@@ -3,6 +3,7 @@ import { resolveMarlinDialect } from '../devices/gcode-dialects';
 import type { RasterPowerValues } from './raster-power-values';
 import {
   CURRENT_LASER_POWER_SCALE_VERSION,
+  powerScaleVersionForDevice,
   usesVirtualPowerRange,
   type LaserPowerScaleVersion,
 } from '../output/laser-power-scale-version';
@@ -12,7 +13,9 @@ export const MARLIN_FAN_MAX_POWER = 255;
 
 /** Dither in integer PWM units, then return the compiled job's original S units.
  * Fractional and small whole-number GRBL ranges must not round a percentage
- * in a 0..1 or 0..20 domain (ADR-567 Amendment 1). */
+ * in a 0..1 or 0..20 domain (ADR-567 Amendment 1). FluidNC from version 4,
+ * like every non-GRBL dialect, quantizes in its own whole S range
+ * (Amendment 2). */
 export function rasterCompilationPowerScale(
   device: DeviceProfile,
   version: LaserPowerScaleVersion = CURRENT_LASER_POWER_SCALE_VERSION,
@@ -21,16 +24,9 @@ export function rasterCompilationPowerScale(
   if (device.controllerKind === 'marlin' && resolveMarlinDialect(device).powerMode === 'fan') {
     return MARLIN_FAN_MAX_POWER;
   }
-  if (
-    usesVirtualPowerRange(device.maxPowerS, version) &&
-    (device.controllerKind === undefined ||
-      device.controllerKind === 'grbl-v1.1' ||
-      device.controllerKind === 'grblhal' ||
-      device.controllerKind === 'fluidnc')
-  ) {
-    return SMOOTHIE_VIRTUAL_MAX_POWER;
-  }
-  return device.maxPowerS;
+  return usesVirtualPowerRange(device.maxPowerS, powerScaleVersionForDevice(device, version))
+    ? SMOOTHIE_VIRTUAL_MAX_POWER
+    : device.maxPowerS;
 }
 
 export function rescaleRasterValues(

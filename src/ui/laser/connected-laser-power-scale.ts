@@ -1,4 +1,5 @@
 import type { DeviceProfile } from '../../core/devices';
+import { fluidncPowerStepWarning } from '../../core/devices/fluidnc-power-scale';
 import type { Project } from '../../core/scene';
 import type { PrepareOutputOptions } from '../../io/gcode';
 import type { NativeBedEvidence } from '../state/native-bed-frame';
@@ -94,6 +95,16 @@ export function laserPowerScaleWarnings(
 ): ReadonlyArray<string> {
   if (project.machine?.kind === 'cnc') return [];
   const scale = resolveLaserPowerScale(project.device, source);
+  // FluidNC drops S fractions, so a speed_map top below 100 loses whole
+  // percentages (ADR-567 Amendment 2).
+  const steps = fluidncPowerStepWarning(project.device, scale);
+  return [...laserPowerScaleSourceWarnings(project, scale), ...(steps === null ? [] : [steps])];
+}
+
+function laserPowerScaleSourceWarnings(
+  project: Project,
+  scale: LaserPowerScale,
+): ReadonlyArray<string> {
   if (scale.source === 'profile') {
     return [
       `Output power uses saved profile S${scale.maxPowerS}; no current controller power range was verified. 100% means S${scale.maxPowerS} under that profile assumption, not measured optical power.`,

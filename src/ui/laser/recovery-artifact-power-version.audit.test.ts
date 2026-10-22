@@ -222,7 +222,7 @@ describe('archived power versions survive the update', () => {
   it('rejects unknown power versions at hydration and artifact decode', async () => {
     const output = prepared('vector');
     const saved = await archive(output, emitPreparedGcode(output).gcode);
-    const tampered = { ...saved, prepared: { ...saved.prepared, laserPowerScaleVersion: 4 } };
+    const tampered = { ...saved, prepared: { ...saved.prepared, laserPowerScaleVersion: 5 } };
     expect(isExecutionArtifact(tampered)).toBe(false);
     expect(
       hydratePreparedExecutionOutput(tampered.prepared as unknown as SuccessfulPreparedOutput),
