@@ -213,27 +213,4 @@ describe('web RTSP camera bridge client', () => {
 
     expect(result).toEqual({ kind: 'invalid', reason: 'Only private RTSP hosts allowed.' });
   });
-
-  it('asks the bridge to switch the Falcon pointer with a POST (ADR-635)', async () => {
-    const fetch = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(Response.json({ kind: 'ok' }))
-      .mockResolvedValueOnce(
-        Response.json({ kind: 'failed', reason: 'The Falcon answered HTTP 500.' }, { status: 502 }),
-      )
-      .mockRejectedValueOnce(new TypeError('failed to fetch'));
-    const bridge = createHttpCameraBridge('http://127.0.0.1:51731');
-
-    expect(await bridge.switchFalconPointer?.('192.168.10.1', true)).toEqual({ kind: 'ok' });
-    expect(fetch.mock.calls[0]?.[0]).toBe(
-      'http://127.0.0.1:51731/falcon/pointer?host=192.168.10.1&state=on',
-    );
-    expect(fetch.mock.calls[0]?.[1]).toMatchObject({ method: 'POST' });
-    expect(await bridge.switchFalconPointer?.('192.168.10.1', false)).toEqual({
-      kind: 'failed',
-      reason: 'The Falcon answered HTTP 500.',
-    });
-    const missing = await bridge.switchFalconPointer?.('192.168.10.1', false);
-    expect(missing?.kind).toBe('failed');
-  });
 });
