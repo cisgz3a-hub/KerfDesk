@@ -1,3 +1,4 @@
+import { gcodeCommentLabel } from '../gcode-comments';
 import type { CutGroup, FillGroup, RasterGroup } from '../job';
 import { effectiveHatchSpacingMm, normalizedHatchAngleDeg } from '../job/fill-hatching';
 import type { LayerOperationSettings } from '../scene';
@@ -33,12 +34,14 @@ function scanDirectionText(bidirectional: boolean): string {
   return bidirectional ? 'bidirectional' : 'one-way';
 }
 
+// Settings come from the project file. The loader admits only known names
+// here, but the text still passes the comment guard so no value can end a line.
 function requestedOperationComment(settings: LayerOperationSettings): string {
   if (settings.mode === 'fill') {
-    return `requested override: mode fill; style ${settings.fillStyle}; interval ${settings.hatchSpacingMm} mm; angle ${settings.hatchAngleDeg} deg; direction ${scanDirectionText(settings.fillBidirectional)}; cross-hatch ${settings.fillCrossHatch ? 'on' : 'off'}`;
+    return `requested override: mode fill; style ${gcodeCommentLabel(settings.fillStyle)}; interval ${settings.hatchSpacingMm} mm; angle ${settings.hatchAngleDeg} deg; direction ${scanDirectionText(settings.fillBidirectional)}; cross-hatch ${settings.fillCrossHatch ? 'on' : 'off'}`;
   }
   if (settings.mode === 'image') {
-    return `requested override: mode image; dither ${settings.ditherAlgorithm}; lines ${settings.linesPerMm}/mm; direction ${scanDirectionText(settings.imageBidirectional)}; negative ${settings.negativeImage ? 'on' : 'off'}`;
+    return `requested override: mode image; dither ${gcodeCommentLabel(settings.ditherAlgorithm)}; lines ${settings.linesPerMm}/mm; direction ${scanDirectionText(settings.imageBidirectional)}; negative ${settings.negativeImage ? 'on' : 'off'}`;
   }
   return `requested override: mode line; kerf ${settings.kerfOffsetMm} mm`;
 }

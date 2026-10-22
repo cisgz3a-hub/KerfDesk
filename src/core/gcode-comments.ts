@@ -71,6 +71,15 @@ export function sanitizeGcodeCommentValue(
   return `${result.trimEnd()}${suffix}`;
 }
 
+/**
+ * One project-derived label (a layer id, a colour) as a single inert comment
+ * token. A shared `.lf2` is untrusted: a line break in its layer id would
+ * otherwise end the comment and leave the rest as an executable G-code line.
+ */
+export function gcodeCommentLabel(value: string): string {
+  return sanitizeGcodeCommentValue(value) || '(blank)';
+}
+
 function asciiFold(char: string): string {
   const folded = PRINTABLE_ASCII.test(char)
     ? char

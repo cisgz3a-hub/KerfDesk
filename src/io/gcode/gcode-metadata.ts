@@ -134,8 +134,9 @@ export type GcodeMetadata = {
 // ADR-602 adds dark relative-Z Focus sweeps; air refresh timing follows G90/G91.
 // ADR-398 Amd 1 and ADR-462 Amd 1 hold Marlin air and mode changes and air
 // repeats until a dark move, and drop air changes still held at the job end.
+// ADR-398 Amd 2 leaves a Marlin image layer's closing M5 for a dark move.
 // ADR-250 Amd 3 keeps CNC profile leads clear of every part the job keeps.
-export const EMITTER_REVISION = 'cnc-leads-clear-kept-parts-20261021-v23';
+export const EMITTER_REVISION = 'cnc-leads-clear-kept-parts-20261021-v24';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

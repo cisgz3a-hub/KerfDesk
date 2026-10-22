@@ -245,6 +245,48 @@ test('tools.registration-jig saves an outline from the editor and undoes', async
   await insertedAndUndo(page);
 });
 
+test('tools.registration-jig opens on a clean canvas without burn settings', async ({ page }) => {
+  // Main-canvas artwork, selected, where the new jig's first outline will sit.
+  await page.evaluate(async () => {
+    const storeUrl = '/src/ui/state/index.ts';
+    const shapesUrl = '/src/core/shapes/primitives/index.ts';
+    const sceneUrl = '/src/core/scene/index.ts';
+    const { useStore } = (await import(storeUrl)) as typeof import('../src/ui/state');
+    const { createRectangle } = (await import(
+      shapesUrl
+    )) as typeof import('../src/core/shapes/primitives');
+    const { IDENTITY_TRANSFORM } = (await import(sceneUrl)) as typeof import('../src/core/scene');
+    const { bedWidth, bedHeight } = useStore.getState().project.device;
+    useStore.getState().drawShape(
+      createRectangle({
+        id: 'main-art',
+        color: '#0000ff',
+        spec: { widthMm: 20, heightMm: 10, cornerRadiusMm: 0 },
+        transform: { ...IDENTITY_TRANSFORM, x: bedWidth / 2 - 10, y: bedHeight / 2 - 5 },
+      }),
+    );
+    useStore.getState().selectObject('main-art');
+  });
+  const before = (await snapshot(page)).project.scene.objects;
+  await tool(page, 'Registration Jig');
+  const editor = page.getByRole('dialog', { name: 'Registration Jig editor', exact: true });
+  await editor.getByRole('button', { name: 'Artwork', exact: true }).click();
+  await editor.focus();
+  await page.keyboard.press('Control+a');
+  // Nothing from the main canvas is on the jig canvas, so Select all finds no artwork.
+  await expect(editor).toContainText('Select artwork or an outline on the jig canvas');
+  await expect(editor).toContainText('Burns use each operation’s current settings');
+  for (const label of ['Power', 'Speed', 'Line / Fill settings', 'Jig outline laser settings'])
+    await expect(editor.getByText(label, { exact: false })).toHaveCount(0);
+  await editor.getByRole('button', { name: 'Save to canvas', exact: true }).click();
+  await expect(editor).toHaveCount(0);
+  const after = (await snapshot(page)).project.scene.objects;
+  expect(after.find((object) => object.id === 'main-art')).toEqual(
+    before.find((object) => object.id === 'main-art'),
+  );
+  expect(after).toHaveLength(2);
+});
+
 test('tools.camera exposes source/calibration panel and closes without requesting hardware', async ({
   page,
 }) => {

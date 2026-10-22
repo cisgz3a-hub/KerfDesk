@@ -80,10 +80,16 @@ export function artworkBox(artwork: Artwork): Box | null {
 }
 
 export function selectionBox(ids: readonly string[], artwork: readonly Artwork[]): Box | null {
-  const wanted = new Set(ids);
-  return unionBox(
-    artwork.filter((item) => wanted.has(item.id)).flatMap((item) => artworkBox(item) ?? []),
-  );
+  const byId = new Map(artwork.map((item) => [item.id, item]));
+  const boxes: Box[] = [];
+  for (const id of new Set(ids)) {
+    const item = byId.get(id);
+    const box = item === undefined ? null : artworkBox(item);
+    // Summary truncation must not turn a whole selection into partial transform bounds.
+    if (box === null) return null;
+    boxes.push(box);
+  }
+  return unionBox(boxes);
 }
 
 /** Whole persistent groups select together, matching the desktop. */
