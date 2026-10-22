@@ -2637,6 +2637,8 @@ authorization, Frame proof, controller command, or safety boundary.
    profile references; a difference is informational, not proof that firmware is wrong.
 4. **Export current snapshot** saves versioned read-only evidence. Loading Snapshot A and B
    compares independent axis values neutrally, with no better/worse verdict and no firmware write.
+   A grblHAL password setting is saved as `[password removed]` (ADR-229 Amendment 2), and the
+   local diagnostic bundle leaves out setting lines and passwords (ADR-570 Amendment 1).
 5. Setting writes stay in Device Setup; the pane sends only the gated read.
 
 #### Success - detailed live transcript
@@ -2723,6 +2725,9 @@ authorization, Frame proof, controller command, or safety boundary.
 2. User chooses a save target.
 3. App writes `.lfgrbl-settings.json` containing every visible row, including unknown settings.
 4. Exporting a backup sends no command to the controller.
+5. When the rows hold a grblHAL password (`$75`, `$77`, `$330`, `$331`, `$533`), the panel says
+   before Export that the backup keeps it in plain text for a restore, and the success toast warns
+   to keep the file private (ADR-229 Amendment 2).
 
 #### Error — disconnected
 1. **Read ($$)** is disabled.
