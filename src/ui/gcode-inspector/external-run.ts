@@ -16,6 +16,7 @@ import { confirmCncSetup } from '../laser/cnc-setup-acknowledgement';
 import { confirmLaserModeStartEvidence } from '../laser/laser-mode-start-acknowledgement';
 import { controllerStartPreparationStillCurrent } from '../laser/start-job-authorization';
 import { prepareTransientFrameController } from '../laser/use-frame-action';
+import { startUntrackedRun } from '../laser/untracked-start-retirement';
 import { useStore } from '../state';
 import { reportedWorkPositionMm } from '../state/canvas-motion-plan';
 import type { FrameVerification } from '../state/frame-verification';
@@ -232,31 +233,36 @@ export async function startExternalProgram(frame: ExternalFrame): Promise<boolea
   // A confirmation dialog can outlast a controller change.
   const afterConfirm = externalStartIssue(frame);
   if (afterConfirm !== null) throw new Error(afterConfirm);
-  await useLaserStore.getState().startJob(gcode, {
-    streamingMode: streamingModeForController(
-      project.device.controllerKind,
-      project.device.streamingMode,
-    ),
-    rxBufferBytes: project.device.rxBufferBytes,
-    machineKind: frame.machineKind,
-    // M0/M1 in an external CNC program are controller program stops, not
-    // KerfDesk's emitted multi-bit plan boundaries. Preserve the exact bytes.
-    toolChangePause: false,
-    // Start clears the Frame record before this runs, so it checks what the
-    // record was bound to. Start arming can take a while, during which the
-    // Laser/CNC switch stays usable, so the machine mode is checked here too.
-    assertFinalStartAuthorized: () => {
-      const issue = externalHandoffIssue(
-        frame,
-        useLaserStore.getState(),
-        useStore.getState().project,
-      );
-      if (issue !== null) throw new Error(issue);
-    },
-    ...(laserModeStartEvidence === undefined ? {} : { laserModeStartEvidence }),
-    ...(cncSetupAttestation === null || cncSetupAttestation === undefined
-      ? {}
-      : { cncSetupAttestation }),
-  });
+  // The external program keeps no recovery record (ADR-630), but once it may
+  // have reached the controller the project's last job is no longer the last
+  // thing the machine ran: its recovery card, Run again and second pass go.
+  await startUntrackedRun(() =>
+    useLaserStore.getState().startJob(gcode, {
+      streamingMode: streamingModeForController(
+        project.device.controllerKind,
+        project.device.streamingMode,
+      ),
+      rxBufferBytes: project.device.rxBufferBytes,
+      machineKind: frame.machineKind,
+      // M0/M1 in an external CNC program are controller program stops, not
+      // KerfDesk's emitted multi-bit plan boundaries. Preserve the exact bytes.
+      toolChangePause: false,
+      // Start clears the Frame record before this runs, so it checks what the
+      // record was bound to. Start arming can take a while, during which the
+      // Laser/CNC switch stays usable, so the machine mode is checked here too.
+      assertFinalStartAuthorized: () => {
+        const issue = externalHandoffIssue(
+          frame,
+          useLaserStore.getState(),
+          useStore.getState().project,
+        );
+        if (issue !== null) throw new Error(issue);
+      },
+      ...(laserModeStartEvidence === undefined ? {} : { laserModeStartEvidence }),
+      ...(cncSetupAttestation === null || cncSetupAttestation === undefined
+        ? {}
+        : { cncSetupAttestation }),
+    }),
+  );
   return true;
 }
