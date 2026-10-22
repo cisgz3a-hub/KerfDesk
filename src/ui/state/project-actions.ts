@@ -97,14 +97,7 @@ export function projectActions(
         projectBedReconciliation: bedResolution.notice,
         dirty: bedResolution.notice?.workspaceMismatch === true,
       }));
-      if (autofocus.keptCurrentCommand) {
-        useToastStore
-          .getState()
-          .pushToast(
-            "This file's Auto-focus command was not used: Auto-focus keeps your machine's own command from Machine Setup.",
-            'info',
-          );
-      }
+      if (autofocus.keptCurrentCommand) noteKeptAutofocusCommand();
       const loneArtworkId = loneSelectableArtworkId(autofocus.project.scene);
       if (loneArtworkId !== null && get().selectedObjectId === null)
         get().selectObject(loneArtworkId);
@@ -155,6 +148,15 @@ export function projectActions(
     keepCurrentMachineForOpenedProject: () =>
       set((state) => keepCurrentMachinePatch(state, state.projectBedReconciliation)),
   };
+}
+
+function noteKeptAutofocusCommand(): void {
+  useToastStore
+    .getState()
+    .pushToast(
+      "This file's Auto-focus command was not used: Auto-focus keeps your machine's own command from Machine Setup.",
+      'info',
+    );
 }
 
 function keepCurrentMachinePatch(
