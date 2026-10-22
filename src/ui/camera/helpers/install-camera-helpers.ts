@@ -5,7 +5,9 @@
 //   the project, and when the laser connects (its own camera answers then), so
 //   the canvas shows the bed without opening the Camera panel;
 // - take a new held picture when a job finishes, once the head has settled;
-// - finish an Alt+C that had to start the camera first.
+// - finish an Alt+C that had to start the camera first;
+// - check whether the camera has moved, on each new held picture and once
+//   just after it starts (Amendment 3).
 // Each helper acts only on a camera that is not running, and the operator can
 // switch the start and the after-job refresh off in Camera settings.
 
@@ -24,11 +26,13 @@ import { useLaserStore } from '../../state/laser-store';
 import { AFTER_SETTLE_MS } from '../job-watch/job-watch-runner';
 import { localCameraBridgeAvailable } from '../panel/camera-platform-capability';
 import { lastSourceKind, startRememberedCamera, type CameraStartDeps } from './auto-start';
+import { captureSourceFrame } from '../frame-source';
 import { useCameraHelpersStore } from './camera-helpers-store';
+import { checkCameraMoved } from './moved-check';
 import { refreshCameraPicture, reportRefresh, takePendingRefresh } from './refresh-picture';
 
 export function installCameraHelpers(deps: CameraStartDeps): () => void {
-  const stops = [rememberRunningCamera(), refreshAfterJobs()];
+  const stops = [rememberRunningCamera(), refreshAfterJobs(), checkForMoves()];
   if (!BROWSER_FREE_BUILD) {
     stops.push(startCalibratedCamera(deps));
     void startIfCalibrated(deps);
@@ -88,6 +92,42 @@ function startCalibratedCamera(deps: CameraStartDeps): () => void {
     stopProject();
   };
 }
+
+// A held picture is already taken, so it costs nothing to check. A camera
+// that has just started is checked once it has settled.
+function checkForMoves(): () => void {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const stop = useCameraStore.subscribe((state, previous) => {
+    const { sourceState } = state;
+    if (sourceState.kind !== 'live') return;
+    if (state.overlayStill !== null && state.overlayStill !== previous.overlayStill) {
+      checkCameraMoved(sourceState.source, state.overlayStill);
+    }
+    if (
+      previous.sourceState.kind === 'live' &&
+      previous.sourceState.source === sourceState.source
+    ) {
+      return;
+    }
+    if (timer !== null) clearTimeout(timer);
+    const source = sourceState.source;
+    timer = setTimeout(() => {
+      timer = null;
+      const now = useCameraStore.getState().sourceState;
+      if (now.kind !== 'live' || now.source !== source) return;
+      void captureSourceFrame(source)
+        .then((frame) => (frame === null ? undefined : checkCameraMoved(source, frame)))
+        .catch(() => undefined);
+    }, MOVED_CHECK_SETTLE_MS);
+  });
+  return () => {
+    stop();
+    if (timer !== null) clearTimeout(timer);
+  };
+}
+
+// Long enough for a camera's exposure to settle after it starts.
+export const MOVED_CHECK_SETTLE_MS = 3000;
 
 // Only a held picture needs refreshing: the live camera follows the job anyway.
 function refreshAfterJobs(): () => void {

@@ -21,6 +21,7 @@ import {
   captureSourceFrame,
   type ActiveCameraSource,
 } from '../frame-source';
+import { rememberCameraView } from '../helpers/moved-check';
 import { refreshCameraPicture } from '../helpers/refresh-picture';
 import type { CalibrationSettings } from './camera-calibration-store';
 import { runTransientCameraJob } from './transient-camera-job';
@@ -102,7 +103,9 @@ export function applyNudge(offsetMm: Vec2): boolean {
   if (sourceState.kind !== 'live') return false;
   const own = ownCameraModel(project.device, sourceState);
   if (own === undefined || isHeadCameraModel(own)) return false;
-  updateDeviceProfile(withSavedCameraModel(project.device, nudgedCameraModel(own, offsetMm)));
-  void refreshCameraPicture();
+  const nudged = nudgedCameraModel(own, offsetMm);
+  updateDeviceProfile(withSavedCameraModel(project.device, nudged));
+  // The view now matches the fixed calibration: keep it for the moved check.
+  void refreshCameraPicture().then(() => rememberCameraView(nudged));
   return true;
 }

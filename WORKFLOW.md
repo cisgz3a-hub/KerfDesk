@@ -8499,6 +8499,15 @@ as the pane's design record.
   Undo step) and refreshes the picture; above 10 mm it offers **Recalibrate…**. No ring, or more
   than one near the middle, says what to check and changes nothing. A head camera is not offered
   the fix.
+- **Warn / the camera seems to have moved (ADR-663 Amendment 3).** KerfDesk keeps a small view of
+  what a fixed calibrated camera sees when its calibration is saved, a check keeps it, or a nudge
+  fix is applied. Each new held picture, and one picture a few seconds after the camera starts, is
+  compared with it over the part of the view outside the bed (10 mm clear of its edge). A
+  confident match (score 0.6 or more, the surround at least 4 % of the view) that puts the middle
+  of the bed 1 mm or more off shows **The camera may have moved, by about N mm** in the Camera
+  panel, with **Fix a small offset…**, **Check camera…** and **Dismiss**, and one toast when the
+  panel is closed. A weaker match, too little surround, a head camera or no kept view says
+  nothing; Camera settings says how to start the warning for a calibration without a view.
 - **Check / has the camera moved?** With a calibration saved, **Check camera…** opens the wizard
   at the photo, using the saved target's area and height. The photo is measured against the saved
   calibration. The result says either that the camera has not moved, or how far and which way on

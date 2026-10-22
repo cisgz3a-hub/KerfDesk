@@ -10,6 +10,7 @@ import type { BedArea } from '../../../core/camera/model/camera-model-accuracy';
 import type { Vec2 } from '../../../core/camera/model/camera-model';
 import type { CameraModelRecord } from '../../../core/camera/model/camera-model-record';
 import type { MarkError } from '../../../core/camera/target/bed-calibration';
+import type { ViewThumbnail } from '../../../core/camera/model/view-shift';
 import type { RgbaImage } from '../../../core/camera/rgba-image';
 import type { StreamerState } from '../../../core/controllers/grbl';
 import { useStore } from '../../state';
@@ -31,6 +32,8 @@ export type CalibrationResult = {
   readonly usedMeasuredHeight: boolean;
   /** The calibration saved before this photo, measured on it; null when there was none. */
   readonly savedCheck: SavedCalibrationCheck | null;
+  /** The camera's whole view in this photo, for the "camera moved?" check (ADR-663 Amendment 3). */
+  readonly viewReference?: ViewThumbnail;
 };
 
 export type CalibrationStep =

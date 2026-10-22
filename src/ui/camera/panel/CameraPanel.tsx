@@ -22,6 +22,7 @@ import { JobWatchSection } from '../job-watch/JobWatchSection';
 import { jobWatchWantsCamera, useJobWatchStore } from '../job-watch/job-watch-store';
 import { startRememberedCamera } from '../helpers/auto-start';
 import { CameraFold } from './CameraFold';
+import { CameraMovedNotice } from './CameraMovedNotice';
 import { CameraPreviewCard } from './CameraPreviewCard';
 import { CameraSettingsView } from './CameraSettingsView';
 import { CameraSetupCallout } from './CameraSetupCallout';
@@ -57,6 +58,7 @@ function CameraPanelOpen(): JSX.Element {
       {view === 'main' ? (
         <>
           <CameraPreviewCard onChooseCamera={() => setView('settings')} />
+          <CameraMovedNotice />
           <CameraSetupCallout />
           <OverlayControls />
           <CameraFold title="Watch the job" hint="timelapse and burn check" defaultOpen={watching}>
