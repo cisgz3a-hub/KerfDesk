@@ -22,6 +22,12 @@ import { costlyCanvasPreparation } from '../workspace/canvas-preparation-policy'
 import { controllerReadinessAdvisories } from './controller-readiness-advisories';
 import { pushCncExportControllerMessages } from './cnc-export-controller-advisory';
 import type { TileFile } from './tile-emission';
+import {
+  tileDisplayName,
+  tileFolderContents,
+  tileFolderWarnings,
+  type TileFolderContents,
+} from './tile-folder-check';
 import { finalizeTiledOutput, type TiledOutputPreparation } from './tiled-output-preparation';
 import { tiledSaveWorkBudgetMessage } from './tiled-save-work-budget';
 import { advanceExportVariables, type ExportVariableAdvancement } from './advance-export-variables';
@@ -97,6 +103,7 @@ async function saveConfiguredTiledGcode(ctx: SaveTiledGcodeCtx): Promise<true> {
   pushCncExportControllerMessages(ctx.project.device, ctx.controllerSettings, ctx.pushToast);
   pushWarnings(ctx, preparation.machineWarnings);
   pushWarnings(ctx, preparation.tileAdvisories);
+  const folder = await tileFolderContents(directory, preparation.files);
   const saved = await saveTileFiles(ctx, preparation.files, directory);
   advanceAfterCompleteTileSet(ctx, saved, preparation.files.length);
   ctx.pushToast(
@@ -105,12 +112,22 @@ async function saveConfiguredTiledGcode(ctx: SaveTiledGcodeCtx): Promise<true> {
       : `Saved ${saved} of ${preparation.files.length} tile files.`,
     saved === preparation.files.length ? 'success' : 'warning',
   );
+  pushWarnings(ctx, tileFolderWarnings(writtenOnly(folder, preparation.files.slice(0, saved))));
   pushWarnings(
     ctx,
     [...preparation.preparationAdvisories, ...preparation.emissionAdvisories],
     true,
   );
   return true;
+}
+
+// A set cut short replaced only the files it reached.
+function writtenOnly(
+  folder: TileFolderContents,
+  written: ReadonlyArray<TileFile>,
+): TileFolderContents {
+  const names = new Set(written.map(tileDisplayName));
+  return { ...folder, replaced: folder.replaced.filter((name) => names.has(name)) };
 }
 
 function advanceAfterCompleteTileSet(
@@ -175,7 +192,7 @@ async function saveTileFiles(
 ): Promise<number> {
   let saved = 0;
   for (const file of files) {
-    const displayName = `${file.name}.nc`;
+    const displayName = tileDisplayName(file);
     const target = directory?.file(displayName) ?? (await pickTileTarget(ctx, displayName));
     if (target === null) return saved;
     try {

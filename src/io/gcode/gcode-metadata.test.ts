@@ -41,7 +41,7 @@ function laserAssumptions(
 
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
-    expect(EMITTER_REVISION).toBe('cnc-leads-clear-kept-parts-20261022-v24');
+    expect(EMITTER_REVISION).toBe('cnc-tile-files-per-bit-20261023-v25');
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {

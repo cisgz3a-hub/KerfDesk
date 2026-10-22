@@ -2,12 +2,13 @@
 // indexed row/col tile grid. Each tile's job contains only the motion
 // inside its rectangle (polylines clipped at the boundary with entry/exit
 // interpolation — Z included for path3d), translated so the tile's min
-// corner sits at the machine origin: the operator slides the stock between
+// corner sits at the program origin: the operator slides the stock between
 // tiles and re-zeros XY on the tile frame. Adjacent tiles share
 // registration holes drilled in the overlap strip at IDENTICAL stock
 // positions, so dowel pins re-index the stock physically.
 
 import { cncPassXyPoints, type CncGroup, type CncPass, type Job } from '../job';
+import { placeCncParks } from '../job/job-origin';
 import { cncHelicalContourPoints } from '../job/helical-representation';
 import type { CncMachineConfig, CncTiling } from '../scene';
 import type { DeviceProfile } from '../devices';
@@ -58,9 +59,17 @@ export function tileJobs(
     }
     // This ordering belongs to this indexed file only; another tile may have
     // completed its profile in a separately executed file already.
-    if (groups.length > 0) out.push({ tile, job: { groups: orderGroupsIntoToolSections(groups) } });
+    if (groups.length > 0) out.push({ tile, job: tileLocalJob(groups) });
   }
   return tiledJobsResult(plan.grid, out);
+}
+
+// Each tile is zeroed by hand on its own frame (F-CNC19), so where that frame
+// sits on the bed is unknown. A configured park is a bed position (ADR-392):
+// set aside, never written as tile coordinates, so a tile parks at its own
+// X0 Y0. The park height stays; it is not a bed position (ADR-491).
+function tileLocalJob(groups: ReadonlyArray<CncGroup>): Job {
+  return placeCncParks({ groups: orderGroupsIntoToolSections(groups) }, null);
 }
 
 function registrationForGrid(

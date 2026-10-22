@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildGcodeRenderModel, type GcodeRenderModel } from '../gcode-view';
 import { reviewExternalProgram, type ExternalProgramContext } from './external-program-review';
+import { kerfDeskBitChangeLabels } from './kerfdesk-bit-changes';
 import { normalizeExternalProgram } from './normalize-external-program';
 
 const LASER: ExternalProgramContext = { machineKind: 'laser', laserMaxPowerS: 1000 };
@@ -163,6 +164,34 @@ describe('external program stops (ADR-630)', () => {
     expect(review('G21\nG0 X0 Y0\nG1 X5 F100\nM5\nM10\n').warnings.join()).not.toContain(
       'M0 or M1',
     );
+  });
+
+  // Controller audit v4 E3-P2-1 (ADR-392 Amendment 2): KerfDesk's own bit
+  // change cannot be re-zeroed once its M0 is with the controller.
+  it('names a KerfDesk bit change at an M0, and only then', () => {
+    const file =
+      'G21\nG0 X0 Y0\nM3 S12000\nG1 Z-1 F300\nG0 Z5\nM5\n' +
+      '; tool change: load 6.35 mm (1/4") end mill\n' +
+      '; re-zero Z on the stock top, then cycle-start to resume\nM0\n' +
+      '; tool change: load 3.175 mm (1/8") end mill\nM0\nM3 S12000\nG1 Z-1 F300\nM5\n';
+    const labels = kerfDeskBitChangeLabels(file);
+    expect(labels).toEqual(['6.35 mm (1/4") end mill', '3.175 mm (1/8") end mill']);
+    const warned = review(file, { ...CNC, kerfDeskBitChanges: labels }).warnings;
+    expect(warned).toContain(
+      'This file changes bits at an M0 stop (load 6.35 mm (1/4") end mill, then 1 more). ' +
+        'Run G-code file sends that M0 to the controller as written. The controller then takes ' +
+        "no jog or Zero Z until cycle start, and the new bit's spindle start and plunge are " +
+        "already sent, so it would cut at the old bit's Z zero. Start the job from its project, " +
+        'which holds for the re-zero, or save its tiles again: each bit is then its own file.',
+    );
+    // A program stop that is not KerfDesk's bit change keeps the generic notice only.
+    expect(review(file, CNC).warnings.join('\n')).not.toContain('changes bits');
+    expect(kerfDeskBitChangeLabels('G21\nM0\nG1 X1 F100\n')).toEqual([]);
+    // Labels without the M0 itself: nothing stops there.
+    const noStop = 'G21\n; tool change: load 6.35 mm end mill\nG1 X1 F100\n';
+    expect(
+      review(noStop, { ...CNC, kerfDeskBitChanges: kerfDeskBitChangeLabels(noStop) }).warnings,
+    ).not.toContainEqual(expect.stringContaining('changes bits'));
   });
 });
 
