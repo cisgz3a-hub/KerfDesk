@@ -3,7 +3,9 @@ import { DEFAULT_DEVICE_PROFILE } from '../../../core/devices';
 import { buildMotionManifest } from '../../../core/job/motion-manifest';
 import { fingerprintGcode } from '../../../core/recovery';
 import type { CanvasMotionPlan } from '../../state/canvas-motion-plan';
-import { burnRegion, burnRouteMasks } from './job-burn-route';
+import { burnCheckBlocker, UNKNOWN_BED_POSITION_BURN_CHECK } from './burn-check-run';
+import { burnRegion, burnRouteMasks, planPlacesOnBed } from './job-burn-route';
+import type { WatchCamera } from './job-watch-camera';
 
 const GCODE = 'G21\nG90\nM4 S0\nG0 X0 Y0\nG1 X30 S800\nG1 Y20\nG1 X0\nM5';
 const BED_FRAME = { kind: 'machine', workOffsetMm: { x: 120, y: 80, z: 0 } } as const;
@@ -43,9 +45,27 @@ describe('job burn route on the bed', () => {
     expect(burnRouteMasks(onArtwork, region, 2, 0)).toEqual(burnRouteMasks(onBed, region, 2, 0));
   });
 
-  it('keeps an artwork-relative job without a bed position where it is drawn', () => {
-    const relative = plan({ kind: 'relative', jobOriginOffset: { x: 0, y: 0 } });
-    const atZero = plan({ kind: 'machine', workOffsetMm: { x: 0, y: 0, z: 0 } });
-    expect(burnRegion(relative)).toEqual(burnRegion(atZero));
+  // Rolling audit 12-P2-4: a no-homing machine (or Verified Origin, or not
+  // homed) keeps an artwork-relative frame with no bed (ADR-642 §3), labelled
+  // "bed position unverified". Its artwork is not where it burns, so the watch
+  // does not grade that patch of bed; it says why (ADR-490 §4).
+  it('does not place a job whose bed position is unknown, and the burn check says why', () => {
+    const unknown = plan({ kind: 'relative', jobOriginOffset: { x: -200, y: -230 } });
+    expect(planPlacesOnBed(unknown)).toBe(false);
+    expect(burnCheckBlocker(unknown, fixedCamera)).toBe(UNKNOWN_BED_POSITION_BURN_CHECK);
+    for (const known of [
+      plan(BED_FRAME),
+      plan({ kind: 'relative', jobOriginOffset: { x: -15, y: -25 }, bed: BED_FRAME }),
+    ]) {
+      expect(planPlacesOnBed(known)).toBe(true);
+      expect(burnCheckBlocker(known, fixedCamera)).toBeNull();
+    }
   });
 });
+
+const fixedCamera = {
+  source: { kind: 'usb' },
+  fixedModel: {},
+  surfaceHeightMm: 0,
+  heightAreas: [],
+} as unknown as WatchCamera;

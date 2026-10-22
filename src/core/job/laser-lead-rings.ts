@@ -24,6 +24,7 @@ import { emittedCutArcMoves } from './cut-arc-moves';
 import type { CutGroup, CutSegment, CutTopologyRing, Job } from './job';
 import { copyLists, leadOutline } from './laser-lead-copies';
 import type { LeadRing } from './laser-lead-obstacles';
+import type { SceneOpenLine } from './laser-lead-open-outlines';
 import { pieceClasses, pieceExemptions, pieceLookup, type PieceLookup } from './laser-lead-pieces';
 import { leadSideVerdicts, type LeadSideContour, type LeadSideVerdict } from './laser-lead-sides';
 import { isBurningLineGroup } from './line-start-region';
@@ -50,11 +51,13 @@ export type LeadJobLines = {
 
 /** `burns` says which cut groups really burn; others hold no part. `scene`:
  * the scene's contours the scrap side is judged among (sceneLeadSideContours);
- * absent, the job's own rings are. */
+ * absent, the job's own rings are. `openLines`: the scene's open Line cuts,
+ * which leave a contour in a region they close without a side (Amendment 8). */
 export function leadJobLines(
   job: Job,
   burns: (group: CutGroup) => boolean = isBurningLineGroup,
   scene?: ReadonlyArray<LeadSideContour>,
+  openLines: ReadonlyArray<SceneOpenLine> = [],
 ): LeadJobLines {
   const lines: Array<ReadonlyArray<Vec2>> = [];
   const lineOf = new Map<string, number>();
@@ -108,7 +111,7 @@ export function leadJobLines(
   }
   const parts = pieceLookup(rings);
   const groups = owners.map((owner) => owner.group);
-  const { sides, sceneClasses } = ringSides(rings, owners, scene, parts);
+  const { sides, sceneClasses } = ringSides(rings, owners, { scene, openLines }, parts);
   const representatives = classRepresentatives(sides.map((side) => side.copyClass));
   const copies = copyLists(representatives);
   return {
@@ -128,7 +131,13 @@ export function leadJobLines(
 function ringSides(
   rings: ReadonlyArray<LeadRing>,
   owners: ReadonlyArray<RingOwner>,
-  scene: ReadonlyArray<LeadSideContour> | undefined,
+  {
+    scene,
+    openLines,
+  }: {
+    readonly scene: ReadonlyArray<LeadSideContour> | undefined;
+    readonly openLines: ReadonlyArray<SceneOpenLine>;
+  },
   parts: PieceLookup,
 ): { readonly sides: LeadSideVerdict[]; readonly sceneClasses: ReadonlyArray<number> } {
   if (scene === undefined) {
@@ -143,7 +152,7 @@ function ringSides(
     const sides = rings.map((_, index) => own.get(String(index)) as LeadSideVerdict);
     return { sides, sceneClasses: sides.map((side) => side.copyClass) };
   }
-  const verdicts = leadSideVerdicts(scene);
+  const verdicts = leadSideVerdicts(scene, openLines);
   const fresh = verdicts.size;
   const sides = rings.map(
     (ring, index): LeadSideVerdict =>

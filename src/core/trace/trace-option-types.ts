@@ -167,6 +167,15 @@ export type TraceOptions = {
   // simplify epsilon, centerline join distance) keep their SOURCE-pixel
   // semantics on a supersampled trace. Callers never set this directly.
   readonly pixelScale?: number;
+  // detectorWindowScale: INTERNAL — source px per preview px, set when a
+  // commit traces a grid finer than the preview (trace-commit-grid.ts,
+  // ADR-409 Amendment 2). The local detector windows (the Sketch /
+  // automatic-detail / Faint lines mean and its light-solid and thin-stroke
+  // tests, Edge Detection's neighbourhood) multiply it into pixelScale so the
+  // commit reads the neighbourhood the preview read. Fitting tolerances and
+  // cleanup caps ignore it; the bounded downscale route resets it, since its
+  // windows are in working-grid px. Operators never set this.
+  readonly detectorWindowScale?: number;
   // Source-grid contour/hole area. Converted independently of despeckle;
   // internal working thresholds may be fractional after downsampling.
   readonly ignoreLessThanPixels?: number;

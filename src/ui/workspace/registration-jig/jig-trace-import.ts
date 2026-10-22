@@ -15,6 +15,7 @@ import { fairTracedPathsForCnc } from '../../trace/cnc-trace-fairing';
 import { readFileAsDataUrl, readImageNaturalSize } from '../../trace/image-loader';
 import { matchingPreparedTrace, type PreparedTrace } from '../../trace/prepared-trace';
 import { resolveTraceCommitResult } from '../../trace/trace-commit-result';
+import { traceModeForOptions } from '../../trace/trace-mode-for-options';
 import { bindTraceSourceMask } from '../../trace/trace-source-mask';
 import type { TracePreviewState } from '../../trace/use-trace-preview';
 
@@ -83,15 +84,12 @@ export async function buildJigTraceObject(args: {
   });
   if (result.paths.length === 0)
     throw new Error('No trace paths found. Adjust the trace settings or choose another image.');
-  const traceMode =
-    options.traceMode === 'edge' || options.traceMode === 'centerline'
-      ? options.traceMode
-      : 'filled-contours';
   const traced: TracedImage = {
     kind: 'traced-image',
     id: crypto.randomUUID(),
     source: source.file.name,
-    traceMode,
+    // Line + fill stays 'hybrid', as the Trace dialog commits it.
+    traceMode: traceModeForOptions(options),
     tracePixelWidth: result.width,
     tracePixelHeight: result.height,
     bounds: result.bounds,

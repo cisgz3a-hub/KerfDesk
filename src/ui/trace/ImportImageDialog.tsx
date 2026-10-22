@@ -36,6 +36,7 @@ import {
   type TraceCommitClaim,
 } from './trace-commit-ownership';
 import { commitTraceOutput } from './trace-output-commit';
+import { traceModeForOptions } from './trace-mode-for-options';
 import { useTracePreview } from './use-trace-preview';
 import { useTracePreviewFacts } from './trace-preview-facts';
 import { useTraceCommitLifetime } from './use-trace-commit-lifetime';
@@ -426,11 +427,4 @@ function operationOverrideForTrace(
   if (traceMode !== 'filled-contours') return undefined;
   if (fillStyle === undefined) return undefined;
   return { mode: 'fill', fillStyle };
-}
-
-function traceModeForOptions(options: TraceOptions): NonNullable<TracedImage['traceMode']> {
-  if (options.traceMode === 'centerline') return 'centerline';
-  if (options.traceMode === 'edge') return 'edge';
-  if (options.traceMode === 'hybrid') return 'hybrid';
-  return 'filled-contours';
 }

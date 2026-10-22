@@ -6,6 +6,7 @@ import { runStandaloneCncPreflight } from '../../core/preflight';
 import { createProject, DEFAULT_CNC_MACHINE_CONFIG } from '../../core/scene';
 import { EMITTER_REVISION } from '../../io/gcode';
 import type { PlatformAdapter } from '../../platform/types';
+import { blobText } from '../../platform/web/chromium-save-picker.test-support';
 import { PlatformProvider } from '../app/platform-context';
 import { partitionSavePreflight } from '../app/save-preflight-policy';
 import { useLaserStore } from '../state/laser-store';
@@ -70,21 +71,14 @@ function mockPlatform(cancelPicker = false): {
   readonly write: ReturnType<typeof vi.fn>;
   readonly pickFileForSave: ReturnType<typeof vi.fn>;
 } {
-  const write = vi.fn(async (_data: string | Blob) => undefined);
-  const writeChunks = async (
-    chunks: AsyncIterable<string>,
-    signal?: AbortSignal,
-  ): Promise<void> => {
-    let text = '';
-    for await (const chunk of chunks) {
-      signal?.throwIfAborted();
-      text += chunk;
-    }
-    await write(text);
+  // Records the written text; the save hands over the staged program as a Blob.
+  const write = vi.fn(async (_data: string) => undefined);
+  const target = {
+    displayName: 'surfacing.nc',
+    write: async (data: string | Blob) =>
+      write(typeof data === 'string' ? data : await blobText(data)),
   };
-  const pickFileForSave = vi.fn(async () =>
-    cancelPicker ? null : { displayName: 'surfacing.nc', write, writeChunks },
-  );
+  const pickFileForSave = vi.fn(async () => (cancelPicker ? null : target));
   return {
     write,
     pickFileForSave,
@@ -150,6 +144,8 @@ async function clickSave(
     saveButton.click();
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
+  // The progress row stays until the save has finished or failed.
+  await vi.waitFor(() => expect(host?.querySelector('[role="status"]')).toBeNull());
 }
 
 it('saves explicit surfacing feeds, RPM and bounded depth passes from the visible fields', async () => {
