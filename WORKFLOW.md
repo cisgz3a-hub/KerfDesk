@@ -9565,8 +9565,10 @@ switch away from `G54`, `G92`, `G28`/`G30` moves and `G28.1`/`G30.1` stored posi
 relative moves (`G91`, read from where the head stands), a program that ends in inches (`G20`,
 which leaves the controller in inches; one that switches back says so instead), the laser or
 spindle still on at the end, a tool change (`M6`), program stops (`M0`/`M1`, sent unchanged, so
-the controller holds until the machine's own cycle start; KerfDesk's Resume does not release
-them), KerfDesk's own bit change at an `M0` (its `; tool change: load` comments, read from the
+the controller holds at `M0` until the machine's own cycle start; KerfDesk's Resume does not
+release it. Stock GRBL and FluidNC ignore `M1`, so the review says the program runs straight
+through it and to use `M0`; grblHAL holds at `M1` too, unless optional stop is turned off; ADR-630
+Amendment 5), KerfDesk's own bit change at an `M0` (its `; tool change: load` comments, read from the
 file as opened: the controller takes no jog or Zero Z in that stop and the new bit's spindle
 start and plunge are already sent, so the new bit would cut at the old bit's Z zero; ADR-392
 Amendment 2), a program that looks like the other machine mode, zero XY extent (the Frame visits a
@@ -9586,7 +9588,9 @@ line to send, holds a realtime character (`?`, `!`, `~`), a non-ASCII character 
 character a GRBL-family controller acts on (Ctrl-X; grblHAL's Ctrl-C, Ctrl-T, Ctrl-Y, ESC,
 backspace and DEL) outside a comment, holds a line a GRBL-family controller rejects whole (two
 commands from one modal group such as `G90G91`, two commands that take the axis words, or a
-repeated word: `error:21`, `24`, `25`), or the Inspector cannot construct a finite motion
+repeated word: `error:21`, `24`, `25`), holds on FluidNC or grblHAL a `#` parameter, a `[ ]`
+expression or O-word flow control, which the controller works out as it runs and the Inspector
+cannot trace (ADR-630 Amendment 5), or the Inspector cannot construct a finite motion
 envelope. Other control characters (a DOS end-of-file Ctrl-Z, a form feed) are dropped, as
 GRBL discards them. One refusal is policy, not fact: a `$` controller command (also behind a
 `/` or spaces, or FluidNC's bracket form such as `[J]`) belongs in the Console, because GRBL

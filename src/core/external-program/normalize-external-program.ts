@@ -31,6 +31,7 @@
 
 import type { ControllerKind } from '../devices';
 import { controllerBlockRejection } from './controller-block-check';
+import { evaluatedSyntaxRefusal } from './evaluated-syntax';
 
 export type ExternalProgram = {
   /** The parser used for this executable; absent on legacy GRBL callers. */
@@ -149,7 +150,12 @@ export function createExternalProgramNormalizer(
         return;
       }
       if (reason === null) {
-        const lineRefusal = lineRefusalOf(marlin ? line.trimStart() : line, lineNumber, marlin);
+        const lineRefusal = lineRefusalOf(
+          marlin ? line.trimStart() : line,
+          lineNumber,
+          marlin,
+          controllerKind,
+        );
         if (lineRefusal !== null) reasons.push(lineRefusal);
       }
       lines.push(line);
@@ -253,10 +259,19 @@ function characterRefusal(line: string, lineNumber: number): string | null {
 // A policy refusal, recorded as one in ADR-630 Amendment 1.
 // A '$' line, or FluidNC's bracket form of one ('[J]' and '[Jog]' run as
 // '$J=', fluidnc-line-limit.ts), is a controller command; any other line the
-// controller rejects as a block would leave the framed outline wrong.
-function lineRefusalOf(line: string, lineNumber: number, marlin: boolean): string | null {
+// controller rejects as a block would leave the framed outline wrong, and so
+// would one FluidNC or grblHAL works out as it runs (ADR-630 Amendment 5).
+function lineRefusalOf(
+  line: string,
+  lineNumber: number,
+  marlin: boolean,
+  controllerKind: ControllerKind | undefined,
+): string | null {
   if (line.startsWith('$')) return controllerCommand(line, lineNumber, '$');
   if (line.startsWith('[')) return controllerCommand(line, lineNumber, 'bracket');
+  // Before the checksum check, which would misname `X[5*2]`.
+  const evaluated = evaluatedSyntaxRefusal(line, controllerKind);
+  if (evaluated !== null) return `Line ${lineNumber} (${preview(line)}) ${evaluated}`;
   // Marlin queue.cpp requires line sequence/checksum handling for every
   // leading N line. The ordinary sender implements neither resend protocol.
   // https://github.com/MarlinFirmware/Marlin/blob/2.1.2.8/Marlin/src/gcode/queue.cpp#L438-L470
