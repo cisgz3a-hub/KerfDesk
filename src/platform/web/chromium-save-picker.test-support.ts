@@ -23,8 +23,9 @@ export function installChromiumSavePicker(
   options: {
     /** The name the operator picks; defaults to the suggested name. */
     readonly chooseName?: string;
-    /** Runs while the dialog is open, before the chosen file is emptied. */
-    readonly whilePicking?: () => void;
+    /** Runs while the dialog is open, before the chosen file is emptied. The
+     * dialog stays open until a returned promise settles. */
+    readonly whilePicking?: () => void | Promise<void>;
     readonly writeError?: Error;
   } = {},
 ): ChromiumSavePicker {
@@ -35,7 +36,8 @@ export function installChromiumSavePicker(
     value: async (pickerOptions?: PickerOptions) => {
       picks += 1;
       const name = options.chooseName ?? pickerOptions?.suggestedName ?? 'untitled';
-      options.whilePicking?.();
+      const stillOpen = options.whilePicking?.();
+      if (stillOpen !== undefined) await stillOpen;
       disk.set(name, '');
       return chromiumFileHandle(disk, name, options.writeError);
     },

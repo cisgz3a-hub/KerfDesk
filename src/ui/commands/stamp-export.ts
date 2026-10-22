@@ -1,4 +1,5 @@
 import type { PlatformAdapter } from '../../platform/types';
+import { pickPreparedSaveTarget } from '../app/pick-prepared-save-target';
 import type { StampEncodedDraft } from '../raster/stamp-worker-protocol';
 import type { ToastVariant } from '../state/toast-store';
 export async function exportStampDraft(
@@ -9,16 +10,19 @@ export async function exportStampDraft(
 ): Promise<void> {
   if (!current()) return;
   try {
-    const target = await platform.pickFileForSave({
-      suggestedName: 'stamp-height-intent.png',
-      extensions: ['.png'],
-    });
-    if (target === null || !current()) return;
+    // The picker empties an existing file as it returns (ADR-656): the PNG is
+    // decoded first, and the picked file gets the draft reviewed at the click.
     const prefix = 'data:image/png;base64,';
     if (!draft.dataUrl.startsWith(prefix)) throw new Error('The prepared PNG is unavailable.');
     const bytes = Uint8Array.from(atob(draft.dataUrl.slice(prefix.length)), (character) =>
       character.charCodeAt(0),
     );
+    const target = await pickPreparedSaveTarget(
+      platform,
+      { suggestedName: 'stamp-height-intent.png', extensions: ['.png'] },
+      { title: 'Export stamp PNG', message: 'The stamp PNG is ready.' },
+    );
+    if (target === null) return;
     await target.write(new Blob([bytes], { type: 'image/png' }));
     toast(
       `Saved stamp intent to ${target.displayName}. Physical extent: ${draft.widthMm.toFixed(3)} × ${draft.heightMm.toFixed(3)} mm; set this extent when importing the PNG.`,
