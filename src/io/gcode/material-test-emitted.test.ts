@@ -127,36 +127,41 @@ function projectFor(
   };
 }
 
+// Modal machine state, so a word-less axis keeps its last value.
+type ModalState = {
+  readonly x: number;
+  readonly y: number;
+  readonly s: number;
+  readonly g: number;
+};
+
 function litMoves(gcode: string, device: DeviceProfile): LitMove[] {
-  let x = 0;
-  let y = 0;
-  let s = 0;
-  let motion = 0;
+  let state: ModalState = { x: 0, y: 0, s: 0, g: 0 };
   const moves: LitMove[] = [];
   for (const raw of gcode.split('\n')) {
-    const line = raw.replace(/;.*$/, '').toUpperCase();
-    const words = [...line.matchAll(/([A-Z])\s*(-?\d*\.?\d+)/g)].map(
-      (match) => [match[1], Number(match[2])] as const,
+    const words = new Map(
+      [
+        ...raw
+          .replace(/;.*$/, '')
+          .toUpperCase()
+          .matchAll(/([A-Z])\s*(-?\d*\.?\d+)/g),
+      ].map((match) => [match[1], Number(match[2])] as const),
     );
-    if (words.some(([word]) => word === 'M')) continue;
-    let nextX = x;
-    let nextY = y;
-    let moved = false;
-    for (const [word, value] of words) {
-      if (word === 'G' && (value === 0 || value === 1)) motion = value;
-      if (word === 'X') [nextX, moved] = [value, true];
-      if (word === 'Y') [nextY, moved] = [value, true];
-      if (word === 'S') s = value;
-    }
-    if (!moved) continue;
-    if (motion === 1 && s > 0) {
+    if (words.has('M')) continue;
+    const g = words.get('G');
+    const next: ModalState = {
+      x: words.get('X') ?? state.x,
+      y: words.get('Y') ?? state.y,
+      s: words.get('S') ?? state.s,
+      g: g === 0 || g === 1 ? g : state.g,
+    };
+    if ((words.has('X') || words.has('Y')) && next.g === 1 && next.s > 0) {
       moves.push({
-        from: toSceneCoords({ x, y }, device),
-        to: toSceneCoords({ x: nextX, y: nextY }, device),
+        from: toSceneCoords({ x: state.x, y: state.y }, device),
+        to: toSceneCoords({ x: next.x, y: next.y }, device),
       });
     }
-    x = nextX;
-    y = nextY;
+    state = next;
   }
   return moves;
 }
