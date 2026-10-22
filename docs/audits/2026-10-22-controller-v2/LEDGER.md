@@ -4,6 +4,7 @@ Method: [../2026-10-21-rolling-v2/METHOD.md](../2026-10-21-rolling-v2/METHOD.md)
 
 | # | Area | Tree | Report | Raised | Refuted | P1 | P2 | P3 | Known |
 |---|---|---|---|---|---|---|---|---|---|
+| C1 | Native resume G-code | 99a2e64b7 | [C1-ctl-native-resume.md](C1-ctl-native-resume.md) | 5 | 0 | 0 | 0 | 5 | 5 |
 
 ## Confirmed P1/P2 (coordinator-verified)
 
