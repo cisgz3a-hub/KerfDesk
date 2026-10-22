@@ -129,6 +129,13 @@ function offsetPaths(
       message: 'The inward offset collapsed the shape. Use a smaller distance.',
     });
   }
+  // ADR-410 item 3: Offset is unavailable, with the reason, when it makes nothing.
+  if (outward.value.length === 0 && inward.value.length === 0) {
+    return err({
+      kind: 'empty-result',
+      message: 'Nothing to offset: the selection has no shape or line to outline.',
+    });
+  }
   return ok({ outward: outward.value, inward: inward.value });
 }
 
@@ -202,12 +209,26 @@ function splitPath(path: ColoredPath): { readonly closed: PathsD; readonly open:
   for (const polyline of path.polylines) {
     if (isClosedPolygon(polyline) || isClosedEnough(polyline)) {
       const ring = polylineToPathD(polyline);
-      if (ring.length >= 3) closed.push(ring);
+      // Signed area can cancel between filled lobes of a self-intersection.
+      // Only genuinely collinear rings are strokes; normalize all other rings
+      // under the path's fill rule before offsetting their filled region.
+      if (ring.length >= 3 && !collinearRing(ring)) closed.push(ring);
+      else if (ring.length >= 2) open.push(ring.concat(ring.slice(0, 1)));
     } else if (polyline.points.length >= 2) {
       open.push(polyline.points.map((point) => ({ x: point.x, y: point.y })));
     }
   }
   return { closed, open };
+}
+
+function collinearRing(ring: PathD): boolean {
+  const first = ring[0];
+  if (first === undefined) return true;
+  const next = ring.find((point) => point.x !== first.x || point.y !== first.y);
+  if (next === undefined) return true;
+  const dx = next.x - first.x;
+  const dy = next.y - first.y;
+  return ring.every((point) => dx * (point.y - first.y) === dy * (point.x - first.x));
 }
 
 // Each ColoredPath is its own fill batch, under the rule the canvas and CAM use.

@@ -126,6 +126,23 @@ describe('macOS and Linux update notices (ADR-613)', () => {
     expect(h.openDownloadPage).not.toHaveBeenCalled();
   });
 
+  it.each(['macos', 'linux'] as const)(
+    'does not report up to date when the %s feed disappears after a verified update',
+    async (platform) => {
+      const h = harness(platform);
+      expect(await h.check()).toMatchObject({ state: 'available', version: '1.0.21' });
+      h.serve(() => new Response('Not found', { status: 404 }));
+      expect((await h.check()).state).toBe('failed');
+      expect(h.announce).toHaveBeenCalledOnce();
+      h.serve(() => new Response(envelope(release(platform))));
+      expect(await h.check()).toMatchObject({ state: 'available', version: '1.0.21' });
+      h.updates.download?.();
+      await h.updates.settled();
+      expect(h.openDownloadPage).toHaveBeenCalledOnce();
+      expect(h.announce).toHaveBeenCalledOnce();
+    },
+  );
+
   it('refuses another system, a forged, backdated or rolled-back document', async () => {
     for (const body of [
       envelope(release('linux')),

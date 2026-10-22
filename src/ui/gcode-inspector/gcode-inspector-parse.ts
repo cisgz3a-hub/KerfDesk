@@ -71,6 +71,7 @@ export async function inspectGcodeSource(
 // analyses the finished program.
 function createInspectionReader(context: GcodeInspectionContext, observer: InspectionObserver) {
   const options: BuildRenderModelOptions = {
+    ...(context.controllerKind === 'grbl-v1.1' ? { stockGrbl: true } : {}),
     machineKind: context.machineKind,
     laserPowerControl: context.laserPowerControl,
     ...(context.initialPositionMm === undefined

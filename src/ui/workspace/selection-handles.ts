@@ -78,9 +78,27 @@ export function selectionResizeEditFromDrag(args: {
 }): Extract<SelectionTransformEdit, { kind: 'resize' }> {
   const { handle, bbox, point, lockAspect } = args;
   const spec = HANDLE_RESIZE[handle];
-  const width = resizeExtent(spec.x, point.x, bbox.minX, bbox.maxX);
-  const height = resizeExtent(spec.y, point.y, bbox.minY, bbox.maxY);
+  let width = resizeExtent(spec.x, point.x, bbox.minX, bbox.maxX);
+  let height = resizeExtent(spec.y, point.y, bbox.minY, bbox.maxY);
   const isCorner = spec.x !== undefined && spec.y !== undefined;
+  const originalWidth = bbox.maxX - bbox.minX;
+  const originalHeight = bbox.maxY - bbox.minY;
+  if (
+    isCorner &&
+    lockAspect &&
+    width !== undefined &&
+    height !== undefined &&
+    originalWidth > 0 &&
+    originalHeight > 0
+  ) {
+    // Numeric resize gives one controlling dimension. A corner drag gives two:
+    // follow the axis with the larger proportional travel, including shrinking.
+    const sx = width / originalWidth;
+    const sy = height / originalHeight;
+    const scale = Math.abs(sx - 1) >= Math.abs(sy - 1) ? sx : sy;
+    width = originalWidth * scale;
+    height = originalHeight * scale;
+  }
   return {
     kind: 'resize',
     anchor: spec.anchor,

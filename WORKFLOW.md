@@ -989,6 +989,9 @@ that owns those fields, without changing the existing Frame/Start policy.
    geometry that will be cut, carved, or burned.
 3. **Undo last** removes only the most recent assignment. **Done** commits the whole numbering
    session as one undoable project action. **Cancel** restores the order from before the session.
+   Placement and output-scope changes made during numbering remain after Cancel and leave the
+   project unsaved. **Save** finishes the visible numbering order before opening a file picker or
+   writing, so a later Cancel cannot make the saved file and the clean project disagree.
 4. Numbering ends automatically after every run unit has been assigned.
 5. While numbering is open, other design edits (Delete, nudge, paste, Undo/Redo, menu, toolbar
    and command-search commands) are refused with a notice to click **Done** or **Cancel** first,
