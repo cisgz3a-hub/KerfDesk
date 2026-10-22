@@ -139,12 +139,12 @@ describe('LightBurn settings named in the import report', () => {
       warnings(
         'Cut',
         values({ futureSetting: 3, futureSwitch: 0, enableLaser1: 0 }) +
-          '<SubLayer><index Value="1"/></SubLayer>',
+          '<FutureBlock><index Value="1"/></FutureBlock>',
       ),
     ).toEqual([
       'Tag: LightBurn setting “enableLaser1” was not imported (0).',
       'Tag: LightBurn setting “futureSetting” was not imported (3).',
-      'Tag: LightBurn “SubLayer” settings were not imported.',
+      'Tag: LightBurn “FutureBlock” settings were not imported.',
     ]);
   });
 });

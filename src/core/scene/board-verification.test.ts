@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   boardVerificationPoint,
+  boardVerificationTargets,
+  boardVerificationTargetsEqual,
   capturedBoardShape,
   correctCapturedBoardGeometry,
   verificationTargetChangesOrigin,
@@ -18,6 +20,21 @@ const CIRCLE: CapturedBoardGeometry = {
   center: { x: 100, y: 80 },
   radiusMm: 40,
 };
+const OUTLINE: CapturedBoardGeometry = {
+  kind: 'outline',
+  localPointsMm: [
+    { x: 0, y: 0 },
+    { x: 100, y: 0 },
+    { x: 70, y: 60 },
+    { x: 0, y: 60 },
+  ],
+  anchorIndices: [0, 1, 2, 3],
+  viewSigns: { x: 1, y: 1 },
+  measured: [
+    { index: 0, machine: { x: 10, y: 20 } },
+    { index: 1, machine: { x: 110, y: 20 } },
+  ],
+};
 
 describe('boardVerificationPoint', () => {
   it('maps rectangle corners and circle center/rim points to machine coordinates', () => {
@@ -34,6 +51,11 @@ describe('boardVerificationPoint', () => {
       y: 80,
     });
     expect(boardVerificationPoint(RECT, { kind: 'circle', anchor: 'center' })).toBeNull();
+    expect(boardVerificationPoint(OUTLINE, { kind: 'outline', index: 2, ordinal: 3 })).toEqual({
+      x: 80,
+      y: 80,
+    });
+    expect(boardVerificationPoint(OUTLINE, { kind: 'outline', index: 99, ordinal: 5 })).toBeNull();
   });
 });
 
@@ -111,6 +133,17 @@ describe('correctCapturedBoardGeometry', () => {
     expect(left?.geometry).toEqual({ ...CIRCLE, radiusMm: Math.hypot(-40, 7) });
     expect(left?.crossAxisErrorMm).toBe(7);
   });
+
+  it('refits outline anchors and reports prediction and fit residuals', () => {
+    const result = correctCapturedBoardGeometry(
+      OUTLINE,
+      { kind: 'outline', index: 2, ordinal: 3 },
+      { x: 82, y: 79 },
+    );
+    expect(result?.geometry.kind).toBe('outline');
+    expect(result?.crossAxisErrorMm).toBeCloseTo(Math.hypot(2, -1));
+    expect(result?.residualMm).toBeGreaterThan(0);
+  });
 });
 
 describe('captured board correction policy', () => {
@@ -120,5 +153,21 @@ describe('captured board correction policy', () => {
     expect(verificationTargetChangesOrigin({ kind: 'rect', anchor: 'bottom-left' })).toBe(true);
     expect(verificationTargetChangesOrigin({ kind: 'circle', anchor: 'center' })).toBe(true);
     expect(verificationTargetChangesOrigin({ kind: 'circle', anchor: 'rim-top' })).toBe(false);
+    expect(verificationTargetChangesOrigin({ kind: 'outline', index: 2, ordinal: 3 })).toBe(true);
+  });
+
+  it('enumerates targets and compares outline indices rather than labels', () => {
+    expect(boardVerificationTargets(OUTLINE)).toEqual([
+      { kind: 'outline', index: 0, ordinal: 1 },
+      { kind: 'outline', index: 1, ordinal: 2 },
+      { kind: 'outline', index: 2, ordinal: 3 },
+      { kind: 'outline', index: 3, ordinal: 4 },
+    ]);
+    expect(
+      boardVerificationTargetsEqual(
+        { kind: 'outline', index: 2, ordinal: 3 },
+        { kind: 'outline', index: 2, ordinal: 9 },
+      ),
+    ).toBe(true);
   });
 });

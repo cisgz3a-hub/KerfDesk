@@ -1,5 +1,6 @@
 import { Blob as NodeBlob } from 'node:buffer';
 import { describe, expect, it } from 'vitest';
+import { ciBudgetMs } from '../../__fixtures__/ci-budget';
 import { parseSvg, type ParseSvgResult } from './parse-svg';
 import { readSvgDocumentFromBlob } from './parse-svg-blob';
 import { parseSvgWorkerDocument } from './parse-svg-worker';
@@ -93,11 +94,17 @@ describe.each(parsers)('SVG <use> expansion through %s', (_name, parse) => {
     expect(polylineCount(await parse(fanout(4)))).toBe(10_000);
   });
 
-  it('refuses a <use> fan-out that multiplies past the budget', async () => {
-    await expect(parse(fanout(6))).rejects.toThrow(
-      /SVG <use> references expand to more than 250,000 elements/,
-    );
-  });
+  // This functional refusal check walks the real 250,000-element limit on each
+  // DOM backend; shared-runner contention can exceed Vitest's default timeout.
+  it(
+    'refuses a <use> fan-out that multiplies past the budget',
+    async () => {
+      await expect(parse(fanout(6))).rejects.toThrow(
+        /SVG <use> references expand to more than 250,000 elements/,
+      );
+    },
+    ciBudgetMs(20_000, 60_000),
+  );
 });
 
 describe.each(parsers)('SVG viewports through %s', (_name, parse) => {

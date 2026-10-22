@@ -82,13 +82,27 @@ export function selectionResizeEditFromDrag(args: {
 }): Extract<SelectionTransformEdit, { kind: 'resize' }> {
   const { handle, bbox, point, lockAspect } = args;
   const spec = HANDLE_RESIZE[handle];
-  const width = hasExtent(bbox.minX, bbox.maxX)
-    ? resizeExtent(spec.x, point.x, bbox.minX, bbox.maxX)
-    : undefined;
-  const height = hasExtent(bbox.minY, bbox.maxY)
-    ? resizeExtent(spec.y, point.y, bbox.minY, bbox.maxY)
-    : undefined;
+  let width = resizeExtent(spec.x, point.x, bbox.minX, bbox.maxX);
+  let height = resizeExtent(spec.y, point.y, bbox.minY, bbox.maxY);
   const isCorner = spec.x !== undefined && spec.y !== undefined;
+  const originalWidth = bbox.maxX - bbox.minX;
+  const originalHeight = bbox.maxY - bbox.minY;
+  if (
+    isCorner &&
+    lockAspect &&
+    width !== undefined &&
+    height !== undefined &&
+    originalWidth > 0 &&
+    originalHeight > 0
+  ) {
+    // Numeric resize gives one controlling dimension. A corner drag gives two:
+    // follow the axis with the larger proportional travel, including shrinking.
+    const sx = width / originalWidth;
+    const sy = height / originalHeight;
+    const scale = Math.abs(sx - 1) >= Math.abs(sy - 1) ? sx : sy;
+    width = originalWidth * scale;
+    height = originalHeight * scale;
+  }
   return {
     kind: 'resize',
     anchor: spec.anchor,
@@ -117,7 +131,7 @@ function resizeExtent(
   min: number,
   max: number,
 ): number | undefined {
-  if (side === undefined) return undefined;
+  if (side === undefined || !hasExtent(min, max)) return undefined;
   const growsFromMin = side === 'east' || side === 'south';
   return Math.max(MIN_SELECTION_DIMENSION_MM, growsFromMin ? pointer - min : max - pointer);
 }

@@ -1,7 +1,6 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { writeJson } from './bridge-json.js';
 import { handleDiscoverRequest, handleFrameRequest } from './camera-frame-proxy.js';
-import { handleFalconPointerRequest } from './falcon-pointer.js';
 import { FFMPEG_MISSING_REASON } from './ffmpeg-path.js';
 import { rtspCameraUrlPolicy } from './rtsp-camera-bridge-policy.js';
 import { RtspPreviewSessions } from './rtsp-camera-session.js';
@@ -65,20 +64,15 @@ async function handleBridgeRequest(
     res.writeHead(403).end('Forbidden');
     return;
   }
-  await routeBridgeRequest(req.method, requestUrl, res, bridgePort, previewSessions);
+  await routeBridgeRequest(requestUrl, res, bridgePort, previewSessions);
 }
 
 async function routeBridgeRequest(
-  method: string | undefined,
   requestUrl: URL,
   res: ServerResponse,
   bridgePort: number,
   previewSessions: RtspPreviewSessions,
 ): Promise<void> {
-  if (requestUrl.pathname === '/falcon/pointer') {
-    await handleFalconPointerRequest(method, requestUrl, res);
-    return;
-  }
   if (requestUrl.pathname === '/health') {
     writeJson(res, { kind: 'ok', ffmpegAvailable: await hasFfmpeg(), frameProxy: true });
     return;
@@ -194,7 +188,7 @@ function setCorsHeaders(req: IncomingMessage, res: ServerResponse): void {
   const allowedOrigin = cameraBridgeCorsOrigin(typeof origin === 'string' ? origin : undefined);
   if (allowedOrigin !== null) res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
   res.setHeader('Vary', 'Origin');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 

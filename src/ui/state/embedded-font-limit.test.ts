@@ -104,13 +104,12 @@ describe('embedded fonts stay within the project limit', () => {
     const before = useStore.getState().project;
 
     const extra = font('face-33', 33);
-    useStore.getState().upsertTextObject(text('sign-33', extra.key), extra);
+    expect(() => useStore.getState().upsertTextObject(text('sign-33', extra.key), extra)).toThrow(
+      '32 imported fonts',
+    );
 
     expect(useStore.getState().project).toBe(before);
     expect(fontKeys()).toHaveLength(32);
-    expect(useToastStore.getState().toasts.at(-1)?.message).toMatch(
-      /already uses 32 embedded fonts/,
-    );
     expect(prepareProjectForPersistence(before).kind).toBe('ok');
   });
 });

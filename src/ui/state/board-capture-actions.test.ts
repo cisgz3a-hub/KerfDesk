@@ -110,6 +110,114 @@ describe('addCapturedBoard (circle)', () => {
   });
 });
 
+describe('outline boards (canvas first, ADR-654)', () => {
+  const outline = {
+    kind: 'outline' as const,
+    pointsMm: [
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+      { x: 100, y: 60 },
+      { x: 0, y: 60 },
+    ],
+    anchorIndices: [0, 1, 2, 3],
+  };
+  // The same board measured by the head a quarter turn round.
+  const turned = {
+    ...outline,
+    pointsMm: [
+      { x: 60, y: 0 },
+      { x: 60, y: 100 },
+      { x: 0, y: 100 },
+      { x: 0, y: 0 },
+    ],
+  };
+
+  beforeEach(() => resetStore());
+
+  function drawnCentre(): { readonly x: number; readonly y: number } {
+    const device = useStore.getState().project.device;
+    return { x: (device.bedWidth - 100) / 2 + 50, y: (device.bedHeight - 60) / 2 + 30 };
+  }
+
+  it('draws an exact locked outline centred on the bed without changing placement', () => {
+    const placement = useStore.getState().jobPlacement;
+    useStore.getState().drawCapturedBoardOutline(outline);
+    const state = useStore.getState();
+    const box = findRegistrationBoxes(state.project.scene)[0]!;
+    expect(box.spec).toEqual({ kind: 'polyline', points: outline.pointsMm, closed: true });
+    expect(box.transform).toMatchObject({
+      x: (state.project.device.bedWidth - 100) / 2,
+      y: (state.project.device.bedHeight - 60) / 2,
+    });
+    expect(box).toMatchObject({ locked: true, provenance: 'captured-board' });
+    expect(box.operationIds).toEqual([REGISTRATION_LAYER_ID]);
+    expect(
+      state.project.scene.layers.find((layer) => layer.id === REGISTRATION_LAYER_ID)?.output,
+    ).toBe(false);
+    expect(state.jobPlacement).toEqual(placement);
+  });
+
+  it('registers the drawn outline in place and turns the artwork on it with the board', () => {
+    drawArtwork();
+    useStore.getState().drawCapturedBoardOutline(outline);
+    const centre = drawnCentre();
+    useStore.getState().drawShape(
+      createRectangle({
+        id: 'on-board',
+        color: '#0000ff',
+        spec: { widthMm: 20, heightMm: 10, cornerRadiusMm: 0 },
+        transform: { ...IDENTITY_TRANSFORM, x: centre.x + 10, y: centre.y },
+      }),
+    );
+    const undoDepth = useStore.getState().undoStack.length;
+
+    useStore.getState().registerCapturedBoardOutline(turned, 90);
+
+    const state = useStore.getState();
+    const box = findRegistrationBoxes(state.project.scene)[0]!;
+    expect(box.spec).toEqual({ kind: 'polyline', points: turned.pointsMm, closed: true });
+    // The outline keeps its centre where it was drawn.
+    expect(box.transform.x).toBeCloseTo(centre.x - 30);
+    expect(box.transform.y).toBeCloseTo(centre.y - 50);
+    expect(box).toMatchObject({ locked: true, provenance: 'captured-board' });
+    const onBoard = state.project.scene.objects.find((object) => object.id === 'on-board')!;
+    expect(onBoard.transform.x).toBeCloseTo(centre.x);
+    expect(onBoard.transform.y).toBeCloseTo(centre.y + 10);
+    expect(onBoard.transform.rotationDeg).toBeCloseTo(90);
+    const offBoard = state.project.scene.objects.find((object) => object.id === 'art')!;
+    expect(offBoard.transform).toMatchObject({ x: 5, y: 5, rotationDeg: 0 });
+    expect(state.jobPlacement).toEqual({ startFrom: 'user-origin', anchor: 'front-left' });
+    expect(state.undoStack.length).toBe(undoDepth + 1);
+  });
+
+  it('adds a centred outline when registering with none drawn', () => {
+    useStore.getState().registerCapturedBoardOutline(outline, 0);
+    const state = useStore.getState();
+    const box = findRegistrationBoxes(state.project.scene)[0]!;
+    expect(box.transform.x).toBe((state.project.device.bedWidth - 100) / 2);
+    expect(state.jobPlacement).toEqual({ startFrom: 'user-origin', anchor: 'front-left' });
+  });
+
+  it('updates an outline while preserving its scene front-left', () => {
+    useStore.getState().drawCapturedBoardOutline(outline);
+    const before = transformedBBox(findRegistrationBoxes(useStore.getState().project.scene)[0]!);
+    useStore.getState().updateCapturedBoard({
+      ...outline,
+      pointsMm: [
+        { x: 0, y: 0 },
+        { x: 120, y: 0 },
+        { x: 80, y: 50 },
+        { x: 0, y: 70 },
+      ],
+    });
+    const box = findRegistrationBoxes(useStore.getState().project.scene)[0]!;
+    const after = transformedBBox(box);
+    expect(after.minX).toBeCloseTo(before.minX);
+    expect(after.maxY).toBeCloseTo(before.maxY);
+    expect(box).toMatchObject({ locked: true, provenance: 'captured-board' });
+  });
+});
+
 describe('updateCapturedBoard', () => {
   beforeEach(() => resetStore());
 
