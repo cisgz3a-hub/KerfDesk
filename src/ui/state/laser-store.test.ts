@@ -388,11 +388,11 @@ describe('laser-store autofocus lifecycle', () => {
     const connection = makeConnection(write);
     await connectWith(connection);
 
-    const first = useLaserStore.getState().autofocus('$HZ1');
+    const first = useLaserStore.getState().autofocus('G38.2 Z-10 F100');
     await flush();
     connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
     await flush();
-    const second = useLaserStore.getState().autofocus('$HZ1');
+    const second = useLaserStore.getState().autofocus('G38.2 Z-10 F100');
     connection.emitLine('ok');
     connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
 
@@ -408,7 +408,7 @@ describe('laser-store autofocus lifecycle', () => {
     const connection = makeConnection(write);
     await connectWith(connection);
 
-    const autofocus = useLaserStore.getState().autofocus('$HZ1');
+    const autofocus = useLaserStore.getState().autofocus('G38.2 Z-10 F100');
     await flush();
     connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
     await flush();
@@ -426,7 +426,7 @@ describe('laser-store autofocus lifecycle', () => {
     const connection = makeConnection(write);
     await connectWith(connection);
 
-    const autofocus = useLaserStore.getState().autofocus('$HZ1');
+    const autofocus = useLaserStore.getState().autofocus('G38.2 Z-10 F100');
     await flush();
     connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
     await flush();

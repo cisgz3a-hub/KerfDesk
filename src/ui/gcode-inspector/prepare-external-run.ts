@@ -30,7 +30,13 @@ export function prepareExternalRun(
   if (result.envelope === null) return { kind: 'refused', reasons: [NO_FRAME_ENVELOPE] };
   return {
     kind: 'ready',
-    run: { name, gcode: program.gcode, envelope: result.envelope, start },
+    run: {
+      name,
+      gcode: program.gcode,
+      envelope: result.envelope,
+      start,
+      ...(program.controllerKind === undefined ? {} : { controllerKind: program.controllerKind }),
+    },
     program,
     review: result,
   };
