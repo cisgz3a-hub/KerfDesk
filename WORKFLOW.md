@@ -2939,7 +2939,11 @@ authorization, Frame proof, controller command, or safety boundary.
   the planner (up to 512 on grblHAL), and the picker says those may burn again (ADR-362). An
   alarm that arrives after the last line was acknowledged, while the controller is still
   running its planner (a Smoothieware kill button or hard limit), ends the job the same way
-  and steps back the same way (ADR-341 Amendment 10).
+  and steps back the same way (ADR-341 Amendment 10). A lost link steps back the same way once
+  the first reconnect shows the controller restarted: its startup banner (an Arduino-based board
+  resets when its port reopens, and one powered from USB stops when the cable is pulled) or an
+  Alarm. A controller that answers without either kept running, and the line stays at the first
+  unacknowledged one (ADR-398 Amendment 3).
 - Resume, saved or manual, re-arms the beam with the power commands of the controller the job
   was written for (ADR-364).
   - A Smoothieware job resumes with `fire off` and restores its own `M221` scale and
@@ -2970,8 +2974,8 @@ authorization, Frame proof, controller command, or safety boundary.
   and points here instead of to Set origin here, which would place the rest of the job where
   the head stopped (ADR-341 Amendment 5).
 - After a lost connection the recovery record also keeps how many lines had been sent: a
-  controller keeps running what it had received, so the head stops at the end of the last of
-  them. When the origin is gone, not reported or moved, **Continue from where the head stopped**
+  controller that keeps running runs what it had received, so the head stops at the end of the
+  last of them. When the origin is gone, not reported or moved, **Continue from where the head stopped**
   writes one `G92` that makes the head's current spot that program point, without moving the
   head, and sets the restart to the next line. It is meant for a machine that was not homed
   before the job, and only while nobody has moved the head since the stop; if the controller
@@ -7762,6 +7766,16 @@ as the pane's design record.
    Kill, reset, resend and skipped-command handling retain their separate semantics (ADR-600).
    An errored stream is released only after its remaining reply ownership and Idle settlement
    allow it; error reporting is not successful completion.
+
+#### Error — firmware skips a move (ADR-395 Amendment 1)
+1. A build with `NO_MOTION_BEFORE_HOMING` answers each move with `echo:Home XYZ First` (naming
+   the unhomed axes) and then `ok`; a stopped Marlin prints "Printer stopped due to errors" for
+   each move it reads. Both are handled like a non-halting `Error:` for the line: the job stops
+   before its next line (so a fan-wired laser's `M106` is never sent), the Frame stops and does
+   not count as completed, a jog or owned command is refused.
+2. The notice names the axes. Home is `G28 X Y`, so a build that also needs Z homed is told to
+   home Z from the Console (`G28 Z`) if it has a Z endstop, or to turn `NO_MOTION_BEFORE_HOMING`
+   off. A stopped controller is told to send `M999 S1` (plain `M999` asks for a line resend).
 
 ### F-H3. Smoothieware halt and recovery
 
