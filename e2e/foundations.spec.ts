@@ -77,10 +77,13 @@ test('connects an RTSP camera through the loopback bridge and captures readable 
 
   await page.getByRole('button', { name: 'Close camera panel' }).click();
   bridge.setProbeAvailable(false);
+  // Reopening starts the remembered RTSP camera by itself (ADR-663 Amendment 1);
+  // it is gone now, so the panel says why and offers Reconnect.
   await (await toolbarCommand(page, 'Camera')).click();
+  await expect(camera.getByText('E2E RTSP camera unavailable.', { exact: true })).toBeVisible();
   await camera.getByRole('button', { name: 'Camera settings', exact: true }).click();
-  await camera.getByText(/^RTSP camera/).click();
-  await camera.getByRole('button', { name: 'Connect', exact: true }).click();
+  // The failed RTSP camera's fold is open, with Reconnect in sight.
+  await camera.getByRole('button', { name: 'Reconnect', exact: true }).click();
   await expect(page.getByText('E2E RTSP camera unavailable.', { exact: true })).toBeVisible();
 });
 

@@ -2,12 +2,15 @@
 // once or now and then, out of the everyday panel. Which camera (the laser's
 // own through the bridge, RTSP, a phone app, or USB; ADR-116, ADR-448), its
 // calibration (set up, recalibrate, check, the accuracy map and every
-// calibrated camera; ADR-441, ADR-446), a snapshot, and the diagnostics.
+// calibrated camera; ADR-441, ADR-446), the helpers that start the camera and
+// refresh its picture by themselves (Amendment 1), a snapshot, and the
+// diagnostics.
 
 import type { CSSProperties, ReactNode } from 'react';
 import type { CameraAdapter, CameraBridgeAdapter } from '../../../platform/types';
 import { DownloadDesktopLink } from '../../common/DownloadDesktopLink';
 import { useCameraStore } from '../../state/camera-store';
+import { useCameraHelpersStore } from '../helpers/camera-helpers-store';
 import { CalibrateCameraControls } from '../calibrate/CalibrateCameraControls';
 import { CameraDiagnostics } from './CameraDiagnostics';
 import { MachineCameraSection } from './MachineCameraSection';
@@ -56,11 +59,51 @@ export function CameraSettingsView(props: {
         <CalibrateCameraControls />
         <SavedCamerasSection />
       </SettingsGroup>
+      <SettingsGroup title="Helpers">
+        <CameraHelpersControls />
+      </SettingsGroup>
       <SettingsGroup title="Picture">
         <SnapshotControls wide={props.wide} onToggleWide={props.onToggleWide} />
       </SettingsGroup>
       <CameraDiagnostics bridgeAvailable={props.bridgeAvailable} />
     </div>
+  );
+}
+
+function CameraHelpersControls(): JSX.Element {
+  const settings = useCameraHelpersStore((s) => s.settings);
+  const setSettings = useCameraHelpersStore((s) => s.setSettings);
+  return (
+    <>
+      <label style={checkStyle}>
+        <input
+          type="checkbox"
+          title="Start the camera used last when this panel opens, and once calibrated with KerfDesk and when the laser connects."
+          checked={settings.autoStart}
+          onChange={(event) => setSettings({ autoStart: event.currentTarget.checked })}
+        />
+        <span>
+          Start my camera by itself
+          <span style={hintStyle}>
+            The camera used last starts when this panel opens. Once it is calibrated it also starts
+            with KerfDesk and when the laser connects.
+          </span>
+        </span>
+      </label>
+      <label style={checkStyle}>
+        <input
+          type="checkbox"
+          title="Take a held camera picture again when a job finishes."
+          checked={settings.refreshAfterJob}
+          onChange={(event) => setSettings({ refreshAfterJob: event.currentTarget.checked })}
+        />
+        <span>
+          Refresh the picture after each job
+          <span style={hintStyle}>A held picture is taken again when a job finishes.</span>
+        </span>
+      </label>
+      <p style={noteStyle}>Press Alt+C to refresh the picture at any time.</p>
+    </>
   );
 }
 
@@ -102,6 +145,12 @@ const groupTitleStyle: CSSProperties = {
   fontWeight: 600,
   letterSpacing: '0.04em',
   textTransform: 'uppercase',
+  color: 'var(--lf-text-faint)',
+};
+const checkStyle: CSSProperties = { display: 'flex', alignItems: 'flex-start', gap: 6 };
+const hintStyle: CSSProperties = {
+  display: 'block',
+  fontSize: 12,
   color: 'var(--lf-text-faint)',
 };
 const hostedNoticeStyle: CSSProperties = {

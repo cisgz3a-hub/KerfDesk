@@ -88,6 +88,7 @@ export function shortcutFamilies(
         { keys: 'Ctrl+L', action: 'pen' },
         { keys: 'Alt+M', action: 'measure' },
         { keys: 'Alt+T', action: 'trace selected image' },
+        { keys: 'Alt+C', action: 'refresh the camera picture' },
         { keys: 'Ctrl+Shift+B', action: 'convert to bitmap' },
         { keys: 'Enter or double-click', action: 'finish pen' },
         { keys: 'Esc', action: 'cancel' },
