@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   createPolyline,
+  createRegistrationOutline,
   CURRENT_POLYLINE_FAIRING_VERSION,
   polylineToPolylines,
 } from '../../core/shapes';
@@ -20,6 +21,22 @@ import { fitLegacyCentripetalCubics } from '../../core/trace/centerline/curve-cu
 import { upgradeProjectPolylineFairing } from './polyline-fairing-upgrade';
 
 describe('upgradeProjectPolylineFairing', () => {
+  it('leaves an exact registration outline untouched', () => {
+    const outline = createRegistrationOutline({
+      pointsMm: [
+        { x: 0, y: 0 },
+        { x: 80, y: 0 },
+        { x: 50, y: 40 },
+        { x: 0, y: 30 },
+      ],
+    });
+    const project = projectWith(outline);
+    const result = upgradeProjectPolylineFairing(project);
+    expect(result.upgradedCount).toBe(0);
+    expect(result.project).toBe(project);
+    expect(result.project.scene.objects[0]).toBe(outline);
+  });
+
   it.each([false, true])(
     'preserves migrated operation output while fairing a v2 drawing (sub-operation: %s)',
     (withSubOperation) => {

@@ -2,6 +2,8 @@ import { useReducer, useRef } from 'react';
 import {
   assertNever,
   boardCornersFromOrigin,
+  outlineMachinePoints,
+  type BoardOutlineDraft,
   type BoardShapeKind,
   type Vec2,
 } from '../../../core/scene';
@@ -20,6 +22,7 @@ export type BoardRegistrationEpoch = {
 export type BoardCaptureState = {
   readonly shapeKind: BoardShapeKind;
   readonly circleMethod: CircleCaptureMethod;
+  readonly outlineDraft: BoardOutlineDraft | null;
   // Capture-phase samples only. A committed rectangle is canonical BL/BR/TR/TL;
   // a committed circle keeps its resolved center as the sole point.
   readonly corners: ReadonlyArray<Vec2>;
@@ -34,6 +37,7 @@ export type BoardCaptureState = {
 export type BoardCaptureAction =
   | { readonly type: 'set-shape'; readonly shapeKind: BoardShapeKind }
   | { readonly type: 'set-circle-method'; readonly method: CircleCaptureMethod }
+  | { readonly type: 'set-outline-draft'; readonly draft: BoardOutlineDraft | null }
   | {
       readonly type: 'capture';
       readonly point: Vec2;
@@ -66,6 +70,8 @@ export function boardCaptureReducer(
       return changeBoardShape(state, action.shapeKind);
     case 'set-circle-method':
       return changeCircleMethod(state, action.method);
+    case 'set-outline-draft':
+      return changeOutlineDraft(state, action.draft);
     case 'capture':
       return applyCapture(state, action.point, action.captureEpoch, action.expectedSessionRevision);
     case 'undo':
@@ -108,6 +114,17 @@ function changeCircleMethod(
     : emptyCaptureState('circle', method, state.sessionRevision + 1);
 }
 
+function changeOutlineDraft(
+  state: BoardCaptureState,
+  draft: BoardOutlineDraft | null,
+): BoardCaptureState {
+  if (state.committed || state.shapeKind !== 'outline') return state;
+  return {
+    ...emptyCaptureState('outline', state.circleMethod, state.sessionRevision + 1),
+    outlineDraft: draft,
+  };
+}
+
 function emptyCaptureState(
   shapeKind: BoardShapeKind,
   circleMethod: CircleCaptureMethod,
@@ -116,6 +133,7 @@ function emptyCaptureState(
   return {
     shapeKind,
     circleMethod,
+    outlineDraft: null,
     corners: [],
     captureEpoch: null,
     geometry: null,
@@ -149,6 +167,7 @@ function applyCapture(
 
 function maxCaptures(state: BoardCaptureState): number {
   if (state.shapeKind === 'rect') return 4;
+  if (state.shapeKind === 'outline') return 2;
   return state.circleMethod === 'rim-fit' ? CIRCLE_RIM_POINT_COUNT : 2;
 }
 
@@ -188,13 +207,16 @@ export function boardCaptureCanCommit(
     state.captureEpoch.trustedPositionEpoch === registrationEpoch.trustedPositionEpoch;
   if (!sameMachineFrame) return false;
   return (
-    isRimFitCircle(state) ||
+    originSetAtCommit(state) ||
     state.captureEpoch.workOriginVersion === registrationEpoch.workOriginVersion
   );
 }
 
-function isRimFitCircle(state: BoardCaptureState): boolean {
-  return state.shapeKind === 'circle' && state.circleMethod === 'rim-fit';
+function originSetAtCommit(state: BoardCaptureState): boolean {
+  return (
+    state.shapeKind === 'outline' ||
+    (state.shapeKind === 'circle' && state.circleMethod === 'rim-fit')
+  );
 }
 
 function captureCanCommit(state: BoardCaptureState): boolean {
@@ -202,6 +224,9 @@ function captureCanCommit(state: BoardCaptureState): boolean {
   // the origin was captured. The measured path still requires all four corners
   // before it can construct geometry; both paths retain the epoch checks above.
   if (state.shapeKind === 'rect') return state.corners.length >= 1 && state.corners.length <= 4;
+  if (state.shapeKind === 'outline') {
+    return state.corners.length === 2 && state.outlineDraft !== null;
+  }
   return state.circleMethod === 'rim-fit'
     ? state.corners.length === CIRCLE_RIM_POINT_COUNT
     : state.corners.length >= 1;
@@ -217,15 +242,27 @@ function applyGeometryUpdate(
 }
 
 function canonicalPoints(geometry: CapturedBoardGeometry): ReadonlyArray<Vec2> {
-  return geometry.kind === 'rect'
-    ? boardCornersFromOrigin(geometry.origin, geometry.widthMm, geometry.heightMm)
-    : [geometry.center];
+  switch (geometry.kind) {
+    case 'rect':
+      return boardCornersFromOrigin(geometry.origin, geometry.widthMm, geometry.heightMm);
+    case 'circle':
+      return [geometry.center];
+    case 'outline': {
+      const points = outlineMachinePoints(geometry);
+      return points === null
+        ? geometry.measured.map(({ machine }) => machine)
+        : geometry.anchorIndices
+            .map((index) => points[index])
+            .filter((point): point is Vec2 => point !== undefined);
+    }
+  }
 }
 
 export type BoardCapture = {
   readonly state: BoardCaptureState;
   readonly setShape: (shapeKind: BoardShapeKind) => void;
   readonly setCircleMethod: (method: CircleCaptureMethod) => void;
+  readonly setOutlineDraft: (draft: BoardOutlineDraft | null) => void;
   readonly capture: (point: Vec2, captureEpoch: BoardRegistrationEpoch) => void;
   readonly undo: () => void;
   readonly commit: (
@@ -253,6 +290,7 @@ export function useBoardCapture(): BoardCapture {
     state,
     setShape: (shapeKind) => resetSession({ type: 'set-shape', shapeKind }),
     setCircleMethod: (method) => resetSession({ type: 'set-circle-method', method }),
+    setOutlineDraft: (draft) => resetSession({ type: 'set-outline-draft', draft }),
     capture: (point, captureEpoch) =>
       dispatch({
         type: 'capture',

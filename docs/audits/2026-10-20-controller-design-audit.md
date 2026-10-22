@@ -4,6 +4,12 @@ Status: research plus read-only source audit. No hardware was operated and no co
 changed. Audited: `origin/main` at `9c6e6a3d8`, with open PRs #1287 (external G-code runs,
 ADR-630), #1304 (ADR-642) and #1305 (ADR-640) taken into account. Prepared: 2026-10-20.
 
+Correction, 2026-10-22: D-2's Idle timeout was already 10 seconds at the audited
+commit, not 90. Ordered consumption is not evidence of a lost reply's success.
+D-3 now includes Marlin's trailing resend acknowledgement, and D-7 no longer
+infers a boot lock from missing alarm history. These correct the research;
+they do not implement or authorize the proposals below.
+
 This is the fifth controller audit of October. It does not repeat the earlier ones:
 
 - `2026-10-16-controller-pipeline-audit.md` and `2026-10-16-controller-reconnect-audit.md`
@@ -129,7 +135,7 @@ names are in Sources.
 | Connect | Newlines, `$I` for `[OPT:]` buffer size; `$$` only with "Fetch Settings on Connect"; DTR toggle [forum] | Wait 2 s, `?` ×10, `$I $$ $G`; Ctrl-X only if unresponsive | DTR pulse, `\n\n`; `$# $G` at Idle | `?` until a reply, then `$$` | Ctrl-X (default), `?`, `$$ $I` | Ctrl-X, drop lines until banner, `$$ $#` | Listen 250 ms, `?`, wait for Idle, `$$`, `$I` (stock GRBL only), `$G` |
 | Stream window | Character counting, size from `[OPT:]`, else 128; Synchronous option | 128 | 127 | 120, grows from `Bf:` | 127, grows from `Bf:`/`[OPT:]` | 127 | 120, grows from `Bf:`/`[OPT:]`; one line at a time on FluidNC, Marlin, Smoothieware |
 | `error:N` in a job | Not documented | Pause (`!`) | Stop sending | Pause; ignore option | Count and continue | `!`, then Ignore or Abort dialog | Stop and soft reset (P-2) |
-| Lost `ok` | Stays Busy [inferred] | None | None | None | Fake `ok` after 10 s if `Bf:` empty | None | Job tail: ordered `$G` probe (ADR-610); mid-job: stop after 90 s (D-2) |
+| Lost `ok` | Stays Busy [inferred] | None | None | None | Fake `ok` after 10 s if `Bf:` empty | None | Job tail: ordered `$G` probe (ADR-610); mid-job: 10 s with fresh Idle, 90 s while Run (D-2) |
 | Stop | Ctrl-X, then laser off [forum, changelog] | `!`, wait for Hold with MPos still, then Ctrl-X | `!`, 1 s, Ctrl-X, `$X`, restore modal state | `!`, 500 ms, Ctrl-X (force) | Clear queue, `M5` | 1.1.8: `!`, wait, Ctrl-X, restore offsets | Ctrl-X at once for its own job (D-1); hold first for motion it does not own |
 | After a reset | Auto-unlocks on `[MSG:'$H'\|'$X' to unlock]`; optional Auto-Home [forum, docs] | Nothing re-read | `$X`, modal restore | Nothing | Ends job | Restore modal + G92 | `M5 M9`, re-read `$$ $I $G` (D-5), no auto-unlock |
 | Status poll | About 0.5 s idle, not during a job [forum] | 200 ms | 125 ms | 250 ms | 500 ms default | 250 ms (1.1.8) | 250 ms active, 1 s idle |
@@ -157,7 +163,8 @@ Each rule cites its source above. KerfDesk meets every rule except where a findi
 4. Stop motion with a feed hold, then reset once the hold is complete, so the position survives
    (D-1). Reset at once only when the hold cannot be seen.
 5. Never treat Idle alone as proof that a reply was lost; prove it with an ordered query
-   (ADR-610). Apply the proof wherever one line is owed, not only at the job's end (D-2).
+   (ADR-610). An ordered query proves consumption, not success; it cannot by itself
+   justify continuing after a lost mid-job response (D-2).
 6. Where the firmware offers transport integrity (Marlin line numbers and checksums), use it (D-3).
 7. Identify the firmware explicitly; do not rely on a banner that native USB boards never print
    (D-4).
@@ -173,12 +180,12 @@ Each rule cites its source above. KerfDesk meets every rule except where a findi
 | ID | Area | What KerfDesk does | What controllers and peers do | Severity | Recommended fix |
 | --- | --- | --- | --- | --- | --- |
 | D-1 | Stopping a running job | Abort of its own job, the stop after `error:N`, the 2 s heartbeat stop and the 90 s hold stop all send Ctrl-X at once on GRBL-family controllers (`laser-job-stop.ts:256`, `:304-329`; `laser-error-line.ts:228-237`; `laser-stream-heartbeat-containment.ts:52-77`, `:102-130`). | Ctrl-X while moving raises `ALARM:3` and loses position; after a completed hold it does not. UGS, bCNC, CNCjs and Candle 1.1.8 hold first. LightBurn sends Ctrl-X at once and tells users to re-home. | Correctness and UX, High. Maintainer decision (departs from LightBurn). | Reuse `unowned-motion-stop.ts`'s hold-then-reset (2 s bound) for owned stops; keep homing proof when the reset landed on a settled hold. ADR amending ADR-207, ADR-215 Amd 1 and ADR-212. Hardware check. |
-| D-2 | Lost reply mid-job | The ordered `$G` proof runs only once every line is on the wire (`laser-lost-ack-reconcile.ts:205`). On FluidNC, Marlin and Smoothieware (one line at a time, `controller-streaming-mode.ts:8-12`) one lost `ok` stops the stream; 90 s later KerfDesk ends the job with a reset or quickstop (`laser-stream-stall.ts:19`, `laser-stream-hold.ts:63`, `laser-stream-heartbeat-containment.ts:52-77`). | FluidNC answers `$G` in order in any state, so `[GC:` proves the owed line was read. Marlin numbered lines echo `ok N<n>` with `ADVANCED_OK`. No peer recovers this case except LaserGRBL (`Bf:`-based). | Correctness and UX, Medium. | Extend the ADR-610 Amendment 1 probe to a one-line stream after 1 s of fresh Idle (identified firmware); on `[GC:`, credit the owed line and continue, logging it. Marlin: D-3. Smoothieware: keep the timed rule. ADR-610 Amendment 3. |
-| D-3 | Marlin transport integrity | Job lines go out as `<line>\n` with no `N` or checksum (`streamer.ts:62`; ADR-095 "no line-number replay in v1"); `Resend:` ends the job (`laser-error-line.ts:96-132`). | Marlin checks a checksum only on numbered lines and refuses a damaged one with `Resend:` without running it. Printrun and OctoPrint number and checksum. | Correctness, Medium [inferred frequency]. | `M110 N0` before a stream, `N<n> … *<cs>` on each line, resend the one owed line on `Resend:` (bounded retries), use `ok N<n>` when present. Count the prefix in the line-length limit. Hardware check. |
+| D-2 | Lost reply mid-job | The ordered `$G` proof runs only once every line is on the wire (`laser-lost-ack-reconcile.ts:205`). On FluidNC, Marlin and Smoothieware (one line at a time, `controller-streaming-mode.ts:8-12`) one lost reply stops the stream; after 10 s with fresh Idle (90 s while Run) KerfDesk ends the job with a reset or quickstop (`laser-stream-stall.ts:19`, `laser-stream-hold.ts:63`, `laser-stream-heartbeat-containment.ts:52-77`). | FluidNC answers `$G` in order in any state, so `[GC:` proves the owed line was read. Marlin numbered lines echo `ok N<n>` with `ADVANCED_OK`. No peer recovers this case except LaserGRBL (`Bf:`-based). | Correctness and UX, Medium. | Extend the ADR-610 Amendment 1 probe to a one-line stream after 1 s of fresh Idle (identified firmware); treat `[GC:` only as proof of consumption, never proof that the missing reply was successful; do not resume new motion on it alone. Marlin: D-3. Smoothieware: keep the timed rule. ADR-610 Amendment 3. |
+| D-3 | Marlin transport integrity | Job lines go out as `<line>\n` with no `N` or checksum (`streamer.ts:62`; ADR-095 "no line-number replay in v1"); `Resend:` ends the job (`laser-error-line.ts:96-132`). | Marlin checks a checksum only on numbered lines and refuses a damaged one with `Resend:` without running it. Printrun and OctoPrint number and checksum. | Correctness, Medium [inferred frequency]. | `M110 N0` before a stream, `N<n> … *<cs>` on each line, own the full `Resend:` plus trailing `ok` exchange before retransmission (bounded retries), use `ok N<n>` when present. Count the prefix in the line-length limit. Hardware check. |
 | D-4 | grblHAL identity | The generic grblHAL driver sends no `$I` (`grblhal/driver.ts:86-88`) and no `0x87`, so a board that printed no banner stays unidentified; a lost final reply then waits 15 s for the sustained-Idle rule (ADR-610 Amd 2). | grblHAL's guide says not to rely on the banner and recommends `$I+` and `0x87`; plain `$I` prints `[FIRMWARE:grblHAL]` at the default compatibility level. LightBurn reads `$I` on connect. | UX, Low-Medium. | Send `$I` (or `$I+`) once on the generic grblHAL driver, never the Falcon command sets; accept `[FIRMWARE:grblHAL]` as identification; take the RX size from `[OPT:]`. Fold in P-4's `0x87`. ADR-610 Amd 2 rejected this for lack of evidence; this is the evidence. |
 | D-5 | Re-reads after a reset | Every banner, including after KerfDesk's own Abort or Disconnect reset, clears the settings snapshot and re-reads `$$`, `$I`, `$G` (`laser-line-handler.ts:401`, `:406`, `:445`). Each completed read pops the 8 s "Machine settings detected" toast, even when nothing changed (`laser-line-handler.ts:318`, `DetectedSettingsToast.tsx:18-31`, `:63`). The read waits for Idle (F-4), so after an `ALARM:3` Home falls back to the 30-minute backstop (`laser-home-action.ts:79-81`). | Settings live in EEPROM and survive a soft reset. UGS, CNCjs and LightBurn re-read nothing after a reset; LightBurn reads settings on connect only when asked. | UX, Medium (a routine read announces itself after every Abort). | After a reset KerfDesk sent on the same port, keep the `$$`/`$I` snapshot and re-read only `$G`. Keep today's invalidation for `$RST=`, setting writes and uncommanded banners. Toast only when the read found something new (F-5). |
 | D-6 | Vetting an external program | `$C` is a Console command only (`grbl/console-command.ts:55`). With P-2's reset-on-error, a bad line in an external file costs the job (once #1287 merges). | GRBL documents `$C` as the answer to character counting's error reservation; UGS and Candle offer a check run. | UX, Low (conditional on #1287). | "Check on controller" for an external file: `$C`, stream, collect errors, `$C` off (automatic reset). Stock GRBL, grblHAL and FluidNC only. |
-| D-7 | Alarm at connect | No "Home when connected" option and no automatic unlock (no match for auto-home or auto-unlock in `src/`). Every connect to a homing-enabled machine stops at the Alarm banner. | LightBurn offers Auto-Home on Startup and auto-unlocks when it sees `[MSG:'$H'\|'$X' to unlock]`. GRBL warns that `$X` may leave the position wrong. | UX, Low. | Add an opt-in per-machine "Home when connected", run only at a fresh Alarm or Idle with nothing else running. Do not copy the automatic unlock after a position-losing alarm; at most, offer it for the boot lock alone. |
+| D-7 | Alarm at connect | No "Home when connected" option and no automatic unlock (no match for auto-home or auto-unlock in `src/`). Every connect to a homing-enabled machine stops at the Alarm banner. | LightBurn offers Auto-Home on Startup and auto-unlocks when it sees `[MSG:'$H'\|'$X' to unlock]`. GRBL warns that `$X` may leave the position wrong. | UX, Low. | Add an opt-in per-machine "Home when connected", run only at a fresh Alarm or Idle with nothing else running. Do not copy the automatic unlock after a position-losing alarm; unknown alarm causes require explicit operator unlock; absent `ALARM:N` is not boot-lock evidence. |
 
 ### D-1 — KerfDesk-initiated stops of a running job reset mid-motion
 
@@ -220,28 +227,34 @@ half-dead it costs nothing). When the reset landed on a settled hold and no `ALA
 keep the homing proof; whether the Frame survives is a Frame-first policy question for the same
 ADR. Hardware check on a stock GRBL and a Falcon: decel distance and beam-off timing in M3 and M4.
 
-### D-2 — One lost reply in the middle of a one-line-at-a-time job ends it after 90 s
+### D-2 — One lost reply can stall a one-line-at-a-time job
 
 **What happens.** ADR-610 and its amendments finish a job whose last replies were lost, but only
 once `queuedLineCount(streamer) === 0` (`laser-lost-ack-reconcile.ts:205`). FluidNC, Marlin and
 Smoothieware always stream one line at a time (`controller-streaming-mode.ts:8-12`), so a reply
 lost to a UART line error (the premise of ADR-375 and ADR-600) stops the stream on the spot. The
-live bar names the wait after 3 s; at 90 s the hold watchdog marks the job errored, raises the
+live bar names the wait after 3 s; with fresh Idle the hold watchdog expires after 10 s
+(90 s applies while Run is reported), marks the job errored, raises the
 safety notice and sends Ctrl-X (FluidNC) or the driver's stop lines (Marlin's quickstop,
 Smoothieware's stop lines) (`laser-stream-hold.ts:63`, `laser-stream-heartbeat-containment.ts:52-77`). The machine had been
-idle since the lost line, so the job is ended for nothing.
+idle since the lost line. The missing response could have been an error, so the sender
+cannot establish whether that block's modes or motion applied. These timeout values
+are present in `laser-stream-hold.ts` at the original audited commit `9c6e6a3d8`.
 
 On character-counted GRBL and grblHAL a lost reply mid-job does not stall at once; the host is one
 line behind and the window is smaller until the tail probe resolves it [inferred from
 `streamer.ts`; several losses in one job could still stall it].
 
-**Fix.** ADR-610 Amendment 3: when exactly one job line is owed, the controller is identified as
-FluidNC (or GRBL/grblHAL in a one-line stream) and fresh Idle has held for 1 s after the last reply,
-send the same single `$G`. Its `[GC:` proves the owed line was read; credit it and continue. The
-lost reply may have been an `error:N`, as ADR-610 already says for the tail, so log it; the ADR
-should decide whether to continue or hold and ask. For Marlin, D-3 gives line-level replies; an
-`M114` probe is the fallback [inferred: Marlin runs queued commands in order, not tested here].
-Smoothieware keeps the timed rule.
+**Research direction, not an implementation specification.** An ordered `$G` response
+can establish that an earlier line was consumed. It cannot distinguish a lost `ok`
+from a lost `error:N`. Stock GRBL rejects an erroneous block atomically: a lost
+`G91 F-1` error leaves absolute mode active, so resuming a queued relative program
+would change its path. Do not credit the response as successful and resume on this
+evidence alone. Any mid-job recovery design needs evidence that resolves execution
+state as well as response ownership. The existing tail-settlement rule does not
+authorize a continuation that sends new motion. An `M114` report likewise describes
+position, not the success of every preceding Marlin command. D-3's numbered replies
+would improve transport correlation but still need explicit error handling.
 
 ### D-3 — Marlin lines carry no line number or checksum
 
@@ -257,8 +270,11 @@ catch that, but only for numbered lines ([Marlin queue.cpp]). How often it happe
 machine and cable [inferred].
 
 **Fix.** Send `M110 N0` before a stream and `N<n> <line>*<xor>` for each job line. On
-`Resend: <n>`, resend that line: in a one-line stream it is the only one owed, and Marlin did not
-run the rejected copy. Bound the retries and keep today's terminal stop after them. Use
+`Resend: <n>`, first consume the rejection exchange's trailing `ok`: Marlin
+`queue.cpp::flush_and_request_resend` emits `Resend:` followed by `ok_to_send()`.
+An immediate retransmission must not let that old `ok` acknowledge the new copy.
+Only after owning the complete exchange should the sender retransmit the requested
+line with bounded retries and retain today's terminal stop after them. Use
 `ok N<n>` (with `ADVANCED_OK`) to match replies. Include the prefix in the line-length check
 (Marlin's `MAX_CMD_SIZE`). Console lines can stay unnumbered. Hardware check on a Marlin laser
 build.
@@ -339,8 +355,12 @@ LightBurn unlocks by itself when it sees `[MSG:'$H'|'$X' to unlock]` [forum, Oz 
 report of the session, only at Alarm or Idle with no job, Fire, motion or controller operation,
 and never after a reconnect that interrupted a job. Do not copy the automatic unlock in general:
 GRBL prints the same message after `ALARM:3`, where `$X` hides a lost position. If the maintainer
-wants it, limit it to the boot lock (Alarm with no `ALARM:N` line this session) and say so in the
-log.
+wants it, a separate design must first identify a boot lock using positive evidence.
+An Alarm report with no `ALARM:N` line in this session is insufficient: the alarm
+may predate the connection, or its pushed message may have been lost. Keep unlock
+an explicit operator action when the cause is unknown. Stock GRBL's
+`HOMING_INIT_LOCK` check is before the reinitialization loop in `main.c`; it does
+not by itself force Alarm on every soft reset.
 
 ## 3. Checked and consistent with the rules
 
@@ -403,7 +423,7 @@ log.
 
 Firmware:
 
-- [interface]: https://github.com/gnea/grbl/blob/master/doc/markdown/interface.md
+- [interface]: https://github.com/gnea/grbl/wiki/Grbl-v1.1-Interface
 - [commands]: https://github.com/gnea/grbl/blob/master/doc/markdown/commands.md
 - [config.h]: https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/config.h
   (`DISABLE_LASER_DURING_HOLD`, `HOMING_INIT_LOCK`, lines 583-587 for the former per ADR-375)

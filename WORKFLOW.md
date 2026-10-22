@@ -995,6 +995,9 @@ that owns those fields, without changing the existing Frame/Start policy.
    geometry that will be cut, carved, or burned.
 3. **Undo last** removes only the most recent assignment. **Done** commits the whole numbering
    session as one undoable project action. **Cancel** restores the order from before the session.
+   Placement and output-scope changes made during numbering remain after Cancel and leave the
+   project unsaved. **Save** finishes the visible numbering order before opening a file picker or
+   writing, so a later Cancel cannot make the saved file and the clean project disagree.
 4. Numbering ends automatically after every run unit has been assigned.
 5. While numbering is open, other design edits (Delete, nudge, paste, Undo/Redo, menu, toolbar
    and command-search commands) are refused with a notice to click **Done** or **Cancel** first,
@@ -4798,6 +4801,67 @@ artwork bounds; a verified parametric ellipse can use its major radius. Array
 offers **Use the round boundary**, which centres rows and checks every footprint
 corner against the usable circle, or the conservative inscribed square. The
 preview and applied copies use the same plan; this is not optimal nesting (ADR-599).
+
+---
+
+### F-BC4. Place an irregular board from a photo (ADR-654)
+
+**ADR:** [ADR-654](docs/decisions/ADR-654-outline-board-from-photo.md).
+
+**Operator intent.** Draw the irregular edge of an offcut, live-edge slab or shaped blank from a
+phone photo at its exact ruler-measured size, lay artwork out on it straight away, and register it
+to the machine with two head captures before burning.
+
+**Where in the UI.** Open **Tools → Place Board**, choose **Outline**, then **Draw board from
+photo…**. The photo window takes a file, a pasted photo (Ctrl+V), or a photo an MCP assistant sends
+to the desktop app (`set_board_photo`), which opens the window by itself.
+
+**The happy path.**
+
+1. Photograph the board from straight above with the whole board in view, and open the photo.
+2. Click each corner of the board in order around its edge, adding points along curved edges.
+   Drag a point to move it. **Straighten edge** lines up points that are a little off: pick the
+   points at the two ends of an edge and the points between move onto the straight line joining
+   them. **Undo** reverses the last click, drag, straighten or clear; **Clear** starts over. The
+   dashed line shows the closing edge.
+3. Enter the board's ruler-measured width (left to right in the photo) and height (top to bottom).
+   The clicked outline is scaled to exactly that size. Every clicked corner is a check point, up
+   to six (more points pick the sharpest six); A is the point nearest the photo's bottom-left by
+   default and can be changed, and B is the point farthest from A.
+4. **Draw on canvas** puts the locked outline on the canvas at once, centred and out of the burn.
+   Placement is unchanged until the board is registered.
+5. Select artwork and use **Fit to board** or **Array on board** inside the outline (a conservative
+   inscribed rectangle).
+6. Jog beam-off onto point A and **Capture**, then point B and **Capture**. **Register board**
+   checks the measured scale, sets the work origin at the outline's physical front-left corner,
+   gives the drawn outline the shape and turn the head measured about its own centre, turns
+   unlocked artwork lying on it by the same angle, and switches placement to User Origin
+   front-left. This is one Undo step.
+7. Check every remaining point. Each accepted or adjusted point is measured and refits the outline.
+   These checks are accuracy advice, not a Start gate.
+8. Preview, complete **Frame** for the exact placement, then Start. The completed Frame remains the
+   ordinary Start gate.
+
+**Edge / error cases.** **Draw on canvas** stays disabled, with the reason shown, until there are
+at least three points that do not cross and a width and height of at least 3 mm. A typed size whose
+proportions differ from the clicked outline by more than 10% shows a notice (width and height
+swapped, or a photo taken at an angle) without blocking. **Straighten edge** refuses neighbouring
+ends (there is nothing between them) and any edge whose points sit more than 15% of its length off
+the line, so it cannot collapse a corner. A head-measured spacing of A and B over 5%
+different from the drawn outline is refused as a likely wrong point or size; over 1% shows a
+notice. Locked artwork does not turn at registration. Without a connected machine the board can be
+drawn and laid out but not registered. Reconnect, reset/alarm, homing/manual-position or
+work-origin changes stale the capture epochs and require recapture. A checked point over 5 mm from
+prediction warns about the selected point; a least-squares miss over 1.5 mm warns about photo
+distortion and recommends an edge margin.
+
+**Hardware verification checklist (user-driven — hardware CLAIMED).**
+
+1. Secure scrap material and use S=0 / an air trace first.
+2. Draw the board from a straight-down photo, lay out test artwork, capture A and B and register.
+3. Move beam-off to every check point and confirm the head lands on the physical edge.
+4. Keep test artwork several millimetres inside the outline, then complete Frame and inspect the
+   air trace before enabling normal power.
 
 ---
 
