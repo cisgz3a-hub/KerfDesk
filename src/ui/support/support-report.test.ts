@@ -120,6 +120,32 @@ describe('support report text', () => {
     expect(text).toContain('Bad key KD1.[licence key removed]');
   });
 
+  it('removes tokens and keyed secrets but keeps ordinary addresses and settings', () => {
+    const kept = [
+      '$32=1',
+      '$130=400.000',
+      'Email support@kerfdesk.com',
+      'https://kerfdesk.com/help#start',
+      'file:///C:/app/node_modules/@scope/x.js',
+    ];
+    const text = formatSupportReport(
+      facts({
+        machineConsole: [
+          ...kept,
+          'Authorization: bearer abc.def-123',
+          'body {"apiKey":"sk-key-1","user":"ann"}',
+          'wifi password=pw-in-line',
+        ],
+      }),
+    );
+    for (const line of kept) expect(text).toContain(line);
+    expect(text).not.toMatch(/abc\.def-123|sk-key-1|pw-in-line/);
+    expect(text).toContain('Authorization: bearer [token removed]');
+    expect(text).toContain('{"apiKey":"[removed]","user":"ann"}');
+    expect(text).toContain('password=[removed]');
+    expect(text).toContain('KerfDesk removed licence\nkeys and the passwords and sign-ins');
+  });
+
   it('shows the web app without a desktop log, and says what is empty', () => {
     const text = formatSupportReport(
       facts({

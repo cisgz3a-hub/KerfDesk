@@ -41,6 +41,17 @@ const PRESET_CORRECTIONS: ReadonlyArray<PresetCorrection> = [
     fields: ['bedWidth', 'bedHeight'],
     predates: (device) => device.bedWidth === 410 && device.bedHeight === 400,
   },
+  // #796, 2026-09-19. From 2026-07-07 the A1 Pro preset carried the generic
+  // 400 x 400 mm bed; Creality's LightBurn bundle gives Width 358, Height 268
+  // (controller audit v2 C7-P2-1, ADR-660).
+  {
+    profileIds: ['creality-falcon-a1-pro-grblhal'],
+    before: 'bed 400 x 400 mm',
+    now: '358 x 268 mm',
+    effect: 'a job near the edge can run past the real travel',
+    fields: ['bedWidth', 'bedHeight'],
+    predates: (device) => device.bedWidth === 400 && device.bedHeight === 400,
+  },
 ];
 
 export type StalePresetCorrection = {
@@ -69,4 +80,27 @@ export function stalePresetCorrections(
     effect,
     patch: Object.fromEntries(fields.map((field) => [field, preset[field]])),
   }));
+}
+
+export type WithdrawnPresetCopy = {
+  readonly presetName: string;
+  /** Why Machine Setup no longer lists the preset. */
+  readonly reason: string;
+};
+
+/**
+ * A saved copy of a preset Machine Setup no longer lists that still has the
+ * preset's work area; null for any other profile. A withdrawn preset has no
+ * corrected value to offer, and a work area the operator set is their own
+ * (ADR-660).
+ */
+export function withdrawnPresetCopy(
+  device: Pick<DeviceProfile, 'profileId' | 'bedWidth' | 'bedHeight'>,
+): WithdrawnPresetCopy | null {
+  if (device.profileId === undefined) return null;
+  const entry = profileCatalogEntryById(device.profileId);
+  if (entry?.withdrawn === undefined) return null;
+  const preset = entry.profile;
+  if (device.bedWidth !== preset.bedWidth || device.bedHeight !== preset.bedHeight) return null;
+  return { presetName: preset.name, reason: entry.withdrawn };
 }

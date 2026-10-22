@@ -4,6 +4,7 @@
 // operator decides whether it is good enough for their work (ADR-228).
 
 import type { CameraCaptureBinding } from '../../../core/camera/camera-capture-binding';
+import type { CameraBedFrame } from '../../../core/camera/model/camera-bed-frame';
 import { savedMarkErrors, type BedArea } from '../../../core/camera/model/camera-model-accuracy';
 import type { CameraModelRecord } from '../../../core/camera/model/camera-model-record';
 import type { Vec2 } from '../../../core/scene';
@@ -25,6 +26,8 @@ export function cameraModelFromCalibration(args: {
   readonly calibratedAt: Date;
   /** The head's bed position at the photo, for a camera on the head (ADR-449). */
   readonly headAtCalibrationMm?: Vec2 | null;
+  /** The bed frame the target's rings were placed in (rolling audit 12-P2-2). */
+  readonly bedFrame?: CameraBedFrame;
 }): CameraModelRecord {
   const { calibration } = args;
   return {
@@ -45,6 +48,7 @@ export function cameraModelFromCalibration(args: {
     ...(args.headAtCalibrationMm === undefined || args.headAtCalibrationMm === null
       ? {}
       : { mount: { kind: 'head', headAtCalibrationMm: args.headAtCalibrationMm } }),
+    ...(args.bedFrame === undefined ? {} : { bedFrame: args.bedFrame }),
   };
 }
 

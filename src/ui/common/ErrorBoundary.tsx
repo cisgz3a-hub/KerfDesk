@@ -3,8 +3,10 @@
 // Wraps the App tree. When a render or commit-phase error is thrown,
 // React calls our getDerivedStateFromError and we swap in CrashScreen
 // instead of the broken subtree. The crash screen shows the error
-// message + stack and offers two actions:
+// message + stack and offers these actions:
 //
+//   * ABORT, while the machine is moving (F60/F65).
+//   * Save project, while there is unsaved work (audit 27-P2-2).
 //   * Copy diagnostic → builds a JSON blob (error + stack + timestamp +
 //     user agent + URL) and writes it to the clipboard. Falls back to a
 //     select-all textarea if the Clipboard API is unavailable (insecure
@@ -34,7 +36,26 @@ export type SoftwareAbort = {
   readonly trigger: () => void;
 };
 
-type Props = { readonly children: ReactNode; readonly softwareAbort?: SoftwareAbort };
+// The project lives in a store, not in the crashed tree, so its own Save still
+// works. Without this the only way back to unsaved work was Try again, which
+// fails again for a lasting render bug (audit 27-P2-2).
+export type CrashSave = {
+  // Evaluated when the crash screen renders — is there unsaved work to save?
+  readonly isNeeded: () => boolean;
+  // Runs the project's own Save from the click, so a file picker still sees
+  // the user's gesture.
+  readonly run: () => Promise<'saved' | 'cancelled' | 'failed'>;
+};
+
+type Props = {
+  readonly children: ReactNode;
+  readonly softwareAbort?: SoftwareAbort;
+  readonly crashSave?: CrashSave;
+  // Store-driven dialogs and notices that Save and closing the app still open
+  // (the large-project Save dialog, the close notice, toasts). The subtree that
+  // normally mounts them is gone, so the crash screen hosts them, above itself.
+  readonly crashHosts?: ReactNode;
+};
 type State =
   | { readonly kind: 'ok' }
   | { readonly kind: 'crashed'; readonly error: Error; readonly when: number };
@@ -66,6 +87,8 @@ export class ErrorBoundary extends Component<Props, State> {
           when={this.state.when}
           onRetry={this.handleRetry}
           softwareAbort={this.props.softwareAbort}
+          crashSave={this.props.crashSave}
+          hosts={this.props.crashHosts}
         />
       );
     }
@@ -78,6 +101,8 @@ function CrashScreen(props: {
   readonly when: number;
   readonly onRetry: () => void;
   readonly softwareAbort: SoftwareAbort | undefined;
+  readonly crashSave: CrashSave | undefined;
+  readonly hosts: ReactNode;
 }): JSX.Element {
   const blob = buildDiagnostic(props.error, props.when);
   // Only offer the kill control if the machine was actually moving when the crash
@@ -101,6 +126,7 @@ function CrashScreen(props: {
 
   return (
     <div role="alert" style={overlayStyle}>
+      {props.hosts}
       <h2 style={titleStyle}>Something broke</h2>
       <p style={messageStyle}>{props.error.message || 'Unknown error'}</p>
       <pre style={stackStyle}>{props.error.stack ?? '(no stack available)'}</pre>
@@ -116,6 +142,7 @@ function CrashScreen(props: {
             {SOFTWARE_ABORT_LABEL}
           </button>
         )}
+        <CrashSaveButton crashSave={props.crashSave} />
         <button
           type="button"
           onClick={handleCopy}
@@ -160,6 +187,39 @@ function buildDiagnostic(err: Error, when: number): string {
     2,
   );
 }
+
+function CrashSaveButton(props: { readonly crashSave: CrashSave | undefined }): JSX.Element | null {
+  // Asked once: a successful Save clears the need, and the button stays to say so.
+  const [needed] = useState(() => props.crashSave?.isNeeded() === true);
+  const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
+  const crashSave = props.crashSave;
+  if (!needed || crashSave === undefined) return null;
+  const save = (): void => {
+    setState('saving');
+    crashSave.run().then(
+      (result) => setState(result === 'cancelled' ? 'idle' : result),
+      () => setState('failed'),
+    );
+  };
+  return (
+    <button
+      type="button"
+      className="lf-btn lf-btn--primary"
+      onClick={save}
+      disabled={state === 'saving'}
+      title="Save the project to a file. Your unsaved work is still in memory although the interface crashed."
+    >
+      {SAVE_LABELS[state]}
+    </button>
+  );
+}
+
+const SAVE_LABELS = {
+  idle: 'Save project',
+  saving: 'Saving…',
+  saved: 'Saved',
+  failed: 'Save failed. Try again',
+} as const;
 
 const abortStyle: React.CSSProperties = {
   fontWeight: 800,

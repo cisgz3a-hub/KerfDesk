@@ -18,6 +18,7 @@ import {
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import type { SaveGcodeCtx } from './file-actions';
 import { advanceExportVariables } from './advance-export-variables';
+import { pickPreparedSaveTarget } from './pick-prepared-save-target';
 import { savePreflightFrameOptions } from './save-gcode-emission';
 import { captureProjectOutputSnapshot } from '../laser/project-output-snapshot';
 import type { OutputSnapshotRequest } from '../laser/output-preparation-protocol';
@@ -37,33 +38,26 @@ export async function handleSaveRd(
     // G-code save of the same placement would (audit RU-7).
     ...savePreflightFrameOptions(ctx, placement),
   };
-  if (
-    snapshot === undefined &&
-    !outputPreparationShouldRunOffThread(ctx.project, ctx.outputScope)
-  ) {
-    const result = emitRdFile(ctx.project, options);
-    if (!result.ok) return showRdFailure(result.messages);
-    const target = await pickRdTarget(ctx);
-    if (target !== null) await writeRdResult(ctx, target, result);
-    return;
-  }
-  // The picker must consume transient user activation before the costly await.
-  // A worker failure leaves a recoverable empty target and never retries the
-  // compile on the browser thread.
-  const target = await pickRdTarget(ctx);
-  if (target === null) return;
-  const result = await prepareBackgroundRd(ctx, options, snapshot);
+  // The picker empties an existing file as it returns (ADR-656), so the job
+  // compiles first; a compile that outlasts the click asks for a fresh one. A
+  // worker failure is never retried on the browser thread.
+  const result =
+    snapshot === undefined && !outputPreparationShouldRunOffThread(ctx.project, ctx.outputScope)
+      ? emitRdFile(ctx.project, options)
+      : await prepareBackgroundRd(ctx, options, snapshot);
   if (result === null) return;
   if (!result.ok) return showRdFailure(result.messages);
-  await writeRdResult(ctx, target, result);
+  const target = await pickRdTarget(ctx);
+  if (target !== null) await writeRdResult(ctx, target, result);
 }
 
 async function pickRdTarget(ctx: SaveGcodeCtx): Promise<SaveTarget | null> {
   try {
-    return await ctx.platform.pickFileForSave({
-      suggestedName: suggestedRdName(ctx.savedName),
-      extensions: ['.rd'],
-    });
+    return await pickPreparedSaveTarget(
+      ctx.platform,
+      { suggestedName: suggestedRdName(ctx.savedName), extensions: ['.rd'] },
+      { title: 'Save .rd file', message: 'The .rd job is ready.' },
+    );
   } catch (err) {
     ctx.pushToast(`Could not save .rd file: ${errorMessage(err)}`, 'error');
     return null;
