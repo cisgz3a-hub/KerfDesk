@@ -122,9 +122,10 @@ function DiagnosticDisclosure(): JSX.Element {
         does not query or change the machine.
       </p>
       <p>
-        Omits artwork, job/motion G-code, profile/file names, accounts, licences and device serial
-        numbers. Recognised sensitive text is removed or redacted. Check the JSON for unlabelled
-        secrets before sharing. Nothing is sent automatically.
+        Omits artwork, job/motion G-code, raw setting lines and controller passwords, profile/file
+        names, accounts, licences and device serial numbers. Recognised sensitive text is removed or
+        redacted. Check the JSON for unlabelled secrets before sharing. Nothing is sent
+        automatically.
       </p>
     </>
   );
