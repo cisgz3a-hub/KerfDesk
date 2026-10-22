@@ -148,8 +148,9 @@ export function reviewExternalProgram(
     ...unitWarnings(model),
     ...toolLeftOnWarnings(model),
     ...machineModeWarnings(model, context),
+    ...skippedMotionWarnings(model),
     ...findings
-      .filter((finding) => finding.severity !== 'info')
+      .filter((finding) => finding.severity !== 'info' && finding.id !== SKIPPED_MOTION_FINDING)
       .map((finding) => `${finding.title}: ${finding.detail}`),
     ...unsupportedWordWarnings(findings),
   ];
@@ -176,6 +177,24 @@ function marlinReviewText(
 
 const NEVER_MOVES =
   'The program never moves: its Frame visits the point where the head stands, where the program runs. The Frame does not prove Z clearance.';
+
+/** Program Health's notice for the same moves, which the warning below replaces. */
+const SKIPPED_MOTION_FINDING = 'skipped-motion';
+
+// A move the Inspector cannot read (an arc whose radius does not match, say)
+// adds nothing to the outline. A controller with looser limits may still run
+// it, so the review says the Frame leaves it out, as it does for every other
+// move it cannot place (ADR-630 Amendment 2). Lines count in the sent
+// program, baseline first.
+function skippedMotionWarnings(model: ReviewModel): ReadonlyArray<string> {
+  const first = model.skippedMotions[0];
+  if (first === undefined) return [];
+  const count = model.skippedMotions.length;
+  const one = count === 1;
+  return [
+    `The Inspector could not read ${one ? 'one move' : `${count} moves`} (first: line ${first.line + 1} of the sent program, ${first.reason}), so ${one ? 'it is' : 'they are'} not in the Frame outline. If the controller runs ${one ? 'it' : 'them'}, the head still makes ${one ? 'that move' : 'those moves'}.`,
+  ];
+}
 
 // Program Health lists what the Inspector does not interpret as notes; a run
 // sends those words anyway, so the review names them.
