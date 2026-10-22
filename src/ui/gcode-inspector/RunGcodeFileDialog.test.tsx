@@ -305,4 +305,15 @@ describe('Run G-code file dialog (ADR-630)', () => {
     expect(body.textContent).toContain('Line 2 is a $ controller command');
     expect([...body.querySelectorAll('button')].map((each) => each.textContent)).toEqual(['Close']);
   });
+
+  it('names Smoothieware shell and SD-card lines it will not send (ADR-630 Amendment 5)', async () => {
+    useLaserStore.setState({ activeControllerKind: 'smoothieware' });
+    const body = await show('G21\nversion\nG0 X1\nM28 notes.txt\n');
+    expect(body.textContent).toContain('will not send this file as a job');
+    expect(body.textContent).toContain(
+      'Line 2 (version) starts with a lowercase letter, so Smoothieware runs it as a shell command',
+    );
+    expect(body.textContent).toContain('Line 4 (M28notes.txt) is M28');
+    expect([...body.querySelectorAll('button')].map((each) => each.textContent)).toEqual(['Close']);
+  });
 });
