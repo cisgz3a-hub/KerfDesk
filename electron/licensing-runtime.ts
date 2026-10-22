@@ -206,9 +206,9 @@ class LicensingService {
       hardwareId: action === 'trial' ? await this.options.hardwareId?.() : undefined,
     });
     if (call === null) return current;
-    let answer: backgroundRefresh.GrantAnswer;
+    let value: unknown;
     try {
-      answer = await backgroundRefresh.readGrantReply(reply, call, () =>
+      value = await backgroundRefresh.readGrantReply(reply, () =>
         this.request(call.path, call.body),
       );
     } catch (error) {
@@ -218,7 +218,7 @@ class LicensingService {
       return { ...this.evaluate(saved, device), message: requestFailureMessage(error) };
     }
     try {
-      return await this.acceptGrant(action, answer, { saved, device }, licenseKey, onAccepted);
+      return await this.acceptGrant(action, value, { saved, device }, licenseKey, onAccepted);
     } catch (error) {
       if (action !== 'activate' || current.tier !== 'trial') throw error;
       // A rejected or unsaved paid grant cannot replace an existing trial.
@@ -228,7 +228,7 @@ class LicensingService {
   };
   private readonly acceptGrant = async (
     action: GrantAction,
-    { value, nonce }: backgroundRefresh.GrantAnswer,
+    value: unknown,
     { saved, device }: { readonly saved: LicenceRecord; readonly device: string },
     licenseKey?: string,
     onAccepted?: () => void,
@@ -237,7 +237,7 @@ class LicensingService {
     this.updateCache.failAuthentication();
     let grant: VerifiedGrant;
     try {
-      grant = verifyGrant(this.config, value, device, this.now(), nonce);
+      grant = verifyGrant(this.config, value, device, this.now());
     } catch (error) {
       if (!(error instanceof LicenceClockError)) throw error;
       // The service answered, but this clock is too far off for a trial or developer grant.
