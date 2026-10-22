@@ -65,7 +65,8 @@ Platform limits that shape the design:
 5. **Auto-fill for a new machine or after Find.** When the device has not been through setup in
    this browser, or the operator pressed **Find my machine**, the draft adopts, as ordinary draft
    actions: the firmware the banner named (only a serial firmware), the baud that answered, the
-   machine type from `$32` (a Laser + CNC draft keeps both), and the mapped `$$` values. The card
+   machine type from `$32` (a Laser + CNC draft keeps both), and the mapped `$$` values (a listed
+   machine keeps its type and work area: ADR-637 Amendments 1 and 2). The card
    lists every change as old → new with one **Undo** that restores the draft it started from.
    Nothing reaches the project before **Save machine setup**. A machine already set up, for
    either head, that the operator only opens setup for keeps its values and keeps the explicit

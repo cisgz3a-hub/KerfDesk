@@ -91,6 +91,9 @@ export type DeviceSetupAction =
       readonly kind: 'accept-detected';
       readonly patch: Partial<DeviceProfile>;
       readonly useSpindleScaleAsRpm?: boolean;
+      /** Leave the work area as it is: a listed machine's is sourced, and
+       *  `$130`/`$131` are the controller's travel (ADR-637 Amendment 2). */
+      readonly keepWorkArea?: boolean;
     }
   | { readonly kind: 'set-firmware-backup-confirmed'; readonly confirmed: boolean }
   | { readonly kind: 'toggle-firmware-write'; readonly id: number }
@@ -222,7 +225,9 @@ function reduceDraftAction(
     case 'accept-detected':
       return invalidateFirmwarePlan(
         state,
-        acceptDetectedPatch(state, action.patch, action.useSpindleScaleAsRpm === true),
+        acceptDetectedPatch(state, action.patch, action.useSpindleScaleAsRpm === true, {
+          keepWorkArea: action.keepWorkArea === true,
+        }),
       );
     case 'apply-preset':
       return applyPreset(state, action.profile);

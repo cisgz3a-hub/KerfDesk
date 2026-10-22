@@ -3580,7 +3580,10 @@ again) or **Discard changes**.
      banner names (when the driver can connect to it), the baud rate that answered, the machine
      type from `$32` (laser mode on or off; a Laser + CNC draft keeps both, and a machine chosen
      from the list keeps the type the list gives it, ADR-637 Amendment 1), and the mapped `$$`
-     values. The strip lists each change
+     values. A machine chosen from the list also keeps its listed work area: `$130`/`$131` are
+     the controller's travel, not the bed, so the strip shows them beside the kept area instead
+     of filling them in (ADR-637 Amendment 2). The strip lists each change the fill made that the
+     draft still holds
      as old → new with one **Undo** that restores the draft as it was. A machine already set up
      that the operator only opens setup for keeps its values and offers **Use detected values**
      for the ones that differ (ADR-347). When the adopted firmware differs from the one it
@@ -3703,7 +3706,9 @@ settings and Job Review keep their existing read-only setup references.
    material/bit/stock/tiling, the operation material/tool plan, job placement, CNC cache, and
    existing spindle-ceiling effects through one store action and one undo entry. **Cancel** leaves
    the live project, dirty state, undo/redo history, and controller unchanged. Only after Save does
-   the flow execute and exactly re-read any explicitly queued common firmware writes.
+   the flow execute and exactly re-read any explicitly queued common firmware writes. While a job
+   runs or is held (a CNC bit change included), Save is disabled and says why, as the toolbar's
+   Laser / CNC switch is; the draft stays open and saves once the job ends (ADR-416 Amendment 1).
 
 #### Success — configure CNC defaults before artwork exists
 

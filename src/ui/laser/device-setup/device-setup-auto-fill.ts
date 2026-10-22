@@ -7,7 +7,12 @@
 import { selectControllerDriver } from '../../../core/controllers';
 import type { ControllerKind, DeviceProfile } from '../../../core/devices';
 import type { MachineKind } from '../../../core/scene';
-import type { DeviceSetupAction, DeviceSetupState } from './device-setup-flow';
+import { setupChangeRows, type SetupChangeRow } from './device-setup-accept-detected';
+import {
+  deviceSetupReducer,
+  type DeviceSetupAction,
+  type DeviceSetupState,
+} from './device-setup-flow';
 import { draftIsListedMachine, machinePickerEntries } from './machine-picker-entries';
 
 export type DeviceSetupAutoFillSummary = {
@@ -34,6 +39,10 @@ export type DeviceSetupAutoFillRecord =
       readonly summary: DeviceSetupAutoFillSummary;
       /** The settings read the fill came from, so a later read fills again. */
       readonly readAt: number | null;
+      /** Each value row as the latest fill to change it left it. The card lists
+       *  a change only while the draft still holds that value, so a machine
+       *  chosen afterwards never reads as reported (controller audit v4 E2-P3-1). */
+      readonly written: ReadonlyArray<SetupChangeRow>;
     }
   | { readonly status: 'undone' };
 
@@ -63,14 +72,38 @@ export function nextAutoFill(
   const { readAt } = report;
   if (earlier === null) {
     if (plan === null) return null;
+    const written = writtenRows([], state, plan.actions);
     return {
       actions: plan.actions,
-      record: { status: 'applied', undo: state, summary: plan.summary, readAt },
+      record: { status: 'applied', undo: state, summary: plan.summary, readAt, written },
     };
   }
   if (plan === null) return { actions: [], record: { ...earlier, readAt } };
   const summary = mergeAutoFillSummary(earlier.summary, plan.summary);
-  return { actions: plan.actions, record: { ...earlier, summary, readAt } };
+  const written = writtenRows(earlier.written, state, plan.actions);
+  return { actions: plan.actions, record: { ...earlier, summary, readAt, written } };
+}
+
+function writtenRows(
+  earlier: ReadonlyArray<SetupChangeRow>,
+  state: DeviceSetupState,
+  actions: ReadonlyArray<DeviceSetupAction>,
+): ReadonlyArray<SetupChangeRow> {
+  const rows = setupChangeRows(state, actions.reduce(deviceSetupReducer, state));
+  const replaced = new Set(rows.map((row) => row.label));
+  return [...earlier.filter((row) => !replaced.has(row.label)), ...rows];
+}
+
+/** The rows of the card that the fills wrote and the draft still holds. */
+export function autoFilledRows(
+  record: Extract<DeviceSetupAutoFillRecord, { readonly status: 'applied' }>,
+  state: DeviceSetupState,
+): ReadonlyArray<SetupChangeRow> {
+  return setupChangeRows(record.undo, state).filter((row) =>
+    record.written.some(
+      (written) => written.label === row.label && written.newText === row.newText,
+    ),
+  );
 }
 
 function mergeAutoFillSummary(
@@ -92,6 +125,9 @@ export function planControllerAutoFill(
   report: ControllerReport,
 ): DeviceSetupAutoFillPlan | null {
   const actions: DeviceSetupAction[] = [];
+  // Decided on the draft as the fill finds it: a listed machine (a chosen row,
+  // or a listed laser profile however edited) keeps what the list says it is.
+  const listed = draftIsListedMachine(state, machinePickerEntries(state));
   const controllerKind = adoptedControllerKind(state, report.controllerKind);
   if (controllerKind !== null) {
     actions.push({ kind: 'select-controller', controllerKind });
@@ -100,12 +136,20 @@ export function planControllerAutoFill(
   // actually answered is written after it.
   const baudRate = adoptedBaudRate(state, controllerKind, report.baudRate);
   if (baudRate !== null) actions.push({ kind: 'edit', patch: { baudRate } });
-  const machineKind = machineKindFromLaserMode(state, report.detected);
+  const machineKind = listed ? null : machineKindFromLaserMode(state, report.detected);
   if (machineKind !== null) {
     actions.push({ kind: 'set-machine-kinds', machineKinds: [machineKind] });
   }
   const values = Object.keys(report.detected).length > 0;
-  if (values) actions.push({ kind: 'accept-detected', patch: report.detected });
+  if (values) {
+    // `$130`/`$131` are travel, not the bed (ADR-420 rule 8): a listed
+    // machine keeps its sourced work area (ADR-637 Amendment 2).
+    actions.push({
+      kind: 'accept-detected',
+      patch: report.detected,
+      ...(listed ? { keepWorkArea: true } : {}),
+    });
+  }
   if (actions.length === 0) return null;
   return { actions, summary: { controllerKind, baudRate, machineKind, values } };
 }
@@ -135,9 +179,9 @@ function adoptedBaudRate(
 // GRBL's $32 is the one reported fact about the tool: laser mode on is how a
 // laser runs, off is how a spindle runs. A two-tool machine keeps both. A
 // machine chosen from the list already says what it is, and $32 is a setting
-// of its controller, not a measurement of the machine (ADR-240 #2), so it keeps
-// its type; the reported laser mode still reaches the draft (ADR-637
-// Amendment 1).
+// of its controller, not a measurement of the machine (ADR-240 #2), so the
+// caller keeps its type; the reported laser mode still reaches the draft
+// (ADR-637 Amendment 1).
 function machineKindFromLaserMode(
   state: DeviceSetupState,
   detected: Partial<DeviceProfile>,
@@ -146,6 +190,5 @@ function machineKindFromLaserMode(
   const laserMode: DeviceProfile['laserModeEnabled'] | undefined = detected.laserModeEnabled;
   if (laserMode === undefined) return null;
   const reported: MachineKind = laserMode ? 'laser' : 'cnc';
-  if (state.machineKinds[0] === reported) return null;
-  return draftIsListedMachine(state, machinePickerEntries(state)) ? null : reported;
+  return state.machineKinds[0] === reported ? null : reported;
 }
