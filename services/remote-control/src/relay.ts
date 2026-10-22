@@ -17,6 +17,7 @@ const relayResponseSchema = z.strictObject({
       code: z.enum([
         'unavailable',
         'stale_revision',
+        'busy',
         'needs_pro',
         'unsupported_operation',
         'invalid_input',

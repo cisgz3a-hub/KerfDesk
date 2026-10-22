@@ -12,12 +12,17 @@
 // pieces costs each ring only its neighbours.
 
 import { pointInPolygon } from '../geometry';
+import { PolygonEdgeIndex } from '../geometry/polygon-edge-index';
 import { signedAreaMm2 } from '../geometry/polyline-orientation';
 import type { Vec2 } from '../scene';
 import { ContourBoxIndex } from '../trace/contour-box-index';
 import { outlinesAreCopies } from './laser-lead-copies';
 import type { LeadRing } from './laser-lead-obstacles';
 import type { LeadSideVerdict } from './laser-lead-sides';
+
+// Rings with more points than this are tested for containment through an
+// index of their edges.
+const INDEXED_RING_POINTS = 32;
 
 export type PieceLookup = {
   /** The other rings whose bounds meet ring `index`'s, in ring order. */
@@ -38,9 +43,17 @@ export function pieceLookup(rings: ReadonlyArray<LeadRing>): PieceLookup {
     if (!probes.has(index)) probes.set(index, insidePoint(rings[index]?.points ?? []));
     return probes.get(index) ?? null;
   };
+  // A ring with many edges is tested through an index of them, built once: a
+  // whole outline every one of thousands of pieces lies in is asked once per
+  // piece, and a scan of its edges each time would cost their product.
+  const indexes = new Map<number, PolygonEdgeIndex | null>();
   const holds = (container: number, point: Vec2 | null): boolean => {
     const ring = rings[container];
-    return point !== null && ring !== undefined && pointInPolygon(point, ring.points);
+    if (point === null || ring === undefined) return false;
+    if (ring.points.length <= INDEXED_RING_POINTS) return pointInPolygon(point, ring.points);
+    if (!indexes.has(container)) indexes.set(container, PolygonEdgeIndex.create(ring.points));
+    const index = indexes.get(container) ?? null;
+    return index === null ? pointInPolygon(point, ring.points) : index.containsPoint(point);
   };
   return {
     near: (index) => {
@@ -58,9 +71,10 @@ export function pieceLookup(rings: ReadonlyArray<LeadRing>): PieceLookup {
 
 /** Assigns copy classes to the rings of each scene contour some operation
  * split: a ring takes the class of the earlier ring of its own operation it
- * copies exactly (drawn twice), else, when it is a piece, of the earlier piece
- * of another operation it corresponds to and overlaps most (its counterpart at
- * that operation's offset), else a class of its own; the contour's first ring
+ * copies exactly (drawn twice), else of the earlier ring of the same kind in
+ * another operation it corresponds to and overlaps most: a piece's counterpart
+ * piece at that operation's offset, or for a whole outline the whole outline
+ * another operation cuts; else a class of its own. The contour's first ring
  * keeps the contour's class. A whole outline is no copy of a piece of it: they
  * are not one burn, so each keeps clear of the other's leads, and the piece is
  * only exempt from the outline itself (pieceExemptions). Two different pieces
@@ -88,22 +102,22 @@ export function pieceClasses(
     const twin = earlier.find(
       (other) => groups[other] === group && outlinesAreCopies(rings[other] as LeadRing, ring),
     );
+    // A piece pairs with a piece, and a whole outline with the whole outline
+    // another operation that left the contour whole cuts: those stay copies.
     const isPiece = pieceKeys.has(key);
     const counterpart =
       twin ??
-      (isPiece
-        ? largestOverlap(
-            rings,
-            ring,
-            earlier.filter(
-              (other) =>
-                groups[other] !== group &&
-                pieceKeys.has(`${own}:${groups[other] ?? -1}`) &&
-                !used.has(sides[other]?.copyClass ?? Number.NaN) &&
-                lookup.correspond(index, other),
-            ),
-          )
-        : undefined);
+      largestOverlap(
+        rings,
+        ring,
+        earlier.filter(
+          (other) =>
+            groups[other] !== group &&
+            pieceKeys.has(`${own}:${groups[other] ?? -1}`) === isPiece &&
+            !used.has(sides[other]?.copyClass ?? Number.NaN) &&
+            lookup.correspond(index, other),
+        ),
+      );
     const match = counterpart === undefined ? undefined : sides[counterpart];
     const copyClass =
       match !== undefined ? match.copyClass : started.has(own) ? fresh + index : own;

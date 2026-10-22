@@ -73,6 +73,29 @@ describe('own-contour crossings (ADR-626)', () => {
     expect(crossesOwnContour(clear, small[0] as Vec2, small)).toBe(false);
   });
 
+  it('finds a lead running along its own contour past the join', () => {
+    const square = ring([
+      { x: 0, y: 0 },
+      { x: 40, y: 0 },
+      { x: 40, y: 40 },
+      { x: 0, y: 40 },
+    ]);
+    const join = { x: 5, y: 0 };
+    // Along the bottom edge for 2 mm: far past the join's 0.2 mm.
+    const along = [
+      { x: 5, y: 0 },
+      { x: 7, y: 0 },
+    ];
+    expect(crossesOwnContour(along, join, square)).toBe(true);
+    // Riding it for 0.1 mm beside the join is allowed.
+    const beside = [
+      { x: 5, y: 0 },
+      { x: 5.1, y: 0 },
+      { x: 5.1, y: -1 },
+    ];
+    expect(crossesOwnContour(beside, join, square)).toBe(false);
+  });
+
   it('allows a crossing beside the join, where a lead meets its contour', () => {
     const square = ring([
       { x: 0, y: 0 },

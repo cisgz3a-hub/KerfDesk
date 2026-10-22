@@ -50,7 +50,12 @@ export type SelectionTransformEdit =
 
 export type SelectionTransformError =
   | 'empty-selection'
+  // No width and no height (a point): there is nothing to scale.
   | 'degenerate-selection'
+  // The edit scales an axis the selection has no extent on, such as the height
+  // of a horizontal line. Its other axis still resizes.
+  | 'zero-width-selection'
+  | 'zero-height-selection'
   | 'invalid-dimension'
   | 'invalid-number'
   | 'multi-rotation'
@@ -176,6 +181,7 @@ function resizeSelection(
     return { kind: 'error', reason: 'invalid-dimension' };
   }
   const factors = resizeFactors(resizeMetrics, edit);
+  if (typeof factors === 'string') return { kind: 'error', reason: factors };
   if (rejectsWorldAxisResize(objects, edit, factors)) {
     return { kind: 'error', reason: 'non-uniform-rotated-selection' };
   }
@@ -199,8 +205,10 @@ function resizeMetricsForFrame(
     : selectionMetricsInFrame(objects, frameRotationDeg);
 }
 
+// A straight horizontal or vertical line has one zero extent and still resizes
+// along the other; only a selection flat both ways has nothing to scale.
 function hasDegenerateDimensions(metrics: SelectionMetrics): boolean {
-  return metrics.width <= MIN_DIMENSION_MM || metrics.height <= MIN_DIMENSION_MM;
+  return metrics.width <= MIN_DIMENSION_MM && metrics.height <= MIN_DIMENSION_MM;
 }
 
 function hasInvalidResizeDimension(
@@ -265,15 +273,28 @@ function rotateSelection(
   };
 }
 
+// The scale along each axis, or why an axis the edit sets cannot be scaled. A
+// locked aspect takes its one factor from a set Width with extent, else from a
+// set Height with extent, so a straight line keeps its zero extent and resizes.
 function resizeFactors(
   metrics: SelectionMetrics,
   edit: Extract<SelectionTransformEdit, { readonly kind: 'resize' }>,
-): { readonly x: number; readonly y: number } {
-  const x = edit.width === undefined ? 1 : edit.width / metrics.width;
-  const y = edit.height === undefined ? 1 : edit.height / metrics.height;
-  if (!edit.preserveAspect) return { x, y };
-  const uniform = edit.width !== undefined ? x : y;
-  return { x: uniform, y: uniform };
+): { readonly x: number; readonly y: number } | 'zero-width-selection' | 'zero-height-selection' {
+  const x = axisFactor(edit.width, metrics.width);
+  const y = axisFactor(edit.height, metrics.height);
+  if (edit.preserveAspect) {
+    const uniform = typeof x === 'number' ? x : typeof y === 'number' ? y : undefined;
+    if (uniform !== undefined) return { x: uniform, y: uniform };
+  }
+  if (x === null) return 'zero-width-selection';
+  if (y === null) return 'zero-height-selection';
+  return { x: x ?? 1, y: y ?? 1 };
+}
+
+// undefined: the edit leaves this axis alone; null: it sets an axis with no extent.
+function axisFactor(target: number | undefined, extent: number): number | null | undefined {
+  if (target === undefined) return undefined;
+  return extent <= MIN_DIMENSION_MM ? null : target / extent;
 }
 
 function anchorPointForBBox(bbox: AABB, anchor: SelectionAnchor): Vec2 {

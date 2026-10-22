@@ -44,7 +44,7 @@ export async function executeMachineOperation(
   if (input.command === 'connect_machine') return executeConnect(operation, context);
   if (input.command === 'disconnect_machine') return executeDisconnect(operation);
   if (input.command === 'home_machine') return executeHome(operation);
-  if (input.command === 'set_work_origin') return executeOrigin(input, operation);
+  if (input.command === 'set_work_origin') return executeOrigin(input, operation, context);
   if (input.command === 'pause_job' || input.command === 'resume_job')
     return executePauseResume(input.command === 'pause_job', operation);
   operation.state = 'preparing';

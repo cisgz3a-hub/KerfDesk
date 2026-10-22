@@ -31,10 +31,10 @@ import {
   normalizeFrameWorkCoordinateSystem,
 } from './frame-controller-readiness';
 import {
+  absoluteFrameOffsetRefusal,
   waitForAbsoluteFrameOffset,
   waitForUnreportedFrameWorkOffset,
 } from './frame-position-readiness';
-import { ABSOLUTE_WORK_OFFSET_REQUIRED_MESSAGE } from '../job-placement';
 import { clearStartBlockers } from './start-blocker-invalidation';
 import { clearFrameExpiryNote } from './frame-expiry-note';
 import { type ConfirmedJobReview, type ReviewedStartBundle } from './job-review';
@@ -259,7 +259,7 @@ async function prepareFrameContext(
   signal.throwIfAborted();
   if (!(await waitForAbsoluteFrameOffset(useStore.getState().jobPlacement))) {
     reportFramePreparationRefusal(
-      [ABSOLUTE_WORK_OFFSET_REQUIRED_MESSAGE],
+      absoluteFrameOffsetRefusal(useStore.getState().jobPlacement),
       wcsNormalization.warning,
     );
     return null;

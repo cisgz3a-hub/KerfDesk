@@ -17,8 +17,8 @@ import {
 import type { CutShapesError, CutShapesPlan } from '../../core/geometry/cut-shapes';
 import type { OffsetShapesOptions, OffsetShapesResult } from '../../core/geometry/offset-shapes';
 import {
-  describeWeldChange,
   NOTHING_TO_WELD_MESSAGE,
+  weldChangesOutlines,
 } from '../../core/geometry/vector-path-weld-change';
 import { err, ok, type Result } from '../../core/result';
 import type { ImportedSvg, Scene } from '../../core/scene';
@@ -163,7 +163,7 @@ export function weldPlanForSelection(
     reused === undefined ? planWeldSelection(scene, selected, uniqueWeldId(scene)) : ok(reused);
   // A weld that merges nothing would only flatten editable sources into one
   // path object with the same outlines, so it is refused like a failed weld.
-  if (plan.kind === 'error' || describeWeldChange(selected, plan.value.object).changed) return plan;
+  if (plan.kind === 'error' || weldChangesOutlines(selected, plan.value.object)) return plan;
   return err({ kind: 'nothing-to-weld', message: NOTHING_TO_WELD_MESSAGE });
 }
 

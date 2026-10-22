@@ -30,6 +30,7 @@ import {
 import type { LaserState, LiveRefs } from './laser-store';
 import type { TranscriptSource } from './laser-transcript';
 import { pendingTransportWriteCount } from './laser-start-queue-fence';
+import { laserStatusReportFieldsOff, unknownMachinePositionMessage } from './status-report-fields';
 import {
   assertMachineExecutionOwner,
   ownedMachineWrite,
@@ -96,7 +97,10 @@ async function runJogToMachinePosition(
     get().controllerSettings?.reportInches === true,
   );
   if (current === null) {
-    const message = 'Jog to point needs a live machine position. Wait for an Idle status report.';
+    // A grblHAL `$10` that sends WPos and no WCO never gives one (ADR-375 Amd 2).
+    const message =
+      unknownMachinePositionMessage(laserStatusReportFieldsOff(get())) ??
+      'Jog to point needs a live machine position. Wait for an Idle status report.';
     set({ lastWriteError: message, log: pushLog(get(), `[lf2] ${message}`) });
     throw new Error(message);
   }
