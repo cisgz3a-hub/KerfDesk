@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "sinceSourceSha": "dfba62ae90e3fc2f23ebe05b0bc5624b3e790151",
+  "sinceSourceSha": "faf5a54f1091df17afbcf0e30dd9d7b80208a028",
   "highlights": [
-    "Line cuts can start and end off the part with a laser lead-in and lead-out, placed on each shape's scrap side. A new Blue Noise dither gives smoother midtones in portraits.",
-    "New free tools: a G-code Inspector, your computer's installed fonts, inch display units, and running a G-code file made in another program. Paid Pro licences keep working offline, like LightBurn's.",
-    "Machine Setup starts with one machine list, Start shows a compact confirm sheet you can edit in place, and the artwork hover readout shows power and speed. The Falcon A1 Pro's red pointer switches on with one tick.",
-    "Controllers behave more safely: jog cancel waits for the machine's reply, failed auto-connects and settings reads stay quiet, the safety notice and recovery card float over the canvas, and alarms are read per firmware.",
-    "Artwork lights up while you edit its settings. Trace an image already on the Registration Jig, Centre & LED keeps the pointer light on until LED off, and dither swatches appear wherever you pick a dither.",
-    "Bevel offsets keep square corners and line ends, Weld warns before enclosed shapes vanish, kerf offsets judge inner and outer edges more reliably, and the Artwork panel and hover pulse are calmer."
+    "Camera setup is redesigned: a guided wizard, a simple everyday panel, a camera that starts and refreshes by itself (Alt+C), a quick fix for a small offset, and a warning when the camera seems to have moved.",
+    "Place Board can draw an irregular board from a photo and register it with the head, and its panel now floats over the canvas. The Falcon A1 Pro's LED shows where it will burn using the laser at low power.",
+    "Safer laser output: project labels can no longer inject G-code, Marlin keeps the beam dark at air changes and the job end, small power ranges keep fine steps, and lead-ins stay out of kept parts on laser and CNC.",
+    "Controllers: tool changes re-zero Z only, Marlin's skipped moves stop Frame and jobs, auto-focus probes need their own slow feed, grblHAL settings are checked, and the Ortur LM3 presets now use grblHAL.",
+    "Running another program's G-code checks laser mode and power scale like Start does and warns about burning rapids. No-go zones cover the Frame route and resume moves, and tiled CNC jobs save one file per bit.",
+    "Recovery tells a real controller restart from a greeting, Abort and Save survive a window crash, saving never empties a file it cannot finish, scan offsets no longer move placed jobs, and Cut Settings apply what they show."
   ]
 }
