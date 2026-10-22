@@ -3,9 +3,14 @@
 // no position of their own: "Target already engraved" has to know the layout
 // the laser used, and rebuilding it from the wizard's settings, which start
 // from the defaults after every restart, matched a target engraved with
-// another margin to the wrong bed positions. Unreadable storage means nothing
-// is remembered.
+// another margin to the wrong bed positions. The bed frame it was engraved in
+// goes with it, so a calibration from it records that frame (rolling audit
+// 12-P2-2). Unreadable storage means nothing is remembered.
 
+import {
+  normalizeCameraBedFrame,
+  type CameraBedFrame,
+} from '../../../core/camera/model/camera-bed-frame';
 import type { BedArea } from '../../../core/camera/model/camera-model-accuracy';
 import type { DeviceProfile } from '../../../core/devices';
 
@@ -18,7 +23,26 @@ export type EngravedTarget = {
   /** The margin it was laid out with or, for a head camera, the square's side, mm. */
   readonly layoutMm: number;
   readonly engravedAt: string;
+  /** The bed frame the rings were placed in; absent on targets remembered before it was kept. */
+  readonly bedFrame?: CameraBedFrame;
 };
+
+/**
+ * The bed frame `target` was engraved in. A target remembered without one
+ * keeps its bed size and takes today's origin, with the native offset unknown.
+ */
+export function engravedTargetBedFrame(
+  target: EngravedTarget,
+  now: CameraBedFrame,
+): CameraBedFrame {
+  return (
+    target.bedFrame ?? {
+      origin: now.origin,
+      bedWidthMm: target.bedWidthMm,
+      bedHeightMm: target.bedHeightMm,
+    }
+  );
+}
 
 type MachineTargets = { readonly bed?: EngravedTarget; readonly head?: EngravedTarget };
 
@@ -105,7 +129,17 @@ function parseTarget(value: unknown): EngravedTarget | null {
   if (!allFinite(numbers) || typeof engravedAt !== 'string') return null;
   const [x, y, width, height, bedWidthMm, bedHeightMm, layoutMm] = numbers;
   if (!(width > 0 && height > 0)) return null;
-  return { area: { x, y, width, height }, bedWidthMm, bedHeightMm, layoutMm, engravedAt };
+  const bedFrame =
+    value['bedFrame'] === undefined ? undefined : normalizeCameraBedFrame(value['bedFrame']);
+  if (value['bedFrame'] !== undefined && bedFrame === undefined) return null;
+  return {
+    area: { x, y, width, height },
+    bedWidthMm,
+    bedHeightMm,
+    layoutMm,
+    engravedAt,
+    ...(bedFrame === undefined ? {} : { bedFrame }),
+  };
 }
 
 type SevenNumbers = readonly [number, number, number, number, number, number, number];

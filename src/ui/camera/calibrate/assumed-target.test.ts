@@ -18,6 +18,7 @@ function assume(overrides: Partial<Parameters<typeof assumedTarget>[0]> = {}) {
     bedHeightMm: 400,
     knownArea: null,
     remembered: engravedWith20,
+    frameNow: { origin: 'front-left', bedWidthMm: 400, bedHeightMm: 400 },
     ...overrides,
   });
 }
