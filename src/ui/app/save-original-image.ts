@@ -8,6 +8,7 @@ import { encodeBmp24 } from '../../core/raster/encode-bmp';
 import type { RasterImage } from '../../core/scene';
 import type { PlatformAdapter } from '../../platform/types';
 import { readRasterSourceFile } from '../import/paged-raster-source';
+import { pickPreparedSaveTarget } from './pick-prepared-save-target';
 import type { ToastVariant } from '../state/toast-store';
 
 export type OriginalImageFormat = 'png' | 'jpeg' | 'bmp';
@@ -33,23 +34,20 @@ export type SaveOriginalImageCtx = {
 
 export async function saveOriginalImage(ctx: SaveOriginalImageCtx): Promise<void> {
   const { mime, extension } = FORMATS[ctx.format];
-  let target;
   try {
-    target = await ctx.platform.pickFileForSave({
-      suggestedName: `${fileStem(ctx.image.source)}${extension}`,
-      extensions: [extension],
-    });
-  } catch (error) {
-    ctx.pushToast(`Could not save the image: ${message(error)}`, 'error');
-    return;
-  }
-  if (target === null) return;
-  try {
+    // The picker empties an existing file as it returns (ADR-656): the image
+    // is read and encoded first.
     const source = await (ctx.readSource ?? ((image) => readRasterSourceFile(image, image.source)))(
       ctx.image,
     );
     const blob =
       source.type === mime ? source : await (ctx.encode ?? encodeInBrowser)(source, ctx.format);
+    const target = await pickPreparedSaveTarget(
+      ctx.platform,
+      { suggestedName: `${fileStem(ctx.image.source)}${extension}`, extensions: [extension] },
+      { title: 'Save original image', message: 'The image is ready.' },
+    );
+    if (target === null) return;
     await target.write(blob);
     ctx.pushToast(`Saved the original image to ${target.displayName}`, 'success');
   } catch (error) {

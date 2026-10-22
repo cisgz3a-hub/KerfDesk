@@ -10,6 +10,7 @@ import {
   mpgCommandBlockMessage,
   motionOperationCommandBlockMessage,
   pushLog,
+  toolChangeXyOriginBlockMessage,
 } from './laser-store-helpers';
 import type { LaserState, LiveRefs } from './laser-store';
 import { confirmFreshManualMotionIdle } from './manual-motion-fresh-idle';
@@ -20,19 +21,32 @@ type SetFn = (
 type GetFn = () => LaserState;
 
 // Every origin action requires a known stationary controller and exclusive
-// acknowledgement ownership before it may start a transaction.
+// acknowledgement ownership before it may start a transaction. `axes` names
+// what the action can move. Only a Z-only action (Zero Z) runs in a CNC
+// tool-change hold; every other origin action can move the X/Y origin the rest
+// of the job is placed on, so it is refused there (ADR-375 Amendment 3).
 export async function assertOriginActionReady(
   set: SetFn,
   get: GetFn,
   refs: LiveRefs,
   safeWrite: OriginSafeWrite,
+  axes: 'z' | 'xy' = 'xy',
 ): Promise<void> {
-  assertOriginActionReadyNow(set, get, refs);
+  const assertReady = (): void => {
+    assertOriginActionReadyNow(set, get, refs);
+    if (axes === 'xy') assertNoToolChangeHold(set, get);
+  };
+  assertReady();
   await confirmFreshManualMotionIdle({ get, refs, write: safeWrite, action: 'origin' }).catch(
     (error: unknown) =>
       blockOriginAction(set, get, error instanceof Error ? error.message : String(error)),
   );
-  assertOriginActionReadyNow(set, get, refs);
+  assertReady();
+}
+
+function assertNoToolChangeHold(set: SetFn, get: GetFn): void {
+  const message = toolChangeXyOriginBlockMessage(get());
+  if (message !== null) blockOriginAction(set, get, message);
 }
 
 function assertOriginActionReadyNow(set: SetFn, get: GetFn, refs: LiveRefs): void {

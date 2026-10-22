@@ -91,6 +91,7 @@ import { materialLibraryActions, type MaterialLibraryActions } from './material-
 import { savedLibrariesActions, type SavedLibrariesActions } from './saved-libraries-actions';
 import { libraryActions, type LibraryActions } from './material-library-store-actions';
 import { objectPropertiesActions, type ObjectPropertiesActions } from './object-properties-actions';
+import type { LayerParamOwnerActions } from './layer-param-actions';
 import { operationActions, type OperationActions } from './operation-actions';
 import { artworkOrderActions, type ArtworkOrderActions } from './artwork-order-actions';
 import { imageEditActions, type ImageEditActions } from './image-edit-actions';
@@ -159,6 +160,7 @@ export const DEFAULT_OUTPUT_SCOPE_SETTINGS: OutputScopeSettings = {
 };
 
 export type AppState = PartGeneratorActions &
+  LayerParamOwnerActions &
   ConstrainedSketchActions &
   ReliefAuthoringActions &
   ObjectPropertiesActions &
@@ -434,7 +436,7 @@ export const useStore = create<AppState>((rawSet, get) => {
   const set = numberingEditGuardSetter(interactionSet);
   return {
     ...initialState(),
-    ...projectActions(documentSet, get, initialState),
+    ...projectActions(documentSet, get, initialState, proOperationMutationSetter(set, get)),
     ...objectInsertActions(set, get),
     ...imageImportActions(set, get),
     ...breakApartActions(proOperationMutationSetter(set, get)),

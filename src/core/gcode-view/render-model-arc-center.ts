@@ -1,6 +1,8 @@
 // Where a G2/G3 arc's centre is, from I/J or R, for the render model
 // (ADR-255 stage 2). Split out of gcode-render-model-builder.ts unchanged,
 // except that it returns why a line is skipped instead of recording it.
+// The points and words are in the arc's plane (render-model-arc.ts): I and J
+// hold the offsets along the plane's first and second axes.
 
 import { ijArcCenter, rArcGeometry } from '../gcode';
 
@@ -16,12 +18,13 @@ export function renderArcCenter(
   to: XY,
   clockwise: boolean,
   unitScale: number,
+  offsetNames = 'I/J',
 ): { readonly center: XY } | { readonly skipped: string } {
   const i = axisWords.get('I');
   const j = axisWords.get('J');
   if (i !== undefined || j !== undefined) return { center: ijArcCenter(from, i, j, unitScale) };
   const r = axisWords.get('R');
-  if (r === undefined) return { skipped: 'arc needs I/J or R' };
+  if (r === undefined) return { skipped: `arc needs ${offsetNames} or R` };
   const solved = rArcGeometry(from, to, r, clockwise, unitScale);
   if (solved === null) return { skipped: 'R-form arc cannot start and end at the same point' };
   if (solved.halfChordGapSq < -ARC_RADIUS_TOLERANCE_MM * solved.chordMm) {

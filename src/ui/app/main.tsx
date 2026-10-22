@@ -21,16 +21,14 @@ import {
 } from '../../platform/electron';
 import type { PlatformAdapter } from '../../platform/types';
 import { webAdapter } from '../../platform/web';
-import { ErrorBoundary, type SoftwareAbort } from '../common/ErrorBoundary';
-import { isActiveJob } from '../state/laser-store-helpers';
-import { useLaserStore } from '../state/laser-store';
-import { unownedControllerMotion } from '../state/unowned-controller-motion';
+import { ErrorBoundary } from '../common/ErrorBoundary';
 // Design tokens + shared chrome classes (ADR-047). Imported exactly once,
 // here — jsdom tests never load main.tsx, so styling stays out of unit tests.
 import '../theme/tokens.css';
 import '../kit/icons.css';
 import { initAppTheme } from '../theme/app-theme';
 import { App } from './App';
+import { CrashScreenHosts, machineSoftwareAbort, projectCrashSave } from './crash-recovery';
 import { PlatformProvider } from './platform-context';
 import { EditionProvider } from '../licensing/EditionProvider';
 import { installProjectSealKey } from '../licensing/project-seal';
@@ -91,31 +89,17 @@ function prepareDesktopWorkspace(): void {
   if (sealKey !== undefined) installProjectSealKey(sealKey);
 }
 
-// If a render crash unmounts the App (and its Abort button + Ctrl+. listener),
-// the crash screen still needs a way to request a controller abort (F60/F65). Both
-// closures read the store at call time, so they reflect the machine's real state
-// at the moment of the crash / click.
-const softwareAbort: SoftwareAbort = {
-  isMotionLive: () => {
-    const s = useLaserStore.getState();
-    return (
-      isActiveJob(s.streamer) ||
-      s.controllerOperation !== null ||
-      s.motionOperation !== null ||
-      s.fireActive ||
-      unownedControllerMotion(s) !== null
-    );
-  },
-  trigger: () =>
-    void useLaserStore
-      .getState()
-      .stopJob()
-      .catch(() => undefined),
-};
-
+// App puts the workspace in its own boundary, so a crash there keeps the job
+// protections running (audit 27-P2-2). This root boundary catches the rest:
+// the providers, the startup gate and those protections themselves. It still
+// offers the software Abort (F60/F65) and Save.
 createRoot(rootElement).render(
   <StrictMode>
-    <ErrorBoundary softwareAbort={softwareAbort}>
+    <ErrorBoundary
+      softwareAbort={machineSoftwareAbort}
+      crashSave={projectCrashSave(adapter)}
+      crashHosts={<CrashScreenHosts />}
+    >
       <PlatformProvider adapter={adapter}>
         <DesktopStartupGate onNativeReady={prepareDesktopWorkspace}>
           <DesktopDownloadContext.Provider value={resolveWindowsDesktopDownload}>

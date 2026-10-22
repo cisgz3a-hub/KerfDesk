@@ -139,19 +139,16 @@ function LaserOperations(
 }
 
 // Artworks that own an edited field keep it over the base (ADR-317), so the
-// edit must reach them too (controller audit speed-2).
+// edit must reach them too (controller audit speed-2), in the same undo step
+// as the base (audit 2026-10-21 06-P2-5).
 function useCommitLayerPatch(): (
   layer: Layer,
   objects: ReadonlyArray<SceneObject>,
   patch: ReviewRowPatch,
 ) => void {
-  const setLayerParam = useStore((s) => s.setLayerParam);
-  const setArtworkOverride = useStore((s) => s.setObjectsOperationOverrideForOperation);
-  return (layer, objects, patch) => {
-    const owners = artworkOwnerPatches(layer, objects, patch);
-    setLayerParam(layer.id, patch);
-    for (const owner of owners) setArtworkOverride(owner.objectIds, layer.id, owner.patch);
-  };
+  const save = useStore((s) => s.setLayerParamWithArtworkOverrides);
+  return (layer, objects, patch) =>
+    save(layer.id, patch, artworkOwnerPatches(layer, objects, patch));
 }
 
 function CncOperations(props: {

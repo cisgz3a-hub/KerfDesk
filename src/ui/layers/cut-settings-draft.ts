@@ -25,6 +25,7 @@ import {
   MIN_LEAD_LENGTH_MM,
 } from '../../core/job/laser-lead-settings';
 import { DITHER_ALGORITHMS, type Layer, type LayerMode } from '../../core/scene';
+import { numberField, reconciledNumberField, submittedNumber } from './cut-settings-number-field';
 
 export type LayerPatch = Partial<Omit<Layer, 'id' | 'color'>>;
 export type CutSettingsLimits = {
@@ -106,8 +107,14 @@ function readImageSettingsPatch(
     };
   }
   return {
-    minPower: numberField(data, 'minPower', layer.minPower, 0, deferArtworkBounds ? 100 : power),
-    dotWidthCorrectionMm: numberField(
+    minPower: reconciledNumberField(
+      data,
+      'minPower',
+      layer.minPower,
+      0,
+      deferArtworkBounds ? 100 : power,
+    ),
+    dotWidthCorrectionMm: reconciledNumberField(
       data,
       'dotWidthCorrectionMm',
       layer.dotWidthCorrectionMm,
@@ -377,22 +384,6 @@ function readImageLinesPerMm(data: FormData, layer: Layer): number {
     );
   }
   return layer.linesPerMm;
-}
-
-function numberField(
-  data: FormData,
-  name: string,
-  fallback: number,
-  min: number,
-  max: number,
-): number {
-  const parsed = submittedNumber(data, name);
-  if (!Number.isFinite(parsed)) return fallback;
-  return Math.max(min, Math.min(max, parsed));
-}
-
-function submittedNumber(data: FormData, name: string): number {
-  return Number.parseFloat(String(data.get(name) ?? ''));
 }
 
 function positiveFiniteLimit(value: number | undefined): number | null {

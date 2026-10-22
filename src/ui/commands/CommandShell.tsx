@@ -47,6 +47,7 @@ import { ScanOffsetCommandDialog } from './ScanOffsetCommandDialog';
 import { IntervalDialog, MaterialDialog } from './CalibrationGridDialogs';
 import { GcodeSaveDialog } from '../app/GcodeSaveDialog';
 import { ProjectSaveDialog } from '../app/ProjectSaveDialog';
+import { SaveReadyDialog } from '../app/SaveReadyDialog';
 import { VectorRepairDialogHost } from './VectorRepairDialogHost';
 import { OffsetShapesDialogHost } from './OffsetShapesDialogHost';
 import { SettingsWindowHost } from '../settings/SettingsWindowHost';
@@ -172,6 +173,7 @@ function StoreOpenedDialogs(): JSX.Element {
     <>
       <GcodeSaveDialogHost />
       <ProjectSaveDialog />
+      <SaveReadyDialog />
       <BarcodeDialogHost />
       <CopyAlongPathDialogHost />
       <OptimizeShapesDialogHost />

@@ -13,10 +13,23 @@ import importPlugin from 'eslint-plugin-import';
 import reactHooksPlugin from 'eslint-plugin-react-hooks';
 import prettierConfig from 'eslint-config-prettier';
 import globals from 'globals';
+import kerfdeskRules from './scripts/eslint/no-raw-project-set-state.mjs';
 
 const FILE_LINE_LIMIT = 400;
 const FUNCTION_LINE_LIMIT = 80;
 const COMPLEXITY_LIMIT = 12;
+
+// Test support outside *.test.* files seeds the store directly.
+const UI_TEST_SUPPORT_FILES = [
+  'src/ui/**/__fixtures__/**',
+  'src/ui/**/testing/**',
+  'src/ui/**/*-testing.{ts,tsx}',
+  'src/ui/**/*test-helpers.ts',
+  'src/ui/**/*.test-fixture.{ts,tsx}',
+  'src/ui/**/*.test-support.{ts,tsx}',
+  'src/ui/**/*-test-fixtures.ts',
+  'src/ui/**/*-audit-support.ts',
+];
 
 const moduleBoundaries = {
   'boundaries/elements': [
@@ -320,6 +333,15 @@ export default tseslint.config(
         },
       ],
     },
+  },
+  // ADR-592 decision 5: project edits outside the store pass its Pro guard
+  // (scripts/eslint/no-raw-project-set-state.mjs). Its own rule name keeps the
+  // file-wide colour disables above from switching it off.
+  {
+    files: ['src/ui/**/*.ts', 'src/ui/**/*.tsx'],
+    ignores: ['**/*.test.ts', '**/*.test.tsx', ...UI_TEST_SUPPORT_FILES],
+    plugins: { kerfdesk: kerfdeskRules },
+    rules: { 'kerfdesk/no-raw-project-set-state': 'error' },
   },
   // H13: the job-aware wrapper module is the ONE place allowed to touch the
   // native blocking dialogs — everything else must go through it.

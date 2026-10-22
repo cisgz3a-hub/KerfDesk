@@ -27,11 +27,15 @@ import {
   type RealtimeOverrideByte,
 } from '../../core/controllers/grbl';
 import { useLaserStore } from '../state/laser-store';
+import { laserStatusReportFieldsOff, overridesOffMessage } from '../state/status-report-fields';
 import { useStore } from '../state/store';
 import { controllerActionFailureHandler } from './report-controller-action-failure';
 
 export function OverrideControls(): JSX.Element {
   const ovCache = useLaserStore((s) => s.ovCache);
+  const capabilities = useLaserStore((s) => s.capabilities);
+  const controllerSettings = useLaserStore((s) => s.controllerSettings);
+  const fieldsOff = laserStatusReportFieldsOff({ capabilities, controllerSettings });
   const send = useLaserStore((s) => s.sendRealtimeOverride);
   const activeJobMachineKind = useLaserStore((s) => s.activeJobMachineKind);
   const projectMachineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
@@ -41,6 +45,13 @@ export function OverrideControls(): JSX.Element {
   };
   return (
     <div style={boxStyle} aria-label="Job overrides">
+      {ovCache === null && fieldsOff?.overridesOff === true && (
+        // A grblHAL `$10` without bit 6 never sends Ov:, so the "—" readouts
+        // would otherwise look like a report still to come (ADR-375 Amd 2).
+        <span style={noticeStyle} title={overridesOffMessage(fieldsOff)}>
+          Percentages not reported: $10 bit 6 is off (send $10={fieldsOff.suggestedMask})
+        </span>
+      )}
       <OverrideRow
         label="Feed"
         percent={ovCache?.feed ?? null}
@@ -190,6 +201,7 @@ const stepButtonStyle: React.CSSProperties = {
   fontSize: 11,
   fontVariantNumeric: 'tabular-nums',
 };
+const noticeStyle: React.CSSProperties = { fontSize: 11, color: 'var(--lf-text-muted)' };
 // Sits under the Feed row, indented past the label column (72 + 4 gap) so it
 // reads as an annotation on Feed rather than a new control.
 const captionStyle: React.CSSProperties = {
