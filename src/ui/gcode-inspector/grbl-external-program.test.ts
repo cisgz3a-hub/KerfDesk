@@ -135,10 +135,81 @@ describe('stock GRBL external block semantics', () => {
     expect(model.stats.travelMm).toBeCloseTo(20 * Math.PI + 90);
   });
 
-  it('does not place relative moves after an arc in a plane this renderer cannot draw', () => {
-    const { review } = inspect('G18 G2 X0 Z100 I-100 K0 F600\nG91\nG1 X10');
-    expect(review.envelope?.maxX).not.toBe(110);
-    expect(review.warnings.join('\n')).toMatch(/plane|not placed/);
+  it('places relative moves from a supported G18 arc endpoint', () => {
+    const { model, review } = inspect('G18 G2 X0 Z100 I-100 K0 F600\nG91\nG1 X10');
+    expect(model.skippedMotions).toEqual([]);
+    expect(review.envelope).toEqual({ minX: 0, minY: 0, maxX: 100, maxY: 0 });
+    expect(Array.from(model.positions.slice(-6))).toEqual([0, 0, 100, 10, 0, 100]);
+  });
+
+  it.each(['G18 G2 X10 I4 K10', 'G19 G2 Y10 J4 K10'])(
+    'rejects invalid %s geometry before distance or tool changes',
+    (arc) => {
+      const { model, review } = inspect(`G91 M4 S500 ${arc} F600\nG1 X10`);
+      expect(review.envelope).toEqual({ minX: 10, minY: 0, maxX: 100, maxY: 0 });
+      expect(model.stats.cutMm).toBe(0);
+      expect(review.warnings.join('\n')).toContain('Stock GRBL rejects');
+      expect(review.warnings.join('\n')).toContain('radius mismatch');
+    },
+  );
+
+  it.each([
+    ['G18 G2 X0 Z500.2 I-500 K0', { x: 500, y: 0, z: 0 }],
+    ['G19 G3 Y0 Z500.2 J-500 K0', { x: 0, y: 500, z: 0 }],
+  ] as const)('uses stock radius tolerance for %s', (arc, start) => {
+    const { model } = inspect(`${arc} F600\nG91\nG1 X10`, start);
+    expect(model.skippedMotions).toEqual([]);
+    expect(model.stats.programBounds?.maxZ).toBeCloseTo(500.2);
+    expect(Array.from(model.positions.slice(-3))).toEqual([10, 0, Math.fround(500.2)]);
+  });
+
+  it.each(['G18 G2 Y10 I5 K0', 'G19 G2 X10 J5 K0'])(
+    'rejects %s without selected-plane axis words atomically',
+    (arc) => {
+      const { model, review } = inspect(`G91 ${arc} M4 S500 F600\nG1 X10`);
+      expect(review.envelope).toEqual({ minX: 10, minY: 0, maxX: 100, maxY: 0 });
+      expect(model.stats.cutMm).toBe(0);
+      expect(review.warnings.join('\n')).toContain('axis words');
+    },
+  );
+
+  it.each(['G18 G2 X10.0001 R5', 'G19 G2 Y10.0001 R5'])(
+    'rejects %s with an impossible R chord atomically',
+    (arc) => {
+      const { model, review } = inspect(`G91 ${arc} M4 S500 F600\nG1 X10`);
+      expect(review.envelope).toEqual({ minX: 10, minY: 0, maxX: 100, maxY: 0 });
+      expect(model.stats.cutMm).toBe(0);
+      expect(review.warnings.join('\n')).toContain('radius too small');
+    },
+  );
+
+  it.each(['G18 G2 X10 R5 J0', 'G19 G2 Y10 R5 I0', 'G2 X10 R5 K0'])(
+    'rejects unused out-of-plane offsets in %s atomically',
+    (arc) => {
+      const { model, review } = inspect(`G91 ${arc} M4 S500 F600\nG1 X10`);
+      expect(review.envelope).toEqual({ minX: 10, minY: 0, maxX: 100, maxY: 0 });
+      expect(model.stats.cutMm).toBe(0);
+      expect(review.warnings.join('\n')).toContain('unused I/J/K');
+    },
+  );
+
+  it.each(['G18 G3 X0 Z500 I-500 K0', 'G19 G3 Y0 Z500 J-500 K0'])(
+    'does not assert invalid %s geometry after the Z origin changes',
+    (arc) => {
+      const { review } = inspect(`G10 L2 P1 Z500\n${arc} F600\nG91\nG1 X10`);
+      expect(review.warnings.join('\n')).not.toContain('Stock GRBL rejects');
+    },
+  );
+
+  it('does not use a forgotten Z position to reject a G18 arc', () => {
+    const { review } = inspect('G28 Z0\nG18 G3 X0 Z500 I-500 K0 F600\nG1 X10');
+    expect(review.warnings.join('\n')).not.toContain('Stock GRBL rejects');
+  });
+
+  it('still validates XY arcs when only Z has an unknown origin', () => {
+    const { review } = inspect('G10 L2 P1 Z500\nG91 G2 X10 I4 J10 F600\nG1 X10');
+    expect(review.warnings.join('\n')).toContain('Stock GRBL rejects');
+    expect(review.envelope).toEqual({ minX: 10, minY: 0, maxX: 100, maxY: 0 });
   });
 
   it('does not declare an arc rejected from a start displaced by an offset write', () => {

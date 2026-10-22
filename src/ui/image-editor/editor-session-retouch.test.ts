@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createRgbaBuffer } from '../../core/image-edit/rgba-buffer';
 import { createSession } from './editor-session';
-import { addLayerAboveActive } from './editor-session-layers';
+import { commitAdjustment } from './editor-adjust-session';
+import { addLayerAboveActive, compositeSession } from './editor-session-layers';
 import { applyCloneStroke, commitHealDab } from './editor-session-retouch';
 import { useImageEditorStore } from './image-editor-store';
 
@@ -98,5 +99,46 @@ describe('commitHealDab', () => {
     expect(session.doc.data[base]).toBe(180);
     expect(session.history.undoStack.length).toBe(1);
     expect(session.history.undoStack[0]?.label).toBe('Spot heal');
+  });
+});
+
+describe('commitHealDab on transparent layers (audit 23-P2-1)', () => {
+  // Paper of composite tone 228 with a dark 4 × 4 speck at the centre.
+  function paperWithSpeck(paper: number) {
+    const doc = createRgbaBuffer(40, 40);
+    for (let i = 0; i < doc.data.length; i += 4) doc.data.fill(paper, i, i + 3);
+    for (let y = 18; y < 22; y += 1) {
+      for (let x = 18; x < 22; x += 1) doc.data.fill(40, (y * 40 + x) * 4, (y * 40 + x) * 4 + 3);
+    }
+    return createSession('obj-1', 'test.png', doc, BOUNDS);
+  }
+
+  function compositeGrey(session: ReturnType<typeof createSession>, x: number, y: number) {
+    return compositeSession(session).data[(y * 40 + x) * 4];
+  }
+
+  it('heals after Clean up white paper to the paper tone, not a black disc', () => {
+    const cleaned = commitAdjustment(paperWithSpeck(228), 'remove-white-background', {
+      cleanup: 0,
+    });
+    expect([...cleaned.doc.data.slice(0, 4)]).toEqual([0, 0, 0, 27]);
+    const healed = commitHealDab(cleaned, { x: 20, y: 20 }, 6);
+    expect(compositeGrey(healed, 20, 20)).toBe(228);
+    expect(compositeGrey(healed, 23, 20)).toBe(228);
+    // The layer keeps its cleaned-up transparency where it healed.
+    expect([...healed.doc.data.slice((20 * 40 + 20) * 4, (20 * 40 + 20) * 4 + 4)]).toEqual([
+      0, 0, 0, 27,
+    ]);
+  });
+
+  it('heals on an empty upper layer from the picture below', () => {
+    const session = addLayerAboveActive(paperWithSpeck(200), 'l1');
+    const healed = commitHealDab(session, { x: 20, y: 20 }, 6);
+    expect(compositeGrey(healed, 20, 20)).toBe(200);
+    expect([...healed.doc.data.slice((20 * 40 + 20) * 4, (20 * 40 + 20) * 4 + 4)]).toEqual([
+      200, 200, 200, 255,
+    ]);
+    // The Background speck itself is untouched; the patch lives on the layer.
+    expect(healed.layers[0]?.buffer.data[(20 * 40 + 20) * 4]).toBe(40);
   });
 });

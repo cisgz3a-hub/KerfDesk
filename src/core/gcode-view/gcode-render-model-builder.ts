@@ -200,7 +200,7 @@ function recordGrblBlock(
   if (!context.stockGrbl) return false;
   const rejected =
     grblBlockRejection(raw) ??
-    grblArcBlockRejection(context.modal, words, context.program.canPlaceXY());
+    grblArcBlockRejection(context.modal, words, context.program.canPlace);
   if (rejected !== null) {
     context.skipped.push({ line, reason: grblRejectedBlockWarning(rejected) });
     return true;
@@ -280,7 +280,9 @@ function emitMotion(
   }
   if (modal.motion === 2 || modal.motion === 3) {
     // A skipped (invalid) arc moves nothing — the controller would have
-    // rejected the line, so the modal position must not advance either.
+    // rejected the line, so the modal position must not advance either. An
+    // external run's review names it as not in the Frame outline (ADR-630
+    // Amendment 2), since a controller with looser limits may still run it.
     if (!emitArc(context, axisWords, target, line)) return;
   } else {
     emitLinear(context, target, line);
