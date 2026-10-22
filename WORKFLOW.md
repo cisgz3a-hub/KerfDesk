@@ -2920,7 +2920,11 @@ authorization, Frame proof, controller command, or safety boundary.
   An `ALARM:N` is not counted as acknowledging a line. After a stop that discards the
   controller's planner (Abort, the auto-abort after a rejected line, a reboot), the automatic
   line also steps back over the moves the last status report showed still waiting in the
-  planner (up to 512 on grblHAL), and the picker says those may burn again (ADR-362).
+  planner (up to 512 on grblHAL), and the picker says those may burn again (ADR-362). A lost
+  link steps back the same way once the first reconnect shows the controller restarted: its
+  startup banner (an Arduino-based board resets when its port reopens, and one powered from
+  USB stops when the cable is pulled) or an Alarm. A controller that answers without either
+  kept running, and the line stays at the first unacknowledged one (ADR-398 Amendment 3).
 - Resume, saved or manual, re-arms the beam with the power commands of the controller the job
   was written for (ADR-364).
   - A Smoothieware job resumes with `fire off` and restores its own `M221` scale and
@@ -2951,8 +2955,8 @@ authorization, Frame proof, controller command, or safety boundary.
   and points here instead of to Set origin here, which would place the rest of the job where
   the head stopped (ADR-341 Amendment 5).
 - After a lost connection the recovery record also keeps how many lines had been sent: a
-  controller keeps running what it had received, so the head stops at the end of the last of
-  them. When the origin is gone, not reported or moved, **Continue from where the head stopped**
+  controller that keeps running runs what it had received, so the head stops at the end of the
+  last of them. When the origin is gone, not reported or moved, **Continue from where the head stopped**
   writes one `G92` that makes the head's current spot that program point, without moving the
   head, and sets the restart to the next line. It is meant for a machine that was not homed
   before the job, and only while nobody has moved the head since the stop; if the controller

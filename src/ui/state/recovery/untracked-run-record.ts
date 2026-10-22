@@ -15,6 +15,8 @@
 // a record the Review can continue from again.
 
 import type { JobCheckpoint, JobInterruption } from '../../../core/recovery';
+
+type PlannerBacklog = NonNullable<JobInterruption['plannerBacklog']>;
 import type { LegacyFingerprintOnlyArtifactV1, RunId } from './execution-artifact';
 import { startIntentStandInArtifact } from './start-intent';
 
@@ -54,21 +56,21 @@ export function untrackedRunCheckpoint(
   updatedAtIso: string,
 ): JobCheckpoint {
   const toJob = (lines: number): number => jobLines(record, lines);
-  const { plannerBacklog, sentLines } = interruption;
+  const backlogToJob = (backlog: PlannerBacklog): PlannerBacklog => ({
+    ...backlog,
+    ackedAtStatus: toJob(backlog.ackedAtStatus),
+  });
+  const { plannerBacklog, plannerBacklogIfRestarted, sentLines } = interruption;
   return {
     ...record.intent,
     ackedLines: toJob(ackedLines),
     interruption: {
       ...interruption,
       ...(sentLines === undefined ? {} : { sentLines: toJob(sentLines) }),
-      ...(plannerBacklog === undefined
+      ...(plannerBacklog === undefined ? {} : { plannerBacklog: backlogToJob(plannerBacklog) }),
+      ...(plannerBacklogIfRestarted === undefined
         ? {}
-        : {
-            plannerBacklog: {
-              ...plannerBacklog,
-              ackedAtStatus: toJob(plannerBacklog.ackedAtStatus),
-            },
-          }),
+        : { plannerBacklogIfRestarted: backlogToJob(plannerBacklogIfRestarted) }),
     },
     updatedAtIso,
   };

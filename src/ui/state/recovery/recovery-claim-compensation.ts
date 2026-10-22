@@ -1,6 +1,7 @@
 import type { RunId } from './execution-artifact';
 import type { RecoveryStorageBackend } from './recovery-backend';
 import { validRecoverySlots } from './recovery-model';
+import { recoveryErrorMessage as errorMessage } from './recovery-result';
 import { releaseRecoveryClaimMutation } from './recovery-slot-mutations';
 
 type CompensationResult = { readonly ok: true } | { readonly ok: false; readonly error: unknown };
@@ -32,4 +33,20 @@ export async function compensateFailedRecoveryClaim(args: {
     }
   }
   return { ok: false, error: lastError };
+}
+
+/** Compensate a claim whose result is ambiguous, then reload the snapshot, or
+ * warn when the release itself failed. */
+export async function releaseAmbiguousRecoveryClaim(
+  args: Parameters<typeof compensateFailedRecoveryClaim>[0] & {
+    readonly refresh: () => Promise<unknown>;
+    readonly warn: (operation: string, message: string) => void;
+  },
+): Promise<void> {
+  const compensated = await compensateFailedRecoveryClaim(args);
+  if (compensated.ok) {
+    await args.refresh();
+  } else {
+    args.warn('release failed interrupted job recovery claim', errorMessage(compensated.error));
+  }
 }
