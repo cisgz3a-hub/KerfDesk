@@ -1,6 +1,6 @@
 ## ADR-592 Amendment 1 - A wrong-clock check-in must answer the request just sent (2026-10-20)
 
-**Status:** Implemented in source; the service change takes effect at the next Worker redeploy, which must come before the desktop release that carries the app change | **Date:** 2026-10-20 | **Amends:** ADR-592 decision 2 (devices check in) | **Amended by:** ADR-623 Amendment 2 (paid licences keep working offline)
+**Status:** Implemented in source; the service change takes effect at the next Worker redeploy, which must come before the desktop release that carries the app change | **Date:** 2026-10-20 | **Amends:** ADR-592 decision 2 (devices check in) | **Amended by:** ADR-623 Amendment 2 (paid licences keep working offline); [ADR-592 Amendment 3](ADR-592-amendment-3-refresh-nonce-withdrawn.md) (2026-10-23) withdraws the app side from 1.0.23: the app sends and checks no nonce, and the Worker keeps signing one back for 1.0.21 and 1.0.22
 
 ### Context
 
