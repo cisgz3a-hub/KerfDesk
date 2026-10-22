@@ -69,7 +69,7 @@ const errorCodes = {
   request_conflict: 'invalid_input',
   request_limit: 'unavailable',
   read_only: 'unavailable',
-  busy: 'unavailable',
+  busy: 'busy',
   not_found: 'invalid_input',
   not_editable: 'unsupported_operation',
 } as const;

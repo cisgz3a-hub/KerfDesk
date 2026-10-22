@@ -6,7 +6,10 @@ import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { machineSettingsReadBlockReason } from '../state/machine-settings-read-readiness';
 import { useToastStore } from '../state/toast-store';
-import { exportGrblSettingsBackup } from './export-grbl-settings-backup';
+import {
+  exportGrblSettingsBackup,
+  settingsBackupHoldsPasswords,
+} from './export-grbl-settings-backup';
 import {
   machineSettingsContextForProfile,
   machineSettingsContextNotice,
@@ -51,7 +54,14 @@ export function MachineSettingsPanel(props: MachineSettingsPanelProps = {}): JSX
   const handleExport = (): void => {
     void exportGrblSettingsBackup({ platform, rows }).then((result) => {
       if (result.ok) {
-        pushToast(`Exported machine settings backup to ${result.displayName}`, 'success');
+        if (result.holdsPasswords) {
+          pushToast(
+            `Exported machine settings backup to ${result.displayName}. It holds the controller's passwords in plain text; keep it private.`,
+            'warning',
+          );
+        } else {
+          pushToast(`Exported machine settings backup to ${result.displayName}`, 'success');
+        }
         return;
       }
       if (result.reason !== 'cancelled') pushToast(result.message, 'error');
@@ -75,6 +85,12 @@ export function MachineSettingsPanel(props: MachineSettingsPanelProps = {}): JSX
         readDisabledReason={readDisabledReason}
         exportDisabledReason={exportDisabledReason}
       />
+      {settingsBackupHoldsPasswords(rows) ? (
+        <p role="note" style={passwordNoticeStyle}>
+          These settings include the controller&apos;s Wi-Fi, WebUI or MQTT passwords. An exported
+          backup keeps them in plain text so a restore can put them back; keep the file private.
+        </p>
+      ) : null}
       {lastSettingsReadAt !== null ? (
         <div style={readAtStyle}>Last read: {new Date(lastSettingsReadAt).toLocaleString()}</div>
       ) : null}
@@ -291,6 +307,10 @@ const noticeStyle: React.CSSProperties = {
   margin: '6px 0',
   color: 'var(--lf-text-muted)',
   lineHeight: 1.35,
+};
+const passwordNoticeStyle: React.CSSProperties = {
+  ...noticeStyle,
+  color: 'var(--lf-warning-fg)',
 };
 const buttonRowStyle: React.CSSProperties = {
   display: 'flex',

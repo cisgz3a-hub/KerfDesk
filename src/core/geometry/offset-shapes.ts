@@ -5,6 +5,7 @@
 // https://docs.lightburnsoftware.com/latest/Reference/OffsetShapes/
 
 import {
+  areaD,
   EndType,
   FillRule,
   inflatePathsD,
@@ -129,6 +130,13 @@ function offsetPaths(
       message: 'The inward offset collapsed the shape. Use a smaller distance.',
     });
   }
+  // ADR-410 item 3: Offset is unavailable, with the reason, when it makes nothing.
+  if (outward.value.length === 0 && inward.value.length === 0) {
+    return err({
+      kind: 'empty-result',
+      message: 'Nothing to offset: the selection has no shape or line to outline.',
+    });
+  }
   return ok({ outward: outward.value, inward: inward.value });
 }
 
@@ -202,12 +210,30 @@ function splitPath(path: ColoredPath): { readonly closed: PathsD; readonly open:
   for (const polyline of path.polylines) {
     if (isClosedPolygon(polyline) || isClosedEnough(polyline)) {
       const ring = polylineToPathD(polyline);
-      if (ring.length >= 3) closed.push(ring);
+      // A closed path with no area, such as SVG `M0 0 L10 0 Z`, draws only a
+      // line, so it is outlined as that line, as an open path or a closed
+      // two-point DXF polyline is (audit 2026-10-21 geometry P3-3).
+      if (ring.length >= 3 && !enclosesNothing(ring)) closed.push(ring);
+      else if (ring.length >= 2) open.push(ring.concat(ring.slice(0, 1)));
     } else if (polyline.points.length >= 2) {
       open.push(polyline.points.map((point) => ({ x: point.x, y: point.y })));
     }
   }
   return { closed, open };
+}
+
+// Thinner on average than the 1 µm grid the region is normalized on, where it
+// would vanish: twice the area over the perimeter is a sliver's width.
+function enclosesNothing(ring: PathD): boolean {
+  let perimeter = 0;
+  for (let index = 0; index < ring.length; index += 1) {
+    const from = ring[index];
+    const to = ring[(index + 1) % ring.length];
+    if (from !== undefined && to !== undefined) {
+      perimeter += Math.hypot(to.x - from.x, to.y - from.y);
+    }
+  }
+  return 2 * Math.abs(areaD(ring)) <= perimeter / 10 ** VECTOR_PATH_PRECISION_DECIMALS;
 }
 
 // Each ColoredPath is its own fill batch, under the rule the canvas and CAM use.

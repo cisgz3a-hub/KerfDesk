@@ -77,7 +77,14 @@ function mapped(rendered: TextRenderResult, m: AffineMatrix): TextRenderResult {
     })),
     ...(path.curves === undefined ? {} : { curves: bakeCurves(path.curves, m) }),
   }));
-  return { ...rendered, paths, bounds: pathsBounds(paths) ?? rendered.bounds };
+  // The alignment anchor moves with the glyphs, so a squeezed or slanted
+  // variable record still lands its centre or end where the template's was.
+  return {
+    ...rendered,
+    paths,
+    bounds: pathsBounds(paths) ?? rendered.bounds,
+    ...(rendered.anchor === undefined ? {} : { anchor: point(rendered.anchor) }),
+  };
 }
 
 function emboldened(rendered: TextRenderResult, offsetMm: number): TextRenderResult {

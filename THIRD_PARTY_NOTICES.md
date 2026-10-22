@@ -31,6 +31,14 @@ are in `docs/licensing/photocraft-color-to-alpha.txt` and are included in the
 generated release notices. No upstream editor, artwork or fonts are bundled for
 this feature.
 
+The Blue Noise dither (ADR-649) transcribes the integer error-filter weights
+from Appendix I of Victor Ostromoukhov, "A Simple and Efficient
+Error-Diffusion Algorithm" (SIGGRAPH 2001). The paper states the author's
+intention to put the algorithm into the public domain; no separate licence
+accompanies the table. Source, scope and attribution are in
+`docs/licensing/ostromoukhov-error-diffusion.txt` and are included in the
+generated release notices.
+
 | Library | License | Copyright / source |
 |---|---|---|
 | react, react-dom | MIT | © Meta Platforms, Inc. and affiliates — https://github.com/facebook/react |
