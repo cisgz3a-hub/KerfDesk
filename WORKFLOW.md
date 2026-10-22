@@ -8082,7 +8082,12 @@ as the pane's design record.
    stays open for further work. Physical mm size never changes from painting.
 4. Closing the editor (Esc from Select, or the close button) simply returns
    to the workspace; the session is kept in memory and reopening the same
-   image resumes it. No confirmation dialog exists anywhere in the editor.
+   image resumes it. Moving the image or changing its layer, power or engrave
+   settings in between keeps the session, and a later Apply keeps those
+   changes. If the image itself changed (new pixels or a new extent, e.g.
+   after Crop Image), the session no longer matches it: Studio opens the image
+   as it is now and a notice says the unapplied edits were discarded. No
+   confirmation dialog exists anywhere in the editor.
 
 #### Error — decode failure
 1. If the image's `dataUrl` cannot be decoded, a typed toast reports it and
