@@ -78,6 +78,24 @@ describe('closed offset degeneracy follows the filled region', () => {
     expect(run(artwork({ closed: true, points })).inward).toBeNull();
   });
 
+  it('outlines a rotated collinear closed line, whose vertices miss exact collinearity', () => {
+    const points = [
+      { x: 0, y: 0 },
+      { x: 5, y: 0 },
+      { x: 10, y: 0 },
+    ];
+    const rotated = (closed: boolean): ImportedSvg => ({
+      ...artwork({ closed, points }),
+      transform: { ...IDENTITY_TRANSFORM, rotationDeg: 30, x: 3.3, y: 7.7 },
+    });
+    const open = run(rotated(false)).outward!.bounds;
+    const closed = run(rotated(true)).outward;
+    expect(closed).not.toBeNull();
+    for (const side of ['minX', 'maxX', 'minY', 'maxY'] as const) {
+      expect(closed!.bounds[side]).toBeCloseTo(open[side], 3);
+    }
+  });
+
   it('does not publish an empty offset for a point with no stroke extent', () => {
     const result = offsetShapes(
       [artwork({ closed: false, points: [{ x: 3, y: 3 }] })],

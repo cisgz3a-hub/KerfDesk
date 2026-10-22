@@ -52,9 +52,18 @@ export type JobInterruption = {
    * whether the controller kept running. A boot banner or an Alarm there means
    * it restarted and discarded its planner, and this becomes `plannerBacklog`;
    * a status report without either means it kept running, and this is dropped
-   * (ADR-398 Amendment 3).
+   * (ADR-398 Amendment 3). A reconnect that cannot show either way leaves it
+   * as `unconfirmedPlannerBacklog` (ADR-398 Amendment 4).
    */
   readonly plannerBacklogIfRestarted?: PlannerBacklog;
+  /**
+   * The backlog a restart would have thrown away, when the first reconnect
+   * could not show whether the controller restarted: grblHAL greets every new
+   * connection with its startup banner, and a board on Wi-Fi or Ethernet
+   * cannot show a restart at all. The automatic restart does not step back
+   * over it; the restart hint names the line that would (ADR-398 Amendment 4).
+   */
+  readonly unconfirmedPlannerBacklog?: PlannerBacklog;
 };
 
 export function withJobInterruption<T extends { readonly updatedAtIso: string }>(
@@ -92,19 +101,25 @@ function parseStopEvidence(
   value: Record<string, unknown>,
 ): Pick<
   JobInterruption,
-  'plannerBacklog' | 'positionLost' | 'sentLines' | 'plannerBacklogIfRestarted'
+  | 'plannerBacklog'
+  | 'positionLost'
+  | 'sentLines'
+  | 'plannerBacklogIfRestarted'
+  | 'unconfirmedPlannerBacklog'
 > | null {
   const positionLost = parsePositionLost(value['positionLost']);
   const plannerBacklog = parsePlannerBacklog(value['plannerBacklog']);
   const sentLines = parseSentLines(value['sentLines']);
   const ifRestarted = parsePlannerBacklog(value['plannerBacklogIfRestarted']);
+  const unconfirmed = parsePlannerBacklog(value['unconfirmedPlannerBacklog']);
   if (positionLost === null || plannerBacklog === null || sentLines === null) return null;
-  if (ifRestarted === null) return null;
+  if (ifRestarted === null || unconfirmed === null) return null;
   return {
     ...(plannerBacklog === undefined ? {} : { plannerBacklog }),
     ...(positionLost === undefined ? {} : { positionLost }),
     ...(sentLines === undefined ? {} : { sentLines }),
     ...(ifRestarted === undefined ? {} : { plannerBacklogIfRestarted: ifRestarted }),
+    ...(unconfirmed === undefined ? {} : { unconfirmedPlannerBacklog: unconfirmed }),
   };
 }
 
