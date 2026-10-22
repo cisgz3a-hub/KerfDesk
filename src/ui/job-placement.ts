@@ -8,6 +8,13 @@ import { resolveNativeBedFrame, type NativeBedEvidence } from './state/native-be
 import { nativePointToBed } from '../core/devices/native-bed-frame';
 import { machineBoundsForDevice } from '../core/devices/machine-bounds';
 import type { PrepareOutputOptions } from '../io/gcode/prepare-output';
+import type { ControllerCapabilities } from '../core/controllers/controller-capabilities';
+import {
+  missingPositionMessage,
+  workOffsetOffFor,
+  workOffsetOffMessage,
+  type StatusReportFieldsOff,
+} from './state/status-report-fields';
 
 export type { JobPlacementSettings };
 
@@ -72,6 +79,11 @@ export type MachinePlacementSnapshot = NativeBedEvidence & {
   readonly workOriginActive?: boolean;
   readonly wcoCache?: WorkCoordinateOffset | null;
   readonly reportInches?: boolean;
+  // Whether a grblHAL `$10` keeps WCO from ever arriving, so a refusal names
+  // the setting instead of a wait (ADR-375 Amendment 2): the Start snapshot
+  // carries it, the live laser state has the capabilities to derive it.
+  readonly statusReportFieldsOff?: StatusReportFieldsOff | null;
+  readonly capabilities?: Pick<ControllerCapabilities, 'statusReportMask'>;
 };
 
 export type ResolvedJobPlacement =
@@ -220,9 +232,14 @@ function resolveAbsolute(machine: MachinePlacementSnapshot): ResolvedJobPlacemen
   const wco = knownWco(machine);
   if (wco !== null) return { ok: true, preflightMotionOffset: xyOffset(wco) };
   if (!customOriginIsActive(machine)) return { ok: true };
+  const fieldsOff = workOffsetOffFor(machine);
   return {
     ok: false,
-    messages: [ABSOLUTE_WORK_OFFSET_REQUIRED_MESSAGE],
+    messages: [
+      fieldsOff === null
+        ? ABSOLUTE_WORK_OFFSET_REQUIRED_MESSAGE
+        : `Absolute Coordinates needs the work offset, because a work origin is set. ${workOffsetOffMessage(fieldsOff)}`,
+    ],
   };
 }
 
@@ -232,10 +249,13 @@ function resolveCurrentPosition(
 ): ResolvedJobPlacement {
   const current = currentWorkPosition(machine);
   if (current === null) {
+    const neverReported = missingPositionMessage(workOffsetOffFor(machine));
     return {
       ok: false,
       messages: [
-        'Current Position needs a live machine position and work-coordinate offset. Wait for an Idle status report, or choose Absolute Coordinates.',
+        neverReported === null
+          ? 'Current Position needs a live machine position and work-coordinate offset. Wait for an Idle status report, or choose Absolute Coordinates.'
+          : `Current Position needs the head's position from the work origin. ${neverReported}`,
       ],
     };
   }
@@ -268,7 +288,15 @@ function resolveUserOrigin(
     };
   }
   if (wco === null) {
-    return { ok: false, messages: [CUSTOM_ORIGIN_LOCATION_UNKNOWN_MESSAGE] };
+    const fieldsOff = workOffsetOffFor(machine);
+    return {
+      ok: false,
+      messages: [
+        fieldsOff === null
+          ? CUSTOM_ORIGIN_LOCATION_UNKNOWN_MESSAGE
+          : `The work origin is set, but the controller never reports where it is. ${workOffsetOffMessage(fieldsOff)}`,
+      ],
+    };
   }
   return {
     ok: true,

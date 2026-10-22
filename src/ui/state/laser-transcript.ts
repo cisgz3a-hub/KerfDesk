@@ -3,6 +3,7 @@ import { presentAlarm, presentError } from '../../core/controllers/grbl/response
 import type { ControllerEvent } from '../../core/controllers';
 import type { ControllerKind } from '../../core/devices';
 import type { ControllerIncidentContext } from './controller-incident-context';
+import { motionRefusalReason } from './laser-safety-notice';
 
 export const TRANSCRIPT_MAX = 500;
 
@@ -136,6 +137,9 @@ function decoded(
   controllerKind: ControllerKind,
 ): { readonly decoded: string } | Record<string, never> {
   if (response.kind === 'error') {
+    if (response.motionRefusal !== undefined) {
+      return { decoded: motionRefusalReason(response.motionRefusal) };
+    }
     if (response.code === null) {
       return { decoded: `Unrecognized controller error: ${response.raw ?? 'error'}` };
     }

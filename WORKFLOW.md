@@ -2936,7 +2936,11 @@ authorization, Frame proof, controller command, or safety boundary.
   An `ALARM:N` is not counted as acknowledging a line. After a stop that discards the
   controller's planner (Abort, the auto-abort after a rejected line, a reboot), the automatic
   line also steps back over the moves the last status report showed still waiting in the
-  planner (up to 512 on grblHAL), and the picker says those may burn again (ADR-362).
+  planner (up to 512 on grblHAL), and the picker says those may burn again (ADR-362). A lost
+  link steps back the same way once the first reconnect shows the controller restarted: its
+  startup banner (an Arduino-based board resets when its port reopens, and one powered from
+  USB stops when the cable is pulled) or an Alarm. A controller that answers without either
+  kept running, and the line stays at the first unacknowledged one (ADR-398 Amendment 3).
 - Resume, saved or manual, re-arms the beam with the power commands of the controller the job
   was written for (ADR-364).
   - A Smoothieware job resumes with `fire off` and restores its own `M221` scale and
@@ -2967,8 +2971,8 @@ authorization, Frame proof, controller command, or safety boundary.
   and points here instead of to Set origin here, which would place the rest of the job where
   the head stopped (ADR-341 Amendment 5).
 - After a lost connection the recovery record also keeps how many lines had been sent: a
-  controller keeps running what it had received, so the head stops at the end of the last of
-  them. When the origin is gone, not reported or moved, **Continue from where the head stopped**
+  controller that keeps running runs what it had received, so the head stops at the end of the
+  last of them. When the origin is gone, not reported or moved, **Continue from where the head stopped**
   writes one `G92` that makes the head's current spot that program point, without moving the
   head, and sets the restart to the next line. It is meant for a machine that was not homed
   before the job, and only while nobody has moved the head since the stop; if the controller
@@ -4368,7 +4372,10 @@ its machine reference. Frame allows the fresh Idle/work-offset report to arrive 
 an unresolved Absolute placement. Before the controller has reported any WCO, Frame also asks for
 it (a bounded burst of status queries, at most 3 s), homed or not, whenever Absolute or Current
 Position would otherwise assume a zero offset; if none arrives the Frame proceeds at that assumed
-zero and Job Review says so (ADR-375). A missing report is described as missing coordinate data,
+zero and Job Review says so (ADR-375). On grblHAL, whose `$$` shows `$10` whole, a `$10` without
+bit 5 never sends WCO: Frame skips that wait, and the status panel, Move to position, Job Review
+and the placement refusals name the bit and the `$10` to send (ADR-375 Amendment 2). A missing
+report is described as missing coordinate data,
 not as a requirement to erase the work origin. Equivalent MPos/WPos reports and a first WCO
 report equal to the assumed zero do not cancel unchanged preparation, a Frame in progress, its
 permit or the Start handoff. Actual movement, changed offsets (a first non-zero WCO, Z-only
@@ -4477,7 +4484,11 @@ Set origin here again. It is a warning; Frame and Start are not refused (ADR-375
    Verify fresh controller data; local cache clearing does not erase persistent controller offsets.
 10. **Status-format fixtures.** For stock GRBL, test both `$10=1` (MPos) and `$10=0`
     (WPos). WCO is an intermittent field independent of that selection, not a separate `$10`
-    bit. Do not apply generic settings writes to the Falcon A1 vendor contract, which does
+    bit. grblHAL at its default `COMPATIBILITY_LEVEL` 0 differs: `$10` is a bitfield (default
+    511) whose bit 5 sends WCO and bit 6 sends Ov, so `$10=0` or `$10=1` there turns both off.
+    Expect the status panel to read "Origin: not reported (WCO off in $10; send $10=96)" (or 97),
+    and with `$10=0` "MPos: cannot be known" (ADR-375 Amendment 2).
+    Do not apply generic settings writes to the Falcon A1 vendor contract, which does
     not offer ordinary settings fetch. See the [GRBL status documentation](https://github.com/gnea/grbl/wiki/Grbl-v1.1-Interface).
 11. **Air pump at Start (ADR-323).** First confirm Machine Setup shows
     Air output `M8` and "Air restart" ticked. A Falcon A1 Pro profile
@@ -7761,6 +7772,16 @@ as the pane's design record.
    An errored stream is released only after its remaining reply ownership and Idle settlement
    allow it; error reporting is not successful completion.
 
+#### Error — firmware skips a move (ADR-395 Amendment 1)
+1. A build with `NO_MOTION_BEFORE_HOMING` answers each move with `echo:Home XYZ First` (naming
+   the unhomed axes) and then `ok`; a stopped Marlin prints "Printer stopped due to errors" for
+   each move it reads. Both are handled like a non-halting `Error:` for the line: the job stops
+   before its next line (so a fan-wired laser's `M106` is never sent), the Frame stops and does
+   not count as completed, a jog or owned command is refused.
+2. The notice names the axes. Home is `G28 X Y`, so a build that also needs Z homed is told to
+   home Z from the Console (`G28 Z`) if it has a Z endstop, or to turn `NO_MOTION_BEFORE_HOMING`
+   off. A stopped controller is told to send `M999 S1` (plain `M999` asks for a line resend).
+
 ### F-H3. Smoothieware halt and recovery
 
 #### Success
@@ -8094,7 +8115,12 @@ as the pane's design record.
    stays open for further work. Physical mm size never changes from painting.
 4. Closing the editor (Esc from Select, or the close button) simply returns
    to the workspace; the session is kept in memory and reopening the same
-   image resumes it. No confirmation dialog exists anywhere in the editor.
+   image resumes it. Moving the image or changing its layer, power or engrave
+   settings in between keeps the session, and a later Apply keeps those
+   changes. If the image itself changed (new pixels or a new extent, e.g.
+   after Crop Image), the session no longer matches it: Studio opens the image
+   as it is now and a notice says the unapplied edits were discarded. No
+   confirmation dialog exists anywhere in the editor.
 
 #### Error — decode failure
 1. If the image's `dataUrl` cannot be decoded, a typed toast reports it and
@@ -9262,8 +9288,10 @@ The G-code Inspector is free in every edition (ADR-627).
    the head stands. The outline holds only motion the program places in the work coordinates it
    starts in: `G53` and probe moves, a move to the stored `G30` position, moves after the
    program changes its origin (`G92`, or `G10 L2`/`L20` on `G54`) on the axes it changes, and
-   moves in `G55`-`G59` are left out and named in the warnings. A program that never moves
-   frames the point where the head stands. A large file is prepared a slice at a time.
+   moves in `G55`-`G59` are left out and named in the warnings. Arcs count by their exact
+   extent in the plane they run in: XY (`G17`), XZ (`G18`) or YZ (`G19`) (ADR-630 Amendment 2).
+   A program that never moves frames the point where the head stands. A large file is prepared a
+   slice at a time.
    On Marlin, the baseline is two separate lines, `G21` then `G90`, and significant whitespace is
    preserved. Review reads the first command on each line with that command's parameters; later
    G/M words do not execute as extra commands. Firmware-dependent motion and its dependent
@@ -9297,8 +9325,11 @@ them), a program that looks like the other machine mode, zero XY extent (the Fra
 point and proves no Z clearance or depth), probing (`G38.2` to `G38.5`), `M3`/`M4` with no
 `S` anywhere (it runs at the S the controller already holds), the words the Inspector does not
 interpret, a Frame outline that leaves the configured machine bounds or overlaps an enabled
-no-go zone (or a note that the outline could not be placed on the bed), and Program Health
-notices and warnings. Commands are found however they are spelt (`G+91`, `G91.0`, `G 91`).
+no-go zone (or a note that the outline could not be placed on the bed), moves the Inspector
+could not read, such as an arc whose radius does not match (they are not in the Frame outline,
+and the head still makes them if the controller runs them; the first one is named by its line in
+the sent program, where the baseline line comes first), and Program Health notices and warnings.
+Commands are found however they are spelt (`G+91`, `G91.0`, `G 91`).
 
 #### Refusals
 

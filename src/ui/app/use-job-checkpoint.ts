@@ -35,6 +35,7 @@ import {
   subscribeCheckpointArchiveActivation,
   type CheckpointArchiveHandoff,
 } from './checkpoint-archive-handoff';
+import { installLinkLossRestartTracking } from './link-loss-restart-tracking';
 
 type StreamObservation = {
   readonly runId: RunId;
@@ -91,10 +92,12 @@ export function installJobCheckpointTracking(
     repository,
     tracker.retryActivatedArchive,
   );
+  const uninstallLinkLossRestart = installLinkLossRestartTracking(repository);
   return () => {
     active = false;
     unsubscribe();
     unsubscribeArchive();
+    uninstallLinkLossRestart();
   };
 }
 

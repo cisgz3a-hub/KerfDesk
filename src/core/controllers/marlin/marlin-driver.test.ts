@@ -63,6 +63,37 @@ describe('classifyMarlinResponse', () => {
     });
   });
 
+  // Controller audit v2 C6-P2-2: a NO_MOTION_BEFORE_HOMING build skips G0-G3
+  // after echoing MSG_HOME_FIRST "Home %s First" (motion.cpp L1479-L1496,
+  // language_en.h L596), and a stopped build prints STR_ERR_STOPPED for each
+  // one (queue.cpp L523-L535); both still answer the line `ok`.
+  it('classifies a skipped move as a rejection that still owes its ok', () => {
+    expect(classifyMarlinResponse('echo:Home XYZ First')).toEqual({
+      kind: 'error',
+      code: null,
+      raw: 'echo:Home XYZ First',
+      acknowledgesLine: false,
+      motionRefusal: { reason: 'home-first', axes: 'XYZ' },
+    });
+    expect(classifyMarlinResponse('echo:Home Z First')).toMatchObject({
+      motionRefusal: { reason: 'home-first', axes: 'Z' },
+    });
+    const stopped =
+      'Printer stopped due to errors. Fix the error and use M999 to restart. ' +
+      '(Temperature is reset. Set it after restarting)';
+    for (const line of [stopped, `Error:${stopped}`]) {
+      expect(classifyMarlinResponse(line)).toEqual({
+        kind: 'error',
+        code: null,
+        raw: line,
+        acknowledgesLine: false,
+        motionRefusal: { reason: 'stopped' },
+      });
+    }
+    // Other echo lines stay messages.
+    expect(classifyMarlinResponse('echo:Home offset X0.00')).toMatchObject({ kind: 'message' });
+  });
+
   it('parses M114 position lines into Idle status reports', () => {
     const report = parseMarlinPositionReport('X:10.50 Y:5.00 Z:0.00 E:0.00 Count X:840 Y:400 Z:0');
     // M114 is the logical (work) position (audit MA-2).
