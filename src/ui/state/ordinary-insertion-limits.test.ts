@@ -106,23 +106,35 @@ it('keeps editing existing text available at the operation limit', () => {
   expect(lastToast()).toBeUndefined();
 });
 
-it('does not add a 33rd imported font when creating text', () => {
+// ADR-628 Amendment 1: the limit counts embedded fonts some text uses. The same
+// bytes reuse a copy and a font nothing uses is pruned, so only a 33rd distinct
+// face beside 32 in use is refused, with a message rather than an exception.
+const fontBytes = (seed: number): string => btoa(String.fromCharCode(0, 1, 0, 0, seed));
+
+it('does not add a 33rd embedded font in use when creating text', () => {
   const embeddedFonts = Array.from({ length: 32 }, (_, index) => ({
     key: `embedded:${index}`,
     fileName: `${index}.ttf`,
-    dataBase64: 'AAEAAA==',
+    dataBase64: fontBytes(index),
   }));
-  const project = { ...useStore.getState().project, embeddedFonts };
+  const texts = embeddedFonts.map((font, index) => ({
+    ...text(),
+    id: `text-${index}`,
+    fontKey: font.key,
+  }));
+  const base = useStore.getState().project;
+  const project = {
+    ...base,
+    embeddedFonts,
+    scene: { ...base.scene, objects: [...base.scene.objects, ...texts] },
+  };
   useStore.setState({ project });
-  expect(() =>
-    useStore.getState().upsertTextObject(
-      { ...text(), fontKey: 'embedded:new' },
-      {
-        key: 'embedded:new',
-        fileName: 'new.ttf',
-        dataBase64: 'AAEAAA==',
-      },
-    ),
-  ).toThrow('32 imported fonts');
+  useStore
+    .getState()
+    .upsertTextObject(
+      { ...text(), id: 'text-new', fontKey: 'embedded:new' },
+      { key: 'embedded:new', fileName: 'new.ttf', dataBase64: fontBytes(32) },
+    );
   expectUnchanged(project);
+  expect(lastToast()?.message).toContain('already uses 32 embedded fonts');
 });
