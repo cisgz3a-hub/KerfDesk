@@ -1,6 +1,6 @@
 // Test rotation controls inside Rotary Setup (ADR-373). They test the values
-// on screen, before Apply, so the operator can adjust a measurement and turn
-// the part again until one revolution lands back on the mark.
+// on screen, before Apply, so the operator can correct one and turn again. A
+// finished turn names the value that turn can correct (ADR-373 Amendment 1).
 
 import {
   rotaryUsesRollerDiameter,
@@ -65,7 +65,7 @@ export function RotaryTestRotationPanel(props: {
         )}
       </div>
       <p role="status" style={hintStyle}>
-        {rotaryTestStatusText(view, testable)}
+        {rotaryTestStatusText(view, testable, props.setup)}
       </p>
       {blockReason !== null && view.kind !== 'running' ? (
         <p style={hintStyle}>{blockReason}</p>
@@ -85,9 +85,9 @@ function rotaryTestTargets(setup: RotarySetup): ReadonlyArray<TestTarget> {
     : [object];
 }
 
-function rotaryTestStatusText(view: RotaryTestView, testable: boolean): string {
+function rotaryTestStatusText(view: RotaryTestView, testable: boolean, setup: RotarySetup): string {
   if (view.kind === 'running') return runningText(view.plan, view.phase);
-  if (view.kind === 'finished') return finishedText(view.outcome);
+  if (view.kind === 'finished') return finishedText(view.outcome, view.plan.target, setup);
   if (!testable) return 'Enter measurements greater than zero to test the rotation.';
   return 'Tests the values above, before Apply.';
 }
@@ -101,8 +101,41 @@ function runningText(plan: RotaryTestPlan, phase: RotaryTestPhase): string {
   );
 }
 
-function finishedText(outcome: RotaryTestOutcome): string {
+function finishedText(
+  outcome: RotaryTestOutcome,
+  target: RotaryRevolutionTarget,
+  setup: RotarySetup,
+): string {
   if (outcome.kind === 'failed') return outcome.message;
   if (outcome.kind === 'stopped') return 'Stopped. Nothing more is sent.';
-  return 'Done. If the mark did not come back to the same place, adjust the measurements and test again.';
+  return `Done. ${missAdvice(target, setup)}`;
+}
+
+// What to change when one revolution misses the mark. A drive turn measures
+// Motion per turn alone. A roller's burn size never depends on the object
+// diameter (LightBurn: it "does not affect output"), so tuning it until an
+// object turn lands would hide a wrong scale (ADR-373 Amendment 1).
+function missAdvice(target: RotaryRevolutionTarget, setup: RotarySetup): string {
+  if (target === 'drive' || setup.type === 'chuck') {
+    const part = setup.type === 'chuck' ? 'chuck' : 'roller';
+    return (
+      `If the ${part} did not turn exactly once, change Motion per turn: lower it if the ` +
+      `${part} turned too far, raise it if it stopped short.`
+    );
+  }
+  if (rotaryUsesRollerDiameter(setup)) {
+    return (
+      'If the mark did not come back to the same place, check Motion per turn with Turn roller ' +
+      'once first. If the roller turns exactly once, measure the roller diameter and the object ' +
+      'again instead of adjusting either until the mark lands. The roller diameter sets the burn ' +
+      'size; the object diameter only sets how much artwork fits in one turn.'
+    );
+  }
+  return (
+    "If the mark did not come back to the same place, the controller is not moving the part's " +
+    'surface in millimetres, so jobs would burn at the wrong size. Turn on Scale Y from the ' +
+    "roller diameter and enter the roller diameter and Motion per turn, or set the controller's " +
+    "Y steps/mm to the part's surface. Changing the object diameter can make the mark land, but " +
+    'it does not fix the size.'
+  );
 }
