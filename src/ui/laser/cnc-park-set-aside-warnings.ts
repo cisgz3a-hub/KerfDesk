@@ -5,7 +5,7 @@
 // Frame or Start (PROJECT.md rule 21).
 
 import type { Job } from '../../core/job';
-import type { Project } from '../../core/scene';
+import type { CncMachineParams, Project } from '../../core/scene';
 import { formatMm } from './job-review/job-review-format';
 
 // Static body of the advisory; the park numbers are the only interpolated part
@@ -15,11 +15,29 @@ const PARK_SET_ASIDE_WARNING_BODY =
   "the job's origin instead. A confirmed Home with the controller's work offset reported places " +
   'the park; Verified Origin jobs always park at their origin.';
 
+// Tiled export (ADR-392 Amendment 2): each tile is zeroed by hand on its own
+// frame, so no tile's bed position is known and every tile sets the park aside.
+const TILE_PARK_SET_ASIDE_WARNING_BODY =
+  'is not used in tile files: each tile is zeroed by hand on its own frame, so where that ' +
+  "frame sits on the bed is unknown. Every tile file ends at the tile's X0 Y0 instead.";
+
 export function cncParkSetAsideWarning(parkXMm: number, parkYMm: number): string {
   return (
     `The Machine Setup park at bed X ${formatMm(parkXMm)} · Y ${formatMm(parkYMm)} mm ` +
     PARK_SET_ASIDE_WARNING_BODY
   );
+}
+
+/** Warn on a tiled export when Machine Setup has a park: tiles never use it. */
+export function cncTileParkSetAsideWarnings(
+  params: Pick<CncMachineParams, 'parkXMm' | 'parkYMm'>,
+): ReadonlyArray<string> {
+  const { parkXMm, parkYMm } = params;
+  if (parkXMm === undefined && parkYMm === undefined) return [];
+  return [
+    `The Machine Setup park at bed X ${formatMm(parkXMm ?? 0)} · Y ${formatMm(parkYMm ?? 0)} mm ` +
+      TILE_PARK_SET_ASIDE_WARNING_BODY,
+  ];
 }
 
 /** Warn when Machine Setup has a park but the prepared job carries none: the

@@ -6354,12 +6354,26 @@ and lifts the command's CNC-only gate.)*
 
 #### Success
 1. **Startup Setup > Current job > Tiling**: enable, set tile size, overlap, and
-   registration holes. Save G-code then exports ONE FILE PER TILE
-   (sequential save dialogs, names carry the index: job_tile-r1-c2.nc).
+   registration holes. Save G-code then exports ONE FILE PER TILE AND BIT
+   (one folder or sequential save dialogs; names carry the index:
+   job_tile-r1-c2.nc). A tile that needs more than one bit, a registration
+   cutter other than the job's bit included, is written as one file per bit in
+   the tile's run order (job_tile-r1-c2_bit-1-of-2.nc, …_bit-2-of-2.nc), and
+   each file's header names its bit (ADR-392 Amendment 2). Tile files hold no
+   M0 bit change: they run only through Run G-code file, which sends an M0 to
+   the controller, and stock GRBL then takes no jog or Zero Z until cycle
+   start. Between a tile's bit files the machine is Idle: keep the tile's X/Y
+   zero, change the bit and re-zero Z on the stock top.
 2. Each tile's file contains only the motion inside its rectangle
    (clipped at boundaries, Z interpolated), translated so the tile's
-   corner is the machine origin: cut tile 1, slide the stock, re-zero
-   XY on the next tile frame, cut tile 2, and so on.
+   corner is its program origin: cut tile 1, slide the stock, re-zero
+   XY on the next tile frame, cut tile 2, and so on. Each tile is zeroed by
+   hand, so a Machine Setup bed park is set aside in tile files (ADR-392
+   Decision 2): every tile file ends at the tile's X0 Y0, lifted to the park
+   height when one is set, and the save warns that the park is not used.
+   When the chosen folder already holds a file of the same name, or the
+   one-file tile an earlier save wrote where this save writes per bit, the
+   save names those files once the set is written.
    A ramp entry kept as a plunge because its source path is shorter than one
    cut width or cannot descend at coordinate precision remains disclosed in
    each affected tile's G-code header, including tabbed path3d output. Split
@@ -6377,7 +6391,7 @@ and lifts the command's CNC-only gate.)*
 4. Matching flat end mills peck to the requested depth; smaller flat end mills
    clear concentric circles at each depth step. Adjacent tiles use identical
    stock-space centers in the overlap strip. Registration joins clearing work
-   before profiles **within each tile file**. This does not establish global
+   before profiles **within each tile**. This does not establish global
    order across separately run indexed files: earlier files may already have
    completed profiles. Cutter suitability and workholding remain operator
    choices; no physical cutting recipe is inferred from these defaults.
@@ -6623,11 +6637,16 @@ and lifts the command's CNC-only gate.)*
 ### F-CNC25. Surface the spoilboard — Phase H.11 (ADR-103 G8)
 
 #### Success
-1. **Machine > CNC Utilities > Surface spoilboard**: width/height (prefilled from
-   the stock), stepover % of the active bit, total depth. Save writes a
-   provenance-stamped standalone .nc: serpentine rows per 0.5 mm depth
-   step, spindle-off safe-Z lift before M3/spin-up, park at the origin
-   after M5. Fixed feeds are capped to the device-profile maximum.
+1. **Machine > CNC Utilities > Surface spoilboard**: Width and Height (prefilled
+   from the stock), Stepover % of the active bit, Total depth, Feed, Plunge,
+   Spindle RPM and Depth per pass (default 0.5 mm). Feed, Plunge and RPM start
+   from editable surfacing starters (ADR-457 Amendment 1); output caps Feed and
+   Plunge at CNC's own Max feed (ADR-416) and RPM at the spindle maximum. Save
+   writes a provenance-stamped standalone .nc: serpentine rows at each depth
+   step, spindle-off safe-Z lift before M3/spin-up, park at the origin after
+   M5. The depth and row ladders count whole steps with a rounding tolerance,
+   so a total that divides evenly (0.9 mm at 0.3 mm per pass) runs no extra
+   pass and no duplicate row.
 2. The toast repeats the operator contract: zero X/Y at the area's
    front-left corner and Z on the surface to be faced before running.
 3. Save checks and generates the whole program first (**Checking surfacing
@@ -9476,7 +9495,10 @@ relative moves (`G91`, read from where the head stands), a program that ends in 
 which leaves the controller in inches; one that switches back says so instead), the laser or
 spindle still on at the end, a tool change (`M6`), program stops (`M0`/`M1`, sent unchanged, so
 the controller holds until the machine's own cycle start; KerfDesk's Resume does not release
-them), a program that looks like the other machine mode, zero XY extent (the Frame visits a
+them), KerfDesk's own bit change at an `M0` (its `; tool change: load` comments, read from the
+file as opened: the controller takes no jog or Zero Z in that stop and the new bit's spindle
+start and plunge are already sent, so the new bit would cut at the old bit's Z zero; ADR-392
+Amendment 2), a program that looks like the other machine mode, zero XY extent (the Frame visits a
 point and proves no Z clearance or depth), probing (`G38.2` to `G38.5`), `M3`/`M4` with no
 `S` anywhere (it runs at the S the controller already holds), the words the Inspector does not
 interpret, a Frame outline that leaves the configured machine bounds or overlaps an enabled

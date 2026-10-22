@@ -138,8 +138,9 @@ function RegistrationGuidance(props: { readonly cutterTooWide: boolean }): JSX.E
         </p>
       ) : null}
       <p style={hintStyle}>
-        Registration and clearing run before profiles within each tile file. Earlier tile files may
-        already have completed profiles; indexed export does not establish an order across
+        Registration and clearing run before profiles within each tile. A registration cutter other
+        than the job&apos;s bit makes each tile one file per bit, run in order. Earlier tile files
+        may already have completed profiles; indexed export does not establish an order across
         separately run files.
       </p>
     </>

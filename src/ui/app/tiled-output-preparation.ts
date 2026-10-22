@@ -2,6 +2,7 @@ import { tileJobs, type TiledJobsResult } from '../../core/cnc/tile-jobs';
 import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
 import type { ControllerSettingsSnapshot } from '../../core/preflight';
 import type { PreparedOutput } from '../../io/gcode';
+import { cncTileParkSetAsideWarnings } from '../laser/cnc-park-set-aside-warnings';
 import { detectMachineJobWarnings } from '../laser/machine-job-warnings';
 import { emitTileFiles, type TileFile } from './tile-emission';
 
@@ -70,7 +71,7 @@ export function finalizeTiledOutput(
       activeWcs,
       prepared,
     ),
-    tileAdvisories: tiled.advisories ?? [],
+    tileAdvisories: [...(tiled.advisories ?? []), ...cncTileParkSetAsideWarnings(machine.params)],
     preparationAdvisories: (prepared.advisories ?? []).map((issue) => issue.message),
     emissionAdvisories: emitted.advisories,
   };

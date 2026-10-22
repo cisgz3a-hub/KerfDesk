@@ -91,6 +91,7 @@ export function surfacingStarterValues(
 // return their exact row/pass-count failure before allocation.
 const MAX_SURFACING_ITERATIONS = 100_000;
 const POSITIVE_FINITE_REASON = 'must be a positive finite number.';
+const LADDER_RATIO_EPS = 1e-9;
 
 function fmt(value: number): string {
   const text = formatCncCoordinateMm(value);
@@ -108,9 +109,19 @@ export function surfacingRowYs(heightMm: number, stepMm: number): SurfacingRowsR
   if (capReason !== null) return { ok: false, reason: capReason };
 
   const rows: number[] = [];
-  for (let y = 0; y < heightMm; y += stepMm) rows.push(y);
+  const steps = ladderSteps(heightMm, stepMm);
+  for (let index = 0; index < steps; index += 1) rows.push(index * stepMm);
   rows.push(heightMm);
   return { ok: true, rows };
+}
+
+// How many full steps fit before the exact end of a row or depth ladder. A
+// running sum drifts (0.3 + 0.3 + 0.3 is 0.8999…), and a ratio a hair above a
+// whole number would add a duplicate last row or a whole extra facing pass at
+// the final depth (controller audit v4 E3-P3-1). The tolerance is the job
+// emitter's (zPassCount's DEPTH_EPS).
+function ladderSteps(spanMm: number, stepMm: number): number {
+  return Math.max(1, Math.ceil(spanMm / stepMm - LADDER_RATIO_EPS));
 }
 
 export function buildSurfacingProgram(params: SurfacingParams): SurfacingProgramResult {
@@ -193,7 +204,8 @@ function depthLadder(perPassMm: number, totalMm: number): DepthLadderResult {
   const capReason = iterationCapReason('depth pass', total, step);
   if (capReason !== null) return { ok: false, reason: capReason };
   const depths: number[] = [];
-  for (let depth = step; depth < total; depth += step) depths.push(depth);
+  const steps = ladderSteps(total, step);
+  for (let index = 1; index < steps; index += 1) depths.push(index * step);
   depths.push(total);
   return { ok: true, depths };
 }

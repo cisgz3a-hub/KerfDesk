@@ -19,6 +19,7 @@ import {
   grblRejectedBlockWarning,
 } from '../gcode-view/grbl-block-rejection';
 import { externalProgramBaseline } from './normalize-external-program';
+import { kerfDeskBitChangeWarnings } from './kerfdesk-bit-changes';
 
 export type ExternalProgramEnvelope = {
   readonly minX: number;
@@ -44,6 +45,9 @@ export type ExternalProgramContext = {
   /** Where the program is read from, in work mm. A program that never moves
    * runs there, so its Frame visits that point. */
   readonly start?: { readonly x: number; readonly y: number };
+  /** The bits KerfDesk's own bit-change comments name, in file order
+   * (`kerfDeskBitChangeLabels` on the file as opened). */
+  readonly kerfDeskBitChanges?: ReadonlyArray<string>;
 };
 
 type ReviewModel = Pick<GcodeRenderModel, 'stats' | 'events' | 'skippedMotions'>;
@@ -148,6 +152,7 @@ export function reviewExternalProgram(
     ...(interpreted?.warnings ?? []),
     ...offsetWriteWarnings(commands),
     ...COMMAND_WARNINGS.filter((check) => check.matches(commands)).map((check) => check.warning),
+    ...kerfDeskBitChangeWarnings(commands.m.has(0), context.kerfDeskBitChanges ?? []),
     ...coordinateSystemWarnings(model),
     ...(still === undefined ? pointEnvelopeWarnings(reviewedText, model) : [NEVER_MOVES]),
     ...unitWarnings(model),

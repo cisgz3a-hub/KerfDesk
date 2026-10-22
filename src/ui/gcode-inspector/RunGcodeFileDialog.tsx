@@ -5,6 +5,7 @@
 
 import { useMemo, useState } from 'react';
 import { reviewExternalProgram, type ExternalProgram } from '../../core/external-program';
+import { kerfDeskBitChangeLabels } from '../../core/external-program/kerfdesk-bit-changes';
 import { machineKindOf } from '../../core/scene';
 import { Button, Dialog, DialogActions } from '../kit';
 import { useStore } from '../state';
@@ -68,6 +69,9 @@ function InspectExternalRun(
   const [pinned, setPinned] = useState<RunStart | null>(null);
   const [frame, setFrame] = useState<ExternalFrame | null>(null);
   const start = pinned ?? live;
+  // The sent bytes have no comments, so KerfDesk's bit-change labels are read
+  // from the file as opened.
+  const bitChanges = useMemo(() => kerfDeskBitChangeLabels(props.text), [props.text]);
   const source = useMemo(
     () => ({
       ...deviceInspectionContext(
@@ -101,6 +105,7 @@ function InspectExternalRun(
           ? {}
           : { controllerKind: props.program.controllerKind }),
         start: start ?? DRAWN_ORIGIN,
+        kerfDeskBitChanges: bitChanges,
       },
       result.analysis.findings,
     ),

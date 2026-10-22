@@ -136,7 +136,9 @@ export type GcodeMetadata = {
 // repeats until a dark move, and drop air changes still held at the job end.
 // ADR-398 Amd 2 leaves a Marlin image layer's closing M5 for a dark move.
 // ADR-250 Amd 3 keeps CNC profile leads clear of every part the job keeps.
-export const EMITTER_REVISION = 'cnc-leads-clear-kept-parts-20261022-v24';
+// ADR-392 Amd 2 writes a tile that needs several bits as one file per bit (no
+// M0) and sets the bed park aside in tiles; surfacing ladders run no extra pass.
+export const EMITTER_REVISION = 'cnc-tile-files-per-bit-20261023-v25';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S
