@@ -1,8 +1,8 @@
 // File > Export artwork as PDF... / EPS... / GeoJSON... (ADR-468).
 // Artwork interchange only: geometry and colour, no machine settings. The
 // flow matches Export artwork as DXF: capture the artwork and clock before
-// the picker, refuse image-only selections before asking for a file name,
-// outline variable text, then write.
+// the picker, refuse image-only selections, outline variable text and build
+// the file, then ask for a file name and write.
 
 import { DEFAULT_PROJECT_VARIABLE_DATA, type Project } from '../../core/scene';
 import { err, ok, type Result } from '../../core/result';
@@ -19,6 +19,7 @@ import type { PlatformAdapter } from '../../platform/types';
 import { renderVariableText } from '../text/render-variable-text';
 import type { ToastVariant } from '../state/toast-store';
 import { exportProjectSelection } from './export-artwork-svg';
+import { pickPreparedSaveTarget } from './pick-prepared-save-target';
 
 export type ArtworkVectorFormat = 'pdf' | 'ai' | 'eps' | 'geojson';
 
@@ -110,16 +111,19 @@ export async function handleExportArtworkFormat(ctx: ExportArtworkFormatContext)
     ctx.pushToast('Could not export ' + spec.label + ': ' + message, 'error');
   try {
     const stem = fileStem(ctx.savedName, ids !== undefined);
-    const target = await ctx.platform.pickFileForSave({
-      suggestedName: stem + spec.extension,
-      extensions: [spec.extension],
-    });
-    if (target === null) return;
+    // The picker empties an existing file as it returns (ADR-656): the file is
+    // made first.
     const file = await exportFile(ctx, spec, project, ids, evaluation, stem);
     if (file.kind === 'error') {
       failed(file.error);
       return;
     }
+    const target = await pickPreparedSaveTarget(
+      ctx.platform,
+      { suggestedName: stem + spec.extension, extensions: [spec.extension] },
+      { title: 'Export ' + spec.label, message: 'The ' + spec.label + ' file is ready.' },
+    );
+    if (target === null) return;
     await target.write(new Blob([file.value.text], { type: spec.mime }));
     const done = exportedToast(spec, target.displayName, file.value);
     ctx.pushToast(done.message, done.variant);

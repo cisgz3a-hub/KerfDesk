@@ -1301,6 +1301,8 @@ that owns those fields, without changing the existing Frame/Start policy.
    (ADR-431).
 3. Cancellation writes nothing. Missing image pixels, unsupported 3D relief or invalid geometry
    report an error without claiming a successful partial export. A write error reports its reason.
+   The file is made before the destination is asked for, so a failure leaves an existing file as
+   it was (ADR-656); a slow export asks for one more click on **Choose file…**.
 4. Re-import preserves the supported vector/image composition, physical size and image clips
    (ADR-358). New exports also restore their authored scene coordinate frame through explicit
    artwork-origin metadata (ADR-574), before ordinary import placement. Older exports, or files
@@ -6475,22 +6477,27 @@ and lifts the command's CNC-only gate.)*
    after M5. Fixed feeds are capped to the device-profile maximum.
 2. The toast repeats the operator contract: zero X/Y at the area's
    front-left corner and Z on the surface to be faced before running.
-3. Choose the destination when Save is clicked. Background emitted-text
+3. Save checks and generates the whole program first (**Checking surfacing
+   program…**), then asks for the destination (ADR-656): the browser's save
+   picker empties an existing file as soon as it returns. Background emitted-text
    preflight checks the work-origin bed envelope, enabled no-go-zone
    uncertainty, feed/RPM ceilings, finite coordinates, safe travel/depth,
-   and spindle-start clearance before a writable transaction opens. Setup
-   and controller findings remain advisory toasts, including on picker cancel.
-4. Generation, preflight, and file writes use bounded buffers. **Cancel surfacing
-   save** stops preparation or discards uncommitted file bytes. **Finishing
-   surfacing save…** means the complete file is already being committed and
-   can no longer be cancelled. A replacement save waits for that commit to
-   settle before opening another writable; changing projects retires old UI
-   notifications. Existing file contents survive preflight, generation, or
-   write failures before the final commit.
+   and spindle-start clearance before the picker opens. When preparation
+   outlasts the Save click, **Save surfacing program** asks for one more
+   click on **Choose file…**. Setup and controller findings remain advisory
+   toasts, including on picker cancel.
+4. Generation and preflight use bounded buffers; the finished program is held
+   in browser blob storage until it is written. **Cancel surfacing save** stops
+   preparation or the destination choice, and no file is touched. Once a file
+   is chosen, **Finishing surfacing save…** writes the complete program and can
+   no longer be cancelled. A replacement save waits for that commit to settle
+   before opening another writable; changing projects retires old UI
+   notifications. Existing file contents survive preflight, generation and
+   cancellation; only a write failure after the file is chosen can leave it empty.
 
 #### Error — save fails
-1. A preflight failure or failed dialog/write toasts the reason; nothing
-   is written.
+1. A preflight or generation failure toasts the reason before any file dialog
+   opens; nothing is written. A failed dialog or write toasts the reason.
 
 #### Empty
 1. Cancelling the save dialog writes nothing.
