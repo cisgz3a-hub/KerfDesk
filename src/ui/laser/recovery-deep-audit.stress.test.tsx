@@ -144,10 +144,14 @@ async function yankAt(h: StressHarness, delayMs: number): Promise<Interrupted> {
   return { h, runId, capsule, gcode: capsule.artifact.gcode };
 }
 
-/** Recover through the real flow on a fresh controller; return the lines sent. */
+/** Recover through the real flow on a fresh controller; return the lines sent.
+ * The yanked simulator kept running, so the reconnect shows no reset banner
+ * and the restart stays where the record put it (ADR-398 Amendment 3). */
 async function recoverOnWire(interrupted: Interrupted): Promise<string[]> {
-  const { h, capsule } = interrupted;
-  h.simulator = await connectSimulator();
+  const { h, runId } = interrupted;
+  h.simulator = await connectSimulator({ emitBannerOnOpen: false });
+  const capsule = await expectCapsuleFor(h.repository, runId);
+  expect(capsule.interruption).not.toHaveProperty('plannerBacklog');
   const before = h.simulator.outbound().length;
   expect(await drive(runLaserRecoveryCapsuleFlow(capsule, h.repository))).toBe(true);
   expect(jobAwareAlert).not.toHaveBeenCalled();

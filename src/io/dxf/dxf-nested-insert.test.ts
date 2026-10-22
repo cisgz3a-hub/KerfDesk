@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { nestedMinsertDxf, nestedMinsertStartX } from '../../__fixtures__/nested-minsert';
+import {
+  holdsEveryNestedMinsertInstance,
+  NESTED_MINSERT_INSTANCES,
+  nestedMinsertDxf,
+} from '../../__fixtures__/nested-minsert';
 import { parseDxf } from './parse-dxf';
 
 describe('composed DXF MINSERT expansion', () => {
@@ -9,47 +13,23 @@ describe('composed DXF MINSERT expansion', () => {
     const result = parseDxf({ dxfText, id: 'nested', source: 'nested.dxf' });
     if (result.kind !== 'ok' || result.object === null)
       throw new Error('Expected imported geometry');
-    expect(result.pathCount).toBe(150_000);
     expect(result.notes).toEqual([]);
     expect(result.skippedSummary).toBeNull();
     expect(result.object.paths).toHaveLength(1);
     const path = result.object.paths[0];
     expect(path?.color).toBe('#ff0000');
-    expect(path?.polylines).toHaveLength(150_000);
-    expect(path?.curves).toHaveLength(150_000);
-    expect(
-      path?.polylines.every((line, index) => {
-        const from = line.points[0],
-          to = line.points[1];
-        const x = nestedMinsertStartX(index);
-        return (
-          !line.closed &&
-          line.points.length === 2 &&
-          from !== undefined &&
-          to !== undefined &&
-          Math.abs(from.x - x) < 1e-8 &&
-          Math.abs(to.x - (x - 4)) < 1e-8 &&
-          Math.abs(from.y) < 1e-8 &&
-          Math.abs(to.y) < 1e-8
-        );
-      }),
-    ).toBe(true);
-    expect(
-      path?.curves?.every((curve, index) => {
-        const segment = curve.segments[0],
-          x = nestedMinsertStartX(index);
-        return (
-          !curve.closed &&
-          curve.segments.length === 1 &&
-          segment?.kind === 'line' &&
-          Math.abs(curve.start.x - x) < 1e-8 &&
-          Math.abs(segment.to.x - (x - 4)) < 1e-8 &&
-          Math.abs(curve.start.y) < 1e-8 &&
-          Math.abs(segment.to.y) < 1e-8
-        );
-      }),
-    ).toBe(true);
+    const curves = path?.curves ?? [];
+    // Instances whose ends meet exactly one other end are joined on import
+    // (ADR-626 Amendment 8), so there are fewer paths than instances; every
+    // instance is still there, as one line piece.
+    expect(path?.polylines).toHaveLength(curves.length);
+    expect(result.pathCount).toBe(curves.length);
+    expect(curves.length).toBeLessThan(NESTED_MINSERT_INSTANCES);
+    expect(curves.every((curve) => !curve.closed)).toBe(true);
+    expect(holdsEveryNestedMinsertInstance(curves)).toBe(true);
     expect(result.object.bounds.maxX).toBeCloseTo(6986, 8);
     expect(result.object.bounds.maxY).toBeCloseTo(0, 8);
-  });
+    // About 3.3 s alone on a dev box, and longer beside other test runs. The test
+    // says the instances expand correctly, not how fast, so only a hang trips it.
+  }, 30_000);
 });

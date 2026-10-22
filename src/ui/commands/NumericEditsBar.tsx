@@ -294,18 +294,16 @@ function NumberField(props: {
   const commitIfEdited = (text: string): void => {
     if (text.trim() !== shown) commit(text);
   };
-  const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>): void => {
-    if (event.key === 'Enter') {
-      // Enter on the text as shown is no edit either: in an inch box it would
-      // write back the four-decimal rounding (10 mm shown as 0.3937).
-      commitIfEdited(event.currentTarget.value);
-      return;
-    }
-    const stepped = steppedDraft(event.key, evaluate(event.currentTarget.value), step, format);
-    if (stepped === null) return;
-    event.preventDefault();
-    updateDraft(stepped);
-  };
+  const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>): void =>
+    handleFieldKey(event, {
+      commitIfEdited,
+      revert: () => {
+        setDraft(shown);
+        setDraftIsValid(true);
+      },
+      stepped: (key, text) => steppedDraft(key, evaluate(text), step, format),
+      updateDraft,
+    });
   return (
     <label className="lf-numeric-edit-field">
       <span className="lf-numeric-edit-caption">{props.caption}</span>
@@ -328,6 +326,36 @@ function NumberField(props: {
       {!props.hideUnit && <span className="lf-numeric-edit-unit">{unitLabel}</span>}
     </label>
   );
+}
+
+type FieldKeyActions = {
+  readonly commitIfEdited: (text: string) => void;
+  readonly revert: () => void;
+  readonly stepped: (key: string, text: string) => string | null;
+  readonly updateDraft: (text: string) => void;
+};
+
+function handleFieldKey(
+  event: React.KeyboardEvent<HTMLInputElement>,
+  actions: FieldKeyActions,
+): void {
+  if (event.key === 'Enter') {
+    // Enter on the text as shown is no edit either: in an inch box it would
+    // write back the four-decimal rounding (10 mm shown as 0.3937).
+    actions.commitIfEdited(event.currentTarget.value);
+    return;
+  }
+  if (event.key === 'Escape') {
+    // Esc abandons the typed text, as the node and compound boxes do, so
+    // leaving the box afterwards applies nothing (audit 08-P3-7).
+    event.stopPropagation();
+    actions.revert();
+    return;
+  }
+  const stepped = actions.stepped(event.key, event.currentTarget.value);
+  if (stepped === null) return;
+  event.preventDefault();
+  actions.updateDraft(stepped);
 }
 
 function entryOptions(
@@ -387,5 +415,12 @@ function messageForError(reason: string): string {
   if (reason === 'multi-rotation') return 'Rotate one object at a time in Numeric Edits.';
   if (reason === 'invalid-dimension') return 'Width and height must be greater than 0.';
   if (reason === 'invalid-number') return 'Numeric values must be finite.';
+  if (reason === 'zero-height-selection') {
+    return 'The selection has no height to scale, like a horizontal line. Change its width instead.';
+  }
+  if (reason === 'zero-width-selection') {
+    return 'The selection has no width to scale, like a vertical line. Change its height instead.';
+  }
+  if (reason === 'degenerate-selection') return 'The selection has no width or height to scale.';
   return 'Numeric edit could not be applied.';
 }

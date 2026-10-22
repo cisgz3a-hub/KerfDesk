@@ -1,4 +1,5 @@
 import type { PlatformAdapter } from '../../platform/types';
+import { pickPreparedSaveTarget } from '../app/pick-prepared-save-target';
 import { useStore } from '../state/store';
 import { useToastStore } from '../state/toast-store';
 import {
@@ -59,14 +60,20 @@ export function personalArtworkActions(
     exportLibrary: () => void run((isCurrent) => exportLibrary(platform, storage, isCurrent)),
     insert: (entry: PersonalArtwork) => {
       try {
-        useStore.setState((state) => insertPersonalArtwork(state, entry));
-        useToastStore
-          .getState()
-          .pushToast(
-            `${entry.name} added with its saved operations. Review settings for this machine.`,
-            'success',
-          );
-        onClose();
+        // Saved V-carve, relief or adaptive work is new Pro work here: without
+        // Pro the insert waits for the Pro prompt, as paste does (ADR-592).
+        useStore.getState().commitProjectEdit(
+          (state) => insertPersonalArtwork(state, entry),
+          () => {
+            useToastStore
+              .getState()
+              .pushToast(
+                `${entry.name} added with its saved operations. Review settings for this machine.`,
+                'success',
+              );
+            onClose();
+          },
+        );
       } catch (cause) {
         onError(personalArtworkError(cause));
       }
@@ -99,11 +106,14 @@ async function exportLibrary(
 ): Promise<void> {
   const json = serializePersonalArtworkLibrary(await storage.list());
   if (!isCurrent()) return;
-  const target = await platform.pickFileForSave({
-    suggestedName: 'my-artwork.lfart',
-    extensions: ['.lfart'],
-  });
-  if (!isCurrent() || target === null) return;
+  // The picker empties an existing file as it returns (ADR-656): once picked,
+  // the file gets the library listed at the click, even if the panel closed.
+  const target = await pickPreparedSaveTarget(
+    platform,
+    { suggestedName: 'my-artwork.lfart', extensions: ['.lfart'] },
+    { title: 'Export artwork library', message: 'The artwork library is ready.' },
+  );
+  if (target === null) return;
   await target.write(json);
 }
 

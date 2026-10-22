@@ -103,7 +103,9 @@ export type SolidPlane = {
   readonly luma: Float32Array;
   /** The RGBA pixels the luma was read from. */
   readonly rgba: Uint8ClampedArray;
-  /** Supersampling factor; the pixel constants above are in source px. */
+  /** Working px per source px (the detector window scale: supersampling times a
+   *  finer commit grid's ratio, ADR-409 Amendment 2); the pixel constants above
+   *  are in source px. */
   readonly pixelScale: number;
 };
 

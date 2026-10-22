@@ -35,7 +35,8 @@ import {
   withoutArcMoves,
 } from './cut-arc-moves';
 import { isEmittableCutSegment } from './cut-emission-resolution';
-import type { CutGroup, CutSegment, Job, JobDiagnostic } from './job';
+import type { CutGroup, CutSegment, Job } from './job';
+import { countsFor, countSideUnknown, leadDiagnostics, type LeadCounts } from './laser-lead-counts';
 import type { CutGroupLaserLeads } from './laser-lead-settings';
 import type { JobBounds } from './job-bounds';
 import { fitLead, retracesLeadIn, type LeadFit, type LeadFitContext } from './laser-lead-fit';
@@ -53,7 +54,7 @@ import {
   withoutLeadScaffolding,
   type LeadJobLines,
 } from './laser-lead-rings';
-import { sceneLeadSideContours } from './laser-lead-sides';
+import { sceneLeadSideGeometry, type LeadSideVerdict } from './laser-lead-sides';
 import {
   leadSpan,
   leadWrap,
@@ -88,15 +89,6 @@ type LeadWorld = LeadJobLines & {
   readonly leadLines: Map<number, number[]>;
 };
 
-type LeadCounts = {
-  readonly layerName: string;
-  shortened: number;
-  omitted: number;
-  /** Contours left without leads because their scrap side is unknown, by
-   * the operation whose shape holds them: each must be looked at. */
-  readonly sideUnknown: Map<string, number>;
-};
-
 export function applyLaserLeads(job: Job, options: LaserLeadOptions): Job {
   if (!job.groups.some((group) => group.kind === 'cut' && group.laserLeads !== undefined))
     return withoutLeadScaffolding(job);
@@ -105,8 +97,8 @@ export function applyLaserLeads(job: Job, options: LaserLeadOptions): Job {
   const burns = (group: CutGroup): boolean =>
     isBurningLineGroup(group) && hasJobStartPower(group, options.device);
   const scene =
-    options.scene === undefined ? undefined : sceneLeadSideContours(options.scene, options.device);
-  const lines = leadJobLines(job, burns, scene);
+    options.scene === undefined ? undefined : sceneLeadSideGeometry(options.scene, options.device);
+  const lines = leadJobLines(job, burns, scene?.contours, scene?.openLines);
   const obstacles = LeadObstacles.create(lines.lines, lines.rings);
   const wrap = leadWrap(options.wrapMm, lines.lines);
   for (const line of lines.lines) {
@@ -146,38 +138,6 @@ export function applyLaserLeads(job: Job, options: LaserLeadOptions): Job {
   };
 }
 
-// By operation id: two operations can share a name (each parent's Sub-layer 1).
-function countsFor(counts: Map<string, LeadCounts>, layerId: string, name: string): LeadCounts {
-  const existing = counts.get(layerId);
-  if (existing !== undefined) return existing;
-  const created = { layerName: name, shortened: 0, omitted: 0, sideUnknown: new Map() };
-  counts.set(layerId, created);
-  return created;
-}
-
-function leadDiagnostics(counts: ReadonlyMap<string, LeadCounts>): JobDiagnostic[] {
-  return [...counts.entries()].flatMap(([layerId, tally]): JobDiagnostic[] => [
-    ...(tally.shortened > 0 || tally.omitted > 0
-      ? [
-          {
-            kind: 'laser-leads-adjusted' as const,
-            layerId,
-            layerName: tally.layerName,
-            shortened: tally.shortened,
-            omitted: tally.omitted,
-          },
-        ]
-      : []),
-    ...[...tally.sideUnknown].map(([aroundName, count]) => ({
-      kind: 'laser-leads-side-unknown' as const,
-      layerId,
-      layerName: tally.layerName,
-      count,
-      aroundName,
-    })),
-  ]);
-}
-
 function leadSegment(
   segment: CutSegment,
   group: CutGroup,
@@ -185,11 +145,11 @@ function leadSegment(
   world: LeadWorld,
   tally: LeadCounts,
 ): CutSegment {
-  // Automatic, and a closed shape on an operation without leads holds it: it
-  // may be a part, so no side is safe.
+  // Automatic, and a closed shape on an operation without leads holds it, or
+  // open lines close a region round it: it may be a part, so no side is safe.
   const unknown = unknownSide(group, key, world);
   if (unknown !== null) {
-    tally.sideUnknown.set(unknown, (tally.sideUnknown.get(unknown) ?? 0) + 1);
+    countSideUnknown(tally, unknown);
     return segment;
   }
   const planned = leadAttempt(segment, group, key, world);
@@ -211,13 +171,13 @@ function leadSegment(
   return leadedSegment(attempt.segment, leadIn, leadOut, finalPass, group.passes);
 }
 
-/** The operation whose shape leaves the side unknown, or null when known. */
-function unknownSide(group: CutGroup, key: string, world: LeadWorld): string | null {
+/** The verdict that leaves the side unknown, or null when it is known. */
+function unknownSide(group: CutGroup, key: string, world: LeadWorld): LeadSideVerdict | null {
   if (group.laserLeads?.side !== 'auto') return null;
   const lineId = world.lineOf.get(key);
   const ringId = lineId === undefined ? undefined : world.ringOfLine.get(lineId);
   const verdict = ringId === undefined ? undefined : world.sides[ringId];
-  return verdict?.side === 'unknown' ? (verdict.aroundName ?? '') : null;
+  return verdict?.side === 'unknown' ? verdict : null;
 }
 
 type LeadAttempt = {

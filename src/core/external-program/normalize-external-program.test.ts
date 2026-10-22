@@ -82,7 +82,9 @@ describe('external G-code program normalization (ADR-630)', () => {
     }
     // Marlin stops a job at G94 (and G17 without CNC_WORKSPACE_PLANES).
     expect(externalProgramBaseline('marlin')).toBe('G21\nG90');
-    expect(externalProgramBaseline('smoothieware')).toBe('G17G21G90G0');
+    // Smoothieware has no G94, and keeps the M221 power scale a Frame, jog or
+    // Home zeroed (ADR-630 Amendment 3).
+    expect(externalProgramBaseline('smoothieware')).toBe('G17G21G90G0\nM221 S100');
     expect(normalizeExternalProgram('X1\n', 'G21G90')).toMatchObject({
       kind: 'ok',
       program: { gcode: 'G21G90\nX1\n', baseline: 'G21G90' },

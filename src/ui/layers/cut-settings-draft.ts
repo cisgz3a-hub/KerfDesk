@@ -12,6 +12,7 @@ import {
   DEFAULT_TAB_SPACING_MM,
   imageOverscanMmFor,
   MAX_IMAGE_OVERSCAN_MM,
+  MIN_PERFORATION_MM,
 } from '../../core/job/operation-cut-extras';
 import {
   DEFAULT_ARC_LEAD_ANGLE_DEG,
@@ -24,6 +25,7 @@ import {
   MIN_LEAD_LENGTH_MM,
 } from '../../core/job/laser-lead-settings';
 import { DITHER_ALGORITHMS, type Layer, type LayerMode } from '../../core/scene';
+import { numberField, reconciledNumberField, submittedNumber } from './cut-settings-number-field';
 
 export type LayerPatch = Partial<Omit<Layer, 'id' | 'color'>>;
 export type CutSettingsLimits = {
@@ -39,7 +41,6 @@ export const MAX_TABS_PER_SHAPE = 100;
 export const MIN_TAB_SPACING_MM = 1;
 export const MAX_TAB_SPACING_MM = 1000;
 export const MAX_OVERCUT_MM = 50;
-export const MIN_PERFORATION_MM = 0.01;
 export const MAX_PERFORATION_MM = 100;
 
 export function readCutSettingsPatch(
@@ -106,8 +107,14 @@ function readImageSettingsPatch(
     };
   }
   return {
-    minPower: numberField(data, 'minPower', layer.minPower, 0, deferArtworkBounds ? 100 : power),
-    dotWidthCorrectionMm: numberField(
+    minPower: reconciledNumberField(
+      data,
+      'minPower',
+      layer.minPower,
+      0,
+      deferArtworkBounds ? 100 : power,
+    ),
+    dotWidthCorrectionMm: reconciledNumberField(
       data,
       'dotWidthCorrectionMm',
       layer.dotWidthCorrectionMm,
@@ -377,22 +384,6 @@ function readImageLinesPerMm(data: FormData, layer: Layer): number {
     );
   }
   return layer.linesPerMm;
-}
-
-function numberField(
-  data: FormData,
-  name: string,
-  fallback: number,
-  min: number,
-  max: number,
-): number {
-  const parsed = submittedNumber(data, name);
-  if (!Number.isFinite(parsed)) return fallback;
-  return Math.max(min, Math.min(max, parsed));
-}
-
-function submittedNumber(data: FormData, name: string): number {
-  return Number.parseFloat(String(data.get(name) ?? ''));
 }
 
 function positiveFiniteLimit(value: number | undefined): number | null {

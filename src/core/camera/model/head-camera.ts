@@ -51,10 +51,17 @@ export function modelAtHead(record: CameraModelRecord, headMm: Vec2): CameraMode
   };
   if (shift.x === 0 && shift.y === 0) return record;
   return {
-    ...record,
-    pose: shiftedPose(record.pose, shift),
-    accuracy: shiftedAccuracy(record.accuracy, shift),
+    ...movedModel(record, shift),
     mount: { kind: 'head', headAtCalibrationMm: { x: headMm.x, y: headMm.y } },
+  };
+}
+
+/** `record` with its pose and its measured rings moved `shiftMm` across the bed. */
+export function movedModel(record: CameraModelRecord, shiftMm: Vec2): CameraModelRecord {
+  return {
+    ...record,
+    pose: shiftedPose(record.pose, shiftMm),
+    accuracy: shiftedAccuracy(record.accuracy, shiftMm),
   };
 }
 
@@ -204,19 +211,42 @@ export type HeadCapturePlan = {
   readonly coversArea: boolean;
 };
 
+/** The head positions (scene mm) the machine may stop at. */
+export type HeadReach = {
+  readonly minX: number;
+  readonly minY: number;
+  readonly maxX: number;
+  readonly maxY: number;
+};
+
 /**
  * Where to stop the head so that `view` (relative to the head) covers `area`,
- * row by row in a snake. Stops stay on the bed; where that keeps the camera
- * from reaching part of the area, `coversArea` says so.
+ * row by row in a snake. Stops stay inside `reach`: the bed, less the edge
+ * strip the machine keeps the head out of (ADR-375's pull-off); where that
+ * keeps the camera from reaching part of the area, `coversArea` says so.
  */
 export function planHeadCaptures(
   view: BedArea,
   area: BedArea,
-  bed: { readonly width: number; readonly height: number },
+  reach: HeadReach,
   overlap = HEAD_CAPTURE_OVERLAP,
 ): HeadCapturePlan {
-  const columns = axisStops(area.x, area.width, view.x, view.width, bed.width, overlap);
-  const rows = axisStops(area.y, area.height, view.y, view.height, bed.height, overlap);
+  const columns = axisStops(
+    area.x,
+    area.width,
+    view.x,
+    view.width,
+    [reach.minX, reach.maxX],
+    overlap,
+  );
+  const rows = axisStops(
+    area.y,
+    area.height,
+    view.y,
+    view.height,
+    [reach.minY, reach.maxY],
+    overlap,
+  );
   const heads: Vec2[] = [];
   rows.stops.forEach((y, row) => {
     const order = row % 2 === 0 ? columns.stops : [...columns.stops].reverse();
@@ -232,7 +262,7 @@ function axisStops(
   length: number,
   viewStart: number,
   viewLength: number,
-  bedLength: number,
+  reach: readonly [number, number],
   overlap: number,
 ): AxisStops {
   const centres =
@@ -243,7 +273,7 @@ function axisStops(
           start + length - viewLength / 2,
           Math.ceil((length - viewLength) / (viewLength * (1 - overlap))) + 1,
         );
-  const stops = centres.map((c) => clamp(c - viewStart - viewLength / 2, 0, bedLength));
+  const stops = centres.map((c) => clamp(c - viewStart - viewLength / 2, reach[0], reach[1]));
   return { stops, covers: seen(stops, viewStart, viewLength, start, start + length) };
 }
 

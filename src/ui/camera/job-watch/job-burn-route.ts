@@ -2,7 +2,8 @@
 // canvas already draws its live trail from: every lit move, mapped from
 // controller to bed millimetres by the same walker, at the beam's width. A
 // User Origin job is drawn over its artwork, so its lines are shifted back to
-// where they burn (ADR-642).
+// where they burn (ADR-642). A job whose bed position is unknown is not placed
+// on the bed at all (ADR-490 §4, rolling audit 12-P2-4).
 
 import type { BedArea } from '../../../core/camera/model/camera-model-accuracy';
 import {
@@ -18,9 +19,27 @@ import { walkRouteLines, type RouteLineVisitor } from '../../workspace/route-ran
 // The canvas trail's nominal beam when the machine does not say (draw-burn-trail).
 const NOMINAL_LASER_KERF_MM = 0.2;
 
-/** Whether the plan can be placed on the bed at all. */
+/**
+ * Whether the plan can be placed on the bed at all: it can be drawn, and
+ * KerfDesk knows where on the bed it burns.
+ */
 export function planPlacesOnBed(plan: CanvasMotionPlan): boolean {
-  return plan.capability !== 'unavailable' && plan.capability !== 'file-only';
+  return (
+    plan.capability !== 'unavailable' &&
+    plan.capability !== 'file-only' &&
+    planBedPositionKnown(plan)
+  );
+}
+
+/**
+ * Whether KerfDesk knows where on the bed the plan burns: a machine frame, or
+ * an artwork-relative one that keeps its bed position (ADR-642 §3). Without
+ * one (no homing, not homed, Verified Origin), it is drawn only relative to
+ * its artwork, and that is not where it burns.
+ */
+export function planBedPositionKnown(plan: CanvasMotionPlan): boolean {
+  const frame = plan.coordinateFrame;
+  return frame.kind === 'machine' || frame.bed !== undefined;
 }
 
 /**

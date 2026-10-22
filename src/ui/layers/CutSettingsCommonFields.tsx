@@ -1,9 +1,10 @@
 import {
   DEFAULT_PERFORATION_CUT_MM,
   DEFAULT_PERFORATION_SKIP_MM,
+  MIN_PERFORATION_MM,
 } from '../../core/job/operation-cut-extras';
 import type { Layer, LayerMode } from '../../core/scene';
-import { MAX_OVERCUT_MM, MAX_PERFORATION_MM, MIN_PERFORATION_MM } from './cut-settings-draft';
+import { MAX_OVERCUT_MM, MAX_PERFORATION_MM } from './cut-settings-draft';
 import { useStore } from '../state';
 import { CutPowerModeField } from './CutPowerModeField';
 import { Field, NumberInput } from './CutSettingsInputs';
@@ -127,7 +128,6 @@ function LineModeFields(props: { readonly layer: Layer }): JSX.Element {
           value={props.layer.fillOverscanMm}
           min={0}
           max={25}
-          step={0.5}
           label="contour entry"
           title="Shared with Fill overscan. On 4040-safe, Line contours use up to 5 mm of laser-off feed-matched entry; other profiles may not apply it."
         />
@@ -139,7 +139,6 @@ function LineModeFields(props: { readonly layer: Layer }): JSX.Element {
           value={props.layer.kerfOffsetMm}
           min={-10}
           max={10}
-          step={0.01}
           label="kerf offset"
           title="Compensate laser beam width on closed Line cuts. Positive cuts outside outer shapes and inside holes. A shape inside another shape on this operation, or on one with a kerf offset, leads or tabs, counts as a hole; source artwork is unchanged."
         />
@@ -151,7 +150,6 @@ function LineModeFields(props: { readonly layer: Layer }): JSX.Element {
           value={props.layer.overcutMm ?? 0}
           min={0}
           max={MAX_OVERCUT_MM}
-          step={0.01}
           label="overcut"
           title="Keep cutting past the start of each closed shape on the final pass so the seam is cut through. 0 turns it off. Shapes opened by tabs or perforation are not overcut."
         />
@@ -191,7 +189,6 @@ function LinePerforationFields(props: { readonly layer: Layer }): JSX.Element {
           value={props.layer.perforationCutMm ?? DEFAULT_PERFORATION_CUT_MM}
           min={MIN_PERFORATION_MM}
           max={MAX_PERFORATION_MM}
-          step={0.01}
           label="perforation cut length"
           title="Length of each cut dash in millimeters."
         />
@@ -203,7 +200,6 @@ function LinePerforationFields(props: { readonly layer: Layer }): JSX.Element {
           value={props.layer.perforationSkipMm ?? DEFAULT_PERFORATION_SKIP_MM}
           min={MIN_PERFORATION_MM}
           max={MAX_PERFORATION_MM}
-          step={0.01}
           label="perforation skip length"
           title="Length of each uncut gap between dashes in millimeters."
         />

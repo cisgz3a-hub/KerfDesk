@@ -28,10 +28,16 @@ import {
 import { emitPreparedGcode } from '../../../io/gcode/emit-gcode';
 import { prepareOutput } from '../../../io/gcode/prepare-output';
 import { profileCatalogEntryById, type DeviceProfile } from '../../devices';
+import { normalizeExternalProgram } from '../../external-program';
 import type { Project } from '../../scene';
+import { buildSmoothieFrameLines, SMOOTHIE_FRAME_TOOL_OFF_LINES } from '../smoothieware/commands';
 import { laserResumeDialectForDevice } from './laser-resume-dialect';
 import { mixedLaserProject } from './laser-resume-project.test-helper';
-import { buildResumeProgram, type LaserResumeTransformVersion } from './resume-program';
+import {
+  buildResumeProgram,
+  LASER_RESUME_TRANSFORM_VERSION,
+  type LaserResumeTransformVersion,
+} from './resume-program';
 
 const LASER = {
   machineKind: 'laser',
@@ -182,6 +188,54 @@ describe.each(SCENARIOS)('laser resume on $name', (scenario) => {
     const { checked, divergences } = resumeDivergences(scenario, gcode, 2);
     expect(divergences.length).toBeGreaterThan(checked / 2);
   }, 60_000);
+});
+
+// An opened program on Smoothieware (controller audit v2 C6-P2-1) sets its
+// power only with S and never sends M221, so it burns at whatever scale the
+// board holds, and a Frame's tool-off lines leave that at zero. The baseline's
+// `M221 S100` (ADR-630 Amendment 3) sets it, and a resume scanning past the
+// baseline re-arms at it.
+describe('an opened Smoothieware program after its Frame', () => {
+  const file =
+    'G00 G17 G40 G21 G54\nG90\nM3\nG0 X0 Y0\nG1 X10 Y0 S0.5 F600\nG1 X10 Y10\nG0 X20\nG1 X30 S0.25\nM5\n';
+  const framed = () => {
+    const model = powerUpSmoothie({ position: RECONNECTED_HEAD });
+    const frame = buildSmoothieFrameLines({ minX: 0, minY: 0, maxX: 30, maxY: 10 }, 3000);
+    runSmoothieLines(model, [
+      ...SMOOTHIE_FRAME_TOOL_OFF_LINES,
+      ...frame.map((line) => line.trim()),
+    ]);
+    expect(model.scale).toBe(0);
+    return model;
+  };
+  const sendable = (baseline?: string) => {
+    const normalized = normalizeExternalProgram(file, baseline, 'smoothieware');
+    if (normalized.kind !== 'ok') throw new Error(normalized.reasons.join('\n'));
+    return normalized.program.gcode;
+  };
+  const scenario: Scenario = {
+    name: 'Smoothieware opened program',
+    device: () => profile('generic-smoothieware'),
+    original: (gcode) => runSmoothieLines(framed(), gcode).burns,
+    resumed: (lines) => runSmoothieLines(framed(), lines).burns,
+  };
+
+  it('burns its S power at full scale when Started after the Frame', () => {
+    expect(scenario.original(sendable()).map((burn) => burn.power)).toEqual([0.5, 0.5, 0.25]);
+    // The baseline before ADR-630 Amendment 3 left the Frame's zero scale.
+    expect(scenario.original(sendable('G17G21G90G0'))).toEqual([]);
+  });
+
+  it('burns what the original burns from every restart line', () => {
+    const gcode = sendable();
+    const { checked, divergences } = resumeDivergences(
+      scenario,
+      gcode,
+      LASER_RESUME_TRANSFORM_VERSION,
+    );
+    expect(checked).toBe(gcode.split('\n').length - 1);
+    expect(divergences).toEqual([]);
+  });
 });
 
 describe('the hostile reconnect state is really hostile', () => {
