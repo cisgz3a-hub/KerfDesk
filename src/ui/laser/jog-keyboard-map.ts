@@ -8,8 +8,9 @@
 //
 // Bare arrow keys are NOT jog keys: they nudge the selected canvas object and
 // one press must never also move the head (F104). With NumLock off the keypad
-// sends ArrowUp/ArrowLeft/..., which therefore stay with the canvas; only the
-// digit a NumLock-on keypad sends is read as a jog.
+// sends ArrowUp/ArrowLeft/... for 8/4/6/2 and Home/PageUp/End/PageDown for
+// 7/9/1/3 (W3C UI Events code values), so only the digit a NumLock-on keypad
+// sends is read as a jog, and no keypad key ever jogs Z (isNumpadKey).
 
 import type { PhysicalJogDirection } from './jog-control-policy';
 
@@ -74,8 +75,20 @@ function chordLabel(chord: BracketChord): string {
   return `Ctrl+${chord.modifier}+${chord.code === 'BracketLeft' ? '[' : ']'}`;
 }
 
-// NumLock on: the keypad sends the digit. NumLock off: it sends an arrow key,
-// which the canvas nudge owns (F104). Numpad 5 (Clear) is not bound.
+/**
+ * True for a key on the numeric keypad, whatever NumLock makes it send. With
+ * NumLock off keypad 9 and 3 send PageUp/PageDown, so the Page-key Z jog must
+ * not read them: the same keys jog XY diagonally with NumLock on (ADR-493
+ * Amendment 1).
+ */
+export function isNumpadKey(event: Pick<KeyboardEvent, 'code' | 'location'>): boolean {
+  return (
+    event.code.startsWith('Numpad') || event.location === KeyboardEvent.DOM_KEY_LOCATION_NUMPAD
+  );
+}
+
+// NumLock on: the keypad sends the digit. NumLock off: it sends an arrow or
+// navigation key, which never jogs (F104). Numpad 5 (Clear) is not bound.
 function matchesNumpadDigit(event: JogKeyEvent, digit: string): boolean {
   if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return false;
   return event.code === `Numpad${digit}` && event.key === digit;
