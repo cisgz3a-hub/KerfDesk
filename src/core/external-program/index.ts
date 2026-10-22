@@ -21,3 +21,4 @@ export {
   type ExternalProgramReview,
   type ExternalProgramUnits,
 } from './external-program-review';
+export { findLitRapids, type LitRapids } from './lit-rapids';

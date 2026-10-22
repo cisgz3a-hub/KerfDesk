@@ -9432,7 +9432,9 @@ The G-code Inspector is free in every edition (ADR-627).
 4. A clean Frame unlocks **Start**. The status reads **Ready to start**. A Jog, Home, origin
    or probe change, reset, alarm, reconnect, another Frame or a machine-mode switch locks it
    again with the reason; the program is then read again from wherever the head stands.
-5. **Start** asks the usual laser-mode (`$32`) or CNC workholding question, checks the Frame is
+5. **Start** asks the usual CNC workholding question, or on a laser the `$30`/`$32` settings
+   question whenever Job Review would ask it; on this path it cites the Run review warnings, and
+   it opens with the rapids that would burn (ADR-630 Amendment 4). It checks the Frame is
    still current and the head is still at the program's start, then streams the program with
    the ordinary streamer and closes the Inspector. The last check, after the controller is
    prepared, repeats the session, origin, position and machine-mode checks. The Live Motion
@@ -9443,7 +9445,17 @@ The G-code Inspector is free in every edition (ADR-627).
 
 #### Warnings (never refuse)
 
-Work-offset writes (`G10 L2`/`G10 L20`, listed first: later moves, and later jobs, may be
+The connected controller's `$30` and `$32` come first, checked and worded as Job Review does for
+a project Start (ADR-630 Amendment 4): a router reporting `$32=1` (laser mode on: the spin-up
+dwell runs with the spindle off and plunges start with the bit not at speed), a laser reporting
+`$32=0`, a `$30` that does not match the profile's max S or the spindle's max RPM, and settings
+not read or not reported. On a laser whose `$32=0` is reported or not confirmed, a program with
+G0 moves made while `M3`/`M4` is on and `S` is not set to 0 also gets a warning that counts them
+and names the first by its line in the sent program: with laser mode off, GRBL, grblHAL and
+FluidNC keep the beam on during those rapids, so each burns a line. A program that writes `S0`
+on every G0 gets no such warning.
+
+Then the program's own: work-offset writes (`G10 L2`/`G10 L20`, listed first: later moves, and later jobs, may be
 displaced from the traced outline), moves in machine coordinates (`G53`), a work coordinate
 switch away from `G54`, `G92`, `G28`/`G30` moves and `G28.1`/`G30.1` stored positions,
 relative moves (`G91`, read from where the head stands), a program that ends in inches (`G20`,
