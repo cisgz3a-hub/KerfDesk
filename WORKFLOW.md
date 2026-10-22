@@ -1760,12 +1760,13 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
   (ADR-362), and stops motion or a hold the controller reports that nothing in KerfDesk started,
   as **ABORT MOTION** does (ADR-375).
 - `PageUp` / `PageDown` — Jog Z. When a scrolling list, tab panel or the Artwork panel has focus,
-  the keys scroll it instead (ADR-362).
+  the keys scroll it instead (ADR-362). Only the dedicated keys jog Z: the keypad's 9 / 3 never do,
+  even with Num Lock off, when they send PageUp / PageDown (ADR-493 Amendment 1).
 - `Cmd/Ctrl+Shift+]` / `Cmd/Ctrl+Shift+[` — Jog up / down one step; `Cmd/Ctrl+Alt+[` /
   `Cmd/Ctrl+Alt+]` — Jog left / right one step (LightBurn's Move-window keys, ADR-493).
-  Numpad `8`/`2`/`4`/`6` jog the same way and `7`/`9`/`1`/`3` diagonally, only with Num Lock on:
-  with Num Lock off the keypad sends arrow keys, which nudge the selected artwork and never move
-  the machine. Directions, step and speed are exactly the jog pad arrows'. Like the Z keys, they
+  Numpad `8`/`2`/`4`/`6` jog the same way and `7`/`9`/`1`/`3` diagonally, only with Num Lock on.
+  With Num Lock off the keypad sends arrow keys (8/2/4/6), which nudge the selected artwork, or
+  Home/PageUp/End/PageDown (7/9/1/3), and none of them moves the machine. Directions, step and speed are exactly the jog pad arrows'. Like the Z keys, they
   work only while the jog pad is shown and enabled, send one step per press (no auto-repeat), and
   do nothing in a dialog, a text field or a focused scrolling list.
 
