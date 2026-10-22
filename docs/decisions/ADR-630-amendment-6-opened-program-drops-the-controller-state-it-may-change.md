@@ -1,4 +1,4 @@
-## ADR-630 Amendment 5 - An opened program drops the WCS and Work-Z records it may change (2026-10-23)
+## ADR-630 Amendment 6 - An opened program drops the WCS and Work-Z records it may change (2026-10-23)
 
 **Status:** Accepted. Amends ADR-630 "Review and Start". Keeps PROJECT.md non-negotiable 21 and
 ADR-565: nothing new refuses, and the completed Frame stays the only ordinary Start gate. Fixes

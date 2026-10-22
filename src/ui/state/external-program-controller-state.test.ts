@@ -1,4 +1,4 @@
-// Controller audit v4 E4-P1-1 / E4-P2-1 (ADR-630 Amendment 5): what an opened
+// Controller audit v4 E4-P1-1 / E4-P2-1 (ADR-630 Amendment 6): what an opened
 // program's own words may change, by the Console's rule.
 
 import { describe, expect, it } from 'vitest';

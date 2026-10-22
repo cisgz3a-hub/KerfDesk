@@ -1,6 +1,6 @@
 // external-program-controller-state — the store records an opened program's
 // own words may change, dropped as its stream is installed (controller audit v4
-// E4-P1-1 and E4-P2-1, ADR-630 Amendment 5).
+// E4-P1-1 and E4-P2-1, ADR-630 Amendment 6).
 //
 // KerfDesk's own programs pin G54 and write no offset or tool. An opened
 // program can do both, and the store kept what it knew before the run:

@@ -252,7 +252,7 @@ export async function startExternalProgram(frame: ExternalFrame): Promise<boolea
       // KerfDesk's emitted multi-bit plan boundaries. Preserve the exact bytes.
       toolChangePause: false,
       // Its own G54-G59, offset and tool words may change what the store
-      // records; those records go as it starts (ADR-630 Amendment 5).
+      // records; those records go as it starts (ADR-630 Amendment 6).
       externalProgram: true,
       // Start clears the Frame record before this runs, so it checks what the
       // record was bound to. Start arming can take a while, during which the

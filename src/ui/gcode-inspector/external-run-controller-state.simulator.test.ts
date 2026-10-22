@@ -1,4 +1,4 @@
-// Controller audit v4 E4-P1-1 / E4-P2-1 (ADR-630 Amendment 5). An opened
+// Controller audit v4 E4-P1-1 / E4-P2-1 (ADR-630 Amendment 6). An opened
 // program that selects G55 with no M2/M30 after it leaves stock GRBL in G55
 // (gcode.c L1091-1101), and the store kept G54, so the next Frame skipped its
 // G54 selection and traced in G55. One that writes `G92 Z` or `G10 L20 Z`, or
