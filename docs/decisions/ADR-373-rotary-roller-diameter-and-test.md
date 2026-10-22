@@ -187,5 +187,7 @@ LightBurn's GCode rotary page
   roller and applies `rollerDiameterMm: 25`.
 - `ui/laser/rotary-setup-edit.test.ts`: covers `NEW_ROTARY_SETUP`, a chuck switched to Roller
   starting scaled, and a legacy roller staying unscaled.
+- `ui/laser/MachineDialogControls.audit.test.tsx`: in Rotary Setup, a saved chuck switched to
+  Roller enables Motion per turn and shows the 25 mm roller diameter.
 - `ui/laser/rotary-summary.test.ts` and `device-setup/device-setup-option-status.test.ts`: the
   "(Y not scaled)" label.
