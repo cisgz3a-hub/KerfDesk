@@ -4343,7 +4343,10 @@ its machine reference. Frame allows the fresh Idle/work-offset report to arrive 
 an unresolved Absolute placement. Before the controller has reported any WCO, Frame also asks for
 it (a bounded burst of status queries, at most 3 s), homed or not, whenever Absolute or Current
 Position would otherwise assume a zero offset; if none arrives the Frame proceeds at that assumed
-zero and Job Review says so (ADR-375). A missing report is described as missing coordinate data,
+zero and Job Review says so (ADR-375). On grblHAL, whose `$$` shows `$10` whole, a `$10` without
+bit 5 never sends WCO: Frame skips that wait, and the status panel, Move to position, Job Review
+and the placement refusals name the bit and the `$10` to send (ADR-375 Amendment 2). A missing
+report is described as missing coordinate data,
 not as a requirement to erase the work origin. Equivalent MPos/WPos reports and a first WCO
 report equal to the assumed zero do not cancel unchanged preparation, a Frame in progress, its
 permit or the Start handoff. Actual movement, changed offsets (a first non-zero WCO, Z-only
@@ -4452,7 +4455,11 @@ Set origin here again. It is a warning; Frame and Start are not refused (ADR-375
    Verify fresh controller data; local cache clearing does not erase persistent controller offsets.
 10. **Status-format fixtures.** For stock GRBL, test both `$10=1` (MPos) and `$10=0`
     (WPos). WCO is an intermittent field independent of that selection, not a separate `$10`
-    bit. Do not apply generic settings writes to the Falcon A1 vendor contract, which does
+    bit. grblHAL at its default `COMPATIBILITY_LEVEL` 0 differs: `$10` is a bitfield (default
+    511) whose bit 5 sends WCO and bit 6 sends Ov, so `$10=0` or `$10=1` there turns both off.
+    Expect the status panel to read "Origin: not reported (WCO off in $10; send $10=96)" (or 97),
+    and with `$10=0` "MPos: cannot be known" (ADR-375 Amendment 2).
+    Do not apply generic settings writes to the Falcon A1 vendor contract, which does
     not offer ordinary settings fetch. See the [GRBL status documentation](https://github.com/gnea/grbl/wiki/Grbl-v1.1-Interface).
 11. **Air pump at Start (ADR-323).** First confirm Machine Setup shows
     Air output `M8` and "Air restart" ticked. A Falcon A1 Pro profile
