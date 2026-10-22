@@ -9,6 +9,9 @@ Method: [../2026-10-21-rolling-v2/METHOD.md](../2026-10-21-rolling-v2/METHOD.md)
 | D3 | Rotary | 7cd526213 | [D3-ctl-rotary.md](D3-ctl-rotary.md) | 7 | 0 | 0 | 1 | 6 (P2-2 lowered) | 2 |
 | D4 | Spindle and machine hours | 7cd526213 | [D4-ctl-spindle-hours.md](D4-ctl-spindle-hours.md) | 8 | 0 | 0 | 2 | 6 | 7 |
 | D5 | No-go zones and laser-off motion | 7cd526213 | [D5-ctl-zones-laser-off-motion.md](D5-ctl-zones-laser-off-motion.md) | 11 | 0 | 0 | 4 | 7 | 9 |
+| D6 | Controller detection and readiness | 7cd526213 | [D6-ctl-detect-identify.md](D6-ctl-detect-identify.md) | 7 | 0 | 0 | 0 | 7 | 6 |
+
+**Note (D6 refuter):** the profile, not the banner, picks the driver. A grblHAL board that prints the compatibility banner "Grbl 1.1f" under a stock-GRBL profile is driven as stock GRBL. Fixes that key grblHAL behaviour on `driver.kind` alone (C4-P2-1 setting validation, C8-P2-2 `$10` handling) will not reach such boards. Within the GRBL family, a wrong profile is not caught by Frame; only Marlin and Smoothieware mismatches fail closed.
 
 ## Confirmed P1/P2 (coordinator-verified)
 
