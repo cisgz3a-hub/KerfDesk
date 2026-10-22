@@ -39,9 +39,8 @@ import { replacePathsInRegion } from './region-merge';
 import { cropRawImageData, normalizeTraceBoundary, offsetColoredPaths } from './trace-boundary';
 import type { TraceBoundary } from './trace-boundary';
 import {
-  SKETCH_RADIUS_PX,
   applyImageAdjustments,
-  effectivePixelScale,
+  sketchWindowRadiusPx,
   type RawImageData,
   type TraceOptions,
 } from './trace-image';
@@ -121,7 +120,7 @@ export async function enhanceRegionPaths(args: EnhanceRegionArgs): Promise<Color
 // 3x3 median and the auto median's two-link support), or Edge Detection's
 // local-contrast window. One more pixel covers bilinear upscaling's reach.
 function regionContextPx(options: TraceOptions): number {
-  const sketch = SKETCH_RADIUS_PX * effectivePixelScale(options);
+  const sketch = sketchWindowRadiusPx(options);
   const edge = options.traceMode === 'edge' ? edgeMaskRadiusPx(options) : 0;
   return Math.ceil(Math.max(sketch, edge)) + 1;
 }
