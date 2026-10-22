@@ -52,7 +52,7 @@ export const mcpMachineToolInfo = {
   set_work_origin: {
     title: 'Set the work origin here',
     description:
-      'Set the work origin at the current head position using the ordinary desktop action: axes "xy" sets X/Y, "z" zeros Z where supported. No motion. Requires machine-control approval, expectedRevision and UUID requestId.',
+      'Set the work origin at the current head position using the ordinary desktop action: axes "xy" sets X/Y and switches an Absolute start to User Origin, "z" zeros Z where supported. Zero Z is refused when it would replace an established work Z0 with the bit away from it; the user must touch the bit to the stock or use the PC. No motion. Requires machine-control approval, expectedRevision and UUID requestId.',
   },
   pause_job: {
     title: 'Pause the running job',

@@ -10,6 +10,8 @@ import type { AABB, SelectionAnchor, SelectionTransformEdit, Vec2 } from '../../
 import { HANDLE_SCREEN_PX, type HandleKind } from './handles';
 
 const MIN_SELECTION_DIMENSION_MM = 0.001;
+// The core resize's own zero-extent limit (selection-transform.ts).
+const FLAT_EXTENT_MM = 0.000001;
 
 export type SelectionHandle = {
   readonly kind: HandleKind;
@@ -69,7 +71,9 @@ const HANDLE_RESIZE: Readonly<Record<HandleKind, HandleResizeSpec>> = {
 // both axes (aspect-locked unless lockAspect is false, matching single-object
 // corner scaling), edge handles resize one axis; the opposite corner/edge is
 // the pinned pivot. Dimensions clamp to a small positive so a drag past the
-// pivot stops rather than inverting the selection.
+// pivot stops rather than inverting the selection. An axis the selection has no
+// extent on (collinear straight lines) is left alone, as a single object's
+// handle leaves it, so that edit sets no size when only that axis would move.
 export function selectionResizeEditFromDrag(args: {
   readonly handle: HandleKind;
   readonly bbox: AABB;
@@ -78,8 +82,12 @@ export function selectionResizeEditFromDrag(args: {
 }): Extract<SelectionTransformEdit, { kind: 'resize' }> {
   const { handle, bbox, point, lockAspect } = args;
   const spec = HANDLE_RESIZE[handle];
-  const width = resizeExtent(spec.x, point.x, bbox.minX, bbox.maxX);
-  const height = resizeExtent(spec.y, point.y, bbox.minY, bbox.maxY);
+  const width = hasExtent(bbox.minX, bbox.maxX)
+    ? resizeExtent(spec.x, point.x, bbox.minX, bbox.maxX)
+    : undefined;
+  const height = hasExtent(bbox.minY, bbox.maxY)
+    ? resizeExtent(spec.y, point.y, bbox.minY, bbox.maxY)
+    : undefined;
   const isCorner = spec.x !== undefined && spec.y !== undefined;
   return {
     kind: 'resize',
@@ -88,6 +96,17 @@ export function selectionResizeEditFromDrag(args: {
     ...(height === undefined ? {} : { height }),
     preserveAspect: isCorner ? lockAspect : false,
   };
+}
+
+/** Whether a handle resize edit changes any size. */
+export function resizeEditSetsSize(
+  edit: Extract<SelectionTransformEdit, { kind: 'resize' }>,
+): boolean {
+  return edit.width !== undefined || edit.height !== undefined;
+}
+
+function hasExtent(min: number, max: number): boolean {
+  return max - min > FLAT_EXTENT_MM;
 }
 
 // New extent along one axis: the handle grows from the far/near edge toward

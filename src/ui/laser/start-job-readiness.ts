@@ -66,6 +66,7 @@ import { findMachineStartIssues, prepareStartInput } from './start-job-input';
 import { workOffsetAssumptionWarnings } from './work-offset-assumption';
 import { unknownNativeBedWarning } from './restored-origin-warning';
 import type { LaserSecondPassChain } from '../state/recovery/laser-second-pass-lineage';
+import type { StatusReportFieldsOff } from '../state/status-report-fields';
 import { frameBoundsPreviewOf, type FrameBoundsPreview } from './frame-bounds-preview';
 import {
   inspectPreparedStart,
@@ -165,6 +166,9 @@ export type MachineStartSnapshot = {
   // The connected driver's status reports carry WCO (work-offset-assumption),
   // so a missing offset is one not reported yet and Job Review says so.
   readonly reportsWorkOffset?: boolean;
+  // The WCO: and Ov: fields a grblHAL `$10` keeps from ever arriving, so Job
+  // Review names the setting instead of a wait (ADR-375 Amendment 2).
+  readonly statusReportFieldsOff?: StatusReportFieldsOff | null;
   readonly reportInches?: boolean;
   readonly controllerBuildInfo?: GrblBuildInfo | null;
   readonly controllerBuildInfoObservation?: SessionObservationStamp | null;

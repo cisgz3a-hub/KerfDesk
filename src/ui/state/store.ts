@@ -434,7 +434,7 @@ export const useStore = create<AppState>((rawSet, get) => {
   const set = numberingEditGuardSetter(interactionSet);
   return {
     ...initialState(),
-    ...projectActions(documentSet, get, initialState),
+    ...projectActions(documentSet, get, initialState, proOperationMutationSetter(set, get)),
     ...objectInsertActions(set, get),
     ...imageImportActions(set, get),
     ...breakApartActions(proOperationMutationSetter(set, get)),

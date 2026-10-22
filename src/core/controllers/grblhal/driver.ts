@@ -77,6 +77,9 @@ export const grblHalDriver: ControllerDriver = {
     // COMPATIBILITY_LEVEL 0, the default build, latches a refused line's
     // error (protocol.c:246-286); an empty line clears it.
     stickyLineError: true,
+    // `$10` bits 5 and 6 send WCO: and Ov:, so a stock-GRBL value turns them
+    // off (status-report-mask.ts, ADR-375 Amendment 2).
+    statusReportMask: 'grblhal-fields',
   },
   commands: {
     ...grblDriver.commands,
