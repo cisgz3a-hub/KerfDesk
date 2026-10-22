@@ -52,6 +52,29 @@ export function canonicalizeOpenedProjectBed(
   };
 }
 
+/**
+ * A file opened for the machine already in use keeps that machine's own
+ * Auto-focus command (ADR-400 Amendment 1). The file can copy the machine's
+ * identity, and then no machine notice shows, so its line must not decide what
+ * the next Auto-focus press sends. A file for another machine brings its
+ * vetted command with the rest of that machine, behind the machine notice.
+ */
+export function withCurrentMachineAutofocus(
+  project: Project,
+  previous: Project,
+): { readonly project: Project; readonly keptCurrentCommand: boolean } {
+  const current = previous.device.autofocusCommand;
+  if (
+    project.device.autofocusCommand === current ||
+    deviceIdentity(project.device) !== deviceIdentity(previous.device)
+  )
+    return { project, keptCurrentCommand: false };
+  return {
+    project: { ...project, device: { ...project.device, autofocusCommand: current } },
+    keptCurrentCommand: true,
+  };
+}
+
 function deviceIdentity(device: DeviceProfile): string {
   return [device.profileId ?? '', device.name, device.bedWidth, device.bedHeight].join('|');
 }

@@ -23,7 +23,7 @@ export const BOARD_CORNER_COUNT = 4;
 // The shape of a captured board (ADR-126). A rectangle comes from the four-corner
 // (or one-corner + typed size) capture; a circle comes from a single centre
 // capture plus a diameter (typed, or measured by jogging to a rim point).
-// Extensible — polygon variants are governed by ADR-650.
+// Extensible — polygon variants are governed by ADR-654.
 export type BoardShape =
   | { readonly kind: 'rect'; readonly widthMm: number; readonly heightMm: number }
   | { readonly kind: 'circle'; readonly diameterMm: number }

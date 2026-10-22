@@ -7,6 +7,7 @@ import {
 } from '../../../core/scene';
 import { NumberInput } from '../../kit';
 import { jigEditableSelection, withJigTransforms } from './jig-canvas-selection';
+import { jigNumberFieldKeys } from './jig-number-field-keys';
 
 export function JigSelectionFields(props: {
   readonly project: Project;
@@ -103,9 +104,7 @@ function JigNumber(props: {
             props.onCommit(value);
           else event.currentTarget.value = String(Number(props.value.toFixed(3)));
         }}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') event.currentTarget.blur();
-        }}
+        {...jigNumberFieldKeys(String(Number(props.value.toFixed(3))))}
       />
     </label>
   );

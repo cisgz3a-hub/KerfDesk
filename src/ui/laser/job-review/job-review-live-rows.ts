@@ -5,6 +5,7 @@
 
 import { deviceForActiveHead } from '../../../core/cnc/cnc-head-feeds';
 import type { OverrideValues, StatusReport } from '../../../core/controllers/grbl';
+import { reportedMaxPowerS } from '../../../core/controllers/grbl/parse-settings';
 import type { ActiveWorkCoordinateSystem } from '../../../core/controllers/grbl/work-offset-readback';
 import type { ControllerKind } from '../../../core/devices';
 import type { ControllerSettingsSnapshot } from '../../../core/preflight';
@@ -411,13 +412,12 @@ function maxPowerFact(
   settings: ControllerSettingsSnapshot,
   profileMaxPowerS: number,
 ): JobReviewFact {
-  if (settings.maxPowerS === undefined) return fact('S max $30', 'Unknown', 'warning');
-  const matches = settings.maxPowerS === profileMaxPowerS;
+  const reported = reportedMaxPowerS(settings);
+  if (reported === undefined) return fact('S max $30', 'Unknown', 'warning');
+  const matches = reported === profileMaxPowerS;
   return fact(
     'S max $30',
-    matches
-      ? `${settings.maxPowerS}`
-      : `${settings.maxPowerS} — profile expects ${profileMaxPowerS}`,
+    matches ? `${reported}` : `${reported} — profile expects ${profileMaxPowerS}`,
     matches ? 'default' : 'warning',
   );
 }

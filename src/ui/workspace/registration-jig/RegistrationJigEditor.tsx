@@ -19,8 +19,9 @@ export function RegistrationJigEditor(props: { readonly onClose: () => void }): 
   const root = useRef<HTMLDivElement>(null);
   useRegisterModal();
   // Open on the editor itself: an Enter or Space pressed on arrival must not
-  // land on Close or Save. Escape in a field only leaves that field, so a
-  // half-typed value or text is never lost to a selection change.
+  // land on Close or Save. Escape in a field only leaves that field, so half-
+  // typed text is never lost to a selection change; a field that applies when
+  // it is left drops the value typed into it, as number fields do elsewhere.
   useDialogA11y(
     root,
     () => {
@@ -57,7 +58,7 @@ export function RegistrationJigEditor(props: { readonly onClose: () => void }): 
         <div className="lf-jig-body">
           <JigEditorSidebar editor={editor} />
           <RegistrationJigCanvas
-            project={editor.session.draft.project}
+            project={editor.view}
             selectedIds={editor.ids}
             fitRequest={editor.fitRequest}
             onSelectionChange={editor.onSelect}

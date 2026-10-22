@@ -110,7 +110,7 @@ describe('addCapturedBoard (circle)', () => {
   });
 });
 
-describe('outline boards (canvas first, ADR-650)', () => {
+describe('outline boards (canvas first, ADR-654)', () => {
   const outline = {
     kind: 'outline' as const,
     pointsMm: [

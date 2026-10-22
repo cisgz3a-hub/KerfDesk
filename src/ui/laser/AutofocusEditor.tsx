@@ -15,7 +15,8 @@
 // error:3 but is left in its homing state until a reset (controller audit
 // 2026-09-25 CG-9).
 
-import type { ControllerCommandSet } from '../../core/devices/device-profile';
+import { profileAutofocusIssue } from '../../core/devices/autofocus-command';
+import type { ControllerCommandSet, ControllerKind } from '../../core/devices/device-profile';
 import { inlineCodeStyle } from './device-settings-shared';
 
 const AUTOFOCUS_PRESETS: ReadonlyArray<{
@@ -36,7 +37,13 @@ export function AutofocusEditor(props: {
   readonly value: string;
   readonly onChange: (next: string) => void;
   readonly controllerCommandSet?: ControllerCommandSet | undefined;
+  readonly controllerKind?: ControllerKind | undefined;
 }): JSX.Element {
+  const issue = profileAutofocusIssue({
+    autofocusCommand: props.value,
+    controllerKind: props.controllerKind,
+    controllerCommandSet: props.controllerCommandSet,
+  });
   const presets = AUTOFOCUS_PRESETS.filter(
     (preset) => preset.commandSet === props.controllerCommandSet,
   );
@@ -74,6 +81,11 @@ export function AutofocusEditor(props: {
         title="One G-code or firmware command KerfDesk sends when auto-focus is requested. Leave blank to disable auto-focus."
         style={textareaStyle}
       />
+      {issue !== null && (
+        <p role="alert" style={issueStyle}>
+          {issue}
+        </p>
+      )}
       <p style={focusHintStyle}>
         Only one controller line is supported; multi-step G-code probe sequences are not sent from
         this control. Leave this empty when the machine has no supported auto-focus routine. Common
@@ -117,6 +129,7 @@ const focusHintStyle: React.CSSProperties = {
   margin: '2px 0 0 0',
   fontStyle: 'italic',
 };
+const issueStyle: React.CSSProperties = { margin: 0, fontSize: 11, color: 'var(--lf-danger)' };
 const presetsRowStyle: React.CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 4 };
 const presetButtonStyle: React.CSSProperties = {
   fontSize: 11,

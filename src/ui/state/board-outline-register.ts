@@ -1,4 +1,4 @@
-// Registering an outline board that is already on the canvas (ADR-650). The
+// Registering an outline board that is already on the canvas (ADR-654). The
 // operator lays artwork out on the drawn outline before the head measures where
 // the board really sits. Registration keeps the outline where it is drawn, gives
 // it the shape and turn the head measured, and turns the artwork on it about the

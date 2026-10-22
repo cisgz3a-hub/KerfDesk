@@ -44,11 +44,13 @@ export function BoardVerificationControls(props: {
         </p>
       )}
       {active !== null && (
-        <ActiveVerification
-          target={active}
-          disabled={props.disabled}
-          controller={props.controller}
-        />
+        <div data-board-active-check>
+          <ActiveVerification
+            target={active}
+            disabled={props.disabled}
+            controller={props.controller}
+          />
+        </div>
       )}
       <div aria-live="polite" aria-atomic="true" style={liveRegionStyle}>
         {props.controller.error ?? props.controller.feedback}

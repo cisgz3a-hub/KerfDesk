@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { deviceForActiveHead } from '../../../core/cnc/cnc-head-feeds';
 import type { BoardOutlineDraft } from '../../../core/scene';
-import { Button, Icon } from '../../kit';
-import { TutorialButton } from '../../tutorials/TutorialButton';
 import { useStore } from '../../state';
 import { inferCurrentMachinePosition } from '../../state/infer-machine-position';
 import { useLaserStore } from '../../state/laser-store';
 import { useUiStore } from '../../state/ui-store';
 import { BoardAnchorOverlay } from './BoardAnchorOverlay';
 import { BoardCapturePhase } from './BoardCapturePhase';
+import { BoardCaptureFloatingPanel } from './BoardCaptureFloatingPanel';
+import type { FloatingBoardPanelPosition } from './use-floating-board-panel';
 import { BoardShapeToggle } from './BoardShapeToggle';
 import { capturedBoardOutlineMatches } from './captured-board-outline';
 import {
@@ -35,22 +35,34 @@ const BOARD_JOG_FEED_MM_PER_MIN = 3000;
 export function BoardCapturePanel(): JSX.Element | null {
   const open = useUiStore((state) => state.boardCapturePanelOpen);
   const capture = useBoardCapture();
+  const panelPosition = useRef<FloatingBoardPanelPosition | null>(null);
   const [bodyMounted, setBodyMounted] = useState(open);
   const release = useCallback(() => setBodyMounted(false), []);
   if (open && !bodyMounted) setBodyMounted(true);
   if (!open && !bodyMounted) return null;
-  return <BoardCapturePanelBody open={open} capture={capture} onRelease={release} />;
+  return (
+    <BoardCapturePanelBody
+      open={open}
+      capture={capture}
+      onRelease={release}
+      panelPosition={panelPosition}
+    />
+  );
 }
+
+type BoardCapturePanelBodyProps = {
+  readonly open: boolean;
+  readonly capture: BoardCapture;
+  readonly onRelease: () => void;
+  readonly panelPosition: React.MutableRefObject<FloatingBoardPanelPosition | null>;
+};
 
 function BoardCapturePanelBody({
   open,
   capture,
   onRelease,
-}: {
-  readonly open: boolean;
-  readonly capture: BoardCapture;
-  readonly onRelease: () => void;
-}): JSX.Element | null {
+  panelPosition,
+}: BoardCapturePanelBodyProps): JSX.Element | null {
   const close = useUiStore((state) => state.closeBoardCapturePanel);
   const livePosition = useLiveMachinePosition();
   const currentEpoch = useCurrentRegistrationEpoch();
@@ -84,8 +96,12 @@ function BoardCapturePanelBody({
   if (!open) return null;
   return (
     <>
-      <section aria-label="Place board" className="lf-chip" style={panelStyle}>
-        <PanelHeader disabled={panelLocked} onClose={close} />
+      <BoardCaptureFloatingPanel
+        busy={panelLocked}
+        checkActive={verification.activeTarget !== null}
+        onClose={close}
+        rememberedPosition={panelPosition}
+      >
         <PanelMessages
           connected={connected}
           handlers={handlers}
@@ -105,7 +121,7 @@ function BoardCapturePanelBody({
           outlineInitialFile={pendingPhoto.initialFile}
           onOutlineInitialFileConsumed={pendingPhoto.consumeInitialFile}
         />
-      </section>
+      </BoardCaptureFloatingPanel>
       <CommittedBoardOverlay
         committed={committed}
         geometry={geometry}
@@ -165,7 +181,7 @@ function BoardCapturePanelContent(props: {
   const undoCapture = (): void => {
     if (!captureSessionMotionActive()) undo();
   };
-  // Canvas first (ADR-650): the drawn outline goes on the canvas at once, so
+  // Canvas first (ADR-654): the drawn outline goes on the canvas at once, so
   // artwork can be laid out on it before the head registers where it sits.
   const drawOutline = (draft: BoardOutlineDraft): void => {
     if (captureSessionMotionActive()) return;
@@ -274,26 +290,6 @@ function useKeepBoardPanelOpenWhileBusy(
   }, [captureBusy, open, verification, onRelease]);
 }
 
-function PanelHeader(props: {
-  readonly disabled: boolean;
-  readonly onClose: () => void;
-}): JSX.Element {
-  return (
-    <header style={headerStyle}>
-      <strong>Place Board</strong>
-      <TutorialButton tutorialId="board" compact label="Place board" />
-      <Button
-        variant="ghost"
-        aria-label="Close board capture panel"
-        disabled={props.disabled}
-        onClick={props.onClose}
-      >
-        <Icon name="close" size={16} />
-      </Button>
-    </header>
-  );
-}
-
 function PanelMessages(props: {
   readonly connected: boolean;
   readonly handlers: BoardCaptureHandlers;
@@ -340,28 +336,6 @@ function CommittedBoardOverlay(props: {
     />
   );
 }
-
-const panelStyle: React.CSSProperties = {
-  position: 'absolute',
-  zIndex: 5,
-  top: 12,
-  left: 12,
-  width: 280,
-  maxHeight: 'calc(100% - 24px)',
-  overflowY: 'auto',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 6,
-  padding: 12,
-  boxShadow: 'var(--lf-shadow)',
-  pointerEvents: 'auto',
-  fontSize: 13,
-};
-const headerStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-};
 const hintStyle: React.CSSProperties = {
   margin: 0,
   fontSize: 12,

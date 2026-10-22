@@ -12,6 +12,10 @@ import { colorForCutIndex, importLbrnGeometry } from './lbrn-geometry';
 import { lightBurnNotesWarnings, lightBurnProjectNotes } from './lbrn-notes';
 import { resolveLightBurnOverscan } from './lbrn-overscan';
 import { lightBurnSettingsNotImported, type LayerKind } from './lbrn-setting-report';
+import {
+  PROJECT_SCENE_LIMITS,
+  validateSceneBudgets,
+} from '../project/project-scene-integrity-validator';
 
 // MAX_XML_DEPTH is an integrity bound, not a policy cap: unbounded nesting
 // overflows the recursive walker. It stays. The former 20 MB byte ceiling and
@@ -122,6 +126,8 @@ export function importLightBurnProjectDocument(
       artworkOrder: layerByLayerArtworkOrder(objects, layers),
     },
   };
+  const overLimit = projectLimitRefusal(project);
+  if (overLimit !== null) return { ok: false, reason: overLimit };
   return {
     ok: true,
     project,
@@ -409,4 +415,16 @@ function normalized(value: string): string {
 }
 function defaultParseXml(text: string): Document {
   return new DOMParser().parseFromString(text, 'application/xml');
+}
+
+// The loader's limits, checked before the import replaces the open document:
+// Save and autosave refuse a project past them, so it would hold work that can
+// never be kept (ADR-307 Amendment 2, audit 13-P2-1).
+function projectLimitRefusal(project: Project): string | null {
+  const refusal = validateSceneBudgets(project.scene as unknown as Record<string, unknown>);
+  if (refusal === null) return null;
+  const objects = project.scene.objects.length;
+  return objects > PROJECT_SCENE_LIMITS.objects
+    ? `This LightBurn project has ${objects} shapes, but a KerfDesk project holds at most ${PROJECT_SCENE_LIMITS.objects} objects, so it could never be saved. Split the design into smaller LightBurn projects and import each one.`
+    : `This LightBurn project is past a KerfDesk project limit, so it could never be saved (${refusal}).`;
 }

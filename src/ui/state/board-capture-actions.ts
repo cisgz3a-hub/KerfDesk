@@ -63,7 +63,7 @@ export function boardCaptureActions(
     addCapturedBoardBox: (widthMm, heightMm) =>
       addCapturedBoard({ kind: 'rect', widthMm, heightMm }),
     updateCapturedBoard: (shape) => set((s) => updateCapturedBoardMutation(s, shape) ?? {}),
-    // Canvas first (ADR-650): artwork is laid out on the drawn outline before the
+    // Canvas first (ADR-654): artwork is laid out on the drawn outline before the
     // head registers it, so placement stays as it was until registration.
     drawCapturedBoardOutline: (shape) =>
       set((s) => commitCapturedBoard(s, buildBoardOutline(s, shape), s.jobPlacement)),

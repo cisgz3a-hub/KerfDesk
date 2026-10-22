@@ -1,4 +1,4 @@
-## ADR-650 - Place Board: irregular outline boards from a photo, registered by the head (2026-10-21)
+## ADR-654 - Place Board: irregular outline boards from a photo, registered by the head (2026-10-21)
 
 **Status:** Accepted, at the maintainer's request ("take a photo of a board ... add measurements ...
 the canvas draws that shape ... it should know exactly where the board is on my laser", "capture

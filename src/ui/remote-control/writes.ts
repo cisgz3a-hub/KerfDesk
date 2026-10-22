@@ -1,4 +1,4 @@
-import { IDENTITY_TRANSFORM } from '../../core/scene';
+import { IDENTITY_TRANSFORM, type ShapeObject } from '../../core/scene';
 import { createRectangle } from '../../core/shapes/primitives/create-rectangle';
 import { DEFAULT_TEXT_COLOR } from '../../core/text';
 import type { AppState } from '../state/store';
@@ -12,6 +12,7 @@ import { publicIdentifier, selectedIds } from './projections';
 import { prepareRemoteShape } from './touch-shapes';
 import { prepareRemoteSelection } from './selection';
 import { deliverBoardPhoto, placeOnBoard, prepareBoardPhoto, preparePlaceOnBoard } from './board';
+import { RemoteFault } from './fault';
 
 export async function applyRemoteWrite(
   write: RemoteWrite,
@@ -67,14 +68,11 @@ async function applyOrdinaryRemoteWrite(
       });
     }
     case 'add_rectangle':
-      return commit(() => addRectangle(state, write.args));
+      return commit(() => addRectangle(store, write.args));
     case 'add_ellipse':
     case 'add_polyline': {
       const object = prepareRemoteShape(state, write);
-      return commit(() => {
-        store.getState().drawShape(object);
-        return { changedArtworkIds: [object.id] };
-      });
+      return commit(() => drawShape(store, object));
     }
     case 'add_text': {
       const object = await prepareRemoteText(write.args, signal);
@@ -117,11 +115,12 @@ async function applyOrdinaryRemoteWrite(
 }
 // ADR-584: CNC workspaces create the same ordinary artwork; CNC defaults seed fresh layers.
 function addRectangle(
-  state: AppState,
+  store: RemoteAppStore,
   args: Extract<RemoteWrite, { command: 'add_rectangle' }>['args'],
 ) {
   const id = crypto.randomUUID();
-  state.drawShape(
+  return drawShape(
+    store,
     createRectangle({
       id,
       color: DEFAULT_TEXT_COLOR,
@@ -129,5 +128,12 @@ function addRectangle(
       transform: { ...IDENTITY_TRANSFORM, x: args.xMm, y: args.yMm },
     }),
   );
-  return { changedArtworkIds: [id] };
+}
+
+function drawShape(store: RemoteAppStore, object: ShapeObject) {
+  store.getState().drawShape(object);
+  // Desktop drawing can refuse an insertion with a warning and no state change.
+  if (!store.getState().project.scene.objects.some((item) => item.id === object.id))
+    throw new RemoteFault('failed');
+  return { changedArtworkIds: [object.id] };
 }

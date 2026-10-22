@@ -724,6 +724,8 @@ the linked artwork.
    copy asked for, in one undo step, up to the project's own limit of 10,000 objects (a copy counts
    everything it carries, such as an image's mask); a count, spacing or gap that would place more
    is refused with how many fit, and nothing changes. Nothing else caps the number of copies.
+   With **Last copy size**, gap mode measures the requested clearance between the final scaled
+   copies, including the closing seam. Centre-spacing and count modes keep their requested centres.
 5. When a selection gives a tool nothing to do, a notice says what to select, and nothing changes.
    None of these tools operates a machine or changes how other artwork compiles.
 
@@ -1482,6 +1484,9 @@ the completed physical Frame is the spatial source of truth.
    nothing. The desktop app allows it without asking.
 3. A LightBurn project (`.lbrn`, `.lbrn2`) opens as an import and is never written; its first Save
    asks where to save the `.lf2`, as it does for a template or a project dropped on the window.
+   One with more shapes than a project holds (10,000 objects) is not opened, since it could never
+   be saved: `Could not import <name>: This LightBurn project has <n> shapes, but a KerfDesk project
+   holds at most 10000 objects, …` (ADR-307 Amendment 2).
 4. The desktop app replaces an Explorer-opened file whole: it writes the new bytes beside it and
    then swaps them in, so a failed save leaves the old file as it was. A file that has gone, become
    read-only or stays held by another program reports why and stays unsaved; Save As still works.
@@ -1576,6 +1581,21 @@ the completed physical Frame is the spatial source of truth.
 
 #### Error — file is not a valid .lf2
 - Modal: `Could not open <filename>: not a valid KerfDesk project.` No load.
+
+#### Edge — the file carries an Auto-focus command (ADR-400 Amendment 1)
+1. On load, an Auto-focus command that is not a focus routine (a G0–G3 move, an X/Y word, an
+   M-code, `S` above 0, or a `$` settings write) is cleared, as a refused
+   positioning-light command is. Auto-focus then shows **Set up auto-focus**.
+2. A file for the machine already in use (same profile, name and bed) keeps that machine's own
+   Auto-focus command from Machine Setup. When the file's command differs, an info toast says
+   `This file's Auto-focus command was not used: Auto-focus keeps your machine's own command from
+   Machine Setup.`
+3. A file for another machine brings its vetted command with the rest of that machine, behind the
+   machine notice; **Keep current machine** restores the current command too.
+4. Whatever its source, the Auto-focus button sends only a focus routine: `$HZ1` on the Falcon
+   A1 Pro, `$HZ` on grblHAL or FluidNC, a Z-only `G38.2`–`G38.5` probe, or `G30` on Marlin or
+   Smoothieware. Stock GRBL gets no `$H…` command, which would leave it stuck homing. Any M-code and
+   anything else is refused with its reason and nothing is sent.
 
 #### Edge — file is a valid .lf2 but references a device profile not on this machine
 - Project loads with the embedded device profile, adopted wholesale (`deserializeProject`).
@@ -2752,11 +2772,19 @@ authorization, Frame proof, controller command, or safety boundary.
 ### F-B15a. Burn a multi-outline registration jig set (ADR-057 amendment)
 
 1. Open **Registration Jig** or **Edit jig** to enter its dedicated editor. Its own
-   canvas opens fitted to the jig, with **Fit jig** and **Fit bed** available. A new
-   jig opens on **Jig layout**; an existing jig opens on **Artwork**. Draft edits and
+   canvas opens fitted to the jig, with **Fit jig** and **Fit bed** available. The jig
+   canvas is clean (ADR-652): it shows only the jig's outlines and the artwork on them,
+   and opens with nothing from the main canvas selected. Other main-canvas artwork is not shown, selected or
+   changed there, and stays where it is when the jig is saved. A new jig opens with just
+   its first outline, on **Jig layout**; an existing jig opens on **Artwork**. Draft edits and
    Undo/Redo stay in the editor until **Save to canvas**, and the footer shows
    **Unsaved changes** while the draft differs. Escape in a field only leaves the
-   field; otherwise Escape first clears the selection.
+   field. In the fields that apply when they are left (the selection's position,
+   size and rotation, and the artwork **Line / Fill settings**), Escape drops the
+   value typed there and Enter applies it, and either way focus returns to the
+   editor. Layout, artwork size and text fields keep their draft until **Apply
+   layout**, **Apply size** or **Add text**. Otherwise Escape first clears the
+   selection.
    Escape with nothing selected, or **Close without saving**, closes at once when
    nothing changed; otherwise it asks **Save jig changes?** with **Save to canvas**,
    **Discard changes** and **Keep editing**. Discarding leaves the main canvas unchanged.
@@ -2788,9 +2816,11 @@ authorization, Frame proof, controller command, or safety boundary.
    the image and removes the image (ADR-633). If Centre + copy already copied that
    image to the other outlines, the button reads **Replace all N images with trace**
    and every copy is replaced the same way.
-   **Line / Fill settings** controls the selected artwork's operation, power, speed and
-   passes; Fill also exposes line interval, scan angle, fill style and cross-hatch.
-   Use Line for open traced paths. These edits remain in the draft until saved.
+   The editor has no burn settings (ADR-652). Outlines burn with the reserved
+   **Registration jig** Line operation and artwork with the operation it gets on import,
+   both starting at the standard operation defaults. Job Review shows the exact settings
+   before Start, and **Edit** on an operation card there, the outline's included, changes
+   power, speed, passes and air assist for the project.
 4. Select one artwork or artwork group and click **Centre + copy artwork to all N**.
    The original is proportionally fitted into 90% of the first outline's usable
    region, preserving aspect ratio, and one identical operation-preserving copy is
@@ -3414,6 +3444,9 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
 - F-C3. Autosave + recovery
 - F-C4. Re-import changed SVG with diff
 - F-C5. Copy / paste / duplicate
+  Copy and Paste carry the imported fonts used by copied text across documents, so that text stays
+  editable after saving and reopening. Identical font data is reused; conflicting font keys are
+  kept distinct. A Paste exceeding the project's existing font or scene limit leaves it unchanged.
 - F-C6. Crash reporter
 - F-C7. Unified Machine Setup — specified below (ADR-205; supersedes the split ADR-092 surface)
 
@@ -3707,7 +3740,9 @@ settings and Job Review keep their existing read-only setup references.
   on this computer. Nothing is read until you press it; the browser asks for permission the
   first time. Search by family or style, then choose a style: KerfDesk copies that face into the
   project, exactly like an imported `.ttf` / `.otf` (10 MB per font, 32 fonts per project), so
-  the project opens on computers without the font. A face inside a `.ttc` collection is copied
+  the project opens on computers without the font. A face already embedded is reused, not copied
+  again; a font no text uses any more leaves the project and is not saved; and a 33rd font in use
+  is refused when it is chosen (ADR-628 Amendment 1). A face inside a `.ttc` collection is copied
   out on its own. A font whose licence restricts embedding says so first; choose **Embed font**
   to use it anyway or **Back** to pick another. Firefox and Safari cannot list installed fonts:
   the dialog says so and **Import** still works. A browser that blocks font access may answer
@@ -4540,10 +4575,17 @@ corner, and let artwork be centered (or corner-snapped) onto it. Solves
 "burn on a board I just placed, centered" without a camera.
 
 **Where in the UI.** A **Place Board** toolbar button (Tools group, next to
-Registration Jig) toggles a NON-modal floating panel pinned to the top-left
-of the canvas — the same pattern as the registration jig, so canvas mouse
-handling and the Laser panel's jog controls keep working while it is open
-(the operator jogs on the right, captures in the panel). It guides the
+Registration Jig) toggles a compact NON-modal floating panel on the canvas.
+It starts at the top-right and takes no layout space. Drag the **Place Board**
+title bar to move it, or focus that title and use arrow keys (Shift moves farther;
+Home returns it to the top-right). Its position is kept when closing and reopening
+the tool, and the whole panel stays within the canvas when resizing or expanding.
+The Laser panel's jog controls remain available (jog on the right, capture in the
+floating panel). Only its body scrolls; its title, help and close controls stay
+visible. **Collapse Place Board controls** folds it to a small title strip without
+clearing captured points or unfinished dimensions. Expand it to continue. Collapse
+is unavailable during an active capture, point check or correction, and selecting
+a canvas verification marker reveals that check's controls (ADR-650). It guides the
 operator (bottom-left first — that corner becomes the origin — then the
 other corners in any order), shows the live head position, and offers
 Capture / Undo last / Start over. After four corners it shows the measured
@@ -4707,9 +4749,9 @@ preview and applied copies use the same plan; this is not optimal nesting (ADR-5
 
 ---
 
-### F-BC4. Place an irregular board from a photo (ADR-650)
+### F-BC4. Place an irregular board from a photo (ADR-654)
 
-**ADR:** [ADR-650](docs/decisions/ADR-650-outline-board-from-photo.md).
+**ADR:** [ADR-654](docs/decisions/ADR-654-outline-board-from-photo.md).
 
 **Operator intent.** Draw the irregular edge of an offcut, live-edge slab or shaped blank from a
 phone photo at its exact ruler-measured size, lay artwork out on it straight away, and register it
@@ -8799,7 +8841,9 @@ recorded below, and only step 4 remains deliberately open:
 1. [x] Create repo secrets `PAGES_CLOUDFLARE_API_TOKEN` (Pages-only scope) and
    `PAGES_CLOUDFLARE_ACCOUNT_ID` alongside the legacy names. Completed
    2026-07-22; both names exist (the legacy names were later deleted under
-   step 3).
+   step 3). Under ADR-651 (2026-10-21) the deploy job names the `production`
+   environment, and both names belong there, limited to main, not in the
+   repository.
 2. [x] `gh workflow disable 308419274` completed and the historical workflow is
    verified `disabled_manually`; this deliberately pauses the old stable/manual
    lane during cutover and is reversible. The workflow has since been removed
@@ -9248,6 +9292,10 @@ The G-code Inspector is free in every edition (ADR-627).
    program changes its origin (`G92`, or `G10 L2`/`L20` on `G54`) on the axes it changes, and
    moves in `G55`-`G59` are left out and named in the warnings. A program that never moves
    frames the point where the head stands. A large file is prepared a slice at a time.
+   On Marlin, the baseline is two separate lines, `G21` then `G90`, and significant whitespace is
+   preserved. Review reads the first command on each line with that command's parameters; later
+   G/M words do not execute as extra commands. Firmware-dependent motion and its dependent
+   coordinates are disclosed as outside the known Frame outline (ADR-653).
 3. **Frame** is enabled while connected, Idle, with no other motion running, once the machine
    reports where the head is and every line fits the controller; its tooltip says why
    otherwise. It runs the ordinary Frame preparation (G54 selection, report units), traces the
