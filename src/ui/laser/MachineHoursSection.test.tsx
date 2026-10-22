@@ -7,7 +7,8 @@ import { currentHoursMachine, useMachineHoursTracking } from '../app/use-machine
 import { useStore } from '../state';
 import type { LiveCanvasLifecycle, LiveCanvasRun } from '../state/canvas-motion-plan';
 import { useLaserStore } from '../state/laser-store';
-import { HOUR_MS } from '../state/machine-hours';
+import { addRunTime, HOUR_MS } from '../state/machine-hours';
+import { MACHINE_HOURS_STORAGE_KEY, persistMachineHours } from '../state/machine-hours-persistence';
 import { useMachineHoursStore } from '../state/machine-hours-store';
 import { resetStore } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
@@ -111,6 +112,26 @@ describe('MachineHoursSection (ADR-502)', () => {
       ['Clear the air-assist nozzle and check the fans', 50],
       ['Replace the honeycomb', 50],
     ]);
+  });
+
+  // Audit v3 D4-P3-4: the browser tells only the other windows about a write.
+  it('refreshes when another window writes the hours', async () => {
+    function Tracker(): null {
+      useMachineHoursTracking();
+      return null;
+    }
+    await act(async () => root.render(<Tracker />));
+    const machine = currentHoursMachine();
+    persistMachineHours(localStorage, addRunTime({}, machine, HOUR_MS, true));
+    expect(useMachineHoursStore.getState().book[machine.signature]).toBeUndefined();
+
+    await act(async () => {
+      window.dispatchEvent(new StorageEvent('storage', { key: MACHINE_HOURS_STORAGE_KEY }));
+    });
+    expect(useMachineHoursStore.getState().book[machine.signature]).toMatchObject({
+      runMs: HOUR_MS,
+      jobs: 1,
+    });
   });
 
   it('counts a job while it runs and says when a reminder falls due', async () => {

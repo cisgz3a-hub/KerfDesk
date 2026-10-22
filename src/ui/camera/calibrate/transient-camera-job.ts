@@ -30,6 +30,7 @@ import {
   type TransientFrameControllerPreparation,
 } from '../../laser/use-frame-action';
 import type { FramedRunPermit } from '../../state/framed-run';
+import { startUntrackedRun } from '../../laser/untracked-start-retirement';
 
 const GRBL_LASER_MODE_SETTING = '$32';
 
@@ -162,37 +163,41 @@ async function startTransientFramedRun(permit: FramedRunPermit): Promise<boolean
   try {
     const readinessIssue = framedRunReadinessIssue(permit);
     if (readinessIssue !== null) throw new Error(readinessIssue);
-    await useLaserStore.getState().startJob(candidate.preparedStart.gcode, {
-      streamingMode: streamingModeForController(
-        candidate.project.device.controllerKind,
-        candidate.project.device.streamingMode,
-      ),
-      rxBufferBytes: candidate.project.device.rxBufferBytes,
-      machineKind: machineKindOf(candidate.project.machine),
-      framedRunPermit: permit,
-      assertFinalStartAuthorized: () => {
-        if (!framedRunStartClaimIsCurrent(claim)) {
-          throw new Error(
-            'The completed camera-target Frame permit was consumed, replaced, or revoked before Start.',
-          );
-        }
-        const issue = framedRunReadinessIssue(permit);
-        if (issue !== null) throw new Error(issue);
-      },
-      ...(candidate.review?.laserModeStartEvidence === undefined
-        ? {}
-        : { laserModeStartEvidence: candidate.review.laserModeStartEvidence }),
-      ...(candidate.preparedStart.cncToolPlan === undefined
-        ? {}
-        : { cncToolPlan: candidate.preparedStart.cncToolPlan }),
-      ...(candidate.review?.cncSetupAttestation === undefined
-        ? {}
-        : { cncSetupAttestation: candidate.review.cncSetupAttestation }),
-      canvasPlan: candidate.preparedStart.canvasPlan,
-      ...(candidate.preparedStart.jobTimingPlan === undefined
-        ? {}
-        : { jobTimingPlan: candidate.preparedStart.jobTimingPlan }),
-    });
+    // The target keeps no recovery record, but it changes what the machine
+    // last ran: the project's recovery card, Run again and second pass go.
+    await startUntrackedRun(() =>
+      useLaserStore.getState().startJob(candidate.preparedStart.gcode, {
+        streamingMode: streamingModeForController(
+          candidate.project.device.controllerKind,
+          candidate.project.device.streamingMode,
+        ),
+        rxBufferBytes: candidate.project.device.rxBufferBytes,
+        machineKind: machineKindOf(candidate.project.machine),
+        framedRunPermit: permit,
+        assertFinalStartAuthorized: () => {
+          if (!framedRunStartClaimIsCurrent(claim)) {
+            throw new Error(
+              'The completed camera-target Frame permit was consumed, replaced, or revoked before Start.',
+            );
+          }
+          const issue = framedRunReadinessIssue(permit);
+          if (issue !== null) throw new Error(issue);
+        },
+        ...(candidate.review?.laserModeStartEvidence === undefined
+          ? {}
+          : { laserModeStartEvidence: candidate.review.laserModeStartEvidence }),
+        ...(candidate.preparedStart.cncToolPlan === undefined
+          ? {}
+          : { cncToolPlan: candidate.preparedStart.cncToolPlan }),
+        ...(candidate.review?.cncSetupAttestation === undefined
+          ? {}
+          : { cncSetupAttestation: candidate.review.cncSetupAttestation }),
+        canvasPlan: candidate.preparedStart.canvasPlan,
+        ...(candidate.preparedStart.jobTimingPlan === undefined
+          ? {}
+          : { jobTimingPlan: candidate.preparedStart.jobTimingPlan }),
+      }),
+    );
     return true;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

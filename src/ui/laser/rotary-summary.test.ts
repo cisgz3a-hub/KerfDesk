@@ -18,21 +18,24 @@ const ROLLER: RotarySetup = {
 describe('rotary summary', () => {
   it('names the attachment and the object diameter', () => {
     expect(rotaryTypeLabel(ROLLER)).toBe('Roller');
-    expect(rotaryAttachmentSummary(ROLLER)).toBe('Roller, Ø60 mm');
     expect(rotaryAttachmentSummary({ ...ROLLER, type: 'chuck', mmPerRotation: 360 })).toBe(
       'Chuck, Ø60 mm',
     );
   });
 
-  it('adds the roller size only when Y is scaled from it', () => {
+  it("names what a roller's Y follows: its roller size, or no scale (ADR-373 Amd 1)", () => {
     const measured = { ...ROLLER, rollerDiameterMm: 25 };
     expect(rotaryAttachmentSummary(measured)).toBe('Roller, Ø60 mm (rollers Ø25 mm)');
+    expect(rotaryAttachmentSummary(ROLLER)).toBe('Roller, Ø60 mm (Y not scaled)');
     expect(rotaryAttachmentSummary({ ...measured, type: 'chuck' })).toBe('Chuck, Ø60 mm');
+    expect(rotaryReviewSummary(ROLLER)).toBe(
+      'Enabled · Roller, Ø60 mm (Y not scaled) · Y ×1.00, one revolution = 188.5 machine mm',
+    );
   });
 
   it('shows a diameter derived from a circumference without float noise', () => {
     expect(rotaryAttachmentSummary({ ...ROLLER, objectDiameterMm: 188.5 / Math.PI })).toBe(
-      'Roller, Ø60 mm',
+      'Roller, Ø60 mm (Y not scaled)',
     );
     expect(formatRotaryMm(12.345)).toBe('12.35');
     expect(formatRotaryMm(188.4956)).toBe('188.5');

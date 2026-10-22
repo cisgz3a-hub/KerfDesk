@@ -2,12 +2,14 @@ import type { StreamerStatus } from '../../core/controllers/grbl';
 import { SOFTWARE_ABORT_TITLE } from '../common/software-abort-copy';
 import {
   cncJobLaserModeEnabled,
+  cncPauseControllerKind,
   cncPauseLiftPhase,
   cncPauseLiftSkipReason,
 } from '../state/cnc-pause-lift-state';
 import { cncResumeAdvisoryNotice } from '../state/cnc-pause-resume-policy';
 import { describeControllerOperation } from '../state/laser-controller-operation';
-import { useLaserStore } from '../state/laser-store';
+import { laserDotLit } from '../state/laser-dot-light';
+import { useLaserStore, type LaserState } from '../state/laser-store';
 import { useStore } from '../state';
 import { describeStreamHold, streamHoldHeading, type StreamHold } from '../state/laser-stream-hold';
 import { isActiveJobStatus, toolChangeContinueBlockMessage } from '../state/laser-store-helpers';
@@ -52,7 +54,7 @@ export function LiveMotionBar(): JSX.Element | null {
   const streamProgress = useLiveStreamProgress();
   const controllerOperation = useLaserStore((state) => state.controllerOperation);
   const motionOperation = useLaserStore((state) => state.motionOperation);
-  const fireActive = useLaserStore((state) => state.fireActive);
+  const fire = useLaserStore(fireLatch);
   const pauseResumeTransition = useLaserStore((state) => state.pauseResumeTransition);
   const controllerHold = useLaserStore(selectControllerHold);
   const streamHold = useLaserStore((state) => state.streamHold ?? null);
@@ -67,7 +69,7 @@ export function LiveMotionBar(): JSX.Element | null {
     streamProgress,
     controllerOperation,
     motionOperation,
-    fireActive,
+    fire,
     pauseResumeTransition,
     controllerHold,
     streamHold,
@@ -118,11 +120,13 @@ function LiveMotionPrimaryAction({ status }: { readonly status: StreamerStatus |
   const laserModeEnabled = useLaserStore(cncJobLaserModeEnabled);
   const liftPhase = useLaserStore(cncPauseLiftPhase);
   const liftSkipReason = useLaserStore(cncPauseLiftSkipReason);
+  const controllerKind = useLaserStore(cncPauseControllerKind);
   const resumeAdvisory = cncResumeAdvisoryNotice(
     machineKind,
     laserModeEnabled,
     liftPhase,
     liftSkipReason,
+    controllerKind,
   );
   const pauseResumeTransition = useLaserStore((state) => state.pauseResumeTransition);
   if (pauseResumeTransition !== null) {
@@ -139,7 +143,12 @@ function LiveMotionPrimaryAction({ status }: { readonly status: StreamerStatus |
     return (
       <LiveMotionActionButton
         label="Pause"
-        title={pauseControlMessage(machineKind, hasRealtimePause, streamPauseBeamOff)}
+        title={pauseControlMessage(
+          machineKind,
+          hasRealtimePause,
+          streamPauseBeamOff,
+          controllerKind,
+        )}
         onClick={pauseJob}
       />
     );
@@ -195,7 +204,7 @@ function describeLiveMotion(
   streamProgress: LiveStreamProgress,
   controllerOperation: ControllerOperation | null,
   motionOperation: MotionOperation | null,
-  fireActive: boolean,
+  fire: FireLatch | null,
   pauseResumeTransition: PauseResumeTransition | null,
   controllerHold: ControllerHold,
   streamHold: StreamHold | null = null,
@@ -226,10 +235,13 @@ function describeLiveMotion(
   // A latched momentary Fire keeps the beam on with no motion — the bar must
   // still offer a persistent off control, not only the hold-button's release
   // (AUDIT A6). Fire is Idle-only, so this never shadows a job or operation.
-  if (fireActive) {
+  if (fire !== null) {
     return {
       heading: 'LASER FIRING',
-      detail: 'Momentary Fire is holding the beam on',
+      detail:
+        fire === 'laser-dot'
+          ? 'The laser dot is on at low power to show where it will burn'
+          : 'Momentary Fire is holding the beam on',
       abortLabel: 'LASER OFF',
     };
   }
@@ -238,6 +250,14 @@ function describeLiveMotion(
   return unownedMotion === null
     ? null
     : describeUnownedMotion(unownedMotion, controllerHold, homingStateStuck);
+}
+
+type FireLatch = 'momentary' | 'laser-dot';
+
+// The Falcon's LED holds the Fire latch too (ADR-664); say which beam is on.
+function fireLatch(state: LaserState): FireLatch | null {
+  if (!state.fireActive) return null;
+  return laserDotLit(state) ? 'laser-dot' : 'momentary';
 }
 
 // A hold the controller entered by itself — its own feed-hold input, a lid

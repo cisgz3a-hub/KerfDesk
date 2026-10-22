@@ -3,7 +3,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildGcodeRenderModel } from '../../core/gcode-view';
 import { parseStatusReport } from '../../core/controllers/grbl/status-parser';
-import { createProject } from '../../core/scene';
+import { CNC_LASER_MODE_ENABLED_MESSAGE } from '../../core/preflight/controller-readiness';
+import { createProject, DEFAULT_CNC_MACHINE_CONFIG } from '../../core/scene';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
@@ -68,6 +69,8 @@ describe('Run G-code file dialog (ADR-630)', () => {
     expect(body.textContent).toContain('/ marks, % markers and blank lines left out');
     expect(body.textContent).toContain('50 mm × 40 mm');
     expect(body.textContent).toContain('millimetres (G21)');
+    // No controller to describe until one is connected (ADR-630 Amendment 4).
+    expect(body.textContent).not.toContain('$32');
     expect(button(body, 'Start').disabled).toBe(true);
     expect(button(body, 'Start').title).toBe(EXTERNAL_FRAME_FIRST);
     expect(button(body, 'Frame').disabled).toBe(true);
@@ -246,6 +249,35 @@ describe('Run G-code file dialog (ADR-630)', () => {
     expect(body.textContent).toContain('Warnings');
     expect(body.textContent).toContain('inches (G20)');
     expect(body.textContent).toContain('never sends M5');
+  });
+
+  // ADR-630 Amendment 4: the controller's $30/$32 findings, as Job Review
+  // words them, plus the rapids a laser at $32=0 runs lit. Frame stays open.
+  it('lists the lit rapids of a laser reporting $32=0', async () => {
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      statusReport: parseStatusReport('<Idle|MPos:0.000,0.000,0.000|FS:0,0>'),
+      controllerSettings: { laserModeEnabled: false, maxPowerS: 1000 },
+    });
+    const body = await show('M4\nG1 X10 Y10 S800 F1000\nG0 X10 Y40\nG1 X40 Y40\nM5\n');
+    expect(body.textContent).toContain('The controller reports $32=0 (laser mode off)');
+    expect(body.textContent).toContain('One G0 move in this program runs with M3 or M4 on');
+    expect(body.textContent).toContain('first: line 4 of the sent program');
+    expect(body.textContent).toContain('Controller reports $32=0. Enable GRBL laser mode ($32=1)');
+    expect(button(body, 'Frame').disabled).toBe(false);
+  });
+
+  it('lists a router left in laser mode', async () => {
+    useStore.setState({ project: { ...createProject(), machine: DEFAULT_CNC_MACHINE_CONFIG } });
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      statusReport: parseStatusReport('<Idle|MPos:0.000,0.000,0.000|FS:0,0>'),
+      controllerSettings: { laserModeEnabled: true, maxPowerS: 12000 },
+    });
+    const body = await show('M3 S11000\nG4 P3\nG0 X10 Y10\nG1 Z-2 F300\nG0 Z5\nM5\n');
+    expect(body.textContent).toContain(CNC_LASER_MODE_ENABLED_MESSAGE);
+    expect(body.textContent).not.toContain('G0 move');
+    expect(button(body, 'Frame').disabled).toBe(false);
   });
 
   it('shows the G10 displacement warning while preserving Frame and exact sendable bytes', async () => {
