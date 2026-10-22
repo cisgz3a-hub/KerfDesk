@@ -52,8 +52,8 @@ export function SurfacingPanel(props: { readonly machine: CncMachineConfig }): J
         <div role="status">
           {phase === 'preparing'
             ? 'Checking surfacing program… '
-            : phase === 'writing'
-              ? 'Writing surfacing program… '
+            : phase === 'choosing'
+              ? 'Choose where to save the surfacing program… '
               : 'Finishing surfacing save… '}
           {phase !== 'finalizing' && (
             <button type="button" onClick={cancel} title={cancelSaveTitle}>
@@ -67,4 +67,4 @@ export function SurfacingPanel(props: { readonly machine: CncMachineConfig }): J
 }
 
 const cancelSaveTitle =
-  'Stop preparing the surfacing program or discard its uncommitted file bytes.';
+  'Stop preparing the surfacing program. No file is touched until you choose one.';
