@@ -245,7 +245,7 @@ class RemoteAccessRuntime {
     this.error = SAVE_FAILED;
     this.relay.close();
   }
-  /** An unsaved Disable or Revoke must not reconnect next launch (ADR-653): tell a connected
+  /** An unsaved Disable or Revoke must not reconnect next launch (ADR-657): tell a connected
    *  relay now, then remove the saved record. */
   private async failClosed(revocation: RelayMessage | null): Promise<never> {
     this.available = false;

@@ -1,4 +1,4 @@
-// Fixed status texts for a remote-settings save that failed (ADR-653). No native
+// Fixed status texts for a remote-settings save that failed (ADR-657). No native
 // error text reaches the renderer.
 
 export const SAVE_FAILED = 'Remote settings could not be saved securely.';

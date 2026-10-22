@@ -1,4 +1,4 @@
-## ADR-653 - Remote Set origin and Zero Z keep the PC guards, definite refusals stay definite, and a failed revocation save fails closed
+## ADR-657 - Remote Set origin and Zero Z keep the PC guards, definite refusals stay definite, and a failed revocation save fails closed
 
 **Status:** Accepted; unit- and workerd-tested, not hardware-tested. | **Date:** 2026-10-21
 
