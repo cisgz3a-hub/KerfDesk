@@ -42,7 +42,7 @@ export type BedTargetLayout = {
 
 export const DEFAULT_TARGET_SPACING_MM = 40;
 export const DEFAULT_RING_DIAMETER_MM = 10;
-const RING_WIDTH_SHARE = 0.18;
+export const RING_WIDTH_SHARE = 0.18;
 // Keep every ring fully inside the area.
 const EDGE_CLEARANCE_SHARE = 0.75;
 // The fewest columns and rows that hold the anchor L with rings around it.

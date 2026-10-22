@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
-import { generateCameraBedTarget } from './camera-bed-target-pattern';
+import { DEFAULT_RING_DIAMETER_MM } from '../camera/target/bed-target';
+import { generateCameraBedTarget, generateCameraNudgeRing } from './camera-bed-target-pattern';
 import { compileJob } from './compile-job';
 
 describe('generateCameraBedTarget', () => {
@@ -70,3 +71,22 @@ function sampleAlong(
   }
   return samples;
 }
+
+describe('generateCameraNudgeRing (ADR-663 Amendment 2)', () => {
+  it('burns one target-sized ring with its hole, centred where asked', () => {
+    const scene = generateCameraNudgeRing({ centre: { x: 200, y: 150 }, power: 20, speed: 2500 });
+    expect(scene.layers).toHaveLength(1);
+    expect(scene.layers[0]).toMatchObject({ mode: 'fill', power: 20, speed: 2500 });
+    const [ring] = scene.objects;
+    if (ring?.kind !== 'imported-svg') throw new Error('one imported ring expected');
+    const outer = DEFAULT_RING_DIAMETER_MM / 2;
+    expect(ring.transform.x + outer).toBeCloseTo(200, 9);
+    expect(ring.transform.y + outer).toBeCloseTo(150, 9);
+    const [outline, hole] = ring.paths[0]?.polylines ?? [];
+    const radius = (line: typeof outline) =>
+      Math.hypot((line?.points[0]?.x ?? 0) - outer, (line?.points[0]?.y ?? 0) - outer);
+    expect(radius(outline)).toBeCloseTo(outer, 9);
+    expect(radius(hole)).toBeLessThan(outer);
+    expect(radius(hole)).toBeGreaterThan(outer / 2);
+  });
+});

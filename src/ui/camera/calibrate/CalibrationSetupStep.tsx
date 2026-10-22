@@ -215,7 +215,7 @@ function SettingsFields(props: { readonly settings: CalibrationSettings }): JSX.
 
 // Holds the typed text while the field has focus, so clearing a field to type
 // a new number does not snap back to the stored value on the way.
-function NumberField(props: {
+export function NumberField(props: {
   readonly label: string;
   readonly value: number | null;
   readonly step: number;
