@@ -253,7 +253,14 @@ describe('runJobReviewGate through runStartJobFlow', () => {
     useLaserStore.setState({ frameVerification: null });
     const frameWcsNormalizationWarning =
       'Controller was using G55. KerfDesk selected G54 because both this physical Frame and the reviewed program run in G54. Your G55 offset was not erased, and neither was any other G54-G59 offset. If you cancel, G54 remains selected.';
-    const initial = { ...(await unframedReviewBundle()), frameWcsNormalizationWarning };
+    // ADR-232 Amendment 1 (audit v3 D5-P2-3): the Frame's own route crossing
+    // is listed beside the job's findings, and a rebuild keeps it too.
+    const frameNoGoWarnings = [`The Frame's outline crosses the configured no-go zone "Clamp".`];
+    const initial = {
+      ...(await unframedReviewBundle()),
+      frameWcsNormalizationWarning,
+      frameNoGoWarnings,
+    };
     const capture = captureJobReviewModels();
 
     const review = runJobReviewGate({
@@ -264,6 +271,7 @@ describe('runJobReviewGate through runStartJobFlow', () => {
     await vi.waitFor(() => expect(capture.models).toHaveLength(1));
     expect(reviewState()).toMatchObject({ kind: 'open', purpose: 'frame' });
     expect(capture.models[0]?.warnings).toContain(frameWcsNormalizationWarning);
+    expect(capture.models[0]?.warnings).toContain(frameNoGoWarnings[0]);
 
     useJobReviewStore.getState().requestRebuild();
     await vi.waitFor(() => expect(capture.models).toHaveLength(2));
@@ -271,10 +279,11 @@ describe('runJobReviewGate through runStartJobFlow', () => {
     expect(rebuilt.kind === 'open' ? rebuilt.blocker : ['closed']).toBeNull();
     expect(rebuilt.kind === 'open' ? rebuilt.purpose : null).toBe('frame');
     expect(capture.models[1]?.warnings).toContain(frameWcsNormalizationWarning);
+    expect(capture.models[1]?.warnings).toContain(frameNoGoWarnings[0]);
 
     useJobReviewStore.getState().confirm();
     await expect(review).resolves.toMatchObject({
-      bundle: { frameWcsNormalizationWarning },
+      bundle: { frameWcsNormalizationWarning, frameNoGoWarnings },
     });
     capture.stop();
   });

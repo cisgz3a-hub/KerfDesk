@@ -3,6 +3,7 @@ import type { MachineKind } from '../../core/scene';
 import { reportedWorkPositionMm } from '../state/canvas-motion-plan';
 import { CNC_FRAME_REQUIRES_GRBL_MESSAGE } from '../state/cnc-frame-lines';
 import type { FrameMotionCandidate } from '../state/framed-run';
+import { frameRouteNoGoWarnings } from '../state/laser-frame-motion-plan';
 import { useLaserStore } from '../state/laser-store';
 import type { LaserMotionOperation, LaserMotionOperationId } from '../state/laser-motion-operation';
 import { useToastStore } from '../state/toast-store';
@@ -110,6 +111,17 @@ export function currentWorkXy(
 ): { readonly x: number; readonly y: number } | undefined {
   const position = reportedWorkPositionMm(laser, laser.controllerSettings?.reportInches === true);
   return position === null ? undefined : { x: position.x, y: position.y };
+}
+
+/** The candidate with the configured no-go zones its own Frame route crosses,
+ * which Start's Job Review lists (ADR-232 Amendment 1). */
+export function withFrameNoGoWarnings<Candidate extends FrameMotionCandidate>(
+  laser: ReturnType<typeof useLaserStore.getState>,
+  motionBounds: JobBounds,
+  candidate: Candidate,
+): Candidate {
+  const frameNoGoWarnings = frameRouteNoGoWarnings(laser, motionBounds, candidate);
+  return frameNoGoWarnings.length === 0 ? candidate : { ...candidate, frameNoGoWarnings };
 }
 
 /** CNC frames prove the traced XY bounds; laser frames prove the complete

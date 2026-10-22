@@ -129,12 +129,17 @@ afterEach(() => {
 });
 
 describe('reviewFramedRunForStart', () => {
-  it('prepares the current exact artifact and retains the Frame WCS disclosure for Start review', async () => {
+  it('prepares the current exact artifact and retains the Frame WCS disclosure and no-go findings for Start review', async () => {
     const installed = await installReviewPendingFramedRunPermitForCurrentState();
     const disclosure = 'Controller was using G55. KerfDesk selected G54.';
+    const frameNoGoWarnings = ['The Frame\'s outline crosses the configured no-go zone "Clamp".'];
     const permit = {
       ...installed,
-      candidate: { ...installed.candidate, frameWcsNormalizationWarning: disclosure },
+      candidate: {
+        ...installed.candidate,
+        frameWcsNormalizationWarning: disclosure,
+        frameNoGoWarnings,
+      },
     };
     useLaserStore.setState({ framedRun: permit });
     const gateCalls: ReviewGateArgs[] = [];
@@ -153,6 +158,7 @@ describe('reviewFramedRunForStart', () => {
     expect(args.initial.prepared.canvasPlan.retentionKey).toBe(permit.candidate.executionSignature);
     expect(args.initial.project).toBe(permit.candidate.project);
     expect(args.initial.frameWcsNormalizationWarning).toBe(disclosure);
+    expect(args.initial.frameNoGoWarnings).toEqual(frameNoGoWarnings);
     expect(args.completedReceipt).toBeNull();
     // Ordinary Start supplies its purpose explicitly to both native and remote presenters.
     expect(args.purpose).toBe('start');

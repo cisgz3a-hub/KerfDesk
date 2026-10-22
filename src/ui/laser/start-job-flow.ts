@@ -316,6 +316,7 @@ export async function runStartFromLineFlow(fromLine: number): Promise<void> {
     prepared.laserModeStartSnapshot,
     prepared.controllerSnapshot,
     restart.placementNote,
+    prepared,
   );
   if (started) noteManualRestartStarted(restart);
 }

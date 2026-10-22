@@ -120,12 +120,12 @@ function warnJogTargetOutsideConfiguredBounds(
     `Jog target X${target.x.toFixed(3)} Y${target.y.toFixed(3)} is outside the ` +
     `configured machine bounds X${bounds.minX.toFixed(3)}..${bounds.maxX.toFixed(3)}, ` +
     `Y${bounds.minY.toFixed(3)}..${bounds.maxY.toFixed(3)}. Controller limits still apply.`;
-  publishJogPolicyWarning(set, get, message);
+  publishMotionPolicyWarning(set, get, message);
 }
 
 function warnUnresolvedJogXyPath(set: SetFn, get: GetFn, params: JogParams): void {
   if (params.dx === undefined && params.dy === undefined) return;
-  publishJogPolicyWarning(
+  publishMotionPolicyWarning(
     set,
     get,
     'The current machine XY position is unresolved, so KerfDesk cannot compare this jog path with configured bounds or no-go zones. The requested controller jog will be sent unchanged; monitor the move and use Cancel Jog or the physical E-stop if needed.',
@@ -147,14 +147,15 @@ function warnJogNoGoZoneCrossing(
   if (zones === undefined || zones.length === 0) return;
   const zone = firstZoneCrossedBySegment(path.start, path.target, zones);
   if (zone === null) return;
-  publishJogPolicyWarning(
+  publishMotionPolicyWarning(
     set,
     get,
     `This jog path crosses the configured no-go zone "${zone.name}". The requested controller jog will be sent unchanged; monitor the move and use Cancel Jog or the physical E-stop if needed.`,
   );
 }
 
-function publishJogPolicyWarning(set: SetFn, get: GetFn, message: string): void {
+/** Warn-only motion guidance: a toast plus the console log (ADR-232). */
+export function publishMotionPolicyWarning(set: SetFn, get: GetFn, message: string): void {
   useToastStore.getState().pushToast(message, 'warning');
   set({ log: pushLog(get(), `[lf2] ${message}`) });
 }

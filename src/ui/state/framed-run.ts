@@ -72,6 +72,9 @@ export type FramedRunCandidate = {
   /** Durable disclosure for the owned pre-Frame G54 selection, surfaced in
    * Start's Job Review for a review-pending permit. */
   readonly frameWcsNormalizationWarning?: string;
+  /** The configured no-go zones this Frame's own route crosses, surfaced in
+   * Start's Job Review as warnings (ADR-232 Amendment 1). */
+  readonly frameNoGoWarnings?: ReadonlyArray<string>;
   /** Transient calibration jobs own immutable prepared bytes outside the open
    * canvas. Their permit must follow that project rather than the unrelated
    * live-project execution signature. */

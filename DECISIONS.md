@@ -10963,6 +10963,13 @@ overhangs the bed` without attempting the trace the operator explicitly chose as
 - ADR-231 remains authoritative for report-unit conversion, cancel-race settlement, honest device
   metadata, and the requirement for clean completion, but its pre-wire spatial/settings refusals are
   superseded.
+
+### Amendments
+
+ADR-232's amendments are separate decision files (ADR-344):
+`docs/decisions/ADR-232-amendment-1-frame-route-and-resume-reentry-reach-the-no-go-check.md` (the
+Frame's own route and a laser resume's re-entry move are compared with no-go zones as warnings, and
+the CNC envelope uses the full bit diameter).
 ---
 
 ## ADR-233 - Revisioned machine-aware CNC starters initialize new operations without rewriting jobs
