@@ -70,8 +70,17 @@ describe('Continue from where the head stopped after a lost link', () => {
       expect(head.y).toBeCloseTo(ORIGIN.y + stop.pointMm.y, 3);
 
       // The reset controller counts from where the head stands, with no origin.
+      // Its banner makes the automatic restart step back over the planner
+      // (ADR-398 Amendment 3); the continue from the head stop is unchanged.
       h.simulator = await connectSimulator();
       expect(useLaserStore.getState().workOriginActive).toBe(false);
+      await vi.waitFor(() =>
+        expect(
+          h.repository.getSnapshot().recoveryCapsule?.interruption.plannerBacklog,
+        ).toBeDefined(),
+      );
+      const revised = await expectCapsuleFor(h.repository, runId);
+      expect(recoveryHeadStop(revised)).toEqual(stop);
       const before = h.simulator.outbound().length;
       const written = await drive(useLaserStore.getState().setOriginAtProgramPoint(stop.pointMm));
       expect(programLines(h.simulator, before)).toContain(
@@ -90,7 +99,7 @@ describe('Continue from where the head stopped after a lost link', () => {
       expect(head.x + h.simulator.state().mpos.x).toBeCloseTo(ORIGIN.x, 3);
       expect(head.y + h.simulator.state().mpos.y).toBeCloseTo(ORIGIN.y, 3);
 
-      const resumed = runLaserRecoveryCapsuleFlow(capsule, h.repository, { fromLine: stop.line });
+      const resumed = runLaserRecoveryCapsuleFlow(revised, h.repository, { fromLine: stop.line });
       expect(await drive(resumed)).toBe(true);
       await tick(8_000);
       expect(useLaserStore.getState().streamer).toBeNull();

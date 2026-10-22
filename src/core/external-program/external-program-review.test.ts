@@ -208,6 +208,36 @@ describe('external program final units (ADR-630)', () => {
     expect(review('G0 X1 Y1\nG1 X2 F100\n').units).toBe('undeclared');
     expect(review('G20\nG0 X1 Y1\n').units).toBe('inch');
   });
+
+  // Smoothieware's baseline restores the M221 power scale a Frame zeroed
+  // (ADR-630 Amendment 3). It is a percent, not the program's S, and it does
+  // not leave the program's laser on.
+  it("does not read Smoothieware's M221 S100 baseline as the program's own command", () => {
+    const smoothie: ExternalProgramContext = { ...LASER, controllerKind: 'smoothieware' };
+    const reviewSmoothie = (file: string) => {
+      const normalized = normalizeExternalProgram(file, undefined, 'smoothieware');
+      if (normalized.kind !== 'ok') throw new Error(normalized.reasons.join('\n'));
+      const gcode = normalized.program.gcode;
+      expect(gcode.startsWith('G17G21G90G0\nM221 S100\n')).toBe(true);
+      const built = buildGcodeRenderModel(gcode, {
+        machineKind: 'laser',
+        laserPowerControl: 'smoothieware',
+      });
+      if (built.kind !== 'ok') throw new Error(built.reason);
+      return { model: built.model, review: reviewExternalProgram(gcode, built.model, smoothie) };
+    };
+    const { model, review: sOnly } = reviewSmoothie('G0 X0 Y0\nG1 X10 S0.5 F600\nG0 X0\n');
+    expect(sOnly.warnings).toEqual([]);
+    // The review draws the burn at the scale the baseline sets.
+    expect(model.stats.cutMm).toBe(10);
+    expect(Array.from(model.segPower)).toContain(0.5);
+    expect(reviewSmoothie('M3\nG1 X10 S0.5 F600\nM5\n').review.warnings.join('\n')).toContain(
+      'before it sets S',
+    );
+    expect(reviewSmoothie('M3 S0.5\nG1 X10 F600\n').review.warnings.join('\n')).toContain(
+      'never sends M5',
+    );
+  });
 });
 
 // The Frame traces the program's outline in the work coordinates it starts in.

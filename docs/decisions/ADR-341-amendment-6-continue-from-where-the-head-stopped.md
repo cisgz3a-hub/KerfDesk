@@ -1,6 +1,8 @@
 ## ADR-341 Amendment 6 - Continue from where the head stopped, and the Review opens after a reconnect (2026-09-27)
 
-**Status:** Accepted. | **Date:** 2026-09-27
+**Status:** Accepted. The Context's premise that a dropped link leaves the controller running
+holds only for a controller that did not restart; ADR-398 Amendment 3 steps the automatic
+restart back when the reconnect shows a restart. | **Date:** 2026-09-27
 
 ### Context
 
