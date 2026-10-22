@@ -11,7 +11,6 @@ import { cncSideInputScene, cncSideOutputProject } from '../../core/cnc/cnc-two-
 import {
   applyJobOriginOffset,
   compileJob,
-  computeJobPlacementBounds,
   computeRegistrationBoxBounds,
   computeSceneOutputBounds,
   jobOriginOffset,
@@ -22,6 +21,8 @@ import {
   type JobBounds,
   type JobOriginPlacement,
 } from '../../core/job';
+// Not in the job barrel: its export count is ratcheted (ADR-015).
+import { computeJobPlacementBounds } from '../../core/job/job-bounds';
 import { compileCncJobResult, type CncJobCompilationResult } from '../../core/cnc/compile-cnc-job';
 import { toMachineCoords, toSceneCoords } from '../../core/devices';
 import {
