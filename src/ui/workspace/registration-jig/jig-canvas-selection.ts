@@ -17,7 +17,12 @@ import {
   rotateSelectionByDrag,
   selectionRotateAnchor,
 } from '../rotate-handle';
-import { aabbHandlePoints, hitAabbHandle, selectionResizeEditFromDrag } from '../selection-handles';
+import {
+  aabbHandlePoints,
+  hitAabbHandle,
+  resizeEditSetsSize,
+  selectionResizeEditFromDrag,
+} from '../selection-handles';
 import { selectObjectsInMarquee } from '../selection-marquee';
 
 /** Objects the jig canvas may select: unlocked, on a visible layer. Locked
@@ -172,6 +177,7 @@ export function resizeJigSelection(
     point: { x: grab.position.x + delta.x, y: grab.position.y + delta.y },
     lockAspect: drag.lockAspect,
   });
+  if (!resizeEditSetsSize(edit)) return unchanged;
   const result = buildSelectionTransformEdit(objects, edit);
   if (result.kind === 'error')
     return { project, refused: result.reason === 'non-uniform-rotated-selection' };

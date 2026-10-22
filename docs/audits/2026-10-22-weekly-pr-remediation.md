@@ -7,7 +7,7 @@ The weekly audit inventoried 173 pull requests and recorded 20 confirmed finding
 | ID | Audited PRs | Repair and regression evidence |
 | --- | --- | --- |
 | M1 | #1287 | Stock GRBL known-invalid blocks are interpreted atomically before modes/tool events commit. `G91 F-1` from X100 no longer changes the following absolute X10 move to X110. Original executable bytes remain unchanged; buffered-execution risk is disclosed. |
-| M2 | #1287, #1368 | Stock GRBL radius tolerance accepts the radius-500 / 0.2 mm mismatch case and preserves its endpoint for the following relative move. Invalid geometry and missing active-plane axis words reject the whole block before modal changes. Unsupported planes invalidate dependent placement. |
+| M2 | #1287, #1368 | Stock GRBL radius tolerance accepts the radius-500 / 0.2 mm mismatch case and preserves its endpoint for the following relative move. Invalid geometry and missing active-plane axis words reject the whole block before modal changes in G17/G18/G19, preserving the subsequently merged plane support from #1368. Unknown or displaced work positions cannot prove geometric rejection. |
 | M3 | #1351, #1358 | Marlin M106/M107 validate repeated, spaced and lowercase P selectors before fan-zero projection. Ambiguous fan commands cannot silently prove laser-off. |
 | M4 | #1351 | External timing uses the active controller override for laser and CNC. Saved Smoothieware plus connected Marlin uses the application's 15-block Marlin model, not the 32-block saved-device model. |
 | M5 | #1287 | Unsupported G10/L warnings remain visible even without a specialized L2/L20 warning. |

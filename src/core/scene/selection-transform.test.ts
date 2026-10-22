@@ -221,7 +221,73 @@ describe('buildSelectionTransformEdit', () => {
       reason: 'invalid-number',
     });
   });
+
+  // Audit 08-P2-2: a straight line has one zero extent and still resizes along the other.
+  it('resizes the length of a straight line and refuses only its zero axis', () => {
+    const line = flatObject('line', { minX: 0, minY: 5, maxX: 30, maxY: 5 });
+    const resize = (
+      edit: { readonly width?: number; readonly height?: number },
+      preserveAspect: boolean,
+    ) =>
+      buildSelectionTransformEdit([line], { kind: 'resize', anchor: 'w', preserveAspect, ...edit });
+
+    for (const preserveAspect of [false, true]) {
+      const result = resize({ width: 60 }, preserveAspect);
+      expect(result.kind).toBe('ok');
+      if (result.kind !== 'ok') return;
+      expect(result.transforms[0]?.transform).toMatchObject({
+        scaleX: 2,
+        scaleY: preserveAspect ? 2 : 1,
+      });
+    }
+    expect(resize({ height: 10 }, false)).toEqual({
+      kind: 'error',
+      reason: 'zero-height-selection',
+    });
+    expect(resize({ height: 10 }, true)).toEqual({
+      kind: 'error',
+      reason: 'zero-height-selection',
+    });
+    expect(resize({ width: 60, height: 10 }, false)).toEqual({
+      kind: 'error',
+      reason: 'zero-height-selection',
+    });
+    // Locked, the factor comes from the axis that has extent.
+    const locked = resize({ width: 60, height: 10 }, true);
+    expect(locked.kind === 'ok' && locked.transforms[0]?.transform.scaleX).toBe(2);
+
+    const vertical = flatObject('vertical', { minX: 5, minY: 0, maxX: 5, maxY: 40 });
+    const tall = buildSelectionTransformEdit([vertical], {
+      kind: 'resize',
+      anchor: 'n',
+      height: 20,
+      preserveAspect: false,
+    });
+    expect(tall.kind === 'ok' && tall.transforms[0]?.transform.scaleY).toBe(0.5);
+    expect(
+      buildSelectionTransformEdit([vertical], {
+        kind: 'resize',
+        anchor: 'n',
+        width: 20,
+        preserveAspect: false,
+      }),
+    ).toEqual({ kind: 'error', reason: 'zero-width-selection' });
+
+    const point = flatObject('point', { minX: 5, minY: 5, maxX: 5, maxY: 5 });
+    expect(
+      buildSelectionTransformEdit([point], {
+        kind: 'resize',
+        anchor: 'c',
+        width: 20,
+        preserveAspect: true,
+      }),
+    ).toEqual({ kind: 'error', reason: 'degenerate-selection' });
+  });
 });
+
+function flatObject(id: string, bounds: SceneObject['bounds']): SceneObject {
+  return { ...objectWithTransform(id, IDENTITY_TRANSFORM), bounds };
+}
 
 function objectWithTransform(id: string, transform: Transform): SceneObject {
   return {

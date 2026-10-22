@@ -14,6 +14,7 @@ import {
   ownerFor,
   ownerIsCurrent,
   ownersMatch,
+  ownersShareSource,
   reconcileAppliedStash,
   retainDocumentEpochStash,
   stashSession,
@@ -82,10 +83,11 @@ export function openEditorAction(
     return;
   }
   const stashed = stash[image.id];
-  if (stashed !== undefined && (stashed.owner === null || ownersMatch(stashed.owner, owner))) {
+  if (stashed !== undefined && stashResumesOn(stashed, owner)) {
     resumeStashedSession(set, image.id, stashed, owner, session, sessionOwner);
     return;
   }
+  announceDiscardedStash(stashed);
 
   const requestToken = Symbol(image.id);
   set((state) => ({
@@ -127,6 +129,21 @@ export function openEditorAction(
       set({ loadState: { kind: 'failed', message } });
       useToastStore.getState().pushToast(`Could not open image for editing: ${message}`, 'error');
     });
+}
+
+function stashResumesOn(stashed: StashedEditorSession, owner: ImageEditorSessionOwner): boolean {
+  return stashed.owner === null || ownersShareSource(stashed.owner, owner);
+}
+
+// Close promises the session resumes, so never drop unapplied work silently.
+function announceDiscardedStash(stashed: StashedEditorSession | undefined): void {
+  if (stashed?.session.dirtySinceApply !== true) return;
+  useToastStore
+    .getState()
+    .pushToast(
+      'The image itself changed after Image Studio closed, so its unapplied edits were discarded. Studio opens the image as it is now.',
+      'warning',
+    );
 }
 
 /** Apply the current editor revision to its scene object. */
@@ -267,7 +284,9 @@ function resumeStashedSession(
 ): void {
   set((state) => {
     const { [objectId]: _resumed, ...remainingStash } = state.stash;
-    const resumedOwner = stashed.owner ?? owner;
+    // Bind to the current object: after a placement change the stashed owner
+    // is no longer current, and Apply would refuse it.
+    const resumedOwner = owner;
     const isResumingApply = applyRequestOwnsSession(
       state.applyRequest,
       stashed.session,

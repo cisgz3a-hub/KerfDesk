@@ -8,8 +8,10 @@ import {
   cloneStrokeDirtyRect,
   cloneStrokeInPlace,
   healDirtyRect,
+  healRepairFrom,
   healSpotInPlace,
   type CloneStroke,
+  type HealRepair,
 } from '../../core/image-retouch';
 import { captureScoped, type EditorSession } from './editor-session';
 import { compositeSession } from './editor-session-layers';
@@ -45,8 +47,10 @@ export function commitHealDab(
 ): EditorSession {
   const rect = healDirtyRect(session.doc, centre, radiusPx);
   if (rect.width === 0 || rect.height === 0) return session;
+  const repair = healRepairFor(session, centre, radiusPx);
+  if (repair === null) return session;
   const entry = captureScoped(session, rect, 'Spot heal');
-  healSpotInPlace(session.doc, centre, radiusPx, session.selection ?? undefined);
+  healSpotInPlace(session.doc, centre, radiusPx, session.selection ?? undefined, repair);
   return {
     ...session,
     history: pushHistoryEntry(session.history, entry),
@@ -54,6 +58,22 @@ export function commitHealDab(
     dirtySinceApply: true,
     lastDirtyRect: rect,
   };
+}
+
+// Heal patches the active layer from its own ring, alpha-weighted, so a
+// transparent surround heals to transparency instead of the black RGB that
+// transparent pixels hold (audit 23-P2-1). An upper layer that is empty around
+// the spot has nothing of its own to heal from, so it heals from the visible
+// composite, as clone samples it: the heal-on-a-new-layer habit.
+function healRepairFor(
+  session: EditorSession,
+  centre: PaintPoint,
+  radiusPx: number,
+): HealRepair | null {
+  const own = healRepairFrom(session.doc, centre, radiusPx);
+  const isBottomLayer = session.layers[0]?.id === session.activeLayerId;
+  if (own === null || own.alpha > 0 || isBottomLayer) return own;
+  return healRepairFrom(compositeSession(session), centre, radiusPx);
 }
 
 /**

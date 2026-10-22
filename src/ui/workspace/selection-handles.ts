@@ -10,6 +10,8 @@ import type { AABB, SelectionAnchor, SelectionTransformEdit, Vec2 } from '../../
 import { HANDLE_SCREEN_PX, type HandleKind } from './handles';
 
 const MIN_SELECTION_DIMENSION_MM = 0.001;
+// The core resize's own zero-extent limit (selection-transform.ts).
+const FLAT_EXTENT_MM = 0.000001;
 
 export type SelectionHandle = {
   readonly kind: HandleKind;
@@ -69,7 +71,9 @@ const HANDLE_RESIZE: Readonly<Record<HandleKind, HandleResizeSpec>> = {
 // both axes (aspect-locked unless lockAspect is false, matching single-object
 // corner scaling), edge handles resize one axis; the opposite corner/edge is
 // the pinned pivot. Dimensions clamp to a small positive so a drag past the
-// pivot stops rather than inverting the selection.
+// pivot stops rather than inverting the selection. An axis the selection has no
+// extent on (collinear straight lines) is left alone, as a single object's
+// handle leaves it, so that edit sets no size when only that axis would move.
 export function selectionResizeEditFromDrag(args: {
   readonly handle: HandleKind;
   readonly bbox: AABB;
@@ -108,6 +112,17 @@ export function selectionResizeEditFromDrag(args: {
   };
 }
 
+/** Whether a handle resize edit changes any size. */
+export function resizeEditSetsSize(
+  edit: Extract<SelectionTransformEdit, { kind: 'resize' }>,
+): boolean {
+  return edit.width !== undefined || edit.height !== undefined;
+}
+
+function hasExtent(min: number, max: number): boolean {
+  return max - min > FLAT_EXTENT_MM;
+}
+
 // New extent along one axis: the handle grows from the far/near edge toward
 // the pointer, clamped positive.
 function resizeExtent(
@@ -116,7 +131,7 @@ function resizeExtent(
   min: number,
   max: number,
 ): number | undefined {
-  if (side === undefined) return undefined;
+  if (side === undefined || !hasExtent(min, max)) return undefined;
   const growsFromMin = side === 'east' || side === 'south';
   return Math.max(MIN_SELECTION_DIMENSION_MM, growsFromMin ? pointer - min : max - pointer);
 }

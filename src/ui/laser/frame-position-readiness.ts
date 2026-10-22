@@ -1,12 +1,14 @@
 import { reportedWorkPositionMm } from '../state/canvas-motion-plan';
 import { useLaserStore, type LaserState } from '../state/laser-store';
 import {
+  ABSOLUTE_WORK_OFFSET_REQUIRED_MESSAGE,
   placementAssumesZeroWorkOffset,
   resolveJobPlacement,
   type JobPlacementSettings,
 } from '../job-placement';
+import { workOffsetOffFor } from '../state/status-report-fields';
 import { waitForControllerStatus } from './frame-status-wait';
-import { controllerReportsWorkOffset } from './work-offset-assumption';
+import { controllerWillReportWorkOffset } from './work-offset-assumption';
 
 const FRAME_POSITION_TIMEOUT_MS = 3_000;
 const FRAME_POSITION_POLL_MS = 25;
@@ -20,6 +22,10 @@ export async function waitForAbsoluteFrameOffset(
   const before = useLaserStore.getState();
   if (placement.startFrom !== 'absolute') return true;
   if (!needsAbsoluteFrameOffset(before, placement)) return true;
+  // A grblHAL `$10` without bit 5 never sends WCO, so no wait can bring it
+  // (ADR-375 Amendment 2). Frame goes on at the zero Job Review says it
+  // assumed, unless the placement cannot resolve without the offset.
+  if (workOffsetOffFor(before) !== null) return resolveJobPlacement(placement, before).ok;
   const deadline = Date.now() + FRAME_POSITION_TIMEOUT_MS;
   let nextQuery = Date.now();
   while (Date.now() <= deadline) {
@@ -46,6 +52,16 @@ export async function waitForAbsoluteFrameOffset(
     });
   }
   return false;
+}
+
+/** Why an Absolute Frame stopped without the work offset: the wait ran out,
+ * or a grblHAL `$10` means it can never arrive (ADR-375 Amendment 2). */
+export function absoluteFrameOffsetRefusal(placement: JobPlacementSettings): ReadonlyArray<string> {
+  const laser = useLaserStore.getState();
+  const resolved = resolveJobPlacement(placement, laser);
+  return workOffsetOffFor(laser) !== null && !resolved.ok
+    ? resolved.messages
+    : [ABSOLUTE_WORK_OFFSET_REQUIRED_MESSAGE];
 }
 
 function needsAbsoluteFrameOffset(
@@ -76,7 +92,8 @@ export async function waitForUnreportedFrameWorkOffset(
 
 function awaitsReportedWorkOffset(laser: LaserState, placement: JobPlacementSettings): boolean {
   return (
-    controllerReportsWorkOffset(laser.capabilities) &&
+    // A grblHAL `$10` without bit 5 never sends WCO (ADR-375 Amendment 2).
+    controllerWillReportWorkOffset(laser) &&
     // While position evidence is suppressed the store discards WCO as well
     // (statusPositionPatch), so no report could end the wait.
     laser.positionEvidenceSuppressed !== true &&

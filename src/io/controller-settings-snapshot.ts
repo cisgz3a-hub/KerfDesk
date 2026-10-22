@@ -1,4 +1,8 @@
 import { isKnownControllerKind, type ControllerKind } from '../core/devices/device-profile';
+import {
+  CONTROLLER_PASSWORD_REMOVED,
+  isGrblhalPasswordSetting,
+} from '../core/controllers/controller-password-settings';
 import { settingsMapToRows, type GrblSettingRow } from '../core/controllers/grbl/grbl-settings';
 
 export const CONTROLLER_SETTINGS_SNAPSHOT_FORMAT = 'laserforge.controller-settings.snapshot';
@@ -23,7 +27,8 @@ export type ControllerSettingsSnapshotValue = {
   readonly rawValue: string;
 };
 
-/** Read-only controller evidence. This document never contains write commands. */
+/** Read-only controller evidence. This document never contains write commands,
+ *  and one created here holds no controller password. */
 export type ControllerSettingsSnapshot = {
   readonly format: typeof CONTROLLER_SETTINGS_SNAPSHOT_FORMAT;
   readonly schemaVersion: typeof CONTROLLER_SETTINGS_SNAPSHOT_SCHEMA_VERSION;
@@ -71,7 +76,10 @@ export function createControllerSettingsSnapshot(
     operatorLabel: input.operatorLabel,
     profile: input.profile,
     controllerKinds: input.controllerKinds,
-    settings: input.settings.map(({ id, rawValue }) => ({ id, rawValue })),
+    settings: input.settings.map(({ id, rawValue }) => ({
+      id,
+      rawValue: snapshotValue(id, rawValue),
+    })),
   });
   if (result.kind !== 'ok') {
     const detail =
@@ -79,6 +87,15 @@ export function createControllerSettingsSnapshot(
     throw new TypeError(`Invalid controller settings snapshot: ${detail}`);
   }
   return result.snapshot;
+}
+
+// The snapshot is made to travel between machines and people, and grblHAL
+// reads its passwords back in clear (audit C4-P3-7). An empty one stays empty,
+// so the comparison still shows which machine has none set.
+function snapshotValue(id: number, rawValue: string): string {
+  return isGrblhalPasswordSetting(id) && rawValue.trim() !== ''
+    ? CONTROLLER_PASSWORD_REMOVED
+    : rawValue;
 }
 
 export function serializeControllerSettingsSnapshot(snapshot: ControllerSettingsSnapshot): string {

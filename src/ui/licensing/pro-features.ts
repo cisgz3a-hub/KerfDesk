@@ -20,7 +20,8 @@ export const PRO_FEATURES: Readonly<
 > = {
   vcarve: {
     name: 'V-carve',
-    summary: 'Carve lettering and artwork with a V-bit, cutting deeper where shapes are wider.',
+    summary:
+      'Carve lettering and artwork with a V-bit, cutting deeper where shapes are wider. Includes tapered V-bit inlay pairs.',
   },
   relief: {
     name: '3D relief',

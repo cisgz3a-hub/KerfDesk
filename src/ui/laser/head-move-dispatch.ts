@@ -23,6 +23,7 @@ import { inferCurrentMachinePosition, reportedWorkOffsetMm } from '../state/infe
 import { useLaserStore, type LaserState } from '../state/laser-store';
 import { jogFrameCommandBlockMessage } from '../state/laser-store-helpers';
 import { resolveNativeBedFrame, selectNativeBedEvidence } from '../state/native-bed-frame';
+import { laserStatusReportFieldsOff, missingPositionMessage } from '../state/status-report-fields';
 import { useToastStore } from '../state/toast-store';
 import { clampJogFeed } from './jog-control-policy';
 import { useJogControlPreferences } from './jog-control-preferences';
@@ -53,6 +54,14 @@ export function headMoveBlockMessage(laser: LaserState): string | null {
   return jogFrameCommandBlockMessage(laser);
 }
 
+/** Why the head position or work offset will never arrive although the
+ * controller reports: a grblHAL `$10` that sends no WCO (ADR-375 Amendment 2).
+ * Null when a status report may still bring it. */
+export function headPositionUnknownMessage(laser: LaserState): string | null {
+  if (laser.statusReport === null) return null;
+  return missingPositionMessage(laserStatusReportFieldsOff(laser));
+}
+
 /** The head's current position in a frame, or null when it cannot be read. */
 export function currentHeadPosition(frame: SavedPositionFrame): HeadPosition | null {
   const laser = useLaserStore.getState();
@@ -77,7 +86,7 @@ export function dispatchHeadMove(position: HeadPosition, what: string): boolean 
   }
   const resolved = headPositionToNative(position, headFrameContext(laser));
   if (resolved.kind !== 'native') {
-    toast(HEAD_MOVE_NEEDS_WORK_OFFSET, 'error');
+    toast(headPositionUnknownMessage(laser) ?? HEAD_MOVE_NEEDS_WORK_OFFSET, 'error');
     return false;
   }
   if (!resolved.verified) toast(HEAD_MOVE_UNVERIFIED_BED, 'warning');
