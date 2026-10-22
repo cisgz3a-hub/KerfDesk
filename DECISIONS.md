@@ -20086,6 +20086,34 @@ physical controller, optical power, air-cut or material result.
 
 ---
 
+### October 22, 2026 amendment: Cut Settings applies what it shows
+
+Rolling audit 2026-10-21 findings 06-P2-2 and 06-P2-4 (`docs/audits/2026-10-21-rolling-v2/`):
+
+- **One artwork writes only its edits.** Cut Settings opened for one artwork that already has
+  its own settings wrote the whole form, 24 fields, into that artwork's scope, so later edits to
+  the operation never reached it while the inspector said "Edits apply to all of them". Every
+  freshly traced artwork qualified. Item 1 already says omitted fields inherit the base, so
+  Apply on artwork settings now writes only the fields the operator changed, for any count of
+  artworks, as the multi-artwork path did. Fields left alone keep following the operation.
+- **A stored value never blocks Apply.** The dialog's number boxes refused values the app
+  itself stores (37.5 % or a 22.5° angle typed in the inspector, 12 in/min stored as
+  304.8 mm/min, a LightBurn layer's 33.3 mm/s, 0.125 mm kerf, 0.03 mm interval or converted
+  overscan), and the browser blocked Apply over a field the operator never touched. Boxes that
+  hold any number now take any step, and every box's range also admits the value it opened
+  with, as the image density boxes already did; whole-number settings keep a step of 1. A
+  value submitted as it opened is kept exactly, even outside the range a new entry is held to;
+  only new entries are clamped. Limits that follow another field (minimum power under power,
+  dot width under scan density) are still reconciled.
+
+Verification: `CutSettingsDialog.one-artwork.test.tsx` (one owner Apply writes only Passes, then
+the operation's speed reaches it in the emitted program) and `CutSettingsDialog.stored-values.test.tsx`
+(values stored through the inspector and the LightBurn importer survive a Passes-only Apply, with
+the same F and S words and twice the cut moves). Executable output for unedited fields is
+unchanged.
+
+---
+
 ## ADR-318 — CNC audit repair preserves settings, registration and preparation ownership
 
 **Status:** Accepted

@@ -81,3 +81,19 @@ Verification: `JobReviewOperations.editing.test.tsx` (an untouched speed above O
 stays as stored), `job-review-store.test.ts` (Confirm held while a card edits) and
 `machine-review.test.ts` (a remote review is withdrawn and refused during an edit, and a fresh one
 starts the job once).
+
+### Amendment 2 - One Save is one undo step (2026-10-22)
+
+Rolling audit 2026-10-21 finding 06-P2-5: when an artwork owned an edited field, Save wrote the
+operation with `setLayerParam` and then each owner group with its own override action, one undo
+step each. One Undo then left a job that was neither before nor after the Save: at 40 % saved over
+80 %, the owner burned `S800` again while its sibling stayed at `S400`, and the card read 40 %.
+
+Save now writes the operation and its artwork owners through one store action,
+`setLayerParamWithArtworkOverrides`, which applies the same operation edit (including the ADR-496
+reseed) and the same per-artwork override writes as before, with one history snapshot. One Undo
+restores the whole Save and one Redo reapplies it. The values written are unchanged.
+
+Verification: `JobReviewOperations.save-undo.test.tsx` saves 40 % on an operation whose artwork
+owns its power: one undo step, both artworks emit `S400`, one Undo returns both to `S800` with the
+card at 80, and Redo returns both to `S400`.
