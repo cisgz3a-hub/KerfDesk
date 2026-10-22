@@ -5,6 +5,7 @@
 // branch in ONE place so both call sites stay simple.
 
 import type { ControllerSettingsSnapshot } from '../../core/controllers/grbl';
+import { marlinPowerScaleWarning } from '../../core/devices/marlin-power-scale';
 import { smoothiePowerScaleWarning } from '../../core/devices/smoothie-power-scale';
 import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
 import type { Project } from '../../core/scene';
@@ -77,6 +78,8 @@ export function detectMachineJobWarnings(
           ...detectLaserMachineLimitWarnings(project, controllerSettings),
           // A saved Smoothieware profile above S 2 (controller audit SM-7).
           ...warningList(smoothiePowerScaleWarning(project.device)),
+          // A Marlin inline profile above one byte of S (audit v4 E1-P3-3).
+          ...warningList(marlinPowerScaleWarning(project.device)),
         ];
   return [
     ...detectActiveWcsMismatchWarnings(activeWcs),

@@ -7,6 +7,7 @@ import {
   FLUIDNC_CNC_LASER_MODE_ENABLED_MESSAGE,
   laserMaxPowerMismatchMessage,
   laserModeDisabledMessage,
+  laserMinPowerNonzeroMessage,
   laserModeUnverifiedMessage,
   laserPowerRangeEmptyMessage,
   readinessSettingsSource,
@@ -274,7 +275,7 @@ function laserReadiness(
 }
 
 // $30 at or below $31 is the stronger finding: the range is empty, not merely
-// raised at the bottom, so it replaces the "may burn hotter" advice.
+// raised at the bottom, so it replaces the raised-$31 advice.
 function lowPowerWarning(
   controller: ControllerSettingsSnapshot,
   source: ReadinessSettingsSource,
@@ -294,7 +295,11 @@ function lowPowerWarning(
   return controller.minPowerS !== undefined && controller.minPowerS > 0
     ? {
         code: 'min-power-nonzero',
-        message: `Controller $31 minimum S is ${controller.minPowerS}. Low nonzero power values may burn hotter than expected.`,
+        message: laserMinPowerNonzeroMessage(
+          controller.minPowerS,
+          reportedMaxS,
+          powerRangeFirmware(source, firmwareKind),
+        ),
       }
     : null;
 }

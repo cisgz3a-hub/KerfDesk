@@ -85,6 +85,39 @@ export function laserPowerRangeEmptyMessage(
   }
 }
 
+/** `$31` above zero with `$30` above it (controller audit v4 E1-P3-2). Stock
+ *  GRBL's `spindle_compute_pwm_value` maps S linearly from `$31` up to `$30`
+ *  and gives any S > 0 at or below `$31` the lowest PWM step (1 of 255), so
+ *  every power below 100% burns weaker than set: at `$31=100`, `$30=1000`, 60%
+ *  runs at 55.7%. grblHAL maps the same way with its `$35` PWM minimum as the
+ *  floor (0.4% of full when `$35=0`); a raised `$35` lifts low powers instead.
+ *  https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/spindle_control.c#L192-L215
+ *  https://github.com/grblHAL/core/blob/4ec1ae44b857a70d2f9298344feac4b43ed0eb6b/spindle_control.c#L1045-L1078
+ *  A Job Review warning, never a Start guard (ADR-565). */
+export function laserMinPowerNonzeroMessage(
+  minS: number,
+  maxS: number | undefined,
+  firmware: PowerRangeFirmware,
+): string {
+  const lead = `Controller $31 minimum S is ${minS}.`;
+  const example =
+    maxS === undefined || maxS / 2 <= minS
+      ? ''
+      : ` (50% runs at about ${Math.round(((maxS / 2 - minS) / (maxS - minS)) * 100)}%)`;
+  const floorShare =
+    maxS === undefined ? '' : ` (powers up to ${Number(((minS / maxS) * 100).toFixed(1))}%)`;
+  const advice = 'Set $31=0 so power maps from zero.';
+  switch (firmware) {
+    case 'grbl':
+      return `${lead} Stock GRBL maps S from $31 up to $30, so every power below 100% burns weaker than set${example}, and any S at or below $31${floorShare} fires only at the lowest PWM step, about 0.4%. ${advice}`;
+    case 'grblhal':
+      return `${lead} grblHAL maps S from $31 up to $30, so with $35=0 every power below 100% burns weaker than set${example}, and any S at or below $31${floorShare} fires only at the $35 PWM minimum, about 0.4% when $35=0. A raised $35 lifts low powers instead. ${advice}`;
+    case 'fluidnc':
+    case 'unknown':
+      return `${lead} GRBL-family firmware maps S from $31 up to $30, so every power below 100% burns weaker than set${example}, and any S at or below $31${floorShare} fires only at the PWM minimum: about 0.4% on stock GRBL, or grblHAL's $35. ${advice}`;
+  }
+}
+
 export function spindleScaleMismatchMessage(
   controllerMaxPowerS: number,
   spindleMaxRpm: number,

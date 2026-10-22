@@ -103,13 +103,51 @@ describe('power-range-empty Job Review warning', () => {
     expect(rangeMessage(result)).toContain('$30=1000 is not above $31=1000');
   });
 
-  it('keeps "may burn hotter" for a nonzero $31 below $30', () => {
+  it('keeps the $31 advice for a nonzero $31 below $30', () => {
     const settings = dump([
       [30, '1000'],
       [31, '10'],
       [32, '1'],
     ]);
     expect(codes(runControllerReadiness(laserProject, settings))).toEqual(['min-power-nonzero']);
+  });
+
+  // Audit v4 E1-P3-2: stock GRBL maps S from $31 to $30, so a raised $31 burns
+  // every power below 100% weaker (60% at 55.7%) and S at or below $31 at the
+  // lowest PWM step. The old advice said low powers "may burn hotter".
+  it('says a raised $31 burns weaker on stock GRBL and names $35 on grblHAL', () => {
+    const settings = dump([
+      [30, '1000'],
+      [31, '100'],
+      [32, '1'],
+    ]);
+    const minMessage = (firmware: 'grbl-v1.1' | 'grblhal' | undefined) =>
+      runControllerReadiness(laserProject, settings, 'grbl-dollar', firmware).warnings.find(
+        (warning) => warning.code === 'min-power-nonzero',
+      )?.message;
+    expect(minMessage('grbl-v1.1')).toBe(
+      'Controller $31 minimum S is 100. Stock GRBL maps S from $31 up to $30, so every power below 100% burns weaker than set (50% runs at about 44%), and any S at or below $31 (powers up to 10%) fires only at the lowest PWM step, about 0.4%. Set $31=0 so power maps from zero.',
+    );
+    expect(minMessage('grblhal')).toContain('fires only at the $35 PWM minimum');
+    expect(minMessage('grblhal')).toContain('A raised $35 lifts low powers instead.');
+    expect(minMessage(undefined)).toContain("about 0.4% on stock GRBL, or grblHAL's $35");
+    for (const firmware of ['grbl-v1.1', 'grblhal', undefined] as const) {
+      expect(minMessage(firmware)).not.toContain('hotter');
+    }
+  });
+
+  it('leaves out the shares when $30 was not reported', () => {
+    const settings = dump([
+      [31, '100'],
+      [32, '1'],
+    ]);
+    const message = runControllerReadiness(
+      laserProject,
+      settings,
+      'grbl-dollar',
+      'grbl-v1.1',
+    ).warnings.find((warning) => warning.code === 'min-power-nonzero')?.message;
+    expect(message).toContain('burns weaker than set, and any S at or below $31 fires only');
   });
 
   it('describes grblHAL on/off spindle control instead of full power', () => {

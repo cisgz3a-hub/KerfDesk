@@ -106,11 +106,9 @@ describe('runControllerReadiness', () => {
     });
 
     expect(result.ok).toBe(true);
-    expect(result.warnings).toContainEqual({
-      code: 'min-power-nonzero',
-      message:
-        'Controller $31 minimum S is 10. Low nonzero power values may burn hotter than expected.',
-    });
+    const warning = result.warnings.find((issue) => issue.code === 'min-power-nonzero');
+    expect(warning?.message).toMatch(/^Controller \$31 minimum S is 10\. /);
+    expect(warning?.message).toContain('every power below 100% burns weaker than set');
   });
 
   it('uses the project max S value, not the default, when checking mismatches', () => {
