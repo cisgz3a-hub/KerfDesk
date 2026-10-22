@@ -126,7 +126,7 @@ describe('settingsMapToProfilePatch', () => {
   // grblHAL `$22` bit 3 is force set origin ("Set machine origin to 0",
   // settings.h#L714-L718). `$$` prints the whole bitfield, and lists `$384`,
   // only at COMPATIBILITY_LEVEL <= 1 (settings.c#L1775-L1782, system.c#L300-L317);
-  // above it `$22` is 0 or 1 and says nothing about force origin. ADR-375 Amd 2.
+  // above it `$22` is 0 or 1 and says nothing about force origin. ADR-375 Amd 3.
   it('reads grblHAL force set origin from a dump that prints the whole $22 bitfield', () => {
     expect(settingsMapToControllerSettings(grblHalSettingsMap({ 22: '9' }))).toMatchObject({
       homingEnabled: true,

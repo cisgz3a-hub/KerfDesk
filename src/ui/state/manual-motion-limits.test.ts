@@ -128,7 +128,7 @@ describe('manual-motion limits without a verified bed frame', () => {
   });
 
   // Homing ties MPos to the switch whatever `$20` says, so stock GRBL homed
-  // without a frame keeps the pull-off clear of the switch too (ADR-375 Amd 2).
+  // without a frame keeps the pull-off clear of the switch too (ADR-375 Amd 3).
   it('insets the switch edge on stock GRBL homed this session with soft limits off', () => {
     const base = softLimitedGrbl();
     const softOff = { ...base.controllerSettings, softLimitsEnabled: false };
@@ -141,7 +141,7 @@ describe('manual-motion limits without a verified bed frame', () => {
   });
 });
 
-// Controller audit v2 C3-P2-1 and C3-P2-2 (ADR-375 Amendment 2), from grblHAL's
+// Controller audit v2 C3-P2-1 and C3-P2-2 (ADR-375 Amendment 3), from grblHAL's
 // own `$$` (`$20=1 $21=1 $22=1 $23=0 $27=2 $130=400 $131=300`, `$384` listed).
 // grblHAL core d7aaee3: a homed axis's envelope is [-$130 + $27, -$27] for every
 // `$23` without force origin, [-$130 + $27, 0] / [0, $130 - $27] with it, and a

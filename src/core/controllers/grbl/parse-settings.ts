@@ -80,7 +80,7 @@ export type ControllerSettingsSnapshot = Partial<
   readonly g92PersistenceDisabled?: boolean;
   // grblHAL `$22` bit 3 "Set machine origin to 0" (force set origin), read
   // only from a dump that prints the whole `$22` bitfield (ADR-375
-  // Amendment 2); undefined for stock GRBL and FluidNC, which print 0 or 1.
+  // Amendment 3); undefined for stock GRBL and FluidNC, which print 0 or 1.
   readonly homingForceSetOrigin?: boolean;
   // `$100` / `$101` / `$102`: one step's length bounds how far the machine position a
   // status report shows can sit from the firmware's own (ADR-375).
