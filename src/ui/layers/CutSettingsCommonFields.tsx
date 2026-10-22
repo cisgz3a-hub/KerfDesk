@@ -1,9 +1,10 @@
 import {
   DEFAULT_PERFORATION_CUT_MM,
   DEFAULT_PERFORATION_SKIP_MM,
+  MIN_PERFORATION_MM,
 } from '../../core/job/operation-cut-extras';
 import type { Layer, LayerMode } from '../../core/scene';
-import { MAX_OVERCUT_MM, MAX_PERFORATION_MM, MIN_PERFORATION_MM } from './cut-settings-draft';
+import { MAX_OVERCUT_MM, MAX_PERFORATION_MM } from './cut-settings-draft';
 import { useStore } from '../state';
 import { CutPowerModeField } from './CutPowerModeField';
 import { Field, NumberInput } from './CutSettingsInputs';

@@ -61,6 +61,10 @@ export type ControllerSettingsSnapshot = Partial<
   readonly homingEnabled?: boolean;
   readonly homingDirectionMask?: number;
   readonly statusReportMask?: number;
+  // This `$$` shows `$10` whole, as grblHAL at COMPATIBILITY_LEVEL 0 or 1
+  // stores and prints it, so its upper bits are what the reports carry
+  // (statusReportMaskFields).
+  readonly statusReportMaskIsFull?: true;
   readonly reportInches?: boolean;
   readonly homingPullOffMm?: number;
   readonly zMaxFeed?: number;
@@ -183,7 +187,6 @@ export function settingsMapToControllerSettings(
   const hardLimitsEnabled = grblEnableBit(parseFiniteNumber(map.get(21)));
   const homingEnabled = grblEnableBit(parseFiniteNumber(map.get(22)));
   const homingDirectionMask = parseNonNegativeInteger(map.get(23));
-  const statusReportMask = parseNonNegativeInteger(map.get(10));
   const reportInches = parseBooleanSetting(map, 13);
   const homingPullOffMm = parseNonNegativeNumber(map.get(27));
   const zMaxFeed = parsePositiveNumber(map.get(112));
@@ -196,7 +199,7 @@ export function settingsMapToControllerSettings(
     ...(hardLimitsEnabled === undefined ? {} : { hardLimitsEnabled }),
     ...(homingEnabled === undefined ? {} : { homingEnabled }),
     ...(homingDirectionMask === undefined ? {} : { homingDirectionMask }),
-    ...(statusReportMask === undefined ? {} : { statusReportMask }),
+    ...statusReportMaskFields(map),
     ...(reportInches === undefined ? {} : { reportInches }),
     ...(homingPullOffMm === undefined ? {} : { homingPullOffMm }),
     ...(zMaxFeed === undefined ? {} : { zMaxFeed }),
@@ -274,6 +277,37 @@ function forceSetOriginField(
   const flags = parseNonNegativeInteger(map.get(22));
   if (flags === undefined || (flags <= 1 && !map.has(384))) return {};
   return { homingForceSetOrigin: (flags & 8) !== 0 };
+}
+
+// `$10`, and whether this dump shows it whole. grblHAL at COMPATIBILITY_LEVEL 0
+// (its default) or 1 stores the whole `$10` and prints it; above level 1 it
+// keeps the upper bits from its build and prints only bits 0 and 1
+// (settings.c). Such a level's `$$` lists only the stock GRBL settings
+// (system.c, report.c), so a `$10` above 3, or any other setting in the dump,
+// shows the whole mask. Stock GRBL lists only those settings too.
+// https://github.com/grblHAL/core/blob/4ec1ae44b857a70d2f9298344feac4b43ed0eb6b/settings.c#L862-L872
+// https://github.com/grblHAL/core/blob/4ec1ae44b857a70d2f9298344feac4b43ed0eb6b/settings.c#L1739-L1745
+// https://github.com/grblHAL/core/blob/4ec1ae44b857a70d2f9298344feac4b43ed0eb6b/system.c#L300-L318
+// https://github.com/grblHAL/core/blob/4ec1ae44b857a70d2f9298344feac4b43ed0eb6b/report.c#L503-L507
+function statusReportMaskFields(
+  map: ReadonlyMap<number, string>,
+): Pick<ControllerSettingsSnapshot, 'statusReportMask' | 'statusReportMaskIsFull'> {
+  const statusReportMask = parseNonNegativeInteger(map.get(10));
+  if (statusReportMask === undefined) return {};
+  const isFull = statusReportMask > 3 || [...map.keys()].some((id) => !isStockGrblSetting(id));
+  return isFull ? { statusReportMask, statusReportMaskIsFull: true } : { statusReportMask };
+}
+
+// $0-$7, $10-$13, $20-$27, $30-$32 and the per-axis steps, rate, acceleration
+// and travel ($100-$139): grblHAL's legacy settings, a superset of stock GRBL's.
+function isStockGrblSetting(id: number): boolean {
+  return (
+    (id >= 0 && id <= 7) ||
+    (id >= 10 && id <= 13) ||
+    (id >= 20 && id <= 27) ||
+    (id >= 30 && id <= 32) ||
+    (id >= 100 && id <= 139)
+  );
 }
 
 function stepsPerMmFields(

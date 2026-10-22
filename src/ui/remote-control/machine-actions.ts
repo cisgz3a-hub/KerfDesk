@@ -1,4 +1,6 @@
 import { connectOptionsForDevice } from '../commands/connect-options';
+import { placementAfterSetOrigin } from '../laser/set-origin-placement';
+import { liveZeroZOverwriteWarning, REMOTE_ZERO_Z_REFUSAL } from '../laser/zero-z-guard';
 import { pauseAutoConnect } from '../state/auto-connect-session';
 import { isActiveJob, setupCommandBlockMessage } from '../state/laser-store-helpers';
 import { hasPendingControllerWrite } from '../state/laser-start-queue-fence';
@@ -127,18 +129,28 @@ export async function executeHome(operation: OwnedMachineOperation): Promise<voi
   );
 }
 
+/** The PC's Zero Z and Set origin, with the guards the PC wraps them in. */
 export async function executeOrigin(
   input: Extract<MachineCommand, { readonly command: 'set_work_origin' }>,
   operation: OwnedMachineOperation,
+  context: MachineExecutionContext,
 ): Promise<void> {
+  const z = input.args.axes === 'z';
+  // The PC asks before Zero Z replaces an established work Z0. A remote caller
+  // cannot answer that question, so it is refused before anything is written.
+  if (z && liveZeroZOverwriteWarning(useLaserStore.getState()) !== null)
+    throw new MachineRefusal(REMOTE_ZERO_Z_REFUSAL);
+  const store = context.options.store ?? useStore;
   await settle(
     operation,
-    () =>
-      input.args.axes === 'z'
-        ? useLaserStore.getState().zeroZHere()
-        : useLaserStore.getState().setOriginHere(),
+    z
+      ? () => useLaserStore.getState().zeroZHere()
+      : async () => {
+          await useLaserStore.getState().setOriginHere();
+          placementAfterSetOrigin(operation.documentEpoch, store);
+        },
     'The origin could not be set. Check the machine on the PC.',
-    input.args.axes === 'z' ? 'Z zeroed here.' : 'Work origin set here.',
+    z ? 'Z zeroed here.' : 'Work origin set here.',
   );
 }
 

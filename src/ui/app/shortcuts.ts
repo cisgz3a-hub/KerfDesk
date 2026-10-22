@@ -94,7 +94,7 @@ export type TransformCtx = {
   readonly selectedObjectId: string | null;
   readonly selectedPathNode: PathNodeRef | null;
   readonly applyObjectTransform: (id: string, transform: Transform) => void;
-  readonly nudgeSelection: (dx: number, dy: number) => void;
+  readonly nudgeSelection: AppState['nudgeSelection'];
   readonly nudgeSelectedPathNode: (dx: number, dy: number) => void;
   readonly flipSelection: (axis: SelectionFlipAxis) => void;
   // The Settings window's nudge distances; the defaults when absent.

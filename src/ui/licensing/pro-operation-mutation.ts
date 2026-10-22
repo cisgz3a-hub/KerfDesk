@@ -52,12 +52,19 @@ export function proOperationMutationSetter<State extends ProjectEditState>(
     const before = get();
     const restoreUndoName = saveUndoStepName(before.project);
     const patch = typeof update === 'function' ? update(before) : update;
+    // A later guard in the chain (canvas numbering) may still refuse the patch,
+    // so success is read from the store, not assumed.
+    const landed = (): boolean =>
+      patch.project === undefined ||
+      patch.project === before.project ||
+      get().project !== before.project;
     const feature =
       patch.project === undefined || proFeaturesUnlocked()
         ? null
         : featureForEdit(before.project, patch.project);
     if (feature === null) {
       set(() => patch);
+      if (!landed()) return false;
       onCommitted?.();
       return true;
     }
@@ -78,10 +85,10 @@ export function proOperationMutationSetter<State extends ProjectEditState>(
           return {};
         commitUndoName();
         committed = true;
-        applied = true;
         return patch;
       });
-      if (committed) onCommitted?.();
+      applied = committed && landed();
+      if (applied) onCommitted?.();
     });
     return applied;
   };

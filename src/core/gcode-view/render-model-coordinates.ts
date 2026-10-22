@@ -2,7 +2,7 @@ import { parseGrblCncCoordinate } from '../cnc/coordinate-representation';
 import type { RenderModal } from './render-model-words';
 
 export function grblCoordinateWord(letter: string, text: string): number {
-  return 'XYZIJR'.includes(letter) ? parseGrblCncCoordinate(text) : Number.parseFloat(text);
+  return 'XYZIJKR'.includes(letter) ? parseGrblCncCoordinate(text) : Number.parseFloat(text);
 }
 
 export function resolveTarget(

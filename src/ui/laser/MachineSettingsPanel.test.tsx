@@ -7,6 +7,7 @@ import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import { PlatformProvider } from '../app/platform-context';
 import { useLaserStore, type LaserState } from '../state/laser-store';
 import { resetStore } from '../state/test-helpers';
+import { useToastStore } from '../state/toast-store';
 import { MachineSettingsPanel } from './MachineSettingsPanel';
 import type { MachineSettingsPresentationContext } from './machine-settings-presentation';
 
@@ -263,6 +264,49 @@ describe('MachineSettingsPanel', () => {
         }),
       ]);
     } finally {
+      await cleanup();
+    }
+  });
+
+  it('says before and after export that the backup holds controller passwords (audit C4-P3-7)', async () => {
+    const originalPushToast = useToastStore.getState().pushToast;
+    const pushToast = vi.fn();
+    useToastStore.setState({ pushToast });
+    const platform = makePlatform(async () => ({
+      displayName: 'settings.lfgrbl-settings.json',
+      write: async () => undefined,
+    }));
+    useLaserStore.setState({
+      grblSettingsRows: settingsMapToRows(new Map([[30, '1000']])),
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    const { host, cleanup } = await renderPanel(platform);
+    try {
+      expect(host.textContent).not.toContain('passwords');
+      await act(async () => {
+        useLaserStore.setState({
+          grblSettingsRows: settingsMapToRows(
+            new Map([
+              [30, '1000'],
+              [533, 'mqttSecret9'],
+            ]),
+          ),
+        } as Partial<ReturnType<typeof useLaserStore.getState>>);
+      });
+      expect(host.textContent).toContain(
+        'An exported backup keeps them in plain text so a restore can put them back',
+      );
+      await act(async () => {
+        button(host, 'Export backup').click();
+        await Promise.resolve();
+      });
+      await vi.waitFor(() =>
+        expect(pushToast).toHaveBeenCalledWith(
+          expect.stringContaining("holds the controller's passwords in plain text"),
+          'warning',
+        ),
+      );
+    } finally {
+      useToastStore.setState({ pushToast: originalPushToast });
       await cleanup();
     }
   });
