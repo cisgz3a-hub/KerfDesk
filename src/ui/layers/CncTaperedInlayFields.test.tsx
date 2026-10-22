@@ -1,12 +1,13 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createLayer,
   createProject,
   DEFAULT_CNC_LAYER_SETTINGS,
   DEFAULT_CNC_MACHINE_CONFIG,
 } from '../../core/scene';
+import { EditionContext, UNRESTRICTED_EDITION } from '../licensing/edition';
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
 import { CncLayerFields } from './CncLayerFields';
@@ -88,6 +89,23 @@ describe('canonical linked tapered inlay editor', () => {
     expect(settings?.taperedInlay).toBeUndefined();
     expect(settings?.inlayPocketDepthMm).toBe(2.7);
     expect(settings?.depthMm).toBe(8);
+  });
+
+  it('marks the tapered pair Pro in Free and asks before choosing it (ADR-540 Amendment 6)', async () => {
+    const requestPro = vi.fn(() => false);
+    const free = { ...UNRESTRICTED_EDITION, licensed: true, pro: false, requestPro };
+    await act(async () =>
+      root.render(
+        <EditionContext.Provider value={free}>
+          <ConnectedFields />
+        </EditionContext.Provider>,
+      ),
+    );
+    const option = host.querySelector('option[value="tapered-v"]');
+    expect(option?.textContent).toBe('Tapered V-bit pair (Pro)');
+    await choose('tapered-v');
+    expect(requestPro).toHaveBeenCalledExactlyOnceWith('vcarve', expect.any(Function));
+    expect(useStore.getState().project.scene.layers[0]?.cnc?.taperedInlay).toBeUndefined();
   });
 
   it('updates linked axial dimensions without changing the radial gap', async () => {

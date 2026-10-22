@@ -1,6 +1,7 @@
 import {
   operationIdsForObject,
   polylineToCurveSubpath,
+  type CncLayerSettings,
   type ColoredPath,
   type Layer,
   type Project,
@@ -12,12 +13,18 @@ import type { ProFeature } from './pro-features';
 
 /** The operation choices that need Pro when created or assigned to new artwork. */
 export function operationProFeature(operation: Pick<Layer, 'cnc'>): ProFeature | null {
-  if (operation.cnc?.cutType === 'v-carve') return 'vcarve';
-  if (operation.cnc?.cutType === 'relief-rough' || operation.cnc?.cutType === 'relief-finish')
-    return 'relief';
-  if (operation.cnc?.cutType === 'pocket' && operation.cnc.pocketStrategy === 'adaptive')
-    return 'adaptive-clearing';
-  return null;
+  // Archived scenes pass raw layers here, so a null `cnc` must not throw.
+  const cnc = operation.cnc ?? null;
+  if (cnc === null) return null;
+  if (cnc.cutType === 'v-carve' || isTaperedInlay(cnc)) return 'vcarve';
+  if (cnc.cutType === 'relief-rough' || cnc.cutType === 'relief-finish') return 'relief';
+  return cnc.cutType === 'pocket' && cnc.pocketStrategy === 'adaptive' ? 'adaptive-clearing' : null;
+}
+
+// A tapered V-bit inlay cuts both halves with V-carve passes (ADR-540
+// Amendment 6); the straight end-mill pair stays Free.
+function isTaperedInlay(cnc: CncLayerSettings): boolean {
+  return cnc.cutType === 'inlay-pair' && cnc.taperedInlay !== undefined;
 }
 
 /**
