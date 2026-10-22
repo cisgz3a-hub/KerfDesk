@@ -540,3 +540,23 @@ MINSERT instances as line pieces, since the few whose ends meet are joined;
 nested contours, dangling lines and 20,000 hatch lines across one span; `core/job/remove-cut-overlaps.test.ts` the kept outline with and
 without a merge tolerance and its absence without leads; `ui/laser/laser-lead-warnings.test.ts` the
 wording. Not qualified on a machine.
+
+### Amendment 9 — bounded work and collinear overlaps (2026-10-22)
+
+1. **Containment in a large ring goes through its edge index.** A ring with more than 32 points is
+   asked whether it holds a probe point through a `PolygonEdgeIndex` built once, so a whole outline
+   that thousands of pieces lie in costs each piece a short lookup, not a scan of its edges.
+2. **A lead running along its own contour is a crossing.** A lead step that runs along one of its
+   contour's edges touches it over the whole stretch they share; both ends of that stretch are
+   measured from the join, so riding the contour more than 0.2 mm from the join rejects the lead.
+3. **Whole outlines stay copies of each other.** When two operations cut a contour whole and a third
+   splits it, each whole outline pairs with the other (a piece pairs only with a piece), so their
+   identical leads still ignore each other.
+4. **A contour's grid has a total budget.** Its edges take at most 2,000,000 grid places in all; the
+   edges past that are checked by every query, so unit-mismatched artwork with many very long edges
+   cannot exhaust memory.
+
+Verification: `core/job/laser-lead-own-crossing.test.ts` rejects a lead along its contour's edge
+past the join and allows one beside it; `core/job/laser-lead-sides.test.ts` keeps two whole cuts
+copies beside a split one; `core/job/laser-lead-pieces.test.ts` tests containment in a 400-point
+ring. The first two failed before this amendment.
