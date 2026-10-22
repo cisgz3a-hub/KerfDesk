@@ -52,7 +52,7 @@ export function importLightBurnClbDocument(
   const warnings: string[] = [];
   const entries = entryElements.flatMap((entry, index) => {
     const parsed = parseEntry(entry, index, sourceName, unknownFields, warnings);
-    if (parsed !== null) return [parsed];
+    if (parsed !== null) return parsed;
     warnings.push(`Entry ${index + 1} was skipped because speed or power was missing.`);
     return [];
   });
@@ -76,33 +76,49 @@ export function importLightBurnClbDocument(
   };
 }
 
+// One preset per entry, or two for a Fill+Line entry: a preset holds one mode.
 function parseEntry(
   entry: Element,
   index: number,
   sourceName: string,
   unknownFields: Set<string>,
   warnings: string[],
-): MaterialPreset | null {
+): ReadonlyArray<MaterialPreset> | null {
   const setting = firstDescendant(entry, ['cutsetting', 'cutsetting_0', 'cutsettings']) ?? entry;
   collectUnknownFields(setting, unknownFields);
   const speedMmSec = numberField(setting, ['speed', 'speedmmsec']);
   const power = numberField(setting, ['maxpower', 'power']);
   if (speedMmSec === null || power === null) return null;
-  const mode = operationMode(field(setting, ['type', 'mode', 'cutmode']));
   const materialName = ancestorAttribute(entry, ['material'], ['name']) ?? 'Imported material';
   const thickness = numberAttribute(entry, ['thickness']);
   const description = attribute(entry, ['desc', 'description', 'title']) ?? `Entry ${index + 1}`;
-  const overscanMm =
-    mode === 'fill' ? importedOverscanMm(setting, speedMmSec, description, warnings) : 0;
-  return {
-    id: `${slug(materialName)}-${slug(description)}-${index + 1}`,
-    materialName,
-    ...entryIdentity(entry, thickness, description),
-    operation: mode === 'line' ? 'cut' : 'engrave',
-    description: `${description} (imported from ${sourceName})`,
-    recipe: importedRecipe(setting, mode, speedMmSec, power, overscanMm),
-    revision: 'lightburn-clb-import-v1',
+  const entryName = `Entry ${index + 1} (${materialName}, “${description}”)`;
+  const mode = operationMode(field(setting, ['type', 'mode', 'cutmode']), entryName, warnings);
+  const preset = (
+    presetMode: MaterialRecipe['mode'],
+    name: string,
+    idSuffix: string,
+  ): MaterialPreset => {
+    const overscanMm =
+      presetMode === 'fill' ? importedOverscanMm(setting, speedMmSec, description, warnings) : 0;
+    return {
+      id: `${slug(materialName)}-${slug(description)}-${index + 1}${idSuffix}`,
+      materialName,
+      ...entryIdentity(entry, thickness, name),
+      operation: presetMode === 'line' ? 'cut' : 'engrave',
+      description: `${name} (imported from ${sourceName})`,
+      recipe: importedRecipe(setting, presetMode, speedMmSec, power, overscanMm),
+      revision: 'lightburn-clb-import-v1',
+    };
   };
+  if (mode !== 'fill+line') return [preset(mode, description, '')];
+  // Fill+Line fills the shapes, then cuts their outlines, as a .lbrn layer of
+  // the mode opens as a Fill and then a Line operation (ADR-388 Amendment 1).
+  const line = `${description} (Line)`;
+  warnings.push(
+    `${entryName} is a LightBurn Fill+Line setting, so it opened as a Fill preset and a Line preset, “${line}”. Apply the Line to a second operation that runs after the Fill to cut the outlines.`,
+  );
+  return [preset('fill', description, ''), preset('line', line, '-line')];
 }
 
 // A saved library entry carries exactly one of a positive thickness or a title
@@ -268,10 +284,44 @@ function elementsByName(document: Document, name: string): Element[] {
     (element) => normalized(element.tagName) === target,
   );
 }
-function operationMode(raw: string | null): MaterialRecipe['mode'] {
-  const value = raw?.toLowerCase() ?? '';
-  if (value.includes('image')) return 'image';
-  if (value.includes('scan') || value.includes('fill')) return 'fill';
+type ClbMode = MaterialRecipe['mode'] | 'fill+line';
+
+// A setting's `type` is LightBurn's layer mode, read as a whole name as the
+// .lbrn importer reads it (ADR-388): Cut is a Line, Scan a Fill and Scan+Cut a
+// Fill+Line. The other names older libraries write stay readable.
+const CLB_MODES: ReadonlyMap<string, ClbMode> = new Map([
+  ['cut', 'line'],
+  ['line', 'line'],
+  ['scan', 'fill'],
+  ['fill', 'fill'],
+  ['image', 'image'],
+  ['scan+cut', 'fill+line'],
+  ['fill+line', 'fill+line'],
+]);
+
+const MODE_NAMES: Readonly<Record<MaterialRecipe['mode'], string>> = {
+  line: 'Line',
+  fill: 'Fill',
+  image: 'Image',
+};
+
+// A setting with no type is LightBurn's default, Line. Any other name is
+// named in the report, with the mode it opened as.
+function operationMode(raw: string | null, entryName: string, warnings: string[]): ClbMode {
+  const type = raw?.trim() ?? '';
+  const known = CLB_MODES.get(type.toLowerCase().replace(/\s+/g, ''));
+  if (known !== undefined) return known;
+  if (type === '') return 'line';
+  const mode = guessedMode(type.toLowerCase());
+  warnings.push(
+    `${entryName}: LightBurn mode “${type}” has no KerfDesk equivalent, so it opened as a ${MODE_NAMES[mode]} preset. Check its settings before using it.`,
+  );
+  return mode;
+}
+
+function guessedMode(type: string): MaterialRecipe['mode'] {
+  if (type.includes('image')) return 'image';
+  if (type.includes('scan') || type.includes('fill')) return 'fill';
   return 'line';
 }
 function xmlDepth(element: Element): number {
