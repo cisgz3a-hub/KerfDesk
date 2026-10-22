@@ -270,9 +270,15 @@ describe('describeAutofocusResult', () => {
     expect(result.message).toMatch(/firmware/i);
   });
 
-  it('maps error:9 to the no-probe-pin hint', () => {
+  it('maps error:9 to the alarm-or-jog lockout it means, not a missing probe', () => {
+    // gnea/grbl error_codes_en_US.csv row 9; a missing probe is error:20
+    // (controller audit v3 D2-P3-1).
     const result = describeAutofocusResult({ kind: 'rejected', errorCode: 9, raw: 'error:9' });
-    expect(result.message).toMatch(/probe pin/i);
+    expect(result.message).toMatch(/Alarm or Jog/);
+    expect(result.message).not.toMatch(/probe/i);
+    expect(
+      describeAutofocusResult({ kind: 'rejected', errorCode: 20, raw: 'error:20' }).message,
+    ).toMatch(/no probe input/);
   });
 
   it('maps unrecognized error responses to the raw controller reply', () => {

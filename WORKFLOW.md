@@ -1598,10 +1598,11 @@ the completed physical Frame is the spatial source of truth.
 #### Error — file is not a valid .lf2
 - Modal: `Could not open <filename>: not a valid KerfDesk project.` No load.
 
-#### Edge — the file carries an Auto-focus command (ADR-400 Amendment 1)
-1. On load, an Auto-focus command that is not a focus routine (a G0–G3 move, an X/Y word, an
-   M-code, `S` above 0, or a `$` settings write) is cleared, as a refused
-   positioning-light command is. Auto-focus then shows **Set up auto-focus**.
+#### Edge — the file carries an Auto-focus command (ADR-400 Amendments 1 and 2)
+1. On load, an Auto-focus command that is not a focus routine is cleared, as a refused
+   positioning-light command is. That covers a G0–G3 move, an X/Y word, an M-code, `S` above 0,
+   a `$` settings write, a probe without its own feed of at most 150 mm/min, a `G38.3`/`G38.5`
+   probe and `G30`. Auto-focus then shows **Set up auto-focus**.
 2. A file for the machine already in use (same profile, name and bed) keeps that machine's own
    Auto-focus command from Machine Setup. When the file's command differs, an info toast says
    `This file's Auto-focus command was not used: Auto-focus keeps your machine's own command from
@@ -1609,9 +1610,15 @@ the completed physical Frame is the spatial source of truth.
 3. A file for another machine brings its vetted command with the rest of that machine, behind the
    machine notice; **Keep current machine** restores the current command too.
 4. Whatever its source, the Auto-focus button sends only a focus routine: `$HZ1` on the Falcon
-   A1 Pro, `$HZ` on grblHAL or FluidNC, a Z-only `G38.2`–`G38.5` probe, or `G30` on Marlin or
-   Smoothieware. Stock GRBL gets no `$H…` command, which would leave it stuck homing. Any M-code and
-   anything else is refused with its reason and nothing is sent.
+   A1 Pro, `$HZ` on grblHAL or FluidNC, or a Z-only `G38.2`/`G38.4` probe with its own feed of at
+   most 150 mm/min, for example `G38.2 Z-10 F100`. Its Z target is a work-coordinate position
+   (G90), not a distance. Without F the controller would probe at the last job's feed. `G38.3` and
+   `G38.5` end silently when they miss, and `G30` does not focus on any supported firmware, so
+   all three are refused. Stock GRBL gets no `$H…` command, which would leave it stuck homing. Any
+   M-code and anything else is refused with its reason and nothing is sent.
+5. When the controller answers `error:9`, it was in Alarm or Jog: clear the alarm or let the jog
+   finish, then retry. `error:20` means the firmware has no probe input or does not support the
+   command.
 
 #### Edge — file is a valid .lf2 but references a device profile not on this machine
 - Project loads with the embedded device profile, adopted wholesale (`deserializeProject`).
