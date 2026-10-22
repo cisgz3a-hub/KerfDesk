@@ -7917,6 +7917,9 @@ as the pane's design record.
    **Box slots** operation pockets the divider slots at the same depth.
    The pocket clears every slot, so no loose piece is left and no tab
    bridges a slot; clearing runs before any outline frees a panel.
+   Both operations cut with the active bit the reliefs were sized for.
+   Where a machine starter would pin its own cutter instead, they follow
+   the active bit and keep the starter's feeds as retained values.
 
 #### Error — relief tool larger than a finger cell
 1. Validation error per F-K2; generation disabled until resolved.

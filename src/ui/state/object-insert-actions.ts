@@ -8,15 +8,13 @@ import { applySvgFragmentImport, applySvgFragmentReimport } from './svg-fragment
 import {
   findRegistrationBoxes,
   type EmbeddedFont,
-  type Layer,
-  type Project,
   type SceneObject,
   type ShapeObject,
   type TextObject,
-  machineKindOf,
 } from '../../core/scene';
 import {
   applyInsertBoxPanels,
+  cutFreshCncOperationsWithActiveBit,
   type InsertablePart,
   type InsertableSheet,
 } from './box-insert-mutation';
@@ -34,12 +32,7 @@ import { saveUndoStepName } from './undo-step-names';
 import { prepareProjectInsertion, reportProjectInsertionFailure } from './project-insertion-budget';
 import type { DesignApplyRecord } from './design-apply-record';
 import { createRegistrationBox, createRegistrationCircle } from '../../core/shapes';
-import { applyLayerDefaultSettings } from '../layers/layer-default-settings';
-import { seedFreshCncLayer } from './cnc-auto-seeding';
-import { seedFreshLaserLayer } from './laser-recipe-seeding';
-import type { MaterialLibraryDocument } from '../../io/material-library';
-import type { CncLiveCapsState } from './cnc-live-caps-actions';
-import { defaultSettingsForOperation, type LayerDefaultsState } from './layer-default-actions';
+import { applyLayerDefaultsToFreshLayers, svgStructuralDefaults } from './fresh-operation-seeding';
 import type { AppState } from './store';
 import { fitAllObjects } from './viewport-actions';
 import {
@@ -218,15 +211,15 @@ function insertBoxPanelsAction(set: Setter): AppState['insertBoxPanels'] {
   return (panels: ReadonlyArray<InsertablePart>, sheet: InsertableSheet) => {
     set((state) => {
       const next = applyInsertBoxPanels(state, panels, sheet);
-      return next === null
-        ? state
-        : applyLayerDefaultsToFreshLayers(
-            state.project.scene.layers,
-            next,
-            state.layerDefaults,
-            state.cncLiveCaps,
-            state.materialLibrary,
-          );
+      if (next === null) return state;
+      const seeded = applyLayerDefaultsToFreshLayers(
+        state.project.scene.layers,
+        next,
+        state.layerDefaults,
+        state.cncLiveCaps,
+        state.materialLibrary,
+      );
+      return cutFreshCncOperationsWithActiveBit(state.project.scene.layers, seeded);
     });
   };
 }
@@ -315,47 +308,6 @@ function applyTextAndEmbeddedFont(
   return { ...next, project };
 }
 
-export function applyLayerDefaultsToFreshLayers<T extends { readonly project: Project }>(
-  previousLayers: ReadonlyArray<Layer>,
-  result: T,
-  defaults: LayerDefaultsState,
-  liveCaps: CncLiveCapsState['cncLiveCaps'],
-  materialLibrary: MaterialLibraryDocument | null,
-): T {
-  const existing = new Set(previousLayers.map((layer) => layer.id));
-  const machine = result.project.machine;
-  let changed = false;
-  const layers = result.project.scene.layers.map((layer) => {
-    if (existing.has(layer.id)) return layer;
-    const settings = defaultSettingsForOperation(defaults, result.project.scene.objects, layer);
-    const withDefaults =
-      Object.keys(settings).length === 0
-        ? layer
-        : applyLayerDefaultSettings(layer, settings, machineKindOf(machine));
-    // Seed fresh CNC layers from the project stock material (ADR-112), and
-    // fresh laser layers from the job material's best recipe (ADR-496); each
-    // is a no-op when no material is chosen.
-    const seeded =
-      machine?.kind === 'cnc'
-        ? seedFreshCncLayer(withDefaults, {
-            device: result.project.device,
-            machine,
-            liveCaps,
-          })
-        : seedFreshLaserLayer(withDefaults, result.project, materialLibrary);
-    if (seeded !== layer) changed = true;
-    return seeded;
-  });
-  if (!changed) return result;
-  return {
-    ...result,
-    project: {
-      ...result.project,
-      scene: { ...result.project.scene, layers },
-    },
-  };
-}
-
 function svgFragmentActions(
   set: Setter,
   get: Getter,
@@ -396,21 +348,5 @@ function svgFragmentActions(
       if (outcome !== null) fitAllObjects(get);
       return outcome;
     },
-  };
-}
-
-// Authored SVG fill/stroke and decoded image density determine structural
-// settings. Saved speed/power/CNC preferences must not turn an image into Line.
-function svgStructuralDefaults(defaults: LayerDefaultsState): LayerDefaultsState {
-  const settings = (value: NonNullable<LayerDefaultsState['allColors']>) => {
-    const { mode: _mode, linesPerMm: _density, ...rest } = value;
-    return rest;
-  };
-  return {
-    ...defaults,
-    allColors: defaults.allColors === null ? null : settings(defaults.allColors),
-    byColor: Object.fromEntries(
-      Object.entries(defaults.byColor).map(([key, value]) => [key, settings(value)]),
-    ),
   };
 }
