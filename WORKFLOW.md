@@ -2324,8 +2324,8 @@ minimum target size.
    bound still applies; the CNC-only Door progress extension does not.
 
 #### Success — generic CNC resume (ADR-180 amendment 2)
-1. The CNC **Resume** button is enabled alongside **ABORT JOB**. Its tooltip and the paused rail carry an advisory stating that Resume restarts the spindle, waits a fixed spin-up delay (4 s in stock GRBL), then continues the same line from where it stopped — and that the cutter is still in the cut, so it spins back up **engaged**. On a deep or full-width pass, check the bit before resuming. That advisory needs the controller to have reported `$32=0`: with laser mode on (`$32=1`), it says instead that Resume restarts motion at once with **no** spin-up and recommends **ABORT JOB** and recovery from the interrupted-job card. With `$32` unreported, it says the mode is unconfirmed and Resume **may** restart motion without spindle spin-up, and recommends verifying `$32=0` before resuming or aborting and recovering (ADR-180 Amendment 5). Job Review opens that warning's full text for a router job whose `$32` is on or unreported. When a GRBL or grblHAL controller reports `$32=1`, that warning carries **Send $32=0**: after a confirm, it writes the setting through Machine Settings' guarded write, reads `$$` back to verify, and the warning clears (ADR-180 Amendment 6). FluidNC, whose `$32` follows its YAML spindle type, gets no button.
-2. On Resume the store writes realtime `~` and waits for a fresh same-session report proving `Run` or `Idle` before refilling the stream — the **door-confirmed** branch, selected by driver capability (`realtime.safetyDoor`) rather than machine kind. GRBL restores spindle and coolant and holds motion for `SAFETY_DOOR_SPINDLE_DELAY` (4.0 s in stock `config.h`) so the cutter is back at speed before the interrupted move continues. In laser mode (`$32=1`) GRBL and grblHAL skip that delay, and the stopped cutter moves the instant power returns (CNC audit MC-1).
+1. The CNC **Resume** button is enabled alongside **ABORT JOB**. Its tooltip and the paused rail carry an advisory stating that Resume restarts the spindle, waits a fixed spin-up delay (4 s in stock GRBL), then continues the same line from where it stopped — and that the cutter is still in the cut, so it spins back up **engaged**. On a deep or full-width pass, check the bit before resuming. That advisory needs the controller to have reported `$32=0`: with laser mode on (`$32=1`), it says instead that Resume restarts motion at once with **no** spin-up and recommends **ABORT JOB** and recovery from the interrupted-job card. With `$32` unreported, it says the mode is unconfirmed and Resume **may** restart motion without spindle spin-up, and recommends verifying `$32=0` before resuming or aborting and recovering (ADR-180 Amendment 5). Job Review opens that warning's full text for a router job whose `$32` is on or unreported. When a GRBL or grblHAL controller reports `$32=1`, that warning carries **Send $32=0**: after a confirm, it writes the setting through Machine Settings' guarded write, reads `$$` back to verify, and the warning clears (ADR-180 Amendment 6). FluidNC, whose `$32` follows its YAML spindle type, gets no button. On FluidNC the advisory is its own (ADR-180 Amendment 7). KerfDesk never lifts the bit there (it stays in the cut unless parking is on in FluidNC's own configuration), and FluidNC's door resume waits only the spindle's `spinup_ms` from its YAML configuration. That is 0 unless set; an RS485 VFD that reports its speed is waited for. So the bit can be fed through the cut while it is still speeding up. The advisory recommends **ABORT JOB** and recovery from the interrupted-job card, or setting `spinup_ms` in the spindle's section of the FluidNC configuration to the spindle's time to full speed. With `$32=1` (a Laser spindle type), it says Resume has no spin-up, and to configure a router spindle in the YAML.
+2. On Resume the store writes realtime `~` and waits for a fresh same-session report proving `Run` or `Idle` before refilling the stream — the **door-confirmed** branch, selected by driver capability (`realtime.safetyDoor`) rather than machine kind. GRBL restores spindle and coolant and holds motion for `SAFETY_DOOR_SPINDLE_DELAY` (4.0 s in stock `config.h`) so the cutter is back at speed before the interrupted move continues. In laser mode (`$32=1`) GRBL and grblHAL skip that delay, and the stopped cutter moves the instant power returns (CNC audit MC-1). FluidNC restores the spindle with no delay of its own and waits only the spindle's `spinup_ms` (controller audit v3 D4-P2-2).
 3. Fresh post-command same-session `Door:3` reports keep **JOB RESUMING** live without refilling.
    Two seconds of silence fails; a non-resettable 30-second maximum bounds custom firmware. Only
    fresh `Run`/`Idle` proof releases host refill. Every immediately stageable owned stream write
@@ -2341,7 +2341,9 @@ minimum target size.
 
 #### Success — lift
 1. After a confirmed CNC Pause (F-B7), the app checks the conditions for a lift:
-   - GRBL 1.1 or grblHAL;
+   - GRBL 1.1 or grblHAL, as named by the welcome banner (or the connected driver before one).
+     FluidNC never lifts. This is checked before the settings, because FluidNC's `$I` lists
+     parking (`P`) whatever its YAML says (ADR-180 Amendment 7);
    - `$32=0` is confirmed;
    - the build has no parking (`P` in `$I`);
    - (A later Pause of the same job relies on the `$32` and parking check an earlier lift made
@@ -3443,11 +3445,14 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    takes the flat length of a strip wrapped once round the part where the artwork goes and the
    strip's thickness (default 0.1 mm), shows Ø = wrap / π − thickness, and **Use this diameter**
    fills the field.
-3. A **chuck** scales Y by Motion per turn / (π × object diameter). A **roller** either leaves Y
-   unscaled (**Scale Y from the roller diameter** off: the controller already moves the surface
-   in millimetres; every pre-ADR-373 roller setup, byte-identical output) or scales it by Motion
-   per turn / (π × **Roller diameter**), independent of the part's size. Motion per turn is
-   disabled while it has no effect. A chuck never stores a roller diameter.
+3. A **chuck** scales Y by Motion per turn / (π × object diameter). A **roller** either scales it
+   by Motion per turn / (π × **Roller diameter**), independent of the part's size, or leaves Y
+   unscaled (**Scale Y from the roller diameter** off: the controller's Y steps/mm already move
+   the surface in millimetres; every pre-ADR-373 roller setup, byte-identical output). A new
+   roller starts scaled (Roller diameter 25 mm until measured), as LightBurn's roller always is,
+   and so does a saved chuck switched to Roller; a saved roller opens in the mode it was saved
+   with (ADR-373 Amendment 1). Motion per turn is disabled while it has no effect. A chuck never
+   stores a roller diameter.
 4. The preview shows the surface circumference, the machine travel for one revolution (the wrap
    limit the bounds preflight enforces), the Y scale, and the tallest artwork one revolution holds.
 5. **Rotary preset** (ADR-503) shows when the machine's family has a rotary whose maker publishes
@@ -3467,8 +3472,17 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    `G90` on Marlin (Smoothieware wraps the same move in its tool-off lines and `M120`/`M121`),
    `M5` / `G21 G91` / `G1 Y… F… S0` / `G90` on the Falcon contract. No turn carries M3/M4 or a
    power word. Ruida has no jog command, so the test is unavailable there.
-3. The operator checks that a mark on the part returns to the same place, adjusts the
-   measurements, tests again, then applies.
+3. The operator checks that a mark returns to the same place, corrects the value the note under
+   the buttons names, tests again, then applies (ADR-373 Amendment 1):
+   - after **Turn chuck once** or **Turn roller once**: Motion per turn, lower if it turned too
+     far, higher if it stopped short;
+   - after **Turn object once** on a scaled roller: check Motion per turn with Turn roller once
+     first, then measure the roller diameter and the object again rather than tuning either;
+   - after **Turn object once** on an unscaled roller: the controller is not moving the surface in
+     millimetres, so turn on **Scale Y from the roller diameter** (roller diameter and Motion per
+     turn) or set the controller's Y steps/mm to the surface. The note says that changing the
+     object diameter can make the mark land without fixing the size: a roller's Y scale never
+     reads it.
 
 #### Edge — stop, close, refusal
 1. **Stop rotation**, closing the dialog, or Esc sends jog cancel (`0x85`) where the firmware
@@ -3483,8 +3497,8 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
 #### Success — the Rotary switch
 1. Once the profile has a rotary setup, a laser project's Job actions dock shows a **Rotary**
    toggle above Frame and Start with the attachment and size, for example
-   "Roller, Ø60 mm (rollers Ø25 mm)" or "Off · Chuck, Ø80 mm". Its tooltip gives the Y scale and
-   the machine travel for one revolution.
+   "Roller, Ø60 mm (rollers Ø25 mm)", "Roller, Ø60 mm (Y not scaled)" or "Off · Chuck, Ø80 mm".
+   Its tooltip gives the Y scale and the machine travel for one revolution.
 2. It toggles `device.rotary.enabled`, the setup Rotary Setup edits, as one undoable profile
    edit. It is disabled while a job, motion or controller operation owns the machine. A setup
    whose measurements cannot map Y opens Rotary Setup instead of switching on.
@@ -9439,7 +9453,9 @@ The G-code Inspector is free in every edition (ADR-627).
 4. A clean Frame unlocks **Start**. The status reads **Ready to start**. A Jog, Home, origin
    or probe change, reset, alarm, reconnect, another Frame or a machine-mode switch locks it
    again with the reason; the program is then read again from wherever the head stands.
-5. **Start** asks the usual laser-mode (`$32`) or CNC workholding question, checks the Frame is
+5. **Start** asks the usual CNC workholding question, or on a laser the `$30`/`$32` settings
+   question whenever Job Review would ask it; on this path it cites the Run review warnings, and
+   it opens with the rapids that would burn (ADR-630 Amendment 4). It checks the Frame is
    still current and the head is still at the program's start, then streams the program with
    the ordinary streamer and closes the Inspector. The last check, after the controller is
    prepared, repeats the session, origin, position and machine-mode checks. The Live Motion
@@ -9450,7 +9466,17 @@ The G-code Inspector is free in every edition (ADR-627).
 
 #### Warnings (never refuse)
 
-Work-offset writes (`G10 L2`/`G10 L20`, listed first: later moves, and later jobs, may be
+The connected controller's `$30` and `$32` come first, checked and worded as Job Review does for
+a project Start (ADR-630 Amendment 4): a router reporting `$32=1` (laser mode on: the spin-up
+dwell runs with the spindle off and plunges start with the bit not at speed), a laser reporting
+`$32=0`, a `$30` that does not match the profile's max S or the spindle's max RPM, and settings
+not read or not reported. On a laser whose `$32=0` is reported or not confirmed, a program with
+G0 moves made while `M3`/`M4` is on and `S` is not set to 0 also gets a warning that counts them
+and names the first by its line in the sent program: with laser mode off, GRBL, grblHAL and
+FluidNC keep the beam on during those rapids, so each burns a line. A program that writes `S0`
+on every G0 gets no such warning.
+
+Then the program's own: work-offset writes (`G10 L2`/`G10 L20`, listed first: later moves, and later jobs, may be
 displaced from the traced outline), moves in machine coordinates (`G53`), a work coordinate
 switch away from `G54`, `G92`, `G28`/`G30` moves and `G28.1`/`G30.1` stored positions,
 relative moves (`G91`, read from where the head stands), a program that ends in inches (`G20`,

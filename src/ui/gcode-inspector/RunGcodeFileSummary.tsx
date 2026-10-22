@@ -20,6 +20,8 @@ export function RunGcodeFileSummary(props: {
   readonly machineKind: MachineKind;
   /** False until the machine reports the head position the outline starts from. */
   readonly startKnown: boolean;
+  /** The controller's $30/$32 findings and lit rapids (external-run-readiness.ts). */
+  readonly controllerWarnings: ReadonlyArray<string>;
   /** Where the outline lands on the bed (external-run-bed.ts). */
   readonly bedWarnings: ReadonlyArray<string>;
   readonly formatLength: (mm: number) => string;
@@ -27,7 +29,7 @@ export function RunGcodeFileSummary(props: {
 }): JSX.Element {
   const { program, review, run } = props.prepared;
   const { envelope, start } = run;
-  const warnings = [...review.warnings, ...props.bedWarnings];
+  const warnings = [...props.controllerWarnings, ...review.warnings, ...props.bedWarnings];
   return (
     <div className="lf-run-gcode-summary">
       <dl>
