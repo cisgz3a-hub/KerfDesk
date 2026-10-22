@@ -1,4 +1,5 @@
-import type { ControllerCommandSet, ControllerKind } from './device-profile';
+import type { ControllerCommandSet, ControllerKind, DeviceProfile } from './device-profile';
+import { DEFAULT_FIRE_POWER_PERCENT, HARD_MAX_FIRE_POWER_PERCENT } from './fire-control';
 
 /** A separate pointer, explicitly mapped to the machine's documented accessory output. */
 export type GcodePositioningLight = {
@@ -12,30 +13,50 @@ export type GcodePositioningLight = {
   readonly afterFrame?: boolean;
 };
 
-/** The Falcon A1 Pro's own head pointer. Its firmware has no G-code for it;
- * it is switched over the machine's HTTP link, as Creality's software does (ADR-635). */
-export type FalconPointerLight = {
-  readonly kind: 'creality-falcon-pointer';
-  readonly offsetXmm: number;
-  readonly offsetYmm: number;
+/** The Falcon A1 Pro's 20 W head has no separate pointer. Like the "Laser on"
+ * button in Creality's own software, its LED is the cutting laser itself at a
+ * capped low power, so the dot is exactly where it will burn (ADR-664). */
+export type LaserDotLight = {
+  readonly kind: 'laser-dot';
+  /** Share of the controller's S range, never above HARD_MAX_FIRE_POWER_PERCENT. */
+  readonly powerPercent: number;
+  /** The dot is the laser spot, so it has no offset. */
+  readonly offsetXmm: 0;
+  readonly offsetYmm: 0;
   readonly afterFrame?: boolean;
 };
 
-export type PositioningLight = GcodePositioningLight | FalconPointerLight;
+export type PositioningLight = GcodePositioningLight | LaserDotLight;
 
-export const FALCON_POINTER_LIGHT: FalconPointerLight = {
-  kind: 'creality-falcon-pointer',
+export const LASER_DOT_LIGHT: LaserDotLight = {
+  kind: 'laser-dot',
+  powerPercent: DEFAULT_FIRE_POWER_PERCENT,
   offsetXmm: 0,
   offsetYmm: 0,
 };
 
-/** The command set whose machine serves the pointer's HTTP switch. */
-export const FALCON_POINTER_COMMAND_SET: ControllerCommandSet = 'creality-falcon-a1-pro';
+/** The machine whose LED is its laser dot. */
+export const LASER_DOT_COMMAND_SET: ControllerCommandSet = 'creality-falcon-a1-pro';
 
-export function isFalconPointerLight(
-  light: PositioningLight | undefined,
-): light is FalconPointerLight {
-  return light?.kind === 'creality-falcon-pointer';
+/** Creality's software turns the dot off after 30 s; so does KerfDesk. */
+export const LASER_DOT_AUTO_OFF_MS = 30_000;
+
+export function isLaserDotLight(light: PositioningLight | undefined): light is LaserDotLight {
+  return light?.kind === 'laser-dot';
+}
+
+/** ADR-635's network "red pointer" switched the wrong light. A saved one is
+ * dropped, never turned into a laser dot without the operator's tick. */
+const RETIRED_FALCON_POINTER_MESSAGE =
+  'The Falcon “red pointer” setting switched the wrong light and was replaced. Tick “Show where it will burn” to use the laser at low power instead.';
+
+/** Why the fitted module cannot show a dot, or null: an infrared beam is
+ * invisible, so a low-power dot would show nothing while still emitting. */
+export function laserDotModuleIssue(device: Pick<DeviceProfile, 'laserSubProfile'>): string | null {
+  const nm = device.laserSubProfile?.wavelengthNm;
+  return nm !== undefined && (nm < 400 || nm > 700)
+    ? `The fitted laser module’s ${nm} nm beam is invisible, so it cannot show a dot. Fit and choose the blue module to use the laser dot.`
+    : null;
 }
 
 export const MAX_POSITIONING_LIGHT_OFFSET_MM = 1000;
@@ -70,7 +91,7 @@ export function positioningLightIssue(
     return 'Positioning light must contain its on/off commands and X/Y offsets.';
   }
   const light = value as Record<string, unknown>;
-  if (light['kind'] !== undefined) return falconPointerIssue(light);
+  if (light['kind'] !== undefined) return laserDotIssue(light);
   for (const field of ['onCommand', 'offCommand'] as const) {
     const issue = commandIssue(light[field], field, controllerKind);
     if (issue !== null) return issue;
@@ -88,7 +109,7 @@ export function positioningLightIssue(
 }
 
 /** The light the device can actually switch: the stored mapping must be valid,
- * and the Falcon pointer exists only on the Falcon A1 Pro command set. */
+ * and the laser dot exists only on the Falcon A1 Pro command set. */
 export function devicePositioningLightIssue(device: {
   readonly positioningLight?: unknown;
   readonly controllerKind?: ControllerKind | undefined;
@@ -97,16 +118,26 @@ export function devicePositioningLightIssue(device: {
 }): string | null {
   const light = device.positioningLight;
   const issue = positioningLightIssue(light, device.controllerKind, device.gcodeDialect?.dialectId);
-  if (issue !== null || !isFalconPointerLight(light as PositioningLight | undefined)) return issue;
-  return device.controllerCommandSet === FALCON_POINTER_COMMAND_SET
+  if (issue !== null || !isLaserDotLight(light as PositioningLight | undefined)) return issue;
+  return device.controllerCommandSet === LASER_DOT_COMMAND_SET
     ? null
-    : 'The Falcon red pointer needs the Creality Falcon A1 Pro machine profile.';
+    : 'The laser dot needs the Creality Falcon A1 Pro machine profile.';
 }
 
-function falconPointerIssue(light: Record<string, unknown>): string | null {
-  if (light['kind'] !== 'creality-falcon-pointer')
-    return 'Positioning light type is not one KerfDesk knows.';
-  return afterFrameIssue(light) ?? offsetIssue(light);
+function laserDotIssue(light: Record<string, unknown>): string | null {
+  if (light['kind'] === 'creality-falcon-pointer') return RETIRED_FALCON_POINTER_MESSAGE;
+  if (light['kind'] !== 'laser-dot') return 'Positioning light type is not one KerfDesk knows.';
+  const power = light['powerPercent'];
+  if (
+    typeof power !== 'number' ||
+    !Number.isFinite(power) ||
+    power <= 0 ||
+    power > HARD_MAX_FIRE_POWER_PERCENT
+  )
+    return `Laser dot power must be above 0% and no more than ${HARD_MAX_FIRE_POWER_PERCENT}%.`;
+  if (light['offsetXmm'] !== 0 || light['offsetYmm'] !== 0)
+    return 'The laser dot is the laser spot, so its offsets must be 0.';
+  return afterFrameIssue(light);
 }
 
 function afterFrameIssue(light: Record<string, unknown>): string | null {
@@ -208,13 +239,8 @@ export function normalizePositioningLight(
     return undefined;
   const light = value as PositioningLight;
   const afterFrame = light.afterFrame === true ? { afterFrame: true } : {};
-  if (isFalconPointerLight(light))
-    return {
-      kind: light.kind,
-      offsetXmm: light.offsetXmm,
-      offsetYmm: light.offsetYmm,
-      ...afterFrame,
-    };
+  if (isLaserDotLight(light))
+    return { ...LASER_DOT_LIGHT, powerPercent: light.powerPercent, ...afterFrame };
   return {
     onCommand: light.onCommand.trim(),
     offCommand: light.offCommand.trim(),

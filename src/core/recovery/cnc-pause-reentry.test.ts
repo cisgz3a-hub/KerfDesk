@@ -266,8 +266,9 @@ describe('planCncPauseReentry', () => {
   });
 
   it('is not offered on FluidNC, whose reset at a hold is not qualified', () => {
-    expect(plan({ stopPoint: { x: 20, y: 10, z: -2 }, controllerKind: 'fluidnc' })).toMatchObject({
+    expect(plan({ stopPoint: { x: 20, y: 10, z: -2 }, controllerKind: 'fluidnc' })).toEqual({
       kind: 'no-lift',
+      reason: 'KerfDesk does not lift the bit on FluidNC.',
     });
   });
 });

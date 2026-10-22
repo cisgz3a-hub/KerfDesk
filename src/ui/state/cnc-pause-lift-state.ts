@@ -9,6 +9,7 @@ import {
   type StatusReport,
   type StreamerStatus,
 } from '../../core/controllers/grbl';
+import type { ControllerKind } from '../../core/devices';
 import type { MotionPoint } from '../../core/job/motion-manifest';
 import type { CncPauseReentryPlan } from '../../core/recovery/cnc-pause-reentry';
 import type { LaserState, WorkOriginSource } from './laser-store';
@@ -126,6 +127,13 @@ export function cncPauseLiftJobPatch(
 export function cncPauseLiftSkipReason(state: LaserState): string | null {
   if (state.streamer?.status !== 'paused' || currentCncPauseLift(state) !== null) return null;
   return currentCncPauseLiftJob(state)?.skipReason ?? null;
+}
+
+/** Store selector: the firmware a CNC Pause and its Resume run on. The
+ *  welcome banner names it even when the profile picked another driver;
+ *  before a banner, the connected driver stands in (ADR-180 Amendment 7). */
+export function cncPauseControllerKind(state: LaserState): ControllerKind {
+  return state.detectedControllerKind ?? state.activeControllerKind;
 }
 
 /** Store selector: laser mode ($32) as far as the current job knows it. A

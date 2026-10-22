@@ -11,6 +11,7 @@ import type { LaserModeStartEvidence } from '../../state/laser-mode-start-eviden
 import { initialLaserState } from '../../state/laser-store-helpers';
 import { useLaserStore } from '../../state/laser-store';
 import { jobAwareAlert, jobAwareConfirm } from '../../state/job-aware-dialogs';
+import { recoveryRepository } from '../../state/recovery';
 import { LASER_MODE_UNVERIFIED_START_PROMPT } from '../../laser/laser-mode-start-acknowledgement';
 import { prepareStartJobSnapshot, type StartJobPreparation } from '../../laser/start-job-readiness';
 import type { ConfirmedJobReview } from '../../laser/job-review';
@@ -190,11 +191,32 @@ describe('runTransientCameraJob laser-mode evidence', () => {
     const startJob = vi.fn<typeof originalStartJob>(async () => undefined);
     setReadyLaser(startJob, true);
     vi.mocked(dispatchTransientReviewedFrame).mockResolvedValueOnce(null);
+    const retired = vi.spyOn(recoveryRepository, 'noteUntrackedRunAccepted');
 
     await expect(runTransientCameraJob(createProject())).resolves.toBe(false);
 
     expect(dispatchTransientReviewedFrame).toHaveBeenCalledOnce();
     expect(startJob).not.toHaveBeenCalled();
+    expect(retired).not.toHaveBeenCalled();
+  });
+
+  // Rolling audit 2026-10-21, 05-P3-1: the target is not the project's job,
+  // but it is now the last thing the machine ran.
+  it("retires the project job's recovery card, Run again and second pass once the target starts", async () => {
+    const startJob = vi.fn<typeof originalStartJob>(async (_gcode, options) => {
+      options?.assertFinalStartAuthorized?.();
+    });
+    setReadyLaser(startJob, true);
+    const retired = vi
+      .spyOn(recoveryRepository, 'noteUntrackedRunAccepted')
+      .mockResolvedValue({ ok: true, value: true });
+
+    await expect(runTransientCameraJob(createProject())).resolves.toBe(true);
+
+    expect(retired).toHaveBeenCalledExactlyOnceWith();
+    expect(startJob.mock.invocationCallOrder[0]).toBeLessThan(
+      retired.mock.invocationCallOrder[0] ?? Number.NEGATIVE_INFINITY,
+    );
   });
 
   it('prompts exactly once with the informed acknowledgement when only camera-marker $32 is unknown', async () => {
