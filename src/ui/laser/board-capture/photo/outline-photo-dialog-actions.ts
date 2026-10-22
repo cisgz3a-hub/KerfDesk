@@ -5,18 +5,29 @@ import type { OutlinePhotoDispatch, OutlinePhotoSession } from './use-outline-ph
 // Pressing this close to an existing point (screen px) picks it up to drag.
 const GRAB_RADIUS_PX = 12;
 
+// Initial file, picker and paste share the reducer dispatch for one dialog.
+// A newer selection owns both success and failure; a late decode must never
+// replace its photo, outline or error. Weak keys keep separate dialogs isolated.
+const photoRequests = new WeakMap<OutlinePhotoDispatch, object>();
+
 export async function loadOutlinePhoto(
   file: File | undefined,
   dispatch: OutlinePhotoDispatch,
 ): Promise<void> {
   if (file === undefined) return;
+  const request = {};
+  photoRequests.set(dispatch, request);
   try {
-    dispatch({ type: 'photo-loaded', image: await loadImageAsRawData(file, 2048) });
+    const image = await loadImageAsRawData(file, 2048);
+    if (photoRequests.get(dispatch) === request) dispatch({ type: 'photo-loaded', image });
   } catch (error) {
+    if (photoRequests.get(dispatch) !== request) return;
     dispatch({
       type: 'error',
       error: error instanceof Error ? error.message : 'Could not load that photo.',
     });
+  } finally {
+    if (photoRequests.get(dispatch) === request) photoRequests.delete(dispatch);
   }
 }
 
