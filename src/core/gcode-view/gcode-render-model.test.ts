@@ -178,7 +178,7 @@ describe('buildGcodeRenderModel — forgiving motion policy', () => {
         'G0 X0 Y0',
         'G2 X10 Y0 R3', // radius too small for chord
         'G18',
-        'G2 X20 Y0 I5 J0', // wrong plane
+        'G2 X20 Y0 J5', // J is not an XZ-plane offset
         'G17',
         'G1 X30 F100', // still renders after the skips
       ].join('\n'),
@@ -186,7 +186,7 @@ describe('buildGcodeRenderModel — forgiving motion policy', () => {
     expect(model.skippedMotions.map((skip) => skip.reason)).toEqual([
       'arc needs I/J or R',
       'arc radius too small for its chord',
-      'G18/G19 plane arcs are not renderable (XY only)',
+      'arc needs I/K or R',
     ]);
     expect(model.segmentCount).toBe(1);
     expect(model.segKind[0]).toBe(SEG_KIND.cut);

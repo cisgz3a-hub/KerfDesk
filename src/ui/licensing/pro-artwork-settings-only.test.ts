@@ -6,6 +6,7 @@ import {
   testMaterializedRelief,
   testReliefBoundary,
 } from '../../__fixtures__/relief-authoring';
+import { deserializeProject, serializeProject } from '../../io/project';
 import { proProject } from '../app/pro-project-test-fixtures';
 import { useStore } from '../state/store';
 import { resetStore } from '../state/test-helpers';
@@ -96,6 +97,25 @@ it('keeps settings, placement and removal of existing Pro work free', () => {
   const plain = proProject();
   expect(changedProArtworkFeature(plain, relettered(plain))).toBeNull();
 });
+
+it('treats the curves a save fills in as the same artwork, and changed curves as new', () => {
+  const before = template();
+  const reopened = deserialized(before);
+  // A reopened copy of the same outline, such as a retained array's archived source.
+  expect(changedProArtworkFeature(before, reopened)).toBeNull();
+  const curved = withObject(reopened, 'text', (object) =>
+    'paths' in object
+      ? { ...object, paths: object.paths.map((path) => ({ ...path, curves: [] })) }
+      : object,
+  );
+  expect(changedProArtworkFeature(reopened, curved)).toBe('vcarve');
+});
+
+function deserialized(project: Project): Project {
+  const parsed = deserializeProject(serializeProject(project));
+  if (parsed.kind !== 'ok') throw new Error(`Project did not reopen: ${parsed.kind}`);
+  return parsed.project;
+}
 
 it('refuses an ungated store edit to Pro artwork in Free and applies it with Pro', async () => {
   const before = template();

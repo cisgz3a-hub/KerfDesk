@@ -9,6 +9,7 @@ export function upgradeCurrentProjectPolylineFairing(pushToast: PushToast): numb
   const state = useStore.getState();
   const upgraded = upgradeProjectPolylineFairing(state.project);
   if (upgraded.upgradedCount === 0) return 0;
+  // eslint-disable-next-line kerfdesk/no-raw-project-set-state -- a format upgrade of drawn paths already in the document authors no new artwork, so like opening it, it skips the Pro guard (ADR-592 decision 5).
   useStore.setState({ project: upgraded.project, dirty: true });
   pushToast(
     `Smoothed ${upgraded.upgradedCount} existing drawn ${upgraded.upgradedCount === 1 ? 'path' : 'paths'}.`,

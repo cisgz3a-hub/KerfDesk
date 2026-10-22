@@ -66,6 +66,20 @@ describe('NumericEditsBar', () => {
     expect(input(container, 'Selection width').value).toBe('20');
   });
 
+  // Audit 08-P3-7: Esc kept the typed draft, and leaving the box applied it.
+  it('drops the typed text on Escape, so leaving the box applies nothing', async () => {
+    installProject();
+    const container = await render(<NumericEditsBar />);
+    const width = input(container, 'Selection width');
+
+    await typeAndPress(width, '200', 'Escape');
+    expect(input(container, 'Selection width').value).toBe('20');
+    await act(async () => Simulate.blur(input(container, 'Selection width')));
+
+    expect(useStore.getState().project.scene.objects[0]?.transform.scaleX).toBe(1);
+    expect(useStore.getState().undoStack).toHaveLength(0);
+  });
+
   it('commits nothing when a box loses focus with its text as shown', async () => {
     installProject(10.12345);
     useStore.setState({ dirty: false });

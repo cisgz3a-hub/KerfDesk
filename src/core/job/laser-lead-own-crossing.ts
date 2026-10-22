@@ -17,6 +17,9 @@ const CELL_MM = 1;
 // An edge is gridded in the cells it passes through; one passing more than this
 // (100 m at 1 mm) is checked by every query instead.
 const MAX_CELLS_PER_EDGE = 100_000;
+// And a contour's edges take at most this many grid places in all; the edges
+// past it are checked by every query, so the grid cannot outgrow memory.
+const MAX_CELLS_PER_CONTOUR = 2_000_000;
 
 type RingWalk = {
   readonly cumulative: ReadonlyArray<number>;
@@ -44,10 +47,10 @@ export function crossesOwnContour(
     const from = walk.cumulative[edge - 1] ?? 0;
     const span = (walk.cumulative[edge] ?? 0) - from;
     for (let step = 1; step < lead.length; step += 1) {
-      const along = crossingOnEdge(lead[step - 1] as Vec2, lead[step] as Vec2, a, b);
-      if (along === null) continue;
-      const apart = Math.abs(from + along * span - join);
-      if (Math.min(apart, walk.lengthMm - apart) > JOIN_NEIGHBOURHOOD_MM) return true;
+      for (const along of touchesOnEdge(lead[step - 1] as Vec2, lead[step] as Vec2, a, b)) {
+        const apart = Math.abs(from + along * span - join);
+        if (Math.min(apart, walk.lengthMm - apart) > JOIN_NEIGHBOURHOOD_MM) return true;
+      }
     }
   }
   return false;
@@ -59,22 +62,32 @@ function ringWalk(ring: ReadonlyArray<Vec2>): RingWalk {
   const cumulative = [0];
   const cells = new Map<string, number[]>();
   const wide: number[] = [];
+  let budget = MAX_CELLS_PER_CONTOUR;
   for (let index = 1; index < ring.length; index += 1) {
     const a = ring[index - 1] as Vec2;
     const b = ring[index] as Vec2;
     cumulative.push((cumulative[index - 1] ?? 0) + Math.hypot(b.x - a.x, b.y - a.y));
-    gridEdge(cells, wide, index, a, b);
+    budget -= gridEdge(cells, wide, index, a, b, budget);
   }
   const walk = { cumulative, lengthMm: cumulative[cumulative.length - 1] ?? 0, cells, wide };
   walks.set(ring, walk);
   return walk;
 }
 
-function gridEdge(cells: Map<string, number[]>, wide: number[], edge: number, a: Vec2, b: Vec2) {
+/** Grids one edge within `budget` cells and says how many it took; an edge
+ * that would take more is checked by every query instead. */
+function gridEdge(
+  cells: Map<string, number[]>,
+  wide: number[],
+  edge: number,
+  a: Vec2,
+  b: Vec2,
+  budget: number,
+): number {
   const span = Math.abs(cellOf(b.x) - cellOf(a.x)) + Math.abs(cellOf(b.y) - cellOf(a.y)) + 1;
-  if (!Number.isFinite(span) || span > MAX_CELLS_PER_EDGE) {
+  if (!Number.isFinite(span) || span > MAX_CELLS_PER_EDGE || span > budget) {
     wide.push(edge);
-    return;
+    return 0;
   }
   const add = (cx: number, cy: number): void => {
     const key = `${cx},${cy}`;
@@ -83,6 +96,7 @@ function gridEdge(cells: Map<string, number[]>, wide: number[], edge: number, a:
     else if (list[list.length - 1] !== edge) list.push(edge);
   };
   walkCells(a, b, add, span + 2);
+  return span;
 }
 
 /** Every grid cell the segment a-b passes through, in order (a grid walk): at
@@ -204,20 +218,39 @@ function positionAlong(ring: ReadonlyArray<Vec2>, walk: RingWalk, point: Vec2): 
   return position;
 }
 
-/** Where along edge a-b the lead step p-q crosses it (0..1), or null. Steps
- * that run along the edge are left to the distance checks. */
-function crossingOnEdge(p: Vec2, q: Vec2, a: Vec2, b: Vec2): number | null {
+/** Where along edge a-b (0..1) the lead step p-q meets it: the crossing, or,
+ * for a step running along the edge, both ends of the stretch they share. */
+function touchesOnEdge(p: Vec2, q: Vec2, a: Vec2, b: Vec2): ReadonlyArray<number> {
   const rx = q.x - p.x;
   const ry = q.y - p.y;
   const sx = b.x - a.x;
   const sy = b.y - a.y;
   const determinant = rx * sy - ry * sx;
-  if (determinant === 0) return null;
   const wx = a.x - p.x;
   const wy = a.y - p.y;
+  if (determinant === 0) return sharedStretch(p, q, a, b);
   const t = (wx * sy - wy * sx) / determinant;
   const u = (wx * ry - wy * rx) / determinant;
-  return t >= 0 && t <= 1 && u >= 0 && u <= 1 ? u : null;
+  return t >= 0 && t <= 1 && u >= 0 && u <= 1 ? [u] : [];
+}
+
+// A parallel step this close to the edge's line runs along the edge.
+const COLLINEAR_MM = 1e-9;
+
+/** For a step parallel to edge a-b: the ends of the stretch of the edge it
+ * runs along, as 0..1 along the edge; none when it runs beside the edge. */
+function sharedStretch(p: Vec2, q: Vec2, a: Vec2, b: Vec2): ReadonlyArray<number> {
+  const sx = b.x - a.x;
+  const sy = b.y - a.y;
+  const lengthSq = sx * sx + sy * sy;
+  if (lengthSq === 0) return [];
+  const offLine = Math.abs((p.x - a.x) * sy - (p.y - a.y) * sx) / Math.sqrt(lengthSq);
+  if (offLine > COLLINEAR_MM) return [];
+  const atP = ((p.x - a.x) * sx + (p.y - a.y) * sy) / lengthSq;
+  const atQ = ((q.x - a.x) * sx + (q.y - a.y) * sy) / lengthSq;
+  const low = Math.max(0, Math.min(atP, atQ));
+  const high = Math.min(1, Math.max(atP, atQ));
+  return low <= high ? [low, high] : [];
 }
 
 type Box = {

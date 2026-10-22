@@ -142,7 +142,7 @@ function ActionButtons(props: {
         type="button"
         className="lf-btn lf-btn--ghost"
         onClick={props.actions.close}
-        title="Close — the editing session is kept and resumes on reopen"
+        title="Close — unapplied edits are kept and resume on reopen. Moving the image or changing its settings keeps them; a change to the image itself starts fresh, with a notice."
         aria-label={props.embedded ? 'Back to photos' : 'Close Image Studio'}
       >
         {props.embedded ? 'Back to photos' : <Icon name="close" size={18} />}

@@ -31,6 +31,42 @@ export function isScrollRegionTarget(target: EventTarget | null): boolean {
   return role !== null && SCROLL_REGION_ROLES.has(role);
 }
 
+// Widgets whose own arrow keys move within them (WAI-ARIA keyboard patterns).
+const ARROW_KEY_WIDGET_ROLES: ReadonlySet<string> = new Set([
+  ...SCROLL_REGION_ROLES,
+  'tab',
+  'radio',
+  'radiogroup',
+  'slider',
+  'spinbutton',
+  'scrollbar',
+  'separator',
+  'option',
+  'treeitem',
+  'gridcell',
+  'row',
+  'combobox',
+  'menu',
+  'menubar',
+  'menuitem',
+  'menuitemcheckbox',
+  'menuitemradio',
+]);
+
+/**
+ * An arrow key that a focused widget answers itself: a tab strip switching tabs,
+ * a slider, a radio group, a list or a menu. A window-level arrow binding such as
+ * the selection nudge must leave it alone, or one key does two things. A plain
+ * button is not such a widget, so bare arrows still nudge from it (ADR-493).
+ */
+export function isArrowKeyWidgetEvent(event: KeyboardEvent): boolean {
+  if (event.defaultPrevented) return true;
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) return false;
+  const role = target.getAttribute('role');
+  return role !== null && ARROW_KEY_WIDGET_ROLES.has(role);
+}
+
 export function isKeyboardActivationTarget(target: EventTarget | null): boolean {
   if (isEditableShortcutTarget(target)) return true;
   if (!(target instanceof HTMLElement)) return false;

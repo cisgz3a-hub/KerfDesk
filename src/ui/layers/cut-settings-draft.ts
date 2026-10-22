@@ -12,6 +12,7 @@ import {
   DEFAULT_TAB_SPACING_MM,
   imageOverscanMmFor,
   MAX_IMAGE_OVERSCAN_MM,
+  MIN_PERFORATION_MM,
 } from '../../core/job/operation-cut-extras';
 import {
   DEFAULT_ARC_LEAD_ANGLE_DEG,
@@ -39,7 +40,6 @@ export const MAX_TABS_PER_SHAPE = 100;
 export const MIN_TAB_SPACING_MM = 1;
 export const MAX_TAB_SPACING_MM = 1000;
 export const MAX_OVERCUT_MM = 50;
-export const MIN_PERFORATION_MM = 0.01;
 export const MAX_PERFORATION_MM = 100;
 
 export function readCutSettingsPatch(

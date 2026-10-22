@@ -10,11 +10,38 @@
 // trusted. A first-time zero (no current evidence) stays silent: with no
 // established zero the work-frame Z carries no meaning to warn about.
 
+import { currentWorkZMm } from '../state/infer-machine-position';
+import type { LaserState } from '../state/laser-store';
 import { isWorkZZeroEvidenceCurrent, type WorkZZeroEvidence } from '../state/work-z-zero-evidence';
 
 /** Below this |work Z| the bit is at the established zero (touching the
  *  stock top), so re-zeroing is a correction, not an overwrite. */
 export const ZERO_Z_OVERWRITE_WARNING_THRESHOLD_MM = 0.5;
+
+/** A phone or MCP client cannot answer the PC's confirmation, so a remote
+ *  Zero Z is refused wherever the PC would ask (audit 2026-10-21 01-P2-1). */
+export const REMOTE_ZERO_Z_REFUSAL =
+  'Work Z0 is already set and the bit is not at it, so Zero Z here would move the work zero ' +
+  'and change the cut depth. Nothing was changed. Touch the bit to the stock top first, or ' +
+  'use Zero Z on the PC, which asks you to confirm.';
+
+type ZeroZState = Pick<
+  LaserState,
+  'workZZeroEvidence' | 'workZReferenceEpoch' | 'statusReport' | 'wcoCache' | 'controllerSettings'
+>;
+
+/** The confirmation for the live controller state, read at the moment of Zero Z. */
+export function liveZeroZOverwriteWarning(state: ZeroZState): string | null {
+  return zeroZOverwriteWarning({
+    evidence: state.workZZeroEvidence,
+    referenceEpoch: state.workZReferenceEpoch,
+    workZMm: currentWorkZMm(
+      state.statusReport,
+      state.wcoCache,
+      state.controllerSettings?.reportInches === true,
+    ),
+  });
+}
 
 /** The confirmation to show before Zero Z, or null when no confirmation is
  *  needed and the zero may be written directly. */

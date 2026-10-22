@@ -20,6 +20,11 @@ import {
   reportedWorkOffsetMm,
 } from '../state/infer-machine-position';
 import { isRestoredWorkOrigin } from '../state/work-origin-state';
+import {
+  laserStatusReportFieldsOff,
+  missingPositionMessage,
+  type StatusReportFieldsOff,
+} from '../state/status-report-fields';
 import { controllerReportsWorkOffset } from './work-offset-assumption';
 import { useLengthUnit } from '../state/display-units';
 import { feedUnitLabel, MM_PER_INCH, type DisplayLengthUnit } from '../display-length';
@@ -33,6 +38,9 @@ export function StatusDisplay({
   const originName = useLaserStore(customOriginName);
   const reportInches = useLaserStore((s) => s.controllerSettings?.reportInches === true);
   const reportsOffset = useLaserStore((s) => controllerReportsWorkOffset(s.capabilities));
+  const capabilities = useLaserStore((s) => s.capabilities);
+  const controllerSettings = useLaserStore((s) => s.controllerSettings);
+  const fieldsOff = laserStatusReportFieldsOff({ capabilities, controllerSettings });
   const unit = useLengthUnit();
   if (report === null) return unavailableStatus(variant);
   if (variant === 'state') return <StatusState report={report} />;
@@ -46,14 +54,20 @@ export function StatusDisplay({
   return (
     <div style={panelStyle}>
       {variant !== 'details' && <StatusState report={report} />}
-      {pos !== null && (
+      {pos !== null ? (
         <div style={posRowStyle}>
           <strong>MPos:</strong> X {dro(pos.x, unit)} Y {dro(pos.y, unit)} Z {dro(pos.z, unit)}
           {inchMark(unit)}
         </div>
+      ) : (
+        <UnknownMachinePositionRow fieldsOff={fieldsOff} />
       )}
-      <div style={customOrigin ? originCustomStyle : originDefaultStyle}>
-        <strong>Origin:</strong> {originLabel(customOrigin, wcoMm, reportsOffset, originName, unit)}
+      <div
+        style={customOrigin ? originCustomStyle : originDefaultStyle}
+        title={originTitle(wcoMm, fieldsOff)}
+      >
+        <strong>Origin:</strong>{' '}
+        {originLabel(customOrigin, wcoMm, reportsOffset, originName, unit, fieldsOff)}
       </div>
       {feedMmPerMin !== null && (
         <div style={feedRowStyle}>
@@ -89,17 +103,45 @@ function StatusState({
   );
 }
 
+// A grblHAL `$10` with bits 0 and 5 clear reports WPos and no offset, so no
+// machine position can be derived; say so instead of leaving the row out
+// (ADR-375 Amendment 2).
+function UnknownMachinePositionRow({
+  fieldsOff,
+}: {
+  readonly fieldsOff: StatusReportFieldsOff | null;
+}): JSX.Element | null {
+  if (fieldsOff?.machinePositionUnknown !== true) return null;
+  return (
+    <div style={posRowStyle} title={missingPositionMessage(fieldsOff) ?? undefined}>
+      <strong>MPos:</strong> cannot be known (WPos only, no WCO)
+    </div>
+  );
+}
+
+function originTitle(
+  wcoMm: ReturnType<typeof reportedWorkOffsetMm>,
+  fieldsOff: StatusReportFieldsOff | null,
+): string | undefined {
+  return wcoMm === null ? (missingPositionMessage(fieldsOff) ?? undefined) : undefined;
+}
+
 // Without a WCO the origin is unknown, not machine 0,0: the controller may hold
 // a persistent G54 or a kept G92 offset. GRBL sends WCO in only some status
 // reports, so it is "not reported yet"; a controller whose reports never carry
-// it says just "not reported" (ADR-375).
+// it says just "not reported" (ADR-375), and a grblHAL whose `$10` turns WCO
+// off says which `$10` sends it (ADR-375 Amendment 2).
 function originLabel(
   customOrigin: boolean,
   wcoMm: ReturnType<typeof reportedWorkOffsetMm>,
   reportsOffset: boolean,
   originName: string,
   unit: DisplayLengthUnit,
+  fieldsOff: StatusReportFieldsOff | null,
 ): string {
+  if (wcoMm === null && fieldsOff?.workOffsetOff === true) {
+    return `not reported (WCO off in $10; send $10=${fieldsOff.suggestedMask})`;
+  }
   if (wcoMm === null) return reportsOffset ? 'not reported yet' : 'not reported';
   return customOrigin
     ? `X ${dro(wcoMm.x, unit)} Y ${dro(wcoMm.y, unit)}${inchMark(unit)} (${originName})`

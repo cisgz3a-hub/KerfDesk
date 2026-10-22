@@ -11,6 +11,12 @@
 // https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/gcode.c#L787
 
 import type { ControllerCapabilities } from '../../core/controllers';
+import type { ControllerSettingsSnapshot } from '../../core/controllers/grbl/parse-settings';
+import {
+  laserStatusReportFieldsOff,
+  workOffsetOffMessage,
+  type StatusReportFieldsOff,
+} from '../state/status-report-fields';
 import {
   placementAssumesZeroWorkOffset,
   type MachinePlacementSnapshot,
@@ -30,14 +36,40 @@ export function controllerReportsWorkOffset(
   return capabilities.statusQuery === 'realtime-report' && capabilities.wcs === 'g92-and-g10';
 }
 
+/** The same assumption when a grblHAL `$10` keeps WCO from ever arriving
+ * (ADR-375 Amendment 2): no wait would have brought it. */
+export function workOffsetOffAssumedZeroWarning(fieldsOff: StatusReportFieldsOff): string {
+  return `Work offset assumed zero. ${workOffsetOffMessage(fieldsOff)} Until then KerfDesk assumes the offset is zero: if a G54 or G92 offset is set on the controller, the job sits on the bed shifted by that offset from what KerfDesk shows and checks; the physical Frame traced where it will actually run.`;
+}
+
 /** The Job Review warning for a preparation placed with the assumed zero. */
 export function workOffsetAssumptionWarnings(
   placement: Extract<ResolvedJobPlacement, { readonly ok: true }>,
-  machine: MachinePlacementSnapshot & { readonly reportsWorkOffset?: boolean },
+  machine: MachinePlacementSnapshot & {
+    readonly reportsWorkOffset?: boolean;
+    readonly statusReportFieldsOff?: StatusReportFieldsOff | null;
+  },
 ): ReadonlyArray<string> {
   if (machine.reportsWorkOffset !== true) return [];
   const startFrom = placement.jobOrigin?.startFrom ?? 'absolute';
-  return placementAssumesZeroWorkOffset(startFrom, machine)
-    ? [WORK_OFFSET_ASSUMED_ZERO_WARNING]
-    : [];
+  if (!placementAssumesZeroWorkOffset(startFrom, machine)) return [];
+  const fieldsOff = machine.statusReportFieldsOff;
+  return [
+    fieldsOff?.workOffsetOff === true
+      ? workOffsetOffAssumedZeroWarning(fieldsOff)
+      : WORK_OFFSET_ASSUMED_ZERO_WARNING,
+  ];
+}
+
+/** Whether the connected controller's reports will ever carry WCO: a GRBL-family
+ * report stream, unless a grblHAL `$10` turns the field off (ADR-375
+ * Amendment 2). */
+export function controllerWillReportWorkOffset(laser: {
+  readonly capabilities: Pick<ControllerCapabilities, 'statusQuery' | 'wcs' | 'statusReportMask'>;
+  readonly controllerSettings: ControllerSettingsSnapshot | null;
+}): boolean {
+  return (
+    controllerReportsWorkOffset(laser.capabilities) &&
+    laserStatusReportFieldsOff(laser)?.workOffsetOff !== true
+  );
 }

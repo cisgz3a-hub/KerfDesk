@@ -263,6 +263,44 @@ describe('offsetShapes open paths', () => {
     expect(result.inward).toBeNull();
   });
 
+  // Audit 2026-10-21 geometry P3-3: SVG `M0 0 L10 0 Z` and `<polygon points="0,0 10,0"/>`
+  // import as closed paths with no area, which Offset used to drop silently.
+  it('outlines a closed path with no area as the line it draws', () => {
+    const closedLines: ReadonlyArray<Polyline> = [
+      {
+        closed: true,
+        points: [
+          { x: 0, y: 0 },
+          { x: 10, y: 0 },
+          { x: 0, y: 0 },
+        ],
+      },
+      {
+        closed: true,
+        points: [
+          { x: 0, y: 0 },
+          { x: 5, y: 0 },
+          { x: 10, y: 0 },
+        ],
+      },
+    ];
+    const open = run(line, { distanceMm: 2 }).outward!.bounds;
+    for (const closedLine of closedLines) {
+      const { bounds } = run([art([closedLine])], { distanceMm: 2 }).outward!;
+      expect(bounds.minX).toBeCloseTo(open.minX, 3);
+      expect(bounds.maxX).toBeCloseTo(open.maxX, 3);
+      expect(bounds.minY).toBeCloseTo(open.minY, 3);
+      expect(bounds.maxY).toBeCloseTo(open.maxY, 3);
+    }
+  });
+
+  it('refuses, with a reason, a selection that has nothing to outline', () => {
+    const point: Polyline = { closed: false, points: [{ x: 3, y: 3 }] };
+    const result = offsetShapes([art([point])], options({}), IDS);
+    expect(result.kind === 'error' && result.error.kind).toBe('empty-result');
+    if (result.kind === 'error') expect(result.error.message).toMatch(/^Nothing to offset/);
+  });
+
   it('explains that Inward needs a closed shape', () => {
     const result = offsetShapes(line, options({ direction: 'inward' }), IDS);
     expect(result.kind).toBe('error');
