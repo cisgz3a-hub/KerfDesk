@@ -36,6 +36,8 @@ describe('GRBL-family variant drivers', () => {
       ...grblDriver.capabilities,
       statusWhileHoming: false,
       stickyLineError: true,
+      // `$10` bits 5 and 6 send WCO: and Ov: (ADR-375 Amendment 2).
+      statusReportMask: 'grblhal-fields',
     });
     expect(grblHalDriver.homingCycle).toEqual({ locateScalar: 10, locateCyclesSettingId: 43 });
     expect(grblDriver.capabilities.statusWhileHoming).toBe(false);
