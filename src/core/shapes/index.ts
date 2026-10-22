@@ -22,5 +22,6 @@ export type { DrawShapeKind, DrawShapeModifiers } from './shape-from-drag';
 export {
   createRegistrationBox,
   createRegistrationCircle,
+  createRegistrationOutline,
   REGISTRATION_BOX_OBJECT_ID,
 } from './registration-box';

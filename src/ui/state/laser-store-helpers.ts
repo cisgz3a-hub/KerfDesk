@@ -38,7 +38,7 @@ export const UNKNOWN_IDLE_STATUS_MESSAGE =
 export const MOTION_OPERATION_ACTIVE_MESSAGE =
   'A jog or frame operation is active. Wait for GRBL to report Idle, or cancel the operation, before sending another motion command.';
 export const FIRE_ACTIVE_COMMAND_MESSAGE =
-  'Release the momentary Fire control before sending another machine command.';
+  'Release the momentary Fire control, or switch the laser dot off, before sending another machine command.';
 export const MPG_ACTIVE_MOTION_MESSAGE =
   'Jog and Frame are unavailable while grblHAL reports MPG mode active. Return motion control from the pendant/MPG to KerfDesk and wait for an MPG:0 report.';
 /** Operator guidance for a command rejected while grblHAL MPG owns transport control. */

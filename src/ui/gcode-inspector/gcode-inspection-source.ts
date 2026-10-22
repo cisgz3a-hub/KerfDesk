@@ -104,7 +104,7 @@ export function deviceInspectionContext(
   machineKind: 'laser' | 'cnc',
   controllerKind?: ControllerKind,
 ): GcodeInspectionContext {
-  const timing = deviceInspectionTiming(device);
+  const timing = deviceInspectionTiming(device, controllerKind);
   const controller = controllerKind === undefined ? {} : { controllerKind };
   if (machineKind === 'cnc') return { machineKind: 'cnc', timing, ...controller };
   return {
@@ -132,8 +132,11 @@ export function deviceInspectionLaser(device: DeviceProfile): GcodeInspectionLas
 }
 
 /** The same limits and calibration Job Review times the device's jobs with. */
-export function deviceInspectionTiming(device: DeviceProfile): GcodeInspectionTiming {
-  const plannerBlocks = devicePlannerBlocks(device);
+export function deviceInspectionTiming(
+  device: DeviceProfile,
+  controllerKind?: ControllerKind,
+): GcodeInspectionTiming {
+  const plannerBlocks = devicePlannerBlocks(device, controllerKind);
   return {
     limits: {
       accelMmPerSec2: device.accelMmPerSec2,

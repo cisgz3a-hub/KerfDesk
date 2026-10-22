@@ -1,4 +1,5 @@
 import { profileSupportsCapability } from '../../core/devices';
+import { isLaserDotLight } from '../../core/devices/positioning-light';
 import type { ControllerDriver } from '../../core/controllers';
 import { laserFireRefusal } from '../../core/preflight/laser-module-readiness';
 import { machineKindOf } from '../../core/scene';
@@ -45,7 +46,7 @@ const FIRE_OFF_COMMAND = 'M5\n';
  * https://github.com/gnea/grbl/blob/master/grbl/gcode.c
  * https://github.com/gnea/grbl/wiki/Grbl-v1.1-Laser-Mode
  */
-function fireOnCommand(powerS: number, feedMmPerMin: number): string {
+export function fireOnCommand(powerS: number, feedMmPerMin: number): string {
   const feed = Math.max(1, Math.round(feedMmPerMin));
   return `G1 F${feed} M3 S${powerS}\n`;
 }
@@ -104,7 +105,9 @@ async function deactivateFire(
     get().controllerSessionEpoch === sessionEpoch &&
     get().connectionAttempt === connectionAttempt
   ) {
-    set({ fireActive: false });
+    // The Falcon's LED is this same beam (ADR-664): M5 put the dot out too.
+    const dot = isLaserDotLight(useStore.getState().project.device.positioningLight);
+    set({ fireActive: false, ...(dot ? { positioningLightEnabled: false } : {}) });
   }
 }
 

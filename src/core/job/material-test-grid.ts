@@ -148,10 +148,19 @@ export function materialTestGridAxes(options: MaterialTestGridOptions): Material
   return { mode, rowAxis, columnAxis, fixed };
 }
 
-function planMaterialTestGrid(options: MaterialTestGridOptions): GridPlan {
-  const { mode, rowAxis, columnAxis, fixed } = materialTestGridAxes(options);
+/** Physical cell dimensions shared by Generate and its display-only preview. */
+export function materialTestCellDimensions(options: MaterialTestGridOptions): {
+  readonly cellWidth: number;
+  readonly cellHeight: number;
+} {
   const cellWidth = Math.max(MIN_CELL_SIZE_MM, finiteOr(options.cellWidthMm, MIN_CELL_SIZE_MM));
   const cellHeight = Math.max(MIN_CELL_SIZE_MM, finiteOr(options.cellHeightMm, MIN_CELL_SIZE_MM));
+  return { cellWidth, cellHeight };
+}
+
+function planMaterialTestGrid(options: MaterialTestGridOptions): GridPlan {
+  const { mode, rowAxis, columnAxis, fixed } = materialTestGridAxes(options);
+  const { cellWidth, cellHeight } = materialTestCellDimensions(options);
   const layers = materialTestLayers({ mode, rowAxis, columnAxis, fixed, options });
   const layout = materialTestLayout({
     origin: options.origin ?? DEFAULT_ORIGIN,

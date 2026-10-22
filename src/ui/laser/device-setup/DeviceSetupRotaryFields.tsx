@@ -76,14 +76,15 @@ export function DeviceSetupRotaryFields(props: {
               apply(editRotaryFields(edit, { reverseAxis: event.target.checked }))
             }
             aria-label="Reverse rotary direction"
-            title="Reverse rotary travel only if the calibration test moves in the wrong direction."
+            title="Reverse rotary travel only if burned text comes out mirrored around the part."
           />
           Reverse rotary axis
         </label>
       </Row>
       <p style={mutedStyle}>
-        Run the rotary calibration pattern after saving and measure one full revolution before
-        production.
+        After saving, use Test rotation in Rotary Setup to check one revolution. Then burn the
+        rotary test pattern and measure its height around the part: it should match the height
+        Generate test pattern reports.
       </p>
     </div>
   );
@@ -104,7 +105,7 @@ function RollerScaleRows(props: {
             checked={props.scaled}
             onChange={(event) => props.onEdit(editRollerScaling(props.edit, event.target.checked))}
             aria-label="Scale Y from the roller diameter"
-            title="Leave off when the controller already moves the part's surface in millimetres."
+            title="Needed for a roller on an unchanged Y port. Turn off only when the controller's Y steps/mm already move the part's surface in millimetres."
           />
           Scale Y from the roller diameter
         </label>

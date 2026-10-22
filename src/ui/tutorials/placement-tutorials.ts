@@ -119,7 +119,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
     id: 'board',
     title: 'Place artwork on a measured board',
     summary:
-      'Capture a rectangular or circular board, place the design and physically check the outline.',
+      'Capture a rectangular, circular or photo-traced outline board, then place and check the design.',
     category: 'Machine & setup',
     machine: 'all',
     minutes: 4,
@@ -131,14 +131,14 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose the board shape',
         instruction:
-          'Choose Rectangle or Circle. For a rectangle, jog to and capture the bottom-left corner first; this establishes its work origin. For a circle, choose Find center from rim or Center already marked.',
+          'Choose Rectangle, Circle or Outline. For Outline, open a photo of the board, click its corners and type its size: the board goes on the canvas at once, and two head captures register it to the machine later.',
         focus: 'Rectangle or circle reference',
         result: 'The chosen capture method matches how you can locate the physical board.',
       },
       {
         title: 'Finish measuring the outline',
         instruction:
-          'For a rectangle, capture the other three corners in any order or enter Width and Height after the first corner. A circle can use four well-spaced rim points, or a captured centre with an edge point or measured diameter.',
+          'Measure rectangles or circles as prompted. For an outline, jog the head onto points A and B shown on the outline, capture each, then Register board.',
         focus: 'Measured points or known dimensions',
         result:
           'Create the board outline to obtain a locked placement reference excluded from the burn.',
@@ -162,7 +162,18 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
       },
     ],
     tip: 'Board checks and capture controls can move the real head or change its coordinate reference. If the reference becomes stale, capture the board again.',
-    keywords: ['board', 'stock', 'capture', 'corners', 'circle', 'centre', 'placement', 'array'],
+    keywords: [
+      'board',
+      'stock',
+      'capture',
+      'corners',
+      'circle',
+      'outline',
+      'photo',
+      'centre',
+      'placement',
+      'array',
+    ],
     related: ['origin', 'jog', 'array', 'registration', 'frame-start'],
   },
   {
@@ -187,7 +198,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Check rotary travel and direction',
         instruction:
-          'For a chuck, set Motion per turn from the verified machine setup. For a roller whose controller moves in motor millimetres, turn on Scale Y from the roller diameter and enter the driven roller diameter and Motion per turn. Inspect Y scale and Machine travel per revolution; use Reverse rotary direction only when needed.',
+          'For a chuck, set Motion per turn from the verified machine setup. For a roller, keep Scale Y from the roller diameter on and enter the driven roller diameter and Motion per turn; turn it off only when the controller’s Y steps/mm already move the part’s surface in millimetres. Inspect Y scale and Machine travel per revolution; use Reverse rotary direction only when needed.',
         focus: 'Scale · travel per revolution',
         result:
           'The conversion between the flat design and rotary movement is explicit in the profile.',
@@ -195,7 +206,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Test the rotation',
         instruction:
-          'With the controller connected and Idle, mark the part and choose a Test rotation button. The part turns one revolution slowly with the laser off, pauses, then turns back. If the mark does not return to the same place, adjust the measurements and test again before Apply.',
+          'With the controller connected and Idle, mark the part and choose a Test rotation button. The part turns one revolution slowly with the laser off, pauses, then turns back. If it misses, follow the note under the buttons: a chuck or roller turn corrects Motion per turn, and an unscaled roller needs Scale Y from the roller diameter or a controller set to the surface. Changing the object diameter never fixes a roller’s burn size.',
         focus: 'Test rotation',
         result: 'One revolution on the machine matches one revolution of the part.',
       },

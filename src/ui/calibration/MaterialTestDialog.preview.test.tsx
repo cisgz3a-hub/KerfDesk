@@ -36,7 +36,7 @@ describe('MaterialTestDialog test card preview (ADR-497)', () => {
       expect(preview(host).getAttribute('aria-label')).toBe(
         'Test card preview. 10 by 10 engraved test card: rows vary speed from 3000 to 1000 mm/min; ' +
           'columns vary power from 10 to 40%. Darker cells get more energy; the deepest gets 12 ' +
-          'times the faintest.',
+          'times the faintest. Cells: 5 × 5 mm. Cell proportions shown; spacing is schematic.',
       );
     } finally {
       await act(async () => root.unmount());

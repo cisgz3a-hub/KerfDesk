@@ -1,4 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import {
+  GRBLHAL_LEVEL_2_DUMP,
+  grblHalSettingsMap,
+} from '../../../__fixtures__/controllers/grblhal-settings-dump';
 import { classifyResponse } from './response';
 import {
   idleCollector,
@@ -106,6 +110,7 @@ describe('settingsMapToProfilePatch', () => {
       softLimitsEnabled: true,
       hardLimitsEnabled: true,
       homingEnabled: true,
+      homingForceSetOrigin: false,
     });
     const optionsWithoutEnable = new Map([
       [21, '2'],
@@ -114,7 +119,33 @@ describe('settingsMapToProfilePatch', () => {
     expect(settingsMapToControllerSettings(optionsWithoutEnable)).toEqual({
       hardLimitsEnabled: false,
       homingEnabled: false,
+      homingForceSetOrigin: false,
     });
+  });
+
+  // grblHAL `$22` bit 3 is force set origin ("Set machine origin to 0",
+  // settings.h#L714-L718). `$$` prints the whole bitfield, and lists `$384`,
+  // only at COMPATIBILITY_LEVEL <= 1 (settings.c#L1775-L1782, system.c#L300-L317);
+  // above it `$22` is 0 or 1 and says nothing about force origin. ADR-375 Amd 3.
+  it('reads grblHAL force set origin from a dump that prints the whole $22 bitfield', () => {
+    expect(settingsMapToControllerSettings(grblHalSettingsMap({ 22: '9' }))).toMatchObject({
+      homingEnabled: true,
+      homingForceSetOrigin: true,
+    });
+    expect(settingsMapToControllerSettings(grblHalSettingsMap())).toMatchObject({
+      homingEnabled: true,
+      homingForceSetOrigin: false,
+    });
+    const level2 = settingsMapToControllerSettings(grblHalSettingsMap({}, GRBLHAL_LEVEL_2_DUMP));
+    expect(level2.homingEnabled).toBe(true);
+    expect(level2).not.toHaveProperty('homingForceSetOrigin');
+    expect(
+      settingsMapToControllerSettings(grblHalSettingsMap({ 22: '13' }, GRBLHAL_LEVEL_2_DUMP)),
+    ).toMatchObject({ homingForceSetOrigin: true });
+  });
+
+  it('reads no force set origin from a stock GRBL $22', () => {
+    expect(settingsMapToControllerSettings(new Map([[22, '1']]))).toEqual({ homingEnabled: true });
   });
 
   it('leaves a $21/$22 value that is not a non-negative integer unknown', () => {

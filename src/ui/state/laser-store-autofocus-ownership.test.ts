@@ -198,6 +198,20 @@ describe('store autofocus shared response ownership', () => {
     expect(useLaserStore.getState().autofocusBusy).toBe(false);
   });
 
+  it('sends nothing for a probe with no feed of its own (controller audit v3 D2-P3-3)', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(writes);
+    await connectWith(connection);
+    writes.length = 0;
+
+    const result = await useLaserStore.getState().autofocus('G38.2 Z-10');
+
+    expect(result.kind).toBe('preflight-failed');
+    if (result.kind === 'preflight-failed') expect(result.reason).toMatch(/needs its own feed/);
+    expect(writes).toEqual([]);
+    expect(useLaserStore.getState().autofocusBusy).toBe(false);
+  });
+
   it('refuses to start while a previous controller response is still owed', async () => {
     const writes: string[] = [];
     const connection = makeConnection(writes);
