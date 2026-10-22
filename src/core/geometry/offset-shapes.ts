@@ -221,14 +221,32 @@ function splitPath(path: ColoredPath): { readonly closed: PathsD; readonly open:
   return { closed, open };
 }
 
+// A rotated or scaled straight line comes out of materialization a few ulps off
+// exact collinearity, so "on the line" means within half the 1 µm grid that the
+// filled region is normalized on.
+const COLLINEAR_TOLERANCE_MM = 0.5 / 10 ** VECTOR_PATH_PRECISION_DECIMALS;
+
 function collinearRing(ring: PathD): boolean {
   const first = ring[0];
   if (first === undefined) return true;
-  const next = ring.find((point) => point.x !== first.x || point.y !== first.y);
-  if (next === undefined) return true;
-  const dx = next.x - first.x;
-  const dy = next.y - first.y;
-  return ring.every((point) => dx * (point.y - first.y) === dy * (point.x - first.x));
+  // The vertex farthest from the first fixes the line's direction; two close
+  // vertices would give a direction that the tolerance cannot bound.
+  let far = first;
+  let farSq = 0;
+  for (const point of ring) {
+    const distanceSq = (point.x - first.x) ** 2 + (point.y - first.y) ** 2;
+    if (distanceSq > farSq) {
+      far = point;
+      farSq = distanceSq;
+    }
+  }
+  if (farSq === 0) return true;
+  const dx = far.x - first.x;
+  const dy = far.y - first.y;
+  const limit = COLLINEAR_TOLERANCE_MM * Math.sqrt(farSq);
+  return ring.every(
+    (point) => Math.abs(dx * (point.y - first.y) - dy * (point.x - first.x)) <= limit,
+  );
 }
 
 // Each ColoredPath is its own fill batch, under the rule the canvas and CAM use.
