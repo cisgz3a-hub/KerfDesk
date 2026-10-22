@@ -9250,8 +9250,10 @@ The G-code Inspector is free in every edition (ADR-627).
    the head stands. The outline holds only motion the program places in the work coordinates it
    starts in: `G53` and probe moves, a move to the stored `G30` position, moves after the
    program changes its origin (`G92`, or `G10 L2`/`L20` on `G54`) on the axes it changes, and
-   moves in `G55`-`G59` are left out and named in the warnings. A program that never moves
-   frames the point where the head stands. A large file is prepared a slice at a time.
+   moves in `G55`-`G59` are left out and named in the warnings. Arcs count by their exact
+   extent in the plane they run in: XY (`G17`), XZ (`G18`) or YZ (`G19`) (ADR-630 Amendment 2).
+   A program that never moves frames the point where the head stands. A large file is prepared a
+   slice at a time.
    On Marlin, the baseline is two separate lines, `G21` then `G90`, and significant whitespace is
    preserved. Review reads the first command on each line with that command's parameters; later
    G/M words do not execute as extra commands. Firmware-dependent motion and its dependent
@@ -9285,8 +9287,11 @@ them), a program that looks like the other machine mode, zero XY extent (the Fra
 point and proves no Z clearance or depth), probing (`G38.2` to `G38.5`), `M3`/`M4` with no
 `S` anywhere (it runs at the S the controller already holds), the words the Inspector does not
 interpret, a Frame outline that leaves the configured machine bounds or overlaps an enabled
-no-go zone (or a note that the outline could not be placed on the bed), and Program Health
-notices and warnings. Commands are found however they are spelt (`G+91`, `G91.0`, `G 91`).
+no-go zone (or a note that the outline could not be placed on the bed), moves the Inspector
+could not read, such as an arc whose radius does not match (they are not in the Frame outline,
+and the head still makes them if the controller runs them; the first one is named by its line in
+the sent program, where the baseline line comes first), and Program Health notices and warnings.
+Commands are found however they are spelt (`G+91`, `G91.0`, `G 91`).
 
 #### Refusals
 
