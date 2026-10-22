@@ -30,6 +30,7 @@ import type { MaterialLibraryDocument } from '../../io/material-library';
 import { projectWithFreshLaserRecipes } from './laser-recipe-seeding';
 import { reportDependencyRepairs } from './object-delete-actions';
 import type { repairRemovedObjectReferences } from './repair-object-dependencies';
+import { prepareProjectInsertion } from './project-insertion-budget';
 
 // Narrow `set`: every action here dispatches a pure mutation helper
 // returning a MutationResult. AppState's full Setter is assignable to
@@ -44,7 +45,7 @@ type ImportState = StateSlice &
 type ImportSet = (fn: (s: ImportState) => MutationResult) => void;
 
 export function imageImportActions(
-  set: ImportSet,
+  rawSet: ImportSet,
   get: () => ProjectSlice,
 ): {
   readonly importRasterImage: (object: SceneObject, batchIdx?: number) => ImportOutcome;
@@ -60,6 +61,8 @@ export function imageImportActions(
   ) => void;
   readonly convertToBitmap: (sourceIds: ReadonlyArray<string>, raster: RasterImage) => void;
 } {
+  const set: ImportSet = (update) =>
+    rawSet((state) => prepareProjectInsertion(state.project, () => update(state)));
   return {
     importRasterImage: (object, batchIdx) => {
       let outcome: ImportOutcome = { kind: 'added' };

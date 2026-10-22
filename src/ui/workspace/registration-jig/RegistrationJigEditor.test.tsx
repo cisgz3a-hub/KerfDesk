@@ -214,6 +214,25 @@ describe('Registration Jig dedicated editor', () => {
     expect(container.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)?.value).toBe(shown);
     expect(container.textContent).not.toContain('Unsaved changes');
   });
+  it('leaves a value being composed with an IME alone on Escape', () => {
+    savedJigWithArtwork();
+    useStore.getState().selectObject('art');
+    render();
+    const field = container.querySelector<HTMLInputElement>('[aria-label="X (mm)"]');
+    if (field === null) throw new Error('Missing selection field');
+    act(() => field.focus());
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(field, '42');
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    act(() => {
+      field.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', isComposing: true, bubbles: true }),
+      );
+    });
+    expect(document.activeElement).toBe(field);
+    expect(field.value).toBe('42');
+  });
   it('Enter in a field applies the value and keeps focus on the editor', async () => {
     // Laid out as in a browser, so the editor's focus recovery can pick a button.
     const laidOut = vi

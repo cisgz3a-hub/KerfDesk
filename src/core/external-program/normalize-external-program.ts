@@ -33,6 +33,8 @@ import type { ControllerKind } from '../devices';
 import { controllerBlockRejection } from './controller-block-check';
 
 export type ExternalProgram = {
+  /** The parser used for this executable; absent on legacy GRBL callers. */
+  readonly controllerKind?: ControllerKind;
   /** One line per sent line, each ending in '\n', the baseline first. */
   readonly gcode: string;
   /** The baseline line sent first (externalProgramBaseline). */
@@ -59,15 +61,15 @@ export const EXTERNAL_PROGRAM_BASELINE = 'G17G21G90G94G0';
 
 /**
  * The baseline a controller accepts. Marlin stops a job at a command its
- * build lacks (G94 always, G17 without CNC_WORKSPACE_PLANES) and keeps no
- * motion or plane mode, so millimetres and absolute distance are all it
- * needs; Smoothieware keeps plane and motion modes but has no G94.
+ * build lacks (G94 always, G17 without CNC_WORKSPACE_PLANES). Its units and
+ * distance commands must be separate lines; optional motion/plane behavior
+ * is disclosed by the Marlin reader. Smoothieware has no G94.
  */
 export function externalProgramBaseline(kind: ControllerKind): string {
   if (kind === 'grbl-v1.1' || kind === 'grblhal' || kind === 'fluidnc') {
     return EXTERNAL_PROGRAM_BASELINE;
   }
-  return kind === 'smoothieware' ? 'G17G21G90G0' : 'G21G90';
+  return kind === 'smoothieware' ? 'G17G21G90G0' : 'G21\nG90';
 }
 
 /** The baseline's words with what each sets, for the Run review. */
@@ -97,10 +99,20 @@ export type ExternalProgramNormalizer = {
 
 /** Line-at-a-time normalization, so a large file can be fed in chunks. */
 export function createExternalProgramNormalizer(
-  baseline: string = EXTERNAL_PROGRAM_BASELINE,
+  baseline: string = externalProgramBaseline('grbl-v1.1'),
+  controllerKind?: ControllerKind,
 ): ExternalProgramNormalizer {
+  if (baseline === EXTERNAL_PROGRAM_BASELINE && controllerKind !== undefined) {
+    baseline = externalProgramBaseline(controllerKind);
+  }
+  // Retain compatibility with callers supplying externalProgramBaseline(kind).
+  const marlin =
+    controllerKind === undefined
+      ? baseline === externalProgramBaseline('marlin')
+      : controllerKind === 'marlin';
   const reasons: string[] = [];
-  const lines: string[] = [baseline];
+  const lines: string[] = baseline.split('\n');
+  const baselineLines = lines.length;
   let lineNumber = 0;
   let droppedLineCount = 0;
   let commentsRemoved = false;
@@ -116,13 +128,15 @@ export function createExternalProgramNormalizer(
       if (stripped !== raw) commentsRemoved = true;
       const reason = characterRefusal(stripped, lineNumber);
       if (reason !== null) reasons.push(reason);
-      const line = canonicalLine(stripped);
-      if (line === '' || line === '%') {
+      // Marlin parses the first command, then its parameters. Whitespace
+      // terminates a number there: X1 0 0 must not be rewritten as X100.
+      const line = marlin ? stripped.trim() : canonicalLine(stripped);
+      if (line.trim() === '' || line.trim() === '%') {
         droppedLineCount += 1;
         return;
       }
       if (reason === null) {
-        const lineRefusal = lineRefusalOf(line, lineNumber);
+        const lineRefusal = lineRefusalOf(marlin ? line.trimStart() : line, lineNumber, marlin);
         if (lineRefusal !== null) reasons.push(lineRefusal);
       }
       lines.push(line);
@@ -130,13 +144,18 @@ export function createExternalProgramNormalizer(
     finish: () => {
       if (sawNul) return refused([NUL_REASON]);
       if (reasons.length > 0) return refused(summarize(reasons));
-      if (lines.length === 1) return refused(['The file has no G-code line to send.']);
+      if (lines.length === baselineLines) return refused(['The file has no G-code line to send.']);
       const gcode = lines.map((line) => `${line}\n`).join('');
       return {
         kind: 'ok',
         program: {
           gcode,
           baseline,
+          ...(controllerKind === undefined
+            ? marlin
+              ? { controllerKind: 'marlin' as const }
+              : {}
+            : { controllerKind }),
           lineCount: lines.length,
           byteCount: gcode.length,
           droppedLineCount,
@@ -150,8 +169,9 @@ export function createExternalProgramNormalizer(
 export function normalizeExternalProgram(
   text: string,
   baseline: string = EXTERNAL_PROGRAM_BASELINE,
+  controllerKind?: ControllerKind,
 ): ExternalProgramResult {
-  const normalizer = createExternalProgramNormalizer(baseline);
+  const normalizer = createExternalProgramNormalizer(baseline, controllerKind);
   for (const line of sourceLines(text)) normalizer.push(line);
   return normalizer.finish();
 }
@@ -221,15 +241,21 @@ function characterRefusal(line: string, lineNumber: number): string | null {
 // A '$' line, or FluidNC's bracket form of one ('[J]' and '[Jog]' run as
 // '$J=', fluidnc-line-limit.ts), is a controller command; any other line the
 // controller rejects as a block would leave the framed outline wrong.
-function lineRefusalOf(line: string, lineNumber: number): string | null {
+function lineRefusalOf(line: string, lineNumber: number, marlin: boolean): string | null {
   if (line.startsWith('$')) return controllerCommand(line, lineNumber, '$');
   if (line.startsWith('[')) return controllerCommand(line, lineNumber, 'bracket');
+  // Marlin queue.cpp requires line sequence/checksum handling for every
+  // leading N line. The ordinary sender implements neither resend protocol.
+  // https://github.com/MarlinFirmware/Marlin/blob/2.1.2.8/Marlin/src/gcode/queue.cpp#L438-L470
+  if (marlin && line.startsWith('N')) {
+    return `Line ${lineNumber} (${preview(line)}) uses Marlin's numbered checksum protocol. KerfDesk streams unnumbered lines, so save the program without line numbers and checksums.`;
+  }
   // Marlin's line-number checksum framing (`N1 G1 X10*42`): GRBL rejects the
   // '*', and normalizing the line breaks the checksum Marlin would verify.
   if (line.includes('*')) {
     return `Line ${lineNumber} (${preview(line)}) carries a checksum (*), framing for a line protocol KerfDesk does not stream. GRBL rejects the line and Marlin would ask for it again, so save the program without checksums.`;
   }
-  const rejected = controllerBlockRejection(line);
+  const rejected = marlin ? null : controllerBlockRejection(line);
   if (rejected === null) return null;
   return `Line ${lineNumber} (${preview(line)}) is one the controller rejects whole: ${rejected}. The Frame would trace it as if it ran, so fix it in the program.`;
 }
