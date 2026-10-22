@@ -11,7 +11,7 @@ import type {
   RasterGroup,
 } from './job';
 import type { JobBounds } from './job-bounds';
-import { computeJobBounds } from './job-bounds';
+import { computeJobPlacementBounds } from './job-bounds';
 import { withContourEntryBounds } from './contour-entry';
 import { translateCutSegment } from './cut-arc-moves';
 import { machineToScan, rasterScanFrame } from '../raster/raster-scan-frame';
@@ -97,7 +97,8 @@ export function applyJobOriginOffset(job: Job, offset: Vec2): Job {
 
 // The translation applyJobOrigin applies for this job + placement (zero for
 // absolute placements). Exposed so the preview can undo the placement when
-// mapping the prepared job back into the scene frame (H3).
+// mapping the prepared job back into the scene frame (H3). The anchor is the
+// design extent: a scan-offset table does not move it (ADR-052 Amendment 1).
 export function jobOriginOffset(
   job: Job,
   placement: JobOriginPlacement,
@@ -105,7 +106,7 @@ export function jobOriginOffset(
 ): Vec2 {
   const target = targetPoint(placement);
   if (target === null) return { x: 0, y: 0 };
-  const bounds = computeJobBounds(job, device);
+  const bounds = computeJobPlacementBounds(job, device);
   if (bounds === null) return { x: 0, y: 0 };
   const anchor = anchorPointForOrigin(bounds, placement.anchor, device?.origin);
   return { x: target.x - anchor.x, y: target.y - anchor.y };

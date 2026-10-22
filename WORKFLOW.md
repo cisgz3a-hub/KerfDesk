@@ -5245,6 +5245,10 @@ last updated.
 6. Raster Diagnostics checks actual split runways against the profile acceleration distance as
    well as the calibration margin. Confirm that acceleration against the controller. If runway
    is too short, lower engraving speed or increase Overscan before measuring scan offsets.
+7. A saved table moves only the commanded reverse rows. **User Origin**, **Current Position** and
+   **Verified Origin** anchor the design bounds, so turning a table on or changing it never moves
+   a placed job, its forward rows or its Line cuts (ADR-052 Amendment 1). Frame and the bed and
+   no-go checks still trace the commanded rows, which can reach up to the offset past the anchor.
 
 ## Phase H flows (CNC router mode — ADR-098)
 

@@ -4,6 +4,7 @@ import type { Job } from './job';
 import {
   applyJobOrigin,
   JOB_ORIGIN_ANCHORS,
+  jobOriginOffset,
   jobOriginOffsetFromBounds,
   offsetJobBounds,
   USER_ORIGIN_JOB_PLACEMENT,
@@ -169,5 +170,54 @@ describe('anchorPointForOrigin: anchors are physical corners on every device ori
       y: -215,
     });
     expect(jobOriginOffsetFromBounds(bounds, placement)).toEqual({ x: -175, y: -185 });
+  });
+});
+
+// ADR-052 Amendment 1: an image's reverse rows are commanded off design so they
+// burn on the forward rows; the anchor stays on the design corner.
+describe('jobOriginOffset with a scan-offset table', () => {
+  const imageJob: Job = {
+    groups: [
+      {
+        kind: 'raster',
+        layerId: 'image',
+        color: '#000000',
+        power: 30,
+        speed: 6000,
+        passes: 1,
+        airAssist: false,
+        sValues: new Uint16Array([0, 100, 100, 0]),
+        pixelWidth: 2,
+        pixelHeight: 2,
+        bounds: { minX: 40, minY: 30, maxX: 42, maxY: 32 },
+        overscanMm: 1,
+        dotWidthCorrectionMm: 0,
+      },
+    ],
+  };
+  const withTable = (offsetMm: number) => ({
+    ...DEFAULT_DEVICE_PROFILE,
+    scanningOffsets: [{ speedMmPerMin: 6000, offsetMm }],
+  });
+
+  it.each([
+    { anchor: 'front-left', offsetMm: 0.25, expected: { x: -40, y: -30 } },
+    { anchor: 'front-right', offsetMm: -0.25, expected: { x: -42, y: -30 } },
+    { anchor: 'center', offsetMm: 0.25, expected: { x: -41, y: -31 } },
+  ] as const)('anchors $anchor on the design image with a $offsetMm mm table', (row) => {
+    const placement = { startFrom: 'user-origin', anchor: row.anchor } as const;
+
+    expect(jobOriginOffset(imageJob, placement, withTable(row.offsetMm))).toEqual(row.expected);
+    expect(jobOriginOffset(imageJob, placement, DEFAULT_DEVICE_PROFILE)).toEqual(row.expected);
+  });
+
+  it('places a current-position image on the design corner', () => {
+    const placement = {
+      startFrom: 'current-position',
+      anchor: 'front-left',
+      currentPosition: { x: 100, y: 100 },
+    } as const;
+
+    expect(jobOriginOffset(imageJob, placement, withTable(0.25))).toEqual({ x: 60, y: 70 });
   });
 });
