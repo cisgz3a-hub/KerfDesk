@@ -66,7 +66,7 @@ export function CalibrationSetupStep(props: { readonly note: string | null }): J
       <details style={foldStyle}>
         <summary
           style={summaryStyle}
-          title="Show or hide the power, speed and passes used to engrave the target."
+          title="Show or hide the power, speed, margin and camera height used to engrave the target."
         >
           Engrave settings
         </summary>
