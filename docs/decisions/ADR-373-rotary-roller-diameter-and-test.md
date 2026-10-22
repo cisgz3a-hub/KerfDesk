@@ -97,3 +97,97 @@ showed rotary state only inside the dialog, Machine Setup and Job Review.
   `RotaryModeSwitch.test.tsx`, `RotaryModeSwitch.frame.test.tsx`,
   `device-setup/DeviceSetupRotaryFields.test.tsx`, `rotary-setup-edit.test.ts`,
   `rotary-summary.test.ts`: dialog, switch (including Frame expiry) and wizard behaviour.
+
+### Amendment 1 (2026-10-22) - a missed test turn names what to change, and a new roller scales
+
+**Context.** Controller audit v3 finding D3-P2-1 (confirmed by a refuter): every new roller
+started unscaled, and the Test rotation note after any turn said "adjust the measurements and
+test again". On an unscaled roller only **Turn object once** exists and Motion per turn is greyed
+out, so the operator could change only the object diameter. Tuning it makes the test land: on a
+stock roller (40 machine mm per turn of a Ø25 roller) under an 80 mm tumbler, Ø40.74 turns the
+tumbler exactly once. But Y stays at scale 1, so a 20 mm design still burns 39.27 mm tall. The
+wrap preview, the Rotary switch and Job Review then all agree on a 128 mm circumference, which
+removes the one signal before a burn that the setup is wrong.
+
+LightBurn's GCode rotary page
+(https://docs.lightburnsoftware.com/2.1/Reference/RotaryMode/RotaryModeGCode/) says:
+- For a roller, the object diameter "does not affect output".
+- Output comes from mm per rotation and the roller diameter.
+- The Test turns "the roller or wheel driven by the motor", and the correction is to mm per
+  rotation: reduce it if the rotary turns too far, increase it if it stops short.
+- It has no roller mode without a roller diameter.
+
+**Decision.**
+1. **The note names the value the turn can correct.** After a finished turn, Test rotation says:
+   - After **Turn chuck once** or **Turn roller once**: change Motion per turn, lower if it turned
+     too far, higher if it stopped short. This is LightBurn's instruction.
+   - After **Turn object once** on a roller scaled from its diameter: check Motion per turn with
+     Turn roller once first. Then measure the roller diameter and the object again rather than
+     adjust either until the mark lands. The roller diameter sets the burn size; the object
+     diameter only sets how much artwork fits in one turn.
+   - After **Turn object once** on an unscaled roller: the controller is not moving the part's
+     surface in millimetres, so jobs would burn at the wrong size. Turn on **Scale Y from the
+     roller diameter** and enter the roller diameter and Motion per turn, or set the controller's
+     Y steps/mm to the part's surface. Changing the object diameter can make the mark land, but
+     it does not fix the size.
+
+   No note asks the operator to tune a roller's object diameter. The note follows the setup on
+   screen, so once the operator turns roller scaling on, it already names the next check.
+2. **A new roller scales, as LightBurn's does.** Rotary Setup and Machine Setup's rotary fields
+   start a profile that has no rotary from `NEW_ROTARY_SETUP` (`ui/laser/rotary-setup-edit.ts`).
+   That is `DEFAULT_ROTARY_SETUP` plus a 25 mm roller diameter, the field's existing starting
+   value. A saved chuck switched to Roller also starts scaled.
+   - Motion per turn keeps its existing 360 mm starting value. Both numbers are placeholders for
+     the operator's measured values; LightBurn states no default for either.
+   - A never-edited new roller therefore maps Y ×4.58 instead of ×1. Neither placeholder fits an
+     unmeasured rotary. The scaled one shows both values it depends on, Turn roller once checks
+     Motion per turn directly, and the scale is visible in Rotary Setup and Job Review before
+     anything burns.
+3. **Earlier projects are unchanged.** A saved roller without a roller diameter opens unscaled and
+   keeps scale 1, with output byte-identical to decision 2 above (the golden digests are
+   unchanged). Nothing changes in:
+   - `DEFAULT_ROTARY_SETUP`, `rotaryYScale` or any other core function;
+   - `.lf2` and machine-profile import.
+
+   No load path adds a roller diameter; only a setup created in the UI after this amendment
+   carries one.
+4. **The mode is named.** `rotaryAttachmentSummary` labels an unscaled roller "(Y not scaled)",
+   as a scaled one already carried "(rollers Ø25 mm)". The Rotary switch, Machine Setup's status
+   line and Job Review's Rotary fact therefore all say which mapping the next job uses.
+5. **Copy:**
+   - the toggle's hint and title say when Y may stay unscaled;
+   - tutorial steps 2-3, `docs/laser-production-workflows.md` and WORKFLOW F-B17 follow
+     decisions 1-2;
+   - audit P3-4: Machine Setup's note no longer promises that the calibration pattern measures a
+     full revolution or shows direction. The pattern is a symmetric rectangle under half a
+     turn. The generate toast now names the height to measure around the part.
+
+**Consequences.**
+- A stock roller left on the defaults now follows LightBurn's flow: enter the roller diameter and
+  Motion per turn, check the roller turn, then the object turn.
+- An operator whose controller's Y steps/mm already move the surface must turn scaling off on a
+  new roller; the toggle's hint says when.
+- Not changed by this amendment (same audit):
+  - D3-P2-2: Home with the rotary on;
+  - D3-P3-1 and D3-P3-2: positional checks against rotary Y;
+  - D3-P3-3: the G-code inspector's wrap ignores Reverse;
+  - an asymmetric calibration pattern.
+- Evidence is unit and component tests only; physical rotary qualification stays operator-owned.
+
+**Verification.**
+- `ui/laser/RotaryTestRotationPanel.test.tsx`:
+  - an unscaled roller whose diameter was tuned to land (Ø128/π, a 128 mm turn) gets the
+    roller-scaling note and no "adjust the measurements";
+  - turning scaling on switches the note to the roller-turn check;
+  - roller and chuck turns name Motion per turn.
+- `io/gcode/emit-gcode-rotary-roller.test.ts`: on a stock roller, the unscaled output burns ×1.96
+  tall and the tuned diameter changes no byte. With roller scaling on, the 50 mm line burns 50 mm
+  for both object sizes.
+- `ui/laser/RotarySetupDialog.roller.test.tsx`: a profile with no rotary opens on a scaled
+  roller and applies `rollerDiameterMm: 25`.
+- `ui/laser/rotary-setup-edit.test.ts`: covers `NEW_ROTARY_SETUP`, a chuck switched to Roller
+  starting scaled, and a legacy roller staying unscaled.
+- `ui/laser/MachineDialogControls.audit.test.tsx`: in Rotary Setup, a saved chuck switched to
+  Roller enables Motion per turn and shows the 25 mm roller diameter.
+- `ui/laser/rotary-summary.test.ts` and `device-setup/device-setup-option-status.test.ts`: the
+  "(Y not scaled)" label.

@@ -40,6 +40,10 @@ export type MachineCommand =
       readonly command: 'set_work_origin';
       readonly args: MachineAdmission & { readonly axes: 'xy' | 'z' };
     }
+  | {
+      readonly command: 'capture_board_point' | 'finish_board';
+      readonly args: MachineAdmission;
+    }
   | { readonly command: 'pause_job' | 'resume_job'; readonly args: { readonly requestId: string } }
   | {
       readonly command: 'jog_hold_start';
@@ -101,6 +105,7 @@ export type MachineOperationKind =
   | 'disconnect'
   | 'home'
   | 'origin'
+  | 'board'
   | 'pause'
   | 'resume'
   | 'hold';

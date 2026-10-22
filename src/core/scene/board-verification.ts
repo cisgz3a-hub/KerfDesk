@@ -1,4 +1,10 @@
 import type { BoardShape } from './board-capture';
+import {
+  correctOutlineGeometry,
+  outlineBoardShape,
+  outlineMachinePoints,
+  type OutlineBoardGeometry,
+} from './board-outline-registration';
 import type { Vec2 } from './scene-object';
 
 export type CapturedBoardGeometry =
@@ -12,7 +18,8 @@ export type CapturedBoardGeometry =
       readonly kind: 'circle';
       readonly center: Vec2;
       readonly radiusMm: number;
-    };
+    }
+  | OutlineBoardGeometry;
 
 export type RectangleBoardVerificationAnchor =
   | 'bottom-left'
@@ -27,11 +34,13 @@ export type CircleBoardVerificationAnchor =
   | 'rim-left';
 export type BoardVerificationTarget =
   | { readonly kind: 'rect'; readonly anchor: RectangleBoardVerificationAnchor }
-  | { readonly kind: 'circle'; readonly anchor: CircleBoardVerificationAnchor };
+  | { readonly kind: 'circle'; readonly anchor: CircleBoardVerificationAnchor }
+  | { readonly kind: 'outline'; readonly index: number; readonly ordinal: number };
 
 export type BoardGeometryCorrection = {
   readonly geometry: CapturedBoardGeometry;
   readonly crossAxisErrorMm: number;
+  readonly residualMm?: number;
 };
 
 export const RECTANGLE_BOARD_VERIFICATION_ANCHORS = [
@@ -50,9 +59,20 @@ export const CIRCLE_BOARD_VERIFICATION_ANCHORS = [
 ] as const satisfies ReadonlyArray<CircleBoardVerificationAnchor>;
 
 export function capturedBoardShape(geometry: CapturedBoardGeometry): BoardShape {
-  return geometry.kind === 'rect'
-    ? { kind: 'rect', widthMm: geometry.widthMm, heightMm: geometry.heightMm }
-    : { kind: 'circle', diameterMm: geometry.radiusMm * 2 };
+  switch (geometry.kind) {
+    case 'rect':
+      return { kind: 'rect', widthMm: geometry.widthMm, heightMm: geometry.heightMm };
+    case 'circle':
+      return { kind: 'circle', diameterMm: geometry.radiusMm * 2 };
+    case 'outline':
+      return (
+        outlineBoardShape(geometry) ?? {
+          kind: 'outline',
+          pointsMm: geometry.localPointsMm,
+          anchorIndices: geometry.anchorIndices,
+        }
+      );
+  }
 }
 
 export function boardVerificationPoint(
@@ -65,6 +85,10 @@ export function boardVerificationPoint(
   }
   if (geometry.kind === 'circle' && target.kind === 'circle') {
     return circleVerificationPoint(geometry, target.anchor);
+  }
+  if (geometry.kind === 'outline' && target.kind === 'outline') {
+    if (!geometry.anchorIndices.includes(target.index)) return null;
+    return outlineMachinePoints(geometry)?.[target.index] ?? null;
   }
   return null;
 }
@@ -127,14 +151,52 @@ export function correctCapturedBoardGeometry(
       crossAxisErrorMm: circleRimCrossAxisErrorMm(target.anchor, dx, dy),
     };
   }
+  if (geometry.kind === 'outline' && target.kind === 'outline') {
+    const correction = correctOutlineGeometry(geometry, target.index, confirmed);
+    return correction === null
+      ? null
+      : {
+          geometry: correction.geometry,
+          crossAxisErrorMm: correction.predictionErrorMm,
+          residualMm: correction.maxResidualMm,
+        };
+  }
   return null;
 }
 
 export function verificationTargetChangesOrigin(target: BoardVerificationTarget): boolean {
+  if (target.kind === 'outline') return true;
   return (
     (target.kind === 'rect' && target.anchor === 'bottom-left') ||
     (target.kind === 'circle' && target.anchor === 'center')
   );
+}
+
+export function boardVerificationTargets(
+  geometry: CapturedBoardGeometry,
+): BoardVerificationTarget[] {
+  switch (geometry.kind) {
+    case 'rect':
+      return RECTANGLE_BOARD_VERIFICATION_ANCHORS.map((anchor) => ({ kind: 'rect', anchor }));
+    case 'circle':
+      return CIRCLE_BOARD_VERIFICATION_ANCHORS.map((anchor) => ({ kind: 'circle', anchor }));
+    case 'outline':
+      return geometry.anchorIndices.map((index, position) => ({
+        kind: 'outline',
+        index,
+        ordinal: position + 1,
+      }));
+  }
+}
+
+export function boardVerificationTargetsEqual(
+  left: BoardVerificationTarget,
+  right: BoardVerificationTarget,
+): boolean {
+  if (left.kind !== right.kind) return false;
+  if (left.kind === 'rect' && right.kind === 'rect') return left.anchor === right.anchor;
+  if (left.kind === 'circle' && right.kind === 'circle') return left.anchor === right.anchor;
+  return left.kind === 'outline' && right.kind === 'outline' && left.index === right.index;
 }
 
 function correctRectangle(

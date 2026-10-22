@@ -73,7 +73,7 @@ export function useBoardVerification(args: BoardVerificationArgs): BoardVerifica
     epochValid,
     state.cancelling,
   );
-  const decisions = createDecisionActions(state, ready);
+  const decisions = createDecisionActions(args, state, ready);
   return {
     activeTarget: state.session?.target ?? null,
     ready,
@@ -145,12 +145,20 @@ function createMoveAction(
 }
 
 function createDecisionActions(
+  args: BoardVerificationArgs,
   state: VerificationState,
   ready: boolean,
 ): Pick<BoardVerificationController, 'acceptTarget' | 'adjustTarget'> {
   return {
     acceptTarget: () => {
       if (state.session === null || !ready || !liveActionReady(state.setError)) return;
+      if (state.session.target.kind === 'outline') {
+        const position = currentMachinePosition();
+        if (position === null) return;
+        const target = state.session.target;
+        saveCorrection(args, state, target, position, `Anchor ${target.ordinal} checked.`);
+        return;
+      }
       state.setFeedback(`${boardVerificationTargetLabel(state.session.target)} confirmed.`);
       state.setError(null);
       state.setSession(null);
@@ -188,6 +196,7 @@ function saveCorrection(
   state: VerificationState,
   target: BoardVerificationTarget,
   position: Vec2,
+  successMessage?: string,
 ): void {
   state.setSaving(true);
   state.setError(null);
@@ -195,7 +204,8 @@ function saveCorrection(
     .onCorrect(target, position)
     .then(() => {
       state.setFeedback(
-        `${boardVerificationTargetLabel(target)} updated from the current head position.`,
+        successMessage ??
+          `${boardVerificationTargetLabel(target)} updated from the current head position.`,
       );
       state.setSession(null);
     })
@@ -284,6 +294,7 @@ function verificationReady(
 }
 
 export function boardVerificationTargetLabel(target: BoardVerificationTarget): string {
+  if (target.kind === 'outline') return `Anchor ${target.ordinal}`;
   switch (target.anchor) {
     case 'bottom-left':
       return 'Bottom-left corner';

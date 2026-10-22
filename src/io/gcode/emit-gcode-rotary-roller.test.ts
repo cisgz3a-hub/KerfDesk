@@ -113,6 +113,30 @@ describe('emitGcode roller rotary diameter (ADR-373)', () => {
     expect(xWords(result.gcode)).toEqual(xWords(emitGcode(project(LEGACY_ROLLER, false)).gcode));
   });
 
+  it('burns a stock roller design at its drawn size only with roller scaling (ADR-373 Amd 1)', () => {
+    // Audit controller-v3 D3-P2-1: a roller on an unchanged Y port, 40 machine
+    // mm per turn of its Ø25 roller, so the surface moves π·25/40 ≈ 1.963 mm
+    // per machine mm. The design's line is 50 mm tall.
+    const surfacePerMachineMm = (Math.PI * 25) / 40;
+    const burnedMm = (gcode: string): number => {
+      const ys = yWords(gcode);
+      return (Math.max(...ys) - Math.min(...ys)) * surfacePerMachineMm;
+    };
+    const unscaled = { ...LEGACY_ROLLER, mmPerRotation: 40, objectDiameterMm: 80 };
+    const unscaledGcode = emitGcode(project(unscaled, false)).gcode;
+    expect(burnedMm(unscaledGcode)).toBeCloseTo(50 * surfacePerMachineMm, 2);
+    // Tuning the object diameter until Test rotation lands changes no byte.
+    const tuned = { ...unscaled, objectDiameterMm: 128 / Math.PI };
+    expect(emitGcode(project(tuned, false)).gcode).toBe(unscaledGcode);
+    // Scaled from the roller, the same line burns 50 mm on any object size.
+    for (const objectDiameterMm of [80, 128 / Math.PI]) {
+      const scaled = { ...unscaled, objectDiameterMm, rollerDiameterMm: 25 };
+      const result = emitGcode(project(scaled, false));
+      expect(result.preflight.ok).toBe(true);
+      expect(burnedMm(result.gcode)).toBeCloseTo(50, 2);
+    }
+  });
+
   it('uses the object/roller ratio for the one-revolution wrap limit', () => {
     // Object Ø15: one revolution is π·15 ≈ 47.1 surface mm, less than the
     // 50 mm design, whatever the roller scale.

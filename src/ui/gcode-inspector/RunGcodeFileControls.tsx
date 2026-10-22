@@ -5,6 +5,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { streamingModeForController } from '../../core/devices';
+import { findLitRapids } from '../../core/external-program';
 import { formatDuration } from '../../core/job/format-duration';
 import { machineKindOf } from '../../core/scene';
 import { formatLengthWithUnit } from '../display-length';
@@ -21,6 +22,7 @@ import {
   type ExternalFrame,
 } from './external-run';
 import { externalOutlineBedWarnings } from './external-run-bed';
+import { externalControllerWarnings } from './external-run-readiness';
 import type { GcodeInspectorAnalysis } from './gcode-inspector-analysis';
 import type { PreparedExternalRun } from './prepare-external-run';
 import { RunGcodeFileSummary } from './RunGcodeFileSummary';
@@ -152,6 +154,7 @@ export function RunGcodeFileControls(props: {
   );
   const { frame, busy, error } = actions;
   const fitIssue = useControllerFitIssue(prepared.run.gcode);
+  const litRapids = useMemo(() => findLitRapids(prepared.run.gcode), [prepared.run.gcode]);
   // A spent or expired Frame no longer holds the start: read the program again
   // from wherever the head is now.
   const frameSpent = frame !== null && laser.frameVerification !== frame.verification;
@@ -171,6 +174,7 @@ export function RunGcodeFileControls(props: {
         analysis={props.analysis}
         machineKind={machineKindOf(project.machine)}
         startKnown={props.start !== null}
+        controllerWarnings={externalControllerWarnings(project, laser, litRapids)}
         bedWarnings={externalOutlineBedWarnings(prepared.run.envelope, laser, project.device)}
         formatLength={(mm) => formatLengthWithUnit(mm, unit)}
         formatSeconds={formatDuration}

@@ -27,6 +27,8 @@ export type KnownAxes = { x: boolean; y: boolean; z: boolean };
 
 export type ProgramBoundsTracker = {
   readonly known: KnownAxes;
+  /** Geometry validation may use axes only while every one is placed. */
+  readonly canPlace: (axes: ReadonlyArray<keyof KnownAxes>) => boolean;
   /** Adds the axes of `point` that `known` says the program set. */
   readonly include: (point: Point, known?: KnownAxes) => void;
   /** After a move to `target`: axis words set their axis in absolute mode. */
@@ -87,6 +89,7 @@ export function createProgramBoundsTracker(initialPosition?: Point): ProgramBoun
   if (initialPosition !== undefined) include(initialPosition);
   return {
     known,
+    canPlace: (axes) => !foreign && axes.every((axis) => known[axis] && !displaced[axis]),
     include,
     moveTo: (target, axisWords, absolute) => {
       Object.assign(known, axesSetBy(known, axisWords, absolute));

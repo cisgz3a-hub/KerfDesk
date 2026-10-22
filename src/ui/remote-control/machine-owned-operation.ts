@@ -23,6 +23,8 @@ const MACHINE_OPERATION_KINDS: Record<MachineAction['command'], MachineOperation
   disconnect_machine: 'disconnect',
   home_machine: 'home',
   set_work_origin: 'origin',
+  capture_board_point: 'board',
+  finish_board: 'board',
   pause_job: 'pause',
   resume_job: 'resume',
   jog_hold_start: 'hold',

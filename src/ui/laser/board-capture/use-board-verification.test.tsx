@@ -320,6 +320,7 @@ function VerificationProbe(props: {
 }
 
 async function renderController(args: {
+  readonly geometry?: CapturedBoardGeometry;
   readonly onCorrect: (
     target: BoardVerificationTarget,
     position: { readonly x: number; readonly y: number },
@@ -335,7 +336,7 @@ async function renderController(args: {
     root = createRoot(host);
     root.render(
       <VerificationProbe
-        geometry={RECTANGLE}
+        geometry={args.geometry ?? RECTANGLE}
         registrationEpoch={REGISTERED_EPOCH}
         onCorrect={args.onCorrect}
         publish={(next) => {

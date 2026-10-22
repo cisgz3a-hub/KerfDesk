@@ -1,5 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
+import { ciBudgetMs } from '../../__fixtures__/ci-budget';
 import type { CncPass } from '../job';
 import type { CncTool } from '../scene';
 import { kernelForTool } from '../sim';
@@ -269,34 +270,40 @@ describe('relief roughing with flat finishing (ADR-450)', () => {
     expect(finishedFlatDepthAt(on.finishedFlats!, 20, 20)).toBe(-3);
   });
 
-  it('never cuts below the model, whatever the flats and settings', () => {
-    const box = fc.record({
-      x0: fc.integer({ min: 2, max: 26 }),
-      y0: fc.integer({ min: 2, max: 26 }),
-      size: fc.integer({ min: 3, max: 12 }),
-      zMm: fc.double({ min: -2.9, max: -0.1, noNaN: true }),
-    });
-    fc.assert(
-      fc.property(
-        fc.array(box, { minLength: 1, maxLength: 3 }),
-        fc.double({ min: 0.1, max: 1, noNaN: true }),
-        fc.double({ min: 0.5, max: 2, noNaN: true }),
-        (boxes, allowanceMm, depthPerPassMm) => {
-          const map = boxesMap(
-            -3,
-            boxes.map((b) => ({
-              x0: b.x0,
-              y0: b.y0,
-              x1: b.x0 + b.size,
-              y1: b.y0 + b.size,
-              zMm: b.zMm,
-            })),
-          );
-          const ladder = reliefRoughingLadder(map, options({ allowanceMm, depthPerPassMm }));
-          expect(worstGougeMm(map, ladder.passes)).toBeLessThanOrEqual(1e-5);
-        },
-      ),
-      { numRuns: 12, seed: 450 },
-    );
-  });
+  // Twelve complete roughing plans plus independent cutter-footprint checks
+  // take several seconds; retain every case on shared runners.
+  it(
+    'never cuts below the model, whatever the flats and settings',
+    { timeout: ciBudgetMs(15_000, 45_000) },
+    () => {
+      const box = fc.record({
+        x0: fc.integer({ min: 2, max: 26 }),
+        y0: fc.integer({ min: 2, max: 26 }),
+        size: fc.integer({ min: 3, max: 12 }),
+        zMm: fc.double({ min: -2.9, max: -0.1, noNaN: true }),
+      });
+      fc.assert(
+        fc.property(
+          fc.array(box, { minLength: 1, maxLength: 3 }),
+          fc.double({ min: 0.1, max: 1, noNaN: true }),
+          fc.double({ min: 0.5, max: 2, noNaN: true }),
+          (boxes, allowanceMm, depthPerPassMm) => {
+            const map = boxesMap(
+              -3,
+              boxes.map((b) => ({
+                x0: b.x0,
+                y0: b.y0,
+                x1: b.x0 + b.size,
+                y1: b.y0 + b.size,
+                zMm: b.zMm,
+              })),
+            );
+            const ladder = reliefRoughingLadder(map, options({ allowanceMm, depthPerPassMm }));
+            expect(worstGougeMm(map, ladder.passes)).toBeLessThanOrEqual(1e-5);
+          },
+        ),
+        { numRuns: 12, seed: 450 },
+      );
+    },
+  );
 });

@@ -8,6 +8,7 @@ import { useStore } from '../state';
 import type { FrameVerification } from '../state/frame-verification';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
+import { recoveryRepository } from '../state/recovery';
 import {
   acknowledgeAndSettleFrameLeg,
   acknowledgeFrameToolOffPrelude,
@@ -64,6 +65,11 @@ describe('external run through the laser store (ADR-630)', () => {
       controller: useLaserStore.getState(),
     };
     expect(externalStartIssue(frame)).toBeNull();
+    // The project's last job stops being the last thing the machine ran
+    // (rolling audit 2026-10-21, 05-P3-1).
+    const retired = vi
+      .spyOn(recoveryRepository, 'noteUntrackedRunAccepted')
+      .mockResolvedValue({ ok: true, value: true });
     writes.length = 0;
     const started = startExternalProgram(frame);
     for (let tick = 0; tick < 20 && !writes.includes('?'); tick += 1) await flush();
@@ -72,6 +78,7 @@ describe('external run through the laser store (ADR-630)', () => {
       await flush();
     }
     await expect(started).resolves.toBe(true);
+    expect(retired).toHaveBeenCalledExactlyOnceWith();
     const sent = writes.join('');
     expect(sent).toContain(GCODE);
     expect(useLaserStore.getState().streamer).not.toBeNull();
