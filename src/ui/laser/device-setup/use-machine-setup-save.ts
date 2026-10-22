@@ -6,10 +6,18 @@ import { machineCapabilityWarningMessage } from '../../machine/machine-capabilit
 import { useStore } from '../../state';
 import type { CncStartupOperationDraft } from '../../state/cnc-startup-setup';
 import { useLaserStore } from '../../state/laser-store';
+import { isActiveJob, isActiveJobStatus } from '../../state/laser-store-helpers';
 import { useToastStore } from '../../state/toast-store';
 import type { DeviceSetupState } from './device-setup-flow';
 import { machineSetupProfile } from './device-setup-flow';
 import { computeFirmwareDiffs, type FirmwareDiff } from './device-setup-firmware-diff';
+
+// A running or held job keeps the machine it started with, as the toolbar's
+// Laser/CNC switch does (ADR-416 Amendment 1). Save replaces the machine type,
+// work area, origin, homing and CNC values that jog, Zero Z, probing and the
+// safe-Z lift read live during a bit change, so it waits for the job to end.
+export const SETUP_SAVE_LOCKED_DURING_JOB =
+  'Finish or stop the running job before saving Machine Setup. Nothing was saved; your changes stay in this draft.';
 
 export function useMachineSetupSave(input: {
   readonly state: DeviceSetupState;
@@ -18,16 +26,27 @@ export function useMachineSetupSave(input: {
   readonly materialApplyRequested: boolean;
   readonly onClose: () => void;
   readonly onConfigured?: ((profile: DeviceProfile) => void) | undefined;
-}): { readonly saving: boolean; readonly firmwareWriteCount: number; readonly onSave: () => void } {
+}): {
+  readonly saving: boolean;
+  readonly firmwareWriteCount: number;
+  /** A job is running or held, so Save is refused until it ends. */
+  readonly lockedByJob: boolean;
+  readonly onSave: () => void;
+} {
   const [saving, setSaving] = useState(false);
   const replaceMachineSetup = useStore((store) => store.replaceMachineSetup);
   const replaceCncStartupSetup = useStore((store) => store.replaceCncStartupSetup);
   const rows = useLaserStore((store) => store.grblSettingsRows);
   const writeGrblSetting = useLaserStore((store) => store.writeGrblSetting);
+  const lockedByJob = useLaserStore((store) => isActiveJobStatus(store.streamer?.status ?? null));
   const pushToast = useToastStore((store) => store.pushToast);
   const writes = queuedFirmwareDiffs(input.state, rows);
   const onSave = (): void => {
     if (saving) return;
+    if (isActiveJob(useLaserStore.getState().streamer)) {
+      pushToast(SETUP_SAVE_LOCKED_DURING_JOB, 'warning');
+      return;
+    }
     setSaving(true);
     void saveAndSync().catch((error: unknown) => {
       pushToast(`Machine Setup could not save: ${errorMessage(error)}`, 'error');
@@ -64,7 +83,7 @@ export function useMachineSetupSave(input: {
     await syncFirmware(writes, writeGrblSetting, pushToast);
     input.onClose();
   };
-  return { saving, firmwareWriteCount: writes.length, onSave };
+  return { saving, firmwareWriteCount: writes.length, lockedByJob, onSave };
 }
 
 async function syncFirmware(

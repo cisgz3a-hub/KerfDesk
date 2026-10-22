@@ -10,6 +10,7 @@ import {
 } from './device-setup-steps';
 import { DeviceSetupStages, type DeviceSetupStagesProps } from './DeviceSetupStages';
 import { DeviceSetupSummary } from './DeviceSetupSummary';
+import { SETUP_SAVE_LOCKED_DURING_JOB } from './use-machine-setup-save';
 
 const STAGES: Record<
   DeviceSetupStage,
@@ -46,6 +47,8 @@ type ShellProps = DeviceSetupStagesProps & {
   readonly onSave: () => void;
   readonly saving: boolean;
   readonly firmwareWriteCount: number;
+  /** A job is running or held: Save waits for it (ADR-416 Amendment 1). */
+  readonly lockedByJob: boolean;
 };
 
 export function DeviceSetupShell(props: ShellProps): JSX.Element {
@@ -166,6 +169,11 @@ function SetupStepper({
 function SetupActions(props: ShellProps): JSX.Element {
   const stage = deviceSetupStage(props.state.step);
   const ready = machineSetupValidationIssues(props.state).length === 0;
+  const saveBlockedReason = props.lockedByJob
+    ? SETUP_SAVE_LOCKED_DURING_JOB
+    : ready
+      ? undefined
+      : 'Resolve the flagged configuration items before saving.';
   return (
     <footer className="lf-setup-footer">
       <Button
@@ -176,6 +184,11 @@ function SetupActions(props: ShellProps): JSX.Element {
       >
         Cancel without saving
       </Button>
+      {stage === 'review' && props.lockedByJob ? (
+        <p role="status" className="lf-setup-job-lock">
+          {SETUP_SAVE_LOCKED_DURING_JOB}
+        </p>
+      ) : null}
       <DialogActions>
         {stage === 'identify' ? null : (
           <Button
@@ -190,11 +203,8 @@ function SetupActions(props: ShellProps): JSX.Element {
           <Button
             variant="primary"
             onClick={props.onSave}
-            disabled={!ready || props.saving}
-            {...helpProps(
-              'control:laser.device-setup.finish',
-              ready ? undefined : 'Resolve the flagged configuration items before saving.',
-            )}
+            disabled={!ready || props.saving || props.lockedByJob}
+            {...helpProps('control:laser.device-setup.finish', saveBlockedReason)}
           >
             {saveButtonLabel(props)}
           </Button>
