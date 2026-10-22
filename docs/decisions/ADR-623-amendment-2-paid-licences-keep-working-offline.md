@@ -87,3 +87,7 @@ What LightBurn does:
 ADR-592 Amendment 1 landed first. Its nonce is kept for every refresh: a grant
 that signs another request's nonce is refused. Its paid wrong-clock offset is
 removed here, because a paid grant is no longer held to the clock.
+
+[ADR-592 Amendment 3](ADR-592-amendment-3-refresh-nonce-withdrawn.md) (2026-10-23)
+then withdrew the nonce from the app: with no paid check-in left, it protected
+nothing. From 1.0.23 a refresh sends none and no grant is refused over one.

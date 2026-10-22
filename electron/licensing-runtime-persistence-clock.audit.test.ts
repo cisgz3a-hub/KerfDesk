@@ -5,14 +5,7 @@ import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { expect, it } from 'vitest';
 import { createLicensingRuntime } from './licensing-runtime';
 import { createLicensingStore, type LicensingStore } from './licensing-store';
-import {
-  answering,
-  grant,
-  harness,
-  saved,
-  TEST_KEY,
-  trialClaims,
-} from './licensing-runtime.test-support';
+import { grant, harness, saved, TEST_KEY, trialClaims } from './licensing-runtime.test-support';
 
 const BEFORE_EPOCH = Date.parse('1969-12-31T00:00:00.000Z');
 
@@ -48,7 +41,7 @@ it.each([Date.parse('1990-01-01T00:00:00.000Z'), 0, BEFORE_EPOCH])(
     withDiskStore(async (store) => {
       const h = harness();
       h.clock(localClock);
-      h.fetch.mockImplementation(answering());
+      h.fetch.mockImplementation(async () => grant());
       const options = { ...h.options, store };
       expect(await createLicensingRuntime(options).activate(TEST_KEY)).toMatchObject({
         state: 'ready',

@@ -1,15 +1,17 @@
 import type { LicenceStatus } from './licensing-status.js';
 import type { LicenceRecord } from './licensing-store.js';
 import type { LicensingConfig } from './licensing-config.js';
-import { grantRequest, type GrantCall } from './licensing-grant.js';
+import { grantRequest } from './licensing-grant.js';
 import { licenceRefreshDue } from './licensing-schedule.js';
 
 export type RefreshReply =
-  | { readonly kind: 'success'; readonly value: unknown; readonly nonce: string | undefined }
+  | { readonly kind: 'success'; readonly value: unknown }
   | { readonly kind: 'failure'; readonly error: unknown };
-export type BackgroundRefreshPlan = GrantCall & { readonly identity: string };
-/** A service answer and the nonce its request sent (ADR-592 Amendment 1). */
-export type GrantAnswer = { readonly value: unknown; readonly nonce: string | undefined };
+export type BackgroundRefreshPlan = {
+  readonly path: string;
+  readonly body: unknown;
+  readonly identity: string;
+};
 
 /** Clock checkpoints and purchase records can change while the network waits. */
 export function refreshIdentity(saved: LicenceRecord, device: string): string {
@@ -17,15 +19,13 @@ export function refreshIdentity(saved: LicenceRecord, device: string): string {
   return JSON.stringify([device, rights]);
 }
 
-/** A background reply answers the request it planned, so it brings that request's nonce. */
 export async function readGrantReply(
   reply: RefreshReply | undefined,
-  call: GrantCall,
   request: () => Promise<unknown>,
-): Promise<GrantAnswer> {
-  if (reply === undefined) return { value: await request(), nonce: call.nonce };
+): Promise<unknown> {
+  if (reply === undefined) return request();
   if (reply.kind === 'failure') throw reply.error;
-  return { value: reply.value, nonce: reply.nonce };
+  return reply.value;
 }
 
 /** Only the request waits outside the runtime queue. Preparation and applying
@@ -68,7 +68,7 @@ export function createBackgroundLicenceRefresh(options: {
     // Saved rights stay in force while the request waits, so update
     // eligibility is not held off; applying the reply is the mutation.
     const reply: RefreshReply = await options.request(pending.path, pending.body).then(
-      (value) => ({ kind: 'success', value, nonce: pending.nonce }),
+      (value) => ({ kind: 'success', value }),
       (error: unknown) => ({ kind: 'failure', error }),
     );
     return options.safe(async () => {
