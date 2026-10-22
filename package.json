@@ -63,6 +63,7 @@
     "generate:notices": "node scripts/generate-third-party-notices.mjs",
     "generate:privacy": "node scripts/generate-privacy-page.mjs",
     "check:privacy": "node scripts/generate-privacy-page.mjs --check",
+    "check:public-info": "node scripts/generate-site-pages.mjs --public-info --check",
     "build:web": "pnpm generate:privacy && pnpm generate:notices && pnpm typecheck && pnpm build:bundle",
     "build:bundle": "node --max-old-space-size=4096 node_modules/vite/bin/vite.js build",
     "preview:web": "vite preview",

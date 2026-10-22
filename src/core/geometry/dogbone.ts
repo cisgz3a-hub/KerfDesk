@@ -5,10 +5,13 @@
 // with the bit centre exactly on the corner, an isolated point that pocket
 // and inside-profile compensation skip, so it never changed the toolpath.
 //
-// Model: the object's rings are unioned into a region (NonZero); convex
-// corners of the region's OUTER boundaries with interior angle below the
-// threshold get dogbones; hole rings (islands of remaining material) are left
-// alone in v1. The dogbones are unioned back into the region.
+// Model: the object's rings are normalized into the region the canvas and CAM
+// read (each artwork path even-odd unless it declares non-zero, text non-zero;
+// vector-path-regions.ts), so a CAD outline keeps the same-direction holes
+// inside it (WA-6); convex corners of the region's OUTER boundaries with
+// interior angle below the threshold get dogbones; hole rings (islands of
+// remaining material) are left alone in v1. The dogbones are unioned back
+// into the region.
 
 import { unionD, FillRule, type PathD, type PathsD } from 'clipper2-ts';
 import { err, ok, type Result } from '../result';
@@ -19,12 +22,12 @@ import {
   DOGBONE_PRECISION_DECIMALS,
   type DogboneCorner,
 } from './corner-dogbone';
+import { normalizeVectorObjectRegion } from './vector-path-regions';
 import {
   boundsForPaths,
   isClosedPolygon,
   materializeVectorObject,
   pathDToPolyline,
-  polylineToPathD,
   tryVectorOp,
   type VectorOpError,
   type VectorSceneObject,
@@ -48,9 +51,10 @@ export function dogboneVectorObject(
     return err({ kind: 'bad-distance', message: 'Dogbone needs a positive bit diameter.' });
   }
   const materialized = materializeVectorObject(object);
-  const rings = collectClosedRings(materialized);
-  if (rings.kind === 'error') return rings;
-  const regionResult = tryVectorOp(() => unionD(rings.value, FillRule.NonZero));
+  if (!materialized.paths.every((path) => path.polylines.every(isClosedPolygon))) {
+    return err({ kind: 'open-contours', message: 'Dogbone applies to closed contours only.' });
+  }
+  const regionResult = normalizeVectorObjectRegion(materialized);
   if (regionResult.kind === 'error') return regionResult;
   const region = regionResult.value;
   const radius = bitDiameterMm / 2;
@@ -92,19 +96,6 @@ function dogboneReliefs(region: PathsD, radius: number): PathsD {
     }
   }
   return reliefs;
-}
-
-function collectClosedRings(materialized: ImportedSvg): Result<PathsD, VectorOpError> {
-  const rings: PathsD = [];
-  for (const path of materialized.paths) {
-    for (const polyline of path.polylines) {
-      if (!isClosedPolygon(polyline)) {
-        return err({ kind: 'open-contours', message: 'Dogbone applies to closed contours only.' });
-      }
-      rings.push(polylineToPathD(polyline));
-    }
-  }
-  return ok(rings);
 }
 
 function signedArea(ring: PathD): number {

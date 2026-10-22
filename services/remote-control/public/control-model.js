@@ -2,6 +2,7 @@ export const $ = (selector) => document.querySelector(selector);
 export const errorMessages = {
   unavailable: 'The computer is offline. Open KerfDesk on your PC and refresh.',
   stale_revision: 'The workspace changed on your PC. Refresh before trying the edit again.',
+  busy: 'Your PC is busy with another action. Wait for it to finish, then try again.',
   needs_pro: 'Choose a trial or licence in the desktop app to use this Pro feature.',
   unsupported_operation: 'This operation cannot be edited here. Use KerfDesk on your PC.',
   invalid_input: 'Check the values and try again.',
