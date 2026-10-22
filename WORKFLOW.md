@@ -7756,6 +7756,16 @@ as the pane's design record.
    An errored stream is released only after its remaining reply ownership and Idle settlement
    allow it; error reporting is not successful completion.
 
+#### Error — firmware skips a move (ADR-395 Amendment 1)
+1. A build with `NO_MOTION_BEFORE_HOMING` answers each move with `echo:Home XYZ First` (naming
+   the unhomed axes) and then `ok`; a stopped Marlin prints "Printer stopped due to errors" for
+   each move it reads. Both are handled like a non-halting `Error:` for the line: the job stops
+   before its next line (so a fan-wired laser's `M106` is never sent), the Frame stops and does
+   not count as completed, a jog or owned command is refused.
+2. The notice names the axes. Home is `G28 X Y`, so a build that also needs Z homed is told to
+   home Z from the Console (`G28 Z`) if it has a Z endstop, or to turn `NO_MOTION_BEFORE_HOMING`
+   off. A stopped controller is told to send `M999 S1` (plain `M999` asks for a line resend).
+
 ### F-H3. Smoothieware halt and recovery
 
 #### Success
