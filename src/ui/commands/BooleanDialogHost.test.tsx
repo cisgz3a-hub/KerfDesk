@@ -229,6 +229,47 @@ describe('Boolean review dialog', () => {
     );
     expect(button('Apply').disabled).toBe(false);
   });
+  it('does not warn about a bar whose corners sit inside the two shapes it bridges', async () => {
+    const bar: ImportedSvg = {
+      ...square('bar', 0),
+      name: 'Bar',
+      paths: [
+        {
+          color: '#000000',
+          polylines: [
+            {
+              closed: true,
+              points: [
+                { x: 5, y: 4 },
+                { x: 25, y: 4 },
+                { x: 25, y: 6 },
+                { x: 5, y: 6 },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    useStore.setState({
+      project: {
+        ...createProject(),
+        scene: {
+          objects: [square('left', 0), square('right', 20), bar],
+          layers: [createLayer({ id: 'cut', color: '#000000' })],
+          groups: [],
+        },
+      },
+      selectedObjectId: 'left',
+      additionalSelectedIds: new Set(['right', 'bar']),
+    });
+    await act(async () => {
+      root.render(<BooleanDialogHost />);
+      openBooleanDialog('weld');
+    });
+    expect(document.querySelector('[role="status"]')?.textContent).not.toContain('Nothing to weld');
+    expect(document.querySelector('[role="alert"]')).toBeNull();
+    expect(button('Apply').disabled).toBe(false);
+  });
   it('invalidates a changed selection without applying to new operands', async () => {
     const before = await open();
     await act(async () => useStore.setState({ additionalSelectedIds: new Set() }));

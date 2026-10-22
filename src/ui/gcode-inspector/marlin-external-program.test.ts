@@ -169,4 +169,13 @@ describe('Marlin external executable interpretation', () => {
     );
     expect(cuts).toEqual(firmware.burns.map((burn) => ({ power: burn.power, x: burn.to.x })));
   });
+
+  it('warns that an inline M3 after M5 burns on a LASER_POWER_SYNC build', () => {
+    const disabled = inspect('M3 I S100\nG1 X10 F600\nM5\nM3 S50\nG1 X20\nM5 I').review;
+    expect(disabled.warnings.join('\n')).toContain('LASER_POWER_SYNC');
+    const enabled = inspect('M3 I S100\nG1 X10 F600\nM3 S50\nG1 X20\nM5 I').review;
+    expect(enabled.warnings.join('\n')).not.toContain('LASER_POWER_SYNC');
+    const reEnabled = inspect('M3 I S100\nG1 X10 F600\nM5\nM3 I S50\nG1 X20\nM5 I').review;
+    expect(reEnabled.warnings.join('\n')).not.toContain('LASER_POWER_SYNC');
+  });
 });

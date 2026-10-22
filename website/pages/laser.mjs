@@ -105,9 +105,9 @@ function traceSection() {
       })}
       <div class="prose">
         <p>
-          Multi-File Trace turns several image files into separate SVG files in one go, using the
-          Line Art preset. If you keep the original image in your project, Re-trace Original reopens
-          Trace Image so you can try another preset.
+          Multi-File Trace, part of Pro, turns several image files into separate SVG files in one
+          go, using the Line Art preset. If you keep the original image in your project, Re-trace
+          Original reopens Trace Image so you can try another preset.
         </p>
       </div>`,
   });
