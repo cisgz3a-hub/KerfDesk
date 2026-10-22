@@ -3,7 +3,7 @@ import { normalizeReportedMPosToMm } from '../../core/controllers/grbl/machine-e
 import {
   POSITIONING_LIGHT_UNSUPPORTED_MESSAGE,
   devicePositioningLightIssue,
-  isFalconPointerLight,
+  isLaserDotLight,
   positioningLightSupported,
 } from '../../core/devices/positioning-light';
 import type { PositioningLight } from '../../core/devices/positioning-light';
@@ -22,10 +22,9 @@ import { warnJogMotionPolicy } from './laser-jog-warnings';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { SafeWrite } from './laser-safe-write';
 import { useStore } from './store';
-import { FalconPointerNotSentError, switchFalconPointer } from './falcon-pointer-link';
+import { assertLaserDotAllowed, lightOffPatch, sendLightOn } from './positioning-light-on';
 import {
   assertPositioningLightAdmission as assertAdmission,
-  findFalconBeforeHold,
   grblRefusalCode,
   positioningLightBatch,
   positioningLightCommand,
@@ -68,17 +67,11 @@ export function positioningLightActions(
 }
 
 /** The captured off command while the light may still be on over this same
- * connection, for Disconnect's best-effort cleanup; null otherwise. */
+ * connection, for Disconnect's best-effort cleanup; null otherwise. The laser
+ * dot holds the Fire latch, whose own M5 Disconnect already sends. */
 export function positioningLightDisconnectOff(state: LaserState, refs: LiveRefs): string | null {
   const lit = litMapping(state, refs);
-  return lit === null || isFalconPointerLight(lit) ? null : lit.offCommand;
-}
-
-/** While the Falcon pointer may still be on from this same connection,
- * Disconnect switches it off over the network, best effort (ADR-635). */
-export function falconPointerOffOnDisconnect(state: LaserState, refs: LiveRefs): void {
-  if (isFalconPointerLight(litMapping(state, refs) ?? undefined))
-    void switchFalconPointer(false).catch(() => undefined);
+  return lit === null || isLaserDotLight(lit) ? null : lit.offCommand;
 }
 
 function sessionLight(refs: LiveRefs): PositioningLight | undefined {
@@ -113,12 +106,10 @@ async function runPositioningLight(
   enabled: boolean,
   target?: Target,
 ): Promise<void> {
-  assertAdmission(get(), refs);
+  assertAdmission(withoutOwnDotLatch(get(), refs), refs);
   assertTarget(target);
-  // The light this request switches, or the one still on from this session.
-  const lights = [resolveMapping(get(), refs, enabled), sessionLight(refs)];
-  await findFalconBeforeHold(set, get, refs, lights);
   const mapping = resolveMapping(get(), refs, enabled);
+  const dotOff = laserDotInvolved(mapping, refs);
   const { context, owns, session, dispose } = createTransaction(
     set,
     get,
@@ -139,7 +130,7 @@ async function runPositioningLight(
       for (const line of lightToolOffLines(driver.commands.frameToolOffLines, target !== undefined))
         await positioningLightCommand(context, line);
       await switchLight(context, mapping, false);
-      set({ positioningLightEnabled: false });
+      set(lightOffPatch(dotOff));
       lightSnapshots.delete(refs);
       await positioningLightFence(context);
       const ready = await positioningLightStatus(context);
@@ -149,11 +140,16 @@ async function runPositioningLight(
           mayHaveMoved = true;
         });
       settled = true;
-      lightSnapshots.set(refs, { mapping: { ...mapping }, session, connection: refs.connection });
-      await sendLightOn(context, set, mapping, owns);
+      const snapshot = { mapping: { ...mapping }, session, connection: refs.connection };
+      lightSnapshots.set(refs, snapshot);
+      await sendLightOn(context, set, mapping, owns, {
+        forget: () => lightSnapshots.delete(refs),
+        isCurrent: () => lightSnapshots.get(refs) === snapshot && session(),
+        off: () => runPositioningLight(set, get, refs, write, false),
+      });
     } else {
       await switchLight(context, mapping, false);
-      set({ positioningLightEnabled: false });
+      set(lightOffPatch(dotOff));
       lightSnapshots.delete(refs);
     }
     context.assertCurrent();
@@ -195,28 +191,18 @@ async function containUnsettledMove(
     .catch(() => undefined);
 }
 
-// On may have reached hardware even if its acknowledgement is subsequently
-// lost or a generic fault rejects the exchange. Keep the captured Off mapping.
-// GRBL-family error:20 rejects an unsupported command before execution, so only
-// that qualified response proves the preceding acknowledged Off still holds.
-async function sendLightOn(
-  context: PositioningLightTransaction,
-  set: SetFn,
-  mapping: PositioningLight,
-  owns: () => boolean,
-): Promise<void> {
-  set({ positioningLightEnabled: true });
-  try {
-    await switchLight(context, mapping, true);
-  } catch (error) {
-    // A Falcon pointer request that never left KerfDesk cannot have lit it.
-    const notSent = error instanceof FalconPointerNotSentError;
-    if ((grblRefusalCode(error, context.refs.driver) === 20 || notSent) && owns()) {
-      set({ positioningLightEnabled: false });
-      lightSnapshots.delete(context.refs);
-    }
-    throw error;
-  }
+/** The dot's Fire latch is dropped once an acknowledged M5 put it out. */
+function laserDotInvolved(mapping: PositioningLight, refs: LiveRefs): boolean {
+  return isLaserDotLight(mapping) || isLaserDotLight(sessionLight(refs));
+}
+
+/** The dot's own Fire latch does not refuse its LED off, or a new LED on or
+ * centre that puts it out first (ADR-660). A held momentary Fire still does. */
+function withoutOwnDotLatch(state: LaserState, refs: LiveRefs): LaserState {
+  const lit = lightSnapshots.get(refs);
+  return lit?.session() === true && isLaserDotLight(lit.mapping) && state.positioningLightEnabled
+    ? { ...state, fireActive: false }
+    : state;
 }
 
 async function turnOffPreviousLight(context: PositioningLightTransaction): Promise<void> {
@@ -267,6 +253,7 @@ function resolveMapping(state: LaserState, refs: LiveRefs, enabled: boolean): Po
     throw new Error(
       'The positioning light belongs to an earlier connection; check it at the machine.',
     );
+  assertLaserDotAllowed(state, device, mapping, enabled);
   return mapping;
 }
 

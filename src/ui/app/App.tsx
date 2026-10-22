@@ -30,7 +30,6 @@ import { useAutosave } from './use-autosave';
 import { AutosaveRecoveryControl } from './AutosaveRecoveryControl';
 import { ProProjectDesktopDialog } from './ProProjectDesktopDialog';
 import { useActiveJobWakeLock } from './use-active-job-wake-lock';
-import { useFalconPointerLink } from './use-falcon-pointer-link';
 import { useJobWatch } from '../camera/job-watch/job-watch-runner';
 import { useAutoConnectController } from './use-auto-connect-controller';
 import { useCncLibraryPersistence } from './use-cnc-library-persistence';
@@ -138,7 +137,6 @@ function AppLifecycle(): null {
   useSpacePan();
   useOperationColorPeek();
   useActiveJobWakeLock();
-  useFalconPointerLink();
   useJobWatch();
   useAutoConnectController();
   useJobCheckpoint();

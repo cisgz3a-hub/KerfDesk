@@ -1,11 +1,14 @@
 import type { ControllerKind, DeviceProfile } from '../../../core/devices';
+import { HARD_MAX_FIRE_POWER_PERCENT } from '../../../core/devices/fire-control';
 import {
   devicePositioningLightIssue,
-  FALCON_POINTER_COMMAND_SET,
-  FALCON_POINTER_LIGHT,
-  isFalconPointerLight,
-  type FalconPointerLight,
+  isLaserDotLight,
+  LASER_DOT_AUTO_OFF_MS,
+  LASER_DOT_COMMAND_SET,
+  LASER_DOT_LIGHT,
+  laserDotModuleIssue,
   type GcodePositioningLight,
+  type LaserDotLight,
   type PositioningLight,
 } from '../../../core/devices/positioning-light';
 
@@ -35,22 +38,29 @@ export function PositioningLightEditor({
   }
   const value = device.positioningLight;
   const issue = devicePositioningLightIssue(device);
-  // The Falcon A1 Pro's pointer has no G-code; Creality switches it over the
-  // machine's network link, so there is nothing to type (ADR-635).
-  if (device.controllerCommandSet === FALCON_POINTER_COMMAND_SET && !isGcodeLight(value))
-    return <FalconPointerEditor value={value} issue={issue} onChange={onChange} />;
-  if (isFalconPointerLight(value))
-    return <ForeignFalconPointer issue={issue} onChange={onChange} />;
+  // The Falcon A1 Pro's head has no separate LED: its LED is the laser itself
+  // at low power, as Creality's "Laser on" button does (ADR-660).
+  if (device.controllerCommandSet === LASER_DOT_COMMAND_SET && !isGcodeLight(value))
+    return (
+      <LaserDotEditor
+        value={value}
+        issue={issue}
+        moduleIssue={laserDotModuleIssue(device)}
+        onChange={onChange}
+      />
+    );
+  if (isLaserDotLight(value)) return <ForeignLaserDot issue={issue} onChange={onChange} />;
   return <GcodeLightEditor device={device} value={value} issue={issue} onChange={onChange} />;
 }
 
 function isGcodeLight(value: PositioningLight | undefined): value is GcodePositioningLight {
-  return value !== undefined && !isFalconPointerLight(value);
+  return value !== undefined && !isLaserDotLight(value);
 }
 
-function FalconPointerEditor(props: {
-  readonly value: FalconPointerLight | undefined;
+function LaserDotEditor(props: {
+  readonly value: LaserDotLight | undefined;
   readonly issue: string | null;
+  readonly moduleIssue: string | null;
   readonly onChange: LightChange;
 }): JSX.Element {
   const { value, onChange } = props;
@@ -59,32 +69,56 @@ function FalconPointerEditor(props: {
       <label>
         <input
           type="checkbox"
-          title="Use the red pointer on the Falcon’s laser head for LED on, LED off and Centre & LED."
+          title="LED on, LED off and Centre & LED turn the laser itself on at low power, as the “Laser on” button in Creality’s software does."
           checked={value !== undefined}
-          onChange={(event) => onChange(event.target.checked ? FALCON_POINTER_LIGHT : undefined)}
+          onChange={(event) => onChange(event.target.checked ? LASER_DOT_LIGHT : undefined)}
         />{' '}
-        Use the Falcon’s red pointer
+        Show where it will burn with the laser at low power
       </label>
       <p style={{ margin: 0 }}>
-        Nothing to type. KerfDesk switches the pointer the way Creality’s software does, over the
-        Falcon’s own network link (the one its camera uses), so it needs KerfDesk Desktop.
+        The Falcon A1 Pro’s laser head has no separate LED. Like Creality’s “Laser on” button, LED
+        on turns the laser itself on at low power, so its dot is exactly where it will burn. It goes
+        off by itself after {LASER_DOT_AUTO_OFF_MS / 1000} s, and LED off or LASER OFF puts it out
+        sooner.
       </p>
       {value !== undefined ? (
         <>
-          <p style={{ margin: 0 }}>
-            Leave the offsets at 0 when the red dot sits on the laser spot. Otherwise enter the dot
-            position minus the laser spot, along the canvas bed axes.
+          <p role="note" style={{ margin: 0, color: 'var(--lf-danger)' }}>
+            This is the cutting laser. Wear laser safety glasses or watch through the lid, and keep
+            the power low: even a few percent can mark paper or card if the head moves slowly.
           </p>
-          <OffsetFields value={value} onChange={onChange} />
+          <DotPowerField value={value} onChange={onChange} />
           <AfterFrameField value={value} onChange={onChange} />
-          <IssueText issue={props.issue} />
+          <IssueText issue={props.issue ?? props.moduleIssue} />
         </>
       ) : null}
     </div>
   );
 }
 
-function ForeignFalconPointer(props: {
+function DotPowerField(props: {
+  readonly value: LaserDotLight;
+  readonly onChange: (value: LaserDotLight) => void;
+}): JSX.Element {
+  return (
+    <label style={fieldStyle}>
+      Dot power (%)
+      <input
+        type="number"
+        title={`Laser power for the dot. 1% is usually enough to see it; KerfDesk never allows more than ${HARD_MAX_FIRE_POWER_PERCENT}%.`}
+        min={0.1}
+        max={HARD_MAX_FIRE_POWER_PERCENT}
+        step={0.1}
+        value={Number.isFinite(props.value.powerPercent) ? props.value.powerPercent : ''}
+        onChange={(event) =>
+          props.onChange({ ...props.value, powerPercent: event.target.valueAsNumber })
+        }
+      />
+    </label>
+  );
+}
+
+function ForeignLaserDot(props: {
   readonly issue: string | null;
   readonly onChange: LightChange;
 }): JSX.Element {
@@ -94,10 +128,10 @@ function ForeignFalconPointer(props: {
       <button
         type="button"
         className="lf-btn"
-        title="Remove the Falcon red pointer from this profile; it only works on the Falcon A1 Pro profile."
+        title="Remove the laser dot from this profile; it only works on the Falcon A1 Pro profile."
         onClick={() => props.onChange(undefined)}
       >
-        Remove the Falcon pointer
+        Remove the laser dot
       </button>
     </div>
   );
@@ -126,10 +160,10 @@ function GcodeLightEditor(props: {
         not configure the cutting laser. A manually switched light must be operated on the machine.
       </p>
       {device.machineFamily === 'creality-falcon' &&
-      device.controllerCommandSet !== FALCON_POINTER_COMMAND_SET ? (
+      device.controllerCommandSet !== LASER_DOT_COMMAND_SET ? (
         <p style={{ margin: 0 }}>
-          A Creality Falcon A1 Pro? Choose its own machine profile to use its red pointer with
-          nothing to type.
+          A Creality Falcon A1 Pro? Choose its own machine profile to show where it will burn with
+          the laser at low power, with nothing to type.
         </p>
       ) : null}
       {value !== undefined ? (
@@ -167,9 +201,9 @@ function IssueText({ issue }: { readonly issue: string | null }): JSX.Element | 
   );
 }
 
-function OffsetFields<T extends PositioningLight>(props: {
-  readonly value: T;
-  readonly onChange: (value: T) => void;
+function OffsetFields(props: {
+  readonly value: GcodePositioningLight;
+  readonly onChange: (value: GcodePositioningLight) => void;
 }): JSX.Element {
   const { value, onChange } = props;
   return (
@@ -196,7 +230,11 @@ function AfterFrameField<T extends PositioningLight>(props: {
     <label>
       <input
         type="checkbox"
-        title="After Frame finishes, automatically show the centre of the whole framed job on the board, using its captured placement and LED offsets. The LED stays on until switched off, and Frame stays valid for Start."
+        title={
+          isLaserDotLight(props.value)
+            ? `After Frame finishes, move with the beam off to the centre of the whole framed job and turn the laser dot on there. It goes off by itself after ${LASER_DOT_AUTO_OFF_MS / 1000} s; switch it off before Start. Frame stays valid for Start.`
+            : 'After Frame finishes, automatically show the centre of the whole framed job on the board, using its captured placement and LED offsets. The LED stays on until switched off, and Frame stays valid for Start.'
+        }
         checked={props.value.afterFrame === true}
         onChange={(event) => {
           const { afterFrame: _previous, ...rest } = props.value;
