@@ -216,8 +216,10 @@ describe('Registration Jig dedicated editor', () => {
   });
   it('leaves a value being composed with an IME alone on Escape', () => {
     savedJigWithArtwork();
-    useStore.getState().selectObject('art');
     render();
+    // The editor opens on a clean canvas (ADR-652): it never takes over the
+    // main canvas selection, so select inside it.
+    press('a', { ctrlKey: true });
     const field = container.querySelector<HTMLInputElement>('[aria-label="X (mm)"]');
     if (field === null) throw new Error('Missing selection field');
     act(() => field.focus());
