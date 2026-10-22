@@ -11,7 +11,8 @@ import { cameraModelInBedFrame } from '../../../core/camera/model/camera-bed-fra
 import type { BedArea } from '../../../core/camera/model/camera-model-accuracy';
 import type { CameraModelRecord } from '../../../core/camera/model/camera-model-record';
 import { isHeadCameraModel } from '../../../core/camera/model/head-camera';
-import { cameraBedFrameNow, ownCameraModel } from '../active-camera-model';
+import { ownCameraModel } from '../active-camera-model';
+import { cameraBedFrameNow } from '../camera-bed-frame-now';
 import type { SurfaceHeightArea } from '../../../core/camera/model/height-areas';
 import type { RgbaImage } from '../../../core/camera/rgba-image';
 import { useStore } from '../../state';

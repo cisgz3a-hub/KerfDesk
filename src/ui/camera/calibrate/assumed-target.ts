@@ -9,7 +9,7 @@ import type { CameraBedFrame } from '../../../core/camera/model/camera-bed-frame
 import type { BedArea } from '../../../core/camera/model/camera-model-accuracy';
 import type { DeviceProfile } from '../../../core/devices';
 import { useStore } from '../../state';
-import { cameraBedFrameNow, useCameraBedFrame } from '../active-camera-model';
+import { cameraBedFrameNow, useCameraBedFrame } from '../camera-bed-frame-now';
 import { calibrationTargetArea } from './calibration-actions';
 import { useCameraCalibrationStore, type CalibrationSettings } from './camera-calibration-store';
 import {

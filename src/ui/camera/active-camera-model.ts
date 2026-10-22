@@ -11,7 +11,6 @@
 import { useMemo } from 'react';
 import {
   cameraBedFrameNote,
-  cameraModelInBedFrame,
   type CameraBedFrame,
   type CameraBedFrameNote,
 } from '../../core/camera/model/camera-bed-frame';
@@ -22,8 +21,7 @@ import type { DeviceProfile } from '../../core/devices/device-profile';
 import type { Vec2 } from '../../core/scene';
 import { useStore } from '../state';
 import { useCameraStore, type CameraSourceState } from '../state/camera-store';
-import { useLaserStore } from '../state/laser-store';
-import { cameraBedFrameFor, selectNativeBedEvidence } from '../state/native-bed-frame';
+import { cameraBedFrameNow, modelInBedFrame, useCameraBedFrame } from './camera-bed-frame-now';
 import { cameraSourceIdentity } from './frame-source';
 import { headPositionNow, useHeadPositionOnBed } from './head/head-position';
 
@@ -41,34 +39,6 @@ export function activeCameraModel(
   const framed = modelInBedFrame(model, bedFrame);
   return framed === undefined ? undefined : placedModel(framed, head);
 }
-
-/** The bed frame the open project's machine is set up with now. */
-export function cameraBedFrameNow(): CameraBedFrame {
-  return cameraBedFrameFor(useStore.getState().project.device, useLaserStore.getState());
-}
-
-/**
- * `model` in the bed frame `bedFrame`, or undefined when it cannot be used
- * there. One result per saved model and frame, so an unchanged frame gives the
- * very same model.
- */
-export function modelInBedFrame(
-  model: CameraModelRecord,
-  bedFrame: CameraBedFrame,
-): CameraModelRecord | undefined {
-  const key = JSON.stringify(bedFrame);
-  const cached = framedAt.get(model);
-  if (cached?.key === key) return cached.model;
-  const placed = cameraModelInBedFrame(model, bedFrame);
-  const framed = placed.kind === 'ok' ? placed.model : undefined;
-  framedAt.set(model, { key, model: framed });
-  return framed;
-}
-
-const framedAt = new WeakMap<
-  CameraModelRecord,
-  { readonly key: string; readonly model: CameraModelRecord | undefined }
->();
 
 // One placed model per saved model and head position, so a head that has not
 // moved gives the very same model (consumers compare by identity to notice a
@@ -130,14 +100,6 @@ export function useOwnCameraModel(): CameraModelRecord | undefined {
     () => ownCameraModel({ cameraModel, otherCameraModels }, sourceState),
     [cameraModel, otherCameraModels, sourceState],
   );
-}
-
-/** {@link cameraBedFrameNow} for React. */
-export function useCameraBedFrame(): CameraBedFrame {
-  const device = useStore((s) => s.project.device);
-  // The same snapshot until a connect, settings read or Home changes it.
-  const evidence = useLaserStore(selectNativeBedEvidence);
-  return useMemo(() => cameraBedFrameFor(device, evidence), [device, evidence]);
 }
 
 /** What the Camera panel says about the running camera's own calibration in the frame now. */

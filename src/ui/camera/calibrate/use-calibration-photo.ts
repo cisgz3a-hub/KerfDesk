@@ -7,7 +7,7 @@ import { ownModelFor, withSavedCameraModel } from '../../../core/camera/model/sa
 import type { Vec2 } from '../../../core/scene';
 import { useStore } from '../../state';
 import { useCameraStore } from '../../state/camera-store';
-import { cameraBedFrameNow, modelInBedFrame } from '../active-camera-model';
+import { cameraBedFrameNow, modelInBedFrame } from '../camera-bed-frame-now';
 import { cameraSourceIdentity } from '../frame-source';
 import { headPositionNow } from '../head/head-position';
 import { currentAssumedTarget } from './assumed-target';

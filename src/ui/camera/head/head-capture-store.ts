@@ -35,7 +35,7 @@ import {
   positionLaserNativeTarget,
   positionLaserReach,
 } from '../../workspace/position-laser-click';
-import { cameraBedFrameNow } from '../active-camera-model';
+import { cameraBedFrameNow } from '../camera-bed-frame-now';
 import { cameraSourceIdentity, captureSourceFrame, type ActiveCameraSource } from '../frame-source';
 import { runHeadCapture, type HeadCaptureIo, type HeadSettle } from './head-capture-run';
 import { headPositionNow } from './head-position';
