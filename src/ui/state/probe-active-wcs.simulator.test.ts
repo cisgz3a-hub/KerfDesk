@@ -56,7 +56,7 @@ async function settle<T>(promise: Promise<T>): Promise<T> {
 }
 
 /** Stock GRBL with G55 selected from the Console, as a `$N` startup line would. */
-async function connectInG55(): Promise<string[]> {
+async function connectInG55(): Promise<void> {
   const sim = createGrblSimulator();
   await useLaserStore.getState().connect(sim.adapter, { controllerKind: 'grbl-v1.1' });
   await vi.advanceTimersByTimeAsync(1_200);
@@ -66,7 +66,6 @@ async function connectInG55(): Promise<string[]> {
     await vi.advanceTimersByTimeAsync(100);
   expect(useLaserStore.getState().activeWcs).toBe('G55');
   expect(useLaserStore.getState().statusReport?.state).toBe('Idle');
-  return sim.outbound();
 }
 
 function workZIsCurrent(): boolean {
