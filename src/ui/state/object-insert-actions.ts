@@ -25,11 +25,7 @@ import { reportDependencyRepairs } from './object-delete-actions';
 import { refuseSceneLimitOverrun } from './scene-copy-room';
 import { validateDesignStudioDocument } from '../../io/project/project-design-studio-validator';
 import { useToastStore } from './toast-store';
-import {
-  EMBEDDED_FONT_LIMIT_REASON,
-  MAX_EMBEDDED_FONTS,
-  withReferencedEmbeddedFonts,
-} from '../../core/text/embedded-font-set';
+import { withReferencedEmbeddedFonts } from '../../core/text/embedded-font-set';
 import { saveUndoStepName } from './undo-step-names';
 import { prepareProjectInsertion, reportProjectInsertionFailure } from './project-insertion-budget';
 import type { DesignApplyRecord } from './design-apply-record';
@@ -278,8 +274,8 @@ function applyDesignSketchAction(set: Setter): AppState['applyDesignSketch'] {
 
 // ADR-628 Amendment 1: a font with the same bytes as one already embedded is
 // reused under that key, a font nothing names any more leaves with the commit
-// (undo restores the whole previous project, fonts included), and a commit
-// that would leave more fonts than a project can hold changes nothing.
+// (undo restores the whole previous project, fonts included), and the font
+// limit then counts only fonts something in the project still names.
 function applyTextAndEmbeddedFont(
   state: AppState,
   text: TextObject,
@@ -305,13 +301,11 @@ function applyTextAndEmbeddedFont(
           ...(next.project.embeddedFonts ?? []).filter((font) => font.key !== embeddedFont.key),
           embeddedFont,
         ];
+  // A project left past the font limit is refused by the insertion budget
+  // (project-insertion-budget.ts), which the text dialogs show without closing.
   const project = withReferencedEmbeddedFonts(
     embeddedFonts === undefined ? next.project : { ...next.project, embeddedFonts },
   );
-  if ((project.embeddedFonts ?? []).length > MAX_EMBEDDED_FONTS) {
-    useToastStore.getState().pushToast(EMBEDDED_FONT_LIMIT_REASON, 'warning');
-    return state;
-  }
   return { ...next, project };
 }
 

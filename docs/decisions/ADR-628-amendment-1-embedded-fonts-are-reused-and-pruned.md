@@ -29,8 +29,10 @@ path counted fonts (rolling audit v2, report 13, finding P2-2):
    embedded, when the fonts in use already number 32: `This project already uses 32 embedded
    fonts, the most it can hold. Choose one of them, or change or delete text that uses a font you
    no longer need.` The font of the text being edited does not count when nothing else uses it,
-   since the choice replaces it. A commit that would still pass the limit changes nothing and shows
-   the same reason.
+   since the choice replaces it. A commit that would still pass the limit is refused by the
+   insertion budget every add-objects path shares (`project-insertion-budget.ts`), which counts the
+   fonts after unused ones are dropped. It changes nothing, and the text dialog shows the reason
+   and stays open.
 
 ### Consequences
 

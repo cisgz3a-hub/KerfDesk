@@ -106,23 +106,31 @@ it('keeps editing existing text available at the operation limit', () => {
   expect(lastToast()).toBeUndefined();
 });
 
+// ADR-628 Amendment 1: identical bytes are one font and a font nothing uses is
+// dropped, so the limit is reached by 32 distinct faces that texts still use.
 it('does not add a 33rd imported font when creating text', () => {
   const embeddedFonts = Array.from({ length: 32 }, (_, index) => ({
     key: `embedded:${index}`,
     fileName: `${index}.ttf`,
-    dataBase64: 'AAEAAA==',
+    dataBase64: btoa(`OTTO-face-${index}`),
   }));
-  const project = { ...useStore.getState().project, embeddedFonts };
-  useStore.setState({ project });
+  const texts = embeddedFonts.map((font, index) => ({
+    ...text(),
+    id: `text-${index}`,
+    fontKey: font.key,
+  }));
+  const project = loadScene(texts, []);
+  useStore.setState({ project: { ...project, embeddedFonts } });
+  const before = useStore.getState().project;
   expect(() =>
     useStore.getState().upsertTextObject(
-      { ...text(), fontKey: 'embedded:new' },
+      { ...text(), id: 'text-new', fontKey: 'embedded:new' },
       {
         key: 'embedded:new',
         fileName: 'new.ttf',
-        dataBase64: 'AAEAAA==',
+        dataBase64: btoa('OTTO-face-new'),
       },
     ),
   ).toThrow('32 imported fonts');
-  expectUnchanged(project);
+  expectUnchanged(before);
 });

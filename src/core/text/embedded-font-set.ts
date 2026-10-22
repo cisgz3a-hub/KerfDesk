@@ -18,7 +18,7 @@ export type EmbeddedFontChoice =
   | { readonly kind: 'new'; readonly font: EmbeddedFont }
   | { readonly kind: 'full'; readonly reason: string };
 
-export const EMBEDDED_FONT_LIMIT_REASON = `This project already uses ${MAX_EMBEDDED_FONTS} embedded fonts, the most it can hold. Choose one of them, or change or delete text that uses a font you no longer need.`;
+const EMBEDDED_FONT_LIMIT_REASON = `This project already uses ${MAX_EMBEDDED_FONTS} embedded fonts, the most it can hold. Choose one of them, or change or delete text that uses a font you no longer need.`;
 
 /**
  * What choosing `font` for a text does to the project. `replacingObjectId` is
