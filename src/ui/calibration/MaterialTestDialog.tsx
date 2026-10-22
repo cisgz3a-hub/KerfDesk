@@ -1,7 +1,10 @@
 import { useState, type ChangeEvent, type CSSProperties } from 'react';
 import type { MaterialTestGridOptions } from '../../core/job';
 import type { MaterialTestParameter } from '../../core/job/material-test-axes';
-import { materialTestRunwayMm } from '../../core/job/material-test-grid';
+import {
+  materialTestRunwayMm,
+  materialTestRunwayReachMmPerMin,
+} from '../../core/job/material-test-grid';
 import { CalibrationNumberField } from './CalibrationNumberField';
 import { CalibrationPresetButtons } from './CalibrationPresetButtons';
 import { MaterialTestPreview } from './MaterialTestPreview';
@@ -207,6 +210,17 @@ function RunwayNote(props: {
   if (!Number.isFinite(fastest)) return null;
   const runwayMm = materialTestRunwayMm(fastest, accel);
   if (runwayMm <= STORED_FILL_RUNWAY_MM) return null;
+  const reach = materialTestRunwayReachMmPerMin(fastest, accel);
+  if (reach !== undefined) {
+    return (
+      <p style={noteStyle}>
+        The fastest engraved cells need more runway than the {formatFeed(runwayMm)} mm a row can
+        run. At {formatFeed(accel)} mm/s² (Machine Setup) that is enough for about{' '}
+        {formatFeed(Math.floor(reach / 10) * 10)} mm/min, so faster cells may burn below their
+        labelled speed. The grid leaves room for the runway on the left.
+      </p>
+    );
+  }
   return (
     <p style={noteStyle}>
       The fastest engraved cells need {formatFeed(runwayMm)} mm of runway to reach{' '}
