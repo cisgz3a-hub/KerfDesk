@@ -1,4 +1,4 @@
-## ADR-375 Amendment 2 - A tool-change hold re-zeroes Z only, and the store follows the G54 KerfDesk selects (2026-10-22)
+## ADR-375 Amendment 3 - A tool-change hold re-zeroes Z only, and the store follows the G54 KerfDesk selects (2026-10-22)
 
 **Status:** Accepted. | **Date:** 2026-10-22
 

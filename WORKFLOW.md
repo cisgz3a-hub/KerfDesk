@@ -5991,7 +5991,7 @@ and lifts the command's CNC-only gate.)*
    writes and the phone remote's X/Y `set_work_origin` are refused for the whole
    hold, before anything is written. The Probe panel offers only "Z only" there
    and keeps the remembered XYZ mode for after the job. Zero Z and the Z probe stay
-   available (ADR-375 Amendment 2). To change X/Y, stop the job first.
+   available (ADR-375 Amendment 3). To change X/Y, stop the job first.
 
 #### Empty
 1. Single-bit jobs never pause.
@@ -9105,7 +9105,7 @@ desktop artifact stays **CLAIMED** under `PROJECT.md` Desktop Preview acceptance
    controller was known to be in another system (G55-G59), its WCO and Frame
    evidence are void, as after Frame's own G54 selection. Zero Z, Set origin and
    the other GRBL-family origin writes, which put `G54` in their block, do the
-   same (ADR-375 Amendment 2).
+   same (ADR-375 Amendment 3).
 
 This software qualification does not prove physical plate geometry, probe
 wiring, spindle coast-down, or real-machine reset behavior. First hardware

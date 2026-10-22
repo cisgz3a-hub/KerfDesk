@@ -49,7 +49,7 @@ export function probePreflight(
 
 // A tool-change hold opens the setup gate for the new bit's Z touch-off only.
 // The corner cycle ends in G92.1 and G10 L20 P0 X Y Z, which would move the
-// X/Y origin the rest of the held job runs on (ADR-375 Amendment 2).
+// X/Y origin the rest of the held job runs on (ADR-375 Amendment 3).
 function toolChangeProbeBlockReason(state: LaserState, request: ProbeRequest): string | null {
   return request?.kind === 'z' ? null : toolChangeXyOriginBlockMessage(state);
 }

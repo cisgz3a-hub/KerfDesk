@@ -1,6 +1,6 @@
 // acknowledged-wcs — the store's active work coordinate system follows a
 // G54-G59 word KerfDesk sends itself, once the controller acknowledges it
-// (controller audit v2 C2-P2-1, ADR-375 Amendment 2).
+// (controller audit v2 C2-P2-1, ADR-375 Amendment 3).
 //
 // Every probe cycle starts with `G54`, and on GRBL-family controllers Zero Z,
 // Set origin and the saved-origin writes put `G54` in the block with their G92

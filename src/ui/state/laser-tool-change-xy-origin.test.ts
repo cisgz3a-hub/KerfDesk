@@ -1,5 +1,5 @@
 // A CNC tool-change hold re-zeroes Z only (controller audit v2 C2-P1-1,
-// ADR-375 Amendment 2). The XYZ corner probe ends in G92.1 and
+// ADR-375 Amendment 3). The XYZ corner probe ends in G92.1 and
 // G10 L20 P0 X Y Z, and Set origin writes G92 X Y, so either one run in the
 // hold moved the X/Y origin and Continue then cut the rest of the job there.
 // Driven through the real store with a fake GRBL 1.1 controller, as the

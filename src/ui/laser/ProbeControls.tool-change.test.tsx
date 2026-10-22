@@ -1,5 +1,5 @@
 // A tool-change hold offers the Z cycle only (controller audit v2 C2-P1-1,
-// ADR-375 Amendment 2). The probe draft keeps its mode for the whole document
+// ADR-375 Amendment 3). The probe draft keeps its mode for the whole document
 // and controller session, so an XYZ corner draft from the morning setup must
 // not become the touch-off for the second bit.
 import { act } from 'react';

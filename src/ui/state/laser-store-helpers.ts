@@ -103,7 +103,7 @@ export function setupBlockingJobCommandBlockMessage(state: LaserState): string |
 // The setup gate opens in a drained hold so the new bit can be touched off,
 // which re-zeroes Z only. The rest of the job runs on the X/Y origin it started
 // with, and Continue cannot see an X/Y change, so every X/Y origin writer is
-// refused for the whole hold (controller audit v2 C2-P1-1, ADR-375 Amendment 2).
+// refused for the whole hold (controller audit v2 C2-P1-1, ADR-375 Amendment 3).
 export function toolChangeXyOriginBlockMessage(state: Pick<LaserState, 'streamer'>): string | null {
   return state.streamer?.status === 'tool-change' ? TOOL_CHANGE_XY_ORIGIN_MESSAGE : null;
 }

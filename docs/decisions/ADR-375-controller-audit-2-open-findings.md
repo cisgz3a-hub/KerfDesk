@@ -1,6 +1,6 @@
 ## ADR-375 - Controller audit 2: the controller faults main still had (2026-09-29)
 
-**Status:** Accepted; the grblHAL-only jog-cancel wait (finding 6, M-6) amended by ADR-640, which applies it to every driver; decision 1 amended by [Amendment 2](ADR-375-amendment-2-tool-change-holds-re-zero-z-only.md) (a tool-change hold re-zeroes Z only; the store follows the G54 a probe or origin write selects). | **Date:** 2026-09-29
+**Status:** Accepted; the grblHAL-only jog-cancel wait (finding 6, M-6) amended by ADR-640, which applies it to every driver; decision 1 amended by [Amendment 3](ADR-375-amendment-3-tool-change-holds-re-zero-z-only.md) (a tool-change hold re-zeroes Z only; the store follows the G54 a probe or origin write selects). | **Date:** 2026-09-29
 
 **Fire timing correction:** [ADR-355 Amendment 1](ADR-355-amendment-1-acknowledged-override-baseline.md)
 supersedes the known-100% Fire reset omission below. Pending flags are processed at an owned

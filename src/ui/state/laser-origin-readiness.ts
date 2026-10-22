@@ -24,7 +24,7 @@ type GetFn = () => LaserState;
 // acknowledgement ownership before it may start a transaction. `axes` names
 // what the action can move. Only a Z-only action (Zero Z) runs in a CNC
 // tool-change hold; every other origin action can move the X/Y origin the rest
-// of the job is placed on, so it is refused there (ADR-375 Amendment 2).
+// of the job is placed on, so it is refused there (ADR-375 Amendment 3).
 export async function assertOriginActionReady(
   set: SetFn,
   get: GetFn,

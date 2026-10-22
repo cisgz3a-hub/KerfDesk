@@ -1,4 +1,4 @@
-// Controller audit v2 C2-P2-1 (ADR-375 Amendment 2): every probe cycle starts
+// Controller audit v2 C2-P2-1 (ADR-375 Amendment 3): every probe cycle starts
 // with `G54`, and GRBL's G54 is modal, so after a probe the controller is in
 // G54 and `G10 L20 P0` wrote G54. The store kept the system it knew before
 // (G55 here), so the next Frame "selected" G54 again, voided the fresh probe

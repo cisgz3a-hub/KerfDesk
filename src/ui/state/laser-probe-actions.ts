@@ -131,7 +131,7 @@ function reserveProbe(set: SetFn, affectsXy: boolean): number {
 
 // Both cycles start with `G54` (probe.ts), so the program's system is the one
 // they probe. The store follows the controller there once it acknowledges the
-// line, and the next Frame keeps this probe's Work-Z (ADR-375 Amendment 2).
+// line, and the next Frame keeps this probe's Work-Z (ADR-375 Amendment 3).
 function recordAcknowledgedWcs(set: SetFn, transactionId: number, line: string): void {
   set((state) =>
     isCurrentProbe(state, transactionId) ? acknowledgedWcsPatch(state, line, 'Probe') : {},

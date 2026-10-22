@@ -90,7 +90,7 @@ export function ProbeControls(): JSX.Element | null {
   );
   // The held job runs on the X/Y origin it started with, so a tool-change hold
   // offers the Z cycle only; the store refuses the corner cycle there too. The
-  // draft keeps its mode for after the job (ADR-375 Amendment 2).
+  // draft keeps its mode for after the job (ADR-375 Amendment 3).
   const mode: ProbeMode = toolChangeHold ? 'z' : form.mode;
   const toolSupported = mode !== 'corner' || effectiveTool.kind === 'end-mill';
   const readiness = probeControlReadiness({
