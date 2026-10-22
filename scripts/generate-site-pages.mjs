@@ -148,7 +148,12 @@ export async function renderPublicInformation({
       await writeFile(target, bytes);
     }
   }
-  if (stale.length) throw new Error('Public information output is stale: ' + stale.join(', '));
+  if (stale.length)
+    throw new Error(
+      'Public information output is stale: ' +
+        stale.join(', ') +
+        '. Run node scripts/generate-site-pages.mjs --public-info.',
+    );
   return destination;
 }
 
