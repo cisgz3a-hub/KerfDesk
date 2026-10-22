@@ -51,6 +51,10 @@ export class RemoteStorageUnavailableError extends Error {
   }
 }
 
+function missingFile(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
+}
+
 /** Separate from licensing: no credential ever falls back to a plaintext file. */
 export function createRemoteCredentialStore(options: {
   readonly userDataPath: string;
@@ -91,13 +95,7 @@ export function createRemoteCredentialStore(options: {
       try {
         handle = await open(file, 'r');
       } catch (error) {
-        if (
-          typeof error === 'object' &&
-          error !== null &&
-          'code' in error &&
-          error.code === 'ENOENT'
-        )
-          return null;
+        if (missingFile(error)) return null;
         throw new Error('Saved remote settings are unavailable.');
       }
       let encrypted: Buffer;
@@ -117,6 +115,12 @@ export function createRemoteCredentialStore(options: {
       if (decrypted.shouldReEncrypt) await write(value);
       return value;
     },
+    /** Removes the saved record; false while it is still there. Needs no secure storage. */
+    discard: (): Promise<boolean> =>
+      unlink(file).then(
+        () => true,
+        (error: unknown) => missingFile(error),
+      ),
     create: (): RemoteIdentity => ({
       schemaVersion: 1,
       deviceId: randomUUID(),
