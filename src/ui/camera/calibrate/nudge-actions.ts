@@ -1,0 +1,108 @@
+// The quick nudge fix's actions (ADR-663 Amendment 2): burn one ring in the
+// middle of the bed as a temporary job, find it in a new photo, and move the
+// saved camera so its picture shows the ring where the laser burned it. Only a
+// camera fixed above the bed is nudged: a head camera's picture is placed by
+// where the head is (ADR-449), and its own Check measures it there.
+
+import { isHeadCameraModel } from '../../../core/camera/model/head-camera';
+import type { Vec2 } from '../../../core/camera/model/camera-model';
+import { measureNudge, nudgedCameraModel } from '../../../core/camera/model/nudge';
+import { withSavedCameraModel } from '../../../core/camera/model/saved-cameras';
+import { toGrayImage } from '../../../core/camera/gray';
+import { detectRingMarks } from '../../../core/camera/target/ring-detect';
+import { generateCameraNudgeRing } from '../../../core/job/camera-bed-target-pattern';
+import type { Project } from '../../../core/scene';
+import { useStore } from '../../state';
+import { useCameraStore } from '../../state/camera-store';
+import { activeCameraModelNow, ownCameraModel } from '../active-camera-model';
+import { cameraModelForFrame } from '../camera-model-frame';
+import {
+  cameraCaptureBindingForFrame,
+  captureSourceFrame,
+  type ActiveCameraSource,
+} from '../frame-source';
+import { refreshCameraPicture } from '../helpers/refresh-picture';
+import type { CalibrationSettings } from './camera-calibration-store';
+import { runTransientCameraJob } from './transient-camera-job';
+
+/** Where the nudge ring burns: the middle of the bed, scene millimetres. */
+export function nudgeRingCentre(): Vec2 {
+  const { bedWidth, bedHeight } = useStore.getState().project.device;
+  return { x: bedWidth / 2, y: bedHeight / 2 };
+}
+
+export async function engraveNudgeRing(
+  settings: CalibrationSettings,
+  startTransientJob: (project: Project) => Promise<boolean> = runTransientCameraJob,
+): Promise<boolean> {
+  const { project } = useStore.getState();
+  // A laser engraving in either canvas mode, as the calibration target (ADR-416).
+  return startTransientJob({
+    ...project,
+    machine: { kind: 'laser' },
+    scene: generateCameraNudgeRing({
+      centre: nudgeRingCentre(),
+      power: settings.powerPercent,
+      speed: settings.speedMmPerMin,
+    }),
+  });
+}
+
+export type NudgePhotoOutcome =
+  | { readonly kind: 'ok'; readonly offsetMm: Vec2 }
+  | { readonly kind: 'failed'; readonly message: string };
+
+/** Find the burned ring in a new photo and say how far the picture is from it. */
+export async function photographNudgeRing(args: {
+  readonly source: ActiveCameraSource;
+  readonly sheetThicknessMm: number;
+  readonly capture?: typeof captureSourceFrame;
+}): Promise<NudgePhotoOutcome> {
+  const model = activeCameraModelNow();
+  if (model === undefined || isHeadCameraModel(model)) {
+    return { kind: 'failed', message: 'This fix needs a calibrated camera fixed above the bed.' };
+  }
+  const frame = await (args.capture ?? captureSourceFrame)(args.source).catch(() => null);
+  if (frame === null) return { kind: 'failed', message: 'The camera picture could not be read.' };
+  const binding = cameraCaptureBindingForFrame(args.source, frame.width, frame.height);
+  const forFrame = cameraModelForFrame(model, binding, frame.width, frame.height);
+  if (forFrame.kind === 'issue') return { kind: 'failed', message: forFrame.message };
+  const measure = measureNudge({
+    lens: forFrame.lens,
+    pose: forFrame.pose,
+    rings: detectRingMarks(toGrayImage(frame)),
+    burnedAtMm: nudgeRingCentre(),
+    heightMm: args.sheetThicknessMm,
+  });
+  switch (measure.kind) {
+    case 'found':
+      return { kind: 'ok', offsetMm: measure.offsetMm };
+    case 'ambiguous':
+      return {
+        kind: 'failed',
+        message: `There are ${measure.rings} rings near the middle of the bed, so KerfDesk cannot tell which one it burned. Burn the ring on a clean piece of scrap with no old target on it.`,
+      };
+    case 'not-found':
+      return {
+        kind: 'failed',
+        message:
+          'No ring was found near the middle of the bed. Check that the ring burned dark enough, the head is not over it, and the sheet thickness is right, then take the photo again.',
+      };
+  }
+}
+
+/**
+ * Move the running camera's saved calibration by `offsetMm` (one undo step)
+ * and show a fresh picture with it. False when there is no such calibration.
+ */
+export function applyNudge(offsetMm: Vec2): boolean {
+  const { project, updateDeviceProfile } = useStore.getState();
+  const { sourceState } = useCameraStore.getState();
+  // Never another camera's calibration: with no camera running, "own" is just the newest.
+  if (sourceState.kind !== 'live') return false;
+  const own = ownCameraModel(project.device, sourceState);
+  if (own === undefined || isHeadCameraModel(own)) return false;
+  updateDeviceProfile(withSavedCameraModel(project.device, nudgedCameraModel(own, offsetMm)));
+  void refreshCameraPicture();
+  return true;
+}

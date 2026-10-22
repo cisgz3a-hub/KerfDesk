@@ -5,6 +5,7 @@
 // made for the bed the machine is set up with now. The wizard itself is
 // mounted by the Camera panel, so it stays open whichever page the panel shows.
 
+import { isHeadCameraModel } from '../../../core/camera/model/head-camera';
 import { useEdition } from '../../licensing/edition';
 import { AccuracyMapToggle } from '../accuracy/AccuracyMapToggle';
 import { useOwnCameraFrameNote, useOwnCameraModel } from '../active-camera-model';
@@ -15,6 +16,7 @@ export function CalibrateCameraControls(): JSX.Element {
   const openSetup = useCameraCalibrationStore((s) => s.openSetup);
   const openWizard = useCameraCalibrationStore((s) => s.openWizard);
   const openCheck = useCameraCalibrationStore((s) => s.openCheck);
+  const openNudge = useCameraCalibrationStore((s) => s.openNudge);
   const model = useOwnCameraModel();
   const frameNote = useOwnCameraFrameNote();
   // Calibrating or checking the camera is camera alignment, a Pro tool
@@ -50,6 +52,16 @@ export function CalibrateCameraControls(): JSX.Element {
             >
               Check camera…
             </button>
+            {isHeadCameraModel(model) ? null : (
+              <button
+                type="button"
+                className="lf-btn"
+                onClick={() => requestPro('camera-alignment', openNudge)}
+                title="The picture is a millimetre or two off: burn one ring, take a photo, and move the picture onto it."
+              >
+                Fix a small offset…
+              </button>
+            )}
             <AccuracyMapToggle />
           </>
         )}

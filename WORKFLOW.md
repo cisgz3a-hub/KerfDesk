@@ -8469,6 +8469,13 @@ as the pane's design record.
   entered, the result asks for a tape-measured height so thick material lines up.
 - **Edge / minimized wizard.** The wizard can minimize into a small non-modal panel so the
   operator can watch the camera and reach the machine while the target engraves.
+- **Fix / a small offset (ADR-663 Amendment 2).** For a calibrated camera fixed above the bed,
+  **Fix a small offset…** in Camera settings burns one target-sized ring in the middle of the bed
+  (or **Ring already burned**), finds it in a photo and reports how far the picture is off.
+  Under 0.2 mm nothing changes; up to 10 mm **Fix** moves the saved calibration by that much (one
+  Undo step) and refreshes the picture; above 10 mm it offers **Recalibrate…**. No ring, or more
+  than one near the middle, says what to check and changes nothing. A head camera is not offered
+  the fix.
 - **Check / has the camera moved?** With a calibration saved, **Check camera…** opens the wizard
   at the photo, using the saved target's area and height. The photo is measured against the saved
   calibration. The result says either that the camera has not moved, or how far and which way on

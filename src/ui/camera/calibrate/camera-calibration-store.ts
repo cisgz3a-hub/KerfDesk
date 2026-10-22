@@ -7,6 +7,7 @@
 import { create } from 'zustand';
 import type { CameraBedFrame } from '../../../core/camera/model/camera-bed-frame';
 import type { BedArea } from '../../../core/camera/model/camera-model-accuracy';
+import type { Vec2 } from '../../../core/camera/model/camera-model';
 import type { CameraModelRecord } from '../../../core/camera/model/camera-model-record';
 import type { MarkError } from '../../../core/camera/target/bed-calibration';
 import type { RgbaImage } from '../../../core/camera/rgba-image';
@@ -48,7 +49,12 @@ export type CalibrationStep =
       readonly earlierJob: StreamerState | null;
     }
   | { readonly kind: 'photo'; readonly status: PhotoStatus }
-  | { readonly kind: 'result'; readonly result: CalibrationResult };
+  | { readonly kind: 'result'; readonly result: CalibrationResult }
+  // The quick nudge fix (ADR-663 Amendment 2): burn one ring, photograph it,
+  // move the saved camera onto it.
+  | { readonly kind: 'nudge-setup'; readonly note: string | null }
+  | { readonly kind: 'nudge-photo'; readonly status: PhotoStatus }
+  | { readonly kind: 'nudge-result'; readonly offsetMm: Vec2 };
 
 export type CalibrationSettings = {
   /** Thickness of the sheet the target is engraved on, mm. */
@@ -67,7 +73,9 @@ export type CalibrationSettings = {
 
 // 'check' starts at the photo of a target already engraved, to see whether
 // the saved calibration still holds (ADR-441 Amendment 1).
-export type CalibrationMode = 'calibrate' | 'check';
+// 'nudge' lines a calibrated camera's picture up with one burned ring
+// (ADR-663 Amendment 2).
+export type CalibrationMode = 'calibrate' | 'check' | 'nudge';
 
 // The margin and square size of the targets last engraved on this machine
 // (ADR-441 Amendment 4), filled in when the wizard opens.
@@ -89,6 +97,8 @@ export type CameraCalibrationStore = {
   readonly targetBedFrame: CameraBedFrame | null;
   /** The guided setup from its first screen, choosing the camera (ADR-663). */
   readonly openSetup: () => void;
+  /** The quick nudge fix for a calibrated camera fixed above the bed. */
+  readonly openNudge: () => void;
   /** Straight to the target, for a camera already chosen and placed. */
   readonly openWizard: () => void;
   readonly openCheck: (saved: CameraModelRecord) => void;
@@ -128,6 +138,16 @@ export const useCameraCalibrationStore = create<CameraCalibrationStore>((set) =>
       mode: 'calibrate',
       minimized: false,
       step: { kind: 'camera' },
+      targetArea: null,
+      targetBedFrame: null,
+      settings: withRemembered(s.settings),
+    })),
+  openNudge: () =>
+    set((s) => ({
+      open: true,
+      mode: 'nudge',
+      minimized: false,
+      step: { kind: 'nudge-setup', note: null },
       targetArea: null,
       targetBedFrame: null,
       settings: withRemembered(s.settings),

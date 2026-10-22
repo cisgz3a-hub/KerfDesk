@@ -5,7 +5,8 @@
 // the machine profile. One target gives the lens, the camera's position and
 // the bed mapping together. Recalibrating starts at the target; a check of the
 // saved calibration starts at the photo. State lives in
-// camera-calibration-store; steps are thin renderers.
+// camera-calibration-store; steps are thin renderers. The same frame runs the
+// quick nudge fix (ADR-663 Amendment 2): burn a ring, photograph it, fix.
 
 import { assertNever } from '../../../core/scene';
 import { CameraWizardFrame } from './CameraWizardFrame';
@@ -14,6 +15,7 @@ import { EngravingStep, PhotoStep } from './CalibrationPhotoSteps';
 import { CalibrationResultStep } from './CalibrationResultStep';
 import { CameraMountStep } from './CameraMountStep';
 import { CameraPickStep } from './CameraPickStep';
+import { NudgePhotoStep, NudgeResultStep, NudgeSetupStep } from './NudgeSteps';
 import { PictureCheckStep } from './PictureCheckStep';
 import {
   useCameraCalibrationStore,
@@ -35,6 +37,11 @@ const SETUP_STEP_LABELS: ReadonlyArray<StepLabel> = [
   { kinds: ['photo'], label: '5 · Photo' },
   { kinds: ['result'], label: '6 · Save' },
 ];
+const NUDGE_STEP_LABELS: ReadonlyArray<StepLabel> = [
+  { kinds: ['nudge-setup', 'engraving'], label: '1 · Burn a ring' },
+  { kinds: ['nudge-photo'], label: '2 · Photo' },
+  { kinds: ['nudge-result'], label: '3 · Fix' },
+];
 const CHECK_STEP_LABELS: ReadonlyArray<StepLabel> = [
   { kinds: ['setup', 'engraving'], label: '1 · Target' },
   { kinds: ['photo'], label: '2 · Photo' },
@@ -42,7 +49,25 @@ const CHECK_STEP_LABELS: ReadonlyArray<StepLabel> = [
 ];
 
 function wizardTitle(mode: CalibrationMode): string {
-  return mode === 'check' ? 'Check camera' : 'Camera setup';
+  switch (mode) {
+    case 'check':
+      return 'Check camera';
+    case 'nudge':
+      return 'Fix camera offset';
+    case 'calibrate':
+      return 'Camera setup';
+  }
+}
+
+function stepLabels(mode: CalibrationMode): ReadonlyArray<StepLabel> {
+  switch (mode) {
+    case 'check':
+      return CHECK_STEP_LABELS;
+    case 'nudge':
+      return NUDGE_STEP_LABELS;
+    case 'calibrate':
+      return SETUP_STEP_LABELS;
+  }
 }
 
 export function CameraCalibrationWizard(): JSX.Element | null {
@@ -58,7 +83,7 @@ function OpenWizard(): JSX.Element {
   const toggleMinimized = useCameraCalibrationStore((s) => s.toggleMinimized);
   // The request outlives the step's modal/non-modal presentation when minimized.
   const photo = useCalibrationPhoto();
-  const labels = mode === 'check' ? CHECK_STEP_LABELS : SETUP_STEP_LABELS;
+  const labels = stepLabels(mode);
   return (
     <CameraWizardFrame
       title={wizardTitle(mode)}
@@ -107,6 +132,12 @@ function StepBody(props: {
       return <PhotoStep status={step.status} take={props.photo.take} cancel={props.photo.cancel} />;
     case 'result':
       return <CalibrationResultStep result={step.result} save={props.photo.save} />;
+    case 'nudge-setup':
+      return <NudgeSetupStep note={step.note} />;
+    case 'nudge-photo':
+      return <NudgePhotoStep status={step.status} />;
+    case 'nudge-result':
+      return <NudgeResultStep offsetMm={step.offsetMm} />;
     default:
       return assertNever(step, 'camera calibration step');
   }
