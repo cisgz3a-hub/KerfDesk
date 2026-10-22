@@ -8,7 +8,12 @@ import type { RecoveryCapsule, RecoveryRepositorySnapshot } from '../state/recov
 import { useRecoveryRepositorySelection } from '../state/use-recovery-repository';
 import { automaticRecoveryRestart } from './laser-recovery-automatic-restart';
 import { runStartFromLineFlow } from './start-job-flow';
-import { prepareManualRestartSource, type ManualRestartSource } from './manual-restart-source';
+import {
+  derivedLaserProgram,
+  prepareManualRestartSource,
+  type DerivedLaserProgram,
+  type ManualRestartSource,
+} from './manual-restart-source';
 import { ManualLaserRestartDialog } from './ManualLaserRestartDialog';
 
 const MIN_LINE = 1;
@@ -103,7 +108,10 @@ type SavedLaserRestart = {
 
 /** Until the operator types a line, the field holds the saved interrupted
  * job's automatic restart line. The progress bar counts sent lines, not file
- * lines, so a line typed from it can restart far from the stop. */
+ * lines, so a line typed from it can restart far from the stop. A resumed
+ * recovery or a painted second pass counts lines of its own program, while
+ * this control replays the project's, so its line is not filled in (rolling
+ * audit 2026-10-21, 05-P2-1). */
 function useRestartLine(): {
   readonly line: number;
   readonly setLine: (line: number) => void;
@@ -131,6 +139,10 @@ function savedLaserRestart({
   if (capsule === null || capsule.artifact.machineKind !== 'laser') {
     return { key: 'none', line: null, hint: null };
   }
+  const derived = derivedLaserProgram(capsule.artifact);
+  if (derived !== null) {
+    return { key: capsule.runId, line: null, hint: derivedRunHint(derived, capsule) };
+  }
   const automatic = automaticRecoveryRestart(capsule);
   const stopped = `The saved interrupted job stopped after ${capsule.ackedLines} of ${capsule.sendableLines} sent lines.`;
   return {
@@ -141,6 +153,19 @@ function savedLaserRestart({
         ? `${stopped} Only its fingerprint was saved, so the Interrupted job saved card's Review finds its restart line in this project and shows the origin.`
         : `${stopped} Its automatic restart is file line ${automatic.line}, filled in above. The Interrupted job saved card's Review restarts there too and shows the origin.`,
   };
+}
+
+function derivedRunHint(derived: DerivedLaserProgram, capsule: RecoveryCapsule): string {
+  const [run, program] =
+    derived === 'resume'
+      ? ['a resumed recovery', 'its resume program']
+      : ['a painted second pass', 'the painted program'];
+  return (
+    `The saved interrupted job was ${run} and stopped after ${capsule.ackedLines} of ` +
+    `${capsule.sendableLines} sent lines of ${program}. Those line numbers do not count this ` +
+    "project's full program, which a line typed here replays, so none is filled in. The " +
+    "Interrupted job saved card's Review restarts that program where it stopped and shows the origin."
+  );
 }
 
 function ManualRestartGuidance(props: { readonly savedHint: string | null }): JSX.Element {

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { createProject, createRegistrationLayer } from '../../../core/scene';
-import { createRegistrationBox, createRegistrationCircle } from '../../../core/shapes';
+import {
+  createRegistrationBox,
+  createRegistrationCircle,
+  createRegistrationOutline,
+} from '../../../core/shapes';
 import { capturedBoardOutlineMatches } from './captured-board-outline';
 
 describe('capturedBoardOutlineMatches', () => {
@@ -59,5 +63,38 @@ describe('capturedBoardOutlineMatches', () => {
   it('fails closed when the outline or local geometry is absent', () => {
     const scene = createProject().scene;
     expect(capturedBoardOutlineMatches(scene, null, null)).toBe(false);
+  });
+
+  it('matches a registered outline polyline by its bbox', () => {
+    const project = createProject();
+    const object = {
+      ...createRegistrationOutline({
+        id: 'board',
+        pointsMm: [
+          { x: 0, y: 0 },
+          { x: 100, y: 0 },
+          { x: 60, y: 50 },
+          { x: 0, y: 60 },
+        ],
+      }),
+      provenance: 'captured-board' as const,
+      locked: true,
+    };
+    const scene = {
+      ...project.scene,
+      layers: [...project.scene.layers, createRegistrationLayer()],
+      objects: [object],
+    };
+    const geometry = {
+      kind: 'outline' as const,
+      localPointsMm: object.spec.kind === 'polyline' ? object.spec.points : [],
+      anchorIndices: [0, 1, 3],
+      viewSigns: { x: 1 as const, y: 1 as const },
+      measured: [
+        { index: 0, machine: { x: 0, y: 0 } },
+        { index: 1, machine: { x: 100, y: 0 } },
+      ],
+    };
+    expect(capturedBoardOutlineMatches(scene, 'board', geometry)).toBe(true);
   });
 });

@@ -13,7 +13,6 @@ import { canvasJobTimingPlan } from '../state/canvas-job-timing-plan';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { readJobCheckpoint, writeJobCheckpoint } from '../state/job-checkpoint-storage';
 import { useLaserStore } from '../state/laser-store';
-import { recoveryRepository } from '../state/recovery';
 import type { LaserModeStartSnapshot } from '../state/laser-mode-start-evidence';
 import { confirmLaserModeStartEvidence } from './laser-mode-start-acknowledgement';
 import { resumeConfirmation } from './resume-confirmation';
@@ -25,6 +24,7 @@ import {
 import { buildLaserResumeProgram } from './laser-resume-program';
 import { markOwnedResumeCheckpoint, sameCheckpoint } from './start-job-checkpoint-policy';
 import { finalRecoveryStartAssertion } from './recovery-start-authorization';
+import { retireRecoveryAfterUntrackedStart } from './untracked-start-retirement';
 import {
   isJobStartBeforeProgramError,
   isJobStartTransmissionError,
@@ -76,13 +76,13 @@ export async function streamResumeFromRawLine(
     // Manual start-from-line is deliberately outside exact recovery tracking,
     // but an accepted stream changes physical machine state. An older capsule
     // or completed-job receipt must not remain eligible afterward.
-    await recoveryRepository.noteUntrackedRunAccepted();
+    await retireRecoveryAfterUntrackedStart();
     return true;
   } catch (err) {
     if (isJobStartTransmissionError(err)) {
       // Manual restarts have no sealed run to retain, but attempted output must
       // still retire recovery records whose machine history is now obsolete.
-      await recoveryRepository.noteUntrackedRunAccepted();
+      await retireRecoveryAfterUntrackedStart();
     } else if (!finalAuthorizationPassed || isJobStartBeforeProgramError(err)) {
       restoreUnacceptedResumeCheckpoint(
         checkpointBeforeStart,

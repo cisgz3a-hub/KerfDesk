@@ -69,6 +69,16 @@ function change(sources: ReadonlyArray<VectorSceneObject>) {
 const letters = [rectangle(20, 75, 28, 85), rectangle(32, 75, 40, 85), rectangle(44, 75, 52, 85)];
 
 describe('describeWeldChange', () => {
+  it('preserves a real narrow bridge even when its uncovered area is below a perimeter tolerance', () => {
+    expect(
+      change([
+        artwork('left', [rectangle(0, 0, 10, 10)]),
+        artwork('right', [rectangle(10.002, 0, 20.002, 10)]),
+        artwork('bridge', [rectangle(5, 4, 15, 6)]),
+      ]),
+    ).toEqual({ changed: true, absorbedIds: [] });
+  });
+
   it('reports no change for one ellipse on its own', () => {
     expect(change([artwork('ellipse', [ellipse(50, 80, 50, 80)])])).toEqual({
       changed: false,

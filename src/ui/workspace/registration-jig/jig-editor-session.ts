@@ -14,7 +14,7 @@ import { applyCenterArtworkInRegistrationJigSet } from '../../state/registration
 import { applyRemoveRegistrationBox } from '../../state/registration-box-actions';
 import { applyRegistrationOutput } from '../../state/registration-output-actions';
 import { pushUndo } from '../../state/scene-mutations';
-import { rebaseJigDraft, type JigRebaseConflict } from './jig-editor-rebase';
+import { jigSceneConflict, rebaseJigDraft, type JigRebaseConflict } from './jig-editor-rebase';
 import { jigBackgroundIds } from './jig-editor-scope';
 
 export type JigDraft = Pick<
@@ -219,6 +219,8 @@ export function commitJigEditorSession(
     draft = { ...draft, ...applyRegistrationOutput({ ...draft, undoStack: [] }, 'box') };
   }
   const project = lockOutlines(draft.project);
+  const conflict = jigSceneConflict(project.scene);
+  if (conflict !== null) return { kind: 'refused', reason: conflict };
   // Publish one edit, never the editor's intermediate history or machine state.
   // The editor never sees the main canvas's selection (ADR-652), so that selection,
   // which also scopes Selected artwork only output, comes back as it was.
