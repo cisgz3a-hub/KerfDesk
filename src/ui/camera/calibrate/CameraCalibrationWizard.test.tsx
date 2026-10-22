@@ -13,6 +13,7 @@ import { useLaserStore } from '../../state/laser-store';
 import { resetStore } from '../../state/test-helpers';
 import { engraveCalibrationTarget, photographTarget } from './calibration-actions';
 import { CameraCalibrationWizard } from './CameraCalibrationWizard';
+import { loadViewReference } from '../helpers/view-reference';
 import {
   DEFAULT_CALIBRATION_SETTINGS,
   useCameraCalibrationStore,
@@ -151,6 +152,21 @@ describe('camera calibration wizard', () => {
     expect(useStore.getState().project.device.cameraModel).toEqual(savedCameraModel());
     expect(useCameraStore.getState().overlayVisible).toBe(true);
     expect(useCameraCalibrationStore.getState().open).toBe(false);
+  });
+
+  it('keeps the calibration photo as the view the moved check compares with (ADR-663 Amd 3)', async () => {
+    localStorage.clear();
+    useCameraStore.setState({ sourceState: { kind: 'live', source } });
+    const view = { width: 4, height: 2, data: new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]) };
+    vi.mocked(photographTarget).mockResolvedValue({
+      kind: 'ok',
+      result: result({ viewReference: view }),
+    });
+    useCameraCalibrationStore.getState().setStep({ kind: 'photo', status: { kind: 'idle' } });
+    await mountControl(<CameraCalibrationWizard />);
+    await clickControl(document.body, 'Take photo');
+    await clickControl(document.body, 'Save calibration');
+    expect(loadViewReference(savedCameraModel())).toEqual(view);
   });
 
   it('calibrates a second camera and keeps the first camera’s calibration (ADR-446)', async () => {

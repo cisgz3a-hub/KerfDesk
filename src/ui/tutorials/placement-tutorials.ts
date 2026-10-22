@@ -38,14 +38,14 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Refresh before placing artwork',
         instruction:
-          'Use Refresh picture after moving material, or Live. Set Material height to the top of the material so its edges line up, then place artwork over the image or trace a visible shape. Physically Frame the exact intended job before Start.',
+          'Use Refresh picture (Alt+C) after moving material, or Live; a held picture also refreshes after each job. Set Material height to the top of the material so its edges line up, then place artwork over the image or trace a visible shape. Physically Frame the exact intended job before Start.',
         focus: 'Fresh image · correct surface height',
         result:
           'The overlay helps place artwork, and the physical Frame checks the intended job location.',
         visual: 'frame',
       },
     ],
-    tip: 'Moving the camera changes its relationship to the bed; calibrate again after it moves. A convincing overlay alone does not verify real-world alignment.',
+    tip: 'Moving the camera changes its relationship to the bed. KerfDesk warns when the camera seems to have moved: Fix a small offset… in Camera settings lines a slid picture up with one burned ring, and a bigger move needs a new calibration. A convincing overlay alone does not verify real-world alignment.',
     keywords: ['camera', 'USB', 'RTSP', 'lens', 'calibration', 'target', 'overlay', 'alignment'],
     related: ['trace', 'board', 'print-cut', 'frame-start'],
   },

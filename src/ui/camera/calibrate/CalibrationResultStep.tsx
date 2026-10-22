@@ -19,6 +19,8 @@ import {
 import { RgbaCanvas } from './RgbaCanvas';
 import { savedCalibrationVerdict } from './saved-calibration-check';
 import { SavedCalibrationCheckNote } from './SavedCalibrationCheckNote';
+import { markCameraSteady } from '../helpers/moved-check';
+import { saveViewReference } from '../helpers/view-reference';
 import { columnStyle, noteStyle, rowStyle } from './wizard-styles';
 
 // Above this the photo alone leaves the camera height loose enough to shift
@@ -107,7 +109,15 @@ function ResultActions(props: {
         <button
           type="button"
           className={keepFirst ? 'lf-btn lf-btn--primary' : 'lf-btn'}
-          onClick={closeWizard}
+          onClick={() => {
+            // A check that found the camera where it was renews its moved-check view.
+            const reference = props.result.viewReference;
+            if (unchanged && savedCheck.kind === 'measured' && reference !== undefined) {
+              saveViewReference(savedCheck.saved, reference);
+              markCameraSteady();
+            }
+            closeWizard();
+          }}
           title="Close without changing the saved calibration."
         >
           Keep saved calibration

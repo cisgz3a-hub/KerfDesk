@@ -11,6 +11,7 @@ import { AccuracyMapToggle } from '../accuracy/AccuracyMapToggle';
 import { useOwnCameraFrameNote, useOwnCameraModel } from '../active-camera-model';
 import { calibrationGrade } from './calibration-result';
 import { useCameraCalibrationStore } from './camera-calibration-store';
+import { hasViewReference } from '../helpers/view-reference';
 
 export function CalibrateCameraControls(): JSX.Element {
   const openSetup = useCameraCalibrationStore((s) => s.openSetup);
@@ -72,6 +73,12 @@ export function CalibrateCameraControls(): JSX.Element {
         <p style={noteStyle}>
           Calibrated {new Date(model.calibratedAt).toLocaleDateString()}: average error{' '}
           {model.accuracy.rmsErrorMm.toFixed(2)} mm. {calibrationGrade(model).headline}
+        </p>
+      )}
+      {model === undefined || isHeadCameraModel(model) || hasViewReference(model) ? null : (
+        <p style={noteStyle}>
+          To be warned when the camera moves, run Check camera or Fix a small offset once: KerfDesk
+          then keeps a view to compare with.
         </p>
       )}
       {frameNote === null ? null : (

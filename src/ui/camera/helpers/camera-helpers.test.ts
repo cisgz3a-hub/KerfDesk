@@ -25,7 +25,7 @@ import { resetStore } from '../../state/test-helpers';
 import { AFTER_SETTLE_MS } from '../job-watch/job-watch-runner';
 import { startRememberedCamera } from './auto-start';
 import { useCameraHelpersStore } from './camera-helpers-store';
-import { installCameraHelpers } from './install-camera-helpers';
+import { installCameraHelpers, MOVED_CHECK_SETTLE_MS } from './install-camera-helpers';
 import { refreshCameraPicture, refreshCameraPictureFromKey } from './refresh-picture';
 
 const capture = vi.hoisted(() => vi.fn());
@@ -218,14 +218,20 @@ describe('the installed helpers', () => {
       bridgeAvailable: false,
     });
     useCameraStore.setState({ sourceState: { kind: 'live', source: machineSource } });
+    // The moved check takes its one picture of a camera that has just started.
+    await vi.advanceTimersByTimeAsync(MOVED_CHECK_SETTLE_MS);
+    capture.mockClear();
     useLaserStore.setState({ liveCanvasRun: run('finished', {}) });
     await vi.advanceTimersByTimeAsync(AFTER_SETTLE_MS);
     expect(capture).not.toHaveBeenCalled();
-    useCameraStore.getState().setOverlayStill({ ...frame });
+    expect(useCameraStore.getState().overlayStill).toBeNull();
+    const held = { ...frame };
+    useCameraStore.getState().setOverlayStill(held);
     useCameraHelpersStore.getState().setSettings({ refreshAfterJob: false });
     useLaserStore.setState({ liveCanvasRun: run('finished', {}) });
     await vi.advanceTimersByTimeAsync(AFTER_SETTLE_MS);
     expect(capture).not.toHaveBeenCalled();
+    expect(useCameraStore.getState().overlayStill).toBe(held);
     stop();
   });
 });

@@ -17,6 +17,8 @@ import {
   type CalibrationResult,
   type CalibrationStep,
 } from './camera-calibration-store';
+import { markCameraSteady } from '../helpers/moved-check';
+import { saveViewReference } from '../helpers/view-reference';
 
 export type CalibrationPhotoControls = {
   readonly take: () => Promise<void>;
@@ -158,6 +160,11 @@ function saveCurrent(runRef: RunRef, result: CalibrationResult): void {
   runRef.current = null;
   const { device } = useStore.getState().project;
   useStore.getState().updateDeviceProfile(withSavedCameraModel(device, result.record));
+  // The calibration photo is the view the "camera moved?" check compares with.
+  if (result.viewReference !== undefined) {
+    saveViewReference(result.record, result.viewReference);
+    markCameraSteady();
+  }
   useCameraStore.getState().setOverlayVisible(true);
   useCameraCalibrationStore.getState().closeWizard();
 }

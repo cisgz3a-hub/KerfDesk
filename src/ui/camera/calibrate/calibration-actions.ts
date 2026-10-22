@@ -14,6 +14,8 @@ import type { CameraBedFrame } from '../../../core/camera/model/camera-bed-frame
 import type { BedArea } from '../../../core/camera/model/camera-model-accuracy';
 import type { CameraModelRecord } from '../../../core/camera/model/camera-model-record';
 import { isHeadCameraModel, modelAtHead } from '../../../core/camera/model/head-camera';
+import { viewThumbnail } from '../../../core/camera/model/view-shift';
+import type { RgbaImage } from '../../../core/camera/rgba-image';
 import { bedTargetLayout, type BedTargetArea } from '../../../core/camera/target/bed-target';
 import { generateCameraBedTarget } from '../../../core/job/camera-bed-target-pattern';
 import type { Project, Vec2 } from '../../../core/scene';
@@ -177,8 +179,18 @@ export async function photographTarget(args: {
       cameraHeightSigmaMm: outcome.cameraHeightSigmaMm,
       usedMeasuredHeight: settings.cameraHeightMm !== null,
       savedCheck,
+      ...fixedCameraView(settings, raw),
     },
   };
+}
+
+// The photo's whole view, kept for the "camera moved?" check (ADR-663
+// Amendment 3). A head camera sees another patch at every stop, so keeps none.
+function fixedCameraView(
+  settings: CalibrationSettings,
+  raw: RgbaImage,
+): Pick<CalibrationResult, 'viewReference'> {
+  return settings.headCamera ? {} : { viewReference: viewThumbnail(raw) };
 }
 
 // A head camera's saved calibration, placed where the head took this photo.
