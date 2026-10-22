@@ -4,6 +4,12 @@
 ADR-341 Amendment 6's Context that a dropped USB link leaves the controller running every line
 it had received. | **Date:** 2026-10-22
 
+**Amended by [ADR-398 Amendment 4](ADR-398-amendment-4-a-greeting-banner-does-not-prove-a-restart.md):**
+grblHAL greets every network client, and every native-USB port open, with its startup banner
+without resetting, and a network board cannot show a restart at all. On those links a banner no
+longer proves a restart: the first status or Alarm decides, an unknown verdict does not step back,
+and the restart hint names the line that would.
+
 ### Context
 
 Rolling audit 2026-10-21, finding 18-P2-1

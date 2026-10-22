@@ -2953,6 +2953,14 @@ authorization, Frame proof, controller command, or safety boundary.
   startup banner (an Arduino-based board resets when its port reopens, and one powered from
   USB stops when the cable is pulled) or an Alarm. A controller that answers without either
   kept running, and the line stays at the first unacknowledged one (ADR-398 Amendment 3).
+  grblHAL sends the same banner to every new network connection and every native-USB port
+  open without resetting, and a board on Wi-Fi or Ethernet cannot show a restart at all. On
+  those links the banner does not count: a `Run` or `Hold` status means the controller kept
+  running, an Alarm that it stopped, and anything else leaves the restart unknown. An unknown
+  restart keeps the automatic line, and the picker names the earlier line that replays the
+  moves a restart would have thrown away, for the operator to choose after inspecting the
+  work (ADR-398 Amendment 4). The Review and the lost-link notices name the link, USB or
+  network.
 - Resume, saved or manual, re-arms the beam with the power commands of the controller the job
   was written for (ADR-364).
   - A Smoothieware job resumes with `fire off` and restores its own `M221` scale and

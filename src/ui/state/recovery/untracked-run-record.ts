@@ -60,7 +60,8 @@ export function untrackedRunCheckpoint(
     ...backlog,
     ackedAtStatus: toJob(backlog.ackedAtStatus),
   });
-  const { plannerBacklog, plannerBacklogIfRestarted, sentLines } = interruption;
+  const { plannerBacklog, plannerBacklogIfRestarted, unconfirmedPlannerBacklog, sentLines } =
+    interruption;
   return {
     ...record.intent,
     ackedLines: toJob(ackedLines),
@@ -71,6 +72,9 @@ export function untrackedRunCheckpoint(
       ...(plannerBacklogIfRestarted === undefined
         ? {}
         : { plannerBacklogIfRestarted: backlogToJob(plannerBacklogIfRestarted) }),
+      ...(unconfirmedPlannerBacklog === undefined
+        ? {}
+        : { unconfirmedPlannerBacklog: backlogToJob(unconfirmedPlannerBacklog) }),
     },
     updatedAtIso,
   };
