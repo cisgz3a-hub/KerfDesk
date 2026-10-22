@@ -4,12 +4,11 @@
 // retract, post-frame safe-Z) from silently moving work Z0 into the air.
 
 import { useCallback } from 'react';
-import { currentWorkZMm } from '../state/infer-machine-position';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { controllerActionFailureHandler } from './report-controller-action-failure';
-import { zeroZOverwriteWarning } from './zero-z-guard';
+import { liveZeroZOverwriteWarning } from './zero-z-guard';
 
 export function useZeroZAction(): () => void {
   // The live state is read at the click. Subscribing to it re-rendered the
@@ -17,15 +16,7 @@ export function useZeroZAction(): () => void {
   // this handler reads once (ADR-352).
   return useCallback((): void => {
     const state = useLaserStore.getState();
-    const warning = zeroZOverwriteWarning({
-      evidence: state.workZZeroEvidence,
-      referenceEpoch: state.workZReferenceEpoch,
-      workZMm: currentWorkZMm(
-        state.statusReport,
-        state.wcoCache,
-        state.controllerSettings?.reportInches === true,
-      ),
-    });
+    const warning = liveZeroZOverwriteWarning(state);
     if (warning !== null && !jobAwareConfirm(warning)) return;
     // Both outcomes are visible: the DRO does not show work Z, and a refusal
     // used to become an unhandled rejection with no message (audit ui-panel-5).

@@ -1,0 +1,19 @@
+Ostromoukhov variable-coefficient error-diffusion weights
+
+Source: Victor Ostromoukhov, "A Simple and Efficient Error-Diffusion
+Algorithm", Proceedings of SIGGRAPH 2001, pp. 567-572,
+https://doi.org/10.1145/383259.383326
+Author's copy: https://www.iro.umontreal.ca/~ostrom/varcoeffED/SIGGRAPH01_varcoeffED.pdf
+Material used: the integer error-filter weights printed in the paper's
+Appendix I for input levels 0..127, transcribed into
+src/core/raster/dither-blue-noise-tables.ts (ADR-649).
+KerfDesk files: src/core/raster/dither-blue-noise-tables.ts,
+src/core/raster/dither-blue-noise.ts
+Changes: rows used only up to KerfDesk's first re-optimised key level; the
+diffusion, threshold modulation and midtone weights are KerfDesk's own
+implementation. No upstream source code is included.
+
+Status: the paper states, "Our algorithm has been developed in an academic
+framework. It is our firm intention to put it into the public domain." No
+separate licence accompanies the published table. It is reproduced here with
+attribution to its author.
