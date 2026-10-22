@@ -5,6 +5,7 @@ import type { CncWrapStudy } from '../../../core/scene/cnc-wrap-study';
 import { parseCncWrapStudy } from '../../../io/project/project-cnc-wrap-study-validator';
 import { buildCncWrapStudyArtifact } from '../../../io/cnc/cnc-wrap-study-artifact';
 import { useStore } from '../../state';
+import { pickPreparedSaveTarget } from '../../app/pick-prepared-save-target';
 import { usePlatformOptional } from '../../app/platform-context';
 import { Dialog } from '../../kit';
 export function CncWrapStudyReview(props: {
@@ -34,17 +35,22 @@ export function CncWrapStudyReview(props: {
     }
     writing.current = true;
     setBusy(true);
-    const target = platform.pickFileForSave({
-      suggestedName: 'cnc-wrap-study.json',
-      extensions: ['.json'],
-    });
-    void target
+    // The picker empties an existing file as it returns (ADR-656): the picked
+    // file gets the study reviewed at the click, even if the project changed.
+    const source = props.project;
+    void pickPreparedSaveTarget(
+      platform,
+      { suggestedName: 'cnc-wrap-study.json', extensions: ['.json'] },
+      { title: 'Save CNC wrap study', message: 'The study and reference program are ready.' },
+    )
       .then(async (destination) => {
         if (destination === null) return;
-        if (useStore.getState().project !== props.project)
-          throw new Error('The source project changed before writing. Reopen the reference study.');
         await destination.write(artifact.json);
-        setError('');
+        setError(
+          useStore.getState().project === source
+            ? ''
+            : 'Saved the study from before the source project changed. Save again to include the change.',
+        );
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => {
