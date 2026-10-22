@@ -3,9 +3,9 @@ import { saveSurfacingProgram } from './save-surfacing-program';
 
 type Options = Omit<
   Parameters<typeof saveSurfacingProgram>[0],
-  'signal' | 'onWriting' | 'onFinalizing' | 'isCurrent'
+  'signal' | 'onChoosing' | 'onFinalizing' | 'isCurrent'
 >;
-type Phase = 'preparing' | 'writing' | 'finalizing' | null;
+type Phase = 'preparing' | 'choosing' | 'finalizing' | null;
 type SaveOwner = { readonly controller: AbortController; finalizing: boolean };
 
 export function useSurfacingSave(
@@ -35,8 +35,8 @@ export function useSurfacingSave(
       ...options,
       signal: owner.controller.signal,
       isCurrent,
-      onWriting: () => {
-        if (isCurrent()) setPhase('writing');
+      onChoosing: () => {
+        if (isCurrent()) setPhase('choosing');
       },
       onFinalizing: () => {
         owner.finalizing = true;

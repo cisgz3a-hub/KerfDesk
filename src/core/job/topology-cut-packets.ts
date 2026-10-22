@@ -11,7 +11,7 @@ import {
 import { createNearestEntryQuery } from './segment-entry-index';
 import { removeCutOverlaps } from './remove-cut-overlaps';
 import { containmentDepths } from './containment-depth';
-import { cleanupTopologyRoute, type PlannedCutPart } from './topology-cut-cleanup';
+import { cleanupTopologyRoute, mergedOutlines, type PlannedCutPart } from './topology-cut-cleanup';
 
 type Settings = Pick<ProjectOptimizationSettings, 'insideFirst' | 'pathDirection' | 'startPoint'> &
   Partial<
@@ -229,6 +229,7 @@ function coalescePeerParts(route: ReadonlyArray<PlannedCutPart>): CutGroup[] {
       out[out.length - 1] = {
         ...previous,
         segments: [...previous.segments, ...part.group.segments],
+        ...mergedOutlines(previous, part.group),
       };
     else out.push(part.group);
     last = part;

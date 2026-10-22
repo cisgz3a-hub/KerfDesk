@@ -21,7 +21,9 @@ import {
  * discarded the controller's planner also records its backlog, so recovery
  * restarts before the moves it threw away (controller audit recovery-6). A
  * stop that may have killed the steppers mid-motion is marked position-lost
- * (ADR-215 Amendment 1). A lost link records the lines sent by then. */
+ * (ADR-215 Amendment 1). A lost link records the lines sent by then, and keeps
+ * its backlog aside until the reconnect shows whether the controller
+ * restarted (ADR-398 Amendment 3). */
 export function checkpointInterruption(
   status: StreamerStatus,
   notice: LaserSafetyNotice | null,
@@ -37,6 +39,9 @@ export function checkpointInterruption(
     sentLines,
   );
   if (plannerBacklog === undefined) return interruption;
+  if (interruption.kind === 'disconnect') {
+    return { ...interruption, plannerBacklogIfRestarted: plannerBacklog };
+  }
   // The stop sent while the app closed may never have arrived.
   const stopMayNotHaveArrived = stopRequest?.reason === 'app-closing';
   return PLANNER_DISCARDING_KINDS.includes(interruption.kind) && !stopMayNotHaveArrived
@@ -44,11 +49,12 @@ export function checkpointInterruption(
     : interruption;
 }
 
-/** A lost link leaves the controller running what it had received, so the
- * head stops at the end of the last line sent. The record keeps how many that
- * was, acknowledged lines plus those still in flight, so recovery can continue
- * from where the head stands (ADR-341 Amendment 6). Other stops either
- * discarded the planner or failed a write whose lines may never have left. */
+/** A controller that keeps running after a lost link runs what it had
+ * received, so the head stops at the end of the last line sent. The record
+ * keeps how many that was, acknowledged lines plus those still in flight, so
+ * recovery can continue from where the head stands (ADR-341 Amendment 6).
+ * Other stops either discarded the planner or failed a write whose lines may
+ * never have left. */
 function withSentLines(
   interruption: JobInterruption,
   sentLines: number | undefined,
@@ -59,8 +65,10 @@ function withSentLines(
 }
 
 // Abort and an ALARM stop with a soft reset or alarm; an auto-abort follows a
-// rejected line; a reboot loses everything. A lost link, a failed write or a
-// stall leaves the controller running what it had.
+// rejected line; a reboot loses everything. A failed write or a stall leaves
+// the controller running what it had. A lost link may do either: an
+// Arduino-class board resets when its port reopens, so the reconnect decides
+// (ADR-398 Amendment 3).
 const PLANNER_DISCARDING_KINDS: ReadonlyArray<JobInterruption['kind']> = [
   'cancelled',
   'controller-error',

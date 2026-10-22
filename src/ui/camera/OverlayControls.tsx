@@ -4,14 +4,20 @@
 // camera model uses to undo parallax exactly (ADR-440), and height areas for
 // objects that stand above the material (ADR-441 Amendment 2), and the pieces
 // on the bed to repeat a design on (ADR-442). A camera on the laser head
-// captures and stitches pictures instead of freezing one (ADR-449). Camera placement
+// captures and stitches pictures instead of freezing one (ADR-449). A
+// calibration made with another origin corner is not drawn, and the row says
+// why (rolling audit 12-P2-2). Camera placement
 // stays latched after hiding the image so its status remains visible until
 // the operator exits it.
 
 import { isHeadCameraModel } from '../../core/camera/model/head-camera';
 import { DraftNumberInput } from '../kit/DraftNumberInput';
 import { useCameraStore } from '../state/camera-store';
-import { useActiveCameraModel, useOwnCameraModel } from './active-camera-model';
+import {
+  useActiveCameraModel,
+  useOwnCameraFrameNote,
+  useOwnCameraModel,
+} from './active-camera-model';
 import { HeadCaptureControls } from './head/HeadCaptureControls';
 import { useCameraPlacementControls } from './use-camera-placement-controls';
 import { TraceFromCameraButton } from './TraceFromCameraButton';
@@ -22,8 +28,16 @@ import { PiecesControl } from './pieces/PiecesControl';
 export function OverlayControls(): JSX.Element | null {
   const model = useActiveCameraModel();
   const own = useOwnCameraModel();
+  const frameNote = useOwnCameraFrameNote();
   if (model !== undefined)
     return <CalibratedOverlayControls headCamera={isHeadCameraModel(model)} />;
+  if (frameNote !== null && !frameNote.usable) {
+    return (
+      <p role="status" style={headNoticeStyle}>
+        {frameNote.message}
+      </p>
+    );
+  }
   return isHeadCameraModel(own) ? <HeadPositionNotice /> : null;
 }
 

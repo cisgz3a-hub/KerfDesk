@@ -1,6 +1,7 @@
 // The text of Help > Save Support Report (ADR-546): what KerfDesk support
 // needs to see what went wrong, in a plain file the customer reads before
-// sending. It holds no licence key, payment order or password. This module
+// sending. It holds no payment order, and the licence keys, passwords and
+// sign-ins support-report-redaction.ts recognises are removed. This module
 // only formats; save-support-report.ts gathers the facts.
 
 import type { ControllerKind } from '../../core/devices';
@@ -46,9 +47,10 @@ export function formatSupportReport(facts: SupportReportFacts): string {
       'KerfDesk support report',
       `Saved ${facts.savedAt.toISOString()}`,
       '',
-      'This file helps KerfDesk support see what went wrong. It holds no licence key,',
-      'password or payment details. Read it before you send it, and delete anything',
-      'you would rather not share.',
+      'This file helps KerfDesk support see what went wrong. KerfDesk removed licence',
+      'keys and the passwords and sign-ins it recognises, such as controller Wi-Fi',
+      'passwords. It holds no payment details. Read it before you send it, and delete',
+      'anything you would rather not share.',
     ],
     section('KerfDesk', [
       `Version: ${facts.build.version} (commit ${facts.build.commit}, built ${facts.build.builtAt})`,

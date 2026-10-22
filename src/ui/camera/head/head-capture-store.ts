@@ -2,10 +2,13 @@
 // the head is; Capture selection / Capture bed jogs the head over that area,
 // taking a picture at each stop, and stitches them into one top-down picture
 // shown on the canvas. Moves use the same beam-off jog as Move laser here,
-// under the same readiness rules; Stop cancels the jog in progress and keeps
-// the pictures already taken.
+// under the same readiness rules and the same manual-motion limits, so a stop
+// at the bed edge stays the pull-off clear of the homing switch (ADR-375,
+// rolling audit 12-P2-3); Stop cancels the jog in progress and keeps the
+// pictures already taken.
 
 import { create } from 'zustand';
+import { cameraModelInBedFrame } from '../../../core/camera/model/camera-bed-frame';
 import type { BedArea } from '../../../core/camera/model/camera-model-accuracy';
 import type { CameraModelRecord } from '../../../core/camera/model/camera-model-record';
 import {
@@ -18,7 +21,8 @@ import {
   type HeadCameraPicture,
 } from '../../../core/camera/model/head-camera-stitch';
 import { ownModelFor } from '../../../core/camera/model/saved-cameras';
-import { bedPointToNative } from '../../../core/devices/native-bed-frame';
+import { toSceneCoords, type DeviceProfile } from '../../../core/devices';
+import { nativePointToBed } from '../../../core/devices/native-bed-frame';
 import type { Vec2 } from '../../../core/scene';
 import { useStore } from '../../state';
 import { useCameraStore } from '../../state/camera-store';
@@ -28,8 +32,10 @@ import { resolveNativeBedFrame } from '../../state/native-bed-frame';
 import {
   clampToBed,
   positionLaserFeed,
-  positionLaserTarget,
+  positionLaserNativeTarget,
+  positionLaserReach,
 } from '../../workspace/position-laser-click';
+import { cameraBedFrameNow } from '../camera-bed-frame-now';
 import { cameraSourceIdentity, captureSourceFrame, type ActiveCameraSource } from '../frame-source';
 import { runHeadCapture, type HeadCaptureIo, type HeadSettle } from './head-capture-run';
 import { headPositionNow } from './head-position';
@@ -117,10 +123,8 @@ function captureSetup(target: HeadCaptureTarget): Setup {
     return { kind: 'failed', message: 'Start the head camera first.' };
   }
   const source = camera.sourceState.source;
-  const record = ownModelFor(device, cameraSourceIdentity(source));
-  if (record === undefined || !isHeadCameraModel(record)) {
-    return { kind: 'failed', message: NOT_HEAD_CAMERA };
-  }
+  const record = headCameraRecord(device, source);
+  if (typeof record === 'string') return { kind: 'failed', message: record };
   const head = headPositionNow();
   if (head === null) return { kind: 'failed', message: HEAD_POSITION_UNKNOWN };
   const view = headCameraView(record, camera.surfaceHeightMm);
@@ -133,7 +137,10 @@ function captureSetup(target: HeadCaptureTarget): Setup {
   }
   const blocked = machineBlockedMessage();
   if (blocked !== null) return { kind: 'failed', message: blocked };
-  const plan = planHeadCaptures(view, target.area, bed);
+  const laser = useLaserStore.getState();
+  const frame = resolveNativeBedFrame(device, laser);
+  if (frame === null) return { kind: 'failed', message: HEAD_POSITION_UNKNOWN };
+  const plan = planHeadCaptures(view, target.area, positionLaserReach(device, frame, laser));
   return {
     kind: 'ready',
     record,
@@ -142,6 +149,19 @@ function captureSetup(target: HeadCaptureTarget): Setup {
     region: target.area,
     coversArea: plan.coversArea,
   };
+}
+
+// The running camera's own head-camera calibration in today's bed frame, or
+// why it cannot be used: one made with another origin corner would put every
+// picture in the mirrored place (rolling audit 12-P2-2).
+function headCameraRecord(
+  device: DeviceProfile,
+  source: ActiveCameraSource,
+): CameraModelRecord | string {
+  const own = ownModelFor(device, cameraSourceIdentity(source));
+  if (own === undefined || !isHeadCameraModel(own)) return NOT_HEAD_CAMERA;
+  const framed = cameraModelInBedFrame(own, cameraBedFrameNow());
+  return framed.kind === 'ok' ? framed.model : framed.message;
 }
 
 function machineBlockedMessage(): string | null {
@@ -162,7 +182,8 @@ function machineIo(
   };
   return {
     moveTo: target.kind === 'here' ? async () => undefined : jogHeadTo,
-    settleAt: (stop) => settleAt(stop, stopRequested),
+    // A capture here settles where the head already is; a stop, where its jog goes.
+    settleAt: (stop) => settleAt(target.kind === 'here' ? stop : jogStopOnBed(stop), stopRequested),
     takePicture: async () => {
       await sleep(PICTURE_SETTLE_MS);
       if (useCameraStore.getState().sourceEpoch !== epoch) return null;
@@ -179,13 +200,24 @@ function machineIo(
   };
 }
 
+// The same target and limits as Move laser here (ADR-449 §4, ADR-375).
 async function jogHeadTo(head: Vec2): Promise<void> {
   const { device } = useStore.getState().project;
   const laser = useLaserStore.getState();
   const frame = resolveNativeBedFrame(device, laser);
   if (frame === null) throw new Error(HEAD_POSITION_UNKNOWN);
-  const target = bedPointToNative(positionLaserTarget(head, device), frame);
+  const target = positionLaserNativeTarget(head, device, frame, laser);
   await laser.jogToMachinePosition(target.x, target.y, positionLaserFeed(device.maxFeed));
+}
+
+// Where jogHeadTo(stop) takes the head, on the bed.
+function jogStopOnBed(stop: Vec2): Vec2 {
+  const { device } = useStore.getState().project;
+  const laser = useLaserStore.getState();
+  const frame = resolveNativeBedFrame(device, laser);
+  if (frame === null) return clampToBed(stop, device.bedWidth, device.bedHeight);
+  const native = positionLaserNativeTarget(stop, device, frame, laser);
+  return toSceneCoords(nativePointToBed(native, frame), device);
 }
 
 async function settleAt(stop: Vec2, stopRequested: () => boolean): Promise<HeadSettle> {

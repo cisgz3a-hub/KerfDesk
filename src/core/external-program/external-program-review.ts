@@ -18,6 +18,7 @@ import {
   grblBlockUncertainty,
   grblRejectedBlockWarning,
 } from '../gcode-view/grbl-block-rejection';
+import { externalProgramBaseline } from './normalize-external-program';
 
 export type ExternalProgramEnvelope = {
   readonly minX: number;
@@ -132,7 +133,8 @@ export function reviewExternalProgram(
 ): ExternalProgramReview {
   const interpreted = controllerReviewText(gcode, context);
   const reviewedText = interpreted?.gcode ?? gcode;
-  const scanned = commandsIn(reviewedText);
+  const baselineLines = baselineLineCount(gcode, context.controllerKind);
+  const scanned = commandsIn(reviewedText, baselineLines);
   // Marlin's M3/M4 without S uses configured startup power; its reader names
   // that separately. GRBL's retained-S warning would contradict it.
   const commands =
@@ -149,7 +151,7 @@ export function reviewExternalProgram(
     ...coordinateSystemWarnings(model),
     ...(still === undefined ? pointEnvelopeWarnings(reviewedText, model) : [NEVER_MOVES]),
     ...unitWarnings(model),
-    ...toolLeftOnWarnings(model),
+    ...toolLeftOnWarnings(model, baselineLines),
     ...machineModeWarnings(model, context),
     ...skippedMotionWarnings(model),
     ...findings
@@ -232,12 +234,21 @@ function unsupportedWordWarnings(findings: ReadonlyArray<ProgramFinding>): Reado
   ];
 }
 
-function commandsIn(gcode: string): Commands {
+// The sent program opens with KerfDesk's baseline (externalProgramBaseline).
+// Its lines set the modes the review assumes; they are not the program's own
+// commands. Smoothieware's `M221 S100` restores the power-up scale: it is not
+// an S the program set, nor the program leaving its laser on.
+function baselineLineCount(gcode: string, kind: ControllerKind | undefined): number {
+  const baseline = externalProgramBaseline(kind ?? 'grbl-v1.1');
+  return gcode.startsWith(`${baseline}\n`) ? baseline.split('\n').length : 0;
+}
+
+function commandsIn(gcode: string, baselineLines: number): Commands {
   const g = new Set<number>();
   const m = new Set<number>();
   const offsetWrites = new Set<number>();
   const speed = createSpeedTracker();
-  for (const line of gcode.split('\n')) {
+  for (const line of gcode.split('\n').slice(baselineLines)) {
     const words = scanGcodeWords(line);
     for (const word of words) {
       const code = Math.round(word.value * 10) / 10;
@@ -346,9 +357,10 @@ function coordinateSystemWarnings(model: ReviewModel): ReadonlyArray<string> {
 
 // GRBL switches the spindle or laser off at a program end (M2/M30), as the
 // Inspector's parser does, so a CAM program ending in M30 without M5 is fine.
-function toolLeftOnWarnings(model: ReviewModel): ReadonlyArray<string> {
+function toolLeftOnWarnings(model: ReviewModel, baselineLines: number): ReadonlyArray<string> {
   let on = false;
   for (const event of model.events) {
+    if (event.line < baselineLines) continue;
     if (event.kind === 'spindle-on') on = true;
     else if (event.kind === 'spindle-off' || event.kind === 'program-end') on = false;
   }
