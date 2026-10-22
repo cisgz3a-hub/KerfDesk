@@ -2,9 +2,12 @@
 // settings that requested them. The owner lives above the minimize/expand
 // presentation, and remains current until Save or explicit abandonment.
 import { useEffect, useRef, type MutableRefObject } from 'react';
+import { sceneInBedFrame, type CameraBedFrame } from '../../../core/camera/model/camera-bed-frame';
 import { ownModelFor, withSavedCameraModel } from '../../../core/camera/model/saved-cameras';
+import type { Vec2 } from '../../../core/scene';
 import { useStore } from '../../state';
 import { useCameraStore } from '../../state/camera-store';
+import { cameraBedFrameNow, modelInBedFrame } from '../active-camera-model';
 import { cameraSourceIdentity } from '../frame-source';
 import { headPositionNow } from '../head/head-position';
 import { currentAssumedTarget } from './assumed-target';
@@ -75,16 +78,22 @@ export function useCalibrationPhoto(): CalibrationPhotoControls {
     };
     runRef.current = run;
     wizard.setStep(run.step);
+    // The layout the wizard shows as assumed, remembered from the engraving when known.
+    const assumed = currentAssumedTarget();
+    // The head is read in today's frame; the fit is in the frame the rings were
+    // placed in, and the saved calibration is measured in that frame too.
+    const head = wizard.settings.headCamera ? headPositionNow() : null;
+    const savedHere = saved === undefined ? undefined : modelInBedFrame(saved, assumed.bedFrame);
     try {
       const outcome = await photographTarget({
         source: camera.sourceState.source,
         settings: wizard.settings,
         bedWidthMm: app.project.device.bedWidth,
         bedHeightMm: app.project.device.bedHeight,
-        // The layout the wizard shows as assumed, remembered from the engraving when known.
-        area: currentAssumedTarget().area,
-        ...(saved === undefined ? {} : { saved }),
-        headMm: wizard.settings.headCamera ? headPositionNow() : null,
+        area: assumed.area,
+        bedFrame: assumed.bedFrame,
+        ...(savedHere === undefined ? {} : { saved: savedHere }),
+        headMm: head === null ? null : headInTargetFrame(head, assumed.bedFrame),
         signal: run.controller.signal,
       });
       publish(
@@ -104,6 +113,10 @@ export function useCalibrationPhoto(): CalibrationPhotoControls {
     cancel: () => discard(runRef),
     save: (result) => saveCurrent(runRef, result),
   };
+}
+
+function headInTargetFrame(head: Vec2, target: CameraBedFrame): Vec2 {
+  return sceneInBedFrame(head, cameraBedFrameNow(), target);
 }
 
 function isCurrent(runRef: RunRef, run: PhotoRun): boolean {

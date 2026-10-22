@@ -1,10 +1,11 @@
 // CalibrateCameraControls — the Camera panel's calibration row (ADR-441):
 // opens the one-photo calibration wizard, or a check of the saved calibration
 // against a new photo (Amendment 1), and says how the saved calibration
-// measured, so the operator sees at a glance whether the camera is ready.
+// measured, so the operator sees at a glance whether the camera is ready,
+// and whether it was made for the bed the machine is set up with now.
 
 import { useEdition } from '../../licensing/edition';
-import { useOwnCameraModel } from '../active-camera-model';
+import { useOwnCameraFrameNote, useOwnCameraModel } from '../active-camera-model';
 import { calibrationGrade } from './calibration-result';
 import { CameraCalibrationWizard } from './CameraCalibrationWizard';
 import { useCameraCalibrationStore } from './camera-calibration-store';
@@ -13,6 +14,7 @@ export function CalibrateCameraControls(): JSX.Element {
   const openWizard = useCameraCalibrationStore((s) => s.openWizard);
   const openCheck = useCameraCalibrationStore((s) => s.openCheck);
   const model = useOwnCameraModel();
+  const frameNote = useOwnCameraFrameNote();
   // Calibrating or checking the camera is camera alignment, a Pro tool
   // (ADR-540). A saved calibration keeps working in Free.
   const { requestPro } = useEdition();
@@ -44,6 +46,11 @@ export function CalibrateCameraControls(): JSX.Element {
           {model.accuracy.rmsErrorMm.toFixed(2)} mm. {calibrationGrade(model).headline}
         </p>
       )}
+      {frameNote === null ? null : (
+        <p role="status" style={frameNote.usable ? noteStyle : frameIssueStyle}>
+          {frameNote.message}
+        </p>
+      )}
       <CameraCalibrationWizard />
     </div>
   );
@@ -52,3 +59,4 @@ export function CalibrateCameraControls(): JSX.Element {
 const columnStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 4 };
 const rowStyle: React.CSSProperties = { display: 'flex', gap: 8, flexWrap: 'wrap' };
 const noteStyle: React.CSSProperties = { margin: 0, fontSize: 12, color: 'var(--lf-text-faint)' };
+const frameIssueStyle: React.CSSProperties = { ...noteStyle, color: 'var(--lf-warning-fg)' };

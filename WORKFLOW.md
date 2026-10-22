@@ -8262,6 +8262,11 @@ as the pane's design record.
   the photo step says the sheet must lie where it was engraved, and **Back** engraves a new one.
 - **Edge / another camera.** A photo from another camera or with another crop is not compared;
   the result says why and the new calibration can still be saved.
+- **Edge / Machine Setup changed since calibrating.** A calibration keeps the origin, bed size and
+  native bed frame its target was engraved in (ADR-440 Amendment 1). After a bed-size or
+  native-frame change the camera picture is moved to match, and the calibration row says on what
+  bed it was made and how far it moved. After an origin change the camera is not used: the Camera
+  panel says "Calibrate the camera again, or set the origin back".
 
 ### F-CAM3. Corrected camera overlay (ADR-440, ADR-441 Amendment 2)
 
@@ -8503,7 +8508,9 @@ as the pane's design record.
 - **Edge / stop.** **Stop** cancels the move in progress. The panel says how many pictures were
   taken and shows them.
 - **Edge / out of reach.** When the head cannot travel far enough for the camera to see an edge
-  of the area, the picture stops short of that edge and the panel says why.
+  of the area, the picture stops short of that edge and the panel says why. Like **Move laser
+  here**, the stops keep the pull-off clear of the homing switches when hard limits are on
+  (ADR-449 Amendment 1).
 - **Edge / back to live.** **Live** clears the joined picture and shows the live camera again.
 - **Edge / work-position reports.** A controller set to report its work position (`$10`) places
   the head at WPos plus the reported work offset (WCO), the position the status panel shows. Until
@@ -8535,7 +8542,9 @@ as the pane's design record.
 - **Error / no camera.** A job that starts without a running camera gets a note instead: no
   timelapse, and "The camera was not running when the job started."
 - **Error / cannot check.** A CNC job, a camera that is not fixed and calibrated, or a job that
-  was stopped says why it was not checked. The camera stopping mid-job ends the timelapse with the
+  was stopped says why it was not checked. So does a job whose bed position is unverified (no
+  homing, not homed, Verified Origin): KerfDesk does not know where it burns (ADR-490
+  Amendment 1). The camera stopping mid-job ends the timelapse with the
   frames it has.
 
 ---
