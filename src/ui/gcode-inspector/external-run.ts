@@ -251,6 +251,9 @@ export async function startExternalProgram(frame: ExternalFrame): Promise<boolea
       // M0/M1 in an external CNC program are controller program stops, not
       // KerfDesk's emitted multi-bit plan boundaries. Preserve the exact bytes.
       toolChangePause: false,
+      // Its own G54-G59, offset and tool words may change what the store
+      // records; those records go as it starts (ADR-630 Amendment 5).
+      externalProgram: true,
       // Start clears the Frame record before this runs, so it checks what the
       // record was bound to. Start arming can take a while, during which the
       // Laser/CNC switch stays usable, so the machine mode is checked here too.
