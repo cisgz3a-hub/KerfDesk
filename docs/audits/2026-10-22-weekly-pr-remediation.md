@@ -1,6 +1,6 @@
 # Weekly PR audit remediation - 22 October 2026
 
-The weekly audit inventoried 173 pull requests and recorded 20 confirmed findings. This remediation started from `origin/main` at `17efcd7f4f1b314d46d7ae7c7d6ea18ab3b86dc4`. Each finding below has a repair or an operational disposition. The existing photo and geometry PRs were updated separately so unrelated feature work was not imported into this repair branch.
+The weekly audit inventoried 173 pull requests and recorded 20 confirmed findings. This remediation started from `origin/main` at `17efcd7f4f1b314d46d7ae7c7d6ea18ab3b86dc4`, then incorporated current main at `1bb2b885e179ec2952e9b2fb7ea9c4c36f7c758d` after another session merged #1354 and #1355. Each finding below has a repair or an operational disposition. The photo repair was pushed separately to its existing feature PR.
 
 ## Finding disposition
 
@@ -14,7 +14,7 @@ The weekly audit inventoried 173 pull requests and recorded 20 confirmed finding
 | M-DOC1 | #1326 | Corrected the controller design audit's Idle timer, missing-response assumptions, Marlin resend acknowledgement ownership and boot-lock inference. No proposed recovery protocol was implemented. |
 | DOC1 | #1250 | Numbering rollback retains placement/output-scope changes and matching persisted job setup, with dirty state. This also preserves acknowledged machine-origin updates. Tests cover Cancel and no-op actions. |
 | DOC2 | #1250 | Save commits the visible numbering order and retires its rollback before any asynchronous picker/write. Cancel cannot later restore different content while leaving it clean; failed saves remain dirty. |
-| DOC3 | #1354 | Collinearity, rather than signed-area cancellation, identifies closed strokes. Bowtie lobes retain filled offset semantics under both fill rules. Minimal repair pushed to #1354; matching regression protection is included here. |
+| DOC3 | #1354 | Collinearity, rather than signed-area cancellation, identifies closed strokes. Bowtie lobes retain filled offset semantics under both fill rules. #1354 merged while the repair was being prepared; the correction and regressions are included in this combined PR. |
 | DOC4 | #1308 | Weld reports absorption only after same-batch coverage proves that no region survives. Intersection-only bridges, including a narrow surviving bridge, are not falsely absorbed. The command-availability path avoids the extra coverage work. |
 | DOC5 | #1352 | The existing insertion guard throws on commit-time font overflow, allowing Add Text to preserve its draft and retry after Undo. Tests exercise the mounted form, not only the store. |
 | UI-P2-1 | #1252 | Jig rebase checks canonical scene integrity; duplicate operation colours are refused without publishing an unreadable project. |
@@ -42,8 +42,8 @@ No additional confirmed defect remained in the reviewed repair paths. This is a 
 - Jig/material/shared resizing: **37 final focused tests** passed, with the related existing suites also exercised.
 - Platform updater: **10 tests** passed for the final helper extraction.
 - Photo PR #1362: **43 tests / 9 files** passed after merging current main; its photo branch typecheck and scoped lint passed before the unrelated main merge. Published head: `b80728df096eb2a3ddc1276e3313df11aad64583` (repair commit `4a7e4ef5c`).
-- Geometry PR #1354: **40 tests / 5 files** passed after merging current main. Published head: `8c564666ab027f4aeb0d025f3a4db0136bafd310` (repair commit `0a7623a82`).
-- Main repair branch: renderer typecheck, Electron build/lint, formatting, privacy, ADR numbering, action pins, workflow secret scopes, production dependency licences, file-size limits, soft-size policy and public index exports passed. Final renderer/browser and hosted checks are recorded on the PR.
+- Prepared geometry repair: **40 tests / 5 files** passed at `8c564666ab027f4aeb0d025f3a4db0136bafd310` (repair commit `0a7623a82`). Its branch push happened after #1354 merged at its older head, so that push alone did not repair main. The combined PR incorporates the correction after merging the updated main.
+- Main repair branch: renderer typecheck, desktop renderer bundle, Electron build/lint, formatting, privacy, ADR numbering, action pins, workflow secret scopes, production dependency licences, file-size limits, soft-size policy and public index exports passed before the final main reconciliation. Focused reconciliation and browser results, plus current-head hosted checks, are recorded on the PR.
 
 Local diagnostic scripts, original failure logs and lane reports are retained under `build/weekly-pr-fixes-20261022/`; they are not product source. Local lint excludes that generated evidence folder and the preceding audit's generated corpus. Clean hosted CI validates the committed tree without those local diagnostic files.
 
