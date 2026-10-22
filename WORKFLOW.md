@@ -6451,6 +6451,10 @@ and lifts the command's CNC-only gate.)*
    The review names each such source before Apply. Apply remains available,
    because that union is valid; put the inner artwork on another operation,
    or use Subtract, to keep it.
+2. The review names only a source that the other shapes of its operation
+   cover. A bar whose ends sit inside two circles is the bridge that joins
+   them, so Weld keeps its area and the review does not name it. Of two
+   identical shapes, only one is named, because Weld keeps the other.
 
 #### Edge — transforms and z-order
 1. Object transforms are baked to world space before combining, so a
@@ -6583,6 +6587,10 @@ and lifts the command's CNC-only gate.)*
 #### Edge — reflex corners and islands
 1. Reflex (inside-L) corners and hole rings (islands of remaining
    material) are never relieved.
+2. Dogbone reads holes the way the canvas and the CNC job do: ordinary
+   artwork fills even-odd unless a path declares non-zero, and text fills
+   non-zero. A CAD plate whose outline, `CIRCLE` holes and slots all run
+   the same way round keeps every hole.
 
 ### F-CNC27. Supervised CNC interruption recovery — Phase H.11 (ADR-200)
 

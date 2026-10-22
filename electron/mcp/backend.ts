@@ -12,6 +12,7 @@ export interface KerfDeskMcpBackend {
 export const mcpErrorMessages = {
   unavailable: 'The desktop workspace is not available. Open KerfDesk and try again.',
   stale_revision: 'The workspace changed. Read its current revision before retrying.',
+  busy: 'The desktop is busy with another action. Wait for it to finish, then try again.',
   needs_pro: 'This change requires Pro access in the desktop app.',
   unsupported_operation: 'This tool cannot edit that operation.',
   invalid_input: 'The tool arguments are invalid.',

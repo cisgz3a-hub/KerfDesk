@@ -13,7 +13,7 @@ import {
 } from './protocol.js';
 import { json, sameDigest } from './security.js';
 import { McpRequests } from './mcp-requests.js';
-import { ControlActions } from './control-actions.js';
+import { ControlActions, isDefiniteRefusal } from './control-actions.js';
 import { plainObject, metadataBytes } from './device-envelope.js';
 import { isPhoneAttachment, type WaitArgs } from './live.js';
 import {
@@ -120,7 +120,13 @@ export class RemoteDevice extends LiveDevice {
     for (const item of [...this.pending.values()])
       if (item.clientId === clientId) this.finish(item, errorResult('cancelled'), true);
   }
-  private finish(item: Pending, result: CommandResponse, cancelDesktop = false): void {
+  /** `answered`: the result is the desktop's own reply, not a relay timeout or cancel. */
+  private finish(
+    item: Pending,
+    result: CommandResponse,
+    cancelDesktop = false,
+    answered = false,
+  ): void {
     if (this.pending.get(item.requestId) !== item) return;
     this.pending.delete(item.requestId);
     if (item.mcpReservation) this.mcpRequests.detach(item.mcpReservation, item.requestId);
@@ -128,16 +134,24 @@ export class RemoteDevice extends LiveDevice {
     if (item.name === 'wait_for_change') this.live.cancelWait(item.requestId);
     else if (cancelDesktop && this.owner()?.connectionId === item.connectionId)
       this.send({ v: 1, type: 'cancel', requestId: item.requestId });
-    item.resolve(this.controlResponse(item, result));
+    item.resolve(this.controlResponse(item, result, answered));
   }
 
-  private controlResponse(item: Pending, result: CommandResponse): CommandResponse {
+  private controlResponse(
+    item: Pending,
+    result: CommandResponse,
+    answered: boolean,
+  ): CommandResponse {
     if (!this.resultAuthorized(item)) return result;
     const props = { deviceId: '', clientId: item.clientId, leaseId: item.leaseId };
     if (item.controlId) {
       const operation = result.result?.operation;
+      const refusal = answered ? result.error?.code : undefined;
       if (plainObject(operation) && operation.operationId === item.controlId)
         this.controlActions.acknowledge(props, item.controlId, operation);
+      // The desktop refused before owning an operation: nothing moved, so say so.
+      else if (refusal !== undefined && isDefiniteRefusal(refusal))
+        this.controlActions.refuse(props, item.controlId, refusal);
       else result = { result: this.controlActions.unknown(props, item.controlId), error: null };
     }
     if (item.controlLookupId)
@@ -339,7 +353,7 @@ export class RemoteDevice extends LiveDevice {
         typeof supplied === 'string' && Object.hasOwn(mcpErrorMessages, supplied)
           ? (supplied as KerfDeskMcpErrorCode)
           : 'failed';
-      this.finish(item, errorResult(code));
+      this.finish(item, errorResult(code), false, true);
     } else {
       const parsed = mcpOutputSchemas[item.name].safeParse(value.result);
       this.finish(
