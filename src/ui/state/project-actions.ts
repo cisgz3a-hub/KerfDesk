@@ -41,10 +41,24 @@ type ProjectActionSet = (
 type ProjectActionGet = () => AppState;
 type InitialStateFactory = (project?: Project) => Partial<AppState>;
 
+/**
+ * Commits an edit through the store's authoring guard (ADR-540 Amendment 1
+ * item 6, ADR-592 decision 5): without Pro, new or changed Pro work waits for
+ * the Pro prompt. Returns false while it waits; `onCommitted` runs only once
+ * the edit lands, and a delayed commit checks `isCurrent` again first.
+ */
+export type ProjectEditCommit = (
+  update: AppState | Partial<AppState> | ((state: AppState) => AppState | Partial<AppState>),
+  onCommitted?: () => void,
+  isCurrent?: () => boolean,
+) => boolean;
+
 export type ProjectActions = StudioDocumentActions &
   ProjectSheetActions &
   ProductionManifestActions &
   RetainedArrayActions & {
+    /** Edits built outside the store commit here, never through `useStore.setState`. */
+    readonly commitProjectEdit: ProjectEditCommit;
     readonly setProject: (project: Project) => ProjectMachineCapabilityLoadResult;
     readonly newProject: () => void;
     readonly claimProjectOpenRequest: () => number;
@@ -57,12 +71,16 @@ export function projectActions(
   set: ProjectActionSet,
   get: ProjectActionGet,
   initialState: InitialStateFactory,
+  authoringSet: ProjectEditCommit,
 ): ProjectActions {
   return {
     ...projectSheetActions(set, get),
     ...studioDocumentActions(set),
     ...productionManifestActions(set, get),
-    ...retainedArrayActions(set),
+    // Regenerate adds copies of the arrayed artwork, so it asks for Pro as
+    // creating an array does (ADR-540 Amendment 1 item 6).
+    ...retainedArrayActions(authoringSet),
+    commitProjectEdit: authoringSet,
     setProject: (project) => {
       const preserved = preserveUnadmittedProProject(project);
       if (preserved !== null) return { kind: 'desktop-required', features: preserved.features };
@@ -79,14 +97,7 @@ export function projectActions(
         projectBedReconciliation: bedResolution.notice,
         dirty: bedResolution.notice?.workspaceMismatch === true,
       }));
-      if (autofocus.keptCurrentCommand) {
-        useToastStore
-          .getState()
-          .pushToast(
-            "This file's Auto-focus command was not used: Auto-focus keeps your machine's own command from Machine Setup.",
-            'info',
-          );
-      }
+      if (autofocus.keptCurrentCommand) noteKeptAutofocusCommand();
       const loneArtworkId = loneSelectableArtworkId(autofocus.project.scene);
       if (loneArtworkId !== null && get().selectedObjectId === null)
         get().selectObject(loneArtworkId);
@@ -137,6 +148,15 @@ export function projectActions(
     keepCurrentMachineForOpenedProject: () =>
       set((state) => keepCurrentMachinePatch(state, state.projectBedReconciliation)),
   };
+}
+
+function noteKeptAutofocusCommand(): void {
+  useToastStore
+    .getState()
+    .pushToast(
+      "This file's Auto-focus command was not used: Auto-focus keeps your machine's own command from Machine Setup.",
+      'info',
+    );
 }
 
 function keepCurrentMachinePatch(

@@ -150,6 +150,10 @@ export function clearOwnedPointerDrag(args: {
 }
 
 function initializeDragSurface(drag: DragState, deps: WorkspaceDragDeps): void {
+  // These drags took their own snapshot before their first edit. A guide pulled
+  // out of a ruler already exists by now, so a second snapshot would hold it:
+  // a ruler click, Esc and Undo could then never take it away again.
+  if (drag.kind === 'guide') return;
   if (drag.kind === 'move' && drag.interactionStarted === true) return;
   if (drag.kind === 'marquee') {
     deps.setSelectionMarquee({ start: drag.startScenePoint, end: drag.startScenePoint });

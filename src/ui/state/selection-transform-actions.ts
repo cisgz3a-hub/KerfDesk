@@ -56,7 +56,13 @@ export type SelectionTransformActions = SelectionReferenceState & {
   readonly distributeSelection: (kind: SelectionDistributeKind) => void;
   readonly matchSelectionSize: (kind: SelectionMatchSizeKind, proportional: boolean) => void;
   readonly moveSelectionTogether: (axis: SelectionMoveTogetherAxis) => void;
-  readonly nudgeSelection: (dx: number, dy: number) => void;
+  /** An arrow-key nudge. A held key's auto-repeats pass `heldRepeat` and continue the
+   * press's undo step, so holding an arrow is one step (audit 08-P3-2). */
+  readonly nudgeSelection: (
+    dx: number,
+    dy: number,
+    options?: { readonly heldRepeat?: boolean },
+  ) => void;
   readonly flipSelection: (axis: SelectionFlipAxis) => void;
   // ADR-410: Rotate 90° about the selection centre (+1 clockwise on screen).
   readonly rotateSelectionQuarterTurn: (direction: QuarterTurnDirection) => void;
@@ -91,7 +97,8 @@ export function selectionTransformActions(set: Setter): SelectionTransformAction
     matchSelectionSize: (kind, proportional) =>
       set((state) => applySelectionMatchSizeToState(state, kind, proportional)),
     moveSelectionTogether: (axis) => set((state) => applySelectionMoveTogetherToState(state, axis)),
-    nudgeSelection: (dx, dy) => set((state) => applySelectionNudgeToState(state, dx, dy)),
+    nudgeSelection: (dx, dy, options) =>
+      set((state) => applySelectionNudgeToState(state, dx, dy, options?.heldRepeat === true)),
     flipSelection: (axis) => set((state) => applySelectionFlipToState(state, axis)),
     rotateSelectionQuarterTurn: (direction) =>
       set((state) => applySelectionQuarterTurnToState(state, direction)),
@@ -279,15 +286,26 @@ function applySelectionDistributeToState(
   return applySelectionTransformsToState(state, result.transforms);
 }
 
+// Projects a nudge produced. A held arrow key's repeat continues the step while
+// the project is still the one the previous nudge left: about 2 s of repeats
+// (30 a second) used to push the whole 50-step history out.
+const nudgeResults = new WeakSet<Project>();
+
 function applySelectionNudgeToState(
   state: AppState,
   dx: number,
   dy: number,
+  heldRepeat: boolean,
 ): AppState | Partial<AppState> {
   const ids = selectedObjectIds(state);
   const result = buildSelectionNudgeEdit(selectedObjects(state.project.scene, ids), dx, dy);
   if (result.kind === 'error') return state;
-  return applySelectionTransformsToState(state, result.transforms);
+  const next = applySelectionTransformsToState(state, result.transforms);
+  if (next.project === undefined || next.project === state.project) return next;
+  nudgeResults.add(next.project);
+  return heldRepeat && nudgeResults.has(state.project)
+    ? { ...next, undoStack: state.undoStack }
+    : next;
 }
 
 function applySelectionFlipToState(

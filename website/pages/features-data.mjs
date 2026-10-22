@@ -8,7 +8,8 @@
 //   - arrays: src/core/scene/array-layout.ts:3-26
 //   - masks, crop, Adjust Image, measure, jig, laser-only gate:
 //     src/ui/help/command-help-topics.ts, src/ui/commands/machine-command-gate.ts:31-46
-//   - Registration Jig: DECISIONS.md ADR-057 (hardware verification pending)
+//   - Registration Jig: DECISIONS.md ADR-057 (hardware verification pending);
+//     Pro, like Multi-file trace, in src/ui/licensing/pro-features.ts (ADR-540 Amendment 5)
 //   - file types: README.md "File formats", src/ui/app/*-action(s).ts pickers,
 //     src/io/lightburn/lbdev-import.ts:44-48 (.lbzip refused, GRBL-only profiles)
 //   - camera bed alignment: the "Align to bed" wizard needs the Labs flag
@@ -39,13 +40,13 @@ export const OVERVIEW = [
     icon: 'scan-eye',
     title: 'Images and tracing',
     href: '#images',
-    body: 'Line Art tracing, image masks and crop, and the Image Studio editor. Every other trace preset is in Pro.',
+    body: 'Line Art tracing, image masks and crop, and the Image Studio editor. Multi-file trace and every other trace preset are in Pro.',
   },
   {
     icon: 'package',
     title: 'Generators and layout',
     href: '#generators',
-    body: 'Arrays, Quick Nest, test grids, material libraries and a Registration Jig, plus the box generator in Pro.',
+    body: 'Arrays, Quick Nest, test grids and material libraries, plus the box generator and Registration Jig in Pro.',
   },
   {
     icon: 'circle-play',
@@ -107,6 +108,7 @@ export const IMAGES = [
   {
     icon: 'files',
     title: 'Multi-file trace',
+    pro: true,
     body: 'Trace several images at once into separate SVG files, without changing your workspace.',
   },
   {
@@ -166,6 +168,7 @@ export const GENERATORS = [
   {
     icon: 'crosshair',
     title: 'Registration Jig',
+    pro: true,
     body: 'For lasers: burn a box outline as a placement guide, set your workpiece inside it, then burn your artwork. Both runs are placed from the same box, so the art keeps its position relative to it.',
     status: 'shipped-code-and-tests',
   },

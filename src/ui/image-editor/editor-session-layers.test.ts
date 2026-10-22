@@ -14,11 +14,13 @@ import {
 import {
   addLayerAboveActive,
   addTextLayer,
+  commitLayerOpacity,
   compositeSession,
   duplicateActiveLayer,
   mergeActiveLayerDown,
   moveActiveLayer,
   moveLayerToIndex,
+  previewLayerOpacity,
   redoScoped,
   removeActiveLayer,
   setActiveLayer,
@@ -302,5 +304,44 @@ describe('layer session ops', () => {
     expect(session.history.redoStack).toHaveLength(0);
     expect(redoScoped(session)).toBe(session);
     expect(undoScoped(session).layers.map((layer) => layer.id)).toEqual(['background']);
+  });
+});
+
+describe('opacity slider drag (audit 23-P2-2)', () => {
+  it('previews every input event without history and commits the drag as one step', () => {
+    const painted = commitStroke(
+      newSession(),
+      { kind: 'pencil' },
+      { diameterPx: 1, hardness: 1, opacity: 1 },
+      BLACK,
+      [{ x: 3, y: 3 }],
+      'Pencil',
+    );
+    let session = addLayerAboveActive(painted, 'ink');
+    const history = session.history;
+    for (let percent = 99; percent >= 50; percent -= 1) {
+      session = previewLayerOpacity(session, 'ink', percent / 100);
+      expect(session.history).toBe(history);
+    }
+    expect(session.layers[1]?.opacity).toBe(0.5);
+    session = commitLayerOpacity(session, 'ink', 1);
+    expect(session.history.undoStack.map((entry) => entry.label)).toEqual([
+      'Pencil',
+      'Add layer',
+      'Layer opacity',
+    ]);
+    expect(session.dirtySinceApply).toBe(true);
+    session = undoScoped(session);
+    expect(session.layers[1]?.opacity).toBe(1);
+    session = redoScoped(session);
+    expect(session.layers[1]?.opacity).toBe(0.5);
+  });
+
+  it('records nothing when the drag ends where it started', () => {
+    let session = addLayerAboveActive(newSession(), 'ink');
+    const history = session.history;
+    session = previewLayerOpacity(session, 'ink', 0.4);
+    session = previewLayerOpacity(session, 'ink', 1);
+    expect(commitLayerOpacity(session, 'ink', 1).history).toBe(history);
   });
 });

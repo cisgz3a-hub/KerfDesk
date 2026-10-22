@@ -25,6 +25,7 @@ import { laserModuleAbsentJobWarning } from '../../core/preflight/laser-module-r
 import { runCompiledWorkPreflight } from '../../core/preflight/compiled-work';
 import { machineKindOf, type Project, type Scene } from '../../core/scene';
 import { cncAccessoryStartIssue, cncOverrideStartIssue } from '../state/cnc-accessory-readiness';
+import type { StatusReportFieldsOff } from '../state/status-report-fields';
 import { cncWorkZeroStartIssue } from './cnc-start-advisories';
 import type { MachineStartSnapshot } from './start-job-readiness';
 
@@ -42,7 +43,9 @@ export function demotedPolicyWarnings(project: Project, machine: MachineStartSna
   const noLaserModule =
     machineKind === 'laser' ? laserModuleAbsentJobWarning(machine.laserModuleReport) : null;
   if (noLaserModule !== null) warnings.push(noLaserModule);
-  warnings.push(...cncOverrideStartIssues(project, machine.ovCache));
+  warnings.push(
+    ...cncOverrideStartIssues(project, machine.ovCache, machine.statusReportFieldsOff ?? null),
+  );
   warnings.push(...cncAccessoryStartIssues(project, machine.accessoryCache));
   const workZeroIssue = cncWorkZeroStartIssue(
     project,
@@ -129,8 +132,9 @@ function cncAccessoryStartIssues(
 function cncOverrideStartIssues(
   project: Project,
   overrides: OverrideValues | null | undefined,
+  fieldsOff: StatusReportFieldsOff | null,
 ): ReadonlyArray<string> {
-  const issue = cncOverrideStartIssue(machineKindOf(project.machine), overrides);
+  const issue = cncOverrideStartIssue(machineKindOf(project.machine), overrides, fieldsOff);
   return issue === null ? [] : [issue];
 }
 

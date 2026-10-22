@@ -573,6 +573,10 @@ the linked artwork.
   such as `50%`.
 - A typing mistake shows a notice with what was wrong and what to type, and the box goes back to
   the current value. An emptied box goes back silently. ArrowUp and ArrowDown nudge by 0.1 mm or 1°.
+  Escape drops the typed text, and leaving the box then applies nothing.
+- A horizontal or vertical line has no height or width. Its length can still be typed, with the
+  aspect lock on or off; typing the missing side is refused with a notice that says to change the
+  other one. Dragging a handle of several such lines in a row changes their length the same way.
 
 #### Edge — transform pushes object out of bed
 - Permitted (user may be temporarily repositioning).
@@ -1724,6 +1728,9 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - Arrow keys — Nudge 1 mm
 - Shift+Arrow — Nudge 10 mm
 - `Cmd/Ctrl+Arrow` — Nudge 0.1 mm (ADR-499; all three distances are set in Settings → Canvas)
+- Holding an arrow key slides the selection as one undo step. An arrow key on a focused tab strip,
+  slider, radio group, list or menu works that control and does not nudge (or align, with Alt);
+  from a plain button it still nudges (ADR-493, ADR-499 Amendment 1).
 - `Alt+Left` / `Alt+Right` / `Alt+Up` / `Alt+Down` — Align left / right / top / bottom (ADR-499)
 - `Alt+PgUp` / `Alt+PgDn` — Align centres on X / Y (ADR-499)
 - `Alt+Shift+H` / `Alt+Shift+V` — Distribute horizontal / vertical spacing (ADR-499)
@@ -1760,12 +1767,13 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
   (ADR-362), and stops motion or a hold the controller reports that nothing in KerfDesk started,
   as **ABORT MOTION** does (ADR-375).
 - `PageUp` / `PageDown` — Jog Z. When a scrolling list, tab panel or the Artwork panel has focus,
-  the keys scroll it instead (ADR-362).
+  the keys scroll it instead (ADR-362). Only the dedicated keys jog Z: the keypad's 9 / 3 never do,
+  even with Num Lock off, when they send PageUp / PageDown (ADR-493 Amendment 1).
 - `Cmd/Ctrl+Shift+]` / `Cmd/Ctrl+Shift+[` — Jog up / down one step; `Cmd/Ctrl+Alt+[` /
   `Cmd/Ctrl+Alt+]` — Jog left / right one step (LightBurn's Move-window keys, ADR-493).
-  Numpad `8`/`2`/`4`/`6` jog the same way and `7`/`9`/`1`/`3` diagonally, only with Num Lock on:
-  with Num Lock off the keypad sends arrow keys, which nudge the selected artwork and never move
-  the machine. Directions, step and speed are exactly the jog pad arrows'. Like the Z keys, they
+  Numpad `8`/`2`/`4`/`6` jog the same way and `7`/`9`/`1`/`3` diagonally, only with Num Lock on.
+  With Num Lock off the keypad sends arrow keys (8/2/4/6), which nudge the selected artwork, or
+  Home/PageUp/End/PageDown (7/9/1/3), and none of them moves the machine. Directions, step and speed are exactly the jog pad arrows'. Like the Z keys, they
   work only while the jog pad is shown and enabled, send one step per press (no auto-repeat), and
   do nothing in a dialog, a text field or a focused scrolling list.
 
@@ -2637,6 +2645,8 @@ authorization, Frame proof, controller command, or safety boundary.
    profile references; a difference is informational, not proof that firmware is wrong.
 4. **Export current snapshot** saves versioned read-only evidence. Loading Snapshot A and B
    compares independent axis values neutrally, with no better/worse verdict and no firmware write.
+   A grblHAL password setting is saved as `[password removed]` (ADR-229 Amendment 2), and the
+   local diagnostic bundle leaves out setting lines and passwords (ADR-570 Amendment 1).
 5. Setting writes stay in Device Setup; the pane sends only the gated read.
 
 #### Success - detailed live transcript
@@ -2723,6 +2733,9 @@ authorization, Frame proof, controller command, or safety boundary.
 2. User chooses a save target.
 3. App writes `.lfgrbl-settings.json` containing every visible row, including unknown settings.
 4. Exporting a backup sends no command to the controller.
+5. When the rows hold a grblHAL password (`$75`, `$77`, `$330`, `$331`, `$533`), the panel says
+   before Export that the backup keeps it in plain text for a restore, and the success toast warns
+   to keep the file private (ADR-229 Amendment 2).
 
 #### Error — disconnected
 1. **Read ($$)** is disabled.
@@ -4343,7 +4356,10 @@ its machine reference. Frame allows the fresh Idle/work-offset report to arrive 
 an unresolved Absolute placement. Before the controller has reported any WCO, Frame also asks for
 it (a bounded burst of status queries, at most 3 s), homed or not, whenever Absolute or Current
 Position would otherwise assume a zero offset; if none arrives the Frame proceeds at that assumed
-zero and Job Review says so (ADR-375). A missing report is described as missing coordinate data,
+zero and Job Review says so (ADR-375). On grblHAL, whose `$$` shows `$10` whole, a `$10` without
+bit 5 never sends WCO: Frame skips that wait, and the status panel, Move to position, Job Review
+and the placement refusals name the bit and the `$10` to send (ADR-375 Amendment 2). A missing
+report is described as missing coordinate data,
 not as a requirement to erase the work origin. Equivalent MPos/WPos reports and a first WCO
 report equal to the assumed zero do not cancel unchanged preparation, a Frame in progress, its
 permit or the Start handoff. Actual movement, changed offsets (a first non-zero WCO, Z-only
@@ -4452,7 +4468,11 @@ Set origin here again. It is a warning; Frame and Start are not refused (ADR-375
    Verify fresh controller data; local cache clearing does not erase persistent controller offsets.
 10. **Status-format fixtures.** For stock GRBL, test both `$10=1` (MPos) and `$10=0`
     (WPos). WCO is an intermittent field independent of that selection, not a separate `$10`
-    bit. Do not apply generic settings writes to the Falcon A1 vendor contract, which does
+    bit. grblHAL at its default `COMPATIBILITY_LEVEL` 0 differs: `$10` is a bitfield (default
+    511) whose bit 5 sends WCO and bit 6 sends Ov, so `$10=0` or `$10=1` there turns both off.
+    Expect the status panel to read "Origin: not reported (WCO off in $10; send $10=96)" (or 97),
+    and with `$10=0` "MPos: cannot be known" (ADR-375 Amendment 2).
+    Do not apply generic settings writes to the Falcon A1 vendor contract, which does
     not offer ordinary settings fetch. See the [GRBL status documentation](https://github.com/gnea/grbl/wiki/Grbl-v1.1-Interface).
 11. **Air pump at Start (ADR-323).** First confirm Machine Setup shows
     Air output `M8` and "Air restart" ticked. A Falcon A1 Pro profile
@@ -8069,7 +8089,12 @@ as the pane's design record.
    stays open for further work. Physical mm size never changes from painting.
 4. Closing the editor (Esc from Select, or the close button) simply returns
    to the workspace; the session is kept in memory and reopening the same
-   image resumes it. No confirmation dialog exists anywhere in the editor.
+   image resumes it. Moving the image or changing its layer, power or engrave
+   settings in between keeps the session, and a later Apply keeps those
+   changes. If the image itself changed (new pixels or a new extent, e.g.
+   after Crop Image), the session no longer matches it: Studio opens the image
+   as it is now and a notice says the unapplied edits were discarded. No
+   confirmation dialog exists anywhere in the editor.
 
 #### Error — decode failure
 1. If the image's `dataUrl` cannot be decoded, a typed toast reports it and
@@ -9237,8 +9262,10 @@ The G-code Inspector is free in every edition (ADR-627).
    the head stands. The outline holds only motion the program places in the work coordinates it
    starts in: `G53` and probe moves, a move to the stored `G30` position, moves after the
    program changes its origin (`G92`, or `G10 L2`/`L20` on `G54`) on the axes it changes, and
-   moves in `G55`-`G59` are left out and named in the warnings. A program that never moves
-   frames the point where the head stands. A large file is prepared a slice at a time.
+   moves in `G55`-`G59` are left out and named in the warnings. Arcs count by their exact
+   extent in the plane they run in: XY (`G17`), XZ (`G18`) or YZ (`G19`) (ADR-630 Amendment 2).
+   A program that never moves frames the point where the head stands. A large file is prepared a
+   slice at a time.
    On Marlin, the baseline is two separate lines, `G21` then `G90`, and significant whitespace is
    preserved. Review reads the first command on each line with that command's parameters; later
    G/M words do not execute as extra commands. Firmware-dependent motion and its dependent
@@ -9272,8 +9299,11 @@ them), a program that looks like the other machine mode, zero XY extent (the Fra
 point and proves no Z clearance or depth), probing (`G38.2` to `G38.5`), `M3`/`M4` with no
 `S` anywhere (it runs at the S the controller already holds), the words the Inspector does not
 interpret, a Frame outline that leaves the configured machine bounds or overlaps an enabled
-no-go zone (or a note that the outline could not be placed on the bed), and Program Health
-notices and warnings. Commands are found however they are spelt (`G+91`, `G91.0`, `G 91`).
+no-go zone (or a note that the outline could not be placed on the bed), moves the Inspector
+could not read, such as an arc whose radius does not match (they are not in the Frame outline,
+and the head still makes them if the controller runs them; the first one is named by its line in
+the sent program, where the baseline line comes first), and Program Health notices and warnings.
+Commands are found however they are spelt (`G+91`, `G91.0`, `G 91`).
 
 #### Refusals
 
@@ -9457,8 +9487,8 @@ is selected so it can be acted on immediately.
 #### Edge — Esc mid-drag
 
 1. Esc discards the draft outright and the following pointer-up does NOT commit
-   it. (The main workspace draw tool has the opposite behaviour today - see the
-   defects noted in the research document.)
+   it. The main workspace draw and measure tools do the same: Esc returns to
+   Select, and the release draws or measures nothing.
 
 ### F-DS5b. Draw a Polyline or Arc (DS-3)
 

@@ -365,3 +365,76 @@ test('real workerd: unavailable desktop receipts preserve confirmed dispatch onl
     await worker.dispose();
   }
 });
+
+// Rolling audit 2026-10-21 01-P2-3: the desktop refuses these before it owns an
+// operation, so nothing moved. ADR-569 keeps "unconfirmed" for a lost result.
+test('real workerd: definite desktop refusals pass through and are never replayed as unconfirmed', async () => {
+  const worker = startControlWorker();
+  let desktop;
+  try {
+    desktop = await connectDesktop(worker);
+    const phone = await pairPhone(worker, desktop, ['read', 'control']);
+    const refuse = async (name, args, code) => {
+      const pending = phone.post('/api/client/command', { name, args });
+      const sent = await desktop.inbox.next('command');
+      desktop.send({
+        type: 'error',
+        requestId: sent.requestId,
+        error: { code, message: 'The desktop request could not be completed.' },
+      });
+      return pending;
+    };
+    for (const code of ['stale_revision', 'busy', 'invalid_input']) {
+      const args = { expectedRevision: 'audit-1', requestId: randomUUID() };
+      const refused = await refuse('frame_job', args, code);
+      assert.equal(refused.status, 400);
+      assert.equal((await refused.json()).error.code, code);
+      const commands = desktop.inbox.queue.filter((item) => item.type === 'command').length;
+      const repeated = await phone.post('/api/client/command', { name: 'frame_job', args });
+      assert.equal(repeated.status, 400);
+      assert.equal((await repeated.json()).error.code, code);
+      assert.equal(
+        desktop.inbox.queue.filter((item) => item.type === 'command').length,
+        commands,
+        'A refused ID is never dispatched again',
+      );
+      const lookup = phone.post('/api/client/command', {
+        name: 'get_control_operation',
+        args: { operationId: args.requestId },
+      });
+      const asked = await desktop.inbox.next('command');
+      // The desktop never owned this ID, so it reports it as unknown to this session.
+      desktop.send({
+        type: 'result',
+        requestId: asked.requestId,
+        result: {
+          revision: 'audit-2',
+          operation: {
+            operationId: args.requestId,
+            kind: 'job',
+            state: 'unknown',
+            revision: 'audit-2',
+            committed: null,
+          },
+        },
+      });
+      const receipt = (await (await lookup).json()).result.operation;
+      assert.equal(receipt.state, 'failed');
+      assert.equal(receipt.committed, false);
+      assert.equal(receipt.kind, 'frame');
+    }
+    // A code that can follow dispatch keeps the unconfirmed receipt.
+    const ambiguous = await refuse(
+      'frame_job',
+      { expectedRevision: 'audit-1', requestId: randomUUID() },
+      'unavailable',
+    );
+    assert.equal(ambiguous.status, 200);
+    const unknown = (await ambiguous.json()).result.operation;
+    assert.equal(unknown.state, 'unknown');
+    assert.equal(unknown.committed, null);
+  } finally {
+    close(desktop);
+    await worker.dispose();
+  }
+});
