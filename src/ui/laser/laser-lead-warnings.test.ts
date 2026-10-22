@@ -41,6 +41,30 @@ describe('laser lead warnings (ADR-626)', () => {
     ]);
   });
 
+  it('says to close the outline when open lines close round a shape (ADR-626 Amd 8)', () => {
+    const warnings = laserLeadWarnings([
+      {
+        kind: 'laser-leads-side-unknown',
+        layerId: 'cut',
+        layerName: 'Cut',
+        count: 1,
+        aroundName: 'Cut',
+      },
+      {
+        kind: 'laser-leads-side-unknown',
+        layerId: 'cut',
+        layerName: 'Cut',
+        count: 2,
+        aroundName: 'Cut',
+        aroundOpenPaths: true,
+      },
+    ]);
+    expect(warnings).toEqual([
+      'Lead-in/lead-out on layer "Cut": 1 shape inside a closed shape on layer "Cut", which has no leads, gets no leads. That shape may be a part, or only a score line or border, so which side is scrap is unknown. Turn on leads for "Cut" if it cuts parts out, or set Lead side to Always outside or Always inside.',
+      'Lead-in/lead-out on layer "Cut": 2 shapes inside open lines on layer "Cut" get no leads. Those lines close round them but are not one closed shape, so they may be the outline of a part, and which side is scrap is unknown. Close the outline with Tools > Join paths, or set Lead side to Always outside or Always inside.',
+    ]);
+  });
+
   it('keeps two operations that share a name apart', () => {
     const warnings = laserLeadWarnings([
       { kind: 'laser-leads-tabbed', layerId: 'a:sub-1', layerName: 'Sub-layer 1', count: 1 },

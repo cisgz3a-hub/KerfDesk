@@ -2,6 +2,8 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { createProject, type Project } from '../../core/scene';
 import { parseProjectTemplate, serializeProjectTemplate } from '../../io/project/project-template';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
+import { installChromiumSavePicker } from '../../platform/web/chromium-save-picker.test-support';
+import { webAdapter } from '../../platform/web/web-adapter';
 import {
   artworkProject,
   assetReader,
@@ -231,4 +233,34 @@ it('cancel/failure and late completion never publish a template as the ordinary 
   await pending;
   expect(pushToast).not.toHaveBeenCalled();
   expect(useStore.getState().lastSaveTarget).toBeNull();
+});
+
+it('leaves an existing template intact when its assets cannot be read (audit 19-P2-1)', async () => {
+  // Chromium empties the chosen file as the picker returns (ADR-656).
+  const disk = new Map([['work.lf2template', 'previous template']]);
+  const picker = installChromiumSavePicker(disk);
+  const pushToast = vi.fn();
+  try {
+    await saveProjectTemplate({
+      platform: webAdapter,
+      project: pagedProject(),
+      savedName: 'work.lf2',
+      assetReader: {
+        ...assetReader(),
+        readManifest: async () => {
+          throw new Error('asset storage unavailable');
+        },
+      },
+      getProjectDocumentEpoch: () => useStore.getState().projectDocumentEpoch,
+      pushToast,
+    });
+  } finally {
+    picker.restore();
+  }
+  expect(picker.picks()).toBe(0);
+  expect(disk.get('work.lf2template')).toBe('previous template');
+  expect(pushToast).toHaveBeenCalledWith(
+    expect.stringContaining('Could not save template'),
+    'error',
+  );
 });

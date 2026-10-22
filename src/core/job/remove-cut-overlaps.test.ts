@@ -209,3 +209,40 @@ describe('opt-in laser line overlap removal', () => {
     expect(removeCutOverlaps(group(segments)).segments).toEqual(segments);
   });
 });
+
+// ADR-626 Amendment 8 (audit 03-P1-3): a part that loses its shared edge is
+// still a part, so laser leads must still see its whole outline.
+describe('outlines overlap removal splits, for laser leads', () => {
+  const led = (segment: CutSegment, contour: string): CutSegment => ({
+    ...segment,
+    leadSource: `art#0:${contour}`,
+    nesting: { forest: 'run', depth: 0, topologyContour: contour },
+  });
+
+  for (const tolerance of [0, 0.05]) {
+    it(`keeps the whole outline of a contour it splits (merge tolerance ${tolerance})`, () => {
+      const first = led(square(0), '0');
+      const second = led(square(10), '1');
+      const result = removeCutOverlaps(group([first, second]), tolerance);
+      expect(result.segments[0]).toBe(first);
+      expect(result.segments.slice(1).every((segment) => !segment.closed)).toBe(true);
+      expect(result.topologyRings).toEqual([
+        { forest: 'run', contour: '1', polyline: second.polyline, leadSource: 'art#0:1' },
+      ]);
+    });
+  }
+
+  it('keeps no outline when no lead is asked for, so output is unchanged', () => {
+    const result = removeCutOverlaps(group([square(0), square(10)]));
+    expect(result.segments).toHaveLength(2);
+    expect(result.topologyRings).toBeUndefined();
+  });
+
+  it('adds no second outline for a contour the group already keeps', () => {
+    const kept = { forest: 'run', contour: '1', polyline: square(10).polyline };
+    const pieces = removeCutOverlaps(
+      group([led(square(0), '0'), led(square(10), '1')], { topologyRings: [kept] }),
+    );
+    expect(pieces.topologyRings).toEqual([kept]);
+  });
+});

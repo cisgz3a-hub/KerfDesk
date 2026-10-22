@@ -6,6 +6,7 @@
 import { APP_DISPLAY_NAME } from '../../core/app-branding';
 import type { PlatformAdapter } from '../../platform/types';
 import { canvasTheme } from '../theme/canvas-theme';
+import { pickPreparedSaveTarget } from './pick-prepared-save-target';
 import type { ToastVariant } from '../state/toast-store';
 
 export type SavePreviewImageCtx = {
@@ -22,19 +23,17 @@ export async function saveWorkspacePreviewImage(ctx: SavePreviewImageCtx): Promi
     ctx.pushToast('Open the workspace before saving a preview image.', 'warning');
     return;
   }
-  let target;
   try {
-    target = await ctx.platform.pickFileForSave({
-      suggestedName: `${projectStem(ctx.savedName)}-preview.png`,
-      extensions: ['.png'],
-    });
-  } catch (error) {
-    ctx.pushToast(`Could not save the preview image: ${message(error)}`, 'error');
-    return;
-  }
-  if (target === null) return;
-  try {
-    await target.write(await (ctx.encode ?? compositeToPng)(layers));
+    // The picker empties an existing file as it returns (ADR-656): the PNG is
+    // made first, from the workspace as it is at the click.
+    const png = await (ctx.encode ?? compositeToPng)(layers);
+    const target = await pickPreparedSaveTarget(
+      ctx.platform,
+      { suggestedName: `${projectStem(ctx.savedName)}-preview.png`, extensions: ['.png'] },
+      { title: 'Save preview image', message: 'The preview image is ready.' },
+    );
+    if (target === null) return;
+    await target.write(png);
     ctx.pushToast(`Saved the preview image to ${target.displayName}`, 'success');
   } catch (error) {
     ctx.pushToast(`Could not save the preview image: ${message(error)}`, 'error');
