@@ -8,6 +8,21 @@ import { useStore } from '../../state';
 import { pickPreparedSaveTarget } from '../../app/pick-prepared-save-target';
 import { usePlatformOptional } from '../../app/platform-context';
 import { Dialog } from '../../kit';
+
+/** The study validated, then built into its reference artifact for this project. */
+function useWrapStudyArtifact(
+  project: Project,
+  machine: CncMachineConfig,
+  setup: CncMachiningSetup,
+  study: CncWrapStudy,
+) {
+  return useMemo(() => {
+    const parsed = parseCncWrapStudy(study);
+    if (parsed.kind === 'invalid') return { kind: 'unavailable' as const, reason: parsed.reason };
+    return buildCncWrapStudyArtifact({ ...project, machine, cncSetup: setup }, study);
+  }, [project, machine, setup, study]);
+}
+
 export function CncWrapStudyReview(props: {
   readonly project: Project;
   readonly machine: CncMachineConfig;
@@ -19,14 +34,7 @@ export function CncWrapStudyReview(props: {
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false),
     writing = useRef(false);
-  const artifact = useMemo(() => {
-    const parsed = parseCncWrapStudy(props.study);
-    if (parsed.kind === 'invalid') return { kind: 'unavailable' as const, reason: parsed.reason };
-    return buildCncWrapStudyArtifact(
-      { ...props.project, machine: props.machine, cncSetup: props.setup },
-      props.study,
-    );
-  }, [props.project, props.machine, props.setup, props.study]);
+  const artifact = useWrapStudyArtifact(props.project, props.machine, props.setup, props.study);
   function save(): void {
     if (platform === null || artifact.kind !== 'ok' || writing.current) return;
     if (useStore.getState().project !== props.project) {
