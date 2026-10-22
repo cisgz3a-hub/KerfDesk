@@ -10,6 +10,7 @@ import {
   type SceneObject,
 } from '../scene';
 import { compileJob } from './compile-job';
+import { MIN_PERFORATION_MM, perforationPatternFor } from './operation-cut-extras';
 import type { CutGroup, Job } from './job';
 import { buildToolpath } from './toolpath';
 
@@ -73,6 +74,24 @@ describe('Line perforation and overcut (ADR-415)', () => {
     expect(group.segments).toHaveLength(10);
     expect(group.segments.every((segment) => !segment.closed)).toBe(true);
     expect(group).not.toHaveProperty('finalPassOvercutMm');
+  });
+
+  // Audit 2026-10-21 geometry P3-4: at 1e-300 mm the dash loop never advanced.
+  it('cuts lengths below the Cut Settings minimum from a project file at that minimum', () => {
+    const crafted = { perforationEnabled: true, perforationCutMm: 1e-300, perforationSkipMm: 1e-9 };
+    expect(perforationPatternFor(crafted)).toEqual({
+      cutMm: MIN_PERFORATION_MM,
+      skipMm: MIN_PERFORATION_MM,
+    });
+    const atMinimum = cutGroup(
+      compileWith({
+        perforationEnabled: true,
+        perforationCutMm: MIN_PERFORATION_MM,
+        perforationSkipMm: MIN_PERFORATION_MM,
+      }),
+    );
+    expect(atMinimum.segments.length).toBeGreaterThan(1000);
+    expect(cutGroup(compileWith(crafted)).segments).toEqual(atMinimum.segments);
   });
 
   it('perforates the pieces tabs leave, so tab gaps stay uncut', () => {
