@@ -2,6 +2,7 @@ import type { StreamerStatus } from '../../core/controllers/grbl';
 import { SOFTWARE_ABORT_TITLE } from '../common/software-abort-copy';
 import {
   cncJobLaserModeEnabled,
+  cncPauseControllerKind,
   cncPauseLiftPhase,
   cncPauseLiftSkipReason,
 } from '../state/cnc-pause-lift-state';
@@ -118,11 +119,13 @@ function LiveMotionPrimaryAction({ status }: { readonly status: StreamerStatus |
   const laserModeEnabled = useLaserStore(cncJobLaserModeEnabled);
   const liftPhase = useLaserStore(cncPauseLiftPhase);
   const liftSkipReason = useLaserStore(cncPauseLiftSkipReason);
+  const controllerKind = useLaserStore(cncPauseControllerKind);
   const resumeAdvisory = cncResumeAdvisoryNotice(
     machineKind,
     laserModeEnabled,
     liftPhase,
     liftSkipReason,
+    controllerKind,
   );
   const pauseResumeTransition = useLaserStore((state) => state.pauseResumeTransition);
   if (pauseResumeTransition !== null) {
@@ -139,7 +142,12 @@ function LiveMotionPrimaryAction({ status }: { readonly status: StreamerStatus |
     return (
       <LiveMotionActionButton
         label="Pause"
-        title={pauseControlMessage(machineKind, hasRealtimePause, streamPauseBeamOff)}
+        title={pauseControlMessage(
+          machineKind,
+          hasRealtimePause,
+          streamPauseBeamOff,
+          controllerKind,
+        )}
         onClick={pauseJob}
       />
     );
