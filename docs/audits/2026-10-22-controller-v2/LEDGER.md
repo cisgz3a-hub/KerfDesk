@@ -7,12 +7,14 @@ Method: [../2026-10-21-rolling-v2/METHOD.md](../2026-10-21-rolling-v2/METHOD.md)
 | C1 | Native resume G-code | 99a2e64b7 | [C1-ctl-native-resume.md](C1-ctl-native-resume.md) | 5 | 0 | 0 | 0 | 5 | 5 |
 | C3 | Homing, envelope and jog | 99a2e64b7 | [C3-ctl-homing-envelope-jog.md](C3-ctl-homing-envelope-jog.md) | 5 | 0 | 0 | 2 | 3 | 4 |
 | C4 | Settings and EEPROM writes | 99a2e64b7 | [C4-ctl-settings-eeprom.md](C4-ctl-settings-eeprom.md) | 9 | 0 | 0 | 1 | 8 | 3 |
+| C5 | Console and responses | 99a2e64b7 | [C5-ctl-console-responses.md](C5-ctl-console-responses.md) | 4 | 0 | 0 | 1 | 3 | 5 |
 | C2 | Probing and offsets | 99a2e64b7 | [C2-ctl-probing.md](C2-ctl-probing.md) | 5 | 0 (one P3 sub-claim) | 1 | 1 | 3 | 6 |
 
 ## Confirmed P1/P2 (coordinator-verified)
 
 | ID | Area | Summary | Coordinator evidence | Fix status |
 |---|---|---|---|---|
+| C5-P2-1 | console-responses | The Super Console diagnostic bundle copies raw `$$` reply lines (and typed `$N=` writes) into the file, including grblHAL Wi-Fi/AP/MQTT passwords (`$75`, `$77`, `$533`), while its disclosure says "raw settings values" are left out; PR #1364 covers only the support report | **READ**: `diagnostic-bundle.ts` `diagnosticTranscript` skips job/motion/gcode entries but keeps `$$` replies through `redactDiagnosticText`; disclosure at :188. Auditor + refuter REPRO through the real store; **SOURCE** grblHAL `settings.c` prints passwords unless a WebUI is connected | open |
 | C3-P2-1 | homing-envelope-jog | On grblHAL any X/Y bit in `$23` leaves press-and-hold jog with no limits: KerfDesk reads force-origin only from stock GRBL's `$I`, never grblHAL's `$22` bit 3 (in the `$$` dump), so every hold asks for a full bed width and grblHAL refuses with error:15 | **READ**: `jog-travel-limits.ts:74` returns null when `forceOrigin === null && xyMask !== 0`. **SOURCE** grblHAL d7aaee3 `$22` bit 3. Refuter REPRO (`$J=G91 G21 X400.000` outside [−398, −2]) | open |
 | C3-P2-2 | homing-envelope-jog | A homed grblHAL with soft limits off gets no pull-off margin; holding an arrow toward the homing corner runs onto the switch → ALARM:1 and a re-home (stock GRBL stops 2 mm short) | refuter REPRO (`$20=0`, hold from −2 targets 398, switch at 0); ADR-375's hard-limit rule does not depend on `$20` | open |
 | C4-P2-1 | settings-eeprom | On grblHAL the Console sends `$N=` writes unvalidated, and grblHAL silently stores a different value: `$100=26,67` → 26 (parts ~2.5% short), `$110=5O00` → 5 mm/min, `$22=1.0` → homing off and soft limits forced off (pinned build also `$1=25.0` → 250); the controller answers `ok` and the `$$` re-read never compares | **READ**: `console-setting-writes.ts` `consoleSettingWriteIssue` validates `grbl-dollar` writes only when `driver.kind === 'grbl-v1.1'`, returning null for grblHAL. **SOURCE**: grblHAL `settings.c` `settings_store_setting`, `nuts_bolts.c` `read_uint`/`read_float` (d7aaee3 and master 62f25d4). Refuter REPRO through the real store | open |
