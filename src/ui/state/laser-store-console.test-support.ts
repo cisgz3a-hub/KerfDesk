@@ -50,7 +50,7 @@ export function makeConnection(
   };
 }
 
-function makeAdapter(connection: SerialConnection): PlatformAdapter {
+export function makeAdapter(connection: SerialConnection): PlatformAdapter {
   return {
     id: 'mock',
     pickFilesForOpen: async () => [],

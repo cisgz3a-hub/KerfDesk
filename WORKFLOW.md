@@ -2096,8 +2096,12 @@ not erased. GRBL's independent `$13` reporting-unit contract is unchanged.
    controller's own (ADR-375).
 3. After Unlock without Home, stock GRBL's own reported MPos aims the hold, while the rest of the
    app still treats the position as unknown (ADR-375).
-4. Otherwise the jog asks for full travel and relies on the release.
-5. A release just after the jog went out waits for its reply before `0x85`, as Cancel does
+4. After a Home in this session, the hold also stops the pull-off clear of the switch with soft
+   limits off, so a held arrow toward the homing corner does not trip the switch (`ALARM:1`). On
+   grblHAL this works for every homing direction (`$23`): force set origin is read from `$22`
+   bit 3 when the `$$` dump prints the whole `$22` bitfield (ADR-375 Amendment 3).
+5. Otherwise the jog asks for full travel and relies on the release.
+6. A release just after the jog went out waits for its reply before `0x85`, as Cancel does
    (F-B4). If a motion line's reply never comes, Cancel says so after 8 s and the jog stays owned,
    since the reply may still arrive; once the controller reports Idle, Disconnect and Connect stay
    available to clear it (ADR-640).
@@ -2588,8 +2592,13 @@ authorization, Frame proof, controller command, or safety boundary.
 2. `$number=value` settings writes require connected, idle controller state and explicit
    confirmation. On stock GRBL a value the firmware would store differently (anything but 0 or 1
    for an on/off setting, a fraction or a value outside 0-255 for its other 8-bit settings) is
-   refused before the prompt. Every acknowledged write is read back with `$$`, so the settings
-   table shows what the controller stored (ADR-375).
+   refused before the prompt. On grblHAL, a value for one of the GRBL settings KerfDesk knows is
+   refused before the prompt unless it is one plain number the setting takes as typed: grblHAL
+   keeps only the number at the start (`$100=26,67` would store 26), and older builds read
+   `$22=1.0` as 10, so the message names the line to send instead. Every acknowledged write is
+   read back with `$$`, so the settings table shows what the controller stored (ADR-375). When
+   the re-read shows a different value than the one typed, the Console says so (ADR-375
+   Amendment 3).
 
 #### Edge — arbitrary G-code
 1. Single-line G-code commands are allowed only when connected, no operation is active, and GRBL reports `Idle`.
