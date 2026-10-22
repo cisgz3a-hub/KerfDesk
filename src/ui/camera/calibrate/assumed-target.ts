@@ -2,14 +2,21 @@
 // how to say so. The rings are labelled from this layout, so a wrong one
 // shifts the whole calibration while every figure still looks perfect; the
 // wizard therefore always shows the layout it assumes, where the operator can
-// still correct it.
+// still correct it. The layout's bed frame goes with it, so the calibration
+// records the frame its rings were placed in (rolling audit 12-P2-2).
 
+import type { CameraBedFrame } from '../../../core/camera/model/camera-bed-frame';
 import type { BedArea } from '../../../core/camera/model/camera-model-accuracy';
 import type { DeviceProfile } from '../../../core/devices';
 import { useStore } from '../../state';
+import { cameraBedFrameNow, useCameraBedFrame } from '../camera-bed-frame-now';
 import { calibrationTargetArea } from './calibration-actions';
 import { useCameraCalibrationStore, type CalibrationSettings } from './camera-calibration-store';
-import { rememberedEngravedTarget, type EngravedTarget } from './engraved-target-memory';
+import {
+  engravedTargetBedFrame,
+  rememberedEngravedTarget,
+  type EngravedTarget,
+} from './engraved-target-memory';
 
 export type AssumedTarget = {
   readonly area: BedArea;
@@ -17,6 +24,8 @@ export type AssumedTarget = {
   readonly source: 'saved-calibration' | 'engraved' | 'settings';
   /** The layout in words, to follow "looks for". */
   readonly description: string;
+  /** The bed frame the layout's rings were placed in. */
+  readonly bedFrame: CameraBedFrame;
 };
 
 type LayoutSettings = Pick<CalibrationSettings, 'marginMm' | 'headCamera' | 'headTargetSizeMm'>;
@@ -33,15 +42,20 @@ export function assumedTarget(args: {
   readonly bedWidthMm: number;
   readonly bedHeightMm: number;
   readonly knownArea: BedArea | null;
+  /** The saved calibration's frame, with `knownArea`; null when it was not saved. */
+  readonly knownBedFrame?: CameraBedFrame | null;
   readonly remembered: EngravedTarget | null;
+  /** The bed frame the machine is set up with now. */
+  readonly frameNow: CameraBedFrame;
 }): AssumedTarget {
-  const { settings, remembered } = args;
+  const { settings, remembered, frameNow } = args;
   if (args.knownArea !== null) {
     const { width, height } = args.knownArea;
     return {
       area: args.knownArea,
       source: 'saved-calibration',
       description: `the target of the saved calibration, ${size(width, height)}`,
+      bedFrame: args.knownBedFrame ?? frameNow,
     };
   }
   const bedNow = size(args.bedWidthMm, args.bedHeightMm);
@@ -53,6 +67,7 @@ export function assumedTarget(args: {
       area: remembered.area,
       source: 'engraved',
       description: `the target engraved from this computer on ${date}: ${layoutWords(settings, remembered.area, bedThen)}${changed}`,
+      bedFrame: engravedTargetBedFrame(remembered, frameNow),
     };
   }
   const area = calibrationTargetArea(args.bedWidthMm, args.bedHeightMm, settings);
@@ -60,33 +75,50 @@ export function assumedTarget(args: {
     area,
     source: 'settings',
     description: `a target laid out by these settings: ${layoutWords(settings, area, bedNow)}`,
+    bedFrame: frameNow,
   };
 }
 
 /** {@link assumedTarget} for the open wizard and the machine now. */
 export function currentAssumedTarget(): AssumedTarget {
-  const { settings, targetArea } = useCameraCalibrationStore.getState();
-  return assumedTargetFor(useStore.getState().project.device, settings, targetArea);
+  const { settings, targetArea, targetBedFrame } = useCameraCalibrationStore.getState();
+  return assumedTargetFor(useStore.getState().project.device, settings, {
+    area: targetArea,
+    bedFrame: targetBedFrame,
+    frameNow: cameraBedFrameNow(),
+  });
 }
 
 export function useAssumedTarget(): AssumedTarget {
   const settings = useCameraCalibrationStore((s) => s.settings);
   const targetArea = useCameraCalibrationStore((s) => s.targetArea);
+  const targetBedFrame = useCameraCalibrationStore((s) => s.targetBedFrame);
   const device = useStore((s) => s.project.device);
-  return assumedTargetFor(device, settings, targetArea);
+  const frameNow = useCameraBedFrame();
+  return assumedTargetFor(device, settings, {
+    area: targetArea,
+    bedFrame: targetBedFrame,
+    frameNow,
+  });
 }
 
 function assumedTargetFor(
   device: Machine,
   settings: CalibrationSettings,
-  targetArea: BedArea | null,
+  known: {
+    readonly area: BedArea | null;
+    readonly bedFrame: CameraBedFrame | null;
+    readonly frameNow: CameraBedFrame;
+  },
 ): AssumedTarget {
   return assumedTarget({
     settings,
     bedWidthMm: device.bedWidth,
     bedHeightMm: device.bedHeight,
-    knownArea: targetArea,
+    knownArea: known.area,
+    knownBedFrame: known.bedFrame,
     remembered: rememberedEngravedTarget(device, settings.headCamera),
+    frameNow: known.frameNow,
   });
 }
 

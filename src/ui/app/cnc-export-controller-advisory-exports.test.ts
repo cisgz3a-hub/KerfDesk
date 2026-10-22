@@ -12,6 +12,7 @@ import { profileCatalogEntryById } from '../../core/devices/profile-catalog';
 import { DEFAULT_CNC_MACHINE_CONFIG, type Project } from '../../core/scene';
 import { prepareOutput } from '../../io/gcode';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
+import { blobText } from '../../platform/web/chromium-save-picker.test-support';
 import type { TiledOutputPreparationRequest } from '../laser/output-preparation-protocol';
 import type * as OutputPreparationWorkerClient from '../laser/output-preparation-worker-client';
 import { saveSurfacingProgram } from '../machine/save-surfacing-program';
@@ -83,12 +84,7 @@ function streamingPlatform(written: string[]): PlatformAdapter {
   const target: SaveTarget = {
     displayName: 'surfacing.nc',
     write: async (data) => {
-      if (typeof data === 'string') written.push(data);
-    },
-    writeChunks: async (chunks) => {
-      let text = '';
-      for await (const chunk of chunks) text += chunk;
-      written.push(text);
+      written.push(typeof data === 'string' ? data : await blobText(data));
     },
   };
   return mockPlatform({ save: async () => target });
@@ -134,7 +130,7 @@ describe('surfacing Save for a controller that cannot run it', () => {
       settingsCapability: 'none',
       inputs: { widthMm: 100, heightMm: 80, stepoverPct: 40, totalDepthMm: 0.5 },
       signal: new AbortController().signal,
-      onWriting: () => undefined,
+      onChoosing: () => undefined,
       onFinalizing: () => undefined,
       isCurrent: () => true,
     });
@@ -178,7 +174,7 @@ describe('tiled and surfacing Save on a disconnected GRBL profile', () => {
       settingsCapability: 'none',
       inputs: { widthMm: 100, heightMm: 80, stepoverPct: 40, totalDepthMm: 0.5 },
       signal: new AbortController().signal,
-      onWriting: () => undefined,
+      onChoosing: () => undefined,
       onFinalizing: () => undefined,
       isCurrent: () => true,
     });

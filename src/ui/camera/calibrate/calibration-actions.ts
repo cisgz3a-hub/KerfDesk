@@ -5,9 +5,12 @@
 // every ring is without the operator entering coordinates. A camera on the
 // laser head (ADR-449) sees a small patch of the bed, so its target is a small
 // square in the middle of the bed, and the photo records where the head was.
+// The calibration records the bed frame the rings were placed in, so a later
+// change of bed size, origin or native frame is noticed (rolling audit 12-P2-2).
 
 import { toGrayImage } from '../../../core/camera/gray';
 import { warpFrameToBedImage } from '../../../core/camera/model/bed-image';
+import type { CameraBedFrame } from '../../../core/camera/model/camera-bed-frame';
 import type { BedArea } from '../../../core/camera/model/camera-model-accuracy';
 import type { CameraModelRecord } from '../../../core/camera/model/camera-model-record';
 import { isHeadCameraModel, modelAtHead } from '../../../core/camera/model/head-camera';
@@ -15,6 +18,8 @@ import { bedTargetLayout, type BedTargetArea } from '../../../core/camera/target
 import { generateCameraBedTarget } from '../../../core/job/camera-bed-target-pattern';
 import type { Project, Vec2 } from '../../../core/scene';
 import { useStore } from '../../state';
+import { useLaserStore } from '../../state/laser-store';
+import { cameraBedFrameFor } from '../../state/native-bed-frame';
 import {
   cameraCaptureBindingForFrame,
   captureSourceFrame,
@@ -65,6 +70,7 @@ export async function engraveCalibrationTarget(
 ): Promise<boolean> {
   const { project } = useStore.getState();
   const { device } = project;
+  const bedFrame = cameraBedFrameFor(device, useLaserStore.getState());
   const area = calibrationTargetArea(device.bedWidth, device.bedHeight, settings);
   const pattern = generateCameraBedTarget({
     area,
@@ -87,6 +93,7 @@ export async function engraveCalibrationTarget(
       bedHeightMm: device.bedHeight,
       layoutMm: settings.headCamera ? settings.headTargetSizeMm : settings.marginMm,
       engravedAt: new Date().toISOString(),
+      bedFrame,
     });
   }
   return started;
@@ -103,9 +110,11 @@ export async function photographTarget(args: {
   readonly bedHeightMm: number;
   /** Where the target was engraved when that is known; else from the margin. */
   readonly area?: BedArea;
+  /** The bed frame the target's rings were placed in; absent when unknown. */
+  readonly bedFrame?: CameraBedFrame;
   /** The calibration saved before this photo, to measure on it. */
   readonly saved?: CameraModelRecord;
-  /** The head's bed position now, for a camera on the head; null when unknown. */
+  /** The head's bed position now, in the target's bed frame, for a camera on the head; null when unknown. */
   readonly headMm?: Vec2 | null;
   readonly signal?: AbortSignal;
   readonly now?: () => Date;
@@ -142,6 +151,7 @@ export async function photographTarget(args: {
     targetArea: area,
     calibratedAt: (args.now ?? (() => new Date()))(),
     headAtCalibrationMm: head,
+    ...(args.bedFrame === undefined ? {} : { bedFrame: args.bedFrame }),
   });
   const savedCheck =
     args.saved === undefined

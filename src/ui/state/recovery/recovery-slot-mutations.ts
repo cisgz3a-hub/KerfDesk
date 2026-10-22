@@ -1,4 +1,8 @@
-import type { JobInterruption } from '../../../core/recovery';
+import {
+  settleLinkLossRestart,
+  type JobInterruption,
+  type LinkLossRestartEvidence,
+} from '../../../core/recovery';
 import {
   estimateExecutionArtifactBytes,
   type ExecutionArtifactV1,
@@ -117,6 +121,34 @@ export function interruptRunMutation(
       executionHistory: appendBoundedExecutionHistory(slots, historyRecord),
     },
     value: true,
+  };
+}
+
+/** Record what the first reconnect after a lost link showed: a controller that
+ * restarted gets the planner step-back, one that kept running loses the
+ * held-back backlog (ADR-398 Amendment 3). Only the saved, unclaimed capsule
+ * still waiting for that verdict changes; its execution history keeps the
+ * record made at the stop. */
+export function settleLinkLossRestartMutation(
+  expected: { readonly runId: RunId; readonly revision: number },
+  evidence: LinkLossRestartEvidence,
+): (slots: PersistedRecoverySlots) => SlotMutation<boolean> {
+  return (slots) => {
+    const capsule = slots.recoveryCapsule;
+    if (
+      capsule?.runId !== expected.runId ||
+      capsule.revision !== expected.revision ||
+      capsule.claim !== undefined
+    ) {
+      return unchanged(slots, false);
+    }
+    const interruption = settleLinkLossRestart(capsule.interruption, evidence);
+    if (interruption === null) return unchanged(slots, false);
+    const revision = slots.revision + 1;
+    return {
+      slots: { ...slots, revision, recoveryCapsule: { ...capsule, revision, interruption } },
+      value: true,
+    };
   };
 }
 

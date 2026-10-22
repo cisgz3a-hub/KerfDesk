@@ -1,4 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import {
+  GRBLHAL_LEVEL_2_DUMP,
+  grblHalSettingsMap,
+} from '../../../__fixtures__/controllers/grblhal-settings-dump';
 import { classifyResponse } from './response';
 import {
   idleCollector,
@@ -106,6 +110,7 @@ describe('settingsMapToProfilePatch', () => {
       softLimitsEnabled: true,
       hardLimitsEnabled: true,
       homingEnabled: true,
+      homingForceSetOrigin: false,
     });
     const optionsWithoutEnable = new Map([
       [21, '2'],
@@ -114,7 +119,33 @@ describe('settingsMapToProfilePatch', () => {
     expect(settingsMapToControllerSettings(optionsWithoutEnable)).toEqual({
       hardLimitsEnabled: false,
       homingEnabled: false,
+      homingForceSetOrigin: false,
     });
+  });
+
+  // grblHAL `$22` bit 3 is force set origin ("Set machine origin to 0",
+  // settings.h#L714-L718). `$$` prints the whole bitfield, and lists `$384`,
+  // only at COMPATIBILITY_LEVEL <= 1 (settings.c#L1775-L1782, system.c#L300-L317);
+  // above it `$22` is 0 or 1 and says nothing about force origin. ADR-375 Amd 3.
+  it('reads grblHAL force set origin from a dump that prints the whole $22 bitfield', () => {
+    expect(settingsMapToControllerSettings(grblHalSettingsMap({ 22: '9' }))).toMatchObject({
+      homingEnabled: true,
+      homingForceSetOrigin: true,
+    });
+    expect(settingsMapToControllerSettings(grblHalSettingsMap())).toMatchObject({
+      homingEnabled: true,
+      homingForceSetOrigin: false,
+    });
+    const level2 = settingsMapToControllerSettings(grblHalSettingsMap({}, GRBLHAL_LEVEL_2_DUMP));
+    expect(level2.homingEnabled).toBe(true);
+    expect(level2).not.toHaveProperty('homingForceSetOrigin');
+    expect(
+      settingsMapToControllerSettings(grblHalSettingsMap({ 22: '13' }, GRBLHAL_LEVEL_2_DUMP)),
+    ).toMatchObject({ homingForceSetOrigin: true });
+  });
+
+  it('reads no force set origin from a stock GRBL $22', () => {
+    expect(settingsMapToControllerSettings(new Map([[22, '1']]))).toEqual({ homingEnabled: true });
   });
 
   it('leaves a $21/$22 value that is not a non-negative integer unknown', () => {
@@ -145,6 +176,42 @@ describe('settingsMapToProfilePatch', () => {
     });
     expect(settingsMapToControllerSettings(new Map([[384, '2']]))).toEqual({});
     expect(settingsMapToProfilePatch(new Map([[384, '0']]))).toEqual({});
+  });
+
+  // grblHAL at COMPATIBILITY_LEVEL 0 or 1 stores and prints `$10` whole and
+  // lists every setting in `$$`; above level 1 it prints only bits 0 and 1 and
+  // lists only the stock settings (core settings.c#L862-L872, #L1739-L1745,
+  // system.c#L300-L318, report.c#L503-L507). ADR-375 Amendment 2.
+  it('marks a $10 the dump shows whole: above 3, or beside a non-stock setting', () => {
+    expect(settingsMapToControllerSettings(new Map([[10, '511']]))).toEqual({
+      statusReportMask: 511,
+      statusReportMaskIsFull: true,
+    });
+    const grblHalDump = new Map([
+      [10, '0'],
+      [13, '0'],
+      [130, '400'],
+      [384, '0'],
+    ]);
+    expect(settingsMapToControllerSettings(grblHalDump)).toMatchObject({
+      statusReportMask: 0,
+      statusReportMaskIsFull: true,
+    });
+    const legacyOnlyDump = new Map([
+      [0, '10'],
+      [7, '0'],
+      [10, '1'],
+      [32, '1'],
+      [103, '80'],
+      [139, '0'],
+    ]);
+    expect(settingsMapToControllerSettings(legacyOnlyDump).statusReportMask).toBe(1);
+    expect(settingsMapToControllerSettings(legacyOnlyDump)).not.toHaveProperty(
+      'statusReportMaskIsFull',
+    );
+    expect(settingsMapToControllerSettings(new Map([[384, '0']]))).not.toHaveProperty(
+      'statusReportMaskIsFull',
+    );
   });
 
   // One step's length bounds how far a reported MPos sits from the firmware's

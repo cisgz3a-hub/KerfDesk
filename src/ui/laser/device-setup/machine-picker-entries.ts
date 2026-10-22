@@ -1,8 +1,10 @@
 // The Machine stage's one list of machines (ADR-637): every brand laser
 // profile and every CNC preset, grouped by brand. The generic firmware
 // starters are not machines, so they stay out of the list; "My machine isn't
-// listed" covers them with a firmware choice. Choosing an entry only changes
-// the setup draft; nothing reaches the project before Save.
+// listed" covers them with a firmware choice. A withdrawn preset stays out too
+// (ADR-660), so a saved copy of it opens as a machine that isn't listed.
+// Choosing an entry only changes the setup draft; nothing reaches the project
+// before Save.
 
 import { CNC_MACHINE_CATALOG, type CncMachinePreset } from '../../../core/cnc';
 import {
@@ -59,7 +61,9 @@ export function machinePickerEntries(state: DeviceSetupState): ReadonlyArray<Mac
     controllerSettings: state.controllerRead ? state.detected : null,
     settingsRows: [],
   });
-  const lasers = suggestions.filter((item) => !isGenericProfile(item.profile)).map(laserEntry);
+  const lasers = suggestions
+    .filter((item) => !isGenericProfile(item.profile) && item.entry.withdrawn === undefined)
+    .map(laserEntry);
   return [...lasers, ...CNC_MACHINE_CATALOG.map(cncEntry)];
 }
 

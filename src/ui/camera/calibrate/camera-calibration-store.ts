@@ -5,6 +5,7 @@
 // and the layout of the last target engraved (engraved-target-memory.ts).
 
 import { create } from 'zustand';
+import type { CameraBedFrame } from '../../../core/camera/model/camera-bed-frame';
 import type { BedArea } from '../../../core/camera/model/camera-model-accuracy';
 import type { CameraModelRecord } from '../../../core/camera/model/camera-model-record';
 import type { MarkError } from '../../../core/camera/target/bed-calibration';
@@ -83,6 +84,9 @@ export type CameraCalibrationStore = {
   // The engraved target's area when it is known (a check of the saved
   // calibration); null derives it from the bed and the margin.
   readonly targetArea: BedArea | null;
+  // The bed frame that area was engraved in, read only with targetArea; null
+  // when the saved calibration did not keep it (rolling audit 12-P2-2).
+  readonly targetBedFrame: CameraBedFrame | null;
   /** The guided setup from its first screen, choosing the camera (ADR-663). */
   readonly openSetup: () => void;
   /** Straight to the target, for a camera already chosen and placed. */
@@ -117,6 +121,7 @@ export const useCameraCalibrationStore = create<CameraCalibrationStore>((set) =>
   step: INITIAL_STEP,
   settings: DEFAULT_CALIBRATION_SETTINGS,
   targetArea: null,
+  targetBedFrame: null,
   openSetup: () =>
     set((s) => ({
       open: true,
@@ -124,6 +129,7 @@ export const useCameraCalibrationStore = create<CameraCalibrationStore>((set) =>
       minimized: false,
       step: { kind: 'camera' },
       targetArea: null,
+      targetBedFrame: null,
       settings: withRemembered(s.settings),
     })),
   openWizard: () =>
@@ -133,6 +139,7 @@ export const useCameraCalibrationStore = create<CameraCalibrationStore>((set) =>
       minimized: false,
       step: INITIAL_STEP,
       targetArea: null,
+      targetBedFrame: null,
       settings: withRemembered(s.settings),
     })),
   // Check needs the target that was actually engraved. Older records remain
@@ -152,6 +159,7 @@ export const useCameraCalibrationStore = create<CameraCalibrationStore>((set) =>
         headCamera: saved.mount?.kind === 'head',
       },
       targetArea: saved.accuracy.targetArea ?? null,
+      targetBedFrame: saved.bedFrame ?? null,
     })),
   closeWizard: () => set({ open: false, minimized: false, step: INITIAL_STEP }),
   toggleMinimized: () => set((s) => ({ minimized: !s.minimized })),

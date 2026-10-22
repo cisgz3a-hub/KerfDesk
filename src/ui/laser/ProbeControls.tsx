@@ -34,6 +34,8 @@ type ProbeFieldsProps = {
   readonly onZParams: (params: ZProbeParams) => void;
   readonly onBitDiameter: (value: number) => void;
   readonly onCornerGeometry: (value: CornerProbeGeometryDraft) => void;
+  /** A tool-change hold re-zeroes Z only, so the corner cycle is not offered. */
+  readonly cornerUnavailable: boolean;
 };
 
 const CORNERS: ReadonlyArray<{ readonly value: ProbeCorner; readonly label: string }> = [
@@ -51,6 +53,7 @@ export function ProbeControls(): JSX.Element | null {
   const connection = useLaserStore((s) => s.connection);
   const statusReport = useLaserStore((s) => s.statusReport);
   const probeBusy = useLaserStore((s) => s.probeBusy);
+  const toolChangeHold = useLaserStore((s) => s.streamer?.status === 'tool-change');
   const probe = useLaserStore((s) => s.probe);
   const pushToast = useToastStore((s) => s.pushToast);
   // Every mount in the same document/profile/controller session shares one
@@ -85,7 +88,11 @@ export function ProbeControls(): JSX.Element | null {
     effectiveTool.id,
     effectiveTool.diameterMm,
   );
-  const toolSupported = form.mode !== 'corner' || effectiveTool.kind === 'end-mill';
+  // The held job runs on the X/Y origin it started with, so a tool-change hold
+  // offers the Z cycle only; the store refuses the corner cycle there too. The
+  // draft keeps its mode for after the job (ADR-375 Amendment 3).
+  const mode: ProbeMode = toolChangeHold ? 'z' : form.mode;
+  const toolSupported = mode !== 'corner' || effectiveTool.kind === 'end-mill';
   const readiness = probeControlReadiness({
     isConnected: connection.kind === 'connected',
     isIdle: statusReport?.state === 'Idle',
@@ -95,7 +102,7 @@ export function ProbeControls(): JSX.Element | null {
 
   const run = (): void => {
     const request = buildProbeRequest({
-      mode: form.mode,
+      mode,
       zParams: form.zParams,
       bitDiameterMm: effectiveBitDiameter,
       toolKind: effectiveTool.kind,
@@ -111,12 +118,13 @@ export function ProbeControls(): JSX.Element | null {
   return (
     <>
       <p style={hintStyle}>
-        {probeHint(form.mode)}
+        {probeHint(mode, toolChangeHold)}
         {' Spindle must be off.'}
       </p>
       <ProbeFields
         key={contextKey}
-        mode={form.mode}
+        mode={mode}
+        cornerUnavailable={toolChangeHold}
         corner={form.corner}
         zParams={form.zParams}
         bitDiameterMm={effectiveBitDiameter}
@@ -162,10 +170,15 @@ function probeControlReadiness(input: {
   };
 }
 
-function probeHint(mode: ProbeMode): string {
-  return mode === 'z'
-    ? 'Rest the plate on the stock top under the bit and clip the probe lead to the bit. Z0 lands on the stock top.'
-    : 'Rest the plate flush on the chosen stock corner with the bit at the measured X/Y offsets, 5–15 mm above. X0 Y0 Z0 land on that corner.';
+const TOOL_CHANGE_PROBE_HINT =
+  'Tool change: probe Z only. The X/Y origin stays where the job started.';
+
+function probeHint(mode: ProbeMode, toolChangeHold: boolean): string {
+  const hint =
+    mode === 'z'
+      ? 'Rest the plate on the stock top under the bit and clip the probe lead to the bit. Z0 lands on the stock top.'
+      : 'Rest the plate flush on the chosen stock corner with the bit at the measured X/Y offsets, 5–15 mm above. X0 Y0 Z0 land on that corner.';
+  return toolChangeHold ? `${TOOL_CHANGE_PROBE_HINT} ${hint}` : hint;
 }
 
 function probeButtonLabel(isBusy: boolean): string {
@@ -206,7 +219,9 @@ function ProbeFields(props: ProbeFieldsProps): JSX.Element {
             onChange={(e) => props.onMode(e.target.value === 'corner' ? 'corner' : 'z')}
           >
             <option value="z">Z only (stock top)</option>
-            <option value="corner">XYZ corner</option>
+            <option value="corner" disabled={props.cornerUnavailable}>
+              XYZ corner
+            </option>
           </select>
         </label>
         {props.mode === 'corner' && (

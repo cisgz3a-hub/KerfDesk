@@ -16,6 +16,8 @@
 // the link is gone no software command can stop motion (GRBL laser_mode notes:
 // Ctrl-X soft reset cannot be sent after USB is gone).
 
+import type { MotionRefusal } from '../../core/controllers/controller-event';
+
 export type LaserSafetyAction =
   | 'pause'
   | 'resume'
@@ -277,6 +279,39 @@ export function skippedCommandNotice(
       'physical E-stop or power cutoff now if unsafe. Enable that option in the firmware, or ' +
       'change the device profile so the job does not send the command, then home before re-running.',
   };
+}
+
+/** Why the controller skips moves it still answers `ok`, in one sentence
+ * (ADR-395 Amendment 1; the full notice is in laser-motion-refusal.ts). */
+export function motionRefusalReason(refusal: MotionRefusal): string {
+  if (refusal.reason === 'stopped') {
+    return (
+      'The controller is stopped after a firmware error ("Printer stopped due to errors") and ' +
+      'skips every move until it is restarted.'
+    );
+  }
+  const verb = refusal.axes.length === 1 ? 'is' : 'are';
+  return (
+    'The controller skipped a move because its firmware does not move until ' +
+    `${axisList(refusal.axes)} ${verb} homed ("Home ${refusal.axes} First", NO_MOTION_BEFORE_HOMING).`
+  );
+}
+
+/** "X, Y and Z" for the axis letters "XYZ". */
+export function axisList(axes: string): string {
+  const letters = [...axes];
+  if (letters.length <= 1) return axes;
+  return `${letters.slice(0, -1).join(', ')} and ${letters.at(-1) ?? ''}`;
+}
+
+/** The text an owned command is refused with when its error report is
+ * followed by the line's own `ok`. */
+export function refusalText(response: {
+  readonly raw?: string;
+  readonly motionRefusal?: MotionRefusal;
+}): string {
+  if (response.motionRefusal !== undefined) return motionRefusalReason(response.motionRefusal);
+  return response.raw ?? 'Controller rejected the command.';
 }
 
 // ADR-053 P3: a hard-limit ALARM fired while a Verified Frame was tracing the

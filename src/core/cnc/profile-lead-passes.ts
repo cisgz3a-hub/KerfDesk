@@ -17,7 +17,10 @@
 // the opposite winding (a hole) flips to the inverse side.
 // Leads default-on for closed profile-outside/inside cuts; ramp entry, an
 // off-bed lead, a lead that curls into this contour, or into a disjoint sibling
-// part all fall back to the legacy straight plunge. A tabbed pass is represented
+// part all fall back to the legacy straight plunge. So does a lead whose cutter
+// would reach a part kept by any profile operation in the job, including the
+// wall of a hole this part is nested in (ADR-250 Amendment 3); those passes are
+// marked so Job Review can say why they plunge. A tabbed pass is represented
 // as one XY-closed path3d ring, so it keeps the same lead without flattening its
 // per-point tab Z moves.
 
@@ -28,6 +31,8 @@ import type { Vec3 } from '../geometry/vec3';
 import type { CncContourPass, CncPass, CncPath3dPass } from '../job';
 import type { CncCutType, CncLayerSettings, Polyline, Vec2 } from '../scene';
 import { computeProfileLead, type ProfileLeadOptions } from './profile-lead';
+import { leadClearsKeptWalls, type ProfileLeadKeptMaterial } from './profile-lead-kept-walls';
+import { segmentsStayOnSide } from './profile-lead-side-crossings';
 import type { ProfileSide } from './profile-paths';
 
 type LeadContext = {
@@ -35,18 +40,20 @@ type LeadContext = {
   readonly options: ProfileLeadOptions;
   readonly bed: MachineBounds;
   readonly siblings: ReadonlyArray<ReadonlyArray<Vec2>>;
+  readonly kept: ProfileLeadKeptMaterial | undefined;
 };
 
-// Tab interpolation can place an analytically shared contour endpoint at
-// 1 - ~1e-16 on the lead chord. Treat only parameter-scale roundoff as the
-// endpoint; real boundary crossings farther into the segment remain cuts.
-const BOUNDARY_PARAMETER_EPSILON = 1e-12;
-
+/**
+ * `kept` lists the walls every profile operation in the job keeps and this
+ * operation's cutter radius at full depth. Callers without a job (unit tests,
+ * single-group helpers) leave it out and get the same-operation checks only.
+ */
 export function applyProfileLeadPasses(
   passes: ReadonlyArray<CncPass>,
   settings: CncLayerSettings,
   toolDiameterMm: number,
   bed: MachineBounds,
+  kept?: ProfileLeadKeptMaterial,
 ): ReadonlyArray<CncPass> {
   // A ramp owns the entry of the passes it shaped, so `settings` must describe
   // the ramp these passes were compiled with: the layer ladder ramps whenever
@@ -73,6 +80,7 @@ export function applyProfileLeadPasses(
       options,
       bed,
       siblings: leadObstacles(polygon, shapes, side),
+      kept,
     };
     return leadForPass(pass, polygon, context);
   });
@@ -139,7 +147,10 @@ function windingSide(
 // Disjoint parts and retained islands inside an inward-led boundary are
 // obstacles. Opposite winding distinguishes those islands from concentric
 // roughing/finishing copies of the same boundary. Enclosing parents remain
-// excluded: their interior includes this contour's legitimate waste region.
+// excluded here: their interior includes this contour's legitimate waste
+// region. The wall of a hole this part sits in is kept material all the same,
+// and the job-wide kept-wall check (ADR-250 Amendment 3) holds the lead's
+// whole cutter inside it.
 function leadObstacles(
   polygon: ReadonlyArray<Vec2>,
   shapes: ReadonlyArray<ReadonlyArray<Vec2>>,
@@ -324,8 +335,18 @@ function leadForPass(
   const { leadIn, leadOut } = result.lead;
   if (!fitsBed(leadIn, ctx.bed) || !fitsBed(leadOut, ctx.bed)) return pass;
   if (!leadClearsPart(leadIn, leadOut, ctx.side, polygon)) return pass;
-  if (!leadClearsSiblings(leadIn, leadOut, ctx.siblings)) return pass;
+  if (!leadClearsSiblings(leadIn, leadOut, ctx.siblings)) return leadBlockedPass(pass);
+  if (ctx.kept !== undefined && !leadClearsKeptWalls(leadIn, leadOut, ctx.kept)) {
+    return leadBlockedPass(pass);
+  }
   return ledPath3d(pass, leadIn, leadOut);
+}
+
+// The legacy plunge, marked: no lead fits without cutting a kept part, so the
+// entry lands on the wall ADR-250 moves it off. Motion is unchanged; the
+// marker lets Job Review say so (ADR-250 Amendment 3).
+function leadBlockedPass(pass: CncContourPass | CncPath3dPass): CncPass {
+  return { ...pass, leadBlocked: true };
 }
 
 // Both sampled vertices and the emitted segments between them must stay on
@@ -363,56 +384,6 @@ function leadClearsSiblings(
       (polygon) =>
         segmentsStayOnSide(leadIn, polygon, false) && segmentsStayOnSide(leadOut, polygon, false),
     )
-  );
-}
-
-// Polygon membership can change only at a boundary intersection. Split each
-// emitted line/chord there and inspect every intervening open interval, rather
-// than adding a sampling spacing that could still miss a thin kept feature.
-function segmentsStayOnSide(
-  points: ReadonlyArray<Vec2>,
-  polygon: ReadonlyArray<Vec2>,
-  inside: boolean,
-): boolean {
-  for (let i = 1; i < points.length; i += 1) {
-    const start = points[i - 1] as Vec2;
-    const end = points[i] as Vec2;
-    const cuts = segmentBoundaryCuts(start, end, polygon);
-    for (let j = 1; j < cuts.length; j += 1) {
-      const from = cuts[j - 1] as number;
-      const to = cuts[j] as number;
-      if (from === to) continue;
-      const t = (from + to) / 2;
-      const midpoint = {
-        x: start.x + (end.x - start.x) * t,
-        y: start.y + (end.y - start.y) * t,
-      };
-      if (pointInPolygon(midpoint, polygon) !== inside) return false;
-    }
-  }
-  return true;
-}
-
-function segmentBoundaryCuts(a: Vec2, b: Vec2, polygon: ReadonlyArray<Vec2>): number[] {
-  const cuts = [0, 1];
-  const rx = b.x - a.x;
-  const ry = b.y - a.y;
-  for (let i = 0; i < polygon.length; i += 1) {
-    const c = polygon[i] as Vec2;
-    const d = polygon[(i + 1) % polygon.length] as Vec2;
-    const sx = d.x - c.x;
-    const sy = d.y - c.y;
-    const cross = rx * sy - ry * sx;
-    if (cross === 0) continue;
-    const t = ((c.x - a.x) * sy - (c.y - a.y) * sx) / cross;
-    const u = ((c.x - a.x) * ry - (c.y - a.y) * rx) / cross;
-    if (t > BOUNDARY_PARAMETER_EPSILON && t < 1 - BOUNDARY_PARAMETER_EPSILON && u >= 0 && u <= 1) {
-      cuts.push(t);
-    }
-  }
-  cuts.sort((left, right) => left - right);
-  return cuts.filter(
-    (cut, index) => index === 0 || cut - (cuts[index - 1] as number) > BOUNDARY_PARAMETER_EPSILON,
   );
 }
 

@@ -88,3 +88,28 @@ record of where it came from.
 - `JobMaterialControls.test.tsx`: the controls set the material, thickness and switch, and the
   button reports what it did.
 - Not tried on a machine: the recipes are the library's.
+
+### Amendment 1 - A Process switch inside Cut Settings reseeds as the inspector's does (2026-10-22)
+
+Rolling audit 2026-10-21 finding 06-P2-3: §6 ran only when the edit held the mode and nothing else.
+The inspector's Line / Fill / Image switch is such an edit; the Process select in Cut Settings
+sent the whole form, so a cut switched to Fill there kept 90 % / 400 mm/min and its cut preset
+link, and Job Review then named the cut preset on a Fill card.
+
+1. **Eligibility is the operation before the edit.** An edit that switches the mode of an
+   operation still exactly as its linked recipe left it takes the new mode's recipe, whatever
+   else the edit holds (`sceneWithModeSwitchRecipe`). The edit's other fields are explicit and
+   apply on top of the recipe, as if made after the switch. A mode-only edit behaves as before.
+2. **Cut Settings shows the switch before Apply.** On the operation (not on artwork that owns its
+   settings, which no recipe links), changing Process before any other field reloads the dialog
+   with the operation as the switch alone would leave it: the same function the store runs.
+   Apply with nothing else edited sends `{ mode }`, the inspector's own edit, so both give the
+   same settings, link and undo step. Fields edited after the switch apply on top of the recipe.
+3. **Edits made before the switch are kept.** If another field was already edited, the dialog
+   does not reload, so nothing typed is lost; Apply writes the values it shows and, by point 1,
+   links the new mode's preset, marked as edited.
+
+Verification: `CutSettingsDialog.process-reseed.test.tsx` drives the inspector's More cut settings:
+the switch shows and applies 35 % / 3000 mm/min linked to the Fill preset, equal to the inspector
+switch and emitting `S350 F3000`; an edit after the switch stays on top of the recipe in one undo
+step; edits before the switch keep the shown values; switching back restores the stored values.
