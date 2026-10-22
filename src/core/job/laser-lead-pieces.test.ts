@@ -76,6 +76,18 @@ describe('kerf pieces of one contour (ADR-626)', () => {
     expect(exempt).toEqual([[1], [0]]);
   });
 
+  it('tests containment in a ring of many edges through its edge index', () => {
+    const circle = (cx: number, r: number) =>
+      Array.from({ length: 400 }, (_, index) => {
+        const angle = (index / 400) * 2 * Math.PI;
+        return { x: cx + r * Math.cos(angle), y: r * Math.sin(angle) };
+      });
+    const rings = [ring(circle(0, 10)), ring(circle(0, 9.9)), ring(circle(30, 9.9))];
+    const lookup = pieceLookup(rings);
+    expect(lookup.correspond(1, 0)).toBe(true);
+    expect(lookup.correspond(2, 0)).toBe(false);
+  });
+
   it('finds the inside of a piece only one output step wide', () => {
     const sliver = [
       { x: 0, y: 0 },

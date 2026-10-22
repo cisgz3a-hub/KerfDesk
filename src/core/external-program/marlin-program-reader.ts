@@ -114,9 +114,7 @@ function updateMotionPower(line: Line, cutter: Cutter): void {
   cutter.unitPower = power;
 }
 
-function cutterLine(line: Line, cutter: Cutter): MarlinReadLine {
-  const result = projectParameters(line, 'S');
-  if (result.unplaced !== undefined) return result;
+function enableCutter(line: Line, cutter: Cutter): void {
   const { code, warnings } = line;
   if (has(line, 'I')) {
     if (cutter.laser) {
@@ -128,6 +126,20 @@ function cutterLine(line: Line, cutter: Cutter): MarlinReadLine {
       );
   }
   if (!cutter.inline) cutter.enabled = true;
+  else if (!cutter.enabled)
+    // M5 disabled the inline output; this M3/M4 sets power without re-enabling it.
+    // With LASER_POWER_SYNC (off by default) Marlin applies that power at once and
+    // keeps it through the following moves.
+    warnings.push(
+      `${code} without I after M5 leaves Marlin's inline output disabled on a default build, so the preview shows the following moves dark. A build with LASER_POWER_SYNC can fire the laser at this power at once and keep it on through the following moves.`,
+    );
+}
+
+function cutterLine(line: Line, cutter: Cutter): MarlinReadLine {
+  const result = projectParameters(line, 'S');
+  if (result.unplaced !== undefined) return result;
+  const { code, warnings } = line;
+  enableCutter(line, cutter);
   const power = value(line, 'S');
   if (power !== null) cutter.unitPower = power;
   else
