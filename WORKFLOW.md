@@ -6156,6 +6156,12 @@ and lifts the command's CNC-only gate.)*
    An inlay pair never ramps, so its insert keeps its lead even when the
    layer carries a Ramp entry angle left from an earlier cut type, which an
    inlay layer does not show (ADR-250 Amendment 2).
+   A lead never cuts into a part the job keeps: the whole cutter, not just its
+   centre, stays clear of every part on every profile operation and inside the
+   hole a nested part sits in. Where no lead fits, that pass plunges straight
+   down on the cut line as it would with None, and Job Review warns that the
+   plunge can mark that edge. The warning never blocks Frame or Start
+   (ADR-250 Amendment 3).
 
 #### Advisory — invalid or unrepresentable V-carve entry
 1. Ordinary profile/pocket/engrave and relief roughing retain positive requested

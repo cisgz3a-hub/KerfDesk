@@ -243,6 +243,11 @@ export type CncContourPass = {
   // No descending 0.001 mm step fits the requested angle on this path's
   // represented segments. Omission keeps the existing short-path reason.
   readonly entryPlungeReason?: 'coordinate-precision';
+  // Provenance marker: the layer asked for a profile lead (ADR-250), but every
+  // lead would cut into a part the job keeps, so the pass keeps its straight
+  // plunge on the cut line (ADR-250 Amendment 3). Job Review discloses it;
+  // motion is unchanged.
+  readonly leadBlocked?: true;
   // ADR-491: a stay-down link fed the bit here at this depth, so the pass needs
   // no entry of its own (ramp entry leaves it alone).
   readonly stayDownEntry?: true;
@@ -276,6 +281,8 @@ export type CncPath3dPass = {
   // ramp has no descending step at the coordinate precision.
   readonly entryPlunge?: true;
   readonly entryPlungeReason?: 'coordinate-precision';
+  // A tabbed profile ring that no lead fits beside (see CncContourPass.leadBlocked).
+  readonly leadBlocked?: true;
   // ADR-491: a short level move between two pocket passes, fed at the plunge
   // feed in place of a lift and re-plunge. Provenance only.
   readonly stayDownLink?: true;
