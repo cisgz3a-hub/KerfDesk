@@ -142,7 +142,7 @@ async function zeroZHere(
     get().workZReferenceEpoch,
     selectedCncToolId(useStore.getState().project),
   );
-  await assertOriginActionReady(set, get, refs, safeWrite);
+  await assertOriginActionReady(set, get, refs, safeWrite, 'z');
   const machineBeforeG92 = hostRecordedMachinePosition(get());
   await runOriginTransaction(
     set,

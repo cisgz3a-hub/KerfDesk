@@ -5985,6 +5985,14 @@ and lifts the command's CNC-only gate.)*
    removal confirmation, clamping, and actual spindle-at-speed remain
    operator/machine responsibilities.
 
+#### Error — X/Y origin change during the hold
+1. The hold re-zeroes Z only. The rest of the job runs on the X/Y origin it
+   started with, so the XYZ corner probe, Set origin, Reset origin, the saved-origin
+   writes and the phone remote's X/Y `set_work_origin` are refused for the whole
+   hold, before anything is written. The Probe panel offers only "Z only" there
+   and keeps the remembered XYZ mode for after the job. Zero Z and the Z probe stay
+   available (ADR-375 Amendment 2). To change X/Y, stop the job first.
+
 #### Empty
 1. Single-bit jobs never pause.
 
@@ -9091,6 +9099,13 @@ desktop artifact stays **CLAIMED** under `PROJECT.md` Desktop Preview acceptance
 2. A corner request may mutate XY and therefore invalidates XY-origin, WCO, and
    both compatibility Frame evidence and any exact candidate/permit at
    reservation time.
+3. Both cycles start with `G54`, the system the prepared program runs in. Once the
+   controller acknowledges it, KerfDesk records G54 as the active WCS, so the next
+   Frame keeps the probe's Work-Z instead of selecting G54 again. When the
+   controller was known to be in another system (G55-G59), its WCO and Frame
+   evidence are void, as after Frame's own G54 selection. Zero Z, Set origin and
+   the other GRBL-family origin writes, which put `G54` in their block, do the
+   same (ADR-375 Amendment 2).
 
 This software qualification does not prove physical plate geometry, probe
 wiring, spindle coast-down, or real-machine reset behavior. First hardware

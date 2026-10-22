@@ -1,3 +1,4 @@
+import { acknowledgedWcsPatch } from './acknowledged-wcs';
 import { type LaserControllerOperation } from './laser-controller-operation';
 import {
   ControllerCommandRefusedError,
@@ -65,6 +66,8 @@ export async function runOriginTransaction(
         source: 'origin',
       });
       assertCurrent();
+      // GRBL-family origin blocks select G54; the store follows the controller.
+      set((state) => (ownsTransaction(state) ? acknowledgedWcsPatch(state, line, label) : {}));
     });
     // successPatch may await a fresh controller frame — Set Origin waits for the
     // post-G92 work-offset report so it never records a location-unknown origin.

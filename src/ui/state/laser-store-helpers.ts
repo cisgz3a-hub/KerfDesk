@@ -51,6 +51,8 @@ export const TOOL_CHANGE_ACK_OWED_MESSAGE =
   'The controller has not yet answered your last command. Continue once it has, so its answer is not counted as a job line.';
 export const TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE =
   'Load the new bit, select it as the Active bit, and establish its Z zero on the stock top before continuing.';
+export const TOOL_CHANGE_XY_ORIGIN_MESSAGE =
+  'A tool change re-zeroes Z only. The rest of the job is placed on the X/Y origin it started with, so the XYZ corner probe and Set or Reset origin wait until the job ends. Use the Z probe or Zero Z for the new bit.';
 
 export function serialWriteErrorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -96,6 +98,14 @@ export function setupBlockingJobCommandBlockMessage(state: LaserState): string |
   if (!isActiveJob(state.streamer)) return null;
   if (state.streamer?.status !== 'tool-change') return ACTIVE_JOB_COMMAND_MESSAGE;
   return toolChangeReady(state) ? null : TOOL_CHANGE_NOT_IDLE_MESSAGE;
+}
+
+// The setup gate opens in a drained hold so the new bit can be touched off,
+// which re-zeroes Z only. The rest of the job runs on the X/Y origin it started
+// with, and Continue cannot see an X/Y change, so every X/Y origin writer is
+// refused for the whole hold (controller audit v2 C2-P1-1, ADR-375 Amendment 2).
+export function toolChangeXyOriginBlockMessage(state: Pick<LaserState, 'streamer'>): string | null {
+  return state.streamer?.status === 'tool-change' ? TOOL_CHANGE_XY_ORIGIN_MESSAGE : null;
 }
 
 // Ready to touch off the new bit only when the pre-M0 retract/park has fully
@@ -264,7 +274,8 @@ export function assertAutofocusIdle(state: LaserState): void {
 
 // Guards the origin actions (Zero-Z, Set Origin). Uses the setup-motion gate,
 // so re-zeroing the new bit is permitted during a settled (Idle) tool-change
-// hold but blocked during any other active job.
+// hold but blocked during any other active job. The origin readiness check
+// also refuses an X/Y origin action in that hold (toolChangeXyOriginBlockMessage).
 export function assertNoActiveJob(state: LaserState): void {
   const message = setupBlockingJobCommandBlockMessage(state);
   if (message !== null) throw new Error(message);
