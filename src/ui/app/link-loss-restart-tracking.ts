@@ -6,25 +6,71 @@
 // reconnect, or when its record was already saved as the connection began
 // (after an app restart). A reboot later in the same connection does not
 // count: by then the controller had answered as one that kept running.
+//
+// A banner proves a restart only where it cannot be a greeting (ADR-398
+// Amendment 4). grblHAL greets every new network client and, on native USB,
+// every port open, without resetting; and a board on Wi-Fi or Ethernet that
+// did restart printed its boot banner before its network came up. There the
+// first status decides: a running or held machine kept running, an Alarm
+// stopped it, and anything else leaves the restart unknown.
 
-import { awaitsLinkLossVerdict, type LinkLossRestartEvidence } from '../../core/recovery';
+import { awaitsLinkLossVerdict } from '../../core/recovery';
+import type {
+  LinkLossLink,
+  LinkLossRestartEvidence,
+  LinkLossRestartSign,
+} from '../../core/recovery/link-loss-restart';
+import type { GrblState } from '../../core/controllers/grbl';
+import { controllerLink } from '../state/laser-safety-notice';
 import { useLaserStore, type LaserState } from '../state/laser-store';
 import { recoveryRepository, type RecoveryRepository } from '../state/recovery';
 
 type ReconnectFacts = Pick<
   LaserState,
-  'connection' | 'detectedControllerKind' | 'alarmCode' | 'statusReport'
+  | 'connection'
+  | 'serialPortInfo'
+  | 'activeControllerKind'
+  | 'detectedControllerKind'
+  | 'alarmCode'
+  | 'statusReport'
 >;
+
+// A controller that had restarted would be idle or alarmed: it has no job to
+// run or hold. A door or a jog can follow a restart too.
+const KEPT_RUNNING_STATES: ReadonlySet<GrblState> = new Set(['Run', 'Hold']);
 
 /** What a connection has shown so far; null until the controller has spoken.
  * Connecting clears the banner's controller kind, the alarm and the status,
  * so each belongs to this connection, and only a startup banner sets the kind
- * (an owned M115 reply is consumed before it can). */
+ * (an owned M115 reply is consumed before it can). The port info is set with
+ * the connected state, so the link is known from the first answer. */
 export function linkLossRestartEvidence(state: ReconnectFacts): LinkLossRestartEvidence | null {
   if (state.connection.kind !== 'connected') return null;
-  if (state.detectedControllerKind !== null) return 'boot-banner';
+  const link = controllerLink(state);
+  const sign = reconnectSign(state, link);
+  return sign === null ? null : { sign, link };
+}
+
+function reconnectSign(state: ReconnectFacts, link: LinkLossLink): LinkLossRestartSign | null {
+  const banner = state.detectedControllerKind !== null;
+  if (banner && !bannerMayGreet(state, link)) return 'boot-banner';
   if (state.alarmCode !== null || state.statusReport?.state === 'Alarm') return 'alarm';
-  return state.statusReport === null ? null : 'kept-running';
+  if (state.statusReport === null) return null;
+  if (KEPT_RUNNING_STATES.has(state.statusReport.state)) return 'kept-running';
+  // A USB board that greets without resetting, or any network board, cannot
+  // show a restart this way; a quiet USB board did not reset at the open.
+  return banner || link === 'network' ? 'unknown' : 'kept-running';
+}
+
+/** Whether this connection's banner may be a greeting from a board that kept
+ * running: grblHAL's on every link (a build reporting itself as "Grbl 1.1f"
+ * runs a grblHAL profile), any banner over the network. */
+function bannerMayGreet(state: ReconnectFacts, link: LinkLossLink): boolean {
+  return (
+    link === 'network' ||
+    state.detectedControllerKind === 'grblhal' ||
+    state.activeControllerKind === 'grblhal'
+  );
 }
 
 /** `undefined` until the repository has loaded the record saved before the

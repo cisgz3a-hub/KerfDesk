@@ -298,4 +298,21 @@ describe('buildPortClosePatch safety notice', () => {
     const patch = buildPortClosePatch(idle({ safetyNotice: earlier }));
     expect(patch).not.toHaveProperty('safetyNotice');
   });
+
+  it('names a Wi-Fi or Ethernet link, which has no USB cable (D7-P3-3)', () => {
+    const tcp = { serialPortInfo: { transport: 'tcp' } } as const;
+    const job = buildPortClosePatch(idle({ ...tcp, streamer: streamingState() })).safetyNotice;
+    expect(job).toEqual(disconnectDuringJobNotice('network'));
+    expect(job?.message).toMatch(/^Network connection was lost during an active job/);
+    expect(job?.message).toContain('Reconnect from the network connection form');
+    const motion = buildPortClosePatch(
+      idle({ ...tcp, motionOperation: startMotionOperation('jog') }),
+    );
+    expect(motion.safetyNotice?.message).toMatch(/^Network connection was lost while/);
+    const fire = buildPortClosePatch(idle({ ...tcp, fireActive: true })).safetyNotice;
+    expect(fire?.message).toMatch(/^Network connection was lost while the momentary Fire/);
+    for (const notice of [job, motion.safetyNotice, fire]) {
+      expect(notice?.message).not.toContain('USB');
+    }
+  });
 });

@@ -157,7 +157,9 @@ describe('settleLinkLossRestartMutation (ADR-398 Amendment 3)', () => {
   const expected = { runId: RUN_ID, revision: 2 };
 
   it('gives the saved run the planner step-back when the controller restarted', () => {
-    const result = settleLinkLossRestartMutation(expected, 'boot-banner')(waiting());
+    const result = settleLinkLossRestartMutation(expected, { sign: 'boot-banner', link: 'usb' })(
+      waiting(),
+    );
     expect(result.value).toBe(true);
     const capsule = result.slots.recoveryCapsule;
     expect(capsule?.revision).toBe(3);
@@ -167,7 +169,9 @@ describe('settleLinkLossRestartMutation (ADR-398 Amendment 3)', () => {
   });
 
   it('drops the held-back backlog when the controller kept running', () => {
-    const result = settleLinkLossRestartMutation(expected, 'kept-running')(waiting());
+    const result = settleLinkLossRestartMutation(expected, { sign: 'kept-running', link: 'usb' })(
+      waiting(),
+    );
     expect(result.slots.recoveryCapsule?.interruption).toEqual({
       kind: 'disconnect',
       message: 'Cable removed.',
@@ -182,7 +186,9 @@ describe('settleLinkLossRestartMutation (ADR-398 Amendment 3)', () => {
       [waiting(true), expected],
       [INTERRUPTED_SLOTS, expected],
     ] as const) {
-      expect(settleLinkLossRestartMutation(args, 'boot-banner')(slots)).toEqual({
+      expect(
+        settleLinkLossRestartMutation(args, { sign: 'boot-banner', link: 'usb' })(slots),
+      ).toEqual({
         slots,
         value: false,
       });
