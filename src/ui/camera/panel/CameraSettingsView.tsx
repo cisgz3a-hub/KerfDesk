@@ -78,6 +78,7 @@ function CameraHelpersControls(): JSX.Element {
       <label style={checkStyle}>
         <input
           type="checkbox"
+          title="Start the camera used last when this panel opens, and once calibrated with KerfDesk and when the laser connects."
           checked={settings.autoStart}
           onChange={(event) => setSettings({ autoStart: event.currentTarget.checked })}
         />
@@ -92,6 +93,7 @@ function CameraHelpersControls(): JSX.Element {
       <label style={checkStyle}>
         <input
           type="checkbox"
+          title="Take a held camera picture again when a job finishes."
           checked={settings.refreshAfterJob}
           onChange={(event) => setSettings({ refreshAfterJob: event.currentTarget.checked })}
         />
