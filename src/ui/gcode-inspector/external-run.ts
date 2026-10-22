@@ -23,6 +23,7 @@ import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { captureLaserModeStartSnapshot } from '../state/laser-mode-start-evidence';
 import { useLaserStore, type LaserState } from '../state/laser-store';
 import { jogFrameCommandBlockMessage } from '../state/laser-store-helpers';
+import { externalLaserModeStartPrompt } from './external-run-readiness';
 
 export type ExternalRun = {
   readonly controllerKind?: ControllerKind;
@@ -215,11 +216,14 @@ export async function startExternalProgram(frame: ExternalFrame): Promise<boolea
   const project = useStore.getState().project;
   const laser = useLaserStore.getState();
   const { gcode } = frame.run;
+  // The Run review lists the controller's $30/$32 findings (ADR-630
+  // Amendment 4); this acknowledgement cites them and names lit rapids.
   const laserModeStartEvidence = confirmLaserModeStartEvidence(
     project,
     captureLaserModeStartSnapshot(laser),
     jobAwareConfirm,
     gcode,
+    externalLaserModeStartPrompt(project, laser, gcode),
   );
   if (laserModeStartEvidence === null) return false;
   const cncSetupAttestation = confirmCncSetup(
