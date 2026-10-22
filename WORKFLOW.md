@@ -2921,9 +2921,12 @@ authorization, Frame proof, controller command, or safety boundary.
   automatic line is the rejected line itself, so that burn is not skipped; the picker says
   that lines the controller ran after it before stopping may burn again (ADR-341 Amendment 3).
   An `ALARM:N` is not counted as acknowledging a line. After a stop that discards the
-  controller's planner (Abort, the auto-abort after a rejected line, a reboot), the automatic
-  line also steps back over the moves the last status report showed still waiting in the
-  planner (up to 512 on grblHAL), and the picker says those may burn again (ADR-362).
+  controller's planner (Abort, the auto-abort after a rejected line, a reboot, an alarm), the
+  automatic line also steps back over the moves the last status report showed still waiting in
+  the planner (up to 512 on grblHAL), and the picker says those may burn again (ADR-362). An
+  alarm that arrives after the last line was acknowledged, while the controller is still
+  running its planner (a Smoothieware kill button or hard limit), ends the job the same way
+  and steps back the same way (ADR-341 Amendment 10).
 - Resume, saved or manual, re-arms the beam with the power commands of the controller the job
   was written for (ADR-364).
   - A Smoothieware job resumes with `fire off` and restores its own `M221` scale and
@@ -2987,7 +2990,11 @@ authorization, Frame proof, controller command, or safety boundary.
   re-anchored where the head stopped; the dialog and confirmation name that placement. With no
   such run, the confirmation says the restart is anchored at the head as it is now (ADR-362).
   While an interrupted laser job is saved, the line field starts at its automatic restart line
-  (a file line, like the field) and says where the job stopped in sent lines.
+  (a file line, like the field) and says where the job stopped in sent lines. When that job
+  was itself a resumed recovery or a painted second pass, its lines count its own program, not
+  the project's full program this control replays, so the field is not filled in and the hint
+  points to the card's Review. The dialog and confirmation say which program the line counts
+  (ADR-341 Amendment 10).
   Costly image/fill preparation runs in the background for both manual and fingerprint-based
   recovery; worker failure is retryable and never falls back to blocking the canvas.
 - Recovery preserves the saved scope and resolved placement. It uses its separate source,
@@ -7755,6 +7762,8 @@ as the pane's design record.
 4. Abort uses the controller's Ctrl-X halt path; a halted controller answers `!!` to normal
    lines (`error:Alarm lock` in grbl mode). Its `ALARM:` lines (hard limit, kill button, Abort
    in grbl mode) stop a running job and are logged; they never name a job line as rejected.
+   One that arrives after the last line was answered, while queued moves still run, stops the
+   job too and is saved as a stop that discarded the planner (ADR-341 Amendment 10).
    Unlock sends `M999`. A Frame that ended before its own `M121` gets one `M121` once the board
    is unhalted and Idle, so job travel keeps the configured seek rate. The board halts rather
    than reboots, so the controller checks run again on the first Idle after Unlock. This is not
@@ -9248,7 +9257,9 @@ The G-code Inspector is free in every edition (ADR-627).
    still current and the head is still at the program's start, then streams the program with
    the ordinary streamer and closes the Inspector. The last check, after the controller is
    prepared, repeats the session, origin, position and machine-mode checks. The Live Motion
-   bar's Pause, Resume and **ABORT JOB** work as for any job.
+   bar's Pause, Resume and **ABORT JOB** work as for any job. Once the program may have reached
+   the controller, the project's interrupted-job card, **Run again** and second-pass offer are
+   retired: the file is now the last thing the machine ran (ADR-341 Amendment 10).
 6. One Frame allows one run. Running the file again needs another Frame.
 
 #### Warnings (never refuse)

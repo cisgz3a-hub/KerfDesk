@@ -57,7 +57,7 @@ In CNC mode the existing workholding and exclusive-access attestation applies; i
 ### Not in this decision
 
 - Running the same file again needs another Frame (one Frame, one run). Reusing the Frame across runs, as ADR-565 does for the project, can follow once the external run keeps ADR-565's evidence.
-- Interrupted-job resume, the second pass and job history are project features; an interrupted external run reports where it stopped and offers no resume.
+- Interrupted-job resume, the second pass and job history are project features; an interrupted external run reports where it stopped and offers no resume. Once its program may have reached the controller, an external run retires the project's recovery card, Run again receipt and second-pass offer, because the project's last job is no longer the last thing the machine ran (ADR-341 Amendment 10).
 - The file is never edited, imported into the drawing or saved into the project.
 
 ## Consequences
