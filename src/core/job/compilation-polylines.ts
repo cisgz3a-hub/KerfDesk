@@ -9,6 +9,7 @@ import {
   type Transform,
 } from '../scene';
 import { flattenColoredPathCurvesForTransform } from '../scene/curve-path';
+import type { TraceSteps } from '../trace/trace-steps';
 
 // The 100k preparation threshold is routing-only: it moves expensive output
 // work to the worker and must not change the geometry that worker compiles.
@@ -29,4 +30,24 @@ export function compilationPolylines(
     throw new Error('Canonical curve flattening exceeded the JavaScript safe-integer budget.');
   }
   return flattened.polylines;
+}
+
+/** compilationPolylines with a checkpoint before each canonical curve, for a
+ * trace dense enough that flattening it at once would hold the UI thread.
+ * Each curve flattens on its own, exactly as it does inside the whole path:
+ * the safe-integer budget is never reached, so it cannot change a flattening. */
+export function* compilationPolylinesSteps(
+  path: ColoredPath,
+  transform: Transform,
+  toleranceMm: number = DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
+): TraceSteps<ReadonlyArray<Polyline>> {
+  const cooperate = yield;
+  if (path.curves === undefined) return compilationPolylines(path, transform, toleranceMm);
+  const polylines: Polyline[] = [];
+  for (const curve of path.curves) {
+    if (cooperate) yield;
+    // One curve flattens to one polyline.
+    polylines.push(...compilationPolylines({ ...path, curves: [curve] }, transform, toleranceMm));
+  }
+  return polylines;
 }
