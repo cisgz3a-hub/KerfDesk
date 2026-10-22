@@ -25,11 +25,7 @@ import { reportDependencyRepairs } from './object-delete-actions';
 import { refuseSceneLimitOverrun } from './scene-copy-room';
 import { validateDesignStudioDocument } from '../../io/project/project-design-studio-validator';
 import { useToastStore } from './toast-store';
-import {
-  EMBEDDED_FONT_LIMIT_REASON,
-  MAX_EMBEDDED_FONTS,
-  withReferencedEmbeddedFonts,
-} from '../../core/text/embedded-font-set';
+import { withReferencedEmbeddedFonts } from '../../core/text/embedded-font-set';
 import { saveUndoStepName } from './undo-step-names';
 import { prepareProjectInsertion, reportProjectInsertionFailure } from './project-insertion-budget';
 import type { DesignApplyRecord } from './design-apply-record';
@@ -308,10 +304,8 @@ function applyTextAndEmbeddedFont(
   const project = withReferencedEmbeddedFonts(
     embeddedFonts === undefined ? next.project : { ...next.project, embeddedFonts },
   );
-  if ((project.embeddedFonts ?? []).length > MAX_EMBEDDED_FONTS) {
-    useToastStore.getState().pushToast(EMBEDDED_FONT_LIMIT_REASON, 'warning');
-    return state;
-  }
+  // The shared insertion guard refuses an over-budget project by throwing.
+  // Text editors catch that refusal and retain the draft for correction.
   return { ...next, project };
 }
 

@@ -128,15 +128,24 @@ export function projectActions(
       set({ projectOpenRequestEpoch: nextEpoch });
       return nextEpoch;
     },
-    claimProjectSaveRequest: () => {
-      const nextEpoch = get().projectSaveRequestEpoch + 1;
-      set({ projectSaveRequestEpoch: nextEpoch });
-      return nextEpoch;
-    },
+    claimProjectSaveRequest: () => claimProjectSaveRequest(set, get),
     acceptOpenedProjectMachine: () => set({ projectBedReconciliation: null }),
     keepCurrentMachineForOpenedProject: () =>
       set((state) => keepCurrentMachinePatch(state, state.projectBedReconciliation)),
   };
+}
+
+function claimProjectSaveRequest(set: ProjectActionSet, get: ProjectActionGet): number {
+  // Save commits the visible numbering order as one undo step. Retire its
+  // rollback before any picker/write awaits, so Cancel cannot later restore
+  // different content while retaining this save's clean status and target.
+  if (useUiStore.getState().artworkNumbering.kind === 'active') {
+    get().endInteraction();
+    useUiStore.getState().finishArtworkNumbering();
+  }
+  const nextEpoch = get().projectSaveRequestEpoch + 1;
+  set({ projectSaveRequestEpoch: nextEpoch });
+  return nextEpoch;
 }
 
 function keepCurrentMachinePatch(

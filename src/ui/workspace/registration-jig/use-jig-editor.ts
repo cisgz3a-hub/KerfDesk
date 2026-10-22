@@ -208,6 +208,10 @@ function refusalMessage(reason: JigCommitRefusal): string {
       return `An operation setting you changed here was also changed in the main project, or artwork here uses an operation the main project removed. ${REOPEN} to start from the current operations.`;
     case 'project':
       return `A project setting changed in the main project overlaps this editor's changes. ${REOPEN} to start from the current project.`;
+    case 'scene-limits':
+      return 'Combining this draft with the main project would exceed a project size limit. Your draft is still open. Remove some artwork or unused operations before saving again.';
+    case 'scene-integrity':
+      return `Combining this draft with the main project would create conflicting operation colours or artwork references. Your draft is still open. ${REOPEN} to start from the current project.`;
   }
 }
 
