@@ -89,10 +89,12 @@ import {
   activeJobCommandBlockMessage,
   assertAutofocusIdle,
   initialLaserState,
+  isActiveJob,
   mpgCommandBlockMessage,
   motionOperationCommandBlockMessage,
   pushLog,
 } from './laser-store-helpers';
+import { registerActiveJobProbe } from './job-machine-lock';
 import type { StallProbe } from './laser-stream-stall';
 import type { ControllerIncidentState } from './laser-incident-history';
 import type { ControllerFirmwareReport } from '../../core/controllers/controller-firmware-report';
@@ -578,3 +580,6 @@ export const useLaserStore = create<LaserState>((set, get) => {
 });
 
 bindControllerQualificationScheduler(useLaserStore, refs);
+// The project store refuses machine changes while a job holds the machine
+// (ADR-416 Amendment 2); it cannot import this store, so it asks through this.
+registerActiveJobProbe(() => isActiveJob(useLaserStore.getState().streamer));

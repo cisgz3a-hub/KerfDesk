@@ -34,6 +34,7 @@ import {
 } from './project-bed-reconciliation';
 import { useToastStore } from './toast-store';
 import { projectSheetActions, type ProjectSheetActions } from './project-sheet-actions';
+import { JOB_MACHINE_OPEN_REFUSED, refuseJobMachineChange } from './job-machine-lock';
 
 type ProjectActionSet = (
   fn: AppState | Partial<AppState> | ((state: AppState) => AppState | Partial<AppState>),
@@ -88,6 +89,9 @@ export function projectActions(
       const resolution = resolveProjectMachineCapability(project, current.cncLibrary.customTools);
       const bedResolution = canonicalizeOpenedProjectBed(resolution.project, current.project);
       const autofocus = withCurrentMachineAutofocus(bedResolution.project, current.project);
+      // A file on another machine waits for a running job (ADR-416 Amendment 2).
+      if (refuseJobMachineChange(current.project, autofocus.project, JOB_MACHINE_OPEN_REFUSED))
+        return { kind: 'job-machine-locked' };
       useUiStore.getState().resetArtworkRunOrder();
       set((state) => ({
         ...initialState(autofocus.project),

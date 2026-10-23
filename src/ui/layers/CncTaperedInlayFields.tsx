@@ -39,7 +39,7 @@ const INLAY_ROWS: ReadonlyArray<{ key: LengthKey; label: string; min: number; ti
     label: 'Radial fit gap',
     min: 0,
     title:
-      'Independent per-side radial gap on reachable taper walls. This is not the axial glue gap.',
+      'Per-side gap between the plug and pocket walls at nominal engagement. The taper closes it as the plug sinks this gap divided by tan(half the V-bit angle) deeper, into the glue gap.',
   },
   {
     key: 'pocketStartDepthMm',
@@ -102,8 +102,9 @@ export function CncTaperedInlayFields(props: {
       ))}
       <p className="lf-cnc-settings-hint">
         Pocket program floor: Z−{format(intent.pocketStartDepthMm + intent.pocketDepthMm)} mm. Plug
-        program floor: Z−{format(intent.plugStartDepthMm + taperedInlayPlugDepth(intent))} mm.
-        Narrow details can remain shallower; Job Review reports lost engagement geometry.
+        program floor: Z−{format(intent.plugStartDepthMm + taperedInlayPlugDepth(intent))} mm. The
+        plug is V-carved from a start depth, so its walls follow the pocket walls on every detail,
+        including narrow ones that stay shallower than the pocket depth.
       </p>
       <p className="lf-cnc-settings-hint">
         This operation intentionally retains the pair linkage. Review both generated pieces after a

@@ -3,7 +3,8 @@ import type { Project } from '../scene/project';
 import type { Scene } from '../scene/scene';
 import type { CncStock } from '../scene/machine';
 import type { CncTwoSidedSetup } from '../scene/cnc-two-sided-setup';
-import type { SceneObject, Vec2 } from '../scene/scene-object';
+import type { MeshReliefObject, SceneObject, Vec2 } from '../scene/scene-object';
+import { reliefSideForStock } from '../relief/relief-two-sided-stock';
 
 /** Independently defined physical flip in work coordinates; Z remains side-local stock-top. */
 export function cncSideBPoint(point: Vec2, stock: CncStock, side: CncTwoSidedSetup): Vec2 {
@@ -14,11 +15,41 @@ export function cncSideBPoint(point: Vec2, stock: CncStock, side: CncTwoSidedSet
     y: side.sideBStockOriginMm.y + (side.flipAxis === 'x' ? stock.heightMm - y : y),
   };
 }
+/** The active side's objects, with each two-sided split side planned for the current stock. */
 export function cncSideInputScene(project: Project, scene: Scene): Scene {
-  const side = project.machine?.kind === 'cnc' ? project.cncSetup?.twoSided : undefined;
-  if (side === undefined) return scene;
+  const machine = project.machine;
+  if (machine?.kind !== 'cnc') return scene;
+  const fitted = reliefSidesForStock(scene, machine.stock.thicknessMm);
+  const side = project.cncSetup?.twoSided;
+  if (side === undefined) return fitted;
   const ids = new Set(side.activeSide === 'A' ? side.sideAObjectIds : side.sideBObjectIds);
-  return { ...scene, objects: scene.objects.filter((object) => ids.has(object.id)) };
+  return { ...fitted, objects: fitted.objects.filter((object) => ids.has(object.id)) };
+}
+
+// ADR-580 Amendment 1: a split's side reliefs follow a stock edit made after
+// the split; a side with no stock left to carve drops out of its program.
+function reliefSidesForStock(scene: Scene, stockThicknessMm: number): Scene {
+  let changed = false;
+  const fit = (objects: ReadonlyArray<SceneObject>): SceneObject[] =>
+    objects.flatMap((object) => {
+      if (object.kind !== 'relief' || object.reliefSource.kind !== 'legacy-mesh') return [object];
+      const side = reliefSideForStock(object as MeshReliefObject, stockThicknessMm);
+      if (side.kind === 'no-stock') {
+        changed = true;
+        return [];
+      }
+      if (side.relief !== object) changed = true;
+      return [side.relief];
+    });
+  const objects = fit(scene.objects);
+  const outputDependencies =
+    scene.outputDependencies === undefined ? undefined : fit(scene.outputDependencies);
+  if (!changed) return scene;
+  return {
+    ...scene,
+    objects,
+    ...(outputDependencies === undefined ? {} : { outputDependencies }),
+  };
 }
 /** Flip retained source placement before CAM, so contour direction, ramps and contact are replanned. */
 export function cncSideOutputProject(project: Project, scene: Scene): Project {
