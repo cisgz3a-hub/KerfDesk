@@ -1,4 +1,5 @@
 import { Fragment, useState } from 'react';
+import { shownControllerSettingValue } from '../../core/controllers/controller-password-settings';
 import type { GrblSettingRow } from '../../core/controllers/grbl';
 import { usePlatform } from '../app/platform-context';
 import { helpProps } from '../help/help-topics';
@@ -214,7 +215,7 @@ function SettingsTable(props: {
                   {group.rows.map(({ row, presentation }) => (
                     <tr key={row.code}>
                       <td style={cellStyle}>{row.code}</td>
-                      <td style={cellStyle}>{row.rawValue}</td>
+                      <td style={cellStyle}>{shownControllerSettingValue(row.id, row.rawValue)}</td>
                       <td style={cellStyle}>{presentation.unit ?? '-'}</td>
                       <td style={cellStyle}>
                         <span style={riskBadgeStyle}>{riskLabel(row.writeRisk)}</span>
@@ -254,7 +255,7 @@ function filterRows(
   return rows.filter(({ row, presentation }) =>
     [
       row.code,
-      row.rawValue,
+      shownControllerSettingValue(row.id, row.rawValue),
       presentation.name,
       presentation.unit ?? '',
       presentation.description,

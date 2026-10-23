@@ -112,6 +112,18 @@ describe('Super console TSV formatting', () => {
     );
   });
 
+  it('removes grblHAL and FluidNC passwords from the copied rows', () => {
+    const copied = formatSuperConsoleTsv([
+      entry({ id: 4, raw: '$75=wifi secret' }),
+      entry({ id: 5, raw: '$Sta/Password=hunter2', decoded: 'Station password' }),
+      entry({ id: 6, raw: '[ESP101]letmein' }),
+      entry({ id: 7, raw: '$30=1000' }),
+    ]);
+    expect(copied).not.toMatch(/wifi secret|hunter2|letmein/);
+    expect(copied).toContain('$75=[password removed]');
+    expect(copied).toContain('$30=1000');
+  });
+
   it('pins the header and escapes control characters so one entry stays one row', () => {
     expect(
       formatSuperConsoleTsv([

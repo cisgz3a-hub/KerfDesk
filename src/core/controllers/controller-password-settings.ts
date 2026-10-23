@@ -23,6 +23,17 @@ export function isGrblhalPasswordSetting(id: number): boolean {
   return GRBLHAL_PASSWORD_SETTING_IDS.includes(id);
 }
 
+export const CONTROLLER_PASSWORD_HIDDEN = '[password hidden]';
+
+/** The value a screen shows for setting `id`: a password stays hidden, in the
+ *  settings table and in a snapshot saved before snapshots dropped them. Only
+ *  an exported backup keeps it, so a restore can write it back. */
+export function shownControllerSettingValue(id: number, rawValue: string): string {
+  return isGrblhalPasswordSetting(id) && rawValue.trim() !== ''
+    ? CONTROLLER_PASSWORD_HIDDEN
+    : rawValue;
+}
+
 // A value already removed is left alone, so a second pass over text whose line
 // breaks were escaped keeps what follows them.
 const NOT_REMOVED = String.raw`(?!\[password removed\])`;
