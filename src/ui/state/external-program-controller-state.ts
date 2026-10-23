@@ -12,7 +12,9 @@
 //   in G55, while the job's own G54 cut at the G54 origin.
 // - `G92 Z`, `G10 L2/L20 Z`, `G43.1`, `M6` or `T` left the probed Work Z
 //   current, so the next CNC Start skipped its Zero Z check. GRBL keeps G92 and
-//   the tool length offset through M30, and G10 writes them to EEPROM.
+//   the tool length offset through M30, and G10 writes them to EEPROM. So do
+//   grblHAL's tool-table `G43`/`G43.2 H` and `M61`, whose offset also outlasts a
+//   soft reset (ADR-630 Amendment 8).
 // The Console drops the same evidence for the same words, and each line is read
 // with its rule (commonConsoleStateEffect). A word that selects the system
 // already active changes nothing, so a CAM header's `G54` keeps both records.

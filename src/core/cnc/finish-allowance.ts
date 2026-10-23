@@ -1,10 +1,11 @@
 import type { CncPass } from '../job';
 import type { CncLayerSettings, Polyline, Vec2 } from '../scene';
 import { passNeedsTabs, tabTopZMm } from './cnc-tabs';
-import { tabFractionsFromReference, tabRampedPoints } from './cnc-tab-ramp';
+import { tabRampedPoints } from './cnc-tab-ramp';
 import { manualTabCentersForToolpaths, type CollectedCncContour } from './cnc-manual-tab-mapping';
 import { roughingReach } from './finish-allowance-coverage';
 import { bucketFinishAllowanceParts } from './finish-allowance-part-buckets';
+import { roughingTabCentersBesideFinishTabs } from './finish-allowance-tabs';
 import type { FrameHandedness } from './machine-frame-handedness';
 import { enforceCutDirection } from './motion-polish';
 import { groupInnerFirstByPart, orderInnerFirst } from './profile-ordering';
@@ -16,10 +17,25 @@ const COORD_EPS = 1e-9;
 
 // Stock-to-leave applies only to side-offset profiles. Other cut types keep
 // their existing toolpaths and do not receive a finishing contour.
-export function profileFinishAllowanceMm(settings: CncLayerSettings): number {
+//
+// ADR-140 Amendment 2: the allowance cut is at most the cutter radius. At one
+// cut width the roughing slot no longer meets the finishing slot, and the ring
+// of stock between them is left standing free. From the radius up the "skin" is
+// half the cutter or more, so the finishing pass steps down (finishingDepths).
+export function profileFinishAllowanceMm(settings: CncLayerSettings, cutWidthMm: number): number {
   const applies = settings.cutType === 'profile-outside' || settings.cutType === 'profile-inside';
   const allowance = settings.finishAllowanceMm ?? 0;
-  return applies && Number.isFinite(allowance) && allowance > 0 ? allowance : 0;
+  if (!applies || !Number.isFinite(allowance) || !(allowance > 0)) return 0;
+  return cutWidthMm > 0 ? Math.min(allowance, cutWidthMm / 2) : allowance;
+}
+
+/** True when the allowance is cut as the cutter radius: half the cutter in stock. */
+export function finishAllowanceReachesRadius(
+  settings: CncLayerSettings,
+  cutWidthMm: number,
+): boolean {
+  const allowance = profileFinishAllowanceMm(settings, cutWidthMm);
+  return allowance > 0 && allowance >= cutWidthMm / 2 - COORD_EPS;
 }
 
 /** Complete roughing and the true-wall finish for one part before the next. */
@@ -30,7 +46,7 @@ export function profilePassesWithFinishAllowance(
   roughingToolpaths: ReadonlyArray<Polyline>,
   handedness: FrameHandedness,
   tabSources: ReadonlyArray<CollectedCncContour>,
-  roughingPassesForPart: (part: ReadonlyArray<Polyline>) => ReadonlyArray<CncPass>,
+  roughingPassesForPart: RoughingPassesForPart,
   finishingSettings?: CncLayerSettings,
 ): ReadonlyArray<CncPass> {
   const sourceParts = groupInnerFirstByPart(polylines);
@@ -45,12 +61,25 @@ export function profilePassesWithFinishAllowance(
   const roughBySource = bucketFinishAllowanceParts(sourceParts, roughParts);
   const finishBySource = bucketFinishAllowanceParts(sourceParts, finishParts);
   const manualTabCenters = manualTabCentersForToolpaths(finishToolpaths, tabSources);
+  // ADR-140 Amendment 2: one tab plan. The finishing rings keep the bridges the
+  // layer has without an allowance, and every roughing ring, a ring merged
+  // around several parts included, rises beside each of them.
+  const roughTabCenters = settings.tabsEnabled
+    ? roughingTabCentersBesideFinishTabs(
+        finishToolpaths,
+        roughingToolpaths,
+        settings.tabsPerShape,
+        manualTabCenters,
+        manualTabCentersForToolpaths(roughingToolpaths, tabSources),
+        toolDiameterMm,
+      )
+    : new Map<Polyline, ReadonlyArray<number>>();
   const passes: CncPass[] = [];
   for (let index = 0; index < sourceParts.length; index += 1) {
     const sourceRough = roughBySource.buckets[index]?.flat() ?? [];
     const sourceFinish = finishBySource.buckets[index]?.flat() ?? [];
     passes.push(
-      ...roughingPassesForPart(sourceRough),
+      ...roughingPassesForPart(sourceRough, roughTabCenters),
       ...finishingPasses(sourceFinish, -settings.depthMm, {
         settings,
         toolDiameterMm,
@@ -67,11 +96,17 @@ export function profilePassesWithFinishAllowance(
     settings,
     toolDiameterMm,
     manualTabCenters,
+    roughTabCenters,
     roughingPassesForPart,
     finishingSettings,
   );
   return passes;
 }
+
+type RoughingPassesForPart = (
+  part: ReadonlyArray<Polyline>,
+  tabCenters: ReadonlyMap<Polyline, ReadonlyArray<number>>,
+) => ReadonlyArray<CncPass>;
 
 // Build the true-wall paths independently, then assign both rough and finish
 // topology back to the source parts. Offset output indices are not provenance:
@@ -108,7 +143,6 @@ function finishingPasses(
       const pass = finishingPass(toolpath, depth, {
         settings: ctx.settings,
         toolDiameterMm: ctx.toolDiameterMm,
-        roughingToolpaths: ctx.roughingToolpaths,
         manualCenters: ctx.manualTabCenters.get(toolpath),
       });
       return pass === null
@@ -121,7 +155,8 @@ function finishingPasses(
 // A Wall finishing recipe sets the finishing depth per pass. Without one the
 // finishing contour is a single full-depth pass beside a roughed wall, and
 // follows the layer's depth ladder where roughing never reached it
-// (ADR-140 Amendment 1).
+// (ADR-140 Amendment 1) or where the allowance is the cutter radius, half the
+// cutter in stock (Amendment 2).
 function finishingDepths(
   toolpaths: ReadonlyArray<Polyline>,
   zMm: number,
@@ -132,11 +167,12 @@ function finishingDepths(
     return () => depths;
   }
   if (toolpaths.length === 0) return () => [zMm];
+  const ladder = zPassDepths(-zMm, ctx.settings.depthPerPassMm);
+  if (finishAllowanceReachesRadius(ctx.settings, ctx.toolDiameterMm)) return () => ladder;
   const reach = roughingReach(
     ctx.roughingToolpaths,
-    ctx.toolDiameterMm / 2 + profileFinishAllowanceMm(ctx.settings),
+    ctx.toolDiameterMm / 2 + profileFinishAllowanceMm(ctx.settings, ctx.toolDiameterMm),
   );
-  const ladder = zPassDepths(-zMm, ctx.settings.depthPerPassMm);
   return (toolpath) => (reach.covers(toolpath) ? [zMm] : ladder);
 }
 
@@ -147,7 +183,8 @@ function appendUnassignedParts(
   settings: CncLayerSettings,
   toolDiameterMm: number,
   manualTabCenters: ReadonlyMap<Polyline, ReadonlyArray<number>>,
-  roughingPassesForPart: (part: ReadonlyArray<Polyline>) => ReadonlyArray<CncPass>,
+  roughTabCenters: ReadonlyMap<Polyline, ReadonlyArray<number>>,
+  roughingPassesForPart: RoughingPassesForPart,
   finishingSettings?: CncLayerSettings,
 ): void {
   const partCount = Math.max(roughParts.length, finishParts.length);
@@ -155,7 +192,7 @@ function appendUnassignedParts(
     const rough = roughParts[index] ?? [];
     const finish = finishParts[index] ?? [];
     passes.push(
-      ...roughingPassesForPart(rough),
+      ...roughingPassesForPart(rough, roughTabCenters),
       ...finishingPasses(finish, -settings.depthMm, {
         settings,
         toolDiameterMm,
@@ -170,25 +207,21 @@ function appendUnassignedParts(
 type FinishingPassContext = {
   readonly settings: CncLayerSettings;
   readonly toolDiameterMm: number;
-  readonly roughingToolpaths: ReadonlyArray<Polyline>;
   readonly manualCenters: ReadonlyArray<number> | undefined;
 };
 
 // ADR-258: a tabbed finishing pass is ONE path3d that rises to the tab top, like
-// the roughing passes. Persisted anchors win; otherwise the centres are projected
-// from the matching roughing toolpath so an offset start vertex or perimeter change
-// cannot move the physical bridges. Anything untabbed stays an ordinary contour.
+// the roughing passes. Its bridges are the layer's own (persisted anchors, else
+// even spacing), where the layer puts them without an allowance; the roughing
+// rings rise beside them (ADR-140 Amendment 2). Anything untabbed stays an
+// ordinary contour.
 function finishingPass(toolpath: Polyline, zMm: number, ctx: FinishingPassContext): CncPass | null {
-  const { settings, toolDiameterMm, roughingToolpaths, manualCenters } = ctx;
+  const { settings, toolDiameterMm, manualCenters } = ctx;
   const needsTabs =
     settings.tabsEnabled &&
     toolpath.closed &&
     passNeedsTabs(zMm, settings.depthMm, settings.tabHeightMm);
   if (needsTabs) {
-    const centres =
-      manualCenters ??
-      tabFractionsFromReference(toolpath, roughingToolpaths, settings.tabsPerShape) ??
-      undefined;
     const points = tabRampedPoints(
       toolpath,
       zMm,
@@ -198,7 +231,7 @@ function finishingPass(toolpath: Polyline, zMm: number, ctx: FinishingPassContex
         tabsPerShape: settings.tabsPerShape,
         toolDiameterMm,
       },
-      centres,
+      manualCenters,
     );
     if (points !== null && points.length >= 2) {
       return { kind: 'path3d', points, closed: false };
