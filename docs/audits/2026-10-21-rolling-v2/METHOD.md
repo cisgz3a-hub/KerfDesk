@@ -73,6 +73,19 @@ Every finding records:
 A READ-only finding cannot be P1 unless the refuter reproduces it. Severity is set by the
 failure scenario, not by how alarming the code looks.
 
+**Citation rule (2026-10-23, meta audit v1 M5).** Every SOURCE link must be pinned so it can be re-checked later. Use one of:
+- a commit SHA (`blob/<sha>/path#Lx-Ly`);
+- a versioned docs path;
+- a live URL plus an archive link and the fetch date.
+
+Quoted text must be copied verbatim from that source.
+
+ADR quotes must come from `DECISIONS.md` or `docs/decisions` at the audited SHA, and must name the ADR, the amendment and the item. A code comment or README that mentions an ADR is cited as its own `file:line`, never as ADR text.
+
+A refuter that cannot fetch a source marks that anchor UNVERIFIED rather than confirming it.
+
+Why: M5 re-checked 123 citations and found that the firmware, LightBurn and vendor sources were accurate. The faults were all in KerfDesk's own ADR quotes, most of them code comments quoted as ADR text. Several citations also used unpinned "master" or "latest" refs or gave no URL.
+
 ## 5. Verification (the refuter)
 
 Every candidate finding goes to a refuter that did not raise it and starts from a fresh
