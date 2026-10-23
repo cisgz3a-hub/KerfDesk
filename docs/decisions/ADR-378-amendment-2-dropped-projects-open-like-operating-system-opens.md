@@ -1,4 +1,4 @@
-## ADR-378 Amendment 1 - A project dropped on the window opens like a double-click (2026-09-29)
+## ADR-378 Amendment 2 - A project dropped on the window opens like a double-click (2026-09-29)
 
 **Status:** Accepted. | **Date:** 2026-09-29
 
