@@ -83,8 +83,17 @@ export async function setOriginAtMachinePoint(
   refs: LiveRefs,
   safeWrite: OriginSafeWrite,
   pointMm: SavedXyOffsetMm,
+  assertTargetCurrent?: () => void,
 ): Promise<void> {
-  await writeXyOffset(set, get, refs, safeWrite, BOARD_ORIGIN_WRITE, () => pointMm);
+  await writeXyOffset(
+    set,
+    get,
+    refs,
+    safeWrite,
+    BOARD_ORIGIN_WRITE,
+    () => pointMm,
+    assertTargetCurrent,
+  );
 }
 
 /**
@@ -150,8 +159,11 @@ async function writeXyOffset(
   safeWrite: OriginSafeWrite,
   action: XyOffsetWrite,
   targetFor: (machineMm: SavedXyOffsetMm) => SavedXyOffsetMm,
+  assertTargetCurrent?: () => void,
 ): Promise<{ readonly offsetMm: SavedXyOffsetMm; readonly confirmed: boolean }> {
+  assertTargetCurrent?.();
   await assertOriginActionReady(set, get, refs, safeWrite);
+  assertTargetCurrent?.();
   const before = get();
   const reportInches = before.controllerSettings?.reportInches === true;
   const machineMm = inferCurrentMachinePosition(before.statusReport, before.wcoCache, reportInches);
@@ -172,7 +184,9 @@ async function writeXyOffset(
       safeWrite,
       action.label,
       async (write) => {
+        assertTargetCurrent?.();
         if (!grblFamily) await write('G21\n');
+        assertTargetCurrent?.();
         if (usesReportedOffset) confirmation.observe();
         await write(`${line}\n`);
       },
@@ -182,7 +196,11 @@ async function writeXyOffset(
         if (usesReportedOffset) confirmed = await confirmation.wait(assertCurrent);
         return restoredOriginPatch(get(), savedMm, usesReportedOffset);
       },
-      { changesXyOrigin: true, reestablishesPositionEvidence: true },
+      {
+        changesXyOrigin: true,
+        reestablishesPositionEvidence: true,
+        ...(assertTargetCurrent === undefined ? {} : { assertBeforeWrite: assertTargetCurrent }),
+      },
     );
   } finally {
     confirmation.cancel();

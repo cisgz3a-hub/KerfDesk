@@ -6,7 +6,7 @@
 supersedes the known-100% Fire reset omission below. Pending flags are processed at an owned
 acknowledged boundary before resetting the spindle override and issuing capped Fire-on.
 
-**grblHAL correction:** [Amendment 3](ADR-375-amendment-3-grblhal-envelope-and-console-values.md)
+**grblHAL correction:** [Amendment 4](ADR-375-amendment-4-grblhal-envelope-and-console-values.md)
 amends decisions 3 and 9 for grblHAL. It corrects decision 9's premise that grblHAL refuses a value
 it would store differently: it keeps only the number at the start of a `$N=` value, and builds
 before 20261015 read `1.0` as 10 for a whole-number setting, all with `ok`. It also reads

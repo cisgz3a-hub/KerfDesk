@@ -146,7 +146,8 @@ export type GcodeMetadata = {
 // ADR-153 Amd 1 gives rest ladders above 50% stepover a core ring.
 // ADR-285 Amd 1 erodes the V-carve flat core with round joins, so its floor
 // passes sweep each inside corner instead of leaving a fin.
-export const EMITTER_REVISION = 'vcarve-floor-inside-corners-20261023-v28';
+// CNC audit v1 F4-P3-2: a drill group's header names the plunge feed it drills at.
+export const EMITTER_REVISION = 'cnc-drill-plunge-feed-20261023-v29';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

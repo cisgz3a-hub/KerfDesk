@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { CHIPLOAD_MATERIALS } from '../../core/cnc';
 import { cncStageRecipe } from '../../core/cnc/cnc-stage-settings';
 import type { CncCuttingStage } from '../../core/scene/cnc-stage-recipe';
@@ -12,11 +12,17 @@ import { CncMaterialOptions } from '../common/CncMaterialOptions';
 import { MANUAL_FEEDS_LABEL } from '../common/cnc-material-vocabulary';
 import { openMachineSetup } from '../laser/device-setup';
 import { useStore } from '../state';
+import { cncOperationMaterialKey } from '../state/cnc-feed-provenance';
 import {
   cncStartupOperationDraft,
   sceneWithCncStartupOperationDrafts,
   type CncStartupOperationDraft,
 } from '../state/cnc-startup-setup';
+import {
+  cncKeptFeedsAfterBitChange,
+  CncKeptFeedsNotice,
+  type CncKeptFeeds,
+} from './CncKeptFeedsNotice';
 import { CncOperationToolSelect } from './CncOperationToolSelect';
 
 type BindingPatch = Partial<Omit<CncStartupOperationDraft, 'layerId'>>;
@@ -26,6 +32,8 @@ type OperationToolProps = {
   readonly layer: Layer;
   readonly settings: CncLayerSettings;
   readonly hasReliefObjects: boolean;
+  /** The material a hand edit or Manual last took off this operation, or null. */
+  readonly editedFromMaterialKey: string | null;
   readonly onCommitSettings: (settings: CncLayerSettings, replaceFeedDrafts: boolean) => void;
 };
 
@@ -37,6 +45,7 @@ export function CncOperationToolFields(props: OperationToolProps): JSX.Element |
   const machine = useStore((state) => state.project.machine);
   const profile = useStore((state) => state.project.device);
   const liveCaps = useStore((state) => state.cncLiveCaps);
+  const [keptFeeds, setKeptFeeds] = useState<CncKeptFeeds | null>(null);
   if (machine?.kind !== 'cnc') return null;
   const operation = operationWithMaterialBinding(props.layer, props.settings);
   const draft = cncStartupOperationDraft(operation);
@@ -50,9 +59,20 @@ export function CncOperationToolFields(props: OperationToolProps): JSX.Element |
       drafts: [{ ...draft, ...patch }],
     });
     const next = scene.layers[0];
-    if (next !== operation && next?.cnc !== undefined) {
-      props.onCommitSettings(next.cnc, 'materialKey' in patch || 'toolId' in patch);
+    if (next === operation || next?.cnc === undefined) return;
+    // A primary bit that keeps hand-edited values says so (CNC audit v1 F4-P2-1).
+    if ('toolId' in patch) {
+      setKeptFeeds(
+        cncKeptFeedsAfterBitChange({
+          machine,
+          layerId: props.layer.id,
+          before: props.settings,
+          after: next.cnc,
+          materialKey: cncOperationMaterialKey(props.settings) ?? props.editedFromMaterialKey,
+        }),
+      );
     }
+    props.onCommitSettings(next.cnc, 'materialKey' in patch || 'toolId' in patch);
   };
   return (
     <section className="lf-cnc-settings-card" aria-label="Bit and material">
@@ -77,6 +97,16 @@ export function CncOperationToolFields(props: OperationToolProps): JSX.Element |
         value={draft.materialKey}
         onChange={(materialKey) => commit({ materialKey })}
       />
+      {keptFeeds === null ? null : (
+        <CncKeptFeedsNotice
+          kept={keptFeeds}
+          layerId={props.layer.id}
+          settings={props.settings}
+          machine={machine}
+          onApply={(settings) => props.onCommitSettings(settings, true)}
+          onDismiss={() => setKeptFeeds(null)}
+        />
+      )}
     </section>
   );
 }
@@ -114,7 +144,7 @@ function CncOperationMaterialField(props: {
         id={id}
         value={props.value ?? ''}
         aria-label={`Material for ${props.layer.color}`}
-        title="Choosing a material applies its starting feed, plunge, spindle speed and depth per pass, and a new bit refreshes them. Manual keeps your numbers."
+        title="Choosing a material applies its starting feed, plunge, spindle speed and depth per pass, and a new bit refreshes them. Editing one of those values sets this to Manual, which keeps your numbers when the bit changes."
         onChange={(event) => {
           const value = event.target.value;
           props.onChange(value === JOB_MATERIAL_VALUE ? (jobMaterial ?? null) : value || null);
@@ -215,9 +245,7 @@ function materialName(key: string): string {
 // Older recipes can carry their material only in provenance. Present and edit
 // that binding consistently without changing the project merely by opening it.
 function operationWithMaterialBinding(layer: Layer, settings: CncLayerSettings): Layer {
-  const materialKey =
-    settings.materialKey ??
-    (settings.feedSource?.kind === 'material-recipe' ? settings.feedSource.materialKey : undefined);
+  const materialKey = cncOperationMaterialKey(settings);
   return {
     ...layer,
     cnc: materialKey === undefined ? settings : { ...settings, materialKey },
