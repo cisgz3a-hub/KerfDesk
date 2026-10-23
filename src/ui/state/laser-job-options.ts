@@ -33,6 +33,9 @@ export type StartJobOptions = CreateStreamerOptions & {
   readonly canvasPlan?: CanvasMotionPlan;
   /** In-memory timing result for the exact G-code passed to startJob. */
   readonly jobTimingPlan?: CanvasJobTimingPlanResult;
+  /** An opened program (ADR-630): the WCS and Work-Z records its own words may
+   *  change are dropped as its stream is installed (Amendment 6). */
+  readonly externalProgram?: boolean;
 };
 
 export function normalizeStartJobOptions(options: CreateStreamerOptions): CreateStreamerOptions {

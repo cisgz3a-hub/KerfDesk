@@ -9546,6 +9546,12 @@ The G-code Inspector is free in every edition (ADR-627).
    the controller, the project's interrupted-job card, **Run again** and second-pass offer are
    retired: the file is now the last thing the machine ran (ADR-341 Amendment 10).
 6. One Frame allows one run. Running the file again needs another Frame.
+7. From Start on, KerfDesk no longer trusts what the program may have changed (ADR-630
+   Amendment 6), so this also holds after a Stop. If the program selects `G55`-`G59`, the next
+   Frame reads the active system (`$G`) and selects `G54` if another one is active. If it writes
+   a Z offset (`G92 Z`, `G10 L2`/`L20 Z`), sets or cancels a tool length (`G43.1`, `G49`) or
+   changes the tool (`M6`, `T`), Work Z set before it no longer counts, so the next CNC Frame
+   asks for Zero Z again. A `G54` that selects the system already active changes neither.
 
 #### Warnings (never refuse)
 
