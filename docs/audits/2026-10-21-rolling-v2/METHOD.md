@@ -48,6 +48,15 @@ Each area runs the lenses that apply to it. Lenses are run as separate, independ
   failure scenario.
 - **P3.** Latent (not reachable today), doc/code drift, missing test, or polish.
 
+**Clarification (2026-10-23, meta audit v1 M2/M3).** The P1 test has no reach clause.
+
+- **When it is P1.** A defect that is reachable today and silently produces wrong physical output is P1, however few users meet it. Wrong physical output means power, position, depth or scale. Examples of narrow reach: a setting that is off by default, a rare `$30`, or an unusual firmware build.
+- **What reach can do.** Reach can only lower a finding to P3, and only when the defect is not reachable today. In that case it is latent.
+- **Why this was added.** Refuters kept P1-by-effect findings at P2 because of narrow reach four times: 03-P2-4, C6-P2-2, D3-P2-1 and D4-P2-1. The meta audit corrected all four.
+- **What a refuter must do instead.** A refuter that wants to lower a P1 must show either:
+  - that the output is not wrong, or
+  - that a clear warning reaches the operator before the output is produced.
+
 ## 4. Evidence bar
 
 Every finding records:
