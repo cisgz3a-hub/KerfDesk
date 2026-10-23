@@ -5598,8 +5598,13 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    in the stock with a 1 mm stock-face frame round a margin, assigned to the
    two-sided setup (ADR-573), which is switched on if it was off. Carve side
    A, flip the stock as Machine Setup's Two-sided machining says, set Z0 on
-   the new top, make side B active and carve it. Stock thinner than the
-   model is planned as stock as thick as the model, and the result says so.
+   the new top, make side B active and carve it. Both sides follow a later
+   change to Machine Setup's stock thickness: the model stays centred and the
+   floors stay the holding web apart, so no re-split is needed. Stock thinner
+   than the model caps it at both stock faces, the part comes out as thick
+   as the stock, and Job Review says so. A side split by an earlier version
+   cannot follow the stock, and Job Review asks for a re-split
+   (ADR-580 Amendment 1).
 3. The mesh keeps its CAD top-view orientation: +Y in the STL is the top of
    the canvas, so raised text reads the right way round (ADR-414). Meshes
    already saved in projects keep the orientation they were saved with.
