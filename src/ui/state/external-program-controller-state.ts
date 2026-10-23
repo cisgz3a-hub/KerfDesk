@@ -10,6 +10,8 @@
 //   keeps the system even through M30. The store still said G54, so the next
 //   Frame skipped its G54 selection (frame-controller-readiness.ts) and traced
 //   in G55, while the job's own G54 cut at the G54 origin.
+// - `G92 X/Y` or `G10 L2/L20 X/Y` left the X/Y work origin KerfDesk set
+//   marked current; the Console already drops it for the same words.
 // - `G92 Z`, `G10 L2/L20 Z`, `G43.1`, `M6` or `T` left the probed Work Z
 //   current, so the next CNC Start skipped its Zero Z check. GRBL keeps G92 and
 //   the tool length offset through M30, and G10 writes them to EEPROM. So do
@@ -41,11 +43,19 @@ const WORK_Z_EFFECTS: ReadonlySet<ConsoleStateEffect> = new Set([
   'tool',
 ]);
 
+/** The Console effects that void the X/Y work origin (laser-console-actions.ts). */
+const WORK_ORIGIN_EFFECTS: ReadonlySet<ConsoleStateEffect> = new Set([
+  'coordinates-xy',
+  'coordinates-all',
+]);
+
 export type ExternalProgramControllerEffects = {
   /** A G54-G59 word selects a system other than `activeWcs`. */
   readonly selectsOtherWcs: boolean;
   /** A line changes a Z offset or the tool, by the Console's rule. */
   readonly changesWorkZ: boolean;
+  /** A line changes an X/Y offset (`G92 X`, `G10 L2/L20 X`), by the Console's rule. */
+  readonly changesWorkOrigin: boolean;
 };
 
 /** What `gcode` may change, read against the system the store knows is active
@@ -56,6 +66,7 @@ export function externalProgramControllerEffects(
 ): ExternalProgramControllerEffects {
   let selectsOtherWcs = false;
   let changesWorkZ = false;
+  let changesWorkOrigin = false;
   for (const line of gcode.split('\n')) {
     const words = scanConsoleWords(line);
     if (!words.some(mayChangeControllerState)) continue;
@@ -63,9 +74,10 @@ export function externalProgramControllerEffects(
     if (selected !== undefined && selected !== activeWcs) selectsOtherWcs = true;
     const effect = commonConsoleStateEffect(withoutActiveWcs(words, activeWcs));
     if (WORK_Z_EFFECTS.has(effect)) changesWorkZ = true;
-    if (selectsOtherWcs && changesWorkZ) break;
+    if (WORK_ORIGIN_EFFECTS.has(effect)) changesWorkOrigin = true;
+    if (selectsOtherWcs && changesWorkZ && changesWorkOrigin) break;
   }
-  return { selectsOtherWcs, changesWorkZ };
+  return { selectsOtherWcs, changesWorkZ, changesWorkOrigin };
 }
 
 /** The store as an opened program starts streaming. */
@@ -74,24 +86,49 @@ export function externalProgramControllerStatePatch(
   gcode: string,
 ): Partial<LaserState> {
   const effects = externalProgramControllerEffects(gcode, state.activeWcs);
-  const dropsWcs = effects.selectsOtherWcs && state.activeWcs !== null;
-  if (!dropsWcs && !effects.changesWorkZ) return {};
-  const notes = [
-    ...(dropsWcs
-      ? [
-          `it selects a work coordinate system other than ${state.activeWcs}, so the next Frame reads the active one first`,
-        ]
-      : []),
-    ...(effects.changesWorkZ
-      ? ['it changes a Z offset or the tool, so Work Z set before it no longer applies']
-      : []),
+  const parts = [
+    wcsPart(state, effects),
+    workZPart(state, effects),
+    workOriginPart(state, effects),
   ];
+  const notes = parts.flatMap((part) => (part.note === null ? [] : [part.note]));
+  const patch: Partial<LaserState> = Object.assign({}, ...parts.map((part) => part.patch));
+  if (Object.keys(patch).length === 0) return {};
+  return notes.length === 0
+    ? patch
+    : { ...patch, log: pushLog(state, `[lf2] Opened program: ${notes.join('; ')}.`) };
+}
+
+type StatePart = { readonly patch: Partial<LaserState>; readonly note: string | null };
+
+const NO_PART: StatePart = { patch: {}, note: null };
+
+function wcsPart(state: LaserState, effects: ExternalProgramControllerEffects): StatePart {
+  if (!effects.selectsOtherWcs || state.activeWcs === null) return NO_PART;
   return {
-    ...(dropsWcs ? { activeWcs: null } : {}),
-    ...(effects.changesWorkZ
-      ? { workZZeroEvidence: null, workZReferenceEpoch: state.workZReferenceEpoch + 1 }
-      : {}),
-    log: pushLog(state, `[lf2] Opened program: ${notes.join('; ')}.`),
+    patch: { activeWcs: null },
+    note: `it selects a work coordinate system other than ${state.activeWcs}, so the next Frame reads the active one first`,
+  };
+}
+
+function workZPart(state: LaserState, effects: ExternalProgramControllerEffects): StatePart {
+  if (!effects.changesWorkZ) return NO_PART;
+  return {
+    patch: { workZZeroEvidence: null, workZReferenceEpoch: state.workZReferenceEpoch + 1 },
+    note: 'it changes a Z offset or the tool, so Work Z set before it no longer applies',
+  };
+}
+
+// As the Console's coordinates-xy effect: the origin KerfDesk set is gone, and
+// the next status report brings the new offset. Anything bound to the old
+// origin, such as a Place Board registration, does not outlive it.
+function workOriginPart(state: LaserState, effects: ExternalProgramControllerEffects): StatePart {
+  if (!effects.changesWorkOrigin) return NO_PART;
+  const workOriginVersion = (state.workOriginVersion ?? 0) + 1;
+  if (!state.workOriginActive) return { patch: { workOriginVersion }, note: null };
+  return {
+    patch: { workOriginVersion, workOriginActive: false, workOriginSource: 'none', wcoCache: null },
+    note: 'it changes an X/Y offset, so the work origin set before it no longer applies',
   };
 }
 

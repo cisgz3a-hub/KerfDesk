@@ -9,14 +9,15 @@ import {
 import { useLaserStore, type LaserState } from './laser-store';
 import { captureWorkZZeroEvidence } from './work-z-zero-evidence';
 
-const NONE = { selectsOtherWcs: false, changesWorkZ: false };
+const NONE = { selectsOtherWcs: false, changesWorkZ: false, changesWorkOrigin: false };
 
 describe('externalProgramControllerEffects', () => {
-  it('reads a G55-G59 selection as leaving the WCS and voiding Work Z', () => {
+  it('reads a G55-G59 selection as leaving the WCS and voiding both offsets', () => {
     for (const select of ['G55', 'G59', 'G059', 'G0G56X1', 'G59.1']) {
       expect(externalProgramControllerEffects(`G21G90\n${select}\nG1X5F600\n`, 'G54')).toEqual({
         selectsOtherWcs: true,
         changesWorkZ: true,
+        changesWorkOrigin: true,
       });
     }
   });
@@ -46,6 +47,8 @@ describe('externalProgramControllerEffects', () => {
       expect(externalProgramControllerEffects(`G0X0\n${line}\nG1X5F600\n`, 'G54'), line).toEqual({
         selectsOtherWcs: false,
         changesWorkZ: true,
+        // G92.1 clears every axis offset.
+        changesWorkOrigin: line === 'G92.1',
       });
     }
   });
@@ -57,12 +60,23 @@ describe('externalProgramControllerEffects', () => {
       expect(
         externalProgramControllerEffects(`G21G90G54\nG0X0Y0\n${line}\nG1X5F600\nM30\n`, 'G54'),
         line,
-      ).toEqual({ selectsOtherWcs: false, changesWorkZ: true });
+      ).toEqual({ selectsOtherWcs: false, changesWorkZ: true, changesWorkOrigin: false });
     }
   });
 
-  it('leaves Work Z for XY-only offsets and plain motion', () => {
-    for (const line of ['G92X0Y0', 'G10L2P1X5Y5', 'G1X5Y5F600', 'M3S1000', 'G4P0.5', 'M30']) {
+  // Audit follow-up to #1413: an X/Y offset the program writes moves the work
+  // origin KerfDesk set, as the Console's coordinates-xy effect says.
+  it('voids the X/Y work origin, not Work Z, for XY-only offsets', () => {
+    for (const line of ['G92X0Y0', 'G10L2P1X5Y5', 'G10L20P0X0']) {
+      expect(externalProgramControllerEffects(`${line}\n`, 'G54'), line).toEqual({
+        ...NONE,
+        changesWorkOrigin: true,
+      });
+    }
+  });
+
+  it('changes nothing for plain motion and machine words', () => {
+    for (const line of ['G1X5Y5F600', 'M3S1000', 'G4P0.5', 'M30']) {
       expect(externalProgramControllerEffects(`${line}\n`, 'G54'), line).toEqual(NONE);
     }
   });
@@ -71,6 +85,7 @@ describe('externalProgramControllerEffects', () => {
     expect(externalProgramControllerEffects('G54\nG1X5F600\n', null)).toEqual({
       selectsOtherWcs: true,
       changesWorkZ: true,
+      changesWorkOrigin: true,
     });
   });
 });
@@ -107,6 +122,21 @@ describe('externalProgramControllerStatePatch', () => {
     expect(patch).not.toHaveProperty('activeWcs');
     expect(patch).toMatchObject({ workZZeroEvidence: null, workZReferenceEpoch: 5 });
     expect(patch.log?.at(-1)).toContain('Work Z set before it no longer applies');
+  });
+
+  it('drops the work origin KerfDesk set after a program that writes G92 X Y', () => {
+    const patch = externalProgramControllerStatePatch(
+      { ...probed(), workOriginActive: true, workOriginSource: 'g92' },
+      'G21G90G54\nG92X0Y0\nG1X5F600\nM30\n',
+    );
+    expect(patch).toMatchObject({
+      workOriginActive: false,
+      workOriginSource: 'none',
+      wcoCache: null,
+      workOriginVersion: (probed().workOriginVersion ?? 0) + 1,
+    });
+    expect(patch).not.toHaveProperty('workZZeroEvidence');
+    expect(patch.log?.at(-1)).toContain('the work origin set before it no longer applies');
   });
 
   it('changes nothing for a program that touches neither record', () => {

@@ -271,6 +271,7 @@ describe('laser-store console commands', () => {
         workOriginActive: true,
       },
       trustedPositionEpoch: 7,
+      workOriginVersion: 3,
     });
 
     await useLaserStore.getState().sendConsoleCommand('G92 X0 Y0');
@@ -284,6 +285,8 @@ describe('laser-store console commands', () => {
       frameVerification: null,
       statusReport: null,
       trustedPositionEpoch: 8,
+      // A Place Board registration bound to the old origin must not outlive it.
+      workOriginVersion: 4,
     });
   });
 
