@@ -231,9 +231,10 @@ export class LicensingAuthority {
   }
 
   /**
-   * Confirms a seat. The nonce the app sends with a refresh is signed back into
-   * the grant, so the app can tell this answer from a saved one replayed to it
-   * (ADR-592 Amendment 1). An older app sends none and gets the grant it always did.
+   * Confirms a seat. A nonce sent with a refresh is still signed back into the
+   * grant: 1.0.21 and 1.0.22 send one and refuse a grant that signs a different
+   * one (ADR-592 Amendment 1). Later apps send none and get the grant an app
+   * always got (ADR-592 Amendment 3).
    */
   async refresh(body) {
     const refreshNonce = body.refreshNonce === undefined ? undefined : nonce(body.refreshNonce);

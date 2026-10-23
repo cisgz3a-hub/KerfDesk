@@ -11,10 +11,11 @@
 // program cannot change what was framed.
 //
 // Refusals are factual (what the controller would act on, or cannot take as a
-// job line) with one policy refusal the maintainer kept: a `$` controller
-// command. GRBL runs those only while Idle (error:8 otherwise), and the Frame
-// cannot trace what they move, so they belong in the Console (ADR-630
-// Amendment 1).
+// job line) with two policy refusals. A `$` controller command: GRBL runs
+// those only while Idle (error:8 otherwise), and the Frame cannot trace what
+// they move, so they belong in the Console (ADR-630 Amendment 1). And a line
+// the controller hands to its shell, its files or a program stored on it
+// (storage-command-check.ts, ADR-630 Amendment 5).
 //
 // GRBL treats '?', '!', '~', Ctrl-X and every byte above 0x7F as realtime
 // commands before a line is collected, even inside a comment, and throws away
@@ -31,6 +32,7 @@
 
 import type { ControllerKind } from '../devices';
 import { controllerBlockRejection } from './controller-block-check';
+import { storageCommandRefusal } from './storage-command-check';
 
 export type ExternalProgram = {
   /** The parser used for this executable; absent on legacy GRBL callers. */
@@ -119,10 +121,8 @@ export function createExternalProgramNormalizer(
     baseline = externalProgramBaseline(controllerKind);
   }
   // Retain compatibility with callers supplying externalProgramBaseline(kind).
-  const marlin =
-    controllerKind === undefined
-      ? baseline === externalProgramBaseline('marlin')
-      : controllerKind === 'marlin';
+  const dialect = controllerKind ?? baselineKind(baseline);
+  const marlin = dialect === 'marlin';
   const reasons: string[] = [];
   const lines: string[] = baseline.split('\n');
   const baselineLines = lines.length;
@@ -149,7 +149,7 @@ export function createExternalProgramNormalizer(
         return;
       }
       if (reason === null) {
-        const lineRefusal = lineRefusalOf(marlin ? line.trimStart() : line, lineNumber, marlin);
+        const lineRefusal = lineRefusalOf(marlin ? line.trimStart() : line, lineNumber, dialect);
         if (lineRefusal !== null) reasons.push(lineRefusal);
       }
       lines.push(line);
@@ -250,13 +250,29 @@ function characterRefusal(line: string, lineNumber: number): string | null {
   return null;
 }
 
-// A policy refusal, recorded as one in ADR-630 Amendment 1.
+/** The controller kind a legacy caller's baseline names, if it names one. */
+function baselineKind(baseline: string): ControllerKind | undefined {
+  if (baseline === externalProgramBaseline('marlin')) return 'marlin';
+  return baseline === externalProgramBaseline('smoothieware') ? 'smoothieware' : undefined;
+}
+
+// Policy refusals, recorded as such in ADR-630 Amendments 1 and 5.
 // A '$' line, or FluidNC's bracket form of one ('[J]' and '[Jog]' run as
-// '$J=', fluidnc-line-limit.ts), is a controller command; any other line the
-// controller rejects as a block would leave the framed outline wrong.
-function lineRefusalOf(line: string, lineNumber: number, marlin: boolean): string | null {
+// '$J=', fluidnc-line-limit.ts), is a controller command, and a shell, file
+// or stored-program command runs what the file does not hold; any other line
+// the controller rejects as a block would leave the framed outline wrong.
+function lineRefusalOf(
+  line: string,
+  lineNumber: number,
+  dialect: ControllerKind | undefined,
+): string | null {
+  const marlin = dialect === 'marlin';
   if (line.startsWith('$')) return controllerCommand(line, lineNumber, '$');
   if (line.startsWith('[')) return controllerCommand(line, lineNumber, 'bracket');
+  const storage = storageCommandRefusal(line, dialect);
+  if (storage !== null) {
+    return `Line ${lineNumber} (${preview(line)}) ${storage}. KerfDesk does not send shell, file or stored-program commands inside a job: the Frame cannot trace what they run. Remove it from the program.`;
+  }
   // Marlin queue.cpp requires line sequence/checksum handling for every
   // leading N line. The ordinary sender implements neither resend protocol.
   // https://github.com/MarlinFirmware/Marlin/blob/2.1.2.8/Marlin/src/gcode/queue.cpp#L438-L470
