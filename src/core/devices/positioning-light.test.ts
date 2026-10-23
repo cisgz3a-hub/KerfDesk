@@ -169,6 +169,27 @@ describe('laser-firing fan commands', () => {
 });
 
 describe('positioning light command meaning', () => {
+  it.each([810, 811, 812, 813, 814, 815, 816, 817, 818, 819])(
+    'rejects stored macro M%s as either Marlin light command, including padded aliases',
+    (code) => {
+      for (const command of [`M${code}`, `m0${code}.0`]) {
+        for (const field of ['onCommand', 'offCommand'] as const) {
+          const mapping = { ...light, [field]: command };
+          for (const kind of ['marlin', undefined] as const) {
+            expect(positioningLightIssue(mapping, kind)).toMatch(/stored macro/);
+            expect(normalizePositioningLight(mapping, kind)).toBeUndefined();
+          }
+        }
+      }
+    },
+  );
+
+  it('keeps explicitly configured accessory codes on other controller families', () => {
+    expect(
+      positioningLightIssue({ ...light, onCommand: 'M810', offCommand: 'M811' }, 'smoothieware'),
+    ).toBeNull();
+  });
+
   it.each([
     ['M355 S1', 'M0355 S1'],
     ['M355 S1', 'm355  s1'],

@@ -328,4 +328,14 @@ describe('Run G-code file dialog (ADR-630)', () => {
     expect(body.textContent).toContain('Line 4 (M28notes.txt) is M28');
     expect([...body.querySelectorAll('button')].map((each) => each.textContent)).toEqual(['Close']);
   });
+
+  it('refuses a Marlin macro program instead of offering its incomplete Frame', async () => {
+    useLaserStore.setState({ activeControllerKind: 'marlin' });
+    const body = await show('M810 G1 X120 F600\nG1 X10 F600\nM810\nM5\n');
+    expect(body.textContent).toContain('will not send this file as a job');
+    expect(body.textContent).toContain('Line 1 (M810 G1 X120 F600) is M810');
+    expect(body.textContent).toContain('Line 3 (M810) is M810');
+    expect(body.textContent).toContain('macro stored on the controller');
+    expect([...body.querySelectorAll('button')].map((each) => each.textContent)).toEqual(['Close']);
+  });
 });

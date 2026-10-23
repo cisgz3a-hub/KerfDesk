@@ -1,8 +1,7 @@
 // Tiled save into a reserved folder (controller audit v4 E3-P3-2). The folder
 // may already hold tile files from an earlier save: writing replaces a file of
-// the same name without asking, and a tile now written as one file per bit
-// (ADR-392 Amendment 2) leaves the earlier save's one-file tile beside its new
-// files. Both are named once the set is written, as warnings, so only this
+// the same name without asking. Changed bit counts or a smaller tile grid can
+// leave older files beside the new set. Both are named as warnings, so only this
 // save's files are cut. Checked before writing: afterwards every name exists.
 
 import { tileNameWithoutBit } from '../../core/cnc/tile-bit-files';
@@ -14,8 +13,9 @@ const LISTED_NAMES = 5;
 export type TileFolderContents = {
   /** This save's file names the folder already held. */
   readonly replaced: ReadonlyArray<string>;
-  /** One-file tiles from an earlier save, where this save writes that tile per bit. */
+  /** Same-job tile files this save will not replace. */
   readonly earlier: ReadonlyArray<string>;
+  readonly inspectionIncomplete?: boolean;
 };
 
 const NOTHING_FOUND: TileFolderContents = { replaced: [], earlier: [] };
@@ -30,9 +30,41 @@ export async function tileFolderContents(
   files: ReadonlyArray<TileFile>,
 ): Promise<TileFolderContents> {
   const exists = directory?.exists;
-  if (exists === undefined) return NOTHING_FOUND;
+  if (directory === undefined) return NOTHING_FOUND;
   const names = files.map(tileDisplayName);
   const written = new Set(names);
+  if (directory.listFiles !== undefined) {
+    try {
+      const present = new Set(await directory.listFiles());
+      const jobs = new Set(names.map(tileJobName).filter((name) => name !== null));
+      let inspectionIncomplete = false;
+      // Preserve the adapter's collision rules (for example case-insensitive
+      // Windows names), rather than assuming enumeration names compare exactly.
+      const replaced = await filterPresent(names, async (name) => {
+        if (present.has(name)) return true;
+        try {
+          return exists !== undefined && (await exists(name));
+        } catch {
+          inspectionIncomplete = true;
+          return false;
+        }
+      });
+      return {
+        replaced,
+        earlier: [...present]
+          .filter((name) => !written.has(name) && jobs.has(tileJobName(name) ?? ''))
+          .sort(),
+        ...(inspectionIncomplete ? { inspectionIncomplete: true } : {}),
+      };
+    } catch {
+      const known = await tileFolderContents(
+        { file: directory.file, ...(exists === undefined ? {} : { exists }) },
+        files,
+      );
+      return { ...known, inspectionIncomplete: true };
+    }
+  }
+  if (exists === undefined) return NOTHING_FOUND;
   const oneFileTiles = new Set<string>();
   for (const file of files) {
     const tileName = tileNameWithoutBit(file.name);
@@ -54,6 +86,11 @@ export async function tileFolderContents(
 
 export function tileFolderWarnings(contents: TileFolderContents): ReadonlyArray<string> {
   const warnings: string[] = [];
+  if (contents.inspectionIncomplete === true) {
+    warnings.push(
+      'KerfDesk could not check the folder for earlier tile files. Check that you cut only the files from this save.',
+    );
+  }
   if (contents.replaced.length > 0) {
     warnings.push(
       `This save replaced ${contents.replaced.length} file(s) already in the folder: ` +
@@ -67,6 +104,13 @@ export function tileFolderWarnings(contents: TileFolderContents): ReadonlyArray<
     );
   }
   return warnings;
+}
+
+function tileJobName(displayName: string): string | null {
+  return (
+    /^(.*)_tile-r[1-9]\d*-c[1-9]\d*(?:_bit-[1-9]\d*-of-[1-9]\d*)?\.nc$/.exec(displayName)?.[1] ??
+    null
+  );
 }
 
 async function filterPresent(

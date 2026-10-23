@@ -6415,8 +6415,10 @@ and lifts the command's CNC-only gate.)*
    Decision 2): every tile file ends at the tile's X0 Y0, lifted to the park
    height when one is set, and the save warns that the park is not used.
    When the chosen folder already holds a file of the same name, or the
-   one-file tile an earlier save wrote where this save writes per bit, the
-   save names those files once the set is written.
+   earlier same-job tile files outside this save's set (including a changed bit count
+   or smaller grid), the save names those files once the set is written. It leaves
+   earlier files intact. If the folder cannot be checked, a warning asks the operator
+   to check that only this save's files are cut (ADR-668).
    A ramp entry kept as a plunge because its source path is shorter than one
    cut width or cannot descend at coordinate precision remains disclosed in
    each affected tile's G-code header, including tabbed path3d output. Split
@@ -8527,7 +8529,8 @@ as the pane's design record.
   Under 0.2 mm nothing changes; up to 10 mm **Fix** moves the saved calibration by that much (one
   Undo step) and refreshes the picture; above 10 mm it offers **Recalibrate…**. No ring, or more
   than one near the middle, says what to check and changes nothing. A head camera is not offered
-  the fix.
+  the fix. A pending photo and its result belong to that wizard, document, camera and
+  calibration; changing them retires the old result, so Fix cannot shift another setup (ADR-668).
 - **Warn / the camera seems to have moved (ADR-663 Amendment 3).** KerfDesk keeps a small view of
   what a fixed calibrated camera sees when its calibration is saved, a check keeps it, or a nudge
   fix is applied. Each new held picture, and one picture a few seconds after the camera starts, is
@@ -8572,6 +8575,8 @@ as the pane's design record.
   why when it cannot (no camera, not set up, a head camera). With **Refresh the picture after each
   job** on (default on), a held picture is taken again 3 s after a job finishes; a live picture,
   a stopped job and a head camera are left alone.
+  When refreshes overlap, only the newest request may replace the picture. Choosing Live,
+  hiding the picture or changing document/camera retires an older pending refresh (ADR-668).
 - **Material height.** Enter the material's top height above the bed; the overlay and
   camera trace show the bed as seen at that height, so the material's edges line up.
 - **Object heights.** **Add height area** gives part of the bed its own height, for an object that
