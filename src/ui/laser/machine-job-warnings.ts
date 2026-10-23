@@ -25,6 +25,7 @@ import { detectCncRasterWarnings } from './cnc-raster-warnings';
 import { detectCncReliefPlanningWarnings } from './cnc-relief-planning-warnings';
 import { detectCncStockWarnings } from './cnc-stock-warnings';
 import { detectCncThroughCutTabWarnings } from './cnc-through-cut-tab-warnings';
+import { detectCncTwoSidedStockWarnings } from './cnc-two-sided-stock-warnings';
 import { detectCncUnmodeledBitLayoutWarnings } from './cnc-unmodeled-bit-layout-warnings';
 import { detectCncZTravelWarnings } from './cnc-z-travel-warnings';
 import { detectDataMatrixScanWarnings } from './data-matrix-scan-warnings';
@@ -51,6 +52,7 @@ export function detectMachineJobWarnings(
     project.machine?.kind === 'cnc'
       ? [
           ...detectCncStockWarnings(project, prepared),
+          ...detectCncTwoSidedStockWarnings(project),
           ...detectCncThroughCutTabWarnings(project, job),
           ...detectCncOnPathSizeWarnings(project),
           ...detectCncFullTabCoverageWarnings(project, job),
