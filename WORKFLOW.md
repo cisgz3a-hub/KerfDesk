@@ -1719,6 +1719,15 @@ the completed physical Frame is the spatial source of truth.
 #### Edge — undo across project load
 - History clears on Open / New / Close.
 
+#### Edge — undo or redo while a job runs or is held
+- A running, paused or held job (a CNC bit change included) keeps the machine it started with
+  (ADR-416 Amendment 2). Undo and Redo still step through edits that leave the machine alone. A
+  step that would change Laser / CNC, CNC values such as the safe-Z height, or the machine's
+  controller, work area, origin, homing, jog feeds and limits or Z probing is not applied: the
+  history stays as it is and a warning says to finish or stop the job first. A jump in the Undo
+  list stops at that step. After the job ends, the same Undo or Redo applies.
+- Opening a project on another machine waits for the job the same way; nothing is opened.
+
 ---
 
 ### F-A15. Keyboard shortcuts (full list)
@@ -3713,6 +3722,7 @@ settings and Job Review keep their existing read-only setup references.
    the flow execute and exactly re-read any explicitly queued common firmware writes. While a job
    runs or is held (a CNC bit change included), Save is disabled and says why, as the toolbar's
    Laser / CNC switch is; the draft stays open and saves once the job ends (ADR-416 Amendment 1).
+   Undo, Redo and Open cannot make that change either (ADR-416 Amendment 2, F-A14).
 
 #### Success — configure CNC defaults before artwork exists
 
@@ -5598,8 +5608,13 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    in the stock with a 1 mm stock-face frame round a margin, assigned to the
    two-sided setup (ADR-573), which is switched on if it was off. Carve side
    A, flip the stock as Machine Setup's Two-sided machining says, set Z0 on
-   the new top, make side B active and carve it. Stock thinner than the
-   model is planned as stock as thick as the model, and the result says so.
+   the new top, make side B active and carve it. Both sides follow a later
+   change to Machine Setup's stock thickness: the model stays centred and the
+   floors stay the holding web apart, so no re-split is needed. Stock thinner
+   than the model caps it at both stock faces, the part comes out as thick
+   as the stock, and Job Review says so. A side split by an earlier version
+   cannot follow the stock, and Job Review asks for a re-split
+   (ADR-580 Amendment 1).
 3. The mesh keeps its CAD top-view orientation: +Y in the STL is the top of
    the canvas, so raised text reads the right way round (ADR-414). Meshes
    already saved in projects keep the orientation they were saved with.

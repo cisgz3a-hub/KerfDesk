@@ -1,4 +1,4 @@
-## ADR-665 - Correct the verified audit defects without changing Start policy (2026-10-23)
+## ADR-666 - Correct the verified audit defects without changing Start policy (2026-10-23)
 
 **Status:** Accepted. | **Date:** 2026-10-23
 
