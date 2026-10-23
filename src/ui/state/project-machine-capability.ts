@@ -16,12 +16,24 @@ import type { ProFeature } from '../licensing/pro-features';
 
 export type ProjectMachineCapabilityLoadResult =
   | { readonly kind: 'desktop-required'; readonly features: ReadonlyArray<ProFeature> }
+  // Not opened: a running job keeps its machine (ADR-416 Amendment 2).
+  | { readonly kind: 'job-machine-locked' }
   | { readonly kind: 'loaded'; readonly projectBedReconciled?: boolean }
   | {
       readonly kind: 'capability-warning';
       readonly activeKind: MachineKind;
       readonly projectBedReconciled?: boolean;
     };
+
+/** True when `setProject` left the document as it was, so the caller opens nothing. */
+export function projectLoadRefused(
+  result: ProjectMachineCapabilityLoadResult,
+): result is Extract<
+  ProjectMachineCapabilityLoadResult,
+  { readonly kind: 'desktop-required' | 'job-machine-locked' }
+> {
+  return result.kind === 'desktop-required' || result.kind === 'job-machine-locked';
+}
 
 export type ProjectMachineCapabilityResolution = {
   readonly project: Project;

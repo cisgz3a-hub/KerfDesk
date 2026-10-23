@@ -36,6 +36,7 @@ export function completeNativeProjectOpen(
 ): boolean {
   if (result.kind === 'ok') {
     const loadResult = ctx.setProject(result.project);
+    if (loadResult.kind === 'job-machine-locked') return false;
     if (loadResult.kind === 'desktop-required') {
       describePendingProProject(result.project, fileName);
       return false;
@@ -72,6 +73,7 @@ export function completeLightBurnProjectOpen(
     return false;
   }
   const loadResult = ctx.setProject(result.project);
+  if (loadResult.kind === 'job-machine-locked') return false;
   if (loadResult.kind === 'desktop-required') {
     describePendingProProject(result.project, fileName);
     return false;
@@ -109,7 +111,10 @@ function reportMachineCapabilityRepair(
 function markCapabilityAwareLoad(
   ctx: ProjectOpenCompletionContext,
   filename: string,
-  result: Exclude<ProjectMachineCapabilityLoadResult, { readonly kind: 'desktop-required' }>,
+  result: Exclude<
+    ProjectMachineCapabilityLoadResult,
+    { readonly kind: 'desktop-required' | 'job-machine-locked' }
+  >,
   saveTarget: SaveTarget | null,
 ): void {
   const dirty = result.projectBedReconciled === true;

@@ -1,8 +1,9 @@
 // Which geometry the minimum-feature check reads, and against what width
 // (ADR-433). Only cutting operations are checked: laser Line operations
-// against the kerf, CNC profile and pocket operations against the bit.
-// Fill, Image, engrave, V-carve, drill and relief operations are skipped —
-// their marks are not parts that can fall apart.
+// against the kerf, CNC profile, pocket and straight inlay operations against
+// the bit. Fill, Image, engrave, V-carve, drill and relief operations are
+// skipped — their marks are not parts that can fall apart — and so is a
+// tapered inlay pair, which V-carves its detail into both halves.
 //
 // Geometry is the artwork itself, flattened exactly as compile flattens it
 // and placed in machine coordinates, not the kerf-compensated path; a CNC
@@ -115,6 +116,10 @@ const CNC_SIDES: Partial<Record<CncCutType, Pick<MinFeatureRequest, 'checkWidths
     'profile-outside': { checkWidths: false, checkGaps: true },
     // The bit is centred on the line: both sides lose what it cannot fit.
     'profile-on-path': { checkWidths: true, checkGaps: true },
+    // A straight pair cuts both halves from one bit-radius design (ADR-155): a part narrower
+    // than the bit is left out of the pocket and the insert, a narrower gap is closed in both
+    // (ADR-433 Amendment 2).
+    'inlay-pair': { checkWidths: true, checkGaps: true },
   };
 
 function objectPaths(
@@ -213,6 +218,13 @@ function cncTarget(
   const sides = CNC_SIDES[settings.cutType];
   if (sides === undefined) return null;
   const tool = layerCncTool(machine, settings);
+  // A tapered pair V-carves both halves (ADR-665), and a straight pair with another bit is
+  // refused outright (cnc-inlay-issues), so only an end-mill straight pair is checked.
+  if (
+    settings.cutType === 'inlay-pair' &&
+    (settings.taperedInlay !== undefined || tool.kind !== 'end-mill')
+  )
+    return null;
   const paths = cncMachinedPaths(objects, layer, project, tool.diameterMm, objectIds);
   // The compiler lays a bit that narrows toward its tip out by what it cuts
   // at the operation's full depth (ADR-368 Amendment 3), so only a feature

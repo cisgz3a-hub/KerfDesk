@@ -25,6 +25,7 @@ import {
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import type { ImportOutcome } from '../state/store';
 import type { ToastVariant } from '../state/toast-store';
+import { projectLoadRefused } from '../state/project-machine-capability';
 import {
   type JobPlacementSettings,
   type MachinePlacementSnapshot,
@@ -365,7 +366,7 @@ export async function handleOpenProject(
     ...ctx,
     setProject: (project) => {
       const result = ctx.setProject(project);
-      if (result.kind !== 'desktop-required') owner.adoptCurrentDocument();
+      if (!projectLoadRefused(result)) owner.adoptCurrentDocument();
       return result;
     },
     pushToast: owner.pushToast,

@@ -65,3 +65,17 @@ describe('grblHAL Console report commands', () => {
     expect(grblHalDriver.prepareConsoleCommand('$DWNGRD').ok).toBe(false);
   });
 });
+
+// A tool table's offsets outlast M30 and a soft reset on grblHAL, so the
+// Console voids Work Z for them as it does for G43.1 (ADR-630 Amendment 8).
+describe('grblHAL Console tool length offsets', () => {
+  it.each(['G43 H1', 'G43', 'G43.2 H2', 'G49', 'M61 Q2'])(
+    'prepares %s as a tool change',
+    (input) => {
+      expect(grblHalDriver.prepareConsoleCommand(input)).toMatchObject({
+        ok: true,
+        command: { kind: 'gcode', stateEffect: 'tool' },
+      });
+    },
+  );
+});
