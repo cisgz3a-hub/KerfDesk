@@ -79,7 +79,7 @@ Job Review keeps its existing warnings.
 - **F4-P3-2:** a drill group's feed is its plunge feed, the feed every peck runs at. It used to
   name min(feed, plunge), so with plunge 2000 and feed 800 the header and Job Review said feed 800
   while the program drilled at F2000. Only that header comment changes in the emitted G-code
-  (`EMITTER_REVISION` v26).
+  (`EMITTER_REVISION` v29; v26 to v28 are taken by open PRs #1416, #1421 and #1422).
 
 ### Verification
 

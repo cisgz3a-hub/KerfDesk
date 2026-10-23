@@ -139,7 +139,7 @@ export type GcodeMetadata = {
 // ADR-392 Amd 2 writes a tile that needs several bits as one file per bit (no
 // M0) and sets the bed park aside in tiles; surfacing ladders run no extra pass.
 // CNC audit v1 F4-P3-2: a drill group's header names the plunge feed it drills at.
-export const EMITTER_REVISION = 'cnc-drill-plunge-feed-20261023-v26';
+export const EMITTER_REVISION = 'cnc-drill-plunge-feed-20261023-v29';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S
