@@ -86,6 +86,26 @@ describe('timelapse Save video over an existing file', () => {
     expect(disk.get('timelapse.webm')).toBe('previous video');
   });
 
+  it('re-enables Save when the recorder throws instead of leaving it stuck', async () => {
+    const disk = new Map([['timelapse.webm', 'previous video']]);
+    picker = installChromiumSavePicker(disk);
+    video.encode.mockRejectedValue(new DOMException('Recorder failed', 'NotSupportedError'));
+
+    await clickSaveVideo();
+
+    await vi.waitFor(() =>
+      expect(useToastStore.getState().toasts).toContainEqual(
+        expect.objectContaining({ message: 'Could not make the timelapse video.' }),
+      ),
+    );
+    const button = [...(host?.querySelectorAll('button') ?? [])].find(
+      (node) => node.textContent === 'Save video…',
+    );
+    expect(button?.disabled).toBe(false);
+    expect(picker.picks()).toBe(0);
+    expect(disk.get('timelapse.webm')).toBe('previous video');
+  });
+
   it('asks for a fresh Choose file click after a long encode, then saves', async () => {
     const disk = new Map([['timelapse.webm', 'previous video']]);
     picker = installChromiumSavePicker(disk);

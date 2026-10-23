@@ -23,23 +23,160 @@ export function isGrblhalPasswordSetting(id: number): boolean {
   return GRBLHAL_PASSWORD_SETTING_IDS.includes(id);
 }
 
-// A value already removed is left alone, so a second pass over text whose line
-// breaks were escaped keeps what follows them.
-const NOT_REMOVED = String.raw`(?!\[password removed\])`;
-const PASSWORD_ASSIGNMENTS: ReadonlyArray<RegExp> = [
-  new RegExp(
-    String.raw`(\$\s*(?:${GRBLHAL_PASSWORD_SETTING_IDS.join('|')})\s*=)${NOT_REMOVED}[^\r\n]*`,
-    'g',
-  ),
-  new RegExp(String.raw`(\$[\w/]*password\s*=)${NOT_REMOVED}[^\r\n]*`, 'gi'),
-  new RegExp(String.raw`(\[ESP10[16]\])${NOT_REMOVED}[^\r\n]*`, 'gi'),
-];
+export const CONTROLLER_PASSWORD_HIDDEN = '[password hidden]';
+
+/** The value a screen shows for setting `id`: a password stays hidden, in the
+ *  settings table and in a snapshot saved before snapshots dropped them. Only
+ *  an exported backup keeps it, so a restore can write it back. */
+export function shownControllerSettingValue(id: number, rawValue: string): string {
+  return isGrblhalPasswordSetting(id) && rawValue.trim() !== ''
+    ? CONTROLLER_PASSWORD_HIDDEN
+    : rawValue;
+}
+
+// grblHAL reads a numeric prefix, tolerates a fraction below 0.001, and casts
+// to float32 before selecting the setting. A decimal just below an integer can
+// therefore select that integer's password (for example 74.999999 selects 75).
+// For these IDs below 1000, 0.002 deliberately covers the fraction tolerance
+// and float32 rounding in either direction. This is conservative redaction,
+// not command validation: ordinary neighboring integer IDs remain visible.
+// https://github.com/grblHAL/core/blob/4ec1ae44b857a70d2f9298344feac4b43ed0eb6b/system.c#L1203-L1213
+// https://github.com/grblHAL/core/blob/4ec1ae44b857a70d2f9298344feac4b43ed0eb6b/nuts_bolts.c#L249-L317
+const PASSWORD_ALIAS_MARGIN = 0.002;
+const FLUIDNC_PASSWORD_MARKERS = ['[ESP101]', '[ESP106]'];
+
+type ScannedSettingKey = { readonly end: number; readonly password: boolean };
 
 /** Replaces each password assignment's whole value, spaces included, to the
  *  end of its line: `$75=secret` becomes `$75=[password removed]`. */
 export function maskControllerPasswords(text: string): string {
-  return PASSWORD_ASSIGNMENTS.reduce(
-    (current, pattern) => current.replace(pattern, `$1${CONTROLLER_PASSWORD_REMOVED}`),
-    text,
+  const parts: string[] = [];
+  let cursor = 0;
+  let copyFrom = 0;
+  let passwordKey = false;
+  while (cursor < text.length) {
+    const character = text.charAt(cursor);
+    if (character === '$') {
+      const key = scanSettingKey(text, cursor + 1);
+      passwordKey ||= key.password;
+      cursor = key.end;
+      continue;
+    }
+    if (isLineBreak(character)) {
+      passwordKey = false;
+      cursor += 1;
+      continue;
+    }
+    const valueStart = passwordValueStart(text, cursor, character, passwordKey);
+    if (character === '=') passwordKey = false;
+    // Keep already removed values intact, including following escaped text.
+    if (valueStart !== null && !text.startsWith(CONTROLLER_PASSWORD_REMOVED, valueStart)) {
+      const end = physicalLineEnd(text, valueStart);
+      parts.push(text.slice(copyFrom, valueStart), CONTROLLER_PASSWORD_REMOVED);
+      copyFrom = end;
+      cursor = end;
+      passwordKey = false;
+    } else cursor += 1;
+  }
+  if (parts.length === 0) return text;
+  parts.push(text.slice(copyFrom));
+  return parts.join('');
+}
+
+// Prefix scans consume disjoint characters. Suffixes are visited only by the
+// outer cursor, so repeated `$75x` candidates without '=' cannot rescan a line.
+function scanSettingKey(text: string, start: number): ScannedSettingKey {
+  const keyStart = skipHorizontalBlanks(text, start);
+  const numberStart =
+    text.charAt(keyStart) === '+' ? skipHorizontalBlanks(text, keyStart + 1) : keyStart;
+  const character = text.charAt(numberStart);
+  return isDecimalDigit(character) || character === '.'
+    ? scanNumericKey(text, numberStart)
+    : scanNamedKey(text, keyStart);
+}
+
+function scanNumericKey(text: string, start: number): ScannedSettingKey {
+  let end = start;
+  let word = '';
+  let decimal = false;
+  while (end < text.length) {
+    const character = text.charAt(end);
+    if (isHorizontalBlank(character)) end += 1;
+    else if (isDecimalDigit(character)) {
+      word += character;
+      end += 1;
+    } else if (character === '.' && !decimal) {
+      word += character;
+      decimal = true;
+      end += 1;
+    } else break;
+  }
+  const value = Number(word);
+  return {
+    end,
+    password: GRBLHAL_PASSWORD_SETTING_IDS.some(
+      (id) => Math.abs(value - id) < PASSWORD_ALIAS_MARGIN,
+    ),
+  };
+}
+
+function scanNamedKey(text: string, start: number): ScannedSettingKey {
+  let end = start;
+  while (isSettingNameCode(text.charCodeAt(end))) end += 1;
+  const wordEnd = end;
+  end = skipHorizontalBlanks(text, end);
+  return {
+    end,
+    password:
+      wordEnd - start >= 8 &&
+      text.slice(wordEnd - 8, wordEnd).toLowerCase() === 'password' &&
+      text.charAt(end) === '=',
+  };
+}
+
+function passwordValueStart(
+  text: string,
+  cursor: number,
+  character: string,
+  passwordKey: boolean,
+): number | null {
+  if (character === '=' && passwordKey) return cursor + 1;
+  if (character !== '[') return null;
+  return FLUIDNC_PASSWORD_MARKERS.includes(text.slice(cursor, cursor + 8).toUpperCase())
+    ? cursor + 8
+    : null;
+}
+
+function skipHorizontalBlanks(text: string, start: number): number {
+  let end = start;
+  while (isHorizontalBlank(text.charAt(end))) end += 1;
+  return end;
+}
+
+function physicalLineEnd(text: string, start: number): number {
+  let end = start;
+  while (end < text.length && !isLineBreak(text.charAt(end))) end += 1;
+  return end;
+}
+
+function isHorizontalBlank(character: string): boolean {
+  return character === ' ' || character === '\t';
+}
+
+function isLineBreak(character: string): boolean {
+  return character === '\r' || character === '\n';
+}
+
+function isDecimalDigit(character: string): boolean {
+  return character >= '0' && character <= '9';
+}
+
+function isSettingNameCode(code: number): boolean {
+  return (
+    (code >= 48 && code <= 57) ||
+    (code >= 65 && code <= 90) ||
+    (code >= 97 && code <= 122) ||
+    code === 95 ||
+    code === 47
   );
 }

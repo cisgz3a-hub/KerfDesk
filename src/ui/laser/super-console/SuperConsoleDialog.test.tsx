@@ -197,6 +197,51 @@ describe('SuperConsoleLauncher / SuperConsoleDialog', () => {
     await unmount();
   });
 
+  it('Copy visible removes numeric password aliases without hiding neighboring settings', async () => {
+    const writeText = vi.fn(async (_text: string) => undefined);
+    const descriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    useLaserStore.setState({
+      transcript: [
+        transcriptEntry(1, {
+          direction: 'out',
+          source: 'console',
+          kind: 'setting-write',
+          raw: '$075=SyntheticWifi',
+        }),
+        transcriptEntry(2, { raw: '$0 3 3 1=SyntheticUser' }),
+        transcriptEntry(3, { raw: '$07500=1' }),
+        transcriptEntry(4, { raw: '$74.999999=SyntheticRoundedWifi' }),
+        transcriptEntry(5, {
+          raw: '$76.9999999=SyntheticRoundedAP',
+          decoded: '$329.9999999=SyntheticRoundedAdmin',
+        }),
+        transcriptEntry(6, { raw: '$532.9999999=SyntheticRoundedBroker' }),
+        transcriptEntry(7, { raw: '$74=VisibleSSID' }),
+      ],
+    });
+    const { host, unmount } = await renderLauncher();
+    try {
+      await openDialog(host);
+      await act(async () => button(document.body, 'Copy visible').click());
+      expect(writeText).toHaveBeenCalledOnce();
+      const copied = writeText.mock.calls[0]?.[0] ?? '';
+      expect(copied).not.toMatch(/SyntheticWifi|SyntheticUser|SyntheticRounded/);
+      expect(copied).toContain('$075=[password removed]');
+      expect(copied).toContain('$0 3 3 1=[password removed]');
+      expect(copied).toContain('$07500=1');
+      expect(copied).toContain('$74.999999=[password removed]');
+      expect(copied).toContain('$76.9999999=[password removed]');
+      expect(copied).toContain('$329.9999999=[password removed]');
+      expect(copied).toContain('$532.9999999=[password removed]');
+      expect(copied).toContain('$74=VisibleSSID');
+    } finally {
+      await unmount();
+      if (descriptor === undefined) delete (navigator as { clipboard?: unknown }).clipboard;
+      else Object.defineProperty(navigator, 'clipboard', descriptor);
+    }
+  });
+
   it('offers timestamped TSV for manual copy when clipboard access is unavailable', async () => {
     useLaserStore.setState({
       transcript: [transcriptEntry(1, { at: 1, raw: '$I\tvalue', decoded: 'line one\nline two' })],
