@@ -10,7 +10,7 @@ import {
   type Polyline,
   type Scene,
 } from '../scene';
-import { automaticOverscanMm } from './automatic-overscan';
+import { automaticOverscanMm, automaticOverscanReachMmPerMin } from './automatic-overscan';
 import { createCalibrationLabelLayer, formatCalibrationNumber } from './calibration-labels';
 import { MAX_FILL_OVERSCAN_MM } from './compile-job-defaults';
 import {
@@ -23,6 +23,7 @@ import {
   type MaterialTestParameter,
   type MaterialTestParameterInput,
 } from './material-test-axes';
+import { MATERIAL_TEST_CELL_SOURCE } from './material-test-cell-order';
 import {
   cellX,
   cellY,
@@ -260,6 +261,26 @@ export function materialTestRunwayMm(
   return Math.max(LAYER_DEFAULTS.fillOverscanMm, needed);
 }
 
+/** When the fastest cell needs more than the longest runway a row gets, the
+ * feed that runway is enough for; undefined when the runway is enough. */
+export function materialTestRunwayReachMmPerMin(
+  fastestFeedMmPerMin: number,
+  accelMmPerSec2: number | undefined,
+): number | undefined {
+  if (accelMmPerSec2 === undefined || !Number.isFinite(accelMmPerSec2) || accelMmPerSec2 <= 0) {
+    return undefined;
+  }
+  const needed = automaticOverscanMm({
+    feedMmPerMin: effectiveGcodeFeedMmPerMin(fastestFeedMmPerMin),
+    accelMmPerSec2,
+    scanAngleDeg: 0,
+    maxMm: Number.POSITIVE_INFINITY,
+  });
+  return needed > MAX_FILL_OVERSCAN_MM
+    ? automaticOverscanReachMmPerMin(MAX_FILL_OVERSCAN_MM, accelMmPerSec2)
+    : undefined;
+}
+
 function materialTestLayerName(
   parameter: MaterialTestParameter,
   value: number,
@@ -356,7 +377,7 @@ function squareObject(args: {
   return {
     kind: 'imported-svg',
     id: args.id,
-    source: 'material-test-grid',
+    source: MATERIAL_TEST_CELL_SOURCE,
     operationIds: [args.operationId],
     bounds,
     transform: { ...IDENTITY_TRANSFORM, x: args.x, y: args.y },
