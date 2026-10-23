@@ -138,7 +138,10 @@ export type GcodeMetadata = {
 // ADR-250 Amd 3 keeps CNC profile leads clear of every part the job keeps.
 // ADR-392 Amd 2 writes a tile that needs several bits as one file per bit (no
 // M0) and sets the bed park aside in tiles; surfacing ladders run no extra pass.
-export const EMITTER_REVISION = 'cnc-tile-files-per-bit-20261023-v25';
+// ADR-154 Amd 4 cuts island adaptive pockets into strips where island bounds
+// cross in open stock and runs each wall cleanup after the clearing beside it;
+// ADR-153 Amd 1 gives rest ladders above 50% stepover a core ring.
+export const EMITTER_REVISION = 'adaptive-island-strips-rest-cores-20261023-v26';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S
