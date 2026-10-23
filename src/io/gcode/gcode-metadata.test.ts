@@ -41,7 +41,7 @@ function laserAssumptions(
 
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
-    expect(EMITTER_REVISION).toBe('vcarve-floor-inside-corners-20261023-v26');
+    expect(EMITTER_REVISION).toBe('vcarve-floor-inside-corners-20261023-v27');
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {

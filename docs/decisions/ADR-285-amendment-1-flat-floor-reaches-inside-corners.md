@@ -97,5 +97,5 @@ rounding.
   rings, and run at constant full depth. ADR-285 item 6's 115200-baud planner-window check on the
   recovered `Safe` fixture keeps its 13.8 ms margin, and that program stays under its
   18,000-line budget at 17,769 lines.
-- The emitter revision is `vcarve-floor-inside-corners-20261023-v26`.
+- The emitter revision is `vcarve-floor-inside-corners-20261023-v27`.
 - Not verified: air-cut, material cut, surface finish or machine behaviour on the extra blocks.

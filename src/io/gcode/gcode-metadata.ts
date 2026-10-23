@@ -140,7 +140,7 @@ export type GcodeMetadata = {
 // M0) and sets the bed park aside in tiles; surfacing ladders run no extra pass.
 // ADR-285 Amd 1 erodes the V-carve flat core with round joins, so its floor
 // passes sweep each inside corner instead of leaving a fin.
-export const EMITTER_REVISION = 'vcarve-floor-inside-corners-20261023-v26';
+export const EMITTER_REVISION = 'vcarve-floor-inside-corners-20261023-v27';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S
