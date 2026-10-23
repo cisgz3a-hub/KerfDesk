@@ -19,19 +19,31 @@ describe('withManualCncFeedPatch', () => {
     ['feed', { feedMmPerMin: 550 }],
     ['plunge', { plungeMmPerMin: 100 }],
     ['spindle', { spindleRpm: 10000 }],
-  ] as const)('clears automatic provenance after a manual %s edit', (_label, patch) => {
-    const result = withManualCncFeedPatch(automaticSettings, patch);
+  ] as const)(
+    'clears automatic provenance and the stale material label after a manual %s edit',
+    (_label, patch) => {
+      const result = withManualCncFeedPatch(automaticSettings, patch);
 
-    expect(result).toMatchObject(patch);
-    expect(result).not.toHaveProperty('feedSource');
-    expect(result.materialKey).toBe('plywood-mdf');
-  });
+      expect(result).toMatchObject(patch);
+      expect(result).not.toHaveProperty('feedSource');
+      // ADR-233 decision 5 (CNC audit v1 F4-P2-1): the numbers no longer follow
+      // the material, so the operation reads Manual.
+      expect(result).not.toHaveProperty('materialKey');
+    },
+  );
 
   it('preserves provenance for edits unrelated to feed calculation', () => {
     expect(withManualCncFeedPatch(automaticSettings, { tabsEnabled: true })).toEqual({
       ...automaticSettings,
       tabsEnabled: true,
     });
+  });
+
+  it('preserves provenance when a cutting value is committed unchanged', () => {
+    const { feedMmPerMin, depthPerPassMm } = automaticSettings;
+    expect(withManualCncFeedPatch(automaticSettings, { feedMmPerMin, depthPerPassMm })).toEqual(
+      automaticSettings,
+    );
   });
 });
 

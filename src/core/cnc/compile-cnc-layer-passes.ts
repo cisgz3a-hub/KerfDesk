@@ -7,7 +7,12 @@ import {
   type Polyline,
 } from '../scene';
 import type { CncPass } from '../job';
-import { passNeedsTabs, settingsWithStockTabGate, tabTopZMm } from './cnc-tabs';
+import {
+  depthsWithTabTopPass,
+  passNeedsTabs,
+  settingsWithStockTabGate,
+  tabTopZMm,
+} from './cnc-tabs';
 import { tabRampedPoints } from './cnc-tab-ramp';
 import { cncLayoutCutWidths } from './layout-cut-widths';
 import {
@@ -388,16 +393,6 @@ function passNeedsTabsForContour(
   settings: CncLayerSettings,
 ): boolean {
   return wantsTabs && toolpath.closed && passNeedsTabs(zMm, settings.depthMm, settings.tabHeightMm);
-}
-
-function depthsWithTabTopPass(
-  depths: ReadonlyArray<number>,
-  settings: CncLayerSettings,
-): ReadonlyArray<number> {
-  const tabTop = tabTopZMm(settings.depthMm, settings.tabHeightMm);
-  if (tabTop >= -1e-9 || tabTop <= -settings.depthMm + 1e-9) return depths;
-  if (depths.some((z) => Math.abs(z - tabTop) <= 1e-9)) return depths;
-  return [...depths, tabTop].sort((a, b) => b - a);
 }
 
 function appendTabbedPasses(
