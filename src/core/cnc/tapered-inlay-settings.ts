@@ -63,6 +63,14 @@ export function taperedInlayToolIssue(
     requiredDepth * slope > tool.diameterMm / 2 + 0.000001
   )
     return 'The V-bit cutting diameter cannot reach the requested pocket or plug depth.';
+  return plugWallIssue(settings, slope);
+}
+
+function plugWallIssue(settings: CncTaperedInlaySettings, slope: number): string | null {
+  // The plug walls start this far below the plug top (ADR-665); its waste floor must lie deeper.
+  const fitDepth = settings.fitClearanceMm / slope;
+  if (fitDepth + 0.000001 >= settings.surfaceClearanceMm)
+    return `Surface clearance must be more than ${Math.ceil(fitDepth * 1000) / 1000} mm, the depth the radial fit gap adds to the plug walls on this V-bit.`;
   const minimumBorder = (settings.engagementDepthMm + 2 * settings.surfaceClearanceMm) * slope;
   return settings.plugBorderMm + settings.fitClearanceMm + 0.001 < minimumBorder
     ? `Plug border needs at least ${Math.ceil((minimumBorder - settings.fitClearanceMm) * 1000) / 1000} mm for the requested tapered wall.`
@@ -75,6 +83,17 @@ export function taperedInlaySlope(includedAngleDeg: number): number {
 
 export function taperedInlayPlugDepth(settings: CncTaperedInlaySettings): number {
   return settings.engagementDepthMm + settings.surfaceClearanceMm;
+}
+
+/**
+ * The plug's V-carve start depth (ADR-665): engagement plus the depth at which the radial fit gap
+ * closes on the taper. Seated, the plug's top lies this far into the pocket.
+ */
+export function taperedInlayWallStartDepth(
+  settings: CncTaperedInlaySettings,
+  includedAngleDeg: number,
+): number {
+  return settings.engagementDepthMm + settings.fitClearanceMm / taperedInlaySlope(includedAngleDeg);
 }
 
 /** Straight-wall radial offset after flipping the plug into the pocket. */
