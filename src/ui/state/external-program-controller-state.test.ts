@@ -6,8 +6,7 @@ import {
   externalProgramControllerEffects,
   externalProgramControllerStatePatch,
 } from './external-program-controller-state';
-import { initialLaserState } from './laser-store-helpers';
-import type { LaserState } from './laser-store';
+import { useLaserStore, type LaserState } from './laser-store';
 import { captureWorkZZeroEvidence } from './work-z-zero-evidence';
 
 const NONE = { selectsOtherWcs: false, changesWorkZ: false };
@@ -67,7 +66,7 @@ describe('externalProgramControllerEffects', () => {
 
 describe('externalProgramControllerStatePatch', () => {
   const probed = (): LaserState => ({
-    ...initialLaserState(),
+    ...useLaserStore.getState(),
     activeWcs: 'G54',
     workZReferenceEpoch: 4,
     workZZeroEvidence: captureWorkZZeroEvidence('probe', 4),
