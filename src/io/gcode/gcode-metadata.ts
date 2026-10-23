@@ -141,7 +141,12 @@ export type GcodeMetadata = {
 // ADR-140 Amd 2 rises roughing beside every finishing tab, a merged roughing ring
 // included, and cuts a finish allowance of the bit radius or more as the radius,
 // stepping its finishing pass down.
-export const EMITTER_REVISION = 'cnc-finish-allowance-tabs-20261023-v26';
+// ADR-154 Amd 4 cuts island adaptive pockets into strips where island bounds
+// cross in open stock and runs each wall cleanup after the clearing beside it;
+// ADR-153 Amd 1 gives rest ladders above 50% stepover a core ring.
+// ADR-285 Amd 1 erodes the V-carve flat core with round joins, so its floor
+// passes sweep each inside corner instead of leaving a fin.
+export const EMITTER_REVISION = 'vcarve-floor-inside-corners-20261023-v28';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S
