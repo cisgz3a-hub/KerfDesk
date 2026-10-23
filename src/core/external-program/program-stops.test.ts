@@ -4,7 +4,7 @@ import { buildGcodeRenderModel } from '../gcode-view';
 import { reviewExternalProgram } from './external-program-review';
 import { externalProgramBaseline, normalizeExternalProgram } from './normalize-external-program';
 
-// Controller audit v4 E4-P2-3 (ADR-630 Amendment 5): stock GRBL and FluidNC
+// Controller audit v4 E4-P2-3 (ADR-630 Amendment 7): stock GRBL and FluidNC
 // ignore M1, so the review must not promise a hold there; grblHAL holds.
 
 const HOLD =
@@ -30,7 +30,7 @@ function warnings(file: string, kind?: ControllerKind): ReadonlyArray<string> {
 
 const STOPS = (stop: string) => `G0 X0 Y0\nG1 X5 F100\n${stop}\nG1 X10\nM5\n`;
 
-describe('program stops in the Run review (ADR-630 Amendment 5)', () => {
+describe('program stops in the Run review (ADR-630 Amendment 7)', () => {
   it.each([
     ['grbl-v1.1', 'Stock GRBL'],
     ['fluidnc', 'FluidNC'],

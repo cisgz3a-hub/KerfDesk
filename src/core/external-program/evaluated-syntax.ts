@@ -1,5 +1,5 @@
 // evaluated-syntax — lines FluidNC and grblHAL work out as they run (ADR-630
-// Amendment 5, controller audit v4 E4-P2-2). FluidNC reads a word's value from
+// Amendment 7, controller audit v4 E4-P2-2). FluidNC reads a word's value from
 // a `#` parameter (`X#1`, `X#<width>`, `X##2`) or a bracketed expression
 // (`X[5*2]`), takes `#1=120` as an assignment, and hands whatever follows an O
 // number to flow control (`O100 if [...]`, `O100 while [...]`). It removes

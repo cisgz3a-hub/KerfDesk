@@ -154,7 +154,7 @@ describe('external G-code program review (ADR-630)', () => {
 });
 
 describe('external program stops (ADR-630)', () => {
-  // M1 differs per firmware: program-stops.test.ts (ADR-630 Amendment 5).
+  // M1 differs per firmware: program-stops.test.ts (ADR-630 Amendment 7).
   it("says an M0 stop waits for the machine's own cycle start", () => {
     const stopped = review('G21 G90\nG0 X0 Y0\nM0\nG1 X10 F100 S50\nM5\n').warnings.join('\n');
     expect(stopped).toContain('stops with M0. The controller holds there');

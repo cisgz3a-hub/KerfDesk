@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ControllerKind } from '../devices';
 import { externalProgramBaseline, normalizeExternalProgram } from './normalize-external-program';
 
-// Controller audit v4 E4-P2-2 (ADR-630 Amendment 5): FluidNC works out `#`
+// Controller audit v4 E4-P2-2 (ADR-630 Amendment 7): FluidNC works out `#`
 // parameters, `[ ]` expressions and O-word flow control as it runs, and the
 // Inspector reads none of them, so such a program is refused rather than
 // framed along a path that does not run.
@@ -19,7 +19,7 @@ function sendsAs(text: string, kind: ControllerKind): string {
   return result.program.gcode;
 }
 
-describe('FluidNC and grblHAL evaluated syntax (ADR-630 Amendment 5)', () => {
+describe('FluidNC and grblHAL evaluated syntax (ADR-630 Amendment 7)', () => {
   it("refuses the audit's FluidNC program, whose Frame stopped at X10 while it ran to X120", () => {
     const reasons = refusal('G1 X10 F1000\n#1 = 120\nG1 X#1\n', 'fluidnc');
     expect(reasons).toEqual([

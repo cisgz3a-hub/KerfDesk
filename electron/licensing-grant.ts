@@ -1,4 +1,3 @@
-import { randomBytes } from 'node:crypto';
 import { checkGrantTime, grantTimeChecked } from './licensing-clock.js';
 import type { LicencePayment } from './licensing-commerce.js';
 import type { LicensingConfig } from './licensing-config.js';
@@ -61,13 +60,6 @@ export function renewalIdentity(
     : undefined;
 }
 
-/** A service call. A refresh also keeps the random nonce it sends (ADR-592 Amendment 1). */
-export type GrantCall = {
-  readonly path: string;
-  readonly body: unknown;
-  readonly nonce?: string;
-};
-
 /** The service call for an action, or null when a refresh has nothing to refresh. */
 export function grantRequest(
   config: LicensingConfig,
@@ -80,17 +72,15 @@ export function grantRequest(
     /** The firmware digest a trial is also bound to, when this computer has one (ADR-592). */
     readonly hardwareId?: string | null | undefined;
   },
-): GrantCall | null {
+): { readonly path: string; readonly body: unknown } | null {
   const { action, saved, device } = request;
-  if (action === 'refresh') {
-    if (saved.credential === undefined) return null;
-    const nonce = randomBytes(32).toString('base64url');
-    return {
-      path: '/v1/activations/refresh',
-      body: { ...requireActivationBody(config, saved.credential, device), refreshNonce: nonce },
-      nonce,
-    };
-  }
+  if (action === 'refresh')
+    return saved.credential === undefined
+      ? null
+      : {
+          path: '/v1/activations/refresh',
+          body: requireActivationBody(config, saved.credential, device),
+        };
   return {
     path: action === 'trial' ? '/v1/trials/start' : '/v1/licenses/activate',
     body: {
@@ -105,25 +95,20 @@ export function grantRequest(
 }
 
 /**
- * Checks a service grant for this device. A grant that signs a refresh nonce
- * must sign back the one this request sent: a saved answer replayed later
- * signs an older nonce and is refused (ADR-592 Amendment 1), so it cannot
- * stand in for a refresh that would have carried a trial's check-in or a
- * refund. A trial or developer grant issued more than five minutes from this
- * computer's clock throws LicenceClockError. A paid grant is accepted whatever
- * the clock says: its rights never end, so the clock cannot change them
- * (ADR-623 Amendment 2).
+ * Checks a service grant for this device. A trial or developer grant issued
+ * more than five minutes from this computer's clock throws LicenceClockError.
+ * A paid grant is accepted whatever the clock says: its rights never end, so
+ * the clock cannot change them (ADR-623 Amendment 2). A `refreshNonce` claim,
+ * which grants answering 1.0.21 and 1.0.22 carry, is not checked (ADR-592
+ * Amendment 3).
  */
 export function verifyGrant(
   config: LicensingConfig,
   value: unknown,
   device: string,
   now: number,
-  nonce?: string,
 ): VerifiedGrant {
   const grant = verifySignedGrant(config, value, device);
-  if (grant.claims.refreshNonce !== undefined && grant.claims.refreshNonce !== nonce)
-    throw new Error('Replayed entitlement');
   if (grantTimeChecked(grant.claims)) checkGrantTime(grant.claims.issuedAt, now);
   return grant;
 }

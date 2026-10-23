@@ -125,14 +125,3 @@ export function trialClaims(patch: Partial<LicenceClaims> = {}): LicenceClaims {
 export function grant(claim: LicenceClaims = claims()): Response {
   return Response.json({ entitlement: envelope(claim), activationToken: token });
 }
-/** The nonce a refresh request sent, or undefined for any other request. */
-export function sentNonce(init: RequestInit): string | undefined {
-  return (JSON.parse(String(init.body)) as { refreshNonce?: string }).refreshNonce;
-}
-/** A current service: it signs back the nonce its refresh request sent (ADR-592 Amendment 1). */
-export function answering(claim: LicenceClaims = claims()) {
-  return async (_url: string, init: RequestInit): Promise<Response> => {
-    const nonce = sentNonce(init);
-    return grant(nonce === undefined ? claim : { ...claim, refreshNonce: nonce });
-  };
-}

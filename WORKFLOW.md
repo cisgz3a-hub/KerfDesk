@@ -9568,7 +9568,7 @@ spindle still on at the end, a tool change (`M6`), program stops (`M0`/`M1`, sen
 the controller holds at `M0` until the machine's own cycle start; KerfDesk's Resume does not
 release it. Stock GRBL and FluidNC ignore `M1`, so the review says the program runs straight
 through it and to use `M0`; grblHAL holds at `M1` too, unless optional stop is turned off; ADR-630
-Amendment 5), KerfDesk's own bit change at an `M0` (its `; tool change: load` comments, read from the
+Amendment 7), KerfDesk's own bit change at an `M0` (its `; tool change: load` comments, read from the
 file as opened: the controller takes no jog or Zero Z in that stop and the new bit's spindle
 start and plunge are already sent, so the new bit would cut at the old bit's Z zero; ADR-392
 Amendment 2), a program that looks like the other machine mode, zero XY extent (the Frame visits a
@@ -9590,11 +9590,17 @@ backspace and DEL) outside a comment, holds a line a GRBL-family controller reje
 commands from one modal group such as `G90G91`, two commands that take the axis words, or a
 repeated word: `error:21`, `24`, `25`), holds on FluidNC or grblHAL a `#` parameter, a `[ ]`
 expression or O-word flow control, which the controller works out as it runs and the Inspector
-cannot trace (ADR-630 Amendment 5), or the Inspector cannot construct a finite motion
+cannot trace (ADR-630 Amendment 7), or the Inspector cannot construct a finite motion
 envelope. Other control characters (a DOS end-of-file Ctrl-Z, a form feed) are dropped, as
-GRBL discards them. One refusal is policy, not fact: a `$` controller command (also behind a
+GRBL discards them. Two refusals are policy, not fact. A `$` controller command (also behind a
 `/` or spaces, or FluidNC's bracket form such as `[J]`) belongs in the Console, because GRBL
-runs it only while Idle and the Frame cannot trace what it moves (ADR-630 Amendment 1). A line longer than the connected
+runs it only while Idle and the Frame cannot trace what it moves (ADR-630 Amendment 1). The
+other is a line the connected controller hands to its shell, its files or a stored program: on
+Smoothieware a line starting with a lowercase letter, `M1000` and the SD-card and config-file
+M-codes; on Marlin SD-card writes and prints, `M500` and `M997`; on grblHAL `G65`, `G66`,
+`M98` and a named `O<…> call`. `M30` with a file name is refused; a bare `M30` still ends the
+program. The review names each such line and what the controller would do with it (ADR-630
+Amendment 5). A line longer than the connected
 controller's line or receive buffer (ADR-375) is named before Frame and keeps Frame unavailable.
 
 #### Not included

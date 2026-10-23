@@ -306,7 +306,7 @@ describe('Run G-code file dialog (ADR-630)', () => {
     expect([...body.querySelectorAll('button')].map((each) => each.textContent)).toEqual(['Close']);
   });
 
-  // Controller audit v4 E4-P2-2 (ADR-630 Amendment 5): FluidNC would run to
+  // Controller audit v4 E4-P2-2 (ADR-630 Amendment 7): FluidNC would run to
   // X120 where the Frame traced X10, so the file is not framed at all.
   it('refuses a FluidNC program it cannot trace, with no Frame or Start', async () => {
     useLaserStore.setState({ activeControllerKind: 'fluidnc' });
@@ -315,6 +315,17 @@ describe('Run G-code file dialog (ADR-630)', () => {
     expect(body.textContent).toContain(
       'Line 2 (#1=120) uses a # parameter, which FluidNC works out as the program runs.',
     );
+    expect([...body.querySelectorAll('button')].map((each) => each.textContent)).toEqual(['Close']);
+  });
+
+  it('names Smoothieware shell and SD-card lines it will not send (ADR-630 Amendment 5)', async () => {
+    useLaserStore.setState({ activeControllerKind: 'smoothieware' });
+    const body = await show('G21\nversion\nG0 X1\nM28 notes.txt\n');
+    expect(body.textContent).toContain('will not send this file as a job');
+    expect(body.textContent).toContain(
+      'Line 2 (version) starts with a lowercase letter, so Smoothieware runs it as a shell command',
+    );
+    expect(body.textContent).toContain('Line 4 (M28notes.txt) is M28');
     expect([...body.querySelectorAll('button')].map((each) => each.textContent)).toEqual(['Close']);
   });
 });

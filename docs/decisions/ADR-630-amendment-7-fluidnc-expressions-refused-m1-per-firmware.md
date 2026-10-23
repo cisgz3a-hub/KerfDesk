@@ -1,4 +1,4 @@
-## ADR-630 Amendment 5 - FluidNC and grblHAL expressions are refused, and M1 is described per firmware (2026-10-23)
+## ADR-630 Amendment 7 - FluidNC and grblHAL expressions are refused, and M1 is described per firmware (2026-10-23)
 
 **Status:** Accepted. Amends ADR-630 "What is sent" (Refusals) and "Review and Start". Keeps PROJECT.md
 non-negotiable 21 and ADR-565: the completed Frame stays the only ordinary Start gate. Fixes
@@ -37,7 +37,9 @@ controller audit v4 findings E4-P2-2 and E4-P2-3. | **Date:** 2026-10-23
    reason names the line, the syntax (`a # parameter`, `a [ ] expression` or `O-word flow
    control`) and the firmware, and asks for the program to be saved with plain numbers. The check
    runs before the `*` checksum check, so `X[5*2]` is named as an expression. A line that *starts*
-   with `[` keeps its own refusal, because FluidNC runs it as a `$` command.
+   with `[` keeps its own refusal, because FluidNC runs it as a `$` command, and a grblHAL
+   stored-program call (`O<…> call`, `M98`) keeps Amendment 5's shell, file and stored-program
+   refusal, which is checked first.
    - **Why not evaluate it.** Evaluating would mean reproducing FluidNC's expression language and
      its parameter store. Those values can depend on the controller at run time: work offsets,
      the current position, probe results, and FluidNC's config items. KerfDesk does not hold them

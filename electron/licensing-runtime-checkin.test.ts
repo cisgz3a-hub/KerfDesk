@@ -1,7 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import { createLicensingRuntime } from './licensing-runtime';
 import {
-  answering,
   claims,
   grant,
   harness,
@@ -138,7 +137,7 @@ it.each([
 );
 it('still refuses a trial or developer grant from a clock that is off, but never a paid one', async () => {
   const trial = harness({ ...saved(trialClaims()), refreshedAt: NOW / 1000 });
-  trial.fetch.mockImplementation(answering(trialClaims({ issuedAt: NOW / 1000 - 3600 })));
+  trial.fetch.mockResolvedValue(grant(trialClaims({ issuedAt: NOW / 1000 - 3600 })));
   expect(await trial.runtime.refresh()).toMatchObject({ state: 'clock-error', tier: 'trial' });
   expect(trial.saved()?.credential).toEqual(saved(trialClaims()).credential);
   const developer = harness();

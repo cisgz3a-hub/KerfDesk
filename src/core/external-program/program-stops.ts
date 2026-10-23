@@ -1,5 +1,5 @@
 // program-stops — what the Run review says about a program's M0 and M1
-// (ADR-630 Amendment 5, controller audit v4 E4-P2-3). An external run sends
+// (ADR-630 Amendment 7, controller audit v4 E4-P2-3). An external run sends
 // both unchanged, so any hold is the controller's own. M0 holds on every
 // controller. M1 is an optional stop: stock GRBL and FluidNC take it and do
 // nothing, so the program runs straight on, while grblHAL holds unless its
