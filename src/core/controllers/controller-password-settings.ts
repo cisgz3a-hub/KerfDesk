@@ -40,6 +40,10 @@ const NOT_REMOVED = String.raw`(?!\[password removed\])`;
 // grblHAL reads setting IDs numerically; the Console also accepts padded IDs.
 // Ignore horizontal blanks inside that word without masking neighboring IDs.
 // https://github.com/grblHAL/core/blob/4ec1ae44b857a70d2f9298344feac4b43ed0eb6b/system.c#L1203-L1213
+// read_float stops at a suffix and isintf tolerates a small fraction; the
+// caller never requires the whole key to be consumed. Redact those suffixes
+// conservatively, but leave digit continuations such as `$7500` alone.
+// https://github.com/grblHAL/core/blob/4ec1ae44b857a70d2f9298344feac4b43ed0eb6b/nuts_bolts.c#L249-L317
 const PASSWORD_SETTING_ID_WORDS = GRBLHAL_PASSWORD_SETTING_IDS.map((id) =>
   String(id)
     .split('')
@@ -48,7 +52,7 @@ const PASSWORD_SETTING_ID_WORDS = GRBLHAL_PASSWORD_SETTING_IDS.map((id) =>
 
 const PASSWORD_ASSIGNMENTS: ReadonlyArray<RegExp> = [
   new RegExp(
-    String.raw`(\$[ \t]*(?:\+[ \t]*)?(?:0[ \t]*)*(?:${PASSWORD_SETTING_ID_WORDS})(?:[ \t]*\.(?:[ \t]*0)*)?[ \t]*=)${NOT_REMOVED}[^\r\n]*`,
+    String.raw`(\$[ \t]*(?:\+[ \t]*)?(?:0[ \t]*)*(?:${PASSWORD_SETTING_ID_WORDS})(?![ \t]*\d)[^=\r\n]*=)${NOT_REMOVED}[^\r\n]*`,
     'g',
   ),
   new RegExp(String.raw`(\$[\w/]*password\s*=)${NOT_REMOVED}[^\r\n]*`, 'gi'),

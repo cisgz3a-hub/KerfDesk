@@ -26,14 +26,15 @@ only; no hardware was operated.
    password setting as `[password hidden]`, and the table search does not match it. **Copy
    visible** in the Super console removes grblHAL and FluidNC password assignments. Only the
    exported backup keeps them, for a restore, as before. Numeric password differences are hidden
-   too, and setting-ID padding cannot reveal a password in copied text.
+   too, and setting-ID aliases accepted by the controller cannot reveal a password in copied text.
 5. **A program that feeds only by arcs is not empty (ADR-392 Amendment 2).** Preflight's
    empty-output rule, the standalone surfacing preflight and the per-bit tile split count a
    `G1`, `G2` or `G3` in integer spellings (`G01`, `G2.0`, packed words), from one shared
    test that ignores comments.
 6. **A dismissed camera-moved warning covers that episode only (amends ADR-663 Amendment 3).**
    Dismiss keeps the warning quiet while the camera stays where it was: same calibration and
-   less than a further 1 mm of shift. A view confirmed steady since (a nudge fix, a kept check)
+   less than 1 mm from the dismissed position, including a move in another direction or back
+   towards the reference. A view confirmed steady since (a nudge fix, a kept check)
    ends the dismissal. A nudge fix keeps `calibratedAt`, so keying on the calibration alone
    silenced every later move until a full recalibration. The closed-panel toast follows the same
    re-arm transition, including several smaller shifts that cross the dismissal threshold.
@@ -44,7 +45,8 @@ only; no hardware was operated.
    now refuses two `docs/decisions/` files claiming the same decision and amendment number. It
    found two "ADR-378 Amendment 1" files from 2026-09-29: the storage-refusal amendment landed
    first and keeps 1, the dropped-project amendment becomes Amendment 2.
-   Amendment numbers compare numerically, so zero padding does not hide a collision.
+   Amendment numbers compare numerically, so zero padding does not hide a collision. An
+   amendment file's heading must name the same amendment as its filename.
 
 ### Not changed
 

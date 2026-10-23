@@ -14,7 +14,12 @@ import { useCameraStore } from '../../state/camera-store';
 import { resetStore } from '../../state/test-helpers';
 import { useToastStore } from '../../state/toast-store';
 import { CameraMovedNotice } from '../panel/CameraMovedNotice';
-import { checkCameraMoved, markCameraSteady, useCameraMovedStore } from './moved-check';
+import {
+  cameraMovedWarningDismissed,
+  checkCameraMoved,
+  markCameraSteady,
+  useCameraMovedStore,
+} from './moved-check';
 import { saveViewReference } from './view-reference';
 
 const source = {
@@ -136,6 +141,30 @@ describe('checkCameraMoved', () => {
     checkCameraMoved(source, frame(12, -7));
     expect(useToastStore.getState().toasts).toHaveLength(1);
   });
+
+  it.each([
+    ['reverses direction', 12, -7, -12, 7],
+    ['moves back toward the reference', 20, -7, 12, -7],
+  ] as const)('re-arms after the camera %s from its dismissed position', (kind, x, y, nx, ny) => {
+    useCameraStore.setState({ panelOpen: false });
+    saveViewReference(record, viewThumbnail(frame(0, 0)));
+    const first = checkCameraMoved(source, frame(x, y));
+    if (first.kind !== 'moved') throw new Error('Expected the initial camera move');
+    useCameraMovedStore.getState().dismiss();
+    useToastStore.getState().dismissToastKey('camera-moved');
+
+    const next = checkCameraMoved(source, frame(nx, ny));
+    if (next.kind !== 'moved') throw new Error('Expected another camera move');
+    if (kind === 'reverses direction') expect(Math.abs(next.mm - first.mm)).toBeLessThan(1);
+    else expect(next.mm).toBeLessThan(first.mm - 1);
+    expect(
+      cameraMovedWarningDismissed(next, useCameraMovedStore.getState().dismissedFor),
+      JSON.stringify({ first, next }),
+    ).toBe(false);
+    expect(useToastStore.getState().toasts.map((toast) => toast.message)).toEqual([
+      `The camera may have moved, by about ${next.mm.toFixed(1)} mm. Open Camera to fix it.`,
+    ]);
+  });
   it('does not check a camera on the laser head', () => {
     const head = {
       ...record,
@@ -150,7 +179,12 @@ describe('checkCameraMoved', () => {
 describe('the warning in the Camera panel', () => {
   it('offers the fix and the check, and Dismiss keeps it quiet for this calibration', async () => {
     useCameraMovedStore.setState({
-      state: { kind: 'moved', mm: 2.4, calibratedAt: record.calibratedAt },
+      state: {
+        kind: 'moved',
+        mm: 2.4,
+        offsetMm: { x: 2.4, y: 0 },
+        calibratedAt: record.calibratedAt,
+      },
     });
     const host = await mountControl(<CameraMovedNotice />);
     expect(host.textContent).toContain('The camera may have moved, by about 2.4 mm.');
@@ -160,7 +194,12 @@ describe('the warning in the Camera panel', () => {
     expect(host.textContent).toBe('');
     await act(async () =>
       useCameraMovedStore.setState({
-        state: { kind: 'moved', mm: 3, calibratedAt: record.calibratedAt },
+        state: {
+          kind: 'moved',
+          mm: 3,
+          offsetMm: { x: 3, y: 0 },
+          calibratedAt: record.calibratedAt,
+        },
       }),
     );
     expect(host.textContent).toBe('');
@@ -170,7 +209,12 @@ describe('the warning in the Camera panel', () => {
   // keyed on the calibration alone silenced every later move for good.
   it('warns again after the view was confirmed steady, or for a clearly bigger move', async () => {
     useCameraMovedStore.setState({
-      state: { kind: 'moved', mm: 2.4, calibratedAt: record.calibratedAt },
+      state: {
+        kind: 'moved',
+        mm: 2.4,
+        offsetMm: { x: 2.4, y: 0 },
+        calibratedAt: record.calibratedAt,
+      },
     });
     const host = await mountControl(<CameraMovedNotice />);
     await clickControl(host, 'Dismiss');
@@ -178,7 +222,12 @@ describe('the warning in the Camera panel', () => {
 
     await act(async () =>
       useCameraMovedStore.setState({
-        state: { kind: 'moved', mm: 3.6, calibratedAt: record.calibratedAt },
+        state: {
+          kind: 'moved',
+          mm: 3.6,
+          offsetMm: { x: 3.6, y: 0 },
+          calibratedAt: record.calibratedAt,
+        },
       }),
     );
     expect(host.textContent).toContain('by about 3.6 mm');
@@ -188,7 +237,12 @@ describe('the warning in the Camera panel', () => {
     expect(useCameraMovedStore.getState().dismissedFor).toBeNull();
     await act(async () =>
       useCameraMovedStore.setState({
-        state: { kind: 'moved', mm: 1.5, calibratedAt: record.calibratedAt },
+        state: {
+          kind: 'moved',
+          mm: 1.5,
+          offsetMm: { x: 1.5, y: 0 },
+          calibratedAt: record.calibratedAt,
+        },
       }),
     );
     expect(host.textContent).toContain('by about 1.5 mm');

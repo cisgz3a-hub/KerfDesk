@@ -51,11 +51,26 @@ describe('controller password settings', () => {
     },
   );
 
+  it.each([
+    '$75x=SyntheticWifi',
+    '$+077.0001=SyntheticAP',
+    '$0330.0001=SyntheticAdmin',
+    '$0331tail=SyntheticUser',
+    '$0 5 3 3 . 000001suffix=SyntheticBroker',
+  ])('masks the numeric password prefix grblHAL accepts in %s', (command) => {
+    expect(prepareConsoleCommand(command).ok).toBe(true);
+    const prefix = command.slice(0, command.indexOf('=') + 1);
+    expect(maskControllerPasswords(command)).toBe(`${prefix}[password removed]`);
+  });
+
   it('leaves other settings alone and does not run on into escaped text', () => {
     for (const text of [
       '$7500=1',
       '$07500=1',
       '$03310=1',
+      '$75 00=1',
+      '$0331 0=1',
+      '$5330suffix=1',
       '$1075=1',
       '$74=MyNetwork',
       '$532=mqtt-user',

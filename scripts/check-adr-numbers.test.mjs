@@ -139,6 +139,34 @@ test('lets different decisions share an amendment number', () => {
   assert.equal(code, 0);
 });
 
+for (const heading of ['#', '##']) {
+  for (const newline of ['\n', '\r\n']) {
+    test(`rejects an amendment number mismatch in a ${heading} heading with ${JSON.stringify(newline)}`, () => {
+      const { code, output } = runGate(UNIQUE_DECISIONS, newline, {
+        'ADR-2-amendment-1-first.md': ['## ADR-2 Amendment 1 - First', ''],
+        'ADR-2-amendment-2-renamed.md': [`${heading} ADR-2 Amendment 1 - Still claims one`, ''],
+      });
+      assert.equal(code, 1);
+      assert.match(output, /heading says ADR-2 Amendment 1, filename says ADR-2 Amendment 2/);
+    });
+  }
+
+  test(`accepts numerically matching padded amendment identities in a ${heading} heading`, () => {
+    const { code } = runGate(UNIQUE_DECISIONS, '\n', {
+      'ADR-002-amendment-03-padded.md': [`${heading} ADR-2 Amendment 003 - Same identity`, ''],
+    });
+    assert.equal(code, 0);
+  });
+
+  test(`rejects an amendment heading with a different decision number in a ${heading} heading`, () => {
+    const { code, output } = runGate(UNIQUE_DECISIONS, '\n', {
+      'ADR-2-amendment-1-mislabelled.md': [`${heading} ADR-1 Amendment 1 - Wrong decision`, ''],
+    });
+    assert.equal(code, 1);
+    assert.match(output, /heading says ADR-1 Amendment 1, filename says ADR-2 Amendment 1/);
+  });
+}
+
 test('rejects a decision file whose heading disagrees with its filename', () => {
   const { code, output } = runGate(UNIQUE_DECISIONS, '\n', {
     'ADR-9-mislabelled.md': ['## ADR-8 - Heading says something else', ''],

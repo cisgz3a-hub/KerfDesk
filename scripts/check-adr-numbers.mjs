@@ -30,6 +30,7 @@ const DECISION_DIR = join('docs', 'decisions');
 // number, so anchoring on a separator would silently skip whole sections.
 const HEADING_PATTERN = /^## ADR-(\d+)(.*)$/;
 const AMENDMENT_PATTERN = /^\s+Amendment\b/;
+const AMENDMENT_HEADING_PATTERN = /^#{1,2} ADR-(\d+)\s+Amendment\s+(\d+)\b/;
 // `ADR-344-slug.md`, or `ADR-311-amendment-1-slug.md` for an amendment file.
 const FILENAME_PATTERN = /^ADR-(\d+)(-amendment-\d+)?-[a-z0-9-]+\.md$/u;
 
@@ -90,8 +91,22 @@ for (const name of decisionFiles()) {
   }
   const expected = Number(claimed[1]);
   if (claimed[2] !== undefined) {
-    const key = `ADR-${expected} Amendment ${Number(claimed[2].slice('-amendment-'.length))}`;
+    const expectedAmendment = Number(claimed[2].slice('-amendment-'.length));
+    const key = `ADR-${expected} Amendment ${expectedAmendment}`;
     amendmentFiles.set(key, [...(amendmentFiles.get(key) ?? []), join(DECISION_DIR, name)]);
+    // Some amendment files use a top-level title. Check either title depth so
+    // renaming a colliding file cannot leave its old amendment identity behind.
+    readLines(join(DECISION_DIR, name)).forEach((line, index) => {
+      const heading = AMENDMENT_HEADING_PATTERN.exec(line);
+      if (heading === null) return;
+      const number = Number(heading[1]);
+      const amendment = Number(heading[2]);
+      if (number !== expected || amendment !== expectedAmendment) {
+        misnamed.push(
+          `  ${join(DECISION_DIR, name)}:${index + 1}  heading says ADR-${number} Amendment ${amendment}, filename says ${key}`,
+        );
+      }
+    });
   }
   let claimsItsNumber = false;
   collectHeadings(join(DECISION_DIR, name), join(DECISION_DIR, name), (number, line, amendment) => {
