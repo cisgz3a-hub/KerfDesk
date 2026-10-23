@@ -2,6 +2,8 @@
   "schemaVersion": 1,
   "sinceSourceSha": "b9202d5aa604949bab957595f6d3db7e4b0e770c",
   "highlights": [
-    "Licence check-ins are simpler: the app no longer sends or checks a one-time code with each check-in, in line with paid licences that keep working offline, as in LightBurn."
+    "Licence check-ins are simpler: the app no longer sends or checks a one-time code with each check-in, in line with paid licences that keep working offline, as in LightBurn.",
+    "Run G-code file is safer: it refuses shell, file, stored-program and FluidNC/grblHAL expression commands, explains M1 per firmware, and forgets the work offsets and Z the program may have changed.",
+    "The Material Test card keeps to its hatch floor, fits its column labels, and burns the gentlest cut first."
   ]
 }
