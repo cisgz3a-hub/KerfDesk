@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "sinceSourceSha": "87ecb4f240deec4e2d161c3306a37f96e0588130",
   "highlights": [
-    "Artwork editing keeps numeric drafts and copied nodes with their intended selection, preserves groups during layout and array edits, and makes text and barcode previews agree with applied results.",
+    "Artwork editing prevents stale numeric and node edits from reaching the wrong artwork, preserves groups during layout and array edits, and makes text and barcode previews agree with applied results.",
     "Project opens and imports honour newer requests and cancellation. Recent files keep their identity across windows, and Snapshot saves preserve a name typed while a save is in progress.",
     "Image Studio keeps resize proportions at size limits, clears stale Clone and crop state, cancels interrupted gestures, and reads colours from the displayed preview.",
-    "CNC adaptive pockets clear islands and remaining stock in the right order, and V-carve flat floors reach inside corners.",
-    "CNC bit changes name the hand-edited feeds they keep. Two-sided work preserves stock-rail arcs, and inlay plug checks follow the cut width at depth.",
+    "CNC adaptive pockets clear around islands and remaining stock in the right order, V-carve flat floors reach inside corners, and tapered inlay plugs use start-depth V-carve geometry.",
+    "CNC bit changes name the hand-edited feeds they keep. Two-sided reliefs follow stock changes, curved relief rails keep their curves, and straight inlay pairs are checked for narrow parts and gaps.",
     "Numeric Auto-focus probes explicitly set millimetres and absolute mode, and projects warn when an unsupported saved focus command is removed."
   ]
 }
