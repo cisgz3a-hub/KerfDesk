@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { prepareConsoleCommand } from './grbl/console-command';
 import {
   GRBLHAL_PASSWORD_SETTING_IDS,
   isGrblhalPasswordSetting,
@@ -26,8 +27,40 @@ describe('controller password settings', () => {
     );
   });
 
+  it.each([
+    '$075=SyntheticWifi',
+    '$00077=SyntheticAP',
+    '$03 30 =SyntheticAdmin',
+    '$0 3 3 1=SyntheticUser',
+    '$ 0 0 5 3 3 =SyntheticBroker',
+  ])('masks the accepted padded password assignment %s', (command) => {
+    expect(prepareConsoleCommand(command)).toMatchObject({
+      ok: true,
+      command: { kind: 'setting-write' },
+    });
+    const prefix = command.slice(0, command.indexOf('=') + 1);
+    expect(maskControllerPasswords(command)).toBe(`${prefix}[password removed]`);
+  });
+
+  it.each(['$+075.000=SyntheticWifi', '$077 . 0 0 =SyntheticAP'])(
+    'masks the equivalent firmware setting ID in %s',
+    (command) => {
+      expect(prepareConsoleCommand(command).ok).toBe(true);
+      const prefix = command.slice(0, command.indexOf('=') + 1);
+      expect(maskControllerPasswords(command)).toBe(`${prefix}[password removed]`);
+    },
+  );
+
   it('leaves other settings alone and does not run on into escaped text', () => {
-    for (const text of ['$7500=1', '$1075=1', '$74=MyNetwork', '$532=mqtt-user', '$330']) {
+    for (const text of [
+      '$7500=1',
+      '$07500=1',
+      '$03310=1',
+      '$1075=1',
+      '$74=MyNetwork',
+      '$532=mqtt-user',
+      '$330',
+    ]) {
       expect(maskControllerPasswords(text)).toBe(text);
     }
     const once = maskControllerPasswords('$77=apSecret77');

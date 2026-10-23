@@ -143,9 +143,12 @@ function publish(state: CameraMovedState): CameraMovedState {
   const before = useCameraMovedStore.getState();
   useCameraMovedStore.setState(state.kind === 'steady' ? { state, dismissedFor: null } : { state });
   // Say it once, where the operator is, when the panel is closed.
+  // Re-arm as the dismissal ends, even across several smaller shifts.
   if (
     state.kind === 'moved' &&
-    (before.state.kind !== 'moved' || before.state.mm + MOVED_MM <= state.mm) &&
+    (before.state.kind !== 'moved' ||
+      cameraMovedWarningDismissed(before.state, before.dismissedFor) ||
+      before.state.mm + MOVED_MM <= state.mm) &&
     !cameraMovedWarningDismissed(state, before.dismissedFor) &&
     !useCameraStore.getState().panelOpen
   ) {

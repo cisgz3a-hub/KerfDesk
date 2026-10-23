@@ -75,6 +75,7 @@ beforeEach(() => {
 
 afterEach(() => {
   useCameraStore.setState(initialCamera);
+  useToastStore.getState().dismissToastKey('camera-moved');
 });
 
 describe('checkCameraMoved', () => {
@@ -102,6 +103,39 @@ describe('checkCameraMoved', () => {
     expect(useToastStore.getState().toasts).toHaveLength(1);
   });
 
+  it('toasts again when small shifts cumulatively cross the dismissed move threshold', () => {
+    useCameraStore.setState({ panelOpen: false });
+    saveViewReference(record, viewThumbnail(frame(0, 0)));
+    const first = checkCameraMoved(source, frame(12, -7));
+    if (first.kind !== 'moved') throw new Error('Expected the initial camera move');
+    useCameraMovedStore.getState().dismiss();
+    useToastStore.getState().dismissToastKey('camera-moved');
+
+    const next = checkCameraMoved(source, frame(13, -7));
+    if (next.kind !== 'moved') throw new Error('Expected the next camera move');
+    expect(next.mm - first.mm).toBeGreaterThan(0);
+    expect(next.mm - first.mm).toBeLessThan(1);
+    expect(useToastStore.getState().toasts).toHaveLength(0);
+
+    const crossed = checkCameraMoved(source, frame(14, -7));
+    if (crossed.kind !== 'moved') throw new Error('Expected the accumulated camera move');
+    expect(crossed.mm - next.mm).toBeGreaterThan(0);
+    expect(crossed.mm - next.mm).toBeLessThan(1);
+    expect(crossed.mm - first.mm).toBeGreaterThanOrEqual(1);
+    expect(useToastStore.getState().toasts.map((toast) => toast.message)).toEqual([
+      `The camera may have moved, by about ${crossed.mm.toFixed(1)} mm. Open Camera to fix it.`,
+    ]);
+    const toast = useToastStore.getState().toasts[0];
+    checkCameraMoved(source, frame(14, -7));
+    expect(useToastStore.getState().toasts[0]).toBe(toast);
+
+    useCameraMovedStore.getState().dismiss();
+    useToastStore.getState().dismissToastKey('camera-moved');
+    expect(checkCameraMoved(source, frame(0, 0))).toEqual({ kind: 'steady' });
+    expect(useCameraMovedStore.getState().dismissedFor).toBeNull();
+    checkCameraMoved(source, frame(12, -7));
+    expect(useToastStore.getState().toasts).toHaveLength(1);
+  });
   it('does not check a camera on the laser head', () => {
     const head = {
       ...record,

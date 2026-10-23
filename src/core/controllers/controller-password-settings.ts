@@ -37,9 +37,18 @@ export function shownControllerSettingValue(id: number, rawValue: string): strin
 // A value already removed is left alone, so a second pass over text whose line
 // breaks were escaped keeps what follows them.
 const NOT_REMOVED = String.raw`(?!\[password removed\])`;
+// grblHAL reads setting IDs numerically; the Console also accepts padded IDs.
+// Ignore horizontal blanks inside that word without masking neighboring IDs.
+// https://github.com/grblHAL/core/blob/4ec1ae44b857a70d2f9298344feac4b43ed0eb6b/system.c#L1203-L1213
+const PASSWORD_SETTING_ID_WORDS = GRBLHAL_PASSWORD_SETTING_IDS.map((id) =>
+  String(id)
+    .split('')
+    .join(String.raw`[ \t]*`),
+).join('|');
+
 const PASSWORD_ASSIGNMENTS: ReadonlyArray<RegExp> = [
   new RegExp(
-    String.raw`(\$\s*(?:${GRBLHAL_PASSWORD_SETTING_IDS.join('|')})\s*=)${NOT_REMOVED}[^\r\n]*`,
+    String.raw`(\$[ \t]*(?:\+[ \t]*)?(?:0[ \t]*)*(?:${PASSWORD_SETTING_ID_WORDS})(?:[ \t]*\.(?:[ \t]*0)*)?[ \t]*=)${NOT_REMOVED}[^\r\n]*`,
     'g',
   ),
   new RegExp(String.raw`(\$[\w/]*password\s*=)${NOT_REMOVED}[^\r\n]*`, 'gi'),

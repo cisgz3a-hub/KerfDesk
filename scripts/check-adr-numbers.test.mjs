@@ -123,6 +123,14 @@ test('rejects two amendment files that claim the same amendment number', () => {
   assert.match(output, /ADR-2-amendment-3-second\.md/);
 });
 
+test('rejects numerically duplicate amendment numbers', () => {
+  const { code, output } = runGate(UNIQUE_DECISIONS, '\n', {
+    'ADR-2-amendment-3-first.md': ['## ADR-2 Amendment 3 - First', ''],
+    'ADR-2-amendment-03-second.md': ['## ADR-2 Amendment 3 - Second', ''],
+  });
+  assert.equal(code, 1);
+  assert.match(output, /ADR-2 Amendment 3 claimed 2x/);
+});
 test('lets different decisions share an amendment number', () => {
   const { code } = runGate(UNIQUE_DECISIONS, '\n', {
     'ADR-1-amendment-1-for-one.md': ['## ADR-1 Amendment 1 - For one', ''],

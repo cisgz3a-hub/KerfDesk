@@ -1,5 +1,8 @@
 import { useMemo, useState } from 'react';
-import { shownControllerSettingValue } from '../../../core/controllers/controller-password-settings';
+import {
+  isGrblhalPasswordSetting,
+  shownControllerSettingValue,
+} from '../../../core/controllers/controller-password-settings';
 import type { GrblSettingRow } from '../../../core/controllers/grbl';
 import { compareSettingsSnapshots } from '../../../core/controllers/grbl/compare-settings-snapshots';
 import type { ControllerKind, DeviceProfile } from '../../../core/devices';
@@ -299,7 +302,11 @@ function ComparisonRow(props: {
       </td>
       <td style={valueCellStyle}>{shownSnapshotValue(props.row.id, props.row.leftRawValue)}</td>
       <td style={valueCellStyle}>{shownSnapshotValue(props.row.id, props.row.rightRawValue)}</td>
-      <td style={valueCellStyle}>{formatDelta(props.row.delta, props.row.percentDeltaFromLeft)}</td>
+      <td style={valueCellStyle}>
+        {isGrblhalPasswordSetting(props.row.id)
+          ? '-'
+          : formatDelta(props.row.delta, props.row.percentDeltaFromLeft)}
+      </td>
       <td style={cellStyle}>{comparisonLabel(props.row.status)}</td>
     </tr>
   );

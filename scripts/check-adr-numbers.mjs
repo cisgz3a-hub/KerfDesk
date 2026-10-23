@@ -90,7 +90,7 @@ for (const name of decisionFiles()) {
   }
   const expected = Number(claimed[1]);
   if (claimed[2] !== undefined) {
-    const key = `ADR-${expected} Amendment ${claimed[2].slice('-amendment-'.length)}`;
+    const key = `ADR-${expected} Amendment ${Number(claimed[2].slice('-amendment-'.length))}`;
     amendmentFiles.set(key, [...(amendmentFiles.get(key) ?? []), join(DECISION_DIR, name)]);
   }
   let claimsItsNumber = false;

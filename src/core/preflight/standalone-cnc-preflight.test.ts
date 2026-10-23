@@ -26,6 +26,25 @@ describe('runStandaloneCncPreflight', () => {
     });
   });
 
+  it.each(['G2', 'G3'])('accepts a program whose only feed is a %s arc', (motion) => {
+    const gcode = VALID_BODY.replace('G0 X0.000 Y0.000', 'G0 X10.000 Y10.000').replace(
+      'G1 Z-0.500 F300.000\nG1 X100.000 F1000.000',
+      `${motion} X20.000 Y10.000 Z-0.500 I5.000 J0.000 F300.000`,
+    );
+    expect(runStandaloneCncPreflight(DEVICE, DEFAULT_CNC_MACHINE_CONFIG, gcode)).toEqual({
+      ok: true,
+      issues: [],
+    });
+  });
+
+  it('accepts zero-decimal motion words without reporting empty output', () => {
+    const gcode = VALID_BODY.replaceAll('G1 ', 'G1.0 ');
+    expect(runStandaloneCncPreflight(DEVICE, DEFAULT_CNC_MACHINE_CONFIG, gcode)).toEqual({
+      ok: true,
+      issues: [],
+    });
+  });
+
   it('blocks a stationary spindle start before safe-Z clearance', () => {
     const unsafe = VALID_BODY.replace('G0 Z3.810\nM3 S12000', 'M3 S12000\nG0 Z3.810');
     const result = runStandaloneCncPreflight(DEVICE, DEFAULT_CNC_MACHINE_CONFIG, unsafe);
