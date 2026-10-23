@@ -20,6 +20,7 @@ import {
 } from '../gcode-view/grbl-block-rejection';
 import { externalProgramBaseline } from './normalize-external-program';
 import { kerfDeskBitChangeWarnings } from './kerfdesk-bit-changes';
+import { programStopWarnings } from './program-stops';
 
 export type ExternalProgramEnvelope = {
   readonly minX: number;
@@ -121,12 +122,6 @@ const COMMAND_WARNINGS: ReadonlyArray<{
     warning:
       'The program asks for a tool change (M6). Stock GRBL does not support M6 and stops with an error there.',
   },
-  {
-    // An external run sends M0/M1 unchanged; the hold is the controller's own.
-    matches: (c) => c.m.has(0) || c.m.has(1),
-    warning:
-      "The program stops with M0 or M1. The controller holds there until the machine's own cycle start is pressed; KerfDesk's Resume does not release a stop the program asked for.",
-  },
 ];
 
 export function reviewExternalProgram(
@@ -152,6 +147,7 @@ export function reviewExternalProgram(
     ...(interpreted?.warnings ?? []),
     ...offsetWriteWarnings(commands),
     ...COMMAND_WARNINGS.filter((check) => check.matches(commands)).map((check) => check.warning),
+    ...programStopWarnings(commands.m, context.controllerKind),
     ...kerfDeskBitChangeWarnings(commands.m.has(0), context.kerfDeskBitChanges ?? []),
     ...coordinateSystemWarnings(model),
     ...(still === undefined ? pointEnvelopeWarnings(reviewedText, model) : [NEVER_MOVES]),
