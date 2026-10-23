@@ -138,7 +138,10 @@ export type GcodeMetadata = {
 // ADR-250 Amd 3 keeps CNC profile leads clear of every part the job keeps.
 // ADR-392 Amd 2 writes a tile that needs several bits as one file per bit (no
 // M0) and sets the bed park aside in tiles; surfacing ladders run no extra pass.
-export const EMITTER_REVISION = 'cnc-tile-files-per-bit-20261023-v25';
+// ADR-140 Amd 2 rises roughing beside every finishing tab, a merged roughing ring
+// included, and cuts a finish allowance of the bit radius or more as the radius,
+// stepping its finishing pass down.
+export const EMITTER_REVISION = 'cnc-finish-allowance-tabs-20261023-v26';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

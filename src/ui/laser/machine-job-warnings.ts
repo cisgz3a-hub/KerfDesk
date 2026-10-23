@@ -15,6 +15,7 @@ import { detectCncAngledToolFeedWarnings } from './cnc-angled-tool-feed-warnings
 import { detectCompiledReliefDepthWarningsForJob } from './cnc-compiled-depth-warnings';
 import { detectCncContourPrecisionWarnings } from './cnc-contour-precision-warnings';
 import { detectCncDefaultFeedWarnings } from './cnc-default-feed-warnings';
+import { detectCncFinishAllowanceWarnings } from './cnc-finish-allowance-warnings';
 import { detectCncFullTabCoverageWarnings } from './cnc-full-tab-coverage-warnings';
 import { detectCncMachineLimitWarnings } from './cnc-machine-limit-warnings';
 import { detectCncMissingPrimaryToolWarnings } from './cnc-missing-primary-tool-warnings';
@@ -56,6 +57,7 @@ export function detectMachineJobWarnings(
           ...detectCncThroughCutTabWarnings(project, job),
           ...detectCncOnPathSizeWarnings(project),
           ...detectCncFullTabCoverageWarnings(project, job),
+          ...detectCncFinishAllowanceWarnings(project),
           ...detectCncDefaultFeedWarnings(project),
           ...detectCncAngledToolFeedWarnings(project),
           ...detectCncUnmodeledBitLayoutWarnings(project),
