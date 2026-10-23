@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { ControllerKind } from '../devices';
 import {
   EXTERNAL_PROGRAM_BASELINE,
   canonicalLine,
@@ -135,6 +136,80 @@ describe('external G-code program normalization (ADR-630)', () => {
     expect(reasons(' [Jog] G91 X100 F600\n')[0]).toContain(
       'Line 1 is a bracket controller command',
     );
+  });
+
+  describe('shell, file and stored-program commands (ADR-630 Amendment 5)', () => {
+    function refusedOn(kind: ControllerKind, text: string): ReadonlyArray<string> {
+      const result = normalizeExternalProgram(text, undefined, kind);
+      if (result.kind !== 'refused') throw new Error(`accepted: ${result.program.gcode}`);
+      return result.reasons;
+    }
+
+    it('refuses Smoothieware shell lines and SD-card or config-file M-codes, naming each line', () => {
+      const program = ['G21', 'version', 'M1000 version', 'M28 notes.txt', 'G1 X10 F600'];
+      const found = refusedOn('smoothieware', [...program, 'M30 notes.txt', 'M500'].join('\n'));
+      expect(found).toEqual([
+        expect.stringContaining('Line 2 (version) starts with a lowercase letter'),
+        expect.stringContaining('Line 3 (M1000version) is M1000'),
+        expect.stringContaining('Line 4 (M28notes.txt) is M28'),
+        expect.stringContaining('Line 6 (M30notes.txt) is M30 with a file name'),
+        expect.stringContaining('Line 7 (M500) is M500'),
+      ]);
+      expect(found[0]).toContain(
+        'KerfDesk does not send shell, file or stored-program commands inside a job',
+      );
+    });
+
+    it('refuses lowercase G-code on Smoothieware, whose shell takes it, but not on GRBL', () => {
+      expect(refusedOn('smoothieware', 'g1 x10 f600\n')[0]).toContain(
+        'Line 1 (g1x10f600) starts with a lowercase letter',
+      );
+      expect(normalizeExternalProgram('g1 x10 f600\n', undefined, 'grbl-v1.1').kind).toBe('ok');
+    });
+
+    it('still sends an ordinary Smoothieware laser program', () => {
+      const program = [
+        '; made elsewhere',
+        'G21',
+        'G90',
+        'M3',
+        'G0 X10 Y10',
+        'G1 X20 Y10 S0.6 F1200',
+        'G1 X20 Y20',
+        'M5',
+        'G0 X0 Y0',
+        'M2',
+      ].join('\n');
+      expect(normalizeExternalProgram(program, undefined, 'smoothieware')).toMatchObject({
+        kind: 'ok',
+        program: {
+          gcode: `${externalProgramBaseline('smoothieware')}\nG21\nG90\nM3\nG0X10Y10\nG1X20Y10S0.6F1200\nG1X20Y20\nM5\nG0X0Y0\nM2\n`,
+        },
+      });
+    });
+
+    it('refuses them for a caller that names Smoothieware only by its baseline', () => {
+      const result = normalizeExternalProgram('reset\n', externalProgramBaseline('smoothieware'));
+      expect(result.kind).toBe('refused');
+    });
+
+    it('refuses Marlin SD-card writes and EEPROM saves, but keeps M30 ending the program', () => {
+      const found = refusedOn('marlin', 'G21\nM28 notes.txt\nM500\nM30 notes.txt\n');
+      expect(found).toEqual([
+        expect.stringContaining('Line 2 (M28 notes.txt) is M28'),
+        expect.stringContaining('Line 3 (M500) is M500, which saves the settings to EEPROM'),
+        expect.stringContaining('Line 4 (M30 notes.txt) is M30 with a file name'),
+      ]);
+      expect(normalizeExternalProgram('G21\nG0 X1\nM30\n', undefined, 'marlin').kind).toBe('ok');
+    });
+
+    it('refuses grblHAL macro and subprogram calls', () => {
+      expect(refusedOn('grblhal', 'G0 X0\nG65 P100\nM98 P100\nO<probe> call\n')).toEqual([
+        expect.stringContaining('Line 2 (G65P100) is G65'),
+        expect.stringContaining('Line 3 (M98P100) is M98'),
+        expect.stringContaining('Line 4 (O<probe>call) calls a named subroutine'),
+      ]);
+    });
   });
 
   it('refuses a block the controller rejects whole, which the Frame would trace as run', () => {
