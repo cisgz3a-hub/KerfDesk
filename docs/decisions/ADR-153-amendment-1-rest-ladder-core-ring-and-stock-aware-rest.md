@@ -67,7 +67,7 @@ ADR-153 as written forbids such a fallback.
    is executable output that cuts the pocket the operator drew, and Job Review discloses it. The
    legacy model keeps ADR-153's rule: an invalid request compiles no pocket for the layer, and
    preflight names the reason.
-4. **Emitter revision** advances to `adaptive-island-strips-rest-cores-20261023-v26`, together
+4. **Emitter revision** advances to `adaptive-island-strips-rest-cores-20261023-v27`, together
    with ADR-154 Amendment 4.
 
 ### Consequences

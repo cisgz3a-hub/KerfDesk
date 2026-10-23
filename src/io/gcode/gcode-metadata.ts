@@ -141,7 +141,7 @@ export type GcodeMetadata = {
 // ADR-154 Amd 4 cuts island adaptive pockets into strips where island bounds
 // cross in open stock and runs each wall cleanup after the clearing beside it;
 // ADR-153 Amd 1 gives rest ladders above 50% stepover a core ring.
-export const EMITTER_REVISION = 'adaptive-island-strips-rest-cores-20261023-v26';
+export const EMITTER_REVISION = 'adaptive-island-strips-rest-cores-20261023-v27';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

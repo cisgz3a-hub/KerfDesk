@@ -78,7 +78,7 @@ height field:
    cannot enter. Job Review then lists "Offset pocket fallback:" with the refusal reason
    (`cnc-adaptive-clearing-invalid`). Open contours and invalid parameters still compile no
    adaptive plan.
-5. **Emitter revision** advances to `adaptive-island-strips-rest-cores-20261023-v26`, together
+5. **Emitter revision** advances to `adaptive-island-strips-rest-cores-20261023-v27`, together
    with ADR-153 Amendment 1.
 
 ### Consequences
