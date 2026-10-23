@@ -4,11 +4,15 @@ import {
   FillRule,
   inflatePathsD,
   intersectD,
+  isPositiveD,
   JoinType,
   unionD,
   type PathD,
   type PathsD,
 } from 'clipper2-ts';
+import { pointInPolygon } from '../geometry';
+import { differenceClosedPolylinesChecked } from '../geometry/polygon-difference';
+import { roundStrokeOutline } from '../geometry/round-stroke-outline';
 import { tryVectorOp } from '../geometry/vector-path-tools';
 import type { Polyline, Vec2 } from '../scene';
 
@@ -31,6 +35,9 @@ const MIN_STEPOVER_PERCENT = 10;
 const MAX_RINGS = 4096;
 const PRECISION_DECIMALS = 3;
 const EPSILON = 1e-9;
+// The pocket ladder's core-ring bisection (pocket-paths.ts).
+const RING_BISECT_ITERATIONS = 24;
+const RING_BISECT_TOLERANCE_MM = 0.01;
 
 export type RestPocketCompletion = 'complete' | 'geometry-failed' | 'pass-limit';
 
@@ -214,7 +221,89 @@ function centerRegionRings(
     const level = levels[index];
     if (level !== undefined) out.push(...level.map(toPolyline));
   }
-  return { toolpaths: out, completion };
+  return withRestCores(
+    target,
+    { toolpaths: out, completion },
+    levels.length * stepMm,
+    stepMm,
+    toolDiameterMm,
+  );
+}
+
+// A stepover past half the clearing width can leave the last ring's sweep
+// short of the target's middle. Every rest slot wider than the bit but
+// narrower than two steps kept a full-depth fin along its middle, and the
+// ladder still reported complete (CNC audit v1 F2-P2-2). The pocket ladder's
+// fix (pocket-paths.ts coreRing and remainingPocketCores, July audit 1.10)
+// applies: each target component gets its deepest ring, found by bisection,
+// and any target still outside every ring's sweep is cut along its outline
+// first. At stepover <= 50% the last ring's sweep always reaches the middle,
+// so the ladder is unchanged (ADR-153 Amendment 1).
+function withRestCores(
+  target: PathsD,
+  ladder: CenterRegionRings,
+  emptyInsetMm: number,
+  stepMm: number,
+  clearingDiameterMm: number,
+): CenterRegionRings {
+  if (!(stepMm > clearingDiameterMm / 2) || ladder.completion !== 'complete') return ladder;
+  const cores = restCores(target, emptyInsetMm, ladder.toolpaths, clearingDiameterMm);
+  return cores === null
+    ? { ...ladder, completion: 'geometry-failed' }
+    : { ...ladder, toolpaths: [...cores, ...ladder.toolpaths] };
+}
+
+// Null is a geometry failure.
+function restCores(
+  target: PathsD,
+  emptyInsetMm: number,
+  rings: ReadonlyArray<Polyline>,
+  clearingDiameterMm: number,
+): ReadonlyArray<Polyline> | null {
+  const deepest: Polyline[] = [];
+  for (const component of targetComponents(target)) {
+    const ring = deepestRing(component, emptyInsetMm);
+    if (ring === null) return null;
+    deepest.push(...ring.map(toPolyline));
+  }
+  const ringed = [...deepest, ...rings];
+  const swept = roundStrokeOutline(ringed, clearingDiameterMm);
+  if (swept === null) return null;
+  const remaining = differenceClosedPolylinesChecked(target.map(toPolyline), swept);
+  return remaining.kind === 'error' ? null : [...remaining.value, ...deepest];
+}
+
+// Largest inset in (0, emptyInsetMm) that still offsets to a ring, by the
+// same bisection as the pocket ladder's deepestRing.
+function deepestRing(component: PathsD, emptyInsetMm: number): PathsD | null {
+  let low = 0;
+  let high = emptyInsetMm;
+  let best: PathsD = [];
+  for (let i = 0; i < RING_BISECT_ITERATIONS && high - low > RING_BISECT_TOLERANCE_MM; i += 1) {
+    const mid = (low + high) / 2;
+    const inset = offset(component, -mid, JoinType.Miter);
+    if (inset === null) return null;
+    if (inset.length === 0) {
+      high = mid;
+    } else {
+      low = mid;
+      best = inset;
+    }
+  }
+  return best;
+}
+
+// Each outer path of the target with the holes inside it.
+function targetComponents(target: PathsD): ReadonlyArray<PathsD> {
+  const outers = target.filter((path) => isPositiveD(path));
+  const holes = target.filter((path) => !isPositiveD(path));
+  return outers.map((outer) => [
+    outer,
+    ...holes.filter((hole) => {
+      const probe = hole[0];
+      return probe !== undefined && pointInPolygon(probe, outer);
+    }),
+  ]);
 }
 
 function offset(paths: PathsD, deltaMm: number, joinType: JoinType): PathsD | null {
