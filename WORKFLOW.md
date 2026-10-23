@@ -1719,6 +1719,15 @@ the completed physical Frame is the spatial source of truth.
 #### Edge — undo across project load
 - History clears on Open / New / Close.
 
+#### Edge — undo or redo while a job runs or is held
+- A running, paused or held job (a CNC bit change included) keeps the machine it started with
+  (ADR-416 Amendment 2). Undo and Redo still step through edits that leave the machine alone. A
+  step that would change Laser / CNC, CNC values such as the safe-Z height, or the machine's
+  controller, work area, origin, homing, jog feeds and limits or Z probing is not applied: the
+  history stays as it is and a warning says to finish or stop the job first. A jump in the Undo
+  list stops at that step. After the job ends, the same Undo or Redo applies.
+- Opening a project on another machine waits for the job the same way; nothing is opened.
+
 ---
 
 ### F-A15. Keyboard shortcuts (full list)
@@ -3713,6 +3722,7 @@ settings and Job Review keep their existing read-only setup references.
    the flow execute and exactly re-read any explicitly queued common firmware writes. While a job
    runs or is held (a CNC bit change included), Save is disabled and says why, as the toolbar's
    Laser / CNC switch is; the draft stays open and saves once the job ends (ADR-416 Amendment 1).
+   Undo, Redo and Open cannot make that change either (ADR-416 Amendment 2, F-A14).
 
 #### Success — configure CNC defaults before artwork exists
 

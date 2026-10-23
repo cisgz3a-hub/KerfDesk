@@ -7,13 +7,10 @@ import {
   type ConstrainedSketchActions,
 } from './constrained-sketch-actions';
 import { reliefAuthoringActions, type ReliefAuthoringActions } from './relief-authoring-actions';
-import { reliefLinkMutationSetter } from './relief-link-mutation';
 import { numberingEditGuardSetter } from './numbering-edit-guard';
+import { storeSetters } from './store-setters';
 import { observeDesignHierarchyDocument } from './design-hierarchy-store';
-import {
-  freeProArtworkSetter,
-  proOperationMutationSetter,
-} from '../licensing/pro-operation-mutation';
+import { proOperationMutationSetter } from '../licensing/pro-operation-mutation';
 import { newlyIntroducedProOperationFeature } from '../licensing/pro-operation-policy';
 import type { SvgFragmentActions } from './svg-fragment-mutation';
 // Zustand store: project/UI state, undo/redo, and dirty/save tracking.
@@ -433,15 +430,8 @@ export type AppState = PartGeneratorActions &
   };
 
 export const useStore = create<AppState>((rawSet, get) => {
-  const documentSet = reliefLinkMutationSetter(rawSet);
-  // Free edits existing Pro work's settings, not its artwork (ADR-592). Document
-  // replacement, history and save tracking keep the unguarded setter.
-  // Refresh linked relief data before checking the resulting artwork, so a
-  // Free edit to a linked vector cannot silently author a different relief.
-  const interactionSet = reliefLinkMutationSetter(freeProArtworkSetter(rawSet));
-  // Canvas numbering holds one interaction open; edits that Cancel would revert
-  // stand down until it closes. Only the interaction itself skips this guard.
-  const set = numberingEditGuardSetter(interactionSet);
+  // The job-machine, Pro and numbering guards, in their order (store-setters.ts).
+  const { documentSet, interactionSet, set } = storeSetters(rawSet);
   return {
     ...initialState(),
     ...projectActions(documentSet, get, initialState, proOperationMutationSetter(set, get)),
