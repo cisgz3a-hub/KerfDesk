@@ -10,7 +10,7 @@
 //   4. All motion fits inside the bed (shared bounds scanner).
 //   5. No-go zones are respected (shared scanner — clamps matter on a router).
 //   6. Z is up on every XY rapid; no rapid plunges (findPlungedTravelIssues).
-//   7. Generated G-code is non-empty (at least one G1 line).
+//   7. Generated G-code is non-empty (at least one G1, G2 or G3 move).
 
 import {
   findCncAdaptivePocketIssues,
@@ -39,6 +39,7 @@ import {
   type CncLayerSettings,
 } from '../scene';
 import { findCncMotionBoundsPreflightIssues } from './cnc-motion-bounds-preflight';
+import { hasCuttingMove } from './cutting-move';
 import { cncOpenContourIssues } from './cnc-open-contour-issues';
 import { cncProfileLeadPlungeIssues } from './cnc-profile-lead-plunge-issues';
 import { findInvalidCncToolGeometry } from './cnc-tool-geometry';
@@ -226,7 +227,7 @@ function rampPlungeReason(plunges: RampEntryPlunges, relief: boolean): string {
 }
 
 function appendEmptyOutputIssue(gcode: string, issues: PreflightIssue[]): void {
-  if (/\bG1\b/.test(gcode)) return;
+  if (hasCuttingMove(gcode)) return;
   issues.push({
     code: 'empty-output',
     message:
