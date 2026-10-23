@@ -287,33 +287,37 @@ describe('laser-store console commands', () => {
     });
   });
 
-  it('invalidates Z truth but preserves XY authority for a console tool-length change', async () => {
-    const connection = makeConnection(async () => undefined, {
-      autoRespondToStatusQuery: true,
-    });
-    await connectWith(connection);
-    connection.emitLine('<Idle|MPos:12.000,34.000,5.000|WCO:12.000,34.000,5.000|FS:0,0>');
-    useLaserStore.setState({
-      workOriginActive: true,
-      workOriginSource: 'g92',
-      workZZeroEvidence: { source: 'manual-zero', referenceEpoch: 7 },
-      workZReferenceEpoch: 7,
-      wcoCache: { x: 12, y: 34, z: 5 },
-      trustedPositionEpoch: 7,
-    });
+  // `G43 H1` and `M61 Q2` are grblHAL tool-table words (ADR-630 Amendment 8).
+  it.each(['G43.1 Z-12.5', 'G43 H1', 'G43.2 H2', 'M61 Q2'])(
+    'invalidates Z truth but preserves XY authority for a console tool-length change (%s)',
+    async (command) => {
+      const connection = makeConnection(async () => undefined, {
+        autoRespondToStatusQuery: true,
+      });
+      await connectWith(connection);
+      connection.emitLine('<Idle|MPos:12.000,34.000,5.000|WCO:12.000,34.000,5.000|FS:0,0>');
+      useLaserStore.setState({
+        workOriginActive: true,
+        workOriginSource: 'g92',
+        workZZeroEvidence: { source: 'manual-zero', referenceEpoch: 7 },
+        workZReferenceEpoch: 7,
+        wcoCache: { x: 12, y: 34, z: 5 },
+        trustedPositionEpoch: 7,
+      });
 
-    await useLaserStore.getState().sendConsoleCommand('G43.1 Z-12.5');
+      await useLaserStore.getState().sendConsoleCommand(command);
 
-    expect(useLaserStore.getState()).toMatchObject({
-      workOriginActive: true,
-      workOriginSource: 'g92',
-      workZZeroEvidence: null,
-      workZReferenceEpoch: 8,
-      wcoCache: null,
-      statusReport: null,
-      trustedPositionEpoch: 8,
-    });
-  });
+      expect(useLaserStore.getState()).toMatchObject({
+        workOriginActive: true,
+        workOriginSource: 'g92',
+        workZZeroEvidence: null,
+        workZReferenceEpoch: 8,
+        wcoCache: null,
+        statusReport: null,
+        trustedPositionEpoch: 8,
+      });
+    },
+  );
 
   it.each([
     ['T2', true],

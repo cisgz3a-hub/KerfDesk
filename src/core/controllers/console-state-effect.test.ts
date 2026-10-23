@@ -16,6 +16,20 @@ describe('commonConsoleStateEffect', () => {
     }
   });
 
+  // ADR-630 Amendment 8 (meta audit M4-P1-2): grblHAL's tool table offsets.
+  it.each(['G43 H1', 'G43H2', 'G43', 'G043.0 H1', 'G43.2 H3', 'G43.20H3', 'M61 Q2', 'M061Q2'])(
+    'recognizes the grblHAL tool length offset word %s',
+    (command) => {
+      expect(commonConsoleStateEffect(command)).toBe('tool');
+      expect(commonConsoleStateEffect(`G92 X0 ${command}`)).toBe('coordinates-all');
+    },
+  );
+
+  it.each(['G43.3 H1', 'G43.15 H1', 'G1 X43 H1', 'M62 P1', 'G0 X1 (G43 H1)'])(
+    'does not read %s as a tool length offset',
+    (command) => expect(commonConsoleStateEffect(command)).not.toBe('tool'),
+  );
+
   it.each(['T2', 'T2.5', 'T+002.5', 'T 2 . 5', 'T.5'])(
     'recognizes accepted numeric tool selections in %s',
     (command) => {
