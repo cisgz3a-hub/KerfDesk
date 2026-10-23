@@ -20,7 +20,7 @@ describe('web RTSP camera bridge client', () => {
   });
 
   it('returns probe status and preview URL from the local bridge', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(
         JSON.stringify({
           kind: 'ok',
@@ -35,7 +35,8 @@ describe('web RTSP camera bridge client', () => {
     );
 
     const bridge = createHttpCameraBridge('http://127.0.0.1:51731');
-    const result = await bridge.probeRtspCamera({ url: 'rtsp://192.168.10.1:8554/' });
+    const login = 'rtsp://admin:S3cret@192.168.10.1:8554/';
+    const result = await bridge.probeRtspCamera({ url: login });
 
     expect(result).toEqual({
       kind: 'ok',
@@ -45,6 +46,11 @@ describe('web RTSP camera bridge client', () => {
       previewUrl: 'http://127.0.0.1:51731/stream.mjpg?url=x',
       streamSessionId: 'session-a',
     });
+    // The address, login and all, goes in the body, never the URL (audit v2 04-P2-1).
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:51731/probe',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ url: login }) }),
+    );
   });
 
   it('reads and validates the exact RTSP stream-session status', async () => {
@@ -158,11 +164,34 @@ describe('web RTSP camera bridge client', () => {
     });
   });
 
-  it('builds pixel-readable proxied frame URLs', () => {
-    const bridge = createHttpCameraBridge('http://127.0.0.1:51731');
-    expect(bridge.proxiedFrameUrl('http://192.168.10.1:8080/media/getCapturePhoto?a=b')).toBe(
-      'http://127.0.0.1:51731/frame.jpg?url=http%3A%2F%2F192.168.10.1%3A8080%2Fmedia%2FgetCapturePhoto%3Fa%3Db',
+  it('registers a frame source by body and takes the frame URL the bridge names it by', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({ kind: 'ok', frameUrl: 'http://127.0.0.1:51731/frame.jpg?source=abc' }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
     );
+    const bridge = createHttpCameraBridge('http://127.0.0.1:51731');
+    const cameraUrl = 'http://user:pw@192.168.10.1:8080/media/getCapturePhoto?a=b';
+    expect(await bridge.registerFrameSource(cameraUrl)).toEqual({
+      kind: 'ok',
+      frameUrl: 'http://127.0.0.1:51731/frame.jpg?source=abc',
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:51731/frame-source',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ url: cameraUrl }) }),
+    );
+
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ kind: 'invalid', reason: 'Private-network hosts only.' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    expect(await bridge.registerFrameSource('http://8.8.8.8/x.jpg')).toEqual({
+      kind: 'invalid',
+      reason: 'Private-network hosts only.',
+    });
   });
 
   it('reports bridge health including the frame proxy capability', async () => {

@@ -16,7 +16,7 @@ function assume(overrides: Partial<Parameters<typeof assumedTarget>[0]> = {}) {
     settings: { ...DEFAULT_CALIBRATION_SETTINGS, marginMm: 20 },
     bedWidthMm: 400,
     bedHeightMm: 400,
-    knownArea: null,
+    known: null,
     remembered: engravedWith20,
     frameNow: { origin: 'front-left', bedWidthMm: 400, bedHeightMm: 400 },
     ...overrides,
@@ -48,10 +48,11 @@ describe('assumedTarget', () => {
     expect(assume({ remembered: null }).source).toBe('settings');
   });
 
-  it('uses the saved calibration’s own target during a check', () => {
-    const known = { x: 10, y: 10, width: 380, height: 380 };
-    const target = assume({ knownArea: known });
-    expect(target).toMatchObject({ source: 'saved-calibration', area: known });
+  it('uses the saved calibration’s own target during a check, in the frame it was saved in', () => {
+    const area = { x: 10, y: 10, width: 380, height: 380 };
+    const bedFrame = { origin: 'front-left' as const, bedWidthMm: 400, bedHeightMm: 390 };
+    const target = assume({ known: { area, bedFrame } });
+    expect(target).toMatchObject({ source: 'saved-calibration', area, bedFrame });
     expect(target.description).toBe('the target of the saved calibration, 380 × 380 mm');
   });
 

@@ -261,12 +261,21 @@ function makeStartRtspSource(
       });
       return;
     }
-    const queryFingerprint = await cameraQueryFingerprint(url);
+    const [frame, queryFingerprint] = await Promise.all([
+      bridge.registerFrameSource(url),
+      cameraQueryFingerprint(url),
+    ]);
     if (get().sourceEpoch !== epoch) return;
+    if (frame.kind !== 'ok') {
+      set({
+        sourceState: { kind: 'error', sourceKind: 'machine-rtsp', message: frame.reason },
+      });
+      return;
+    }
     const source: Extract<ActiveCameraSource, { readonly kind: 'machine-rtsp' }> = {
       kind: 'machine-rtsp',
       previewUrl: probe.previewUrl,
-      frameUrl: bridge.proxiedFrameUrl(url),
+      frameUrl: frame.frameUrl,
       liveness:
         probe.streamSessionId === undefined
           ? { kind: 'unmonitored', advisory: UNMONITORED_RTSP_ADVISORY }

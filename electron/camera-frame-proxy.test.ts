@@ -11,6 +11,7 @@ import {
   handleDiscoverRequest,
   serveHttpFrame,
 } from './camera-frame-proxy';
+import { CameraFrameSources } from './camera-frame-sources';
 import { startLocalRtspCameraBridge, type RtspCameraBridgeHandle } from './rtsp-camera-bridge';
 
 const JPEG_BYTES = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]);
@@ -65,22 +66,68 @@ describe('camera frame proxy over the real bridge server', () => {
   });
 
   const bridgeUrl = (path: string): string => `http://127.0.0.1:${bridge.port}${path}`;
-  const frameProxyUrl = (upstreamPath: string): string =>
-    bridgeUrl(
-      `/frame.jpg?url=${encodeURIComponent(`http://127.0.0.1:${upstreamPort}${upstreamPath}`)}`,
-    );
+  // A camera is registered by body; its frames are then fetched by id (audit v2 04-P2-1).
+  const registerFrameSource = (
+    cameraUrl: string,
+    headers: Record<string, string> = { Origin: TRUSTED_ORIGIN },
+  ): Promise<Response> =>
+    fetch(bridgeUrl('/frame-source'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify({ url: cameraUrl }),
+    });
+  const upstreamUrl = (upstreamPath: string): string =>
+    `http://127.0.0.1:${upstreamPort}${upstreamPath}`;
 
   it('refuses a loopback camera end-to-end but still sets CORS for a trusted origin (ELE-02)', async () => {
     // The mock camera is on loopback, which the proxy now refuses outright (a
     // real machine camera lives on RFC1918); the request never reaches it. CORS
     // is still set for the trusted app origin, since that runs before the policy.
     const hitsBefore = upstreamHits;
-    const response = await fetch(frameProxyUrl('/frame'), {
-      headers: { Origin: TRUSTED_ORIGIN },
-    });
+    const response = await registerFrameSource(upstreamUrl('/frame'));
     expect(await response.json()).toMatchObject({ kind: 'invalid' });
     expect(response.headers.get('access-control-allow-origin')).toBe(TRUSTED_ORIGIN);
     expect(upstreamHits).toBe(hitsBefore);
+  });
+
+  it('names a registered camera by an id, never by its address (audit v2 04-P2-1)', async () => {
+    const cameraUrl = 'http://admin:S3cret@192.168.10.1:8080/media/getCapturePhoto';
+    const response = await registerFrameSource(cameraUrl);
+    const body = (await response.json()) as { readonly kind: string; readonly frameUrl: string };
+    expect(body.kind).toBe('ok');
+    const frameUrl = new URL(body.frameUrl);
+    expect(frameUrl.pathname).toBe('/frame.jpg');
+    expect([...frameUrl.searchParams.keys()]).toEqual(['source']);
+    expect(body.frameUrl).not.toContain('192.168');
+    expect(body.frameUrl).not.toContain('S3cret');
+    // The same camera keeps its id, so polls share one upstream fetch.
+    const again = (await (await registerFrameSource(cameraUrl)).json()) as typeof body;
+    expect(again.frameUrl).toBe(body.frameUrl);
+  });
+
+  it('serves no frame for a camera address in the query or an unknown source', async () => {
+    const hitsBefore = upstreamHits;
+    for (const query of [`url=${encodeURIComponent(upstreamUrl('/frame'))}`, 'source=unknown']) {
+      const response = await fetch(bridgeUrl(`/frame.jpg?${query}`), {
+        headers: { Origin: TRUSTED_ORIGIN },
+      });
+      expect(response.status).toBe(404);
+      expect(await response.json()).toMatchObject({ kind: 'invalid' });
+    }
+    expect(upstreamHits).toBe(hitsBefore);
+  });
+
+  it('takes a camera address only in a POST body', async () => {
+    const get = await fetch(bridgeUrl(`/frame-source?url=${encodeURIComponent(upstreamUrl('/x'))}`), {
+      headers: { Origin: TRUSTED_ORIGIN },
+    });
+    expect(get.status).toBe(405);
+    const garbled = await fetch(bridgeUrl('/frame-source'), {
+      method: 'POST',
+      headers: { Origin: TRUSTED_ORIGIN, 'Content-Type': 'application/json' },
+      body: '{"url":',
+    });
+    expect(garbled.status).toBe(400);
   });
 
   // serveHttpFrame is the proxy's fetch+serve half, exercised directly against the
@@ -100,8 +147,8 @@ describe('camera frame proxy over the real bridge server', () => {
 
   it('refuses an untrusted Origin before contacting the camera (S03-001)', async () => {
     const hitsBefore = upstreamHits;
-    const response = await fetch(frameProxyUrl('/frame'), {
-      headers: { Origin: 'https://evil.example' },
+    const response = await registerFrameSource(upstreamUrl('/frame'), {
+      Origin: 'https://evil.example',
     });
     expect(response.status).toBe(403);
     expect(upstreamHits).toBe(hitsBefore);
@@ -111,8 +158,10 @@ describe('camera frame proxy over the real bridge server', () => {
     // A plain <img> on another site, or a DNS-rebound same-origin page, sends
     // no Origin. KerfDesk's own requests always carry one.
     const hitsBefore = upstreamHits;
-    const response = await fetch(frameProxyUrl('/frame'));
+    const response = await registerFrameSource(upstreamUrl('/frame'), {});
     expect(response.status).toBe(403);
+    const frame = await fetch(bridgeUrl('/frame.jpg?source=unknown'));
+    expect(frame.status).toBe(403);
     expect(upstreamHits).toBe(hitsBefore);
   });
 
@@ -147,10 +196,7 @@ describe('camera frame proxy over the real bridge server', () => {
 
   it('rejects policy-invalid frame URLs without fetching', async () => {
     const hitsBefore = upstreamHits;
-    const response = await fetch(
-      bridgeUrl(`/frame.jpg?url=${encodeURIComponent('http://example.com/frame.jpg')}`),
-      { headers: { Origin: TRUSTED_ORIGIN } },
-    );
+    const response = await registerFrameSource('http://example.com/frame.jpg');
     const body: unknown = await response.json();
     expect(body).toMatchObject({ kind: 'invalid' });
     expect(upstreamHits).toBe(hitsBefore);
@@ -239,18 +285,18 @@ describe('machine camera discovery', () => {
     await closeServer(dead);
 
     const cameraUrl = `http://127.0.0.1:${upstreamPort}/frame`;
+    const sources = new CameraFrameSources(() => 'source-1');
     const body = await runDiscover({
       bridgePort: 51731,
+      sources,
       candidates: [`http://127.0.0.1:${deadPort}/frame`, cameraUrl],
       probeTimeoutMs: 500,
     });
     expect(body).toEqual({
       kind: 'ok',
-      found: {
-        cameraUrl,
-        proxyFrameUrl: `http://127.0.0.1:51731/frame.jpg?url=${encodeURIComponent(cameraUrl)}`,
-      },
+      found: { cameraUrl, proxyFrameUrl: 'http://127.0.0.1:51731/frame.jpg?source=source-1' },
     });
+    expect(sources.cameraUrl('source-1')).toBe(cameraUrl);
     await closeServer(upstream);
   });
 
@@ -260,6 +306,7 @@ describe('machine camera discovery', () => {
     await closeServer(dead);
     const body = await runDiscover({
       bridgePort: 51731,
+      sources: new CameraFrameSources(),
       candidates: [`http://127.0.0.1:${deadPort}/frame`],
       probeTimeoutMs: 500,
     });
@@ -316,6 +363,7 @@ describe('fetchFrameBytes timeout', () => {
 /** Run handleDiscoverRequest through a throwaway HTTP server and parse the JSON. */
 async function runDiscover(options: {
   bridgePort: number;
+  sources: CameraFrameSources;
   candidates: ReadonlyArray<string>;
   probeTimeoutMs: number;
 }): Promise<unknown> {

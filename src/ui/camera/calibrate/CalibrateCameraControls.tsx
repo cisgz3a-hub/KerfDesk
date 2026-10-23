@@ -9,6 +9,7 @@ import { isHeadCameraModel } from '../../../core/camera/model/head-camera';
 import { useEdition } from '../../licensing/edition';
 import { AccuracyMapToggle } from '../accuracy/AccuracyMapToggle';
 import { useOwnCameraFrameNote, useOwnCameraModel } from '../active-camera-model';
+import { CameraFrameNotice } from '../CameraFrameNotice';
 import { calibrationGrade } from './calibration-result';
 import { useCameraCalibrationStore } from './camera-calibration-store';
 import { hasViewReference } from '../helpers/view-reference';
@@ -82,9 +83,7 @@ export function CalibrateCameraControls(): JSX.Element {
         </p>
       )}
       {frameNote === null ? null : (
-        <p role="status" style={frameNote.usable ? noteStyle : frameIssueStyle}>
-          {frameNote.message}
-        </p>
+        <CameraFrameNotice note={frameNote} style={frameNote.usable ? noteStyle : frameIssueStyle} />
       )}
     </div>
   );

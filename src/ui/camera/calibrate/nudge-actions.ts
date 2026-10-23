@@ -4,6 +4,7 @@
 // camera fixed above the bed is nudged: a head camera's picture is placed by
 // where the head is (ADR-449), and its own Check measures it there.
 
+import { cameraBedFrameNote } from '../../../core/camera/model/camera-bed-frame';
 import { isHeadCameraModel } from '../../../core/camera/model/head-camera';
 import type { Vec2 } from '../../../core/camera/model/camera-model';
 import { measureNudge, nudgedCameraModel } from '../../../core/camera/model/nudge';
@@ -15,6 +16,7 @@ import type { Project } from '../../../core/scene';
 import { useStore } from '../../state';
 import { useCameraStore } from '../../state/camera-store';
 import { activeCameraModelNow, ownCameraModel } from '../active-camera-model';
+import { cameraBedFrameNow } from '../camera-bed-frame-now';
 import { cameraModelForFrame } from '../camera-model-frame';
 import {
   cameraCaptureBindingForFrame,
@@ -61,7 +63,10 @@ export async function photographNudgeRing(args: {
 }): Promise<NudgePhotoOutcome> {
   const model = activeCameraModelNow();
   if (model === undefined || isHeadCameraModel(model)) {
-    return { kind: 'failed', message: 'This fix needs a calibrated camera fixed above the bed.' };
+    return {
+      kind: 'failed',
+      message: unusableCalibrationReason() ?? 'This fix needs a calibrated camera fixed above the bed.',
+    };
   }
   const frame = await (args.capture ?? captureSourceFrame)(args.source).catch(() => null);
   if (frame === null) return { kind: 'failed', message: 'The camera picture could not be read.' };
@@ -90,6 +95,15 @@ export async function photographNudgeRing(args: {
           'No ring was found near the middle of the bed. Check that the ring burned dark enough, the head is not over it, and the sheet thickness is right, then take the photo again.',
       };
   }
+}
+
+// Why the running camera's own calibration is not used in the bed frame now
+// (another origin corner, or no frame recorded), so the fix says that instead.
+function unusableCalibrationReason(): string | null {
+  const { sourceState } = useCameraStore.getState();
+  const own = ownCameraModel(useStore.getState().project.device, sourceState);
+  const note = own === undefined ? null : cameraBedFrameNote(own, cameraBedFrameNow());
+  return note !== null && !note.usable ? note.message : null;
 }
 
 /**

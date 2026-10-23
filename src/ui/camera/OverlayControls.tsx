@@ -5,7 +5,9 @@
 // beside Refresh; filling blanks (ADR-442) and object heights (ADR-441
 // Amendment 2) open as folds. A camera on the laser head captures and stitches
 // pictures instead of freezing one (ADR-449). A calibration made with another
-// origin corner is not drawn, and the panel says why (rolling audit 12-P2-2).
+// origin corner is not drawn, and the panel says why (rolling audit 12-P2-2);
+// one saved before its bed frame was recorded can be confirmed here (ADR-440
+// Amendment 2).
 // Camera placement stays latched after hiding the image so its status remains
 // visible until the operator exits it.
 
@@ -18,6 +20,7 @@ import {
   useOwnCameraFrameNote,
   useOwnCameraModel,
 } from './active-camera-model';
+import { CameraFrameNotice } from './CameraFrameNotice';
 import { HeadCaptureControls } from './head/HeadCaptureControls';
 import { CameraFold } from './panel/CameraFold';
 import { useCameraPlacementControls } from './use-camera-placement-controls';
@@ -33,11 +36,7 @@ export function OverlayControls(): JSX.Element | null {
   if (model !== undefined)
     return <CalibratedOverlayControls headCamera={isHeadCameraModel(model)} />;
   if (frameNote !== null && !frameNote.usable) {
-    return (
-      <p role="status" style={headNoticeStyle}>
-        {frameNote.message}
-      </p>
-    );
+    return <CameraFrameNotice note={frameNote} style={headNoticeStyle} />;
   }
   return isHeadCameraModel(own) ? <HeadPositionNotice /> : null;
 }

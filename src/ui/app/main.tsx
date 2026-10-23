@@ -15,6 +15,7 @@ import {
   createDesktopSerialAdapter,
   createDesktopMachineNetwork,
   createDesktopAiAssistant,
+  createDesktopCameraBridge,
   createDesktopSupportLogReader,
   createDesktopWindowCommands,
   isElectronRenderer,
@@ -64,7 +65,8 @@ const adapter: PlatformAdapter = isElectronRenderer()
         handleSaveTarget: webAdapter.openedProjectSaveTarget,
       }),
       // The main process serves its support log (ADR-546), takes job reports
-      // (ADR-548) and runs File > Exit (ADR-554) only on app://.
+      // (ADR-548), runs File > Exit (ADR-554) and hands over the camera
+      // bridge's keys (ADR-141 Amendment 2) only on app://.
       ...(window.location.protocol === 'app:'
         ? {
             readSupportLog: createDesktopSupportLogReader(),
@@ -72,6 +74,7 @@ const adapter: PlatformAdapter = isElectronRenderer()
             desktopWindow: createDesktopWindowCommands(),
             aiAssistant: createDesktopAiAssistant(),
             machineNetwork: createDesktopMachineNetwork(),
+            cameraBridge: createDesktopCameraBridge(),
           }
         : {}),
     }

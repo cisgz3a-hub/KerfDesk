@@ -5,7 +5,10 @@
 import { act } from 'react';
 import type * as CalibrationActions from './calibration-actions';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { savedCameraModel } from '../../../core/camera/model/model-fixtures';
+import {
+  savedCameraModel,
+  unframedCameraModel,
+} from '../../../core/camera/model/model-fixtures';
 import { clickControl, control, mountControl } from '../../image-editor/control-audit-test-support';
 import { useStore } from '../../state';
 import { useCameraStore } from '../../state/camera-store';
@@ -341,6 +344,29 @@ describe('camera calibration photo ownership', () => {
     expect(control(document.body, 'Save new calibration').className).toContain('lf-btn--primary');
     await clickControl(document.body, 'Save new calibration');
     expect(useStore.getState().project.device.cameraModel).toEqual(savedCameraModel());
+  });
+
+  it('does not check a calibration saved without its bed frame, so no refit gets today’s (M2-P3-3)', async () => {
+    // Meta audit M2-P3-3: checked in today's frame after a bed change, the old
+    // target read as no drift, and saving the refit stamped the wrong frame.
+    const base = unframedCameraModel();
+    const saved = {
+      ...base,
+      accuracy: { ...base.accuracy, targetArea: { x: 5, y: 5, width: 390, height: 390 } },
+    };
+    await act(async () => useStore.getState().updateDeviceProfile({ cameraModel: saved }));
+    useCameraStore.setState({ sourceState: { kind: 'live', source } });
+    await act(async () => useCameraCalibrationStore.getState().openCheck(saved));
+    expect(useCameraCalibrationStore.getState()).toMatchObject({
+      mode: 'calibrate',
+      step: { kind: 'setup', note: expect.stringContaining('before KerfDesk recorded the bed') },
+      targetArea: null,
+      targetBedFrame: null,
+    });
+    await mountControl(<CameraCalibrationWizard />);
+    expect(document.body.textContent).toContain('choose Confirm bed and origin in the Camera panel');
+    expect(photographTarget).not.toHaveBeenCalled();
+    expect(useStore.getState().project.device.cameraModel).toBe(saved);
   });
 
   it.each(['cancel', 'close'] as const)(

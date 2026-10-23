@@ -7,7 +7,10 @@
 // facts, so it holds only while they do. With the same origin corner, a later
 // bed-size or native-offset change moves every scene point by one constant,
 // which the pose takes up exactly. Another origin corner mirrors the bed,
-// which no camera pose can, so it needs a new calibration. Pure core.
+// which no camera pose can, so it needs a new calibration. A calibration saved
+// before frames were recorded is not trusted until the operator confirms the
+// bed it was made on, or calibrates again (meta audit M2-P3-3, ADR-440
+// Amendment 2). Pure core.
 
 import type { DeviceProfile, Origin } from '../../devices/device-profile';
 import { toMachineCoords, toSceneCoords } from '../../devices/origin-transform';
@@ -31,9 +34,9 @@ export type ModelInBedFrame =
 const SAME_MM = 1e-6;
 
 /**
- * `record` expressed in the bed frame `now`. A record saved without a frame,
- * or fitted in this one, is returned as it is; one fitted on another bed size
- * or native offset is moved to match; one fitted with another origin corner
+ * `record` expressed in the bed frame `now`. A record fitted in this frame is
+ * returned as it is; one fitted on another bed size or native offset is moved
+ * to match; one fitted with another origin corner, or saved without a frame,
  * cannot be used.
  */
 export function cameraModelInBedFrame(
@@ -41,7 +44,11 @@ export function cameraModelInBedFrame(
   now: CameraBedFrame,
 ): ModelInBedFrame {
   const fitted = record.bedFrame;
-  if (fitted === undefined) return { kind: 'ok', model: record };
+  // Its rings were placed in a frame nobody recorded. Reading it in today's
+  // frame is right only while Machine Setup has not changed since, and a check
+  // would label its target in today's frame too, so it would report no drift
+  // (meta audit M2-P3-3).
+  if (fitted === undefined) return { kind: 'issue', message: unrecordedFrameMessage(now) };
   if (fitted.origin !== now.origin) {
     return {
       kind: 'issue',
@@ -83,6 +90,8 @@ export type CameraBedFrameNote = {
   /** False when the calibration cannot be used in this frame at all. */
   readonly usable: boolean;
   readonly message: string;
+  /** No frame was saved with it, so the operator may confirm today's ({@link withConfirmedBedFrame}). */
+  readonly frameUnrecorded?: true;
 };
 
 /**
@@ -94,8 +103,12 @@ export function cameraBedFrameNote(
   now: CameraBedFrame,
 ): CameraBedFrameNote | null {
   const placed = cameraModelInBedFrame(record, now);
-  if (placed.kind === 'issue') return { usable: false, message: placed.message };
   const fitted = record.bedFrame;
+  if (placed.kind === 'issue') {
+    return fitted === undefined
+      ? { usable: false, message: placed.message, frameUnrecorded: true }
+      : { usable: false, message: placed.message };
+  }
   if (placed.model === record || fitted === undefined) return null;
   const shift = bedFrameShift(fitted, now);
   const sameBed = fitted.bedWidthMm === now.bedWidthMm && fitted.bedHeightMm === now.bedHeightMm;
@@ -106,6 +119,27 @@ export function cameraBedFrameNote(
     usable: true,
     message: `The camera was calibrated ${when}. KerfDesk moves its picture ${mm(Math.hypot(shift.x, shift.y))} mm to match the machine as it is set up now.`,
   };
+}
+
+/**
+ * `record` with the frame the operator confirmed it was calibrated in: the
+ * origin corner and bed size Machine Setup has now. The native offset stays
+ * unknown, so no later offset moves it. A record that already has a frame
+ * keeps it (ADR-440 Amendment 2).
+ */
+export function withConfirmedBedFrame(
+  record: CameraModelRecord,
+  now: CameraBedFrame,
+): CameraModelRecord {
+  if (record.bedFrame !== undefined) return record;
+  return {
+    ...record,
+    bedFrame: { origin: now.origin, bedWidthMm: now.bedWidthMm, bedHeightMm: now.bedHeightMm },
+  };
+}
+
+function unrecordedFrameMessage(now: CameraBedFrame): string {
+  return `This camera was calibrated before KerfDesk recorded the bed it was calibrated on, so KerfDesk cannot tell whether its picture still lines up with the burn. If Machine Setup still has the origin ${originWords(now.origin)} and the bed at ${mm(now.bedWidthMm)} × ${mm(now.bedHeightMm)} mm, as when the camera was calibrated, choose Confirm bed and origin in the Camera panel. If either has changed since, calibrate the camera again.`;
 }
 
 function mm(value: number): number {

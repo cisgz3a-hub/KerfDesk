@@ -123,12 +123,20 @@ async function installRtspBridgeRoutes(
         contentType: 'application/json',
         body: JSON.stringify({
           kind: 'ok',
-          url: requestUrl.searchParams.get('url'),
+          // The camera address comes in the body (audit v2 04-P2-1).
+          url: (route.request().postDataJSON() as { readonly url: string }).url,
           codec: 'h264',
           ffmpegAvailable: true,
           previewUrl: 'http://127.0.0.1:51731/stream.mjpg?camera=e2e',
           streamSessionId: 'e2e-session',
         }),
+      });
+      return;
+    }
+    if (requestUrl.pathname === '/frame-source') {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ kind: 'ok', frameUrl: 'http://127.0.0.1:51731/frame.jpg?source=e2e' }),
       });
       return;
     }

@@ -16,7 +16,7 @@ function mockBridge(overrides?: Partial<CameraBridgeAdapter>): CameraBridgeAdapt
     probeRtspCamera: async () => ({ kind: 'unavailable', reason: 'not under test' }),
     rtspStreamStatus: async () => ({ kind: 'live' }),
     discoverMachineCamera: async () => ({ kind: 'not-found' }),
-    proxiedFrameUrl: (cameraUrl) => `http://127.0.0.1:51731/frame.jpg?url=${cameraUrl}`,
+    registerFrameSource: async (cameraUrl) => ({ kind: 'ok', frameUrl: `http://127.0.0.1:51731/frame.jpg?url=${cameraUrl}` }),
     health: async () => ({ kind: 'ok', ffmpegAvailable: false, frameProxy: true }),
     ...overrides,
   };

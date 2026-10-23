@@ -467,15 +467,24 @@ export type CameraBridgeStreamStatus =
   | { readonly kind: 'failed'; readonly reason: string }
   | { readonly kind: 'unavailable'; readonly reason: string };
 
+// A camera registered with the bridge's frame proxy: its address, which can
+// hold a login, went in a request body, and `frameUrl` names it by an id
+// (rolling audit v2 04-P2-1).
+export type CameraBridgeFrameSource =
+  | { readonly kind: 'ok'; readonly frameUrl: string }
+  | { readonly kind: 'invalid'; readonly reason: string }
+  | { readonly kind: 'unavailable'; readonly reason: string };
+
 export type CameraBridgeAdapter = {
   readonly isSupported: () => boolean;
   readonly probeRtspCamera: (req: CameraBridgeProbeRequest) => Promise<CameraBridgeProbeResult>;
   readonly rtspStreamStatus: (streamSessionId: string) => Promise<CameraBridgeStreamStatus>;
   // Probe the machine's snapshot camera server-side via the bridge (ADR-116).
   readonly discoverMachineCamera: () => Promise<MachineCameraDiscovery>;
-  // Bridge frame-proxy URL for a camera URL. Responses carry CORS for this
-  // app origin, so frames fetched through it are pixel-readable.
-  readonly proxiedFrameUrl: (cameraUrl: string) => string;
+  // Register a camera with the bridge frame proxy. Responses from its frame
+  // URL carry CORS for this app origin, so frames fetched through it are
+  // pixel-readable.
+  readonly registerFrameSource: (cameraUrl: string) => Promise<CameraBridgeFrameSource>;
   readonly health: () => Promise<CameraBridgeHealth>;
 };
 

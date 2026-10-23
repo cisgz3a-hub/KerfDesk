@@ -91,6 +91,8 @@ import { installTaskbarJobProgress } from './taskbar-job-progress.js';
 import { withDesktopWorkspaceRoutes } from './desktop-routes.js';
 import { createDesktopBackgroundStartup } from './desktop-startup.js';
 import { cameraBridgeLifecycle } from './camera-bridge-lifecycle.js';
+import { createCameraBridgeKeys } from './camera-bridge-keys.js';
+import { withCameraBridgeRoutes } from './camera-bridge-routes.js';
 import { createDesktopRemoteAccess } from './remote-access/desktop.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -208,8 +210,29 @@ const CSP_POLICY = [
   "form-action 'none'",
   "frame-ancestors 'none'",
 ].join('; ');
+// The app://app window proves the bridge is this launch's before it sends a
+// camera address (ADR-141 Amendment 2). A dev-server window cannot reach the
+// app routes that hand the keys over, so it keeps the keyless dev bridge.
+const CAMERA_BRIDGE_KEYS = IS_DEV_SERVER_RENDERER ? undefined : createCameraBridgeKeys();
 // Runs only while a workspace is admitted past the licence window (ADR-623).
-const cameraBridge = cameraBridgeLifecycle(() => startLocalRtspCameraBridge());
+const cameraBridge = cameraBridgeLifecycle(() =>
+  startLocalRtspCameraBridge(CAMERA_BRIDGE_PORT, CAMERA_BRIDGE_KEYS),
+);
+// The window asks before each camera connect, which also retries a bridge
+// whose port was taken when it started.
+function withCameraBridgeConnection(
+  routes: Parameters<typeof withCameraBridgeRoutes>[0],
+): Parameters<typeof withCameraBridgeRoutes>[0] {
+  if (CAMERA_BRIDGE_KEYS === undefined) return routes;
+  return withCameraBridgeRoutes(routes, {
+    origin: CAMERA_BRIDGE_ORIGIN,
+    keys: CAMERA_BRIDGE_KEYS,
+    status: async () => {
+      await cameraBridge.retry();
+      return cameraBridge.status();
+    },
+  });
+}
 app.on('before-quit', () => {
   prepareLicenceQuit?.();
   quitRequested = true;
@@ -543,8 +566,10 @@ if (HAS_SINGLE_INSTANCE_LOCK && REFUSED_DEBUG_SWITCH === null)
         'app',
         startup.routes(
           withDesktopWorkspaceRoutes(
-            remoteAccess.routes(
-              licence.routes(DESKTOP_PROJECT_OPENS.routes(makeAppProtocolHandler(distRoot))),
+            withCameraBridgeConnection(
+              remoteAccess.routes(
+                licence.routes(DESKTOP_PROJECT_OPENS.routes(makeAppProtocolHandler(distRoot))),
+              ),
             ),
             SUPPORT_LOG,
             DESKTOP_DATA_PATH,

@@ -126,6 +126,10 @@ const MISSING_TARGET_LAYOUT_NOTE =
   "This calibration's target layout was not saved, so it cannot be checked against the old target. " +
   'Recalibrate with a new engraved target, or confirm the original bed size and enter the exact original margins ' +
   'and sheet thickness before choosing Target already engraved. Your saved calibration is unchanged.';
+const UNRECORDED_TARGET_FRAME_NOTE =
+  'This calibration was saved before KerfDesk recorded the bed it was calibrated on, so Check camera cannot tell ' +
+  'where its target lies on the bed now. If Machine Setup is unchanged since the calibration, choose Confirm bed and origin in ' +
+  'the Camera panel and check again; otherwise recalibrate with a new engraved target. Your saved calibration is unchanged.';
 
 export const useCameraCalibrationStore = create<CameraCalibrationStore>((set) => ({
   open: false,
@@ -165,25 +169,35 @@ export const useCameraCalibrationStore = create<CameraCalibrationStore>((set) =>
       targetBedFrame: null,
       settings: withRemembered(s.settings),
     })),
-  // Check needs the target that was actually engraved. Older records remain
-  // usable, but current bed/margin settings cannot stand in for their layout.
+  // Check needs the target that was actually engraved, in the bed frame it was
+  // engraved in. Current bed/margin settings cannot stand in for the layout,
+  // nor today's frame for a frame that was never saved: labelling the rings in
+  // today's frame reports no drift after a bed change, and saving that refit
+  // would record the wrong frame for good (meta audit M2-P3-3).
   openCheck: (saved) =>
-    set((s) => ({
-      open: true,
-      mode: saved.accuracy.targetArea === undefined ? 'calibrate' : 'check',
-      minimized: false,
-      step:
-        saved.accuracy.targetArea === undefined
-          ? { kind: 'setup', note: MISSING_TARGET_LAYOUT_NOTE }
-          : { kind: 'photo', status: { kind: 'idle' } },
-      settings: {
-        ...withRemembered(s.settings),
-        sheetThicknessMm: saved.accuracy.targetHeightMm,
-        headCamera: saved.mount?.kind === 'head',
-      },
-      targetArea: saved.accuracy.targetArea ?? null,
-      targetBedFrame: saved.bedFrame ?? null,
-    })),
+    set((s) => {
+      const area = saved.accuracy.targetArea;
+      const frame = saved.bedFrame;
+      const checkable = area !== undefined && frame !== undefined;
+      return {
+        open: true,
+        mode: checkable ? 'check' : 'calibrate',
+        minimized: false,
+        step: checkable
+          ? { kind: 'photo', status: { kind: 'idle' } }
+          : {
+              kind: 'setup',
+              note: area === undefined ? MISSING_TARGET_LAYOUT_NOTE : UNRECORDED_TARGET_FRAME_NOTE,
+            },
+        settings: {
+          ...withRemembered(s.settings),
+          sheetThicknessMm: saved.accuracy.targetHeightMm,
+          headCamera: saved.mount?.kind === 'head',
+        },
+        targetArea: checkable ? area : null,
+        targetBedFrame: checkable ? frame : null,
+      };
+    }),
   closeWizard: () => set({ open: false, minimized: false, step: INITIAL_STEP }),
   toggleMinimized: () => set((s) => ({ minimized: !s.minimized })),
   // A new margin or target size describes a new target, so a known area no longer applies.
