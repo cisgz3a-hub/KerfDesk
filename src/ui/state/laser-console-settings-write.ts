@@ -85,7 +85,7 @@ export async function rereadSettingsAfterConsoleWrite(
 
 // grblHAL answers `ok` to a value it stored only in part (`$100=26,67` keeps
 // 26), so the re-read is compared with what was typed, as the Machine
-// Settings writer verifies its own writes (ADR-375 Amendment 3).
+// Settings writer verifies its own writes (ADR-375 Amendment 4).
 function reportStoredSettingMismatch(
   set: SetFn,
   get: GetFn,

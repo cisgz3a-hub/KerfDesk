@@ -3,7 +3,7 @@
 // few seconds (bright enough, nothing washed out, how fine the picture is) and
 // lists what it cannot see for itself. Advice only: Next is always offered.
 
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import {
   assessPicture,
   COARSE_MM_PER_PIXEL,
@@ -68,15 +68,23 @@ function usePictureMeasure(source: ActiveCameraSource | null): Measured | null {
   const bedWidth = useStore((s) => s.project.device.bedWidth);
   const bedHeight = useStore((s) => s.project.device.bedHeight);
   const [measured, setMeasured] = useState<Measured | null>(null);
+  // Survives source/bed changes so a slow old capture cannot overlap its replacement.
+  const measuring = useRef(false);
   useEffect(() => {
     setMeasured(null);
     if (source === null) return;
     let cancelled = false;
     const measure = async (): Promise<void> => {
-      const frame = await captureSourceFrame(source).catch(() => null);
-      if (cancelled || frame === null) return;
-      const quality = assessPicture(frame, { widthMm: bedWidth, heightMm: bedHeight });
-      if (quality !== null) setMeasured({ quality, width: frame.width, height: frame.height });
+      if (measuring.current || cancelled) return;
+      measuring.current = true;
+      try {
+        const frame = await captureSourceFrame(source).catch(() => null);
+        if (cancelled || frame === null) return;
+        const quality = assessPicture(frame, { widthMm: bedWidth, heightMm: bedHeight });
+        if (quality !== null) setMeasured({ quality, width: frame.width, height: frame.height });
+      } finally {
+        measuring.current = false;
+      }
     };
     void measure();
     const timer = setInterval(() => void measure(), PICTURE_CHECK_INTERVAL_MS);

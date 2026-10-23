@@ -108,13 +108,13 @@ describe('installLinkLossRestartTracking', () => {
     expect(settle).toHaveBeenCalledWith({ runId: 'dropped', revision: 4 }, usb('alarm'));
   });
 
-  it('keeps the first answer: a banner after a status report reads as kept running', () => {
+  it('keeps the first answer: a banner after an inconclusive status does not invent a restart verdict', () => {
     const { repository, settle } = fakeRepository(lostLinkCapsule('saved'));
     uninstall = installLinkLossRestartTracking(repository);
     connect();
     useLaserStore.setState({ statusReport: status('Idle') });
     useLaserStore.setState({ detectedControllerKind: 'grbl-v1.1' });
-    expect(settle).toHaveBeenCalledWith({ runId: 'saved', revision: 4 }, usb('kept-running'));
+    expect(settle).toHaveBeenCalledWith({ runId: 'saved', revision: 4 }, usb('unknown'));
   });
 
   it('reads past a grblHAL Telnet greeting to the first status (D7-P2-1)', () => {
@@ -178,7 +178,7 @@ describe('linkLossRestartEvidence', () => {
     );
     expect(linkLossRestartEvidence({ ...quiet, alarmCode: 1 })).toEqual(usb('alarm'));
     expect(linkLossRestartEvidence({ ...quiet, statusReport: status('Idle') })).toEqual(
-      usb('kept-running'),
+      usb('unknown'),
     );
     expect(
       linkLossRestartEvidence({
@@ -187,6 +187,21 @@ describe('linkLossRestartEvidence', () => {
         statusReport: status('Idle'),
       }),
     ).toBeNull();
+  });
+
+  it.each(['Idle', 'Door', 'Jog'] as const)(
+    'keeps a quiet USB reconnect in %s unknown instead of asserting continuity',
+    (state) => {
+      expect(linkLossRestartEvidence({ ...quiet, statusReport: status(state) })).toEqual(
+        usb('unknown'),
+      );
+    },
+  );
+
+  it.each(['Run', 'Hold'] as const)('accepts active USB planner evidence in %s', (state) => {
+    expect(linkLossRestartEvidence({ ...quiet, statusReport: status(state) })).toEqual(
+      usb('kept-running'),
+    );
   });
 
   it('still reads a stock GRBL banner on USB as a restart', () => {
@@ -251,9 +266,9 @@ describe('linkLossRestartEvidence', () => {
         statusReport: status('Idle'),
       }),
     ).toEqual(usb('unknown'));
-    // A grblHAL board that does not greet and answers idle did not reset.
+    // Missing a USB startup banner does not prove the board never reset.
     expect(linkLossRestartEvidence({ ...hal, statusReport: status('Idle') })).toEqual(
-      usb('kept-running'),
+      usb('unknown'),
     );
   });
 });

@@ -74,8 +74,8 @@ export function originActions(
     releaseMotors: () => releaseMotors(set, get, refs, safeWrite),
     restoreWorkOrigin: (savedOffsetMm) =>
       restoreWorkOrigin(set, get, refs, safeWrite, savedOffsetMm),
-    setOriginAtMachinePoint: (pointMm) =>
-      setOriginAtMachinePoint(set, get, refs, safeWrite, pointMm),
+    setOriginAtMachinePoint: (pointMm, assertTargetCurrent) =>
+      setOriginAtMachinePoint(set, get, refs, safeWrite, pointMm, assertTargetCurrent),
     setOriginAtProgramPoint: (pointMm) =>
       setOriginAtProgramPoint(set, get, refs, safeWrite, pointMm),
   };

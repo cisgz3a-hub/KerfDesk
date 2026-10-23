@@ -117,7 +117,7 @@ describe('jogTravelLimits on grblHAL', () => {
     expect(jogTravelLimits({ ...GRBLHAL, homingDirectionMask: 3 })).toBeNull();
   });
 
-  // grblHAL's `$22` bit 3 says force origin is off (ADR-375 Amendment 3): its
+  // grblHAL's `$22` bit 3 says force origin is off (ADR-375 Amendment 4): its
   // envelope is then the same for every `$23` (controller audit v2 C3-P2-1).
   it('keeps one envelope for every homing direction without force origin', () => {
     for (const mask of [1, 2, 3]) {

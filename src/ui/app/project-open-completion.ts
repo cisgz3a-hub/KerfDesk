@@ -48,6 +48,12 @@ export function completeNativeProjectOpen(
       `Opened ${fileName}${migration}`,
       result.migratedFrom === undefined ? 'success' : 'info',
     );
+    if (result.autofocusCommandRemoved) {
+      ctx.pushToast(
+        'The saved Auto-focus command was removed because it is not supported. Review Auto-focus in Machine Settings before using it.',
+        'warning',
+      );
+    }
     reportMachineCapabilityRepair(loadResult, ctx.pushToast);
     return true;
   }

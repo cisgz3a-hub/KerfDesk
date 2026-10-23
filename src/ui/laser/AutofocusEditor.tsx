@@ -92,11 +92,12 @@ export function AutofocusEditor(props: {
       <p style={focusHintStyle}>
         Only one controller line is supported; multi-step G-code probe sequences are not sent from
         this control. A <code style={inlineCodeStyle}>G38.2</code> probe needs its own feed, at most{' '}
-        {MAX_AUTOFOCUS_PROBE_FEED_MM_PER_MIN} mm/min, and its Z target is a work-coordinate position
-        (G90), not a distance. Leave this empty when the machine has no supported auto-focus
-        routine. Common error replies: <code style={inlineCodeStyle}>error:9</code> (the controller
-        was in Alarm or Jog) and <code style={inlineCodeStyle}>error:20</code> (no probe input, or
-        unsupported G-code on this firmware).
+        {MAX_AUTOFOCUS_PROBE_FEED_MM_PER_MIN} mm/min. KerfDesk sets millimetres and absolute mode
+        (G21, G90) before probing; Z is a work-coordinate position, not a distance. Leave this empty
+        when the machine has no supported auto-focus routine. Common error replies:{' '}
+        <code style={inlineCodeStyle}>error:9</code> (the controller was in Alarm or Jog) and{' '}
+        <code style={inlineCodeStyle}>error:20</code> (no probe input, or unsupported G-code on this
+        firmware).
       </p>
     </div>
   );

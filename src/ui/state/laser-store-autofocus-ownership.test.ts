@@ -3,6 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
+import * as safeWriteModule from './laser-safe-write';
 import { respondToTestGrblHandshake, settleTestGrblHandshake } from './laser-test-start-helpers';
 
 type FakeConnection = SerialConnection & {
@@ -75,6 +76,11 @@ async function beginAutofocus(
   expect(writes).not.toContain('G38.2 Z-10 F100\n');
   connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
   await flush();
+  for (const setup of ['G21\n', 'G90\n']) {
+    expect(writes.at(-1)).toBe(setup);
+    connection.emitLine('ok');
+    await flush();
+  }
   expect(writes.at(-1)).toBe('G38.2 Z-10 F100\n');
   return { pending };
 }
@@ -110,6 +116,50 @@ afterEach(async () => {
 });
 
 describe('store autofocus shared response ownership', () => {
+  it('forwards the original-session guard through a deferred store write', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(writes);
+    await connectWith(connection);
+    writes.length = 0;
+    const createSafeWrite = safeWriteModule.createSafeWrite;
+    let release: (() => void) | undefined;
+    const paused = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const spy = vi
+      .spyOn(safeWriteModule, 'createSafeWrite')
+      .mockImplementation((set, get, refs) => {
+        const write = createSafeWrite(set, get, refs);
+        return async (line, action, source, assertBeforeWrite) => {
+          if (line === 'G21\n') {
+            await paused;
+            // The store's adapter must retain the operation's original guard.
+            // safeWrite's own reservation would otherwise capture this new epoch.
+            refs.writeEpoch = (refs.writeEpoch ?? 0) + 1;
+          }
+          await write(line, action, source, assertBeforeWrite);
+        };
+      });
+    try {
+      const pending = useLaserStore.getState().autofocus('G38.2 Z-10 F100');
+      await flush();
+      connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+      await flush();
+      expect(writes).toEqual(['?']);
+      release?.();
+      expect(await pending).toEqual({
+        kind: 'preflight-failed',
+        reason: 'Auto-focus cancelled because the controller session changed.',
+      });
+      expect(writes).toEqual(['?']);
+      expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
+      expect(useLaserStore.getState().pendingTransportWrites).toBe(0);
+    } finally {
+      release?.();
+      spy.mockRestore();
+    }
+  });
+
   it('expires a completed Frame permit before autofocus can dispatch', async () => {
     const writes: string[] = [];
     const connection = makeConnection(writes);
@@ -126,7 +176,7 @@ describe('store autofocus shared response ownership', () => {
 
     const { pending } = await beginAutofocus(connection, writes);
 
-    expect(writes).toEqual(['?', 'G38.2 Z-10 F100\n']);
+    expect(writes).toEqual(['?', 'G21\n', 'G90\n', 'G38.2 Z-10 F100\n']);
     expect(useLaserStore.getState().framedRun).toBeNull();
     expect(useLaserStore.getState().frameVerification).toBeNull();
     connection.emitLine('ok');
@@ -142,7 +192,7 @@ describe('store autofocus shared response ownership', () => {
 
     const { pending } = await beginAutofocus(connection, writes);
 
-    expect(writes).toEqual(['?', 'G38.2 Z-10 F100\n']);
+    expect(writes).toEqual(['?', 'G21\n', 'G90\n', 'G38.2 Z-10 F100\n']);
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
     expect(useLaserStore.getState().autofocusBusy).toBe(true);
     expect(

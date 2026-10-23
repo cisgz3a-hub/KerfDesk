@@ -261,7 +261,7 @@ describe('Run G-code file dialog (ADR-630)', () => {
     });
     const body = await show('M4\nG1 X10 Y10 S800 F1000\nG0 X10 Y40\nG1 X40 Y40\nM5\n');
     expect(body.textContent).toContain('The controller reports $32=0 (laser mode off)');
-    expect(body.textContent).toContain('One G0 move in this program runs with M3 or M4 on');
+    expect(body.textContent).toContain('One rapid command in this program runs with M3 or M4 on');
     expect(body.textContent).toContain('first: line 4 of the sent program');
     expect(body.textContent).toContain('Controller reports $32=0. Enable GRBL laser mode ($32=1)');
     expect(button(body, 'Frame').disabled).toBe(false);
@@ -276,7 +276,7 @@ describe('Run G-code file dialog (ADR-630)', () => {
     });
     const body = await show('M3 S11000\nG4 P3\nG0 X10 Y10\nG1 Z-2 F300\nG0 Z5\nM5\n');
     expect(body.textContent).toContain(CNC_LASER_MODE_ENABLED_MESSAGE);
-    expect(body.textContent).not.toContain('G0 move');
+    expect(body.textContent).not.toContain('rapid command');
     expect(button(body, 'Frame').disabled).toBe(false);
   });
 

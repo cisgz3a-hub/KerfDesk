@@ -42,6 +42,7 @@ import { findCncMotionBoundsPreflightIssues } from './cnc-motion-bounds-prefligh
 import { cncOpenContourIssues } from './cnc-open-contour-issues';
 import { cncProfileLeadPlungeIssues } from './cnc-profile-lead-plunge-issues';
 import { findInvalidCncToolGeometry } from './cnc-tool-geometry';
+import { cncStarterToolFeedIssue } from './cnc-starter-tool-feed';
 import { findNoGoZoneCollisions } from './no-go-zones';
 import type { PreflightIssue, PreflightResult } from './preflight';
 
@@ -250,6 +251,8 @@ function appendCncLayerIssues(
   config: CncMachineConfig,
   issues: PreflightIssue[],
 ): void {
+  const retainedStarter = cncStarterToolFeedIssue(layer, config);
+  if (retainedStarter !== null) issues.push(retainedStarter);
   const settings: CncLayerSettings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
   if (!(settings.depthMm > 0) || !(settings.depthPerPassMm > 0)) {
     issues.push({

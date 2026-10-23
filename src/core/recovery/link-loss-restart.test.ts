@@ -141,6 +141,8 @@ describe('a reconnect that cannot show whether the controller restarted', () => 
     const message = settleLinkLossRestart(LOST_LINK, usb('unknown'))?.message;
     expect(message).toMatch(/^The USB connection was lost/);
     expect(message).toContain('each time its USB port opens');
+    expect(message).not.toContain('It sent its startup banner');
+    expect(message).toContain('before the port reopened');
   });
 });
 

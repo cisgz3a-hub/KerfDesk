@@ -5,7 +5,7 @@
 // when the run was live as a link dropped, also if its record lands after the
 // reconnect, or when its record was already saved as the connection began
 // (after an app restart). A reboot later in the same connection does not
-// count: by then the controller had answered as one that kept running.
+// count: by then the initial reconnect evidence has already been recorded.
 //
 // A banner proves a restart only where it cannot be a greeting (ADR-398
 // Amendment 4). grblHAL greets every new network client and, on native USB,
@@ -57,9 +57,9 @@ function reconnectSign(state: ReconnectFacts, link: LinkLossLink): LinkLossResta
   if (state.alarmCode !== null || state.statusReport?.state === 'Alarm') return 'alarm';
   if (state.statusReport === null) return null;
   if (KEPT_RUNNING_STATES.has(state.statusReport.state)) return 'kept-running';
-  // A USB board that greets without resetting, or any network board, cannot
-  // show a restart this way; a quiet USB board did not reset at the open.
-  return banner || link === 'network' ? 'unknown' : 'kept-running';
+  // A restart can finish before USB reconnects, too. Missing its banner is
+  // not evidence that the queued job survived; only Run or Hold proves that.
+  return 'unknown';
 }
 
 /** Whether this connection's banner may be a greeting from a board that kept

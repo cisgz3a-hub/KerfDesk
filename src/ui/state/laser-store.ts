@@ -527,9 +527,7 @@ export const useLaserStore = create<LaserState>((set, get) => {
   return {
     ...initialLaserState(),
     ...connectionActions(set, get, refs, write),
-    ...autofocusActions(set, get, refs, (line, action, source) =>
-      safeWrite(set, get, line, action, source),
-    ),
+    ...autofocusActions(set, get, refs, write),
     ...jogActions(set, get, refs, write),
     ...positioningLightActions(set, get, refs, write),
     ...airAssistActions(set, get),
@@ -561,8 +559,8 @@ export const useLaserStore = create<LaserState>((set, get) => {
       (line, action) => safeWrite(set, get, line, action),
       () => refs.driver,
     ),
-    ...originActions(set, get, refs, (line, action, source) =>
-      safeWrite(set, get, line, action, source),
+    ...originActions(set, get, refs, (line, action, source, assertBeforeWrite) =>
+      safeWrite(set, get, line, action, source, assertBeforeWrite),
     ),
     ...workZRecoveryActions(
       set,

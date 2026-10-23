@@ -38,7 +38,7 @@ export const LASER_DOT_LIGHT: LaserDotLight = {
 /** The machine whose LED is its laser dot. */
 export const LASER_DOT_COMMAND_SET: ControllerCommandSet = 'creality-falcon-a1-pro';
 
-/** Creality's software turns the dot off after 30 s; so does KerfDesk. */
+/** Host-side off deadline; requires a responsive app and controller connection. */
 export const LASER_DOT_AUTO_OFF_MS = 30_000;
 
 export function isLaserDotLight(light: PositioningLight | undefined): light is LaserDotLight {

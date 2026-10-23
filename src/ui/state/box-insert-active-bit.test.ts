@@ -8,6 +8,9 @@ import { generateBox, generateFitCoupon, type BoxPanel, type BoxSpec } from '../
 import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../../core/devices';
 import { activeCncTool, layerCncTool, type CncMachineConfig, type Layer } from '../../core/scene';
 import { useStore } from './store';
+import { runCncPreflight } from '../../core/preflight/cnc-preflight';
+import { COMPILE_INTEGRITY_PREFLIGHT_CODES } from '../../core/preflight';
+import { cutFreshCncOperationsWithActiveBit } from './box-insert-mutation';
 import { resetStore } from './test-helpers';
 
 const SPEC: BoxSpec = {
@@ -83,9 +86,9 @@ describe('box operations cut with the bit their reliefs were sized for', () => {
     for (const name of ['Box panels', 'Box slots']) {
       expect(operation(name).cnc?.toolId).toBeUndefined();
       expect(cuttingBitMm(name)).toBe(bitMm);
-      // The starter's numbers stay, but no longer claim its own cutter.
+      // Retained starter values keep their original provenance for review.
       expect(operation(name).cnc).toMatchObject({ feedMmPerMin: 300, depthPerPassMm: 0.75 });
-      expect(operation(name).cnc?.feedSource).toBeUndefined();
+      expect(operation(name).cnc?.feedSource).toMatchObject({ kind: 'machine-starter' });
     }
     const panelBitMm = cuttingBitMm('Box panels');
     const unreached = relieved.filter((panel, index) => {
@@ -105,6 +108,58 @@ describe('box operations cut with the bit their reliefs were sized for', () => {
     expect(cuttingBitMm('Box slots')).toBeCloseTo(1.588, 3);
   });
 
+  it('discloses inherited starter values for the active bit, including after setup refresh', () => {
+    select4040WithActiveBit('em-1588');
+    insertBoxForActiveBit();
+    useStore.getState().updateCncMachine({ stock: { thicknessMm: 7 } });
+    const result = runCncPreflight(
+      useStore.getState().project,
+      cncMachine(),
+      'G21\nG90\nG1 X1 F300',
+      { sourceGeometryChecks: 'compiled-evidence-only' },
+    );
+    const warnings = result.issues.filter(
+      (issue) => issue.code === 'cnc-starter-tool-feed-retained',
+    );
+    expect(warnings).toHaveLength(2);
+    for (const warning of warnings) {
+      expect(warning.message).toContain('3.175 mm');
+      expect(warning.message).toContain('1.588 mm');
+      expect(warning.message).toContain('300 mm/min');
+      expect(warning.message).toContain('0.75 mm/pass');
+      expect(COMPILE_INTEGRITY_PREFLIGHT_CODES.has(warning.code)).toBe(false);
+    }
+    expect(cuttingBitMm('Box panels')).toBeCloseTo(1.588, 3);
+  });
+
+  it('recalculates an explicit material recipe for the active cutter instead of retaining the other bit values', () => {
+    select4040WithActiveBit('em-1588');
+    insertBoxForActiveBit();
+    const project = useStore.getState().project;
+    const existing = operation('Box panels');
+    const layer = {
+      ...existing,
+      cnc: {
+        ...existing.cnc!,
+        toolId: 'em-3175',
+        feedMmPerMin: 777,
+        depthPerPassMm: 2,
+        feedSource: { kind: 'material-recipe' as const, materialKey: 'aluminum', fluteCount: 3 },
+      },
+    };
+    const result = cutFreshCncOperationsWithActiveBit([], {
+      project: { ...project, scene: { ...project.scene, layers: [layer] } },
+    });
+    const settings = result.project.scene.layers[0]?.cnc;
+    expect(settings?.toolId).toBeUndefined();
+    expect(settings).toMatchObject({
+      feedMmPerMin: 300,
+      plungeMmPerMin: 50,
+      depthPerPassMm: 0.2,
+      feedSource: { kind: 'material-recipe', materialKey: 'aluminum', fluteCount: 2 },
+    });
+  });
+
   it('keeps the full starter seeding when the starter bit is the active bit', () => {
     select4040WithActiveBit('em-3175');
     insertBoxForActiveBit();
@@ -114,6 +169,15 @@ describe('box operations cut with the bit their reliefs were sized for', () => {
       feedMmPerMin: 300,
       feedSource: { kind: 'machine-starter' },
     });
+    const result = runCncPreflight(
+      useStore.getState().project,
+      cncMachine(),
+      'G21\nG90\nG1 X1 F300',
+      { sourceGeometryChecks: 'compiled-evidence-only' },
+    );
+    expect(result.issues.some((issue) => issue.code === 'cnc-starter-tool-feed-retained')).toBe(
+      false,
+    );
   });
 
   it('gives Box Fit Test strips the same bit', () => {

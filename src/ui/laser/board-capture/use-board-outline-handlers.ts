@@ -12,6 +12,7 @@ import {
   type OutlineBoardGeometry,
 } from '../../../core/scene';
 import type { BoardCapture } from './use-board-capture';
+import { boardCaptureOriginOwner } from './board-capture-origin-owner';
 
 type SetMessage = Dispatch<SetStateAction<string | null>>;
 
@@ -19,7 +20,10 @@ export function createOutlineFinishHandler(
   args: {
     readonly capture: BoardCapture;
     readonly device: DeviceProfile;
-    readonly setOriginAtMachinePoint: (pointMm: Vec2) => Promise<void>;
+    readonly setOriginAtMachinePoint: (
+      pointMm: Vec2,
+      assertTargetCurrent?: () => void,
+    ) => Promise<void>;
   },
   commit: (geometry: CapturedBoardGeometry) => void,
   setError: SetMessage,
@@ -49,7 +53,10 @@ export function createOutlineFinishHandler(
     }
     setBusy(true);
     try {
-      await args.setOriginAtMachinePoint(corner);
+      const owner = boardCaptureOriginOwner(args.capture);
+      owner.assertBeforeWrite();
+      await args.setOriginAtMachinePoint(corner, owner.assertBeforeWrite);
+      owner.assertAfterWrite();
       commit(result.geometry);
     } catch (error) {
       setError(errorMessage(error, 'Could not set the outline board origin.'));

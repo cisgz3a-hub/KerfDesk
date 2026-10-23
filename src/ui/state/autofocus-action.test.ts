@@ -114,6 +114,69 @@ describe('runAutofocus — shared response ownership', () => {
     expect((await pending).kind).toBe('ok');
   });
 
+  it('owns each coordinate setup reply before sending a probe', async () => {
+    const harness = makeHarness();
+    const pending = runAutofocus(harness.args({ command: 'G38.2 Z-10 F100' }));
+    await flush();
+    expect(harness.written).toEqual(['G21\n']);
+    harness.emit('ok');
+    await flush();
+    expect(harness.written).toEqual(['G21\n', 'G90\n']);
+    harness.emit('ok');
+    await flush();
+    expect(harness.written.at(-1)).toBe('G38.2 Z-10 F100\n');
+    harness.emit('ok');
+    harness.emit('<Idle|MPos:0,0,-8|FS:0,0>');
+    expect((await pending).kind).toBe('ok');
+  });
+
+  it('never probes if coordinate setup is rejected', async () => {
+    const harness = makeHarness();
+    const pending = runAutofocus(harness.args({ command: 'G38.4 Z-10 F100' }));
+    await flush();
+    harness.emit('error:20');
+    expect((await pending).kind).toBe('rejected');
+    expect(harness.written).toEqual(['G21\n']);
+  });
+
+  it('does not send the next setup line on a replacement controller session', async () => {
+    const harness = makeHarness();
+    const pending = runAutofocus(harness.args({ command: 'G38.2 Z-10 F100' }));
+    await flush();
+    harness.emit('ok');
+    harness.refs.writeEpoch = 1;
+    expect(await pending).toEqual({
+      kind: 'preflight-failed',
+      reason: 'Auto-focus cancelled because the controller session changed.',
+    });
+    expect(harness.written).toEqual(['G21\n']);
+  });
+
+  it.each(['G21\n', 'G90\n', 'G38.2 Z-10 F100\n'])(
+    'checks the original session at the write boundary for %s',
+    async (interruptedLine) => {
+      const harness = makeHarness();
+      const dispatched: string[] = [];
+      const result = await runAutofocus(
+        harness.args({
+          command: 'G38.2 Z-10 F100',
+          write: async (line, _action, _source, assertBeforeWrite) => {
+            // A store subscription may replace the session while reserving
+            // the write. safeWrite invokes this guard again before conn.write.
+            if (line === interruptedLine) harness.refs.writeEpoch = 1;
+            expect(assertBeforeWrite).toBeTypeOf('function');
+            assertBeforeWrite?.();
+            dispatched.push(line);
+            harness.emit('ok');
+          },
+        }),
+      );
+      expect(result.kind).toBe('preflight-failed');
+      expect(dispatched).not.toContain(interruptedLine);
+      expect(dispatched).not.toContain('G38.2 Z-10 F100\n');
+    },
+  );
+
   it('does not dispatch until a fresh Idle confirmation resolves', async () => {
     const harness = makeHarness();
     let confirm: ((report: StatusReport) => void) | undefined;
