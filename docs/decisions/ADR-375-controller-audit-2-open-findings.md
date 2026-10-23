@@ -241,7 +241,7 @@ therefore sent moves the firmware refuses, or trusted values the controller had 
      off while KerfDesk reported the write as done. On the stock GRBL driver the Console now
      refuses, before its confirmation prompt, a value the firmware would store as something else,
      with the check the Machine Settings dialog already applies (#923). grblHAL refuses such
-     values itself. *(Corrected by Amendment 3: grblHAL refuses a non-zero fraction or a value
+     values itself. *(Corrected by Amendment 4: grblHAL refuses a non-zero fraction or a value
      outside a setting's declared limits, but stores the leading number of `26,67` or `5O00`, and
      builds before 20261015 read `1.0` as 10, all with `ok`; the Console now checks grblHAL values
      too.)* Every acknowledged Console setting write is read back with `$$`, not only a `$13`
