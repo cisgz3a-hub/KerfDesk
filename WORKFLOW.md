@@ -199,7 +199,7 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 4. After import, all imported objects are multi-selected.
 5. Toast: `Imported 3 designs · 3 artwork operations`.
 
-#### Success — a project file dropped on the window (ADR-378 Amendment 1)
+#### Success — a project file dropped on the window (ADR-378 Amendment 2)
 1. User drops a KerfDesk project (`.lf2`) or a LightBurn project (`.lbrn`, `.lbrn2`).
 2. It opens exactly like a project double-clicked in Explorer (ADR-378): the Save / Don't Save /
    Cancel question comes first when the current project has unsaved changes, and during a job or
@@ -2692,7 +2692,9 @@ authorization, Frame proof, controller command, or safety boundary.
 4. **Export current snapshot** saves versioned read-only evidence. Loading Snapshot A and B
    compares independent axis values neutrally, with no better/worse verdict and no firmware write.
    A grblHAL password setting is saved as `[password removed]` (ADR-229 Amendment 2), and the
-   local diagnostic bundle leaves out setting lines and passwords (ADR-570 Amendment 1).
+   local diagnostic bundle leaves out setting lines and passwords (ADR-570 Amendment 1). The
+   comparison shows a password, even from an older snapshot, as `[password hidden]`, and
+   **Copy visible** removes grblHAL and FluidNC passwords from the copied transcript.
 5. Setting writes stay in Device Setup; the pane sends only the gated read.
 
 #### Success - detailed live transcript
@@ -2781,7 +2783,8 @@ authorization, Frame proof, controller command, or safety boundary.
 4. Exporting a backup sends no command to the controller.
 5. When the rows hold a grblHAL password (`$75`, `$77`, `$330`, `$331`, `$533`), the panel says
    before Export that the backup keeps it in plain text for a restore, and the success toast warns
-   to keep the file private (ADR-229 Amendment 2).
+   to keep the file private (ADR-229 Amendment 2). The settings table shows such a value as
+   `[password hidden]`, and the search does not match it.
 
 #### Error — disconnected
 1. **Read ($$)** is disabled.
@@ -8532,7 +8535,9 @@ as the pane's design record.
   confident match (score 0.6 or more, the surround at least 4 % of the view) that puts the middle
   of the bed 1 mm or more off shows **The camera may have moved, by about N mm** in the Camera
   panel, with **Fix a small offset…**, **Check camera…** and **Dismiss**, and one toast when the
-  panel is closed. A weaker match, too little surround, a head camera or no kept view says
+  panel is closed. **Dismiss** keeps that warning quiet while the camera stays where it was then;
+  a view confirmed steady since (a nudge fix, a kept check), or a further shift of 1 mm or more,
+  warns again. A weaker match, too little surround, a head camera or no kept view says
   nothing; Camera settings says how to start the warning for a calibration without a view.
 - **Check / has the camera moved?** With a calibration saved, **Check camera…** opens the wizard
   at the photo, using the saved target's area and height. The photo is measured against the saved
@@ -9571,7 +9576,9 @@ The G-code Inspector is free in every edition (ADR-627).
    a Z offset (`G92 Z`, `G10 L2`/`L20 Z`), sets or cancels a tool length (`G43.1`, `G49`, and
    grblHAL's tool-table `G43`/`G43.2`, ADR-630 Amendment 8) or changes the tool (`M6`, `T`,
    `M61`), Work Z set before it no longer counts, so the next CNC Frame asks for Zero Z again.
-   The Console voids it for the same words. A `G54` that selects the system already active
+   If it writes an X/Y offset (`G92 X/Y`, `G10 L2`/`L20 X/Y`, `G92.1`), the work origin set
+   before it no longer counts, and a Place Board registration bound to it is void (ADR-667).
+   The Console voids each for the same words. A `G54` that selects the system already active
    changes neither.
 
 #### Warnings (never refuse)
