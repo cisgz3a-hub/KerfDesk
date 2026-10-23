@@ -94,6 +94,8 @@ export type PreflightCode =
   // Advisory-only: secondary CNC cutters share values established for the
   // layer's primary cutter and require explicit operator verification.
   | 'cnc-secondary-tool-feed-retained'
+  // Advisory-only: values retained from a machine starter for a different cutter.
+  | 'cnc-starter-tool-feed-retained'
   | 'empty-output';
 
 export type PreflightIssue = {

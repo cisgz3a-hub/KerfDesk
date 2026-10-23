@@ -144,6 +144,40 @@ describe('Falcon A1 Pro laser dot through the LED controls (ADR-664)', () => {
     expect(h.lines().at(-1)).toBe('M5');
   });
 
+  it('retries after both automatic off paths fail, keeping LASER OFF offered', async () => {
+    vi.useFakeTimers();
+    const h = dotHarness();
+    const fallback = vi.fn(async () => {
+      throw new Error('link unavailable');
+    });
+    h.set({ setFireActive: fallback });
+    await h.actions.switchPositioningLightOn();
+    h.fail('M5');
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(fallback).toHaveBeenCalledOnce();
+    expect(h.get()).toMatchObject({ fireActive: true, positioningLightEnabled: true });
+    h.fail('');
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(h.get()).toMatchObject({ fireActive: false, positioningLightEnabled: false });
+    expect(h.lines().at(-1)).toBe('M5');
+  });
+
+  it('does not send a fallback off into a replacement controller session', async () => {
+    vi.useFakeTimers();
+    const h = dotHarness();
+    const fallback = vi.fn(async () => undefined);
+    h.set({ setFireActive: fallback });
+    await h.actions.switchPositioningLightOn();
+    h.after((line) => {
+      if (line === 'M5') h.set({ controllerSessionEpoch: h.get().controllerSessionEpoch + 1 });
+    });
+    h.fail('M5');
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(fallback).not.toHaveBeenCalled();
+    const sent = h.writes.length;
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(h.writes).toHaveLength(sent);
+  });
   it('refuses the infrared module, whose beam would show nothing', async () => {
     const h = dotHarness();
     const project = useStore.getState().project;

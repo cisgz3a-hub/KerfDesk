@@ -78,6 +78,29 @@ describe('findLitRapids (ADR-630 Amendment 4)', () => {
     expect(findLitRapids(program)).toEqual({ count: 1, firstLine: 3 });
   });
 
+  it.each(['G28', 'G30', 'G28 X0', 'G30 Z0'])(
+    'warns for a lit stored-position return %s, even with no axis words',
+    (command) => {
+      expect(findLitRapids(`G1 F100\nM3 S200\n${command}\nX10`)).toEqual({
+        count: 1,
+        firstLine: 3,
+        storedPositionReturns: { count: 1, firstLine: 3 },
+      });
+    },
+  );
+
+  it('does not count stored-position setters or laser-off returns', () => {
+    expect(findLitRapids('M3 S200\nG28.1\nG30.1\nG28 S0\nM5\nG30')).toBeNull();
+  });
+
+  it('applies power before a return and program end after it', () => {
+    expect(findLitRapids('G30 M3 S200 M2\nG28')).toEqual({
+      count: 1,
+      firstLine: 1,
+      storedPositionReturns: { count: 1, firstLine: 1 },
+    });
+  });
+
   it('is quiet with the laser never on', () => {
     expect(findLitRapids(sent('G0 X10 Y10\nG1 X20 S0 F600\nG0 X0 Y0'))).toBeNull();
   });

@@ -100,7 +100,7 @@ async function switchOn(
       set({
         log: pushLog(
           context.get(),
-          `[lf2] Laser dot on at ${mapping.powerPercent}% to show where it will burn; it goes off by itself after ${LASER_DOT_AUTO_OFF_MS / 1000} s.`,
+          `[lf2] Laser dot on at ${mapping.powerPercent}% to show where it will burn; KerfDesk will request off after ${LASER_DOT_AUTO_OFF_MS / 1000} s while the app and connection remain responsive.`,
         ),
       });
   } catch (error) {
@@ -118,6 +118,7 @@ type LaserDotAutoOff = LitLight & {
   readonly set: SetFn;
   readonly get: () => LaserState;
   readonly refs: LiveRefs;
+  warned?: boolean;
 };
 
 /** Put a dot that is, or may be, lit out after 30 s, as Creality's "Laser on"
@@ -149,9 +150,22 @@ async function autoOffLaserDot(autoOff: LaserDotAutoOff): Promise<void> {
     set({ log: pushLog(get(), `[lf2] Laser dot off after ${LASER_DOT_AUTO_OFF_MS / 1000} s.`) });
   } catch {
     // Not Idle or not admitted: M5 on its own, as LASER OFF sends it.
-    if (get().fireActive)
+    if (autoOff.isCurrent() && get().fireActive)
       await get()
         .setFireActive(false)
         .catch(() => undefined);
+    // Neither off path succeeded. Keep the latch and keep trying for this
+    // exact light/session; a stale timer must never switch a replacement off.
+    if (!autoOff.isCurrent() || !get().fireActive) return;
+    if (!autoOff.warned) {
+      autoOff.warned = true;
+      set({
+        log: pushLog(
+          get(),
+          '[lf2] Laser dot off could not be confirmed. Retrying; use the machine stop if the beam remains on.',
+        ),
+      });
+    }
+    armLaserDotAutoOff(autoOff, LASER_DOT_AUTO_OFF_RETRY_MS);
   }
 }

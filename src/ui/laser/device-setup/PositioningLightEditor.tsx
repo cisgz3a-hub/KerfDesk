@@ -77,15 +77,16 @@ function LaserDotEditor(props: {
       </label>
       <p style={{ margin: 0 }}>
         The Falcon A1 Pro’s laser head has no separate LED. Like Creality’s “Laser on” button, LED
-        on turns the laser itself on at low power, so its dot is exactly where it will burn. It goes
-        off by itself after {LASER_DOT_AUTO_OFF_MS / 1000} s, and LED off or LASER OFF puts it out
-        sooner.
+        on turns the laser itself on at low power, so its dot is exactly where it will burn.
+        KerfDesk requests off after {LASER_DOT_AUTO_OFF_MS / 1000} s while the app and connection
+        remain responsive. LED off or LASER OFF requests off sooner. Use the machine stop if the
+        beam remains on.
       </p>
       {value !== undefined ? (
         <>
           <p role="note" style={{ margin: 0, color: 'var(--lf-danger)' }}>
             This is the cutting laser. Wear laser safety glasses or watch through the lid, and keep
-            the power low: even a few percent can mark paper or card if the head moves slowly.
+            the power low: even a few percent can mark paper or card while the head is stationary.
           </p>
           <DotPowerField value={value} onChange={onChange} />
           <AfterFrameField value={value} onChange={onChange} />
@@ -232,7 +233,7 @@ function AfterFrameField<T extends PositioningLight>(props: {
         type="checkbox"
         title={
           isLaserDotLight(props.value)
-            ? `After Frame finishes, move with the beam off to the centre of the whole framed job and turn the laser dot on there. It goes off by itself after ${LASER_DOT_AUTO_OFF_MS / 1000} s; switch it off before Start. Frame stays valid for Start.`
+            ? `After Frame finishes, move with the beam off to the centre of the whole framed job and turn the laser dot on there. KerfDesk requests off after ${LASER_DOT_AUTO_OFF_MS / 1000} s while the app and connection remain responsive; switch it off before Start. Frame stays valid for Start.`
             : 'After Frame finishes, automatically show the centre of the whole framed job on the board, using its captured placement and LED offsets. The LED stays on until switched off, and Frame stays valid for Start.'
         }
         checked={props.value.afterFrame === true}

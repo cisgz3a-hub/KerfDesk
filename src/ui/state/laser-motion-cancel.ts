@@ -18,9 +18,11 @@ import { cancelPendingManualMotions } from './manual-motion-intent';
 
 const CANCEL_QUEUE_TIMEOUT_MS = 8_000;
 const CANCEL_QUEUE_POLL_MS = 10;
-// How long Cancel lets the controller parse the line it was just sent, counted
-// from when that line has left the transport, before writing the jog-cancel
-// byte anyway.
+// A transport promise can remain pending after its bytes reached a moving
+// controller. Give it a short grace, never the post-cancel settlement budget.
+const JOG_CANCEL_TRANSPORT_GRACE_MS = 250;
+// Extra time to prefer a parsed/acknowledged line after the transport grace.
+// Even when that handoff is still pending, send the jog-cancel byte afterwards.
 const JOG_CANCEL_PARSE_GRACE_MS = 250;
 const CONTROLLER_STATE_TIMEOUT_MESSAGE = 'Timed out waiting for controller state after Cancel.';
 // Disconnect and Reconnect are disabled while a motion owner may still be
@@ -190,9 +192,10 @@ async function waitForCancelledMotionQueue(
 // then waits for that reply as before. A jog still running afterwards stops on
 // this byte or on the re-send after a fresh Jog report.
 async function waitForOwedRepliesBriefly(context: CancelContext): Promise<void> {
-  // A line still being written has not reached the controller, so its parse
-  // grace starts only once it is out (ADR-375 re-audit).
-  await settledWithin(context, CANCEL_QUEUE_TIMEOUT_MS, transportWritesDone);
+  // Prefer its reply before 0x85, which may flush unparsed grblHAL input.
+  // A stalled handoff must still let us attempt the stop within 500 ms.
+  // Keep the owed reply and owner: settlement/retry proves the eventual stop.
+  await settledWithin(context, JOG_CANCEL_TRANSPORT_GRACE_MS, transportWritesDone);
   await owedRepliesSettled(context, JOG_CANCEL_PARSE_GRACE_MS);
 }
 
@@ -207,12 +210,13 @@ async function settledWithin(
   settled: (state: LaserState) => boolean,
 ): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
-  while (Date.now() <= deadline) {
+  while (true) {
     assertCancelContext(context);
     if (settled(context.get())) return true;
-    await sleep(CANCEL_QUEUE_POLL_MS);
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) return false;
+    await sleep(Math.min(CANCEL_QUEUE_POLL_MS, remaining));
   }
-  return false;
 }
 
 function motionQueueSettled(state: LaserState): boolean {
