@@ -7,8 +7,8 @@
 // $330 WebUI admin, $331 WebUI user and $533 MQTT broker. Only the Wi-Fi
 // drivers (wifi.c, esp_at.c), the WebUI plugin (login.c) and the Ethernet
 // drivers (enet.c) declare a Format_Password setting, and only these five.
-// FluidNC names its Wi-Fi passwords `$Sta/Password` and `$AP/Password`, also
-// set with `[ESP101]` and `[ESP106]` (WebUI/WifiConfig.cpp).
+// FluidNC accepts both names (Sta/Password, AP/Password) and compatibility
+// aliases (ESP101, ESP106), in either $key=value or [key]value syntax.
 // https://github.com/grblHAL/core/blob/4ec1ae44b857a70d2f9298344feac4b43ed0eb6b/settings.c#L1961-L1962
 // https://github.com/grblHAL/core/blob/4ec1ae44b857a70d2f9298344feac4b43ed0eb6b/settings.h#L131-L133
 // https://github.com/grblHAL/core/blob/4ec1ae44b857a70d2f9298344feac4b43ed0eb6b/settings.h#L199-L200
@@ -43,7 +43,7 @@ export function shownControllerSettingValue(id: number, rawValue: string): strin
 // https://github.com/grblHAL/core/blob/4ec1ae44b857a70d2f9298344feac4b43ed0eb6b/system.c#L1203-L1213
 // https://github.com/grblHAL/core/blob/4ec1ae44b857a70d2f9298344feac4b43ed0eb6b/nuts_bolts.c#L249-L317
 const PASSWORD_ALIAS_MARGIN = 0.002;
-const FLUIDNC_PASSWORD_MARKERS = ['[ESP101]', '[ESP106]'];
+const FLUIDNC_PASSWORD_MARKERS = ['[ESP101]', '[ESP106]', '[STA/PASSWORD]', '[AP/PASSWORD]'];
 
 type ScannedSettingKey = { readonly end: number; readonly password: boolean };
 
@@ -69,8 +69,8 @@ export function maskControllerPasswords(text: string): string {
     }
     const valueStart = passwordValueStart(text, cursor, character, passwordKey);
     if (character === '=') passwordKey = false;
-    // Keep already removed values intact, including following escaped text.
-    if (valueStart !== null && !text.startsWith(CONTROLLER_PASSWORD_REMOVED, valueStart)) {
+    // This is raw text: even a removal-marker prefix can be part of a password.
+    if (valueStart !== null) {
       const end = physicalLineEnd(text, valueStart);
       parts.push(text.slice(copyFrom, valueStart), CONTROLLER_PASSWORD_REMOVED);
       copyFrom = end;
@@ -125,11 +125,11 @@ function scanNamedKey(text: string, start: number): ScannedSettingKey {
   while (isSettingNameCode(text.charCodeAt(end))) end += 1;
   const wordEnd = end;
   end = skipHorizontalBlanks(text, end);
+  const name = text.slice(start, wordEnd).toLowerCase();
   return {
     end,
     password:
-      wordEnd - start >= 8 &&
-      text.slice(wordEnd - 8, wordEnd).toLowerCase() === 'password' &&
+      (name.endsWith('password') || name === 'esp101' || name === 'esp106') &&
       text.charAt(end) === '=',
   };
 }
@@ -142,9 +142,11 @@ function passwordValueStart(
 ): number | null {
   if (character === '=' && passwordKey) return cursor + 1;
   if (character !== '[') return null;
-  return FLUIDNC_PASSWORD_MARKERS.includes(text.slice(cursor, cursor + 8).toUpperCase())
-    ? cursor + 8
-    : null;
+  // A fixed set of bounded-length markers keeps failed bracket candidates linear.
+  const marker = FLUIDNC_PASSWORD_MARKERS.find(
+    (candidate) => text.slice(cursor, cursor + candidate.length).toUpperCase() === candidate,
+  );
+  return marker === undefined ? null : cursor + marker.length;
 }
 
 function skipHorizontalBlanks(text: string, start: number): number {

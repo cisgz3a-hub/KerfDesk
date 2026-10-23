@@ -81,7 +81,7 @@ describe('controller password settings', () => {
         '$75x'.repeat(length),
         `$${'0 '.repeat(length)}74suffix`,
         `$${'0 '.repeat(length)}7500=visible`,
-        `${'$75x'.repeat(length)}=[password removed]\\nnext line`,
+        `${'$75x'.repeat(length)}=[password removed]`,
       ]) {
         const characterReads = vi.spyOn(String.prototype, 'charAt');
         const codeReads = vi.spyOn(String.prototype, 'charCodeAt');
@@ -109,12 +109,11 @@ describe('controller password settings', () => {
       '$30=1000 $74=VisibleSSID $75=[password removed]',
     );
     expect(maskControllerPasswords('$75=[password removed]\\n$533=SyntheticBroker')).toBe(
-      '$75=[password removed]\\n$533=[password removed]',
+      '$75=[password removed]',
     );
     const text =
       '$75suffix=[password removed]\\nnext line\r\n$74=visible\n$329.9999999=SyntheticAdmin';
-    const masked =
-      '$75suffix=[password removed]\\nnext line\r\n$74=visible\n$329.9999999=[password removed]';
+    const masked = '$75suffix=[password removed]\r\n$74=visible\n$329.9999999=[password removed]';
     expect(maskControllerPasswords(text)).toBe(masked);
     expect(maskControllerPasswords(masked)).toBe(masked);
     expect(maskControllerPasswords('$75suffix\n$30=1000')).toBe('$75suffix\n$30=1000');
@@ -130,7 +129,20 @@ describe('controller password settings', () => {
     );
   });
 
-  it('leaves other settings alone and does not run on into escaped text', () => {
+  it.each(['$ESP101=', '$esp106=', '[Sta/Password]', '[ap/password]'])(
+    'masks both FluidNC spellings and syntaxes: %s',
+    (prefix) => {
+      const masked = `${prefix}[password removed]`;
+      expect(maskControllerPasswords(`${prefix}Synthetic Secret\r\n$100=80`)).toBe(
+        `${masked}\r\n$100=80`,
+      );
+      expect(maskControllerPasswords(`${masked}\\nSyntheticTail`)).toBe(masked);
+      expect(maskControllerPasswords(`${masked}SyntheticTail`)).toBe(masked);
+      expect(maskControllerPasswords(prefix)).toBe(masked);
+    },
+  );
+
+  it('leaves other settings alone and is idempotent on its own output', () => {
     for (const text of [
       '$7500=1',
       '$07500=1',
@@ -146,10 +158,17 @@ describe('controller password settings', () => {
       '$534=visible',
       '$532=mqtt-user',
       '$330',
+      '$ESP100=VisibleSSID',
+      '$ESP105=VisibleAP',
+      '$ESP1010=visible',
+      '[Sta/SSID]VisibleSSID',
+      '[ESP100]VisibleSSID',
+      '[Sta/PasswordExtra]visible',
     ]) {
       expect(maskControllerPasswords(text)).toBe(text);
     }
     const once = maskControllerPasswords('$77=apSecret77');
-    expect(maskControllerPasswords(`${once}\\nnext line`)).toBe(`${once}\\nnext line`);
+    expect(maskControllerPasswords(once)).toBe(once);
+    expect(maskControllerPasswords(`${once}\\nSyntheticTail`)).toBe(once);
   });
 });
