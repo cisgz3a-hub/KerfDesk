@@ -68,13 +68,13 @@ it.each(['opened', 'missing', 'denied'] as const)(
 
 it('holds an external file if a modal opens while its read waits', async () => {
   const read = deferred<string>();
-  const started = deferred<void>();
+  const started = deferred<undefined>();
   const before = useStore.getState().project;
   let modal = false;
   const external = {
     name: 'external.lf2',
     text: () => {
-      started.resolve();
+      started.resolve(undefined);
       return read.promise;
     },
   };
@@ -96,8 +96,8 @@ it('holds an external file if a modal opens while its read waits', async () => {
 });
 
 it('claims a template request before its Save guard so a newer cancelled Open retires it', async () => {
-  const write = deferred<void>();
-  const writing = deferred<void>();
+  const write = deferred<undefined>();
+  const writing = deferred<undefined>();
   const pickFilesForOpen = vi.fn(async () => []);
   const platform = { ...mockPlatform(), pickFilesForOpen };
   useStore.setState({
@@ -106,7 +106,7 @@ it('claims a template request before its Save guard so a newer cancelled Open re
     lastSaveTarget: {
       displayName: 'current.lf2',
       write: async () => {
-        writing.resolve();
+        writing.resolve(undefined);
         await write.promise;
       },
     },
@@ -119,7 +119,7 @@ it('claims a template request before its Save guard so a newer cancelled Open re
   await vi.waitFor(() => expect(useConfirmSaveStore.getState().request).not.toBeNull());
   useConfirmSaveStore.getState().choose('cancel');
   await newer;
-  write.resolve();
+  write.resolve(undefined);
   await template;
   expect(pickFilesForOpen).not.toHaveBeenCalled();
 });

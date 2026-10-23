@@ -54,9 +54,9 @@ test('overflowing notifications scroll over text and scrollbar while short notic
   const message = stack.locator('.lf-toast__message');
   const passedThrough = await message.evaluate((node) => {
     const bounds = node.getBoundingClientRect();
-    return !node
-      .closest('.lf-toasts')!
-      .contains(document.elementFromPoint(bounds.x + 10, bounds.y + 5));
+    const region = node.closest('.lf-toasts');
+    if (region === null) throw new Error('Notification region missing');
+    return !region.contains(document.elementFromPoint(bounds.x + 10, bounds.y + 5));
   });
   expect(passedThrough).toBe(true);
   expect((await kerfdesk.events()).filter((event) => event.kind.startsWith('serial-'))).toEqual([]);
@@ -118,7 +118,8 @@ test('a canvas selection change retires the previous width draft, including afte
       const url = performance
         .getEntriesByType('resource')
         .map((entry) => entry.name)
-        .find((entry) => new URL(entry).pathname === '/src/ui/state/index.ts')!;
+        .find((entry) => new URL(entry).pathname === '/src/ui/state/index.ts');
+      if (url === undefined) throw new Error('Rendered project store module missing');
       const { useStore } = await import(url);
       return useStore
         .getState()
@@ -163,7 +164,8 @@ async function clickArtwork(page: Page, index: number): Promise<void> {
     const { computeView } = await load('/src/ui/workspace/view-transform.ts');
     const canvas = document.querySelector<HTMLCanvasElement>(
       'canvas[aria-label="KerfDesk workspace"]',
-    )!;
+    );
+    if (canvas === null) throw new Error('Workspace canvas missing');
     const state = useStore.getState();
     const object = state.project.scene.objects[objectIndex];
     const view = computeView(

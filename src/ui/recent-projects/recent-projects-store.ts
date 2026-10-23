@@ -92,6 +92,38 @@ function serialize(change: () => Promise<void>): Promise<void> {
   return next;
 }
 
+function recordRecentProjectFile(
+  set: (patch: Partial<RecentProjectsState>) => void,
+  get: () => RecentProjectsState,
+  files: RecentFileAdapter,
+  use: RecentProjectFileUse,
+): Promise<void> {
+  return serialize(async () => {
+    const usedAt = Date.now();
+    const persistence = currentStorage();
+    let expected = await persistence.load();
+    for (;;) {
+      const matchId = await sameFileEntry(files, expected, use);
+      const id = matchId ?? newRecentProjectId();
+      const result = await updateRecentProjectsIfUnchanged(persistence, expected, (current) =>
+        recordRecentProjectUse(current, { ...use, usedAt }, matchId, id, currentCommittedLimit()),
+      );
+      if (!result.applied) {
+        expected = result.entries;
+        continue;
+      }
+      set({
+        entries: result.entries,
+        ...(!hasPendingComputerPreference(RECENT_PROJECT_LIMIT_KEY)
+          ? { limit: committedLimit }
+          : {}),
+      });
+      get().setStatus(id, 'present');
+      return;
+    }
+  });
+}
+
 export const useRecentProjectsStore = create<RecentProjectsState>((set, get) => {
   const apply = (change: (entries: Entries) => Entries): Promise<void> =>
     serialize(async () => {
@@ -113,37 +145,7 @@ export const useRecentProjectsStore = create<RecentProjectsState>((set, get) => 
           set({ entries, limit: committedLimit });
         }
       }),
-    record: (files, use) =>
-      serialize(async () => {
-        const usedAt = Date.now();
-        const persistence = currentStorage();
-        let expected = await persistence.load();
-        for (;;) {
-          const matchId = await sameFileEntry(files, expected, use);
-          const id = matchId ?? newRecentProjectId();
-          const result = await updateRecentProjectsIfUnchanged(persistence, expected, (current) =>
-            recordRecentProjectUse(
-              current,
-              { ...use, usedAt },
-              matchId,
-              id,
-              currentCommittedLimit(),
-            ),
-          );
-          if (!result.applied) {
-            expected = result.entries;
-            continue;
-          }
-          set({
-            entries: result.entries,
-            ...(!hasPendingComputerPreference(RECENT_PROJECT_LIMIT_KEY)
-              ? { limit: committedLimit }
-              : {}),
-          });
-          get().setStatus(id, 'present');
-          return;
-        }
-      }),
+    record: (files, use) => recordRecentProjectFile(set, get, files, use),
     probe: async (files) => {
       const checks = get().entries.map(async (entry) => {
         if (entry.ref === null) return;

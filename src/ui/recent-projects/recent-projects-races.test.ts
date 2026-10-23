@@ -20,7 +20,9 @@ const use = (name: string, folder = 'one') => ({
   ref: { kind: 'desktop-path' as const, path: `C:/${folder}/${name}.lf2`, token: 'a'.repeat(43) },
 });
 const store = () => useRecentProjectsStore.getState();
-const extraStores: Array<typeof import('./recent-projects-store')> = [];
+const extraStores: Array<{
+  readonly configureRecentProjectsForTests: typeof configureRecentProjectsForTests;
+}> = [];
 
 beforeEach(() => {
   localStorage.removeItem(RECENT_PROJECT_LIMIT_KEY);

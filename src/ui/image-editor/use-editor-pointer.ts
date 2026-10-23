@@ -3,7 +3,7 @@
 // per gesture (the capture->mutate->push history protocol lives in the
 // session ops). Wheel zooms about the cursor; middle-drag pans.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   ellipseSelection,
   polygonSelection,
@@ -30,6 +30,7 @@ import { useQuickMaskStore } from './quick-mask-store';
 import type { EditorView } from './image-editor-types';
 import { canvasToDoc } from './editor-canvas-draw';
 import { dragTransform, hitTransformHandle } from './editor-transform';
+import { useEditorGestureRetirement } from './use-editor-gesture-retirement';
 
 const ZOOM_STEP = 1.1;
 const MIN_SCALE = 0.05;
@@ -79,23 +80,7 @@ export function useEditorPointer(
     setDrag(next);
   }, []);
 
-  useEffect(
-    () =>
-      useImageEditorStore.subscribe((state, previous) => {
-        if (
-          state.tool !== previous.tool ||
-          state.session !== previous.session ||
-          state.sessionOwner !== previous.sessionOwner ||
-          state.pendingCrop !== previous.pendingCrop ||
-          (previous.transform !== null && state.transform === null)
-        ) {
-          // Retire the ref synchronously: Escape followed by pointer-up can
-          // arrive before React renders the replacement tool or session.
-          update(IDLE_DRAG);
-        }
-      }),
-    [update],
-  );
+  useEditorGestureRetirement(update);
 
   const docPoint = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
