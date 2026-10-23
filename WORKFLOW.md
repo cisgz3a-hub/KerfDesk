@@ -9594,9 +9594,15 @@ backspace and DEL) outside a comment, holds a line a GRBL-family controller reje
 commands from one modal group such as `G90G91`, two commands that take the axis words, or a
 repeated word: `error:21`, `24`, `25`), or the Inspector cannot construct a finite motion
 envelope. Other control characters (a DOS end-of-file Ctrl-Z, a form feed) are dropped, as
-GRBL discards them. One refusal is policy, not fact: a `$` controller command (also behind a
+GRBL discards them. Two refusals are policy, not fact. A `$` controller command (also behind a
 `/` or spaces, or FluidNC's bracket form such as `[J]`) belongs in the Console, because GRBL
-runs it only while Idle and the Frame cannot trace what it moves (ADR-630 Amendment 1). A line longer than the connected
+runs it only while Idle and the Frame cannot trace what it moves (ADR-630 Amendment 1). The
+other is a line the connected controller hands to its shell, its files or a stored program: on
+Smoothieware a line starting with a lowercase letter, `M1000` and the SD-card and config-file
+M-codes; on Marlin SD-card writes and prints, `M500` and `M997`; on grblHAL `G65`, `G66`,
+`M98` and a named `O<…> call`. `M30` with a file name is refused; a bare `M30` still ends the
+program. The review names each such line and what the controller would do with it (ADR-630
+Amendment 5). A line longer than the connected
 controller's line or receive buffer (ADR-375) is named before Frame and keeps Frame unavailable.
 
 #### Not included
