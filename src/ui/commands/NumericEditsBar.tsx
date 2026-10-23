@@ -77,13 +77,14 @@ export function NumericEditsBar(): JSX.Element {
           disabled={!model.hasSelection}
           onChange={model.setAnchor}
         />
-        <NumericFields model={model} />
+        <NumericFields key={model.selectionKey} model={model} />
       </div>
     </section>
   );
 }
 
 type NumericEditModel = {
+  readonly selectionKey: string;
   readonly anchor: SelectionAnchor;
   readonly setAnchor: (anchor: SelectionAnchor) => void;
   readonly preserveAspect: boolean;
@@ -101,6 +102,7 @@ function useNumericEditModel(): NumericEditModel {
   const project = useStore((state) => state.project);
   const selectedObjectId = useStore((state) => state.selectedObjectId);
   const additionalSelectedIds = useStore((state) => state.additionalSelectedIds);
+  const documentEpoch = useStore((state) => state.projectDocumentEpoch);
   const applySelectionTransforms = useStore((state) => state.applySelectionTransforms);
   const pushToast = useToastStore((state) => state.pushToast);
   const anchor = useUiStore((state) => state.selectionAnchor);
@@ -124,6 +126,9 @@ function useNumericEditModel(): NumericEditModel {
     applySelectionTransforms(result.transforms);
   };
   return {
+    // A canvas pointerdown can select different artwork before field blur.
+    // Retire the old fields so their draft cannot commit to that new selection.
+    selectionKey: JSON.stringify([documentEpoch, objects.map((object) => object.id).sort()]),
     anchor,
     setAnchor,
     preserveAspect,

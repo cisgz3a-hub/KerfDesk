@@ -30,6 +30,43 @@ afterEach(async () => {
 });
 
 describe('NumericEditsBar', () => {
+  it.each([false, true])(
+    'retires a selection draft before blur can edit another object (Enter first: %s)',
+    async (enterFirst) => {
+      installProject();
+      const state = useStore.getState();
+      const original = state.project.scene.objects[0]!;
+      useStore.setState({
+        project: {
+          ...state.project,
+          scene: {
+            ...state.project.scene,
+            objects: [
+              original,
+              { ...original, id: 'shape-2', transform: { ...original.transform, x: 50 } },
+            ],
+          },
+        },
+      });
+      const container = await render(<NumericEditsBar />);
+      const width = input(container, 'Selection width');
+      await act(async () => {
+        setInputValue(width, '40');
+        Simulate.change(width);
+      });
+      if (enterFirst) await act(async () => Simulate.keyDown(width, { key: 'Enter' }));
+      // Canvas pointerdown selects B before the browser dispatches field blur.
+      await act(async () => useStore.getState().selectObject('shape-2'));
+      await act(async () => Simulate.blur(input(container, 'Selection width')));
+      expect(useStore.getState().project.scene.objects[1]?.transform.scaleX).toBe(1);
+      expect(useStore.getState().project.scene.objects[0]?.transform.scaleX).toBe(
+        enterFirst ? 2 : 1,
+      );
+      expect(useStore.getState().undoStack).toHaveLength(enterFirst ? 1 : 0);
+      expect(input(container, 'Selection width').value).toBe('20');
+    },
+  );
+
   it('keeps all transform fields available with the anchor grid collapsed', async () => {
     const container = await render(<NumericEditsBar />);
     const toolbar = container.querySelector('section[aria-label="Numeric Edits Toolbar"]');

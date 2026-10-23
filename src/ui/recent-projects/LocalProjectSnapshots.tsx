@@ -111,7 +111,7 @@ function SnapshotCapture(props: { readonly view: ReturnType<typeof useSnapshots>
     void view.run(async () => {
       await view.storage.add(await captureLocalProjectSnapshot(project, name));
       await view.reload();
-      setName('');
+      setName((current) => (current === name ? '' : current));
       useToastStore.getState().pushToast('Saved a complete local snapshot.', 'success');
     });
   };

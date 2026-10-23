@@ -11,6 +11,10 @@ import {
   DEFAULT_RECENT_PROJECT_LIMIT,
   type RecentProjectEntry,
 } from './recent-project-model';
+import {
+  sameRecentProjectSnapshot,
+  type RecentProjectConditionalUpdate,
+} from './recent-project-transaction';
 
 const DATABASE_NAME = 'kerfdesk-recent-projects';
 const DATABASE_VERSION = 1;
@@ -26,6 +30,11 @@ export type RecentProjectStorage = {
   /** Apply a change to the stored list inside one transaction, so two windows
    * recording at the same moment both land. Resolves with the changed list. */
   readonly update: (change: (entries: Entries) => Entries) => Promise<Entries>;
+  /** A checked mutation retains its pure intent when storage temporarily refuses. */
+  readonly updateIfUnchanged?: (
+    expected: Entries,
+    change: (entries: Entries) => Entries,
+  ) => Promise<RecentProjectConditionalUpdate>;
 };
 
 export function createMemoryRecentProjectStorage(initial: Entries = []): RecentProjectStorage {
@@ -123,6 +132,26 @@ export function createFallbackRecentProjectStorage(
         );
       }
       return known;
+    },
+    updateIfUnchanged: async (expected, change) => {
+      let applied = false;
+      if (
+        available() &&
+        (await attempt((replay) =>
+          primary.update((entries) => {
+            const current = replay(entries);
+            applied = sameRecentProjectSnapshot(current, expected);
+            return applied ? change(current) : current;
+          }),
+        ))
+      )
+        return { applied, entries: known };
+      if (!sameRecentProjectSnapshot(known, expected)) return { applied: false, entries: known };
+      known = change(known);
+      // Replay the actual mutation, never the old compare condition: storage
+      // recovery may include changes made by another window in the meantime.
+      if (available()) unstored = [...unstored, change];
+      return { applied: true, entries: known };
     },
     update: async (change) => {
       if (available() && (await attempt((replay) => primary.update((e) => change(replay(e)))))) {

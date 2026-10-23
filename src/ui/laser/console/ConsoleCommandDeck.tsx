@@ -13,6 +13,7 @@ export type ConsoleCommandDeckProps = {
   readonly enableHistory?: boolean;
   readonly showQuickCommands?: boolean;
   readonly onCommandSent?: (command: string) => void;
+  readonly retainDraft?: boolean;
 };
 
 export function ConsoleCommandDeck({
@@ -21,8 +22,9 @@ export function ConsoleCommandDeck({
   enableHistory = true,
   showQuickCommands = true,
   onCommandSent,
+  retainDraft = false,
 }: ConsoleCommandDeckProps): JSX.Element {
-  const model = useConsoleCommandDeckModel(enableHistory, onCommandSent);
+  const model = useConsoleCommandDeckModel(enableHistory, onCommandSent, retainDraft);
   return (
     <section aria-label={ariaLabel} style={deckStyle}>
       {showQuickCommands && model.driver.consoleQuickCommands.length > 0 ? (
