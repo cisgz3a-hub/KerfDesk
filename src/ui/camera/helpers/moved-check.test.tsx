@@ -14,7 +14,7 @@ import { useCameraStore } from '../../state/camera-store';
 import { resetStore } from '../../state/test-helpers';
 import { useToastStore } from '../../state/toast-store';
 import { CameraMovedNotice } from '../panel/CameraMovedNotice';
-import { checkCameraMoved, useCameraMovedStore } from './moved-check';
+import { checkCameraMoved, markCameraSteady, useCameraMovedStore } from './moved-check';
 import { saveViewReference } from './view-reference';
 
 const source = {
@@ -130,5 +130,33 @@ describe('the warning in the Camera panel', () => {
       }),
     );
     expect(host.textContent).toBe('');
+  });
+
+  // Audit follow-up to #1405: a nudge fix keeps calibratedAt, so a dismissal
+  // keyed on the calibration alone silenced every later move for good.
+  it('warns again after the view was confirmed steady, or for a clearly bigger move', async () => {
+    useCameraMovedStore.setState({
+      state: { kind: 'moved', mm: 2.4, calibratedAt: record.calibratedAt },
+    });
+    const host = await mountControl(<CameraMovedNotice />);
+    await clickControl(host, 'Dismiss');
+    expect(host.textContent).toBe('');
+
+    await act(async () =>
+      useCameraMovedStore.setState({
+        state: { kind: 'moved', mm: 3.6, calibratedAt: record.calibratedAt },
+      }),
+    );
+    expect(host.textContent).toContain('by about 3.6 mm');
+
+    await clickControl(host, 'Dismiss');
+    await act(async () => markCameraSteady());
+    expect(useCameraMovedStore.getState().dismissedFor).toBeNull();
+    await act(async () =>
+      useCameraMovedStore.setState({
+        state: { kind: 'moved', mm: 1.5, calibratedAt: record.calibratedAt },
+      }),
+    );
+    expect(host.textContent).toContain('by about 1.5 mm');
   });
 });

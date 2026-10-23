@@ -35,10 +35,12 @@ export type CameraMovedState =
   | { readonly kind: 'steady' }
   | { readonly kind: 'moved'; readonly mm: number; readonly calibratedAt: string };
 
+/** The warning the operator dismissed: its calibration and measured shift. */
+export type CameraMovedDismissal = { readonly calibratedAt: string; readonly mm: number };
+
 type CameraMovedStore = {
   readonly state: CameraMovedState;
-  /** The calibration whose warning the operator dismissed; it stays quiet. */
-  readonly dismissedFor: string | null;
+  readonly dismissedFor: CameraMovedDismissal | null;
   readonly dismiss: () => void;
 };
 
@@ -47,9 +49,28 @@ export const useCameraMovedStore = create<CameraMovedStore>((set, get) => ({
   dismissedFor: null,
   dismiss: () => {
     const { state } = get();
-    set({ dismissedFor: state.kind === 'moved' ? state.calibratedAt : null });
+    set({
+      dismissedFor:
+        state.kind === 'moved' ? { calibratedAt: state.calibratedAt, mm: state.mm } : null,
+    });
   },
 }));
+
+/** A dismissed warning stays quiet while the camera stays where it was then:
+ * the same calibration, and not moved a further millimetre or more. A view
+ * confirmed steady since (a nudge fix, a kept check) ends the dismissal, so
+ * the next move warns again. */
+export function cameraMovedWarningDismissed(
+  state: CameraMovedState,
+  dismissedFor: CameraMovedDismissal | null,
+): boolean {
+  return (
+    state.kind === 'moved' &&
+    dismissedFor !== null &&
+    dismissedFor.calibratedAt === state.calibratedAt &&
+    state.mm < dismissedFor.mm + MOVED_MM
+  );
+}
 
 /** Compare `frame` from `source` with the running camera's reference. */
 export function checkCameraMoved(source: ActiveCameraSource, frame: RgbaImage): CameraMovedState {
@@ -120,12 +141,12 @@ const steady: CameraMovedState = { kind: 'steady' };
 
 function publish(state: CameraMovedState): CameraMovedState {
   const before = useCameraMovedStore.getState();
-  useCameraMovedStore.setState({ state });
+  useCameraMovedStore.setState(state.kind === 'steady' ? { state, dismissedFor: null } : { state });
   // Say it once, where the operator is, when the panel is closed.
   if (
     state.kind === 'moved' &&
-    before.state.kind !== 'moved' &&
-    before.dismissedFor !== state.calibratedAt &&
+    (before.state.kind !== 'moved' || before.state.mm + MOVED_MM <= state.mm) &&
+    !cameraMovedWarningDismissed(state, before.dismissedFor) &&
     !useCameraStore.getState().panelOpen
   ) {
     useToastStore
