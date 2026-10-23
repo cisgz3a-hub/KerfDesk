@@ -67,6 +67,29 @@ export function differenceClosedPolylinesChecked(
 }
 
 /**
+ * Area inside `subject` or `clip`. Each operand is read with even-odd fill on
+ * its own, so neither operand's winding direction matters.
+ */
+export function unionClosedPolylinesChecked(
+  subject: ReadonlyArray<Polyline>,
+  clip: ReadonlyArray<Polyline>,
+): Result<ReadonlyArray<Polyline>, VectorOpError> {
+  const subjectPaths = subject
+    .map(polylineToPathD)
+    .filter((path) => path.length >= MIN_CLOSED_POINTS);
+  const clipPaths = clip.map(polylineToPathD).filter((path) => path.length >= MIN_CLOSED_POINTS);
+  const combined = tryVectorOp(() =>
+    unionD(subjectPaths, clipPaths, FillRule.EvenOdd, DIFFERENCE_PRECISION_DECIMALS),
+  );
+  if (combined.kind === 'error') return combined;
+  return ok(
+    combined.value.map((path) =>
+      collapseTinySegments(pathDToPolyline(path), MIN_OFFSET_SEGMENT_MM),
+    ),
+  );
+}
+
+/**
  * Resolve overlaps and self-intersections into ordinary even-odd contour
  * roots before an offset ladder consumes them. Offsetting a raw bow-tie can
  * invert the intended inset and grow outward on every step; normalization

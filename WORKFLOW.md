@@ -5655,7 +5655,11 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    is capped at the shallower of that floor and the modeled V-bit cone height;
    inward floor-clearing routes exist only in the remaining mathematical flat
    core. A region wider than the selected bit's finite cone footprint likewise
-   needs floor-clearing motion even in flowing-depth mode.
+   needs floor-clearing motion even in flowing-depth mode. That core is every
+   point at least one cone radius from the outline, so at an inside corner its
+   edge is an arc of that radius around the corner, and the floor passes follow
+   it at the floor pitch. The corner is left with the same scallop as the rest
+   of the floor, not a fin (ADR-285 Amendment 1).
 5. A selected flat clearing end mill is active only when **Flat depth** is on.
    Its floor boundary and Z passes use the same effective depth and cannot cut
    below the V walls. **Stepover** directly edits its clearing spacing; inlay
