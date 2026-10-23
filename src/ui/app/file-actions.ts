@@ -7,7 +7,7 @@ import type { SvgArtworkFragment } from '../state/svg-fragment-mutation';
 // anywhere.
 
 import { selectControllerDriver } from '../../core/controllers';
-import type { DeviceProfile } from '../../core/devices';
+import type { ControllerKind, DeviceProfile } from '../../core/devices';
 import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
 import type {
   ControllerSettingsSnapshot,
@@ -34,7 +34,10 @@ import {
 import { importDxfFiles } from './dxf-import-action';
 import { handleSaveTiledGcode } from './save-tiled-gcode';
 import { advanceExportVariables } from './advance-export-variables';
-import { controllerReadinessAdvisories } from './controller-readiness-advisories';
+import {
+  controllerReadinessAdvisories,
+  readinessFirmwareKind,
+} from './controller-readiness-advisories';
 import {
   cncExportOtherControllersNote,
   cncProjectExportAdvisories,
@@ -181,6 +184,12 @@ function optionalSettingsCapability(
   return settingsCapability === undefined ? {} : { settingsCapability };
 }
 
+function optionalFirmwareKind(
+  firmwareKind: ControllerKind | undefined,
+): { readonly firmwareKind: ControllerKind } | Record<never, never> {
+  return firmwareKind === undefined ? {} : { firmwareKind };
+}
+
 // exactOptionalPropertyTypes: an explicit `undefined` is not assignable to an
 // optional field, so the key is omitted instead of passed through.
 function optionalActiveWcs(
@@ -205,6 +214,7 @@ export async function handleSaveGcode(
         ? {}
         : { controllerSettings: ctx.controllerSettings }),
       ...optionalSettingsCapability(ctx.settingsCapability),
+      ...optionalFirmwareKind(readinessFirmwareKind(ctx.machine)),
       ...optionalActiveWcs(ctx.activeWcs),
       pushToast: ctx.pushToast,
       ...(ctx.advanceVariablesAfter === undefined
@@ -253,7 +263,12 @@ async function saveOrdinaryGcode(
   // ATTEMPT, so reporting it only after a successful write would tell the
   // operator less than the refusal did whenever the picker is cancelled.
   for (const advisory of [
-    ...controllerReadinessAdvisories(ctx.project, ctx.controllerSettings, ctx.settingsCapability),
+    ...controllerReadinessAdvisories(
+      ctx.project,
+      ctx.controllerSettings,
+      ctx.settingsCapability,
+      readinessFirmwareKind(ctx.machine),
+    ),
     ...cncProjectExportAdvisories(ctx.project),
   ]) {
     ctx.pushToast(advisory, 'warning');

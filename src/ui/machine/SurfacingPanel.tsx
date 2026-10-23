@@ -5,6 +5,7 @@ import { SurfacingFields, useSurfacingValues } from './SurfacingFields';
 // stock footprint and active bit.
 
 import type { CncMachineConfig } from '../../core/scene';
+import { readinessFirmwareKind } from '../app/controller-readiness-advisories';
 import { usePlatform } from '../app/platform-context';
 import { RailSection } from '../kit';
 import { useLaserStore } from '../state/laser-store';
@@ -19,6 +20,7 @@ export function SurfacingPanel(props: { readonly machine: CncMachineConfig }): J
   const projectDocumentEpoch = useStore((s) => s.projectDocumentEpoch);
   const controllerSettings = useLaserStore((s) => s.controllerSettings);
   const settingsCapability = useLaserStore((s) => s.capabilities.settings);
+  const firmwareKind = useLaserStore((s) => readinessFirmwareKind(s));
   const { machine } = props;
   const values = useSurfacingValues(machine, project, projectDocumentEpoch);
 
@@ -30,6 +32,7 @@ export function SurfacingPanel(props: { readonly machine: CncMachineConfig }): J
       machine,
       controllerSettings,
       settingsCapability,
+      ...(firmwareKind === undefined ? {} : { firmwareKind }),
       inputs: values.inputs,
     },
     projectDocumentEpoch,
