@@ -111,6 +111,26 @@ for (const [label, newline] of [
   });
 }
 
+test('rejects two amendment files that claim the same amendment number', () => {
+  // ADR-375 Amendment 3 landed twice from two branches on 2026-10-22.
+  const { code, output } = runGate(UNIQUE_DECISIONS, '\n', {
+    'ADR-2-amendment-3-first.md': ['## ADR-2 Amendment 3 - First', ''],
+    'ADR-2-amendment-3-second.md': ['## ADR-2 Amendment 3 - Second', ''],
+  });
+  assert.equal(code, 1);
+  assert.match(output, /ADR-2 Amendment 3 claimed 2x/);
+  assert.match(output, /ADR-2-amendment-3-first\.md/);
+  assert.match(output, /ADR-2-amendment-3-second\.md/);
+});
+
+test('lets different decisions share an amendment number', () => {
+  const { code } = runGate(UNIQUE_DECISIONS, '\n', {
+    'ADR-1-amendment-1-for-one.md': ['## ADR-1 Amendment 1 - For one', ''],
+    'ADR-2-amendment-1-for-two.md': ['## ADR-2 Amendment 1 - For two', ''],
+  });
+  assert.equal(code, 0);
+});
+
 test('rejects a decision file whose heading disagrees with its filename', () => {
   const { code, output } = runGate(UNIQUE_DECISIONS, '\n', {
     'ADR-9-mislabelled.md': ['## ADR-8 - Heading says something else', ''],

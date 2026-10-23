@@ -74,6 +74,11 @@ function decisionFiles() {
 }
 
 const misnamed = [];
+// Amendment files of one decision must not share an amendment number: on
+// 2026-10-22 two branches each landed "ADR-375 Amendment 3", and references to
+// it then named two different amendments.
+/** @type {Map<string, string[]>} */
+const amendmentFiles = new Map();
 collectHeadings(LEGACY_FILE, LEGACY_FILE);
 for (const name of decisionFiles()) {
   const claimed = FILENAME_PATTERN.exec(name);
@@ -84,6 +89,10 @@ for (const name of decisionFiles()) {
     continue;
   }
   const expected = Number(claimed[1]);
+  if (claimed[2] !== undefined) {
+    const key = `ADR-${expected} Amendment ${claimed[2].slice('-amendment-'.length)}`;
+    amendmentFiles.set(key, [...(amendmentFiles.get(key) ?? []), join(DECISION_DIR, name)]);
+  }
   let claimsItsNumber = false;
   collectHeadings(join(DECISION_DIR, name), join(DECISION_DIR, name), (number, line, amendment) => {
     if (number === expected) {
@@ -114,11 +123,18 @@ const duplicates = [...decisionLines.entries()]
   .filter(([, at]) => at.length > 1)
   .sort(([a], [b]) => a - b);
 
-if (duplicates.length > 0) {
-  console.error('Duplicate ADR numbers:');
+const duplicateAmendments = [...amendmentFiles.entries()].filter(([, files]) => files.length > 1);
+
+if (duplicates.length > 0 || duplicateAmendments.length > 0) {
+  if (duplicates.length > 0) console.error('Duplicate ADR numbers:');
   for (const [number, at] of duplicates) {
     console.error(`  ADR-${number} claimed ${at.length}x`);
     for (const { file, line } of at) console.error(`    ${file}:${line}`);
+  }
+  if (duplicateAmendments.length > 0) console.error('Duplicate amendment numbers:');
+  for (const [key, files] of duplicateAmendments) {
+    console.error(`  ${key} claimed ${files.length}x`);
+    for (const file of files) console.error(`    ${file}`);
   }
   console.error('\nThe earliest-landed decision keeps the number; renumber the others and');
   console.error('update their references. Beware: references to a shared number belong to');

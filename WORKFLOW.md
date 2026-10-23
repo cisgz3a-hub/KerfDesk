@@ -199,7 +199,7 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 4. After import, all imported objects are multi-selected.
 5. Toast: `Imported 3 designs · 3 artwork operations`.
 
-#### Success — a project file dropped on the window (ADR-378 Amendment 1)
+#### Success — a project file dropped on the window (ADR-378 Amendment 2)
 1. User drops a KerfDesk project (`.lf2`) or a LightBurn project (`.lbrn`, `.lbrn2`).
 2. It opens exactly like a project double-clicked in Explorer (ADR-378): the Save / Don't Save /
    Cancel question comes first when the current project has unsaved changes, and during a job or
