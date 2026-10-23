@@ -22,6 +22,7 @@ export type { ColoredPath, SubpathNesting } from './colored-path';
 import type { VariableTemplate } from './variable-template';
 import type { ReliefHeightfield } from './relief/relief-heightfield';
 import type { ReliefAuthoringDocument } from './relief/relief-authoring';
+import type { ReliefTwoSidedSplitRecord } from './relief/relief-two-sided-split';
 import type { LaserLeadSide, LaserLeadStyle, LayerPowerMode, TabLayoutMode } from './layer';
 import type { LaserTabAnchor } from './laser-tab-anchor';
 import type { PhotoEditorDocument } from './photo-editor-document';
@@ -553,6 +554,7 @@ export type MeshReliefObject = ReliefObjectCommon & {
     readonly meshPositions: ReadonlyArray<number> | Float32Array | Float64Array;
     readonly emptyCells: 'floor' | 'top';
   };
+  readonly twoSidedSplit?: ReliefTwoSidedSplitRecord; // a side of a two-sided split (ADR-580)
 };
 
 /** Canonical scalar-field CNC relief (ADR-291). */

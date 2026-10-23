@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { offsetClosedPolylinesWithRoundJoins } from '../geometry/kerf-offset';
 import { type CncTool, type Polyline } from '../scene';
 import { DEFAULT_CNC_TAPERED_INLAY } from '../scene/cnc-tapered-inlay';
 import { inlayBounds } from './tapered-inlay-geometry';
@@ -8,6 +7,7 @@ import {
   normalizeCncTaperedInlay,
   taperedInlayContactAtDepth,
   taperedInlayPlugDepth,
+  taperedInlayWallStartDepth,
 } from './tapered-inlay-settings';
 import { taperedInlayValuePatch } from '../../ui/layers/tapered-inlay-value-patch';
 
@@ -41,71 +41,72 @@ function box(x: number, width: number): Polyline {
     ],
   };
 }
-function minX(contours: ReadonlyArray<Polyline>): number {
-  return inlayBounds(contours)?.minX ?? NaN;
-}
-
 describe('linked tapered inlay contact geometry', () => {
   it.each([30, 60, 90, 120])(
-    'preserves independent radial fit on an analytic circular wall at %s degrees',
+    'starts the plug walls at engagement plus the radial fit depth at %s degrees',
     (angle) => {
-      const source = [circle(10)];
-      const plan = planTaperedInlayPair(source, INTENT, bit(angle));
-      expect(plan.ok).toBe(true);
+      const plan = planTaperedInlayPair([circle(10)], INTENT, bit(angle));
       if (!plan.ok) throw new Error(plan.reason);
       const slope = Math.tan((angle * Math.PI) / 360);
-      for (const depth of [0, 0.5, 1, 2]) {
-        const femaleSection = offsetClosedPolylinesWithRoundJoins(
-          plan.femaleContours,
-          -depth * slope,
-        );
-        const maleDepth = INTENT.engagementDepthMm - depth;
-        const maleSection = offsetClosedPolylinesWithRoundJoins(
-          plan.plugTopContours,
-          maleDepth * slope,
-        );
-        expect(minX(maleSection) - minX(femaleSection)).toBeCloseTo(INTENT.fitClearanceMm, 2);
+      // ADR-665: with every waste tip this much lower, the plug cut at a distance d inside the
+      // mirrored outline is this depth minus d / slope, the pocket wall plus the fit gap.
+      expect(plan.plugWallStartDepthMm).toBeCloseTo(
+        INTENT.engagementDepthMm + INTENT.fitClearanceMm / slope,
+        12,
+      );
+      expect(taperedInlayWallStartDepth(INTENT, angle)).toBe(plan.plugWallStartDepthMm);
+      for (const depth of [0, 0.5, 1, 2])
         expect(taperedInlayContactAtDepth(INTENT, angle, depth).radialGapMm).toBeCloseTo(0.08, 10);
-      }
       expect(INTENT.pocketDepthMm - INTENT.engagementDepthMm).toBe(0.5);
       expect(taperedInlayPlugDepth(INTENT) - INTENT.engagementDepthMm).toBe(1);
     },
   );
 
-  it('keeps glue, surface clearance and radial clearance as separate dimensions', () => {
+  it('carves the plug waste around the whole source, mirrored, with its counters', () => {
+    const plan = planTaperedInlayPair([circle(10), box(50, 1)], INTENT, bit(90));
+    if (!plan.ok) throw new Error(plan.reason);
+    expect(plan.femaleContours).toHaveLength(2);
+    // The border plus one hole per source shape: nothing narrow is dropped (audit F5-P2-1).
+    expect(plan.maleWasteContours).toHaveLength(3);
+    const widths = plan.maleWasteContours
+      .map((contour) => {
+        const bounds = inlayBounds([contour]);
+        return bounds === null ? NaN : bounds.maxX - bounds.minX;
+      })
+      .sort((a, b) => a - b);
+    expect(widths[0]).toBeCloseTo(1, 9);
+    expect(widths[1]).toBeCloseTo(20, 2);
+    expect(plan.findings.join(' ')).not.toContain('cannot be reproduced');
+  });
+
+  it('keeps glue and surface clearance out of the plug walls, and fit in them', () => {
     const base = planTaperedInlayPair([circle(10)], INTENT, bit(60));
+    if (!base.ok) throw new Error(base.reason);
     const glue = taperedInlayValuePatch(INTENT, 'glueGapMm', 0.9);
     const surface = taperedInlayValuePatch(INTENT, 'surfaceClearanceMm', 1.4);
     expect(glue.pocketDepthMm).toBe(2.9);
     expect(taperedInlayPlugDepth(glue)).toBe(3);
     expect(surface.pocketDepthMm).toBe(2.5);
     expect(taperedInlayPlugDepth(surface)).toBe(3.4);
-    expect(planTaperedInlayPair([circle(10)], glue, bit(60))).toMatchObject(
-      base.ok ? { plugTopContours: base.plugTopContours } : {},
-    );
-    expect(planTaperedInlayPair([circle(10)], surface, bit(60))).toMatchObject(
-      base.ok ? { plugTopContours: base.plugTopContours } : {},
-    );
+    for (const intent of [glue, surface])
+      expect(planTaperedInlayPair([circle(10)], intent, bit(60))).toMatchObject({
+        maleWasteContours: base.maleWasteContours,
+        plugWallStartDepthMm: base.plugWallStartDepthMm,
+      });
     const fit = taperedInlayValuePatch(INTENT, 'fitClearanceMm', 0.3);
     expect(fit.pocketDepthMm).toBe(2.5);
     expect(fit.glueGapMm).toBe(0.5);
+    const fitPlan = planTaperedInlayPair([circle(10)], fit, bit(60));
+    if (!fitPlan.ok) throw new Error(fitPlan.reason);
+    expect(fitPlan.plugWallStartDepthMm - base.plugWallStartDepthMm).toBeCloseTo(
+      (0.3 - INTENT.fitClearanceMm) / Math.tan(Math.PI / 6),
+      12,
+    );
   });
 
-  it('retains and reports a lost narrow island while carving reachable artwork', () => {
-    const plan = planTaperedInlayPair([circle(10), box(50, 1)], INTENT, bit(90));
-    expect(plan.ok).toBe(true);
-    if (!plan.ok) return;
-    expect(plan.femaleContours.length).toBe(2);
-    expect(plan.plugTopContours.length).toBe(1);
-    expect(plan.lostDetailAreaMm2).toBeGreaterThan(19);
-    expect(plan.findings.join(' ')).toContain('narrow details');
-  });
-
-  it('reports an entirely unreachable design instead of claiming an empty matching plug', () => {
-    expect(planTaperedInlayPair([box(0, 1)], INTENT, bit(90))).toMatchObject({
-      ok: false,
-      reason: expect.stringContaining('No source detail'),
-    });
+  it('plans a stroke narrower than the engagement inset, which the opening refused', () => {
+    const plan = planTaperedInlayPair([box(0, 1)], INTENT, bit(90));
+    expect(plan).toMatchObject({ ok: true, femaleContours: [expect.anything()] });
   });
 
   it('keeps the plug waste border separated for either physical-right coordinate direction', () => {
@@ -140,5 +141,19 @@ describe('linked tapered inlay contact geometry', () => {
     expect(
       planTaperedInlayPair([circle(10)], { ...INTENT, plugBorderMm: 0.1 }, bit(90)),
     ).toMatchObject({ ok: false, reason: expect.stringContaining('Plug border') });
+  });
+
+  it('refuses a fit gap whose depth reaches the plug waste floor', () => {
+    // 0.6 mm per side on a 60 degree bit starts the walls 1.04 mm down; the waste floor is 1 mm.
+    expect(
+      planTaperedInlayPair([circle(10)], { ...INTENT, fitClearanceMm: 0.6 }, bit(60)),
+    ).toMatchObject({
+      ok: false,
+      reason:
+        'Surface clearance must be more than 1.04 mm, the depth the radial fit gap adds to the plug walls on this V-bit.',
+    });
+    expect(
+      planTaperedInlayPair([circle(10)], { ...INTENT, fitClearanceMm: 0.55 }, bit(60)).ok,
+    ).toBe(true);
   });
 });

@@ -56,7 +56,7 @@ it('emits island entry helices, plunge-feed seed slotting and cutters wholly cle
     TOOL,
   );
   if (operation.kind !== 'ok') throw new Error(JSON.stringify(operation));
-  const passes = adaptivePocketPasses(operation, [-1], source);
+  const passes = adaptivePocketPasses(operation, [-1]);
   const seeds = passes.filter((pass) => pass.kind === 'path3d');
   const entries = passes.filter((pass) => pass.kind === 'helical-contour');
   expect(entries.length).toBeGreaterThan(1);

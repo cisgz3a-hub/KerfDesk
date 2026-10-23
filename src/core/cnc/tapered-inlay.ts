@@ -1,20 +1,14 @@
-import { offsetClosedPolylinesWithRoundJoinsChecked } from '../geometry/kerf-offset';
 import {
   differenceClosedPolylinesChecked,
   normalizeClosedPolylinesEvenOddChecked,
 } from '../geometry/polygon-difference';
 import type { CncTool, Polyline } from '../scene';
 import type { CncTaperedInlaySettings } from '../scene/cnc-tapered-inlay';
-import {
-  inlayBorder,
-  inlayBounds,
-  inlayFilledArea,
-  mirrorInlayContours,
-} from './tapered-inlay-geometry';
+import { inlayBorder, inlayBounds, mirrorInlayContours } from './tapered-inlay-geometry';
 import {
   taperedInlaySettingsIssue,
-  taperedInlaySlope,
   taperedInlayToolIssue,
+  taperedInlayWallStartDepth,
 } from './tapered-inlay-settings';
 
 export type TaperedInlayPairPlan =
@@ -22,15 +16,17 @@ export type TaperedInlayPairPlan =
   | {
       readonly ok: true;
       readonly femaleContours: ReadonlyArray<Polyline>;
-      readonly plugTopContours: ReadonlyArray<Polyline>;
       readonly maleWasteContours: ReadonlyArray<Polyline>;
-      readonly lostDetailContours: ReadonlyArray<Polyline>;
-      readonly lostDetailAreaMm2: number;
+      /** The plug's V-carve start depth (ADR-665): every waste tool tip sits this much lower. */
+      readonly plugWallStartDepthMm: number;
       readonly findings: ReadonlyArray<string>;
-      readonly engagementInsetMm: number;
     };
 
-/** Both pieces use this source revision. The plug waste is the complement of its retained top. */
+/**
+ * Both pieces use this source revision (ADR-665). The pocket V-carves the source; the plug
+ * V-carves the waste around the mirrored source from a start depth of engagement plus the radial
+ * fit gap's depth, so its walls are the pocket walls offset by the fit gap on every detail.
+ */
 export function planTaperedInlayPair(
   contours: ReadonlyArray<Polyline>,
   settings: CncTaperedInlaySettings,
@@ -42,32 +38,16 @@ export function planTaperedInlayPair(
   const normalized = normalizeClosedPolylinesEvenOddChecked(contours);
   if (normalized.kind === 'error')
     return failure('The inlay source could not be normalized.', true);
-  const engagementInsetMm = settings.engagementDepthMm * taperedInlaySlope(tool.tipAngleDeg ?? 90);
-  const plugInset = engagementInsetMm + settings.fitClearanceMm;
-  const plugTop = offsetClosedPolylinesWithRoundJoinsChecked(normalized.value, -plugInset);
-  if (plugTop.kind === 'error') return failure('The retained plug could not be offset.', true);
-  if (plugTop.value.length === 0)
-    return failure(
-      'No source detail is wide enough for the requested engagement and radial fit gap.',
-    );
-  const reconstructed = offsetClosedPolylinesWithRoundJoinsChecked(plugTop.value, plugInset);
-  if (reconstructed.kind === 'error')
-    return failure('Inlay contact coverage could not be checked.', true);
-  const lost = differenceClosedPolylinesChecked(normalized.value, reconstructed.value);
-  if (lost.kind === 'error')
-    return failure('Inlay lost-detail coverage could not be checked.', true);
   const femaleBounds = inlayBounds(normalized.value);
   if (femaleBounds === null) return failure('The source inlay has no finite bounds.');
   const border = inlayBorder(femaleBounds, settings.plugBorderMm);
-  const waste = differenceClosedPolylinesChecked([border], plugTop.value);
+  const waste = differenceClosedPolylinesChecked([border], normalized.value);
   const plugBounds = inlayBounds([border]);
   if (waste.kind === 'error' || plugBounds === null)
     return failure('The tapered plug waste region could not be calculated.', true);
-  const lostDetailAreaMm2 = inlayFilledArea(lost.value);
   return {
     ok: true,
     femaleContours: normalized.value,
-    plugTopContours: plugTop.value,
     maleWasteContours: mirrorInlayContours(
       waste.value,
       femaleBounds,
@@ -75,10 +55,8 @@ export function planTaperedInlayPair(
       settings.pairSpacingMm,
       directionX,
     ),
-    lostDetailContours: lost.value,
-    lostDetailAreaMm2,
-    engagementInsetMm,
-    findings: inlayFindings(settings, lostDetailAreaMm2),
+    plugWallStartDepthMm: taperedInlayWallStartDepth(settings, tool.tipAngleDeg ?? 90),
+    findings: inlayFindings(settings),
   };
 }
 
@@ -102,17 +80,10 @@ function validClosed(contour: Polyline): boolean {
   );
 }
 
-function inlayFindings(
-  settings: CncTaperedInlaySettings,
-  lostAreaMm2: number,
-): ReadonlyArray<string> {
+function inlayFindings(settings: CncTaperedInlaySettings): ReadonlyArray<string> {
   const findings = [
     'Tapered inlay clearances are geometric estimates; material fit, glue and cutter deflection need a matched trial.',
   ];
-  if (lostAreaMm2 > 0.001)
-    findings.push(
-      `${Math.round(lostAreaMm2 * 1000) / 1000} mm² of source corners or narrow details cannot be reproduced at the nominal engagement. Inspect both pieces.`,
-    );
   if (settings.pocketStartDepthMm > 0 || settings.plugStartDepthMm > 0)
     findings.push(
       'A nonzero starting plane assumes the material above that plane has already been removed; this pair does not clear it.',
