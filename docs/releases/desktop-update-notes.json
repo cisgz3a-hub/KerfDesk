@@ -1,9 +1,12 @@
 {
   "schemaVersion": 1,
-  "sinceSourceSha": "b9202d5aa604949bab957595f6d3db7e4b0e770c",
+  "sinceSourceSha": "87ecb4f240deec4e2d161c3306a37f96e0588130",
   "highlights": [
-    "Licence check-ins are simpler: the app no longer sends or checks a one-time code with each check-in, in line with paid licences that keep working offline, as in LightBurn.",
-    "Run G-code file is safer: it refuses shell, file, stored-program and FluidNC/grblHAL expression commands, explains M1 per firmware, and forgets the work offsets and Z the program may have changed.",
-    "The Material Test card keeps to its hatch floor, fits its column labels, and burns the gentlest cut first."
+    "Artwork editing keeps numeric drafts and copied nodes with their intended selection, preserves groups during layout and array edits, and makes text and barcode previews agree with applied results.",
+    "Project opens and imports honour newer requests and cancellation. Recent files keep their identity across windows, and Snapshot saves preserve a name typed while a save is in progress.",
+    "Image Studio keeps resize proportions at size limits, clears stale Clone and crop state, cancels interrupted gestures, and reads colours from the displayed preview.",
+    "CNC adaptive pockets clear islands and remaining stock in the right order, and V-carve flat floors reach inside corners.",
+    "CNC bit changes name the hand-edited feeds they keep. Two-sided work preserves stock-rail arcs, and inlay plug checks follow the cut width at depth.",
+    "Numeric Auto-focus probes explicitly set millimetres and absolute mode, and projects warn when an unsupported saved focus command is removed."
   ]
 }
