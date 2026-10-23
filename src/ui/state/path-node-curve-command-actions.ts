@@ -25,7 +25,7 @@ import { boundsForPaths } from './path-node-edit-geometry';
 import type { PathNodeRef } from './path-node-edit-actions';
 import { planCurveNodeJoin } from './path-node-curve-join-plan';
 import { curveCommandPath } from './path-node-command-geometry';
-import { synchronizePolylineShapeGeometry } from './path-node-shape-sync';
+import { synchronizeOrConvertPolylineShape } from './path-node-shape-sync';
 import { useToastStore } from './toast-store';
 
 type CurveJoinCommandOutcome =
@@ -237,7 +237,7 @@ export function mutateObjectCurve(
     const bounds = boundsForPaths(paths);
     const updated =
       object.kind === 'shape'
-        ? synchronizePolylineShapeGeometry(object, paths, bounds)
+        ? synchronizeOrConvertPolylineShape(object, paths, bounds)
         : { ...object, paths, bounds };
     if (updated === null) return object;
     changed = true;

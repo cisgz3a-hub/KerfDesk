@@ -289,12 +289,8 @@ export function viewActions(
           .filter((object) => object.locked !== true)
           .filter((object) => sceneObjectHasVisibleLayer(s.project.scene, object))
           .map((o) => o.id);
-        const [primary, ...rest] = ids;
         return {
-          ...scopedSelectionProjectPatch(s, {
-            selectedObjectId: primary ?? null,
-            additionalSelectedIds: new Set(rest),
-          }),
+          ...scopedSelectionProjectPatch(s, selectionFromIds(s, ids, false)),
           selectedPathNode: null,
           selectedPathNodes: [],
         };

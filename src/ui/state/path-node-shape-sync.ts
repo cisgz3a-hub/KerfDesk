@@ -1,4 +1,4 @@
-import type { Bounds, ColoredPath, ShapeObject } from '../../core/scene';
+import type { Bounds, ColoredPath, ImportedSvg, ShapeObject } from '../../core/scene';
 import { materializedPolylineToSpecPoints } from './path-node-edit-geometry';
 
 /**
@@ -31,4 +31,16 @@ export function synchronizePolylineShapeGeometry(
       closed: polyline.closed,
     },
   };
+}
+
+/** A split no longer has a single parametric polyline; retain its exact editable curves. */
+export function synchronizeOrConvertPolylineShape(
+  object: ShapeObject,
+  paths: ReadonlyArray<ColoredPath>,
+  bounds: Bounds,
+): ShapeObject | ImportedSvg | null {
+  const synchronized = synchronizePolylineShapeGeometry(object, paths, bounds);
+  if (synchronized !== null || object.spec.kind !== 'polyline') return synchronized;
+  const { spec: _spec, color: _color, ...metadata } = object;
+  return { ...metadata, kind: 'imported-svg', source: 'Shape: polyline (paths)', paths, bounds };
 }

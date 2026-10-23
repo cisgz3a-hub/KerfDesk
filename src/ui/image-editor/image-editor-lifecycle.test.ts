@@ -92,6 +92,7 @@ beforeEach(() => {
     applyRequest: null,
     pendingCrop: null,
     transform: null,
+    tool: { kind: 'brush' },
   });
 });
 
@@ -103,6 +104,61 @@ afterEach(() => {
 });
 
 describe('Image Studio session lifecycle', () => {
+  it('retires clone source readiness when closing and opening another image', async () => {
+    const first = raster('clone-first');
+    const second = raster('clone-second');
+    setCurrentImages(first, second);
+    vi.mocked(decodeRasterToBuffer).mockResolvedValue(createRgbaBuffer(4, 4));
+    useImageEditorStore.getState().openEditor(first);
+    await settle();
+    useImageEditorStore.getState().setTool({
+      kind: 'clone',
+      source: { x: 3, y: 3 },
+      offset: { x: 2, y: 2 },
+    });
+
+    useImageEditorStore.getState().closeEditor();
+    useImageEditorStore.getState().openEditor(second);
+    await settle();
+
+    expect(useImageEditorStore.getState().tool).toEqual({
+      kind: 'clone',
+      source: null,
+      offset: null,
+    });
+    expect(useImageEditorStore.getState().session?.dirtySinceApply).toBe(false);
+    expect(useImageEditorStore.getState().session?.history.undoStack).toHaveLength(0);
+  });
+
+  it('retires clone coordinates on direct and stashed image switches', async () => {
+    const first = raster('clone-first');
+    const second = raster('clone-second');
+    setCurrentImages(first, second);
+    vi.mocked(decodeRasterToBuffer).mockResolvedValue(createRgbaBuffer(4, 4));
+    const source = { kind: 'clone', source: { x: 3, y: 3 }, offset: null } as const;
+    useImageEditorStore.getState().openEditor(first);
+    await settle();
+    useImageEditorStore.getState().setTool(source);
+    useImageEditorStore.getState().openEditor(first);
+    expect(useImageEditorStore.getState().tool).toBe(source);
+
+    useImageEditorStore.getState().openEditor(second);
+    await settle();
+    expect(useImageEditorStore.getState().tool).toEqual({
+      kind: 'clone',
+      source: null,
+      offset: null,
+    });
+    useImageEditorStore.getState().setTool(source);
+    useImageEditorStore.getState().openEditor(first);
+    expect(useImageEditorStore.getState().session?.objectId).toBe(first.id);
+    expect(useImageEditorStore.getState().tool).toEqual({
+      kind: 'clone',
+      source: null,
+      offset: null,
+    });
+  });
+
   it('can Apply, Undo, Apply, Redo, and Apply without losing editor changes', async () => {
     const image = raster('editable');
     const snapshots: number[] = [];

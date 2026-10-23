@@ -43,6 +43,7 @@ import { applyCenterArtworkInRegistrationJigSet } from './registration-jig-artwo
 import { selectionReferenceId, type SelectionReferenceState } from './selection-reference';
 import { useToastStore } from './toast-store';
 import { fitObjectToBoard, type BoardFitOptions } from '../../core/scene/fit-object-to-board';
+import { currentHierarchyFocus, groupsWithinFocus } from './design-hierarchy-store';
 
 export type SelectionTransformEdit = {
   readonly id: string;
@@ -207,10 +208,9 @@ function applySelectionAlignToState(
   state: AppState,
   kind: SelectionAlignKind,
 ): AppState | Partial<AppState> {
-  const scene = state.project.scene;
   const { objects, referenceId } = referencedSelection(state);
   if (referenceId === undefined) return state;
-  const result = buildSelectionAlignEdit(objects, { kind, referenceId }, scene.groups ?? []);
+  const result = buildSelectionAlignEdit(objects, { kind, referenceId }, layoutGroups(state));
   if (result.kind === 'error') return state;
   return applySelectionTransformsToState(state, result.transforms);
 }
@@ -226,7 +226,7 @@ function applySelectionMatchSizeToState(
   const result = buildSelectionMatchSizeEdit(
     objects,
     { kind, referenceId, proportional },
-    state.project.scene.groups ?? [],
+    layoutGroups(state),
   );
   if (result.kind === 'error') return state;
   if (result.skipped > 0) {
@@ -251,7 +251,7 @@ function applySelectionMoveTogetherToState(
   const result = buildSelectionMoveTogetherEdit(
     objects,
     { axis, referenceId },
-    state.project.scene.groups ?? [],
+    layoutGroups(state),
   );
   if (result.kind === 'error') return state;
   return applySelectionTransformsToState(state, result.transforms);
@@ -280,7 +280,7 @@ function applySelectionDistributeToState(
   const result = buildSelectionDistributeEdit(
     selectedObjects(scene, ids),
     { kind },
-    scene.groups ?? [],
+    layoutGroups(state),
   );
   if (result.kind === 'error') return state;
   return applySelectionTransformsToState(state, result.transforms);
@@ -378,6 +378,14 @@ function selectedObjectIds(state: AppState): ReadonlyArray<string> {
     ...(state.selectedObjectId === null ? [] : [state.selectedObjectId]),
     ...state.additionalSelectedIds,
   ];
+}
+
+function layoutGroups(state: AppState): NonNullable<Scene['groups']> {
+  const scene = state.project.scene;
+  return groupsWithinFocus(
+    scene.groups ?? [],
+    currentHierarchyFocus(scene, state.projectDocumentEpoch),
+  );
 }
 
 function selectedObjects(scene: Scene, ids: ReadonlyArray<string>): ReadonlyArray<SceneObject> {

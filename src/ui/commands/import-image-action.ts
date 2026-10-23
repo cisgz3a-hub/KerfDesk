@@ -49,9 +49,10 @@ export async function importImageFile(
     const loaded = await loadImageSamples(file, pageBacked, dimensionQualified, controls?.options);
     warnImageCleanup(loaded, pushToast);
     rollback = loaded.kind === 'paged' ? loaded.rollback : null;
-    assertImportActive(options.signal);
+    const signal = controls?.options.signal ?? options.signal;
+    assertImportActive(signal);
     const imported = await importedRasterObject(file, loaded);
-    assertImportActive(options.signal);
+    assertImportActive(signal);
     const outcome = importRasterImage(imported.object);
     rollback = null;
     pushToast(

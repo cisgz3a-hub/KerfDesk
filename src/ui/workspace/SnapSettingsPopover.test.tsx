@@ -38,6 +38,23 @@ async function click(element: Element | null): Promise<void> {
 }
 
 describe('SnapSettingsButton', () => {
+  it('keeps the form open while Tab moves between its inputs', async () => {
+    await click(document.querySelector('button[aria-label="Snap settings"]'));
+    const nodes = document.querySelector<HTMLInputElement>('input[aria-label="Nodes"]')!;
+    const midpoints = document.querySelector<HTMLInputElement>('input[aria-label="Midpoints"]')!;
+    await act(async () => {
+      nodes.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+      midpoints.focus();
+    });
+    expect(document.querySelector('[role="dialog"][aria-label="Snap settings"]')).not.toBeNull();
+    expect(document.activeElement).toBe(midpoints);
+    await act(async () =>
+      midpoints.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })),
+    );
+    expect(document.querySelector('[role="dialog"][aria-label="Snap settings"]')).toBeNull();
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Snap settings');
+  });
+
   it('opens the snap settings with every kind shown and titled', async () => {
     await click(document.querySelector('button[aria-label="Snap settings"]'));
 

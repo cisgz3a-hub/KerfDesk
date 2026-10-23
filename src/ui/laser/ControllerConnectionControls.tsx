@@ -118,7 +118,7 @@ function useAutoConnectPreference(): Pick<
   const [enabled, setEnabled] = useState(() => loadAutoConnectPreference(browserLocalStorage()));
   const session = useAutoConnectSession();
   const change = (next: boolean): void => {
-    saveAutoConnectPreference(browserLocalStorage(), next);
+    saveAutoConnectPreference(undefined, next);
     setEnabled(next);
   };
   return {

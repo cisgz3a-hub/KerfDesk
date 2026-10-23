@@ -123,6 +123,23 @@ describe('createLaunchQueueFileOpens', () => {
     await vi.waitFor(() => expect(received).toEqual(['first.lf2', 'second.lf2']));
   });
 
+  it('retains ordering across separate launches with reversed read completion', async () => {
+    const { host, launch } = launchHost();
+    const received: string[] = [];
+    createLaunchQueueFileOpens(host).subscribe((request) => {
+      received.push(request.kind === 'file' ? request.file.name : request.name);
+    });
+    let release!: (file: File) => void;
+    const slow = new Promise<File>((resolve) => {
+      release = resolve;
+    });
+    await launch(fileHandle('first.lf2', () => slow));
+    await launch(fileHandle('second.lf2'));
+    expect(received).toEqual([]);
+    release(new File(['{}'], 'first.lf2'));
+    await vi.waitFor(() => expect(received).toEqual(['first.lf2', 'second.lf2']));
+  });
+
   it('holds a launch that arrives between subscribers for the next one', async () => {
     const { host, launch } = launchHost();
     const source = createLaunchQueueFileOpens(host);
