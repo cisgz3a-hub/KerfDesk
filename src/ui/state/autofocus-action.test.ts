@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { classifyResponse, type StatusReport } from '../../core/controllers/grbl';
+import { autofocusCommandIssue } from '../../core/devices/autofocus-command';
 import { describeAutofocusResult, runAutofocus, type RunAutofocusArgs } from './autofocus-action';
 import {
   cancelControllerLifecycleRefs,
@@ -114,21 +115,25 @@ describe('runAutofocus — shared response ownership', () => {
     expect((await pending).kind).toBe('ok');
   });
 
-  it('owns each coordinate setup reply before sending a probe', async () => {
-    const harness = makeHarness();
-    const pending = runAutofocus(harness.args({ command: 'G38.2 Z-10 F100' }));
-    await flush();
-    expect(harness.written).toEqual(['G21\n']);
-    harness.emit('ok');
-    await flush();
-    expect(harness.written).toEqual(['G21\n', 'G90\n']);
-    harness.emit('ok');
-    await flush();
-    expect(harness.written.at(-1)).toBe('G38.2 Z-10 F100\n');
-    harness.emit('ok');
-    harness.emit('<Idle|MPos:0,0,-8|FS:0,0>');
-    expect((await pending).kind).toBe('ok');
-  });
+  it.each(['G38.2 Z-10 F100', 'G38 .2 Z-10 F100', 'G3 8.2 Z-1 0 F1 0 0', 'g3 8 .4 z-10 f100'])(
+    'owns each coordinate setup reply before sending a probe (%s)',
+    async (command) => {
+      expect(autofocusCommandIssue(command)).toBeNull();
+      const harness = makeHarness();
+      const pending = runAutofocus(harness.args({ command }));
+      await flush();
+      expect(harness.written).toEqual(['G21\n']);
+      harness.emit('ok');
+      await flush();
+      expect(harness.written).toEqual(['G21\n', 'G90\n']);
+      harness.emit('ok');
+      await flush();
+      expect(harness.written).toEqual(['G21\n', 'G90\n', `${command}\n`]);
+      harness.emit('ok');
+      harness.emit('<Idle|MPos:0,0,-8|FS:0,0>');
+      expect((await pending).kind).toBe('ok');
+    },
+  );
 
   it('never probes if coordinate setup is rejected', async () => {
     const harness = makeHarness();

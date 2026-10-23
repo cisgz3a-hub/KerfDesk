@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
+import type { AutofocusResult } from './autofocus-action';
 import { useLaserStore } from './laser-store';
 import { isActiveJob } from './laser-store-helpers';
 import { captureTestLaserStartFenceAck, startTestLaserJob } from './laser-test-start-helpers';
@@ -383,10 +384,14 @@ describe('laser-store serial write failures', () => {
 });
 
 describe('laser-store autofocus lifecycle', () => {
-  async function acknowledgeProbeSetup(
-    connection: FakeConnection,
-    write: (data: string) => Promise<void>,
-  ): Promise<void> {
+  async function beginAutofocus(): Promise<readonly [FakeConnection, Promise<AutofocusResult>]> {
+    const write = vi.fn<(data: string) => Promise<void>>(async () => undefined);
+    const connection = makeConnection(write);
+    await connectWith(connection);
+    const pending = useLaserStore.getState().autofocus('G38.2 Z-10 F100');
+    await flush();
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await flush();
     for (const setup of ['G21\n', 'G90\n']) {
       expect(write).toHaveBeenLastCalledWith(setup);
       expect(write).not.toHaveBeenCalledWith('G38.2 Z-10 F100\n');
@@ -394,18 +399,11 @@ describe('laser-store autofocus lifecycle', () => {
       await flush();
     }
     expect(write).toHaveBeenLastCalledWith('G38.2 Z-10 F100\n');
+    return [connection, pending];
   }
 
   it('refuses a second autofocus while one is already pending', async () => {
-    const write = vi.fn<(data: string) => Promise<void>>(async () => undefined);
-    const connection = makeConnection(write);
-    await connectWith(connection);
-
-    const first = useLaserStore.getState().autofocus('G38.2 Z-10 F100');
-    await flush();
-    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
-    await flush();
-    await acknowledgeProbeSetup(connection, write);
+    const [connection, first] = await beginAutofocus();
     const second = useLaserStore.getState().autofocus('G38.2 Z-10 F100');
     connection.emitLine('ok');
     connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
@@ -418,15 +416,7 @@ describe('laser-store autofocus lifecycle', () => {
   });
 
   it('refuses jog commands while autofocus is pending', async () => {
-    const write = vi.fn<(data: string) => Promise<void>>(async () => undefined);
-    const connection = makeConnection(write);
-    await connectWith(connection);
-
-    const autofocus = useLaserStore.getState().autofocus('G38.2 Z-10 F100');
-    await flush();
-    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
-    await flush();
-    await acknowledgeProbeSetup(connection, write);
+    const [connection, autofocus] = await beginAutofocus();
 
     await expect(useLaserStore.getState().jog({ dx: 1, feed: 1000 })).rejects.toThrow(
       /auto-focus is running/i,
@@ -437,15 +427,7 @@ describe('laser-store autofocus lifecycle', () => {
   });
 
   it('refuses other motion and origin actions while autofocus is busy', async () => {
-    const write = vi.fn<(data: string) => Promise<void>>(async () => undefined);
-    const connection = makeConnection(write);
-    await connectWith(connection);
-
-    const autofocus = useLaserStore.getState().autofocus('G38.2 Z-10 F100');
-    await flush();
-    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
-    await flush();
-    await acknowledgeProbeSetup(connection, write);
+    const [connection, autofocus] = await beginAutofocus();
 
     await expect(useLaserStore.getState().home()).rejects.toThrow(/auto-focus is running/i);
     await expect(

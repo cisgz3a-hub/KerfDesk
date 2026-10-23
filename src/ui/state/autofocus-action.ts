@@ -69,7 +69,9 @@ export async function runAutofocus(args: RunAutofocusArgs): Promise<AutofocusRes
     // Console and opened programs can leave G91 or G20 behind. Establish the
     // editor's absolute millimetre target before probing, with each setup
     // acknowledgement owned separately. Vendor focus macros keep their contract.
-    const first = scanGcodeWords(command)[0];
+    // Match validation and the controller's removal of horizontal blanks,
+    // including blanks inside the G word's numeric value. Keep sent bytes intact.
+    const first = scanGcodeWords(command.replaceAll(/[ \t]/g, ''))[0];
     if (first?.letter === 'G' && (first.value === 38.2 || first.value === 38.4)) {
       for (const setup of ['G21', 'G90']) {
         assertSession();
