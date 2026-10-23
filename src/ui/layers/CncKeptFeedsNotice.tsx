@@ -95,12 +95,18 @@ export function CncKeptFeedsNotice(props: {
           <button
             type="button"
             className="lf-cnc-link-button"
+            title={`Apply ${name} starting feed, plunge, spindle speed and depth per pass for this bit.`}
             onClick={() => props.onApply({ ...props.settings, ...patch })}
           >
             Use {name} values
           </button>
         )}
-        <button type="button" className="lf-cnc-link-button" onClick={props.onDismiss}>
+        <button
+          type="button"
+          className="lf-cnc-link-button"
+          title="Keep the current cutting values and dismiss this note."
+          onClick={props.onDismiss}
+        >
           Keep these values
         </button>
       </div>
