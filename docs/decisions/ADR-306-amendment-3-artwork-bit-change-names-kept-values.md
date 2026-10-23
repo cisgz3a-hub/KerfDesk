@@ -86,7 +86,8 @@ Job Review keeps its existing warnings.
 - `src/ui/layers/CncKeptFeedsNotice.test.tsx` drives the real Artwork card and store through the
   audit's sequence. It covers the Manual label, the note, the re-apply action, its undo step, the
   feed box staying mounted, the no-material case, dismissal, and the silent recipe case.
-- `src/ui/state/cnc-feed-provenance.test.ts`, `src/ui/laser/job-review/job-review-detail-facts.test.ts`
-  (counts checked against compiled levels) and `src/__fixtures__/cnc-repair/drilling.test.ts`
-  (every fed move, the group feed and the header agree) cover the rest.
+- `src/ui/state/cnc-feed-provenance.test.ts` and `src/ui/remote-control/cnc-operation-audit.test.ts`
+  cover the label rule. `src/ui/laser/job-review/job-review-cnc-depth.test.ts` checks the counts
+  against compiled levels. `src/__fixtures__/cnc-repair/drilling.test.ts` checks that every fed
+  move, the group feed and the header agree.
 - Software verification does not qualify feeds, speeds, chip load or a physical cut.
