@@ -7,6 +7,6 @@
     "Image Studio keeps resize proportions at size limits, clears stale Clone and crop state, cancels interrupted gestures, and reads colours from the displayed preview. Camera movement warnings re-arm after later shifts.",
     "CNC adaptive pockets clear around islands and remaining stock in the right order, V-carve flat floors reach inside corners, and tapered inlay plugs use start-depth V-carve geometry. CNC checks recognise arc moves.",
     "CNC bit changes name the hand-edited feeds they keep. Two-sided reliefs follow stock changes, curved relief rails keep their curves, and straight inlay pairs are checked for narrow parts and gaps.",
-    "Numeric Auto-focus probes explicitly set millimetres and absolute mode, and projects warn when an unsupported saved focus command is removed. Settings and copied logs hide controller passwords."
+    "Numeric Auto-focus sets millimetres and absolute mode; unsupported saved focus commands warn. Settings and copied logs hide controller passwords. Desktop networking blocks compromised eMudhra intermediate certificates."
   ]
 }
