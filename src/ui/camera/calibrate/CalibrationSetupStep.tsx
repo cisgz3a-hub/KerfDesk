@@ -5,7 +5,7 @@
 // laser head (ADR-449) gets a small square target in the middle of the bed.
 
 import { useState } from 'react';
-import { bedTargetLayout } from '../../../core/camera/target/bed-target';
+import { bedTargetLayoutWithRings } from '../../../core/camera/target/bed-target';
 import { machineKindOf } from '../../../core/scene';
 import { useStore } from '../../state';
 import { jobAwareConfirm } from '../../state/job-aware-dialogs';
@@ -35,7 +35,7 @@ export function CalibrationSetupStep(props: { readonly note: string | null }): J
   const bedWidth = useStore((s) => s.project.device.bedWidth);
   const bedHeight = useStore((s) => s.project.device.bedHeight);
   const area = calibrationTargetArea(bedWidth, bedHeight, settings);
-  const rings = bedTargetLayout({ area }).marks.length;
+  const rings = bedTargetLayoutWithRings(area, settings.ringDiameterMm).marks.length;
 
   return (
     <div style={columnStyle}>
@@ -268,6 +268,13 @@ function SettingsFields(props: { readonly settings: CalibrationSettings }): JSX.
             onChange={(value) => update({ marginMm: value ?? settings.marginMm })}
           />
         )}
+        <NumberField
+          label="Ring size (mm)"
+          value={settings.ringDiameterMm}
+          step={1}
+          title="Outer diameter of the target's rings; they are spaced four sizes apart. 10 mm suits most cameras. If the photo says the rings are too small, use the size it suggests."
+          onChange={(value) => update({ ringDiameterMm: value ?? settings.ringDiameterMm })}
+        />
         <NumberField
           label="Camera height (mm)"
           value={settings.cameraHeightMm}

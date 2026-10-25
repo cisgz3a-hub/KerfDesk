@@ -45,6 +45,8 @@ export async function engraveNudgeRing(
     machine: { kind: 'laser' },
     scene: generateCameraNudgeRing({
       centre: nudgeRingCentre(),
+      // The calibration's ring size: the size this camera was shown it can find.
+      ringDiameterMm: settings.ringDiameterMm,
       power: settings.powerPercent,
       speed: settings.speedMmPerMin,
     }),

@@ -12,6 +12,7 @@ import {
   type CameraBedFrame,
 } from '../../../core/camera/model/camera-bed-frame';
 import type { BedArea } from '../../../core/camera/model/camera-model-accuracy';
+import { DEFAULT_RING_DIAMETER_MM } from '../../../core/camera/target/bed-target';
 import type { DeviceProfile } from '../../../core/devices';
 
 export type EngravedTarget = {
@@ -25,6 +26,10 @@ export type EngravedTarget = {
   readonly engravedAt: string;
   /** The bed frame the rings were placed in; absent on targets remembered before it was kept. */
   readonly bedFrame?: CameraBedFrame;
+  /** Put on the canvas for the operator to engrave, rather than engraved by the wizard. */
+  readonly onCanvas?: true;
+  /** Outer diameter of its rings, mm; absent on targets remembered before ring sizes (10 mm). */
+  readonly ringDiameterMm?: number;
 };
 
 /**
@@ -64,12 +69,16 @@ export function rememberedEngravedTarget(
 export function rememberedLayoutSettings(device: Pick<DeviceProfile, 'profileId' | 'name'>): {
   readonly marginMm?: number;
   readonly headTargetSizeMm?: number;
+  readonly ringDiameterMm?: number;
 } {
   const bed = rememberedEngravedTarget(device, false);
   const head = rememberedEngravedTarget(device, true);
+  // The fixed camera's ring size: the one a recalibration most likely reuses.
+  const ring = bed?.ringDiameterMm ?? (bed === null ? undefined : DEFAULT_RING_DIAMETER_MM);
   return {
     ...(bed === null ? {} : { marginMm: bed.layoutMm }),
     ...(head === null ? {} : { headTargetSizeMm: head.layoutMm }),
+    ...(ring === undefined ? {} : { ringDiameterMm: ring }),
   };
 }
 
@@ -139,6 +148,18 @@ function parseTarget(value: unknown): EngravedTarget | null {
     layoutMm,
     engravedAt,
     ...(bedFrame === undefined ? {} : { bedFrame }),
+    ...targetExtras(value),
+  };
+}
+
+// How the target was placed and how large its rings are, when remembered.
+function targetExtras(
+  value: Record<string, unknown>,
+): Pick<EngravedTarget, 'onCanvas' | 'ringDiameterMm'> {
+  const ring = value['ringDiameterMm'];
+  return {
+    ...(value['onCanvas'] === true ? { onCanvas: true as const } : {}),
+    ...(isFiniteNumber(ring) && ring > 0 ? { ringDiameterMm: ring } : {}),
   };
 }
 

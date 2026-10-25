@@ -8,7 +8,11 @@ import { withSavedCameraModel } from '../../../core/camera/model/saved-cameras';
 import type { MarkError } from '../../../core/camera/target/bed-calibration';
 import { targetLayoutMismatch } from '../../../core/camera/target/target-coverage';
 import { useStore } from '../../state';
-import { calibrationGrade, type CalibrationGrade } from './calibration-result';
+import {
+  calibrationGrade,
+  LOOSE_HEIGHT_SIGMA_MM,
+  type CalibrationGrade,
+} from './calibration-result';
 import { useCameraCalibrationStore, type CalibrationResult } from './camera-calibration-store';
 import {
   FAIR_RING_MM,
@@ -22,10 +26,6 @@ import { SavedCalibrationCheckNote } from './SavedCalibrationCheckNote';
 import { markCameraSteady } from '../helpers/moved-check';
 import { saveViewReference } from '../helpers/view-reference';
 import { columnStyle, noteStyle, rowStyle } from './wizard-styles';
-
-// Above this the photo alone leaves the camera height loose enough to shift
-// thick material by a visible amount (ADR-440).
-const HEIGHT_ADVICE_SIGMA_MM = 10;
 
 export function CalibrationResultStep(props: {
   readonly result: CalibrationResult;
@@ -47,7 +47,10 @@ export function CalibrationResultStep(props: {
       <p style={{ margin: 0, fontWeight: 600, color: TONE_COLORS[grade.tone] }}>{grade.headline}</p>
       <AccuracyFigures result={result} />
       {grade.advice === null ? null : <p style={noteStyle}>{grade.advice}</p>}
-      {heightAdvice(result)}
+      {/* The grade already says it when it is about the height alone. */}
+      {record.accuracy.onlyAtTargetHeight === true && grade.tone !== 'rough'
+        ? null
+        : heightAdvice(result)}
       {checking ? null : check}
       <OtherCamerasNote result={result} />
       <BedAccuracyMap result={result} />
@@ -170,8 +173,7 @@ function Figure(props: { readonly label: string; readonly value: string }): JSX.
 }
 
 function heightAdvice(result: CalibrationResult): JSX.Element | null {
-  if (result.usedMeasuredHeight || result.cameraHeightSigmaMm <= HEIGHT_ADVICE_SIGMA_MM)
-    return null;
+  if (result.usedMeasuredHeight || result.cameraHeightSigmaMm <= LOOSE_HEIGHT_SIGMA_MM) return null;
   return (
     <p style={noteStyle}>
       The camera looks almost straight down, so one photo cannot tell its height to better than ±

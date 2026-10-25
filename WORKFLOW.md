@@ -8538,7 +8538,17 @@ as the pane's design record.
 - **Edge / rough fit.** A fit with a large error is described with what to check (sheet moved,
   not flat, out of focus) and can still be saved; the operator decides.
 - **Edge / camera straight down.** When one photo cannot pin the camera height down and none was
-  entered, the result asks for a tape-measured height so thick material lines up.
+  entered, the lens keeps only its two dominant terms. The result is graded fair, "Lined up at the
+  height of the N mm target sheet only", and asks for a tape-measured height so other thicknesses
+  line up. The calibration row in Camera settings keeps saying so after saving (Amendment 7).
+- **Edge / low-resolution camera.** **Ring size (mm)** under Engrave settings sets the rings'
+  diameter (10 mm by default; the grid step is four ring sizes). When the rings in the photo are
+  under about 9.5 px across, the photo fails as "rings too small" with the ring size to use, or asks
+  for a larger picture or a closer camera. The ring size goes with the target, the canvas target,
+  the nudge ring and the saved calibration (Amendment 7).
+- **Warning / camera placement with a relative Start from.** With camera placement on and Start
+  from not Absolute Coordinates, Job Review says the job burns where that origin puts it, not where
+  the artwork sits on the camera picture. Advice only (ADR-228 Amendment 1).
 - **Edge / minimized wizard.** The wizard can minimize into a small non-modal panel so the
   operator can watch the camera and reach the machine while the target engraves.
 - **Fix / a small offset (ADR-663 Amendment 2).** For a calibrated camera fixed above the bed,
