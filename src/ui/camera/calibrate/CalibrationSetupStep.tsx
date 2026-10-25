@@ -6,10 +6,17 @@
 
 import { useState } from 'react';
 import { bedTargetLayout } from '../../../core/camera/target/bed-target';
+import { machineKindOf } from '../../../core/scene';
 import { useStore } from '../../state';
+import { jobAwareConfirm } from '../../state/job-aware-dialogs';
 import { useLaserStore } from '../../state/laser-store';
+import { useToastStore } from '../../state/toast-store';
 import { useAssumedTarget } from './assumed-target';
-import { calibrationTargetArea, engraveCalibrationTarget } from './calibration-actions';
+import {
+  addCalibrationTargetToCanvas,
+  calibrationTargetArea,
+  engraveCalibrationTarget,
+} from './calibration-actions';
 import { useCameraCalibrationStore, type CalibrationSettings } from './camera-calibration-store';
 import {
   columnStyle,
@@ -18,6 +25,7 @@ import {
   inputStyle,
   noteStyle,
   rowStyle,
+  warnStyle,
 } from './wizard-styles';
 
 export function CalibrationSetupStep(props: { readonly note: string | null }): JSX.Element {
@@ -116,6 +124,7 @@ function TargetActions(props: {
         >
           Engrave target
         </button>
+        <AddTargetToCanvasButton settings={settings} />
         <button
           type="button"
           className="lf-btn"
@@ -130,8 +139,12 @@ function TargetActions(props: {
         {assumed.source === 'settings' ? correctionHint(settings.headCamera) : null}
       </p>
       {connected ? null : (
-        <p style={noteStyle}>Connect the machine to engrave, or use a target engraved earlier.</p>
+        <p style={noteStyle}>
+          Connect the machine to engrave from here, add the target to the canvas to engrave it like
+          any job, or use a target engraved earlier.
+        </p>
       )}
+      <TargetPlacementNote connected={connected} />
       {props.note === null ? null : <p style={errStyle}>{props.note}</p>}
       <div style={rowStyle}>
         <button
@@ -145,6 +158,66 @@ function TargetActions(props: {
       </div>
     </>
   );
+}
+
+// Puts the target on the canvas as artwork, for an operator who engraves it
+// like any job (ADR-441 Amendment 5), and waits at the photo.
+function AddTargetToCanvasButton(props: { readonly settings: CalibrationSettings }): JSX.Element {
+  const cncCanvas = useStore((s) => machineKindOf(s.project.machine) === 'cnc');
+  const add = (): void => {
+    if (useStore.getState().dirty && !jobAwareConfirm(REPLACE_ARTWORK_QUESTION)) return;
+    addCalibrationTargetToCanvas(props.settings);
+    useCameraCalibrationStore.setState({ targetArea: null, minimized: true });
+    useCameraCalibrationStore.getState().setStep({ kind: 'photo', status: { kind: 'idle' } });
+    useToastStore.getState().pushToast(TARGET_ON_CANVAS_MESSAGE, 'success');
+  };
+  return (
+    <button
+      type="button"
+      className="lf-btn"
+      disabled={cncCanvas}
+      onClick={add}
+      title={
+        cncCanvas
+          ? 'Switch the canvas to Laser to add the target: the rings are a laser engraving.'
+          : 'Put the ring target on the canvas in place of the current artwork (Undo brings it back), to Frame and Start like any job. Keep the rings where they are, then come back here for the photo.'
+      }
+    >
+      Add target to canvas
+    </button>
+  );
+}
+
+function TargetPlacementNote(props: { readonly connected: boolean }): JSX.Element | null {
+  const homingEnabled = useStore((s) => s.project.device.homing.enabled);
+  const homed = useLaserStore((s) => s.homingState === 'confirmed');
+  const note = targetPlacementNote(props.connected, homingEnabled, homed);
+  return note === null ? null : (
+    <p role="status" style={homingEnabled ? warnStyle : noteStyle}>
+      {note}
+    </p>
+  );
+}
+
+const REPLACE_ARTWORK_QUESTION =
+  'Adding the calibration target replaces the current artwork (Undo brings it back). Continue?';
+export const TARGET_ON_CANVAS_MESSAGE =
+  'Calibration target added to the canvas and locked in place. Start from is now Absolute Coordinates. Frame and Start it, leave the sheet where it is, then reopen Camera setup for the photo.';
+export const HOME_BEFORE_TARGET_NOTE =
+  'Home the machine before engraving the target. Until it is homed, the rings are placed from wherever the head was when the machine was switched on, so the calibration would hold only until the next Home.';
+export const NO_HOMING_TARGET_NOTE =
+  'This machine has no homing, so the camera lines up only while the controller keeps the zero it has when the target is engraved.';
+
+// The target runs at Absolute coordinates, which name a fixed place on the bed
+// only once the machine is homed (ADR-441 Amendment 5). Advice, not a gate.
+function targetPlacementNote(
+  connected: boolean,
+  homingEnabled: boolean,
+  homed: boolean,
+): string | null {
+  if (!connected) return null;
+  if (!homingEnabled) return NO_HOMING_TARGET_NOTE;
+  return homed ? null : HOME_BEFORE_TARGET_NOTE;
 }
 
 // The rings are matched to the layout the settings describe, so a target

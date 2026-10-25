@@ -101,6 +101,37 @@ export async function engraveCalibrationTarget(
   return started;
 }
 
+/**
+ * Put the target on the canvas as the project's artwork (undoable), for an
+ * operator who engraves it like any job: Frame, review and Start, or later
+ * from another session. The rings are locked so a stray drag cannot move them
+ * off the bed positions the photo will look for, and Start from becomes
+ * Absolute Coordinates, the only mode that burns them there.
+ */
+export function addCalibrationTargetToCanvas(settings: CalibrationSettings): void {
+  const store = useStore.getState();
+  const { device } = store.project;
+  const area = calibrationTargetArea(device.bedWidth, device.bedHeight, settings);
+  const pattern = generateCameraBedTarget({
+    area,
+    power: settings.powerPercent,
+    speed: settings.speedMmPerMin,
+  });
+  store.replaceSceneWithGeneratedScene({
+    ...pattern.scene,
+    objects: pattern.scene.objects.map((object) => ({ ...object, locked: true })),
+  });
+  if (store.jobPlacement.startFrom !== 'absolute') store.setJobPlacement({ startFrom: 'absolute' });
+  rememberEngravedTarget(device, settings.headCamera, {
+    area,
+    bedWidthMm: device.bedWidth,
+    bedHeightMm: device.bedHeight,
+    layoutMm: settings.headCamera ? settings.headTargetSizeMm : settings.marginMm,
+    engravedAt: new Date().toISOString(),
+    bedFrame: cameraBedFrameFor(device, useLaserStore.getState()),
+  });
+}
+
 export type PhotoOutcome =
   | { readonly kind: 'ok'; readonly result: CalibrationResult }
   | { readonly kind: 'failed'; readonly message: string };

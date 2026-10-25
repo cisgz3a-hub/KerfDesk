@@ -8498,6 +8498,18 @@ as the pane's design record.
   The setup and photo steps name the layout it looks for: its size, margin, bed and where it came
   from. A target engraved with another margin is described by entering that margin first
   (Amendment 4).
+- **Alternative / target on the canvas.** **Add target to canvas** works without a connection. It
+  replaces the artwork with the ring target on its own layer (asking first when the project has
+  unsaved changes; Undo brings the artwork back), locks the rings, sets Start from to Absolute
+  Coordinates, remembers the layout like an engraved target, minimises the wizard at the photo
+  step and says what to do next. The operator Frames and Starts it like any job, then reopens the
+  wizard for the photo. Disabled with a reason while the canvas is in CNC mode (ADR-441
+  Amendment 5).
+- **Warning / not homed.** While connected, the target step says to home first on a homing machine
+  that is not homed, and on a machine without homing that the camera lines up only while the
+  controller keeps its zero. Advice only: **Engrave target** stays available. A calibration whose
+  rings were placed before the controller-to-bed offset was known says so on the calibration row
+  once it is known, and suggests homing and calibrating again if the picture is off.
 - **Edge / small bed.** When the usual grid of 10 mm rings 40 mm apart does not fit inside the
   margins, the rings and spacing shrink together so every ring stays on the bed. The grid keeps
   rings around all three solid anchors. Engrave a new target if an older one ran off the bed or
