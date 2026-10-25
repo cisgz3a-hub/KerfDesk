@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "sinceSourceSha": "19ff6042a2f4d0ff41486efb6ee2592d9ce2a557",
+  "sinceSourceSha": "19aba0456008a5b19ae6c2096284482a1b414202",
   "highlights": [
-    "Camera setup engraves the calibration target on a sheet about A4 in size (300 × 200 mm by default) in the middle of the bed, instead of a board covering the whole bed. Enter your sheet's size on the Target step.",
-    "Calibration from a smaller target keeps the camera picture close to the burn across the rest of the bed, where it could previously be far out."
+    "Your camera calibration now stays when you open a project saved earlier for the same machine. Before, such a file could remove the calibration, and a later machine change saved over it.",
+    "Cut jobs with many pieces travel less: each piece's holes are cut just before its outline, and the route is shortened further. In tests, travel dropped by about a fifth."
   ]
 }
