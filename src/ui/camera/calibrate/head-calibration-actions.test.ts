@@ -84,8 +84,17 @@ describe('calibrationTargetArea', () => {
     expect(calibrationTargetArea(30, 50, SETTINGS)).toEqual({ x: 0, y: 10, width: 30, height: 30 });
   });
 
-  it('covers the bed inside the margin for a fixed camera', () => {
-    expect(calibrationTargetArea(400, 300, DEFAULT_CALIBRATION_SETTINGS)).toEqual(
+  it('puts a fixed camera target on the sheet in the middle of the bed, inside its margin', () => {
+    // The default 300 × 200 mm sheet on a 400 × 300 mm bed, 5 mm margin.
+    expect(calibrationTargetArea(400, 300, DEFAULT_CALIBRATION_SETTINGS)).toEqual({
+      x: 55,
+      y: 55,
+      width: 290,
+      height: 190,
+    });
+    // A sheet larger than the bed covers the whole bed.
+    const wholeBed = { ...DEFAULT_CALIBRATION_SETTINGS, sheetWidthMm: 999, sheetHeightMm: 999 };
+    expect(calibrationTargetArea(400, 300, wholeBed)).toEqual(
       targetAreaForBed(400, 300, DEFAULT_CALIBRATION_SETTINGS.marginMm),
     );
   });

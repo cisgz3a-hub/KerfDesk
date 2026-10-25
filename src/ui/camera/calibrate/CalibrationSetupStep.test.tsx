@@ -48,7 +48,8 @@ describe('calibration target step', () => {
     await clickControl(document.body, 'Add target to canvas');
     const { project, jobPlacement } = useStore.getState();
     expect(project.scene.layers.map((layer) => layer.id)).toEqual(['camera-bed-target']);
-    expect(project.scene.objects).toHaveLength(100);
+    // The default 300 × 200 mm sheet in the middle of the bed: 7 × 5 rings.
+    expect(project.scene.objects).toHaveLength(35);
     expect(jobPlacement.startFrom).toBe('absolute');
     expect(useCameraCalibrationStore.getState()).toMatchObject({
       minimized: true,

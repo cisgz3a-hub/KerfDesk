@@ -30,7 +30,7 @@ export type AssumedTarget = {
 };
 
 type LayoutSettings = Pick<CalibrationSettings, 'marginMm' | 'headCamera' | 'headTargetSizeMm'> &
-  Partial<Pick<CalibrationSettings, 'ringDiameterMm'>>;
+  Partial<Pick<CalibrationSettings, 'ringDiameterMm' | 'sheetWidthMm' | 'sheetHeightMm'>>;
 type Machine = Pick<DeviceProfile, 'profileId' | 'name' | 'bedWidth' | 'bedHeight'>;
 
 /**
@@ -63,7 +63,7 @@ export function assumedTarget(args: {
   const bedNow = size(args.bedWidthMm, args.bedHeightMm);
   if (
     remembered !== null &&
-    remembered.layoutMm === layoutSetting(settings) &&
+    describesRemembered(settings, remembered) &&
     (remembered.ringDiameterMm ?? DEFAULT_RING_DIAMETER_MM) === ringSetting(settings)
   ) {
     const bedThen = size(remembered.bedWidthMm, remembered.bedHeightMm);
@@ -130,8 +130,18 @@ function assumedTargetFor(
   });
 }
 
-function layoutSetting(settings: LayoutSettings): number {
-  return settings.headCamera ? settings.headTargetSizeMm : settings.marginMm;
+// The settings still describe the remembered target when they lay out the
+// same area on the bed it was engraved on: margin, sheet size and head-target
+// size all included (ADR-441 Amendment 8).
+function describesRemembered(settings: LayoutSettings, remembered: EngravedTarget): boolean {
+  const area = calibrationTargetArea(remembered.bedWidthMm, remembered.bedHeightMm, settings);
+  const same = (a: number, b: number): boolean => Math.abs(a - b) < 1e-6;
+  return (
+    same(area.x, remembered.area.x) &&
+    same(area.y, remembered.area.y) &&
+    same(area.width, remembered.area.width) &&
+    same(area.height, remembered.area.height)
+  );
 }
 
 function ringSetting(settings: LayoutSettings): number {
@@ -144,7 +154,8 @@ function layoutWords(settings: LayoutSettings, area: BedArea, bed: string): stri
   if (settings.headCamera) {
     return `a ${size(area.width, area.height)} square in the middle of a ${bed} bed${rings}`;
   }
-  return `${size(area.width, area.height)} with a ${round(settings.marginMm)} mm margin on a ${bed} bed${rings}`;
+  const sheet = size(area.width + 2 * settings.marginMm, area.height + 2 * settings.marginMm);
+  return `${size(area.width, area.height)} with a ${round(settings.marginMm)} mm margin on a ${sheet} sheet in the middle of a ${bed} bed${rings}`;
 }
 
 function size(width: number, height: number): string {

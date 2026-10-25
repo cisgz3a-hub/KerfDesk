@@ -279,6 +279,60 @@ describe('calibrateFromBedTarget with a target over the middle of the bed only',
   }, 20_000);
 });
 
+describe('calibrateFromBedTarget with an A4-size sheet in the middle of the bed', () => {
+  it('keeps the picture close past the rings instead of bending it with four lens terms', () => {
+    // Audit 2026-10-25: 35 rings on a 300 × 200 mm sheet let four terms pass
+    // the two-sigma test and bent the bed 87 mm out for a side camera.
+    const side = lookAt([460, 200, -380], [190, 200, 0]);
+    const wide = wideLens(1280);
+    const sheet = { x: 50, y: 100, width: 300, height: 200 };
+    const sheetLayout = bedTargetLayout({
+      area: { x: 55, y: 105, width: 290, height: 190 },
+    });
+    const sheetFrame = renderTargetScene({
+      lens: wide,
+      pose: side,
+      layout: sheetLayout,
+      sheet,
+      sheetThicknessMm: THICKNESS,
+      noise: 4,
+      honeycombPitchMm: 6,
+    });
+    const result = calibrateFromBedTarget({
+      frame: sheetFrame,
+      layout: sheetLayout,
+      sheetThicknessMm: THICKNESS,
+    });
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.foundMarks).toBe(35);
+    expect(result.lens.distortion.slice(1)).toEqual([0, 0, 0]);
+    expect(worstBedError(wide, side, result.lens, result.pose)).toBeLessThan(1.5);
+  }, 20_000);
+});
+
+// The worst distance, over the whole 400 mm bed the true camera sees, between
+// a bed point and where the fitted model puts it.
+function worstBedError(
+  trueLens: LensModel,
+  truePose: CameraPose,
+  lensFit: LensModel,
+  poseFit: CameraPose,
+): number {
+  let worst = 0;
+  for (let y = 0; y <= 400; y += 20) {
+    for (let x = 0; x <= 400; x += 20) {
+      const pixel = projectWorldPoint(trueLens, truePose, bedPoint(x, y, THICKNESS));
+      const inPicture =
+        pixel !== null && pixel.x >= 0 && pixel.y >= 0 && pixel.x <= 1279 && pixel.y <= 719;
+      if (!inPicture) continue;
+      const seen = pixelToBed(lensFit, poseFit, pixel, THICKNESS);
+      worst = Math.max(worst, Math.hypot((seen?.x ?? 1e9) - x, (seen?.y ?? 1e9) - y));
+    }
+  }
+  return worst;
+}
+
 describe('calibrateFromBedTarget with a low-resolution camera', () => {
   // 640 px across a 400 mm bed: 10 mm rings come out about 7.7 px wide, where
   // the detector loses their holes and anchors (ADR-441 Amendment 7).

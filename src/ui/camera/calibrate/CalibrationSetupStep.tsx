@@ -41,20 +41,40 @@ export function CalibrationSetupStep(props: { readonly note: string | null }): J
     <div style={columnStyle}>
       <p style={leadStyle}>Engrave the target</p>
       <p style={textStyle}>
-        {settings.headCamera
-          ? 'Put a flat sheet of scrap in the middle of the bed'
-          : 'Cover the bed with one flat sheet of scrap'}{' '}
-        (card, plywood or anodised aluminium) and enter how thick it is.
+        Put a flat sheet of scrap (card, plywood or anodised aluminium) in the middle of the bed and
+        enter {settings.headCamera ? 'how thick it is' : 'its size and how thick it is'}.
       </p>
-      <NumberField
-        label="Sheet thickness (mm)"
-        value={settings.sheetThicknessMm}
-        step={0.1}
-        title="Thickness of the sheet the target is engraved on. The camera is fitted to its top surface."
-        onChange={(value) =>
-          updateSettings({ sheetThicknessMm: value ?? settings.sheetThicknessMm })
-        }
-      />
+      <div style={rowStyle}>
+        {settings.headCamera ? null : (
+          <>
+            <NumberField
+              label="Sheet width (mm)"
+              value={settings.sheetWidthMm}
+              step={10}
+              title="Width of the sheet, left to right. About A4 (300 × 200 mm) calibrates the whole bed well; a sheet larger than the bed covers the bed."
+              onChange={(value) => updateSettings({ sheetWidthMm: value ?? settings.sheetWidthMm })}
+            />
+            <NumberField
+              label="Sheet height (mm)"
+              value={settings.sheetHeightMm}
+              step={10}
+              title="Height of the sheet, front to back."
+              onChange={(value) =>
+                updateSettings({ sheetHeightMm: value ?? settings.sheetHeightMm })
+              }
+            />
+          </>
+        )}
+        <NumberField
+          label="Sheet thickness (mm)"
+          value={settings.sheetThicknessMm}
+          step={0.1}
+          title="Thickness of the sheet the target is engraved on. The camera is fitted to its top surface."
+          onChange={(value) =>
+            updateSettings({ sheetThicknessMm: value ?? settings.sheetThicknessMm })
+          }
+        />
+      </div>
       <p style={noteStyle}>
         KerfDesk engraves {rings} small rings across {Math.round(area.width)} ×{' '}
         {Math.round(area.height)} mm, then one photo of them calibrates the lens, finds where the
@@ -264,7 +284,7 @@ function SettingsFields(props: { readonly settings: CalibrationSettings }): JSX.
             label="Margin (mm)"
             value={settings.marginMm}
             step={1}
-            title="Space kept clear around the target on every side of the bed."
+            title="Space kept clear around the target on every side of the sheet."
             onChange={(value) => update({ marginMm: value ?? settings.marginMm })}
           />
         )}

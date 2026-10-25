@@ -13,7 +13,12 @@ const engravedWith20: EngravedTarget = {
 
 function assume(overrides: Partial<Parameters<typeof assumedTarget>[0]> = {}) {
   return assumedTarget({
-    settings: { ...DEFAULT_CALIBRATION_SETTINGS, marginMm: 20 },
+    settings: {
+      ...DEFAULT_CALIBRATION_SETTINGS,
+      marginMm: 20,
+      sheetWidthMm: 400,
+      sheetHeightMm: 400,
+    },
     bedWidthMm: 400,
     bedHeightMm: 400,
     knownArea: null,
@@ -29,7 +34,9 @@ describe('assumedTarget', () => {
     expect(target.source).toBe('engraved');
     expect(target.area).toEqual(engravedWith20.area);
     expect(target.description).toContain('the target engraved from this computer on');
-    expect(target.description).toContain('360 × 360 mm with a 20 mm margin on a 400 × 400 mm bed');
+    expect(target.description).toContain(
+      '360 × 360 mm with a 20 mm margin on a 400 × 400 mm sheet in the middle of a 400 × 400 mm bed',
+    );
   });
 
   it('says a target put on the canvas was added there, not engraved', () => {
@@ -47,9 +54,10 @@ describe('assumedTarget', () => {
   it('follows the settings once another margin is entered, and says which layout that is', () => {
     const target = assume({ settings: DEFAULT_CALIBRATION_SETTINGS });
     expect(target.source).toBe('settings');
-    expect(target.area).toEqual({ x: 5, y: 5, width: 390, height: 390 });
+    // The default 300 × 200 mm sheet in the middle of the 400 mm bed.
+    expect(target.area).toEqual({ x: 55, y: 105, width: 290, height: 190 });
     expect(target.description).toBe(
-      'a target laid out by these settings: 390 × 390 mm with a 5 mm margin on a 400 × 400 mm bed',
+      'a target laid out by these settings: 290 × 190 mm with a 5 mm margin on a 300 × 200 mm sheet in the middle of a 400 × 400 mm bed',
     );
     expect(assume({ remembered: null }).source).toBe('settings');
   });
