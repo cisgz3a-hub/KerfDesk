@@ -27,6 +27,8 @@ export type CalibrationResult = {
   readonly markErrors: ReadonlyArray<MarkError>;
   /** The photo flattened onto the bed at the target's height, for review. */
   readonly bedImage: RgbaImage | null;
+  /** The part of the bed that picture shows, mm; absent means the whole bed. */
+  readonly bedImageRegion?: BedArea;
   /** Camera height the photo alone could not pin down to within this, mm. */
   readonly cameraHeightSigmaMm: number;
   readonly usedMeasuredHeight: boolean;

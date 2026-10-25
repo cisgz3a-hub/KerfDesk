@@ -98,6 +98,7 @@ describe('photographTarget', () => {
       height: photo.height,
     });
     expect(bedImage).toMatchObject({ width: BED, height: BED });
+    expect(outcome.result.bedImageRegion).toEqual({ x: 0, y: 0, width: BED, height: BED });
     expect(outcome.result.usedMeasuredHeight).toBe(false);
     expect(outcome.result.savedCheck).toBeNull();
     expect(record.accuracy.targetArea).toEqual(targetAreaForBed(BED, BED, SETTINGS.marginMm));

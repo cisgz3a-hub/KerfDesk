@@ -12,7 +12,7 @@ import { lensFoldsInPicture } from '../model/fit-determined-lens';
 import { lookAt, overheadPose, wideLens } from '../model/model-fixtures';
 import { calibrateFromBedTarget } from './bed-calibration';
 import { bedTargetLayout, type BedTargetLayout } from './bed-target';
-import { detectRingMarks } from './ring-detect';
+import { detectRingMarks, type RingMark } from './ring-detect';
 import { renderTargetScene } from './target-render-fixtures';
 import { matchBedTarget } from './target-match';
 
@@ -91,6 +91,56 @@ describe('target matching', () => {
   it('fails plainly when the anchors are not visible', () => {
     const rings = detectRingMarks(frame).filter((r) => !r.anchor);
     expect(matchBedTarget(rings, layout)).toEqual({ kind: 'failed', reason: 'anchors-not-found' });
+  });
+
+  // The detected mark at grid cell (col, row), with its disc/ring flag replaced.
+  function marksWith(cells: ReadonlyMap<string, boolean | null>): RingMark[] {
+    const rings = detectRingMarks(frame);
+    const atCell = (mark: RingMark): string | undefined => {
+      const found = layout.marks.find((m) => {
+        const p = projectWorldPoint(lens, pose, bedPoint(m.x, m.y, THICKNESS));
+        return p !== null && Math.hypot(p.x - mark.x, p.y - mark.y) < 2;
+      });
+      return found === undefined ? undefined : `${found.col},${found.row}`;
+    };
+    return rings.flatMap((mark) => {
+      const cell = atCell(mark);
+      const change = cell === undefined ? undefined : cells.get(cell);
+      if (change === undefined) return [mark];
+      return change === null ? [] : [{ ...mark, anchor: change }];
+    });
+  }
+
+  it('refuses a turned L of filled-in rings rather than labelling every ring wrongly', () => {
+    // Audit 2026-10-25: the third anchor unseen and two rings filled in at
+    // (0,1) and (2,1) form an L turned a quarter. On a square layout it labels
+    // every ring a cell off, and the fit then reported 0.41 mm for a picture
+    // 215 mm out.
+    const marks = marksWith(
+      new Map([
+        ['0,2', null],
+        ['0,1', true],
+        ['2,1', true],
+      ]),
+    );
+    expect(matchBedTarget(marks, layout)).toEqual({ kind: 'failed', reason: 'anchors-unclear' });
+  });
+
+  it('does not take a skewed pair of discs for the anchor L', () => {
+    // A filled ring two across and one up from the origin lands on the grid
+    // the way the long arm's middle should, but the arms are not grid steps.
+    const marks = marksWith(
+      new Map([
+        ['0,2', null],
+        ['4,-2', true],
+      ]),
+    );
+    expect(matchBedTarget(marks, layout)).toEqual({ kind: 'failed', reason: 'anchors-not-found' });
+  });
+
+  it('says the anchors are unclear when a ring in the grid has filled in', () => {
+    const marks = marksWith(new Map([['3,3', true]]));
+    expect(matchBedTarget(marks, layout)).toEqual({ kind: 'failed', reason: 'anchors-unclear' });
   });
 });
 

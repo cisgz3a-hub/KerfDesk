@@ -140,6 +140,8 @@ export function calibrationFailureMessage(reason: BedCalibrationFailure['reason'
       return 'The three solid discs in the middle of the target were not found. Make sure nothing covers them, including the laser head.';
     case 'target-too-large':
       return 'The target fills the picture from edge to edge, so the rings around its three solid discs may be cut off. Move the camera further from the target or engrave a smaller target (a larger margin, or a smaller target size for a camera on the head), and make sure nothing covers the discs.';
+    case 'anchors-unclear':
+      return 'Some rings look like solid discs in the photo, so KerfDesk cannot tell which three discs mark the middle of the target. Light the bed evenly, set the camera to a larger picture size or move it closer, and if the rings are burned nearly solid, engrave a new target with less power. Old marks next to the target can also cause this.';
     case 'mirrored-image':
       return 'The camera picture is mirrored. Turn off mirroring or flipping in the camera settings, then take the photo again.';
     case 'too-few-marks':

@@ -123,6 +123,8 @@ describe('photographing a head camera target', () => {
     expect(first.result.record.accuracy.rmsErrorMm).toBeLessThan(0.1);
     // The review picture shows the 40 mm target with room around it, in detail.
     expect(first.result.bedImage).toMatchObject({ width: 640, height: 640 });
+    // The ring dots of the review are drawn over that part of the bed only.
+    expect(first.result.bedImageRegion).toMatchObject({ width: 80, height: 80 });
 
     // Five millimetres away the rings sit elsewhere in the picture, and the
     // saved calibration moved with the head still lands on them.

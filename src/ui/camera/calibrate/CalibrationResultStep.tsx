@@ -189,18 +189,26 @@ function BedAccuracyMap(props: { readonly result: CalibrationResult }): JSX.Elem
   const bedWidth = useStore((s) => s.project.device.bedWidth);
   const bedHeight = useStore((s) => s.project.device.bedHeight);
   if (bedImage === null) return null;
+  // A head camera's review shows only the target and its surroundings, so the
+  // dots are placed in that part of the bed, not the whole of it.
+  const region = props.result.bedImageRegion ?? {
+    x: 0,
+    y: 0,
+    width: bedWidth,
+    height: bedHeight,
+  };
   return (
     <figure style={mapStyle}>
       <div style={mapFrameStyle}>
         <RgbaCanvas image={bedImage} alt="Camera photo flattened onto the bed" />
         <svg
-          viewBox={`0 0 ${bedWidth} ${bedHeight}`}
+          viewBox={`${region.x} ${region.y} ${region.width} ${region.height}`}
           preserveAspectRatio="none"
           style={mapOverlayStyle}
           aria-hidden="true"
         >
           {markErrors.map((mark) => (
-            <RingMark key={`${mark.x},${mark.y}`} mark={mark} bedWidth={bedWidth} />
+            <RingMark key={`${mark.x},${mark.y}`} mark={mark} regionWidth={region.width} />
           ))}
         </svg>
       </div>
@@ -213,9 +221,9 @@ function BedAccuracyMap(props: { readonly result: CalibrationResult }): JSX.Elem
   );
 }
 
-function RingMark(props: { readonly mark: MarkError; readonly bedWidth: number }): JSX.Element {
+function RingMark(props: { readonly mark: MarkError; readonly regionWidth: number }): JSX.Element {
   const { mark } = props;
-  const radius = props.bedWidth / 120;
+  const radius = props.regionWidth / 120;
   const error = Math.hypot(mark.dxMm, mark.dyMm);
   if (mark.rejected) {
     return (

@@ -8502,9 +8502,9 @@ as the pane's design record.
   replaces the artwork with the ring target on its own layer (asking first when the project has
   unsaved changes; Undo brings the artwork back), locks the rings, sets Start from to Absolute
   Coordinates, remembers the layout like an engraved target, minimises the wizard at the photo
-  step and says what to do next. The operator Frames and Starts it like any job, then reopens the
-  wizard for the photo. Disabled with a reason while the canvas is in CNC mode (ADR-441
-  Amendment 5).
+  step and says what to do next. The operator Frames and Starts it like any job, then presses
+  **Expand** on the minimised wizard for the photo. Disabled with a reason while the canvas is in
+  CNC mode (ADR-441 Amendment 5).
 - **Warning / not homed.** While connected, the target step says to home first on a homing machine
   that is not homed, and on a machine without homing that the camera lines up only while the
   controller keeps its zero. Advice only: **Engrave target** stays available. A calibration whose
@@ -8521,6 +8521,12 @@ as the pane's design record.
   target that fills the picture edge to edge says to move the camera back or engrave a smaller
   target, and a lens the rings cannot model out to the picture's edges asks for a larger target
   (Amendment 4).
+- **Error / anchors unclear.** When rings have filled in (a small, dim or noisy picture, or rings
+  burned nearly solid), a solid disc stands where a ring should be, or more than one placement of
+  the anchor L fits the rings, or the only one would put rings where the target has none. The photo
+  then cannot say which three discs are the anchors. The message asks for even light, a larger
+  picture or a closer camera, and a lighter new target, and mentions old marks beside the target.
+  Nothing is fitted (Amendment 6).
 - **Edge / target smaller than the picture.** The fit keeps only the lens terms the rings pin
   down. When a quarter or more of what the camera sees lies outside the target, the result says
   that the accuracy is measured on the rings and the rest of the picture is estimated

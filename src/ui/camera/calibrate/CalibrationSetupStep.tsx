@@ -180,7 +180,7 @@ function AddTargetToCanvasButton(props: { readonly settings: CalibrationSettings
       title={
         cncCanvas
           ? 'Switch the canvas to Laser to add the target: the rings are a laser engraving.'
-          : 'Put the ring target on the canvas in place of the current artwork (Undo brings it back), to Frame and Start like any job. Keep the rings where they are, then come back here for the photo.'
+          : 'Put the ring target on the canvas in place of the current artwork (Undo brings it back), to Frame and Start like any job. This wizard waits, minimised, at the photo step.'
       }
     >
       Add target to canvas
@@ -202,7 +202,7 @@ function TargetPlacementNote(props: { readonly connected: boolean }): JSX.Elemen
 const REPLACE_ARTWORK_QUESTION =
   'Adding the calibration target replaces the current artwork (Undo brings it back). Continue?';
 export const TARGET_ON_CANVAS_MESSAGE =
-  'Calibration target added to the canvas and locked in place. Start from is now Absolute Coordinates. Frame and Start it, leave the sheet where it is, then reopen Camera setup for the photo.';
+  'Calibration target added to the canvas and locked in place. Start from is now Absolute Coordinates. Frame and Start it, leave the sheet where it is, then press Expand on the Camera setup panel at the bottom right to take the photo.';
 export const HOME_BEFORE_TARGET_NOTE =
   'Home the machine before engraving the target. Until it is homed, the rings are placed from wherever the head was when the machine was switched on, so the calibration would hold only until the next Home.';
 export const NO_HOMING_TARGET_NOTE =

@@ -197,8 +197,9 @@ export async function photographTarget(args: {
           marks: outcome.markErrors,
           targetHeightMm: settings.sheetThicknessMm,
         });
+  const review = reviewArea(args, area, head !== null);
   const bedImage = warpFrameToBedImage(raw, outcome.lens, outcome.pose, {
-    ...reviewArea(args, area, head !== null),
+    ...review,
     surfaceHeightMm: settings.sheetThicknessMm,
   });
   return {
@@ -207,6 +208,7 @@ export async function photographTarget(args: {
       record,
       markErrors: outcome.markErrors,
       bedImage,
+      bedImageRegion: review.region,
       cameraHeightSigmaMm: outcome.cameraHeightSigmaMm,
       usedMeasuredHeight: settings.cameraHeightMm !== null,
       savedCheck,
