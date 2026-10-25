@@ -114,7 +114,7 @@ Open library evaluation at Phase B kickoff per ADR-017: study CNCjs source (MIT)
 
 ### Phase C — v0.3 "Polish" [MVP completes here]
 
-Job time estimates, settings panel, SVG re-import with diff, and a persisted deterministic Cut Planner (travel policy, inside-first, layer priority, path direction, and planning start), plus keyboard shortcuts, autosave + recovery, and a local-only crash reporter. The planner remains bounded nearest-neighbor rather than full 2-opt (ADR-163).
+Job time estimates, settings panel, SVG re-import with diff, and a persisted deterministic Cut Planner (travel policy, inside-first, layer priority, path direction, and planning start), plus keyboard shortcuts, autosave + recovery, and a local-only crash reporter. The planner builds a nearest-neighbor route, keeps inside-first part by part, and refines it with bounded, deterministic 2-opt/Or-opt scored back to the park (ADR-163, ADR-669); it does not claim optimality.
 
 Cut Planner also offers opt-in **Remove overlapping lines**, off by default. It removes coincident
 laser Line spans within one compiled settings group while retaining separate operations, pass
