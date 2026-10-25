@@ -54,15 +54,23 @@ export function worldToCamera(pose: CameraPose, p: Vec3, rotation?: Mat3): Vec3 
   };
 }
 
-/** Pixel of a camera-frame point, or null when it lies behind the camera. */
+/**
+ * Pixel of a camera-frame point, or null when it lies behind the camera or
+ * wider than the lens can image: past the polynomial's turning point
+ * (fisheyeAngleLimit) the forward map runs back inward, and would put the
+ * point on a pixel that sees another ray.
+ */
 export function projectCameraPoint(lens: LensModel, c: Vec3): Vec2 | null {
   if (!(c.z > MIN_DEPTH)) return null;
-  const d = distortFisheye(c.x / c.z, c.y / c.z, lens.distortion);
+  const a = c.x / c.z;
+  const b = c.y / c.z;
+  if (Math.atan(Math.hypot(a, b)) > fisheyeAngleLimit(lens.distortion)) return null;
+  const d = distortFisheye(a, b, lens.distortion);
   const k = lens.intrinsics;
   return { x: k.fx * d.x + k.cx, y: k.fy * d.y + k.cy };
 }
 
-/** Pixel where the camera sees world point `p`, or null when it is behind the camera. */
+/** Pixel where the camera sees world point `p`, or null where it cannot (see projectCameraPoint). */
 export function projectWorldPoint(
   lens: LensModel,
   pose: CameraPose,
