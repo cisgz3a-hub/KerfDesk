@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "sinceSourceSha": "87ecb4f240deec4e2d161c3306a37f96e0588130",
+  "sinceSourceSha": "a9ad5080c14a642e73a0ff7d941dce6cdb8f9ac1",
   "highlights": [
-    "Artwork editing prevents stale numeric and node edits from reaching the wrong artwork, preserves groups during layout and array edits, and makes text and barcode previews agree with applied results.",
-    "Project opens and imports honour newer requests and cancellation. Recent files keep their identity across windows, and Snapshot saves preserve a name typed while a save is in progress.",
-    "Image Studio keeps resize proportions at size limits, clears stale Clone and crop state, cancels interrupted gestures, and reads colours from the displayed preview. Camera movement warnings re-arm after later shifts.",
-    "CNC adaptive pockets clear around islands and remaining stock in the right order, V-carve flat floors reach inside corners, and tapered inlay plugs use start-depth V-carve geometry. CNC checks recognise arc moves.",
-    "CNC bit changes name the hand-edited feeds they keep. Two-sided reliefs follow stock changes, curved relief rails keep their curves, and straight inlay pairs are checked for narrow parts and gaps.",
-    "Numeric Auto-focus sets millimetres and absolute mode; unsupported saved focus commands warn. Settings and copied logs hide controller passwords. Desktop networking blocks compromised eMudhra intermediate certificates."
+    "Camera calibration no longer labels the target's rings wrongly when some look solid in a small, dim or noisy photo; it says what to fix instead, and no longer reports a mirrored picture by mistake.",
+    "Calibration keeps only the lens terms the photo supports, so the camera picture stays closer to the burn at the bed's corners, outside the target's rings.",
+    "A camera looking straight down without a measured height is graded as lined up at the target sheet's height only, and asks for the camera height so other thicknesses line up.",
+    "The camera overlay no longer shows a folded copy of the picture where the camera cannot see. Camera setup adds Ring size for low-resolution cameras and names the size to use when rings are too small.",
+    "Camera setup can put the ring target on the canvas to engrave like any job, asks to home the machine first, and says when a calibration was made before the bed position was known.",
+    "Job Review warns when artwork is placed with the camera but Start from is not Absolute Coordinates, because the job would burn somewhere else."
   ]
 }
