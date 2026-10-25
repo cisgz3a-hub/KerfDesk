@@ -32,6 +32,12 @@ describe('assumedTarget', () => {
     expect(target.description).toContain('360 × 360 mm with a 20 mm margin on a 400 × 400 mm bed');
   });
 
+  it('says a target put on the canvas was added there, not engraved', () => {
+    const target = assume({ remembered: { ...engravedWith20, onCanvas: true } });
+    expect(target.source).toBe('engraved');
+    expect(target.description).toContain('the target added to the canvas from this computer on');
+  });
+
   it('keeps the engraved area when the bed size changed since, and says so', () => {
     const target = assume({ bedWidthMm: 380 });
     expect(target.area).toEqual(engravedWith20.area);

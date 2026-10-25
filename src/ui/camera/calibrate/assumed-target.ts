@@ -7,6 +7,7 @@
 
 import type { CameraBedFrame } from '../../../core/camera/model/camera-bed-frame';
 import type { BedArea } from '../../../core/camera/model/camera-model-accuracy';
+import { DEFAULT_RING_DIAMETER_MM } from '../../../core/camera/target/bed-target';
 import type { DeviceProfile } from '../../../core/devices';
 import { useStore } from '../../state';
 import { cameraBedFrameNow, useCameraBedFrame } from '../camera-bed-frame-now';
@@ -28,7 +29,8 @@ export type AssumedTarget = {
   readonly bedFrame: CameraBedFrame;
 };
 
-type LayoutSettings = Pick<CalibrationSettings, 'marginMm' | 'headCamera' | 'headTargetSizeMm'>;
+type LayoutSettings = Pick<CalibrationSettings, 'marginMm' | 'headCamera' | 'headTargetSizeMm'> &
+  Partial<Pick<CalibrationSettings, 'ringDiameterMm'>>;
 type Machine = Pick<DeviceProfile, 'profileId' | 'name' | 'bedWidth' | 'bedHeight'>;
 
 /**
@@ -59,14 +61,20 @@ export function assumedTarget(args: {
     };
   }
   const bedNow = size(args.bedWidthMm, args.bedHeightMm);
-  if (remembered !== null && remembered.layoutMm === layoutSetting(settings)) {
+  if (
+    remembered !== null &&
+    remembered.layoutMm === layoutSetting(settings) &&
+    (remembered.ringDiameterMm ?? DEFAULT_RING_DIAMETER_MM) === ringSetting(settings)
+  ) {
     const bedThen = size(remembered.bedWidthMm, remembered.bedHeightMm);
     const changed = bedThen === bedNow ? '' : ` (the bed is now ${bedNow})`;
     const date = new Date(remembered.engravedAt).toLocaleDateString();
+    // A target put on the canvas is engraved by the operator, maybe later.
+    const how = remembered.onCanvas === true ? 'added to the canvas' : 'engraved';
     return {
       area: remembered.area,
       source: 'engraved',
-      description: `the target engraved from this computer on ${date}: ${layoutWords(settings, remembered.area, bedThen)}${changed}`,
+      description: `the target ${how} from this computer on ${date}: ${layoutWords(settings, remembered.area, bedThen)}${changed}`,
       bedFrame: engravedTargetBedFrame(remembered, frameNow),
     };
   }
@@ -126,11 +134,17 @@ function layoutSetting(settings: LayoutSettings): number {
   return settings.headCamera ? settings.headTargetSizeMm : settings.marginMm;
 }
 
+function ringSetting(settings: LayoutSettings): number {
+  return settings.ringDiameterMm ?? DEFAULT_RING_DIAMETER_MM;
+}
+
 function layoutWords(settings: LayoutSettings, area: BedArea, bed: string): string {
+  const ring = ringSetting(settings);
+  const rings = ring === DEFAULT_RING_DIAMETER_MM ? '' : `, ${round(ring)} mm rings`;
   if (settings.headCamera) {
-    return `a ${size(area.width, area.height)} square in the middle of a ${bed} bed`;
+    return `a ${size(area.width, area.height)} square in the middle of a ${bed} bed${rings}`;
   }
-  return `${size(area.width, area.height)} with a ${round(settings.marginMm)} mm margin on a ${bed} bed`;
+  return `${size(area.width, area.height)} with a ${round(settings.marginMm)} mm margin on a ${bed} bed${rings}`;
 }
 
 function size(width: number, height: number): string {

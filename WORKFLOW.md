@@ -8498,6 +8498,18 @@ as the pane's design record.
   The setup and photo steps name the layout it looks for: its size, margin, bed and where it came
   from. A target engraved with another margin is described by entering that margin first
   (Amendment 4).
+- **Alternative / target on the canvas.** **Add target to canvas** works without a connection. It
+  replaces the artwork with the ring target on its own layer (asking first when the project has
+  unsaved changes; Undo brings the artwork back), locks the rings, sets Start from to Absolute
+  Coordinates, remembers the layout like an engraved target, minimises the wizard at the photo
+  step and says what to do next. The operator Frames and Starts it like any job, then presses
+  **Expand** on the minimised wizard for the photo. Disabled with a reason while the canvas is in
+  CNC mode (ADR-441 Amendment 5).
+- **Warning / not homed.** While connected, the target step says to home first on a homing machine
+  that is not homed, and on a machine without homing that the camera lines up only while the
+  controller keeps its zero. Advice only: **Engrave target** stays available. A calibration whose
+  rings were placed before the controller-to-bed offset was known says so on the calibration row
+  once it is known, and suggests homing and calibrating again if the picture is off.
 - **Edge / small bed.** When the usual grid of 10 mm rings 40 mm apart does not fit inside the
   margins, the rings and spacing shrink together so every ring stays on the bed. The grid keeps
   rings around all three solid anchors. Engrave a new target if an older one ran off the bed or
@@ -8509,6 +8521,12 @@ as the pane's design record.
   target that fills the picture edge to edge says to move the camera back or engrave a smaller
   target, and a lens the rings cannot model out to the picture's edges asks for a larger target
   (Amendment 4).
+- **Error / anchors unclear.** When rings have filled in (a small, dim or noisy picture, or rings
+  burned nearly solid), a solid disc stands where a ring should be, or more than one placement of
+  the anchor L fits the rings, or the only one would put rings where the target has none. The photo
+  then cannot say which three discs are the anchors. The message asks for even light, a larger
+  picture or a closer camera, and a lighter new target, and mentions old marks beside the target.
+  Nothing is fitted (Amendment 6).
 - **Edge / target smaller than the picture.** The fit keeps only the lens terms the rings pin
   down. When a quarter or more of what the camera sees lies outside the target, the result says
   that the accuracy is measured on the rings and the rest of the picture is estimated
@@ -8520,7 +8538,17 @@ as the pane's design record.
 - **Edge / rough fit.** A fit with a large error is described with what to check (sheet moved,
   not flat, out of focus) and can still be saved; the operator decides.
 - **Edge / camera straight down.** When one photo cannot pin the camera height down and none was
-  entered, the result asks for a tape-measured height so thick material lines up.
+  entered, the lens keeps only its two dominant terms. The result is graded fair, "Lined up at the
+  height of the N mm target sheet only", and asks for a tape-measured height so other thicknesses
+  line up. The calibration row in Camera settings keeps saying so after saving (Amendment 7).
+- **Edge / low-resolution camera.** **Ring size (mm)** under Engrave settings sets the rings'
+  diameter (10 mm by default; the grid step is four ring sizes). When the rings in the photo are
+  under about 9.5 px across, the photo fails as "rings too small" with the ring size to use, or asks
+  for a larger picture or a closer camera. The ring size goes with the target, the canvas target,
+  the nudge ring and the saved calibration (Amendment 7).
+- **Warning / camera placement with a relative Start from.** With camera placement on and Start
+  from not Absolute Coordinates, Job Review says the job burns where that origin puts it, not where
+  the artwork sits on the camera picture. Advice only (ADR-228 Amendment 1).
 - **Edge / minimized wizard.** The wizard can minimize into a small non-modal panel so the
   operator can watch the camera and reach the machine while the target engraves.
 - **Fix / a small offset (ADR-663 Amendment 2).** For a calibrated camera fixed above the bed,

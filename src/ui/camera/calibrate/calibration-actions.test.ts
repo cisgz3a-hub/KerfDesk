@@ -19,6 +19,7 @@ import { DEFAULT_CNC_MACHINE_CONFIG, type Project } from '../../../core/scene';
 import { useStore } from '../../state';
 import { captureSourceFrame, type ActiveCameraSource } from '../frame-source';
 import {
+  addCalibrationTargetToCanvas,
   engraveCalibrationTarget,
   photographTarget,
   targetAreaForBed,
@@ -97,6 +98,7 @@ describe('photographTarget', () => {
       height: photo.height,
     });
     expect(bedImage).toMatchObject({ width: BED, height: BED });
+    expect(outcome.result.bedImageRegion).toEqual({ x: 0, y: 0, width: BED, height: BED });
     expect(outcome.result.usedMeasuredHeight).toBe(false);
     expect(outcome.result.savedCheck).toBeNull();
     expect(record.accuracy.targetArea).toEqual(targetAreaForBed(BED, BED, SETTINGS.marginMm));
@@ -149,6 +151,28 @@ describe('photographTarget', () => {
       kind: 'failed',
       message: expect.stringContaining('Could not take a photo'),
     });
+  });
+});
+
+describe('addCalibrationTargetToCanvas', () => {
+  it('replaces the artwork with locked rings, runs them at Absolute, and remembers them', () => {
+    localStorage.clear();
+    const before = useStore.getState().project;
+    useStore.setState({ jobPlacement: { startFrom: 'user-origin', anchor: 'center' } });
+    const settings = { ...SETTINGS, marginMm: 12 };
+    addCalibrationTargetToCanvas(settings);
+    const { project, jobPlacement, undoStack } = useStore.getState();
+    const { device } = project;
+    const area = targetAreaForBed(device.bedWidth, device.bedHeight, 12);
+    expect(project.scene.layers).toEqual([
+      expect.objectContaining({ id: 'camera-bed-target', power: 35, speed: 3000 }),
+    ]);
+    expect(project.scene.objects).toHaveLength(bedTargetLayout({ area }).marks.length);
+    expect(project.scene.objects.every((object) => object.locked === true)).toBe(true);
+    expect(undoStack.at(-1)).toBe(before);
+    expect(jobPlacement).toEqual({ startFrom: 'absolute', anchor: 'center' });
+    expect(rememberedEngravedTarget(device, false)).toMatchObject({ area, layoutMm: 12 });
+    useStore.setState({ project: before });
   });
 });
 
