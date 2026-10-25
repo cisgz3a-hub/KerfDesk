@@ -1604,6 +1604,16 @@ the completed physical Frame is the spatial source of truth.
 #### Error — file is not a valid .lf2
 - Modal: `Could not open <filename>: not a valid KerfDesk project.` No load.
 
+#### Edge — the file carries a camera calibration (ADR-440 Amendment 3)
+1. A file for the machine already in use (same profile, name and bed) keeps the camera
+   calibrations this machine has now. An older calibration saved in the file, or none, does not
+   replace them, so the next machine edit cannot save over them either. When the file held a
+   different calibration, an info toast says `This file's camera calibration was not used: the
+   camera keeps your machine's current calibration.`
+2. With no camera calibration in use, the file's calibration comes in with it, as before.
+3. A file for another machine brings its own calibration with the rest of that machine, behind
+   the machine notice; **Keep current machine** restores the current calibration too.
+
 #### Edge — the file carries an Auto-focus command (ADR-400 Amendments 1 and 2)
 1. On load, an Auto-focus command that is not a focus routine is cleared, as a refused
    positioning-light command is. That covers a G0–G3 move, an X/Y word, an M-code, `S` above 0,
