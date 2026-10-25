@@ -1398,6 +1398,27 @@ that owns those fields, without changing the existing Frame/Start policy.
 5. Line operations and Offset Fill rings follow it; Fill, Image and CNC output do not change. Preview,
    the time estimate, Job Review and every output format read the same planned job.
 
+### F-A9f. How Reduce travel orders Line cuts (ADR-669)
+
+1. With **Reduce travel**, the Cut Planner builds a nearest-first route, then improves it by moving
+   and reversing stretches of that route. It counts the move back to where the job parks, so the
+   head ends near where the next operation, or the park, starts. The improvement stops after a fixed
+   amount of work, so the same project always gives the same G-code.
+2. **Inside paths first** works part by part: a shape waits only for the shapes inside it. Each
+   part's holes are cut before its own outline, but the planner no longer cuts every hole on the
+   sheet before any outline. **Cut in direction order** sweeps the sheet once instead of once per
+   nesting level. Tabbed and perforated outlines still wait for everything inside them.
+3. Nothing the planner changes alters a burn: order, the start of a closed shape (under **Nearest
+   point** or **Nearest corner**) and, with **Allow reverse**, the direction of an open path. A closed
+   shape is never reversed. A **Line burn start** choice keeps its first contour first. The planner
+   never makes a route longer than the order it was given.
+4. Dragging **Job start** to a contour plans the rest of that operation again from there, instead
+   of only moving that contour to the front. Any shape that has nothing still waiting inside it can
+   be the start.
+5. **Keep source order**, Fill, Image and CNC output are unchanged. Group and operation order are
+   unchanged. Preview, the time estimate, Job Review and every output format read the same planned
+   job.
+
 ### F-A10. Pre-flight check (before G-code save)
 
 Runs whenever Save G-code (or Start) is invoked. Cannot be skipped. For **Save

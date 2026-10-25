@@ -210,12 +210,19 @@ async function runFixture() {
       assert.equal(fingerprint(job), before, 'Repeat mutated input');
       // The oracle scans every remaining endpoint itself. It does not use the
       // production entry grid, containment code, distance helper or reversal.
+      // ADR-669 refines the greedy route, scored back to the origin, so the
+      // planned tour must keep the geometry and never travel further.
       const oracleSample = makeSegments(48, pattern === 'nested' ? 'grid' : pattern, seed);
       const oracleResult = optimizePaths(
         { groups: [{ ...group, segments: oracleSample }] },
         settings,
       );
-      assert.deepEqual(oracleResult.groups[0].segments, exhaustiveGreedy(oracleSample, direction));
+      verifyGeometry({ ...group, segments: oracleSample }, oracleResult.groups[0], direction);
+      assert.ok(
+        routeTravel(oracleResult.groups[0].segments) <=
+          routeTravel(exhaustiveGreedy(oracleSample, direction)) + 1e-6,
+        'Refined route travels further than the greedy route',
+      );
       const travelMm = routeTravel(result.groups[0].segments);
       assert.ok(Number.isFinite(travelMm));
       parentPort.postMessage({
