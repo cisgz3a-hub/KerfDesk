@@ -69,8 +69,14 @@ export type CalibrationSettings = {
   readonly cameraHeightMm: number | null;
   readonly powerPercent: number;
   readonly speedMmPerMin: number;
-  /** Margin kept clear around the target on every side of the bed, mm. */
+  /** Margin kept clear around the target on every side of the sheet, mm. */
   readonly marginMm: number;
+  /**
+   * The sheet the target is engraved on, laid in the middle of the bed, mm
+   * (ADR-441 Amendment 8). Larger than the bed means the whole bed.
+   */
+  readonly sheetWidthMm: number;
+  readonly sheetHeightMm: number;
   /** The camera rides on the laser head (ADR-449): a small target it sees whole. */
   readonly headCamera: boolean;
   /** Side of the head camera's square target, mm. */
@@ -92,7 +98,10 @@ export type CalibrationMode = 'calibrate' | 'check' | 'nudge';
 // The margin and square size of the targets last engraved on this machine
 // (ADR-441 Amendment 4), filled in when the wizard opens.
 type RememberedLayout = Partial<
-  Pick<CalibrationSettings, 'marginMm' | 'headTargetSizeMm' | 'ringDiameterMm'>
+  Pick<
+    CalibrationSettings,
+    'marginMm' | 'headTargetSizeMm' | 'ringDiameterMm' | 'sheetWidthMm' | 'sheetHeightMm'
+  >
 >;
 
 export type CameraCalibrationStore = {
@@ -128,6 +137,10 @@ export const DEFAULT_CALIBRATION_SETTINGS: CalibrationSettings = {
   powerPercent: 35,
   speedMmPerMin: 3000,
   marginMm: 5,
+  // About A4: a sheet most workshops have. Measured, it keeps the picture
+  // within 0.2 mm on the sheet and 1.3 mm across a 400 mm bed (Amendment 8).
+  sheetWidthMm: 300,
+  sheetHeightMm: 200,
   headCamera: false,
   headTargetSizeMm: 40,
   ringDiameterMm: DEFAULT_RING_DIAMETER_MM,
@@ -204,6 +217,8 @@ export const useCameraCalibrationStore = create<CameraCalibrationStore>((set) =>
     set((s) => ({
       settings: sanitized({ ...s.settings, ...patch }),
       ...(patch.marginMm === undefined &&
+      patch.sheetWidthMm === undefined &&
+      patch.sheetHeightMm === undefined &&
       patch.headCamera === undefined &&
       patch.headTargetSizeMm === undefined &&
       patch.ringDiameterMm === undefined
@@ -238,6 +253,8 @@ function sanitized(settings: CalibrationSettings): CalibrationSettings {
     powerPercent: Math.min(100, atLeast(settings.powerPercent, 0, d.powerPercent)),
     speedMmPerMin: settings.speedMmPerMin > 0 ? settings.speedMmPerMin : d.speedMmPerMin,
     marginMm: atLeast(settings.marginMm, 0, d.marginMm),
+    sheetWidthMm: positiveOr(settings.sheetWidthMm, d.sheetWidthMm),
+    sheetHeightMm: positiveOr(settings.sheetHeightMm, d.sheetHeightMm),
     headCamera: settings.headCamera,
     headTargetSizeMm:
       settings.headTargetSizeMm > 0 && Number.isFinite(settings.headTargetSizeMm)
@@ -248,6 +265,10 @@ function sanitized(settings: CalibrationSettings): CalibrationSettings {
         ? settings.ringDiameterMm
         : d.ringDiameterMm,
   };
+}
+
+function positiveOr(value: number, fallback: number): number {
+  return value > 0 && Number.isFinite(value) ? value : fallback;
 }
 
 function atLeast(value: number, min: number, fallback: number): number {

@@ -81,10 +81,21 @@ export type BedCalibrationFailure =
       readonly ringDiameterPx: number;
     };
 
-// Rings the matcher found this share of the target, or better, may fit up to
-// four distortion terms; fewer fit the two dominant ones at most. Either way
-// the fit keeps only the terms the rings pin down (fitDeterminedLens).
-const FULL_DISTORTION_MIN_MARKS = 30;
+// From this many rings the fit may use up to four distortion terms; fewer fit
+// the two dominant ones at most. Either way the fit keeps only the terms the
+// rings pin down (fitDeterminedLens). At 30 to 49 rings on a part-bed sheet,
+// four terms passed the two-sigma test on the rings yet bent the picture by
+// 43 to 135 mm past them, where one or two terms stayed within 2 mm
+// (ADR-441 Amendment 8).
+const FULL_DISTORTION_MIN_MARKS = 60;
+// Below this only the first term: at 30 rings two terms still bent the
+// picture 17 mm past a 250 x 200 mm sheet (ADR-441 Amendment 8).
+const TWO_TERM_MIN_MARKS = 40;
+
+function distortionTermsFor(rings: number): 1 | 2 | 4 {
+  if (rings >= FULL_DISTORTION_MIN_MARKS) return 4;
+  return rings >= TWO_TERM_MIN_MARKS ? 2 : 1;
+}
 // 2 % of the width on the rings' noise scale: what the 8 % applied unscaled
 // used to weigh (ADR-441 Amendment 7).
 const PRINCIPAL_POINT_SIGMA_SHARE = 0.02;
@@ -167,7 +178,7 @@ type TargetFit =
 function fitTargetPoints(input: BedCalibrationInput, points: ObservedView['points']): TargetFit {
   const { width, height: imageHeight } = input.frame;
   const measured = input.measuredCameraHeightMm;
-  const fitWith = (distortionTerms: 2 | 4) =>
+  const fitWith = (distortionTerms: 1 | 2 | 4) =>
     fitDeterminedLens([{ points }], {
       imageWidth: width,
       imageHeight,
@@ -178,7 +189,7 @@ function fitTargetPoints(input: BedCalibrationInput, points: ObservedView['point
         ? {}
         : { cameraHeightPrior: { heightMm: measured, sigmaMm: MEASURED_HEIGHT_SIGMA_MM } }),
     });
-  const first = fitWith(points.length >= FULL_DISTORTION_MIN_MARKS ? 4 : 2);
+  const first = fitWith(distortionTermsFor(points.length));
   if (first.kind === 'failed') return first;
   // One flat target seen square-on cannot fix the focal length (Sturm and
   // Maybank 1999), so the photo leaves the camera height loose. Then the
@@ -188,7 +199,7 @@ function fitTargetPoints(input: BedCalibrationInput, points: ObservedView['point
     measured === undefined &&
     first.cameraHeightSigmaMm > UNDETERMINED_HEIGHT_SIGMA_MM &&
     first.lens.distortion.some((term, index) => index >= 2 && term !== 0);
-  const fit = loose ? fitWith(2) : first;
+  const fit = loose ? fitWith(distortionTermsFor(points.length) === 1 ? 1 : 2) : first;
   if (fit.kind === 'failed') return fit;
   // The two-term refit pins the height only by leaving terms out; the
   // looseness the photo really left is the full fit's.

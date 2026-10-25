@@ -70,13 +70,22 @@ export function rememberedLayoutSettings(device: Pick<DeviceProfile, 'profileId'
   readonly marginMm?: number;
   readonly headTargetSizeMm?: number;
   readonly ringDiameterMm?: number;
+  readonly sheetWidthMm?: number;
+  readonly sheetHeightMm?: number;
 } {
   const bed = rememberedEngravedTarget(device, false);
   const head = rememberedEngravedTarget(device, true);
   // The fixed camera's ring size: the one a recalibration most likely reuses.
   const ring = bed?.ringDiameterMm ?? (bed === null ? undefined : DEFAULT_RING_DIAMETER_MM);
+  // The sheet the area came from: the area plus its margin on each side.
+  // A target remembered before sheet sizes covered the whole bed.
+  const sheet =
+    bed === null
+      ? null
+      : { width: bed.area.width + 2 * bed.layoutMm, height: bed.area.height + 2 * bed.layoutMm };
   return {
     ...(bed === null ? {} : { marginMm: bed.layoutMm }),
+    ...(sheet === null ? {} : { sheetWidthMm: sheet.width, sheetHeightMm: sheet.height }),
     ...(head === null ? {} : { headTargetSizeMm: head.layoutMm }),
     ...(ring === undefined ? {} : { ringDiameterMm: ring }),
   };

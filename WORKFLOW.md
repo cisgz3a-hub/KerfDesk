@@ -8483,8 +8483,10 @@ as the pane's design record.
   finest bed millimetres per pixel, flagged above 0.5 mm. It is advice; Next is always offered.
   The next three steps are the target, the photo and the result below. In Camera settings,
   **Recalibrate…** opens at the target and **Check camera…** at the photo.
-- **Success / calibrated.** On the target step the operator covers the bed with one flat sheet,
-  enters its thickness and, optionally (under **Engrave settings**, with power, speed and margin),
+- **Success / calibrated.** On the target step the operator puts one flat sheet in the middle of
+  the bed and enters its size (**Sheet width** and **Sheet height**, 300 × 200 mm by default, about
+  A4; ADR-441 Amendment 8) and thickness and, optionally (under **Engrave settings**, with power,
+  speed and margin),
   the camera lens height by tape measure, and presses **Engrave target**: the ring target streams as a temporary job through the
   normal Frame, review and Start path, leaving the project and undo history untouched. When the
   job finishes the wizard moves to the photo. The operator moves the head clear of the three solid

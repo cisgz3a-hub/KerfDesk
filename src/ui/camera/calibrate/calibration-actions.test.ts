@@ -33,7 +33,14 @@ vi.mock('../frame-source', async (original) => ({
 }));
 
 const BED = 400;
-const SETTINGS = { ...DEFAULT_CALIBRATION_SETTINGS, sheetThicknessMm: 3, marginMm: 5 };
+// A sheet covering the whole 400 mm bed, as the rendered photo shows.
+const SETTINGS = {
+  ...DEFAULT_CALIBRATION_SETTINGS,
+  sheetThicknessMm: 3,
+  marginMm: 5,
+  sheetWidthMm: BED,
+  sheetHeightMm: BED,
+};
 const source: ActiveCameraSource = {
   kind: 'usb',
   stream: {

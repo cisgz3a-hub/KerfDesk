@@ -65,13 +65,27 @@ export function targetAreaForBed(
   };
 }
 
-/** Where the calibration target goes: the whole bed, or a head camera's small square. */
+/**
+ * Where the calibration target goes: the operator's sheet in the middle of
+ * the bed, inside its margin (ADR-441 Amendment 8), or a head camera's small
+ * square. A sheet larger than the bed covers the whole bed.
+ */
 export function calibrationTargetArea(
   bedWidthMm: number,
   bedHeightMm: number,
-  settings: Pick<CalibrationSettings, 'marginMm' | 'headCamera' | 'headTargetSizeMm'>,
+  settings: Pick<CalibrationSettings, 'marginMm' | 'headCamera' | 'headTargetSizeMm'> &
+    Partial<Pick<CalibrationSettings, 'sheetWidthMm' | 'sheetHeightMm'>>,
 ): BedTargetArea {
-  if (!settings.headCamera) return targetAreaForBed(bedWidthMm, bedHeightMm, settings.marginMm);
+  if (!settings.headCamera) {
+    const sheetWidth = Math.min(settings.sheetWidthMm ?? bedWidthMm, bedWidthMm);
+    const sheetHeight = Math.min(settings.sheetHeightMm ?? bedHeightMm, bedHeightMm);
+    const onSheet = targetAreaForBed(sheetWidth, sheetHeight, settings.marginMm);
+    return {
+      ...onSheet,
+      x: onSheet.x + (bedWidthMm - sheetWidth) / 2,
+      y: onSheet.y + (bedHeightMm - sheetHeight) / 2,
+    };
+  }
   const size = Math.min(settings.headTargetSizeMm, bedWidthMm, bedHeightMm);
   return { x: (bedWidthMm - size) / 2, y: (bedHeightMm - size) / 2, width: size, height: size };
 }
