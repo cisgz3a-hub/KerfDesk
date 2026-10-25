@@ -1,12 +1,8 @@
 {
   "schemaVersion": 1,
-  "sinceSourceSha": "a9ad5080c14a642e73a0ff7d941dce6cdb8f9ac1",
+  "sinceSourceSha": "19ff6042a2f4d0ff41486efb6ee2592d9ce2a557",
   "highlights": [
-    "Camera calibration no longer labels the target's rings wrongly when some look solid in a small, dim or noisy photo; it says what to fix instead, and no longer reports a mirrored picture by mistake.",
-    "Calibration keeps only the lens terms the photo supports, so the camera picture stays closer to the burn at the bed's corners, outside the target's rings.",
-    "A camera looking straight down without a measured height is graded as lined up at the target sheet's height only, and asks for the camera height so other thicknesses line up.",
-    "The camera overlay no longer shows a folded copy of the picture where the camera cannot see. Camera setup adds Ring size for low-resolution cameras and names the size to use when rings are too small.",
-    "Camera setup can put the ring target on the canvas to engrave like any job, asks to home the machine first, and says when a calibration was made before the bed position was known.",
-    "Job Review warns when artwork is placed with the camera but Start from is not Absolute Coordinates, because the job would burn somewhere else."
+    "Camera setup engraves the calibration target on a sheet about A4 in size (300 × 200 mm by default) in the middle of the bed, instead of a board covering the whole bed. Enter your sheet's size on the Target step.",
+    "Calibration from a smaller target keeps the camera picture close to the burn across the rest of the bed, where it could previously be far out."
   ]
 }
