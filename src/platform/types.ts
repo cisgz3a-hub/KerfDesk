@@ -469,29 +469,23 @@ export type CameraBridgeStreamStatus =
   | { readonly kind: 'failed'; readonly reason: string }
   | { readonly kind: 'unavailable'; readonly reason: string };
 
-// A camera registered with the bridge's frame proxy: its address, which can
-// hold a login, went in a request body, and `frameUrl` names it by an id
-// (rolling audit v2 04-P2-1).
+// A camera registered with the bridge's frame proxy: its address (which can
+// hold a login) went in a body; `frameUrl` names it by an id (audit v2 04-P2-1).
 export type CameraBridgeFrameSource =
   | { readonly kind: 'ok'; readonly frameUrl: string }
-  | { readonly kind: 'invalid'; readonly reason: string }
-  | { readonly kind: 'unavailable'; readonly reason: string };
+  | { readonly kind: 'invalid' | 'unavailable'; readonly reason: string };
 
-/**
- * How the window reaches the camera bridge, asked afresh before each camera
- * request (ADR-141 Amendment 2).
- */
+// How the window reaches the camera bridge, asked before each camera request
+// (ADR-141 Amendment 2): an open development bridge taken on trust, this
+// launch's keys from main over app://app, or why main has no bridge running.
 export type CameraBridgeConnection =
-  /** Local development: a bridge with no keys, taken on trust. */
   | { readonly kind: 'open'; readonly origin: string }
-  /** The desktop app: this launch's keys, from main over app://app. */
   | {
       readonly kind: 'keyed';
       readonly origin: string;
       readonly proofKey: string;
       readonly clientToken: string;
     }
-  /** Main says the bridge is not running, and why. */
   | { readonly kind: 'unavailable'; readonly reason: string };
 
 export type CameraBridgeAdapter = {
@@ -500,9 +494,8 @@ export type CameraBridgeAdapter = {
   readonly rtspStreamStatus: (streamSessionId: string) => Promise<CameraBridgeStreamStatus>;
   // Probe the machine's snapshot camera server-side via the bridge (ADR-116).
   readonly discoverMachineCamera: () => Promise<MachineCameraDiscovery>;
-  // Register a camera with the bridge frame proxy. Responses from its frame
-  // URL carry CORS for this app origin, so frames fetched through it are
-  // pixel-readable.
+  // Register a camera with the bridge frame proxy. Its frame URL's responses
+  // carry CORS for this app origin, so frames are pixel-readable.
   readonly registerFrameSource: (cameraUrl: string) => Promise<CameraBridgeFrameSource>;
   readonly health: () => Promise<CameraBridgeHealth>;
 };
