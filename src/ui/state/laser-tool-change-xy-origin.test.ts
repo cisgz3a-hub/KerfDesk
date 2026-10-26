@@ -19,6 +19,7 @@ import { createProject } from '../../core/scene';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { cncControllerEpochOf, createCncSetupAttestation } from './cnc-setup-attestation';
 import { useLaserStore } from './laser-store';
+import { markProbeCircuitTested } from './probe-test-touch.test-support';
 import {
   TOOL_CHANGE_XY_ORIGIN_MESSAGE,
   toolChangeContinueBlockMessage,
@@ -152,6 +153,7 @@ async function reachDrainedHold(device: Device): Promise<void> {
 /** Runs a probe, reporting Idle until it settles (it needs two fresh reports). */
 async function probeAtIdle(device: Device, request: ProbeRequest): Promise<unknown> {
   let result: unknown = undefined;
+  markProbeCircuitTested();
   const pending = useLaserStore
     .getState()
     .probe(request)

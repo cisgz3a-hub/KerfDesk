@@ -9,6 +9,7 @@ import type {
 } from '../job/job';
 import { DEFAULT_CNC_LAYER_SETTINGS, type Scene } from '../scene';
 import type { CncCompilationEvidence } from './cnc-compilation-artifact';
+import type { CncStackedCopyMerge } from '../job/cnc-compilation-sidecar-types';
 import type { CncOpenContourOmissions } from './cnc-open-contour-omissions';
 import type { VCarveLadder } from './vcarve-plan';
 
@@ -63,6 +64,7 @@ export function buildCncCompilationSidecar(
   reliefPlans: ReadonlyArray<CncReliefPlanningEvidence>,
   offsetLadderDiagnostics: ReadonlyArray<CncOffsetLadderCompilationEvidence>,
   openContourOmissions: CncOpenContourOmissions,
+  mergedStackedCopies: ReadonlyArray<CncStackedCopyMerge> = [],
 ): CncCompilationSidecar {
   const exactOffsetDiagnostics = uniqueOffsetDiagnostics([
     ...offsetLadderDiagnostics,
@@ -88,6 +90,8 @@ export function buildCncCompilationSidecar(
     offsetLadderDiagnostics: exactOffsetDiagnostics,
     omittedOpenContours: openContourOmissions.counts,
     omittedOpenContourSources: openContourOmissions.sources,
+    // No legacy fallback reads this, so an absent field simply means none.
+    ...(mergedStackedCopies.length === 0 ? {} : { mergedStackedCopies }),
   };
 }
 

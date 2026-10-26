@@ -34,6 +34,8 @@ import type {
   CncOpenContourOmissionSource,
 } from '../job/cnc-compilation-sidecar-types';
 import { cncOpenContourOmissions } from './cnc-open-contour-omissions';
+import { cncStackedCopyMerges } from './cnc-stacked-copies';
+import type { CncStackedCopyMerge } from '../job/cnc-compilation-sidecar-types';
 import type { ReliefMaterializationFailure } from '../relief/relief-materialization-failure';
 import { isProfileCutType } from './compile-cnc-helpers';
 import { compileReliefGroupsForLayer } from './compile-cnc-relief';
@@ -148,6 +150,7 @@ function compileCncSnapshot(
   const reliefPlans: CncReliefPlanningEvidence[] = [];
   const omittedOpenContours: CncOpenContourOmission[] = [];
   const omittedOpenContourSources: CncOpenContourOmissionSource[] = [];
+  const mergedStackedCopies: CncStackedCopyMerge[] = [];
   const sourceObjects = scene.objects;
   const allSourceObjects = [...sourceObjects, ...(scene.outputDependencies ?? [])];
   const runs = artworkOperationRuns(scene);
@@ -172,6 +175,7 @@ function compileCncSnapshot(
     reliefPlans.push(...operation.reliefPlans);
     omittedOpenContours.push(...operation.openContourOmissions.counts);
     omittedOpenContourSources.push(...operation.openContourOmissions.sources);
+    mergedStackedCopies.push(...operation.stackedCopyMerges);
     offsetLadderDiagnostics.push(...operation.offsetLadderDiagnostics);
     if (operation.stepoverOperation !== undefined) {
       stepoverOperations.push(operation.stepoverOperation);
@@ -187,6 +191,7 @@ function compileCncSnapshot(
     reliefPlans,
     offsetLadderDiagnostics,
     { counts: omittedOpenContours, sources: omittedOpenContourSources },
+    mergedStackedCopies,
   );
   return {
     kind: 'compiled',
@@ -246,6 +251,7 @@ function compileCncOperation(
     ],
     profileGroups: vectorGroups.profileGroups,
     openContourOmissions: cncOpenContourOmissions(layer, contours),
+    stackedCopyMerges: cncStackedCopyMerges(layer, contours),
     reliefPlans: relief.evidence.plans,
     offsetLadderDiagnostics: [
       ...vectorGroups.offsetLadderDiagnostics,

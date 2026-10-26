@@ -82,6 +82,9 @@ export type PreflightCode =
   | 'cnc-layer-empty'
   // Advisory-only: exact open contours omitted by closed-only CNC operations.
   | 'cnc-open-contours-omitted'
+  // Advisory-only (ADR-359 Amendment 3): exact stacked copies of a closed
+  // outline on a filled CNC cut were merged and cut once.
+  | 'cnc-stacked-copies-merged'
   | 'plunged-travel'
   | 'spindle-start-before-clearance'
   | 'relief-needs-cnc'

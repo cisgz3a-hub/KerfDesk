@@ -9,6 +9,11 @@ import { activeCncTool } from '../../core/scene';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { describeProbeResult } from '../state/probe-actions';
+import {
+  probeCircuitBlockReason,
+  probeCircuitCheck,
+  type ProbeCircuitCheck,
+} from '../state/probe-test-touch';
 import { useToastStore } from '../state/toast-store';
 import {
   CornerProbeGeometryFields,
@@ -50,9 +55,7 @@ export function ProbeControls(): JSX.Element | null {
   const contextKey = useProbeFormContextKey();
   const machine = project.machine;
   const probingSupported = useLaserStore((s) => s.capabilities.probing);
-  const connection = useLaserStore((s) => s.connection);
-  const statusReport = useLaserStore((s) => s.statusReport);
-  const probeBusy = useLaserStore((s) => s.probeBusy);
+  const live = useProbeLiveState();
   const toolChangeHold = useLaserStore((s) => s.streamer?.status === 'tool-change');
   const probe = useLaserStore((s) => s.probe);
   const pushToast = useToastStore((s) => s.pushToast);
@@ -93,12 +96,7 @@ export function ProbeControls(): JSX.Element | null {
   // draft keeps its mode for after the job (ADR-375 Amendment 3).
   const mode: ProbeMode = toolChangeHold ? 'z' : form.mode;
   const toolSupported = mode !== 'corner' || effectiveTool.kind === 'end-mill';
-  const readiness = probeControlReadiness({
-    isConnected: connection.kind === 'connected',
-    isIdle: statusReport?.state === 'Idle',
-    isBusy: probeBusy,
-    toolSupported,
-  });
+  const readiness = probeControlReadiness({ ...live, toolSupported });
 
   const run = (): void => {
     const request = buildProbeRequest({
@@ -121,6 +119,7 @@ export function ProbeControls(): JSX.Element | null {
         {probeHint(mode, toolChangeHold)}
         {' Spindle must be off.'}
       </p>
+      <ProbeCircuitLine />
       <ProbeFields
         key={contextKey}
         mode={mode}
@@ -136,7 +135,7 @@ export function ProbeControls(): JSX.Element | null {
         onCornerGeometry={(value) => setCornerGeometry(contextKey, value)}
       />
       <button type="button" onClick={run} disabled={!readiness.ready} title={readiness.title}>
-        {probeButtonLabel(probeBusy)}
+        {probeButtonLabel(live.isBusy)}
       </button>
     </>
   );
@@ -149,24 +148,70 @@ function useProbeFormContextKey(): string {
   );
 }
 
-function probeControlReadiness(input: {
+type ProbeLiveState = {
   readonly isConnected: boolean;
   readonly isIdle: boolean;
   readonly isBusy: boolean;
-  readonly toolSupported: boolean;
-}): { readonly ready: boolean; readonly title: string } {
+  /** Why the probe circuit is not tested yet, or null (ADR-103 Amendment 2). */
+  readonly circuitBlock: string | null;
+};
+
+function useProbeLiveState(): ProbeLiveState {
+  const isConnected = useLaserStore((s) => s.connection.kind === 'connected');
+  const isIdle = useLaserStore((s) => s.statusReport?.state === 'Idle');
+  const isBusy = useLaserStore((s) => s.probeBusy);
+  const circuitBlock = useLaserStore(probeCircuitBlockReason);
+  return { isConnected, isIdle, isBusy, circuitBlock };
+}
+
+/** The live probe input and its test touch (ADR-103 Amendment 2). */
+function ProbeCircuitLine(): JSX.Element | null {
+  const circuit = useLaserStore(probeCircuitCheck);
+  const shown = useLaserStore((s) => s.connection.kind === 'connected' && !s.probeBusy);
+  if (!shown) return null;
+  return (
+    <p role="status" aria-label="Probe circuit" style={circuitStyle(circuit)}>
+      {probeCircuitLine(circuit)}
+    </p>
+  );
+}
+
+function probeControlReadiness(input: ProbeLiveState & { readonly toolSupported: boolean }): {
+  readonly ready: boolean;
+  readonly title: string;
+} {
   if (!input.toolSupported) {
     return {
       ready: false,
       title: 'XYZ corner probing requires a cylindrical end mill with a straight flank.',
     };
   }
-  const ready = input.isConnected && input.isIdle && !input.isBusy;
+  if (!input.isConnected || !input.isIdle || input.isBusy) {
+    return { ready: false, title: 'Connect and wait for Idle before probing.' };
+  }
+  if (input.circuitBlock !== null) return { ready: false, title: input.circuitBlock };
   return {
-    ready,
-    title: ready
-      ? 'Start the probing cycle. The bit moves toward the plate at the seek feed.'
-      : 'Connect and wait for Idle before probing.',
+    ready: true,
+    title: 'Start the probing cycle. The bit moves toward the plate at the seek feed.',
+  };
+}
+
+function probeCircuitLine(circuit: ProbeCircuitCheck): string {
+  switch (circuit) {
+    case 'untested':
+      return 'Probe circuit: not tested. Hold the plate against the bit until this reads closed, then take it away.';
+    case 'closed':
+      return 'Probe circuit: closed. Take the plate away from the bit.';
+    case 'tested':
+      return 'Probe circuit: tested. Place the plate, then Run probe.';
+  }
+}
+
+function circuitStyle(circuit: ProbeCircuitCheck): React.CSSProperties {
+  return {
+    ...hintStyle,
+    color: circuit === 'tested' ? 'var(--lf-success-fg)' : 'var(--lf-text)',
+    fontWeight: circuit === 'tested' ? 400 : 600,
   };
 }
 

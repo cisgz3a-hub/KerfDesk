@@ -18,6 +18,7 @@ import { DEFAULT_Z_PROBE_PARAMS, type ProbeRequest } from '../../core/controller
 import { resolveJobPlacement } from '../job-placement';
 import { disconnectOnTestClock } from './laser-disconnect-testing';
 import { useLaserStore } from './laser-store';
+import { markProbeCircuitTested } from './probe-test-touch.test-support';
 import { resetStore } from './test-helpers';
 
 const USER_ORIGIN = { startFrom: 'user-origin', anchor: 'front-left' } as const;
@@ -94,6 +95,7 @@ describe('a failed probe keeps the Set origin (M-1)', () => {
   it.each([4, 5] as const)('a Z touch-off that fails with ALARM:%i, then Unlock', async (code) => {
     const sim = await connectWithSetOrigin({ probeFailure: code });
 
+    markProbeCircuitTested();
     await expect(settle(useLaserStore.getState().probe(Z_REQUEST))).resolves.toEqual({
       kind: 'probe-failed',
       alarmCode: code,
