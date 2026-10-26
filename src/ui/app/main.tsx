@@ -15,12 +15,14 @@ import {
   createDesktopSerialAdapter,
   createDesktopMachineNetwork,
   createDesktopAiAssistant,
+  desktopCameraBridgeConnection,
   createDesktopSupportLogReader,
   createDesktopWindowCommands,
   isElectronRenderer,
 } from '../../platform/electron';
 import type { PlatformAdapter } from '../../platform/types';
 import { webAdapter } from '../../platform/web';
+import { createHttpCameraBridge } from '../../platform/web/camera-bridge';
 import { ErrorBoundary } from '../common/ErrorBoundary';
 // Design tokens + shared chrome classes (ADR-047). Imported exactly once,
 // here — jsdom tests never load main.tsx, so styling stays out of unit tests.
@@ -64,7 +66,8 @@ const adapter: PlatformAdapter = isElectronRenderer()
         handleSaveTarget: webAdapter.openedProjectSaveTarget,
       }),
       // The main process serves its support log (ADR-546), takes job reports
-      // (ADR-548) and runs File > Exit (ADR-554) only on app://.
+      // (ADR-548), runs File > Exit (ADR-554) and hands over the camera
+      // bridge's keys (ADR-141 Amendment 2) only on app://.
       ...(window.location.protocol === 'app:'
         ? {
             readSupportLog: createDesktopSupportLogReader(),
@@ -72,6 +75,7 @@ const adapter: PlatformAdapter = isElectronRenderer()
             desktopWindow: createDesktopWindowCommands(),
             aiAssistant: createDesktopAiAssistant(),
             machineNetwork: createDesktopMachineNetwork(),
+            cameraBridge: createHttpCameraBridge(() => desktopCameraBridgeConnection()),
           }
         : {}),
     }

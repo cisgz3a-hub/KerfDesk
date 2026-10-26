@@ -8653,6 +8653,13 @@ as the pane's design record.
   native-frame change the camera picture is moved to match, and the calibration row says on what
   bed it was made and how far it moved. After an origin change the camera is not used: the Camera
   panel says "Calibrate the camera again, or set the origin back".
+- **Edge / calibration saved without its bed frame (ADR-440 Amendment 4).** A calibration from
+  KerfDesk 1.0.21 or earlier recorded no bed frame, so it is not used until the operator says
+  which frame it belongs to. The Camera panel names the origin and bed size Machine Setup has now
+  and offers **Confirm bed and origin**, which records them on the calibration (one undo step, no
+  Pro needed). If either has changed since the calibration, the panel says to calibrate again.
+  **Check camera…** opens setup for such a calibration instead of checking it in today's frame,
+  and the saved calibration stays as it is.
 
 ### F-CAM3. Corrected camera overlay (ADR-440, ADR-441 Amendment 2)
 
@@ -8735,6 +8742,13 @@ as the pane's design record.
   are pointed to the bridge command; the desktop app starts it automatically.
   Hosted web builds cannot call the loopback network-camera bridge and support
   USB cameras only (ADR-141).
+- **Error / another program on the bridge's port (ADR-141 Amendment 2).** The desktop app checks
+  that whatever answers on `127.0.0.1:51731` is the bridge it started, with a fresh challenge
+  signed by this launch's key, before it sends any camera address or login. When the bridge could
+  not start because the port is taken, or Windows set it aside, the camera panel says so and what
+  to do; the next connect tries again. A program that answers without the proof gets nothing more,
+  and the panel says another program is answering on the port. Camera addresses go to the bridge
+  in request bodies, never in URLs.
 - **Error / RTSP preview interrupted.** Each probe creates an unguessable bridge-owned stream
   session shared by every view of that exact source. The renderer polls its status because
   Chromium does not reliably emit `<img>` error after an established MJPEG socket dies.
