@@ -1,4 +1,5 @@
 import type { CncOpenContourOmissions } from './cnc-open-contour-omissions';
+import type { CncStackedCopyMerge } from '../job/cnc-compilation-sidecar-types';
 import type {
   CncGroup,
   CncOffsetLadderCompilationEvidence,
@@ -7,6 +8,7 @@ import type {
 } from '../job/job';
 export type CompiledCncOperation = {
   readonly openContourOmissions: CncOpenContourOmissions;
+  readonly stackedCopyMerges: ReadonlyArray<CncStackedCopyMerge>;
   readonly kind: 'compiled';
   readonly layerId: string;
   readonly clearingGroups: ReadonlyArray<CncGroup>;

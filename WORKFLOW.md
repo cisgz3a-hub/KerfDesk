@@ -697,6 +697,11 @@ the linked artwork.
    drawn the other way, count. Copies on another operation, or with another power scale,
    override or tabs placed by hand (CNC or laser), are kept. Locked artwork, image masks and
    path-text guides are never deleted.
+   On CNC, an exact copy of a closed outline left on a profile, pocket, V-carve or inlay
+   operation would cancel its original under the even-odd fill, so neither would be cut. The
+   compile cuts such copies once, by the same rule as this tool, also for a path an SVG draws
+   twice. Job Review then says how many copies were cut once, as a warning. On path, engrave
+   and drill keep every copy, since each is cut again (ADR-359 Amendment 3).
 5. **Tools → Image → Flatten Image Mask** bakes the mask into the selected image and crops it, as
    **Crop Image** does, then deletes the mask shape. The shape stays when it is locked or another
    image or path text uses it; the notice says which.
