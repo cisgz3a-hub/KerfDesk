@@ -48,6 +48,15 @@ Each area runs the lenses that apply to it. Lenses are run as separate, independ
   failure scenario.
 - **P3.** Latent (not reachable today), doc/code drift, missing test, or polish.
 
+**Clarification (2026-10-23, meta audit v1 M2/M3).** The P1 test has no reach clause.
+
+- **When it is P1.** A defect that is reachable today and silently produces wrong physical output is P1, however few users meet it. Wrong physical output means power, position, depth or scale. Examples of narrow reach: a setting that is off by default, a rare `$30`, or an unusual firmware build.
+- **What reach can do.** Reach can only lower a finding to P3, and only when the defect is not reachable today. In that case it is latent.
+- **Why this was added.** Refuters kept P1-by-effect findings at P2 because of narrow reach four times: 03-P2-4, C6-P2-2, D3-P2-1 and D4-P2-1. The meta audit corrected all four.
+- **What a refuter must do instead.** A refuter that wants to lower a P1 must show either:
+  - that the output is not wrong, or
+  - that a clear warning reaches the operator before the output is produced.
+
 ## 4. Evidence bar
 
 Every finding records:
@@ -63,6 +72,19 @@ Every finding records:
 
 A READ-only finding cannot be P1 unless the refuter reproduces it. Severity is set by the
 failure scenario, not by how alarming the code looks.
+
+**Citation rule (2026-10-23, meta audit v1 M5).** Every SOURCE link must be pinned so it can be re-checked later. Use one of:
+- a commit SHA (`blob/<sha>/path#Lx-Ly`);
+- a versioned docs path;
+- a live URL plus an archive link and the fetch date.
+
+Quoted text must be copied verbatim from that source.
+
+ADR quotes must come from `DECISIONS.md` or `docs/decisions` at the audited SHA, and must name the ADR, the amendment and the item. A code comment or README that mentions an ADR is cited as its own `file:line`, never as ADR text.
+
+A refuter that cannot fetch a source marks that anchor UNVERIFIED rather than confirming it.
+
+Why: M5 re-checked 123 citations and found that the firmware, LightBurn and vendor sources were accurate. The faults were all in KerfDesk's own ADR quotes, most of them code comments quoted as ADR text. Several citations also used unpinned "master" or "latest" refs or gave no URL.
 
 ## 5. Verification (the refuter)
 
