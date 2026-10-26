@@ -3,10 +3,12 @@
 // (M3) output never makes the controller drain its planner while the beam is
 // still lit mid-job. Covers the Neotronics 4040 profile, whose compile adds
 // ADR-239 contour entry runways and controlled laser-off travel, and the
-// grbl-compatible dialect. The oracle is grbl-lit-drain-checker.ts.
+// grbl-compatible dialect. The oracle is grbl-lit-drain-checker.ts, and
+// marlin-lit-drain-checker.ts for the Marlin inline and fan dialects.
 
 import { describe, expect, it } from 'vitest';
 import { findM3LitPlannerDrains } from '../../__fixtures__/controllers/grbl-lit-drain-checker';
+import { findMarlinLitPlannerDrains } from '../../__fixtures__/controllers/marlin-lit-drain-checker';
 import {
   DEFAULT_DEVICE_PROFILE,
   NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
@@ -107,6 +109,27 @@ describe('OR-1 through emitGcode: no mid-job drain with an M3 beam lit', () => {
       expect(gcode).toMatch(/^M8$/m);
       expect(gcode).toMatch(/^M9$/m);
       expect(findM3LitPlannerDrains(gcode)).toEqual([]);
+    }
+  });
+});
+
+// ADR-398 Amendment 1 (audit 2026-10-21, 03-P2-2): Marlin runs every burn as
+// continuous power, so the same projects must not drain lit there either.
+describe('OR-1 through emitGcode on Marlin: no drain with the beam lit', () => {
+  it.each([['marlin-inline' as const], ['marlin-fan' as const]])('%s', (dialectId) => {
+    const device: DeviceProfile = {
+      ...DEFAULT_DEVICE_PROFILE,
+      controllerKind: 'marlin',
+      maxPowerS: 255,
+      airAssistCommand: 'M8',
+      gcodeDialect: { dialectId },
+    };
+    for (const project of [lineProject(device), fillProject(device)]) {
+      const { gcode, preflight } = emitGcode(project);
+      expect(preflight.ok).toBe(true);
+      expect(gcode).toMatch(/^M8$/m);
+      expect(gcode).toMatch(/^M9$/m);
+      expect(findMarlinLitPlannerDrains(gcode)).toEqual([]);
     }
   });
 });

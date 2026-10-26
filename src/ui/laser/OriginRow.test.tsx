@@ -375,7 +375,7 @@ describe('OriginRow Set-origin attention pulse (ADR-327)', () => {
   });
 });
 
-// ADR-648 (audit CS-05): stock Marlin compiles no G92.1, so Reset origin is a
+// ADR-672 (audit CS-05): stock Marlin compiles no G92.1, so Reset origin is a
 // G92 to the recorded machine position, offered only while KerfDesk knows it.
 describe('OriginRow Reset origin on Marlin', () => {
   const grblCapabilities = useLaserStore.getState().capabilities;

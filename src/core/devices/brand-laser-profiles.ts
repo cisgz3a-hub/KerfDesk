@@ -1,8 +1,10 @@
+import { GRBLHAL_DEFAULT_RX_BUFFER_BYTES } from '../grbl-streaming';
 import {
   DEFAULT_DEVICE_PROFILE,
   type DeviceProfile,
   type LaserSubProfile,
   type ProfileCapability,
+  type ProfileEvidence,
 } from './device-profile';
 
 const LASER_CAPABILITIES: ReadonlyArray<ProfileCapability> = [
@@ -149,10 +151,20 @@ export const SCULPFUN_S30_MANUAL_AIR_PROFILE: DeviceProfile = {
   ],
 };
 
+// Firmware family corrected on this date (controller audit v2 C7-P2-2, ADR-660).
+const ORTUR_GRBLHAL_AT = '2026-10-22';
+const ORTUR_LM3_MANUAL =
+  'https://github.com/Ortur-Tech/Ortur_Laser_Master_3/blob/main/4-User%20Manual%20in%20Ten%20Languages-V1.1/1-OLM3%20User%20Manual%20-%20English.PDF';
+const ORTUR_FIRMWARE_EVIDENCE: ProfileEvidence = {
+  label: 'Ortur Laser Master 3 firmware family',
+  status: 'public-spec-starter',
+  note: `The LM3 runs Ortur Laser Firmware (OLF) 2.x, built on grblHAL for its ESP32-S2 mainboard. Ortur's LM3 user manual sets Wi-Fi with "$74=WiFi name" and "$75=WiFi password", which are grblHAL settings 74 and 75 and do not exist in stock GRBL 1.1. LM3 owners' startup reports read "GrblHAL 1.1f", [FIRMWARE:grblHAL], [DRIVER:ESP32-S2] and [BOARD:Ortur Laser Master 3] with OLF 205 (2022) and OLF 211 (2024, LU3-20A head). The profile therefore uses the grblHAL driver. Not hardware-tested. Sources checked ${ORTUR_GRBLHAL_AT}: ${ORTUR_LM3_MANUAL} (sections 7.2 and 7.3), https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/settings.h , https://forum.lightburnsoftware.com/t/ortur-lm3-not-connecting-with-either-wifi-or-usb/76960 , https://forum.lightburnsoftware.com/t/lu3-20a-firmware/136461`,
+};
+
 function orturProfile(power: 10 | 20 | 40): DeviceProfile {
   const head = power === 10 ? 'LU2-10A' : `LU3-${power}A`;
   const bedHeight = power === 10 ? 400 : 380;
-  return diodeProfile({
+  const profile = diodeProfile({
     // Existing saved 400 x 400 profiles keep their ID and their 10 W scope.
     profileId: power === 10 ? 'ortur-laser-master-3' : `ortur-laser-master-3-${power}w`,
     vendor: 'Ortur',
@@ -164,6 +176,19 @@ function orturProfile(power: 10 | 20 | 40): DeviceProfile {
     source: 'https://ortur.net/pages/support-olm3',
     note: `${head}: 400 x ${bedHeight} mm; published S maximum 1000 and default baud 115200. The app feed ceiling is a conservative starter, not the manufacturer's maximum.`,
   });
+  return {
+    ...profile,
+    // The firmware is on the LM3 mainboard, not the head, so all three heads
+    // take it. The grblHAL driver clears the error grblHAL latches after a
+    // refused line and leaves $N= values to the firmware; the stock GRBL driver
+    // did neither.
+    catalogVersion: ORTUR_GRBLHAL_AT,
+    controllerKind: 'grblhal',
+    // The grblHAL starter's window. Start bounds it by the controller's own
+    // Bf: report and falls back to the stock window without one (ADR-331).
+    rxBufferBytes: GRBLHAL_DEFAULT_RX_BUFFER_BYTES,
+    evidence: [...(profile.evidence ?? []), ORTUR_FIRMWARE_EVIDENCE],
+  };
 }
 
 export const ORTUR_LASER_MASTER_3_PROFILES: ReadonlyArray<DeviceProfile> = [

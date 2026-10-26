@@ -1,5 +1,6 @@
 import { buildCncToolPrograms, type CncToolProgram } from '../../io/cnc/cnc-tool-programs';
 import { cncProgramReachWarnings } from '../../io/cnc/cnc-program-reach';
+import { cncToolSectionMaximumDepthsMm } from '../../core/cnc/output-representation';
 import { cncProgramFacts, type CncProgramFacts } from '../../io/cnc/cnc-program-facts';
 import { emitPreparedGcode, type EmitGcodeOptions, type PreparedOutput } from '../../io/gcode';
 import type { PreflightResult } from '../../core/preflight';
@@ -96,6 +97,7 @@ export function emitSavePreparedOutput(
         prepared.project,
         emitted.gcode,
         artifacts.cncProgramFacts?.toolPlan,
+        cncToolSectionMaximumDepthsMm(prepared.job),
       ),
     ],
     placement: {

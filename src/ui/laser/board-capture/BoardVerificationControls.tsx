@@ -1,6 +1,5 @@
 import {
-  CIRCLE_BOARD_VERIFICATION_ANCHORS,
-  RECTANGLE_BOARD_VERIFICATION_ANCHORS,
+  boardVerificationTargets,
   type BoardVerificationTarget,
   type CapturedBoardGeometry,
 } from '../../../core/scene/board-verification';
@@ -16,7 +15,7 @@ export function BoardVerificationControls(props: {
   readonly disabled: boolean;
   readonly controller: BoardVerificationController;
 }): JSX.Element {
-  const targets = verificationTargets(props.geometry);
+  const targets = boardVerificationTargets(props.geometry);
   const active = props.controller.activeTarget;
   const checksDisabled = props.disabled || !props.controller.epochValid || active !== null;
 
@@ -29,7 +28,7 @@ export function BoardVerificationControls(props: {
       <div aria-label="Board check points" role="group" style={buttonRowStyle}>
         {targets.map((target) => (
           <Button
-            key={target.anchor}
+            key={targetKey(target)}
             disabled={checksDisabled}
             title={`Move the laser head beam-off to the ${boardVerificationTargetLabel(target).toLowerCase()}`}
             onClick={() => props.controller.selectTarget(target)}
@@ -45,11 +44,13 @@ export function BoardVerificationControls(props: {
         </p>
       )}
       {active !== null && (
-        <ActiveVerification
-          target={active}
-          disabled={props.disabled}
-          controller={props.controller}
-        />
+        <div data-board-active-check>
+          <ActiveVerification
+            target={active}
+            disabled={props.disabled}
+            controller={props.controller}
+          />
+        </div>
       )}
       <div aria-live="polite" aria-atomic="true" style={liveRegionStyle}>
         {props.controller.error ?? props.controller.feedback}
@@ -144,15 +145,8 @@ function SavingVerification({ label }: { readonly label: string }): JSX.Element 
   );
 }
 
-function verificationTargets(
-  geometry: CapturedBoardGeometry,
-): ReadonlyArray<BoardVerificationTarget> {
-  return geometry.kind === 'rect'
-    ? RECTANGLE_BOARD_VERIFICATION_ANCHORS.map((anchor) => ({ kind: 'rect', anchor }))
-    : CIRCLE_BOARD_VERIFICATION_ANCHORS.map((anchor) => ({ kind: 'circle', anchor }));
-}
-
 function shortTargetLabel(target: BoardVerificationTarget): string {
+  if (target.kind === 'outline') return `Anchor ${target.ordinal}`;
   switch (target.anchor) {
     case 'bottom-left':
       return 'Btm-left';
@@ -173,6 +167,10 @@ function shortTargetLabel(target: BoardVerificationTarget): string {
     case 'rim-left':
       return 'Left rim';
   }
+}
+
+function targetKey(target: BoardVerificationTarget): string {
+  return target.kind === 'outline' ? `outline:${target.index}` : `${target.kind}:${target.anchor}`;
 }
 
 const sectionStyle: React.CSSProperties = {

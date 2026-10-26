@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, type MutableRefObject } from 'react';
 import { profileSupportsCapability, type LaserFireControl } from '../../core/devices';
 import { machineKindOf, type Project } from '../../core/scene';
 import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
+import { laserDotLit } from '../state/laser-dot-light';
 import { useLaserStore, type LaserState } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { useStore } from '../state/store';
@@ -72,9 +73,13 @@ function useMomentaryRelease(setFireActive: LaserState['setFireActive']): {
   const release = useCallback(() => {
     if (releasePending.current) return;
     const current = useLaserStore.getState();
+    // The Falcon's laser dot holds the same latch without this button: a
+    // stray release must not put it out (LED off, LASER OFF and its timer do).
     if (
       !held.current &&
-      (!current.fireActive || current.controllerOperation?.kind === 'job-start-mark')
+      (!current.fireActive ||
+        current.controllerOperation?.kind === 'job-start-mark' ||
+        laserDotLit(current))
     )
       return;
     held.current = false;

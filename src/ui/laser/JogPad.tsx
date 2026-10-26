@@ -7,7 +7,7 @@
 // keys while it is mounted: PageUp/PageDown for Z focus, and LightBurn's XY
 // keys (ADR-493), which send the same step vector as the matching arrow.
 // While a step jog runs on a GRBL-family controller the arrows and XY keys stay
-// live for more steps, which join that jog (stepJogsOnly, ADR-648); hold, Z
+// live for more steps, which join that jog (stepJogsOnly, ADR-672); hold, Z
 // focus and the settings rows wait for it to finish.
 
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
@@ -133,7 +133,7 @@ export function JogPad({
   );
 }
 
-// A step press may join a running step jog (ADR-648); a hold never does.
+// A step press may join a running step jog (ADR-672); a hold never does.
 function useJogSenders(
   focusStep: number,
   focusFeed: number,
@@ -221,9 +221,12 @@ function machineActionAreas(showManualAir: boolean, machineKind: 'laser' | 'cnc'
 // (error:15), so this session's `$$` bounds the hold as well, and the homing
 // edge stays the pull-off clear of its switch (ADR-375). Stock GRBL checks from
 // its own MPos even after an Unlock without Home, when KerfDesk hides the
-// position, so that clamp alone aims from the controller's number then. With
-// neither a frame nor soft limits, the hold asks for full travel and relies on
-// release plus the jog-cancel byte, as it does with no position.
+// position, so that clamp alone aims from the controller's number then. A Home
+// in this session ties MPos to the switch, so a homed grblHAL, which never has
+// a frame, keeps the pull-off clear of its switch with soft limits off too
+// (ADR-375 Amendment 4). With no frame, no soft limits and no Home, the hold
+// asks for full travel and relies on release plus the jog-cancel byte, as it
+// does with no position.
 function JogArrows(props: Omit<Parameters<typeof JogArrowGrid>[0], 'position'>): JSX.Element {
   const statusReport = useLaserStore((s) => (props.disabled ? null : s.statusReport));
   const wcoCache = useLaserStore((s) => s.wcoCache);

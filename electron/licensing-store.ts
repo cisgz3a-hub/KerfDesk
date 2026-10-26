@@ -15,9 +15,9 @@ export type LicenceRecord = {
   /** Last time the licence service confirmed this device's rights. */
   readonly refreshedAt?: number;
   /**
-   * Seconds this computer's clock was ahead of the licence service (behind if
-   * negative) when it accepted the saved paid grant despite its clock (ADR-592).
-   * Absent when the clock agreed.
+   * Seconds this computer's clock was off when an older version accepted the
+   * saved paid grant (ADR-592). Still read so such a record stays valid, but
+   * nothing uses it, and the next grant drops it (ADR-623 Amendment 2).
    */
   readonly clockOffset?: number;
   readonly credential?: LicenceCredential;

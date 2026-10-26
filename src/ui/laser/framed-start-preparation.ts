@@ -91,6 +91,9 @@ export async function prepareFramedStartReview(
     ...(candidate.frameWcsNormalizationWarning === undefined
       ? {}
       : { frameWcsNormalizationWarning: candidate.frameWcsNormalizationWarning }),
+    ...(candidate.frameNoGoWarnings === undefined
+      ? {}
+      : { frameNoGoWarnings: candidate.frameNoGoWarnings }),
   };
 }
 

@@ -117,6 +117,24 @@ describe('jogTravelLimits on grblHAL', () => {
     expect(jogTravelLimits({ ...GRBLHAL, homingDirectionMask: 3 })).toBeNull();
   });
 
+  // grblHAL's `$22` bit 3 says force origin is off (ADR-375 Amendment 4): its
+  // envelope is then the same for every `$23` (controller audit v2 C3-P2-1).
+  it('keeps one envelope for every homing direction without force origin', () => {
+    for (const mask of [1, 2, 3]) {
+      expect(
+        jogTravelLimits({ ...GRBLHAL, forceOrigin: false, homingDirectionMask: mask }),
+      ).toEqual(box(-397.99, -2.01, -297.99, -2.01));
+    }
+  });
+
+  // With `$20=0` grblHAL refuses nothing, so the box is its envelope exactly:
+  // the switch inset on both edges and no rounding margin (C3-P2-2).
+  it('keeps the switch inset without a margin when soft limits are off', () => {
+    expect(jogTravelLimits({ ...GRBLHAL, forceOrigin: false, softLimitsEnforced: false })).toEqual(
+      box(-398, -2, -298, -2),
+    );
+  });
+
   it('ignores homing bits of axes beyond X and Y', () => {
     expect(jogTravelLimits({ ...GRBLHAL, homingDirectionMask: 12 })).toEqual(
       jogTravelLimits(GRBLHAL),

@@ -45,7 +45,7 @@ export function moveCurveAnchor(
     const incoming = segments[incomingIndex] as PathSegment;
     segments[incomingIndex] = translateIncoming(incoming, delta);
   }
-  if (outgoingIndex !== null && outgoingIndex !== incomingIndex) {
+  if (outgoingIndex !== null) {
     const outgoing = segments[outgoingIndex] as PathSegment;
     segments[outgoingIndex] = translateOutgoing(outgoing, delta);
   }
@@ -112,7 +112,8 @@ export function smoothCurveNode(path: CurveSubpath, nodeIndex: number): CurveSub
     control2: { x: anchor.x - direction.x * inLength, y: anchor.y - direction.y * inLength },
   };
   segments[outgoingIndex] = {
-    ...outgoing,
+    // A single-segment loop owns both handles; retain the incoming update.
+    ...(segments[outgoingIndex] as CubicPathSegment),
     control1: { x: anchor.x + direction.x * outLength, y: anchor.y + direction.y * outLength },
   };
   return { ...path, segments };
@@ -195,7 +196,10 @@ function explicitClosingSegments(path: CurveSubpath): ReadonlyArray<PathSegment>
 
 function incomingSegmentIndex(path: CurveSubpath, nodeIndex: number): number | null {
   if (nodeIndex > 0) return nodeIndex - 1;
-  return path.closed && path.segments.length > 0 ? path.segments.length - 1 : null;
+  const last = path.segments.at(-1);
+  return path.closed && last !== undefined && samePoint(last.to, path.start)
+    ? path.segments.length - 1
+    : null;
 }
 
 function outgoingSegmentIndex(path: CurveSubpath, nodeIndex: number): number | null {

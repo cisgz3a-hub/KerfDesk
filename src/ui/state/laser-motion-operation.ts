@@ -61,7 +61,7 @@ type LaserMotionOperationCommon = {
    * up. Bounded so a persistently failing settlement cannot loop. */
   readonly automaticReleaseAttempts?: number;
   /** An operator step jog that later step presses may extend; their lines
-   *  wait in pendingLines ahead of the settlement marker (ADR-648). */
+   *  wait in pendingLines ahead of the settlement marker (ADR-672). */
   readonly stepJogQueue?: StepJogQueue;
 };
 

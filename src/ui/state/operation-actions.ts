@@ -9,6 +9,7 @@ import {
 import { cloneArtworkOperations } from './clone-artwork-operations';
 import { operationListActions, type OperationListActions } from './operation-list-actions';
 import { pruneOrphanLayers, pushUndo, type StateSlice } from './scene-mutations';
+import { refuseSceneLimitOverrun } from './scene-copy-room';
 
 type OperationActionState = StateSlice & {
   readonly selectedObjectId: string | null;
@@ -173,6 +174,8 @@ function cloneOperationForObjects(
   const source = state.project.scene.layers.find((layer) => layer.id === operationId);
   if (source === undefined) return {};
   const scene = cloneArtworkOperations(state.project.scene, objectIds, source, additive);
+  if (refuseSceneLimitOverrun(state.project.scene, scene, 'Delete unused operations first.'))
+    return {};
   return scene === state.project.scene ? {} : mutation(state, { ...state.project, scene });
 }
 

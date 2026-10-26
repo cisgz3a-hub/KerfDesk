@@ -9,12 +9,46 @@ import { useStore } from '../state';
 import { formatFeed, type FeedCeiling } from './feed-ceiling';
 import type { LayerOperationControlTarget } from './LayerRowFields';
 import { OperationSliderField } from './OperationSliderField';
+import { useLengthUnit } from '../state/display-units';
+import { MM_PER_INCH, type DisplayLengthUnit } from '../display-length';
+import { dimensionEntry, dimensionEntryError } from './dimension-entry';
 
 const mmPerSecFormat = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 });
 
 /** Vendor material guides often give speed in mm/s; show the same speed that way. */
 export function mmPerSecReading(mmPerMin: number): string {
   return `${mmPerSecFormat.format(mmPerMin / 60)} mm/s`;
+}
+
+const inPerSecFormat = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
+
+// ADR-629: with Inches the field shows in/min to one decimal and commits the
+// typed value times 25.4. The saved speed stays in mm/min, and showing it
+// never writes it back (useDebouncedCommit commits only an edited draft).
+type SpeedDisplay = {
+  readonly unit: string;
+  readonly toDisplay: (mmPerMin: number) => number;
+  readonly fromDisplay: (value: number) => number;
+  readonly describe: (value: number) => string;
+};
+
+function speedDisplay(unit: DisplayLengthUnit): SpeedDisplay {
+  if (unit === 'mm') {
+    return {
+      unit: 'mm/min',
+      toDisplay: (v) => v,
+      fromDisplay: (v) => v,
+      describe: mmPerSecReading,
+    };
+  }
+  return {
+    unit: 'in/min',
+    toDisplay: (mmPerMin) => Number((mmPerMin / MM_PER_INCH).toFixed(1)),
+    // A micrometre per minute absorbs the 25.4 round trip's floating-point
+    // noise, so the 100 mm/min stop commits 100, not 99.99999999999999.
+    fromDisplay: (inPerMin) => Math.round(inPerMin * MM_PER_INCH * 1e3) / 1e3,
+    describe: (inPerMin) => `${inPerSecFormat.format(inPerMin / 60)} in/s`,
+  };
 }
 
 export function SpeedInput(props: {
@@ -32,22 +66,47 @@ export function SpeedInput(props: {
     [profileId, laserSubProfile, maxFeed],
   );
   const stops = useMemo(() => speedSliderStops(range), [range]);
+  const unit = useLengthUnit();
+  const display = speedDisplay(unit);
+  const reconcileKey = useMemo(
+    () => ({ target: operationTarget.reconcileKey, unit }),
+    [operationTarget.reconcileKey, unit],
+  );
+  const value = display.toDisplay(operationTarget.settings.speed);
+  const min = unit === 'in' ? 1 / MM_PER_INCH : 1;
+  const max = unit === 'in' ? maxFeed / MM_PER_INCH : maxFeed;
   return (
     <OperationSliderField
       label="Speed"
-      unit="mm/min"
+      unit={display.unit}
       ariaContext={targetAriaContext(layer, operationTarget)}
-      value={operationTarget.settings.speed}
+      value={value}
       mixed={operationTarget.mixedFields?.speed}
-      reconcileKey={operationTarget.reconcileKey}
-      commit={(speed) => operationTarget.commit({ speed })}
-      parse={(s) => clamp(numericValue(s, operationTarget.settings.speed), 1, maxFeed)}
-      observe={ceiling.observe}
-      min={1}
-      max={maxFeed}
-      stops={stops}
-      describe={mmPerSecReading}
-      title={`Feed rate in millimeters per minute for this layer. The slider covers this machine's usual working speeds, ${formatFeed(range.min)} to ${formatFeed(range.max)} mm/min; type any speed up to its Output max feed, ${formatFeed(maxFeed)} mm/min (Machine Setup).`}
+      reconcileKey={reconcileKey}
+      inputType="text"
+      validate={(text) => dimensionEntryError(text, unit, 'feed')}
+      commit={(speed) =>
+        operationTarget.commit({
+          speed: clamp(display.fromDisplay(speed), 1, maxFeed),
+        })
+      }
+      parse={(text) => {
+        const parsed = dimensionEntry(text, unit, 'feed');
+        const mmPerMin = parsed.kind === 'ok' ? parsed.value : operationTarget.settings.speed;
+        return clamp(unit === 'in' ? mmPerMin / MM_PER_INCH : mmPerMin, min, max);
+      }}
+      // The ceiling note compares millimetres per minute.
+      observe={(raw) => {
+        const typed = dimensionEntry(raw, unit, 'feed');
+        ceiling.observe(typed.kind === 'ok' ? String(typed.value) : '');
+      }}
+      min={min}
+      max={max}
+      // Exact converted stops: the slider lands on the very speed the stop
+      // names; only the labels and the number box round it.
+      stops={display.unit === 'mm/min' ? stops : stops.map((stop) => stop / MM_PER_INCH)}
+      describe={display.describe}
+      title={`Feed rate in ${display.unit} for this layer. The slider covers this machine's usual working speeds, ${formatFeed(range.min)} to ${formatFeed(range.max)} mm/min; type any speed up to its Output max feed, ${formatFeed(maxFeed)} mm/min (Machine Setup).`}
     />
   );
 }

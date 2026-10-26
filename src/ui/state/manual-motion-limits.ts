@@ -6,7 +6,9 @@
 // switch trips. It comes from this session's `$$` (and `$I`), independent of
 // the bed frame and of profile homing: a profile with homing off never gets a
 // frame, yet GRBL still refuses a whole hold jog whose target leaves its
-// envelope (error:15).
+// envelope (error:15). After this session's Home the machine position is tied
+// to the switch whatever `$20` says, so the switch inset applies with soft
+// limits off too (ADR-375 Amendment 4).
 
 import type { ControllerSettingsSnapshot, StatusReport } from '../../core/controllers/grbl';
 import {
@@ -21,9 +23,10 @@ import type { NativeBedEvidence } from './native-bed-frame';
 
 /**
  * The native XY box a manual move may reach, or null when there is neither a
- * verified bed frame nor a firmware envelope the controller enforces right
- * now. With a frame, the firmware limits only pull its edges in; a frame with
- * no settings read this session (the Falcon vendor contract) is used as is.
+ * verified bed frame nor a firmware envelope that the controller enforces or
+ * that this session's Home tied to the switch. With a frame, the firmware
+ * limits only pull its edges in; a frame with no settings read this session
+ * (the Falcon vendor contract) is used as is.
  */
 export function resolveManualMotionLimits(
   frame: NativeBedFrame | null,
@@ -40,7 +43,11 @@ export function resolveManualMotionLimits(
       ? frame.nativeBounds
       : intersectWithFrame(frame.nativeBounds, firmware);
   }
-  return settings?.softLimitsEnforced === true ? firmware : null;
+  // A homed grblHAL never has a frame, and with `$20=0` nothing refuses a hold
+  // that runs onto its homing switch (ALARM:1, position lost).
+  return settings?.softLimitsEnforced === true || evidence.homingState === 'confirmed'
+    ? firmware
+    : null;
 }
 
 /**
@@ -80,7 +87,8 @@ function jogTravelSettings(evidence: NativeBedEvidence): JogTravelSettings | nul
     firmware,
     travelMm: { x: bedWidth, y: bedHeight },
     homingDirectionMask,
-    forceOrigin: firmware === 'grbl' ? currentForceOrigin(evidence) : null,
+    forceOrigin:
+      firmware === 'grbl' ? currentForceOrigin(evidence) : (settings.homingForceSetOrigin ?? null),
     hardLimits: settings.hardLimitsEnabled,
     pullOffMm: settings.homingPullOffMm,
     softLimitsEnforced: settings.softLimitsEnabled === true,

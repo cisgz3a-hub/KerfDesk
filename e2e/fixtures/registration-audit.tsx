@@ -119,7 +119,11 @@ async function camera(): Promise<void> {
     },
   }));
   useCameraCalibrationStore.getState().openWizard();
-  useCameraCalibrationStore.setState({ settings: { ...DEFAULT_CALIBRATION_SETTINGS } });
+  // The rendered sheet covers the whole 400 mm bed, so the settings say so
+  // (the default is an A4-size sheet, ADR-441 Amendment 8).
+  useCameraCalibrationStore.setState({
+    settings: { ...DEFAULT_CALIBRATION_SETTINGS, sheetWidthMm: 400, sheetHeightMm: 400 },
+  });
 }
 
 function Harness(): JSX.Element {

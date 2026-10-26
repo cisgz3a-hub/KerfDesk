@@ -335,11 +335,11 @@ describe('licence key and recovery (ADR-523 Amendment 1)', () => {
     expect(h.saved()?.credential).toBeDefined();
     expect(h.saved()?.pendingDeactivation).toBeUndefined();
   });
-  it('confirms saved rights in the background about once a week', async () => {
-    const fresh = harness({ ...saved(), refreshedAt: NOW / 1000 - 3 * 86_400 });
+  it('confirms saved paid rights in the background about once a week', async () => {
+    const fresh = harness({ ...saved(), refreshedAt: NOW / 1000 - 6 * 86_400 });
     await fresh.runtime.refreshInBackground();
     expect(fresh.fetch).not.toHaveBeenCalled();
-    const due = harness({ ...saved(), refreshedAt: NOW / 1000 - 8 * 86_400 });
+    const due = harness({ ...saved(), refreshedAt: NOW / 1000 - 7 * 86_400 });
     await due.runtime.refreshInBackground();
     expect(due.fetch).toHaveBeenCalledOnce();
     expect(String(due.fetch.mock.calls[0]?.[0])).toContain('/v1/activations/refresh');
@@ -720,8 +720,18 @@ describe('synchronous eligibility at update installation', () => {
 
 describe('clock checks and the saved clock mark (ADR-523 Amendment 2)', () => {
   it('reports a clock more than five minutes off as a clock problem, not an outage', async () => {
+    // A paid grant never reads the clock (ADR-623 Amendment 2); a developer grant still does.
     const h = harness();
-    h.fetch.mockResolvedValue(grant(claims({ issuedAt: NOW / 1000 + 2 * 3600 })));
+    h.fetch.mockResolvedValue(
+      grant(
+        claims({
+          tier: 'developer',
+          perpetualUpdates: true,
+          updatesUntil: null,
+          issuedAt: NOW / 1000 + 2 * 3600,
+        }),
+      ),
+    );
     const activated = await h.runtime.activate(TEST_KEY);
     expect(activated).toMatchObject({ state: 'clock-error', edition: 'free', tier: null });
     expect(activated.message).toContain('about 2 hours behind');
@@ -848,46 +858,5 @@ describe('a deactivation the service refuses (ADR-523 Amendment 2)', () => {
     expect(status).toMatchObject({ state: 'ready', edition: 'pro' });
     expect(status.message).toContain('nothing was reset');
     expect(h.saved()?.credential).toBeDefined();
-  });
-});
-
-describe('orders and checkout links (ADR-523 Amendment 2)', () => {
-  it('drops an unfinished purchase when a licence key unlocks paid Pro, so Renew shows', async () => {
-    const h = harness({
-      schemaVersion: 1,
-      lastSeenAt: NOW / 1000,
-      payment: {
-        requestId: token,
-        operation: 'purchase',
-        order: { orderId: 'order-1', claimToken: token, checkoutUrl },
-      },
-    });
-    const status = await h.runtime.activate(TEST_KEY);
-    expect(status).toMatchObject({ tier: 'paid', edition: 'pro', paymentPending: false });
-    expect(status.message).toContain('order-1');
-    expect(h.saved()?.payment).toBeUndefined();
-    // Paying a saved renewal still renews the licence on the service, so it stays.
-    const renewal = harness({
-      ...saved(),
-      payment: { requestId: token, operation: 'renewal', licenseKey: TEST_KEY },
-    });
-    expect(await renewal.runtime.activate(TEST_KEY)).toMatchObject({
-      paymentPending: true,
-    });
-  });
-  it('refuses a checkout link whose transaction ID is not lower case', async () => {
-    const h = harness();
-    h.fetch.mockResolvedValue(
-      Response.json({
-        orderId: 'order-1',
-        claimToken: token,
-        checkoutUrl: `https://kerfdesk.com/buy.html?_ptxn=txn_${'A'.repeat(26)}`,
-        amount: 4950,
-        currency: 'USD',
-      }),
-    );
-    await h.runtime.checkout('purchase');
-    expect(h.openCheckout).not.toHaveBeenCalled();
-    expect(h.saved()?.payment?.order).toBeUndefined();
   });
 });

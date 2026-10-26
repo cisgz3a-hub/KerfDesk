@@ -5,9 +5,13 @@ import { PANEL_PULSE_ANIMATION, syncPanelPulse } from './sync-panel-pulses';
 
 type FakeAnimation = { animationName?: string; startTime: number | null };
 
+// Only a subtree lookup returns the ::before glow's animation, so the fake
+// hands its animations back only when asked for the subtree.
 function hintWith(animations: FakeAnimation[]): HTMLButtonElement {
   const button = document.createElement('button');
-  Object.defineProperty(button, 'getAnimations', { value: () => animations });
+  Object.defineProperty(button, 'getAnimations', {
+    value: (options?: GetAnimationsOptions) => (options?.subtree === true ? animations : []),
+  });
   return button;
 }
 
@@ -19,7 +23,7 @@ function animationStart(target: Element, animationName: string): AnimationEvent 
 }
 
 describe('syncPanelPulse', () => {
-  it('pins every panel hint pulse to the document timeline origin', () => {
+  it('pins every panel hint pulse, glow layer included, to the document timeline origin', () => {
     const pulse: FakeAnimation = { animationName: PANEL_PULSE_ANIMATION, startTime: 1734.5 };
     const other: FakeAnimation = { animationName: 'lf-attention-pulse', startTime: 900 };
     const transition: FakeAnimation = { startTime: 50 };
@@ -45,11 +49,28 @@ describe('collapsed-panel hint style', () => {
     'utf8',
   );
 
+  function keyframesBody(): string {
+    const start = css.indexOf(`@keyframes ${PANEL_PULSE_ANIMATION}`);
+    let depth = 0;
+    for (let index = css.indexOf('{', start); index < css.length; index += 1) {
+      if (css[index] === '{') depth += 1;
+      if (css[index] === '}') depth -= 1;
+      if (depth === 0) return css.slice(start, index + 1);
+    }
+    return '';
+  }
+
   it('names the keyframes the sync listens for', () => {
     expect(css).toContain(`@keyframes ${PANEL_PULSE_ANIMATION}`);
   });
 
   it('stays a faint tint and never fills the rail with the solid accent', () => {
     expect(css).not.toMatch(/background:\s*var\(--lf-accent\)\s*;/);
+  });
+
+  it('breathes by fading the glow alone, so the border and label never flash', () => {
+    const properties = [...keyframesBody().matchAll(/([a-z-]+)\s*:/g)].map((match) => match[1]);
+    expect(properties.length).toBeGreaterThan(0);
+    expect(new Set(properties)).toEqual(new Set(['opacity']));
   });
 });

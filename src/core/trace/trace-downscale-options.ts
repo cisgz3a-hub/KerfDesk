@@ -3,6 +3,9 @@ import type { TraceOptions } from './trace-option-types';
 // Source-area controls converted to the bounded downscale raster (see the
 // caller). The automatic small-mark policy's areas are source px² too
 // (ADR-434); a commit-grid ratio already on the options composes with it.
+// Detector windows stay in working-grid px on this route, and the preview and
+// a finer commit both reach a working grid of the same bounded size, so the
+// commit's window ratio is dropped (ADR-409 Amendment 2).
 export function downscaleWorkingOptions(options: TraceOptions, areaScale: number): TraceOptions {
   return {
     ...options,
@@ -19,5 +22,6 @@ export function downscaleWorkingOptions(options: TraceOptions, areaScale: number
     autoUpscaleSmallSources: false,
     upscaleSmallSmoothSources: false,
     pixelScale: 1,
+    ...(options.detectorWindowScale === undefined ? {} : { detectorWindowScale: 1 }),
   };
 }

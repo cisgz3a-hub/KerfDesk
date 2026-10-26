@@ -3,18 +3,15 @@ import {
   findRegistrationBoxes,
   isRegistrationBox,
   sceneObjectHasVisibleLayer,
-  updateLayer,
 } from '../../../core/scene';
 import { Button } from '../../kit';
 import { RegistrationJigOutlineControls } from '../RegistrationJigOutlineControls';
-import { RegistrationJigOperationSettingsEditor } from '../RegistrationJigOperationSettings';
 import { JigSelectionFields } from './JigSelectionFields';
 import { RegistrationJigArtworkSizeEditor } from '../RegistrationJigArtworkSizeControls';
 import { applyRegistrationJigArtworkSize } from '../../state/registration-jig-artwork-actions';
 import { JigArtworkImport } from './JigArtworkImport';
 import { JigTextControls } from './JigTextControls';
 import { JigTraceControls } from './JigTraceControls';
-import { JigArtworkSettings } from './JigArtworkSettings';
 import {
   centerJigArtwork,
   changeJigDraft,
@@ -33,7 +30,7 @@ export function JigEditorSidebar({
   const [tab, setTab] = useState<JigEditorTab>(() =>
     editor.session.firstSave ? 'layout' : 'artwork',
   );
-  const project = editor.session.draft.project;
+  const project = editor.view;
   return (
     <aside className="lf-jig-sidebar">
       <JigEditorTabs tab={tab} pendingLayout={editor.pendingLayout} onChange={setTab} />
@@ -58,7 +55,7 @@ function JigEditorTabs(props: {
         title={
           props.pendingLayout
             ? 'Jig layout has field changes that are not applied yet'
-            : 'Outline shape, size, grid and outline laser settings'
+            : 'Outline shape, size and grid'
         }
         onClick={() => props.onChange('layout')}
       >
@@ -81,7 +78,7 @@ function JigLayoutSection(props: {
 }): JSX.Element {
   const { editor } = props;
   const { setSession } = editor;
-  const project = editor.session.draft.project;
+  const project = editor.view;
   const boxes = findRegistrationBoxes(project.scene);
   const locked = jigOutlinesLocked(project);
   // Artwork changes must not discard un-applied layout fields. Outline edits
@@ -92,7 +89,8 @@ function JigLayoutSection(props: {
       {locked && <JigOutlineLock onUnlock={() => setSession(unlockJigOutlines)} />}
       <RegistrationJigOutlineControls
         key={layoutKey}
-        scene={project.scene}
+        // The whole draft, so the layout's capacity check counts hidden artwork too.
+        scene={editor.session.draft.project.scene}
         onPendingChange={editor.setPendingLayout}
         onReplace={editor.onReplaceLayout}
         onRemove={editor.onRemoveLayout}
@@ -110,7 +108,7 @@ function JigLayoutSection(props: {
         Apply layout to rebuild the grid. Drag outlines or edit the selection below to position
         them.
       </p>
-      <JigOutlineBurnSettings editor={editor} />
+      <JigBurnSettingsNote />
     </section>
   );
 }
@@ -121,8 +119,7 @@ function JigArtworkSection(props: {
   readonly hidden: boolean;
 }): JSX.Element {
   const { editor } = props;
-  const { session, setSession } = editor;
-  const project = session.draft.project;
+  const project = editor.view;
   return (
     <section className="lf-jig-fields" aria-label="Jig artwork" hidden={props.hidden}>
       <JigArtworkImport
@@ -135,11 +132,13 @@ function JigArtworkSection(props: {
         onUpsert={editor.onUpsert}
         onBusyChange={editor.onTextBusy}
       />
-      <details className="lf-jig-trace">
+      <details className="lf-jig-trace" open>
         <summary title="Show or hide image tracing">Trace an image</summary>
         <JigTraceControls
           project={project}
+          selectedIds={editor.ids}
           onImport={editor.onImport}
+          onTraceImage={editor.onTraceImage}
           onBusyChange={editor.onTraceBusy}
         />
       </details>
@@ -148,10 +147,7 @@ function JigArtworkSection(props: {
         outlineCount={findRegistrationBoxes(project.scene).length}
       />
       <JigSharedArtworkSize editor={editor} />
-      <JigArtworkSettings
-        draft={session.draft}
-        onChange={(draft) => setSession((current) => changeJigDraft(current, draft))}
-      />
+      <JigBurnSettingsNote />
     </section>
   );
 }
@@ -216,7 +212,7 @@ function hasEditableArtworkSelection(editor: JigEditorController): boolean {
 function JigSharedArtworkSize({ editor }: { readonly editor: JigEditorController }): JSX.Element {
   return (
     <RegistrationJigArtworkSizeEditor
-      scene={editor.session.draft.project.scene}
+      scene={editor.view.scene}
       onResize={(input) => {
         const result = applyRegistrationJigArtworkSize(
           { ...editor.session.draft, undoStack: [] },
@@ -231,24 +227,13 @@ function JigSharedArtworkSize({ editor }: { readonly editor: JigEditorController
   );
 }
 
-function JigOutlineBurnSettings({
-  editor,
-}: {
-  readonly editor: JigEditorController;
-}): JSX.Element | null {
-  if (editor.session.draft.project.machine?.kind === 'cnc') return null;
+// The jig keeps burn settings out of the way (ADR-652): each burn uses its
+// operation's current settings, which Job Review shows and edits before every Start.
+function JigBurnSettingsNote(): JSX.Element {
   return (
-    <RegistrationJigOperationSettingsEditor
-      scene={editor.session.draft.project.scene}
-      onChange={(id, patch) =>
-        editor.setSession((current) => {
-          const project = current.draft.project;
-          if (!project.scene.layers.some((layer) => layer.id === id)) return current;
-          return changeJigDraft(current, {
-            project: { ...project, scene: updateLayer(project.scene, id, patch) },
-          });
-        })
-      }
-    />
+    <p className="lf-jig-muted">
+      Burns use each operation’s current settings; new artwork starts at the standard ones. Job
+      Review shows them after Frame, and Edit there changes them.
+    </p>
   );
 }

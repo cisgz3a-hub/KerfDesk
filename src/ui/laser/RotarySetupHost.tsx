@@ -33,8 +33,10 @@ export function RotarySetupHost(props: { readonly onClose: () => void }): JSX.El
     const pattern = generateRotaryCalibrationPattern(rotary);
     replaceScene(pattern.scene);
     props.onClose();
+    const heightMm = pattern.heightMm.toFixed(2);
     pushToast(
-      `Generated ${pattern.widthMm.toFixed(0)} x ${pattern.heightMm.toFixed(2)} mm rotary test pattern.`,
+      `Generated ${pattern.widthMm.toFixed(0)} x ${heightMm} mm rotary test pattern. ` +
+        `Burned, it should measure ${heightMm} mm around the part.`,
       'success',
     );
   };

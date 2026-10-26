@@ -18,7 +18,7 @@ qualified professional in the relevant country before launch.
 | Included | Perpetual use of eligible versions, three active computers, one year of updates |
 | Renewal | Optional US$20 for another year of updates; never automatic |
 | Trial | Every Pro tool for 30 days from the first online registration |
-| Editions | KerfDesk Free stays in the browser. A commercial desktop build opens behind its licence window until an active trial or licence admits the workspace (ADR-623, owner's choice 2026-10-18, replacing desktop Free under ADR-540). Rights ending never unmount an admitted workspace or stop a job |
+| Editions | KerfDesk Free stays in the browser. A commercial desktop build is built to open behind its licence window until an active trial or licence admits the workspace (ADR-623, owner's choice 2026-10-18, replacing desktop Free under ADR-540). The owner held that window off on 2026-10-21 ([ADR-623 Amendment 3](decisions/ADR-623-amendment-3-licence-window-held-off.md)), so from 1.0.21 the desktop app opens in KerfDesk Free again until they turn it on. Rights ending never unmount an admitted workspace or stop a job |
 | Developer access | Separate free licences for Johann and Father, three computers each, unlimited updates |
 | Seller | South Africa; customers expected mainly in the USA |
 | Payment provider | Paddle (subject to its own seller approval) |

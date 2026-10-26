@@ -29,7 +29,7 @@ import {
   unlockJigOutlines,
   type JigEditorSession,
 } from './jig-editor-session';
-import { nudgeJigSelection } from './jig-editor-artwork';
+import { importJigArtwork, nudgeJigSelection } from './jig-editor-artwork';
 
 const GRID = {
   outline: { kind: 'rectangle' as const, widthMm: 50, heightMm: 30 },
@@ -39,15 +39,23 @@ const GRID = {
   spacingY: 5,
 };
 
+function square(id: string, color: string, x = 5, y = 5) {
+  return createRectangle({
+    id,
+    color,
+    spec: { widthMm: 10, heightMm: 10, cornerRadiusMm: 0 },
+    transform: { ...IDENTITY_TRANSFORM, x, y },
+  });
+}
+
 function addArtwork(id: string, color: string): void {
-  useStore.getState().drawShape(
-    createRectangle({
-      id,
-      color,
-      spec: { widthMm: 10, heightMm: 10, cornerRadiusMm: 0 },
-      transform: { ...IDENTITY_TRANSFORM, x: 5, y: 5 },
-    }),
-  );
+  useStore.getState().drawShape(square(id, color));
+}
+
+/** Artwork in the middle of the bed, where the first jig outline is centred. */
+function addArtworkOnOutline(id: string, color: string): void {
+  const { bedWidth, bedHeight } = useStore.getState().project.device;
+  useStore.getState().drawShape(square(id, color, bedWidth / 2 - 5, bedHeight / 2 - 5));
 }
 
 function artworkOperation(id: string): string {
@@ -121,7 +129,7 @@ describe('registration jig editor session', () => {
   beforeEach(() => {
     resetStore();
     useStore.setState({ registrationArtworkOutputSnapshot: null });
-    addArtwork('enabled-art', '#0000ff');
+    addArtworkOnOutline('enabled-art', '#0000ff');
     addArtwork('disabled-art', '#00aa00');
     useStore.getState().setLayerParam(artworkOperation('disabled-art'), { output: false });
   });
@@ -131,7 +139,8 @@ describe('registration jig editor session', () => {
     const before = structuredClone(state.project);
     let session = createJigEditorSession(state);
     session = replaceJigLayout(session, GRID);
-    session = selectJigObjects(session, new Set(['enabled-art']));
+    session = importJigArtwork(session, square('jig-art', '#ff00ff'));
+    session = selectJigObjects(session, new Set(['jig-art']));
     session = centerJigArtwork(session);
 
     expect(findRegistrationBoxes(session.draft.project.scene)).toHaveLength(6);
@@ -140,6 +149,44 @@ describe('registration jig editor session', () => {
     expect(state.project).toEqual(before);
     expect(findRegistrationBoxes(state.project.scene)).toHaveLength(0);
     expect(useStore.getState().undoStack).toBe(state.undoStack);
+  });
+
+  it('opens on a clean canvas: no main-canvas selection and its artwork out of reach', () => {
+    useStore.getState().selectObject('enabled-art');
+    const session = createJigEditorSession(useStore.getState());
+
+    // Only the new jig's own first outline may be selected, never main-canvas artwork.
+    const [created] = findRegistrationBoxes(session.draft.project.scene);
+    expect(session.draft.selectedObjectId).toBe(created!.id);
+    expect(session.draft.additionalSelectedIds.size).toBe(0);
+    // No jig yet, so all main-canvas artwork is background, even on the new outline.
+    expect([...session.background].sort()).toEqual(['disabled-art', 'enabled-art']);
+    expect(selectJigObjects(session, new Set(['enabled-art'])).draft.selectedObjectId).toBeNull();
+    const picked = selectJigObjects(session, new Set(['disabled-art', created!.id]));
+    expect(picked.draft.selectedObjectId).toBe(created!.id);
+    expect(picked.draft.additionalSelectedIds.size).toBe(0);
+  });
+
+  it('reopens a saved jig with its own artwork and leaves the rest in the background', () => {
+    saveFirstJig();
+    // The main canvas's selection (which also scopes Selected artwork only output).
+    useStore.getState().selectObject('disabled-art');
+    const saved = useStore.getState();
+    const session = createJigEditorSession(saved);
+
+    expect([...session.background]).toEqual(['disabled-art']);
+    // Saving keeps the background artwork exactly where it was.
+    const moved = nudgeJigSelection(selectJigObjects(session, new Set(['enabled-art'])), 1, 0);
+    const resaved = commit(saved, moved);
+    expect(resaved.project.scene.objects.map((object) => object.id)).toEqual(
+      saved.project.scene.objects.map((object) => object.id),
+    );
+    expect(resaved.project.scene.objects.find((object) => object.id === 'disabled-art')).toBe(
+      saved.project.scene.objects.find((object) => object.id === 'disabled-art'),
+    );
+    // The editor's own selection stays in the editor; the main selection comes back.
+    expect(resaved.selectedObjectId).toBe('disabled-art');
+    expect(resaved.additionalSelectedIds.size).toBe(0);
   });
 
   it('saves the first layout as Outline only with one undo entry and restores artwork intent', () => {

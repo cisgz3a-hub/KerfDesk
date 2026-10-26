@@ -14,7 +14,32 @@
 //
 // The copy is deliberately blunt and names the PHYSICAL control, because once
 // the link is gone no software command can stop motion (GRBL laser_mode notes:
-// Ctrl-X soft reset cannot be sent after USB is gone).
+// Ctrl-X soft reset cannot be sent after USB is gone). A notice about the link
+// names the one the session ran over: USB, or Wi-Fi/Ethernet (ADR-601), which
+// has no cable to check and reconnects from its own form (controller audit
+// D7-P3-3).
+
+import type { MotionRefusal } from '../../core/controllers/controller-event';
+import type { SerialPortIdentity } from '../../platform/types';
+
+/** The link a controller session runs over, as its notices name it. */
+export type ControllerLink = 'usb' | 'network';
+
+export function controllerLink(state: {
+  readonly serialPortInfo?: SerialPortIdentity | null;
+}): ControllerLink {
+  return state.serialPortInfo?.transport === 'tcp' ? 'network' : 'usb';
+}
+
+const LINK_LOST: Record<ControllerLink, string> = {
+  usb: 'USB connection was lost',
+  network: 'Network connection was lost',
+};
+
+const RECONNECT: Record<ControllerLink, string> = {
+  usb: 'Reconnect',
+  network: 'Reconnect from the network connection form',
+};
 
 export type LaserSafetyAction =
   | 'pause'
@@ -101,14 +126,19 @@ export type LaserSafetyNotice =
 // percentage forever with no signal. The watchdog raises this notice when
 // nothing acks and fresh Run status stops arriving for STREAM_STALL_TIMEOUT_MS
 // while lines are in flight.
-export const STREAM_STALLED_MESSAGE =
-  'The controller has not acknowledged a command or reported fresh movement status for longer ' +
-  'than the active-link watchdog window. KerfDesk froze the stream and requested a controller ' +
-  'soft reset while the link was still present. Use the physical E-stop or power cutoff if the ' +
-  'machine did not stop, then check the USB link before re-running.';
+function streamStalledMessage(link: ControllerLink): string {
+  return (
+    'The controller has not acknowledged a command or reported fresh movement status for longer ' +
+    'than the active-link watchdog window. KerfDesk froze the stream and requested a controller ' +
+    'soft reset while the link was still present. Use the physical E-stop or power cutoff if the ' +
+    `machine did not stop, then check the ${link === 'usb' ? 'USB' : 'network'} link before re-running.`
+  );
+}
 
-export function streamStalledNotice(): LaserSafetyNotice {
-  return { kind: 'stream-stalled', message: STREAM_STALLED_MESSAGE };
+export const STREAM_STALLED_MESSAGE = streamStalledMessage('usb');
+
+export function streamStalledNotice(link: ControllerLink = 'usb'): LaserSafetyNotice {
+  return { kind: 'stream-stalled', message: streamStalledMessage(link) };
 }
 
 export function acknowledgementStalledNotice(resetRequested: boolean): LaserSafetyNotice {
@@ -153,45 +183,65 @@ export function cncPauseResumeStalledNotice(): LaserSafetyNotice {
 // before its banner can arrive). The reboot discarded all buffered motion, so
 // the job is over — but the head is parked mid-cut and the work is ruined
 // unless re-run from a known origin.
-export const CONTROLLER_REBOOT_DURING_JOB_MESSAGE =
-  'The controller rebooted while a job was streaming or still finishing (its startup banner arrived before motion settled). ' +
-  'The job was aborted and buffered motion is lost. Check the USB cable and controller power, ' +
-  'then re-home before running the job again.';
-
-export function controllerRebootNotice(): LaserSafetyNotice {
-  return { kind: 'controller-reboot', message: CONTROLLER_REBOOT_DURING_JOB_MESSAGE };
+function controllerRebootMessage(link: ControllerLink): string {
+  return (
+    'The controller rebooted while a job was streaming or still finishing (its startup banner arrived before motion settled). ' +
+    `The job was aborted and buffered motion is lost. Check the ${link === 'usb' ? 'USB cable and controller' : 'controller'} power, ` +
+    'then re-home before running the job again.'
+  );
 }
 
-export const DISCONNECT_DURING_JOB_MESSAGE =
-  'USB connection was lost during an active job. The machine may still be moving from ' +
-  'buffered commands. Use physical E-stop or power cutoff now if unsafe. Reconnect and ' +
-  'home before continuing.';
+export const CONTROLLER_REBOOT_DURING_JOB_MESSAGE = controllerRebootMessage('usb');
 
-export function disconnectDuringJobNotice(): LaserSafetyNotice {
-  return { kind: 'disconnect-during-job', message: DISCONNECT_DURING_JOB_MESSAGE };
+export function controllerRebootNotice(link: ControllerLink = 'usb'): LaserSafetyNotice {
+  return { kind: 'controller-reboot', message: controllerRebootMessage(link) };
 }
 
-export const DISCONNECT_DURING_MOTION_MESSAGE =
-  'USB connection was lost while the machine was moving (a jog, Frame, Home, probe or ' +
-  'auto-focus). It may still be finishing buffered motion. Use physical E-stop or power ' +
-  'cutoff now if unsafe. Reconnect and home before continuing.';
+function disconnectDuringJobMessage(link: ControllerLink): string {
+  return (
+    `${LINK_LOST[link]} during an active job. The machine may still be moving from ` +
+    'buffered commands. Use physical E-stop or power cutoff now if unsafe. ' +
+    `${RECONNECT[link]} and home before continuing.`
+  );
+}
+
+export const DISCONNECT_DURING_JOB_MESSAGE = disconnectDuringJobMessage('usb');
+
+export function disconnectDuringJobNotice(link: ControllerLink = 'usb'): LaserSafetyNotice {
+  return { kind: 'disconnect-during-job', message: disconnectDuringJobMessage(link) };
+}
+
+function disconnectDuringMotionMessage(link: ControllerLink): string {
+  return (
+    `${LINK_LOST[link]} while the machine was moving (a jog, Frame, Home, probe or ` +
+    'auto-focus). It may still be finishing buffered motion. Use physical E-stop or power ' +
+    `cutoff now if unsafe. ${RECONNECT[link]} and home before continuing.`
+  );
+}
+
+export const DISCONNECT_DURING_MOTION_MESSAGE = disconnectDuringMotionMessage('usb');
 
 // The same kind as a job's notice, so every physical-stop and recovery rule
 // that reads it is unchanged; only the banner's title differs (ADR-639).
-export function disconnectDuringMotionNotice(): LaserSafetyNotice {
+export function disconnectDuringMotionNotice(link: ControllerLink = 'usb'): LaserSafetyNotice {
   return {
     kind: 'disconnect-during-job',
     cause: 'motion',
-    message: DISCONNECT_DURING_MOTION_MESSAGE,
+    message: disconnectDuringMotionMessage(link),
   };
 }
 
-export const DISCONNECT_DURING_FIRE_MESSAGE =
-  'USB connection was lost while the momentary Fire beam was requested. Software can no longer ' +
-  'confirm M5 reached the controller. Use physical E-stop or power cutoff now.';
+function disconnectDuringFireMessage(link: ControllerLink): string {
+  return (
+    `${LINK_LOST[link]} while the momentary Fire beam was requested. Software can no longer ` +
+    'confirm M5 reached the controller. Use physical E-stop or power cutoff now.'
+  );
+}
 
-export function disconnectDuringFireNotice(): LaserSafetyNotice {
-  return { kind: 'disconnect-during-fire', message: DISCONNECT_DURING_FIRE_MESSAGE };
+export const DISCONNECT_DURING_FIRE_MESSAGE = disconnectDuringFireMessage('usb');
+
+export function disconnectDuringFireNotice(link: ControllerLink = 'usb'): LaserSafetyNotice {
+  return { kind: 'disconnect-during-fire', message: disconnectDuringFireMessage(link) };
 }
 
 // A controller with neither a realtime reset nor quickstop lines (see
@@ -277,6 +327,39 @@ export function skippedCommandNotice(
       'physical E-stop or power cutoff now if unsafe. Enable that option in the firmware, or ' +
       'change the device profile so the job does not send the command, then home before re-running.',
   };
+}
+
+/** Why the controller skips moves it still answers `ok`, in one sentence
+ * (ADR-395 Amendment 1; the full notice is in laser-motion-refusal.ts). */
+export function motionRefusalReason(refusal: MotionRefusal): string {
+  if (refusal.reason === 'stopped') {
+    return (
+      'The controller is stopped after a firmware error ("Printer stopped due to errors") and ' +
+      'skips every move until it is restarted.'
+    );
+  }
+  const verb = refusal.axes.length === 1 ? 'is' : 'are';
+  return (
+    'The controller skipped a move because its firmware does not move until ' +
+    `${axisList(refusal.axes)} ${verb} homed ("Home ${refusal.axes} First", NO_MOTION_BEFORE_HOMING).`
+  );
+}
+
+/** "X, Y and Z" for the axis letters "XYZ". */
+export function axisList(axes: string): string {
+  const letters = [...axes];
+  if (letters.length <= 1) return axes;
+  return `${letters.slice(0, -1).join(', ')} and ${letters.at(-1) ?? ''}`;
+}
+
+/** The text an owned command is refused with when its error report is
+ * followed by the line's own `ok`. */
+export function refusalText(response: {
+  readonly raw?: string;
+  readonly motionRefusal?: MotionRefusal;
+}): string {
+  if (response.motionRefusal !== undefined) return motionRefusalReason(response.motionRefusal);
+  return response.raw ?? 'Controller rejected the command.';
 }
 
 // ADR-053 P3: a hard-limit ALARM fired while a Verified Frame was tracing the

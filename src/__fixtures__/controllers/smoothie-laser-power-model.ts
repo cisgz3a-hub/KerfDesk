@@ -4,6 +4,8 @@
 //  - GcodeDispatch.cpp: lowercase lines are shell commands; a line starting
 //    with X, Y or Z runs as the last G0-G3 command, one starting with F as G1;
 //    any other uppercase line without a G, M, T or S command does nothing;
+//    a line runs as one command per G or M, split before each G or M after
+//    its first two characters (`G17G21G90G0` is four commands);
 //  - Laser.cpp: `fire <percent>` drives the beam at that power whatever the
 //    motion (manual mode) until `fire off`/`fire 0`. `M221 S` sets the power
 //    scale in percent and P > 0 disables proportional power, both at once
@@ -126,11 +128,30 @@ export function executeSmoothieLine(model: SmoothieLaserModel, raw: string, line
     return;
   }
   const first = text[0] ?? '';
-  let command = text.toUpperCase();
+  let command = text;
   if ('XYZ'.includes(first)) command = `G${model.modalMotion} ${command}`;
   else if (first === 'F') command = `G1 ${command}`;
   else if (!'GMTSN'.includes(first)) return;
-  executeCommand(model, parseWords(command), line);
+  for (const single of singleCommands(command)) {
+    executeCommand(model, parseWords(single.toUpperCase()), line);
+  }
+}
+
+// GcodeDispatch::on_console_line_received: `find_first_of("GM", 2)` cuts the
+// next command off the line, so each G or M runs with the words after it.
+function singleCommands(command: string): string[] {
+  const commands: string[] = [];
+  let rest = command;
+  while (rest !== '') {
+    const next = rest.slice(2).search(/[GM]/);
+    if (next < 0) {
+      commands.push(rest);
+      break;
+    }
+    commands.push(rest.slice(0, next + 2));
+    rest = rest.slice(next + 2);
+  }
+  return commands;
 }
 
 function executeShellLine(model: SmoothieLaserModel, text: string): void {
@@ -155,9 +176,12 @@ function executeCommand(model: SmoothieLaserModel, words: ReadonlyArray<Word>, l
   }
 }
 
-// G4 dwells, G21 is millimetres, G54-G59 select a work system (offsets are not
-// modelled) and Robot.cpp has no G94.
-const NO_EFFECT_G: ReadonlySet<number> = new Set([4, 21, 54, 55, 56, 57, 58, 59, 94]);
+// G4 dwells, G17-G19 select the arc plane (arcs are not modelled), G21 is
+// millimetres, G54-G59 select a work system (offsets are not modelled) and
+// Robot.cpp has no G40 or G94.
+const NO_EFFECT_G: ReadonlySet<number> = new Set([
+  4, 17, 18, 19, 21, 40, 54, 55, 56, 57, 58, 59, 94,
+]);
 
 function executeMCode(model: SmoothieLaserModel, code: number, words: ReadonlyArray<Word>): void {
   if (code === 221 && model.laserModule) {

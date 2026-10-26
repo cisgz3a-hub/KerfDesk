@@ -5,6 +5,7 @@ import { grblDriver } from '../../core/controllers';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
 import { respondToTestGrblHandshake, settleTestGrblHandshake } from './laser-test-start-helpers';
+import { stockNativeEvidence } from './native-bed-frame.test-support';
 import { useStore } from './store';
 import { useToastStore } from './toast-store';
 
@@ -183,5 +184,55 @@ describe('jog no-go zone warnings (DEV-04)', () => {
       message: expect.stringMatching(/XY position is unresolved.*sent unchanged/i),
     });
     expect(useLaserStore.getState().lastWriteError).toBeNull();
+  });
+});
+
+// Audit v3 D5-P2-3, ADR-232 Amendment 1: the Frame's own route is warned like
+// a jog's and still sent.
+describe('Frame no-go zone warnings', () => {
+  const FRAME_BOUNDS = { minX: 10, minY: 10, maxX: 50, maxY: 50 };
+  const EDGE_CLAMP: NoGoZone = { ...CLAMP, name: 'Edge clamp', x: 29, y: 9, width: 2, height: 2 };
+
+  /** Session-current stock GRBL evidence: the bed mapping Start trusts. */
+  function trustVerifiedBedFrame(): void {
+    const project = useStore.getState().project;
+    const device = { ...project.device, homing: { ...project.device.homing, enabled: true } };
+    useStore.setState({ project: { ...project, device } });
+    const epoch = useLaserStore.getState().controllerSessionEpoch;
+    useLaserStore.setState({
+      ...stockNativeEvidence(device, true),
+      controllerSessionEpoch: epoch,
+      controllerSettingsObservation: { sessionEpoch: epoch, observedAt: 1 },
+      controllerBuildInfoObservation: { sessionEpoch: epoch, observedAt: 1 },
+    });
+  }
+
+  it('sends the Frame and warns when only its perimeter crosses a zone', async () => {
+    await connectIdleAtOrigin(makeConnection(async () => undefined));
+    trustVerifiedBedFrame();
+    setZone(EDGE_CLAMP);
+
+    await useLaserStore.getState().frame(FRAME_BOUNDS, 1000);
+
+    expect(useLaserStore.getState().motionOperation?.kind).toBe('frame');
+    expect(useToastStore.getState().toasts.at(-1)).toMatchObject({
+      variant: 'warning',
+      message: expect.stringMatching(
+        /^The Frame's outline crosses the configured no-go zone "Edge clamp"\..*sent unchanged/,
+      ),
+    });
+    expect(useLaserStore.getState().lastWriteError).toBeNull();
+  });
+
+  it('does not compare the route without a verified bed mapping', async () => {
+    await connectIdleAtOrigin(makeConnection(async () => undefined));
+    setZone(EDGE_CLAMP);
+
+    await useLaserStore.getState().frame(FRAME_BOUNDS, 1000);
+
+    expect(useLaserStore.getState().motionOperation?.kind).toBe('frame');
+    expect(useToastStore.getState().toasts.some((toast) => toast.variant === 'warning')).toBe(
+      false,
+    );
   });
 });

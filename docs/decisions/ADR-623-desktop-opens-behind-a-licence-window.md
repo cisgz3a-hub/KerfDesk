@@ -1,6 +1,6 @@
 ## ADR-623 - The desktop app opens behind a licence window; Free stays in the browser (2026-10-18)
 
-**Status:** Implemented in source; reaches installed apps with the next desktop release. Decision 3 amended by [ADR-623 Amendment 1](ADR-623-amendment-1-an-admitted-session-survives-a-reload.md) (an admitted session survives a reload) | **Date:** 2026-10-18 | **Supersedes:** ADR-540 item 1 and the desktop half of its Free edition | **Amends:** ADR-540 items 3, 5 and 8, ADR-540 Amendment 2, ADR-592
+**Status:** Implemented in source; reaches installed apps with the next desktop release. Decision 3 amended by [ADR-623 Amendment 1](ADR-623-amendment-1-an-admitted-session-survives-a-reload.md) (an admitted session survives a reload) and [ADR-623 Amendment 2](ADR-623-amendment-2-paid-licences-keep-working-offline.md) (a paid licence has no check-in, so it is never kept out at launch for being offline or for its clock). **Held off** by [ADR-623 Amendment 3](ADR-623-amendment-3-licence-window-held-off.md) (2026-10-21): one setting, `DESKTOP_LICENCE_WINDOW`, is off, so desktop releases from 1.0.21 open straight into KerfDesk Free until the owner turns the window back on | **Date:** 2026-10-18 | **Supersedes:** ADR-540 item 1 and the desktop half of its Free edition | **Amends:** ADR-540 items 3, 5 and 8, ADR-540 Amendment 2, ADR-592
 
 ### Context
 

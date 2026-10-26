@@ -2,6 +2,7 @@ import { DEFAULT_PROJECT_VARIABLE_DATA, type Project, type RasterImage } from '.
 import { materializeVariableText } from '../../io/gcode/prepare-output-snapshot';
 import { exportSceneSvg } from '../../io/svg/export-scene-svg';
 import type { PlatformAdapter } from '../../platform/types';
+import { pickPreparedSaveTarget } from './pick-prepared-save-target';
 import { embedSvgRasterImages } from './svg-artwork-images';
 import { renderVariableText } from '../text/render-variable-text';
 import type { ToastVariant } from '../state/toast-store';
@@ -35,11 +36,8 @@ export async function handleExportArtworkSvg(ctx: ExportArtworkSvgContext): Prom
     return;
   }
   try {
-    const target = await ctx.platform.pickFileForSave({
-      suggestedName: svgFilename(ctx.savedName, ids !== undefined),
-      extensions: ['.svg'],
-    });
-    if (target === null) return;
+    // The picker empties an existing file as it returns (ADR-656): every
+    // fallible step runs first.
     const resolved = await materializeVariableText(
       project,
       evaluation,
@@ -63,6 +61,12 @@ export async function handleExportArtworkSvg(ctx: ExportArtworkSvgContext): Prom
       ctx.pushToast('Could not export SVG: ' + result.error, 'error');
       return;
     }
+    const target = await pickPreparedSaveTarget(
+      ctx.platform,
+      { suggestedName: svgFilename(ctx.savedName, ids !== undefined), extensions: ['.svg'] },
+      { title: 'Export SVG', message: 'The SVG is ready.' },
+    );
+    if (target === null) return;
     await target.write(new Blob([result.value.svg], { type: 'image/svg+xml' }));
     ctx.pushToast(
       'Exported ' +

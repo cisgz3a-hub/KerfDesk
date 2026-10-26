@@ -114,9 +114,15 @@ export type ControllerCapabilities = {
   // can be set at all. 'g92.1': the firmware's own G92.1 (GRBL family,
   // Smoothieware). 'machine-frame-g92': a G92 to the machine position, which
   // only a host that recorded the shift can compute (Marlin, whose stock build
-  // compiles no G92.1; ADR-648). Absent means 'g92.1' wherever `wcs` is not
+  // compiles no G92.1; ADR-672). Absent means 'g92.1' wherever `wcs` is not
   // 'none'.
   readonly transientOriginClear?: 'g92.1' | 'machine-frame-g92';
+  // What `$10` turns on when a `$$` shows it whole (statusReportMaskIsFull).
+  // 'grblhal-fields': grblHAL's bitfield, whose bit 0 picks MPos over WPos and
+  // whose bits 5 and 6 send the WCO: and Ov: fields (grblhal/status-report-
+  // mask.ts). Absent means stock GRBL's `$10`, which picks only MPos or WPos
+  // and the buffer field: its reports carry WCO: and Ov: whatever it holds.
+  readonly statusReportMask?: 'grblhal-fields';
   // Whether the realtime soft reset reboots the firmware, which then prints
   // its banner. GRBL-family firmware does. Smoothieware halts instead: Ctrl-X
   // sets halt_flag (USBSerial.cpp:204-208) and on_idle prints `HALTED, M999

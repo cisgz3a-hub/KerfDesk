@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { RotarySetup } from '../../core/devices';
+import { DEFAULT_ROTARY_SETUP, rotaryYScale, type RotarySetup } from '../../core/devices';
 import {
   DEFAULT_ROLLER_DIAMETER_MM,
   displayObjectCircumferenceMm,
@@ -9,6 +9,7 @@ import {
   editRollerScaling,
   editRotaryFields,
   editRotaryType,
+  NEW_ROTARY_SETUP,
   startRotaryEdit,
 } from './rotary-setup-edit';
 
@@ -24,6 +25,27 @@ describe('rotary setup edits', () => {
     const edit = startRotaryEdit(LEGACY_ROLLER);
     expect(edit.setup).toBe(LEGACY_ROLLER);
     expect(edit.parkedRoller).toEqual({ diameterMm: DEFAULT_ROLLER_DIAMETER_MM, scaled: false });
+  });
+
+  it('starts a new roller scaled from its roller diameter, as LightBurn does (ADR-373 Amd 1)', () => {
+    expect(NEW_ROTARY_SETUP).toEqual({
+      ...DEFAULT_ROTARY_SETUP,
+      rollerDiameterMm: DEFAULT_ROLLER_DIAMETER_MM,
+    });
+    const edit = startRotaryEdit(NEW_ROTARY_SETUP);
+    expect(edit.setup).toBe(NEW_ROTARY_SETUP);
+    expect(edit.parkedRoller).toEqual({ diameterMm: DEFAULT_ROLLER_DIAMETER_MM, scaled: true });
+    expect(rotaryYScale(edit.setup)).toBeCloseTo(360 / (Math.PI * 25), 12);
+    // Stored setups and the core default are untouched: no roller diameter.
+    expect(DEFAULT_ROTARY_SETUP).not.toHaveProperty('rollerDiameterMm');
+  });
+
+  it('turns a saved chuck switched to Roller into a scaled roller', () => {
+    const chuck: RotarySetup = { ...LEGACY_ROLLER, type: 'chuck' };
+    expect(editRotaryType(startRotaryEdit(chuck), 'roller').setup).toEqual({
+      ...LEGACY_ROLLER,
+      rollerDiameterMm: DEFAULT_ROLLER_DIAMETER_MM,
+    });
   });
 
   it('adds the roller diameter only while roller scaling is on, and remembers it', () => {

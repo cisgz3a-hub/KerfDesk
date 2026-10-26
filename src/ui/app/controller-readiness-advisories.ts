@@ -22,6 +22,7 @@ import {
   type ControllerSettingsSnapshot,
   type ReadinessSettingsCapability,
 } from '../../core/preflight';
+import type { ControllerKind } from '../../core/devices';
 import type { Project } from '../../core/scene';
 
 // Keeps the wording of the refusal this replaced, so the operator still reads
@@ -34,11 +35,31 @@ export function controllerReadinessAdvisories(
   project: Project,
   controllerSettings: ControllerSettingsSnapshot | null | undefined,
   settingsCapability: ReadinessSettingsCapability = 'grbl-dollar',
+  // The connected firmware, as Start passes it, so a power-range finding
+  // describes that firmware's behaviour rather than stock GRBL's.
+  firmwareKind?: ControllerKind,
 ): ReadonlyArray<string> {
   if (controllerSettings === undefined) return [];
   if (controllerSettings === null && settingsCapability !== 'none') return [];
-  const readiness = runControllerReadiness(project, controllerSettings, settingsCapability);
+  const readiness = runControllerReadiness(
+    project,
+    controllerSettings,
+    settingsCapability,
+    firmwareKind,
+  );
   return [...readiness.errors, ...readiness.warnings].map(
     (issue) => `${EXPORT_ADVISORY_PREFIX}: ${issue.message}`,
   );
+}
+
+/** The firmware the banner named, else the driver in use (as Start reads it). */
+export function readinessFirmwareKind(
+  source:
+    | {
+        readonly detectedControllerKind?: ControllerKind | null;
+        readonly activeControllerKind?: ControllerKind;
+      }
+    | undefined,
+): ControllerKind | undefined {
+  return source?.detectedControllerKind ?? source?.activeControllerKind;
 }

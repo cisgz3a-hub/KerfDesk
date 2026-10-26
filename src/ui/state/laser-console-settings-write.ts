@@ -1,4 +1,5 @@
 import type { ControllerDriver } from '../../core/controllers';
+import { consoleSettingReadbackIssue } from '../../core/controllers/console-setting-writes';
 import type { PreparedConsoleCommand } from '../../core/controllers/grbl';
 import { beginReportUnitsWrite } from './controller-report-units';
 import { grblSettingWriteEvidencePatch } from './grbl-settings-evidence';
@@ -71,6 +72,8 @@ export async function rereadSettingsAfterConsoleWrite(
           EMPTY_SETTINGS_RESPONSE_MESSAGE,
         ),
       );
+    } else if (get().controllerSessionEpoch === qualificationEpoch) {
+      reportStoredSettingMismatch(set, get, driver, written);
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -78,4 +81,22 @@ export async function rereadSettingsAfterConsoleWrite(
     if (reportUnitsWrite) reportUnitsStayUnconfirmed(set, error);
     else settingWriteStaysUnverified(set, written, error);
   }
+}
+
+// grblHAL answers `ok` to a value it stored only in part (`$100=26,67` keeps
+// 26), so the re-read is compared with what was typed, as the Machine
+// Settings writer verifies its own writes (ADR-375 Amendment 4).
+function reportStoredSettingMismatch(
+  set: SetFn,
+  get: GetFn,
+  driver: ControllerDriver,
+  written: string,
+): void {
+  const id = Number(/^\$(\d+)=/.exec(written)?.[1]);
+  const row = get().grblSettingsRows.find((candidate) => candidate.id === id);
+  const issue = consoleSettingReadbackIssue(driver, written, row?.rawValue);
+  if (issue === null) return;
+  set({ lastWriteError: issue });
+  // The Console renders the transcript, which a plain log line never reaches.
+  get().pushSystemNotice(`[lf2] ${issue}`);
 }

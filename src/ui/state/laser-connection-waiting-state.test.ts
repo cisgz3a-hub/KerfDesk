@@ -121,7 +121,7 @@ describe('connection handshake waiting for controller Idle', () => {
     },
   );
 
-  // ADR-648 (behaviour audit F-4): GRBL answers `$$` in Alarm, and a stock
+  // ADR-672 (behaviour audit F-4): GRBL answers `$$` in Alarm, and a stock
   // board with homing enabled boots there, so the first connect reads at once.
   it('reads settings while the controller stays in Alarm', async () => {
     const writes: string[] = [];

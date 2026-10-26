@@ -1,29 +1,44 @@
-// OverlayControls — the Camera panel's workspace-overlay row (ADR-107,
-// LightBurn "Camera Control" parity): show/hide on canvas, a fade slider, the
-// still-vs-live source choice, the material's surface height, which the
-// camera model uses to undo parallax exactly (ADR-440), and height areas for
-// objects that stand above the material (ADR-441 Amendment 2), and the pieces
-// on the bed to repeat a design on (ADR-442). A camera on the laser head
-// captures and stitches pictures instead of freezing one (ADR-449). Camera placement
-// stays latched after hiding the image so its status remains visible until
-// the operator exits it.
+// OverlayControls — the everyday Camera panel once the camera is calibrated
+// (ADR-107, ADR-663): refresh the bed picture or keep it live, show it on the
+// canvas at the strength wanted, and the material's surface height, which the
+// camera model uses to undo parallax exactly (ADR-440). Trace from camera sits
+// beside Refresh; filling blanks (ADR-442) and object heights (ADR-441
+// Amendment 2) open as folds. A camera on the laser head captures and stitches
+// pictures instead of freezing one (ADR-449). A calibration made with another
+// origin corner is not drawn, and the panel says why (rolling audit 12-P2-2).
+// Camera placement stays latched after hiding the image so its status remains
+// visible until the operator exits it.
 
 import { isHeadCameraModel } from '../../core/camera/model/head-camera';
 import { DraftNumberInput } from '../kit/DraftNumberInput';
+import { Icon } from '../kit/icons';
 import { useCameraStore } from '../state/camera-store';
-import { useActiveCameraModel, useOwnCameraModel } from './active-camera-model';
+import {
+  useActiveCameraModel,
+  useOwnCameraFrameNote,
+  useOwnCameraModel,
+} from './active-camera-model';
 import { HeadCaptureControls } from './head/HeadCaptureControls';
+import { CameraFold } from './panel/CameraFold';
 import { useCameraPlacementControls } from './use-camera-placement-controls';
 import { TraceFromCameraButton } from './TraceFromCameraButton';
-import { AccuracyMapToggle } from './accuracy/AccuracyMapToggle';
 import { HeightAreasControl } from './heights/HeightAreasControl';
 import { PiecesControl } from './pieces/PiecesControl';
+import { usePieceScanStore } from './pieces/piece-scan-store';
 
 export function OverlayControls(): JSX.Element | null {
   const model = useActiveCameraModel();
   const own = useOwnCameraModel();
+  const frameNote = useOwnCameraFrameNote();
   if (model !== undefined)
     return <CalibratedOverlayControls headCamera={isHeadCameraModel(model)} />;
+  if (frameNote !== null && !frameNote.usable) {
+    return (
+      <p role="status" style={headNoticeStyle}>
+        {frameNote.message}
+      </p>
+    );
+  }
   return isHeadCameraModel(own) ? <HeadPositionNotice /> : null;
 }
 
@@ -47,56 +62,73 @@ function CalibratedOverlayControls(props: { readonly headCamera: boolean }): JSX
   const surfaceHeightMm = useCameraStore((s) => s.surfaceHeightMm);
   const setSurfaceHeightMm = useCameraStore((s) => s.setSurfaceHeightMm);
   const placement = useCameraPlacementControls(true);
+  // Found pieces and height areas outlive the panel; their folds open on them.
+  const piecesFound = usePieceScanStore((s) => s.scan !== null);
+  const hasHeightAreas = useCameraStore((s) => s.heightAreas.length > 0);
 
   const sourceLive = sourceState.kind === 'live';
   return (
-    <div style={sectionStyle}>
-      <OverlayActionRow
+    <section style={sectionStyle} aria-label="Bed picture">
+      <PictureActionRow
         placement={placement}
-        visible={visible}
         sourceLive={sourceLive}
         hasStill={still !== null || bedPicture !== null}
         headCamera={props.headCamera}
       />
+      {props.headCamera ? null : (
+        <p style={showingStyle}>{showingNow(sourceLive, still !== null || bedPicture !== null)}</p>
+      )}
       {props.headCamera ? <HeadCaptureControls /> : null}
-      {placement.active ? <CameraPlacementStatus placement={placement} /> : null}
+      <div style={rowStyle}>
+        <label
+          style={checkStyle}
+          title="Show or hide the corrected camera picture on the workspace canvas."
+        >
+          <input
+            type="checkbox"
+            title="Show or hide the corrected camera picture on the workspace canvas."
+            checked={visible}
+            onChange={placement.toggleOverlay}
+          />
+          Show on canvas
+        </label>
+        <OpacityControl opacity={opacity} onChange={setOpacity} />
+      </div>
       <SurfaceHeightControl heightMm={surfaceHeightMm} onChange={setSurfaceHeightMm} />
-      <HeightAreasControl />
-      <PiecesControl />
-      <FadeControl opacity={opacity} onChange={setOpacity} />
-    </div>
+      {placement.active ? <CameraPlacementStatus placement={placement} /> : null}
+      <CameraFold title="Fill blanks" hint="the design on every piece" defaultOpen={piecesFound}>
+        <PiecesControl />
+      </CameraFold>
+      <CameraFold
+        title="Raised objects"
+        hint="a box or a part taller than the sheet"
+        defaultOpen={hasHeightAreas}
+      >
+        <HeightAreasControl />
+      </CameraFold>
+    </section>
   );
 }
 
 type PlacementControls = ReturnType<typeof useCameraPlacementControls>;
 
-function OverlayActionRow(props: {
+function PictureActionRow(props: {
   readonly placement: PlacementControls;
-  readonly visible: boolean;
   readonly sourceLive: boolean;
   readonly hasStill: boolean;
   readonly headCamera: boolean;
 }): JSX.Element {
   return (
     <div style={rowStyle}>
-      <button
-        type="button"
-        className="lf-btn"
-        aria-pressed={props.visible}
-        onClick={props.placement.toggleOverlay}
-        title="Show or hide the corrected camera picture on the workspace canvas."
-      >
-        {props.visible ? 'Overlay on' : 'Overlay off'}
-      </button>
       {props.headCamera ? null : (
         <button
           type="button"
-          className="lf-btn"
+          className="lf-btn lf-btn--primary"
           disabled={!props.sourceLive}
           onClick={() => void props.placement.updateStill()}
-          title="Freeze the current camera frame as the workspace overlay."
+          title="Take a new picture of the bed and show it on the canvas, held still while you place artwork (Alt+C)."
         >
-          Update still
+          <Icon name="refresh" size={14} /> Refresh picture
         </button>
       )}
       <button
@@ -104,15 +136,21 @@ function OverlayActionRow(props: {
         className="lf-btn"
         disabled={!props.hasStill || !props.sourceLive}
         onClick={props.placement.useLive}
-        title="Show the live camera on the canvas instead of the frozen still."
+        title="Show the live camera on the canvas instead of the held picture."
       >
         Live
       </button>
       <TraceFromCameraButton />
-      <AccuracyMapToggle />
-      {props.placement.active ? <ExitPlacementButton onExit={props.placement.exit} /> : null}
     </div>
   );
+}
+
+// Which picture the canvas holds, so Refresh and Live read as one choice.
+function showingNow(sourceLive: boolean, hasStill: boolean): string {
+  if (hasStill) return 'The canvas shows the refreshed picture. Live follows the camera again.';
+  return sourceLive
+    ? 'The canvas shows the live camera. Refresh picture holds one still.'
+    : 'Start the camera to show the bed on the canvas.';
 }
 
 function SurfaceHeightControl(props: {
@@ -120,45 +158,42 @@ function SurfaceHeightControl(props: {
   readonly onChange: (heightMm: number) => void;
 }): JSX.Element {
   return (
-    <>
-      <label style={heightStyle}>
-        Material surface height
-        <span style={heightInputStyle}>
-          <DraftNumberInput
-            min={0}
-            max={500}
-            step={0.1}
-            value={props.heightMm}
-            aria-label="Material surface height above bed"
-            title="Height of the material's top surface above the machine bed. The camera picture is corrected to this height."
-            normalize={(value) => Math.max(0, Math.min(500, value))}
-            onValueChange={props.onChange}
-          />{' '}
-          mm
-        </span>
-      </label>
-      <div role="status" style={heightMessageStyle}>
-        The camera picture shows the bed as seen at {props.heightMm} mm above it: set this to the
-        top of your material so its edges line up.
-      </div>
-    </>
+    <label style={heightStyle}>
+      <span style={heightLabelStyle}>
+        Material height
+        <span style={heightMessageStyle}>top of the material above the bed</span>
+      </span>
+      <span style={heightInputStyle}>
+        <DraftNumberInput
+          min={0}
+          max={500}
+          step={0.1}
+          value={props.heightMm}
+          aria-label="Material surface height above bed"
+          title={`The camera picture shows the bed as seen at ${props.heightMm} mm above it: set this to the top of your material so its edges line up.`}
+          normalize={(value) => Math.max(0, Math.min(500, value))}
+          onValueChange={props.onChange}
+        />{' '}
+        mm
+      </span>
+    </label>
   );
 }
 
-function FadeControl(props: {
+function OpacityControl(props: {
   readonly opacity: number;
   readonly onChange: (opacity: number) => void;
 }): JSX.Element {
   return (
     <label style={fadeStyle}>
-      Fade
+      Opacity
       <input
         type="range"
         min={0}
         max={100}
         value={props.opacity}
         aria-label="Camera overlay opacity"
-        title="How strongly the camera image shows through on the canvas."
+        title="How strongly the camera picture shows through on the canvas."
         onChange={(event) => props.onChange(Number(event.currentTarget.value))}
         style={sliderStyle}
       />
@@ -196,6 +231,7 @@ function CameraPlacementStatus(props: { readonly placement: PlacementControls })
           Confirm bed coordinates
         </button>
       ) : null}
+      <ExitPlacementButton onExit={placement.exit} />
     </div>
   );
 }
@@ -218,24 +254,37 @@ const sectionStyle: React.CSSProperties = {
   paddingTop: 8,
   borderTop: '1px solid var(--lf-border)',
 };
-const rowStyle: React.CSSProperties = { display: 'flex', gap: 8, flexWrap: 'wrap' };
+const rowStyle: React.CSSProperties = {
+  display: 'flex',
+  gap: 8,
+  flexWrap: 'wrap',
+  alignItems: 'center',
+};
 const fadeStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 8,
+  flex: 1,
+  minWidth: 120,
   fontSize: 12,
 };
 const sliderStyle: React.CSSProperties = { flex: 1 };
+const checkStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6 };
+const showingStyle: React.CSSProperties = {
+  margin: 0,
+  fontSize: 12,
+  color: 'var(--lf-text-faint)',
+};
 const heightStyle: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
   gap: 8,
-  fontSize: 12,
 };
+const heightLabelStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column' };
 const heightInputStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 4 };
 
-const heightMessageStyle: React.CSSProperties = { fontSize: 12, color: 'var(--lf-text-faint)' };
+const heightMessageStyle: React.CSSProperties = { fontSize: 11, color: 'var(--lf-text-faint)' };
 const headNoticeStyle: React.CSSProperties = {
   margin: 0,
   paddingTop: 8,

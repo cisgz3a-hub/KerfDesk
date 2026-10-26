@@ -4,6 +4,7 @@ import { rotaryAppliesTo, type Job } from '../../../core/job';
 import { laserSecondPassSupportsController } from '../../../core/laser-second-pass/source-family';
 import { hasRepresentedCutBurn } from '../../../core/output/grbl-strategy';
 import {
+  CURRENT_LASER_POWER_SCALE_VERSION,
   powerScaleVersionForDevice,
   type LaserPowerScaleVersion,
 } from '../../../core/output/laser-power-scale-version';
@@ -14,7 +15,7 @@ import { machineKindOf, type Project } from '../../../core/scene';
 export function secondPassProjectEligible(
   project: Project,
   job: Job,
-  laserPowerScaleVersion: LaserPowerScaleVersion = 2,
+  laserPowerScaleVersion: LaserPowerScaleVersion = CURRENT_LASER_POWER_SCALE_VERSION,
 ): boolean {
   if (
     machineKindOf(project.machine) !== 'laser' ||

@@ -14,6 +14,7 @@ import { canonicalRequest, record, validateCommand, type ValidatedCommand } from
 import { cameraSnapshot } from './machine-camera';
 import { applyRemoteWrite } from './writes';
 import { applyDesignWrite } from './design-writes';
+import { boardProjection } from './board';
 import { DESIGN_WRITE_COMMANDS, type DesignWrite } from './design-validation';
 import { createMachineControl } from './machine-control';
 import type {
@@ -179,37 +180,53 @@ async function projectRead(
   if (context.isDisposed() || signal.aborted) throw new RemoteFault('cancelled');
   const state = context.store.getState();
   const revision = context.tracker.current();
-  let data = await (async () => {
-    switch (input.command) {
-      case 'get_workspace':
-        return workspaceReadProjection(state, context.options);
-      case 'get_workspace_scene':
-        return workspaceSceneProjection(state, context.options, signal);
-      case 'get_workspace_preview':
-        return workspacePreviewProjection(state, context.options, signal);
-      case 'list_fonts':
-        return fontsProjection();
-      case 'get_text':
-        return textProjection(state, input.args.artworkId, context.options);
-      case 'get_machine':
-        return machineProjection(state);
-      case 'get_app_status':
-        return appStatusProjection(context.options);
-      case 'list_material_recipes':
-        return recipesProjection(state);
-      case 'review_job':
-        return reviewProjection(
-          context.options,
-          revision,
-          state.project.machine?.kind ?? 'laser',
-          signal,
-        );
-    }
-  })();
+  let data =
+    input.command === 'get_board'
+      ? boardProjection(context.store)
+      : await nonBoardRead(input as NonBoardReadInput, context, state, revision, signal);
   if (context.isDisposed() || signal.aborted) throw new RemoteFault('cancelled');
   data = reprojectAfterRead(input.command, data, state, context.options);
   if (context.tracker.current() !== revision) throw new RemoteFault('stale_revision');
   return { ok: true, revision, data };
+}
+
+type ReadInput = Exclude<ValidatedCommand, AnyWrite>;
+type NonBoardReadInput = ReadInput & {
+  readonly command: Exclude<ReadInput['command'], 'get_board'>;
+};
+
+async function nonBoardRead(
+  input: NonBoardReadInput,
+  context: Context,
+  state: ReturnType<Context['store']['getState']>,
+  revision: string,
+  signal: AbortSignal,
+): Promise<Record<string, unknown>> {
+  switch (input.command) {
+    case 'get_workspace':
+      return workspaceReadProjection(state, context.options);
+    case 'get_workspace_scene':
+      return workspaceSceneProjection(state, context.options, signal);
+    case 'get_workspace_preview':
+      return workspacePreviewProjection(state, context.options, signal);
+    case 'list_fonts':
+      return fontsProjection();
+    case 'get_text':
+      return textProjection(state, input.args.artworkId, context.options);
+    case 'get_machine':
+      return machineProjection(state);
+    case 'get_app_status':
+      return appStatusProjection(context.options);
+    case 'list_material_recipes':
+      return recipesProjection(state);
+    case 'review_job':
+      return reviewProjection(
+        context.options,
+        revision,
+        state.project.machine?.kind ?? 'laser',
+        signal,
+      );
+  }
 }
 /**
  * Operation names can contain artwork wording. Re-project this synchronous snapshot using the

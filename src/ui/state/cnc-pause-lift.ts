@@ -17,6 +17,7 @@ import { formatGcodeCoordinateMm } from '../../core/gcode';
 import type { MotionPoint } from '../../core/job/motion-manifest';
 import {
   CNC_REENTRY_MODAL_LINE,
+  cncPauseLiftFirmwareRefusal,
   cncPauseLiftLine,
   planCncPauseReentry,
   type CncPauseReentryPlan,
@@ -31,6 +32,7 @@ import {
 } from './cnc-pause-lift-commands';
 import { restoreCncLiftOverrides } from './cnc-pause-lift-overrides';
 import {
+  cncPauseControllerKind,
   cncPauseLiftJobPatch,
   currentCncPauseLiftJob,
   nextCncPauseLiftToken,
@@ -168,6 +170,10 @@ function liftRefusal(
   if (state.connection.kind !== 'connected' || context.driver().realtime.softReset === null) {
     return 'The controller has no soft reset to clear its hold with.';
   }
+  // Ahead of the settings: FluidNC's `$I` lists parking whatever its YAML
+  // says, so the parking check cannot speak for FluidNC (ADR-180 Amendment 7).
+  const firmware = cncPauseLiftFirmwareRefusal(cncPauseControllerKind(state));
+  if (firmware !== null) return firmware;
   const settings = settingsConfirmed ? null : settingsRefusal(state);
   if (settings !== null) return settings;
   if (state.mpgActive === true) return 'A pendant (MPG) has control of the machine.';

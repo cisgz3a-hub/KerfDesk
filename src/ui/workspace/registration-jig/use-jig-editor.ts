@@ -1,9 +1,10 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   findRegistrationBoxes,
   type Project,
   type SceneObject,
   type TextObject,
+  type TracedImage,
 } from '../../../core/scene';
 import { useStore } from '../../state';
 import { reportDependencyRepairs } from '../../state/object-delete-actions';
@@ -25,11 +26,13 @@ import {
   deleteJigArtworkWithRepairs,
   importJigArtwork,
   nudgeJigSelection,
+  traceJigImage,
   upsertJigText,
   type JigImportPlacement,
 } from './jig-editor-artwork';
 import { useJigArtworkImport } from './JigArtworkImport';
 import { jigSelectAll } from './jig-canvas-selection';
+import { jigViewProject, withJigBackground } from './jig-editor-scope';
 
 export function useJigEditor(onClose: () => void) {
   const [session, setSession] = useState(() => createJigEditorSession(useStore.getState()));
@@ -37,9 +40,20 @@ export function useJigEditor(onClose: () => void) {
   const working = useJigWorking();
   // Bumped when the outline layout is rebuilt, so the canvas refits to the new grid.
   const [fitRequest, setFitRequest] = useState(0);
+  // The canvas and sidebar edit the jig view; fold each edit back into the
+  // whole draft so main-canvas artwork outside the jig stays as it was.
   const onCommit = useCallback(
-    (project: Project) => setSession((current) => changeJigDraft(current, { project })),
+    (project: Project) =>
+      setSession((current) =>
+        changeJigDraft(current, {
+          project: withJigBackground(current.draft.project, project, current.background),
+        }),
+      ),
     [],
+  );
+  const view = useMemo(
+    () => jigViewProject(session.draft.project, session.background),
+    [session.draft.project, session.background],
   );
   const onSelect = useCallback(
     (ids: ReadonlySet<string>) => setSession((current) => selectJigObjects(current, ids)),
@@ -52,6 +66,11 @@ export function useJigEditor(onClose: () => void) {
   );
   const onUpsert = useCallback(
     (object: TextObject) => setSession((current) => upsertJigText(current, object)),
+    [],
+  );
+  const onTraceImage = useCallback(
+    (imageId: string, traced: TracedImage) =>
+      setSession((current) => traceJigImage(current, imageId, traced)),
     [],
   );
   const artworkImport = useJigArtworkImport(onImport, working.onImportBusy);
@@ -75,6 +94,8 @@ export function useJigEditor(onClose: () => void) {
     ...closing,
     session,
     setSession,
+    /** The draft as the editor shows it: the jig without main-canvas artwork. */
+    view,
     pendingLayout,
     setPendingLayout,
     busy: working.busy,
@@ -87,6 +108,7 @@ export function useJigEditor(onClose: () => void) {
     onSelect,
     onImport,
     onUpsert,
+    onTraceImage,
     onReplaceLayout,
     onRemoveLayout,
     onTextBusy: working.onTextBusy,
@@ -134,15 +156,26 @@ function useJigEditorClose(args: {
       onClose();
       return true;
     }
-    const result = commitJigEditorSession(useStore.getState(), session);
-    if (result.kind === 'refused') {
+    let refused: JigCommitRefusal | null = null;
+    // The draft may assign artwork to a Pro operation: without Pro that waits
+    // for the Pro prompt, and the editor closes once the change lands.
+    const committed = useStore.getState().commitProjectEdit(
+      (state) => {
+        const result = commitJigEditorSession(state, session);
+        if (result.kind === 'saved') return result.change;
+        refused = result.reason;
+        return {};
+      },
+      () => {
+        if (refused === null) onClose();
+      },
+    );
+    if (refused !== null) {
       setConfirmingClose(false);
-      setError(refusalMessage(result.reason));
+      setError(refusalMessage(refused));
       return false;
     }
-    useStore.setState(result.change);
-    onClose();
-    return true;
+    return committed;
   };
   const requestClose = (): void => {
     if (dirty && !captured) setConfirmingClose(true);
@@ -186,6 +219,10 @@ function refusalMessage(reason: JigCommitRefusal): string {
       return `An operation setting you changed here was also changed in the main project, or artwork here uses an operation the main project removed. ${REOPEN} to start from the current operations.`;
     case 'project':
       return `A project setting changed in the main project overlaps this editor's changes. ${REOPEN} to start from the current project.`;
+    case 'scene-limits':
+      return 'Combining this draft with the main project would exceed a project size limit. Your draft is still open. Remove some artwork or unused operations before saving again.';
+    case 'scene-integrity':
+      return `Combining this draft with the main project would create conflicting operation colours or artwork references. Your draft is still open. ${REOPEN} to start from the current project.`;
   }
 }
 

@@ -8,7 +8,7 @@ import {
 import { autoMedianFilter, medianFilter } from './preprocess';
 import { invertImage } from './raster-prep';
 import { shouldTraceAlphaMask } from './trace-alpha';
-import { effectivePixelScale, type RawImageData, type TraceOptions } from './trace-image';
+import { detectorWindowScale, type RawImageData, type TraceOptions } from './trace-image';
 
 // The detector has two parameters (ADR-437). Both are carried by the
 // Canny-era option fields so saved options keep their exact output:
@@ -124,7 +124,7 @@ export function edgeBlurSigmaForRadius(radiusPx: number): number {
 
 function edgeMaskOptions(options: TraceOptions): LocalContrastMaskOptions {
   return {
-    radiusPx: edgeSourceRadiusPx(options) * effectivePixelScale(options),
+    radiusPx: edgeSourceRadiusPx(options) * detectorWindowScale(options),
     delta: edgeContrastDelta(options),
   };
 }

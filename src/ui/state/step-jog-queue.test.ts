@@ -1,4 +1,4 @@
-// Protocol audit P-3, ADR-648: step presses join a running operator step jog
+// Protocol audit P-3, ADR-672: step presses join a running operator step jog
 // on a GRBL-family controller, up to three steps, and each queued step waits
 // in KerfDesk until the one before it settles. Cancel's 0x85 then stops the
 // running step and no queued step is ever written.

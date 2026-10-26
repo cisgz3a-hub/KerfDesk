@@ -7,6 +7,8 @@ import {
 import { DEFAULT_PROJECT_VARIABLE_DATA, type Project, type TextObject } from '../../core/scene';
 import type { SaveTarget } from '../../platform/types';
 import type { VariableTextRenderer } from '../../io/gcode/prepare-output-snapshot';
+import { installChromiumSavePicker } from '../../platform/web/chromium-save-picker.test-support';
+import { webAdapter } from '../../platform/web/web-adapter';
 import { handleExportArtworkSvg } from './export-artwork-svg';
 
 function destination(): { readonly target: SaveTarget; readonly writes: Array<string | Blob> } {
@@ -68,9 +70,9 @@ const renderer: VariableTextRenderer = async ({ text }) => ({
 });
 
 describe('SVG export action', () => {
-  it('captures the selected artwork before the picker resolves', async () => {
+  it('captures the selected artwork at the click, before preparing and picking', async () => {
     const saved = destination();
-    let finishPicker: (target: SaveTarget) => void = () => undefined;
+    let finishPicker = null as ((target: SaveTarget) => void) | null;
     const ids = ['A'];
     const pending = handleExportArtworkSvg({
       platform: mockPlatform({
@@ -85,7 +87,8 @@ describe('SVG export action', () => {
       pushToast: vi.fn(),
     });
     ids[0] = 'B';
-    finishPicker(saved.target);
+    await vi.waitFor(() => expect(finishPicker).not.toBeNull());
+    finishPicker?.(saved.target);
     await pending;
     const svg = await textOf(saved.writes[0]);
     expect(svg).toContain('viewBox="10 0 10 0.01"');
@@ -114,22 +117,44 @@ describe('SVG export action', () => {
     expect(JSON.stringify(p)).toBe(before);
   });
 
-  it('does no materialisation, image loading or writes after picker cancellation', async () => {
-    const render = vi.fn(renderer),
-      readImageSource = vi.fn(),
-      pushToast = vi.fn();
+  it('stays silent when the picker is cancelled after preparation', async () => {
+    const pushToast = vi.fn();
     await handleExportArtworkSvg({
       platform: mockPlatform(),
       project: variableProject(),
       selectedIds: [],
       savedName: null,
       pushToast,
-      renderer: render,
-      readImageSource,
+      renderer,
     });
-    expect(render).not.toHaveBeenCalled();
-    expect(readImageSource).not.toHaveBeenCalled();
     expect(pushToast).not.toHaveBeenCalled();
+  });
+
+  it('leaves an existing SVG intact when preparation fails, without opening the picker', async () => {
+    // Chromium empties the chosen file as the picker returns (ADR-656, audit 19-P2-1).
+    const disk = new Map([['artwork.svg', '<svg>previous</svg>']]);
+    const picker = installChromiumSavePicker(disk);
+    const pushToast = vi.fn();
+    try {
+      await handleExportArtworkSvg({
+        platform: webAdapter,
+        project: variableProject(),
+        selectedIds: [],
+        savedName: null,
+        pushToast,
+        renderer: async () => {
+          throw new Error('font failed to load');
+        },
+      });
+    } finally {
+      picker.restore();
+    }
+    expect(picker.picks()).toBe(0);
+    expect(disk.get('artwork.svg')).toBe('<svg>previous</svg>');
+    expect(pushToast).toHaveBeenCalledWith(
+      expect.stringContaining('Could not export SVG'),
+      'error',
+    );
   });
 
   it('does not let invalid variables outside the selection block an artwork export', async () => {

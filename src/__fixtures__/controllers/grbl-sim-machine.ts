@@ -333,6 +333,8 @@ function reduceSoftReset(state: GrblSimState, opts: GrblSimOptions): GrblSimReac
     // state); grblHAL at COMPATIBILITY_LEVEL <= 1 keeps it (gcode.c:787 clears
     // only up to g92_offset). The persistent G54 offset survives either way.
     g92: opts.firmware === 'grblhal' ? state.g92 : null,
+    // gc_init selects G54 again on both.
+    wcs: 'G54',
     pendingLine: null,
     critical: false,
     lastError: null,

@@ -17,6 +17,10 @@
 // an outer contour otherwise. A closed shape on an operation without leads may
 // be a part, or only a score line or a sheet border, and parity cannot tell
 // which: a contour it holds gets no side, so no leads, and Job Review says so.
+//
+// Open lines are no closed shape, but they too may be the edge of a part: a
+// contour in a region the scene's open Line cuts close gets no side either
+// (laser-lead-open-outlines.ts, ADR-626 Amendment 8).
 
 import { vectorPowerReachesController } from './job-start-power';
 import type { DeviceProfile } from '../devices';
@@ -33,6 +37,7 @@ import {
 } from '../scene';
 import { compilationPolylines } from './compilation-polylines';
 import { copyRepresentatives, leadOutline, type LeadOutline } from './laser-lead-copies';
+import { openLineHolders, type SceneOpenLine } from './laser-lead-open-outlines';
 import { laserLeadSpecFor } from './laser-lead-settings';
 import { properContourAncestors } from './proper-contour-containment';
 
@@ -59,8 +64,11 @@ export type LeadSideVerdict = {
   readonly side: 'inside' | 'outside' | 'unknown';
   /** Contours with the same class are copies of one outline. */
   readonly copyClass: number;
-  /** For 'unknown': the operation without leads whose shape holds it. */
+  /** For 'unknown': the operation without leads whose shape holds it, or
+   * whose open lines close a region round it. */
   readonly aroundName?: string;
+  /** For 'unknown': open lines of `aroundName`, not a closed shape, hold it. */
+  readonly aroundOpenPaths?: true;
 };
 
 /** A scene contour with the operation that cuts it, as the artwork runs it,
@@ -77,18 +85,45 @@ export function sceneLeadSideContours(
   scene: Pick<Scene, 'layers' | 'objects'>,
   device?: DeviceProfile,
 ): SceneLineContour[] {
-  const contours: SceneLineContour[] = [];
+  return sceneLines(scene, device, null);
+}
+
+/** The scene's closed Line contours, and the open paths of the same burning
+ * Line operations, which may close a region round a contour (Amendment 8). */
+export function sceneLeadSideGeometry(
+  scene: Pick<Scene, 'layers' | 'objects'>,
+  device?: DeviceProfile,
+): {
+  readonly contours: ReadonlyArray<SceneLineContour>;
+  readonly openLines: ReadonlyArray<SceneOpenLine>;
+} {
+  const openLines: SceneOpenLine[] = [];
+  return { contours: sceneLines(scene, device, openLines), openLines };
+}
+
+type SceneLines = {
+  readonly contours: SceneLineContour[];
+  /** Null when the caller reads closed contours only. */
+  readonly openLines: SceneOpenLine[] | null;
+};
+
+function sceneLines(
+  scene: Pick<Scene, 'layers' | 'objects'>,
+  device: DeviceProfile | undefined,
+  openLines: SceneOpenLine[] | null,
+): SceneLineContour[] {
+  const into: SceneLines = { contours: [], openLines };
   for (const layer of scene.layers) {
     const operations = [layer, ...layer.subLayers.map((sub) => layerFromSubLayer(layer, sub))];
     for (const operation of operations) {
-      for (const object of scene.objects) appendContours(contours, operation, object, device);
+      for (const object of scene.objects) appendContours(into, operation, object, device);
     }
   }
-  return contours;
+  return into.contours;
 }
 
 function appendContours(
-  contours: SceneLineContour[],
+  into: SceneLines,
   operation: Layer,
   object: SceneObject,
   device: DeviceProfile | undefined,
@@ -101,8 +136,14 @@ function appendContours(
   for (const [pathIndex, path] of object.paths.entries()) {
     if (!pathUsesOperation(object, path, operation)) continue;
     for (const [index, polyline] of compilationPolylines(path, object.transform).entries()) {
-      if (!polyline.closed) continue;
-      contours.push({
+      if (!polyline.closed) {
+        into.openLines?.push({
+          points: polyline.points.map((point) => applyTransform(point, object.transform)),
+          operationName: effective.name,
+        });
+        continue;
+      }
+      into.contours.push({
         key: laserLeadSourceKey(object.id, pathIndex, index),
         points: polyline.points.map((point) => applyTransform(point, object.transform)),
         decides,
@@ -120,9 +161,11 @@ type SideClass = {
   aroundName: string;
 };
 
-/** The scrap side of every contour, by key. */
+/** The scrap side of every contour, by key. `openLines`: the scene's open
+ * Line cuts; a contour in a region they close gets no side. */
 export function leadSideVerdicts(
   contours: ReadonlyArray<LeadSideContour>,
+  openLines: ReadonlyArray<SceneOpenLine> = [],
 ): ReadonlyMap<string, LeadSideVerdict> {
   const byKey = new Map<string, SideClass>();
   for (const contour of contours) {
@@ -145,22 +188,32 @@ export function leadSideVerdicts(
   const ancestors = properContourAncestors(
     unique.map((index) => ({ polyline: keyed[index]?.outline.points ?? [], closed: true })),
   );
+  const openHolders = openLineHolders(
+    unique.map((index) => keyed[index]?.outline.points ?? []),
+    openLines,
+  );
   const at = new Map(unique.map((index, position) => [index, position]));
   const verdicts = new Map<string, LeadSideVerdict>();
   [...byKey.keys()].forEach((key, index) => {
     const copyClass = representatives[index] ?? index;
-    const holders = (ancestors[at.get(copyClass) ?? -1] ?? []).map(
-      (position) => keyed[unique[position] ?? -1],
-    );
-    const unknown = holders.find((holder) => holder?.decides !== true);
-    verdicts.set(
-      key,
-      unknown === undefined
-        ? { side: holders.length % 2 === 1 ? 'inside' : 'outside', copyClass }
-        : { side: 'unknown', copyClass, aroundName: unknown?.aroundName ?? '' },
-    );
+    const position = at.get(copyClass) ?? -1;
+    const holders = (ancestors[position] ?? []).map((held) => keyed[unique[held] ?? -1]);
+    verdicts.set(key, verdict(copyClass, holders, openHolders[position]));
   });
   return verdicts;
+}
+
+function verdict(
+  copyClass: number,
+  holders: ReadonlyArray<SideClass | undefined>,
+  openHolder: string | undefined,
+): LeadSideVerdict {
+  const unknown = holders.find((holder) => holder?.decides !== true);
+  if (unknown !== undefined)
+    return { side: 'unknown', copyClass, aroundName: unknown?.aroundName ?? '' };
+  if (openHolder !== undefined)
+    return { side: 'unknown', copyClass, aroundName: openHolder, aroundOpenPaths: true };
+  return { side: holders.length % 2 === 1 ? 'inside' : 'outside', copyClass };
 }
 
 function closedPoints(points: ReadonlyArray<Vec2>): ReadonlyArray<Vec2> {

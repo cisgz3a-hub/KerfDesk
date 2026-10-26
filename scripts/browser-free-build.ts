@@ -11,10 +11,9 @@ export const PRO_BUILD_ENTRIES: Readonly<Record<string, readonly string[]>> = {
   'src/ui/box/BoxGeneratorHost.tsx': ['BoxGeneratorHost'],
   'src/ui/workspace/RegistrationJigPanel.tsx': ['RegistrationJigPanel'],
   'src/ui/laser/board-capture/BoardCapturePanel.tsx': ['BoardCapturePanel'],
-  'src/ui/gcode-inspector/InspectorView.tsx': ['InspectorView'],
-  'src/ui/gcode-inspector/CanvasGcodeView.tsx': ['CanvasGcodeView'],
   'src/ui/camera/WorkspaceCameraOverlay.tsx': ['WorkspaceCameraOverlay'],
   'src/ui/camera/calibrate/CalibrateCameraControls.tsx': ['CalibrateCameraControls'],
+  'src/ui/camera/calibrate/CameraCalibrationWizard.tsx': ['CameraCalibrationWizard'],
   'src/ui/camera/OverlayControls.tsx': ['OverlayControls'],
   'src/ui/camera/panel/SavedCamerasSection.tsx': ['SavedCamerasSection'],
   'src/ui/camera/active-camera-model.ts': [

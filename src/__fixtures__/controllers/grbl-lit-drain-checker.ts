@@ -21,7 +21,10 @@
 // The beam and spindle state come from the independent port of gcode.c laser
 // power (grbl-laser-power-model.ts). The job's own ending (M9/M5 after the last
 // burn) has the same lit stop, but GRBL's guidance is about force-syncs "during
-// a job", and no laser-off move exists there, so the ending is left out.
+// a job", and no laser-off move exists there, so those two words are allowed
+// after the last burn. Any other drain there (an air-on, a re-arm, a dwell) is
+// reported: it is not the ending, and an air-on dwells for grblHAL's `$673` or
+// FluidNC's `coolant/delay_ms` with the beam lit (audit 2026-10-21, 03-P2-1).
 
 import { executeGrblLine, powerUpGrbl, type GrblLaserPowerModel } from './grbl-laser-power-model';
 
@@ -29,7 +32,8 @@ type Word = { readonly letter: string; readonly value: number };
 type Coolant = { mist: boolean; flood: boolean };
 type Head = { x: number | null; y: number | null };
 
-/** Every mid-job line that drains GRBL's planner with an M3 beam lit. */
+/** Every line that drains GRBL's planner with an M3 beam lit, apart from the
+ *  job's own M9/M5 after the last burn. */
 export function findM3LitPlannerDrains(gcode: string): string[] {
   const lines = gcode.split('\n');
   const lastBurn = lastBurnIndex(lines);
@@ -39,7 +43,8 @@ export function findM3LitPlannerDrains(gcode: string): string[] {
   const found: string[] = [];
   lines.forEach((line, index) => {
     const lit = model.spindle === 'cw' && model.beam > 0;
-    if (index < lastBurn && lit && drainsPlanner(model, coolant, head, line)) {
+    const jobEnd = index > lastBurn && isJobEndWord(line);
+    if (lit && !jobEnd && drainsPlanner(model, coolant, head, line)) {
       found.push(`line ${index + 1} "${line.trim()}" drains with M3 S${model.beam} lit`);
     }
     executeGrblLine(model, line);
@@ -50,6 +55,12 @@ export function findM3LitPlannerDrains(gcode: string): string[] {
     }
   });
   return found;
+}
+
+/** The job's own ending: switching air off (`M9`) or the beam off (`M5`). */
+export function isJobEndWord(line: string): boolean {
+  const ws = words(line);
+  return ws.length === 1 && ws[0]?.letter === 'M' && (ws[0].value === 5 || ws[0].value === 9);
 }
 
 function words(line: string): Word[] {

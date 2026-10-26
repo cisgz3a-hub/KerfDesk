@@ -6,6 +6,7 @@ import type { useCameraStore } from '../state/camera-store';
 import type { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { connectedLaserModuleEvidence } from '../state/laser-module-probe';
+import { laserStatusReportFieldsOff } from '../state/status-report-fields';
 import { isRestoredWorkOrigin } from '../state/work-origin-state';
 import { controllerReportsWorkOffset } from './work-offset-assumption';
 
@@ -56,6 +57,7 @@ export function machineSnapshot(
       laser.capabilities.statusQuery,
     ),
     reportsWorkOffset: controllerReportsWorkOffset(laser.capabilities),
+    statusReportFieldsOff: laserStatusReportFieldsOff(laser),
   };
 }
 

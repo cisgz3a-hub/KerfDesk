@@ -3,9 +3,7 @@
 // attribution pushed that file past the 400-line cap.
 
 import {
-  cancel as cancelStreamer,
   pause as pauseStreamer,
-  wipeInFlight,
   type StatusReport,
   type StreamerState,
 } from '../../core/controllers/grbl';
@@ -40,6 +38,7 @@ import { HOMING_STATE_RESET_MESSAGE, reportsStuckHomingState } from './controlle
 import { resumeJogSettlementAfterMpg } from './laser-motion-operation';
 import { releaseAbandonedMotionAtIdle } from './laser-motion-release';
 import { isProbeAlarmedToolChangeHold } from './tool-change-probe-alarm';
+import { cancelActiveStreamerPatch } from './laser-alarm-stream-end';
 import {
   homeAlarmReplyWindowPatch,
   isStaleHomeAlarmReply,
@@ -336,7 +335,7 @@ function handleInvalidatingStatus(
     statusSequence: state.statusSequence + 1,
     statusObservation: null,
     ...statusResponseObservationPatch(state),
-    ...(keepToolChangeHold || ownedReset ? {} : cancelActiveStreamerPatch(streamer)),
+    ...(keepToolChangeHold || ownedReset ? {} : cancelActiveStreamerPatch(streamer, alarm)),
     ...(alarm ? {} : { alarmCode: null }),
     wcoCache: null,
     ovCache: null,
@@ -432,19 +431,6 @@ export function originUnknownAfterControllerReset(
     workZZeroEvidence: null,
     workZReferenceEpoch: state.workZReferenceEpoch + 1,
   };
-}
-
-function cancelActiveStreamerPatch(
-  streamer: StreamerState | null,
-): Partial<Pick<LaserState, 'streamer'>> {
-  if (streamer === null) return {};
-  // 'tool-change' is an active hold (M0 queued, pre-M0 motion may be draining):
-  // an Alarm there wiped the firmware buffer just as during streaming/paused, so
-  // cancel it too (Codex audit: status list not updated when tool-change landed).
-  if (!['idle', 'streaming', 'paused', 'tool-change'].includes(streamer.status)) return {};
-  // Alarm = the firmware wiped its buffer; in-flight lines will never be
-  // acked, so drop them from the accounting too (audit F1).
-  return { streamer: wipeInFlight(cancelStreamer(streamer)) };
 }
 
 function mpgOwnershipPatch(

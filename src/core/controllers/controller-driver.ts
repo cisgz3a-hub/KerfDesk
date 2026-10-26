@@ -25,7 +25,7 @@ export type ControllerRealtime = {
   readonly statusQuery: string | null;
   /** A status request answered with every report field at once, the work
    *  offset (`WCO:`) included (grblHAL 0x87). Stock GRBL sends WCO only every
-   *  few reports. Absent or null: the firmware has no such request (ADR-648). */
+   *  few reports. Absent or null: the firmware has no such request (ADR-672). */
   readonly completeStatusQuery?: string | null;
   /** Feed hold (GRBL '!'). */
   readonly hold: string | null;
@@ -35,11 +35,10 @@ export type ControllerRealtime = {
   readonly resume: string | null;
   /** Abort / soft reset (GRBL \x18). */
   readonly softReset: string | null;
-  /** Cancel the in-flight jog only (GRBL \x85). */
+  /** Cancel the in-flight jog only (GRBL \x85). grblHAL also discards,
+   *  unanswered, every line it has received but not parsed yet, so Cancel
+   *  waits briefly for owed replies before writing it (ADR-640). */
   readonly jogCancel: string | null;
-  /** True when the jog-cancel byte also discards, unanswered, every line the
-   *  controller has received but not parsed yet (grblHAL, in every state). */
-  readonly jogCancelDropsUnparsedLines?: boolean;
 };
 
 export type ControllerCommands = {

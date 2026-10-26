@@ -2,7 +2,8 @@
 
 **Date:** 2026-09-27
 **Status:** Implemented; software verification recorded below. Hardware qualification requires
-separate evidence (WORKFLOW F.3 step 13).
+separate evidence (WORKFLOW F.3 step 13). Repeat placement on Marlin amended by ADR-462
+Amendment 1.
 
 This builds on ADR-335 and ADR-345, which recorded the Creality A1 family's air standby timer, and
 on ADR-370, which let the Falcon Console send `$152`. It adds no Start guard. Job Review stays

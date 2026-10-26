@@ -32,10 +32,15 @@ import { isProbeAlarmedToolChangeHold } from './tool-change-probe-alarm';
 import { framePushWritePatch } from './laser-frame-modal-restore';
 import { toolOffAirPatch } from './laser-tool-off-air';
 import { publishControllerIncident } from './laser-incident-publish';
+import {
+  noteControllerSettingWrite,
+  type OwnedResetSettingsRefs,
+} from './laser-owned-reset-settings';
 
 export type SafeWriteRefs = UntrackedAckLedgerRefs &
   TranscriptBufferRefs &
-  JobTransportLedgerRefs & {
+  JobTransportLedgerRefs &
+  OwnedResetSettingsRefs & {
     connection: SerialConnection | null;
     readonly driver: ControllerDriver;
     nextTranscriptId: number;
@@ -112,6 +117,9 @@ export function createSafeWrite(set: SetFn, get: GetFn, refs: SafeWriteRefs): Sa
     const binding = reserveWrite(set, get, refs, line, action, writeSource);
     const { writeEpoch, ownedMotionOperationId } = binding;
     assertDispatchWrite(set, refs, conn, action, binding, assertBeforeWrite);
+    // A `$` assignment may reach EEPROM even when its reply is lost: the
+    // settings read before it no longer survive a reset (ADR-648).
+    noteControllerSettingWrite(refs, line);
     try {
       await conn.write(line);
       assertCurrentWriteEpoch(refs, writeEpoch);

@@ -108,6 +108,7 @@ export function DepthPerPassField(props: {
       layer={props.layer}
       label="Depth per pass"
       unit="mm"
+      dimension="length"
       value={props.settings.depthPerPassMm}
       min={0.05}
       max={50}
@@ -136,6 +137,7 @@ export function CncFeedFields(props: {
         layer={layer}
         label="Feed"
         unit="mm/min"
+        dimension="feed"
         value={settings.feedMmPerMin}
         min={1}
         max={maxFeed}
@@ -148,6 +150,7 @@ export function CncFeedFields(props: {
         layer={layer}
         label="Plunge"
         unit="mm/min"
+        dimension="feed"
         value={settings.plungeMmPerMin}
         min={1}
         max={maxFeed}

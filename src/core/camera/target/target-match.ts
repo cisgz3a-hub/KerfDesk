@@ -19,9 +19,25 @@ export type TargetMatch =
     }
   | { readonly kind: 'failed'; readonly reason: TargetMatchFailure };
 
-export type TargetMatchFailure = 'anchors-not-found' | 'mirrored-image' | 'too-few-marks';
+/**
+ * 'anchors-unclear': discs other than the three anchors (rings whose hole
+ * filled in, in a small, dim or over-burned picture) form Ls too, and none, or
+ * more than one, labels the rings in a way the target's layout allows.
+ */
+export type TargetMatchFailure =
+  | 'anchors-not-found'
+  | 'anchors-unclear'
+  | 'mirrored-image'
+  | 'too-few-marks';
 
 type Anchors = { readonly origin: RingMark; readonly x: RingMark; readonly y: RingMark };
+
+type GrownGrid = {
+  readonly grid: Map<string, RingMark>;
+  /** Rings the labelling puts on cells the layout does not have. */
+  readonly outside: number;
+  readonly mirrored: boolean;
+};
 
 const MAX_ANCHOR_CANDIDATES = 60;
 const MAX_L_SCORE = 0.6;
@@ -31,6 +47,19 @@ const MIN_AREA_RATIO = 0.4;
 const MAX_AREA_RATIO = 2.5;
 const MIN_MATCHED = 8;
 const MIN_MATCHED_SHARE = 0.25;
+// Arms nearer parallel than this are no L under any laser camera's perspective.
+const MAX_ARM_COSINE = 0.9;
+// A combination of the arms this much shorter than an arm means the arm is
+// not one grid step but several (a skewed L); slack for perspective.
+const REDUCED_SLACK = 0.9;
+// A mark this close (in arm lengths) to a half step means the arms skip it.
+const HALF_STEP_SHARE = 0.25;
+// The grid is grown this many cells past the layout's edge, where a ring can
+// only be found when the labelling is wrong.
+const GROW_PAST_EDGE = 2;
+// Another labelling this close in size to the best one leaves it in doubt.
+const RIVAL_SHARE = 0.05;
+const MIN_RIVAL_GAP = 2;
 const DIRECTIONS: ReadonlyArray<readonly [number, number]> = [
   [1, 0],
   [-1, 0],
@@ -47,20 +76,33 @@ export function matchBedTarget(
     rings.filter((r) => !r.anchor),
   );
   if (candidates.length === 0) return { kind: 'failed', reason: 'anchors-not-found' };
-  // Stray blobs can form an L too; the true L is the one the grid agrees
-  // with. Growing does not depend on handedness, so a mirrored image still
-  // grows its full grid, which is how it is recognised.
-  let grid = new Map<string, RingMark>();
-  let mirrored = false;
-  for (const anchors of candidates) {
-    const grown = growGrid(rings, layout, anchors);
-    if (grown.size <= grid.size) continue;
-    grid = grown;
-    mirrored = cross(sub(anchors.x, anchors.origin), sub(anchors.y, anchors.origin)) < 0;
-  }
+  // Stray discs can form an L too, and every L of grid steps grows a grid as
+  // large as the true one, labelling every ring wrongly while the fit still
+  // looks clean. The true L is the one whose grid stays inside the layout, and
+  // it must beat every other such labelling plainly. Growing does not depend
+  // on handedness, so a mirrored image still grows its full grid, which is how
+  // it is recognised.
+  const grown: GrownGrid[] = candidates.map((anchors) => ({
+    ...growGrid(rings, layout, anchors),
+    mirrored: cross(sub(anchors.x, anchors.origin), sub(anchors.y, anchors.origin)) < 0,
+  }));
   const needed = Math.max(MIN_MATCHED, Math.ceil(MIN_MATCHED_SHARE * layout.marks.length));
-  if (grid.size < needed) return { kind: 'failed', reason: 'too-few-marks' };
-  if (mirrored) return { kind: 'failed', reason: 'mirrored-image' };
+  const largest = Math.max(...grown.map((g) => g.grid.size));
+  if (largest < needed) return { kind: 'failed', reason: 'too-few-marks' };
+  const fitting = grown.filter((g) => g.outside === 0);
+  const best = fitting.reduce<GrownGrid | null>(
+    (most, g) => (most === null || g.grid.size > most.grid.size ? g : most),
+    null,
+  );
+  // A disc where the labelling expects a ring is a ring whose hole filled in;
+  // then the true third anchor may be such a ring too, and a turned L of
+  // filled rings fits a square layout exactly. The photo cannot say which.
+  if (best === null || hasRival(fitting, best) || discsOffAnchorCells(best.grid)) {
+    return { kind: 'failed', reason: 'anchors-unclear' };
+  }
+  if (best.grid.size < needed) return { kind: 'failed', reason: 'too-few-marks' };
+  if (best.mirrored) return { kind: 'failed', reason: 'mirrored-image' };
+  const { grid } = best;
   const correspondences: TargetCorrespondence[] = [];
   for (const mark of layout.marks) {
     const found = grid.get(key(mark.col, mark.row));
@@ -78,6 +120,7 @@ function anchorCandidates(
   rings: ReadonlyArray<RingMark>,
 ): Anchors[] {
   if (discs.length < 3 || discs.length > MAX_ANCHOR_CANDIDATES) return [];
+  const marks = [...rings, ...discs];
   const scored: Array<{ readonly score: number; readonly anchors: Anchors }> = [];
   for (const origin of discs) {
     const step = nearestDistance(rings, origin);
@@ -86,7 +129,9 @@ function anchorCandidates(
         if (x === origin || y === origin || x === y) continue;
         let score = lScore(origin, x, y) + Math.abs(distance(x, origin) / step - 1);
         if (score >= MAX_L_SCORE) score = latticeScore(rings, origin, x, y);
-        if (score < MAX_L_SCORE) scored.push({ score, anchors: { origin, x, y } });
+        if (score < MAX_L_SCORE && armsAreGridSteps(marks, origin, x, y)) {
+          scored.push({ score, anchors: { origin, x, y } });
+        }
       }
     }
   }
@@ -121,6 +166,63 @@ function latticeScore(rings: ReadonlyArray<RingMark>, origin: Vec2, x: Vec2, y: 
   return nearestDistance(rings, behind) / armLength + nearestDistance(rings, middle) / halfLength;
 }
 
+// The short arm and half the long arm must be single grid steps along two
+// different axes: not near parallel, no shorter combination of them (a skewed
+// pair such as one step and two-across-one-down passes latticeScore, since
+// both land on rings), and no mark half a step along either arm or their
+// diagonals (a diagonal pair spans only every other ring). The test is on
+// lengths in the picture, so it holds under the perspective of a tilted camera.
+function armsAreGridSteps(marks: ReadonlyArray<RingMark>, origin: Vec2, x: Vec2, y: Vec2): boolean {
+  const arm = sub(x, origin);
+  const half = scale(sub(y, origin), 0.5);
+  const armLength = Math.hypot(arm.x, arm.y);
+  const halfLength = Math.hypot(half.x, half.y);
+  if (armLength === 0 || halfLength === 0) return false;
+  const cosine = Math.abs(arm.x * half.x + arm.y * half.y) / (armLength * halfLength);
+  if (cosine > MAX_ARM_COSINE) return false;
+  for (const k of [-2, -1, 1, 2]) {
+    if (Math.hypot(half.x - k * arm.x, half.y - k * arm.y) < REDUCED_SLACK * halfLength) {
+      return false;
+    }
+    if (Math.hypot(arm.x - k * half.x, arm.y - k * half.y) < REDUCED_SLACK * armLength) {
+      return false;
+    }
+  }
+  const reach = HALF_STEP_SHARE * Math.min(armLength, halfLength);
+  const halfSteps = [
+    scale(arm, 0.5),
+    scale(half, 0.5),
+    scale({ x: arm.x + half.x, y: arm.y + half.y }, 0.5),
+    scale({ x: arm.x - half.x, y: arm.y - half.y }, 0.5),
+  ];
+  return halfSteps.every(
+    (step) => nearestDistance(marks, { x: origin.x + step.x, y: origin.y + step.y }) > reach,
+  );
+}
+
+const ANCHOR_CELLS: ReadonlySet<string> = new Set([key(0, 0), key(1, 0), key(0, 2)]);
+
+function discsOffAnchorCells(grid: ReadonlyMap<string, RingMark>): boolean {
+  return [...grid].some(([cell, mark]) => mark.anchor && !ANCHOR_CELLS.has(cell));
+}
+
+// True when another labelling of the rings grows nearly as large a grid as
+// the best one: which is right is then a guess.
+function hasRival(grids: ReadonlyArray<GrownGrid>, best: GrownGrid): boolean {
+  const gap = Math.max(MIN_RIVAL_GAP, Math.ceil(RIVAL_SHARE * best.grid.size));
+  const cellOf = new Map<RingMark, string>();
+  for (const [cell, ring] of best.grid) cellOf.set(ring, cell);
+  return grids.some(
+    (other) =>
+      other !== best &&
+      other.grid.size >= best.grid.size - gap &&
+      [...other.grid].some(([cell, ring]) => {
+        const there = cellOf.get(ring);
+        return there !== undefined && there !== cell;
+      }),
+  );
+}
+
 function lScore(origin: Vec2, x: Vec2, y: Vec2): number {
   const vx = sub(x, origin);
   const vy = sub(y, origin);
@@ -131,12 +233,23 @@ function lScore(origin: Vec2, x: Vec2, y: Vec2): number {
   return cosine + Math.abs(ly / lx / 2 - 1);
 }
 
+// The grid grown from `anchors`, a little past the layout's edge so that a
+// wrong labelling shows itself by finding rings where the layout has none.
 function growGrid(
   rings: ReadonlyArray<RingMark>,
   layout: BedTargetLayout,
   anchors: Anchors,
-): Map<string, RingMark> {
-  const exists = new Set(layout.marks.map((m) => key(m.col, m.row)));
+): Omit<GrownGrid, 'mirrored'> {
+  const layoutCells = new Set(layout.marks.map((m) => key(m.col, m.row)));
+  const cols = layout.marks.map((m) => m.col);
+  const rows = layout.marks.map((m) => m.row);
+  const minCol = Math.min(...cols) - GROW_PAST_EDGE;
+  const maxCol = Math.max(...cols) + GROW_PAST_EDGE;
+  const minRow = Math.min(...rows) - GROW_PAST_EDGE;
+  const maxRow = Math.max(...rows) + GROW_PAST_EDGE;
+  const reachable = (col: number, row: number): boolean =>
+    col >= minCol && col <= maxCol && row >= minRow && row <= maxRow;
+  const ringsOnly = rings.filter((ring) => !ring.anchor);
   const grid = new Map<string, RingMark>();
   const used = new Set<RingMark>();
   const place = (col: number, row: number, ring: RingMark) => {
@@ -159,14 +272,23 @@ function growGrid(
   for (const [col, row] of queue) {
     for (const [dc, dr] of DIRECTIONS) {
       const target = key(col + dc, row + dr);
-      if (!exists.has(target) || grid.has(target)) continue;
-      const ring = findNeighbour(rings, used, grid, fallback, col, row, dc, dr);
+      if (!reachable(col + dc, row + dr) || grid.has(target)) continue;
+      // Past the layout only a real ring is evidence: a solid blob of bed
+      // just beyond the sheet's edge often sits a step from the last ring.
+      const candidates = layoutCells.has(target) ? rings : ringsOnly;
+      const ring = findNeighbour(candidates, used, grid, fallback, col, row, dc, dr);
       if (ring === null) continue;
       place(col + dc, row + dr, ring);
       queue.push([col + dc, row + dr]);
     }
   }
-  return grid;
+  let outside = 0;
+  for (const cell of [...grid.keys()]) {
+    if (layoutCells.has(cell)) continue;
+    outside += 1;
+    grid.delete(cell);
+  }
+  return { grid, outside };
 }
 
 function findNeighbour(

@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { settingsMapToRows } from '../../core/controllers/grbl';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
-import { exportGrblSettingsBackup } from './export-grbl-settings-backup';
+import {
+  exportGrblSettingsBackup,
+  settingsBackupHoldsPasswords,
+} from './export-grbl-settings-backup';
 
 function makePlatform(save: PlatformAdapter['pickFileForSave']): PlatformAdapter {
   return {
@@ -37,7 +40,11 @@ describe('exportGrblSettingsBackup', () => {
       createdAt: '2026-06-15T09:00:00.000Z',
     });
 
-    expect(result).toEqual({ ok: true, displayName: 'settings.lfgrbl-settings.json' });
+    expect(result).toEqual({
+      ok: true,
+      displayName: 'settings.lfgrbl-settings.json',
+      holdsPasswords: false,
+    });
     expect(JSON.parse(written)).toMatchObject({
       format: 'laserforge.grbl-settings.backup',
       version: 1,
@@ -79,6 +86,39 @@ describe('exportGrblSettingsBackup', () => {
       reason: 'cancelled',
       message: 'Backup export cancelled.',
     });
+  });
+
+  it('keeps grblHAL passwords for a restore and reports that it did (audit C4-P3-7)', async () => {
+    let written = '';
+    const platform = makePlatform(async () => ({
+      displayName: 'settings.lfgrbl-settings.json',
+      write: async (data) => {
+        if (typeof data !== 'string') throw new Error('expected text backup');
+        written = data;
+      },
+    }));
+    const rows = settingsMapToRows(
+      new Map([
+        [75, 'hunter2pass'],
+        [100, '80.000'],
+      ]),
+    );
+
+    const result = await exportGrblSettingsBackup({
+      platform,
+      rows,
+      createdAt: '2026-06-15T09:00:00.000Z',
+    });
+
+    expect(result).toMatchObject({ ok: true, holdsPasswords: true });
+    expect(JSON.parse(written).settings).toContainEqual(
+      expect.objectContaining({ code: '$75', rawValue: 'hunter2pass' }),
+    );
+    expect(settingsBackupHoldsPasswords(rows)).toBe(true);
+    expect(settingsBackupHoldsPasswords(settingsMapToRows(new Map([[75, ' ']])))).toBe(false);
+    expect(settingsBackupHoldsPasswords(settingsMapToRows(new Map([[74, 'ShopWifi']])))).toBe(
+      false,
+    );
   });
 
   it('keeps unknown settings in the exported backup', async () => {

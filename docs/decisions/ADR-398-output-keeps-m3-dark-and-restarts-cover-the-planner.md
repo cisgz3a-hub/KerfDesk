@@ -1,6 +1,8 @@
 ## ADR-398 - Laser output never drains the planner with an M3 beam lit, and restarts cover the whole planner (2026-09-25)
 
-**Status:** Accepted. | **Date:** 2026-09-25
+**Status:** Accepted; Decision 1 extended to Marlin and the job end by ADR-398 Amendment 1, and
+to Marlin image layers by ADR-398 Amendment 2; Decision 2 extended to a lost link whose reconnect
+shows the controller restarted by ADR-398 Amendment 3. | **Date:** 2026-09-25
 
 Amends the GRBL laser emitter of ADR-006/ADR-322, the Marlin output of ADR-095, recovery item 8
 of ADR-362 and the resume evidence of ADR-341 Amendment 3. It changes the G-code of every

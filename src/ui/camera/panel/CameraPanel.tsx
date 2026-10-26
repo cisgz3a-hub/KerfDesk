@@ -1,34 +1,34 @@
-// CameraPanel — the LightBurn-style Camera Control panel (ADR-107/116): pick
-// a camera (machine-integrated via the bridge, RTSP by URL, a phone camera
-// app by its address (ADR-448), or USB), start it
-// as the active source, calibrate it from one photo (ADR-441), control the
-// workspace overlay, and self-check via Diagnostics. Opened from the top
-// toolbar / Tools menu via the `tools.camera` command (like the registration
-// jig); it renders nothing until opened, and its own × button closes it.
-// Closing the panel keeps a running camera on while the canvas shows it.
+// CameraPanel — the Camera panel (ADR-107/116, redesigned by ADR-663). The
+// everyday view shows what the camera sees with one Start button, then either
+// one button into the guided setup (pick the camera, engrave a target, take
+// one photo; ADR-441) or, once calibrated, the bed-picture controls: Refresh
+// picture, Live, Show on canvas, material height, Trace and the tool folds.
+// Choosing another camera, recalibrating, the snapshot and the diagnostics sit
+// on its settings page behind the gear. Opened from the top toolbar / Tools
+// menu via the `tools.camera` command; it renders nothing until opened, and its
+// own × button closes it. Closing the panel keeps a running camera on while the
+// canvas shows it.
 
 import { TutorialButton } from '../../tutorials/TutorialButton';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { usePlatform } from '../../app';
+import { Icon } from '../../kit/icons';
 import { loadCameraPanelWide, saveCameraPanelWide } from '../../state/camera-preference-storage';
 import { useCameraStore } from '../../state/camera-store';
-import { CalibrateCameraControls } from '../calibrate/CalibrateCameraControls';
+import { CameraCalibrationWizard } from '../calibrate/CameraCalibrationWizard';
 import { activeCameraModelNow } from '../active-camera-model';
 import { OverlayControls } from '../OverlayControls';
 import { JobWatchSection } from '../job-watch/JobWatchSection';
-import { jobWatchWantsCamera } from '../job-watch/job-watch-store';
-import { CameraDiagnostics } from './CameraDiagnostics';
-import { CameraSetupSteps } from './CameraSetupSteps';
-import { MachineCameraSection } from './MachineCameraSection';
-import { noteStyle } from './panel-styles';
-import { PhoneCameraSection } from './PhoneCameraSection';
-import { RtspSourceControls } from './RtspSourceControls';
-import { SavedCamerasSection } from './SavedCamerasSection';
-import { SnapshotControls } from './SnapshotControls';
-import { UsbCameraSection } from './UsbCameraSection';
+import { jobWatchWantsCamera, useJobWatchStore } from '../job-watch/job-watch-store';
+import { startRememberedCamera } from '../helpers/auto-start';
+import { CameraFold } from './CameraFold';
+import { CameraMovedNotice } from './CameraMovedNotice';
+import { CameraPreviewCard } from './CameraPreviewCard';
+import { CameraSettingsView } from './CameraSettingsView';
+import { CameraSetupCallout } from './CameraSetupCallout';
 import { localCameraBridgeAvailable } from './camera-platform-capability';
-import { DownloadDesktopLink } from '../../common/DownloadDesktopLink';
-import { Icon } from '../../kit/icons';
+
+type PanelView = 'main' | 'settings';
 
 export function CameraPanel(): JSX.Element | null {
   const open = useCameraStore((s) => s.panelOpen);
@@ -36,16 +36,11 @@ export function CameraPanel(): JSX.Element | null {
 }
 
 function CameraPanelOpen(): JSX.Element {
-  const {
-    bridge,
-    bridgeAvailable,
-    camera,
-    close,
-    detectMachineCamera,
-    isSupported,
-    machineCamera,
-  } = useCameraPanelOpenState();
+  const { bridge, bridgeAvailable, camera, close } = useCameraPanelOpenState();
+  const [view, setView] = useState<PanelView>('main');
   const [wide, setWide] = useState(() => loadCameraPanelWide());
+  // A ticked choice stays in sight instead of hiding in a closed fold.
+  const watching = useJobWatchStore((s) => s.settings.timelapse || s.settings.burnCheck);
   const toggleWide = (): void => {
     setWide((current) => {
       saveCameraPanelWide(!current);
@@ -59,46 +54,72 @@ function CameraPanelOpen(): JSX.Element {
       aria-label="Camera preview"
       style={{ ...panelStyle, width: wide ? WIDE_PANEL_WIDTH_PX : PANEL_WIDTH_PX }}
     >
-      <div style={headerStyle}>
-        <strong>Camera</strong>
-        <TutorialButton tutorialId="camera" compact label="Camera" />
+      <PanelHeader view={view} onView={setView} onClose={close} />
+      {view === 'main' ? (
+        <>
+          <CameraPreviewCard onChooseCamera={() => setView('settings')} />
+          <CameraMovedNotice />
+          <CameraSetupCallout />
+          <OverlayControls />
+          <CameraFold title="Watch the job" hint="timelapse and burn check" defaultOpen={watching}>
+            <JobWatchSection />
+          </CameraFold>
+        </>
+      ) : (
+        <CameraSettingsView
+          camera={camera}
+          bridge={bridge}
+          bridgeAvailable={bridgeAvailable}
+          wide={wide}
+          onToggleWide={toggleWide}
+        />
+      )}
+      <CameraCalibrationWizard />
+    </div>
+  );
+}
+
+function PanelHeader(props: {
+  readonly view: PanelView;
+  readonly onView: (view: PanelView) => void;
+  readonly onClose: () => void;
+}): JSX.Element {
+  const settings = props.view === 'settings';
+  return (
+    <div style={headerStyle}>
+      {settings ? (
         <button
           type="button"
           className="lf-btn"
-          onClick={close}
-          aria-label="Close camera panel"
-          title="Close the camera panel."
+          onClick={() => props.onView('main')}
+          aria-label="Back to the camera"
+          title="Back to the camera picture and its controls."
         >
-          <Icon name="close" size={16} />
+          <Icon name="chevron-left" size={16} />
         </button>
-      </div>
-      <CameraSetupSteps />
-      {bridgeAvailable ? (
-        <>
-          <MachineCameraSection
-            state={machineCamera}
-            onDetect={() => void detectMachineCamera(bridge)}
-          />
-          <RtspSourceControls />
-          <PhoneCameraSection />
-        </>
-      ) : (
-        <HostedNetworkCameraNotice />
+      ) : null}
+      <strong style={titleStyle}>{settings ? 'Camera settings' : 'Camera'}</strong>
+      <TutorialButton tutorialId="camera" compact label="Camera" />
+      {settings ? null : (
+        <button
+          type="button"
+          className="lf-btn"
+          onClick={() => props.onView('settings')}
+          aria-label="Camera settings"
+          title="Choose another camera, recalibrate or check it, save a snapshot, and diagnostics."
+        >
+          <Icon name="sliders" size={16} />
+        </button>
       )}
-      {isSupported ? (
-        <UsbCameraSection camera={camera} />
-      ) : (
-        <p style={noteStyle}>
-          A USB webcam needs a Chromium browser over https/localhost — not available here. The
-          machine camera above does not need it.
-        </p>
-      )}
-      <CalibrateCameraControls />
-      <SavedCamerasSection />
-      <OverlayControls />
-      <SnapshotControls wide={wide} onToggleWide={toggleWide} />
-      <JobWatchSection />
-      <CameraDiagnostics bridgeAvailable={bridgeAvailable} />
+      <button
+        type="button"
+        className="lf-btn"
+        onClick={props.onClose}
+        aria-label="Close camera panel"
+        title="Close the camera panel."
+      >
+        <Icon name="close" size={16} />
+      </button>
     </div>
   );
 }
@@ -109,7 +130,6 @@ function useCameraPanelOpenState() {
   const camera = platform.camera;
   const bridge = platform.cameraBridge;
   const bridgeAvailable = localCameraBridgeAvailable(platform.id, window.location.hostname);
-  const isSupported = useCameraStore((s) => s.isSupported);
   const detectSupport = useCameraStore((s) => s.detectSupport);
   const refreshCameras = useCameraStore((s) => s.refreshCameras);
   const stopSource = useCameraStore((s) => s.stopSource);
@@ -124,6 +144,8 @@ function useCameraPanelOpenState() {
     });
     // Probe the machine-integrated camera once on open; the button re-probes.
     if (bridgeAvailable && machineCamera.kind === 'idle') void detectMachineCamera(bridge);
+    // Then start the camera used last, so it is there without a click (ADR-663 Amendment 1).
+    void startRememberedCamera({ camera, bridge, bridgeAvailable });
     return () => {
       stopWatchingDevices?.();
       if (!cameraShownOnCanvas() && !jobWatchWantsCamera()) stopSource();
@@ -141,15 +163,7 @@ function useCameraPanelOpenState() {
     stopSource,
   ]);
 
-  return {
-    bridge,
-    bridgeAvailable,
-    camera,
-    close,
-    detectMachineCamera,
-    isSupported,
-    machineCamera,
-  };
+  return { bridge, bridgeAvailable, camera, close };
 }
 
 // The canvas overlay draws the live camera, so the source outlives the panel
@@ -159,32 +173,11 @@ function cameraShownOnCanvas(): boolean {
   return useCameraStore.getState().overlayVisible && activeCameraModelNow() !== undefined;
 }
 
-// Why the machine camera works in Desktop and not here: the laser's camera
-// serves plain http on the local network without CORS, so an https page may
-// at most display it (Chrome's Local Network Access) and can never read its
-// pixels, which calibration, the corrected overlay and trace all need. A
-// phone camera app is the same kind of local-network camera (ADR-448).
-function HostedNetworkCameraNotice(): JSX.Element {
-  return (
-    <div style={hostedNoticeStyle}>
-      <strong>USB cameras work here.</strong>
-      <span>
-        So does a phone that shows up as a webcam (Continuity Camera on a Mac, or a webcam app with
-        its computer driver). A laser&apos;s built-in camera, RTSP/IP cameras and phone camera apps
-        cannot be read by a web page: they answer on your local network without the permission
-        browsers require. KerfDesk Desktop reads them through its own local camera bridge, with
-        nothing to set up.
-      </span>
-      <DownloadDesktopLink />
-    </div>
-  );
-}
-
-// Compact fits beside the layers panel; wide is the F-CAM9 monitoring view.
+// Compact fits beside the layers panel; wide is the F-CAM8 monitoring view.
 const PANEL_WIDTH_PX = 320;
 const WIDE_PANEL_WIDTH_PX = 560;
 
-const panelStyle: React.CSSProperties = {
+const panelStyle: CSSProperties = {
   position: 'absolute',
   bottom: 12,
   left: 12,
@@ -202,18 +195,9 @@ const panelStyle: React.CSSProperties = {
   fontFamily: 'system-ui, sans-serif',
   fontSize: 13,
 };
-const headerStyle: React.CSSProperties = {
+const headerStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  justifyContent: 'space-between',
-};
-const hostedNoticeStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'flex-start',
   gap: 6,
-  padding: 8,
-  border: '1px solid var(--lf-border)',
-  borderRadius: 6,
-  background: 'var(--lf-bg-1)',
 };
+const titleStyle: CSSProperties = { flex: 1 };

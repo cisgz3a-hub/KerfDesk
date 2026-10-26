@@ -2,6 +2,7 @@ import { lazy, Suspense, useState } from 'react';
 import { Button, Dialog, DialogActions } from '../kit';
 import { useStore } from '../state';
 import { useImageEditorStore } from '../image-editor/image-editor-store';
+import { openToneCalibration } from '../calibration/tone-calibration-store';
 import { useToastStore } from '../state/toast-store';
 import {
   buildPhotoEngravingUpdate,
@@ -37,30 +38,33 @@ function OwnedPhotoEngravingDialog({
       return;
     }
     let applied = false;
-    useStore.setState((state) => {
-      if (
-        usePhotoEngravingStore.getState().session !== session ||
-        !photoEngravingSessionIsCurrent(state, session)
-      )
-        return state;
-      const update = buildPhotoEngravingUpdate(state, session, patch);
-      if (update === null) {
-        applied =
-          photoEngravingSessionIsCurrent(state, session) &&
-          photoEngravingImage(session.image, session.operation, patch) === session.image;
-        return state;
-      }
-      applied = true;
-      return update;
-    });
-    if (!applied) {
+    useStore.getState().commitProjectEdit(
+      (state) => {
+        if (
+          usePhotoEngravingStore.getState().session !== session ||
+          !photoEngravingSessionIsCurrent(state, session)
+        )
+          return {};
+        const update = buildPhotoEngravingUpdate(state, session, patch);
+        if (update === null) {
+          applied =
+            photoEngravingSessionIsCurrent(state, session) &&
+            photoEngravingImage(session.image, session.operation, patch) === session.image;
+          return {};
+        }
+        applied = true;
+        return update;
+      },
+      () => {
+        if (!applied) return;
+        close();
+        useToastStore
+          .getState()
+          .pushToast('Photo engraving settings applied to the selected photo.', 'success');
+      },
+    );
+    if (!applied)
       setError('The photo or operation changed. Close this window and open Photo engraving again.');
-      return;
-    }
-    close();
-    useToastStore
-      .getState()
-      .pushToast('Photo engraving settings applied to the selected photo.', 'success');
   };
   return (
     <Suspense fallback={<LoadingPhotoDialog onClose={close} />}>
@@ -74,6 +78,10 @@ function OwnedPhotoEngravingDialog({
           if (!current) return;
           close();
           void useImageEditorStore.getState().openEditor(session.image);
+        }}
+        onCalibrateTones={(seed) => {
+          close();
+          openToneCalibration({ seed });
         }}
       />
     </Suspense>

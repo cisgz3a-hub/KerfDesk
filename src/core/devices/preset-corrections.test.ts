@@ -5,7 +5,8 @@ import {
   XTOOL_D1_PRO_PROFILES,
 } from './brand-laser-profiles';
 import type { DeviceProfile } from './device-profile';
-import { stalePresetCorrections } from './preset-corrections';
+import { FALCON_A1_PRO_GRBLHAL_PROFILE, FALCON_COMPATIBLE_PROFILE } from './falcon-profiles';
+import { stalePresetCorrections, withdrawnPresetCopy } from './preset-corrections';
 
 // 2026-09-25 PR audit SET-1: #894 corrected these presets in the catalog only.
 // A copy saved before it kept the old value, and nothing said so.
@@ -42,6 +43,23 @@ describe('stalePresetCorrections', () => {
     }
   });
 
+  // Controller audit v2 C7-P2-1 (ADR-660): from 2026-07-07 until #796 the A1 Pro
+  // preset spread the generic 400 x 400 mm bed. The machine is 358 x 268 mm.
+  it('names a saved Falcon A1 Pro copy that still has the old 400 x 400 mm bed', () => {
+    const stale = { ...FALCON_A1_PRO_GRBLHAL_PROFILE, bedWidth: 400, bedHeight: 400 };
+    expect(stalePresetCorrections(stale)).toEqual([
+      expect.objectContaining({
+        presetName: FALCON_A1_PRO_GRBLHAL_PROFILE.name,
+        before: 'bed 400 x 400 mm',
+        patch: { bedWidth: 358, bedHeight: 268 },
+      }),
+    ]);
+    expect(stalePresetCorrections(FALCON_A1_PRO_GRBLHAL_PROFILE)).toEqual([]);
+    expect(
+      stalePresetCorrections({ ...FALCON_A1_PRO_GRBLHAL_PROFILE, bedWidth: 400, bedHeight: 300 }),
+    ).toEqual([]);
+  });
+
   it("leaves the operator's own values and other profiles alone", () => {
     const [xtool] = XTOOL_D1_PRO_PROFILES;
     const [s30] = S30_PRESETS;
@@ -60,6 +78,29 @@ describe('stalePresetCorrections', () => {
   it('gives every corrected preset a new catalog version', () => {
     for (const preset of [...XTOOL_D1_PRO_PROFILES, ...S30_PRESETS]) {
       expect(preset.catalogVersion).toBe('2026-09-24');
+    }
+  });
+});
+
+// Controller audit v2 C7-P2-3 (ADR-660): no Creality machine is 400 x 400 mm, so
+// the Falcon-compatible fallback left Machine Setup's list. A saved copy keeps
+// resolving, and one that still has that work area is named.
+describe('withdrawnPresetCopy', () => {
+  it('names a saved copy of the withdrawn Falcon-compatible fallback', () => {
+    expect(withdrawnPresetCopy(FALCON_COMPATIBLE_PROFILE)).toEqual({
+      presetName: FALCON_COMPATIBLE_PROFILE.name,
+      reason: expect.stringContaining('Falcon A1 at 305 x 381 mm'),
+    });
+  });
+
+  it('leaves a work area the operator set, and every listed preset, alone', () => {
+    expect(
+      withdrawnPresetCopy({ ...FALCON_COMPATIBLE_PROFILE, bedWidth: 381, bedHeight: 305 }),
+    ).toBeNull();
+    expect(withdrawnPresetCopy(withoutProfileId(FALCON_COMPATIBLE_PROFILE))).toBeNull();
+    expect(withdrawnPresetCopy(FALCON_A1_PRO_GRBLHAL_PROFILE)).toBeNull();
+    for (const preset of [...XTOOL_D1_PRO_PROFILES, ...S30_PRESETS]) {
+      expect(withdrawnPresetCopy(preset)).toBeNull();
     }
   });
 });

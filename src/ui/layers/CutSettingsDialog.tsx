@@ -9,13 +9,25 @@ import {
 import { CutSettingsFillFields } from './CutSettingsFillFields';
 import { CutSettingsImageFields } from './CutSettingsImageFields';
 import { readCutSettingsPatch, type LayerPatch } from './cut-settings-draft';
-import { changedCutSettingsPatch, cutSettingField } from './cut-settings-field-edits';
+import {
+  changedCutSettingsPatch,
+  cutSettingField,
+  withoutUntouchedLineDefaults,
+} from './cut-settings-field-edits';
 import './laser-operation-settings.css';
 
 type CutSettingsDialogProps = {
   readonly layer: Layer;
   readonly maxFeed?: number;
   readonly selectionCount?: number;
+  /** Artwork settings (ADR-317 §1): Apply sends only the fields the operator
+   * changed, so every other field keeps following the operation. Implied by
+   * `selectionCount`. */
+  readonly onlyChangedFields?: boolean;
+  /** The operation as a Process switch alone would leave it (ADR-496 §6). When
+   * given, the dialog shows it as soon as Process changes, provided nothing
+   * else has been edited yet, and a switch alone applies as `{ mode }`. */
+  readonly previewModeSwitch?: (mode: LayerMode) => Layer | undefined;
   readonly operationMembershipEditable?: boolean;
   readonly onCancel: () => void;
   readonly onApply: (patch: LayerPatch) => void;
@@ -25,21 +37,37 @@ export function CutSettingsDialog(props: CutSettingsDialogProps): JSX.Element {
   const maxFeed = positiveFiniteLimit(props.maxFeed);
   const changedFields = useRef(new Map<string, HTMLElement>());
   const signature = layerFormSignature(props.layer);
+  // Tied to the stored layer it was made from, so a store change drops it.
+  const [switched, setSwitched] = useState<{ readonly from: string; readonly layer: Layer }>();
+  const layer = switched?.from === signature ? switched.layer : props.layer;
+  const onlyChangedFields = props.onlyChangedFields === true || props.selectionCount !== undefined;
   useEffect(() => {
     changedFields.current.clear();
   }, [signature]);
+  const onProcessChange = (mode: LayerMode): void => {
+    if (props.previewModeSwitch === undefined || editedBesidesProcess(changedFields.current))
+      return;
+    const next = mode === props.layer.mode ? undefined : props.previewModeSwitch(mode);
+    setSwitched(next === undefined ? undefined : { from: signature, layer: next });
+  };
   const onSubmit = (event: React.FormEvent): void => {
     event.preventDefault();
     const form = event.currentTarget;
     if (!(form instanceof HTMLFormElement)) return;
-    const patch = readCutSettingsPatch(new FormData(form), props.layer, {
+    // A Process switch and nothing else is the inspector's one-field edit, so
+    // the store reseeds it exactly as it does that one.
+    if (layer !== props.layer && !editedBesidesProcess(changedFields.current)) {
+      props.onApply({ mode: layer.mode });
+      return;
+    }
+    const patch = readCutSettingsPatch(new FormData(form), layer, {
       ...(maxFeed === null ? {} : { maxFeed }),
       deferArtworkBounds: props.selectionCount !== undefined,
     });
     props.onApply(
-      props.selectionCount !== undefined
+      onlyChangedFields
         ? changedCutSettingsPatch(form, patch, changedFields.current)
-        : patch,
+        : withoutUntouchedLineDefaults(form, patch, layer, changedFields.current),
     );
   };
   return (
@@ -56,7 +84,9 @@ export function CutSettingsDialog(props: CutSettingsDialogProps): JSX.Element {
           "Reset to Default" rewrites the layer in the store while the dialog is
           open, so without this remount the boxes kept the pre-reset numbers and
           Apply wrote them straight back — silently undoing the reset. Typing never
-          changes the stored layer, so an in-progress edit is never remounted. */}
+          changes the stored layer, so an in-progress edit is never remounted.
+          A previewed Process switch remounts too, but only before any other
+          field is edited. */}
       <div
         className="lf-cut-settings-content"
         onChangeCapture={(event) => {
@@ -65,11 +95,12 @@ export function CutSettingsDialog(props: CutSettingsDialogProps): JSX.Element {
         }}
       >
         <CutSettingsBody
-          key={signature}
-          layer={props.layer}
+          key={layerFormSignature(layer)}
+          layer={layer}
           selectionCount={props.selectionCount}
           deferArtworkBounds={props.selectionCount !== undefined}
           operationMembershipEditable={props.operationMembershipEditable !== false}
+          onProcessChange={onProcessChange}
           {...(maxFeed === null ? {} : { maxFeed })}
         />
       </div>
@@ -90,6 +121,7 @@ function CutSettingsBody(props: {
   readonly maxFeed?: number;
   readonly deferArtworkBounds: boolean;
   readonly operationMembershipEditable: boolean;
+  readonly onProcessChange: (mode: LayerMode) => void;
 }): JSX.Element {
   const [mode, setMode] = useState<LayerMode>(props.layer.mode);
   const [dither, setDither] = useState<Layer['ditherAlgorithm']>(props.layer.ditherAlgorithm);
@@ -111,7 +143,10 @@ function CutSettingsBody(props: {
         layer={props.layer}
         operationMembershipEditable={props.operationMembershipEditable}
         mode={mode}
-        onModeChange={setMode}
+        onModeChange={(next) => {
+          setMode(next);
+          props.onProcessChange(next);
+        }}
         onPowerChange={setPower}
         {...maxFeedProps}
       />
@@ -147,6 +182,12 @@ function CutSettingsBody(props: {
 // re-renders do not remount anything.
 function layerFormSignature(layer: Layer): string {
   return JSON.stringify(layer);
+}
+
+// Unmounted controls (a process change hid them, or a preview remounted the
+// form) no longer count as edits, as on Apply.
+function editedBesidesProcess(changed: ReadonlyMap<string, HTMLElement>): boolean {
+  return [...changed].some(([name, control]) => name !== 'mode' && control.isConnected);
 }
 
 function positiveFiniteLimit(value: number | undefined): number | null {

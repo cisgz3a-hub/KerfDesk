@@ -1,0 +1,96 @@
+.lf-board-panel {
+  --lf-text-md: 12px;
+  --lf-text-sm: 11px;
+  position: absolute;
+  z-index: 20;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: 260px;
+  max-width: calc(100% - 16px);
+  max-height: min(340px, calc(100% - 16px));
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--lf-border-strong);
+  border-radius: 8px;
+  background: var(--lf-bg-1);
+  color: var(--lf-text);
+  box-shadow: var(--lf-shadow);
+  font-size: 12px;
+  pointer-events: auto;
+}
+
+.lf-board-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  padding: 4px;
+  border-bottom: 1px solid var(--lf-border);
+}
+
+.lf-board-panel-header .lf-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 3px;
+}
+
+.lf-board-panel-drag {
+  flex: 1;
+  min-width: 0;
+}
+
+.lf-board-panel-drag > .lf-btn {
+  width: 100%;
+  justify-content: flex-start;
+  gap: 4px;
+  white-space: nowrap;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.lf-board-panel-drag > .lf-btn:active {
+  cursor: grabbing;
+}
+
+.lf-board-panel-grip {
+  color: var(--lf-text-muted);
+  letter-spacing: -3px;
+  padding-right: 3px;
+}
+
+.lf-board-panel-content {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-height: 0;
+  padding: 8px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.lf-board-panel-content[hidden] {
+  display: none;
+}
+
+.lf-board-panel[data-collapsed='true'] {
+  width: 210px;
+}
+
+.lf-board-panel[data-collapsed='true'] .lf-board-panel-header {
+  border-bottom: 0;
+}
+
+.lf-board-panel-move-help {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

@@ -18,6 +18,7 @@ describe('openGcodeFileInInspector', () => {
     expect(openInspector).toHaveBeenCalledWith('part.nc', {
       kind: 'text',
       text: 'G21\nG1 X10',
+      openedFile: true,
     });
     expect(pushToast).not.toHaveBeenCalled();
   });
@@ -55,7 +56,11 @@ describe('openGcodeFileInInspector', () => {
     );
 
     expect(text).toHaveBeenCalled();
-    expect(openInspector).toHaveBeenCalledWith('huge.tap', { kind: 'text', text: 'G21' });
+    expect(openInspector).toHaveBeenCalledWith('huge.tap', {
+      kind: 'text',
+      text: 'G21',
+      openedFile: true,
+    });
     expect(pushToast).toHaveBeenCalledWith(expect.stringMatching(/may take a while/i), 'warning');
   });
 });
@@ -73,7 +78,11 @@ describe('handleOpenGcodeInspector', () => {
       accept: ['.nc', '.gcode', '.tap'],
       multiple: false,
     });
-    expect(openInspector).toHaveBeenCalledWith('picked.tap', { kind: 'text', text: 'G21' });
+    expect(openInspector).toHaveBeenCalledWith('picked.tap', {
+      kind: 'text',
+      text: 'G21',
+      openedFile: true,
+    });
   });
 });
 
@@ -91,7 +100,7 @@ describe('open2dSimulatorFromSource', () => {
 
     await open2dSimulatorFromSource(
       'part.nc',
-      { kind: 'blob', blob: source },
+      { kind: 'blob', blob: source, openedFile: true },
       openPreview,
       pushToast,
     );
@@ -114,7 +123,7 @@ describe('open2dSimulatorFromSource', () => {
 
     await open2dSimulatorFromSource(
       'cancelled.nc',
-      { kind: 'blob', blob: source },
+      { kind: 'blob', blob: source, openedFile: true },
       vi.fn(),
       pushToast,
       { signal: controller.signal },

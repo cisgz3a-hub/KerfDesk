@@ -59,31 +59,34 @@ const URL_BY_KEY: Readonly<Record<OutlineFontKey, string>> = {
 
 type OutlineFontKey = Extract<FontEntry, { readonly geometry: 'outline' }>['key'];
 
-const cache = new Map<string, ArrayBuffer>();
+type CachedFont = { readonly resource: string; readonly buffer: ArrayBuffer };
+const cache = new Map<string, CachedFont>();
 
 export async function loadFont(
   key: string,
   embeddedFonts?: ReadonlyArray<EmbeddedFont>,
 ): Promise<ArrayBuffer> {
-  const cached = cache.get(key);
-  if (cached !== undefined) return cached;
   const known = findFontEntry(key);
   if (known === null) {
-    const embedded = embeddedFonts?.find((font) => font.key === key);
-    if (embedded === undefined)
-      throw new Error(`Font "${key}" is not available. Relink it to edit.`);
+    // Imported keys belong to a project. Another project can reuse a key
+    // with different bytes, or omit it, even while the old font is cached.
+    const embedded = requireEmbeddedFont(key, embeddedFonts);
+    const cached = cache.get(key);
+    if (cached?.resource === embedded.dataBase64) return cached.buffer;
     const buffer = embeddedFontBuffer(embedded);
-    cache.set(key, buffer);
+    cache.set(key, { resource: embedded.dataBase64, buffer });
     return buffer;
   }
   if (known.geometry !== 'outline') {
     throw new Error(`Font "${key}" uses native stroke geometry and has no outline file.`);
   }
+  const cached = cache.get(key);
+  if (cached !== undefined) return cached.buffer;
   const url = URL_BY_KEY[known.key];
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Failed to fetch font ${key}: ${res.status}`);
   const buf = await res.arrayBuffer();
-  cache.set(key, buf);
+  cache.set(key, { resource: key, buffer: buf });
   return buf;
 }
 
@@ -91,8 +94,24 @@ export async function loadFont(
 // synchronous code (canvas draw) get the font without awaiting; the
 // caller falls back to a placeholder or no-op until the async load
 // completes and a redraw is triggered.
-export function getCachedFont(key: string): ArrayBuffer | null {
-  return cache.get(key) ?? null;
+export function getCachedFont(
+  key: string,
+  embeddedFonts?: ReadonlyArray<EmbeddedFont>,
+): ArrayBuffer | null {
+  const cached = cache.get(key);
+  if (cached === undefined) return null;
+  const resource =
+    findFontEntry(key) === null ? embeddedFonts?.find((font) => font.key === key)?.dataBase64 : key;
+  return cached.resource === resource ? cached.buffer : null;
+}
+
+function requireEmbeddedFont(
+  key: string,
+  fonts: ReadonlyArray<EmbeddedFont> | undefined,
+): EmbeddedFont {
+  const embedded = fonts?.find((font) => font.key === key);
+  if (embedded === undefined) throw new Error(`Font "${key}" is not available. Relink it to edit.`);
+  return embedded;
 }
 
 // CSS family name used by the font preview picker. Each bundled .ttf
@@ -103,10 +122,9 @@ export function cssFamilyForFont(key: string): string {
   return `lf2-${key}`;
 }
 
-// Tracks which font keys have already been added to document.fonts.
-// FontFace.load() is idempotent but adding the same FontFace twice
-// would still leak — keep one entry per key.
-const cssRegistered = new Set<string>();
+type CssRegistration = { readonly resource: string; ready: Promise<void> };
+const cssRegistrations = new Map<string, CssRegistration>();
+const cssFaces = new Map<string, FontFace>();
 
 // Register a bundled .ttf with the browser's font system so CSS
 // `font-family: lf2-<key>` works. Pulls from the same in-memory
@@ -117,17 +135,52 @@ export async function ensureFontCss(
   key: string,
   embeddedFonts?: ReadonlyArray<EmbeddedFont>,
 ): Promise<void> {
-  if (cssRegistered.has(key)) return;
   if (typeof document === 'undefined' || typeof FontFace === 'undefined') {
     // Non-browser / test env — nothing to register. Calls become
     // no-ops so the picker still functions (with system fallback).
     return;
   }
-  const buf = await loadFont(key, embeddedFonts);
-  // FontFace accepts the raw ArrayBuffer / BufferSource directly,
-  // avoiding a second network fetch on top of `loadFont`.
-  const face = new FontFace(cssFamilyForFont(key), buf);
-  await face.load();
-  document.fonts.add(face);
-  cssRegistered.add(key);
+  let resource: string;
+  try {
+    resource =
+      findFontEntry(key) === null ? requireEmbeddedFont(key, embeddedFonts).dataBase64 : key;
+  } catch (error) {
+    removeFontCss(key);
+    throw error;
+  }
+  const existing = cssRegistrations.get(key);
+  if (existing?.resource === resource) return existing.ready;
+  const registration: CssRegistration = { resource, ready: Promise.resolve() };
+  // Claim the resource before any await so a late load from an older
+  // document cannot replace the current document's CSS face.
+  cssRegistrations.set(key, registration);
+  registration.ready = registerFontCss(key, embeddedFonts, registration);
+  return registration.ready;
+}
+
+async function registerFontCss(
+  key: string,
+  fonts: ReadonlyArray<EmbeddedFont> | undefined,
+  registration: CssRegistration,
+): Promise<void> {
+  try {
+    const buffer = await loadFont(key, fonts);
+    const face = new FontFace(cssFamilyForFont(key), buffer);
+    await face.load();
+    if (cssRegistrations.get(key) !== registration) return;
+    const previous = cssFaces.get(key);
+    if (previous !== undefined) document.fonts.delete(previous);
+    document.fonts.add(face);
+    cssFaces.set(key, face);
+  } catch (error) {
+    if (cssRegistrations.get(key) === registration) removeFontCss(key);
+    throw error;
+  }
+}
+
+function removeFontCss(key: string): void {
+  cssRegistrations.delete(key);
+  const face = cssFaces.get(key);
+  if (face !== undefined) document.fonts.delete(face);
+  cssFaces.delete(key);
 }

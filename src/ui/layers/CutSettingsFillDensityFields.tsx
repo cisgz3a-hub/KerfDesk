@@ -1,9 +1,14 @@
 import { DraftNumberInput } from '../kit/DraftNumberInput';
+import { boundsAdmitting } from './CutSettingsInputs';
 
 export function CutSettingsFillDensityFields(props: {
   readonly lineIntervalMm: number;
+  /** The interval the form opened with. A LightBurn 0.03 mm interval is what
+   * compiles, so it stays admissible beside the range for new entries. */
+  readonly storedLineIntervalMm: number;
   readonly onChange: (lineIntervalMm: number) => void;
 }): JSX.Element {
+  const bounds = fillDensityBounds(props.storedLineIntervalMm);
   return (
     <>
       <input
@@ -16,8 +21,8 @@ export function CutSettingsFillDensityFields(props: {
       <Field label="Line Interval">
         <DraftNumberInput
           data-setting="hatchSpacingMm"
-          min={0.05}
-          max={10}
+          min={bounds.intervalMm.min}
+          {...(bounds.intervalMm.max === undefined ? {} : { max: bounds.intervalMm.max })}
           step="any"
           className="lf-input"
           value={props.lineIntervalMm}
@@ -33,11 +38,11 @@ export function CutSettingsFillDensityFields(props: {
       <Field label="Lines / Inch">
         <DraftNumberInput
           data-setting="hatchSpacingMm"
-          min={lineIntervalMmToLinesPerInch(10)}
-          max={lineIntervalMmToLinesPerInch(0.05)}
+          min={bounds.linesPerInch.min}
+          {...(bounds.linesPerInch.max === undefined ? {} : { max: bounds.linesPerInch.max })}
           step="any"
           className="lf-input"
-          value={lineIntervalMmToLinesPerInch(props.lineIntervalMm)}
+          value={25.4 / props.lineIntervalMm}
           format={(value) => String(displayNumber(value, 2))}
           normalize={(value) => lineIntervalMmToLinesPerInch(linesPerInchToLineIntervalMm(value))}
           onValueChange={(value) => props.onChange(linesPerInchToLineIntervalMm(value))}
@@ -58,6 +63,22 @@ function Field(props: { readonly label: string; readonly children: React.ReactNo
       <span style={controlStyle}>{props.children}</span>
     </label>
   );
+}
+
+// Each box admits the stored density as it shows it (rounded), or 0.05 mm
+// itself would show 508 lpi against a 507.99999999999994 maximum.
+function fillDensityBounds(storedLineIntervalMm: number): {
+  readonly intervalMm: ReturnType<typeof boundsAdmitting>;
+  readonly linesPerInch: ReturnType<typeof boundsAdmitting>;
+} {
+  return {
+    intervalMm: boundsAdmitting(displayNumber(storedLineIntervalMm, 4), 0.05, 10),
+    linesPerInch: boundsAdmitting(
+      displayNumber(25.4 / storedLineIntervalMm, 2),
+      lineIntervalMmToLinesPerInch(10),
+      lineIntervalMmToLinesPerInch(0.05),
+    ),
+  };
 }
 
 function lineIntervalMmToLinesPerInch(lineIntervalMm: number): number {

@@ -120,8 +120,13 @@ function isAllowedNonMediaAppPermission(permission: string): boolean {
   // grants plain-text writes to a focused page without a prompt; denying it
   // made every Copy button fail on the desktop app only. Clipboard reads stay
   // denied.
+  //
+  // 'local-fonts' backs window.queryLocalFonts for System fonts... (ADR-628):
+  // the renderer asks only from the operator's click, and the chosen face is
+  // embedded in the project. The list itself is never stored or sent.
   return (
     permission === 'serial' ||
+    permission === 'local-fonts' ||
     permission === 'screen-wake-lock' ||
     permission === 'clipboard-sanitized-write' ||
     permission.startsWith('fileSystem')

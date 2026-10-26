@@ -16,7 +16,7 @@ type StatusRequestWrite = (
 // idle-poll period (~1 s) on every Frame that had to select G54. The query is
 // inert to the planner and owes no acknowledgement. `complete` asks for every
 // report field at once where the driver can (grblHAL 0x87), so a caller
-// waiting for WCO need not wait out GRBL's refresh count (ADR-648).
+// waiting for WCO need not wait out GRBL's refresh count (ADR-672).
 export function statusRequestActions(
   get: () => LaserState,
   refs: { readonly driver: ControllerDriver },
@@ -38,7 +38,7 @@ export function statusRequestActions(
 
 /** Sends the driver's complete-report request once, where it has one. grblHAL
  * answers 0x87 with every report field, so WCO arrives now instead of after up
- * to ten idle reports (protocol audit P-4, ADR-648). Inert to the planner and
+ * to ten idle reports (protocol audit P-4, ADR-672). Inert to the planner and
  * owes no acknowledgement; a failed write leaves the ordinary poll running. */
 export async function sendCompleteStatusRequest(
   driver: ControllerDriver,

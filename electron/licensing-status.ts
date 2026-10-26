@@ -1,13 +1,12 @@
 import {
   automaticTimeSetting,
   CHECK_IN_LIMIT,
-  CLOCK_TOLERANCE,
   checkInDueAt,
   checkInOverdue,
   clockRolledBack,
-  clockWarningMessage,
 } from './licensing-clock.js';
 import type { LicensingConfig } from './licensing-config.js';
+import { licenceWindowText } from './licence-window.js';
 import type { LicenceRecord } from './licensing-store.js';
 import {
   licenceCoversRelease,
@@ -18,9 +17,11 @@ import {
 } from './licensing-verification.js';
 
 /**
- * What the renderer learns about this device's licence (ADR-540). A commercial
- * desktop app opens its workspace only once `edition` is Pro (ADR-623); after
- * that, no state here gates a machine operation or the open workspace.
+ * What the renderer learns about this device's licence (ADR-540). With the
+ * licence window on, a commercial desktop app opens its workspace only once
+ * `edition` is Pro (ADR-623); while ADR-623 Amendment 3 holds it off, the app
+ * always opens and `edition` only unlocks the Pro tools. No state here gates a
+ * machine operation or an open workspace.
  */
 export type LicenceStatus = {
   readonly channel: 'free' | 'commercial';
@@ -40,7 +41,8 @@ export type LicenceStatus = {
   readonly trialExpiresInMs?: number;
   /**
    * Unix seconds on this computer's clock when new Pro choices pause unless the
-   * licence service confirms these rights first (ADR-592). Absent without a check-in.
+   * licence service confirms these rights first (ADR-592). Only a trial has a
+   * check-in; paid and developer rights never carry one (ADR-623 Amendment 2).
    */
   readonly checkInDueAt?: number;
   readonly updatesUntil: number | null;
@@ -133,14 +135,20 @@ export function evaluateLicence(
     return summary(
       'unavailable',
       null,
-      'This KerfDesk build is not configured for licences, so it cannot be activated. Install an official KerfDesk release.',
+      licenceWindowText(
+        'This KerfDesk build is not configured for licences, so it cannot be activated. Install an official KerfDesk release.',
+        'This KerfDesk build is not configured for licences, so Pro tools are locked. Everything else works. Install an official KerfDesk release to use Pro.',
+      ),
     );
   const release = verifyLicenceRelease(config.release, config.releaseKeys);
   if (release === null || release.version !== version)
     return summary(
       'unavailable',
       null,
-      'This build has no valid signed release identity, so it cannot be activated. Install an official KerfDesk release.',
+      licenceWindowText(
+        'This build has no valid signed release identity, so it cannot be activated. Install an official KerfDesk release.',
+        'This build has no valid signed release identity, so Pro tools are locked. Install an official KerfDesk release to use Pro.',
+      ),
     );
   if (saved.pendingDeactivation !== undefined)
     return summary(
@@ -161,59 +169,55 @@ export function evaluateLicence(
     return summary(
       'clock-error',
       claims,
-      `This computer’s clock is earlier than the last licence check, so your trial cannot be used. Turn on ${automaticTimeSetting(platform)}, then choose Refresh licence.`,
+      `This computer’s clock is earlier than the last licence check, so ${licenceWindowText('your trial cannot be used', 'the Pro tools in your trial are locked')}. Turn on ${automaticTimeSetting(platform)}, then choose Refresh licence.`,
     );
   if (claims.accessExpiresAt !== null && Math.max(now, saved.lastSeenAt) >= claims.accessExpiresAt)
     return summary(
       'trial-expired',
       claims,
-      'Your 30-day trial has ended. Buy a licence or enter your licence key to keep using KerfDesk.',
+      licenceWindowText(
+        'Your 30-day trial has ended. Buy a licence or enter your licence key to keep using KerfDesk.',
+        'Your 30-day Pro trial has ended. KerfDesk Free keeps working. Buy a licence or enter your key to use the Pro tools again.',
+      ),
     );
   return withCheckInDue(
-    summary(...currentRights(claims, release, saved, now, platform)),
+    summary(...currentRights(claims, release, saved.lastSeenAt, now, platform)),
     claims,
-    saved,
   );
 }
 
-/** A paid grant's saved clock offset (ADR-592); a trial is never measured by one. */
-function paidOffset(claims: LicenceClaims, saved: LicenceRecord): number {
-  return claims.tier === 'paid' ? (saved.clockOffset ?? 0) : 0;
-}
-
-function withCheckInDue(
-  status: LicenceStatus,
-  claims: LicenceClaims,
-  saved: LicenceRecord,
-): LicenceStatus {
-  const due = checkInDueAt(claims, paidOffset(claims, saved));
+function withCheckInDue(status: LicenceStatus, claims: LicenceClaims): LicenceStatus {
+  const due = checkInDueAt(claims);
   return due === null ? status : { ...status, checkInDueAt: due };
 }
 
-/** Rights that verified and have not ended: due a check-in, beyond their updates, or ready. */
+/**
+ * Rights that verified and have not ended: a trial due a check-in, beyond their
+ * updates, or ready. A paid licence is never due a check-in and never reads the
+ * clock here, so offline or with a wrong clock it opens as usual (ADR-623
+ * Amendment 2); only its update period can stop a newer release.
+ */
 function currentRights(
   claims: LicenceClaims,
   release: VerifiedRelease,
-  saved: LicenceRecord,
+  lastSeenAt: number,
   now: number,
   platform: string,
 ): [LicenceStatus['state'], LicenceClaims, string | null] {
-  const offset = paidOffset(claims, saved);
-  if (checkInOverdue(claims, saved.lastSeenAt, now, offset))
+  if (checkInOverdue(claims, lastSeenAt, now))
     return ['checkin-required', claims, checkInMessage(claims, platform)];
   if (!licenceCoversRelease(claims, release))
     return ['updates-expired', claims, updatesExpiredMessage(claims)];
-  // The last confirmation arrived with this clock off: keep saying so.
-  const clockOff = Math.abs(offset) > CLOCK_TOLERANCE;
-  return ['ready', claims, clockOff ? clockWarningMessage(offset, platform) : null];
+  return ['ready', claims, null];
 }
 
+/** Only a trial has a check-in (ADR-592, ADR-623 Amendment 2). */
 function checkInMessage(claims: LicenceClaims, platform: string): string {
   const days = Math.round((CHECK_IN_LIMIT[claims.tier] ?? 0) / 86_400);
-  return `KerfDesk has not confirmed this ${claims.tier === 'trial' ? 'trial' : 'licence'} with the licence service for more than ${days} days, so it needs a check before KerfDesk opens again. An open KerfDesk keeps its projects, Frame and Start. Connect to the internet and choose Refresh licence. If this computer’s clock is wrong, turn on ${automaticTimeSetting(platform)} first.`;
+  return `KerfDesk has not confirmed this trial with the licence service for more than ${days} days, ${licenceWindowText('so it needs a check before KerfDesk opens again. An open KerfDesk keeps its projects, Frame and Start.', 'so new Pro tools are paused. Your projects, Frame and Start keep working.')} Connect to the internet and choose Refresh licence. If this computer’s clock is wrong, turn on ${automaticTimeSetting(platform)} first.`;
 }
 
 function updatesExpiredMessage(claims: LicenceClaims): string {
   const until = claims.updatesUntil === null ? 'its update date' : date(claims.updatesUntil);
-  return `Your licence includes KerfDesk versions released until ${until}. This version is newer, so your licence cannot open it. Renew updates, or install a version your licence covers.`;
+  return `Your licence includes KerfDesk versions released until ${until}. This version is newer, so ${licenceWindowText('your licence cannot open it', 'Pro tools are locked here')}. Renew updates, or install a version your licence covers.`;
 }

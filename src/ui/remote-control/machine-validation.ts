@@ -14,6 +14,8 @@ export const MACHINE_COMMANDS = new Set([
   'disconnect_machine',
   'home_machine',
   'set_work_origin',
+  'capture_board_point',
+  'finish_board',
   'pause_job',
   'resume_job',
   'jog_hold_start',
@@ -68,6 +70,8 @@ function validAction(command: string, args: Record<string, unknown>): boolean {
       'connect_machine',
       'disconnect_machine',
       'home_machine',
+      'capture_board_point',
+      'finish_board',
     ].includes(command)
   )
     return keys(args, admission);

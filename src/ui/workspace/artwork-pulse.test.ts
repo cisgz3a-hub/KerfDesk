@@ -17,6 +17,7 @@ import {
   pulseStartOffsets,
   pulseStrength,
   pulseTargetFor,
+  PulseTrigger,
   type PulseTarget,
 } from './artwork-pulse';
 import { sameOperationSettings } from './pulse-settings-match';
@@ -204,6 +205,118 @@ describe('which artwork pulses together', () => {
     expect(offsets.get('p39')).toBe(0);
     expect(offsets.get('p0')).toBeLessThanOrEqual(560);
     expect(offsets.get('p0')).toBeGreaterThan(offsets.get('p1') ?? Infinity);
+  });
+});
+
+describe('settings edit glow', () => {
+  const engrave = layer('engrave', '#2563eb', { power: 40, speed: 3000 });
+  const sameEngrave = layer('engrave-2', '#dc2626', { power: 40, speed: 3000 });
+  const centre = (object: { readonly transform: { readonly x: number } }) => ({
+    x: object.transform.x,
+    y: 0,
+  });
+
+  it('lights exactly the edited artwork, not pieces that merely share its settings', () => {
+    const objects = [artwork('heart', 'engrave', 0), artwork('name', 'engrave-2', 100)];
+    const target = pulseTargetFor(
+      objects,
+      [engrave, sameEngrave],
+      'laser',
+      { kind: 'edit', owner: 'editor', serial: 1, objectIds: ['heart'], operationIds: ['engrave'] },
+      centre,
+    );
+    expect(target?.objectIds).toEqual(['heart']);
+    expect([...(target?.colorSources ?? [])]).toEqual([['engrave', 'engrave']]);
+  });
+
+  it('lights every piece an operation edit changes, sweeping left to right', () => {
+    const objects = [artwork('right', 'engrave', 200), artwork('left', 'engrave', 0)];
+    const target = pulseTargetFor(
+      objects,
+      [engrave],
+      'laser',
+      {
+        kind: 'edit',
+        owner: 'editor',
+        serial: 1,
+        objectIds: ['right', 'left'],
+        operationIds: ['engrave'],
+      },
+      centre,
+    );
+    expect(target?.objectIds).toEqual(['right', 'left']);
+    expect(target?.offsets.get('left')).toBe(0);
+    expect(target?.offsets.get('right')).toBeGreaterThan(0);
+  });
+
+  it('lights nothing once the edited artwork no longer uses the operation', () => {
+    const seed = {
+      kind: 'edit',
+      owner: 'editor',
+      serial: 1,
+      objectIds: ['heart'],
+      operationIds: ['engrave'],
+    } as const;
+    const moved = [artwork('heart', 'engrave-2', 0)];
+    expect(pulseTargetFor(moved, [engrave, sameEngrave], 'laser', seed, centre)).toBeNull();
+  });
+});
+
+describe('when a hover pulses', () => {
+  const edit = {
+    kind: 'edit',
+    owner: 'editor',
+    serial: 1,
+    objectIds: ['heart'],
+    operationIds: ['engrave'],
+  } as const;
+  const sceneA = {};
+  const sceneB = {};
+
+  it('pulses when an edit begins and again with each change it makes', () => {
+    const trigger = new PulseTrigger();
+    expect(trigger.next(edit, null, sceneA)).toBe(true);
+    expect(trigger.next(edit, null, sceneB)).toBe(true);
+    expect(trigger.next(edit, null, sceneB)).toBe(false);
+  });
+
+  it('brings an edit back after a hover without pulsing, and pulses the next edit', () => {
+    const trigger = new PulseTrigger();
+    expect(trigger.next(edit, null, sceneA)).toBe(true);
+    expect(trigger.next({ kind: 'object', objectId: 'box' }, 'box', sceneA)).toBe(true);
+    expect(trigger.next(edit, null, sceneA)).toBe(false);
+    trigger.next(null, null, sceneA);
+    expect(trigger.next(edit, null, sceneA)).toBe(true);
+  });
+
+  it('pulses an edit that ended and began again while a hover hid it', () => {
+    const trigger = new PulseTrigger();
+    expect(trigger.next(edit, null, sceneA)).toBe(true);
+    expect(trigger.next({ kind: 'operation', operationId: 'engrave' }, null, sceneA)).toBe(true);
+    // Under the hover the edit ended and began again: the store made a new edit.
+    expect(trigger.next({ ...edit, serial: 2 }, null, sceneA)).toBe(true);
+  });
+
+  it('pulses when focus moves straight to another editor of the same artwork', () => {
+    const trigger = new PulseTrigger();
+    expect(trigger.next(edit, null, sceneA)).toBe(true);
+    expect(trigger.next({ ...edit, owner: 'operation-row:engrave' }, null, sceneA)).toBe(true);
+    expect(trigger.next({ ...edit, owner: 'operation-row:engrave' }, null, sceneA)).toBe(false);
+  });
+
+  it('still regroups a row hover without pulsing when the scene changes under it', () => {
+    const trigger = new PulseTrigger();
+    const row = { kind: 'operation', operationId: 'engrave' } as const;
+    expect(trigger.next(row, null, sceneA)).toBe(true);
+    expect(trigger.next(row, null, sceneB)).toBe(false);
+  });
+
+  it('returns a paused canvas hover to the same piece without a second pulse', () => {
+    const trigger = new PulseTrigger();
+    const piece = { kind: 'object', objectId: 'heart' } as const;
+    expect(trigger.next(piece, 'heart', sceneA)).toBe(true);
+    trigger.next(null, 'heart', sceneA);
+    expect(trigger.next(piece, 'heart', sceneA)).toBe(false);
   });
 });
 

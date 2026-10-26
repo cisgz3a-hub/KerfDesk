@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../../core/devices';
-import { computeJobBounds, type JobOriginPlacement } from '../../core/job';
+import { computeJobBounds, type Job, type JobOriginPlacement } from '../../core/job';
 import {
   createLayer,
   createProject,
@@ -9,106 +9,194 @@ import {
   type OutputScope,
   type Project,
   type SceneObject,
+  type Vec2,
 } from '../../core/scene';
 import { emitGcode } from './emit-gcode';
-import { prepareOutput } from './prepare-output';
+import { prepareOutput, type PreparedOutput } from './prepare-output';
 
-const COLOR = '#ff0000';
+const FILL_COLOR = '#ff0000';
+const LINE_COLOR = '#0000ff';
 const SPEED_MM_PER_MIN = 1500;
+const SIZE_MM = 10;
 
-describe('scan-offset-aware job placement', () => {
-  it.each([
-    {
-      label: 'user origin',
-      placement: { startFrom: 'user-origin', anchor: 'front-left' } as const,
-      targetX: 0,
-    },
-    {
-      label: 'verified origin',
-      placement: { startFrom: 'verified-origin', anchor: 'front-left' } as const,
-      targetX: 0,
-    },
-    {
-      label: 'current position',
-      placement: {
-        startFrom: 'current-position',
-        anchor: 'front-left',
-        currentPosition: { x: 50, y: 25 },
-      } as const,
-      targetX: 50,
-    },
-  ])('anchors the calibrated reverse-row minimum at $label', ({ placement, targetX }) => {
-    const project = fillProject(0.5, [fillSquare('selected', 10)]);
-    const prepared = prepareOutput(project, { jobOrigin: placement });
-    if (!prepared.ok) throw new Error('expected prepared output');
+type Anchor = 'front-left' | 'front-right' | 'center';
+type PlacementCase = {
+  readonly label: string;
+  readonly target: Vec2;
+  readonly placement: (anchor: Anchor) => JobOriginPlacement;
+};
 
-    expect(computeJobBounds(prepared.job, project.device)?.minX).toBeCloseTo(targetX, 6);
+const userOrigin = (anchor: Anchor): JobOriginPlacement => ({ startFrom: 'user-origin', anchor });
 
-    const emitted = emitGcode(project, { jobOrigin: placement });
-    expect(emitted.preflight.ok).toBe(true);
-    expect(emitted.gcode).not.toMatch(/\b[XY]-/);
+// ADR-052 Amendment 1: the table moves only commanded reverse rows, so a
+// Line cut drawn on the fill's own outline stays on the Job Origin anchor.
+const PLACEMENTS: ReadonlyArray<PlacementCase> = [
+  {
+    label: 'user origin',
+    target: { x: 0, y: 0 },
+    placement: userOrigin,
+  },
+  {
+    label: 'verified origin',
+    target: { x: 0, y: 0 },
+    placement: (anchor) => ({ startFrom: 'verified-origin', anchor }),
+  },
+  {
+    label: 'current position',
+    target: { x: 50, y: 25 },
+    placement: (anchor) => ({
+      startFrom: 'current-position',
+      anchor,
+      currentPosition: { x: 50, y: 25 },
+    }),
+  },
+];
+
+describe('scan-offset tables leave placed jobs on their anchor (ADR-052 Amendment 1)', () => {
+  it.each(PLACEMENTS)(
+    'a positive table keeps the Line cut on the front-left anchor at $label',
+    ({ placement, target }) => {
+      const jobOrigin = placement('front-left');
+      const prepared = prepare(lineAndFillProject(0.5, [square('art', 10)]), jobOrigin);
+      const untabled = prepare(lineAndFillProject(null, [square('art', 10)]), jobOrigin);
+
+      expect(prepared.jobOriginOffset).toEqual(untabled.jobOriginOffset);
+      expect(lineBounds(prepared.job)).toEqual({
+        minX: target.x,
+        minY: target.y,
+        maxX: target.x + SIZE_MM,
+        maxY: target.y + SIZE_MM,
+      });
+      // The commanded reverse rows still reach 0.5 mm past the anchor; that
+      // is real motion, so the burn and motion envelopes keep it.
+      expect(computeJobBounds(prepared.job, prepared.project.device)?.minX).toBeCloseTo(
+        target.x - 0.5,
+        6,
+      );
+    },
+  );
+
+  it.each(PLACEMENTS)(
+    'a negative table keeps the Line cut on the front-right anchor at $label',
+    ({ placement, target }) => {
+      const jobOrigin = placement('front-right');
+      const prepared = prepare(lineAndFillProject(-0.5, [square('art', 10)]), jobOrigin);
+      const untabled = prepare(lineAndFillProject(null, [square('art', 10)]), jobOrigin);
+
+      expect(prepared.jobOriginOffset).toEqual(untabled.jobOriginOffset);
+      expect(lineBounds(prepared.job)).toMatchObject({ minY: target.y, maxX: target.x });
+      expect(computeJobBounds(prepared.job, prepared.project.device)?.maxX).toBeCloseTo(
+        target.x + 0.5,
+        6,
+      );
+    },
+  );
+
+  it.each([0.5, -0.5])('a %s mm table keeps the centre anchor on the design centre', (offsetMm) => {
+    const jobOrigin = userOrigin('center');
+    const prepared = prepare(lineAndFillProject(offsetMm, [square('art', 10)]), jobOrigin);
+
+    expect(lineBounds(prepared.job)).toEqual({ minX: -5, minY: -5, maxX: 5, maxY: 5 });
   });
 
-  it('anchors the calibrated reverse-row maximum for a negative offset', () => {
-    const project = fillProject(-0.5, [fillSquare('selected', 10)]);
-    const placement: JobOriginPlacement = { startFrom: 'user-origin', anchor: 'front-right' };
-    const prepared = prepareOutput(project, { jobOrigin: placement });
-    if (!prepared.ok) throw new Error('expected prepared output');
+  it('emits the compensated reverse rows below the origin and still passes preflight', () => {
+    const project = lineAndFillProject(0.5, [square('art', 10)]);
+    const emitted = emitGcode(project, { jobOrigin: userOrigin('front-left') });
 
-    expect(computeJobBounds(prepared.job, project.device)?.maxX).toBeCloseTo(0, 6);
+    expect(emitted.preflight.ok).toBe(true);
+    // Compact rows read `G1X-0.5Y2…`: the reverse rows end 0.5 mm below X0.
+    expect(emitted.gcode).toMatch(/X-0\.5(?![0-9])/);
   });
 
   it.each([
     { useSelectionOrigin: true, expectedMinX: 0 },
     { useSelectionOrigin: false, expectedMinX: 90 },
   ])(
-    'uses calibrated full/selected bounds when useSelectionOrigin=$useSelectionOrigin',
+    'anchors full/selected design bounds when useSelectionOrigin=$useSelectionOrigin',
     ({ useSelectionOrigin, expectedMinX }) => {
-      const project = fillProject(0.5, [fillSquare('selected', 100), fillSquare('unselected', 10)]);
+      const project = lineAndFillProject(0.5, [square('selected', 100), square('unselected', 10)]);
       const outputScope: OutputScope = {
         cutSelectedGraphics: true,
         useSelectionOrigin,
         selectedObjectIds: ['selected'],
       };
-      const prepared = prepareOutput(project, {
-        jobOrigin: { startFrom: 'user-origin', anchor: 'front-left' },
-        outputScope,
-      });
-      if (!prepared.ok) throw new Error('expected prepared output');
+      const prepared = prepare(project, userOrigin('front-left'), outputScope);
 
-      expect(computeJobBounds(prepared.job, project.device)?.minX).toBeCloseTo(expectedMinX, 6);
+      expect(lineBounds(prepared.job)?.minX).toBeCloseTo(expectedMinX, 6);
     },
   );
 });
 
-function fillProject(offsetMm: number, objects: ReadonlyArray<SceneObject>): Project {
+function prepare(
+  project: Project,
+  jobOrigin: JobOriginPlacement,
+  outputScope?: OutputScope,
+): Extract<PreparedOutput, { readonly ok: true }> {
+  const prepared = prepareOutput(project, {
+    jobOrigin,
+    ...(outputScope === undefined ? {} : { outputScope }),
+  });
+  if (!prepared.ok) throw new Error('expected prepared output');
+  return prepared;
+}
+
+// Independent of the production bounds helpers: the Line cut's own vertices.
+function lineBounds(job: Job) {
+  const points = job.groups.flatMap((group) =>
+    group.kind === 'cut' && group.color === LINE_COLOR
+      ? group.segments.flatMap((segment) => segment.polyline)
+      : [],
+  );
+  if (points.length === 0) return null;
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  return {
+    minX: Math.min(...xs),
+    minY: Math.min(...ys),
+    maxX: Math.max(...xs),
+    maxY: Math.max(...ys),
+  };
+}
+
+function lineAndFillProject(offsetMm: number | null, objects: ReadonlyArray<SceneObject>): Project {
   const device = {
     ...NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
-    scanningOffsets: [{ speedMmPerMin: SPEED_MM_PER_MIN, offsetMm }],
+    scanningOffsets: offsetMm === null ? [] : [{ speedMmPerMin: SPEED_MM_PER_MIN, offsetMm }],
   };
-  const layer = {
-    ...createLayer({ id: 'fill', color: COLOR, mode: 'fill' }),
+  const fill = {
+    ...createLayer({ id: 'fill', color: FILL_COLOR, mode: 'fill' }),
     speed: SPEED_MM_PER_MIN,
     hatchAngleDeg: 0,
     hatchSpacingMm: 2,
     fillBidirectional: true,
     fillOverscanMm: 0,
   };
+  const line = createLayer({ id: 'line', color: LINE_COLOR, mode: 'line' });
   return {
     ...createProject(device),
     scene: {
       ...EMPTY_SCENE,
       objects,
-      layers: [layer],
+      layers: [fill, line],
       artworkOrder: objects.map((object) => object.id),
     },
   };
 }
 
-function fillSquare(id: string, x: number): SceneObject {
+// One square, filled and outlined by a Line cut on the same edges.
+function square(id: string, x: number): SceneObject {
   const minY = 10;
-  const maxX = x + 10;
-  const maxY = minY + 10;
+  const maxX = x + SIZE_MM;
+  const maxY = minY + SIZE_MM;
+  const outline = {
+    closed: true,
+    points: [
+      { x, y: minY },
+      { x: maxX, y: minY },
+      { x: maxX, y: maxY },
+      { x, y: maxY },
+    ],
+  };
   return {
     kind: 'imported-svg',
     id,
@@ -116,20 +204,8 @@ function fillSquare(id: string, x: number): SceneObject {
     bounds: { minX: x, minY, maxX, maxY },
     transform: IDENTITY_TRANSFORM,
     paths: [
-      {
-        color: COLOR,
-        polylines: [
-          {
-            closed: true,
-            points: [
-              { x, y: minY },
-              { x: maxX, y: minY },
-              { x: maxX, y: maxY },
-              { x, y: maxY },
-            ],
-          },
-        ],
-      },
+      { color: FILL_COLOR, polylines: [outline] },
+      { color: LINE_COLOR, polylines: [outline] },
     ],
   };
 }

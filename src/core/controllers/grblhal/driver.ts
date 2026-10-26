@@ -63,17 +63,17 @@ export const grblHalDriver: ControllerDriver = {
   ...grblDriver,
   kind: 'grblhal',
   label: 'grblHAL',
+  // grblHAL handles 0x85 in every state: it drops the partial line and
+  // flushes the input buffer, so a line not parsed yet is never answered
+  // (https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/protocol.c#L896-L899;
+  // stream.h#L287-L291). Cancel waits briefly for owed replies before the
+  // byte on every driver, because grblHAL can greet as stock GRBL (ADR-640).
   realtime: {
     ...grblDriver.realtime,
-    // grblHAL handles 0x85 in every state: it drops the partial line and
-    // flushes the input buffer, so a line not parsed yet is never answered
-    // (https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/protocol.c#L896-L899;
-    // stream.h#L287-L291). Stock GRBL ignores 0x85 outside Jog and flushes
-    // nothing (https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/serial.c#L159-L162).
-    jogCancelDropsUnparsedLines: true,
     // CMD_STATUS_REPORT_ALL (0x87) sets every report flag and requests a
     // status report, so WCO: arrives at once instead of at the next refresh
-    // count. Stock GRBL has no such byte.
+    // count. Stock GRBL discards an unknown extended byte; a grblHAL that
+    // greets as stock GRBL runs the GRBL driver and gets the plain `?`.
     // https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/grbl.h
     // (CMD_STATUS_REPORT_ALL), protocol.c (protocol_enqueue_realtime_command).
     completeStatusQuery: '\x87',
@@ -87,6 +87,9 @@ export const grblHalDriver: ControllerDriver = {
     // COMPATIBILITY_LEVEL 0, the default build, latches a refused line's
     // error (protocol.c:246-286); an empty line clears it.
     stickyLineError: true,
+    // `$10` bits 5 and 6 send WCO: and Ov:, so a stock-GRBL value turns them
+    // off (status-report-mask.ts, ADR-375 Amendment 2).
+    statusReportMask: 'grblhal-fields',
   },
   commands: {
     ...grblDriver.commands,

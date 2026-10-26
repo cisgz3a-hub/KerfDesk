@@ -70,6 +70,9 @@ export type ReviewedStartBundle = {
   /** Durable disclosure for the owned pre-Frame G54 selection. Rebuilds run
    * after that selection, so they must retain the original named WCS fact. */
   readonly frameWcsNormalizationWarning?: string;
+  /** The no-go zones the completed Frame's own route crossed. Rebuilds keep
+   * them: the Frame that produced them is the one Start claims. */
+  readonly frameNoGoWarnings?: ReadonlyArray<string>;
 };
 
 export type ConfirmedJobReview = {
@@ -220,12 +223,15 @@ export function modelFor(bundle: ReviewedStartBundle): ReturnType<typeof buildJo
           ...bundle.laser,
           connected: bundle.laser.connection.kind === 'connected',
         });
+  // The Frame's own route was compared with no-go zones when it ran (ADR-232
+  // Amendment 1); its findings sit beside the job's.
+  const frameNoGo = bundle.frameNoGoWarnings ?? [];
   const disclosed =
-    fluidnc.length === 0 && frozenPower.length === 0
+    fluidnc.length === 0 && frozenPower.length === 0 && frameNoGo.length === 0
       ? baseModel
       : {
           ...baseModel,
-          warnings: [...new Set([...baseModel.warnings, ...frozenPower, ...fluidnc])],
+          warnings: [...new Set([...baseModel.warnings, ...frameNoGo, ...frozenPower, ...fluidnc])],
         };
   const warning = bundle.frameWcsNormalizationWarning;
   const framedModel =
@@ -400,7 +406,6 @@ async function rebuildCurrentStart(
   onCompletedReplayChanged: (() => Promise<void> | void) | undefined,
   signal: AbortSignal,
 ): Promise<RebuiltStart> {
-  const frameWcsNormalizationWarning = previousBundle.frameWcsNormalizationWarning;
   const app = useStore.getState();
   const laser = useLaserStore.getState();
   const camera = useCameraStore.getState();
@@ -432,7 +437,7 @@ async function rebuildCurrentStart(
         ? {}
         : { preparedMachineInputsKey: previousBundle.preparedMachineInputsKey }
       : { preparedMachineInputsKey: startMachineInputsKey(app.project, laser, camera) }),
-    ...(frameWcsNormalizationWarning === undefined ? {} : { frameWcsNormalizationWarning }),
+    ...frameDisclosures(previousBundle),
   };
   const frameRefusal = frameFirstRefusal(purpose, bundle);
   if (frameRefusal !== null) return frameRefusal;
@@ -441,6 +446,18 @@ async function rebuildCurrentStart(
     return { ok: false, messages: [COMPLETED_REPLAY_CHANGED_MESSAGE], closeReview: true };
   }
   return { ok: true, bundle };
+}
+
+// What the claimed Frame disclosed when it ran (its G54 selection and its own
+// route's no-go crossings). A rebuild compiles after that Frame, so it keeps them.
+function frameDisclosures(
+  bundle: ReviewedStartBundle,
+): Pick<ReviewedStartBundle, 'frameWcsNormalizationWarning' | 'frameNoGoWarnings'> {
+  const { frameWcsNormalizationWarning, frameNoGoWarnings } = bundle;
+  return {
+    ...(frameWcsNormalizationWarning === undefined ? {} : { frameWcsNormalizationWarning }),
+    ...(frameNoGoWarnings === undefined ? {} : { frameNoGoWarnings }),
+  };
 }
 
 // Frame-first (ADR-228): Start needs a Frame of this exact compiled job. The

@@ -79,6 +79,7 @@ function plainFileName(value: string): boolean {
   );
 }
 const artworkIds = z.array(id).min(1).max(200);
+export const REMOTE_IMPORT_BASE64_LIMIT = 240_000;
 
 const designArgs = {
   create_operation: z.strictObject({ ...admission, ...createOperation }),
@@ -98,7 +99,7 @@ const designArgs = {
     dataBase64: z
       .string()
       .min(4)
-      .max(240_000)
+      .max(REMOTE_IMPORT_BASE64_LIMIT)
       .regex(/^[A-Za-z0-9+/]*={0,2}$/)
       .refine((value) => value.length % 4 === 0),
     ...placement,

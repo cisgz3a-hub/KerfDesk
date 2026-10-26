@@ -73,9 +73,9 @@ function preview(ctx) {
     title: 'See the program before your machine moves',
     content: html`${split({
       title: 'Preview, then inspect',
-      body: html`Press <kbd>P</kbd> to preview the exact toolpath your machine will run. With Pro,
-        open the G-code Inspector: a 3D viewer with playback that shows which line of the program
-        made each move. ${proPill()}`,
+      body: html`Press <kbd>P</kbd> to preview the exact toolpath your machine will run. Then open
+        the G-code Inspector: a 3D viewer with playback that shows which line of the program made
+        each move.`,
       points: PREVIEW_POINTS,
       media: shot(ctx, 'gcode3d', {
         caption: 'The canvas switched to G-code 3D, with playback controls below the view.',

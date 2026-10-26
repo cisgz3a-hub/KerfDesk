@@ -1,6 +1,6 @@
 ## ADR-592 Amendment 1 - A wrong-clock check-in must answer the request just sent (2026-10-20)
 
-**Status:** Implemented in source; the service change takes effect at the next Worker redeploy, which must come before the desktop release that carries the app change | **Date:** 2026-10-20 | **Amends:** ADR-592 decision 2 (devices check in)
+**Status:** Implemented in source; the service change takes effect at the next Worker redeploy, which must come before the desktop release that carries the app change | **Date:** 2026-10-20 | **Amends:** ADR-592 decision 2 (devices check in) | **Amended by:** ADR-623 Amendment 2 (paid licences keep working offline); [ADR-592 Amendment 3](ADR-592-amendment-3-refresh-nonce-withdrawn.md) (2026-10-23) withdraws the app side from 1.0.23: the app sends and checks no nonce, and the Worker keeps signing one back for 1.0.21 and 1.0.22
 
 ### Context
 
@@ -73,3 +73,18 @@ existing work and output stay usable. Developer licences remain exempt.
   refresh, nonce-free grants on a correct clock).
 - This decision operates no machine and changes no output. Frame remains the sole
   ordinary Start gate.
+
+### Since ADR-623 Amendment 2
+
+A paid licence now has no check-in and ignores the clock, so the wrong-clock
+offset this amendment guarded is gone: a paid grant is never held to the clock,
+and no offset is saved. The nonce stays, for every refresh:
+
+- A trial's refresh still counts as its check-in only when the grant signs back
+  the nonce its request sent, so a replayed answer cannot push a trial's
+  three-day check-in on.
+- A paid refresh whose grant signs another nonce is refused and confirms
+  nothing, so the next quiet check still asks the service. That is how a
+  refund reaches a connected computer. A replayed grant from an older service
+  that signs no nonce is accepted, which, like staying offline, only keeps a
+  paid licence working as LightBurn's does.

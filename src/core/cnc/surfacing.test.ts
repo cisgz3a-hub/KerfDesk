@@ -113,6 +113,34 @@ describe('buildSurfacingProgram', () => {
     expect(plunges).toEqual(['G1 Z-0.500 F600.000', 'G1 Z-1.000 F600.000', 'G1 Z-1.200 F600.000']);
   });
 
+  // Controller audit v4 E3-P3-1: a running sum drifts (0.3 + 0.3 + 0.3 is
+  // 0.8999…), which faced the whole board a fourth time at the final depth.
+  it.each([
+    [0.3, 0.9, ['G1 Z-0.300 F600.000', 'G1 Z-0.600 F600.000', 'G1 Z-0.900 F600.000']],
+    [0.15, 0.45, ['G1 Z-0.150 F600.000', 'G1 Z-0.300 F600.000', 'G1 Z-0.450 F600.000']],
+    [0.7, 2.1, ['G1 Z-0.700 F600.000', 'G1 Z-1.400 F600.000', 'G1 Z-2.100 F600.000']],
+  ] as const)(
+    'runs %s mm passes to %s mm with no repeated final pass',
+    (perPass, total, plunges) => {
+      const program = expectSurfacingProgram(
+        buildSurfacingProgram({ ...PARAMS, depthPerPassMm: perPass, totalDepthMm: total }),
+      );
+      expect(program.passes).toBe(3);
+      expect(program.lines.filter((line) => line.startsWith('G1 Z-'))).toEqual(plunges);
+    },
+  );
+
+  it('lands a dividing row ladder on the far edge once, without a duplicate row', () => {
+    // 101.6 / 10.16 is 10.000000000000002; summing 10.16 ten times is 101.59999….
+    const rows = expectSurfacingRows(surfacingRowYs(101.6, 10.16));
+    expect(rows).toHaveLength(11);
+    expect(rows.at(-1)).toBe(101.6);
+    expect(rows.at(-2)).toBeCloseTo(91.44, 9);
+    const heightRows = expectSurfacingRows(surfacingRowYs(0.9, 0.3));
+    expect(heightRows).toHaveLength(4);
+    expect(heightRows.at(-1)).toBe(0.9);
+  });
+
   it.each([
     [0.00049, 0],
     [0.0005, 0.001],

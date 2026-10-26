@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createProject } from '../../core/scene';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
+import {
+  installChromiumSavePicker,
+  lapseUserActivation,
+} from '../../platform/web/chromium-save-picker.test-support';
+import { webAdapter } from '../../platform/web/web-adapter';
+import { useSaveReadyDialogStore } from '../state/save-ready-dialog-store';
 import type * as RdModule from '../../io/rd';
 import type * as OutputWorkerModule from '../laser/output-preparation-worker-client';
 import type * as JobAwareDialogsModule from '../state/job-aware-dialogs';
@@ -49,7 +55,9 @@ describe('costly Ruida Save routing', () => {
 
       await handleSaveRd(context(order, writes), { ok: true });
 
-      expect(order).toEqual(['picker', 'worker']);
+      // The picker empties an existing file as it returns (ADR-656), so a
+      // failed compile never opens it.
+      expect(order).toEqual(['worker']);
       expect(mocks.direct).not.toHaveBeenCalled();
       expect(writes).toEqual([]);
       expect(mocks.alert).toHaveBeenCalledWith(
@@ -70,10 +78,54 @@ describe('costly Ruida Save routing', () => {
 
     await handleSaveRd(context(order, writes), { ok: true });
 
-    expect(order).toEqual(['picker', 'worker', 'write']);
+    expect(order).toEqual(['worker', 'picker', 'write']);
     expect(mocks.direct).not.toHaveBeenCalled();
     expect(writes).toHaveLength(1);
     expect(writes[0]).toBeInstanceOf(Blob);
+  });
+
+  it('leaves an existing .rd file intact when the worker fails (audit 19-P2-1)', async () => {
+    const disk = new Map([['job.rd', 'previous rd']]);
+    const picker = installChromiumSavePicker(disk);
+    mocks.prepareBackground.mockImplementation(() => Promise.reject(new Error('worker crashed')));
+    try {
+      await handleSaveRd(
+        {
+          platform: webAdapter,
+          project: createProject(),
+          savedName: null,
+          pushToast: () => undefined,
+        },
+        { ok: true },
+      );
+    } finally {
+      picker.restore();
+    }
+    expect(picker.picks()).toBe(0);
+    expect(disk.get('job.rd')).toBe('previous rd');
+    expect(mocks.alert).toHaveBeenCalledWith(expect.stringContaining('worker crashed'));
+  });
+
+  it('asks for a fresh Choose file click when compiling outlasts the click', async () => {
+    const order: string[] = [];
+    const writes: Array<string | Blob> = [];
+    mocks.prepareBackground.mockImplementation(() => {
+      order.push('worker');
+      return Promise.resolve({ ok: true, bytes: new Uint8Array([1]), advisories: [] });
+    });
+    const restoreActivation = lapseUserActivation();
+    try {
+      const saving = handleSaveRd(context(order, writes), { ok: true });
+      await vi.waitFor(() =>
+        expect(useSaveReadyDialogStore.getState().request?.title).toBe('Save .rd file'),
+      );
+      expect(order).toEqual(['worker']);
+      useSaveReadyDialogStore.getState().request?.choose();
+      await saving;
+    } finally {
+      restoreActivation();
+    }
+    expect(order).toEqual(['worker', 'picker', 'write']);
   });
 
   it('keeps cheap jobs on the direct path before opening the picker', async () => {

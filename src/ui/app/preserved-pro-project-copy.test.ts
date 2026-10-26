@@ -1,5 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { serializeProject } from '../../io/project';
+import { installChromiumSavePicker } from '../../platform/web/chromium-save-picker.test-support';
+import { webAdapter } from '../../platform/web/web-adapter';
 import { assetReader, pagedProject } from '../library/personal-artwork-test-fixtures';
 import {
   preserveUnadmittedProProject,
@@ -87,4 +89,30 @@ it('failed image hydration writes nothing and retains the complete original for 
   ).rejects.toThrow('unavailable');
   expect(write).not.toHaveBeenCalled();
   expect(usePendingProProjectStore.getState().pending?.project).toBe(project);
+});
+
+it('leaves an existing file intact when the copy cannot read its assets (audit 19-P2-1)', async () => {
+  // Chromium empties the chosen file as the picker returns (ADR-656).
+  const paged = pagedProject();
+  const pending = preserveUnadmittedProProject(
+    { ...proProject(), scene: { ...proProject().scene, objects: paged.scene.objects } },
+    { source: 'file', name: 'design.lf2' },
+  );
+  if (pending === null) throw new Error('Expected desktop project');
+  const disk = new Map([['design-preserved.lf2', 'previous copy']]);
+  const picker = installChromiumSavePicker(disk);
+  try {
+    await expect(
+      savePreservedProProjectCopy(pending, webAdapter, {
+        ...assetReader(),
+        readManifest: async () => {
+          throw new Error('asset storage unavailable');
+        },
+      }),
+    ).rejects.toThrow();
+  } finally {
+    picker.restore();
+  }
+  expect(picker.picks()).toBe(0);
+  expect(disk.get('design-preserved.lf2')).toBe('previous copy');
 });

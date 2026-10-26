@@ -20,12 +20,15 @@ import {
   type GrblSimOptions,
   type GrblSimReaction,
   type GrblSimState,
+  type GrblSimWcs,
 } from './grbl-sim-state';
 
 const STATUS_SYSTEM_GC_LOCK = 9;
 const STATUS_TRAVEL_EXCEEDED = 15;
 const STATUS_CRITICAL_EVENT = 79;
 const PROGRAM_PAUSE_RE = /(?:^|\s)[Mm]0*0(?![\d.])/;
+const WCS_SELECT_RE = /[Gg]0*(5[4-9])(?![\d.])/g;
+const PROGRAM_END_RE = /[Mm]0*(?:2|30)(?![\d.])/;
 const DWELL_SECONDS_RE = /[Pp](\d*\.?\d+)/;
 
 export function reduceGrblSimLine(
@@ -200,9 +203,10 @@ function reduceDollarQuery(
     };
   }
   if (line === '$G') {
+    const wcs = state.wcs ?? 'G54';
     return {
       state,
-      effects: [emit('[GC:G0 G54 G17 G21 G90 G94 M5 M9 T0 F0 S0]', opts), emit('ok', opts)],
+      effects: [emit(`[GC:G0 ${wcs} G17 G21 G90 G94 M5 M9 T0 F0 S0]`, opts), emit('ok', opts)],
     };
   }
   return null;
@@ -261,7 +265,22 @@ function jogLeavesStockTravel(state: GrblSimState, target: SimVec3, opts: GrblSi
   });
 }
 
+// A G54-G59 word selects a work coordinate system before the line's G10, G92
+// and motion run, and M2/M30 select G54 again once it ends (gnea/grbl gcode.c
+// L1091-1101); a soft reset does too (gc_init, grbl-sim-machine.ts).
 function reduceGcodeLine(state: GrblSimState, line: string, opts: GrblSimOptions): GrblSimReaction {
+  const selected = [...line.matchAll(WCS_SELECT_RE)].at(-1)?.[1];
+  const inWcs = selected === undefined ? state : { ...state, wcs: `G${selected}` as GrblSimWcs };
+  const reaction = reduceGcodeLineInWcs(inWcs, line, opts);
+  if (!PROGRAM_END_RE.test(line)) return reaction;
+  return { ...reaction, state: { ...reaction.state, wcs: 'G54' } };
+}
+
+function reduceGcodeLineInWcs(
+  state: GrblSimState,
+  line: string,
+  opts: GrblSimOptions,
+): GrblSimReaction {
   if (hasGWord(line, 92.1)) {
     return { state: { ...state, g92: null }, effects: [emit('ok', opts)] };
   }

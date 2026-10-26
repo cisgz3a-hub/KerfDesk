@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createEllipse, createRectangle } from '../shapes/primitives';
+import { createRegistrationOutline } from '../shapes/registration-box';
+import { boardFitRegion } from './board-fit-region';
 import { fitObjectToBoard, fittedArtworkSize } from './fit-object-to-board';
 import { transformedBBox } from './hit-test';
 import { applyTransform } from './transform';
@@ -41,6 +43,30 @@ describe('exact board fitting', () => {
     if (plan.kind !== 'ok') return;
     expect(plan.scale).toBeCloseTo(4.5);
     expect(transformedBBox(plan.object)).toEqual({ minX: 25, minY: 37.5, maxX: 115, maxY: 82.5 });
+  });
+
+  it('centres and sizes artwork from an outline board inscribed region', () => {
+    const outline = createRegistrationOutline({
+      pointsMm: [
+        { x: 0, y: 0 },
+        { x: 100, y: 0 },
+        { x: 100, y: 35 },
+        { x: 35, y: 35 },
+        { x: 35, y: 100 },
+        { x: 0, y: 100 },
+      ],
+      x: 20,
+      y: 30,
+    });
+    const plan = fitObjectToBoard(artwork, outline, { mode: 'fit', marginMm: 2 });
+    expect(plan.kind).toBe('ok');
+    if (plan.kind !== 'ok') return;
+    const region = boardFitRegion(outline);
+    const bounds = transformedBBox(plan.object);
+    expect((bounds.minX + bounds.maxX) / 2).toBeCloseTo((region.minX + region.maxX) / 2);
+    expect((bounds.minY + bounds.maxY) / 2).toBeCloseTo((region.minY + region.maxY) / 2);
+    expect(bounds.minX).toBeGreaterThanOrEqual(region.minX + 2 - 1e-9);
+    expect(bounds.maxX).toBeLessThanOrEqual(region.maxX - 2 + 1e-9);
   });
 
   it('keeps actual size and reports when the chosen margin is exceeded', () => {

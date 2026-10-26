@@ -24,7 +24,7 @@ import type { BoundaryMode } from './region-enhance-trace';
 import { cropOnlyNote } from './BoundaryModePicker';
 import type { BoundarySelection } from './use-boundary-selection';
 import { TracePreviewPanel } from './TracePreviewPanel';
-import { conditionTracedImageForMachine } from './trace-machine-conditioning';
+import { conditionTracedImageForCommit } from './trace-machine-conditioning';
 import { useDialogTraceOptions, useTraceDialogSettings } from './use-trace-dialog-settings';
 import { resolveTraceCommitResult } from './trace-commit-result';
 import { traceCommitGridForClaim } from './trace-commit-grid-note';
@@ -36,6 +36,7 @@ import {
   type TraceCommitClaim,
 } from './trace-commit-ownership';
 import { commitTraceOutput } from './trace-output-commit';
+import { traceModeForOptions } from './trace-mode-for-options';
 import { useTracePreview } from './use-trace-preview';
 import { useTracePreviewFacts } from './trace-preview-facts';
 import { useTraceCommitLifetime } from './use-trace-commit-lifetime';
@@ -44,7 +45,7 @@ import {
   type TracePreviewCommitControl,
   type TracePreviewCommitUpdate,
 } from './use-trace-preview-settlement';
-import { isTraceRequestSuperseded } from './use-trace-worker-client';
+import { isTraceRequestSuperseded, type TraceResult } from './use-trace-worker-client';
 import { isTraceAbort, traceAbortError } from './trace-cancellation';
 import { useCanvasTraceSourceFile } from './use-trace-source-file';
 
@@ -333,66 +334,105 @@ export async function commit(args: TraceCommitArgs, ctx: TraceCommitContext): Pr
     });
     const owner = ctx.claimOwner();
     if (owner === null) return;
-    settleTracePreview(ctx, { kind: 'ready', result });
-    const { paths, bounds, width, height, notices } = result;
-    if (paths.length === 0) {
-      ctx.pushToast(
-        `Tracing ${args.seed.source} produced no paths — try a higher contrast image.`,
-        'warning',
-      );
-      return;
+    // The preview shows this result whenever the dialog stays open: while a
+    // raster scan is built from it, and after any outcome that does not land,
+    // where a retry reuses it. A landed vector trace closes the dialog, and
+    // painting a full-resolution trace into that closing preview only held
+    // the UI thread.
+    const showResult = (): void => settleTracePreview(ctx, { kind: 'ready', result });
+    if (args.traceOutput === 'raster') showResult();
+    let landed = false;
+    try {
+      landed = await commitTraceResult(args, ctx, result, owner);
+    } finally {
+      if (!landed && args.traceOutput !== 'raster') showResult();
     }
-    // transform is a placeholder: applyTraceToExisting overwrites it
-    // with the source bitmap's own transform so the vectors register
-    // pixel-for-pixel over the features they came from (ADR-026).
-    const traceMode = traceModeForOptions(args.options);
-    const operationOverride = operationOverrideForTrace(traceMode, args.traceFillStyle);
-    const traced: TracedImage = {
-      kind: 'traced-image',
-      id: args.replaceTraceId ?? crypto.randomUUID(),
-      source: args.seed.source,
-      traceSourceId: args.seed.id,
-      traceMode,
-      tracePixelWidth: width,
-      tracePixelHeight: height,
-      bounds,
-      transform: IDENTITY_TRANSFORM,
-      paths,
-      ...(args.traceSettings === undefined ? {} : { traceSettings: args.traceSettings }),
-      ...(operationOverride === undefined ? {} : { operationOverride }),
-    };
-    const liveProject = owner.project;
-    const liveSource = owner.source;
-    // P2-A: refuse to commit if the live source changed (content/grid) or was
-    // removed while the modal was open. Vector output may follow a moved source;
-    // raster output captures the complete live object and operation references
-    // below, then checks them again after its asynchronous bitmap build.
-    if (!sameTraceSourceContent(liveSource, args.seed)) {
-      ctx.pushToast(
-        `The source image for ${args.seed.source} changed or was removed — re-open Trace to continue.`,
-        'error',
-      );
-      return;
-    }
-    // Photo ribbon width encodes tone; generic contour fairing changes that
-    // coverage and can erase narrow highlights. Keep its reviewed geometry.
-    // Machine conditioning uses the exact live placement that the store will
-    // apply. Transform-only source changes are intentionally accepted, so
-    // conditioning before this point would use stale physical units.
-    const placement = positionTraceOverRasterSource(liveSource, traced).transform;
-    const machineKind = liveProject.machine?.kind;
-    const commitTraced = conditionTracedImageForMachine(traced, placement, machineKind, args);
-    const outputArgs = {
-      ...args,
-      photoShading: args.options.photoDetail !== undefined,
-      ...(notices === undefined ? {} : { notices }),
-    };
-    if (await commitTraceOutput(outputArgs, ctx, commitTraced, liveProject)) ctx.close();
+    if (landed) ctx.close();
   } catch (err) {
     reportTraceCommitError(args.seed.source, err, ctx);
   } finally {
     releaseTraceCommitBusy(ctx);
   }
+}
+
+/** Build, condition and hand off the traced object. True once it landed. */
+async function commitTraceResult(
+  args: TraceCommitArgs,
+  ctx: TraceCommitContext,
+  result: TraceResult,
+  owner: TraceCommitClaim,
+): Promise<boolean> {
+  const { paths, bounds, width, height, notices } = result;
+  if (paths.length === 0) {
+    ctx.pushToast(
+      `Tracing ${args.seed.source} produced no paths — try a higher contrast image.`,
+      'warning',
+    );
+    return false;
+  }
+  // transform is a placeholder: applyTraceToExisting overwrites it
+  // with the source bitmap's own transform so the vectors register
+  // pixel-for-pixel over the features they came from (ADR-026).
+  const traceMode = traceModeForOptions(args.options);
+  const operationOverride = operationOverrideForTrace(traceMode, args.traceFillStyle);
+  const traced: TracedImage = {
+    kind: 'traced-image',
+    id: args.replaceTraceId ?? crypto.randomUUID(),
+    source: args.seed.source,
+    traceSourceId: args.seed.id,
+    traceMode,
+    tracePixelWidth: width,
+    tracePixelHeight: height,
+    bounds,
+    transform: IDENTITY_TRANSFORM,
+    paths,
+    ...(args.traceSettings === undefined ? {} : { traceSettings: args.traceSettings }),
+    ...(operationOverride === undefined ? {} : { operationOverride }),
+  };
+  const liveProject = owner.project;
+  const liveSource = owner.source;
+  // P2-A: refuse to commit if the live source changed (content/grid) or was
+  // removed while the modal was open. Vector output may follow a moved source;
+  // raster output captures the complete live object and operation references
+  // below, then checks them again after its asynchronous bitmap build.
+  if (!sameTraceSourceContent(liveSource, args.seed)) {
+    ctx.pushToast(
+      `The source image for ${args.seed.source} changed or was removed — re-open Trace to continue.`,
+      'error',
+    );
+    return false;
+  }
+  // Photo ribbon width encodes tone; generic contour fairing changes that
+  // coverage and can erase narrow highlights. Keep its reviewed geometry.
+  // Machine conditioning uses the exact live placement that the store will
+  // apply. Transform-only source changes are intentionally accepted, so
+  // conditioning before this point would use stale physical units.
+  const placement = positionTraceOverRasterSource(liveSource, traced).transform;
+  const machineKind = liveProject.machine?.kind;
+  const commitTraced = await conditionTracedImageForCommit(
+    traced,
+    placement,
+    machineKind,
+    args,
+    ctx.signal,
+  );
+  // Conditioning gave the browser turns. A claim proves the same document and
+  // source object, so the placement still holds; the machine must too.
+  const conditionedOwner = ctx.claimOwner();
+  if (conditionedOwner === null) return false;
+  if (conditionedOwner.project.machine?.kind !== machineKind) {
+    ctx.pushToast(
+      `The machine changed while the trace of ${args.seed.source} was being prepared — re-open Trace to continue.`,
+      'error',
+    );
+    return false;
+  }
+  const outputArgs = {
+    ...args,
+    photoShading: args.options.photoDetail !== undefined,
+    ...(notices === undefined ? {} : { notices }),
+  };
+  return commitTraceOutput(outputArgs, ctx, commitTraced, conditionedOwner.project);
 }
 
 function reportTraceCommitError(source: string, err: unknown, ctx: TraceCommitContext): void {
@@ -426,11 +466,4 @@ function operationOverrideForTrace(
   if (traceMode !== 'filled-contours') return undefined;
   if (fillStyle === undefined) return undefined;
   return { mode: 'fill', fillStyle };
-}
-
-function traceModeForOptions(options: TraceOptions): NonNullable<TracedImage['traceMode']> {
-  if (options.traceMode === 'centerline') return 'centerline';
-  if (options.traceMode === 'edge') return 'edge';
-  if (options.traceMode === 'hybrid') return 'hybrid';
-  return 'filled-contours';
 }

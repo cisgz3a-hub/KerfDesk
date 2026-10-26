@@ -35,7 +35,7 @@ export function secret(value) {
   return device(value);
 }
 
-/** A refresh request's random nonce: 32 bytes as 43 base64url characters (ADR-592 Amendment 1). */
+/** A refresh request's random nonce: 32 bytes as 43 base64url characters (ADR-592 Amendments 1 and 3). */
 export function nonce(value) {
   return device(value);
 }

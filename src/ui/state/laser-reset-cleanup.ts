@@ -15,6 +15,7 @@
 import type { ControllerDriver } from '../../core/controllers';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import type { LaserControllerOperation } from './laser-controller-operation';
+import type { RetainedControllerSettings } from './laser-owned-reset-settings';
 
 export const RESET_CLEANUP_BANNER_TIMEOUT_MS = 500;
 
@@ -30,6 +31,8 @@ export type ResetCleanupOptions = {
   readonly onResetBoundary?: () => void;
   readonly onComplete?: (error: unknown | null) => void;
   readonly onCancel?: () => void;
+  /** The `$$`/`$I` snapshot this owned reset still carries to its banner (ADR-648). */
+  readonly retainedSettings?: () => RetainedControllerSettings | null;
 };
 
 export type ResetCleanupRefs = {
@@ -52,6 +55,17 @@ export function hasUnconfirmedResetCleanup(
     refs.pendingResetCleanup?.options.requireResetBoundary === true &&
     hasOwnedControllerReset(operation)
   );
+}
+
+/** The settings snapshot that the owned reset awaiting this banner carries, or
+ * null when the banner closes no reset KerfDesk sent on this port (ADR-648). */
+export function ownedResetRetainedSettings(
+  refs: ResetCleanupRefs & { readonly connection?: unknown },
+): RetainedControllerSettings | null {
+  const pending = refs.pendingResetCleanup;
+  if (pending?.options.requireResetBoundary !== true) return null;
+  const retained = pending.options.retainedSettings?.() ?? null;
+  return retained !== null && retained.connection === refs.connection ? retained : null;
 }
 
 /** Cleanup after a controller reset must explicitly include spindle/laser off.

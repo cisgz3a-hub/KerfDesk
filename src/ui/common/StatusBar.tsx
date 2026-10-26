@@ -9,6 +9,12 @@
 import { transformedBBox, type Project } from '../../core/scene';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
+import { useLengthUnit } from '../state/display-units';
+import {
+  formatDisplayLength,
+  formatDisplayLengthFixed,
+  type DisplayLengthUnit,
+} from '../display-length';
 import { selectedOpenFillContourCount } from './fill-diagnostics';
 import { DesktopPreviewUpdateButton } from './DesktopPreviewUpdateButton';
 import { PwaUpdateButton } from './PwaUpdateButton';
@@ -24,6 +30,7 @@ export function StatusBar({ children }: { readonly children?: React.ReactNode })
   const selectedObjectId = useStore((s) => s.selectedObjectId);
   const additionalSelectedIds = useStore((s) => s.additionalSelectedIds);
   const zoomFactor = useUiStore((s) => s.zoomFactor);
+  const unit = useLengthUnit();
   const objectCount = project.scene.objects.length;
   const groupCount = project.scene.groups?.length ?? 0;
   const lockedCount = project.scene.objects.filter((object) => object.locked === true).length;
@@ -43,9 +50,11 @@ export function StatusBar({ children }: { readonly children?: React.ReactNode })
         <Segment>
           {cursorMm === null
             ? 'Cursor: —'
-            : `Cursor: X ${cursorMm.x.toFixed(1)}, Y ${cursorMm.y.toFixed(1)} mm`}
+            : `Cursor: X ${fixed(cursorMm.x, unit)}, Y ${fixed(cursorMm.y, unit)} ${unit}`}
         </Segment>
-        <Segment>{describeSelection(project, selectedObjectId, additionalSelectedIds)}</Segment>
+        <Segment>
+          {describeSelection(project, selectedObjectId, additionalSelectedIds, unit)}
+        </Segment>
         {selectedFillWarning !== null && <Segment>{selectedFillWarning}</Segment>}
         <Segment>Objects: {objectCount}</Segment>
         {groupCount > 0 && <Segment>Groups: {groupCount}</Segment>}
@@ -55,7 +64,8 @@ export function StatusBar({ children }: { readonly children?: React.ReactNode })
         </Segment>
         <Segment>Device: {project.device.name}</Segment>
         <Segment>
-          Bed: {project.device.bedWidth} × {project.device.bedHeight} mm
+          Bed: {formatDisplayLength(project.device.bedWidth, unit)} ×{' '}
+          {formatDisplayLength(project.device.bedHeight, unit)} {unit}
         </Segment>
         <Segment>Zoom: {Math.round(zoomFactor * 100)}%</Segment>
         {/* Mount point for the canvas motion overlay's machine-status line, which
@@ -98,6 +108,7 @@ function describeSelection(
   project: ReturnType<typeof useStore.getState>['project'],
   selectedId: string | null,
   additional: ReadonlySet<string>,
+  unit: DisplayLengthUnit,
 ): string {
   if (selectedId === null) return 'Nothing selected';
   const obj = project.scene.objects.find((o) => o.id === selectedId);
@@ -107,7 +118,12 @@ function describeSelection(
   const bbox = transformedBBox(obj);
   const w = bbox.maxX - bbox.minX;
   const h = bbox.maxY - bbox.minY;
-  return `1 selected · ${w.toFixed(1)} × ${h.toFixed(1)} mm · X ${bbox.minX.toFixed(1)}, Y ${bbox.minY.toFixed(1)}`;
+  return `1 selected · ${fixed(w, unit)} × ${fixed(h, unit)} ${unit} · X ${fixed(bbox.minX, unit)}, Y ${fixed(bbox.minY, unit)}`;
+}
+
+// One decimal of a millimetre, or three of an inch (ADR-629).
+function fixed(mm: number, unit: DisplayLengthUnit): string {
+  return formatDisplayLengthFixed(mm, unit, 1);
 }
 
 function fillWarning(

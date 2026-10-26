@@ -88,7 +88,7 @@ const MUTATIONS: SourceMutation[] = [
   },
   {
     name: 'unknown base power version in place',
-    apply: (source) => Object.assign(source.prepared, { laserPowerScaleVersion: 3 }),
+    apply: (source) => Object.assign(source.prepared, { laserPowerScaleVersion: 5 }),
   },
   {
     name: 'provenance in place',

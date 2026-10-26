@@ -63,16 +63,21 @@ export function renderStrokeFontText(
   const lines = text.split('\n').map((line) => Array.from(line));
   const widths = lines.map((line) => lineWidth(line, font, scale, spacingMm));
   const maxWidth = widths.reduce((maximum, width) => Math.max(maximum, width), 0);
-  const curves = lines.flatMap((line, index) =>
-    renderLine({
+  let glyphOffset = 0;
+  const glyphContours: number[] = [];
+  const curves = lines.flatMap((line, index) => {
+    const rendered = renderLine({
       characters: line,
       x: alignmentOffset(actual.alignment, widths[index] ?? 0, maxWidth),
       y: index * actual.sizeMm * actual.lineHeight,
       scale,
       spacingMm,
       font,
-    }),
-  );
+    });
+    glyphContours.push(...rendered.glyphContours.map((id) => id + glyphOffset));
+    glyphOffset += line.length;
+    return rendered.curves;
+  });
   // Where a zero-width line would sit is the point every line aligns to.
   const result = normalizedResult(
     curves,
@@ -80,7 +85,11 @@ export function renderStrokeFontText(
     alignmentOffset(actual.alignment, 0, maxWidth),
   );
   const missing = missingCharacters(text, (character) => font.glyphs.has(character));
-  const rendered = missing.length === 0 ? result : { ...result, missingCharacters: missing };
+  const rendered = {
+    ...result,
+    glyphContours: [glyphContours],
+    ...(missing.length === 0 ? {} : { missingCharacters: missing }),
+  };
   return layout === undefined || input.textBox === undefined
     ? rendered
     : finishTextBoxRender(rendered, layout, input.textBox, input.alignment);
@@ -95,12 +104,17 @@ type LineRenderInput = {
   readonly font: StrokeFont;
 };
 
-function renderLine(input: LineRenderInput): ReadonlyArray<CurveSubpath> {
+function renderLine(input: LineRenderInput): {
+  readonly curves: ReadonlyArray<CurveSubpath>;
+  readonly glyphContours: ReadonlyArray<number>;
+} {
   const output: CurveSubpath[] = [];
+  const glyphContours: number[] = [];
   let penX = input.x;
   input.characters.forEach((character, index) => {
     const glyph = glyphForCharacter(input.font, character);
     if (glyph === undefined) return;
+    glyphContours.push(...glyph.paths.map(() => index));
     output.push(
       ...glyph.paths.map((path) =>
         transformPath(path, penX, input.y, input.scale, input.font.yAxis),
@@ -109,7 +123,7 @@ function renderLine(input: LineRenderInput): ReadonlyArray<CurveSubpath> {
     penX += glyph.advance * input.scale;
     if (index + 1 < input.characters.length) penX += input.spacingMm;
   });
-  return output;
+  return { curves: output, glyphContours };
 }
 
 function transformPath(

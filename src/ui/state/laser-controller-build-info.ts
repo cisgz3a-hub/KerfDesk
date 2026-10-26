@@ -11,6 +11,10 @@ import {
 import type { LaserSafetyAction } from './laser-safety-notice';
 import type { SessionObservationStamp } from './laser-controller-observation';
 import type { TranscriptSource } from './laser-transcript';
+import {
+  noteControllerBuildInfoRead,
+  type OwnedResetSettingsRefs,
+} from './laser-owned-reset-settings';
 
 const MAX_BUILD_INFO_LINES = 8;
 const MAX_BUILD_INFO_LINE_LENGTH = 512;
@@ -58,7 +62,7 @@ export function observedControllerBuildInfoState(
  * failure belongs in the log; unsupported drivers expose a null query. */
 export async function readControllerBuildInfo(args: {
   readonly driver: ControllerDriver;
-  readonly refs: ControllerLifecycleRefs;
+  readonly refs: ControllerLifecycleRefs & OwnedResetSettingsRefs;
   readonly write: BuildInfoWrite;
   readonly commandKind: ControllerCommandKind;
   readonly sessionEpoch: number;
@@ -77,5 +81,6 @@ export async function readControllerBuildInfo(args: {
     ...(args.source === undefined ? {} : { source: args.source }),
   });
   if (!args.isCurrent()) return null;
+  noteControllerBuildInfoRead(args.refs);
   return observedControllerBuildInfoState(responses, args.sessionEpoch, Date.now());
 }

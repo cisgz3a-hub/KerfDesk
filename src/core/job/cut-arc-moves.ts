@@ -295,12 +295,25 @@ export function translateCutSegment<T extends CutSegment>(segment: T, dx: number
   const polyline = segment.polyline.map(shift);
   const moves = validCutArcMoves(segment);
   const finalPass = segment.finalPassBurn;
+  const contour = segment.leadContour;
   const moved = {
     ...withoutArcMoves(segment),
     polyline,
     ...(finalPass === undefined
       ? {}
       : { finalPassBurn: { polyline: finalPass.polyline.map(shift) } }),
+    ...(contour?.arcMoves === undefined
+      ? {}
+      : {
+          leadContour: {
+            ...contour,
+            arcMoves: {
+              ...contour.arcMoves,
+              from: shift(contour.arcMoves.from),
+              moves: translateArcMoves(contour.arcMoves.moves, dx, dy),
+            },
+          },
+        }),
   };
   return moves === null ? moved : withCutArcMoves(moved, translateArcMoves(moves, dx, dy));
 }

@@ -206,3 +206,13 @@ test('waits for a late flush instead of reading the archive short', async () => 
     fs.rmSync(fixture.root, { recursive: true, force: true });
   }
 });
+
+// The package check finds the About renderer asset by ABOUT_MARKER, so the
+// About text in CommandShell.tsx must keep it word for word.
+test('the About dialog keeps the text the package check finds it by', () => {
+  const shell = fs.readFileSync(
+    new URL('../src/ui/commands/CommandShell.tsx', import.meta.url),
+    'utf8',
+  );
+  assert.ok(shell.includes(`'${ABOUT_MARKER}`));
+});

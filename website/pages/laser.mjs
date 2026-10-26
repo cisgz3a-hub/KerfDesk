@@ -105,9 +105,9 @@ function traceSection() {
       })}
       <div class="prose">
         <p>
-          Multi-File Trace turns several image files into separate SVG files in one go, using the
-          Line Art preset. If you keep the original image in your project, Re-trace Original reopens
-          Trace Image so you can try another preset.
+          Multi-File Trace, part of Pro, turns several image files into separate SVG files in one
+          go, using the Line Art preset. If you keep the original image in your project, Re-trace
+          Original reopens Trace Image so you can try another preset.
         </p>
       </div>`,
   });
@@ -134,7 +134,7 @@ function runSection(ctx) {
         body: 'Preview shows cuts and travel moves on the canvas, and a GRBL-style motion planner estimates how long the job will take. It is an estimate, not a promise: it hasn’t been compared with real run times.',
         points: [
           'Toolpath preview with an estimated run time',
-          'With Pro, play the program back in 3D in the G-code Inspector',
+          'Play the program back in 3D in the G-code Inspector',
           'Automated tests check that the G-code keeps the laser off on every travel move',
         ],
         media: shot(ctx, 'preview', { caption: 'The toolpath preview in KerfDesk.' }),

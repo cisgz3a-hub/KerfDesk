@@ -62,4 +62,26 @@ describe('O2: explicit drilling motion, preview and duration', () => {
       expect(Math.min(move.from.z, move.to.z)).toBeGreaterThanOrEqual(5);
     }
   });
+
+  // CNC audit v1 F4-P3-2: the group used to name min(feed, plunge), 800 here,
+  // while every move of the cycle ran at F2000.
+  it.each([
+    [800, 2000],
+    [1000, 200],
+  ] as const)('names the feed it drills at: feed %s, plunge %s', (feed, plunge) => {
+    const { job, output, moves } = compiled({
+      cutType: 'drill',
+      depthMm: 6,
+      depthPerPassMm: 2,
+      feedMmPerMin: feed,
+      plungeMmPerMin: plunge,
+    });
+    const group = job.groups.find((entry) => entry.kind === 'cnc');
+    if (group?.kind !== 'cnc') throw new Error('drill group missing');
+    expect(group.feedMmPerMin).toBe(plunge);
+    expect(output.gcode).toContain(`; cnc motion: feed-mm-min: ${plunge};`);
+    const fed = moves.filter((move) => move.mode === 1);
+    expect(fed.length).toBeGreaterThan(0);
+    expect(fed.every((move) => move.feed === plunge)).toBe(true);
+  });
 });

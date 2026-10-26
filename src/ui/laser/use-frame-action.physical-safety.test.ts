@@ -244,7 +244,7 @@ describe('Frame source-of-truth contract', () => {
     expect(useLaserStore.getState().framedRun).not.toBeNull();
   });
 
-  it('keeps a perimeter no-go finding advisory and still frames', async () => {
+  it('never refuses a Frame whose perimeter crosses a zone on an unverified bed mapping', async () => {
     installVectorProject({ minX: 40, minY: 40, maxX: 100, maxY: 100 });
     const bounds = currentMotionBounds();
     setNoGoZone({
@@ -258,11 +258,43 @@ describe('Frame source-of-truth contract', () => {
 
     await expect(runFrameNow()).resolves.toBe(true);
 
-    // A zone touching only the frame outline never refuses Frame; the
-    // interior test below pins the warning content for crossed job motion.
+    // A zone touching only the frame outline never refuses Frame. Without a
+    // verified native-to-bed frame the route is not compared (Job Review says
+    // zones cannot be checked); the next test covers a verified mapping.
     expect(frame).toHaveBeenCalledOnce();
-    expect(useLaserStore.getState().framedRun).not.toBeNull();
+    expect(useLaserStore.getState().framedRun?.candidate.frameNoGoWarnings).toBeUndefined();
     expect(useToastStore.getState().toasts.at(-1)?.variant).toBe('success');
+  });
+
+  // Audit v3 D5-P2-3, ADR-232 Amendment 1: the job's diagonal misses the zone,
+  // so only the Frame's own perimeter crosses it.
+  it('carries a perimeter-only no-go crossing into the permit for Job Review', async () => {
+    installVectorProject({ minX: 40, minY: 40, maxX: 100, maxY: 100 });
+    const project = useStore.getState().project;
+    const device = { ...project.device, homing: { ...project.device.homing, enabled: true } };
+    useStore.setState({ project: { ...project, device } });
+    useLaserStore.setState({
+      ...stockNativeEvidence(device, true),
+      wcoCache: { x: 0, y: 0, z: 0 },
+    });
+    const bounds = currentMotionBounds();
+    setNoGoZone({
+      x: (bounds.minX + bounds.maxX) / 2 - 1,
+      y: bounds.minY - 1,
+      width: 2,
+      height: 2,
+    });
+    const frame = completingFrame();
+    useLaserStore.setState({ frame });
+
+    await expect(runFrameNow()).resolves.toBe(true);
+
+    expect(frame).toHaveBeenCalledOnce();
+    const candidate = useLaserStore.getState().framedRun?.candidate;
+    expect(JSON.stringify(candidate?.preparedStart.warnings)).not.toContain('Clamp');
+    expect(candidate?.frameNoGoWarnings).toEqual([
+      expect.stringContaining(`The Frame's outline crosses the configured no-go zone "Clamp"`),
+    ]);
   });
 
   it('keeps an interior no-go finding advisory and lets the completed Frame authorize', async () => {

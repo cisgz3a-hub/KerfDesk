@@ -177,12 +177,16 @@ test('spawn throw still records a failed attempt and cleans its unused profile',
 
 test('records and validates the commercial licence-window flow selected by CLI arguments', async (t) => {
   const fixture = await smokeFixture(t);
-  const options = parseNativeSmokeArgs([
-    process.execPath,
-    `--output=${fixture.output}`,
-    '--timeout-ms=5000',
-    '--expect-licence-window',
-  ]);
+  // The flow with the licence window on (ADR-623), whatever the shared setting.
+  const options = {
+    ...parseNativeSmokeArgs([
+      process.execPath,
+      `--output=${fixture.output}`,
+      '--timeout-ms=5000',
+      '--expect-licence-window',
+    ]),
+    licenceWindow: true,
+  };
   const result = await runNativeSmoke(
     options,
     scriptedSpawn(async (child, args) => {
@@ -230,4 +234,42 @@ test('records and validates the commercial licence-window flow selected by CLI a
   assert.equal(rejected.manifest.licensingExpectation, 'commercial-licence-window');
   assert.equal(rejected.manifest.failure.kind, 'validation');
   assert.match(rejected.message, /commercial licence window/);
+});
+
+test('records an unlicensed commercial package opening in Free while the window is held off', async (t) => {
+  // ADR-623 Amendment 3: the same CLI flag now expects the KerfDesk Free workspace.
+  const fixture = await smokeFixture(t);
+  const options = { ...smokeArgs(fixture), expectLicenceWindow: true, licenceWindow: false };
+  const commercialFree = {
+    kind: 'observed',
+    channel: 'commercial',
+    state: 'activation-required',
+    edition: 'free',
+    proEnabled: false,
+    updateState: 'up-to-date',
+  };
+  const result = await runNativeSmoke(
+    options,
+    scriptedSpawn(async (child, args) => {
+      const renderer = { ...validResult(smokePaths(args).userData).renderer };
+      renderer.licensing = commercialFree;
+      await writeSmokeResult(args, { renderer });
+      closeChild(child);
+    }),
+    { tempBase: fixture.root },
+  );
+  assert.equal(result.manifest.outcome, 'success');
+  assert.equal(result.manifest.licensingExpectation, 'commercial-unlicensed-free');
+  const rejected = await failedSmoke(
+    runNativeSmoke(
+      options,
+      scriptedSpawn(async (child, args) => {
+        await writeSmokeResult(args);
+        closeChild(child);
+      }),
+      { tempBase: fixture.root },
+    ),
+  );
+  assert.equal(rejected.manifest.failure.kind, 'validation');
+  assert.match(rejected.message, /Free workspace/);
 });

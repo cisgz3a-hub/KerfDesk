@@ -26,10 +26,13 @@ export const marlinStrategy = {
     const body = withMarlinTravelFeed(
       withoutGrblWorkspacePreamble(
         // The fan and inline transforms read the emitted body line by line, so
-        // it has to arrive in the verbose spelling (ADR-332).
+        // it has to arrive in the verbose spelling (ADR-332). Both run the
+        // body's M4 as continuous power, which stays lit when the head stops
+        // (ADR-398 Amendment 1).
         grblStrategy.emit(intermediateJob, intermediateDevice, {
           ...options,
           compactMotionWords: false,
+          stopKeepsPower: true,
         }),
       ),
       // Stock Marlin runs G0 at the modal feed (MA-8).

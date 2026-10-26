@@ -3,11 +3,16 @@
 // take a licence says that Pro is in the desktop app (ADR-544). It never gates work.
 
 import type { LicenceStatus } from '../../platform/types';
+import { DESKTOP_LICENCE_WINDOW } from '../../../public/desktop-licence-window.mjs';
 import { useEdition } from './edition';
 
 const DAY = 86_400;
 
-export function editionLabel(status: LicenceStatus, nowSeconds: number): string {
+export function editionLabel(
+  status: LicenceStatus,
+  nowSeconds: number,
+  licenceWindow = DESKTOP_LICENCE_WINDOW,
+): string {
   // Saved rights that only wait on the licence service are still Pro rights.
   if (status.state === 'checkin-required' && status.tier !== null && status.tier !== 'developer')
     return status.tier === 'trial' ? 'Pro trial · check-in needed' : 'Pro · check-in needed';
@@ -18,8 +23,17 @@ export function editionLabel(status: LicenceStatus, nowSeconds: number): string 
     }
     return 'Pro';
   }
-  // Only rights that ended in this session reach here: the app opened with them (ADR-623).
-  return 'Licence needed';
+  return withoutProLabel(status, licenceWindow);
+}
+
+/**
+ * Behind the licence window, only rights that ended in this session reach here:
+ * the app opened with them (ADR-623). While Amendment 3 holds the window off, the
+ * desktop app runs KerfDesk Free without them (ADR-540).
+ */
+function withoutProLabel(status: LicenceStatus, licenceWindow: boolean): string {
+  if (licenceWindow) return 'Licence needed';
+  return status.state === 'activation-required' && status.tier === null ? 'Free · Try Pro' : 'Free';
 }
 
 export const PRO_IN_DESKTOP_LABEL = 'Free · Pro in the desktop app';

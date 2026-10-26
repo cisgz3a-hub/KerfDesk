@@ -1,5 +1,4 @@
-import { randomBytes } from 'node:crypto';
-import { checkGrantTime, LicenceClockError, paidClockOffset } from './licensing-clock.js';
+import { checkGrantTime, grantTimeChecked } from './licensing-clock.js';
 import type { LicencePayment } from './licensing-commerce.js';
 import type { LicensingConfig } from './licensing-config.js';
 import { displayDeviceName, RELEASED, REVOKED } from './licensing-messages.js';
@@ -13,8 +12,6 @@ export type GrantAction = 'activate' | 'trial' | 'refresh';
 export type VerifiedGrant = {
   readonly credential: LicenceCredential;
   readonly claims: LicenceClaims;
-  /** Set when a paid refresh was accepted despite this computer's clock (ADR-592). */
-  readonly clockOffset?: number;
 };
 type ActivationBody = {
   readonly licenseId: string;
@@ -63,13 +60,6 @@ export function renewalIdentity(
     : undefined;
 }
 
-/** A service call. A refresh also keeps the random nonce it sends (ADR-592 Amendment 1). */
-export type GrantCall = {
-  readonly path: string;
-  readonly body: unknown;
-  readonly nonce?: string;
-};
-
 /** The service call for an action, or null when a refresh has nothing to refresh. */
 export function grantRequest(
   config: LicensingConfig,
@@ -82,17 +72,15 @@ export function grantRequest(
     /** The firmware digest a trial is also bound to, when this computer has one (ADR-592). */
     readonly hardwareId?: string | null | undefined;
   },
-): GrantCall | null {
+): { readonly path: string; readonly body: unknown } | null {
   const { action, saved, device } = request;
-  if (action === 'refresh') {
-    if (saved.credential === undefined) return null;
-    const nonce = randomBytes(32).toString('base64url');
-    return {
-      path: '/v1/activations/refresh',
-      body: { ...requireActivationBody(config, saved.credential, device), refreshNonce: nonce },
-      nonce,
-    };
-  }
+  if (action === 'refresh')
+    return saved.credential === undefined
+      ? null
+      : {
+          path: '/v1/activations/refresh',
+          body: requireActivationBody(config, saved.credential, device),
+        };
   return {
     path: action === 'trial' ? '/v1/trials/start' : '/v1/licenses/activate',
     body: {
@@ -107,36 +95,21 @@ export function grantRequest(
 }
 
 /**
- * Checks a service grant for this device. A grant issued more than five
- * minutes from this computer's clock throws LicenceClockError, for every tier,
- * except a paid refresh within one check-in period that signs back `nonce`, the
- * one its request sent: the service did confirm that licence just now, so it is
- * kept with the measured offset (ADR-592). Without the nonce a saved grant
- * replayed later would pass for a new one and push the check-in on each time,
- * so a grant from an older service is held to the clock, and one that signs any
- * other nonce is refused (ADR-592 Amendment 1).
+ * Checks a service grant for this device. A trial or developer grant issued
+ * more than five minutes from this computer's clock throws LicenceClockError.
+ * A paid grant is accepted whatever the clock says: its rights never end, so
+ * the clock cannot change them (ADR-623 Amendment 2). A `refreshNonce` claim,
+ * which grants answering 1.0.21 and 1.0.22 carry, is not checked (ADR-592
+ * Amendment 3).
  */
 export function verifyGrant(
   config: LicensingConfig,
   value: unknown,
   device: string,
   now: number,
-  action: GrantAction,
-  nonce?: string,
 ): VerifiedGrant {
   const grant = verifySignedGrant(config, value, device);
-  const answered = nonce !== undefined && grant.claims.refreshNonce === nonce;
-  if (grant.claims.refreshNonce !== undefined && !answered) throw new Error('Replayed entitlement');
-  try {
-    checkGrantTime(grant.claims.issuedAt, now);
-  } catch (error) {
-    const clockOffset =
-      error instanceof LicenceClockError && action === 'refresh' && answered
-        ? paidClockOffset(grant.claims, error.offset)
-        : null;
-    if (clockOffset === null) throw error;
-    return { ...grant, clockOffset };
-  }
+  if (grantTimeChecked(grant.claims)) checkGrantTime(grant.claims.issuedAt, now);
   return grant;
 }
 
@@ -162,8 +135,8 @@ function verifySignedGrant(config: LicensingConfig, value: unknown, device: stri
 /**
  * The record a verified grant leaves. A fresh grant ends any stuck
  * deactivation, and a key that unlocks paid Pro drops an unfinished purchase,
- * which would otherwise hide Renew (ADR-523 Amendment 2). A clock offset is
- * kept only with the grant it was measured for.
+ * which would otherwise hide Renew (ADR-523 Amendment 2). A clock offset an
+ * older version saved is dropped: nothing reads it now (ADR-623 Amendment 2).
  */
 export function grantedRecord(
   action: GrantAction,
@@ -179,10 +152,11 @@ export function grantedRecord(
     ...rest,
     schemaVersion: 1,
     // A freshly signed online grant can recover a corrected system clock.
-    lastSeenAt: now,
-    refreshedAt: now,
+    // A paid grant also works before the Unix epoch (ADR-623 Amendment 2),
+    // while the persisted local clock marks must remain nonnegative.
+    lastSeenAt: Math.max(0, now),
+    refreshedAt: Math.max(0, now),
     credential: grant.credential,
-    ...(grant.clockOffset === undefined ? {} : { clockOffset: grant.clockOffset }),
     ...(payment === undefined || stale ? {} : { payment }),
     ...(action === 'activate' && validLicenceKey(licenseKey) ? { licenseKey } : {}),
   };
@@ -201,7 +175,9 @@ export function revokedRecord(
   // A released seat keeps its activation key; a revoked licence's key is useless.
   return {
     ...rest,
-    refreshedAt: now,
+    // A wrong paid-device clock must not prevent a received revocation
+    // from surviving the next launch.
+    refreshedAt: Math.max(0, now),
     ...(revoked || licenseKey === undefined ? {} : { licenseKey }),
   };
 }

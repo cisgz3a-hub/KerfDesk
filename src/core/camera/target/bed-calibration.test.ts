@@ -11,8 +11,13 @@ import {
 import { lensFoldsInPicture } from '../model/fit-determined-lens';
 import { lookAt, overheadPose, wideLens } from '../model/model-fixtures';
 import { calibrateFromBedTarget } from './bed-calibration';
-import { bedTargetLayout, type BedTargetLayout } from './bed-target';
-import { detectRingMarks } from './ring-detect';
+import {
+  bedTargetLayout,
+  bedTargetLayoutWithRings,
+  MIN_RING_DIAMETER_PX,
+  type BedTargetLayout,
+} from './bed-target';
+import { detectRingMarks, type RingMark } from './ring-detect';
 import { renderTargetScene } from './target-render-fixtures';
 import { matchBedTarget } from './target-match';
 
@@ -92,6 +97,56 @@ describe('target matching', () => {
     const rings = detectRingMarks(frame).filter((r) => !r.anchor);
     expect(matchBedTarget(rings, layout)).toEqual({ kind: 'failed', reason: 'anchors-not-found' });
   });
+
+  // The detected mark at grid cell (col, row), with its disc/ring flag replaced.
+  function marksWith(cells: ReadonlyMap<string, boolean | null>): RingMark[] {
+    const rings = detectRingMarks(frame);
+    const atCell = (mark: RingMark): string | undefined => {
+      const found = layout.marks.find((m) => {
+        const p = projectWorldPoint(lens, pose, bedPoint(m.x, m.y, THICKNESS));
+        return p !== null && Math.hypot(p.x - mark.x, p.y - mark.y) < 2;
+      });
+      return found === undefined ? undefined : `${found.col},${found.row}`;
+    };
+    return rings.flatMap((mark) => {
+      const cell = atCell(mark);
+      const change = cell === undefined ? undefined : cells.get(cell);
+      if (change === undefined) return [mark];
+      return change === null ? [] : [{ ...mark, anchor: change }];
+    });
+  }
+
+  it('refuses a turned L of filled-in rings rather than labelling every ring wrongly', () => {
+    // Audit 2026-10-25: the third anchor unseen and two rings filled in at
+    // (0,1) and (2,1) form an L turned a quarter. On a square layout it labels
+    // every ring a cell off, and the fit then reported 0.41 mm for a picture
+    // 215 mm out.
+    const marks = marksWith(
+      new Map([
+        ['0,2', null],
+        ['0,1', true],
+        ['2,1', true],
+      ]),
+    );
+    expect(matchBedTarget(marks, layout)).toEqual({ kind: 'failed', reason: 'anchors-unclear' });
+  });
+
+  it('does not take a skewed pair of discs for the anchor L', () => {
+    // A filled ring two across and one up from the origin lands on the grid
+    // the way the long arm's middle should, but the arms are not grid steps.
+    const marks = marksWith(
+      new Map([
+        ['0,2', null],
+        ['4,-2', true],
+      ]),
+    );
+    expect(matchBedTarget(marks, layout)).toEqual({ kind: 'failed', reason: 'anchors-not-found' });
+  });
+
+  it('says the anchors are unclear when a ring in the grid has filled in', () => {
+    const marks = marksWith(new Map([['3,3', true]]));
+    expect(matchBedTarget(marks, layout)).toEqual({ kind: 'failed', reason: 'anchors-unclear' });
+  });
 });
 
 describe('calibrateFromBedTarget', () => {
@@ -148,6 +203,41 @@ describe('calibrateFromBedTarget with a camera looking straight down', () => {
     }
     // Rendering the photo dominates; a busy machine can take several seconds.
   }, 20_000);
+
+  it('keeps only the two dominant lens terms when no height pins the camera down', () => {
+    // A single flat target seen square-on cannot fix the focal length (Sturm
+    // and Maybank 1999). Audit 2026-10-25: the free fit wandered to k4 = 46 057
+    // and missed the bed corners at the sheet's own height by 0.59 mm.
+    const downPose = lookAt([200, 200, -400], [200, 200.001, 0]);
+    const downFrame = renderTargetScene({
+      lens,
+      pose: downPose,
+      layout,
+      sheet: SHEET,
+      sheetThicknessMm: THICKNESS,
+      noise: 4,
+    });
+    const result = calibrateFromBedTarget({
+      frame: downFrame,
+      layout,
+      sheetThicknessMm: THICKNESS,
+    });
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.heightMeasured).toBe(false);
+    expect(result.cameraHeightSigmaMm).toBeGreaterThan(25);
+    expect(result.lens.distortion.slice(2)).toEqual([0, 0]);
+    for (const [x, y] of [
+      [0, 0],
+      [400, 0],
+      [0, 400],
+      [400, 400],
+    ] as const) {
+      const pixel = projectWorldPoint(lens, downPose, bedPoint(x, y, THICKNESS));
+      const seen = pixelToBed(result.lens, result.pose, pixel ?? { x: 0, y: 0 }, THICKNESS);
+      expect(Math.hypot((seen?.x ?? 0) - x, (seen?.y ?? 0) - y)).toBeLessThan(0.4);
+    }
+  }, 20_000);
 });
 
 describe('calibrateFromBedTarget with a target over the middle of the bed only', () => {
@@ -186,6 +276,98 @@ describe('calibrateFromBedTarget with a target over the middle of the bed only',
       const seen = pixelToBed(result.lens, result.pose, pixel ?? { x: 0, y: 0 }, THICKNESS);
       expect(Math.hypot((seen?.x ?? 0) - x, (seen?.y ?? 0) - y)).toBeLessThan(2);
     }
+  }, 20_000);
+});
+
+describe('calibrateFromBedTarget with an A4-size sheet in the middle of the bed', () => {
+  it('keeps the picture close past the rings instead of bending it with four lens terms', () => {
+    // Audit 2026-10-25: 35 rings on a 300 × 200 mm sheet let four terms pass
+    // the two-sigma test and bent the bed 87 mm out for a side camera.
+    const side = lookAt([460, 200, -380], [190, 200, 0]);
+    const wide = wideLens(1280);
+    const sheet = { x: 50, y: 100, width: 300, height: 200 };
+    const sheetLayout = bedTargetLayout({
+      area: { x: 55, y: 105, width: 290, height: 190 },
+    });
+    const sheetFrame = renderTargetScene({
+      lens: wide,
+      pose: side,
+      layout: sheetLayout,
+      sheet,
+      sheetThicknessMm: THICKNESS,
+      noise: 4,
+      honeycombPitchMm: 6,
+    });
+    const result = calibrateFromBedTarget({
+      frame: sheetFrame,
+      layout: sheetLayout,
+      sheetThicknessMm: THICKNESS,
+    });
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.foundMarks).toBe(35);
+    expect(result.lens.distortion.slice(1)).toEqual([0, 0, 0]);
+    expect(worstBedError(wide, side, result.lens, result.pose)).toBeLessThan(1.5);
+  }, 20_000);
+});
+
+// The worst distance, over the whole 400 mm bed the true camera sees, between
+// a bed point and where the fitted model puts it.
+function worstBedError(
+  trueLens: LensModel,
+  truePose: CameraPose,
+  lensFit: LensModel,
+  poseFit: CameraPose,
+): number {
+  let worst = 0;
+  for (let y = 0; y <= 400; y += 20) {
+    for (let x = 0; x <= 400; x += 20) {
+      const pixel = projectWorldPoint(trueLens, truePose, bedPoint(x, y, THICKNESS));
+      const inPicture =
+        pixel !== null && pixel.x >= 0 && pixel.y >= 0 && pixel.x <= 1279 && pixel.y <= 719;
+      if (!inPicture) continue;
+      const seen = pixelToBed(lensFit, poseFit, pixel, THICKNESS);
+      worst = Math.max(worst, Math.hypot((seen?.x ?? 1e9) - x, (seen?.y ?? 1e9) - y));
+    }
+  }
+  return worst;
+}
+
+describe('calibrateFromBedTarget with a low-resolution camera', () => {
+  // 640 px across a 400 mm bed: 10 mm rings come out about 7.7 px wide, where
+  // the detector loses their holes and anchors (ADR-441 Amendment 7).
+  const small = wideLens(640);
+  function photo(ringDiameterMm: number) {
+    const ringLayout = bedTargetLayoutWithRings(SHEET, ringDiameterMm);
+    const smallFrame = renderTargetScene({
+      lens: small,
+      pose,
+      layout: ringLayout,
+      sheet: SHEET,
+      sheetThicknessMm: THICKNESS,
+      noise: 3,
+      honeycombPitchMm: 6,
+    });
+    return calibrateFromBedTarget({
+      frame: smallFrame,
+      layout: ringLayout,
+      sheetThicknessMm: THICKNESS,
+    });
+  }
+
+  it('says the rings are too small rather than that the anchors are covered', () => {
+    const result = photo(10);
+    expect(result).toMatchObject({ kind: 'failed', reason: 'rings-too-small' });
+    if (result.kind === 'failed' && result.reason === 'rings-too-small') {
+      expect(result.ringDiameterPx).toBeLessThan(MIN_RING_DIAMETER_PX);
+    }
+  }, 20_000);
+
+  it('calibrates with larger rings, spaced four ring sizes apart', () => {
+    const result = photo(16);
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.rmsErrorMm).toBeLessThan(0.3);
   }, 20_000);
 });
 

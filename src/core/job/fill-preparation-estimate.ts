@@ -8,13 +8,13 @@ import {
   type Vec2,
 } from '../scene';
 import { flattenColoredPathCurvesForTransform } from '../scene/curve-path';
+import { MIN_HATCH_SPACING_MM } from './fill-hatching';
 
 export type FillPreparationEstimate =
   | { readonly kind: 'counted'; readonly segments: number }
   | { readonly kind: 'work-budget-exceeded' }
   | { readonly kind: 'invalid-input' };
 
-const MIN_HATCH_SPACING_MM = 0.05;
 // A classifier must not repeat the hatch compiler's quadratic work. This is
 // a work limit for the estimate only; background output remains unrestricted.
 const EDGE_SCAN_BUDGET = 1_000_000;

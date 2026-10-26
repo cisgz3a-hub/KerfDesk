@@ -5,7 +5,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
     id: 'camera',
     title: 'Use a camera to place artwork',
     summary:
-      'Connect a camera, calibrate it from one photo of an engraved target, and place artwork on the corrected bed image.',
+      'Start a camera, set it up from one photo of an engraved target, and place artwork on the corrected bed image.',
     category: 'Machine & setup',
     machine: 'all',
     minutes: 5,
@@ -15,17 +15,17 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
     visual: 'camera',
     steps: [
       {
-        title: 'Choose a camera source',
+        title: 'Start the camera',
         instruction:
-          'Select a USB camera and choose Start, or choose Use this camera on a detected machine camera. Machine and RTSP cameras need KerfDesk Desktop; the panel says which sources this browser can read.',
-        focus: 'Source → Start',
+          "Open Tools → Camera. Choose Use this camera on the laser's built-in camera, or Start camera for a USB camera. Choose camera… or the gear opens Camera settings for network and phone cameras. They need KerfDesk Desktop; the panel says which cameras this browser can read.",
+        focus: 'Preview card → Use this camera / Start camera',
         result: 'A live camera image is available for calibration and placement.',
       },
       {
-        title: 'Engrave the calibration target',
+        title: 'Set up and engrave the target',
         instruction:
-          'Choose Calibrate camera. Cover the bed with one flat sheet, enter its thickness and, for a camera that looks straight down, the camera height by tape measure. Engrave target runs a temporary job through the usual Frame and review; Target already engraved reuses one.',
-        focus: 'Sheet thickness · camera height',
+          'Choose Set up camera. Confirm the camera, say whether it sits above the bed or on the laser head, and check the picture. Then cover the bed with one flat sheet and enter its thickness; Engrave settings holds power, speed, margin and the camera height for a camera that looks straight down. Engrave target runs a temporary job through the usual Frame and review; Target already engraved reuses one.',
+        focus: 'Camera · Mounting · Picture · Sheet thickness',
         result: 'Rings are engraved across the bed at exactly known positions.',
       },
       {
@@ -38,14 +38,14 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Refresh before placing artwork',
         instruction:
-          'Use Update still after moving material, or Live. Set Material surface height to the top of the material so its edges line up, then place artwork over the image or trace a visible shape. Physically Frame the exact intended job before Start.',
+          'Use Refresh picture (Alt+C) after moving material, or Live; a held picture also refreshes after each job. Set Material height to the top of the material so its edges line up, then place artwork over the image or trace a visible shape. Physically Frame the exact intended job before Start.',
         focus: 'Fresh image · correct surface height',
         result:
           'The overlay helps place artwork, and the physical Frame checks the intended job location.',
         visual: 'frame',
       },
     ],
-    tip: 'Moving the camera changes its relationship to the bed; calibrate again after it moves. A convincing overlay alone does not verify real-world alignment.',
+    tip: 'Moving the camera changes its relationship to the bed. KerfDesk warns when the camera seems to have moved: Fix a small offset… in Camera settings lines a slid picture up with one burned ring, and a bigger move needs a new calibration. A convincing overlay alone does not verify real-world alignment.',
     keywords: ['camera', 'USB', 'RTSP', 'lens', 'calibration', 'target', 'overlay', 'alignment'],
     related: ['trace', 'board', 'print-cut', 'frame-start'],
   },
@@ -75,7 +75,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
         title: 'Burn the outline onto the wood first',
         examplePhase: 0,
         instruction:
-          'Leave the leather keychain off the wood. Choose Outline only and set Jig outline laser settings for marking this wood. Inspect Preview, complete Frame for this exact outline job, then choose Start and Start job in Job Review.',
+          'Leave the leather keychain off the wood. Choose Outline only, inspect Preview and complete Frame for this exact outline job. Choose Start; in Job Review, check the outline card’s settings and use Edit if this wood needs a lighter mark, then Start job.',
         focus: 'Run 1: burn the outline on empty wood',
         result:
           'The wood now carries a physical outline at the same known coordinates as the canvas rectangle.',
@@ -84,7 +84,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
         title: 'Place the real keychain on the burned outline',
         examplePhase: 1,
         instruction:
-          'Place the leather blank inside the burned rectangle, lining up its outside edges and intended hole orientation. Keep the wood, canvas outline and work origin fixed. Add and select the design, choose Centre artwork in outline, then check clearance from the rounded edges and hole.',
+          'Place the leather blank inside the burned rectangle, lining up its outside edges and intended hole orientation. Keep the wood, canvas outline and work origin fixed. Click Edit jig, import or drop the design (or add text) inside the jig editor, select it, choose Centre artwork in outline, check clearance from the rounded edges and hole, then Save to canvas.',
         focus: 'Place the leather; keep the wood and origin fixed',
         result:
           'Known coordinates locate the artwork on the placed leather. The machine does not detect the keychain.',
@@ -93,7 +93,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
         title: 'Burn the artwork onto the keychain',
         examplePhase: 2,
         instruction:
-          'Choose Artwork only, check the artwork’s settings for the leather, and inspect Preview with the jig outline excluded. Focus for the leather surface. With the blank in place, complete a new Frame for the exact artwork job, then Start, review the warnings, and Start job.',
+          'Choose Artwork only and inspect Preview with the jig outline excluded. Focus for the leather surface. With the blank in place, complete a new Frame for the exact artwork job, then choose Start. In Job Review, check the artwork’s settings for the leather and use Edit if needed, review the warnings, and Start job.',
         focus: 'Run 2: burn the artwork on the leather',
         result:
           'The artwork is engraved on the leather keychain; the locating outline remains on the wood underneath.',
@@ -119,7 +119,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
     id: 'board',
     title: 'Place artwork on a measured board',
     summary:
-      'Capture a rectangular or circular board, place the design and physically check the outline.',
+      'Capture a rectangular, circular or photo-traced outline board, then place and check the design.',
     category: 'Machine & setup',
     machine: 'all',
     minutes: 4,
@@ -131,14 +131,14 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose the board shape',
         instruction:
-          'Choose Rectangle or Circle. For a rectangle, jog to and capture the bottom-left corner first; this establishes its work origin. For a circle, choose Find center from rim or Center already marked.',
+          'Choose Rectangle, Circle or Outline. For Outline, open a photo of the board, click its corners and type its size: the board goes on the canvas at once, and two head captures register it to the machine later.',
         focus: 'Rectangle or circle reference',
         result: 'The chosen capture method matches how you can locate the physical board.',
       },
       {
         title: 'Finish measuring the outline',
         instruction:
-          'For a rectangle, capture the other three corners in any order or enter Width and Height after the first corner. A circle can use four well-spaced rim points, or a captured centre with an edge point or measured diameter.',
+          'Measure rectangles or circles as prompted. For an outline, jog the head onto points A and B shown on the outline, capture each, then Register board.',
         focus: 'Measured points or known dimensions',
         result:
           'Create the board outline to obtain a locked placement reference excluded from the burn.',
@@ -162,7 +162,18 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
       },
     ],
     tip: 'Board checks and capture controls can move the real head or change its coordinate reference. If the reference becomes stale, capture the board again.',
-    keywords: ['board', 'stock', 'capture', 'corners', 'circle', 'centre', 'placement', 'array'],
+    keywords: [
+      'board',
+      'stock',
+      'capture',
+      'corners',
+      'circle',
+      'outline',
+      'photo',
+      'centre',
+      'placement',
+      'array',
+    ],
     related: ['origin', 'jog', 'array', 'registration', 'frame-start'],
   },
   {
@@ -187,7 +198,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Check rotary travel and direction',
         instruction:
-          'For a chuck, set Motion per turn from the verified machine setup. For a roller whose controller moves in motor millimetres, turn on Scale Y from the roller diameter and enter the driven roller diameter and Motion per turn. Inspect Y scale and Machine travel per revolution; use Reverse rotary direction only when needed.',
+          'For a chuck, set Motion per turn from the verified machine setup. For a roller, keep Scale Y from the roller diameter on and enter the driven roller diameter and Motion per turn; turn it off only when the controller’s Y steps/mm already move the part’s surface in millimetres. Inspect Y scale and Machine travel per revolution; use Reverse rotary direction only when needed.',
         focus: 'Scale · travel per revolution',
         result:
           'The conversion between the flat design and rotary movement is explicit in the profile.',
@@ -195,7 +206,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Test the rotation',
         instruction:
-          'With the controller connected and Idle, mark the part and choose a Test rotation button. The part turns one revolution slowly with the laser off, pauses, then turns back. If the mark does not return to the same place, adjust the measurements and test again before Apply.',
+          'With the controller connected and Idle, mark the part and choose a Test rotation button. The part turns one revolution slowly with the laser off, pauses, then turns back. If it misses, follow the note under the buttons: a chuck or roller turn corrects Motion per turn, and an unscaled roller needs Scale Y from the roller diameter or a controller set to the surface. Changing the object diameter never fixes a roller’s burn size.',
         focus: 'Test rotation',
         result: 'One revolution on the machine matches one revolution of the part.',
       },

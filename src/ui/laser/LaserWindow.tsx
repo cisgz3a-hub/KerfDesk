@@ -76,7 +76,7 @@ export function LaserWindow({ dockedJobActions = false }: Props = {}): JSX.Eleme
     machineOperationBusy,
     jogBlocked,
   );
-  // A running step jog takes more step presses (ADR-648); nothing else on the
+  // A running step jog takes more step presses (ADR-672); nothing else on the
   // pad is enabled while it runs.
   const stepJogsOnly = useLaserStore(canQueueStepJog) && jogPadDisabled && !jogBlocked;
   if (!machinePanel.isExpanded) {

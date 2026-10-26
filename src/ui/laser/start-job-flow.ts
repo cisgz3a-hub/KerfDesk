@@ -23,7 +23,11 @@ import {
 import { clearStartBlockers } from './start-blocker-invalidation';
 import { useToastStore } from '../state/toast-store';
 import { streamResumeFromRawLine } from './start-job-resume-stream';
-import { noteManualRestartStarted, prepareManualRestartSource } from './manual-restart-source';
+import {
+  manualRestartNotes,
+  noteManualRestartStarted,
+  prepareManualRestartSource,
+} from './manual-restart-source';
 import {
   completedReceiptIsCurrent,
   currentReplayExecutionSignature,
@@ -305,6 +309,7 @@ export async function runStartFromLineFlow(fromLine: number): Promise<void> {
     return;
   }
   // The newest run's own placement, not the stopped head (audit recovery-4).
+  // The line counts the project's own program, and the confirmation says so.
   const restart = await prepareManualRestartSource();
   if (restart === null) return;
   const prepared = restart.source;
@@ -315,7 +320,8 @@ export async function runStartFromLineFlow(fromLine: number): Promise<void> {
     prepared.canvasPlan,
     prepared.laserModeStartSnapshot,
     prepared.controllerSnapshot,
-    restart.placementNote,
+    manualRestartNotes(restart),
+    prepared,
   );
   if (started) noteManualRestartStarted(restart);
 }

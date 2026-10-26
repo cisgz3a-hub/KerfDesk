@@ -87,6 +87,39 @@ describe('MaterialTestDialog settings to vary (ADR-497)', () => {
     }
   });
 
+  it('keeps hatch spacing at or above the fill engine floor (E5-P2-1)', async () => {
+    const { host, root, onGenerate } = await renderDialog();
+    try {
+      await choose(host, 'Rows vary', 'interval');
+      await type(host, 'Min hatch spacing', '0.03');
+      expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+        'Min hatch spacing: enter 0.05 or greater.',
+      );
+      await clickGenerate(host);
+      expect(onGenerate).not.toHaveBeenCalled();
+      await type(host, 'Min hatch spacing', '0.05');
+      await clickGenerate(host);
+      expect(onGenerate).toHaveBeenCalledWith(expect.objectContaining({ intervalMinMm: 0.05 }));
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it('names the speed a capped runway reaches', async () => {
+    const { host, root } = await renderDialog(36000, 500);
+    try {
+      await type(host, 'Max speed', '20000');
+      expect(host.textContent).not.toContain('need 25 mm of runway to reach');
+      expect(host.textContent).toContain(
+        'The fastest engraved cells need more runway than the 25 mm a row can run. At 500 mm/s² ' +
+          '(Machine Setup) that is enough for about 9,040 mm/min, so faster cells may burn below ' +
+          'their labelled speed.',
+      );
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
   it('says when the fastest cells need a longer runway than 5 mm', async () => {
     const { host, root } = await renderDialog(6000, 500);
     try {

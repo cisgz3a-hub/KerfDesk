@@ -2,7 +2,8 @@
 // workspace draws artwork in plain ink; pointing at artwork, or at an
 // operation row, swells one soft tint of that operation's colour across every
 // piece that shares its settings, rippling out from the piece under the
-// pointer. A soft colour edge stays while the pointer rests there. Pure: no
+// pointer. A soft colour edge stays while the pointer rests there. Editing
+// settings lights up only the artwork the edit changes (ADR-646). Pure: no
 // DOM, no canvas.
 
 import { operationIdsForObject, type Layer, type SceneObject } from '../../core/scene';
@@ -72,7 +73,72 @@ export function pulseColorSources(
 
 export type PulseSeed =
   | { readonly kind: 'object'; readonly objectId: string }
-  | { readonly kind: 'operation'; readonly operationId: string };
+  | { readonly kind: 'operation'; readonly operationId: string }
+  /** A settings edit (ADR-646): exactly the artwork it changes, never widened to same settings. */
+  | {
+      readonly kind: 'edit';
+      /** The editor holding it: focus moving to another editor is a new edit, even on the same artwork. */
+      readonly owner: string;
+      /**
+       * New for each edit that begins, so one that ended and began again while
+       * a hover hid it still pulses when it shows (ADR-646 Amendment 1).
+       */
+      readonly serial: number;
+      readonly objectIds: ReadonlyArray<string>;
+      readonly operationIds: ReadonlyArray<string>;
+    };
+
+/** Identifies one hover (or edit), so the same one set again is recognised. */
+export function pulseSeedKey(seed: PulseSeed | null): string {
+  if (seed === null) return '';
+  if (seed.kind === 'object') return `o:${seed.objectId}`;
+  if (seed.kind === 'operation') return `r:${seed.operationId}`;
+  return `e:${JSON.stringify([seed.serial, seed.owner, seed.objectIds, seed.operationIds])}`;
+}
+
+/**
+ * Whether the hover now in force should pulse, or only bring back its edge.
+ * Called once per change of hover, scene or canvas piece.
+ */
+export class PulseTrigger {
+  private lastSeedKey = '';
+  private pulsedObjectId: string | null = null;
+  private pulsedEditKey: string | null = null;
+  private lastScene: unknown = undefined;
+
+  next(seed: PulseSeed | null, canvasObjectId: string | null, scene: unknown): boolean {
+    const seedKey = pulseSeedKey(seed);
+    // An edit during the hover (Paste settings on the hovered row, say) can
+    // change which operations share its settings: regroup without pulsing again.
+    const sameHover = seedKey !== '' && seedKey === this.lastSeedKey;
+    this.lastSeedKey = seedKey;
+    const sceneChanged = scene !== this.lastScene;
+    this.lastScene = scene;
+    const resumedPiece = this.rememberCanvasPiece(seed, canvasObjectId);
+    if (seed?.kind !== 'edit') {
+      if (seed === null) this.pulsedEditKey = null;
+      return !(sameHover || resumedPiece);
+    }
+    // An edit pulses when it begins and again with every change it makes
+    // (ADR-646). A hover over it and back is the same edit: its edge returns,
+    // no pulse. The clock lets a running pulse finish, so dragging a slider
+    // pulses at the pulse's own pace rather than restarting on every step.
+    const editResumed = seedKey === this.pulsedEditKey;
+    this.pulsedEditKey = seedKey;
+    return !editResumed || (sameHover && sceneChanged);
+  }
+
+  /**
+   * A click or drag pauses the canvas hover. Coming back to the same piece
+   * is still the same hover: its edge returns without a second pulse.
+   */
+  private rememberCanvasPiece(seed: PulseSeed | null, canvasObjectId: string | null): boolean {
+    const resumed = seed?.kind === 'object' && seed.objectId === this.pulsedObjectId;
+    if (seed?.kind === 'object') this.pulsedObjectId = seed.objectId;
+    else if (canvasObjectId === null) this.pulsedObjectId = null;
+    return resumed;
+  }
+}
 
 /** Operation id → id of the operation whose colour its artwork pulses in. */
 export type PulseColorSources = ReadonlyMap<string, string>;
@@ -97,6 +163,7 @@ export function pulseTargetFor(
   seed: PulseSeed,
   centerOf: (object: SceneObject) => { readonly x: number; readonly y: number },
 ): PulseTarget | null {
+  if (seed.kind === 'edit') return editPulseTarget(objects, layers, seed, centerOf);
   let seedIds: ReadonlyArray<string> = seed.kind === 'operation' ? [seed.operationId] : [];
   let originId: string | null = null;
   if (seed.kind === 'object') {
@@ -116,6 +183,37 @@ export function pulseTargetFor(
     colorSources,
     objectIds: members.map((object) => object.id),
     offsets: pulseStartOffsets(pieces, originId),
+  };
+}
+
+/**
+ * An edit changes its own artwork only: other pieces that happen to share
+ * the settings keep theirs, so they stay dark. Each operation shows in its
+ * own colour, and only the parts of a piece that use the edited operations
+ * light up.
+ */
+function editPulseTarget(
+  objects: ReadonlyArray<SceneObject>,
+  layers: ReadonlyArray<Layer>,
+  seed: Extract<PulseSeed, { readonly kind: 'edit' }>,
+  centerOf: (object: SceneObject) => { readonly x: number; readonly y: number },
+): PulseTarget | null {
+  const colorSources = new Map(
+    layers
+      .filter((layer) => seed.operationIds.includes(layer.id))
+      .map((layer) => [layer.id, layer.id]),
+  );
+  const members = objects.filter(
+    (object) =>
+      seed.objectIds.includes(object.id) &&
+      operationIdsForObject(object, layers).some((id) => colorSources.has(id)),
+  );
+  if (members.length === 0) return null;
+  const pieces = members.map((object) => ({ id: object.id, ...centerOf(object) }));
+  return {
+    colorSources,
+    objectIds: members.map((object) => object.id),
+    offsets: pulseStartOffsets(pieces, null),
   };
 }
 

@@ -73,6 +73,20 @@ describe('hoverOutputSettings', () => {
     });
   });
 
+  it('reads speed in in/min with Inches on, as the layer Speed box does (ADR-629)', () => {
+    const object = vector(['#ff0000']);
+    const project = projectWith([RED], object);
+    expect(hoverOutputSettings(project, object, 'in')).toMatchObject({
+      lines: [{ power: '40%', speed: '47.2 in/min' }],
+    });
+    const fast = operation('red', '#ff0000', { power: 40, speed: 99_000 });
+    const capped = projectWith([fast], object);
+    const maxInPerMin = Number((capped.device.maxFeed / 25.4).toFixed(1));
+    expect(hoverOutputSettings(capped, object, 'in')).toMatchObject({
+      lines: [{ speed: `${maxInPerMin} in/min (capped)` }],
+    });
+  });
+
   it('applies the artwork override and power scale, as output does', () => {
     const object = vector(['#ff0000'], {
       powerScale: 50,

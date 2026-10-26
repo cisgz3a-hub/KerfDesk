@@ -108,6 +108,7 @@ function makeLaserStateActions() {
     releaseMotors: async () => undefined,
     restoreWorkOrigin: async () => undefined,
     setOriginAtProgramPoint: async () => ({ x: 0, y: 0 }),
+    setOriginAtMachinePoint: async () => undefined,
     configureGrblLaserSetup: async () => undefined,
     readMachineSettings: async () => undefined,
     readFirmwareReport: async () => {

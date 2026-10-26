@@ -172,7 +172,17 @@ describe('a paid purchase replaces an active trial only after verified, durable 
     const h = trial();
     expect(await h.runtime.status()).toMatchObject({ tier: 'trial', edition: 'pro' });
     h.clock(NOW + 1_000);
-    h.fetch.mockResolvedValue(grant(claims({ issuedAt: NOW / 1000 + 600 })));
+    // A paid grant never reads the clock (ADR-623 Amendment 2); a developer grant still does.
+    h.fetch.mockResolvedValue(
+      grant(
+        claims({
+          tier: 'developer',
+          perpetualUpdates: true,
+          updatesUntil: null,
+          issuedAt: NOW / 1000 + 600,
+        }),
+      ),
+    );
     h.store.write.mockRejectedValue(new Error('disk remains full'));
     expect(await h.runtime.activate(TEST_KEY)).toMatchObject({ edition: 'free' });
     expect(h.runtime.proUnlocked()).toBe(false);

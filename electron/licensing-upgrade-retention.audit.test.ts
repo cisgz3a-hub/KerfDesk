@@ -178,7 +178,7 @@ describe('saved commercial rights through a fresh 1.0.8 runtime', () => {
     'keeps saved %s rights and its key after a due offline startup refresh',
     async (tier) => {
       const h = await harness(tier);
-      // A paid refresh is due weekly, a trial's daily.
+      // A trial refresh is due daily, a paid one weekly.
       h.time(ISSUED + (tier === 'trial' ? 2 : 8) * DAY);
       const saved = await h.store.read();
       expect(await h.runtime().refreshInBackground()).toMatchObject({
@@ -204,21 +204,17 @@ describe('saved commercial rights through a fresh 1.0.8 runtime', () => {
     expect(await readFile(h.file)).toEqual(before);
   });
 
-  it.each([
-    { offset: -300, state: 'ready' },
-    { offset: 30 * DAY, state: 'ready' },
-    { offset: -1000 * DAY, state: 'checkin-required' },
-    { offset: 1000 * DAY, state: 'checkin-required' },
-  ])(
-    'keeps a covered paid version at clock offset $offset as $state, moving only its mark on',
-    async ({ offset, state }) => {
+  // A paid licence has no check-in, so no clock locks it (ADR-623 Amendment 2).
+  it.each([-300, 30 * DAY, -1000 * DAY, 1000 * DAY])(
+    'keeps a covered paid version ready at clock offset %s, moving only its mark on',
+    async (offset) => {
       const h = await harness('paid');
       const before = await h.store.read();
       if (before === null) throw new Error('Expected the old saved record.');
       h.time(ISSUED + offset);
       expect(await h.runtime().status()).toMatchObject({
-        state,
-        edition: state === 'ready' ? 'pro' : 'free',
+        state: 'ready',
+        edition: 'pro',
         licenseKey: key,
       });
       // ADR-592: a paid licence's last-seen mark only ever moves forward.

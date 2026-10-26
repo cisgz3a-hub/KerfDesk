@@ -60,7 +60,7 @@ describe('waitForUnreportedFrameWorkOffset', () => {
     });
     await vi.advanceTimersByTimeAsync(250);
     expect(settled).toBe(false);
-    // One complete-report request (grblHAL 0x87, ADR-648), then the burst.
+    // One complete-report request (grblHAL 0x87, ADR-672), then the burst.
     expect(requests()).toBe(4);
     expect(vi.mocked(useLaserStore.getState().requestControllerStatus).mock.calls[0]).toEqual([
       { complete: true },

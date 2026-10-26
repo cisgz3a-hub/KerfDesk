@@ -152,9 +152,13 @@ function leadWorkUnitsPerContour(operation: Layer): number {
   return leads * Math.ceil(spec.lengthMm / LEAD_MM_PER_WORK_UNIT);
 }
 
+// The closed contours compile cuts: the canonical curves when the path has them
+// (compilationPolylines flattens each subpath into one contour), else its
+// polylines.
 function closedContourCount(path: ColoredPath): number {
+  const contours = path.curves ?? path.polylines;
   let count = 0;
-  for (const polyline of path.polylines) if (polyline.closed) count += 1;
+  for (const contour of contours) if (contour.closed) count += 1;
   return count;
 }
 

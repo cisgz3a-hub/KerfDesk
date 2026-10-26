@@ -1,9 +1,18 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve, sep } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { DESKTOP_LICENCE_WINDOW } from '../../public/desktop-licence-window.mjs';
 import { appPrivacyFiles, checkPrivacyFiles } from '../../scripts/generate-privacy-page.mjs';
 import { attrValues, textContent } from './helpers.mjs';
 
@@ -42,7 +51,7 @@ test('app privacy notice preserves source disclosures and scopes static-page cla
   const document = expected.get('index.html').toString('utf8');
   const text = textContent(document);
   assert.match(document, /href="https:\/\/kerfdesk.com\/privacy\/"/);
-  assert.match(document, /datetime="2026-10-12"/);
+  assert.match(document, /datetime="2026-10-22"/);
   assert.match(text, /Johannes Stephanus Stolk/);
   assert.match(text, /responsible for the personal information KerfDesk handles/);
   assert.match(text, /No cookies on this page/);
@@ -62,6 +71,18 @@ test('app privacy notice preserves source disclosures and scopes static-page cla
   assert.match(text, /does not promise Zero Data Retention/);
   assert.match(text, /does not attach the open project, canvas, machine settings or toolpaths/);
   assert.match(text, /no network scan or automatic reconnect/);
+  assert.match(text, /FluidNC’s Telnet channel or grblHAL’s raw Telnet service/);
+  assert.match(text, /The card opens by itself on your first visit/);
+  assert.match(text, /The Buying Pro section also links to Paddle’s privacy notice/);
+  assert.match(text, /Network Error Logging/);
+  assert.match(text, /Successful requests aren’t reported/);
+  assert.match(
+    text,
+    DESKTOP_LICENCE_WINDOW
+      ? /confirmed within three days before KerfDesk can open again/
+      : /If a trial isn’t confirmed within three days, KerfDesk still opens/,
+  );
+  if (!DESKTOP_LICENCE_WINDOW) assert.doesNotMatch(text, /before KerfDesk can open again/);
   assert.match(text, /sameSite=Strict/i);
   assert.match(text, /Command arguments and workspace responses are processed in memory/);
   assert.match(text, /Separately approved machine-control clients can/);
@@ -89,6 +110,21 @@ test('app privacy notice preserves source disclosures and scopes static-page cla
     if (url.pathname === '/') continue;
     assert.ok(noticeLinkExists(url.pathname), `Notice links to missing app file ${url.pathname}`);
   }
+});
+
+// The notice says where the web app may connect; public/_headers decides it.
+test('app privacy notice names every host the web app’s security policy allows', () => {
+  const headers = readFileSync(join(publicRoot, '_headers'), 'utf8');
+  const allowed = headers.match(/Content-Security-Policy:[^\n]*\bconnect-src ([^;\n]+)/)?.[1];
+  assert.ok(allowed, 'public/_headers has a connect-src');
+  const text = textContent(expected.get('index.html').toString('utf8'));
+  for (const source of allowed.trim().split(/\s+/)) {
+    if (source === "'self'") continue;
+    const { hostname, port } = new URL(source);
+    const named = port ? `${hostname} port ${port}` : hostname;
+    assert.ok(text.includes(named), `The notice does not name ${named}`);
+  }
+  assert.match(text, /security policy lets it connect only to kerfdesk\.com, to dl\.kerfdesk\.com/);
 });
 
 test('privacy check accepts exact files and rejects changed policy bytes', (t) => {

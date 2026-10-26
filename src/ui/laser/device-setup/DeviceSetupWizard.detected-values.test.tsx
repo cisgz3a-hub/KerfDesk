@@ -74,6 +74,37 @@ describe('DeviceSetupWizard detected values', () => {
     }
   });
 
+  // ADR-637 Amendment 2 (controller audit v4 E2-P2-1): Sculpfun's firmware
+  // reports 400 × 410 mm of travel for the S30's 380 × 385 mm work area.
+  it('keeps a listed machine’s work area and shows the controller’s travel to review', async () => {
+    const view = await renderWizard(undefined, mockPlatform(), { newMachine: true });
+    try {
+      const s30 = () => radio(view.host, 'Use Sculpfun S30 (5 W, stock automatic air)');
+      await act(async () => s30().click());
+      await act(async () => {
+        useLaserStore.setState({
+          connection: { kind: 'connected' },
+          detectedSettings: { bedWidth: 400, bedHeight: 410, maxFeed: 10000 },
+          lastSettingsReadAt: 1,
+        } as Partial<ReturnType<typeof useLaserStore.getState>>);
+      });
+      const filled = view.host.querySelector('.lf-setup-found-filled');
+      expect(filled?.textContent).toContain('Filled in from your controller');
+      expect(filled?.textContent).not.toContain('Bed width');
+      expect(filled?.textContent).not.toContain('Bed height');
+      const kept = filled?.querySelector('.lf-setup-kept-area')?.textContent;
+      expect(kept).toContain('Work area kept at 380 × 385 mm');
+      expect(kept).toContain('($130 × $131) is 400 × 410 mm');
+      expect(s30().checked).toBe(true);
+
+      await act(async () => button(view.host, 'Next').click());
+      expect(input(view.host, 'Bed width (mm)').value).toBe('380');
+      expect(input(view.host, 'Bed height (mm)').value).toBe('385');
+    } finally {
+      await view.unmount();
+    }
+  });
+
   // Setup saved for either head counts: its signatures differ since ADR-416.
   it.each(['laser', 'cnc'] as const)(
     'keeps a machine already set up (%s) as it is until Use detected values',
@@ -114,6 +145,14 @@ function input(host: HTMLElement, ariaLabel: string): HTMLInputElement {
   const field = host.querySelector(`input[aria-label="${ariaLabel}"]`);
   if (!(field instanceof HTMLInputElement)) throw new Error(`Input missing: ${ariaLabel}`);
   return field;
+}
+
+function radio(host: HTMLElement, ariaLabel: string): HTMLInputElement {
+  const match = [...host.querySelectorAll<HTMLInputElement>('input[type="radio"]')].find(
+    (candidate) => candidate.getAttribute('aria-label')?.startsWith(ariaLabel),
+  );
+  if (!(match instanceof HTMLInputElement)) throw new Error(`Radio missing: ${ariaLabel}`);
+  return match;
 }
 
 function button(host: HTMLElement, label: string): HTMLButtonElement {

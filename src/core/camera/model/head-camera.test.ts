@@ -102,7 +102,7 @@ describe('a camera that rides on the head', () => {
 
 describe('planHeadCaptures', () => {
   const view = { x: 5, y: -15, width: 50, height: 30 };
-  const bed = { width: 400, height: 300 };
+  const bed = { minX: 0, minY: 0, maxX: 400, maxY: 300 };
 
   it('covers an area in overlapping rows, snaking back and forth', () => {
     const plan = planHeadCaptures(view, { x: 100, y: 100, width: 100, height: 60 }, bed, 0.2);
@@ -127,6 +127,18 @@ describe('planHeadCaptures', () => {
     // The camera looks 5 mm right of the head, so the left 5 mm needs the head off the bed.
     const plan = planHeadCaptures(view, { x: 0, y: 100, width: 100, height: 30 }, bed);
     expect(plan.heads.every((head) => head.x >= 0)).toBe(true);
+    expect(plan.coversArea).toBe(false);
+  });
+
+  // Rolling audit 12-P2-3: the machine keeps the head the pull-off clear of
+  // the homing switch (ADR-375), so stops stay inside what it can reach.
+  it('keeps the stops inside the reach, and says what that leaves unseen', () => {
+    const reach = { minX: 2.01, minY: 0, maxX: 397.99, maxY: 300 };
+    const plan = planHeadCaptures(view, { x: 0, y: 0, width: 400, height: 300 }, reach);
+    const xs = plan.heads.map((head) => head.x);
+    // With the bed as the reach, the first column stood at x 0 (the camera looks 5 mm right).
+    expect(Math.min(...xs)).toBe(2.01);
+    expect(Math.max(...xs)).toBeLessThanOrEqual(397.99);
     expect(plan.coversArea).toBe(false);
   });
 });
@@ -160,7 +172,7 @@ describe('stitchHeadCameraPictures', () => {
     const area = { x: 110, y: 90, width: 90, height: 50 };
     const view = headCameraView(record, 0);
     if (view === null) throw new Error('no view');
-    const plan = planHeadCaptures(view, area, { width: 400, height: 300 });
+    const plan = planHeadCaptures(view, area, { minX: 0, minY: 0, maxX: 400, maxY: 300 });
     expect(plan.heads.length).toBeGreaterThan(3);
     const pictures = plan.heads.map((head) => ({ frame: photograph(record, head), headMm: head }));
     const stitched = stitchHeadCameraPictures(record, pictures, {

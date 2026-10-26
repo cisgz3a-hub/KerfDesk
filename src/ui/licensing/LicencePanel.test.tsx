@@ -7,6 +7,7 @@ import type {
   LicenceAdapter,
   LicenceStatus,
 } from '../../platform/types';
+import { DESKTOP_LICENCE_WINDOW } from '../../../public/desktop-licence-window.mjs';
 
 const NO_UPDATES: CommercialUpdateStatus = {
   state: 'unavailable',
@@ -155,7 +156,9 @@ it('does not erase a draft when an unrelated licence action completes', async ()
   const adapter = client(offered(false));
   await show(adapter);
   await enterKey('synthetic-key-to-correct');
-  await act(async () => button('Start free 30-day trial').click());
+  // The trial names Pro while KerfDesk Free stays on the desktop (ADR-623 Amendment 3).
+  const trial = DESKTOP_LICENCE_WINDOW ? 'Start free 30-day trial' : 'Start free 30-day Pro trial';
+  await act(async () => button(trial).click());
   expect(adapter.startTrial).toHaveBeenCalledOnce();
   expect(activationInput().value).toBe('synthetic-key-to-correct');
 });

@@ -3,6 +3,7 @@ import { applyTransform } from './transform';
 import { transformedBBox, transformedBounds } from './hit-test';
 import type { SceneObject, ShapeObject } from './scene-object';
 import { isCanonicalEllipse } from './canonical-ellipse';
+import { boardFitRegion } from './board-fit-region';
 
 export type BoardFitOptions = {
   readonly marginMm: number;
@@ -26,7 +27,7 @@ export function fitObjectToBoard(
   if (!Number.isFinite(options.marginMm) || options.marginMm < 0) {
     return { kind: 'error', message: 'Enter an edge margin of zero or more millimetres.' };
   }
-  const region = transformedBBox(board);
+  const region = fitRegion(board);
   const size = boardSize(board);
   const width = size.width - 2 * options.marginMm;
   const height = size.height - 2 * options.marginMm;
@@ -42,10 +43,14 @@ export function fitObjectToBoard(
   }
   // Captured round boards and circular jig outlines are circles. For an ellipse
   // use its smaller inscribed circle; never promise containment in its AABB.
-  const availableScale =
-    board.spec.kind === 'ellipse'
-      ? Math.min(width, height) / (2 * radiusAboutCenter(object))
-      : Math.min(width / objectWidth, height / objectHeight);
+  const availableScale = availableBoardScale(
+    object,
+    board,
+    width,
+    height,
+    objectWidth,
+    objectHeight,
+  );
   const scale = options.mode === 'keep-size' ? 1 : availableScale;
   if (!Number.isFinite(scale) || scale <= 0) {
     return { kind: 'error', message: 'The artwork cannot be fitted at these dimensions.' };
@@ -87,8 +92,28 @@ function boardSize(board: ShapeObject): { readonly width: number; readonly heigh
     );
     return { width: diameter, height: diameter };
   }
-  const bounds = transformedBBox(board);
+  const bounds = fitRegion(board);
   return { width: bounds.maxX - bounds.minX, height: bounds.maxY - bounds.minY };
+}
+
+function fitRegion(board: ShapeObject): ReturnType<typeof boardFitRegion> {
+  return board.spec.kind === 'polyline' && board.spec.closed
+    ? boardFitRegion(board)
+    : transformedBBox(board);
+}
+
+function availableBoardScale(
+  object: SceneObject,
+  board: ShapeObject,
+  width: number,
+  height: number,
+  objectWidth: number,
+  objectHeight: number,
+): number {
+  if (board.spec.kind === 'ellipse') {
+    return Math.min(width, height) / (2 * radiusAboutCenter(object));
+  }
+  return Math.min(width / objectWidth, height / objectHeight);
 }
 
 function radiusAboutCenter(object: SceneObject): number {

@@ -2,6 +2,8 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { PlatformAdapter } from '../../platform/types';
+import { installChromiumSavePicker } from '../../platform/web/chromium-save-picker.test-support';
+import { webAdapter } from '../../platform/web/web-adapter';
 import { PlatformProvider } from '../app/platform-context';
 import { useStore } from '../state/store';
 import { resetStore } from '../state/test-helpers';
@@ -160,6 +162,31 @@ it('cancelled file pickers and failed exports preserve local artwork and the ope
   await click('Export library...');
   expect(host.querySelector('[role="alert"]')?.textContent).toContain('Disk full');
   expect(records).toEqual([entry]);
+});
+
+it('writes the listed library when the panel closes while the export picker is open', async () => {
+  // Audit 19-P2-1 / ADR-656 Amendment 1: Chromium empties the chosen file as
+  // its save picker returns, so the pick commits the library listed at the click.
+  const entry = await capturePersonalArtwork(useStore.getState(), 'Saved logo', 'Jigs');
+  records = [entry];
+  const disk = new Map([['my-artwork.lfart', 'previous library']]);
+  let confirm: () => void = () => undefined;
+  const dialogOpen = new Promise<void>((resolve) => {
+    confirm = resolve;
+  });
+  const picker = installChromiumSavePicker(disk, { whilePicking: () => dialogOpen });
+  try {
+    await render(webAdapter);
+    await click('Export library...');
+    await act(async () => root.render(null));
+    await act(async () => confirm());
+    await vi.waitFor(() =>
+      expect(disk.get('my-artwork.lfart')).toBe(serializePersonalArtworkLibrary([entry])),
+    );
+  } finally {
+    picker.restore();
+  }
+  expect(picker.picks()).toBe(1);
 });
 
 it('renames a saved entry and replaces what it holds, keeping its id', async () => {

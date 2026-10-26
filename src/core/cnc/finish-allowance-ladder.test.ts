@@ -146,6 +146,27 @@ describe('finish-only features follow the depth ladder (ADR-140 Amendment 1)', (
     expect(contourZs(passes, smallHole)).toEqual([-2, -4, -6, -6.35]);
   });
 
+  it('cuts an allowance of the bit radius or more as the radius, stepping the finish down', () => {
+    // ADR-140 Amendment 2 (CNC audit v1 F3-P2-1). A 4 mm allowance used to put
+    // the roughing loop 40 + 2 x (1.5875 + 4) = 51.2 mm across and finish in one
+    // 6.35 mm deep pass with the whole bit in solid stock.
+    const passes = compiledPasses([rectangle(10, 10, 40, 40)], { finishAllowanceMm: 4 });
+    // Roughing at one cut width out: 40 + 2 x 3.175 = 46.35 mm across.
+    const roughing = (size: Size): boolean => size.width > 46 && size.width < 47;
+    // Finishing at the radius: 43.175 mm across.
+    const finishing = (size: Size): boolean => size.width > 43 && size.width < 44;
+
+    expect(contourZs(passes, roughing)).toEqual([-2, -4, -6, -6.35]);
+    expect(contourZs(passes, finishing)).toEqual([-2, -4, -6, -6.35]);
+  });
+
+  it('keeps one full-depth finishing pass for an allowance just under the radius', () => {
+    const passes = compiledPasses([rectangle(10, 10, 40, 40)], { finishAllowanceMm: 1.5 });
+    const finishing = (size: Size): boolean => size.width > 43 && size.width < 44;
+
+    expect(contourZs(passes, finishing)).toEqual([-6.35]);
+  });
+
   it('still drops a hole narrower than the bit', () => {
     const passes = compiledPasses([circle(30, 30, 1.5)], {
       cutType: 'profile-inside',

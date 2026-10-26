@@ -141,6 +141,10 @@ describe('BoardCapturePanel open gate', () => {
     await renderPanel(true);
     await act(async () => buttonByText('Capture corner')?.click());
     expect(buttonByText('Circle')?.disabled).toBe(true);
+    expect(
+      host?.querySelector<HTMLButtonElement>('[aria-label="Collapse Place Board controls"]')
+        ?.disabled,
+    ).toBe(true);
 
     await setPanelOpen(false);
 
@@ -150,5 +154,36 @@ describe('BoardCapturePanel open gate', () => {
     await act(async () => resolveOrigin());
     expect(setOriginHere).toHaveBeenCalledTimes(1);
     expect(host?.textContent).toContain('Corner 2 of 4');
+  });
+
+  it('keeps captured points and unfinished dimensions when collapsed', async () => {
+    useLaserStore.setState({
+      setOriginHere: vi.fn(async () => undefined),
+      connection: { kind: 'connected' },
+      wcoCache: null,
+      statusReport: idleAt(10, 10),
+    });
+    await renderPanel(true);
+    await act(async () => buttonByText('Capture corner')?.click());
+    const width = host?.querySelector<HTMLInputElement>('[aria-label="Board width in mm"]');
+    if (width === null || width === undefined) throw new Error('Board width is missing');
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(width, '135');
+      width.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await act(async () =>
+      host
+        ?.querySelector<HTMLButtonElement>('[aria-label="Collapse Place Board controls"]')
+        ?.click(),
+    );
+    expect(host?.querySelector('.lf-board-panel-content')?.hasAttribute('hidden')).toBe(true);
+    await act(async () =>
+      host?.querySelector<HTMLButtonElement>('[aria-label="Expand Place Board controls"]')?.click(),
+    );
+    expect(host?.textContent).toContain('Corner 2 of 4');
+    expect(host?.querySelector<HTMLInputElement>('[aria-label="Board width in mm"]')?.value).toBe(
+      '135',
+    );
+    expect(useLaserStore.getState().setOriginHere).toHaveBeenCalledTimes(1);
   });
 });

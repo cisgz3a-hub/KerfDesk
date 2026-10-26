@@ -1,5 +1,6 @@
 import type { OverrideValues, StatusReport } from '../../core/controllers/grbl';
 import type { MachineKind } from '../../core/scene';
+import { overridesOffMessage, type StatusReportFieldsOff } from './status-report-fields';
 
 type Accessories = NonNullable<StatusReport['accessories']>;
 export type ReducedOverrideAcknowledgement = OverrideValues;
@@ -68,8 +69,17 @@ export const CNC_OVERRIDE_BLOCK_PREFIX =
 export function cncOverrideStartIssue(
   machineKind: MachineKind,
   overrides: OverrideValues | null | undefined,
+  fieldsOff: StatusReportFieldsOff | null = null,
 ): string | null {
   if (machineKind !== 'cnc') return null;
+  // A grblHAL `$10` without bit 6 never sends Ov:, so waiting cannot help
+  // (ADR-375 Amendment 2).
+  if (overrides == null && fieldsOff?.overridesOff === true) {
+    return (
+      'CNC Start cannot confirm the feed, rapid and spindle overrides before streaming. ' +
+      overridesOffMessage(fieldsOff)
+    );
+  }
   if (overrides == null) {
     return (
       'CNC Start requires a fresh GRBL override observation before streaming. ' +

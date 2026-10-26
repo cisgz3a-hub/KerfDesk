@@ -18,6 +18,7 @@ import {
   HOST_RECORDED_RESET_UNKNOWN_MESSAGE,
   hostRecordedMachinePosition,
 } from '../state/host-recorded-origin';
+import { placementAfterSetOrigin } from './set-origin-placement';
 
 // ADR-053 P4 — releasing motors ($SLP) is hard to undo cleanly (waking needs a
 // soft-reset, which clears G92 on stock GRBL and FluidNC), so confirm and spell out the correct order:
@@ -139,7 +140,7 @@ const RESET_ORIGIN_SUCCESS: Record<ResetOriginClear['mode'], string> = {
   'machine-frame-g92': 'Work origin cleared: machine coordinates restored (G92).',
 };
 
-// How this controller clears a transient origin (ADR-648, audit CS-05).
+// How this controller clears a transient origin (ADR-672, audit CS-05).
 // Marlin's restoring G92 is computed from the recorded machine position, so
 // Reset origin waits until KerfDesk knows it.
 type ResetOriginClear = {
@@ -161,7 +162,7 @@ function useResetOriginClear(): ResetOriginClear {
 //     `busy`) — the operator can re-set the origin whenever the head
 //     is at a new corner.
 //   - "Reset origin" sends G92.1, or on Marlin a G92 that restores machine
-//     coordinates (ADR-648). Only enabled when wcoCache shows a
+//     coordinates (ADR-672). Only enabled when wcoCache shows a
 //     non-trivial offset; disabled otherwise (nothing to clear).
 //   - "Release motors" sends $SLP for hand-positioning (ADR-053 P4).
 type Props = {
@@ -182,7 +183,6 @@ export function OriginRow(props: Props): JSX.Element | null {
   const workOriginActive = useLaserStore((s) => s.workOriginActive);
   const workOriginSource = useLaserStore((s) => s.workOriginSource);
   const persistentOriginReady = useLaserStore((s) => s.statusReport?.state === 'Idle');
-  const setJobPlacement = useStore((s) => s.setJobPlacement);
   const pushToast = useToastStore((s) => s.pushToast);
   const resetClear = useResetOriginClear();
   const busy = props.disabled || props.streaming;
@@ -219,7 +219,6 @@ export function OriginRow(props: Props): JSX.Element | null {
     setOrigin,
     resetOrigin,
     releaseMotors,
-    setJobPlacement,
     pushToast,
     resetSuccess: RESET_ORIGIN_SUCCESS[resetClear.mode],
   });
@@ -279,27 +278,9 @@ type OriginHandlerDeps = {
   readonly setOrigin: () => Promise<void>;
   readonly resetOrigin: () => Promise<void>;
   readonly releaseMotors: () => Promise<void>;
-  readonly setJobPlacement: (placement: { readonly startFrom: 'user-origin' }) => void;
   readonly pushToast: (message: string, variant: 'success') => void;
   readonly resetSuccess: string;
 };
-
-// Set origin upgrades Absolute Coordinates to User Origin. An explicit
-// User, Verified, or Current Position choice is the operator's and is
-// never rewritten under them (ADR-193; ADR-327). The mode is read when the
-// controller acknowledges, not when the button rendered: Set origin waits up to
-// a few seconds for the work-offset frame and the dropdown may change meanwhile.
-// The controller origin is global, but its placement update belongs only to
-// the document in which the operator clicked, even if New/Open ran meanwhile.
-function placementAfterSetOrigin(
-  setJobPlacement: OriginHandlerDeps['setJobPlacement'],
-  documentEpoch: number,
-): void {
-  const state = useStore.getState();
-  if (state.projectDocumentEpoch !== documentEpoch) return;
-  const startFrom: JobStartMode = state.jobPlacement.startFrom;
-  if (startFrom === 'absolute') setJobPlacement({ startFrom: 'user-origin' });
-}
 
 // Toast on ack covers the WCO-frame latency gap — GRBL reports WCO
 // intermittently (every Nth status per `$10`), so the StatusDisplay readout
@@ -316,7 +297,7 @@ function makeOriginHandlers(deps: OriginHandlerDeps): {
       void deps
         .setOrigin()
         .then(() => {
-          placementAfterSetOrigin(deps.setJobPlacement, documentEpoch);
+          placementAfterSetOrigin(documentEpoch);
           deps.pushToast('Origin set to current head position (G92).', 'success');
         })
         .catch(reportOriginActionFailure);
@@ -399,14 +380,13 @@ function AdvancedOriginControls(props: {
 }): JSX.Element {
   const setPersistentOrigin = useLaserStore((s) => s.setPersistentOriginHere);
   const clearPersistentOrigin = useLaserStore((s) => s.clearPersistentOrigin);
-  const setJobPlacement = useStore((s) => s.setJobPlacement);
   const pushToast = useToastStore((s) => s.pushToast);
   const onSetPersistent = (): void => {
     const documentEpoch = useStore.getState().projectDocumentEpoch;
     if (!jobAwareConfirm(SET_PERSISTENT_ORIGIN_CONFIRM)) return;
     void setPersistentOrigin()
       .then(() => {
-        placementAfterSetOrigin(setJobPlacement, documentEpoch);
+        placementAfterSetOrigin(documentEpoch);
         pushToast('Persistent G54 XY origin set; temporary offsets cleared.', 'success');
       })
       .catch(reportOriginActionFailure);

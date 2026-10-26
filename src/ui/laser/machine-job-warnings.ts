@@ -5,6 +5,7 @@
 // branch in ONE place so both call sites stay simple.
 
 import type { ControllerSettingsSnapshot } from '../../core/controllers/grbl';
+import { marlinPowerScaleWarning } from '../../core/devices/marlin-power-scale';
 import { smoothiePowerScaleWarning } from '../../core/devices/smoothie-power-scale';
 import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
 import type { Project } from '../../core/scene';
@@ -14,6 +15,7 @@ import { detectCncAngledToolFeedWarnings } from './cnc-angled-tool-feed-warnings
 import { detectCompiledReliefDepthWarningsForJob } from './cnc-compiled-depth-warnings';
 import { detectCncContourPrecisionWarnings } from './cnc-contour-precision-warnings';
 import { detectCncDefaultFeedWarnings } from './cnc-default-feed-warnings';
+import { detectCncFinishAllowanceWarnings } from './cnc-finish-allowance-warnings';
 import { detectCncFullTabCoverageWarnings } from './cnc-full-tab-coverage-warnings';
 import { detectCncMachineLimitWarnings } from './cnc-machine-limit-warnings';
 import { detectCncMissingPrimaryToolWarnings } from './cnc-missing-primary-tool-warnings';
@@ -24,6 +26,7 @@ import { detectCncRasterWarnings } from './cnc-raster-warnings';
 import { detectCncReliefPlanningWarnings } from './cnc-relief-planning-warnings';
 import { detectCncStockWarnings } from './cnc-stock-warnings';
 import { detectCncThroughCutTabWarnings } from './cnc-through-cut-tab-warnings';
+import { detectCncTwoSidedStockWarnings } from './cnc-two-sided-stock-warnings';
 import { detectCncUnmodeledBitLayoutWarnings } from './cnc-unmodeled-bit-layout-warnings';
 import { detectCncZTravelWarnings } from './cnc-z-travel-warnings';
 import { detectDataMatrixScanWarnings } from './data-matrix-scan-warnings';
@@ -50,9 +53,11 @@ export function detectMachineJobWarnings(
     project.machine?.kind === 'cnc'
       ? [
           ...detectCncStockWarnings(project, prepared),
+          ...detectCncTwoSidedStockWarnings(project),
           ...detectCncThroughCutTabWarnings(project, job),
           ...detectCncOnPathSizeWarnings(project),
           ...detectCncFullTabCoverageWarnings(project, job),
+          ...detectCncFinishAllowanceWarnings(project),
           ...detectCncDefaultFeedWarnings(project),
           ...detectCncAngledToolFeedWarnings(project),
           ...detectCncUnmodeledBitLayoutWarnings(project),
@@ -77,6 +82,8 @@ export function detectMachineJobWarnings(
           ...detectLaserMachineLimitWarnings(project, controllerSettings),
           // A saved Smoothieware profile above S 2 (controller audit SM-7).
           ...warningList(smoothiePowerScaleWarning(project.device)),
+          // A Marlin inline profile above one byte of S (audit v4 E1-P3-3).
+          ...warningList(marlinPowerScaleWarning(project.device)),
         ];
   return [
     ...detectActiveWcsMismatchWarnings(activeWcs),

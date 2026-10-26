@@ -5,7 +5,9 @@
 // boot banner, `ok` per answered line (none for a comment-only or empty line),
 // `echo:busy: processing` while a handler waits, `Error:<text>` then `ok` for a
 // handler error, `echo:Unknown command: "<line>"` then `ok` for an M-code the
-// build lacks, M114 and G92 position lines, M115 firmware identity, and M112,
+// build lacks, `echo:Home <axes> First` then `ok` for a move a
+// NO_MOTION_BEFORE_HOMING build skips, the stopped notice after stop(), M114
+// and G92 position lines, M115 firmware identity, and M112,
 // which halts the firmware (upstream rules cited in marlin-sim-queue.ts and
 // below). Beam power, fan power and burns come from marlin-laser-power-model.ts;
 // a burn is recorded when its move starts, so a quickstop drops the burns of
@@ -39,6 +41,10 @@ export type MarlinSimBuild = {
   readonly coolantMist: boolean;
   /** HAS_FAN: M106, M107. */
   readonly fan: boolean;
+  /** NO_MOTION_BEFORE_HOMING (off in stock builds, Configuration.h L1697):
+   * while X, Y or Z is unhomed, G0-G3 echo `Home <axes> First`, skip the move
+   * and answer `ok` (motion.h L461-L465, motion.cpp L1479-L1496). */
+  readonly noMotionBeforeHoming: boolean;
 };
 
 export type CreateMarlinSimulatorOptions = {
@@ -67,6 +73,8 @@ export type MarlinSimState = {
   readonly pendingMotions: number;
   readonly isHalted: boolean;
   readonly isHomed: boolean;
+  /** The axes a G28 has homed, in XYZ order. */
+  readonly homedAxes: string;
   readonly fanPower: number;
   readonly laserMode: 'standard' | 'continuous' | 'dynamic';
   readonly inlineBurnPowers: ReadonlyArray<number>;
@@ -81,7 +89,15 @@ export type MarlinSimulator = {
   readonly port: FakeSerialPort;
   readonly state: () => MarlinSimState;
   readonly outbound: () => ReadonlyArray<string>;
+  /** stop() after a firmware error (MarlinCore.cpp L965-L980): it prints
+   * STR_ERR_STOPPED as an Error:, then prints it bare for every G0-G3 it reads
+   * (queue.cpp L523-L535) and skips the move, answering `ok`. */
+  readonly stop: () => void;
 };
+
+const STR_ERR_STOPPED =
+  'Printer stopped due to errors. Fix the error and use M999 to restart. ' +
+  '(Temperature is reset. Set it after restarting)';
 
 const FIRMWARE_LINE =
   'FIRMWARE_NAME:Marlin 2.1.2 (LaserForge-sim) SOURCE_CODE_URL:github.com/MarlinFirmware/Marlin';
@@ -91,7 +107,18 @@ const DEFAULT_BUILD: MarlinSimBuild = {
   airAssist: true,
   coolantMist: true,
   fan: true,
+  noMotionBeforeHoming: false,
 };
+
+const MAIN_AXES = ['X', 'Y', 'Z'] as const;
+
+/** The axes a G28 homes: the named ones, or all when it names none or all
+ * (G28.cpp `home_all`). */
+function axesG28Homes(line: string): ReadonlyArray<string> {
+  const words = line.replace(/^G0*28/i, '');
+  const named = MAIN_AXES.filter((axis) => new RegExp(axis, 'i').test(words));
+  return named.length === 0 ? MAIN_AXES : named;
+}
 
 const BUILD_OPTION_OF: Readonly<Record<string, keyof MarlinSimBuild>> = {
   M3: 'laser',
@@ -127,9 +154,12 @@ export function createMarlinSimulator(options: CreateMarlinSimulatorOptions = {}
     runTo: SIM_ZERO_VEC3,
     isAbsolute: true,
     isHalted: false,
+    isStopped: false,
     isHomed: false,
+    homedAxes: new Set<string>(),
     waitUntil: null as number | null,
   };
+  const unhomedAxes = (): string => MAIN_AXES.filter((a) => !machine.homedAxes.has(a)).join('');
 
   const emit = (line: string): void => {
     setTimeout(() => port.emitLine(line), delay);
@@ -176,8 +206,17 @@ export function createMarlinSimulator(options: CreateMarlinSimulatorOptions = {}
     return answer();
   };
 
+  // Moves answered without planning anything. MOTION_CONDITIONS (motion.h
+  // L461-L465) skips them before their S word is read; a stopped build already
+  // said so when it read the line (readLine).
+  const skipsMove = (): boolean => {
+    if (machine.isStopped) return answer();
+    const unhomed = build.noMotionBeforeHoming ? unhomedAxes() : '';
+    if (unhomed !== '') return answer(`echo:Home ${unhomed} First`);
+    return queue.discarding() && answer(); // quick_stop(): moves refused for 1 s
+  };
   const move: MarlinSimHandler = (line) => {
-    if (queue.discarding()) return answer(); // quick_stop(): moves refused for 1 s
+    if (skipsMove()) return true;
     if (queue.plannerFull()) return false;
     const words = parseMotionWords(line);
     const moveBurns = applyPower(line);
@@ -212,13 +251,14 @@ export function createMarlinSimulator(options: CreateMarlinSimulatorOptions = {}
     power.y = machine.pos.y;
     return answer(positionLine());
   };
-  const home: MarlinSimHandler = () =>
+  const home: MarlinSimHandler = (line) =>
     waitThen(homingMs, () => {
       machine.pos = { x: 0, y: 0, z: machine.pos.z };
       machine.runTo = machine.pos;
       power.x = 0;
       power.y = 0;
       machine.isHomed = true;
+      for (const axis of axesG28Homes(line)) machine.homedAxes.add(axis);
     });
   const dwell: MarlinSimHandler = (line) => {
     const words = /P\s*(\d*\.?\d+)/i.exec(line)?.[1];
@@ -291,12 +331,16 @@ export function createMarlinSimulator(options: CreateMarlinSimulatorOptions = {}
       return false;
     }
     if (/^M410\b/i.test(line)) quickStop();
+    // queue.cpp L523-L535: strchr(command, 'G'), then strtol of what follows.
+    const gCode = Number(/G\s*(\d+)/.exec(line)?.[1] ?? Number.NaN);
+    if (machine.isStopped && gCode >= 0 && gCode <= 3) emit(STR_ERR_STOPPED);
     return true;
   }
 
   port.onOpen(() => {
     queue.reset();
     machine.isHalted = false;
+    machine.isStopped = false;
     if (options.emitBannerOnOpen !== false) emit('start');
   });
   port.onWrite((data) => queue.receive(data));
@@ -310,6 +354,7 @@ export function createMarlinSimulator(options: CreateMarlinSimulatorOptions = {}
       pendingMotions: queue.pendingMotions(),
       isHalted: machine.isHalted,
       isHomed: machine.isHomed,
+      homedAxes: MAIN_AXES.filter((a) => machine.homedAxes.has(a)).join(''),
       fanPower: power.fan,
       laserMode: power.mode,
       inlineBurnPowers: burns
@@ -319,5 +364,10 @@ export function createMarlinSimulator(options: CreateMarlinSimulatorOptions = {}
       modelErrors: [...modelErrors],
     }),
     outbound: () => port.outbound(),
+    stop: () => {
+      if (machine.isStopped) return;
+      emit(`Error:${STR_ERR_STOPPED}`);
+      machine.isStopped = true;
+    },
   };
 }

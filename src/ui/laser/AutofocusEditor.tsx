@@ -15,7 +15,11 @@
 // error:3 but is left in its homing state until a reset (controller audit
 // 2026-09-25 CG-9).
 
-import type { ControllerCommandSet } from '../../core/devices/device-profile';
+import {
+  MAX_AUTOFOCUS_PROBE_FEED_MM_PER_MIN,
+  profileAutofocusIssue,
+} from '../../core/devices/autofocus-command';
+import type { ControllerCommandSet, ControllerKind } from '../../core/devices/device-profile';
 import { inlineCodeStyle } from './device-settings-shared';
 
 const AUTOFOCUS_PRESETS: ReadonlyArray<{
@@ -36,7 +40,13 @@ export function AutofocusEditor(props: {
   readonly value: string;
   readonly onChange: (next: string) => void;
   readonly controllerCommandSet?: ControllerCommandSet | undefined;
+  readonly controllerKind?: ControllerKind | undefined;
 }): JSX.Element {
+  const issue = profileAutofocusIssue({
+    autofocusCommand: props.value,
+    controllerKind: props.controllerKind,
+    controllerCommandSet: props.controllerCommandSet,
+  });
   const presets = AUTOFOCUS_PRESETS.filter(
     (preset) => preset.commandSet === props.controllerCommandSet,
   );
@@ -74,11 +84,20 @@ export function AutofocusEditor(props: {
         title="One G-code or firmware command KerfDesk sends when auto-focus is requested. Leave blank to disable auto-focus."
         style={textareaStyle}
       />
+      {issue !== null && (
+        <p role="alert" style={issueStyle}>
+          {issue}
+        </p>
+      )}
       <p style={focusHintStyle}>
         Only one controller line is supported; multi-step G-code probe sequences are not sent from
-        this control. Leave this empty when the machine has no supported auto-focus routine. Common
-        error replies: <code style={inlineCodeStyle}>error:9</code> (no probe pin) and{' '}
-        <code style={inlineCodeStyle}>error:20</code> (unsupported G-code on this firmware).
+        this control. A <code style={inlineCodeStyle}>G38.2</code> probe needs its own feed, at most{' '}
+        {MAX_AUTOFOCUS_PROBE_FEED_MM_PER_MIN} mm/min. KerfDesk sets millimetres and absolute mode
+        (G21, G90) before probing; Z is a work-coordinate position, not a distance. Leave this empty
+        when the machine has no supported auto-focus routine. Common error replies:{' '}
+        <code style={inlineCodeStyle}>error:9</code> (the controller was in Alarm or Jog) and{' '}
+        <code style={inlineCodeStyle}>error:20</code> (no probe input, or unsupported G-code on this
+        firmware).
       </p>
     </div>
   );
@@ -117,6 +136,7 @@ const focusHintStyle: React.CSSProperties = {
   margin: '2px 0 0 0',
   fontStyle: 'italic',
 };
+const issueStyle: React.CSSProperties = { margin: 0, fontSize: 11, color: 'var(--lf-danger)' };
 const presetsRowStyle: React.CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 4 };
 const presetButtonStyle: React.CSSProperties = {
   fontSize: 11,

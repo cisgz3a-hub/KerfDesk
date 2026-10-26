@@ -11,6 +11,7 @@ import {
   activateFreshRunMutation,
   claimRecoveryMutation,
   interruptRunMutation,
+  settleLinkLossRestartMutation,
 } from './recovery-slot-mutations';
 
 const RUN_ID = 'run-recovery';
@@ -134,6 +135,64 @@ describe('repeated interruption of a superseded run', () => {
   it('still refuses to interrupt a run it never recorded', () => {
     const other = interruptRunMutation(emptyRecoverySlots(0), 'run-unknown', 1, interruption, NOW);
     expect(other.value).toBe(false);
+  });
+});
+
+describe('settleLinkLossRestartMutation (ADR-398 Amendment 3)', () => {
+  const BACKLOG = { ackedAtStatus: 1, queuedBlocks: 15, bound: 'planner-size' } as const;
+  const waiting = (claimed = false): PersistedRecoverySlots => ({
+    ...INTERRUPTED_SLOTS,
+    revision: 2,
+    recoveryCapsule: {
+      ...INTERRUPTED_SLOTS.recoveryCapsule!,
+      interruption: {
+        kind: 'disconnect',
+        message: 'Cable removed.',
+        sentLines: 3,
+        plannerBacklogIfRestarted: BACKLOG,
+      },
+      ...(claimed ? { claim: { attemptId: 'attempt', claimedAtIso: NOW } } : {}),
+    },
+  });
+  const expected = { runId: RUN_ID, revision: 2 };
+
+  it('gives the saved run the planner step-back when the controller restarted', () => {
+    const result = settleLinkLossRestartMutation(expected, { sign: 'boot-banner', link: 'usb' })(
+      waiting(),
+    );
+    expect(result.value).toBe(true);
+    const capsule = result.slots.recoveryCapsule;
+    expect(capsule?.revision).toBe(3);
+    expect(capsule?.updatedAtIso).toBe(NOW);
+    expect(capsule?.interruption).toMatchObject({ sentLines: 3, plannerBacklog: BACKLOG });
+    expect(capsule?.interruption).not.toHaveProperty('plannerBacklogIfRestarted');
+  });
+
+  it('drops the held-back backlog when the controller kept running', () => {
+    const result = settleLinkLossRestartMutation(expected, { sign: 'kept-running', link: 'usb' })(
+      waiting(),
+    );
+    expect(result.slots.recoveryCapsule?.interruption).toEqual({
+      kind: 'disconnect',
+      message: 'Cable removed.',
+      sentLines: 3,
+    });
+  });
+
+  it('changes nothing for another revision, a claimed capsule or a settled record', () => {
+    for (const [slots, args] of [
+      [waiting(), { runId: RUN_ID, revision: 1 }],
+      [waiting(), { runId: 'run-other', revision: 2 }],
+      [waiting(true), expected],
+      [INTERRUPTED_SLOTS, expected],
+    ] as const) {
+      expect(
+        settleLinkLossRestartMutation(args, { sign: 'boot-banner', link: 'usb' })(slots),
+      ).toEqual({
+        slots,
+        value: false,
+      });
+    }
   });
 });
 

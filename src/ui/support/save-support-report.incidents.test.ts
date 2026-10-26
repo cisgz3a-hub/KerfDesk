@@ -7,6 +7,7 @@ import {
   resetIncidentState,
   seedIncidentHistory,
 } from '../../__fixtures__/controller-incidents';
+import { classifyResponse, settingsMapToRows } from '../../core/controllers/grbl';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
@@ -15,7 +16,7 @@ import { saveSupportReport } from './save-support-report';
 
 const SAVED_AT = new Date('2026-10-07T09:00:00.000Z');
 
-function platform(cancelled = false) {
+function platform(cancelled = false, desktopLog = 'Local desktop log.') {
   const written: string[] = [];
   const calls: string[] = [];
   const target: SaveTarget = {
@@ -27,7 +28,7 @@ function platform(cancelled = false) {
   };
   const readSupportLog = vi.fn(async () => {
     calls.push('log');
-    return 'Local desktop log.';
+    return desktopLog;
   });
   const adapter: PlatformAdapter = {
     id: 'electron',
@@ -108,6 +109,53 @@ describe('D1 local support-report incident evidence', () => {
     expect(report).toContain('Detail KD1.[licence key removed]');
     expect(report).not.toContain('KD1.audit.secret');
     expect(report).not.toContain('KD1.other.secret');
+  });
+
+  // Audit 27-P2-3: grblHAL prints its password settings in `$$` unless its WebUI
+  // is connected, and the console, incidents and desktop log repeat the wire.
+  it('removes controller passwords and sign-ins from every section', async () => {
+    const dump = [
+      '$32=1',
+      '$75=sta pw 75',
+      '$77=ap-pw-77',
+      '$330=admin-pw-330',
+      '$331=user-pw-331',
+      '$533=mqtt-pw-533',
+      '$750=5',
+    ];
+    const settings = new Map<number, string>();
+    for (const line of dump) {
+      const response = classifyResponse(line);
+      if (response.kind === 'setting') settings.set(response.id, response.value);
+    }
+    seedIncidentHistory([incidentEntry(1, { kind: 'error', raw: '$533=mqtt-pw-533\r\nerror:9' })], {
+      grblSettingsRows: settingsMapToRows(settings),
+      lastSettingsReadAt: SAVED_AT.getTime(),
+      log: [
+        ...dump.map((line) => `< ${line}`),
+        '> $Sta/Password=fluid sta pw',
+        '> $AP/Password=fluid-ap-pw',
+        '> [ESP101]esp-sta-pw',
+      ],
+    });
+    const h = platform(
+      false,
+      'WARN camera rtsp://cam:cam@pw@10.0.0.9/live failed\nINFO GET /lic?token=tok-123&page=2',
+    );
+    await saveSupportReport(h.adapter, () => SAVED_AT);
+    const report = h.written[0] ?? '';
+    for (const secret of ['pw 75', 'pw-77', 'pw-330', 'pw-331', 'pw-533', 'sta pw', 'ap-pw'])
+      expect(report).not.toContain(secret);
+    for (const secret of ['esp-sta-pw', 'cam:cam', 'tok-123']) expect(report).not.toContain(secret);
+    expect(report).toContain('$75=[password removed]\n$77=[password removed]');
+    expect(report).toContain('< $331=[password removed]');
+    expect(report).toContain('$533=[password removed]\\r\\nerror:9');
+    expect(report).toContain('> $Sta/Password=[password removed]');
+    expect(report).toContain('> [ESP101][password removed]');
+    expect(report).toContain('rtsp://[sign-in removed]@10.0.0.9/live failed');
+    expect(report).toContain('token=[removed]&page=2');
+    expect(report).toContain('$32=1');
+    expect(report).toContain('$750=5');
   });
 
   it('export never acknowledges the outstanding SafetyNotice or deletes retained incidents', async () => {

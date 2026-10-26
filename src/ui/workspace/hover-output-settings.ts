@@ -2,7 +2,8 @@
 // would run for the hovered piece, not only what its operation row says. A
 // per-artwork override, the artwork's power scale, a Grayscale image's minimum
 // power and the machine's Output max feed all change the numbers output uses,
-// so they change these too. Pure: no DOM, no store.
+// so they change these too. With Inches on, speed reads in in/min like the
+// layer Speed box (ADR-629). Pure: no DOM, no store.
 
 import {
   effectiveObjectMinPowerPercent,
@@ -22,6 +23,7 @@ import {
   runUsesMinPower,
   type ArtworkOutputRun,
 } from '../layers/artwork-output-runs';
+import { MM_PER_INCH, type DisplayLengthUnit } from '../display-length';
 
 export type HoverSettingsLine = {
   /** The operation's colour, so a multi-colour piece says which line is which. */
@@ -50,6 +52,7 @@ const MAX_LINES = 3;
 export function hoverOutputSettings(
   project: Project,
   object: SceneObject,
+  unit: DisplayLengthUnit = 'mm',
 ): HoverOutputSettings | null {
   if (machineKindOf(project.machine) !== 'laser' || object.kind === 'relief') return null;
   // A trace's source bitmap is a reference: output skips it whatever its operation says.
@@ -67,7 +70,7 @@ export function hoverOutputSettings(
   if (runs.length === 0) return { kind: 'note', text: modeMismatchNote(object, firstEnabled) };
   const lines: HoverSettingsLine[] = [];
   for (const run of runs) {
-    const line = runLine(run, object, project.device.maxFeed);
+    const line = runLine(run, object, project.device.maxFeed, unit);
     if (!lines.some((seen) => seen.power === line.power && seen.speed === line.speed))
       lines.push(line);
   }
@@ -90,7 +93,12 @@ function modeMismatchNote(object: SceneObject, run: Layer): string {
   return `Not engraved: operation is in ${mode} mode`;
 }
 
-function runLine(run: ArtworkOutputRun, object: SceneObject, maxFeed: number): HoverSettingsLine {
+function runLine(
+  run: ArtworkOutputRun,
+  object: SceneObject,
+  maxFeed: number,
+  unit: DisplayLengthUnit,
+): HoverSettingsLine {
   const { effective } = run;
   const power = effectiveObjectPowerPercent(effective, object);
   // Only Grayscale shades between a floor and the peak; dithers, Line and
@@ -105,8 +113,14 @@ function runLine(run: ArtworkOutputRun, object: SceneObject, maxFeed: number): H
       minPower > 0 && minPower < power
         ? `${format(minPower)}–${format(power)}%`
         : `${format(power)}%`,
-    speed: `${format(capped ? maxFeed : effective.speed)} mm/min${capped ? ' (capped)' : ''}`,
+    speed: `${speedText(capped ? maxFeed : effective.speed, unit)}${capped ? ' (capped)' : ''}`,
   };
+}
+
+// In inches, one decimal of in/min, as the layer Speed box shows it.
+function speedText(mmPerMin: number, unit: DisplayLengthUnit): string {
+  if (unit === 'mm') return `${format(mmPerMin)} mm/min`;
+  return `${format(Number((mmPerMin / MM_PER_INCH).toFixed(1)))} in/min`;
 }
 
 function format(value: number): string {

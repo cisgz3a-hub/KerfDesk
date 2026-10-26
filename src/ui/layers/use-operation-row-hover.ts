@@ -8,7 +8,15 @@ import { useEffect, useRef } from 'react';
 import { PULSE_HOVER_DWELL_MS } from '../workspace/artwork-pulse';
 import { useUiStore } from '../state/ui-store';
 
-export function useOperationRowHover(operationId: string): {
+export function useOperationRowHover(
+  operationId: string,
+  /**
+   * The row's own controls hold an edit glow (ADR-646 Amendment 1). The row
+   * steps aside for it: the edit lights exactly what it changes, where the
+   * row pulse widens to every operation with the same settings.
+   */
+  editing = false,
+): {
   readonly onPointerEnter: () => void;
   readonly onPointerLeave: () => void;
   readonly onFocus: () => void;
@@ -17,6 +25,8 @@ export function useOperationRowHover(operationId: string): {
   const setHovered = useUiStore((state) => state.setHoveredOperationId);
   const release = useUiStore((state) => state.releaseHoveredOperationId);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const editingNow = useRef(editing);
+  editingNow.current = editing;
   const cancel = (): void => {
     if (timer.current !== null) clearTimeout(timer.current);
     timer.current = null;
@@ -29,9 +39,17 @@ export function useOperationRowHover(operationId: string): {
     },
     [operationId, release],
   );
+  useEffect(() => {
+    if (!editing) return;
+    if (timer.current !== null) clearTimeout(timer.current);
+    timer.current = null;
+    release(operationId);
+  }, [editing, operationId, release]);
   const settle = (): void => {
     cancel();
-    timer.current = setTimeout(() => setHovered(operationId), PULSE_HOVER_DWELL_MS);
+    timer.current = setTimeout(() => {
+      if (!editingNow.current) setHovered(operationId);
+    }, PULSE_HOVER_DWELL_MS);
   };
   const leave = (): void => {
     cancel();

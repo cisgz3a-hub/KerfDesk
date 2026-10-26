@@ -171,7 +171,10 @@ function Set-UpgradeMachine($Machine) {
   Set-UpgradeValue 'Bed width (mm)' 'Spinner' '321' $Machine
   Set-UpgradeValue 'Bed height (mm)' 'Spinner' '234' $Machine
   (Get-UpgradeControl 'Device name' 'Edit' $Machine).SetFocus()
-  Invoke-UpgradeControl 'Review setup' 'Button' $Machine
+  # The create phase drives the published baseline. 1.0.21's Machine Setup
+  # (ADR-637) dropped 1.0.20's "Review setup" button; every build since
+  # 1.0.20 labels its stepper step the same way.
+  Invoke-UpgradeControl 'Go to step 3: Review & save' 'Button' $Machine
   Invoke-UpgradeControl 'Save machine setup' 'Button' $Machine
 }
 

@@ -35,7 +35,12 @@ import { pushLog } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 import type { LiveRefs } from './laser-store';
 import { assertOriginActionReady, usesPrimaryWcs } from './laser-origin-readiness';
-import { restoreWorkOrigin, setOriginAtProgramPoint } from './laser-origin-restore';
+import {
+  restoreWorkOrigin,
+  setOriginAtMachinePoint,
+  setOriginAtProgramPoint,
+} from './laser-origin-restore';
+import { workOffsetOffFor, workOffsetOffMessage } from './status-report-fields';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -57,6 +62,7 @@ export function originActions(
   | 'clearPersistentOrigin'
   | 'releaseMotors'
   | 'restoreWorkOrigin'
+  | 'setOriginAtMachinePoint'
   | 'setOriginAtProgramPoint'
 > {
   return {
@@ -68,6 +74,8 @@ export function originActions(
     releaseMotors: () => releaseMotors(set, get, refs, safeWrite),
     restoreWorkOrigin: (savedOffsetMm) =>
       restoreWorkOrigin(set, get, refs, safeWrite, savedOffsetMm),
+    setOriginAtMachinePoint: (pointMm, assertTargetCurrent) =>
+      setOriginAtMachinePoint(set, get, refs, safeWrite, pointMm, assertTargetCurrent),
     setOriginAtProgramPoint: (pointMm) =>
       setOriginAtProgramPoint(set, get, refs, safeWrite, pointMm),
   };
@@ -103,7 +111,10 @@ async function setOriginHere(
     // controllers never report WCO, so skip the wait there.
     async (assertCurrent) => {
       if (usesPrimaryWcs(get())) {
-        sawFreshWcoFrame = await waitForOriginWcoFrame(get, assertCurrent);
+        // A grblHAL `$10` without bit 5 never sends WCO, so no wait or jog
+        // brings the new origin's offset (ADR-375 Amendment 2).
+        sawFreshWcoFrame =
+          workOffsetOffFor(get()) === null && (await waitForOriginWcoFrame(get, assertCurrent));
       }
       const { statusReport, wcoCache } = get();
       return transientXyOriginPatch(
@@ -125,7 +136,12 @@ async function setOriginHere(
     get().controllerSessionEpoch === sessionEpoch &&
     refs.writeEpoch === writeEpoch
   ) {
-    set((state) => ({ log: pushLog(state, ORIGIN_WCO_UNCONFIRMED_NOTICE) }));
+    const fieldsOff = workOffsetOffFor(get());
+    const notice =
+      fieldsOff === null
+        ? ORIGIN_WCO_UNCONFIRMED_NOTICE
+        : `[lf2] Origin set, but its machine location stays unknown. ${workOffsetOffMessage(fieldsOff)}`;
+    set((state) => ({ log: pushLog(state, notice) }));
   }
 }
 
@@ -142,7 +158,7 @@ async function zeroZHere(
     get().workZReferenceEpoch,
     selectedCncToolId(useStore.getState().project),
   );
-  await assertOriginActionReady(set, get, refs, safeWrite);
+  await assertOriginActionReady(set, get, refs, safeWrite, 'z');
   const machineBeforeG92 = hostRecordedMachinePosition(get());
   await runOriginTransaction(
     set,
@@ -186,7 +202,7 @@ async function resetOrigin(
 
 // Marlin's G92.1 needs CNC_COORDINATE_SYSTEMS; a stock build acknowledges it and
 // keeps the shift. A G92 to the machine position restores machine coordinates
-// on every build (host-recorded-origin.ts; audit CG-11, CS-05, ADR-648). It is
+// on every build (host-recorded-origin.ts; audit CG-11, CS-05, ADR-672). It is
 // computed from the shift KerfDesk recorded, so it needs a host-recorded
 // machine position and refuses without one.
 async function restoreHostRecordedMachineFrame(
@@ -302,7 +318,7 @@ export const ORIGIN_WCO_UNCONFIRMED_NOTICE =
 async function waitForOriginWcoFrame(get: GetFn, assertCurrent: () => void): Promise<boolean> {
   const deadline = Date.now() + ORIGIN_WCO_WAIT_TIMEOUT_MS;
   assertCurrent();
-  // grblHAL answers its complete-report request with WCO at once (ADR-648).
+  // grblHAL answers its complete-report request with WCO at once (ADR-672).
   if (get().wcoCache === null) void get().requestControllerStatus({ complete: true });
   while (get().wcoCache === null && Date.now() <= deadline) {
     await sleep(ORIGIN_WCO_POLL_MS);

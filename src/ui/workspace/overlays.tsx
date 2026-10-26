@@ -7,6 +7,7 @@ import type { Project } from '../../core/scene';
 import { transformedBBox } from '../../core/scene';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
+import { useLengthUnit } from '../state/display-units';
 import { Icon } from '../kit';
 import { measureReadout } from './measure-tool';
 import { SnapSettingsButton } from './SnapSettingsPopover';
@@ -185,6 +186,7 @@ export function MeasureReadoutOverlay(props: {
   readonly viewState: { readonly zoomFactor: number; readonly panX: number; readonly panY: number };
 }): JSX.Element | null {
   const draft = useUiStore((s) => s.measureDraft);
+  const unit = useLengthUnit();
   const canvas = props.canvasRef.current;
   if (canvas === null || draft === null) return null;
   const view = computeView(
@@ -211,7 +213,7 @@ export function MeasureReadoutOverlay(props: {
         top: clamp(cssY - 34, 8, Math.max(8, rect.height - 40)),
       }}
     >
-      {measureReadout(draft).label}
+      {measureReadout(draft, unit).label}
     </div>
   );
 }

@@ -9,6 +9,10 @@ import {
 } from '../../core/scene';
 import type { AppState } from '../state/store';
 import { pushUndo } from '../state/undo-stack';
+import {
+  applyLayerDefaultsToFreshLayers,
+  svgStructuralDefaults,
+} from '../state/fresh-operation-seeding';
 import { validateSceneBudgets } from '../../io/project/project-scene-integrity-validator';
 import { carriedSelectionReference } from '../state/selection-reference';
 
@@ -40,7 +44,12 @@ export function aiDraftArtwork(draft: AiDraft, request: AiRequest, id: string): 
     ],
   };
 }
-/** Normal artwork allocator and Undo; no generated operation settings are accepted. */
+/**
+ * Normal artwork allocator and Undo; no generated operation settings are
+ * accepted. The new operation takes the operator's own setup exactly as an
+ * imported SVG does (Make Default, the job material's recipe, the CNC stock or
+ * machine starter), with the draft's outline keeping it a Line operation.
+ */
 export function applyAiDraft(
   state: AppState,
   owner: AiDocumentOwner,
@@ -61,12 +70,16 @@ export function applyAiDraft(
     throw new Error(
       `${budgetError}. Remove unused artwork/operations or use another sheet before adding this draft.`,
     );
+  const { project } = applyLayerDefaultsToFreshLayers(
+    state.project.scene.layers,
+    { project: { ...state.project, scene } },
+    svgStructuralDefaults(state.layerDefaults),
+    state.cncLiveCaps,
+    state.materialLibrary,
+  );
   const selection = { selectedObjectId: object.id, additionalSelectedIds: new Set<string>() };
   return {
-    project: {
-      ...state.project,
-      scene,
-    },
+    project,
     ...selection,
     selectedPathNode: null,
     selectedPathNodes: [],

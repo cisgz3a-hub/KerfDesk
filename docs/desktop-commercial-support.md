@@ -23,6 +23,12 @@ the single command that needs it.
 | Paid licence | Forever, for eligible versions | Releases published on or before the update cutoff; one year from purchase, plus one year per US$20 renewal | 3 active at once |
 | Developer (Johann, Father) | Forever | All future releases | 3 active at once |
 
+- **For now, from 1.0.21, the licence window is held off** ([ADR-623 Amendment 3](decisions/ADR-623-amendment-3-licence-window-held-off.md)).
+  The commercial desktop app opens straight into KerfDesk Free. Opening a Pro tool,
+  Help > Licence or the status bar's `Free · Try Pro` starts the 30-day trial or
+  takes a licence key, and when a trial or licence ends KerfDesk Free keeps
+  working; only new Pro tool choices pause. The bullets below that describe the
+  licence window apply only once a release turns it back on.
 - The commercial desktop app opens behind its licence window until this computer
   has an active trial or licence (ADR-623). The workspace, projects and machine
   connections stay unavailable until then. The window offers activation and the
@@ -120,20 +126,33 @@ its original end date. A new trial after it ends is not available; offer the
 purchase instead. Reinstalling Windows creates a new installation identity, and
 this service does not claim to prevent that.
 
+### A paid licence without the internet
+
+A paid licence activated on a computer keeps working there offline, for as long
+as it stays offline, as LightBurn's does (ADR-623 Amendment 2). It has no check-in
+and never opens to the licence window for being offline. KerfDesk tries the
+licence service quietly at startup and about once a week while it runs, and shows
+nothing when it cannot connect. Activating a new computer, or the same computer
+after its operating system is reinstalled, needs the internet once.
+
+A trial is different: it must reach the service at least every 3 days (ADR-592).
+After that the licence window asks for **Refresh licence** at the next launch.
+
 ### A wrong computer clock
 
-Only a trial watches the clock (ADR-523 Amendment 2). A paid or developer licence
-keeps Pro whatever the clock says.
+Only a trial watches the clock (ADR-523 Amendment 2). A paid licence keeps Pro
+whatever the clock says, and its activation, **Check payment** and refreshes work
+with any clock (ADR-623 Amendment 2).
 
-- "This computer's clock is earlier than the last licence check, so the Pro tools
-  in your trial are locked...": the clock moved back more than five minutes during
-  a trial. Ask the customer to turn on **Set time automatically** in Windows' Date
-  & time settings, then choose **Refresh licence** in Help > Licence.
+- "This computer's clock is earlier than the last licence check, so your trial
+  cannot be used...": the clock moved back more than five minutes during a trial.
+  Ask the customer to turn on automatic time (the message names where on their
+  system), then choose **Refresh licence**.
 - "This computer's clock is about N minutes (or hours, or days) ahead (or behind),
-  so the licence could not be confirmed...": an activation, trial start, refresh or
-  Check payment met a clock more than five minutes from the licence service's, for
-  any licence. The saved licence is kept, and updates wait until a check succeeds.
-  Ask for automatic time and the right time zone, then try again.
+  so the licence could not be confirmed...": a trial start or trial refresh, or a
+  developer licence's activation or refresh, met a clock more than five minutes
+  from the licence service's. The saved licence is kept, and updates wait until a
+  check succeeds. Ask for automatic time and the right time zone, then try again.
 
 ### "This licence already has three active devices"
 
@@ -278,9 +297,10 @@ An approved full refund, a chargeback or a chargeback warning on a purchase now
 revokes its licence automatically when Paddle's signed `adjustment.created` or
 `adjustment.updated` webhook arrives (ADR-592); a reversed chargeback restores a
 licence that chargeback revoked. Its key stops activating at once, and connected
-computers drop Pro at their next weekly check. A computer kept offline loses new
-Pro tools within 30 days, when its check-in falls due, so do not promise more
-than that. Partial refunds (a tax refund, say) and refunds of a renewal are only
+computers drop Pro at their next check, within about a day. A computer kept
+offline, or one that blocks the licence service, keeps Pro until it next reaches
+the service, as with LightBurn (ADR-623 Amendment 2), so do not promise that it
+loses Pro. Partial refunds (a tax refund, say) and refunds of a renewal are only
 recorded for review: the lookup shows them under `payment-adjustment`. Decide
 those by hand with `POST /v1/admin/licenses/status`; a status you set by hand
 replaces the automatic one, so a later chargeback reversal never undoes it.
@@ -291,7 +311,7 @@ Rekey the licence instead of revoking it: `POST /v1/admin/licenses/rekey` with
 `{licenseId}` returns a new key, and the old key stops activating at once. Add
 `releaseSeats: true` when unknown computers hold seats: every seat is freed
 (without using up the customer's six moves), and each computer loses Pro at its
-next weekly check. Send the new key privately to the purchaser, who activates
+next check, within about a day if it is online. Send the new key privately to the purchaser, who activates
 their own computers with it. A later lookup returns the new key too.
 
 ### Privacy or deletion request

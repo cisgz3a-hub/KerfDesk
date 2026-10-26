@@ -7,6 +7,7 @@ import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { LaserWindow } from './LaserWindow';
 import { MachineConnectionToolbar } from './MachineConnectionToolbar';
+import { WorkspaceSafetyNotice } from './WorkspaceSafetyNotice';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -57,6 +58,7 @@ describe('LaserWindow recovery connection escape', () => {
             <>
               <MachineConnectionToolbar />
               <LaserWindow />
+              <WorkspaceSafetyNotice />
             </>
           </PlatformProvider>,
         );

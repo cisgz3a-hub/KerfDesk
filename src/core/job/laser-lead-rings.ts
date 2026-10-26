@@ -22,8 +22,10 @@ import { sampleArcMoves } from '../geometry/arc-fit';
 import type { Vec2 } from '../scene';
 import { emittedCutArcMoves } from './cut-arc-moves';
 import type { CutGroup, CutSegment, CutTopologyRing, Job } from './job';
-import { copyLists, copyRepresentatives, leadOutline } from './laser-lead-copies';
+import { copyLists, leadOutline } from './laser-lead-copies';
 import type { LeadRing } from './laser-lead-obstacles';
+import type { SceneOpenLine } from './laser-lead-open-outlines';
+import { pieceClasses, pieceExemptions, pieceLookup, type PieceLookup } from './laser-lead-pieces';
 import { leadSideVerdicts, type LeadSideContour, type LeadSideVerdict } from './laser-lead-sides';
 import { isBurningLineGroup } from './line-start-region';
 import { properContourAncestors } from './proper-contour-containment';
@@ -42,15 +44,20 @@ export type LeadJobLines = {
   readonly holders: ReadonlyArray<ReadonlySet<number>>;
   /** The other rings that are copies of each ring. */
   readonly copies: ReadonlyArray<ReadonlyArray<number>>;
+  /** The rings each ring's leads may cross and end inside: its copies, and
+   * every ring another operation cuts from the same scene contour over it. */
+  readonly exempt: ReadonlyArray<ReadonlyArray<number>>;
 };
 
 /** `burns` says which cut groups really burn; others hold no part. `scene`:
  * the scene's contours the scrap side is judged among (sceneLeadSideContours);
- * absent, the job's own rings are. */
+ * absent, the job's own rings are. `openLines`: the scene's open Line cuts,
+ * which leave a contour in a region they close without a side (Amendment 8). */
 export function leadJobLines(
   job: Job,
   burns: (group: CutGroup) => boolean = isBurningLineGroup,
   scene?: ReadonlyArray<LeadSideContour>,
+  openLines: ReadonlyArray<SceneOpenLine> = [],
 ): LeadJobLines {
   const lines: Array<ReadonlyArray<Vec2>> = [];
   const lineOf = new Map<string, number>();
@@ -102,7 +109,9 @@ export function leadJobLines(
     rings.push(ring(outline.polyline, [...ids, bridged], outline.leadSource));
     owners.push(owner);
   }
-  const sides = ringSides(rings, owners, scene);
+  const parts = pieceLookup(rings);
+  const groups = owners.map((owner) => owner.group);
+  const { sides, sceneClasses } = ringSides(rings, owners, { scene, openLines }, parts);
   const representatives = classRepresentatives(sides.map((side) => side.copyClass));
   const copies = copyLists(representatives);
   return {
@@ -113,6 +122,7 @@ export function leadJobLines(
     sides,
     holders: ringHolders(rings, representatives, copies),
     copies,
+    exempt: pieceExemptions(rings, groups, copies, parts, sceneClasses),
   };
 }
 
@@ -121,8 +131,15 @@ export function leadJobLines(
 function ringSides(
   rings: ReadonlyArray<LeadRing>,
   owners: ReadonlyArray<RingOwner>,
-  scene: ReadonlyArray<LeadSideContour> | undefined,
-): LeadSideVerdict[] {
+  {
+    scene,
+    openLines,
+  }: {
+    readonly scene: ReadonlyArray<LeadSideContour> | undefined;
+    readonly openLines: ReadonlyArray<SceneOpenLine>;
+  },
+  parts: PieceLookup,
+): { readonly sides: LeadSideVerdict[]; readonly sceneClasses: ReadonlyArray<number> } {
   if (scene === undefined) {
     const own = leadSideVerdicts(
       rings.map((ring, index) => ({
@@ -132,9 +149,10 @@ function ringSides(
         operationName: owners[index]?.operationName ?? '',
       })),
     );
-    return rings.map((_, index) => own.get(String(index)) as LeadSideVerdict);
+    const sides = rings.map((_, index) => own.get(String(index)) as LeadSideVerdict);
+    return { sides, sceneClasses: sides.map((side) => side.copyClass) };
   }
-  const verdicts = leadSideVerdicts(scene);
+  const verdicts = leadSideVerdicts(scene, openLines);
   const fresh = verdicts.size;
   const sides = rings.map(
     (ring, index): LeadSideVerdict =>
@@ -144,36 +162,17 @@ function ringSides(
         aroundName: '',
       },
   );
-  splitKerfPieces(rings, owners, sides, fresh);
-  return sides;
-}
-
-// A copy is the outline cut again, by another group or drawn twice. Two rings
-// of one group from one scene contour that are not the same outline are the
-// pieces a kerf offset split it into: each keeps clear of the other.
-function splitKerfPieces(
-  rings: ReadonlyArray<LeadRing>,
-  owners: ReadonlyArray<RingOwner>,
-  sides: LeadSideVerdict[],
-  fresh: number,
-): void {
-  const members = new Map<string, number[]>();
-  sides.forEach((side, index) => {
-    const key = `${owners[index]?.group ?? -1}:${side.copyClass}`;
-    const list = members.get(key);
-    if (list === undefined) members.set(key, [index]);
-    else list.push(index);
-  });
-  for (const list of members.values()) {
-    if (list.length < 2) continue;
-    const representatives = copyRepresentatives(list.map((index) => rings[index] as LeadRing));
-    list.forEach((index, position) => {
-      const representative = representatives[position] ?? position;
-      const side = sides[index];
-      if (representative === 0 || side === undefined) return;
-      sides[index] = { ...side, copyClass: fresh + (list[representative] ?? index) };
-    });
-  }
+  // The class each ring's scene contour has, coincident contours sharing one,
+  // before the pieces some operation split them into are told apart.
+  const sceneClasses = sides.map((side) => side.copyClass);
+  pieceClasses(
+    rings,
+    owners.map((owner) => owner.group),
+    sides,
+    fresh,
+    parts,
+  );
+  return { sides, sceneClasses };
 }
 
 type RingOwner = Pick<LeadSideContour, 'decides' | 'operationName'> & { readonly group: number };

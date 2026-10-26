@@ -26,9 +26,10 @@ export type JogTravelSettings = {
   readonly travelMm: { readonly x: number; readonly y: number };
   /** `$23`. */
   readonly homingDirectionMask: number;
-  /** `[OPT:]` Z (HOMING_FORCE_SET_ORIGIN); null when this session has no `$I`. */
+  /** Force set origin: stock GRBL's `[OPT:]` Z (HOMING_FORCE_SET_ORIGIN) or
+   *  grblHAL's `$22` bit 3; null when this session has not read it. */
   readonly forceOrigin: boolean | null;
-  /** `$21`; undefined when not read as 0/1 (a grblHAL bitfield such as 3). */
+  /** `$21` bit 0; undefined when `$21` was not read as a non-negative integer. */
   readonly hardLimits: boolean | undefined;
   /** `$27`; undefined when not read. */
   readonly pullOffMm: number | undefined;

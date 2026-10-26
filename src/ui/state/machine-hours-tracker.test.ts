@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { LiveCanvasLifecycle, LiveCanvasRun } from './canvas-motion-plan';
 import { advanceRunClock, RUN_CLOCK_FLUSH_MS, type RunClock } from './machine-hours-tracker';
 
-const PLAN_A = {} as LiveCanvasRun['plan'];
-const PLAN_B = {} as LiveCanvasRun['plan'];
+const PLAN_A = { manifest: {} } as LiveCanvasRun['plan'];
+const PLAN_B = { manifest: {} } as LiveCanvasRun['plan'];
 
 function run(lifecycle: LiveCanvasLifecycle, plan = PLAN_A, startedAtMs = 1000) {
   return { plan, startedAtMs, lifecycle };
@@ -70,6 +70,20 @@ describe('measured run time (ADR-502)', () => {
         [6_000, null],
       ]),
     ).toEqual({ ms: 4_000 + 2_000, jobs: 2 });
+  });
+
+  // Audit v3 D4-P3-1: Pause and lift re-issues the plan with a new
+  // positionEpoch, and that used to end the job and open a second one.
+  it('keeps one job when Pause and lift re-issues its plan', () => {
+    const lifted = { ...PLAN_A, positionEpoch: 2 };
+    expect(
+      replay([
+        [0, run('running', PLAN_A, 0)],
+        [5_000, run('paused', PLAN_A, 0)],
+        [9_000, run('running', lifted, 0)],
+        [12_000, run('finished', lifted, 0)],
+      ]),
+    ).toEqual({ ms: 5_000 + 3_000, jobs: 1 });
   });
 
   it('counts nothing with no job', () => {

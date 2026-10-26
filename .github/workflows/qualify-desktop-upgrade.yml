@@ -35,6 +35,9 @@ jobs:
     if: github.repository == 'cisgz3a-hub/KerfDesk' && github.ref == 'refs/heads/main' && (inputs.qualification_mode == '' || inputs.qualification_mode == 'historical-upgrade')
     runs-on: windows-latest
     timeout-minutes: 30
+    # The qualification licence belongs in this main-only environment with the
+    # release credentials, so no branch workflow can read it (ADR-651).
+    environment: desktop-commercial
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -62,6 +65,7 @@ jobs:
           PREVIOUS_RELEASE_VERSION: ${{ inputs.previous_version }}
           TARGET_RELEASE_VERSION: ${{ inputs.target_version }}
           # Opens a build behind the licence window, then releases the seat (ADR-623).
+          # Unused while ADR-623 Amendment 3 holds the window off: every build opens in Free.
           KERFDESK_NATIVE_QUALIFICATION_LICENCE: ${{ secrets.KERFDESK_NATIVE_QUALIFICATION_LICENCE }}
         shell: pwsh
         run: |
@@ -90,9 +94,10 @@ jobs:
     if: >-
       github.repository == 'cisgz3a-hub/KerfDesk' &&
       inputs.qualification_mode == 'developer-licence' &&
-      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/codex/payment-launch-20261007')
+      github.ref == 'refs/heads/main'
     runs-on: windows-latest
     timeout-minutes: 20
+    environment: desktop-commercial
     concurrency:
       group: native-developer-licence
       cancel-in-progress: false

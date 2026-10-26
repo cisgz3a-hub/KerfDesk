@@ -9,6 +9,7 @@ import { promisify } from 'node:util';
 import { preparePublishedUpgradeInstaller } from './published-upgrade-installers.mjs';
 import { verifyHistoricalInstalledResources } from './verify-historical-installed.mjs';
 import { collectNativeSmokeProcess } from './native-smoke-process.mjs';
+import { DESKTOP_LICENCE_WINDOW } from '../public/desktop-licence-window.mjs';
 import {
   LicenceQualificationError,
   nativeLicenceArguments,
@@ -142,6 +143,15 @@ async function verifyInstalled(input, paths, downloaded) {
   return { ...identity, executableSHA256, asarSHA256, byteIdenticalToPublicInstaller: true };
 }
 
+/**
+ * The edition button a deactivated device shows: "Licence needed" behind the
+ * licence window (ADR-623), or KerfDesk Free while ADR-623 Amendment 3 holds
+ * that window off. The proof helper spells out the Free label itself.
+ */
+export function deactivatedEdition(licenceWindow = DESKTOP_LICENCE_WINDOW) {
+  return licenceWindow ? 'Licence needed' : 'Free';
+}
+
 async function windowProof(input, paths, evidence, child, label, edition) {
   const png = join(evidence, 'screenshots', `${label}.png`);
   try {
@@ -200,7 +210,7 @@ export async function nativePhase(
             input.output,
             child,
             label,
-            phase === 'deactivate' ? 'Licence needed' : 'Pro',
+            phase === 'deactivate' ? deactivatedEdition() : 'Pro',
           );
         });
         return child;
@@ -249,12 +259,11 @@ export async function qualifyDesktopLicence(input) {
     packageModified: false,
     nativeAppExecuted: false,
     paidTierQualified: false,
-    screenshotScope:
-      'Only the exact Pro or Licence needed edition button, never the licence panel (ADR-623).',
+    screenshotScope: `Only the exact Pro or ${deactivatedEdition()} edition button, never the licence panel (ADR-623).`,
     limitations: [
       'One real Windows machine identity; no three-seat or device-transfer qualification.',
       'Developer licence only; paid and trial lifecycle evidence remains separate.',
-      'Native deactivation from Pro to Licence needed is observed; backend seat inventory is verified separately.',
+      `Native deactivation from Pro to ${deactivatedEdition()} is observed; backend seat inventory is verified separately.`,
       'The shipped smoke uses stubbed file pickers and an in-memory project save.',
       'A same-version reinstall is tested; no new-version credential migration is claimed.',
       'UIA screenshot crops are best effort; receipts assert the actual shipped native helper outcomes.',

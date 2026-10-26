@@ -11,6 +11,11 @@
 // last completed run, or the previous manual restart. With none, it keeps the
 // live placement and says where that anchors the job. Nothing here refuses:
 // this is the operator's own restart path.
+//
+// The line it restarts from counts the program prepared here, which is always
+// the project's own. A resumed recovery or a painted second pass ran a program
+// of its own whose line numbers are not these (rolling audit 2026-10-21,
+// 05-P2-1), so the confirmation says which program the line counts.
 
 import type { JobOriginPlacement } from '../../core/job';
 import { fingerprintGcode, fingerprintsEqual, type GcodeFingerprint } from '../../core/recovery';
@@ -22,7 +27,10 @@ import type { WorkCoordinateOffset } from '../state/origin-actions';
 import { savedWorkOffsetMm } from './laser-recovery-origin';
 import { prepareRecoverySource, type PreparedRecoverySource } from './start-job-source';
 
+type RunSource = 'interrupted' | 'completed' | 'manual-restart';
+
 type RunPlacement = {
+  readonly source: RunSource;
   readonly outputScope: OutputScope;
   readonly jobOrigin?: JobOriginPlacement;
   /** The program this placement produced, before any resume transform. */
@@ -37,7 +45,19 @@ export type ManualRestartSource = {
   readonly outputScope: OutputScope;
   /** Where the restart is anchored, in words, for its confirmation. */
   readonly placementNote: string;
+  /** Which program the restart line counts, in words, for its confirmation. */
+  readonly programNote: string;
 };
+
+/** What a run's archived bytes are when they are not the project's own
+ * program: a resumed recovery or a painted second pass (ADR-341). */
+export type DerivedLaserProgram = 'resume' | 'second-pass';
+
+export function derivedLaserProgram(artifact: RecoveryArtifactV1): DerivedLaserProgram | null {
+  if (artifact.kind !== 'exact-execution') return null;
+  if ((artifact.laserSecondPassChain?.length ?? 0) > 0) return 'second-pass';
+  return (artifact.laserResumeChain?.length ?? 0) > 0 ? 'resume' : null;
+}
 
 // Session-scoped: a manual restart supersedes the recovery record, so the
 // next manual restart of the same job must find its placement here.
@@ -58,13 +78,25 @@ export async function prepareManualRestartSource(
         source,
         outputScope: run.outputScope,
         placementNote: runPlacementNote(run.jobOrigin),
+        programNote: programNote(source, run.source, repository),
       };
     }
   }
   const outputScope = currentOutputScope(useStore.getState());
   const source = await prepareRecoverySource();
   if (source === null) return null;
-  return { source, outputScope, placementNote: livePlacementNote(source.jobOrigin) };
+  return {
+    source,
+    outputScope,
+    placementNote: livePlacementNote(source.jobOrigin),
+    programNote: programNote(source, null, repository),
+  };
+}
+
+/** The notes a manual restart's confirmation carries: the program its line
+ * counts, then where it is anchored. */
+export function manualRestartNotes(restart: ManualRestartSource): string {
+  return `${restart.programNote}\n\n${restart.placementNote}`;
 }
 
 /** Remembers the placement a manual restart ran with, for the next one. */
@@ -73,6 +105,7 @@ export function noteManualRestartStarted(
   atIso = new Date().toISOString(),
 ): void {
   lastManualRestart = {
+    source: 'manual-restart',
     outputScope: restart.outputScope,
     ...(restart.source.jobOrigin === undefined ? {} : { jobOrigin: restart.source.jobOrigin }),
     fingerprint: fingerprintGcode(restart.source.gcode),
@@ -90,30 +123,65 @@ function runPlacementsNewestFirst(repository: RecoveryRepository): ReadonlyArray
   const capsule = snapshot.recoveryCapsule;
   const receipt = snapshot.lastCompletedReceipt;
   const runs = [
-    capsule === null ? null : artifactPlacement(capsule.artifact, capsule.updatedAtIso),
-    receipt === null ? null : artifactPlacement(receipt.artifact, receipt.completedAtIso),
+    capsule === null
+      ? null
+      : artifactPlacement(capsule.artifact, capsule.updatedAtIso, 'interrupted'),
+    receipt === null
+      ? null
+      : artifactPlacement(receipt.artifact, receipt.completedAtIso, 'completed'),
     lastManualRestart,
   ].filter((run): run is RunPlacement => run !== null);
   return [...runs].sort((a, b) => b.atIso.localeCompare(a.atIso));
 }
 
-function artifactPlacement(artifact: RecoveryArtifactV1, atIso: string): RunPlacement | null {
+function artifactPlacement(
+  artifact: RecoveryArtifactV1,
+  atIso: string,
+  source: RunSource,
+): RunPlacement | null {
   if (artifact.machineKind !== 'laser') return null;
   // A resumed or painted run's bytes are not the project's own program.
-  if (
-    artifact.kind === 'exact-execution' &&
-    ((artifact.laserResumeChain?.length ?? 0) > 0 ||
-      (artifact.laserSecondPassChain?.length ?? 0) > 0)
-  ) {
-    return null;
-  }
+  if (derivedLaserProgram(artifact) !== null) return null;
   return {
+    source,
     outputScope: artifact.outputScope,
     ...(artifact.jobOrigin === undefined ? {} : { jobOrigin: artifact.jobOrigin }),
     fingerprint: artifact.fingerprint,
     atIso,
     savedOffsetMm: savedWorkOffsetMm(artifact),
   };
+}
+
+const RUN_PROGRAM: Readonly<Record<RunSource, string>> = {
+  interrupted: 'the program the interrupted job ran',
+  completed: 'the program the last completed job ran',
+  'manual-restart': 'the program the last manual restart replayed',
+};
+
+function programNote(
+  source: PreparedRecoverySource,
+  matched: RunSource | null,
+  repository: RecoveryRepository,
+): string {
+  const lines = source.canvasPlan.fingerprint.lines;
+  const program =
+    matched === null
+      ? `Line numbers count this project's full program as it compiles now (${lines} lines).`
+      : `Line numbers count this project's full program (${lines} lines), ${RUN_PROGRAM[matched]}.`;
+  const elsewhere = matched === 'interrupted' ? null : interruptedJobNumbering(repository);
+  return elsewhere === null ? program : `${program} ${elsewhere}`;
+}
+
+/** Why the saved interrupted job's own line numbers are not this program's. */
+function interruptedJobNumbering(repository: RecoveryRepository): string | null {
+  const capsule = repository.getSnapshot().recoveryCapsule;
+  if (capsule === null || capsule.artifact.machineKind !== 'laser') return null;
+  const derived = derivedLaserProgram(capsule.artifact);
+  if (derived === null) {
+    return "This project no longer reproduces the saved interrupted job's program, so that job's line numbers may point elsewhere here.";
+  }
+  const ran = derived === 'resume' ? 'a resume program' : 'a painted second pass';
+  return `The saved interrupted job ran ${ran}, so its line numbers do not count this program; the Interrupted job saved card's Review restarts it on that program.`;
 }
 
 function mm(value: number): string {

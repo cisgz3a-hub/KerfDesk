@@ -14,7 +14,7 @@ import {
 } from '../model/camera-model';
 import type { BedArea } from '../model/camera-model-accuracy';
 import type { CameraModelRecord } from '../model/camera-model-record';
-import { bedTargetLayout, type BedTargetMark } from './bed-target';
+import { bedTargetLayoutWithRings, type BedTargetMark } from './bed-target';
 import { missingOuterBand, type MissingOuterBand } from './missing-outer-band';
 
 // Picture samples across and down when measuring what the target covers.
@@ -27,9 +27,9 @@ const SAMPLES_DOWN = 18;
  * labelled with the wrong bed position; null when nothing suggests it.
  */
 export function targetLayoutMismatch(record: CameraModelRecord): MissingOuterBand | null {
-  const { targetArea, marks, targetHeightMm } = record.accuracy;
+  const { targetArea, marks, targetHeightMm, targetRingDiameterMm } = record.accuracy;
   if (targetArea === undefined || marks === undefined) return null;
-  const layout = bedTargetLayout({ area: targetArea });
+  const layout = bedTargetLayoutWithRings(targetArea, targetRingDiameterMm);
   return missingOuterBand(layout, marks, (mark) =>
     ringInPicture(record.lens, record.pose, mark, layout.ringDiameterMm, targetHeightMm),
   );

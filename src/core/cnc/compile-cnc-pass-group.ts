@@ -22,10 +22,10 @@ export function cncGroupForPasses(
   options: CncGroupCompileOptions = {},
 ): CncGroup | null {
   if (passes.length === 0) return null;
-  const cutFeed =
-    settings.cutType === 'drill'
-      ? Math.min(settings.feedMmPerMin, settings.plungeMmPerMin)
-      : settings.feedMmPerMin;
+  // A drill cycle is all vertical moves, which run at the plunge feed, so its
+  // group names that feed: the lower of the two named a feed never sent
+  // whenever plunge was faster (CNC audit v1 F4-P3-2).
+  const cutFeed = settings.cutType === 'drill' ? settings.plungeMmPerMin : settings.feedMmPerMin;
   return {
     kind: 'cnc',
     layerId: layer.id,

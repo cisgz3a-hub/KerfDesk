@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { findMachinePhase } from '../laser/device-setup/find-machine-phase';
 import { useLaserStore } from './laser-store';
@@ -153,6 +153,38 @@ describe('connection diagnostics', () => {
     expect(findMachineShows()).toBe('silent');
   });
 
+  // A Wi-Fi or Ethernet session has no baud rate or cable (controller audit D7-P3-2).
+  it('points a silent network controller at its target, not a baud rate', async () => {
+    // A network attempt keeps later Reconnects off USB; the next test connects over USB.
+    onTestFinished(() => useLaserStore.setState({ lastConnectionTransport: null }));
+    vi.useFakeTimers();
+    const usb = adapterFor(silentConnection());
+    const network: PlatformAdapter = {
+      ...usb,
+      serial: {
+        ...usb.serial,
+        transport: 'tcp',
+        requestPort: async () => ({
+          info: { transport: 'tcp' },
+          open: async () => silentConnection(),
+        }),
+      },
+    };
+    await useLaserStore.getState().connect(network, { controllerKind: 'grblhal' });
+
+    await vi.advanceTimersByTimeAsync(10_001);
+    const laser = useLaserStore.getState();
+    expect(laser.log).toContain(
+      '[lf2] No controller response within 10 s over the network connection. Check the target and that the device is grblHAL.',
+    );
+    expect(logMentionsBaud()).toBe(false);
+    expect(laser.controllerQualification).toMatchObject({
+      kind: 'failed',
+      message:
+        'No controller answer came back over the network connection. Check the target and its enabled network service, then retry.',
+    });
+  });
+
   it('qualifies a board whose banner comes after 2 s without blaming the baud rate', async () => {
     vi.useFakeTimers();
     const machine: { state: string | null } = { state: null };
@@ -241,7 +273,7 @@ describe('connection diagnostics', () => {
     expect(useLaserStore.getState().controllerQualification.kind).toBe('failed');
   });
 
-  // ADR-648: an Alarm answer proves communication, and GRBL reads `$$` there.
+  // ADR-672: an Alarm answer proves communication, and GRBL reads `$$` there.
   it('reads settings when the first answer after 2 s is an Alarm', async () => {
     vi.useFakeTimers();
     const machine: { state: string | null } = { state: null };

@@ -2,11 +2,12 @@
 // headed by a live one-line status. Editors stay draft-bound; no
 // live project state or hardware command changes when a field is edited.
 
-import { DEFAULT_ROTARY_SETUP, type DeviceProfile } from '../../../core/devices';
+import type { DeviceProfile } from '../../../core/devices';
 import { positioningLightSupported } from '../../../core/devices/positioning-light';
 import { scanOffsetMagnitudeLimitMm } from '../../../core/devices/scan-offset-profile';
 import { AutofocusEditor } from '../AutofocusEditor';
 import { ZRows } from '../DeviceProfileRows';
+import { NEW_ROTARY_SETUP } from '../rotary-setup-edit';
 import { SafetyZonesPanel } from '../MachineSetupSafetyZones';
 import { PlannerFields } from '../PlannerAdvanced';
 import { ScanOffsetEditor } from '../ScanOffsetEditor';
@@ -137,11 +138,12 @@ function LaserCalibrationSections(props: {
           value={draft.autofocusCommand}
           onChange={(autofocusCommand) => update({ autofocusCommand })}
           controllerCommandSet={draft.controllerCommandSet}
+          controllerKind={draft.controllerKind}
         />
       </OptionSection>
       <OptionSection title="Rotary attachment" status={rotaryStatus(draft)}>
         <DeviceSetupRotaryFields
-          value={draft.rotary ?? DEFAULT_ROTARY_SETUP}
+          value={draft.rotary ?? NEW_ROTARY_SETUP}
           onChange={(rotary) => update({ rotary })}
         />
       </OptionSection>
