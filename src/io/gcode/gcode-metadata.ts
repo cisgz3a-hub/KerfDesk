@@ -150,8 +150,10 @@ export type GcodeMetadata = {
 // ADR-415 Amd 1 marks image run-ins and run-outs as laser-off motion; ADR-239
 // Amd 1 says a contour entry was skipped when the bed position is unknown;
 // ADR-127 Amd 1 keeps a placed rotary job on its anchor.
+// ADR-672 closes CNC Outside/Inside outlines whose ends meet within 0.5 mm, so
+// they are offset as closed shapes; carries forward v30 above.
 // ADR-412 Amd 2 keeps every relief cut inside the relief's own footprint: the
-// stock past its map stands at the stock top.
+// stock past its map stands at the stock top; carries forward v31 above.
 export const EMITTER_REVISION = 'relief-footprint-edge-20261027-v32';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports

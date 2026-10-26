@@ -34,6 +34,8 @@ export function compileCncProjectedOperation(
   return {
     kind: 'compiled',
     openContourOmissions: cncOpenContourOmissions(layer, contours),
+    // Projection cuts Engrave and On path only, which cut every path on its line.
+    profileOpenPaths: [],
     stackedCopyMerges: cncStackedCopyMerges(layer, contours),
     layerId: layer.id,
     clearingGroups: isProfileCutType(settings.cutType) ? [] : groups,

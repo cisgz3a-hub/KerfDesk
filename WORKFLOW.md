@@ -5447,9 +5447,16 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 1. An operation with no bound geometry compiles to no passes and is skipped; no G-code group is
    emitted for it.
 
-#### Edge — open paths on a profile-outside layer
-1. Open polylines cannot be offset; they are cut on-path (documented
-   fallback), closed shapes on the same layer still offset normally.
+#### Edge — open paths on a profile-outside or profile-inside layer (ADR-672)
+1. Open paths of one artwork whose ends each meet exactly one other end within 0.5 mm, closing a
+   loop (a path that stops a hair short of its start, CAD LINEs whose corners miss), are joined
+   and cut as one closed shape, offset to the layer's side. Job Review says how many outlines were
+   closed.
+2. Any other open path cannot be offset, so it is cut on its line, and closed shapes on the same
+   layer still offset normally. A part it outlines comes out one cut width smaller (Outside), a
+   hole one cut width larger (Inside). The layer card notes it at design time, and Job Review warns
+   with the count and the cut width; close the outline with Tools > Join paths or choose On path.
+   The warning never blocks save or Start.
 
 #### Edge — a bit that narrows toward its tip sets pocket or profile offsets
 1. A ball nose, V-bit, engraving bit or tapered ball nose stores its widest cutting

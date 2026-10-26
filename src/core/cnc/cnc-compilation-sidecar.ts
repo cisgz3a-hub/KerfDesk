@@ -65,6 +65,7 @@ export function buildCncCompilationSidecar(
   offsetLadderDiagnostics: ReadonlyArray<CncOffsetLadderCompilationEvidence>,
   openContourOmissions: CncOpenContourOmissions,
   mergedStackedCopies: ReadonlyArray<CncStackedCopyMerge> = [],
+  profileEvidence: Pick<CncCompilationSidecar, 'profileOpenPaths' | 'keptPartCuts'> = {},
 ): CncCompilationSidecar {
   const exactOffsetDiagnostics = uniqueOffsetDiagnostics([
     ...offsetLadderDiagnostics,
@@ -90,6 +91,7 @@ export function buildCncCompilationSidecar(
     offsetLadderDiagnostics: exactOffsetDiagnostics,
     omittedOpenContours: openContourOmissions.counts,
     omittedOpenContourSources: openContourOmissions.sources,
+    ...profileEvidence,
     // No legacy fallback reads this, so an absent field simply means none.
     ...(mergedStackedCopies.length === 0 ? {} : { mergedStackedCopies }),
   };

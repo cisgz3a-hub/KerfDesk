@@ -49,9 +49,12 @@ export function profileLeadJobWalls(
       tool.diameterMm,
       source.contours,
     );
-    walls.push(
-      ...profileLeadKeptWalls(contours, settings.cutType, profileLeadCutWidthMm(tool, settings)),
+    const kept = profileLeadKeptWalls(
+      contours,
+      settings.cutType,
+      profileLeadCutWidthMm(tool, settings),
     );
+    walls.push(...kept.map((wall) => ({ ...wall, layerId: layer.id })));
   }
   return { walls, geometry };
 }
