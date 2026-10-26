@@ -1,3 +1,4 @@
+import { deviceForActiveHead } from '../../core/cnc/cnc-head-feeds';
 import {
   countOutputVectorSegments,
   estimateJobDuration,
@@ -163,10 +164,12 @@ export function estimateLiveJobFromPrepared(
   const initialPosition = options.initialPosition ?? jobStart;
   // ADR-127: measure the machine-space job. Identity when no rotary is active,
   // so flat jobs are unchanged. Kept in step with buildPreparedJobMetrics so
-  // the live tile and Job Review cannot report different durations.
+  // the live tile and Job Review cannot report different durations. ADR-416
+  // Decision 4: a CNC job is timed at CNC's own Max feed, as the Start
+  // countdown times it, never at the laser's.
   const result = estimateJobDuration(
     machineSpaceJob(prepared.job, prepared.project.device, prepared.project.machine),
-    prepared.project.device,
+    deviceForActiveHead(prepared.project.device, prepared.project.machine),
     {
       ...(initialPosition === undefined ? {} : { initialPosition }),
       ...(finishPosition === undefined ? {} : { finishPosition }),

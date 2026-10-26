@@ -1,3 +1,4 @@
+import { deviceForActiveHead } from '../../core/cnc/cnc-head-feeds';
 import {
   estimateJobDuration,
   machineSpaceJob,
@@ -55,9 +56,11 @@ export function buildPreparedJobMetrics(
   // the rotary scale (~1.91x on the shipped chuck defaults, i.e. the Time tile
   // showed roughly half the real duration). machineSpaceJob is the identity
   // when no rotary is active, so flat jobs are unchanged.
+  // ADR-416 Decision 4: a CNC job is timed at CNC's own Max feed, as the Start
+  // countdown times it, never at the laser's. Bounds and park read no feed.
   const duration: JobDurationEstimate =
     timingOptions.unavailableReason === undefined
-      ? estimateJobDuration(framedJob, device, {
+      ? estimateJobDuration(framedJob, deviceForActiveHead(device, prepared.project.machine), {
           ...(initialPosition === undefined ? {} : { initialPosition }),
           ...(finishPosition === undefined ? {} : { finishPosition }),
           ...timingOptions,

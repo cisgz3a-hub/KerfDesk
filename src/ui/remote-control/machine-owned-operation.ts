@@ -1,4 +1,5 @@
 import { useLaserStore } from '../state/laser-store';
+import { cancelAttemptOwnsStatusBoundary } from '../state/laser-motion-operation';
 import { useJobReviewStore } from '../laser/job-review/job-review-store';
 import { operationIsTerminal, type OwnedMachineOperation } from './machine-operation-state';
 import type { MachineAuthority, MachineCommand, MachineOperationKind } from './machine-types';
@@ -56,18 +57,43 @@ export function cancelMachineOperation(operation: OwnedMachineOperation, stopMot
   if (
     !stopMotion ||
     operation.motionId === undefined ||
+    operation.cancelledMotionId === operation.motionId ||
     state.controllerSessionEpoch !== operation.controllerEpoch ||
     motion?.operationId !== operation.motionId
   )
     return;
   // Close further legs before asynchronous ordinary Cancel. Never stop another owner.
   useLaserStore.setState({ motionOperation: { ...motion, cancelRequested: true } });
-  // Synchronous subscribers may replace the connection or motion during publication.
-  const current = useLaserStore.getState();
-  if (!ownsCurrentMotion(current, operation)) return;
-  void current.cancelJog().catch(() => {
+  // Synchronous subscribers may replace the connection or motion during publication;
+  // cancelOwnedMotionOnce reads the store again.
+  cancelOwnedMotionOnce(
+    operation,
+    'Motion cancellation could not be confirmed. Check the machine on the PC.',
+  );
+}
+/**
+ * ADR-585 Amendment 1: one native Cancel per owned motion, whichever stop path asks first. A
+ * second Cancel replaced the first, and that rejection read as an unconfirmed stop. A rejection
+ * counts only when no other Cancel now settles the same motion, as for the desktop's own Cancel.
+ */
+export function cancelOwnedMotionOnce(operation: OwnedMachineOperation, failure: string): void {
+  const state = useLaserStore.getState();
+  if (
+    operation.motionId === undefined ||
+    operation.cancelledMotionId === operation.motionId ||
+    !ownsCurrentMotion(state, operation)
+  )
+    return;
+  operation.cancelledMotionId = operation.motionId;
+  void state.cancelJog().catch(() => {
+    const current = useLaserStore.getState();
+    if (
+      ownsCurrentMotion(current, operation) &&
+      cancelAttemptOwnsStatusBoundary(current.motionOperation)
+    )
+      return;
     operation.state = 'unknown';
-    operation.message = 'Motion cancellation could not be confirmed. Check the machine on the PC.';
+    operation.message = failure;
   });
 }
 function ownsCurrentMotion(
