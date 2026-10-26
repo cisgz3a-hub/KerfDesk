@@ -41,9 +41,9 @@ export type CncToolReachInput = {
 
 /** Advisory analysis only: unknown/short reach never changes Start or output policy. */
 export function analyzeCncToolReach(input: CncToolReachInput): CncToolReachAnalysis {
-  const findings = assemblyFindings(input.tool, input.depthMm);
-  const envelopes = toolEnvelopes(input.tool);
   const fixtures = input.fixtures.filter(validFixture);
+  const findings = assemblyFindings(input.tool, input.depthMm, fixtures.length > 0);
+  const envelopes = toolEnvelopes(input, fixtures);
   if (fixtures.length !== input.fixtures.length)
     findings.push(
       finding(
@@ -69,21 +69,39 @@ export function analyzeCncToolReach(input: CncToolReachInput): CncToolReachAnaly
   };
 }
 
-function assemblyFindings(tool: CncTool, depthMm: number): CncToolReachFinding[] {
-  const missing = missingAssemblyFields(tool);
+function assemblyFindings(
+  tool: CncTool,
+  depthMm: number,
+  checksFixtures: boolean,
+): CncToolReachFinding[] {
+  const unknown = unknownGeometryMessage(tool, checksFixtures);
   return [
-    ...(missing.length === 0
-      ? []
-      : [
-          finding(
-            tool,
-            'unknown-geometry',
-            `Unknown ${missing.join(', ')}; assembly clearance is incomplete.`,
-          ),
-        ]),
+    ...(unknown === null ? [] : [finding(tool, 'unknown-geometry', unknown)]),
     ...reachDepthFindings(tool, depthMm),
     ...assemblyContradictions(tool),
   ];
+}
+/** Names what is unknown and, with fixtures, which parts were and were not
+ * checked against them (ADR-572 Amendment 1). */
+function unknownGeometryMessage(tool: CncTool, checksFixtures: boolean): string | null {
+  const missing = missingAssemblyFields(tool);
+  if (missing.length === 0) return null;
+  const parts = [`Unknown ${missing.join(', ')}.`];
+  if (checksFixtures) {
+    if (!positive(tool.fluteLengthMm) && positive(tool.diameterMm))
+      parts.push(
+        `Fixtures were checked against the cutter's ${tool.diameterMm} mm width only, as a column from its tip up past every fixture top.`,
+      );
+    const shankNeeds = missing.filter((field) => field !== 'holder envelope');
+    const unchecked = [
+      shankNeeds.length > 0 ? `the shank (needs ${shankNeeds.join(', ')})` : '',
+      missing.includes('holder envelope') ? 'the holder (needs a holder envelope)' : '',
+    ].filter(Boolean);
+    if (unchecked.length > 0)
+      parts.push(`Not checked against fixtures: ${unchecked.join(' and ')}.`);
+  }
+  parts.push('Assembly clearance is incomplete.');
+  return parts.join(' ');
 }
 function missingAssemblyFields(tool: CncTool): ReadonlyArray<string> {
   return [
@@ -150,15 +168,19 @@ function assemblyContradictions(tool: CncTool): CncToolReachFinding[] {
     );
   return out;
 }
-function toolEnvelopes(tool: CncTool): ReadonlyArray<CncReachEnvelope> {
+function toolEnvelopes(
+  input: CncToolReachInput,
+  fixtures: ReadonlyArray<CncReachFixture>,
+): ReadonlyArray<CncReachEnvelope> {
+  const tool = input.tool;
   const out: CncReachEnvelope[] = [];
   const length = tool.fluteLengthMm;
-  if (positive(length) && positive(tool.diameterMm))
+  if (positive(tool.diameterMm))
     out.push({
       component: 'cutter',
       name: 'Cutter',
       startMm: 0,
-      lengthMm: length,
+      lengthMm: positive(length) ? length : cutterColumnLengthMm(input, fixtures),
       diameterMm: tool.diameterMm,
     });
   if (
@@ -177,6 +199,25 @@ function toolEnvelopes(tool: CncTool): ReadonlyArray<CncReachEnvelope> {
   for (const segment of tool.holderSegments ?? [])
     if (validHolder(segment)) out.push({ ...segment, component: 'holder' });
   return out;
+}
+/**
+ * With no flute length the cutter's own width is still known, so it is a
+ * column from the tip up past every fixture top: a fixture the tip passes
+ * through or under is contact. A shank at least as wide as the cutter fills
+ * that column for real; a wider shank or holder stays unchecked and is
+ * disclosed (ADR-572 Amendment 1).
+ */
+function cutterColumnLengthMm(
+  input: CncToolReachInput,
+  fixtures: ReadonlyArray<CncReachFixture>,
+): number {
+  let lowestTipZ = Number.isFinite(input.depthMm) ? -Math.max(0, input.depthMm) : 0;
+  for (const path of input.paths)
+    for (const point of path)
+      if (Number.isFinite(point.z)) lowestTipZ = Math.min(lowestTipZ, point.z);
+  let highestTopZ = lowestTipZ;
+  for (const fixture of fixtures) highestTopZ = Math.max(highestTopZ, fixture.topZMm);
+  return highestTopZ - lowestTipZ;
 }
 
 function evaluatePaths(
