@@ -53,7 +53,8 @@ M2 re-checked it on main on 2026-10-23.
 - Goldens that pinned runway bytes were re-pinned only after checking that removing every
   ` ; kerfdesk:laser-off-motion` from the new output gives the old bytes exactly: the ADR-373
   roller digests (`emit-gcode-rotary-roller.test.ts`), the shipped-pipeline and per-layer snapshots
-  (`emit-gcode.snapshot`, `emit-gcode-layer-settings.snapshot`), the Marlin image pin
+  (`emit-gcode.snapshot`, `emit-gcode-layer-settings.snapshot`), the rotary raster Save snapshot
+  (`ui/laser/save-output-emission.test.ts`), the Marlin image pin
   (`marlin-raster-lit-end.test.ts`), the OR-1 M3 hand-off (`grbl-strategy-m3-lit-drain.test.ts`)
   and the raster row layouts (`emit-raster`, `emit-raster-compaction`, `emit-raster-scan-offset`).
   On the roller fixture (a 10 × 10 mm all-black image at default overscan, so each row is one
