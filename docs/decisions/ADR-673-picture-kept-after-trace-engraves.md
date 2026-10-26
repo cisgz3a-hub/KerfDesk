@@ -1,6 +1,6 @@
-## ADR-672 - A picture kept after Trace engraves like any image; a kept camera capture does not (2026-10-26)
+## ADR-673 - A picture kept after Trace engraves like any image; a kept camera capture does not (2026-10-26)
 
-**Status:** Accepted. | **Date:** 2026-10-26 (written 2026-10-20 as ADR-648; renumbered, that number went to owned-reset settings)
+**Status:** Accepted. | **Date:** 2026-10-26 (written 2026-10-20 as ADR-648; renumbered twice: ADR-648 went to owned-reset settings and ADR-672 to CNC side profiles)
 
 Amends ADR-026 (the tint and its "deletable backing"), ADR-235 decision 2 for a kept source and
 decision 4 ("excluded trace-source backing"), ADR-408 decision 4 (the fresh-trace default of

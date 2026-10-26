@@ -145,7 +145,7 @@ it('adopts an unfinished matching preview without a second decode or worker requ
   expect(previewWorker.terminate).not.toHaveBeenCalled();
   await finishPreview();
   expect(useUiStore.getState().imageDialog).toBeNull();
-  // Delete Image After trace is off by default (ADR-672): the source stays.
+  // Delete Image After trace is off by default (ADR-673): the source stays.
   expect(useStore.getState().project.scene.objects.map((object) => object.kind)).toEqual([
     'raster-image',
     'traced-image',

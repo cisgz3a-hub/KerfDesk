@@ -77,7 +77,7 @@ function projectWithSource(device?: DeviceProfile): Project {
 }
 
 // Delete Image After trace, the dialog's default. A kept photo would engrave as
-// well (ADR-672); these tests pin the trace's own production output.
+// well (ADR-673); these tests pin the trace's own production output.
 function committedTraceProject(device?: DeviceProfile): Project {
   return applyRasterizedTraceToExisting(
     { project: projectWithSource(device), undoStack: [] },

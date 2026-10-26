@@ -180,7 +180,7 @@ test('photo Raster scan keeps partial tones through the conversion worker and PN
   const dialog = page.getByRole('dialog', { name: 'Trace image' });
   await dialog.getByRole('combobox', { name: 'Trace preset' }).selectOption('Photo shading');
   await dialog.getByRole('combobox', { name: 'Trace output' }).selectOption('raster');
-  // This test inspects the trace output alone; the photo is kept by default (ADR-672).
+  // This test inspects the trace output alone; the photo is kept by default (ADR-673).
   await dialog.getByRole('checkbox', { name: 'Delete Image After trace' }).check();
   await expect(dialog.getByText(/Trace ready/)).toBeVisible({ timeout: 30_000 });
   const artwork = await dialog.locator('.lf-trace-preview__artwork').boundingBox();

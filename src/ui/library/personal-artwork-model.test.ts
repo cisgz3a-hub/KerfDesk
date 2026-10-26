@@ -282,7 +282,7 @@ it('retains output ordering and reuses already embedded font bytes on repeated i
   expect(new Set(twice.scene.objects.map((object) => object.id)).size).toBe(6);
 });
 
-// ADR-672: a trace's kept picture engraves, so it is artwork of its own, not a
+// ADR-673: a trace's kept picture engraves, so it is artwork of its own, not a
 // dependency. Saving only the trace saves only the trace, as copying LightBurn's
 // traced vectors leaves the image alone; this used to carry the bitmap along.
 it('saves only the trace when only the trace is selected', async () => {

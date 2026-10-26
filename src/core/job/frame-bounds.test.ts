@@ -125,7 +125,7 @@ describe('computeFrameBounds', () => {
     );
   });
 
-  // ADR-672: a photo kept when tracing is output, so it is framed. This used to
+  // ADR-673: a photo kept when tracing is output, so it is framed. This used to
   // pin the opposite, when the kept photo was skipped.
   it('frames a photo kept behind its trace just like compileJob', () => {
     const scene = {

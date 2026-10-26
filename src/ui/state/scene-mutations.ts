@@ -259,7 +259,7 @@ export function applyFreshImport(
 // (positionTraceOverRasterSource) so the vectors land pixel-for-pixel over the
 // features they came from. Delete Image After trace removes the bitmap; a
 // bitmap the operator keeps is left exactly as it was, an ordinary image that
-// engraves on its own operation as in LightBurn (ADR-672). The trace is
+// engraves on its own operation as in LightBurn (ADR-673). The trace is
 // appended last (drawn on top) and becomes the selection; a single pushUndo
 // covers the change.
 //

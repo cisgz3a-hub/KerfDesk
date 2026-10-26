@@ -1,4 +1,4 @@
-// ADR-672: a camera capture kept after Trace from Camera is a picture of the
+// ADR-673: a camera capture kept after Trace from Camera is a picture of the
 // bed, a placement reference like the LightBurn camera overlay. It stays in
 // the scene but never engraves, while the trace made from it does.
 
@@ -78,7 +78,7 @@ function captureOperationsOutput(project: Project): ReadonlyArray<boolean> {
   return project.scene.layers.filter((layer) => ids.includes(layer.id)).map((l) => l.output);
 }
 
-describe('a camera capture kept after Trace (ADR-672)', () => {
+describe('a camera capture kept after Trace (ADR-673)', () => {
   it('stays on an Image operation with Output off while the vector trace is output', () => {
     const result = applyCameraTraceImport(
       { project: createProject(), undoStack: [] },

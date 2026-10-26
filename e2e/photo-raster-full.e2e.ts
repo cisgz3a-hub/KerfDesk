@@ -45,7 +45,7 @@ for (const detail of [60, 100]) {
     await detailControl.fill(String(detail));
     await detailControl.blur();
     await dialog.getByRole('combobox', { name: 'Trace output' }).selectOption('raster');
-    // This test inspects the trace output alone; the photo is kept by default (ADR-672).
+    // This test inspects the trace output alone; the photo is kept by default (ADR-673).
     await dialog.getByRole('checkbox', { name: 'Delete Image After trace' }).check();
     await expect(dialog.getByText(/Trace ready/)).toBeVisible({ timeout: 60_000 });
     await dialog.getByRole('button', { name: 'Trace', exact: true }).click();

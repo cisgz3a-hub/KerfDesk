@@ -389,7 +389,7 @@ describe('compileJob raster image groups', () => {
     expect(bounds?.maxY).toBeCloseTo(dev.bedHeight);
   });
 
-  // ADR-672 replaced the exclusion this test used to pin: a photo kept when
+  // ADR-673 replaced the exclusion this test used to pin: a photo kept when
   // tracing engraves on its Image operation, as in LightBurn, and the trace
   // then runs on its own operation.
   it('raster-engraves a photo kept behind its trace, then runs the trace', () => {

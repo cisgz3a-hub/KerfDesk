@@ -215,7 +215,7 @@ describe('Trace commit dialog and document lifetime', () => {
       await act(async () => {
         next.resolve(result);
       });
-      // Delete Image After trace is off by default (ADR-672): the source stays.
+      // Delete Image After trace is off by default (ADR-673): the source stays.
       expect(useStore.getState().project.scene.objects.map((object) => object.kind)).toEqual([
         'raster-image',
         'traced-image',

@@ -210,7 +210,7 @@ describe('hoverOutputSettings', () => {
     });
   });
 
-  // ADR-672: a photo kept behind its trace engraves, so its hover shows the
+  // ADR-673: a photo kept behind its trace engraves, so its hover shows the
   // power and speed it burns at. This used to read "Trace source, not output".
   it("shows the power and speed of a trace's kept photo, which engraves", () => {
     const source: SceneObject = {

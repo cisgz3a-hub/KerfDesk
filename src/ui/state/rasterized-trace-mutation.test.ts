@@ -83,7 +83,7 @@ function committedRaster(project: Project, id = 'raster-trace'): RasterImage {
 }
 
 describe('applyRasterizedTraceToExisting', () => {
-  // ADR-672: the kept photo is an ordinary image that engraves on its own
+  // ADR-673: the kept photo is an ordinary image that engraves on its own
   // operation, and the result burns on a copy of it, so either can be turned
   // off alone. This used to pin the photo as render-only on a shared operation.
   it('keeps the source as an ordinary image and gives the result a copy of its operation', () => {

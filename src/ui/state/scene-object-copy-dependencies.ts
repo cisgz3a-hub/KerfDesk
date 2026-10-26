@@ -54,7 +54,7 @@ function withoutSvgImport(object: SceneObject): SceneObject {
 
 // A trace's kept picture (traceSourceId) is not a dependency: it is artwork of
 // its own that engraves, so copying a trace copies only the trace, as copying
-// LightBurn's traced vectors leaves the image alone (ADR-672). The copy keeps
+// LightBurn's traced vectors leaves the image alone (ADR-673). The copy keeps
 // its Re-trace link to that picture, which is remapped only when the picture
 // is copied too.
 export function sceneObjectCopyDependencyIds(object: SceneObject): readonly string[] {

@@ -61,7 +61,7 @@ describe('camera capture enters Trace as an atomic registered import', () => {
             }),
       );
       // A kept capture is a bed picture: it stays, on an output-off Image
-      // operation of its own, and never engraves (ADR-672).
+      // operation of its own, and never engraves (ADR-673).
       if (kept !== undefined) {
         const keptOperations = operationIdsForObject(kept, committed.scene.layers);
         expect(
@@ -143,7 +143,7 @@ describe('camera capture enters Trace as an atomic registered import', () => {
       expect(buildBitmapFromVectors).not.toHaveBeenCalled();
       await submit();
       // The later dialog keeps its capture: Delete Image After trace is off by
-      // default (ADR-672), so capture and trace join the two existing objects.
+      // default (ADR-673), so capture and trace join the two existing objects.
       expect(useStore.getState().project.scene.objects).toHaveLength(4);
     },
   );

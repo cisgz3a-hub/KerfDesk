@@ -1258,7 +1258,7 @@ overlap.
 5. The retained source is **output-eligible** (appears in G-code) until the
    user deletes it or toggles its image layer's output off — matching
    LightBurn, where the retained image is a real object on its own layer.
-   *(ADR-672, 2026-10-20: restored after a later `trace-source` exclusion
+   *(ADR-673, 2026-10-20: restored after a later `trace-source` exclusion
    broke it; the tint is removed and a kept camera capture stays output-off.)*
 
 **Consequences.**
@@ -11152,7 +11152,7 @@ so a large source traced on the smaller grid could be committed at the wrong phy
    pixels. Boundary selections are remapped from the retained burn grid to the capped trace grid.
    The live source and complete Image-operation set are revalidated after conversion.
 4. Commit is atomic and records one undo entry. The original image is either retained as the
-   excluded `trace-source` backing (superseded by ADR-672: it is retained as an ordinary image
+   excluded `trace-source` backing (superseded by ADR-673: it is retained as an ordinary image
    that engraves, and the result then burns on copies of its operations) or removed by the
    existing delete toggle; re-trace replaces the
    prior result in place so stacking, artwork order, and group references remain stable. Raster

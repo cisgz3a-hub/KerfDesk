@@ -33,7 +33,7 @@ test('inspects a trace without restarting the worker, edits with sliders, and co
 }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   const dialog = await openTrace(page, kerfdesk);
-  // Off by default, as in LightBurn (ADR-672): the image is kept and engraves.
+  // Off by default, as in LightBurn (ADR-673): the image is kept and engraves.
   await expect(
     dialog.getByRole('checkbox', { name: 'Delete Image After trace' }),
   ).not.toBeChecked();

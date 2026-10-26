@@ -60,7 +60,7 @@ function closeOver(scene: Scene, members: Set<string>): void {
   }
 }
 
-// A trace's kept picture is no copy dependency (ADR-672), but Re-trace Original
+// A trace's kept picture is no copy dependency (ADR-673), but Re-trace Original
 // reads and can delete it, so it still belongs to the trace's jig.
 function traceSourceLink(object: SceneObject): readonly string[] {
   return 'traceSourceId' in object && object.traceSourceId !== undefined

@@ -34,7 +34,7 @@ import { repairRemovedProjectObjectReferences } from './repair-object-dependenci
  * so speed, power, dither, density, passes, and scan direction do not silently
  * change. A deleted source hands its operations to the result (they survive
  * because the result is added before orphan pruning). A kept source is an
- * ordinary image that engraves on its own operations (ADR-672), so the result
+ * ordinary image that engraves on its own operations (ADR-673), so the result
  * gets copies of them instead: either can then be turned off on its own, like
  * a LightBurn image and its trace on separate layers. Re-trace in place keeps
  * the result's own operations.

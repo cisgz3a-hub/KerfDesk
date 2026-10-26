@@ -1,4 +1,4 @@
-// ADR-672: builds before it saved a picture kept behind a trace with
+// ADR-673: builds before it saved a picture kept behind a trace with
 // `role: 'trace-source'` and left it out of every job. Such a project still
 // opens and the marker is dropped: a kept photo engraves on its Image operation
 // like any other image, a kept camera capture stays out of the job on an
@@ -92,7 +92,7 @@ function load(text: string): Project {
   return result.project;
 }
 
-describe('a project saved with the legacy trace-source marker (ADR-672)', () => {
+describe('a project saved with the legacy trace-source marker (ADR-673)', () => {
   it('opens with the kept photo as an ordinary image that engraves before the trace', () => {
     const loaded = load(legacyDocument());
     const [loadedPhoto, loadedTrace] = loaded.scene.objects;

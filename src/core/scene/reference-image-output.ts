@@ -1,4 +1,4 @@
-// ADR-672: a camera capture kept after Trace is a picture of the bed, a
+// ADR-673: a camera capture kept after Trace is a picture of the bed, a
 // placement reference like the LightBurn camera overlay, never artwork to burn.
 // It stays an ordinary scene object, but the Image operations it burns with are
 // left with Output off, so it shows without engraving until the operator turns

@@ -30,7 +30,7 @@ export type RasterTraceInputs = {
  * the actual source references lets the caller detect any transform, content,
  * binding, parent-operation, or sub-operation edit made while the asynchronous
  * bitmap worker is running. A source whose Image operations all have Output
- * off, such as a camera capture kept after Trace (ADR-672), sizes the bitmap
+ * off, such as a camera capture kept after Trace (ADR-673), sizes the bitmap
  * from those operations instead. */
 export function rasterTraceInputs(project: Project, sourceId: string): RasterTraceInputs | null {
   const source = project.scene.objects.find((object) => object.id === sourceId);

@@ -1,7 +1,7 @@
 import type { Project, Scene, SceneObject } from '../../core/scene';
 import { CAMERA_CAPTURE_SOURCE, withImageOutputOff } from '../../core/scene/reference-image-output';
 
-// ADR-672: earlier builds tagged a picture kept behind its trace
+// ADR-673: earlier builds tagged a picture kept behind its trace
 // `role: 'trace-source'` and left it out of every job. The marker is dropped on
 // load, so the next save writes the project without it:
 // - a kept photo becomes an ordinary image that engraves on its operation, as

@@ -427,7 +427,7 @@ describe('applyTraceToExisting (ADR-026)', () => {
     expect(result.undoStack[0]).toBe(project);
   });
 
-  // ADR-672: a kept source is an ordinary image that engraves, as in LightBurn.
+  // ADR-673: a kept source is an ordinary image that engraves, as in LightBurn.
   // This used to pin a 'trace-source' tag that left it out of every job.
   it('leaves a kept source raster exactly as it was, on its own operation', () => {
     const project = projectWithSource();

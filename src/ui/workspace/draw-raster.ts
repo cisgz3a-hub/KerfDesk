@@ -150,7 +150,7 @@ export function drawRasterImage(
 // An adjusted image draws the grey tone that burns (ADR-359); an unadjusted
 // one, its source, from a copy decoded off the main thread once it lands
 // (ADR-359 Amendment 1). A photo kept behind a trace draws like any other
-// image: it engraves like one (ADR-672).
+// image: it engraves like one (ADR-673).
 function rasterPaint(
   displayDataUrl: string,
   img: HTMLImageElement,

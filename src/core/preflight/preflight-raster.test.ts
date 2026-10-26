@@ -212,7 +212,7 @@ describe('runPreflight — F4: layer-mode-mismatch (silent compile drop)', () =>
     expect(result.issues.some((i) => i.message.includes('5 mm'))).toBe(true);
   });
 
-  // A photo kept behind its trace engraves on its Image operation (ADR-672),
+  // A photo kept behind its trace engraves on its Image operation (ADR-673),
   // so it is checked like any image: on Image it is no mode mismatch.
   it('does not report a mode mismatch for a rotated photo kept behind its trace', () => {
     const imageLayer = createLayer({ id: 'L-gray', color: '#808080', mode: 'image' });

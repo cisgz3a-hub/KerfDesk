@@ -1,4 +1,4 @@
-// ADR-672: a photo kept when tracing (Delete Image After trace unticked) is an
+// ADR-673: a photo kept when tracing (Delete Image After trace unticked) is an
 // ordinary image that engraves on its Image operation, as in LightBurn, where
 // the customer workflow is engrave the photo, then cut an Offset Shapes outline
 // of its trace. These tests drive the real store actions end to end.
@@ -119,7 +119,7 @@ function offsetOutlineAsCut(): Project {
 beforeEach(resetStore);
 afterEach(resetStore);
 
-describe('a photo kept when tracing (ADR-672)', () => {
+describe('a photo kept when tracing (ADR-673)', () => {
   it('engraves the photo, then cuts the Offset Shapes outline of its trace', () => {
     useStore.getState().importRasterImage(photo());
     expect(groupKinds(useStore.getState().project)).toEqual(['raster']);
