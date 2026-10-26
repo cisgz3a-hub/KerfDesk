@@ -51,6 +51,9 @@ export type GrblSimState = {
   readonly overrides: GrblSimOverrides;
   /** A door input held open: the door state reports Door:1 and refuses cycle start. */
   readonly doorAjar?: boolean;
+  /** The probe input closed (plate touching the bit): reports carry Pn:P and a
+   *  G38.2 fails with ALARM:4, as GRBL checks the input before it moves. */
+  readonly probeClosed?: boolean;
   /** Stock GRBL left in its homing state by a refused `$H` suffix: no cycle
    *  runs, yet it reports Home and reads lines until a reset (grbl-sim-lines.ts). */
   readonly homingStuck?: boolean;
@@ -68,6 +71,7 @@ export type GrblSimEvent =
   | { readonly kind: 'rx-line'; readonly line: string }
   | { readonly kind: 'alarm'; readonly code: number }
   | { readonly kind: 'door-input'; readonly open: boolean }
+  | { readonly kind: 'probe-input'; readonly closed: boolean }
   | GrblSimTimedEvent;
 
 export type GrblSimEffect =

@@ -6516,20 +6516,29 @@ and lifts the command's CNC-only gate.)*
 1. Router controls → "Probe (touch plate)": pick Z-only (stock top) or
    XYZ corner (plus which corner). Plate thickness, max travel, and (for
    XYZ) bit diameter are editable; bit diameter prefills from the
-   machine's active bit. Run is enabled only when connected and Idle.
-2. Z cycle: fast G38.2 seek down, 2 mm back-off, slow re-touch, then
+   machine's active bit. Run is enabled only when connected, Idle and
+   the probe circuit is tested.
+2. Test touch (ADR-103 Amendment 2): a live **Probe circuit** line reads
+   "not tested". The operator holds the plate against the bit (or clip)
+   until it reads "closed" (a status report with `Pn:P`; an idle machine is
+   polled about once a second), then takes the plate away until it reads
+   "tested". Touches made in Alarm count. Each touch-off uses the touch up, so a
+   retry asks for a new one, and so do a streamed job and a new controller
+   session. Touches during a tool-change hold count. The cycle's own
+   contacts never count.
+3. Z cycle: fast G38.2 seek down, 2 mm back-off, slow re-touch, then
    `G10 L20 P0 Z<thickness>` — work Z0 lands on the STOCK TOP (plate
    underside) — and a retract. Every line owns the controller response
    arbiter exclusively; after the retract, the active driver's planner
    fence plus two fresh Idle reports complete before the toast confirms
    "work zero is set and motion is settled".
-3. XYZ corner cycle: Z first over the plate center, then each side face
+4. XYZ corner cycle: Z first over the plate center, then each side face
    (two-stage, flank contact below the plate top). The cycle keeps all
    positioning relative and leaves the previous WCS untouched until all
    six contacts succeed. One acknowledged `G10 L20 P0 X... Y... Z...`
    then commits the complete corner frame before the bit parks just
    outside it. Corner choice mirrors all directions and signs.
-4. When current Work-Z evidence is missing, a connected, Idle controller
+5. When current Work-Z evidence is missing, a connected, Idle controller
    that supports owned modal/WCS reads exposes **Advanced: Reuse existing
    controller setup** → **Use existing controller Z zero**. After explicit
    stock-top/tool confirmation, it reads `$G` → `$#` → `$G` and records the
@@ -6538,16 +6547,25 @@ and lifts the command's CNC-only gate.)*
    verified status.
 
 #### Error — probe never fires / fires early
-1. ALARM:5 (no contact within travel): named toast — check the clip
+1. No test touch yet: Run stays disabled, and the store refuses the
+   cycle with "Test the probe first" before any `G38.2` is written. On
+   grblHAL, if the `$$` shows `$10` without bit 4 (pin state), no report
+   can carry `Pn:`, and the reason names the `$10` to send. KerfDesk
+   never writes it. A stock GRBL build compiled without pin-state reporting
+   cannot touch off; Zero Z here still works.
+2. Probe input already closed: refused before GRBL would raise ALARM:4,
+   naming a shorted lead and the probe-input invert (`$6` on GRBL and
+   grblHAL).
+3. ALARM:5 (no contact within travel): named toast — check the clip
    lead, start closer, `$X` to unlock, retry.
-2. ALARM:4 (already triggered): named toast — check for a short /
+4. ALARM:4 (already triggered): named toast — check for a short /
    already-touching bit, `$X`, retry.
-3. Any error:N stops the sequence immediately; nothing further is sent.
+5. Any error:N stops the sequence immediately; nothing further is sent.
    In XYZ mode, an error before the combined G10 leaves the previous WCS
    unchanged. A timeout or disconnect while that one commit is awaiting
    acknowledgement makes the coordinate state unknown, so setup evidence
    remains invalid until the operator re-establishes the work frame.
-4. No `ok` within 45 s, or failure to settle at fresh Idle: timeout toast
+6. No `ok` within 45 s, or failure to settle at fresh Idle: timeout toast
    names the pending boundary, invalidates work-Z/status evidence, and
    warns that motion state is unknown (physical stop if unsafe).
 

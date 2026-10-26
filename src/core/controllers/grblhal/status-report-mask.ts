@@ -15,6 +15,7 @@ import type { ControllerCapabilities } from '../controller-capabilities';
 import type { ControllerSettingsSnapshot } from '../grbl/parse-settings';
 
 const MACHINE_POSITION_BIT = 1 << 0;
+const PIN_STATE_BIT = 1 << 4;
 const WORK_OFFSET_BIT = 1 << 5;
 const OVERRIDES_BIT = 1 << 6;
 
@@ -52,4 +53,22 @@ export function statusReportFieldsOff(
     machinePositionUnknown: workOffsetOff && (mask & MACHINE_POSITION_BIT) === 0,
     suggestedMask: mask | WORK_OFFSET_BIT | OVERRIDES_BIT,
   };
+}
+
+/** `$10` as reported, and the same with the pin-state bit set. */
+export type PinStateReportOff = { readonly mask: number; readonly suggestedMask: number };
+
+/** Whether this grblHAL's `$10` leaves Pn: out of every report (bit 4 clear),
+ * so a closed probe input can never show; null when it does not, the
+ * controller is not grblHAL, or the `$$` did not show `$10` whole. Pn: is
+ * printed only under `settings.status_report.pin_state`:
+ * https://github.com/grblHAL/core/blob/4ec1ae44b857a70d2f9298344feac4b43ed0eb6b/report.c#L1409-L1436 */
+export function pinStateReportOff(
+  capabilities: Pick<ControllerCapabilities, 'statusReportMask'>,
+  settings: Pick<ControllerSettingsSnapshot, 'statusReportMask' | 'statusReportMaskIsFull'> | null,
+): PinStateReportOff | null {
+  if (capabilities.statusReportMask !== 'grblhal-fields') return null;
+  const mask = settings?.statusReportMask;
+  if (settings?.statusReportMaskIsFull !== true || mask === undefined) return null;
+  return (mask & PIN_STATE_BIT) === 0 ? { mask, suggestedMask: mask | PIN_STATE_BIT } : null;
 }

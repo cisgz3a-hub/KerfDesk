@@ -8,6 +8,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { ProbeRequest } from '../../core/controllers/grbl/probe';
 import { useLaserStore } from './laser-store';
+import { markProbeCircuitTested } from './probe-test-touch.test-support';
 import { connectWith, makeConnection } from './laser-store-console.test-support';
 
 const Z_REQUEST = {
@@ -55,6 +56,7 @@ async function probeAfterStatus(statusLines: ReadonlyArray<string>): Promise<{
   await flush();
   writes.length = 0;
   let outcome: unknown = 'pending';
+  markProbeCircuitTested();
   void useLaserStore
     .getState()
     .probe(Z_REQUEST)
