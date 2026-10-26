@@ -2,8 +2,8 @@ import type { ProjectOptimizationSettings, Vec2 } from '../scene';
 import type { DeviceProfile } from '../devices';
 import { hasJobStartPower } from './job-start-power';
 import { offsetForEmittedFeed, type ScanOffsetPoint } from './scan-offset';
-import { containmentDepths } from './containment-depth';
 import { nearestClosedStart } from './closed-shape-start';
+import { configuredSegmentOrder, segmentHolds, startCursorForSegments } from './segment-order';
 import { reverseCutSegment, rotateClosedCutSegment, validCutArcMoves } from './cut-arc-moves';
 import { firstToolpathProcessPoint } from './first-process-point';
 import { isEmittableCutSegment } from './cut-emission-resolution';
@@ -20,6 +20,12 @@ export type JobStartPointOptions = {
   readonly allowReverse?: boolean;
   readonly insideFirst?: boolean;
   readonly preserveOrder?: boolean;
+  /** ADR-669: re-plan the rest of the first group from the chosen contour
+   * under these settings; absent keeps the planned order behind it. */
+  readonly replan?: {
+    readonly closedShapeStart: ProjectOptimizationSettings['closedShapeStart'];
+    readonly startPoint: ProjectOptimizationSettings['startPoint'];
+  };
   readonly scanningOffsets?: ReadonlyArray<ScanOffsetPoint>;
   readonly device?: DeviceProfile;
 };
@@ -30,18 +36,28 @@ export function jobStartPointOptions(
   optimization: Pick<
     ProjectOptimizationSettings,
     'travelPolicy' | 'pathDirection' | 'insideFirst' | 'cutDirection' | 'lineStartRegion'
-  >,
+  > &
+    Partial<Pick<ProjectOptimizationSettings, 'closedShapeStart' | 'startPoint'>>,
   scanningOffsets?: ReadonlyArray<ScanOffsetPoint>,
   device?: DeviceProfile,
 ): JobStartPointOptions {
+  const preserveOrder =
+    optimization.travelPolicy === 'source-order' ||
+    (optimization.cutDirection !== undefined && optimization.lineStartRegion === undefined);
   return {
     allowReverse:
       optimization.travelPolicy !== 'source-order' &&
       optimization.pathDirection === 'allow-reverse',
     insideFirst: optimization.travelPolicy !== 'source-order' && optimization.insideFirst,
-    preserveOrder:
-      optimization.travelPolicy === 'source-order' ||
-      (optimization.cutDirection !== undefined && optimization.lineStartRegion === undefined),
+    preserveOrder,
+    ...(preserveOrder
+      ? {}
+      : {
+          replan: {
+            closedShapeStart: optimization.closedShapeStart ?? 'drawn',
+            startPoint: optimization.startPoint ?? 'machine-origin',
+          },
+        }),
     ...(scanningOffsets === undefined ? {} : { scanningOffsets }),
     ...(device === undefined ? {} : { device }),
   };
@@ -59,10 +75,9 @@ type Selection = ResolvedJobStartPoint & {
   readonly segment: CutSegment;
 };
 
-type ContainmentEligibility = {
-  readonly depths: ReadonlyArray<number>;
-  readonly maxDepth: number;
-};
+// Per segment: may it be cut first under inside-first? Part by part
+// (ADR-669), any segment nothing deeper waits inside can start the job.
+type ContainmentEligibility = ReadonlyArray<boolean>;
 // Prepared jobs and their segment arrays are immutable. Pointer movement only
 // changes the target, so keep containment work once per prepared geometry.
 const containmentCache = new WeakMap<ReadonlyArray<CutSegment>, ContainmentEligibility>();
@@ -74,13 +89,12 @@ const processStartCache = new WeakMap<
 function containmentEligibility(segments: ReadonlyArray<CutSegment>): ContainmentEligibility {
   const cached = containmentCache.get(segments);
   if (cached !== undefined) return cached;
-  const depths = containmentDepths(segments);
-  const maxDepth = segments.reduce(
-    (max, segment, index) =>
-      isEmittableCutSegment(segment) ? Math.max(max, depths[index] ?? 0) : max,
-    0,
+  // Unemittable segments never start the job, so they must not hold one back.
+  const emittable = segments.map((segment) =>
+    isEmittableCutSegment(segment) ? segment : { ...segment, polyline: [] },
   );
-  const eligibility = { depths, maxDepth };
+  const holds = segmentHolds(emittable);
+  const eligibility = holds.heldBy.map((list) => list.length === 0);
   containmentCache.set(segments, eligibility);
   return eligibility;
 }
@@ -117,6 +131,7 @@ export function applyJobStartPoint(
   if (group?.kind === 'cut') {
     const segment = group.segments[selection.segmentIndex];
     if (segment === undefined) return job;
+    const rest = group.segments.filter((_, index) => index !== selection.segmentIndex);
     replacement = {
       ...group,
       segments:
@@ -124,10 +139,7 @@ export function applyJobStartPoint(
           ? group.segments.map((item, index) =>
               index === selection.segmentIndex ? selection.segment : item,
             )
-          : [
-              selection.segment,
-              ...group.segments.filter((_, index) => index !== selection.segmentIndex),
-            ],
+          : [selection.segment, ...replannedRest(group.segments, rest, selection.segment, options)],
     };
   } else if (group?.kind === 'cnc') {
     // Selection only accepts identical constant-depth contours. Rotate every
@@ -143,6 +155,31 @@ export function applyJobStartPoint(
     ...job,
     groups: job.groups.map((item, index) => (index === selection.groupIndex ? replacement : item)),
   };
+}
+
+// The planner's route ran from its seed; from the chosen contour that route's
+// second hop can cross the sheet. Plan the rest again from where the chosen
+// contour ends, still scored back to the seed (ADR-669). The chosen contour
+// holds nothing back, so the rest keeps every inside-first precedence.
+function replannedRest(
+  all: ReadonlyArray<CutSegment>,
+  rest: ReadonlyArray<CutSegment>,
+  chosen: CutSegment,
+  options: JobStartPointOptions,
+): ReadonlyArray<CutSegment> {
+  const exit = chosen.polyline[chosen.polyline.length - 1];
+  if (options.replan === undefined || exit === undefined || rest.length === 0) return rest;
+  return configuredSegmentOrder(
+    rest,
+    {
+      insideFirst: options.insideFirst === true,
+      pathDirection: options.allowReverse === true ? 'allow-reverse' : 'preserve',
+      startPoint: options.replan.startPoint,
+      closedShapeStart: options.replan.closedShapeStart,
+    },
+    exit,
+    { returnTo: startCursorForSegments(all, options.replan.startPoint), pinFirst: false },
+  );
 }
 
 function selectStart(job: Job, target: Vec2, options: JobStartPointOptions): Selection | null {
@@ -235,10 +272,7 @@ function selectCut(
   let best: Selection | null = null;
   let bestDistance = Number.POSITIVE_INFINITY;
   for (const [segmentIndex, segment] of segments.entries()) {
-    if (
-      !acceptSegment(segment) ||
-      (eligibility !== null && eligibility.depths[segmentIndex] !== eligibility.maxDepth)
-    )
+    if (!acceptSegment(segment) || (eligibility !== null && eligibility[segmentIndex] !== true))
       continue;
     const selected = selectedSegment(segment, target, options.allowReverse !== false);
     const point = selected?.polyline[0];

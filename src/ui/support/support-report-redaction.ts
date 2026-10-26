@@ -9,34 +9,21 @@
 // 27-P2-3). Sign-ins written into an address (a camera's
 // rtsp://user:pass@host) and key=value secrets go the same way.
 
-// A value the first pass removed stays as it is on the second, so the text
-// after an escaped line break in an incident cell survives.
-const NOT_REMOVED = String.raw`(?!\[(?:password )?removed\])`;
-const SECRET_KEY = String.raw`[\w-]*(?:password|passwd|pwd|token|secret|api[_-]?key)`;
+import { maskControllerPasswords } from '../../core/controllers/controller-password-settings';
+import { redactKeyedSecretValues } from './support-report-secret-values';
 
 const REDACTIONS: ReadonlyArray<readonly [RegExp, string]> = [
   [/\bKD\d+\.[\w-]+\.[\w-]+/g, 'KD1.[licence key removed]'],
-  // Up to the authority's last @, so a password holding an unencoded @ goes too.
-  [/\b([a-z][a-z\d+.-]*:\/\/)[^\s/?#]+@/gi, '$1[sign-in removed]@'],
+  // Consume a complete scheme token once, rather than retrying after every
+  // hyphen. Up to the authority's last @ removes an unencoded @ in a password.
+  [/(?<![a-z\d+.-])([+\d.-]*[a-z][a-z\d+.-]*:\/\/)[^\s/?#]+@/gi, '$1[sign-in removed]@'],
   [/\b(Bearer\s+)[\w.~+/=-]+/gi, '$1[token removed]'],
-  // A setting's whole value goes, spaces included, to the end of its line.
-  [
-    new RegExp(String.raw`(\$(?:75|77|330|331|533)\s*=)${NOT_REMOVED}[^\r\n]*`, 'g'),
-    '$1[password removed]',
-  ],
-  [
-    new RegExp(String.raw`(\$[\w/]*password\s*=)${NOT_REMOVED}[^\r\n]*`, 'gi'),
-    '$1[password removed]',
-  ],
-  [new RegExp(String.raw`(\[ESP10[16]\])${NOT_REMOVED}[^\r\n]*`, 'g'), '$1[password removed]'],
-  [new RegExp(String.raw`\b(${SECRET_KEY})=${NOT_REMOVED}[^\s&;,"']+`, 'gi'), '$1=[removed]'],
-  [new RegExp(String.raw`("${SECRET_KEY}"\s*:\s*")[^"]*"`, 'gi'), '$1[removed]"'],
 ];
 
-/** Applied before cell escaping and again to the complete local support report. */
+/** Redact raw facts before rendering; never trust marker text supplied by a log. */
 export function redactSupportReportText(text: string): string {
   return REDACTIONS.reduce(
     (current, [pattern, replacement]) => current.replace(pattern, replacement),
-    text,
+    maskControllerPasswords(redactKeyedSecretValues(text)),
   );
 }

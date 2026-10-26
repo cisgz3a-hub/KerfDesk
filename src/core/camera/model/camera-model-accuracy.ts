@@ -32,7 +32,15 @@ export type CameraModelAccuracy = {
   readonly targetHeightMm: number;
   /** The engraved target's rings, bed mm; absent on records saved without them. */
   readonly targetArea?: BedArea;
+  /** Outer diameter of the target's rings, mm; absent means the default 10 mm. */
+  readonly targetRingDiameterMm?: number;
   readonly marks?: ReadonlyArray<SavedMarkError>;
+  /**
+   * The photo could not fix the camera's height and none was measured (a
+   * camera looking almost straight down; ADR-441 Amendment 7): the picture
+   * lines up at the target's height, and elsewhere it may be off by millimetres.
+   */
+  readonly onlyAtTargetHeight?: true;
 };
 
 // A full-bed target has on the order of a hundred rings; anything far beyond
@@ -81,18 +89,35 @@ export function normalizeCameraModelAccuracy(value: unknown): CameraModelAccurac
   ) {
     return undefined;
   }
+  const target = normalizeTargetFacts(value);
+  if (target === null) return undefined;
+  return { rmsErrorMm, maxErrorMm, foundMarks, expectedMarks, targetHeightMm, ...target };
+}
+
+type TargetFacts = Pick<
+  CameraModelAccuracy,
+  'targetArea' | 'targetRingDiameterMm' | 'marks' | 'onlyAtTargetHeight'
+>;
+
+// The optional facts about the target; null when one is present but malformed.
+function normalizeTargetFacts(value: Record<string, unknown>): TargetFacts | null {
   const targetArea = optional(value['targetArea'], normalizeArea);
   const marks = optional(value['marks'], normalizeMarks);
-  if (targetArea === null || marks === null) return undefined;
+  const ring = optional(value['targetRingDiameterMm'], positive);
+  const onlyAtTargetHeight = value['onlyAtTargetHeight'];
+  if (targetArea === null || marks === null || ring === null) return null;
+  if (onlyAtTargetHeight !== undefined && onlyAtTargetHeight !== true) return null;
   return {
-    rmsErrorMm,
-    maxErrorMm,
-    foundMarks,
-    expectedMarks,
-    targetHeightMm,
     ...(targetArea === undefined ? {} : { targetArea }),
+    ...(ring === undefined ? {} : { targetRingDiameterMm: ring }),
     ...(marks === undefined ? {} : { marks }),
+    ...(onlyAtTargetHeight === true ? { onlyAtTargetHeight } : {}),
   };
+}
+
+function positive(value: unknown): number | undefined {
+  const n = finite(value);
+  return n !== undefined && n > 0 ? n : undefined;
 }
 
 // Absent stays absent; present but malformed is null, which drops the record.

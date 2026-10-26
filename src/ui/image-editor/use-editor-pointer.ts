@@ -30,6 +30,7 @@ import { useQuickMaskStore } from './quick-mask-store';
 import type { EditorView } from './image-editor-types';
 import { canvasToDoc } from './editor-canvas-draw';
 import { dragTransform, hitTransformHandle } from './editor-transform';
+import { useEditorGestureRetirement } from './use-editor-gesture-retirement';
 
 const ZOOM_STEP = 1.1;
 const MIN_SCALE = 0.05;
@@ -78,6 +79,8 @@ export function useEditorPointer(
     dragRef.current = next;
     setDrag(next);
   }, []);
+
+  useEditorGestureRetirement(update);
 
   const docPoint = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {

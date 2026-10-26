@@ -82,7 +82,7 @@ describe('Console setting values stock GRBL would store differently', () => {
   );
 });
 
-// Controller audit v2 C4-P2-1 (ADR-375 Amendment 3). grblHAL core keeps every
+// Controller audit v2 C4-P2-1 (ADR-375 Amendment 4). grblHAL core keeps every
 // character after `=` (system.c#L1139-L1213) and reads only the number at the
 // start (settings.c#L3527-L3552, nuts_bolts.c read_uint/read_float), answering
 // ok; d7aaee3's read_uint also takes each zero after the point as one more

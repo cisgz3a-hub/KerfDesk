@@ -1,4 +1,5 @@
 export type { ReliefDepthMap } from './relief-depth-map';
+export type { ReliefTwoSidedSplitRecord } from './relief-two-sided-split';
 export type { HeightfieldReliefObject, MeshReliefObject } from '../scene-object';
 export type {
   ReliefHeightfield,

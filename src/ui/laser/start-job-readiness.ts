@@ -369,7 +369,7 @@ export function finalizeStartPreparation(
       ...(largeRasterWarning === null ? [] : [largeRasterWarning]),
       ...compiledWorkAdvisories(prepared.job),
       ...detectCompiledVCarveDepthWarningsForJob(prepared.project, prepared.job),
-      ...demotedPolicyWarnings(options.project, options.machine),
+      ...demotedPolicyWarnings(options.project, options.machine, options.placement.jobOrigin),
       ...advisoryWarnings,
       ...emitSplit.warnings,
       ...collectPrintCutFrameWarnings(

@@ -66,7 +66,7 @@ export function formatSupportReport(facts: SupportReportFacts): string {
     section('Machine', facts.machine),
     section(settingsTitle(facts.machineSettings.readAt), facts.machineSettings.lines, 'Not read.'),
     section('Machine console, newest last', facts.machineConsole, 'Empty.'),
-    section(
+    preRedactedSection(
       'Retained controller incidents, newest last',
       incidentReportLines(facts.controllerIncidents ?? []),
       'None.',
@@ -75,13 +75,25 @@ export function formatSupportReport(facts: SupportReportFacts): string {
     ...(facts.app === 'electron' ? [section('Desktop log, newest last', logLines(facts))] : []),
   ];
   const text = `${sections.map((lines) => lines.join('\n')).join('\n\n')}\n`;
-  return redactSupportReportText(text);
+  return text;
 }
 
 function section(
   title: string,
   lines: ReadonlyArray<string>,
   empty = 'Nothing to show.',
+): ReadonlyArray<string> {
+  const redacted = lines.length === 0 ? [] : redactSupportReportText(lines.join('\n')).split('\n');
+  return preRedactedSection(title, redacted, empty);
+}
+
+// Incident cells are redacted before escaping their physical line breaks.
+// Do not re-interpret the escaped result as raw passwords, or trust marker
+// prefixes in raw facts merely to make that second pass appear idempotent.
+function preRedactedSection(
+  title: string,
+  lines: ReadonlyArray<string>,
+  empty: string,
 ): ReadonlyArray<string> {
   return [`== ${title} ==`, ...(lines.length === 0 ? [empty] : lines)];
 }

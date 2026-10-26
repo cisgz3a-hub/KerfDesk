@@ -33,7 +33,8 @@ leaks and give each head its own copy of those, with bed, origin, homing and con
 
 1. **The leaks are closed** (commit e6d515b3). Print and Cut never applies to a CNC job; Manual
    Air is hidden and refused in CNC mode (M9 still works); the mode toggle is locked while a job
-   runs, and so is Machine Setup's Save (Amendment 1); Frame follows the job's own mode; the jig's CNC placement is measured from the CNC
+   runs, and so is Machine Setup's Save (Amendment 1), and the store refuses any other change to
+   the job's machine, Undo, Redo and Open included (Amendment 2); Frame follows the job's own mode; the jig's CNC placement is measured from the CNC
    compile; the Box Generator keeps a draft per mode; CNC Job Review and CNC preflight drop the
    laser rows and checks; rotary does not limit CNC jogs; the Machine Setup nudge is per mode.
 2. **Make Default is laser only.** It never stores a CNC block, and a block saved before this

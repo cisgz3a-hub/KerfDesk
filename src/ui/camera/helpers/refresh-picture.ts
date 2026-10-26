@@ -10,13 +10,15 @@ import { useStore } from '../../state';
 import { useCameraStore } from '../../state/camera-store';
 import { useToastStore } from '../../state/toast-store';
 import { activeCameraModelNow, ownCameraModel } from '../active-camera-model';
-import { cameraCaptureBindingForFrame, captureSourceFrame } from '../frame-source';
+import { captureSourceFrame } from '../frame-source';
+import { captureOverlayStill } from '../capture-overlay-still';
 
 export type RefreshOutcome =
   | 'refreshed'
   | 'no-camera'
   | 'not-calibrated'
   | 'head-camera'
+  | 'superseded'
   | 'failed';
 
 /** Take a new held picture with the running, calibrated camera and show it. */
@@ -28,15 +30,8 @@ export async function refreshCameraPicture(
   const own = ownCameraModel(useStore.getState().project.device, sourceState);
   if (own !== undefined && isHeadCameraModel(own)) return 'head-camera';
   if (activeCameraModelNow() === undefined) return 'not-calibrated';
-  const source = sourceState.source;
-  const frame = await capture(source).catch(() => null);
-  if (frame === null) return 'failed';
-  const now = useCameraStore.getState();
-  // Another camera started while the picture was taken: it is not this camera's.
-  if (now.sourceState.kind !== 'live' || now.sourceState.source !== source) return 'failed';
-  now.setOverlayStill(frame, cameraCaptureBindingForFrame(source, frame.width, frame.height));
-  now.setOverlayVisible(true);
-  now.activatePlacement();
+  const result = await captureOverlayStill(capture, { showOverlay: true, activatePlacement: true });
+  if (result !== 'captured') return result;
   return 'refreshed';
 }
 
@@ -75,6 +70,7 @@ export function reportRefresh(outcome: RefreshOutcome): void {
 function refreshMessage(outcome: RefreshOutcome): string | null {
   switch (outcome) {
     case 'refreshed':
+    case 'superseded':
       return null;
     case 'no-camera':
       return 'Start the camera to refresh its picture.';

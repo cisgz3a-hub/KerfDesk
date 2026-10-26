@@ -88,9 +88,10 @@ async function parseDxfFile(
     if (offThread !== null) return await offThread;
     if (blob !== null) {
       pushToast(mainThreadImportFallbackAdvisory(file.name), 'warning');
-      return parseDxf({ dxfText: await file.text(), id, source: file.name });
     }
-    return parseDxf({ dxfText: await file.text(), id, source: file.name });
+    const dxfText = await file.text();
+    controls.options.signal?.throwIfAborted();
+    return parseDxf({ dxfText, id, source: file.name });
   } finally {
     controls.dispose();
   }

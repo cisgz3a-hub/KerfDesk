@@ -66,7 +66,21 @@ export function captureRetainedArray(input: {
     sourceIds: [...selectedIds],
     instances: capturedInstances,
     ownedObjectIds,
-    sourceProjectJson: serializeProject(arrayArchiveProject(project, sourceIds), { compact: true }),
+    sourceProjectJson: serializeProject(
+      arrayArchiveProject(
+        {
+          ...project,
+          scene: {
+            ...project.scene,
+            groups: (project.scene.groups ?? []).filter((group) =>
+              group.objectIds.every((id) => sourceIds.has(id)),
+            ),
+          },
+        },
+        sourceIds,
+      ),
+      { compact: true },
+    ),
     baselineProjectJson: serializeProject(
       arrayArchiveProject({ ...project, scene: input.scene }, memberIds),
       { compact: true },

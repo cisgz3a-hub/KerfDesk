@@ -4,8 +4,9 @@
 // to clear chips, re-enter, and repeat to full depth. GRBL has no canned
 // G81/G83 cycles, so the peck is explicit motion — encoded as a path3d pass
 // (constant XY, varying Z), which the emitter turns into plunge-feed moves.
-// The whole hole cycle runs at the layer's PLUNGE feed (compile pins the
-// drill group's cut feed to it): re-entry through the cleared hole is air
+// The whole hole cycle runs at the layer's PLUNGE feed, because the emitter
+// sends every vertical move at plunge, and compile reports the drill group's
+// cut feed as that same plunge feed: re-entry through the cleared hole is air
 // until the previous floor, and fresh material only ever meets the bit at
 // plunge feed.
 

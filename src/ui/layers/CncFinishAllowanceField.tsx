@@ -2,6 +2,8 @@
 // passes stay this far proud of the wall, then one full-depth finishing pass
 // cleans the true contour. An Advanced refinement, shown only for the two
 // side-offset profile cut types (not pocket / on-path / relief). 0 = off.
+// The compiler cuts at most the bit's radius (ADR-140 Amendment 2), which
+// depends on the bit, so the field keeps its fixed range and Job Review warns.
 
 import type { CncLayerSettings, Layer } from '../../core/scene';
 import { NumberField } from './CncLayerPrimitives';
@@ -24,7 +26,7 @@ export function CncFinishAllowanceField(props: {
       min={0}
       max={MAX_FINISH_ALLOWANCE_MM}
       step={0.1}
-      title="Stock left by the roughing passes and removed by one full-depth finishing pass at the true wall. 0 = off (no separate finishing pass)."
+      title="Stock left by the roughing passes and removed by one full-depth finishing pass at the true wall. Keep it under half the bit: from the bit's radius up it is cut as the radius, and the finishing pass steps down. 0 = off (no separate finishing pass)."
       onCommit={(finishAllowanceMm) => props.onCommit({ finishAllowanceMm })}
     />
   );

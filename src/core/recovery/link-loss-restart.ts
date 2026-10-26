@@ -14,8 +14,8 @@
 // - a boot banner before the controller's first status report means it
 //   restarted;
 // - an Alarm means its motion was stopped, which also clears the planner;
-// - a status report without either means it kept running, and Continue from
-//   where the head stopped still holds (ADR-341 Amendment 6).
+// - Run or Hold proves it kept running; an idle board may have restarted
+//   before reconnect and printed a banner while the link was unavailable.
 //
 // A banner is not always a boot (Amendment 4). grblHAL greets every new
 // Telnet, WebSocket or Bluetooth client, and a native-USB build greets 200 ms
@@ -52,8 +52,8 @@ const RESTART_CAUSES: Record<LinkLossLink, string> = {
 
 const UNCONFIRMED_CAUSES: Record<LinkLossLink, string> = {
   usb:
-    'It sent its startup banner, but grblHAL sends that banner each time its USB port opens, ' +
-    'also when it kept running.',
+    'A USB startup banner may have been sent before the port reopened; grblHAL can also send ' +
+    'a greeting each time its USB port opens without restarting.',
   network:
     'Over Wi-Fi or Ethernet the startup banner settles nothing either way: grblHAL sends one to ' +
     'every new connection, and a board that restarted sent its own before its network came up.',

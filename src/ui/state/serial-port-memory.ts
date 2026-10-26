@@ -4,6 +4,8 @@
 // Storage is injected so the logic is testable; reads and writes fail soft.
 
 import type { SerialPortIdentity, SerialPortRef } from '../../platform/types';
+import { browserLocalStorage } from './browser-local-storage';
+import { saveComputerPreference, usePreferencePersistenceStore } from './preference-persistence';
 
 export const SERIAL_PORT_MEMORY_STORAGE_KEY = 'kerfdesk.serial.last-port.v1';
 export const AUTO_CONNECT_STORAGE_KEY = 'kerfdesk.serial.auto-connect.v1';
@@ -103,15 +105,22 @@ export function forgetRememberedSerialPort(storage: StorageLike | null): void {
  *  operator picked before, and the connection reads settings and moves
  *  nothing (ADR-420). */
 export function loadAutoConnectPreference(storage: StorageLike | null): boolean {
+  const pending = usePreferencePersistenceStore.getState().pending.get(AUTO_CONNECT_STORAGE_KEY);
+  if (
+    pending !== undefined &&
+    (pending.options.storage === storage ||
+      (pending.options.storage === undefined && storage === browserLocalStorage()))
+  ) {
+    return pending.value !== 'off';
+  }
   return readItem(storage, AUTO_CONNECT_STORAGE_KEY) !== 'off';
 }
 
-export function saveAutoConnectPreference(storage: StorageLike | null, enabled: boolean): void {
-  try {
-    storage?.setItem(AUTO_CONNECT_STORAGE_KEY, enabled ? 'on' : 'off');
-  } catch {
-    // The choice then lasts for this session only.
-  }
+export function saveAutoConnectPreference(
+  storage: StorageLike | null | undefined,
+  enabled: boolean,
+): void {
+  saveComputerPreference(AUTO_CONNECT_STORAGE_KEY, enabled ? 'on' : 'off', { storage });
 }
 
 export function usbIdLabel(identity: SerialPortIdentity | null | undefined): string | null {

@@ -10,6 +10,7 @@ import type { BedArea } from '../../../core/camera/model/camera-model-accuracy';
 import type { Vec2 } from '../../../core/camera/model/camera-model';
 import type { CameraModelRecord } from '../../../core/camera/model/camera-model-record';
 import type { MarkError } from '../../../core/camera/target/bed-calibration';
+import { DEFAULT_RING_DIAMETER_MM } from '../../../core/camera/target/bed-target';
 import type { ViewThumbnail } from '../../../core/camera/model/view-shift';
 import type { RgbaImage } from '../../../core/camera/rgba-image';
 import type { StreamerState } from '../../../core/controllers/grbl';
@@ -27,6 +28,8 @@ export type CalibrationResult = {
   readonly markErrors: ReadonlyArray<MarkError>;
   /** The photo flattened onto the bed at the target's height, for review. */
   readonly bedImage: RgbaImage | null;
+  /** The part of the bed that picture shows, mm; absent means the whole bed. */
+  readonly bedImageRegion?: BedArea;
   /** Camera height the photo alone could not pin down to within this, mm. */
   readonly cameraHeightSigmaMm: number;
   readonly usedMeasuredHeight: boolean;
@@ -66,12 +69,24 @@ export type CalibrationSettings = {
   readonly cameraHeightMm: number | null;
   readonly powerPercent: number;
   readonly speedMmPerMin: number;
-  /** Margin kept clear around the target on every side of the bed, mm. */
+  /** Margin kept clear around the target on every side of the sheet, mm. */
   readonly marginMm: number;
+  /**
+   * The sheet the target is engraved on, laid in the middle of the bed, mm
+   * (ADR-441 Amendment 8). Larger than the bed means the whole bed.
+   */
+  readonly sheetWidthMm: number;
+  readonly sheetHeightMm: number;
   /** The camera rides on the laser head (ADR-449): a small target it sees whole. */
   readonly headCamera: boolean;
   /** Side of the head camera's square target, mm. */
   readonly headTargetSizeMm: number;
+  /**
+   * Outer diameter of the target's rings, mm; the grid step is four of them.
+   * Larger rings for a camera that sees each ring as only a few pixels
+   * (ADR-441 Amendment 7).
+   */
+  readonly ringDiameterMm: number;
 };
 
 // 'check' starts at the photo of a target already engraved, to see whether
@@ -82,7 +97,12 @@ export type CalibrationMode = 'calibrate' | 'check' | 'nudge';
 
 // The margin and square size of the targets last engraved on this machine
 // (ADR-441 Amendment 4), filled in when the wizard opens.
-type RememberedLayout = Partial<Pick<CalibrationSettings, 'marginMm' | 'headTargetSizeMm'>>;
+type RememberedLayout = Partial<
+  Pick<
+    CalibrationSettings,
+    'marginMm' | 'headTargetSizeMm' | 'ringDiameterMm' | 'sheetWidthMm' | 'sheetHeightMm'
+  >
+>;
 
 export type CameraCalibrationStore = {
   readonly open: boolean;
@@ -117,8 +137,13 @@ export const DEFAULT_CALIBRATION_SETTINGS: CalibrationSettings = {
   powerPercent: 35,
   speedMmPerMin: 3000,
   marginMm: 5,
+  // About A4: a sheet most workshops have. Measured, it keeps the picture
+  // within 0.2 mm on the sheet and 1.3 mm across a 400 mm bed (Amendment 8).
+  sheetWidthMm: 300,
+  sheetHeightMm: 200,
   headCamera: false,
   headTargetSizeMm: 40,
+  ringDiameterMm: DEFAULT_RING_DIAMETER_MM,
 };
 
 const INITIAL_STEP: CalibrationStep = { kind: 'setup', note: null };
@@ -180,6 +205,7 @@ export const useCameraCalibrationStore = create<CameraCalibrationStore>((set) =>
         ...withRemembered(s.settings),
         sheetThicknessMm: saved.accuracy.targetHeightMm,
         headCamera: saved.mount?.kind === 'head',
+        ringDiameterMm: saved.accuracy.targetRingDiameterMm ?? DEFAULT_RING_DIAMETER_MM,
       },
       targetArea: saved.accuracy.targetArea ?? null,
       targetBedFrame: saved.bedFrame ?? null,
@@ -191,8 +217,11 @@ export const useCameraCalibrationStore = create<CameraCalibrationStore>((set) =>
     set((s) => ({
       settings: sanitized({ ...s.settings, ...patch }),
       ...(patch.marginMm === undefined &&
+      patch.sheetWidthMm === undefined &&
+      patch.sheetHeightMm === undefined &&
       patch.headCamera === undefined &&
-      patch.headTargetSizeMm === undefined
+      patch.headTargetSizeMm === undefined &&
+      patch.ringDiameterMm === undefined
         ? {}
         : { targetArea: null }),
     })),
@@ -224,12 +253,22 @@ function sanitized(settings: CalibrationSettings): CalibrationSettings {
     powerPercent: Math.min(100, atLeast(settings.powerPercent, 0, d.powerPercent)),
     speedMmPerMin: settings.speedMmPerMin > 0 ? settings.speedMmPerMin : d.speedMmPerMin,
     marginMm: atLeast(settings.marginMm, 0, d.marginMm),
+    sheetWidthMm: positiveOr(settings.sheetWidthMm, d.sheetWidthMm),
+    sheetHeightMm: positiveOr(settings.sheetHeightMm, d.sheetHeightMm),
     headCamera: settings.headCamera,
     headTargetSizeMm:
       settings.headTargetSizeMm > 0 && Number.isFinite(settings.headTargetSizeMm)
         ? settings.headTargetSizeMm
         : d.headTargetSizeMm,
+    ringDiameterMm:
+      settings.ringDiameterMm > 0 && Number.isFinite(settings.ringDiameterMm)
+        ? settings.ringDiameterMm
+        : d.ringDiameterMm,
   };
+}
+
+function positiveOr(value: number, fallback: number): number {
+  return value > 0 && Number.isFinite(value) ? value : fallback;
 }
 
 function atLeast(value: number, min: number, fallback: number): number {

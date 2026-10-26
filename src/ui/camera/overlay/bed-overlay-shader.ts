@@ -20,7 +20,7 @@ import {
   clipAreaToBed,
   type SurfaceHeightArea,
 } from '../../../core/camera/model/height-areas';
-import type { FisheyeDistortion } from '../../../core/camera/fisheye';
+import { fisheyeAngleLimit, type FisheyeDistortion } from '../../../core/camera/fisheye';
 import type { Mat3 } from '../../../core/camera/homography';
 import { rodriguesToMatrix } from '../../../core/camera/rodrigues';
 import type { ViewTransform } from '../../workspace/view-transform';
@@ -69,6 +69,8 @@ export type BedOverlayUniforms = {
   readonly uPrincipal: Pair;
   /** Kannala-Brandt k1..k4. */
   readonly uDistortion: Quad;
+  /** Widest ray angle the lens images, radians (fisheyeAngleLimit). */
+  readonly uAngleLimit: number;
   /** Pixel size of the frame the intrinsics are expressed in. */
   readonly uFrameSize: Pair;
   /** 0..1; the output is premultiplied by it. */
@@ -90,6 +92,7 @@ export const BED_OVERLAY_UNIFORM_KINDS = {
   uFocal: 'vec2',
   uPrincipal: 'vec2',
   uDistortion: 'vec4',
+  uAngleLimit: 'float',
   uFrameSize: 'vec2',
   uOpacity: 'float',
 } as const satisfies Record<keyof BedOverlayUniforms, BedOverlayUniformKind>;
@@ -131,6 +134,7 @@ uniform vec3 uTranslation;
 uniform vec2 uFocal;
 uniform vec2 uPrincipal;
 uniform vec4 uDistortion;
+uniform float uAngleLimit;
 uniform vec2 uFrameSize;
 uniform float uOpacity;
 
@@ -161,7 +165,9 @@ void main() {
   vec3 cam = uRotation * vec3(bed, uSurfaceZ) + uTranslation;
   if (!(cam.z > MIN_DEPTH)) return;
   vec2 ab = cam.xy / cam.z;
-  float s = fisheyeScale(length(ab), uDistortion);
+  float r = length(ab);
+  if (atan(r) > uAngleLimit) return;
+  float s = fisheyeScale(r, uDistortion);
   vec2 pixel = uFocal * (ab * s) + uPrincipal;
   vec2 uv = (pixel + 0.5) / uFrameSize;
   if (!inside(uv, vec2(1.0))) return;
@@ -222,6 +228,7 @@ export function bedOverlayUniforms(args: BedOverlayUniformArgs): BedOverlayUnifo
     uFocal: [k.fx, k.fy],
     uPrincipal: [k.cx, k.cy],
     uDistortion: [...lens.distortion],
+    uAngleLimit: fisheyeAngleLimit(lens.distortion),
     uFrameSize: [lens.imageWidth, lens.imageHeight],
     uOpacity: clampUnit(args.opacity),
   };
@@ -279,7 +286,9 @@ export function bedOverlaySampleCoord(
   if (!(camZ > MIN_DEPTH)) return null;
   const a = camX / camZ;
   const b = camY / camZ;
-  const s = fisheyeScale(Math.hypot(a, b), u.uDistortion);
+  const r = Math.hypot(a, b);
+  if (Math.atan(r) > u.uAngleLimit) return null;
+  const s = fisheyeScale(r, u.uDistortion);
   const pixelX = u.uFocal[0] * (a * s) + u.uPrincipal[0];
   const pixelY = u.uFocal[1] * (b * s) + u.uPrincipal[1];
   const texU = (pixelX + 0.5) / u.uFrameSize[0];

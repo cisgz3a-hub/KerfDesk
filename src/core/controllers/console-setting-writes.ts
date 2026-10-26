@@ -24,7 +24,7 @@
 // `$110=5O00` stored 5 with `ok`. Builds before 20261015 also read each zero
 // after the point of a whole-number setting as one more digit: `$22=1.0`
 // stored 10, which turned homing and soft limits off (controller audit v2
-// C4-P2-1, ADR-375 Amendment 3). For the GRBL settings KerfDesk knows, the
+// C4-P2-1, ADR-375 Amendment 4). For the GRBL settings KerfDesk knows, the
 // Console therefore sends only the value the Machine Settings encoder would
 // send (grbl-setting-number.ts). Other grblHAL settings, strings, addresses and
 // plugin settings among them, are left to the firmware; the `$$` re-read is
@@ -159,7 +159,7 @@ function olderGrblHalWholeNumber(typed: string): number | null {
 
 /**
  * Why the `$$` re-read after an acknowledged Console `$N=` write does not show
- * the typed value, or null when it does or cannot tell (ADR-375 Amendment 3).
+ * the typed value, or null when it does or cannot tell (ADR-375 Amendment 4).
  * A numeric value is compared at the precision the controller printed. On
  * grblHAL a value that is not one number is a mismatch only when the setting
  * reads back as a number: a string setting reads back as its text.

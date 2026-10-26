@@ -86,6 +86,41 @@ describe('SuperConsoleSnapshotCompare', () => {
     await unmount();
   });
 
+  it.each([
+    { id: 75, left: '00000000', right: '87654321' },
+    { id: 330, left: '12345678', right: '24691356' },
+  ])('hides legacy numeric passwords and their derived comparisons ($id)', async (values) => {
+    const left = legacySnapshotText('Left', values.id, values.left, '250');
+    const right = legacySnapshotText('Right', values.id, values.right, '500');
+    const loaded = deserializeControllerSettingsSnapshot(left);
+    expect(loaded.kind).toBe('ok');
+    if (loaded.kind === 'ok') {
+      expect(loaded.snapshot.settings.find((setting) => setting.id === values.id)?.rawValue).toBe(
+        values.left,
+      );
+    }
+    const pickFilesForOpen = vi
+      .fn<PlatformAdapter['pickFilesForOpen']>()
+      .mockResolvedValueOnce([{ name: 'legacy-a.json', text: async () => left }])
+      .mockResolvedValueOnce([{ name: 'legacy-b.json', text: async () => right }]);
+    const { host, unmount } = await renderCompare(makePlatform({ pickFilesForOpen }));
+    try {
+      await clickButton(host, 'Load A');
+      await clickButton(host, 'Load B');
+      const row = [...host.querySelectorAll('tbody tr')].find(
+        (candidate) => candidate.querySelector('strong')?.textContent === `$${values.id}`,
+      );
+      if (row === undefined) throw new Error('Password comparison row missing');
+      const cells = [...row.querySelectorAll('td')].map((cell) => cell.textContent);
+      expect(cells.slice(1, 4)).toEqual(['[password hidden]', '[password hidden]', '-']);
+      expect(host.textContent).not.toContain(values.left);
+      expect(host.textContent).not.toContain(values.right);
+      expect(host.textContent).toContain('+250 (+100.0%)');
+    } finally {
+      await unmount();
+    }
+  });
+
   it('loads two files and compares axis values without a quality verdict', async () => {
     const files = [snapshotText('4040', '250'), snapshotText('Falcon', '500')];
     const pickFilesForOpen = vi
@@ -151,6 +186,22 @@ function snapshotText(label: string, acceleration: string): string {
       settings: [{ id: 120, rawValue: acceleration }],
     }),
   );
+}
+
+// Legacy files can contain raw passwords; add one after the current exporter
+// has made the ordinary settings so the real loader exercises that old format.
+function legacySnapshotText(
+  label: string,
+  id: number,
+  password: string,
+  acceleration: string,
+): string {
+  const result = deserializeControllerSettingsSnapshot(snapshotText(label, acceleration));
+  if (result.kind !== 'ok') throw new Error('Snapshot fixture invalid');
+  return JSON.stringify({
+    ...result.snapshot,
+    settings: [...result.snapshot.settings, { id, rawValue: password }],
+  });
 }
 
 function requiredInput(host: HTMLElement, label: string): HTMLInputElement {

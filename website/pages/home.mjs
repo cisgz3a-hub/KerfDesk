@@ -61,7 +61,7 @@ const PILLARS = [
   {
     icon: 'zap',
     title: 'Engrave and cut',
-    body: 'Line, Fill and Image modes, with cross-hatch fills, kerf compensation, holding tabs and 11 dither and grayscale options for photos. Image engraving hasn’t been run on a machine yet.',
+    body: 'Line, Fill and Image modes, with cross-hatch fills, kerf compensation, holding tabs and 12 dither and grayscale options for photos. Image engraving hasn’t been run on a machine yet.',
     href: '/laser/',
   },
   {

@@ -9,13 +9,13 @@ import { useCameraStore } from '../../state/camera-store';
 import { useLaserStore } from '../../state/laser-store';
 import { useToastStore } from '../../state/toast-store';
 import { CameraSourceView } from '../CameraSourceView';
-import { useCameraCalibrationStore, type PhotoStatus } from './camera-calibration-store';
 import {
-  applyNudge,
-  engraveNudgeRing,
-  nudgeRingCentre,
-  photographNudgeRing,
-} from './nudge-actions';
+  useCameraCalibrationStore,
+  type CalibrationStep,
+  type PhotoStatus,
+} from './camera-calibration-store';
+import { engraveNudgeRing, nudgeRingCentre } from './nudge-actions';
+import type { NudgePhotoControls } from './use-nudge-photo';
 import { NumberField } from './CalibrationSetupStep';
 import { columnStyle, errStyle, noteStyle, rowStyle } from './wizard-styles';
 
@@ -28,8 +28,13 @@ export function NudgeSetupStep(props: { readonly note: string | null }): JSX.Ele
 
   const burn = async (): Promise<void> => {
     const earlierJob = useLaserStore.getState().streamer;
-    setStep({ kind: 'engraving', started: false, earlierJob });
+    const pending: CalibrationStep = { kind: 'engraving', started: false, earlierJob };
+    setStep(pending);
     const started = await engraveNudgeRing(settings);
+    const wizard = useCameraCalibrationStore.getState();
+    // The temporary job may finish preparing after this wizard was replaced.
+    // Minimize keeps the same step; close/reopen and a new mode do not.
+    if (!wizard.open || wizard.mode !== 'nudge' || wizard.step !== pending) return;
     setStep(
       started
         ? { kind: 'engraving', started: true, earlierJob }
@@ -88,21 +93,13 @@ export function NudgeSetupStep(props: { readonly note: string | null }): JSX.Ele
   );
 }
 
-export function NudgePhotoStep(props: { readonly status: PhotoStatus }): JSX.Element {
+export function NudgePhotoStep(props: {
+  readonly status: PhotoStatus;
+  readonly take: NudgePhotoControls['take'];
+}): JSX.Element {
   const sourceState = useCameraStore((s) => s.sourceState);
-  const sheetThicknessMm = useCameraCalibrationStore((s) => s.settings.sheetThicknessMm);
   const setStep = useCameraCalibrationStore((s) => s.setStep);
   const running = props.status.kind === 'running';
-  const take = async (): Promise<void> => {
-    if (sourceState.kind !== 'live') return;
-    setStep({ kind: 'nudge-photo', status: { kind: 'running' } });
-    const outcome = await photographNudgeRing({ source: sourceState.source, sheetThicknessMm });
-    setStep(
-      outcome.kind === 'ok'
-        ? { kind: 'nudge-result', offsetMm: outcome.offsetMm }
-        : { kind: 'nudge-photo', status: { kind: 'failed', message: outcome.message } },
-    );
-  };
   return (
     <div style={columnStyle}>
       <p style={noteStyle}>
@@ -120,7 +117,7 @@ export function NudgePhotoStep(props: { readonly status: PhotoStatus }): JSX.Ele
           type="button"
           className="lf-btn lf-btn--primary"
           disabled={sourceState.kind !== 'live' || running}
-          onClick={() => void take()}
+          onClick={() => void props.take()}
           title="Take one photo and find the ring in it."
         >
           {running ? 'Finding the ring…' : 'Take photo'}
@@ -140,14 +137,17 @@ export function NudgePhotoStep(props: { readonly status: PhotoStatus }): JSX.Ele
   );
 }
 
-export function NudgeResultStep(props: { readonly offsetMm: Vec2 }): JSX.Element {
+export function NudgeResultStep(props: {
+  readonly offsetMm: Vec2;
+  readonly apply: NudgePhotoControls['apply'];
+}): JSX.Element {
   const closeWizard = useCameraCalibrationStore((s) => s.closeWizard);
   const openWizard = useCameraCalibrationStore((s) => s.openWizard);
   const setStep = useCameraCalibrationStore((s) => s.setStep);
   const [applied, setApplied] = useState(false);
   const size = nudgeSizeMm(props.offsetMm);
   const apply = (): void => {
-    if (!applyNudge(props.offsetMm)) {
+    if (!props.apply(props.offsetMm)) {
       useToastStore
         .getState()
         .pushToast('The running camera has no calibration of its own to fix.', 'warning');

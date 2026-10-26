@@ -96,6 +96,11 @@ describe('splitReliefForTwoSides', () => {
       expect(corner.y).toBeCloseTo(was.y, 9);
       expect(side.color).toBe(original.color);
     }
+    // ADR-580 Amendment 1: each side records the stock it was planned for.
+    expect(objects.map((side) => (side as MeshReliefObject).twoSidedSplit)).toEqual([
+      { side: 'A', stockThicknessMm: 14, modelDepthMm: 10, splitHeightMm: 5, webMm: 1 },
+      { side: 'B', stockThicknessMm: 14, modelDepthMm: 10, splitHeightMm: 5, webMm: 1 },
+    ]);
     expect(state.project.cncSetup?.twoSided).toMatchObject({
       activeSide: 'A',
       sideAObjectIds: [result.sideAId],
@@ -140,6 +145,42 @@ describe('splitReliefForTwoSides', () => {
       sideAObjectIds: ['other', result.sideAId],
       sideBObjectIds: ['back', result.sideBId],
     });
+  });
+
+  it('records the model height as the planned stock when the stock is thinner', () => {
+    const base = project();
+    const machine = base.machine;
+    if (machine?.kind !== 'cnc') throw new Error('expected a CNC machine');
+    useStore.setState({
+      project: { ...base, machine: { ...machine, stock: { ...machine.stock, thicknessMm: 6 } } },
+    });
+    const result = useStore
+      .getState()
+      .splitReliefForTwoSides('model', { splitHeightMm: 5, webMm: 1, marginMm: 6 });
+    if (result.kind !== 'ok') throw new Error(result.reason);
+    expect(result.fitsStock).toBe(false);
+    const sideA = useStore.getState().project.scene.objects[0] as MeshReliefObject;
+    expect(sideA.twoSidedSplit).toEqual({
+      side: 'A',
+      stockThicknessMm: 10,
+      modelDepthMm: 10,
+      splitHeightMm: 5,
+      webMm: 1,
+    });
+  });
+
+  it('refuses to split a side of a split again', () => {
+    useStore.setState({ project: project() });
+    const result = useStore
+      .getState()
+      .splitReliefForTwoSides('model', { splitHeightMm: 5, webMm: 1, marginMm: 6 });
+    if (result.kind !== 'ok') throw new Error(result.reason);
+    const before = useStore.getState().project;
+    const again = useStore
+      .getState()
+      .splitReliefForTwoSides(result.sideAId, { splitHeightMm: 5, webMm: 1, marginMm: 6 });
+    expect(again.kind).toBe('error');
+    expect(useStore.getState().project).toBe(before);
   });
 
   it('reports a split outside the model and changes nothing', () => {

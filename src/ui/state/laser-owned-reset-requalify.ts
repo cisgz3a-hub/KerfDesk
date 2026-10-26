@@ -15,7 +15,10 @@ import {
 } from './grbl-settings-actions';
 import { readOnlyControllerOperation } from './laser-controller-operation';
 import { qualifiedController } from './laser-controller-qualification';
-import { hasSessionSettingsRead } from './laser-owned-reset-settings';
+import {
+  sessionSettingsReadHolds,
+  type OwnedResetSettingsRefs,
+} from './laser-owned-reset-settings';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import { pushLog } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
@@ -38,12 +41,14 @@ const WCS_READ_OPERATION_LABEL = 'Reading active work coordinates';
 export async function readModalStateAfterOwnedReset(
   set: SetFn,
   get: GetFn,
-  refs: GrblSettingsActionRefs,
+  refs: GrblSettingsActionRefs & OwnedResetSettingsRefs,
   write: WriteFn,
   readMachineSettings: () => Promise<void>,
 ): Promise<void> {
   const epoch = get().controllerSessionEpoch;
-  if (!hasSessionSettingsRead(get(), epoch)) return readMachineSettings();
+  // A `$` write since the kept read (say a Console `$30=` while the
+  // qualification waited) may have changed EEPROM, so read `$$` again.
+  if (!sessionSettingsReadHolds(get(), epoch, refs)) return readMachineSettings();
   const blocked = machineSettingsReadBlockReason(get(), {
     settingsCollectionActive: refs.settingsCollector.kind === 'collecting',
     resetCleanupPending: refs.pendingResetCleanup != null,

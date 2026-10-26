@@ -52,6 +52,7 @@ import { pauseAutoConnect } from '../state/auto-connect-session';
 import { useEdition } from '../licensing/edition';
 import { useGuideLockStore } from '../workspace/guide-lock-store';
 import { labelProCommands } from './edition-command-gate';
+import { currentHierarchyFocus, useDesignHierarchyStore } from '../state/design-hierarchy-store';
 
 export type { CommandShellCallbacks } from './app-command-context-types';
 
@@ -76,6 +77,7 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
   const wireframeActive = useUiStore((s) => s.wireframeView);
   // Re-render when guidelines lock, so the menu item re-labels.
   useGuideLockStore((s) => s.locked);
+  useDesignHierarchyStore((s) => s.focusId);
   const edition = useEdition();
   const commands = buildAppCommands(
     appCommandContext(callbacks, platform, app, laser, pushToast, {
@@ -117,7 +119,7 @@ function appCommandContext(
 ): AppCommandContext {
   const selected = selectedObject(app.project, app.selectedObjectId);
   const selectedIds = selectedObjectIds(app.selectedObjectId, app.additionalSelectedIds);
-  const arrangeUnits = selectionUnitCount(app.project, selectedIds);
+  const arrangeUnits = focusedLayoutUnitCount(app, selectedIds);
   const imageMaskPair = selectedImageMaskPair(app.project, selectedIds);
   const selection = { selected, selectedIds, imageMaskPair };
   const hasMaskedRasterSelection =
@@ -186,6 +188,17 @@ function appCommandContext(
     previewActive: app.previewMode,
     hasPreviewableContent: hasPreviewableContent(app.project),
   };
+}
+
+function focusedLayoutUnitCount(
+  app: ReturnType<typeof useStore.getState>,
+  ids: ReadonlyArray<string>,
+): number {
+  return selectionUnitCount(
+    app.project,
+    ids,
+    currentHierarchyFocus(app.project.scene, app.projectDocumentEpoch),
+  );
 }
 
 // File → Recent Projects and Edit → Settings act on their own stores.

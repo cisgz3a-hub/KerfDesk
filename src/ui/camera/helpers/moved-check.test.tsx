@@ -14,7 +14,12 @@ import { useCameraStore } from '../../state/camera-store';
 import { resetStore } from '../../state/test-helpers';
 import { useToastStore } from '../../state/toast-store';
 import { CameraMovedNotice } from '../panel/CameraMovedNotice';
-import { checkCameraMoved, useCameraMovedStore } from './moved-check';
+import {
+  cameraMovedWarningDismissed,
+  checkCameraMoved,
+  markCameraSteady,
+  useCameraMovedStore,
+} from './moved-check';
 import { saveViewReference } from './view-reference';
 
 const source = {
@@ -75,6 +80,7 @@ beforeEach(() => {
 
 afterEach(() => {
   useCameraStore.setState(initialCamera);
+  useToastStore.getState().dismissToastKey('camera-moved');
 });
 
 describe('checkCameraMoved', () => {
@@ -102,6 +108,63 @@ describe('checkCameraMoved', () => {
     expect(useToastStore.getState().toasts).toHaveLength(1);
   });
 
+  it('toasts again when small shifts cumulatively cross the dismissed move threshold', () => {
+    useCameraStore.setState({ panelOpen: false });
+    saveViewReference(record, viewThumbnail(frame(0, 0)));
+    const first = checkCameraMoved(source, frame(12, -7));
+    if (first.kind !== 'moved') throw new Error('Expected the initial camera move');
+    useCameraMovedStore.getState().dismiss();
+    useToastStore.getState().dismissToastKey('camera-moved');
+
+    const next = checkCameraMoved(source, frame(13, -7));
+    if (next.kind !== 'moved') throw new Error('Expected the next camera move');
+    expect(next.mm - first.mm).toBeGreaterThan(0);
+    expect(next.mm - first.mm).toBeLessThan(1);
+    expect(useToastStore.getState().toasts).toHaveLength(0);
+
+    const crossed = checkCameraMoved(source, frame(14, -7));
+    if (crossed.kind !== 'moved') throw new Error('Expected the accumulated camera move');
+    expect(crossed.mm - next.mm).toBeGreaterThan(0);
+    expect(crossed.mm - next.mm).toBeLessThan(1);
+    expect(crossed.mm - first.mm).toBeGreaterThanOrEqual(1);
+    expect(useToastStore.getState().toasts.map((toast) => toast.message)).toEqual([
+      `The camera may have moved, by about ${crossed.mm.toFixed(1)} mm. Open Camera to fix it.`,
+    ]);
+    const toast = useToastStore.getState().toasts[0];
+    checkCameraMoved(source, frame(14, -7));
+    expect(useToastStore.getState().toasts[0]).toBe(toast);
+
+    useCameraMovedStore.getState().dismiss();
+    useToastStore.getState().dismissToastKey('camera-moved');
+    expect(checkCameraMoved(source, frame(0, 0))).toEqual({ kind: 'steady' });
+    expect(useCameraMovedStore.getState().dismissedFor).toBeNull();
+    checkCameraMoved(source, frame(12, -7));
+    expect(useToastStore.getState().toasts).toHaveLength(1);
+  });
+
+  it.each([
+    ['reverses direction', 12, -7, -12, 7],
+    ['moves back toward the reference', 20, -7, 12, -7],
+  ] as const)('re-arms after the camera %s from its dismissed position', (kind, x, y, nx, ny) => {
+    useCameraStore.setState({ panelOpen: false });
+    saveViewReference(record, viewThumbnail(frame(0, 0)));
+    const first = checkCameraMoved(source, frame(x, y));
+    if (first.kind !== 'moved') throw new Error('Expected the initial camera move');
+    useCameraMovedStore.getState().dismiss();
+    useToastStore.getState().dismissToastKey('camera-moved');
+
+    const next = checkCameraMoved(source, frame(nx, ny));
+    if (next.kind !== 'moved') throw new Error('Expected another camera move');
+    if (kind === 'reverses direction') expect(Math.abs(next.mm - first.mm)).toBeLessThan(1);
+    else expect(next.mm).toBeLessThan(first.mm - 1);
+    expect(
+      cameraMovedWarningDismissed(next, useCameraMovedStore.getState().dismissedFor),
+      JSON.stringify({ first, next }),
+    ).toBe(false);
+    expect(useToastStore.getState().toasts.map((toast) => toast.message)).toEqual([
+      `The camera may have moved, by about ${next.mm.toFixed(1)} mm. Open Camera to fix it.`,
+    ]);
+  });
   it('does not check a camera on the laser head', () => {
     const head = {
       ...record,
@@ -116,7 +179,12 @@ describe('checkCameraMoved', () => {
 describe('the warning in the Camera panel', () => {
   it('offers the fix and the check, and Dismiss keeps it quiet for this calibration', async () => {
     useCameraMovedStore.setState({
-      state: { kind: 'moved', mm: 2.4, calibratedAt: record.calibratedAt },
+      state: {
+        kind: 'moved',
+        mm: 2.4,
+        offsetMm: { x: 2.4, y: 0 },
+        calibratedAt: record.calibratedAt,
+      },
     });
     const host = await mountControl(<CameraMovedNotice />);
     expect(host.textContent).toContain('The camera may have moved, by about 2.4 mm.');
@@ -126,9 +194,57 @@ describe('the warning in the Camera panel', () => {
     expect(host.textContent).toBe('');
     await act(async () =>
       useCameraMovedStore.setState({
-        state: { kind: 'moved', mm: 3, calibratedAt: record.calibratedAt },
+        state: {
+          kind: 'moved',
+          mm: 3,
+          offsetMm: { x: 3, y: 0 },
+          calibratedAt: record.calibratedAt,
+        },
       }),
     );
     expect(host.textContent).toBe('');
+  });
+
+  // Audit follow-up to #1405: a nudge fix keeps calibratedAt, so a dismissal
+  // keyed on the calibration alone silenced every later move for good.
+  it('warns again after the view was confirmed steady, or for a clearly bigger move', async () => {
+    useCameraMovedStore.setState({
+      state: {
+        kind: 'moved',
+        mm: 2.4,
+        offsetMm: { x: 2.4, y: 0 },
+        calibratedAt: record.calibratedAt,
+      },
+    });
+    const host = await mountControl(<CameraMovedNotice />);
+    await clickControl(host, 'Dismiss');
+    expect(host.textContent).toBe('');
+
+    await act(async () =>
+      useCameraMovedStore.setState({
+        state: {
+          kind: 'moved',
+          mm: 3.6,
+          offsetMm: { x: 3.6, y: 0 },
+          calibratedAt: record.calibratedAt,
+        },
+      }),
+    );
+    expect(host.textContent).toContain('by about 3.6 mm');
+
+    await clickControl(host, 'Dismiss');
+    await act(async () => markCameraSteady());
+    expect(useCameraMovedStore.getState().dismissedFor).toBeNull();
+    await act(async () =>
+      useCameraMovedStore.setState({
+        state: {
+          kind: 'moved',
+          mm: 1.5,
+          offsetMm: { x: 1.5, y: 0 },
+          calibratedAt: record.calibratedAt,
+        },
+      }),
+    );
+    expect(host.textContent).toContain('by about 1.5 mm');
   });
 });

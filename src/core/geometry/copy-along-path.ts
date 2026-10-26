@@ -130,7 +130,7 @@ function resolveCopies(
 ): Resolved | CopyAlongPathShortfall {
   const along = alongPath(guide, source, spec);
   const result =
-    spec.mode === 'gap' && copyScale(spec, 1, 2) !== 1
+    spec.mode === 'gap'
       ? scaledGapDistances(guide, source, spec, along.startMm, maxCopies)
       : guide.closed
         ? closedDistances(along, maxCopies)

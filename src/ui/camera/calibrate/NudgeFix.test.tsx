@@ -79,6 +79,21 @@ async function photoWithOffset(x: number, y: number): Promise<void> {
 }
 
 describe('the quick nudge fix', () => {
+  it.each([false, true])('ignores a stale burn completion (started: %s)', async (started) => {
+    let finish!: (value: boolean) => void;
+    useLaserStore.setState({ connection: { kind: 'connected' } });
+    vi.mocked(engraveNudgeRing).mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    await openNudge();
+    await clickControl(document.body, 'Burn the ring');
+    await act(async () => {
+      useCameraCalibrationStore.getState().closeWizard();
+      useCameraCalibrationStore.getState().openNudge();
+    });
+    const reopened = useCameraCalibrationStore.getState().step;
+    await act(async () => finish(started));
+    expect(useCameraCalibrationStore.getState().step).toBe(reopened);
+  });
+
   it('burns one ring through the job path and goes on to the photo when it finishes', async () => {
     useLaserStore.setState({ connection: { kind: 'connected' } });
     vi.mocked(engraveNudgeRing).mockResolvedValue(true);
@@ -160,42 +175,103 @@ describe('the quick nudge fix', () => {
     await mountControl(<CalibrateCameraControls />);
     expect(() => control(document.body, 'Fix a small offset…')).toThrow();
   });
+
+  it('ignores a late photo after closing and reopening the nudge wizard', async () => {
+    let finish!: (outcome: NudgeActions.NudgePhotoOutcome) => void;
+    vi.mocked(photographNudgeRing).mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    await openNudge();
+    await clickControl(document.body, 'Ring already burned');
+    await clickControl(document.body, 'Take photo');
+    await act(async () => {
+      useCameraCalibrationStore.getState().closeWizard();
+      useCameraCalibrationStore.getState().openNudge();
+    });
+    await act(async () => finish({ kind: 'ok', offsetMm: { x: 2, y: 0 } }));
+    expect(useCameraCalibrationStore.getState().step.kind).toBe('nudge-setup');
+  });
+
+  it.each(['document', 'profile', 'camera', 'settings'] as const)(
+    'retires a result when its %s changes, even if the old context returns',
+    async (change) => {
+      await photoWithOffset(2, 0);
+      const app = useStore.getState();
+      const camera = useCameraStore.getState();
+      const wizard = useCameraCalibrationStore.getState();
+      await act(async () => {
+        if (change === 'document') {
+          useStore.setState({ projectDocumentEpoch: app.projectDocumentEpoch + 1 });
+        } else if (change === 'profile') {
+          useStore.setState({ project: { ...app.project, device: { ...app.project.device } } });
+          useStore.setState({ project: app.project });
+        } else if (change === 'camera') {
+          useCameraStore.setState({ sourceState: { kind: 'idle' } });
+          useCameraStore.setState({ sourceState: camera.sourceState });
+        } else {
+          wizard.updateSettings({ sheetThicknessMm: wizard.settings.sheetThicknessMm + 1 });
+          useCameraCalibrationStore.setState({ settings: wizard.settings });
+        }
+      });
+      expect(() => control(document.body, 'Fix')).toThrow();
+      expect(useStore.getState().project.device.cameraModel).toBe(app.project.device.cameraModel);
+      expect(useCameraCalibrationStore.getState().step).toMatchObject({ kind: 'nudge-photo' });
+    },
+  );
+
+  it('keeps a pending photo and its result through minimize and expand', async () => {
+    let finish!: (outcome: NudgeActions.NudgePhotoOutcome) => void;
+    vi.mocked(photographNudgeRing).mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    await openNudge();
+    await clickControl(document.body, 'Ring already burned');
+    await clickControl(document.body, 'Take photo');
+    await clickControl(document.body, 'Minimize');
+    await act(async () => finish({ kind: 'ok', offsetMm: { x: 2, y: 0 } }));
+    await clickControl(document.body, 'Expand');
+    await clickControl(document.body, 'Fix');
+    expect(useCameraCalibrationStore.getState().open).toBe(false);
+  });
 });
 
 describe('finding the burned ring in a photo', () => {
-  it('measures a picture that shows the ring off where it burned', async () => {
-    const { photographNudgeRing: photograph } =
-      await vi.importActual<typeof NudgeActions>('./nudge-actions');
-    // The saved camera places the ring 1.5 mm left of and 0.5 mm above the burn
-    // in the middle of the 400 × 400 mm bed.
-    const gray = renderTargetScene({
-      lens: wideLens(),
-      pose: overheadPose(),
-      layout: {
-        marks: [{ col: 0, row: 0, x: 198.5, y: 199.5, anchor: false }],
-        spacingMm: 40,
-        ringDiameterMm: 10,
-        ringWidthMm: 1.8,
-      },
-      sheet: { x: 150, y: 150, width: 100, height: 100 },
-      sheetThicknessMm: 3,
-      noise: 2,
-    });
-    const rgba = new Uint8ClampedArray(gray.width * gray.height * 4);
-    for (let index = 0; index < gray.width * gray.height; index += 1) {
-      const value = gray.data[index] ?? 0;
-      rgba.set([value, value, value, 255], index * 4);
-    }
-    const frame = { width: gray.width, height: gray.height, data: rgba };
-    const outcome = await photograph({
-      source: machine,
-      sheetThicknessMm: 3,
-      capture: async () => frame,
-    });
-    expect(outcome.kind).toBe('ok');
-    if (outcome.kind !== 'ok') return;
-    // One ring about 14 px across, seen in perspective: a tenth of a millimetre.
-    expect(Math.abs(outcome.offsetMm.x - 1.5)).toBeLessThan(0.15);
-    expect(Math.abs(outcome.offsetMm.y - 0.5)).toBeLessThan(0.15);
-  }, 30_000);
+  it.each([false, true])(
+    'measures against the bed captured at request time (bed changes: %s)',
+    async (changeBed) => {
+      const { photographNudgeRing: photograph } =
+        await vi.importActual<typeof NudgeActions>('./nudge-actions');
+      // The saved camera places the ring 1.5 mm left of and 0.5 mm above the burn
+      // in the middle of the 400 × 400 mm bed.
+      const gray = renderTargetScene({
+        lens: wideLens(),
+        pose: overheadPose(),
+        layout: {
+          marks: [{ col: 0, row: 0, x: 198.5, y: 199.5, anchor: false }],
+          spacingMm: 40,
+          ringDiameterMm: 10,
+          ringWidthMm: 1.8,
+        },
+        sheet: { x: 150, y: 150, width: 100, height: 100 },
+        sheetThicknessMm: 3,
+        noise: 2,
+      });
+      const rgba = new Uint8ClampedArray(gray.width * gray.height * 4);
+      for (let index = 0; index < gray.width * gray.height; index += 1) {
+        const value = gray.data[index] ?? 0;
+        rgba.set([value, value, value, 255], index * 4);
+      }
+      const frame = { width: gray.width, height: gray.height, data: rgba };
+      const outcome = await photograph({
+        source: machine,
+        sheetThicknessMm: 3,
+        capture: async () => {
+          if (changeBed) useStore.getState().updateDeviceProfile({ bedWidth: 800 });
+          return frame;
+        },
+      });
+      expect(outcome.kind).toBe('ok');
+      if (outcome.kind !== 'ok') return;
+      // One ring about 14 px across, seen in perspective: a tenth of a millimetre.
+      expect(Math.abs(outcome.offsetMm.x - 1.5)).toBeLessThan(0.15);
+      expect(Math.abs(outcome.offsetMm.y - 0.5)).toBeLessThan(0.15);
+    },
+    30_000,
+  );
 });

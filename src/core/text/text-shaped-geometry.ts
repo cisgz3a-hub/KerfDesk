@@ -1,5 +1,6 @@
 import type * as opentype from 'opentype.js';
 import { textOutlineGeometry, type TextOutlineGeometry } from './text-outline-path';
+import type { GlyphOutlineGeometry } from './text-glyph-geometry';
 import type { TextShaping } from './text-shaping-types';
 
 export function shapedLineWidth(
@@ -25,9 +26,11 @@ export function shapedTextGeometry(
   x: number,
   y: number,
   tracking: number,
-): TextOutlineGeometry {
+): GlyphOutlineGeometry {
   const line = shaping.line(start, start + length);
-  const commands: opentype.PathCommand[] = [];
+  const polylines: TextOutlineGeometry['polylines'][number][] = [];
+  const curves: TextOutlineGeometry['curves'][number][] = [];
+  const glyphContours: number[] = [];
   for (const glyph of line.glyphs) {
     const path = font.glyphs
       .get(glyph.id)
@@ -36,7 +39,10 @@ export function shapedTextGeometry(
         y + (glyph.y * size) / font.unitsPerEm,
         size,
       );
-    commands.push(...path.commands);
+    const geometry = textOutlineGeometry(path.commands);
+    polylines.push(...geometry.polylines);
+    curves.push(...geometry.curves);
+    glyphContours.push(...geometry.polylines.map(() => glyph.cluster));
   }
-  return textOutlineGeometry(commands);
+  return { polylines, curves, glyphContours };
 }

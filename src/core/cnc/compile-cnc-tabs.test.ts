@@ -252,7 +252,8 @@ describe('compileCncJob holding tabs (ADR-258)', () => {
   });
 
   it('keeps holding tabs on the finishing pass so the part is not fully severed', () => {
-    const allowanceMm = 2;
+    // Under the 1/8 in bit's radius, so the finish stays one pass (ADR-140 Amendment 2).
+    const allowanceMm = 1;
     const group = onlyGroup(
       sceneWith(
         [

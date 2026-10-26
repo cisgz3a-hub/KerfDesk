@@ -1,5 +1,13 @@
-import { FillRule, intersectD, isPositiveD, type PathsD } from 'clipper2-ts';
+import {
+  FillRule,
+  intersectD,
+  isPositiveD,
+  pointInPolygonD,
+  PointInPolygonResult,
+  type PathsD,
+} from 'clipper2-ts';
 import { tryVectorOp } from '../geometry/vector-path-tools';
+import type { Polyline } from '../scene';
 import {
   componentRegions,
   offsetAdaptivePaths,
@@ -9,6 +17,16 @@ import {
 import { sequencesForComponent, type AdaptivePocketSequence } from './adaptive-pocket-sequences';
 
 type IslandResult =
+  | {
+      readonly ok: true;
+      readonly sequences: ReadonlyArray<AdaptivePocketSequence>;
+      // Every wall and island of the whole region. The planner runs each one
+      // after the clearing beside it (ADR-154 Amendment 4).
+      readonly cleanupRings: ReadonlyArray<Polyline>;
+      readonly partitionCount: number;
+    }
+  | { readonly ok: false; readonly reason: string };
+type CellResult =
   | {
       readonly ok: true;
       readonly sequences: ReadonlyArray<AdaptivePocketSequence>;
@@ -22,7 +40,15 @@ type Bounds = {
   readonly maxY: number;
 };
 
-/** Partition at island bounds so rectangular fixtures retain convex independent clearing cells. */
+/**
+ * Partition at island bounds so rectangular fixtures retain convex independent
+ * clearing cells. A cell corner must lie on a wall or an island, where the
+ * cleanup rings reach it. Where an island's x bound crossed another's y bound
+ * in open stock, the four cells' corners there kept a full-depth pin of stock,
+ * 0.858 r^2, that no pass removed (CNC audit v1 F2-P1-1). Such a pocket is cut
+ * into strips across its shorter side instead: each island spans whole strips,
+ * so no cut line crosses another (ADR-154 Amendment 4).
+ */
 export function adaptiveIslandSequences(
   region: PathsD,
   diameterMm: number,
@@ -30,8 +56,12 @@ export function adaptiveIslandSequences(
 ): IslandResult {
   const bounds = regionBounds(region);
   if (bounds === null) return fail('Island adaptive planning has no finite bounds.');
-  const xs = islandCuts(region, bounds, 'x'),
+  let xs = islandCuts(region, bounds, 'x'),
     ys = islandCuts(region, bounds, 'y');
+  if (cutsCrossInStock(region, xs, ys)) {
+    if (bounds.maxX - bounds.minX >= bounds.maxY - bounds.minY) ys = [bounds.minY, bounds.maxY];
+    else xs = [bounds.minX, bounds.maxX];
+  }
   if ((xs.length - 1) * (ys.length - 1) > 256)
     return fail('Island adaptive planning exceeds the 256-cell partition budget.');
   const sequences: AdaptivePocketSequence[] = [];
@@ -47,16 +77,29 @@ export function adaptiveIslandSequences(
     }
   const finish = offsetAdaptivePaths(region, -diameterMm / 2, ADAPTIVE_FINISH_ARC_TOLERANCE_MM);
   if (finish === null) return fail('Island adaptive final wall cleanup could not be calculated.');
-  const lastIndex = sequences.length - 1;
-  const last = sequences[lastIndex];
-  if (last !== undefined)
-    sequences[lastIndex] = {
-      ...last,
-      finishRings: [...last.finishRings, ...finish.map(toPolyline)],
-    };
   return sequences.length === 0
     ? fail('Island adaptive planning found no reachable partitions.')
-    : { ok: true, sequences, partitionCount };
+    : { ok: true, sequences, cleanupRings: finish.map(toPolyline), partitionCount };
+}
+
+// Whether two inner cut lines cross at a point of stock off every wall.
+function cutsCrossInStock(
+  region: PathsD,
+  xs: ReadonlyArray<number>,
+  ys: ReadonlyArray<number>,
+): boolean {
+  for (const x of xs.slice(1, -1))
+    for (const y of ys.slice(1, -1)) {
+      let inside = false,
+        onWall = false;
+      for (const path of region) {
+        const result = pointInPolygonD({ x, y }, path, 3);
+        if (result === PointInPolygonResult.IsOn) onWall = true;
+        else if (result === PointInPolygonResult.IsInside) inside = !inside;
+      }
+      if (inside && !onWall) return true;
+    }
+  return false;
 }
 
 function cellSequences(
@@ -64,7 +107,7 @@ function cellSequences(
   bounds: Bounds,
   diameterMm: number,
   loadMm: number,
-): IslandResult {
+): CellResult {
   const clip = [
     [
       { x: bounds.minX, y: bounds.minY },
@@ -120,7 +163,7 @@ function regionBounds(region: PathsD): Bounds | null {
   return Number.isFinite(minX + minY + maxX + maxY) ? { minX, maxX, minY, maxY } : null;
 }
 
-function fail(reason: string): IslandResult {
+function fail(reason: string): { readonly ok: false; readonly reason: string } {
   return { ok: false, reason };
 }
 

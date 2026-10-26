@@ -8,6 +8,7 @@ import type { PathNodeRef } from './path-node-edit-actions';
 import { pruneOrphanLayers, pushUndo } from './scene-mutations';
 import { removeObjectIdsFromGroups, selectedObjectIds } from './scene-group-actions';
 import { useToastStore } from './toast-store';
+import { repairRemovedObjectReferences } from './repair-object-dependencies';
 
 export type VectorRepairActions = {
   readonly unionSilhouetteSelection: (operationId: string) => boolean;
@@ -150,7 +151,7 @@ function joinSelection(state: RepairState, toleranceMm: number): RepairState | R
     );
   return commitRepair(
     state,
-    next,
+    repairRemovedObjectReferences(next).scene,
     plan.objects.map((object) => object.id),
   );
 }

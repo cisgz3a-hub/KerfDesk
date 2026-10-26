@@ -178,18 +178,25 @@ describe('the first reconnect after a lost link', () => {
   );
 
   it(
-    'keeps the restart at the first unacknowledged line when the controller kept running',
+    'keeps a quiet USB Idle reconnect unknown and names the backlog a restart discarded',
     async () => {
       const { h, saved, gcode } = await loseLinkWithPlannerFull();
-      // No banner: the board did not reset, and answers the status query.
+      // This is a fresh controller with an empty planner, but its USB startup
+      // banner was missed. Idle cannot distinguish it from one that finished.
       h.simulator = await connectSimulator({ emitBannerOnOpen: false });
       const revised = await settledCapsule(h.repository, saved);
-      expect(revised.interruption).toEqual({
+      expect(revised.interruption).toMatchObject({
         kind: 'disconnect',
-        message: saved.interruption.message,
+        unconfirmedPlannerBacklog: saved.interruption.plannerBacklogIfRestarted,
         sentLines: saved.interruption.sentLines,
       });
-      expect(automaticRecoveryRestart(revised)?.line).toBe(rawResumeLine(gcode, saved.ackedLines));
+      expect(revised.interruption.message).toContain(
+        'does not show whether the controller restarted',
+      );
+      expect(revised.interruption.message).not.toContain('It sent its startup banner');
+      const restart = automaticRecoveryRestart(revised);
+      expect(restart?.line).toBe(rawResumeLine(gcode, saved.ackedLines));
+      expect(restart?.ifRestarted?.line).toBeLessThan(restart?.line ?? 0);
       expect(recoveryHeadStop(revised)).not.toBeNull();
     },
     STRESS_TIMEOUT_MS,

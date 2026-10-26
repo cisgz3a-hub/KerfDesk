@@ -1,9 +1,10 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef } from 'react';
 import { helpProps } from '../help/help-topics';
 import { useLaserStore } from '../state/laser-store';
 import type { SerialTranscriptEntry } from '../state/laser-transcript';
 import { ConsoleCommandDeck } from './console/ConsoleCommandDeck';
 import { useTranscriptCopy } from './console/use-transcript-copy';
+import { useConsoleWorkspaceState } from './console/console-workspace-state';
 
 // `active` is false while the docked console's section is collapsed. The
 // transcript publishes several times a second during a job, so a hidden
@@ -14,8 +15,8 @@ export function ConsolePanel({ active = true }: { readonly active?: boolean } = 
   const transcript = useLaserStore((state) => (active ? state.transcript : shown.current));
   shown.current = transcript;
   const clearTranscript = useLaserStore((state) => state.clearTranscript);
-  const [showStatus, setShowStatus] = useState(false);
-  const [showStream, setShowStream] = useState(false);
+  const showStatus = useConsoleWorkspaceState((state) => state.showStatus);
+  const showStream = useConsoleWorkspaceState((state) => state.showStream);
   const { copyState, manualText, copy, reset } = useTranscriptCopy();
   const visible = useMemo(
     () => visibleEntries(transcript, { showStatus, showStream }),
@@ -39,11 +40,11 @@ export function ConsolePanel({ active = true }: { readonly active?: boolean } = 
         showStream={showStream}
         onShowStatus={(value) => {
           reset();
-          setShowStatus(value);
+          useConsoleWorkspaceState.setState({ showStatus: value });
         }}
         onShowStream={(value) => {
           reset();
-          setShowStream(value);
+          useConsoleWorkspaceState.setState({ showStream: value });
         }}
       />
       <ConsoleTranscript visible={visible} />
@@ -61,7 +62,7 @@ export function ConsolePanel({ active = true }: { readonly active?: boolean } = 
         </label>
       ) : null}
       <div style={commandDeckWrapStyle}>
-        <ConsoleCommandDeck enableHistory={false} ariaLabel="Docked console commands" />
+        <ConsoleCommandDeck enableHistory={false} retainDraft ariaLabel="Docked console commands" />
       </div>
     </section>
   );

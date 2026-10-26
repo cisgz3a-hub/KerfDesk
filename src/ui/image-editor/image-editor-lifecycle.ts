@@ -34,6 +34,7 @@ export function closeEditorAction(set: Setter, get: () => ImageEditorState): voi
   set((state) => ({
     session: null,
     sessionOwner: null,
+    tool: toolForNewSession(state.tool),
     loadState: { kind: 'idle' },
     view: null,
     isSpacePanning: false,
@@ -93,6 +94,7 @@ export function openEditorAction(
   set((state) => ({
     session: null,
     sessionOwner: null,
+    tool: toolForNewSession(state.tool),
     stash: stashSession(
       state.stash,
       image.id,
@@ -295,6 +297,7 @@ function resumeStashedSession(
     return {
       session: stashed.session,
       sessionOwner: resumedOwner,
+      tool: toolForNewSession(state.tool),
       stash:
         currentSession === null || currentSession.objectId === objectId
           ? remainingStash
@@ -309,4 +312,10 @@ function resumeStashedSession(
       applyRequest: isResumingApply ? state.applyRequest : null,
     };
   });
+}
+
+function toolForNewSession(tool: ImageEditorState['tool']): ImageEditorState['tool'] {
+  // Clone coordinates belong to the image where Alt-click established them.
+  // Keep the chosen tool while requiring a fresh source for a new session.
+  return tool.kind === 'clone' ? { kind: 'clone', source: null, offset: null } : tool;
 }

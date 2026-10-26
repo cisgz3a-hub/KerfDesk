@@ -38,7 +38,10 @@ type BoardCaptureHandlerArgs = {
   readonly livePosition: Vec2 | null;
   readonly device: DeviceProfile;
   readonly setOriginHere: () => Promise<void>;
-  readonly setOriginAtMachinePoint: (pointMm: Vec2) => Promise<void>;
+  readonly setOriginAtMachinePoint: (
+    pointMm: Vec2,
+    assertTargetCurrent?: () => void,
+  ) => Promise<void>;
   readonly addCapturedBoard: (shape: BoardShape) => void;
   readonly registerCapturedBoardOutline: (
     shape: Extract<BoardShape, { readonly kind: 'outline' }>,
