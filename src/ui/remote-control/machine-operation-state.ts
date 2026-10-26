@@ -16,6 +16,8 @@ export type OwnedMachineOperation = {
   /** Raw preparation diagnostics stay PC-only without sharing, even after a source disappears. */
   privateMessage?: true;
   motionId?: LaserMotionOperationId;
+  /** The motion this operation already sent its one native Cancel for (ADR-585 Amendment 1). */
+  cancelledMotionId?: LaserMotionOperationId;
   runId?: string;
   streamerEpoch?: number;
   motionSettled?: Promise<void>;
