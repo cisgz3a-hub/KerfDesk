@@ -152,7 +152,9 @@ export type GcodeMetadata = {
 // ADR-127 Amd 1 keeps a placed rotary job on its anchor.
 // ADR-672 closes CNC Outside/Inside outlines whose ends meet within 0.5 mm, so
 // they are offset as closed shapes; carries forward v30 above.
-export const EMITTER_REVISION = 'cnc-profile-closes-open-outlines-20261026-v31';
+// ADR-412 Amd 2 keeps every relief cut inside the relief's own footprint: the
+// stock past its map stands at the stock top; carries forward v31 above.
+export const EMITTER_REVISION = 'relief-footprint-edge-20261027-v32';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

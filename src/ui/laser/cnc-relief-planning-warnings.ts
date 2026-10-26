@@ -12,14 +12,21 @@ import {
   reliefFinishStrategyFor,
 } from '../../core/relief/relief-finishing-strategy';
 import {
+  applyTransform,
   DEFAULT_CNC_LAYER_SETTINGS,
   sceneObjectUsesOperation,
   type Layer,
   type Project,
+  type ReliefObject,
+  type Vec2,
 } from '../../core/scene';
+// Deep import: core/cnc's barrel is a ratcheted over-cap legacy barrel.
+import { reliefMachineSpaceGeometry } from '../../core/cnc/relief-machine-space';
 
 const RECOMMENDED_STEPOVER_MIN_PERCENT = 10;
 const RECOMMENDED_STEPOVER_MAX_PERCENT = 85;
+// Footprints sharing less than an output quantum across only touch.
+const FOOTPRINT_OVERLAP_MM = 0.001;
 
 type CncCompilation = NonNullable<Job['cncCompilation']>;
 type CncReliefPlan = NonNullable<CncCompilation['reliefPlans']>[number];
@@ -40,7 +47,9 @@ export function detectCncReliefPlanningWarnings(
     ...compiledReliefPlanningWarnings(project, compiled?.reliefPlans ?? []),
     ...reliefProjectionOrderWarnings(project, compiledJob),
     ...sourceReliefPlanningWarnings(project, compiled, sourceGeometryChecks),
-    ...(sourceGeometryChecks === 'full' ? mixedReliefLayerWarnings(project) : []),
+    ...(sourceGeometryChecks === 'full'
+      ? [...mixedReliefLayerWarnings(project), ...overlappingReliefWarnings(project)]
+      : []),
   ];
   return unique(warnings);
 }
@@ -157,6 +166,79 @@ function mixedReliefLayerWarnings(project: Project): ReadonlyArray<string> {
         'shows their compiled motions together.',
     ];
   });
+}
+
+// ADR-412 Amendment 2: a relief is carved to its own surface inside its own
+// footprint and never past it, so reliefs side by side never cut each other.
+// Where two footprints overlap, each still carves the shared area to its own
+// surface, on one operation or on two, so each cut reaches into the other.
+function overlappingReliefWarnings(project: Project): ReadonlyArray<string> {
+  const placed = project.scene.objects.flatMap((object) => {
+    if (object.kind !== 'relief') return [];
+    const layers = project.scene.layers.filter(
+      (layer) => layer.output && sceneObjectUsesOperation(object, layer),
+    );
+    return layers.length === 0 ? [] : [{ relief: object, layers, footprint: footprintOf(object) }];
+  });
+  return placed.flatMap((first, index) =>
+    placed
+      .slice(index + 1)
+      .filter((second) => footprintsOverlap(first.footprint, second.footprint))
+      .map(
+        (second) =>
+          `Reliefs ${placedReliefLabel(first)} and ${placedReliefLabel(second)} overlap. Each ` +
+          'relief is carved to its own surface across its whole footprint, so where the ' +
+          'footprints overlap each cut reaches into the other relief. Move them apart, or ' +
+          'join them into one relief, before running.',
+      ),
+  );
+}
+
+function placedReliefLabel(placed: {
+  readonly relief: ReliefObject;
+  readonly layers: ReadonlyArray<Layer>;
+}): string {
+  const names = placed.layers.map((layer) => `"${layer.name}"`).join(', ');
+  return `"${placed.relief.source}" (layer ${names})`;
+}
+
+// The placed corners of the map a relief is carved inside.
+function footprintOf(relief: ReliefObject): ReadonlyArray<Vec2> {
+  const { widthMm, heightMm, residualTransform } = reliefMachineSpaceGeometry(relief);
+  return [
+    { x: 0, y: 0 },
+    { x: widthMm, y: 0 },
+    { x: widthMm, y: heightMm },
+    { x: 0, y: heightMm },
+  ].map((corner) => applyTransform(corner, residualTransform));
+}
+
+// Two convex footprints share area unless one of their edge normals separates
+// them; footprints that only touch along an edge share none.
+function footprintsOverlap(a: ReadonlyArray<Vec2>, b: ReadonlyArray<Vec2>): boolean {
+  for (const polygon of [a, b]) {
+    for (let index = 0; index < polygon.length; index += 1) {
+      const from = polygon[index];
+      const to = polygon[(index + 1) % polygon.length];
+      if (from === undefined || to === undefined) continue;
+      const length = Math.hypot(to.x - from.x, to.y - from.y);
+      if (!(length > 0)) continue;
+      const axis = { x: (from.y - to.y) / length, y: (to.x - from.x) / length };
+      const spanA = projectedSpan(a, axis);
+      const spanB = projectedSpan(b, axis);
+      const shared = Math.min(spanA.max, spanB.max) - Math.max(spanA.min, spanB.min);
+      if (!(shared > FOOTPRINT_OVERLAP_MM)) return false;
+    }
+  }
+  return true;
+}
+
+function projectedSpan(
+  polygon: ReadonlyArray<Vec2>,
+  axis: Vec2,
+): { readonly min: number; readonly max: number } {
+  const along = polygon.map((point) => point.x * axis.x + point.y * axis.y);
+  return { min: Math.min(...along), max: Math.max(...along) };
 }
 
 function oversizedReliefGridWarnings(project: Project, plan: CncReliefPlan): ReadonlyArray<string> {

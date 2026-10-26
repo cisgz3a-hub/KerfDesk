@@ -148,10 +148,41 @@ function removal(job: Job, cutter: CncTool, box: Box): RemovalGrid {
   return result.grid;
 }
 
-// Cells whose floor stands more than `slackMm` above the relief floor.
-function cellsLeftStanding(grid: RemovalGrid, slackMm: number): number {
+// ADR-412 Amendment 2: roughing stays inside the relief's footprint, so its
+// edge is a wall. The bit's centre keeps its reach of the edge plus the
+// contour clearance (sqrt(10)/4 cells, ADR-412) and up to half a cell more, so
+// stock may stand within that band of the edge, and in the corners a round
+// bit cannot reach; finishing takes it. A tapered ball nose reaches the floor
+// only near its tip, and on a slope only where the bit's axis can stand does
+// a cell keep the plain terrace, so either widens the band by the radius.
+// Coverage is judged inside.
+function insideEdgeBand(
+  box: Box,
+  cutter: CncTool,
+  axisOnly = false,
+): (x: number, y: number) => boolean {
+  const clearanceMm = (Math.sqrt(10) / 4 + 1) * (cutter.diameterMm / 8);
+  const bandMm =
+    cutter.kind === 'end-mill' && !axisOnly ? clearanceMm : cutter.diameterMm / 2 + clearanceMm;
+  const cornerMm = cutter.diameterMm / 2 + clearanceMm;
+  return (x, y) => {
+    const nearX = Math.min(x - box.minX, box.maxX - x);
+    const nearY = Math.min(y - box.minY, box.maxY - y);
+    return Math.min(nearX, nearY) > bandMm && !(nearX < cornerMm && nearY < cornerMm);
+  };
+}
+
+// Cells inside the edge band whose floor stands more than `slackMm` above the
+// relief floor.
+function cellsLeftStanding(grid: RemovalGrid, slackMm: number, box: Box, cutter: CncTool): number {
+  const inside = insideEdgeBand(box, cutter);
   let count = 0;
-  for (const depth of grid.depth) if (depth > -DEPTH_MM + slackMm) count += 1;
+  for (let row = 0; row < grid.heightCells; row += 1) {
+    for (let col = 0; col < grid.widthCells; col += 1) {
+      if (!inside(box.minX + (col + 0.5) * CELL_MM, box.minY + (row + 0.5) * CELL_MM)) continue;
+      if ((grid.depth[row * grid.widthCells + col] ?? 0) > -DEPTH_MM + slackMm) count += 1;
+    }
+  }
   return count;
 }
 
@@ -186,28 +217,32 @@ describe('relief roughing rings', () => {
     const relief = flatRelief(20);
     const cutter = tool('em-3175');
     const job = compile(relief, cutter, 40);
+    const box = machineBox(relief);
     // The half-sides the rings dropped left about 1,100 cells uncut to the
     // stock top on the half of the relief holding the seams.
-    expect(cellsLeftStanding(removal(job, cutter, machineBox(relief)), FLAT_SLACK_MM)).toBe(0);
+    expect(cellsLeftStanding(removal(job, cutter, box), FLAT_SLACK_MM, box, cutter)).toBe(0);
   }, 60_000);
 
   it('leave no stock at the ring seams with a tapered ball nose', () => {
     const relief = flatRelief(20);
+    const box = machineBox(relief);
     // 11% spaces the rings at most 0.69 mm apart (11% of the widest diameter),
     // close enough that no rib stands between them at a 1.5 mm level.
     const job = compile(relief, TBN, 11);
-    expect(cellsLeftStanding(removal(job, TBN, machineBox(relief)), BALL_SLACK_MM)).toBe(0);
+    expect(cellsLeftStanding(removal(job, TBN, box), BALL_SLACK_MM, box, TBN)).toBe(0);
   }, 60_000);
 });
 
 describe('relief roughing core cleanup', () => {
   it('clears the centre an end mill leaves above 50% stepover', () => {
-    // At 85% a 6.35 mm end mill's second ring stops 4.6 mm from the centre of
-    // a 20 mm relief and sweeps 3.175 mm, which left a 2.9 mm core standing.
-    const relief = flatRelief(20);
+    // The 6.35 mm end mill's outer ring rides about 3.97 mm in from the edge of
+    // a 28 mm relief (ADR-412 Amendment 2). At 85% its second ring stops 4.5
+    // mm from the centre and sweeps 3.175 mm, which left a 1.3 mm core standing.
+    const relief = flatRelief(28);
     const cutter = tool('em-6350');
     const job = compile(relief, cutter, 85);
-    expect(cellsLeftStanding(removal(job, cutter, machineBox(relief)), FLAT_SLACK_MM)).toBe(0);
+    const box = machineBox(relief);
+    expect(cellsLeftStanding(removal(job, cutter, box), FLAT_SLACK_MM, box, cutter)).toBe(0);
   }, 60_000);
 
   it('clears the centre a tapered ball nose leaves above 50% stepover', () => {
@@ -219,14 +254,16 @@ describe('relief roughing core cleanup', () => {
   }, 60_000);
 
   it('adds no pass where the rings already reach the centre', () => {
-    // A 13 mm relief at 85%: the second ring passes 1.1 mm from the centre,
-    // well inside the 3.175 mm the 6.35 mm end mill sweeps.
-    const relief = flatRelief(13);
+    // A 20.6 mm relief at 85%: the outer ring rides about 3.95 mm in from its
+    // edge, and the second passes about 0.95 mm from the centre, well inside
+    // the 3.175 mm the 6.35 mm end mill sweeps.
+    const relief = flatRelief(20.6);
     const cutter = tool('em-6350');
     const job = compile(relief, cutter, 85);
+    const box = machineBox(relief);
     // Two rings on each of the two levels, and nothing else.
     expect(roughingLoops(roughingPasses(job))).toHaveLength(4);
-    expect(cellsLeftStanding(removal(job, cutter, machineBox(relief)), FLAT_SLACK_MM)).toBe(0);
+    expect(cellsLeftStanding(removal(job, cutter, box), FLAT_SLACK_MM, box, cutter)).toBe(0);
   }, 60_000);
 });
 
@@ -255,7 +292,8 @@ describe('relief roughing motion (ADR-424)', () => {
       expect(pass.points[0]?.z).toBeGreaterThan(pass.points[pass.points.length - 1]?.z ?? 0);
       expect(pass.points[0]?.z).toBeLessThanOrEqual(0);
     }
-    expect(cellsLeftStanding(removal(job, cutter, machineBox(relief)), FLAT_SLACK_MM)).toBe(0);
+    const box = machineBox(relief);
+    expect(cellsLeftStanding(removal(job, cutter, box), FLAT_SLACK_MM, box, cutter)).toBe(0);
     // The G-code records the entry, with no advisory about ramps below the
     // stock top: each starts where the level above has cut.
     const gcode = cncGrblStrategy.emit({ groups: [group] }, DEFAULT_DEVICE_PROFILE);
@@ -311,6 +349,7 @@ describe('relief roughing fine steps (ADR-422 Amendment 1)', () => {
     const relief = pyramidRelief();
     const box = machineBox(relief);
     const grid = removal(compile(relief, cutter, 40, settings), cutter, box);
+    const inside = insideEdgeBand(box, cutter, true);
     const middle = PYRAMID_MM / 2;
     let max = Number.NEGATIVE_INFINITY;
     let min = Number.POSITIVE_INFINITY;
@@ -321,7 +360,10 @@ describe('relief roughing fine steps (ADR-422 Amendment 1)', () => {
           Math.abs((row + 0.5) * CELL_MM - middle),
         );
         const left = (grid.depth[row * grid.widthCells + col] ?? 0) + slope * off;
-        max = Math.max(max, left);
+        // Terraces count inside the edge's wall band; a gouge counts anywhere.
+        if (inside(box.minX + (col + 0.5) * CELL_MM, box.minY + (row + 0.5) * CELL_MM)) {
+          max = Math.max(max, left);
+        }
         min = Math.min(min, left);
       }
     }

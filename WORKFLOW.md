@@ -5658,6 +5658,20 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    adds a cutter move. A core-cleanup offset failure reports through the same
    warning (ADR-413).
 
+#### Edge — a relief's edge / reliefs side by side
+1. A relief is carved inside its own footprint only (ADR-412 Amendment 2).
+   Whatever lies past the edge of its map (bare stock, another relief on the
+   same or another operation, a part the job keeps) counts as stock at the
+   stock top: roughing keeps its allowance plus the contour clearance off the
+   edge, and finishing checks every move against it. A relief whose edge is
+   deep is therefore cut like a pocket, with a wall at its footprint and a
+   ball's own radius left as a fillet at the wall's foot. To clear stock round
+   a relief, draw that clearing as its own operation or enlarge the relief.
+2. Reliefs side by side never cut each other, however close. Where two
+   reliefs' footprints overlap, each still carves the shared area to its own
+   surface, so Job Review warns and names both reliefs and their layers. It is
+   a warning only.
+
 ### F-CNC7. Import an STL relief — Phase H.4 (ADR-098/309)
 
 #### Success
