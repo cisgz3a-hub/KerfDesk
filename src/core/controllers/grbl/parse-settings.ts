@@ -65,6 +65,11 @@ export type ControllerSettingsSnapshot = Partial<
   // stores and prints it, so its upper bits are what the reports carry
   // (statusReportMaskFields).
   readonly statusReportMaskIsFull?: true;
+  // This `$$` lists one of `$14`-`$18`, grblHAL's signal invert and pull-up
+  // masks, which stock GRBL leaves unused. It is how a grblHAL build that
+  // greets as "Grbl 1.1f" shows itself under a stock-GRBL profile
+  // (grblHalSignalSettingsField; ADR-375 Amendment 5).
+  readonly listsGrblHalSignalSettings?: true;
   readonly reportInches?: boolean;
   readonly homingPullOffMm?: number;
   readonly zMaxFeed?: number;
@@ -84,7 +89,7 @@ export type ControllerSettingsSnapshot = Partial<
   readonly g92PersistenceDisabled?: boolean;
   // grblHAL `$22` bit 3 "Set machine origin to 0" (force set origin), read
   // only from a dump that prints the whole `$22` bitfield (ADR-375
-  // Amendment 3); undefined for stock GRBL and FluidNC, which print 0 or 1.
+  // Amendment 4); undefined for stock GRBL and FluidNC, which print 0 or 1.
   readonly homingForceSetOrigin?: boolean;
   // `$100` / `$101` / `$102`: one step's length bounds how far the machine position a
   // status report shows can sit from the firmware's own (ADR-375).
@@ -208,6 +213,7 @@ export function settingsMapToControllerSettings(
     ...(maxFeedY === undefined ? {} : { maxFeedY }),
     ...machineModeField(map),
     ...g92PersistenceField(map),
+    ...grblHalSignalSettingsField(map),
     ...forceSetOriginField(map),
     ...stepsPerMmFields(map),
     ...zeroMaxPowerField(map),
@@ -279,12 +285,28 @@ function forceSetOriginField(
   return { homingForceSetOrigin: (flags & 8) !== 0 };
 }
 
+// grblHAL keeps its signal invert and pull-up masks in `$14`-`$18`, which stock
+// GRBL leaves unused, and its `$$` lists them at COMPATIBILITY_LEVEL 0 or 1:
+// core d7aaee3 always lists `$15` and `$18`, and Ortur's ESP32-S2 firmware
+// (level 1, greeting "Grbl 1.1f") lists all five. A stock-GRBL fork may list
+// settings of its own, as Ortur's STM32 firmware (Grbl 1.1h) lists `$33`, so
+// only these five are taken as grblHAL's (ADR-375 Amendment 5).
+// https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/settings.c#L2368-L2372
+// https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/system.c#L300-L317
+// https://github.com/Ortur-Tech/Ortur_Laser_Firmware_17X-18X/blob/4849ac85fc1f1a15c47d0dbbfc3e69450922ad32/ESPLaserMasterGrbl/main/grbl/report.c#L482-L490
+// https://github.com/Ortur-Tech/Ortur_Laser_Firmware_14X/blob/19e68f0eb6b6043a034ce36eec40151270be53dd/grbl/report.c#L233-L242
+function grblHalSignalSettingsField(
+  map: ReadonlyMap<number, string>,
+): Pick<ControllerSettingsSnapshot, 'listsGrblHalSignalSettings'> {
+  return [14, 15, 16, 17, 18].some((id) => map.has(id)) ? { listsGrblHalSignalSettings: true } : {};
+}
+
 // `$10`, and whether this dump shows it whole. grblHAL at COMPATIBILITY_LEVEL 0
 // (its default) or 1 stores the whole `$10` and prints it; above level 1 it
 // keeps the upper bits from its build and prints only bits 0 and 1
-// (settings.c). Such a level's `$$` lists only the stock GRBL settings
+// (settings.c). Such a level's `$$` lists only grblHAL's legacy settings
 // (system.c, report.c), so a `$10` above 3, or any other setting in the dump,
-// shows the whole mask. Stock GRBL lists only those settings too.
+// shows the whole mask. Stock GRBL lists only legacy settings too.
 // https://github.com/grblHAL/core/blob/4ec1ae44b857a70d2f9298344feac4b43ed0eb6b/settings.c#L862-L872
 // https://github.com/grblHAL/core/blob/4ec1ae44b857a70d2f9298344feac4b43ed0eb6b/settings.c#L1739-L1745
 // https://github.com/grblHAL/core/blob/4ec1ae44b857a70d2f9298344feac4b43ed0eb6b/system.c#L300-L318
@@ -298,12 +320,16 @@ function statusReportMaskFields(
   return isFull ? { statusReportMask, statusReportMaskIsFull: true } : { statusReportMask };
 }
 
-// $0-$7, $10-$13, $20-$27, $30-$32 and the per-axis steps, rate, acceleration
-// and travel ($100-$139): grblHAL's legacy settings, a superset of stock GRBL's.
+// $0-$7, $10-$13, $19, $20-$27, $30-$32 and the per-axis steps, rate,
+// acceleration and travel ($100-$139): grblHAL's legacy settings, a superset of
+// stock GRBL's. `$19` (probe pull-up disable) is legacy in grblHAL, so a level 2
+// build with a probe input lists it beside a `$10` cut to bits 0 and 1.
+// https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/settings.c#L2373
 function isStockGrblSetting(id: number): boolean {
   return (
     (id >= 0 && id <= 7) ||
     (id >= 10 && id <= 13) ||
+    id === 19 ||
     (id >= 20 && id <= 27) ||
     (id >= 30 && id <= 32) ||
     (id >= 100 && id <= 139)

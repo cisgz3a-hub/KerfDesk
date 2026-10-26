@@ -12,6 +12,10 @@ it would store differently: it keeps only the number at the start of a `$N=` val
 before 20261015 read `1.0` as 10 for a whole-number setting, all with `ok`. It also reads
 grblHAL's force set origin from `$22` bit 3 and keeps the hold's switch inset after this
 session's Home with soft limits off (decision 3).
+[Amendment 5](ADR-375-amendment-5-grblhal-evidence-under-a-grbl-profile.md) applies those Console
+checks, and grblHAL's `$10`, to a stock-GRBL profile whose controller shows grblHAL (a `GrblHAL`
+banner, `$14`-`$18` in its `$$`, or grblHAL lines in `$I`), and reports a value stored in part on
+every driver.
 
 A second audit of the controller layer and the controller settings (requested 2026-09-24), checked
 line by line against pinned firmware source: gnea/grbl v1.1h at `bfb67f0c`, grblHAL/core at

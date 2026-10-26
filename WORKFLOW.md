@@ -2668,7 +2668,10 @@ authorization, Frame proof, controller command, or safety boundary.
    `$22=1.0` as 10, so the message names the line to send instead. Every acknowledged write is
    read back with `$$`, so the settings table shows what the controller stored (ADR-375). When
    the re-read shows a different value than the one typed, the Console says so (ADR-375
-   Amendment 3).
+   Amendment 4), on every profile. A grblHAL board that greets as `Grbl 1.1f` (Ortur's ESP32-S2
+   lasers) runs under the stock-GRBL profile. When its `$$` lists grblHAL's `$14`-`$18`, its
+   banner reads `GrblHAL` or its `$I` names grblHAL, a value must pass the grblHAL check as well
+   as the stock one, and the refusal says why grblHAL applies (ADR-375 Amendment 5).
 
 #### Edge — arbitrary G-code
 1. Single-line G-code commands are allowed only when connected, no operation is active, and GRBL reports `Idle`.
@@ -4489,7 +4492,9 @@ it (a bounded burst of status queries, at most 3 s), homed or not, whenever Abso
 Position would otherwise assume a zero offset; if none arrives the Frame proceeds at that assumed
 zero and Job Review says so (ADR-375). On grblHAL, whose `$$` shows `$10` whole, a `$10` without
 bit 5 never sends WCO: Frame skips that wait, and the status panel, Move to position, Job Review
-and the placement refusals name the bit and the `$10` to send (ADR-375 Amendment 2). A missing
+and the placement refusals name the bit and the `$10` to send (ADR-375 Amendment 2). The same
+holds on the stock-GRBL profile when its `$$` lists grblHAL's `$14`-`$18` (ADR-375 Amendment 5).
+A missing
 report is described as missing coordinate data,
 not as a requirement to erase the work origin. Equivalent MPos/WPos reports and a first WCO
 report equal to the assumed zero do not cancel unchanged preparation, a Frame in progress, its

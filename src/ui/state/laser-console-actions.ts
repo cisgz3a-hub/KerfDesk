@@ -3,6 +3,7 @@ import type { PreparedConsoleCommand, SettingsCollectorState } from '../../core/
 import { grblSettingCommandMachineKindIssue } from '../../core/controllers/grbl/grbl-setting-write';
 import type { ControllerDriver } from '../../core/controllers';
 import { consoleSettingWriteIssue } from '../../core/controllers/console-setting-writes';
+import type { GrblHalSessionEvidence } from '../../core/controllers/grblhal/grblhal-evidence';
 import { machineKindOf } from '../../core/scene';
 import * as detectedSettings from './detected-settings-action';
 import { unqualifiedControllerSettingsPatch } from './controller-report-units';
@@ -97,7 +98,11 @@ export function consoleActions(
     sendConsoleCommand: async (input, options = {}) => {
       const prepared = refs.driver.prepareConsoleCommand(input);
       if (!prepared.ok) return block(set, get, refs, prepared.reason);
-      const settingWriteBlocked = consoleSettingWriteBlockReason(refs.driver, prepared.command);
+      const settingWriteBlocked = consoleSettingWriteBlockReason(
+        refs.driver,
+        prepared.command,
+        get(),
+      );
       if (settingWriteBlocked !== null) return block(set, get, refs, settingWriteBlocked);
       const blocked = consoleCommandBlockReason(get(), prepared.command, false);
       if (blocked !== null) return block(set, get, refs, blocked);
@@ -279,6 +284,7 @@ function invalidateConsoleCommandEvidence(set: SetFn, command: PreparedConsoleCo
 function consoleSettingWriteBlockReason(
   driver: ControllerDriver,
   command: { readonly kind: string; readonly normalized: string },
+  session: GrblHalSessionEvidence,
 ): string | null {
   const machineKindIssue = grblSettingCommandMachineKindIssue(
     machineKindOf(useStore.getState().project.machine),
@@ -287,8 +293,10 @@ function consoleSettingWriteBlockReason(
   // A profile policy, not a claim about the firmware: the Falcon A1 Pro's
   // grblHAL answers `$N=` writes, but its vendor configuration keeps settings
   // out of host software apart from the air settings Creality documents for
-  // console use (audit settings-console-10, ADR-370).
-  return machineKindIssue ?? consoleSettingWriteIssue(driver, command);
+  // console use (audit settings-console-10, ADR-370). What the controller
+  // showed of itself can put grblHAL under a stock-GRBL profile (ADR-375
+  // Amendment 5).
+  return machineKindIssue ?? consoleSettingWriteIssue(driver, command, session);
 }
 
 async function confirmFreshConsoleIdle(
