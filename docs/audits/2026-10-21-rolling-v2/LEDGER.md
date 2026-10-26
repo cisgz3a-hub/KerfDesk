@@ -133,3 +133,11 @@ Coordinator checks were made on `origin/main` @ `faf5a54f1`; no audited line cha
 | 12-P2-3 | camera | Head-camera Capture bed / Capture selection jog exactly onto the homing-side bed edge, skipping the ADR-375 pull-off limit; on GRBL with hard limits this can trip the switch (ALARM) | **READ**: `head-capture-store.ts` `jogHeadTo` sends `bedPointToNative(positionLaserTarget(...))`; Move laser here (`position-laser-click.ts:70-71`) clamps to `resolveManualMotionLimits(frame, laser)`. Refuter REPRO (6 of 48 stops on the switch) + GRBL source | fixed, #1373 merged (Corrected by meta-v1 M2, 2026-10-23) |
 | 12-P2-4 | camera | The burn check grades jobs whose bed position KerfDesk itself marks unknown (no-homing machine, User Origin), against the canvas artwork, contrary to ADR-490 §4 | refuter REPRO (`job-burn-route.ts:22` guard passes) | fixed, #1373 merged (Corrected by meta-v1 M2, 2026-10-23) |
 | 04-P2-1 | electron-main | Camera bridge's fixed loopback port has no server identity check: a squatter receives RTSP logins; operator told the wrong reason | READ `camera-bridge.ts:11,96` (fixed origin, credentials in query, no token); `camera-bridge-lifecycle.ts:19-21` only logs bind failure | open, no PR or card before meta-v1 M2 (Corrected by meta-v1 M2, 2026-10-23) |
+
+## Corrections by meta audit v1 M6 (2026-10-26)
+
+| ID | Summary | Evidence | Status |
+|---|---|---|---|
+| 03 C-D-3 / P3-10 → **P1** | Under Cut selected graphics (or with neighbours' output turned off), lead obstacles come only from the prepared job, so a laser lead burns 0.914 mm into an unselected neighbour part 0.5 mm away with no warning; the whole job burns 0 and warns. ADR-626 clause 4 promises this cannot happen; it was kept as P3 doc drift (Corrected by meta-v1 M6, 2026-10-26) | M6 + refuter REPRO on main adf300522 | open — fix card proposed |
+| 03-P2-9 gap (M6-R1, P2) | With a Line Kerf Offset, an 80 mm plate drawn open with a 0.6–1.0 mm corner gap silently loses compensation and its r5 hole is cut 0.8 mm oversize (#1345 covers gaps up to 0.5 mm only) (Corrected by meta-v1 M6, 2026-10-26) | M6 refuter REPRO | open — fix card proposed |
+| 12-P2-1 (P3 record) | Lowered as "by design" under ADR-500 Amd 1 §2, but #1437 later fixed it as a bug and ADR-440 Amd 3 reversed the basis (Corrected by meta-v1 M6, 2026-10-26) | M6 + refuter | fixed by #1437 |
