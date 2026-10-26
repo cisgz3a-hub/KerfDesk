@@ -65,7 +65,11 @@ function buildAlignedPlan(
   model: GcodeRenderModel,
   options: BuildExecutablePlanOptions,
 ): BuildExecutablePlanResult {
-  const manifest = buildMotionManifest(gcode, { machineKind: options.machineKind });
+  // Smoothieware burns without M3/M4 (ADR-096 Amendment 1).
+  const manifest = buildMotionManifest(gcode, {
+    machineKind: options.machineKind,
+    ...(options.controller === 'smoothieware' ? { laserPowerControl: 'smoothieware' } : {}),
+  });
   const aligned = alignPlanMotions(model, manifest.blocks);
   if (aligned.motions === null) {
     return { kind: 'error', reason: 'semantic-mismatch', issues: aligned.issues };

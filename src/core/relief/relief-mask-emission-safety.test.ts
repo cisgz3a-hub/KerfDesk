@@ -24,6 +24,11 @@ import { reliefRoughingPasses } from './relief-roughing';
 
 const RELIEF_COLOR = '#79512f';
 const DEVICE = { ...DEFAULT_DEVICE_PROFILE, origin: 'rear-left' as const };
+// The stock past a relief's edge holds the cutter at the stock top within its
+// reach (ADR-412 Amendment 2), so each masked strip is this many rows tall:
+// its middle rows stand clear of its top and bottom edges, and the excluded
+// columns run its whole height.
+const STRIP_ROWS = 25;
 
 type MaskEmissionCase = {
   readonly name: string;
@@ -169,17 +174,23 @@ function directRoughingCandidate(tool: CncTool, cellMm: number): MaskEmissionCas
 }
 
 function directMaskedMap(candidate: MaskEmissionCase): Heightmap {
-  const inclusion = new Uint8Array(candidate.columns).fill(1);
-  inclusion.fill(0, candidate.includedColumns);
+  const inclusion = Uint8Array.from(stripInclusion(candidate), (value) => (value === 0 ? 0 : 1));
   return {
     widthCells: candidate.columns,
-    heightCells: 1,
+    heightCells: STRIP_ROWS,
     widthMm: candidate.columns * candidate.cellMm,
-    heightMm: candidate.cellMm,
+    heightMm: STRIP_ROWS * candidate.cellMm,
     mmPerCell: candidate.cellMm,
-    depth: new Float32Array(candidate.columns).fill(-2),
+    depth: new Float32Array(candidate.columns * STRIP_ROWS).fill(-2),
     inclusion,
   };
+}
+
+// Row by row: the included columns, then the excluded ones.
+function stripInclusion(candidate: MaskEmissionCase): ReadonlyArray<number> {
+  return Array.from({ length: candidate.columns * STRIP_ROWS }, (_, index) =>
+    index % candidate.columns < candidate.includedColumns ? 255 : 0,
+  );
 }
 
 function roughingJob(tool: CncTool, passes: ReadonlyArray<CncPass>): Job {
@@ -207,21 +218,19 @@ function roughingJob(tool: CncTool, passes: ReadonlyArray<CncPass>): Job {
 
 function compileMaskedRelief(candidate: MaskEmissionCase) {
   const widthMm = candidate.columns * candidate.cellMm;
-  const heightMm = candidate.cellMm;
+  const heightMm = STRIP_ROWS * candidate.cellMm;
   const relief: ReliefObject = {
     kind: 'relief',
     id: `relief-${candidate.tool.id}`,
     source: `${candidate.tool.id}.png`,
     reliefSource: testReliefHeightfield({
       width: candidate.columns,
-      height: 1,
+      height: STRIP_ROWS,
       physicalWidthMm: widthMm,
       physicalHeightMm: heightMm,
       maxDepthMm: 2,
-      samplesU8: Array.from({ length: candidate.columns }, () => 0),
-      inclusionMask: Array.from({ length: candidate.columns }, (_, col) =>
-        col < candidate.includedColumns ? 255 : 0,
-      ),
+      samplesU8: Array.from({ length: candidate.columns * STRIP_ROWS }, () => 0),
+      inclusionMask: stripInclusion(candidate),
     }),
     targetWidthMm: widthMm,
     reliefDepthMm: 2,
@@ -317,6 +326,7 @@ function expectMinimumMaskMargin(
 
 function excludedCellPolygons(candidate: MaskEmissionCase): ReadonlyArray<ReadonlyArray<Vec2>> {
   const polygons: Vec2[][] = [];
+  const heightMm = STRIP_ROWS * candidate.cellMm;
   for (let col = candidate.includedColumns; col < candidate.columns; col += 1) {
     const minX = col * candidate.cellMm;
     const maxX = (col + 1) * candidate.cellMm;
@@ -324,8 +334,8 @@ function excludedCellPolygons(candidate: MaskEmissionCase): ReadonlyArray<Readon
       [
         { x: minX, y: 0 },
         { x: maxX, y: 0 },
-        { x: maxX, y: candidate.cellMm },
-        { x: minX, y: candidate.cellMm },
+        { x: maxX, y: heightMm },
+        { x: minX, y: heightMm },
       ].map((point) => applyTransform(point, candidate.transform)),
     );
   }

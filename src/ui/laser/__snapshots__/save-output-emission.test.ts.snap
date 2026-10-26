@@ -12,45 +12,45 @@ M4 S0
 M5
 M4 S0
 G0X5Y0.095S0
-G1X10F1500
+G1X10F1500 ; kerfdesk:laser-off-motion
 X11S300
-X16S0
+X16S0 ; kerfdesk:laser-off-motion
 G0X16Y0.286S0
-G1X11
+G1X11 ; kerfdesk:laser-off-motion
 X10S300
-X5S0
+X5S0 ; kerfdesk:laser-off-motion
 G0X5Y0.477S0
-G1X10
+G1X10 ; kerfdesk:laser-off-motion
 X11S300
-X16S0
+X16S0 ; kerfdesk:laser-off-motion
 G0X16Y0.668S0
-G1X11
+G1X11 ; kerfdesk:laser-off-motion
 X10S300
-X5S0
+X5S0 ; kerfdesk:laser-off-motion
 G0X5Y0.859S0
-G1X10
+G1X10 ; kerfdesk:laser-off-motion
 X11S300
-X16S0
+X16S0 ; kerfdesk:laser-off-motion
 G0X16Y1.05S0
-G1X11
+G1X11 ; kerfdesk:laser-off-motion
 X10S300
-X5S0
+X5S0 ; kerfdesk:laser-off-motion
 G0X5Y1.241S0
-G1X10
+G1X10 ; kerfdesk:laser-off-motion
 X11S300
-X16S0
+X16S0 ; kerfdesk:laser-off-motion
 G0X16Y1.432S0
-G1X11
+G1X11 ; kerfdesk:laser-off-motion
 X10S300
-X5S0
+X5S0 ; kerfdesk:laser-off-motion
 G0X5Y1.623S0
-G1X10
+G1X10 ; kerfdesk:laser-off-motion
 X11S300
-X16S0
+X16S0 ; kerfdesk:laser-off-motion
 G0X16Y1.814S0
-G1X11
+G1X11 ; kerfdesk:laser-off-motion
 X10S300
-X5S0
+X5S0 ; kerfdesk:laser-off-motion
 M5
 G0 X0.000 Y0.000 S0
 "

@@ -157,19 +157,23 @@ describe('relief entry provenance', () => {
   });
 
   it('preserves and discloses short relief-loop plunges after compilation', () => {
+    // The 1/8" bit keeps its radius, the 0.5 mm allowance and the contour
+    // clearance (2.4 mm) off the relief's edge (ADR-412 Amendment 2), so an
+    // 8.1 mm relief leaves it a 3.2 mm square: one ring, then an inner ring
+    // shorter than one cut width.
     const source = flatRelief();
     const small: ReliefObject = {
       ...source,
       reliefSource: testReliefHeightfield({
         width: 1,
         height: 1,
-        physicalWidthMm: 3.3,
-        physicalHeightMm: 3.3,
+        physicalWidthMm: 8.1,
+        physicalHeightMm: 8.1,
         maxDepthMm: 3,
         samplesU8: [0],
       }),
-      targetWidthMm: 3.3,
-      bounds: { minX: 0, minY: 0, maxX: 3.3, maxY: 3.3 },
+      targetWidthMm: 8.1,
+      bounds: { minX: 0, minY: 0, maxX: 8.1, maxY: 8.1 },
     };
     const job = compile([small], {});
     const rough = group(job, 'relief-rough');

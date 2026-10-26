@@ -119,11 +119,24 @@ describe('an STL relief is finished against its own triangles (ADR-580)', () => 
     let worst = 0;
     // The path keeps only the vertices a straight move cannot replace, so it
     // is read along every move, not only at its vertices.
+    // Away from the relief's edges, where only the plane can touch: within the
+    // ball's reach of an edge it rides up clear of the stock past it (ADR-412
+    // Amendment 2), so a move with an end there is left out too.
+    const margin = r + 0.05;
+    const awayFromEdges = (point: { x: number; y: number }): boolean => {
+      const local = toSceneCoords(point, DEFAULT_DEVICE_PROFILE);
+      return (
+        local.x >= margin &&
+        local.x <= WIDTH_MM - margin &&
+        local.y >= margin &&
+        local.y <= HEIGHT_MM - margin
+      );
+    };
     for (const pass of group.passes) {
       if (pass.kind !== 'path3d') continue;
       pass.points.forEach((from, index) => {
         const to = pass.points[index + 1];
-        if (to === undefined) return;
+        if (to === undefined || !awayFromEdges(from) || !awayFromEdges(to)) return;
         for (let s = 0; s <= 8; s += 1) {
           const t = s / 8;
           const point = {
@@ -131,10 +144,6 @@ describe('an STL relief is finished against its own triangles (ADR-580)', () => 
             y: from.y + t * (to.y - from.y),
           };
           const local = toSceneCoords(point, DEFAULT_DEVICE_PROFILE);
-          // Away from the relief's edges, where only the plane can touch.
-          const margin = r + 0.05;
-          if (local.x < margin || local.x > WIDTH_MM - margin) continue;
-          if (local.y < margin || local.y > HEIGHT_MM - margin) continue;
           const z = from.z + t * (to.z - from.z);
           const plane = -DEPTH_MM + SLOPE * local.y;
           worst = Math.max(worst, Math.abs(z - (plane + lift)));

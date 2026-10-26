@@ -1,4 +1,5 @@
 import type { CncGroup, CncPass, Group, Job } from '../../../core/job';
+import { contourEntriesSkipped } from '../../../core/job/contour-entry';
 import { tabbedProfileLayerIds } from '../../../core/cnc/compiled-tab-rises';
 import { cncGroupMaximumDepth, cncPassCanEmit } from '../../../core/cnc/output-representation';
 import {
@@ -43,8 +44,9 @@ export function buildEffectiveOperationReview(
 ): ReadonlyArray<JobReviewEffectiveOperation> {
   const summariesByLayer = new Map<string, string[]>();
   const vCarveDepthByLayer = new Map<string, CncCoordinateRepresentation>();
+  const entriesSkipped = contourEntriesSkipped(job);
   for (const group of job.groups) {
-    const summary = effectiveGroupSummary(group, scene);
+    const summary = effectiveGroupSummary(group, scene, entriesSkipped);
     const summaries = summariesByLayer.get(group.layerId) ?? [];
     if (!summaries.includes(summary)) summaries.push(summary);
     summariesByLayer.set(group.layerId, summaries);
@@ -189,8 +191,10 @@ function effectiveGroupSummary(
         readonly layers: ReadonlyArray<Layer>;
       }
     | undefined,
+  entriesSkipped: boolean,
 ): string {
-  const summary = group.kind === 'cnc' ? cncGroupSummary(group) : laserGroupSummary(group, scene);
+  const summary =
+    group.kind === 'cnc' ? cncGroupSummary(group) : laserGroupSummary(group, scene, entriesSkipped);
   const object = scene?.objects.find((candidate) => candidate.id === group.sourceObjectId);
   return object === undefined ? summary : `${artworkOperationName(object)} — ${summary}`;
 }
@@ -233,6 +237,7 @@ function laserGroupSummary(
         readonly layers: ReadonlyArray<Layer>;
       }
     | undefined,
+  entriesSkipped: boolean,
 ): string {
   const kind = laserGroupKindLabel(group);
   const powerMode =
@@ -248,7 +253,7 @@ function laserGroupSummary(
       : scene === undefined
         ? ` · effective override: ${laserOperationDetail(group.operationSettings)}`
         : ` · requested ${baseLayer?.name ?? group.layerId}; effective artwork override: ${laserOperationDetail(group.operationSettings)}`;
-  const contourEntry = contourEntrySummary(group);
+  const contourEntry = contourEntrySummary(group, entriesSkipped);
   return (
     `${kind} · ${formatNumber(group.power)}% power` +
     ` · ${speed}` +
@@ -270,12 +275,15 @@ function reportsGeometryDerivedDepth(cutType: string): boolean {
   return cutType === 'v-carve' || cutType === 'relief-rough' || cutType === 'relief-finish';
 }
 
-function contourEntrySummary(group: Exclude<Group, CncGroup>): string {
+function contourEntrySummary(group: Exclude<Group, CncGroup>, skipped: boolean): string {
   if (
     (group.kind === 'cut' || (group.kind === 'fill' && group.fillStyle === 'offset')) &&
     group.entryRunwayMm !== undefined
   ) {
-    return ` · contour entry ${formatNumber(group.entryRunwayMm)} mm effective (laser off)`;
+    // ADR-239 Amendment 1: the emitter adds no entry without a bed envelope.
+    return skipped
+      ? ' · contour entry not added (bed position unknown)'
+      : ` · contour entry ${formatNumber(group.entryRunwayMm)} mm effective (laser off)`;
   }
   return '';
 }

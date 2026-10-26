@@ -9,6 +9,8 @@ export type JoinableCurve = {
 export type EndpointJoinResult = {
   /** Index of the earliest source curve -> replacement. Other consumed curves -> null. */
   readonly replacements: ReadonlyMap<number, CurveSubpath | null>;
+  /** Each replacement's source curves, ascending (so the replaced one first). */
+  readonly members: ReadonlyMap<number, ReadonlyArray<number>>;
   readonly joins: number;
   readonly closures: number;
   readonly ambiguousEndpoints: number;
@@ -28,6 +30,7 @@ export function joinCurveEndpointsWithin(
   ]);
   const { links, ambiguousEndpoints } = endpointLinks(curves, endpoints, toleranceMm);
   const replacements = new Map<number, CurveSubpath | null>();
+  const members = new Map<number, ReadonlyArray<number>>();
   let joins = 0;
   let closures = 0;
   const visited = new Set<number>();
@@ -43,10 +46,11 @@ export function joinCurveEndpointsWithin(
     if (result === null) continue;
     const leader = component[0] ?? index;
     for (const member of component) replacements.set(member, member === leader ? result : null);
+    members.set(leader, component);
     joins += component.length - 1;
     if (free === undefined) closures += 1;
   }
-  return { replacements, joins, closures, ambiguousEndpoints };
+  return { replacements, members, joins, closures, ambiguousEndpoints };
 }
 
 function endpointLinks(

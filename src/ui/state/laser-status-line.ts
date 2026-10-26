@@ -38,6 +38,7 @@ import { HOMING_STATE_RESET_MESSAGE, reportsStuckHomingState } from './controlle
 import { resumeJogSettlementAfterMpg } from './laser-motion-operation';
 import { releaseAbandonedMotionAtIdle } from './laser-motion-release';
 import { isProbeAlarmedToolChangeHold } from './tool-change-probe-alarm';
+import { probeTestTouchPatch } from './probe-test-touch';
 import { cancelActiveStreamerPatch } from './laser-alarm-stream-end';
 import {
   homeAlarmReplyWindowPatch,
@@ -118,6 +119,7 @@ export function handleStatusLine(
     ...operationPatch,
     ...autofocusRecoveryPatch,
     ...nonAlarmReportPatch(state, report),
+    ...probeTestTouchPatch(state, report),
     ...completedStreamerPatch,
     ...freshToolChangeIdlePatch(streamer, report),
     // Idle may release a failed/unowned terminal streamer so the next Frame
@@ -313,6 +315,8 @@ function handleRepeatedInvalidatingStatus(
     statusObservation: null,
     ...statusResponseObservationPatch(state),
     ...mpgOwnershipPatch(report, state),
+    // After ALARM:5 the operator clips the lead on and tests it before `$X`.
+    ...probeTestTouchPatch(state, report),
   });
   observeStatusConsumers(set, refs, state, nextSequence, report);
 }

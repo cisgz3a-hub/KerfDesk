@@ -28,9 +28,18 @@ export function makeStartSnapshotSource(
     get().stopSource();
     const epoch = get().sourceEpoch;
     set({ sourceState: { kind: 'starting', sourceKind: 'machine-jpeg' } });
+    // The address goes to the bridge once; its pictures come by an id.
+    const registered = await bridge.registerFrameSource(url);
+    if (get().sourceEpoch !== epoch) return;
+    if (registered.kind !== 'ok') {
+      set({
+        sourceState: { kind: 'error', sourceKind: 'machine-jpeg', message: registered.reason },
+      });
+      return;
+    }
     const source: Extract<ActiveCameraSource, { readonly kind: 'machine-jpeg' }> = {
       kind: 'machine-jpeg',
-      frameUrl: bridge.proxiedFrameUrl(url),
+      frameUrl: registered.frameUrl,
       cameraUrl: url,
       pollIntervalMs: SNAPSHOT_CAMERA_POLL_INTERVAL_MS,
     };

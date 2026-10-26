@@ -4,11 +4,11 @@
 
 import { describe, expect, it } from 'vitest';
 import { testReliefHeightfield } from '../../__fixtures__/relief-heightfield';
-import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from '../devices';
+import { DEFAULT_DEVICE_PROFILE, toMachineCoords, type DeviceProfile } from '../devices';
 import { computeJobBounds, frameBoundsSignature } from '../job';
 import { signedAreaMm2 } from '../geometry/polyline-orientation';
 import { scallopRowSpacingMm } from '../relief';
-import { finishingRows } from '../relief/relief-finishing-test-rows';
+import { finishingRows, pointsAlongMoves } from '../relief/relief-finishing-test-rows';
 import { cncGrblStrategy } from '../output';
 import {
   createLayer,
@@ -231,9 +231,20 @@ describe('relief finishing compile (H.8)', () => {
     expect(
       finish.passes.every((pass) => pass.kind === 'path3d' && pass.lateralFeed === 'z-rate-capped'),
     ).toBe(true);
-    for (const pass of finish.passes) {
-      if (pass.kind !== 'path3d') continue;
-      for (const point of pass.points) expect(point.z).toBeCloseTo(-0.1, 6);
+    // Within the ball's reach of the relief's 12 mm edge it rises, at most a
+    // lifted move's 0.002 mm tolerance above the top, to clear the stock past
+    // it (ADR-412 Amendment 2); elsewhere it skims the floor, at most the path
+    // reduction's 0.002 mm above it.
+    const centre = toMachineCoords({ x: 6, y: 6 }, DEFAULT_DEVICE_PROFILE);
+    const along = pointsAlongMoves(finish.passes, 16);
+    const floor = along.filter(
+      (p) => 6 - Math.max(Math.abs(p.x - centre.x), Math.abs(p.y - centre.y)) > 3.175 / 2 + 0.001,
+    );
+    expect(floor.length).toBeGreaterThan(0);
+    for (const point of floor) expect(point.z).toBeLessThanOrEqual(-0.098);
+    for (const point of along) {
+      expect(point.z).toBeGreaterThanOrEqual(-0.1 - 1e-6);
+      expect(point.z).toBeLessThanOrEqual(0.002);
     }
   });
 

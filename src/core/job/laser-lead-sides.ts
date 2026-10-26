@@ -19,8 +19,11 @@
 // which: a contour it holds gets no side, so no leads, and Job Review says so.
 //
 // Open lines are no closed shape, but they too may be the edge of a part: a
-// contour in a region the scene's open Line cuts close gets no side either
-// (laser-lead-open-outlines.ts, ADR-626 Amendment 8).
+// contour in a region the scene's open Line cuts close, or nearly close, gets
+// no side either (laser-lead-open-outlines.ts, ADR-626 Amendments 8 and 10).
+//
+// The lines the output leaves uncut are parts that stay on the sheet, so the
+// leads keep clear of them too (Amendment 10): they are collected here as well.
 
 import { vectorPowerReachesController } from './job-start-power';
 import type { DeviceProfile } from '../devices';
@@ -88,31 +91,57 @@ export function sceneLeadSideContours(
   return sceneLines(scene, device, null);
 }
 
+/** The Line geometry of the scene the output does not cut now: its artwork is
+ * outside Cut selected graphics, or its operation's output is off. */
+export type UncutSceneLines = {
+  readonly contours: ReadonlyArray<SceneLineContour>;
+  readonly openLines: ReadonlyArray<SceneOpenLine>;
+};
+
 /** The scene's closed Line contours, and the open paths of the same burning
- * Line operations, which may close a region round a contour (Amendment 8). */
+ * Line operations, which may close a region round a contour (Amendment 8).
+ * `outputObjectIds`: the artwork the output cuts; with it, also the lines it
+ * does not cut, parts that stay on the sheet (Amendment 10). */
 export function sceneLeadSideGeometry(
   scene: Pick<Scene, 'layers' | 'objects'>,
   device?: DeviceProfile,
+  outputObjectIds?: ReadonlySet<string>,
 ): {
   readonly contours: ReadonlyArray<SceneLineContour>;
   readonly openLines: ReadonlyArray<SceneOpenLine>;
+  readonly uncut: UncutSceneLines;
 } {
   const openLines: SceneOpenLine[] = [];
-  return { contours: sceneLines(scene, device, openLines), openLines };
+  const uncut: UncutCollection = {
+    contours: [],
+    openLines: [],
+    objectIds: outputObjectIds ?? null,
+  };
+  return { contours: sceneLines(scene, device, openLines, uncut), openLines, uncut };
 }
 
 type SceneLines = {
   readonly contours: SceneLineContour[];
   /** Null when the caller reads closed contours only. */
   readonly openLines: SceneOpenLine[] | null;
+  /** Null when the caller does not ask which lines the output leaves uncut. */
+  readonly uncut: UncutCollection | null;
+};
+
+type UncutCollection = {
+  readonly contours: SceneLineContour[];
+  readonly openLines: SceneOpenLine[];
+  /** The artwork the output cuts; null when every artwork is in it. */
+  readonly objectIds: ReadonlySet<string> | null;
 };
 
 function sceneLines(
   scene: Pick<Scene, 'layers' | 'objects'>,
   device: DeviceProfile | undefined,
   openLines: SceneOpenLine[] | null,
+  uncut: UncutCollection | null = null,
 ): SceneLineContour[] {
-  const into: SceneLines = { contours: [], openLines };
+  const into: SceneLines = { contours: [], openLines, uncut };
   for (const layer of scene.layers) {
     const operations = [layer, ...layer.subLayers.map((sub) => layerFromSubLayer(layer, sub))];
     for (const operation of operations) {
@@ -120,6 +149,18 @@ function sceneLines(
     }
   }
   return into.contours;
+}
+
+/** Where the output leaves this artwork's lines on this operation uncut, the
+ * list they also go to; else null. */
+function uncutInto(
+  into: SceneLines,
+  operation: Layer,
+  object: SceneObject,
+): UncutCollection | null {
+  const uncut = into.uncut;
+  if (uncut === null) return null;
+  return operation.output && (uncut.objectIds?.has(object.id) ?? true) ? null : uncut;
 }
 
 function appendContours(
@@ -133,24 +174,27 @@ function appendContours(
   if (effective.mode !== 'line') return;
   if (!vectorPowerReachesController(effectiveObjectPowerPercent(effective, object), device)) return;
   const decides = laserLeadSpecFor(effective) !== null;
+  const uncut = uncutInto(into, operation, object);
   for (const [pathIndex, path] of object.paths.entries()) {
     if (!pathUsesOperation(object, path, operation)) continue;
     for (const [index, polyline] of compilationPolylines(path, object.transform).entries()) {
+      const points = polyline.points.map((point) => applyTransform(point, object.transform));
       if (!polyline.closed) {
-        into.openLines?.push({
-          points: polyline.points.map((point) => applyTransform(point, object.transform)),
-          operationName: effective.name,
-        });
+        const line = { points, operationName: effective.name };
+        into.openLines?.push(line);
+        uncut?.openLines.push(line);
         continue;
       }
-      into.contours.push({
+      const contour = {
         key: laserLeadSourceKey(object.id, pathIndex, index),
-        points: polyline.points.map((point) => applyTransform(point, object.transform)),
+        points,
         decides,
         operationName: effective.name,
         operation: effective,
         path: `${object.id}#${pathIndex}`,
-      });
+      };
+      into.contours.push(contour);
+      uncut?.contours.push(contour);
     }
   }
 }
