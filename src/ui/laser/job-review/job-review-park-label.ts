@@ -6,9 +6,10 @@
 
 import type { JobOriginPlacement } from '../../../core/job';
 import type { CncMachineParams } from '../../../core/scene';
+import { highestFitAdvice, type CncLiftZTopCheck } from '../cnc-park-z-top';
 import { formatMm } from './job-review-format';
 
-type ParkFact = {
+export type ParkFact = {
   readonly label: string;
   readonly value: string;
   readonly tone: 'default' | 'warning';
@@ -18,10 +19,11 @@ export function parkFacts(
   params: Pick<CncMachineParams, 'parkXMm' | 'parkYMm' | 'safeZMm' | 'parkZMm'>,
   startFrom: JobOriginPlacement['startFrom'] | undefined,
   zTravelMm: number | undefined,
+  zTop?: CncLiftZTopCheck,
 ): ReadonlyArray<ParkFact> {
   return [
     { label: 'Park after job', value: parkLabel(params, startFrom), tone: 'default' },
-    parkHeightFact(params, zTravelMm),
+    withZTopCheck(parkHeightFact(params, zTravelMm), zTop),
   ];
 }
 
@@ -43,6 +45,26 @@ function parkHeightFact(
     value: `${value} · at or above the ${formatMm(zTravelMm)} mm Z travel`,
     tone: 'warning',
   };
+}
+
+// ADR-491 Amendment 2: with live machine state the row also says where the lift
+// lands against the top of Z travel, or why that could not be checked.
+function withZTopCheck(fact: ParkFact, zTop: CncLiftZTopCheck | undefined): ParkFact {
+  if (zTop === undefined) return fact;
+  switch (zTop.kind) {
+    case 'fits':
+      return { ...fact, value: `${fact.value} · ${formatMm(zTop.roomMm)} mm under the Z top` };
+    case 'over':
+      return {
+        ...fact,
+        value:
+          `${fact.value} · ${formatMm(zTop.overMm)} mm past the Z top with the work zero set now · ` +
+          highestFitAdvice(zTop.highestFitMm),
+        tone: 'warning',
+      };
+    case 'unchecked':
+      return { ...fact, value: `${fact.value} · Z top not checked: ${zTop.reason}` };
+  }
 }
 
 export function parkLabel(

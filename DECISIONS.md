@@ -20635,7 +20635,7 @@ are accepted, so the worker's peak remains proportional to the route. No hardwar
 
 ## ADR-327 - Job placement anchors are physical corners; Frame permits survive canvas selection; Verified Origin gets User Origin parity (2026-09-20)
 
-**Status:** Accepted; amends the WORKFLOW.md F-F3 Set-origin rule (ADR-021 covers only the G92 mechanics), ADR-053 (Verified Origin coaching and remedies), ADR-193 (explicit placement choices are never rewritten) and the execution-signature scope of ADR-230/ADR-232. The completed-Frame contract of ADR-228/230/232/237 is unchanged: no ordinary Start gate is added or removed.
+**Status:** Accepted; amends the WORKFLOW.md F-F3 Set-origin rule (ADR-021 covers only the G92 mechanics), ADR-053 (Verified Origin coaching and remedies), ADR-193 (explicit placement choices are never rewritten) and the execution-signature scope of ADR-230/ADR-232. The completed-Frame contract of ADR-228/230/232/237 is unchanged: no ordinary Start gate is added or removed. On a CNC profile the anchors name the artwork, not the cutter's reach, by ADR-327 Amendment 1.
 
 ### Context
 

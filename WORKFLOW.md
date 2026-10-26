@@ -4657,7 +4657,8 @@ on the rail, below the job actions, as the hand-placement fallback):
    **Set origin here** (User Origin), or selects **Current Position** in the
    Start from dropdown and jogs to the chosen 9-dot job anchor (the nine anchors
    name physical corners of the artwork as drawn on the canvas, on every machine
-   origin — ADR-327). Set origin is
+   origin — ADR-327; on a CNC profile too, not the cutter's reach past the
+   outline, which Frame still traces — ADR-327 Amendment 1). Set origin is
    not required while Current Position is active, but the exact completed Frame
    is required in both modes. (The former "Choose jog positioning" button was
    removed as redundant with the Start from dropdown — ADR-225.)
@@ -5809,6 +5810,13 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 1. A `.lf2` saved before stock footprints existed loads with the default
    400 × 400 footprint at the origin; thickness is preserved.
 
+#### Edge — nesting parts on the stock (ADR-433 Amendment 3)
+1. On a CNC project, Quick Nest and Quantity production open their Part spacing at the widest
+   bit that cuts on or outside a part outline (an Outside or On-path profile) plus 1 mm, rounded
+   up to 0.1 mm: 4.2 mm for a 1/8" bit. Never below the 2 mm laser default.
+2. A smaller spacing is still allowed. Quick Nest then says it is closer than the bit plus 1 mm
+   and that the bit cutting one part out can cut into the next, and names the value to use.
+
 ### F-CNC9. Import a DXF drawing — Phase H.6
 
 #### Success
@@ -6157,6 +6165,16 @@ and lifts the command's CNC-only gate.)*
    for none it names where the job ends: "Not set · program X0 Y0", or "Not set · back to where the
    job started" for Current Position. The CNC setup reference and the Machine Setup review page
    show "None".
+5. The park height is a work Z, so where it lands depends on where Z was zeroed (ADR-491
+   Amendment 2). Once this session's `$` and Home (or soft limits on) fix the top of Z travel and
+   the controller reports its work offset, Job Review's Park height row says how far under the Z
+   top the lift stays. A lift past it is a Start warning that gives the overshoot and the highest
+   Park height that fits: with Z zeroed 40 mm below the homed top of a 75 mm axis, a 50 mm park
+   goes 10 mm past it. When the check cannot run, the row says "Z top not checked" and why. The
+   check uses the work zero set now; each bit change re-zeroes Z.
+6. Preview and the 3D view draw the program's parks: the lift to the park height and the move to
+   the park at every bit change and at the job end, a configured park winning. A cut that retracts
+   between passes lifts to safe Z before each replunge, as in the program.
 
 ### F-CNC15. Re-zero Z at a tool change — Phase H.7
 

@@ -1,3 +1,4 @@
+import { cncNestSpacing } from '../../core/cnc/cnc-nest-spacing';
 import { findRegistrationBoxes } from '../../core/scene';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
@@ -36,6 +37,7 @@ export function QuickNestDialogHost(props: { readonly onClose: () => void }): JS
   return (
     <QuickNestDialog
       boardAvailable={boardAvailable}
+      cncSpacing={cncNestSpacing(project)}
       running={running}
       progress={progress}
       {...(draft === null ? {} : { input: draft.input })}

@@ -7,6 +7,8 @@ import type { JobOriginPlacement } from '../../../core/job';
 import type { MachineKind, Project } from '../../../core/scene';
 import { useStore } from '../../state';
 import { useLaserStore } from '../../state/laser-store';
+import { selectNativeBedEvidence } from '../../state/native-bed-frame';
+import { checkCncLiftAgainstZTop, type CncLiftZTopCheck } from '../cnc-park-z-top';
 import { buildMachineReviewFacts, type JobReviewFact } from './job-review-live-rows';
 import {
   detailsStyle,
@@ -29,8 +31,9 @@ export function JobReviewMachineSection(props: {
   const liveProject = useStore((s) => s.project);
   const project = props.project ?? liveProject;
   const controllerSettings = useLaserStore((s) => s.controllerSettings);
+  const zTop = useCncParkZTop(project);
   const facts = [
-    ...buildMachineReviewFacts(project, controllerSettings, props.startFrom),
+    ...buildMachineReviewFacts(project, controllerSettings, props.startFrom, zTop),
     ...props.outputQualityFacts,
   ];
   return (
@@ -62,5 +65,27 @@ export function JobReviewMachineSection(props: {
         </>
       ) : null}
     </details>
+  );
+}
+
+// The park lift against the live Z top (ADR-491 Amendment 2). Selects the
+// offset's Z alone so a fresh status report does not re-render the section.
+function useCncParkZTop(project: Project): CncLiftZTopCheck | undefined {
+  const evidence = useLaserStore(selectNativeBedEvidence);
+  const wcoZ = useLaserStore((s) => (s.statusReport?.wco ?? s.wcoCache)?.z ?? null);
+  const unitsUnconfirmed = useLaserStore((s) => s.reportUnitsUnconfirmed === true);
+  const activeWcs = useLaserStore((s) => s.activeWcs);
+  const machine = project.machine;
+  if (machine?.kind !== 'cnc') return undefined;
+  const { safeZMm, parkZMm } = machine.params;
+  return checkCncLiftAgainstZTop(
+    Math.max(safeZMm, parkZMm ?? safeZMm),
+    {
+      ...evidence,
+      wcoCache: wcoZ === null ? null : { x: 0, y: 0, z: wcoZ },
+      reportUnitsUnconfirmed: unitsUnconfirmed,
+      activeWcs,
+    },
+    project.device.zTravelMm,
   );
 }

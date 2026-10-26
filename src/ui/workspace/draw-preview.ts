@@ -276,7 +276,9 @@ function previewStartPoint(jobOrigin: JobOriginPlacement | undefined): Vec2 {
 }
 
 // The laser park comes from the one finish source emission uses (ADR-493), so
-// the drawn final move is the emitted one.
+// the drawn final move is the emitted one. A CNC job passes that finish as the
+// emitter's fallback; the toolpath then draws the park lift, each bit-change
+// park and the job-end park, a configured park winning (ADR-491 Amendment 2).
 function previewParkPoint(
   project: Project,
   job: Job,

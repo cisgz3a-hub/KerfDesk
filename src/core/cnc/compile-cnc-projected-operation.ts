@@ -7,6 +7,7 @@ import { collectLayerContours, layerPolylinesFromContours } from './collect-cnc-
 import { compileReliefProjectionGroups } from './compile-cnc-relief-projection';
 import { isProfileCutType } from './compile-cnc-helpers';
 import { tagArtworkGroup, type CompiledCncOperation } from './compile-cnc-operation-result';
+import { cncOperationDesignBounds, withDesignBounds } from './cnc-design-bounds';
 
 export function compileCncProjectedOperation(
   sourceObjects: Scene['objects'],
@@ -29,7 +30,10 @@ export function compileCncProjectedOperation(
     polylines,
   );
   if (projected.kind === 'relief-materialization-failed') return projected;
-  const groups = projected.groups.map((group) => tagArtworkGroup(group, priorityObjectId));
+  const groups = withDesignBounds(
+    projected.groups.map((group) => tagArtworkGroup(group, priorityObjectId)),
+    cncOperationDesignBounds(polylines, sourceObjects, layer, device),
+  );
   return {
     kind: 'compiled',
     openContourOmissions: cncOpenContourOmissions(layer, contours),

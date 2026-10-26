@@ -41,6 +41,17 @@ export type JogTravelSettings = {
 
 export type JogTravelLimits = { readonly x: AxisBounds; readonly y: AxisBounds };
 
+/** The Z half of the same envelope: `$132`, `$23` bit 2 and `$102`. */
+export type ZTravelSettings = Omit<JogTravelSettings, 'travelMm' | 'stepsPerMm'> & {
+  readonly travelZMm: number;
+  readonly stepsPerMmZ: number | undefined;
+};
+
+type InsetSettings = Pick<
+  JogTravelSettings,
+  'firmware' | 'forceOrigin' | 'hardLimits' | 'pullOffMm' | 'softLimitsEnforced'
+>;
+
 // Hard limits on but `$27` unread: gSender keeps the same 1 mm off the edge
 // (https://github.com/Sienci-Labs/gsender/blob/14c7084c1091dbd500d675d0dabda885484bf12e/src/server/controllers/Grbl/GrblController.js#L2119-L2133).
 const UNKNOWN_PULL_OFF_MM = 1;
@@ -83,8 +94,24 @@ export function jogTravelLimits(settings: JogTravelSettings): JogTravelLimits | 
   return x === null || y === null ? null : { x, y };
 }
 
+/** The machine Z range a commanded move may reach, inset from the homing
+ *  switch as the XY box is, or null when these settings do not fix it. A job's
+ *  park lift is checked against its top (ADR-491 Amendment 2). */
+export function zTravelLimits(settings: ZTravelSettings): AxisBounds | null {
+  const mask = settings.homingDirectionMask;
+  if (!isPositiveFinite(settings.travelZMm) || !isDirectionMask(mask)) return null;
+  const homesNegative = (mask & 4) !== 0;
+  if (settings.forceOrigin === null && homesNegative) return null;
+  const envelope = deriveMachineEnvelope(
+    { x: 1, y: 1, z: settings.travelZMm },
+    mask & 4,
+    settings.forceOrigin === true,
+  );
+  return insetAxis(settings, envelope.z, homesNegative, settings.stepsPerMmZ);
+}
+
 function insetAxis(
-  settings: JogTravelSettings,
+  settings: InsetSettings,
   envelope: AxisBounds,
   homesNegative: boolean,
   stepsPerMm: number | undefined,
@@ -110,7 +137,7 @@ function positionMarginMm(stepsPerMm: number | undefined): number {
 }
 
 // An unknown `$21` keeps the inset: the narrower box suits either value.
-function switchPullOffMm(settings: JogTravelSettings): number {
+function switchPullOffMm(settings: InsetSettings): number {
   if (settings.hardLimits === false) return 0;
   const pullOff = settings.pullOffMm;
   return pullOff !== undefined && Number.isFinite(pullOff) && pullOff >= 0

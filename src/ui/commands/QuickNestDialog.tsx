@@ -3,6 +3,7 @@ import { Button, Dialog, DialogActions, NumberInput } from '../kit';
 import type { QuickNestOptions } from '../state/nest-actions';
 import type { NestGoal, NestingInput, NestingProgress } from '../../core/nesting/layout-nest';
 import type { NestRotation } from '../../core/nesting';
+import { CNC_NEST_SPACING_MARGIN_MM, type CncNestSpacing } from '../../core/cnc/cnc-nest-spacing';
 import { NestDraftPreview } from './NestDraftPreview';
 
 export type QuickNestDialogProps = {
@@ -17,6 +18,8 @@ export type QuickNestDialogProps = {
   readonly onAcceptBest?: () => void;
   readonly onReset?: () => void;
   readonly onProduction?: () => void;
+  /** A CNC project's bit-based minimum spacing (ADR-433 Amendment 3). */
+  readonly cncSpacing?: CncNestSpacing | null;
 };
 type NestForm = {
   readonly bin: QuickNestOptions['bin'];
@@ -33,9 +36,10 @@ type SettingsProps = {
   readonly form: NestForm;
   readonly change: (patch: Partial<NestForm>) => void;
 };
+const LASER_SPACING_MM = 2;
 const INITIAL: NestForm = {
   bin: 'workspace',
-  padding: '2',
+  padding: String(LASER_SPACING_MM),
   allowRotation: true,
   method: 'outline',
   goal: undefined,
@@ -46,7 +50,7 @@ const INITIAL: NestForm = {
 };
 
 export function QuickNestDialog(props: QuickNestDialogProps): JSX.Element {
-  const [form, setForm] = useState(INITIAL);
+  const [form, setForm] = useState(() => initialForm(props.cncSpacing ?? null));
   const change = (patch: Partial<NestForm>): void =>
     setForm((previous) => ({ ...previous, ...patch }));
   const permitted = form.allowRotation
@@ -70,7 +74,12 @@ export function QuickNestDialog(props: QuickNestDialogProps): JSX.Element {
         style={{ ...fieldsStyle, padding: 0, border: 0, margin: 0 }}
       >
         <NestGoalFields form={form} change={change} />
-        <NestBoundaryFields form={form} change={change} boardAvailable={props.boardAvailable} />
+        <NestBoundaryFields
+          form={form}
+          change={change}
+          boardAvailable={props.boardAvailable}
+          cncSpacing={props.cncSpacing ?? null}
+        />
         <NestOrientationFields form={form} change={change} />
         <label style={checkStyle}>
           <input
@@ -100,6 +109,12 @@ export function QuickNestDialog(props: QuickNestDialogProps): JSX.Element {
       <NestDialogActions {...props} hasDraft={hasDraft} permitted={permitted.length > 0} />
     </Dialog>
   );
+}
+// A router's parts start one bit plus a margin apart, never closer than the
+// laser default (ADR-433 Amendment 3).
+function initialForm(cncSpacing: CncNestSpacing | null): NestForm {
+  if (cncSpacing === null) return INITIAL;
+  return { ...INITIAL, padding: String(Math.max(LASER_SPACING_MM, cncSpacing.spacingMm)) };
 }
 function nestFormRequest(form: NestForm): QuickNestOptions {
   return {
@@ -144,7 +159,11 @@ function NestBoundaryFields({
   form,
   change,
   boardAvailable,
-}: SettingsProps & { readonly boardAvailable: boolean }): JSX.Element {
+  cncSpacing,
+}: SettingsProps & {
+  readonly boardAvailable: boolean;
+  readonly cncSpacing: CncNestSpacing | null;
+}): JSX.Element {
   return (
     <>
       <label style={fieldStyle}>
@@ -171,6 +190,13 @@ function NestBoundaryFields({
           onChange={(event) => change({ padding: event.currentTarget.value })}
         />
       </label>
+      {cncSpacing !== null && nonNegative(form.padding) < cncSpacing.spacingMm && (
+        <p role="status" style={spacingWarningStyle}>
+          Closer than the {cncSpacing.bitDiameterMm} mm bit plus{' '}
+          {CNC_NEST_SPACING_MARGIN_MM} mm: the bit that cuts one part out can cut into the next.
+          Use at least {cncSpacing.spacingMm} mm.
+        </p>
+      )}
     </>
   );
 }
@@ -331,6 +357,11 @@ const fieldStyle: React.CSSProperties = {
   fontSize: 13,
 };
 const checkStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8 };
+const spacingWarningStyle: React.CSSProperties = {
+  margin: 0,
+  fontSize: 12,
+  color: 'var(--lf-warning-fg)',
+};
 const methodStyle: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: '1fr 1fr',

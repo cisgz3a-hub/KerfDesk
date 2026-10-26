@@ -63,6 +63,7 @@ import {
 } from './cnc-compilation-sidecar';
 import { compiledInlayGroups, secondaryClearingGroups } from './compile-cnc-operation-groups';
 import { restAwareVCarveGroup } from './vcarve-rest-finishing';
+import { cncOperationDesignBounds, withDesignBounds } from './cnc-design-bounds';
 
 export { xyToolpathsForCutType } from './compile-cnc-layer-passes';
 export { vcarveClearanceGroupForLayer } from './compile-cnc-operation-groups';
@@ -237,14 +238,18 @@ function compileCncOperation(
     leadWalls,
   );
   const usesStepover = relief.evidence.stepoverUsed || vectorGroups.stepoverUsed;
+  const design = cncOperationDesignBounds(polylines, sourceObjects, layer, device);
   return {
     kind: 'compiled',
     layerId: layer.id,
-    clearingGroups: [
-      ...relief.groups.map((group) => tagArtworkGroup(group, priorityObjectId)),
-      ...vectorGroups.clearingGroups,
-    ],
-    profileGroups: vectorGroups.profileGroups,
+    clearingGroups: withDesignBounds(
+      [
+        ...relief.groups.map((group) => tagArtworkGroup(group, priorityObjectId)),
+        ...vectorGroups.clearingGroups,
+      ],
+      design,
+    ),
+    profileGroups: withDesignBounds(vectorGroups.profileGroups, design),
     openContourOmissions: cncOpenContourOmissions(layer, contours),
     reliefPlans: relief.evidence.plans,
     offsetLadderDiagnostics: [

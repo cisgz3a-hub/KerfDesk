@@ -266,8 +266,10 @@ function placeCncPark(group: CncGroup, bedToProgram: Vec2 | null): CncGroup {
 }
 
 function translateCncGroup(group: CncGroup, dx: number, dy: number): CncGroup {
+  const design = group.designBounds;
   return {
     ...group,
+    ...(design === undefined ? {} : { designBounds: offsetJobBounds(design, { x: dx, y: dy }) }),
     passes: group.passes.map((pass) => translateCncPass(pass, dx, dy)),
   };
 }

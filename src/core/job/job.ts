@@ -22,6 +22,7 @@ import type { RasterPowerValues } from '../raster/raster-power-values';
 import type { CncCuttingStage } from '../scene/cnc-stage-recipe';
 import {
   assertNever,
+  type Bounds,
   type CncCoolantMode,
   type CncCutType,
   type CncToolKind,
@@ -415,6 +416,7 @@ export type CncGroup = {
   readonly parkYMm?: number;
   // ADR-491: lift height before the park move. Absent = safe Z.
   readonly parkZMm?: number;
+  readonly designBounds?: Bounds; // ADR-327 Amd 1: the Job Origin anchor, not the reach
   readonly passes: ReadonlyArray<CncPass>;
 };
 

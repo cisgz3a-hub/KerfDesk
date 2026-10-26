@@ -62,6 +62,7 @@ import { startControllerPolicy } from './start-job-controller-policy';
 import type { PreparedJobMetrics } from './prepared-job-metrics';
 import { controllerIdentityWarnings } from './controller-identity-warnings';
 import { detectCompiledVCarveDepthWarningsForJob } from './cnc-compiled-depth-warnings';
+import { detectCncParkZTopWarnings } from './cnc-park-z-top';
 import { findMachineStartIssues, prepareStartInput } from './start-job-input';
 import { workOffsetAssumptionWarnings } from './work-offset-assumption';
 import { unknownNativeBedWarning } from './restored-origin-warning';
@@ -369,6 +370,7 @@ export function finalizeStartPreparation(
       ...(largeRasterWarning === null ? [] : [largeRasterWarning]),
       ...compiledWorkAdvisories(prepared.job),
       ...detectCompiledVCarveDepthWarningsForJob(prepared.project, prepared.job),
+      ...detectCncParkZTopWarnings(prepared.project, prepared.job, options.machineWithReportUnits),
       ...demotedPolicyWarnings(options.project, options.machine, options.placement.jobOrigin),
       ...advisoryWarnings,
       ...emitSplit.warnings,

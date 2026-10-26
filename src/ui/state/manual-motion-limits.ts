@@ -13,10 +13,14 @@
 import type { ControllerSettingsSnapshot, StatusReport } from '../../core/controllers/grbl';
 import {
   jogTravelLimits,
+  zTravelLimits,
   type JogTravelFirmware,
   type JogTravelSettings,
 } from '../../core/controllers/grbl/jog-travel-limits';
-import { normalizeReportedMPosToMm } from '../../core/controllers/grbl/machine-envelope';
+import {
+  normalizeReportedMPosToMm,
+  type AxisBounds,
+} from '../../core/controllers/grbl/machine-envelope';
 import type { NativeBedFrame, NativeXyBounds } from '../../core/devices/native-bed-frame';
 import type { Vec2 } from '../../core/scene';
 import type { NativeBedEvidence } from './native-bed-frame';
@@ -71,6 +75,39 @@ export function firmwareJogCheckPosition(
   const { x, y, z } = hiddenMPos;
   const [xMm, yMm] = normalizeReportedMPosToMm([x, y, z], reportInches);
   return { x: xMm, y: yMm };
+}
+
+/**
+ * The machine Z range the firmware's envelope allows, from this session's
+ * `$` (`$132`, `$23`, `$27`, `$21`), or null when it is not known. It is
+ * known on the same terms as the XY box: the controller enforces it (`$20=1`)
+ * or this session's Home tied the machine position to the switch. Without
+ * `$132` the machine profile's recorded Z travel stands in. A CNC job's park
+ * lift is checked against its top (ADR-491 Amendment 2).
+ */
+export function resolveFirmwareZLimits(
+  evidence: NativeBedEvidence,
+  profileZTravelMm?: number,
+): AxisBounds | null {
+  const firmware = travelFirmware(evidence);
+  const settings = currentSessionSettings(evidence);
+  if (firmware === null || settings === null) return null;
+  const homed = evidence.homingState === 'confirmed';
+  if (firmware === 'grblhal' ? !homed : settings.softLimitsEnabled !== true && !homed) return null;
+  const zTravelMm = settings.zTravelMm ?? profileZTravelMm;
+  const { homingDirectionMask } = settings;
+  if (zTravelMm === undefined || homingDirectionMask === undefined) return null;
+  return zTravelLimits({
+    firmware,
+    travelZMm: zTravelMm,
+    homingDirectionMask,
+    forceOrigin:
+      firmware === 'grbl' ? currentForceOrigin(evidence) : (settings.homingForceSetOrigin ?? null),
+    hardLimits: settings.hardLimitsEnabled,
+    pullOffMm: settings.homingPullOffMm,
+    softLimitsEnforced: settings.softLimitsEnabled === true,
+    stepsPerMmZ: settings.stepsPerMmZ,
+  });
 }
 
 function jogTravelSettings(evidence: NativeBedEvidence): JogTravelSettings | null {

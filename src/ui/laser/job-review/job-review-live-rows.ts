@@ -16,13 +16,7 @@ import {
   type ScanOffsetPoint,
 } from '../../../core/job';
 import type { ScanDirectionReason } from '../../../core/job/scan-direction-policy';
-import {
-  activeCncTool,
-  machineKindOf,
-  type Layer,
-  type MachineKind,
-  type Project,
-} from '../../../core/scene';
+import { machineKindOf, type Layer, type MachineKind, type Project } from '../../../core/scene';
 import { layerSubLayerOperationId } from '../../../core/scene/layer';
 import { effectiveScanOffsetCalibrationStatus } from '../../../core/devices/scan-offset-profile';
 import {
@@ -32,7 +26,8 @@ import {
   overridesAreBaseline,
 } from './job-review-format';
 import { frameMotionFeeds } from '../../state/frame-feed-limits';
-import { parkFacts } from './job-review-park-label';
+import { cncMachineReviewFacts } from './job-review-cnc-machine-facts';
+import type { CncLiftZTopCheck } from '../cnc-park-z-top';
 import { buildContourEntryReviewFacts } from './job-review-contour-entry-facts';
 import { rotaryReviewSummary } from '../rotary-summary';
 import { laserModuleFacts } from './job-review-laser-module';
@@ -99,6 +94,9 @@ export function buildMachineReviewFacts(
   project: Project,
   controllerSettings: ControllerSettingsSnapshot | null = null,
   startFrom?: JobOriginPlacement['startFrom'],
+  // The park lift against the live Z top (ADR-491 Amendment 2); absent
+  // without live machine state.
+  zTop?: CncLiftZTopCheck,
 ): ReadonlyArray<JobReviewFact> {
   // Max feed and Frame feed are the active head's own (CNC keeps its own).
   const device = deviceForActiveHead(project.device, project.machine);
@@ -110,22 +108,7 @@ export function buildMachineReviewFacts(
   ];
   const machine = project.machine;
   if (machineKindOf(machine) === 'cnc' && machine?.kind === 'cnc') {
-    return [
-      ...shared,
-      fact(
-        'Stock',
-        `${formatMm(machine.stock.widthMm)} × ${formatMm(machine.stock.heightMm)} × ${formatMm(machine.stock.thicknessMm)} mm`,
-      ),
-      fact('Active bit', activeCncTool(machine).name),
-      poweredZAssumptionFact(project),
-      fact('Safe Z', `${formatMm(machine.params.safeZMm)} mm above stock top`),
-      fact(
-        'Spindle',
-        `max ${machine.params.spindleMaxRpm} RPM · spin-up ${machine.params.spindleSpinupSec} s`,
-      ),
-      fact('Coolant', machine.params.coolant ?? 'off'),
-      ...parkFacts(machine.params, startFrom, project.device.zTravelMm),
-    ];
+    return [...shared, ...cncMachineReviewFacts(project, machine, startFrom, zTop)];
   }
   // The G-code dialect and the raster scan-offset table shape laser output
   // only; CNC output is GRBL router G-code whatever the laser dialect (ADR-399).
@@ -153,16 +136,6 @@ export function buildMachineReviewFacts(
           ),
         ]),
   ];
-}
-
-function poweredZAssumptionFact(project: Project): JobReviewFact {
-  const travel = project.device.zTravelMm;
-  const recorded = travel === undefined ? 'no travel recorded' : `${formatMm(travel)} mm recorded`;
-  return fact(
-    'Powered Z assumption',
-    `CNC assumes installed powered Z · ${recorded} (informational, not hardware proof)`,
-    'warning',
-  );
 }
 
 function scanOffsetProvenanceFact(project: Project): JobReviewFact {
