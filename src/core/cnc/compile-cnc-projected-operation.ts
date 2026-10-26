@@ -1,4 +1,5 @@
 import { cncOpenContourOmissions } from './cnc-open-contour-omissions';
+import { cncStackedCopyMerges } from './cnc-stacked-copies';
 import type { DeviceProfile } from '../devices';
 import type { CncMachineConfig, CncLayerSettings, Layer, Scene } from '../scene';
 import type { ReliefMaterializationFailure } from '../relief/relief-materialization-failure';
@@ -33,6 +34,7 @@ export function compileCncProjectedOperation(
   return {
     kind: 'compiled',
     openContourOmissions: cncOpenContourOmissions(layer, contours),
+    stackedCopyMerges: cncStackedCopyMerges(layer, contours),
     layerId: layer.id,
     clearingGroups: isProfileCutType(settings.cutType) ? [] : groups,
     profileGroups: isProfileCutType(settings.cutType) ? groups : [],

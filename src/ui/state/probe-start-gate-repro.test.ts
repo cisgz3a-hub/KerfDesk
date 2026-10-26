@@ -34,6 +34,7 @@ import {
 } from '../job-placement';
 import type { FrameVerification } from './frame-verification';
 import { useLaserStore } from './laser-store';
+import { markProbeCircuitTested } from './probe-test-touch.test-support';
 import { respondToTestGrblHandshake } from './laser-test-start-helpers';
 import { useStore } from './store';
 import {
@@ -147,6 +148,7 @@ async function flush(): Promise<void> {
 // Ack every probe line, then prove settlement with two fresh Idle reports —
 // the exact sequence laser-probe-lifecycle.test.ts validates line-by-line.
 async function runSuccessfulZProbe(connection: FakeConnection, writes: string[]): Promise<void> {
+  markProbeCircuitTested();
   const probe = useLaserStore.getState().probe(Z_REQUEST);
   await flush();
   const expectedSequence = ['M5', 'M9', ...buildZProbeLines(Z_REQUEST.params), 'G4 P0.01'];

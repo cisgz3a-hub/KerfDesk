@@ -8,6 +8,7 @@ import {
   savedCameraModels,
   savedModelFor,
   withoutSavedCameraModel,
+  withReplacedCameraModel,
   withSavedCameraModel,
 } from './saved-cameras';
 
@@ -92,6 +93,19 @@ describe('saved cameras', () => {
     });
     expect(withoutSavedCameraModel({ cameraModel: overhead }, overhead)).toEqual({
       cameraModel: undefined,
+      otherCameraModels: undefined,
+    });
+  });
+
+  it('replaces a calibration where it is saved, so the newest stays the newest', () => {
+    const profile = { cameraModel: overhead, otherCameraModels: [builtIn] };
+    const confirmed = { ...builtIn, calibratedAt: '2026-10-23T09:00:00.000Z' };
+    expect(withReplacedCameraModel(profile, builtIn, confirmed)).toEqual({
+      cameraModel: overhead,
+      otherCameraModels: [confirmed],
+    });
+    expect(withReplacedCameraModel({ cameraModel: overhead }, overhead, confirmed)).toEqual({
+      cameraModel: confirmed,
       otherCameraModels: undefined,
     });
   });

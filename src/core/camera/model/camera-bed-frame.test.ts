@@ -2,6 +2,8 @@
 // target was placed in. The audit's repro calibrated a front-left 400 × 400
 // bed, then set the bed to 400 × 410: the same model kept drawing what the
 // camera saw at machine Y200 at scene Y200, which now burns at machine Y210.
+// Meta audit M2-P3-3: a calibration saved before the frame was kept had the
+// same gap, so it is not used until its frame is confirmed (ADR-440 Amd 4).
 
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, toMachineCoords, type DeviceProfile } from '../../devices';
@@ -11,11 +13,12 @@ import {
   cameraModelInBedFrame,
   sceneInBedFrame,
   UNVERIFIED_FRAME_NOTE,
+  withConfirmedBedFrame,
   type CameraBedFrame,
 } from './camera-bed-frame';
 import { bedMapper, bedPoint, projectWorldPoint, type Vec2 } from './camera-model';
 import { normalizeCameraModelRecord, type CameraModelRecord } from './camera-model-record';
-import { lookAt, savedCameraModel } from './model-fixtures';
+import { lookAt, savedCameraModel, unframedCameraModel } from './model-fixtures';
 import { modelAtHead } from './head-camera';
 
 const FRONT_LEFT_400: CameraBedFrame = { origin: 'front-left', bedWidthMm: 400, bedHeightMm: 400 };
@@ -83,15 +86,52 @@ describe('a calibration in the bed frame now', () => {
     });
   });
 
-  it('gives the same record back when nothing changed, and for older records without a frame', () => {
+  it('gives the same record back when nothing changed', () => {
     expect(cameraModelInBedFrame(calibrated, FRONT_LEFT_400)).toEqual({
       kind: 'ok',
       model: calibrated,
     });
-    const older = savedCameraModel();
-    const placed = cameraModelInBedFrame(older, { ...FRONT_LEFT_400, origin: 'rear-right' });
-    expect(placed.kind === 'ok' && placed.model).toBe(older);
     expect(cameraBedFrameNote(calibrated, FRONT_LEFT_400)).toBeNull();
+  });
+
+  it('does not use an older record without a frame, whatever the bed is now', () => {
+    // Calibrated on 400 × 400 by 1.0.21, then the bed was corrected to 410:
+    // drawn as saved, machine Y200 would show at scene Y200 and burn at Y210.
+    const older = unframedCameraModel();
+    const now: CameraBedFrame = { ...FRONT_LEFT_400, bedHeightMm: 410 };
+    const placed = cameraModelInBedFrame(older, now);
+    expect(placed).toEqual({
+      kind: 'issue',
+      message: expect.stringContaining('before KerfDesk recorded the bed it was calibrated on'),
+    });
+    expect(cameraModelInBedFrame(older, FRONT_LEFT_400).kind).toBe('issue');
+    expect(cameraBedFrameNote(older, now)).toEqual({
+      usable: false,
+      frameUnrecorded: true,
+      message: expect.stringContaining(
+        'If Machine Setup still has the origin at the front left and the bed at 400 × 410 mm, as when the camera was calibrated, choose Confirm bed and origin',
+      ),
+    });
+    // An origin change on a framed record cannot be confirmed away.
+    expect(
+      cameraBedFrameNote(calibrated, { ...FRONT_LEFT_400, origin: 'rear-left' }),
+    ).not.toHaveProperty('frameUnrecorded');
+  });
+
+  it('uses an older record once its frame is confirmed, and follows a later bed change exactly', () => {
+    const older = unframedCameraModel();
+    const known = { ...FRONT_LEFT_400, nativeToBedOffsetMm: { x: 400, y: 0 } };
+    const confirmed = withConfirmedBedFrame(older, known);
+    // The origin and bed size the operator confirmed; the native offset then stays unknown.
+    expect(confirmed.bedFrame).toEqual(FRONT_LEFT_400);
+    expect(cameraModelInBedFrame(confirmed, known)).toEqual({ kind: 'ok', model: confirmed });
+    const placed = cameraModelInBedFrame(confirmed, { ...FRONT_LEFT_400, bedHeightMm: 410 });
+    if (placed.kind !== 'ok') throw new Error('expected a usable model');
+    expect(drawnAt(placed.model, { x: 200, y: 200 })?.y).toBeCloseTo(210, 6);
+    // A record that has its frame is never re-stamped.
+    expect(withConfirmedBedFrame(calibrated, { ...FRONT_LEFT_400, bedHeightMm: 410 })).toBe(
+      calibrated,
+    );
   });
 
   it('says how far it moved the picture', () => {
@@ -116,7 +156,11 @@ describe('a calibration in the bed frame now', () => {
     // Known then and now, or unknown both times (no homing): nothing to say.
     expect(cameraBedFrameNote({ ...calibrated, bedFrame: homed }, homed)).toBeNull();
     expect(cameraBedFrameNote(calibrated, FRONT_LEFT_400)).toBeNull();
-    expect(cameraBedFrameNote(savedCameraModel(), homed)).toBeNull();
+    // No frame at all is not "nothing to say": it waits for one (ADR-440 Amd 4).
+    expect(cameraBedFrameNote(unframedCameraModel(), homed)).toMatchObject({
+      usable: false,
+      frameUnrecorded: true,
+    });
   });
 
   it('counts a native offset only when both frames know it', () => {
@@ -166,7 +210,7 @@ describe('saving the frame with the calibration', () => {
       bedFrame: { ...FRONT_LEFT_400, nativeToBedOffsetMm: { x: 400, y: 0 } },
     };
     expect(normalizeCameraModelRecord(JSON.parse(JSON.stringify(withNative)))).toEqual(withNative);
-    const older = savedCameraModel();
+    const older = unframedCameraModel();
     expect(normalizeCameraModelRecord(JSON.parse(JSON.stringify(older)))).toEqual(older);
     expect(
       normalizeCameraModelRecord({ ...older, bedFrame: { origin: 'upside-down', bedWidthMm: 1 } }),

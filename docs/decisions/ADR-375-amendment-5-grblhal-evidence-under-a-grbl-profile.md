@@ -103,8 +103,9 @@ No hardware was available, so none of this is hardware evidence.
    text and is not flagged.
 4. **The stock-GRBL driver reads `$10` as grblHAL's when the `$$` lists `$14`-`$18`** (amends
    Amendment 2 decision 2). The driver declares `statusReportMask: 'grblhal-fields-if-grblhal-dump'`,
-   and Amendment 2's texts then apply. FluidNC, which copies the stock driver's capabilities, drops
-   the entry: its `$10` stays stock GRBL's.
+   and Amendment 2's texts then apply. So does the probe test's bit 4 (`Pn:`) hint
+   (`pinStateReportOff`, ADR-103 Amendment 2), with the same layout in the Ortur firmware. FluidNC,
+   which copies the stock driver's capabilities, drops the entry: its `$10` stays stock GRBL's.
 5. **`$19` is a legacy setting** in the `statusReportMaskIsFull` test (corrects Amendment 2
    decision 1).
 

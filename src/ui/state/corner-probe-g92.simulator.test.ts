@@ -22,6 +22,7 @@ import {
 import { resolveJobPlacement } from '../job-placement';
 import { disconnectOnTestClock } from './laser-disconnect-testing';
 import { useLaserStore } from './laser-store';
+import { markProbeCircuitTested } from './probe-test-touch.test-support';
 import { resetStore } from './test-helpers';
 
 const USER_ORIGIN = { startFrom: 'user-origin', anchor: 'front-left' } as const;
@@ -117,6 +118,7 @@ describe('touch-plate probing after Set origin here (M-2)', () => {
   it('stores the probed corner itself, so it survives the next reset', async () => {
     const sim = await connectWithSetOrigin();
 
+    markProbeCircuitTested();
     await expect(settle(useLaserStore.getState().probe(CORNER_REQUEST))).resolves.toEqual({
       kind: 'ok',
     });
@@ -143,6 +145,7 @@ describe('touch-plate probing after Set origin here (M-2)', () => {
   it('keeps the XY origin through a Z touch-off', async () => {
     const sim = await connectWithSetOrigin();
 
+    markProbeCircuitTested();
     await expect(settle(useLaserStore.getState().probe(Z_REQUEST))).resolves.toEqual({
       kind: 'ok',
     });

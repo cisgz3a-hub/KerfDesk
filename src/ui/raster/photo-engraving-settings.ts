@@ -1,4 +1,5 @@
 import { effectiveOperationForObject } from '../../core/effective-output';
+import { DEFAULT_SHARPEN_RADIUS } from '../../core/raster/luma-sharpen';
 import { activePhotoToneCurve, type PhotoToneCurve } from '../../core/raster/photo-tone-curve';
 import type { DitherAlgorithm, Layer, RasterImage } from '../../core/scene';
 import type { PhotoEngravingApply } from './photo-engraving-apply';
@@ -16,6 +17,10 @@ export type PhotoEngravingDraft = {
   readonly brightness: number;
   readonly contrast: number;
   readonly gamma: number;
+  /** ADR-671 unsharp amount in percent; 0 is off. */
+  readonly sharpenAmount: number;
+  /** Gaussian sigma in burn cells. */
+  readonly sharpenRadius: number;
   readonly ditherAlgorithm: PhotoDither;
   readonly linesPerMm: number;
   readonly negativeImage: boolean;
@@ -32,6 +37,8 @@ export function initialPhotoEngravingDraft(
     brightness: image.brightness ?? 0,
     contrast: image.contrast ?? 0,
     gamma: image.gamma ?? 1,
+    sharpenAmount: image.sharpenAmount ?? 0,
+    sharpenRadius: image.sharpenRadius ?? DEFAULT_SHARPEN_RADIUS,
     ditherAlgorithm: photoDither(effective.ditherAlgorithm),
     linesPerMm: effective.linesPerMm,
     negativeImage: effective.negativeImage,
@@ -46,7 +53,13 @@ export function photoDither(value: string): PhotoDither {
 
 export function photoEngravingPatch(draft: PhotoEngravingDraft): PhotoEngravingApply {
   return {
-    imagePatch: { brightness: draft.brightness, contrast: draft.contrast, gamma: draft.gamma },
+    imagePatch: {
+      brightness: draft.brightness,
+      contrast: draft.contrast,
+      gamma: draft.gamma,
+      sharpenAmount: draft.sharpenAmount,
+      sharpenRadius: draft.sharpenRadius,
+    },
     layerPatch: {
       ditherAlgorithm: draft.ditherAlgorithm,
       linesPerMm: draft.linesPerMm,

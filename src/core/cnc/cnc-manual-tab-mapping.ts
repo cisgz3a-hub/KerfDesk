@@ -18,6 +18,9 @@ export type CollectedCncContour = {
   // their source family or the centreline used by line/engrave operations.
   readonly fillRule?: 'nonzero' | 'evenodd';
   readonly manualTabPoints?: ReadonlyArray<Vec2>;
+  // Exact closed copies merged into this contour on a filled cut, where two
+  // identical outlines would enclose nothing (cnc-stacked-copies.ts).
+  readonly stackedCopies?: number;
 };
 
 export function manualTabCentersForToolpaths(

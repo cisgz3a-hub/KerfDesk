@@ -12,6 +12,7 @@ import { DEFAULT_Z_PROBE_PARAMS, type ProbeRequest } from '../../core/controller
 import { normalizeFrameWorkCoordinateSystem } from '../laser/frame-controller-readiness';
 import { disconnectOnTestClock } from './laser-disconnect-testing';
 import { useLaserStore } from './laser-store';
+import { markProbeCircuitTested } from './probe-test-touch.test-support';
 import { resetStore } from './test-helpers';
 import { isWorkZZeroEvidenceCurrent } from './work-z-zero-evidence';
 
@@ -77,6 +78,7 @@ describe('probing selects the program G54 and the store follows it', () => {
   it('keeps the probe Work-Z through the next Frame on a controller left in G55', async () => {
     await connectInG55();
 
+    markProbeCircuitTested();
     await expect(settle(useLaserStore.getState().probe(Z_REQUEST))).resolves.toEqual({
       kind: 'ok',
     });
