@@ -108,6 +108,43 @@ describe('offsetForSpeed', () => {
   });
 });
 
+// A firing-lag machine needs a negative entry (audit v3 D8-P3-5); the lookup
+// keeps the sign through every branch, and a table may cross zero.
+describe('offsetForSpeed with negative and sign-crossing tables', () => {
+  const negative: ReadonlyArray<ScanOffsetPoint> = [
+    { speedMmPerMin: 3000, offsetMm: -0.04 },
+    { speedMmPerMin: 6000, offsetMm: -0.09 },
+  ];
+  const crossing: ReadonlyArray<ScanOffsetPoint> = [
+    { speedMmPerMin: 1000, offsetMm: -0.1 },
+    { speedMmPerMin: 3000, offsetMm: 0.1 },
+  ];
+
+  it('keeps a negative sign at, between, below and above the points', () => {
+    expect(offsetForSpeed(negative, 3000)).toBeCloseTo(-0.04, 10);
+    expect(offsetForSpeed(negative, 4500)).toBeCloseTo(-0.065, 10);
+    expect(offsetForSpeed(negative, 1500)).toBeCloseTo(-0.02, 10);
+    expect(offsetForSpeed(negative, 20000)).toBeCloseTo(-0.09, 10);
+  });
+
+  it('interpolates through zero between points of opposite sign', () => {
+    expect(offsetForSpeed(crossing, 500)).toBeCloseTo(-0.05, 10);
+    expect(offsetForSpeed(crossing, 2000)).toBeCloseTo(0, 10);
+    expect(offsetForSpeed(crossing, 2500)).toBeCloseTo(0.05, 10);
+    expect(offsetForSpeed(crossing, 9000)).toBeCloseTo(0.1, 10);
+  });
+
+  it('property: a sign-crossing table stays within its smallest and largest offsets', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 1, max: 50000 }), (speed) => {
+        const result = offsetForSpeed(crossing, speed);
+        return result >= -0.1 - 1e-9 && result <= 0.1 + 1e-9;
+      }),
+      { numRuns: FUZZ_RUNS },
+    );
+  });
+});
+
 describe('offsetForEmittedFeed', () => {
   it('selects compensation at the same floored or fractional feed represented in G-code', () => {
     const table: ReadonlyArray<ScanOffsetPoint> = [

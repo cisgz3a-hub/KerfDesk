@@ -55,17 +55,23 @@ const CORNER_MITER_LIMIT = 4;
 const DEFAULT_MITER_LIMIT = 2;
 const FALLBACK_COLOR = '#000000';
 
+// LightBurn's Corner Style figure cuts a Bevel corner off at the offset
+// distance, so its flat sides run on past the corner (ADR-410 Amendment 2).
+// That is Clipper's Square join. Clipper's Bevel join cuts between the two
+// offset points instead, only 0.71 x the distance from a right-angled corner.
 const JOIN_TYPE: Readonly<Record<OffsetCornerStyle, JoinType>> = {
   round: JoinType.Round,
-  bevel: JoinType.Bevel,
+  bevel: JoinType.Square,
   corner: JoinType.Miter,
 };
 
-// LightBurn does not document open-path end caps; the cap follows the corner
-// style so a Corner offset of a line has square ends and Round has round ends.
+// LightBurn documents no open-path end caps. A line end is a 180° turn, and
+// its cap keeps the outline the offset distance clear of the line: Round has
+// a half circle; Bevel and Corner have a square cap, which is what their joins
+// make of a 180° turn. A flat (butt) cap would cut through the line's end.
 const OPEN_END_TYPE: Readonly<Record<OffsetCornerStyle, EndType>> = {
   round: EndType.Round,
-  bevel: EndType.Butt,
+  bevel: EndType.Square,
   corner: EndType.Square,
 };
 
@@ -121,6 +127,13 @@ function offsetPaths(
     return err({
       kind: 'collapsed',
       message: 'The inward offset collapsed the shape. Use a smaller distance.',
+    });
+  }
+  // ADR-410 item 3: Offset is unavailable, with the reason, when it makes nothing.
+  if (outward.value.length === 0 && inward.value.length === 0) {
+    return err({
+      kind: 'empty-result',
+      message: 'Nothing to offset: the selection has no shape or line to outline.',
     });
   }
   return ok({ outward: outward.value, inward: inward.value });
@@ -196,12 +209,56 @@ function splitPath(path: ColoredPath): { readonly closed: PathsD; readonly open:
   for (const polyline of path.polylines) {
     if (isClosedPolygon(polyline) || isClosedEnough(polyline)) {
       const ring = polylineToPathD(polyline);
-      if (ring.length >= 3) closed.push(ring);
+      // Signed area can cancel between filled lobes of a self-intersection.
+      // Rings that are collinear, including after region-grid quantization,
+      // are strokes. Normalize other rings under the path's fill rule first.
+      if (ring.length >= 3 && !collinearRing(ring) && !collinearOnRegionGrid(ring))
+        closed.push(ring);
+      else if (ring.length >= 2) open.push(ring.concat(ring.slice(0, 1)));
     } else if (polyline.points.length >= 2) {
       open.push(polyline.points.map((point) => ({ x: point.x, y: point.y })));
     }
   }
   return { closed, open };
+}
+
+// A rotated or scaled straight line comes out of materialization a few ulps off
+// exact collinearity, so "on the line" means within half the 1 µm grid that the
+// filled region is normalized on.
+const COLLINEAR_TOLERANCE_MM = 0.5 / 10 ** VECTOR_PATH_PRECISION_DECIMALS;
+
+function collinearRing(ring: PathD, tolerance = COLLINEAR_TOLERANCE_MM): boolean {
+  const first = ring[0];
+  if (first === undefined) return true;
+  // The vertex farthest from the first fixes the line's direction; two close
+  // vertices would give a direction that the tolerance cannot bound.
+  let far = first;
+  let farSq = 0;
+  for (const point of ring) {
+    const distanceSq = (point.x - first.x) ** 2 + (point.y - first.y) ** 2;
+    if (distanceSq > farSq) {
+      far = point;
+      farSq = distanceSq;
+    }
+  }
+  if (farSq === 0) return true;
+  const dx = far.x - first.x;
+  const dy = far.y - first.y;
+  const limit = tolerance * Math.sqrt(farSq);
+  return ring.every(
+    (point) => Math.abs(dx * (point.y - first.y) - dy * (point.x - first.x)) <= limit,
+  );
+}
+
+// A noncollinear sliver can become a line on Clipper's normalization grid.
+// Outline that line as a stroke, but do not resurrect noncollinear rings whose
+// filled areas cancel under their fill rule (for example a repeated traversal).
+function collinearOnRegionGrid(ring: PathD): boolean {
+  const scale = 10 ** VECTOR_PATH_PRECISION_DECIMALS;
+  return collinearRing(
+    ring.map(({ x, y }) => ({ x: Math.round(x * scale), y: Math.round(y * scale) })),
+    0,
+  );
 }
 
 // Each ColoredPath is its own fill batch, under the rule the canvas and CAM use.

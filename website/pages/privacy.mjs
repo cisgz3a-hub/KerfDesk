@@ -8,6 +8,7 @@
 // licensing sends), or in website/lib/meta-files.mjs. This factual published
 // notice is separate from the full review draft and does not certify compliance.
 
+import { DESKTOP_LICENCE_WINDOW } from '../../public/desktop-licence-window.mjs';
 import { callout, featureGrid, pageHero, section, statusPill, table } from '../lib/components.mjs';
 import { html } from '../lib/html.mjs';
 import { remotePrivacy } from '../lib/remote-privacy.mjs';
@@ -41,8 +42,12 @@ const AT_A_GLANCE = [
 // sw.js revalidation), vite.config.ts (prompt-only updates; lesson and bit
 // pictures cached on demand for 30 days), electron/preview-update.ts,
 // electron/licensing-*.ts, electron/commercial-update.ts,
-// electron/rtsp-camera-bridge.ts and electron/camera-frame-proxy*.ts. The
-// Download update link is user-initiated, so it is covered in previewCheck().
+// electron/rtsp-camera-bridge.ts and electron/camera-frame-proxy*.ts. The web
+// app's desktop download card: src/ui/licensing/BrowserDesktopWelcome.tsx (opens
+// by itself on a first visit), DesktopWelcomeDialog.tsx and
+// public/desktop-windows-download.mjs (no credentials, no referrer). Network
+// machines: src/ui/laser/machine-network-profile.ts. The Download update link is
+// user-initiated, so it is covered in previewCheck().
 function connections(site) {
   return [
     [
@@ -54,6 +59,11 @@ function connections(site) {
       'You open a lesson, or show a CNC bit picture, in the web app',
       'kerfdesk.com',
       'Your browser downloads that picture and keeps a copy for up to 30 days.',
+    ],
+    [
+      'You first open the web app, or reopen its desktop download card from the status bar',
+      site.downloadHost,
+      'The card opens by itself on your first visit. It asks for the signed list of released Windows versions so it can offer the current installer. The request sends no cookies, referrer, project, design, machine or job details. The installer downloads only when you choose Download for Windows.',
     ],
     [
       'You start the desktop Preview',
@@ -101,9 +111,9 @@ function connections(site) {
       'The reviewed prompt, dimensions and task; for material requests, the listed candidate recipe names/descriptions and any photograph you select. Your API key authenticates the request. No open project, canvas, machine settings or toolpaths are attached. See below for storage and provider handling.',
     ],
     [
-      'You explicitly connect a FluidNC network machine in the desktop app',
+      'You explicitly connect a FluidNC or grblHAL network machine in the desktop app',
       'The IP address or hostname and Telnet port you enter',
-      'Controller commands and responses use that configured TCP channel. There is no network scan or automatic reconnect. The channel is not encrypted; use a trusted network.',
+      'Controller commands and responses use that configured TCP channel: FluidNC’s Telnet channel or grblHAL’s raw Telnet service. There is no network scan or automatic reconnect. The channel is not encrypted; use a trusted network.',
     ],
   ];
 }
@@ -135,6 +145,17 @@ function websitePart(site, appPrivacy) {
         ? 'This privacy page adds no tracking of its own.'
         : 'This site adds no tracking of its own.'}
     </p>
+    <h3>Network error reports</h3>
+    <p>
+      Cloudflare delivers kerfdesk.com, ${site.downloadHost} and ${site.licensingHost}. Their
+      responses ask browsers that support Network Error Logging, such as Chrome and Edge, to report
+      failed requests. If a request to one of these sites fails within 7 days of your last visit,
+      for example because its name can’t be looked up or a connection can’t be made, your browser
+      may send Cloudflare a short report. It holds the address requested, the referring page, the
+      server’s IP address, the type of failure and how long the request took. Successful requests
+      aren’t reported. Your browser sends these reports, not a KerfDesk script, and Cloudflare uses
+      them to find network problems.
+    </p>
     <h3>Links to other sites</h3>
     <p>
       ${appPrivacy
@@ -143,7 +164,8 @@ function websitePart(site, appPrivacy) {
       the KerfDesk app, its download page, its support page and its notices.
       <a href="#app">Part 2</a> covers the app. The download page serves installers from
       ${site.downloadHost}. Your browser may tell the next site that you came from here, but not
-      which page. The optional AI section also links to OpenAI’s API data policy.
+      which page. The Buying Pro section also links to Paddle’s privacy notice, and the optional AI
+      section to OpenAI’s API data policy.
     </p>
     <h3>Download statistics</h3>
     <p>
@@ -202,6 +224,14 @@ function previewCheck(site, appPrivacy) {
     </p>`;
 }
 
+// What an unconfirmed trial stops follows the app's own setting: while ADR-623
+// Amendment 3 holds the licence window off, KerfDesk opens in Free and only new
+// Pro choices pause. Turning the window on changes this sentence, so check:privacy
+// then asks for the notice to be regenerated (and its date changed).
+const TRIAL_CONFIRMATION = DESKTOP_LICENCE_WINDOW
+  ? 'A trial must still be confirmed within three days before KerfDesk can open again or new Pro tools can be chosen.'
+  : 'If a trial isn’t confirmed within three days, KerfDesk still opens, but new Pro tools can’t be chosen until it is.';
+
 function licensing(site, appPrivacy) {
   return html`<h3 id="licensing">Pro trials and licenses</h3>
     <p>
@@ -233,9 +263,14 @@ function licensing(site, appPrivacy) {
       The desktop app also quietly confirms saved trial rights daily and paid license rights about
       once a week. It checks whether that confirmation is due at startup and every 30 minutes while
       open, using the same installation digest and saved credential. A failed connection does not
-      interrupt your work. New Pro choices require a confirmation within three days for trials or 30
-      days for paid licenses. Developer licenses are exempt. Existing work, Frame, Start and Save
-      G-code remain available, and the signed trial expiry still applies on your computer.
+      interrupt an open workspace. ${TRIAL_CONFIRMATION} Its signed expiry and clock rules still
+      apply. Developer licenses have no confirmation deadline. Existing work, Frame, Start and Save
+      G-code remain available in an open workspace.
+    </p>
+    <p>
+      Once activated on this computer, a paid license keeps working offline indefinitely, with no
+      confirmation deadline or clock lock. It remains bound to this installation and covers releases
+      within its update period.
     </p>
     <p>
       The licensing service retains trial installation and firmware digests to recognise repeat
@@ -245,8 +280,8 @@ function licensing(site, appPrivacy) {
     <p>
       The licensing service records verified Paddle refund and chargeback references and their
       effect on a license. Approved full purchase refunds and chargebacks revoke the license;
-      partial and renewal refunds go to support for review. Your next online confirmation picks up a
-      revocation.
+      partial and renewal refunds go to support for review. A revocation or seat deactivation
+      reported by the service takes effect at your next online license confirmation.
     </p>
     <h3>Buying Pro</h3>
     <p>
@@ -285,7 +320,7 @@ function licensing(site, appPrivacy) {
     </p>`;
 }
 
-function cameraHelper() {
+function cameraHelper(site) {
   return html`<h3>The camera helper</h3>
     <p>
       Network cameras are available only in the desktop app. To reach them, the desktop app starts a
@@ -296,8 +331,9 @@ function cameraHelper() {
       your local network.
     </p>
     <p>
-      The web app’s security policy lets it connect only to kerfdesk.com and to that one address on
-      your own computer. It loads no third-party scripts.
+      The web app’s security policy lets it connect only to kerfdesk.com, to ${site.downloadHost}
+      for its desktop download card, and to that one address on your own computer. It loads no
+      third-party scripts.
     </p>`;
 }
 
@@ -306,9 +342,9 @@ function deviceAccess() {
     <ul>
       <li>
         <strong>Your machine.</strong> For USB, you pick your machine’s port when you click Connect.
-        The desktop app also supports an explicitly configured FluidNC Telnet channel. Machine
-        commands go to the port or network address you choose. These connections do not upload a
-        project to a KerfDesk service.
+        The desktop app also supports an explicitly configured FluidNC Telnet channel or grblHAL raw
+        Telnet service; neither is encrypted. Machine commands go to the port or network address you
+        choose. These connections do not upload a project to a KerfDesk service.
       </li>
       <li>
         <strong>USB cameras.</strong> In a browser, KerfDesk can use a camera only after you allow
@@ -343,7 +379,7 @@ function appPart(site, appPrivacy) {
     })}
     <div class="prose">
       ${previewCheck(site, appPrivacy)} ${licensing(site, appPrivacy)} ${remotePrivacy()}
-      ${aiPrivacy()} ${cameraHelper()} ${deviceAccess()}
+      ${aiPrivacy()} ${cameraHelper(site)} ${deviceAccess()}
       ${callout({
         iconName: 'wifi-off',
         title: 'Working offline',
@@ -378,7 +414,7 @@ export const page = {
     'KerfDesk needs no account for ordinary use. Read about updates, licensing, downloads, optional AI, remote access and machine connections.',
   render: ({ site, appPrivacy = false }) =>
     html`${pageHero({
-      eyebrow: html`Last updated <time datetime="2026-10-12">October 12, 2026</time>`,
+      eyebrow: html`Last updated <time datetime="2026-10-22">October 22, 2026</time>`,
       title: 'Privacy',
       lead: appPrivacy
         ? 'KerfDesk doesn’t track you. This notice covers this privacy page and the KerfDesk app: what each one sends over the network, and what stays on your computer.'

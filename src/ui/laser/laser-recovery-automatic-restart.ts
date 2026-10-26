@@ -18,12 +18,32 @@ export function automaticRestartHint(automatic: AutomaticRestart | null): string
   if (automatic === null) {
     return 'Automatic uses acknowledged command progress, which can be ahead of the physical cut. Inspect the work and choose an earlier movement if needed.';
   }
+  const ifRestarted = ifRestartedHint(automatic);
+  const hint = automaticLineHint(automatic);
+  return ifRestarted === null ? hint : `${hint} ${ifRestarted}`;
+}
+
+function automaticLineHint(automatic: AutomaticRestart): string {
   const backlogHint = plannerBacklogHint(automatic);
   if (backlogHint !== null) return backlogHint;
   if (automatic.replaysRejectedLine) {
     return `Automatic restarts at line ${automatic.line}, the line the controller rejected, so that burn is not skipped. Lines after it that the controller ran before it stopped may burn again; inspect the work and choose a later line if they did.`;
   }
   return `Automatic restarts at line ${automatic.line}, from acknowledged command progress, which can be ahead of the physical cut. Inspect the work and choose an earlier movement if needed.`;
+}
+
+/** The step back a restart would need, when the reconnect after a lost link
+ * could not show whether the controller restarted (ADR-398 Amendment 4). */
+function ifRestartedHint(automatic: AutomaticRestart): string | null {
+  const step = automatic.ifRestarted;
+  if (step === undefined) return null;
+  const lost =
+    step.basis === 'planner-size'
+      ? `it may have thrown away up to ${step.blocks} buffered moves, a whole planner`
+      : step.basis === 'after-empty-status'
+        ? 'it threw away the moves acknowledged after its last report showed an empty buffer'
+        : `it threw away about ${step.blocks} buffered moves`;
+  return `The reconnect did not show whether the controller restarted. If it did, ${lost}: restart from line ${step.line} to replay them.`;
 }
 
 const REPLAY_ADVICE =

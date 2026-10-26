@@ -80,8 +80,17 @@ export function useJobWatch(): void {
 
 function beginJob(plan: CanvasMotionPlan, io: WatchIo): WatchedJob | null {
   const { settings } = useJobWatchStore.getState();
-  if (!settings.timelapse && !settings.burnCheck) return null;
+  // Every new run changes the work under the camera, even when watching was
+  // switched off. An older after-picture wait or capture must not compare the
+  // new work against the previous job's route.
   generation += 1;
+  // A completed verdict may remain visible, but another run also means a
+  // fresh picture can no longer isolate the work in that verdict.
+  lastBurnWatch = null;
+  if (!settings.timelapse && !settings.burnCheck) {
+    retirePendingWatch();
+    return null;
+  }
   const current = generation;
   const isCurrent = (): boolean => generation === current;
   clearBurnCheckResult();
@@ -103,6 +112,28 @@ function beginJob(plan: CanvasMotionPlan, io: WatchIo): WatchedJob | null {
   }
   const before = settings.burnCheck ? startBurnCheck(plan, region, camera, io, isCurrent) : null;
   return { generation: current, plan, camera, recorder, before };
+}
+
+function retirePendingWatch(): void {
+  const { burnCheck, timelapse } = useJobWatchStore.getState();
+  if (burnCheck.kind === 'watching' || burnCheck.kind === 'checking') {
+    lastBurnWatch = null;
+    useJobWatchStore.setState({
+      burnCheck: {
+        kind: 'unavailable',
+        reason: 'Another job started before the after picture was ready.',
+      },
+    });
+  }
+  if (timelapse?.recording === true) {
+    useJobWatchStore.setState({
+      timelapse: {
+        ...timelapse,
+        recording: false,
+        note: 'Another job started before the final picture was ready.',
+      },
+    });
+  }
 }
 
 function startBurnCheck(

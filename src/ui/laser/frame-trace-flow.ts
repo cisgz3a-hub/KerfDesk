@@ -30,6 +30,7 @@ import {
   reportFrameRefusal,
   requireFrameControllerQueue,
   waitForFrameOutcome,
+  withFrameNoGoWarnings,
 } from './frame-dispatch-support';
 import { frameTraceReadinessIssue, transientMachineActivity } from './framed-run-invalidation';
 import { frameInputsAreCurrent } from './reviewed-frame-current';
@@ -165,7 +166,11 @@ async function traceFrameOutline(
     reportFrameRefusal([FRAME_WORK_POSITION_UNKNOWN_MESSAGE]);
     return null;
   }
-  const candidate = traceCandidate(context, preview, currentLaser, returnToWorkPosition);
+  const candidate = withFrameNoGoWarnings(
+    currentLaser,
+    preview.frameMotionBounds,
+    traceCandidate(context, preview, currentLaser, returnToWorkPosition),
+  );
   preparation.claimTrace(candidate);
   publishFramePreparationStage('tracing');
   const completion = waitForFrameOutcome(candidate);

@@ -31,10 +31,10 @@ import {
   normalizeFrameWorkCoordinateSystem,
 } from './frame-controller-readiness';
 import {
+  absoluteFrameOffsetRefusal,
   waitForAbsoluteFrameOffset,
   waitForUnreportedFrameWorkOffset,
 } from './frame-position-readiness';
-import { ABSOLUTE_WORK_OFFSET_REQUIRED_MESSAGE } from '../job-placement';
 import { clearStartBlockers } from './start-blocker-invalidation';
 import { clearFrameExpiryNote } from './frame-expiry-note';
 import { type ConfirmedJobReview, type ReviewedStartBundle } from './job-review';
@@ -56,6 +56,7 @@ import {
   requireFrameControllerQueue,
   requireFrameControllerRunsMachineKind,
   waitForFrameOutcome,
+  withFrameNoGoWarnings,
 } from './frame-dispatch-support';
 import {
   dispatchTracedFrame,
@@ -259,7 +260,7 @@ async function prepareFrameContext(
   signal.throwIfAborted();
   if (!(await waitForAbsoluteFrameOffset(useStore.getState().jobPlacement))) {
     reportFramePreparationRefusal(
-      [ABSOLUTE_WORK_OFFSET_REQUIRED_MESSAGE],
+      absoluteFrameOffsetRefusal(useStore.getState().jobPlacement),
       wcsNormalization.warning,
     );
     return null;
@@ -363,7 +364,7 @@ async function dispatchPreparedFrame(
     return false;
   }
   const candidateOptions = reviewedFrameCandidateOptions(bundle, options);
-  const candidate: FramedRunCandidate = {
+  const candidate = withFrameNoGoWarnings<FramedRunCandidate>(currentLaser, motionBounds, {
     preparedStart: bundle.prepared,
     project: bundle.project,
     ...candidateOptions,
@@ -379,7 +380,7 @@ async function dispatchPreparedFrame(
     ...(bundle.frameWcsNormalizationWarning === undefined
       ? {}
       : { frameWcsNormalizationWarning: bundle.frameWcsNormalizationWarning }),
-  };
+  });
 
   publishFramePreparationStage('tracing');
   const completion = waitForFrameOutcome(candidate);

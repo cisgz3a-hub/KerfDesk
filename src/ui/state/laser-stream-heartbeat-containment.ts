@@ -2,6 +2,7 @@ import { markErrored } from '../../core/controllers/grbl';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import {
   acknowledgementStalledNotice,
+  controllerLink,
   streamStalledNotice,
   writeFailedNotice,
 } from './laser-safety-notice';
@@ -117,11 +118,14 @@ export function containLostStreamHeartbeat(
   );
   refs.heartbeatProbe = heartbeat.probe;
   if (!heartbeat.lost) return false;
-  set((current) => ({
-    ...publishControllerIncident(refs, current, streamStalledNotice().message),
-    safetyNotice: current.safetyNotice ?? streamStalledNotice(),
-    streamReset: streamResetRecord(current),
-  }));
+  set((current) => {
+    const stalled = streamStalledNotice(controllerLink(current));
+    return {
+      ...publishControllerIncident(refs, current, stalled.message),
+      safetyNotice: current.safetyNotice ?? stalled,
+      streamReset: streamResetRecord(current),
+    };
+  });
   // Freeze synchronously, then quarantine after the bounded reset transaction
   // so a late banner/ok cannot enter a future job.
   const connection = refs.connection;

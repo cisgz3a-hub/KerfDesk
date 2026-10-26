@@ -94,9 +94,16 @@ function shellLineRefusal(line: string): string | null {
     // Any other `$` letter draws `error:Invalid statement`, a terminal reply.
     return ACKLESS_DOLLAR_RE.test(line) ? acklessShellReason(line) : null;
   }
-  if (!/[a-z]/.test(first)) return null;
+  if (!isSmoothieLowercaseShellLine(line)) return null;
   if (/^[fgmnstxyz]-?[\d.]/.test(line)) return LOWERCASE_GCODE_REASON;
   return acklessShellReason(line);
+}
+
+/** SimpleShell, not GcodeDispatch, owns a line that starts with a lowercase
+ *  letter ("ignore all lowercase as they are simpleshell commands"). The
+ *  Console and an opened program (ADR-630 Amendment 5) both go by this. */
+export function isSmoothieLowercaseShellLine(line: string): boolean {
+  return /^[a-z]/.test(line);
 }
 
 function acklessShellReason(line: string): string {

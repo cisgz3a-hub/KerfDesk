@@ -114,6 +114,14 @@ export function projectWithTwoLines(): Project {
   };
 }
 
+/** Vector artwork beside variable text whose CSV column is missing, so an
+ * artwork export fails while it outlines the text. */
+export function projectWithLinesAndMissingVariableData(): Project {
+  const lines = projectWithTwoLines();
+  const text = projectWithMissingVariableData().scene.objects;
+  return { ...lines, scene: { ...lines.scene, objects: [...lines.scene.objects, ...text] } };
+}
+
 export function selectedScope(selectedObjectIds: ReadonlyArray<string>): OutputScope {
   return {
     cutSelectedGraphics: true,

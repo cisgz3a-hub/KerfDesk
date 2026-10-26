@@ -23,6 +23,12 @@ the single command that needs it.
 | Paid licence | Forever, for eligible versions | Releases published on or before the update cutoff; one year from purchase, plus one year per US$20 renewal | 3 active at once |
 | Developer (Johann, Father) | Forever | All future releases | 3 active at once |
 
+- **For now, from 1.0.21, the licence window is held off** ([ADR-623 Amendment 3](decisions/ADR-623-amendment-3-licence-window-held-off.md)).
+  The commercial desktop app opens straight into KerfDesk Free. Opening a Pro tool,
+  Help > Licence or the status bar's `Free · Try Pro` starts the 30-day trial or
+  takes a licence key, and when a trial or licence ends KerfDesk Free keeps
+  working; only new Pro tool choices pause. The bullets below that describe the
+  licence window apply only once a release turns it back on.
 - The commercial desktop app opens behind its licence window until this computer
   has an active trial or licence (ADR-623). The workspace, projects and machine
   connections stay unavailable until then. The window offers activation and the

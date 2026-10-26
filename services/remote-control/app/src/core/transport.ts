@@ -22,6 +22,7 @@ export interface RemoteTransport {
 
 export const ERROR_TEXT: Record<string, string> = {
   stale_revision: 'The design changed on the PC. Your view was refreshed — try again.',
+  busy: 'The PC is busy with another action. Wait for it to finish, then try again.',
   needs_pro: 'This needs Pro. Start a trial or add a licence on the PC.',
   unsupported_operation: 'That isn’t supported for this artwork or operation.',
   invalid_input: 'That value isn’t accepted. Check it and try again.',

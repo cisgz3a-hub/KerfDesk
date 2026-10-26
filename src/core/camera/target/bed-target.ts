@@ -42,7 +42,29 @@ export type BedTargetLayout = {
 
 export const DEFAULT_TARGET_SPACING_MM = 40;
 export const DEFAULT_RING_DIAMETER_MM = 10;
-const RING_WIDTH_SHARE = 0.18;
+// The grid step is four ring diameters (eight radii) at every ring size: the
+// detector's anchor search counts on it (ring-detect.ts).
+export const SPACING_OVER_RING_DIAMETER = DEFAULT_TARGET_SPACING_MM / DEFAULT_RING_DIAMETER_MM;
+// The ring detector finds rings reliably from about this outer diameter in
+// the picture (ADR-441 Amendment 7: 7.7 px and 8.9 px medians failed, 9.5 px
+// and up calibrated); a smaller median means the target needs larger rings.
+export const MIN_RING_DIAMETER_PX = 9.5;
+
+/**
+ * The target laid out over `area` with rings `ringDiameterMm` across and the
+ * grid step that goes with them.
+ */
+export function bedTargetLayoutWithRings(
+  area: BedTargetArea,
+  ringDiameterMm: number = DEFAULT_RING_DIAMETER_MM,
+): BedTargetLayout {
+  return bedTargetLayout({
+    area,
+    ringDiameterMm,
+    spacingMm: ringDiameterMm * SPACING_OVER_RING_DIAMETER,
+  });
+}
+export const RING_WIDTH_SHARE = 0.18;
 // Keep every ring fully inside the area.
 const EDGE_CLEARANCE_SHARE = 0.75;
 // The fewest columns and rows that hold the anchor L with rings around it.

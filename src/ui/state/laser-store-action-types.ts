@@ -6,6 +6,15 @@ import type { PlatformAdapter } from '../../platform/types';
 import type { AutofocusResult } from './autofocus-action';
 import type { ConsoleCommandOptions } from './laser-console-actions';
 import type { FramedRunCandidate, FrameTraceCandidate } from './framed-run';
+import type { FrameVerification } from './frame-verification';
+
+/** An external G-code program's Frame (ADR-630): no run candidate, a record
+ * stored as `frameVerification` on a clean completion, and the work position
+ * the program was read from, which the Frame returns to. */
+export type ExternalFrameRequest = {
+  readonly verification: FrameVerification;
+  readonly returnToWorkPosition: { readonly x: number; readonly y: number };
+};
 import type { FrameWcsSelection } from './frame-wcs-selection';
 import type { StartJobOptions } from './laser-job-options';
 import type { JobStopReason } from './job-stop-request';
@@ -108,6 +117,8 @@ export type LaserStoreActions = {
      * Frame). Laser or CNC Frame motion follows this job, not the open canvas. */
     jobProject?: Project,
     owner?: MachineExecutionOwner,
+    /** Only without a run candidate: an external program's Frame (ADR-630). */
+    external?: ExternalFrameRequest,
   ) => Promise<void>;
   /** Physically trace a job's bounds before its exact program exists. Same
    * motion and completion boundary as `frame`, but a clean completion records
@@ -147,6 +158,11 @@ export type LaserStoreActions = {
     readonly x: number;
     readonly y: number;
   }) => Promise<void>;
+  /** Set work zero to a known machine point without moving the head. */
+  readonly setOriginAtMachinePoint: (
+    pointMm: { readonly x: number; readonly y: number },
+    assertTargetCurrent?: () => void,
+  ) => Promise<void>;
   /** Make the head's current point the program point it stopped at, in mm, with
    *  one G92, and resolve to the XY work offset written (ADR-341 Amd 6). */
   readonly setOriginAtProgramPoint: (pointMm: {

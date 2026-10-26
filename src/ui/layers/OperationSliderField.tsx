@@ -2,6 +2,7 @@ import { useId, useRef, useState } from 'react';
 import { nearestSpeedStopIndex } from '../../core/devices/working-speed-range';
 import { useStore } from '../state/store';
 import { useMixedOperationNumber } from './mixed-operation-input';
+import { spinTextProps } from './spin-text-field';
 import './operation-slider-field.css';
 
 type OperationSliderFieldProps = {
@@ -23,6 +24,8 @@ type OperationSliderFieldProps = {
   readonly mixed?: boolean | undefined;
   readonly reconcileKey?: unknown;
   readonly parse: (value: string) => number;
+  readonly validate?: ((value: string) => string | null) | undefined;
+  readonly inputType?: 'number' | 'text';
   readonly commit: (value: number) => void;
   readonly observe?: (value: string) => void;
 };
@@ -43,6 +46,7 @@ function useSliderDraft(props: OperationSliderFieldProps) {
     mixed: props.mixed,
     reconcileKey: props.reconcileKey,
     parse: props.parse,
+    validate: props.validate,
     commit: props.commit,
     commitOnBlur: dragging,
   });
@@ -84,7 +88,7 @@ function useSliderDraft(props: OperationSliderFieldProps) {
       gesture.current.awaitingFocus = false;
     }
   };
-  return { ...draft, onChange, onRangeChange, startDrag, finishDrag, focusSlider };
+  return { ...draft, change, onChange, onRangeChange, startDrag, finishDrag, focusSlider };
 }
 
 type SliderTrack = {
@@ -159,13 +163,21 @@ export function OperationSliderField(props: OperationSliderFieldProps): JSX.Elem
   const id = useId();
   const draft = useSliderDraft(props);
   const mixed = draft.inputProps['data-mixed'] === 'true';
-  const parsed = Number.parseFloat(draft.displayValue);
+  const parsed = props.parse(draft.displayValue);
   const value = Math.max(
     props.min,
     Math.min(props.max, Number.isFinite(parsed) ? parsed : props.value),
   );
   const track = sliderTrack(props, value);
   const reading = mixed ? undefined : props.describe?.(value);
+  // A box that takes units is text, kept a spin button (spin-text-field).
+  const spin =
+    props.inputType === 'text'
+      ? spinTextProps(
+          { current: props.parse, step: 1, min: props.min, max: props.max, change: draft.change },
+          draft.displayValue,
+        )
+      : {};
   return (
     <div className="lf-operation-slider" role="group" aria-labelledby={`${id}-label`}>
       <div className="lf-operation-slider__heading">
@@ -183,11 +195,14 @@ export function OperationSliderField(props: OperationSliderFieldProps): JSX.Elem
         </label>
         <input
           id={`${id}-number`}
-          type="number"
+          type={props.inputType ?? 'number'}
+          inputMode="decimal"
+          aria-invalid={draft.errorMessage !== null}
           min={props.min}
           max={props.max}
           value={draft.displayValue}
           {...draft.inputProps}
+          {...spin}
           onChange={draft.onChange}
           onBlur={draft.onBlur}
           aria-label={`${props.label} for ${props.ariaContext}`}

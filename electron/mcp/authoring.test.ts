@@ -34,6 +34,7 @@ const readTools = [
   'get_machine',
   'get_app_status',
   'list_material_recipes',
+  'get_board',
   'review_job',
   'get_workspace_preview',
   'list_fonts',
@@ -44,6 +45,8 @@ const readTools = [
   'get_control_operation',
 ] as const;
 const editTools = [
+  'set_board_photo',
+  'place_on_board',
   'set_selection',
   'add_text',
   'add_rectangle',
@@ -75,6 +78,8 @@ const controlTools = [
   'disconnect_machine',
   'home_machine',
   'set_work_origin',
+  'capture_board_point',
+  'finish_board',
   'pause_job',
   'resume_job',
 ] as const;
@@ -92,6 +97,7 @@ const nonDestructiveEdits = [
   'import_file',
   'create_operation',
   'save_project',
+  'set_board_photo',
 ];
 
 afterEach(async () => {

@@ -1,4 +1,5 @@
 import { validateReliefHeightfield } from './project-relief-heightfield-validator';
+import { validateReliefTwoSidedSplit } from './project-relief-two-sided-validator';
 import { firstError, isObject, requireLiteral } from './project-shape-primitives';
 
 const LEGACY_RELIEF_SIBLINGS = ['depthMap', 'meshPositions', 'emptyCells'] as const;
@@ -48,9 +49,13 @@ export function validateReliefSource(obj: Record<string, unknown>, path: string)
     return firstError([
       validateMeshPositions(source['meshPositions'], `${path}.reliefSource.meshPositions`),
       requireLiteral(source, `${path}.reliefSource.emptyCells`, ['floor', 'top']),
+      validateReliefTwoSidedSplit(obj, path),
     ]);
   }
-  return validateReliefHeightfield(source, `${path}.reliefSource`);
+  return firstError([
+    validateReliefTwoSidedSplit(obj, path),
+    validateReliefHeightfield(source, `${path}.reliefSource`),
+  ]);
 }
 
 function validateMeshPositions(value: unknown, path: string): string | null {

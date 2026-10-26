@@ -7,6 +7,7 @@ import {
   operationIdsForObject,
   remapSceneObjectOperationBindings,
   sceneObjectUsesOperation,
+  type EmbeddedFont,
   type Layer,
   type Scene,
   type SceneGroup,
@@ -22,6 +23,8 @@ import {
 } from './scene-object-copy-dependencies';
 import { pushUndo } from './scene-mutations';
 import type { AppState } from './store';
+import { copiedEmbeddedFonts, mergeClipboardFonts } from './clipboard-embedded-fonts';
+import { prepareProjectInsertion, reportProjectInsertionFailure } from './project-insertion-budget';
 
 const PASTE_OFFSET_MM = 10;
 const PASTE_FEWER = 'Copy fewer objects to paste, or delete some objects first.';
@@ -32,6 +35,7 @@ export type SceneClipboard = {
   readonly selectedObjectIds: ReadonlyArray<string>;
   readonly sourceDocumentEpoch: number;
   readonly groups?: ReadonlyArray<SceneGroup>;
+  readonly embeddedFonts?: ReadonlyArray<EmbeddedFont>;
 };
 
 export type SceneClipboardActions = {
@@ -44,6 +48,12 @@ export type SceneClipboardActions = {
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
 
 export function sceneClipboardActions(set: Setter): SceneClipboardActions {
+  const paste = (offset: number) =>
+    reportProjectInsertionFailure(() =>
+      set((state) =>
+        prepareProjectInsertion(state.project, () => pasteFromClipboard(state, offset)),
+      ),
+    );
   return {
     copySelection: () =>
       set((state) => {
@@ -57,20 +67,25 @@ export function sceneClipboardActions(set: Setter): SceneClipboardActions {
         const removed = removeSceneObjectsFromState(state, clipboard.selectedObjectIds);
         return removed === state ? state : { ...removed, sceneClipboard: clipboard };
       }),
-    pasteClipboard: () => set((state) => pasteFromClipboard(state, PASTE_OFFSET_MM)),
+    pasteClipboard: () => paste(PASTE_OFFSET_MM),
     // LightBurn's Paste in Place (ADR-410): the copy lands exactly where the
     // original was, e.g. to stack a second pass or move art between projects.
-    pasteClipboardInPlace: () => set((state) => pasteFromClipboard(state, 0)),
+    pasteClipboardInPlace: () => paste(0),
   };
 }
 
 function pasteFromClipboard(state: AppState, offsetMm: number): AppState | Partial<AppState> {
   const clipboard = state.sceneClipboard;
   if (clipboard === null || clipboard.objects.length === 0) return state;
+  const fonts = mergeClipboardFonts(
+    state.project,
+    clipboard.objects,
+    clipboard.embeddedFonts ?? [],
+  );
   const prepared = prepareClipboardPaste(
     state.project.scene,
     clipboard.layers,
-    clipboard.objects,
+    fonts.objects,
     clipboard.selectedObjectIds,
     clipboard.groups ?? [],
     clipboard.sourceDocumentEpoch === state.projectDocumentEpoch,
@@ -87,9 +102,15 @@ function pasteFromClipboard(state: AppState, offsetMm: number): AppState | Parti
   if (refuseSceneLimitOverrun(state.project.scene, scene, PASTE_FEWER)) return state;
   const [primary, ...rest] = prepared.selectedObjectIds;
   return {
-    project: { ...state.project, scene },
+    project: {
+      ...state.project,
+      scene,
+      ...(fonts.embeddedFonts === undefined ? {} : { embeddedFonts: fonts.embeddedFonts }),
+    },
     selectedObjectId: primary ?? null,
     additionalSelectedIds: new Set(rest),
+    selectedPathNode: null,
+    selectedPathNodes: [],
     undoStack: pushUndo(state.project, state.undoStack),
     redoStack: [],
     dirty: true,
@@ -123,6 +144,7 @@ export function clipboardFromSelection(
     selectedObjectIds: ids.filter((id) => copiedIds.has(id)),
     sourceDocumentEpoch: state.projectDocumentEpoch,
     groups,
+    embeddedFonts: copiedEmbeddedFonts(state.project, objects),
   };
 }
 

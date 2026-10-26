@@ -10,6 +10,12 @@
 // or motion relative to a position already set. Until then its assumed value
 // stays out. An axis the program never sets (Z in most laser files) keeps the
 // drawn extent, which is then the assumed value alone.
+//
+// An external run's Frame (ADR-630 Amendment 1) also leaves out what the
+// program does not place in the work coordinates it starts in: an axis whose
+// origin it moves (displace) and anything in another work coordinate system
+// (setForeign). Those hooks are only called when the model is built with
+// `boundsFromStart`.
 
 import type { AxisBounds } from './render-model-types';
 
@@ -21,6 +27,8 @@ export type KnownAxes = { x: boolean; y: boolean; z: boolean };
 
 export type ProgramBoundsTracker = {
   readonly known: KnownAxes;
+  /** Geometry validation may use axes only while every one is placed. */
+  readonly canPlace: (axes: ReadonlyArray<keyof KnownAxes>) => boolean;
   /** Adds the axes of `point` that `known` says the program set. */
   readonly include: (point: Point, known?: KnownAxes) => void;
   /** After a move to `target`: axis words set their axis in absolute mode. */
@@ -31,6 +39,11 @@ export type ProgramBoundsTracker = {
   ) => void;
   /** After G28: the homed axes are at a position the program does not state. */
   readonly forget: (axes: ReadonlyArray<Axis>) => void;
+  /** After an origin write: these axes no longer count, whatever the program says. */
+  readonly displace: (axes: ReadonlyArray<Axis>) => void;
+  /** Entering (true) or leaving another work coordinate system: nothing counts
+   * while in it, and leaving or entering one leaves every position unknown. */
+  readonly setForeign: (foreign: boolean) => void;
   /** After a drilling cycle's moves, which started at `from`. */
   readonly cycle: (
     moves: ReadonlyArray<{ readonly to: Point }>,
@@ -56,27 +69,42 @@ function axesSetBy(
 export function createProgramBoundsTracker(initialPosition?: Point): ProgramBoundsTracker {
   const startKnown = initialPosition !== undefined;
   const known: KnownAxes = { x: startKnown, y: startKnown, z: startKnown };
+  const displaced: KnownAxes = { x: false, y: false, z: false };
+  let foreign = false;
   const x = createRange();
   const y = createRange();
   const z = createRange();
   const include = (point: Point, axes: KnownAxes = known): void => {
-    if (axes.x) x.add(point.x);
-    if (axes.y) y.add(point.y);
-    if (axes.z) z.add(point.z);
+    if (foreign) return;
+    if (axes.x && !displaced.x) x.add(point.x);
+    if (axes.y && !displaced.y) y.add(point.y);
+    if (axes.z && !displaced.z) z.add(point.z);
+  };
+  const forget = (axes: ReadonlyArray<Axis>): void => {
+    const all = axes.length === 0;
+    if (all || axes.includes('X')) known.x = false;
+    if (all || axes.includes('Y')) known.y = false;
+    if (all || axes.includes('Z')) known.z = false;
   };
   if (initialPosition !== undefined) include(initialPosition);
   return {
     known,
+    canPlace: (axes) => !foreign && axes.every((axis) => known[axis] && !displaced[axis]),
     include,
     moveTo: (target, axisWords, absolute) => {
       Object.assign(known, axesSetBy(known, axisWords, absolute));
       include(target);
     },
-    forget: (axes) => {
-      const all = axes.length === 0;
-      if (all || axes.includes('X')) known.x = false;
-      if (all || axes.includes('Y')) known.y = false;
-      if (all || axes.includes('Z')) known.z = false;
+    forget,
+    displace: (axes) => {
+      if (axes.includes('X')) displaced.x = true;
+      if (axes.includes('Y')) displaced.y = true;
+      if (axes.includes('Z')) displaced.z = true;
+    },
+    setForeign: (next) => {
+      if (next === foreign) return;
+      foreign = next;
+      forget([]);
     },
     // A cycle's hole takes its X and Y words, and its R plane and depth count
     // in absolute mode. Before it reaches the hole it may rise at the old X and Y.

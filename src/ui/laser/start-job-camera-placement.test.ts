@@ -57,11 +57,12 @@ function cameraProject(homingEnabled: boolean): Project {
 }
 
 // Frame-first (ADR-228): the camera Start gates (absolute-mode requirement,
-// home / position-epoch proof) are deleted entirely — not even demoted to
-// warnings. The watched Frame trace is the placement proof; the camera panel
-// keeps its own in-panel confirmation UI.
+// home / position-epoch proof) are deleted; the watched Frame trace is the
+// placement proof. ADR-228 Amendment (camera placement start-from): a relative
+// Start from is said in Job Review, because the camera picture shows absolute
+// bed positions, and it still never refuses.
 describe('Start camera-placement integration', () => {
-  it('starts a camera-placed job on a relative origin once framed', () => {
+  it('starts a camera-placed job on a relative origin once framed, and says where it burns', () => {
     const project = cameraProject(true);
     const wco = { x: 15, y: 25, z: 0 };
     const result = prepareStartJob(
@@ -83,6 +84,25 @@ describe('Start camera-placement integration', () => {
     );
 
     expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.warnings).toContainEqual(
+        expect.stringContaining('Camera placement is on, but Start from is User Origin.'),
+      );
+    }
+  });
+
+  it('says nothing about Start from for a camera-placed job at Absolute Coordinates', () => {
+    const project = cameraProject(true);
+    const result = prepareStartJob(project, READY_CONTROLLER, {
+      ...READY_MACHINE,
+      cameraPlacementActive: true,
+      homingState: 'confirmed',
+      frameVerification: frameVerificationForProject(project),
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.warnings.some((w) => w.includes('Camera placement is on'))).toBe(false);
+    }
   });
 
   it('starts without a completed Home on a homing-capable machine once framed', () => {

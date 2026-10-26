@@ -17,7 +17,7 @@ import {
   type FakeConnection,
 } from '../state/laser-store-motion-operation.test-support';
 import { settleTestGrblHandshake, startTestLaserJob } from '../state/laser-test-start-helpers';
-import { ControllerConnectionControls } from './ControllerConnectionControls';
+import { CurrentControllerControls } from './controller-connection-controls.test-support';
 import { installFrameOnceProject } from './frame-once.test-support';
 import { ensureFramedRunInvalidationSubscriptions } from './framed-run-invalidation';
 import { reviewPendingFramedRunPermitForCurrentState } from './framed-run-testing';
@@ -103,21 +103,6 @@ function fixture() {
     serial: { isSupported: () => true, requestPort },
   };
   return { original, replacement, requestPort, platform };
-}
-
-function CurrentControllerControls(): JSX.Element {
-  const autofocusBusy = useLaserStore((state) => state.autofocusBusy);
-  const motionOperation = useLaserStore((state) => state.motionOperation);
-  const controllerOperation = useLaserStore((state) => state.controllerOperation);
-  return (
-    <ControllerConnectionControls
-      machineKind="laser"
-      autofocusBusy={autofocusBusy}
-      motionOperation={motionOperation}
-      controllerOperation={controllerOperation}
-      onForget={() => undefined}
-    />
-  );
 }
 
 async function render(platform: PlatformAdapter): Promise<HTMLElement> {

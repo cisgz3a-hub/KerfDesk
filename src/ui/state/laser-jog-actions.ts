@@ -7,7 +7,7 @@
 
 import { isAtOrAboveSafeZ } from './cnc-frame-lines';
 import { currentWorkZMm, inferCurrentMachinePosition } from './infer-machine-position';
-import { buildFrameDispatchPlan } from './laser-frame-motion-plan';
+import { buildFrameDispatchPlan, frameRouteNoGoWarnings } from './laser-frame-motion-plan';
 import { runHomeAction } from './laser-home-action';
 import {
   markMotionOperationDispatched,
@@ -22,7 +22,7 @@ import { assertAutofocusIdle, jogFrameCommandBlockMessage, pushLog } from './las
 import { useStore } from './store';
 import { isWorkZEvidenceCurrentForStart } from './work-z-zero-evidence';
 import { confirmFreshManualMotionIdle } from './manual-motion-fresh-idle';
-import { warnJogMotionPolicy } from './laser-jog-warnings';
+import { publishMotionPolicyWarning, warnJogMotionPolicy } from './laser-jog-warnings';
 import {
   assertManualMotionNotCancelled,
   manualMotionCancelGeneration,
@@ -30,6 +30,7 @@ import {
 import type { LaserState, LiveRefs } from './laser-store';
 import type { TranscriptSource } from './laser-transcript';
 import { pendingTransportWriteCount } from './laser-start-queue-fence';
+import { laserStatusReportFieldsOff, unknownMachinePositionMessage } from './status-report-fields';
 import {
   assertMachineExecutionOwner,
   ownedMachineWrite,
@@ -72,8 +73,8 @@ export function jogActions(
     jogToMachinePosition: (x, y, feed) => runJogToMachinePosition(context, x, y, feed),
     jog: (params, owner) => runJog(context, params, owner),
     cancelJog: () => runCancelJog(set, get, refs, safeWrite),
-    frame: (bounds, feed, candidate, jobProject, owner) =>
-      runFrame(context, bounds, feed, candidate, jobProject, owner),
+    frame: (bounds, feed, candidate, jobProject, owner, external) =>
+      runFrame(context, bounds, feed, candidate, jobProject, owner, external),
     traceFrame: (bounds, feed, candidate, owner) =>
       runFrame(context, bounds, feed, candidate, undefined, owner),
   };
@@ -96,7 +97,10 @@ async function runJogToMachinePosition(
     get().controllerSettings?.reportInches === true,
   );
   if (current === null) {
-    const message = 'Jog to point needs a live machine position. Wait for an Idle status report.';
+    // A grblHAL `$10` that sends WPos and no WCO never gives one (ADR-375 Amd 2).
+    const message =
+      unknownMachinePositionMessage(laserStatusReportFieldsOff(get())) ??
+      'Jog to point needs a live machine position. Wait for an Idle status report.';
     set({ lastWriteError: message, log: pushLog(get(), `[lf2] ${message}`) });
     throw new Error(message);
   }
@@ -200,6 +204,7 @@ async function runFrame(
   candidate: Parameters<LaserState['frame']>[2] | Parameters<LaserState['traceFrame']>[2],
   jobProject?: Parameters<LaserState['frame']>[3],
   owner?: MachineExecutionOwner,
+  external?: Parameters<LaserState['frame']>[5],
 ): Promise<void> {
   assertMachineExecutionOwner(owner);
   context = { ...context, safeWrite: ownedMachineWrite(context.safeWrite, owner) };
@@ -211,11 +216,21 @@ async function runFrame(
   assertMachineExecutionOwner(owner);
   // A new physical Frame voids every earlier proof, traced or permitted.
   set({ frameVerification: null, framedRun: null, frameTrace: null });
-  const plan = buildFrameDispatchPlan(refs, get, bounds, feed, candidate, jobProject);
+  const externalFrame = candidate === undefined ? external : undefined;
+  const plan = buildFrameDispatchPlan(
+    refs,
+    get,
+    bounds,
+    feed,
+    candidate,
+    jobProject,
+    externalFrame,
+  );
   if (plan.kind === 'blocked') {
     set({ lastWriteError: plan.message, log: pushLog(get(), `[lf2] ${plan.message}`) });
     throw new Error(plan.message);
   }
+  warnFrameRouteNoGoZones(context, bounds, candidate, jobProject, externalFrame);
   // Every Frame ends with the active driver's planner-drain marker. Status
   // reports alone are not a causal completion proof: realtime replies can be
   // delayed, and Marlin M114 normally reports projected rather than physical
@@ -238,7 +253,7 @@ async function runFrame(
       0,
       undefined,
       frameSettlementLine,
-      undefined,
+      externalFrame?.verification,
       plan.expectedReturnWorkZMm,
     ),
     ...(owner === undefined ? {} : { executionOwner: owner }),
@@ -266,6 +281,20 @@ async function runFrame(
   } catch (error) {
     set((state) => failOwnedMotionOperation(state, operation.operationId));
     throw error;
+  }
+}
+
+// Like a jog, a Frame whose own route crosses a no-go zone is warned and still
+// sent (ADR-232 Amendment 1).
+function warnFrameRouteNoGoZones(
+  { set, get }: JogActionContext,
+  bounds: Parameters<typeof frameRouteNoGoWarnings>[1],
+  candidate: Parameters<typeof frameRouteNoGoWarnings>[2],
+  jobProject: Parameters<typeof frameRouteNoGoWarnings>[3],
+  external: Parameters<typeof frameRouteNoGoWarnings>[4],
+): void {
+  for (const warning of frameRouteNoGoWarnings(get(), bounds, candidate, jobProject, external)) {
+    publishMotionPolicyWarning(set, get, warning);
   }
 }
 

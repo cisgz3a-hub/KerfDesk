@@ -199,7 +199,7 @@ export const PRODUCTION_TOOL_TUTORIALS: readonly Tutorial[] = [
         title: 'Save the setup and export the files',
         examplePhase: 2,
         instruction:
-          'Save CNC machine setup, then use File → Save G-code. The export produces separate files identified by tile row and column; keep those names and the corresponding stock positions together.',
+          'Save CNC machine setup, then use File → Save G-code. The export produces separate files identified by tile row and column; keep those names and the corresponding stock positions together. A tile that needs more than one bit gets one file per bit (_bit-1-of-2, _bit-2-of-2): run them in order, changing the bit and re-zeroing Z between them.',
         focus: 'Save setup → indexed files',
         result:
           'Each file contains the output for its own tile rather than one continuous machine run.',

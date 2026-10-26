@@ -8,15 +8,13 @@ import { applySvgFragmentImport, applySvgFragmentReimport } from './svg-fragment
 import {
   findRegistrationBoxes,
   type EmbeddedFont,
-  type Layer,
-  type Project,
   type SceneObject,
   type ShapeObject,
   type TextObject,
-  machineKindOf,
 } from '../../core/scene';
 import {
   applyInsertBoxPanels,
+  cutFreshCncOperationsWithActiveBit,
   type InsertablePart,
   type InsertableSheet,
 } from './box-insert-mutation';
@@ -25,15 +23,12 @@ import { reportDependencyRepairs } from './object-delete-actions';
 import { refuseSceneLimitOverrun } from './scene-copy-room';
 import { validateDesignStudioDocument } from '../../io/project/project-design-studio-validator';
 import { useToastStore } from './toast-store';
+import { withReferencedEmbeddedFonts } from '../../core/text/embedded-font-set';
 import { saveUndoStepName } from './undo-step-names';
+import { prepareProjectInsertion, reportProjectInsertionFailure } from './project-insertion-budget';
 import type { DesignApplyRecord } from './design-apply-record';
 import { createRegistrationBox, createRegistrationCircle } from '../../core/shapes';
-import { applyLayerDefaultSettings } from '../layers/layer-default-settings';
-import { seedFreshCncLayer } from './cnc-auto-seeding';
-import { seedFreshLaserLayer } from './laser-recipe-seeding';
-import type { MaterialLibraryDocument } from '../../io/material-library';
-import type { CncLiveCapsState } from './cnc-live-caps-actions';
-import { defaultSettingsForOperation, type LayerDefaultsState } from './layer-default-actions';
+import { applyLayerDefaultsToFreshLayers, svgStructuralDefaults } from './fresh-operation-seeding';
 import type { AppState } from './store';
 import { fitAllObjects } from './viewport-actions';
 import {
@@ -58,7 +53,7 @@ type Getter = () => AppState;
 const DESIGN_FEWER = 'Apply a smaller drawing, or delete some objects first.';
 
 export function objectInsertActions(
-  set: Setter,
+  rawSet: Setter,
   get: Getter,
 ): Pick<
   AppState,
@@ -75,11 +70,14 @@ export function objectInsertActions(
   | 'removeRegistrationBox'
   | 'setRegistrationBoxLocked'
 > {
+  const importSet: Setter = (update) =>
+    rawSet((state) => prepareProjectInsertion(state.project, () => update(state)));
+  const set: Setter = (update) => reportProjectInsertionFailure(() => importSet(update));
   return {
-    importSvgObject: importSvgObjectAction(set, get),
-    ...svgFragmentActions(set, get),
-    reimportSvgObject: reimportSvgObjectAction(set, get),
-    upsertTextObject: upsertTextObjectAction(set),
+    importSvgObject: importSvgObjectAction(importSet, get),
+    ...svgFragmentActions(importSet, get),
+    reimportSvgObject: reimportSvgObjectAction(importSet, get),
+    upsertTextObject: upsertTextObjectAction(importSet),
     drawShape: drawShapeAction(set),
     insertBoxPanels: insertBoxPanelsAction(set),
     applyDesignSketch: applyDesignSketchAction(set),
@@ -209,15 +207,19 @@ function insertBoxPanelsAction(set: Setter): AppState['insertBoxPanels'] {
   return (panels: ReadonlyArray<InsertablePart>, sheet: InsertableSheet) => {
     set((state) => {
       const next = applyInsertBoxPanels(state, panels, sheet);
-      return next === null
-        ? state
-        : applyLayerDefaultsToFreshLayers(
-            state.project.scene.layers,
-            next,
-            state.layerDefaults,
-            state.cncLiveCaps,
-            state.materialLibrary,
-          );
+      if (next === null) return state;
+      const seeded = applyLayerDefaultsToFreshLayers(
+        state.project.scene.layers,
+        next,
+        state.layerDefaults,
+        state.cncLiveCaps,
+        state.materialLibrary,
+      );
+      return cutFreshCncOperationsWithActiveBit(
+        state.project.scene.layers,
+        seeded,
+        state.cncLiveCaps,
+      );
     });
   };
 }
@@ -267,58 +269,41 @@ function applyDesignSketchAction(set: Setter): AppState['applyDesignSketch'] {
   };
 }
 
+// ADR-628 Amendment 1: a font with the same bytes as one already embedded is
+// reused under that key, a font nothing names any more leaves with the commit
+// (undo restores the whole previous project, fonts included), and a commit
+// that would leave more fonts than a project can hold changes nothing.
 function applyTextAndEmbeddedFont(
   state: AppState,
   text: TextObject,
   embeddedFont?: EmbeddedFont,
   options?: TextInsertOptions,
 ) {
-  const next = applyUpsertText(state, text, options);
-  if (embeddedFont === undefined) return next;
-  const existing = next.project.embeddedFonts ?? [];
-  const embeddedFonts = [...existing.filter((font) => font.key !== embeddedFont.key), embeddedFont];
-  return { ...next, project: { ...next.project, embeddedFonts } };
-}
-
-export function applyLayerDefaultsToFreshLayers<T extends { readonly project: Project }>(
-  previousLayers: ReadonlyArray<Layer>,
-  result: T,
-  defaults: LayerDefaultsState,
-  liveCaps: CncLiveCapsState['cncLiveCaps'],
-  materialLibrary: MaterialLibraryDocument | null,
-): T {
-  const existing = new Set(previousLayers.map((layer) => layer.id));
-  const machine = result.project.machine;
-  let changed = false;
-  const layers = result.project.scene.layers.map((layer) => {
-    if (existing.has(layer.id)) return layer;
-    const settings = defaultSettingsForOperation(defaults, result.project.scene.objects, layer);
-    const withDefaults =
-      Object.keys(settings).length === 0
-        ? layer
-        : applyLayerDefaultSettings(layer, settings, machineKindOf(machine));
-    // Seed fresh CNC layers from the project stock material (ADR-112), and
-    // fresh laser layers from the job material's best recipe (ADR-496); each
-    // is a no-op when no material is chosen.
-    const seeded =
-      machine?.kind === 'cnc'
-        ? seedFreshCncLayer(withDefaults, {
-            device: result.project.device,
-            machine,
-            liveCaps,
-          })
-        : seedFreshLaserLayer(withDefaults, result.project, materialLibrary);
-    if (seeded !== layer) changed = true;
-    return seeded;
-  });
-  if (!changed) return result;
-  return {
-    ...result,
-    project: {
-      ...result.project,
-      scene: { ...result.project.scene, layers },
-    },
-  };
+  const existing = state.project.embeddedFonts ?? [];
+  const same =
+    embeddedFont === undefined
+      ? undefined
+      : existing.find(
+          (font) => font.dataBase64 === embeddedFont.dataBase64 && font.key !== embeddedFont.key,
+        );
+  const placed =
+    same !== undefined && text.fontKey === embeddedFont?.key
+      ? { ...text, fontKey: same.key }
+      : text;
+  const next = applyUpsertText(state, placed, options);
+  const embeddedFonts =
+    embeddedFont === undefined || same !== undefined
+      ? next.project.embeddedFonts
+      : [
+          ...(next.project.embeddedFonts ?? []).filter((font) => font.key !== embeddedFont.key),
+          embeddedFont,
+        ];
+  const project = withReferencedEmbeddedFonts(
+    embeddedFonts === undefined ? next.project : { ...next.project, embeddedFonts },
+  );
+  // The shared insertion guard refuses an over-budget project by throwing.
+  // Text editors catch that refusal and retain the draft for correction.
+  return { ...next, project };
 }
 
 function svgFragmentActions(
@@ -361,21 +346,5 @@ function svgFragmentActions(
       if (outcome !== null) fitAllObjects(get);
       return outcome;
     },
-  };
-}
-
-// Authored SVG fill/stroke and decoded image density determine structural
-// settings. Saved speed/power/CNC preferences must not turn an image into Line.
-function svgStructuralDefaults(defaults: LayerDefaultsState): LayerDefaultsState {
-  const settings = (value: NonNullable<LayerDefaultsState['allColors']>) => {
-    const { mode: _mode, linesPerMm: _density, ...rest } = value;
-    return rest;
-  };
-  return {
-    ...defaults,
-    allColors: defaults.allColors === null ? null : settings(defaults.allColors),
-    byColor: Object.fromEntries(
-      Object.entries(defaults.byColor).map(([key, value]) => [key, settings(value)]),
-    ),
   };
 }

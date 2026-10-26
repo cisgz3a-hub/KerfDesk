@@ -58,6 +58,10 @@ function fixture(initial: RemoteIdentity | null = identity(), monotonicNow?: () 
     write: vi.fn(async (value) => {
       saved = structuredClone(value);
     }),
+    discard: vi.fn(async () => {
+      saved = null;
+      return true;
+    }),
     create: () => ({ ...identity(), enabled: false }),
   };
   const queue = createRemoteRendererQueue();
@@ -65,6 +69,7 @@ function fixture(initial: RemoteIdentity | null = identity(), monotonicNow?: () 
   const runtime = createRemoteAccessRuntime(store, queue, monotonicNow);
   return { runtime, store, saved: () => saved, queue, options: captured.options! };
 }
+type Fixture = ReturnType<typeof fixture>;
 const client = (scopes: RemoteScope[] = ['read', 'edit']) => ({
   id: randomUUID(),
   label: 'Approved client',
@@ -238,6 +243,68 @@ describe('native opt-in, scoped pairing and durable revocation', () => {
     expect(JSON.stringify(f.runtime.status())).not.toContain('secret/path');
     expect(f.queue.ready()).toBe(true);
     f.runtime.closed();
+  });
+
+  // Rolling audit 2026-10-21 01-P2-4: a failed save used to leave the old record,
+  // so the revoked phone regained control on the next launch.
+  const revocations: ReadonlyArray<
+    readonly [string, (f: Fixture, clientId: string) => Promise<unknown>, string | null]
+  > = [
+    ['Disable', (f) => f.runtime.configure(false), null],
+    ['Revoke', (f, clientId) => f.runtime.revoke(clientId), 'client.revoke'],
+    ['Revoke all', (f) => f.runtime.revokeAll(), 'clients.revokeAll'],
+  ];
+  describe.each(revocations)('%s whose save fails', (_label, act, sent) => {
+    it('fails closed across a restart and shows the real error', async () => {
+      const f = fixture();
+      const [approved] = await connected(f, [client(['read', 'control'])]);
+      vi.mocked(f.store.write).mockRejectedValueOnce(new Error('EBUSY: rename'));
+      await expect(act(f, approved!.id)).rejects.toThrow('could not be saved securely');
+      if (sent !== null)
+        expect(captured.relay.send.mock.calls.map(([m]) => m.type)).toContain(sent);
+      expect(f.store.discard).toHaveBeenCalledOnce();
+      expect(f.saved()).toBeNull();
+      expect(f.runtime.status()).toMatchObject({ available: false, enabled: false });
+      expect(f.runtime.status().error).toContain('saved pairing removed');
+      // Detaching and reattaching the renderer closes the relay again.
+      f.runtime.closed();
+      expect(f.runtime.status().error).toContain('saved pairing removed');
+
+      const relaunched = fixture(f.saved());
+      captured.relay.start.mockClear();
+      await relaunched.runtime.opened();
+      expect(captured.relay.start).not.toHaveBeenCalled();
+      expect(relaunched.runtime.status().enabled).toBe(false);
+      relaunched.runtime.closed();
+    });
+
+    it('says so when the saved record cannot be removed either', async () => {
+      const f = fixture();
+      const [approved] = await connected(f, [client(['read', 'control'])]);
+      vi.mocked(f.store.write).mockRejectedValueOnce(new Error('EBUSY: rename'));
+      vi.mocked(f.store.discard).mockResolvedValueOnce(false);
+      await expect(act(f, approved!.id)).rejects.toThrow('could not be removed');
+      expect(f.runtime.status()).toMatchObject({ available: false, connected: false });
+      expect(f.runtime.status().error).toContain('may reconnect after a restart');
+      expect(f.runtime.status().error).not.toContain('EBUSY');
+      expect(f.options.canRequest(approved!.id, ['read', 'control'])).toBe(false);
+      f.runtime.closed();
+    });
+  });
+
+  it('keeps the real error when a confirmed revocation cannot be cleared from storage', async () => {
+    const f = fixture();
+    await connected(f);
+    await f.runtime.revokeAll();
+    const requestId = captured.relay.send.mock.calls.findLast(
+      ([m]) => m.type === 'clients.revokeAll',
+    )![0].requestId;
+    vi.mocked(f.store.write).mockRejectedValueOnce(new Error('EBUSY: rename'));
+    f.options.onMessage({ type: 'clients.revoked', requestId });
+    await vi.waitFor(() => expect(f.runtime.status().available).toBe(false));
+    expect(f.runtime.status().error).toBe('Remote settings could not be saved securely.');
+    // The queued revocation is still saved, so the next launch repeats it.
+    expect(f.saved()).toMatchObject({ revokeOnConnect: true });
   });
 
   it('asks refused storage again at the next attach but keeps an unopenable record shut', async () => {

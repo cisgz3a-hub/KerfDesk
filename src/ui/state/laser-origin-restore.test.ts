@@ -13,7 +13,12 @@ import {
 } from './laser-controller-status-wait';
 import { consumeControllerCommandResponse } from './laser-interactive-command';
 import { OriginTransactionCancelledError } from './laser-origin-transaction';
-import { restoreWorkOrigin, setOriginAtProgramPoint } from './laser-origin-restore';
+import {
+  BOARD_ORIGIN_WRITE,
+  restoreWorkOrigin,
+  setOriginAtMachinePoint,
+  setOriginAtProgramPoint,
+} from './laser-origin-restore';
 import { statusPositionPatch } from './laser-status-position';
 import { useLaserStore, type LaserState, type LiveRefs } from './laser-store';
 
@@ -81,6 +86,86 @@ async function flush() {
 afterEach(() => vi.useRealTimers());
 
 describe('Restore saved origin controller evidence and units', () => {
+  it('sets a board origin at a known machine point without moving the head', async () => {
+    const h = harness();
+    const writes: string[] = [];
+    const write = async (line: string) => {
+      writes.push(line);
+      queueMicrotask(() => {
+        h.report({ x: 20, y: 30, z: 4 });
+        consumeControllerCommandResponse(h.refs, { kind: 'ok' }, 'ok');
+      });
+    };
+    await setOriginAtMachinePoint(h.set, h.get, h.refs, write, saved);
+    expect(writes).toEqual(['G54 G21 G92 X80.000 Y170.000\n']);
+    expect(h.get().workOriginVersion).toBe(2);
+    expect(h.get().wcoCache).toEqual({ x: 20, y: 30, z: 4 });
+  });
+
+  it('rechecks calculated-target ownership after asynchronous readiness before any origin write', async () => {
+    const h = harness();
+    const write = vi.fn(async () => undefined);
+    const assertCurrent = () => {
+      if (h.get().workOriginVersion !== 1) throw new Error('Capture origin changed');
+    };
+    const pending = setOriginAtMachinePoint(h.set, h.get, h.refs, write, saved, assertCurrent);
+    h.set({ workOriginVersion: 2 });
+    await expect(pending).rejects.toThrow('Capture origin changed');
+    expect(write).not.toHaveBeenCalled();
+    expect(h.get().controllerOperation).toBeNull();
+    expect(h.get().workOriginVersion).toBe(2);
+  });
+
+  it('carries target ownership to a deferred SafeWrite dispatch', async () => {
+    const h = harness();
+    let current = true;
+    let release: () => void = () => undefined;
+    const deferred = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const dispatched: string[] = [];
+    const write = vi.fn(
+      async (
+        line: string,
+        _action?: unknown,
+        _source?: unknown,
+        assertBeforeWrite?: () => void,
+      ) => {
+        await deferred;
+        assertBeforeWrite?.();
+        dispatched.push(line);
+        queueMicrotask(() => {
+          h.report({ ...saved, z: 4 });
+          consumeControllerCommandResponse(h.refs, { kind: 'ok' }, 'ok');
+        });
+      },
+    );
+    const pending = setOriginAtMachinePoint(h.set, h.get, h.refs, write, saved, () => {
+      if (!current) throw new Error('Capture owner changed');
+    });
+    const rejected = expect(pending).rejects.toThrow('Capture owner changed');
+    await flush();
+    expect(write).toHaveBeenCalledOnce();
+    current = false;
+    release();
+    await rejected;
+    expect(dispatched).toEqual([]);
+    expect(h.refs.controllerCommand).toBeNull();
+  });
+
+  it('logs the board-origin notice without throwing when confirmation times out', async () => {
+    vi.useFakeTimers();
+    const h = harness();
+    const write = async () => {
+      queueMicrotask(() => consumeControllerCommandResponse(h.refs, { kind: 'ok' }, 'ok'));
+    };
+    const pending = setOriginAtMachinePoint(h.set, h.get, h.refs, write, saved);
+    await vi.advanceTimersByTimeAsync(3_100);
+    await expect(pending).resolves.toBeUndefined();
+    expect(h.get().workOriginVersion).toBe(2);
+    expect(h.get().log.join('\n')).toContain(BOARD_ORIGIN_WRITE.unconfirmedNotice);
+  });
+
   it.each([null, '<Idle|MPos:100,200,10|FS:0,0>', '<Idle|MPos:100,200,10|WCO:11,12,4|FS:0,0>'])(
     'does not return a successful head-stop anchor without matching fresh offset proof: %s',
     async (statusAfterWrite) => {

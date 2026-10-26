@@ -150,6 +150,35 @@ describe('registration jig canvas marquee and select all', () => {
 });
 
 describe('registration jig canvas handles', () => {
+  it('keeps the interior of small selected artwork movable while preserving outside handles', () => {
+    const objects = jigEditableSelection(row(), new Set(['a']));
+    for (const point of [
+      { x: 1, y: 1 },
+      { x: 5, y: 5 },
+      { x: 9, y: 9 },
+    ]) {
+      expect(jigHandleAt(objects, point, 2.5)).toBeNull();
+    }
+    expect(jigHandleAt(objects, { x: -1, y: -1 }, 2.5)).toEqual({ kind: 'resize', handle: 'nw' });
+  });
+
+  it.each([
+    [{ x: 10, y: 20 }, 20],
+    [{ x: 10, y: 5 }, 5],
+    [{ x: 12, y: 20 }, 20],
+    [{ x: 20, y: 12 }, 20],
+  ])('follows either corner-drag axis for proportional growth and shrinking: %j', (point, size) => {
+    const project = row();
+    const result = resizeJigSelection(project, new Set(['a']), {
+      handle: 'se',
+      start: { x: 10, y: 10 },
+      point,
+      lockAspect: true,
+    });
+    expect(result.refused).toBe(false);
+    expectBounds(bounds(result.project, 'a'), { minX: 0, minY: 0, maxX: size, maxY: size });
+  });
+
   it('finds the resize handles and the rotate handle of the selection bounds', () => {
     const project = row();
     const objects = jigEditableSelection(project, new Set(['a', 'b']));

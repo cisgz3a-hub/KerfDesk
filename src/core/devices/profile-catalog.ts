@@ -13,7 +13,8 @@ import { FALCON_A1_PRO_GRBLHAL_PROFILE, FALCON_COMPATIBLE_PROFILE } from './falc
 import { validateScanOffsetProfile } from './scan-offset-profile';
 import { cncSubProfileIssues } from './cnc-sub-profile-validation';
 import { machineProfileControllerIssues } from './machine-profile-controller-validation';
-import { positioningLightIssue } from './positioning-light';
+import { devicePositioningLightIssue } from './positioning-light';
+import { profileAutofocusIssue } from './autofocus-command';
 import {
   XTOOL_D1_PRO_PROFILES,
   SCULPFUN_S30_PROFILE,
@@ -37,6 +38,11 @@ export type MachineProfileCatalogEntry = {
   readonly profile: DeviceProfile;
   readonly evidence: ReadonlyArray<ProfileEvidence>;
   readonly reviewNotes: ReadonlyArray<string>;
+  /**
+   * Why Machine Setup's list leaves this preset out. A withdrawn preset stays
+   * in the catalog only so a saved copy still resolves (ADR-660).
+   */
+  readonly withdrawn?: string;
 };
 
 // Phase H controller-family starters. Wire-compatible with the GRBL driver
@@ -172,9 +178,15 @@ export const GRBL_MACHINE_PROFILE_CATALOG: ReadonlyArray<MachineProfileCatalogEn
   entry(FALCON_A1_PRO_GRBLHAL_PROFILE, [
     'Manufacturer configuration starter; controller build and physical operation are not qualified. Use the researched model-specific dimensions and commands.',
   ]),
-  entry(FALCON_COMPATIBLE_PROFILE, [
-    'Broad Falcon-compatible GRBL fallback. Choose the A1 Pro profile only for that model; a firmware banner does not identify the machine.',
-  ]),
+  entry(
+    FALCON_COMPATIBLE_PROFILE,
+    [
+      'Broad Falcon-compatible GRBL fallback. Choose the A1 Pro profile only for that model; a firmware banner does not identify the machine.',
+    ],
+    // Controller audit v2 C7-P2-3: listed under Creality, an A1 owner got a
+    // bounds check 95 mm deeper than the machine.
+    "its 400 x 400 mm work area is not any Falcon model's: Creality lists the Falcon A1 at 305 x 381 mm and the A1 Pro at 358 x 268 mm",
+  ),
   entry(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE, [
     'No default 4040 scan-offset table is shipped; calibrate before enabling compensation.',
   ]),
@@ -245,12 +257,10 @@ export function duplicateProfileAsCustom(
 
 export function validateMachineProfile(profile: DeviceProfile): ReadonlyArray<string> {
   const errors: string[] = [];
-  const lightIssue = positioningLightIssue(
-    profile.positioningLight,
-    profile.controllerKind,
-    profile.gcodeDialect?.dialectId,
-  );
+  const lightIssue = devicePositioningLightIssue(profile);
   if (lightIssue !== null) errors.push(lightIssue);
+  const autofocusIssue = profileAutofocusIssue(profile);
+  if (autofocusIssue !== null) errors.push(autofocusIssue);
   requireNonEmpty(profile.name, 'name', errors);
   if (profile.profileId !== undefined) requireNonEmpty(profile.profileId, 'profileId', errors);
   errors.push(...machineProfileControllerIssues(profile));
@@ -285,6 +295,7 @@ export function validateMachineProfile(profile: DeviceProfile): ReadonlyArray<st
 function entry(
   profile: DeviceProfile,
   reviewNotes: ReadonlyArray<string>,
+  withdrawn?: string,
 ): MachineProfileCatalogEntry {
   const builtInProfile = {
     ...profile,
@@ -298,6 +309,7 @@ function entry(
     profile: builtInProfile,
     evidence: builtInProfile.evidence ?? [],
     reviewNotes,
+    ...(withdrawn === undefined ? {} : { withdrawn }),
   };
 }
 

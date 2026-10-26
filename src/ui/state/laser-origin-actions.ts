@@ -35,7 +35,12 @@ import { pushLog } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 import type { LiveRefs } from './laser-store';
 import { assertOriginActionReady, usesPrimaryWcs } from './laser-origin-readiness';
-import { restoreWorkOrigin, setOriginAtProgramPoint } from './laser-origin-restore';
+import {
+  restoreWorkOrigin,
+  setOriginAtMachinePoint,
+  setOriginAtProgramPoint,
+} from './laser-origin-restore';
+import { workOffsetOffFor, workOffsetOffMessage } from './status-report-fields';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -57,6 +62,7 @@ export function originActions(
   | 'clearPersistentOrigin'
   | 'releaseMotors'
   | 'restoreWorkOrigin'
+  | 'setOriginAtMachinePoint'
   | 'setOriginAtProgramPoint'
 > {
   return {
@@ -68,6 +74,8 @@ export function originActions(
     releaseMotors: () => releaseMotors(set, get, refs, safeWrite),
     restoreWorkOrigin: (savedOffsetMm) =>
       restoreWorkOrigin(set, get, refs, safeWrite, savedOffsetMm),
+    setOriginAtMachinePoint: (pointMm, assertTargetCurrent) =>
+      setOriginAtMachinePoint(set, get, refs, safeWrite, pointMm, assertTargetCurrent),
     setOriginAtProgramPoint: (pointMm) =>
       setOriginAtProgramPoint(set, get, refs, safeWrite, pointMm),
   };
@@ -103,7 +111,10 @@ async function setOriginHere(
     // controllers never report WCO, so skip the wait there.
     async (assertCurrent) => {
       if (usesPrimaryWcs(get())) {
-        sawFreshWcoFrame = await waitForOriginWcoFrame(get, assertCurrent);
+        // A grblHAL `$10` without bit 5 never sends WCO, so no wait or jog
+        // brings the new origin's offset (ADR-375 Amendment 2).
+        sawFreshWcoFrame =
+          workOffsetOffFor(get()) === null && (await waitForOriginWcoFrame(get, assertCurrent));
       }
       const { statusReport, wcoCache } = get();
       return transientXyOriginPatch(
@@ -125,7 +136,12 @@ async function setOriginHere(
     get().controllerSessionEpoch === sessionEpoch &&
     refs.writeEpoch === writeEpoch
   ) {
-    set((state) => ({ log: pushLog(state, ORIGIN_WCO_UNCONFIRMED_NOTICE) }));
+    const fieldsOff = workOffsetOffFor(get());
+    const notice =
+      fieldsOff === null
+        ? ORIGIN_WCO_UNCONFIRMED_NOTICE
+        : `[lf2] Origin set, but its machine location stays unknown. ${workOffsetOffMessage(fieldsOff)}`;
+    set((state) => ({ log: pushLog(state, notice) }));
   }
 }
 
@@ -142,7 +158,7 @@ async function zeroZHere(
     get().workZReferenceEpoch,
     selectedCncToolId(useStore.getState().project),
   );
-  await assertOriginActionReady(set, get, refs, safeWrite);
+  await assertOriginActionReady(set, get, refs, safeWrite, 'z');
   const machineBeforeG92 = hostRecordedMachinePosition(get());
   await runOriginTransaction(
     set,

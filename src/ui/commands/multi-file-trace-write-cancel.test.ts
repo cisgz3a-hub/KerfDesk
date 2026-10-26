@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { mockPlatform } from '../../__fixtures__/file-actions';
 import type { BatchTraceFile } from '../../core/trace/batch-trace';
 import type { SaveDirectoryTarget, SaveTarget } from '../../platform/types';
+import { installChromiumSavePicker } from '../../platform/web/chromium-save-picker.test-support';
+import { webAdapter } from '../../platform/web/web-adapter';
 import {
   runMultiFileTrace,
   traceFileWriterForDirectory,
@@ -60,20 +62,20 @@ describe('batch export cancellation at asynchronous save boundaries', () => {
     );
   });
 
-  it('does not write when cancelled while the per-file save picker is open', async () => {
+  it('writes the traced file when cancelled while the per-file save picker is open', async () => {
+    // Chromium has already emptied the chosen file when the picker returns
+    // (ADR-656, audit 19-P2-1); skipping the write would leave it at 0 bytes.
     const controller = new AbortController();
-    const write = vi.fn(async () => undefined);
-    const platform = {
-      ...mockPlatform(),
-      pickFileForSave: async () => {
-        controller.abort();
-        return target(write);
-      },
-    };
-    await expect(
-      writeTraceFileWithPlatform(platform, file, controller.signal),
-    ).rejects.toMatchObject({ name: 'AbortError' });
-    expect(write).not.toHaveBeenCalled();
+    const disk = new Map([['sample-trace.svg', '<svg>previous</svg>']]);
+    const picker = installChromiumSavePicker(disk, { whilePicking: () => controller.abort() });
+    try {
+      await expect(writeTraceFileWithPlatform(webAdapter, file, controller.signal)).resolves.toBe(
+        true,
+      );
+    } finally {
+      picker.restore();
+    }
+    expect(disk.get('sample-trace.svg')).toBe('<svg/>');
   });
 
   it.each([false, true])(

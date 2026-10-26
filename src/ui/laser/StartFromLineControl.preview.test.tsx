@@ -104,13 +104,16 @@ describe('manual laser restart preview', () => {
       source.controllerSnapshot,
       // Where the restart is anchored, for its confirmation (audit recovery-4).
       expect.stringContaining('Placement:'),
+      // Its warnings and bed offset, for the resume's own review (ADR-232 Amendment 1).
+      source,
     );
-    const [project, gcode, , plan, , controller] =
+    const [project, gcode, , plan, , controller, , qualification] =
       vi.mocked(streamResumeFromRawLine).mock.calls[0]!;
     expect(project).toBe(source.project);
     expect(gcode).toBe(source.gcode);
     expect(plan).toBe(source.canvasPlan);
     expect(controller).toBe(source.controllerSnapshot);
+    expect(qualification).toBe(source);
     expect(button('Starting recovery…').disabled).toBe(true);
     expect(button('Cancel').disabled).toBe(true);
     expect(runStartFromLineFlow).not.toHaveBeenCalled();

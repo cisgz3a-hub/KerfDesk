@@ -7,6 +7,7 @@ import {
   toolbarCommand,
   expectToolbarCommandEnabled,
 } from './fixtures/workspace-ui';
+import { expectControllerSettingsRead } from './fixtures/controller-settings-read';
 import {
   expect,
   test,
@@ -212,10 +213,18 @@ test('exports rotary raster through the configured machine-space transform', asy
   expect(Math.max(...yValues)).toBeGreaterThan(30);
 });
 
-test('opens the one-photo camera calibration without a Labs switch', async ({ page }) => {
+test('walks the guided camera setup to the one-photo calibration without a Labs switch', async ({
+  page,
+}) => {
   await (await toolbarCommand(page, 'Camera')).click();
-  await page.getByRole('button', { name: 'Calibrate camera…' }).click();
-  await expect(page.getByText('Calibrate camera', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Start camera', exact: true }).click();
+  await page.getByRole('button', { name: 'Set up camera', exact: true }).click();
+  await expect(page.getByText('Camera setup', { exact: true })).toBeVisible();
+  await expect(page.getByText('Which camera should KerfDesk use?')).toBeVisible();
+  for (const screen of ['Where is the camera?', 'Check the picture', 'Engrave the target']) {
+    await page.getByRole('button', { name: 'Next', exact: true }).click();
+    await expect(page.getByText(screen, { exact: true })).toBeVisible();
+  }
   await page.getByRole('button', { name: 'Target already engraved' }).click();
   await expect(page.getByRole('button', { name: 'Take photo' })).toBeVisible();
 });
@@ -228,7 +237,7 @@ test('uses one print-and-cut transform for export and invalidates it on trust lo
   await selectWorkspacePanel(page, 'Machine');
   await connectMachineAndDismissFirstSetup(page);
   await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
-  await expect(page.getByText(/^Info: Machine settings detected:/)).toBeVisible();
+  await expectControllerSettingsRead(page);
   const home = machineJogAction(page, 'Home');
   await home.click();
   await expect
@@ -651,6 +660,7 @@ test('frames, pauses, resumes, alarms, stops, and homes back to a safe ready sta
 
   const abortEventBaseline = (await kerfdesk.events()).length;
   const settingsReadsBeforeAbort = exactSerialWriteCount(await kerfdesk.events(), '$$\n');
+  const modalReadsBeforeAbort = exactSerialWriteCount(await kerfdesk.events(), '$G\n');
   // Model this scenario's prompt reboot at the accepted reset write. Browser
   // scheduling must not turn it into the separate missing/late-boot workflow.
   await kerfdesk.setSerialStatusAfterCommand('\u0018', "Grbl 1.1h ['$' for help]");
@@ -682,9 +692,12 @@ test('frames, pauses, resumes, alarms, stops, and homes back to a safe ready sta
   // fresh cleanup replies; enabling alone does not replay abandoned job ACKs.
   await kerfdesk.setAutoAcknowledge(true);
   await kerfdesk.acknowledgeSerial(2);
+  // Abort's own reboot keeps the settings: only the modal state is read
+  // again, never `$$` (ADR-648).
   await expect
-    .poll(async () => exactSerialWriteCount(await kerfdesk.events(), '$$\n'))
-    .toBeGreaterThan(settingsReadsBeforeAbort);
+    .poll(async () => exactSerialWriteCount(await kerfdesk.events(), '$G\n'))
+    .toBeGreaterThan(modalReadsBeforeAbort);
+  expect(exactSerialWriteCount(await kerfdesk.events(), '$$\n')).toBe(settingsReadsBeforeAbort);
   const readyResetSession = {
     sessionEpoch: resetSessionEpoch,
     qualifiedSession: true,
@@ -697,7 +710,7 @@ test('frames, pauses, resumes, alarms, stops, and homes back to a safe ready sta
   await expect.poll(recoverySnapshot).toEqual(readyResetSession);
   const informationWarning = page
     .getByRole('alert')
-    .filter({ hasText: /Controller connection needs recovery|Controller information unavailable/ });
+    .filter({ hasText: /Machine stopped answering|Couldn’t read machine settings/ });
   await expect(informationWarning).toHaveCount(0);
   expect(await connectionEvents()).toEqual(originalConnection);
 

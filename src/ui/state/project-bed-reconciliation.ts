@@ -52,6 +52,85 @@ export function canonicalizeOpenedProjectBed(
   };
 }
 
+/**
+ * A file opened for the machine already in use keeps that machine's own
+ * Auto-focus command (ADR-400 Amendment 1). The file can copy the machine's
+ * identity, and then no machine notice shows, so its line must not decide what
+ * the next Auto-focus press sends. A file for another machine brings its
+ * vetted command with the rest of that machine, behind the machine notice.
+ */
+export function withCurrentMachineAutofocus(
+  project: Project,
+  previous: Project,
+): { readonly project: Project; readonly keptCurrentCommand: boolean } {
+  const current = previous.device.autofocusCommand;
+  if (
+    project.device.autofocusCommand === current ||
+    deviceIdentity(project.device) !== deviceIdentity(previous.device)
+  )
+    return { project, keptCurrentCommand: false };
+  return {
+    project: { ...project, device: { ...project.device, autofocusCommand: current } },
+    keptCurrentCommand: true,
+  };
+}
+
+/**
+ * A file opened for the machine already in use keeps that machine's camera
+ * calibrations (ADR-440 Amendment 3). The camera belongs to the machine, not
+ * the job: a file saved before the latest calibration must not swap in its
+ * older copy, or none, and then have the next machine edit save that over the
+ * calibration. With no calibration in use the file's copy comes in as before;
+ * a file for another machine brings its own, behind the machine notice.
+ */
+export function withCurrentMachineCamera(
+  project: Project,
+  previous: Project,
+): { readonly project: Project; readonly keptCurrentCamera: boolean } {
+  const current = previous.device;
+  if (!hasCameraCalibration(current) || deviceIdentity(project.device) !== deviceIdentity(current))
+    return { project, keptCurrentCamera: false };
+  const opened = project.device;
+  const { cameraModel: _model, otherCameraModels: _others, ...rest } = opened;
+  return {
+    project: { ...project, device: { ...rest, ...cameraFields(current) } },
+    // Worth a word only when the file held a calibration of its own.
+    keptCurrentCamera:
+      hasCameraCalibration(opened) && !sameValue(cameraFields(opened), cameraFields(current)),
+  };
+}
+
+// Structural equality for saved JSON-like records: a file's copy of the same
+// calibration is a different object with the same values.
+function sameValue(left: unknown, right: unknown): boolean {
+  if (left === right) return true;
+  if (typeof left !== 'object' || typeof right !== 'object' || left === null || right === null)
+    return false;
+  if (Array.isArray(left) !== Array.isArray(right)) return false;
+  const a = left as Record<string, unknown>;
+  const b = right as Record<string, unknown>;
+  const keys = Object.keys(a).filter((key) => a[key] !== undefined);
+  return (
+    keys.length === Object.keys(b).filter((key) => b[key] !== undefined).length &&
+    keys.every((key) => sameValue(a[key], b[key]))
+  );
+}
+
+function hasCameraCalibration(device: DeviceProfile): boolean {
+  return device.cameraModel !== undefined || (device.otherCameraModels?.length ?? 0) > 0;
+}
+
+function cameraFields(
+  device: DeviceProfile,
+): Pick<DeviceProfile, 'cameraModel' | 'otherCameraModels'> {
+  return {
+    ...(device.cameraModel === undefined ? {} : { cameraModel: device.cameraModel }),
+    ...(device.otherCameraModels === undefined
+      ? {}
+      : { otherCameraModels: device.otherCameraModels }),
+  };
+}
+
 function deviceIdentity(device: DeviceProfile): string {
   return [device.profileId ?? '', device.name, device.bedWidth, device.bedHeight].join('|');
 }

@@ -76,6 +76,17 @@ export function calibrationLabelWidthMm(text: string, sizeMm: number): number {
   return renderCalibrationLabel(text, sizeMm).bounds.maxX;
 }
 
+/** The size at which every digit of `text` stays within `maxWidthMm`, never above `sizeMm`. */
+export function calibrationLabelSizeToFit(
+  text: string,
+  sizeMm: number,
+  maxWidthMm: number,
+): number {
+  // Glyph width scales linearly with size.
+  const width = calibrationLabelWidthMm(text, sizeMm);
+  return width > maxWidthMm ? sizeMm * (maxWidthMm / width) : sizeMm;
+}
+
 export function formatCalibrationNumber(value: number): string {
   if (Number.isInteger(value)) return value.toFixed(0);
   return value.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');

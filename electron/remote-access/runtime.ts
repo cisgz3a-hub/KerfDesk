@@ -20,6 +20,7 @@ import type { RemoteRendererQueue } from './renderer-queue.js';
 import { RemotePairingState } from './pairing-state.js';
 import { RemoteControlLease, validControlLifetime } from './control-lease.js';
 import { RemoteLiveSignals } from './live-signals.js';
+import { REVOCATION_SAVE_FAILED, REVOCATION_STUCK, SAVE_FAILED } from './save-failure-messages.js';
 function parseClient(value: unknown): RemoteClient | null {
   if (
     !object(value) ||
@@ -136,10 +137,12 @@ class RemoteAccessRuntime {
     this.live.connection(open);
     if (!open) {
       this.waitingClients = false;
-      this.error =
-        this.identity?.enabled === true
-          ? 'The computer is offline. Remote access will reconnect automatically.'
-          : null;
+      // A storage failure shut remote access; closing the relay must not hide why.
+      if (this.available)
+        this.error =
+          this.identity?.enabled === true
+            ? 'The computer is offline. Remote access will reconnect automatically.'
+            : null;
       return;
     }
     this.error = null;
@@ -218,10 +221,7 @@ class RemoteAccessRuntime {
       this.blockedClients.clear();
       this.revoking = false;
       this.listClients();
-    }).catch(() => {
-      this.available = false;
-      this.relay.close();
-    });
+    }).catch(() => this.shutAfterSaveFailure());
   }
   private finishClientRevocations(clients: RemoteClient[]): void {
     const cleared = [...this.blockedClients.entries()].filter(
@@ -237,10 +237,24 @@ class RemoteAccessRuntime {
       await this.persist({ ...this.identity, pendingRevocations });
       for (const [id, epoch] of matching)
         if (this.blockedClients.get(id) === epoch) this.blockedClients.delete(id);
-    }).catch(() => {
-      this.available = false;
-      this.relay.close();
-    });
+    }).catch(() => this.shutAfterSaveFailure());
+  }
+  // Nothing is lost when only a later save fails: the saved queue still repeats the revocation.
+  private shutAfterSaveFailure(): void {
+    this.available = false;
+    this.error = SAVE_FAILED;
+    this.relay.close();
+  }
+  /** An unsaved Disable or Revoke must not reconnect next launch (ADR-657): tell a connected
+   *  relay now, then remove the saved record. */
+  private async failClosed(revocation: RelayMessage | null): Promise<never> {
+    this.available = false;
+    if (revocation !== null && this.connected) this.relay.send(revocation);
+    const removed = await this.store.discard();
+    if (removed) this.identity = null;
+    this.error = removed ? REVOCATION_SAVE_FAILED : REVOCATION_STUCK;
+    this.relay.close();
+    throw new Error(this.error);
   }
   status(): RemoteAccessStatus {
     const pairing = this.pairing.status();
@@ -306,10 +320,9 @@ class RemoteAccessRuntime {
       try {
         await this.persist(next);
       } catch {
-        this.available = false;
-        this.error = 'Remote settings could not be saved securely.';
-        this.relay.close();
-        throw new Error(this.error);
+        if (!enabled) return this.failClosed(null);
+        this.shutAfterSaveFailure();
+        throw new Error(SAVE_FAILED);
       }
       if (enabled && epoch === this.configurationEpoch) this.relay.start(next);
       return this.status();
@@ -359,9 +372,7 @@ class RemoteAccessRuntime {
           pendingRevocations: [...this.blockedClients.keys()],
         });
       } catch {
-        this.available = false;
-        this.relay.close();
-        throw new Error('Remote revocation could not be saved securely.');
+        return this.failClosed({ type: 'client.revoke', clientId });
       }
       this.relay.send({ type: 'client.revoke', clientId });
       this.listClients();
@@ -379,9 +390,7 @@ class RemoteAccessRuntime {
       try {
         if (this.identity !== null) await this.persist({ ...this.identity, revokeOnConnect: true });
       } catch {
-        this.available = false;
-        this.relay.close();
-        throw new Error('Remote revocation could not be saved securely.');
+        return this.failClosed({ type: 'clients.revokeAll', requestId: this.relay.requestId() });
       }
       this.pairing.reset();
       this.clients = [];

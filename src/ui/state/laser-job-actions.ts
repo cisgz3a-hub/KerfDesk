@@ -65,6 +65,8 @@ import { armHostedRefill, releaseHostedRefill } from './laser-hosted-refill';
 import { captureHostedRefillStream } from './laser-hosted-refill-owner';
 import { createStartArmingCompletion } from './laser-start-arming-completion';
 import type { TranscriptSource } from './laser-transcript';
+import { noteControllerSettingWrite } from './laser-owned-reset-settings';
+import { externalProgramControllerStatePatch } from './external-program-controller-state';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -152,6 +154,7 @@ async function runStartJob(
     );
     assertStartHandoff(context, options, setupEpoch, completion.assertCurrent);
     consumeClaimedFramedRun(set, get, options.framedRunPermit);
+    noteControllerSettingWrite(context.refs, gcode);
     const writeOwner = installInitialStream(context, gcode, options, { stepped, labels, toolIds });
     completion.streamStarted(writeOwner, options.runId ?? null);
     if (stepped.toSend.length === 0) {
@@ -256,7 +259,10 @@ function prepareInitialStream(
 } {
   const streamOptions = normalizeStartJobOptions(options);
   const stepped = step(
-    createStreamer(gcode, { ...streamOptions, toolChangePause: options.machineKind === 'cnc' }),
+    createStreamer(gcode, {
+      ...streamOptions,
+      toolChangePause: options.toolChangePause ?? options.machineKind === 'cnc',
+    }),
   );
   return { stepped, ...toolChangeManifest(gcode, options) };
 }
@@ -268,7 +274,8 @@ function toolChangeManifest(
   readonly labels: ReadonlyArray<string>;
   readonly toolIds: ReadonlyArray<string | null>;
 } {
-  if (options.machineKind !== 'cnc') return { labels: [], toolIds: [] };
+  if (options.machineKind !== 'cnc' || options.toolChangePause === false)
+    return { labels: [], toolIds: [] };
   // Structured compile metadata carries stable IDs without changing G-code
   // bytes. Direct/imported callers retain the legacy comment-label fallback.
   const plannedChanges = options.cncToolPlan?.slice(1);
@@ -420,6 +427,7 @@ function installInitialStream(
     ),
     accessoryCache: invalidateAccessoryObservation(state.accessoryCache),
     activeJobMachineKind: options.machineKind ?? 'laser',
+    ...(options.externalProgram === true ? externalProgramControllerStatePatch(state, gcode) : {}),
   }));
   return writeOwner;
 }

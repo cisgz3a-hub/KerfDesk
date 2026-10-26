@@ -1,11 +1,14 @@
 import type { NativeLicencePhase } from './native-smoke-licence-config.js';
+import { DESKTOP_LICENCE_WINDOW } from './licence-window.js';
 import { RENDERER_SMOKE_SOURCE, RENDERER_WORKSPACE_READY_SOURCE } from './native-smoke-renderer.js';
 
 // Fixed UI actions only: no arbitrary script input, entitlement override or
 // response substitution. The key exists only in this evaluated call's memory.
-// An unlicensed profile opens behind the licence window (ADR-623), so activation
-// enters the key there; the import/save smoke runs once the workspace is in.
-const QUALIFICATION_SOURCE = String.raw`async (phase, key) => {
+// With the licence window on, an unlicensed profile opens behind it (ADR-623), so
+// activation enters the key there; the import/save smoke runs once the workspace
+// is in. While ADR-623 Amendment 3 holds the window off, the profile opens in
+// KerfDesk Free and activation uses Help > Licence, as before ADR-623.
+const QUALIFICATION_SOURCE = String.raw`async (phase, key, licenceWindow) => {
   if (location.href !== 'app://app/index.html') throw new Error('Qualification requires the packaged app');
   if (!['activate', 'offline', 'deactivate'].includes(phase)) throw new Error('Unknown qualification phase');
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -48,7 +51,9 @@ const QUALIFICATION_SOURCE = String.raw`async (phase, key) => {
   let proAction = 'not-requested';
   if (phase === 'activate') {
     if (!isFree(before)) throw new Error('Activation qualification requires an initially unlicensed profile');
-    if (opened !== 'licence-window') throw new Error('The workspace opened without the licence window');
+    if (licenceWindow && opened !== 'licence-window') throw new Error('The workspace opened without the licence window');
+    if (!licenceWindow && opened !== 'workspace') throw new Error('The licence window opened while it is held off');
+    if (!licenceWindow) await openLicence();
     const input = await wait(() => document.getElementById('kerfdesk-licence-key'), 'Licence input missing');
     if (!(input instanceof HTMLInputElement)) throw new Error('Licence input missing');
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, key);
@@ -58,6 +63,7 @@ const QUALIFICATION_SOURCE = String.raw`async (phase, key) => {
     activate.click();
     key = '';
     await wait(async () => isDeveloper(await status()), 'Developer activation was not observed');
+    if (!licenceWindow) button('Close licence settings')?.click();
   }
   const smoke = await ${RENDERER_SMOKE_SOURCE};
   if (phase === 'offline') {
@@ -90,6 +96,10 @@ const QUALIFICATION_SOURCE = String.raw`async (phase, key) => {
   };
 }`;
 
-export function nativeLicenceRendererSource(phase: NativeLicencePhase, key: string): string {
-  return `(${QUALIFICATION_SOURCE})(${JSON.stringify(phase)}, ${JSON.stringify(key)})`;
+export function nativeLicenceRendererSource(
+  phase: NativeLicencePhase,
+  key: string,
+  licenceWindow = DESKTOP_LICENCE_WINDOW,
+): string {
+  return `(${QUALIFICATION_SOURCE})(${JSON.stringify(phase)}, ${JSON.stringify(key)}, ${String(licenceWindow)})`;
 }

@@ -1,9 +1,10 @@
 // "Save as STL…" in the Inspector's Stock section (ADR-487): the stock as
-// carved so far, as a closed STL solid in the program's millimetres. The file
-// is picked first, while the click still counts as the operator's, and the
-// worker writes the solid after.
+// carved so far, as a closed STL solid in the program's millimetres. The worker
+// makes the solid first: the save picker empties an existing file as it
+// returns (ADR-656), and a slow solid then asks for a fresh Choose file click.
 
 import { useState } from 'react';
+import { pickPreparedSaveTarget } from '../app/pick-prepared-save-target';
 import { usePlatformOptional } from '../app/platform-context';
 import type { StockStl } from './stock-stl';
 
@@ -19,16 +20,20 @@ export function InspectorStockSave(props: {
   const { stl } = props;
   const save = async (): Promise<void> => {
     if (stl === null) return;
-    const target = await platform.pickFileForSave({
-      suggestedName: STL_SUGGESTED_NAME,
-      extensions: ['.stl'],
-    });
-    if (target === null) return;
     setSaving(true);
-    setNote('Writing the STL…');
+    setNote('Making the STL…');
     const solid = await stl();
     if (solid === null) {
       setNote('Nothing of the stock is left to save.');
+      return;
+    }
+    const target = await pickPreparedSaveTarget(
+      platform,
+      { suggestedName: STL_SUGGESTED_NAME, extensions: ['.stl'] },
+      { title: 'Save stock as STL', message: 'The STL is ready.' },
+    );
+    if (target === null) {
+      setNote(null);
       return;
     }
     await target.write(new Blob([solid.bytes], { type: 'model/stl' }));

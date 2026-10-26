@@ -11,7 +11,6 @@ import { cncSideInputScene, cncSideOutputProject } from '../../core/cnc/cnc-two-
 import {
   applyJobOriginOffset,
   compileJob,
-  computeJobBounds,
   computeRegistrationBoxBounds,
   computeSceneOutputBounds,
   jobOriginOffset,
@@ -22,6 +21,8 @@ import {
   type JobBounds,
   type JobOriginPlacement,
 } from '../../core/job';
+// Not in the job barrel: its export count is ratcheted (ADR-015).
+import { computeJobPlacementBounds } from '../../core/job/job-bounds';
 import { compileCncJobResult, type CncJobCompilationResult } from '../../core/cnc/compile-cnc-job';
 import { toMachineCoords, toSceneCoords } from '../../core/devices';
 import {
@@ -399,7 +400,9 @@ export function registrationBoxBounds(project: Project): JobBounds | null {
   const boxScene = registrationBoxScene(project.scene);
   if (boxScene === null) return null;
   const compiled = compileCncJobResult(boxScene, project.device, machine);
-  return compiled.kind === 'compiled' ? computeJobBounds(compiled.job, project.device) : null;
+  return compiled.kind === 'compiled'
+    ? computeJobPlacementBounds(compiled.job, project.device)
+    : null;
 }
 
 /** Actual anchor source for selected output using the whole-scene origin. */
@@ -412,5 +415,7 @@ function fullSceneOutputBounds(project: Project): JobBounds | null {
     return computeSceneOutputBounds(project.scene, project.device);
   }
   const compiled = compileCncJobResult(project.scene, project.device, machine);
-  return compiled.kind === 'compiled' ? computeJobBounds(compiled.job, project.device) : null;
+  return compiled.kind === 'compiled'
+    ? computeJobPlacementBounds(compiled.job, project.device)
+    : null;
 }

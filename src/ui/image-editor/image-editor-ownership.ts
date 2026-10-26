@@ -50,6 +50,45 @@ export function ownersMatch(a: ImageEditorSessionOwner, b: ImageEditorSessionOwn
   return a.projectDocumentEpoch === b.projectDocumentEpoch && a.sourceImage === b.sourceImage;
 }
 
+/**
+ * Whether a closed session may resume on `next` (ADR-311 Amendment 2, audit
+ * 23-P2-3). A nudge, or a layer, power or dither change, makes a new image
+ * object but keeps the file, pixels and size the session was opened from.
+ * Apply writes only those fields, so the newer placement and settings survive
+ * it. Exact owners still fence every asynchronous completion (ADR-311 §2);
+ * this only decides a reopen.
+ */
+export function ownersShareSource(
+  stashed: ImageEditorSessionOwner,
+  next: ImageEditorSessionOwner,
+): boolean {
+  if (stashed.projectDocumentEpoch !== next.projectDocumentEpoch) return false;
+  const before = stashed.sourceImage;
+  const after = next.sourceImage;
+  return before === after || (samePixels(before, after) && sameBounds(before, after));
+}
+
+function samePixels(before: RasterImage, after: RasterImage): boolean {
+  return (
+    before.id === after.id &&
+    before.source === after.source &&
+    before.dataUrl === after.dataUrl &&
+    before.imageAsset === after.imageAsset &&
+    before.editorDocument === after.editorDocument &&
+    before.pixelWidth === after.pixelWidth &&
+    before.pixelHeight === after.pixelHeight
+  );
+}
+
+function sameBounds(before: RasterImage, after: RasterImage): boolean {
+  return (
+    before.bounds.minX === after.bounds.minX &&
+    before.bounds.minY === after.bounds.minY &&
+    before.bounds.maxX === after.bounds.maxX &&
+    before.bounds.maxY === after.bounds.maxY
+  );
+}
+
 export function nullableOwnersMatch(
   a: ImageEditorSessionOwner | null,
   b: ImageEditorSessionOwner | null,

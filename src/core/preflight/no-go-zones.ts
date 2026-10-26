@@ -46,6 +46,16 @@ export function firstZoneCrossedBySegment(
   return null;
 }
 
+/** The enabled zones a bed-coordinate rectangle overlaps, edges included. An
+ * external program's Frame outline is checked this way (ADR-630 Amendment 1):
+ * its motion stays inside the outline, so a zone outside it is clear. */
+export function zonesOverlappingRect(
+  rect: Rect,
+  zones: ReadonlyArray<NoGoZone>,
+): ReadonlyArray<NoGoZone> {
+  return zones.filter((zone) => zone.enabled && rectsIntersect(rect, rectForZone(zone)));
+}
+
 export function findNoGoZoneCollisions(
   gcode: string | ReadonlyArray<string>,
   zones: ReadonlyArray<NoGoZone>,
@@ -147,11 +157,21 @@ function appendCollision(
   }
 }
 
+// `; cnc tool: <kind>; diameter-mm: D[; angle-deg: A][; tip-diameter-mm: T]`
+// (cnc-grbl-group-comments.ts). The field is read by name: an engraving bit
+// with a flat or a tapered ball nose also writes `tip-diameter-mm`, and the
+// cutter's full diameter, not its tip, is the width that meets a clamp
+// (audit v3 D5-P2-1, ADR-232 Amendment 1).
 function cutterRadiusFromToolComment(line: string): number | null {
-  const match = /^\s*;\s*cnc tool:.*\bdiameter-mm:\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))/i.exec(line);
+  const match = /^\s*;\s*cnc tool:(.*)$/i.exec(line);
   if (match === null) return null;
-  const diameterMm = Number(match[1]);
-  return Number.isFinite(diameterMm) && diameterMm > 0 ? diameterMm / 2 : null;
+  for (const field of (match[1] ?? '').split(';')) {
+    const [name, value] = field.split(':');
+    if (name?.trim().toLowerCase() !== 'diameter-mm' || value === undefined) continue;
+    const diameterMm = Number(value.trim());
+    return Number.isFinite(diameterMm) && diameterMm > 0 ? diameterMm / 2 : null;
+  }
+  return null;
 }
 
 function validRadius(value: number | undefined): number {

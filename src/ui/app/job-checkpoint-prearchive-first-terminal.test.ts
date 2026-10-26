@@ -94,8 +94,14 @@ const CASES: ReadonlyArray<Case> = [
     status: 'disconnected',
     atTerminal: { safetyNotice: CABLE_LOSS, connection: { kind: 'disconnected' } },
     whileWaiting: [{ safetyNotice: null }],
-    // The six program lines were all sent (ADR-341 Amendment 6).
-    recorded: { kind: 'disconnect', message: CABLE_LOSS.message, sentLines: 6 },
+    // The six program lines were all sent (ADR-341 Amendment 6); the planner
+    // waits for the reconnect's verdict (ADR-398 Amendment 3).
+    recorded: {
+      kind: 'disconnect',
+      message: CABLE_LOSS.message,
+      sentLines: 6,
+      plannerBacklogIfRestarted: PLANNER_SIZE_BOUND,
+    },
   },
   {
     // recordWriteFailure raises this with the port still open. The Abort stays

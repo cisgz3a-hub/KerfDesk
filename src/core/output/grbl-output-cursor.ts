@@ -35,26 +35,52 @@
 // M4 output is dark at any stop (GRBL stepper.c:392-398 switches a
 // rate-adjusted block's PWM off at an empty buffer), so nothing is held there
 // and its bytes do not change.
+//
+// Marlin differs (ADR-398 Amendment 1). Its body is written under M4 but runs
+// as continuous inline power (`M3 I`) or as fan PWM, and Marlin 2.1.2.5 turns
+// the beam off at an empty planner only in its dynamic mode (stepper.cpp
+// :2347-2348). Every burn there leaves the beam lit at a stop, and M5 and
+// M7/M8/M9 synchronize first (M3-M5.cpp, M7-M9.cpp), so the M3 holds apply
+// under either word (`stopKeepsPower`). Marlin plans no block for a move to
+// where the head already is (planner.cpp:2247-2248) and applies a G0's zero
+// power only when its block starts (stepper.cpp:2574-2584), so that move
+// neither drains nor darkens: it is still written, and the holds stay.
 
 import { formatGcodeCoordinateMm } from '../gcode';
 import type { RasterGroupEnd } from '../raster/emit-raster';
 
 export type EmittedHead = { readonly x: string; readonly y: string };
 export type SpindleWordInEffect = 'M3' | 'M4' | 'off';
+export type AirWordInEffect = 'M7' | 'M8' | 'off';
 
 export type LaserOutputCursor = {
   /** Spindle word the controller has in effect after the lines written so far. */
   modeInEffect: SpindleWordInEffect;
+  /** Air word the controller has in effect after the lines written so far. */
+  airInEffect: AirWordInEffect;
+  /** The beam keeps its last power at a stop under M4 too (Marlin). */
+  readonly stopKeepsPower: boolean;
   /** Head position at controller precision; null when unknown. */
   head: EmittedHead | null;
-  /** A planner drain written now would stop the head with an M3 beam lit. */
+  /** A planner drain written now would stop the head with the beam lit (M3,
+   *  or either word when `stopKeepsPower`). */
   litAtStop: boolean;
   /** Mode and air lines waiting for the next laser-off move. */
   held: string[];
 };
 
-export function createLaserOutputCursor(modeInEffect: SpindleWordInEffect): LaserOutputCursor {
-  return { modeInEffect, head: null, litAtStop: false, held: [] };
+export function createLaserOutputCursor(
+  modeInEffect: SpindleWordInEffect,
+  stopKeepsPower = false,
+): LaserOutputCursor {
+  return {
+    modeInEffect,
+    airInEffect: 'off',
+    stopKeepsPower,
+    head: null,
+    litAtStop: false,
+    held: [],
+  };
 }
 
 export function emittedHead(x: number, y: number): EmittedHead {
@@ -71,19 +97,22 @@ export function transitionLinesNow(
     cursor.held.push(...lines);
     return [];
   }
-  noteSpindleWords(cursor, lines);
+  noteWrittenWords(cursor, lines);
   return [...lines];
 }
 
 /** A laser-off move (seek or S0 runway). Under M3 a move to where the head
  * already is is dropped; otherwise the move is written, followed by any held
- * transitions, which now drain with the beam dark. */
+ * transitions, which now drain with the beam dark. On Marlin a move to where
+ * the head already is darkens nothing, so the transitions stay held. */
 export function laserOffMoveLines(
   cursor: LaserOutputCursor,
   target: EmittedHead,
   line: string,
 ): string[] {
-  if (cursor.modeInEffect === 'M3' && sameHead(cursor.head, target)) return [];
+  const coincident = sameHead(cursor.head, target);
+  if (cursor.modeInEffect === 'M3' && coincident) return [];
+  if (cursor.stopKeepsPower && coincident) return [line];
   noteLaserOffMove(cursor, target);
   return [line, ...releaseHeldLines(cursor)];
 }
@@ -129,7 +158,9 @@ function excursionPoint(start: Point, target: Point): Point {
 
 export function noteBurn(cursor: LaserOutputCursor, head: EmittedHead): void {
   cursor.head = head;
-  cursor.litAtStop = cursor.modeInEffect === 'M3';
+  cursor.litAtStop = cursor.stopKeepsPower
+    ? cursor.modeInEffect !== 'off'
+    : cursor.modeInEffect === 'M3';
 }
 
 /** A laser-off move that follows burns inside one sweep (never held lines). */
@@ -141,7 +172,23 @@ export function noteLaserOffMove(cursor: LaserOutputCursor, head: EmittedHead): 
 export function releaseHeldLines(cursor: LaserOutputCursor): string[] {
   const lines = cursor.held;
   cursor.held = [];
-  noteSpindleWords(cursor, lines);
+  noteWrittenWords(cursor, lines);
+  return lines;
+}
+
+/**
+ * The held lines still written when the job ends (ADR-398 Amendment 1). They
+ * were held for groups that burned nothing, and no laser-off move follows the
+ * last burn. An air change among them would drain the planner with the beam
+ * lit and, on grblHAL (`$673`) or FluidNC (`coolant/delay_ms`), dwell lit for
+ * the air on-delay, to switch air for a burn that never comes, so air changes
+ * are dropped. Spindle words stay: they open with the `M5` that switches the
+ * beam off, which is the job's own end.
+ */
+export function heldLinesAtJobEnd(cursor: LaserOutputCursor): string[] {
+  const lines = cursor.held.filter((line) => !AIR_WORD.test(line));
+  cursor.held = [];
+  noteWrittenWords(cursor, lines);
   return lines;
 }
 
@@ -153,20 +200,36 @@ export function takeHeldLines(cursor: LaserOutputCursor): string[] {
 }
 
 /** Carry the raster's actual last position and held transitions into the next
- * group. Blank raster groups may still be holding the preceding M3 state. */
-export function noteRasterGroupEnd(cursor: LaserOutputCursor, ending: RasterGroupEnd): void {
+ * group. Blank raster groups may still be holding the preceding lit state and
+ * hand back unwritten the held lines they were given (`handedOver`). A lit
+ * ending leaves the raster's own word (`rasterMode`) in effect: M3, or M4 on
+ * Marlin (ADR-398 Amendment 2). */
+export function noteRasterGroupEnd(
+  cursor: LaserOutputCursor,
+  ending: RasterGroupEnd,
+  handedOver: ReadonlyArray<string>,
+  rasterMode: 'M3' | 'M4',
+): void {
   const { closingM5Deferred, head, deferredEntryLines } = ending;
+  const openingWritten = deferredEntryLines.length === 0;
+  if (openingWritten) noteWrittenWords(cursor, handedOver);
   cursor.head = head === null ? null : emittedHead(head.x, head.y);
   cursor.held = closingM5Deferred ? [...deferredEntryLines, 'M5'] : [];
-  cursor.modeInEffect = closingM5Deferred ? 'M3' : 'off';
+  if (!closingM5Deferred) cursor.modeInEffect = 'off';
+  else if (openingWritten) cursor.modeInEffect = rasterMode;
   cursor.litAtStop = closingM5Deferred;
 }
 
-function noteSpindleWords(cursor: LaserOutputCursor, lines: ReadonlyArray<string>): void {
+const AIR_WORD = /^M[789]\b/;
+
+function noteWrittenWords(cursor: LaserOutputCursor, lines: ReadonlyArray<string>): void {
   for (const line of lines) {
     if (/^M3\b/.test(line)) cursor.modeInEffect = 'M3';
     else if (/^M4\b/.test(line)) cursor.modeInEffect = 'M4';
     else if (/^M5\b/.test(line)) cursor.modeInEffect = 'off';
+    else if (/^M7\b/.test(line)) cursor.airInEffect = 'M7';
+    else if (/^M8\b/.test(line)) cursor.airInEffect = 'M8';
+    else if (/^M9\b/.test(line)) cursor.airInEffect = 'off';
   }
 }
 

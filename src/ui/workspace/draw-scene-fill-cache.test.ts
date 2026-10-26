@@ -11,7 +11,8 @@ import {
 } from '../../core/scene';
 import { drawScene } from './draw-scene';
 
-vi.mock('../../core/job/fill-hatching', () => ({
+vi.mock('../../core/job/fill-hatching', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   fillHatching: vi.fn(() => [
     {
       points: [

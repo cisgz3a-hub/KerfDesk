@@ -1,3 +1,4 @@
+import type { CameraBedFrame } from '../../core/camera/model/camera-bed-frame';
 import type { ControllerSettingsSnapshot } from '../../core/controllers/grbl';
 import type { GrblBuildInfo } from '../../core/controllers/grbl/build-info';
 import { deriveMachineEnvelope } from '../../core/controllers/grbl/machine-envelope';
@@ -70,6 +71,25 @@ export function nativeBedCaptureFrameKey(
     device.bedHeight,
     resolveNativeBedFrame(device, evidence)?.nativeToBedOffsetMm ?? null,
   ]);
+}
+
+/**
+ * The bed frame a camera calibration is fitted in and checked against
+ * (rolling audit 12-P2-2): the facts {@link nativeBedCaptureFrameKey} keys
+ * Print and Cut's head captures on, with the native offset absent while it is
+ * unknown.
+ */
+export function cameraBedFrameFor(
+  device: DeviceProfile,
+  evidence: NativeBedEvidence,
+): CameraBedFrame {
+  const offset = resolveNativeBedFrame(device, evidence)?.nativeToBedOffsetMm;
+  return {
+    origin: device.origin,
+    bedWidthMm: device.bedWidth,
+    bedHeightMm: device.bedHeight,
+    ...(offset === undefined ? {} : { nativeToBedOffsetMm: { x: offset.x, y: offset.y } }),
+  };
 }
 
 /** A settings/build snapshot is evidence only for the session that observed it.

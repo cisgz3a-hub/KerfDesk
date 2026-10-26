@@ -49,6 +49,9 @@ dimensions at most 100000 mm and positive font sizes at most 1000 mm.
 | `apply_material_recipe` | `operationId`, `recipeId` | Applies a user-saved recipe to a Laser operation. |
 | `add_svg` | `svg` ≤180000 characters, optional `xMm`, `yMm`, `widthMm` | Sanitised desktop SVG import; scripts, foreign content and external references are dropped. |
 | `import_file` | `fileName`, `mimeType` SVG/PNG/JPEG/DXF, `dataBase64` ≤240000, optional placement | Ordinary desktop import path; image magic bytes checked. |
+| `get_board` | none | Read Place Board status and bounded dimensions; never coordinates or artwork. |
+| `set_board_photo` | JPEG/PNG base64 plus write admission | Delivers a phone photo to Place Board → Outline on the PC. |
+| `place_on_board` | artwork IDs, center/fit/array options, write admission | Place existing artwork inside the captured board. |
 | `save_project` | Only write admission | Saves to the existing file only; `saved:false` when never saved. Opens no picker and returns no path. |
 | `apply_edits` | `edits`: 1–40 `{command,args}` | All-or-nothing batch as one "Remote edits" Undo step. Allowed commands are the single edit tools above (without admission fields); `"$n"` in `artworkIds`/`operationId` refers to edit n's result. |
 | `get_machine_status` | None | Current connection, labelled work position, actual jog capabilities, Frame, job and action readiness. |
@@ -60,9 +63,14 @@ dimensions at most 100000 mm and positive font sizes at most 1000 mm.
 | `abort_job` | `requestId` UUID | Canonical network Abort, independently admitted while another command waits; no artwork revision required. |
 | `connect_machine`, `disconnect_machine` | Machine write admission | ADR-585. Reconnect only to the port already chosen on the PC (`portSelection: 'remembered-only'`, ADR-639); disconnect refused during a job or motion. |
 | `home_machine` | Machine write admission | Desktop Home with all its guards. |
-| `set_work_origin` | Machine write admission, `axes` xy/z | Desktop Set origin here / Zero Z; no motion. |
+| `set_work_origin` | Machine write admission, `axes` xy/z | Desktop Set origin here (Absolute start becomes User Origin) / Zero Z, refused where the PC would ask to confirm (ADR-657); no motion. |
+| `capture_board_point` | Machine write admission | Same as Capture in the open Place Board panel. |
+| `finish_board` | Machine write admission | Finish the current board capture. |
 | `pause_job`, `resume_job` | `requestId` UUID | Desktop Pause/Resume with controller confirmation; no artwork revision required. |
 | `get_camera_snapshot` | None | Control scope plus artwork sharing: one JPEG still ≤1024 px and ≤240000 base64 characters of the live PC camera. |
+
+Place Board photos open on the computer, where the operator clicks the board outline and sizes it.
+The operator checks outline points there, and a completed Frame remains the ordinary Start gate.
 
 Selection modes are advertised by `get_workspace.capabilities.selectionModes`.
 Without that capability, omit `mode` and use the original `artworkIds` replacement.
@@ -153,7 +161,7 @@ records with truthful total/truncated fields, rather than a raw store, licence
 status, connection or purchase object.
 
 Backend failures may throw `KerfDeskMcpError` or an object with one of
-`unavailable`, `stale_revision`, `needs_pro`, `unsupported_operation`,
+`unavailable`, `stale_revision`, `busy`, `needs_pro`, `unsupported_operation`,
 `invalid_input`, `cancelled`, `control_limit` or `failed`. Only a fixed
 code/message pair is returned. Exception messages, stacks and validation input values are excluded.
 Licence keys, payment records, device identities, native paths, serial ports

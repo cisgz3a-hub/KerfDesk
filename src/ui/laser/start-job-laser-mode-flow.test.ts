@@ -236,8 +236,12 @@ describe('laser-mode acknowledgement across Start and recovery', () => {
 
     await runStartFromLineFlow(2);
 
-    expect(vi.mocked(jobAwareConfirm).mock.calls[0]?.[0]).toBe(LASER_MODE_UNVERIFIED_START_PROMPT);
-    expect(vi.mocked(jobAwareConfirm).mock.calls[1]?.[0]).toMatch(/Review resume/i);
+    // As in the saved recovery: the prepared source's warnings first (ADR-232
+    // Amendment 1), then $32, then the resume review.
+    const prompts = vi.mocked(jobAwareConfirm).mock.calls.map(([message]) => message);
+    expect(prompts[0]).toMatch(/^Controller warning:/);
+    expect(prompts[1]).toBe(LASER_MODE_UNVERIFIED_START_PROMPT);
+    expect(prompts[2]).toMatch(/Review resume/i);
     expect(useLaserStore.getState().startJob).toHaveBeenCalledWith(
       expect.stringContaining('resume preamble'),
       expect.objectContaining({

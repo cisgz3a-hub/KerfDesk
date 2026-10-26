@@ -12,7 +12,9 @@ import { cancelWorkspaceDrag } from './workspace-drag-cancel';
 
 // Transforms roll back via cancelInteraction; a marquee just clears its box;
 // pan restores the exact view captured at pointer-down. Draw/measure/pen keep
-// the existing global Esc (resetToolMode) behavior.
+// the existing global Esc (resetToolMode) behavior; leaving the tool then ends
+// a draw or measure drag (use-tool-change-cancels-drag.ts), so the release
+// commits nothing.
 const ESC_CANCELABLE_DRAG_KINDS: ReadonlySet<DragState['kind']> = new Set([
   'move',
   'scale',

@@ -305,13 +305,16 @@ describe('controller recovery on the existing connection', () => {
       await vi.advanceTimersByTimeAsync(30_000);
 
       expectQualifying();
-      expect(f.settingsReads()).toBe(1);
+      // Abort's own greeting kept the settings through the wait (ADR-648).
+      expect(useLaserStore.getState().grblSettingsRows).not.toHaveLength(0);
+      const modalReads = f.writes.filter((line) => line === '$G\n').length;
       f.controls.state = 'Idle';
       f.status();
       await vi.advanceTimersByTimeAsync(250);
 
       expect(useLaserStore.getState().controllerQualification.kind).toBe('qualified');
-      expect(f.settingsReads()).toBe(2);
+      expect(f.settingsReads()).toBe(1);
+      expect(f.writes.filter((line) => line === '$G\n')).toHaveLength(modalReads + 1);
       expectSameConnection(f);
     },
   );
@@ -337,13 +340,16 @@ describe('controller recovery on the existing connection', () => {
       expect(useLaserStore.getState().controllerQualification.kind).toBe('failed');
       expect(f.settingsReads()).toBe(1);
       expectSameConnection(f);
+      const modalReads = f.writes.filter((line) => line === '$G\n').length;
       f.controls.state = 'Idle';
       f.controls.statusResponses = true;
       f.status();
       await vi.advanceTimersByTimeAsync(250);
 
       expect(useLaserStore.getState().controllerQualification.kind).toBe('qualified');
-      expect(f.settingsReads()).toBe(2);
+      // The resumed qualification still holds Abort's kept settings (ADR-648).
+      expect(f.settingsReads()).toBe(1);
+      expect(f.writes.filter((line) => line === '$G\n')).toHaveLength(modalReads + 1);
       expectSameConnection(f);
     },
   );
@@ -395,6 +401,7 @@ describe('controller recovery on the existing connection', () => {
       if (trigger === 'controller error') {
         expect(useLaserStore.getState().safetyNotice?.kind).toBe('controller-error');
       }
+      const modalReads = f.writes.filter((line) => line === '$G\n').length;
       f.controls.statusResponses = true;
       f.status();
       for (let reply = 0; reply < debt; reply += 1) f.emit('ok');
@@ -403,7 +410,10 @@ describe('controller recovery on the existing connection', () => {
       expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
       expect(useLaserStore.getState().controllerQualification.kind).toBe('qualified');
       expect(useLaserStore.getState().getControllerReconnectRecommended()).toBe(false);
-      expect(f.settingsReads()).toBe(2);
+      // Lost cleanup replies change nothing in EEPROM: the reboot's kept
+      // settings stand, and only `$G` is read (ADR-648).
+      expect(f.settingsReads()).toBe(1);
+      expect(f.writes.filter((line) => line === '$G\n')).toHaveLength(modalReads + 1);
       expect(useLaserStore.getState().frameVerification).toBeNull();
       expectSameConnection(f);
     },

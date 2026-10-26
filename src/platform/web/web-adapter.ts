@@ -21,7 +21,6 @@ import { webSerial } from './web-serial';
 import { createHttpCameraBridge } from './camera-bridge';
 import { createLaunchQueueFileOpens } from './launch-queue-file-opens';
 import { fileHandleFromFile, webRecentFiles } from './recent-file-handles';
-import { writeSaveChunks } from './write-save-chunks';
 
 type FilePickerAcceptType = {
   description: string;
@@ -56,6 +55,10 @@ async function pickFilesForOpen(req: FileOpenRequest): Promise<ReadonlyArray<Fil
   return out;
 }
 
+// Chromium creates the chosen file, or empties an existing one, before
+// showSaveFilePicker resolves (WICG File System Access "set entry's binary data
+// to an empty byte sequence"; Chromium CreateAndTruncateFile). Callers prepare
+// all bytes before picking (ADR-656).
 async function pickFileForSave(req: FileSaveRequest): Promise<SaveTarget | null> {
   if (typeof window.showSaveFilePicker !== 'function') {
     throw new Error('File System Access API is required to save files in the web app.');
@@ -97,6 +100,13 @@ async function reserveSaveDirectory(): Promise<SaveDirectoryTarget | null> {
   return {
     file: (displayName) => directoryFileTarget(directory, displayName),
     exists: (displayName) => directoryHasEntry(directory, displayName),
+    listFiles: async () => {
+      const names: string[] = [];
+      for await (const [name, handle] of directory.entries()) {
+        if (handle.kind === 'file') names.push(name);
+      }
+      return names;
+    },
   };
 }
 
@@ -127,16 +137,30 @@ function directoryFileTarget(
     isSameDestination: (other) => sameWebSaveDestination(identity, other.destinationIdentity),
     compareDestination: (other) => compareWebSaveDestination(identity, other.destinationIdentity),
     write: async (data) => {
+      // Creating the handle creates an empty entry at once. When the write
+      // fails, remove an entry this save created, so no 0-byte file holds the
+      // name; a file that was already there keeps its old contents.
+      const existed = await directoryHasEntry(directory, displayName);
       const handle = await directory.getFileHandle(displayName, { create: true });
-      const writable = await handle.createWritable();
-      await writeAndClose(writable, data);
-    },
-    writeChunks: async (chunks, signal, onFinalizing) => {
-      signal?.throwIfAborted();
-      const handle = await directory.getFileHandle(displayName, { create: true });
-      await writeSaveChunks(await handle.createWritable(), chunks, signal, onFinalizing);
+      try {
+        await writeAndClose(await handle.createWritable(), data);
+      } catch (err) {
+        if (!existed) await removeEntryQuietly(directory, displayName);
+        throw err;
+      }
     },
   };
+}
+
+async function removeEntryQuietly(
+  directory: FileSystemDirectoryHandle,
+  displayName: string,
+): Promise<void> {
+  try {
+    await directory.removeEntry(displayName);
+  } catch {
+    // best-effort cleanup; the write failure is the error to report
+  }
 }
 
 type WebSaveDestination =
@@ -162,11 +186,6 @@ function fileHandleTarget(
       await beforeWrite();
       const writable = await handle.createWritable();
       await writeAndClose(writable, data);
-    },
-    writeChunks: async (chunks, signal, onFinalizing) => {
-      signal?.throwIfAborted();
-      await beforeWrite();
-      await writeSaveChunks(await handle.createWritable(), chunks, signal, onFinalizing);
     },
   };
 }

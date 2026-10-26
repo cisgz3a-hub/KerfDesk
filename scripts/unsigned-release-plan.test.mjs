@@ -565,8 +565,12 @@ test('the Desktop package check rehearses the commercial Mac and Linux builds (A
   );
   const linux = workflow.jobs['commercial-linux'];
   const mac = workflow.jobs['commercial-macos'];
-  // Linux on every pull request; macOS with the other native jobs.
-  assert.equal(linux.if, undefined);
+  // Linux on every push to main and on each pull request that changes packaging
+  // or desktop source (ADR-647); macOS with the other native jobs.
+  assert.equal(
+    linux.if,
+    "${{ !cancelled() && needs.packaging-scope.outputs.installers != 'false' }}",
+  );
   assert.equal(mac.if, '${{ inputs.native == true }}');
   for (const job of [linux, mac]) {
     const run = job.steps.map((step) => step.run ?? '').join('\n');

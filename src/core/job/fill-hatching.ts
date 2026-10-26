@@ -41,8 +41,10 @@ const SCANLINE_EPS = 1e-6;
 // Minimum permitted hatch spacing. Anything denser than this is almost
 // certainly user error (the laser can't move that fine, and the G-code
 // would be enormous) — clamp at the algorithm boundary rather than risk
-// an infinite-feeling loop.
-const MIN_HATCH_SPACING_MM = 0.05;
+// an infinite-feeling loop. Calibration grids take their lowest spacing from
+// here, so a burned label never names a spacing this floor replaces
+// (ADR-497 Amendment 1).
+export const MIN_HATCH_SPACING_MM = 0.05;
 
 export type HatchInput = {
   readonly polylines: ReadonlyArray<Polyline>;

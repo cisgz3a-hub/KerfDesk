@@ -60,9 +60,9 @@ async function readGcodeSource(
   const sizeAdvisory = importSourceSizeAdvisory(file, 'gcode');
   if (sizeAdvisory !== null) pushToast(sizeAdvisory, 'warning');
   const blob = await resolveImportBlob(file);
-  if (blob !== null) return { kind: 'blob', blob };
+  if (blob !== null) return { kind: 'blob', blob, openedFile: true };
   try {
-    return { kind: 'text', text: await file.text() };
+    return { kind: 'text', text: await file.text(), openedFile: true };
   } catch (err) {
     pushToast(`${file.name}: ${err instanceof Error ? err.message : String(err)}`, 'error');
     return null;

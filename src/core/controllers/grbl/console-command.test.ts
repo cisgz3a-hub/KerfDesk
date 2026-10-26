@@ -148,6 +148,10 @@ describe('prepareConsoleCommand', () => {
       ['G10 L20 P1 X0 Z15', 'coordinates-all'],
       ['G43.1 Z-12.5', 'tool'],
       ['T2 M6', 'tool'],
+      // grblHAL tool-table offsets (ADR-630 Amendment 8).
+      ['G43 H1', 'tool'],
+      ['G43.2 H2', 'tool'],
+      ['M61 Q2', 'tool'],
     ] as const;
     for (const [input, stateEffect] of cases) {
       expect(prepareConsoleCommand(input)).toMatchObject({

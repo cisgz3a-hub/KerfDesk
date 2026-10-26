@@ -1,13 +1,9 @@
 import { useState } from 'react';
-import {
-  DEFAULT_ROTARY_SETUP,
-  rotaryMeasurementsValid,
-  type RotarySetup,
-} from '../../core/devices/rotary';
+import { rotaryMeasurementsValid, type RotarySetup } from '../../core/devices/rotary';
 import type { RotaryPreset } from '../../core/devices/rotary-presets';
 import { Button, Dialog, DialogActions } from '../kit';
 import { errorStyle } from './rotary-setup-dialog.styles';
-import { startRotaryEdit } from './rotary-setup-edit';
+import { NEW_ROTARY_SETUP, startRotaryEdit } from './rotary-setup-edit';
 import { RotarySetupFields } from './RotarySetupFields';
 import { RotaryTestRotationPanel } from './RotaryTestRotationPanel';
 import { useRotaryTestRotation } from './use-rotary-test-rotation';
@@ -24,7 +20,7 @@ export function RotarySetupDialog(props: {
   readonly artwork?: RotaryArtworkExtent | null;
   readonly outputDescription?: string;
 }): JSX.Element {
-  const [edit, setEdit] = useState(() => startRotaryEdit(props.setup ?? DEFAULT_ROTARY_SETUP));
+  const [edit, setEdit] = useState(() => startRotaryEdit(props.setup ?? NEW_ROTARY_SETUP));
   const test = useRotaryTestRotation();
   const { setup } = edit;
   const valid = rotaryMeasurementsValid(setup);

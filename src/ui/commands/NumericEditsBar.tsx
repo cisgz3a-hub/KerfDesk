@@ -15,12 +15,17 @@ import {
   type SelectionTransformEdit,
 } from '../../core/scene';
 import { useStore } from '../state';
+import { useLengthUnit } from '../state/display-units';
+import { lengthUnitLabel, MM_PER_INCH, type DisplayLengthUnit } from '../display-length';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import { TransformAnchorPicker } from './TransformAnchorPicker';
 import './NumericEditsBar.css';
 
 const DISPLAY_DECIMALS = 3;
+const INCH_DISPLAY_DECIMALS = 4;
+// The ArrowUp/ArrowDown nudge of an inch box: a hundredth of an inch.
+const INCH_STEP_MM = MM_PER_INCH / 100;
 // Longest slice of a refused entry echoed back in the error toast.
 const ECHO_MAX_CHARS = 32;
 
@@ -38,6 +43,8 @@ type EntrySpec = {
 
 const LENGTH_ACCEPTS =
   'Type a number in mm, math like 10+5 or 2*(3+4), or a unit like 1in or 2.5cm.';
+const INCH_LENGTH_ACCEPTS =
+  'Type a number in inches, math like 1/2+1/8 or 2*(3+4), or a unit like 10mm or 2.5cm.';
 const LENGTH_RETRY =
   'Type a number, a sum like 10+5, a unit like 1in, or a percentage like 50% in Width or Height.';
 const POSITION_ENTRY: EntrySpec = {
@@ -70,13 +77,14 @@ export function NumericEditsBar(): JSX.Element {
           disabled={!model.hasSelection}
           onChange={model.setAnchor}
         />
-        <NumericFields model={model} />
+        <NumericFields key={model.selectionKey} model={model} />
       </div>
     </section>
   );
 }
 
 type NumericEditModel = {
+  readonly selectionKey: string;
   readonly anchor: SelectionAnchor;
   readonly setAnchor: (anchor: SelectionAnchor) => void;
   readonly preserveAspect: boolean;
@@ -94,6 +102,7 @@ function useNumericEditModel(): NumericEditModel {
   const project = useStore((state) => state.project);
   const selectedObjectId = useStore((state) => state.selectedObjectId);
   const additionalSelectedIds = useStore((state) => state.additionalSelectedIds);
+  const documentEpoch = useStore((state) => state.projectDocumentEpoch);
   const applySelectionTransforms = useStore((state) => state.applySelectionTransforms);
   const pushToast = useToastStore((state) => state.pushToast);
   const anchor = useUiStore((state) => state.selectionAnchor);
@@ -117,6 +126,9 @@ function useNumericEditModel(): NumericEditModel {
     applySelectionTransforms(result.transforms);
   };
   return {
+    // A canvas pointerdown can select different artwork before field blur.
+    // Retire the old fields so their draft cannot commit to that new selection.
+    selectionKey: JSON.stringify([documentEpoch, objects.map((object) => object.id).sort()]),
     anchor,
     setAnchor,
     preserveAspect,
@@ -133,6 +145,7 @@ function useNumericEditModel(): NumericEditModel {
 
 function NumericFields(props: { readonly model: NumericEditModel }): JSX.Element {
   const { model } = props;
+  const lengthUnit = useLengthUnit();
   return (
     <>
       <div className="lf-numeric-field-group">
@@ -141,7 +154,7 @@ function NumericFields(props: { readonly model: NumericEditModel }): JSX.Element
           caption="X"
           value={model.xValue}
           disabled={!model.hasSelection}
-          unit="mm"
+          lengthUnit={lengthUnit}
           hideUnit
           entry={POSITION_ENTRY}
           onCommit={(x) => model.commit({ kind: 'position', anchor: model.anchor, x })}
@@ -151,13 +164,13 @@ function NumericFields(props: { readonly model: NumericEditModel }): JSX.Element
           caption="Y"
           value={model.yValue}
           disabled={!model.hasSelection}
-          unit="mm"
+          lengthUnit={lengthUnit}
           entry={POSITION_ENTRY}
           onCommit={(y) => model.commit({ kind: 'position', anchor: model.anchor, y })}
         />
       </div>
       <span className="lf-numeric-edit-divider" aria-hidden="true" />
-      <SizeFields model={model} />
+      <SizeFields model={model} lengthUnit={lengthUnit} />
       <span className="lf-numeric-edit-divider" aria-hidden="true" />
       <NumberField
         label="Selection rotation"
@@ -172,7 +185,13 @@ function NumericFields(props: { readonly model: NumericEditModel }): JSX.Element
   );
 }
 
-function SizeFields({ model }: { readonly model: NumericEditModel }): JSX.Element {
+function SizeFields({
+  model,
+  lengthUnit,
+}: {
+  readonly model: NumericEditModel;
+  readonly lengthUnit: DisplayLengthUnit;
+}): JSX.Element {
   return (
     <div className="lf-numeric-field-group">
       <NumberField
@@ -180,7 +199,7 @@ function SizeFields({ model }: { readonly model: NumericEditModel }): JSX.Elemen
         caption="W"
         value={model.widthValue}
         disabled={!model.hasSelection}
-        unit="mm"
+        lengthUnit={lengthUnit}
         hideUnit
         entry={SIZE_ENTRY}
         onCommit={(width) =>
@@ -208,7 +227,7 @@ function SizeFields({ model }: { readonly model: NumericEditModel }): JSX.Elemen
         caption="H"
         value={model.heightValue}
         disabled={!model.hasSelection}
-        unit="mm"
+        lengthUnit={lengthUnit}
         entry={SIZE_ENTRY}
         onCommit={(height) =>
           model.commit({
@@ -228,12 +247,22 @@ function NumberField(props: {
   readonly caption: string;
   readonly value: number | null;
   readonly disabled: boolean;
-  readonly unit: string;
+  /** Rotation names its unit; length boxes follow the display unit (ADR-629). */
+  readonly unit?: string;
+  readonly lengthUnit?: DisplayLengthUnit;
   readonly hideUnit?: boolean;
   readonly entry: EntrySpec;
   readonly onCommit: (value: number) => void;
 }): JSX.Element {
-  const shown = formatNumber(props.value);
+  const lengthUnit = props.lengthUnit;
+  const format = (value: number | null): string => formatNumber(value, lengthUnit);
+  const unitLabel = lengthUnit === undefined ? (props.unit ?? '') : lengthUnitLabel(lengthUnit);
+  const accepts =
+    lengthUnit === 'in'
+      ? props.entry.accepts.replace(LENGTH_ACCEPTS, INCH_LENGTH_ACCEPTS)
+      : props.entry.accepts;
+  const step = lengthUnit === 'in' ? INCH_STEP_MM : props.entry.step;
+  const shown = format(props.value);
   const [draft, setDraft] = useState(shown);
   const [draftIsValid, setDraftIsValid] = useState(true);
   // Re-snap on every commit ATTEMPT, not only when the value moved. A commit
@@ -244,11 +273,11 @@ function NumberField(props: {
   // re-snap exists to prevent.
   const [commitSeq, setCommitSeq] = useState(0);
   useEffect(() => {
-    setDraft(formatNumber(props.value));
+    setDraft(formatNumber(props.value, lengthUnit));
     setDraftIsValid(true);
-  }, [props.value, commitSeq]);
+  }, [props.value, commitSeq, lengthUnit]);
   const evaluate = (text: string): NumericEntryResult =>
-    evaluateNumericEntry(text, entryOptions(props.entry, props.value));
+    evaluateNumericEntry(text, entryOptions(props.entry, props.value, lengthUnit));
   const updateDraft = (text: string): void => {
     setDraft(text);
     setDraftIsValid(evaluate(text).kind === 'ok');
@@ -270,23 +299,23 @@ function NumberField(props: {
   const commitIfEdited = (text: string): void => {
     if (text.trim() !== shown) commit(text);
   };
-  const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>): void => {
-    if (event.key === 'Enter') {
-      commit(event.currentTarget.value);
-      return;
-    }
-    const stepped = steppedDraft(event.key, evaluate(event.currentTarget.value), props.entry.step);
-    if (stepped === null) return;
-    event.preventDefault();
-    updateDraft(stepped);
-  };
+  const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>): void =>
+    handleFieldKey(event, {
+      commitIfEdited,
+      revert: () => {
+        setDraft(shown);
+        setDraftIsValid(true);
+      },
+      stepped: (key, text) => steppedDraft(key, evaluate(text), step, format),
+      updateDraft,
+    });
   return (
     <label className="lf-numeric-edit-field">
       <span className="lf-numeric-edit-caption">{props.caption}</span>
       <input
         className="lf-input"
         aria-label={props.label}
-        title={`${props.label}. Values are measured from the selected anchor point. ${props.entry.accepts}`}
+        title={`${props.label}. Values are measured from the selected anchor point. ${accepts}`}
         type="text"
         inputMode="decimal"
         autoComplete="off"
@@ -299,23 +328,63 @@ function NumberField(props: {
         onBlur={(event) => commitIfEdited(event.currentTarget.value)}
         onKeyDown={onKeyDown}
       />
-      {!props.hideUnit && <span className="lf-numeric-edit-unit">{props.unit}</span>}
+      {!props.hideUnit && <span className="lf-numeric-edit-unit">{unitLabel}</span>}
     </label>
   );
 }
 
-function entryOptions(entry: EntrySpec, current: number | null): NumericEntryOptions {
+type FieldKeyActions = {
+  readonly commitIfEdited: (text: string) => void;
+  readonly revert: () => void;
+  readonly stepped: (key: string, text: string) => string | null;
+  readonly updateDraft: (text: string) => void;
+};
+
+function handleFieldKey(
+  event: React.KeyboardEvent<HTMLInputElement>,
+  actions: FieldKeyActions,
+): void {
+  if (event.key === 'Enter') {
+    // Enter on the text as shown is no edit either: in an inch box it would
+    // write back the four-decimal rounding (10 mm shown as 0.3937).
+    actions.commitIfEdited(event.currentTarget.value);
+    return;
+  }
+  if (event.key === 'Escape') {
+    // Esc abandons the typed text, as the node and compound boxes do, so
+    // leaving the box afterwards applies nothing (audit 08-P3-7).
+    event.stopPropagation();
+    actions.revert();
+    return;
+  }
+  const stepped = actions.stepped(event.key, event.currentTarget.value);
+  if (stepped === null) return;
+  event.preventDefault();
+  actions.updateDraft(stepped);
+}
+
+function entryOptions(
+  entry: EntrySpec,
+  current: number | null,
+  lengthUnit: DisplayLengthUnit | undefined,
+): NumericEntryOptions {
+  const unit = lengthUnit === undefined ? {} : { lengthUnit };
   return entry.percent && current !== null
-    ? { kind: entry.kind, percentOf: current }
-    : { kind: entry.kind };
+    ? { kind: entry.kind, percentOf: current, ...unit }
+    : { kind: entry.kind, ...unit };
 }
 
 // ArrowUp/ArrowDown nudge a readable draft by one step without committing,
 // as the old number spinner did; Enter or blur still commits.
-function steppedDraft(key: string, current: NumericEntryResult, step: number): string | null {
+function steppedDraft(
+  key: string,
+  current: NumericEntryResult,
+  step: number,
+  format: (value: number) => string,
+): string | null {
   const direction = key === 'ArrowUp' ? 1 : key === 'ArrowDown' ? -1 : 0;
   if (direction === 0 || current.kind !== 'ok') return null;
-  return formatNumber(current.value + direction * step);
+  return format(current.value + direction * step);
 }
 
 function pushEntryError(text: string, reason: string, entry: EntrySpec): void {
@@ -336,8 +405,12 @@ function selectedObjects(
   return objects.filter((object) => ids.has(object.id));
 }
 
-function formatNumber(value: number | null): string {
-  return value === null ? '' : Number(value.toFixed(DISPLAY_DECIMALS)).toString();
+// Length boxes show the display unit (ADR-629); rotation shows degrees.
+function formatNumber(value: number | null, lengthUnit?: DisplayLengthUnit): string {
+  if (value === null) return '';
+  if (lengthUnit === 'in')
+    return Number((value / MM_PER_INCH).toFixed(INCH_DISPLAY_DECIMALS)).toString();
+  return Number(value.toFixed(DISPLAY_DECIMALS)).toString();
 }
 
 function messageForError(reason: string): string {
@@ -347,5 +420,12 @@ function messageForError(reason: string): string {
   if (reason === 'multi-rotation') return 'Rotate one object at a time in Numeric Edits.';
   if (reason === 'invalid-dimension') return 'Width and height must be greater than 0.';
   if (reason === 'invalid-number') return 'Numeric values must be finite.';
+  if (reason === 'zero-height-selection') {
+    return 'The selection has no height to scale, like a horizontal line. Change its width instead.';
+  }
+  if (reason === 'zero-width-selection') {
+    return 'The selection has no width to scale, like a vertical line. Change its height instead.';
+  }
+  if (reason === 'degenerate-selection') return 'The selection has no width or height to scale.';
   return 'Numeric edit could not be applied.';
 }

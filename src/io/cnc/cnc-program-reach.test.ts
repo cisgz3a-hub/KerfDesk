@@ -78,6 +78,14 @@ describe('exact CNC program reach review', () => {
       'no resolved cutter identity',
     );
   });
+  it('opens on the job’s own bits, not unrelated library entries (audit F7-P3-1)', () => {
+    const project = { ...projectWithLine(), machine: DEFAULT_CNC_MACHINE_CONFIG };
+    const starterVBit = DEFAULT_CNC_MACHINE_CONFIG.tools.find(
+      (tool) => tool.shankDiameterMm !== undefined,
+    );
+    expect(starterVBit).toBeDefined();
+    expect(cncProgramReachWarnings(project, program, plan)).toEqual([]);
+  });
   it('warns for a fixture crossed by travel and never changes emitted bytes', () => {
     const tool = {
       ...DEFAULT_CNC_MACHINE_CONFIG.tools[0]!,
@@ -120,5 +128,87 @@ describe('exact CNC program reach review', () => {
     );
     expect(withWarnings.gcode).toBe(baseline.gcode);
     expect(withWarnings.kind).toBe('emitted');
+  });
+});
+
+// One 0.01 mm-step zigzag level per millimetre of depth, `linesPerPass` lines each.
+function levelsProgram(levels: number, linesPerPass: number): string[] {
+  const lines = ['G0 Z5', 'G0 X0 Y0'];
+  for (let level = 1; level <= levels; level++) {
+    lines.push('G1 Z-' + level + ' F100');
+    for (let i = 0; i < linesPerPass; i++)
+      lines.push('G1 X' + (i % 2) * 2 + ' Y' + (i * 0.01).toFixed(2) + ' F600');
+  }
+  return lines;
+}
+
+describe('reach depth past the bounded geometry review (audit F7-P2-2, ADR-572 Amendment 2)', () => {
+  const longBit = {
+    id: 'long',
+    name: 'Long bit',
+    kind: 'end-mill' as const,
+    diameterMm: 6,
+    fluteLengthMm: 15,
+    stickoutMm: 24,
+  };
+  const lateBit = {
+    id: 'late',
+    name: 'Late bit',
+    kind: 'end-mill' as const,
+    diameterMm: 1.588,
+    fluteLengthMm: 4.7,
+    stickoutMm: 12,
+  };
+  const project = {
+    ...projectWithLine(),
+    machine: { ...DEFAULT_CNC_MACHINE_CONFIG, tools: [longBit, lateBit], toolId: longBit.id },
+  };
+  const longPlan = [{ id: longBit.id, name: longBit.name }];
+  const twoBitPlan = [...longPlan, { id: lateBit.id, name: lateBit.name }];
+  // Level 16 starts after line 50,000, so the parse alone stops at Z-15.
+  const deepLate = ['G21', 'G90', ...levelsProgram(16, 3_400)].join('\n');
+  const lateSecondBit = [
+    'G21',
+    'G90',
+    ...levelsProgram(10, 5_200),
+    'M0',
+    'G21',
+    'G90',
+    ...levelsProgram(8, 10),
+  ].join('\n');
+
+  it('compares the compiled deepest cut after line 50,000 with the flute length', () => {
+    expect(cncProgramGeometry(deepLate, longPlan).sections[0]).toMatchObject({
+      depthMm: 15,
+      truncated: true,
+    });
+    const warnings = cncProgramReachWarnings(project, deepLate, longPlan, [16]);
+    expect(warnings).toContain(
+      'CNC reach review · Long bit: Cut depth 16 mm exceeds the recorded 15 mm flute length.',
+    );
+    expect(warnings.join(' ')).not.toContain('cut depth was read only');
+  });
+  it('never presents a partial depth read as complete', () => {
+    const warnings = cncProgramReachWarnings(project, deepLate, longPlan);
+    expect(warnings.join(' ')).not.toContain('exceeds the recorded');
+    expect(warnings).toContain(
+      "CNC reach review · Long bit: cut depth was read only up to where the geometry review stopped; deeper cuts later in this bit's section were not compared with its flute length or stickout.",
+    );
+  });
+  it('reviews a second bit that starts after the geometry review stopped', () => {
+    expect(lateSecondBit.split('\n').indexOf('M0') + 1).toBeGreaterThan(50_000);
+    expect(cncProgramGeometry(lateSecondBit, twoBitPlan).sections).toHaveLength(1);
+    const warnings = cncProgramReachWarnings(project, lateSecondBit, twoBitPlan, [10, 8]);
+    expect(warnings).toEqual(
+      expect.arrayContaining([
+        'CNC reach review · Late bit: Cut depth 8 mm exceeds the recorded 4.7 mm flute length.',
+        "CNC reach review · Late bit: no program geometry was reviewed for this bit's section; its fixture clearance was not evaluated.",
+      ]),
+    );
+    const parsedOnly = cncProgramReachWarnings(project, lateSecondBit, twoBitPlan);
+    expect(parsedOnly).toContain(
+      "CNC reach review · Late bit: no program geometry was reviewed for this bit's section; its cut depth and fixture clearance were not evaluated.",
+    );
+    expect(parsedOnly.join(' ')).not.toContain('Late bit: Cut depth');
   });
 });

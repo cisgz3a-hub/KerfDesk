@@ -25,11 +25,8 @@ import {
   type Polyline,
   type Vec2,
 } from '../scene';
-import {
-  textOutlineGeometry,
-  translateTextOutline,
-  type TextOutlineGeometry,
-} from './text-outline-path';
+import { translateTextOutline } from './text-outline-path';
+import { outlineGlyphGeometry, type GlyphOutlineGeometry } from './text-glyph-geometry';
 import { layoutTextBox, type TextBoxLayout } from './text-box-layout';
 import { finishTextBoxRender } from './text-box-render';
 import { cncStrokeTextToPolylines } from './cnc-stroke-font';
@@ -91,6 +88,8 @@ export type TextRenderResult = {
   readonly textBoxLayout?: TextBoxLayout;
   readonly paths: ReadonlyArray<ColoredPath>;
   readonly bounds: Bounds;
+  /** Transient glyph ownership by path and contour; overlapping ink does not merge letters. */
+  readonly glyphContours?: ReadonlyArray<ReadonlyArray<number>>;
   /**
    * The alignment anchor, in the same frame as `paths` and `bounds`: the
    * point on the first line's baseline where every line starts, centres or
@@ -183,6 +182,8 @@ function renderOutlineLines(
   const maxWidth = lineWidths.reduce((m, w) => (w > m ? w : m), 0);
   const raw: Polyline[] = [];
   const rawCurves: CurveSubpath[] = [];
+  const glyphContours: number[] = [];
+  let glyphOffset = 0;
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i] ?? '';
     const lineWidth = lineWidths[i] ?? 0;
@@ -200,6 +201,8 @@ function renderOutlineLines(
     );
     raw.push(...geometry.polylines);
     rawCurves.push(...geometry.curves);
+    glyphContours.push(...geometry.glyphContours.map((id) => id + glyphOffset));
+    glyphOffset += geometry.glyphContours.reduce((maximum, id) => Math.max(maximum, id), -1) + 1;
   }
   // Normalize: translate so the natural bounds are (0, 0)-rooted,
   // matching ImportedSvg's viewBox convention. fit-to-bed, hit-test,
@@ -211,6 +214,7 @@ function renderOutlineLines(
   const missing = missingCharacters(text, outlineGlyphCoverage(font), true);
   const rendered: TextRenderResult = {
     paths: [{ color: actual.color, polylines, curves }],
+    glyphContours: [glyphContours],
     bounds,
     ...(offset === null ? {} : { anchor: { x: anchorX + offset.x, y: offset.y } }),
     ...(missing.length === 0 ? {} : { missingCharacters: missing }),
@@ -352,7 +356,7 @@ function lineGeometry(
   letterSpacing: number,
   shaping?: TextShaping,
   start = 0,
-): TextOutlineGeometry {
+): GlyphOutlineGeometry {
   if (shaping !== undefined)
     return shapedTextGeometry(
       font,
@@ -364,23 +368,8 @@ function lineGeometry(
       yBaseline,
       letterSpacing,
     );
-  // opentype's getPath returns SVG-like commands in mm-equivalent
-  // units when we pass sizeMm directly. The baseline sits at y = 0
-  // by convention; we translate to (xOffset, yBaseline). The
-  // letterSpacing option (since opentype.js 1.3) is a multiplier of
-  // fontSize added after each glyph's natural advance — opentype's
-  // implementation just does `x += options.letterSpacing * fontSize`
-  // per char (verified in node_modules/opentype.js source).
-  //
-  // Features: opentype v2 defaults kerning ON but ships ligatures OFF.
-  // We turn liga + rlig on explicitly so "fi" / "fl" and language-
-  // required ligatures render as expected — without this, glyphs that
-  // a font designs as one shape come out as two separate letters and
-  // the user sees a visible regression vs Inkscape / CorelDRAW
-  // (MIT-compare audit recommendation).
-  const path = font.getPath(line, xOffset, yBaseline, sizeMm, {
+  return outlineGlyphGeometry(font, line, sizeMm, xOffset, yBaseline, {
     ...SHAPING_OPTIONS,
     letterSpacing,
   });
-  return textOutlineGeometry(path.commands);
 }

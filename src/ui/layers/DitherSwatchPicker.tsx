@@ -29,12 +29,22 @@ const DITHER_COPY: Readonly<
   sierra3: { label: 'Sierra 3', description: 'Wide, smooth spreading, close to Jarvis.' },
   sierra2: { label: 'Sierra 2', description: 'A lighter Sierra 3 with slightly finer detail.' },
   'sierra-lite': { label: 'Sierra Lite', description: 'A small kernel close to Floyd-Steinberg.' },
+  'blue-noise': {
+    label: 'Blue Noise',
+    description:
+      'Even, fine dots with no worms or repeating patterns in smooth tones. Best for portraits.',
+  },
   ordered: { label: 'Ordered', description: 'A regular grid of dots, the same in every area.' },
   grayscale: {
     label: 'Grayscale',
     description: 'No dots: power follows brightness between Min power and Power.',
   },
 };
+
+/** The name a dither is shown by. */
+export function ditherLabel(algorithm: DitherAlgorithm): string {
+  return DITHER_COPY[algorithm].label;
+}
 
 const MIXED_HINT = 'Choose one dither for all selected artwork.';
 const THUMBNAIL_SCALE = 2;

@@ -17,6 +17,8 @@ import {
   type SkippedCommand,
 } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
+import type { MotionRefusal } from '../../core/controllers/controller-event';
+import { motionRefusedNotice } from './laser-motion-refusal';
 import { invalidateControllerSessionEvidence } from './laser-controller-evidence';
 import { requalifyAfterHaltingReset } from './laser-controller-qualification';
 import { clearCncLiveCaps } from './detected-settings-action';
@@ -35,7 +37,26 @@ export type ControllerRejection = {
   readonly acknowledgesLine?: boolean;
   /** Marlin skipped the line as an unknown command (MA-12). */
   readonly skipped?: SkippedCommand;
+  /** The controller skipped a move it still answers (ADR-395 Amendment 1). */
+  readonly motionRefusal?: MotionRefusal;
 };
+
+// The rejected line's own Frame or jog stops. A stopped Marlin announces itself
+// as it reads each move (queue.cpp L523-L535), not in answer order, and skips
+// every later move as well, so it stops whichever Frame or jog is running.
+function rejectedMotionPatch(
+  state: LaserState,
+  rejection: ControllerRejection,
+  ackSettlement: AckSettlement,
+): Partial<Pick<LaserState, 'motionOperation'>> {
+  const operation = state.motionOperation;
+  if (operation === null) return {};
+  const rejectedMotionId =
+    ackSettlement.owner === 'untracked' ? ackSettlement.motionOperationId : null;
+  const refusesEveryMove = rejection.motionRefusal?.reason === 'stopped';
+  if (!refusesEveryMove && operation.operationId !== rejectedMotionId) return {};
+  return { motionOperation: { ...operation, cancelRequested: true } };
+}
 
 export function handleErrorLine(
   set: SetFn,
@@ -54,18 +75,12 @@ export function handleErrorLine(
     ackSettlement.owner === 'stream'
       ? state.streamer?.inFlight[0]?.line.trim()
       : ownedCommandLine?.trim();
-  const rejectedMotionId =
-    ackSettlement.owner === 'untracked' ? ackSettlement.motionOperationId : null;
-  const motionErrorPatch =
-    rejectedMotionId !== null && state.motionOperation?.operationId === rejectedMotionId
-      ? { motionOperation: { ...state.motionOperation, cancelRequested: true } }
-      : {};
   set({
     lastError: rejection.code,
     ...frameProofReset(),
     ...errorNoticePatch(state, rejection, rejectedLine),
     ...plannedRejectionResetPatch(state, refs, rejection, ackSettlement),
-    ...motionErrorPatch,
+    ...rejectedMotionPatch(state, rejection, ackSettlement),
   });
   if (ackSettlement.owner === 'untracked') {
     // grblHAL latches the error for every later G-code line (HF-7).
@@ -162,6 +177,10 @@ function rejectionNotice(
 ): LaserSafetyNotice {
   if (rejection.skipped !== undefined && rejectedLine !== undefined) {
     return skippedCommandNotice(rejection.skipped, rejectedLine);
+  }
+  if (rejection.motionRefusal !== undefined) {
+    const context = controllerErrorContext(state);
+    return motionRefusedNotice(rejection.motionRefusal, context, rejection.raw, rejectedLine);
   }
   return controllerErrorNotice(
     rejection.code,

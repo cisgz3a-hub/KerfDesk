@@ -3,8 +3,13 @@
 // a roller scaled from that diameter; a chuck never carries one. Turning the
 // scaling off, or switching to Chuck, parks the last diameter so turning it
 // back on restores the operator's value instead of a default.
+//
+// A new roller scales from its roller diameter, as LightBurn's roller always
+// does. A saved roller opens in the mode it was saved with, so earlier
+// projects keep their output (ADR-373 Amendment 1).
 
 import {
+  DEFAULT_ROTARY_SETUP,
   rotaryCircumferenceMm,
   rotaryDiameterFromCircumferenceMm,
   type RotarySetup,
@@ -12,9 +17,18 @@ import {
 } from '../../core/devices/rotary';
 import type { RotaryPreset } from '../../core/devices/rotary-presets';
 
-// Only the field's starting value; nothing scales until the operator turns
-// roller scaling on and measures the driven roller.
+// Only the field's starting value, for the operator to replace with the
+// driven roller's measured diameter.
 export const DEFAULT_ROLLER_DIAMETER_MM = 25;
+
+// What Rotary Setup and Machine Setup start from when a profile has no rotary.
+// A stock roller on an unchanged Y port turns a fixed angle per machine mm, so
+// the part's surface moves by that angle times the roller's radius. Scale 1
+// suits only a controller whose Y steps/mm were set to the surface.
+export const NEW_ROTARY_SETUP: RotarySetup = {
+  ...DEFAULT_ROTARY_SETUP,
+  rollerDiameterMm: DEFAULT_ROLLER_DIAMETER_MM,
+};
 
 export type ParkedRoller = { readonly diameterMm: number; readonly scaled: boolean };
 
@@ -33,7 +47,8 @@ export function startRotaryEdit(setup: RotarySetup): RotaryEdit {
     setup: setup.type === 'chuck' ? withoutRollerDiameter(setup) : setup,
     parkedRoller: {
       diameterMm: diameterMm ?? DEFAULT_ROLLER_DIAMETER_MM,
-      scaled: diameterMm !== undefined,
+      // A chuck switched to Roller becomes a new roller, which scales.
+      scaled: setup.type === 'chuck' || diameterMm !== undefined,
     },
   };
 }

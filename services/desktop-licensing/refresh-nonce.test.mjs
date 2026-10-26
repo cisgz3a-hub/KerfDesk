@@ -6,7 +6,8 @@ import { authorityRequest } from './http.mjs';
 import { claims, credentials, deviceId, fixture, NOW, request } from './test-support.mjs';
 
 // ADR-592 Amendment 1: the nonce an app sends with a refresh comes back inside
-// the signed grant, so a saved answer replayed later cannot pass for a new one.
+// the signed grant. Only 1.0.21 and 1.0.22 send one; the Worker keeps signing it
+// back so those installed apps get the answer they check for (ADR-592 Amendment 3).
 
 async function paidSeat() {
   const f = await fixture();

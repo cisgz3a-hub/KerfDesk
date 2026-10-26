@@ -1,3 +1,4 @@
+import type { PhotoToneCurve } from '../raster/photo-tone-curve';
 import type { PagedRasterImageAsset } from './raster-image-asset';
 import type { FontKey, TextAlignment, PathTextSettings, TextStyle } from './text-settings';
 export type {
@@ -22,6 +23,7 @@ export type { ColoredPath, SubpathNesting } from './colored-path';
 import type { VariableTemplate } from './variable-template';
 import type { ReliefHeightfield } from './relief/relief-heightfield';
 import type { ReliefAuthoringDocument } from './relief/relief-authoring';
+import type { ReliefTwoSidedSplitRecord } from './relief/relief-two-sided-split';
 import type { LaserLeadSide, LaserLeadStyle, LayerPowerMode, TabLayoutMode } from './layer';
 import type { LaserTabAnchor } from './laser-tab-anchor';
 import type { PhotoEditorDocument } from './photo-editor-document';
@@ -150,6 +152,7 @@ export type ObjectOperationSettingsOverride = {
   readonly leadLengthMm?: number | undefined;
   readonly leadAngleDeg?: number | undefined;
   readonly leadSide?: LaserLeadSide | undefined;
+  readonly photoToneCurve?: PhotoToneCurve | undefined;
 };
 
 export type ObjectOperationOverride = ObjectOperationSettingsOverride & {
@@ -340,6 +343,9 @@ export const DITHER_ALGORITHMS = [
   'sierra3',
   'sierra2',
   'sierra-lite',
+  // Variable-coefficient diffusion with a modulated threshold (ADR-649). An
+  // older build refuses a project holding a value it does not list here.
+  'blue-noise',
   'ordered',
   'grayscale',
 ] as const;
@@ -541,6 +547,7 @@ export type MeshReliefObject = ReliefObjectCommon & {
     readonly meshPositions: ReadonlyArray<number> | Float32Array | Float64Array;
     readonly emptyCells: 'floor' | 'top';
   };
+  readonly twoSidedSplit?: ReliefTwoSidedSplitRecord; // a side of a two-sided split (ADR-580)
 };
 
 /** Canonical scalar-field CNC relief (ADR-291). */

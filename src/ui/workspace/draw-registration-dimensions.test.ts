@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { createProject, createRegistrationLayer, type Project } from '../../core/scene';
-import { createRegistrationBox, createRegistrationCircle } from '../../core/shapes';
+import {
+  createRegistrationBox,
+  createRegistrationCircle,
+  createRegistrationOutline,
+} from '../../core/shapes';
 import { createRectangle } from '../../core/shapes/primitives';
 import { drawScene } from './draw-scene';
 
@@ -104,5 +108,20 @@ describe('drawScene registration box dimensions', () => {
 
     expect(texts).toContain('⌀ 90.0 mm');
     expect(texts.some((t) => t.includes('×'))).toBe(false); // not "90.0 × 90.0 mm"
+  });
+
+  it('labels a closed outline from its local bounding box', () => {
+    const { ctx, texts } = recordingContext();
+    const outline = createRegistrationOutline({
+      pointsMm: [
+        { x: 0, y: 0 },
+        { x: 120, y: 0 },
+        { x: 80, y: 70 },
+        { x: 0, y: 60 },
+      ],
+    });
+    const project = sceneProject(createProject(), [createRegistrationLayer()], [outline]);
+    drawScene(ctx, 800, 600, project, DRAW_OPTS);
+    expect(texts).toContain('120.0 × 70.0 mm');
   });
 });

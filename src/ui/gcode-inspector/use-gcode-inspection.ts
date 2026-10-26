@@ -101,6 +101,11 @@ async function inspectGcodeOnMainThread(
 function inspectionContextOf(source: GcodeInspectionSource): GcodeInspectionContext {
   return {
     ...(source.machineKind === undefined ? {} : { machineKind: source.machineKind }),
+    ...(source.controllerKind === undefined ? {} : { controllerKind: source.controllerKind }),
+    ...(source.initialPositionMm === undefined
+      ? {}
+      : { initialPositionMm: source.initialPositionMm }),
+    ...(source.boundsFromStart === undefined ? {} : { boundsFromStart: source.boundsFromStart }),
     ...(source.laserPowerControl === undefined
       ? {}
       : { laserPowerControl: source.laserPowerControl }),

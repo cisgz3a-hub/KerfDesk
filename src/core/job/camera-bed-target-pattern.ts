@@ -6,7 +6,9 @@
 // the scanline fill leaves the hole unburned under either fill rule.
 
 import {
-  bedTargetLayout,
+  bedTargetLayoutWithRings,
+  DEFAULT_RING_DIAMETER_MM,
+  RING_WIDTH_SHARE,
   type BedTargetArea,
   type BedTargetLayout,
   type BedTargetMark,
@@ -22,7 +24,8 @@ import {
 
 export type CameraBedTargetOptions = {
   readonly area: BedTargetArea;
-  readonly spacingMm?: number;
+  /** Outer ring diameter, mm; the grid step follows it (bedTargetLayoutWithRings). */
+  readonly ringDiameterMm?: number;
   readonly speed?: number;
   readonly power?: number;
 };
@@ -44,10 +47,7 @@ const TARGET_HATCH_SPACING_MM = 0.2;
 const CIRCLE_SEGMENTS = 48;
 
 export function generateCameraBedTarget(options: CameraBedTargetOptions): CameraBedTargetPattern {
-  const layout = bedTargetLayout({
-    area: options.area,
-    ...(options.spacingMm === undefined ? {} : { spacingMm: options.spacingMm }),
-  });
+  const layout = bedTargetLayoutWithRings(options.area, options.ringDiameterMm);
   const layer: Layer = {
     ...createLayer({
       id: 'camera-bed-target',
@@ -84,6 +84,53 @@ function markObject(
     transform: { ...IDENTITY_TRANSFORM, x: mark.x - outer, y: mark.y - outer },
     paths: [{ color: TARGET_LAYER_COLOR, polylines }],
   };
+}
+
+export type CameraNudgeRingOptions = {
+  /** Where the ring's centre burns, bed millimetres. */
+  readonly centre: { readonly x: number; readonly y: number };
+  /** Outer diameter, mm: the calibration target's ring size. */
+  readonly ringDiameterMm?: number;
+  readonly speed?: number;
+  readonly power?: number;
+};
+
+/**
+ * One ring of the calibration target's size, for the quick nudge fix
+ * (ADR-663 Amendment 2): the photo finds it with the same ring detector.
+ */
+export function generateCameraNudgeRing(options: CameraNudgeRingOptions): Scene {
+  const layer: Layer = {
+    ...createLayer({
+      id: 'camera-nudge-ring',
+      name: 'Camera nudge ring',
+      color: TARGET_LAYER_COLOR,
+      mode: 'fill',
+    }),
+    speed: options.speed ?? DEFAULT_SPEED_MM_MIN,
+    power: options.power ?? DEFAULT_POWER_PERCENT,
+    hatchSpacingMm: TARGET_HATCH_SPACING_MM,
+    fillStyle: 'scanline',
+    fillBidirectional: true,
+  };
+  const diameter = options.ringDiameterMm ?? DEFAULT_RING_DIAMETER_MM;
+  const outer = diameter / 2;
+  const inner = outer - diameter * RING_WIDTH_SHARE;
+  const ring: ImportedSvg = {
+    kind: 'imported-svg',
+    id: 'camera-nudge-ring',
+    source: 'camera-bed-target',
+    operationIds: [layer.id],
+    bounds: { minX: 0, minY: 0, maxX: 2 * outer, maxY: 2 * outer },
+    transform: { ...IDENTITY_TRANSFORM, x: options.centre.x - outer, y: options.centre.y - outer },
+    paths: [
+      {
+        color: TARGET_LAYER_COLOR,
+        polylines: [circle(outer, outer, 1), circle(outer, inner, -1)],
+      },
+    ],
+  };
+  return { objects: [ring], layers: [layer] };
 }
 
 // A closed circle about (centre, centre) in the object's own frame; `winding`

@@ -62,6 +62,7 @@ import { drawArtworkRunFocus } from './draw-artwork-run-focus';
 import { drawBed, drawGrid, drawOriginMarker } from './draw-bed-chrome';
 import { objectIntersectsCanvas } from './object-viewport';
 import { beginArtworkSpriteFrame } from './artwork-sprite-cache';
+import type { DisplayLengthUnit } from '../display-length';
 
 export type DrawOpts = {
   readonly selectedId: string | null;
@@ -117,6 +118,8 @@ export type DrawOpts = {
   // ADR-620: artwork rests in plain ink; true (Alt held) paints every path in
   // its operation colour instead.
   readonly operationColors?: boolean;
+  // ADR-629: rulers count in the operator's display unit.
+  readonly lengthUnit?: DisplayLengthUnit;
 };
 
 export function drawScene(
@@ -183,7 +186,7 @@ export function drawScene(
   if (!opts.preview) drawSnapFeedback(ctx, project, opts, view);
   drawOutOfBoundsOutlines(ctx, project, view);
   // Rulers go LAST so they're on top of everything else (F-A2).
-  drawRulers(ctx, canvasW, canvasH, view);
+  drawRulers(ctx, canvasW, canvasH, view, opts.lengthUnit);
 }
 
 function drawSnapFeedback(

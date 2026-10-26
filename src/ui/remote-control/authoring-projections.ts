@@ -5,6 +5,7 @@ import { RemoteFault } from './fault';
 import { publicIdentifier, workspaceProjection } from './projections';
 import { validTextPatch } from './text-validation';
 import { artworkTransformBounds } from './transform-bounds';
+import { boundedWorkspaceResponse } from './response-budget';
 
 export function historyProjection(state: AppState) {
   return { canUndo: state.undoStack.length > 0, canRedo: state.redoStack.length > 0 };
@@ -13,7 +14,7 @@ export function historyProjection(state: AppState) {
 export function workspaceReadProjection(state: AppState, options: RemoteControlOptions) {
   const workspace = workspaceProjection(state, options.canShareArtwork?.() === true);
   const bounds = artworkTransformBounds(state, workspace.artwork);
-  return {
+  return boundedWorkspaceResponse({
     ...workspace,
     artwork: workspace.artwork.map((item) => {
       const transformBounds = bounds.get(item.id);
@@ -33,7 +34,7 @@ export function workspaceReadProjection(state: AppState, options: RemoteControlO
       canEdit: options.canWrite() && options.canEdit?.() !== false && state.pendingUndo === null,
       artworkSharingEnabled: options.canShareArtwork?.() === true,
     },
-  };
+  });
 }
 
 export function fontsProjection(): Record<string, unknown> {

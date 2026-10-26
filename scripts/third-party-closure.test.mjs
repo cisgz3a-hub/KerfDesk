@@ -185,6 +185,14 @@ test('renders deterministic notices for every production package and artwork ass
     first.includes(photoCraftNotice),
     'adapted PhotoCraft code must ship its complete notice',
   );
+  const ostromoukhovNotice = fs
+    .readFileSync(path.join(REPO_ROOT, 'docs/licensing/ostromoukhov-error-diffusion.txt'), 'utf8')
+    .trim()
+    .replace(/\r\n?/g, '\n');
+  assert.ok(
+    first.includes(ostromoukhovNotice),
+    'the transcribed Ostromoukhov weight table must ship its attribution',
+  );
   assert.match(first, /Electron package license is reproduced below/);
   assert.match(first, /artifact-level license files are explicitly bundled and required/);
   assert.match(first, /explicitly bundles the Electron and Chromium runtime license files/);

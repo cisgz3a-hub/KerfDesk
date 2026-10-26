@@ -1,9 +1,11 @@
 import { effectiveOperationForObject } from '../../core/effective-output';
+import { activePhotoToneCurve, type PhotoToneCurve } from '../../core/raster/photo-tone-curve';
 import type { DitherAlgorithm, Layer, RasterImage } from '../../core/scene';
 import type { PhotoEngravingApply } from './photo-engraving-apply';
 
-/** The dithers that suit photographs, smoothest first. */
+/** The dithers that suit photographs, smoothest first (ADR-649 measures it). */
 export const PHOTO_DITHERS = [
+  'blue-noise',
   'jarvis',
   'stucki',
   'floyd-steinberg',
@@ -17,6 +19,8 @@ export type PhotoEngravingDraft = {
   readonly ditherAlgorithm: PhotoDither;
   readonly linesPerMm: number;
   readonly negativeImage: boolean;
+  /** ADR-670: the material tone calibration; undefined burns the tones uncorrected. */
+  readonly photoToneCurve: PhotoToneCurve | undefined;
 };
 
 export function initialPhotoEngravingDraft(
@@ -31,11 +35,13 @@ export function initialPhotoEngravingDraft(
     ditherAlgorithm: photoDither(effective.ditherAlgorithm),
     linesPerMm: effective.linesPerMm,
     negativeImage: effective.negativeImage,
+    photoToneCurve: activePhotoToneCurve(effective.photoToneCurve),
   };
 }
 
+/** A photo dither for a stored mode; other modes start with Jarvis (ADR-581). */
 export function photoDither(value: string): PhotoDither {
-  return value === 'stucki' || value === 'floyd-steinberg' ? value : 'jarvis';
+  return PHOTO_DITHERS.find((dither) => dither === value) ?? 'jarvis';
 }
 
 export function photoEngravingPatch(draft: PhotoEngravingDraft): PhotoEngravingApply {
@@ -46,6 +52,7 @@ export function photoEngravingPatch(draft: PhotoEngravingDraft): PhotoEngravingA
       linesPerMm: draft.linesPerMm,
       negativeImage: draft.negativeImage,
       passThrough: false,
+      photoToneCurve: draft.photoToneCurve,
     },
   };
 }

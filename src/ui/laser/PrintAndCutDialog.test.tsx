@@ -198,6 +198,76 @@ describe('PrintAndCutDialog targets from the selection and marks from the camera
   });
 });
 
+describe('unusual registration acknowledgement ownership', () => {
+  const first = { x: 20, y: 30 };
+  const second = { x: 123, y: 30 };
+  const render = (a = first, b = second): void =>
+    act(() =>
+      root.render(
+        <PrintAndCutDialog
+          initialTargets={{ first: { x: 0, y: 0 }, second: { x: 100, y: 0 } }}
+          firstMachinePoint={a}
+          secondMachinePoint={b}
+          captureEnabled={true}
+          onCapture={vi.fn()}
+          onCancel={vi.fn()}
+          onApply={vi.fn()}
+          onDisable={vi.fn()}
+        />,
+      ),
+    );
+  const acknowledge = (): void => {
+    const checkbox = host.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    if (checkbox === null) throw new Error('unusual registration acknowledgement missing');
+    act(() => checkbox.click());
+    expect(buttonByText(host, 'Apply registration').disabled).toBe(false);
+  };
+
+  it('retains acknowledgement while the same targets and captures are displayed again', () => {
+    render();
+    acknowledge();
+    render();
+    expect(buttonByText(host, 'Apply registration').disabled).toBe(false);
+  });
+
+  it('asks again after both captures translate even when scale and turn return to the same figures', () => {
+    render();
+    acknowledge();
+    const translatedFirst = { x: 120, y: 130 };
+    render(translatedFirst, second);
+    render(translatedFirst, { x: 223, y: 130 });
+    expect(host.textContent).toContain('print scale +3.00 %), turned 0.0°');
+    expect(buttonByText(host, 'Apply registration').disabled).toBe(true);
+  });
+
+  it('asks again when a new capture changes by less than the displayed precision', () => {
+    render();
+    acknowledge();
+    render(first, { x: 123.001, y: 30 });
+    expect(host.textContent).toContain('103.0 mm apart (designed 100.0 mm, print scale +3.00 %');
+    expect(buttonByText(host, 'Apply registration').disabled).toBe(true);
+  });
+
+  it('asks again for a fresh capture even when its coordinates repeat', () => {
+    render();
+    acknowledge();
+    render(first, { ...second });
+    expect(buttonByText(host, 'Apply registration').disabled).toBe(true);
+  });
+
+  it('asks again when a design target changes by less than the displayed precision', () => {
+    render();
+    acknowledge();
+    const firstX = host.querySelectorAll<HTMLInputElement>('input[type="number"]').item(0);
+    act(() => {
+      firstX.value = '0.001';
+      Simulate.change(firstX);
+    });
+    expect(host.textContent).toContain('103.0 mm apart (designed 100.0 mm, print scale +3.00 %');
+    expect(buttonByText(host, 'Apply registration').disabled).toBe(true);
+  });
+});
+
 function buttonByText(container: HTMLElement, text: string): HTMLButtonElement {
   const button = [...container.querySelectorAll('button')].find((candidate) =>
     candidate.textContent?.includes(text),

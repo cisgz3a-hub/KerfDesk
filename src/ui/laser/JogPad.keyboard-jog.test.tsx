@@ -2,12 +2,15 @@
 // the keys while it is mounted, so the oracle is what the pad sends through the
 // store's jog action: the SAME vector its matching on-screen arrow sends (origin
 // signs, step, clamped feed), nothing while the pad is disabled or unmounted,
-// and a refusal reported the way an arrow click reports it.
+// and a refusal reported the way an arrow click reports it. A NumLock-off
+// keypad never moves the machine: its 9 / 3 send PageUp / PageDown, which once
+// jogged a CNC bit down from the key the pad names for +X -Y (controller audit
+// v2, C8-P2-1; ADR-493 Amendment 1).
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createProject } from '../../core/scene';
+import { createProject, DEFAULT_CNC_MACHINE_CONFIG } from '../../core/scene';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
@@ -48,6 +51,11 @@ const RIGHT_CHORD: KeyboardEventInit = {
 
 function numpad(digit: string): KeyboardEventInit {
   return { key: digit, code: `Numpad${digit}` };
+}
+
+// NumLock off: the keypad's code and location, and the navigation key it sends.
+function numLockOff(digit: string, key: string): KeyboardEventInit {
+  return { key, code: `Numpad${digit}`, location: KeyboardEvent.DOM_KEY_LOCATION_NUMPAD };
 }
 
 async function renderJogPad(disabled = false): Promise<{
@@ -177,6 +185,36 @@ describe('JogPad keyboard XY jog (ADR-493)', () => {
     await press({ key: 'ArrowUp', code: 'Numpad8' });
 
     expect(jog).not.toHaveBeenCalled();
+
+    await unmount();
+  });
+
+  it('never jogs a CNC from a NumLock-off keypad 9, 3, 1 or 7', async () => {
+    const jog = vi.fn(async () => undefined);
+    useLaserStore.setState({ jog });
+    useStore.setState({ project: { ...createProject(), machine: DEFAULT_CNC_MACHINE_CONFIG } });
+    const { host, unmount } = await renderJogPad();
+
+    for (const init of [
+      numLockOff('9', 'PageUp'),
+      numLockOff('3', 'PageDown'),
+      numLockOff('1', 'End'),
+      numLockOff('7', 'Home'),
+    ]) {
+      const event = await press(init);
+      expect(event.defaultPrevented, init.code).toBe(false);
+    }
+    expect(jog).not.toHaveBeenCalled();
+
+    // Z focus is live on a CNC: the dedicated key still jogs it, and the
+    // NumLock-on keypad 3 still sends what its +X -Y arrow sends.
+    await press({ key: 'PageDown', code: 'PageDown' });
+    expect(jog).toHaveBeenCalledWith({ dz: -1, feed: 600 });
+    jog.mockClear();
+    await press(numpad('3'));
+    await act(async () => arrow(host, 'Jog +X -Y 10 mm').click());
+    expect(jog).toHaveBeenCalledTimes(2);
+    expect(jog.mock.calls[0]).toEqual(jog.mock.calls[1]);
 
     await unmount();
   });

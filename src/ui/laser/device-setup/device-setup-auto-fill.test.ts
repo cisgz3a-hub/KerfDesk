@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from '../../../core/devices';
 import { DEFAULT_CNC_MACHINE_CONFIG, LASER_MACHINE_CONFIG } from '../../../core/scene';
-import { nextAutoFill, planControllerAutoFill } from './device-setup-auto-fill';
+import { autoFilledRows, nextAutoFill, planControllerAutoFill } from './device-setup-auto-fill';
 import {
   deviceSetupReducer,
   initDeviceSetup,
@@ -48,6 +48,23 @@ function chooseListed(state: DeviceSetupState, brand: string): DeviceSetupState 
   if (entry === undefined) throw new Error(`No listed ${brand} machine`);
   return run(state, chooseMachineEntryActions(state, entry));
 }
+
+function chooseEntry(state: DeviceSetupState, id: string): DeviceSetupState {
+  const entry = machinePickerEntries(state).find((item) => item.id === id);
+  if (entry === undefined) throw new Error(`No listed machine ${id}`);
+  return run(state, chooseMachineEntryActions(state, entry));
+}
+
+// Sculpfun's firmware sets $130=400 / $131=410 for the S30's 380 x 385 mm
+// engraving area (brand-laser-profiles.ts).
+const S30_FIRMWARE: Partial<DeviceProfile> = {
+  bedWidth: 400,
+  bedHeight: 410,
+  maxFeed: 10000,
+  maxPowerS: 1000,
+  minPowerS: 0,
+  laserModeEnabled: true,
+};
 
 describe('planControllerAutoFill', () => {
   it('copies the reported work area, speed and power into the draft', () => {
@@ -116,6 +133,33 @@ describe('planControllerAutoFill', () => {
     expect(run(router, routerPlan?.actions ?? []).machineKinds).toEqual(['cnc']);
   });
 
+  // ADR-637 Amendment 2 (controller audit v4 E2-P2-1): $130/$131 are the
+  // controller's travel, not the bed, so a listed machine keeps its sourced
+  // work area and stays the chosen row.
+  it('keeps the sourced work area of a machine chosen from the list', () => {
+    const s30 = chooseEntry(reported(S30_FIRMWARE), 'sculpfun-s30');
+    expect(s30.draft).toMatchObject({ bedWidth: 380, bedHeight: 385 });
+    const plan = planControllerAutoFill(s30, report(s30, null));
+    expect(plan?.summary.values).toBe(true);
+    const filled = run(s30, plan?.actions ?? []);
+    expect(filled.draft).toMatchObject({ bedWidth: 380, bedHeight: 385, maxFeed: 10000 });
+    // The observation is kept for Review's travel comparison.
+    expect(filled.detected).toMatchObject({ bedWidth: 400, bedHeight: 410 });
+    expect(selectedMachineEntry(filled, machinePickerEntries(filled))?.id).toBe('sculpfun-s30');
+
+    // A CNC preset is chosen while its work area holds, so it stays chosen too.
+    const router = chooseListed(reported(REPORTED), 'Genmitsu');
+    const routerArea = { bedWidth: router.draft.bedWidth, bedHeight: router.draft.bedHeight };
+    const routerFilled = run(
+      router,
+      planControllerAutoFill(router, report(router, null))?.actions ?? [],
+    );
+    expect(routerFilled.draft).toMatchObject(routerArea);
+    expect(selectedMachineEntry(routerFilled, machinePickerEntries(routerFilled))?.brand).toBe(
+      'Genmitsu',
+    );
+  });
+
   it('plans nothing when the controller reported nothing new', () => {
     const state = reported({});
     expect(planControllerAutoFill(state, report(state, 115200))).toBeNull();
@@ -154,6 +198,42 @@ describe('nextAutoFill', () => {
     // summary keeps the baud the first fill set.
     expect(second.record.undo).toBe(state);
     expect(second.record.summary.baudRate).toBe(230400);
+  });
+
+  // The other order: the toolbar's first Connect fills the starter, then the
+  // operator chooses the S30, then a later read (Read again) fills on top.
+  it('keeps a listed work area chosen after the first fill when a later read fills again', () => {
+    const state = reported(S30_FIRMWARE);
+    const first = nextAutoFill(state, null, { ...report(state, null), readAt: 1 });
+    if (first === null) throw new Error('expected a first fill');
+    const starter = run(state, first.actions);
+    // The starter is not listed, so it takes the controller's travel.
+    expect(starter.draft).toMatchObject({ bedWidth: 400, bedHeight: 410 });
+
+    const s30 = chooseEntry(starter, 'sculpfun-s30');
+    const second = nextAutoFill(s30, first.record, { ...report(s30, null), readAt: 2 });
+    if (second === null) throw new Error('expected a refill');
+    expect(run(s30, second.actions).draft).toMatchObject({ bedWidth: 380, bedHeight: 385 });
+  });
+
+  // Controller audit v4 E2-P3-1: the card lists only what a fill wrote and the
+  // draft still holds, never a machine's values chosen after the fill.
+  it('lists only the values a fill wrote that the draft still holds', () => {
+    const state = reported(S30_FIRMWARE);
+    const first = nextAutoFill(state, null, { ...report(state, null), readAt: 1 });
+    if (first === null || first.record.status !== 'applied') throw new Error('expected a fill');
+    const filled = run(state, first.actions);
+    // The 400 × 400 starter takes the reported 410 mm height.
+    expect(autoFilledRows(first.record, filled).map((row) => row.label)).toEqual(
+      expect.arrayContaining(['Bed height', 'Max feed']),
+    );
+
+    // Choosing the S30 replaces the filled work area with the listed one:
+    // neither 380 nor 385 came from the controller.
+    const s30 = chooseEntry(filled, 'sculpfun-s30');
+    const labels = autoFilledRows(first.record, s30).map((row) => row.label);
+    expect(labels).not.toContain('Bed width');
+    expect(labels).not.toContain('Bed height');
   });
 
   it('fills nothing after Undo until the next Find', () => {

@@ -1,4 +1,5 @@
 import type { Project } from '../../core/scene';
+import { withReferencedEmbeddedFonts } from '../../core/text/embedded-font-set';
 import { deserializeProject } from './deserialize-project';
 import { deserializeFailureReason, errorMessage } from './deserialize-failure-reason';
 import { serializeProject } from './serialize-project';
@@ -14,7 +15,8 @@ export type PreparedProjectPersistence =
 export function prepareProjectForPersistence(project: Project): PreparedProjectPersistence {
   let serialized: string;
   try {
-    serialized = serializeProject(project);
+    // Fonts no text uses are not written (ADR-628 Amendment 1).
+    serialized = serializeProject(withReferencedEmbeddedFonts(project));
   } catch (error) {
     return { kind: 'invalid', reason: errorMessage(error) };
   }

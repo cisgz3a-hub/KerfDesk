@@ -1,6 +1,7 @@
 import type { TextAlignment } from '../../core/scene';
 import { findFontEntry } from '../../core/text';
 import { FontImportButton } from './FontImportButton';
+import { SystemFontsButton } from './SystemFontsButton';
 import { FontPicker } from './FontPicker';
 import { FontUsageHint } from './FontUsageHint';
 import { TextBoxFields } from './TextBoxFields';
@@ -33,6 +34,7 @@ export function TextFormattingFields(props: Props): JSX.Element {
           onChange={fields.setFontKey}
         />
         <FontImportButton importFont={fields.importFont} />
+        <SystemFontsButton importFont={fields.importFont} disabled={props.disabled ?? false} />
         <FontUsageHint
           fontKey={values.fontKey}
           embeddedFonts={values.embeddedFonts}

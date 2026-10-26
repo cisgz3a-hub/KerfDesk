@@ -10,6 +10,13 @@ import {
   type Layer,
   type RasterImage,
 } from '../../core/scene';
+import {
+  activePhotoToneCurve,
+  IDENTITY_PHOTO_TONE_CURVE,
+  isPhotoToneCurve,
+  photoToneCurvesEqual,
+  type PhotoToneCurve,
+} from '../../core/raster/photo-tone-curve';
 import type { ObjectOperationSettingsOverride } from '../../core/scene/scene-object';
 import type { AppState } from '../state/store';
 import { pushUndo } from '../state/undo-stack';
@@ -29,7 +36,7 @@ export type PhotoEngravingApply = {
   };
   readonly layerPatch: Pick<
     Layer,
-    'ditherAlgorithm' | 'linesPerMm' | 'negativeImage' | 'passThrough'
+    'ditherAlgorithm' | 'linesPerMm' | 'negativeImage' | 'passThrough' | 'photoToneCurve'
   >;
 };
 
@@ -78,13 +85,16 @@ export function photoEngravingImage(
     if (!Object.hasOwn(byOperation, child.id))
       byOperation[child.id] = operationOverrideForObject(child, image) ?? null;
   }
+  const { photoToneCurve: _previousCurve, ...override } =
+    operationOverrideForObject(operation, image) ?? {};
   byOperation[operation.id] = {
-    ...operationOverrideForObject(operation, image),
+    ...override,
     mode: 'image',
     ditherAlgorithm: patch.layerPatch.ditherAlgorithm,
     linesPerMm: patch.layerPatch.linesPerMm,
     negativeImage: patch.layerPatch.negativeImage,
     passThrough: patch.layerPatch.passThrough,
+    ...photoToneCurveOverride(operation, patch.layerPatch.photoToneCurve),
   };
   return {
     ...image,
@@ -93,6 +103,18 @@ export function photoEngravingImage(
     gamma: patch.imagePatch.gamma,
     operationOverride: { ...image.operationOverride, byOperation },
   };
+}
+
+// ADR-670: the photo's own choice. "None" over an operation that carries a
+// curve needs the identity curve, because an absent override key inherits it.
+function photoToneCurveOverride(
+  operation: Layer,
+  curve: PhotoToneCurve | undefined,
+): Pick<ObjectOperationSettingsOverride, 'photoToneCurve'> {
+  if (curve !== undefined) return { photoToneCurve: curve };
+  return activePhotoToneCurve(operation.photoToneCurve) === undefined
+    ? {}
+    : { photoToneCurve: IDENTITY_PHOTO_TONE_CURVE };
 }
 
 /** Commit tone and image-mode settings as one Undo step, without editing a shared layer. */
@@ -134,7 +156,11 @@ function matchesCurrentSettings(
     effective.ditherAlgorithm === patch.layerPatch.ditherAlgorithm &&
     effective.linesPerMm === patch.layerPatch.linesPerMm &&
     effective.negativeImage === patch.layerPatch.negativeImage &&
-    effective.passThrough === patch.layerPatch.passThrough
+    effective.passThrough === patch.layerPatch.passThrough &&
+    photoToneCurvesEqual(
+      activePhotoToneCurve(effective.photoToneCurve),
+      activePhotoToneCurve(patch.layerPatch.photoToneCurve),
+    )
   );
 }
 
@@ -150,7 +176,8 @@ export function photoEngravingPatchIsValid({
     layerPatch.linesPerMm > 0 &&
     DITHER_ALGORITHMS.includes(layerPatch.ditherAlgorithm) &&
     typeof layerPatch.negativeImage === 'boolean' &&
-    typeof layerPatch.passThrough === 'boolean'
+    typeof layerPatch.passThrough === 'boolean' &&
+    (layerPatch.photoToneCurve === undefined || isPhotoToneCurve(layerPatch.photoToneCurve))
   );
 }
 

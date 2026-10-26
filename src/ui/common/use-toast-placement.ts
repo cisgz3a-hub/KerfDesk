@@ -118,7 +118,7 @@ function workspacePlacement(bounds: DOMRect | undefined): CSSProperties {
 }
 
 /** Distance from the viewport bottom to just above the Live Motion popup. */
-function liveMotionFloor(gap: number): number | null {
+export function liveMotionFloor(gap: number): number | null {
   const popup = document.querySelector('[aria-label="Live Motion"]');
   if (popup === null) return null;
   const { top, height } = popup.getBoundingClientRect();

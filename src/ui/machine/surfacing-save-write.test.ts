@@ -1,15 +1,45 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { SaveTarget } from '../../platform/types';
-import { writeSurfacingFile } from './surfacing-save-write';
+import { blobText } from '../../platform/web/chromium-save-picker.test-support';
+import { stageSurfacingProgram, writeSurfacingFile } from './surfacing-save-write';
 
-const chunks = {
-  async *[Symbol.asyncIterator]() {
-    yield 'complete program';
-  },
-};
-function options(controller = new AbortController()) {
-  return { signal: controller.signal, onWriting: vi.fn(), onFinalizing: vi.fn() };
+function chunksOf(...texts: string[]): AsyncIterable<string> {
+  return {
+    async *[Symbol.asyncIterator]() {
+      for (const text of texts) yield text;
+    },
+  };
 }
+
+describe('surfacing program staging', () => {
+  it('collects every chunk in order before a destination is chosen', async () => {
+    const program = await stageSurfacingProgram(
+      chunksOf('G21\n', 'G90\n', 'M5\n'),
+      new AbortController().signal,
+    );
+    expect(await blobText(program)).toBe('G21\nG90\nM5\n');
+  });
+
+  it('stops generating when the save is cancelled', async () => {
+    const controller = new AbortController();
+    const pulled: string[] = [];
+    const chunks = {
+      async *[Symbol.asyncIterator]() {
+        for (const text of ['G21\n', 'G90\n', 'M5\n']) {
+          pulled.push(text);
+          yield text;
+          controller.abort();
+        }
+      },
+    };
+    await expect(stageSurfacingProgram(chunks, controller.signal)).rejects.toMatchObject({
+      name: 'AbortError',
+    });
+    // The chunk in flight when Cancel lands is the last one pulled.
+    expect(pulled).toEqual(['G21\n', 'G90\n']);
+  });
+});
+
 describe('surfacing save commit ownership', () => {
   it('settles an old final commit before a replacement opens its writer', async () => {
     let finishOldClose: () => void = () => undefined;
@@ -19,9 +49,7 @@ describe('surfacing save commit ownership', () => {
     const committed: string[] = [];
     const old: SaveTarget = {
       displayName: 'same.nc',
-      write: async () => undefined,
-      writeChunks: async (_chunks, _signal, onFinalizing) => {
-        onFinalizing?.();
+      write: async () => {
         await oldClose;
         committed.push('old');
       },
@@ -29,17 +57,9 @@ describe('surfacing save commit ownership', () => {
     const replacementWrite = vi.fn(async () => {
       committed.push('new');
     });
-    const replacement: SaveTarget = {
-      displayName: 'same.nc',
-      write: async () => undefined,
-      writeChunks: replacementWrite,
-    };
-    const controller = new AbortController();
-    const firstOptions = options(controller);
-    const first = writeSurfacingFile(old, chunks, firstOptions);
-    await vi.waitFor(() => expect(firstOptions.onFinalizing).toHaveBeenCalledOnce());
-    controller.abort(); // close already owns an irrevocable full-file commit
-    const second = writeSurfacingFile(replacement, chunks, options());
+    const replacement: SaveTarget = { displayName: 'same.nc', write: replacementWrite };
+    const first = writeSurfacingFile(old, new Blob(['old']));
+    const second = writeSurfacingFile(replacement, new Blob(['new']));
     await Promise.resolve();
     expect(replacementWrite).not.toHaveBeenCalled();
     finishOldClose();
@@ -47,40 +67,16 @@ describe('surfacing save commit ownership', () => {
     expect(committed).toEqual(['old', 'new']);
   });
 
-  it('releases the next save after a write failure and skips cancelled queued work', async () => {
-    let rejectFirst: (error: Error) => void = () => undefined;
-    const failure = new Promise<void>((_resolve, reject) => {
-      rejectFirst = reject;
-    });
+  it('releases the next save after a write failure', async () => {
     const failedTarget: SaveTarget = {
       displayName: 'failed.nc',
-      write: async () => undefined,
-      writeChunks: () => failure,
-    };
-    const first = writeSurfacingFile(failedTarget, chunks, options());
-    const rejected = expect(first).rejects.toThrow('disk full');
-    const cancelledWrite = vi.fn(async () => undefined);
-    const controller = new AbortController();
-    const second = writeSurfacingFile(
-      {
-        displayName: 'cancelled.nc',
-        write: async () => undefined,
-        writeChunks: cancelledWrite,
+      write: async () => {
+        throw new Error('disk full');
       },
-      chunks,
-      options(controller),
-    );
-    const cancelled = expect(second).rejects.toMatchObject({ name: 'AbortError' });
-    controller.abort();
-    rejectFirst(new Error('disk full'));
-    await Promise.all([rejected, cancelled]);
-    expect(cancelledWrite).not.toHaveBeenCalled();
+    };
+    await expect(writeSurfacingFile(failedTarget, new Blob(['x']))).rejects.toThrow('disk full');
     const finalWrite = vi.fn(async () => undefined);
-    await writeSurfacingFile(
-      { displayName: 'last.nc', write: async () => undefined, writeChunks: finalWrite },
-      chunks,
-      options(),
-    );
+    await writeSurfacingFile({ displayName: 'last.nc', write: finalWrite }, new Blob(['y']));
     expect(finalWrite).toHaveBeenCalledOnce();
   });
 });

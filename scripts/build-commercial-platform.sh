@@ -52,7 +52,9 @@ if [[ "${platform}" == macos ]]; then
     --commercial "${identity}"
 
   # Fuses and app.asar, then launch the licence window from inside the DMG,
-  # as a new operator opening this commercial build would (ADR-623).
+  # as a new operator opening this commercial build would (ADR-623). While
+  # ADR-623 Amendment 3 holds that window off, --expect-licence-window expects
+  # the unlicensed KerfDesk Free workspace instead, with its import and save.
   mount_dir="$(mktemp -d)"
   hdiutil attach -readonly -nobrowse -mountpoint "${mount_dir}" "${dmg}" >/dev/null
   trap 'bash scripts/detach-macos-dmg.sh "${mount_dir}"' EXIT
@@ -66,7 +68,8 @@ if [[ "${platform}" == macos ]]; then
   trap - EXIT
 
   unpacked="$(pwd)/$(ls -d "${release}"/mac*/KerfDesk.app)"
-  # The unlicensed baseline opens behind its licence window (ADR-623).
+  # The unlicensed baseline opens behind its licence window (ADR-623), or in
+  # KerfDesk Free while Amendment 3 holds it off.
   node scripts/verify-asar-integrity-enforced.mjs --expect-licence-window \
     "${unpacked}/Contents/MacOS/KerfDesk" "${unpacked}/Contents/Resources/app.asar"
   files=("${dmg}")
@@ -92,7 +95,8 @@ else
   # Linux keeps a licence only under a Secret Service key (licensing-store.ts
   # probes the key Electron actually uses). Launch with an unlocked GNOME Keyring
   # and no desktop name, as on a window manager without GNOME or KDE, so the
-  # window must offer a trial or key, not report a missing keyring. Its own
+  # window (or, while it is held off, Help > Licence) must offer a trial or key,
+  # not report a missing keyring. Its own
   # D-Bus session bus, and the keyring on it, end with each launch.
   with_keyring() {
     dbus-run-session -- bash -c '

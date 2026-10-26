@@ -35,8 +35,21 @@ export type JobBounds = {
 
 type MutableBounds = { minX: number; minY: number; maxX: number; maxY: number };
 
+// Where reverse scan rows sit: at their commanded scan-offset position, or at
+// the design position they burn on once that offset is calibrated.
+type ReverseRows = 'compensated' | 'design';
+
 export function computeJobBounds(job: Job, device?: DeviceProfile): JobBounds | null {
-  return computeBounds(job, false, device, false);
+  return computeBounds(job, false, device, false, 'compensated');
+}
+
+/** Job Origin anchor bounds (ADR-052 Amendment 1). Scan-offset compensation
+ * moves commanded reverse rows so they burn on top of the forward rows, so
+ * placement measures those rows at design: a table never moves the placed job,
+ * its forward rows or its vector cuts. Motion, burn and Frame bounds keep the
+ * commanded shift. */
+export function computeJobPlacementBounds(job: Job, device?: DeviceProfile): JobBounds | null {
+  return computeBounds(job, false, device, false, 'design');
 }
 
 // Full physical motion envelope, including laser-off acceleration runways.
@@ -44,19 +57,19 @@ export function computeJobBounds(job: Job, device?: DeviceProfile): JobBounds | 
 // the cached executable artifact will travel; computeJobBounds remains the
 // artwork/burn-area measurement shown separately in review.
 export function computeJobMotionBounds(job: Job, device?: DeviceProfile): JobBounds | null {
-  return computeBounds(job, true, device, false);
+  return computeBounds(job, true, device, false, 'compensated');
 }
 
 /** Final-output burn bounds. CNC contours use the same parser-represented
  * vertices as emission and Preview. Keep computeJobBounds for pre-placement
  * and pre-tiling geometry because those transforms can restore representability. */
 export function computeEmittedJobBounds(job: Job, device?: DeviceProfile): JobBounds | null {
-  return computeBounds(job, false, device, true);
+  return computeBounds(job, false, device, true, 'compensated');
 }
 
 /** Final-output physical motion bounds, with represented CNC contour motion. */
 export function computeEmittedJobMotionBounds(job: Job, device?: DeviceProfile): JobBounds | null {
-  return computeBounds(job, true, device, true);
+  return computeBounds(job, true, device, true, 'compensated');
 }
 
 /** Frame remains the sole ordinary Start permit. When an entire program has
@@ -75,6 +88,7 @@ function computeBounds(
   includeOverscanMotion: boolean,
   device: DeviceProfile | undefined,
   useRepresentedCncMotion: boolean,
+  reverseRows: ReverseRows,
 ): JobBounds | null {
   const b: MutableBounds = {
     minX: Number.POSITIVE_INFINITY,
@@ -98,6 +112,7 @@ function computeBounds(
         device,
         useRepresentedCncMotion,
         entryBounds,
+        reverseRows,
       )
     )
       any = true;
@@ -113,18 +128,19 @@ function extendBoundsForGroup(
   device: DeviceProfile | undefined,
   useRepresentedCncMotion: boolean,
   entryBounds: ContourEntryBounds,
+  reverseRows: ReverseRows,
 ): boolean {
   switch (group.kind) {
     case 'cut':
     case 'fill': {
       if (group.kind === 'fill' && group.fillStyle !== 'offset')
-        return extendBoundsForFill(b, group, includeOverscanMotion, device);
+        return extendBoundsForFill(b, group, includeOverscanMotion, device, reverseRows);
       const any = extendBoundsForCut(b, group, device);
       extendBoundsForContourEntries(b, group, includeOverscanMotion, entryBounds);
       return any;
     }
     case 'raster':
-      return extendBoundsForRaster(b, group, includeOverscanMotion, device);
+      return extendBoundsForRaster(b, group, includeOverscanMotion, device, reverseRows);
     case 'cnc':
       return extendBoundsForCnc(b, group, useRepresentedCncMotion);
     default:
@@ -205,12 +221,13 @@ function extendBoundsForFill(
   group: FillGroup,
   includeOverscanMotion: boolean,
   device: DeviceProfile | undefined,
+  reverseRows: ReverseRows,
 ): boolean {
   const usesPlannedBurnBounds = group.fillRunwayPolicy === 'feed-matched-every-sweep';
   // Scanline fills never go out as arcs (ADR-432 writes arcs only for Line
   // cuts and offset fills), so their outlines bound as drawn polylines.
   let any = usesPlannedBurnBounds ? false : extendBoundsForPolylines(b, group);
-  const scanOffsetMm = group.bidirectionalScanOffsetMm ?? scanOffsetForGroup(device, group.speed);
+  const scanOffsetMm = groupScanOffsetMm(group, device, reverseRows);
   const plans = planFillSweeps(group, scanOffsetMm);
   for (const plan of plans) {
     const sweep = plan.sweep;
@@ -244,8 +261,9 @@ function extendBoundsForRaster(
   group: RasterGroup,
   includeOverscanMotion: boolean,
   device: DeviceProfile | undefined,
+  reverseRows: ReverseRows,
 ): boolean {
-  const scanOffsetMm = group.bidirectionalScanOffsetMm ?? scanOffsetForGroup(device, group.speed);
+  const scanOffsetMm = groupScanOffsetMm(group, device, reverseRows);
   const reverseShiftX = hasActiveReverseRasterRow(group) ? -scanOffsetMm : 0;
   const rects: ScanRect[] = [group.bounds];
   if (reverseShiftX !== 0) rects.push(shiftedScanRect(group.bounds, 0, reverseShiftX));
@@ -313,6 +331,16 @@ function hasActiveReverseRasterRow(group: RasterGroup): boolean {
     emittedRowCount += 1;
   }
   return false;
+}
+
+// A layer's local offset replaces the device table, so design rows drop both.
+function groupScanOffsetMm(
+  group: FillGroup | RasterGroup,
+  device: DeviceProfile | undefined,
+  reverseRows: ReverseRows,
+): number {
+  if (reverseRows === 'design') return 0;
+  return group.bidirectionalScanOffsetMm ?? scanOffsetForGroup(device, group.speed);
 }
 
 function scanOffsetForGroup(device: DeviceProfile | undefined, speed: number): number {

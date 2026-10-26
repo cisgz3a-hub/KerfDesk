@@ -1,4 +1,5 @@
 import type { LicenceStatus } from '../../platform/types';
+import { DESKTOP_LICENCE_WINDOW } from '../../../public/desktop-licence-window.mjs';
 
 /** Cached rights never extend a trial beyond its signed deadline. */
 export function trialHasExpired(
@@ -69,7 +70,10 @@ export function expireTrialStatus(status: LicenceStatus, clock?: TrialExpiryCloc
     ...status,
     edition: 'free',
     state: 'trial-expired',
-    message:
-      'Your 30-day trial has ended. Your open work keeps working until KerfDesk closes. Buy a licence or enter your key to keep using KerfDesk.',
+    // KerfDesk Free stays on the desktop while the licence window is held off
+    // (ADR-623 Amendment 3).
+    message: DESKTOP_LICENCE_WINDOW
+      ? 'Your 30-day trial has ended. Your open work keeps working until KerfDesk closes. Buy a licence or enter your key to keep using KerfDesk.'
+      : 'Your 30-day Pro trial has ended. Existing work keeps working. Buy a licence or enter your key to choose new Pro tools.',
   };
 }

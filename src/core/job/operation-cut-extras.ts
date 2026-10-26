@@ -9,6 +9,8 @@ import { DEFAULT_OVERSCAN_MM, MAX_FILL_OVERSCAN_MM } from './compile-job-default
 
 export const DEFAULT_PERFORATION_CUT_MM = 3;
 export const DEFAULT_PERFORATION_SKIP_MM = 1;
+/** The shortest dash or gap Cut Settings accepts. */
+export const MIN_PERFORATION_MM = 0.01;
 // Image overscan uses the same ceiling as Scan Line fill (ADR-238 Amendment 3).
 export const MAX_IMAGE_OVERSCAN_MM = MAX_FILL_OVERSCAN_MM;
 export const DEFAULT_TAB_SPACING_MM = 50;
@@ -33,7 +35,14 @@ export function perforationPatternFor(settings: CutExtras): PerforationPattern |
   if (settings.perforationEnabled !== true) return null;
   const cutMm = settings.perforationCutMm ?? DEFAULT_PERFORATION_CUT_MM;
   const skipMm = settings.perforationSkipMm ?? DEFAULT_PERFORATION_SKIP_MM;
-  return isPositive(cutMm) && isPositive(skipMm) ? { cutMm, skipMm } : null;
+  if (!isPositive(cutMm) || !isPositive(skipMm)) return null;
+  // A project file can hold lengths below the Cut Settings minimum. Clamp them,
+  // so the dash count stays bounded by the path length: at 1e-300 mm the dash
+  // loop would never advance (audit 2026-10-21 geometry P3-4).
+  return {
+    cutMm: Math.max(MIN_PERFORATION_MM, cutMm),
+    skipMm: Math.max(MIN_PERFORATION_MM, skipMm),
+  };
 }
 
 /** How far a closed Line contour runs past its start on the final pass; 0 is off. */

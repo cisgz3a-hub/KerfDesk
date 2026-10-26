@@ -12,6 +12,7 @@ import {
   type ColoredPolyline,
   type ExpandOutcome,
 } from './dxf-expand';
+import { joinTouchingDxfPieces } from './dxf-join-touching';
 
 // Content CAD does not display is listed after the skipped entity types, in
 // this order, since its label reads on its own ("2 on hidden layers").
@@ -37,7 +38,7 @@ export function buildDxfResult(
 ): ParseDxfResult {
   const notes = distinctNotes([...metadataNotes, ...expanded.notes]);
   const skippedSummary = formatSkipped(expanded.skipped);
-  const paths = normalizeAndGroup(expanded.polylines);
+  const paths = normalizeAndGroup(joinTouchingDxfPieces(expanded.polylines));
   if (paths.length === 0) {
     return { kind: 'ok', object: null, pathCount: 0, notes, skippedSummary };
   }

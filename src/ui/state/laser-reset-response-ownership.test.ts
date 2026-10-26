@@ -60,7 +60,9 @@ describe('causal reset response ownership', () => {
     expect(f.writes.filter((line) => line === '\x18')).toHaveLength(1);
     expect(f.writes.filter((line) => line === 'M5\n')).toHaveLength(1);
     expect(f.writes.filter((line) => line === 'M9\n')).toHaveLength(1);
-    expect(f.writes.filter((line) => line === '$$\n')).toHaveLength(1);
+    // The greeting closes KerfDesk's own reset: settings kept, `$G` re-read (ADR-648).
+    expect(f.writes).not.toContain('$$\n');
+    expect(f.writes.filter((line) => line === '$G\n')).toHaveLength(1);
     expect(f.close).not.toHaveBeenCalled();
   });
 

@@ -19,6 +19,7 @@ export function createLaserStoreRefs(): LiveRefs {
     qualificationTimer: null,
     qualificationDeadline: null,
     runControllerQualification: null,
+    runModalStateQualification: null,
     heartbeatProbe: null,
     connectAttemptRevision: 0,
     forgetIntentRevision: 0,

@@ -60,13 +60,39 @@ function square(size: number): ImportedSvg {
   };
 }
 
+function openLine(length: number): ImportedSvg {
+  return {
+    ...square(length),
+    id: 'line',
+    bounds: { minX: 0, minY: 0, maxX: length, maxY: 0 },
+    paths: [
+      {
+        color: '#000000',
+        polylines: [
+          {
+            closed: false,
+            points: [
+              { x: 0, y: 0 },
+              { x: length, y: 0 },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+}
+
 function load(size: number, proOperation = false): void {
+  loadObject(square(size), proOperation);
+}
+
+function loadObject(object: ImportedSvg, proOperation = false): void {
   const layer = createLayer({ id: 'cut', color: '#000000' });
   useStore.setState({
     project: {
       ...createProject(),
       scene: {
-        objects: [square(size)],
+        objects: [object],
         layers: [
           proOperation
             ? { ...layer, cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'v-carve' } }
@@ -75,7 +101,7 @@ function load(size: number, proOperation = false): void {
         groups: [],
       },
     },
-    selectedObjectId: 'sq',
+    selectedObjectId: object.id,
     additionalSelectedIds: new Set(),
   });
 }
@@ -207,6 +233,21 @@ describe('Offset Shapes dialog', () => {
 
     expect(status()).toContain('collapsed');
     expect(button('Offset').disabled).toBe(true);
+  });
+
+  it('previews a Bevel outline that clears the ends of an open line', async () => {
+    loadObject(openLine(20));
+    await render();
+    await setDistance('2');
+    await act(async () => Simulate.click(button('Bevel')));
+
+    expect(status()).toContain('24.00 × 4.00 mm');
+    const outline = host.ownerDocument.querySelector('[data-testid="offset-preview-out"]');
+    const xs = [...(outline?.getAttribute('d') ?? '').matchAll(/[ML](-?[\d.]+) /g)].map((match) =>
+      Number(match[1]),
+    );
+    expect(Math.min(...xs)).toBeCloseTo(-2, 3);
+    expect(Math.max(...xs)).toBeCloseTo(22, 3);
   });
 
   it('reopens with the settings last applied', async () => {

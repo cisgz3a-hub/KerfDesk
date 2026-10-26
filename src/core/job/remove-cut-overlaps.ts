@@ -6,7 +6,7 @@ import type { Vec2 } from '../scene';
 import { firstContourIntervals, type OwnedInterval } from './cut-overlap-intervals';
 import { withoutArcMoves } from './cut-arc-moves';
 import { removeNearCutOverlaps } from './remove-near-cut-overlaps';
-import type { CutGroup, CutSegment } from './job';
+import type { CutGroup, CutSegment, CutTopologyRing } from './job';
 
 const SCALE = 10 ** GCODE_COORDINATE_DECIMAL_PLACES;
 type Edge = OwnedInterval & {
@@ -25,7 +25,58 @@ type Span = readonly [Vec2, Vec2];
  * A merge tolerance above zero (LBG-C13) also merges near-coincident spans
  * (remove-near-cut-overlaps.ts); zero, the default, keeps this exact rule. */
 export function removeCutOverlaps(group: CutGroup, mergeToleranceMm = 0): CutGroup {
-  if (mergeToleranceMm > 0) return removeNearCutOverlaps(group, mergeToleranceMm);
+  const removed =
+    mergeToleranceMm > 0
+      ? removeNearCutOverlaps(group, mergeToleranceMm)
+      : removeExactCutOverlaps(group);
+  return removed === group ? group : withSplitOutlines(group, removed);
+}
+
+// ADR-626 Amendment 8 (audit 03-P1-3): a part whose shared edge another part
+// already cuts is still a part. When laser leads are asked for (compile then
+// stamps each closed contour with its scene contour, leadSource), a contour
+// this removal broke into pieces keeps its whole outline on the group, as one
+// broken by tabs or perforation does, so leads still keep out of it. Leads
+// drop the outlines once placed; a job without leads never carries them.
+function withSplitOutlines(before: CutGroup, after: CutGroup): CutGroup {
+  // Contours still cut whole, and outlines the group already keeps.
+  const whole = new Set([
+    ...after.segments.flatMap((segment) =>
+      segment.closed && segment.nesting?.topologyContour !== undefined
+        ? [ringKey(segment.nesting.forest, segment.nesting.topologyContour)]
+        : [],
+    ),
+    ...(after.topologyRings ?? []).map((ring) => ringKey(ring.forest, ring.contour)),
+  ]);
+  const split = before.segments.flatMap((segment) => {
+    const ring = splitOutline(segment);
+    if (ring === null || whole.has(ringKey(ring.forest, ring.contour))) return [];
+    whole.add(ringKey(ring.forest, ring.contour));
+    return [ring];
+  });
+  return split.length === 0
+    ? after
+    : { ...after, topologyRings: [...(after.topologyRings ?? []), ...split] };
+}
+
+/** The outline a closed contour with lead scaffolding keeps if it is split. */
+function splitOutline(segment: CutSegment): CutTopologyRing | null {
+  const { nesting, leadSource } = segment;
+  if (!segment.closed || leadSource === undefined || nesting?.topologyContour === undefined)
+    return null;
+  return {
+    forest: nesting.forest,
+    contour: nesting.topologyContour,
+    polyline: segment.polyline,
+    leadSource,
+  };
+}
+
+function ringKey(forest: string, contour: string): string {
+  return `${forest}\u0000${contour}`;
+}
+
+function removeExactCutOverlaps(group: CutGroup): CutGroup {
   if (group.segments.length < 2 || group.segments.some(isCncProjection)) return group;
   const lines = new Map<string, Edge[]>();
   const contours = group.segments.map((segment, owner) => {

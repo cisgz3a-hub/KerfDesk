@@ -1,11 +1,13 @@
 // The text of Help > Save Support Report (ADR-546): what KerfDesk support
 // needs to see what went wrong, in a plain file the customer reads before
-// sending. It holds no licence key, payment order or password. This module
+// sending. It holds no payment order, and the licence keys, passwords and
+// sign-ins support-report-redaction.ts recognises are removed. This module
 // only formats; save-support-report.ts gathers the facts.
 
 import type { ControllerKind } from '../../core/devices';
 import type { MachineKind } from '../../core/scene';
 import type { LicenceStatus } from '../../platform/types';
+import { DESKTOP_LICENCE_WINDOW } from '../../../public/desktop-licence-window.mjs';
 import type { EditionValue } from '../licensing/edition';
 import type { RendererProblem } from './renderer-problems';
 import type { SerialTranscriptEntry } from '../state/laser-transcript';
@@ -45,9 +47,10 @@ export function formatSupportReport(facts: SupportReportFacts): string {
       'KerfDesk support report',
       `Saved ${facts.savedAt.toISOString()}`,
       '',
-      'This file helps KerfDesk support see what went wrong. It holds no licence key,',
-      'password or payment details. Read it before you send it, and delete anything',
-      'you would rather not share.',
+      'This file helps KerfDesk support see what went wrong. KerfDesk removed licence',
+      'keys and the passwords and sign-ins it recognises, such as controller Wi-Fi',
+      'passwords. It holds no payment details. Read it before you send it, and delete',
+      'anything you would rather not share.',
     ],
     section('KerfDesk', [
       `Version: ${facts.build.version} (commit ${facts.build.commit}, built ${facts.build.builtAt})`,
@@ -63,7 +66,7 @@ export function formatSupportReport(facts: SupportReportFacts): string {
     section('Machine', facts.machine),
     section(settingsTitle(facts.machineSettings.readAt), facts.machineSettings.lines, 'Not read.'),
     section('Machine console, newest last', facts.machineConsole, 'Empty.'),
-    section(
+    preRedactedSection(
       'Retained controller incidents, newest last',
       incidentReportLines(facts.controllerIncidents ?? []),
       'None.',
@@ -72,13 +75,25 @@ export function formatSupportReport(facts: SupportReportFacts): string {
     ...(facts.app === 'electron' ? [section('Desktop log, newest last', logLines(facts))] : []),
   ];
   const text = `${sections.map((lines) => lines.join('\n')).join('\n\n')}\n`;
-  return redactSupportReportText(text);
+  return text;
 }
 
 function section(
   title: string,
   lines: ReadonlyArray<string>,
   empty = 'Nothing to show.',
+): ReadonlyArray<string> {
+  const redacted = lines.length === 0 ? [] : redactSupportReportText(lines.join('\n')).split('\n');
+  return preRedactedSection(title, redacted, empty);
+}
+
+// Incident cells are redacted before escaping their physical line breaks.
+// Do not re-interpret the escaped result as raw passwords, or trust marker
+// prefixes in raw facts merely to make that second pass appear idempotent.
+function preRedactedSection(
+  title: string,
+  lines: ReadonlyArray<string>,
+  empty: string,
 ): ReadonlyArray<string> {
   return [`== ${title} ==`, ...(lines.length === 0 ? [empty] : lines)];
 }
@@ -115,7 +130,8 @@ export function describeEdition(edition: EditionValue): string {
 }
 
 function editionName(status: LicenceStatus): string {
-  if (status.edition === 'free') return 'Licence needed';
+  // The desktop app runs Free while the licence window is held off (ADR-623 Amendment 3).
+  if (status.edition === 'free') return DESKTOP_LICENCE_WINDOW ? 'Licence needed' : 'KerfDesk Free';
   if (status.tier === 'trial') return 'KerfDesk Pro trial';
   return status.tier === 'developer' ? 'KerfDesk Pro (developer licence)' : 'KerfDesk Pro';
 }

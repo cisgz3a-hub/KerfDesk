@@ -84,6 +84,8 @@ function widthConsequence(report: MinFeatureReport, count: number): string {
   const g = grammar(count);
   if (report.machine === 'laser') return g.verb('burns away or breaks', 'burn away or break');
   if (report.cutType === 'profile-on-path') return g.verb('is cut away', 'are cut away');
+  if (report.cutType === 'inlay-pair')
+    return `the bit cannot enter ${g.it}, so the pocket and the insert both leave ${g.it} out`;
   return `the bit cannot enter ${g.it}, so ${g.verb('stays uncut', 'stay uncut')}`;
 }
 
@@ -92,6 +94,8 @@ function gapConsequence(report: MinFeatureReport, count: number): string {
   if (report.cutType === 'profile-outside') {
     return `the bit cannot fit into ${g.it}, so ${g.verb('stays uncut', 'stay uncut')}`;
   }
+  if (report.cutType === 'inlay-pair')
+    return `the bit cannot fit into ${g.it}, so the pocket and the insert both close ${g.it} up`;
   return 'the cuts on each side merge';
 }
 

@@ -113,6 +113,19 @@ export function settingsWithStockTabGate(
   return tabHeightMm === settings.tabHeightMm ? settings : { ...settings, tabHeightMm };
 }
 
+/** A closed tabbed contour's depth ladder: the plain ladder plus one level at
+ * the tab top, where the loop is cut whole before the passes below skip the
+ * tabs. Job Review counts passes from the same ladder (CNC audit v1 F4-P3-1). */
+export function depthsWithTabTopPass(
+  depths: ReadonlyArray<number>,
+  settings: CncLayerSettings,
+): ReadonlyArray<number> {
+  const tabTop = tabTopZMm(settings.depthMm, settings.tabHeightMm);
+  if (tabTop >= -TAB_EPS || tabTop <= -settings.depthMm + TAB_EPS) return depths;
+  if (depths.some((z) => Math.abs(z - tabTop) <= TAB_EPS)) return depths;
+  return [...depths, tabTop].sort((a, b) => b - a);
+}
+
 export function splitPassForTabs(
   polyline: Polyline,
   settings: CncTabSettings,

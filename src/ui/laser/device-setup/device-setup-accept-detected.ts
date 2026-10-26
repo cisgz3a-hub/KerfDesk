@@ -13,15 +13,20 @@ import { describePatch } from '../DetectedSettingsBanner';
 import { deviceSetupSupportsMachineKind } from './device-setup-capability';
 import type { DeviceSetupState } from './device-setup-flow';
 
-type ChangeRow = ReturnType<typeof describePatch>[number];
+export type SetupChangeRow = ReturnType<typeof describePatch>[number];
+type ChangeRow = SetupChangeRow;
 
 export function acceptDetectedPatch(
   state: DeviceSetupState,
   patch: Partial<DeviceProfile>,
   useSpindleScaleAsRpm: boolean,
+  options: { readonly keepWorkArea?: boolean } = {},
 ): Partial<DeviceSetupState> {
   const draft = controllerCompatibleProfile(
-    deviceProfileWithInteractivePatch(state.draft, profilePatchForSetup(state, patch)),
+    deviceProfileWithInteractivePatch(
+      state.draft,
+      profilePatchForSetup(state, patch, options.keepWorkArea === true),
+    ),
     state.draft.controllerKind,
   ).profile;
   const cncDraft = cncDraftWithDetected(state, patch, useSpindleScaleAsRpm);
@@ -71,8 +76,15 @@ function pushFeedRow(rows: ChangeRow[], label: string, prev: number, next: numbe
 function profilePatchForSetup(
   state: DeviceSetupState,
   patch: Partial<DeviceProfile>,
+  keepWorkArea: boolean,
 ): Partial<DeviceProfile> {
   const shared = { ...patch };
+  // `$130`/`$131` are the controller's travel limits, not the bed (ADR-420
+  // rule 8), so a sourced work area stays (ADR-637 Amendment 2).
+  if (keepWorkArea) {
+    delete shared.bedWidth;
+    delete shared.bedHeight;
+  }
   if (state.machineKind === 'cnc') {
     delete shared.maxPowerS;
     delete shared.minPowerS;

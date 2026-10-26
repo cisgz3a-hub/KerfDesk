@@ -500,7 +500,7 @@ Reviewer answers "what should this UI do?" from `WORKFLOW.md` alone; "why this a
 
 ## ADR-017 — Third-party library evaluation policy; DOMPurify pinned for Phase A
 
-**Status:** Accepted; macOS-target example amended by ADR-248 | **Date:** 2026-05-26
+**Status:** Accepted; macOS-target example amended by ADR-248; LGPL programs KerfDesk does not link allowed in the Linux AppImage by ADR-017 Amendment 1; its GPL-3.0 libraries and GConf left out by ADR-017 Amendment 2 | **Date:** 2026-05-26
 
 ### Context
 The project source code is MIT-licensed under ADR-120/247 and uses compatible dependencies freely (the dependency-policy half of the original ADR-008 survived ADR-018 and remains unchanged). The user has indicated that "if there is proven MIT code for extra features, we can do research and add it." This is a powerful capability — well-maintained libraries reduce bug surface, and proven implementations are often safer than hand-rolled equivalents.
@@ -3165,7 +3165,7 @@ reload / address-bar defaults in the web build (acceptable on a CAD surface).
 
 ## ADR-052 — Scanning offset compensation: a per-speed table cancels the bidirectional zipper
 
-**Status:** Accepted; model, emitters, bounds, IO, calibration UI, and provenance status shipped; physical calibration pending. | **Date:** 2026-06-17
+**Status:** Accepted; model, emitters, bounds, IO, calibration UI, and provenance status shipped; physical calibration pending; Job Origin anchors the design rows, not the compensated ones, by ADR-052 Amendment 1 | **Date:** 2026-06-17
 
 ### Context
 
@@ -3577,7 +3577,9 @@ The floating jig panel is replaced by a dedicated editor with its own editable
 canvas, fitted to the jig on opening. Layout, selection transforms, text with the
 existing writing styles, imports, inline image tracing and Line/Fill operation
 settings are draft changes with local Undo/Redo. Shared artwork sizing, aspect-lock
-controls and the existing jig-instance copy/ordering semantics remain available.
+controls and the existing jig-instance copy/ordering semantics remain available. *Amended by ADR-652:
+the editor opens on a clean canvas showing only the jig, with no main-canvas selection, and has
+no Line/Fill or outline burn settings.*
 **Save to canvas** commits one undoable edit and locks the outlines on the main
 canvas. A new jig initially selects **Outline only**; editing an existing jig keeps
 its output mode. Closing without saving does not publish the draft. Captured boards
@@ -10963,6 +10965,13 @@ overhangs the bed` without attempting the trace the operator explicitly chose as
 - ADR-231 remains authoritative for report-unit conversion, cancel-race settlement, honest device
   metadata, and the requirement for clean completion, but its pre-wire spatial/settings refusals are
   superseded.
+
+### Amendments
+
+ADR-232's amendments are separate decision files (ADR-344):
+`docs/decisions/ADR-232-amendment-1-frame-route-and-resume-reentry-reach-the-no-go-check.md` (the
+Frame's own route and a laser resume's re-entry move are compared with no-go zones as warnings, and
+the CNC envelope uses the full bit diameter).
 ---
 
 ## ADR-233 - Revisioned machine-aware CNC starters initialize new operations without rewriting jobs
@@ -20088,6 +20097,34 @@ physical controller, optical power, air-cut or material result.
 
 ---
 
+### October 22, 2026 amendment: Cut Settings applies what it shows
+
+Rolling audit 2026-10-21 findings 06-P2-2 and 06-P2-4 (`docs/audits/2026-10-21-rolling-v2/`):
+
+- **One artwork writes only its edits.** Cut Settings opened for one artwork that already has
+  its own settings wrote the whole form, 24 fields, into that artwork's scope, so later edits to
+  the operation never reached it while the inspector said "Edits apply to all of them". Every
+  freshly traced artwork qualified. Item 1 already says omitted fields inherit the base, so
+  Apply on artwork settings now writes only the fields the operator changed, for any count of
+  artworks, as the multi-artwork path did. Fields left alone keep following the operation.
+- **A stored value never blocks Apply.** The dialog's number boxes refused values the app
+  itself stores (37.5 % or a 22.5° angle typed in the inspector, 12 in/min stored as
+  304.8 mm/min, a LightBurn layer's 33.3 mm/s, 0.125 mm kerf, 0.03 mm interval or converted
+  overscan), and the browser blocked Apply over a field the operator never touched. Boxes that
+  hold any number now take any step, and every box's range also admits the value it opened
+  with, as the image density boxes already did; whole-number settings keep a step of 1. A
+  value submitted as it opened is kept exactly, even outside the range a new entry is held to;
+  only new entries are clamped. Limits that follow another field (minimum power under power,
+  dot width under scan density) are still reconciled.
+
+Verification: `CutSettingsDialog.one-artwork.test.tsx` (one owner Apply writes only Passes, then
+the operation's speed reaches it in the emitted program) and `CutSettingsDialog.stored-values.test.tsx`
+(values stored through the inspector and the LightBurn importer survive a Passes-only Apply, with
+the same F and S words and twice the cut moves). Executable output for unedited fields is
+unchanged.
+
+---
+
 ## ADR-318 — CNC audit repair preserves settings, registration and preparation ownership
 
 **Status:** Accepted
@@ -21690,8 +21727,9 @@ ADR-341's amendments are separate decision files (ADR-344):
 `docs/decisions/ADR-341-amendment-5-recovery-restores-the-saved-origin.md`,
 `docs/decisions/ADR-341-amendment-6-continue-from-where-the-head-stopped.md`,
 `docs/decisions/ADR-341-amendment-7-second-pass-for-jobs-too-large-to-archive.md`,
-`docs/decisions/ADR-341-amendment-8-oversized-jobs-keep-a-short-record.md` and
-`docs/decisions/ADR-341-amendment-9-second-pass-output-and-workbench-quality.md`.
+`docs/decisions/ADR-341-amendment-8-oversized-jobs-keep-a-short-record.md`,
+`docs/decisions/ADR-341-amendment-9-second-pass-output-and-workbench-quality.md` and
+`docs/decisions/ADR-341-amendment-10-recovery-numbering-done-tail-alarms-and-untracked-runs.md`.
 Amendment 1 was first appended here on 2026-09-22 and was moved there verbatim.
 
 ---

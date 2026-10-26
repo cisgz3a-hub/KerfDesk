@@ -5,7 +5,10 @@ import { imageDitherAlgorithm, prepareImageLuma } from '../raster/image-processi
 import { burnGridKernel } from '../raster/luma-resample';
 import { STREAMED_RASTER_PIXEL_THRESHOLD } from '../raster/raster-budget';
 import type { RasterPowerValues } from '../raster/raster-power-values';
-import { rasterCompilationPowerScale, rescaleRasterValues } from '../raster/controller-power-scale';
+import {
+  rasterCompilationPowerScale,
+  rescaleRasterValuesForVersion,
+} from '../raster/controller-power-scale';
 import { isAlongXScan, rasterScanFrame, type RasterScanFrame } from '../raster/raster-scan-frame';
 import { originFlipsRasterX, originFlipsRasterY } from '../raster-output';
 import {
@@ -33,7 +36,10 @@ import {
 import { resolveImageScanDirection } from './scan-direction-policy';
 import { imageScanPassRuns, type ScanPassRun } from './scan-pass-angles';
 import { validatedScanOffsetMm } from './scan-offset';
-import type { LaserPowerScaleVersion } from '../output/laser-power-scale-version';
+import {
+  CURRENT_LASER_POWER_SCALE_VERSION,
+  type LaserPowerScaleVersion,
+} from '../output/laser-power-scale-version';
 
 const WHITE_LUMA_BYTE = 255;
 
@@ -78,7 +84,7 @@ export function compileRasterGroupsForLayer(
     appendObjectRasterGroups(obj, effectiveLayer, device, out, {
       objects: sceneObjects,
       sourceLumaOverride: options.sourceLumaByObjectId?.get(obj.id),
-      laserPowerScaleVersion: options.laserPowerScaleVersion ?? 2,
+      laserPowerScaleVersion: options.laserPowerScaleVersion ?? CURRENT_LASER_POWER_SCALE_VERSION,
     });
   }
   return out;
@@ -177,7 +183,7 @@ function compileRasterGroup(
     sMax,
     sMin,
     scanFrame: options.scanFrame,
-    laserPowerScaleVersion: options.laserPowerScaleVersion ?? 2,
+    laserPowerScaleVersion: options.laserPowerScaleVersion ?? CURRENT_LASER_POWER_SCALE_VERSION,
   };
   const rasterValues = rasterValuesFor(rasterInput);
   return {
@@ -229,7 +235,12 @@ function rasterValuesFor(
   const toDeviceUnits = (values: RasterPowerValues): RasterPowerValues =>
     compilationMaxS === input.device.maxPowerS
       ? values
-      : rescaleRasterValues(values, compilationMaxS, input.device.maxPowerS);
+      : rescaleRasterValuesForVersion(
+          values,
+          compilationMaxS,
+          input.device.maxPowerS,
+          input.laserPowerScaleVersion ?? CURRENT_LASER_POWER_SCALE_VERSION,
+        );
   // Streaming works for every dither algorithm and mask (ADR-243); only size
   // chooses between one-shot materialization and an O(width) row provider.
   if (input.pixelWidth * input.pixelHeight <= STREAMED_RASTER_PIXEL_THRESHOLD) {

@@ -15,9 +15,11 @@ import type { LaserMotionOperationId } from './laser-motion-operation';
 import type { TranscriptSource } from './laser-transcript';
 import type { TranscriptBufferRefs } from './laser-transcript-buffer';
 import type { UnknownCommandRefs } from './laser-unknown-command';
+import type { OwnedResetSettingsRefs } from './laser-owned-reset-settings';
 
 export type HandlerRefs = ControllerLifecycleRefs &
   ResetCleanupRefs &
+  OwnedResetSettingsRefs &
   ResetAlarmRefs & {
     // Active firmware driver — classification and follow-up command bytes come
     // from here so this pipeline stays firmware-neutral (ADR-094).

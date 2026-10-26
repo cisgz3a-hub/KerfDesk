@@ -586,9 +586,11 @@ With the box dialog's CNC defaults (inner 60 × 40 × 30, 6.35 mm stock, 3.175 m
 
 ### WA-6: The dogbone tool merges its input with the non-zero rule, so an even-odd drawing can lose its holes
 
-**Low** · Open · Confirmed in code
+**Low** · Fixed in PR #1354 · Confirmed in code
 
 *Found by the weakness audit and handed to this audit; traced in the code, not reproduced here.*
+
+**Fixed in PR #1354.** The rolling audit of 2026-10-21 (geometry K-1) reproduced this through `parseDxf` and raised it to P2. A CAD plate whose outline, `CIRCLE` hole and slot all run counter-clockwise lost both holes. Dogbone now builds its region with the same normalization as Weld and the booleans: each path under its own fill rule, at 1 µm. The DXF plate and same-direction loops are regression tests in `dogbone-operations.test.ts`.
 
 The dogbone tool unions its rings with clipper2's two-argument call, which fills non-zero at two decimal places. A drawing that relies on even-odd filling, such as a ring drawn as two loops in the same direction, is filled solid before corners are relieved.
 

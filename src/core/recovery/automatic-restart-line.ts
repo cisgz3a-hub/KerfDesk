@@ -29,6 +29,14 @@ export type AutomaticRestart = {
    *  moves acknowledged after a report that showed an empty planner, or the
    *  controller's whole planner when no report showed it (OR-3). */
   readonly plannerBacklogBasis?: 'status-backlog' | 'after-empty-status' | 'planner-size';
+  /** Where a step back over a lost link's backlog would restart, when the
+   *  reconnect could not show whether the controller restarted (ADR-398
+   *  Amendment 4). The automatic line does not use it; the hint names it. */
+  readonly ifRestarted?: {
+    readonly line: number;
+    readonly blocks: number;
+    readonly basis: NonNullable<AutomaticRestart['plannerBacklogBasis']>;
+  };
 };
 
 type RestartScan = {
@@ -66,7 +74,12 @@ export function automaticRestart(
     if (newline === -1) break;
     start = newline + 1;
   }
-  return withPlannerBacklog(gcode, restartFrom(scan, ackedSendableLines), interruption);
+  const restart = restartFrom(scan, ackedSendableLines);
+  return withUnconfirmedBacklog(
+    gcode,
+    withPlannerBacklog(gcode, restart, interruption),
+    interruption,
+  );
 }
 
 // A stop that discarded the planner also discarded moves acknowledged before
@@ -85,6 +98,27 @@ function withPlannerBacklog(
     line: frontier,
     plannerBacklogBlocks: backlog.queuedBlocks,
     plannerBacklogBasis: plannerBacklogBasis(backlog),
+  };
+}
+
+// A backlog the reconnect could not confirm lost moves no line; it only names
+// the earlier line the operator may choose.
+function withUnconfirmedBacklog(
+  gcode: string,
+  restart: AutomaticRestart,
+  interruption: JobInterruption | undefined,
+): AutomaticRestart {
+  const backlog = interruption?.unconfirmedPlannerBacklog;
+  if (backlog === undefined) return restart;
+  const frontier = plannerFrontierRawLine(gcode, backlog);
+  if (frontier === null || frontier >= restart.line) return restart;
+  return {
+    ...restart,
+    ifRestarted: {
+      line: frontier,
+      blocks: backlog.queuedBlocks,
+      basis: plannerBacklogBasis(backlog),
+    },
   };
 }
 

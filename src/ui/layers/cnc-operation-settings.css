@@ -147,6 +147,31 @@
   min-height: 26px;
 }
 
+/* A bit change that kept hand-edited values (CNC audit v1 F4-P2-1). */
+.lf-cnc-kept-feeds {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--lf-warning);
+  border-radius: 6px;
+  color: var(--lf-warning-fg);
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.lf-cnc-kept-feeds > p {
+  margin: 0;
+}
+
+.lf-cnc-kept-feeds__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
 .lf-cnc-settings .lf-section {
   min-width: 0;
   margin: 0;

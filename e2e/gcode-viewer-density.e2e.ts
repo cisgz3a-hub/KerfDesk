@@ -8,7 +8,7 @@ async function mount(page: Page, text?: string): Promise<Locator> {
   await page.goto('/');
   await expect(
     page.locator('meta[name="kerfdesk-build-capabilities"]'),
-    'The real Inspector must run in desktop mode, where its Pro component is retained.',
+    'The density fixture runs against the desktop build.',
   ).toHaveAttribute('content', 'desktop');
   const welcome = page.getByRole('button', { name: 'Continue with Free', exact: true });
   if (await welcome.isVisible()) await welcome.click();

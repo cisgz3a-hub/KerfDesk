@@ -29,7 +29,7 @@ test('portrait photo workflow previews real dots, cancels, persists and undoes o
   await photoButton.click();
   const dialog = page.getByRole('dialog', { name: 'Photo engraving', exact: true });
   const processing = dialog.getByRole('radiogroup', { name: 'Photo processing' });
-  await expect(processing.getByRole('radio')).toHaveCount(3);
+  await expect(processing.getByRole('radio')).toHaveCount(4);
   await processing.getByRole('radio', { name: 'Jarvis', exact: true }).check();
   await dialog.getByRole('spinbutton', { name: 'Photo engraving DPI' }).fill('127');
   await dialog.getByRole('spinbutton', { name: 'Photo engraving DPI' }).blur();

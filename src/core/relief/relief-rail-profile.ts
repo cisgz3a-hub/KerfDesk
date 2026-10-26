@@ -5,8 +5,19 @@ import type {
 import type { Vec2 } from '../scene/scene-object';
 import { reliefBoundaryError } from './relief-vector-boundary';
 import type { ComponentSample, ReliefComponentSampler } from './relief-authoring-sampling';
+import {
+  measuredRail,
+  parameters,
+  smoothStripSides,
+  snappedParameters,
+  stripSides,
+  surroundingSections,
+  vertexNormals,
+  type Rail,
+  type Sides,
+  type Vertex,
+} from './relief-rail-stations';
 
-type Vertex = Vec2 & { readonly u: number; readonly t: number };
 type Strip = { left0: Vertex; right0: Vertex; left1: Vertex; right1: Vertex };
 type Triangle = {
   readonly strip: Strip;
@@ -18,11 +29,6 @@ type Triangle = {
   readonly minY: number;
   readonly maxX: number;
   readonly maxY: number;
-};
-type Rail = {
-  readonly points: ReadonlyArray<Vec2>;
-  readonly distances: ReadonlyArray<number>;
-  readonly length: number;
 };
 
 /** An injective oriented strip is the supported scalar domain; folds are rejected. */
@@ -41,8 +47,23 @@ export function railProfileTriangles(
             ? [...source.secondRail.points].reverse()
             : source.secondRail.points,
         );
-  const times = parameters(source, first, second);
-  const sides = times.map((t) => stripSides(source, first, second, t));
+  const sectioned = (): ReadonlyArray<Triangle> =>
+    sweptTriangles(
+      parameters(source, first, second).map((t) => stripSides(source, first, second, t)),
+      legacy,
+    );
+  if (legacy) return sectioned();
+  try {
+    return sectioned();
+  } catch {
+    // ADR-575 Amendment 1: sections square to each segment cross near a curved
+    // rail's vertices. A rail they refuse is sectioned along a smoothed normal
+    // field instead; every rail they accept keeps them, so saved fields hold.
+    return smoothlySweptTriangles(source, first, second);
+  }
+}
+
+function sweptTriangles(sides: Sides, legacy: boolean): ReadonlyArray<Triangle> {
   const boundary = {
     rings: [
       {
@@ -55,10 +76,34 @@ export function railProfileTriangles(
   if (error !== null) throw new Error(`Rail sweep is not single-valued: ${error}`);
   return triangulatedSides(sides, legacy);
 }
-function triangulatedSides(
-  sides: ReadonlyArray<{ readonly left: Vertex; readonly right: Vertex }>,
-  legacy: boolean,
+
+function smoothlySweptTriangles(
+  source: ReliefRailProfileSource,
+  first: Rail,
+  second: Rail | undefined,
 ): ReadonlyArray<Triangle> {
+  const normals = second === undefined ? vertexNormals(first) : [];
+  const sides = snappedParameters(parameters(source, first, second), first, second).map((t) =>
+    second === undefined
+      ? smoothStripSides(source, first, normals, t)
+      : stripSides(source, first, second, t),
+  );
+  try {
+    return sweptTriangles(sides, false);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    if (!/single-valued|fold|collaps/.test(message)) throw error;
+    // Sectioned smoothly, only a real fold is left: say what makes one.
+    throw new Error(
+      `${message} ` +
+        (second === undefined
+          ? 'The sweep folds over itself where the rail turns tighter than half its width or ' +
+            'passes within its width of itself: narrow the rail or ease the curve.'
+          : 'The sweep folds over itself where the two rails cross or one turns back on itself.'),
+    );
+  }
+}
+function triangulatedSides(sides: Sides, legacy: boolean): ReadonlyArray<Triangle> {
   const out: Triangle[] = [];
   let sign = 0;
   for (let i = 1; i < sides.length; i += 1) {
@@ -154,76 +199,7 @@ export function railProfileSampler(
     return { included: false, heightMm: 0 } satisfies ComponentSample;
   };
 }
-function measuredRail(points: ReadonlyArray<Vec2>): Rail {
-  const distances = [0];
-  for (let i = 1; i < points.length; i += 1) {
-    const a = points[i - 1],
-      b = points[i];
-    if (a !== undefined && b !== undefined)
-      distances.push((distances[i - 1] ?? 0) + Math.hypot(b.x - a.x, b.y - a.y));
-  }
-  const length = distances[distances.length - 1] ?? 0;
-  if (!(length > 0)) throw new Error('Rail requires a non-zero physical length.');
-  return { points, distances, length };
-}
-function pointOnRail(rail: Rail, t: number): Vec2 {
-  const distance = t * rail.length;
-  for (let i = 1; i < rail.points.length; i += 1) {
-    const end = rail.distances[i] ?? 0;
-    if (end < distance && i < rail.points.length - 1) continue;
-    const a = rail.points[i - 1],
-      b = rail.points[i];
-    if (a === undefined || b === undefined) continue;
-    const start = rail.distances[i - 1] ?? 0,
-      fraction = Math.max(0, Math.min(1, (distance - start) / (end - start)));
-    return { x: a.x + (b.x - a.x) * fraction, y: a.y + (b.y - a.y) * fraction };
-  }
-  throw new Error('Rail has no usable segment.');
-}
-function parameters(
-  source: ReliefRailProfileSource,
-  first: Rail,
-  second: Rail | undefined,
-): number[] {
-  const values = [
-    ...Array.from({ length: source.samplingSteps + 1 }, (_, i) => i / source.samplingSteps),
-    ...first.distances.map((d) => d / first.length),
-    ...(second?.distances.map((d) => d / second.length) ?? []),
-    ...source.sections.map((s) => s.position),
-  ];
-  const sorted = [...new Set(values)].sort((a, b) => a - b);
-  if (sorted.length > 256) throw new Error('Rail strip exceeds its 256-position geometry budget.');
-  return sorted;
-}
-function stripSides(
-  source: ReliefRailProfileSource,
-  first: Rail,
-  second: Rail | undefined,
-  t: number,
-): { readonly left: Vertex; readonly right: Vertex } {
-  const center = pointOnRail(first, t),
-    scale = sectionWidth(source.sections, t);
-  let left: Vec2, right: Vec2;
-  if (second === undefined) {
-    const before = pointOnRail(first, Math.max(0, t - 1e-5)),
-      after = pointOnRail(first, Math.min(1, t + 1e-5));
-    const dx = after.x - before.x,
-      dy = after.y - before.y,
-      length = Math.hypot(dx, dy);
-    if (!(length > 1e-12)) throw new Error('Rail reverses or collapses at a strip position.');
-    const nx = ((-dy / length) * source.widthMm * scale) / 2,
-      ny = ((dx / length) * source.widthMm * scale) / 2;
-    left = { x: center.x - nx, y: center.y - ny };
-    right = { x: center.x + nx, y: center.y + ny };
-  } else {
-    const edge = pointOnRail(second, t),
-      cx = (center.x + edge.x) / 2,
-      cy = (center.y + edge.y) / 2;
-    left = { x: cx + (center.x - cx) * scale, y: cy + (center.y - cy) * scale };
-    right = { x: cx + (edge.x - cx) * scale, y: cy + (edge.y - cy) * scale };
-  }
-  return { left: { ...left, u: 0, t }, right: { ...right, u: 1, t } };
-}
+
 function cross(a: Vec2, b: Vec2, c: Vec2): number {
   return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
 }
@@ -240,29 +216,6 @@ function triangleLocation(
   // v1 interpolated the two triangles, including non-bilinear strips.
   if (legacy) return { u: wa * a.u + wb * b.u + wc * c.u, t: wa * a.t + wb * b.t + wc * c.t };
   return stripLocation(triangle.strip, p);
-}
-function surroundingSections(
-  sections: ReadonlyArray<ReliefProfileSection>,
-  t: number,
-): { a: ReliefProfileSection; b: ReliefProfileSection; fraction: number } {
-  const first = sections[0];
-  if (first === undefined) throw new Error('A rail requires profiles.');
-  for (let i = 1; i < sections.length; i += 1) {
-    const a = sections[i - 1],
-      b = sections[i];
-    if (a !== undefined && b !== undefined && t <= b.position)
-      return {
-        a,
-        b,
-        fraction: Math.max(0, Math.min(1, (t - a.position) / (b.position - a.position))),
-      };
-  }
-  const last = sections[sections.length - 1] ?? first;
-  return { a: last, b: last, fraction: 0 };
-}
-function sectionWidth(sections: ReadonlyArray<ReliefProfileSection>, t: number): number {
-  const { a, b, fraction } = surroundingSections(sections, t);
-  return a.widthScale * (1 - fraction) + b.widthScale * fraction;
 }
 function sectionHeight(
   sections: ReadonlyArray<ReliefProfileSection>,

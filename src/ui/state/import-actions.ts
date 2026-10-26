@@ -28,6 +28,9 @@ import type { LayerDefaultsState } from './layer-default-actions';
 import { applyCameraTraceImport } from './camera-trace-import';
 import type { MaterialLibraryDocument } from '../../io/material-library';
 import { projectWithFreshLaserRecipes } from './laser-recipe-seeding';
+import { reportDependencyRepairs } from './object-delete-actions';
+import type { repairRemovedObjectReferences } from './repair-object-dependencies';
+import { prepareProjectInsertion } from './project-insertion-budget';
 
 // Narrow `set`: every action here dispatches a pure mutation helper
 // returning a MutationResult. AppState's full Setter is assignable to
@@ -42,7 +45,7 @@ type ImportState = StateSlice &
 type ImportSet = (fn: (s: ImportState) => MutationResult) => void;
 
 export function imageImportActions(
-  set: ImportSet,
+  rawSet: ImportSet,
   get: () => ProjectSlice,
 ): {
   readonly importRasterImage: (object: SceneObject, batchIdx?: number) => ImportOutcome;
@@ -58,6 +61,8 @@ export function imageImportActions(
   ) => void;
   readonly convertToBitmap: (sourceIds: ReadonlyArray<string>, raster: RasterImage) => void;
 } {
+  const set: ImportSet = (update) =>
+    rawSet((state) => prepareProjectInsertion(state.project, () => update(state)));
   return {
     importRasterImage: (object, batchIdx) => {
       let outcome: ImportOutcome = { kind: 'added' };
@@ -106,12 +111,23 @@ export function imageImportActions(
   };
 }
 
-function withFreshCncLayers(state: ImportState, result: MutationResult): MutationResult {
+function withFreshCncLayers(
+  state: ImportState,
+  result: MutationResult & {
+    readonly dependencyRepairs?: Pick<
+      ReturnType<typeof repairRemovedObjectReferences>,
+      'repairedImageMasks' | 'repairedPathTextGuides'
+    >;
+  },
+): MutationResult {
+  const { dependencyRepairs, ...mutation } = result;
+  if (dependencyRepairs !== undefined)
+    reportDependencyRepairs(dependencyRepairs, 'unavailable-vector');
   // Laser Make Default never carries CNC settings, so every new CNC operation
   // from an import or trace is seeded from the machine setup, and every new
   // laser operation from the job material's best recipe (ADR-496).
   return {
-    ...result,
+    ...mutation,
     project: projectWithFreshLaserRecipes(
       state.project.scene.layers,
       projectWithFreshCncLayers(

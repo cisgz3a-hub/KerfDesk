@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   IDENTITY_TRANSFORM,
   polylineToCurveSubpath,
+  type CurveSubpath,
   type Polyline,
   type TracedImage,
   type Transform,
@@ -9,7 +10,12 @@ import {
 } from '../../core/scene';
 import { boundsFromColoredPaths, DEFAULT_TRACE_OPTIONS } from '../../core/trace';
 import { fairTracedImageForCnc } from './fair-traced-image-for-cnc';
-import { conditionTracedImageForMachine } from './trace-machine-conditioning';
+import {
+  COMMIT_CONDITIONING_SYNC_VERTICES,
+  conditionTracedImageForCommit,
+  conditionTracedImageForMachine,
+} from './trace-machine-conditioning';
+import { isTraceAbort } from './trace-cancellation';
 
 const PLACEMENT: Transform = { ...IDENTITY_TRANSFORM, x: 5, y: 7, scaleX: 0.1, scaleY: 0.1 };
 const VECTOR = { options: DEFAULT_TRACE_OPTIONS, traceOutput: 'vector' } as const;
@@ -35,6 +41,59 @@ function tracedRing(): TracedImage {
     bounds: boundsFromColoredPaths(paths),
     paths,
   };
+}
+
+function ringPoints(cx: number, cy: number, radius: number, count: number): Vec2[] {
+  const points: Vec2[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const angle = (2 * Math.PI * index) / count;
+    points.push({ x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) });
+  }
+  points.push({ ...(points[0] as Vec2) });
+  return points;
+}
+
+function cubicCircle(cx: number, cy: number, r: number): CurveSubpath {
+  const k = 0.5523 * r;
+  const cubic = (c1: Vec2, c2: Vec2, to: Vec2) => ({
+    kind: 'cubic' as const,
+    control1: c1,
+    control2: c2,
+    to,
+  });
+  return {
+    start: { x: cx + r, y: cy },
+    segments: [
+      cubic({ x: cx + r, y: cy + k }, { x: cx + k, y: cy + r }, { x: cx, y: cy + r }),
+      cubic({ x: cx - k, y: cy + r }, { x: cx - r, y: cy + k }, { x: cx - r, y: cy }),
+      cubic({ x: cx - r, y: cy - k }, { x: cx - k, y: cy - r }, { x: cx, y: cy - r }),
+      cubic({ x: cx + k, y: cy - r }, { x: cx + r, y: cy - k }, { x: cx + r, y: cy }),
+    ],
+    closed: true,
+  };
+}
+
+/** A coloring-page-like trace: dense pixel-pitch rings (each with a hole) and
+ *  fitted cubic circles, far more vertices than a commit conditions inline. */
+function denseTrace(): TracedImage {
+  const polylines: Polyline[] = [];
+  const curves: CurveSubpath[] = [];
+  for (let row = 0; row < 6; row += 1) {
+    for (let column = 0; column < 6; column += 1) {
+      const cx = 60 + column * 120;
+      const cy = 60 + row * 120;
+      for (const radius of [50, 46]) {
+        const ring: Polyline = { points: ringPoints(cx, cy, radius, 300), closed: true };
+        polylines.push(ring);
+        curves.push(polylineToCurveSubpath(ring));
+      }
+      const fitted = cubicCircle(cx, cy, 20);
+      curves.push(fitted);
+      polylines.push({ points: ringPoints(cx, cy, 20, 120), closed: true });
+    }
+  }
+  const paths = [{ color: '#000000', polylines, curves }];
+  return { ...tracedRing(), tracePixelWidth: 720, tracePixelHeight: 720, paths };
 }
 
 function vertexCount(traced: TracedImage): number {
@@ -85,5 +144,67 @@ describe('conditionTracedImageForMachine', () => {
     };
     const traced = { ...tracedRing(), paths: [{ color: '#000000', polylines: [triangle] }] };
     expect(conditionTracedImageForMachine(traced, PLACEMENT, 'laser', VECTOR)).toBe(traced);
+  });
+});
+
+// The whole browser app froze after a dense Line Art trace: the commit ran
+// this conditioning (seconds on a coloring page) in one task.
+describe('conditionTracedImageForCommit', () => {
+  /** Timer tasks that ran while `work` was pending. */
+  async function turnsDuring<T>(work: () => Promise<T>): Promise<{ value: T; turns: number }> {
+    let turns = 0;
+    let done = false;
+    const tick = (): void => {
+      if (done) return;
+      turns += 1;
+      setTimeout(tick, 0);
+    };
+    setTimeout(tick, 0);
+    try {
+      return { value: await work(), turns };
+    } finally {
+      done = true;
+    }
+  }
+
+  it('gives the browser turns on a dense laser trace and conditions it exactly as in one task', async () => {
+    const traced = denseTrace();
+    expect(vertexCount(traced)).toBeGreaterThan(10 * COMMIT_CONDITIONING_SYNC_VERTICES);
+    const inOneTask = conditionTracedImageForMachine(traced, PLACEMENT, 'laser', VECTOR);
+    expect(vertexCount(inOneTask)).toBeLessThan(vertexCount(traced) / 4);
+
+    const { value, turns } = await turnsDuring(() =>
+      conditionTracedImageForCommit(traced, PLACEMENT, 'laser', VECTOR),
+    );
+
+    // Hundreds of milliseconds of work, sliced every 8 ms.
+    expect(turns).toBeGreaterThan(0);
+    expect(value).toEqual(inOneTask);
+  });
+
+  it('stops when the commit is cancelled', async () => {
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 0);
+
+    const outcome = await conditionTracedImageForCommit(
+      denseTrace(),
+      PLACEMENT,
+      'laser',
+      VECTOR,
+      controller.signal,
+    ).catch((error: unknown) => error);
+
+    expect(isTraceAbort(outcome)).toBe(true);
+  });
+
+  it('conditions a small trace in the commit task itself', async () => {
+    const traced = tracedRing();
+
+    const { value, turns } = await turnsDuring(() =>
+      conditionTracedImageForCommit(traced, PLACEMENT, 'laser', VECTOR),
+    );
+
+    expect(turns).toBe(0);
+    expect(value).toEqual(conditionTracedImageForMachine(traced, PLACEMENT, 'laser', VECTOR));
   });
 });

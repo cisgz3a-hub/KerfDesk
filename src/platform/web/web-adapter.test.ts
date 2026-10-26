@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { chromiumDirectory, installChromiumSavePicker } from './chromium-save-picker.test-support';
 import { webAdapter } from './web-adapter';
 
 const originalSavePickerDescriptor = Object.getOwnPropertyDescriptor(window, 'showSaveFilePicker');
@@ -24,6 +25,23 @@ afterEach(() => {
 });
 
 describe('webAdapter save target', () => {
+  it('lists only immediate files without opening or modifying their contents', async () => {
+    const getFileHandle = vi.fn();
+    Object.defineProperty(window, 'showDirectoryPicker', {
+      configurable: true,
+      value: async () => ({
+        getFileHandle,
+        entries: async function* () {
+          yield ['old_tile-r1-c1.nc', { kind: 'file' }];
+          yield ['nested_tile-r1-c1.nc', { kind: 'directory' }];
+        },
+      }),
+    });
+    const directory = await webAdapter.reserveSaveDirectory?.();
+    await expect(directory?.listFiles?.()).resolves.toEqual(['old_tile-r1-c1.nc']);
+    expect(getFileHandle).not.toHaveBeenCalled();
+  });
+
   it.each(['NotAllowedError', 'NotReadableError'])(
     'propagates %s from a directory existence probe',
     async (name) => {
@@ -41,16 +59,22 @@ describe('webAdapter save target', () => {
     },
   );
 
-  it('does not open or truncate the file until prepared data is written', async () => {
-    const writable = writableStreamMock();
-    const createWritable = installSavePicker(writable);
+  it('hands back a chosen file that Chromium has already emptied (ADR-656)', async () => {
+    // The old test here asserted "does not truncate" against a picker that
+    // could not truncate (audit 19-P2-1). Chromium empties the file on pick, so
+    // the contract callers rely on is the opposite: prepare before picking.
+    const disk = new Map([['out.gcode', 'G21\n(previous program)\n']]);
+    const picker = installChromiumSavePicker(disk);
+    try {
+      const target = await webAdapter.pickFileForSave(saveRequest);
+      if (target === null) throw new Error('expected save target');
+      expect(disk.get('out.gcode')).toBe('');
 
-    const target = await webAdapter.pickFileForSave(saveRequest);
-    if (target === null) throw new Error('expected save target');
-    expect(createWritable).not.toHaveBeenCalled();
-
-    await target.write('G21\n');
-    expect(createWritable).toHaveBeenCalledOnce();
+      await target.write('G21\nG90\n');
+      expect(disk.get('out.gcode')).toBe('G21\nG90\n');
+    } finally {
+      picker.restore();
+    }
   });
 
   it('aborts the writable stream when a save write fails', async () => {
@@ -119,6 +143,33 @@ describe('webAdapter save target', () => {
     expect(getFileHandle).toHaveBeenCalledWith('custom-name.nc', { create: true });
     expect(createWritable).toHaveBeenCalledOnce();
     expect(writable.write).toHaveBeenCalledWith('G21\n');
+  });
+
+  it('removes the entry a failed folder write created, leaving no empty file', async () => {
+    const disk = new Map<string, string>();
+    Object.defineProperty(window, 'showDirectoryPicker', {
+      configurable: true,
+      value: vi.fn(async () => chromiumDirectory(disk, { writeError: new Error('disk full') })),
+    });
+
+    const directory = await webAdapter.reserveSaveDirectory?.();
+    await expect(directory?.file('logo-trace.svg').write('<svg/>')).rejects.toThrow('disk full');
+
+    expect([...disk.keys()]).toEqual([]);
+    await expect(directory?.exists?.('logo-trace.svg')).resolves.toBe(false);
+  });
+
+  it('keeps an existing file and its contents when a folder write over it fails', async () => {
+    const disk = new Map([['tile-1.gcode', 'G21\n(previous tile)\n']]);
+    Object.defineProperty(window, 'showDirectoryPicker', {
+      configurable: true,
+      value: vi.fn(async () => chromiumDirectory(disk, { writeError: new Error('disk full') })),
+    });
+
+    const directory = await webAdapter.reserveSaveDirectory?.();
+    await expect(directory?.file('tile-1.gcode').write('G21\n')).rejects.toThrow('disk full');
+
+    expect(disk.get('tile-1.gcode')).toBe('G21\n(previous tile)\n');
   });
 
   it('reserves a reusable directory without creating any tile target', async () => {

@@ -20,6 +20,7 @@ import { savedCameraModel } from '../../../core/camera/model/model-fixtures';
 import { useStore } from '../../state';
 import { resetStore } from '../../state/test-helpers';
 import { useTutorialStore } from '../../tutorials/tutorial-store';
+import { useJobWatchStore } from '../job-watch/job-watch-store';
 import { useCameraCalibrationStore } from '../calibrate/camera-calibration-store';
 import { CameraPanel } from './CameraPanel';
 import { CameraDiagnostics } from './CameraDiagnostics';
@@ -72,21 +73,32 @@ it('opens the camera lesson, persists the larger panel preference and closes the
   expect(useTutorialStore.getState().tutorialId).toBe('camera');
   const dialog = host.querySelector<HTMLElement>('[aria-label="Camera preview"]')!;
   expect(dialog.style.width).toBe('320px');
+  // The larger monitoring view is chosen on the settings page (ADR-663).
+  await clickControl(host, 'Camera settings');
+  expect(host.textContent).toContain('Camera settings');
   await clickControl(host, 'Larger view');
   expect(dialog.style.width).toBe('560px');
   await clickControl(host, 'Compact view');
   expect(dialog.style.width).toBe('320px');
+  await clickControl(host, 'Back to the camera');
+  expect(control(host, 'Camera settings')).toBeTruthy();
   await clickControl(host, 'Close camera panel');
   expect(camera.getState().panelOpen).toBe(false);
   expect(host.querySelector('[role="dialog"]')).toBeNull();
 });
 
-it('opens the one-photo calibration from the panel', async () => {
+it('opens the guided camera setup from the panel at the camera choice', async () => {
   camera.setState({ panelOpen: true, machineCamera: { kind: 'not-found' } });
   const host = await mountControl(wrap(<CameraPanel />));
-  await clickControl(host, 'Calibrate camera…');
-  expect(useCameraCalibrationStore.getState().open).toBe(true);
-  expect(document.body.textContent).toContain('Engrave target');
+  expect(host.textContent).toContain('Set up your camera');
+  await clickControl(host, 'Set up camera');
+  expect(useCameraCalibrationStore.getState()).toMatchObject({
+    open: true,
+    mode: 'calibrate',
+    step: { kind: 'camera' },
+  });
+  expect(document.body.textContent).toContain('Which camera should KerfDesk use?');
+  expect(control(document.body, 'Next').disabled).toBe(true);
 });
 
 it('keeps a running camera when the panel closes while the calibrated overlay shows it', async () => {
@@ -238,3 +250,68 @@ it('gates idle snapshot, passes the live source and platform to save, and dispat
   await clickControl(host, 'Larger view');
   expect(onToggleWide).toHaveBeenCalledTimes(1);
 });
+
+// The everyday view (ADR-663): one Start for the camera this computer would pick.
+it("starts the laser's own camera from the preview card when the bridge found it", async () => {
+  const found = { kind: 'found' as const, cameraUrl: live.cameraUrl, proxyFrameUrl: live.frameUrl };
+  camera.setState({ panelOpen: true, machineCamera: found });
+  const host = await mountControl(wrap(<CameraPanel />));
+  expect(host.textContent).toContain("Laser's built-in camera");
+  await clickControl(host, 'Use this camera');
+  expect(camera.getState().sourceState).toEqual({ kind: 'live', source: live });
+  expect(host.textContent).toContain("Laser's built-in camera");
+  await clickControl(host, 'Stop');
+  expect(camera.getState().sourceState.kind).toBe('idle');
+});
+
+it('starts the chosen USB camera from the preview card and names it', async () => {
+  const stream: CameraStream = {
+    stream: {} as MediaStream,
+    sourceId: 'audit-usb',
+    resizeMode: 'none',
+    stop: vi.fn(),
+  };
+  const adapter: CameraAdapter = {
+    isSupported: () => true,
+    listCameras: async () => [{ deviceId: 'overhead', label: 'Overhead webcam' }],
+    openStream: vi.fn<CameraAdapter['openStream']>().mockResolvedValue(stream),
+    discoverNetworkCamera: async () => null,
+  };
+  camera.setState({ panelOpen: true, machineCamera: { kind: 'not-found' } });
+  const host = await mountControl(wrap(<CameraPanel />, { ...platform, camera: adapter }));
+  expect(host.textContent).toContain('Camera off');
+  await clickControl(host, 'Start camera');
+  expect(adapter.openStream).toHaveBeenCalledTimes(1);
+  expect(camera.getState().sourceState).toMatchObject({ kind: 'live', source: { kind: 'usb' } });
+  expect(host.textContent).toContain('Overhead webcam');
+});
+
+it('shows the bed-picture controls instead of the setup once the running camera is calibrated', async () => {
+  useStore.getState().updateDeviceProfile({ cameraModel: savedCameraModel() });
+  camera.setState({ panelOpen: true, machineCamera: { kind: 'not-found' } });
+  const host = await mountControl(wrap(<CameraPanel />));
+  expect(host.textContent).not.toContain('Set up your camera');
+  expect(control(host, 'Refresh picture')).toBeTruthy();
+  expect(host.textContent).toContain('Show on canvas');
+  expect(host.textContent).toContain('Fill blanks');
+  expect(host.textContent).toContain('Watch the job');
+  await clickControl(host, 'Camera settings');
+  expect(control(host, 'Recalibrate…')).toBeTruthy();
+  expect(control(host, 'Check camera…')).toBeTruthy();
+});
+
+it('keeps Watch the job open while one of its choices is ticked', async () => {
+  const before = useJobWatchStore.getState().settings;
+  camera.setState({ panelOpen: true, machineCamera: { kind: 'not-found' } });
+  const closed = await mountControl(wrap(<CameraPanel />));
+  expect(watchFold(closed)?.open).toBe(false);
+  await act(async () => useJobWatchStore.getState().setSettings({ timelapse: true }));
+  expect(watchFold(closed)?.open).toBe(true);
+  useJobWatchStore.getState().setSettings(before);
+});
+
+function watchFold(host: HTMLElement): HTMLDetailsElement | undefined {
+  return [...host.querySelectorAll('details')].find((fold) =>
+    fold.querySelector('summary')?.textContent?.startsWith('Watch the job'),
+  );
+}

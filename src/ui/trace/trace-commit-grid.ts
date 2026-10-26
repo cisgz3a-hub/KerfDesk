@@ -206,7 +206,7 @@ export function commitGridExceedsPreview(plan: TraceCommitGridPlan): boolean {
 /**
  * The size controls an operator sets in the dialog (Ignore less than, ink
  * despeckle or the automatic small-mark policy, Minimum line, gap joins, Line + fill's Max stroke
- * width) keep the physical meaning they had on
+ * width) and the detectors' local windows keep the physical meaning they had on
  * the preview grid, so the commit drops the same specks the preview dropped.
  * Lengths scale by the longest-edge ratio and areas by the ratio of the two
  * grids' pixel counts: on a tall or narrow source the short edge is a small
@@ -236,6 +236,11 @@ export function traceOptionsForCommitGrid(
     ...scaled('edgeJoinGapPx', options.edgeJoinGapPx, ratio),
     ...scaled('centerlineJoinGapPx', options.centerlineJoinGapPx, ratio),
     ...scaled('hybridMaxStrokeWidthPx', options.hybridMaxStrokeWidthPx, ratio),
+    // The local detector windows (Sketch, automatic detail, Faint lines, Edge
+    // Detection's neighbourhood) read the area the preview read, so a stroke
+    // the preview filled is not hollowed or thinned on the finer grid
+    // (ADR-409 Amendment 2).
+    detectorWindowScale: (options.detectorWindowScale ?? 1) * ratio,
   };
 }
 

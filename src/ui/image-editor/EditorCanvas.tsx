@@ -66,7 +66,7 @@ export function EditorCanvas(props: EditorCanvasProps): JSX.Element {
 
   const activeView = view ?? { scale: 1, panX: 0, panY: 0 };
   const pointer = useEditorPointer(activeView, setView);
-  const hover = useCanvasHover(hostRef, tool, brush, activeView, isSpacePanning);
+  const hover = useCanvasHover(hostRef, tool, brush, activeView, isSpacePanning, doc);
 
   useEffect(() => {
     const canvas = canvasRef.current;

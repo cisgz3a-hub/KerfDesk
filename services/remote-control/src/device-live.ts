@@ -51,6 +51,7 @@ export async function admitControl(
   if (!authorized()) return { response: errorResult('cancelled') };
   if (admission.state === 'fresh') return { controlId: admission.operationId };
   if (admission.state === 'replay') return { response: { result: admission.result, error: null } };
+  if (admission.state === 'refused') return { response: errorResult(admission.code) };
   const code =
     admission.state === 'conflict'
       ? 'invalid_input'

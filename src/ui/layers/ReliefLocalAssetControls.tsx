@@ -8,6 +8,7 @@ import {
   reliefComponentAsset,
   type ReliefComponentAsset,
 } from '../../io/project/relief-component-asset';
+import { pickPreparedSaveTarget } from '../app/pick-prepared-save-target';
 import { usePlatformOptional } from '../app/platform-context';
 
 export function ReliefLocalAssetControls(props: {
@@ -33,13 +34,16 @@ export function ReliefLocalAssetControls(props: {
     const generation = owner.current;
     setBusy(true);
     try {
-      const asset = reliefComponentAsset(props.document, props.component);
-      const target = await platform.pickFileForSave({
-        suggestedName: 'relief-component.lfrelief',
-        extensions: ['.lfrelief'],
-      });
-      if (generation !== owner.current) return;
-      if (target !== null) await target.write(JSON.stringify(asset, null, 2) + '\n');
+      // The picker empties an existing file as it returns (ADR-656): the
+      // picked file gets the component captured at the click, even if the
+      // document changed while the picker was open.
+      const json = JSON.stringify(reliefComponentAsset(props.document, props.component), null, 2);
+      const target = await pickPreparedSaveTarget(
+        platform,
+        { suggestedName: 'relief-component.lfrelief', extensions: ['.lfrelief'] },
+        { title: 'Save relief component', message: 'The relief component is ready.' },
+      );
+      if (target !== null) await target.write(json + '\n');
     } catch (error) {
       props.onError(error instanceof Error ? error.message : 'Could not save relief component.');
     } finally {

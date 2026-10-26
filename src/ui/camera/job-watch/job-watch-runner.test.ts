@@ -23,7 +23,7 @@ import { useLaserStore } from '../../state/laser-store';
 import { resetStore } from '../../state/test-helpers';
 import { burnRegion } from './job-burn-route';
 import type { WatchIo } from './job-watch-camera';
-import { installJobWatch } from './job-watch-runner';
+import { canRetakeAfterPicture, installJobWatch } from './job-watch-runner';
 import { DEFAULT_JOB_WATCH_SETTINGS } from './job-watch-settings';
 import { useJobWatchStore } from './job-watch-store';
 
@@ -249,5 +249,52 @@ describe('watching a job with the camera', () => {
     useLaserStore.setState({ liveCanvasRun: startLiveCanvasRun(fillPlan(), 1000) });
     expect(useJobWatchStore.getState().timelapse).toBeNull();
     expect(useJobWatchStore.getState().burnCheck).toEqual({ kind: 'idle' });
+  });
+
+  it('does not check the previous burn against a new unwatched job', async () => {
+    uninstall();
+    let finishSettling!: () => void;
+    const settled = new Promise<void>((resolve) => {
+      finishSettling = resolve;
+    });
+    const captureFrame = vi.fn(io.captureFrame);
+    uninstall = installJobWatch({ ...io, captureFrame, wait: () => settled });
+    useJobWatchStore.setState({
+      settings: { ...DEFAULT_JOB_WATCH_SETTINGS, burnCheck: true },
+    });
+    const plan = fillPlan();
+    useLaserStore.setState({ liveCanvasRun: startLiveCanvasRun(plan, 1000) });
+    setLifecycle(plan, 'finished');
+    await vi.waitFor(() => expect(useJobWatchStore.getState().burnCheck.kind).toBe('checking'));
+
+    // The operator turns watching off and starts the next job during the
+    // smoke-clear wait. Its picture cannot describe the earlier job alone.
+    useJobWatchStore.setState({ settings: DEFAULT_JOB_WATCH_SETTINGS });
+    useLaserStore.setState({ liveCanvasRun: startLiveCanvasRun(fillPlan(), 2000) });
+    finishSettling();
+    await settled;
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(captureFrame).toHaveBeenCalledTimes(1);
+    expect(useJobWatchStore.getState().burnCheck).toEqual({
+      kind: 'unavailable',
+      reason: 'Another job started before the after picture was ready.',
+    });
+    expect(useCameraStore.getState().bedPicture).toBeNull();
+  });
+
+  it('keeps a completed verdict but retires its retake when another unwatched job starts', async () => {
+    const plan = fillPlan();
+    useLaserStore.setState({ liveCanvasRun: startLiveCanvasRun(plan, 1000) });
+    setLifecycle(plan, 'finished');
+    await vi.waitFor(() => expect(useJobWatchStore.getState().burnCheck.kind).toBe('done'), {
+      timeout: 5000,
+    });
+    const verdict = useJobWatchStore.getState().burnCheck;
+    expect(canRetakeAfterPicture()).toBe(true);
+    useJobWatchStore.setState({ settings: DEFAULT_JOB_WATCH_SETTINGS });
+    useLaserStore.setState({ liveCanvasRun: startLiveCanvasRun(fillPlan(), 2000) });
+    expect(useJobWatchStore.getState().burnCheck).toBe(verdict);
+    expect(canRetakeAfterPicture()).toBe(false);
   });
 });

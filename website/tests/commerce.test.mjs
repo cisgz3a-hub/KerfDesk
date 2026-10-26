@@ -2,6 +2,7 @@
 // Closed-sales and trial-only renders remain covered for operational rollback.
 
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 import { commerce } from '../commerce.config.mjs';
 import { commerceErrors, formatPrice } from '../lib/commerce.mjs';
@@ -12,6 +13,24 @@ import { attrValues, buildToTemp, builtPages, textContent } from './helpers.mjs'
 const PRO = commerce.plans.find((plan) => plan.id === 'pro');
 // Every price the site may show, as formatPrice writes it.
 const SETTLED_PRICES = ['US$49.50', 'US$20'];
+
+// The app's Pro tools as it gates them (ADR-540 and its amendments), read from
+// the TypeScript source: the `ProFeature` keys and each entry's display name.
+const PRO_FEATURES_SOURCE = readFileSync(
+  new URL('../../src/ui/licensing/pro-features.ts', import.meta.url),
+  'utf8',
+);
+function appProFeatures() {
+  const union = PRO_FEATURES_SOURCE.match(/export type ProFeature =([^;]+);/)?.[1] ?? '';
+  const table = PRO_FEATURES_SOURCE.match(
+    /export const PRO_FEATURES[^=]*= \{\n([\s\S]*?)\n\};/,
+  )?.[1];
+  const entries = [...(table ?? '').matchAll(/^ {2}'?([a-z-]+)'?: \{\n {4}name: '([^']+)',$/gm)];
+  return {
+    keys: [...union.matchAll(/'([a-z-]+)'/g)].map((match) => match[1]),
+    entries: entries.map(([, key, name]) => ({ key, name })),
+  };
+}
 
 const CHECKOUT_PLAN = { ...PRO, checkoutUrl: 'https://checkout.example.com/buy/pro' };
 
@@ -52,6 +71,7 @@ describe('commerce configuration', () => {
       'Laser cutting and engraving',
       '2D CNC cuts',
       'All machine control',
+      'G-code Inspector',
     ]);
     assert.equal(commerce.plans.length, 1, 'Free and Pro are the only editions');
     assert.ok(PRO, 'the Pro plan is configured');
@@ -72,10 +92,27 @@ describe('commerce configuration', () => {
       'Adaptive clearing',
       'Advanced tracing',
       'Camera alignment',
+      'Registration Jig',
+      'Place Board',
       'Box generator',
       'Design Studio',
-      'G-code Inspector',
     ]);
+  });
+
+  // ADR-524 Amendment 1: the site changes with the edition. A tool the app
+  // gates as Pro (ADR-540 Amendment 5 added two) must be on the Pro list.
+  it('lists exactly the Pro tools the app gates, in the app’s order', () => {
+    const { keys, entries } = appProFeatures();
+    assert.ok(keys.length > 0, 'ProFeature keys were read from pro-features.ts');
+    assert.deepEqual(
+      entries.map((entry) => entry.key),
+      keys,
+      'every ProFeature has a PRO_FEATURES entry whose name this test can read',
+    );
+    assert.deepEqual(
+      PRO.includes,
+      entries.map((entry) => entry.name),
+    );
   });
 
   it('ships the owner-authorised trial and first-party purchase flow with policy links', () => {
@@ -140,7 +177,7 @@ describe('commerce configuration', () => {
     assert.match(text, /In the Windows desktop app\./);
     assert.match(
       text,
-      /All Pro features are in the desktop app V-carve, 3D relief, Adaptive clearing, Advanced tracing, Camera alignment, Box generator, Design Studio and G-code Inspector are in KerfDesk Pro, which comes with the Windows desktop app\. KerfDesk in the browser is the Free edition/,
+      /All Pro features are in the desktop app V-carve, 3D relief, Adaptive clearing, Advanced tracing, Camera alignment, Registration Jig, Place Board, Box generator and Design Studio are in KerfDesk Pro, which comes with the Windows desktop app\. KerfDesk in the browser is the Free edition/,
     );
     assert.match(text, /Can I use Pro in the browser\? No\. Pro works in the Windows desktop app/);
     assert.doesNotMatch(text, /browser counts as (?:one|a) device/);

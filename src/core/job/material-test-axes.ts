@@ -6,6 +6,7 @@
 import { effectiveGcodeFeedMmPerMin, formatGcodeFeedMmPerMin } from '../gcode/feed-word';
 import { LAYER_DEFAULTS } from '../scene';
 import { formatCalibrationNumber } from './calibration-labels';
+import { MIN_HATCH_SPACING_MM } from './fill-hatching';
 
 export type MaterialTestParameter = 'speed' | 'power' | 'passes' | 'interval';
 
@@ -18,7 +19,9 @@ export const MATERIAL_TEST_PARAMETERS: ReadonlyArray<MaterialTestParameter> = [
 
 export const MIN_TEST_PASSES = 1;
 export const MAX_TEST_PASSES = 20;
-export const MIN_TEST_INTERVAL_MM = 0.01;
+// The fill engine's floor: a denser cell would burn at it under a label that
+// names a spacing it never ran (ADR-497 Amendment 1).
+export const MIN_TEST_INTERVAL_MM = MIN_HATCH_SPACING_MM;
 export const MAX_TEST_INTERVAL_MM = 10;
 const MIN_POWER_PERCENT = 0;
 const MAX_POWER_PERCENT = 100;
@@ -142,7 +145,8 @@ function axisValues(
 function linspace(start: number, end: number, count: number): number[] {
   if (count === 1) return [start];
   const step = (end - start) / (count - 1);
-  return Array.from({ length: count }, (_, index) => start + step * index);
+  // Six decimals, as the Interval Test keeps, so 0.03 is not 0.030000000000000002.
+  return Array.from({ length: count }, (_, index) => Number((start + step * index).toFixed(6)));
 }
 
 function orderedPair(a: number, b: number): readonly [number, number] {

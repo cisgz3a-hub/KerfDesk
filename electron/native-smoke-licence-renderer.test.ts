@@ -2,6 +2,7 @@ import { runInNewContext } from 'node:vm';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nativeLicenceRendererSource } from './native-smoke-licence-renderer.js';
 import type { NativeLicencePhase } from './native-smoke-licence-config.js';
+import { DESKTOP_LICENCE_WINDOW } from './licence-window.js';
 
 // Test the additional phase UI independently of the existing import/save smoke.
 vi.mock('./native-smoke-renderer.js', () => ({
@@ -26,16 +27,18 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-function fixture(initial: typeof free) {
+function fixture(initial: typeof free, licenceWindow = true) {
   let status = initial;
   let submitted = '';
   let studioOpened = false;
-  // The workspace's edition control exists only once the window lets the profile in (ADR-623).
+  // The workspace's edition control exists only once the window lets the profile in
+  // (ADR-623), or from the start while Amendment 3 holds the window off.
   const edition = document.createElement('button');
+  const freeLabel = licenceWindow ? 'Licence needed' : 'Free · Try Pro';
   const update = () => {
     edition.setAttribute(
       'aria-label',
-      `Edition: ${status.edition === 'pro' ? 'Pro' : 'Licence needed'}. Open licence settings`,
+      `Edition: ${status.edition === 'pro' ? 'Pro' : freeLabel}. Open licence settings`,
     );
   };
   update();
@@ -86,7 +89,7 @@ function fixture(initial: typeof free) {
     dialog.append(close);
     document.body.append(dialog);
   };
-  if (status.edition === 'pro') document.body.append(edition, studio);
+  if (status.edition === 'pro' || !licenceWindow) document.body.append(edition, studio);
   else document.body.append(gate);
   const fetch = vi.fn(async (_url, options) => {
     expect(options).toMatchObject({ method: 'GET', headers: { 'X-KerfDesk-Licensing': '1' } });
@@ -95,8 +98,13 @@ function fixture(initial: typeof free) {
   return { fetch, submitted: () => submitted, studioOpened: () => studioOpened };
 }
 
-function execute(phase: NativeLicencePhase, fetch: ReturnType<typeof fixture>['fetch']) {
-  return runInNewContext(nativeLicenceRendererSource(phase, phase === 'activate' ? key : ''), {
+function execute(
+  phase: NativeLicencePhase,
+  fetch: ReturnType<typeof fixture>['fetch'],
+  licenceWindow = true,
+) {
+  const source = nativeLicenceRendererSource(phase, phase === 'activate' ? key : '', licenceWindow);
+  return runInNewContext(source, {
     location: { href: 'app://app/index.html' },
     document,
     HTMLInputElement,
@@ -150,6 +158,28 @@ describe('native qualification uses normal UI controls', () => {
     document.body.append(toolbar);
     await expect(execute('activate', ui.fetch)).rejects.toThrow('without the licence window');
     expect(ui.submitted()).toBe('');
+  });
+
+  it('activates from Help > Licence in KerfDesk Free while the window is held off', async () => {
+    // ADR-623 Amendment 3: the unlicensed profile opens its workspace, as 1.0.20 did.
+    const ui = fixture(free, false);
+    const result = await execute('activate', ui.fetch, false);
+    expect(ui.submitted()).toBe(key);
+    expect(ui.studioOpened()).toBe(true);
+    expect(document.querySelector('[aria-label="KerfDesk licence"]')).toBeNull();
+    expect(result.licenceQualification).toMatchObject({ before: free, after: pro });
+    expect(JSON.stringify(result)).not.toContain(key);
+  });
+
+  it('refuses activation behind a licence window that is held off', async () => {
+    const ui = fixture(free);
+    await expect(execute('activate', ui.fetch, false)).rejects.toThrow('held off');
+    expect(ui.submitted()).toBe('');
+  });
+
+  it('follows the shared licence window setting by default', () => {
+    const source = nativeLicenceRendererSource('offline', '');
+    expect(source.endsWith(`, ${String(DESKTOP_LICENCE_WINDOW)})`)).toBe(true);
   });
 
   it('refuses activation over an existing Pro profile and offline proof from Free', async () => {

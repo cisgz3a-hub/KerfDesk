@@ -10,8 +10,13 @@ import {
   IDENTITY_TRANSFORM,
   REGISTRATION_LAYER_COLOR,
   REGISTRATION_LAYER_ID,
+  polylineToCurveSubpath,
   type ShapeObject,
+  type Vec2,
 } from '../scene';
+import { CURRENT_POLYLINE_FAIRING_VERSION } from './create-polyline';
+import { polylineToPolylines } from './polyline';
+import { boundsOfPolylines } from './polyline-bounds';
 import { createEllipse } from './primitives/create-ellipse';
 import { createRectangle } from './primitives/create-rectangle';
 
@@ -58,6 +63,33 @@ export function createRegistrationCircle(args: {
     transform: { ...IDENTITY_TRANSFORM, x: args.x ?? 0, y: args.y ?? 0 },
   });
   return { ...circle, operationIds: [REGISTRATION_LAYER_ID] };
+}
+
+export function createRegistrationOutline(args: {
+  readonly pointsMm: ReadonlyArray<Vec2>;
+  readonly x?: number;
+  readonly y?: number;
+  readonly id?: string;
+}): ShapeObject {
+  const spec = { points: args.pointsMm, closed: true };
+  const polylines = polylineToPolylines(spec);
+  return {
+    kind: 'shape',
+    id: args.id ?? REGISTRATION_BOX_OBJECT_ID,
+    spec: { kind: 'polyline', ...spec },
+    color: REGISTRATION_LAYER_COLOR,
+    bounds: boundsOfPolylines(polylines),
+    transform: { ...IDENTITY_TRANSFORM, x: args.x ?? 0, y: args.y ?? 0 },
+    paths: [
+      {
+        color: REGISTRATION_LAYER_COLOR,
+        polylines,
+        curves: polylines.map(polylineToCurveSubpath),
+      },
+    ],
+    operationIds: [REGISTRATION_LAYER_ID],
+    fairingVersion: CURRENT_POLYLINE_FAIRING_VERSION,
+  };
 }
 
 function sanitizeSize(value: number): number {

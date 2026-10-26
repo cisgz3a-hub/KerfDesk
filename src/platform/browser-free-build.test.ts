@@ -5,8 +5,10 @@ import { runInNewContext } from 'node:vm';
 import { build } from 'vite';
 import { describe, expect, it } from 'vitest';
 import { TRACE_PRESETS } from '../core/trace/trace-presets';
+import { DEFAULT_CNC_TAPERED_INLAY } from '../core/scene/cnc-tapered-inlay';
 import type {
   CncLayerSettings,
+  CncTool,
   ImportedSvg,
   Scene,
   createLayer,
@@ -35,6 +37,11 @@ describe('browser Free build boundary', () => {
     ).toEqual([true, true, true, true, true]);
     expect(isBrowserFreeMode('desktop')).toBe(false);
     expect(isBrowserFreeMode('test', 'serve')).toBe(false);
+  });
+
+  it('keeps the free G-code Inspector in the browser build (ADR-627)', () => {
+    const paths = Object.keys(PRO_BUILD_ENTRIES);
+    expect(paths.some((path) => path.startsWith('src/ui/gcode-inspector/'))).toBe(false);
   });
 
   it('checks every explicit source boundary and refuses renamed implementations', () => {
@@ -125,7 +132,35 @@ describe('browser Free build boundary', () => {
       const scene = cncScene(probe, choice);
       expect(() => probe.compile(scene, probe.device, probe.machine)).toThrow(DESKTOP_TOOL_MESSAGE);
     }
+    // ADR-540 Amendment 6: a tapered V-bit inlay pair cuts V-carve passes, so it
+    // is Pro and cannot compile here, while the straight pair above stays Free.
+    const machine = { ...probe.machine, tools: [...probe.machine.tools, POINTED_V60] };
+    const tapered = cncScene(probe, TAPERED_INLAY);
+    expect(() => probe.compile(tapered, probe.device, machine)).toThrow(DESKTOP_TOOL_MESSAGE);
   }, 30_000);
+
+  it('compiles that tapered inlay pair from the desktop source', async () => {
+    // Proves the Free refusal above comes from the stripped V-carve engine.
+    const scene = await import('../core/scene');
+    const { DEFAULT_DEVICE_PROFILE } = await import('../core/devices');
+    const { compileCncJob } = await import('../core/cnc/compile-cnc-job');
+    const source = {
+      createLayer: scene.createLayer,
+      defaults: scene.DEFAULT_CNC_LAYER_SETTINGS,
+      transform: scene.IDENTITY_TRANSFORM,
+    };
+    const machine = {
+      ...scene.DEFAULT_CNC_MACHINE_CONFIG,
+      tools: [...scene.DEFAULT_CNC_MACHINE_CONFIG.tools, POINTED_V60],
+    };
+    const job = compileCncJob(cncScene(source, TAPERED_INLAY), DEFAULT_DEVICE_PROFILE, machine);
+    expect(
+      job.groups.reduce(
+        (count, group) => count + (group.kind === 'cnc' ? group.passes.length : 0),
+        0,
+      ),
+    ).toBeGreaterThan(0);
+  }, 60_000);
 });
 
 const boxSpec = {
@@ -213,6 +248,29 @@ async function traceBundle(mode = 'production'): Promise<{
   return runInNewContext(`${chunk.code}\ntraceProbe;`) as Awaited<ReturnType<typeof traceBundle>>;
 }
 
+// The pointed bit and fit of the tapered inlay compiler's own tests.
+const POINTED_V60: CncTool = {
+  id: 'v60',
+  name: 'Test pointed V60',
+  kind: 'v-bit',
+  diameterMm: 6,
+  tipAngleDeg: 60,
+};
+const TAPERED_INLAY: Partial<CncLayerSettings> = {
+  cutType: 'inlay-pair',
+  toolId: POINTED_V60.id,
+  depthPerPassMm: 0.25,
+  vResolutionMm: 0.1,
+  taperedInlay: {
+    ...DEFAULT_CNC_TAPERED_INLAY,
+    pocketDepthMm: 0.7,
+    engagementDepthMm: 0.5,
+    glueGapMm: 0.2,
+    surfaceClearanceMm: 0.3,
+    plugBorderMm: 1,
+  },
+};
+
 type CncProbe = {
   compile: typeof compileCncJob;
   diagnostics: typeof findCncOffsetLadderDiagnostics;
@@ -259,7 +317,10 @@ async function cncBundle(): Promise<CncProbe> {
   return runInNewContext(`${chunk.code}\ncncProbe;`, { TextEncoder, TextDecoder }) as CncProbe;
 }
 
-function cncScene(probe: CncProbe, choice: Partial<CncLayerSettings>): Scene {
+function cncScene(
+  probe: Pick<CncProbe, 'createLayer' | 'defaults' | 'transform'>,
+  choice: Partial<CncLayerSettings>,
+): Scene {
   const layer = {
     ...probe.createLayer({ id: 'L1', color: '#ff0000' }),
     cnc: { ...probe.defaults, tabsEnabled: false, depthMm: 2, depthPerPassMm: 1, ...choice },

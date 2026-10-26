@@ -11,6 +11,7 @@ import { hasPendingControllerWrite } from './laser-start-queue-fence';
 import { disconnectedControllerQualification } from './laser-controller-qualification';
 import { emptyControllerBuildInfoState } from './laser-controller-build-info';
 import {
+  controllerLink,
   disconnectDuringFireNotice,
   disconnectDuringJobNotice,
   disconnectDuringMotionNotice,
@@ -37,7 +38,7 @@ export const UNKNOWN_IDLE_STATUS_MESSAGE =
 export const MOTION_OPERATION_ACTIVE_MESSAGE =
   'A jog or frame operation is active. Wait for GRBL to report Idle, or cancel the operation, before sending another motion command.';
 export const FIRE_ACTIVE_COMMAND_MESSAGE =
-  'Release the momentary Fire control before sending another machine command.';
+  'Release the momentary Fire control, or switch the laser dot off, before sending another machine command.';
 export const MPG_ACTIVE_MOTION_MESSAGE =
   'Jog and Frame are unavailable while grblHAL reports MPG mode active. Return motion control from the pendant/MPG to KerfDesk and wait for an MPG:0 report.';
 /** Operator guidance for a command rejected while grblHAL MPG owns transport control. */
@@ -51,6 +52,8 @@ export const TOOL_CHANGE_ACK_OWED_MESSAGE =
   'The controller has not yet answered your last command. Continue once it has, so its answer is not counted as a job line.';
 export const TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE =
   'Load the new bit, select it as the Active bit, and establish its Z zero on the stock top before continuing.';
+export const TOOL_CHANGE_XY_ORIGIN_MESSAGE =
+  'A tool change re-zeroes Z only. The rest of the job is placed on the X/Y origin it started with, so the XYZ corner probe and Set or Reset origin wait until the job ends. Use the Z probe or Zero Z for the new bit.';
 
 export function serialWriteErrorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -96,6 +99,14 @@ export function setupBlockingJobCommandBlockMessage(state: LaserState): string |
   if (!isActiveJob(state.streamer)) return null;
   if (state.streamer?.status !== 'tool-change') return ACTIVE_JOB_COMMAND_MESSAGE;
   return toolChangeReady(state) ? null : TOOL_CHANGE_NOT_IDLE_MESSAGE;
+}
+
+// The setup gate opens in a drained hold so the new bit can be touched off,
+// which re-zeroes Z only. The rest of the job runs on the X/Y origin it started
+// with, and Continue cannot see an X/Y change, so every X/Y origin writer is
+// refused for the whole hold (controller audit v2 C2-P1-1, ADR-375 Amendment 3).
+export function toolChangeXyOriginBlockMessage(state: Pick<LaserState, 'streamer'>): string | null {
+  return state.streamer?.status === 'tool-change' ? TOOL_CHANGE_XY_ORIGIN_MESSAGE : null;
 }
 
 // Ready to touch off the new bit only when the pre-M0 retract/park has fully
@@ -264,7 +275,8 @@ export function assertAutofocusIdle(state: LaserState): void {
 
 // Guards the origin actions (Zero-Z, Set Origin). Uses the setup-motion gate,
 // so re-zeroing the new bit is permitted during a settled (Idle) tool-change
-// hold but blocked during any other active job.
+// hold but blocked during any other active job. The origin readiness check
+// also refuses an X/Y origin action in that hold (toolChangeXyOriginBlockMessage).
 export function assertNoActiveJob(state: LaserState): void {
   const message = setupBlockingJobCommandBlockMessage(state);
   if (message !== null) throw new Error(message);
@@ -474,16 +486,18 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
 // Only a link lost while the machine may still move raises the E-stop banner
 // (ADR-639, amending P0-B). A settings or build-info read, a reset the
 // controller already answered at rest, or the handshake moves nothing: its
-// incident is logged and the rail shows the ordinary disconnected state.
+// incident is logged and the rail shows the ordinary disconnected state. The
+// notice names the link the session ran over (controller audit D7-P3-3).
 function portCloseSafetyNotice(state: LaserState, wasActiveJob: boolean): LaserSafetyNotice | null {
-  if (state.fireActive) return disconnectDuringFireNotice();
+  const link = controllerLink(state);
+  if (state.fireActive) return disconnectDuringFireNotice(link);
   const operationMotion = controllerOperation.controllerOperationMotion(
     state.controllerOperation,
     state.statusReport,
   );
-  if (wasActiveJob || operationMotion === 'job') return disconnectDuringJobNotice();
+  if (wasActiveJob || operationMotion === 'job') return disconnectDuringJobNotice(link);
   if (state.motionOperation !== null || operationMotion === 'motion') {
-    return disconnectDuringMotionNotice();
+    return disconnectDuringMotionNotice(link);
   }
   return null;
 }

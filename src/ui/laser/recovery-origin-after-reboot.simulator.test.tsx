@@ -60,11 +60,18 @@ describe('User Origin recovery after a controller reboot', () => {
       expect(savedWorkOffsetMm(artifact)).toMatchObject(ORIGIN);
 
       // The reboot: machine zero where it was (the first controller also
-      // started there), no G92 origin.
+      // started there), no G92 origin. Its banner tells the saved run the
+      // controller restarted, so the record is revised (ADR-398 Amendment 3).
       h.simulator = await connectSimulator();
       expect(useLaserStore.getState().workOriginActive).toBe(false);
+      await vi.waitFor(() =>
+        expect(
+          h.repository.getSnapshot().recoveryCapsule?.interruption.plannerBacklog,
+        ).toBeDefined(),
+      );
+      const revised = await expectCapsuleFor(h.repository, runId);
       vi.mocked(jobAwareAlert).mockClear();
-      expect(await drive(runLaserRecoveryCapsuleFlow(capsule, h.repository))).toBe(false);
+      expect(await drive(runLaserRecoveryCapsuleFlow(revised, h.repository))).toBe(false);
       const refusal = String(vi.mocked(jobAwareAlert).mock.calls[0]?.[0]);
       expect(refusal).toContain('no longer has the work origin this job ran with');
       expect(refusal).toContain('X 20, Y 30 mm from machine zero');
@@ -79,7 +86,7 @@ describe('User Origin recovery after a controller reboot', () => {
       expect(h.simulator.state().mpos).toMatchObject({ x: 0, y: 0 });
 
       vi.mocked(jobAwareAlert).mockClear();
-      expect(await drive(runLaserRecoveryCapsuleFlow(capsule, h.repository))).toBe(true);
+      expect(await drive(runLaserRecoveryCapsuleFlow(revised, h.repository))).toBe(true);
       expect(jobAwareAlert).not.toHaveBeenCalled();
       await tick(8_000);
       expect(useLaserStore.getState().streamer).toBeNull();

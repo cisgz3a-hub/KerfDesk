@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createProject, DEFAULT_CNC_MACHINE_CONFIG, type Project } from '../../core/scene';
 import {
+  deviceInspectionContext,
   projectInspectionContext as contextWithTiming,
   withCurrentDevice,
   type GcodeInspectionContext,
@@ -74,6 +75,14 @@ describe('Inspector design context (ADR-487)', () => {
 });
 
 describe('Inspector timing context (ADR-425)', () => {
+  it.each(['laser', 'cnc'] as const)(
+    'uses the connected controller planner for %s inspection',
+    (kind) => {
+      const device = { ...createProject().device, controllerKind: 'smoothieware' as const };
+      expect(deviceInspectionContext(device, kind, 'marlin').timing?.plannerBlocks).toBe(15);
+      expect(deviceInspectionContext(device, kind).timing?.plannerBlocks).toBe(32);
+    },
+  );
   it('times compiled programs against the device limits and calibration Job Review uses', () => {
     const project = createProject();
     const device = {

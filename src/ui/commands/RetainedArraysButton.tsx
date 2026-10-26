@@ -145,17 +145,16 @@ function createRetainedArrayApply(
         setError(materialized.message);
         return;
       }
-      const result = useStore
-        .getState()
-        .regenerateArrayLayout(
-          layout.id,
-          spec,
-          materialized?.ok === true ? materialized.materialized : undefined,
-          captured,
-          isCurrent,
-        );
-      if (result === null) onClose();
-      else setError(result);
+      const result = useStore.getState().regenerateArrayLayout(
+        layout.id,
+        spec,
+        materialized?.ok === true ? materialized.materialized : undefined,
+        captured,
+        isCurrent,
+        // Also closes once a regeneration held for Pro lands after unlock.
+        onClose,
+      );
+      if (result !== null) setError(result);
     } catch (caught) {
       if (isCurrent()) setError(caught instanceof Error ? caught.message : String(caught));
     } finally {

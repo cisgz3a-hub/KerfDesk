@@ -2,7 +2,11 @@ import { type StandardSchemaWithJSON } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import { MCP_ARRANGE_ACTIONS, mcpTextPatchSchema } from './authoring-schemas.js';
 import { mcpMachineInputSchemas } from './machine-schemas.js';
-import { mcpDesignInputSchemas, mcpOperationPatchSchema } from './design-schemas.js';
+import {
+  MCP_IMPORT_BASE64_LIMIT,
+  mcpDesignInputSchemas,
+  mcpOperationPatchSchema,
+} from './design-schemas.js';
 import { mcpSelectionFields, validSelectionFields } from './selection-schemas.js';
 
 export const MCP_MAX_ITEMS = 200;
@@ -26,6 +30,7 @@ export const mcpInputSchemas = {
   get_app_status: z.strictObject({}),
   list_material_recipes: z.strictObject({}),
   review_job: z.strictObject({}),
+  get_board: z.strictObject({}),
   get_workspace_preview: z.strictObject({}),
   list_fonts: z.strictObject({}),
   get_text: z.strictObject({ artworkId: id }),
@@ -79,6 +84,31 @@ export const mcpInputSchemas = {
     artworkIds: artworkIds.min(1),
     action: z.enum(MCP_ARRANGE_ACTIONS),
   }),
+  set_board_photo: z.strictObject({
+    ...writeAdmission,
+    mimeType: z.enum(['image/jpeg', 'image/png']),
+    dataBase64: z
+      .string()
+      .min(4)
+      .max(MCP_IMPORT_BASE64_LIMIT)
+      .regex(/^[A-Za-z0-9+/]*={0,2}$/)
+      .refine((value) => value.length % 4 === 0),
+  }),
+  place_on_board: z
+    .strictObject({
+      ...writeAdmission,
+      artworkIds: artworkIds.min(1),
+      action: z.enum(['center', 'fit', 'array']),
+      marginMm: z.number().min(0).max(1000).optional(),
+      rows: z.number().int().min(1).max(50).optional(),
+      cols: z.number().int().min(1).max(50).optional(),
+      gapMm: z.number().min(0).max(1000).optional(),
+    })
+    .refine(
+      (value) =>
+        (value.rows === undefined) === (value.cols === undefined) &&
+        (value.action !== 'array' || value.artworkIds.length === 1),
+    ),
   undo: z.strictObject(writeAdmission),
   redo: z.strictObject(writeAdmission),
   ...mcpDesignInputSchemas,
@@ -99,6 +129,8 @@ export const MCP_WRITE_COMMANDS = new Set<KerfDeskMcpCommand>([
   'update_operation',
   'update_text',
   'arrange_artwork',
+  'set_board_photo',
+  'place_on_board',
   'undo',
   'redo',
   'create_operation',
@@ -123,6 +155,8 @@ export const MCP_CONTROL_COMMANDS = new Set<KerfDeskMcpCommand>([
   'disconnect_machine',
   'home_machine',
   'set_work_origin',
+  'capture_board_point',
+  'finish_board',
   'pause_job',
   'resume_job',
   'jog_hold_start',

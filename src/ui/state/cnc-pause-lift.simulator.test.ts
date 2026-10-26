@@ -15,10 +15,20 @@ import {
   RT_SPINDLE_OV_MINUS_10,
   type RealtimeOverrideByte,
 } from '../../core/controllers/grbl';
-import { cncPauseLiftSkipReason } from './cnc-pause-lift-state';
+import {
+  cncJobLaserModeEnabled,
+  cncPauseControllerKind,
+  cncPauseLiftPhase,
+  cncPauseLiftSkipReason,
+} from './cnc-pause-lift-state';
+import {
+  CNC_RESUME_FLUIDNC_ADVISORY_MESSAGE,
+  cncResumeAdvisoryNotice,
+} from './cnc-pause-resume-policy';
 import { cncControllerEpochOf, createCncSetupAttestation } from './cnc-setup-attestation';
 import { currentStreamResetMayLosePosition } from './job-stop-request';
 import { useLaserStore } from './laser-store';
+import type { ConnectControllerOptions } from './laser-store-action-types';
 import { resetStore } from './test-helpers';
 
 const SEGMENTS = 20;
@@ -91,9 +101,12 @@ async function settle<T>(action: Promise<T>, limitMs = 30_000): Promise<T> {
   return tracked;
 }
 
-async function connectCnc(options: CreateGrblSimulatorOptions = {}): Promise<GrblSimulator> {
+async function connectCnc(
+  options: CreateGrblSimulatorOptions = {},
+  connectOptions: ConnectControllerOptions = {},
+): Promise<GrblSimulator> {
   const sim = createGrblSimulator({ motionMs: 100, plannerBlocks: 4, ...options });
-  await useLaserStore.getState().connect(sim.adapter);
+  await useLaserStore.getState().connect(sim.adapter, connectOptions);
   await pump(20);
   await pump(1100);
   expect(useLaserStore.getState().statusReport?.state).toBe('Idle');
@@ -259,6 +272,46 @@ describe('CNC Pause and lift against the GRBL simulator', () => {
       state.log.some((line) => line.includes('Paused without lifting the bit: Laser mode')),
     ).toBe(true);
   });
+
+  // ADR-180 Amendment 7 (audit v3 D4-P2-2): FluidNC keeps the door pause. Its
+  // `$I` lists parking whatever its YAML says, so the refusal names FluidNC,
+  // not parking, and the advice beside Resume names spinup_ms. The banner
+  // decides even when the profile picked GRBL.
+  it.each(['fluidnc', 'grbl-v1.1'] as const)(
+    'keeps the plain door pause under a FluidNC banner (%s driver)',
+    async (controllerKind) => {
+      const sim = await connectCnc(
+        { settings: CNC_SETTINGS, firmwareBanner: "Grbl 3.7 [FluidNC v4.0.3 (wifi) '$' for help]" },
+        { controllerKind },
+      );
+      await startCnc(PROGRAM);
+      await pump(1500);
+      await settle(useLaserStore.getState().pauseJob());
+
+      const paused = useLaserStore.getState();
+      expect(cncPauseControllerKind(paused)).toBe('fluidnc');
+      expect(paused.cncPauseLift ?? null).toBeNull();
+      expect(paused.streamer?.status).toBe('paused');
+      expect(sim.outbound()).toContain('\x84');
+      expect(sim.outbound()).not.toContain('\x18');
+      expect(cncPauseLiftSkipReason(paused)).toBe('KerfDesk does not lift the bit on FluidNC.');
+      const advisory = cncResumeAdvisoryNotice(
+        paused.activeJobMachineKind,
+        cncJobLaserModeEnabled(paused),
+        cncPauseLiftPhase(paused),
+        cncPauseLiftSkipReason(paused),
+        cncPauseControllerKind(paused),
+      );
+      expect(advisory).toBe(CNC_RESUME_FLUIDNC_ADVISORY_MESSAGE);
+
+      const beforeResume = sim.outbound().length;
+      await settle(useLaserStore.getState().resumeJob());
+      const resumed = sim.outbound().slice(beforeResume);
+      expect(resumed).toContain('~');
+      expect(resumed).not.toContain('\x18');
+      expect(useLaserStore.getState().streamer?.status).toBe('streaming');
+    },
+  );
 });
 
 // ADR-411 Amendment 1: the re-audit's gaps in the lift itself.

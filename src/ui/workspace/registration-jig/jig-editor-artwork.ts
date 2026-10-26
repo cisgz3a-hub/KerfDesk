@@ -4,12 +4,14 @@ import {
   sceneObjectHasVisibleLayer,
   type SceneObject,
   type TextObject,
+  type TracedImage,
 } from '../../../core/scene';
 import { applyFreshImport, applyUpsertText, pruneOrphanLayers } from '../../state/scene-mutations';
 import { removeObjectIdsFromGroups } from '../../state/scene-group-actions';
 import { repairDanglingObjectDependencies } from '../../state/object-delete-actions';
 import { applyRegistrationOutput } from '../../state/registration-output-actions';
 import { fitJigArtwork } from './fit-jig-artwork';
+import { replaceJigImageWithTrace } from './jig-image-trace';
 import {
   changeJigDraft,
   selectedJigIds,
@@ -86,6 +88,16 @@ export function upsertJigText(session: JigEditorSession, object: TextObject): Ji
     selectedObjectId: object.id,
     additionalSelectedIds: new Set(),
   });
+}
+
+/** Replaces a jig image and its outline copies with a trace of it (ADR-633). */
+export function traceJigImage(
+  session: JigEditorSession,
+  imageId: string,
+  traced: TracedImage,
+): JigEditorSession {
+  const draft = replaceJigImageWithTrace(session.draft, imageId, traced);
+  return draft === null ? session : finishArtworkEdit(session, draft);
 }
 
 function finishArtworkEdit(session: JigEditorSession, initial: JigDraft): JigEditorSession {

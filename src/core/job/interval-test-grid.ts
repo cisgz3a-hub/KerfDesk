@@ -8,6 +8,7 @@ import {
   type Scene,
 } from '../scene';
 import {
+  calibrationLabelSizeToFit,
   calibrationLabelWidthMm,
   createCalibrationLabelLayer,
   createCalibrationLabelObject,
@@ -15,6 +16,7 @@ import {
   formatCalibrationNumber,
 } from './calibration-labels';
 import { effectiveCalibrationSpeed } from './material-test-axes';
+import { MIN_HATCH_SPACING_MM } from './fill-hatching';
 import { formatGcodeFeedMmPerMin } from '../gcode/feed-word';
 
 const MIN_STEPS = 1;
@@ -24,7 +26,7 @@ const MIN_POWER_PERCENT = 0;
 const MAX_POWER_PERCENT = 100;
 const DEFAULT_GAP_MM = 2;
 const MIN_SWATCH_SIZE_MM = 1;
-const MIN_INTERVAL_MM = 0.05;
+const MIN_INTERVAL_MM = MIN_HATCH_SPACING_MM;
 const DEFAULT_INTERVAL_MM = 0.1;
 const DEFAULT_ORIGIN = { x: 0, y: 0 } as const;
 
@@ -153,8 +155,7 @@ function intervalTestLabelObjects(args: {
   const intervalLabels = args.cells.map((cell) => {
     const text = formatCalibrationInterval(cell.intervalMm);
     // Keep every interval digit while fitting the label within its own swatch.
-    const width = calibrationLabelWidthMm(text, args.labelSize);
-    const sizeMm = args.labelSize * Math.min(1, (args.swatchSize * 0.9) / width);
+    const sizeMm = calibrationLabelSizeToFit(text, args.labelSize, args.swatchSize * 0.9);
     return createCalibrationLabelObject({
       id: `interval-test-label-${cell.step}`,
       operationId: args.labelLayerId,

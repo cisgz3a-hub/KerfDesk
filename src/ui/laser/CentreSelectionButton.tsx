@@ -1,10 +1,13 @@
 import { rotaryAppliesTo } from '../../core/job/rotary-job';
 import { machineKindOf } from '../../core/scene';
 import {
-  positioningLightIssue,
+  devicePositioningLightIssue,
+  isLaserDotLight,
+  LASER_DOT_AUTO_OFF_MS,
   positioningLightSupported,
 } from '../../core/devices/positioning-light';
 import { useStore } from '../state';
+import { laserDotLit, withoutLaserDotLatch } from '../state/laser-dot-light';
 import { useLaserStore } from '../state/laser-store';
 import { headMoveBlockMessage } from './head-move-dispatch';
 import { centreSelectionLight } from './centre-selection-light';
@@ -24,8 +27,12 @@ export function CentreSelectionButton({
   const needsSetup = positioningSetupNeeded(project.device);
   const fileOnly = project.device.controllerKind === 'ruida';
   const lightEnabled = useLaserStore((state) => state.positioningLightEnabled);
-  const machineBlocked = useLaserStore((state) => headMoveBlockMessage(state));
+  // Centring puts the dot out before it moves, so the dot's own latch is no block.
+  const machineBlocked = useLaserStore((state) =>
+    headMoveBlockMessage(withoutLaserDotLatch(state)),
+  );
   const placementBlocked = usePlacementBlockMessage();
+  const dot = isLaserDotLight(project.device.positioningLight);
   const blocked = artworkCentreBlockMessage({
     fileOnly,
     needsSetup,
@@ -43,7 +50,7 @@ export function CentreSelectionButton({
       {laserMode && targets.length > 1 ? (
         <ArtworkTargetChooser targets={targets} target={target} choose={chooseTarget} />
       ) : null}
-      {laserMode ? <ArtworkCentreAction target={target} blocked={blocked} /> : null}
+      {laserMode ? <ArtworkCentreAction target={target} blocked={blocked} dot={dot} /> : null}
       {laserMode && needsSetup && !fileOnly ? (
         <button
           type="button"
@@ -56,10 +63,12 @@ export function CentreSelectionButton({
           Set up LED
         </button>
       ) : null}
-      <PositioningLightControls configured={laserMode && !needsSetup && !fileOnly} />
+      <PositioningLightControls configured={laserMode && !needsSetup && !fileOnly} dot={dot} />
     </div>
   );
 }
+
+const AUTO_OFF_S = LASER_DOT_AUTO_OFF_MS / 1000;
 
 function ArtworkTargetChooser(props: {
   readonly targets: ReadonlyArray<ArtworkLightTarget>;
@@ -90,6 +99,7 @@ function ArtworkTargetChooser(props: {
 function ArtworkCentreAction(props: {
   readonly target: ArtworkLightTarget | undefined;
   readonly blocked: string | null;
+  readonly dot: boolean;
 }): JSX.Element {
   return (
     <button
@@ -98,7 +108,9 @@ function ArtworkCentreAction(props: {
       aria-label="Artwork centre & LED"
       title={
         props.blocked ??
-        'Move with the cutting beam off to this artwork’s centre on the board, then leave the separate LED on until you switch it off.'
+        (props.dot
+          ? `Move with the beam off to this artwork’s centre on the board, then turn the laser on at low power so its dot shows where it will burn. Wear laser safety glasses. KerfDesk requests off after ${AUTO_OFF_S} s while the app and connection remain responsive.`
+          : 'Move with the cutting beam off to this artwork’s centre on the board, then leave the separate LED on until you switch it off.')
       }
       disabled={props.blocked !== null}
       onClick={() => {
@@ -115,13 +127,18 @@ function ArtworkCentreAction(props: {
 
 function PositioningLightControls({
   configured,
+  dot,
 }: {
   readonly configured: boolean;
+  readonly dot: boolean;
 }): JSX.Element | null {
   const lightEnabled = useLaserStore((state) => state.positioningLightEnabled);
+  // A reset or LASER OFF can put the dot out without LED off: the beam's own
+  // latch says whether it may still be on.
+  const lit = useLaserStore((state) => (dot ? laserDotLit(state) : state.positioningLightEnabled));
   const on = useLaserStore((state) => state.switchPositioningLightOn);
   const off = useLaserStore((state) => state.switchPositioningLightOff);
-  const blocked = useLaserStore((state) => headMoveBlockMessage(state));
+  const blocked = useLaserStore((state) => headMoveBlockMessage(withoutLaserDotLatch(state)));
   if (!lightEnabled && !configured) return null;
   const switchLight = (enabled: boolean): void => {
     void (enabled ? on() : off()).catch(
@@ -139,8 +156,13 @@ function PositioningLightControls({
           type="button"
           className="lf-btn"
           aria-label="LED on"
-          aria-pressed={lightEnabled}
-          title={blocked ?? 'Switch on the separate LED here without moving the head. No timer.'}
+          aria-pressed={lit}
+          title={
+            blocked ??
+            (dot
+              ? `Turn the laser on at low power here, without moving the head, so its dot shows where it will burn. Wear laser safety glasses. KerfDesk requests off after ${AUTO_OFF_S} s while the app and connection remain responsive.`
+              : 'Switch on the separate LED here without moving the head. No timer.')
+          }
           disabled={blocked !== null}
           onClick={() => switchLight(true)}
         >
@@ -153,7 +175,9 @@ function PositioningLightControls({
         aria-label="LED off"
         title={
           blocked ??
-          'Switch off the separate positioning light. Its physical state is not reported by the controller.'
+          (dot
+            ? 'Switch the laser dot off (M5).'
+            : 'Switch off the separate positioning light. Its physical state is not reported by the controller.')
         }
         disabled={blocked !== null}
         onClick={() => switchLight(false)}
@@ -185,12 +209,5 @@ function positioningControlsVisible(
 function positioningSetupNeeded(
   device: ReturnType<typeof useStore.getState>['project']['device'],
 ): boolean {
-  return (
-    device.positioningLight === undefined ||
-    positioningLightIssue(
-      device.positioningLight,
-      device.controllerKind,
-      device.gcodeDialect?.dialectId,
-    ) !== null
-  );
+  return device.positioningLight === undefined || devicePositioningLightIssue(device) !== null;
 }

@@ -1,7 +1,7 @@
-import { compilationPolylines } from '../../core/job/compilation-polylines';
+import { compilationPolylinesSteps } from '../../core/job/compilation-polylines';
 import type { ColoredPath, Polyline, Transform } from '../../core/scene';
 import { preserveContourTopologySteps } from '../../core/trace/contour-topology';
-import { runTraceSteps } from '../../core/trace/trace-steps';
+import type { TraceSteps } from '../../core/trace/trace-steps';
 
 type Boundary = {
   readonly pathIndex: number;
@@ -13,24 +13,23 @@ type Boundary = {
 
 /** A per-outline distance bound cannot preserve a narrow gap or hole. Check
  * all closed boundaries together against the geometry compile reads, and
- * undo only conflicting simplifications. Fitted canonical curves stay intact. */
-export function preserveLaserTraceTopology(
+ * undo only conflicting simplifications. Fitted canonical curves stay intact.
+ * Resumable steps, so a dense trace can be checked cooperatively. */
+export function* preserveLaserTraceTopologySteps(
   source: ReadonlyArray<ColoredPath>,
   candidates: ColoredPath[],
   placement: Transform,
-): ColoredPath[] {
+): TraceSteps<ColoredPath[]> {
   if (candidates.every((candidate, index) => candidate === source[index])) return candidates;
-  const boundaries = closedBoundaries(source, candidates, placement);
+  const boundaries = yield* closedBoundariesSteps(source, candidates, placement);
   if (!boundaries.some((boundary) => boundary.simplified)) return candidates;
-  const retained = runTraceSteps(
-    preserveContourTopologySteps(
-      boundaries.map((boundary) => ({
-        source: boundary.source,
-        polyline: boundary.polyline,
-        baseline: boundary.source,
-        refine: () => boundary.source,
-      })),
-    ),
+  const retained = yield* preserveContourTopologySteps(
+    boundaries.map((boundary) => ({
+      source: boundary.source,
+      polyline: boundary.polyline,
+      baseline: boundary.source,
+      refine: () => boundary.source,
+    })),
   );
   const fallbacks = new Map<number, Map<number, Polyline>>();
   boundaries.forEach((boundary, index) => {
@@ -60,17 +59,18 @@ export function preserveLaserTraceTopology(
   });
 }
 
-function closedBoundaries(
+function* closedBoundariesSteps(
   source: ReadonlyArray<ColoredPath>,
   candidates: ReadonlyArray<ColoredPath>,
   placement: Transform,
-): Boundary[] {
+): TraceSteps<Boundary[]> {
   const boundaries: Boundary[] = [];
-  candidates.forEach((candidate, pathIndex) => {
+  for (const [pathIndex, candidate] of candidates.entries()) {
     const original = source[pathIndex];
-    if (original === undefined) return;
-    const before = compilationPolylines(original, placement);
-    const after = candidate === original ? before : compilationPolylines(candidate, placement);
+    if (original === undefined) continue;
+    const before = yield* compilationPolylinesSteps(original, placement);
+    const after =
+      candidate === original ? before : yield* compilationPolylinesSteps(candidate, placement);
     after.forEach((polyline, subpathIndex) => {
       const previous = before[subpathIndex];
       if (previous === undefined || !previous.closed || !polyline.closed) return;
@@ -88,6 +88,6 @@ function closedBoundaries(
             : candidate.curves?.[subpathIndex] !== curve,
       });
     });
-  });
+  }
   return boundaries;
 }

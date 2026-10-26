@@ -33,12 +33,9 @@ export function advanceRunClock(
   run: RunView | null,
   now: number,
 ): RunClockStep {
-  const sameRun =
-    clock !== null &&
-    run !== null &&
-    clock.plan === run.plan &&
-    clock.startedAtMs === run.startedAtMs;
-  if (sameRun) return advanceSameRun(clock, run.lifecycle, now);
+  if (clock !== null && run !== null && sameJob(clock, run)) {
+    return advanceSameRun(clock, run.lifecycle, now);
+  }
   // The run changed or went away: whatever was still open ends here.
   const closed = clock === null ? NOTHING : endRun(clock, now);
   if (run === null) return { ...closed, clock: null };
@@ -60,6 +57,12 @@ export function advanceRunClock(
 }
 
 const NOTHING: RunClockStep = { clock: null, addMs: 0, jobEnded: false };
+
+// Pause and lift re-issues the run's plan with a new positionEpoch (ADR-411),
+// so a job is its motion and start time, not the plan object (audit v3 D4-P3-1).
+function sameJob(clock: RunClock, run: RunView): boolean {
+  return clock.plan.manifest === run.plan.manifest && clock.startedAtMs === run.startedAtMs;
+}
 
 function advanceSameRun(
   clock: RunClock,

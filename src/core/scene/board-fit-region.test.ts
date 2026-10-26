@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { boardFitRegion } from './board-fit-region';
+import { createRegistrationOutline } from '../shapes/registration-box';
+import { pointInPolygon } from './board-outline';
 import {
   IDENTITY_TRANSFORM,
   type Bounds,
@@ -60,5 +62,30 @@ describe('boardFitRegion', () => {
     expect((region.minX + region.maxX) / 2).toBeCloseTo(65);
     expect((region.minY + region.maxY) / 2).toBeCloseTo(75);
     expect(region.maxX - region.minX).toBeCloseTo(90 / Math.SQRT2);
+  });
+
+  it('returns a conservative inscribed region for a closed outline and caches it', () => {
+    const points = [
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+      { x: 100, y: 35 },
+      { x: 35, y: 35 },
+      { x: 35, y: 100 },
+      { x: 0, y: 100 },
+    ];
+    const outline = createRegistrationOutline({ pointsMm: points, x: 10, y: 20 });
+    const region = boardFitRegion(outline);
+    expect(boardFitRegion(outline)).toBe(region);
+    expect(region.maxX - region.minX).toBeGreaterThan(90);
+    expect(region.maxY - region.minY).toBeLessThan(35);
+    const scenePolygon = points.map((point) => ({ x: point.x + 10, y: point.y + 20 }));
+    for (const point of [
+      { x: region.minX, y: region.minY },
+      { x: region.maxX, y: region.minY },
+      { x: region.maxX, y: region.maxY },
+      { x: region.minX, y: region.maxY },
+    ]) {
+      expect(pointInPolygon(point, scenePolygon)).toBe(true);
+    }
   });
 });

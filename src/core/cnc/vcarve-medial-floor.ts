@@ -1,5 +1,12 @@
-import { buildOffsetLadder, insetContoursChecked } from '../geometry/offset-ladder';
-import { normalizeClosedPolylineTreeEvenOddChecked } from '../geometry/polygon-difference';
+import {
+  offsetClosedPolylinesForKerfChecked,
+  offsetClosedPolylinesWithRoundJoinsChecked,
+} from '../geometry/kerf-offset';
+import { buildOffsetLadder, type InsetContours } from '../geometry/offset-ladder';
+import {
+  normalizeClosedPolylineTreeEvenOddChecked,
+  unionClosedPolylinesChecked,
+} from '../geometry/polygon-difference';
 import type { Polyline, Vec2 } from '../scene';
 import {
   distinctLoopPoints,
@@ -10,6 +17,10 @@ import {
 } from './vcarve-medial-region';
 
 const MAX_FLOOR_RINGS = 8192;
+// Clipper's default round-join arc tolerance as a fraction of the offset;
+// kerf-offset passes no tolerance of its own. One join step therefore turns
+// 2·acos(1 − 0.002), about 7.25 degrees.
+const CLIPPER_ARC_TOLERANCE_PER_MM = 0.002;
 
 export type VCarveFlatCorePlan = {
   readonly routes: ReadonlyArray<Polyline>;
@@ -30,7 +41,7 @@ export function vcarveFlatCoreRoutes(
   floorPitchMm: number,
 ): VCarveFlatCorePlan {
   if (!(clampInsetMm > 0) || !(floorPitchMm > 0)) return NO_FLAT_CORE;
-  const floor = insetContoursChecked(normalizedContours, clampInsetMm);
+  const floor = flatCoreContours(normalizedContours, clampInsetMm);
   if (floor.offsetFailed) return { ...NO_FLAT_CORE, offsetFailed: true };
   const normalizedFloor = normalizeClosedPolylineTreeEvenOddChecked(floor.contours);
   if (normalizedFloor.kind === 'error') return { ...NO_FLAT_CORE, offsetFailed: true };
@@ -49,6 +60,38 @@ export function vcarveFlatCoreRoutes(
     routes.push(...linkFloorLoops(region, [...region.loops, ...ladder.rings.flat()]));
   }
   return { routes, offsetFailed, capped };
+}
+
+/**
+ * The flat core is every point at least one cone radius `r` from the outline:
+ * the region eroded by a disc (ADR-285 Amendment 1). Around an inside corner
+ * its edge is an arc of radius `r` centred on the corner. A mitred inset alone
+ * squares that corner off short of the arc, and the cone sweeping the square
+ * corner leaves a fin standing on the floor.
+ *
+ * A plain round-join inset is not the answer either. Clipper puts its arc
+ * points on the circle, so each chord dips inside radius `r`, the floor pass
+ * must rise and fall along it, and the certified depth profile splits it into
+ * blocks too short for GRBL's 16-block planner window (ADR-285 item 6).
+ *
+ * So the core is the mitred inset at `r`, joined with a round-join inset at
+ * `r / (1 - 0.002)`. That inset's chords touch the circle of radius `r` from
+ * outside, so no point of the core comes nearer the outline than `r` and the
+ * floor stays at full depth. At a corner turning less than one join step the
+ * enlarged arc lies inside the mitred inset, so the union keeps the single
+ * mitre point there, which is no further off the arc than Clipper's own
+ * chords. Only sharper inside corners gain the arc.
+ */
+function flatCoreContours(contours: ReadonlyArray<Polyline>, insetMm: number): InsetContours {
+  const mitred = offsetClosedPolylinesForKerfChecked(contours, -insetMm);
+  if (mitred.kind === 'error') return FLAT_CORE_FAILED;
+  const arcs = offsetClosedPolylinesWithRoundJoinsChecked(
+    contours,
+    -insetMm / (1 - CLIPPER_ARC_TOLERANCE_PER_MM),
+  );
+  if (arcs.kind === 'error') return FLAT_CORE_FAILED;
+  const core = unionClosedPolylinesChecked(mitred.value, arcs.value);
+  return core.kind === 'error' ? FLAT_CORE_FAILED : { contours: core.value, offsetFailed: false };
 }
 
 function linkFloorLoops(
@@ -137,3 +180,5 @@ const NO_FLAT_CORE: VCarveFlatCorePlan = {
   offsetFailed: false,
   capped: false,
 };
+
+const FLAT_CORE_FAILED: InsetContours = { contours: [], offsetFailed: true };

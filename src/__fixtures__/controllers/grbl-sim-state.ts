@@ -17,6 +17,8 @@ export type GrblSimMachineLabel =
 
 export type GrblSimFirmware = 'grbl' | 'grblhal';
 
+export type GrblSimWcs = 'G54' | 'G55' | 'G56' | 'G57' | 'G58' | 'G59';
+
 /** A line the main loop is still inside: its `ok` is owed and no later line is
  * parsed. `sync` waits for the planner to drain (protocol_buffer_synchronize). */
 export type GrblSimPendingLine =
@@ -29,6 +31,9 @@ export type GrblSimState = {
   readonly mpos: SimVec3;
   readonly g92: SimVec3 | null;
   readonly g54: SimVec3 | null;
+  /** The selected work coordinate system `$G` reports; absent reads as G54.
+   *  Only G54's offset is modelled, so every system moves by it. */
+  readonly wcs?: GrblSimWcs;
   readonly isAbsolute: boolean;
   readonly feed: number;
   readonly spindle: number;

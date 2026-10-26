@@ -8,6 +8,7 @@ import {
   type MaterialTestParameter,
 } from '../../core/job/material-test-axes';
 import {
+  materialTestCellDimensions,
   materialTestGridAxes,
   type MaterialTestGridOptions,
 } from '../../core/job/material-test-grid';
@@ -35,6 +36,8 @@ export type MaterialTestPreviewAxis = {
 
 export type MaterialTestPreviewModel = {
   readonly mode: 'fill' | 'line';
+  readonly cellWidth: number;
+  readonly cellHeight: number;
   readonly rows: MaterialTestPreviewAxis;
   readonly columns: MaterialTestPreviewAxis;
   /** Row by row, gentlest cell first. */
@@ -85,6 +88,7 @@ export function materialTestPreview(options: MaterialTestGridOptions): MaterialT
   const columns = previewAxis(columnAxis.parameter, columnAxis.labels);
   return {
     mode,
+    ...materialTestCellDimensions(options),
     rows,
     columns,
     cells,

@@ -47,6 +47,6 @@ export const SAFETY_NOTICE_TEXT = [
   'You are responsible for safe operation and for following your machine',
   "manufacturer's instructions and your local safety regulations.",
   '',
-  'Full guide: https://kerfdesk.com/safety/ — Licence: see the License & Safety',
-  'Notice (/eula.txt).',
+  'Full guide: https://kerfdesk.com/safety/ — Licence: see Help > License &',
+  'Safety Notice.',
 ].join('\n');

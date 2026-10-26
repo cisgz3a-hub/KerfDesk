@@ -1,3 +1,5 @@
+import type { ConsoleCommandResult } from '../../core/controllers/grbl/console-command';
+import { autofocusCommandIssue } from '../../core/devices/autofocus-command';
 import { runAutofocus } from './autofocus-action';
 import { confirmFreshAutofocusIdle } from './autofocus-fresh-idle';
 import type { LaserState, LiveRefs } from './laser-store';
@@ -76,6 +78,11 @@ async function runOwnedAutofocus(
   // every later command (controller audit 2026-09-25 CG-9).
   const policy = command.trim() === '' ? null : refs.driver.prepareConsoleCommand(command);
   if (policy !== null && !policy.ok) return { kind: 'preflight-failed', reason: policy.reason };
+  // Whatever its source (Machine Setup, a machine profile, a project file), a
+  // press sends only a focus routine: never a burn, an XY move or a settings
+  // write the Console would ask about first (ADR-400 Amendment 1, 13-P1-1).
+  const commandIssue = autofocusDispatchIssue(command, refs, policy);
+  if (commandIssue !== null) return { kind: 'preflight-failed', reason: commandIssue };
   const expectedSessionEpoch = get().controllerSessionEpoch;
   set({
     autofocusBusy: true,
@@ -111,6 +118,19 @@ async function runOwnedAutofocus(
   } finally {
     set({ autofocusBusy: false });
   }
+}
+
+function autofocusDispatchIssue(
+  command: string,
+  refs: LiveRefs,
+  policy: ConsoleCommandResult | null,
+): string | null {
+  const issue = autofocusCommandIssue(command, refs.driver);
+  if (issue !== null) return issue;
+  if (policy === null || !policy.ok) return null;
+  return policy.command.kind !== 'gcode' || policy.command.requiresConfirmation
+    ? 'Auto-focus sends only a focus command. Send this from the Console instead.'
+    : null;
 }
 
 function autofocusBlockMessage(state: LaserState, refs: LiveRefs): string | null {

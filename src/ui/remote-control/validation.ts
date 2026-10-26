@@ -7,6 +7,7 @@ import {
   validOperationPatch,
   validateDesignWrite,
   type DesignWrite,
+  REMOTE_IMPORT_BASE64_LIMIT,
 } from './design-validation';
 
 const READS = new Set([
@@ -18,6 +19,7 @@ const READS = new Set([
   'get_machine',
   'get_app_status',
   'list_material_recipes',
+  'get_board',
   'review_job',
 ]);
 const WRITES = new Set([
@@ -30,6 +32,8 @@ const WRITES = new Set([
   'update_operation',
   'update_text',
   'arrange_artwork',
+  'set_board_photo',
+  'place_on_board',
   'undo',
   'redo',
 ]);
@@ -102,6 +106,8 @@ const WRITE_FIELDS: Record<RemoteWriteCommand, readonly string[]> = {
   update_operation: ['operationId', 'patch'],
   update_text: ['artworkId', 'patch'],
   arrange_artwork: ['artworkIds', 'action'],
+  set_board_photo: ['mimeType', 'dataBase64'],
+  place_on_board: ['artworkIds', 'action'],
   undo: [],
   redo: [],
 };
@@ -119,6 +125,9 @@ function validWrite(command: RemoteWriteCommand, args: RecordValue): boolean {
         ? ['mode', 'artworkIds'].filter((field) => Object.hasOwn(args, field))
         : []),
       ...(command === 'add_text' && Object.hasOwn(args, 'fontId') ? ['fontId'] : []),
+      ...(command === 'place_on_board'
+        ? ['marginMm', 'rows', 'cols', 'gapMm'].filter((field) => Object.hasOwn(args, field))
+        : []),
     ])
   )
     return false;
@@ -139,9 +148,36 @@ const WRITE_VALUES: Record<RemoteWriteCommand, (args: RecordValue) => boolean> =
   update_text: (args) => identifier(args['artworkId']) && validTextPatch(args['patch']),
   arrange_artwork: (args) =>
     ids(args['artworkIds'], 1) && ARRANGE_ACTIONS.has(args['action'] as string),
+  set_board_photo: (args) =>
+    (args['mimeType'] === 'image/jpeg' || args['mimeType'] === 'image/png') &&
+    typeof args['dataBase64'] === 'string' &&
+    args['dataBase64'].length <= REMOTE_IMPORT_BASE64_LIMIT,
+  place_on_board: boardPlacementValues,
   undo: () => true,
   redo: () => true,
 };
+function boardPlacementValues(args: RecordValue): boolean {
+  const action = args['action'];
+  const rows = args['rows'];
+  const cols = args['cols'];
+  return [
+    ids(args['artworkIds'], 1),
+    action === 'center' || action === 'fit' || action === 'array',
+    validOptionalDistance(args['marginMm']),
+    validOptionalDistance(args['gapMm']),
+    validBoardGrid(rows, cols),
+    action !== 'array' || (args['artworkIds'] as unknown[]).length === 1,
+  ].every(Boolean);
+}
+function validOptionalDistance(value: unknown): boolean {
+  return value === undefined || finite(value, 0, 1000);
+}
+function validBoardGrid(rows: unknown, cols: unknown): boolean {
+  if (rows === undefined || cols === undefined) return rows === cols;
+  return (
+    Number.isInteger(rows) && finite(rows, 1, 50) && Number.isInteger(cols) && finite(cols, 1, 50)
+  );
+}
 function polylineValues(args: RecordValue): boolean {
   const points = args['pointsMm'];
   if (

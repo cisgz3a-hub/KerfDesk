@@ -89,7 +89,9 @@ export function LaserOperationFields(props: {
           key={props.reconcileKey}
           layer={props.operation}
           onClose={closeSettings}
-          {...(props.editObjectOverride ? { onApply: setOverride } : {})}
+          // Any count of artworks: a field the operator did not change must
+          // keep following the operation (ADR-317 §1, audit 06-P2-2).
+          {...(props.editObjectOverride ? { onApply: setOverride, onlyChangedFields: true } : {})}
           {...(props.editObjectOverride && props.objectIds.length > 1
             ? { selectionCount: props.objectIds.length }
             : {})}

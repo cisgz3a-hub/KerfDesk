@@ -166,6 +166,39 @@ describe('raster-image import resolution', () => {
     expect(pushToast).toHaveBeenCalledWith('panorama.png: import cancelled.', 'info');
   });
 
+  it('honours Escape after worker sampling while the final source read is pending', async () => {
+    pngImport.shouldPageBackPng.mockReturnValue(false);
+    pngImport.shouldDecodeDimensionQualifiedPng.mockResolvedValue(true);
+    pngImport.tryDecodeDimensionQualifiedPng.mockResolvedValue({
+      natural: { width: 20_000, height: 1 },
+      sampled: { width: 8192, height: 1 },
+      density: null,
+      lumaBase64: 'sampled-luma',
+      cleanupWarning: null,
+    });
+    let finishRead!: (value: string) => void;
+    imageLoader.readFileAsDataUrl.mockImplementationOnce(
+      () =>
+        new Promise<string>((resolve) => {
+          finishRead = resolve;
+        }),
+    );
+    const insert = vi.fn();
+    const toast = vi.fn();
+    const pending = importImageFile(
+      new File(['png'], 'late.png', { type: 'image/png' }),
+      insert,
+      toast,
+    );
+    await vi.waitFor(() => expect(finishRead).toBeTypeOf('function'));
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    finishRead('data:image/png;base64,source');
+    expect(await pending).toBeNull();
+    expect(insert).not.toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith('late.png: import cancelled.', 'info');
+    expect(toast.mock.calls.some(([message]) => message.startsWith('Added image'))).toBe(false);
+  });
+
   it('uses the burn decode cap instead of silently sampling through the trace-preview cap', async () => {
     imageLoader.readImageNaturalSize.mockResolvedValue({ width: 6000, height: 3000 });
     imageLoader.loadImageAsRawData.mockResolvedValue({
