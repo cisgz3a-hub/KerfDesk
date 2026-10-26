@@ -1,6 +1,7 @@
 import type { CncGroup } from '../../core/job';
 import { COMPILE_INTEGRITY_PREFLIGHT_CODES } from '../../core/preflight';
 import { collectIndexedCncGroups } from '../../core/output/cnc-grbl-job-groups';
+import { cncToolSectionMaximumDepthsMm } from '../../core/cnc/output-representation';
 import { sha256Hex } from '../../core/relief/sha256';
 import { emitPreparedGcode, type EmitGcodeOptions, type PreparedOutput } from '../gcode';
 import { cncToolProgramFilename } from './cnc-program-filenames';
@@ -84,10 +85,11 @@ function emitSection(
 ): CncToolProgram | string {
   const first = section.groups[0];
   if (first === undefined) return 'A prepared CNC cutter section is empty.';
+  const sectionJob = { ...prepared.job, groups: section.groups };
   const emitted =
     retainedEmission ??
     emitPreparedGcode(
-      { ...prepared, job: { ...prepared.job, groups: section.groups } },
+      { ...prepared, job: sectionJob },
       { ...options, sourceGeometryChecks: 'compiled-evidence-only' },
     );
   const failures = emitted.preflight.issues.filter((issue) =>
@@ -110,7 +112,12 @@ function emitSection(
     byteLength: bytes.length,
     warnings: [
       ...emitted.preflight.issues.map((issue) => issue.message),
-      ...cncProgramReachWarnings(prepared.project, emitted.gcode, [{ id: toolId, name: toolName }]),
+      ...cncProgramReachWarnings(
+        prepared.project,
+        emitted.gcode,
+        [{ id: toolId, name: toolName }],
+        cncToolSectionMaximumDepthsMm(sectionJob),
+      ),
     ],
   };
 }

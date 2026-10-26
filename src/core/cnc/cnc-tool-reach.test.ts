@@ -52,6 +52,60 @@ describe('tool reach advisories', () => {
     expect(result.findings[0]?.kind).toBe('unknown-geometry');
     expect(normalizeCncToolAssembly(tool)).toEqual({});
   });
+  describe('a bit with no flute length (audit F7-P2-1, ADR-572 Amendment 1)', () => {
+    const bit = { id: 'cat', name: '1/8 end mill', kind: 'end-mill' as const, diameterMm: 3.175 };
+    // Machine Setup's default clamp size, crossed by a G0 at the 3.81 mm safe Z.
+    const clamp: CncReachFixture = {
+      id: 'clamp-1',
+      name: 'Clamp 1',
+      xMm: 70,
+      yMm: 340,
+      widthMm: 20,
+      heightMm: 60,
+      bottomZMm: 0,
+      topZMm: 15,
+    };
+    const travel = (z: number) => [
+      [
+        { x: 41.588, y: 383.175, z },
+        { x: 118.413, y: 383.175, z },
+      ],
+    ];
+    const input = { tool: bit, depthMm: 3, fixtures: [clamp] };
+
+    it('reports the clamp a safe-Z rapid crosses as cutter contact', () => {
+      const result = analyzeCncToolReach({ ...input, paths: travel(3.81) });
+      expect(result.findings).toContainEqual({
+        kind: 'fixture-intersection',
+        toolId: 'cat',
+        message: 'Cutter envelope intersects fixture Clamp 1 along the supplied path.',
+        fixtureId: 'clamp-1',
+        component: 'cutter',
+      });
+      expect(result.complete).toBe(false);
+      expect(normalizeCncToolAssembly(bit)).toEqual({});
+    });
+    it('models the column up past the fixture top, and nothing below the tip', () => {
+      const raised = { ...clamp, bottomZMm: 10, topZMm: 15 };
+      const over = analyzeCncToolReach({ ...input, fixtures: [raised], paths: travel(3.81) });
+      expect(over.findings.map((f) => f.kind)).toContain('fixture-intersection');
+      const above = analyzeCncToolReach({ ...input, paths: travel(15.5) });
+      expect(above.findings.map((f) => f.kind)).not.toContain('fixture-intersection');
+    });
+    it('says what was checked and what each unchecked part needs', () => {
+      const message = analyzeCncToolReach({ ...input, paths: travel(3.81) }).findings[0]?.message;
+      expect(message).toBe(
+        'Unknown flute length, stickout, shank diameter, holder envelope. ' +
+          "Fixtures were checked against the cutter's 3.175 mm width only, as a column from its tip up past every fixture top. " +
+          'Not checked against fixtures: the shank (needs flute length, stickout, shank diameter) and the holder (needs a holder envelope). ' +
+          'Assembly clearance is incomplete.',
+      );
+      const withoutFixtures = analyzeCncToolReach({ ...input, fixtures: [], paths: travel(3.81) });
+      expect(withoutFixtures.findings[0]?.message).toBe(
+        'Unknown flute length, stickout, shank diameter, holder envelope. Assembly clearance is incomplete.',
+      );
+    });
+  });
   it.each([
     { incompletePaths: true },
     { paths: [] },

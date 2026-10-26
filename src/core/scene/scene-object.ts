@@ -1,3 +1,4 @@
+import type { PhotoToneCurve } from '../raster/photo-tone-curve';
 import type { PagedRasterImageAsset } from './raster-image-asset';
 import type { FontKey, TextAlignment, PathTextSettings, TextStyle } from './text-settings';
 export type {
@@ -151,6 +152,7 @@ export type ObjectOperationSettingsOverride = {
   readonly leadLengthMm?: number | undefined;
   readonly leadAngleDeg?: number | undefined;
   readonly leadSide?: LaserLeadSide | undefined;
+  readonly photoToneCurve?: PhotoToneCurve | undefined;
 };
 
 export type ObjectOperationOverride = ObjectOperationSettingsOverride & {

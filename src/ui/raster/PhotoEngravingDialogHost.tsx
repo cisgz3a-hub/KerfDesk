@@ -2,6 +2,7 @@ import { lazy, Suspense, useState } from 'react';
 import { Button, Dialog, DialogActions } from '../kit';
 import { useStore } from '../state';
 import { useImageEditorStore } from '../image-editor/image-editor-store';
+import { openToneCalibration } from '../calibration/tone-calibration-store';
 import { useToastStore } from '../state/toast-store';
 import {
   buildPhotoEngravingUpdate,
@@ -77,6 +78,10 @@ function OwnedPhotoEngravingDialog({
           if (!current) return;
           close();
           void useImageEditorStore.getState().openEditor(session.image);
+        }}
+        onCalibrateTones={(seed) => {
+          close();
+          openToneCalibration({ seed });
         }}
       />
     </Suspense>

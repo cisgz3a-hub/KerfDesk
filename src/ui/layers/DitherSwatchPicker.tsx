@@ -41,6 +41,11 @@ const DITHER_COPY: Readonly<
   },
 };
 
+/** The name a dither is shown by. */
+export function ditherLabel(algorithm: DitherAlgorithm): string {
+  return DITHER_COPY[algorithm].label;
+}
+
 const MIXED_HINT = 'Choose one dither for all selected artwork.';
 const THUMBNAIL_SCALE = 2;
 
