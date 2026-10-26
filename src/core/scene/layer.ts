@@ -1,6 +1,7 @@
 // Persisted process operation. The historical `Layer` type name remains while
 // schema v3 moves binding from geometry colors to stable operation ids.
 
+import { photoToneCurvesEqual, type PhotoToneCurve } from '../raster/photo-tone-curve';
 import type { CncLayerSettings } from './machine';
 import type { DitherAlgorithm } from './scene-object';
 
@@ -83,6 +84,10 @@ export type LayerOperationSettings = {
   readonly leadLengthMm?: number | undefined;
   readonly leadAngleDeg?: number | undefined;
   readonly leadSide?: LaserLeadSide | undefined;
+  // ADR-670. Optional for the same reason: absent means no material tone
+  // calibration, which compiles byte-identically to the output before it. An
+  // Image operation applies it to the luma it dithers, after Negative.
+  readonly photoToneCurve?: PhotoToneCurve | undefined;
 };
 
 // ADR-626: an arc meets the cut tangentially; a line meets it at an angle.
@@ -209,6 +214,7 @@ const LAYER_OPERATION_SETTING_KEYS = [
   'leadLengthMm',
   'leadAngleDeg',
   'leadSide',
+  'photoToneCurve',
 ] as const satisfies ReadonlyArray<keyof LayerOperationSettings>;
 
 const LAYER_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
@@ -301,6 +307,7 @@ export const OPTIONAL_CUT_SETTING_KEYS = [
   'leadLengthMm',
   'leadAngleDeg',
   'leadSide',
+  'photoToneCurve',
 ] as const satisfies ReadonlyArray<keyof LayerOperationSettings>;
 
 // Written only when set, so a capture of an operation that never used them
@@ -342,8 +349,22 @@ export function layerOperationOutputEqual(
     (settings) => settings.leadInEnabled === true || settings.leadOutEnabled === true,
   );
   return LAYER_OPERATION_SETTING_KEYS.every(
-    (key) => left[key] === right[key] || (!leadsAsked && LASER_LEAD_SETTING_KEY_SET.has(key)),
+    (key) =>
+      operationSettingEqual(left, right, key) ||
+      (!leadsAsked && LASER_LEAD_SETTING_KEY_SET.has(key)),
   );
+}
+
+// ADR-670: a tone curve is a value, so two operations holding equal curves
+// (each read from its own file) still match.
+function operationSettingEqual(
+  left: LayerOperationSettings,
+  right: LayerOperationSettings,
+  key: (typeof LAYER_OPERATION_SETTING_KEYS)[number],
+): boolean {
+  return key === 'photoToneCurve'
+    ? photoToneCurvesEqual(left.photoToneCurve, right.photoToneCurve)
+    : left[key] === right[key];
 }
 
 /** ADR-626: the settings without leads. A stored setting set (saved defaults,
@@ -444,5 +465,5 @@ export function layerOperationSettingsEqual(
   left: LayerOperationSettings,
   right: LayerOperationSettings,
 ): boolean {
-  return LAYER_OPERATION_SETTING_KEYS.every((key) => left[key] === right[key]);
+  return LAYER_OPERATION_SETTING_KEYS.every((key) => operationSettingEqual(left, right, key));
 }

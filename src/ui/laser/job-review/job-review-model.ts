@@ -1,5 +1,5 @@
 import * as jig from './job-review-registration-jig';
-import { cncProgramReachWarnings } from '../../../io/cnc/cnc-program-reach';
+import { jobReviewCncReachWarnings } from './job-review-cnc-reach';
 import { compiledFocusTestWarnings } from './focus-test-warnings';
 // Job Review uses one successful Start preparation (ADR-224). Editable sections read stores;
 // compiled facts come from the prepared job.
@@ -130,11 +130,7 @@ export function buildJobReviewModel(args: JobReviewModelArgs): JobReviewModel {
       ...detectManualAirAssistWarnings(args.prepared.prepared.job, args.project.device),
       ...detectPresetCorrectionWarnings(args.project.device),
       ...detectStaleCatalogBitWarnings(args.project, args.prepared.cncToolPlan),
-      ...cncProgramReachWarnings(
-        args.prepared.prepared.project,
-        args.prepared.gcode,
-        args.prepared.cncToolPlan,
-      ),
+      ...jobReviewCncReachWarnings(args.prepared),
       ...detectAirAssistStartWarnings(
         args.prepared.prepared.job,
         args.project.device,

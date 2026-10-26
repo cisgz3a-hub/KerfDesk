@@ -1,4 +1,5 @@
 import { effectiveOperationForObject } from '../../core/effective-output';
+import { activePhotoToneCurve, type PhotoToneCurve } from '../../core/raster/photo-tone-curve';
 import type { DitherAlgorithm, Layer, RasterImage } from '../../core/scene';
 import type { PhotoEngravingApply } from './photo-engraving-apply';
 
@@ -18,6 +19,8 @@ export type PhotoEngravingDraft = {
   readonly ditherAlgorithm: PhotoDither;
   readonly linesPerMm: number;
   readonly negativeImage: boolean;
+  /** ADR-670: the material tone calibration; undefined burns the tones uncorrected. */
+  readonly photoToneCurve: PhotoToneCurve | undefined;
 };
 
 export function initialPhotoEngravingDraft(
@@ -32,6 +35,7 @@ export function initialPhotoEngravingDraft(
     ditherAlgorithm: photoDither(effective.ditherAlgorithm),
     linesPerMm: effective.linesPerMm,
     negativeImage: effective.negativeImage,
+    photoToneCurve: activePhotoToneCurve(effective.photoToneCurve),
   };
 }
 
@@ -48,6 +52,7 @@ export function photoEngravingPatch(draft: PhotoEngravingDraft): PhotoEngravingA
       linesPerMm: draft.linesPerMm,
       negativeImage: draft.negativeImage,
       passThrough: false,
+      photoToneCurve: draft.photoToneCurve,
     },
   };
 }
