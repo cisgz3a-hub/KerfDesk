@@ -1,9 +1,6 @@
 import { normalizeSceneObject } from './normalize-scene-object';
-<<<<<<< HEAD
 import { settleLegacyTraceSources } from './legacy-trace-source';
-=======
 import { projectLoadResult, type LoadedProject } from './project-load-metadata';
->>>>>>> origin/main
 import { normalizePositioningLight } from '../../core/devices/positioning-light';
 import type { ReliefAuthoringResolutions } from './project-relief-authoring-validator';
 // deserializeProject - parses a .lf2 string and returns a typed Project, or a
