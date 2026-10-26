@@ -34,6 +34,46 @@ beforeEach(() => {
 });
 
 describe('costly tiled output isolation', () => {
+  it('warns about old bit files after saving the new set and leaves their bytes intact', async () => {
+    const old = ['job_tile-r1-c1_bit-1-of-2.nc', 'job_tile-r1-c1_bit-2-of-2.nc'];
+    const disk = new Map(old.map((name) => [name, 'old program']));
+    const pushToast = vi.fn();
+    mocks.prepareTiledOutputOffThread.mockResolvedValue({
+      kind: 'ready',
+      files: [{ name: 'job_tile-r1-c1', gcode: 'new program' }],
+      machineWarnings: [],
+      tileAdvisories: [],
+      preparationAdvisories: [],
+      emissionAdvisories: [],
+    });
+    await handleSaveTiledGcode({
+      platform: {
+        ...capturingPlatform([]),
+        reserveSaveDirectory: async () => ({
+          listFiles: async () => [...disk.keys()],
+          file: (displayName) => ({
+            displayName,
+            write: async (data) => {
+              disk.set(displayName, String(data));
+            },
+          }),
+        }),
+      },
+      project: costlyTiledProject(),
+      savedName: 'job',
+      pushToast,
+    });
+    expect([...disk]).toEqual([
+      ...old.map((name) => [name, 'old program']),
+      ['job_tile-r1-c1.nc', 'new program'],
+    ]);
+    expect(pushToast).toHaveBeenCalledWith(expect.stringContaining(old.join(', ')), 'warning');
+    expect(pushToast).toHaveBeenCalledWith(
+      expect.stringContaining('Saved all 1 tile files'),
+      'success',
+    );
+  });
+
   it('reserves one directory before the worker and creates files only after preparation', async () => {
     const order: string[] = [];
     const suggestedNames: string[] = [];

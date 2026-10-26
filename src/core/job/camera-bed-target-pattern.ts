@@ -6,7 +6,7 @@
 // the scanline fill leaves the hole unburned under either fill rule.
 
 import {
-  bedTargetLayout,
+  bedTargetLayoutWithRings,
   DEFAULT_RING_DIAMETER_MM,
   RING_WIDTH_SHARE,
   type BedTargetArea,
@@ -24,7 +24,8 @@ import {
 
 export type CameraBedTargetOptions = {
   readonly area: BedTargetArea;
-  readonly spacingMm?: number;
+  /** Outer ring diameter, mm; the grid step follows it (bedTargetLayoutWithRings). */
+  readonly ringDiameterMm?: number;
   readonly speed?: number;
   readonly power?: number;
 };
@@ -46,10 +47,7 @@ const TARGET_HATCH_SPACING_MM = 0.2;
 const CIRCLE_SEGMENTS = 48;
 
 export function generateCameraBedTarget(options: CameraBedTargetOptions): CameraBedTargetPattern {
-  const layout = bedTargetLayout({
-    area: options.area,
-    ...(options.spacingMm === undefined ? {} : { spacingMm: options.spacingMm }),
-  });
+  const layout = bedTargetLayoutWithRings(options.area, options.ringDiameterMm);
   const layer: Layer = {
     ...createLayer({
       id: 'camera-bed-target',
@@ -91,6 +89,8 @@ function markObject(
 export type CameraNudgeRingOptions = {
   /** Where the ring's centre burns, bed millimetres. */
   readonly centre: { readonly x: number; readonly y: number };
+  /** Outer diameter, mm: the calibration target's ring size. */
+  readonly ringDiameterMm?: number;
   readonly speed?: number;
   readonly power?: number;
 };
@@ -113,8 +113,9 @@ export function generateCameraNudgeRing(options: CameraNudgeRingOptions): Scene 
     fillStyle: 'scanline',
     fillBidirectional: true,
   };
-  const outer = DEFAULT_RING_DIAMETER_MM / 2;
-  const inner = outer - DEFAULT_RING_DIAMETER_MM * RING_WIDTH_SHARE;
+  const diameter = options.ringDiameterMm ?? DEFAULT_RING_DIAMETER_MM;
+  const outer = diameter / 2;
+  const inner = outer - diameter * RING_WIDTH_SHARE;
   const ring: ImportedSvg = {
     kind: 'imported-svg',
     id: 'camera-nudge-ring',

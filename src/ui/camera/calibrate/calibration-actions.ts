@@ -16,7 +16,14 @@ import type { CameraModelRecord } from '../../../core/camera/model/camera-model-
 import { isHeadCameraModel, modelAtHead } from '../../../core/camera/model/head-camera';
 import { viewThumbnail } from '../../../core/camera/model/view-shift';
 import type { RgbaImage } from '../../../core/camera/rgba-image';
-import { bedTargetLayout, type BedTargetArea } from '../../../core/camera/target/bed-target';
+import type {
+  BedCalibration,
+  BedCalibrationFailure,
+} from '../../../core/camera/target/bed-calibration';
+import {
+  bedTargetLayoutWithRings,
+  type BedTargetArea,
+} from '../../../core/camera/target/bed-target';
 import { generateCameraBedTarget } from '../../../core/job/camera-bed-target-pattern';
 import type { Project, Vec2 } from '../../../core/scene';
 import { useStore } from '../../state';
@@ -27,7 +34,11 @@ import {
   captureSourceFrame,
   type ActiveCameraSource,
 } from '../frame-source';
-import { calibrationFailureMessage, cameraModelFromCalibration } from './calibration-result';
+import {
+  calibrationFailureMessage,
+  cameraModelFromCalibration,
+  ringsTooSmallMessage,
+} from './calibration-result';
 import type { CalibrationResult, CalibrationSettings } from './camera-calibration-store';
 import { rememberEngravedTarget } from './engraved-target-memory';
 import { runBedCalibration } from './run-bed-calibration';
@@ -54,13 +65,27 @@ export function targetAreaForBed(
   };
 }
 
-/** Where the calibration target goes: the whole bed, or a head camera's small square. */
+/**
+ * Where the calibration target goes: the operator's sheet in the middle of
+ * the bed, inside its margin (ADR-441 Amendment 8), or a head camera's small
+ * square. A sheet larger than the bed covers the whole bed.
+ */
 export function calibrationTargetArea(
   bedWidthMm: number,
   bedHeightMm: number,
-  settings: Pick<CalibrationSettings, 'marginMm' | 'headCamera' | 'headTargetSizeMm'>,
+  settings: Pick<CalibrationSettings, 'marginMm' | 'headCamera' | 'headTargetSizeMm'> &
+    Partial<Pick<CalibrationSettings, 'sheetWidthMm' | 'sheetHeightMm'>>,
 ): BedTargetArea {
-  if (!settings.headCamera) return targetAreaForBed(bedWidthMm, bedHeightMm, settings.marginMm);
+  if (!settings.headCamera) {
+    const sheetWidth = Math.min(settings.sheetWidthMm ?? bedWidthMm, bedWidthMm);
+    const sheetHeight = Math.min(settings.sheetHeightMm ?? bedHeightMm, bedHeightMm);
+    const onSheet = targetAreaForBed(sheetWidth, sheetHeight, settings.marginMm);
+    return {
+      ...onSheet,
+      x: onSheet.x + (bedWidthMm - sheetWidth) / 2,
+      y: onSheet.y + (bedHeightMm - sheetHeight) / 2,
+    };
+  }
   const size = Math.min(settings.headTargetSizeMm, bedWidthMm, bedHeightMm);
   return { x: (bedWidthMm - size) / 2, y: (bedHeightMm - size) / 2, width: size, height: size };
 }
@@ -74,11 +99,7 @@ export async function engraveCalibrationTarget(
   const { device } = project;
   const bedFrame = cameraBedFrameFor(device, useLaserStore.getState());
   const area = calibrationTargetArea(device.bedWidth, device.bedHeight, settings);
-  const pattern = generateCameraBedTarget({
-    area,
-    power: settings.powerPercent,
-    speed: settings.speedMmPerMin,
-  });
+  const pattern = targetPattern(area, settings);
   // A laser engraving in either canvas mode (ADR-416): the rings mark where
   // the laser fires, and the wizard's power and speed are laser settings.
   const started = await startTransientJob({
@@ -88,17 +109,59 @@ export async function engraveCalibrationTarget(
   });
   // Remember where these rings went, so a later "Target already engraved"
   // labels them from this layout, not from whatever the settings say then.
-  if (started) {
-    rememberEngravedTarget(device, settings.headCamera, {
-      area,
-      bedWidthMm: device.bedWidth,
-      bedHeightMm: device.bedHeight,
-      layoutMm: settings.headCamera ? settings.headTargetSizeMm : settings.marginMm,
-      engravedAt: new Date().toISOString(),
-      bedFrame,
-    });
-  }
+  if (started) rememberTarget(device, settings, area, bedFrame, false);
   return started;
+}
+
+function targetPattern(area: BedTargetArea, settings: CalibrationSettings) {
+  return generateCameraBedTarget({
+    area,
+    ringDiameterMm: settings.ringDiameterMm,
+    power: settings.powerPercent,
+    speed: settings.speedMmPerMin,
+  });
+}
+
+// Remember where these rings went and how large they are, so a later "Target
+// already engraved" labels them from this layout, not from whatever the
+// settings say then.
+function rememberTarget(
+  device: Project['device'],
+  settings: CalibrationSettings,
+  area: BedTargetArea,
+  bedFrame: CameraBedFrame,
+  onCanvas: boolean,
+): void {
+  rememberEngravedTarget(device, settings.headCamera, {
+    area,
+    bedWidthMm: device.bedWidth,
+    bedHeightMm: device.bedHeight,
+    layoutMm: settings.headCamera ? settings.headTargetSizeMm : settings.marginMm,
+    engravedAt: new Date().toISOString(),
+    bedFrame,
+    ringDiameterMm: settings.ringDiameterMm,
+    ...(onCanvas ? { onCanvas: true as const } : {}),
+  });
+}
+
+/**
+ * Put the target on the canvas as the project's artwork (undoable), for an
+ * operator who engraves it like any job: Frame, review and Start, or later
+ * from another session. The rings are locked so a stray drag cannot move them
+ * off the bed positions the photo will look for, and Start from becomes
+ * Absolute Coordinates, the only mode that burns them there.
+ */
+export function addCalibrationTargetToCanvas(settings: CalibrationSettings): void {
+  const store = useStore.getState();
+  const { device } = store.project;
+  const area = calibrationTargetArea(device.bedWidth, device.bedHeight, settings);
+  const pattern = targetPattern(area, settings);
+  store.replaceSceneWithGeneratedScene({
+    ...pattern.scene,
+    objects: pattern.scene.objects.map((object) => ({ ...object, locked: true })),
+  });
+  if (store.jobPlacement.startFrom !== 'absolute') store.setJobPlacement({ startFrom: 'absolute' });
+  rememberTarget(device, settings, area, cameraBedFrameFor(device, useLaserStore.getState()), true);
 }
 
 export type PhotoOutcome =
@@ -130,7 +193,7 @@ export async function photographTarget(args: {
     return { kind: 'failed', message: 'Could not take a photo. Check that the camera is running.' };
   }
   const area = args.area ?? calibrationTargetArea(args.bedWidthMm, args.bedHeightMm, settings);
-  const layout = bedTargetLayout({ area });
+  const layout = bedTargetLayoutWithRings(area, settings.ringDiameterMm);
   const outcome = await runBedCalibration(
     {
       frame: toGrayImage(raw),
@@ -143,7 +206,7 @@ export async function photographTarget(args: {
     args.signal,
   );
   if (outcome.kind === 'failed') {
-    return { kind: 'failed', message: calibrationFailureMessage(outcome.reason) };
+    return { kind: 'failed', message: photoFailureMessage(outcome, settings.ringDiameterMm) };
   }
   const capture = cameraCaptureBindingForFrame(args.source, raw.width, raw.height);
   const record = cameraModelFromCalibration({
@@ -151,6 +214,7 @@ export async function photographTarget(args: {
     capture,
     targetHeightMm: settings.sheetThicknessMm,
     targetArea: area,
+    targetRingDiameterMm: settings.ringDiameterMm,
     calibratedAt: (args.now ?? (() => new Date()))(),
     headAtCalibrationMm: head,
     ...(args.bedFrame === undefined ? {} : { bedFrame: args.bedFrame }),
@@ -166,21 +230,45 @@ export async function photographTarget(args: {
           marks: outcome.markErrors,
           targetHeightMm: settings.sheetThicknessMm,
         });
+  return { kind: 'ok', result: reviewResult(raw, outcome, record, savedCheck, args, area, head) };
+}
+
+function photoFailureMessage(failure: BedCalibrationFailure, ringDiameterMm: number): string {
+  return failure.reason === 'rings-too-small'
+    ? ringsTooSmallMessage(failure.ringDiameterPx, ringDiameterMm)
+    : calibrationFailureMessage(failure.reason);
+}
+
+// The result the wizard reviews: the record, the photo flattened onto the bed
+// with what it covers, and how well the height and the saved model held.
+function reviewResult(
+  raw: RgbaImage,
+  outcome: BedCalibration,
+  record: CameraModelRecord,
+  savedCheck: CalibrationResult['savedCheck'],
+  args: {
+    readonly settings: CalibrationSettings;
+    readonly bedWidthMm: number;
+    readonly bedHeightMm: number;
+  },
+  area: BedArea,
+  head: Vec2 | null,
+): CalibrationResult {
+  const { settings } = args;
+  const review = reviewArea(args, area, head !== null);
   const bedImage = warpFrameToBedImage(raw, outcome.lens, outcome.pose, {
-    ...reviewArea(args, area, head !== null),
+    ...review,
     surfaceHeightMm: settings.sheetThicknessMm,
   });
   return {
-    kind: 'ok',
-    result: {
-      record,
-      markErrors: outcome.markErrors,
-      bedImage,
-      cameraHeightSigmaMm: outcome.cameraHeightSigmaMm,
-      usedMeasuredHeight: settings.cameraHeightMm !== null,
-      savedCheck,
-      ...fixedCameraView(settings, raw),
-    },
+    record,
+    markErrors: outcome.markErrors,
+    bedImage,
+    bedImageRegion: review.region,
+    cameraHeightSigmaMm: outcome.cameraHeightSigmaMm,
+    usedMeasuredHeight: settings.cameraHeightMm !== null,
+    savedCheck,
+    ...fixedCameraView(settings, raw),
   };
 }
 

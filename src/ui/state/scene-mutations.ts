@@ -144,10 +144,7 @@ export function resolveRasterLayerColor(
 //
 // Empty selection → no-op; the caller's `set((s) => ...)` should fall
 // through without changing state (the undefined return signals that).
-export function applyDuplicate(
-  s: DuplicateState,
-  newIdFor: (oldId: string) => string,
-): (MutationResult & { readonly additionalSelectedIds: ReadonlySet<string> }) | null {
+export function applyDuplicate(s: DuplicateState, newIdFor: (oldId: string) => string) {
   const ids = selectedDuplicateIds(s);
   if (ids.length === 0) return null;
   const duplicated = duplicateSceneSelection(s.project.scene, ids, newIdFor);
@@ -157,9 +154,11 @@ export function applyDuplicate(
     project: { ...s.project, scene: duplicated.scene },
     selectedObjectId: first ?? '',
     additionalSelectedIds: new Set(rest),
+    selectedPathNode: null,
+    selectedPathNodes: [],
     undoStack: pushUndo(s.project, s.undoStack),
     redoStack: [],
-    dirty: true,
+    dirty: true as const,
   };
 }
 

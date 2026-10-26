@@ -95,7 +95,7 @@ const GUARDED = sent(
   ].join('\n'),
 );
 const LIT_RAPIDS =
-  'The controller reports $32=0 (laser mode off), so it keeps the beam on during rapid moves. 2 G0 moves in this program run with M3 or M4 on and S not set to 0 (first: line 5 of the sent program): each burns a line where the head travels. Laser mode on, or S0 on those moves, keeps them dark.';
+  'The controller reports $32=0 (laser mode off), so it keeps the beam on during rapid moves. 2 rapid commands in this program run with M3 or M4 on and S not set to 0 (first: line 5 of the sent program): each burns a line where the head travels. Laser mode on, or S0 on those moves, keeps them dark.';
 
 beforeEach(() => {
   resetStore();
@@ -162,6 +162,33 @@ describe('external run controller readiness (ADR-630 Amendment 4)', () => {
     expect(useLaserStore.getState().streamer).toBeNull();
   });
 
+  it('warns for stored-position returns without adding a Start refusal', async () => {
+    const writes = await connectReporting({ laserModeEnabled: false, maxPowerS: 1000 });
+    const gcode = sent('M3 S200\nG1 X10 F100\nG28\nG30 Z0\nM5');
+    expect(reviewWarnings(gcode)[0]).toContain('2 rapid commands');
+    expect(reviewWarnings(gcode)[0]).toContain('first: line 4');
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    await expect(startExternalProgram(framed(gcode, 'laser'))).resolves.toBe(true);
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(confirm.mock.calls[0]?.[0]).toContain('2 rapid commands');
+    expect(writes.join('')).toContain(gcode);
+  });
+
+  it('warns about stored returns at $32=1 without claiming laser mode keeps them dark', async () => {
+    const writes = await connectReporting({ laserModeEnabled: true, maxPowerS: 1000 });
+    const gcode = sent('M3 S200\nG1 X10 F100\nG28\nM5');
+    const warnings = reviewWarnings(gcode);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('One G28/G30 stored-position return command');
+    expect(warnings[0]).toContain('do not rely on $32 alone');
+    expect(warnings[0]).toContain('Send S0 or M5 before the return');
+    expect(reviewWarnings(sent('M3 S200\nG1 X10 F100\nG28 S0\nM5'))).toEqual([]);
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    await expect(startExternalProgram(framed(gcode, 'laser'))).resolves.toBe(true);
+    expect(confirm).not.toHaveBeenCalled();
+    expect(writes.join('')).toContain(gcode);
+  });
+
   it('stays quiet about rapids when every G0 writes S0 at $32=0', async () => {
     const writes = await connectReporting({ laserModeEnabled: false, maxPowerS: 1000 });
     // Project Start's own output writes S0 on every G0 and gets the same two
@@ -191,7 +218,7 @@ describe('external run controller readiness (ADR-630 Amendment 4)', () => {
   it('says the rapids would burn when $32 is not confirmed', async () => {
     await connectReporting({ maxPowerS: 1000 });
     expect(reviewWarnings(UNGUARDED)[0]).toBe(
-      'Laser mode ($32) is not confirmed. 2 G0 moves in this program run with M3 or M4 on and S not set to 0 (first: line 5 of the sent program). If laser mode is off ($32=0), each burns a line where the head travels.',
+      'Laser mode ($32) is not confirmed. 2 rapid commands in this program run with M3 or M4 on and S not set to 0 (first: line 5 of the sent program). If laser mode is off ($32=0), each burns a line where the head travels.',
     );
   });
 });

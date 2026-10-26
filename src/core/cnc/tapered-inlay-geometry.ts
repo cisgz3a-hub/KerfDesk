@@ -55,16 +55,3 @@ export function mirrorInlayContours(
     })),
   }));
 }
-
-export function inlayFilledArea(contours: ReadonlyArray<Polyline>): number {
-  let area = 0;
-  for (const contour of contours) {
-    const points = contour.points;
-    for (let index = 0; index < points.length; index += 1) {
-      const a = points[index],
-        b = points[(index + 1) % points.length];
-      if (a !== undefined && b !== undefined) area += a.x * b.y - b.x * a.y;
-    }
-  }
-  return Math.abs(area / 2);
-}

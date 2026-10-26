@@ -13,6 +13,7 @@ import { createPortal } from 'react-dom';
 import { Icon } from '../kit/icons';
 import { useToastStore, type ToastVariant } from '../state/toast-store';
 import { useToastPlacement } from './use-toast-placement';
+import { useToastScrollability } from './use-toast-scrollability';
 import './Toasts.css';
 
 // Three single-line toasts fit the reserved band; a fourth (the import
@@ -24,9 +25,11 @@ export function Toasts(): JSX.Element {
   const toasts = useToastStore((s) => s.toasts).slice(-MAX_VISIBLE_TOASTS);
   const dismiss = useToastStore((s) => s.dismissToast);
   const placement = useToastPlacement(toasts.length > 0);
+  const { ref, scrollable } = useToastScrollability(JSON.stringify(toasts), placement.host);
   const notifications = (
     <div
-      className={`lf-toasts${placement.host === null ? ' lf-toasts--workspace' : ''}`}
+      ref={ref}
+      className={`lf-toasts${placement.host === null ? ' lf-toasts--workspace' : ''}${scrollable ? ' lf-toasts--scrollable' : ''}`}
       style={placement.host === null ? placement.style : undefined}
       role="region"
       aria-label="Notifications"

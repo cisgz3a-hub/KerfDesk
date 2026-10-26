@@ -138,7 +138,16 @@ export type GcodeMetadata = {
 // ADR-250 Amd 3 keeps CNC profile leads clear of every part the job keeps.
 // ADR-392 Amd 2 writes a tile that needs several bits as one file per bit (no
 // M0) and sets the bed park aside in tiles; surfacing ladders run no extra pass.
-export const EMITTER_REVISION = 'cnc-tile-files-per-bit-20261023-v25';
+// ADR-140 Amd 2 rises roughing beside every finishing tab, a merged roughing ring
+// included, and cuts a finish allowance of the bit radius or more as the radius,
+// stepping its finishing pass down.
+// ADR-154 Amd 4 cuts island adaptive pockets into strips where island bounds
+// cross in open stock and runs each wall cleanup after the clearing beside it;
+// ADR-153 Amd 1 gives rest ladders above 50% stepover a core ring.
+// ADR-285 Amd 1 erodes the V-carve flat core with round joins, so its floor
+// passes sweep each inside corner instead of leaving a fin.
+// CNC audit v1 F4-P3-2: a drill group's header names the plunge feed it drills at.
+export const EMITTER_REVISION = 'cnc-drill-plunge-feed-20261023-v29';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

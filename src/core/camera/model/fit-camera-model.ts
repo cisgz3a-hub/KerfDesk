@@ -84,7 +84,10 @@ const LENS_PARAMS = 8; // f, aspect, cx, cy, k1..k4
 const POSE_PARAMS = 6;
 const MIN_POINTS_PER_VIEW = 6;
 const DEFAULT_FOCAL_SEEDS = [0.35, 0.5, 0.7, 1.0, 1.4];
-const ASPECT_SIGMA = 0.01;
+// On the same noise scale as the rings (fillPriors). The fit used to apply
+// it unscaled as 0.01, which weighed exactly this; 0.01 at its stated
+// strength fitted material off the target's height worse (ADR-441 Amendment 7).
+const ASPECT_SIGMA = 0.0025;
 const SEED_ITERATIONS = 25;
 const ROBUST_PX = 1;
 // Typical ring or corner detection noise; a clean synthetic fit's residual is
@@ -319,15 +322,17 @@ function huberWeight(norm: number, threshold: number | null): number {
 function fillPriors(problem: Problem, full: Float64Array, out: Float64Array): void {
   const { imageWidth, imageHeight, cameraHeightPrior } = problem.options;
   const base = problem.pointResiduals;
+  // Every prior is scaled into pixels of typical detection noise, so each is
+  // weighed against the photo by its stated sigma. Unscaled, the lens priors
+  // counted as if rings were found to 1 px, four times stiffer than stated
+  // next to the height prior (ADR-441 Amendment 7).
   if (problem.lensPriorCount > 0) {
     const sigma = problem.options.principalPointSigmaPx ?? Number.POSITIVE_INFINITY;
-    out[base] = ((full[1] ?? 1) - 1) / ASPECT_SIGMA;
-    out[base + 1] = ((full[2] ?? 0) - (imageWidth - 1) / 2) / sigma;
-    out[base + 2] = ((full[3] ?? 0) - (imageHeight - 1) / 2) / sigma;
+    out[base] = (((full[1] ?? 1) - 1) / ASPECT_SIGMA) * MIN_POINT_NOISE_PX;
+    out[base + 1] = (((full[2] ?? 0) - (imageWidth - 1) / 2) / sigma) * MIN_POINT_NOISE_PX;
+    out[base + 2] = (((full[3] ?? 0) - (imageHeight - 1) / 2) / sigma) * MIN_POINT_NOISE_PX;
   }
   if (cameraHeightPrior !== undefined) {
-    // Scaled into pixels of typical detection noise so the measurement and
-    // the photo are weighed against each other by their real uncertainties.
     const height = -cameraCentre(poseOf(full, 0)).z;
     out[base + problem.lensPriorCount] =
       ((height - cameraHeightPrior.heightMm) / cameraHeightPrior.sigmaMm) * MIN_POINT_NOISE_PX;

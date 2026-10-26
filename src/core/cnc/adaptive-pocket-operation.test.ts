@@ -47,8 +47,8 @@ describe('adaptivePocketPasses', () => {
     if (operation.kind !== 'ok') return;
     expect(operation.plan.sequences).toHaveLength(2);
 
-    const passes = adaptivePocketPasses(operation, [-1], [pocket]);
-    expect(passes).toEqual(adaptivePocketPasses(operation, [-1], [pocket]));
+    const passes = adaptivePocketPasses(operation, [-1]);
+    expect(passes).toEqual(adaptivePocketPasses(operation, [-1]));
     const roughing = passes.filter((pass) => pass.kind === 'helical-contour');
     expect(roughing).toHaveLength(2);
     for (const pass of roughing) {

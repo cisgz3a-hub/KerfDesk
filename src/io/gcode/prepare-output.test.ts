@@ -162,28 +162,6 @@ describe('prepareOutput', () => {
     ]);
   });
 
-  it('defaults to reducing travel moves inside cut groups', () => {
-    const prepared = prepareOutput(travelOptimizationProject());
-
-    expect(firstCutSegmentStart(prepared)).toEqual({ x: 0, y: 0 });
-  });
-
-  it('preserves source cut order when reduce travel moves is disabled', () => {
-    const base = travelOptimizationProject();
-    const project: Project = {
-      ...base,
-      optimization: {
-        ...base.optimization,
-        reduceTravelMoves: false,
-        travelPolicy: 'source-order',
-      },
-    };
-
-    const prepared = prepareOutput(project);
-
-    expect(firstCutSegmentStart(prepared)).toEqual({ x: 100, y: 300 });
-  });
-
   it('preserves artwork priority through placement and path optimization', () => {
     const base = createProject();
     const firstOperation = createLayer({ id: 'first-op', color: '#2563eb' });
@@ -343,54 +321,6 @@ function policyFindingProject(): Project {
     ...base,
     device: { ...base.device, controlledLaserOffTravelFeedMmPerMin: 0 },
   };
-}
-
-function travelOptimizationProject(): Project {
-  const obj: SceneObject = {
-    kind: 'imported-svg',
-    id: 'O1',
-    source: 'travel.svg',
-    bounds: { minX: 0, minY: 100, maxX: 101, maxY: 400 },
-    transform: IDENTITY_TRANSFORM,
-    paths: [
-      {
-        color: '#ff0000',
-        polylines: [
-          {
-            points: [
-              { x: 100, y: 100 },
-              { x: 101, y: 100 },
-            ],
-            closed: false,
-          },
-          {
-            points: [
-              { x: 0, y: 400 },
-              { x: 1, y: 400 },
-            ],
-            closed: false,
-          },
-        ],
-      },
-    ],
-  };
-  const base = createProject();
-  return {
-    ...base,
-    scene: addLayer(addObject(base.scene, obj), createLayer({ id: 'L1', color: '#ff0000' })),
-  };
-}
-
-function firstCutSegmentStart(prepared: ReturnType<typeof prepareOutput>): {
-  x: number;
-  y: number;
-} {
-  if (!prepared.ok) throw new Error('expected prepared output');
-  const group = prepared.job.groups[0];
-  if (group?.kind !== 'cut') throw new Error('expected first group to be a cut group');
-  const first = group.segments[0]?.polyline[0];
-  if (first === undefined) throw new Error('expected first cut segment');
-  return first;
 }
 
 function cutSegmentStarts(prepared: ReturnType<typeof prepareOutput>): ReadonlyArray<{

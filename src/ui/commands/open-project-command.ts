@@ -8,6 +8,8 @@ import type { ToastVariant } from '../state/toast-store';
 type PushToast = (message: string, variant?: ToastVariant) => void;
 
 export type OpenProjectOptions = {
+  /** A Recent click claims its request before its permission/read wait. */
+  readonly requestEpoch?: number;
   /** A file the operator already chose (Recent Projects, or one the operating
    * system handed over), so the picker is skipped. */
   readonly file?: OpenProjectFile;
@@ -24,7 +26,8 @@ export async function openProjectCommand(
   options: OpenProjectOptions = {},
 ): Promise<void> {
   const initial = useStore.getState();
-  const requestEpoch = initial.claimProjectOpenRequest();
+  const requestEpoch = options.requestEpoch ?? initial.claimProjectOpenRequest();
+  if (useStore.getState().projectOpenRequestEpoch !== requestEpoch) return;
   if (!(await confirmDiscardAsync(platform, 'open another project'))) return;
   if (
     useStore.getState().projectOpenRequestEpoch !== requestEpoch ||

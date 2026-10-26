@@ -311,6 +311,31 @@ describe('MachineSettingsPanel', () => {
     }
   });
 
+  // Controller audit v2 C5-P2-1 follow-up: the table hides a password value,
+  // and a search for it finds nothing.
+  it('hides controller passwords in the settings table and its search', async () => {
+    useLaserStore.setState({
+      grblSettingsRows: settingsMapToRows(
+        new Map([
+          [30, '1000'],
+          [75, 'wifiSecret7'],
+        ]),
+      ),
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    const { host, cleanup } = await renderPanel();
+    try {
+      expect(host.textContent).not.toContain('wifiSecret7');
+      expect(host.textContent).toContain('[password hidden]');
+      expect(host.textContent).toContain('1000');
+      const search = host.querySelector<HTMLInputElement>('input[type="search"]');
+      if (search === null) throw new Error('search missing');
+      await act(async () => Simulate.change(search, { target: { value: 'wifiSecret' } as never }));
+      expect(host.textContent).toContain('No settings match.');
+    } finally {
+      await cleanup();
+    }
+  });
+
   it('does not render any firmware write controls', async () => {
     useLaserStore.setState({
       grblSettingsRows: settingsMapToRows(new Map([[30, '1000']])),

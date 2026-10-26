@@ -84,8 +84,10 @@ it.each([
   );
   expect(resultCode(result)).toBe('ok');
   const current = useStore.getState().project.scene.layers[0]!.cnc;
-  expect(current).toMatchObject({ ...patch, materialKey: 'plywood-mdf' });
+  expect(current).toMatchObject(patch);
   expect(current).not.toHaveProperty('feedSource');
+  // ADR-233 decision 5 (CNC audit v1 F4-P2-1): the material label goes too.
+  expect(current).not.toHaveProperty('materialKey');
   useStore.getState().undo();
   expect(useStore.getState().project.scene.layers[0]!.cnc).toEqual(automatic);
 });

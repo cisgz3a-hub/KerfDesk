@@ -19,6 +19,7 @@ import { cncGrblStrategy } from '../../core/output';
 import {
   COMPILE_INTEGRITY_PREFLIGHT_CODES,
   findCncSecondaryToolFeedIssues,
+  hasCuttingMove,
   runCncPreflight,
 } from '../../core/preflight';
 import type { Job } from '../../core/job';
@@ -42,10 +43,6 @@ export const TILE_BIT_FILES_ADVISORY =
   'change the bit and re-zero Z on the stock top before each one. Tile files hold no M0 bit ' +
   'change, because Run G-code file sends an M0 to the controller, which then takes no jog or ' +
   'Zero Z until cycle start.';
-
-// The same test as runCncPreflight's empty-output rule: a program with no G1
-// cuts nothing.
-const CUTTING_MOVE = /\bG1\b/;
 
 // The tile set plus every policy finding raised while emitting it.
 export type TileEmission =
@@ -127,7 +124,8 @@ export function emitTileFiles(
 function cuttingRuns<Run extends TileBitRun & { readonly body: string }>(
   runs: ReadonlyArray<Run>,
 ): ReadonlyArray<Run> {
-  const cutting = runs.filter((run) => CUTTING_MOVE.test(run.body));
+  // The same test as runCncPreflight's empty-output rule.
+  const cutting = runs.filter((run) => hasCuttingMove(run.body));
   return cutting.length === 0 ? runs : cutting;
 }
 

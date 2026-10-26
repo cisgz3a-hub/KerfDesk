@@ -27,7 +27,7 @@ export const MODES = [
   {
     icon: 'image',
     title: 'Image',
-    body: 'Engraves a photo or other bitmap row by row, with 11 dither and grayscale options.',
+    body: 'Engraves a photo or other bitmap row by row, with 12 dither and grayscale options.',
     status: 'shipped-code-and-tests',
   },
 ];
@@ -59,7 +59,7 @@ export const IMAGE_FEATURES = [
   {
     icon: 'blend',
     title: 'Dithering and grayscale',
-    body: 'Eleven options. Threshold, Floyd–Steinberg, Jarvis, Stucki, Atkinson, Burkes, three Sierra variants and ordered (Bayer) dithering turn shades into dots. Grayscale varies the laser power instead.',
+    body: 'Twelve options. Threshold, Floyd–Steinberg, Jarvis, Stucki, Atkinson, Burkes, three Sierra variants, Blue Noise and ordered (Bayer) dithering turn shades into dots. Grayscale varies the laser power instead.',
   },
   {
     icon: 'grid-2x2',

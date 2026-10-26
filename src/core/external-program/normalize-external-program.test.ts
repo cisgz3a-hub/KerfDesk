@@ -203,6 +203,67 @@ describe('external G-code program normalization (ADR-630)', () => {
       expect(normalizeExternalProgram('G21\nG0 X1\nM30\n', undefined, 'marlin').kind).toBe('ok');
     });
 
+    it('refuses Marlin macro definitions and calls before preparing an executable program', () => {
+      const source = 'M810 G1 X120 F600\nG1 X10 F600\nM810\nM5\n';
+      const expected = {
+        kind: 'refused',
+        reasons: [
+          expect.stringContaining('Line 1 (M810 G1 X120 F600) is M810'),
+          expect.stringContaining('Line 3 (M810) is M810'),
+        ],
+      };
+      expect(normalizeExternalProgram(source, undefined, 'marlin')).toEqual(expected);
+      expect(normalizeExternalProgram(source, externalProgramBaseline('marlin'))).toEqual(expected);
+      expect(refusedOn('marlin', 'G1 X10 F600\nM 00819\nM66346\n')).toEqual([
+        expect.stringContaining('Line 2 (M 00819) is M819'),
+        expect.stringContaining('Line 3 (M66346) is M810'),
+      ]);
+      expect(refusedOn('marlin', 'G1 X10 F600\nG53 M810\nn1 M819\n')).toEqual([
+        expect.stringContaining('Line 2 (G53 M810) is M810'),
+        expect.stringContaining('Line 3 (n1 M819) is M819'),
+      ]);
+    });
+
+    it('keeps Marlin first-command semantics and ordinary accessory bytes', () => {
+      const source = 'M355 S1\nG1 X10 F600 M810 ; M819\n(M810)\nM355 S0\n';
+      expect(normalizeExternalProgram(source, undefined, 'marlin')).toMatchObject({
+        kind: 'ok',
+        program: { gcode: 'G21\nG90\nM355 S1\nG1 X10 F600 M810\nM355 S0\n' },
+      });
+    });
+
+    it('refuses stored macros reached through either Marlin G53 parser implementation', () => {
+      // FASTER_GCODE_PARSER chains after the first space, while the slow
+      // parser chains immediately after the command number and spaces.
+      expect(refusedOn('marlin', 'G1 X10 F600\nG53G1 M810\nG53junk M819\n')).toEqual([
+        expect.stringContaining('Line 2 (G53G1 M810) is M810'),
+        expect.stringContaining('Line 3 (G53junk M819) is M819'),
+      ]);
+      expect(normalizeExternalProgram('G53G1 X10 M810\n', undefined, 'marlin')).toMatchObject({
+        kind: 'ok',
+        program: { gcode: 'G21\nG90\nG53G1 X10 M810\n' },
+      });
+    });
+
+    it('checks the serial and quoted-string text the Marlin parser actually receives', () => {
+      const source = ['\\M810', 'M8\\19', 'G53junk \\M810', 'G53J" \\M810"'].join('\n');
+      expect(refusedOn('marlin', source)).toEqual([
+        expect.stringContaining('Line 1 (\\M810) is M810'),
+        expect.stringContaining('Line 2 (M8\\19) is M819'),
+        expect.stringContaining('Line 3 (G53junk \\M810) is M810'),
+        expect.stringContaining('Line 4 (G53J" \\M810") is M810'),
+      ]);
+      const accessory = 'M355 S1\nG1 J" \\M810"\nG53 J" \\M810"\nM355 S0\n';
+      expect(normalizeExternalProgram(accessory, undefined, 'marlin')).toMatchObject({
+        kind: 'ok',
+        program: { gcode: `G21\nG90\n${accessory}` },
+      });
+      const nested = String.raw`G53 G53J" \\M810"`;
+      expect(refusedOn('marlin', nested)).toEqual([
+        expect.stringContaining(`Line 1 (${nested}) is M810`),
+      ]);
+    });
+
     it('refuses grblHAL macro and subprogram calls', () => {
       expect(refusedOn('grblhal', 'G0 X0\nG65 P100\nM98 P100\nO<probe> call\n')).toEqual([
         expect.stringContaining('Line 2 (G65P100) is G65'),

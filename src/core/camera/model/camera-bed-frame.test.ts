@@ -10,6 +10,7 @@ import {
   cameraBedFrameNote,
   cameraModelInBedFrame,
   sceneInBedFrame,
+  UNVERIFIED_FRAME_NOTE,
   type CameraBedFrame,
 } from './camera-bed-frame';
 import { bedMapper, bedPoint, projectWorldPoint, type Vec2 } from './camera-model';
@@ -100,6 +101,22 @@ describe('a calibration in the bed frame now', () => {
       message:
         'The camera was calibrated on a 400 × 400 mm bed. KerfDesk moves its picture 10 mm to match the machine as it is set up now.',
     });
+  });
+
+  it('says when the rings were placed before the bed position was known', () => {
+    const homed = { ...FRONT_LEFT_400, nativeToBedOffsetMm: { x: 0, y: 400 } };
+    // Engraved unhomed: Absolute coordinates counted from the power-on head.
+    expect(cameraBedFrameNote(calibrated, homed)).toEqual({
+      usable: true,
+      message: UNVERIFIED_FRAME_NOTE,
+    });
+    expect(cameraBedFrameNote(calibrated, { ...homed, bedHeightMm: 410 })?.message).toBe(
+      `The camera was calibrated on a 400 × 400 mm bed. KerfDesk moves its picture 10 mm to match the machine as it is set up now. ${UNVERIFIED_FRAME_NOTE}`,
+    );
+    // Known then and now, or unknown both times (no homing): nothing to say.
+    expect(cameraBedFrameNote({ ...calibrated, bedFrame: homed }, homed)).toBeNull();
+    expect(cameraBedFrameNote(calibrated, FRONT_LEFT_400)).toBeNull();
+    expect(cameraBedFrameNote(savedCameraModel(), homed)).toBeNull();
   });
 
   it('counts a native offset only when both frames know it', () => {

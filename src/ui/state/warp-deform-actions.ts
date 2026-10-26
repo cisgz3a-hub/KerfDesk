@@ -5,7 +5,7 @@
 import { warpDeformHandlesUnmoved, type WarpDeformGrid } from '../../core/geometry/warp-deform-map';
 import { WARP_DEFORM_TOLERANCE_MM } from '../../core/geometry/warp-deform-paths';
 import { isVectorPathObject } from '../../core/geometry/vector-path-tools';
-import type { Scene } from '../../core/scene/scene';
+import type { Project, Scene } from '../../core/scene';
 import { selectedObjectIds } from './scene-group-actions';
 import { pushUndo } from './scene-mutations';
 import type { AppState } from './store';
@@ -15,7 +15,10 @@ import type { WarpDeformRequest } from './warp-deform-session';
 
 export type WarpDeformActions = {
   /** Bend the session's artwork by its handles, as one undo step. */
-  readonly applyWarpDeform: (request: WarpDeformRequest) => void;
+  readonly applyWarpDeform: (
+    request: WarpDeformRequest,
+    display?: { readonly source: Project; readonly scene: Scene },
+  ) => void;
 };
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
@@ -24,20 +27,39 @@ type LeftAlone = { readonly imagesAndReliefs: number; readonly locked: number };
 
 export function warpDeformActions(set: Setter): WarpDeformActions {
   return {
-    applyWarpDeform: (request) => set((state) => applyWarpDeformMutation(state, request)),
+    applyWarpDeform: (request, display) =>
+      set((state) =>
+        display !== undefined && display.source !== state.project
+          ? state
+          : applyWarpDeformMutation(state, request, display?.scene),
+      ),
   };
 }
 
 function applyWarpDeformMutation(
   state: AppState,
   request: WarpDeformRequest,
+  display?: Scene,
 ): AppState | Partial<AppState> {
   if (warpDeformHandlesUnmoved(request.grid, request.box, request.handles)) {
     toast('The handles have not moved, so nothing changed.');
     return state;
   }
   const scene = state.project.scene;
-  const plan = planWarpDeform(scene, request);
+  const ids = new Set(request.objectIds);
+  const shown = new Map(display?.objects.map((object) => [object.id, object]));
+  const current =
+    display === undefined
+      ? scene
+      : {
+          ...scene,
+          objects: scene.objects.map((object) =>
+            ids.has(object.id) && object.locked !== true
+              ? (shown.get(object.id) ?? object)
+              : object,
+          ),
+        };
+  const plan = planWarpDeform(current, request);
   if (plan.failure !== undefined) {
     toast(plan.failure);
     return state;

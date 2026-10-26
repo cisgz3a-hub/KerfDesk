@@ -21,6 +21,7 @@ import {
   updateNotesUrl,
   verifyUpdateNotes,
 } from '../public/desktop-update-notes.mjs';
+import { launchPublicDeliveryBrowser } from './public-delivery-browser.mjs';
 
 // Cloudflare redirects /download.html to this canonical path.
 const WEBSITE_URL = 'https://kerfdesk.com/download';
@@ -211,8 +212,8 @@ export async function verifyPublicDesktopRelease({
 
 /** Shared read-only browser boundary for the stable and Preview publication checks. */
 export async function inspectPublicDownloadPage(outputDirectory, screenshot, inspect) {
-  const { chromium, expect } = await import('@playwright/test');
-  const browser = await chromium.launch({ channel: 'chrome', headless: true, timeout: 30_000 });
+  const { expect } = await import('@playwright/test');
+  const browser = await launchPublicDeliveryBrowser();
   try {
     const context = await browser.newContext({
       acceptDownloads: false,

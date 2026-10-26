@@ -5,11 +5,18 @@
 // laser head (ADR-449) gets a small square target in the middle of the bed.
 
 import { useState } from 'react';
-import { bedTargetLayout } from '../../../core/camera/target/bed-target';
+import { bedTargetLayoutWithRings } from '../../../core/camera/target/bed-target';
+import { machineKindOf } from '../../../core/scene';
 import { useStore } from '../../state';
+import { jobAwareConfirm } from '../../state/job-aware-dialogs';
 import { useLaserStore } from '../../state/laser-store';
+import { useToastStore } from '../../state/toast-store';
 import { useAssumedTarget } from './assumed-target';
-import { calibrationTargetArea, engraveCalibrationTarget } from './calibration-actions';
+import {
+  addCalibrationTargetToCanvas,
+  calibrationTargetArea,
+  engraveCalibrationTarget,
+} from './calibration-actions';
 import { useCameraCalibrationStore, type CalibrationSettings } from './camera-calibration-store';
 import {
   columnStyle,
@@ -18,6 +25,7 @@ import {
   inputStyle,
   noteStyle,
   rowStyle,
+  warnStyle,
 } from './wizard-styles';
 
 export function CalibrationSetupStep(props: { readonly note: string | null }): JSX.Element {
@@ -27,26 +35,46 @@ export function CalibrationSetupStep(props: { readonly note: string | null }): J
   const bedWidth = useStore((s) => s.project.device.bedWidth);
   const bedHeight = useStore((s) => s.project.device.bedHeight);
   const area = calibrationTargetArea(bedWidth, bedHeight, settings);
-  const rings = bedTargetLayout({ area }).marks.length;
+  const rings = bedTargetLayoutWithRings(area, settings.ringDiameterMm).marks.length;
 
   return (
     <div style={columnStyle}>
       <p style={leadStyle}>Engrave the target</p>
       <p style={textStyle}>
-        {settings.headCamera
-          ? 'Put a flat sheet of scrap in the middle of the bed'
-          : 'Cover the bed with one flat sheet of scrap'}{' '}
-        (card, plywood or anodised aluminium) and enter how thick it is.
+        Put a flat sheet of scrap (card, plywood or anodised aluminium) in the middle of the bed and
+        enter {settings.headCamera ? 'how thick it is' : 'its size and how thick it is'}.
       </p>
-      <NumberField
-        label="Sheet thickness (mm)"
-        value={settings.sheetThicknessMm}
-        step={0.1}
-        title="Thickness of the sheet the target is engraved on. The camera is fitted to its top surface."
-        onChange={(value) =>
-          updateSettings({ sheetThicknessMm: value ?? settings.sheetThicknessMm })
-        }
-      />
+      <div style={rowStyle}>
+        {settings.headCamera ? null : (
+          <>
+            <NumberField
+              label="Sheet width (mm)"
+              value={settings.sheetWidthMm}
+              step={10}
+              title="Width of the sheet, left to right. About A4 (300 × 200 mm) calibrates the whole bed well; a sheet larger than the bed covers the bed."
+              onChange={(value) => updateSettings({ sheetWidthMm: value ?? settings.sheetWidthMm })}
+            />
+            <NumberField
+              label="Sheet height (mm)"
+              value={settings.sheetHeightMm}
+              step={10}
+              title="Height of the sheet, front to back."
+              onChange={(value) =>
+                updateSettings({ sheetHeightMm: value ?? settings.sheetHeightMm })
+              }
+            />
+          </>
+        )}
+        <NumberField
+          label="Sheet thickness (mm)"
+          value={settings.sheetThicknessMm}
+          step={0.1}
+          title="Thickness of the sheet the target is engraved on. The camera is fitted to its top surface."
+          onChange={(value) =>
+            updateSettings({ sheetThicknessMm: value ?? settings.sheetThicknessMm })
+          }
+        />
+      </div>
       <p style={noteStyle}>
         KerfDesk engraves {rings} small rings across {Math.round(area.width)} ×{' '}
         {Math.round(area.height)} mm, then one photo of them calibrates the lens, finds where the
@@ -116,6 +144,7 @@ function TargetActions(props: {
         >
           Engrave target
         </button>
+        <AddTargetToCanvasButton settings={settings} />
         <button
           type="button"
           className="lf-btn"
@@ -130,8 +159,12 @@ function TargetActions(props: {
         {assumed.source === 'settings' ? correctionHint(settings.headCamera) : null}
       </p>
       {connected ? null : (
-        <p style={noteStyle}>Connect the machine to engrave, or use a target engraved earlier.</p>
+        <p style={noteStyle}>
+          Connect the machine to engrave from here, add the target to the canvas to engrave it like
+          any job, or use a target engraved earlier.
+        </p>
       )}
+      <TargetPlacementNote connected={connected} />
       {props.note === null ? null : <p style={errStyle}>{props.note}</p>}
       <div style={rowStyle}>
         <button
@@ -145,6 +178,66 @@ function TargetActions(props: {
       </div>
     </>
   );
+}
+
+// Puts the target on the canvas as artwork, for an operator who engraves it
+// like any job (ADR-441 Amendment 5), and waits at the photo.
+function AddTargetToCanvasButton(props: { readonly settings: CalibrationSettings }): JSX.Element {
+  const cncCanvas = useStore((s) => machineKindOf(s.project.machine) === 'cnc');
+  const add = (): void => {
+    if (useStore.getState().dirty && !jobAwareConfirm(REPLACE_ARTWORK_QUESTION)) return;
+    addCalibrationTargetToCanvas(props.settings);
+    useCameraCalibrationStore.setState({ targetArea: null, minimized: true });
+    useCameraCalibrationStore.getState().setStep({ kind: 'photo', status: { kind: 'idle' } });
+    useToastStore.getState().pushToast(TARGET_ON_CANVAS_MESSAGE, 'success');
+  };
+  return (
+    <button
+      type="button"
+      className="lf-btn"
+      disabled={cncCanvas}
+      onClick={add}
+      title={
+        cncCanvas
+          ? 'Switch the canvas to Laser to add the target: the rings are a laser engraving.'
+          : 'Put the ring target on the canvas in place of the current artwork (Undo brings it back), to Frame and Start like any job. This wizard waits, minimised, at the photo step.'
+      }
+    >
+      Add target to canvas
+    </button>
+  );
+}
+
+function TargetPlacementNote(props: { readonly connected: boolean }): JSX.Element | null {
+  const homingEnabled = useStore((s) => s.project.device.homing.enabled);
+  const homed = useLaserStore((s) => s.homingState === 'confirmed');
+  const note = targetPlacementNote(props.connected, homingEnabled, homed);
+  return note === null ? null : (
+    <p role="status" style={homingEnabled ? warnStyle : noteStyle}>
+      {note}
+    </p>
+  );
+}
+
+const REPLACE_ARTWORK_QUESTION =
+  'Adding the calibration target replaces the current artwork (Undo brings it back). Continue?';
+export const TARGET_ON_CANVAS_MESSAGE =
+  'Calibration target added to the canvas and locked in place. Start from is now Absolute Coordinates. Frame and Start it, leave the sheet where it is, then press Expand on the Camera setup panel at the bottom right to take the photo.';
+export const HOME_BEFORE_TARGET_NOTE =
+  'Home the machine before engraving the target. Until it is homed, the rings are placed from wherever the head was when the machine was switched on, so the calibration would hold only until the next Home.';
+export const NO_HOMING_TARGET_NOTE =
+  'This machine has no homing, so the camera lines up only while the controller keeps the zero it has when the target is engraved.';
+
+// The target runs at Absolute coordinates, which name a fixed place on the bed
+// only once the machine is homed (ADR-441 Amendment 5). Advice, not a gate.
+function targetPlacementNote(
+  connected: boolean,
+  homingEnabled: boolean,
+  homed: boolean,
+): string | null {
+  if (!connected) return null;
+  if (!homingEnabled) return NO_HOMING_TARGET_NOTE;
+  return homed ? null : HOME_BEFORE_TARGET_NOTE;
 }
 
 // The rings are matched to the layout the settings describe, so a target
@@ -191,10 +284,17 @@ function SettingsFields(props: { readonly settings: CalibrationSettings }): JSX.
             label="Margin (mm)"
             value={settings.marginMm}
             step={1}
-            title="Space kept clear around the target on every side of the bed."
+            title="Space kept clear around the target on every side of the sheet."
             onChange={(value) => update({ marginMm: value ?? settings.marginMm })}
           />
         )}
+        <NumberField
+          label="Ring size (mm)"
+          value={settings.ringDiameterMm}
+          step={1}
+          title="Outer diameter of the target's rings; they are spaced four sizes apart. 10 mm suits most cameras. If the photo says the rings are too small, use the size it suggests."
+          onChange={(value) => update({ ringDiameterMm: value ?? settings.ringDiameterMm })}
+        />
         <NumberField
           label="Camera height (mm)"
           value={settings.cameraHeightMm}

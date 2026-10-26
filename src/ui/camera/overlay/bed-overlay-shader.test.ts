@@ -178,6 +178,27 @@ describe('bed overlay shader maths', () => {
     expect(bedOverlaySampleCoord(uniformsFor(lens, lowOverCorner, 0), fragX, fragY)).toBeNull();
   });
 
+  it('discards points wider than the lens images, which the lens would fold back inside', () => {
+    // Turns back at about 63°, outside its picture. Straight down 100 mm over
+    // the origin corner, the far corner is 80° out: past the turn, the forward
+    // map put it about 313 px from the centre, inside the frame.
+    const turnsOutside: LensModel = {
+      intrinsics: { fx: 800, fy: 800, cx: 639.5, cy: 359.5 },
+      distortion: [0, 0, 0, -0.05],
+      imageWidth: 1280,
+      imageHeight: 720,
+    };
+    const lowOverCorner = lookAt([0, 0, -100], [0, 0, 0]);
+    const uniforms = uniformsFor(turnsOutside, lowOverCorner, 0);
+    expect(uniforms.uAngleLimit).toBeCloseTo(1.105, 3);
+    const far = fragmentOver(400, 400);
+    expect(bedOverlaySampleCoord(uniforms, far.fragX, far.fragY)).toBeNull();
+    const near = fragmentOver(30, 30);
+    const seen = modelTexCoord(turnsOutside, lowOverCorner, 30, 30, 0);
+    expect(seen).not.toBeNull();
+    expectSameCoord(bedOverlaySampleCoord(uniforms, near.fragX, near.fragY), seen);
+  });
+
   it('clamps opacity and sanitises the canvas inputs', () => {
     expect(uniformsFor(lens, pose, 0, 1.5).uOpacity).toBe(1);
     expect(uniformsFor(lens, pose, 0, -0.2).uOpacity).toBe(0);
