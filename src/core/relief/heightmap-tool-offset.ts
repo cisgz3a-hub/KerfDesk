@@ -11,14 +11,18 @@
 // whole-cell and output-precision envelopes below. Adding a finishing allowance lifts the whole
 // roughing target so H.8's ball-nose pass has material to finish.
 //
-// Out-of-bounds neighbors are ignored (treated as bottomless), so the field
-// never inflates at the heightmap edge.
+// The stock past the map's edge stands at the stock top, like an excluded
+// cell (ADR-412 Amendment 2, heightmap-outside-stock.ts): a relief is carved
+// inside its own footprint, never into bare stock or a neighbouring relief.
+// It used to count as bottomless, so a cutter on the last sample reached a
+// whole radius past the footprint.
 
 import type { ToolKernel } from '../sim';
 // Deep import: core/cnc's barrel is a ratcheted over-cap legacy barrel
 // (scripts/index-export-baseline.json) and may only shrink.
 import { CNC_MASK_EMISSION_Z_CLEARANCE_MM } from '../cnc/cnc-output-precision';
 import type { Heightmap } from './heightmap';
+import { outsideStockConstraint } from './heightmap-outside-stock';
 import { createSurfaceContactField, type SurfaceContactField } from './heightmap-surface-contact';
 import {
   hasPartialTerminalCandidate,
@@ -98,12 +102,14 @@ function dilateHeightmap(
       const center = cy * widthCells + cx;
       if (inclusion?.[center] === 0) continue;
       if (!wholeRow && options.columns?.[cx] !== 1) continue;
+      const outside = outsideStockConstraint(map, kernel, cx, cy);
       storeTipDepth(
         out,
         outBits,
         center,
-        dilatedCell(map, kernel, cx, cy, allowanceMm, touchesExcluded, center, contact),
-        inclusion !== undefined,
+        dilatedCell(map, kernel, cx, cy, allowanceMm, touchesExcluded, center, contact, outside),
+        // Stock in reach: past the map's edge, or excluded by its mask.
+        inclusion !== undefined || outside !== Number.NEGATIVE_INFINITY,
       );
     }
   }
@@ -119,9 +125,11 @@ function dilatedCell(
   touchesExcluded: Uint8Array | undefined,
   center: number,
   contact: SurfaceContactField | null,
+  outsideConstraint: number,
 ): number {
   let best = excludedMaskConstraint(map, kernel, cx, cy, touchesExcluded, center);
   best = Math.max(best, includedSurfaceConstraint(map, kernel, cx, cy));
+  best = Math.max(best, outsideConstraint);
   // ADR-412: the lattice kernel only meets the surface at sample points; the
   // exact contact with the surface between them can only raise the tip.
   if (contact !== null) best = contact.constraint(cx, cy, best);
@@ -240,9 +248,10 @@ function markExcludedSweep(
   }
 }
 
-// Masked tip depths must never round to a deeper Float32 value than the proven
+// Tip depths with stock in reach (excluded by the mask, or past the map's
+// edge) must never round to a deeper Float32 value than the proven
 // double-precision constraint. Moving one representable step toward stock top
-// when necessary preserves the mask proof without changing unmasked output.
+// when necessary preserves the proof without changing any other tip.
 function storeTipDepth(
   out: Float32Array,
   outBits: Uint32Array,

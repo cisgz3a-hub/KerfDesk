@@ -39,6 +39,29 @@ export function coneMap(): Heightmap {
   );
 }
 
+// ADR-412 Amendment 2: the stock past a map's edge stands at the stock top, so
+// these maps' floors meet a wall at their edge, and the waterline circles that
+// wall too, within the ball's radius of the edge. Their features stand well
+// inside it: a contour or pass whose every point stands more than
+// EDGE_WALL_MM from the edge follows a feature.
+export const EDGE_WALL_MM = 3;
+
+export function insideEdgeWall(
+  map: Heightmap,
+  point: { readonly x: number; readonly y: number },
+): boolean {
+  return Math.min(point.x, map.widthMm - point.x, point.y, map.heightMm - point.y) > EDGE_WALL_MM;
+}
+
+export function featurePasses(
+  map: Heightmap,
+  passes: ReadonlyArray<CncPass>,
+): ReadonlyArray<CncPass> {
+  return passes.filter(
+    (pass) => pass.kind === 'path3d' && pass.points.every((point) => insideEdgeWall(map, point)),
+  );
+}
+
 export function exactSurface(map: Heightmap, kernel: ToolKernel): WaterlineSurface {
   const field = createSurfaceContactField(map, kernel);
   if (field === null) throw new Error('expected a contact field');

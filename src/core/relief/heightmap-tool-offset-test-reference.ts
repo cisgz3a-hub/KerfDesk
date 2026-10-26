@@ -61,7 +61,8 @@ function referenceDilation(
       const context = { map, kernel, cx, cy };
       const surface = surfaceConstraint(context, geometry);
       const excluded = excludedConstraint(context, geometry, false);
-      const lattice = Math.max(surface, excluded);
+      const outside = outsideConstraint(context);
+      const lattice = Math.max(surface, excluded, outside);
       const best = contact === null ? lattice : contact.constraint(cx, cy, lattice);
       const safe = best === Number.NEGATIVE_INFINITY ? (map.depth[center] ?? 0) : best;
       storeTipDepth(
@@ -69,7 +70,7 @@ function referenceDilation(
         outBits,
         center,
         Math.min(0, safe + allowanceMm),
-        map.inclusion !== undefined,
+        map.inclusion !== undefined || outside !== Number.NEGATIVE_INFINITY,
       );
       if (
         touchesExcluded !== undefined &&
@@ -195,6 +196,27 @@ function physicalExcludedConstraint(
     }
   }
   return best;
+}
+
+// ADR-412 Amendment 2: the stock past the map's edge is a block at the stock
+// top, as an excluded cell is, reached across the nearest of the four sides
+// the first and last cells end at. Both geometries see the same physical edge.
+function outsideConstraint(context: CellContext): number {
+  const { map, kernel, cx, cy } = context;
+  const centerX = partialCellCenter(map, 'x', cx);
+  const centerY = partialCellCenter(map, 'y', cy);
+  const nearestSideMm = Math.min(
+    centerX - partialCellStart(map, 'x', 0),
+    partialCellEnd(map, 'x', map.widthCells - 1) - centerX,
+    centerY - partialCellStart(map, 'y', 0),
+    partialCellEnd(map, 'y', map.heightCells - 1) - centerY,
+  );
+  const distanceMm = Math.max(0, Math.max(0, nearestSideMm) - kernel.maskPathUncertaintyMm);
+  if (distanceMm > kernel.radiusMm + toolDistanceTolerance(kernel)) {
+    return Number.NEGATIVE_INFINITY;
+  }
+  const dz = cuttingSurfaceDz(kernel.tool, Math.min(kernel.radiusMm, distanceMm), kernel.radiusMm);
+  return CNC_MASK_EMISSION_Z_CLEARANCE_MM - dz;
 }
 
 function distanceToCell(value: number, map: Heightmap, axis: 'x' | 'y', index: number): number {

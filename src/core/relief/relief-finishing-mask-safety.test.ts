@@ -42,10 +42,11 @@ describe('relief finishing mask sweep safety', () => {
 
     const simulated = computeRemovalGrid(
       buildToolpath(jobFor(tool, passes), { startPoint: { x: 0.1, y: 0.1 } }),
-      { originX: 0, originY: 0, widthMm: 3, heightMm: 0.2, mmPerCell: 0.2 },
+      { originX: 0, originY: MIDDLE_ROW * 0.2, widthMm: 3, heightMm: 0.2, mmPerCell: 0.2 },
       kernel,
     );
     if (simulated.kind === 'error') throw new Error(simulated.reason);
+    expect(Math.min(...simulated.grid.depth.slice(0, 12))).toBeLessThan(-1);
     expect([...simulated.grid.depth.slice(12)]).toEqual([0, 0, 0]);
   });
 
@@ -113,16 +114,30 @@ describe('relief finishing mask sweep safety', () => {
 
 type FinishingPass = ReturnType<typeof reliefFinishingPasses>[number];
 
-function maskedRow(): Heightmap {
+// The stock past the map's edge holds the cutter at the stock top within its
+// reach (ADR-412 Amendment 2), so a strip is STRIP_ROWS tall: its middle row
+// stands clear of the top and bottom edges, as a lone row did when they were
+// bottomless.
+const STRIP_ROWS = 25;
+const MIDDLE_ROW = 12;
+
+function strip(row: ReadonlyArray<number>, mmPerCell: number, widthMm: number): Heightmap {
+  const widthCells = row.length;
+  const inclusion = new Uint8Array(widthCells * STRIP_ROWS);
+  for (let index = 0; index < STRIP_ROWS; index += 1) inclusion.set(row, index * widthCells);
   return {
-    widthCells: 15,
-    heightCells: 1,
-    widthMm: 3,
-    heightMm: 0.2,
-    mmPerCell: 0.2,
-    depth: new Float32Array(15).fill(-2),
-    inclusion: Uint8Array.from([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0]),
+    widthCells,
+    heightCells: STRIP_ROWS,
+    widthMm,
+    heightMm: STRIP_ROWS * mmPerCell,
+    mmPerCell,
+    depth: new Float32Array(widthCells * STRIP_ROWS).fill(-2),
+    inclusion,
   };
+}
+
+function maskedRow(): Heightmap {
+  return strip([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0], 0.2, 3);
 }
 
 // A bowl 2 mm deep, excluded outside a 2.4 mm circle.
@@ -150,17 +165,8 @@ function discMask(): Heightmap {
 
 function fractionalMaskedRow(): Heightmap {
   const widthCells = 24;
-  const inclusion = new Uint8Array(widthCells).fill(1);
-  inclusion.fill(0, 20);
-  return {
-    widthCells,
-    heightCells: 1,
-    widthMm: widthCells / 5.8,
-    heightMm: 1 / 5.8,
-    mmPerCell: 1 / 5.8,
-    depth: new Float32Array(widthCells).fill(-2),
-    inclusion,
-  };
+  const row = new Array<number>(widthCells).fill(1).fill(0, 20);
+  return strip(row, 1 / 5.8, widthCells / 5.8);
 }
 
 function complexMask(): Heightmap {

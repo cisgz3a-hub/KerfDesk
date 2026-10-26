@@ -71,7 +71,7 @@ describe('relief partial terminal cells', () => {
     expect(pass.points[1]?.x).toBe(pitch + (Number.MAX_VALUE - pitch) / 2);
   });
 
-  it('maps roughing dual-grid contours to the exact terminal edges', () => {
+  it('keeps roughing contours off the exact terminal edges', () => {
     const map = partialMap(1, 1, 0.3, 4, 4);
     const tool: CncTool = {
       id: 'partial-rough',
@@ -88,18 +88,29 @@ describe('relief partial terminal cells', () => {
     });
     const points = passes.flatMap((pass) => (pass.kind === 'contour' ? pass.polyline : []));
 
+    // ADR-412 Amendment 2: the stock past the map's edge keeps the cutter its
+    // radius off it, measured to the exact 1 mm edge, not the grid's nominal
+    // 1.2 mm end. Cell 2's centre (0.75) stands 0.25 mm from the exact edge,
+    // inside the radius plus the 0.237 mm contour clearance, so only cell 1
+    // is cut on each axis; from 1.2 mm it would have stood 0.45 mm off.
+    const reach = tool.diameterMm / 2;
     expect(points.length).toBeGreaterThan(0);
-    expect(points.every((point) => point.x >= 0 && point.x <= map.widthMm)).toBe(true);
-    expect(points.every((point) => point.y >= 0 && point.y <= map.heightMm)).toBe(true);
-    expect(points.some((point) => point.x === map.widthMm)).toBe(true);
-    expect(points.some((point) => point.y === map.heightMm)).toBe(true);
+    expect(points.every((point) => point.x >= reach && point.x <= map.widthMm - reach)).toBe(true);
+    expect(points.every((point) => point.y >= reach && point.y <= map.heightMm - reach)).toBe(true);
+    expect(Math.max(...points.map((point) => point.x))).toBeLessThan(0.75);
+    expect(Math.max(...points.map((point) => point.y))).toBeLessThan(0.75);
   });
 
   it('uses physical center distance for a tool spanning the shortened cell', () => {
+    // Three rows of [-1, -1, 0] whose last cell is 0.1 mm wide. The middle
+    // row's middle sample stands clear of the stock past the map's edge
+    // (ADR-412 Amendment 2) except across the far side, where the ball's own
+    // 0.6 mm reach of it requires less than the shortened cell does.
     const map: Heightmap = {
-      ...partialMap(1.1, 1, 1, 2, 1),
-      depth: Float32Array.from([-1, 0]),
+      ...partialMap(2.1, 3, 1, 3, 3),
+      depth: Float32Array.from([-1, -1, 0, -1, -1, 0, -1, -1, 0]),
     };
+    const sample = 4;
     const tool: CncTool = {
       id: 'partial-ball',
       name: '1.2 mm ball nose',
@@ -112,8 +123,8 @@ describe('relief partial terminal cells', () => {
     const kernel = kernelForTool(tool, map.mmPerCell);
     const lattice = dilateHeightmapByTool(map, kernel, 0, { betweenSamples: false });
 
-    expect(lattice[0]).toBeCloseTo(-expectedDz, 6);
-    expect(lattice[0]).toBeGreaterThan(-1);
+    expect(lattice[sample]).toBeCloseTo(-expectedDz, 6);
+    expect(lattice[sample]).toBeGreaterThan(-1);
 
     // ADR-412: the ball meets the ramp between the two samples where its own
     // slope matches the ramp's, which holds the tip higher than either sample.
@@ -123,8 +134,8 @@ describe('relief partial terminal cells', () => {
       -1 + slope * contactRadius - (radiusMm - Math.sqrt(radiusMm ** 2 - contactRadius ** 2));
     const tip = dilateHeightmapByTool(map, kernel, 0);
 
-    expect(tip[0]).toBeCloseTo(contactTip, 6);
-    expect(tip[0]).toBeGreaterThan(lattice[0] ?? 0);
+    expect(tip[sample]).toBeCloseTo(contactTip, 6);
+    expect(tip[sample]).toBeGreaterThan(lattice[sample] ?? 0);
   });
 
   it('treats an included partial cell as physically adjacent to excluded stock', () => {
