@@ -1,6 +1,7 @@
 import { CMD_BUILD_INFO, CMD_SETTINGS, CMD_UNLOCK, RT_RESUME, RT_STATUS } from './commands';
 import { commonConsoleStateEffect, type ConsoleStateEffect } from '../console-state-effect';
 import { consoleTextRefusal, normalizeConsoleSpaces } from '../console-text';
+import { grblLineReaderView } from './grbl-line-reader';
 
 export const CMD_OFFSETS = '$#';
 export const CMD_MODAL_STATE = '$G';
@@ -60,9 +61,13 @@ const IDLE_OR_ALARM: ReadonlyArray<string> = ['Idle', 'Alarm'];
 const IDLE_OR_CHECK: ReadonlyArray<string> = ['Idle', 'Check'];
 
 const SETTING_WRITE_RE = /^\$\d+=\S.*$/;
-const STARTUP_WRITE_RE = /^\$N\d*=/i;
+// GRBL reads a startup line's number with read_float and keeps trunc() of it,
+// so `$N+0=` and `$N0.5=` store line 0 as `$N0=` does (system.c L237-L266).
+const STARTUP_WRITE_RE = /^\$N(?:[+\-.\d][^=]*)?=/i;
 const BUILD_INFO_WRITE_RE = /^\$I=/i;
 const DOWNGRADE_RE = /^\$DWNGRD(?:=|$)/;
+const NUMBERED_KEY_RE = /^\$[+\-.\d][^=]*=/;
+const PLAIN_NUMBERED_KEY_RE = /^\$\d+=/;
 const POSITION_AFFECTING_SETTING_IDS: ReadonlyArray<number> = [
   2, 3, 20, 22, 23, 100, 101, 102, 130, 131, 132,
 ];
@@ -71,6 +76,47 @@ export function prepareConsoleCommand(input: string): ConsoleCommandResult {
   const trimmed = normalizeConsoleSpaces(input).trim();
   const lineRefusal = consoleLineRefusal(trimmed);
   if (lineRefusal !== null) return { ok: false, reason: lineRefusal };
+  const typed = classifyConsoleLine(trimmed);
+  if (!typed.ok) return typed;
+  const disguised = disguisedSystemCommandRefusal(trimmed, typed.command);
+  return disguised === null ? typed : { ok: false, reason: disguised };
+}
+
+// GRBL's line reader drops `( … )` and `;` comments and the block-delete '/'
+// before it looks for a `$` command (grbl-line-reader.ts), so `(x)$30=255`,
+// `$30(x)=255` and `$RST(x)=*` reached the firmware as `$30=255` and `$RST=*`
+// while the Console took them for G-code: no persistent-command block, no
+// confirmation, no value check and no `$$` re-read (meta audit v1 M6-P2-1). The
+// line GRBL's parser would receive is classified as well, and the line is sent
+// as typed only when both are the same command. grblHAL and FluidNC keep a
+// comment inside a `$` line, but hand a line that starts with one to their
+// G-code parser, which strips it and takes the `$` left in front for a jog
+// (grblHAL gcode.c L1091-L1348, FluidNC GCode.cpp L157-L312); a stock-GRBL
+// profile can be talking to either.
+function disguisedSystemCommandRefusal(
+  trimmed: string,
+  typed: PreparedConsoleCommand,
+): string | null {
+  const view = grblLineReaderView(trimmed);
+  if (!view.startsWith('$')) return null;
+  const firmware = classifyConsoleLine(view);
+  if (!firmware.ok) return firmware.reason;
+  if (trimmed.startsWith('$') && sameSafeguards(typed, firmware.command)) return null;
+  return `GRBL removes comments and "/" before it reads a line, so this line can run as ${view} without the checks the Console gives that command. Type the command without comments or "/".`;
+}
+
+function sameSafeguards(a: PreparedConsoleCommand, b: PreparedConsoleCommand): boolean {
+  return (
+    a.kind === b.kind &&
+    a.stateEffect === b.stateEffect &&
+    a.requiresIdle === b.requiresIdle &&
+    a.requiresNoActiveOperation === b.requiresNoActiveOperation &&
+    a.requiresConfirmation === b.requiresConfirmation &&
+    (a.allowedStates ?? []).join() === (b.allowedStates ?? []).join()
+  );
+}
+
+function classifyConsoleLine(trimmed: string): ConsoleCommandResult {
   // GRBL discards horizontal whitespace while parsing `$` system commands.
   // Classify the fully compact form so spaces cannot disguise a persistent
   // write/reset as ordinary G-code and bypass its safety policy; send the
@@ -81,6 +127,8 @@ export function prepareConsoleCommand(input: string): ConsoleCommandResult {
   if (isBlockedPersistentCommand(upper)) {
     return { ok: false, reason: BLOCKED_PERSISTENT_REASON };
   }
+  const settingNumber = numberedKeyRefusal(compact);
+  if (settingNumber !== null) return { ok: false, reason: settingNumber };
   const realtime = prepareRealtimeCommand(normalized);
   if (realtime !== null) return realtime;
   const systemCommand = prepareSystemCommand(upper);
@@ -183,6 +231,17 @@ function normalizeConsoleInput(trimmed: string): string {
   const key = trimmed.slice(0, equals).replaceAll(/[ \t]/g, '');
   const value = trimmed.slice(equals + 1).replace(/^[ \t]+/, '');
   return `${key}=${value}`;
+}
+
+// Both firmwares read a setting number with read_float, which takes a sign, a
+// point and anything after the digits: stock GRBL stores `$30.0=` and `$+30=`
+// as `$30=` (system.c L252-L271), and grblHAL, which never checks what follows
+// the number, also `$30;x=`, `$30)=` and `$30(x)=` (system.c L1155-L1212). Only
+// digits pass as a setting number, so every write meets the setting checks.
+function numberedKeyRefusal(compact: string): string | null {
+  if (!NUMBERED_KEY_RE.test(compact) || PLAIN_NUMBERED_KEY_RE.test(compact)) return null;
+  const key = compact.slice(0, compact.indexOf('='));
+  return `${key} is not a plain setting number: GRBL and grblHAL read the number at its start and can write that setting without the Console's checks. Type the setting number as digits only, as in $30=1000.`;
 }
 
 function settingWriteStateEffect(normalized: string): ConsoleStateEffect {
