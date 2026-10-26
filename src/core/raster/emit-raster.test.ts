@@ -166,9 +166,9 @@ describe('emitRasterGroup — row layout', () => {
     );
     const lines = out.split('\n').filter((l) => l.startsWith('G'));
     expect(lines).toContain('G0 X5.000 Y0.500 S0');
-    expect(lines).toContain('G1 X10.000 F6000 S0');
+    expect(lines).toContain('G1 X10.000 F6000 S0 ; kerfdesk:laser-off-motion');
     expect(lines).toContain('G1 X12.000 S500');
-    expect(lines).toContain('G1 X17.000 S0');
+    expect(lines).toContain('G1 X17.000 S0 ; kerfdesk:laser-off-motion');
   });
 
   it('clips sweep to active span when row has leading/trailing zeros', () => {
@@ -217,13 +217,13 @@ describe('emitRasterGroup — row layout', () => {
     const motion = out.split('\n').filter((line) => line.startsWith('G'));
     expect(motion).toEqual([
       'G0 X-1.000 Y0.500 S0',
-      'G1 X0.000 F6000 S0',
+      'G1 X0.000 F6000 S0 ; kerfdesk:laser-off-motion',
       'G1 X2.000 S500',
-      'G1 X3.000 S0',
+      'G1 X3.000 S0 ; kerfdesk:laser-off-motion',
       'G0 X5.000 Y2.500 S0',
-      'G1 X4.000 S0',
+      'G1 X4.000 S0 ; kerfdesk:laser-off-motion',
       'G1 X2.000 S700',
-      'G1 X1.000 S0',
+      'G1 X1.000 S0 ; kerfdesk:laser-off-motion',
     ]);
   });
 });

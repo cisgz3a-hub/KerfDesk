@@ -61,25 +61,25 @@ G1 X45.000 Y348.000 F3000 S0 ; kerfdesk:laser-off-motion
 M5
 M4 S0
 G0X100Y295.5S0
-G1X105F2500
+G1X105F2500 ; kerfdesk:laser-off-motion
 X110S450
-X115S0
+X115S0 ; kerfdesk:laser-off-motion
 G0X115Y296.5S0
-G1X110
+G1X110 ; kerfdesk:laser-off-motion
 X105S450
-X100S0
+X100S0 ; kerfdesk:laser-off-motion
 G0X100Y297.5S0
-G1X105
+G1X105 ; kerfdesk:laser-off-motion
 X110S450
-X115S0
+X115S0 ; kerfdesk:laser-off-motion
 G0X110Y298.5S0
-G1X105
+G1X105 ; kerfdesk:laser-off-motion
 X100S450
-X95S0
+X95S0 ; kerfdesk:laser-off-motion
 G0X95Y299.5S0
-G1X100
+G1X100 ; kerfdesk:laser-off-motion
 X105S450
-X110S0
+X110S0 ; kerfdesk:laser-off-motion
 M5
 G0 X0.000 Y0.000 S0
 "

@@ -35,6 +35,7 @@ import {
 } from './laser-off-motion-policy';
 import { findNoGoZoneCollisions } from './no-go-zones';
 import { findRelativeMotionEnvelopeIssues } from './relative-motion-envelope';
+import { rotaryWrapIssue, rotaryWrapLimit, rotaryXOnlyBounds } from './rotary-bounds';
 import { operationScanOffsetIssues } from './scan-offset-policy';
 import { openFillContourIssues } from './open-fill-contour-issues';
 import { lineOpenOutlineIssues } from './line-open-outline-issues';
@@ -122,8 +123,8 @@ export type PreflightOptions = {
   readonly motionOffset?: MotionBoundsOffset | undefined;
   readonly initialMachinePosition?: { readonly x: number; readonly y: number } | undefined;
   readonly coordinateMode?: 'machine' | 'relative-origin';
-  // Rotary (ADR-127): the Y limit is one object revolution, not the bed —
-  // overrides the height used by the bounds checks when set.
+  // Rotary (ADR-127 Amendment 1): Y is a turn of the object, not the bed.
+  // When set, Y is checked only by its extent against this one-turn limit.
   readonly boundsHeightOverrideMm?: number;
 };
 
@@ -296,10 +297,11 @@ function appendBoundsIssues(
   issues: PreflightIssue[],
   options: PreflightOptions,
 ): void {
-  const machineBounds = boundsWithHeightOverride(
-    machineBoundsForDevice(project.device),
-    options.boundsHeightOverrideMm,
-  );
+  const wrapMm = rotaryWrapLimit(options.boundsHeightOverrideMm);
+  const bed = machineBoundsForDevice(project.device);
+  const machineBounds = wrapMm === null ? bed : rotaryXOnlyBounds(bed);
+  const wrapIssue = wrapMm === null ? null : rotaryWrapIssue(gcodeLines, wrapMm);
+  if (wrapIssue !== null) issues.push({ code: 'out-of-bed', message: wrapIssue });
   if (options.coordinateMode === 'relative-origin' && options.motionOffset === undefined) {
     const envelopeIssues = findRelativeMotionEnvelopeIssues(gcodeLines, {
       width: machineBounds.width,
@@ -333,17 +335,6 @@ function appendBoundsIssues(
         `${overscanMm} mm inside the left/right edges.`,
     });
   }
-}
-
-// Rotary wrap limit (ADR-127): Y spans [0, override] regardless of the
-// origin convention — the rotary axis has no rear rail, one revolution is
-// the whole coordinate space.
-function boundsWithHeightOverride(
-  bounds: ReturnType<typeof machineBoundsForDevice>,
-  overrideMm: number | undefined,
-): ReturnType<typeof machineBoundsForDevice> {
-  if (overrideMm === undefined || !Number.isFinite(overrideMm) || overrideMm <= 0) return bounds;
-  return { ...bounds, height: overrideMm, minY: 0, maxY: overrideMm };
 }
 
 // Last line of defense against a non-finite coordinate (XNaN, X-Infinity)

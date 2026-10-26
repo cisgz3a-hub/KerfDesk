@@ -147,8 +147,11 @@ export type GcodeMetadata = {
 // ADR-285 Amd 1 erodes the V-carve flat core with round joins, so its floor
 // passes sweep each inside corner instead of leaving a fin.
 // CNC audit v1 F4-P3-2: a drill group's header names the plunge feed it drills at.
+// ADR-415 Amd 1 marks image run-ins and run-outs as laser-off motion; ADR-239
+// Amd 1 says a contour entry was skipped when the bed position is unknown;
+// ADR-127 Amd 1 keeps a placed rotary job on its anchor.
 // ADR-672 closes CNC Outside/Inside outlines whose ends meet within 0.5 mm, so
-// they are offset as closed shapes (v30 is PR #1440's laser runway markers).
+// they are offset as closed shapes; carries forward v30 above.
 export const EMITTER_REVISION = 'cnc-profile-closes-open-outlines-20261026-v31';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports

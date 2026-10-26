@@ -33,7 +33,17 @@ export function findRelativeMotionEnvelopeIssues(
   return issues;
 }
 
-function collectRelativeMotionEnvelope(gcode: string | ReadonlyArray<string>): Bounds | null {
+/** Y span of the program's own motion. The start point is left out: it is
+ * wherever the head already is, which on a rotary is the cylinder's turn. */
+export function programMotionYSpan(gcode: string | ReadonlyArray<string>): number | null {
+  const bounds = collectRelativeMotionEnvelope(gcode, false);
+  return bounds === null ? null : bounds.maxY - bounds.minY;
+}
+
+function collectRelativeMotionEnvelope(
+  gcode: string | ReadonlyArray<string>,
+  includeStart = true,
+): Bounds | null {
   const bounds: Bounds = {
     minX: Number.POSITIVE_INFINITY,
     minY: Number.POSITIVE_INFINITY,
@@ -52,7 +62,7 @@ function collectRelativeMotionEnvelope(gcode: string | ReadonlyArray<string>): B
     if (!scanned.isMotion || modalMotion === null) continue;
     const motion = motionEnvelopeForLine(stripped, current, absolute, modalMotion);
     if (motion === null) continue;
-    mergePoint(bounds, current);
+    if (includeStart || any) mergePoint(bounds, current);
     mergePoint(bounds, motion.next);
     if (motion.arcBounds !== undefined) mergeBounds(bounds, motion.arcBounds);
     current = motion.next;

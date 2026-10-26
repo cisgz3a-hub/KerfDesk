@@ -1073,7 +1073,10 @@ that owns those fields, without changing the existing Frame/Start policy.
    are not overcut.
 3. **More cut settings → Image detail → Overscan** (0 to 25 mm, default 5) sets the laser-off
    run-up at both ends of every scan line. The note under it says how much run-up this machine needs
-   to reach the operation's saved speed.
+   to reach the operation's saved speed. Each run-up is written as a marked laser-off move
+   (`; kerfdesk:laser-off-motion`), as Fill's are, so following that advice never raises the
+   "long blank feed" warning; a laser-off feed longer than the largest overscan still does
+   (ADR-415 Amendment 1).
 4. Job Review lists these settings on the operation's detail line when they are set. Preview, Frame,
    the time estimate and every output format follow them. With none set, output is unchanged.
 5. Material presets do not store them; applying a preset keeps what the operation has.
@@ -2565,7 +2568,10 @@ Positive subsecond estimates display `<1s`. An exhausted estimate while the job 
 displays that it is waiting for the controller; numerical rounding never implies completion.
 
 The live burn glow requires a running, unambiguous process segment and no controller evidence
-that the laser is off. Travel, stopped/error/disconnected states, and uncertain route positions
+that the laser is off. On Smoothieware a process segment is any G1-G3 whose S is above zero while
+the `M221` power scale is above zero, since its laser module ignores M3/M4/M5; the route, burn
+trail, job-start marker, camera burn check and restart preview read it that way (ADR-096
+Amendment 1). Travel, stopped/error/disconnected states, and uncertain route positions
 keep the ordinary position marker. Cooling colours follow physical route distance, so splitting
 one straight cut into smaller G-code moves does not change its cooling pattern.
 
@@ -2668,7 +2674,10 @@ authorization, Frame proof, controller command, or safety boundary.
    `$22=1.0` as 10, so the message names the line to send instead. Every acknowledged write is
    read back with `$$`, so the settings table shows what the controller stored (ADR-375). When
    the re-read shows a different value than the one typed, the Console says so (ADR-375
-   Amendment 3).
+   Amendment 4), on every profile. A grblHAL board that greets as `Grbl 1.1f` (Ortur's ESP32-S2
+   lasers) runs under the stock-GRBL profile. When its `$$` lists grblHAL's `$14`-`$18`, its
+   banner reads `GrblHAL` or its `$I` names grblHAL, a value must pass the grblHAL check as well
+   as the stock one, and the refusal says why grblHAL applies (ADR-375 Amendment 5).
 
 #### Edge — arbitrary G-code
 1. Single-line G-code commands are allowed only when connected, no operation is active, and GRBL reports `Idle`.
@@ -3559,6 +3568,18 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
 3. **Apply** and **Generate test pattern** are disabled while a test turns.
 4. A test turn is a jog: it expires a completed Frame, and Start stays greyed out until the job
    is framed again (ADR-372).
+
+#### Success — where a rotary job burns (ADR-127 Amendment 1)
+1. In Current Position, User Origin and Verified Origin the job keeps its placement anchor: the
+   anchor's work Y is where the cylinder already is, and the job grows around it at the rotary's
+   scale. A Current Position job with a centre anchor burns around the head and returns there; a
+   User Origin job anchored back-left burns in front of the origin, not on top of it.
+2. In Absolute Coordinates the job starts at work Y 0, as before.
+3. With **Reverse direction** on, a placed job mirrors about its anchor, so the anchor still burns
+   where the cylinder is.
+4. Bounds checks keep X on the bed but check Y only by how far it spans: one turn of the object is
+   the limit, and a job taller than that warns. Where the job sits in Y never warns, with or without
+   a known work offset.
 
 #### Success — the Rotary switch
 1. Once the profile has a rotary setup, a laser project's Job actions dock shows a **Rotary**
@@ -4489,7 +4510,9 @@ it (a bounded burst of status queries, at most 3 s), homed or not, whenever Abso
 Position would otherwise assume a zero offset; if none arrives the Frame proceeds at that assumed
 zero and Job Review says so (ADR-375). On grblHAL, whose `$$` shows `$10` whole, a `$10` without
 bit 5 never sends WCO: Frame skips that wait, and the status panel, Move to position, Job Review
-and the placement refusals name the bit and the `$10` to send (ADR-375 Amendment 2). A missing
+and the placement refusals name the bit and the `$10` to send (ADR-375 Amendment 2). The same
+holds on the stock-GRBL profile when its `$$` lists grblHAL's `$14`-`$18` (ADR-375 Amendment 5).
+A missing
 report is described as missing coordinate data,
 not as a requirement to erase the work origin. Equivalent MPos/WPos reports and a first WCO
 report equal to the assumed zero do not cancel unchanged preparation, a Frame in progress, its
@@ -4498,7 +4521,9 @@ included), report units, controller sessions and output edits still invalidate t
 
 Contour entry moves use the prepared program's explicit physical envelope, including centred
 origins and translated work origins. If that envelope is unknown, the optional contour entry is
-omitted. Preview, timing, Frame bounds and output use the same prepared result. Earlier archived
+omitted, and the program's layer comment (`contour-entry skipped (bed position unknown)`) and Job
+Review ("Not added …", a warning-tone fact) say so instead of calling the entry effective
+(ADR-239 Amendment 1). Preview, timing, Frame bounds and output use the same prepared result. Earlier archived
 jobs retain their original entry behaviour so recovery does not silently change sealed output.
 
 **Status readout.** `StatusDisplay` shows MPos + `Origin:` row. The
