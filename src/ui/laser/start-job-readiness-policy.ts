@@ -17,7 +17,12 @@ import {
   unencodableLineMessage,
 } from '../../core/controllers/grbl/sendable-line-scan';
 import type { ControllerKind } from '../../core/devices';
-import { PREPARATION_COMPILED_SEGMENT_BUDGET, type Job } from '../../core/job';
+import {
+  PREPARATION_COMPILED_SEGMENT_BUDGET,
+  type Job,
+  type JobOriginPlacement,
+  type JobStartMode,
+} from '../../core/job';
 import { scenePreparationSize } from '../../core/job/preparation-complexity';
 import { rasterPreparationTooComplex } from '../../core/job/raster-preparation-complexity';
 import { COMPILE_INTEGRITY_PREFLIGHT_CODES, type PreflightIssue } from '../../core/preflight';
@@ -32,8 +37,14 @@ import type { MachineStartSnapshot } from './start-job-readiness';
 export const CNC_REQUIRES_GRBL_MESSAGE =
   'CNC jobs require a GRBL-family controller (GRBL, grblHAL, FluidNC). The connected firmware does not accept the GRBL CNC dialect — e.g. it reads the G4 spin-up dwell in milliseconds instead of seconds, so the bit would plunge before the spindle is at speed.';
 
-export function demotedPolicyWarnings(project: Project, machine: MachineStartSnapshot): string[] {
+export function demotedPolicyWarnings(
+  project: Project,
+  machine: MachineStartSnapshot,
+  jobOrigin?: JobOriginPlacement,
+): string[] {
   const warnings: string[] = [];
+  const cameraStartFrom = cameraPlacementStartFromWarning(machine, jobOrigin);
+  if (cameraStartFrom !== null) warnings.push(cameraStartFrom);
   const machineKind = machineKindOf(project.machine);
   if (machineKind === 'cnc' && machine.cncJobsSupported === false) {
     warnings.push(CNC_REQUIRES_GRBL_MESSAGE);
@@ -55,6 +66,27 @@ export function demotedPolicyWarnings(project: Project, machine: MachineStartSna
   );
   if (workZeroIssue !== null) warnings.push(workZeroIssue);
   return warnings;
+}
+
+const START_FROM_NAMES: Readonly<Record<Exclude<JobStartMode, 'absolute'>, string>> = {
+  'current-position': 'Current Position',
+  'user-origin': 'User Origin',
+  'verified-origin': 'Verified Origin',
+};
+
+/**
+ * The camera picture shows absolute bed positions, so artwork placed on it
+ * burns there only from Absolute Coordinates (ADR-228 Amendment: camera
+ * placement is said in Job Review, never refused). LightBurn expects Absolute
+ * Coordinates for camera placement for the same reason.
+ */
+export function cameraPlacementStartFromWarning(
+  machine: Pick<MachineStartSnapshot, 'cameraPlacementActive'>,
+  jobOrigin: JobOriginPlacement | undefined,
+): string | null {
+  if (machine.cameraPlacementActive !== true || jobOrigin === undefined) return null;
+  if (jobOrigin.startFrom === 'absolute') return null;
+  return `Camera placement is on, but Start from is ${START_FROM_NAMES[jobOrigin.startFrom]}. The camera picture shows positions on the bed, so this job burns where ${START_FROM_NAMES[jobOrigin.startFrom]} puts it, not where the artwork sits on the camera picture. Choose Absolute Coordinates to burn it where it is placed, and watch the Frame.`;
 }
 
 export const LARGE_JOB_PREPARATION_WARNING =

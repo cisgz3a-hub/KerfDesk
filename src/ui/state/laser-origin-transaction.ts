@@ -19,6 +19,7 @@ export type OriginSafeWrite = (
   line: string,
   action?: LaserSafetyAction,
   source?: TranscriptSource,
+  assertBeforeWrite?: () => void,
 ) => Promise<void>;
 
 export type OriginCommandWriter = (write: (line: string) => Promise<void>) => Promise<void>;
@@ -58,13 +59,21 @@ export async function runOriginTransaction(
     await writeCommands(async (line) => {
       pendingLine = line;
       assertCurrent();
-      await startControllerCommand(refs, safeWrite, {
-        kind: 'interactive-command',
-        label,
-        command: line,
-        action: 'origin',
-        source: 'origin',
-      });
+      await startControllerCommand(
+        refs,
+        (payload, action, source) =>
+          safeWrite(payload, action, source, () => {
+            assertCurrent();
+            options.assertBeforeWrite?.();
+          }),
+        {
+          kind: 'interactive-command',
+          label,
+          command: line,
+          action: 'origin',
+          source: 'origin',
+        },
+      );
       assertCurrent();
       // GRBL-family origin blocks select G54; the store follows the controller.
       set((state) => (ownsTransaction(state) ? acknowledgedWcsPatch(state, line, label) : {}));
@@ -97,6 +106,7 @@ export async function runOriginTransaction(
 }
 
 type OriginTransactionOptions = {
+  readonly assertBeforeWrite?: () => void;
   readonly changesXyOrigin?: boolean;
   readonly reestablishesPositionEvidence?: boolean;
   /** A single-line command the controller refused (`error:N`) never ran,

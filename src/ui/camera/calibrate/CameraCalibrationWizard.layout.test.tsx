@@ -110,9 +110,16 @@ describe('Target already engraved', () => {
   it('shows the layout the settings describe when nothing was engraved here, and follows a new margin', async () => {
     await openSetupAtTarget();
     expect(document.body.textContent).toContain(
-      'Target already engraved looks for a target laid out by these settings: 390 × 390 mm with a 5 mm margin on a 400 × 400 mm bed. If it was engraved with another margin, enter that margin first.',
+      'Target already engraved looks for a target laid out by these settings: 290 × 190 mm with a 5 mm margin on a 300 × 200 mm sheet in the middle of a 400 × 400 mm bed. If it was engraved with another margin, enter that margin first.',
     );
     await act(async () => useCameraCalibrationStore.getState().updateSettings({ marginMm: 20 }));
+    expect(document.body.textContent).toContain('260 × 160 mm with a 20 mm margin');
+    // The engraved target covered the whole bed: its sheet size describes it too.
+    await act(async () =>
+      useCameraCalibrationStore
+        .getState()
+        .updateSettings({ sheetWidthMm: 400, sheetHeightMm: 400 }),
+    );
     expect(document.body.textContent).toContain('360 × 360 mm with a 20 mm margin');
     await clickControl(document.body, 'Target already engraved');
     await clickControl(document.body, 'Take photo');

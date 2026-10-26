@@ -7,7 +7,7 @@
 // pictures instead of freezing one (ADR-449). A calibration made with another
 // origin corner is not drawn, and the panel says why (rolling audit 12-P2-2);
 // one saved before its bed frame was recorded can be confirmed here (ADR-440
-// Amendment 2).
+// Amendment 4).
 // Camera placement stays latched after hiding the image so its status remains
 // visible until the operator exits it.
 

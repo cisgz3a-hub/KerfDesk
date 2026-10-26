@@ -1,4 +1,4 @@
-## ADR-375 Amendment 3 - grblHAL's jog envelope, and Console setting values grblHAL stores differently (2026-10-22)
+## ADR-375 Amendment 4 - grblHAL's jog envelope, and Console setting values grblHAL stores differently (2026-10-22)
 
 **Status:** Accepted. | **Date:** 2026-10-22
 

@@ -58,6 +58,10 @@ export function chromiumDirectory(
   return {
     kind: 'directory',
     name: 'chosen-folder',
+    entries: async function* () {
+      for (const name of disk.keys())
+        yield [name, chromiumFileHandle(disk, name, options.writeError)];
+    },
     getFileHandle: async (name: string, handleOptions?: { readonly create?: boolean }) => {
       if (!disk.has(name)) {
         if (handleOptions?.create !== true) throw notFound();

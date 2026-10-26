@@ -189,7 +189,7 @@ function machineActionAreas(showManualAir: boolean, machineKind: 'laser' | 'cnc'
 // position, so that clamp alone aims from the controller's number then. A Home
 // in this session ties MPos to the switch, so a homed grblHAL, which never has
 // a frame, keeps the pull-off clear of its switch with soft limits off too
-// (ADR-375 Amendment 3). With no frame, no soft limits and no Home, the hold
+// (ADR-375 Amendment 4). With no frame, no soft limits and no Home, the hold
 // asks for full travel and relies on release plus the jog-cancel byte, as it
 // does with no position.
 function JogArrows(props: Omit<Parameters<typeof JogArrowGrid>[0], 'position'>): JSX.Element {

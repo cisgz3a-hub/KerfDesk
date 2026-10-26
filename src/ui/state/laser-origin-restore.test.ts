@@ -102,6 +102,57 @@ describe('Restore saved origin controller evidence and units', () => {
     expect(h.get().wcoCache).toEqual({ x: 20, y: 30, z: 4 });
   });
 
+  it('rechecks calculated-target ownership after asynchronous readiness before any origin write', async () => {
+    const h = harness();
+    const write = vi.fn(async () => undefined);
+    const assertCurrent = () => {
+      if (h.get().workOriginVersion !== 1) throw new Error('Capture origin changed');
+    };
+    const pending = setOriginAtMachinePoint(h.set, h.get, h.refs, write, saved, assertCurrent);
+    h.set({ workOriginVersion: 2 });
+    await expect(pending).rejects.toThrow('Capture origin changed');
+    expect(write).not.toHaveBeenCalled();
+    expect(h.get().controllerOperation).toBeNull();
+    expect(h.get().workOriginVersion).toBe(2);
+  });
+
+  it('carries target ownership to a deferred SafeWrite dispatch', async () => {
+    const h = harness();
+    let current = true;
+    let release: () => void = () => undefined;
+    const deferred = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const dispatched: string[] = [];
+    const write = vi.fn(
+      async (
+        line: string,
+        _action?: unknown,
+        _source?: unknown,
+        assertBeforeWrite?: () => void,
+      ) => {
+        await deferred;
+        assertBeforeWrite?.();
+        dispatched.push(line);
+        queueMicrotask(() => {
+          h.report({ ...saved, z: 4 });
+          consumeControllerCommandResponse(h.refs, { kind: 'ok' }, 'ok');
+        });
+      },
+    );
+    const pending = setOriginAtMachinePoint(h.set, h.get, h.refs, write, saved, () => {
+      if (!current) throw new Error('Capture owner changed');
+    });
+    const rejected = expect(pending).rejects.toThrow('Capture owner changed');
+    await flush();
+    expect(write).toHaveBeenCalledOnce();
+    current = false;
+    release();
+    await rejected;
+    expect(dispatched).toEqual([]);
+    expect(h.refs.controllerCommand).toBeNull();
+  });
+
   it('logs the board-origin notice without throwing when confirmation times out', async () => {
     vi.useFakeTimers();
     const h = harness();

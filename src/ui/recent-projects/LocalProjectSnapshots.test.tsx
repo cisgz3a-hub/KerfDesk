@@ -65,3 +65,56 @@ it('makes applied operator notes undoable and shows them with the latest persist
     vi.unstubAllGlobals();
   }
 });
+
+it('preserves the next snapshot name typed while a save is pending', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  resetStore();
+  useStore.getState().setProject(projectWithLine());
+  const persisted = createLocalSnapshotStorage(new FakeIDBFactory());
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const add = vi.fn(async (snapshot: Parameters<typeof persisted.add>[0]) => {
+    await gate;
+    await persisted.add(snapshot);
+  });
+  const storage = { ...persisted, add };
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  try {
+    await act(async () =>
+      root.render(
+        <LocalProjectSnapshots platform={mockPlatform()} storage={storage} onRestored={vi.fn()} />,
+      ),
+    );
+    const name = host.querySelector<HTMLInputElement>('[aria-label="Local snapshot name"]')!;
+    await act(async () => {
+      name.value = 'First layout';
+      Simulate.change(name);
+    });
+    const save = [...host.querySelectorAll('button')].find(
+      (button) => button.textContent === 'Save local snapshot',
+    )!;
+    await act(async () => save.click());
+    await vi.waitFor(() => expect(add).toHaveBeenCalledOnce());
+    await act(async () => {
+      name.value = 'Next layout';
+      Simulate.change(name);
+    });
+    await act(async () => {
+      release();
+      await gate;
+    });
+    await vi.waitFor(async () => {
+      await act(async () => Promise.resolve());
+      expect(host.textContent).toContain('Latest local copy');
+    });
+    expect(name.value).toBe('Next layout');
+    expect((await persisted.list())[0]?.name).toBe('First layout');
+  } finally {
+    release();
+    await act(async () => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});

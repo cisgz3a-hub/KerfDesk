@@ -222,27 +222,25 @@ describe('compiled whole-run contour context', () => {
     );
     const edges = burns(grblStrategy.emit(planned, project.device));
     const main = edges.filter((edge) => edge.power === 800);
-    expect(main[0]?.a).toEqual({ x: 20, y: 10 }); // child C leaves the cursor nearest B
-    expect(main[0]?.b).toEqual({ x: 30, y: 10 });
+    // Part by part (ADR-669): A holds nothing and is nearest the origin, so it
+    // goes first; C must still precede B, the parent that encloses it.
+    expect(main[0]?.a).toEqual({ x: 10, y: 10 });
+    expect(main[0]?.b).toEqual({ x: 20, y: 10 });
     const shared = main.flatMap((edge, index) =>
       edge.a.x === 20 && edge.b.x === 20 ? [index] : [],
     );
-    const aEdges = main.flatMap((edge, index) => (edge.a.x < 20 || edge.b.x < 20 ? [index] : []));
-    const firstA = aEdges[0] ?? -1;
-    expect(shared).toHaveLength(2); // both B passes own the single shared edge
-    // Same-depth peers retain their legacy combined process-group pass loop.
-    // Within each pass, B visits first and owns the shared edge; A has 3 edges.
-    expect(firstA).toBeGreaterThan(shared[0] ?? Infinity);
-    expect(aEdges[3]).toBeGreaterThan(shared[1] ?? Infinity);
+    const bEdges = main.flatMap((edge, index) => (edge.a.x > 20 || edge.b.x > 20 ? [index] : []));
+    expect(shared).toHaveLength(2); // both A passes own the single shared edge
+    // A runs both passes first and owns the shared edge; B keeps 3 edges a pass.
+    expect(bEdges).toHaveLength(6);
+    expect(bEdges[0]).toBeGreaterThan(shared[1] ?? Infinity);
+    const firstChild = edges.findIndex((edge) => edge.power === 400);
+    const firstB = edges.findIndex(
+      (edge) => edge.power === 800 && (edge.a.x > 20 || edge.b.x > 20),
+    );
+    expect(firstChild).toBeGreaterThanOrEqual(0);
+    expect(edges.findLastIndex((edge) => edge.power === 400)).toBeLessThan(firstB);
     expect(main.reduce((length, edge) => length + burnLength(edge), 0)).toBeCloseTo(140, 8);
-    expect(
-      edges
-        .slice(
-          0,
-          edges.findIndex((edge) => edge.power === 800),
-        )
-        .every((edge) => edge.power === 400),
-    ).toBe(true);
   });
   it('single-pass shared-edge winner retains the original pre-cleanup drawn traversal', () => {
     const project = sharedEdgeDrawnProject();

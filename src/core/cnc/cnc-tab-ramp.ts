@@ -21,7 +21,6 @@
 //
 // Pure: no clock, no randomness, no I/O.
 
-import { automaticTabAnchorPoints } from '../geometry/tabs-bridges';
 import type { Vec3 } from '../geometry/vec3';
 import type { Polyline, Vec2 } from '../scene';
 
@@ -72,63 +71,58 @@ export function tabRampedPoints(
 }
 
 /**
- * Tab centres for `target`, expressed as normalized perimeter fractions, taken
- * from whichever of `references` it most closely follows.
- *
- * Finishing passes must put their bridges where the roughing pass put them: a
- * finishing contour is a different offset of the same feature, so its own even
- * spacing would land the tabs somewhere else and the physical bridge would be cut
- * away. The split model solved this with `splitPassForTabsAlignedToReference`;
- * this is the same projection expressed as fractions `tabRampedPoints` accepts.
- *
- * Returns null when no usable closed reference exists, in which case the caller
- * should fall back to ordinary even spacing.
+ * The XY centre of every tab `tabRampedPoints` cuts on `toolpath` for the same
+ * `tabsPerShape` and `manualCenters`. Empty for an open or degenerate loop.
  */
-export function tabFractionsFromReference(
-  target: Polyline,
-  references: ReadonlyArray<Polyline>,
+export function tabCenterPoints(
+  toolpath: Polyline,
   tabsPerShape: number,
-): ReadonlyArray<number> | null {
-  const reference = closestClosedReference(target, references);
-  if (reference === null) return null;
-  const anchors = automaticTabAnchorPoints(reference, tabsPerShape);
-  if (anchors.length === 0) return null;
-  const points = closedLoopPoints(target.points);
-  if (points.length < 3) return null;
+  manualCenters?: ReadonlyArray<number>,
+): ReadonlyArray<Vec2> {
+  if (!toolpath.closed) return [];
+  const points = closedLoopPoints(toolpath.points);
+  if (points.length < 3) return [];
   const cumulative = cumulativeDistances(points);
   const perimeter = cumulative[cumulative.length - 1] ?? 0;
-  if (!(perimeter > EPS)) return null;
-  return anchors.map((anchor) => nearestDistance(points, anchor) / perimeter);
+  if (!(perimeter > EPS)) return [];
+  return tabCenters(perimeter, tabsPerShape, manualCenters).map((center) =>
+    pointAtDistance(points, cumulative, perimeter, center),
+  );
 }
 
-// The closed reference whose shape the target follows most closely, by mean
-// vertex distance — the same selection the split model used.
-function closestClosedReference(
+/**
+ * Tab centres for `target`, as normalized perimeter fractions: the nearest point
+ * of `target` to each anchor that lies within `reachMm` of it.
+ *
+ * A pass whose slot runs beside a bridge another pass leaves must rise at the
+ * same place, or it cuts that bridge away (ADR-140 Amendment 2). Anchors out of
+ * reach are left out, so a pass never rises where no bridge stands beside it.
+ */
+export function tabFractionsNear(
   target: Polyline,
-  references: ReadonlyArray<Polyline>,
-): Polyline | null {
-  let best: Polyline | null = null;
-  let bestDistance = Infinity;
-  for (const reference of references) {
-    if (!reference.closed || reference.points.length < 3) continue;
-    const mean = meanNearestDistance(target.points, reference.points);
-    if (mean < bestDistance - EPS) {
-      best = reference;
-      bestDistance = mean;
-    }
+  anchors: ReadonlyArray<Vec2>,
+  reachMm: number,
+): ReadonlyArray<number> {
+  if (!target.closed) return [];
+  const points = closedLoopPoints(target.points);
+  if (points.length < 3) return [];
+  const cumulative = cumulativeDistances(points);
+  const perimeter = cumulative[cumulative.length - 1] ?? 0;
+  if (!(perimeter > EPS)) return [];
+  const fractions: number[] = [];
+  for (const anchor of anchors) {
+    const nearest = nearestOnLoop(points, anchor);
+    if (nearest.distance <= reachMm + EPS) fractions.push(nearest.at / perimeter);
   }
-  return best;
+  return fractions;
 }
 
-function meanNearestDistance(points: ReadonlyArray<Vec2>, against: ReadonlyArray<Vec2>): number {
-  if (points.length === 0) return Infinity;
-  let total = 0;
-  for (const point of points) total += pointToLoopDistance(point, against);
-  return total / points.length;
-}
-
-// Arc-length position along the ring of the point nearest `anchor`.
-function nearestDistance(points: ReadonlyArray<Vec2>, anchor: Vec2): number {
+// Arc-length position along the ring of the point nearest `anchor`, and how far
+// that point is from it.
+function nearestOnLoop(
+  points: ReadonlyArray<Vec2>,
+  anchor: Vec2,
+): { readonly at: number; readonly distance: number } {
   let bestDistance = Infinity;
   let bestAt = 0;
   let travelled = 0;
@@ -143,17 +137,7 @@ function nearestDistance(points: ReadonlyArray<Vec2>, anchor: Vec2): number {
     }
     travelled += span;
   }
-  return bestAt;
-}
-
-function pointToLoopDistance(point: Vec2, loop: ReadonlyArray<Vec2>): number {
-  let nearest = Infinity;
-  for (let index = 0; index < loop.length; index += 1) {
-    const a = loop[index] as Vec2;
-    const b = loop[(index + 1) % loop.length] as Vec2;
-    nearest = Math.min(nearest, projectOntoSegment(point, a, b).distance);
-  }
-  return nearest;
+  return { at: bestAt, distance: bestDistance };
 }
 
 function projectOntoSegment(

@@ -9,7 +9,7 @@
 //     toast-store-adjacent UI store; counts enter/leave nesting because the
 //     browser fires dragenter/leave on every nested element.
 //   * A dropped project (.lf2, .lbrn, .lbrn2) opens like one the operating
-//     system hands over instead (ADR-378 Amendment 1).
+//     system hands over instead (ADR-378 Amendment 2).
 
 import { useEffect, useRef } from 'react';
 import type { PlatformAdapter } from '../../platform/types';

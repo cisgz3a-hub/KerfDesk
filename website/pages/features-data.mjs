@@ -126,7 +126,7 @@ export const IMAGES = [
     icon: 'mountain-snow',
     title: 'Engrave photos',
     href: '/laser/',
-    body: 'On a laser, tune brightness, contrast and gamma, then engrave with 11 dither and grayscale options at 5 to 25 lines per mm. Run a test piece first.',
+    body: 'On a laser, tune brightness, contrast and gamma, then engrave with 12 dither and grayscale options at 5 to 25 lines per mm. Run a test piece first.',
     status: 'shipped-code-and-tests',
   },
   {

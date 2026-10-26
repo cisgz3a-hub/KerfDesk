@@ -108,6 +108,8 @@ function pasteFromClipboard(state: AppState, offsetMm: number): AppState | Parti
     },
     selectedObjectId: primary ?? null,
     additionalSelectedIds: new Set(rest),
+    selectedPathNode: null,
+    selectedPathNodes: [],
     undoStack: pushUndo(state.project, state.undoStack),
     redoStack: [],
     dirty: true,

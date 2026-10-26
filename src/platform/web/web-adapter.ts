@@ -100,6 +100,13 @@ async function reserveSaveDirectory(): Promise<SaveDirectoryTarget | null> {
   return {
     file: (displayName) => directoryFileTarget(directory, displayName),
     exists: (displayName) => directoryHasEntry(directory, displayName),
+    listFiles: async () => {
+      const names: string[] = [];
+      for await (const [name, handle] of directory.entries()) {
+        if (handle.kind === 'file') names.push(name);
+      }
+      return names;
+    },
   };
 }
 

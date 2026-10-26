@@ -1,4 +1,4 @@
-## ADR-440 Amendment 2 - A calibration saved without its bed frame is not trusted until the frame is confirmed (2026-10-23)
+## ADR-440 Amendment 4 - A calibration saved without its bed frame is not trusted until the frame is confirmed (2026-10-23)
 
 **Status:** Accepted. | **Date:** 2026-10-23
 
@@ -55,6 +55,9 @@ The meta audit of 2026-10-23, finding M2-P3-3, showed that the remedy it named d
   chooses Confirm bed and origin or recalibrates. That is one click for a machine whose setup has not
   changed. For one whose bed or origin was changed since, the reason says to recalibrate, which is
   the only honest fix: KerfDesk cannot know the old frame.
+- A confirmed frame has no native offset. Once the controller proves one, the Camera panel also
+  shows ADR-441 Amendment 5's note that the rings were placed before the bed position was known,
+  which is true of such a calibration.
 - An operator who confirms a bed that was in fact changed gets the 12-P2-2 offset back. The reason
   names the origin and bed size being confirmed, so the choice is made with them in view.
 - A remembered engraved target without a frame (ADR-441 Amendment 4) still takes today's origin

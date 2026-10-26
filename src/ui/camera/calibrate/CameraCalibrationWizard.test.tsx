@@ -68,7 +68,7 @@ afterEach(async () => {
 describe('camera calibration wizard', () => {
   it('needs a connection to engrave but can go straight to the photo', async () => {
     await mountControl(<CameraCalibrationWizard />);
-    expect(document.body.textContent).toContain('100 small rings');
+    expect(document.body.textContent).toContain('35 small rings across 290 × 190 mm');
     expect(control(document.body, 'Engrave target').disabled).toBe(true);
     await clickControl(document.body, 'Target already engraved');
     expect(useCameraCalibrationStore.getState().step).toEqual({

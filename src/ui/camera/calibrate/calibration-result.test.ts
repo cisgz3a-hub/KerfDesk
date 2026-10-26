@@ -4,10 +4,13 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { GrayImage } from '../../../core/camera/corner-subpix';
 import type { BedArea } from '../../../core/camera/model/camera-model-accuracy';
-import type { CameraModelRecord } from '../../../core/camera/model/camera-model-record';
+import {
+  normalizeCameraModelRecord,
+  type CameraModelRecord,
+} from '../../../core/camera/model/camera-model-record';
 import { lookAt, savedCameraModel, wideLens } from '../../../core/camera/model/model-fixtures';
 import { calibrateFromBedTarget } from '../../../core/camera/target/bed-calibration';
-import { bedTargetLayout } from '../../../core/camera/target/bed-target';
+import { bedTargetLayout, bedTargetLayoutWithRings } from '../../../core/camera/target/bed-target';
 import { renderTargetScene } from '../../../core/camera/target/target-render-fixtures';
 import { targetAreaForBed } from './calibration-actions';
 import { targetLayoutMismatch } from '../../../core/camera/target/target-coverage';
@@ -15,6 +18,7 @@ import {
   calibrationFailureMessage,
   calibrationGrade,
   cameraModelFromCalibration,
+  ringsTooSmallMessage,
 } from './calibration-result';
 
 const SHEET_MM = 3;
@@ -109,6 +113,36 @@ describe('a target that covers only part of what the camera sees', () => {
   });
 });
 
+describe('a camera looking straight down with no measured height', () => {
+  it('is graded as lined up at the target height only, and keeps saying so once saved', () => {
+    // Audit 2026-10-25: the rings fit at 0.07 mm while 25 mm material was 9 mm out.
+    const area = targetAreaForBed(400, 400, 5);
+    const frame = renderTargetScene({
+      lens: wideLens(960),
+      pose: lookAt([200, 200, -400], [200, 200.001, 0]),
+      layout: bedTargetLayout({ area }),
+      sheet: area,
+      sheetThicknessMm: SHEET_MM,
+      noise: 4,
+    });
+    const record = calibrated(frame, area);
+    expect(record.accuracy.rmsErrorMm).toBeLessThan(0.25);
+    expect(record.accuracy.onlyAtTargetHeight).toBe(true);
+    const grade = calibrationGrade(record);
+    expect(grade.tone).toBe('fair');
+    expect(grade.headline).toBe('Lined up at the height of the 3 mm target sheet only.');
+    expect(grade.advice).toContain('Measure the height of the camera lens above the bed');
+    const saved = normalizeCameraModelRecord(JSON.parse(JSON.stringify(record)));
+    expect(saved?.accuracy.onlyAtTargetHeight).toBe(true);
+  }, 60_000);
+
+  it('is graded on its figures with a measured height', () => {
+    const record = savedCameraModel();
+    expect(record.accuracy.onlyAtTargetHeight).toBeUndefined();
+    expect(calibrationGrade(record).tone).toBe('good');
+  });
+});
+
 describe('calibration failures', () => {
   it('tells a target too large for the picture from one whose anchors are covered', () => {
     expect(calibrationFailureMessage('target-too-large')).toContain(
@@ -116,4 +150,44 @@ describe('calibration failures', () => {
     );
     expect(calibrationFailureMessage('anchors-not-found')).toContain('Make sure nothing covers');
   });
+
+  it('suggests the ring size that makes rings too small in the picture findable', () => {
+    // 7.7 px for 10 mm rings: 12 px needs 16 mm rings.
+    expect(ringsTooSmallMessage(7.7, 10)).toContain('Engrave a new target with 16 mm rings');
+    // Beyond 25 mm a larger picture is the better fix.
+    expect(ringsTooSmallMessage(3, 10)).toContain('larger picture size or move it closer');
+  });
+
+  it('keeps a non-default ring size with the saved calibration', () => {
+    const area = targetAreaForBed(400, 400, 5);
+    const frame = renderTargetScene({
+      lens: wideLens(960),
+      pose: lookAt([200, -30, -360], [200, 210, 0]),
+      layout: bedTargetLayoutWithRings(area, 16),
+      sheet: area,
+      sheetThicknessMm: SHEET_MM,
+      noise: 3,
+      honeycombPitchMm: 6,
+    });
+    const calibration = calibrateFromBedTarget({
+      frame,
+      layout: bedTargetLayoutWithRings(area, 16),
+      sheetThicknessMm: SHEET_MM,
+    });
+    if (calibration.kind !== 'ok') throw new Error(`calibration failed: ${calibration.reason}`);
+    const record = cameraModelFromCalibration({
+      calibration,
+      capture: null,
+      targetHeightMm: SHEET_MM,
+      targetArea: area,
+      targetRingDiameterMm: 16,
+      calibratedAt: new Date(0),
+    });
+    expect(record.accuracy.targetRingDiameterMm).toBe(16);
+    // Measured against its own 16 mm layout, the full grid is no mismatch.
+    expect(targetLayoutMismatch(record)).toBeNull();
+    expect(
+      normalizeCameraModelRecord(JSON.parse(JSON.stringify(record)))?.accuracy.targetRingDiameterMm,
+    ).toBe(16);
+  }, 60_000);
 });

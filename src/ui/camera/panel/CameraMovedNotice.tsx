@@ -7,7 +7,7 @@ import type { CSSProperties } from 'react';
 import { useEdition } from '../../licensing/edition';
 import { useOwnCameraModel } from '../active-camera-model';
 import { useCameraCalibrationStore } from '../calibrate/camera-calibration-store';
-import { useCameraMovedStore } from '../helpers/moved-check';
+import { cameraMovedWarningDismissed, useCameraMovedStore } from '../helpers/moved-check';
 
 export function CameraMovedNotice(): JSX.Element | null {
   const state = useCameraMovedStore((s) => s.state);
@@ -17,7 +17,11 @@ export function CameraMovedNotice(): JSX.Element | null {
   const openCheck = useCameraCalibrationStore((s) => s.openCheck);
   const own = useOwnCameraModel();
   const { requestPro } = useEdition();
-  if (state.kind !== 'moved' || dismissedFor === state.calibratedAt || own === undefined) {
+  if (
+    state.kind !== 'moved' ||
+    cameraMovedWarningDismissed(state, dismissedFor) ||
+    own === undefined
+  ) {
     return null;
   }
   return (

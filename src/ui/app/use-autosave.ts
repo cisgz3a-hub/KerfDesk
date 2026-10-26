@@ -25,6 +25,7 @@ import { startAutosaveLoop, type AutosaveSnapshotFn } from '../state/autosave-lo
 import { createAutosaveProjectSnapshot } from '../state/autosave-project-snapshot';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
+import { projectLoadRefused } from '../state/project-machine-capability';
 import { loadedMachineCapabilityWarningMessage } from '../machine/machine-capability-messages';
 import { preserveUnadmittedProProject } from '../state/pending-pro-project';
 import { initialLicenceStatus } from '../licensing/edition';
@@ -152,7 +153,7 @@ export async function runAutosaveRecovery(
   const s = useStore.getState();
   if (ok) {
     const loadResult = s.setProject(record.project);
-    if (loadResult.kind === 'desktop-required') return;
+    if (projectLoadRefused(loadResult)) return;
     if (loadResult.kind === 'capability-warning') {
       useToastStore
         .getState()

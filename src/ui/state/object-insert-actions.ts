@@ -215,7 +215,11 @@ function insertBoxPanelsAction(set: Setter): AppState['insertBoxPanels'] {
         state.cncLiveCaps,
         state.materialLibrary,
       );
-      return cutFreshCncOperationsWithActiveBit(state.project.scene.layers, seeded);
+      return cutFreshCncOperationsWithActiveBit(
+        state.project.scene.layers,
+        seeded,
+        state.cncLiveCaps,
+      );
     });
   };
 }

@@ -1,4 +1,8 @@
 import { useMemo, useState } from 'react';
+import {
+  isGrblhalPasswordSetting,
+  shownControllerSettingValue,
+} from '../../../core/controllers/controller-password-settings';
 import type { GrblSettingRow } from '../../../core/controllers/grbl';
 import { compareSettingsSnapshots } from '../../../core/controllers/grbl/compare-settings-snapshots';
 import type { ControllerKind, DeviceProfile } from '../../../core/devices';
@@ -283,6 +287,10 @@ function SnapshotComparisonTable(props: {
   );
 }
 
+function shownSnapshotValue(id: number, rawValue: string | null): string {
+  return rawValue === null ? 'missing' : shownControllerSettingValue(id, rawValue);
+}
+
 function ComparisonRow(props: {
   readonly row: SnapshotComparison;
   readonly name: string | undefined;
@@ -292,9 +300,13 @@ function ComparisonRow(props: {
       <td style={cellStyle}>
         <strong>{props.row.code}</strong> {props.name ?? 'Unknown setting'}
       </td>
-      <td style={valueCellStyle}>{props.row.leftRawValue ?? 'missing'}</td>
-      <td style={valueCellStyle}>{props.row.rightRawValue ?? 'missing'}</td>
-      <td style={valueCellStyle}>{formatDelta(props.row.delta, props.row.percentDeltaFromLeft)}</td>
+      <td style={valueCellStyle}>{shownSnapshotValue(props.row.id, props.row.leftRawValue)}</td>
+      <td style={valueCellStyle}>{shownSnapshotValue(props.row.id, props.row.rightRawValue)}</td>
+      <td style={valueCellStyle}>
+        {isGrblhalPasswordSetting(props.row.id)
+          ? '-'
+          : formatDelta(props.row.delta, props.row.percentDeltaFromLeft)}
+      </td>
       <td style={cellStyle}>{comparisonLabel(props.row.status)}</td>
     </tr>
   );

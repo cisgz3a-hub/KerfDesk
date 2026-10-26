@@ -96,6 +96,59 @@ describe('closed offset degeneracy follows the filled region', () => {
     }
   });
 
+  it.each([0.0006, 0.0008])(
+    'outlines a closed %s mm sliver that collapses to a line on the region grid',
+    (height) => {
+      const points = [
+        { x: 0, y: -height / 2 },
+        { x: 10, y: -height / 2 },
+        { x: 5, y: height / 2 },
+      ];
+      const result = run(artwork({ closed: true, points }));
+      expect(result.outward?.bounds.minX).toBeCloseTo(-1, 2);
+      expect(result.outward?.bounds.maxX).toBeCloseTo(11, 2);
+      expect(result.inward).toBeNull();
+    },
+  );
+
+  it('keeps a collapsed sliver beside a filled shape in the same selection', () => {
+    const sliver = artwork({
+      closed: true,
+      points: [
+        { x: 0, y: -0.0003 },
+        { x: 10, y: -0.0003 },
+        { x: 5, y: 0.0003 },
+      ],
+    });
+    const square = artwork({
+      closed: true,
+      points: [
+        { x: 30, y: 0 },
+        { x: 40, y: 0 },
+        { x: 40, y: 10 },
+        { x: 30, y: 10 },
+      ],
+    });
+    const result = offsetShapes([sliver, square], OPTIONS, IDS);
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') expect(result.value.outward?.paths[0]?.polylines).toHaveLength(2);
+  });
+
+  it('does not resurrect a noncollinear ring cancelled by its own even-odd traversal', () => {
+    const points = [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 10 },
+      { x: 0, y: 10 },
+    ];
+    const result = offsetShapes(
+      [artwork({ closed: true, points: [...points, ...points] })],
+      OPTIONS,
+      IDS,
+    );
+    expect(result.kind).toBe('error');
+  });
+
   it('does not publish an empty offset for a point with no stroke extent', () => {
     const result = offsetShapes(
       [artwork({ closed: false, points: [{ x: 3, y: 3 }] })],

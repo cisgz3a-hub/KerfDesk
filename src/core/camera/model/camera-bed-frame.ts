@@ -10,7 +10,7 @@
 // which no camera pose can, so it needs a new calibration. A calibration saved
 // before frames were recorded is not trusted until the operator confirms the
 // bed it was made on, or calibrates again (meta audit M2-P3-3, ADR-440
-// Amendment 2). Pure core.
+// Amendment 4). Pure core.
 
 import type { DeviceProfile, Origin } from '../../devices/device-profile';
 import { toMachineCoords, toSceneCoords } from '../../devices/origin-transform';
@@ -96,7 +96,8 @@ export type CameraBedFrameNote = {
 
 /**
  * What the Camera panel says about `record` in the bed frame `now`: why it
- * cannot be used, how far it was moved to fit, or null when it fits as saved.
+ * cannot be used, how far it was moved to fit, that its rings were placed
+ * before the bed position was known, or null when it fits as saved.
  */
 export function cameraBedFrameNote(
   record: CameraModelRecord,
@@ -109,23 +110,38 @@ export function cameraBedFrameNote(
       ? { usable: false, message: placed.message, frameUnrecorded: true }
       : { usable: false, message: placed.message };
   }
-  if (placed.model === record || fitted === undefined) return null;
+  if (fitted === undefined) return null;
+  const notes = [
+    ...(placed.model === record ? [] : [movedNote(fitted, now)]),
+    ...(placedBeforeBedWasKnown(fitted, now) ? [UNVERIFIED_FRAME_NOTE] : []),
+  ];
+  return notes.length === 0 ? null : { usable: true, message: notes.join(' ') };
+}
+
+// ADR-441 Amendment 5: rings engraved while the native offset was unknown
+// (not homed, or settings unread) sit wherever Absolute coordinates were that
+// session. Once the offset is known, nothing tells how far that was off.
+export const UNVERIFIED_FRAME_NOTE =
+  'The camera was calibrated before KerfDesk knew where the machine coordinates sit on the bed (the machine was not homed, or its settings were not read). If the picture does not line up with a burn, home the machine and calibrate the camera again.';
+
+function placedBeforeBedWasKnown(fitted: CameraBedFrame, now: CameraBedFrame): boolean {
+  return fitted.nativeToBedOffsetMm === undefined && now.nativeToBedOffsetMm !== undefined;
+}
+
+function movedNote(fitted: CameraBedFrame, now: CameraBedFrame): string {
   const shift = bedFrameShift(fitted, now);
   const sameBed = fitted.bedWidthMm === now.bedWidthMm && fitted.bedHeightMm === now.bedHeightMm;
   const when = sameBed
     ? 'with other machine travel settings'
     : `on a ${mm(fitted.bedWidthMm)} × ${mm(fitted.bedHeightMm)} mm bed`;
-  return {
-    usable: true,
-    message: `The camera was calibrated ${when}. KerfDesk moves its picture ${mm(Math.hypot(shift.x, shift.y))} mm to match the machine as it is set up now.`,
-  };
+  return `The camera was calibrated ${when}. KerfDesk moves its picture ${mm(Math.hypot(shift.x, shift.y))} mm to match the machine as it is set up now.`;
 }
 
 /**
  * `record` with the frame the operator confirmed it was calibrated in: the
  * origin corner and bed size Machine Setup has now. The native offset stays
  * unknown, so no later offset moves it. A record that already has a frame
- * keeps it (ADR-440 Amendment 2).
+ * keeps it (ADR-440 Amendment 4).
  */
 export function withConfirmedBedFrame(
   record: CameraModelRecord,

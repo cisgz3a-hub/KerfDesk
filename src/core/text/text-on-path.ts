@@ -84,10 +84,19 @@ function guidePolyline(guide: SceneObject, reverse: boolean): ReadonlyArray<Vec2
     .flatMap((path) => path.polylines)
     .find((line) => line.points.length >= 2);
   if (candidate === undefined) return null;
-  const local = candidate.closed
-    ? [...candidate.points, candidate.points[0] as Vec2]
-    : [...candidate.points];
-  const points = local.map((point) => applyTransform(point, guide.transform));
+  const points: Vec2[] = [];
+  for (const point of candidate.points) {
+    const world = applyTransform(point, guide.transform);
+    const previous = points.at(-1);
+    if (previous === undefined || Math.hypot(world.x - previous.x, world.y - previous.y) > 1e-12) {
+      points.push(world);
+    }
+  }
+  if (points.length < 2) return null;
+  const first = points[0] as Vec2;
+  const last = points.at(-1) as Vec2;
+  if (candidate.closed && Math.hypot(last.x - first.x, last.y - first.y) > 1e-12)
+    points.push(first);
   return reverse ? [...points].reverse() : points;
 }
 

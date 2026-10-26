@@ -47,7 +47,7 @@ already keys its head captures on these facts (`nativeBedCaptureFrameKey`).
 ### Consequences
 
 - A calibration made before this amendment has no frame. It is used as before until the camera is
-  calibrated or checked again. **Replaced by Amendment 2:** such a calibration is not used until
+  calibrated or checked again. **Replaced by Amendment 4:** such a calibration is not used until
   its frame is confirmed or the camera is recalibrated, because a check labelled its target in
   today's frame and saved that frame for good (meta audit M2-P3-3).
 - An origin change makes the camera unusable until it is recalibrated or the origin is set back.

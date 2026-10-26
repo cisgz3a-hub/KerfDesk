@@ -196,6 +196,8 @@ export type SaveDirectoryTarget = {
   /** Whether the folder already holds an entry with this name, so a caller
    * that must not replace files can pick another name first. */
   readonly exists?: (displayName: string) => Promise<boolean>;
+  /** Immediate file names only; inspecting a reserved folder never changes it. */
+  readonly listFiles?: () => Promise<ReadonlyArray<string>>;
 };
 
 // A platform that defines reserveSaveDirectory but cannot pick a folder here

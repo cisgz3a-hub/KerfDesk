@@ -6712,7 +6712,7 @@ SOFTWARE.
 
 == Electron desktop runtime package ==
 
---- Package: electron@44.8.0 (MIT) ---
+--- Package: electron@44.9.1 (MIT) ---
 License source(s): LICENSE
 Copyright (c) Electron contributors
 Copyright (c) 2013-2020 GitHub Inc.

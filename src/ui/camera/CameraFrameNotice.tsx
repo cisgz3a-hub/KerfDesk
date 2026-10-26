@@ -1,7 +1,7 @@
 // CameraFrameNotice — what the Camera panel says about the running camera's
 // calibration in the bed frame now (rolling audit 12-P2-2): how far its
 // picture moved, or why it is not used. A calibration saved before its bed
-// frame was recorded gets Confirm bed and origin beside the reason (ADR-440 Amendment 2).
+// frame was recorded gets Confirm bed and origin beside the reason (ADR-440 Amendment 4).
 
 import type { CSSProperties } from 'react';
 import type { CameraBedFrameNote } from '../../core/camera/model/camera-bed-frame';

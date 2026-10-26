@@ -24,6 +24,7 @@ import {
   RECENT_PROJECT_LIMIT_KEY,
   type RecentProjectStorage,
 } from './recent-project-storage';
+import { updateRecentProjectsIfUnchanged } from './recent-project-transaction';
 
 export type RecentProjectStatus = 'present' | 'missing';
 
@@ -68,6 +69,13 @@ export const RECENT_PROJECTS_UNSAVED_MESSAGE =
 let storage: RecentProjectStorage | null = null;
 let pending: Promise<unknown> = Promise.resolve();
 let committedLimit = loadRecentProjectLimit();
+let statusEpoch = 0;
+const statusVersions = new Map<string, number>();
+
+function currentCommittedLimit(): number {
+  committedLimit = loadRecentProjectLimit();
+  return committedLimit;
+}
 
 function currentStorage(): RecentProjectStorage {
   storage ??= defaultRecentProjectStorage({
@@ -82,6 +90,38 @@ function serialize(change: () => Promise<void>): Promise<void> {
   const next = pending.then(change);
   pending = next.catch(() => undefined);
   return next;
+}
+
+function recordRecentProjectFile(
+  set: (patch: Partial<RecentProjectsState>) => void,
+  get: () => RecentProjectsState,
+  files: RecentFileAdapter,
+  use: RecentProjectFileUse,
+): Promise<void> {
+  return serialize(async () => {
+    const usedAt = Date.now();
+    const persistence = currentStorage();
+    let expected = await persistence.load();
+    for (;;) {
+      const matchId = await sameFileEntry(files, expected, use);
+      const id = matchId ?? newRecentProjectId();
+      const result = await updateRecentProjectsIfUnchanged(persistence, expected, (current) =>
+        recordRecentProjectUse(current, { ...use, usedAt }, matchId, id, currentCommittedLimit()),
+      );
+      if (!result.applied) {
+        expected = result.entries;
+        continue;
+      }
+      set({
+        entries: result.entries,
+        ...(!hasPendingComputerPreference(RECENT_PROJECT_LIMIT_KEY)
+          ? { limit: committedLimit }
+          : {}),
+      });
+      get().setStatus(id, 'present');
+      return;
+    }
+  });
 }
 
 export const useRecentProjectsStore = create<RecentProjectsState>((set, get) => {
@@ -105,25 +145,27 @@ export const useRecentProjectsStore = create<RecentProjectsState>((set, get) => 
           set({ entries, limit: committedLimit });
         }
       }),
-    record: (files, use) =>
-      serialize(async () => {
-        const matchId = await sameFileEntry(files, await currentStorage().load(), use);
-        const id = matchId ?? newRecentProjectId();
-        const usedAt = Date.now();
-        const entries = await currentStorage().update((current) =>
-          recordRecentProjectUse(current, { ...use, usedAt }, matchId, id, committedLimit),
-        );
-        set({ entries, statuses: { ...get().statuses, [id]: 'present' } });
-      }),
+    record: (files, use) => recordRecentProjectFile(set, get, files, use),
     probe: async (files) => {
       const checks = get().entries.map(async (entry) => {
         if (entry.ref === null) return;
+        const version = ++statusEpoch;
+        statusVersions.set(entry.id, version);
         const found = await files.probe(entry.ref).catch(() => ({ kind: 'unknown' as const }));
-        if (found.kind !== 'unknown') get().setStatus(entry.id, found.kind);
+        if (
+          found.kind !== 'unknown' &&
+          statusVersions.get(entry.id) === version &&
+          get().entries.some((current) => current.id === entry.id)
+        ) {
+          get().setStatus(entry.id, found.kind);
+        }
       });
       await Promise.all(checks);
     },
-    setPinned: (id, pinned) => apply((entries) => setRecentProjectPinned(entries, id, pinned)),
+    setPinned: (id, pinned) =>
+      apply((entries) =>
+        trimRecentProjects(setRecentProjectPinned(entries, id, pinned), currentCommittedLimit()),
+      ),
     remove: (id) => apply((entries) => removeRecentProject(entries, id)),
     clearUnpinned: () => apply(clearUnpinnedRecentProjects),
     clearAll: () => apply(() => []),
@@ -145,7 +187,10 @@ export const useRecentProjectsStore = create<RecentProjectsState>((set, get) => 
       });
       return trimming;
     },
-    setStatus: (id, status) => set({ statuses: { ...get().statuses, [id]: status } }),
+    setStatus: (id, status) => {
+      statusVersions.set(id, ++statusEpoch);
+      set({ statuses: { ...get().statuses, [id]: status } });
+    },
     openDialog: (notice) => set({ dialogOpen: true, notice: notice ?? null }),
     closeDialog: () => set({ dialogOpen: false, notice: null }),
   };
@@ -166,13 +211,18 @@ async function sameFileEntry(
   entries: Entries,
   use: RecentProjectFileUse,
 ): Promise<string | null> {
+  let nameOnly: string | null = null;
   for (const entry of entries) {
     if (!sameRecentProjectName(entry.name, use.name)) continue;
     // A name-only entry has nothing else to compare.
-    if (entry.ref === null || use.ref === null) return entry.id;
+    if (entry.ref === null) {
+      nameOnly ??= entry.id;
+      continue;
+    }
+    if (use.ref === null) continue;
     if (await files.isSameFile(entry.ref, use.ref).catch(() => false)) return entry.id;
   }
-  return null;
+  return nameOnly;
 }
 
 function newRecentProjectId(): string {
@@ -187,6 +237,8 @@ export function configureRecentProjectsForTests(next: RecentProjectStorage | nul
   storage = next;
   pending = Promise.resolve();
   committedLimit = loadRecentProjectLimit();
+  statusEpoch += 1;
+  statusVersions.clear();
   useRecentProjectsStore.setState({
     entries: [],
     limit: loadRecentProjectLimit(),

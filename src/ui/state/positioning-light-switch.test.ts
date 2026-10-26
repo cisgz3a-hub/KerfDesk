@@ -35,6 +35,27 @@ function frame(h: ReturnType<typeof harness>): FramedRunPermit {
 }
 
 describe('independent positioning LED switch', () => {
+  it.each(['switchPositioningLightOn', 'switchPositioningLightOff'] as const)(
+    'refuses a stored macro mapping before %s takes ownership or writes',
+    async (action) => {
+      const h = harness('marlin');
+      const project = useStore.getState().project;
+      useStore.setState({
+        project: {
+          ...project,
+          device: {
+            ...project.device,
+            positioningLight: { ...h.mapping, onCommand: 'M0810', offCommand: 'M819' },
+          },
+        },
+      });
+      await expect(h.actions[action]()).rejects.toThrow('stored macro');
+      expect(h.writes).toEqual([]);
+      expect(h.get().controllerOperation).toBeNull();
+      expect(h.get().positioningLightEnabled).toBe(false);
+    },
+  );
+
   it.each(families)(
     'keeps the LED on until Off without moving or altering Frame on %s',
     async (kind) => {

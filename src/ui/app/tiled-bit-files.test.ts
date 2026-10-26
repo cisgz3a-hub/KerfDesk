@@ -215,7 +215,7 @@ describe('tiled save, a bed park (E3-P2-2)', () => {
 });
 
 describe('tile emission edges', () => {
-  it('writes no file for a bit that only touches the tile at one point', () => {
+  it.each(['em-6350', 'G2', 'G3'])('omits a point-only bit named %s', (noncuttingToolId) => {
     const project = twoTileProject({ registration: false, park: false });
     const machine = project.machine;
     if (machine?.kind !== 'cnc') throw new Error('expected CNC project');
@@ -246,7 +246,7 @@ describe('tile emission edges', () => {
     });
     // A path whose vertex sits on the tile edge clips to a zero-length piece
     // there, which emits no move at all.
-    const job: Job = { groups: [cut('em-3175', 30), cut('em-6350', 10)] };
+    const job: Job = { groups: [cut('em-3175', 30), cut(noncuttingToolId, 10)] };
     const tile = { row: 0, col: 0, rect: { minX: 0, minY: 0, maxX: 50, maxY: 50 } };
     const emitted = emitTileFiles(project, machine, [{ tile, job }], 'job', job);
     if (emitted.kind !== 'ready') throw new Error(emitted.messages.join('; '));

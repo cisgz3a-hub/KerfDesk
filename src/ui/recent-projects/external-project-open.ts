@@ -61,9 +61,9 @@ export async function handleExternalProjectOpen(
     return;
   }
   // Rechecked after the unsaved-changes question and after reading/parsing:
-  // a job can start while either asynchronous step waits.
+  // a job or another dialog can open while either asynchronous step waits.
   const stillAllowed = (): boolean => {
-    if (!deps.jobActive()) return true;
+    if (!deps.jobActive() && !deps.dialogOpen()) return true;
     hold();
     return false;
   };

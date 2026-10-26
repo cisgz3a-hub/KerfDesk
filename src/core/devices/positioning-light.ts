@@ -38,7 +38,7 @@ export const LASER_DOT_LIGHT: LaserDotLight = {
 /** The machine whose LED is its laser dot. */
 export const LASER_DOT_COMMAND_SET: ControllerCommandSet = 'creality-falcon-a1-pro';
 
-/** Creality's software turns the dot off after 30 s; so does KerfDesk. */
+/** Host-side off deadline; requires a responsive app and controller connection. */
 export const LASER_DOT_AUTO_OFF_MS = 30_000;
 
 export function isLaserDotLight(light: PositioningLight | undefined): light is LaserDotLight {
@@ -266,6 +266,8 @@ function machineStateCommandIssue(
 ): string | null {
   const [head = '', ...words] = command.trim().toUpperCase().split(/ +/);
   const code = Number(/^M(\d+)/.exec(head)?.[1]);
+  if (isMarlinMacroCommand(code, kind))
+    return 'Positioning light commands cannot define or run a stored macro.';
   if (STATE_CHANGING_M_CODES.has(code))
     return 'Positioning light commands cannot change pins, limits, overrides or motion settings.';
   // Smoothieware's M106/M107 are configurable switch commands; elsewhere they
@@ -277,4 +279,11 @@ function machineStateCommandIssue(
   return Number.isInteger(fan) && fan > 0
     ? null
     : 'Positioning light M106/M107 must name a non-zero P fan index; fan 0 can be the laser.';
+}
+
+// Marlin's optional M810-M819 macros can run arbitrary stored motion, not
+// just an accessory. Other families retain their explicit custom mappings.
+// https://marlinfw.org/docs/gcode/M810-M819.html
+function isMarlinMacroCommand(code: number, kind: ControllerKind | undefined): boolean {
+  return (kind === 'marlin' || kind === undefined) && code >= 810 && code <= 819;
 }

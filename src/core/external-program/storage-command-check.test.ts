@@ -51,6 +51,68 @@ describe('storageCommandRefusal (ADR-630 Amendment 5)', () => {
   describe('Marlin', () => {
     const refusal = (line: string): string | null => storageCommandRefusal(line, 'marlin');
 
+    it.each([810, 811, 812, 813, 814, 815, 816, 817, 818, 819])(
+      'refuses defining or invoking stored macro M%s',
+      (code) => {
+        for (const line of [`M${code}`, `M${code} G1 X120 F600`, `m0${code}.0`]) {
+          expect(refusal(line)).toBe(
+            `is M${code}, which defines or runs a macro stored on the controller`,
+          );
+        }
+      },
+    );
+
+    it.each(['M 00810', 'M66346', 'M4294968106', 'M-64726', 'M+020074'])(
+      'recognizes the firmware command-number alias %s for M810',
+      (line) => expect(refusal(line)).toMatch(/^is M810, which defines or runs a macro/),
+    );
+
+    it('does not turn a later parameter or a neighboring code into a macro call', () => {
+      for (const line of [
+        'G1 X10 M810',
+        'M355 S1 M819',
+        'G53 G1 X10 M810',
+        'M809',
+        'M820',
+        'M 8 10',
+      ]) {
+        expect(refusal(line)).toBeNull();
+      }
+    });
+
+    it.each(['G53 M810', 'G53G53 M810', 'G 53 M810', 'G65589 M66346', 'n1 M810', 'G53 n+1 M810'])(
+      'finds the stored macro behind the supported parser prefix in %s',
+      (line) => expect(refusal(line)).toMatch(/is M810, which defines or runs a macro/),
+    );
+
+    it.each(['G53G1 M810', 'G53junk M810', 'G53G1 G53junk M810', 'n1 G53junk M810'])(
+      'finds the stored macro reached by the fast parser chain in %s',
+      (line) => expect(refusal(line)).toMatch(/^is M810, which defines or runs a macro/),
+    );
+
+    it('does not chain an ordinary command or switch parser modes mid-chain', () => {
+      for (const line of ['G53G1 X10 M810', 'G53junk M355 S1 M810', 'G53junk G 53 M810']) {
+        expect(refusal(line)).toBeNull();
+      }
+    });
+
+    it.each(['\\M810', 'M8\\10', 'G53junk \\M810', 'G53J" \\M810"'])(
+      'recognizes the macro exposed by serial or quoted-string unescaping in %s',
+      (line) => expect(refusal(line)).toMatch(/^is M810, which defines or runs a macro/),
+    );
+
+    it('keeps quoted text that no supported parser configuration executes', () => {
+      for (const line of ['G1 J" \\M810"', 'G53 J" \\M810"', 'G53J" x\\M810"']) {
+        expect(refusal(line)).toBeNull();
+      }
+    });
+
+    it('keeps the quoted build fixed while nested G53 parsers unescape the shared buffer again', () => {
+      const line = String.raw`G53 G53J" \\M810"`;
+      expect(refusal(line)).toMatch(/^is M810, which defines or runs a macro/);
+      expect(refusal(`${'G53 '.repeat(10_000)}J"ordinary"`)).toBeNull();
+    });
+
     it('refuses SD-card writes, SD prints, EEPROM saves and firmware updates', () => {
       expect(refusal('M28 notes.txt')).toMatch(/^is M28, which writes the lines after it/);
       expect(refusal('M29')).toBe('is M29, which ends an SD-card upload');

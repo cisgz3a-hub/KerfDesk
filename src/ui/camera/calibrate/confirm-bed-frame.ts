@@ -1,5 +1,5 @@
 // Confirm the bed a calibration saved without one was made on (meta audit
-// M2-P3-3, ADR-440 Amendment 2). KerfDesk 1.0.21 and older kept no bed frame,
+// M2-P3-3, ADR-440 Amendment 4). KerfDesk 1.0.21 and older kept no bed frame,
 // so such a calibration is not used until the operator says Machine Setup's
 // origin corner and bed size are still the ones it was calibrated with; the
 // calibration then records them, and later bed changes move its picture as

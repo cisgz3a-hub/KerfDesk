@@ -17,6 +17,7 @@
 
 import { classifyResponse, type StatusReport } from '../../core/controllers/grbl';
 import { consoleTextRefusal } from '../../core/controllers/console-text';
+import { scanGcodeWords } from '../../core/gcode/word-scan';
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import type { TranscriptSource } from './laser-transcript';
@@ -41,6 +42,7 @@ export type RunAutofocusArgs = {
     line: string,
     action?: LaserSafetyAction,
     source?: TranscriptSource,
+    assertBeforeWrite?: () => void,
   ) => Promise<void>;
   readonly timeoutMs?: number;
 };
@@ -50,11 +52,40 @@ export async function runAutofocus(args: RunAutofocusArgs): Promise<AutofocusRes
   if (preflight !== null) return preflight;
   const command = args.command.trim();
   const timeoutMs = args.timeoutMs ?? AUTOFOCUS_TIMEOUT_MS;
+  const writeEpoch = args.refs.writeEpoch ?? 0;
   const freshIdle = await confirmFreshIdle(args);
   if (freshIdle.kind !== 'ok') return freshIdle;
   try {
+    const assertSession = (): void => {
+      if ((args.refs.writeEpoch ?? 0) !== writeEpoch)
+        throw new Error('Auto-focus cancelled because the controller session changed.');
+    };
+    const write: RunAutofocusArgs['write'] = async (line, action, source) => {
+      assertSession();
+      await args.write(line, action, source, assertSession);
+    };
+    assertSession();
     args.onDispatch?.();
-    await startControllerCommand(args.refs, args.write, {
+    // Console and opened programs can leave G91 or G20 behind. Establish the
+    // editor's absolute millimetre target before probing, with each setup
+    // acknowledgement owned separately. Vendor focus macros keep their contract.
+    // Match validation and the controller's removal of horizontal blanks,
+    // including blanks inside the G word's numeric value. Keep sent bytes intact.
+    const first = scanGcodeWords(command.replaceAll(/[ \t]/g, ''))[0];
+    if (first?.letter === 'G' && (first.value === 38.2 || first.value === 38.4)) {
+      for (const setup of ['G21', 'G90']) {
+        assertSession();
+        await startControllerCommand(args.refs, write, {
+          kind: 'autofocus',
+          label: 'Auto-focus coordinate setup',
+          command: `${setup}\n`,
+          source: 'motion',
+          timeoutMs,
+        });
+      }
+    }
+    assertSession();
+    await startControllerCommand(args.refs, write, {
       kind: 'autofocus',
       label: 'Auto-focus',
       command: `${command}\n`,

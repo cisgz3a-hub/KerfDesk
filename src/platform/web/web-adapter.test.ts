@@ -25,6 +25,23 @@ afterEach(() => {
 });
 
 describe('webAdapter save target', () => {
+  it('lists only immediate files without opening or modifying their contents', async () => {
+    const getFileHandle = vi.fn();
+    Object.defineProperty(window, 'showDirectoryPicker', {
+      configurable: true,
+      value: async () => ({
+        getFileHandle,
+        entries: async function* () {
+          yield ['old_tile-r1-c1.nc', { kind: 'file' }];
+          yield ['nested_tile-r1-c1.nc', { kind: 'directory' }];
+        },
+      }),
+    });
+    const directory = await webAdapter.reserveSaveDirectory?.();
+    await expect(directory?.listFiles?.()).resolves.toEqual(['old_tile-r1-c1.nc']);
+    expect(getFileHandle).not.toHaveBeenCalled();
+  });
+
   it.each(['NotAllowedError', 'NotReadableError'])(
     'propagates %s from a directory existence probe',
     async (name) => {

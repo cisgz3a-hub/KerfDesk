@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { compileCncJob } from '../cnc';
+import { planStraightInlayPair } from '../cnc/inlay-pair';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
+import { DEFAULT_CNC_TAPERED_INLAY } from '../scene/cnc-tapered-inlay';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
   DEFAULT_CNC_MACHINE_CONFIG,
@@ -146,6 +148,39 @@ describe('checkProjectMinimumFeatures', () => {
     expect(report?.analysis.widths.count).toBe(0);
     expect(report?.analysis.gaps.count).toBe(1);
     expect(report?.analysis.gaps.minWidthMm).toBeCloseTo(2, 9);
+  });
+
+  // CNC audit v1 F5-P2-3: a straight pair cuts both halves from one bit-radius design
+  // (ADR-155), so a part narrower than the bit leaves both halves and a narrower gap closes in
+  // both, yet the check skipped inlay pairs.
+  it('checks a straight inlay pair for narrow parts and gaps, as its plan drops them', () => {
+    const straight = { toolDiameterMm: 3, allowanceMm: 0, pairSpacingMm: 10, stepoverPercent: 40 };
+    const narrowPart = [rectangle(0, 0, 2, 20), rectangle(10, 0, 10, 20)];
+    const [partReport] = checkProjectMinimumFeatures(cncProject('inlay-pair', narrowPart));
+    expect(partReport?.request.thresholdMm).toBe(3);
+    expect(partReport?.analysis.widths.count).toBe(1);
+    expect(partReport?.analysis.widths.minWidthMm).toBeCloseTo(2, 9);
+    const partPlan = planStraightInlayPair(narrowPart, straight);
+    if (!partPlan.ok) throw new Error(partPlan.reason);
+    expect(partPlan.femaleContours).toHaveLength(1);
+    expect(Math.min(...partPlan.femaleContours[0]!.points.map((p) => p.x))).toBeGreaterThan(9);
+
+    const narrowGap = [rectangle(0, 0, 6, 20), rectangle(8, 0, 6, 20)];
+    const [gapReport] = checkProjectMinimumFeatures(cncProject('inlay-pair', narrowGap));
+    expect(gapReport?.analysis.widths.count).toBe(0);
+    expect(gapReport?.analysis.gaps.count).toBe(1);
+    expect(gapReport?.analysis.gaps.minWidthMm).toBeCloseTo(2, 9);
+    const gapPlan = planStraightInlayPair(narrowGap, straight);
+    expect(gapPlan.ok && gapPlan.femaleContours).toHaveLength(1);
+  });
+
+  it('skips a tapered inlay pair, which V-carves its detail, and a pair it refuses', () => {
+    const slot = [rectangle(10, 10, 2, 20)];
+    const tapered = { toolId: 'vb-90', taperedInlay: DEFAULT_CNC_TAPERED_INLAY };
+    expect(checkProjectMinimumFeatures(cncProject('inlay-pair', slot, tapered))).toEqual([]);
+    expect(
+      checkProjectMinimumFeatures(cncProject('inlay-pair', slot, { toolId: 'vb-90' })),
+    ).toEqual([]);
   });
 
   it('skips CNC engrave and V-carve operations', () => {

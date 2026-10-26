@@ -199,7 +199,7 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 4. After import, all imported objects are multi-selected.
 5. Toast: `Imported 3 designs · 3 artwork operations`.
 
-#### Success — a project file dropped on the window (ADR-378 Amendment 1)
+#### Success — a project file dropped on the window (ADR-378 Amendment 2)
 1. User drops a KerfDesk project (`.lf2`) or a LightBurn project (`.lbrn`, `.lbrn2`).
 2. It opens exactly like a project double-clicked in Explorer (ADR-378): the Save / Don't Save /
    Cancel question comes first when the current project has unsaved changes, and during a job or
@@ -1398,6 +1398,27 @@ that owns those fields, without changing the existing Frame/Start policy.
 5. Line operations and Offset Fill rings follow it; Fill, Image and CNC output do not change. Preview,
    the time estimate, Job Review and every output format read the same planned job.
 
+### F-A9f. How Reduce travel orders Line cuts (ADR-669)
+
+1. With **Reduce travel**, the Cut Planner builds a nearest-first route, then improves it by moving
+   and reversing stretches of that route. It counts the move back to where the job parks, so the
+   head ends near where the next operation, or the park, starts. The improvement stops after a fixed
+   amount of work, so the same project always gives the same G-code.
+2. **Inside paths first** works part by part: a shape waits only for the shapes inside it. Each
+   part's holes are cut before its own outline, but the planner no longer cuts every hole on the
+   sheet before any outline. **Cut in direction order** sweeps the sheet once instead of once per
+   nesting level. Tabbed and perforated outlines still wait for everything inside them.
+3. Nothing the planner changes alters a burn: order, the start of a closed shape (under **Nearest
+   point** or **Nearest corner**) and, with **Allow reverse**, the direction of an open path. A closed
+   shape is never reversed. A **Line burn start** choice keeps its first contour first. The planner
+   never makes a route longer than the order it was given.
+4. Dragging **Job start** to a contour plans the rest of that operation again from there, instead
+   of only moving that contour to the front. Any shape that has nothing still waiting inside it can
+   be the start.
+5. **Keep source order**, Fill, Image and CNC output are unchanged. Group and operation order are
+   unchanged. Preview, the time estimate, Job Review and every output format read the same planned
+   job.
+
 ### F-A10. Pre-flight check (before G-code save)
 
 Runs whenever Save G-code (or Start) is invoked. Cannot be skipped. For **Save
@@ -1604,6 +1625,16 @@ the completed physical Frame is the spatial source of truth.
 #### Error — file is not a valid .lf2
 - Modal: `Could not open <filename>: not a valid KerfDesk project.` No load.
 
+#### Edge — the file carries a camera calibration (ADR-440 Amendment 3)
+1. A file for the machine already in use (same profile, name and bed) keeps the camera
+   calibrations this machine has now. An older calibration saved in the file, or none, does not
+   replace them, so the next machine edit cannot save over them either. When the file held a
+   different calibration, an info toast says `This file's camera calibration was not used: the
+   camera keeps your machine's current calibration.`
+2. With no camera calibration in use, the file's calibration comes in with it, as before.
+3. A file for another machine brings its own calibration with the rest of that machine, behind
+   the machine notice; **Keep current machine** restores the current calibration too.
+
 #### Edge — the file carries an Auto-focus command (ADR-400 Amendments 1 and 2)
 1. On load, an Auto-focus command that is not a focus routine is cleared, as a refused
    positioning-light command is. That covers a G0–G3 move, an X/Y word, an M-code, `S` above 0,
@@ -1718,6 +1749,15 @@ the completed physical Frame is the spatial source of truth.
 
 #### Edge — undo across project load
 - History clears on Open / New / Close.
+
+#### Edge — undo or redo while a job runs or is held
+- A running, paused or held job (a CNC bit change included) keeps the machine it started with
+  (ADR-416 Amendment 2). Undo and Redo still step through edits that leave the machine alone. A
+  step that would change Laser / CNC, CNC values such as the safe-Z height, or the machine's
+  controller, work area, origin, homing, jog feeds and limits or Z probing is not applied: the
+  history stays as it is and a warning says to finish or stop the job first. A jump in the Undo
+  list stops at that step. After the job ends, the same Undo or Redo applies.
+- Opening a project on another machine waits for the job the same way; nothing is opened.
 
 ---
 
@@ -2113,7 +2153,7 @@ not erased. GRBL's independent `$13` reporting-unit contract is unchanged.
 4. After a Home in this session, the hold also stops the pull-off clear of the switch with soft
    limits off, so a held arrow toward the homing corner does not trip the switch (`ALARM:1`). On
    grblHAL this works for every homing direction (`$23`): force set origin is read from `$22`
-   bit 3 when the `$$` dump prints the whole `$22` bitfield (ADR-375 Amendment 3).
+   bit 3 when the `$$` dump prints the whole `$22` bitfield (ADR-375 Amendment 4).
 5. Otherwise the jog asks for full travel and relies on the release.
 6. A release just after the jog went out waits for its reply before `0x85`, as Cancel does
    (F-B4). If a motion line's reply never comes, Cancel says so after 8 s and the jog stays owned,
@@ -2683,7 +2723,9 @@ authorization, Frame proof, controller command, or safety boundary.
 4. **Export current snapshot** saves versioned read-only evidence. Loading Snapshot A and B
    compares independent axis values neutrally, with no better/worse verdict and no firmware write.
    A grblHAL password setting is saved as `[password removed]` (ADR-229 Amendment 2), and the
-   local diagnostic bundle leaves out setting lines and passwords (ADR-570 Amendment 1).
+   local diagnostic bundle leaves out setting lines and passwords (ADR-570 Amendment 1). The
+   comparison shows a password, even from an older snapshot, as `[password hidden]`, and
+   **Copy visible** removes grblHAL and FluidNC passwords from the copied transcript.
 5. Setting writes stay in Device Setup; the pane sends only the gated read.
 
 #### Success - detailed live transcript
@@ -2772,7 +2814,8 @@ authorization, Frame proof, controller command, or safety boundary.
 4. Exporting a backup sends no command to the controller.
 5. When the rows hold a grblHAL password (`$75`, `$77`, `$330`, `$331`, `$533`), the panel says
    before Export that the backup keeps it in plain text for a restore, and the success toast warns
-   to keep the file private (ADR-229 Amendment 2).
+   to keep the file private (ADR-229 Amendment 2). The settings table shows such a value as
+   `[password hidden]`, and the search does not match it.
 
 #### Error — disconnected
 1. **Read ($$)** is disabled.
@@ -3713,6 +3756,7 @@ settings and Job Review keep their existing read-only setup references.
    the flow execute and exactly re-read any explicitly queued common firmware writes. While a job
    runs or is held (a CNC bit change included), Save is disabled and says why, as the toolbar's
    Laser / CNC switch is; the draft stays open and saves once the job ends (ADR-416 Amendment 1).
+   Undo, Redo and Open cannot make that change either (ADR-416 Amendment 2, F-A14).
 
 #### Success — configure CNC defaults before artwork exists
 
@@ -5598,8 +5642,13 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    in the stock with a 1 mm stock-face frame round a margin, assigned to the
    two-sided setup (ADR-573), which is switched on if it was off. Carve side
    A, flip the stock as Machine Setup's Two-sided machining says, set Z0 on
-   the new top, make side B active and carve it. Stock thinner than the
-   model is planned as stock as thick as the model, and the result says so.
+   the new top, make side B active and carve it. Both sides follow a later
+   change to Machine Setup's stock thickness: the model stays centred and the
+   floors stay the holding web apart, so no re-split is needed. Stock thinner
+   than the model caps it at both stock faces, the part comes out as thick
+   as the stock, and Job Review says so. A side split by an earlier version
+   cannot follow the stock, and Job Review asks for a re-split
+   (ADR-580 Amendment 1).
 3. The mesh keeps its CAD top-view orientation: +Y in the STL is the top of
    the canvas, so raised text reads the right way round (ADR-414). Meshes
    already saved in projects keep the orientation they were saved with.
@@ -5655,7 +5704,11 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    is capped at the shallower of that floor and the modeled V-bit cone height;
    inward floor-clearing routes exist only in the remaining mathematical flat
    core. A region wider than the selected bit's finite cone footprint likewise
-   needs floor-clearing motion even in flowing-depth mode.
+   needs floor-clearing motion even in flowing-depth mode. That core is every
+   point at least one cone radius from the outline, so at an inside corner its
+   edge is an arc of that radius around the corner, and the floor passes follow
+   it at the floor pitch. The corner is left with the same scallop as the rest
+   of the floor, not a fin (ADR-285 Amendment 1).
 5. A selected flat clearing end mill is active only when **Flat depth** is on.
    Its floor boundary and Z passes use the same effective depth and cannot cut
    below the V walls. **Stepover** directly edits its clearing spacing; inlay
@@ -6393,8 +6446,10 @@ and lifts the command's CNC-only gate.)*
    Decision 2): every tile file ends at the tile's X0 Y0, lifted to the park
    height when one is set, and the save warns that the park is not used.
    When the chosen folder already holds a file of the same name, or the
-   one-file tile an earlier save wrote where this save writes per bit, the
-   save names those files once the set is written.
+   earlier same-job tile files outside this save's set (including a changed bit count
+   or smaller grid), the save names those files once the set is written. It leaves
+   earlier files intact. If the folder cannot be checked, a warning asks the operator
+   to check that only this save's files are cut (ADR-668).
    A ramp entry kept as a plunge because its source path is shorter than one
    cut width or cannot descend at coordinate precision remains disclosed in
    each affected tile's G-code header, including tabbed path3d output. Split
@@ -8459,8 +8514,10 @@ as the pane's design record.
   finest bed millimetres per pixel, flagged above 0.5 mm. It is advice; Next is always offered.
   The next three steps are the target, the photo and the result below. In Camera settings,
   **Recalibrate…** opens at the target and **Check camera…** at the photo.
-- **Success / calibrated.** On the target step the operator covers the bed with one flat sheet,
-  enters its thickness and, optionally (under **Engrave settings**, with power, speed and margin),
+- **Success / calibrated.** On the target step the operator puts one flat sheet in the middle of
+  the bed and enters its size (**Sheet width** and **Sheet height**, 300 × 200 mm by default, about
+  A4; ADR-441 Amendment 8) and thickness and, optionally (under **Engrave settings**, with power,
+  speed and margin),
   the camera lens height by tape measure, and presses **Engrave target**: the ring target streams as a temporary job through the
   normal Frame, review and Start path, leaving the project and undo history untouched. When the
   job finishes the wizard moves to the photo. The operator moves the head clear of the three solid
@@ -8474,6 +8531,18 @@ as the pane's design record.
   The setup and photo steps name the layout it looks for: its size, margin, bed and where it came
   from. A target engraved with another margin is described by entering that margin first
   (Amendment 4).
+- **Alternative / target on the canvas.** **Add target to canvas** works without a connection. It
+  replaces the artwork with the ring target on its own layer (asking first when the project has
+  unsaved changes; Undo brings the artwork back), locks the rings, sets Start from to Absolute
+  Coordinates, remembers the layout like an engraved target, minimises the wizard at the photo
+  step and says what to do next. The operator Frames and Starts it like any job, then presses
+  **Expand** on the minimised wizard for the photo. Disabled with a reason while the canvas is in
+  CNC mode (ADR-441 Amendment 5).
+- **Warning / not homed.** While connected, the target step says to home first on a homing machine
+  that is not homed, and on a machine without homing that the camera lines up only while the
+  controller keeps its zero. Advice only: **Engrave target** stays available. A calibration whose
+  rings were placed before the controller-to-bed offset was known says so on the calibration row
+  once it is known, and suggests homing and calibrating again if the picture is off.
 - **Edge / small bed.** When the usual grid of 10 mm rings 40 mm apart does not fit inside the
   margins, the rings and spacing shrink together so every ring stays on the bed. The grid keeps
   rings around all three solid anchors. Engrave a new target if an older one ran off the bed or
@@ -8485,6 +8554,12 @@ as the pane's design record.
   target that fills the picture edge to edge says to move the camera back or engrave a smaller
   target, and a lens the rings cannot model out to the picture's edges asks for a larger target
   (Amendment 4).
+- **Error / anchors unclear.** When rings have filled in (a small, dim or noisy picture, or rings
+  burned nearly solid), a solid disc stands where a ring should be, or more than one placement of
+  the anchor L fits the rings, or the only one would put rings where the target has none. The photo
+  then cannot say which three discs are the anchors. The message asks for even light, a larger
+  picture or a closer camera, and a lighter new target, and mentions old marks beside the target.
+  Nothing is fitted (Amendment 6).
 - **Edge / target smaller than the picture.** The fit keeps only the lens terms the rings pin
   down. When a quarter or more of what the camera sees lies outside the target, the result says
   that the accuracy is measured on the rings and the rest of the picture is estimated
@@ -8496,7 +8571,17 @@ as the pane's design record.
 - **Edge / rough fit.** A fit with a large error is described with what to check (sheet moved,
   not flat, out of focus) and can still be saved; the operator decides.
 - **Edge / camera straight down.** When one photo cannot pin the camera height down and none was
-  entered, the result asks for a tape-measured height so thick material lines up.
+  entered, the lens keeps only its two dominant terms. The result is graded fair, "Lined up at the
+  height of the N mm target sheet only", and asks for a tape-measured height so other thicknesses
+  line up. The calibration row in Camera settings keeps saying so after saving (Amendment 7).
+- **Edge / low-resolution camera.** **Ring size (mm)** under Engrave settings sets the rings'
+  diameter (10 mm by default; the grid step is four ring sizes). When the rings in the photo are
+  under about 9.5 px across, the photo fails as "rings too small" with the ring size to use, or asks
+  for a larger picture or a closer camera. The ring size goes with the target, the canvas target,
+  the nudge ring and the saved calibration (Amendment 7).
+- **Warning / camera placement with a relative Start from.** With camera placement on and Start
+  from not Absolute Coordinates, Job Review says the job burns where that origin puts it, not where
+  the artwork sits on the camera picture. Advice only (ADR-228 Amendment 1).
 - **Edge / minimized wizard.** The wizard can minimize into a small non-modal panel so the
   operator can watch the camera and reach the machine while the target engraves.
 - **Fix / a small offset (ADR-663 Amendment 2).** For a calibrated camera fixed above the bed,
@@ -8505,7 +8590,8 @@ as the pane's design record.
   Under 0.2 mm nothing changes; up to 10 mm **Fix** moves the saved calibration by that much (one
   Undo step) and refreshes the picture; above 10 mm it offers **Recalibrate…**. No ring, or more
   than one near the middle, says what to check and changes nothing. A head camera is not offered
-  the fix.
+  the fix. A pending photo and its result belong to that wizard, document, camera and
+  calibration; changing them retires the old result, so Fix cannot shift another setup (ADR-668).
 - **Warn / the camera seems to have moved (ADR-663 Amendment 3).** KerfDesk keeps a small view of
   what a fixed calibrated camera sees when its calibration is saved, a check keeps it, or a nudge
   fix is applied. Each new held picture, and one picture a few seconds after the camera starts, is
@@ -8513,7 +8599,9 @@ as the pane's design record.
   confident match (score 0.6 or more, the surround at least 4 % of the view) that puts the middle
   of the bed 1 mm or more off shows **The camera may have moved, by about N mm** in the Camera
   panel, with **Fix a small offset…**, **Check camera…** and **Dismiss**, and one toast when the
-  panel is closed. A weaker match, too little surround, a head camera or no kept view says
+  panel is closed. **Dismiss** keeps that warning quiet while the camera stays where it was then;
+  a view confirmed steady since (a nudge fix, a kept check), or a further shift of 1 mm or more,
+  warns again. A weaker match, too little surround, a head camera or no kept view says
   nothing; Camera settings says how to start the warning for a calibration without a view.
 - **Check / has the camera moved?** With a calibration saved, **Check camera…** opens the wizard
   at the photo, using the saved target's area and height. The photo is measured against the saved
@@ -8533,7 +8621,7 @@ as the pane's design record.
   native-frame change the camera picture is moved to match, and the calibration row says on what
   bed it was made and how far it moved. After an origin change the camera is not used: the Camera
   panel says "Calibrate the camera again, or set the origin back".
-- **Edge / calibration saved without its bed frame (ADR-440 Amendment 2).** A calibration from
+- **Edge / calibration saved without its bed frame (ADR-440 Amendment 4).** A calibration from
   KerfDesk 1.0.21 or earlier recorded no bed frame, so it is not used until the operator says
   which frame it belongs to. The Camera panel names the origin and bed size Machine Setup has now
   and offers **Confirm bed and origin**, which records them on the calibration (one undo step, no
@@ -8555,6 +8643,8 @@ as the pane's design record.
   why when it cannot (no camera, not set up, a head camera). With **Refresh the picture after each
   job** on (default on), a held picture is taken again 3 s after a job finishes; a live picture,
   a stopped job and a head camera are left alone.
+  When refreshes overlap, only the newest request may replace the picture. Choosing Live,
+  hiding the picture or changing document/camera retires an older pending refresh (ADR-668).
 - **Material height.** Enter the material's top height above the bed; the overlay and
   camera trace show the bed as seen at that height, so the material's edges line up.
 - **Object heights.** **Add height area** gives part of the bed its own height, for an object that
@@ -9563,9 +9653,13 @@ The G-code Inspector is free in every edition (ADR-627).
 7. From Start on, KerfDesk no longer trusts what the program may have changed (ADR-630
    Amendment 6), so this also holds after a Stop. If the program selects `G55`-`G59`, the next
    Frame reads the active system (`$G`) and selects `G54` if another one is active. If it writes
-   a Z offset (`G92 Z`, `G10 L2`/`L20 Z`), sets or cancels a tool length (`G43.1`, `G49`) or
-   changes the tool (`M6`, `T`), Work Z set before it no longer counts, so the next CNC Frame
-   asks for Zero Z again. A `G54` that selects the system already active changes neither.
+   a Z offset (`G92 Z`, `G10 L2`/`L20 Z`), sets or cancels a tool length (`G43.1`, `G49`, and
+   grblHAL's tool-table `G43`/`G43.2`, ADR-630 Amendment 8) or changes the tool (`M6`, `T`,
+   `M61`), Work Z set before it no longer counts, so the next CNC Frame asks for Zero Z again.
+   If it writes an X/Y offset (`G92 X/Y`, `G10 L2`/`L20 X/Y`, `G92.1`), the work origin set
+   before it no longer counts, and a Place Board registration bound to it is void (ADR-667).
+   The Console voids each for the same words. A `G54` that selects the system already active
+   changes neither.
 
 #### Warnings (never refuse)
 

@@ -108,7 +108,7 @@ it('toggles the actual overlay, freezes a frame, returns to Live and exits place
   expect(useStore.getState().jobPlacement).toEqual({ startFrom: 'user-origin', anchor: 'center' });
 });
 
-it('holds back a calibration saved without its bed frame until the bed is confirmed (ADR-440 Amd 2)', async () => {
+it('holds back a calibration saved without its bed frame until the bed is confirmed (ADR-440 Amd 4)', async () => {
   const { project } = useStore.getState();
   const saved = project.device.cameraModel;
   if (saved === undefined) throw new Error('fixture has a camera model');

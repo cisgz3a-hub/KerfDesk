@@ -1,6 +1,7 @@
 import { cncMaxFeedMmPerMin } from '../../core/cnc/cnc-head-feeds';
 import { SURFACING_DEFAULT_DEPTH_PER_PASS_MM } from '../../core/cnc/surfacing';
 import type { SurfacingParams } from '../../core/cnc/surfacing';
+import type { ControllerKind } from '../../core/devices';
 import type { ControllerSettingsSnapshot, ReadinessSettingsCapability } from '../../core/preflight';
 import { standaloneCncSetupAdvisories } from '../../core/preflight/standalone-cnc-preflight';
 import { activeCncTool, type CncMachineConfig, type Project } from '../../core/scene';
@@ -32,6 +33,7 @@ type SaveSurfacingOptions = {
   readonly machine: CncMachineConfig;
   readonly controllerSettings: ControllerSettingsSnapshot | null;
   readonly settingsCapability: ReadinessSettingsCapability;
+  readonly firmwareKind?: ControllerKind;
   readonly inputs: SurfacingInputs;
   readonly signal: AbortSignal;
   /** The program is ready; a destination is being chosen. */
@@ -66,6 +68,7 @@ export async function saveSurfacingProgram(options: SaveSurfacingOptions): Promi
     project,
     controllerSettings,
     settingsCapability,
+    options.firmwareKind,
   )) {
     warn(message);
   }

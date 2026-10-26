@@ -3,7 +3,7 @@
 // bed, then set the bed to 400 × 410: the same model kept drawing what the
 // camera saw at machine Y200 at scene Y200, which now burns at machine Y210.
 // Meta audit M2-P3-3: a calibration saved before the frame was kept had the
-// same gap, so it is not used until its frame is confirmed (ADR-440 Amd 2).
+// same gap, so it is not used until its frame is confirmed (ADR-440 Amd 4).
 
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, toMachineCoords, type DeviceProfile } from '../../devices';
@@ -12,6 +12,7 @@ import {
   cameraBedFrameNote,
   cameraModelInBedFrame,
   sceneInBedFrame,
+  UNVERIFIED_FRAME_NOTE,
   withConfirmedBedFrame,
   type CameraBedFrame,
 } from './camera-bed-frame';
@@ -139,6 +140,26 @@ describe('a calibration in the bed frame now', () => {
       usable: true,
       message:
         'The camera was calibrated on a 400 × 400 mm bed. KerfDesk moves its picture 10 mm to match the machine as it is set up now.',
+    });
+  });
+
+  it('says when the rings were placed before the bed position was known', () => {
+    const homed = { ...FRONT_LEFT_400, nativeToBedOffsetMm: { x: 0, y: 400 } };
+    // Engraved unhomed: Absolute coordinates counted from the power-on head.
+    expect(cameraBedFrameNote(calibrated, homed)).toEqual({
+      usable: true,
+      message: UNVERIFIED_FRAME_NOTE,
+    });
+    expect(cameraBedFrameNote(calibrated, { ...homed, bedHeightMm: 410 })?.message).toBe(
+      `The camera was calibrated on a 400 × 400 mm bed. KerfDesk moves its picture 10 mm to match the machine as it is set up now. ${UNVERIFIED_FRAME_NOTE}`,
+    );
+    // Known then and now, or unknown both times (no homing): nothing to say.
+    expect(cameraBedFrameNote({ ...calibrated, bedFrame: homed }, homed)).toBeNull();
+    expect(cameraBedFrameNote(calibrated, FRONT_LEFT_400)).toBeNull();
+    // No frame at all is not "nothing to say": it waits for one (ADR-440 Amd 4).
+    expect(cameraBedFrameNote(unframedCameraModel(), homed)).toMatchObject({
+      usable: false,
+      frameUnrecorded: true,
     });
   });
 

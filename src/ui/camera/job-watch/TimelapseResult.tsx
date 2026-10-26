@@ -80,8 +80,11 @@ function useSaveVideo(frames: ReadonlyArray<Blob>): {
     // The picker empties an existing file as it returns (ADR-656), so the
     // video is made first; the long encode then asks for a fresh click.
     setSavingFrame(0);
-    const video = await encodeTimelapseVideo(frames, format, setSavingFrame);
-    setSavingFrame(null);
+    // MediaRecorder and captureStream can still throw after isTypeSupported;
+    // a throw then counts as a failed recording and re-enables Save.
+    const video = await encodeTimelapseVideo(frames, format, setSavingFrame)
+      .catch(() => null)
+      .finally(() => setSavingFrame(null));
     if (video === null) {
       pushToast('Could not make the timelapse video.', 'error');
       return;
