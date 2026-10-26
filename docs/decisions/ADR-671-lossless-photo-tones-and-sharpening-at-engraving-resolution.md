@@ -64,7 +64,8 @@ filter runs. Its values are not copied numerically here.
      a smooth monotonic curve the difference from sharpening before it is second order. With
      sharpening off, ADR-670 output is unchanged.
 3. **Every view agrees.** The canvas raster preview, the Photo engraving preview and G-code
-   all come from the same compiled groups. Save processed bitmap applies the same filter, scaling
+   all come from the same compiled groups. The canvas preview's cache key includes both
+   sharpening fields, so changing only sharpening rebuilds it. Save processed bitmap applies the same filter, scaling
    the radius when its preview is capped. The design canvas's adjusted-tone display remains a
    source-resolution tone view and does not show burn-grid sharpening. Image Studio's kerf
    Thicken repair no longer treats a sharpened photo as burning its pixels as they are.
