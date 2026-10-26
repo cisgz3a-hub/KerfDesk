@@ -1,5 +1,7 @@
 # Controller protocol audit — how controllers work, and how KerfDesk talks to them
 
+> **Status (2026-10-26, meta audit v1 M7):** P-1, P-5 and P-6 were fixed by #1315. CS-05 was fixed by #923 on 2026-09-26. See [the corrections](2026-10-23-meta-v1/M7-corrections-older-audits.md) for the current status of every item.
+
 Status: research plus read-only source audit, no hardware run. Nothing was changed.
 Audited: origin/main at `73025a10e`, plus open PR #1287 (`claude/market-fixes`) for the external
 G-code run feature. Prepared: 2026-10-20.

@@ -12,7 +12,7 @@ Method: [../2026-10-21-rolling-v2/METHOD.md](../2026-10-21-rolling-v2/METHOD.md)
 | M6 | Clean claims, dispositions, contradictions | adf300522 | [M6-meta-clean-and-refuted.md](M6-meta-clean-and-refuted.md) | 11 (+R1) | 0 (1 known, 1 plausible) | 4 | 3 | 5 | wrong disposition, wrong severity, wrong clean claim, contradiction |
 | M7 | Pre-rolling audits (2026-09-24 to 2026-10-20) | adf300522 | [M7-meta-older-audits.md](M7-meta-older-audits.md) | 11 | 0 (1 known) | 1 | 5 (P1-2 lowered) | 5 (P2-4 lowered) | record omission, wrong severity, stale record |
 
-**Totals (2026-10-26, all seven areas):** 56 raised, 1 refuted. P1 7, P2 10, P3 38, plus 80 stale ledger rows corrected (58 rolling-v2, 23 controller-v2/v3, 9 controller-v4, less overlaps).
+**Totals (2026-10-26, all seven areas):** 56 raised, 1 refuted. P1 7, P2 10, P3 38, plus 96 stale ledger rows corrected (rolling-v2: 6 P1 and 58 P2; controller v2/v3: 23; controller v4: 9). The older audits had no ledger; [M7-corrections-older-audits.md](M7-corrections-older-audits.md) is now theirs.
 
 - **Findings held up.** Every re-checked P1/P2 was genuine, and every sampled fix works on main: 401 + 470 regression tests pass, and fix-revert runs fail as they should.
 - **The records did not.** Ledger statuses went stale after fixes merged, and confirmed findings with no fix card were later re-filed as KNOWN and lost.

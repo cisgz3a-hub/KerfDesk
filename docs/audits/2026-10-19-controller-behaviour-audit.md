@@ -1,5 +1,7 @@
 # Controller behaviour audit — connection, reconnect and notices
 
+> **Status (2026-10-26, meta audit v1 M7):** F-1 to F-3 were fixed by #1294, and F-5 and F-9 by #1328. F-4, F-6, F-7, F-8 and F-10 are still open. See [the corrections](2026-10-23-meta-v1/M7-corrections-older-audits.md) for the current status of every item.
+
 Status: read-only source audit, no hardware run. Nothing was changed.
 Audited checkout: `claude/macos-linux-desktop` at `96ccab88f` (origin/main at `36cd85588`).
 Prepared: 2026-10-19. Findings F-1, F-2 and F-3 are implemented in PR #1294.

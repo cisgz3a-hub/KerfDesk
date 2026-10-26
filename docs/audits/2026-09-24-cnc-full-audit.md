@@ -1,5 +1,7 @@
 # KerfDesk CNC audit (2026-09-24)
 
+> **Status (2026-10-26, meta audit v1 M7):** The fixes merged in #898 on 2026-09-24. The status tags below were not updated after that. See [the corrections](2026-10-23-meta-v1/M7-corrections-older-audits.md) for the current status of every item.
+
 The router side of KerfDesk, checked against the real GRBL 1.1h source. Every finding was reproduced or traced to code and is backed by a cited source.
 
 - **Checked:** main at 6b6250b, 24 Sep 2026

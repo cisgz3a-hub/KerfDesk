@@ -1,5 +1,7 @@
 # G-code and controller pipeline audit — 16 October 2026
 
+> **Status (2026-10-26, meta audit v1 M7):** These changes merged in #1212 on 2026-10-15. See [the corrections](2026-10-23-meta-v1/M7-corrections-older-audits.md) for the current status of every item.
+
 Baseline: `f7e2a36895b67cfa33be03c16e6c19e7c6722d14` (fetched `origin/main`).
 Repair branch: `codex/controller-protocol-audit-fixes-20261016`.
 Scope: all six supported controller families, their output dialects, serial/network transport,

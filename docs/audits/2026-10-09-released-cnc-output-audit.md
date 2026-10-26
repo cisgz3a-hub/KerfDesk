@@ -1,5 +1,7 @@
 # Released CNC and executable-output audit, 9 October 2026
 
+> **Status (2026-10-26, meta audit v1 M7):** This candidate merged in #1109 on 2026-10-08. See [the corrections](2026-10-23-meta-v1/M7-corrections-older-audits.md) for the current status of every item.
+
 The audit independently examined the source used for KerfDesk desktop 1.0.13: commit `e34ad795e1e6d8dad256d106e41e9b3a8f335331`, tree `075d0ca4fb817f1f947e7a7a931086a5694e3932`. The desktop publication workflow [37834306969](https://github.com/cisgz3a-hub/KerfDesk/actions/runs/37834306969) was successful. This audit qualifies software behaviour at that source and the local candidate; it does not qualify the installed executable or a physical machine.
 
 Eight reproducible product defects were repaired, together with one internal numerical weakness. Baseline failures were saved before repairs. The dirty primary checkout and other audit worktrees were preserved.
