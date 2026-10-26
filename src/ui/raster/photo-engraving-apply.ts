@@ -11,6 +11,12 @@ import {
   type RasterImage,
 } from '../../core/scene';
 import {
+  DEFAULT_SHARPEN_RADIUS,
+  SHARPEN_AMOUNT_MAX,
+  SHARPEN_RADIUS_MAX,
+  SHARPEN_RADIUS_MIN,
+} from '../../core/raster/luma-sharpen';
+import {
   activePhotoToneCurve,
   IDENTITY_PHOTO_TONE_CURVE,
   isPhotoToneCurve,
@@ -33,6 +39,9 @@ export type PhotoEngravingApply = {
     readonly brightness: number;
     readonly contrast: number;
     readonly gamma: number;
+    /** ADR-671; omitted keeps the photo's own sharpening, 0 turns it off. */
+    readonly sharpenAmount?: number;
+    readonly sharpenRadius?: number;
   };
   readonly layerPatch: Pick<
     Layer,
@@ -98,11 +107,24 @@ export function photoEngravingImage(
     ...photoToneCurveOverride(operation, patch.layerPatch.photoToneCurve),
   };
   return {
-    ...image,
+    ...withSharpening(image, patch.imagePatch),
     brightness: patch.imagePatch.brightness,
     contrast: patch.imagePatch.contrast,
     gamma: patch.imagePatch.gamma,
     operationOverride: { ...image.operationOverride, byOperation },
+  };
+}
+
+// Sharpening off leaves no fields behind, so the photo compiles exactly as one
+// that was never sharpened.
+function withSharpening(image: RasterImage, patch: PhotoEngravingApply['imagePatch']): RasterImage {
+  if (patch.sharpenAmount === undefined) return image;
+  const { sharpenAmount: _amount, sharpenRadius: _radius, ...unsharpened } = image;
+  if (patch.sharpenAmount === 0) return unsharpened;
+  return {
+    ...unsharpened,
+    sharpenAmount: patch.sharpenAmount,
+    sharpenRadius: patch.sharpenRadius ?? image.sharpenRadius ?? DEFAULT_SHARPEN_RADIUS,
   };
 }
 
@@ -150,9 +172,8 @@ function matchesCurrentSettings(
 ): boolean {
   const effective = effectiveOperationForObject(operation, image);
   return (
-    (image.brightness ?? 0) === patch.imagePatch.brightness &&
-    (image.contrast ?? 0) === patch.imagePatch.contrast &&
-    (image.gamma ?? 1) === patch.imagePatch.gamma &&
+    imageToneMatches(image, patch.imagePatch) &&
+    sharpeningMatches(image, patch.imagePatch) &&
     effective.mode === 'image' &&
     effective.ditherAlgorithm === patch.layerPatch.ditherAlgorithm &&
     effective.linesPerMm === patch.layerPatch.linesPerMm &&
@@ -165,6 +186,25 @@ function matchesCurrentSettings(
   );
 }
 
+function imageToneMatches(image: RasterImage, patch: PhotoEngravingApply['imagePatch']): boolean {
+  return (
+    (image.brightness ?? 0) === patch.brightness &&
+    (image.contrast ?? 0) === patch.contrast &&
+    (image.gamma ?? 1) === patch.gamma
+  );
+}
+
+function sharpeningMatches(image: RasterImage, patch: PhotoEngravingApply['imagePatch']): boolean {
+  if (patch.sharpenAmount === undefined) return true;
+  const amount = image.sharpenAmount ?? 0;
+  if (amount !== patch.sharpenAmount) return false;
+  return (
+    amount === 0 ||
+    patch.sharpenRadius === undefined ||
+    (image.sharpenRadius ?? DEFAULT_SHARPEN_RADIUS) === patch.sharpenRadius
+  );
+}
+
 export function photoEngravingPatchIsValid({
   imagePatch,
   layerPatch,
@@ -173,12 +213,21 @@ export function photoEngravingPatchIsValid({
     inRange(imagePatch.brightness, -100, 100) &&
     inRange(imagePatch.contrast, -100, 100) &&
     inRange(imagePatch.gamma, 0.1, 5) &&
+    sharpeningPatchIsValid(imagePatch) &&
     Number.isFinite(layerPatch.linesPerMm) &&
     layerPatch.linesPerMm > 0 &&
     DITHER_ALGORITHMS.includes(layerPatch.ditherAlgorithm) &&
     typeof layerPatch.negativeImage === 'boolean' &&
     typeof layerPatch.passThrough === 'boolean' &&
     (layerPatch.photoToneCurve === undefined || isPhotoToneCurve(layerPatch.photoToneCurve))
+  );
+}
+
+function sharpeningPatchIsValid(patch: PhotoEngravingApply['imagePatch']): boolean {
+  return (
+    (patch.sharpenAmount === undefined || inRange(patch.sharpenAmount, 0, SHARPEN_AMOUNT_MAX)) &&
+    (patch.sharpenRadius === undefined ||
+      inRange(patch.sharpenRadius, SHARPEN_RADIUS_MIN, SHARPEN_RADIUS_MAX))
   );
 }
 

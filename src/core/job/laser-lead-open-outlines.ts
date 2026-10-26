@@ -17,6 +17,11 @@
 // held by those lines, however many closed shapes sit between. Closed
 // contours do not take part: open lines that close a region only together
 // with a closed shape's edge are not read here.
+//
+// A gap wider than that still leaves an outline (Amendment 10,
+// laser-lead-open-gaps.ts): lines that run nearly all the way round, their
+// free ends closer together than a tenth of their length, hold a contour with
+// a point inside the region they would close, clear of the lines themselves.
 
 import {
   areaD,
@@ -28,8 +33,11 @@ import {
   type PathD,
 } from 'clipper2-ts';
 import { pointInPolygon } from '../geometry/point-in-polygon';
+import { PolygonEdgeIndex } from '../geometry/polygon-edge-index';
 import { tryVectorOp } from '../geometry/vector-path-tools';
-import type { Vec2 } from '../scene';
+import { polylineToCurveSubpath, type Vec2 } from '../scene';
+import { ContourBoxIndex } from '../trace/contour-box-index';
+import { openOutlines, type OpenOutline } from './laser-lead-open-gaps';
 import { CLOSE_OPEN_FILL_CONTOUR_TOLERANCE_MM } from './open-fill-contours';
 
 /** Open lines whose ends come this close close a region: the gap Fill
@@ -65,16 +73,24 @@ type Ring = {
 };
 
 /** For each contour, the operation whose open lines close a region round it,
- * or undefined when no open lines do. */
+ * or nearly all the way round it, or undefined when no open lines do. */
 export function openLineHolders(
   contours: ReadonlyArray<ReadonlyArray<Vec2>>,
   lines: ReadonlyArray<SceneOpenLine>,
 ): ReadonlyArray<string | undefined> {
+  const drawn = lines.filter((line) => line.points.length >= 2);
+  const closing = closingLineHolders(contours, drawn);
+  if (closing.every((holder) => holder !== undefined)) return closing;
+  const leftOpen = leftOpenHolders(contours, drawn);
+  return closing.map((holder, index) => holder ?? leftOpen(index));
+}
+
+function closingLineHolders(
+  contours: ReadonlyArray<ReadonlyArray<Vec2>>,
+  lines: ReadonlyArray<SceneOpenLine>,
+): ReadonlyArray<string | undefined> {
   const boxes = contours.map(boxOf);
-  const strokes = reachingStrokes(
-    lines.filter((line) => line.points.length >= 2),
-    boxes,
-  );
+  const strokes = reachingStrokes(lines, boxes);
   const first = strokes[0];
   if (first === undefined) return contours.map(() => undefined);
   const rings = unitedStrokes(strokes);
@@ -94,6 +110,75 @@ export function openLineHolders(
     }
     return undefined;
   });
+}
+
+// Amendment 10: lines that run nearly all the way round a contour, their ends
+// further apart than the strokes close. The lines of every burning Line
+// operation chain, as their strokes unite above, and the region an outline
+// would close holds a contour with a point inside it that is clear of the
+// outline's own lines: a contour drawn on the lines is not inside them.
+function leftOpenHolders(
+  contours: ReadonlyArray<ReadonlyArray<Vec2>>,
+  lines: ReadonlyArray<SceneOpenLine>,
+): (contour: number) => string | undefined {
+  const outlines = openOutlines(
+    lines.map((line) => ({
+      curve: polylineToCurveSubpath({ points: line.points, closed: false }),
+      signature: '',
+    })),
+    OPEN_OUTLINE_GAP_MM,
+  ).flatMap((outline) => {
+    const box = boxOf(outline.points);
+    return [box.minX, box.minY, box.maxX, box.maxY].every(Number.isFinite)
+      ? [{ ...box, outline, edges: lazyEdges(outline.points) }]
+      : [];
+  });
+  if (outlines.length === 0) return () => undefined;
+  const index = ContourBoxIndex.create(outlines);
+  return (contour) => {
+    const points = contours[contour] ?? [];
+    const held = index.query(boxOf(points)).find((region) => regionHolds(region, points));
+    return held === undefined ? undefined : lines[held.outline.index]?.operationName;
+  };
+}
+
+type OutlineRegion = Box & {
+  readonly outline: OpenOutline;
+  readonly edges: () => PolygonEdgeIndex | null;
+};
+
+// Outlines with more points than this are tested through an index of their
+// edges, built on first use.
+const INDEXED_OUTLINE_POINTS = 32;
+
+function lazyEdges(points: ReadonlyArray<Vec2>): () => PolygonEdgeIndex | null {
+  let built: PolygonEdgeIndex | null | undefined;
+  return () => {
+    if (built === undefined)
+      built = points.length > INDEXED_OUTLINE_POINTS ? PolygonEdgeIndex.create(points) : null;
+    return built;
+  };
+}
+
+function regionHolds(region: OutlineRegion, points: ReadonlyArray<Vec2>): boolean {
+  const { outline } = region;
+  for (const point of points) {
+    if (!contains(region, point)) continue;
+    const edges = region.edges();
+    const inside =
+      edges === null ? pointInPolygon(point, outline.points) : edges.containsPoint(point);
+    if (inside && clearOfLines(point, outline.points, STROKE_RADIUS_MM)) return true;
+  }
+  return false;
+}
+
+/** Farther than `marginMm` from the open lines, the closing gap aside. */
+function clearOfLines(point: Vec2, points: ReadonlyArray<Vec2>, marginMm: number): boolean {
+  for (let index = 1; index < points.length; index += 1) {
+    if (segmentDistance(point, points[index - 1] as Vec2, points[index] as Vec2) <= marginMm)
+      return false;
+  }
+  return true;
 }
 
 // Lines whose strokes cannot meet cannot close a region together, and a

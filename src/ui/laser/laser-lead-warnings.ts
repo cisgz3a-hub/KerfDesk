@@ -94,14 +94,15 @@ function laserLeadWarning(diagnostic: LeadDiagnostic): string {
   }
 }
 
-// ADR-626 Amendment 8: open lines that close a region round a shape may be a
-// part's outline that was never joined, such as a CAD plate drawn as LINEs.
+// ADR-626 Amendments 8 and 10: open lines that close a region round a shape,
+// or nearly close it, may be a part's outline that was never joined, such as a
+// CAD plate drawn as LINEs or a plate drawn with one corner left open.
 function openLinesWarning(
   where: string,
   diagnostic: Extract<LeadDiagnostic, { readonly kind: 'laser-leads-side-unknown' }>,
 ): string {
   const one = diagnostic.count === 1;
-  return `${where}: ${shapes(diagnostic.count)} inside open lines on layer "${diagnostic.aroundName}" ${one ? 'gets' : 'get'} no leads. Those lines close round ${one ? 'it' : 'them'} but are not one closed shape, so they may be the outline of a part, and which side is scrap is unknown. Close the outline with Tools > Join paths, or set Lead side to Always outside or Always inside.`;
+  return `${where}: ${shapes(diagnostic.count)} inside open lines on layer "${diagnostic.aroundName}" ${one ? 'gets' : 'get'} no leads. Those lines run all or nearly all the way round ${one ? 'it' : 'them'} but are not one closed shape, so they may be the outline of a part, and which side is scrap is unknown. Close the outline with Tools > Join paths, or set Lead side to Always outside or Always inside.`;
 }
 
 function adjustedParts(shortened: number, omitted: number): string {

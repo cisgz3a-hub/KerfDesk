@@ -16,6 +16,7 @@ import {
 import { rasterCompilationPowerScale } from '../../core/raster/controller-power-scale';
 import { imageDitherAlgorithm, prepareImageLuma } from '../../core/raster/image-processing';
 import { burnGridKernel } from '../../core/raster/luma-resample';
+import { burnGridSharpen, gridSharpen, sharpenLuma } from '../../core/raster/luma-sharpen';
 import type { Layer, RasterImage, SceneObject } from '../../core/scene';
 
 const PERCENT_MAX = 100;
@@ -74,10 +75,22 @@ export function buildProcessedRasterBitmap(
           height,
           burnGridKernel(imageDitherAlgorithm(layer)),
         );
+  // Compile's own sharpening (ADR-671), its burn-cell radius kept the same
+  // size in millimetres on a capped preview grid.
+  const sharpen = burnGridSharpen(image, layer.passThrough);
+  const burnLuma =
+    sharpen === null
+      ? luma
+      : sharpenLuma(
+          luma,
+          width,
+          height,
+          gridSharpen(sharpen, outputDimensions.width / width, outputDimensions.height / height),
+        );
   const maskedLuma = applyImageMaskToLuma({
     image,
     maskObject: options.maskObject,
-    luma,
+    luma: burnLuma,
     width,
     height,
   });

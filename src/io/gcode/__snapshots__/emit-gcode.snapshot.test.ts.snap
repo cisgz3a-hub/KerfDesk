@@ -717,25 +717,25 @@ G1 X35.000 Y53.000 F1500 S0 ; kerfdesk:laser-off-motion
 M5
 M4 S0
 G0X90Y0.5S0
-G1X95F1500
+G1X95F1500 ; kerfdesk:laser-off-motion
 X100S300
-X105S0
+X105S0 ; kerfdesk:laser-off-motion
 G0X105Y1.5S0
-G1X100
+G1X100 ; kerfdesk:laser-off-motion
 X95S300
-X90S0
+X90S0 ; kerfdesk:laser-off-motion
 G0X90Y2.5S0
-G1X95
+G1X95 ; kerfdesk:laser-off-motion
 X100S300
-X105S0
+X105S0 ; kerfdesk:laser-off-motion
 G0X100Y3.5S0
-G1X95
+G1X95 ; kerfdesk:laser-off-motion
 X90S300
-X85S0
+X85S0 ; kerfdesk:laser-off-motion
 G0X85Y4.5S0
-G1X90
+G1X90 ; kerfdesk:laser-off-motion
 X95S300
-X100S0
+X100S0 ; kerfdesk:laser-off-motion
 M5
 G0 X0.000 Y0.000 S0
 "
@@ -879,25 +879,25 @@ G1 X45.000 Y348.000 F1500 S0 ; kerfdesk:laser-off-motion
 M5
 M4 S0
 G0X100Y295.5S0
-G1X105F1500
+G1X105F1500 ; kerfdesk:laser-off-motion
 X110S300
-X115S0
+X115S0 ; kerfdesk:laser-off-motion
 G0X115Y296.5S0
-G1X110
+G1X110 ; kerfdesk:laser-off-motion
 X105S300
-X100S0
+X100S0 ; kerfdesk:laser-off-motion
 G0X100Y297.5S0
-G1X105
+G1X105 ; kerfdesk:laser-off-motion
 X110S300
-X115S0
+X115S0 ; kerfdesk:laser-off-motion
 G0X110Y298.5S0
-G1X105
+G1X105 ; kerfdesk:laser-off-motion
 X100S300
-X95S0
+X95S0 ; kerfdesk:laser-off-motion
 G0X95Y299.5S0
-G1X100
+G1X100 ; kerfdesk:laser-off-motion
 X105S300
-X110S0
+X110S0 ; kerfdesk:laser-off-motion
 M5
 G0 X0.000 Y0.000 S0
 "
@@ -915,25 +915,25 @@ M4 S0
 M5
 M4 S0
 G0X100Y295.5S0
-G1X105F1500
+G1X105F1500 ; kerfdesk:laser-off-motion
 X110S300
-X115S0
+X115S0 ; kerfdesk:laser-off-motion
 G0X115Y296.5S0
-G1X110
+G1X110 ; kerfdesk:laser-off-motion
 X105S300
-X100S0
+X100S0 ; kerfdesk:laser-off-motion
 G0X100Y297.5S0
-G1X105
+G1X105 ; kerfdesk:laser-off-motion
 X110S300
-X115S0
+X115S0 ; kerfdesk:laser-off-motion
 G0X110Y298.5S0
-G1X105
+G1X105 ; kerfdesk:laser-off-motion
 X100S300
-X95S0
+X95S0 ; kerfdesk:laser-off-motion
 G0X95Y299.5S0
-G1X100
+G1X100 ; kerfdesk:laser-off-motion
 X105S300
-X110S0
+X110S0 ; kerfdesk:laser-off-motion
 M5
 G0 X0.000 Y0.000 S0
 "

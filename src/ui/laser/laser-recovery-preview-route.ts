@@ -1,3 +1,4 @@
+import { laserPowerControlForDevice } from '../../core/gcode-view';
 import { rotaryAppliesTo } from '../../core/job';
 import { reportedWorkPositionMm, type CanvasMotionPlan } from '../state/canvas-motion-plan';
 import type { ExecutionArtifactV1 } from '../state/recovery';
@@ -45,6 +46,7 @@ export function laserRecoveryPreviewSource(artifact: ExecutionArtifactV1): Recov
   return {
     gcode: artifact.gcode,
     initialPosition,
+    laserPowerControl: laserPowerControlForDevice(device),
     mapping: {
       device,
       // Historical WCO is a native offset, not proof of where the bed lies.
@@ -210,6 +212,9 @@ function packOffThread(
       const message: LaserRecoveryPreviewRequest = {
         gcode: request.gcode,
         initialPosition: request.initialPosition,
+        ...(request.laserPowerControl === undefined
+          ? {}
+          : { laserPowerControl: request.laserPowerControl }),
       };
       worker.postMessage(message);
     } catch (error) {

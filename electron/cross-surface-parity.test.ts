@@ -67,7 +67,24 @@ function electronCsp(bridgePort: number): string {
     .replace(/\$\{CAMERA_BRIDGE_ORIGIN\}/g, `http://127.0.0.1:${bridgePort}`);
 }
 
+function stringConstant(source: string, name: string): string {
+  const match = source.match(new RegExp(`${name}\\s*=\\s*'([^']+)'`));
+  if (!match?.[1]) throw new Error(`string constant not found: ${name}`);
+  return match[1];
+}
+
 describe('cross-surface parity (ELE-08)', () => {
+  it('the bridge and the window agree on how the bridge proves itself (ADR-141 Amd 2)', () => {
+    const electron = read('electron/camera-bridge-keys.ts');
+    const web = read('src/platform/web/camera-bridge.ts');
+    expect(stringConstant(web, 'BRIDGE_PROOF_LABEL')).toBe(
+      stringConstant(electron, 'CAMERA_BRIDGE_PROOF_LABEL'),
+    );
+    expect(stringConstant(web, 'BRIDGE_TOKEN_HEADER')).toBe(
+      stringConstant(electron, 'CAMERA_BRIDGE_TOKEN_HEADER'),
+    );
+  });
+
   it('the web and electron machine-camera host lists resolve to the same URLs', () => {
     const electronUrls = stringArray(
       read('electron/camera-frame-proxy.ts'),

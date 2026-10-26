@@ -13,12 +13,19 @@
 //
 // An outline is what Join paths makes of them at OPEN_OUTLINE_GAP_MM: open
 // paths of one operation whose ends each meet one other end, closing a loop.
+// Or one left open wider than that (ADR-626 Amendment 10, meta audit v1
+// M6-R1): open paths that run nearly all the way round, their free ends
+// closer together than a tenth of their length (laser-lead-open-gaps.ts). The
+// message then names the gap Join paths must bridge. Kerf compensation of the
+// closed shapes inside an outline does not see it either: they are offset as
+// if nothing held them, so a hole is cut oversize, and that is said too.
 
 import { effectiveObjectPowerPercent, effectiveOperationForObject } from '../effective-output';
 import { pointInPolygon } from '../geometry/point-in-polygon';
-import { joinCurveEndpointsWithin, type JoinableCurve } from '../geometry/path-endpoint-join';
+import type { JoinableCurve } from '../geometry/path-endpoint-join';
 import { compilationPolylines } from '../job/compilation-polylines';
 import { vectorPowerReachesController } from '../job/job-start-power';
+import { openOutlines } from '../job/laser-lead-open-gaps';
 import { OPEN_OUTLINE_GAP_MM } from '../job/laser-lead-open-outlines';
 import { laserLeadSpecFor } from '../job/laser-lead-settings';
 import {
@@ -42,6 +49,9 @@ type OperationLines = {
   leads: boolean;
   outlines: number;
   holdsShapes: boolean;
+  holdsKerfShapes: boolean;
+  /** The widest gap an outline is left open by; 0 when every one's ends meet. */
+  gapMm: number;
 };
 
 /** An open path, with the settings its artwork runs it with. Only paths
@@ -58,24 +68,28 @@ type Collected = {
   readonly operations: Map<string, OperationLines>;
   /** One point of every closed Line contour, for what an outline holds. */
   readonly probes: Vec2[];
+  /** One point of every closed Line contour cut with a kerf offset. */
+  readonly kerfProbes: Vec2[];
 };
+
+type Holds = { readonly shapes: boolean; readonly kerfShapes: boolean };
 
 export function lineOpenOutlineIssues(project: Project): ReadonlyArray<PreflightIssue> {
   const collected = collectLines(project);
   if (collected.sources.length === 0) return [];
   const { insideFirst, travelPolicy } = project.optimization;
   const ordersInsideFirst = insideFirst && travelPolicy !== 'source-order';
-  const joined = joinCurveEndpointsWithin(collected.sources, OPEN_OUTLINE_GAP_MM);
-  for (const [index, curve] of joined.replacements) {
-    const source = collected.sources[index];
+  for (const outline of openOutlines(collected.sources, OPEN_OUTLINE_GAP_MM)) {
+    const source = collected.sources[outline.index];
     const operation =
       source === undefined ? undefined : collected.operations.get(source.operationId);
-    if (curve === null || !curve.closed || source === undefined || operation === undefined)
-      continue;
-    const outline = [curve.start, ...curve.segments.map((segment) => segment.to)];
-    const holds =
-      ordersInsideFirst && collected.probes.some((probe) => pointInPolygon(probe, outline));
-    tallyOutline(operation, source, holds);
+    if (source === undefined || operation === undefined) continue;
+    const inside = (probe: Vec2) => pointInPolygon(probe, outline.points);
+    const holds = {
+      shapes: ordersInsideFirst && collected.probes.some(inside),
+      kerfShapes: collected.kerfProbes.some(inside),
+    };
+    tallyOutline(operation, source, holds, outline.gapMm);
   }
   return [...collected.operations.values()].flatMap((operation) => {
     const issue = outlineIssue(operation);
@@ -83,17 +97,25 @@ export function lineOpenOutlineIssues(project: Project): ReadonlyArray<Preflight
   });
 }
 
-// An outline counts only when one of its own settings needs it closed.
-function tallyOutline(operation: OperationLines, source: Source, holdsShapes: boolean): void {
-  if (!source.kerf && !source.leads && !holdsShapes) return;
+// An outline counts only when one of its own settings, or a shape inside it,
+// needs it closed.
+function tallyOutline(
+  operation: OperationLines,
+  source: Source,
+  holds: Holds,
+  gapMm: number,
+): void {
+  if (!source.kerf && !source.leads && !holds.shapes && !holds.kerfShapes) return;
   operation.outlines += 1;
   operation.kerf ||= source.kerf;
   operation.leads ||= source.leads;
-  operation.holdsShapes ||= holdsShapes;
+  operation.holdsShapes ||= holds.shapes;
+  operation.holdsKerfShapes ||= holds.kerfShapes;
+  operation.gapMm = Math.max(operation.gapMm, gapMm);
 }
 
 function collectLines(project: Project): Collected {
-  const collected: Collected = { sources: [], operations: new Map(), probes: [] };
+  const collected: Collected = { sources: [], operations: new Map(), probes: [], kerfProbes: [] };
   for (const layer of project.scene.layers) {
     for (const operation of outputOperationLayers(layer)) {
       for (const object of project.scene.objects)
@@ -114,14 +136,17 @@ function collectObject(
   if (effective.mode !== 'line') return;
   const power = effectiveObjectPowerPercent(effective, object);
   if (!vectorPowerReachesController(power, project.device)) return;
+  const kerf = effective.kerfOffsetMm !== 0;
   for (const path of object.paths) {
     if (!pathUsesOperation(object, path, operation)) continue;
-    collected.probes.push(...closedStarts(path, object));
+    const starts = closedStarts(path, object);
+    collected.probes.push(...starts);
+    if (kerf) collected.kerfProbes.push(...starts);
     if (!subpaths(path).some((subpath) => !subpath.closed)) continue;
     operationLines(collected, operation);
     const settings = {
       operationId: operation.id,
-      kerf: effective.kerfOffsetMm !== 0,
+      kerf,
       leads: laserLeadSpecFor(effective) !== null,
     };
     collectOpenLines(collected, settings, path, object);
@@ -152,6 +177,8 @@ function operationLines(collected: Collected, operation: Layer): OperationLines 
     leads: false,
     outlines: 0,
     holdsShapes: false,
+    holdsKerfShapes: false,
+    gapMm: 0,
   };
   collected.operations.set(operation.id, created);
   return created;
@@ -174,21 +201,35 @@ function closedStarts(path: ColoredPath, object: SceneObject): Vec2[] {
 
 function outlineIssue(operation: OperationLines): PreflightIssue | null {
   if (operation.outlines === 0) return null;
-  const effects = [
-    ...(operation.kerf ? ['no kerf offset'] : []),
-    ...(operation.leads ? ['no lead-in or lead-out'] : []),
-    ...(operation.holdsShapes ? ['the shapes inside are not cut first'] : []),
-  ];
-  if (effects.length === 0) return null;
   const one = operation.outlines === 1;
+  const effects = outlineEffects(operation, one);
+  if (effects.length === 0) return null;
+  const gapMm = Math.max(OPEN_OUTLINE_GAP_MM, roundedUp(operation.gapMm));
+  const ends = operation.gapMm === 0 ? 'meet' : `stop up to ${roundedUp(operation.gapMm)} mm apart`;
   return {
     code: 'line-open-outline',
     message:
       `Layer "${operation.name}": ${operation.outlines} outline${one ? ' is' : 's are'} drawn as ` +
-      `open paths whose ends meet, so ${one ? 'it is' : 'they are'} cut as open lines: ` +
+      `open paths whose ends ${ends}, so ${one ? 'it is' : 'they are'} cut as open lines: ` +
       `${listed(effects)}. Select ${one ? 'it' : 'them'} and use Tools > Join paths ` +
-      `(gap up to ${OPEN_OUTLINE_GAP_MM} mm) to close ${one ? 'it' : 'them'}.`,
+      `(gap up to ${gapMm} mm) to close ${one ? 'it' : 'them'}.`,
   };
+}
+
+function outlineEffects(operation: OperationLines, one: boolean): string[] {
+  return [
+    ...(operation.kerf ? ['no kerf offset'] : []),
+    ...(operation.leads ? ['no lead-in or lead-out'] : []),
+    ...(operation.holdsKerfShapes
+      ? [`the shapes inside are kerf-offset as if ${one ? 'it' : 'they'} did not hold them`]
+      : []),
+    ...(operation.holdsShapes ? ['the shapes inside are not cut first'] : []),
+  ];
+}
+
+/** Up to the next 0.1 mm, so Join paths at that gap bridges it. */
+function roundedUp(mm: number): number {
+  return Math.ceil(mm * 10 - 1e-9) / 10;
 }
 
 function listed(items: ReadonlyArray<string>): string {

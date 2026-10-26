@@ -180,6 +180,18 @@ describe('4040 contour entry emission (ADR-239)', () => {
     expect(out).not.toContain('F1500 S0');
   });
 
+  // Rolling audit v2 03-P2-6 (ADR-239 Amendment 1): with the bed's position in
+  // program coordinates unknown (ADR-343), no entry is emitted, so the file
+  // must not call one effective.
+  it('says the entry was skipped when the bed position is unknown', () => {
+    const job = { groups: [lineGroup, offsetFillGroup], contourEntryBounds: null };
+    const out = grblStrategy.emit(job, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE);
+
+    expect(out).not.toContain('F1500 S0');
+    expect(out).not.toContain('effective laser-off feed');
+    expect(out.match(/contour-entry skipped \(bed position unknown\)/g)).toHaveLength(2);
+  });
+
   it('keeps generic profiles byte-stable: G0 seek, no controlled or entry motion', () => {
     const out = grblStrategy.emit({ groups: [lineGroupWithoutEntry] }, DEFAULT_DEVICE_PROFILE);
 

@@ -10,6 +10,7 @@ import {
 } from '../../core/controllers/grbl/probe';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
+import { markProbeCircuitTested } from './probe-test-touch.test-support';
 import { respondToTestGrblHandshake } from './laser-test-start-helpers';
 
 type FakeConnection = SerialConnection & {
@@ -126,6 +127,7 @@ describe('atomic corner-probe controller transaction', () => {
     await connectWith(connection);
     writes.length = 0;
 
+    markProbeCircuitTested();
     const result = await useLaserStore.getState().probe({
       ...CORNER_REQUEST,
       params: { ...CORNER_REQUEST.params, bitDiameterMm: 100 },
@@ -154,6 +156,7 @@ describe('atomic corner-probe controller transaction', () => {
     await connectWith(connection);
     writes.length = 0;
 
+    markProbeCircuitTested();
     const result = await useLaserStore.getState().probe({
       ...CORNER_REQUEST,
       params: { ...CORNER_REQUEST.params, ...patch },
@@ -177,6 +180,7 @@ describe('atomic corner-probe controller transaction', () => {
       writes.length = 0;
 
       const lines = buildCornerProbeLines(CORNER_REQUEST.params);
+      markProbeCircuitTested();
       const probe = useLaserStore.getState().probe(CORNER_REQUEST);
       await flush();
       let probeIndex = 0;
@@ -218,6 +222,7 @@ describe('atomic corner-probe controller transaction', () => {
     writes.length = 0;
 
     const lines = buildCornerProbeLines(CORNER_REQUEST.params);
+    markProbeCircuitTested();
     const probe = useLaserStore.getState().probe(CORNER_REQUEST);
     await flush();
     // A registration bound to the old origin is stale from the first line on.
@@ -257,6 +262,7 @@ describe('atomic corner-probe controller transaction', () => {
       const parkLine = lines.at(-1);
       if (parkLine === undefined) throw new Error('corner park line missing');
 
+      markProbeCircuitTested();
       const probe = useLaserStore.getState().probe(CORNER_REQUEST);
       await flush();
       const failureLine = failureBoundary === 'combined G10' ? commitLine : parkLine;
@@ -293,6 +299,7 @@ describe('atomic corner-probe controller transaction', () => {
     const commitLine = lines.find((line) => line.startsWith('G10 L20'));
     if (commitLine === undefined) throw new Error('corner commit line missing');
 
+    markProbeCircuitTested();
     const probe = useLaserStore.getState().probe(CORNER_REQUEST);
     await flush();
     for (const line of ['M5', 'M9', ...lines]) {

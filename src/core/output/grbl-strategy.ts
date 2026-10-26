@@ -282,7 +282,7 @@ function emitGroup(group: CutGroup, context: GroupEmissionContext): string {
   const feed = roundedPositiveFeed(group.speed, `Layer ${group.layerId}`);
   const chunks: string[] = [];
   chunks.push(
-    `; layer ${gcodeCommentLabel(group.layerId)} color ${gcodeCommentLabel(group.color)} power ${group.power}% ${feedComment(group, feed)} passes ${group.passes}${contourEntryComment(group.entryRunwayMm)}${overcutComment(group.finalPassOvercutMm)}${leadComment(group.laserLeads)}${tabSpanComment(group.tabSpanPowerPercent)}`,
+    `; layer ${gcodeCommentLabel(group.layerId)} color ${gcodeCommentLabel(group.color)} power ${group.power}% ${feedComment(group, feed)} passes ${group.passes}${contourEntryComment(group.entryRunwayMm, context.entryBounds)}${overcutComment(group.finalPassOvercutMm)}${leadComment(group.laserLeads)}${tabSpanComment(group.tabSpanPowerPercent)}`,
   );
   pushOperationProvenanceComment(chunks, group);
   const segmentContext = { ...context, s, feed, entryRunwayMm: group.entryRunwayMm };
@@ -309,7 +309,7 @@ function emitOffsetFillGroup(group: FillGroup, context: GroupEmissionContext): s
   const feed = roundedPositiveFeed(group.speed, `Layer ${group.layerId}`);
   const chunks: string[] = [];
   chunks.push(
-    `; offset fill layer ${gcodeCommentLabel(group.layerId)} color ${gcodeCommentLabel(group.color)} power ${group.power}% ${feedComment(group, feed)} passes ${group.passes}${contourEntryComment(group.entryRunwayMm)}`,
+    `; offset fill layer ${gcodeCommentLabel(group.layerId)} color ${gcodeCommentLabel(group.color)} power ${group.power}% ${feedComment(group, feed)} passes ${group.passes}${contourEntryComment(group.entryRunwayMm, context.entryBounds)}`,
   );
   pushOperationProvenanceComment(chunks, group);
   const segmentContext = { ...context, s, feed, entryRunwayMm: group.entryRunwayMm };

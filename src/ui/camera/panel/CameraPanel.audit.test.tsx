@@ -171,7 +171,7 @@ it('opens RTSP details and connects the entered URL through a fake bridge before
     probeRtspCamera: probe,
     rtspStreamStatus: async () => ({ kind: 'live' }),
     discoverMachineCamera: async () => ({ kind: 'not-found' }),
-    proxiedFrameUrl: () => 'http://bridge.invalid/frame',
+    registerFrameSource: async () => ({ kind: 'ok', frameUrl: 'http://bridge.invalid/frame' }),
     health: async () => ({ kind: 'ok', ffmpegAvailable: true, frameProxy: true }),
   };
   const host = await mountControl(

@@ -101,6 +101,7 @@ import type { ControllerFirmwareReport } from '../../core/controllers/controller
 import { firmwareReportActions } from './controller-firmware-report-action';
 import { surfaceProbeActions } from './laser-surface-probe-actions';
 import { createLaserStoreRefs } from './laser-store-refs';
+import type { ProbeTestTouch } from './probe-test-touch';
 
 export { describeAutofocusResult, type AutofocusResult } from './autofocus-action';
 export { hasCustomOrigin, hasCustomXyOrigin, type WorkCoordinateOffset } from './origin-actions';
@@ -160,6 +161,9 @@ export type LaserState = LaserStoreActions &
     readonly autofocusBusy: boolean;
     // ADR-103 G2 - a touch-plate probe cycle is mid-flight.
     readonly probeBusy: boolean;
+    /** The probe input seen closed since the last touch-off in this session
+     * (probe-test-touch.ts, ADR-103 Amendment 2); each touch-off uses it up. */
+    readonly probeTestTouch?: ProbeTestTouch | null;
     readonly motionOperation: LaserMotionOperation | null;
     /** Cancel/Abort intent survives the idle gap between a multi-leg manual move. */
     readonly manualMotionCancelEpoch: number;

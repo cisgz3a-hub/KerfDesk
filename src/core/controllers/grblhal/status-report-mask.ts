@@ -10,11 +10,24 @@
 // https://github.com/grblHAL/core/blob/4ec1ae44b857a70d2f9298344feac4b43ed0eb6b/report.c#L1331-L1340
 // https://github.com/grblHAL/core/blob/4ec1ae44b857a70d2f9298344feac4b43ed0eb6b/report.c#L1471-L1507
 // https://github.com/grblHAL/core/blob/4ec1ae44b857a70d2f9298344feac4b43ed0eb6b/config.h#L97
+//
+// A stock-GRBL profile reads `$10` this way too when its `$$` lists grblHAL's
+// `$14`-`$18`. Ortur's ESP32-S2 grblHAL firmware (COMPATIBILITY_LEVEL 1, no
+// KerfDesk preset) greets as "Grbl 1.1f", prints `$10` whole and sends WCO: and
+// Ov: only with bits 5 and 6 (meta audit v1 M3-P3-3, ADR-375 Amendment 5).
+// https://github.com/Ortur-Tech/Ortur_Laser_Firmware_17X-18X/blob/4849ac85fc1f1a15c47d0dbbfc3e69450922ad32/ESPLaserMasterGrbl/main/grbl/settings.h#L331-L338
+// https://github.com/Ortur-Tech/Ortur_Laser_Firmware_17X-18X/blob/4849ac85fc1f1a15c47d0dbbfc3e69450922ad32/ESPLaserMasterGrbl/main/grbl/report.c#L1401-L1412
 
 import type { ControllerCapabilities } from '../controller-capabilities';
 import type { ControllerSettingsSnapshot } from '../grbl/parse-settings';
 
+type StatusReportMaskSettings = Pick<
+  ControllerSettingsSnapshot,
+  'statusReportMask' | 'statusReportMaskIsFull' | 'listsGrblHalSignalSettings'
+>;
+
 const MACHINE_POSITION_BIT = 1 << 0;
+const PIN_STATE_BIT = 1 << 4;
 const WORK_OFFSET_BIT = 1 << 5;
 const OVERRIDES_BIT = 1 << 6;
 
@@ -37,9 +50,9 @@ export type StatusReportFieldsOff = {
  * sends both, is not grblHAL, or the `$$` did not show `$10` whole. */
 export function statusReportFieldsOff(
   capabilities: Pick<ControllerCapabilities, 'statusReportMask'>,
-  settings: Pick<ControllerSettingsSnapshot, 'statusReportMask' | 'statusReportMaskIsFull'> | null,
+  settings: StatusReportMaskSettings | null,
 ): StatusReportFieldsOff | null {
-  if (capabilities.statusReportMask !== 'grblhal-fields') return null;
+  if (!readsGrblHalMask(capabilities, settings)) return null;
   const mask = settings?.statusReportMask;
   if (settings?.statusReportMaskIsFull !== true || mask === undefined) return null;
   const workOffsetOff = (mask & WORK_OFFSET_BIT) === 0;
@@ -52,4 +65,34 @@ export function statusReportFieldsOff(
     machinePositionUnknown: workOffsetOff && (mask & MACHINE_POSITION_BIT) === 0,
     suggestedMask: mask | WORK_OFFSET_BIT | OVERRIDES_BIT,
   };
+}
+
+/** `$10` as reported, and the same with the pin-state bit set. */
+export type PinStateReportOff = { readonly mask: number; readonly suggestedMask: number };
+
+/** Whether this grblHAL's `$10` leaves Pn: out of every report (bit 4 clear),
+ * so a closed probe input can never show; null when it does not, the
+ * controller is not grblHAL, or the `$$` did not show `$10` whole. Pn: is
+ * printed only under `settings.status_report.pin_state`. A stock-GRBL profile
+ * whose `$$` lists grblHAL's `$14`-`$18` reads it too (ADR-375 Amendment 5).
+ * https://github.com/grblHAL/core/blob/4ec1ae44b857a70d2f9298344feac4b43ed0eb6b/report.c#L1409-L1436 */
+export function pinStateReportOff(
+  capabilities: Pick<ControllerCapabilities, 'statusReportMask'>,
+  settings: StatusReportMaskSettings | null,
+): PinStateReportOff | null {
+  if (!readsGrblHalMask(capabilities, settings)) return null;
+  const mask = settings?.statusReportMask;
+  if (settings?.statusReportMaskIsFull !== true || mask === undefined) return null;
+  return (mask & PIN_STATE_BIT) === 0 ? { mask, suggestedMask: mask | PIN_STATE_BIT } : null;
+}
+
+function readsGrblHalMask(
+  capabilities: Pick<ControllerCapabilities, 'statusReportMask'>,
+  settings: StatusReportMaskSettings | null,
+): boolean {
+  if (capabilities.statusReportMask === 'grblhal-fields') return true;
+  return (
+    capabilities.statusReportMask === 'grblhal-fields-if-grblhal-dump' &&
+    settings?.listsGrblHalSignalSettings === true
+  );
 }
