@@ -1,6 +1,8 @@
 ## ADR-375 Amendment 2 - grblHAL's `$10` names the report fields it turns off (2026-10-22)
 
-**Status:** Accepted. | **Date:** 2026-10-22
+**Status:** Accepted; decisions 1 and 2 amended by
+[Amendment 5](ADR-375-amendment-5-grblhal-evidence-under-a-grbl-profile.md) (`$19` is legacy; the
+stock-GRBL driver reads grblHAL's `$10` when its `$$` lists `$14`-`$18`). | **Date:** 2026-10-22
 
 ### Context
 

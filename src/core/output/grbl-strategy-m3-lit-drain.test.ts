@@ -152,7 +152,9 @@ describe('OR-1: M3 output never drains the planner with the beam lit', () => {
       DEFAULT_DEVICE_PROFILE,
     );
     expect(findM3LitPlannerDrains(out)).toEqual([]);
-    expect(out).toMatch(/; feed 3000 mm\/min[^\n]*\nG0X26Y30\.5S0\nM5\nM4 S0\nG1X31F3000\n/);
+    expect(out).toMatch(
+      /; feed 3000 mm\/min[^\n]*\nG0X26Y30\.5S0\nM5\nM4 S0\nG1X31F3000 ; kerfdesk:laser-off-motion\n/,
+    );
   });
 
   it('grbl-compatible raster ending on a burn, then a cut: the closing M5 waits for the seek', () => {

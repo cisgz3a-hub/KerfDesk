@@ -5,6 +5,7 @@ import type { StatusReport } from '../../core/controllers/grbl';
 import type { ProbeRequest } from '../../core/controllers/grbl/probe';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
+import { markProbeCircuitTested } from '../state/probe-test-touch.test-support';
 import { ProbeControls } from './ProbeControls';
 
 (
@@ -50,6 +51,7 @@ describe('ProbeControls corner geometry', () => {
       statusReport: idleStatus(),
       probe,
     } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    markProbeCircuitTested();
     const { host, root } = await renderControls();
     try {
       const mode = host.querySelector<HTMLSelectElement>('select[aria-label="Probe mode"]');
@@ -127,6 +129,7 @@ describe('ProbeControls corner geometry', () => {
       connection: { kind: 'connected' },
       statusReport: idleStatus(),
     } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    markProbeCircuitTested();
     const { host, root } = await renderControls();
     try {
       const mode = host.querySelector<HTMLSelectElement>('select[aria-label="Probe mode"]');

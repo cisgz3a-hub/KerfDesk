@@ -14,6 +14,9 @@ describe('RTSP preview session lifecycle', () => {
 
     expect(id).toBe('session-a');
     expect(sessions.status(id)).toEqual({ kind: 'starting' });
+    // The stream request names its camera by the session alone (audit v2 04-P2-1).
+    expect(sessions.sourceUrl(id)).toBe('rtsp://192.168.1.20/live');
+    expect(sessions.sourceUrl('session-b')).toBeUndefined();
     expect(sessions.claim(id, 'rtsp://192.168.1.21/live')).toBeNull();
 
     const lifecycle = sessions.claim(id, 'rtsp://192.168.1.20/live');

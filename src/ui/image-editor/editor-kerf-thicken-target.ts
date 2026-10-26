@@ -2,6 +2,7 @@ import type { SelectionMask } from '../../core/image-select';
 import { effectiveOperationForObject } from '../../core/effective-output';
 import type { DeviceProfile } from '../../core/devices';
 import { imageScanPassRuns } from '../../core/job/scan-pass-angles';
+import { burnGridSharpen } from '../../core/raster/luma-sharpen';
 import type { Layer, RasterImage } from '../../core/scene';
 import { editorHorizontalMaskRepair } from './editor-horizontal-mask-repair';
 import type { RasterKerfGroupFacts } from './editor-kerf-output-parity';
@@ -149,8 +150,12 @@ function isDeterministicBlackDither(algorithm: Layer['ditherAlgorithm']): boolea
   return algorithm === 'threshold' || algorithm === 'grayscale';
 }
 
+// ADR-671 sharpening rewrites burn-grid pixels too, so it is not an identity.
 function hasIdentityLumaAdjustments(object: RasterImage): boolean {
   return (
-    (object.brightness ?? 0) === 0 && (object.contrast ?? 0) === 0 && (object.gamma ?? 1) === 1
+    (object.brightness ?? 0) === 0 &&
+    (object.contrast ?? 0) === 0 &&
+    (object.gamma ?? 1) === 1 &&
+    burnGridSharpen(object, false) === null
   );
 }

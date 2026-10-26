@@ -66,5 +66,13 @@ export function savedCameraModel(capture?: CameraCaptureBinding): CameraModelRec
       targetHeightMm: 3,
     },
     calibratedAt: '2026-09-26T12:00:00.000Z',
+    // Fitted on the default machine's front-left 400 × 400 bed (ADR-440 Amendment 1).
+    bedFrame: { origin: 'front-left', bedWidthMm: 400, bedHeightMm: 400 },
   };
+}
+
+/** {@link savedCameraModel} as KerfDesk 1.0.21 and older saved it, with no bed frame. */
+export function unframedCameraModel(capture?: CameraCaptureBinding): CameraModelRecord {
+  const { bedFrame: _unrecorded, ...older } = savedCameraModel(capture);
+  return older;
 }

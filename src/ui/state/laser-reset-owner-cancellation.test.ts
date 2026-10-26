@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProbeRequest } from '../../core/controllers/grbl/probe';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
+import { markProbeCircuitTested } from './probe-test-touch.test-support';
 import { initialLaserState } from './laser-store-helpers';
 import { framedRunCandidate } from './laser-store-motion-operation.test-support';
 
@@ -299,6 +300,7 @@ describe('Abort preserves its reset owner against stale lifecycle callbacks', ()
       const f = await connect();
       expect(useLaserStore.getState().controllerQualification.kind).toBe('qualified');
       f.controls.rejectProbe = true;
+      markProbeCircuitTested();
       const probe = useLaserStore.getState().probe(Z_REQUEST);
       await flush();
       expect(useLaserStore.getState()).toMatchObject({

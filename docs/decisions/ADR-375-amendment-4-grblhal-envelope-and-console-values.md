@@ -1,6 +1,9 @@
 ## ADR-375 Amendment 4 - grblHAL's jog envelope, and Console setting values grblHAL stores differently (2026-10-22)
 
-**Status:** Accepted. | **Date:** 2026-10-22
+**Status:** Accepted; decisions 3 and 4 amended by
+[Amendment 5](ADR-375-amendment-5-grblhal-evidence-under-a-grbl-profile.md) (the grblHAL value
+check also applies on a stock-GRBL profile whose controller shows grblHAL; the re-read reports a
+value stored in part on every driver). | **Date:** 2026-10-22
 
 Amends ADR-375 decisions 3 and 9, after controller audit v2 (2026-10-22) findings C3-P2-1, C3-P2-2
 and C4-P2-1. Sources are grblHAL core at `d7aaee3d`, the commit ADR-375 pins, and master `62f25d4`

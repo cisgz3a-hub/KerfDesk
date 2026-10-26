@@ -70,6 +70,7 @@ beforeEach(() => {
             imageHeight: 8,
           },
           pose: lookAt([4, 4, -20], [4, 4.001, 0]),
+          bedFrame: { origin: project.device.origin, bedWidthMm: 8, bedHeightMm: 8 },
         },
       },
     },
@@ -105,6 +106,26 @@ it('toggles the actual overlay, freezes a frame, returns to Live and exits place
     confirmedPositionEpoch: null,
   });
   expect(useStore.getState().jobPlacement).toEqual({ startFrom: 'user-origin', anchor: 'center' });
+});
+
+it('holds back a calibration saved without its bed frame until the bed is confirmed (ADR-440 Amd 4)', async () => {
+  const { project } = useStore.getState();
+  const saved = project.device.cameraModel;
+  if (saved === undefined) throw new Error('fixture has a camera model');
+  const { bedFrame: _unrecorded, ...older } = saved;
+  useStore.setState({ project: { ...project, device: { ...project.device, cameraModel: older } } });
+  camera.setState({ sourceState: { kind: 'live', source } });
+  const host = await mountControl(<OverlayControls />);
+  expect(host.textContent).toContain('before KerfDesk recorded the bed it was calibrated on');
+  expect(host.textContent).toContain('the bed at 8 × 8 mm');
+  expect(host.textContent).not.toContain('Show on canvas');
+  await clickControl(host, 'Confirm bed and origin');
+  expect(useStore.getState().project.device.cameraModel).toEqual({
+    ...older,
+    bedFrame: { origin: project.device.origin, bedWidthMm: 8, bedHeightMm: 8 },
+  });
+  expect(host.textContent).not.toContain('before KerfDesk recorded');
+  expect(showOnCanvas(host).checked).toBe(false);
 });
 
 function showOnCanvas(host: HTMLElement): HTMLInputElement {

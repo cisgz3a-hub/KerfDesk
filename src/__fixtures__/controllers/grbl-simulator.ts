@@ -100,6 +100,8 @@ export type GrblSimulator = {
   readonly yankCable: () => void;
   /** Open or close a safety-door input switch. */
   readonly setDoorInput: (open: boolean) => void;
+  /** Close (plate touching the bit) or open the probe input. */
+  readonly setProbeInput: (closed: boolean) => void;
   /** RX ring occupancy, peak, and dropped bytes. Inert unless `plannerBlocks` is set. */
   readonly rxWindow: () => GrblSimRxWindow;
   /** Planner occupancy and any withheld ack. Inert unless `plannerBlocks` is set. */
@@ -287,6 +289,7 @@ export function createGrblSimulator(options: CreateGrblSimulatorOptions = {}): G
     },
     yankCable: () => port.emitClose(),
     setDoorInput: (open) => dispatch({ kind: 'door-input', open }),
+    setProbeInput: (closed) => dispatch({ kind: 'probe-input', closed }),
     rxWindow: () => backpressure?.rxWindow() ?? inertRxWindow,
     planner: () => backpressure?.planner() ?? inertPlanner,
   };

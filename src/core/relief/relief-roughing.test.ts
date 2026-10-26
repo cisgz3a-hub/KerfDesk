@@ -64,6 +64,22 @@ function pyramidRelief(): MeshReliefObject {
   };
 }
 
+// The pyramid on a plate at its base height, `plateMm` wider all round.
+function pyramidOnPlate(plateMm: number): MeshReliefObject {
+  const pyramid = pyramidRelief();
+  const size = 20 + 2 * plateMm;
+  const shifted = pyramid.reliefSource.meshPositions.map((value, index) =>
+    index % 3 === 2 ? value : value + plateMm,
+  );
+  const plate = [0, 0, 0, size, 0, 0, size, size, 0, 0, 0, 0, size, size, 0, 0, size, 0];
+  return {
+    ...pyramid,
+    targetWidthMm: size,
+    reliefSource: { ...pyramid.reliefSource, meshPositions: [...shifted, ...plate] },
+    bounds: { minX: 0, minY: 0, maxX: size, maxY: size },
+  };
+}
+
 function heightmapOf(relief: MeshReliefObject): ReturnType<typeof meshToHeightmap> {
   return meshToHeightmap(
     { positions: Float32Array.from(relief.reliefSource.meshPositions) },
@@ -183,9 +199,11 @@ describe('reliefRoughingPasses', () => {
   });
 
   it('cuts each level from the inside out, outer boundaries positive and islands negative', () => {
-    // The integrated 3D allowance leaves four separate inner corner pieces
-    // on this level, then the outer boundary and its island (ADRs 412/427).
-    const result = heightmapOf(pyramidRelief());
+    // The pyramid stands on a plate 4 mm wider all round, so the level's
+    // annulus lies inside the relief's footprint (ADR-412 Amendment 2). The
+    // integrated 3D allowance leaves four separate inner corner pieces on
+    // this level, then two rings round the pyramid (ADRs 412/427).
+    const result = heightmapOf(pyramidOnPlate(4));
     if (result.kind !== 'ok') throw new Error(result.reason);
     const passes = reliefRoughingPasses(result.heightmap, {
       tool: FLAT_TOOL,
@@ -196,13 +214,18 @@ describe('reliefRoughingPasses', () => {
     const areas = passes
       .filter((pass): pass is CncContourPass => pass.kind === 'contour' && pass.zMm === -1.5)
       .map((pass) => signedAreaMm2(pass.polyline));
-    const outers = areas.filter((area) => area > 0);
-    const islands = areas.filter((area) => area < 0);
-    expect(outers).toHaveLength(5);
-    expect(islands).toHaveLength(1);
-    // All four inner pieces precede the boundary and its opposite-wound hole.
-    for (const inner of outers.slice(0, -1)) expect(inner).toBeLessThan(outers[4] ?? 0);
-    expect(areas.slice(-2)).toEqual([outers[4], islands[0]]);
+    expect(areas.filter((area) => area > 0)).toHaveLength(6);
+    expect(areas.filter((area) => area < 0)).toHaveLength(2);
+    // All four inner pieces precede the rings, which run inside out: each
+    // boundary, then its opposite-wound hole, the inner ring first.
+    const [inner = 0, innerHole = 0, outer = 0, outerHole = 0] = areas.slice(4);
+    for (const piece of areas.slice(0, 4)) {
+      expect(piece).toBeGreaterThan(0);
+      expect(piece).toBeLessThan(inner);
+    }
+    expect(innerHole).toBeLessThan(0);
+    expect(outerHole).toBeLessThan(0);
+    expect(inner).toBeLessThan(outer);
   });
 
   it('is deterministic', () => {
@@ -264,13 +287,23 @@ describe('relief roughing — compile pipeline', () => {
     if (group?.kind !== 'cnc') throw new Error('expected cnc group');
     expect(group.cutType).toBe('relief-rough');
     expect(group.passes.length).toBeGreaterThan(0);
-    const toolRadiusMm = 3.175 / 2;
-    expect(computeJobBounds(job, device)).toEqual({
-      minX: -toolRadiusMm,
-      minY: device.bedHeight - 20 - toolRadiusMm,
-      maxX: 20 + toolRadiusMm,
-      maxY: device.bedHeight + toolRadiusMm,
-    });
+    // ADR-412 Amendment 2: the cutter stays inside the relief's 20 mm
+    // footprint, at most the 0.5 mm allowance plus the contour clearance and
+    // half a 0.397 mm roughing cell off each edge. It used to reach a whole
+    // radius past it.
+    const bounds = computeJobBounds(job, device);
+    if (bounds === null) throw new Error('expected job bounds');
+    const cellMm = 3.175 / 8;
+    const gaps = [
+      bounds.minX,
+      20 - bounds.maxX,
+      bounds.minY - (device.bedHeight - 20),
+      device.bedHeight - bounds.maxY,
+    ];
+    for (const gap of gaps) {
+      expect(gap).toBeGreaterThan(0);
+      expect(gap).toBeLessThanOrEqual(0.5 + (Math.sqrt(10) / 4 + 0.5) * cellMm + 0.01);
+    }
 
     const gcode = cncGrblStrategy.emit(job, device);
     expect(findPlungedTravelIssues(gcode, { safeZMm: group.safeZMm })).toEqual([]);

@@ -4,6 +4,7 @@
 
 import type { DeviceProfile, GrblGcodeDialect } from '../devices';
 import type { CutGroup, FillGroup } from '../job';
+import type { ContourEntryBounds } from '../job/contour-entry';
 import { formatGcodeCoordinateMm } from '../gcode';
 import { effectiveGcodeFeedMmPerMin, formatGcodeFeedMmPerMin } from '../gcode/feed-word';
 import { INTENTIONAL_LASER_OFF_MOTION_COMMENT } from '../gcode-comments';
@@ -65,9 +66,15 @@ export function feedComment(group: CutGroup | FillGroup, effectiveFeed: number):
     : `speed ${effectiveFeed} mm/min effective (requested ${group.requestedSpeed} mm/min)`;
 }
 
-export function contourEntryComment(entryRunwayMm: number | undefined): string {
-  return entryRunwayMm === undefined
-    ? ''
+// ADR-239 Amendment 1: with no bed envelope (ADR-343) no entry is emitted, so
+// the comment says it was skipped instead of calling it effective.
+export function contourEntryComment(
+  entryRunwayMm: number | undefined,
+  entryBounds: ContourEntryBounds,
+): string {
+  if (entryRunwayMm === undefined) return '';
+  return entryBounds === null
+    ? ' contour-entry skipped (bed position unknown)'
     : ` contour-entry ${formatGcodeCoordinateMm(entryRunwayMm)} mm effective laser-off feed`;
 }
 

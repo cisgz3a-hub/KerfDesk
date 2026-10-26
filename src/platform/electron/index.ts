@@ -8,3 +8,4 @@ export { createDesktopWindowCommands } from './desktop-window';
 export { createDesktopSerialAdapter } from './desktop-serial';
 export { createDesktopMachineNetwork } from './desktop-machine-network';
 export { createDesktopAiAssistant } from './desktop-ai';
+export { desktopCameraBridgeConnection } from './desktop-camera-bridge';

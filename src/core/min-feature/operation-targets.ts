@@ -239,7 +239,9 @@ function cncTarget(
     cutType: settings.cutType,
     toolName: tool.name,
     ...(wallDiameterMm < tool.diameterMm ? { cutDepthMm: settings.depthMm } : {}),
-    request: { thresholdMm: wallDiameterMm, ...sides },
+    // A bit drops a closed shape it cannot enter whole, however small, so no
+    // such shape is a speck (ADR-433 Amendment 3).
+    request: { thresholdMm: wallDiameterMm, ...sides, wholeShapes: true },
     paths,
   };
 }

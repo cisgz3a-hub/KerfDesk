@@ -68,6 +68,13 @@ export class FeatureSides {
     return onInterior ? enclosed === 0 : enclosed === 1;
   }
 
+  /** True when the region just inside closed path `path` is material; null
+   * when the work budget ran out. */
+  interiorIsMaterial(path: number): boolean | null {
+    const enclosed = this.enclosureParity(path);
+    return enclosed === null ? null : enclosed === 0;
+  }
+
   private sideSine(
     piece: number,
     fromX: number,

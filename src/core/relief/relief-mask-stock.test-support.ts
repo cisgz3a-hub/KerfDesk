@@ -1,5 +1,6 @@
 // Test support (ADR-484): excluded stock checked one excluded cell at a time,
-// and random masked maps.
+// with the stock past the map's edge (ADR-412 Amendment 2), and random masked
+// maps.
 import fc from 'fast-check';
 import { CNC_MASK_EMISSION_Z_CLEARANCE_MM } from '../cnc/precision';
 import { partialCellEnd, partialCellStart } from '../grid';
@@ -13,8 +14,44 @@ export const TOOLS: ReadonlyArray<CncTool> = [
   { id: 'v', name: 'v-bit', kind: 'v-bit', diameterMm: 6, tipAngleDeg: 60 },
 ];
 
-// Every excluded cell's whole physical rectangle, checked one by one.
+// Every excluded cell's whole physical rectangle, checked one by one, and the
+// stock past the map's edge (ADR-412 Amendment 2).
 export function bruteForceTip(
+  map: Heightmap,
+  tool: CncTool,
+  clearanceMm: number,
+  x: number,
+  y: number,
+): number {
+  return Math.max(
+    bruteForceExcludedTip(map, tool, clearanceMm, x, y),
+    bruteForceOutsideTip(map, tool, clearanceMm, x, y),
+  );
+}
+
+// The four half-planes past the map's sides, each checked on its own. Their
+// requirement stops at the stock top.
+function bruteForceOutsideTip(
+  map: Heightmap,
+  tool: CncTool,
+  clearanceMm: number,
+  x: number,
+  y: number,
+): number {
+  const radiusMm = tool.diameterMm / 2;
+  let best = Number.NEGATIVE_INFINITY;
+  for (const gapMm of [x, map.widthMm - x, y, map.heightMm - y]) {
+    const distanceMm = Math.max(0, Math.max(0, gapMm) - clearanceMm);
+    if (distanceMm > radiusMm + 1e-9) continue;
+    best = Math.max(
+      best,
+      Math.min(0, CNC_MASK_EMISSION_Z_CLEARANCE_MM - cuttingSurfaceDz(tool, distanceMm, radiusMm)),
+    );
+  }
+  return best;
+}
+
+function bruteForceExcludedTip(
   map: Heightmap,
   tool: CncTool,
   clearanceMm: number,
