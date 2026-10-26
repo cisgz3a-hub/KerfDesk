@@ -56,6 +56,7 @@ import { JointResizeDialogHost } from './JointResizeDialogHost';
 import { StampPreparationDialogHost } from './StampPreparationDialogHost';
 import { AiAssistantDialogHost } from '../ai/AiAssistantDialog';
 import { FocusTestDialog } from '../calibration/FocusTestDialog';
+import { ToneCalibrationDialogHost } from '../calibration/ToneCalibrationDialogHost';
 
 type SettingsDialogKind =
   | 'optimization'
@@ -183,6 +184,7 @@ function StoreOpenedDialogs(): JSX.Element {
       <SettingsWindowHost />
       <AiAssistantDialogHost />
       <PhotoEngravingDialogHost />
+      <ToneCalibrationDialogHost />
       <LicenseNoticeHost />
     </>
   );
