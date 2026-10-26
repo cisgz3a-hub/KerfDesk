@@ -6,8 +6,11 @@
 //
 // Alt/Option+arrow is not a nudge: it aligns the selection (arrange-shortcuts.ts),
 // as in LightBurn. Ctrl/Cmd+Shift+arrow stays unbound. Windows AltGr arrives
-// as Ctrl+Alt, so it never nudges either.
+// as Ctrl+Alt, so it never nudges either. An arrow key that a focused tab strip,
+// slider, radio group, list or menu answers itself does not nudge as well; from
+// a plain button it still does (ADR-493).
 
+import { isArrowKeyWidgetEvent } from '../common/keyboard-targets';
 import { DEFAULT_NUDGE_STEPS, type NudgeSteps } from '../state/nudge-preferences';
 
 type ModifierState = Pick<KeyboardEvent, 'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey'>;
@@ -28,7 +31,11 @@ const ARROW_DELTAS: Readonly<Record<string, { dx: number; dy: number }>> = {
 
 type NudgeCtx = {
   readonly selectedPathNode: unknown;
-  readonly nudgeSelection: (dx: number, dy: number) => void;
+  readonly nudgeSelection: (
+    dx: number,
+    dy: number,
+    options: { readonly heldRepeat: boolean },
+  ) => void;
   readonly nudgeSelectedPathNode: (dx: number, dy: number) => void;
   readonly nudgeSteps?: NudgeSteps;
 };
@@ -37,10 +44,11 @@ type NudgeCtx = {
 export function tryNudge(e: KeyboardEvent, ctx: NudgeCtx): boolean {
   const arrow = ARROW_DELTAS[e.key];
   if (arrow === undefined) return false;
+  if (isArrowKeyWidgetEvent(e)) return false;
   const step = nudgeStepMm(e, ctx.nudgeSteps ?? DEFAULT_NUDGE_STEPS);
   if (step === null) return false;
   e.preventDefault();
   if (ctx.selectedPathNode !== null) ctx.nudgeSelectedPathNode(arrow.dx * step, arrow.dy * step);
-  else ctx.nudgeSelection(arrow.dx * step, arrow.dy * step);
+  else ctx.nudgeSelection(arrow.dx * step, arrow.dy * step, { heldRepeat: e.repeat });
   return true;
 }

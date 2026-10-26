@@ -1,14 +1,19 @@
 import type { ControllerSettingsSnapshot as GrblControllerSettingsSnapshot } from '../controllers/grbl';
+import { laserPowerRangeIsEmpty, reportedMaxPowerS } from '../controllers/grbl/parse-settings';
+import type { ControllerKind } from '../devices';
 import type { Project } from '../scene';
 import {
   CNC_LASER_MODE_ENABLED_MESSAGE,
   FLUIDNC_CNC_LASER_MODE_ENABLED_MESSAGE,
   laserMaxPowerMismatchMessage,
   laserModeDisabledMessage,
+  laserMinPowerNonzeroMessage,
   laserModeUnverifiedMessage,
+  laserPowerRangeEmptyMessage,
   readinessSettingsSource,
   routerLaserModeMessage,
   spindleScaleMismatchMessage,
+  type PowerRangeFirmware,
   type ReadinessSettingsSource,
 } from './controller-readiness-messages';
 
@@ -29,6 +34,9 @@ export type ControllerReadinessErrorCode =
 
 export type ControllerReadinessWarningCode =
   | 'min-power-nonzero'
+  // $30 at or below $31: no S value sets power. Stock GRBL then fires full
+  // power even at S0 (ADR-567 Amendment 1). A warning, never a refusal.
+  | 'power-range-empty'
   | 'power-scale-unverified'
   | 'laser-mode-unverified'
   // grblHAL's $32 is a three-way mode enum, so a lathe reports $32=2. That is
@@ -55,6 +63,7 @@ export function runControllerReadiness(
   project: Project,
   controller: ControllerSettingsSnapshot | null,
   settingsCapability: ReadinessSettingsCapability = 'grbl-dollar',
+  firmwareKind?: ControllerKind,
 ): ControllerReadinessResult {
   const errors: Array<ControllerReadinessMessage<ControllerReadinessErrorCode>> = [];
   const warnings: Array<ControllerReadinessMessage<ControllerReadinessWarningCode>> = [];
@@ -83,7 +92,9 @@ export function runControllerReadiness(
     // incorrectly. Let the profile assumptions reach Job Review as warnings,
     // matching controllers that expose no settings dump at all. CNC remains
     // strict because unknown $30/$32 changes spindle and plunge semantics.
-    if (cncMachine === null) return laserReadiness(project, {}, 'warn', source);
+    if (cncMachine === null) {
+      return laserReadiness(project, {}, 'warn', source, firmwareKind);
+    }
     errors.push({
       code: 'controller-settings-unknown',
       message:
@@ -115,7 +126,7 @@ export function runControllerReadiness(
   // demotes every error returned here to a Job Review warning (#291), and
   // since #482 the Save/export path states them as advisories rather than
   // refusing, so nothing returned here gates an action on its own.
-  return laserReadiness(project, controller, 'warn', source);
+  return laserReadiness(project, controller, 'warn', source, firmwareKind);
 }
 
 type ReadinessErrors = Array<ControllerReadinessMessage<ControllerReadinessErrorCode>>;
@@ -144,7 +155,8 @@ function cncReadiness(
 ): ControllerReadinessResult {
   const errors: ReadinessErrors = [];
   const warnings: ReadinessWarnings = [];
-  if (controller.maxPowerS === undefined) {
+  const reportedMaxS = reportedMaxPowerS(controller);
+  if (reportedMaxS === undefined) {
     if (absentPolicy === 'error') {
       errors.push({
         code: 'max-power-unknown',
@@ -157,10 +169,10 @@ function cncReadiness(
         message: `The controller's settings dump did not include $30, so the spindle S scale (max RPM ${spindleMaxRpm}) comes from the machine profile and is NOT verified against the firmware. Confirm it before cutting.`,
       });
     }
-  } else if (controller.maxPowerS !== spindleMaxRpm) {
+  } else if (reportedMaxS !== spindleMaxRpm) {
     errors.push({
       code: 'spindle-scale-mismatch',
-      message: spindleScaleMismatchMessage(controller.maxPowerS, spindleMaxRpm, source),
+      message: spindleScaleMismatchMessage(reportedMaxS, spindleMaxRpm, source),
     });
   }
   if (controller.machineMode?.kind === 'lathe') {
@@ -175,6 +187,15 @@ function cncReadiness(
     errors.push({ code: 'laser-mode-enabled', message: routerLaserModeMessage(source) });
   }
   return { ok: errors.length === 0, errors, warnings };
+}
+
+function powerRangeFirmware(
+  source: ReadinessSettingsSource,
+  firmwareKind: ControllerKind | undefined,
+): PowerRangeFirmware {
+  if (source === 'fluidnc-yaml' || firmwareKind === 'fluidnc') return 'fluidnc';
+  if (firmwareKind === 'grblhal') return 'grblhal';
+  return firmwareKind === 'grbl-v1.1' ? 'grbl' : 'unknown';
 }
 
 // A router job with laser mode on or unconfirmed. GRBL's laser mode passes zero
@@ -201,10 +222,14 @@ function laserReadiness(
   controller: ControllerSettingsSnapshot,
   absentPolicy: AbsentSettingPolicy,
   source: ReadinessSettingsSource,
+  firmwareKind: ControllerKind | undefined,
 ): ControllerReadinessResult {
   const errors: ReadinessErrors = [];
   const warnings: ReadinessWarnings = [];
-  if (controller.maxPowerS === undefined) {
+  // A reported $30=0 is evidence, not a missing setting: it has no S range to
+  // apply, so it gets the power-range-empty warning below instead.
+  const reportedMaxS = reportedMaxPowerS(controller);
+  if (reportedMaxS === undefined) {
     if (absentPolicy === 'error') {
       errors.push({
         code: 'max-power-unknown',
@@ -217,7 +242,10 @@ function laserReadiness(
         message: `Controller settings did not confirm $30, so the S power scale (max S ${project.device.maxPowerS}) comes from the device profile and is NOT verified against the firmware. Confirm it before burning at high power.`,
       });
     }
-  } else if (controller.maxPowerS !== project.device.maxPowerS) {
+  } else if (
+    controller.maxPowerS !== undefined &&
+    controller.maxPowerS !== project.device.maxPowerS
+  ) {
     errors.push({
       code: 'max-power-mismatch',
       message: laserMaxPowerMismatchMessage(controller.maxPowerS, project.device.maxPowerS, source),
@@ -240,12 +268,38 @@ function laserReadiness(
     errors.push({ code: 'laser-mode-disabled', message: laserModeDisabledMessage(source) });
   }
 
-  if (controller.minPowerS !== undefined && controller.minPowerS > 0) {
-    warnings.push({
-      code: 'min-power-nonzero',
-      message: `Controller $31 minimum S is ${controller.minPowerS}. Low nonzero power values may burn hotter than expected.`,
-    });
-  }
+  const lowPower = lowPowerWarning(controller, source, firmwareKind);
+  if (lowPower !== null) warnings.push(lowPower);
 
   return { ok: errors.length === 0, errors, warnings };
+}
+
+// $30 at or below $31 is the stronger finding: the range is empty, not merely
+// raised at the bottom, so it replaces the raised-$31 advice.
+function lowPowerWarning(
+  controller: ControllerSettingsSnapshot,
+  source: ReadinessSettingsSource,
+  firmwareKind: ControllerKind | undefined,
+): ControllerReadinessMessage<ControllerReadinessWarningCode> | null {
+  const reportedMaxS = reportedMaxPowerS(controller);
+  if (reportedMaxS !== undefined && laserPowerRangeIsEmpty(controller)) {
+    return {
+      code: 'power-range-empty',
+      message: laserPowerRangeEmptyMessage(
+        reportedMaxS,
+        controller.minPowerS,
+        powerRangeFirmware(source, firmwareKind),
+      ),
+    };
+  }
+  return controller.minPowerS !== undefined && controller.minPowerS > 0
+    ? {
+        code: 'min-power-nonzero',
+        message: laserMinPowerNonzeroMessage(
+          controller.minPowerS,
+          reportedMaxS,
+          powerRangeFirmware(source, firmwareKind),
+        ),
+      }
+    : null;
 }

@@ -69,6 +69,41 @@ describe('controller settings snapshots', () => {
     expect(deserializeControllerSettingsSnapshot(serialized)).toEqual({ kind: 'ok', snapshot });
   });
 
+  it('removes grblHAL passwords from the shareable snapshot (audit C4-P3-7)', () => {
+    const snapshot = createControllerSettingsSnapshot({
+      capturedAt: '2026-07-19T10:20:30.000Z',
+      operatorLabel: 'Shop grblHAL',
+      profile: { profileId: null, name: 'Shop grblHAL' },
+      controllerKinds: { profile: 'grblhal', active: 'grblhal', detected: 'grblhal' },
+      settings: settingsMapToRows(
+        new Map([
+          [74, 'ShopWifi'],
+          [75, 'hunter2 pass'],
+          [77, ''],
+          [330, 'admin123'],
+          [331, '12345678'],
+          [533, 'mqttSecret9'],
+          [110, '6000'],
+        ]),
+      ),
+    });
+
+    const serialized = serializeControllerSettingsSnapshot(snapshot);
+    for (const secret of ['hunter2', 'admin123', '12345678', 'mqttSecret9']) {
+      expect(serialized).not.toContain(secret);
+    }
+    expect(snapshot.settings).toEqual([
+      { id: 74, rawValue: 'ShopWifi' },
+      { id: 75, rawValue: '[password removed]' },
+      { id: 77, rawValue: '' },
+      { id: 110, rawValue: '6000' },
+      { id: 330, rawValue: '[password removed]' },
+      { id: 331, rawValue: '[password removed]' },
+      { id: 533, rawValue: '[password removed]' },
+    ]);
+    expect(deserializeControllerSettingsSnapshot(serialized)).toEqual({ kind: 'ok', snapshot });
+  });
+
   it('reconstructs named rows using current setting metadata without changing raw values', () => {
     const result = deserializeControllerSettingsSnapshot(JSON.stringify(validRawSnapshot()));
     expect(result.kind).toBe('ok');

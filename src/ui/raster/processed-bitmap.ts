@@ -75,7 +75,7 @@ export function buildProcessedRasterBitmap(
           height,
           burnGridKernel(imageDitherAlgorithm(layer)),
         );
-  // Compile's own sharpening (ADR-648), its burn-cell radius kept the same
+  // Compile's own sharpening (ADR-671), its burn-cell radius kept the same
   // size in millimetres on a capped preview grid.
   const sharpen = burnGridSharpen(image, layer.passThrough);
   const burnLuma =

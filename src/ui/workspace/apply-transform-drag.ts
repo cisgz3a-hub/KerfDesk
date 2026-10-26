@@ -10,7 +10,7 @@ import { useToastStore } from '../state/toast-store';
 import { transformUpdatesForMoveDrag, type DragState } from './drag-state';
 import { transformDragWithSnap } from './drag-snap';
 import { rotateSelectionByDrag } from './rotate-handle';
-import { selectionResizeEditFromDrag } from './selection-handles';
+import { resizeEditSetsSize, selectionResizeEditFromDrag } from './selection-handles';
 import type { SnapMarker } from './snap/snap-kinds';
 import type { SnapGuide, SnapSettings } from './snapping';
 
@@ -115,6 +115,8 @@ function applySelectionScaleDrag(args: {
     point: args.point,
     lockAspect: !args.e.shiftKey,
   });
+  // Only the axis of collinear straight lines moved: there is no size to change.
+  if (!resizeEditSetsSize(edit)) return true;
   const result = buildSelectionTransformEdit(objects, edit);
   if (result.kind === 'ok') {
     for (const update of result.transforms) args.setObjectTransform(update.id, update.transform);

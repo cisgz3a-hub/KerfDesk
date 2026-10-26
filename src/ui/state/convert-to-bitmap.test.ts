@@ -16,6 +16,12 @@ import {
   type RasterImage,
 } from '../../core/scene';
 import { applyConvertToBitmap } from './convert-to-bitmap';
+import { validateSceneIntegrity } from '../../io/project/project-scene-integrity-validator';
+import {
+  deserializeProject,
+  prepareProjectForPersistence,
+  serializeProject,
+} from '../../io/project';
 
 const SOURCE_COLOR = '#ff0000';
 const RASTER_COLOR = '#808080';
@@ -247,5 +253,71 @@ describe('applyConvertToBitmap (ADR-029)', () => {
     expect(objects).toHaveLength(before + 1);
     expect(objects.find((o) => o.id === 'src-vec')).toBeDefined();
     expect(objects.filter((o) => o.kind === 'raster-image')).toHaveLength(1);
+  });
+
+  it('removes converted members from design groups without leaving unsaveable references', () => {
+    const base = projectWithVector();
+    const sibling = { ...importedSvgSource(), id: 'src-vec-2' };
+    const other = { ...importedSvgSource(), id: 'other' };
+    const peer = { ...importedSvgSource(), id: 'peer' };
+    const project: Project = {
+      ...base,
+      scene: {
+        ...base.scene,
+        objects: [...base.scene.objects, sibling, other, peer],
+        groups: [
+          { id: 'converted', name: 'Converted pair', objectIds: ['src-vec', 'src-vec-2'] },
+          { id: 'kept', name: 'Other pair', objectIds: ['other', 'peer'] },
+        ],
+      },
+    };
+    const result = applyConvertToBitmap({ project, undoStack: [] }, ['src-vec', 'src-vec-2'], {
+      ...bitmapFor(importedSvgSource()),
+      pixelWidth: 2,
+      pixelHeight: 2,
+      lumaBase64: 'AAAAAA==',
+    });
+    expect(validateSceneIntegrity(result.project.scene)).toBeNull();
+    expect(result.project.scene.groups).toEqual([project.scene.groups![1]]);
+    expect(result.undoStack).toEqual([project]);
+    const staleGroups = {
+      ...result.project,
+      scene: { ...result.project.scene, groups: project.scene.groups! },
+    };
+    expect(prepareProjectForPersistence(staleGroups)).toMatchObject({
+      kind: 'invalid',
+      reason: expect.stringContaining('dangling id'),
+    });
+    expect(deserializeProject(serializeProject(staleGroups)).kind).toBe('invalid');
+    const saved = prepareProjectForPersistence(result.project);
+    expect(saved.kind).toBe('ok');
+    if (saved.kind !== 'ok') return;
+    expect(deserializeProject(saved.json)).toEqual({ kind: 'ok', project: saved.project });
+  });
+
+  it('detaches a deleted conversion source from a surviving image mask', () => {
+    const base = projectWithVector();
+    const masked: RasterImage = {
+      ...bitmapFor(importedSvgSource()),
+      id: 'masked-image',
+      imageMaskId: 'src-vec',
+    };
+    const project: Project = {
+      ...base,
+      scene: {
+        ...base.scene,
+        objects: [...base.scene.objects, masked],
+        layers: [...base.scene.layers, createLayer({ id: RASTER_COLOR, color: RASTER_COLOR })],
+      },
+    };
+    const result = applyConvertToBitmap(
+      { project, undoStack: [] },
+      ['src-vec'],
+      bitmapFor(importedSvgSource()),
+    );
+    expect(result.project.scene.objects.find((object) => object.id === masked.id)).toEqual(
+      expect.not.objectContaining({ imageMaskId: expect.anything() }),
+    );
+    expect(result.undoStack).toEqual([project]);
   });
 });

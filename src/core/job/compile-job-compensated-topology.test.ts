@@ -217,13 +217,26 @@ function regionFor(burn: Burn, regions: readonly Rectangle[]): Rectangle {
   if (region === undefined) throw new Error('Unexpected compensated burn ' + JSON.stringify(burn));
   return region;
 }
+// Inside-first is part by part (ADR-669): every burn of a region finishes
+// before the first burn of any region that encloses it. Regions that do not
+// enclose one another may run in either order.
 function assertInsideFirst(burns: readonly Burn[], regions: readonly Rectangle[]): void {
-  const depths = burns.map((burn) => regionFor(burn, regions).depth);
-  expect(depths.length).toBeGreaterThan(0);
-  expect(depths).toEqual([...depths].sort((a, b) => b - a));
-  expect(new Set(burns.map((burn) => regionFor(burn, regions).id))).toEqual(
-    new Set(regions.map((r) => r.id)),
-  );
+  const ids = burns.map((burn) => regionFor(burn, regions).id);
+  expect(ids.length).toBeGreaterThan(0);
+  const encloses = (outer: Rectangle, inner: Rectangle): boolean =>
+    outer !== inner &&
+    outer.depth < inner.depth &&
+    inner.x >= outer.x &&
+    inner.y >= outer.y &&
+    inner.x + inner.width <= outer.x + outer.width &&
+    inner.y + inner.height <= outer.y + outer.height;
+  for (const outer of regions) {
+    for (const inner of regions) {
+      if (encloses(outer, inner))
+        expect(ids.lastIndexOf(inner.id)).toBeLessThan(ids.indexOf(outer.id));
+    }
+  }
+  expect(new Set(ids)).toEqual(new Set(regions.map((r) => r.id)));
 }
 function assertDistances(
   phase: readonly Burn[],

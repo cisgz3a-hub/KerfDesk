@@ -4,7 +4,7 @@
 // boot, `FIRMWARE_NAME:Marlin ...` from M115, and `X:.. Y:.. Z:..` position
 // lines from M114. Everything maps into the shared ControllerEvent union.
 
-import type { ControllerEvent } from '../controller-event';
+import type { ControllerEvent, MotionRefusal } from '../controller-event';
 import type { StatusReport } from '../grbl/status-parser';
 
 const OK_RE = /^ok\b/i;
@@ -22,6 +22,15 @@ const UNKNOWN_COMMAND_RE = /^echo:\s*Unknown command:\s*"(.*)"\s*$/i;
 // MarlinCore.cpp kill(): SERIAL_ERROR_MSG(STR_ERR_KILLED), then minkill()
 // waits for the RESET button or a power cycle; nothing answers after it.
 const KILLED_RE = /^Error:\s*Printer halted\.?\s*kill\(\) called!?/i;
+// NO_MOTION_BEFORE_HOMING: G0-G3 return early while an axis is unhomed
+// (motion.h L461-L465, G0_G1.cpp L48) after homing_needed_error() echoes
+// MSG_HOME_FIRST "Home %s First" naming every such axis (motion.cpp
+// L1479-L1496, language_en.h L596); gcode.cpp L1122 still answers `ok`.
+const HOME_FIRST_RE = /^echo:\s*Home\s+([A-Z]+)\s+First\s*$/i;
+// STR_ERR_STOPPED (language.h L131): stop() prints it once as an Error:, and a
+// stopped Marlin prints it bare for every G0-G3 it reads (queue.cpp L523-L535),
+// then skips the move (IsRunning() in MOTION_CONDITIONS) and answers `ok`.
+const STOPPED_RE = /^(?:Error:\s*)?Printer stopped due to errors\b/i;
 
 export function classifyMarlinResponse(line: string): ControllerEvent {
   const trimmed = line.trim();
@@ -31,6 +40,7 @@ export function classifyMarlinResponse(line: string): ControllerEvent {
   if (resend !== null) {
     return { kind: 'resend', line: Number.parseInt(resend[1] ?? '0', 10) };
   }
+  if (STOPPED_RE.test(trimmed)) return motionRefusedEvent(trimmed, { reason: 'stopped' });
   if (ERROR_RE.test(trimmed)) return classifyMarlinError(trimmed);
   if (trimmed === 'start' || FIRMWARE_RE.test(trimmed) || /^Marlin\b/.test(trimmed)) {
     return { kind: 'welcome', raw: trimmed };
@@ -43,6 +53,11 @@ function classifyMarlinReport(trimmed: string): ControllerEvent {
   if (report !== null) return { kind: 'status', report };
   const unknownCommand = UNKNOWN_COMMAND_RE.exec(trimmed);
   if (unknownCommand !== null) return unknownCommandEvent(unknownCommand[1] ?? '', trimmed);
+  const homeFirst = HOME_FIRST_RE.exec(trimmed);
+  if (homeFirst !== null) {
+    const axes = (homeFirst[1] ?? '').toUpperCase();
+    return motionRefusedEvent(trimmed, { reason: 'home-first', axes });
+  }
   const echo = ECHO_RE.exec(trimmed);
   if (echo !== null) return { kind: 'message', tag: 'echo', body: echo[1] ?? '' };
   return { kind: 'unknown', raw: trimmed };
@@ -54,6 +69,13 @@ function classifyMarlinError(trimmed: string): ControllerEvent {
   // Serial/checksum errors likewise end with Resend plus ok (queue.cpp).
   // Neither error report retires a line; kill() above never returns.
   return { kind: 'error', code: null, raw: trimmed, acknowledgesLine: false };
+}
+
+// A skipped move rejects the oldest line still owed an answer. That line's own
+// `ok` follows, so the report keeps its acknowledgement debt (ADR-395
+// Amendment 1).
+function motionRefusedEvent(raw: string, motionRefusal: MotionRefusal): ControllerEvent {
+  return { kind: 'error', code: null, raw, acknowledgesLine: false, motionRefusal };
 }
 
 function unknownCommandEvent(command: string, raw: string): ControllerEvent {

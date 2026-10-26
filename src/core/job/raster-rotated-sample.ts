@@ -160,7 +160,7 @@ function sourceAxisCells(input: RotatedRasterSampler): SourceAxisCells {
   };
 }
 
-// ADR-648: a sharpened raster sharpens its sample grid before the mask whitens
+// ADR-671: a sharpened raster sharpens its sample grid before the mask whitens
 // anything, the upright path's order, so a mask edge gains no halo; the mask
 // then applies on that grid. The radius stays in burn cells: on a reduced grid
 // one sample pixel is about one cell, on an unreduced source it is converted.

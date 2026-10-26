@@ -17,13 +17,15 @@ export function EngravingStep(props: {
 }): JSX.Element {
   const current = useLaserStore((s) => s.streamer);
   const setStep = useCameraCalibrationStore((s) => s.setStep);
+  // The nudge fix burns one ring through the same job path (ADR-663 Amendment 2).
+  const nudging = useCameraCalibrationStore((s) => s.mode) === 'nudge';
   const { started } = props;
   const streamer = current === props.earlierJob ? null : current;
 
   useEffect(() => {
     if (!started || streamer === null) return;
     if (streamer.status === 'done') {
-      setStep({ kind: 'photo', status: { kind: 'idle' } });
+      setStep({ kind: nudging ? 'nudge-photo' : 'photo', status: { kind: 'idle' } });
       return;
     }
     if (
@@ -32,17 +34,17 @@ export function EngravingStep(props: {
       streamer.status === 'disconnected'
     ) {
       setStep({
-        kind: 'setup',
-        note: `The target did not finish engraving (${streamer.status}). Fix the cause and engrave again.`,
+        kind: nudging ? 'nudge-setup' : 'setup',
+        note: `The ${nudging ? 'ring' : 'target'} did not finish engraving (${streamer.status}). Fix the cause and engrave again.`,
       });
     }
-  }, [started, streamer, setStep]);
+  }, [started, streamer, setStep, nudging]);
 
   if (!started) {
     return (
       <p style={noteStyle}>
-        Preparing the target job. Review it and confirm in the dialogs that follow; the machine
-        frames the target before it engraves.
+        Preparing the {nudging ? 'ring' : 'target'} job. Review it and confirm in the dialogs that
+        follow; the machine frames the target before it engraves.
       </p>
     );
   }
@@ -52,8 +54,9 @@ export function EngravingStep(props: {
       : '';
   return (
     <p style={noteStyle}>
-      Engraving the target{progress}. Keep clear of the machine and do not move the sheet. The
-      wizard goes on to the photo when the job finishes.
+      Engraving the {nudging ? 'ring' : 'target'}
+      {progress}. Keep clear of the machine and do not move the sheet. The wizard goes on to the
+      photo when the job finishes.
     </p>
   );
 }

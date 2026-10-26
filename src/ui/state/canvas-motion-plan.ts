@@ -1,5 +1,4 @@
 import type { StatusQueryCapability } from '../../core/controllers';
-import { normalizeReportedMPosToMm } from '../../core/controllers/grbl/machine-envelope';
 import { toSceneCoords, type DeviceProfile } from '../../core/devices';
 import {
   rotaryAppliesTo,
@@ -34,12 +33,23 @@ import { registerCanvasExecutablePlan } from './canvas-preview-motion';
 import { registerCanvasProgramSource } from './canvas-program-source';
 import { canvasExecutableSidecarWithinBudget } from './canvas-program-analysis-budget';
 import type { LiveJobTiming } from './live-job-timing';
-import { resolveNativeBedFrame } from './native-bed-frame';
+import {
+  canvasCoordinateFrame,
+  mapControllerPointToScene,
+  normalizedReportPoint,
+  type CanvasCoordinateFrame,
+} from './canvas-coordinate-frame';
 import { framePerimeterForCanvas } from './canvas-frame-perimeter';
 import {
   buildCanvasStartEditingData,
   type CanvasStartEditingData,
 } from './canvas-start-editing-data';
+
+export {
+  artworkToBedShift,
+  canvasCoordinateFrame,
+  mapControllerPointToScene,
+} from './canvas-coordinate-frame';
 
 export type CanvasPlanCapability = 'realtime' | 'settle-only' | 'file-only' | 'unavailable';
 
@@ -49,13 +59,7 @@ export type CanvasMotionPlan = {
   readonly retentionKey: string;
   readonly machineKind: MachineKind;
   readonly device: DeviceProfile;
-  readonly coordinateFrame:
-    | {
-        readonly kind: 'machine';
-        readonly workOffsetMm: MotionPoint;
-        readonly nativeToBedOffsetMm?: Vec2;
-      }
-    | { readonly kind: 'relative'; readonly jobOriginOffset: Vec2 };
+  readonly coordinateFrame: CanvasCoordinateFrame;
   readonly framePerimeter: ReadonlyArray<Vec2>;
   readonly startEditingData?: CanvasStartEditingData;
   readonly jobStart: Vec2 | null;
@@ -342,75 +346,22 @@ export function rebuildCanvasPlanForGcode(
   return resumedPlan;
 }
 
-export function mapControllerPointToScene(
-  point: MotionPoint,
-  plan: Pick<CanvasMotionPlan, 'device' | 'coordinateFrame'>,
-): Vec2 {
-  const frame = plan.coordinateFrame;
-  if (frame.kind === 'relative') {
-    return toSceneCoords(
-      { x: point.x - frame.jobOriginOffset.x, y: point.y - frame.jobOriginOffset.y },
-      plan.device,
-    );
-  }
-  return toSceneCoords(
-    {
-      x: point.x + frame.workOffsetMm.x + (frame.nativeToBedOffsetMm?.x ?? 0),
-      y: point.y + frame.workOffsetMm.y + (frame.nativeToBedOffsetMm?.y ?? 0),
-    },
-    plan.device,
-  );
-}
-
 export function reportedWorkPositionMm(
   machine: Pick<MachineStartSnapshot, 'statusReport' | 'wcoCache' | 'workOriginActive'>,
   reportInches: boolean,
 ): MotionPoint | null {
   const report = machine.statusReport;
   if (report === null) return null;
-  if (report.wPos !== null) return normalized(report.wPos, reportInches);
+  if (report.wPos !== null) return normalizedReportPoint(report.wPos, reportInches);
   if (report.mPos === null) return null;
-  const mPos = normalized(report.mPos, reportInches);
+  const mPos = normalizedReportPoint(report.mPos, reportInches);
   // WCO belongs to the same controller sample as MPos, so prefer it over the
   // intermittent cache. Mixing a fresh MPos with an older cached WCO can move
   // the canvas head by the entire work offset for a single frame.
   const wcoRaw = report.wco ?? machine.wcoCache ?? null;
   if (wcoRaw === null && machine.workOriginActive === true) return null;
-  const wco = wcoRaw === null ? { x: 0, y: 0, z: 0 } : normalized(wcoRaw, reportInches);
+  const wco = wcoRaw === null ? { x: 0, y: 0, z: 0 } : normalizedReportPoint(wcoRaw, reportInches);
   return { x: mPos.x - wco.x, y: mPos.y - wco.y, z: mPos.z - wco.z };
-}
-
-export function canvasCoordinateFrame(
-  prepared: Extract<PreparedOutput, { readonly ok: true }>,
-  machine: MachineStartSnapshot,
-  reportInches: boolean,
-  jobOrigin: JobOriginPlacement | undefined,
-  relativeView: boolean,
-): CanvasMotionPlan['coordinateFrame'] {
-  // A missing physical WCO is exactly the Verified-Origin contract: retain a
-  // truthful artwork-relative view and label that the bed position is unknown.
-  // The same contract covers an origin-anchored start on a machine whose bed
-  // position is unverified (no homing, or not homed this connection): GRBL
-  // still reports a numeric WCO, but MPos is power-on-relative, so drawing
-  // the job-relative program at those "bed" coordinates lands it offset from
-  // the artwork at a physically meaningless position (live repro 2026-07-17).
-  const wcoRaw = machine.statusReport?.wco ?? machine.wcoCache ?? null;
-  const nativeFrame = resolveNativeBedFrame(prepared.project.device, machine);
-  if (
-    relativeView ||
-    jobOrigin?.startFrom === 'verified-origin' ||
-    (machine.workOriginActive === true && wcoRaw === null) ||
-    nativeFrame === null
-  ) {
-    return { kind: 'relative', jobOriginOffset: prepared.jobOriginOffset };
-  }
-  const workOffsetMm = wcoRaw === null ? { x: 0, y: 0, z: 0 } : normalized(wcoRaw, reportInches);
-  return { kind: 'machine', workOffsetMm, nativeToBedOffsetMm: nativeFrame.nativeToBedOffsetMm };
-}
-
-function normalized(point: MotionPoint, reportInches: boolean): MotionPoint {
-  const [x, y, z] = normalizeReportedMPosToMm([point.x, point.y, point.z], reportInches);
-  return { x, y, z };
 }
 
 export function canvasCapability(

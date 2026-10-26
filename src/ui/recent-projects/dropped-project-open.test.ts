@@ -44,7 +44,7 @@ afterEach(() => {
   useStore.setState({ dirty: false });
 });
 
-describe('a project file dropped on the window (ADR-378 Amendment 1)', () => {
+describe('a project file dropped on the window (ADR-378 Amendment 2)', () => {
   it('knows KerfDesk and LightBurn projects by their extension', () => {
     expect(['a.lf2', 'B.LBRN', 'c.lbrn2'].map(isProjectFileName)).toEqual([true, true, true]);
     expect(['a.svg', 'lf2', 'a.lf2.svg', 'a.lbrn3'].map(isProjectFileName)).toEqual([

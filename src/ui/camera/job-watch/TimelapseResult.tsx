@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { timelapseVideoSeconds } from '../../../core/camera/job-watch/timelapse-frames';
 import { usePlatform } from '../../app';
+import { pickPreparedSaveTarget } from '../../app/pick-prepared-save-target';
 import { useToastStore } from '../../state/toast-store';
 import { noteStyle, rowStyle } from '../panel/panel-styles';
 import { useJobWatchStore, type TimelapseView } from './job-watch-store';
@@ -76,20 +77,34 @@ function useSaveVideo(frames: ReadonlyArray<Blob>): {
   const [format] = useState(timelapseVideoFormat);
   const save = async (): Promise<void> => {
     if (format === null) return;
-    const target = await platform.pickFileForSave({
-      suggestedName: `timelapse${format.extension}`,
-      extensions: [format.extension],
-    });
-    if (target === null) return;
+    // The picker empties an existing file as it returns (ADR-656), so the
+    // video is made first; the long encode then asks for a fresh click.
     setSavingFrame(0);
-    const video = await encodeTimelapseVideo(frames, format, setSavingFrame);
-    setSavingFrame(null);
+    // MediaRecorder and captureStream can still throw after isTypeSupported;
+    // a throw then counts as a failed recording and re-enables Save.
+    const video = await encodeTimelapseVideo(frames, format, setSavingFrame)
+      .catch(() => null)
+      .finally(() => setSavingFrame(null));
     if (video === null) {
       pushToast('Could not make the timelapse video.', 'error');
       return;
     }
-    await target.write(video);
-    pushToast('Timelapse video saved.', 'success');
+    try {
+      const target = await pickPreparedSaveTarget(
+        platform,
+        { suggestedName: `timelapse${format.extension}`, extensions: [format.extension] },
+        { title: 'Save timelapse video', message: 'The timelapse video is ready.' },
+      );
+      if (target === null) return;
+      await target.write(video);
+      pushToast('Timelapse video saved.', 'success');
+    } catch (error) {
+      pushToast(
+        'Could not save the timelapse video: ' +
+          (error instanceof Error ? error.message : String(error)),
+        'error',
+      );
+    }
   };
   return {
     save,

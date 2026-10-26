@@ -239,11 +239,16 @@ describe('planner backlog on the recorded cause', () => {
     );
   });
 
-  it('leaves it out where the controller kept running or the stop may not have arrived', () => {
+  it('holds a lost link backlog aside until the reconnect shows a restart (ADR-398 Amendment 3)', () => {
     const lost: LaserSafetyNotice = { kind: 'disconnect-during-job', message: 'USB dropped.' };
-    expect(checkpointInterruption('disconnected', lost, null, backlog)).not.toHaveProperty(
-      'plannerBacklog',
-    );
+    expect(checkpointInterruption('disconnected', lost, null, backlog)).toEqual({
+      kind: 'disconnect',
+      message: 'USB dropped.',
+      plannerBacklogIfRestarted: backlog,
+    });
+  });
+
+  it('leaves it out where the stop may not have arrived', () => {
     const closing = { reason: 'app-closing' as const, streamerEpoch: 2 };
     expect(checkpointInterruption('errored', null, closing, backlog)).not.toHaveProperty(
       'plannerBacklog',

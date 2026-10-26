@@ -7,6 +7,9 @@ import { createKerfDeskMcpServer } from './server.js';
 
 const expectedToolNames = [
   'get_workspace',
+  'get_board',
+  'set_board_photo',
+  'place_on_board',
   'get_machine',
   'get_app_status',
   'list_material_recipes',
@@ -47,6 +50,8 @@ const expectedToolNames = [
   'disconnect_machine',
   'home_machine',
   'set_work_origin',
+  'capture_board_point',
+  'finish_board',
   'pause_job',
   'resume_job',
   'get_camera_snapshot',

@@ -1,4 +1,4 @@
-// Sharpening at engraving resolution (ADR-648) on a real portrait.
+// Sharpening at engraving resolution (ADR-671) on a real portrait.
 //
 // Area resampling (ADR-359) gives each burn cell the exact mean of the source
 // it covers. That box filter keeps tone honest, but it gives up a little of

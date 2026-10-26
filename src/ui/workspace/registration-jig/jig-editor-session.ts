@@ -14,7 +14,8 @@ import { applyCenterArtworkInRegistrationJigSet } from '../../state/registration
 import { applyRemoveRegistrationBox } from '../../state/registration-box-actions';
 import { applyRegistrationOutput } from '../../state/registration-output-actions';
 import { pushUndo } from '../../state/scene-mutations';
-import { rebaseJigDraft, type JigRebaseConflict } from './jig-editor-rebase';
+import { jigSceneConflict, rebaseJigDraft, type JigRebaseConflict } from './jig-editor-rebase';
+import { jigBackgroundIds } from './jig-editor-scope';
 
 export type JigDraft = Pick<
   AppState,
@@ -23,6 +24,8 @@ export type JigDraft = Pick<
 
 export type JigEditorSession = {
   readonly baseProject: Project;
+  /** Main-canvas objects outside the jig: kept in the draft, never shown or selected. */
+  readonly background: ReadonlySet<string>;
   readonly documentEpoch: number;
   readonly firstSave: boolean;
   readonly draft: JigDraft;
@@ -36,10 +39,11 @@ export function createJigEditorSession(state: AppState): JigEditorSession {
   // artwork registered to outlines that no longer match the board, so they stay
   // locked until the operator unlocks them on purpose.
   const burned = registrationRunState(state.project.scene) === 'artwork';
+  // A clean canvas: nothing from the main canvas is selected or shown (ADR-652).
   let draft: JigDraft = {
     project: burned ? lockOutlines(state.project) : editableProject(state.project),
-    selectedObjectId: state.selectedObjectId,
-    additionalSelectedIds: state.additionalSelectedIds,
+    selectedObjectId: null,
+    additionalSelectedIds: new Set(),
     registrationArtworkOutputSnapshot:
       state.project.registrationArtworkOutputSnapshot ?? state.registrationArtworkOutputSnapshot,
   };
@@ -56,16 +60,10 @@ export function createJigEditorSession(state: AppState): JigEditorSession {
       () => crypto.randomUUID(),
     );
     draft = { ...draft, ...created };
-    if (state.selectedObjectId !== null) {
-      draft = {
-        ...draft,
-        selectedObjectId: state.selectedObjectId,
-        additionalSelectedIds: state.additionalSelectedIds,
-      };
-    }
   }
   return {
     baseProject: state.project,
+    background: jigBackgroundIds(state.project.scene),
     documentEpoch: state.projectDocumentEpoch,
     firstSave: boxes.length === 0,
     draft,
@@ -119,7 +117,7 @@ export function selectJigObjects(
   session: JigEditorSession,
   ids: ReadonlySet<string>,
 ): JigEditorSession {
-  const [first, ...rest] = ids;
+  const [first, ...rest] = [...ids].filter((id) => !session.background.has(id));
   return {
     ...session,
     draft: {
@@ -221,11 +219,17 @@ export function commitJigEditorSession(
     draft = { ...draft, ...applyRegistrationOutput({ ...draft, undoStack: [] }, 'box') };
   }
   const project = lockOutlines(draft.project);
+  const conflict = jigSceneConflict(project.scene);
+  if (conflict !== null) return { kind: 'refused', reason: conflict };
   // Publish one edit, never the editor's intermediate history or machine state.
+  // The editor never sees the main canvas's selection (ADR-652), so that selection,
+  // which also scopes Selected artwork only output, comes back as it was.
+  const live = new Set(project.scene.objects.map((object) => object.id));
+  const selected = [...selectedJigIds(state)].filter((id) => live.has(id));
   const change: Partial<AppState> = {
     project,
-    selectedObjectId: draft.selectedObjectId,
-    additionalSelectedIds: draft.additionalSelectedIds,
+    selectedObjectId: selected[0] ?? null,
+    additionalSelectedIds: new Set(selected.slice(1)),
     registrationArtworkOutputSnapshot: project.scene.layers.some(
       (layer) => layer.id === REGISTRATION_LAYER_ID,
     )

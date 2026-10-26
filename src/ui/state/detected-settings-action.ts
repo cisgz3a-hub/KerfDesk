@@ -128,3 +128,23 @@ export function publishCncLiveCaps(settings: ControllerSettingsSnapshot): void {
 export function clearCncLiveCaps(): void {
   useStore.getState().setCncLiveCaps(null);
 }
+
+/** Whether a completed dump has anything for Machine Setup's review lane. */
+export function shouldShowDetectedSettingsReview(detected: DetectedSettingsResult): boolean {
+  if (Object.keys(detected.patch).length > 0) return true;
+  const controller = detected.controllerSettings;
+  if (
+    controller.softLimitsEnabled !== undefined ||
+    controller.hardLimitsEnabled !== undefined ||
+    controller.homingEnabled !== undefined ||
+    controller.homingDirectionMask !== undefined
+  ) {
+    return true;
+  }
+  if (isPositive(controller.zMaxFeed) && isPositive(controller.zTravelMm)) return true;
+  return detected.settingsRows.some((row) => !row.known);
+}
+
+function isPositive(value: number | undefined): boolean {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0;
+}

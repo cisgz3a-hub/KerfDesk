@@ -50,7 +50,7 @@ describe('fitDeterminedLens', () => {
     const fit = fitDeterminedLens([{ points: rings(lens, pose, 60, 340, 0.15) }], {
       ...options,
       distortionTerms: 4,
-      principalPointSigmaPx: 0.08 * lens.imageWidth,
+      principalPointSigmaPx: 0.02 * lens.imageWidth,
     });
     expect(fit.kind).toBe('ok');
     if (fit.kind !== 'ok') return;

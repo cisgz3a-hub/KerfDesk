@@ -1,7 +1,8 @@
-// ADR-415, ADR-494, ADR-492, ADR-495 and ADR-626 operation settings, shared by the operation,
+// ADR-415, ADR-494, ADR-492, ADR-495, ADR-626 and ADR-670 operation settings, shared by the operation,
 // sub-operation and artwork-override validators. All optional: files written
 // before them load as they did.
 
+import { isPhotoToneCurve } from '../../core/raster/photo-tone-curve';
 import {
   optionalBoolean,
   optionalLiteral,
@@ -36,7 +37,15 @@ export function cutExtrasFieldErrors(
     optionalPositiveNumber(value, `${path}.leadLengthMm`),
     optionalNumber(value, `${path}.leadAngleDeg`),
     optionalLiteral(value, `${path}.leadSide`, ['auto', 'outside', 'inside']),
+    optionalPhotoToneCurve(value, `${path}.photoToneCurve`),
   ];
+}
+
+// ADR-670: a curve that is not monotonic and pinned at both ends would burn
+// blank material or soften solid marks, so the file is refused, not repaired.
+function optionalPhotoToneCurve(value: Record<string, unknown>, path: string): string | null {
+  const field = valueAtPath(value, path);
+  return field === undefined || isPhotoToneCurve(field) ? null : `missing or invalid \`${path}\``;
 }
 
 // 0 means no cap on tabs per shape.

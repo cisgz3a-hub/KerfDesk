@@ -1,4 +1,5 @@
 // edition-command-gate — the Pro commands of the Free/Pro split (ADR-540).
+// The G-code Inspector is free (ADR-627), so its commands are not listed.
 // They stay listed and enabled in every edition: choosing one in KerfDesk Free
 // shows the Pro dialog, which can unlock Pro and then run the command. A
 // disabled command would never reach that dialog (runCommand skips it).
@@ -11,8 +12,6 @@ export const PRO_COMMAND_FEATURES: ReadonlyMap<CommandId, ProFeature> = new Map<
   CommandId,
   ProFeature
 >([
-  ['file.inspect-gcode', 'gcode-inspector'],
-  ['file.open-gcode', 'gcode-inspector'],
   ['file.import-height-map', 'relief'],
   ['tools.box-generator', 'box-generator'],
   ['tools.registration-jig', 'registration-jig'],

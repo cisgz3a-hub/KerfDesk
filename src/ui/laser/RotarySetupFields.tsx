@@ -1,7 +1,8 @@
-// Rotary Setup fields. A roller either leaves Y unscaled (the controller
-// already moves the part's surface in millimetres) or scales Y from the
-// driven roller's diameter and Motion per turn, as LightBurn's roller setup
-// does (ADR-373). A chuck always scales from Motion per turn.
+// Rotary Setup fields. A roller either scales Y from the driven roller's
+// diameter and Motion per turn, as LightBurn's roller setup does and a new
+// roller starts, or leaves Y unscaled for a controller whose Y steps/mm
+// already move the part's surface in millimetres (ADR-373, Amendment 1). A
+// chuck always scales from Motion per turn.
 
 import { useState } from 'react';
 import type { RotarySetup, RotaryType } from '../../core/devices/rotary';
@@ -109,8 +110,8 @@ function RollerScaleFields(props: {
       />
       {diameter === undefined ? (
         <p style={hintStyle}>
-          Off: the controller already moves the part&apos;s surface in millimetres, so Y is not
-          scaled.
+          Off: Y is not scaled, so the controller&apos;s Y steps/mm must already move the
+          part&apos;s surface in millimetres. A roller on an unchanged Y port needs this on.
         </p>
       ) : (
         <RotaryNumberField

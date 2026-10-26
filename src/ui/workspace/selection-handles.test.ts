@@ -41,6 +41,23 @@ describe('selection handles (audit C5)', () => {
     expect(edit).toEqual({ kind: 'resize', anchor: 'w', width: 80, preserveAspect: false });
   });
 
+  it.each([
+    [{ x: 40, y: 20 }, 80, 20],
+    [{ x: 40, y: 5 }, 20, 5],
+    [{ x: 60, y: 12 }, 60, 15],
+  ])(
+    'uses proportional pointer travel for non-square corner resizing: %j',
+    (point, width, height) => {
+      expect(selectionResizeEditFromDrag({ handle: 'se', bbox, point, lockAspect: true })).toEqual({
+        kind: 'resize',
+        anchor: 'nw',
+        width,
+        height,
+        preserveAspect: true,
+      });
+    },
+  );
+
   // Regression: the west edge handle pins the EAST edge, so widening leftward
   // must measure maxX - pointer. It previously measured pointer - minX (the
   // east-handle formula), which collapsed the selection to the clamp floor

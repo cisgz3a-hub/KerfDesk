@@ -68,7 +68,23 @@ describe('laser lead scrap sides (ADR-626 Amd 1)', () => {
     expect(verdicts.get('again')?.copyClass).toBe(verdicts.get('plate')?.copyClass);
   });
 
-  it('copies one scene contour across groups, but not the kerf pieces of one group', () => {
+  it('keeps two whole cuts of a contour copies when a third operation splits it', () => {
+    const scene = [contour('bar', square(0, 0, 30))];
+    const whole: CutSegment = { polyline: square(0, 0, 30), closed: true, leadSource: 'bar' };
+    const left: CutSegment = { polyline: square(1, 1, 10), closed: true, leadSource: 'bar' };
+    const right: CutSegment = { polyline: square(19, 1, 10), closed: true, leadSource: 'bar' };
+    const lines = leadJobLines(
+      { groups: [group([whole]), group([{ ...whole }]), group([left, right])] },
+      undefined,
+      scene,
+    );
+    expect(lines.copies[0]).toEqual([1]);
+    expect(lines.copies[1]).toEqual([0]);
+    expect(lines.copies[2]).toEqual([]);
+    expect([...(lines.exempt[2] ?? [])].sort()).toEqual([0, 1]);
+  });
+
+  it('exempts each kerf piece from the outline it was split from, but copies only its duplicate', () => {
     const scene = [contour('bar', square(0, 0, 30))];
     const whole: CutSegment = { polyline: square(0, 0, 30), closed: true, leadSource: 'bar' };
     const left: CutSegment = { polyline: square(1, 1, 10), closed: true, leadSource: 'bar' };
@@ -78,9 +94,14 @@ describe('laser lead scrap sides (ADR-626 Amd 1)', () => {
       undefined,
       scene,
     );
-    expect(lines.copies[0]).toEqual([1, 3]);
-    expect(lines.copies[1]).toEqual([0, 3]);
+    // The whole outline is no copy of a piece of it, but each piece may cross
+    // it (and the whole outline every piece); the pieces of one group stay apart.
+    expect(lines.copies[0]).toEqual([]);
+    expect(lines.copies[1]).toEqual([3]);
     expect(lines.copies[2]).toEqual([]);
+    expect([...(lines.exempt[0] ?? [])].sort()).toEqual([1, 2, 3]);
+    expect([...(lines.exempt[1] ?? [])].sort()).toEqual([0, 3]);
+    expect(lines.exempt[2]).toEqual([0]);
     expect(lines.sides.every((side) => side.side === 'outside')).toBe(true);
   });
 });

@@ -25,6 +25,16 @@ export function captureSetupHistoryContext(project: Project, state: SetupHistory
   });
 }
 
+/** Puts back what a refused change found, so its capture never reaches Undo
+ *  (job-machine-lock.ts). */
+export function restoreSetupHistoryContext(
+  project: Project,
+  context: SetupHistoryContext | null,
+): void {
+  if (context === null) contexts.delete(project);
+  else contexts.set(project, context);
+}
+
 export function setupHistoryContextFor(project: Project): SetupHistoryContext | null {
   const context = contexts.get(project);
   return context === undefined

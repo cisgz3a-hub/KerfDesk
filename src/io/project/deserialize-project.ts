@@ -1,4 +1,5 @@
 import { normalizeSceneObject } from './normalize-scene-object';
+import { projectLoadResult, type LoadedProject } from './project-load-metadata';
 import { normalizePositioningLight } from '../../core/devices/positioning-light';
 import type { ReliefAuthoringResolutions } from './project-relief-authoring-validator';
 // deserializeProject - parses a .lf2 string and returns a typed Project, or a
@@ -54,7 +55,7 @@ import { projectDeviceControllerCompatibleFields } from './project-device-contro
 import { normalizeControllerPatch } from './project-controller-normalization';
 
 export type DeserializeResult =
-  | { readonly kind: 'ok'; readonly project: Project; readonly migratedFrom?: number }
+  | LoadedProject
   | { readonly kind: 'schema-too-new'; readonly sawVersion: number }
   | { readonly kind: 'schema-too-old'; readonly sawVersion: number }
   | { readonly kind: 'invalid'; readonly reason: string };
@@ -111,10 +112,7 @@ export function deserializeProjectValue(raw: unknown): DeserializeResult {
     };
   }
 
-  if (migratedFrom !== undefined) {
-    return { kind: 'ok', project, migratedFrom };
-  }
-  return { kind: 'ok', project };
+  return projectLoadResult(workingRaw, project, migratedFrom);
 }
 
 function normalizeProject(

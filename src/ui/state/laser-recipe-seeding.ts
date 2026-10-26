@@ -7,10 +7,13 @@ import { applyMaterialRecipe } from '../../core/material-library';
 import { bestRecipeForOperation } from '../../core/material-library/auto-recipe';
 import {
   captureLayerOperationSettings,
+  updateLayer,
   type Layer,
   type Project,
   type Scene,
 } from '../../core/scene';
+// Deep import: core/scene's barrel is ratcheted and may only shrink.
+import { withoutInactiveLaserLeadSettings } from '../../core/scene/layer';
 import type { MaterialLibraryDocument, MaterialPreset } from '../../io/material-library';
 
 /** The layer with the preset's recipe applied and linked to it. */
@@ -89,7 +92,15 @@ export function reseedSwitchedLaserLayer(
   if (project.jobSetup.laserMaterial?.autoApplyRecipes !== true || library === null) return after;
   const binding = before.materialBinding;
   if (binding === undefined || binding.libraryId !== library.libraryId) return after;
-  if (!settingsEqual(captureLayerOperationSettings(before), binding.lastResolved)) return after;
+  // Lead fields with both leads off change nothing (ADR-626), so turning
+  // leads on and off again does not count as editing the recipe.
+  if (
+    !settingsEqual(
+      withoutInactiveLaserLeadSettings(captureLayerOperationSettings(before)),
+      withoutInactiveLaserLeadSettings(binding.lastResolved),
+    )
+  )
+    return after;
   const preset = bestPresetForLayer(project, library, after);
   if (preset === undefined) {
     const { materialBinding: _dropped, ...unlinked } = after;
@@ -98,7 +109,14 @@ export function reseedSwitchedLaserLayer(
   return linkedPresetLayer(after, library, preset);
 }
 
-/** `setLayerParam`'s scene, with a pure mode switch reseeded as above. */
+/**
+ * `setLayerParam`'s scene, with a mode switch reseeded as above. Eligibility is
+ * the operation before the edit, whatever else the patch holds: the patch's
+ * other fields are explicit edits and apply on top of the new recipe, as if
+ * made after the switch. Cut Settings applies its Process switch together with
+ * the fields edited after it, so it gives what the inspector's switch followed
+ * by the same edits gives (audit 2026-10-21 06-P2-3).
+ */
 export function sceneWithModeSwitchRecipe(
   project: Project,
   updated: Scene,
@@ -106,17 +124,34 @@ export function sceneWithModeSwitchRecipe(
   patch: Partial<Layer>,
   library: MaterialLibraryDocument | null,
 ): Scene {
-  const keys = Object.keys(patch);
-  if (keys.length !== 1 || keys[0] !== 'mode') return updated;
+  const { mode, ...edits } = patch;
+  if (mode === undefined) return updated;
   const before = project.scene.layers.find((layer) => layer.id === layerId);
-  const after = updated.layers.find((layer) => layer.id === layerId);
-  if (before === undefined || after === undefined || before.mode === after.mode) return updated;
-  const reseeded = reseedSwitchedLaserLayer(before, after, project, library);
-  if (reseeded === after) return updated;
+  if (before === undefined || before.mode === mode) return updated;
+  const switched: Layer = { ...before, mode };
+  const reseeded = reseedSwitchedLaserLayer(before, switched, project, library);
+  if (reseeded === switched) return updated;
+  const after: Layer = { ...reseeded, ...edits };
   return {
     ...updated,
-    layers: updated.layers.map((layer) => (layer.id === layerId ? reseeded : layer)),
+    layers: updated.layers.map((layer) => (layer.id === layerId ? after : layer)),
   };
+}
+
+/** The operation as `setLayerParam(layerId, { mode })` would leave it. Cut
+ * Settings shows this as soon as its Process changes, so Apply writes what the
+ * dialog showed. */
+export function layerAfterModeSwitch(
+  project: Project,
+  library: MaterialLibraryDocument | null,
+  layerId: string,
+  mode: Layer['mode'],
+): Layer | undefined {
+  const patch = { mode };
+  const scene = updateLayer(project.scene, layerId, patch);
+  return sceneWithModeSwitchRecipe(project, scene, layerId, patch, library).layers.find(
+    (layer) => layer.id === layerId,
+  );
 }
 
 function settingsEqual(a: object, b: object): boolean {

@@ -6,7 +6,7 @@ Last updated: [PLACEHOLDER: publication date]
 
 ## KerfDesk Free
 
-Free has no time limit, account, card or computer-seat limit. It runs in the browser and on the desktop and includes drawing/text, file import, Line Art tracing, laser cutting/engraving, 2D CNC cuts and all machine control.
+Free has no time limit, account, card or computer-seat limit. It runs in the browser (the desktop app has no Free edition) and includes drawing/text, file import, Line Art tracing, laser cutting/engraving, 2D CNC cuts, all machine control and the G-code Inspector.
 
 Line Art is the only Free tracer. Every other visible preset, including Sharp, and multi-file tracing are Pro. Browser Free preserves saved Pro projects for the desktop instead of unlocking their operations. The workspace opens as Free without an eligible licence. Licensing never gates Frame, Start, output, Save G-code or a running job.
 
@@ -21,7 +21,6 @@ Everything in Free, plus:
 - **Camera alignment:** calibrate and align a camera picture.
 - **Box generator:** design finger-jointed boxes.
 - **Design Studio:** use the precision design workspace.
-- **G-code Inspector:** inspect G-code moves in 3D.
 
 Pro is desktop only, Windows first. Choosing a new Pro tool asks for a trial or eligible licence; existing Pro output and active jobs remain usable.
 

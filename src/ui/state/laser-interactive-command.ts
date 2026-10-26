@@ -1,7 +1,7 @@
 import type { StatusReport } from '../../core/controllers/grbl';
 import type { ControllerEvent } from '../../core/controllers';
 import { echoedCommandMatchesLine } from '../../core/controllers/controller-event';
-import { skippedCommandReason, type LaserSafetyAction } from './laser-safety-notice';
+import { refusalText, skippedCommandReason, type LaserSafetyAction } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import type { TranscriptSource } from './laser-transcript';
 import {
@@ -269,7 +269,7 @@ function rejectCommandFromTerminalResponse(
 ): boolean {
   if (response.kind === 'error') {
     if (response.acknowledgesLine === false) {
-      request.refusal = response.raw ?? 'Controller rejected the command.';
+      request.refusal = refusalText(response);
       return true;
     }
     const reason = response.raw ?? (response.code === null ? 'error' : `error:${response.code}`);

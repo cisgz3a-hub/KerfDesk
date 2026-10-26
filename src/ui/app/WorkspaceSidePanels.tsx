@@ -14,12 +14,10 @@ import { useSyncedPanelPulses } from '../common/sync-panel-pulses';
 export function WorkspaceSidePanels(): JSX.Element {
   const layout = useWorkspaceLayout();
   const [active, setActive] = useState<RailPanelId>('layers');
-  const [cutsOpen, setCutsOpen] = useState(true);
-  const [machineOpen, setMachineOpen] = useState(true);
   const layersExpanded = useUiStore((state) => state.railPanelVisibility.layers);
   const machinePanel = useMachineRailVisibility();
   const panelId = useId();
-  useWorkspacePanelFocus(setActive, setCutsOpen, setMachineOpen);
+  useWorkspacePanelFocus(setActive);
 
   function selectPanel(panel: RailPanelId): void {
     setActive(panel);
@@ -56,40 +54,24 @@ export function WorkspaceSidePanels(): JSX.Element {
     );
   }
 
+  // Each panel folds to its own 48 px strip from its heading, so Spacious has
+  // no separate show/hide row above them.
   return (
     <section
       aria-label="Workspace side panels"
       data-layout="spacious"
       className="lf-workspace-panels"
     >
-      <div className="lf-workspace-panel-toggles">
-        <PanelToggle
-          label="Artwork"
-          icon="panel-left"
-          expanded={cutsOpen}
-          onToggle={() => setCutsOpen((open) => !open)}
-        />
-        <PanelToggle
-          label="Machine"
-          icon="panel-right"
-          expanded={machineOpen}
-          onToggle={() => setMachineOpen((open) => !open)}
-        />
-      </div>
       <div className="lf-workspace-desktop-panels">
-        {cutsOpen ? (
-          <ResizablePanel label="Artwork" collapsed={!layersExpanded}>
-            <CutsLayersPanel />
-          </ResizablePanel>
-        ) : null}
-        {machineOpen ? (
-          <ResizablePanel label="Machine controls" collapsed={!machinePanel.isExpanded}>
-            <div className="lf-workspace-machine-body">
-              <LaserWindow dockedJobActions />
-            </div>
-            {machinePanel.isExpanded ? <WorkspaceJobActions /> : null}
-          </ResizablePanel>
-        ) : null}
+        <ResizablePanel label="Artwork" collapsed={!layersExpanded}>
+          <CutsLayersPanel />
+        </ResizablePanel>
+        <ResizablePanel label="Machine controls" collapsed={!machinePanel.isExpanded}>
+          <div className="lf-workspace-machine-body">
+            <LaserWindow dockedJobActions />
+          </div>
+          {machinePanel.isExpanded ? <WorkspaceJobActions /> : null}
+        </ResizablePanel>
       </div>
     </section>
   );
@@ -131,27 +113,15 @@ function CompactPanelTabs(props: {
   );
 }
 
-function useWorkspacePanelFocus(
-  setActive: (panel: RailPanelId) => void,
-  setCutsOpen: (open: boolean) => void,
-  setMachineOpen: (open: boolean) => void,
-): void {
+function useWorkspacePanelFocus(setActive: (panel: RailPanelId) => void): void {
   const request = useUiStore((state) => state.railPanelFocusRequest);
   const resetRevision = useWorkspaceLayoutStore((state) => state.resetRevision);
   useEffect(() => {
     setActive('layers');
-    setCutsOpen(true);
-    setMachineOpen(true);
-  }, [resetRevision, setActive, setCutsOpen, setMachineOpen]);
+  }, [resetRevision, setActive]);
   useEffect(() => {
-    if (request?.panel === 'layers') {
-      setActive('layers');
-      setCutsOpen(true);
-    } else if (request?.panel === 'machine') {
-      setActive('machine');
-      setMachineOpen(true);
-    }
-  }, [request, setActive, setCutsOpen, setMachineOpen]);
+    if (request !== null) setActive(request.panel);
+  }, [request, setActive]);
 }
 
 function moveTabFocus(event: KeyboardEvent<HTMLButtonElement>): void {
@@ -214,27 +184,6 @@ function PanelTab(props: {
     >
       <Icon name={props.icon} size={15} />
       <span className="lf-workspace-panel-label">{props.label}</span>
-    </button>
-  );
-}
-
-function PanelToggle(props: {
-  readonly label: string;
-  readonly icon: IconName;
-  readonly expanded: boolean;
-  readonly onToggle: () => void;
-}): JSX.Element {
-  useSyncedPanelPulses();
-  return (
-    <button
-      type="button"
-      className={props.expanded ? 'lf-btn' : 'lf-btn lf-panel-expand-hint'}
-      aria-pressed={props.expanded}
-      title={`${props.expanded ? 'Hide' : 'Show'} ${props.label} panel`}
-      onClick={props.onToggle}
-    >
-      <Icon name={props.icon} size={14} />
-      {props.label}
     </button>
   );
 }

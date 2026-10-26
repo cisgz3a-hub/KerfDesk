@@ -94,6 +94,7 @@ export { suggestMachineProfiles } from './profile-suggestions';
 export type { JogAxisSigns } from './jog-direction';
 export { jogAxisSignsForOrigin } from './jog-direction';
 export { toMachineCoords, toSceneCoords } from './origin-transform';
+export * from './origin-transform';
 export type { ScanOffsetPoint } from './scan-offset-profile';
 export {
   isScanOffsetTable,

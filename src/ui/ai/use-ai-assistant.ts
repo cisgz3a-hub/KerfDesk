@@ -99,13 +99,17 @@ function applyReview(
   const object = aiDraftArtwork(review.draft, review.request, `ai-${crypto.randomUUID()}`);
   try {
     let changed = false;
-    useStore.setState((state) => {
-      const patch = applyAiDraft(state, review.owner, object);
-      changed = patch.project !== undefined;
-      return patch;
-    });
-    if (changed) onClose();
-    else onError('The project changed. Request a new draft before applying it.');
+    useStore.getState().commitProjectEdit(
+      (state) => {
+        const patch = applyAiDraft(state, review.owner, object);
+        changed = patch.project !== undefined;
+        return patch;
+      },
+      () => {
+        if (changed) onClose();
+      },
+    );
+    if (!changed) onError('The project changed. Request a new draft before applying it.');
   } catch (reason) {
     onError(message(reason));
   }

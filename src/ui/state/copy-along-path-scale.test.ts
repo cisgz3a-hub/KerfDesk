@@ -99,6 +99,18 @@ const request = {
 };
 
 describe('Copy Along Path scale and variable increments', () => {
+  it('keeps a requested gap after growing each copied box', () => {
+    load([BOX, GUIDE], ['box', 'guide']);
+    expect(
+      useStore
+        .getState()
+        .copyAlongPath({ ...request, mode: 'gap', spacingMm: 2, endScalePercent: 300 }),
+    ).toBe(true);
+    const boxes = useStore.getState().project.scene.objects.slice(2).map(transformedBBox);
+    expect(boxes).toHaveLength(5);
+    boxes.slice(1).forEach((box, index) => expect(box.minX - boxes[index]!.maxX).toBeCloseTo(2, 9));
+  });
+
   it('grows the copies evenly to the end size, each centred on the guide', () => {
     load([BOX, GUIDE], ['box', 'guide']);
     expect(useStore.getState().copyAlongPath({ ...request, endScalePercent: 300 })).toBe(true);

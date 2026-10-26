@@ -3,6 +3,7 @@ import { APP_DISPLAY_NAME } from '../../core/app-branding';
 import { primaryOperationForObject } from '../../core/scene';
 import { CONNECTION_HELP_TEXT } from '../help/connection-help';
 import { SAFETY_NOTICE_TEXT } from '../help/safety-notice';
+import { LicenseNoticeHost } from '../help/LicenseNoticeDialog';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
@@ -46,6 +47,7 @@ import { ScanOffsetCommandDialog } from './ScanOffsetCommandDialog';
 import { IntervalDialog, MaterialDialog } from './CalibrationGridDialogs';
 import { GcodeSaveDialog } from '../app/GcodeSaveDialog';
 import { ProjectSaveDialog } from '../app/ProjectSaveDialog';
+import { SaveReadyDialog } from '../app/SaveReadyDialog';
 import { VectorRepairDialogHost } from './VectorRepairDialogHost';
 import { OffsetShapesDialogHost } from './OffsetShapesDialogHost';
 import { SettingsWindowHost } from '../settings/SettingsWindowHost';
@@ -54,6 +56,7 @@ import { JointResizeDialogHost } from './JointResizeDialogHost';
 import { StampPreparationDialogHost } from './StampPreparationDialogHost';
 import { AiAssistantDialogHost } from '../ai/AiAssistantDialog';
 import { FocusTestDialog } from '../calibration/FocusTestDialog';
+import { ToneCalibrationDialogHost } from '../calibration/ToneCalibrationDialogHost';
 
 type SettingsDialogKind =
   | 'optimization'
@@ -171,6 +174,7 @@ function StoreOpenedDialogs(): JSX.Element {
     <>
       <GcodeSaveDialogHost />
       <ProjectSaveDialog />
+      <SaveReadyDialog />
       <BarcodeDialogHost />
       <CopyAlongPathDialogHost />
       <OptimizeShapesDialogHost />
@@ -180,6 +184,8 @@ function StoreOpenedDialogs(): JSX.Element {
       <SettingsWindowHost />
       <AiAssistantDialogHost />
       <PhotoEngravingDialogHost />
+      <ToneCalibrationDialogHost />
+      <LicenseNoticeHost />
     </>
   );
 }
@@ -388,7 +394,9 @@ function aboutText(): string {
     `Built ${__BUILD_TIME__}`,
     '',
     'Copyright © 2026 Johann Stolk. All rights reserved.',
-    'Terms of use: License & Safety Notice (/eula.txt).',
+    // verify-packaged-preview-metadata.mjs finds the About asset by this line's
+    // "Terms of use: License & Safety Notice" prefix.
+    'Terms of use: License & Safety Notice, in the Help menu.',
     'Third-party components and their licences: see /third-party-notices.txt.',
     '',
     'SAFETY: this software drives laser and CNC machinery. Verify every',

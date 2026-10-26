@@ -4,6 +4,8 @@
 
 import type { MachineKind } from '../../core/scene';
 import { Dialog } from '../kit/Dialog';
+import { useLaserStore } from '../state/laser-store';
+import { externalRunMachineBlock } from './external-run';
 import type { InspectorRenderModel } from './inspector-model';
 import type { GcodeInspectionSource } from './gcode-inspection-source';
 import { InspectionPressureNotice } from './InspectionPressureNotice';
@@ -19,6 +21,8 @@ export type GcodeInspectorDialogProps = {
   readonly machineKind: MachineKind;
   /** CNC-only handoff to the existing F-CNC10 2D simulator (flow retained). */
   readonly onOpen2dSimulator?: () => void;
+  /** Opened files only: Frame, review and Start this program (ADR-630). */
+  readonly onRunOnMachine?: () => void;
   readonly onClose: () => void;
 };
 
@@ -70,24 +74,56 @@ export function GcodeInspectorDialog(props: GcodeInspectorDialogProps): JSX.Elem
         )
       ) : null}
       {state.kind === 'error' ? <p style={messageStyle}>{state.reason}</p> : null}
-      <footer style={footerStyle}>
-        {state.kind === 'ready' && state.result.parsed.kind === 'ok' ? (
-          <StatsStrip model={state.result.parsed.model} />
-        ) : (
-          <span />
-        )}
-        {props.machineKind === 'cnc' && props.onOpen2dSimulator !== undefined ? (
-          <button
-            type="button"
-            className="lf-btn"
-            title="Open this program in the 2D simulator (F-CNC10)"
-            onClick={props.onOpen2dSimulator}
-          >
-            Open in 2D simulator
-          </button>
-        ) : null}
-      </footer>
+      <InspectorFooter {...props} state={state} />
     </Dialog>
+  );
+}
+
+function InspectorFooter(
+  props: GcodeInspectorDialogProps & { readonly state: InspectionState },
+): JSX.Element {
+  const { state } = props;
+  const inspected = state.kind === 'ready' && hasGcodeInspectorAnalysis(state.result);
+  return (
+    <footer style={footerStyle}>
+      {state.kind === 'ready' && state.result.parsed.kind === 'ok' ? (
+        <StatsStrip model={state.result.parsed.model} />
+      ) : (
+        <span />
+      )}
+      {props.onRunOnMachine !== undefined && inspected ? (
+        <RunOnMachineButton onRun={props.onRunOnMachine} />
+      ) : null}
+      {props.machineKind === 'cnc' && props.onOpen2dSimulator !== undefined ? (
+        <button
+          type="button"
+          className="lf-btn"
+          title="Open this program in the 2D simulator (F-CNC10)"
+          onClick={props.onOpen2dSimulator}
+        >
+          Open in 2D simulator
+        </button>
+      ) : null}
+    </footer>
+  );
+}
+
+// Enabled while connected, Idle and with nothing else running (ADR-630);
+// otherwise its tooltip says why.
+function RunOnMachineButton(props: { readonly onRun: () => void }): JSX.Element {
+  const block = useLaserStore(externalRunMachineBlock);
+  return (
+    <button
+      type="button"
+      className="lf-btn lf-btn--primary"
+      disabled={block !== null}
+      title={
+        block ?? 'Frame this program over the material, review it, then send it to the machine.'
+      }
+      onClick={props.onRun}
+    >
+      Run on machine...
+    </button>
   );
 }
 

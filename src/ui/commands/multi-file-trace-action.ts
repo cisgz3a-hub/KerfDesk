@@ -12,6 +12,7 @@ import type { BatchTraceJob, BatchTraceOutput, BatchTraceSkip } from '../../core
 import { tracedLayersToDxf } from '../../io/dxf/export-dxf';
 import { writeTracedDrawing } from '../../io/vector-formats/traced-drawing';
 import type { PlatformAdapter, SaveDirectoryTarget } from '../../platform/types';
+import { pickPreparedSaveTarget } from '../app/pick-prepared-save-target';
 import { readImageHeaderDensity, type ImageDensity } from '../common/image-density';
 import {
   overriddenSizeMm,
@@ -362,12 +363,18 @@ export async function writeTraceFileWithPlatform(
   signal?: AbortSignal,
 ): Promise<boolean> {
   signal?.throwIfAborted();
-  const target = await platform.pickFileForSave({
-    suggestedName: file.filename,
-    extensions: ['.' + file.format],
-  });
-  signal?.throwIfAborted();
-  if (target === null) return false;
+  const target = await pickPreparedSaveTarget(
+    platform,
+    { suggestedName: file.filename, extensions: ['.' + file.format] },
+    { title: 'Save traced file', message: `${file.filename} is traced.` },
+    signal,
+  );
+  if (target === null) {
+    signal?.throwIfAborted();
+    return false;
+  }
+  // The picker has already emptied an existing file (ADR-656) and this file is
+  // fully traced, so it is written even if Cancel came while the picker was open.
   await target.write(file.text);
   return true;
 }

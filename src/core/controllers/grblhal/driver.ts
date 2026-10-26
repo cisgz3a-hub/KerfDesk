@@ -63,15 +63,11 @@ export const grblHalDriver: ControllerDriver = {
   ...grblDriver,
   kind: 'grblhal',
   label: 'grblHAL',
-  realtime: {
-    ...grblDriver.realtime,
-    // grblHAL handles 0x85 in every state: it drops the partial line and
-    // flushes the input buffer, so a line not parsed yet is never answered
-    // (https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/protocol.c#L896-L899;
-    // stream.h#L287-L291). Stock GRBL ignores 0x85 outside Jog and flushes
-    // nothing (https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/serial.c#L159-L162).
-    jogCancelDropsUnparsedLines: true,
-  },
+  // grblHAL handles 0x85 in every state: it drops the partial line and
+  // flushes the input buffer, so a line not parsed yet is never answered
+  // (https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/protocol.c#L896-L899;
+  // stream.h#L287-L291). Cancel waits briefly for owed replies before the
+  // byte on every driver, because grblHAL can greet as stock GRBL (ADR-640).
   capabilities: {
     ...grblDriver.capabilities,
     // grblHAL's homing loop serves status requests only with "report when
@@ -81,6 +77,9 @@ export const grblHalDriver: ControllerDriver = {
     // COMPATIBILITY_LEVEL 0, the default build, latches a refused line's
     // error (protocol.c:246-286); an empty line clears it.
     stickyLineError: true,
+    // `$10` bits 5 and 6 send WCO: and Ov:, so a stock-GRBL value turns them
+    // off (status-report-mask.ts, ADR-375 Amendment 2).
+    statusReportMask: 'grblhal-fields',
   },
   commands: {
     ...grblDriver.commands,

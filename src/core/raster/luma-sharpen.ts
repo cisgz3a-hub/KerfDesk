@@ -1,4 +1,4 @@
-// Unsharp mask at engraving resolution (ADR-648).
+// Unsharp mask at engraving resolution (ADR-671).
 //
 // Area resampling to the burn grid (ADR-359) averages every burn cell over the
 // source pixels it covers, which softens eyes, lashes and hair again after any

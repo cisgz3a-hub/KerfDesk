@@ -23,6 +23,7 @@ import {
   executeHome,
   executeOrigin,
   executePauseResume,
+  executeBoardAction,
 } from './machine-actions';
 import { executeHold } from './machine-hold';
 
@@ -44,12 +45,22 @@ export async function executeMachineOperation(
   if (input.command === 'connect_machine') return executeConnect(operation, context);
   if (input.command === 'disconnect_machine') return executeDisconnect(operation);
   if (input.command === 'home_machine') return executeHome(operation);
-  if (input.command === 'set_work_origin') return executeOrigin(input, operation);
+  if (input.command === 'set_work_origin') return executeOrigin(input, operation, context);
+  if (boardCommand(input)) return executeBoardAction(input.command === 'finish_board', operation);
   if (input.command === 'pause_job' || input.command === 'resume_job')
     return executePauseResume(input.command === 'pause_job', operation);
   operation.state = 'preparing';
   if (input.command === 'frame_job') return executeFrame(operation, owner);
   return executeReviewedJob(operation, context, owner);
+}
+
+function boardCommand(
+  input: BackgroundMachineAction,
+): input is Extract<
+  BackgroundMachineAction,
+  { readonly command: 'capture_board_point' | 'finish_board' }
+> {
+  return input.command === 'capture_board_point' || input.command === 'finish_board';
 }
 function executionOwner(
   operation: OwnedMachineOperation,

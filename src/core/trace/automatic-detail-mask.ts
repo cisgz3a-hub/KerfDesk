@@ -4,11 +4,13 @@ import type { RawImageData, TraceOptions } from './trace-image';
 
 /** Automatic recovery adds local detail to the preset's brightness band, and
  * fills light solids that the local test alone would hollow (ADR-401).
- * Deliberate Sketch remains local contrast only, including shadow removal. */
+ * Deliberate Sketch remains local contrast only, including shadow removal.
+ * `windowScale` is the detector window scale (working px per preview px). */
 export function prepareAutomaticDetailMask(
   image: RawImageData,
   localField: CrackSubPixelField,
   options: TraceOptions,
+  windowScale: number,
 ): { readonly prepared: RawImageData; readonly crackField: CrackSubPixelField | null } {
   const cutoff = options.cutoffLuma ?? 0;
   const threshold = options.thresholdLuma ?? 128;
@@ -16,15 +18,8 @@ export function prepareAutomaticDetailMask(
   const hi = Math.max(0, Math.min(255, Math.max(cutoff, threshold)));
   const { width, height } = image;
   const plane = classifyDetail(localField, width, height, lo, hi);
-  const scale = options.pixelScale ?? 1;
   const solidIso = lightSolidIso(
-    {
-      width,
-      height,
-      luma: plane.luma,
-      rgba: image.data,
-      pixelScale: Number.isFinite(scale) && scale >= 1 ? scale : 1,
-    },
+    { width, height, luma: plane.luma, rgba: image.data, pixelScale: windowScale },
     hi,
   );
   const data = new Uint8ClampedArray(image.data.length);

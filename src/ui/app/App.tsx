@@ -3,15 +3,16 @@
 // and keyboard shortcuts live in dedicated hooks so this component stays a
 // thin layout shell.
 
+import { useMemo } from 'react';
 import { ConfirmSaveDialog, SaveFilenamePanel, StatusBar, Toasts } from '../common';
+import { ErrorBoundary } from '../common/ErrorBoundary';
 import { ArtworkCreationHost } from '../layers/ArtworkCreationHost';
 import { ProjectSheetsBar } from '../commands/ProjectSheetsBar';
 import { CommandShell } from '../commands';
 import { CanvasGcodeView, CanvasViewSwitch } from '../gcode-inspector';
 import { useCanvasViewStore } from '../state/canvas-view-store';
-import { useEdition } from '../licensing/edition';
 import { UpdatePrompt } from '../licensing/UpdatePrompt';
-import { LiveMotionBar, useJobShortcuts } from '../laser';
+import { LiveMotionBar, useAbortShortcut, useStartShortcut } from '../laser';
 import { MachineSetupDialogHost } from '../laser/device-setup';
 import { BoardCapturePanel } from '../laser/board-capture';
 import { JobReviewDialog } from '../laser/job-review';
@@ -32,6 +33,7 @@ import { AutosaveRecoveryControl } from './AutosaveRecoveryControl';
 import { ProProjectDesktopDialog } from './ProProjectDesktopDialog';
 import { useActiveJobWakeLock } from './use-active-job-wake-lock';
 import { useJobWatch } from '../camera/job-watch/job-watch-runner';
+import { useCameraHelpers } from '../camera/helpers/install-camera-helpers';
 import { useAutoConnectController } from './use-auto-connect-controller';
 import { useCncLibraryPersistence } from './use-cnc-library-persistence';
 import { useGlobalErrorHandlers } from './use-global-error-handlers';
@@ -60,8 +62,34 @@ import { RecentProjectsHost } from '../recent-projects/RecentProjectsHost';
 import { SupportReportHost } from '../support/SupportReportHost';
 import { RemotePairingHost } from '../remote-access/RemotePairingHost';
 import { useRemoteAccess } from './use-remote-access';
+import { CrashScreenHosts, machineSoftwareAbort, projectCrashSave } from './crash-recovery';
+import { usePlatformOptional } from './platform-context';
 
+// A render crash replaces only the workspace. The job runs from the store, so
+// it keeps streaming under the crash screen, and the protections it relies on
+// stay mounted beside the boundary rather than inside it (audit 27-P2-2).
 export function App(): JSX.Element {
+  const platform = usePlatformOptional();
+  const crashSave = useMemo(
+    () => (platform === null ? undefined : projectCrashSave(platform)),
+    [platform],
+  );
+  return (
+    <>
+      <ErrorBoundary
+        softwareAbort={machineSoftwareAbort}
+        {...(crashSave === undefined ? {} : { crashSave })}
+        crashHosts={<CrashScreenHosts />}
+      >
+        <AppWorkspace />
+      </ErrorBoundary>
+      <SupportReportHost />
+      <AppProtections />
+    </>
+  );
+}
+
+function AppWorkspace(): JSX.Element {
   return (
     <div className="lf-app-shell" style={shellStyle}>
       <CommandShell />
@@ -109,42 +137,54 @@ export function App(): JSX.Element {
       <ImageEditorHost />
       <DesignStudioHost />
       <TutorialHost />
-      <SupportReportHost />
       <RemotePairingHost />
-      <AppLifecycle />
+      <WorkspaceLifecycle />
     </div>
   );
 }
 
-// App-wide hooks live in a leaf that renders nothing. Nothing below App is
+// App-wide hooks live in leaves that render nothing. Nothing below App is
 // memoised, so a hook that re-rendered App re-rendered every rail, dialog host
 // and the workspace with it — which the status poll and each cursor hover did
-// while the shortcut hooks subscribed from here. Mounted last so its effects
-// still run after every sibling's, as they did from App itself.
-function AppLifecycle(): null {
+// while the shortcut hooks subscribed from here. Each leaf is mounted last in
+// its tree, so its effects still run after every sibling's.
+//
+// These serve the workspace's editing and go with it when it crashes.
+function WorkspaceLifecycle(): null {
   useRemoteAccess();
-  // Recovery stays in a nonblocking banner. Background autosave protects
-  // edits throughout the session; global handlers catch asynchronous errors.
   usePolylineFairingUpgrade();
   useSingleArtworkSelection();
+  useStartShortcut();
+  useShortcuts();
+  useSpacePan();
+  useOperationColorPeek();
+  useJobWatch();
+  useCameraHelpers();
+  useAutoConnectController();
+  useWindowTitle();
+  return null;
+}
+
+// These protect a running job and unsaved work, so a render crash must not
+// switch them off: autosave and the settings stores' persistence, async error
+// toasts, Ctrl+. Abort, the wake lock (ADR-117), recovery checkpoints, machine
+// hours, the tab-close laser-off with the desktop close handshake (C3,
+// ADR-549) and the unsaved-changes prompt (H-U6).
+function AppProtections(): null {
+  // Recovery stays in a nonblocking banner. Background autosave protects
+  // edits throughout the session; global handlers catch asynchronous errors.
   useAutosave();
   useMachineProfilePersistence();
   useMaterialLibraryPersistence();
   useCncLibraryPersistence();
   useLayerDefaultsPersistence();
   useGlobalErrorHandlers();
-  useJobShortcuts();
-  useShortcuts();
-  useSpacePan();
-  useOperationColorPeek();
+  useAbortShortcut();
   useActiveJobWakeLock();
-  useJobWatch();
-  useAutoConnectController();
   useJobCheckpoint();
   useMachineHoursTracking();
   useUnloadStop();
   useUnsavedChangesGuard();
-  useWindowTitle();
   return null;
 }
 
@@ -156,12 +196,8 @@ function AppLifecycle(): null {
 function CanvasArea(): JSX.Element {
   const showGcode = useCanvasViewStore((store) => store.showGcode);
   const setShowGcode = useCanvasViewStore((store) => store.setShowGcode);
-  const { requestPro } = useEdition();
-  // The G-code 3D view is the G-code Inspector's, a Pro tool (ADR-540).
-  const changeView = (next: boolean): void => {
-    if (next) requestPro('gcode-inspector', () => setShowGcode(true));
-    else setShowGcode(false);
-  };
+  // The G-code 3D view is the G-code Inspector's, free in every edition (ADR-627).
+  const changeView = (next: boolean): void => setShowGcode(next);
   const accessories = (
     <>
       <WorkspaceCameraOverlay />

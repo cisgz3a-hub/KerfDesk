@@ -80,7 +80,7 @@ beforeEach(() => {
   resetStore();
 });
 
-describe('photo engraving sharpening (ADR-648)', () => {
+describe('photo engraving sharpening (ADR-671)', () => {
   it('starts from the photo, defaulting to off at a radius of one line', () => {
     const { operation } = fixture();
     expect(initialPhotoEngravingDraft(portrait(), operation)).toMatchObject({

@@ -78,7 +78,7 @@ describe('device-setup option status summaries', () => {
           },
         }),
       ),
-    ).toBe('Roller, Ø60 mm');
+    ).toBe('Roller, Ø60 mm (Y not scaled)');
     expect(
       rotaryStatus(
         withPatch({

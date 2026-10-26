@@ -5,19 +5,26 @@ import { machineNoun } from '../machine/machine-labels';
 import { MachineModeToggle } from '../machine/MachineModeToggle';
 import { useStore } from '../state';
 import { browserLocalStorage } from '../state/browser-local-storage';
-import { controllerStoppedResponding } from '../state/controller-recovery-status';
 import { useLaserStore } from '../state/laser-store';
+import { motionOwnerAwaitsMissingReply } from '../state/laser-motion-release';
 import { loadAutoConnectPreference, saveAutoConnectPreference } from '../state/serial-port-memory';
 import { pauseAutoConnect, useAutoConnectSession } from '../state/auto-connect-session';
 import { ConnectionBar, type ConnectionBarProps } from './ConnectionBar';
 import { connectMachine } from './connect-machine';
-import { isFileOnlyController, useControllerReconnect } from './controller-reconnect';
+import {
+  isFileOnlyController,
+  useControllerQualificationRetry,
+  useControllerReconnect,
+} from './controller-reconnect';
 import { ConnectedMachineProfile } from './ConnectedMachineProfile';
 import { LaserModuleRow } from './LaserModuleRow';
 import { DeviceSetupControls } from './device-setup';
 import { controllerActionFailureHandler } from './report-controller-action-failure';
 import { MachineNetworkConnect } from './MachineNetworkConnect';
-import { useControllerWentSilent } from './use-controller-went-silent';
+import {
+  useControllerStoppedResponding,
+  useControllerWentSilent,
+} from './use-controller-went-silent';
 import { isApplePlatform, isLinuxDesktop } from '../common/operating-system';
 
 type Props = {
@@ -36,10 +43,10 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
     state.getMachineSettingsReadBlockReason(),
   );
   const reconnectRecommended = useLaserStore((state) => state.getControllerReconnectRecommended());
-  const stoppedResponding = useLaserStore((state) => controllerStoppedResponding(state));
+  const controlsBusy = useConnectionControlsBusy(props);
   const wentSilent = useControllerWentSilent(connection.kind === 'connected');
+  const stoppedResponding = useControllerStoppedResponding(connection.kind === 'connected');
   const disconnectController = useLaserStore((state) => state.disconnect);
-  const retryQualification = useLaserStore((state) => state.retryControllerQualification);
   const controllerKind = useStore((state) => state.project.device.controllerKind);
   const machineName = useStore((state) => state.project.device.name || 'Unnamed machine');
   const supportsSerial = platform.serial.isSupported();
@@ -48,10 +55,7 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
     void connectMachine(platform).catch(controllerActionFailureHandler('Connect'));
   };
   const reconnect = useControllerReconnect();
-  const retryControllerInformation = (): void => {
-    if (useLaserStore.getState().getMachineSettingsReadBlockReason() !== null) return;
-    void retryQualification().catch(controllerActionFailureHandler('Check controller'));
-  };
+  const retryControllerInformation = useControllerQualificationRetry();
   // The operator's Disconnect pauses auto-connect until a port they choose
   // opens (ADR-639); the store's own disconnect, used by the baud scan, does not.
   const disconnect = async (): Promise<void> => {
@@ -87,15 +91,11 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
         qualification={qualification}
         qualificationReadBlockReason={qualificationReadBlockReason}
         reconnectRecommended={reconnectRecommended}
-        controllerStoppedResponding={stoppedResponding}
         controllerWentSilent={wentSilent}
+        controllerStoppedResponding={stoppedResponding}
         onRetryQualification={retryControllerInformation}
         onReconnectQualification={reconnect}
-        disabled={
-          !supportsSerial ||
-          connectionControlsBusy(props.motionOperation, props.controllerOperation) ||
-          isFileOnlyProfile
-        }
+        disabled={!supportsSerial || controlsBusy || isFileOnlyProfile}
       />
     </>
   );
@@ -118,7 +118,7 @@ function useAutoConnectPreference(): Pick<
   const [enabled, setEnabled] = useState(() => loadAutoConnectPreference(browserLocalStorage()));
   const session = useAutoConnectSession();
   const change = (next: boolean): void => {
-    saveAutoConnectPreference(browserLocalStorage(), next);
+    saveAutoConnectPreference(undefined, next);
     setEnabled(next);
   };
   return {
@@ -152,14 +152,24 @@ function ConnectionHints(props: {
   return null;
 }
 
+// A motion owner locks the connection controls, except one that only a
+// missing reply holds on an Idle machine (ADR-640).
+function useConnectionControlsBusy(props: Props): boolean {
+  const missingReply = useLaserStore(motionOwnerAwaitsMissingReply);
+  return connectionControlsBusy(props.motionOperation, props.controllerOperation, missingReply);
+}
+
 // Connection management is the escape hatch for a stale reset or startup
 // handshake. Keep Disconnect/Reconnect available for those controller-owned
-// operations while motion and autofocus retain their stricter lockout.
+// operations while motion and autofocus retain their stricter lockout. A motion
+// owner that only a missing reply holds on an Idle machine is the exception:
+// a new session is the only way to clear it (ADR-640).
 export function connectionControlsBusy(
   motionOperation: unknown,
   controllerOperation: ReturnType<typeof useLaserStore.getState>['controllerOperation'],
+  motionAwaitsMissingReply = false,
 ): boolean {
-  if (motionOperation !== null) return true;
+  if (motionOperation !== null && !motionAwaitsMissingReply) return true;
   return (
     controllerOperation !== null &&
     controllerOperation.kind !== 'autofocus' &&

@@ -1,7 +1,9 @@
-import type { ControllerKind } from './device-profile';
+import type { ControllerCommandSet, ControllerKind, DeviceProfile } from './device-profile';
+import { DEFAULT_FIRE_POWER_PERCENT, HARD_MAX_FIRE_POWER_PERCENT } from './fire-control';
 
 /** A separate pointer, explicitly mapped to the machine's documented accessory output. */
-export type PositioningLight = {
+export type GcodePositioningLight = {
+  readonly kind?: undefined;
   readonly onCommand: string;
   readonly offCommand: string;
   /** Pointer spot minus laser spot, in bed coordinates (millimetres). */
@@ -10,6 +12,52 @@ export type PositioningLight = {
   /** After a clean ordinary Frame, centre the pointer on the framed artwork and switch it on (ADR-605). */
   readonly afterFrame?: boolean;
 };
+
+/** The Falcon A1 Pro's 20 W head has no separate pointer. Like the "Laser on"
+ * button in Creality's own software, its LED is the cutting laser itself at a
+ * capped low power, so the dot is exactly where it will burn (ADR-664). */
+export type LaserDotLight = {
+  readonly kind: 'laser-dot';
+  /** Share of the controller's S range, never above HARD_MAX_FIRE_POWER_PERCENT. */
+  readonly powerPercent: number;
+  /** The dot is the laser spot, so it has no offset. */
+  readonly offsetXmm: 0;
+  readonly offsetYmm: 0;
+  readonly afterFrame?: boolean;
+};
+
+export type PositioningLight = GcodePositioningLight | LaserDotLight;
+
+export const LASER_DOT_LIGHT: LaserDotLight = {
+  kind: 'laser-dot',
+  powerPercent: DEFAULT_FIRE_POWER_PERCENT,
+  offsetXmm: 0,
+  offsetYmm: 0,
+};
+
+/** The machine whose LED is its laser dot. */
+export const LASER_DOT_COMMAND_SET: ControllerCommandSet = 'creality-falcon-a1-pro';
+
+/** Host-side off deadline; requires a responsive app and controller connection. */
+export const LASER_DOT_AUTO_OFF_MS = 30_000;
+
+export function isLaserDotLight(light: PositioningLight | undefined): light is LaserDotLight {
+  return light?.kind === 'laser-dot';
+}
+
+/** ADR-635's network "red pointer" switched the wrong light. A saved one is
+ * dropped, never turned into a laser dot without the operator's tick. */
+const RETIRED_FALCON_POINTER_MESSAGE =
+  'The Falcon “red pointer” setting switched the wrong light and was replaced. Tick “Show where it will burn” to use the laser at low power instead.';
+
+/** Why the fitted module cannot show a dot, or null: an infrared beam is
+ * invisible, so a low-power dot would show nothing while still emitting. */
+export function laserDotModuleIssue(device: Pick<DeviceProfile, 'laserSubProfile'>): string | null {
+  const nm = device.laserSubProfile?.wavelengthNm;
+  return nm !== undefined && (nm < 400 || nm > 700)
+    ? `The fitted laser module’s ${nm} nm beam is invisible, so it cannot show a dot. Fit and choose the blue module to use the laser dot.`
+    : null;
+}
 
 export const MAX_POSITIONING_LIGHT_OFFSET_MM = 1000;
 
@@ -43,6 +91,7 @@ export function positioningLightIssue(
     return 'Positioning light must contain its on/off commands and X/Y offsets.';
   }
   const light = value as Record<string, unknown>;
+  if (light['kind'] !== undefined) return laserDotIssue(light);
   for (const field of ['onCommand', 'offCommand'] as const) {
     const issue = commandIssue(light[field], field, controllerKind);
     if (issue !== null) return issue;
@@ -52,10 +101,49 @@ export function positioningLightIssue(
   if (canonicalCommand(onCommand) === canonicalCommand(offCommand)) {
     return 'Positioning light on and off commands must be different.';
   }
-  if (light['afterFrame'] !== undefined && typeof light['afterFrame'] !== 'boolean') {
-    return 'Positioning light "Centre & LED after Frame" must be on or off.';
-  }
-  return digitalOutputPairIssue(onCommand, offCommand, controllerKind) ?? offsetIssue(light);
+  return (
+    afterFrameIssue(light) ??
+    digitalOutputPairIssue(onCommand, offCommand, controllerKind) ??
+    offsetIssue(light)
+  );
+}
+
+/** The light the device can actually switch: the stored mapping must be valid,
+ * and the laser dot exists only on the Falcon A1 Pro command set. */
+export function devicePositioningLightIssue(device: {
+  readonly positioningLight?: unknown;
+  readonly controllerKind?: ControllerKind | undefined;
+  readonly controllerCommandSet?: ControllerCommandSet | undefined;
+  readonly gcodeDialect?: { readonly dialectId?: string } | undefined;
+}): string | null {
+  const light = device.positioningLight;
+  const issue = positioningLightIssue(light, device.controllerKind, device.gcodeDialect?.dialectId);
+  if (issue !== null || !isLaserDotLight(light as PositioningLight | undefined)) return issue;
+  return device.controllerCommandSet === LASER_DOT_COMMAND_SET
+    ? null
+    : 'The laser dot needs the Creality Falcon A1 Pro machine profile.';
+}
+
+function laserDotIssue(light: Record<string, unknown>): string | null {
+  if (light['kind'] === 'creality-falcon-pointer') return RETIRED_FALCON_POINTER_MESSAGE;
+  if (light['kind'] !== 'laser-dot') return 'Positioning light type is not one KerfDesk knows.';
+  const power = light['powerPercent'];
+  if (
+    typeof power !== 'number' ||
+    !Number.isFinite(power) ||
+    power <= 0 ||
+    power > HARD_MAX_FIRE_POWER_PERCENT
+  )
+    return `Laser dot power must be above 0% and no more than ${HARD_MAX_FIRE_POWER_PERCENT}%.`;
+  if (light['offsetXmm'] !== 0 || light['offsetYmm'] !== 0)
+    return 'The laser dot is the laser spot, so its offsets must be 0.';
+  return afterFrameIssue(light);
+}
+
+function afterFrameIssue(light: Record<string, unknown>): string | null {
+  return light['afterFrame'] !== undefined && typeof light['afterFrame'] !== 'boolean'
+    ? 'Positioning light "Centre & LED after Frame" must be on or off.'
+    : null;
 }
 
 function commandIssue(
@@ -150,12 +238,15 @@ export function normalizePositioningLight(
   if (value === undefined || positioningLightIssue(value, controllerKind, gcodeDialectId) !== null)
     return undefined;
   const light = value as PositioningLight;
+  const afterFrame = light.afterFrame === true ? { afterFrame: true } : {};
+  if (isLaserDotLight(light))
+    return { ...LASER_DOT_LIGHT, powerPercent: light.powerPercent, ...afterFrame };
   return {
     onCommand: light.onCommand.trim(),
     offCommand: light.offCommand.trim(),
     offsetXmm: light.offsetXmm,
     offsetYmm: light.offsetYmm,
-    ...(light.afterFrame === true ? { afterFrame: true } : {}),
+    ...afterFrame,
   };
 }
 
@@ -175,6 +266,8 @@ function machineStateCommandIssue(
 ): string | null {
   const [head = '', ...words] = command.trim().toUpperCase().split(/ +/);
   const code = Number(/^M(\d+)/.exec(head)?.[1]);
+  if (isMarlinMacroCommand(code, kind))
+    return 'Positioning light commands cannot define or run a stored macro.';
   if (STATE_CHANGING_M_CODES.has(code))
     return 'Positioning light commands cannot change pins, limits, overrides or motion settings.';
   // Smoothieware's M106/M107 are configurable switch commands; elsewhere they
@@ -186,4 +279,11 @@ function machineStateCommandIssue(
   return Number.isInteger(fan) && fan > 0
     ? null
     : 'Positioning light M106/M107 must name a non-zero P fan index; fan 0 can be the laser.';
+}
+
+// Marlin's optional M810-M819 macros can run arbitrary stored motion, not
+// just an accessory. Other families retain their explicit custom mappings.
+// https://marlinfw.org/docs/gcode/M810-M819.html
+function isMarlinMacroCommand(code: number, kind: ControllerKind | undefined): boolean {
+  return (kind === 'marlin' || kind === undefined) && code >= 810 && code <= 819;
 }

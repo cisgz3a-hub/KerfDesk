@@ -241,6 +241,10 @@
   padding-left: 18px;
   line-height: 1.6;
 }
+.lf-setup-kept-area {
+  margin: 0;
+  line-height: 1.5;
+}
 .lf-setup-auto-values {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));

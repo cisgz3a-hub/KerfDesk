@@ -1,0 +1,30 @@
+.lf-run-gcode-summary dl {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 12px;
+  margin: 0 0 8px;
+}
+
+.lf-run-gcode-summary dt {
+  color: var(--lf-text-muted);
+}
+
+.lf-run-gcode-summary dd {
+  margin: 0;
+  min-width: 0;
+}
+
+.lf-run-gcode-summary ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.lf-run-gcode-warnings-title {
+  margin: 8px 0 0;
+  font-size: var(--lf-text-sm);
+  color: var(--lf-warning);
+}
+
+.lf-run-gcode-error {
+  color: var(--lf-danger);
+}

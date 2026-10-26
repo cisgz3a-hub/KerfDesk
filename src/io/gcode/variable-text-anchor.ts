@@ -17,6 +17,8 @@ import type { VariableTextRenderer } from './prepare-output-snapshot';
 
 type AnchoredRender = {
   readonly anchor: Vec2;
+  readonly minX: number;
+  readonly minY: number;
   readonly width: number;
   readonly height: number;
 };
@@ -53,10 +55,13 @@ export async function anchoredVariableTextTransform(
   // Only a re-render that reproduces the placed geometry's size can say where
   // its anchor was; anything else keeps the placement output always used.
   if (placed === undefined || !sameExtent(placed, text.bounds)) return text.transform;
+  // The re-render's anchor is carried into the stored geometry's frame. A
+  // styled render does not start at zero (bold grows past it, italic leans
+  // off it), so the offset is between the two frames' corners.
   return shiftTransform(
     text.transform,
-    placed.anchor.x + text.bounds.minX - record.anchor.x,
-    placed.anchor.y + text.bounds.minY - record.anchor.y,
+    placed.anchor.x + text.bounds.minX - placed.minX - record.anchor.x,
+    placed.anchor.y + text.bounds.minY - placed.minY - record.anchor.y,
   );
 }
 
@@ -86,7 +91,13 @@ async function placedRender(
 }
 
 function anchoredRender(anchor: Vec2, bounds: Bounds): AnchoredRender {
-  return { anchor, width: bounds.maxX - bounds.minX, height: bounds.maxY - bounds.minY };
+  return {
+    anchor,
+    minX: bounds.minX,
+    minY: bounds.minY,
+    width: bounds.maxX - bounds.minX,
+    height: bounds.maxY - bounds.minY,
+  };
 }
 
 function sameExtent(render: AnchoredRender, bounds: Bounds): boolean {

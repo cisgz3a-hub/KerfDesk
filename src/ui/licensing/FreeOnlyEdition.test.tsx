@@ -153,16 +153,21 @@ it('runs a free desktop build as KerfDesk Free by default', async () => {
   await expectDesktopDialog(open);
 });
 
-it('mounts no Pro tool before a free desktop build reports, then only explains it', async () => {
+function slowFreeBuild() {
   let report: (status: LicenceStatus) => void = () => undefined;
   const slow = {
     ...client(freeBuild),
     status: vi.fn(() => new Promise<LicenceStatus>((resolve) => (report = resolve))),
   };
+  return { slow, report: (status: LicenceStatus) => report(status) };
+}
+
+it('mounts no Pro tool before a free desktop build reports, then only explains it', async () => {
+  const { slow, report } = slowFreeBuild();
   const open = vi.fn();
   await act(async () =>
     root.render(
-      <EditionProvider client={slow} unlicensedRunsFree>
+      <EditionProvider client={slow} unlicensedRunsFree licenceWindow>
         <VcarveTool onOpen={open} />
       </EditionProvider>,
     ),
@@ -171,6 +176,25 @@ it('mounts no Pro tool before a free desktop build reports, then only explains i
   expect(document.body.textContent).not.toContain('Open V-carve');
   await act(async () => report(freeBuild));
   await act(async () => openButton().click());
+  expect(open).not.toHaveBeenCalled();
+  expect(document.body.textContent).toContain('V-carve is a Pro tool');
+  expectEveryProFeatureListed();
+});
+
+it('does not open a Pro tool asked for before a free desktop build reports', async () => {
+  // While ADR-623 Amendment 3 holds the licence window off, the workspace
+  // mounts at once, as in 1.0.20, and an early Pro request still waits.
+  const { slow, report } = slowFreeBuild();
+  const open = vi.fn();
+  await act(async () =>
+    root.render(
+      <EditionProvider client={slow} unlicensedRunsFree licenceWindow={false}>
+        <VcarveTool onOpen={open} />
+      </EditionProvider>,
+    ),
+  );
+  await act(async () => openButton().click());
+  await act(async () => report(freeBuild));
   expect(open).not.toHaveBeenCalled();
   expect(document.body.textContent).toContain('V-carve is a Pro tool');
   expectEveryProFeatureListed();

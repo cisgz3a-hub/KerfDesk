@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import type { LicenceAdapter, LicenceStatus } from '../../platform/types';
+import { DESKTOP_LICENCE_WINDOW } from '../../../public/desktop-licence-window.mjs';
 import { Button, Dialog, DialogActions } from '../kit';
 import { LicenceActivationForm, licenceMuted } from './LicenceControls';
 import { PRO_FEATURES, PRO_PRICE_LABEL, type ProFeature } from './pro-features';
@@ -14,10 +15,11 @@ type Props = {
 };
 
 /**
- * Explains a locked Pro tool and offers the ways to unlock it (ADR-540). The
- * desktop app opens only with Pro (ADR-623), so this appears only after rights
- * end in a running session. If Pro becomes available here, the provider closes
- * this and opens the tool.
+ * Explains a locked Pro tool and offers the ways to unlock it (ADR-540). Behind
+ * the licence window the desktop app opens only with Pro (ADR-623), so this
+ * appears only after rights end in a running session; while ADR-623 Amendment 3
+ * holds the window off, KerfDesk Free shows it for every Pro tool. If Pro
+ * becomes available here, the provider closes this and opens the tool.
  */
 export function ProFeatureDialog({
   feature,
@@ -83,10 +85,16 @@ export function ProFeatureDialog({
         )}
         <Button onClick={onClose}>Not now</Button>
       </DialogActions>
-      <p style={licenceMuted}>
-        Your open projects and machine keep working until KerfDesk closes, and a licence never stops
-        a job that is running. KerfDesk asks for a licence the next time it opens.
-      </p>
+      {DESKTOP_LICENCE_WINDOW ? (
+        <p style={licenceMuted}>
+          Your open projects and machine keep working until KerfDesk closes, and a licence never
+          stops a job that is running. KerfDesk asks for a licence the next time it opens.
+        </p>
+      ) : (
+        <p style={licenceMuted}>
+          Everything else in KerfDesk stays free, and a licence never stops a job that is running.
+        </p>
+      )}
     </Dialog>
   );
 }

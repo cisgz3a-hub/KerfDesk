@@ -96,6 +96,8 @@ export function harness(
     );
   };
   const ack = (line: string): void => {
+    // A realtime override byte is acted on at once and owes no reply.
+    if (line.length === 1 && line.charCodeAt(0) >= 0x80) return;
     const response = line === 'fire off' ? 'turning laser off and returning to auto mode' : 'ok';
     consumeControllerCommandResponse(refs, driver.classifyLine(response), response);
   };

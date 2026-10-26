@@ -17,7 +17,7 @@ export function applyLumaAdjustments(input: Uint8Array, adjustments: LumaAdjustm
 
 /**
  * The 256-entry curve brightness, contrast and gamma compose to, or null when
- * none is off its default (ADR-648). Each stage keeps its own clamp and the
+ * none is off its default (ADR-671). Each stage keeps its own clamp and the
  * order brightness → contrast → gamma, but the value stays a float until one
  * final rounding. Rounding after every stage merged neighbouring grey levels
  * and banded smooth skin gradients.

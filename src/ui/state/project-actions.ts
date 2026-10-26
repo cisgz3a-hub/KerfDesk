@@ -29,9 +29,13 @@ import { useUiStore } from './ui-store';
 import { applyStartPointDefaults } from './start-point-defaults';
 import {
   canonicalizeOpenedProjectBed,
+  withCurrentMachineAutofocus,
+  withCurrentMachineCamera,
   type ProjectBedReconciliationNotice,
 } from './project-bed-reconciliation';
+import { useToastStore } from './toast-store';
 import { projectSheetActions, type ProjectSheetActions } from './project-sheet-actions';
+import { JOB_MACHINE_OPEN_REFUSED, refuseJobMachineChange } from './job-machine-lock';
 
 type ProjectActionSet = (
   fn: AppState | Partial<AppState> | ((state: AppState) => AppState | Partial<AppState>),
@@ -39,10 +43,24 @@ type ProjectActionSet = (
 type ProjectActionGet = () => AppState;
 type InitialStateFactory = (project?: Project) => Partial<AppState>;
 
+/**
+ * Commits an edit through the store's authoring guard (ADR-540 Amendment 1
+ * item 6, ADR-592 decision 5): without Pro, new or changed Pro work waits for
+ * the Pro prompt. Returns false while it waits; `onCommitted` runs only once
+ * the edit lands, and a delayed commit checks `isCurrent` again first.
+ */
+export type ProjectEditCommit = (
+  update: AppState | Partial<AppState> | ((state: AppState) => AppState | Partial<AppState>),
+  onCommitted?: () => void,
+  isCurrent?: () => boolean,
+) => boolean;
+
 export type ProjectActions = StudioDocumentActions &
   ProjectSheetActions &
   ProductionManifestActions &
   RetainedArrayActions & {
+    /** Edits built outside the store commit here, never through `useStore.setState`. */
+    readonly commitProjectEdit: ProjectEditCommit;
     readonly setProject: (project: Project) => ProjectMachineCapabilityLoadResult;
     readonly newProject: () => void;
     readonly claimProjectOpenRequest: () => number;
@@ -55,28 +73,39 @@ export function projectActions(
   set: ProjectActionSet,
   get: ProjectActionGet,
   initialState: InitialStateFactory,
+  authoringSet: ProjectEditCommit,
 ): ProjectActions {
   return {
     ...projectSheetActions(set, get),
     ...studioDocumentActions(set),
     ...productionManifestActions(set, get),
-    ...retainedArrayActions(set),
+    // Regenerate adds copies of the arrayed artwork, so it asks for Pro as
+    // creating an array does (ADR-540 Amendment 1 item 6).
+    ...retainedArrayActions(authoringSet),
+    commitProjectEdit: authoringSet,
     setProject: (project) => {
       const preserved = preserveUnadmittedProProject(project);
       if (preserved !== null) return { kind: 'desktop-required', features: preserved.features };
       const current = get();
       const resolution = resolveProjectMachineCapability(project, current.cncLibrary.customTools);
       const bedResolution = canonicalizeOpenedProjectBed(resolution.project, current.project);
+      const autofocus = withCurrentMachineAutofocus(bedResolution.project, current.project);
+      const camera = withCurrentMachineCamera(autofocus.project, current.project);
+      // A file on another machine waits for a running job (ADR-416 Amendment 2).
+      if (refuseJobMachineChange(current.project, camera.project, JOB_MACHINE_OPEN_REFUSED))
+        return { kind: 'job-machine-locked' };
       useUiStore.getState().resetArtworkRunOrder();
       set((state) => ({
-        ...initialState(bedResolution.project),
+        ...initialState(camera.project),
         ...retainedApplicationState(state),
         projectDocumentEpoch: state.projectDocumentEpoch + 1,
         cachedCncMachine: resolution.cachedCncMachine,
         projectBedReconciliation: bedResolution.notice,
         dirty: bedResolution.notice?.workspaceMismatch === true,
       }));
-      const loneArtworkId = loneSelectableArtworkId(bedResolution.project.scene);
+      if (autofocus.keptCurrentCommand) noteKeptAutofocusCommand();
+      if (camera.keptCurrentCamera) noteKeptCameraCalibration();
+      const loneArtworkId = loneSelectableArtworkId(camera.project.scene);
       if (loneArtworkId !== null && get().selectedObjectId === null)
         get().selectObject(loneArtworkId);
       return bedResolution.notice?.workspaceMismatch === true
@@ -117,15 +146,42 @@ export function projectActions(
       set({ projectOpenRequestEpoch: nextEpoch });
       return nextEpoch;
     },
-    claimProjectSaveRequest: () => {
-      const nextEpoch = get().projectSaveRequestEpoch + 1;
-      set({ projectSaveRequestEpoch: nextEpoch });
-      return nextEpoch;
-    },
+    claimProjectSaveRequest: () => claimProjectSaveRequest(set, get),
     acceptOpenedProjectMachine: () => set({ projectBedReconciliation: null }),
     keepCurrentMachineForOpenedProject: () =>
       set((state) => keepCurrentMachinePatch(state, state.projectBedReconciliation)),
   };
+}
+
+function claimProjectSaveRequest(set: ProjectActionSet, get: ProjectActionGet): number {
+  // Save commits the visible numbering order as one undo step. Retire its
+  // rollback before any picker/write awaits, so Cancel cannot later restore
+  // different content while retaining this save's clean status and target.
+  if (useUiStore.getState().artworkNumbering.kind === 'active') {
+    get().endInteraction();
+    useUiStore.getState().finishArtworkNumbering();
+  }
+  const nextEpoch = get().projectSaveRequestEpoch + 1;
+  set({ projectSaveRequestEpoch: nextEpoch });
+  return nextEpoch;
+}
+
+function noteKeptCameraCalibration(): void {
+  useToastStore
+    .getState()
+    .pushToast(
+      "This file's camera calibration was not used: the camera keeps your machine's current calibration.",
+      'info',
+    );
+}
+
+function noteKeptAutofocusCommand(): void {
+  useToastStore
+    .getState()
+    .pushToast(
+      "This file's Auto-focus command was not used: Auto-focus keeps your machine's own command from Machine Setup.",
+      'info',
+    );
 }
 
 function keepCurrentMachinePatch(

@@ -150,7 +150,7 @@ function isDeterministicBlackDither(algorithm: Layer['ditherAlgorithm']): boolea
   return algorithm === 'threshold' || algorithm === 'grayscale';
 }
 
-// ADR-648 sharpening rewrites burn-grid pixels too, so it is not an identity.
+// ADR-671 sharpening rewrites burn-grid pixels too, so it is not an identity.
 function hasIdentityLumaAdjustments(object: RasterImage): boolean {
   return (
     (object.brightness ?? 0) === 0 &&

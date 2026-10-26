@@ -1,5 +1,5 @@
 // A project file dropped on the window opens exactly like one the operating
-// system hands over (ADR-378 Amendment 1): behind the unsaved-changes
+// system hands over (ADR-378 Amendment 2): behind the unsaved-changes
 // question, and never over a running job or an open dialog, where it waits in
 // the banner instead.
 

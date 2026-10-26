@@ -38,6 +38,7 @@ export function revealReviewedArtwork(
 
   // Resolve the run's waiter before selection can request a review rebuild.
   useJobReviewStore.getState().cancelAndClose();
+  // eslint-disable-next-line kerfdesk/no-raw-project-set-state -- selection only: the project changes only when Cut Selected Graphics records that selection.
   useStore.setState((state) => ({
     ...scopedSelectionProjectPatch(state, {
       selectedObjectId: ids[0] ?? null,

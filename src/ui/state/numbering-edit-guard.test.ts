@@ -71,6 +71,44 @@ afterEach(() => {
 });
 
 describe('edits while canvas numbering is open', () => {
+  it('does not dirty the rollback snapshot for a no-op that returns the full state', () => {
+    useStore.setState({ dirty: false });
+    const before = useStore.getState().project;
+    startNumbering();
+    useStore.getState().setRegistrationOutput('box'); // No registration layer exists.
+    cancelNumbering();
+    expect(useStore.getState().project).toBe(before);
+    expect(useStore.getState().dirty).toBe(false);
+  });
+
+  it('retains history-free placement and scope coherently when numbering is cancelled', async () => {
+    useStore.setState({ dirty: false });
+    const before = useStore.getState();
+    startNumbering();
+    useStore.getState().selectObjects(['A']);
+    useStore.getState().setArtworkOrderDuringInteraction(['B', 'A']);
+    useStore.getState().setJobPlacement({ startFrom: 'user-origin', anchor: 'center' });
+    useStore
+      .getState()
+      .setOutputScopeSettings({ cutSelectedGraphics: true, useSelectionOrigin: true });
+    expect(await refusalToasts()).toHaveLength(0);
+    cancelNumbering();
+    const after = useStore.getState();
+    expect(after.jobPlacement).toMatchObject({ startFrom: 'user-origin', anchor: 'center' });
+    expect(after.outputScopeSettings).toMatchObject({
+      cutSelectedGraphics: true,
+      useSelectionOrigin: true,
+    });
+    expect(after.project.jobSetup?.placement).toEqual(after.jobPlacement);
+    expect(after.project.jobSetup?.outputScope).toEqual({
+      ...after.outputScopeSettings,
+      selectedObjectIds: [before.selectedObjectId],
+    });
+    expect(canonicalArtworkOrder(after.project.scene)).toEqual(['A', 'B']);
+    expect(after.selectedObjectId).toBe(before.selectedObjectId);
+    expect(after.dirty).toBe(true);
+  });
+
   it('refuses the Delete key and keeps the artwork through Cancel', async () => {
     const undoBefore = useStore.getState().undoStack;
     startNumbering();

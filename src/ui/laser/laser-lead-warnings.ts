@@ -28,6 +28,7 @@ type LeadDiagnostic =
       readonly layerName: string;
       readonly count: number;
       readonly aroundName: string;
+      readonly aroundOpenPaths?: true;
     };
 
 export function isLaserLeadDiagnostic<T extends { readonly kind: string }>(
@@ -41,19 +42,25 @@ export function isLaserLeadDiagnostic<T extends { readonly kind: string }>(
   );
 }
 
-/** One warning per operation (by id: names can repeat) and kind; an operation
- * compiled object by object reports once per object. */
+/** One warning per operation (by id: names can repeat) and kind, and for an
+ * unknown side per operation holding the shapes; an operation compiled object
+ * by object reports once per object. */
 export function laserLeadWarnings(diagnostics: ReadonlyArray<LeadDiagnostic>): string[] {
   const merged: LeadDiagnostic[] = [];
   for (const diagnostic of diagnostics) {
-    const index = merged.findIndex(
-      (earlier) => earlier.kind === diagnostic.kind && earlier.layerId === diagnostic.layerId,
-    );
+    const index = merged.findIndex((earlier) => sameWarning(earlier, diagnostic));
     const earlier = merged[index];
     if (earlier === undefined) merged.push(diagnostic);
     else merged[index] = mergedLeadDiagnostic(earlier, diagnostic);
   }
   return merged.map(laserLeadWarning);
+}
+
+function sameWarning(a: LeadDiagnostic, b: LeadDiagnostic): boolean {
+  if (a.kind !== b.kind || a.layerId !== b.layerId) return false;
+  return a.kind !== 'laser-leads-side-unknown' || b.kind !== 'laser-leads-side-unknown'
+    ? true
+    : a.aroundName === b.aroundName && a.aroundOpenPaths === b.aroundOpenPaths;
 }
 
 function mergedLeadDiagnostic(earlier: LeadDiagnostic, next: LeadDiagnostic): LeadDiagnostic {
@@ -82,8 +89,19 @@ function laserLeadWarning(diagnostic: LeadDiagnostic): string {
     case 'laser-leads-adjusted':
       return `${where}: ${adjustedParts(diagnostic.shortened, diagnostic.omitted)}, because a full lead there would leave the scrap side, come too close to another cut line or run off the bed. Check the preview.${diagnostic.omitted > 0 ? ' Where a lead is missing, that shape starts or stops on its edge, as with leads off.' : ''}`;
     case 'laser-leads-side-unknown':
+      if (diagnostic.aroundOpenPaths === true) return openLinesWarning(where, diagnostic);
       return `${where}: ${shapes(diagnostic.count)} inside a closed shape on layer "${diagnostic.aroundName}", which has no leads, ${diagnostic.count === 1 ? 'gets' : 'get'} no leads. That shape may be a part, or only a score line or border, so which side is scrap is unknown. Turn on leads for "${diagnostic.aroundName}" if it cuts parts out, or set Lead side to Always outside or Always inside.`;
   }
+}
+
+// ADR-626 Amendment 8: open lines that close a region round a shape may be a
+// part's outline that was never joined, such as a CAD plate drawn as LINEs.
+function openLinesWarning(
+  where: string,
+  diagnostic: Extract<LeadDiagnostic, { readonly kind: 'laser-leads-side-unknown' }>,
+): string {
+  const one = diagnostic.count === 1;
+  return `${where}: ${shapes(diagnostic.count)} inside open lines on layer "${diagnostic.aroundName}" ${one ? 'gets' : 'get'} no leads. Those lines close round ${one ? 'it' : 'them'} but are not one closed shape, so they may be the outline of a part, and which side is scrap is unknown. Close the outline with Tools > Join paths, or set Lead side to Always outside or Always inside.`;
 }
 
 function adjustedParts(shortened: number, omitted: number): string {

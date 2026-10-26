@@ -90,10 +90,12 @@ describe('optimizePaths', () => {
   it('reorders two segments so the closer one is visited first', () => {
     // Original order visits the far segment first (bad). Optimizer
     // should swap so we visit (0,0)→(1,0) before the segment 100mm away.
+    // Colinear, so near-first is also the shortest tour back to the origin
+    // (ADR-669 scores that return): 200 mm against 202 mm.
     const j: Job = {
       groups: [
         group([
-          seg([100, 100], [101, 100]), // far first (bad)
+          seg([100, 0], [101, 0]), // far first (bad)
           seg([0, 0], [1, 0]), // close, should go first
         ]),
       ],
@@ -204,7 +206,7 @@ describe('optimizePaths', () => {
   });
 
   it('reorders offset fill contours to enter the closest contour first', () => {
-    const farFirst = fillSeg([100, 100], [101, 100]);
+    const farFirst = fillSeg([100, 0], [101, 0]);
     const nearSecond = fillSeg([0, 0], [1, 0]);
     const j: Job = {
       groups: [fillGroup('offset', [farFirst, nearSecond])],

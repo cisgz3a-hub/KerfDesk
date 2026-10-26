@@ -21,7 +21,9 @@ import {
   type Layer,
 } from '../../core/scene';
 import { useStore } from '../state';
-import { withManualCncFeedPatch } from '../state/cnc-feed-provenance';
+import { useLengthUnit } from '../state/display-units';
+import { formatLengthWithUnit } from '../display-length';
+import { cncOperationMaterialKey, withManualCncFeedPatch } from '../state/cnc-feed-provenance';
 import { useEdition } from '../licensing/edition';
 import { proChoiceLabel } from '../licensing/pro-features';
 import {
@@ -58,7 +60,9 @@ export function CncLayerFields(props: {
   const spindleMaxRpm = isCnc ? machine.params.spindleMaxRpm : 24000;
   const stockThicknessMm = isCnc ? machine.stock.thicknessMm : 0;
   const isProfile = hasProfileTabs(settings);
+  const editedFrom = useEditedFromMaterial(layer, settings);
   const commitSettings = (next: CncLayerSettings): void => {
+    editedFrom.remember(next);
     if (props.onSettingsChange !== undefined) props.onSettingsChange(next);
     else setLayerParam(layer.id, { cnc: next });
   };
@@ -68,12 +72,10 @@ export function CncLayerFields(props: {
     if (replaceFeedDrafts) setAssignmentRevision((revision) => revision + 1);
     commitSettings(next);
   };
-  // Material and bit recipes rewrite these numbers, so their drafts restart.
-  const recipeKey = JSON.stringify([
-    settings.materialKey ?? null,
-    settings.toolId ?? null,
-    assignmentRevision,
-  ]);
+  // Material and bit choices rewrite these numbers, so their drafts restart.
+  // The material label stays out of the key: a hand edit clears it (ADR-233
+  // decision 5) while that edit's box still has focus.
+  const recipeKey = JSON.stringify([settings.toolId ?? null, assignmentRevision]);
 
   return (
     <div className="lf-cnc-settings">
@@ -82,6 +84,7 @@ export function CncLayerFields(props: {
         layer={layer}
         settings={settings}
         hasReliefObjects={hasReliefObjects}
+        editedFromMaterialKey={editedFrom.materialKey}
         onCommitSettings={commitAssignment}
       />
       <VCarveToolWarning settings={settings} />
@@ -125,6 +128,27 @@ export function CncLayerFields(props: {
       />
     </div>
   );
+}
+
+// The material a hand edit or Manual last took off this operation, so a bit
+// change that keeps those numbers can offer that material for the new bit
+// (CNC audit v1 F4-P2-1). It is the card's memory only, not saved.
+function useEditedFromMaterial(
+  layer: Layer,
+  settings: CncLayerSettings,
+): { readonly materialKey: string | null; readonly remember: (next: CncLayerSettings) => void } {
+  const [edited, setEdited] = useState<{ readonly layerId: string; readonly key: string } | null>(
+    null,
+  );
+  return {
+    materialKey: edited?.layerId === layer.id ? edited.key : null,
+    remember: (next) => {
+      const removed = cncOperationMaterialKey(settings);
+      if (removed !== undefined && cncOperationMaterialKey(next) === undefined) {
+        setEdited({ layerId: layer.id, key: removed });
+      }
+    },
+  };
 }
 
 // The cut type's one-line explanation is its tooltip. Traced edges follows
@@ -208,6 +232,7 @@ function CncDepthFields(props: {
   readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
 }): JSX.Element {
   const { layer, settings, onCommit } = props;
+  const lengthUnit = useLengthUnit();
   const isVCarve = settings.cutType === 'v-carve';
   const flatDepthEnabled = settings.vCarveFlatDepthEnabled ?? true;
   const isTaperedInlay = settings.cutType === 'inlay-pair' && settings.taperedInlay !== undefined;
@@ -246,7 +271,7 @@ function CncDepthFields(props: {
             onClick={() => onCommit({ depthMm: props.stockThicknessMm })}
             title="Set exactly to the measured stock thickness. Add a verified overcut manually only when the setup needs it."
           >
-            Set to stock thickness ({props.stockThicknessMm} mm)
+            Set to stock thickness ({formatLengthWithUnit(props.stockThicknessMm, lengthUnit)})
           </button>
         ) : null}
       </div>
@@ -274,6 +299,7 @@ function CutDepthField(props: {
       layer={props.layer}
       label={label}
       unit="mm"
+      dimension="length"
       value={props.settings.depthMm}
       min={0.05}
       max={200}

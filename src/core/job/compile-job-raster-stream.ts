@@ -115,7 +115,7 @@ function streamedLumaRowAt(input: StreamedRasterInput): (y: number) => Uint8Arra
     input.pixelHeight,
     burnGridKernel(input.algorithm),
   );
-  // ADR-648: the same row function the materialized sharpenLuma runs.
+  // ADR-671: the same row function the materialized sharpenLuma runs.
   const sharpen = burnGridSharpen(input.obj, input.passThrough === true);
   const resampledRowAt =
     sharpen === null

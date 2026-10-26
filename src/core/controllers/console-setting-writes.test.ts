@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ControllerDriver } from './controller-driver';
-import { consoleSettingWriteIssue } from './console-setting-writes';
+import { consoleSettingReadbackIssue, consoleSettingWriteIssue } from './console-setting-writes';
 import { selectControllerDriver } from './select-controller-driver';
 
 const falcon = selectControllerDriver('grblhal', 'creality-falcon-a1-pro');
@@ -80,8 +80,84 @@ describe('Console setting values stock GRBL would store differently', () => {
       expect(issue(grbl, input)).toBeNull();
     },
   );
+});
 
-  it('leaves grblHAL, which refuses a fraction itself, to its firmware', () => {
-    expect(issue(grblHal, '$22=0.5')).toBeNull();
+// Controller audit v2 C4-P2-1 (ADR-375 Amendment 4). grblHAL core keeps every
+// character after `=` (system.c#L1139-L1213) and reads only the number at the
+// start (settings.c#L3527-L3552, nuts_bolts.c read_uint/read_float), answering
+// ok; d7aaee3's read_uint also takes each zero after the point as one more
+// digit (nuts_bolts.c#L194-L244), fixed only in 20261015.
+describe('Console setting values grblHAL would store differently', () => {
+  it.each([
+    [
+      '$100=26,67',
+      /^\$100=26,67 cannot be sent: Enter a finite decimal number\. grblHAL keeps only the number at the start/,
+    ],
+    ['$110=5O00', /^\$110=5O00 cannot be sent: .*keeps only the number at the start/],
+    ['$22=1 (on)', /keeps only the number at the start/],
+    ['$22=0.5', /^\$22=0\.5 cannot be sent: Enter an unsigned integer/],
+    [
+      '$22=1.0',
+      /^grblHAL would not store \$22=1\.0 as typed\. Send \$22=1 instead\. grblHAL builds before 20261015 read 1\.0 as 10 /,
+    ],
+    ['$1=255.0', /Send \$1=255 instead\. .*read 255\.0 as 2550/],
+    ['$3=1.00', /Send \$3=1 instead\. .*read 1\.00 as 100/],
+    ['$100=1e2', /Send \$100=100 instead\. grblHAL stops reading a value at its exponent\./],
+    ['$26=70000', /^grblHAL stores \$26 in 16 bits, so 70000 would be stored as 4464\./],
+  ])('refuses %j', (input, reason) => {
+    expect(issue(grblHal, input)).toMatch(reason);
+  });
+
+  it.each([
+    '$110=6000',
+    '$110=5000.0',
+    '$100=26.67',
+    '$22=9',
+    '$22=0.0',
+    '$26=25.',
+    '$1=+25',
+    '$1=025',
+    '$26=65535',
+    '$ 22 = 1',
+  ])('sends %j, which grblHAL stores as typed', (input) => {
+    expect(issue(grblHal, input)).toBeNull();
+  });
+
+  it.each(['$300=laser-1', '$302=192.168.5.1', '$330=12ab', '$680=25.0'])(
+    'leaves %j, a setting KerfDesk does not know, to the firmware and the re-read',
+    (input) => {
+      expect(issue(grblHal, input)).toBeNull();
+    },
+  );
+
+  it('keeps the Falcon contract on its own list', () => {
+    expect(issue(falcon, '$152=100.0')).toContain('whole number from 0 to 100');
+  });
+});
+
+describe('the $$ re-read after a Console setting write', () => {
+  const readback = (driver: ControllerDriver, input: string, reported: string | undefined) =>
+    consoleSettingReadbackIssue(driver, input, reported);
+
+  it('names a value grblHAL stored differently', () => {
+    expect(readback(grblHal, '$680=25.0', '250')).toBe(
+      'The controller reports $680=250 after the re-read, not 25.0: it stored a different value. Write $680 again with the intended value.',
+    );
+    expect(readback(grblHal, '$680=5O00', '5')).toContain('reports $680=5 after the re-read');
+    expect(readback(grbl, '$110=5000', '500.000')).toContain('reports $110=500.000');
+  });
+
+  it('accepts the value at the precision the controller printed', () => {
+    expect(readback(grblHal, '$100=26.67', '26.670')).toBeNull();
+    expect(readback(grblHal, '$0=5.25', '5.3')).toBeNull();
+    expect(readback(grbl, '$22=1 (on)', '1')).toBeNull();
+    expect(readback(grbl, '$30=1000.4', '1000')).toBeNull();
+  });
+
+  it('leaves text settings and settings the re-read did not list alone', () => {
+    expect(readback(grblHal, '$300=laser-1', 'laser-1')).toBeNull();
+    expect(readback(grblHal, '$302=192.168.5.1', '192.168.5.1')).toBeNull();
+    expect(readback(grblHal, '$330=1234', '1234')).toBeNull();
+    expect(readback(grblHal, '$100=26.67', undefined)).toBeNull();
   });
 });

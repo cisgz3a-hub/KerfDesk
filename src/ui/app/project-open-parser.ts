@@ -29,7 +29,9 @@ export async function parseOpenedProjectFile(
   | { readonly kind: 'native'; readonly result: ReturnType<typeof deserializeProject> }
   | { readonly kind: 'lightburn'; readonly result: ReturnType<typeof importLightBurnProject> }
 > {
+  options.signal?.throwIfAborted();
   const blob = await resolveImportBlob(file);
+  options.signal?.throwIfAborted();
   if (/\.lbrn2?$/i.test(file.name)) {
     return {
       kind: 'lightburn',
@@ -46,11 +48,14 @@ async function parseLightBurnProjectFile(
   pushToast: PushToast,
   device: DeviceProfile | undefined,
 ): Promise<ReturnType<typeof importLightBurnProject>> {
-  if (blob === null) return importLightBurnProject(await file.text(), file.name, undefined, device);
+  if (blob === null) {
+    const text = await readProjectText(file, options);
+    return importLightBurnProject(text, file.name, undefined, device);
+  }
   const pending = parseLightBurnProjectOffThread(blob, file.name, options, device);
   if (pending !== null) return pending;
   pushToast(mainThreadImportFallbackAdvisory(file.name), 'warning');
-  return importLightBurnProject(await file.text(), file.name, undefined, device);
+  return importLightBurnProject(await readProjectText(file, options), file.name, undefined, device);
 }
 
 async function parseNativeProjectFile(
@@ -60,14 +65,25 @@ async function parseNativeProjectFile(
   pushToast: PushToast,
 ): Promise<ReturnType<typeof deserializeProject>> {
   if (blob === null) {
-    const text = await file.text();
-    return admitSealedProject(deserializeProject(text), async () => text);
+    const text = await readProjectText(file, options);
+    return admitSealedProject(deserializeProject(text), async () => text, options);
   }
   const pending = parseProjectOffThread(blob, options);
-  if (pending !== null) return admitSealedProject(await pending, () => file.text());
+  if (pending !== null)
+    return admitSealedProject(await pending, () => readProjectText(file, options), options);
   pushToast(mainThreadImportFallbackAdvisory(file.name), 'warning');
+  const text = await readProjectText(file, options);
+  return admitSealedProject(deserializeProject(text), async () => text, options);
+}
+
+async function readProjectText(
+  file: OpenProjectFile,
+  options: DocumentImportRequestOptions,
+): Promise<string> {
+  options.signal?.throwIfAborted();
   const text = await file.text();
-  return admitSealedProject(deserializeProject(text), async () => text);
+  options.signal?.throwIfAborted();
+  return text;
 }
 
 /**
@@ -77,9 +93,13 @@ async function parseNativeProjectFile(
 async function admitSealedProject(
   result: ReturnType<typeof deserializeProject>,
   text: () => Promise<string>,
+  options: DocumentImportRequestOptions,
 ): Promise<ReturnType<typeof deserializeProject>> {
   if (result.kind !== 'ok' || unadmittedProFeatures(result.project).length === 0) return result;
   await projectSealReady();
-  trustIfSealedHere(result.project, await text());
+  options.signal?.throwIfAborted();
+  const source = await text();
+  options.signal?.throwIfAborted();
+  trustIfSealedHere(result.project, source);
   return result;
 }

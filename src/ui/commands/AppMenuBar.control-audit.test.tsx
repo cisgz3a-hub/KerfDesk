@@ -21,7 +21,8 @@ type Outcome = {
     | 'unavailable'
     | 'licence'
     | 'support-report'
-    | 'check-updates';
+    | 'check-updates'
+    | 'license-notice';
 };
 
 // Independent command-to-action expectations. Each command is clicked through
@@ -87,6 +88,7 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'tools.box-fit-test': { callback: 'boxFitTest' },
   'tools.material-test': { callback: 'materialTest', guard: 'create a material test' },
   'tools.interval-test': { callback: 'intervalTest', guard: 'create an interval test' },
+  'tools.tone-calibration': { callback: 'toneCalibration' },
   'tools.scan-offset-test': { callback: 'scanOffsetTest', guard: 'create a scan offset test' },
   'tools.focus-test': { callback: 'focusTest', guard: 'create a focus test' },
   'tools.optimization-settings': { callback: 'optimizationSettings' },
@@ -231,6 +233,7 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'help.open-data-folder': { callback: 'openDataFolder' },
   'help.discussions': { url: 'https://kerfdesk.com/support.html' },
   'help.pricing': { url: 'https://kerfdesk.com/pricing/' },
+  'help.license-notice': { special: 'license-notice' },
   'help.terms': { url: 'https://kerfdesk.com/terms/' },
   'help.privacy': { url: 'https://kerfdesk.com/privacy/' },
   'help.refunds': { url: 'https://kerfdesk.com/refunds/' },
@@ -314,6 +317,8 @@ describe('every registered application menu action', () => {
       window.addEventListener('kerfdesk:support-report', supportReportEvent, { once: true });
       const checkUpdatesEvent = vi.fn();
       window.addEventListener('kerfdesk:check-updates', checkUpdatesEvent, { once: true });
+      const licenseNoticeEvent = vi.fn();
+      window.addEventListener('kerfdesk:license-notice', licenseNoticeEvent, { once: true });
       const opened: Array<{ href: string; target: string; rel: string }> = [];
       vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
         this: HTMLAnchorElement,
@@ -329,6 +334,10 @@ describe('every registered application menu action', () => {
       window.removeEventListener('kerfdesk:support-report', supportReportEvent);
       expect(checkUpdatesEvent).toHaveBeenCalledTimes(Number(outcome.special === 'check-updates'));
       window.removeEventListener('kerfdesk:check-updates', checkUpdatesEvent);
+      expect(licenseNoticeEvent).toHaveBeenCalledTimes(
+        Number(outcome.special === 'license-notice'),
+      );
+      window.removeEventListener('kerfdesk:license-notice', licenseNoticeEvent);
       if (outcome.special === 'unavailable') {
         expect(button.disabled).toBe(true);
         expect(button.title).toContain('Z-motion generator');

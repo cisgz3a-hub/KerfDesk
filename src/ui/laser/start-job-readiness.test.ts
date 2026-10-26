@@ -249,8 +249,8 @@ describe('prepareStartJob', () => {
 
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.warnings).toContain(
-        'Controller $31 minimum S is 10. Low nonzero power values may burn hotter than expected.',
+      expect(result.warnings).toContainEqual(
+        expect.stringMatching(/^Controller \$31 minimum S is 10\. .*burns weaker than set/),
       );
     }
   });

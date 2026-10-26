@@ -59,6 +59,22 @@ describe('Pro commands (ADR-540)', () => {
     expect(edition.asked).toEqual([]);
   });
 
+  it('leave the free G-code Inspector alone (ADR-627)', () => {
+    const edition = freeEdition(false);
+    setActiveEdition(edition);
+    const ctx = baseCtx({ machineKind: 'laser' });
+    const commands = buildAppCommands(ctx);
+    runCommand(commandById(commands, 'file.open-gcode'));
+    runCommand(commandById(commands, 'file.inspect-gcode'));
+    expect(ctx.openGcodePreview).toHaveBeenCalledTimes(1);
+    expect(ctx.inspectCurrentGcode).toHaveBeenCalledTimes(1);
+    expect(edition.asked).toEqual([]);
+    expect(PRO_COMMAND_FEATURES.has('file.open-gcode')).toBe(false);
+    expect(PRO_COMMAND_FEATURES.has('file.inspect-gcode')).toBe(false);
+    const labelled = labelProCommands(commands);
+    expect(commandById(labelled, 'file.open-gcode').label).not.toMatch(/Pro/);
+  });
+
   it('are marked Pro in KerfDesk Free menus', () => {
     const labelled = labelProCommands(buildAppCommands(baseCtx({ machineKind: 'laser' })));
     expect(commandById(labelled, 'tools.box-generator').label).toMatch(/ \(Pro\)$/);

@@ -14,9 +14,11 @@ change. Existing web and free/Preview app builds continue to work without activa
 | Johann and Father | Two individual free developer keys, three computers each, unlimited updates |
 
 Paddle-added taxes are additional. Expired update coverage never ends paid use of
-an already eligible version. The commercial desktop app has no Free edition: it
-opens behind a licence window, with no workspace mounted, until this device has a
-trial or licence (ADR-623). Once open, a session keeps its workspace until KerfDesk
+an already eligible version. The commercial desktop app is built to open behind a
+licence window, with no workspace mounted, until this device has a trial or
+licence (ADR-623). [ADR-623 Amendment 3](decisions/ADR-623-amendment-3-licence-window-held-off.md) holds that window off for now: from 1.0.21 the
+desktop app opens straight into KerfDesk Free (ADR-540), and the checks below that
+name the licence window apply once a release turns it back on. Once open, a session keeps its workspace until KerfDesk
 closes, and a licence change never interrupts an active machining session. Keep
 normal Frame, review, Abort and controller workflows intact.
 

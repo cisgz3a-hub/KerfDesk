@@ -1,6 +1,9 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { parseStatusReport } from '../../core/controllers/grbl/status-parser';
+import { useLaserStore } from '../state/laser-store';
+import { initialLaserState } from '../state/laser-store-helpers';
 import { useUiStore } from '../state/ui-store';
 import { GcodeInspectorDialog } from './GcodeInspectorDialog';
 
@@ -44,6 +47,7 @@ afterEach(() => {
   container = null;
   root = null;
   useUiStore.setState({ modalDepth: 0 });
+  useLaserStore.setState(initialLaserState());
   vi.unstubAllGlobals();
 });
 
@@ -132,4 +136,39 @@ describe('GcodeInspectorDialog', () => {
     );
     expect(container?.textContent ?? '').toContain('Open in 2D simulator');
   });
+
+  // ADR-630: Run on machine... is enabled only while connected, Idle and with
+  // nothing else running; otherwise its tooltip says why.
+  it('enables Run on machine only on a connected, Idle machine', async () => {
+    mount(
+      <GcodeInspectorDialog
+        programName="part.nc"
+        source={{ kind: 'text', text: PROGRAM }}
+        machineKind="laser"
+        onRunOnMachine={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+    const run = (): HTMLButtonElement | undefined =>
+      [...(container?.querySelectorAll('button') ?? [])].find(
+        (each) => each.textContent === 'Run on machine...',
+      );
+    await settleUntil(() => run() !== undefined);
+    expect(run()?.disabled).toBe(true);
+    expect(run()?.title).toBe('Connect to the machine first.');
+    await act(async () => {
+      useLaserStore.setState({
+        connection: { kind: 'connected' },
+        statusReport: parseStatusReport('<Run|MPos:0.000,0.000,0.000|FS:0,0>'),
+      });
+    });
+    expect(run()?.disabled).toBe(true);
+    expect(run()?.title).toContain('Idle');
+    await act(async () => {
+      useLaserStore.setState({
+        statusReport: parseStatusReport('<Idle|MPos:0.000,0.000,0.000|FS:0,0>'),
+      });
+    });
+    expect(run()?.disabled).toBe(false);
+  }, 15_000);
 });

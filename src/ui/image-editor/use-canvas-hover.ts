@@ -4,6 +4,7 @@
 // pointer moves never re-render React.
 
 import { useCallback } from 'react';
+import type { RgbaBuffer } from '../../core/image-edit';
 import type { BrushSettings, EditorTool } from './editor-session';
 import type { EditorView } from './image-editor-types';
 import { useBrushCursor } from './use-brush-cursor';
@@ -25,10 +26,11 @@ export function useCanvasHover(
   brush: BrushSettings,
   view: EditorView,
   isSpacePanning: boolean,
+  displayedDoc: RgbaBuffer | undefined,
 ): CanvasHover {
   const cursor = useBrushCursor(tool, brush, view, isSpacePanning);
   const badge = useModeBadge();
-  const info = useInfoReadout();
+  const info = useInfoReadout(displayedDoc);
 
   const onHoverMove = useCallback(
     (e: React.PointerEvent<HTMLElement>): void => {

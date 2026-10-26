@@ -200,6 +200,71 @@ describe('boardCaptureReducer circle', () => {
   });
 });
 
+describe('boardCaptureReducer outline', () => {
+  const draft = {
+    localPointsMm: [P(0, 0), P(80, 0), P(80, 40), P(0, 60)],
+    anchorIndices: [0, 1, 2, 3],
+    captureOrder: [3, 1] as const,
+  };
+  const geometry: CapturedBoardGeometry = {
+    kind: 'outline',
+    localPointsMm: draft.localPointsMm,
+    anchorIndices: draft.anchorIndices,
+    viewSigns: { x: 1, y: -1 },
+    measured: [
+      { index: 3, machine: P(10, -80) },
+      { index: 1, machine: P(90, -20) },
+    ],
+  };
+
+  function outlineState() {
+    const selected = boardCaptureReducer(INITIAL_BOARD_CAPTURE, {
+      type: 'set-shape',
+      shapeKind: 'outline',
+    });
+    return boardCaptureReducer(selected, { type: 'set-outline-draft', draft });
+  }
+
+  it('resets the session when a draft is set and captures at most two points', () => {
+    const selected = boardCaptureReducer(INITIAL_BOARD_CAPTURE, {
+      type: 'set-shape',
+      shapeKind: 'outline',
+    });
+    const state = outlineState();
+    expect(state.outlineDraft).toEqual(draft);
+    expect(state.sessionRevision).toBeGreaterThan(selected.sessionRevision);
+    expect(capture(state, P(10, -80), P(90, -20), P(100, 100)).corners).toHaveLength(2);
+  });
+
+  it('requires a draft and two captures and permits the commit origin write', () => {
+    const withoutDraft = boardCaptureReducer(INITIAL_BOARD_CAPTURE, {
+      type: 'set-shape',
+      shapeKind: 'outline',
+    });
+    expect(commit(capture(withoutDraft, P(10, -80), P(90, -20)), geometry).committed).toBe(false);
+    const one = capture(outlineState(), P(10, -80));
+    expect(commit(one, geometry).committed).toBe(false);
+    const two = capture(one, P(90, -20));
+    const afterOrigin = { ...EPOCH, workOriginVersion: EPOCH.workOriginVersion + 1 };
+    const committed = commit(two, geometry, afterOrigin);
+    expect(committed.committed).toBe(true);
+    expect(committed.corners).toHaveLength(4);
+  });
+
+  it('ignores draft changes outside an active outline session', () => {
+    expect(boardCaptureReducer(INITIAL_BOARD_CAPTURE, { type: 'set-outline-draft', draft })).toBe(
+      INITIAL_BOARD_CAPTURE,
+    );
+    const committed = commit(capture(INITIAL_BOARD_CAPTURE, P(0, 0)), {
+      kind: 'rect',
+      origin: P(0, 0),
+      widthMm: 20,
+      heightMm: 20,
+    });
+    expect(boardCaptureReducer(committed, { type: 'set-outline-draft', draft })).toBe(committed);
+  });
+});
+
 describe('committed capture updates', () => {
   it('updates same-kind geometry and its origin identity while freezing capture changes', () => {
     const geometry: CapturedBoardGeometry = {

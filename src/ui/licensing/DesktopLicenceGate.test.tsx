@@ -8,6 +8,11 @@ import { rendererCloseRequestScript } from '../../../electron/renderer-close-req
 import { MESSAGES } from '../../../electron/licensing-messages';
 import { desktopCloseController } from '../app/desktop-close-runtime';
 
+// These tests specify the licence window with it turned on (ADR-623). ADR-623
+// Amendment 3 holds it off in releases; EditionProvider.licence-window-off.test.tsx
+// covers that.
+vi.mock('../../../public/desktop-licence-window.mjs', () => ({ DESKTOP_LICENCE_WINDOW: true }));
+
 // The window a commercial desktop build opens behind until a trial or licence is active (ADR-623).
 
 const free: LicenceStatus = {

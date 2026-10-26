@@ -22,6 +22,7 @@ export const commerce = {
       'Laser cutting and engraving',
       '2D CNC cuts',
       'All machine control',
+      'G-code Inspector',
     ],
   },
   // License plan shape: { id, name, price, billing: 'one-time' | 'yearly',
@@ -38,15 +39,18 @@ export const commerce = {
       // Pro is desktop only: the owner's choice of 2026-09-29 (ADR-540 item 7).
       where: 'the Windows desktop app',
       summary: 'Everything in Free, plus:',
+      // The app's Pro tools, by name and in order: src/ui/licensing/pro-features.ts.
+      // Registration Jig and Place Board joined in ADR-540 Amendment 5.
       includes: [
         'V-carve',
         '3D relief',
         'Adaptive clearing',
         'Advanced tracing',
         'Camera alignment',
+        'Registration Jig',
+        'Place Board',
         'Box generator',
         'Design Studio',
-        'G-code Inspector',
       ],
       updateYearPrice: 20,
       deviceLimit: 3,

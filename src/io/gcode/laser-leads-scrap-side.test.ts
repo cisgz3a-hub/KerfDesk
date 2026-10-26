@@ -38,6 +38,26 @@ function square(min: number, max: number): Polyline {
 }
 
 const PLATE = square(20, 60);
+// Two 10 mm squares joined by a 0.4 mm neck: a -0.25 or -0.3 mm kerf pinches
+// the neck off, so an operation with either cuts two pieces.
+const BELL: Polyline = {
+  closed: true,
+  points: [
+    { x: 20, y: 20 },
+    { x: 30, y: 20 },
+    { x: 30, y: 24.8 },
+    { x: 40, y: 24.8 },
+    { x: 40, y: 20 },
+    { x: 50, y: 20 },
+    { x: 50, y: 30 },
+    { x: 40, y: 30 },
+    { x: 40, y: 25.2 },
+    { x: 30, y: 25.2 },
+    { x: 30, y: 30 },
+    { x: 20, y: 30 },
+  ],
+};
+
 const HOLE = square(35, 45);
 
 function layer(id: string, settings: Partial<Layer> = {}): Layer {
@@ -164,6 +184,78 @@ describe('the scrap side of laser leads (ADR-626 Amendment 1)', () => {
     }
   });
 
+  it("keeps each piece's leads clear of the leads of the outline it was split from", () => {
+    const job = prepared(
+      project(
+        [layer('a', { ...LEADS }), layer('b', { ...LEADS, kerfOffsetMm: -0.25 })],
+        [shape('bell', BELL, ['a', 'b'])],
+      ),
+    );
+    const leadsOf = (layerId: string) =>
+      job.groups.flatMap((group) =>
+        group.kind === 'cut' && group.layerId === layerId
+          ? group.segments.flatMap((segment) => {
+              const range = segment.leadContour;
+              if (range === undefined) return [];
+              return [segment.polyline.slice(0, range.from + 1), segment.polyline.slice(range.to)];
+            })
+          : [],
+      );
+    const whole = leadsOf('a');
+    const pieces = leadsOf('b');
+    expect(whole.length).toBeGreaterThan(0);
+    expect(pieces.length).toBeGreaterThan(0);
+    // The pieces' clearance: one kerf width, twice the 0.25 mm offset.
+    for (const lead of pieces) {
+      for (const other of whole) expect(polylinesApartMm(lead, other)).toBeGreaterThan(0.49);
+    }
+  });
+
+  it('leads every piece of a contour two operations split, whatever kerf each uses', () => {
+    // Two 10 mm squares joined by a 0.4 mm neck: a -0.25 or -0.3 mm kerf
+    // pinches the neck off, so each operation cuts two pieces.
+    // 0: the first operation cuts the outline whole, the second splits it.
+    for (const [first, second] of [
+      [-0.25, -0.25],
+      [-0.25, -0.3],
+      [0, -0.25],
+    ] as const) {
+      const job = prepared(
+        project(
+          [
+            layer('a', { ...LEADS, kerfOffsetMm: first }),
+            layer('b', { ...LEADS, kerfOffsetMm: second }),
+          ],
+          [shape('bell', BELL, ['a', 'b'])],
+        ),
+      );
+      const cuts = job.groups.flatMap((group) => (group.kind === 'cut' ? group.segments : []));
+      expect(cuts).toHaveLength(first === 0 ? 3 : 4);
+      for (const cut of cuts) expect(cut.closed).toBe(false);
+      expect(job.diagnostics ?? []).toEqual([]);
+    }
+  });
+
+  it('names each operation that leaves a side unknown, with its own count', () => {
+    const job = prepared(
+      project(
+        [layer('Score'), layer('Border'), layer('inner', LEADS)],
+        [
+          shape('ring', PLATE, ['Score']),
+          shape('hole', HOLE, ['inner']),
+          shape('frame', square(65, 95), ['Border']),
+          shape('slot', square(75, 85), ['inner']),
+        ],
+      ),
+    );
+    const unknown = (job.diagnostics ?? []).flatMap((diagnostic) =>
+      diagnostic.kind === 'laser-leads-side-unknown'
+        ? [`${diagnostic.aroundName}: ${diagnostic.count}`]
+        : [],
+    );
+    expect(unknown.sort()).toEqual(['Border: 1', 'Score: 1']);
+  });
+
   it("keeps the hole's leads out of the part when a score ring lies between", () => {
     const job = prepared(
       project(
@@ -230,3 +322,40 @@ describe('the scrap side of laser leads (ADR-626 Amendment 1)', () => {
     }
   });
 });
+
+function polylinesApartMm(a: ReadonlyArray<Vec2>, b: ReadonlyArray<Vec2>): number {
+  let nearest = Number.POSITIVE_INFINITY;
+  for (let i = 1; i < a.length; i += 1) {
+    for (let j = 1; j < b.length; j += 1) {
+      nearest = Math.min(
+        nearest,
+        segmentsApartMm(a[i - 1] as Vec2, a[i] as Vec2, b[j - 1] as Vec2, b[j] as Vec2),
+      );
+    }
+  }
+  return nearest;
+}
+
+function segmentsApartMm(p: Vec2, q: Vec2, a: Vec2, b: Vec2): number {
+  const rx = q.x - p.x;
+  const ry = q.y - p.y;
+  const sx = b.x - a.x;
+  const sy = b.y - a.y;
+  const determinant = rx * sy - ry * sx;
+  if (determinant !== 0) {
+    const t = ((a.x - p.x) * sy - (a.y - p.y) * sx) / determinant;
+    const u = ((a.x - p.x) * ry - (a.y - p.y) * rx) / determinant;
+    if (t >= 0 && t <= 1 && u >= 0 && u <= 1) return 0;
+  }
+  const toSegment = (point: Vec2, from: Vec2, to: Vec2): number => {
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const span = dx * dx + dy * dy;
+    const t =
+      span === 0
+        ? 0
+        : Math.max(0, Math.min(1, ((point.x - from.x) * dx + (point.y - from.y) * dy) / span));
+    return Math.hypot(point.x - (from.x + dx * t), point.y - (from.y + dy * t));
+  };
+  return Math.min(toSegment(p, a, b), toSegment(q, a, b), toSegment(a, p, q), toSegment(b, p, q));
+}

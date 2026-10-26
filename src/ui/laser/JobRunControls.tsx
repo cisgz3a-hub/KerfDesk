@@ -7,6 +7,7 @@
 import { useLaserStore } from '../state/laser-store';
 import {
   cncJobLaserModeEnabled,
+  cncPauseControllerKind,
   cncPauseLiftPhase,
   cncPauseLiftSkipReason,
 } from '../state/cnc-pause-lift-state';
@@ -37,16 +38,19 @@ export function RunningControls(props: {
   const laserModeEnabled = useLaserStore(cncJobLaserModeEnabled);
   const liftPhase = useLaserStore(cncPauseLiftPhase);
   const liftSkipReason = useLaserStore(cncPauseLiftSkipReason);
+  const controllerKind = useLaserStore(cncPauseControllerKind);
   const resumeAdvisory = cncResumeAdvisoryNotice(
     activeJobMachineKind,
     laserModeEnabled,
     liftPhase,
     liftSkipReason,
+    controllerKind,
   );
   const pauseMessage = pauseControlMessage(
     activeJobMachineKind,
     hasRealtimePause,
     streamPauseBeamOff,
+    controllerKind,
   );
   const safetyMessage = runningSafetyMessage({
     isToolChange: props.isToolChange,

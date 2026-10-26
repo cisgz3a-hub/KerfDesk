@@ -7,9 +7,14 @@
 import type { BoardShapeKind } from '../../../core/scene';
 import { Button } from '../../kit';
 
-const SHAPES: ReadonlyArray<{ readonly kind: BoardShapeKind; readonly label: string }> = [
-  { kind: 'rect', label: 'Rectangle' },
-  { kind: 'circle', label: 'Circle' },
+const SHAPES: ReadonlyArray<{
+  readonly kind: BoardShapeKind;
+  readonly label: string;
+  readonly title: string;
+}> = [
+  { kind: 'rect', label: 'Rectangle', title: 'Capture a rectangular board' },
+  { kind: 'circle', label: 'Circle', title: 'Capture a circular board' },
+  { kind: 'outline', label: 'Outline', title: 'Irregular board traced from a photo' },
 ];
 
 export function BoardShapeToggle({
@@ -23,13 +28,13 @@ export function BoardShapeToggle({
 }): JSX.Element {
   return (
     <div style={rowStyle} role="group" aria-label="Board shape">
-      {SHAPES.map(({ kind, label }) => (
+      {SHAPES.map(({ kind, label, title }) => (
         <Button
           key={kind}
           variant={kind === shapeKind ? 'primary' : 'ghost'}
           disabled={disabled}
           aria-pressed={kind === shapeKind}
-          title={`Capture a ${label.toLowerCase()} board`}
+          title={title}
           onClick={() => onChange(kind)}
         >
           {label}

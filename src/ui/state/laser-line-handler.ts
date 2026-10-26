@@ -19,20 +19,24 @@ import {
 } from '../../core/controllers/grbl';
 import { detectControllerFromBanner, type ControllerEvent } from '../../core/controllers';
 import { parseActiveWcsFromModalResponses } from '../../core/controllers/grbl/work-offset-readback';
-import { flushResetCleanup } from './laser-reset-cleanup';
+import { flushResetCleanup, ownedResetRetainedSettings } from './laser-reset-cleanup';
+import {
+  noteControllerSettingsRead,
+  retainedControllerSettingsPatch,
+} from './laser-owned-reset-settings';
 import {
   qualifiedController,
   qualifyingController,
   scheduleControllerQualification,
 } from './laser-controller-qualification';
-import { controllerRebootNotice } from './laser-safety-notice';
+import { controllerLink, controllerRebootNotice } from './laser-safety-notice';
 import { isOwnedCncPauseLiftReset, ownedLiftResetPatch } from './cnc-pause-lift-state';
 import {
   clearCncLiveCaps,
   consumeSettingsResponse,
   publishCncLiveCaps,
   SETTINGS_READ_OPERATION_LABEL,
-  type DetectedSettingsResult,
+  shouldShowDetectedSettingsReview,
 } from './detected-settings-action';
 import {
   activeControllerCommandLine,
@@ -298,6 +302,7 @@ function publishDetectedSettings(
     }
     return;
   }
+  noteControllerSettingsRead(refs);
   set((current) => ({
     // The terminal $$ acknowledgement is a FIFO boundary: any old-unit
     // status generated before the setting changed has already been received.
@@ -316,6 +321,9 @@ function publishDetectedSettings(
     controllerQualification: qualifiedController(state.controllerSessionEpoch, 'verified'),
     grblSettingsRows: detected.settingsRows,
     lastSettingsReadAt: Date.now(),
+    // The plain result of a routine read lives here and in Controller info;
+    // the toast speaks only when the read found something new (ADR-648).
+    log: pushLog(current, `[lf2] Controller settings read (${detected.settingsRows.length}).`),
     ...(isSettingsReadOperation(current.controllerOperation) ? { controllerOperation: null } : {}),
   }));
   publishCncLiveCaps(detected.controllerSettings);
@@ -325,25 +333,6 @@ function isSettingsReadOperation(operation: LaserState['controllerOperation']): 
   return (
     operation?.kind === 'interactive-command' && operation.label === SETTINGS_READ_OPERATION_LABEL
   );
-}
-
-function shouldShowDetectedSettingsReview(detected: DetectedSettingsResult): boolean {
-  if (Object.keys(detected.patch).length > 0) return true;
-  const controller = detected.controllerSettings;
-  if (
-    controller.softLimitsEnabled !== undefined ||
-    controller.hardLimitsEnabled !== undefined ||
-    controller.homingEnabled !== undefined ||
-    controller.homingDirectionMask !== undefined
-  ) {
-    return true;
-  }
-  if (isPositive(controller.zMaxFeed) && isPositive(controller.zTravelMm)) return true;
-  return detected.settingsRows.some((row) => !row.known);
-}
-
-function isPositive(value: number | undefined): boolean {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0;
 }
 
 // Unknown lines run through banner detection too: connecting with the wrong
@@ -377,6 +366,9 @@ function handleWelcomeLine(
   // The rebooted controller starts a new transcript; anything the old session
   // held back belongs to neither (ADR-333).
   clearTranscriptBuffer(refs);
+  // The banner of a reset KerfDesk sent on this port keeps the `$$`/`$I`
+  // snapshot; any other banner discards it (ADR-648).
+  const retainedSettings = ownedResetRetainedSettings(refs);
   refs.settingsCollector = idleCollector();
   refs.settingsCollectorSessionEpoch = null;
   clearCncLiveCaps();
@@ -405,6 +397,7 @@ function handleWelcomeLine(
     detectedSettings: null,
     grblSettingsRows: [],
     lastSettingsReadAt: null,
+    ...retainedControllerSettingsPatch(retainedSettings, nextSessionEpoch),
     // An ALARM:N the reset itself raised (Abort mid-motion) is still the
     // controller's alarm after the banner; any other code belonged to the
     // previous boot (audit streaming-4).
@@ -437,6 +430,7 @@ function handleWelcomeLine(
   if (!resetPolicy.preserveOperation) {
     cancelControllerLifecycleRefs(refs, resetPolicy.cancellationReason);
   }
+  if (retainedSettings !== null) publishCncLiveCaps(retainedSettings.controllerSettings);
   // Beam-off cleanup deferred by a commanded reset (Stop, auto-stop) goes
   // out NOW, after the ledger reset above — its ack is unambiguous (audit
   // F2): the controller is fully booted, so the ok cannot be swallowed and
@@ -489,7 +483,7 @@ function rebootDuringJobPatch(
     streamer: wipeInFlight(markErrored(streamer)),
     ...liveCanvasLifecyclePatch(state, 'errored'),
     // First notice wins — an earlier root cause is what the operator needs.
-    safetyNotice: state.safetyNotice ?? controllerRebootNotice(),
+    safetyNotice: state.safetyNotice ?? controllerRebootNotice(controllerLink(state)),
   };
 }
 

@@ -3,19 +3,10 @@
 // CNC strategy settings, and the material each operation is bound to. The
 // table renders these as a muted detail line under each row.
 
-import {
-  CHIPLOAD_MATERIALS,
-  isProfileCutType,
-  passNeedsTabs,
-  zPassDepths,
-} from '../../../core/cnc';
+import { CHIPLOAD_MATERIALS, isProfileCutType } from '../../../core/cnc';
 // Deep import: core/cnc's barrel is a ratcheted over-cap legacy barrel
 // (scripts/index-export-baseline.json) and may only shrink.
-import {
-  cutCanFreePart,
-  settingsWithStockTabGate,
-  stockLimitedTabHeightMm,
-} from '../../../core/cnc/cnc-tabs';
+import { cutCanFreePart, stockLimitedTabHeightMm } from '../../../core/cnc/cnc-tabs';
 import { findCncMachineStarterById } from '../../../core/cnc/machine-starters';
 import {
   imageOverscanMmFor,
@@ -34,6 +25,7 @@ import {
 } from '../../../core/scene';
 import type { MaterialLibraryDocument } from '../../../io/material-library';
 import { materialBindingStatus } from '../../layers/material-binding-status';
+import { closedShapesGetTabs, cncDepthParts } from './job-review-cnc-depth';
 import { formatMm } from './job-review-format';
 import { laserTabsPart } from './job-review-laser-tabs';
 
@@ -218,7 +210,9 @@ export function cncOperationDetail(
   // (19.05 / 1.5875 floats to 12.000000000000002, showing 13 for 12 passes).
   return [
     ...reliefRoughingPart(relief),
-    ...(shapes ? cncDepthParts(settings, relief !== undefined) : []),
+    ...(shapes
+      ? cncDepthParts(settings, relief !== undefined, stockThicknessMm, compiledTabs)
+      : []),
     ...cncStepoverPart(settings, shapes, relief),
     ...cncDirectionPart(settings),
     ...(shapes
@@ -284,17 +278,6 @@ function cncProfileTabsPart(
   return [cncTabsPart(settings, stockThicknessMm, keptNote)];
 }
 
-// The compiler's own rule (cnc-tabs.ts): whether a closed shape of this
-// operation gets tabs on its deepest pass.
-function closedShapesGetTabs(settings: CncLayerSettings, stockThicknessMm?: number): boolean {
-  if (!settings.tabsEnabled) return false;
-  const tabs = settingsWithStockTabGate(
-    settings,
-    stockThicknessMm ?? DEFAULT_CNC_STOCK.thicknessMm,
-  );
-  return tabs.tabsEnabled && passNeedsTabs(-tabs.depthMm, tabs.depthMm, tabs.tabHeightMm);
-}
-
 function cncVCarveClearPart(settings: CncLayerSettings): ReadonlyArray<string> {
   const active =
     settings.cutType === 'v-carve' &&
@@ -313,21 +296,6 @@ function cncFinishAllowancePart(settings: CncLayerSettings): ReadonlyArray<strin
 function cncPocketStrategyPart(settings: CncLayerSettings): ReadonlyArray<string> {
   const strategy = settings.pocketStrategy;
   return strategy !== undefined && strategy !== 'offset' ? [`${strategy} pocket`] : [];
-}
-
-function cncDepthParts(settings: CncLayerSettings, besideReliefs: boolean): ReadonlyArray<string> {
-  if (settings.cutType === 'v-carve') {
-    return (settings.vCarveFlatDepthEnabled ?? true)
-      ? [
-          `requested flat floor ${formatMm(settings.depthMm)} mm`,
-          `max stepdown ${formatMm(settings.depthPerPassMm)} mm`,
-        ]
-      : ['flowing V-depth', `max stepdown ${formatMm(settings.depthPerPassMm)} mm`];
-  }
-  const passes = zPassDepths(settings.depthMm, settings.depthPerPassMm).length;
-  // Cut depth reaches only the shapes that are not reliefs.
-  const where = besideReliefs ? ' on the other shapes' : '';
-  return [`${passes} ${passes === 1 ? 'pass' : 'passes'}${where}`];
 }
 
 /** Display name for a layer's linked material preset; null = no binding. */

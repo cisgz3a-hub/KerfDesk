@@ -157,6 +157,8 @@ export type GcodeRenderModel = {
 };
 
 export type BuildRenderModelOptions = {
+  /** Enable only the connected stock GRBL parser's known block semantics. */
+  readonly stockGrbl?: boolean;
   /** Explicit program context. Unspecified/CNC retains geometric G1 cutting
    * semantics because spindle S0/M5 does not establish that a tool is clear. */
   readonly machineKind?: 'laser' | 'cnc' | undefined;
@@ -179,6 +181,12 @@ export type BuildRenderModelOptions = {
   readonly renderPressureThreshold?: number;
   /** Work-coordinate position before the first program line. */
   readonly initialPositionMm?: { readonly x: number; readonly y: number; readonly z: number };
+  /** An external run's Frame outline (ADR-630 Amendment 1): `programBounds`
+   * keeps only motion placed in the work coordinates the program starts in,
+   * leaving out G53 and probe moves, a move to the stored G30 position, moves
+   * on an axis whose origin G10 or G92 moved, and other work coordinate
+   * systems. G10 and G92 axis words draw no move. */
+  readonly boundsFromStart?: boolean;
 };
 
 export type BuildRenderModelResult =

@@ -12,7 +12,8 @@ import {
   publicNativePhase,
   retainedDeveloperSequence,
 } from './native-licence-qualification.mjs';
-import { nativePhase, qualificationInput } from './qualify-desktop-licence.mjs';
+import { deactivatedEdition, nativePhase, qualificationInput } from './qualify-desktop-licence.mjs';
+import { DESKTOP_LICENCE_WINDOW } from '../public/desktop-licence-window.mjs';
 
 const key = `KD1.synthetic-qualification.${'x'.repeat(43)}`;
 const profile = resolve('owned-test-profile');
@@ -460,3 +461,11 @@ for (const childClosed of [false, true])
       await rm(directory, { recursive: true });
     }
   });
+
+test('the deactivation proof expects the edition the licence window setting shows', () => {
+  // Behind the window, a deactivated device needs a licence (ADR-623); while
+  // Amendment 3 holds the window off, it returns to KerfDesk Free.
+  assert.equal(deactivatedEdition(true), 'Licence needed');
+  assert.equal(deactivatedEdition(false), 'Free');
+  assert.equal(deactivatedEdition(), deactivatedEdition(DESKTOP_LICENCE_WINDOW));
+});

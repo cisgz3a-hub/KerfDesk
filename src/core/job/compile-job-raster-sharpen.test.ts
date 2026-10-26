@@ -1,4 +1,4 @@
-// Sharpening at engraving resolution (ADR-648) through the real compiler.
+// Sharpening at engraving resolution (ADR-671) through the real compiler.
 //
 // One file drives both raster branches: the streaming threshold is read
 // through a getter, so the same image compiles materialized and then streamed
@@ -168,7 +168,7 @@ beforeEach(() => {
   streaming.threshold = 4_000_000;
 });
 
-describe('compile with sharpening at engraving resolution (ADR-648)', () => {
+describe('compile with sharpening at engraving resolution (ADR-671)', () => {
   it.each(CASES)('streams the materialized bytes: $name', (testCase) => {
     const sharpened = compileCase(testCase, SHARPEN);
     const plain = compileCase(testCase, {});

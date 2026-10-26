@@ -14,7 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { grblDriver } from '../../core/controllers';
 import { createStreamer, type StreamerState } from '../../core/controllers/grbl';
 import { TOOL_CHANGE_LOAD_PREFIX } from '../../core/output';
-import { createProject } from '../../core/scene';
+import { createProject, machineKindOf } from '../../core/scene';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { cncControllerEpochOf, createCncSetupAttestation } from './cnc-setup-attestation';
 import { createSafeWrite, type SafeWriteRefs } from './laser-safe-write';
@@ -27,6 +27,7 @@ import {
 } from './laser-store-helpers';
 import { respondToTestGrblBuildInfo } from './laser-test-start-helpers';
 import { useStore } from './store';
+import { captureWorkZZeroEvidence } from './work-z-zero-evidence';
 import { testAdapter, writeArgs } from '../remote-control/authoring-test-support';
 
 const IDLE = '<Idle|MPos:10.000,20.000,-1.000|FS:0,0|Ov:100,100,100>';
@@ -244,6 +245,37 @@ describe('jog during a drained, fresh-Idle CNC tool-change hold (audit drivers-2
     expect(after.log.filter((line) => line.includes('Serial write blocked'))).toEqual([]);
     expect(after.streamer?.status).toBe('tool-change');
     expect(after.streamer?.queueIndex).toBe(queueIndex);
+  });
+
+  // Controller meta audit M4-P1-1 (ADR-416 Amendment 2): Undo in the hold
+  // turned the project back to Laser, so the point move after touch-off sent
+  // only its XY jog and dragged the bit at stock-top height.
+  it('keeps the safe-Z lift on a point move when Undo is pressed in the hold', async () => {
+    useStore.getState().setMachineKind('cnc');
+    const machine = useStore.getState().project.machine;
+    const safeZMm = machine?.kind === 'cnc' ? machine.params.safeZMm : 0;
+    const sent: string[] = [];
+    await holdAtToolChange(makeDevice(sent));
+
+    useStore.getState().undo();
+    expect(machineKindOf(useStore.getState().project.machine)).toBe('cnc');
+
+    const held = useLaserStore.getState();
+    useLaserStore.setState({
+      workZZeroEvidence: captureWorkZZeroEvidence('manual-zero', held.workZReferenceEpoch),
+    });
+    sent.length = 0;
+    const move = useLaserStore
+      .getState()
+      .jogToMachinePosition(60, 70, 1000)
+      .catch((error: unknown) => error);
+    await settle();
+
+    expect(sent.find((data) => data.startsWith('$J='))).toBe(
+      `$J=G90 G21 Z${safeZMm.toFixed(3)} F1000\n`,
+    );
+    await useLaserStore.getState().disconnect();
+    await move;
   });
 
   it('keeps Home refused for the whole job', async () => {

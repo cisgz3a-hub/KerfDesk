@@ -70,6 +70,31 @@ SafetyNotice or issue machine commands. The picker remains first and cancellatio
 The history is window-local, retained through Disconnect/Forget/reconnect, capped at 500, and
 explicitly clearable under ADR-229. No persistence across reload or automatic upload is added.
 
+### Amendment 2 (2026-10-22): controller passwords and sign-ins stay out
+
+Rolling audit v2 finding 27-P2-3 found that the report copied grblHAL's Wi-Fi, access point and
+MQTT passwords from `$$`, under a header that said it held no password. grblHAL prints a
+`Format_Password` setting's stored value unless its WebUI is connected (core `settings.c`
+`setting_get_value`), and its ESP32 driver registers `$75`, `$77` and `$533` that way. Core
+`settings.h` also numbers the WebUI admin and user passwords `$330` and `$331`. FluidNC names its
+passwords `$Sta/Password` and `$AP/Password`, also set with `[ESP101]` and `[ESP106]`.
+
+Item 2 now covers these. `support-report-redaction.ts` runs before cell escaping and again over the
+whole report, as the licence-key rule did, so the `$$` rows, console lines, incident text,
+problems and desktop log are all covered. It removes:
+
+- the value of grblHAL `$75`, `$77`, `$330`, `$331` and `$533`, of any `$…Password` setting, and
+  of `[ESP101]` and `[ESP106]`, each to the end of its line;
+- the sign-in written into an address, such as a camera's `rtsp://user:pass@host`;
+- `Bearer` tokens, and the value of a key=value or JSON field whose name ends in password, passwd,
+  pwd, token, secret or API key.
+
+The setting codes stay, so support still sees which settings exist. A second pass leaves a value
+already removed alone, so an escaped incident cell keeps the text after its line break. The header
+no longer promises "no password". It says KerfDesk removed licence keys and the passwords and
+sign-ins it recognises, that the report holds no payment details, and still asks the customer to
+read the file before sending it.
+
 ### Consequences
 
 - The support page tells customers to attach the report, which covers most of

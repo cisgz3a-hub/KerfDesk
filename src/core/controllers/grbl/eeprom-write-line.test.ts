@@ -3,7 +3,11 @@
 // https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/doc/markdown/interface.md
 
 import { describe, expect, it } from 'vitest';
-import { isEepromWriteLine } from './eeprom-write-line';
+import {
+  isBuildInfoWriteLine,
+  isEepromWriteLine,
+  isStoredSettingWriteLine,
+} from './eeprom-write-line';
 import { createStreamer, onAck, step } from './streamer';
 
 describe('isEepromWriteLine', () => {
@@ -40,6 +44,61 @@ describe('isEepromWriteLine', () => {
     'M5',
   ])('does not treat %s as an EEPROM write', (line) => {
     expect(isEepromWriteLine(line)).toBe(false);
+  });
+});
+
+// ADR-648: setting writes (`$key=value`, FluidNC's `[key]value`) and FluidNC's
+// `$NVX` erase retire a kept `$$` snapshot; only `$I=` and `$RST=` change what
+// `$I` reports. The firmware drops whitespace before parsing a line.
+describe('isStoredSettingWriteLine and isBuildInfoWriteLine', () => {
+  it.each([
+    '$I=shop laser',
+    '$I =shop laser',
+    '$ I = shop',
+    '$RST=*',
+    '$RST = $',
+    '$rst=#',
+    '[RST]*',
+    '/ $I=shop laser',
+    '[I]shop laser',
+  ])('treats %s as a build-info write', (line) => {
+    expect(isStoredSettingWriteLine(line)).toBe(true);
+    expect(isBuildInfoWriteLine(line)).toBe(true);
+  });
+
+  it.each([
+    '$30=1000',
+    '$130 = 400',
+    '$N0=G21',
+    '$NVX',
+    '$Settings/Erase',
+    '$nvx=1',
+    '[13]1',
+    '[ 13 ]1',
+    '[NVX]',
+    '/$30=500',
+    '//$130=400',
+  ])('treats %s as a setting write that leaves `$I` alone', (line) => {
+    expect(isStoredSettingWriteLine(line)).toBe(true);
+    expect(isBuildInfoWriteLine(line)).toBe(false);
+  });
+
+  it.each([
+    '$I',
+    '$$',
+    '$J=G91 X1 F100',
+    '$J =G91 X1 F100',
+    '$Jog=G91 X1 F100',
+    '[J]G91 X1 F100',
+    '[ Jog ]G91 X1',
+    'G10 L20 P1 X0',
+    '($I=x) G0 X1',
+    '$NVXY',
+    '[13]',
+    '[ 13 ] ',
+  ])('does not treat %s as a setting write', (line) => {
+    expect(isStoredSettingWriteLine(line)).toBe(false);
+    expect(isBuildInfoWriteLine(line)).toBe(false);
   });
 });
 

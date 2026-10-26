@@ -1,6 +1,7 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
+import { CNC_RESUME_FLUIDNC_ADVISORY_MESSAGE } from '../state/cnc-pause-resume-policy';
 import { useLaserStore } from '../state/laser-store';
 import { RunningControls } from './JobRunControls';
 
@@ -16,7 +17,11 @@ afterEach(async () => {
     await act(async () => root.unmount());
     host.remove();
   }
-  useLaserStore.setState({ activeJobMachineKind: null, controllerSettings: null });
+  useLaserStore.setState({
+    activeJobMachineKind: null,
+    controllerSettings: null,
+    detectedControllerKind: null,
+  });
 });
 
 describe('RunningControls CNC Resume advisory', () => {
@@ -57,5 +62,25 @@ describe('RunningControls CNC Resume advisory', () => {
     expect(host.textContent).toContain('may restart motion without spindle spin-up');
     expect(host.textContent).not.toMatch(/NO\s+spindle spin-up/);
     expect(host.textContent).not.toMatch(/restarts the spindle/i);
+  });
+
+  // ADR-180 Amendment 7: the banner says FluidNC, whose door resume waits
+  // only spinup_ms, so the rail must not promise GRBL's fixed delay.
+  it('names spinup_ms instead of a fixed delay on FluidNC', async () => {
+    useLaserStore.setState({
+      activeJobMachineKind: 'cnc',
+      controllerSettings: { laserModeEnabled: false },
+      detectedControllerKind: 'fluidnc',
+    });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    mounted.push({ host, root });
+    await act(async () => {
+      root.render(<RunningControls isStreaming={false} isPaused={true} isToolChange={false} />);
+    });
+
+    expect(host.textContent).toContain(CNC_RESUME_FLUIDNC_ADVISORY_MESSAGE);
+    expect(host.textContent).not.toMatch(/fixed spin-up delay/);
   });
 });

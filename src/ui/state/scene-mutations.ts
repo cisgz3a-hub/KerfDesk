@@ -40,6 +40,7 @@ import type { BedFit } from '../../core/scene/fit-to-bed';
 import { pruneSceneObjectOperationOverrides } from '../../core/scene/operation-binding';
 import { objectTabAnchorFields } from '../../core/scene/object-tab-anchors';
 import { withColourLayerPowers, type ColourLayerCommit } from '../../core/trace/colour-layer-power';
+import { repairRemovedProjectObjectReferences } from './repair-object-dependencies';
 
 export { positionTraceOverRasterSource } from './trace-placement';
 
@@ -143,10 +144,7 @@ export function resolveRasterLayerColor(
 //
 // Empty selection → no-op; the caller's `set((s) => ...)` should fall
 // through without changing state (the undefined return signals that).
-export function applyDuplicate(
-  s: DuplicateState,
-  newIdFor: (oldId: string) => string,
-): (MutationResult & { readonly additionalSelectedIds: ReadonlySet<string> }) | null {
+export function applyDuplicate(s: DuplicateState, newIdFor: (oldId: string) => string) {
   const ids = selectedDuplicateIds(s);
   if (ids.length === 0) return null;
   const duplicated = duplicateSceneSelection(s.project.scene, ids, newIdFor);
@@ -156,9 +154,11 @@ export function applyDuplicate(
     project: { ...s.project, scene: duplicated.scene },
     selectedObjectId: first ?? '',
     additionalSelectedIds: new Set(rest),
+    selectedPathNode: null,
+    selectedPathNodes: [],
     undoStack: pushUndo(s.project, s.undoStack),
     redoStack: [],
-    dirty: true,
+    dirty: true as const,
   };
 }
 
@@ -273,7 +273,7 @@ export function applyTraceToExisting(
   sourceId: string,
   traced: TracedImage,
   options: TraceExistingImageOptions = {},
-): MutationResult {
+): MutationResult & ReturnType<typeof repairRemovedProjectObjectReferences> {
   const existing = s.project.scene.objects.find((o) => o.id === sourceId);
   const prepared = prepareTraceSource(s.project.scene, existing, options);
   let scene = prepared.scene;
@@ -309,11 +309,10 @@ export function applyTraceToExisting(
     ? replaceObject(scene, positionedTrace.id, created.object)
     : addObject(scene, created.object);
   for (const operation of operations) scene = addLayer(scene, operation);
-  if (prepared.shouldPruneLayers || options.replaceTraceId !== undefined) {
+  if (prepared.shouldPruneLayers || options.replaceTraceId !== undefined)
     scene = pruneOrphanLayers(scene);
-  }
   return {
-    project: { ...s.project, scene },
+    ...repairRemovedProjectObjectReferences({ ...s.project, scene }),
     selectedObjectId: positionedTrace.id,
     undoStack: pushUndo(s.project, s.undoStack),
     redoStack: [],

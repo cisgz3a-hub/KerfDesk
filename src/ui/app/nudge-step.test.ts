@@ -48,18 +48,28 @@ describe('arrow-key nudge distances', () => {
       const event = arrow(init);
       expect(handleTransformShortcut(event, ctx)).toBe(true);
       expect(event.defaultPrevented).toBe(true);
-      expect(ctx.nudgeSelection).toHaveBeenLastCalledWith(dx, 0);
+      expect(ctx.nudgeSelection).toHaveBeenLastCalledWith(dx, 0, { heldRepeat: false });
     }
   });
 
   it('Ctrl+Up nudges 0.1 mm up by default, and Alt+arrow is left to the align keys', () => {
     const ctx = transformCtx();
     expect(handleTransformShortcut(arrow({ key: 'ArrowUp', ctrlKey: true }), ctx)).toBe(true);
-    expect(ctx.nudgeSelection).toHaveBeenCalledWith(0, -0.1);
+    expect(ctx.nudgeSelection).toHaveBeenCalledWith(0, -0.1, { heldRepeat: false });
     const alt = arrow({ altKey: true });
     expect(handleTransformShortcut(alt, ctx)).toBe(false);
     expect(alt.defaultPrevented).toBe(false);
     expect(ctx.nudgeSelection).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks the auto-repeats of a held key so they continue its undo step', () => {
+    const ctx = transformCtx();
+    handleTransformShortcut(arrow(), ctx);
+    handleTransformShortcut(arrow({ repeat: true }), ctx);
+    expect(ctx.nudgeSelection.mock.calls).toEqual([
+      [1, 0, { heldRepeat: false }],
+      [1, 0, { heldRepeat: true }],
+    ]);
   });
 
   it('Ctrl+H is still not a flip', () => {

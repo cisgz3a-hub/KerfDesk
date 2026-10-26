@@ -2,8 +2,10 @@
 // "Jog with controls / Choose jog positioning" method card duplicated the
 // Start-from dropdown's Current Position option and read as a mystery step;
 // jog placement now lives solely in the placement block above.
+// Home off is a setup choice, not a fact about the hardware: listed machines
+// ship with it off, homing switches or not (controller audit v4 E2-P3-3).
 const HAND_POSITION_INSTRUCTION =
-  'No homing switches, so the app only knows a position you give it. ' +
+  'Home is off in Machine Setup, so the app only knows a position you give it. ' +
   'Jog with the arrows, or release the motors and push the head by hand — then set the origin.';
 const RELEASE_MOTORS_LABEL = 'Release motors to move by hand';
 const RELEASING_MOTORS_LABEL = 'Releasing motors...';

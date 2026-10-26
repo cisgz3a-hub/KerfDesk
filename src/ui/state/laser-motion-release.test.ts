@@ -16,10 +16,12 @@ import {
   type GrblSimulator,
 } from '../../__fixtures__/controllers';
 import { grblDriver } from '../../core/controllers';
+import type { StatusReport } from '../../core/controllers/grbl';
 import { FALCON_A1_PRO_GRBLHAL_PROFILE } from '../../core/devices/falcon-profiles';
 import { connectOptionsForDevice } from '../commands/connect-options';
 import { useLaserStore, type ConnectControllerOptions } from './laser-store';
 import { jogFrameCommandBlockMessage, setupCommandBlockMessage } from './laser-store-helpers';
+import { motionOwnerAwaitsMissingReply } from './laser-motion-release';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
 
@@ -210,56 +212,65 @@ describe('a Cancel that gives up does not wedge the motion owner', () => {
     expect(sim.outbound()).not.toContain(SOFT_RESET);
   });
 
-  it('grblHAL: a Cancel right after the jog write waits for the jog reply before 0x85', async () => {
-    // grblHAL flushes every line it has not parsed yet when 0x85 arrives, in
-    // any state, and never answers it
-    // (https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/protocol.c#L896-L899).
-    // A 0x85 written while the jog's reply was owed could drop the jog line;
-    // its reply never came and the jog owner stayed until ABORT MOTION
-    // (controller audit M-6).
-    const sim = await connectIdle(
-      {
-        firmware: 'grblhal',
-        firmwareBanner: GRBL_HAL_BANNER,
-        jogCancelFlushesInput: true,
-        motionMs: 2_000,
-      },
-      { controllerKind: 'grblhal' },
-    );
-    const before = sim.outbound().length;
-    const jogLine = '$J=G91 G21 X50.000 F1000\n';
-
-    const jog = useLaserStore
-      .getState()
-      .jog({ dx: 50, feed: 1000 })
-      .catch(() => undefined);
-    for (let tick = 0; tick < 40; tick += 1) await Promise.resolve();
-    expect(writesSince(sim, before)).toContain(jogLine);
-    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
-    const cancel = useLaserStore
-      .getState()
-      .cancelJog()
-      .then(
-        () => null,
-        (error: unknown) => (error instanceof Error ? error.message : String(error)),
+  it.each([
+    [
+      'grblHAL',
+      { firmware: 'grblhal' as const, firmwareBanner: GRBL_HAL_BANNER },
+      { controllerKind: 'grblhal' as const },
+    ],
+    // grblHAL greets as "Grbl 1.1f" at COMPATIBILITY_LEVEL 1 and up (audit
+    // HF-8), so a board set up with a GRBL profile meets the same flush: a
+    // Falcon on the Falcon-compatible profile showed Cancel's failure after a
+    // held arrow was let go just as its jog went out (ADR-640).
+    ['A board that greets as GRBL', {}, {}],
+  ])(
+    '%s: a Cancel right after the jog write waits for the jog reply before 0x85',
+    async (_label, firmware, connect) => {
+      // grblHAL flushes every line it has not parsed yet when 0x85 arrives, in
+      // any state, and never answers it
+      // (https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/protocol.c#L896-L899).
+      // A 0x85 written while the jog's reply was owed could drop the jog line;
+      // its reply never came and the jog owner stayed until ABORT MOTION
+      // (controller audit M-6).
+      const sim = await connectIdle(
+        { ...firmware, jogCancelFlushesInput: true, motionMs: 2_000 },
+        connect,
       );
-    // The simulator applies a move's position when it parses the line, so X50
-    // shows the jog line was parsed rather than flushed, and Idle well inside
-    // the 2 s move shows the byte stopped it.
-    await pump(100);
-    expect(sim.state().mpos.x).toBe(50);
-    expect(sim.state().machine).toBe('Idle');
-    await pump(10_000);
-    await jog;
+      const before = sim.outbound().length;
+      const jogLine = '$J=G91 G21 X50.000 F1000\n';
 
-    expect(await cancel).toBeNull();
-    const after = writesSince(sim, before);
-    expect(after.indexOf(JOG_CANCEL)).toBeGreaterThan(after.indexOf(jogLine));
-    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
-    expect(operatorCanMoveAgain()).toEqual(RELEASED);
-    expect(sim.state().machine).toBe('Idle');
-    expect(sim.outbound()).not.toContain(SOFT_RESET);
-  });
+      const jog = useLaserStore
+        .getState()
+        .jog({ dx: 50, feed: 1000 })
+        .catch(() => undefined);
+      for (let tick = 0; tick < 40; tick += 1) await Promise.resolve();
+      expect(writesSince(sim, before)).toContain(jogLine);
+      expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
+      const cancel = useLaserStore
+        .getState()
+        .cancelJog()
+        .then(
+          () => null,
+          (error: unknown) => (error instanceof Error ? error.message : String(error)),
+        );
+      // The simulator applies a move's position when it parses the line, so X50
+      // shows the jog line was parsed rather than flushed, and Idle well inside
+      // the 2 s move shows the byte stopped it.
+      await pump(100);
+      expect(sim.state().mpos.x).toBe(50);
+      expect(sim.state().machine).toBe('Idle');
+      await pump(10_000);
+      await jog;
+
+      expect(await cancel).toBeNull();
+      const after = writesSince(sim, before);
+      expect(after.indexOf(JOG_CANCEL)).toBeGreaterThan(after.indexOf(jogLine));
+      expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
+      expect(operatorCanMoveAgain()).toEqual(RELEASED);
+      expect(sim.state().machine).toBe('Idle');
+      expect(sim.outbound()).not.toContain(SOFT_RESET);
+    },
+  );
 
   it('grblHAL: a reply still owed after a short grace does not hold 0x85 back', async () => {
     // A line whose reply is still owed after a serial round trip was already
@@ -298,14 +309,67 @@ describe('a Cancel that gives up does not wedge the motion owner', () => {
     // The settlement still waits for the owed reply and reports it as before.
     await pump(10_000);
     await jog;
-    expect(await cancel).toMatch(/waiting for the previous motion command acknowledgement/);
+    expect(await cancel).toMatch(/did not answer the last motion command/);
     expect(sim.outbound()).not.toContain(SOFT_RESET);
+
+    // The reply may still come, so the owner stays; but on an Idle machine
+    // Disconnect, which the failure names, is the way out rather than a lock
+    // only ABORT MOTION opens (ADR-640).
+    expect(useLaserStore.getState().motionOperation).toMatchObject({ cancelRequested: true });
+    expect(useLaserStore.getState().statusReport?.state).toBe('Idle');
+    expect(motionOwnerAwaitsMissingReply(useLaserStore.getState())).toBe(true);
+    const disconnecting = useLaserStore.getState().disconnect();
+    await pump(2_000);
+    await disconnecting;
+    expect(useLaserStore.getState().connection.kind).toBe('disconnected');
+    expect(useLaserStore.getState().motionOperation).toBeNull();
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
   });
 
-  it('grblHAL: the grace starts once the last line has left the transport', async () => {
-    // A line still being written when Cancel is pressed has not reached
-    // grblHAL, so a grace counted from the press could run out before it
-    // arrives, and 0x85 would then drop it unanswered (ADR-375 re-audit).
+  it('keeps Disconnect locked while a cancelled owner is still busy or still settling', () => {
+    const cancelled = {
+      operationId: Symbol('cancelled-jog'),
+      kind: 'jog' as const,
+      sawControllerBusy: true,
+      idleStatusReports: 0,
+      dispatchComplete: true,
+      pendingLines: [],
+      cancelRequested: true,
+    };
+    const idle = { state: 'Idle' } as StatusReport;
+    const missingReply = {
+      motionOperation: cancelled,
+      pendingUntrackedAcks: 1,
+      statusReport: idle,
+    };
+    expect(motionOwnerAwaitsMissingReply(missingReply)).toBe(true);
+    // Still moving: Cancel and ABORT MOTION are the controls for that.
+    expect(
+      motionOwnerAwaitsMissingReply({
+        ...missingReply,
+        statusReport: { state: 'Jog' } as StatusReport,
+      }),
+    ).toBe(false);
+    // A Cancel attempt still owns the settlement.
+    expect(
+      motionOwnerAwaitsMissingReply({
+        ...missingReply,
+        motionOperation: { ...cancelled, cancelAttemptId: Symbol('attempt') },
+      }),
+    ).toBe(false);
+    // Nothing owed: the automatic release settles it at the next Idle.
+    expect(motionOwnerAwaitsMissingReply({ ...missingReply, pendingUntrackedAcks: 0 })).toBe(false);
+    // An owner that was never cancelled is live motion.
+    expect(
+      motionOwnerAwaitsMissingReply({
+        ...missingReply,
+        motionOperation: { ...cancelled, cancelRequested: false },
+      }),
+    ).toBe(false);
+  });
+
+  it('grblHAL: still prefers the pending write to settle during the bounded grace', async () => {
+    // The ordinary reply-before-cancel path remains inside the 500 ms cap.
     const sim = await connectIdle(
       { firmware: 'grblhal', firmwareBanner: GRBL_HAL_BANNER, motionMs: 5_000 },
       { controllerKind: 'grblhal' },
@@ -340,5 +404,48 @@ describe('a Cancel that gives up does not wedge the motion owner', () => {
     await cancel;
     expect(operatorCanMoveAgain()).toEqual(RELEASED);
     expect(sim.outbound()).not.toContain(SOFT_RESET);
+  });
+
+  it('attempts jog cancel within 500 ms even while a transport promise is stuck', async () => {
+    const sim = await connectIdle({ motionMs: 5_000 });
+    const jog = useLaserStore.getState().jog({ dx: 50, feed: 1000 });
+    await pump(100);
+    expect(sim.state().machine).toBe('Jog');
+    useLaserStore.setState({ pendingTransportWrites: 1 });
+    const before = sim.outbound().length;
+    const cancel = useLaserStore.getState().cancelJog();
+    await pump(499);
+    expect(writesSince(sim, before)).not.toContain(JOG_CANCEL);
+    await pump(1);
+    expect(writesSince(sim, before)).toContain(JOG_CANCEL);
+    expect(sim.state().machine).toBe('Idle');
+    // Dispatching the byte must not invent a settled transport or release the
+    // owner. Its marker/status proof still waits for the original handoff.
+    expect(useLaserStore.getState().motionOperation).not.toBeNull();
+    expect(writesSince(sim, before)).not.toContain(SETTLE_MARKER);
+    useLaserStore.setState({ pendingTransportWrites: 0 });
+    await pump(2_000);
+    await Promise.all([jog, cancel]);
+    expect(operatorCanMoveAgain()).toEqual(RELEASED);
+  });
+
+  it('does not dispatch a delayed cancel into a replacement controller session', async () => {
+    const sim = await connectIdle({ motionMs: 5_000 });
+    const jog = useLaserStore.getState().jog({ dx: 50, feed: 1000 });
+    await pump(100);
+    useLaserStore.setState({ pendingTransportWrites: 1 });
+    const before = sim.outbound().length;
+    const cancel = useLaserStore.getState().cancelJog();
+    const rejected = expect(cancel).rejects.toThrow(/interrupted/);
+    await pump(100);
+    useLaserStore.setState((state) => ({
+      controllerSessionEpoch: state.controllerSessionEpoch + 1,
+      pendingTransportWrites: 0,
+    }));
+    await pump(500);
+    await rejected;
+    expect(writesSince(sim, before)).not.toContain(JOG_CANCEL);
+    await pump(5_000);
+    await jog;
   });
 });

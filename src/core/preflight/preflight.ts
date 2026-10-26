@@ -37,6 +37,7 @@ import { findNoGoZoneCollisions } from './no-go-zones';
 import { findRelativeMotionEnvelopeIssues } from './relative-motion-envelope';
 import { operationScanOffsetIssues } from './scan-offset-policy';
 import { openFillContourIssues } from './open-fill-contour-issues';
+import { lineOpenOutlineIssues } from './line-open-outline-issues';
 
 export type PreflightCode =
   | 'no-output-layer'
@@ -51,6 +52,9 @@ export type PreflightCode =
   | 'passes-below-one'
   | 'layer-mode-mismatch'
   | 'offset-fill-open-contour'
+  // Advisory-only (ADR-626 Amd 8): open paths whose ends meet on a Line
+  // operation with kerf, leads or inside-first are cut as open lines.
+  | 'line-open-outline'
   | 'laser-on-travel'
   | 'long-blank-feed'
   | 'no-go-zone-collision'
@@ -69,6 +73,9 @@ export type PreflightCode =
   // Advisory-only (ADR-471): a ramp entry left passes whose paths are too
   // short to ramp along to plunge.
   | 'cnc-ramp-entry-plunge'
+  // Advisory-only (ADR-250 Amendment 3): no profile lead fits without cutting
+  // a kept part, so those passes keep their straight plunge.
+  | 'cnc-profile-lead-plunge'
   | 'cnc-rest-machining-invalid'
   | 'cnc-adaptive-clearing-invalid'
   | 'cnc-inlay-invalid'
@@ -87,6 +94,8 @@ export type PreflightCode =
   // Advisory-only: secondary CNC cutters share values established for the
   // layer's primary cutter and require explicit operator verification.
   | 'cnc-secondary-tool-feed-retained'
+  // Advisory-only: values retained from a machine starter for a different cutter.
+  | 'cnc-starter-tool-feed-retained'
   | 'empty-output';
 
 export type PreflightIssue = {
@@ -145,6 +154,7 @@ export function runPreflight(
   issues.push(...findLayerModeMismatchIssues(project.scene.objects, outputLayers));
 
   issues.push(...openFillContourIssues(project.scene));
+  issues.push(...lineOpenOutlineIssues(project));
 
   // A8: split the (up to ~96 MB raster) body ONCE and thread the lines through
   // every G-code scanner below, instead of each re-splitting the whole string.

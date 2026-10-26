@@ -1,12 +1,8 @@
 {
   "schemaVersion": 1,
-  "sinceSourceSha": "cbc7a91fa00452f0b171172307ac3fe5e5d8457b",
+  "sinceSourceSha": "19aba0456008a5b19ae6c2096284482a1b414202",
   "highlights": [
-    "Registration Jig has its own editor page: add text, import or trace artwork, then Save to canvas. Escape no longer discards your edits, and after a complete outline burn the jig switches to Artwork only and reminds you to refocus.",
-    "With Absolute Coords on a flat bed, Centre & LED moves the pointer light to the centre of the selected artwork, and a Machine Setup option runs it after a clean Frame. Marlin fan-output laser profiles have no pointer light.",
-    "Find any command with Ctrl+K (Cmd+K on Mac). The workspace is denser and fits smaller screens, the jog pad is more compact, most dialogs keep their buttons visible, and Settings no longer changes size between sections.",
-    "Offset, Combine, Weld and Cut Shapes now run in the background so the app stays responsive. The artwork settings panel shows dither options as visual swatches, and the Material Test dialog previews its grid as you edit it.",
-    "On GRBL and Smoothieware controllers, jobs no longer hang when the last replies are lost. Reconnect pop-ups are quieter, speed sliders use realistic ranges, and a bed diagram sets the origin and records the homing corner.",
-    "Focus Test operations are clearly labelled, trim, node editing, shear and arrays are more accurate, paid licences keep checking in when the clock is off by up to 30 days, and Electron gets the latest Chromium security fixes."
+    "Your camera calibration now stays when you open a project saved earlier for the same machine. Before, such a file could remove the calibration, and a later machine change saved over it.",
+    "Cut jobs with many pieces travel less: each piece's holes are cut just before its outline, and the route is shortened further. In tests, travel dropped by about a fifth."
   ]
 }

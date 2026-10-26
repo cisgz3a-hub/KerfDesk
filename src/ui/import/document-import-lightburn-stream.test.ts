@@ -2,6 +2,10 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
+// Load the comparison importer's material-library graph during collection.
+// Vitest's cold module transforms are setup, not CLB streaming/parsing work;
+// all parser calls and stream assertions below retain the default test budget.
+import '../../io/lightburn/clb-import';
 import { parseDocumentImportText } from './document-import-parse';
 import { parseDocumentImportSource } from './document-import-source';
 

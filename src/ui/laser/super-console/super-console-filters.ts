@@ -1,3 +1,4 @@
+import { maskControllerPasswords } from '../../../core/controllers/controller-password-settings';
 import type { SerialTranscriptEntry } from '../../state/laser-transcript';
 
 // Grouping precedence matters: a job-stream write is direction 'out' AND
@@ -68,14 +69,18 @@ export function filterSuperConsoleEntries(
 
 export const SUPER_CONSOLE_TSV_HEADER = 'Timestamp\tDirection\tSource\tKind\tRaw\tDecoded';
 
+// Copied text leaves the app, so a grblHAL or FluidNC password in a `$$` reply
+// or a typed write is removed first, as the diagnostic bundle removes it
+// (controller audit v2 C5-P2-1 follow-up). Masked before escaping: the mask
+// runs to the end of the line.
 export function formatSuperConsoleLine(entry: SerialTranscriptEntry): string {
   return [
     new Date(entry.at).toISOString(),
     entry.direction,
     entry.source,
     entry.kind,
-    entry.raw,
-    entry.decoded ?? '',
+    maskControllerPasswords(entry.raw),
+    maskControllerPasswords(entry.decoded ?? ''),
   ]
     .map(escapeTsvCell)
     .join('\t');

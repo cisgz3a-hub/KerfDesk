@@ -7,6 +7,7 @@ import {
   POLLED_RESPONSE_TIMEOUT_MS,
 } from './laser-controller-qualification';
 import type { SetFn, GetFn } from './laser-line-shared';
+import { controllerLink } from './laser-safety-notice';
 import type { LaserState, LiveRefs } from './laser-store';
 import { sessionSawLineError } from './laser-serial-line-errors';
 import { appendSystemNotice } from './laser-system-notice';
@@ -66,10 +67,24 @@ function reportMissingControllerResponse(
   waitedMs: number,
 ): void {
   const { baudRate, epoch } = session;
-  const evidence = inboundEvidence(get(), refs);
-  const [notice, failure] = silenceMessages(evidence, waitedMs / 1000, baudRate, refs.driver.label);
+  const state = get();
+  const evidence = inboundEvidence(state, refs);
+  const [notice, failure] =
+    controllerLink(state) === 'network'
+      ? networkSilenceMessages(evidence, waitedMs / 1000, refs.driver.label)
+      : silenceMessages(evidence, waitedMs / 1000, baudRate, refs.driver.label);
   set(appendSystemNotice(get(), refs, notice, true));
-  set((state) => failedControllerQualificationPatch(state, epoch, failure));
+  set((current) => failedControllerQualificationPatch(current, epoch, failure));
+}
+
+function readableSilenceMessages(
+  seconds: number,
+  device: string,
+): readonly [notice: string, failure: string] {
+  return [
+    `[lf2] The controller sent data but no status report within ${seconds} s. Check that the device is ${device}.`,
+    'The controller did not answer the status query. Check the controller profile, then retry.',
+  ];
 }
 
 // Only a controller that sent nothing at all, or nothing that decodes, points
@@ -80,12 +95,7 @@ function silenceMessages(
   baudRate: number,
   device: string,
 ): readonly [notice: string, failure: string] {
-  if (evidence === 'readable') {
-    return [
-      `[lf2] The controller sent data but no status report within ${seconds} s. Check that the device is ${device}.`,
-      'The controller did not answer the status query. Check the controller profile, then retry.',
-    ];
-  }
+  if (evidence === 'readable') return readableSilenceMessages(seconds, device);
   if (evidence === 'undecodable') {
     return [
       `[lf2] Only undecodable data from the controller within ${seconds} s. Check baud rate (${baudRate}) and that the device is ${device}.`,
@@ -95,6 +105,27 @@ function silenceMessages(
   return [
     `[lf2] No controller response within ${seconds} s. Check baud rate (${baudRate}) and that the device is ${device}.`,
     `No controller response was received at ${baudRate} baud. Check the cable and controller profile, then retry.`,
+  ];
+}
+
+// A Wi-Fi or Ethernet session has no baud rate or cable: silence there means
+// the target or its network service, as Machine Setup says (controller audit
+// D7-P3-2).
+function networkSilenceMessages(
+  evidence: InboundEvidence,
+  seconds: number,
+  device: string,
+): readonly [notice: string, failure: string] {
+  if (evidence === 'readable') return readableSilenceMessages(seconds, device);
+  if (evidence === 'undecodable') {
+    return [
+      `[lf2] Only undecodable data from the network target within ${seconds} s. Check that its port is the controller's command channel and that the device is ${device}.`,
+      "The controller's data could not be decoded. Check that the network port is the controller's command channel and the controller profile, then retry.",
+    ];
+  }
+  return [
+    `[lf2] No controller response within ${seconds} s over the network connection. Check the target and that the device is ${device}.`,
+    'No controller answer came back over the network connection. Check the target and its enabled network service, then retry.',
   ];
 }
 

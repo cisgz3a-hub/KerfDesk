@@ -20,6 +20,7 @@ const ENTRIES = [
   'public/desktop-release-keys.json',
   'public/desktop-sandbox-contract.mjs',
   'public/licence-key-text.mjs',
+  'public/desktop-licence-window.mjs',
   'node_modules/electron-updater/package.json',
 ];
 

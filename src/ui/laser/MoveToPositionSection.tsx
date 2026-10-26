@@ -17,9 +17,14 @@ import type {
 import { machineKindOf, type Vec2 } from '../../core/scene';
 import { NumberField } from '../common/NumberField';
 import { useStore } from '../state';
+import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { CollapsibleRailSection } from './CollapsibleRailSection';
-import { currentHeadPosition, dispatchHeadMove } from './head-move-dispatch';
+import {
+  currentHeadPosition,
+  dispatchHeadMove,
+  headPositionUnknownMessage,
+} from './head-move-dispatch';
 import {
   defaultSavedPositionName,
   savedPositionsAfterDelete,
@@ -57,7 +62,11 @@ export function MoveToPositionSection({ disabled }: { readonly disabled: boolean
     if (current === null) {
       useToastStore
         .getState()
-        .pushToast('The head position is not known yet. Wait for a status report.', 'error');
+        .pushToast(
+          headPositionUnknownMessage(useLaserStore.getState()) ??
+            'The head position is not known yet. Wait for a status report.',
+          'error',
+        );
       return;
     }
     setX(current.xMm);

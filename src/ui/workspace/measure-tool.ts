@@ -1,4 +1,5 @@
 import type { Vec2 } from '../../core/scene';
+import { formatDisplayLengthFixed, type DisplayLengthUnit } from '../display-length';
 
 export type MeasureDraft = {
   readonly start: Vec2;
@@ -28,7 +29,11 @@ export function constrainMeasureEnd(start: Vec2, end: Vec2, constrained: boolean
   };
 }
 
-export function measureReadout(draft: MeasureDraft): MeasureReadout {
+/** The label follows the display unit (ADR-629); the numbers stay in mm. */
+export function measureReadout(
+  draft: MeasureDraft,
+  unit: DisplayLengthUnit = 'mm',
+): MeasureReadout {
   const dxMm = draft.end.x - draft.start.x;
   const dyMm = draft.end.y - draft.start.y;
   const distanceMm = Math.hypot(dxMm, dyMm);
@@ -38,8 +43,9 @@ export function measureReadout(draft: MeasureDraft): MeasureReadout {
     dyMm,
     distanceMm,
     angleDeg,
-    label: `${formatMm(distanceMm)} mm | dx ${formatMm(dxMm)} | dy ${formatMm(
+    label: `${formatMm(distanceMm, unit)} ${unit} | dx ${formatMm(dxMm, unit)} | dy ${formatMm(
       dyMm,
+      unit,
     )} | ${angleDeg.toFixed(1)} deg`,
   };
 }
@@ -49,6 +55,7 @@ function normalizeAngleDeg(angle: number): number {
   return normalized < 0 ? normalized + 360 : normalized;
 }
 
-function formatMm(value: number): string {
-  return Object.is(value, -0) ? '0.00' : value.toFixed(2);
+// Two decimals of a millimetre, four of an inch; never a negative zero.
+function formatMm(value: number, unit: DisplayLengthUnit): string {
+  return formatDisplayLengthFixed(value, unit, 2);
 }

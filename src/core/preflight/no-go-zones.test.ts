@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, type NoGoZone } from '../devices';
 import { createLayer, createProject, EMPTY_SCENE, type Project } from '../scene';
 import { runPreflight } from './preflight';
+import { cncGrblStrategy } from '../output/cnc-grbl-strategy';
 import { findNoGoZoneCollisions, firstZoneCrossedBySegment } from './no-go-zones';
 
 function projectWithNoGoZone(enabled = true): Project {
@@ -273,6 +274,60 @@ describe('findNoGoZoneCollisions motion path coverage', () => {
     ).toEqual([{ lineNumber: 2, zone: outsideClamp, cutterRadiusMm: 2 }]);
     expect(findNoGoZoneCollisions(gcode, [outsideClamp], bed)).toEqual([]);
   });
+
+  // Audit v3 D5-P2-1: the emitter writes `tip-diameter-mm` after
+  // `diameter-mm`, and the envelope must use the full cutter width.
+  it.each([
+    ['engraving bit with a 0.2 mm flat', 'engraving', 3.175, 30, 0.2],
+    ['tapered ball nose with a 0.5 mm tip', 'tapered-ball-nose', 6.35, 7, 0.5],
+  ] as const)(
+    'reads the full diameter of an emitted %s, not its tip',
+    (_label, toolKind, toolDiameterMm, toolTipAngleDeg, toolTipDiameterMm) => {
+      const gcode = cncGrblStrategy.emit(
+        {
+          groups: [
+            {
+              kind: 'cnc',
+              layerId: 'L1',
+              color: '#334455',
+              cutType: 'v-carve',
+              toolId: 'tip-bit',
+              toolName: 'Tip bit',
+              toolKind,
+              toolDiameterMm,
+              toolTipAngleDeg,
+              toolTipDiameterMm,
+              feedMmPerMin: 600,
+              plungeMmPerMin: 180,
+              spindleRpm: 12_000,
+              spindleSpinupSec: 3,
+              safeZMm: 5,
+              passes: [
+                {
+                  kind: 'contour',
+                  zMm: -0.5,
+                  polyline: [
+                    { x: 20, y: 50 },
+                    { x: 60, y: 50 },
+                  ],
+                  closed: false,
+                },
+              ],
+            },
+          ],
+        },
+        DEFAULT_DEVICE_PROFILE,
+      );
+      expect(gcode).toContain(`tip-diameter-mm: ${toolTipDiameterMm.toFixed(3)}`);
+      // One millimetre beside the cut: inside the full radius, outside the tip's.
+      const clamp = { ...zone, x: 30, y: 51, width: 5, height: 5 };
+
+      const collisions = findNoGoZoneCollisions(gcode, [clamp], bed);
+
+      expect(collisions.length).toBeGreaterThan(0);
+      expect(collisions.every((hit) => hit.cutterRadiusMm === toolDiameterMm / 2)).toBe(true);
+    },
+  );
 
   it('switches cutter envelopes between multi-tool sections', () => {
     const clamp = { ...zone, x: 0, y: 10, width: 20, height: 10 };

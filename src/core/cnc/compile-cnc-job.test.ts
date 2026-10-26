@@ -384,7 +384,8 @@ describe('compileCncJob', () => {
     );
     const withAllowance = onlyGroup(
       sceneWith(
-        [cncLayer('L1', '#ff0000', layerSettings({ finishAllowanceMm: 2 }))],
+        // Under the 1/8 in bit's radius, so the finish stays one pass (ADR-140 Amendment 2).
+        [cncLayer('L1', '#ff0000', layerSettings({ finishAllowanceMm: 1 }))],
         [squareObject('O1', '#ff0000', size)],
       ),
     );
@@ -394,10 +395,10 @@ describe('compileCncJob', () => {
     };
     // Exactly one extra pass: the appended finishing loop.
     expect(withAllowance.passes).toHaveLength(noAllowance.passes.length + 1);
-    // Roughing contour sits ~2 mm further out per side (span grows by ~2*allowance).
+    // Roughing contour sits ~1 mm further out per side (span grows by ~2*allowance).
     const noSpan = Math.max(...noAllowance.passes.map(spanX));
     const roughSpan = Math.max(...withAllowance.passes.map(spanX));
-    expect(roughSpan).toBeGreaterThan(noSpan + 3.9);
+    expect(roughSpan).toBeGreaterThan(noSpan + 1.9);
     // One finishing pass at FULL depth on the TRUE contour (span == no-allowance span).
     const finishing = withAllowance.passes.filter(
       (pass) => Math.abs(contourPass(pass).zMm + 4) < 1e-9 && Math.abs(spanX(pass) - noSpan) < 1e-6,

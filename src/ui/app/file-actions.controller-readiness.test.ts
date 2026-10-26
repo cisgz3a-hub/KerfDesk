@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { mockPlatform, projectWithLine, toasts } from '../../__fixtures__/file-actions';
+import { settingsMapToControllerSettings } from '../../core/controllers/grbl/parse-settings';
 import type { SaveTarget } from '../../platform/types';
 import { handleSaveGcode } from './file-actions';
 
@@ -69,5 +70,37 @@ describe('handleSaveGcode controller readiness advisories', () => {
     });
 
     expect(toast.messages).toHaveLength(0);
+  });
+
+  // Audit follow-up to #1349: Start names the connected firmware's behaviour
+  // for an empty S range; the Save advisory must say the same.
+  it("describes an empty S range by the connected firmware's behaviour", async () => {
+    const project = projectWithLine();
+    const controllerSettings = settingsMapToControllerSettings(
+      new Map([
+        [30, '0'],
+        [31, '0'],
+        [32, '1'],
+      ]),
+    );
+    const rangeToast = async (activeControllerKind?: 'grblhal'): Promise<string | undefined> => {
+      const toast = toasts();
+      await handleSaveGcode({
+        platform: mockPlatform(),
+        project,
+        savedName: null,
+        ...(activeControllerKind === undefined
+          ? {}
+          : { machine: { statusReport: null, activeControllerKind } }),
+        controllerSettings,
+        pushToast: toast.pushToast,
+      });
+      return toast.messages
+        .map((entry) => entry.message)
+        .find((message) => message.includes('no S power range'));
+    };
+
+    expect(await rangeToast('grblhal')).toContain('grblHAL then switches to on/off');
+    expect(await rangeToast()).not.toContain('grblHAL then switches to on/off');
   });
 });

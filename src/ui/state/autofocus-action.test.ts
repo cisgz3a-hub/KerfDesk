@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { classifyResponse, type StatusReport } from '../../core/controllers/grbl';
+import { autofocusCommandIssue } from '../../core/devices/autofocus-command';
 import { describeAutofocusResult, runAutofocus, type RunAutofocusArgs } from './autofocus-action';
 import {
   cancelControllerLifecycleRefs,
@@ -113,6 +114,73 @@ describe('runAutofocus — shared response ownership', () => {
     harness.emit('<Idle|MPos:0.000,0.000,-8.000|FS:0,0>');
     expect((await pending).kind).toBe('ok');
   });
+
+  it.each(['G38.2 Z-10 F100', 'G38 .2 Z-10 F100', 'G3 8.2 Z-1 0 F1 0 0', 'g3 8 .4 z-10 f100'])(
+    'owns each coordinate setup reply before sending a probe (%s)',
+    async (command) => {
+      expect(autofocusCommandIssue(command)).toBeNull();
+      const harness = makeHarness();
+      const pending = runAutofocus(harness.args({ command }));
+      await flush();
+      expect(harness.written).toEqual(['G21\n']);
+      harness.emit('ok');
+      await flush();
+      expect(harness.written).toEqual(['G21\n', 'G90\n']);
+      harness.emit('ok');
+      await flush();
+      expect(harness.written).toEqual(['G21\n', 'G90\n', `${command}\n`]);
+      harness.emit('ok');
+      harness.emit('<Idle|MPos:0,0,-8|FS:0,0>');
+      expect((await pending).kind).toBe('ok');
+    },
+  );
+
+  it('never probes if coordinate setup is rejected', async () => {
+    const harness = makeHarness();
+    const pending = runAutofocus(harness.args({ command: 'G38.4 Z-10 F100' }));
+    await flush();
+    harness.emit('error:20');
+    expect((await pending).kind).toBe('rejected');
+    expect(harness.written).toEqual(['G21\n']);
+  });
+
+  it('does not send the next setup line on a replacement controller session', async () => {
+    const harness = makeHarness();
+    const pending = runAutofocus(harness.args({ command: 'G38.2 Z-10 F100' }));
+    await flush();
+    harness.emit('ok');
+    harness.refs.writeEpoch = 1;
+    expect(await pending).toEqual({
+      kind: 'preflight-failed',
+      reason: 'Auto-focus cancelled because the controller session changed.',
+    });
+    expect(harness.written).toEqual(['G21\n']);
+  });
+
+  it.each(['G21\n', 'G90\n', 'G38.2 Z-10 F100\n'])(
+    'checks the original session at the write boundary for %s',
+    async (interruptedLine) => {
+      const harness = makeHarness();
+      const dispatched: string[] = [];
+      const result = await runAutofocus(
+        harness.args({
+          command: 'G38.2 Z-10 F100',
+          write: async (line, _action, _source, assertBeforeWrite) => {
+            // A store subscription may replace the session while reserving
+            // the write. safeWrite invokes this guard again before conn.write.
+            if (line === interruptedLine) harness.refs.writeEpoch = 1;
+            expect(assertBeforeWrite).toBeTypeOf('function');
+            assertBeforeWrite?.();
+            dispatched.push(line);
+            harness.emit('ok');
+          },
+        }),
+      );
+      expect(result.kind).toBe('preflight-failed');
+      expect(dispatched).not.toContain(interruptedLine);
+      expect(dispatched).not.toContain('G38.2 Z-10 F100\n');
+    },
+  );
 
   it('does not dispatch until a fresh Idle confirmation resolves', async () => {
     const harness = makeHarness();
@@ -270,9 +338,15 @@ describe('describeAutofocusResult', () => {
     expect(result.message).toMatch(/firmware/i);
   });
 
-  it('maps error:9 to the no-probe-pin hint', () => {
+  it('maps error:9 to the alarm-or-jog lockout it means, not a missing probe', () => {
+    // gnea/grbl error_codes_en_US.csv row 9; a missing probe is error:20
+    // (controller audit v3 D2-P3-1).
     const result = describeAutofocusResult({ kind: 'rejected', errorCode: 9, raw: 'error:9' });
-    expect(result.message).toMatch(/probe pin/i);
+    expect(result.message).toMatch(/Alarm or Jog/);
+    expect(result.message).not.toMatch(/probe/i);
+    expect(
+      describeAutofocusResult({ kind: 'rejected', errorCode: 20, raw: 'error:20' }).message,
+    ).toMatch(/no probe input/);
   });
 
   it('maps unrecognized error responses to the raw controller reply', () => {

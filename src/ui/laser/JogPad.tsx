@@ -186,9 +186,12 @@ function machineActionAreas(showManualAir: boolean, machineKind: 'laser' | 'cnc'
 // (error:15), so this session's `$$` bounds the hold as well, and the homing
 // edge stays the pull-off clear of its switch (ADR-375). Stock GRBL checks from
 // its own MPos even after an Unlock without Home, when KerfDesk hides the
-// position, so that clamp alone aims from the controller's number then. With
-// neither a frame nor soft limits, the hold asks for full travel and relies on
-// release plus the jog-cancel byte, as it does with no position.
+// position, so that clamp alone aims from the controller's number then. A Home
+// in this session ties MPos to the switch, so a homed grblHAL, which never has
+// a frame, keeps the pull-off clear of its switch with soft limits off too
+// (ADR-375 Amendment 4). With no frame, no soft limits and no Home, the hold
+// asks for full travel and relies on release plus the jog-cancel byte, as it
+// does with no position.
 function JogArrows(props: Omit<Parameters<typeof JogArrowGrid>[0], 'position'>): JSX.Element {
   const statusReport = useLaserStore((s) => (props.disabled ? null : s.statusReport));
   const wcoCache = useLaserStore((s) => s.wcoCache);

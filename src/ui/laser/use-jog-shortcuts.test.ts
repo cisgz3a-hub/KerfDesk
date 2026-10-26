@@ -8,7 +8,10 @@
 // keys. The oracle is the machine vector the key asks for: it must be the one
 // the jog pad's matching arrow sends, for a front-left and a mirrored
 // (rear-right) origin. Bare arrows, and the arrows a NumLock-off keypad sends,
-// belong to the canvas nudge and must never move the machine (F104).
+// belong to the canvas nudge and must never move the machine (F104). Nor may
+// the Home / PageUp / End / PageDown a NumLock-off keypad 7 / 9 / 1 / 3 sends:
+// with NumLock on those keys jog XY, so read as Page keys they moved Z
+// instead (controller audit v2, C8-P2-1; ADR-493 Amendment 1).
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { jogAxisSignsForOrigin } from '../../core/devices/jog-direction';
@@ -135,6 +138,41 @@ describe('PageUp/PageDown Z-focus jog', () => {
     expect(onFocusJog).toHaveBeenCalledWith(1);
     expect(onXyJog).not.toHaveBeenCalled();
   });
+
+  // A browser names the keypad by code, by location, or both; either alone
+  // must keep the key off the Z jog.
+  it.each([
+    ['NumLock-off Numpad 9 (sends PageUp)', numLockOff('9', 'PageUp')],
+    ['NumLock-off Numpad 3 (sends PageDown)', numLockOff('3', 'PageDown')],
+    ['a keypad PageDown named only by its code', { key: 'PageDown', code: 'Numpad3' }],
+    [
+      'a keypad PageUp named only by its location',
+      { key: 'PageUp', code: '', location: KeyboardEvent.DOM_KEY_LOCATION_NUMPAD },
+    ],
+  ] as ReadonlyArray<[string, KeyboardEventInit]>)('%s never jogs Z', (_name, init) => {
+    const { onFocusJog, onXyJog, uninstall } = install();
+    cleanup = uninstall;
+
+    const event = press(init);
+
+    expect(onFocusJog).not.toHaveBeenCalled();
+    expect(onXyJog).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it('keeps the dedicated PageDown key jogging Z', () => {
+    const { onFocusJog, uninstall } = install();
+    cleanup = uninstall;
+
+    const event = press({
+      key: 'PageDown',
+      code: 'PageDown',
+      location: KeyboardEvent.DOM_KEY_LOCATION_STANDARD,
+    });
+
+    expect(onFocusJog).toHaveBeenCalledWith(-1);
+    expect(event.defaultPrevented).toBe(true);
+  });
 });
 
 // LightBurn's Move window: Left = Alt+Ctrl+[, Right = Alt+Ctrl+], Up =
@@ -225,6 +263,12 @@ function numpad(digit: string): KeyboardEventInit {
   return { key: digit, code: `Numpad${digit}` };
 }
 
+// A NumLock-off keypad keeps NumpadN as the code and the keypad location, and
+// sends the navigation key printed under the digit (W3C UI Events).
+function numLockOff(digit: string, key: string): KeyboardEventInit {
+  return { key, code: `Numpad${digit}`, location: KeyboardEvent.DOM_KEY_LOCATION_NUMPAD };
+}
+
 describe('keyboard XY jog (ADR-493)', () => {
   it.each(XY_KEYS)('$name jogs one step on a front-left machine', ({ init, frontLeft }) => {
     const { onXyJog, onFocusJog, uninstall } = install({ xyStep: FRONT_LEFT });
@@ -262,9 +306,12 @@ describe('keyboard XY jog (ADR-493)', () => {
       'Shift+ArrowLeft (canvas nudge 10 mm)',
       { key: 'ArrowLeft', code: 'ArrowLeft', shiftKey: true },
     ],
-    ['NumLock-off Numpad 8 (sends ArrowUp)', { key: 'ArrowUp', code: 'Numpad8' }],
-    ['NumLock-off Numpad 4 (sends ArrowLeft)', { key: 'ArrowLeft', code: 'Numpad4' }],
-    ['NumLock-off Numpad 7 (sends Home)', { key: 'Home', code: 'Numpad7' }],
+    ['NumLock-off Numpad 8 (sends ArrowUp)', numLockOff('8', 'ArrowUp')],
+    ['NumLock-off Numpad 4 (sends ArrowLeft)', numLockOff('4', 'ArrowLeft')],
+    ['NumLock-off Numpad 7 (sends Home)', numLockOff('7', 'Home')],
+    ['NumLock-off Numpad 9 (sends PageUp)', numLockOff('9', 'PageUp')],
+    ['NumLock-off Numpad 1 (sends End)', numLockOff('1', 'End')],
+    ['NumLock-off Numpad 3 (sends PageDown)', numLockOff('3', 'PageDown')],
     ['Numpad 5', numpad('5')],
     ['Ctrl+Numpad 8', { ...numpad('8'), ctrlKey: true }],
     ['top-row 8', { key: '8', code: 'Digit8' }],

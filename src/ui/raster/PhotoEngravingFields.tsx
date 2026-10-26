@@ -9,6 +9,7 @@ import { Button } from '../kit';
 import { DraftNumberInput } from '../kit/DraftNumberInput';
 import { DitherSwatchPicker } from '../layers/DitherSwatchPicker';
 import { imageDensityBounds } from './image-density-bounds';
+import { PhotoToneCalibrationField } from './PhotoToneCalibrationField';
 import {
   PHOTO_DITHERS,
   photoDither,
@@ -20,7 +21,11 @@ type PhotoEngravingFieldsProps = {
   readonly draft: PhotoEngravingDraft;
   readonly image: RasterImage;
   readonly storedLinesPerMm: number;
+  /** The photo's effective power and speed, which a tone calibration also depends on. */
+  readonly power: number;
+  readonly speed: number;
   readonly onChange: (patch: Partial<PhotoEngravingDraft>) => void;
+  readonly onCalibrateTones: () => void;
 };
 
 export function PhotoEngravingFields(props: PhotoEngravingFieldsProps): JSX.Element {
@@ -55,6 +60,13 @@ export function PhotoEngravingFields(props: PhotoEngravingFieldsProps): JSX.Elem
           ? 'For surfaces such as slate that mark lighter. Reverses the engraving and shows light marks in the preview.'
           : 'For surfaces such as wood that mark darker. Darker parts of the photo use more laser dots.'}
       </p>
+      <PhotoToneCalibrationField
+        draft={draft}
+        power={props.power}
+        speed={props.speed}
+        onChange={onChange}
+        onCalibrate={props.onCalibrateTones}
+      />
       <PhotoToneFields draft={draft} onChange={onChange} />
       <PhotoResolutionFields {...props} />
       <PhotoSharpenFields draft={draft} onChange={onChange} />
@@ -139,7 +151,7 @@ function PhotoResolutionFields(props: PhotoEngravingFieldsProps): JSX.Element {
   );
 }
 
-// ADR-648: sharpening runs on the engraving grid, after resampling.
+// ADR-671: sharpening runs on the engraving grid, after resampling.
 function PhotoSharpenFields({
   draft,
   onChange,

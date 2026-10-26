@@ -145,10 +145,10 @@ These are recorded project rules, not oversights. Each needs Johann's call befor
 
 - **Start needs a completed Frame** (PROJECT.md non-negotiable 21, ADR-228). LightBurn starts at once.
 - **Start and End G-code are hard-coded** (PROJECT.md "Out of scope"; LIGHTBURN-STUDY D-05).
-- **Running an external G-code file** is out of scope; opened files go to the inspector.
+- ~~**Running an external G-code file**~~ — decided: an opened file runs through its own Frame and Start review (ADR-630).
 - **Macros are one command each** (ADR-293).
 - **Laser Z per layer, Focus Test** (laser Z out of scope in PROJECT.md).
-- **Inch display units** (PROJECT.md: the internal model is millimetres) and **system font listing**.
+- ~~**Inch display units**~~ and ~~**system font listing**~~ — decided: an Inches display preference (ADR-629) and **System fonts...** (ADR-628). The G-code Inspector is free (ADR-627).
 
 ## Build plan
 

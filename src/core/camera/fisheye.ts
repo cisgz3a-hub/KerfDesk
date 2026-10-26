@@ -32,6 +32,9 @@ const MAX_INVERSE_STEPS = 64;
 // Samples of the polynomial's slope when looking for its first turning point.
 const TURN_SCAN_STEPS = 512;
 const HALF_PI = Math.PI / 2;
+// Every projected point asks for its lens's limit, and a lens's distortion
+// tuple is immutable, so the tuple itself keys the answer.
+const angleLimits = new WeakMap<FisheyeDistortion, number>();
 
 // theta_d = theta * (1 + k1 t^2 + k2 t^4 + k3 t^6 + k4 t^8), with t = theta.
 function distortedAngle(theta: number, d: FisheyeDistortion): number {
@@ -83,6 +86,14 @@ export function projectFisheye(
  * there has no single answer.
  */
 export function fisheyeAngleLimit(d: FisheyeDistortion): number {
+  const cached = angleLimits.get(d);
+  if (cached !== undefined) return cached;
+  const limit = scanAngleLimit(d);
+  angleLimits.set(d, limit);
+  return limit;
+}
+
+function scanAngleLimit(d: FisheyeDistortion): number {
   let rising = 0;
   for (let i = 1; i <= TURN_SCAN_STEPS; i += 1) {
     const theta = (HALF_PI * i) / TURN_SCAN_STEPS;

@@ -1,3 +1,4 @@
+import { isGrblhalPasswordSetting } from '../../../core/controllers/controller-password-settings';
 import type { DeviceProfile } from '../../../core/devices';
 import type { GcodeMetadata } from '../../../io/gcode';
 import type { LaserState } from '../../state/laser-store';
@@ -62,6 +63,10 @@ function diagnosticTranscript(options: DiagnosticBundleOptions) {
       // Motion text can reconstruct the user's artwork. Keep diagnostic replies,
       // not executable output, even when a manual command was classified G-code.
       if (entry.source === 'job' || entry.source === 'motion' || entry.kind === 'gcode') continue;
+      // A `$$` reply line or a typed `$N=` write is a raw setting value, and
+      // grblHAL prints its Wi-Fi, WebUI and MQTT passwords there in clear. The
+      // settings block carries the numeric values (audit C5-P2-1).
+      if (entry.kind === 'setting' || entry.kind === 'setting-write') continue;
       const raw = redactDiagnosticText(entry.raw);
       if (raw === null) continue;
       transcript.push({
@@ -127,7 +132,8 @@ function knownController(laser: LaserState) {
     firmwareReport: diagnosticFirmwareReport(laser),
     settings: laser.grblSettingsRows.slice(0, SETTINGS_LIMIT).map((row) => ({
       id: finite(row.id),
-      numericValue: finite(row.numericValue),
+      // An all-digit password would otherwise pass as a number.
+      numericValue: isGrblhalPasswordSetting(row.id) ? null : finite(row.numericValue),
     })),
     settingsOmitted: Math.max(0, laser.grblSettingsRows.length - SETTINGS_LIMIT),
     build:
@@ -185,7 +191,8 @@ function disclosure(transcriptOmitted: number) {
       'profile and file names/paths',
       'accounts and licence data',
       'device serial numbers and controller user info',
-      'raw settings values',
+      'raw settings values and setting lines',
+      'controller passwords',
     ],
     redaction:
       'Recognised sensitive lines are omitted; URLs, paths, addresses and identifiers are redacted. Review before sharing; unlabelled secrets may not be recognised.',

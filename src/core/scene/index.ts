@@ -137,6 +137,9 @@ export {
   firstCornerOffsetMm,
 } from './board-capture';
 export type { BoardVerificationTarget, CapturedBoardGeometry } from './board-verification';
+export * from './board-verification';
+export * from './board-outline';
+export * from './board-outline-registration';
 export type { BoxAnchorAlignError, BoxAnchorAlignResult } from './box-anchor-align';
 export { buildBoxAnchorAlign } from './box-anchor-align';
 export type {

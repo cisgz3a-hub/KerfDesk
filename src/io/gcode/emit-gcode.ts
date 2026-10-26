@@ -27,6 +27,7 @@ import {
   type CncPassSpan,
 } from '../../core/output';
 import { finishOptionsForJob } from '../../core/output/output-strategy';
+import { CURRENT_LASER_POWER_SCALE_VERSION } from '../../core/output/laser-power-scale-version';
 import type { OutputScope, Project, Vec2 } from '../../core/scene';
 import { findFluidncNonExecutableLines } from '../../core/controllers/fluidnc/fluidnc-line-limit';
 import {
@@ -150,7 +151,7 @@ export function emitPreparedGcodeWithCncPassSpans(
   // unless preparation placed a laser finish position (ADR-493).
   const finish = {
     ...finishOptionsForJob(job, options.jobOrigin),
-    laserPowerScaleVersion: prepared.laserPowerScaleVersion ?? 2,
+    laserPowerScaleVersion: prepared.laserPowerScaleVersion ?? CURRENT_LASER_POWER_SCALE_VERSION,
   };
   const emission = materializeProgram(() => {
     const cnc =

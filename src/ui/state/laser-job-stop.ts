@@ -16,6 +16,7 @@
 import { cancel as cancelStreamer, markErrored } from '../../core/controllers/grbl';
 import type { ControllerDriver } from '../../core/controllers';
 import type { SerialConnection } from '../../platform/types';
+import type { OwnedResetSettingsRefs } from './laser-owned-reset-settings';
 import { clearCncLiveCaps } from './detected-settings-action';
 import { isGrblFamilyDriver, runGrblDisconnectTransaction } from './laser-disconnect-transaction';
 import { streamResetRecord, type JobStopReason } from './job-stop-request';
@@ -61,7 +62,8 @@ export type JobStopContext = {
   readonly get: () => LaserState;
   readonly refs: ResetCleanupRefs &
     ControllerLifecycleRefs &
-    ControllerQualificationScheduleRefs & {
+    ControllerQualificationScheduleRefs &
+    OwnedResetSettingsRefs & {
       readonly driver: ControllerDriver;
       readonly connection?: SerialConnection | null;
       readonly settingsCollector?: { readonly kind: string };

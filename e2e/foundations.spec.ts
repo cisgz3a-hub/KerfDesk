@@ -38,7 +38,7 @@ test('connects to deterministic GRBL serial and opens the deterministic USB came
   await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
 
   await (await toolbarCommand(page, 'Camera')).click();
-  await page.getByRole('button', { name: 'Start USB camera' }).click();
+  await page.getByRole('button', { name: 'Start camera', exact: true }).click();
 
   await expect
     .poll(async () => (await kerfdesk.events()).map((event) => event.kind))
@@ -53,6 +53,8 @@ test('connects an RTSP camera through the loopback bridge and captures readable 
   const bridge = await installRtspBridgeRoutes(page);
   const camera = page.getByRole('dialog', { name: 'Camera preview', exact: true });
   await (await toolbarCommand(page, 'Camera')).click();
+  // Cameras other than the laser's own and USB are chosen in Camera settings (ADR-663).
+  await camera.getByRole('button', { name: 'Camera settings', exact: true }).click();
 
   await camera.getByText(/^RTSP camera/).click();
   await camera.getByRole('textbox', { name: 'RTSP camera URL' }).fill('rtsp://192.168.10.1:8554/');
@@ -63,7 +65,9 @@ test('connects an RTSP camera through the loopback bridge and captures readable 
     'src',
     'http://127.0.0.1:51731/stream.mjpg?camera=e2e',
   );
-  await expect(page.getByText(/Use a camera/)).toContainText('Use a camera');
+  await camera.getByRole('button', { name: 'Back to the camera', exact: true }).click();
+  await expect(camera.getByText('Network camera', { exact: true })).toBeVisible();
+  await camera.getByRole('button', { name: 'Camera settings', exact: true }).click();
 
   await page.getByText('Diagnostics', { exact: true }).click();
   await expect(page.getByText(/Bridge: running/)).toContainText('frame proxy yes');
@@ -73,9 +77,13 @@ test('connects an RTSP camera through the loopback bridge and captures readable 
 
   await page.getByRole('button', { name: 'Close camera panel' }).click();
   bridge.setProbeAvailable(false);
+  // Reopening starts the remembered RTSP camera by itself (ADR-663 Amendment 1);
+  // it is gone now, so the panel says why and offers Reconnect.
   await (await toolbarCommand(page, 'Camera')).click();
-  await camera.getByText(/^RTSP camera/).click();
-  await camera.getByRole('button', { name: 'Connect', exact: true }).click();
+  await expect(camera.getByText('E2E RTSP camera unavailable.', { exact: true })).toBeVisible();
+  await camera.getByRole('button', { name: 'Camera settings', exact: true }).click();
+  // The failed RTSP camera's fold is open, with Reconnect in sight.
+  await camera.getByRole('button', { name: 'Reconnect', exact: true }).click();
   await expect(page.getByText('E2E RTSP camera unavailable.', { exact: true })).toBeVisible();
 });
 

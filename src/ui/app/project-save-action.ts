@@ -144,7 +144,7 @@ async function handleInvalidProject(
   const outcome = failProjectSave(owner, reason);
   // The canonical save remains refused (ADR-204), but a separate raw copy
   // keeps the session recoverable without treating discard-before-close as clean.
-  if (outcome === 'error') await offerSalvageExport(ctx, owner, writeOwner);
+  if (outcome === 'error') await offerSalvageExport(ctx, owner, writeOwner, reason);
   return outcome;
 }
 
@@ -154,9 +154,12 @@ async function offerSalvageExport(
   ctx: SaveProjectCtx,
   owner: ProjectSaveOwner,
   writeOwner: ProjectSaveWriteOwner,
+  reason: string,
 ): Promise<void> {
+  // Quote the refusal itself: a project over the object or font limit has
+  // nothing wrong with its machine or output settings (audit 13-P2-1).
   const wantsSalvage = jobAwareConfirm(
-    'This project cannot be saved as-is without changing its machine or output settings. ' +
+    `This project cannot be saved as-is: ${reason.replace(/\.$/, '')}. ` +
       'Export a raw recovery copy to a new file instead? It preserves your work but may need ' +
       'repair before it reopens cleanly.',
   );

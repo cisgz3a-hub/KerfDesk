@@ -92,6 +92,7 @@ beforeEach(() => {
     applyRequest: null,
     pendingCrop: null,
     transform: null,
+    tool: { kind: 'brush' },
   });
 });
 

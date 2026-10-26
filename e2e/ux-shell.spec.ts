@@ -216,7 +216,12 @@ test.describe('workspace shell acceptance', () => {
     await expect(
       page.getByRole('menuitem', { name: "Can't connect? (Troubleshooting)", exact: true }),
     ).toBeVisible();
-    await expect(page.getByRole('menuitem', { name: /safety/i })).toBeVisible();
+    await expect(
+      page.getByRole('menuitem', { name: 'Safety & liability', exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('menuitem', { name: 'License & Safety Notice', exact: true }),
+    ).toBeVisible();
     await expect(page.getByRole('menuitem', { name: /about kerfdesk/i })).toBeVisible();
   });
 });

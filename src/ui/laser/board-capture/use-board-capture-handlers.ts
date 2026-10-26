@@ -2,10 +2,12 @@ import { useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import {
   bestFitRectangleFromCorners,
   findRegistrationBoxes,
+  outlineMachineCorner,
   type BestFitRectangle,
   type BoardShape,
   type Vec2,
 } from '../../../core/scene';
+import type { DeviceProfile } from '../../../core/devices';
 import {
   capturedBoardShape,
   correctCapturedBoardGeometry,
@@ -22,6 +24,11 @@ import {
   type BoardCapture,
   type BoardRegistrationEpoch,
 } from './use-board-capture';
+import {
+  createOutlineFinishHandler,
+  outlineGeometryLargeEnough,
+  outlineRotationDeg,
+} from './use-board-outline-handlers';
 
 type SetMessage = Dispatch<SetStateAction<string | null>>;
 const CROSS_AXIS_NOTICE_MM = 5;
@@ -29,8 +36,17 @@ const CROSS_AXIS_NOTICE_MM = 5;
 type BoardCaptureHandlerArgs = {
   readonly capture: BoardCapture;
   readonly livePosition: Vec2 | null;
+  readonly device: DeviceProfile;
   readonly setOriginHere: () => Promise<void>;
+  readonly setOriginAtMachinePoint: (
+    pointMm: Vec2,
+    assertTargetCurrent?: () => void,
+  ) => Promise<void>;
   readonly addCapturedBoard: (shape: BoardShape) => void;
+  readonly registerCapturedBoardOutline: (
+    shape: Extract<BoardShape, { readonly kind: 'outline' }>,
+    rotationDeg: number,
+  ) => void;
   readonly updateCapturedBoard: (shape: BoardShape) => void;
 };
 
@@ -40,9 +56,11 @@ export type BoardCaptureHandlers = {
   readonly busy: boolean;
   readonly rect: BestFitRectangle | null;
   readonly onCapture: () => void;
+  readonly captureNow: () => Promise<void>;
   readonly onFinishRect: () => void;
   readonly onManualSize: (widthMm: number, heightMm: number) => void;
   readonly onFinishCircle: (center: Vec2, diameterMm: number) => Promise<void>;
+  readonly onFinishOutline: () => Promise<void>;
   readonly onCorrectBoardPoint: (target: BoardVerificationTarget, confirmed: Vec2) => Promise<void>;
 };
 
@@ -53,15 +71,24 @@ export function useBoardCaptureHandlers(args: BoardCaptureHandlerArgs): BoardCap
   const corners = args.capture.state.corners;
   const rect = corners.length === 4 ? bestFitRectangleFromCorners(corners) : null;
   const commitGeometry = createGeometryCommit(args);
+  const captureNow = useCapturePointHandler(args, setCaptureError, setCaptureNotice, setBusy);
   const rectangle = createRectangleFinishHandlers(corners, rect, commitGeometry, setCaptureError);
   return {
     captureError,
     captureNotice,
     busy,
     rect,
-    onCapture: useCapturePointHandler(args, setCaptureError, setCaptureNotice, setBusy),
+    onCapture: () => void captureNow().catch(() => undefined),
+    captureNow,
     ...rectangle,
     onFinishCircle: createCircleFinishHandler(
+      args,
+      commitGeometry,
+      setCaptureError,
+      setCaptureNotice,
+      setBusy,
+    ),
+    onFinishOutline: createOutlineFinishHandler(
       args,
       commitGeometry,
       setCaptureError,
@@ -77,27 +104,30 @@ function useCapturePointHandler(
   setError: SetMessage,
   setNotice: SetMessage,
   setBusy: Dispatch<SetStateAction<boolean>>,
-): () => void {
+): () => Promise<void> {
   const capturingRef = useRef(false);
-  return () => {
-    if (capturingRef.current || args.livePosition === null) return;
+  return async () => {
+    if (capturingRef.current) throw new Error('A board point capture is already in progress.');
+    if (args.livePosition === null)
+      throw new Error('Waiting for a machine position report on the computer.');
     capturingRef.current = true;
     setBusy(true);
     setError(null);
     setNotice(null);
-    void capturePoint(args)
-      .catch((error: unknown) =>
-        setError(
-          errorMessage(
-            error,
-            'Could not set the work origin. Check the machine is idle, then try again.',
-          ),
+    try {
+      await capturePoint(args);
+    } catch (error) {
+      setError(
+        errorMessage(
+          error,
+          'Could not set the work origin. Check the machine is idle, then try again.',
         ),
-      )
-      .finally(() => {
-        capturingRef.current = false;
-        setBusy(false);
-      });
+      );
+      throw error;
+    } finally {
+      capturingRef.current = false;
+      setBusy(false);
+    }
   };
 }
 
@@ -123,7 +153,12 @@ function createGeometryCommit(
     if (!boardCaptureCanCommit(args.capture.state, geometry, registrationEpoch)) {
       throw new Error('Board coordinates changed during capture. Start over and capture it again.');
     }
-    args.addCapturedBoard(capturedBoardShape(geometry));
+    const shape = capturedBoardShape(geometry);
+    if (geometry.kind === 'outline' && shape.kind === 'outline') {
+      args.registerCapturedBoardOutline(shape, outlineRotationDeg(geometry));
+    } else {
+      args.addCapturedBoard(shape);
+    }
     const outline = findRegistrationBoxes(useStore.getState().project.scene).find(
       (box) => box.provenance === 'captured-board',
     );
@@ -206,11 +241,17 @@ function createBoardCorrectionHandler(
     try {
       const assertCurrent = boardCorrectionOwner(args.capture, target);
       const correction = correctedGeometry(args, target, confirmed);
-      if (verificationTargetChangesOrigin(target)) await args.setOriginHere();
+      if (target.kind === 'outline' && correction.geometry.kind === 'outline') {
+        const corner = outlineMachineCorner(correction.geometry, 'front-left');
+        if (corner === null) throw new Error('The corrected outline has no front-left corner.');
+        await args.setOriginAtMachinePoint(corner);
+      } else if (verificationTargetChangesOrigin(target)) {
+        await args.setOriginHere();
+      }
       const registrationEpoch = assertCurrent();
       args.updateCapturedBoard(capturedBoardShape(correction.geometry));
       args.capture.updateGeometry(correction.geometry, registrationEpoch);
-      setCrossAxisNotice(correction.crossAxisErrorMm, setNotice);
+      setCorrectionNotice(target, correction, setNotice);
     } catch (error) {
       setError(errorMessage(error, 'Could not update the captured board.'));
       throw error;
@@ -289,12 +330,33 @@ function assertCaptureEpoch(capture: BoardCapture, current: BoardRegistrationEpo
   }
 }
 
-function setCrossAxisNotice(errorMm: number, setNotice: SetMessage): void {
-  if (errorMm <= CROSS_AXIS_NOTICE_MM) return;
-  setNotice(
-    `Point saved, but it was ${errorMm.toFixed(1)} mm off the expected axis. ` +
-      'Check that the intended board point matches the selected verification point.',
-  );
+function setCorrectionNotice(
+  target: BoardVerificationTarget,
+  correction: NonNullable<ReturnType<typeof correctCapturedBoardGeometry>>,
+  setNotice: SetMessage,
+): void {
+  if (correction.crossAxisErrorMm > CROSS_AXIS_NOTICE_MM) {
+    setNotice(
+      target.kind === 'outline'
+        ? `Point saved, but the head was ${correction.crossAxisErrorMm.toFixed(
+            1,
+          )} mm from where the outline predicted. Check that the head is on the selected anchor.`
+        : `Point saved, but it was ${correction.crossAxisErrorMm.toFixed(
+            1,
+          )} mm off the expected axis. Check that the intended board point matches the selected verification point.`,
+    );
+    return;
+  }
+  if (target.kind === 'outline' && (correction.residualMm ?? 0) > 1.5) {
+    const residual = correction.residualMm as number;
+    setNotice(
+      `The outline misses the checked anchors by up to ${residual.toFixed(
+        1,
+      )} mm. The photo may be distorted: keep artwork at least ${
+        Math.ceil(residual) + 1
+      } mm inside the edge, or retake the photo with the reference flat on the board.`,
+    );
+  }
 }
 
 function firstCaptureSetsOrigin(capture: BoardCapture): boolean {
@@ -306,9 +368,13 @@ function firstCaptureSetsOrigin(capture: BoardCapture): boolean {
 }
 
 function largeEnough(geometry: CapturedBoardGeometry): boolean {
-  return geometry.kind === 'rect'
-    ? geometry.widthMm >= MIN_BOARD_DIMENSION_MM && geometry.heightMm >= MIN_BOARD_DIMENSION_MM
-    : geometry.radiusMm * 2 >= MIN_BOARD_DIMENSION_MM;
+  if (geometry.kind === 'rect') {
+    return (
+      geometry.widthMm >= MIN_BOARD_DIMENSION_MM && geometry.heightMm >= MIN_BOARD_DIMENSION_MM
+    );
+  }
+  if (geometry.kind === 'circle') return geometry.radiusMm * 2 >= MIN_BOARD_DIMENSION_MM;
+  return outlineGeometryLargeEnough(geometry, MIN_BOARD_DIMENSION_MM);
 }
 
 function assertRegistrationEpoch(capture: BoardCapture, current: BoardRegistrationEpoch): void {

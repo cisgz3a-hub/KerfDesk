@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { LicenceStatus } from '../../platform/types';
+import { DESKTOP_LICENCE_WINDOW } from '../../../public/desktop-licence-window.mjs';
 import { UNRESTRICTED_EDITION, type EditionValue } from '../licensing/edition';
 import {
   describeEdition,
@@ -119,6 +120,32 @@ describe('support report text', () => {
     expect(text).toContain('Bad key KD1.[licence key removed]');
   });
 
+  it('removes tokens and keyed secrets but keeps ordinary addresses and settings', () => {
+    const kept = [
+      '$32=1',
+      '$130=400.000',
+      'Email support@kerfdesk.com',
+      'https://kerfdesk.com/help#start',
+      'file:///C:/app/node_modules/@scope/x.js',
+    ];
+    const text = formatSupportReport(
+      facts({
+        machineConsole: [
+          ...kept,
+          'Authorization: bearer abc.def-123',
+          'body {"apiKey":"sk-key-1","user":"ann"}',
+          'wifi password=pw-in-line',
+        ],
+      }),
+    );
+    for (const line of kept) expect(text).toContain(line);
+    expect(text).not.toMatch(/abc\.def-123|sk-key-1|pw-in-line/);
+    expect(text).toContain('Authorization: bearer [token removed]');
+    expect(text).toContain('{"apiKey":"[removed]","user":"ann"}');
+    expect(text).toContain('password=[removed]');
+    expect(text).toContain('KerfDesk removed licence\nkeys and the passwords and sign-ins');
+  });
+
   it('shows the web app without a desktop log, and says what is empty', () => {
     const text = formatSupportReport(
       facts({
@@ -134,6 +161,120 @@ describe('support report text', () => {
     expect(text).toContain('== Machine console, newest last ==\nEmpty.');
     expect(text).toContain('== Problems in this window, newest last ==\nNone.');
     expect(text).not.toContain('Desktop log');
+  });
+
+  it('removes entire escaped JSON passwords and preserves neighbouring fields', () => {
+    const input = JSON.stringify({
+      password: 'SyntheticHead"SyntheticTail\\SyntheticEnd',
+      apiKey: 'SyntheticKey\\"SyntheticKeyTail',
+      secret: 'SyntheticSlash\\',
+      token: 'Synthetic $75="Tail',
+      user: 'visible',
+    });
+    const text = formatSupportReport(
+      facts({ machineConsole: [input], desktopLog: { kind: 'read', text: input } }),
+    );
+    expect(text).not.toContain('Synthetic');
+    expect(text.split('\n').filter((line) => line.startsWith('{'))).toEqual([
+      '{"password":"[removed]","apiKey":"[removed]","secret":"[removed]","token":"[removed]","user":"visible"}',
+      '{"password":"[removed]","apiKey":"[removed]","secret":"[removed]","token":"[removed]","user":"visible"}',
+    ]);
+  });
+
+  it('removes quoted key=value secrets with spaces, delimiters and escaped quotes', () => {
+    const text = formatSupportReport(
+      facts({
+        machineConsole: [
+          'wifi password=' + JSON.stringify('Synthetic "Tail; & rest') + ' user=visible',
+          String.raw`api_key='Synthetic \'Tail, rest' mode=visible`,
+          'password="" user=empty-visible',
+        ],
+      }),
+    );
+    expect(text).not.toMatch(/Synthetic|Tail|rest/);
+    expect(text).toContain('wifi password="[removed]" user=visible');
+    expect(text).toContain("api_key='[removed]' mode=visible");
+    expect(text).toContain('password="[removed]" user=empty-visible');
+  });
+
+  it('redacts accepted controller aliases across report sections and escaped incident cells', () => {
+    const commands = [
+      '$075=SyntheticPadded',
+      '$74.999999=SyntheticRounded',
+      '$+077.0001=SyntheticFraction',
+      '$ESP101=SyntheticStation',
+      '$esp106=SyntheticAP',
+      '[Sta/Password]SyntheticBracketStation',
+      '[ap/password]SyntheticBracketAP',
+    ];
+    const text = formatSupportReport(
+      facts({
+        machineSettings: { readAt: NOW, lines: commands },
+        machineConsole: commands,
+        problems: [{ at: NOW, kind: 'error', message: commands.join('\n') }],
+        desktopLog: { kind: 'read', text: commands.join('\n') },
+        controllerIncidents: [
+          {
+            id: 1,
+            at: NOW,
+            direction: 'out',
+            source: 'console',
+            kind: 'setting-write',
+            raw: commands.join('\r\n') + '\r\nerror:9',
+          },
+        ],
+      }),
+    );
+    expect(text).not.toContain('Synthetic');
+    expect(text).toContain('$075=[password removed]');
+    expect(text).toContain('$74.999999=[password removed]');
+    expect(text).toContain('[Sta/Password][password removed]');
+    expect(text).toContain('$esp106=[password removed]');
+    expect(text).toContain('[ap/password][password removed]\\r\\nerror:9');
+  });
+
+  it('redacts truncated quoted values without consuming later lines or report sections', () => {
+    const text = formatSupportReport(
+      facts({ machineConsole: ['password="SyntheticTruncated\\', '$130=400.000'] }),
+    );
+    expect(text).not.toContain('SyntheticTruncated');
+    expect(text).toContain('password="[removed]\n$130=400.000');
+    expect(text).toContain('== Problems in this window, newest last ==');
+    expect(text).toContain('INFO  [app] KerfDesk 0.9.1 started.');
+  });
+
+  it('treats removal-marker prefixes and literal escaped newlines as raw password data', () => {
+    const input = [
+      '$75=[password removed]SyntheticTail',
+      String.raw`[ESP101][password removed]\nSyntheticEscapedTail`,
+      'password=[removed]SyntheticKeyedTail',
+      String.raw`password=[removed]\nSyntheticKeyedEscapedTail`,
+    ];
+    const text = formatSupportReport(
+      facts({
+        machineConsole: input,
+        desktopLog: { kind: 'read', text: input.join('\n') },
+        controllerIncidents: [
+          {
+            id: 2,
+            at: NOW,
+            direction: 'out',
+            source: 'console',
+            kind: 'setting-write',
+            raw: input.join('\r\n') + '\r\nerror:9',
+          },
+        ],
+      }),
+    );
+    expect(text).not.toContain('Synthetic');
+    expect(text).toContain('password=[removed]\\r\\nerror:9');
+  });
+
+  it('redacts JSON values separated from their keys by physical log line breaks', () => {
+    const input = '{"password":\n"SyntheticMultiline", "user":"visible"}';
+    const text = formatSupportReport(facts({ desktopLog: { kind: 'read', text: input } }));
+    expect(text).not.toContain('SyntheticMultiline');
+    expect(text).toContain('{"password":\n"[removed]", "user":"visible"}');
   });
 
   it('says when the desktop log could not be read', () => {
@@ -179,7 +320,8 @@ describe('support report edition', () => {
           accessExpiresAt: NOW,
         }),
       }),
-      'Licence needed: trial ends 2026-09-29, licence state trial-expired',
+      // The desktop app runs Free while the licence window is held off (ADR-623 Amendment 3).
+      `${DESKTOP_LICENCE_WINDOW ? 'Licence needed' : 'KerfDesk Free'}: trial ends 2026-09-29, licence state trial-expired`,
     ],
     [
       edition({

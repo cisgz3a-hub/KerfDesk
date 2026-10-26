@@ -23,6 +23,7 @@ files:
   - public/desktop-release-keys.json
   - public/desktop-sandbox-contract.mjs
   - public/licence-key-text.mjs
+  - public/desktop-licence-window.mjs
   # The renderer is bundled into dist/web. Ship only the main process's
   # reachable packages and mandatory dependency closure (ADR-483), including
   # nested imports. electron/packaged-runtime-closure.test.ts checks this list
@@ -140,6 +141,11 @@ appImage:
 # runtime needs libfuse2 and fails before KerfDesk starts (ADR-607).
 toolsets:
   appimage: 1.0.3
+
+# The toolset's lib/x64 also holds GPL-3.0 libraries (libappindicator3,
+# libindicator3) and GConf, which KerfDesk does not use. This hook gives
+# electron-builder a copy of the toolset without them (ADR-017 Amendment 2).
+artifactBuildStarted: scripts/appimage-toolset.mjs
 
 mac:
   appId: com.kerfdesk.app

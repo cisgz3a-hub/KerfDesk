@@ -6,7 +6,7 @@
 //
 // The map of GRBL setting numbers we look at:
 //   $11   Junction deviation (mm)              → junctionDeviationMm
-//   $30   Max spindle/laser RPM (S-value top)  → maxPowerS
+//   $30   Max spindle/laser RPM (S-value top)  → maxPowerS (0 → maxPowerSReportedAsZero)
 //   $31   Min spindle/laser RPM (S-value floor)→ minPowerS
 //   $32   Mode of operation                    → machineMode + laserModeEnabled
 //   $110  Max rate X (mm/min)                  ┐
@@ -61,6 +61,10 @@ export type ControllerSettingsSnapshot = Partial<
   readonly homingEnabled?: boolean;
   readonly homingDirectionMask?: number;
   readonly statusReportMask?: number;
+  // This `$$` shows `$10` whole, as grblHAL at COMPATIBILITY_LEVEL 0 or 1
+  // stores and prints it, so its upper bits are what the reports carry
+  // (statusReportMaskFields).
+  readonly statusReportMaskIsFull?: true;
   readonly reportInches?: boolean;
   readonly homingPullOffMm?: number;
   readonly zMaxFeed?: number;
@@ -78,11 +82,19 @@ export type ControllerSettingsSnapshot = Partial<
   // G92 origin (Set origin here) and restores it at power-up. Read, never
   // written, so Job Review can say which (ADR-375).
   readonly g92PersistenceDisabled?: boolean;
+  // grblHAL `$22` bit 3 "Set machine origin to 0" (force set origin), read
+  // only from a dump that prints the whole `$22` bitfield (ADR-375
+  // Amendment 3); undefined for stock GRBL and FluidNC, which print 0 or 1.
+  readonly homingForceSetOrigin?: boolean;
   // `$100` / `$101` / `$102`: one step's length bounds how far the machine position a
   // status report shows can sit from the firmware's own (ADR-375).
   readonly stepsPerMmX?: number;
   readonly stepsPerMmY?: number;
   readonly stepsPerMmZ?: number;
+  // `$30=0` was reported. `maxPowerS` holds only a positive S range, because a
+  // zero top must never reach a profile, but the report itself is evidence:
+  // the controller has no S range at all (ADR-567 Amendment 1).
+  readonly maxPowerSReportedAsZero?: true;
 };
 
 export type SettingsCollectorState =
@@ -175,7 +187,6 @@ export function settingsMapToControllerSettings(
   const hardLimitsEnabled = grblEnableBit(parseFiniteNumber(map.get(21)));
   const homingEnabled = grblEnableBit(parseFiniteNumber(map.get(22)));
   const homingDirectionMask = parseNonNegativeInteger(map.get(23));
-  const statusReportMask = parseNonNegativeInteger(map.get(10));
   const reportInches = parseBooleanSetting(map, 13);
   const homingPullOffMm = parseNonNegativeNumber(map.get(27));
   const zMaxFeed = parsePositiveNumber(map.get(112));
@@ -188,7 +199,7 @@ export function settingsMapToControllerSettings(
     ...(hardLimitsEnabled === undefined ? {} : { hardLimitsEnabled }),
     ...(homingEnabled === undefined ? {} : { homingEnabled }),
     ...(homingDirectionMask === undefined ? {} : { homingDirectionMask }),
-    ...(statusReportMask === undefined ? {} : { statusReportMask }),
+    ...statusReportMaskFields(map),
     ...(reportInches === undefined ? {} : { reportInches }),
     ...(homingPullOffMm === undefined ? {} : { homingPullOffMm }),
     ...(zMaxFeed === undefined ? {} : { zMaxFeed }),
@@ -197,8 +208,37 @@ export function settingsMapToControllerSettings(
     ...(maxFeedY === undefined ? {} : { maxFeedY }),
     ...machineModeField(map),
     ...g92PersistenceField(map),
+    ...forceSetOriginField(map),
     ...stepsPerMmFields(map),
+    ...zeroMaxPowerField(map),
   };
+}
+
+// A reported `$30=0`, which settingsMapToProfilePatch leaves out of `maxPowerS`.
+function zeroMaxPowerField(
+  map: ReadonlyMap<number, string>,
+): Pick<ControllerSettingsSnapshot, 'maxPowerSReportedAsZero'> {
+  return parseFiniteNumber(map.get(30)) === 0 ? { maxPowerSReportedAsZero: true } : {};
+}
+
+/** The `$30` the controller reported, including 0; undefined when it did not
+ *  report one. Use `maxPowerS` wherever a usable S range is needed. */
+export function reportedMaxPowerS(
+  settings: Pick<ControllerSettingsSnapshot, 'maxPowerS' | 'maxPowerSReportedAsZero'>,
+): number | undefined {
+  return settings.maxPowerS ?? (settings.maxPowerSReportedAsZero === true ? 0 : undefined);
+}
+
+/** True when the reported `$30` is not above `$31`, so no S value lies between
+ *  them. GRBL-family settings reject negative values, so an unreported `$31`
+ *  counts as 0. Stock GRBL then drives full PWM for every S, S0 included:
+ *  `spindle_compute_pwm_value` returns the maximum when `rpm_min >= rpm_max`
+ *  before its S0 branch (gnea/grbl spindle_control.c). */
+export function laserPowerRangeIsEmpty(
+  settings: Pick<ControllerSettingsSnapshot, 'maxPowerS' | 'maxPowerSReportedAsZero' | 'minPowerS'>,
+): boolean {
+  const maxS = reportedMaxPowerS(settings);
+  return maxS !== undefined && maxS <= (settings.minPowerS ?? 0);
 }
 
 // Kept out of settingsMapToControllerSettings' spread chain so that function
@@ -220,6 +260,54 @@ function g92PersistenceField(
 ): Pick<ControllerSettingsSnapshot, 'g92PersistenceDisabled'> {
   const g92PersistenceDisabled = parseBooleanSetting(map, 384);
   return g92PersistenceDisabled === undefined ? {} : { g92PersistenceDisabled };
+}
+
+// grblHAL's `$22` bit 3 is force set origin, which puts a homed axis at 0 and
+// decides its envelope. `$$` prints the whole bitfield, and lists extended
+// settings such as `$384`, only at COMPATIBILITY_LEVEL <= 1; above that `$22`
+// is 0 or 1 and force origin is a build default no setting reports. So the
+// bit is read when `$22` carries more than bit 0 or the dump lists `$384`:
+// https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/settings.h#L714-L718
+// https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/settings.c#L1775-L1782
+// https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/system.c#L300-L317
+// https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/machine_limits.c#L116-L140
+function forceSetOriginField(
+  map: ReadonlyMap<number, string>,
+): Pick<ControllerSettingsSnapshot, 'homingForceSetOrigin'> {
+  const flags = parseNonNegativeInteger(map.get(22));
+  if (flags === undefined || (flags <= 1 && !map.has(384))) return {};
+  return { homingForceSetOrigin: (flags & 8) !== 0 };
+}
+
+// `$10`, and whether this dump shows it whole. grblHAL at COMPATIBILITY_LEVEL 0
+// (its default) or 1 stores the whole `$10` and prints it; above level 1 it
+// keeps the upper bits from its build and prints only bits 0 and 1
+// (settings.c). Such a level's `$$` lists only the stock GRBL settings
+// (system.c, report.c), so a `$10` above 3, or any other setting in the dump,
+// shows the whole mask. Stock GRBL lists only those settings too.
+// https://github.com/grblHAL/core/blob/4ec1ae44b857a70d2f9298344feac4b43ed0eb6b/settings.c#L862-L872
+// https://github.com/grblHAL/core/blob/4ec1ae44b857a70d2f9298344feac4b43ed0eb6b/settings.c#L1739-L1745
+// https://github.com/grblHAL/core/blob/4ec1ae44b857a70d2f9298344feac4b43ed0eb6b/system.c#L300-L318
+// https://github.com/grblHAL/core/blob/4ec1ae44b857a70d2f9298344feac4b43ed0eb6b/report.c#L503-L507
+function statusReportMaskFields(
+  map: ReadonlyMap<number, string>,
+): Pick<ControllerSettingsSnapshot, 'statusReportMask' | 'statusReportMaskIsFull'> {
+  const statusReportMask = parseNonNegativeInteger(map.get(10));
+  if (statusReportMask === undefined) return {};
+  const isFull = statusReportMask > 3 || [...map.keys()].some((id) => !isStockGrblSetting(id));
+  return isFull ? { statusReportMask, statusReportMaskIsFull: true } : { statusReportMask };
+}
+
+// $0-$7, $10-$13, $20-$27, $30-$32 and the per-axis steps, rate, acceleration
+// and travel ($100-$139): grblHAL's legacy settings, a superset of stock GRBL's.
+function isStockGrblSetting(id: number): boolean {
+  return (
+    (id >= 0 && id <= 7) ||
+    (id >= 10 && id <= 13) ||
+    (id >= 20 && id <= 27) ||
+    (id >= 30 && id <= 32) ||
+    (id >= 100 && id <= 139)
+  );
 }
 
 function stepsPerMmFields(

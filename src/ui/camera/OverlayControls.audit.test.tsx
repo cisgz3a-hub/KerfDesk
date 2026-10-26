@@ -1,7 +1,12 @@
 import { act } from 'react';
 import type * as FrameSource from './frame-source';
 import { beforeEach, expect, it, vi } from 'vitest';
-import { clickControl, control, mountControl } from '../image-editor/control-audit-test-support';
+import {
+  clickControl,
+  clickElement,
+  control,
+  mountControl,
+} from '../image-editor/control-audit-test-support';
 import { lookAt, savedCameraModel } from '../../core/camera/model/model-fixtures';
 import { useStore } from '../state';
 import { useCameraStore as camera } from '../state/camera-store';
@@ -9,6 +14,7 @@ import { useLaserStore } from '../state/laser-store';
 import { useUiStore } from '../state/ui-store';
 import { resetStore } from '../state/test-helpers';
 import { OverlayControls } from './OverlayControls';
+import { CalibrateCameraControls } from './calibrate/CalibrateCameraControls';
 
 const capture = vi.hoisted(() => vi.fn());
 vi.mock('./frame-source', async (original) => ({
@@ -75,17 +81,19 @@ beforeEach(() => {
 it('toggles the actual overlay, freezes a frame, returns to Live and exits placement without changing origin', async () => {
   useStore.setState({ jobPlacement: { startFrom: 'user-origin', anchor: 'center' } });
   const host = await mountControl(<OverlayControls />);
-  expect(control(host, 'Update still').disabled).toBe(true);
+  expect(control(host, 'Refresh picture').disabled).toBe(true);
   expect(control(host, 'Live').disabled).toBe(true);
   expect(control(host, 'Trace from camera').disabled).toBe(true);
-  await clickControl(host, 'Overlay off');
+  expect(showOnCanvas(host).checked).toBe(false);
+  await clickElement(showOnCanvas(host));
   expect(camera.getState()).toMatchObject({ overlayVisible: true, placementActive: true });
+  expect(showOnCanvas(host).checked).toBe(true);
   await clickControl(host, 'Confirm bed coordinates');
   expect(camera.getState().confirmedPositionEpoch).toBe(7);
-  await clickControl(host, 'Overlay on');
+  await clickElement(showOnCanvas(host));
   expect(camera.getState()).toMatchObject({ overlayVisible: false, placementActive: true });
   await act(async () => camera.setState({ sourceState: { kind: 'live', source } }));
-  await clickControl(host, 'Update still');
+  await clickControl(host, 'Refresh picture');
   expect(capture).toHaveBeenCalledWith(source);
   expect(camera.getState().overlayStill).toBe(frame);
   await clickControl(host, 'Live');
@@ -99,6 +107,15 @@ it('toggles the actual overlay, freezes a frame, returns to Live and exits place
   expect(useStore.getState().jobPlacement).toEqual({ startFrom: 'user-origin', anchor: 'center' });
 });
 
+function showOnCanvas(host: HTMLElement): HTMLInputElement {
+  const label = [...host.querySelectorAll('label')].find(
+    (element) => element.textContent?.trim() === 'Show on canvas',
+  );
+  const input = label?.querySelector<HTMLInputElement>('input[type="checkbox"]');
+  if (input === null || input === undefined) throw new Error('Show on canvas missing');
+  return input;
+}
+
 it('camera Trace captures at the input boundary and opens a bed-sized source in the normal trace dialog', async () => {
   camera.setState({ sourceState: { kind: 'live', source } });
   const host = await mountControl(<OverlayControls />);
@@ -111,9 +128,9 @@ it('camera Trace captures at the input boundary and opens a bed-sized source in 
   expect(camera.getState().placementActive).toBe(true);
 });
 
-it('offers the accuracy map only for a calibration saved with its rings, and toggles it', async () => {
+it('offers the accuracy map in Camera settings only for a calibration saved with its rings, and toggles it', async () => {
   camera.setState({ accuracyMapVisible: false });
-  const bare = await mountControl(<OverlayControls />);
+  const bare = await mountControl(<CalibrateCameraControls />);
   expect(bare.textContent).not.toContain('Accuracy map');
   const device = useStore.getState().project.device;
   const model = device.cameraModel;

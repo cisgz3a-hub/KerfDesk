@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
-import type { RotarySetup } from '../../core/devices';
+import { DEFAULT_ROTARY_SETUP, type RotarySetup } from '../../core/devices';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { resetStore } from '../state/test-helpers';
@@ -36,7 +36,7 @@ afterEach(() => {
   host.remove();
 });
 
-function renderDialog(setup: RotarySetup): void {
+function renderDialog(setup: RotarySetup | undefined): void {
   act(() =>
     root.render(
       <RotarySetupDialog
@@ -71,6 +71,10 @@ function button(text: string): HTMLButtonElement {
   return found;
 }
 
+function buttonTexts(): string[] {
+  return [...host.querySelectorAll('button')].map((node) => node.textContent?.trim() ?? '');
+}
+
 function type(field: HTMLInputElement, value: string): void {
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
   if (setter === undefined) throw new Error('native value setter not found');
@@ -93,6 +97,16 @@ describe('Rotary Setup roller diameter (ADR-373)', () => {
     act(() => button('Apply').click());
     expect(onApply).toHaveBeenCalledWith(LEGACY_ROLLER);
     expect(onApply.mock.calls[0]?.[0]).not.toHaveProperty('rollerDiameterMm');
+  });
+
+  it('starts a profile without a rotary on a roller scaled from its diameter (Amd 1)', () => {
+    renderDialog(undefined);
+    expect(checkbox('Scale Y from the roller diameter').checked).toBe(true);
+    expect(input('Rotary roller diameter').value).toBe('25');
+    expect(input('Rotary millimetres per rotation').disabled).toBe(false);
+    expect(buttonTexts()).toEqual(expect.arrayContaining(['Turn roller once', 'Turn object once']));
+    act(() => button('Apply').click());
+    expect(onApply).toHaveBeenCalledWith({ ...DEFAULT_ROTARY_SETUP, rollerDiameterMm: 25 });
   });
 
   it('scales Y from the roller diameter and shows the scale and wrap limit', () => {

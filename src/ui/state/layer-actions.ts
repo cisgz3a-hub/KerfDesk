@@ -28,6 +28,7 @@ import {
   type LayerSettingsClipboard,
 } from './layer-settings-clipboard';
 import { pushUndo, type StateSlice } from './scene-mutations';
+import { refuseSceneLimitOverrun } from './scene-copy-room';
 
 const HEX_LAYER_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 
@@ -184,6 +185,8 @@ function createManualLayerAction(set: LayerActionSet): LayerActions['createManua
             })
           : seedFreshLaserLayer(base, state.project, state.materialLibrary ?? null);
       const scene = addLayer(state.project.scene, layer);
+      if (refuseSceneLimitOverrun(state.project.scene, scene, 'Delete unused operations first.'))
+        return {};
       return mutation(state, { ...state.project, scene });
     });
 }

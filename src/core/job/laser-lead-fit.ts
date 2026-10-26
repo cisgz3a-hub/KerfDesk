@@ -1,7 +1,9 @@
 // Whether a laser lead fits where it is asked to go (ADR-626), and the
 // longest lead on the shortening ladder that does. A lead fits when:
 //   - it stays on the bed (when the program's bed position is known);
-//   - it leaves its own contour and never comes back toward it: walking out
+//   - it never crosses its own contour away from the join
+//     (laser-lead-own-crossing.ts), and it leaves the contour and never comes
+//     back toward it: walking out
 //     from the join, it never comes nearer the contour than it already was
 //     (within TOLERANCE_MM, and up to the clearance), and its free end, where
 //     the start or stop mark lands, is on the scrap side and at least the
@@ -16,10 +18,12 @@
 // Full length first, then shorter steps down to a quarter; null when none fit.
 
 import { pointInPolygon } from '../geometry';
+import { sampleArcMoves } from '../geometry/arc-fit';
 import type { Vec2 } from '../scene';
 import { extendBoundsByEmittedArcMoves } from './cut-arc-moves';
 import type { JobBounds } from './job-bounds';
 import type { LeadObstacles } from './laser-lead-obstacles';
+import { crossesOwnContour } from './laser-lead-own-crossing';
 import {
   ARC_SAMPLE_SAGITTA_MM,
   leadPath,
@@ -33,6 +37,9 @@ export type LeadFitContext = {
   readonly obstacles: LeadObstacles;
   readonly ownLine: number;
   readonly ownRing: ReadonlyArray<Vec2>;
+  /** The contour as it burns: its G2/G3 arcs sampled when it goes out as arcs,
+   * else its chords. The crossing check reads this. */
+  readonly ownBurn: ReadonlyArray<Vec2>;
   /** Lines and rings the lead ignores: its own contour and its copies. */
   readonly ignoredLines: ReadonlySet<number>;
   readonly ignoredRings: ReadonlySet<number>;
@@ -60,6 +67,16 @@ const BED_SLACK_MM = 1e-6;
 // Share of a short lead's own reach into the scrap its free end must keep
 // from its contour; the rest allows for the contour curving under it.
 const FREE_END_REACH_SHARE = 0.9;
+// A lead-out leaving within this of the way its lead-in came retraces it
+// (retracesLeadIn).
+const RETRACE_DEG = 30;
+// Two leads join at one point only within this: a lead-out from anywhere else
+// is checked against the whole lead-in.
+const SHARED_JOIN_MM = 1e-6;
+// A lead written as G2/G3 is checked against its own contour along the arcs
+// the machine follows, sampled this finely, not along the chords it is drawn
+// with, which the arcs bulge past.
+const EMITTED_ARC_SAGITTA_MM = 0.001;
 
 export function fitLead(
   kind: LeadKind,
@@ -82,6 +99,8 @@ export function leadFits(
 ): boolean {
   const { at } = join;
   if (!onBed(path, context.bed, context.arcsEmitted)) return false;
+  if (crossesOwnContour(emittedPoints(path, context.arcsEmitted), at, context.ownBurn))
+    return false;
   const outward = kind === 'in' ? [...path.points].reverse() : path.points;
   // An arc written as G2/G3 bulges up to the sampling sag past the chords
   // checked here, so it keeps that much more clearance from other cut lines.
@@ -182,4 +201,113 @@ function withinBounds(point: Vec2, bounds: JobBounds): boolean {
     point.y >= bounds.minY &&
     point.y <= bounds.maxY
   );
+}
+
+/** Whether a lead-out would burn over its contour's lead-in on the same pass.
+ * Where both join the contour at one point, judged there: line leads at a
+ * right-angle corner leave along the very line they came in on, and a lead-out
+ * leaving within RETRACE_DEG of the way the lead-in came overlaps it for more
+ * than a kerf width. Arc leads at a corner part at a right angle and meet again
+ * only at their free ends, both in the scrap. A lead-out leaving from
+ * anywhere else, however near (an overcut's, from where the overcut ends),
+ * must keep the clearance from the whole lead-in once it is the clearance from
+ * its own start, or the two cross or run side by side. */
+export function retracesLeadIn(leadOut: LeadFit, leadIn: LeadFit, clearanceMm: number): boolean {
+  const start = leadOut.path.points[0];
+  const inPoints = leadIn.path.points;
+  const join = inPoints[inPoints.length - 1];
+  if (start === undefined || join === undefined) return false;
+  if (Math.hypot(start.x - join.x, start.y - join.y) > SHARED_JOIN_MM) {
+    // Step by step, the whole step: a lead-out only grazing the lead-in can
+    // come closest between two samples. The step across the clearance from
+    // its start is measured from where it crosses.
+    let previous = start;
+    for (const sample of walkSamples([start, ...leadOut.path.points.slice(1)])) {
+      const part = partBeyond(previous, sample, start, clearanceMm);
+      if (part !== null && stepToPolylineMm(part[0], part[1], inPoints) < clearanceMm) return true;
+      previous = sample;
+    }
+    return false;
+  }
+  const outward = direction(start, leadOut.path.points[1]);
+  const back = direction(join, inPoints[inPoints.length - 2]);
+  if (outward === null || back === null) return false;
+  return outward.x * back.x + outward.y * back.y > Math.cos((RETRACE_DEG * Math.PI) / 180);
+}
+
+/** The part of the step p-q farther than `radiusMm` from `centre`, or null. */
+function partBeyond(p: Vec2, q: Vec2, centre: Vec2, radiusMm: number): [Vec2, Vec2] | null {
+  const pInside = Math.hypot(p.x - centre.x, p.y - centre.y) <= radiusMm;
+  const qInside = Math.hypot(q.x - centre.x, q.y - centre.y) <= radiusMm;
+  if (pInside && qInside) return null;
+  if (!pInside && !qInside) return [p, q];
+  // Where |p + t (q - p) - centre| = radius: the larger root leaving the
+  // circle, the smaller entering it.
+  const dx = q.x - p.x;
+  const dy = q.y - p.y;
+  const ox = p.x - centre.x;
+  const oy = p.y - centre.y;
+  const a = dx * dx + dy * dy;
+  const b = 2 * (ox * dx + oy * dy);
+  const c = ox * ox + oy * oy - radiusMm * radiusMm;
+  const root = Math.sqrt(Math.max(0, b * b - 4 * a * c));
+  const t = Math.max(0, Math.min(1, (-b + (pInside ? root : -root)) / (2 * a)));
+  const crossing = { x: p.x + dx * t, y: p.y + dy * t };
+  return pInside ? [crossing, q] : [p, crossing];
+}
+
+/** The least distance from the step p-q to the polyline. */
+function stepToPolylineMm(p: Vec2, q: Vec2, points: ReadonlyArray<Vec2>): number {
+  let nearest = Number.POSITIVE_INFINITY;
+  for (let index = 1; index < points.length; index += 1) {
+    nearest = Math.min(
+      nearest,
+      segmentsDistanceMm(p, q, points[index - 1] as Vec2, points[index] as Vec2),
+    );
+  }
+  return nearest;
+}
+
+// Crossing segments are 0 apart; otherwise the nearest pair has an endpoint.
+function segmentsDistanceMm(p: Vec2, q: Vec2, a: Vec2, b: Vec2): number {
+  const rx = q.x - p.x;
+  const ry = q.y - p.y;
+  const sx = b.x - a.x;
+  const sy = b.y - a.y;
+  const determinant = rx * sy - ry * sx;
+  if (determinant !== 0) {
+    const t = ((a.x - p.x) * sy - (a.y - p.y) * sx) / determinant;
+    const u = ((a.x - p.x) * ry - (a.y - p.y) * rx) / determinant;
+    if (t >= 0 && t <= 1 && u >= 0 && u <= 1) return 0;
+  }
+  return Math.min(
+    pointToSegmentMm(p, a, b),
+    pointToSegmentMm(q, a, b),
+    pointToSegmentMm(a, p, q),
+    pointToSegmentMm(b, p, q),
+  );
+}
+
+function pointToSegmentMm(point: Vec2, a: Vec2, b: Vec2): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const span = dx * dx + dy * dy;
+  const t =
+    span === 0 ? 0 : Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / span));
+  return Math.hypot(point.x - (a.x + dx * t), point.y - (a.y + dy * t));
+}
+
+function direction(from: Vec2 | undefined, to: Vec2 | undefined): Vec2 | null {
+  if (from === undefined || to === undefined) return null;
+  const length = Math.hypot(to.x - from.x, to.y - from.y);
+  return length === 0 ? null : { x: (to.x - from.x) / length, y: (to.y - from.y) / length };
+}
+
+/** The lead as the machine runs it: its arcs, finely sampled, when it goes out
+ * as G2/G3; else the chords it is written as. */
+function emittedPoints(path: LeadPath, arcsEmitted: boolean): ReadonlyArray<Vec2> {
+  const start = path.points[0];
+  return arcsEmitted && start !== undefined && path.moves.some((move) => move.kind === 'arc')
+    ? sampleArcMoves(start, path.moves, EMITTED_ARC_SAGITTA_MM)
+    : path.points;
 }

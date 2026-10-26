@@ -10,6 +10,7 @@
 import type { ArrayPlacement } from '../scene/array-layout';
 import type { Bounds, Vec2 } from '../scene/scene-object';
 import { pointAtDistance, type PathWalk } from './path-walk';
+import { copyScale, scaledGapDistances } from './copy-along-path-scaled-gap';
 
 /** Place a number of copies, copies a set distance apart centre to centre, or a set gap apart edge to edge. */
 export type CopyAlongPathMode = 'count' | 'spacing' | 'gap';
@@ -98,7 +99,7 @@ export function copyAlongPathLayout(
     placements: Array.from({ length: resolved.count }, (_, index) =>
       withScale(
         placementAt(guide, resolved.along.wrap(resolved.at(index)), centre, spec.rotateCopies),
-        scaleFactor(spec, index, resolved.count),
+        copyScale(spec, index, resolved.count),
         centre,
       ),
     ),
@@ -128,7 +129,12 @@ function resolveCopies(
   maxCopies: number,
 ): Resolved | CopyAlongPathShortfall {
   const along = alongPath(guide, source, spec);
-  const result = guide.closed ? closedDistances(along, maxCopies) : openDistances(along, maxCopies);
+  const result =
+    spec.mode === 'gap'
+      ? scaledGapDistances(guide, source, spec, along.startMm, maxCopies)
+      : guide.closed
+        ? closedDistances(along, maxCopies)
+        : openDistances(along, maxCopies);
   return result.kind === 'ok' ? { ...result, along } : result;
 }
 
@@ -280,15 +286,8 @@ function placementAt(
 // straight run, so only then does the centre distance vary.
 function uniformStep(distances: Resolved, spec: CopyAlongPathSpec): number | null {
   if (distances.count < 2) return null;
-  if (spec.mode === 'gap' && !spec.rotateCopies) return null;
+  if (spec.mode === 'gap' && (!spec.rotateCopies || copyScale(spec, 1, 2) !== 1)) return null;
   return distances.at(1) - distances.at(0);
-}
-
-// Copy `index` of `count` steps evenly from the original's size to the end size.
-function scaleFactor(spec: CopyAlongPathSpec, index: number, count: number): number {
-  const end = spec.endScalePercent;
-  if (end === undefined || !Number.isFinite(end) || end <= 0 || count < 2) return 1;
-  return 1 + (end / 100 - 1) * (index / (count - 1));
 }
 
 function withScale(placement: ArrayPlacement, factor: number, center: Vec2): ArrayPlacement {

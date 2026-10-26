@@ -32,7 +32,7 @@ Each route has an edge limit per client address: trial starts 5 a minute (`TRIAL
 | --- | --- | --- |
 | `POST /v1/trials/start` | `deviceId`, `deviceName`, optional `hardwareId` (ADR-592: refused with `trial_already_used` when that hardware already had another installation's trial) | `entitlement`, `activationToken` |
 | `POST /v1/licenses/activate` | `licenseKey`, `deviceId`, `deviceName` | `entitlement`, `activationToken` |
-| `POST /v1/activations/refresh` | activation credentials below, optional `refreshNonce` (ADR-592 Amendment 1: 43-character base64url, signed back into the grant) | `entitlement`, same `activationToken` |
+| `POST /v1/activations/refresh` | activation credentials below, optional `refreshNonce` (ADR-592 Amendments 1 and 3: 43-character base64url, signed back into the grant; only 1.0.21 and 1.0.22 send it) | `entitlement`, same `activationToken` |
 | `POST /v1/activations/deactivate` | activation credentials below | `{ "deactivated": true }` |
 | `POST /v1/licenses/activations` | `licenseKey` | `{ "activations": [{ "activationId", "deviceName", "createdAt" }] }` |
 | `POST /v1/licenses/deactivate` | `licenseKey`, `activationId` | `{ "deactivated": true }` |
@@ -81,7 +81,7 @@ Envelope: `{ keyId, payload, signature }`. `payload` is base64url of the exact U
 
 All dates are integer Unix seconds. Trial `updatesUntil` equals `accessExpiresAt`, exactly 30 days after first server registration. Paid `accessExpiresAt` is null, `perpetualUpdates` is false, and `updatesUntil` is the paid update cutoff. On refresh, a paid cutoff may be earlier than `issuedAt`; that does not revoke use of eligible versions. Developer `accessExpiresAt` and `updatesUntil` are null and `perpetualUpdates` is true. The client must validate the entire claim schema, product, pinned signature, device binding, applicable dates, and trusted release eligibility. Renewals extend from the later of the current cutoff or server time by one calendar year (29 February is clamped to 28 February).
 
-A refresh that sent `refreshNonce` gets a grant whose claims end with that same `refreshNonce`; activations, trials and refreshes without one carry none. The app sends a new random nonce with every refresh and accepts a paid grant issued more than five minutes from its own clock only when the signed nonce is the one it just sent, so a saved answer replayed later cannot pass as a fresh check-in (ADR-592 Amendment 1). Redeploy this Worker before releasing an app that relies on it: until then, a paid computer with a wrong clock sees the clock error instead of a confirmed check-in.
+A refresh that sent `refreshNonce` gets a grant whose claims end with that same `refreshNonce`; activations, trials and refreshes without one carry none. Desktop 1.0.21 and 1.0.22 send a new random nonce with every refresh and refuse a grant that signs a different one (ADR-592 Amendment 1). Later apps send none and do not check the claim, because paid licences work offline whatever the clock says (ADR-592 Amendment 3, ADR-623 Amendment 2). Keep signing the nonce back while those versions are installed. No app depends on a Worker redeploy for this: a Worker from before Amendment 1 ignores the field and signs no nonce, which every version accepts.
 
 ### Private administration
 

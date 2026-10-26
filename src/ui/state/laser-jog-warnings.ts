@@ -52,14 +52,36 @@ export function warnJogMotionPolicy(set: SetFn, get: GetFn, params: JogParams): 
 // that was never homed keeps the operator-positioned convention the bounds
 // and no-go zones were configured under (MPos zero where the head powered up).
 function bedJogPath(state: LaserState, device: DeviceProfile, path: JogXyPath): JogXyPath | null {
+  const [start, target] = nativePointsOnBed(state, device, [path.start, path.target]) ?? [];
+  return start === undefined || target === undefined ? null : { start, target };
+}
+
+/** Native machine points in bed coordinates, or null when no bed comparison
+ * is meaningful (see bedJogPath). An external run's Frame outline uses it too. */
+export function nativePointsOnBed(
+  state: LaserState,
+  device: DeviceProfile,
+  points: ReadonlyArray<Point>,
+): ReadonlyArray<Point> | null {
   const frame = resolveNativeBedFrame(device, selectNativeBedEvidence(state));
-  if (frame !== null) {
-    return {
-      start: nativePointToBed(path.start, frame),
-      target: nativePointToBed(path.target, frame),
-    };
-  }
-  return state.homingState === 'confirmed' ? null : path;
+  if (frame !== null) return points.map((point) => nativePointToBed(point, frame));
+  return state.homingState === 'confirmed' ? null : points;
+}
+
+/** The configured XY bounds machine motion is compared with. */
+export function configuredMotionBounds(device: DeviceProfile): {
+  readonly minX: number;
+  readonly minY: number;
+  readonly maxX: number;
+  readonly maxY: number;
+} {
+  const baseBounds = machineBoundsForDevice(device);
+  // Rotary is a laser attachment (never applied to CNC output), so a router
+  // keeps the bed's own Y range.
+  const rotary = useStore.getState().project.machine?.kind === 'cnc' ? undefined : device.rotary;
+  return isRotaryActive(rotary)
+    ? { ...baseBounds, minY: 0, maxY: rotaryYLimitMm(rotary) }
+    : baseBounds;
 }
 
 function resolveJogXyPath(get: GetFn, params: JogParams): JogXyPath | null {
@@ -85,13 +107,7 @@ function warnJogTargetOutsideConfiguredBounds(
   device: DeviceProfile,
   target: Point,
 ): void {
-  const baseBounds = machineBoundsForDevice(device);
-  // Rotary is a laser attachment (never applied to CNC output), so a router
-  // jog keeps the bed's own Y range.
-  const rotary = useStore.getState().project.machine?.kind === 'cnc' ? undefined : device.rotary;
-  const bounds = isRotaryActive(rotary)
-    ? { ...baseBounds, minY: 0, maxY: rotaryYLimitMm(rotary) }
-    : baseBounds;
+  const bounds = configuredMotionBounds(device);
   if (
     target.x >= bounds.minX &&
     target.x <= bounds.maxX &&
@@ -104,12 +120,12 @@ function warnJogTargetOutsideConfiguredBounds(
     `Jog target X${target.x.toFixed(3)} Y${target.y.toFixed(3)} is outside the ` +
     `configured machine bounds X${bounds.minX.toFixed(3)}..${bounds.maxX.toFixed(3)}, ` +
     `Y${bounds.minY.toFixed(3)}..${bounds.maxY.toFixed(3)}. Controller limits still apply.`;
-  publishJogPolicyWarning(set, get, message);
+  publishMotionPolicyWarning(set, get, message);
 }
 
 function warnUnresolvedJogXyPath(set: SetFn, get: GetFn, params: JogParams): void {
   if (params.dx === undefined && params.dy === undefined) return;
-  publishJogPolicyWarning(
+  publishMotionPolicyWarning(
     set,
     get,
     'The current machine XY position is unresolved, so KerfDesk cannot compare this jog path with configured bounds or no-go zones. The requested controller jog will be sent unchanged; monitor the move and use Cancel Jog or the physical E-stop if needed.',
@@ -131,14 +147,15 @@ function warnJogNoGoZoneCrossing(
   if (zones === undefined || zones.length === 0) return;
   const zone = firstZoneCrossedBySegment(path.start, path.target, zones);
   if (zone === null) return;
-  publishJogPolicyWarning(
+  publishMotionPolicyWarning(
     set,
     get,
     `This jog path crosses the configured no-go zone "${zone.name}". The requested controller jog will be sent unchanged; monitor the move and use Cancel Jog or the physical E-stop if needed.`,
   );
 }
 
-function publishJogPolicyWarning(set: SetFn, get: GetFn, message: string): void {
+/** Warn-only motion guidance: a toast plus the console log (ADR-232). */
+export function publishMotionPolicyWarning(set: SetFn, get: GetFn, message: string): void {
   useToastStore.getState().pushToast(message, 'warning');
   set({ log: pushLog(get(), `[lf2] ${message}`) });
 }

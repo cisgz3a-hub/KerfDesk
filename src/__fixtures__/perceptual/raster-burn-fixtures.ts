@@ -44,7 +44,7 @@ export type RasterFixtureInput = {
   readonly rotationDeg?: number;
   readonly bidirectional?: boolean;
   readonly device?: DeviceProfile;
-  // The photo's own engrave adjustments: tones and ADR-648 sharpening.
+  // The photo's own engrave adjustments: tones and ADR-671 sharpening.
   readonly imageSettings?: Pick<
     RasterImage,
     'brightness' | 'contrast' | 'gamma' | 'sharpenAmount' | 'sharpenRadius'

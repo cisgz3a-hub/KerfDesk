@@ -134,7 +134,7 @@ describe('ControllerConnectionControls contextual recovery', () => {
     const platform = await connectedInfoFailure(harness);
     const close = vi.spyOn(harness.connection, 'close');
     const container = await render(platform);
-    expect(container.textContent).toContain('Controller information unavailable');
+    expect(container.textContent).toContain('Couldn’t read machine settings');
     expect(container.textContent).not.toContain('Reconnect controller');
     const retry = retryButton(container);
     expect(retry?.disabled).toBe(false);

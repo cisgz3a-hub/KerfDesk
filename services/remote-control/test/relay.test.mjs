@@ -31,6 +31,7 @@ const readTools = [
   'wait_for_change',
   'get_machine_status',
   'get_control_operation',
+  'get_board',
 ];
 const editTools = [
   'set_selection',
@@ -53,6 +54,8 @@ const editTools = [
   'import_file',
   'save_project',
   'apply_edits',
+  'set_board_photo',
+  'place_on_board',
 ];
 const controlTools = [
   'jog_machine',
@@ -64,6 +67,8 @@ const controlTools = [
   'disconnect_machine',
   'home_machine',
   'set_work_origin',
+  'capture_board_point',
+  'finish_board',
   'pause_job',
   'resume_job',
 ];
@@ -79,6 +84,7 @@ const nonDestructiveEdits = [
   'import_file',
   'create_operation',
   'save_project',
+  'set_board_photo',
 ];
 
 function assertToolCatalogue(tools) {

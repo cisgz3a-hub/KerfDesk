@@ -6,7 +6,9 @@ param(
   [Parameter(Mandatory = $true)][string]$ExpectedProfile,
   [Parameter(Mandatory = $true)][string]$Project,
   [Parameter(Mandatory = $true)][string]$ExpectedVersion,
-  [Parameter(Mandatory = $true)][string]$ExpectedCommit
+  [Parameter(Mandatory = $true)][string]$ExpectedCommit,
+  # ADR-623 Amendment 3: the candidate opens in KerfDesk Free, never behind a licence window.
+  [switch]$LicenceWindowHeldOff
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -44,7 +46,11 @@ $receipt = [ordered]@{
   phase = $Phase; expectedVersion = $ExpectedVersion; expectedCommit = $ExpectedCommit
   executable = $Executable; expectedProfile = $ExpectedProfile; project = $Project
   mode = 'normal installed launch, Windows accessibility and real native file dialogs; no CDP or smoke mode'
-  limitations = @('A build behind the licence window is opened with the developer qualification licence, released in the final phase; no paid credential is used (ADR-623).', 'No hardware is connected or operated.')
+  limitations = @($(if ($LicenceWindowHeldOff) {
+    'Every build opens in KerfDesk Free while the licence window is held off (ADR-623 Amendment 3); no licence is activated or released.'
+  } else {
+    'A build behind the licence window is opened with the developer qualification licence, released in the final phase; no paid credential is used (ADR-623).'
+  }), 'No hardware is connected or operated.')
 }
 function Write-UpgradeReceipt {
   $receipt | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $EvidenceRoot 'result.json') -Encoding utf8
@@ -131,6 +137,7 @@ function Enter-UpgradeWorkspace([string]$Key, [switch]$ReleaseOnly) {
     Start-Sleep -Milliseconds 200
   } while ([DateTime]::UtcNow -lt $deadline)
   if ($null -eq $keyField -and $null -eq $retry) { throw 'Neither the workspace nor a settled licence window opened.' }
+  if ($LicenceWindowHeldOff) { throw 'The licence window opened, but ADR-623 Amendment 3 holds it off: KerfDesk must open in Free.' }
   if ($ReleaseOnly) {
     if ($null -eq $retry) { return [ordered]@{ licenceWindow = $true; activated = $false; release = 'nothing to release' } }
     Invoke-UpgradeControl 'Retry device deactivation' 'Button' $window

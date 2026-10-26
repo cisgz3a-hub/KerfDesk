@@ -1,4 +1,5 @@
 import type { DeviceProfile } from '../devices';
+import type { CncTool } from '../scene';
 import type { ChiploadMaterial } from './feeds-calculator';
 
 export type CncMachineStarterValues = {
@@ -35,6 +36,16 @@ export type CncMachineStarter = {
   };
   readonly values: CncMachineStarterValues;
 };
+
+/** Whether retained starter values still describe their original cutter. */
+export function cncStarterMatchesTool(starter: CncMachineStarter, tool: CncTool): boolean {
+  return (
+    tool.id === starter.tool.toolId &&
+    tool.kind === 'end-mill' &&
+    tool.diameterMm === starter.tool.diameterMm &&
+    (tool.fluteCount ?? 2) === starter.tool.fluteCount
+  );
+}
 
 export type CncMachineStarterMatch = {
   readonly starter: CncMachineStarter;

@@ -15,7 +15,7 @@ function* settingsGrid(): Generator<LumaAdjustments> {
 }
 
 // The composed curve before any rounding: the documented stage order and
-// clamps, kept in floating point (ADR-648).
+// clamps, kept in floating point (ADR-671).
 function exactLevel(level: number, { brightness = 0, contrast = 0, gamma = 1 }: LumaAdjustments) {
   const clamp = (v: number): number => Math.max(0, Math.min(255, v));
   const brightened = clamp(level + brightness * 2.55);
@@ -67,7 +67,7 @@ describe('applyLumaAdjustments', () => {
   });
 });
 
-describe('lumaAdjustmentLut (ADR-648)', () => {
+describe('lumaAdjustmentLut (ADR-671)', () => {
   it('rounds only once: every level is within half a grey level of the exact curve', () => {
     let worst = 0;
     let worstStageRounded = 0;

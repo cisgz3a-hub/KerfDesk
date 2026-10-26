@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, type DeviceProfile, type Origin } from './device-profile';
-import { toMachineCoords, toSceneCoords } from './origin-transform';
+import { sceneAxisSigns, toMachineCoords, toSceneCoords } from './origin-transform';
 
 function withOrigin(origin: Origin): DeviceProfile {
   return { ...DEFAULT_DEVICE_PROFILE, origin };
@@ -86,5 +86,18 @@ describe('toSceneCoords', () => {
       x: dev.bedWidth / 2,
       y: dev.bedHeight / 2,
     });
+  });
+
+  it('reports the finite-difference axis signs for every origin', () => {
+    for (const origin of ALL_ORIGINS) {
+      const dev = withOrigin(origin);
+      const point = { x: 37, y: 51 };
+      const base = toSceneCoords(point, dev);
+      const xStep = toSceneCoords({ x: point.x + 1, y: point.y }, dev);
+      const yStep = toSceneCoords({ x: point.x, y: point.y + 1 }, dev);
+      const signs = sceneAxisSigns(origin);
+      expect({ x: xStep.x - base.x, y: xStep.y - base.y }).toEqual({ x: signs.x, y: 0 });
+      expect({ x: yStep.x - base.x, y: yStep.y - base.y }).toEqual({ x: 0, y: signs.y });
+    }
   });
 });

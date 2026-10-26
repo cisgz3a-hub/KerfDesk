@@ -3,6 +3,8 @@ import { DEFAULT_CNC_TAPERED_INLAY } from '../../core/scene/cnc-tapered-inlay';
 import { NumberField, Row, selectStyle } from './CncLayerPrimitives';
 import { CncTaperedInlayFields } from './CncTaperedInlayFields';
 import { RailSection } from '../kit';
+import { useEdition } from '../licensing/edition';
+import { proChoiceLabel } from '../licensing/pro-features';
 
 type InlayFieldsProps = {
   readonly layer: Layer;
@@ -11,7 +13,19 @@ type InlayFieldsProps = {
 };
 
 export function CncInlayFields(props: InlayFieldsProps): JSX.Element | null {
+  const edition = useEdition();
   if (props.settings.cutType !== 'inlay-pair') return null;
+  const tapered = props.settings.taperedInlay !== undefined;
+  // A tapered pair cuts with V-carve passes, a Pro tool (ADR-540 Amendment 6):
+  // only choosing it anew asks, so an existing tapered pair stays editable.
+  const choose = (method: string): void => {
+    const apply = (): void =>
+      props.onCommit({
+        taperedInlay: method === 'tapered-v' ? { ...DEFAULT_CNC_TAPERED_INLAY } : undefined,
+      });
+    if (method === 'tapered-v' && !tapered) edition.requestPro('vcarve', apply);
+    else apply();
+  };
   return (
     <RailSection
       label="Inlay fit"
@@ -20,19 +34,16 @@ export function CncInlayFields(props: InlayFieldsProps): JSX.Element | null {
     >
       <Row label="Pair method">
         <select
-          value={props.settings.taperedInlay === undefined ? 'straight' : 'tapered-v'}
+          value={tapered ? 'tapered-v' : 'straight'}
           style={selectStyle}
           aria-label={`Inlay pair method for ${props.layer.color}`}
           title="Generate a straight end-mill pair or a linked tapered pair using the selected pointed V-bit."
-          onChange={(event) =>
-            props.onCommit({
-              taperedInlay:
-                event.target.value === 'tapered-v' ? { ...DEFAULT_CNC_TAPERED_INLAY } : undefined,
-            })
-          }
+          onChange={(event) => choose(event.target.value)}
         >
           <option value="straight">Straight end-mill pair</option>
-          <option value="tapered-v">Tapered V-bit pair</option>
+          <option value="tapered-v">
+            {proChoiceLabel('Tapered V-bit pair', !tapered && !edition.pro)}
+          </option>
         </select>
       </Row>
       {props.settings.taperedInlay === undefined ? (

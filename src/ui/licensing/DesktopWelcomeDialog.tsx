@@ -1,7 +1,22 @@
 import { useContext, useEffect, useState } from 'react';
 import { DesktopDownloadContext, type DesktopDownloadResult } from './desktop-download-context';
 import { Dialog, Icon } from '../kit';
+import { DESKTOP_LICENCE_WINDOW } from '../../../public/desktop-licence-window.mjs';
 import './desktop-welcome.css';
+
+// What the desktop app opens into: KerfDesk Free while ADR-623 Amendment 3 holds
+// its licence window off, otherwise the window that asks for a trial or licence.
+const DESKTOP_COPY = DESKTOP_LICENCE_WINDOW
+  ? {
+      tagline: 'Every tool, free for 30 days. Then a one-time licence.',
+      licence: 'The desktop app needs a trial or licence.',
+      download: 'Download the Windows app, which opens with a free 30-day trial or your licence',
+    }
+  : {
+      tagline: 'Free workspace. More possibilities with Pro.',
+      licence: 'Pro tools unlock with a desktop licence.',
+      download: 'Download the Windows app, which starts in Free until you unlock Pro',
+    };
 
 type DownloadState = DesktopDownloadResult | { readonly status: 'loading' };
 
@@ -99,7 +114,7 @@ function DesktopDownloadCard({ download, onClose, retry }: DesktopDownloadCardPr
         </span>
         <div>
           <h3>KerfDesk for Windows</h3>
-          <span>Every tool, free for 30 days. Then a one-time licence.</span>
+          <span>{DESKTOP_COPY.tagline}</span>
         </div>
       </div>
       <ul className="lf-desktop-welcome__features" aria-label="Desktop Pro highlights">
@@ -108,7 +123,7 @@ function DesktopDownloadCard({ download, onClose, retry }: DesktopDownloadCardPr
         <li>Camera alignment</li>
         <li>Box generator &amp; more</li>
       </ul>
-      <p className="lf-desktop-welcome__licence">The desktop app needs a trial or licence.</p>
+      <p className="lf-desktop-welcome__licence">{DESKTOP_COPY.licence}</p>
       {download.status === 'ready' ? (
         <a
           className="lf-desktop-welcome__download"
@@ -117,7 +132,7 @@ function DesktopDownloadCard({ download, onClose, retry }: DesktopDownloadCardPr
           target="_blank"
           rel="noopener noreferrer"
           onClick={onClose}
-          title="Download the Windows app, which opens with a free 30-day trial or your licence"
+          title={DESKTOP_COPY.download}
         >
           <DownloadIcon /> Download for Windows <Icon name="arrow-up-right" size={18} />
         </a>

@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import { settingsMapToRows } from '../../../core/controllers/grbl';
 import { DEFAULT_DEVICE_PROFILE } from '../../../core/devices';
+import { macroDispatchTranscriptEntry } from '../../state/console-command-provenance';
 import { useLaserStore, type LaserState } from '../../state/laser-store';
-import type { SerialTranscriptEntry } from '../../state/laser-transcript';
+import {
+  inboundTranscriptEntry,
+  outboundTranscriptEntry,
+  type SerialTranscriptEntry,
+} from '../../state/laser-transcript';
 import { createDiagnosticBundle, DIAGNOSTIC_BUNDLE_MAX_BYTES } from './diagnostic-bundle';
 import { redactDiagnosticText } from './diagnostic-redaction';
 
@@ -131,6 +137,53 @@ describe('local diagnostic bundle', () => {
     expect(decoded.knownController.build.rxBufferBytes).toBe(128);
     expect(result.json).not.toContain('private-value');
     expect(result.json).not.toContain('private-unit-42');
+  });
+
+  it('leaves grblHAL passwords out of setting rows, typed writes and macro lines (audit C5-P2-1)', () => {
+    const transcript = [
+      inboundTranscriptEntry(1, 10, '$70=7', undefined, 'grblhal'),
+      inboundTranscriptEntry(2, 11, '$75=hunter2pass', undefined, 'grblhal'),
+      inboundTranscriptEntry(3, 12, '$533=mqttSecret9', undefined, 'grblhal'),
+      inboundTranscriptEntry(4, 13, 'ok', undefined, 'grblhal'),
+      outboundTranscriptEntry(5, 14, '$75=newWifiPass\n', 'console'),
+      macroDispatchTranscriptEntry(
+        6,
+        15,
+        { kind: 'user-macro', macroName: 'AP', macroTemplate: '$77=apSecret77' },
+        '$77=apSecret77',
+      ),
+    ];
+    expect(transcript.map((row) => row.kind)).toEqual([
+      'setting',
+      'setting',
+      'setting',
+      'ok',
+      'setting-write',
+      'message',
+    ]);
+    const result = create(transcript, true, {
+      grblSettingsRows: settingsMapToRows(
+        new Map([
+          [75, '12345678'],
+          [100, '80.000'],
+        ]),
+      ),
+    });
+    const decoded = JSON.parse(result.json);
+    for (const secret of ['hunter2pass', 'mqttSecret9', 'newWifiPass', 'apSecret77', '12345678']) {
+      expect(result.json).not.toContain(secret);
+    }
+    expect(decoded.transcript.map((row: { raw: string }) => row.raw)).toEqual([
+      'ok',
+      'User macro "AP" dispatched through Console: $77=[password removed]',
+    ]);
+    expect(decoded.knownController.settings).toEqual([
+      { id: 75, numericValue: null },
+      { id: 100, numericValue: 80 },
+    ]);
+    expect(decoded.disclosure.omitted).toEqual(
+      expect.arrayContaining(['raw settings values and setting lines', 'controller passwords']),
+    );
   });
 
   it('caps encoded UTF-8 bytes including JSON escaping and decoded text', () => {

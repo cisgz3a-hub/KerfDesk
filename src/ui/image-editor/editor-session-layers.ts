@@ -183,6 +183,41 @@ export function setActiveLayerProps(session: EditorSession, props: LayerProps): 
 }
 
 /**
+ * Live opacity while the Layers slider drags: the canvas shows it, but no
+ * history is recorded. Each input event used to clone every layer into its
+ * own Undo step, so one drag evicted the earlier history (audit 23-P2-2).
+ */
+export function previewLayerOpacity(
+  session: EditorSession,
+  id: string,
+  opacity: number,
+): EditorSession {
+  const layer = session.layers.find((candidate) => candidate.id === id);
+  if (layer === undefined || layer.opacity === opacity) return session;
+  return withLayers(
+    session,
+    setLayerProps(session.layers, id, { opacity }),
+    session.activeLayerId,
+    null,
+  );
+}
+
+/** Record a whole slider drag as one "Layer opacity" step from where it started. */
+export function commitLayerOpacity(
+  session: EditorSession,
+  id: string,
+  startOpacity: number,
+): EditorSession {
+  const layer = session.layers.find((candidate) => candidate.id === id);
+  if (layer === undefined || layer.opacity === startOpacity) return session;
+  const before = {
+    ...session,
+    layers: setLayerProps(session.layers, id, { opacity: startOpacity }),
+  };
+  return withLayers(before, session.layers, session.activeLayerId, 'Layer opacity');
+}
+
+/**
  * The one composite path (ADR-245): what the canvas shows and what Apply
  * bakes. Fast path: a single fully-visible normal layer IS the document.
  */

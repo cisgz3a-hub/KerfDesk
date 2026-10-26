@@ -1,4 +1,5 @@
 import type { LicenceAdapter, LicenceStatus } from '../../platform/types';
+import { DESKTOP_LICENCE_WINDOW } from '../../../public/desktop-licence-window.mjs';
 import { EarlyUpdatesOption } from './EarlyUpdatesOption';
 import { LicenceDevicesPanel } from './LicenceDevicesPanel';
 import {
@@ -113,8 +114,27 @@ export function SavedLicence({
   );
 }
 
-/** What a desktop licence includes. KerfDesk Free is the browser app (ADR-623). */
+/**
+ * What a desktop licence includes. Behind the licence window, KerfDesk Free is
+ * the browser app (ADR-623); while Amendment 3 holds the window off, the desktop
+ * app runs Free too and a licence adds Pro (ADR-540).
+ */
 export function EditionSummary(): JSX.Element {
+  if (!DESKTOP_LICENCE_WINDOW)
+    return (
+      <>
+        <p style={licenceMuted}>
+          Free covers drawing, text, import, Line Art tracing, laser cut and engrave, 2D CNC cuts,
+          the G-code Inspector and all machine control. Pro adds V-carve, 3D relief, adaptive
+          clearing, advanced tracing, camera alignment, the Registration Jig, Place Board, the box
+          generator and Design Studio.
+        </p>
+        <p style={licenceMuted}>
+          A Pro licence runs on three devices at a time and keeps working with every version
+          released during its year of updates. Licence changes never stop a job that is running.
+        </p>
+      </>
+    );
   return (
     <>
       <p style={licenceMuted}>
@@ -129,7 +149,8 @@ export function EditionSummary(): JSX.Element {
 
 function editionTitle(status: LicenceStatus | null): string {
   if (status === null) return 'KerfDesk';
-  return status.edition === 'pro' ? 'KerfDesk Pro' : 'Licence needed';
+  if (status.edition === 'pro') return 'KerfDesk Pro';
+  return DESKTOP_LICENCE_WINDOW ? 'Licence needed' : 'KerfDesk Free';
 }
 
 export function offersActivation(status: LicenceStatus | null): boolean {

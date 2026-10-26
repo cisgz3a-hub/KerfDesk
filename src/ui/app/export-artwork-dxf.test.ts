@@ -1,7 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
-import { mockPlatform, projectWithTwoLines } from '../../__fixtures__/file-actions';
+import {
+  mockPlatform,
+  projectWithLinesAndMissingVariableData,
+  projectWithTwoLines,
+} from '../../__fixtures__/file-actions';
 import { IDENTITY_TRANSFORM, type Project, type SceneObject } from '../../core/scene';
 import type { SaveTarget } from '../../platform/types';
+import { installChromiumSavePicker } from '../../platform/web/chromium-save-picker.test-support';
+import { webAdapter } from '../../platform/web/web-adapter';
 import type { VariableTextRenderer } from '../../io/gcode/prepare-output-snapshot';
 import { parseDxf } from '../../io/dxf/parse-dxf';
 import { handleExportArtworkDxf } from './export-artwork-dxf';
@@ -111,6 +117,31 @@ describe('DXF export action', () => {
     expect(pushToast).toHaveBeenCalledWith(
       'DXF holds vector artwork only. Select vector, text or traced artwork.',
       'warning',
+    );
+  });
+
+  it('leaves an existing DXF intact when text outlining fails, without opening the picker', async () => {
+    // Chromium empties the chosen file as the picker returns (ADR-656, audit 19-P2-1).
+    const disk = new Map([['artwork.dxf', 'previous dxf']]);
+    const picker = installChromiumSavePicker(disk);
+    const pushToast = vi.fn();
+    try {
+      await handleExportArtworkDxf({
+        platform: webAdapter,
+        project: projectWithLinesAndMissingVariableData(),
+        selectedIds: [],
+        savedName: null,
+        pushToast,
+        renderer,
+      });
+    } finally {
+      picker.restore();
+    }
+    expect(picker.picks()).toBe(0);
+    expect(disk.get('artwork.dxf')).toBe('previous dxf');
+    expect(pushToast).toHaveBeenCalledWith(
+      expect.stringContaining('Could not export DXF'),
+      'error',
     );
   });
 

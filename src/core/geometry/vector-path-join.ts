@@ -183,6 +183,7 @@ function repairMetadata(
   paths: ReadonlyArray<ColoredPath>,
 ): Pick<
   ImportedSvg,
+  | 'name'
   | 'operationIds'
   | 'operationOverride'
   | 'powerScale'
@@ -192,6 +193,7 @@ function repairMetadata(
   | 'laserTabAnchors'
 > {
   return {
+    ...(object.name === undefined ? {} : { name: object.name }),
     ...(object.operationIds === undefined ? {} : { operationIds: object.operationIds }),
     ...(object.operationOverride === undefined
       ? {}
