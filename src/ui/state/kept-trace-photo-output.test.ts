@@ -75,7 +75,7 @@ function trace(): TracedImage {
 
 function sourcesInJob(project: Project): ReadonlyArray<string> {
   return compileJob(project.scene, project.device).groups.flatMap((group) =>
-    group.kind === 'raster' ? [group.sourceObjectId] : [group.kind],
+    group.kind === 'raster' ? [group.sourceObjectId ?? 'raster'] : [group.kind],
   );
 }
 

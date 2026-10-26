@@ -120,7 +120,7 @@ describe('applyRasterizedTraceToExisting', () => {
 
     const groups = compileJob(result.project.scene, result.project.device).groups;
     const rasterSources = (job: typeof groups): ReadonlyArray<string> =>
-      job.flatMap((group) => (group.kind === 'raster' ? [group.sourceObjectId] : [])).sort();
+      job.flatMap((group) => (group.kind === 'raster' ? [group.sourceObjectId ?? ''] : [])).sort();
     expect(rasterSources(groups)).toEqual([output.id, source.id].sort());
     expect(
       groups.find((group) => group.kind === 'raster' && group.sourceObjectId === output.id),
