@@ -44,6 +44,11 @@ export type RasterFixtureInput = {
   readonly rotationDeg?: number;
   readonly bidirectional?: boolean;
   readonly device?: DeviceProfile;
+  // The photo's own engrave adjustments: tones and ADR-671 sharpening.
+  readonly imageSettings?: Pick<
+    RasterImage,
+    'brightness' | 'contrast' | 'gamma' | 'sharpenAmount' | 'sharpenRadius'
+  >;
 };
 
 export type RasterFixture = {
@@ -78,6 +83,7 @@ export function compileRasterFixture(input: RasterFixtureInput): RasterFixture {
     dither: input.ditherAlgorithm,
     linesPerMm: input.linesPerMm ?? DEFAULT_LINES_PER_MM,
     lumaBase64: encodeLumaBase64(input.luma),
+    ...input.imageSettings,
   } satisfies RasterImage;
   const layer = {
     ...createLayer({ id: 'image', color: '#808080', mode: 'image' as const }),

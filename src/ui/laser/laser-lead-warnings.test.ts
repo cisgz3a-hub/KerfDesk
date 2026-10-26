@@ -61,7 +61,7 @@ describe('laser lead warnings (ADR-626)', () => {
     ]);
     expect(warnings).toEqual([
       'Lead-in/lead-out on layer "Cut": 1 shape inside a closed shape on layer "Cut", which has no leads, gets no leads. That shape may be a part, or only a score line or border, so which side is scrap is unknown. Turn on leads for "Cut" if it cuts parts out, or set Lead side to Always outside or Always inside.',
-      'Lead-in/lead-out on layer "Cut": 2 shapes inside open lines on layer "Cut" get no leads. Those lines close round them but are not one closed shape, so they may be the outline of a part, and which side is scrap is unknown. Close the outline with Tools > Join paths, or set Lead side to Always outside or Always inside.',
+      'Lead-in/lead-out on layer "Cut": 2 shapes inside open lines on layer "Cut" get no leads. Those lines run all or nearly all the way round them but are not one closed shape, so they may be the outline of a part, and which side is scrap is unknown. Close the outline with Tools > Join paths, or set Lead side to Always outside or Always inside.',
     ]);
   });
 

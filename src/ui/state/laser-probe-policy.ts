@@ -16,6 +16,7 @@ import {
 } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 import type { ProbeResult } from './probe-actions';
+import { probeCircuitBlockReason } from './probe-test-touch';
 
 type ProbePolicyRefs = ControllerLifecycleRefs & {
   readonly connection: SerialConnection | null;
@@ -160,7 +161,8 @@ function probeProtocolBlockReason(
   if (refs.driver.commands.settleDwell.length === 0) {
     return 'This controller has no planner-settle command for a qualified probe cycle.';
   }
-  return null;
+  // Last, so a cycle that cannot run for another reason says that reason.
+  return probeCircuitBlockReason(state);
 }
 
 const SPINDLE_ON_REASON = 'Spindle must be off before probing.';

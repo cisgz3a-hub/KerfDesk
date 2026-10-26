@@ -697,6 +697,11 @@ the linked artwork.
    drawn the other way, count. Copies on another operation, or with another power scale,
    override or tabs placed by hand (CNC or laser), are kept. Locked artwork, image masks and
    path-text guides are never deleted.
+   On CNC, an exact copy of a closed outline left on a profile, pocket, V-carve or inlay
+   operation would cancel its original under the even-odd fill, so neither would be cut. The
+   compile cuts such copies once, by the same rule as this tool, also for a path an SVG draws
+   twice. Job Review then says how many copies were cut once, as a warning. On path, engrave
+   and drill keep every copy, since each is cut again (ADR-359 Amendment 3).
 5. **Tools → Image → Flatten Image Mask** bakes the mask into the selected image and crops it, as
    **Crop Image** does, then deletes the mask shape. The shape stays when it is locked or another
    image or path text uses it; the notice says which.
@@ -1210,22 +1215,31 @@ that owns those fields, without changing the existing Frame/Start policy.
    Open lines of a Line operation that close a region (their ends meet, cross, or stop up to
    0.5 mm short, such as a plate drawn as separate lines) may be a part's outline too, so the
    shapes inside that region get no leads either, and Job Review says to close the outline with
-   **Tools → Join paths** or choose a fixed side (ADR-626 Amendment 8). DXF import already joins
-   LINE and ARC pieces whose ends meet.
+   **Tools → Join paths** or choose a fixed side (ADR-626 Amendment 8). So may open lines that run
+   nearly all the way round, however wide the gap they leave: a path, or lines joined end to end,
+   whose two free ends are closer together than a tenth of its length, such as a plate drawn with
+   one corner left open (Amendment 10). DXF import already joins LINE and ARC pieces whose ends
+   meet. Lines that stop short of each other at two or more corners are not read as one outline:
+   join them first.
    **Always outside** and **Always inside** put every lead of the operation on that side.
 4. Leads join each closed shape where it really starts, so they follow **Start closed shapes**
    (F-A9e) and the job start point. Where no lead fits there (a hole that starts at a corner), the
    shape starts in the middle of a nearby edge instead.
 5. A lead keeps 0.2 mm, or one kerf width (twice the Kerf Offset) when that is wider, up to 1 mm,
    from every other cut line, ends on the scrap side and stays on the bed when the bed position is
-   known. A lead that does not fit is shortened, down to a quarter, or left out, and Job Review says
-   how many shapes that affects. That shape is cut as it would be without leads.
+   known. Every other cut line includes the parts this job leaves for later: with **Cut selected
+   graphics**, the unselected artwork, and the artwork of an operation with output off or a
+   disabled sub-layer, as drawn (Amendment 10). A lead never ends inside one of those parts. A lead
+   that does not fit is shortened, down to a quarter, or left out, and Job Review says how many
+   shapes that affects. That shape is cut as it would be without leads.
 6. Every pass cuts lead-in, shape, lead-out. With **Overcut** the final pass runs past the start
    first and leaves by a lead-out from where the overcut ends. Leads follow the kerf-offset path.
    Shapes with tabs and perforated lines get no leads, and Job Review says so. Open paths get none,
    including a shape that **Remove overlapping lines** opened up, but leads still keep out of it.
-   When open paths whose ends meet sit on an operation with a kerf offset or leads, or hold shapes
-   that inside-first would cut first, Job Review warns that they are cut as open lines.
+   When open paths whose ends meet, or that are left open at one place (ends closer together than
+   a tenth of their length), sit on an operation with a kerf offset or leads, or hold shapes that
+   are kerf-offset or that inside-first would cut first, Job Review warns that they are cut as open
+   lines, says how far apart their ends are and the gap **Tools → Join paths** needs to close them.
 7. Preview, Frame, both time estimates, Job Review and every output format (GRBL, Marlin,
    Smoothieware, Ruida) show the leads. On machines that take arcs, a shape that goes out as arcs
    keeps them and its arc leads go out as arcs too. CNC output never changes.
@@ -6531,20 +6545,29 @@ and lifts the command's CNC-only gate.)*
 1. Router controls → "Probe (touch plate)": pick Z-only (stock top) or
    XYZ corner (plus which corner). Plate thickness, max travel, and (for
    XYZ) bit diameter are editable; bit diameter prefills from the
-   machine's active bit. Run is enabled only when connected and Idle.
-2. Z cycle: fast G38.2 seek down, 2 mm back-off, slow re-touch, then
+   machine's active bit. Run is enabled only when connected, Idle and
+   the probe circuit is tested.
+2. Test touch (ADR-103 Amendment 2): a live **Probe circuit** line reads
+   "not tested". The operator holds the plate against the bit (or clip)
+   until it reads "closed" (a status report with `Pn:P`; an idle machine is
+   polled about once a second), then takes the plate away until it reads
+   "tested". Touches made in Alarm count. Each touch-off uses the touch up, so a
+   retry asks for a new one, and so do a streamed job and a new controller
+   session. Touches during a tool-change hold count. The cycle's own
+   contacts never count.
+3. Z cycle: fast G38.2 seek down, 2 mm back-off, slow re-touch, then
    `G10 L20 P0 Z<thickness>` — work Z0 lands on the STOCK TOP (plate
    underside) — and a retract. Every line owns the controller response
    arbiter exclusively; after the retract, the active driver's planner
    fence plus two fresh Idle reports complete before the toast confirms
    "work zero is set and motion is settled".
-3. XYZ corner cycle: Z first over the plate center, then each side face
+4. XYZ corner cycle: Z first over the plate center, then each side face
    (two-stage, flank contact below the plate top). The cycle keeps all
    positioning relative and leaves the previous WCS untouched until all
    six contacts succeed. One acknowledged `G10 L20 P0 X... Y... Z...`
    then commits the complete corner frame before the bit parks just
    outside it. Corner choice mirrors all directions and signs.
-4. When current Work-Z evidence is missing, a connected, Idle controller
+5. When current Work-Z evidence is missing, a connected, Idle controller
    that supports owned modal/WCS reads exposes **Advanced: Reuse existing
    controller setup** → **Use existing controller Z zero**. After explicit
    stock-top/tool confirmation, it reads `$G` → `$#` → `$G` and records the
@@ -6553,16 +6576,25 @@ and lifts the command's CNC-only gate.)*
    verified status.
 
 #### Error — probe never fires / fires early
-1. ALARM:5 (no contact within travel): named toast — check the clip
+1. No test touch yet: Run stays disabled, and the store refuses the
+   cycle with "Test the probe first" before any `G38.2` is written. On
+   grblHAL, if the `$$` shows `$10` without bit 4 (pin state), no report
+   can carry `Pn:`, and the reason names the `$10` to send. KerfDesk
+   never writes it. A stock GRBL build compiled without pin-state reporting
+   cannot touch off; Zero Z here still works.
+2. Probe input already closed: refused before GRBL would raise ALARM:4,
+   naming a shorted lead and the probe-input invert (`$6` on GRBL and
+   grblHAL).
+3. ALARM:5 (no contact within travel): named toast — check the clip
    lead, start closer, `$X` to unlock, retry.
-2. ALARM:4 (already triggered): named toast — check for a short /
+4. ALARM:4 (already triggered): named toast — check for a short /
    already-touching bit, `$X`, retry.
-3. Any error:N stops the sequence immediately; nothing further is sent.
+5. Any error:N stops the sequence immediately; nothing further is sent.
    In XYZ mode, an error before the combined G10 leaves the previous WCS
    unchanged. A timeout or disconnect while that one commit is awaiting
    acknowledgement makes the coordinate state unknown, so setup evidence
    remains invalid until the operator re-establishes the work frame.
-4. No `ok` within 45 s, or failure to settle at fresh Idle: timeout toast
+6. No `ok` within 45 s, or failure to settle at fresh Idle: timeout toast
    names the pending boundary, invalidates work-Z/status evidence, and
    warns that motion state is unknown (physical stop if unsafe).
 
@@ -8641,6 +8673,13 @@ as the pane's design record.
   native-frame change the camera picture is moved to match, and the calibration row says on what
   bed it was made and how far it moved. After an origin change the camera is not used: the Camera
   panel says "Calibrate the camera again, or set the origin back".
+- **Edge / calibration saved without its bed frame (ADR-440 Amendment 4).** A calibration from
+  KerfDesk 1.0.21 or earlier recorded no bed frame, so it is not used until the operator says
+  which frame it belongs to. The Camera panel names the origin and bed size Machine Setup has now
+  and offers **Confirm bed and origin**, which records them on the calibration (one undo step, no
+  Pro needed). If either has changed since the calibration, the panel says to calibrate again.
+  **Check camera…** opens setup for such a calibration instead of checking it in today's frame,
+  and the saved calibration stays as it is.
 
 ### F-CAM3. Corrected camera overlay (ADR-440, ADR-441 Amendment 2)
 
@@ -8723,6 +8762,13 @@ as the pane's design record.
   are pointed to the bridge command; the desktop app starts it automatically.
   Hosted web builds cannot call the loopback network-camera bridge and support
   USB cameras only (ADR-141).
+- **Error / another program on the bridge's port (ADR-141 Amendment 2).** The desktop app checks
+  that whatever answers on `127.0.0.1:51731` is the bridge it started, with a fresh challenge
+  signed by this launch's key, before it sends any camera address or login. When the bridge could
+  not start because the port is taken, or Windows set it aside, the camera panel says so and what
+  to do; the next connect tries again. A program that answers without the proof gets nothing more,
+  and the panel says another program is answering on the port. Camera addresses go to the bridge
+  in request bodies, never in URLs.
 - **Error / RTSP preview interrupted.** Each probe creates an unguessable bridge-owned stream
   session shared by every view of that exact source. The renderer polls its status because
   Chromium does not reliably emit `<img>` error after an established MJPEG socket dies.

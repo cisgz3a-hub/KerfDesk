@@ -7,11 +7,14 @@
 // blocking, so this works identically in the desktop app, dev server, and the
 // deployed site. Lens calibration, auto-align, still overlay, trace, and
 // snapshot all become possible for machine cameras through this route.
+// /frame.jpg names its camera by a registered source id, never by the camera
+// address, which can hold a login (rolling audit v2 04-P2-1).
 
 import type { ServerResponse } from 'node:http';
 import { writeJson } from './bridge-json.js';
 import { cameraFrameUrlPolicy } from './camera-frame-proxy-policy.js';
 import { cancelCameraFrameBody, readCameraFrameBody } from './camera-frame-body.js';
+import type { CameraFrameSources } from './camera-frame-sources.js';
 import { FFMPEG_MISSING_REASON } from './ffmpeg-path.js';
 import { captureRtspFrameJpeg, hasFfmpeg } from './rtsp-camera-stream.js';
 
@@ -33,9 +36,12 @@ export const MACHINE_CAMERA_FRAME_URL_CANDIDATES: ReadonlyArray<string> = [
   'http://192.168.10.2:8080/media/getCapturePhoto',
 ];
 
-/** Bridge frame-proxy URL for a camera URL, as served by /discover. */
-export function proxiedFrameUrl(cameraUrl: string, bridgePort: number): string {
-  return `http://127.0.0.1:${bridgePort}/frame.jpg?url=${encodeURIComponent(cameraUrl)}`;
+const MISSING_SOURCE_REASON =
+  'The camera bridge no longer knows this camera. Connect the camera again.';
+
+/** Bridge frame-proxy URL for a registered frame source. */
+export function proxiedFrameUrl(sourceId: string, bridgePort: number): string {
+  return `http://127.0.0.1:${bridgePort}/frame.jpg?source=${encodeURIComponent(sourceId)}`;
 }
 
 // Machine snapshot cameras are single-threaded embedded servers: concurrent
@@ -75,12 +81,41 @@ function hostOf(url: string): string {
   }
 }
 
+/**
+ * POST /frame-source: check a camera address against the proxy policy and
+ * register it, answering with the /frame.jpg URL that names it.
+ */
+export function handleFrameSourceRequest(
+  cameraUrl: string,
+  res: ServerResponse,
+  bridgePort: number,
+  sources: CameraFrameSources,
+): void {
+  const policy = cameraFrameUrlPolicy(cameraUrl, bridgePort);
+  if (policy.kind !== 'ok') {
+    writeJson(res, policy);
+    return;
+  }
+  writeJson(res, {
+    kind: 'ok',
+    frameUrl: proxiedFrameUrl(sources.register(policy.url.toString()), bridgePort),
+  });
+}
+
 export async function handleFrameRequest(
   requestUrl: URL,
   res: ServerResponse,
   bridgePort: number,
+  sources: CameraFrameSources,
 ): Promise<void> {
-  const policy = cameraFrameUrlPolicy(requestUrl.searchParams.get('url') ?? '', bridgePort);
+  const cameraUrl = sources.cameraUrl(requestUrl.searchParams.get('source') ?? '');
+  if (cameraUrl === undefined) {
+    writeJson(res, { kind: 'invalid', reason: MISSING_SOURCE_REASON }, 404);
+    return;
+  }
+  // The registry holds only addresses the policy passed; checking again keeps
+  // the policy the one gate in front of every camera fetch.
+  const policy = cameraFrameUrlPolicy(cameraUrl, bridgePort);
   if (policy.kind !== 'ok') {
     writeJson(res, policy);
     return;
@@ -175,6 +210,8 @@ function publicFrameError(err: unknown): string {
 
 export type MachineCameraDiscoveryOptions = {
   readonly bridgePort: number;
+  /** Where a found camera is registered, so its frame URL names it by id. */
+  readonly sources: CameraFrameSources;
   readonly candidates?: ReadonlyArray<string>;
   readonly probeTimeoutMs?: number;
 };
@@ -205,6 +242,9 @@ export async function handleDiscoverRequest(
     found:
       cameraUrl === null
         ? null
-        : { cameraUrl, proxyFrameUrl: proxiedFrameUrl(cameraUrl, options.bridgePort) },
+        : {
+            cameraUrl,
+            proxyFrameUrl: proxiedFrameUrl(options.sources.register(cameraUrl), options.bridgePort),
+          },
   });
 }

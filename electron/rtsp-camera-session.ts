@@ -52,6 +52,15 @@ export class RtspPreviewSessions {
     return id;
   }
 
+  /**
+   * The camera address session `id` was created for, so the stream request
+   * names the camera by its session alone (rolling audit v2 04-P2-1).
+   */
+  sourceUrl(id: string): string | undefined {
+    this.prune();
+    return this.sessions.get(id)?.sourceUrl;
+  }
+
   claim(id: string, sourceUrl: string): RtspPreviewLifecycle | null {
     this.prune();
     const entry = this.sessions.get(id);

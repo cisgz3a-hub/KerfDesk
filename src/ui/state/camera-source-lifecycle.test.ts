@@ -73,7 +73,10 @@ function rtspBridge(
     probeRtspCamera: probe,
     rtspStreamStatus,
     discoverMachineCamera: async () => ({ kind: 'not-found' }),
-    proxiedFrameUrl: () => 'http://127.0.0.1:51731/frame.jpg?url=x',
+    registerFrameSource: async () => ({
+      kind: 'ok',
+      frameUrl: 'http://127.0.0.1:51731/frame.jpg?url=x',
+    }),
     health: async () => ({ kind: 'ok', ffmpegAvailable: true, frameProxy: true }),
   };
 }

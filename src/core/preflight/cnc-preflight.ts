@@ -41,6 +41,7 @@ import {
 import { findCncMotionBoundsPreflightIssues } from './cnc-motion-bounds-preflight';
 import { hasCuttingMove } from './cutting-move';
 import { cncOpenContourIssues } from './cnc-open-contour-issues';
+import { cncStackedCopyIssues } from './cnc-stacked-copy-issues';
 import { cncProfileLeadPlungeIssues } from './cnc-profile-lead-plunge-issues';
 import { findInvalidCncToolGeometry } from './cnc-tool-geometry';
 import { cncStarterToolFeedIssue } from './cnc-starter-tool-feed';
@@ -97,6 +98,7 @@ function appendSourceGeometryIssues(
   issues: PreflightIssue[],
 ): void {
   issues.push(...cncOpenContourIssues(options.compiledJob));
+  issues.push(...cncStackedCopyIssues(options.compiledJob));
   if (options.sourceGeometryChecks === 'compiled-evidence-only') {
     appendVCarveEntryIssues(project, config, options.compiledJob, issues);
     return;
