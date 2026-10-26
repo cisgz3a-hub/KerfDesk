@@ -1,9 +1,11 @@
 ## ADR-672 - Settings are read in Alarm, step jogs queue, grblHAL sends WCO at once, and Marlin's Reset origin says what it sends
 
-**Status:** Accepted; unit-tested, not hardware-tested. | **Date:** 2026-10-20
+**Status:** Accepted; unit-tested, not hardware-tested. | **Date:** 2026-10-20 (rebased onto
+main 2026-10-26; drafted as ADR-648, which main gave to "settings survive KerfDesk's own reset")
 
-Amends the qualification scheduler of ADR-400 (connection, TC-1). The Frame-first Start contract (PROJECT.md non-negotiable 21, ADR-565) is unchanged: nothing here adds
-or removes a Start guard.
+Amends the qualification scheduler of ADR-400 (connection, TC-1). The Frame-first Start
+contract (PROJECT.md non-negotiable 21, ADR-565) is unchanged: nothing here adds or removes a
+Start guard. Jog Cancel keeps ADR-640's wait for the jog's reply before 0x85.
 
 ### Context
 
@@ -78,7 +80,11 @@ Two audits found convenience gaps that need no maintainer decision:
    ordinary status query otherwise. KerfDesk sends it once at the end of the connect handshake,
    and at the start of `waitForUnreportedFrameWorkOffset` (Frame) and `waitForOriginWcoFrame`
    (Set origin). The byte is a single realtime byte, inert to the planner, and owes no
-   acknowledgement. No UI code holds the byte.
+   acknowledgement. No UI code holds the byte. Like the background poll, the request stays
+   silent while a controller operation owns polling (`controllerOperationOwnsPolling`): an
+   Alarm report in the middle of a `$$` read would invalidate that read. A grblHAL that greets
+   as stock GRBL runs the GRBL driver and gets the plain `?`; stock GRBL discards an unknown
+   extended byte anyway. FluidNC, where 0x87 is a macro trigger, never gets it.
 
 4. **"Can clear G92" is its own capability.** `ControllerCapabilities.transientOriginClear` says
    how Reset origin clears a transient origin: `'g92.1'` (GRBL family, Smoothieware; the default)

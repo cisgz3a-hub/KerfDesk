@@ -193,7 +193,7 @@ function startConnectedControllerHandshake(
   void runControllerHandshake(set, get, refs, safeWrite, baudRate, ownership.adopt)
     // The work offset of a board that did not reset on open, at once (ADR-672).
     .then(() =>
-      ownership.isCurrent() ? sendCompleteStatusRequest(refs.driver, safeWrite) : undefined,
+      ownership.isCurrent() ? sendCompleteStatusRequest(get(), refs.driver, safeWrite) : undefined,
     )
     .catch((error: unknown) => {
       if (!ownership.isCurrent()) return;

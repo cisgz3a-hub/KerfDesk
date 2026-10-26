@@ -22,11 +22,7 @@ import { assertAutofocusIdle, jogFrameCommandBlockMessage, pushLog } from './las
 import { useStore } from './store';
 import { isWorkZEvidenceCurrentForStart } from './work-z-zero-evidence';
 import { confirmFreshManualMotionIdle } from './manual-motion-fresh-idle';
-import {
-  jogXyTarget,
-  publishMotionPolicyWarning,
-  warnJogMotionPolicy,
-} from './laser-jog-warnings';
+import { jogXyTarget, publishMotionPolicyWarning, warnJogMotionPolicy } from './laser-jog-warnings';
 import { appendStepJog, canQueueStepJog, type StepJogQueue } from './step-jog-queue';
 import {
   assertManualMotionNotCancelled,

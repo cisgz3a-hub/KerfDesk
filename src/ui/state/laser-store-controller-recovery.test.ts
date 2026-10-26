@@ -295,12 +295,15 @@ describe('controller recovery on the existing connection', () => {
     const f = await connect();
     await startTestLaserJob('G1 X1 S100\nG1 X2 S100');
     f.controls.state = 'Alarm';
+    const modalReads = f.writes.filter((line) => line === '$G\n').length;
 
     await useLaserStore.getState().stopJob();
     await vi.advanceTimersByTimeAsync(3_000);
 
     expect(useLaserStore.getState().controllerQualification.kind).toBe('qualified');
-    expect(f.settingsReads()).toBe(2);
+    // Abort's own greeting kept the settings, so only `$G` is read (ADR-648).
+    expect(f.settingsReads()).toBe(1);
+    expect(f.writes.filter((line) => line === '$G\n')).toHaveLength(modalReads + 1);
     expectSameConnection(f);
   });
 

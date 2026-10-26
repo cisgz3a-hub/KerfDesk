@@ -99,7 +99,9 @@ describe('queued step jogs on GRBL', () => {
     await jog({ dx: 3, feed: 1000 }, undefined, STEP);
     // Queued steps wait in KerfDesk, not in the controller's buffer.
     expect(jogLines()).toEqual(['$J=G91 G21 X1.000 F1000\n']);
-    expect(outstandingStepJogs(getMotionOperation()!)).toBe(MAX_STEP_JOGS_PER_OPERATION);
+    expect(outstandingStepJogs(useLaserStore.getState().motionOperation!)).toBe(
+      MAX_STEP_JOGS_PER_OPERATION,
+    );
     expect(canQueueStepJog(useLaserStore.getState())).toBe(false);
     await expect(jog({ dx: 4, feed: 1000 }, undefined, STEP)).rejects.toThrow();
 
@@ -117,6 +119,29 @@ describe('queued step jogs on GRBL', () => {
     await drain();
     connection.emitLine(IDLE);
     await drain();
+    expect(getMotionOperation()).toBeNull();
+  });
+
+  it('runs a step pressed after the planner-drain marker went out', async () => {
+    const { jog } = useLaserStore.getState();
+    await jog({ dx: 1, feed: 1000 }, undefined, STEP);
+    await settleStep();
+    expect(writes).toContain(SETTLE);
+    expect(getMotionOperation()?.awaitingSettlementAck).toBe(true);
+
+    await jog({ dx: 2, feed: 1000 }, undefined, STEP);
+    connection.emitLine('ok');
+    await drain();
+    connection.emitLine(IDLE);
+    await drain();
+    expect(jogLines()).toEqual(['$J=G91 G21 X1.000 F1000\n', '$J=G91 G21 X2.000 F1000\n']);
+
+    await settleStep();
+    connection.emitLine('ok');
+    await drain();
+    connection.emitLine(IDLE);
+    await drain();
+    expect(writes.filter((write) => write === SETTLE)).toHaveLength(2);
     expect(getMotionOperation()).toBeNull();
   });
 
@@ -145,7 +170,7 @@ describe('queued step jogs on GRBL', () => {
 
   it('starts no queue for a press-and-hold or an owned jog', async () => {
     await useLaserStore.getState().jog({ dx: 300, feed: 3000 });
-    expect(getMotionOperation()?.stepJogQueue).toBeUndefined();
+    expect(useLaserStore.getState().motionOperation?.stepJogQueue).toBeUndefined();
     expect(canQueueStepJog(useLaserStore.getState())).toBe(false);
   });
 

@@ -39,13 +39,16 @@ export function statusRequestActions(
 /** Sends the driver's complete-report request once, where it has one. grblHAL
  * answers 0x87 with every report field, so WCO arrives now instead of after up
  * to ten idle reports (protocol audit P-4, ADR-672). Inert to the planner and
- * owes no acknowledgement; a failed write leaves the ordinary poll running. */
+ * owes no acknowledgement; a failed write leaves the ordinary poll running.
+ * Like the background poll, it stays silent while an operation owns polling:
+ * an Alarm report in the middle of a `$$` read would invalidate that read. */
 export async function sendCompleteStatusRequest(
+  state: LaserState,
   driver: ControllerDriver,
   write: StatusRequestWrite,
 ): Promise<void> {
   const query = driver.realtime.completeStatusQuery;
-  if (query == null) return;
+  if (query == null || controllerOperationOwnsPolling(state)) return;
   try {
     await write(query, undefined, 'system');
   } catch {
