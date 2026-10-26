@@ -10,6 +10,7 @@ import type { MachineExecutionContext } from './machine-execution';
 import { operationIsTerminal, type OwnedMachineOperation } from './machine-operation-state';
 import type { MachineCommand } from './machine-types';
 import { MachineRefusal } from './machine-actions';
+import { cancelOwnedMotionOnce } from './machine-owned-operation';
 import { RemoteFault } from './fault';
 
 /**
@@ -109,16 +110,12 @@ export function releaseHeldMotion(operation: OwnedMachineOperation): void {
     if (operation.committed === false) operation.controller.abort();
     return;
   }
-  const state = useLaserStore.getState();
-  if (
-    state.controllerSessionEpoch !== operation.controllerEpoch ||
-    state.motionOperation?.operationId !== operation.motionId
-  )
-    return;
-  void state.cancelJog().catch(() => {
-    operation.state = 'unknown';
-    operation.message = 'The held jog stop could not be confirmed. Check the machine on the PC.';
-  });
+  // A release reaches here from jog_hold_stop, the socket, the dead-man and the
+  // post-dispatch check; only the first sends the Cancel (ADR-585 Amendment 1).
+  cancelOwnedMotionOnce(
+    operation,
+    'The held jog stop could not be confirmed. Check the machine on the PC.',
+  );
 }
 
 type Hold = {
