@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import type { CncContourPass, CncGroup, CncPass } from '../job/job';
 import { parseGrblCncCoordinate } from './cnc-grbl-coordinate-parser';
 import { formatCncCoordinateMm } from './cnc-output-precision';
-import { cncGroupMaximumDepth, cncGroupMaximumDepthMm } from './cnc-group-maximum-depth';
+import {
+  cncGroupMaximumDepth,
+  cncGroupMaximumDepthMm,
+  cncToolSectionMaximumDepthsMm,
+} from './cnc-group-maximum-depth';
 
 function contour(zMm: number, xs: ReadonlyArray<number>): CncContourPass {
   return {
@@ -138,5 +142,20 @@ describe('cncGroupMaximumDepthMm emitted depth', () => {
     ],
   ] as const)('ignores an emissionless %s', (_name, pass) => {
     expect(cncGroupMaximumDepthMm(group([pass]))).toBe(0);
+  });
+});
+
+describe('cncToolSectionMaximumDepthsMm', () => {
+  const cut = (toolId: string, zMm: number): CncGroup => ({
+    ...group([contour(zMm, [0, 10])]),
+    toolId,
+  });
+  it('takes the deepest cut of each contiguous bit section, as the emitter splits them at M0', () => {
+    const job = { groups: [cut('a', -3), cut('a', -18), cut('b', -8), cut('a', -2)] };
+    expect(cncToolSectionMaximumDepthsMm(job)).toEqual([18, 8, 2]);
+  });
+  it('keeps an unrepresentable depth visible instead of dropping it', () => {
+    const job = { groups: [cut('a', -3), cut('a', Number.NaN)] };
+    expect(cncToolSectionMaximumDepthsMm(job)).toEqual([Number.NaN]);
   });
 });
