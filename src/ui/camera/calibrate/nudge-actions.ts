@@ -65,7 +65,8 @@ export async function photographNudgeRing(args: {
   if (model === undefined || isHeadCameraModel(model)) {
     return {
       kind: 'failed',
-      message: unusableCalibrationReason() ?? 'This fix needs a calibrated camera fixed above the bed.',
+      message:
+        unusableCalibrationReason() ?? 'This fix needs a calibrated camera fixed above the bed.',
     };
   }
   const frame = await (args.capture ?? captureSourceFrame)(args.source).catch(() => null);

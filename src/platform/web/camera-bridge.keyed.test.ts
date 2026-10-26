@@ -6,7 +6,8 @@
 
 import { createHmac, randomBytes } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createHttpCameraBridge, type CameraBridgeConnection } from './camera-bridge';
+import type { CameraBridgeConnection } from '../types';
+import { createHttpCameraBridge } from './camera-bridge';
 
 const ORIGIN = 'http://127.0.0.1:51731';
 const LOGIN = 'rtsp://admin:S3cret@192.168.1.10:554/live';
@@ -130,7 +131,10 @@ describe('the desktop window checks its camera bridge before naming a camera', (
     vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('failed to fetch'));
     const bridge = createHttpCameraBridge(async () => keyed);
     const result = await bridge.probeRtspCamera({ url: LOGIN });
-    expect(result).toEqual({ kind: 'unavailable', reason: expect.stringContaining('not answering') });
+    expect(result).toEqual({
+      kind: 'unavailable',
+      reason: expect.stringContaining('not answering'),
+    });
     expect(JSON.stringify(result)).not.toContain('KerfDesk Desktop');
   });
 });

@@ -475,6 +475,23 @@ export type CameraBridgeFrameSource =
   | { readonly kind: 'invalid'; readonly reason: string }
   | { readonly kind: 'unavailable'; readonly reason: string };
 
+/**
+ * How the window reaches the camera bridge, asked afresh before each camera
+ * request (ADR-141 Amendment 2).
+ */
+export type CameraBridgeConnection =
+  /** Local development: a bridge with no keys, taken on trust. */
+  | { readonly kind: 'open'; readonly origin: string }
+  /** The desktop app: this launch's keys, from main over app://app. */
+  | {
+      readonly kind: 'keyed';
+      readonly origin: string;
+      readonly proofKey: string;
+      readonly clientToken: string;
+    }
+  /** Main says the bridge is not running, and why. */
+  | { readonly kind: 'unavailable'; readonly reason: string };
+
 export type CameraBridgeAdapter = {
   readonly isSupported: () => boolean;
   readonly probeRtspCamera: (req: CameraBridgeProbeRequest) => Promise<CameraBridgeProbeResult>;

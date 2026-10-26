@@ -56,7 +56,9 @@ describe('the camera panel hears why the bridge is not running (audit v2 04-P2-1
     await camera.setRunning(true);
     expect(camera.status()).toEqual({
       kind: 'failed',
-      reason: expect.stringContaining('Another program on this computer is already using port 51731'),
+      reason: expect.stringContaining(
+        'Another program on this computer is already using port 51731',
+      ),
     });
     // The program holding the port closed: the next camera connect starts it.
     await camera.retry();

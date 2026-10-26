@@ -5,10 +5,7 @@
 import { act } from 'react';
 import type * as CalibrationActions from './calibration-actions';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  savedCameraModel,
-  unframedCameraModel,
-} from '../../../core/camera/model/model-fixtures';
+import { savedCameraModel, unframedCameraModel } from '../../../core/camera/model/model-fixtures';
 import { clickControl, control, mountControl } from '../../image-editor/control-audit-test-support';
 import { useStore } from '../../state';
 import { useCameraStore } from '../../state/camera-store';
@@ -346,7 +343,7 @@ describe('camera calibration photo ownership', () => {
     expect(useStore.getState().project.device.cameraModel).toEqual(savedCameraModel());
   });
 
-  it('does not check a calibration saved without its bed frame, so no refit gets today’s (M2-P3-3)', async () => {
+  it('never checks a calibration with no bed frame (meta audit M2-P3-3)', async () => {
     // Meta audit M2-P3-3: checked in today's frame after a bed change, the old
     // target read as no drift, and saving the refit stamped the wrong frame.
     const base = unframedCameraModel();
@@ -364,7 +361,7 @@ describe('camera calibration photo ownership', () => {
       targetBedFrame: null,
     });
     await mountControl(<CameraCalibrationWizard />);
-    expect(document.body.textContent).toContain('choose Confirm bed and origin in the Camera panel');
+    expect(document.body.textContent).toContain('choose Confirm bed and origin');
     expect(photographTarget).not.toHaveBeenCalled();
     expect(useStore.getState().project.device.cameraModel).toBe(saved);
   });

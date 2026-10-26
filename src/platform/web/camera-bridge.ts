@@ -11,6 +11,7 @@
 
 import type {
   CameraBridgeAdapter,
+  CameraBridgeConnection,
   CameraBridgeFrameSource,
   CameraBridgeHealth,
   CameraBridgeProbeRequest,
@@ -33,20 +34,6 @@ const BRIDGE_NOT_ANSWERING_REASON =
 const NOT_OUR_BRIDGE_REASON =
   "Another program is answering on the port KerfDesk uses for network cameras, so KerfDesk did not send it the camera's address or login. Close that program, then restart KerfDesk.";
 const INVALID_RESPONSE_REASON = 'The local camera bridge returned an invalid response.';
-
-/** How the window reaches the bridge, asked afresh before each camera request. */
-export type CameraBridgeConnection =
-  /** Local development: a bridge with no keys, taken on trust. */
-  | { readonly kind: 'open'; readonly origin: string }
-  /** The desktop app: this launch's keys, from main over app://app. */
-  | {
-      readonly kind: 'keyed';
-      readonly origin: string;
-      readonly proofKey: string;
-      readonly clientToken: string;
-    }
-  /** Main says the bridge is not running, and why. */
-  | { readonly kind: 'unavailable'; readonly reason: string };
 
 export type CameraBridgeConnect = () => Promise<CameraBridgeConnection>;
 

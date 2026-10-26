@@ -118,9 +118,12 @@ describe('camera frame proxy over the real bridge server', () => {
   });
 
   it('takes a camera address only in a POST body', async () => {
-    const get = await fetch(bridgeUrl(`/frame-source?url=${encodeURIComponent(upstreamUrl('/x'))}`), {
-      headers: { Origin: TRUSTED_ORIGIN },
-    });
+    const get = await fetch(
+      bridgeUrl(`/frame-source?url=${encodeURIComponent(upstreamUrl('/x'))}`),
+      {
+        headers: { Origin: TRUSTED_ORIGIN },
+      },
+    );
     expect(get.status).toBe(405);
     const garbled = await fetch(bridgeUrl('/frame-source'), {
       method: 'POST',

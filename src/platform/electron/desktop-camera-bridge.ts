@@ -1,20 +1,16 @@
-// The desktop window's camera bridge (rolling audit v2 04-P2-1, ADR-141
-// Amendment 2): before each camera request it asks main, over app://app, where
-// the bridge is and for this launch's keys, or why it is not running. A port
-// another program took is then named as such, instead of "available only in
-// KerfDesk Desktop", and the request checks the bridge's proof before it
-// sends a camera address.
+// The desktop window's camera bridge connection (rolling audit v2 04-P2-1,
+// ADR-141 Amendment 2): before each camera request the window asks main, over
+// app://app, where the bridge is and for this launch's keys, or why it is not
+// running. A port another program took is then named as such, instead of
+// "available only in KerfDesk Desktop". The app root hands this to the web
+// bridge client, which checks the bridge's proof before it sends a camera
+// address.
 
-import type { CameraBridgeAdapter } from '../types';
-import { createHttpCameraBridge, type CameraBridgeConnection } from '../web/camera-bridge';
+import type { CameraBridgeConnection } from '../types';
 
 const CONNECTION_URL = 'app://app/api/camera-bridge/connection';
 const MAIN_NOT_ANSWERING_REASON =
   'KerfDesk could not find out whether its network-camera bridge is running. Restart KerfDesk.';
-
-export function createDesktopCameraBridge(fetcher: typeof fetch = fetch): CameraBridgeAdapter {
-  return createHttpCameraBridge(() => desktopCameraBridgeConnection(fetcher));
-}
 
 export async function desktopCameraBridgeConnection(
   fetcher: typeof fetch = fetch,

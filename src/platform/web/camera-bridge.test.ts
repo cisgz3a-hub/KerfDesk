@@ -165,12 +165,14 @@ describe('web RTSP camera bridge client', () => {
   });
 
   it('registers a frame source by body and takes the frame URL the bridge names it by', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(
-        JSON.stringify({ kind: 'ok', frameUrl: 'http://127.0.0.1:51731/frame.jpg?source=abc' }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
-      ),
-    );
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response(
+          JSON.stringify({ kind: 'ok', frameUrl: 'http://127.0.0.1:51731/frame.jpg?source=abc' }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
     const bridge = createHttpCameraBridge('http://127.0.0.1:51731');
     const cameraUrl = 'http://user:pw@192.168.10.1:8080/media/getCapturePhoto?a=b';
     expect(await bridge.registerFrameSource(cameraUrl)).toEqual({

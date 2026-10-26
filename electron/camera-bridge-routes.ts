@@ -48,7 +48,10 @@ export function withCameraBridgeRoutes(
             proofKey: bridge.keys.proofKey,
             clientToken: bridge.keys.clientToken,
           }
-        : { kind: 'unavailable', reason: status.kind === 'failed' ? status.reason : STOPPED_REASON };
+        : {
+            kind: 'unavailable',
+            reason: status.kind === 'failed' ? status.reason : STOPPED_REASON,
+          };
     return new Response(JSON.stringify(body), {
       status: 200,
       headers: { ...HEADERS, 'Content-Type': 'application/json' },

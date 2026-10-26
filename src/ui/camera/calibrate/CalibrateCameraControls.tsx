@@ -83,7 +83,10 @@ export function CalibrateCameraControls(): JSX.Element {
         </p>
       )}
       {frameNote === null ? null : (
-        <CameraFrameNotice note={frameNote} style={frameNote.usable ? noteStyle : frameIssueStyle} />
+        <CameraFrameNotice
+          note={frameNote}
+          style={frameNote.usable ? noteStyle : frameIssueStyle}
+        />
       )}
     </div>
   );

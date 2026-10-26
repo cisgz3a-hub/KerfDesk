@@ -15,13 +15,14 @@ import {
   createDesktopSerialAdapter,
   createDesktopMachineNetwork,
   createDesktopAiAssistant,
-  createDesktopCameraBridge,
+  desktopCameraBridgeConnection,
   createDesktopSupportLogReader,
   createDesktopWindowCommands,
   isElectronRenderer,
 } from '../../platform/electron';
 import type { PlatformAdapter } from '../../platform/types';
 import { webAdapter } from '../../platform/web';
+import { createHttpCameraBridge } from '../../platform/web/camera-bridge';
 import { ErrorBoundary } from '../common/ErrorBoundary';
 // Design tokens + shared chrome classes (ADR-047). Imported exactly once,
 // here — jsdom tests never load main.tsx, so styling stays out of unit tests.
@@ -74,7 +75,7 @@ const adapter: PlatformAdapter = isElectronRenderer()
             desktopWindow: createDesktopWindowCommands(),
             aiAssistant: createDesktopAiAssistant(),
             machineNetwork: createDesktopMachineNetwork(),
-            cameraBridge: createDesktopCameraBridge(),
+            cameraBridge: createHttpCameraBridge(() => desktopCameraBridgeConnection()),
           }
         : {}),
     }

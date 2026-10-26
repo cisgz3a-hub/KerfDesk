@@ -112,9 +112,9 @@ describe('a calibration in the bed frame now', () => {
       ),
     });
     // An origin change on a framed record cannot be confirmed away.
-    expect(cameraBedFrameNote(calibrated, { ...FRONT_LEFT_400, origin: 'rear-left' })).not.toHaveProperty(
-      'frameUnrecorded',
-    );
+    expect(
+      cameraBedFrameNote(calibrated, { ...FRONT_LEFT_400, origin: 'rear-left' }),
+    ).not.toHaveProperty('frameUnrecorded');
   });
 
   it('uses an older record once its frame is confirmed, and follows a later bed change exactly', () => {

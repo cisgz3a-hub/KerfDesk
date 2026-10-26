@@ -84,7 +84,10 @@ async function installControlledRtspBridge(page: Page): Promise<{
       await route.fulfill({
         contentType: 'application/json',
         headers: corsHeaders,
-        body: JSON.stringify({ kind: 'ok', frameUrl: 'http://127.0.0.1:51731/frame.jpg?source=e2e' }),
+        body: JSON.stringify({
+          kind: 'ok',
+          frameUrl: 'http://127.0.0.1:51731/frame.jpg?source=e2e',
+        }),
       });
       return;
     }
