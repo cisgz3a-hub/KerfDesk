@@ -53,10 +53,10 @@ export function insideEdgeWall(
   return Math.min(point.x, map.widthMm - point.x, point.y, map.heightMm - point.y) > EDGE_WALL_MM;
 }
 
-export function featurePasses(
+export function featurePasses<Pass extends CncPass>(
   map: Heightmap,
-  passes: ReadonlyArray<CncPass>,
-): ReadonlyArray<CncPass> {
+  passes: ReadonlyArray<Pass>,
+): ReadonlyArray<Pass> {
   return passes.filter(
     (pass) => pass.kind === 'path3d' && pass.points.every((point) => insideEdgeWall(map, point)),
   );
