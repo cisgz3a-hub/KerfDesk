@@ -1,4 +1,3 @@
-// Not in the job barrel: its export count is ratcheted (ADR-015).
 import {
   generateToneCalibrationWedge,
   type ToneWedgeOptions,

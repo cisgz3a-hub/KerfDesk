@@ -50,7 +50,7 @@ export function ToneWedgeStep(props: {
           <select
             className="lf-select"
             aria-label="Wedge photo processing"
-            title="The photo processing the wedge is burned with"
+            title="How the wedge's grey patches are turned into laser dots"
             value={draft.ditherAlgorithm}
             onChange={text('ditherAlgorithm')}
           >
@@ -66,7 +66,7 @@ export function ToneWedgeStep(props: {
           <select
             className="lf-select"
             aria-label="Wedge material marking"
-            title="Whether the laser darkens or lightens this material"
+            title="Whether the laser leaves dark marks on a light surface or light marks on a dark one"
             value={draft.marking}
             onChange={text('marking')}
           >

@@ -68,7 +68,7 @@ export function ToneRecordStep(props: {
         <input
           className="lf-input"
           aria-label="Calibrated material"
-          title="The material this calibration is for"
+          title="Name the material this calibration is for"
           placeholder="For example: Birch plywood 3 mm"
           value={record.material}
           maxLength={60}
@@ -112,7 +112,7 @@ function ToneRecordRow(props: {
           step={1}
           value={props.seen}
           aria-label={`Patch ${label} looks like`}
-          title="Drag to how dark this patch came out"
+          title="Drag to the tone this patch actually burned"
           className="lf-tone-calibration__slider"
           style={{ background: `linear-gradient(${ramp})` }}
           onChange={(event) => props.onChange(Number(event.target.value))}
