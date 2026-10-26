@@ -17,8 +17,11 @@
 // merge, or an outside cut cannot fit). Witnesses that share a piece, or sit
 // on consecutive pieces of one path, are one feature; features shorter than
 // half the threshold are dropped as specks unless they pinch two paths (or
-// two far-apart parts of one path) together. Work is counted, so a huge job
-// stops early and says so.
+// two far-apart parts of one path) together. A request for whole shapes (CNC,
+// ADR-433 Amendment 3) keeps every feature on a closed path the threshold
+// cannot enter anywhere, however small: a bit drops such a hole whole, so it is
+// the shape, not a speck on one. Work is counted, so a huge job stops early
+// and says so.
 
 import {
   DEFAULT_MIN_FEATURE_BUDGET,
@@ -48,6 +51,10 @@ export type MinFeatureRequest = {
   readonly checkGaps: boolean;
   /** Shortest feature reported, mm; default MIN_EXTENT_FACTOR × threshold. */
   readonly minExtentMm?: number;
+  /** Report every closed path narrower than the threshold across its whole
+   * bounding box, however small, as one feature (CNC: the bit leaves such a
+   * shape out whole; ADR-433 Amendment 3). */
+  readonly wholeShapes?: boolean;
 };
 
 export type MinFeatureAnalysis = {
@@ -70,8 +77,11 @@ const TOUCH_EPSILON_MM = 1e-9;
 /** Features whose witness chords span less than this many thresholds are
  * specks the beam or bit rounds off like a corner (a traced hair spike, a
  * pixel notch), not parts, bridges or gaps. A small round hole still spans
- * its own diameter, so half the threshold keeps every hole the check is for. */
+ * its own diameter, so half the threshold keeps every hole at least that wide;
+ * a whole-shapes request keeps the smaller ones too. */
 export const MIN_EXTENT_FACTOR = 0.5;
+/** A closed path with less area than this (mm²) encloses nothing to report. */
+const WHOLE_SHAPE_MIN_AREA_MM2 = 1e-9;
 /** A witness between two points of one path at least this many thresholds
  * apart along it is a pinch, never a speck: a speck's witnesses stay within
  * about one threshold of boundary around its tip. */
@@ -191,8 +201,51 @@ class PairScanner {
     const material = this.isMaterial(p, q, witness, distance / 2);
     if (material === null) return false;
     const clusters = material ? this.widthsIfRequested() : this.gapsIfRequested();
-    const pinch = arc >= PINCH_ARC_FACTOR * this.request.thresholdMm;
+    const pinch = arc >= PINCH_ARC_FACTOR * this.request.thresholdMm || this.onWholeShape(p, q);
     clusters?.record(p, q, distance, { px, py, qx, qy }, pinch);
+    return true;
+  }
+
+  /** Both pieces lie on one closed path the threshold cannot enter anywhere. */
+  private onWholeShape(p: number, q: number): boolean {
+    const path = num(this.index.path, p);
+    return path === this.index.path[q] && this.isWholeShape(path);
+  }
+
+  private isWholeShape(path: number): boolean {
+    const index = this.index;
+    if (this.request.wholeShapes !== true || index.pathClosed[path] !== true) return false;
+    const width = num(index.pathMaxX, path) - num(index.pathMinX, path);
+    const height = num(index.pathMaxY, path) - num(index.pathMinY, path);
+    // The widest disk inside a shape fits inside its bounding box.
+    return Math.min(width, height) < this.request.thresholdMm;
+  }
+
+  /** A whole shape no witness pair found (a triangle: each pair of its edges
+   * meets at a corner) is one feature at the centre of its box, as wide as
+   * 4 · area / perimeter, its inscribed circle's diameter when the circle
+   * touches every edge. False only when the budget ran out. */
+  recordUnwitnessedShapes(): boolean {
+    const index = this.index;
+    for (let path = 0; path < index.pathClosed.length; path += 1) {
+      if (!this.isWholeShape(path)) continue;
+      const first = num(index.pathStart, path);
+      const end = path + 1 < index.pathStart.length ? num(index.pathStart, path + 1) : index.count;
+      const area = Math.abs(num(index.pathArea, path));
+      const perimeter = num(index.pathLength, path);
+      if (first >= end || area < WHOLE_SHAPE_MIN_AREA_MM2 || perimeter <= 0) continue;
+      const material = this.sides.interiorIsMaterial(path);
+      if (material === null) return false;
+      const clusters = material ? this.widthsIfRequested() : this.gapsIfRequested();
+      if (clusters === null || clusters.flaggedIn(first, end)) continue;
+      const chord = {
+        px: num(index.pathMinX, path),
+        py: num(index.pathMinY, path),
+        qx: num(index.pathMaxX, path),
+        qy: num(index.pathMaxY, path),
+      };
+      clusters.record(first, first, (4 * area) / perimeter, chord, true);
+    }
     return true;
   }
 
@@ -281,7 +334,7 @@ export function analyzeMinimumFeatures(
   const meter = new MinFeatureWorkMeter(budget);
   const index = buildPieceIndex(paths, request.thresholdMm, meter);
   const scanner = new PairScanner(index, request, meter);
-  const scanned = scanner.scan();
+  const scanned = scanner.scan() && scanner.recordUnwitnessedShapes();
   const minExtent = request.minExtentMm ?? MIN_EXTENT_FACTOR * request.thresholdMm;
   const next = (piece: number): number => nextPieceOnPath(index, piece);
   scanner.widths.joinAlongPaths(next);
