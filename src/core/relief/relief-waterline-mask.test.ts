@@ -18,6 +18,7 @@ import {
   ballKernel,
   CELL_MM,
   exactSurface,
+  featurePasses,
   reachesIntoWall,
   sampledMap,
 } from './relief-waterline.test-support';
@@ -131,7 +132,10 @@ function levelsOf(passes: ReadonlyArray<CncPass>): ReadonlyArray<number> {
 
 describe('masked waterline (ADR-484)', { timeout: 60_000 }, () => {
   it('circles excluded stock at every level down to the floor', () => {
-    const passes = planned(squareIslandMap());
+    // The floor's wall at the map's edge is circled too (ADR-412 Amendment
+    // 2); the island stands well inside it.
+    const map = squareIslandMap();
+    const passes = featurePasses(map, planned(map));
 
     // One stay-down pass down to the last level above the floor. It starts
     // at 0.8 mm: 0.4 mm down the ball stands clear of the stock on its tip's

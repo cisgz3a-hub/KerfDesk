@@ -19,6 +19,7 @@ import {
 } from '../../core/scene';
 import { parseDxf } from '../dxf';
 import { emitGcode } from './emit-gcode';
+import { litSamples } from './laser-lit-samples.test-support';
 import { prepareOutput } from './prepare-output';
 
 const DEVICE = DEFAULT_DEVICE_PROFILE;
@@ -66,66 +67,6 @@ function project(layers: ReadonlyArray<Layer>, objects: ReadonlyArray<SceneObjec
   return { ...createProject(DEVICE), scene: { layers: [...layers], objects: [...objects] } };
 }
 
-/** Points every 0.05 mm along every lit feed move (G1/G2/G3 with the beam on
- * and S above zero) of GRBL output, in scene coordinates. */
-function litSamples(gcode: string): Vec2[] {
-  const samples: Vec2[] = [];
-  const state = { at: { x: 0, y: 0 } as Vec2, motion: 0, power: 0, beam: false };
-  for (const raw of gcode.split('\n')) {
-    const words = readWords(raw, state);
-    state.power = words.get('S') ?? state.power;
-    if (!words.has('X') && !words.has('Y')) continue;
-    const to = { x: words.get('X') ?? state.at.x, y: words.get('Y') ?? state.at.y };
-    if (state.motion !== 0 && state.beam && state.power > 0)
-      samples.push(...sampleMove(state.at, to, state.motion, words));
-    state.at = to;
-  }
-  return samples.map((point) => toSceneCoords(point, DEVICE));
-}
-
-/** The line's axis and parameter words; G0-G3 and M3/M4/M5 update `state`. */
-function readWords(raw: string, state: { motion: number; beam: boolean }): Map<string, number> {
-  const line = raw
-    .replace(/\(.*?\)/g, '')
-    .replace(/;.*$/, '')
-    .toUpperCase();
-  const words = new Map<string, number>();
-  for (const [, letter = '', value] of line.matchAll(/([A-Z])\s*([-+]?\d*\.?\d+)/g)) {
-    const code = Number(value);
-    if (letter === 'G') {
-      if (code <= 3) state.motion = code;
-    } else if (letter === 'M') spindle(code, state);
-    else words.set(letter, code);
-  }
-  return words;
-}
-
-function spindle(code: number, state: { beam: boolean }): void {
-  if (code === 3 || code === 4) state.beam = true;
-  else if (code === 5) state.beam = false;
-}
-
-function sampleMove(from: Vec2, to: Vec2, motion: number, words: Map<string, number>): Vec2[] {
-  if (motion === 1) {
-    const steps = Math.max(1, Math.ceil(Math.hypot(to.x - from.x, to.y - from.y) / 0.05));
-    return Array.from({ length: steps + 1 }, (_, step) => ({
-      x: from.x + ((to.x - from.x) * step) / steps,
-      y: from.y + ((to.y - from.y) * step) / steps,
-    }));
-  }
-  const center = { x: from.x + (words.get('I') ?? 0), y: from.y + (words.get('J') ?? 0) };
-  const radius = Math.hypot(from.x - center.x, from.y - center.y);
-  const start = Math.atan2(from.y - center.y, from.x - center.x);
-  let sweep = Math.atan2(to.y - center.y, to.x - center.x) - start;
-  if (motion === 2 && sweep >= 0) sweep -= 2 * Math.PI;
-  if (motion === 3 && sweep <= 0) sweep += 2 * Math.PI;
-  const steps = Math.max(1, Math.ceil((Math.abs(sweep) * radius) / 0.05));
-  return Array.from({ length: steps + 1 }, (_, step) => {
-    const angle = start + (sweep * step) / steps;
-    return { x: center.x + radius * Math.cos(angle), y: center.y + radius * Math.sin(angle) };
-  });
-}
-
 /** Deeper than `depth` inside the rectangle, measured from its nearest side. */
 function insideRect(point: Vec2, min: Vec2, max: Vec2, depth: number): boolean {
   return (
@@ -168,7 +109,7 @@ describe('03-P1-2: a plate drawn as DXF LINE entities', () => {
   ] as const) {
     it(`never leads the hole into the plate (${style} leads)`, () => {
       const input = project([layer(leads)], [importedPlate()]);
-      const lit = litSamples(emitGcode(input).gcode);
+      const lit = litSamples(emitGcode(input).gcode, DEVICE);
       expect(lit.length).toBeGreaterThan(0);
       expect(lit.filter(inPlate)).toEqual([]);
     });
@@ -195,7 +136,7 @@ describe('03-P1-2: a plate drawn as DXF LINE entities', () => {
     const input = project([layer(ARC_LEADS)], [importedPlate(0.1)]);
     const job = prepared(input);
     expect(openSideUnknown(job)).toBe(1);
-    expect(litSamples(emitGcode(input).gcode).filter(inPlate)).toEqual([]);
+    expect(litSamples(emitGcode(input).gcode, DEVICE).filter(inPlate)).toEqual([]);
   });
 
   it('reads crossing lines that overshoot the corners as closing the plate', () => {
@@ -251,7 +192,7 @@ describe('03-P1-2: a plate drawn as DXF LINE entities', () => {
       ],
     );
     expect(openSideUnknown(prepared(input))).toBe(1);
-    expect(litSamples(emitGcode(input).gcode).filter(inPlate)).toEqual([]);
+    expect(litSamples(emitGcode(input).gcode, DEVICE).filter(inPlate)).toEqual([]);
   });
 });
 
@@ -308,7 +249,7 @@ describe('03-P1-3: Remove overlapping lines between two parts that share an edge
     ] as const) {
       it(`keeps every lead out of both parts (${style} leads, ${passes} pass)`, () => {
         const input = sharedEdgeProject({ ...leads, passes });
-        const lit = litSamples(emitGcode(input).gcode);
+        const lit = litSamples(emitGcode(input).gcode, DEVICE);
         expect(lit.length).toBeGreaterThan(0);
         expect(lit.filter((point) => inA(point) || inB(point))).toEqual([]);
       });
@@ -345,7 +286,8 @@ describe('03-P2-9: kerf and order of a DXF plate drawn as LINE entities', () => 
     const issue = preflight.issues.find((found) => found.code === 'line-open-outline');
     expect(issue?.message).toBe(
       'Layer "Cut": 1 outline is drawn as open paths whose ends meet, so it is cut as open ' +
-        'lines: no kerf offset and the shapes inside are not cut first. Select it and use ' +
+        'lines: no kerf offset, the shapes inside are kerf-offset as if it did not hold them ' +
+        'and the shapes inside are not cut first. Select it and use ' +
         'Tools > Join paths (gap up to 0.5 mm) to close it.',
     );
   });

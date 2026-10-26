@@ -58,8 +58,9 @@ import { hasContributingFocusMotion } from '../../core/preflight/focus-contribut
 import { contourEntryBoundsForDevice, withContourEntryBounds } from '../../core/job/contour-entry';
 import { placeCncParks } from '../../core/job/job-origin';
 import { placeLaserFinish } from '../../core/job/laser-finish';
-import { applyLaserLeads } from '../../core/job/apply-laser-leads';
+import { applyLaserLeads, type LeadOutputScope } from '../../core/job/apply-laser-leads';
 import { laserLeadOptions } from '../../core/job/laser-lead-rotary';
+import { withRotaryAnchor } from '../../core/job/rotary-job';
 import {
   CURRENT_LASER_POWER_SCALE_VERSION,
   type LaserPowerScaleVersion,
@@ -287,13 +288,33 @@ export function completePreparedOutput(
     // ADR-626: leads join each contour where the beam really starts, so they
     // follow the planner and the job start point. A job without leads is
     // returned as is. The scrap side is judged among the whole scene's
-    // contours, so the output scope cannot change it (Amendment 1).
-    job: applyLaserLeads(started, {
-      ...laserLeadOptions(input.project.device, input.project.machine, entryBounds),
-      scene: input.sourceProject.scene,
-    }),
+    // contours, so the output scope cannot change it (Amendment 1), and the
+    // parts the output leaves uncut are kept clear of too (Amendment 10). A
+    // placed rotary job keeps its anchor's Y (ADR-127 Amendment 1).
+    job: withRotaryAnchor(
+      applyLaserLeads(started, {
+        ...laserLeadOptions(input.project.device, input.project.machine, entryBounds),
+        scene: input.sourceProject.scene,
+        output: leadOutputScope(input.project, offset),
+      }),
+      input.project.device,
+      input.project.machine,
+      input.options.jobOrigin,
+    ),
     jobOriginOffset: offset,
     advisories: input.advisories,
+  };
+}
+
+// The artwork the output cuts, and the scene's place in the job: compile maps
+// artwork to machine coordinates, and the job origin then shifts the job.
+function leadOutputScope(output: Project, offset: Vec2): LeadOutputScope {
+  return {
+    objectIds: new Set(output.scene.objects.map((object) => object.id)),
+    sceneToJob: (point) => {
+      const machine = toMachineCoords(point, output.device);
+      return { x: machine.x + offset.x, y: machine.y + offset.y };
+    },
   };
 }
 

@@ -560,3 +560,92 @@ Verification: `core/job/laser-lead-own-crossing.test.ts` rejects a lead along it
 past the join and allows one beside it; `core/job/laser-lead-sides.test.ts` keeps two whole cuts
 copies beside a split one; `core/job/laser-lead-pieces.test.ts` tests containment in a 400-point
 ring. The first two failed before this amendment.
+
+### Amendment 10 — parts left uncut, and outlines left open (2026-10-26)
+
+Meta audit v1 (`docs/audits/2026-10-23-meta-v1/M6-meta-clean-and-refuted.md`, on main `adf300522`)
+reproduced, end to end and confirmed by a refuter, three ways a lead or a kerf offset still went
+wrong without a word:
+
+1. **M6-P1-1.** Amendment 1 decision 1 left "the bed, clearance and free-end checks" with the
+   prepared job. With **Cut selected graphics**, or with the neighbours on an operation whose output
+   is off, the parts left for later were therefore no obstacle: a 2 mm line lead on a 20 mm plate
+   burned 0.914 mm into an unselected neighbour 0.5 mm away, and Job Review said nothing. Cutting
+   the whole job burned 0 mm and said a lead was left out. Clause 4 and "Why this is better" promise
+   that a lead never ends inside another part; no amendment narrowed that.
+2. **M6-P1-3.** Amendment 8 decision 2 read open lines as an outline only where their ends come
+   within 0.5 mm (in fact 0.48 mm, through the sampled round caps). An 80 mm plate drawn as one open
+   path with a corner left 0.5, 0.6, 1.0 or 3.0 mm open was no outline, so its r5 hole was read as
+   an outer contour and both of its leads burned 1.449 mm (arc) or 1.620 mm (line) into the plate,
+   with no warning. A gap limit is where detection stops, not proof the output past it is right.
+3. **M6-R1.** The same plate on a Line operation with a 0.2 mm Kerf Offset, left 0.6 to 1.0 mm
+   open, lost its kerf offset and had its hole offset outward (0.8 mm oversize), and the
+   `line-open-outline` warning of Amendment 8 decision 4, which fires at 0.3 mm, said nothing.
+
+Decision:
+
+1. **Every part on the sheet is an obstacle** (`core/job/laser-lead-sides.ts`,
+   `laser-lead-rings.ts`, `apply-laser-leads.ts`). Preparation tells `applyLaserLeads` which
+   artwork the output cuts and where the scene lies in the job (`toMachineCoords`, then the job
+   origin offset). The closed contours and open paths of every burning Line operation that the
+   output leaves uncut, because the artwork is outside **Cut selected graphics** or the operation's
+   output is off (a disabled sub-layer included), join the job's lines after its own, and their
+   closed contours join its rings. So a lead keeps the clearance from them, and its free end must
+   lie inside exactly the rings, uncut ones included, that hold its contour: it can no longer end
+   inside a part left for later. A contour the job cuts by some operation, or a copy of one (the
+   same scene contour, or one matched by shape, Amendment 1 decision 2), is left to the ring the job
+   cuts, so a kerf copy cannot block its own outline's leads. Uncut parts are taken as drawn, without
+   the kerf offset they will be cut with, and they are never led. On an active rotary they are
+   wrapped like the job's lines, and the job's ends stay the job's own. This narrows Amendment 1
+   decision 1: the bed check stays with the prepared job, and the clearance and free-end checks now
+   cover the whole sheet. A job whose output cuts everything, or whose scene asks for no leads,
+   prepares as before.
+2. **An outline left open is an outline** (`core/job/laser-lead-open-gaps.ts`,
+   `laser-lead-open-outlines.ts`). The open paths of every burning Line operation are chained where
+   their ends meet within 0.5 mm, by the pairing rule of Join paths (inclusive, so exactly 0.5 mm
+   joins). A chain is an outline when joining closes it, or when its two free ends lie closer
+   together than a tenth of its length (`OPEN_OUTLINE_SHARE`): it runs nearly all the way round what
+   it encloses, however many millimetres the gap is. Its region is the chain closed by the straight
+   line between its ends, as a fill closes an open path. A contour with a point in that region and
+   more than 0.25 mm from the outline's own lines (half the stroke width of decision 2 of Amendment
+   8, so a contour drawn on the lines is not inside them) gets no side under **Scrap side
+   (automatic)**: no leads, and the `laser-leads-side-unknown` warning with `aroundOpenPaths`, now
+   worded "those lines run all or nearly all the way round". This is in addition to the stroke union
+   of Amendment 8, which still reads lines that cross. A straight line, an L, a U with a whole side
+   missing and an arc short of about 330 degrees are not outlines. The fixed sides are unchanged.
+3. **The Line advisory names every outline left open** (`core/preflight/line-open-outline-issues.ts`).
+   `line-open-outline` counts the outlines of decision 2, chained per operation and settings as Join
+   paths would, when their artwork runs them with a kerf offset or leads, when they hold a closed
+   Line contour that inside-first would cut first, and now also when they hold a closed contour cut
+   with a kerf offset, since that contour is offset as if the outline did not hold it (a hole comes
+   out oversize). For an outline left open the message says how far apart its ends are and the gap
+   to give **Tools → Join paths**, rounded up to 0.1 mm; outlines whose ends meet keep the 0.5 mm
+   wording. It stays a warning (rule 7, ADR-565).
+
+Not covered: open lines that stop short of each other at two or more places, more than 0.5 mm each,
+do not chain into one outline, so a plate drawn as four lines each short of every corner is still
+read as open lines; decision 2 reads it only where the stroke union closes it. Neither does an open
+path that only reaches a tenth of its length or less from closing (a U, a 300-degree arc). Join paths
+closes both. Open lines that close a region only together with a closed shape's edge stay as
+Amendment 8 left them.
+
+Consequences: with **Cut selected graphics** or output switched off, a part's leads may be shortened
+or left out next to a part cut later, exactly as cutting the whole job would, and Job Review says
+so. A contour inside a nearly closed open path, such as a hole inside an open arc of more than
+about 330 degrees, now gets no automatic leads, with a warning, where it used to get a side by
+parity among closed shapes only. Kerf-offset shapes inside an open outline are now named in Job
+Review.
+
+Verification: `io/gcode/laser-leads-uncut-parts.test.ts` prepares a 20 mm plate with four
+neighbours 0.5 mm away, emits GRBL and reads the burn back: under Cut selected graphics, with the
+neighbours' operation output off, and with the selection placed at a user origin, no lit move
+enters a neighbour and Job Review reports the adjusted lead, while neighbours 5 mm away leave full
+leads. `io/gcode/laser-leads-open-gaps.test.ts` runs the M6 plate left 0.5, 0.6, 1.0 and 1.5 mm
+open with arc and line leads: no lit move enters the plate and one side-unknown warning is given;
+with a 0.2 mm kerf offset the advisory names the plate, the gap (0.6, 1 and 1.5 mm) and the hole
+offset as if the outline did not hold it. `core/job/laser-lead-open-gaps.test.ts` covers the share rule (a
+340-degree arc is an outline, a 300-degree one is not), chaining, a chain joining closes, lines,
+Ls and Us, and per-signature joining; `core/job/laser-lead-open-outlines.test.ts` covers gaps from
+0.4 to 3 mm, one open path, a U, a contour drawn on the lines and the uncovered every-corner case.
+Every case of the first two files except the far neighbours and the exactly-0.5 mm advisory failed
+before this amendment. Not qualified on a machine.

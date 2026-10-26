@@ -128,13 +128,16 @@ describe('invalid CNC tool geometry preflight', () => {
     });
   });
 
-  it('does not refuse an angleless V-bit when even-odd source contours cancel completely', () => {
+  // Two exact copies used to cancel under even-odd and leave nothing to carve.
+  // The planner now carves them once (ADR-359 Amendment 3), and this check
+  // still sees what the planner sees (ADR-576), so the angle matters again.
+  it('refuses an angleless V-bit on a stacked exact copy, which is carved once', () => {
     expect(
       preflight(
-        [vcarveLayer('cancelled-v-carve')],
+        [vcarveLayer('stacked-v-carve')],
         [rectangle('first', VCARVE_COLOR, 20), rectangle('second', VCARVE_COLOR, 20)],
       ),
-    ).toEqual({ ok: true, issues: [] });
+    ).toMatchObject({ ok: false, issues: [{ code: 'cnc-tool-geometry-invalid' }] });
   });
 
   it('does not refuse an angleless V-bit for a closed zero-area contour', () => {

@@ -11,6 +11,7 @@
 import { isRotaryActive, rotaryYLimitMm, rotaryYScale, type DeviceProfile } from '../devices';
 import type { MachineConfig } from '../scene';
 import type { Job } from './job';
+import type { JobOriginPlacement } from './job-origin';
 import { applyRotaryYScale } from './rotary-transform';
 
 // True when this project should apply rotary machine-space scaling: a laser
@@ -23,8 +24,30 @@ export function rotaryAppliesTo(
   return !isCnc && isRotaryActive(device.rotary);
 }
 
-// The machine-space job (Y scaled + rebased). Identity when rotary is
-// inactive, so non-rotary callers are byte-identical.
+// A placed job's rotary anchor (ADR-127 Amendment 1): the work Y its placement
+// put the anchor on, which is where the cylinder already is. Absolute jobs and
+// inactive rotaries get none, so their output is unchanged.
+export function withRotaryAnchor(
+  job: Job,
+  device: DeviceProfile,
+  machine: MachineConfig | undefined,
+  placement: JobOriginPlacement | undefined,
+): Job {
+  if (!rotaryAppliesTo(device, machine)) return job;
+  switch (placement?.startFrom) {
+    case 'current-position':
+      return { ...job, rotaryAnchorY: placement.currentPosition.y };
+    case 'user-origin':
+    case 'verified-origin':
+      return { ...job, rotaryAnchorY: 0 };
+    case 'absolute':
+    case undefined:
+      return job;
+  }
+}
+
+// The machine-space job (Y scaled, around its anchor or rebased to 0). Identity
+// when rotary is inactive, so non-rotary callers are byte-identical.
 export function machineSpaceJob(
   job: Job,
   device: DeviceProfile,

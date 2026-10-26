@@ -1,4 +1,5 @@
 import type { Job } from '../../../core/job';
+import { contourEntriesSkipped } from '../../../core/job/contour-entry';
 import type { Layer } from '../../../core/scene';
 import { layerSubLayerOperationId } from '../../../core/scene/layer';
 import { formatMm } from './job-review-format';
@@ -11,6 +12,7 @@ export function buildContourEntryReviewFacts(
 ): ReadonlyArray<JobReviewFact> {
   const facts: JobReviewFact[] = [];
   const seen = new Set<string>();
+  const skipped = contourEntriesSkipped(job);
   for (const group of job.groups) {
     if (
       group.kind === 'cnc' ||
@@ -23,14 +25,24 @@ export function buildContourEntryReviewFacts(
     const key = `${group.layerId}:${group.entryRunwayMm}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    facts.push({
-      label: `Contour entry — ${operationName(group.layerId, layers)}`,
-      value: `${formatMm(group.entryRunwayMm)} mm effective target at operation feed · laser off`,
-      tone: 'default',
-    });
+    const label = `Contour entry — ${operationName(group.layerId, layers)}`;
+    // ADR-239 Amendment 1: say so when the emitter adds no entry (ADR-343).
+    facts.push(
+      skipped
+        ? { label, value: SKIPPED_ENTRY_VALUE, tone: 'warning' }
+        : {
+            label,
+            value: `${formatMm(group.entryRunwayMm)} mm effective target at operation feed · laser off`,
+            tone: 'default',
+          },
+    );
   }
   return facts;
 }
+
+const SKIPPED_ENTRY_VALUE =
+  'Not added · where the bed edges are in program coordinates is unknown, so each contour ' +
+  'starts burning from rest';
 
 function operationName(layerId: string, layers: ReadonlyArray<Layer>): string {
   const direct = layers.find((layer) => layer.id === layerId);

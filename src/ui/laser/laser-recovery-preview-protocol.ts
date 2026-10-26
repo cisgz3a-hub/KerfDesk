@@ -1,4 +1,8 @@
-import { buildMotionManifest, type MotionPoint } from '../../core/job/motion-manifest';
+import {
+  buildMotionManifest,
+  type BuildMotionManifestOptions,
+  type MotionPoint,
+} from '../../core/job/motion-manifest';
 import {
   packMotionManifest,
   type PackedMotionManifest,
@@ -9,6 +13,8 @@ import {
 export type LaserRecoveryPreviewRequest = {
   readonly gcode: string;
   readonly initialPosition: MotionPoint | null;
+  /** The sealed profile's beam semantics (ADR-096 Amendment 1). */
+  readonly laserPowerControl?: BuildMotionManifestOptions['laserPowerControl'];
 };
 
 export type LaserRecoveryPreviewReply =
@@ -22,6 +28,9 @@ export function packRecoveryPreviewManifest(
 ): PackedMotionManifest {
   const manifest = buildMotionManifest(request.gcode, {
     machineKind: 'laser',
+    ...(request.laserPowerControl === undefined
+      ? {}
+      : { laserPowerControl: request.laserPowerControl }),
     ...(request.initialPosition === null ? {} : { initialPosition: request.initialPosition }),
   });
   return packMotionManifest(manifest, { enforceArchiveBudget: false });
