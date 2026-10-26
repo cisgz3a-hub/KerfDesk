@@ -3,7 +3,7 @@
 // materializing width*height luma + dither buffers, which is what lets any
 // size of image engrave compile without a memory refusal (ADR-243):
 //
-//   source luma rows -> burn-grid resample -> mask -> machine orient -> dither
+//   source luma rows -> burn-grid resample -> sharpen -> mask -> machine orient -> dither
 //
 // Independent dithers (threshold / ordered / grayscale) compute each row in
 // isolation. Error-diffusion dithers use the sequential 3-row window ditherer
@@ -11,6 +11,7 @@
 
 import type { DeviceProfile } from '../devices';
 import { burnGridKernel, createLumaRowResampler } from '../raster/luma-resample';
+import { burnGridSharpen, createSharpenedRowSource, gridSharpen } from '../raster/luma-sharpen';
 import type { RasterPowerValues } from '../raster/raster-power-values';
 import { createImageMaskPixelTest } from '../raster/image-mask';
 import { ditherIndependentRow, isErrorDiffusionMode } from '../raster/dither';
@@ -108,12 +109,23 @@ function streamedLumaRowAt(input: StreamedRasterInput): (y: number) => Uint8Arra
     input.pixelWidth,
     input.pixelHeight,
   );
-  const resampledRowAt = createLumaRowResampler(
+  const burnRowAt = createLumaRowResampler(
     { luma: input.sourceLuma, width: input.sourceWidth, height: input.sourceHeight },
     input.pixelWidth,
     input.pixelHeight,
     burnGridKernel(input.algorithm),
   );
+  // ADR-671: the same row function the materialized sharpenLuma runs.
+  const sharpen = burnGridSharpen(input.obj, input.passThrough === true);
+  const resampledRowAt =
+    sharpen === null
+      ? burnRowAt
+      : createSharpenedRowSource(
+          burnRowAt,
+          input.pixelWidth,
+          input.pixelHeight,
+          gridSharpen(sharpen),
+        );
   return (y: number): Uint8Array =>
     resampledOrientedRow(input, y, { flipX, flipY, insideMask, resampledRowAt });
 }
