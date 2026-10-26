@@ -117,6 +117,46 @@ describe('minFeatureWarnings', () => {
     ]);
   });
 
+  // CNC audit v1 F5-P2-3: a straight inlay pair drops both from the pocket and the insert.
+  it('says a straight inlay pair leaves narrow parts out of both halves and closes narrow gaps', () => {
+    const parts: SceneObject = {
+      kind: 'imported-svg',
+      id: 'parts',
+      source: 'parts.svg',
+      bounds: { minX: 20, minY: 20, maxX: 60, maxY: 40 },
+      transform: IDENTITY_TRANSFORM,
+      paths: [
+        {
+          color: '#ff0000',
+          polylines: [
+            rectangle(20, 20, 2, 20),
+            rectangle(30, 20, 10, 20),
+            rectangle(42, 20, 10, 20),
+          ],
+        },
+      ],
+    };
+    const cnc: Project = {
+      ...project(parts, {
+        name: 'Inlay',
+        cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'inlay-pair', toolId: 'em-3000' },
+      }),
+      machine: DEFAULT_CNC_MACHINE_CONFIG,
+    };
+
+    expect(minFeatureWarnings(checkProjectMinimumFeatures(cnc))).toEqual([
+      expect.stringContaining(
+        'Layer "Inlay": 1 area narrower than the 3 mm bit (3 mm end mill) — the bit cannot ' +
+          'enter it, so the pocket and the insert both leave it out; narrowest 2 mm',
+      ),
+      expect.stringContaining(
+        'Layer "Inlay": 1 gap between cut shapes or lines narrower than the 3 mm bit ' +
+          '(3 mm end mill) — the bit cannot fit into it, so the pocket and the insert both ' +
+          'close it up; narrowest 2 mm',
+      ),
+    ]);
+  });
+
   it('gives a plain Line operation one optional line, without positions or a setting to change', () => {
     const reports = checkProjectMinimumFeatures(project(stencil(0.1), { mode: 'line' }));
     expect(minFeatureWarnings(reports)).toEqual([

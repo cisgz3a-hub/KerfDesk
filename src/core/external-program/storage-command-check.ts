@@ -16,12 +16,17 @@
 // https://github.com/Smoothieware/Smoothieware/blob/91fe4286e8ee19f062260abf094b315f9cf6bedf/src/modules/utils/player/Player.cpp
 // https://github.com/Smoothieware/Smoothieware/blob/91fe4286e8ee19f062260abf094b315f9cf6bedf/src/modules/tools/zprobe/CartGridStrategy.cpp
 //
-// Marlin runs only a line's first command. M28 and M928 write later lines into
+// Marlin normally runs only a line's first command. G53 can chain another
+// command on CNC_COORDINATE_SYSTEMS builds. M28 and M928 write later lines into
 // an SD-card file, M30 with a name deletes one, M24 and M32 start an SD print,
 // M1000 resumes one after a power loss, M500 saves the settings to EEPROM and
-// M997 starts a firmware update.
+// M997 starts a firmware update. M810-M819 define or invoke stored macros
+// when GCODE_MACROS is enabled; their body can contain motion or cutting.
 // https://github.com/MarlinFirmware/Marlin/blob/2.1.2.8/Marlin/src/gcode/gcode.cpp
 // https://github.com/MarlinFirmware/Marlin/blob/2.1.2.8/Marlin/src/gcode/parser.cpp
+// https://github.com/MarlinFirmware/Marlin/blob/2.1.2.8/Marlin/src/gcode/queue.cpp
+// https://github.com/MarlinFirmware/Marlin/blob/2.1.2.8/Marlin/src/gcode/feature/macro/M810-M819.cpp
+// https://github.com/MarlinFirmware/Marlin/blob/2.1.2.8/Marlin/src/gcode/geometry/G53-G59.cpp
 //
 // grblHAL runs a macro file from its storage for G65, G66 and M98, and loads
 // a named `O<name> call` subroutine from `<name>.macro`.
@@ -95,16 +100,128 @@ function smoothieRefusal(line: string): string | null {
   return null;
 }
 
-// Marlin's parser skips spaces, takes the command letter (lowercase too on a
-// GCODE_CASE_INSENSITIVE build), its number and an optional subcode, then
-// spaces; what follows is M30's file name.
+// Follow only actual parser prefixes, not later G/M parameter words. Lowercase
+// letters and an N prefix count on GCODE_CASE_INSENSITIVE builds. The queue's
+// uppercase numbered-checksum protocol is separately refused by the normalizer.
 function marlinRefusal(line: string): string | null {
-  const match = /^[Mm] *(\d+)(?:\.\d*)? *(.*)$/.exec(line);
-  if (match === null) return null;
-  const code = Number.parseInt(match[1] ?? '', 10);
-  if (code === 30) return match[2] === '' ? null : M30_NAMED;
+  for (const quoted of [false, true]) {
+    const queued = marlinQueuedText(line, quoted);
+    for (const insensitive of [false, true]) {
+      for (const fast of [false, true]) {
+        const refusal = marlinParserRefusal(queued, { fast, quoted, insensitive });
+        if (refusal !== null) return refusal;
+      }
+    }
+  }
+  return null;
+}
+
+// G53's chain starts at the argument on the slow parser, but after the first
+// space from the command letter on FASTER_GCODE_PARSER. Follow each fixed
+// configuration separately: mixing them could invent an execution path.
+// Offsets always advance, including for adjacent or nested G53 commands.
+function marlinParserRefusal(
+  line: string,
+  mode: { readonly fast: boolean; readonly quoted: boolean; readonly insensitive: boolean },
+): string | null {
+  let offset = 0;
+  let pendingQuotes = mode.fast && mode.quoted;
+  while (offset < line.length) {
+    const header = mode.insensitive
+      ? /^(?:[Nn](?:[+-]\d*|\d+) *)?([GMgm]) *([+-]?\d+)(?:\.\d*)? */
+      : /^(?:N(?:[+-]\d*|\d+) *)?([GM]) *([+-]?\d+)(?:\.\d*)? */;
+    const match = header.exec(line.slice(offset));
+    if (match === null) return null;
+    const code = marlinCommandNumber(match[2] ?? '');
+    const argumentOffset = offset + match[0].length;
+    if (match[1]?.toUpperCase() === 'M') return marlinMRefusal(code, line.slice(argumentOffset));
+    if (code !== 53) return null;
+    if (pendingQuotes) {
+      const decoded = marlinQuotedChainText(line, argumentOffset, mode.insensitive);
+      pendingQuotes = decoded !== line;
+      line = decoded;
+    }
+    const commandOffset = offset + match[0].search(/[GMgm]/);
+    offset = mode.fast ? marlinFastChainOffset(line, commandOffset) : argumentOffset;
+  }
+  return null;
+}
+
+// The serial queue drops an escape outside quotes. With quoted strings enabled
+// it retains escapes inside them for the parser's later in-place unescaping.
+function marlinQueuedText(line: string, quotedStrings: boolean): string {
+  let quoted = false;
+  let escaped = false;
+  let queued = '';
+  for (const character of line) {
+    if (escaped) {
+      queued += character;
+      escaped = false;
+    } else if (character === '\\') {
+      escaped = true;
+      if (quoted) queued += character;
+    } else {
+      if (quotedStrings && character === '"') quoted = !quoted;
+      queued += character;
+    }
+  }
+  return queued;
+}
+
+// Before fast G53 chains, parsing its first quoted argument writes unescaped
+// text and a NUL into the same buffer. That NUL bounds every subsequent chain;
+// retain only its reachable prefix. A bare quote is itself a parameter, while
+// a quote following a letter is that parameter's value.
+function marlinQuotedChainText(line: string, argumentOffset: number, insensitive: boolean): string {
+  const quote = line.indexOf('"', argumentOffset);
+  if (quote < 0) return line;
+  let previous = quote - 1;
+  while (previous >= argumentOffset && line[previous] === ' ') previous--;
+  const parameter = previous < argumentOffset ? '' : (line[previous] ?? '');
+  const valueQuote = (insensitive ? /[A-Za-z]/ : /[A-Z]/).test(parameter);
+  const start = quote + 1 + (!valueQuote && line[quote + 1] === '"' ? 1 : 0);
+  return line.slice(0, start) + marlinUnescapedPrefix(line, start);
+}
+
+function marlinUnescapedPrefix(line: string, start: number): string {
+  let decoded = '';
+  for (let index = start; index < line.length; index++) {
+    let character = line[index];
+    if (character === '"') break;
+    if (character === '\\') character = line[++index];
+    decoded += character ?? '';
+  }
+  return decoded;
+}
+
+function marlinFastChainOffset(line: string, commandOffset: number): number {
+  const firstSpace = line.indexOf(' ', commandOffset);
+  if (firstSpace < 0) return line.length;
+  let next = firstSpace + 1;
+  while (line[next] === ' ') next++;
+  return next;
+}
+
+function marlinMRefusal(code: number, argument: string): string | null {
+  if (code >= 810 && code <= 819)
+    return `is M${code}, which defines or runs a macro stored on the controller`;
+  if (code === 30) return argument === '' ? null : M30_NAMED;
   const effect = MARLIN_M_CODES.get(code);
   return effect === undefined ? null : `is M${code}, ${effect}`;
+}
+
+// Marlin's command number is uint16_t, so M66346 is M810. Reduce each digit
+// before JS number precision can lose an alias. SIGNED_CODENUM builds strip
+// '-' before reading digits; '+' passes their validation but is not stripped,
+// contributing -5 as the first digit (parser.cpp:175-197). Match that optional
+// build too, just as the command-letter check includes case-insensitive builds.
+function marlinCommandNumber(text: string): number {
+  const negative = text.startsWith('-');
+  let code = 0;
+  for (const character of negative ? text.slice(1) : text) {
+    code = (code * 10 + character.charCodeAt(0) - 48) & 0xffff;
+  }
+  return negative ? -code & 0xffff : code;
 }
 
 function grblHalRefusal(line: string): string | null {

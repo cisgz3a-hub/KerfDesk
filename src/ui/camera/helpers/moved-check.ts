@@ -7,14 +7,14 @@
 
 import { create } from 'zustand';
 import { isHeadCameraModel } from '../../../core/camera/model/head-camera';
-import { bedPoint, projectWorldPoint } from '../../../core/camera/model/camera-model';
+import { bedPoint, projectWorldPoint, type Vec2 } from '../../../core/camera/model/camera-model';
 import type { CameraModelRecord } from '../../../core/camera/model/camera-model-record';
 import {
   measureViewShift,
   MIN_MATCH_SCORE,
   MOVED_MM,
   surroundMask,
-  viewShiftOnBedMm,
+  viewShiftOnBedOffsetMm,
   viewThumbnail,
 } from '../../../core/camera/model/view-shift';
 import type { RgbaImage } from '../../../core/camera/rgba-image';
@@ -33,12 +33,19 @@ import { loadViewReference, saveViewReference } from './view-reference';
 export type CameraMovedState =
   | { readonly kind: 'unknown' }
   | { readonly kind: 'steady' }
-  | { readonly kind: 'moved'; readonly mm: number; readonly calibratedAt: string };
+  | {
+      readonly kind: 'moved';
+      readonly mm: number;
+      readonly offsetMm: Vec2;
+      readonly calibratedAt: string;
+    };
+
+/** The warning the operator dismissed: its calibration and measured shift. */
+export type CameraMovedDismissal = { readonly calibratedAt: string; readonly offsetMm: Vec2 };
 
 type CameraMovedStore = {
   readonly state: CameraMovedState;
-  /** The calibration whose warning the operator dismissed; it stays quiet. */
-  readonly dismissedFor: string | null;
+  readonly dismissedFor: CameraMovedDismissal | null;
   readonly dismiss: () => void;
 };
 
@@ -47,9 +54,34 @@ export const useCameraMovedStore = create<CameraMovedStore>((set, get) => ({
   dismissedFor: null,
   dismiss: () => {
     const { state } = get();
-    set({ dismissedFor: state.kind === 'moved' ? state.calibratedAt : null });
+    set({
+      dismissedFor:
+        state.kind === 'moved'
+          ? { calibratedAt: state.calibratedAt, offsetMm: state.offsetMm }
+          : null,
+    });
   },
 }));
+
+/** A dismissed warning stays quiet while the camera stays where it was then:
+ * the same calibration, and not moved a further millimetre or more. A view
+ * confirmed steady since (a nudge fix, a kept check) ends the dismissal, so
+ * the next move warns again. */
+export function cameraMovedWarningDismissed(
+  state: CameraMovedState,
+  dismissedFor: CameraMovedDismissal | null,
+): boolean {
+  return (
+    state.kind === 'moved' &&
+    dismissedFor !== null &&
+    dismissedFor.calibratedAt === state.calibratedAt &&
+    movedDistanceMm(state.offsetMm, dismissedFor.offsetMm) < MOVED_MM
+  );
+}
+
+function movedDistanceMm(a: Vec2, b: Vec2): number {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
 
 /** Compare `frame` from `source` with the running camera's reference. */
 export function checkCameraMoved(source: ActiveCameraSource, frame: RgbaImage): CameraMovedState {
@@ -84,7 +116,7 @@ export function checkCameraMoved(source: ActiveCameraSource, frame: RgbaImage): 
     bedPoint(bedCentreMm.x, bedCentreMm.y),
   );
   if (centrePx === null) return publish(unknown);
-  const mm = viewShiftOnBedMm({
+  const offsetMm = viewShiftOnBedOffsetMm({
     lens: forFrame.lens,
     pose: forFrame.pose,
     thumbWidth: current.width,
@@ -93,8 +125,11 @@ export function checkCameraMoved(source: ActiveCameraSource, frame: RgbaImage): 
     centrePx,
     shift,
   });
-  if (mm === null) return publish(unknown);
-  return publish(mm >= MOVED_MM ? { kind: 'moved', mm, calibratedAt: own.calibratedAt } : steady);
+  if (offsetMm === null) return publish(unknown);
+  const mm = Math.hypot(offsetMm.x, offsetMm.y);
+  return publish(
+    mm >= MOVED_MM ? { kind: 'moved', mm, offsetMm, calibratedAt: own.calibratedAt } : steady,
+  );
 }
 
 /** Take a picture now and keep it as the camera's reference for `record`. */
@@ -120,12 +155,15 @@ const steady: CameraMovedState = { kind: 'steady' };
 
 function publish(state: CameraMovedState): CameraMovedState {
   const before = useCameraMovedStore.getState();
-  useCameraMovedStore.setState({ state });
+  useCameraMovedStore.setState(state.kind === 'steady' ? { state, dismissedFor: null } : { state });
   // Say it once, where the operator is, when the panel is closed.
+  // Re-arm as the dismissal ends, even across several smaller shifts.
   if (
     state.kind === 'moved' &&
-    before.state.kind !== 'moved' &&
-    before.dismissedFor !== state.calibratedAt &&
+    (before.state.kind !== 'moved' ||
+      cameraMovedWarningDismissed(before.state, before.dismissedFor) ||
+      movedDistanceMm(before.state.offsetMm, state.offsetMm) >= MOVED_MM) &&
+    !cameraMovedWarningDismissed(state, before.dismissedFor) &&
     !useCameraStore.getState().panelOpen
   ) {
     useToastStore

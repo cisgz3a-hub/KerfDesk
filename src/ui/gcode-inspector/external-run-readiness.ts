@@ -4,7 +4,7 @@
 // that Job Review shows: laser mode on for a router, laser mode off for a
 // laser, a `$30` that does not match the profile. Like Job Review, the Run
 // review lists them as warnings; none refuses. A laser whose laser mode is off
-// or unconfirmed also names the G0 moves the program makes with the beam on.
+// or unconfirmed also names rapid commands (G0 and G28/G30 returns) the program makes with the beam on.
 
 import { findLitRapids, type LitRapids } from '../../core/external-program';
 import { runControllerReadiness } from '../../core/preflight';
@@ -75,13 +75,34 @@ function litRapidWarning(
   if (litRapids === null || machineKindOf(project.machine) !== 'laser') return null;
   if (laser.capabilities.settings === 'none') return null;
   const laserMode = laser.controllerSettings?.laserModeEnabled;
-  if (laserMode === true) return null;
+  const storedReturn = storedReturnWarning(litRapids);
+  if (laserMode === true) return storedReturn;
+  const warning = rapidMoveWarning(litRapids, laserMode, storedReturn);
+  return storedReturn === null ? warning : `${warning} ${storedReturn}`;
+}
+
+function rapidMoveWarning(
+  litRapids: LitRapids,
+  laserMode: boolean | undefined,
+  storedReturn: string | null,
+): string {
   const one = litRapids.count === 1;
-  const moves = `${one ? 'One G0 move' : `${litRapids.count} G0 moves`} in this program ${one ? 'runs' : 'run'} with M3 or M4 on and S not set to 0 (first: line ${litRapids.firstLine} of the sent program)`;
+  const moves = `${one ? 'One rapid command' : `${litRapids.count} rapid commands`} in this program ${one ? 'runs' : 'run'} with M3 or M4 on and S not set to 0 (first: line ${litRapids.firstLine} of the sent program)`;
   const burns = one
     ? 'it burns a line where the head travels'
     : 'each burns a line where the head travels';
+  const darkness =
+    storedReturn === null
+      ? `Laser mode on, or S0 on ${one ? 'that move' : 'those moves'}, keeps ${one ? 'it' : 'them'} dark.`
+      : 'Send S0 or M5 before these commands to switch the beam off.';
   return laserMode === false
-    ? `The controller reports $32=0 (laser mode off), so it keeps the beam on during rapid moves. ${moves}: ${burns}. Laser mode on, or S0 on ${one ? 'that move' : 'those moves'}, keeps ${one ? 'it' : 'them'} dark.`
+    ? `The controller reports $32=0 (laser mode off), so it keeps the beam on during rapid moves. ${moves}: ${burns}. ${darkness}`
     : `Laser mode ($32) is not confirmed. ${moves}. If laser mode is off ($32=0), ${burns}.`;
+}
+
+function storedReturnWarning(litRapids: LitRapids): string | null {
+  const returns = litRapids.storedPositionReturns;
+  if (returns === undefined) return null;
+  const one = returns.count === 1;
+  return `${one ? 'One' : returns.count} G28/G30 stored-position return ${one ? 'command runs' : 'commands run'} with M3 or M4 on and S not set to 0 (first: line ${returns.firstLine} of the sent program). These returns retain the preceding motion mode, so do not rely on $32 alone to switch the beam off. Send S0 or M5 before the return.`;
 }

@@ -17,6 +17,7 @@ import { useUiStore, type ToolMode } from '../state/ui-store';
 import { warpDeformRequestForSelection } from '../state/warp-deform-plan';
 import { useWarpDeformSession, type WarpDeformRequest } from '../state/warp-deform-session';
 import { canvasTheme } from '../theme/canvas-theme';
+import { deriveVariableBarcodeDisplay } from './variable-barcode-display';
 import {
   canvasMouseToScene,
   pxToMmForCanvas,
@@ -48,7 +49,8 @@ export function activeWarpDeformSession(
 
 export function startWarpDeformTool(grid: WarpDeformGrid): void {
   const app = useStore.getState();
-  const request = warpDeformRequestForSelection(app.project.scene, selectedObjectIds(app), grid);
+  const current = deriveVariableBarcodeDisplay(app.project).project;
+  const request = warpDeformRequestForSelection(current.scene, selectedObjectIds(app), grid);
   if (request === null) {
     useToastStore
       .getState()
@@ -68,8 +70,10 @@ export function startWarpDeformTool(grid: WarpDeformGrid): void {
 export function applyWarpDeformTool(): void {
   const session = activeWarpDeformSession();
   if (session === null) return;
+  const source = useStore.getState().project;
+  const display = deriveVariableBarcodeDisplay(source).project;
   leaveWarpDeformTool();
-  useStore.getState().applyWarpDeform(session);
+  useStore.getState().applyWarpDeform(session, { source, scene: display.scene });
 }
 
 /** Esc or Cancel: return to the Select tool with the artwork as it was, still selected. */

@@ -57,20 +57,24 @@ export function redoHistoryEntries(
   return entries;
 }
 
-/** Undo `count` steps: back to just before the step `count` places down the list. */
+/** Undo `count` steps: back to just before the step `count` places down the list.
+ *  Stops at a step that cannot be undone now, such as one that changes a running
+ *  job's machine (ADR-416 Amendment 2). */
 export function undoSteps(count: number): void {
   for (let step = 0; step < count; step += 1) {
     const state = useStore.getState();
     if (state.undoStack.length === 0) return;
     state.undo();
+    if (state.pendingUndo === null && useStore.getState().undoStack === state.undoStack) return;
   }
 }
 
-/** Redo `count` steps. */
+/** Redo `count` steps, stopping as Undo does. */
 export function redoSteps(count: number): void {
   for (let step = 0; step < count; step += 1) {
     const state = useStore.getState();
     if (state.redoStack.length === 0) return;
     state.redo();
+    if (useStore.getState().redoStack === state.redoStack) return;
   }
 }

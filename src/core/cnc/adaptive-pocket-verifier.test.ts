@@ -98,6 +98,80 @@ describe('verifyAdaptivePocket', () => {
     });
   });
 
+  it(
+    'refuses a pin of stock that the coverage target allows',
+    () => {
+      // Four quadrants cleared to their own bounds meet at the square's centre
+      // and leave a full-depth pin there, 0.858 r^2: 3.4 mm^2, a fifth of a
+      // percent of the pocket, which the coverage target let through (CNC
+      // audit v1 F2-P1-1, ADR-154 Amendment 4).
+      const contours = [square(0, 0, 40)];
+      const quadrants = [
+        square(0, 0, 20),
+        square(20, 0, 20),
+        square(0, 20, 20),
+        square(20, 20, 20),
+      ];
+      const sequences = quadrants.flatMap((quadrant) => {
+        const plan = planAdaptivePocket([quadrant], 4, 0.5);
+        if (!plan.ok) throw new Error(plan.reason);
+        return plan.sequences;
+      });
+      const last = sequences[sequences.length - 1];
+      if (last === undefined) throw new Error('expected adaptive sequences');
+      const wallRing = {
+        ...square(2, 2, 36),
+        points: [...square(2, 2, 36).points, { x: 2, y: 2 }],
+      };
+      const pinned: AdaptivePocketPlan = {
+        ok: true,
+        optimalLoadMm: 0.5,
+        sequences: [
+          ...sequences.slice(0, -1),
+          { ...last, finishRings: [...last.finishRings, wallRing] },
+        ],
+      };
+      const result = verifyAdaptivePocket(contours, 4, pinned);
+      expect(result).toMatchObject({
+        ok: false,
+        reason: 'Adaptive verification found a patch of reachable stock left standing.',
+      });
+      expect(result.coverageRatio).toBeGreaterThan(0.985);
+    },
+    ciBudgetMs(20_000, 60_000),
+  );
+
+  it(
+    'refuses a finishing ring cut before the stock beside it',
+    () => {
+      // The second pocket's wall ring moved onto the first sequence runs before
+      // that pocket is cleared and slots its wall at the cutting feed. Coverage
+      // and the measured roughing are the same (CNC audit v1 F2-P2-1).
+      const contours = [square(0, 0, 20), square(30, 0, 20)];
+      const plan = planAdaptivePocket(contours, 4, 0.5);
+      if (!plan.ok) throw new Error(plan.reason);
+      const [first, second] = plan.sequences;
+      if (first === undefined || second === undefined) throw new Error('expected two sequences');
+      const early: AdaptivePocketPlan = {
+        ...plan,
+        sequences: [
+          { ...first, finishRings: [...first.finishRings, ...second.finishRings] },
+          { ...second, finishRings: [] },
+        ],
+      };
+      expect(verifyAdaptivePocket(contours, 4, plan)).toMatchObject({
+        ok: true,
+        coverageRatio: 1,
+      });
+      expect(verifyAdaptivePocket(contours, 4, early)).toMatchObject({
+        ok: false,
+        reason: 'Adaptive verification found a finishing ring cut before the stock beside it.',
+        coverageRatio: 1,
+      });
+    },
+    ciBudgetMs(20_000, 60_000),
+  );
+
   it('measures the contact exactly, not on the stock grid', () => {
     // A right triangle with 30 mm legs at the default 10% engagement. The grid,
     // whose cell is as wide as the ring spacing here, read up to 0.59 mm and

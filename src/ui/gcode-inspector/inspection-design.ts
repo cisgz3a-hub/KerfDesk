@@ -5,7 +5,9 @@
 
 import { reliefMachineSpaceTransform } from '../../core/cnc/relief-machine-space';
 import { toMachineCoords, type DeviceProfile } from '../../core/devices';
+import { reliefSideForStock } from '../../core/relief/relief-two-sided-stock';
 import { applyTransform, type Project, type ReliefObject, type Vec2 } from '../../core/scene';
+import type { MeshReliefObject } from '../../core/scene/relief';
 import type { EmittedDesignPlacement } from '../laser/save-output-emission';
 
 /**
@@ -44,10 +46,17 @@ export function projectInspectionDesign(
           .filter(
             (object): object is ReliefObject => object.kind === 'relief' && ids.has(object.id),
           )
-          .map((relief) => ({
-            relief,
-            toProgram: reliefToProgram(relief, project.device, placement.jobOriginOffset),
-          }));
+          .flatMap((object) => {
+            // A two-sided split side is carved for the current stock (ADR-580 Amendment 1).
+            const relief = carvedRelief(object, stock.thicknessMm);
+            if (relief === null) return [];
+            return [
+              {
+                relief,
+                toProgram: reliefToProgram(relief, project.device, placement.jobOriginOffset),
+              },
+            ];
+          });
   return {
     ...(Number.isFinite(stock.thicknessMm) && stock.thicknessMm > 0
       ? { stockThicknessMm: stock.thicknessMm }
@@ -55,6 +64,12 @@ export function projectInspectionDesign(
     ...(stock.materialKey === undefined ? {} : { stockMaterialKey: stock.materialKey }),
     reliefs,
   };
+}
+
+function carvedRelief(relief: ReliefObject, stockThicknessMm: number): ReliefObject | null {
+  if (relief.reliefSource.kind !== 'legacy-mesh') return relief;
+  const side = reliefSideForStock(relief as MeshReliefObject, stockThicknessMm);
+  return side.kind === 'no-stock' ? null : side.relief;
 }
 
 /**

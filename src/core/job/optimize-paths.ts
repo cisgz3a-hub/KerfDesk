@@ -1,22 +1,25 @@
 // optimizePaths — reorder CutSegments within each layer to reduce travel.
 //
-// PROJECT.md Phase C item: "path optimization (2-opt)". Ships as a
-// nearest-neighbor heuristic, NOT full 2-opt:
+// PROJECT.md Phase C item: "path optimization (2-opt)". Nearest-neighbour
+// construction, then bounded 2-opt/Or-opt refinement (ADR-669):
 //
-//   * Nearest-neighbor is pure greedy from a fixed start. The naive form is
+//   * Nearest-neighbor is greedy from a fixed start. The naive form is
 //     O(n²); every nearest-pick here is indexed instead — segment entries and
 //     island-fill group entries both through segment-entry-index, containment
 //     depth through containment-depth — so there is no size ceiling anywhere
 //     in this module.
-//   * Greedy distance ordering does not guarantee the shortest route,
-//     even for a small group. It does not score controller cycle time.
-//   * Groups/scopes use their selected planning seed, rather than carrying
-//     the previous group's emitted endpoint. Postamble travel is not scored.
-//     These limits can add substantial travel; see the reproducible probes in
-//     scripts/audit-quality-first-laser-paths.mjs.
-//   * A future route refinement must preserve containment, process/pass
-//     dependencies, requested direction and start policies. A shorter route
-//     alone does not establish a faster or equally good physical cut.
+//   * Inside-first is part by part (inside-first-holds.ts): an outline waits
+//     only for the deeper shapes inside its bounds, not for every deeper shape
+//     in the group.
+//   * Line and Offset Fill routes are then refined (route-refine.ts), scored
+//     as a tour back to the group's planning seed, which is where the park and
+//     the next group start from. Moves keep containment, direction policy and
+//     a Line burn start's first contour; the work is bounded by a step count.
+//   * Groups/scopes still use their selected planning seed rather than
+//     carrying the previous group's endpoint. Distance is the cost; controller
+//     cycle time is not scored. See scripts/audit-path-order-math.mjs.
+//   * A shorter route alone does not establish a faster or equally good
+//     physical cut.
 //
 // Per-layer optimization: layer ORDER is user-controlled (color stack)
 // and not reordered here. We only choose the visit order of segments
@@ -238,6 +241,10 @@ function optimizeGroup(
     group.segments,
     lineSettings,
     hasLinePreference ? lineStartCursor : undefined,
+    {
+      returnTo: startCursorForSegments(group.segments, settings.startPoint),
+      pinFirst: hasLinePreference,
+    },
   );
   return { ...group, segments: ordered };
 }
@@ -266,7 +273,14 @@ function startClosedShapesInSourceOrder(
 
 function optimizeOffsetFillGroup(group: FillGroup, settings: PathOptimizationSettings): FillGroup {
   if (group.segments.length === 0) return group;
-  return { ...group, segments: configuredSegmentOrder(group.segments, settings) };
+  const seed = startCursorForSegments(group.segments, settings.startPoint);
+  return {
+    ...group,
+    segments: configuredSegmentOrder(group.segments, settings, seed, {
+      returnTo: seed,
+      pinFirst: false,
+    }),
+  };
 }
 
 function optimizeIslandFillGroups(

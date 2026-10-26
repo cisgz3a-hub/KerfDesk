@@ -3,6 +3,7 @@ import { selectionUnits } from '../../core/scene/selection-units';
 import { isVectorPathObject, type VectorSceneObject } from '../../core/geometry';
 import { subpathCount } from '../../core/geometry/outer-shape-groups';
 import { isConvertibleVector, type ConvertibleVector } from '../raster/vector-to-bitmap';
+import { groupsWithinFocus } from '../state/design-hierarchy-store';
 
 export function selectedObject(project: Project, selectedObjectId: string | null) {
   if (selectedObjectId === null) return null;
@@ -28,11 +29,15 @@ export function selectionTouchesGroup(
 
 // Align and Distribute move a selected group as one object, so their "enough
 // selected" checks count groups once rather than per member.
-export function selectionUnitCount(project: Project, selectedIds: ReadonlyArray<string>): number {
+export function selectionUnitCount(
+  project: Project,
+  selectedIds: ReadonlyArray<string>,
+  focusId: string | null = null,
+): number {
   const selected = new Set(selectedIds);
   return selectionUnits(
     project.scene.objects.filter((object) => selected.has(object.id)),
-    project.scene.groups ?? [],
+    groupsWithinFocus(project.scene.groups ?? [], focusId),
   ).length;
 }
 

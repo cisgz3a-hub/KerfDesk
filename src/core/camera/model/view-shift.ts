@@ -203,7 +203,7 @@ function halved(grid: Grid): Grid {
  * How far a view shift moves the middle of the bed, mm: the bed centre's pixel
  * shifted by it, mapped back onto the bed. Null when the model gives no ray.
  */
-export function viewShiftOnBedMm(args: {
+type ViewShiftOnBedArgs = {
   readonly lens: LensModel;
   readonly pose: CameraPose;
   readonly thumbWidth: number;
@@ -211,7 +211,15 @@ export function viewShiftOnBedMm(args: {
   readonly bedCentreMm: Vec2;
   readonly centrePx: Vec2;
   readonly shift: ViewShift;
-}): number | null {
+};
+
+export function viewShiftOnBedMm(args: ViewShiftOnBedArgs): number | null {
+  const offset = viewShiftOnBedOffsetMm(args);
+  return offset === null ? null : Math.hypot(offset.x, offset.y);
+}
+
+/** Signed bed displacement, retained when comparing two moved camera positions. */
+export function viewShiftOnBedOffsetMm(args: ViewShiftOnBedArgs): Vec2 | null {
   const toBed = bedMapper(args.lens, args.pose);
   const sx = args.lens.imageWidth / args.thumbWidth;
   const sy = args.lens.imageHeight / args.thumbHeight;
@@ -220,7 +228,7 @@ export function viewShiftOnBedMm(args: {
     0,
   );
   if (moved === null) return null;
-  return Math.hypot(moved.x - args.bedCentreMm.x, moved.y - args.bedCentreMm.y);
+  return { x: moved.x - args.bedCentreMm.x, y: moved.y - args.bedCentreMm.y };
 }
 
 // Sobel gradient magnitude; the one-pixel border stays zero.

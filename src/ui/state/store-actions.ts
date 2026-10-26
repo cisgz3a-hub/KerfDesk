@@ -26,6 +26,11 @@ import {
 } from './cnc-machine-setup-scene';
 import { projectWithParkedCnc } from './parked-cnc-machine';
 import { captureSetupHistoryContext, setupHistoryContextFor } from './setup-history-context';
+import {
+  JOB_MACHINE_REDO_REFUSED,
+  JOB_MACHINE_UNDO_REFUSED,
+  refuseJobMachineChange,
+} from './job-machine-lock';
 import { tracePartHistorySelection } from './trace-part-history';
 import { machineSetupActions } from './machine-setup-actions';
 import { layerParamOwnerActions, projectWithLayerParam } from './layer-param-actions';
@@ -161,6 +166,9 @@ export function historyActions(set: Setter): Pick<AppState, 'undo' | 'redo'> {
         }
         const prev = s.undoStack[s.undoStack.length - 1];
         if (prev === undefined) return s;
+        // A step that changes the running job's machine waits for the job
+        // (ADR-416 Amendment 2); the history stays as it is.
+        if (refuseJobMachineChange(s.project, prev, JOB_MACHINE_UNDO_REFUSED)) return s;
         const context = setupHistoryContextFor(prev);
         if (context !== null) captureSetupHistoryContext(s.project, s);
         return {
@@ -186,6 +194,7 @@ export function historyActions(set: Setter): Pick<AppState, 'undo' | 'redo'> {
       set((s) => {
         const next = s.redoStack[s.redoStack.length - 1];
         if (next === undefined) return s;
+        if (refuseJobMachineChange(s.project, next, JOB_MACHINE_REDO_REFUSED)) return s;
         const context = setupHistoryContextFor(next);
         if (context !== null) captureSetupHistoryContext(s.project, s);
         return {
@@ -280,12 +289,8 @@ export function viewActions(
           .filter((object) => object.locked !== true)
           .filter((object) => sceneObjectHasVisibleLayer(s.project.scene, object))
           .map((o) => o.id);
-        const [primary, ...rest] = ids;
         return {
-          ...scopedSelectionProjectPatch(s, {
-            selectedObjectId: primary ?? null,
-            additionalSelectedIds: new Set(rest),
-          }),
+          ...scopedSelectionProjectPatch(s, selectionFromIds(s, ids, false)),
           selectedPathNode: null,
           selectedPathNodes: [],
         };

@@ -60,8 +60,15 @@ describe('pre-K1 ordinary output and historical Job bytes', () => {
       job,
       jobOriginOffset: { x: 0, y: 0 },
     }).gcode;
-    expect(gcode).toBe(PRE_K1_BYTES[key]);
-    expect(fingerprintGcode(gcode)).toEqual(PRE_K1_FINGERPRINTS[key]);
+    if (key === 'mixed-open') {
+      // ADR-669 reroutes this sealed program: the same burns, in a part-major,
+      // park-scored order that travels no further than the sealed one did.
+      expect(burnMoves(gcode)).toEqual(burnMoves(PRE_K1_BYTES[key]));
+      expect(rapidMm(gcode)).toBeLessThanOrEqual(rapidMm(PRE_K1_BYTES[key]));
+    } else {
+      expect(gcode).toBe(PRE_K1_BYTES[key]);
+      expect(fingerprintGcode(gcode)).toEqual(PRE_K1_FINGERPRINTS[key]);
+    }
     if (key === 'native-arc') expect(gcode).toMatch(/^G[23] /m);
     if (key === 'mixed-open')
       expect(
@@ -90,3 +97,44 @@ describe('pre-K1 ordinary output and historical Job bytes', () => {
     expect(fingerprintGcode(gcode)).toEqual(PRE_K1_FINGERPRINTS['historical-nesting']);
   });
 });
+
+// Absolute G0/G1 XY programs only, with modal feed and power.
+type Move = { rapid: boolean; from: string; to: string; mm: number; words: string };
+function moves(gcode: string): Move[] {
+  const out: Move[] = [];
+  let x = 0,
+    y = 0,
+    feed = '',
+    power = '';
+  for (const line of gcode.split('\n')) {
+    feed = /F([\d.]+)/.exec(line)?.[1] ?? feed;
+    power = /S([\d.]+)/.exec(line)?.[1] ?? power;
+    const motion = /^G([01]) /.exec(line);
+    if (motion === null) continue;
+    const nx = Number(/X(-?[\d.]+)/.exec(line)?.[1] ?? x);
+    const ny = Number(/Y(-?[\d.]+)/.exec(line)?.[1] ?? y);
+    out.push({
+      rapid: motion[1] === '0',
+      from: `${x},${y}`,
+      to: `${nx},${ny}`,
+      mm: Math.hypot(nx - x, ny - y),
+      words: `F${feed} S${power}`,
+    });
+    x = nx;
+    y = ny;
+  }
+  return out;
+}
+// Each burn as an undirected endpoint pair with its words, sorted, so order
+// and direction drop out.
+function burnMoves(gcode: string): string[] {
+  return moves(gcode)
+    .filter((move) => !move.rapid)
+    .map((move) => `${[move.from, move.to].sort().join('|')} ${move.words}`)
+    .sort();
+}
+function rapidMm(gcode: string): number {
+  return moves(gcode)
+    .filter((move) => move.rapid)
+    .reduce((total, move) => total + move.mm, 0);
+}

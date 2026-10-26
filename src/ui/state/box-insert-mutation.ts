@@ -30,6 +30,12 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { withoutCncFeedSource } from './cnc-feed-provenance';
+import { cncHeadDevice } from '../../core/cnc/cnc-head-feeds';
+import {
+  DEFAULT_ASSUMED_FLUTE_COUNT,
+  resolveCncMaterialFeedPatch,
+  type CncMachineStarterLiveCaps,
+} from '../../core/cnc/machine-starters';
 import { pushUndo, type MutationResult, type StateSlice } from './scene-mutations';
 
 // The default drawn-vector cut color (draw-tool parity): panels join the
@@ -92,17 +98,19 @@ export function applyInsertBoxPanels(
  * The reliefs are sized for the active bit (F-K3, ADR-106 Amendment 1), so the
  * fresh operations must cut with it. The machine starter pins its own cutter
  * (ADR-256); when that is not the active bit, the operation follows the active
- * bit instead, as Design Studio Apply drops a seeded bit. The starter's numbers
- * stay as retained values: its provenance names its own cutter, and the next
- * machine refresh would pin that cutter again.
+ * bit instead. A material recipe is recalculated for that bit. Without a chosen
+ * material, retain the starter values and their source so Job Review can name
+ * the cutter mismatch; setup refresh must not repin the starter's cutter.
  */
 export function cutFreshCncOperationsWithActiveBit<T extends { readonly project: Project }>(
   previousLayers: ReadonlyArray<Layer>,
   result: T,
+  liveCaps: CncMachineStarterLiveCaps | null = null,
 ): T {
   const machine = result.project.machine;
   if (machine?.kind !== 'cnc') return result;
-  const activeToolId = activeCncTool(machine).id;
+  const activeTool = activeCncTool(machine);
+  const activeToolId = activeTool.id;
   const existing = new Set(previousLayers.map((layer) => layer.id));
   let changed = false;
   const layers = result.project.scene.layers.map((layer) => {
@@ -111,7 +119,25 @@ export function cutFreshCncOperationsWithActiveBit<T extends { readonly project:
     if (settings.toolId === activeToolId) return layer;
     const { toolId: _seededTool, ...followsActiveBit } = settings;
     changed = true;
-    return { ...layer, cnc: withoutCncFeedSource(followsActiveBit) };
+    if (settings.feedSource?.kind === 'machine-starter') return { ...layer, cnc: followsActiveBit };
+    const recipe = settings.feedSource;
+    const patch =
+      recipe?.kind === 'material-recipe'
+        ? resolveCncMaterialFeedPatch({
+            profile: cncHeadDevice(result.project.device, machine.params),
+            tool: activeTool,
+            materialKey: recipe.materialKey,
+            spindleRpm: settings.spindleRpm,
+            machineSpindleMaxRpm: machine.params.spindleMaxRpm,
+            fluteCount: activeTool.fluteCount ?? DEFAULT_ASSUMED_FLUTE_COUNT,
+            ...(liveCaps === null ? {} : { liveCaps }),
+          })
+        : null;
+    return {
+      ...layer,
+      cnc:
+        patch === null ? withoutCncFeedSource(followsActiveBit) : { ...followsActiveBit, ...patch },
+    };
   });
   if (!changed) return result;
   return {

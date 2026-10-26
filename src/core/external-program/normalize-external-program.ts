@@ -32,6 +32,7 @@
 
 import type { ControllerKind } from '../devices';
 import { controllerBlockRejection } from './controller-block-check';
+import { evaluatedSyntaxRefusal } from './evaluated-syntax';
 import { storageCommandRefusal } from './storage-command-check';
 
 export type ExternalProgram = {
@@ -260,7 +261,8 @@ function baselineKind(baseline: string): ControllerKind | undefined {
 // A '$' line, or FluidNC's bracket form of one ('[J]' and '[Jog]' run as
 // '$J=', fluidnc-line-limit.ts), is a controller command, and a shell, file
 // or stored-program command runs what the file does not hold; any other line
-// the controller rejects as a block would leave the framed outline wrong.
+// the controller rejects as a block would leave the framed outline wrong, and
+// so would one FluidNC or grblHAL works out as it runs (ADR-630 Amendment 7).
 function lineRefusalOf(
   line: string,
   lineNumber: number,
@@ -273,6 +275,9 @@ function lineRefusalOf(
   if (storage !== null) {
     return `Line ${lineNumber} (${preview(line)}) ${storage}. KerfDesk does not send shell, file or stored-program commands inside a job: the Frame cannot trace what they run. Remove it from the program.`;
   }
+  // Before the checksum check, which would misname `X[5*2]`.
+  const evaluated = evaluatedSyntaxRefusal(line, dialect);
+  if (evaluated !== null) return `Line ${lineNumber} (${preview(line)}) ${evaluated}`;
   // Marlin queue.cpp requires line sequence/checksum handling for every
   // leading N line. The ordinary sender implements neither resend protocol.
   // https://github.com/MarlinFirmware/Marlin/blob/2.1.2.8/Marlin/src/gcode/queue.cpp#L438-L470

@@ -210,9 +210,10 @@ function splitPath(path: ColoredPath): { readonly closed: PathsD; readonly open:
     if (isClosedPolygon(polyline) || isClosedEnough(polyline)) {
       const ring = polylineToPathD(polyline);
       // Signed area can cancel between filled lobes of a self-intersection.
-      // Only genuinely collinear rings are strokes; normalize all other rings
-      // under the path's fill rule before offsetting their filled region.
-      if (ring.length >= 3 && !collinearRing(ring)) closed.push(ring);
+      // Rings that are collinear, including after region-grid quantization,
+      // are strokes. Normalize other rings under the path's fill rule first.
+      if (ring.length >= 3 && !collinearRing(ring) && !collinearOnRegionGrid(ring))
+        closed.push(ring);
       else if (ring.length >= 2) open.push(ring.concat(ring.slice(0, 1)));
     } else if (polyline.points.length >= 2) {
       open.push(polyline.points.map((point) => ({ x: point.x, y: point.y })));
@@ -226,7 +227,7 @@ function splitPath(path: ColoredPath): { readonly closed: PathsD; readonly open:
 // filled region is normalized on.
 const COLLINEAR_TOLERANCE_MM = 0.5 / 10 ** VECTOR_PATH_PRECISION_DECIMALS;
 
-function collinearRing(ring: PathD): boolean {
+function collinearRing(ring: PathD, tolerance = COLLINEAR_TOLERANCE_MM): boolean {
   const first = ring[0];
   if (first === undefined) return true;
   // The vertex farthest from the first fixes the line's direction; two close
@@ -243,9 +244,20 @@ function collinearRing(ring: PathD): boolean {
   if (farSq === 0) return true;
   const dx = far.x - first.x;
   const dy = far.y - first.y;
-  const limit = COLLINEAR_TOLERANCE_MM * Math.sqrt(farSq);
+  const limit = tolerance * Math.sqrt(farSq);
   return ring.every(
     (point) => Math.abs(dx * (point.y - first.y) - dy * (point.x - first.x)) <= limit,
+  );
+}
+
+// A noncollinear sliver can become a line on Clipper's normalization grid.
+// Outline that line as a stroke, but do not resurrect noncollinear rings whose
+// filled areas cancel under their fill rule (for example a repeated traversal).
+function collinearOnRegionGrid(ring: PathD): boolean {
+  const scale = 10 ** VECTOR_PATH_PRECISION_DECIMALS;
+  return collinearRing(
+    ring.map(({ x, y }) => ({ x: Math.round(x * scale), y: Math.round(y * scale) })),
+    0,
   );
 }
 

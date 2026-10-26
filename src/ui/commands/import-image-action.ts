@@ -49,9 +49,10 @@ export async function importImageFile(
     const loaded = await loadImageSamples(file, pageBacked, dimensionQualified, controls?.options);
     warnImageCleanup(loaded, pushToast);
     rollback = loaded.kind === 'paged' ? loaded.rollback : null;
-    assertImportActive(options.signal);
+    const signal = pngImportSignal(controls, options.signal);
+    assertImportActive(signal);
     const imported = await importedRasterObject(file, loaded);
-    assertImportActive(options.signal);
+    assertImportActive(signal);
     const outcome = importRasterImage(imported.object);
     rollback = null;
     pushToast(
@@ -75,6 +76,13 @@ function staticImage(file: File): Promise<File> {
 
 function assertImportActive(signal: AbortSignal | undefined): void {
   signal?.throwIfAborted();
+}
+
+function pngImportSignal(
+  controls: PngImportControls | null,
+  fallback: AbortSignal | undefined,
+): AbortSignal | undefined {
+  return controls?.options.signal ?? fallback;
 }
 
 function warnImageCleanup(

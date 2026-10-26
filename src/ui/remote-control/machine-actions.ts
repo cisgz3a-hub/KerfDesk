@@ -186,6 +186,8 @@ export async function executeBoardAction(
 function boardActionBlockMessage(status: BoardRemoteStatus, finish: boolean): string | null {
   if (status.busy) return 'Place Board is busy on the computer. Wait, then try again.';
   if (status.committed) return 'The board is already created. Start a new capture on the computer.';
+  if (!status.coordinatesCurrent)
+    return 'Machine coordinates changed during capture. Start over on the computer.';
   if (finish) return null;
   return status.capturesNeeded !== null && status.captures >= status.capturesNeeded
     ? 'Every capture point is recorded. Use finish_board.'

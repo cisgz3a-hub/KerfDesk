@@ -66,6 +66,7 @@ import { captureHostedRefillStream } from './laser-hosted-refill-owner';
 import { createStartArmingCompletion } from './laser-start-arming-completion';
 import type { TranscriptSource } from './laser-transcript';
 import { noteControllerSettingWrite } from './laser-owned-reset-settings';
+import { externalProgramControllerStatePatch } from './external-program-controller-state';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -426,6 +427,7 @@ function installInitialStream(
     ),
     accessoryCache: invalidateAccessoryObservation(state.accessoryCache),
     activeJobMachineKind: options.machineKind ?? 'laser',
+    ...(options.externalProgram === true ? externalProgramControllerStatePatch(state, gcode) : {}),
   }));
   return writeOwner;
 }

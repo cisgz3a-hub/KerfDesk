@@ -2,7 +2,7 @@
 //
 // Its 20 W head has no separate pointer: Creality's software shows where it
 // will burn with a "Laser on" button that fires the beam at 1-10% and turns it
-// off after 30 s. KerfDesk's LED on does the same through the ordinary
+// off after 30 s. KerfDesk requests off with a host timer through the ordinary
 // positioning-light transaction, with Fire's command, cap and power-override
 // baseline. While the dot is lit it holds the Fire latch (`fireActive`), so
 // jog, Frame, Start, the Console and overrides refuse, Disconnect and closing

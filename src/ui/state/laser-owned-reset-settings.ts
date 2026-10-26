@@ -96,9 +96,8 @@ export function retainableControllerSettings(
 function snapshotStillHolds(state: LaserState, refs: RetainRefs): boolean {
   return (
     state.connection.kind === 'connected' &&
-    hasSessionSettingsRead(state, state.controllerSessionEpoch) &&
-    refs.settingsCollector?.kind !== 'collecting' &&
-    (refs.settingsReadRevision ?? 0) === (refs.settingsWriteRevision ?? 0)
+    sessionSettingsReadHolds(state, state.controllerSessionEpoch, refs) &&
+    refs.settingsCollector?.kind !== 'collecting'
   );
 }
 
@@ -152,5 +151,17 @@ export function hasSessionSettingsRead(state: LaserState, sessionEpoch: number):
     state.controllerSettingsObservation?.sessionEpoch === sessionEpoch &&
     state.lastSettingsReadAt !== null &&
     state.grblSettingsRows.length > 0
+  );
+}
+
+/** This session's `$$` read, when no `$` setting has been written since it. */
+export function sessionSettingsReadHolds(
+  state: LaserState,
+  sessionEpoch: number,
+  refs: OwnedResetSettingsRefs,
+): boolean {
+  return (
+    hasSessionSettingsRead(state, sessionEpoch) &&
+    (refs.settingsReadRevision ?? 0) === (refs.settingsWriteRevision ?? 0)
   );
 }

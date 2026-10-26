@@ -261,7 +261,7 @@ describe('useImportDragDrop G-code Inspector routing (LF-CANVAS-GCODE-DROP-001)'
   });
 });
 
-describe('useImportDragDrop project files (ADR-378 Amendment 1)', () => {
+describe('useImportDragDrop project files (ADR-378 Amendment 2)', () => {
   it('opens a dropped project instead of rejecting it as unsupported', async () => {
     const openGcodeInspector = vi.fn<OpenGcodeInspector>();
     const { unmount } = await renderHarness(openGcodeInspector, mockPlatform());

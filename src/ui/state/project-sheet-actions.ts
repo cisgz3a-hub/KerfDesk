@@ -8,6 +8,7 @@ import { visitWorkflowArchives } from '../../io/project/project-workflow-archive
 import { validateProjectStudioDocuments } from '../../io/project/project-studio-document-validator';
 import { useToastStore } from './toast-store';
 import { trustProject } from '../licensing/project-seal';
+import { projectLoadRefused } from './project-machine-capability';
 
 type Set = (patch: Partial<AppState> | ((state: AppState) => Partial<AppState>)) => void;
 export type ProjectSheetActions = {
@@ -97,7 +98,7 @@ function replaceSheetProject(set: Set, get: () => AppState, project: Project): b
   const previous = get();
   // Another sheet of the open, already admitted document (ADR-592).
   const outcome = previous.setProject(trustProject(project));
-  if (outcome.kind === 'desktop-required') return false;
+  if (projectLoadRefused(outcome)) return false;
   // Preserve this multi-sheet file's save destination; normal document
   // replacement resets Frame, pending work and selection to the new owner.
   set({ savedName: previous.savedName, lastSaveTarget: previous.lastSaveTarget, dirty: true });

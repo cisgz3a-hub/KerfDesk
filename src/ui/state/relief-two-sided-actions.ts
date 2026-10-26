@@ -16,6 +16,7 @@ import {
   splitReliefForTwoSides,
   type ReliefSideMesh,
   type ReliefTwoSidedOptions,
+  type ReliefTwoSidedSplit,
 } from '../../core/relief/relief-two-sided-split';
 import type { AppState } from './store';
 import { pushUndo } from './scene-mutations';
@@ -65,6 +66,9 @@ function plannedSplit(
     return { result: { kind: 'error', reason: 'Select an STL relief to split.' } };
   }
   const mesh = relief as MeshReliefObject;
+  if (mesh.twoSidedSplit !== undefined) {
+    return { result: { kind: 'error', reason: 'This relief is already a side of a split.' } };
+  }
   const split = splitReliefForTwoSides(
     mesh.reliefSource.meshPositions,
     mesh.targetWidthMm,
@@ -72,8 +76,8 @@ function plannedSplit(
     { ...request, stockThicknessMm: machine.stock.thicknessMm },
   );
   if (split.kind === 'error') return { result: split };
-  const sideA = sideRelief(mesh, split.sideA, split.insetMm, 'A');
-  const sideB = sideRelief(mesh, split.sideB, split.insetMm, 'B');
+  const sideA = sideRelief(mesh, split, request, 'A');
+  const sideB = sideRelief(mesh, split, request, 'B');
   const objects = project.scene.objects.flatMap((object) =>
     object.id === id ? [sideA, sideB] : [object],
   );
@@ -104,13 +108,17 @@ function plannedSplit(
 }
 
 // The side's relief at the original's placement, moved so the model inside
-// its frame lands exactly where the original model stood.
+// its frame lands exactly where the original model stood. It records the stock
+// it was planned for, so relief CAM can follow a later stock edit (ADR-580
+// Amendment 1).
 function sideRelief(
   original: MeshReliefObject,
-  side: ReliefSideMesh,
-  insetMm: number,
+  split: Extract<ReliefTwoSidedSplit, { readonly kind: 'ok' }>,
+  request: ReliefTwoSidedRequest,
   name: 'A' | 'B',
 ): MeshReliefObject {
+  const side: ReliefSideMesh = name === 'A' ? split.sideA : split.sideB;
+  const insetMm = split.insetMm;
   const shift = applyTransform({ x: insetMm, y: insetMm }, { ...original.transform, x: 0, y: 0 });
   return {
     ...original,
@@ -119,6 +127,13 @@ function sideRelief(
     targetWidthMm: side.widthMm,
     reliefDepthMm: side.depthMm,
     reliefSource: { kind: 'legacy-mesh', meshPositions: side.positions, emptyCells: 'floor' },
+    twoSidedSplit: {
+      side: name,
+      stockThicknessMm: split.stockThicknessMm,
+      modelDepthMm: original.reliefDepthMm,
+      splitHeightMm: request.splitHeightMm,
+      webMm: request.webMm,
+    },
     // The extent meshToHeightmap gives this mesh at this width.
     bounds: {
       minX: 0,

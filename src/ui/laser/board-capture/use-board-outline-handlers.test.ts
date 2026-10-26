@@ -134,6 +134,79 @@ describe('createOutlineFinishHandler', () => {
     expect(commit).not.toHaveBeenCalled();
   });
 
+  it.each(['controllerSessionEpoch', 'trustedPositionEpoch', 'workOriginVersion'] as const)(
+    'refuses stale %s before writing an outline origin',
+    async (key) => {
+      const capture = captureWith([
+        { x: 100, y: -260 },
+        { x: 180, y: -200 },
+      ]);
+      useLaserStore.setState({ [key]: 2 });
+      const write = vi.fn(async () => undefined);
+      const commit = vi.fn();
+      const handler = createOutlineFinishHandler(
+        { capture, device: DEFAULT_DEVICE_PROFILE, setOriginAtMachinePoint: write },
+        commit,
+        vi.fn(),
+        vi.fn(),
+        vi.fn(),
+      );
+      await expect(handler()).rejects.toThrow('coordinates changed');
+      expect(write).not.toHaveBeenCalled();
+      expect(commit).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['document', 'capture', 'origin'] as const)(
+    'does not commit when %s ownership changes during the origin write',
+    async (change) => {
+      let current = true;
+      const capture = {
+        ...captureWith([
+          { x: 100, y: -260 },
+          { x: 180, y: -200 },
+        ]),
+        isSessionCurrent: () => current,
+      };
+      const write = vi.fn(async () => {
+        if (change === 'document')
+          useStore.setState({ projectDocumentEpoch: useStore.getState().projectDocumentEpoch + 1 });
+        if (change === 'capture') current = false;
+        if (change === 'origin') useLaserStore.setState({ workOriginVersion: 3 });
+      });
+      const commit = vi.fn();
+      const handler = createOutlineFinishHandler(
+        { capture, device: DEFAULT_DEVICE_PROFILE, setOriginAtMachinePoint: write },
+        commit,
+        vi.fn(),
+        vi.fn(),
+        vi.fn(),
+      );
+      await expect(handler()).rejects.toThrow();
+      expect(commit).not.toHaveBeenCalled();
+    },
+  );
+
+  it('accepts the single work-origin advance owned by registration', async () => {
+    const capture = captureWith([
+      { x: 100, y: -260 },
+      { x: 180, y: -200 },
+    ]);
+    const commit = vi.fn();
+    const write = vi.fn(async () => {
+      useLaserStore.setState({ workOriginVersion: 2 });
+    });
+    const handler = createOutlineFinishHandler(
+      { capture, device: DEFAULT_DEVICE_PROFILE, setOriginAtMachinePoint: write },
+      commit,
+      vi.fn(),
+      vi.fn(),
+      vi.fn(),
+    );
+    await handler();
+    expect(commit).toHaveBeenCalledOnce();
+  });
+
   it('records the current head position when an outline anchor is accepted', async () => {
     const target = { kind: 'outline' as const, index: 2, ordinal: 3 };
     const onCorrect = vi.fn(async () => undefined);
