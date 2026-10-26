@@ -41,7 +41,7 @@ function laserAssumptions(
 
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
-    expect(EMITTER_REVISION).toBe('cnc-tile-files-per-bit-20261023-v25');
+    expect(EMITTER_REVISION).toBe('laser-runway-markers-rotary-anchor-20261023-v26');
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {

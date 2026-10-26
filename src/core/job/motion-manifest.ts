@@ -33,6 +33,11 @@ export type MotionManifest = {
 export type BuildMotionManifestOptions = {
   readonly machineKind: MachineKind;
   readonly initialPosition?: MotionPoint;
+  /** How the laser controller turns the beam on (ADR-096 Amendment 1), as the
+   * Inspector reads it (`laserPowerControlForDevice`). Smoothieware fires any
+   * G1-G3 with S > 0 while its M221 scale is above 0, without M3/M4. Absent
+   * reads M3/M4/M106 as arming the beam. */
+  readonly laserPowerControl?: 'spindle' | 'fan' | 'smoothieware' | undefined;
 };
 
 export { buildMotionManifest } from './motion-manifest-parser';

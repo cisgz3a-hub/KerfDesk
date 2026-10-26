@@ -585,6 +585,9 @@ export type Job = {
   readonly cncCompilation?: CncCompilationSidecar;
   /** Laser finish placed by preparation (ADR-493). Absent keeps the default. */
   readonly laserFinish?: JobLaserFinish;
+  /** Program Y an active rotary keeps fixed: the placement target of a placed
+   * job (ADR-127 Amendment 1). Absent rebases the rotary job to Y 0. */
+  readonly rotaryAnchorY?: number;
 };
 
 /** Where a laser job leaves the head (ADR-493): `point` is in this job's program

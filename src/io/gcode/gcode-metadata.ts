@@ -138,7 +138,10 @@ export type GcodeMetadata = {
 // ADR-250 Amd 3 keeps CNC profile leads clear of every part the job keeps.
 // ADR-392 Amd 2 writes a tile that needs several bits as one file per bit (no
 // M0) and sets the bed park aside in tiles; surfacing ladders run no extra pass.
-export const EMITTER_REVISION = 'cnc-tile-files-per-bit-20261023-v25';
+// ADR-415 Amd 1 marks image run-ins and run-outs as laser-off motion; ADR-239
+// Amd 1 says a contour entry was skipped when the bed position is unknown;
+// ADR-127 Amd 1 keeps a placed rotary job on its anchor.
+export const EMITTER_REVISION = 'laser-runway-markers-rotary-anchor-20261023-v26';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

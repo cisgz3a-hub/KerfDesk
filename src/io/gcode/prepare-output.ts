@@ -60,6 +60,7 @@ import { placeCncParks } from '../../core/job/job-origin';
 import { placeLaserFinish } from '../../core/job/laser-finish';
 import { applyLaserLeads } from '../../core/job/apply-laser-leads';
 import { laserLeadOptions } from '../../core/job/laser-lead-rotary';
+import { withRotaryAnchor } from '../../core/job/rotary-job';
 import {
   CURRENT_LASER_POWER_SCALE_VERSION,
   type LaserPowerScaleVersion,
@@ -287,11 +288,17 @@ export function completePreparedOutput(
     // ADR-626: leads join each contour where the beam really starts, so they
     // follow the planner and the job start point. A job without leads is
     // returned as is. The scrap side is judged among the whole scene's
-    // contours, so the output scope cannot change it (Amendment 1).
-    job: applyLaserLeads(started, {
-      ...laserLeadOptions(input.project.device, input.project.machine, entryBounds),
-      scene: input.sourceProject.scene,
-    }),
+    // contours, so the output scope cannot change it (Amendment 1). A placed
+    // rotary job keeps its anchor's Y (ADR-127 Amendment 1).
+    job: withRotaryAnchor(
+      applyLaserLeads(started, {
+        ...laserLeadOptions(input.project.device, input.project.machine, entryBounds),
+        scene: input.sourceProject.scene,
+      }),
+      input.project.device,
+      input.project.machine,
+      input.options.jobOrigin,
+    ),
     jobOriginOffset: offset,
     advisories: input.advisories,
   };
