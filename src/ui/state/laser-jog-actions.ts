@@ -22,7 +22,8 @@ import { assertAutofocusIdle, jogFrameCommandBlockMessage, pushLog } from './las
 import { useStore } from './store';
 import { isWorkZEvidenceCurrentForStart } from './work-z-zero-evidence';
 import { confirmFreshManualMotionIdle } from './manual-motion-fresh-idle';
-import { warnJogMotionPolicy } from './laser-jog-warnings';
+import { jogXyTarget, warnJogMotionPolicy } from './laser-jog-warnings';
+import { appendStepJog, canQueueStepJog, type StepJogQueue } from './step-jog-queue';
 import {
   assertManualMotionNotCancelled,
   manualMotionCancelGeneration,
@@ -70,7 +71,7 @@ export function jogActions(
   return {
     home: () => runHomeAction(set, get, refs, safeWrite, refs.driver),
     jogToMachinePosition: (x, y, feed) => runJogToMachinePosition(context, x, y, feed),
-    jog: (params, owner) => runJog(context, params, owner),
+    jog: (params, owner, options) => runJog(context, params, owner, options),
     cancelJog: () => runCancelJog(set, get, refs, safeWrite),
     frame: (bounds, feed, candidate, jobProject, owner) =>
       runFrame(context, bounds, feed, candidate, jobProject, owner),
@@ -137,8 +138,11 @@ async function runJog(
   context: JogActionContext,
   params: Parameters<LaserState['jog']>[0],
   owner?: MachineExecutionOwner,
+  options?: Parameters<LaserState['jog']>[2],
 ): Promise<void> {
   assertMachineExecutionOwner(owner);
+  const stepPress = options?.queueStep === true && owner === undefined && params.relative !== false;
+  if (stepPress && queueStepJog(context, params)) return;
   context = { ...context, safeWrite: ownedMachineWrite(context.safeWrite, owner) };
   const { set, get, refs } = context;
   assertAutofocusIdle(get());
@@ -152,6 +156,7 @@ async function runJog(
   const operation = {
     ...startSettledJogOperation(refs),
     ...(owner === undefined ? {} : { executionOwner: owner }),
+    ...(stepPress ? { stepJogQueue: firstStepJogQueue(get, params) } : {}),
   };
   assertManualMotionNotCancelled(refs, cancelGeneration);
   set({ motionOperation: operation, frameVerification: null, framedRun: null, frameTrace: null });
@@ -162,6 +167,37 @@ async function runJog(
     set((state) => failOwnedMotionOperation(state, operation.operationId));
     throw error;
   }
+}
+
+// A step press while a step jog runs joins it (ADR-648): its line waits in the
+// operation, so the first step's fresh-Idle proof covers the run, and Cancel's
+// cancelRequested drops every queued step. Returns false to start a new jog.
+function queueStepJog(
+  context: JogActionContext,
+  params: Parameters<LaserState['jog']>[0],
+): boolean {
+  const { set, get, refs } = context;
+  const operation = get().motionOperation;
+  if (operation === null || !canQueueStepJog(get())) return false;
+  const start = operation.stepJogQueue?.plannedEnd ?? null;
+  warnJogMotionPolicy(set, get, params, start);
+  const line = `${refs.driver.commands.buildJog(params)}\n`;
+  const plannedEnd = start === null ? null : jogXyTarget(get, params, start);
+  set((state) =>
+    state.motionOperation?.operationId === operation.operationId
+      ? {
+          motionOperation: appendStepJog(state.motionOperation, line, plannedEnd),
+          frameVerification: null,
+          framedRun: null,
+          frameTrace: null,
+        }
+      : {},
+  );
+  return true;
+}
+
+function firstStepJogQueue(get: GetFn, params: Parameters<LaserState['jog']>[0]): StepJogQueue {
+  return { sessionEpoch: get().controllerSessionEpoch, plannedEnd: jogXyTarget(get, params) };
 }
 
 async function dispatchOwnedJog(

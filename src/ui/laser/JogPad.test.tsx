@@ -346,14 +346,14 @@ describe('JogPad accessible labels', () => {
     await act(async () => {
       up.click();
     });
-    expect(jog).toHaveBeenCalledWith({ dy: -10, feed: 3000 });
+    expect(jog).toHaveBeenCalledWith({ dy: -10, feed: 3000 }, undefined, { queueStep: true });
 
     const right = buttonByLabel(host, 'Jog +X 10 mm');
     if (right === null) throw new Error('→ button missing its +X label');
     await act(async () => {
       right.click();
     });
-    expect(jog).toHaveBeenLastCalledWith({ dx: 10, feed: 3000 });
+    expect(jog).toHaveBeenLastCalledWith({ dx: 10, feed: 3000 }, undefined, { queueStep: true });
 
     await unmount();
   });
@@ -370,11 +370,11 @@ describe('JogPad accessible labels', () => {
     await act(async () => {
       up.click();
     });
-    expect(jog).toHaveBeenCalledWith({ dy: -10, feed: 3000 });
+    expect(jog).toHaveBeenCalledWith({ dy: -10, feed: 3000 }, undefined, { queueStep: true });
     await act(async () => {
       right.click();
     });
-    expect(jog).toHaveBeenLastCalledWith({ dx: -10, feed: 3000 });
+    expect(jog).toHaveBeenLastCalledWith({ dx: -10, feed: 3000 }, undefined, { queueStep: true });
 
     await unmount();
   });
@@ -390,7 +390,7 @@ describe('JogPad accessible labels', () => {
     await act(async () => {
       up.click();
     });
-    expect(jog).toHaveBeenCalledWith({ dy: 10, feed: 3000 });
+    expect(jog).toHaveBeenCalledWith({ dy: 10, feed: 3000 }, undefined, { queueStep: true });
 
     await unmount();
   });

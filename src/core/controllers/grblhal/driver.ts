@@ -71,6 +71,12 @@ export const grblHalDriver: ControllerDriver = {
     // stream.h#L287-L291). Stock GRBL ignores 0x85 outside Jog and flushes
     // nothing (https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/serial.c#L159-L162).
     jogCancelDropsUnparsedLines: true,
+    // CMD_STATUS_REPORT_ALL (0x87) sets every report flag and requests a
+    // status report, so WCO: arrives at once instead of at the next refresh
+    // count. Stock GRBL has no such byte.
+    // https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/grbl.h
+    // (CMD_STATUS_REPORT_ALL), protocol.c (protocol_enqueue_realtime_command).
+    completeStatusQuery: '\x87',
   },
   capabilities: {
     ...grblDriver.capabilities,

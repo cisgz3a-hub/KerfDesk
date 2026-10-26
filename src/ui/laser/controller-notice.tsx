@@ -205,6 +205,8 @@ function qualificationMessage(
       return 'Waiting for controller response…';
     case 'reset-cleanup':
       return 'Controller reset detected. Waiting to read controller settings…';
+    case 'awaiting-ready':
+      return 'Waiting for the controller to be ready before reading its settings…';
     case 'settings-read':
       return 'Reading controller settings…';
     default:

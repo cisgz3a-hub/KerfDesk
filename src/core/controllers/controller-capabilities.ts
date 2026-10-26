@@ -110,6 +110,13 @@ export type ControllerCapabilities = {
   // build compiles no G92.1 (G92.cpp:62-70; controller audit 2026-09-25 MA-2,
   // CG-1, CG-11). Absent means 'reported'.
   readonly workOffsetSource?: 'reported' | 'host-recorded';
+  // How Reset origin clears a transient (G92) origin; `wcs` says whether one
+  // can be set at all. 'g92.1': the firmware's own G92.1 (GRBL family,
+  // Smoothieware). 'machine-frame-g92': a G92 to the machine position, which
+  // only a host that recorded the shift can compute (Marlin, whose stock build
+  // compiles no G92.1; ADR-648). Absent means 'g92.1' wherever `wcs` is not
+  // 'none'.
+  readonly transientOriginClear?: 'g92.1' | 'machine-frame-g92';
   // Whether the realtime soft reset reboots the firmware, which then prints
   // its banner. GRBL-family firmware does. Smoothieware halts instead: Ctrl-X
   // sets halt_flag (USBSerial.cpp:204-208) and on_idle prints `HALTED, M999

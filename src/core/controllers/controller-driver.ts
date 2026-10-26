@@ -23,6 +23,10 @@ export type FrameBounds = {
 export type ControllerRealtime = {
   /** Status report request byte (GRBL '?'), written outside the line queue. */
   readonly statusQuery: string | null;
+  /** A status request answered with every report field at once, the work
+   *  offset (`WCO:`) included (grblHAL 0x87). Stock GRBL sends WCO only every
+   *  few reports. Absent or null: the firmware has no such request (ADR-648). */
+  readonly completeStatusQuery?: string | null;
   /** Feed hold (GRBL '!'). */
   readonly hold: string | null;
   /** Safety Door (GRBL 0x84): controlled motion stop plus accessory shutdown. */

@@ -32,8 +32,15 @@ type JogParams = Parameters<LaserState['jog']>[0];
 type Point = { readonly x: number; readonly y: number };
 type JogXyPath = { readonly start: Point; readonly target: Point };
 
-export function warnJogMotionPolicy(set: SetFn, get: GetFn, params: JogParams): void {
-  const path = resolveJogXyPath(get, params);
+/** `start` overrides the reported position for a step queued behind running
+ *  steps, which starts where they end (ADR-648); null there means unknown. */
+export function warnJogMotionPolicy(
+  set: SetFn,
+  get: GetFn,
+  params: JogParams,
+  start?: Point | null,
+): void {
+  const path = resolveJogXyPath(get, params, start);
   if (path === null) {
     warnUnresolvedJogXyPath(set, get, params);
     return;
@@ -62,15 +69,27 @@ function bedJogPath(state: LaserState, device: DeviceProfile, path: JogXyPath): 
   return state.homingState === 'confirmed' ? null : path;
 }
 
-function resolveJogXyPath(get: GetFn, params: JogParams): JogXyPath | null {
+/** Where an XY jog ends in machine coordinates, or null when unknown. */
+export function jogXyTarget(get: GetFn, params: JogParams, start?: Point | null): Point | null {
+  return resolveJogXyPath(get, params, start)?.target ?? null;
+}
+
+function resolveJogXyPath(
+  get: GetFn,
+  params: JogParams,
+  startOverride?: Point | null,
+): JogXyPath | null {
   const hasX = params.dx !== undefined;
   const hasY = params.dy !== undefined;
   if (!hasX && !hasY) return null;
-  const start = inferCurrentMachinePosition(
-    get().statusReport,
-    get().wcoCache,
-    get().controllerSettings?.reportInches === true,
-  );
+  const start =
+    startOverride !== undefined
+      ? startOverride
+      : inferCurrentMachinePosition(
+          get().statusReport,
+          get().wcoCache,
+          get().controllerSettings?.reportInches === true,
+        );
   if (start === null) return null;
   const relative = params.relative !== false;
   const target = relative

@@ -238,7 +238,9 @@ describe('controller recovery on the existing connection', () => {
     expectSameConnection(f);
   });
 
-  it('keeps the initial Alarm connection open and qualifies when Idle returns', async () => {
+  // Behaviour audit F-4, ADR-648: GRBL answers `$$` in Alarm, so the first
+  // connect of a board locked there reads settings without waiting for Idle.
+  it('keeps the initial Alarm connection open and qualifies it in Alarm', async () => {
     const f = fixture();
     currentFixture = f;
     f.controls.state = 'Alarm';
@@ -246,15 +248,10 @@ describe('controller recovery on the existing connection', () => {
     f.emit('Grbl 1.1f');
     f.status();
 
-    await vi.advanceTimersByTimeAsync(30_000);
-
-    expectQualifying();
-    expect(f.settingsReads()).toBe(0);
-    f.controls.state = 'Idle';
-    f.status();
-    await vi.advanceTimersByTimeAsync(250);
+    await vi.advanceTimersByTimeAsync(3_000);
 
     expect(useLaserStore.getState().controllerQualification.kind).toBe('qualified');
+    expect(useLaserStore.getState().statusReport?.state).toBe('Alarm');
     expect(f.settingsReads()).toBe(1);
     expectSameConnection(f);
   });
@@ -294,7 +291,20 @@ describe('controller recovery on the existing connection', () => {
     expectSameConnection(f);
   });
 
-  it.each(['Alarm', 'Sleep'])(
+  it('refreshes in Alarm after Abort without waiting for Idle (ADR-648)', async () => {
+    const f = await connect();
+    await startTestLaserJob('G1 X1 S100\nG1 X2 S100');
+    f.controls.state = 'Alarm';
+
+    await useLaserStore.getState().stopJob();
+    await vi.advanceTimersByTimeAsync(3_000);
+
+    expect(useLaserStore.getState().controllerQualification.kind).toBe('qualified');
+    expect(f.settingsReads()).toBe(2);
+    expectSameConnection(f);
+  });
+
+  it.each(['Sleep'])(
     'waits in %s after Abort and refreshes automatically after fresh Idle',
     async (controllerState) => {
       const f = await connect();
@@ -316,7 +326,8 @@ describe('controller recovery on the existing connection', () => {
     },
   );
 
-  it.each(['Alarm', 'Sleep'])(
+  // A retained Alarm report now qualifies at once (ADR-648); Sleep still waits.
+  it.each(['Sleep'])(
     'detects silence after a retained %s report and refreshes after a late Idle response',
     async (controllerState) => {
       const f = await connect();

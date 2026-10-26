@@ -123,7 +123,7 @@ describe('JogPad keyboard XY jog (ADR-493)', () => {
     // Physical up on a rear-origin machine is machine -Y (the pad's own label).
     jog.mockClear();
     await press(UP_CHORD);
-    expect(jog).toHaveBeenCalledWith({ dy: -10, feed: 3000 });
+    expect(jog).toHaveBeenCalledWith({ dy: -10, feed: 3000 }, undefined, { queueStep: true });
 
     await unmount();
   });
@@ -138,7 +138,10 @@ describe('JogPad keyboard XY jog (ADR-493)', () => {
     await press(numpad('6'));
     await press(UP_CHORD);
 
-    expect(jog.mock.calls).toEqual([[{ dx: 1, feed: 6000 }], [{ dy: 1, feed: 6000 }]]);
+    expect(jog.mock.calls).toEqual([
+      [{ dx: 1, feed: 6000 }, undefined, { queueStep: true }],
+      [{ dy: 1, feed: 6000 }, undefined, { queueStep: true }],
+    ]);
 
     await unmount();
   });

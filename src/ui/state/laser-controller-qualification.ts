@@ -9,6 +9,10 @@ import type { JobTransportLedgerRefs } from './laser-job-transport-ledger';
 export type ControllerQualificationPhase =
   | 'controller-response'
   | 'reset-cleanup'
+  // Communication is proven in this session, with no reset behind it, but the
+  // controller is in a state that takes no settings read yet (Sleep, Hold, a
+  // jog still running, or Alarm on a controller without `$$`) (ADR-648).
+  | 'awaiting-ready'
   | 'settings-read';
 
 export type ControllerQualification =
@@ -32,6 +36,7 @@ export type ControllerQualificationScheduleRefs = TranscriptBufferRefs &
     readonly pendingResetCleanup?: unknown | null;
     readonly controllerCommand?: unknown | null;
     readonly settingsCollector?: { readonly kind: string };
+    readonly driver?: { readonly commands: { readonly settingsQuery: string | null } };
     qualificationTimer?: ReturnType<typeof setTimeout> | null;
     qualificationDeadline?: number | null;
     qualificationRevision?: number;
@@ -108,7 +113,15 @@ type QualificationScheduleOptions = {
   readonly onSilent?: () => void;
 };
 
-type QualificationReadiness = { alarmSeen: boolean };
+type QualificationReadiness = {
+  alarmSeen: boolean;
+  /** This schedule saw the current Alarm report arrive (ADR-648). */
+  freshAlarm: boolean;
+  /** Settings may be read on that Alarm: the driver has a `$$` dump, which
+   *  GRBL-family firmware answers in Alarm, and no halting reset
+   *  (Smoothieware) waits for the Idle after its Alarm. */
+  readonly readsInAlarm: boolean;
+};
 
 export function scheduleControllerQualification(
   set: SetFn,
@@ -120,7 +133,11 @@ export function scheduleControllerQualification(
   cancelScheduledControllerQualification(refs);
   const connection = refs.connection;
   const revision = refs.qualificationRevision ?? 0;
-  const readiness: QualificationReadiness = { alarmSeen: options.afterAlarm !== true };
+  const readiness: QualificationReadiness = {
+    alarmSeen: options.afterAlarm !== true,
+    freshAlarm: false,
+    readsInAlarm: options.afterAlarm !== true && refs.driver?.commands.settingsQuery != null,
+  };
   let lastStatusSequence = get().statusSequence;
   // Only this scheduler's readiness failure can resume automatically. Empty
   // or rejected settings responses remain an explicit Retry.
@@ -140,6 +157,7 @@ export function scheduleControllerQualification(
     const receivedStatus = receivedControllerStatus(state, lastStatusSequence);
     lastStatusSequence = state.statusSequence;
     const timeout = wait.observe(state, refs, receivedStatus, options.onSilent);
+    if (receivedStatus) readiness.freshAlarm = state.statusReport?.state === 'Alarm';
     const ready = qualificationReadinessAllowsRead(state, refs, readiness);
     if (readinessFailure !== null && wait.shouldRestore(state, receivedStatus)) {
       restoreQualificationAfterStatus(set, readinessFailure, epoch, readiness.alarmSeen);
@@ -195,8 +213,10 @@ export function requalifyAfterHaltingReset(
  * controller response…" forever when a board that does not reset on open was
  * locked in Alarm or Sleep (audit connect-2). The same connection and session,
  * with qualification still pending for it, is an in-session invalidation: the
- * scheduler runs qualification on the first fresh Idle once the operator
- * unlocks, homes or wakes the controller.
+ * scheduler runs qualification on the next fresh Alarm report of a controller
+ * with a `$$` dump, which answers settings reads there, or else on the first
+ * fresh Idle once the operator unlocks, homes or wakes the controller. Nothing
+ * reset, so the phase says it waits for the controller (ADR-648).
  */
 export function resumeQualificationInSession(
   set: SetFn,
@@ -209,7 +229,7 @@ export function resumeQualificationInSession(
   if (refs.connection !== connection || state.controllerSessionEpoch !== epoch) return;
   const qualification = state.controllerQualification;
   if (qualification.kind !== 'qualifying' || qualification.epoch !== epoch) return;
-  set({ controllerQualification: qualifyingController(epoch, 'reset-cleanup') });
+  set({ controllerQualification: qualifyingController(epoch, 'awaiting-ready') });
   scheduleControllerQualification(set, get, refs, epoch);
 }
 
@@ -267,6 +287,7 @@ function qualificationReadinessAllowsRead(
       resetCleanupPending: refs.pendingResetCleanup != null,
       settingsCollectionActive: refs.settingsCollector?.kind === 'collecting',
       requireCurrentStatusObservation: true,
+      freshAlarmObserved: readiness.readsInAlarm && readiness.freshAlarm,
     }) === null
   );
 }

@@ -165,7 +165,7 @@ async function resetOrigin(
   safeWrite: SafeWriteFn,
 ): Promise<void> {
   await assertOriginActionReady(set, get, refs, safeWrite);
-  if (get().capabilities.workOffsetSource === 'host-recorded') {
+  if (get().capabilities.transientOriginClear === 'machine-frame-g92') {
     await restoreHostRecordedMachineFrame(set, get, refs, safeWrite);
     return;
   }
@@ -186,7 +186,9 @@ async function resetOrigin(
 
 // Marlin's G92.1 needs CNC_COORDINATE_SYSTEMS; a stock build acknowledges it and
 // keeps the shift. A G92 to the machine position restores machine coordinates
-// on every build (host-recorded-origin.ts; audit CG-11).
+// on every build (host-recorded-origin.ts; audit CG-11, CS-05, ADR-648). It is
+// computed from the shift KerfDesk recorded, so it needs a host-recorded
+// machine position and refuses without one.
 async function restoreHostRecordedMachineFrame(
   set: SetFn,
   get: GetFn,
@@ -300,6 +302,8 @@ export const ORIGIN_WCO_UNCONFIRMED_NOTICE =
 async function waitForOriginWcoFrame(get: GetFn, assertCurrent: () => void): Promise<boolean> {
   const deadline = Date.now() + ORIGIN_WCO_WAIT_TIMEOUT_MS;
   assertCurrent();
+  // grblHAL answers its complete-report request with WCO at once (ADR-648).
+  if (get().wcoCache === null) void get().requestControllerStatus({ complete: true });
   while (get().wcoCache === null && Date.now() <= deadline) {
     await sleep(ORIGIN_WCO_POLL_MS);
     assertCurrent();

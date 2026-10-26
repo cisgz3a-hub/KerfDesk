@@ -39,7 +39,8 @@ export function JogArrowGrid(props: {
   // cancel an in-flight jog; otherwise the boundary-length move cannot be
   // stopped on release (F101).
   readonly continuousJogSupported: boolean;
-  readonly onJog: (vector: JogVector) => void;
+  /** `mode` tells a step press from the start of a press-and-hold. */
+  readonly onJog: (vector: JogVector, mode: 'step' | 'hold') => void;
   readonly onCancel: () => void;
 }): JSX.Element {
   return (
@@ -75,7 +76,7 @@ function JogArrowButton(
   const handlers = useHoldJog({
     disabled: props.disabled,
     holdEnabled: props.continuousJogSupported,
-    onStep: () => props.onJog(stepVector),
+    onStep: () => props.onJog(stepVector, 'step'),
     onHold: () => {
       const vector = continuousJogVector(
         props.direction,
@@ -84,7 +85,7 @@ function JogArrowButton(
         props.signs,
         props.feed,
       );
-      if (vector !== null) props.onJog(vector);
+      if (vector !== null) props.onJog(vector, 'hold');
     },
     onCancel: props.onCancel,
   });

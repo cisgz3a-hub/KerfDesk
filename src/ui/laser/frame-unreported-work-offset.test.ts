@@ -60,7 +60,11 @@ describe('waitForUnreportedFrameWorkOffset', () => {
     });
     await vi.advanceTimersByTimeAsync(250);
     expect(settled).toBe(false);
-    expect(requests()).toBe(3);
+    // One complete-report request (grblHAL 0x87, ADR-648), then the burst.
+    expect(requests()).toBe(4);
+    expect(vi.mocked(useLaserStore.getState().requestControllerStatus).mock.calls[0]).toEqual([
+      { complete: true },
+    ]);
 
     useLaserStore.setState({ statusSequence: 5, wcoCache: { x: 0, y: 0, z: 0 } });
     await vi.advanceTimersByTimeAsync(25);
@@ -72,7 +76,7 @@ describe('waitForUnreportedFrameWorkOffset', () => {
     const pending = waitForUnreportedFrameWorkOffset(absolute);
     await vi.advanceTimersByTimeAsync(3_100);
     await expect(pending).resolves.toBeUndefined();
-    expect(requests()).toBe(31);
+    expect(requests()).toBe(32);
     expect(useLaserStore.getState().wcoCache).toBeNull();
   });
 

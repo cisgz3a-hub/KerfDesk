@@ -91,7 +91,7 @@ afterEach(async () => {
 });
 
 describe('connection handshake waiting for controller Idle', () => {
-  it.each(['Run', 'Hold:0', 'Door:1', 'Alarm', 'Sleep'])(
+  it.each(['Run', 'Hold:0', 'Door:1', 'Sleep'])(
     'keeps %s as a waiting state and reads settings after the controller becomes Idle',
     async (initialStatus) => {
       const writes: string[] = [];
@@ -120,6 +120,20 @@ describe('connection handshake waiting for controller Idle', () => {
       expect(writes.filter((line) => line === '$$\n')).toHaveLength(1);
     },
   );
+
+  // ADR-648 (behaviour audit F-4): GRBL answers `$$` in Alarm, and a stock
+  // board with homing enabled boots there, so the first connect reads at once.
+  it('reads settings while the controller stays in Alarm', async () => {
+    const writes: string[] = [];
+    await connectController(writes, () => 'Alarm');
+
+    await vi.advanceTimersByTimeAsync(3_000);
+    await flush();
+
+    expect(useLaserStore.getState().connection.kind).toBe('connected');
+    expect(useLaserStore.getState().controllerQualification.kind).toBe('qualified');
+    expect(writes.filter((line) => line === '$$\n')).toHaveLength(1);
+  });
 
   it.each(['empty', 'rejected'] as const)(
     'keeps an attempted %s settings response failed instead of silently rereading it',

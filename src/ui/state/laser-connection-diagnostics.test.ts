@@ -241,7 +241,8 @@ describe('connection diagnostics', () => {
     expect(useLaserStore.getState().controllerQualification.kind).toBe('failed');
   });
 
-  it('keeps waiting for the operator when the first answer after 2 s is an Alarm', async () => {
+  // ADR-648: an Alarm answer proves communication, and GRBL reads `$$` there.
+  it('reads settings when the first answer after 2 s is an Alarm', async () => {
     vi.useFakeTimers();
     const machine: { state: string | null } = { state: null };
     const board = startingGrbl(machine);
@@ -254,10 +255,6 @@ describe('connection diagnostics', () => {
     await vi.advanceTimersByTimeAsync(15_000);
     expect(useLaserStore.getState().statusReport?.state).toBe('Alarm');
     expect(logMentionsBaud()).toBe(false);
-    expect(useLaserStore.getState().controllerQualification.kind).toBe('qualifying');
-
-    machine.state = 'Idle'; // unlocked at the machine
-    await vi.advanceTimersByTimeAsync(2_000);
     expect(useLaserStore.getState().controllerQualification).toMatchObject({ kind: 'qualified' });
   });
 

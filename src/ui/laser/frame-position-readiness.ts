@@ -71,6 +71,12 @@ function needsAbsoluteFrameOffset(
 export async function waitForUnreportedFrameWorkOffset(
   placement: JobPlacementSettings,
 ): Promise<void> {
+  const before = useLaserStore.getState();
+  // grblHAL sends every field, WCO included, on its complete-report request
+  // (ADR-648); elsewhere this is one more ordinary status query.
+  if (awaitsReportedWorkOffset(before, placement)) {
+    void before.requestControllerStatus({ complete: true });
+  }
   await waitForControllerStatus((laser) => !awaitsReportedWorkOffset(laser, placement));
 }
 

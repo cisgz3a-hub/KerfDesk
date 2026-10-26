@@ -88,7 +88,7 @@ describe('JogPad motion controls', () => {
         expect(button, label).toBeDefined();
         jog.mockClear();
         await act(async () => button!.click());
-        expect(jog).toHaveBeenCalledExactlyOnceWith(vector);
+        expect(jog).toHaveBeenCalledExactlyOnceWith(vector, undefined, { queueStep: true });
       }
       jog.mockClear();
       await rerender(true);
@@ -124,7 +124,7 @@ describe('JogPad motion controls', () => {
       speed.dispatchEvent(new Event('change', { bubbles: true }));
       buttonByLabel(host, 'Jog +X 10 mm')?.click();
     });
-    expect(jog).toHaveBeenCalledWith({ dx: 10, feed: 1000 });
+    expect(jog).toHaveBeenCalledWith({ dx: 10, feed: 1000 }, undefined, { queueStep: true });
     await unmount();
   });
 
@@ -136,7 +136,9 @@ describe('JogPad motion controls', () => {
     const upRight = buttonByLabel(host, 'Jog +X +Y 10 mm');
     if (upRight === null) throw new Error('diagonal jog button missing');
     await act(async () => upRight.click());
-    expect(jog).toHaveBeenCalledWith({ dx: 10, dy: 10, feed: 3000 });
+    expect(jog).toHaveBeenCalledWith({ dx: 10, dy: 10, feed: 3000 }, undefined, {
+      queueStep: true,
+    });
     await unmount();
   });
 
@@ -253,7 +255,7 @@ describe('JogPad motion controls', () => {
       });
       // Release performs a single step, and no phantom cancel is issued.
       expect(jog).toHaveBeenCalledTimes(1);
-      expect(jog).toHaveBeenCalledWith({ dx: 10, feed: 3000 });
+      expect(jog).toHaveBeenCalledWith({ dx: 10, feed: 3000 }, undefined, { queueStep: true });
       expect(cancelJog).not.toHaveBeenCalled();
     } finally {
       await unmount();
@@ -305,3 +307,34 @@ async function startHold(button: HTMLButtonElement): Promise<void> {
     await vi.advanceTimersByTimeAsync(250);
   });
 }
+
+// ADR-648 (protocol audit P-3): while a step jog runs, only XY step presses
+// stay live; they join that jog. Press-and-hold and the settings rows wait.
+describe('JogPad while a step jog can take more steps', () => {
+  it('keeps the arrows live as single steps and the rest disabled', async () => {
+    const jog = vi.fn(async () => undefined);
+    useLaserStore.setState({ jog });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    await act(async () => {
+      root = createRoot(host);
+      root.render(<JogPad disabled stepJogsOnly />);
+    });
+    try {
+      const right = buttonByLabel(host, 'Jog +X 10 mm');
+      if (right === null) throw new Error('right jog button missing');
+      expect(right.disabled).toBe(false);
+      expect(right.title).not.toContain('Hold for continuous jog');
+      const speed = host.querySelector<HTMLSelectElement>('select[aria-label="Jog speed"]');
+      expect(speed?.disabled).toBe(true);
+      await act(async () => right.click());
+      expect(jog).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ dx: 10 }), undefined, {
+        queueStep: true,
+      });
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
+});
