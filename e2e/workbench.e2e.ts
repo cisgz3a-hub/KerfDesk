@@ -511,7 +511,7 @@ baseTest('unqualified bitmap legacy fallback still reaches Trace and commits', a
   await expect(trace).toBeEnabled();
   await trace.click();
   await expect(page.getByRole('dialog', { name: 'Trace image' })).toBeVisible();
-  // Off by default, as in LightBurn (ADR-648): the bitmap stays beside the trace.
+  // Off by default, as in LightBurn (ADR-672): the bitmap stays beside the trace.
   await expect(page.getByRole('checkbox', { name: 'Delete Image After trace' })).not.toBeChecked();
   await expect(page.getByRole('button', { name: 'Trace', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: 'Trace', exact: true }).click();

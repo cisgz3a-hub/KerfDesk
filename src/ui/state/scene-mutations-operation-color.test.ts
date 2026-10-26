@@ -88,7 +88,7 @@ describe('operation color assignment', () => {
   });
 
   it('keeps a kept photo on its colour and gives the trace the next one', () => {
-    // ADR-648: the photo the operator keeps engraves, so it is artwork like the
+    // ADR-672: the photo the operator keeps engraves, so it is artwork like the
     // trace and keeps its operation and colour, as a LightBurn image keeps its
     // layer. The trace takes the next free colour, like any second artwork.
     // This used to recolour the photo to the image grey so the trace could
@@ -138,7 +138,7 @@ describe('operation color assignment', () => {
   it('leaves a legacy color-bound source binding intact (audit F1)', () => {
     // A schema-v2 style source bound by COLOR (no operationIds). Recoloring its
     // layer alone would silently re-point it at the trace's operation. Trace
-    // recolours no kept source (ADR-648), so the source keeps its own operation
+    // recolours no kept source (ADR-672), so the source keeps its own operation
     // and the trace lands on the runner-up.
     const legacy = legacyColorBoundProject();
     const result = applyTraceToExisting(
@@ -165,7 +165,7 @@ describe('operation color assignment', () => {
 
 describe('rasterized (raster-output) trace color assignment', () => {
   it('gives a rasterized trace the next colour on its copy of a kept source operation', () => {
-    // ADR-648: the kept photo engraves on its own operation; the result burns
+    // ADR-672: the kept photo engraves on its own operation; the result burns
     // on a copy of it, which takes the next free colour.
     const result = applyRasterizedTraceToExisting(
       { project: importedSource(), undoStack: [] },
@@ -189,7 +189,7 @@ describe('rasterized (raster-output) trace color assignment', () => {
   it('gives a rasterized trace its own colour with no reusable image operation (audit F2)', () => {
     // Force the fresh-operation branch: bind the source to a LINE operation so
     // no Image operation is reusable. The kept source keeps the first colour
-    // (ADR-648), so the freshly allocated operation takes the next one rather
+    // (ADR-672), so the freshly allocated operation takes the next one rather
     // than sharing or stealing the source's.
     const base = createProject();
     const project: Project = {

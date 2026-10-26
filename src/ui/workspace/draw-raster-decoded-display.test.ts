@@ -82,7 +82,7 @@ describe('drawRasterImage decoded display copy', () => {
   });
 
   // A photo kept behind a trace no longer has a tinted copy of its own: it
-  // draws like any picture (ADR-648).
+  // draws like any picture (ADR-672).
   it('keeps adjusted pictures on their own display copy', async () => {
     const adjusted = { ...pictureAt('data:image/jpeg;base64,/9j/AAAC'), brightness: 20 };
     drawRasterImage(recordingContext().ctx, adjusted, CLOSE_UP);

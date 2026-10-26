@@ -332,7 +332,7 @@ function validateRasterObject(obj: Record<string, unknown>, path: string): strin
     obj['imageClip'] === undefined
       ? null
       : validateColoredPaths(obj['imageClip'], `${path}.imageClip`),
-    // Legacy marker from before ADR-648: still accepted, then dropped on load.
+    // Legacy marker from before ADR-672: still accepted, then dropped on load.
     optionalLiteral(obj, `${path}.role`, ['trace-source']),
   ]);
   if (fieldError !== null) return fieldError;

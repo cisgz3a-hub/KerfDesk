@@ -76,7 +76,7 @@ export function useTraceDialogSettings(
   );
   const [traceOutput, setTraceOutput] = useState<TraceOutput>(initial.output ?? 'vector');
   // Off by default, as in LightBurn, where the operator turns it on to drop
-  // the image (ADR-648). A kept image engraves on its own operation and keeps
+  // the image (ADR-672). A kept image engraves on its own operation and keeps
   // Re-trace Original available.
   const [deleteSourceAfterTrace, setDeleteSourceAfterTrace] = useState(false);
   return {

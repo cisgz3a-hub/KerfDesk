@@ -45,7 +45,7 @@ export function applyCameraTraceImport(
   // replacement helpers may prune them while removing a source operation.
   const existingIds = new Set(state.project.scene.layers.map((layer) => layer.id));
   // A kept capture is a bed picture, a placement reference like the LightBurn
-  // camera overlay: it stays, but does not engrave (ADR-648).
+  // camera overlay: it stays, but does not engrave (ADR-672).
   const scene =
     options.deleteSourceAfterTrace === true
       ? result.project.scene

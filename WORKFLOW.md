@@ -4117,13 +4117,13 @@ settings and Job Review keep their existing read-only setup references.
    on its own Image operation (a Raster scan result burns on a copy of that operation), and
    **Re-trace Original** can use it. Delete it or turn its operation's Output off to run only the
    trace. A kept camera capture is a placement reference and stays on an Image operation with
-   Output off (ADR-648). Copying the trace copies only the trace. Cancel, failed tracing,
+   Output off (ADR-672). Copying the trace copies only the trace. Cancel, failed tracing,
    and abandoned requests retain the source; Undo reverses the import and source deletion together.
    The committed trace records the dialog's preset, adjusted settings, output, fill style and
    boundary, and saves them with the project. **Re-trace Original** reopens the dialog with them
    and with **Delete Image After trace** cleared, so the source stays for the next re-trace
    (ADR-408). Traces made before that record reopen on the defaults.
-   Projects saved before ADR-648 marked a kept bitmap as a trace source that never engraved. They
+   Projects saved before ADR-672 marked a kept bitmap as a trace source that never engraved. They
    open with that bitmap as an ordinary image that engraves, and a kept camera capture on an
    output-off operation.
    In a CNC project, smoothing retains established stroke junctions at the
@@ -8364,7 +8364,7 @@ as the pane's design record.
 
 #### Edge — image kept after Trace
 1. Editing an image kept after Trace (ADR-026, an ordinary image since
-   ADR-648) changes future re-traces only after Apply; the existing committed
+   ADR-672) changes future re-traces only after Apply; the existing committed
    vectors are untouched until the operator re-traces (F-L3).
 
 #### Edge — dialog and asynchronous ownership

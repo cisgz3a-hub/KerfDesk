@@ -1,10 +1,11 @@
-## ADR-648 - A picture kept after Trace engraves like any image; a kept camera capture does not (2026-10-20)
+## ADR-672 - A picture kept after Trace engraves like any image; a kept camera capture does not (2026-10-26)
 
-**Status:** Accepted. | **Date:** 2026-10-20
+**Status:** Accepted. | **Date:** 2026-10-26 (written 2026-10-20 as ADR-648; renumbered, that number went to owned-reset settings)
 
 Amends ADR-026 (the tint and its "deletable backing"), ADR-235 decision 2 for a kept source and
 decision 4 ("excluded trace-source backing"), ADR-408 decision 4 (the fresh-trace default of
-Delete Image After trace) and ADR-101's CNC advisory note. It restores ADR-026 decision 5 ("The
+Delete Image After trace), ADR-101's CNC advisory note, and the trace-source checks in ADR-670's
+tone calibration seed and ADR-633's jig tracer. It restores ADR-026 decision 5 ("The
 retained source is output-eligible ... matching LightBurn"). The Frame-first contract (PROJECT.md
 non-negotiable 21, ADR-565) is unchanged: a kept photo is ordinary output, framed like any other.
 
@@ -61,7 +62,8 @@ Three more defects sat on the same path:
 1. **A kept picture is an ordinary image.** Trace no longer tags it. It engraves on its Image
    operation and counts everywhere an image counts: compile, Frame, preflight, overscan, Sort cuts
    last, raster preparation, Preview, the hover card (its power and speed), Photo engraving, the
-   stacked-copy, upsample and CNC raster advisories. The trace keeps `traceSourceId` as a
+   photo tone calibration seed (ADR-670), the jig tracer (ADR-633), the stacked-copy, upsample
+   and CNC raster advisories. The trace keeps `traceSourceId` as a
    provenance link for Re-trace Original; it excludes nothing.
 2. **Delete Image After trace is off by default**, for a fresh trace and a re-trace, as in
    LightBurn. Ticking it removes the picture on OK, as before.
@@ -83,7 +85,8 @@ Three more defects sat on the same path:
    nesting, variable arrays), as copying LightBurn's traced vectors leaves the image alone. The
    copy keeps its Re-trace link to the original picture; pasted where that picture does not exist,
    the link is dropped instead of dangling. Copying the picture and the trace together still
-   remaps the link to the copied picture.
+   remaps the link to the copied picture. The jig editor (ADR-652) still keeps a trace and its picture in the
+   same jig, since Re-trace Original reads and can delete the picture.
 7. **A camera capture never engraves on its own.** A capture kept after Trace from Camera stays in
    the scene, visible like the LightBurn overlay, on its own Image operation with Output off
    (`core/scene/reference-image-output.ts`). The trace never shares that operation. The operator

@@ -178,7 +178,7 @@ function cloneClipboardObjects(
     }
   }
   // A pasted trace keeps its Re-trace link only to a picture that is pasted
-  // with it or already in this scene (ADR-648).
+  // with it or already in this scene (ADR-672).
   const liveIds = new Set([...targetIds, ...idMap.values()]);
   return {
     idMap,

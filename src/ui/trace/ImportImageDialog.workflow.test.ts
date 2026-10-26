@@ -54,7 +54,7 @@ describe('Trace Image workflow controls', () => {
     await withTraceDialog(async (host) => {
       const output = outputSelect(host);
       expect(output?.value).toBe('vector');
-      // Off by default, as in LightBurn (ADR-648).
+      // Off by default, as in LightBurn (ADR-672).
       expect(checkboxByLabel(host, 'Delete Image After trace')?.checked).toBe(false);
       expect(Array.from(output?.options ?? []).map((option) => option.textContent)).toEqual([
         'Editable vectors',
