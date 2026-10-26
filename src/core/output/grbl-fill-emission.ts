@@ -13,6 +13,7 @@ import { offsetForSpeed } from '../job/scan-offset';
 import { formatGcodeCoordinateMm } from '../gcode';
 import { formatGcodeFeedMmPerMin } from '../gcode/feed-word';
 import { formatGcodePowerS } from '../gcode/decimal-word';
+import { gcodeCommentLabel } from '../gcode-comments';
 import {
   createModalMotionWriter,
   joinMotionWords,
@@ -61,7 +62,7 @@ export function emitScanlineFillGroup(group: FillGroup, groupContext: FillGroupE
   const chunks: string[] = [];
   const overscanText = fillRunwayCommentText(group, formatGcodeCoordinateMm);
   chunks.push(
-    `; fill layer ${group.layerId} color ${group.color} power ${group.power}% ${feedComment(group, feed)} passes ${group.passes} ${overscanText}`,
+    `; fill layer ${gcodeCommentLabel(group.layerId)} color ${gcodeCommentLabel(group.color)} power ${group.power}% ${feedComment(group, feed)} passes ${group.passes} ${overscanText}`,
   );
   pushOperationProvenanceComment(chunks, group);
   const scanOffsetMm =

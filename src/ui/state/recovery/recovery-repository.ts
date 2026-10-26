@@ -4,7 +4,7 @@ import { RecoveryActivationCoordinator } from './recovery-activation-coordinator
 import { RecoveryArtifactCleanupCoordinator } from './recovery-artifact-cleanup-coordinator';
 import { RecoveryArtifactStore } from './recovery-artifact-store';
 import { RecoveryFingerprintCapsules } from './recovery-fingerprint-capsules';
-import { compensateFailedRecoveryClaim } from './recovery-claim-compensation';
+import { releaseAmbiguousRecoveryClaim } from './recovery-claim-compensation';
 import {
   type PersistedRecoverySlots,
   type RecoveryCapsule,
@@ -19,6 +19,7 @@ import {
   discardRecoveryMutation,
   promoteStaleActiveRunMutation,
   releaseRecoveryClaimMutation,
+  settleLinkLossRestartMutation,
 } from './recovery-slot-mutations';
 import {
   recoveryErrorMessage as errorMessage,
@@ -253,6 +254,10 @@ export class RecoveryRepository {
     );
   }
 
+  /** What the first reconnect after a lost link showed (ADR-398 Amendment 3). */
+  settleLinkLossRestart = (...settlement: Parameters<typeof settleLinkLossRestartMutation>) =>
+    this.mutateAndRefresh('settle a lost link', settleLinkLossRestartMutation(...settlement));
+
   async discardCompletedReceipt(expectedRunId: RunId): Promise<RecoveryRepositoryResult<boolean>> {
     return this.mutateAndRefresh('discard completed-job replay receipt', (slots) =>
       discardCompletedReceiptMutation(slots, expectedRunId),
@@ -276,18 +281,15 @@ export class RecoveryRepository {
       // hydration that follows can still fail. Compensate by attempt ID so an
       // API failure before controller acceptance never strands a durable
       // claim, while a different window's claim remains untouched.
-      const compensated = await compensateFailedRecoveryClaim({
+      await releaseAmbiguousRecoveryClaim({
         backend: this.options.backend,
         minimumGeneration: this.currentGeneration(),
         runId: args.runId,
         attemptId: args.attemptId,
         updatedAtIso: this.nowIso(),
+        refresh: () => this.refresh(),
+        warn: this.warn,
       });
-      if (compensated.ok) {
-        await this.refresh();
-      } else {
-        this.warn('release failed interrupted job recovery claim', errorMessage(compensated.error));
-      }
       return result;
     }
     const capsule = this.state.snapshot.recoveryCapsule;

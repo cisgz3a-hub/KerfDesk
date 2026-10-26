@@ -120,6 +120,12 @@ describe('CG-2 (Falcon): Frame WCS normalization keeps a live G92 origin', () =>
     await settle(useLaserStore.getState().setOriginHere());
     expect(useLaserStore.getState().workOriginActive).toBe(true);
     expect(useLaserStore.getState().wcoCache).toMatchObject({ x: 100, y: 50 });
+    // Set origin's own `G54 G92 X0 Y0` selected G54 (ADR-375 Amendment 3), so a
+    // Frame right now would send nothing. The WCS can still become unknown with
+    // the G92 origin set: Home reads it again, and this fake answers `$G` with a
+    // bare `ok`. Model that, so the Frame's selection below still runs.
+    expect(useLaserStore.getState().activeWcs).toBe('G54');
+    useLaserStore.setState({ activeWcs: null });
 
     // A few idle polls pass before the operator presses Frame; the report that
     // G92 forced to carry WCO is one of them.

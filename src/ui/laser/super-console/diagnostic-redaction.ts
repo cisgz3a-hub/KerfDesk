@@ -1,3 +1,5 @@
+import { maskControllerPasswords } from '../../../core/controllers/controller-password-settings';
+
 // Diagnostic exports are deliberately allowlisted. This is a second layer for
 // free-form controller text, not a promise to recognise every possible secret.
 export const DIAGNOSTIC_TEXT_LIMIT = 512;
@@ -10,7 +12,8 @@ export function redactDiagnosticText(value: string): string | null {
   ) {
     return null;
   }
-  return value
+  // A `$75=` assignment names no keyword; a macro's dispatch line can carry one.
+  return maskControllerPasswords(value)
     .replace(/(?:https?|wss?|rtsp|file):\/\/[^\s<>"']+/gi, '[redacted URL]')
     .replace(/(?:[A-Za-z]:[\\/]|\\\\)[^\r\n<>"']+/g, '[redacted path]')
     .replace(/\/(?:Users|home|tmp|var|mnt|Volumes)\/[^\r\n<>"']+/g, '[redacted path]')

@@ -8,11 +8,15 @@
 // is drawn taller than the rest so the eye can halve a division without
 // counting. The live pointer position is NOT drawn here — it would redraw the
 // whole scene per mouse-move; `RulerCursorOverlay` tracks it in the DOM.
+//
+// With the Inches preference (ADR-629) the same 1-2-5 steps are chosen in
+// inches: ticks and labels count inches, placed at 25.4 mm each.
 
 import { canvasTheme } from '../theme/canvas-theme';
 import { RULER_THICKNESS_PX } from './canvas-layout';
 import { formatRulerLabel, rulerSteps } from './ruler-steps';
 import type { ViewTransform } from './view-transform';
+import { MM_PER_INCH, type DisplayLengthUnit } from '../display-length';
 
 const MAJOR_TICK_PX = 9;
 const HALF_TICK_PX = 6;
@@ -26,6 +30,7 @@ export function drawRulers(
   canvasW: number,
   canvasH: number,
   view: ViewTransform,
+  unit: DisplayLengthUnit = 'mm',
 ): void {
   ctx.save();
   ctx.fillStyle = canvasTheme.rulerBackground;
@@ -42,9 +47,12 @@ export function drawRulers(
   ctx.fillStyle = canvasTheme.rulerText;
   ctx.font = '12px ui-monospace, Menlo, monospace';
   ctx.textBaseline = 'top';
-  const steps = rulerSteps(view.scale);
-  drawHorizontalRuler(ctx, canvasW, view, steps);
-  drawVerticalRuler(ctx, canvasH, view, steps);
+  // A ruler unit's length in mm and in canvas px.
+  const unitMm = unit === 'in' ? MM_PER_INCH : 1;
+  const unitView = { ...view, scale: view.scale * unitMm };
+  const steps = rulerSteps(unitView.scale);
+  drawHorizontalRuler(ctx, canvasW, unitView, steps);
+  drawVerticalRuler(ctx, canvasH, unitView, steps);
   ctx.restore();
 }
 

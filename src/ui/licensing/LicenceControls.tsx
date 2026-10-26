@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { LicenceAdapter, LicenceStatus } from '../../platform/types';
+import { DESKTOP_LICENCE_WINDOW } from '../../../public/desktop-licence-window.mjs';
 import { purchaseLabel, purchaseTitle, startPurchase } from './purchase-action';
 
 type ActionProps = {
@@ -115,14 +116,15 @@ export function LicenceDeviceActions({ client, status, busy, run }: ActionProps)
           className="lf-btn lf-btn--primary"
           disabled={busy}
           onClick={() => void run(client.startTrial)}
-          title="Use every KerfDesk tool on this device for 30 days"
+          title={`${DESKTOP_LICENCE_WINDOW ? 'Use every KerfDesk tool' : 'Unlock every Pro tool'} on this device for 30 days`}
         >
-          Start free 30-day trial
+          {DESKTOP_LICENCE_WINDOW ? 'Start free 30-day trial' : 'Start free 30-day Pro trial'}
         </button>
       </div>
       <p style={licenceMuted}>
-        Every tool for 30 days on this device. Starting the trial needs an internet connection. No
-        payment details required.
+        {/* KerfDesk Free stays while the licence window is held off (ADR-623 Amendment 3). */}
+        {DESKTOP_LICENCE_WINDOW ? 'Every tool' : 'Every Pro tool'} for 30 days on this device.
+        Starting the trial needs an internet connection. No payment details required.
       </p>
     </>
   );

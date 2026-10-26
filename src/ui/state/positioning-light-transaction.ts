@@ -1,10 +1,20 @@
 import type { StatusReport } from '../../core/controllers/grbl';
+import { isLaserDotLight, type PositioningLight } from '../../core/devices/positioning-light';
+import { laserDotOnLine } from './laser-dot-light';
+import type { LaserSafetyAction } from './laser-safety-notice';
+import { firePowerOverrideReset } from './laser-start-override-reset';
 import {
   cancelFreshControllerStatusWait,
   waitForFreshControllerStatus,
 } from './laser-controller-status-wait';
-import { cancelControllerLifecycleRefs, startControllerCommand } from './laser-interactive-command';
+import {
+  cancelControllerLifecycleRefs,
+  ControllerCommandRefusedError,
+  startControllerCommand,
+} from './laser-interactive-command';
+import { pendingTransportWriteCount } from './laser-start-queue-fence';
 import { recordStatusPollTick } from './laser-status-poll-schedule';
+import { jogFrameCommandBlockMessage } from './laser-store-helpers';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { SafeWrite } from './laser-safe-write';
 
@@ -15,22 +25,80 @@ export type PositioningLightTransaction = {
   readonly assertCurrent: () => void;
 };
 
+/** Whether a light transaction may start now; checked before it takes the controller. */
+export function assertPositioningLightAdmission(state: LaserState, refs: LiveRefs): void {
+  if (state.connection.kind !== 'connected' || refs.connection === null)
+    throw new Error('Connect a controller before using the positioning light.');
+  if (refs.driver.capabilities.transport === 'file-only')
+    throw new Error('This controller supports file export only, not a live positioning light.');
+  const blocked = jogFrameCommandBlockMessage(state);
+  if (blocked !== null) throw new Error(blocked);
+  if (
+    state.autofocusBusy ||
+    state.probeBusy ||
+    refs.controllerStatusWait != null ||
+    state.pendingUntrackedAcks > 0 ||
+    pendingTransportWriteCount(state) > 0
+  )
+    throw new Error('Wait for the current controller command to settle.');
+}
+
 /** Each physical step owns its exact terminal reply. Driver shell responses
  * (Smoothie's `fire off`) are classified by the existing driver as an ACK. */
 export async function positioningLightCommand(
   context: PositioningLightTransaction,
   command: string,
+  action: LaserSafetyAction = 'jog',
 ): Promise<void> {
   context.assertCurrent();
   await startControllerCommand(context.refs, context.write, {
     kind: 'interactive-command',
     label: 'Positioning light',
     command: `${command.trim()}\n`,
-    action: 'jog',
+    action,
     source: 'motion',
     timeoutMode: 'non-idle-status-activity',
   });
   context.assertCurrent();
+}
+
+/** One light state inside the owned transaction: the mapping's G-code line, or
+ * for the laser dot the capped beam-on line or M5 (ADR-664). The caller holds
+ * the Fire latch before the dot's on, and has flushed override flags. */
+export async function switchLight(
+  context: PositioningLightTransaction,
+  mapping: PositioningLight,
+  on: boolean,
+): Promise<void> {
+  if (!isLaserDotLight(mapping))
+    return positioningLightCommand(context, on ? mapping.onCommand : mapping.offCommand);
+  if (!on) return positioningLightCommand(context, 'M5', 'fire');
+  return positioningLightCommand(context, laserDotOnLine(context.get(), mapping), 'fire');
+}
+
+/**
+ * Put the power override back to 100% before the dot goes on: the controller
+ * scales S by it, so one a job left at 200% would double the capped power, as
+ * for Fire. The fence's owned ACK first flushes older override flags; the
+ * caller already holds the Fire latch, which refuses new ones. The reset is a
+ * realtime byte on its own and owes no acknowledgement (ADR-361).
+ */
+export async function resetLaserDotPowerOverride(
+  context: PositioningLightTransaction,
+): Promise<void> {
+  const state = context.get();
+  const reset = firePowerOverrideReset(state.capabilities.overrides, state.ovCache);
+  if (reset === '') return;
+  await positioningLightFence(context);
+  context.assertCurrent();
+  await context.write(reset, 'fire', 'system');
+  context.assertCurrent();
+}
+
+/** The GRBL-family error code that refused a light exchange, or null. */
+export function grblRefusalCode(error: unknown, { kind }: LiveRefs['driver']): number | null {
+  if (!(error instanceof ControllerCommandRefusedError)) return null;
+  return ['grbl-v1.1', 'grblhal', 'fluidnc'].includes(kind) ? error.controllerErrorCode : null;
 }
 
 /** Several lines written together as one owned exchange; every line must

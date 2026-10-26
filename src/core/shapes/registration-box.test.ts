@@ -3,6 +3,7 @@ import { REGISTRATION_LAYER_COLOR } from '../scene';
 import {
   createRegistrationBox,
   createRegistrationCircle,
+  createRegistrationOutline,
   REGISTRATION_BOX_OBJECT_ID,
 } from './registration-box';
 
@@ -77,5 +78,24 @@ describe('createRegistrationCircle', () => {
       widthMm: 1,
       heightMm: 1,
     });
+  });
+});
+
+describe('createRegistrationOutline', () => {
+  it('creates exact closed straight segments with exact bounds', () => {
+    const pointsMm = [
+      { x: 0, y: 0 },
+      { x: 80, y: 5 },
+      { x: 50, y: 40 },
+      { x: 0, y: 30 },
+    ];
+    const outline = createRegistrationOutline({ pointsMm, x: 12, y: 18 });
+    expect(outline.spec).toEqual({ kind: 'polyline', points: pointsMm, closed: true });
+    expect(outline.bounds).toEqual({ minX: 0, minY: 0, maxX: 80, maxY: 40 });
+    expect(outline.transform).toMatchObject({ x: 12, y: 18 });
+    expect(outline.paths[0]?.polylines[0]?.points).toEqual([...pointsMm, pointsMm[0]]);
+    expect(
+      outline.paths[0]?.curves?.[0]?.segments.every((segment) => segment.kind === 'line'),
+    ).toBe(true);
   });
 });

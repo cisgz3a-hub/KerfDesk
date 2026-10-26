@@ -2,13 +2,27 @@ import type { Layer } from '../../core/scene';
 import { useStore } from '../state';
 
 /** Focus Test samples carry relative Z moves that no other field shows. */
-export function LayerFocusTestNotice(props: { readonly layer: Layer }): JSX.Element | null {
+export function LayerFocusTestNotice(props: {
+  readonly layer: Layer;
+  /** Focus handlers of an edit glow this notice is not inside (ADR-646 Amendment 1). */
+  readonly glow?: {
+    readonly onFocus: (event: React.FocusEvent<HTMLElement>) => void;
+    readonly onBlur: (event: React.FocusEvent<HTMLElement>) => void;
+  };
+}): JSX.Element | null {
   const removeLayerFocusTest = useStore((state) => state.removeLayerFocusTest);
   const focus = props.layer.focusTest;
   if (focus === undefined) return null;
   const offset = `${focus.offsetMm >= 0 ? '+' : ''}${focus.offsetMm.toFixed(3)}`;
   return (
-    <div role="note" aria-label={`Focus Test Z for ${props.layer.name}`} style={noticeStyle}>
+    <div
+      role="note"
+      aria-label={`Focus Test Z for ${props.layer.name}`}
+      style={noticeStyle}
+      // Removing it changes the operation for all its artwork (edit glow, ADR-646 Amendment 1).
+      data-edit-scope="operation"
+      {...props.glow}
+    >
       <span>
         Focus Test: Z {offset} mm. Artwork on this operation moves Z relative to the starting focus.
       </span>

@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { IDENTITY_TRANSFORM, type RasterImage } from '../../core/scene';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
+import { installChromiumSavePicker } from '../../platform/web/chromium-save-picker.test-support';
+import { webAdapter } from '../../platform/web/web-adapter';
 import { saveOriginalImage } from './save-original-image';
 
 afterEach(() => {
@@ -110,5 +112,32 @@ describe('saveOriginalImage', () => {
       },
     });
     expect(pushToast).toHaveBeenLastCalledWith('Could not save the image: source missing', 'error');
+  });
+});
+
+describe('Save Original Image over an existing file (ADR-656, audit 19-P2-1)', () => {
+  it('keeps the old file when the source cannot be read, without opening the picker', async () => {
+    const disk = new Map([['dog- portrait.png', 'previous image']]);
+    const picker = installChromiumSavePicker(disk, { chooseName: 'dog- portrait.png' });
+    const pushToast = vi.fn();
+    try {
+      await saveOriginalImage({
+        platform: webAdapter,
+        image,
+        format: 'png',
+        pushToast,
+        readSource: async () => {
+          throw new Error('The image source is no longer available.');
+        },
+      });
+    } finally {
+      picker.restore();
+    }
+    expect(picker.picks()).toBe(0);
+    expect(disk.get('dog- portrait.png')).toBe('previous image');
+    expect(pushToast).toHaveBeenCalledWith(
+      'Could not save the image: The image source is no longer available.',
+      'error',
+    );
   });
 });

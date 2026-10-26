@@ -20,6 +20,8 @@ import {
   type Vec2,
 } from '../../core/scene';
 import { useStore } from '../state';
+import { useLengthUnit } from '../state/display-units';
+import { formatDisplayLengthFixed, MM_PER_INCH, type DisplayLengthUnit } from '../display-length';
 import type { CanvasBitmapSize } from './use-canvas-bitmap-size';
 import { computeView, type ViewState } from './view-transform';
 
@@ -62,11 +64,18 @@ export function measureAtPoint(scene: Scene, point: Vec2, radiusMm: number): Mea
   return null;
 }
 
-export function measureHoverLines(hover: MeasureHover): ReadonlyArray<string> {
+export function measureHoverLines(
+  hover: MeasureHover,
+  unit: DisplayLengthUnit = 'mm',
+): ReadonlyArray<string> {
   const { outline, segment } = hover;
-  const lines = segment === null ? [] : [segmentLine(segment)];
-  lines.push(`Perimeter ${mm(outline.perimeterMm)} mm`);
-  if (outline.areaMm2 !== null) lines.push(`Area ${mm(outline.areaMm2)} mm²`);
+  const mm = (value: number): string => length(value, unit);
+  const lines = segment === null ? [] : [segmentLine(segment, unit)];
+  lines.push(`Perimeter ${mm(outline.perimeterMm)} ${unit}`);
+  if (outline.areaMm2 !== null) {
+    const area = unit === 'in' ? outline.areaMm2 / MM_PER_INCH : outline.areaMm2;
+    lines.push(`Area ${mm(area)} ${unit}²`);
+  }
   if (outline.openContours > 0) {
     lines.push(
       `${outline.openContours} open path${outline.openContours === 1 ? '' : 's'}, no area`,
@@ -75,25 +84,24 @@ export function measureHoverLines(hover: MeasureHover): ReadonlyArray<string> {
   return lines;
 }
 
-function segmentLine(segment: SegmentMeasure): string {
+function segmentLine(segment: SegmentMeasure, unit: DisplayLengthUnit): string {
+  const mm = (value: number): string => length(value, unit);
+  const point = (value: Vec2): string => `(${mm(value.x)}, ${mm(value.y)})`;
   switch (segment.kind) {
     case 'line':
-      return `Line ${mm(segment.lengthMm)} mm at ${segment.angleDeg.toFixed(1)}°`;
+      return `Line ${mm(segment.lengthMm)} ${unit} at ${segment.angleDeg.toFixed(1)}°`;
     case 'curve':
-      return `Curve ${mm(segment.lengthMm)} mm`;
+      return `Curve ${mm(segment.lengthMm)} ${unit}`;
     case 'arc':
       return segment.radiusMm === null
-        ? `Elliptical arc ${mm(segment.lengthMm)} mm, centre ${point(segment.center)}`
-        : `Arc R ${mm(segment.radiusMm)} mm, ${mm(segment.lengthMm)} mm long, centre ${point(segment.center)}`;
+        ? `Elliptical arc ${mm(segment.lengthMm)} ${unit}, centre ${point(segment.center)}`
+        : `Arc R ${mm(segment.radiusMm)} ${unit}, ${mm(segment.lengthMm)} ${unit} long, centre ${point(segment.center)}`;
   }
 }
 
-function mm(value: number): string {
-  return Number.isFinite(value) ? value.toFixed(2) : '-';
-}
-
-function point(value: Vec2): string {
-  return `(${mm(value.x)}, ${mm(value.y)})`;
+// Two decimals of a millimetre, four of an inch (ADR-629).
+function length(value: number, unit: DisplayLengthUnit): string {
+  return Number.isFinite(value) ? formatDisplayLengthFixed(value, unit, 2) : '-';
 }
 
 export function MeasureHoverReadout(props: {
@@ -103,6 +111,7 @@ export function MeasureHoverReadout(props: {
   readonly enabled: boolean;
 }): JSX.Element | null {
   const cursor = useStore((state) => state.cursorMm);
+  const unit = useLengthUnit();
   const view = computeView(
     props.canvasSize.width,
     props.canvasSize.height,
@@ -131,7 +140,7 @@ export function MeasureHoverReadout(props: {
       }}
     >
       <strong>{hover.name}</strong>
-      {measureHoverLines(hover).map((line) => (
+      {measureHoverLines(hover, unit).map((line) => (
         <span key={line} style={{ fontFamily: 'ui-monospace, Menlo, monospace' }}>
           {line}
         </span>

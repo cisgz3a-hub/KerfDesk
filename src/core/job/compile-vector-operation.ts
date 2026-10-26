@@ -20,6 +20,7 @@ import type { KerfSceneSides } from './kerf-scene-sides';
 import { ownedFillMaterial } from './fill-material-ownership';
 import { normalizeClosedPolylinesNonZeroChecked } from '../geometry/polygon-difference';
 import type { LineSegmentCollection } from './collect-line-segments';
+import { allMaterialTestCells } from './material-test-cell-order';
 
 const NO_DIAGNOSTICS: ReadonlyArray<JobDiagnostic> = [];
 
@@ -44,7 +45,7 @@ export function compileVectorGroupsForLayer(
   );
   const fill = resolveFillContext(objects, fillBuckets, device);
   const output = vectorCompilation(
-    buckets.map((bucket) =>
+    buckets.map((bucket, bucketIndex) =>
       bucket.layer.mode === 'fill'
         ? fill.uniformFill && bucket !== fill.firstFill
           ? { groups: [], diagnostics: [] }
@@ -64,7 +65,9 @@ export function compileVectorGroupsForLayer(
             device,
             bucket.powerSource,
             priorityObjectId,
-            scope,
+            // ADR-497 Amendment 1: a Material Test cell is planned on its own,
+            // so its row keeps the generated lowest-risk-first order.
+            allMaterialTestCells(bucket.objects) ? `${scope}:cell:${bucketIndex}` : scope,
           ),
     ),
   );

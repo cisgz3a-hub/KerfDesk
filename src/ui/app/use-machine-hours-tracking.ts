@@ -7,6 +7,7 @@ import { machineKindOf } from '../../core/scene';
 import { deviceProfileSignature } from '../laser/device-setup/device-setup-nudge';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
+import { MACHINE_HOURS_STORAGE_KEY } from '../state/machine-hours-persistence';
 import { useMachineHoursStore, type HoursMachine } from '../state/machine-hours-store';
 import { advanceRunClock, RUN_CLOCK_FLUSH_MS, type RunClock } from '../state/machine-hours-tracker';
 import { useToastStore } from '../state/toast-store';
@@ -48,9 +49,17 @@ export function useMachineHoursTracking(): void {
     observe();
     const unsubscribe = useLaserStore.subscribe(observe);
     const timer = setInterval(observe, RUN_CLOCK_FLUSH_MS);
+    // The browser sends 'storage' only to the other windows of the app, so a
+    // job counted in one window shows up in the others (audit v3 D4-P3-4).
+    const onStorage = (event: StorageEvent): void => {
+      if (event.key !== MACHINE_HOURS_STORAGE_KEY && event.key !== null) return;
+      useMachineHoursStore.getState().reload();
+    };
+    window.addEventListener('storage', onStorage);
     return () => {
       clearInterval(timer);
       unsubscribe();
+      window.removeEventListener('storage', onStorage);
     };
   }, []);
 }

@@ -41,7 +41,9 @@ export function RtspSourceControls(): JSX.Element {
   };
 
   return (
-    <details style={sectionStyle}>
+    // The RTSP camera running, starting or failed is shown open, so its Stop or
+    // Reconnect is in sight (ADR-663 Amendment 1 starts it by itself).
+    <details style={sectionStyle} open={control.kind !== 'idle'}>
       <summary
         style={summaryStyle}
         title="Connect a machine camera that streams RTSP through the local bridge."

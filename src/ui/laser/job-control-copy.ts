@@ -1,3 +1,4 @@
+import type { ControllerKind } from '../../core/devices';
 import type { MachineKind } from '../../core/scene';
 import { cncPauseMessage } from '../state/cnc-pause-resume-policy';
 
@@ -16,8 +17,12 @@ export function pauseControlMessage(
   machineKind: MachineKind | null,
   hasRealtimePause: boolean,
   streamPauseBeamOff = false,
+  controllerKind: ControllerKind | null = null,
 ): string {
-  return cncPauseMessage(machineKind) ?? streamPauseMessage(hasRealtimePause, streamPauseBeamOff);
+  return (
+    cncPauseMessage(machineKind, controllerKind) ??
+    streamPauseMessage(hasRealtimePause, streamPauseBeamOff)
+  );
 }
 
 function streamPauseMessage(hasRealtimePause: boolean, streamPauseBeamOff: boolean): string {

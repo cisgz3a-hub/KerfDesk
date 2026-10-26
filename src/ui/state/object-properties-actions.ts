@@ -154,22 +154,41 @@ function setObjectsOperationOverride(
   patch: ObjectOperationOverride,
   operationId?: string,
 ): ObjectPropertiesMutation {
-  if (ids.size === 0) return {};
+  const project = projectWithOperationOverride(state.project, ids, patch, operationId);
+  if (project === state.project) return {};
+  return {
+    project,
+    undoStack: pushUndo(state.project, state.undoStack),
+    redoStack: [],
+    dirty: true,
+  };
+}
+
+/** The project with `patch` written into each artwork's own settings, or the
+ * same project when nothing changes. Exported so an action that edits an
+ * operation and its artwork owners together records one undo step. */
+export function projectWithOperationOverride(
+  project: Project,
+  ids: ReadonlySet<string>,
+  patch: ObjectOperationOverride,
+  operationId?: string,
+): Project {
+  if (ids.size === 0) return project;
   const sanitized = sanitizeOperationOverridePatch(patch);
-  if (Object.keys(sanitized).length === 0) return {};
+  if (Object.keys(sanitized).length === 0) return project;
   const operations =
     operationId === undefined
       ? []
-      : state.project.scene.layers
+      : project.scene.layers
           .flatMap((layer) => [
             layer,
             ...layer.subLayers.map((sub) => layerFromSubLayer(layer, sub)),
           ])
           .filter((layer) => layer.id === operationId);
-  if (operationId !== undefined && operations.length !== 1) return {};
+  if (operationId !== undefined && operations.length !== 1) return project;
   const operation = operations[0];
   let changed = false;
-  const objects = state.project.scene.objects.map((object) => {
+  const objects = project.scene.objects.map((object) => {
     if (
       !ids.has(object.id) ||
       (operation !== undefined && !sceneObjectUsesOperation(object, operation))
@@ -190,13 +209,7 @@ function setObjectsOperationOverride(
     changed = true;
     return { ...object, operationOverride };
   });
-  if (!changed) return {};
-  return {
-    project: { ...state.project, scene: { ...state.project.scene, objects } },
-    undoStack: pushUndo(state.project, state.undoStack),
-    redoStack: [],
-    dirty: true,
-  };
+  return changed ? { ...project, scene: { ...project.scene, objects } } : project;
 }
 
 function reconcileArtworkBounds(

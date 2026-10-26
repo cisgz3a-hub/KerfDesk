@@ -5,6 +5,7 @@
 // moves never re-render React.
 
 import { useCallback, useRef } from 'react';
+import type { RgbaBuffer } from '../../core/image-edit';
 import { canvasToDoc } from './editor-canvas-draw';
 import { useImageEditorStore } from './image-editor-store';
 import type { EditorSession } from './editor-session';
@@ -15,7 +16,7 @@ type InfoReadout = {
   readonly hideInfo: () => void;
 };
 
-export function useInfoReadout(): InfoReadout {
+export function useInfoReadout(displayedDoc: RgbaBuffer | undefined): InfoReadout {
   const infoRef = useRef<HTMLDivElement>(null);
 
   const hideInfo = useCallback((): void => {
@@ -30,7 +31,7 @@ export function useInfoReadout(): InfoReadout {
       const state = useImageEditorStore.getState();
       const session = state.session;
       const view = state.view;
-      if (session === null || view === null) {
+      if (session === null || view === null || displayedDoc === undefined) {
         info.style.display = 'none';
         return;
       }
@@ -38,24 +39,24 @@ export function useInfoReadout(): InfoReadout {
       const point = canvasToDoc(view, e.clientX - rect.left, e.clientY - rect.top);
       const x = Math.floor(point.x);
       const y = Math.floor(point.y);
-      if (x < 0 || y < 0 || x >= session.doc.width || y >= session.doc.height) {
+      if (x < 0 || y < 0 || x >= displayedDoc.width || y >= displayedDoc.height) {
         info.style.display = 'none';
         return;
       }
-      info.textContent = readoutText(session, x, y);
+      info.textContent = readoutText(session, displayedDoc, x, y);
       info.style.display = 'block';
     },
-    [],
+    [displayedDoc],
   );
 
   return { infoRef, updateInfo, hideInfo };
 }
 
-function readoutText(session: EditorSession, x: number, y: number): string {
-  const base = (y * session.doc.width + x) * 4;
-  const r = session.doc.data[base] ?? 0;
-  const g = session.doc.data[base + 1] ?? 0;
-  const b = session.doc.data[base + 2] ?? 0;
+function readoutText(session: EditorSession, doc: RgbaBuffer, x: number, y: number): string {
+  const base = (y * doc.width + x) * 4;
+  const r = doc.data[base] ?? 0;
+  const g = doc.data[base + 1] ?? 0;
+  const b = doc.data[base + 2] ?? 0;
   // Ink %: 0 = white (no burn), 100 = black — the laser-relevant reading.
   const ink = Math.round(100 - ((r + g + b) / 3 / 255) * 100);
   const { minX, minY } = session.sourceBounds;

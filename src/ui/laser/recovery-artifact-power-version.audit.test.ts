@@ -16,7 +16,7 @@ import { isExecutionArtifact } from '../state/recovery/execution-artifact';
 import { createCurrentTestExecutionArtifact } from '../state/recovery/testing';
 import { recoveryArtifactPreparedProgramMatches } from './recovery-artifact-binding';
 
-function project(kind: 'vector' | 'image'): Project {
+function project(kind: 'vector' | 'image', maxPowerS = 1000.25): Project {
   const base = createProject();
   const color = '#ff0000';
   const geometry = {
@@ -28,7 +28,7 @@ function project(kind: 'vector' | 'image'): Project {
   };
   return {
     ...base,
-    device: { ...base.device, maxPowerS: 1000.25 },
+    device: { ...base.device, maxPowerS },
     scene: {
       ...base.scene,
       layers: [
@@ -75,8 +75,12 @@ function project(kind: 'vector' | 'image'): Project {
   };
 }
 
-function prepared(kind: 'vector' | 'image', legacy = false): SuccessfulPreparedOutput {
-  const result = prepareOutput(project(kind));
+function prepared(
+  kind: 'vector' | 'image',
+  legacy = false,
+  maxPowerS?: number,
+): SuccessfulPreparedOutput {
+  const result = prepareOutput(project(kind, maxPowerS));
   if (!result.ok) throw new Error('Expected power fixture');
   if (!legacy) return result;
   const { laserPowerScaleVersion: _version, ...unversioned } = result;
@@ -84,6 +88,17 @@ function prepared(kind: 'vector' | 'image', legacy = false): SuccessfulPreparedO
     ...unversioned,
     job: compileJob(result.project.scene, result.project.device, 1),
   };
+}
+
+/** The same prepared program written under an explicit later power-scale version. */
+function atVersion(output: SuccessfulPreparedOutput, version: 2 | 3): SuccessfulPreparedOutput {
+  return output.laserPowerScaleVersion === version
+    ? output
+    : {
+        ...output,
+        laserPowerScaleVersion: version,
+        job: compileJob(output.project.scene, output.project.device, version),
+      };
 }
 
 function sourceBytes(output: SuccessfulPreparedOutput): string {
@@ -131,10 +146,11 @@ describe('archived power versions survive the update', () => {
     expect(saved.gcode).toBe(gcode);
   });
 
-  it.each([1, 2] as const)(
+  it.each([1, 2, 3] as const)(
     'rehydrates streamed raster recipe version %s without changing tones or bytes',
     async (version) => {
-      const output = prepared('image', version === 1);
+      const output =
+        version === 1 ? prepared('image', true) : atVersion(prepared('image'), version);
       const gcode = version === 1 ? sourceBytes(output) : emitPreparedGcode(output).gcode;
       if (version === 1) {
         expect(gcode).toContain('S1000');
@@ -187,10 +203,26 @@ describe('archived power versions survive the update', () => {
     expect(chained.gcode).toBe(second.gcode);
   });
 
+  // ADR-567 Amendment 1: version 3 gives a small whole-number $30 the virtual
+  // range; an archived version 2 record keeps its whole-S tones and bytes.
+  it.each([
+    { version: 2 as const, mid: /S10\n/ },
+    { version: 3 as const, mid: /S9\.96\n/ },
+  ])('rehydrates a $30=20 raster recipe at version $version', async ({ version, mid }) => {
+    const output = atVersion(prepared('image', false, 20), version);
+    const gcode = emitPreparedGcode(output).gcode;
+    expect(gcode).toMatch(mid);
+    const saved = await archive(providerRecipe(output), gcode);
+    const hydrated = hydratePreparedExecutionOutput(saved.prepared);
+    expect(hydrated?.laserPowerScaleVersion).toBe(version);
+    expect(emitPreparedGcode(hydrated ?? output).gcode).toBe(gcode);
+    expect(recoveryArtifactPreparedProgramMatches(saved)).toBe(true);
+  });
+
   it('rejects unknown power versions at hydration and artifact decode', async () => {
     const output = prepared('vector');
     const saved = await archive(output, emitPreparedGcode(output).gcode);
-    const tampered = { ...saved, prepared: { ...saved.prepared, laserPowerScaleVersion: 3 } };
+    const tampered = { ...saved, prepared: { ...saved.prepared, laserPowerScaleVersion: 5 } };
     expect(isExecutionArtifact(tampered)).toBe(false);
     expect(
       hydratePreparedExecutionOutput(tampered.prepared as unknown as SuccessfulPreparedOutput),

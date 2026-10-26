@@ -160,9 +160,11 @@ export async function verifyAsarIntegrity(
       `unmodified package did not complete its native smoke baseline (exit=${baseline.code}, signal=${baseline.signal}, failure=${baseline.failure?.kind ?? 'none'}, spawned=${baseline.spawned}, closed=${baseline.childClosed})`,
     );
   }
-  // An unlicensed commercial package opens behind its licence window (ADR-623).
+  // An unlicensed commercial package opens behind its licence window (ADR-623),
+  // or in KerfDesk Free while Amendment 3 holds that window off.
   validateNativeSmokeResult(baseline.smokeResult, baseline.userData, {
     expectLicenceWindow: options.expectLicenceWindow === true,
+    ...(options.licenceWindow === undefined ? {} : { licenceWindow: options.licenceWindow }),
   });
   const { prefix, header } = readHeader(archive);
   const tamper = headerTamper(prefix, header);

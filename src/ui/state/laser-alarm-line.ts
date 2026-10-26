@@ -1,13 +1,15 @@
 // laser-alarm-line — maps a controller alarm into LaserState: GRBL's numbered
 // `ALARM:N`, or a code-less text alarm (Smoothieware `ALARM: Hard limit +X`,
 // controller audit SM-8). Neither answers a line, so neither settles an owed
-// acknowledgement; both stop a running stream. Split from laser-line-handler
-// at the 400-line cap.
+// acknowledgement; both stop a running stream, and one whose lines were all
+// acknowledged but whose motion is not yet confirmed (laser-alarm-stream-end.ts).
+// Split from laser-line-handler at the 400-line cap.
 
 import type { ControllerEvent } from '../../core/controllers';
 import type { GrblPins } from '../../core/controllers/grbl';
 import { cancelControllerLifecycleRefs } from './laser-interactive-command';
 import type { GetFn, HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
+import { alarmEndsUnsettledRunPatch } from './laser-alarm-stream-end';
 import { noteAlarmBeforeBanner } from './laser-reset-alarm';
 import { frameHitLimitNotice } from './laser-safety-notice';
 import { originUnknownAfterControllerReset } from './laser-status-line';
@@ -68,6 +70,8 @@ export function handleAlarmLine(
     trustedPositionEpoch: (prev.trustedPositionEpoch ?? 0) + 1,
     // The alarmed controller discards its pending work; owed acks are gone.
     ...frameLimitPatch(prev, alarm),
+    // A stream already 'done' ends here too; a running one ends just below.
+    ...(ownedReset ? {} : alarmEndsUnsettledRunPatch(prev.streamer)),
   });
   cancelControllerLifecycleRefs(refs, alarm.code === null ? alarm.raw : `ALARM:${alarm.code}`);
   if (alarm.code !== null) noteAlarmBeforeBanner(refs, alarm.code);

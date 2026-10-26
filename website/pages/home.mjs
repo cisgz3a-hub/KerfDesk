@@ -8,7 +8,6 @@ import {
   callout,
   ctaBand,
   featureGrid,
-  proPill,
   section,
   split,
   statusPill,
@@ -62,7 +61,7 @@ const PILLARS = [
   {
     icon: 'zap',
     title: 'Engrave and cut',
-    body: 'Line, Fill and Image modes, with cross-hatch fills, kerf compensation, holding tabs and 11 dither and grayscale options for photos. Image engraving hasn’t been run on a machine yet.',
+    body: 'Line, Fill and Image modes, with cross-hatch fills, kerf compensation, holding tabs and 12 dither and grayscale options for photos. Image engraving hasn’t been run on a machine yet.',
     href: '/laser/',
   },
   {
@@ -188,10 +187,10 @@ export const page = {
       title: 'Check it on screen first',
       content: html`${split({
         title: 'See every move before it happens',
-        body: 'Preview the toolpath and get a time estimate from a GRBL-style motion model before you start. With Pro, the G-code Inspector plays the program back in 3D and opens any .nc, .gcode or .tap file to view.',
+        body: 'Preview the toolpath and get a time estimate from a GRBL-style motion model before you start. The G-code Inspector plays the program back in 3D and opens any .nc, .gcode or .tap file to view.',
         points: [
           'Toolpath preview with travel moves and a playback scrubber',
-          html`3D G-code playback that shows which line made each move ${proPill()}`,
+          '3D G-code playback that shows which line made each move, in every edition',
           'A Program Health report that flags possible issues without blocking anything',
         ],
         media: shot(ctx, 'preview'),

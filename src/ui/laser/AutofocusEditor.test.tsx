@@ -57,4 +57,22 @@ describe('AutofocusEditor', () => {
     expect(labels).not.toContain('Use Creality Falcon A1 Pro');
     expect(host.textContent).not.toContain('Known machine presets');
   });
+
+  // Controller audit v3 D2-P3-1 and D2-P3-3.
+  it('names what error:9 means and refuses a probe with no feed of its own', async () => {
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    root = createRoot(host);
+
+    await act(async () =>
+      root.render(
+        <AutofocusEditor value="G38.2 Z-10" onChange={vi.fn()} controllerKind="grblhal" />,
+      ),
+    );
+
+    expect(host.textContent).toContain('error:9 (the controller was in Alarm or Jog)');
+    expect(host.textContent).not.toContain('no probe pin');
+    expect(host.textContent).toContain('at most 150 mm/min');
+    expect(host.querySelector('[role="alert"]')?.textContent).toMatch(/needs its own feed/);
+  });
 });

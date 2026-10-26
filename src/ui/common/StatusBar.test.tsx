@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createLayer, createProject, IDENTITY_TRANSFORM } from '../../core/scene';
 import { useStore } from '../state';
+import { useDisplayUnitsStore } from '../state/display-units';
 import { usePwaUpdateStore } from '../state/pwa-update-store';
 import { useUiStore } from '../state/ui-store';
 import { StatusBar } from './StatusBar';
@@ -21,6 +22,7 @@ afterEach(() => {
   useStore.getState().newProject();
   useUiStore.getState().resetView();
   usePwaUpdateStore.setState({ availability: { kind: 'none' } });
+  useDisplayUnitsStore.setState({ lengthUnit: 'mm' });
 });
 
 describe('StatusBar', () => {
@@ -82,6 +84,27 @@ describe('StatusBar', () => {
         `1 selected ${MIDDLE_DOT} 25.0 ${TIMES} 10.0 mm ${MIDDLE_DOT} X 5.0, Y 6.0`,
       );
       expect(host.textContent).not.toMatch(MOJIBAKE_MARKERS);
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  // ADR-629: the bed and selection read in inches with the Inches preference.
+  it('shows the bed and selection in inches when the operator chose inches', async () => {
+    useDisplayUnitsStore.setState({ lengthUnit: 'in' });
+    useStore.setState({
+      project: {
+        ...createProject(),
+        scene: { layers: [], objects: [sceneObject('shape-1')] },
+      },
+      selectedObjectId: 'shape-1',
+      additionalSelectedIds: new Set(),
+    });
+    const { host, root } = await renderStatusBar();
+    try {
+      expect(host.textContent).toContain(`Bed: 15.748 ${TIMES} 15.748 in`);
+      expect(host.textContent).toMatch(/1 selected .* in /);
+      expect(host.textContent).not.toContain(' mm');
     } finally {
       await act(async () => root.unmount());
     }

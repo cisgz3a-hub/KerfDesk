@@ -84,8 +84,17 @@ describe('calibrationTargetArea', () => {
     expect(calibrationTargetArea(30, 50, SETTINGS)).toEqual({ x: 0, y: 10, width: 30, height: 30 });
   });
 
-  it('covers the bed inside the margin for a fixed camera', () => {
-    expect(calibrationTargetArea(400, 300, DEFAULT_CALIBRATION_SETTINGS)).toEqual(
+  it('puts a fixed camera target on the sheet in the middle of the bed, inside its margin', () => {
+    // The default 300 × 200 mm sheet on a 400 × 300 mm bed, 5 mm margin.
+    expect(calibrationTargetArea(400, 300, DEFAULT_CALIBRATION_SETTINGS)).toEqual({
+      x: 55,
+      y: 55,
+      width: 290,
+      height: 190,
+    });
+    // A sheet larger than the bed covers the whole bed.
+    const wholeBed = { ...DEFAULT_CALIBRATION_SETTINGS, sheetWidthMm: 999, sheetHeightMm: 999 };
+    expect(calibrationTargetArea(400, 300, wholeBed)).toEqual(
       targetAreaForBed(400, 300, DEFAULT_CALIBRATION_SETTINGS.marginMm),
     );
   });
@@ -123,6 +132,8 @@ describe('photographing a head camera target', () => {
     expect(first.result.record.accuracy.rmsErrorMm).toBeLessThan(0.1);
     // The review picture shows the 40 mm target with room around it, in detail.
     expect(first.result.bedImage).toMatchObject({ width: 640, height: 640 });
+    // The ring dots of the review are drawn over that part of the bed only.
+    expect(first.result.bedImageRegion).toMatchObject({ width: 80, height: 80 });
 
     // Five millimetres away the rings sit elsewhere in the picture, and the
     // saved calibration moved with the head still lands on them.

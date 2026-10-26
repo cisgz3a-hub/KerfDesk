@@ -13,9 +13,10 @@ import type { CncTaperedInlaySettings } from '../scene/cnc-tapered-inlay';
 
 import type { CncCompilationSidecar } from './cnc-compilation-sidecar-types';
 export type { CncCompilationSidecar } from './cnc-compilation-sidecar-types';
+import type { CutArcMoves, LeadContour } from './cut-segment-geometry';
+export type { CutArcMoves } from './cut-segment-geometry';
 
 import { representedCncCoordinateMm } from '../cnc/coordinate-representation';
-import type { ArcMove } from '../geometry/arc-fit';
 import { sampleCircularArcPoints } from '../geometry/arc-representation';
 import type { RasterPowerValues } from '../raster/raster-power-values';
 import type { CncCuttingStage } from '../scene/cnc-stage-recipe';
@@ -75,17 +76,7 @@ export type CutSegment = {
    * scene's contours. Compile writes it only when some operation asks for
    * leads; preparation drops it once leads are placed. */
   readonly leadSource?: string;
-};
-
-/** Fitted line/arc moves for a CutSegment (ADR-432), with a fingerprint of
- * the polyline they were fitted against: they start at `from` and the last
- * lands exactly on the polyline's last point. A reader trusts them only while
- * the polyline still matches the fingerprint. */
-export type CutArcMoves = {
-  readonly moves: ReadonlyArray<ArcMove>;
-  readonly from: Vec2;
-  readonly pointCount: number;
-  readonly lengthMm: number;
+  readonly leadContour?: LeadContour;
 };
 
 export type FillSegment = CutSegment & {
@@ -252,6 +243,11 @@ export type CncContourPass = {
   // No descending 0.001 mm step fits the requested angle on this path's
   // represented segments. Omission keeps the existing short-path reason.
   readonly entryPlungeReason?: 'coordinate-precision';
+  // Provenance marker: the layer asked for a profile lead (ADR-250), but every
+  // lead would cut into a part the job keeps, so the pass keeps its straight
+  // plunge on the cut line (ADR-250 Amendment 3). Job Review discloses it;
+  // motion is unchanged.
+  readonly leadBlocked?: true;
   // ADR-491: a stay-down link fed the bit here at this depth, so the pass needs
   // no entry of its own (ramp entry leaves it alone).
   readonly stayDownEntry?: true;
@@ -285,6 +281,8 @@ export type CncPath3dPass = {
   // ramp has no descending step at the coordinate precision.
   readonly entryPlunge?: true;
   readonly entryPlungeReason?: 'coordinate-precision';
+  // A tabbed profile ring that no lead fits beside (see CncContourPass.leadBlocked).
+  readonly leadBlocked?: true;
   // ADR-491: a short level move between two pocket passes, fed at the plunge
   // feed in place of a lift and re-plunge. Provenance only.
   readonly stayDownLink?: true;
@@ -503,13 +501,17 @@ export type JobDiagnostic =
     }
   // ADR-626 Amd 1: with Lead side automatic, `count` contours got no leads
   // because a closed shape on an operation without leads (`aroundName`) holds
-  // them, and it may be a part or only a score line or border.
+  // them, and it may be a part or only a score line or border. Amd 8: or
+  // because open lines of `aroundName` close a region round them.
   | {
       readonly kind: 'laser-leads-side-unknown';
       readonly layerId: string;
       readonly layerName: string;
       readonly count: number;
       readonly aroundName: string;
+      /** Open lines of `aroundName` close a region round them, rather than a
+       * closed shape holding them (ADR-626 Amd 8). */
+      readonly aroundOpenPaths?: true;
     };
 
 /** Complete compile evidence for one scheduled V-carve operation. */

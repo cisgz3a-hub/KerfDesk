@@ -1,8 +1,9 @@
 // The burn check around one job (ADR-490): a flat picture of the job's part
 // of the bed as the job starts, another once it has finished and the smoke
 // has cleared, and the comparison of the two against the job's path. Only a
-// laser job on a camera fixed over the bed with its own calibration can be
-// checked; anything else says why not instead of guessing.
+// laser job whose bed position is known, on a camera fixed over the bed with
+// its own calibration, can be checked; anything else says why not instead of
+// guessing (ADR-490 §4).
 
 import {
   burnCheckPicture,
@@ -14,7 +15,12 @@ import type { BedArea } from '../../../core/camera/model/camera-model-accuracy';
 import type { RgbaImage } from '../../../core/camera/rgba-image';
 import type { Vec2 } from '../../../core/scene';
 import type { CanvasMotionPlan } from '../../state/canvas-motion-plan';
-import { burnRouteMasks, firstBurnRouteMm, planPlacesOnBed } from './job-burn-route';
+import {
+  burnRouteMasks,
+  firstBurnRouteMm,
+  planBedPositionKnown,
+  planPlacesOnBed,
+} from './job-burn-route';
 import { flattenedPicture, type WatchCamera, type WatchIo } from './job-watch-camera';
 import type { BurnCheckView } from './job-watch-store';
 
@@ -40,6 +46,12 @@ export type BeforePicture =
   | { readonly kind: 'ok'; readonly watch: BurnWatch }
   | { readonly kind: 'unavailable'; readonly reason: string };
 
+// ADR-642 §3 keeps such a job drawn over its artwork, labelled "bed position
+// unverified"; grading the artwork's patch of bed would report the real burn
+// as stray marks and the path as missed (rolling audit 12-P2-4).
+export const UNKNOWN_BED_POSITION_BURN_CHECK =
+  'The bed position is unverified for this job, so KerfDesk does not know where on the bed it burns and the camera cannot check it.';
+
 /** Why this job cannot be checked, or null when it can. */
 export function burnCheckBlocker(
   plan: CanvasMotionPlan,
@@ -48,10 +60,15 @@ export function burnCheckBlocker(
   if (plan.machineKind !== 'laser') return 'The burn check is for laser jobs.';
   if (camera === null) return 'The camera was not running when the job started.';
   if (camera.fixedModel === null) {
-    return 'The burn check needs a camera fixed over the bed, calibrated in the Camera panel.';
+    return (
+      camera.modelIssue ??
+      'The burn check needs a camera fixed over the bed, calibrated in the Camera panel.'
+    );
   }
-  if (!planPlacesOnBed(plan)) return 'KerfDesk could not place this job on the bed.';
-  return null;
+  if (planPlacesOnBed(plan)) return null;
+  return planBedPositionKnown(plan)
+    ? 'KerfDesk could not place this job on the bed.'
+    : UNKNOWN_BED_POSITION_BURN_CHECK;
 }
 
 /** The first picture, taken as the job starts. */

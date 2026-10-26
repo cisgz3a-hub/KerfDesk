@@ -17,6 +17,11 @@
   z-index: var(--lf-z-toast);
 }
 
+.lf-toasts--scrollable {
+  pointer-events: auto;
+  overscroll-behavior: contain;
+}
+
 .lf-toast-dialog-host {
   order: -1;
   flex: 0 0 auto;

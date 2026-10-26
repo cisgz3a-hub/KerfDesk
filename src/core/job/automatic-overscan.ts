@@ -44,6 +44,12 @@ export function automaticOverscanMm(input: AutomaticOverscanInput): number {
   return Math.max(0, Math.min(input.maxMm, stepped));
 }
 
+/** The fastest feed a run-up of `runwayMm` along the X axis covers, margin included. */
+export function automaticOverscanReachMmPerMin(runwayMm: number, accelMmPerSec2: number): number {
+  if (!(runwayMm > 0) || !(accelMmPerSec2 > 0)) return 0;
+  return Math.sqrt((2 * accelMmPerSec2 * runwayMm) / MARGIN) * 60;
+}
+
 /** The least acceleration a move at this angle gets from the profile's value. */
 export function alongScanAccelMmPerSec2(accelMmPerSec2: number, scanAngleDeg: number): number {
   return accelMmPerSec2 / scanAxisShare(scanAngleDeg);

@@ -24,6 +24,14 @@ export type OutputEmitOptions = {
    * Typed as `false` only — nothing may switch compaction ON from here.
    */
   readonly compactMotionWords?: false;
+  /**
+   * The controller keeps the beam at its last power whenever the head stops,
+   * under M4 as well as M3 (ADR-398 Amendment 1). The Marlin strategy passes
+   * this: it writes its body under M4 and runs it as continuous inline power
+   * (`M3 I`) or fan PWM, so the body's transitions must wait for a dark move
+   * the way they do under M3. Typed as `true` only.
+   */
+  readonly stopKeepsPower?: true;
 };
 
 /** The emit options a job's origin placement implies. A current-position job

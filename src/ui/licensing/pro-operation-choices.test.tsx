@@ -2,6 +2,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { DEFAULT_CNC_LAYER_SETTINGS, type CncLayerSettings } from '../../core/scene';
+import { DEFAULT_CNC_TAPERED_INLAY } from '../../core/scene/cnc-tapered-inlay';
 import { LayerSettingsClipboardButtons } from '../layers/LayerSettingsClipboardButtons';
 import { SelectedOperationInspector } from '../layers/SelectedOperationInspector';
 import { useStore } from '../state/store';
@@ -36,6 +37,8 @@ afterEach(async () => {
 
 const CHOICES: ReadonlyArray<readonly [string, Partial<CncLayerSettings>]> = [
   ['vcarve', { cutType: 'v-carve' }],
+  // ADR-540 Amendment 6: a tapered V-bit inlay pair is V-carve.
+  ['vcarve', { cutType: 'inlay-pair', taperedInlay: DEFAULT_CNC_TAPERED_INLAY }],
   ['adaptive-clearing', { cutType: 'pocket', pocketStrategy: 'adaptive' }],
 ];
 

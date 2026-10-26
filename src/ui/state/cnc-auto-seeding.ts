@@ -15,6 +15,10 @@ import {
   type Scene,
 } from '../../core/scene';
 import { cncHeadDevice } from '../../core/cnc/cnc-head-feeds';
+import {
+  findCncMachineStarterById,
+  cncStarterMatchesTool,
+} from '../../core/cnc/cnc-machine-starter-catalog';
 import type { DeviceProfile } from '../../core/devices';
 
 export type CncAutoSeedContext = {
@@ -82,6 +86,11 @@ function refreshMachineStarterLayer(
   source: Extract<NonNullable<CncLayerSettings['feedSource']>, { kind: 'machine-starter' }>,
   context: CncAutoSeedContext,
 ): Layer {
+  const starter = findCncMachineStarterById(source.starterId);
+  // Generated parts follow their active cutter. Retained starter numbers keep
+  // provenance for review, but cannot transfer the starter's cutter on refresh.
+  if (starter !== null && !cncStarterMatchesTool(starter, layerCncTool(context.machine, settings)))
+    return layer;
   const patch = resolveCncStarterFeedPatch(
     context.liveCaps === null
       ? { profile: context.device, machine: context.machine }

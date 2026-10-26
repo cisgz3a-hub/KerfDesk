@@ -35,12 +35,16 @@ import {
   pushUndo,
   type StateSlice,
 } from './scene-mutations';
+import { repairRemovedProjectObjectReferences } from './repair-object-dependencies';
 
 export function applyConvertToBitmap(
   s: StateSlice,
   sourceIds: ReadonlyArray<string>,
   raster: RasterImage,
-): MutationResult & { readonly additionalSelectedIds: ReadonlySet<string> } {
+): MutationResult &
+  ReturnType<typeof repairRemovedProjectObjectReferences> & {
+    readonly additionalSelectedIds: ReadonlySet<string>;
+  } {
   let scene = s.project.scene;
   for (const sourceId of sourceIds) {
     if (scene.objects.some((o) => o.id === sourceId)) {
@@ -58,7 +62,7 @@ export function applyConvertToBitmap(
   // same cleanup removeSceneObject does, so converted shapes don't leave
   // stale line/fill rows (with their power/speed) in the Cuts panel.
   return {
-    project: { ...s.project, scene },
+    ...repairRemovedProjectObjectReferences({ ...s.project, scene }),
     selectedObjectId: converted.id,
     // The merged bitmap is the sole selection: any additional selected ids
     // pointed at sources that no longer exist.

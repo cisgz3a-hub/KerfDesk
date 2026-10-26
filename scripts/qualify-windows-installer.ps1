@@ -45,6 +45,14 @@ if ($Scenario -eq 'HistoricalUpgrade' -and
 # and other children never inherit it; only the historical profile child gets it.
 $qualificationLicence = $env:KERFDESK_NATIVE_QUALIFICATION_LICENCE
 Remove-Item Env:KERFDESK_NATIVE_QUALIFICATION_LICENCE -ErrorAction SilentlyContinue
+# ADR-623 Amendment 3: this source's one licence window setting. While it holds
+# the window off, the candidate opens straight into KerfDesk Free, so every
+# reopen must reach the workspace and no licence key is handed to any child.
+$licenceWindowSetting = Get-Content -LiteralPath (Join-Path (Split-Path -Parent $PSScriptRoot) 'public/desktop-licence-window.mjs') -Raw
+if ($licenceWindowSetting -notmatch '(?m)^export const DESKTOP_LICENCE_WINDOW = (true|false);\r?$') {
+  throw 'The desktop licence window setting could not be read.'
+}
+$licenceWindowOn = $Matches[1] -eq 'true'
 
 function Assert-ChildPath([string]$Path, [string]$Parent) {
   $full = [IO.Path]::GetFullPath($Path)
@@ -108,7 +116,11 @@ $receipt = [ordered]@{
       'Install, packaged launch/import/save on a throwaway profile, and uninstall only; no upgrade and no real file dialogs.'
     }),
     $(if ($Scenario -eq 'HistoricalUpgrade') {
-      'Authenticated production baseline and exact-source upgrade candidate with a native-created profile, opened with the developer qualification licence wherever the licence window appears (ADR-623); paid licensing state remains separate qualification.'
+      $(if ($licenceWindowOn) {
+        'Authenticated production baseline and exact-source upgrade candidate with a native-created profile, opened with the developer qualification licence wherever the licence window appears (ADR-623); paid licensing state remains separate qualification.'
+      } else {
+        'Authenticated production baseline and exact-source upgrade candidate with a native-created profile; both open in KerfDesk Free while the licence window is held off (ADR-623 Amendment 3), so no licence is used; paid licensing state remains separate qualification.'
+      })
     } else { 'Both candidates use this same source commit; historical release/profile migrations remain separate checks.' }),
     'Hosted runner OS and account only; consumer Windows, standard-user UAC and SmartScreen remain separate checks.',
     'No physical controller, camera, laser, spindle or other hardware was operated.'
@@ -371,7 +383,8 @@ function Invoke-InstalledSmoke([string]$Label) {
   # The installed app launches, imports an SVG and saves a project on a throwaway
   # profile; the smoke's own deadline bounds it. A commercial package has no
   # licence on that profile, so it must open behind its licence window instead,
-  # in a state a trial or key can open (ADR-623).
+  # in a state a trial or key can open (ADR-623), or, while ADR-623 Amendment 3
+  # holds that window off, in KerfDesk Free; the smoke reads the same setting.
   $output = Join-Path $EvidenceRoot $Label
   $expectation = @(if ($PackageKind -eq 'CommercialUnsigned') { '--expect-licence-window' })
   & node (Join-Path $PSScriptRoot 'verify-windows-packaged-native-smoke.mjs') $executable "--output=$output" @expectation
@@ -391,7 +404,8 @@ function Invoke-HistoricalProfile([string]$Label, [string]$Phase, [string]$Expec
     '-Project', $project, '-ExpectedVersion', $ExpectedVersion, '-ExpectedCommit', $ExpectedSourceCommit)) {
     $info.ArgumentList.Add($argument)
   }
-  if (-not [string]::IsNullOrEmpty($qualificationLicence)) {
+  if (-not $licenceWindowOn) { $info.ArgumentList.Add('-LicenceWindowHeldOff') }
+  if ($licenceWindowOn -and -not [string]::IsNullOrEmpty($qualificationLicence)) {
     $info.EnvironmentVariables['KERFDESK_QUALIFICATION_LICENCE_KEY'] = $qualificationLicence
   }
   $process = [Diagnostics.Process]::Start($info)

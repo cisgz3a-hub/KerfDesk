@@ -42,11 +42,28 @@ export type JobInterruption = {
   readonly positionLost?: true;
   /**
    * Lines sent before a lost link: acknowledged ones plus those still in
-   * flight, in sendable numbering. A dropped link leaves the controller
-   * running what it had received, so the head stops at the end of the last of
-   * these (ADR-341 Amendment 6).
+   * flight, in sendable numbering. A controller that keeps running after the
+   * drop runs what it had received, so the head stops at the end of the last
+   * of these (ADR-341 Amendment 6).
    */
   readonly sentLines?: number;
+  /**
+   * A lost link's planner backlog, held back until the first reconnect shows
+   * whether the controller kept running. A boot banner or an Alarm there means
+   * it restarted and discarded its planner, and this becomes `plannerBacklog`;
+   * a status report without either means it kept running, and this is dropped
+   * (ADR-398 Amendment 3). A reconnect that cannot show either way leaves it
+   * as `unconfirmedPlannerBacklog` (ADR-398 Amendment 4).
+   */
+  readonly plannerBacklogIfRestarted?: PlannerBacklog;
+  /**
+   * The backlog a restart would have thrown away, when the first reconnect
+   * could not show whether the controller restarted: grblHAL greets every new
+   * connection with its startup banner, and a board on Wi-Fi or Ethernet
+   * cannot show a restart at all. The automatic restart does not step back
+   * over it; the restart hint names the line that would (ADR-398 Amendment 4).
+   */
+  readonly unconfirmedPlannerBacklog?: PlannerBacklog;
 };
 
 export function withJobInterruption<T extends { readonly updatedAtIso: string }>(
@@ -82,15 +99,27 @@ export function parseOptionalJobInterruption(
 /** The optional facts about where the stop left the machine; null when one is corrupt. */
 function parseStopEvidence(
   value: Record<string, unknown>,
-): Pick<JobInterruption, 'plannerBacklog' | 'positionLost' | 'sentLines'> | null {
+): Pick<
+  JobInterruption,
+  | 'plannerBacklog'
+  | 'positionLost'
+  | 'sentLines'
+  | 'plannerBacklogIfRestarted'
+  | 'unconfirmedPlannerBacklog'
+> | null {
   const positionLost = parsePositionLost(value['positionLost']);
   const plannerBacklog = parsePlannerBacklog(value['plannerBacklog']);
   const sentLines = parseSentLines(value['sentLines']);
+  const ifRestarted = parsePlannerBacklog(value['plannerBacklogIfRestarted']);
+  const unconfirmed = parsePlannerBacklog(value['unconfirmedPlannerBacklog']);
   if (positionLost === null || plannerBacklog === null || sentLines === null) return null;
+  if (ifRestarted === null || unconfirmed === null) return null;
   return {
     ...(plannerBacklog === undefined ? {} : { plannerBacklog }),
     ...(positionLost === undefined ? {} : { positionLost }),
     ...(sentLines === undefined ? {} : { sentLines }),
+    ...(ifRestarted === undefined ? {} : { plannerBacklogIfRestarted: ifRestarted }),
+    ...(unconfirmed === undefined ? {} : { unconfirmedPlannerBacklog: unconfirmed }),
   };
 }
 

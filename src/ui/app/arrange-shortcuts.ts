@@ -29,7 +29,8 @@ export function handleArrangeShortcut(
   e: KeyboardEvent,
   context: () => ArrangeShortcutCtx,
 ): boolean {
-  if (isEditableShortcutTarget(e.target)) return false;
+  // A tab strip that already switched tabs on Alt+arrow keeps the key to itself.
+  if (isEditableShortcutTarget(e.target) || e.defaultPrevented) return false;
   const id = arrangeShortcutCommandId(e);
   if (id === null) return false;
   e.preventDefault();

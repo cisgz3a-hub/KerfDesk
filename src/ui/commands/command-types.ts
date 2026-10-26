@@ -153,6 +153,7 @@ export type CommandId =
   | 'help.open-data-folder'
   | 'help.discussions'
   | 'help.pricing'
+  | 'help.license-notice'
   | 'help.terms'
   | 'help.privacy'
   | 'help.refunds';

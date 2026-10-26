@@ -5,13 +5,21 @@
 
 import { selectControllerDriver } from '../../../core/controllers';
 import type { DeviceProfile } from '../../../core/devices';
+import { numbersClose } from '../../../core/util';
 import { useLaserStore } from '../../state/laser-store';
 import { Button } from '../../kit';
 import { acceptDetectedPatch, setupChangeRows } from './device-setup-accept-detected';
-import type { DeviceSetupAutoFillSummary } from './device-setup-auto-fill';
+import { autoFilledRows, type DeviceSetupAutoFillRecord } from './device-setup-auto-fill';
 import type { DeviceSetupState, DeviceSetupStepProps } from './device-setup-flow';
 import { DeviceSetupDetectedApply } from './DeviceSetupDetectedApply';
+import {
+  listedProfileOf,
+  machinePickerEntries,
+  selectedMachineEntry,
+} from './machine-picker-entries';
 import type { DeviceSetupAutomatic } from './use-controller-auto-fill';
+
+type AppliedAutoFill = Extract<DeviceSetupAutoFillRecord, { readonly status: 'applied' }>;
 
 export function DeviceSetupFoundMachine(
   props: DeviceSetupStepProps & { readonly automatic?: DeviceSetupAutomatic | undefined },
@@ -35,9 +43,9 @@ export function DeviceSetupFoundMachine(
       )}
       {record?.status === 'applied' ? (
         <AutoFilled
-          summary={record.summary}
-          before={record.undo}
+          record={record}
           after={props.state}
+          detected={detected ?? {}}
           onUndo={props.automatic?.undo}
         />
       ) : (
@@ -48,13 +56,13 @@ export function DeviceSetupFoundMachine(
 }
 
 function AutoFilled(props: {
-  readonly summary: DeviceSetupAutoFillSummary;
-  readonly before: DeviceSetupState;
+  readonly record: AppliedAutoFill;
   readonly after: DeviceSetupState;
+  readonly detected: Partial<DeviceProfile>;
   readonly onUndo: (() => void) | undefined;
 }): JSX.Element {
-  const rows = setupChangeRows(props.before, props.after);
-  const { summary } = props;
+  const rows = autoFilledRows(props.record, props.after);
+  const { summary } = props.record;
   return (
     <div className="lf-setup-found-filled" role="status" aria-live="polite">
       <strong>Filled in from your controller</strong>
@@ -77,6 +85,7 @@ function AutoFilled(props: {
           </li>
         ))}
       </ul>
+      <KeptWorkArea state={props.after} detected={props.detected} />
       <p className="lf-setup-muted">
         Everything stays editable, and nothing is saved until the last step. Configured travel is
         the controller&apos;s limit, not a measured work area.
@@ -87,6 +96,40 @@ function AutoFilled(props: {
         </Button>
       )}
     </div>
+  );
+}
+
+// A listed machine keeps its sourced work area; the fill leaves `$130`/`$131`
+// out (ADR-637 Amendment 2) and the difference is shown here to review.
+function KeptWorkArea(props: {
+  readonly state: DeviceSetupState;
+  readonly detected: Partial<DeviceProfile>;
+}): JSX.Element | null {
+  const { draft } = props.state;
+  const { bedWidth, bedHeight } = props.detected;
+  if (bedWidth === undefined || bedHeight === undefined) return null;
+  if (numbersClose(bedWidth, draft.bedWidth) && numbersClose(bedHeight, draft.bedHeight)) {
+    return null;
+  }
+  const entries = machinePickerEntries(props.state);
+  const listed = selectedMachineEntry(props.state, entries) ?? listedProfileOf(draft, entries);
+  // A work area the operator typed is theirs, not the list's.
+  if (
+    listed === undefined ||
+    !numbersClose(listed.bedWidth, draft.bedWidth) ||
+    !numbersClose(listed.bedHeight, draft.bedHeight)
+  ) {
+    return null;
+  }
+  return (
+    <p className="lf-setup-kept-area">
+      <strong>
+        Work area kept at {draft.bedWidth} × {draft.bedHeight} mm
+      </strong>
+      , as listed for the {listed.name}. Your controller&apos;s configured travel ($130 × $131) is{' '}
+      {bedWidth} × {bedHeight} mm, which is not filled in. Change the work area in Essentials only
+      if your machine differs from the listed one.
+    </p>
   );
 }
 

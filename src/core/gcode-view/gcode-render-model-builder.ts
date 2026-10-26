@@ -4,10 +4,9 @@
 // Composes the shared engine (core/gcode); forgiving by design — bad arcs and
 // unknown words become findings, never failures (ADR-255 §5).
 
-import { ARC_EPSILON, arcSweepAngle, PROGRAM_PARSE_REASON } from '../gcode';
+import { PROGRAM_PARSE_REASON, type GcodeWordMatch } from '../gcode';
 // Deep import: the core/gcode barrel is at its public-export cap (ADR-015).
 import { stripControllerComments } from '../gcode/word-scan';
-import { timingArcPoints } from './controller-arc-points';
 import {
   createLaserRenderState,
   isLaserOffFeed,
@@ -27,7 +26,14 @@ import {
 } from './native-laser-render-words';
 import { computeProgramStats } from './program-stats';
 import { createProgramBoundsTracker, type ProgramBoundsTracker } from './program-bounds';
-import { ARC_RADIUS_TOLERANCE_MM, renderArcCenter } from './render-model-arc-center';
+import { createPlacementReader, placeBeforeMotion } from './render-model-placement';
+import { nonMotionCategory, recordUnplacedLine } from './render-model-line-accounting';
+import { emitArc, grblArcBlockRejection } from './render-model-arc';
+import {
+  grblBlockRejection,
+  grblBlockUncertainty,
+  grblRejectedBlockWarning,
+} from './grbl-block-rejection';
 import { createSegmentBuilder, type SegmentBuilder } from './segment-builder';
 import {
   countUnsupported,
@@ -45,9 +51,9 @@ import {
 } from './render-model-types';
 
 const AXIS_EPSILON = 1e-9;
-const XY_PLANE = 17;
 
 type BuildContext = {
+  readonly stockGrbl: boolean;
   readonly coordinateRepresentation: BuildRenderModelOptions['coordinateRepresentation'];
   readonly controllerArcToleranceMm: number | undefined;
   readonly laser: LaserRenderState;
@@ -55,6 +61,8 @@ type BuildContext = {
   readonly segments: SegmentBuilder;
   // The program's own extent, without the assumed start (ADR-255 amendment 2).
   readonly program: ProgramBoundsTracker;
+  /** Only with `boundsFromStart` (ADR-630 Amendment 1). */
+  readonly placement: ReturnType<typeof createPlacementReader> | null;
   readonly events: ProgramEvent[];
   readonly skipped: SkippedMotion[];
   readonly unsupported: UnsupportedWordMap;
@@ -63,7 +71,7 @@ type BuildContext = {
 };
 
 export type GcodeRenderModelBuilder = {
-  readonly pushLine: (line: string) => void;
+  readonly pushLine: (line: string, unplaced?: 'position' | 'origin') => void;
   readonly finish: () => BuildRenderModelResult;
 };
 
@@ -75,12 +83,14 @@ export function createGcodeRenderModelBuilder(
   // it is opt-in: only the live countdown passes it as a responsiveness budget
   // it degrades from, never as a refusal of the job itself.
   const context: BuildContext = {
+    stockGrbl: options.stockGrbl === true,
     coordinateRepresentation: options.coordinateRepresentation,
     controllerArcToleranceMm: options.controllerArcToleranceMm,
     laser: createLaserRenderState(options),
     modal: freshRenderModal(options.initialPositionMm),
     segments,
     program: createProgramBoundsTracker(options.initialPositionMm),
+    placement: options.boundsFromStart === true ? createPlacementReader() : null,
     events: [],
     skipped: [],
     unsupported: new Map(),
@@ -92,8 +102,9 @@ export function createGcodeRenderModelBuilder(
   let junkLines = 0;
   let terminalResult: BuildRenderModelResult | null = null;
 
-  const pushLine = (raw: string): void => {
+  const pushLine = (raw: string, unplaced?: 'position' | 'origin'): void => {
     if (terminalResult !== null) return;
+    recordUnplacedLine(context, lineCount, unplaced);
     const category = processLine(context, raw, lineCount);
     categories.push(category);
     if (category === LINE_CATEGORY.junk) junkLines += 1;
@@ -163,6 +174,7 @@ function processLine(context: BuildContext, raw: string, line: number): number {
   );
   if (words === null || words.length === 0) return LINE_CATEGORY.junk;
   context.recognizedWords += words.length;
+  if (recordGrblBlock(context, stripped, words, line)) return LINE_CATEGORY.unsupported;
   updateLaserRenderState(context.laser, words, raw);
   const accounting = {
     countUnsupported: (word: string, atLine: number) =>
@@ -175,18 +187,43 @@ function processLine(context: BuildContext, raw: string, line: number): number {
     accounting,
   });
   const outcome = applyLineWords(context.modal, motionWords, line, accounting);
-  if (emitLineMotion(context, outcome, line)) return LINE_CATEGORY.motion;
+  if (emitPlacedLineMotion(context, outcome, motionWords, line)) return LINE_CATEGORY.motion;
   return nonMotionCategory(outcome, motionWords !== words);
 }
 
-function nonMotionCategory(
+function recordGrblBlock(
+  context: BuildContext,
+  raw: string,
+  words: ReadonlyArray<GcodeWordMatch>,
+  line: number,
+): boolean {
+  if (!context.stockGrbl) return false;
+  const rejected =
+    grblBlockRejection(raw) ??
+    grblArcBlockRejection(context.modal, words, context.program.canPlace);
+  if (rejected !== null) {
+    context.skipped.push({ line, reason: grblRejectedBlockWarning(rejected) });
+    return true;
+  }
+  if (grblBlockUncertainty(raw) !== null) recordUnplacedLine(context, line, 'origin');
+  return false;
+}
+
+// Without `boundsFromStart` every line's axis words are ordinary motion.
+function emitPlacedLineMotion(
+  context: BuildContext,
   outcome: ReturnType<typeof applyLineWords>,
-  hasNativeEvent: boolean,
-): number {
-  if (outcome.sawEvent || hasNativeEvent) return LINE_CATEGORY.event;
-  if (outcome.sawModal) return LINE_CATEGORY.modalOnly;
-  if (outcome.sawUnsupported) return LINE_CATEGORY.unsupported;
-  return LINE_CATEGORY.modalOnly;
+  words: ReadonlyArray<GcodeWordMatch>,
+  line: number,
+): boolean {
+  if (context.placement === null) return emitLineMotion(context, outcome, line);
+  const placement = context.placement(words, context.modal.unitScale);
+  placeBeforeMotion(context.program, context.modal, placement);
+  const moved =
+    placement.motion !== 'none' &&
+    emitLineMotion(context, outcome, line, placement.motion !== 'unplaced');
+  if (placement.unknownAfter.length > 0) context.program.forget(placement.unknownAfter);
+  return moved;
 }
 
 // Routes a line to the right emitter. Returns whether it produced motion.
@@ -194,6 +231,7 @@ function emitLineMotion(
   context: BuildContext,
   outcome: ReturnType<typeof applyLineWords>,
   line: number,
+  placed = true,
 ): boolean {
   if (outcome.homeAxes !== null) {
     emitHome(context, outcome.homeAxes, line);
@@ -204,7 +242,7 @@ function emitLineMotion(
     emitCannedCycle(context, outcome.axisWords, outcome.peckDepth, line);
     return true;
   }
-  emitMotion(context, outcome.axisWords, line);
+  emitMotion(context, outcome.axisWords, line, placed);
   return true;
 }
 
@@ -232,6 +270,7 @@ function emitMotion(
   context: BuildContext,
   axisWords: ReadonlyMap<string, number>,
   line: number,
+  placed: boolean,
 ): void {
   const { modal } = context;
   const target = resolveTarget(modal, axisWords);
@@ -241,12 +280,16 @@ function emitMotion(
   }
   if (modal.motion === 2 || modal.motion === 3) {
     // A skipped (invalid) arc moves nothing — the controller would have
-    // rejected the line, so the modal position must not advance either.
+    // rejected the line, so the modal position must not advance either. An
+    // external run's review names it as not in the Frame outline (ADR-630
+    // Amendment 2), since a controller with looser limits may still run it.
     if (!emitArc(context, axisWords, target, line)) return;
   } else {
     emitLinear(context, target, line);
   }
-  context.program.moveTo(target, axisWords, modal.absolute);
+  // A move the outline cannot place leaves its axes unknown instead (the
+  // caller forgets them), so its end is not counted.
+  if (placed) context.program.moveTo(target, axisWords, modal.absolute);
   modal.x = target.x;
   modal.y = target.y;
   modal.z = target.z;
@@ -323,95 +366,4 @@ function emitLinear(
     power: renderedPower(context.laser, modal),
     lengthMm: length,
   });
-}
-
-function emitArc(
-  context: BuildContext,
-  axisWords: ReadonlyMap<string, number>,
-  target: { x: number; y: number; z: number },
-  line: number,
-): boolean {
-  const { modal } = context;
-  if (modal.plane !== XY_PLANE) {
-    context.skipped.push({ line, reason: 'G18/G19 plane arcs are not renderable (XY only)' });
-    return false;
-  }
-  const clockwise = modal.motion === 2;
-  const from = { x: modal.x, y: modal.y };
-  const solved = renderArcCenter(axisWords, from, target, clockwise, modal.unitScale);
-  if ('skipped' in solved) {
-    context.skipped.push({ line, reason: solved.skipped });
-    return false;
-  }
-  const { center } = solved;
-  const radius = Math.hypot(from.x - center.x, from.y - center.y);
-  const endRadius = Math.hypot(target.x - center.x, target.y - center.y);
-  if (Math.abs(radius - endRadius) > ARC_RADIUS_TOLERANCE_MM) {
-    context.skipped.push({ line, reason: 'arc radius mismatch between start and end points' });
-    return false;
-  }
-  if (radius <= ARC_EPSILON) {
-    context.skipped.push({ line, reason: 'arc radius is zero' });
-    return false;
-  }
-  const startAngle = Math.atan2(from.y - center.y, from.x - center.x);
-  const endAngle = Math.atan2(target.y - center.y, target.x - center.x);
-  const samePoint =
-    Math.abs(from.x - target.x) <= AXIS_EPSILON && Math.abs(from.y - target.y) <= AXIS_EPSILON;
-  const sweep = arcSweepAngle(startAngle, endAngle, clockwise, samePoint);
-  const arc = timingArcPoints(center, radius, startAngle, sweep, context.controllerArcToleranceMm);
-  const points = arc.points;
-  context.controllerArcBudgetRelief += arc.budgetRelief;
-  points[points.length - 1] = { x: target.x, y: target.y };
-  pushArcPairs(context, points, target, sweep * radius, line, clockwise);
-  return true;
-}
-
-// Distributes the arc-true length (3D-helix-true when Z moves) across the
-// sampled pairs by chord proportion so the cumulative route stays exact.
-function pushArcPairs(
-  context: BuildContext,
-  points: ReadonlyArray<{ x: number; y: number }>,
-  target: { x: number; y: number; z: number },
-  signedArcLength: number,
-  line: number,
-  clockwise: boolean,
-): void {
-  const { modal } = context;
-  const dz = target.z - modal.z;
-  const planarLength = Math.abs(signedArcLength);
-  const trueLength = Math.hypot(planarLength, dz);
-  let chordTotal = 0;
-  for (let index = 1; index < points.length; index += 1) {
-    const a = points[index - 1];
-    const b = points[index];
-    if (a !== undefined && b !== undefined) chordTotal += Math.hypot(b.x - a.x, b.y - a.y);
-  }
-  const denominator = Math.max(1, points.length - 1);
-  let previous = { x: modal.x, y: modal.y, z: modal.z };
-  for (let index = 1; index < points.length; index += 1) {
-    const point = points[index];
-    const before = points[index - 1];
-    if (point === undefined || before === undefined) continue;
-    const z = modal.z + (dz * index) / denominator;
-    const chord = Math.hypot(point.x - before.x, point.y - before.y);
-    const share = chordTotal > 0 ? chord / chordTotal : 1 / denominator;
-    context.segments.push({
-      x0: previous.x,
-      y0: previous.y,
-      z0: previous.z,
-      x1: point.x,
-      y1: point.y,
-      z1: z,
-      kind: isLaserOffFeed(context.laser, modal) ? SEG_KIND.travel : SEG_KIND.cut,
-      motion: clockwise ? SEG_MOTION.cw : SEG_MOTION.ccw,
-      line,
-      feed: modal.feed,
-      power: renderedPower(context.laser, modal),
-      lengthMm: trueLength * share,
-    });
-    previous = { x: point.x, y: point.y, z };
-    // An arc is drawn about its start, so it counts where its start does.
-    context.program.include(previous);
-  }
 }

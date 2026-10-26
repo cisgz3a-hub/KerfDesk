@@ -19,6 +19,7 @@
 // that silently fails to restore after a crash.
 
 import type { Project } from '../../core/scene';
+import { withReferencedEmbeddedFonts } from '../../core/text/embedded-font-set';
 import { deserializeProject } from './deserialize-project';
 import { deserializeFailureReason, errorMessage } from './deserialize-failure-reason';
 import { serializeProject } from './serialize-project';
@@ -32,7 +33,7 @@ export function prepareProjectForAutosave(project: Project): PreparedProjectAuto
   try {
     // Recovery needs the same values, without the manual file's indentation.
     // Compact JSON reduces first-save allocation, parsing and storage traffic.
-    serialized = serializeProject(project, { compact: true });
+    serialized = serializeProject(withReferencedEmbeddedFonts(project), { compact: true });
   } catch (error) {
     return { kind: 'invalid', reason: errorMessage(error) };
   }

@@ -1,6 +1,7 @@
 import { cncMaxFeedMmPerMin } from '../../core/cnc/cnc-head-feeds';
 import { SURFACING_DEFAULT_DEPTH_PER_PASS_MM } from '../../core/cnc/surfacing';
 import type { SurfacingParams } from '../../core/cnc/surfacing';
+import type { ControllerKind } from '../../core/devices';
 import type { ControllerSettingsSnapshot, ReadinessSettingsCapability } from '../../core/preflight';
 import { standaloneCncSetupAdvisories } from '../../core/preflight/standalone-cnc-preflight';
 import { activeCncTool, type CncMachineConfig, type Project } from '../../core/scene';
@@ -10,8 +11,9 @@ import { controllerReadinessAdvisories } from '../app/controller-readiness-advis
 import { pushCncExportControllerMessages } from '../app/cnc-export-controller-advisory';
 import { partitionSavePreflight } from '../app/save-preflight-policy';
 import type { ToastVariant } from '../state/toast-store';
+import { pickPreparedSaveTarget } from '../app/pick-prepared-save-target';
 import { startSurfacingStream } from './surfacing-worker-client';
-import { writeSurfacingFile } from './surfacing-save-write';
+import { stageSurfacingProgram, writeSurfacingFile } from './surfacing-save-write';
 
 export type SurfacingInputs = {
   readonly widthMm: number;
@@ -31,9 +33,12 @@ type SaveSurfacingOptions = {
   readonly machine: CncMachineConfig;
   readonly controllerSettings: ControllerSettingsSnapshot | null;
   readonly settingsCapability: ReadinessSettingsCapability;
+  readonly firmwareKind?: ControllerKind;
   readonly inputs: SurfacingInputs;
   readonly signal: AbortSignal;
-  readonly onWriting: () => void;
+  /** The program is ready; a destination is being chosen. */
+  readonly onChoosing: () => void;
+  /** A destination was chosen; the write can no longer be cancelled. */
   readonly onFinalizing: () => void;
   readonly isCurrent: () => boolean;
 };
@@ -48,7 +53,7 @@ export async function saveSurfacingProgram(options: SaveSurfacingOptions): Promi
     settingsCapability,
     inputs,
     signal,
-    onWriting,
+    onChoosing,
   } = options;
   const tool = activeCncTool(machine);
   const reported = new Set<string>();
@@ -63,6 +68,7 @@ export async function saveSurfacingProgram(options: SaveSurfacingOptions): Promi
     project,
     controllerSettings,
     settingsCapability,
+    options.firmwareKind,
   )) {
     warn(message);
   }
@@ -77,31 +83,31 @@ export async function saveSurfacingProgram(options: SaveSurfacingOptions): Promi
     },
     signal,
   );
-  // Attach rejection handling while the native picker is open. Selecting a
-  // destination uses the click's activation; no writable opens until preflight.
-  const preparation = task.ready.then(
-    (prepared) => ({ ok: true as const, prepared }),
-    (error: unknown) => ({ ok: false as const, error }),
-  );
   try {
-    const target = await platform.pickFileForSave({
-      suggestedName: 'surfacing.nc',
-      extensions: ['.gcode', '.nc'],
-    });
-    if (target === null) return;
-    signal.throwIfAborted();
-    const result = await preparation;
-    if (!result.ok) throw result.error;
-    const { summary, preflight } = result.prepared;
+    // The save picker empties an existing file as it returns (ADR-656), so
+    // preflight and the whole program finish before a destination is chosen.
+    const { summary, preflight } = await task.ready;
     const { blocking, advisories } = partitionSavePreflight(preflight.issues);
     for (const issue of advisories) warn(issue.message);
     if (blocking.length > 0) throw new Error(blocking.map((issue) => issue.message).join(' '));
-    signal.throwIfAborted();
-    await writeSurfacingFile(target, task.chunks, {
+    const program = await stageSurfacingProgram(task.chunks, signal);
+    // The worker is done; it need not live on while a destination is chosen.
+    task.dispose();
+    onChoosing();
+    const target = await pickPreparedSaveTarget(
+      platform,
+      { suggestedName: 'surfacing.nc', extensions: ['.gcode', '.nc'] },
+      { title: 'Save surfacing program', message: 'The surfacing program is ready.' },
       signal,
-      onWriting,
-      onFinalizing: options.onFinalizing,
-    });
+    );
+    if (target === null) {
+      signal.throwIfAborted();
+      return;
+    }
+    // The chosen file is already empty, so the prepared program is written
+    // even if the save is cancelled from here on.
+    options.onFinalizing();
+    await writeSurfacingFile(target, program);
     if (!options.isCurrent()) return;
     pushToast(
       `Saved preflighted surfacing program: ${summary.passes} pass(es) × ${summary.rowsPerPass} rows with the ${tool.name}. Requested total depth ${summary.requestedTotalDepthMm} mm; emitted maximum depth ${summary.emittedMaximumDepthText} mm at 0.001 mm coordinate precision. Zero X/Y at the area's front-left corner and Z on the surface before running; the file lifts to safe Z before spindle start.`,

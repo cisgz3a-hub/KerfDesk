@@ -3,15 +3,17 @@
 // plus the six list actions. History entries carry a layer scope (ADR-246),
 // so switching layers keeps undo — Ctrl+Z follows strokes across layers.
 
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '../kit/icons';
 import { resampleBuffer } from '../../core/image-resample';
 import {
   addLayerAboveActive,
+  commitLayerOpacity,
   duplicateActiveLayer,
   mergeActiveLayerDown,
   moveActiveLayer,
   moveLayerToIndex,
+  previewLayerOpacity,
   removeActiveLayer,
   setActiveLayer,
   setActiveLayerProps,
@@ -225,19 +227,7 @@ function ActiveLayerControls(props: {
     <div style={controlsStyle}>
       <label style={controlLabelStyle} title="Opacity of the active layer">
         Opacity
-        <input
-          type="range"
-          min={0}
-          max={100}
-          step={1}
-          value={Math.round(active.opacity * 100)}
-          onChange={(e) =>
-            updateSession((s) => setActiveLayerProps(s, { opacity: Number(e.target.value) / 100 }))
-          }
-          style={{ flex: 1 }}
-          aria-label="Active layer opacity"
-          title="Opacity of the active layer"
-        />
+        <OpacitySlider active={active} />
       </label>
       <label
         style={controlLabelStyle}
@@ -261,6 +251,55 @@ function ActiveLayerControls(props: {
         </select>
       </label>
     </div>
+  );
+}
+
+type OpacityDrag = { readonly layerId: string; readonly startOpacity: number };
+
+// Input events preview the opacity live; the release (the native `change`
+// event, which also ends each keyboard step) records the whole drag as one
+// Undo step from where it started (audit 23-P2-2). Blur and unmount commit a
+// drag that never saw its `change`.
+function OpacitySlider(props: {
+  readonly active: NonNullable<EditorSession['layers'][number]>;
+}): JSX.Element {
+  const { active } = props;
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dragRef = useRef<OpacityDrag | null>(null);
+  const commit = useCallback((): void => {
+    const drag = dragRef.current;
+    dragRef.current = null;
+    if (drag !== null) {
+      updateSession((s) => commitLayerOpacity(s, drag.layerId, drag.startOpacity));
+    }
+  }, []);
+  useEffect(() => {
+    const input = inputRef.current;
+    input?.addEventListener('change', commit);
+    return () => {
+      input?.removeEventListener('change', commit);
+      commit();
+    };
+  }, [commit]);
+  return (
+    <input
+      ref={inputRef}
+      type="range"
+      min={0}
+      max={100}
+      step={1}
+      value={Math.round(active.opacity * 100)}
+      onChange={(e) => {
+        if (dragRef.current !== null && dragRef.current.layerId !== active.id) commit();
+        dragRef.current ??= { layerId: active.id, startOpacity: active.opacity };
+        const opacity = Number(e.target.value) / 100;
+        updateSession((s) => previewLayerOpacity(s, active.id, opacity));
+      }}
+      onBlur={commit}
+      style={{ flex: 1 }}
+      aria-label="Active layer opacity"
+      title="Opacity of the active layer"
+    />
   );
 }
 

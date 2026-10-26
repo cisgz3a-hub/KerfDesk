@@ -228,7 +228,7 @@ function filesAndFeatures() {
       question: 'Can KerfDesk engrave photos or carve on a CNC router?',
       answer: html`<p>
           ${statusPill('shipped-code-and-tests')} It has the tools for both, but neither has run on
-          a real machine yet. Image mode offers 11 dithering and grayscale options for photos, at 5
+          a real machine yet. Image mode offers 12 dithering and grayscale options for photos, at 5
           to 25 lines per mm. CNC mode has profile, pocket, engrave, inlay and drill cuts, V-carve
           in Pro, touch-plate probing and a 3D preview.
         </p>

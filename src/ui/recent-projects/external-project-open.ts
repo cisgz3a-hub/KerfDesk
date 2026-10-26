@@ -14,6 +14,7 @@ import type {
 } from '../../platform/types';
 import { errorMessage } from '../app/file-action-formatters';
 import { openProjectCommand } from '../commands/open-project-command';
+import { initialLicenceStatus } from '../licensing/edition';
 import type { ToastVariant } from '../state/toast-store';
 
 type PushToast = (message: string, variant?: ToastVariant) => void;
@@ -60,9 +61,9 @@ export async function handleExternalProjectOpen(
     return;
   }
   // Rechecked after the unsaved-changes question and after reading/parsing:
-  // a job can start while either asynchronous step waits.
+  // a job or another dialog can open while either asynchronous step waits.
   const stillAllowed = (): boolean => {
-    if (!deps.jobActive()) return true;
+    if (!deps.jobActive() && !deps.dialogOpen()) return true;
     hold();
     return false;
   };
@@ -73,12 +74,18 @@ export async function handleExternalProjectOpen(
   }
 }
 
-/** Opens one handed-over file at a time, in arrival order. */
+/**
+ * Opens one handed-over file at a time, in arrival order. A desktop window
+ * starts with Pro locked until its first licence status (ADR-592), and the
+ * workspace mounts before that status (ADR-623 Amendment 3), so the first open
+ * waits for it, as autosave recovery does: a licensed user's Pro project is
+ * never judged against the startup lock.
+ */
 export function subscribeExternalProjectOpens(
   source: ExternalFileOpenSource,
   deps: ExternalProjectOpenDeps,
 ): () => void {
-  let queue: Promise<void> = Promise.resolve();
+  let queue: Promise<void> = initialLicenceStatus();
   return source.subscribe((request) => {
     queue = queue.then(() => handleExternalProjectOpen(request, deps)).catch(() => undefined);
   });

@@ -48,6 +48,13 @@ describe('project save validation', () => {
       'Could not save project: missing or invalid `workspace.width`',
       'error',
     );
+    // The recovery offer names the refusal, not "machine or output settings"
+    // (audit 13-P2-1).
+    expect(mockConfirm).toHaveBeenLastCalledWith(
+      expect.stringMatching(
+        /^This project cannot be saved as-is: missing or invalid `workspace\.width`\. Export a raw recovery copy/,
+      ),
+    );
   });
 
   it('does not mark a project saved when CNC safety values would be normalized', async () => {

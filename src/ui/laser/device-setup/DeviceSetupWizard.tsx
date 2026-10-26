@@ -125,6 +125,7 @@ function DeviceSetupWizardDraft(props: DeviceSetupWizardProps): JSX.Element {
         onSave={save.onSave}
         saving={save.saving}
         firmwareWriteCount={save.firmwareWriteCount}
+        lockedByJob={save.lockedByJob}
       />
     </Dialog>
   );

@@ -23,6 +23,7 @@ files:
   - public/desktop-release-keys.json
   - public/desktop-sandbox-contract.mjs
   - public/licence-key-text.mjs
+  - public/desktop-licence-window.mjs
   # The renderer is bundled into dist/web. Ship only the main process's
   # reachable packages and mandatory dependency closure (ADR-483), including
   # nested imports. electron/packaged-runtime-closure.test.ts checks this list
@@ -138,9 +139,17 @@ appImage:
 # The static AppImage runtime (electron-builder 26.16.1 lists it as a beta toolset)
 # carries its own FUSE support, so the AppImage starts on Ubuntu 22.04 and newer
 # without libfuse2, which those systems no longer install. The default legacy
-# runtime needs libfuse2 and fails before KerfDesk starts (ADR-607).
+# runtime needs libfuse2 and fails before KerfDesk starts (ADR-607). The runtime
+# and the libraries this toolset copies into usr/lib are listed, with their
+# licences, in docs/licensing/appimage-runtime-notices.txt (ADR-017 Amendment 1):
+# a toolset change means checking that list again.
 toolsets:
   appimage: 1.0.3
+
+# The toolset's lib/x64 also holds GPL-3.0 libraries (libappindicator3,
+# libindicator3) and GConf, which KerfDesk does not use. This hook gives
+# electron-builder a copy of the toolset without them (ADR-017 Amendment 2).
+artifactBuildStarted: scripts/appimage-toolset.mjs
 
 # This stable config has no macOS target: the Mac builds are the unsigned
 # Preview (electron-builder.preview.yml, ADR-248) until a Developer ID and

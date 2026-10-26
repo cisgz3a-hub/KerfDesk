@@ -15,7 +15,7 @@ import {
 } from '../../core/scene';
 import type { CncLiveCapsState } from './cnc-live-caps-actions';
 import type { LayerDefaultsState } from './layer-default-actions';
-import { applyLayerDefaultsToFreshLayers } from './object-insert-actions';
+import { applyLayerDefaultsToFreshLayers } from './fresh-operation-seeding';
 import { pushUndo, type MutationResult, type StateSlice } from './scene-mutations';
 import type { MaterialLibraryDocument } from '../../io/material-library';
 

@@ -111,7 +111,7 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   'tools.place-board': {
     family: 'tools',
     tooltip:
-      'Capture a rectangle from its corners or find a circle from four rim points, then verify and fine-adjust points on the drawn outline.',
+      'Capture a rectangle or circle, or draw an irregular board from a phone photo, then register and verify points on the outline.',
   },
   'tools.box-generator': {
     family: 'tools',
@@ -371,5 +371,10 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   'help.safety': {
     family: 'help',
     tooltip: 'Machine-safety and liability information — read before running a job.',
+  },
+  'help.license-notice': {
+    family: 'help',
+    tooltip:
+      'Read the KerfDesk License & Safety Notice: the licence and safety terms the installer shows, on every system.',
   },
 };

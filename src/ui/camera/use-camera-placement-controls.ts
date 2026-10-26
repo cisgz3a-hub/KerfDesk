@@ -2,8 +2,7 @@ import { useEffect } from 'react';
 import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
 import { useLaserStore } from '../state/laser-store';
-import { captureSourceFrame } from './frame-source';
-import { cameraCaptureBindingForFrame } from './frame-source';
+import { cancelOverlayCapture, captureOverlayStill } from './capture-overlay-still';
 
 export function useCameraPlacementControls(overlayGeometryReady: boolean): {
   readonly active: boolean;
@@ -24,7 +23,7 @@ export function useCameraPlacementControls(overlayGeometryReady: boolean): {
   const setBedPicture = useCameraStore((s) => s.setBedPicture);
   const active = useCameraStore((s) => s.placementActive);
   const activate = useCameraStore((s) => s.activatePlacement);
-  const exit = useCameraStore((s) => s.deactivatePlacement);
+  const deactivate = useCameraStore((s) => s.deactivatePlacement);
   const confirmedEpoch = useCameraStore((s) => s.confirmedPositionEpoch);
   const confirmEpoch = useCameraStore((s) => s.confirmPositionEpoch);
   const homingEnabled = useStore((s) => s.project.device.homing.enabled);
@@ -38,20 +37,22 @@ export function useCameraPlacementControls(overlayGeometryReady: boolean): {
   }, [activate, active, overlayGeometryReady, overlayUsable, visible]);
 
   const toggleOverlay = (): void => {
+    cancelOverlayCapture();
     setVisible(!visible);
     if (!visible && overlayGeometryReady) activate();
   };
   const updateStill = async (): Promise<void> => {
-    if (sourceState.kind !== 'live') return;
-    const frame = await captureSourceFrame(sourceState.source);
-    if (frame === null) return;
-    setStill(frame, cameraCaptureBindingForFrame(sourceState.source, frame.width, frame.height));
-    if (overlayGeometryReady) activate();
+    await captureOverlayStill(undefined, { activatePlacement: overlayGeometryReady });
   };
   const useLive = (): void => {
+    cancelOverlayCapture();
     setStill(null);
     setBedPicture(null);
     if (overlayGeometryReady) activate();
+  };
+  const exit = (): void => {
+    cancelOverlayCapture();
+    deactivate();
   };
   const positionTrusted = homingEnabled
     ? homingState === 'confirmed'

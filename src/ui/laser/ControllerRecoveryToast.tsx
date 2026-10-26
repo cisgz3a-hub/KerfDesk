@@ -12,6 +12,12 @@ type Props = {
   readonly onRetry: (() => void) | undefined;
   readonly onReconnect: (() => void) | undefined;
   readonly disabled: boolean;
+  /** The controller stopped answering status queries (ADR-611). */
+  readonly stoppedResponding?: boolean;
+  /** The canvas card collapses instead of closing (ADR-642). */
+  readonly label?: string;
+  readonly closeLabel?: string;
+  readonly closeTitle?: string;
 };
 
 // Keep recovery actions available without adding a row to the connection bar.
@@ -21,7 +27,7 @@ export function ControllerRecoveryToast(props: Props): JSX.Element {
     <section
       role="alert"
       className="lf-banner lf-banner--warning lf-controller-recovery-toast"
-      aria-label="Controller information"
+      aria-label={props.label ?? 'Controller information'}
       onKeyDown={(event) => {
         if (event.key !== 'Escape') return;
         event.stopPropagation();
@@ -29,16 +35,15 @@ export function ControllerRecoveryToast(props: Props): JSX.Element {
       }}
     >
       <div className="lf-controller-recovery-toast__heading">
-        <strong>
-          {props.reconnectRecommended
-            ? 'Controller connection needs recovery'
-            : 'Controller information unavailable'}
-        </strong>
+        <strong>{recoveryHeading(props)}</strong>
         <button
           type="button"
           className="lf-btn lf-controller-recovery-toast__close"
-          aria-label="Dismiss controller notification"
-          title="Hide this notification. Reopen it from More connection options, Controller info."
+          aria-label={props.closeLabel ?? 'Dismiss controller notification'}
+          title={
+            props.closeTitle ??
+            'Hide this notification. Reopen it from More connection options, Controller info.'
+          }
           ref={props.closeRef}
           autoFocus={props.focusOnOpen}
           onClick={props.onDismiss}
@@ -53,6 +58,13 @@ export function ControllerRecoveryToast(props: Props): JSX.Element {
       <RecoveryActions {...props} />
     </section>
   );
+}
+
+// Titles say what happened to the machine, not the internal check that
+// failed; Retry and Reconnect stay as offered (ADR-611 Amendment 2).
+function recoveryHeading(props: Props): string {
+  if (props.stoppedResponding === true) return 'Machine stopped answering';
+  return 'Couldn’t read machine settings';
 }
 
 function RecoveryActions(props: Props): JSX.Element {

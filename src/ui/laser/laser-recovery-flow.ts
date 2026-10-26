@@ -24,6 +24,7 @@ import {
   type PreparedRecoverySource,
 } from './start-job-source';
 import { resumeConfirmation } from './resume-confirmation';
+import { confirmResumeWarnings, resumeReviewWarnings } from './resume-review-warnings';
 import { confirmLaserModeStartEvidence } from './laser-mode-start-acknowledgement';
 import { buildLaserResumeProgram } from './laser-resume-program';
 import { cleanupRejectedRecoveryAttempt } from './recovery-attempt-cleanup';
@@ -59,6 +60,9 @@ type PlannedLaserRecovery = {
   readonly resumeFromLine: number;
   readonly effectiveResumeFromLine: number;
   readonly reviewedAtIso: string;
+  /** The original program's warnings plus the resume re-entry's no-go
+   * crossings, as the operator confirmed them. */
+  readonly warningsShown: ReadonlyArray<string>;
   readonly laserModeStartEvidence: LaserModeStartEvidence;
 };
 
@@ -100,7 +104,8 @@ async function planLaserRecovery(
     jobAwareAlert(`Cannot resume from line ${fromLine}:\n\n${resume.reason}`);
     return null;
   }
-  if (!confirmWarnings(source.warnings)) return null;
+  const warningsShown = resumeReviewWarnings(source, resume);
+  if (!confirmResumeWarnings(warningsShown)) return null;
   const laserModeStartEvidence = confirmLaserModeStartEvidence(
     source.project,
     source.laserModeStartSnapshot,
@@ -118,6 +123,7 @@ async function planLaserRecovery(
     resumeFromLine: fromLine,
     effectiveResumeFromLine: resume.fromLine,
     reviewedAtIso: new Date().toISOString(),
+    warningsShown,
     laserModeStartEvidence,
   };
 }
@@ -250,7 +256,7 @@ async function buildLaserRecoveryArtifact(
     requestedFromLine: planned.resumeFromLine,
     effectiveFromLine: planned.effectiveResumeFromLine,
     reviewedAtIso: planned.reviewedAtIso,
-    warningsShown: planned.source.warnings,
+    warningsShown: planned.warningsShown,
     laserModeStartEvidence: planned.laserModeStartEvidence,
     ...(planned.source.laserSecondPassChain === undefined
       ? {}
@@ -374,13 +380,6 @@ function controllerObservation(laser: ReturnType<typeof useLaserStore.getState>)
     controllerSessionEpoch: laser.controllerSessionEpoch,
     plannerBlocksAtIdle: currentPlannerCapacityEvidence(laser)?.plannerBlocksFree ?? null,
   };
-}
-
-function confirmWarnings(warnings: ReadonlyArray<string>): boolean {
-  if (warnings.length === 0) return true;
-  return jobAwareConfirm(
-    `Controller warning:\n\n${warnings.map((warning) => `• ${warning}`).join('\n')}\n\nContinue recovery?`,
-  );
 }
 
 function createAttemptId(): string {

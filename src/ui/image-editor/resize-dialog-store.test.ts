@@ -71,6 +71,66 @@ describe('useResizeDialogStore', () => {
     });
   });
 
+  it.each([
+    [16, 12, 'width', 8192, 6144],
+    [16, 12, 'height', 8192, 6144],
+    [12, 16, 'width', 6144, 8192],
+    [12, 16, 'height', 6144, 8192],
+  ] as const)(
+    'preserves the %i:%i aspect ratio when %s reaches the edge cap',
+    (width, height, editedAxis, expectedWidth, expectedHeight) => {
+      useImageEditorStore.setState({
+        session: createSession('aspect', 'test.png', createRgbaBuffer(width, height), BOUNDS),
+      });
+      useResizeDialogStore.getState().open('image-size');
+      if (editedAxis === 'width') useResizeDialogStore.getState().setWidthDraft('9000');
+      else useResizeDialogStore.getState().setHeightDraft('9000');
+
+      expect(useResizeDialogStore.getState().dialog).toMatchObject({
+        lockAspect: true,
+        width: expectedWidth,
+        height: expectedHeight,
+        widthDraft: String(expectedWidth),
+        heightDraft: String(expectedHeight),
+      });
+    },
+  );
+
+  it.each(['image-size', 'canvas-size'] as const)(
+    'discards the old crop coordinates after a committed %s and permits a fresh crop',
+    (kind) => {
+      seedSession();
+      useImageEditorStore.setState({ pendingCrop: { x: 20, y: 10, width: 40, height: 20 } });
+      useResizeDialogStore.getState().open(kind);
+      useResizeDialogStore.getState().setWidthDraft('40');
+      useResizeDialogStore.getState().commit();
+
+      expect(useImageEditorStore.getState().pendingCrop).toBeNull();
+      const resized = useImageEditorStore.getState().session;
+      useImageEditorStore.getState().commitPendingCrop();
+      expect(useImageEditorStore.getState().session).toBe(resized);
+
+      useImageEditorStore.getState().setPendingCrop({ x: 1, y: 2, width: 8, height: 6 });
+      useImageEditorStore.getState().commitPendingCrop();
+      expect(useImageEditorStore.getState().session?.doc).toMatchObject({ width: 8, height: 6 });
+      expect(useImageEditorStore.getState().session?.history.undoStack).toHaveLength(2);
+    },
+  );
+
+  it('retains a pending crop when a resize is cancelled or leaves the dimensions unchanged', () => {
+    seedSession();
+    const crop = { x: 20, y: 10, width: 40, height: 20 };
+    useImageEditorStore.setState({ pendingCrop: crop });
+    useResizeDialogStore.getState().open('image-size');
+    useResizeDialogStore.getState().setWidthDraft('40');
+    useResizeDialogStore.getState().cancel();
+    expect(useImageEditorStore.getState().pendingCrop).toBe(crop);
+
+    useResizeDialogStore.getState().open('image-size');
+    useResizeDialogStore.getState().commit();
+    expect(useImageEditorStore.getState().pendingCrop).toBe(crop);
+  });
+
   it('commit resamples the session, clears the view for a re-fit, and closes', () => {
     seedSession();
     useResizeDialogStore.getState().open('image-size');

@@ -5,6 +5,11 @@ import {
   type VectorOpError,
   type VectorSceneObject,
 } from '../../core/geometry';
+import {
+  describeWeldChange,
+  NOTHING_TO_WELD_MESSAGE,
+  type WeldChange,
+} from '../../core/geometry/vector-path-weld-change';
 import type { Result } from '../../core/result';
 import { artworkOperationName, type ImportedSvg } from '../../core/scene';
 import { useStore } from '../state';
@@ -46,6 +51,7 @@ function BooleanDialog({ session }: { readonly session: BooleanSession }): JSX.E
     sources,
     preview,
     after,
+    absorbed,
     updating,
     canApply,
     unchanged,
@@ -94,6 +100,7 @@ function BooleanDialog({ session }: { readonly session: BooleanSession }): JSX.E
         setKeep={setKeepOperands}
         setRetain={setRetainCompound}
       />
+      {absorbed.length > 0 ? <p role="alert">{absorbedWarning(absorbed)}</p> : null}
       <p role="status" aria-live="polite">
         {booleanReviewStatus(unchanged, updating, preview.problem, keepOperands)}
       </p>
@@ -135,7 +142,7 @@ function useBooleanReview(session: BooleanSession) {
   const primary = useStore((state) => state.selectedObjectId);
   const additional = useStore((state) => state.additionalSelectedIds);
   const close = useBooleanDialogStore((state) => state.close);
-  const { sources, preview, after } = useBooleanPreview(session, operation);
+  const { sources, preview, after, absorbed } = useBooleanPreview(session, operation);
   const ids = selectedObjectIds({ selectedObjectId: primary, additionalSelectedIds: additional });
   const unchanged =
     currentProject === session.project &&
@@ -175,6 +182,7 @@ function useBooleanReview(session: BooleanSession) {
     sources,
     preview,
     after,
+    absorbed,
     updating: preview.updating,
     canApply: preview.canApply,
     unchanged,
@@ -234,21 +242,34 @@ function useBooleanPreview(session: BooleanSession, operation: BooleanPreviewOpe
   const settled = vector.current?.result as Result<ImportedSvg, VectorOpError> | undefined;
   const result: Result<ImportedSvg | WeldSelectionPlan, VectorOpError> | undefined =
     settled === undefined || weld === null ? settled : finishWeldSelection(weld, settled);
+  const weldChange = useMemo<WeldChange | null>(
+    () =>
+      weld !== null && settled?.kind === 'ok' ? describeWeldChange(sources, settled.value) : null,
+    [weld, settled, sources],
+  );
   const preview: BooleanPreviewState = {
-    ...previewStatus(result, vector.unavailable, vector.failed),
+    ...previewStatus(result, vector.unavailable, vector.failed, weldChange),
     prepared: preparedCombine(session, sources, task, result),
   };
   // The last settled result stays visible, marked as updating, while the next one runs.
   const shown = vector.settled?.result as Result<ImportedSvg, VectorOpError> | undefined;
   const after = useMemo(() => (shown?.kind === 'ok' ? [shown.value] : []), [shown]);
-  return { sources, preview, after };
+  const absorbed = useMemo(
+    () => sources.filter((source) => weldChange?.absorbedIds.includes(source.id) === true),
+    [sources, weldChange],
+  );
+  return { sources, preview, after, absorbed };
 }
 
 function previewStatus(
   result: Result<unknown, VectorOpError> | undefined,
   unavailable: string | null,
   failed: string | null,
+  weldChange: WeldChange | null,
 ): Omit<BooleanPreviewState, 'prepared'> {
+  if (weldChange?.changed === false) {
+    return { problem: NOTHING_TO_WELD_MESSAGE, updating: false, canApply: false };
+  }
   if (result !== undefined) {
     return {
       problem: result.kind === 'error' ? result.error.message : null,
@@ -279,6 +300,13 @@ function preparedCombine(
   return task.kind === 'combine'
     ? { kind: 'combine', sources, op: task.op, object: value }
     : undefined;
+}
+
+function absorbedWarning(absorbed: ReadonlyArray<VectorSceneObject>): string {
+  const names = absorbed.map((object) => `“${artworkOperationName(object)}”`).join(', ');
+  return absorbed.length === 1
+    ? `${names} lies entirely inside another shape in the same operation, so Weld removes it.`
+    : `${names} lie entirely inside other shapes in the same operation, so Weld removes them.`;
 }
 
 function booleanReviewStatus(

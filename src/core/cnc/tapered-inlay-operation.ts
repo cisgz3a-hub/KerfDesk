@@ -2,9 +2,11 @@ import {
   layerCncTool,
   type CncLayerSettings,
   type CncMachineConfig,
+  type CncTool,
   type Polyline,
 } from '../scene';
 import type { CncGroup, CncPass } from '../job';
+import { zPassDepths, zPassStepMm } from './depth-passes';
 import { planTaperedInlayPair } from './tapered-inlay';
 import { taperedInlayPlugDepth } from './tapered-inlay-settings';
 import { vcarveMedialPasses } from './vcarve-medial';
@@ -44,12 +46,13 @@ export function compileTaperedInlayOperation(
     depthPerPassMm: settings.depthPerPassMm,
     resolutionMm: settings.vResolutionMm,
   });
-  const male = vcarveMedialPasses(plan.maleWasteContours, {
+  const male = startDepthPlugPasses(
+    plan.maleWasteContours,
+    plan.plugWallStartDepthMm,
+    taperedInlayPlugDepth(intent),
     tool,
-    maxDepthMm: taperedInlayPlugDepth(intent),
-    depthPerPassMm: settings.depthPerPassMm,
-    resolutionMm: settings.vResolutionMm,
-  });
+    settings,
+  );
   const findings = [
     ...plan.findings,
     ...ladderFindings(female, 'Pocket'),
@@ -95,6 +98,73 @@ export function compileTaperedInlayGroups(
     femalePocketPassLimited: operation.passLimited,
     stepoverUsed: false,
   };
+}
+
+/**
+ * The plug as a start-depth V-carve of its waste (ADR-665): every tool tip sits `startDepthMm`
+ * lower, down to the plug depth, so the cone cuts the mirrored design exactly as far in as the
+ * pocket wall plus the fit gap. Every level is that one carve, no deeper than its first wall
+ * level, stepped down from the stock top by the depth per pass until it reaches the start depth;
+ * the wall levels follow. One plan keeps the floor ridges of every level aligned, so no level
+ * cuts deeper than the depth per pass.
+ */
+function startDepthPlugPasses(
+  waste: ReadonlyArray<Polyline>,
+  startDepthMm: number,
+  plugDepthMm: number,
+  tool: CncTool,
+  settings: CncLayerSettings,
+): VCarveLadder {
+  const wallDepthMm = plugDepthMm - startDepthMm;
+  const carve = vcarveMedialPasses(waste, {
+    tool,
+    maxDepthMm: wallDepthMm,
+    depthPerPassMm: wallDepthMm,
+    resolutionMm: settings.vResolutionMm,
+  });
+  const perPass = settings.depthPerPassMm;
+  const wallLevels = zPassDepths(wallDepthMm, perPass).map((levelZ) => ({
+    startMm: startDepthMm,
+    depthMm: -levelZ,
+  }));
+  const firstWallLevelMm = zPassStepMm(wallDepthMm, perPass);
+  const roughStarts =
+    startDepthMm + firstWallLevelMm <= zPassStepMm(plugDepthMm, perPass) + 0.000001
+      ? []
+      : [
+          0,
+          ...zPassDepths(startDepthMm, perPass)
+            .slice(0, -1)
+            .map((levelZ) => -levelZ),
+        ];
+  const levels = [
+    ...roughStarts.map((startMm) => ({ startMm, depthMm: firstWallLevelMm })),
+    ...wallLevels,
+  ];
+  return {
+    ...carve,
+    passes: levels.flatMap(({ startMm, depthMm }) =>
+      offsetStartingPlane(passesNoDeeperThan(carve.passes, depthMm), startMm),
+    ),
+  };
+}
+
+function passesNoDeeperThan(
+  passes: ReadonlyArray<CncPass>,
+  depthMm: number,
+): ReadonlyArray<CncPass> {
+  const floor = (z: number) => Math.max(z, -depthMm);
+  return passes.map((pass): CncPass => {
+    switch (pass.kind) {
+      case 'path3d':
+        return { ...pass, points: pass.points.map((point) => ({ ...point, z: floor(point.z) })) };
+      case 'helical-contour':
+        return { ...pass, startZMm: floor(pass.startZMm), zMm: floor(pass.zMm) };
+      case 'contour':
+      case 'arc':
+        return { ...pass, zMm: floor(pass.zMm) };
+    }
+  });
 }
 
 function pieceSettings(settings: CncLayerSettings, depthMm: number): CncLayerSettings {

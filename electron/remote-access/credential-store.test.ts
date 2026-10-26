@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { createCipheriv, createDecipheriv, randomBytes, randomUUID } from 'node:crypto';
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -68,6 +68,24 @@ describe('separate encrypted remote credentials', () => {
     await restarted.write({ ...identity, enabled: false, revokeOnConnect: true });
     expect(await store.read()).toEqual({ ...identity, enabled: false, revokeOnConnect: true });
     expect(await readdir(directory)).toEqual(['remote-control.v1']);
+  });
+
+  it('discards the saved record without secure storage, so nothing reconnects with it', async () => {
+    const { store, secureStorage } = fixture();
+    await store.write({ ...store.create(), enabled: true });
+    secureStorage.isAsyncEncryptionAvailable.mockResolvedValue(false);
+    expect(await store.discard()).toBe(true);
+    expect(await readdir(directory)).toEqual([]);
+    expect(await store.discard()).toBe(true);
+    secureStorage.isAsyncEncryptionAvailable.mockResolvedValue(true);
+    expect(await store.read()).toBeNull();
+  });
+
+  it('reports a record it could not remove', async () => {
+    const { store, file } = fixture();
+    // Something that cannot be unlinked stands where the record lives.
+    await mkdir(file);
+    expect(await store.discard()).toBe(false);
   });
 
   it('keeps the previous encrypted record when encryption fails', async () => {

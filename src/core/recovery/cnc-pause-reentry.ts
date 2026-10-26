@@ -45,8 +45,19 @@ const Z_EPSILON_MM = 0.001;
 export const CNC_REENTRY_DEFAULT_SPINUP_SEC = 4;
 
 /** Firmware whose soft reset at a completed hold keeps position without an
- *  alarm, and whose restart this re-entry was built against (ADR-411). */
+ *  alarm, and whose restart this re-entry was built against (ADR-411).
+ *  FluidNC stays out (ADR-180 Amendment 7): its `$I` lists parking (`P`)
+ *  whatever its YAML `parking: enable` says, and no simulator or air cut has
+ *  run the lift against its reset. */
 const LIFT_CONTROLLERS: ReadonlySet<ControllerKind> = new Set(['grbl-v1.1', 'grblhal']);
+
+/** Why the firmware rules Pause and lift out, or null when it may lift. */
+export function cncPauseLiftFirmwareRefusal(controllerKind: ControllerKind): string | null {
+  if (LIFT_CONTROLLERS.has(controllerKind)) return null;
+  return controllerKind === 'fluidnc'
+    ? 'KerfDesk does not lift the bit on FluidNC.'
+    : `Pause and lift is not qualified on ${controllerKind}.`;
+}
 
 export type CncPauseReentryPlan = {
   /** First sendable line the stream replays. */
@@ -87,9 +98,8 @@ export type CncPauseReentryInput = {
 };
 
 export function planCncPauseReentry(input: CncPauseReentryInput): CncPauseReentryResult {
-  if (!LIFT_CONTROLLERS.has(input.controllerKind)) {
-    return noLift(`Pause and lift is not qualified on ${input.controllerKind}.`);
-  }
+  const firmwareRefusal = cncPauseLiftFirmwareRefusal(input.controllerKind);
+  if (firmwareRefusal !== null) return noLift(firmwareRefusal);
   const acked = Math.min(Math.max(Math.floor(input.ackedLines), 0), input.lines.length);
   const sent = Math.min(Math.floor(input.sentLines ?? acked), input.lines.length);
   const windowEnd = Math.max(acked, Math.min(acked + 1, sent));

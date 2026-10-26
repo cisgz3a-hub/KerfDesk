@@ -32,6 +32,7 @@ import { controllerOperationCommandBlockMessage } from './laser-controller-opera
 import { controllerRecoveryActions } from './laser-controller-recovery-actions';
 import { applyDetectedSettingsPatch } from './detected-settings-action';
 import { grblSettingsActions } from './grbl-settings-actions';
+import { readModalStateAfterOwnedReset } from './laser-owned-reset-requalify';
 import type { ControllerLifecycleRefs } from './laser-interactive-command';
 import { connectionActions } from './laser-connection-actions';
 import type { ConnectAttemptOwnershipRefs, ConnectionAttemptState } from './laser-connect-attempt';
@@ -88,10 +89,12 @@ import {
   activeJobCommandBlockMessage,
   assertAutofocusIdle,
   initialLaserState,
+  isActiveJob,
   mpgCommandBlockMessage,
   motionOperationCommandBlockMessage,
   pushLog,
 } from './laser-store-helpers';
+import { registerActiveJobProbe } from './job-machine-lock';
 import type { StallProbe } from './laser-stream-stall';
 import type { ControllerIncidentState } from './laser-incident-history';
 import type { ControllerFirmwareReport } from '../../core/controllers/controller-firmware-report';
@@ -515,12 +518,18 @@ export const useLaserStore = create<LaserState>((set, get) => {
     safeWrite(set, get, line, action, source),
   );
   refs.runControllerQualification = settingsActions.readMachineSettings;
+  refs.runModalStateQualification = () =>
+    readModalStateAfterOwnedReset(
+      set,
+      get,
+      refs,
+      (line, action, source) => safeWrite(set, get, line, action, source),
+      settingsActions.readMachineSettings,
+    );
   return {
     ...initialLaserState(),
     ...connectionActions(set, get, refs, write),
-    ...autofocusActions(set, get, refs, (line, action, source) =>
-      safeWrite(set, get, line, action, source),
-    ),
+    ...autofocusActions(set, get, refs, write),
     ...jogActions(set, get, refs, write),
     ...positioningLightActions(set, get, refs, write),
     ...airAssistActions(set, get),
@@ -552,8 +561,8 @@ export const useLaserStore = create<LaserState>((set, get) => {
       (line, action) => safeWrite(set, get, line, action),
       () => refs.driver,
     ),
-    ...originActions(set, get, refs, (line, action, source) =>
-      safeWrite(set, get, line, action, source),
+    ...originActions(set, get, refs, (line, action, source, assertBeforeWrite) =>
+      safeWrite(set, get, line, action, source, assertBeforeWrite),
     ),
     ...workZRecoveryActions(
       set,
@@ -569,3 +578,6 @@ export const useLaserStore = create<LaserState>((set, get) => {
 });
 
 bindControllerQualificationScheduler(useLaserStore, refs);
+// The project store refuses machine changes while a job holds the machine
+// (ADR-416 Amendment 2); it cannot import this store, so it asks through this.
+registerActiveJobProbe(() => isActiveJob(useLaserStore.getState().streamer));

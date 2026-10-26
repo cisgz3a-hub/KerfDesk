@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { planBoardArray } from './board-array-plan';
+import { createRegistrationOutline } from '../shapes/registration-box';
+import { boardFitRegion } from './board-fit-region';
 import { IDENTITY_TRANSFORM, type Bounds, type ShapeObject } from './scene-object';
 
 const cell: Bounds = { minX: 20, minY: 30, maxX: 30, maxY: 40 };
@@ -36,6 +38,29 @@ describe('board array plan', () => {
       expect(cell.maxX + slot.dx).toBeLessThanOrEqual(90);
       expect(cell.minY + slot.dy).toBeGreaterThanOrEqual(10);
       expect(cell.maxY + slot.dy).toBeLessThanOrEqual(90);
+    }
+  });
+
+  it('uses the outline bbox as board bounds and its inscribed region as usable bounds', () => {
+    const outline = createRegistrationOutline({
+      pointsMm: [
+        { x: 0, y: 0 },
+        { x: 100, y: 0 },
+        { x: 100, y: 35 },
+        { x: 35, y: 35 },
+        { x: 35, y: 100 },
+        { x: 0, y: 100 },
+      ],
+      x: 10,
+      y: 20,
+    });
+    const plan = planBoardArray(cell, outline, fill);
+    expect(plan.boardBounds).toEqual({ minX: 10, minY: 20, maxX: 110, maxY: 120 });
+    expect(plan.usableBounds).toEqual(boardFitRegion(outline));
+    expect(plan.boardCircular).toBe(false);
+    for (const slot of plan.offsets) {
+      expect(cell.minX + slot.dx).toBeGreaterThanOrEqual(plan.usableBounds.minX);
+      expect(cell.maxX + slot.dx).toBeLessThanOrEqual(plan.usableBounds.maxX);
     }
   });
 

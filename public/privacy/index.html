@@ -67,7 +67,7 @@
     <main id="main">
       <section class="page-hero">
         <div class="wrap">
-          <p class="eyebrow">Last updated <time datetime="2026-10-12">October 12, 2026</time></p>
+          <p class="eyebrow">Last updated <time datetime="2026-10-22">October 22, 2026</time></p>
           <h1>Privacy</h1>
           <p class="lead">
             KerfDesk doesn’t track you. This notice covers this privacy page and the KerfDesk app:
@@ -213,13 +213,25 @@
               browser you use, the page you asked for and the time. That is how the page gets to
               you. This privacy page adds no tracking of its own.
             </p>
+            <h3>Network error reports</h3>
+            <p>
+              Cloudflare delivers kerfdesk.com, dl.kerfdesk.com and license.kerfdesk.com. Their
+              responses ask browsers that support Network Error Logging, such as Chrome and Edge, to
+              report failed requests. If a request to one of these sites fails within 7 days of your
+              last visit, for example because its name can’t be looked up or a connection can’t be
+              made, your browser may send Cloudflare a short report. It holds the address requested,
+              the referring page, the server’s IP address, the type of failure and how long the
+              request took. Successful requests aren’t reported. Your browser sends these reports,
+              not a KerfDesk script, and Cloudflare uses them to find network problems.
+            </p>
             <h3>Links to other sites</h3>
             <p>
               Links on this page open other KerfDesk pages: the KerfDesk app, its download page, its
               support page and its notices.
               <a href="#app">Part 2</a> covers the app. The download page serves installers from
               dl.kerfdesk.com. Your browser may tell the next site that you came from here, but not
-              which page. The optional AI section also links to OpenAI’s API data policy.
+              which page. The Buying Pro section also links to Paddle’s privacy notice, and the
+              optional AI section to OpenAI’s API data policy.
             </p>
             <h3>Download statistics</h3>
             <p>
@@ -309,6 +321,19 @@
                   <td>Your browser downloads that picture and keeps a copy for up to 30 days.</td>
                 </tr>
                 <tr>
+                  <th scope="row">
+                    You first open the web app, or reopen its desktop download card from the status
+                    bar
+                  </th>
+                  <td>dl.kerfdesk.com</td>
+                  <td>
+                    The card opens by itself on your first visit. It asks for the signed list of
+                    released Windows versions so it can offer the current installer. The request
+                    sends no cookies, referrer, project, design, machine or job details. The
+                    installer downloads only when you choose Download for Windows.
+                  </td>
+                </tr>
+                <tr>
                   <th scope="row">You start the desktop Preview</th>
                   <td>dl.kerfdesk.com</td>
                   <td>One anonymous request asking whether a newer Preview exists. See below.</td>
@@ -385,13 +410,13 @@
                 </tr>
                 <tr>
                   <th scope="row">
-                    You explicitly connect a FluidNC network machine in the desktop app
+                    You explicitly connect a FluidNC or grblHAL network machine in the desktop app
                   </th>
                   <td>The IP address or hostname and Telnet port you enter</td>
                   <td>
-                    Controller commands and responses use that configured TCP channel. There is no
-                    network scan or automatic reconnect. The channel is not encrypted; use a trusted
-                    network.
+                    Controller commands and responses use that configured TCP channel: FluidNC’s
+                    Telnet channel or grblHAL’s raw Telnet service. There is no network scan or
+                    automatic reconnect. The channel is not encrypted; use a trusted network.
                   </td>
                 </tr>
               </tbody>
@@ -448,10 +473,16 @@
               The desktop app also quietly confirms saved trial rights daily and paid license rights
               about once a week. It checks whether that confirmation is due at startup and every 30
               minutes while open, using the same installation digest and saved credential. A failed
-              connection does not interrupt your work. New Pro choices require a confirmation within
-              three days for trials or 30 days for paid licenses. Developer licenses are exempt.
-              Existing work, Frame, Start and Save G-code remain available, and the signed trial
-              expiry still applies on your computer.
+              connection does not interrupt an open workspace. If a trial isn’t confirmed within
+              three days, KerfDesk still opens, but new Pro tools can’t be chosen until it is. Its
+              signed expiry and clock rules still apply. Developer licenses have no confirmation
+              deadline. Existing work, Frame, Start and Save G-code remain available in an open
+              workspace.
+            </p>
+            <p>
+              Once activated on this computer, a paid license keeps working offline indefinitely,
+              with no confirmation deadline or clock lock. It remains bound to this installation and
+              covers releases within its update period.
             </p>
             <p>
               The licensing service retains trial installation and firmware digests to recognise
@@ -462,8 +493,9 @@
             <p>
               The licensing service records verified Paddle refund and chargeback references and
               their effect on a license. Approved full purchase refunds and chargebacks revoke the
-              license; partial and renewal refunds go to support for review. Your next online
-              confirmation picks up a revocation.
+              license; partial and renewal refunds go to support for review. A revocation or seat
+              deactivation reported by the service takes effect at your next online license
+              confirmation.
             </p>
             <h3>Buying Pro</h3>
             <p>
@@ -607,16 +639,18 @@
               at four fixed addresses on your local network.
             </p>
             <p>
-              The web app’s security policy lets it connect only to kerfdesk.com and to that one
-              address on your own computer. It loads no third-party scripts.
+              The web app’s security policy lets it connect only to kerfdesk.com, to dl.kerfdesk.com
+              for its desktop download card, and to that one address on your own computer. It loads
+              no third-party scripts.
             </p>
             <h3>Your machine and USB cameras</h3>
             <ul>
               <li>
                 <strong>Your machine.</strong> For USB, you pick your machine’s port when you click
                 Connect. The desktop app also supports an explicitly configured FluidNC Telnet
-                channel. Machine commands go to the port or network address you choose. These
-                connections do not upload a project to a KerfDesk service.
+                channel or grblHAL raw Telnet service; neither is encrypted. Machine commands go to
+                the port or network address you choose. These connections do not upload a project to
+                a KerfDesk service.
               </li>
               <li>
                 <strong>USB cameras.</strong> In a browser, KerfDesk can use a camera only after you

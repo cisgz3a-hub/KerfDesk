@@ -13,6 +13,7 @@ import { rgbaToPngBlob } from '../raster/luma-bitmap';
 import type { ToastVariant } from '../state/toast-store';
 import { hydratePagedRasterImage } from '../import/paged-raster-hydration';
 import { validateRasterLumaBase64 } from '../../io/project/project-raster-luma-validator';
+import { pickPreparedSaveTarget } from './pick-prepared-save-target';
 
 const FORBIDDEN_FILENAME_CHARS = new Set(['<', '>', ':', '"', '/', '\\', '|', '?', '*']);
 
@@ -52,18 +53,9 @@ export async function handleSaveProcessedBitmap(ctx: SaveProcessedBitmapCtx): Pr
     ctx.pushToast(`Could not save processed bitmap: ${budget.reason}`, 'error');
     return;
   }
-  let target;
   try {
-    target = await ctx.platform.pickFileForSave({
-      suggestedName: suggestedProcessedBitmapName(selected.source),
-      extensions: ['.png'],
-    });
-  } catch (err) {
-    ctx.pushToast(`Could not save processed bitmap: ${errMsg(err)}`, 'error');
-    return;
-  }
-  if (target === null) return;
-  try {
+    // The picker empties an existing file as it returns (ADR-656): the PNG is
+    // made first.
     const preparationImage = await hydratePagedRasterImage(selected);
     assertProcessedBitmapPixels(preparationImage);
     const bitmap = buildProcessedRasterBitmap(preparationImage, layer, ctx.project.device, {
@@ -74,7 +66,14 @@ export async function handleSaveProcessedBitmap(ctx: SaveProcessedBitmapCtx): Pr
       return;
     }
     const encode = ctx.encodePng ?? rgbaToPngBlob;
-    await target.write(await encode(bitmap.rgba, bitmap.width, bitmap.height));
+    const png = await encode(bitmap.rgba, bitmap.width, bitmap.height);
+    const target = await pickPreparedSaveTarget(
+      ctx.platform,
+      { suggestedName: suggestedProcessedBitmapName(selected.source), extensions: ['.png'] },
+      { title: 'Save processed bitmap', message: 'The processed bitmap is ready.' },
+    );
+    if (target === null) return;
+    await target.write(png);
     ctx.pushToast(`Saved processed bitmap to ${target.displayName}`, 'success');
   } catch (err) {
     ctx.pushToast(`Could not save processed bitmap: ${errMsg(err)}`, 'error');

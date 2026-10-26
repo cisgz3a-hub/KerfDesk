@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { RgbaImage } from '../rgba-image';
-import { bedPoint, projectWorldPoint } from './camera-model';
+import { bedPoint, projectWorldPoint, type LensModel } from './camera-model';
 import { warpFrameToBedImage } from './bed-image';
 import { surfaceHeightAt, type SurfaceHeightArea } from './height-areas';
-import { overheadPose, wideLens } from './model-fixtures';
+import { lookAt, overheadPose, wideLens } from './model-fixtures';
 
 const lens = wideLens(640);
 const pose = overheadPose();
@@ -136,6 +136,29 @@ describe('warpFrameToBedImage', () => {
     });
     const centre = (20 * 40 + 20) * 4;
     expect(image?.data[centre + 3]).toBe(0);
+  });
+
+  it('leaves bed points wider than the lens images transparent', () => {
+    // Turns back at about 63°, outside its picture; the bed 1739 mm out is
+    // 80° off the axis of a camera 300 mm up, and used to be read in full.
+    const turnsOutside: LensModel = {
+      intrinsics: { fx: 800, fy: 800, cx: 639.5, cy: 359.5 },
+      distortion: [0, 0, 0, -0.05],
+      imageWidth: 1280,
+      imageHeight: 720,
+    };
+    const white: RgbaImage = {
+      data: new Uint8ClampedArray(1280 * 720 * 4).fill(255),
+      width: 1280,
+      height: 720,
+    };
+    const farX = 300 * Math.tan(1.4);
+    const image = warpFrameToBedImage(white, turnsOutside, lookAt([0, 0, -300], [0, 0, 0]), {
+      region: { x: farX - 5, y: -5, width: 10, height: 10 },
+      pixelsPerMm: 1,
+      surfaceHeightMm: 0,
+    });
+    expect(image?.data.filter((_, i) => i % 4 === 3).every((alpha) => alpha === 0)).toBe(true);
   });
 
   it('returns null for an empty output', () => {

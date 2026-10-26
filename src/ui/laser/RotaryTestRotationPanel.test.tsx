@@ -7,6 +7,7 @@ import type { RotarySetup } from '../../core/devices';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { resetStore } from '../state/test-helpers';
+import { ROTARY_TEST_PAUSE_MS } from './rotary-test-rotation';
 import { RotarySetupDialog } from './RotarySetupDialog';
 
 (
@@ -149,5 +150,82 @@ describe('Rotary Setup Test rotation', () => {
     renderDialog(MEASURED_ROLLER);
     expect(button('Turn roller once').disabled).toBe(true);
     expect(host.textContent).toContain('Connect the controller to test the rotation.');
+  });
+});
+
+// Audit controller-v3 D3-P2-1, ADR-373 Amendment 1: after a turn the note
+// names the value that turn can correct, never the object diameter of a
+// roller, whose Y scale does not read it.
+describe('Rotary Setup Test rotation miss advice', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // Out, the pause, back: each turn ends when the jog double releases motion.
+  async function completeTest(label: string): Promise<void> {
+    act(() => button(label).click());
+    await settle();
+    act(() => useLaserStore.setState({ motionOperation: null }));
+    await settle();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ROTARY_TEST_PAUSE_MS);
+    });
+    await settle();
+    act(() => useLaserStore.setState({ motionOperation: null }));
+    await settle();
+  }
+
+  it('sends an unscaled roller whose diameter was tuned to land to roller scaling', async () => {
+    // A stock roller (40 machine mm per turn of a Ø25 roller) under an 80 mm
+    // tumbler: tuning Ø to 128/π makes the object turn travel 128 mm, exactly
+    // one tumbler turn, while every job still burns at scale 1 (×1.96 tall).
+    renderDialog({
+      enabled: true,
+      type: 'roller',
+      mmPerRotation: 40,
+      objectDiameterMm: 128 / Math.PI,
+    });
+    await completeTest('Turn object once');
+    expect(jogCalls).toHaveLength(2);
+    expect(jogCalls[0]?.dy).toBeCloseTo(128, 9);
+    expect(jogCalls[1]?.dy).toBeCloseTo(-128, 9);
+    const note = status();
+    expect(note).toContain("the controller is not moving the part's surface in millimetres");
+    expect(note).toContain(
+      'Turn on Scale Y from the roller diameter and enter the roller diameter and Motion per turn',
+    );
+    expect(note).toContain("or set the controller's Y steps/mm to the part's surface");
+    expect(note).toContain('Changing the object diameter can make the mark land, but it does not');
+    expect(note).not.toContain('adjust the measurements');
+
+    // Once roller scaling is on, the note names the next check: the roller turn.
+    const scale = [...host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find(
+      (node) => node.title === 'Scale Y from the roller diameter',
+    );
+    act(() => scale?.click());
+    expect(buttonTexts()).toContain('Turn roller once');
+    expect(status()).toContain('check Motion per turn with Turn roller once first');
+    expect(status()).toContain('The roller diameter sets the burn size');
+  });
+
+  it('corrects Motion per turn after a roller or chuck turn', async () => {
+    renderDialog(MEASURED_ROLLER);
+    await completeTest('Turn roller once');
+    expect(jogCalls).toEqual([
+      { dy: 40, feed: 240 },
+      { dy: -40, feed: 240 },
+    ]);
+    expect(status()).toBe(
+      'Done. If the roller did not turn exactly once, change Motion per turn: lower it if the ' +
+        'roller turned too far, raise it if it stopped short.',
+    );
+
+    act(() => button('Chuck').click());
+    await completeTest('Turn chuck once');
+    expect(status()).toContain('If the chuck did not turn exactly once, change Motion per turn');
   });
 });

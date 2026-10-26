@@ -1,5 +1,6 @@
 import { LicenceServiceError } from './licensing-http.js';
 import { LinuxKeyringUnavailableError } from './licensing-store.js';
+import { licenceWindowText } from './licence-window.js';
 
 // What the licence panel says for each service answer (ADR-523, ADR-540,
 // ADR-523 Amendment 2). Every code the service can send a device has a message
@@ -33,18 +34,27 @@ export const ERRORS: ReadonlyMap<string, string> = new Map([
   ['device_limit_reached', DEVICE_LIMIT],
   [
     'trial_expired',
-    'The trial on this device has ended. Buy a licence or enter your licence key to keep using KerfDesk.',
+    licenceWindowText(
+      'The trial on this device has ended. Buy a licence or enter your licence key to keep using KerfDesk.',
+      'The Pro trial on this device has ended. KerfDesk Free keeps working.',
+    ),
   ],
   [
     'trial_already_used',
-    'A trial has already been used on this computer, so another cannot start. Buy a licence or enter your licence key, or email support@kerfdesk.com if you have never tried KerfDesk here.',
+    licenceWindowText(
+      'A trial has already been used on this computer, so another cannot start. Buy a licence or enter your licence key, or email support@kerfdesk.com if you have never tried KerfDesk here.',
+      'A Pro trial has already been used on this computer, so another cannot start. KerfDesk Free keeps working. Buy Pro or enter your licence key, or email support@kerfdesk.com if you have never tried Pro here.',
+    ),
   ],
   ['invalid_credentials', KEY_REFUSED],
   ['invalid_license_tier', KEY_REFUSED],
   ['license_not_found', KEY_REFUSED],
   [
     'license_revoked',
-    'This licence has been cancelled. Contact KerfDesk support if this is unexpected.',
+    licenceWindowText(
+      'This licence has been cancelled. Contact KerfDesk support if this is unexpected.',
+      'This licence has been cancelled, so Pro tools are locked. KerfDesk Free keeps working. Contact KerfDesk support if this is unexpected.',
+    ),
   ],
   [
     'license_inactive',
@@ -108,15 +118,21 @@ export function errorMessage(code: string): string | null {
 // outage or a configuration fault never does (ADR-523 Amendment 1).
 export const RELEASED = new Set(['activation_released', 'activation_inactive']);
 export const REVOKED = new Set(['license_revoked']);
-const FREE_HERE =
-  'Enter your licence key to use KerfDesk here again, or contact KerfDesk support to free the seat.';
+const FREE_HERE = licenceWindowText(
+  'Enter your licence key to use KerfDesk here again, or contact KerfDesk support to free the seat.',
+  'Enter your licence key to use Pro here again, or contact KerfDesk support to free the seat.',
+);
 export const MESSAGES = {
   invalidKey:
     'That is not a whole KerfDesk licence key. A key starts with KD1. and is 84 characters long. Copy it again from the purchase page or your email, then paste it here.',
-  unreadable:
+  unreadable: licenceWindowText(
     'The licence saved on this computer can’t be read, for example after a Windows account or password reset. Reset it, then enter your licence key again; this computer keeps its licence seat.',
-  unavailable:
+    'The licence saved on this computer can’t be read, for example after a Windows account or password reset, so Pro tools are locked. Everything else works. Reset it, then enter your licence key again; this computer keeps its licence seat.',
+  ),
+  unavailable: licenceWindowText(
     'The licence service or this computer’s secure storage is unavailable. Check your connection and that you are signed in to your operating-system account, then try again.',
+    'The licence service or this computer’s secure storage is unavailable, so Pro tools may be locked. Everything else works. Check your connection and that you are signed in to your operating-system account, then try again.',
+  ),
   // Not a network fault: the app cannot use the keyring until it restarts.
   linuxKeyring:
     'KerfDesk keeps its licence in your desktop’s keyring, and no keyring is running here, so a trial or licence key cannot be saved. Your internet connection is not the problem. Install GNOME Keyring or KWallet (or another Secret Service, such as KeePassXC), make sure it starts and unlocks when you sign in, then restart KerfDesk.',

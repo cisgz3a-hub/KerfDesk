@@ -77,3 +77,26 @@ it('jumps backward and forward through actual image pixels from History rows', a
   expect(editor.getState().session?.doc.data[0]).toBe(0);
   await act(async () => editor.getState().select(null));
 });
+
+it('records one Undo step for a whole opacity drag, not one per input event', async () => {
+  const host = await mountControl(<LayersPanel />);
+  await clickControl(host, 'Add a transparent layer above the active one');
+  const slider = host.querySelector<HTMLInputElement>('input[aria-label="Active layer opacity"]');
+  if (slider === null) throw new Error('Opacity slider missing');
+  const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+  const labels = () => editor.getState().session?.history.undoStack.map((entry) => entry.label);
+  // A drag fires one input event per step and one change event on release.
+  for (let percent = 99; percent >= 50; percent -= 1) {
+    await act(async () => {
+      setValue?.call(slider, String(percent));
+      slider.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  }
+  expect(editor.getState().session?.layers.at(-1)?.opacity).toBe(0.5);
+  expect(labels()).toEqual(['Add layer']);
+  await act(async () => slider.dispatchEvent(new Event('change', { bubbles: true })));
+  expect(labels()).toEqual(['Add layer', 'Layer opacity']);
+  await act(async () => editor.getState().undo());
+  expect(editor.getState().session?.layers.at(-1)?.opacity).toBe(1);
+  expect(slider.value).toBe('100');
+});

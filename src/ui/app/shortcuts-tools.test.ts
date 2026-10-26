@@ -32,8 +32,14 @@ function makeCtx(): ToolCtx & {
     typeof vi.fn<NonNullable<ToolCtx['openConvertToBitmap']>>
   >;
   readonly openTraceImage: ReturnType<typeof vi.fn<ToolCtx['openTraceImage']>>;
+  readonly refreshCameraPicture: ReturnType<typeof vi.fn<ToolCtx['refreshCameraPicture']>>;
 } {
-  return { setToolMode: vi.fn(), openConvertToBitmap: vi.fn(), openTraceImage: vi.fn() };
+  return {
+    setToolMode: vi.fn(),
+    openConvertToBitmap: vi.fn(),
+    openTraceImage: vi.fn(),
+    refreshCameraPicture: vi.fn(),
+  };
 }
 
 describe('handleToolShortcut - Measure tool', () => {
@@ -285,5 +291,26 @@ describe('handleToolShortcut - LightBurn tool arming', () => {
     const handled = handleToolShortcut(fakeKeydown({ key: 'k', ctrlKey: true }), ctx);
 
     expect(handled).toBe(false);
+  });
+});
+
+describe('handleToolShortcut - camera picture (ADR-663 Amendment 1)', () => {
+  it("Alt+C refreshes the camera picture, as LightBurn's Update Overlay", () => {
+    const ctx = makeCtx();
+    expect(handleToolShortcut(fakeKeydown({ key: 'c', altKey: true }), ctx)).toBe(true);
+    expect(ctx.refreshCameraPicture).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves Ctrl+C, Alt+Shift+C and a text field to their owners', () => {
+    const ctx = makeCtx();
+    expect(handleToolShortcut(fakeKeydown({ key: 'c', ctrlKey: true }), ctx)).toBe(false);
+    expect(handleToolShortcut(fakeKeydown({ key: 'C', altKey: true, shiftKey: true }), ctx)).toBe(
+      false,
+    );
+    const input = document.createElement('input');
+    expect(handleToolShortcut(fakeKeydown({ key: 'c', altKey: true, target: input }), ctx)).toBe(
+      false,
+    );
+    expect(ctx.refreshCameraPicture).not.toHaveBeenCalled();
   });
 });

@@ -1,8 +1,11 @@
-import { removeObject, type Scene } from '../../core/scene';
+import { removeObject } from '../../core/scene';
 import type { AppState } from './store';
 import { pruneOrphanLayers, pushUndo } from './scene-mutations';
 import { removeObjectIdsFromGroups } from './scene-group-actions';
 import { useToastStore } from './toast-store';
+import { repairDanglingObjectDependencies } from './repair-object-dependencies';
+
+export { repairDanglingObjectDependencies } from './repair-object-dependencies';
 
 export type ObjectDeleteActions = {
   readonly removeSceneObject: (id: string) => void;
@@ -66,55 +69,23 @@ export function removeSceneObjectsFromState(
   };
 }
 
-export function repairDanglingObjectDependencies(scene: Scene): {
-  readonly scene: Scene;
-  readonly repairedImageMasks: number;
-  readonly repairedPathTextGuides: number;
-} {
-  const liveIds = new Set(scene.objects.map((object) => object.id));
-  let repairedImageMasks = 0;
-  let repairedPathTextGuides = 0;
-  const objects = scene.objects.map((object) => {
-    if (
-      object.kind === 'raster-image' &&
-      object.imageMaskId !== undefined &&
-      !liveIds.has(object.imageMaskId)
-    ) {
-      repairedImageMasks += 1;
-      const { imageMaskId: _removed, ...unmasked } = object;
-      return unmasked;
-    }
-    if (
-      object.kind === 'text' &&
-      object.pathText !== undefined &&
-      !liveIds.has(object.pathText.guideObjectId)
-    ) {
-      repairedPathTextGuides += 1;
-      const { pathText: _removed, ...materialized } = object;
-      return materialized;
-    }
-    return object;
-  });
-  return repairedImageMasks === 0 && repairedPathTextGuides === 0
-    ? { scene, repairedImageMasks, repairedPathTextGuides }
-    : { scene: { ...scene, objects }, repairedImageMasks, repairedPathTextGuides };
-}
-
 export function reportDependencyRepairs(
   repair: Pick<
     ReturnType<typeof repairDanglingObjectDependencies>,
     'repairedImageMasks' | 'repairedPathTextGuides'
   >,
+  reason: 'deleted' | 'unavailable-vector' = 'deleted',
 ): void {
   const messages: string[] = [];
+  const cause = reason === 'deleted' ? 'was deleted' : 'is no longer available as a vector';
   if (repair.repairedImageMasks > 0) {
     messages.push(
-      `${repair.repairedImageMasks} image mask reference${repair.repairedImageMasks === 1 ? '' : 's'} was removed because its mask artwork was deleted. The image remains editable and unmasked.`,
+      `${repair.repairedImageMasks} image mask reference${repair.repairedImageMasks === 1 ? '' : 's'} was removed because its mask artwork ${cause}. The image remains editable and unmasked.`,
     );
   }
   if (repair.repairedPathTextGuides > 0) {
     messages.push(
-      `${repair.repairedPathTextGuides} path-text guide reference${repair.repairedPathTextGuides === 1 ? '' : 's'} was removed because its guide artwork was deleted. The stored text geometry remains in place and editable.`,
+      `${repair.repairedPathTextGuides} path-text guide reference${repair.repairedPathTextGuides === 1 ? '' : 's'} was removed because its guide artwork ${cause}. The stored text geometry remains in place and editable.`,
     );
   }
   if (messages.length > 0) useToastStore.getState().pushToast(messages.join(' '), 'warning');

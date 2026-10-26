@@ -1,4 +1,4 @@
-import { IDENTITY_TRANSFORM } from '../../core/scene';
+import { IDENTITY_TRANSFORM, type ShapeObject } from '../../core/scene';
 import { createRectangle } from '../../core/shapes/primitives/create-rectangle';
 import { DEFAULT_TEXT_COLOR } from '../../core/text';
 import type { AppState } from '../state/store';
@@ -11,6 +11,8 @@ import { applyHistory, prepareArrange } from './arrange';
 import { publicIdentifier, selectedIds } from './projections';
 import { prepareRemoteShape } from './touch-shapes';
 import { prepareRemoteSelection } from './selection';
+import { deliverBoardPhoto, placeOnBoard, prepareBoardPhoto, preparePlaceOnBoard } from './board';
+import { RemoteFault } from './fault';
 
 export async function applyRemoteWrite(
   write: RemoteWrite,
@@ -21,6 +23,38 @@ export async function applyRemoteWrite(
 ): Promise<Record<string, unknown>> {
   assertCurrent();
   const state = store.getState();
+  if (isBoardWrite(write)) return applyBoardWrite(write, state, store, commit);
+  return applyOrdinaryRemoteWrite(write, state, store, signal, commit);
+}
+
+type BoardWrite = Extract<RemoteWrite, { readonly command: 'set_board_photo' | 'place_on_board' }>;
+type OrdinaryWrite = Exclude<RemoteWrite, BoardWrite>;
+
+function isBoardWrite(write: RemoteWrite): write is BoardWrite {
+  return write.command === 'set_board_photo' || write.command === 'place_on_board';
+}
+
+function applyBoardWrite(
+  write: BoardWrite,
+  state: AppState,
+  store: RemoteAppStore,
+  commit: (action: () => Record<string, unknown>) => Record<string, unknown>,
+): Record<string, unknown> {
+  if (write.command === 'set_board_photo') {
+    const file = prepareBoardPhoto(write.args);
+    return commit(() => deliverBoardPhoto(file));
+  }
+  const prepared = preparePlaceOnBoard(state, write.args);
+  return commit(() => placeOnBoard(store, prepared));
+}
+
+async function applyOrdinaryRemoteWrite(
+  write: OrdinaryWrite,
+  state: AppState,
+  store: RemoteAppStore,
+  signal: AbortSignal,
+  commit: (action: () => Record<string, unknown>) => Record<string, unknown>,
+): Promise<Record<string, unknown>> {
   switch (write.command) {
     case 'set_selection': {
       const ids = prepareRemoteSelection(state, write.args);
@@ -34,14 +68,11 @@ export async function applyRemoteWrite(
       });
     }
     case 'add_rectangle':
-      return commit(() => addRectangle(state, write.args));
+      return commit(() => addRectangle(store, write.args));
     case 'add_ellipse':
     case 'add_polyline': {
       const object = prepareRemoteShape(state, write);
-      return commit(() => {
-        store.getState().drawShape(object);
-        return { changedArtworkIds: [object.id] };
-      });
+      return commit(() => drawShape(store, object));
     }
     case 'add_text': {
       const object = await prepareRemoteText(write.args, signal);
@@ -84,11 +115,12 @@ export async function applyRemoteWrite(
 }
 // ADR-584: CNC workspaces create the same ordinary artwork; CNC defaults seed fresh layers.
 function addRectangle(
-  state: AppState,
+  store: RemoteAppStore,
   args: Extract<RemoteWrite, { command: 'add_rectangle' }>['args'],
 ) {
   const id = crypto.randomUUID();
-  state.drawShape(
+  return drawShape(
+    store,
     createRectangle({
       id,
       color: DEFAULT_TEXT_COLOR,
@@ -96,5 +128,12 @@ function addRectangle(
       transform: { ...IDENTITY_TRANSFORM, x: args.xMm, y: args.yMm },
     }),
   );
-  return { changedArtworkIds: [id] };
+}
+
+function drawShape(store: RemoteAppStore, object: ShapeObject) {
+  store.getState().drawShape(object);
+  // Desktop drawing can refuse an insertion with a warning and no state change.
+  if (!store.getState().project.scene.objects.some((item) => item.id === object.id))
+    throw new RemoteFault('failed');
+  return { changedArtworkIds: [object.id] };
 }

@@ -11,6 +11,8 @@ import { BoardShapeToggle } from './BoardShapeToggle';
 import { BoardVerificationControls } from './BoardVerificationControls';
 import { CircleBoardPlacementControls } from './CircleBoardPlacementControls';
 import { CircleCaptureSteps } from './CircleCaptureSteps';
+import { OutlineCaptureSteps } from './OutlineCaptureSteps';
+import { OutlineBoardPlacementControls } from './OutlineBoardPlacementControls';
 import type { BoardVerificationController } from './use-board-verification';
 
 const placement = vi.hoisted(() => ({
@@ -166,13 +168,85 @@ describe('Board control audit', () => {
       root.render(<BoardShapeToggle shapeKind="rect" disabled={false} onChange={onChange} />),
     );
     click('Circle');
+    click('Outline');
     click('Rectangle');
-    expect(onChange.mock.calls).toEqual([['circle'], ['rect']]);
+    expect(onChange.mock.calls).toEqual([['circle'], ['outline'], ['rect']]);
     act(() =>
       root.render(<BoardShapeToggle shapeKind="rect" disabled={true} onChange={onChange} />),
     );
     click('Circle');
-    expect(onChange).toHaveBeenCalledTimes(2);
+    expect(onChange).toHaveBeenCalledTimes(3);
+  });
+
+  it('outline capture labels A and B and enables create only after both captures', () => {
+    const draft = {
+      localPointsMm: [
+        { x: 0, y: 0 },
+        { x: 100, y: 0 },
+        { x: 70, y: 60 },
+        { x: 0, y: 60 },
+      ],
+      anchorIndices: [0, 1, 2, 3],
+      captureOrder: [3, 1] as const,
+    };
+    const props = {
+      draft,
+      corners: [{ x: 10, y: 10 }],
+      livePosition: { x: 20, y: 20 },
+      disabled: false,
+      sessionDisabled: false,
+      onCapture: vi.fn(),
+      onUndo: vi.fn(),
+      onFinish: vi.fn(async () => undefined),
+      onDraft: vi.fn(),
+      onInitialFileConsumed: vi.fn(),
+    };
+    act(() => root.render(<OutlineCaptureSteps {...props} />));
+    expect(host.textContent).toContain('point B');
+    expect(button('Register board').disabled).toBe(true);
+    act(() =>
+      root.render(
+        <OutlineCaptureSteps
+          {...props}
+          corners={[
+            { x: 1, y: 1 },
+            { x: 2, y: 2 },
+          ]}
+        />,
+      ),
+    );
+    expect(button('Register board').disabled).toBe(false);
+  });
+
+  it('outline placement reports checked anchors and exposes Fit and Array', () => {
+    const geometry = {
+      kind: 'outline' as const,
+      localPointsMm: [
+        { x: 0, y: 0 },
+        { x: 100, y: 0 },
+        { x: 70, y: 60 },
+        { x: 0, y: 60 },
+      ],
+      anchorIndices: [0, 1, 2, 3],
+      viewSigns: { x: 1 as const, y: 1 as const },
+      measured: [
+        { index: 0, machine: { x: 0, y: 0 } },
+        { index: 1, machine: { x: 100, y: 0 } },
+      ],
+    };
+    act(() =>
+      root.render(
+        <OutlineBoardPlacementControls
+          geometry={geometry}
+          disabled={false}
+          verification={verification()}
+          onReset={vi.fn()}
+        />,
+      ),
+    );
+    expect(host.textContent).toContain('Checked 2 of 4 anchors');
+    expect(button('Fit to board')).toBeDefined();
+    expect(button('Array on board')).toBeDefined();
   });
 
   it('rectangle capture Undo and Start over use their distinct callbacks and lock during a session operation', () => {

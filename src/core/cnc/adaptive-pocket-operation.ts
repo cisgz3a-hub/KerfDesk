@@ -7,10 +7,6 @@ import {
 } from './adaptive-pocket';
 import { verifyAdaptivePocket, type AdaptivePocketVerification } from './adaptive-pocket-verifier';
 import { contourPassFromPolyline } from './compile-cnc-helpers';
-import {
-  buildVCarveSourceRegionLayout,
-  vcarveSourceRegionRankFromLayout,
-} from './vcarve-region-order';
 import type { FrameHandedness } from './machine-frame-handedness';
 import { cutDirectionClockwise, enforceCutDirection } from './motion-polish';
 
@@ -60,26 +56,19 @@ export function resolveAdaptivePocketOperation(
     : { kind: 'error', reason: verification.reason };
 }
 
+// The plan's sequences are already in cutting order, one source region after
+// another; the verifier certified that order, so it is emitted unchanged
+// (ADR-154 Amendment 4).
 export function adaptivePocketPasses(
   operation: Extract<AdaptivePocketOperation, { readonly kind: 'ok' }>,
   depths: ReadonlyArray<number>,
-  sourceContours: ReadonlyArray<Polyline> = [],
   direction?: {
     readonly cutDirection: CncCutDirection;
     readonly handedness: FrameHandedness;
   },
 ): ReadonlyArray<CncPass> {
   const passes: CncPass[] = [];
-  const sourceLayout = buildVCarveSourceRegionLayout(sourceContours);
-  const sequences = operation.plan.sequences
-    .map((sequence, sourceIndex) => ({
-      sequence,
-      sourceIndex,
-      rank: vcarveSourceRegionRankFromLayout(sequence.entryCenter, sourceLayout),
-    }))
-    .sort((a, b) => a.rank - b.rank || a.sourceIndex - b.sourceIndex)
-    .map(({ sequence }) => sequence);
-  for (const sequence of sequences) {
+  for (const sequence of operation.plan.sequences) {
     for (let depthIndex = 0; depthIndex < depths.length; depthIndex += 1) {
       const zMm = depths[depthIndex];
       if (zMm === undefined) continue;
@@ -123,7 +112,6 @@ export function adaptivePocketPassesForSettings(
     ? adaptivePocketPasses(
         operation,
         depths,
-        contours,
         settings.cutDirection === undefined
           ? undefined
           : { cutDirection: settings.cutDirection, handedness },

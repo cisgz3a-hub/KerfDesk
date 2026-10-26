@@ -92,6 +92,7 @@ export function SnapSettingsButton(props: { readonly style: React.CSSProperties 
           role="dialog"
           anchorRef={anchorRef}
           initialFocus="input"
+          closeOnTab={false}
           onClose={close}
         >
           <SnapSettingsPanel />

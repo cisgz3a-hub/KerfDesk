@@ -21,6 +21,7 @@ import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { settleTestGrblHandshake } from '../state/laser-test-start-helpers';
 import { ControllerConnectionControls } from './ControllerConnectionControls';
+import { WorkspaceSafetyNotice } from './WorkspaceSafetyNotice';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -104,6 +105,7 @@ async function render(platform: PlatformAdapter, machineKind: 'laser' | 'cnc' = 
           controllerOperation={null}
           onForget={() => undefined}
         />
+        <WorkspaceSafetyNotice />
       </PlatformProvider>,
     );
   });
@@ -132,7 +134,7 @@ describe('ControllerConnectionControls contextual recovery', () => {
     const platform = await connectedInfoFailure(harness);
     const close = vi.spyOn(harness.connection, 'close');
     const container = await render(platform);
-    expect(container.textContent).toContain('Controller information unavailable');
+    expect(container.textContent).toContain('Couldn’t read machine settings');
     expect(container.textContent).not.toContain('Reconnect controller');
     const retry = retryButton(container);
     expect(retry?.disabled).toBe(false);

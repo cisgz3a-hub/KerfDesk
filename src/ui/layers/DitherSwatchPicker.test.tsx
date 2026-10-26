@@ -96,6 +96,7 @@ describe('Dither swatch picker', () => {
         'Sierra 3',
         'Sierra 2',
         'Sierra Lite',
+        'Blue Noise',
         'Ordered',
         'Grayscale',
       ]);

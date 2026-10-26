@@ -13,6 +13,7 @@ export type RemoteReadCommand =
   | 'get_machine'
   | 'get_app_status'
   | 'list_material_recipes'
+  | 'get_board'
   | 'review_job';
 export type RemoteWriteCommand =
   | 'set_selection'
@@ -24,6 +25,8 @@ export type RemoteWriteCommand =
   | 'update_operation'
   | 'update_text'
   | 'arrange_artwork'
+  | 'set_board_photo'
+  | 'place_on_board'
   | 'undo'
   | 'redo';
 export type RemoteCommand = RemoteReadCommand | RemoteWriteCommand;
@@ -57,6 +60,24 @@ export type RemoteArrangeAction =
   | 'duplicate'
   | 'delete';
 export type RemoteWrite =
+  | {
+      readonly command: 'set_board_photo';
+      readonly args: WriteAdmission & {
+        readonly mimeType: 'image/jpeg' | 'image/png';
+        readonly dataBase64: string;
+      };
+    }
+  | {
+      readonly command: 'place_on_board';
+      readonly args: WriteAdmission & {
+        readonly artworkIds: readonly string[];
+        readonly action: 'center' | 'fit' | 'array';
+        readonly marginMm?: number;
+        readonly rows?: number;
+        readonly cols?: number;
+        readonly gapMm?: number;
+      };
+    }
   | {
       readonly command: 'set_selection';
       readonly args: WriteAdmission & RemoteSelectionArgs;

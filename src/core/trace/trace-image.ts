@@ -42,6 +42,21 @@ import { traceImageToPhotoPathsSteps } from './photo-trace';
 import { coloredPathsToSvg } from './paths-to-svg';
 import { runTraceSteps } from './trace-steps';
 import { brightnessReport, LOCAL_DETAIL_REPORT, type ReportedDetection } from './trace-report';
+import {
+  detectorWindowScale,
+  effectivePixelScale,
+  integralLuma,
+  localMean,
+  sketchWindowRadiusPx,
+} from './sketch-window';
+
+// The detector window helpers moved to sketch-window.ts; importers keep this path.
+export {
+  SKETCH_RADIUS_PX,
+  detectorWindowScale,
+  effectivePixelScale,
+  sketchWindowRadiusPx,
+} from './sketch-window';
 
 // Internal type for the imagetracer module surface we use. Keeps
 // the `as` cast contained to one place.
@@ -171,12 +186,13 @@ export function prepareTraceForContour(
   }
   const adjusted = applyImageAdjustments(image, options);
   if (options.faintLineRecovery !== true && shouldUseSketchTrace(image, options)) {
-    const radiusPx = SKETCH_RADIUS_PX * effectivePixelScale(options);
+    const radiusPx = sketchWindowRadiusPx(options);
     if (options.sketchTrace !== true) {
       const recovered = prepareAutomaticDetailMask(
         adjusted,
         sketchCrackField(adjusted, radiusPx),
         options,
+        detectorWindowScale(options),
       );
       const cleaned = cleanBinaryMask(recovered.prepared, options, recovered.crackField);
       return { ...recovered, prepared: cleaned, report: LOCAL_DETAIL_REPORT };
@@ -210,8 +226,8 @@ export function prepareTraceForContour(
     const recovered = prepareFaintLineMask(
       thresholded.prepared,
       field,
-      sketchCrackField(prepared, SKETCH_RADIUS_PX * effectivePixelScale(options)),
-      effectivePixelScale(options),
+      sketchCrackField(prepared, sketchWindowRadiusPx(options)),
+      detectorWindowScale(options),
     );
     const cleaned = cleanBinaryMask(recovered.prepared, options, recovered.crackField);
     return { ...recovered, median, prepared: cleaned, ...reported };
@@ -238,12 +254,6 @@ function cleanBinaryMask(
     plan.ink === null ? image : despeckle(image, plan.ink.minPixels, saddles ?? 8, plan.ink.keep);
   if (plan.holes === null) return despeckled;
   return fillPinholes(despeckled, effectivePixelScale(options), saddles, plan.holes.fill);
-}
-
-/** Sanitized supersampling factor (see TraceOptions.pixelScale). */
-export function effectivePixelScale(options: TraceOptions): number {
-  const scale = options.pixelScale ?? 1;
-  return Number.isFinite(scale) && scale >= 1 ? scale : 1;
 }
 
 // Sub-pixel crack field (research brief 2026-07-10): the pre-threshold
@@ -312,7 +322,7 @@ function lumaCrackField(prepared: RawImageData, thresholdLuma: number): CrackSub
 // threshold, exposed as thresholdAt so the walker interpolates raw luma
 // against the local iso value. (Exact-equality pixels classify background in
 // the mask; the walker's straddle check falls back to the midpoint there.)
-function sketchCrackField(adjusted: RawImageData, radiusPx = SKETCH_RADIUS_PX): CrackSubPixelField {
+function sketchCrackField(adjusted: RawImageData, radiusPx: number): CrackSubPixelField {
   const { width, height } = adjusted;
   const luma = lumaBuffer(adjusted);
   const integral = integralLuma(luma, width, height);
@@ -371,11 +381,9 @@ function isBinaryMask(options: TraceOptions): boolean {
   );
 }
 
-/** Local-contrast window of sketch and auto-detail masks, in SOURCE pixels. */
-export const SKETCH_RADIUS_PX = 8;
 const SKETCH_CONTRAST_BIAS = 8;
 
-function sketchTraceToMonochrome(image: RawImageData, radiusPx = SKETCH_RADIUS_PX): RawImageData {
+function sketchTraceToMonochrome(image: RawImageData, radiusPx: number): RawImageData {
   const luma = lumaBuffer(image);
   const integral = integralLuma(luma, image.width, image.height);
   const data = new Uint8ClampedArray(image.data.length);
@@ -405,40 +413,6 @@ function lumaBuffer(image: RawImageData): Uint8Array {
     );
   }
   return luma;
-}
-
-function integralLuma(luma: Uint8Array, width: number, height: number): Float64Array {
-  const stride = width + 1;
-  const integral = new Float64Array((height + 1) * stride);
-  for (let y = 1; y <= height; y += 1) {
-    let rowSum = 0;
-    for (let x = 1; x <= width; x += 1) {
-      rowSum += luma[(y - 1) * width + (x - 1)] ?? 255;
-      integral[y * stride + x] = (integral[(y - 1) * stride + x] ?? 0) + rowSum;
-    }
-  }
-  return integral;
-}
-
-function localMean(
-  integral: Float64Array,
-  width: number,
-  height: number,
-  x: number,
-  y: number,
-  radius: number,
-): number {
-  const x0 = Math.max(0, x - radius);
-  const y0 = Math.max(0, y - radius);
-  const x1 = Math.min(width, x + radius + 1);
-  const y1 = Math.min(height, y + radius + 1);
-  const stride = width + 1;
-  const sum =
-    (integral[y1 * stride + x1] ?? 0) -
-    (integral[y0 * stride + x1] ?? 0) -
-    (integral[y1 * stride + x0] ?? 0) +
-    (integral[y0 * stride + x0] ?? 0);
-  return sum / Math.max(1, (x1 - x0) * (y1 - y0));
 }
 
 function alphaToMonochrome(image: RawImageData, cutoff: number, threshold: number): RawImageData {

@@ -35,10 +35,11 @@ import {
   withoutArcMoves,
 } from './cut-arc-moves';
 import { isEmittableCutSegment } from './cut-emission-resolution';
-import type { CutGroup, CutSegment, Job, JobDiagnostic } from './job';
+import type { CutGroup, CutSegment, Job } from './job';
+import { countsFor, countSideUnknown, leadDiagnostics, type LeadCounts } from './laser-lead-counts';
 import type { CutGroupLaserLeads } from './laser-lead-settings';
 import type { JobBounds } from './job-bounds';
-import { fitLead, type LeadFit, type LeadFitContext } from './laser-lead-fit';
+import { fitLead, retracesLeadIn, type LeadFit, type LeadFitContext } from './laser-lead-fit';
 import { LeadObstacles } from './laser-lead-obstacles';
 import {
   backwardTangent,
@@ -53,7 +54,7 @@ import {
   withoutLeadScaffolding,
   type LeadJobLines,
 } from './laser-lead-rings';
-import { sceneLeadSideContours } from './laser-lead-sides';
+import { sceneLeadSideGeometry, type LeadSideVerdict } from './laser-lead-sides';
 import {
   leadSpan,
   leadWrap,
@@ -88,15 +89,6 @@ type LeadWorld = LeadJobLines & {
   readonly leadLines: Map<number, number[]>;
 };
 
-type LeadCounts = {
-  readonly layerName: string;
-  shortened: number;
-  omitted: number;
-  /** Contours left without leads because their scrap side is unknown. */
-  sideUnknown: number;
-  aroundName: string;
-};
-
 export function applyLaserLeads(job: Job, options: LaserLeadOptions): Job {
   if (!job.groups.some((group) => group.kind === 'cut' && group.laserLeads !== undefined))
     return withoutLeadScaffolding(job);
@@ -105,8 +97,8 @@ export function applyLaserLeads(job: Job, options: LaserLeadOptions): Job {
   const burns = (group: CutGroup): boolean =>
     isBurningLineGroup(group) && hasJobStartPower(group, options.device);
   const scene =
-    options.scene === undefined ? undefined : sceneLeadSideContours(options.scene, options.device);
-  const lines = leadJobLines(job, burns, scene);
+    options.scene === undefined ? undefined : sceneLeadSideGeometry(options.scene, options.device);
+  const lines = leadJobLines(job, burns, scene?.contours, scene?.openLines);
   const obstacles = LeadObstacles.create(lines.lines, lines.rings);
   const wrap = leadWrap(options.wrapMm, lines.lines);
   for (const line of lines.lines) {
@@ -146,42 +138,6 @@ export function applyLaserLeads(job: Job, options: LaserLeadOptions): Job {
   };
 }
 
-// By operation id: two operations can share a name (each parent's Sub-layer 1).
-function countsFor(counts: Map<string, LeadCounts>, layerId: string, name: string): LeadCounts {
-  const existing = counts.get(layerId);
-  if (existing !== undefined) return existing;
-  const created = { layerName: name, shortened: 0, omitted: 0, sideUnknown: 0, aroundName: '' };
-  counts.set(layerId, created);
-  return created;
-}
-
-function leadDiagnostics(counts: ReadonlyMap<string, LeadCounts>): JobDiagnostic[] {
-  return [...counts.entries()].flatMap(([layerId, tally]): JobDiagnostic[] => [
-    ...(tally.shortened > 0 || tally.omitted > 0
-      ? [
-          {
-            kind: 'laser-leads-adjusted' as const,
-            layerId,
-            layerName: tally.layerName,
-            shortened: tally.shortened,
-            omitted: tally.omitted,
-          },
-        ]
-      : []),
-    ...(tally.sideUnknown > 0
-      ? [
-          {
-            kind: 'laser-leads-side-unknown' as const,
-            layerId,
-            layerName: tally.layerName,
-            count: tally.sideUnknown,
-            aroundName: tally.aroundName,
-          },
-        ]
-      : []),
-  ]);
-}
-
 function leadSegment(
   segment: CutSegment,
   group: CutGroup,
@@ -189,12 +145,11 @@ function leadSegment(
   world: LeadWorld,
   tally: LeadCounts,
 ): CutSegment {
-  // Automatic, and a closed shape on an operation without leads holds it: it
-  // may be a part, so no side is safe.
+  // Automatic, and a closed shape on an operation without leads holds it, or
+  // open lines close a region round it: it may be a part, so no side is safe.
   const unknown = unknownSide(group, key, world);
   if (unknown !== null) {
-    tally.sideUnknown += 1;
-    if (tally.aroundName === '') tally.aroundName = unknown;
+    countSideUnknown(tally, unknown);
     return segment;
   }
   const planned = leadAttempt(segment, group, key, world);
@@ -216,13 +171,13 @@ function leadSegment(
   return leadedSegment(attempt.segment, leadIn, leadOut, finalPass, group.passes);
 }
 
-/** The operation whose shape leaves the side unknown, or null when known. */
-function unknownSide(group: CutGroup, key: string, world: LeadWorld): string | null {
+/** The verdict that leaves the side unknown, or null when it is known. */
+function unknownSide(group: CutGroup, key: string, world: LeadWorld): LeadSideVerdict | null {
   if (group.laserLeads?.side !== 'auto') return null;
   const lineId = world.lineOf.get(key);
   const ringId = lineId === undefined ? undefined : world.ringOfLine.get(lineId);
   const verdict = ringId === undefined ? undefined : world.sides[ringId];
-  return verdict?.side === 'unknown' ? (verdict.aroundName ?? '') : null;
+  return verdict?.side === 'unknown' ? verdict : null;
 }
 
 type LeadAttempt = {
@@ -247,15 +202,22 @@ function leadAttempt(
   const plan = leadPlan(segment, group, key, world);
   if (plan === null) return null;
   const { spec, shape } = plan;
-  const finalPass = finalPassLeadOut(segment, group, spec.leadOut, plan);
+  const planned = finalPassLeadOut(segment, group, spec.leadOut, plan);
   // With one pass and an overcut the final pass is the only one: it goes out
   // as chords, so its lead-in is fitted as chords, and the ordinary lead-out
   // never burns, so it is not fitted and cannot block.
-  const ordinaryOutBurns = group.passes > 1 || finalPass === null;
+  const ordinaryOutBurns = group.passes > 1 || planned === null;
   const context = ordinaryOutBurns ? plan.context : asChords(plan.context);
   const leadIn = spec.leadIn ? fitLead('in', plan.startJoin, shape, context) : null;
-  const leadOut =
+  const fitted =
     spec.leadOut && ordinaryOutBurns ? fitLead('out', plan.endJoin, shape, context) : null;
+  // A lead-out back along the lead-in would burn it twice: the contour is
+  // started elsewhere instead (leadSegment), where the two part. So would the
+  // final pass's, when its overcut runs a whole lap back to the seam.
+  const retraces = (out: LeadFit | null): boolean =>
+    out !== null && leadIn !== null && retracesLeadIn(out, leadIn, context.clearanceMm);
+  const leadOut = retraces(fitted) ? null : fitted;
+  const finalPass = planned !== null && retraces(planned.fit) ? { ...planned, fit: null } : planned;
   return {
     segment,
     ringId: plan.ringId,
@@ -406,8 +368,12 @@ function finalPassLeadOut(
   };
 }
 
+// A pass that goes out as chords: its leads are fitted as chords, and the
+// contour they must not cross is the chords it runs, not the arcs.
 function asChords(context: LeadFitContext): LeadFitContext {
-  return context.arcsEmitted ? { ...context, arcsEmitted: false } : context;
+  return context.arcsEmitted || context.ownBurn !== context.ownRing
+    ? { ...context, arcsEmitted: false, ownBurn: context.ownRing }
+    : context;
 }
 
 function leadedSegment(
@@ -420,8 +386,17 @@ function leadedSegment(
   const ring = segment.polyline;
   const head = leadIn === null ? ring.slice(0, 1) : leadIn.path.points;
   const polyline = [...head, ...ring.slice(1), ...(leadOut?.path.points.slice(1) ?? [])];
-  const open: CutSegment = { ...withoutArcMoves(segment), polyline, closed: false };
   const contourMoves = validCutArcMoves(segment);
+  // The contour runs on from where the lead-in ends, so its range holds on
+  // the final pass's burn too, which starts with the same lead-in and ring.
+  const leadContour = {
+    from: head.length - 1,
+    to: head.length - 2 + ring.length,
+    ...(contourMoves === null || segment.arcMoves === undefined
+      ? {}
+      : { arcMoves: segment.arcMoves }),
+  };
+  const open: CutSegment = { ...withoutArcMoves(segment), polyline, closed: false, leadContour };
   const withArcs =
     contourMoves === null
       ? open
@@ -458,21 +433,25 @@ function fitContext(
 ): Omit<LeadFitContext, 'arcsEmitted'> {
   // The same outline cut again, by another operation or another group: its
   // lines run along the contour, so a lead cannot keep clear of them, and
-  // need not.
-  const copies = world.copies[ringId] ?? [];
-  const ignoredRings = new Set([ringId, ...copies]);
+  // need not. A copy offset by another kerf runs beside it: the sliver between
+  // two cuts of one outline is cut free of the part either way, so a lead
+  // crossing it burns nothing that stays, and the copy's leads lie beside these.
+  // So is the outline a kerf piece was split from (LeadJobLines.exempt), but
+  // only a true copy's leads run beside these: the leads of a whole outline a
+  // piece lies in are burns of their own, which the piece's leads keep clear of.
+  const exempt = world.exempt[ringId] ?? [];
+  const ignoredRings = new Set([ringId, ...exempt]);
   const ignoredLines = new Set([
     lineId,
-    ...copies.flatMap((index) => [
-      ...(world.rings[index]?.lineIds ?? []),
-      ...(world.leadLines.get(index) ?? []),
-    ]),
+    ...exempt.flatMap((index) => world.rings[index]?.lineIds ?? []),
+    ...(world.copies[ringId] ?? []).flatMap((index) => world.leadLines.get(index) ?? []),
   ]);
   const holders = world.holders[ringId];
   return {
     obstacles: world.obstacles,
     ownLine: lineId,
     ownRing: ring,
+    ownBurn: world.lines[lineId] ?? ring,
     ignoredLines,
     ignoredRings,
     inside,

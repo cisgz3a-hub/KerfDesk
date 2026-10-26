@@ -114,7 +114,10 @@ describe('Machine dialog control audit', () => {
     );
     act(() => button('Roller').click());
     expect(button('Roller').getAttribute('aria-pressed')).toBe('true');
-    expect(check('[aria-label="Rotary millimetres per rotation"]').disabled).toBe(true);
+    // A chuck switched to Roller is a new roller, scaled from its roller
+    // diameter, so Motion per turn applies (ADR-373 Amendment 1).
+    expect(check('[aria-label="Rotary millimetres per rotation"]').disabled).toBe(false);
+    expect(check('[aria-label="Rotary roller diameter"]').value).toBe('25');
     act(() => button('Chuck').click());
     expect(button('Chuck').getAttribute('aria-pressed')).toBe('true');
     expect(check('[aria-label="Rotary millimetres per rotation"]').disabled).toBe(false);

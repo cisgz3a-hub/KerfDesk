@@ -127,7 +127,9 @@ describe('stamp preparation review', () => {
     expect(useStore.getState().project).toBe(project);
     expect(useStore.getState().undoStack).toEqual([]);
   });
-  it('withdraws export intent when review is unchecked during the save picker', async () => {
+  it('writes the reviewed draft when review is unchecked during the save picker', async () => {
+    // The picker has already emptied the chosen file when it returns, so the
+    // pick commits the draft reviewed at the click (ADR-656 Amendment 1).
     const { platform, write, project } = await render();
     let finish: (target: SaveTarget) => void = () => undefined;
     vi.mocked(platform.pickFileForSave).mockImplementation(
@@ -140,8 +142,9 @@ describe('stamp preparation review', () => {
     await review();
     await click('Export PNG…');
     await review(false);
-    await act(async () => finish({ displayName: 'cancelled.png', write }));
-    expect(write).not.toHaveBeenCalled();
+    await act(async () => finish({ displayName: 'stamp.png', write }));
+    expect(write).toHaveBeenCalledOnce();
+    expect(write.mock.calls[0]?.[0]).toBeInstanceOf(Blob);
     expect(useStore.getState().project).toBe(project);
   });
 });

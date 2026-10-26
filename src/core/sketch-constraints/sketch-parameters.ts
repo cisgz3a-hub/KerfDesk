@@ -56,8 +56,9 @@ export function sketchLength(value: SketchValue, values: ReadonlyMap<string, Qua
 function parseExpression(expression: string, resolve: (name: string) => Quantity): Quantity {
   if (expression.length > 512) throw new Error('Parameter expression exceeds 512 characters.');
   const tokens =
-    expression.match(/(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?|[A-Za-z_][A-Za-z_0-9]*|[()+*/-]/gi) ??
-    [];
+    expression.match(
+      /\[[A-Za-z_][A-Za-z_0-9-]*\]|(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?|[A-Za-z_][A-Za-z_0-9]*|[()+*/-]/gi,
+    ) ?? [];
   if (tokens.join('') !== expression.replace(/\s+/g, ''))
     throw new Error('Unsupported parameter expression.');
   if (tokens.length > 256) throw new Error('Parameter expression exceeds its token budget.');
@@ -85,7 +86,9 @@ function parseExpression(expression: string, resolve: (name: string) => Quantity
           : 'scalar';
       return { value: Number(token), unit };
     }
-    if (/^[A-Za-z_]/.test(token)) return resolve(token);
+    // Explicit names keep schema-valid hyphens unambiguous without changing
+    // what subtraction in an existing saved expression means.
+    if (/^(?:[A-Za-z_]|\[)/.test(token)) return resolve(token.replace(/^\[|\]$/g, ''));
     throw new Error('Invalid parameter token: ' + token);
   };
   const product = (): Quantity => {

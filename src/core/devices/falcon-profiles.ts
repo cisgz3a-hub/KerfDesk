@@ -71,6 +71,8 @@ export const FALCON_A1_PRO_GRBLHAL_PROFILE: DeviceProfile = {
   ],
 };
 
+// Withdrawn from Machine Setup's list (profile-catalog.ts, ADR-660): no Creality
+// machine is 400 x 400 mm. Kept so a saved copy still resolves.
 export const FALCON_COMPATIBLE_PROFILE: DeviceProfile = {
   ...DEFAULT_DEVICE_PROFILE,
   profileId: 'creality-falcon-a1-pro-compatible',

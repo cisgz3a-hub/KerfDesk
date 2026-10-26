@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { RT_JOG_CANCEL } from '../../core/controllers/grbl';
 import { useLaserStore } from './laser-store';
+import { motionOwnerAwaitsMissingReply } from './laser-motion-release';
 import {
   connectWith,
   makeConnection,
@@ -22,7 +23,7 @@ afterEach(async () => {
 });
 
 describe('visible cancellation settlement failures', () => {
-  it('publishes the old Jog acknowledgement timeout after a successful cancel write', async () => {
+  it('publishes the missing Jog reply after a successful cancel write', async () => {
     const writes: string[] = [];
     const connection = makeConnection(async (data) => {
       writes.push(data);
@@ -33,18 +34,22 @@ describe('visible cancellation settlement failures', () => {
     useLaserStore.setState({ lastWriteError: null, safetyNotice: null });
     vi.useFakeTimers();
 
+    // The byte waits up to 250 ms for the jog's reply, then Cancel waits 8 s
+    // for it before giving up (ADR-640).
     const cancel = useLaserStore.getState().cancelJog();
-    const rejection = expect(cancel).rejects.toThrow(/previous motion command acknowledgement/);
-    await vi.advanceTimersByTimeAsync(8010);
+    const rejection = expect(cancel).rejects.toThrow(/did not answer the last motion command/);
+    await vi.advanceTimersByTimeAsync(8_300);
     await rejection;
 
     expect(writes).toContain(RT_JOG_CANCEL);
     expect(useLaserStore.getState().lastWriteError).toMatch(
-      /previous motion command acknowledgement/,
+      /did not answer the last motion command/,
     );
     expect(useLaserStore.getState().log.at(-1)).toContain('Motion cancellation needs attention');
     expect(useLaserStore.getState().motionOperation).toMatchObject({ cancelRequested: true });
     expect(useLaserStore.getState().framedRun).toBeNull();
+    // The controller last said Idle, so Disconnect is the way out it names.
+    expect(motionOwnerAwaitsMissingReply(useLaserStore.getState())).toBe(true);
   });
 
   it.each([

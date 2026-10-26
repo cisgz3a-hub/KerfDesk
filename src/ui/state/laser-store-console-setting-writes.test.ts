@@ -9,6 +9,7 @@ import { useLaserStore, type LaserState } from './laser-store';
 import {
   connectWith,
   flushConnect,
+  makeAdapter,
   makeConnection,
   type FakeConnection,
 } from './laser-store-console.test-support';
@@ -161,6 +162,73 @@ describe('Console setting writes on stock GRBL', () => {
       kind: 'failed',
       message: expect.stringContaining('response was empty'),
     });
+  });
+});
+
+// Controller audit v2 C4-P2-1 (ADR-375 Amendment 4): grblHAL keeps only the
+// number at the start of a `$N=` value and answers ok (core d7aaee3
+// settings.c#L3527-L3552), so the store refuses such a value before writing
+// and compares the `$$` re-read with what was typed.
+describe('Console setting writes on grblHAL', () => {
+  async function connectedGrblHalIdle(): Promise<{ connection: FakeConnection; wire: string[] }> {
+    const wire: string[] = [];
+    const connection = makeConnection(
+      async (data) => {
+        wire.push(data);
+      },
+      { autoRespondToStatusQuery: true },
+    );
+    await useLaserStore.getState().connect(makeAdapter(connection), { controllerKind: 'grblhal' });
+    connection.emitLine("GrblHAL 1.1f ['$' or '$HELP' for help]");
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await flushConnect();
+    connection.emitLine('ok');
+    await flushConnect();
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await flushConnect();
+    wire.length = 0;
+    return { connection, wire };
+  }
+
+  async function writeAndReread(command: string, dump: ReadonlyArray<string>): Promise<void> {
+    const { connection, wire } = await connectedGrblHalIdle();
+    const sent = useLaserStore.getState().sendConsoleCommand(command, { confirmed: true });
+    await vi.waitFor(() => expect(wire).toContain(`${command}\n`));
+    connection.emitLine('ok');
+    await vi.waitFor(() => expect(wire).toContain('$$\n'));
+    for (const line of [...dump, 'ok']) connection.emitLine(line);
+    await sent;
+  }
+
+  it.each([
+    ['$100=26,67', /cannot be sent: Enter a finite decimal number/],
+    ['$22=1.0', /Send \$22=1 instead/],
+  ])('refuses %s before writing anything', async (command, reason) => {
+    const { wire } = await connectedGrblHalIdle();
+
+    await expect(
+      useLaserStore.getState().sendConsoleCommand(command, { confirmed: true }),
+    ).rejects.toThrow(reason);
+    expect(wire.filter((data) => data !== '?')).toEqual([]);
+  });
+
+  it('says so when the re-read shows a different value than the one typed', async () => {
+    await writeAndReread('$680=25.0', ['$22=1', '$680=250', '$384=0']);
+
+    const state = useLaserStore.getState();
+    const message =
+      'The controller reports $680=250 after the re-read, not 25.0: it stored a different value.';
+    expect(state.lastWriteError).toContain(message);
+    // The Console shows the transcript, not the plain log.
+    expect(state.transcript.some((entry) => entry.raw.includes(message))).toBe(true);
+    expect(state.grblSettingsRows.find((row) => row.id === 680)?.rawValue).toBe('250');
+  });
+
+  it('stays quiet when the re-read shows the typed value', async () => {
+    await writeAndReread('$110=5000.5', ['$22=1', '$110=5000.500', '$384=0']);
+
+    expect(useLaserStore.getState().lastWriteError).toBeNull();
+    expect(useLaserStore.getState().log.join('\n')).not.toContain('after the re-read');
   });
 });
 

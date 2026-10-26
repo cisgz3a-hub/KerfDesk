@@ -113,6 +113,10 @@ For each version, from a clean checkout at the tagged source:
 
 - [ ] Install N from the downloaded file in the disposable account. The
       installer shows the commercial terms, not the free License & Safety Notice.
+- [ ] While [ADR-623 Amendment 3](decisions/ADR-623-amendment-3-licence-window-held-off.md) holds the licence window off: first launch opens
+      the KerfDesk Free workspace, the status bar shows `Free · Try Pro`, and a Pro
+      tool or Help > Licence offers the trial and a licence key. Skip the two
+      licence-window checks below and start the trial from Help > Licence.
 - [ ] First launch opens only the Activate KerfDesk licence window (ADR-623): no
       workspace, menu, project, camera or serial port behind it. It offers the
       trial, a licence key and Buy Pro. Escape does nothing; Quit KerfDesk and the

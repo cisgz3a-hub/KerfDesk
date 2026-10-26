@@ -1,3 +1,5 @@
+import type { CurveSubpath } from '../core/scene';
+
 // Compact DXF with 150,000 composed INSERT instances. Each individual grid is
 // within the existing limit; the payload is small enough to expose size-based
 // assumptions about parsing cost. The independent transform is documented below.
@@ -99,4 +101,34 @@ export function nestedMinsertDxf(): string {
 // X=-6918 and flips Y, yielding (6986-8c-10r, 0) -> (6982-8c-10r, 0).
 export function nestedMinsertStartX(index: number): number {
   return 6986 - 8 * (index % 500) - 10 * Math.floor(index / 500);
+}
+
+export const NESTED_MINSERT_INSTANCES = 150_000;
+
+/** Whether `curves` hold every instance, each once, as a 4 mm horizontal line
+ * piece where the composed transforms put it. DXF import joins instances whose
+ * ends meet exactly one other end (ADR-626 Amendment 8), so a curve may hold
+ * several; every piece is a line segment. */
+export function holdsEveryNestedMinsertInstance(curves: ReadonlyArray<CurveSubpath>): boolean {
+  const starts: number[] = [];
+  for (const curve of curves) {
+    let at = curve.start;
+    for (const segment of curve.segments) {
+      const to = segment.to;
+      const straight =
+        segment.kind === 'line' &&
+        Math.abs(at.y) < 1e-8 &&
+        Math.abs(to.y) < 1e-8 &&
+        Math.abs(Math.abs(at.x - to.x) - 4) < 1e-8;
+      if (!straight) return false;
+      starts.push(Math.max(at.x, to.x));
+      at = to;
+    }
+  }
+  if (starts.length !== NESTED_MINSERT_INSTANCES) return false;
+  starts.sort((a, b) => a - b);
+  const expected = Array.from({ length: NESTED_MINSERT_INSTANCES }, (_, index) =>
+    nestedMinsertStartX(index),
+  ).sort((a, b) => a - b);
+  return starts.every((x, index) => Math.abs(x - (expected[index] ?? Number.NaN)) < 1e-8);
 }

@@ -8,6 +8,13 @@
 // non-negotiable #9 says Abort must be reachable from any window state,
 // and a panic happens mid-typing as easily as mid-click. Start respects
 // the modal gate (starting a burn from inside a dialog is never intended).
+//
+// Abort listens in the window's capture phase, which runs before any
+// element's own handler. The canvas text editor, Image Studio's dialogs and
+// the desktop Editors panel stop every keydown they get, so a bubble listener
+// never heard Ctrl+. from them, and the modal ones trap Tab too (audit
+// 27-P2-1). The app mounts Abort apart from Start, outside the workspace's
+// error boundary, so it also outlives a render crash (27-P2-2).
 
 import { useEffect } from 'react';
 import { isEditableShortcutTarget } from '../common/keyboard-targets';
@@ -19,20 +26,32 @@ import { runStartJobFlow } from './start-job-flow';
 import { controllerActionFailureHandler } from './report-controller-action-failure';
 
 export function installJobShortcuts(target: Window): () => void {
+  const removeAbort = installAbortShortcut(target);
+  const removeStart = installStartShortcut(target);
+  return () => {
+    removeStart();
+    removeAbort();
+  };
+}
+
+export function installAbortShortcut(target: Window): () => void {
   const onKeyDown = (e: KeyboardEvent): void => {
-    if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
-    if (e.key === '.') {
-      handleStopShortcut(e);
-      return;
-    }
-    if (e.key === 'Enter') {
-      if (isModalOpen(useUiStore.getState())) return;
-      if (isEditableShortcutTarget(e.target)) return;
-      const laser = useLaserStore.getState();
-      if (laser.connection.kind !== 'connected' || isActiveJob(laser.streamer)) return;
-      e.preventDefault();
-      void runStartJobFlow();
-    }
+    if (!(e.ctrlKey || e.metaKey) || e.altKey || e.key !== '.') return;
+    handleStopShortcut(e);
+  };
+  target.addEventListener('keydown', onKeyDown, true);
+  return () => target.removeEventListener('keydown', onKeyDown, true);
+}
+
+export function installStartShortcut(target: Window): () => void {
+  const onKeyDown = (e: KeyboardEvent): void => {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey || e.key !== 'Enter') return;
+    if (isModalOpen(useUiStore.getState())) return;
+    if (isEditableShortcutTarget(e.target)) return;
+    const laser = useLaserStore.getState();
+    if (laser.connection.kind !== 'connected' || isActiveJob(laser.streamer)) return;
+    e.preventDefault();
+    void runStartJobFlow();
   };
   target.addEventListener('keydown', onKeyDown);
   return () => target.removeEventListener('keydown', onKeyDown);
@@ -40,6 +59,14 @@ export function installJobShortcuts(target: Window): () => void {
 
 export function useJobShortcuts(): void {
   useEffect(() => installJobShortcuts(window), []);
+}
+
+export function useAbortShortcut(): void {
+  useEffect(() => installAbortShortcut(window), []);
+}
+
+export function useStartShortcut(): void {
+  useEffect(() => installStartShortcut(window), []);
 }
 
 function handleStopShortcut(e: KeyboardEvent): void {

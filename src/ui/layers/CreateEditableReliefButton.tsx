@@ -81,14 +81,17 @@ function CreateReliefDialog(props: CreateReliefProps): JSX.Element {
     request.current = controller;
     setBusy(true);
     setError('');
-    const result = await prepareNewRelief(document, epoch, controller.signal);
-    if (controller.signal.aborted || result.kind === 'cancelled') return;
-    setBusy(false);
-    if (result.kind === 'error') {
-      setError(result.reason);
-      return;
+    try {
+      const result = await prepareNewRelief(document, epoch, controller.signal);
+      if (controller.signal.aborted || result.kind === 'cancelled') return;
+      if (result.kind === 'error') setError(result.reason);
+      else props.onCreated(result.id);
+    } catch (cause) {
+      if (!controller.signal.aborted)
+        setError(cause instanceof Error ? cause.message : 'The relief could not be added.');
+    } finally {
+      if (!controller.signal.aborted) setBusy(false);
     }
-    props.onCreated(result.id);
   }
   return (
     <Dialog
@@ -123,9 +126,7 @@ function CreateReliefDialog(props: CreateReliefProps): JSX.Element {
           variant="primary"
           title="Create a relief and open its component editor"
           disabled={!valid || busy}
-          onClick={() => {
-            void create();
-          }}
+          onClick={() => void create()}
         >
           Create relief
         </Button>

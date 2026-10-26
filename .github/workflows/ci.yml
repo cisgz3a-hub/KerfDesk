@@ -73,6 +73,11 @@ jobs:
       - name: Check the published privacy notice
         run: pnpm check:privacy
 
+      # Pricing, terms, refunds and safety ship on kerfdesk.com from public/
+      # (ADR-524 Amendment 3 decision 2): fail when one differs from its source.
+      - name: Check the published pricing and policy pages
+        run: pnpm check:public-info
+
       - name: Check formatting
         run: pnpm format:check
 
@@ -105,6 +110,11 @@ jobs:
 
       - name: Check GitHub Actions pins
         run: pnpm check:action-pins
+
+      # Every secret is read only by a job that names the environment holding
+      # it, so no branch workflow needs a repository secret (ADR-651).
+      - name: Check workflow secret scopes
+        run: pnpm check:secret-scopes
 
       - name: Check dependency licences
         run: pnpm license-check

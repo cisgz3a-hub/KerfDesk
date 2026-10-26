@@ -303,6 +303,12 @@
   font-size: 11px;
   color: var(--lf-text-muted);
 }
+.lf-setup-job-lock {
+  flex: 1 1 200px;
+  margin: 0;
+  font-size: 11px;
+  color: var(--lf-warning-fg);
+}
 .lf-setup-dialog :is(button, summary, input, select):focus-visible {
   outline: 2px solid var(--lf-focus);
   outline-offset: 3px;

@@ -1,5 +1,6 @@
 import { isPositiveD } from 'clipper2-ts';
 import { adaptiveIslandSequences } from './adaptive-pocket-islands';
+import { orderAdaptivePocketSequences } from './adaptive-pocket-order';
 import type { Polyline } from '../scene';
 import {
   canonicalAdaptivePocketPaths,
@@ -38,7 +39,7 @@ export function planAdaptivePocket(
     return island.ok
       ? {
           ok: true,
-          sequences: island.sequences,
+          sequences: orderAdaptivePocketSequences(contours, island.sequences, island.cleanupRings),
           optimalLoadMm,
           islandPartitions: island.partitionCount,
         }
@@ -52,7 +53,7 @@ export function planAdaptivePocket(
   }
   return sequences.length === 0
     ? { ok: false, reason: 'Adaptive clearing found no reachable pocket area.' }
-    : { ok: true, sequences, optimalLoadMm };
+    : { ok: true, sequences: orderAdaptivePocketSequences(contours, sequences), optimalLoadMm };
 }
 
 export function canonicalAdaptivePocketContours(

@@ -12,7 +12,7 @@ for (const viewport of [
   { width: 420, height: 600 },
   { width: 360, height: 640 },
 ]) {
-  test(`controller notices stay in the toolbar without shifting controls at ${viewport.width}px`, async ({
+  test(`controller recovery floats over the canvas without shifting controls at ${viewport.width}px`, async ({
     page,
   }) => {
     await page.setViewportSize(viewport);
@@ -34,72 +34,60 @@ for (const viewport of [
       await expect.poll(() => toolbar.boundingBox()).toEqual(toolbarBefore);
     };
 
+    // ADR-642: a controller that needs recovery opens the card by itself,
+    // over the canvas, and the toolbar does not move.
     await setQualification(page, 'failed');
-    const brief = page.getByRole('group', { name: 'Controller notification', exact: true });
-    const toast = page.getByRole('alert', { name: 'Controller information', exact: true });
-    await expect(brief).toBeVisible();
-    await expect(toast).toHaveCount(0);
-    await unchanged();
-    const bounds = await brief.boundingBox();
-    const mode = await page.locator('.lf-machine-toolbar .lf-machine-mode').boundingBox();
-    if (bounds === null || mode === null || toolbarBefore === null)
-      throw new Error('Toolbar notice must have visible bounds');
-    expect(bounds.x).toBeGreaterThanOrEqual(0);
-    expect(bounds.x + bounds.width).toBeLessThanOrEqual(mode.x);
-    expect(bounds.y).toBeGreaterThanOrEqual(toolbarBefore.y);
-    expect(bounds.y + bounds.height).toBeLessThanOrEqual(toolbarBefore.y + toolbarBefore.height);
-    await expect(page.getByRole('button', { name: 'Disconnect', exact: true })).toBeInViewport();
-
-    await page.screenshot({ path: test.info().outputPath('controller-recovery-toast.png') });
-    // Expiry never moves focus from the user's current control.
-    const trigger = page.getByRole('button', { name: 'More connection options', exact: true });
-    await trigger.focus();
-    await expect(brief).toHaveCount(0, { timeout: 8000 });
-    await expect(trigger).toBeFocused();
-    await unchanged();
-    await page.keyboard.press('Enter');
-    const info = page.getByRole('menuitem', { name: 'Controller info', exact: true });
-    await expect(info).toBeFocused();
-    await page.keyboard.press('Enter');
-    await expect(toast).toBeVisible();
+    const card = page.getByRole('alert', { name: 'Controller recovery', exact: true });
+    await expect(card).toBeVisible();
+    await expect(card.getByRole('button', { name: 'Reconnect controller' })).toBeVisible();
     await expect(
-      toast.getByRole('button', { name: 'Dismiss controller notification' }),
-    ).toBeFocused();
+      card.getByRole('button', { name: 'Retry reading controller settings' }),
+    ).toBeVisible();
     await unchanged();
-    await page.keyboard.press('Escape');
-    await expect(toast).toHaveCount(0);
-    await expect(trigger).toBeFocused();
-    await unchanged();
+    const bounds = await card.boundingBox();
+    if (bounds === null || toolbarBefore === null) throw new Error('Card must have bounds');
+    expect(bounds.y).toBeGreaterThanOrEqual(toolbarBefore.y + toolbarBefore.height);
+    expect(bounds.x).toBeGreaterThanOrEqual(0);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width);
+    await expect(page.getByRole('button', { name: 'Disconnect', exact: true })).toBeInViewport();
+    await page.screenshot({ path: test.info().outputPath('controller-recovery-card.png') });
 
+    // Folding keeps a row on the canvas until the controller recovers.
+    await card.getByRole('button', { name: 'Collapse controller recovery' }).click();
+    await expect(card).toHaveCount(0);
+    const folded = page.getByRole('button', { name: /Machine stopped answering/ });
+    await expect(folded).toBeVisible();
+    await expect(folded).toBeFocused();
+    await unchanged();
+    await folded.click();
+    await expect(card).toBeVisible();
+    await expect(card.getByRole('button', { name: 'Collapse controller recovery' })).toBeFocused();
+
+    // Controller info in the menu still shows the same details.
+    const trigger = page.getByRole('button', { name: 'More connection options', exact: true });
     await trigger.click();
+    const info = page.getByRole('menuitem', { name: 'Controller info', exact: true });
     await info.click();
-    const disconnect = page.getByRole('button', { name: 'Disconnect', exact: true });
-    await disconnect.focus();
-    await expect(toast).toHaveCount(0);
-    await expect(disconnect).toBeFocused();
+    const details = page.getByRole('dialog', { name: 'Controller information', exact: true });
+    await expect(details).toContainText('Machine stopped answering');
+    await page.keyboard.press('Escape');
+    await expect(details).toHaveCount(0);
+    await unchanged();
 
     // Reading settings after a reset is routine: it never pops up (ADR-611).
     for (const phase of ['controller-response', 'reset-cleanup', 'settings-read'] as const) {
       await setQualification(page, 'qualifying', phase);
-      await expect(
-        page.getByRole('group', { name: 'Controller notification', exact: true }),
-      ).toHaveCount(0);
-      await expect(
-        page.getByRole('dialog', { name: 'Controller information', exact: true }),
-      ).toHaveCount(0);
+      await expect(card).toHaveCount(0);
+      await expect(folded).toHaveCount(0);
+      await expect(details).toHaveCount(0);
       await unchanged();
     }
-    await page.screenshot({ path: test.info().outputPath('controller-waiting-toolbar.png') });
     await trigger.click();
     await info.click();
-    await expect(
-      page.getByRole('dialog', { name: 'Controller information', exact: true }),
-    ).toContainText('Reading controller settings…');
+    await expect(details).toContainText('Reading controller settings…');
     await setQualification(page, 'qualified');
-    await expect(trigger).toBeFocused();
-    await expect(
-      page.getByRole('group', { name: 'Controller notification', exact: true }),
-    ).toHaveCount(0);
+    await expect(details).toHaveCount(0);
+    await expect(card).toHaveCount(0);
     await trigger.click();
     await expect(info).toHaveCount(0);
   });

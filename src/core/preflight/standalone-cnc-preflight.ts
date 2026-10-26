@@ -16,6 +16,7 @@ import {
 import { findSpindleStartClearanceIssues } from '../invariants/cnc-motion';
 import { iterateGcodeLines } from '../invariants/gcode-words';
 import type { CncMachineConfig } from '../scene';
+import { hasCuttingMove } from './cutting-move';
 import type { PreflightIssue, PreflightResult } from './preflight';
 
 const MAX_REPORTED_ISSUES = 5;
@@ -35,14 +36,14 @@ export function runStandaloneCncPreflight(
   appendWorkOriginBoundsIssues(gcode, device, issues);
   issues.push(...standaloneCncSetupAdvisories(device));
   appendTextInvariantIssues(gcode, machine, issues);
-  if (!hasCuttingMove(gcode)) {
+  if (!cutsAnywhere(gcode)) {
     issues.push({ code: 'empty-output', message: 'No CNC cutting moves were generated.' });
   }
   return { ok: issues.length === 0, issues };
 }
 
-function hasCuttingMove(gcode: string | Iterable<string>): boolean {
-  for (const line of iterateGcodeLines(gcode)) if (/\bG1\b/.test(line)) return true;
+function cutsAnywhere(gcode: string | Iterable<string>): boolean {
+  for (const line of iterateGcodeLines(gcode)) if (hasCuttingMove(line)) return true;
   return false;
 }
 

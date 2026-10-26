@@ -15,7 +15,7 @@ import {
   type VectorSceneObject,
 } from './vector-path-tools';
 
-type WeldBatch = Pick<
+export type WeldBatch = Pick<
   NormalizedVectorPathBatch,
   'color' | 'operationIds' | 'strokeWidthMm' | 'strokeTransform'
 > & {
@@ -56,30 +56,47 @@ function collectWeldBatches(
 ): Result<Map<string, WeldBatch>, VectorOpError> {
   const grouped = new Map<string, WeldBatch>();
   for (const object of objects) {
-    const normalized = normalizeVectorObjectBatches(object);
-    if (normalized.kind === 'error') return normalized;
-    for (const batch of normalized.value) {
-      const operationIds = normalizedOperationIds(batch.operationIds);
-      // One source path may intentionally run under several operations. Split
-      // it into one Weld batch per root so an A+B path can union with A-only
-      // geometry without changing the independent B run.
-      const bindingSets = operationBindingSets(operationIds);
-      for (const bindingSet of bindingSets) {
-        const key = batchKey(batch.color, bindingSet, batch.strokeWidthMm, batch.strokeTransform);
-        const existing = grouped.get(key);
-        grouped.set(key, {
+    const pieces = weldBatchPieces(object);
+    if (pieces.kind === 'error') return pieces;
+    for (const { key, batch } of pieces.value) {
+      const existing = grouped.get(key);
+      grouped.set(key, { ...batch, paths: [...(existing?.paths ?? []), ...batch.paths] });
+    }
+  }
+  return ok(grouped);
+}
+
+/** One object's normalized region within one Weld batch. */
+export type WeldBatchPiece = { readonly key: string; readonly batch: WeldBatch };
+
+/** One object's normalized regions, each keyed by the Weld batch it unions into. */
+export function weldBatchPieces(
+  object: VectorSceneObject,
+): Result<ReadonlyArray<WeldBatchPiece>, VectorOpError> {
+  const normalized = normalizeVectorObjectBatches(object);
+  if (normalized.kind === 'error') return normalized;
+  const pieces: WeldBatchPiece[] = [];
+  for (const batch of normalized.value) {
+    const operationIds = normalizedOperationIds(batch.operationIds);
+    // One source path may intentionally run under several operations. Split
+    // it into one Weld batch per root so an A+B path can union with A-only
+    // geometry without changing the independent B run.
+    for (const bindingSet of operationBindingSets(operationIds)) {
+      pieces.push({
+        key: batchKey(batch.color, bindingSet, batch.strokeWidthMm, batch.strokeTransform),
+        batch: {
           color: batch.color,
           ...(bindingSet === undefined ? {} : { operationIds: bindingSet }),
           ...(batch.strokeWidthMm === undefined ? {} : { strokeWidthMm: batch.strokeWidthMm }),
           ...(batch.strokeTransform === undefined
             ? {}
             : { strokeTransform: batch.strokeTransform }),
-          paths: [...(existing?.paths ?? []), ...batch.paths],
-        });
-      }
+          paths: batch.paths,
+        },
+      });
     }
   }
-  return ok(grouped);
+  return ok(pieces);
 }
 
 function operationBindingSets(

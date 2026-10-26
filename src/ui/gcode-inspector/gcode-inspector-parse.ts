@@ -1,4 +1,5 @@
 import { createGcodeRenderModelBuilder } from '../../core/gcode-view/gcode-render-model-builder';
+import { createMarlinProgramReader } from '../../core/external-program/marlin-program-reader';
 import { createSegmentBuilder } from '../../core/gcode-view/segment-builder';
 import type {
   AxisBounds,
@@ -70,20 +71,29 @@ export async function inspectGcodeSource(
 // analyses the finished program.
 function createInspectionReader(context: GcodeInspectionContext, observer: InspectionObserver) {
   const options: BuildRenderModelOptions = {
+    ...(context.controllerKind === 'grbl-v1.1' ? { stockGrbl: true } : {}),
     machineKind: context.machineKind,
     laserPowerControl: context.laserPowerControl,
+    ...(context.initialPositionMm === undefined
+      ? {}
+      : { initialPositionMm: context.initialPositionMm }),
+    ...(context.boundsFromStart === true ? { boundsFromStart: true } : {}),
     retainPreciseSegmentLengths: true,
     renderPressureThreshold: INSPECTOR_RENDER_PRESSURE_THRESHOLD,
   };
   const segments = createSegmentBuilder(options.retainPreciseSegmentLengths);
   const builder = createGcodeRenderModelBuilder(options, segments);
   const tools = programToolCollector();
+  const marlin =
+    context.controllerKind === 'marlin' ? createMarlinProgramReader(context.machineKind) : null;
   const preview =
     observer.onPreview === undefined ? null : createPreviewEmitter(segments, observer.onPreview);
   return {
     line: (line: string, fraction: () => number): void => {
-      tools.observe(line);
-      builder.pushLine(line);
+      const interpreted = marlin?.(line);
+      const read = interpreted?.line ?? line;
+      tools.observe(read);
+      builder.pushLine(read, interpreted?.unplaced);
       preview?.line(fraction);
     },
     finish: (sourceIndex: GcodeSourceLineIndex): GcodeInspectorWorkerResult => {

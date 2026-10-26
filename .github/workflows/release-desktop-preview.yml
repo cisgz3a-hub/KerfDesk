@@ -288,6 +288,9 @@ jobs:
       cancel-in-progress: false
     needs: [build-windows, build-macos-x64, build-macos-arm64]
     runs-on: ubuntu-latest
+    # The Preview signing key and R2 token belong in this environment, limited
+    # to v*-preview.* tags, so no branch workflow can read them (ADR-651).
+    environment: desktop-preview
     permissions:
       contents: write
       actions: read

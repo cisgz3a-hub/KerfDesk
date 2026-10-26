@@ -428,6 +428,7 @@ release before it is tagged.
 - **Design and import:** Seam traced closed curves G1 at index 0 (kill the trace cusp) ([#388](https://github.com/cisgz3a-hub/KerfDesk/pull/388))
 - **Design and import:** Round-trip CNC profileLead through project save/load ([#384](https://github.com/cisgz3a-hub/KerfDesk/pull/384))
 - **Design and import:** Lighten completed job-progress trail ([#336](https://github.com/cisgz3a-hub/KerfDesk/pull/336))
+- **Machine and connection:** Show the settings read beside the status dot, toast detected settings only when something changed, and retitle failed reads "Couldn’t read machine settings" ([#1328](https://github.com/cisgz3a-hub/KerfDesk/pull/1328))
 - **Machine and connection:** Send EEPROM-writing lines one at a time, judge FluidNC alarms by FluidNC's own table, and show a grblHAL E-stop or motor fault on the machine rail ([#1315](https://github.com/cisgz3a-hub/KerfDesk/pull/1315))
 - **Machine and connection:** Make saving a selected machine profile easy to find ([#961](https://github.com/cisgz3a-hub/KerfDesk/pull/961))
 - **Machine and connection:** Offer corrected presets and bits in one click, and pin preset versions ([#931](https://github.com/cisgz3a-hub/KerfDesk/pull/931))

@@ -64,9 +64,11 @@ function expectPackagingSourceRefs(text: string): void {
       step.uses?.startsWith('actions/checkout@'),
     );
     expect(checkouts, name).toHaveLength(1);
-    // The aggregate gate judges results with its own workflow revision; every
-    // packaging job builds the commit the caller selected.
-    const expectedRef = name === 'desktop-packaging-gate' ? undefined : '${{ inputs.ref }}';
+    // The aggregate gate and the packaging scope decision run from their own
+    // workflow revision (ADR-647); every packaging job builds the commit the
+    // caller selected.
+    const ownRevision = ['desktop-packaging-gate', 'packaging-scope'].includes(name);
+    const expectedRef = ownRevision ? undefined : '${{ inputs.ref }}';
     expect(checkouts[0]?.with?.ref, name).toBe(expectedRef);
   }
 }

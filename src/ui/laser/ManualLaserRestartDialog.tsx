@@ -3,7 +3,11 @@ import { Dialog, DialogActions } from '../kit';
 import { DraftNumberInput } from '../kit/DraftNumberInput';
 import { LaserRecoveryCanvas } from './LaserRecoveryCanvas';
 import { recoveryRouteFromCanvasPlan } from './laser-recovery-preview-route';
-import { noteManualRestartStarted, type ManualRestartSource } from './manual-restart-source';
+import {
+  manualRestartNotes,
+  noteManualRestartStarted,
+  type ManualRestartSource,
+} from './manual-restart-source';
 import { streamResumeFromRawLine } from './start-job-resume-stream';
 
 const RESTART_HINT =
@@ -17,7 +21,7 @@ export function ManualLaserRestartDialog(props: {
   readonly initialLine: number;
   readonly onClose: () => void;
 }): JSX.Element {
-  const { source: prepared, placementNote } = props.restart;
+  const { source: prepared, placementNote, programNote } = props.restart;
   const maximumLine = prepared.canvasPlan.fingerprint.lines;
   // The preparation already parsed this program; packing it is a linear copy.
   const route = useMemo(
@@ -44,7 +48,8 @@ export function ManualLaserRestartDialog(props: {
         prepared.canvasPlan,
         prepared.laserModeStartSnapshot,
         prepared.controllerSnapshot,
-        placementNote,
+        manualRestartNotes(props.restart),
+        prepared,
       );
       if (started) {
         noteManualRestartStarted(props.restart);
@@ -73,6 +78,7 @@ export function ManualLaserRestartDialog(props: {
         disabled={starting}
         onChange={setFromLine}
       />
+      <p>{programNote}</p>
       <p>{placementNote}</p>
       <ManualRestartExplanation />
       {failure === '' ? null : <p role="alert">{failure}</p>}

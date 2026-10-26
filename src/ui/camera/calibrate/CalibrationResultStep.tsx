@@ -8,7 +8,11 @@ import { withSavedCameraModel } from '../../../core/camera/model/saved-cameras';
 import type { MarkError } from '../../../core/camera/target/bed-calibration';
 import { targetLayoutMismatch } from '../../../core/camera/target/target-coverage';
 import { useStore } from '../../state';
-import { calibrationGrade, type CalibrationGrade } from './calibration-result';
+import {
+  calibrationGrade,
+  LOOSE_HEIGHT_SIGMA_MM,
+  type CalibrationGrade,
+} from './calibration-result';
 import { useCameraCalibrationStore, type CalibrationResult } from './camera-calibration-store';
 import {
   FAIR_RING_MM,
@@ -19,11 +23,9 @@ import {
 import { RgbaCanvas } from './RgbaCanvas';
 import { savedCalibrationVerdict } from './saved-calibration-check';
 import { SavedCalibrationCheckNote } from './SavedCalibrationCheckNote';
+import { markCameraSteady } from '../helpers/moved-check';
+import { saveViewReference } from '../helpers/view-reference';
 import { columnStyle, noteStyle, rowStyle } from './wizard-styles';
-
-// Above this the photo alone leaves the camera height loose enough to shift
-// thick material by a visible amount (ADR-440).
-const HEIGHT_ADVICE_SIGMA_MM = 10;
 
 export function CalibrationResultStep(props: {
   readonly result: CalibrationResult;
@@ -45,7 +47,10 @@ export function CalibrationResultStep(props: {
       <p style={{ margin: 0, fontWeight: 600, color: TONE_COLORS[grade.tone] }}>{grade.headline}</p>
       <AccuracyFigures result={result} />
       {grade.advice === null ? null : <p style={noteStyle}>{grade.advice}</p>}
-      {heightAdvice(result)}
+      {/* The grade already says it when it is about the height alone. */}
+      {record.accuracy.onlyAtTargetHeight === true && grade.tone !== 'rough'
+        ? null
+        : heightAdvice(result)}
       {checking ? null : check}
       <OtherCamerasNote result={result} />
       <BedAccuracyMap result={result} />
@@ -107,7 +112,15 @@ function ResultActions(props: {
         <button
           type="button"
           className={keepFirst ? 'lf-btn lf-btn--primary' : 'lf-btn'}
-          onClick={closeWizard}
+          onClick={() => {
+            // A check that found the camera where it was renews its moved-check view.
+            const reference = props.result.viewReference;
+            if (unchanged && savedCheck.kind === 'measured' && reference !== undefined) {
+              saveViewReference(savedCheck.saved, reference);
+              markCameraSteady();
+            }
+            closeWizard();
+          }}
           title="Close without changing the saved calibration."
         >
           Keep saved calibration
@@ -160,8 +173,7 @@ function Figure(props: { readonly label: string; readonly value: string }): JSX.
 }
 
 function heightAdvice(result: CalibrationResult): JSX.Element | null {
-  if (result.usedMeasuredHeight || result.cameraHeightSigmaMm <= HEIGHT_ADVICE_SIGMA_MM)
-    return null;
+  if (result.usedMeasuredHeight || result.cameraHeightSigmaMm <= LOOSE_HEIGHT_SIGMA_MM) return null;
   return (
     <p style={noteStyle}>
       The camera looks almost straight down, so one photo cannot tell its height to better than ±
@@ -179,18 +191,26 @@ function BedAccuracyMap(props: { readonly result: CalibrationResult }): JSX.Elem
   const bedWidth = useStore((s) => s.project.device.bedWidth);
   const bedHeight = useStore((s) => s.project.device.bedHeight);
   if (bedImage === null) return null;
+  // A head camera's review shows only the target and its surroundings, so the
+  // dots are placed in that part of the bed, not the whole of it.
+  const region = props.result.bedImageRegion ?? {
+    x: 0,
+    y: 0,
+    width: bedWidth,
+    height: bedHeight,
+  };
   return (
     <figure style={mapStyle}>
       <div style={mapFrameStyle}>
         <RgbaCanvas image={bedImage} alt="Camera photo flattened onto the bed" />
         <svg
-          viewBox={`0 0 ${bedWidth} ${bedHeight}`}
+          viewBox={`${region.x} ${region.y} ${region.width} ${region.height}`}
           preserveAspectRatio="none"
           style={mapOverlayStyle}
           aria-hidden="true"
         >
           {markErrors.map((mark) => (
-            <RingMark key={`${mark.x},${mark.y}`} mark={mark} bedWidth={bedWidth} />
+            <RingMark key={`${mark.x},${mark.y}`} mark={mark} regionWidth={region.width} />
           ))}
         </svg>
       </div>
@@ -203,9 +223,9 @@ function BedAccuracyMap(props: { readonly result: CalibrationResult }): JSX.Elem
   );
 }
 
-function RingMark(props: { readonly mark: MarkError; readonly bedWidth: number }): JSX.Element {
+function RingMark(props: { readonly mark: MarkError; readonly regionWidth: number }): JSX.Element {
   const { mark } = props;
-  const radius = props.bedWidth / 120;
+  const radius = props.regionWidth / 120;
   const error = Math.hypot(mark.dxMm, mark.dyMm);
   if (mark.rejected) {
     return (

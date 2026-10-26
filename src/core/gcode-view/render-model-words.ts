@@ -6,6 +6,7 @@
 import { applySharedGCode, INCH_TO_MM } from '../gcode';
 import type { GcodeWordMatch } from '../gcode';
 import { CANNED_CYCLES, type CannedCycle, type RetractMode } from './canned-cycle';
+import { settleOffsetK } from './render-model-offset-k';
 import type { ProgramEvent } from './render-model-types';
 
 export type RenderModal = {
@@ -84,7 +85,7 @@ export type WordAccounting = {
   readonly pushEvent: (event: ProgramEvent) => void;
 };
 
-const AXIS_LETTERS = new Set(['X', 'Y', 'Z', 'I', 'J', 'R']);
+const AXIS_LETTERS = new Set(['X', 'Y', 'Z', 'I', 'J', 'K', 'R']);
 const WCS_FIRST = 54;
 const WCS_LAST = 59;
 
@@ -156,6 +157,7 @@ export function applyLineWords(
     blockUnitScale: blockUnitScale(words, modal.unitScale),
   };
   for (const word of words) applyOneWord(word, context);
+  settleOffsetK(modal, tally, line, accounting.countUnsupported);
   resolveDwell(tally, line, accounting);
   if (modal.cycle === 82 && !tally.sawDwell && tally.dwellSeconds !== null) {
     modal.cycleP = tally.dwellSeconds;

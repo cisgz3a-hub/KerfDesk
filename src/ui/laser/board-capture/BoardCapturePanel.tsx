@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { deviceForActiveHead } from '../../../core/cnc/cnc-head-feeds';
-import { Button, Icon } from '../../kit';
-import { TutorialButton } from '../../tutorials/TutorialButton';
+import type { BoardOutlineDraft } from '../../../core/scene';
 import { useStore } from '../../state';
 import { inferCurrentMachinePosition } from '../../state/infer-machine-position';
 import { useLaserStore } from '../../state/laser-store';
 import { useUiStore } from '../../state/ui-store';
 import { BoardAnchorOverlay } from './BoardAnchorOverlay';
 import { BoardCapturePhase } from './BoardCapturePhase';
+import { BoardCaptureFloatingPanel } from './BoardCaptureFloatingPanel';
+import type { FloatingBoardPanelPosition } from './use-floating-board-panel';
 import { BoardShapeToggle } from './BoardShapeToggle';
 import { capturedBoardOutlineMatches } from './captured-board-outline';
 import {
@@ -15,9 +16,12 @@ import {
   type BoardCapture,
   type BoardRegistrationEpoch,
 } from './use-board-capture';
-import { useBoardCaptureHandlers, type BoardCaptureHandlers } from './use-board-capture-handlers';
+import type { BoardCaptureHandlers } from './use-board-capture-handlers';
 import { useBoardVerification, type BoardVerificationController } from './use-board-verification';
 import { useCaptureGating } from './use-capture-gating';
+import { useBoardRemoteRegistration } from './use-board-remote-registration';
+import { usePendingBoardPhoto } from './use-board-photo-inbox';
+import { useBoardPanelHandlers } from './use-board-panel-handlers';
 
 const BOARD_JOG_FEED_MM_PER_MIN = 3000;
 
@@ -31,45 +35,48 @@ const BOARD_JOG_FEED_MM_PER_MIN = 3000;
 export function BoardCapturePanel(): JSX.Element | null {
   const open = useUiStore((state) => state.boardCapturePanelOpen);
   const capture = useBoardCapture();
+  const panelPosition = useRef<FloatingBoardPanelPosition | null>(null);
   const [bodyMounted, setBodyMounted] = useState(open);
   const release = useCallback(() => setBodyMounted(false), []);
   if (open && !bodyMounted) setBodyMounted(true);
   if (!open && !bodyMounted) return null;
-  return <BoardCapturePanelBody open={open} capture={capture} onRelease={release} />;
+  return (
+    <BoardCapturePanelBody
+      open={open}
+      capture={capture}
+      onRelease={release}
+      panelPosition={panelPosition}
+    />
+  );
 }
+
+type BoardCapturePanelBodyProps = {
+  readonly open: boolean;
+  readonly capture: BoardCapture;
+  readonly onRelease: () => void;
+  readonly panelPosition: React.MutableRefObject<FloatingBoardPanelPosition | null>;
+};
 
 function BoardCapturePanelBody({
   open,
   capture,
   onRelease,
-}: {
-  readonly open: boolean;
-  readonly capture: BoardCapture;
-  readonly onRelease: () => void;
-}): JSX.Element | null {
+  panelPosition,
+}: BoardCapturePanelBodyProps): JSX.Element | null {
   const close = useUiStore((state) => state.closeBoardCapturePanel);
   const livePosition = useLiveMachinePosition();
   const currentEpoch = useCurrentRegistrationEpoch();
   const motionActive = useLaserStore((state) => state.motionOperation !== null);
-  const setOriginHere = useLaserStore((state) => state.setOriginHere);
   const jogToMachinePosition = useLaserStore((state) => state.jogToMachinePosition);
   const device = useStore((state) => state.project.device);
   const machine = useStore((state) => state.project.machine);
-  const addCapturedBoard = useStore((state) => state.addCapturedBoard);
-  const updateCapturedBoard = useStore((state) => state.updateCapturedBoard);
   const { connected, disabled } = useCaptureGating();
   const feed = Math.min(deviceForActiveHead(device, machine).maxFeed, BOARD_JOG_FEED_MM_PER_MIN);
   const { geometry, registrationEpoch, outlineId, committed } = capture.state;
   const outlineValid = useStore((state) =>
     capturedBoardOutlineMatches(state.project.scene, outlineId, geometry),
   );
-  const handlers = useBoardCaptureHandlers({
-    capture,
-    livePosition,
-    setOriginHere,
-    addCapturedBoard,
-    updateCapturedBoard,
-  });
+  const handlers = useBoardPanelHandlers(capture, livePosition, device);
   const interactionDisabled = disabled || handlers.busy;
   const sessionDisabled = handlers.busy || motionActive;
   const verification = useBoardVerification({
@@ -82,19 +89,24 @@ function BoardCapturePanelBody({
     onCorrect: handlers.onCorrectBoardPoint,
   });
   const panelLocked = sessionDisabled || verification.saving || verification.cancelling;
+  useBoardRemoteRegistration(open, capture, handlers, currentEpoch, handlers.busy);
+  const pendingPhoto = usePendingBoardPhoto(capture, committed, motionActive);
   useKeepBoardPanelOpenWhileBusy(open, verification, handlers.busy, onRelease);
-  const reset = (): void => {
-    if (panelLocked || useLaserStore.getState().motionOperation !== null) return;
-    verification.cancel();
-    capture.reset();
-  };
 
   if (!open) return null;
   return (
     <>
-      <section aria-label="Place board" className="lf-chip" style={panelStyle}>
-        <PanelHeader disabled={panelLocked} onClose={close} />
-        <PanelMessages connected={connected} handlers={handlers} />
+      <BoardCaptureFloatingPanel
+        busy={panelLocked}
+        checkActive={verification.activeTarget !== null}
+        onClose={close}
+        rememberedPosition={panelPosition}
+      >
+        <PanelMessages
+          connected={connected}
+          handlers={handlers}
+          remotePhotoWaiting={pendingPhoto.waitingWhileCommitted}
+        />
         <BoardCapturePanelContent
           capture={capture}
           geometry={geometry}
@@ -105,9 +117,11 @@ function BoardCapturePanelBody({
           verification={verification}
           feed={feed}
           jogToMachinePosition={jogToMachinePosition}
-          onReset={reset}
+          onReset={() => resetBoardCapture(panelLocked, verification, capture)}
+          outlineInitialFile={pendingPhoto.initialFile}
+          onOutlineInitialFileConsumed={pendingPhoto.consumeInitialFile}
         />
-      </section>
+      </BoardCaptureFloatingPanel>
       <CommittedBoardOverlay
         committed={committed}
         geometry={geometry}
@@ -117,6 +131,16 @@ function BoardCapturePanelBody({
       />
     </>
   );
+}
+
+function resetBoardCapture(
+  panelLocked: boolean,
+  verification: BoardVerificationController,
+  capture: BoardCapture,
+): void {
+  if (panelLocked || useLaserStore.getState().motionOperation !== null) return;
+  verification.cancel();
+  capture.reset();
 }
 
 function useLiveMachinePosition(): ReturnType<typeof inferCurrentMachinePosition> {
@@ -144,8 +168,10 @@ function BoardCapturePanelContent(props: {
   readonly feed: number;
   readonly jogToMachinePosition: (x: number, y: number, feed: number) => Promise<void>;
   readonly onReset: () => void;
+  readonly outlineInitialFile?: File | undefined;
+  readonly onOutlineInitialFileConsumed: () => void;
 }): JSX.Element {
-  const { state, setShape, setCircleMethod, undo } = props.capture;
+  const { state, setShape, setCircleMethod, setOutlineDraft, undo } = props.capture;
   const changeShape = (shapeKind: typeof state.shapeKind): void => {
     if (!captureSessionMotionActive()) setShape(shapeKind);
   };
@@ -154,6 +180,17 @@ function BoardCapturePanelContent(props: {
   };
   const undoCapture = (): void => {
     if (!captureSessionMotionActive()) undo();
+  };
+  // Canvas first (ADR-654): the drawn outline goes on the canvas at once, so
+  // artwork can be laid out on it before the head registers where it sits.
+  const drawOutline = (draft: BoardOutlineDraft): void => {
+    if (captureSessionMotionActive()) return;
+    setOutlineDraft(draft);
+    useStore.getState().drawCapturedBoardOutline({
+      kind: 'outline',
+      pointsMm: draft.localPointsMm,
+      anchorIndices: draft.anchorIndices,
+    });
   };
   return (
     <>
@@ -168,6 +205,7 @@ function BoardCapturePanelContent(props: {
         committed={state.committed}
         shapeKind={state.shapeKind}
         circleMethod={state.circleMethod}
+        outlineDraft={state.outlineDraft}
         corners={state.corners}
         geometry={props.geometry}
         rect={props.handlers.rect}
@@ -182,6 +220,10 @@ function BoardCapturePanelContent(props: {
         onFinishRect={props.handlers.onFinishRect}
         onManualSize={props.handlers.onManualSize}
         onFinishCircle={props.handlers.onFinishCircle}
+        onFinishOutline={props.handlers.onFinishOutline}
+        onOutlineDraft={drawOutline}
+        outlineInitialFile={props.outlineInitialFile}
+        onOutlineInitialFileConsumed={props.onOutlineInitialFileConsumed}
         onReset={props.onReset}
       />
     </>
@@ -248,33 +290,19 @@ function useKeepBoardPanelOpenWhileBusy(
   }, [captureBusy, open, verification, onRelease]);
 }
 
-function PanelHeader(props: {
-  readonly disabled: boolean;
-  readonly onClose: () => void;
-}): JSX.Element {
-  return (
-    <header style={headerStyle}>
-      <strong>Place Board</strong>
-      <TutorialButton tutorialId="board" compact label="Place board" />
-      <Button
-        variant="ghost"
-        aria-label="Close board capture panel"
-        disabled={props.disabled}
-        onClick={props.onClose}
-      >
-        <Icon name="close" size={16} />
-      </Button>
-    </header>
-  );
-}
-
 function PanelMessages(props: {
   readonly connected: boolean;
   readonly handlers: BoardCaptureHandlers;
+  readonly remotePhotoWaiting: boolean;
 }): JSX.Element {
   return (
     <>
       {!props.connected && <p style={hintStyle}>Connect the machine to capture a board.</p>}
+      {props.remotePhotoWaiting && (
+        <p style={noticeStyle} role="status">
+          A photo arrived from a remote client. Start a new board capture to use it.
+        </p>
+      )}
       {props.handlers.captureError !== null && (
         <p style={errorHintStyle} role="alert">
           {props.handlers.captureError}
@@ -308,28 +336,6 @@ function CommittedBoardOverlay(props: {
     />
   );
 }
-
-const panelStyle: React.CSSProperties = {
-  position: 'absolute',
-  zIndex: 5,
-  top: 12,
-  left: 12,
-  width: 280,
-  maxHeight: 'calc(100% - 24px)',
-  overflowY: 'auto',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 6,
-  padding: 12,
-  boxShadow: 'var(--lf-shadow)',
-  pointerEvents: 'auto',
-  fontSize: 13,
-};
-const headerStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-};
 const hintStyle: React.CSSProperties = {
   margin: 0,
   fontSize: 12,

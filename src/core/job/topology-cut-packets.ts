@@ -1,8 +1,16 @@
 // Only new explicitly scoped Jobs enter this planner. Historical nesting alone never opts in.
 import type { ProjectOptimizationSettings, Vec2 } from '../scene';
 import type { Origin } from '../devices';
-import { directionalSegmentOrder, sweepKey } from './directional-order';
+import { directionalSegmentOrder, sweepKey, sweepOrder as sweepIndices } from './directional-order';
+import {
+  insideFirstHolds,
+  releaseHolds,
+  waitingCounts,
+  type InsideFirstHolds,
+} from './inside-first-holds';
 import type { CutGroup, CutSegment, FillGroup, Group } from './job';
+import { refineRoute } from './route-refine';
+import { polylineBounds, type SegmentBounds } from './segment-bounds';
 import {
   collectSegmentEntries,
   configuredSegmentOrder,
@@ -11,7 +19,7 @@ import {
 import { createNearestEntryQuery } from './segment-entry-index';
 import { removeCutOverlaps } from './remove-cut-overlaps';
 import { containmentDepths } from './containment-depth';
-import { cleanupTopologyRoute, type PlannedCutPart } from './topology-cut-cleanup';
+import { cleanupTopologyRoute, mergedOutlines, type PlannedCutPart } from './topology-cut-cleanup';
 
 type Settings = Pick<ProjectOptimizationSettings, 'insideFirst' | 'pathDirection' | 'startPoint'> &
   Partial<
@@ -130,31 +138,69 @@ function orderSinglePass(group: CutGroup, settings: Settings, cursor: Vec2 | nul
             insideFirst: settings.insideFirst,
             allowsReverse: settings.pathDirection === 'allow-reverse',
           })
-        : configuredSegmentOrder(group.segments, settings, cursor ?? undefined),
+        : configuredSegmentOrder(group.segments, settings, cursor ?? undefined, {
+            returnTo: startCursorForSegments(group.segments, settings.startPoint),
+            pinFirst: cursor !== null,
+          }),
   };
   return settings.removeOverlappingLines === true
     ? removeCutOverlaps(ordered, settings.overlapMergeToleranceMm ?? 0)
     : ordered;
 }
 
+// Part by part (ADR-669): a packet is ready once no deeper packet inside its
+// bounds is waiting, then the nearest (or next-in-sweep) ready packet is cut.
+// The nearest-neighbour route is refined as whole packets, each keeping the
+// passes and contour route it was planned with.
 function planPacketRoute(
   packets: ReadonlyArray<Packet>,
   origins: ReadonlyMap<CutGroup, CutGroup>,
   settings: Settings,
   lineCursor: Vec2 | null,
 ): PlannedCutPart[] {
-  const all = packets.flatMap(packetSegments);
-  let cursor = lineCursor ?? startCursorForSegments(all, settings.startPoint);
-  const depths = [...new Set(packets.map((packet) => packet.depth))].sort((a, b) => b - a);
-  const route: PlannedCutPart[] = [];
-  for (const depth of depths) {
-    const peers = packets.filter((packet) => packet.depth === depth);
-    const next = peerPicker(peers, settings, lineCursor);
-    for (;;) {
-      const pick = next(cursor);
-      if (pick === undefined) break;
-      const packet = peers[pick];
+  const seed = startCursorForSegments(packets.flatMap(packetSegments), settings.startPoint);
+  const start = lineCursor ?? seed;
+  const holds = packetHolds(packets);
+  const planned = routePackets(packets, origins, settings, lineCursor, start, holds);
+  const blocks =
+    planned ??
+    routePackets(packets, origins, settings, lineCursor, start, undefined) ??
+    ([] as PlannedCutPart[][]);
+  const sweeps = settings.cutDirection !== undefined && lineCursor === null;
+  if (planned === null || sweeps) return blocks.flat();
+  return refineBlocks(blocks, start, seed, lineCursor !== null, holds).flat();
+}
+
+type PlannedBlock = PlannedCutPart[] & { readonly packet?: number };
+
+// One block of planned parts per packet, in visiting order. With holds, null
+// when a held packet was left unplaced; without, the former depth-major route.
+function routePackets(
+  packets: ReadonlyArray<Packet>,
+  origins: ReadonlyMap<CutGroup, CutGroup>,
+  settings: Settings,
+  lineCursor: Vec2 | null,
+  start: Vec2,
+  holds: InsideFirstHolds | undefined,
+): PlannedBlock[] | null {
+  let cursor = start;
+  const blocks: PlannedBlock[] = [];
+  const placed = new Set<number>();
+  const subsets =
+    holds === undefined
+      ? [...new Set(packets.map((packet) => packet.depth))]
+          .sort((a, b) => b - a)
+          .map((depth) =>
+            packets.flatMap((packet, index) => (packet.depth === depth ? [index] : [])),
+          )
+      : [packets.map((_, index) => index)];
+  for (const members of subsets) {
+    const next = packetPicker(packets, members, settings, lineCursor, holds);
+    for (let pick = next(cursor); pick !== undefined; pick = next(cursor)) {
+      placed.add(pick);
+      const packet = packets[pick];
       if (packet === undefined) continue;
+      const block: PlannedCutPart[] = [];
       // Group passes stay intact: all main passes finish before this parent's low-power passes.
       for (const group of [...packet.main, ...packet.tabs]) {
         const segments = configuredSegmentOrder(
@@ -162,54 +208,144 @@ function planPacketRoute(
           { ...settings, insideFirst: packet.original },
           cursor,
         );
-        route.push({
+        block.push({
           group: { ...group, segments },
           source: origins.get(group) ?? group,
-          depth,
+          depth: packet.depth,
           withoutTabs: !packet.original && packet.tabs.length === 0,
         });
         cursor = segments.at(-1)?.polyline.at(-1) ?? cursor;
       }
+      blocks.push(Object.assign(block, { packet: pick }));
     }
   }
-  return route;
+  // A packet without a usable entry is never placed, as before ADR-669; one
+  // that was also held back may have left its container waiting.
+  const stalled =
+    holds !== undefined &&
+    packets.some((_, index) => !placed.has(index) && (holds.heldBy[index]?.length ?? 0) > 0);
+  return stalled ? null : blocks;
 }
 
-// The next packet at one depth: in the Cut direction sweep when one is set
-// (and no Line burn start), otherwise the nearest entry to the head.
-function peerPicker(
-  peers: ReadonlyArray<Packet>,
+// Packets that cut something inside a shallower packet's bounds hold it back.
+// A packet of original (open) segments encloses nothing.
+function packetHolds(packets: ReadonlyArray<Packet>): InsideFirstHolds {
+  return insideFirstHolds(
+    packets.map((packet) => {
+      const members = packetSegments(packet).map((segment) => polylineBounds(segment.polyline));
+      return {
+        depth: packet.depth,
+        container: packet.original ? null : unionBounds(members),
+        members,
+      };
+    }),
+  );
+}
+
+function unionBounds(boxes: ReadonlyArray<SegmentBounds | null>): SegmentBounds | null {
+  let union: SegmentBounds | null = null;
+  for (const box of boxes) {
+    if (box === null) continue;
+    union =
+      union === null
+        ? box
+        : {
+            minX: Math.min(union.minX, box.minX),
+            minY: Math.min(union.minY, box.minY),
+            maxX: Math.max(union.maxX, box.maxX),
+            maxY: Math.max(union.maxY, box.maxY),
+          };
+  }
+  return union;
+}
+
+// The next packet among `members`: in the Cut direction sweep when one is set
+// (and no Line burn start), otherwise the nearest ready entry to the head.
+function packetPicker(
+  packets: ReadonlyArray<Packet>,
+  members: ReadonlyArray<number>,
   settings: Settings,
   lineCursor: Vec2 | null,
+  holds: InsideFirstHolds | undefined,
 ): (cursor: Vec2) => number | undefined {
-  const sweep = sweepOrder(peers, settings, lineCursor);
-  if (sweep !== null) return () => sweep.shift();
+  const subset = members.map((index) => packets[index] as Packet);
+  const sweep = sweepOrder(subset, settings, lineCursor, holds);
+  if (sweep !== null) {
+    let next = 0;
+    return () => members[sweep[next++] ?? -1];
+  }
   const nearest = createNearestEntryQuery(
-    peers.flatMap((packet, index) =>
-      collectSegmentEntries(packetSegments(packet), {
+    members.flatMap((index) =>
+      collectSegmentEntries(packetSegments(packets[index] as Packet), {
         allowsReverse: settings.pathDirection === 'allow-reverse',
         closedShapeStart: settings.closedShapeStart ?? 'drawn',
       }).map((entry) => ({ ...entry, segmentIndex: index })),
     ),
   );
   const placed = new Set<number>();
+  const waiting = holds?.any === true ? waitingCounts(holds) : null;
+  const isEligible = waiting === null ? undefined : (index: number) => waiting[index] === 0;
   return (cursor) => {
-    const pick = nearest(cursor, (index) => !placed.has(index))?.segmentIndex;
-    if (pick !== undefined) placed.add(pick);
+    const pick = nearest(cursor, (index) => !placed.has(index), isEligible)?.segmentIndex;
+    if (pick === undefined) return undefined;
+    placed.add(pick);
+    if (waiting !== null && holds !== undefined) releaseHolds(holds, waiting, pick);
     return pick;
   };
 }
-// With a Cut direction (and no Line burn start), packets at one depth run in
-// the sweep instead of nearest first. Null keeps the nearest-first route.
+
+// With a Cut direction (and no Line burn start), packets run in the sweep
+// instead of nearest first. Null keeps the nearest-first route. `holds` is
+// indexed like `peers` (all packets, or none for a depth subset).
 function sweepOrder(
   peers: ReadonlyArray<Packet>,
   settings: Settings,
   lineCursor: Vec2 | null,
+  holds: InsideFirstHolds | undefined,
 ): number[] | null {
   if (settings.cutDirection === undefined || lineCursor !== null) return null;
   const key = sweepKey(settings.cutDirection, settings.origin ?? 'front-left');
   const keys = peers.map((packet) => Math.min(...packetSegments(packet).map(key)));
-  return peers.map((_, index) => index).sort((a, b) => (keys[a] ?? 0) - (keys[b] ?? 0) || a - b);
+  return sweepIndices(keys, holds?.holds.length === peers.length ? holds : undefined);
+}
+
+// Reorders whole packet blocks; each keeps its parts, passes and contour route.
+function refineBlocks(
+  blocks: ReadonlyArray<PlannedBlock>,
+  start: Vec2,
+  returnTo: Vec2,
+  pinFirst: boolean,
+  holds: InsideFirstHolds,
+): ReadonlyArray<PlannedBlock> {
+  const ends = blocks.map((block) => {
+    const segments = block.flatMap((part) => part.group.segments);
+    return { entry: segments[0]?.polyline[0], exit: segments.at(-1)?.polyline.at(-1) };
+  });
+  if (ends.some((end) => end.entry === undefined || end.exit === undefined)) return blocks;
+  const position = new Map(blocks.map((block, at) => [block.packet, at]));
+  const remap = (list: ReadonlyArray<number>): number[] =>
+    list.flatMap((packet) => {
+      const at = position.get(packet);
+      return at === undefined ? [] : [at];
+    });
+  const refined = refineRoute(
+    ends.map((end) => ({ entry: end.entry as Vec2, exit: end.exit as Vec2, flippable: false })),
+    {
+      start,
+      returnTo,
+      pinFirst,
+      ...(holds.any
+        ? {
+            holds: {
+              holds: blocks.map((block) => remap(holds.holds[block.packet ?? -1] ?? [])),
+              heldBy: blocks.map((block) => remap(holds.heldBy[block.packet ?? -1] ?? [])),
+              any: true,
+            },
+          }
+        : {}),
+    },
+  );
+  return refined === null ? blocks : refined.order.map((at) => blocks[at] as PlannedBlock);
 }
 
 function coalescePeerParts(route: ReadonlyArray<PlannedCutPart>): CutGroup[] {
@@ -229,6 +365,7 @@ function coalescePeerParts(route: ReadonlyArray<PlannedCutPart>): CutGroup[] {
       out[out.length - 1] = {
         ...previous,
         segments: [...previous.segments, ...part.group.segments],
+        ...mergedOutlines(previous, part.group),
       };
     else out.push(part.group);
     last = part;

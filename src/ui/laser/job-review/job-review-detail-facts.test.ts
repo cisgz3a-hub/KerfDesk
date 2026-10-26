@@ -204,6 +204,8 @@ describe('cncOperationDetail', () => {
       ...DEFAULT_CNC_LAYER_SETTINGS,
       depthMm: 19.05, // 3/4"
       depthPerPassMm: 1.5875, // 1/16"
+      // Tabs would add their own level at -17.05 mm (F4-P3-1).
+      tabsEnabled: false,
     };
     expect(cncOperationDetail(settings)).toContain('12 passes');
   });
@@ -319,8 +321,9 @@ describe('cncOperationDetail', () => {
       'relief roughing 2 levels to 2.5 mm · 1 pass on the other shapes · stepover 40% · tabs 4 per shape (6 × 2 mm), none on reliefs · Manual feeds',
     );
     const through: CncLayerSettings = { ...DEFAULT_CNC_LAYER_SETTINGS, depthMm: 19 };
+    // 13 levels of 1.5 mm plus the tab top at -17 mm (F4-P3-1).
     expect(cncOperationDetail(through, 19, [], mixed)).toContain(
-      '13 passes on the other shapes · stepover 40% · tabs 4 per shape (6 × 2 mm) above the stock bottom, none on reliefs',
+      '14 passes on the other shapes · stepover 40% · tabs 4 per shape (6 × 2 mm) above the stock bottom, none on reliefs',
     );
     // Tabs that no shape keeps need no relief note.
     expect(cncOperationDetail(DEFAULT_CNC_LAYER_SETTINGS, 18, [], mixed)).toContain(

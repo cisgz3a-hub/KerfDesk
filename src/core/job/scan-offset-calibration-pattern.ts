@@ -14,6 +14,7 @@ import {
   createCalibrationLabelLayer,
   createCalibrationLabelObject,
 } from './calibration-labels';
+import { MIN_HATCH_SPACING_MM } from './fill-hatching';
 
 const MIN_STEPS = 1;
 const MAX_STEPS = 10;
@@ -21,7 +22,6 @@ const MIN_SPEED_MM_MIN = 1;
 const MIN_POWER_PERCENT = 0;
 const MAX_POWER_PERCENT = 100;
 const MIN_SWATCH_SIZE_MM = 1;
-const MIN_HATCH_SPACING_MM = 0.05;
 const DEFAULT_HATCH_SPACING_MM = 0.2;
 const DEFAULT_OVERSCAN_MM = 5;
 const DEFAULT_GAP_MM = 4;

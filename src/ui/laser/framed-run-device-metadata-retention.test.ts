@@ -233,7 +233,7 @@ describe('completed Frame retention across descriptive device metadata', () => {
     ['air restart strategy', { airAssistRestartUnreliable: true }],
     ['controlled tool-off feed', { controlledLaserOffTravelFeedMmPerMin: 800 }],
     ['laser-mode profile hint', { laserModeEnabled: false }],
-    ['autofocus button command', { autofocusCommand: 'G30' }],
+    ['autofocus button command', { autofocusCommand: 'G38.2 Z-10 F100' }],
     ['Fire button configuration', { fireControl: { enabled: true, maxPowerPercent: 3 } }],
   ])(
     'retains spatial Frame and refreshes exact preparation when %s changes',

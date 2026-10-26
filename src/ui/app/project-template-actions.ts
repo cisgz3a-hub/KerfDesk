@@ -11,6 +11,7 @@ import { loadedMachineCapabilityWarningMessage } from '../machine/machine-capabi
 import type { ToastVariant } from '../state/toast-store';
 import type { ProjectOpenCompletionContext } from './project-open-completion';
 import { claimProjectOpenRequest } from './project-open-request-owner';
+import { pickPreparedSaveTarget } from './pick-prepared-save-target';
 import { portableProjectAssets } from './portable-project-assets';
 import type { PagedRasterAssetReader } from '../import/paged-raster-hydration';
 import { createProjectSaveWriteCoordinator } from '../state/project-save-write-coordinator';
@@ -68,6 +69,7 @@ export async function openTemplateFile(
     return;
   }
   const loaded = ctx.setProject(project);
+  if (loaded.kind === 'job-machine-locked') return;
   if (loaded.kind === 'desktop-required') {
     describePendingProProject(project, file.name);
     return;
@@ -100,15 +102,20 @@ export async function saveProjectTemplate(ctx: {
     // Capture and validate before the picker can outlive this document.
     const prepared = prepareProjectForPersistence(ctx.project);
     if (prepared.kind !== 'ok') throw new Error(prepared.reason);
-    // Open inside the original user gesture; large asset reads happen afterwards.
-    const target = await ctx.platform.pickFileForSave({
-      suggestedName: `${(ctx.savedName ?? 'untitled.lf2').replace(/\.lf2$/i, '')}.lf2template`,
-      extensions: ['.lf2template'],
-    });
-    if (target === null) return;
+    // The picker empties an existing file as it returns (ADR-656), so assets
+    // are read and the template sealed first; a slow read asks for a fresh click.
     const portable = await portableProjectAssets(prepared.project, ctx.assetReader);
     await projectSealReady();
     const json = serializeProjectTemplate(portable, sealProjectText);
+    const target = await pickPreparedSaveTarget(
+      ctx.platform,
+      {
+        suggestedName: `${(ctx.savedName ?? 'untitled.lf2').replace(/\.lf2$/i, '')}.lf2template`,
+        extensions: ['.lf2template'],
+      },
+      { title: 'Save as template', message: 'The template is ready.' },
+    );
+    if (target === null) return;
     await writer.write(target, json, (error) => {
       if (isCurrent())
         ctx.pushToast(

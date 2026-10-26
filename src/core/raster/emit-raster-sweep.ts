@@ -56,9 +56,19 @@ type RasterSweepEmission = {
   readonly lines: ReadonlyArray<string>;
   /** An engraving F word was actually written, rather than only a seek. */
   readonly feedEmitted: boolean;
-  /** Under M3 the sweep ends on a burn, so a stop right after it would be lit. */
+  /** Under M3, or with `stopKeepsPower`, the last move that moved the head was
+   *  a burn, so a stop right after the sweep would be lit. */
   readonly endsLit: boolean;
   readonly head: RasterControllerHead;
+};
+
+/** What the group's earlier lines left at a sweep's start. */
+export type RasterSweepIncoming = {
+  readonly head: RasterControllerHead | null;
+  /** The group's opening still waits for its first laser-off travel (OR-1). */
+  readonly deferredOpening: boolean;
+  /** A stop here would be lit (see RasterSweepEmission.endsLit). */
+  readonly lit: boolean;
 };
 
 export function emitSpanSweep(
@@ -70,8 +80,7 @@ export function emitSpanSweep(
   reverse: boolean,
   sweepPlan: RasterRowSweepPlan,
   dotWidthCorrectionMm: number,
-  previousHead: RasterControllerHead | null,
-  deferredOpening: boolean,
+  incoming: RasterSweepIncoming,
 ): RasterSweepEmission {
   // Under M3 a motion line that does not move the head drains GRBL's planner
   // with the beam still at the last run's power (GRBL motion_control.c:67-76,
@@ -79,6 +88,14 @@ export function emitSpanSweep(
   // laser-off or not (2026-09-25 controller audit, OR-1). Under M4 the stop is
   // dark and the historical bytes stay.
   const constantPower = input.laserModeCommand === 'M3';
+  // Marlin (`stopKeepsPower`) runs the M4 body as continuous power, which stays
+  // lit at a stop, and plans no block for a move that does not move the head
+  // (planner.cpp:2247-2248), so that move's S0 is never applied (stepper.cpp
+  // :2574-2584). Its bytes stay those of M4; the sweep only reports a lit
+  // ending, so the group's closing M5 can wait for a dark move (ADR-398
+  // Amendment 2).
+  const reportsLitStop = constantPower || input.stopKeepsPower === true;
+  const { head: previousHead, deferredOpening } = incoming;
   const style = motionWordStyleFor(input.compactMotionWords ?? false);
   // One writer per sweep: every row opens with a travel that states its motion
   // word and both axes, so nothing is ever held across a row boundary. (Only an
@@ -114,7 +131,8 @@ export function emitSpanSweep(
     // A controlled G1 seek changes F; reassert engraving feed after it.
     feedPending: emitFeed || input.controlledLaserOffTravelFeedMmPerMin !== undefined,
     feedEmitted: false,
-    endsOnBurn: false,
+    // An opening travel to where the head already is leaves the beam as it was.
+    endsOnBurn: incoming.lit && previousHead !== null && sameRasterHead(startHead, previousHead),
   };
   const formatting = { input, feed, writer, style, line, constantPower, deferredOpening };
   const pushRun = (x: number, s: number): void =>
@@ -140,7 +158,7 @@ export function emitSpanSweep(
   return {
     lines: state.lines,
     feedEmitted: state.feedEmitted,
-    endsLit: constantPower && state.endsOnBurn,
+    endsLit: reportsLitStop && state.endsOnBurn,
     head: state.head,
   };
 }
@@ -154,6 +172,8 @@ type SweepState = {
   prevS: number;
   feedPending: boolean;
   feedEmitted: boolean;
+  /** The last line that moved the head was a burn. A line that does not move
+   *  it (written under M4 only) leaves this as it was. */
   endsOnBurn: boolean;
 };
 
@@ -179,9 +199,9 @@ function pushRasterRun(state: SweepState, x: number, s: number, formatting: Swee
   state.feedEmitted ||= state.feedPending || formatting.input.modalFeedrate === false;
   state.feedPending = false;
   state.prevS = s;
+  if (!sameRasterHead(target, state.head)) state.endsOnBurn = s > 0;
   state.head = target;
   state.headScanX = line.scanX(x);
-  state.endsOnBurn = s > 0;
 }
 
 function closeRasterSweep(
@@ -203,9 +223,9 @@ function closeRasterSweep(
     formatLaserOffG1(x, feed, state.feedPending, input.modalFeedrate ?? true, formatting),
   );
   state.feedEmitted ||= state.feedPending || input.modalFeedrate === false;
+  if (!sameRasterHead(closeHead, state.head)) state.endsOnBurn = false;
   state.head = closeHead;
   state.headScanX = line.scanX(x);
-  state.endsOnBurn = false;
 }
 
 function writesRowClose(
@@ -220,7 +240,7 @@ function writesRowClose(
 // The row's closing move. Under M4 its X word is written even when the head
 // already sits there, so the line stays a motion block that darkens the beam
 // rather than a bare modal `S0` (under M3 that zero-length close is not
-// written at all; see emitSpanSweep).
+// written at all, and Marlin drops it without darkening; see emitSpanSweep).
 function formatLaserOffG1(
   x: number,
   feed: number,

@@ -23,15 +23,18 @@ export function laserModeStartAcknowledgementRequired(
   return !laserModeStartSnapshotIsVerified(snapshot, project.device.maxPowerS);
 }
 
+/** `prompt` is the acknowledgement text; an external run cites its own Run
+ * review instead of Job Review (ADR-630 Amendment 4). */
 export function confirmLaserModeStartEvidence(
   project: Project,
   snapshot: LaserModeStartSnapshot,
   confirm: (message: string) => boolean,
   gcode = '',
+  prompt = LASER_MODE_UNVERIFIED_START_PROMPT,
 ): LaserModeStartEvidence | null | undefined {
   if (machineKindOf(project.machine) !== 'laser') return undefined;
   const acknowledgementRequired = laserModeStartAcknowledgementRequired(project, snapshot, gcode);
-  if (acknowledgementRequired && !confirm(LASER_MODE_UNVERIFIED_START_PROMPT)) return null;
+  if (acknowledgementRequired && !confirm(prompt)) return null;
   return createLaserModeStartEvidence(
     snapshot,
     project.device.maxPowerS,

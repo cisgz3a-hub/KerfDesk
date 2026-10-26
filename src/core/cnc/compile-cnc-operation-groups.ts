@@ -17,6 +17,7 @@ import { compileTaperedInlayGroups } from './tapered-inlay-operation';
 import { applyRampEntry, enforceCutDirection } from './motion-polish';
 import { machineFrameHandedness } from './machine-frame-handedness';
 import { applyProfileLeadPasses } from './profile-lead-passes';
+import { profileLeadKeptMaterial, type ProfileLeadKeptWall } from './profile-lead-kept-walls';
 import { vcarveClearancePocket } from './vcarve-clearance';
 import { vcarveEffectiveDepthMm } from './vcarve-depth';
 import { cncSettingsForStage, cncStageProvenance } from './cnc-stage-settings';
@@ -27,6 +28,7 @@ export function compiledInlayGroups(
   polylines: ReadonlyArray<Polyline>,
   device: DeviceProfile,
   config: CncMachineConfig,
+  leadWalls: ReadonlyArray<ProfileLeadKeptWall> = [],
 ): {
   readonly groups: { readonly female: CncGroup; readonly male: CncGroup } | null;
   readonly femalePocketOffsetFailed: boolean;
@@ -71,6 +73,7 @@ export function compiledInlayGroups(
           settingsWithoutRamp(groupSettings),
           tool.diameterMm,
           machineBoundsForDevice(device),
+          profileLeadKeptMaterial(leadWalls, tool, groupSettings),
         ),
         device,
         config,

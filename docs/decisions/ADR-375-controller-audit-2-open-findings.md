@@ -1,10 +1,17 @@
 ## ADR-375 - Controller audit 2: the controller faults main still had (2026-09-29)
 
-**Status:** Accepted. | **Date:** 2026-09-29
+**Status:** Accepted; the grblHAL-only jog-cancel wait (finding 6, M-6) amended by ADR-640, which applies it to every driver; decision 1 amended by [Amendment 3](ADR-375-amendment-3-tool-change-holds-re-zero-z-only.md) (a tool-change hold re-zeroes Z only; the store follows the G54 a probe or origin write selects). | **Date:** 2026-09-29
 
 **Fire timing correction:** [ADR-355 Amendment 1](ADR-355-amendment-1-acknowledged-override-baseline.md)
 supersedes the known-100% Fire reset omission below. Pending flags are processed at an owned
 acknowledged boundary before resetting the spindle override and issuing capped Fire-on.
+
+**grblHAL correction:** [Amendment 4](ADR-375-amendment-4-grblhal-envelope-and-console-values.md)
+amends decisions 3 and 9 for grblHAL. It corrects decision 9's premise that grblHAL refuses a value
+it would store differently: it keeps only the number at the start of a `$N=` value, and builds
+before 20261015 read `1.0` as 10 for a whole-number setting, all with `ok`. It also reads
+grblHAL's force set origin from `$22` bit 3 and keeps the hold's switch inset after this
+session's Home with soft limits off (decision 3).
 
 A second audit of the controller layer and the controller settings (requested 2026-09-24), checked
 line by line against pinned firmware source: gnea/grbl v1.1h at `bfb67f0c`, grblHAL/core at
@@ -234,8 +241,11 @@ therefore sent moves the firmware refuses, or trusted values the controller had 
      off while KerfDesk reported the write as done. On the stock GRBL driver the Console now
      refuses, before its confirmation prompt, a value the firmware would store as something else,
      with the check the Machine Settings dialog already applies (#923). grblHAL refuses such
-     values itself. Every acknowledged Console setting write is read back with `$$`, not only a
-     `$13` write, so the settings table shows what the controller stored.
+     values itself. *(Corrected by Amendment 4: grblHAL refuses a non-zero fraction or a value
+     outside a setting's declared limits, but stores the leading number of `26,67` or `5O00`, and
+     builds before 20261015 read `1.0` as 10, all with `ok`; the Console now checks grblHAL values
+     too.)* Every acknowledged Console setting write is read back with `$$`, not only a `$13`
+     write, so the settings table shows what the controller stored.
    - GRBL answers lines strictly in order ([protocol.c L88-L104](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/protocol.c#L88-L104)), and an
      owned Console exchange takes the next reply as its own, so a `$$` sent while a `$H` still owed
      its `ok` ended on the homing reply with an empty dump. An owned Console `$$` or `$n=` now

@@ -58,13 +58,28 @@ export function hasRetainedFeedsAfterEffectiveToolChange(before: Project, after:
     }
     const beforeLayer = before.scene.layers.find((candidate) => candidate.id === afterLayer.id);
     if (beforeLayer === undefined) return false;
-    const beforeSettings = beforeLayer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
-    const afterSettings = afterLayer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
-    if (afterSettings.feedSource?.kind === 'material-recipe') return false;
-    const beforeTool = layerCncTool(beforeMachine, beforeSettings);
-    const afterTool = layerCncTool(afterMachine, afterSettings);
-    return !sameCncTool(beforeTool, afterTool) && retainedFeedValues(beforeSettings, afterSettings);
+    return cncOperationKeptFeedsAfterToolChange({
+      beforeMachine,
+      afterMachine,
+      before: beforeLayer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS,
+      after: afterLayer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS,
+    });
   });
+}
+
+/** One operation's half of the check above: its effective cutter changed, its
+ * four cutter-dependent values stayed exact, and no material recipe followed
+ * the new bit. The Artwork card's bit choice reads the same rule. */
+export function cncOperationKeptFeedsAfterToolChange(input: {
+  readonly beforeMachine: CncMachineConfig;
+  readonly afterMachine: CncMachineConfig;
+  readonly before: CncLayerSettings;
+  readonly after: CncLayerSettings;
+}): boolean {
+  if (input.after.feedSource?.kind === 'material-recipe') return false;
+  const beforeTool = layerCncTool(input.beforeMachine, input.before);
+  const afterTool = layerCncTool(input.afterMachine, input.after);
+  return !sameCncTool(beforeTool, afterTool) && retainedFeedValues(input.before, input.after);
 }
 
 /** Returns the unique non-blocking review notices produced by one committed

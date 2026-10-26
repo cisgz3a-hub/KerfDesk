@@ -10,6 +10,7 @@ import type { PlatformAdapter } from '../../platform/types';
 import { renderVariableText } from '../text/render-variable-text';
 import type { ToastVariant } from '../state/toast-store';
 import { exportProjectSelection } from './export-artwork-svg';
+import { pickPreparedSaveTarget } from './pick-prepared-save-target';
 
 export type ExportArtworkDxfContext = {
   readonly platform: PlatformAdapter;
@@ -37,11 +38,8 @@ export async function handleExportArtworkDxf(ctx: ExportArtworkDxfContext): Prom
     return;
   }
   try {
-    const target = await ctx.platform.pickFileForSave({
-      suggestedName: dxfFilename(ctx.savedName, ids !== undefined),
-      extensions: ['.dxf'],
-    });
-    if (target === null) return;
+    // The picker empties an existing file as it returns (ADR-656): every
+    // fallible step runs first.
     const resolved = await materializeVariableText(
       project,
       evaluation,
@@ -54,6 +52,12 @@ export async function handleExportArtworkDxf(ctx: ExportArtworkDxfContext): Prom
       ctx.pushToast('Could not export DXF: ' + result.error, 'error');
       return;
     }
+    const target = await pickPreparedSaveTarget(
+      ctx.platform,
+      { suggestedName: dxfFilename(ctx.savedName, ids !== undefined), extensions: ['.dxf'] },
+      { title: 'Export DXF', message: 'The DXF is ready.' },
+    );
+    if (target === null) return;
     await target.write(new Blob([result.value.dxf], { type: 'application/dxf' }));
     const omitted = result.value.omittedObjectCount;
     ctx.pushToast(

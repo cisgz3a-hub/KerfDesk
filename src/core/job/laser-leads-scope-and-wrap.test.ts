@@ -242,6 +242,21 @@ describe('laser lead scope and wrap (ADR-626)', () => {
     expect(asked.groups.filter((g) => g.kind === 'cut')).toHaveLength(2);
   });
 
+  it('records an artwork override that turns off the leads its operation has on', () => {
+    const job = compileJob(
+      scene([
+        artwork('a', 0),
+        artwork('b', 20, { byOperation: { cut: { leadInEnabled: false } } }),
+      ]),
+      DEFAULT_DEVICE_PROFILE,
+    );
+    const cuts = job.groups.filter((g): g is CutGroup => g.kind === 'cut');
+    const plain = cuts.find((g) => g.laserLeads !== undefined);
+    const off = cuts.find((g) => g.laserLeads === undefined);
+    expect(plain?.operationSettings).toBeUndefined();
+    expect(off?.operationSettings).toMatchObject({ leadInEnabled: false });
+  });
+
   it('counts only the perforated artwork as left without leads', () => {
     const job = compileJob(
       scene([

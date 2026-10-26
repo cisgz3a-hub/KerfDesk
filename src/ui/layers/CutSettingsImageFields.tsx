@@ -18,6 +18,7 @@ import { dotWidthCorrectionMax } from './cut-settings-draft';
 import { burnsAsGrayscale, DitherSwatchPicker, originalPixelsNotice } from './DitherSwatchPicker';
 import { ImageScanPatternFields } from './CutSettingsScanPatternFields';
 import { AutoOverscanSwitch, automaticOverscanNote } from './CutSettingsAutoOverscan';
+import { boundsAdmitting } from './CutSettingsInputs';
 import { normalizedScanAngleDeg } from '../../core/raster/raster-scan-frame';
 
 export function CutSettingsImageFields(props: {
@@ -68,7 +69,6 @@ export function CutSettingsImageFields(props: {
           value={props.layer.dotWidthCorrectionMm}
           min={0}
           max={props.deferArtworkBounds ? 1 : dotWidthCorrectionMax(props.imageLinesPerMm)}
-          step={0.001}
           label="dot width correction"
           title="Compensate for physical laser dot width when raster engraving. Shortens each burned run at both ends along the scan; it cannot widen white lines that run parallel to the scan."
         />
@@ -134,7 +134,6 @@ function ImageOverscanField(props: { readonly layer: Layer }): JSX.Element {
           value={imageOverscanMmFor(props.layer)}
           min={0}
           max={MAX_IMAGE_OVERSCAN_MM}
-          step={0.01}
           disabled={automatic}
           label="image overscan"
           title="Laser-off run-up at scan edges. The required distance depends on speed and acceleration; short runways can change edge exposure."
@@ -292,24 +291,25 @@ function ImageDensityFields(props: {
   );
 }
 
+// Any step, and a range that takes the value it opens with (06-P2-4).
 function NumberInput(props: {
   readonly name: string;
   readonly value: number;
   readonly min: number;
   readonly max?: number;
-  readonly step?: number;
   readonly label?: string;
   readonly title?: string;
   readonly disabled?: boolean;
 }): JSX.Element {
+  const bounds = boundsAdmitting(props.value, props.min, props.max);
   return (
     <input
       name={props.name}
       type="number"
       className="lf-input"
-      min={props.min}
-      {...(props.max !== undefined ? { max: props.max } : {})}
-      step={props.step ?? 1}
+      min={bounds.min}
+      {...(bounds.max !== undefined ? { max: bounds.max } : {})}
+      step="any"
       defaultValue={props.value}
       disabled={props.disabled === true}
       style={numberStyle}

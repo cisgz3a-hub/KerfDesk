@@ -117,6 +117,85 @@ describe('LightBurn CLB import', () => {
     }
   });
 
+  it('opens a Fill+Line (Scan+Cut) entry as a Fill preset and a Line preset, and says so', () => {
+    // Audit 21-P2-3. The entry's shape follows Binary-Kitchen/thunderlaser_nova35
+    // material_library.clb, whose "Füllen + Cut" entries are of this type.
+    const result = importLightBurnClb(
+      `<?xml version="1.0" encoding="UTF-8"?><LightBurnLibrary DisplayName="Shop">
+        <Material name="Plywood">
+          <Entry Thickness="3.0000" Desc="Engrave and outline">
+            <CutSetting type="Scan+Cut"><index Value="0"/><name Value="C00"/>
+              <maxPower Value="60"/><speed Value="10"/><interval Value="0.1"/><overscan Value="0"/>
+            </CutSetting>
+          </Entry>
+        </Material></LightBurnLibrary>`,
+      'shop.clb',
+    );
+    if (!result.ok) throw new Error(result.reason);
+    expect(
+      result.library.entries.map(({ id, operation, thicknessMm, description, recipe }) => ({
+        id,
+        operation,
+        thicknessMm,
+        description,
+        mode: recipe.mode,
+        power: recipe.power,
+        speed: recipe.speed,
+      })),
+    ).toEqual([
+      {
+        id: 'plywood-engrave-and-outline-1',
+        operation: 'engrave',
+        thicknessMm: 3,
+        description: 'Engrave and outline (imported from shop.clb)',
+        mode: 'fill',
+        power: 60,
+        speed: 600,
+      },
+      {
+        id: 'plywood-engrave-and-outline-1-line',
+        operation: 'cut',
+        thicknessMm: 3,
+        description: 'Engrave and outline (Line) (imported from shop.clb)',
+        mode: 'line',
+        power: 60,
+        speed: 600,
+      },
+    ]);
+    expect(result.report.importedEntries).toBe(2);
+    expect(result.report.warnings).toEqual([
+      'Entry 1 (Plywood, “Engrave and outline”) is a LightBurn Fill+Line setting, so it opened as a Fill preset and a Line preset, “Engrave and outline (Line)”. Apply the Line to a second operation that runs after the Fill to cut the outlines.',
+    ]);
+    expect(deserializeMaterialLibrary(serializeMaterialLibrary(result.library))).toMatchObject({
+      kind: 'ok',
+    });
+  });
+
+  it('reads the mode as a whole name, and names one it does not know', () => {
+    const mode = (type: string) => {
+      const typeAttribute = type === '' ? '' : ` type="${type}"`;
+      const result = importLightBurnClb(
+        `<LightBurnLibrary><Material name="Oak"><Entry Thickness="3" Desc="Mark"><CutSetting${typeAttribute}><maxPower Value="20"/><speed Value="100"/></CutSetting></Entry></Material></LightBurnLibrary>`,
+        'oak.clb',
+      );
+      if (!result.ok) throw new Error(result.reason);
+      return {
+        modes: result.library.entries.map((entry) => entry.recipe.mode),
+        warnings: result.report.warnings,
+      };
+    };
+    expect(mode('Cut')).toEqual({ modes: ['line'], warnings: [] });
+    expect(mode('Scan')).toEqual({ modes: ['fill'], warnings: [] });
+    expect(mode('Image')).toEqual({ modes: ['image'], warnings: [] });
+    expect(mode('')).toEqual({ modes: ['line'], warnings: [] });
+    expect(mode('Offset Fill')).toEqual({
+      modes: ['fill'],
+      warnings: [
+        'Entry 1 (Oak, “Mark”): LightBurn mode “Offset Fill” has no KerfDesk equivalent, so it opened as a Fill preset. Check its settings before using it.',
+      ],
+    });
+  });
+
   it('reports skipped unsupported entries instead of silently inventing settings', () => {
     const result = importLightBurnClb(
       `<Library><Material Name="Mixed"><Entry Desc="Missing"><CutSetting Speed="10" /></Entry><Entry Desc="Good"><CutSetting Speed="10" MaxPower="20" /></Entry></Material></Library>`,

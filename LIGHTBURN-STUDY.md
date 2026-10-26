@@ -95,9 +95,10 @@ Power detail below is therefore **[LB-forum]** and must be upgraded.
 | 9 | Sketch | detects hard edges — line drawings, handwriting |
 | 10 | Grayscale | varies power between min and max |
 
-**Ours: 11 algorithms** (`core/raster/dither.ts`): Threshold, Ordered, Floyd–Steinberg (LightBurn's
-"Dither" analogue), Atkinson, Stucki, Jarvis, Burkes, Sierra3, Sierra2, Sierra Lite, and Grayscale.
-That covers seven of LightBurn's ten named modes and adds four error-diffusion alternatives.
+**Ours: 12 algorithms** (`core/raster/dither.ts`): Threshold, Ordered, Floyd–Steinberg (LightBurn's
+"Dither" analogue), Atkinson, Stucki, Jarvis, Burkes, Sierra3, Sierra2, Sierra Lite, Blue Noise
+(ADR-649) and Grayscale. That covers seven of LightBurn's ten named modes and adds five
+error-diffusion alternatives; LightBurn has no counterpart to Blue Noise.
 Newsprint, Halftone, and Sketch remain missing image-mode surfaces.
 
 Adjacent settings:

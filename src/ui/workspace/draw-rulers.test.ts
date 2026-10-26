@@ -5,7 +5,12 @@ import { canvasMouseToScene, computeView, type ViewState } from './view-transfor
 
 type Label = { readonly text: string; readonly x: number; readonly y: number };
 
-function recordRulers(width: number, height: number, viewState: ViewState) {
+function recordRulers(
+  width: number,
+  height: number,
+  viewState: ViewState,
+  unit: 'mm' | 'in' = 'mm',
+) {
   const labels: Label[] = [];
   const fills: Array<{ width: number; height: number }> = [];
   const ctx = new Proxy(
@@ -22,9 +27,22 @@ function recordRulers(width: number, height: number, viewState: ViewState) {
     },
   ) as CanvasRenderingContext2D;
   const view = computeView(width, height, 400, 400, viewState);
-  drawRulers(ctx, width, height, view);
+  drawRulers(ctx, width, height, view, unit);
   return { labels, fills, view };
 }
+
+describe('inch rulers (ADR-629)', () => {
+  it('label inches 25.4 mm apart, aligned with the millimetre scene', () => {
+    const { labels, view } = recordRulers(800, 600, { zoomFactor: 1, panX: 0, panY: 0 }, 'in');
+    // About 46 px to the inch here, so labels step every 2 in.
+    const two = labels.find((label) => label.text === '2' && label.y === 2);
+    const ten = labels.find((label) => label.text === '10' && label.y === 2);
+    if (two === undefined || ten === undefined) throw new Error('Missing inch labels');
+    expect(two.x - 2).toBeCloseTo(view.offsetX + 50.8 * view.scale, 6);
+    expect(ten.x - 2).toBeCloseTo(view.offsetX + 254 * view.scale, 6);
+    expect(labels.some((label) => label.text === '100')).toBe(false);
+  });
+});
 
 describe('workspace ruler alignment', () => {
   it.each([

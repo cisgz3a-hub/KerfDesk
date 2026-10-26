@@ -9,7 +9,7 @@ import {
   type SelectionTransform,
   type Vec2,
 } from '../../../core/scene';
-import type { HandleKind } from '../handles';
+import { HANDLE_SCREEN_PX, type HandleKind } from '../handles';
 import {
   hitSelectionRotateHandle,
   pointerAngleDeg,
@@ -17,7 +17,12 @@ import {
   rotateSelectionByDrag,
   selectionRotateAnchor,
 } from '../rotate-handle';
-import { aabbHandlePoints, hitAabbHandle, selectionResizeEditFromDrag } from '../selection-handles';
+import {
+  aabbHandlePoints,
+  hitAabbHandle,
+  resizeEditSetsSize,
+  selectionResizeEditFromDrag,
+} from '../selection-handles';
 import { selectObjectsInMarquee } from '../selection-marquee';
 
 /** Objects the jig canvas may select: unlocked, on a visible layer. Locked
@@ -107,6 +112,18 @@ export function jigHandleAt(
 ): JigHandle | null {
   const metrics = selectionMetrics(objects);
   if (metrics === null) return null;
+  const { minX, minY, maxX, maxY } = metrics.bbox;
+  // Overlapping fixed-pixel handles must leave small artwork an interior move
+  // target. The handle portions on and outside the bounds remain available.
+  const handleSize = HANDLE_SCREEN_PX * pxToMm;
+  if (
+    (maxX - minX <= handleSize || maxY - minY <= handleSize) &&
+    point.x > minX &&
+    point.x < maxX &&
+    point.y > minY &&
+    point.y < maxY
+  )
+    return null;
   const handle = hitAabbHandle(metrics.bbox, point, pxToMm);
   if (handle !== null) return { kind: 'resize', handle };
   return hitSelectionRotateHandle(objects, point, pxToMm) ? { kind: 'rotate' } : null;
@@ -160,6 +177,7 @@ export function resizeJigSelection(
     point: { x: grab.position.x + delta.x, y: grab.position.y + delta.y },
     lockAspect: drag.lockAspect,
   });
+  if (!resizeEditSetsSize(edit)) return unchanged;
   const result = buildSelectionTransformEdit(objects, edit);
   if (result.kind === 'error')
     return { project, refused: result.reason === 'non-uniform-rotated-selection' };

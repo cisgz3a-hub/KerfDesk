@@ -16,6 +16,7 @@ import { useUiStore, type ToolMode } from '../state/ui-store';
 import { useTutorialStore } from '../tutorials/tutorial-store';
 import { ZoomControls } from './overlays';
 import { PreviewControlsPanel, PreviewRouteControls } from './preview-overlays';
+import { JobReviewOperations } from '../laser/job-review/JobReviewOperations';
 import { RegistrationJigEditor } from './registration-jig/RegistrationJigEditor';
 import { ToolStrip } from './ToolStrip';
 import { Toolbar } from '../common/Toolbar';
@@ -300,6 +301,18 @@ describe('viewport and preview individual outcomes', () => {
   });
 });
 
+// The Job Review card that holds this Edit button, when it is the jig outline's.
+function outlineCard(edit: HTMLElement): HTMLElement | null {
+  for (let node = edit.parentElement; node !== null; node = node.parentElement) {
+    const edits = [...node.querySelectorAll('button')].filter(
+      (item) => item.textContent === 'Edit',
+    );
+    if (edits.length > 1) return null;
+    if (node.textContent?.includes('Registration jig outline operation')) return node;
+  }
+  return null;
+}
+
 describe('registration jig remaining actions', () => {
   // The jig controls live in the dedicated editor; edits are draft-only until
   // Save to canvas, so each action is checked in the draft and after saving.
@@ -309,24 +322,26 @@ describe('registration jig remaining actions', () => {
       .project.scene.layers.find((layer) => layer.id === REGISTRATION_LAYER_ID)?.airAssist;
   }
 
-  it('air assist updates the outline operation on save and Advanced settings opens that operation', async () => {
+  it('keeps outline settings out of the jig editor; Job Review edits the outline operation', async () => {
+    // ADR-652: the editor has no burn settings, and Job Review's outline card is
+    // where the outline's power, speed, passes and air are changed before Start.
     useStore.getState().addRegistrationBox(80, 40);
     const before = outlineAir();
     await mount(<RegistrationJigEditor onClose={vi.fn()} />);
+    expect(host.querySelector('[aria-label="Air assist for registration jig outline"]')).toBeNull();
+    expect(host.textContent).not.toContain('Advanced outline settings');
+    await mount(<JobReviewOperations machineKind="laser" effectiveOperations={[]} />);
+    const card = [...host.querySelectorAll('button')]
+      .filter((item) => item.textContent === 'Edit')
+      .find((item) => outlineCard(item) !== null);
+    if (card === undefined) throw new Error('Missing outline card Edit');
+    await act(async () => card.click());
     const air = host.querySelector<HTMLInputElement>(
-      '[aria-label="Air assist for registration jig outline"]',
+      'input[aria-label="Air assist for Registration jig"]',
     );
-    if (air === null) throw new Error('Missing jig air');
-    expect(air.checked).toBe(before === true);
+    if (air === null) throw new Error('Missing outline air in Job Review');
     await act(async () => air.click());
-    expect(outlineAir()).toBe(before);
-    await click('Advanced outline settings');
-    expect(
-      [...document.querySelectorAll('[role="dialog"]')].some((dialog) =>
-        dialog.textContent?.includes('Cut Settings'),
-      ),
-    ).toBe(true);
-    await click('Save to canvas');
+    await click('Save');
     expect(outlineAir()).toBe(before !== true);
   });
 
