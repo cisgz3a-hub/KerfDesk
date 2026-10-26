@@ -81,6 +81,10 @@ function homeCommand(command: PreparedConsoleCommand): ConsoleCommandResult {
   };
 }
 
+// FluidNC's `$10` is stock GRBL's whatever its `$$` lists, so it does not take
+// the stock driver's grblHAL reading of it (ADR-375 Amendment 4).
+const { statusReportMask: _grblHalDumpMask, ...grblCapabilities } = grblDriver.capabilities;
+
 export const fluidncDriver: ControllerDriver = {
   ...grblDriver,
   kind: 'fluidnc',
@@ -92,7 +96,7 @@ export const fluidncDriver: ControllerDriver = {
     buildInfoQuery: null,
   },
   capabilities: {
-    ...grblDriver.capabilities,
+    ...grblCapabilities,
     settings: 'readonly-dump',
     firmwareSetupPanel: 'none',
     // FluidNC homes from its event loop, which goes on serving `?`.

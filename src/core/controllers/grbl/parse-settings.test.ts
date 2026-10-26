@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  GRBLHAL_LEVEL_1_GRBL_BANNER_DUMP,
   GRBLHAL_LEVEL_2_DUMP,
   grblHalSettingsMap,
 } from '../../../__fixtures__/controllers/grblhal-settings-dump';
@@ -211,6 +212,39 @@ describe('settingsMapToProfilePatch', () => {
     );
     expect(settingsMapToControllerSettings(new Map([[384, '0']]))).not.toHaveProperty(
       'statusReportMaskIsFull',
+    );
+  });
+
+  // `$19` (probe pull-up disable) is a legacy setting in grblHAL, so a level 2
+  // build with a probe input lists it beside `$10 & 3` (core
+  // settings.c#L2373, system.c#L300-L317). ADR-375 Amendment 4.
+  it('does not read a level 2 $10 as whole because the dump lists $19', () => {
+    const level2WithProbe = grblHalSettingsMap({ 10: '1', 19: '0' }, GRBLHAL_LEVEL_2_DUMP);
+    expect(settingsMapToControllerSettings(level2WithProbe)).not.toHaveProperty(
+      'statusReportMaskIsFull',
+    );
+  });
+
+  // grblHAL keeps its signal invert and pull-up masks in `$14`-`$18` and lists
+  // them at level 0 or 1 (core settings.c#L2368-L2372); a stock-GRBL fork
+  // lists its own extras elsewhere, as Ortur's STM32 firmware lists `$33`
+  // (Ortur_Laser_Firmware_14X report.c#L233-L242). ADR-375 Amendment 4.
+  it("marks a dump that lists grblHAL's $14-$18", () => {
+    expect(
+      settingsMapToControllerSettings(grblHalSettingsMap({}, GRBLHAL_LEVEL_1_GRBL_BANNER_DUMP)),
+    ).toMatchObject({ listsGrblHalSignalSettings: true, statusReportMaskIsFull: true });
+    expect(settingsMapToControllerSettings(new Map([[18, '0']]))).toEqual({
+      listsGrblHalSignalSettings: true,
+    });
+    const stockForkDump = new Map([
+      [10, '1'],
+      [19, '0'],
+      [33, '1.000'],
+      [40, '1000'],
+      [130, '400.000'],
+    ]);
+    expect(settingsMapToControllerSettings(stockForkDump)).not.toHaveProperty(
+      'listsGrblHalSignalSettings',
     );
   });
 

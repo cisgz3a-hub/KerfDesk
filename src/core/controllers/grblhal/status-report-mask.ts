@@ -10,9 +10,21 @@
 // https://github.com/grblHAL/core/blob/4ec1ae44b857a70d2f9298344feac4b43ed0eb6b/report.c#L1331-L1340
 // https://github.com/grblHAL/core/blob/4ec1ae44b857a70d2f9298344feac4b43ed0eb6b/report.c#L1471-L1507
 // https://github.com/grblHAL/core/blob/4ec1ae44b857a70d2f9298344feac4b43ed0eb6b/config.h#L97
+//
+// A stock-GRBL profile reads `$10` this way too when its `$$` lists grblHAL's
+// `$14`-`$18`. Ortur's ESP32-S2 grblHAL firmware (COMPATIBILITY_LEVEL 1, no
+// KerfDesk preset) greets as "Grbl 1.1f", prints `$10` whole and sends WCO: and
+// Ov: only with bits 5 and 6 (meta audit v1 M3-P3-3, ADR-375 Amendment 4).
+// https://github.com/Ortur-Tech/Ortur_Laser_Firmware_17X-18X/blob/4849ac85fc1f1a15c47d0dbbfc3e69450922ad32/ESPLaserMasterGrbl/main/grbl/settings.h#L331-L338
+// https://github.com/Ortur-Tech/Ortur_Laser_Firmware_17X-18X/blob/4849ac85fc1f1a15c47d0dbbfc3e69450922ad32/ESPLaserMasterGrbl/main/grbl/report.c#L1401-L1412
 
 import type { ControllerCapabilities } from '../controller-capabilities';
 import type { ControllerSettingsSnapshot } from '../grbl/parse-settings';
+
+type StatusReportMaskSettings = Pick<
+  ControllerSettingsSnapshot,
+  'statusReportMask' | 'statusReportMaskIsFull' | 'listsGrblHalSignalSettings'
+>;
 
 const MACHINE_POSITION_BIT = 1 << 0;
 const WORK_OFFSET_BIT = 1 << 5;
@@ -37,9 +49,9 @@ export type StatusReportFieldsOff = {
  * sends both, is not grblHAL, or the `$$` did not show `$10` whole. */
 export function statusReportFieldsOff(
   capabilities: Pick<ControllerCapabilities, 'statusReportMask'>,
-  settings: Pick<ControllerSettingsSnapshot, 'statusReportMask' | 'statusReportMaskIsFull'> | null,
+  settings: StatusReportMaskSettings | null,
 ): StatusReportFieldsOff | null {
-  if (capabilities.statusReportMask !== 'grblhal-fields') return null;
+  if (!readsGrblHalMask(capabilities, settings)) return null;
   const mask = settings?.statusReportMask;
   if (settings?.statusReportMaskIsFull !== true || mask === undefined) return null;
   const workOffsetOff = (mask & WORK_OFFSET_BIT) === 0;
@@ -52,4 +64,15 @@ export function statusReportFieldsOff(
     machinePositionUnknown: workOffsetOff && (mask & MACHINE_POSITION_BIT) === 0,
     suggestedMask: mask | WORK_OFFSET_BIT | OVERRIDES_BIT,
   };
+}
+
+function readsGrblHalMask(
+  capabilities: Pick<ControllerCapabilities, 'statusReportMask'>,
+  settings: StatusReportMaskSettings | null,
+): boolean {
+  if (capabilities.statusReportMask === 'grblhal-fields') return true;
+  return (
+    capabilities.statusReportMask === 'grblhal-fields-if-grblhal-dump' &&
+    settings?.listsGrblHalSignalSettings === true
+  );
 }

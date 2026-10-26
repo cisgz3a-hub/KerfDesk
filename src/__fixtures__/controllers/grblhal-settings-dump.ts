@@ -58,6 +58,57 @@ export function grblHalSettingsMap(
   return map;
 }
 
+/** A `$$` shaped after Ortur's ESP32-S2 grblHAL firmware (OLF 1.7x-1.8x for the
+ *  Laser Master 2 Pro S1/S2 and the Aufero lasers). It is built at
+ *  COMPATIBILITY_LEVEL 1, greets as "Grbl 1.1f", and its report_grbl_settings
+ *  (true) lists `$14`-`$18` and other extended settings beside the legacy
+ *  ones, decimals to three places. Trimmed, with illustrative values; not
+ *  captured from a board (ADR-375 Amendment 4).
+ *  https://github.com/Ortur-Tech/Ortur_Laser_Firmware_17X-18X/blob/4849ac85fc1f1a15c47d0dbbfc3e69450922ad32/ESPLaserMasterGrbl/main/grbl/report.c#L461-L709 */
+export const GRBLHAL_LEVEL_1_GRBL_BANNER_DUMP: ReadonlyArray<string> = [
+  '$0=10.0',
+  '$1=25',
+  '$2=0',
+  '$3=0',
+  '$4=0',
+  '$5=0',
+  '$6=0',
+  '$10=511',
+  '$11=0.010',
+  '$12=0.002',
+  '$13=0',
+  '$14=0',
+  '$15=0',
+  '$16=0',
+  '$17=0',
+  '$18=0',
+  '$20=0',
+  '$21=0',
+  '$22=0',
+  '$23=0',
+  '$24=25.000',
+  '$25=500.000',
+  '$26=250',
+  '$27=1.000',
+  '$28=0.000',
+  '$30=1000.000',
+  '$31=0.000',
+  '$32=1',
+  '$33=1000.000',
+  '$100=80.000',
+  '$101=80.000',
+  '$102=80.000',
+  '$110=10000.000',
+  '$111=10000.000',
+  '$112=1000.000',
+  '$120=1000.000',
+  '$121=1000.000',
+  '$122=100.000',
+  '$130=400.000',
+  '$131=400.000',
+  '$132=50.000',
+];
+
 /** The dump a COMPATIBILITY_LEVEL 2 build prints: legacy settings only, so no
  *  `$384`, and `$21`/`$22` as 0 or 1. */
 export const GRBLHAL_LEVEL_2_DUMP: ReadonlyArray<string> = GRBLHAL_LASER_DUMP.filter(

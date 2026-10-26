@@ -1,5 +1,6 @@
 import type { ControllerDriver } from '../../../core/controllers';
 import { consoleSettingWriteIssue } from '../../../core/controllers/console-setting-writes';
+import type { GrblHalSessionEvidence } from '../../../core/controllers/grblhal/grblhal-evidence';
 import type { ConsoleCommandOptions } from '../../state/laser-console-actions';
 import type { ConsoleCommandProvenance } from '../../state/console-command-provenance';
 import { jobAwareConfirm } from '../../state/job-aware-dialogs';
@@ -17,12 +18,15 @@ export type RunConsoleCommandResult =
 /**
  * Confirms persistent writes and delegates exclusively to the laser store's
  * sendConsoleCommand action. Rejections are returned for inline UI display.
+ * `session` is what the connected controller showed of itself (ADR-375
+ * Amendment 4).
  */
 export async function runConsoleCommand(
   driver: ControllerDriver,
   input: string,
   sendConsoleCommand: SendConsoleCommand,
   provenance?: ConsoleCommandProvenance,
+  session?: GrblHalSessionEvidence,
 ): Promise<RunConsoleCommandResult> {
   const prepared = driver.prepareConsoleCommand(input);
   if (!prepared.ok) {
@@ -32,7 +36,7 @@ export async function runConsoleCommand(
   const command = prepared.command.normalized;
   // A setting value the store would refuse is refused before the operator is
   // asked to confirm it (ADR-375, C-4); the store still re-checks it.
-  const settingIssue = consoleSettingWriteIssue(driver, prepared.command);
+  const settingIssue = consoleSettingWriteIssue(driver, prepared.command, session);
   if (settingIssue !== null) return { status: 'rejected', command, reason: settingIssue };
   if (
     prepared.command.requiresConfirmation &&

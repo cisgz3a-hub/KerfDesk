@@ -55,4 +55,20 @@ describe('statusReportFieldsOff', () => {
     expect(statusReportFieldsOff(grblDriver.capabilities, whole(0))).toBeNull();
     expect(statusReportFieldsOff(fluidncDriver.capabilities, whole(0))).toBeNull();
   });
+
+  // Meta audit v1 M3-P3-3 (ADR-375 Amendment 4): Ortur's ESP32-S2 grblHAL
+  // firmware (level 1, "Grbl 1.1f", no preset) runs under the stock-GRBL
+  // profile; its `$10` has the same bits (settings.h#L331-L338) and gates
+  // WCO: and Ov: on bits 5 and 6 (report.c#L1401-L1412).
+  it("reads grblHAL's $10 on the stock-GRBL profile when the $$ lists grblHAL's $14-$18", () => {
+    const grblHalDump = { ...whole(1), listsGrblHalSignalSettings: true as const };
+    expect(statusReportFieldsOff(grblDriver.capabilities, grblHalDump)).toMatchObject({
+      workOffsetOff: true,
+      overridesOff: true,
+      suggestedMask: 97,
+    });
+    expect(statusReportFieldsOff(fluidncDriver.capabilities, grblHalDump)).toBeNull();
+    // A stock fork's own extra settings (Ortur's STM32 `$33`) are not grblHAL's.
+    expect(statusReportFieldsOff(grblDriver.capabilities, whole(1))).toBeNull();
+  });
 });

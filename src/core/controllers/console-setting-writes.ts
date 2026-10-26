@@ -32,6 +32,20 @@
 // https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/system.c#L1139-L1213
 // https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/settings.c#L3527-L3552
 // https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/nuts_bolts.c#L194-L244
+//
+// The profile, not the banner, chooses the driver, and a grblHAL build at
+// COMPATIBILITY_LEVEL 1 greets as "Grbl 1.1f". Ortur's ESP32-S2 firmware for the
+// Laser Master 2 Pro S1/S2 and the Aufero lasers is one, and with no preset
+// for them they run under the default stock-GRBL profile. That firmware reads
+// a value with read_float and never checks what follows the number, so
+// `$100=26,67` stores 26 with `ok` where stock GRBL answers error:3, and it
+// keeps a whole-number setting as truncf(value) the way stock GRBL does. So on
+// a stock-GRBL profile whose session shows grblHAL (grblhal-evidence.ts), the
+// value must pass the grblHAL check as well as the stock one (meta audit v1
+// M3-P3-3, ADR-375 Amendment 4).
+// https://github.com/Ortur-Tech/Ortur_Laser_Firmware_17X-18X/blob/4849ac85fc1f1a15c47d0dbbfc3e69450922ad32/ESPLaserMasterGrbl/main/grbl/settings.c#L456-L472
+// https://github.com/Ortur-Tech/Ortur_Laser_Firmware_17X-18X/blob/4849ac85fc1f1a15c47d0dbbfc3e69450922ad32/ESPLaserMasterGrbl/main/grbl/settings.c#L534
+// https://github.com/Ortur-Tech/Ortur_Laser_Firmware_17X-18X/blob/4849ac85fc1f1a15c47d0dbbfc3e69450922ad32/ESPLaserMasterGrbl/main/grbl/nuts_bolts.c#L152-L209
 import type { ConsoleSettingWrite, ControllerDriver } from './controller-driver';
 import { GRBL_SETTING_DEFINITIONS } from './grbl/grbl-setting-definitions';
 import {
@@ -40,6 +54,11 @@ import {
   type EncodedGrblSettingValue,
 } from './grbl/grbl-setting-number';
 import { settingReadbackMatches, stockGrblSettingStorageIssue } from './grbl/grbl-setting-storage';
+import {
+  grblHalEvidence,
+  type GrblHalEvidence,
+  type GrblHalSessionEvidence,
+} from './grblhal/grblhal-evidence';
 
 type ConsoleSettingCommand = { readonly kind: string; readonly normalized: string };
 
@@ -55,15 +74,17 @@ const GRBLHAL_UNCHECKED_UINT16_IDS: ReadonlySet<number> = new Set([26]);
 const UINT16_MAX = 65535;
 
 /** Why the Console must not send this command, or null to allow it. Only
- *  numeric `$N=` writes are judged here; every other command returns null. */
+ *  numeric `$N=` writes are judged here; every other command returns null.
+ *  `session` is what the connected controller showed of itself, which can put
+ *  grblHAL under a stock-GRBL profile. */
 export function consoleSettingWriteIssue(
   driver: ControllerDriver,
   command: ConsoleSettingCommand,
+  session?: GrblHalSessionEvidence,
 ): string | null {
   if (command.kind !== 'setting-write') return null;
   if (driver.capabilities.settings === 'grbl-dollar') {
-    if (driver.kind === 'grbl-v1.1') return stockGrblValueIssue(command.normalized);
-    return driver.kind === 'grblhal' ? grblHalValueIssue(command.normalized) : null;
+    return grblDollarValueIssue(driver, command.normalized, session);
   }
   const match = SETTING_WRITE_RE.exec(command.normalized);
   const allowed = driver.consoleSettingWrites ?? [];
@@ -73,6 +94,22 @@ export function consoleSettingWriteIssue(
   const number = Number(value);
   if (/^\d+$/.test(value) && number >= write.min && number <= write.max) return null;
   return `$${write.id} (${write.meaning}) takes a whole number from ${write.min} to ${write.max}.`;
+}
+
+// The value check for a driver that sends any numeric write: grblHAL's on the
+// grblHAL driver; stock GRBL's on the stock driver, and grblHAL's as well when
+// the session shows grblHAL.
+function grblDollarValueIssue(
+  driver: ControllerDriver,
+  normalized: string,
+  session: GrblHalSessionEvidence | undefined,
+): string | null {
+  if (driver.kind === 'grblhal') return grblHalValueIssue(normalized);
+  if (driver.kind !== 'grbl-v1.1') return null;
+  return (
+    stockGrblValueIssue(normalized) ??
+    grblHalUnderGrblProfileIssue(driver.label, normalized, grblHalEvidence(session))
+  );
 }
 
 // A Console refusal of kind (a), transport: stock GRBL cannot store the value
@@ -103,6 +140,25 @@ function stockGrblSettingValue(text: string): number | null {
     else if (char > ' ' && char !== '/') kept += char;
   }
   return UNSIGNED_DECIMAL_RE.test(kept) ? Number(kept) : null;
+}
+
+const GRBLHAL_EVIDENCE_TEXT: Readonly<Record<GrblHalEvidence, string>> = {
+  banner: 'greets as grblHAL',
+  settings: "lists grblHAL's $14-$18 in its $$ report",
+  'build-info': 'names grblHAL in its $I report',
+};
+
+// The grblHAL refusal on a stock-GRBL profile, saying why grblHAL applies.
+function grblHalUnderGrblProfileIssue(
+  profileLabel: string,
+  normalized: string,
+  evidence: GrblHalEvidence | null,
+): string | null {
+  if (evidence === null) return null;
+  const issue = grblHalValueIssue(normalized);
+  return issue === null
+    ? null
+    : `${issue} The profile selects ${profileLabel}, but this controller ${GRBLHAL_EVIDENCE_TEXT[evidence]}.`;
 }
 
 // A Console refusal of kind (a), transport, as on stock GRBL: grblHAL would
@@ -159,10 +215,13 @@ function olderGrblHalWholeNumber(typed: string): number | null {
 
 /**
  * Why the `$$` re-read after an acknowledged Console `$N=` write does not show
- * the typed value, or null when it does or cannot tell (ADR-375 Amendment 3).
- * A numeric value is compared at the precision the controller printed. On
- * grblHAL a value that is not one number is a mismatch only when the setting
- * reads back as a number: a string setting reads back as its text.
+ * the typed value, or null when it does or cannot tell (ADR-375 Amendments 3
+ * and 4). A numeric value is compared at the precision the controller printed.
+ * A value that is not one number is a mismatch only when the setting reads back
+ * as a number: a string setting reads back as its text. This holds whatever the
+ * driver: stock GRBL refuses such a value, so an `ok` and a number in the
+ * re-read mean the firmware kept part of it, as grblHAL does under a
+ * stock-GRBL profile.
  */
 export function consoleSettingReadbackIssue(
   driver: Pick<ControllerDriver, 'kind'>,
@@ -174,14 +233,11 @@ export function consoleSettingReadbackIssue(
   const typed = match[2] ?? '';
   const reported = reportedRaw.trim();
   const intended =
-    driver.kind === 'grbl-v1.1'
-      ? stockGrblSettingValue(typed)
-      : DECIMAL_RE.test(typed)
-        ? Number(typed)
-        : null;
+    (driver.kind === 'grbl-v1.1' ? stockGrblSettingValue(typed) : null) ??
+    (DECIMAL_RE.test(typed) ? Number(typed) : null);
   if (intended !== null) {
     if (settingReadbackMatches(reported, intended)) return null;
-  } else if (driver.kind !== 'grblhal' || !DECIMAL_RE.test(reported)) {
+  } else if (!DECIMAL_RE.test(reported)) {
     return null;
   }
   return `The controller reports $${match[1]}=${reported} after the re-read, not ${typed}: it stored a different value. Write $${match[1]} again with the intended value.`;
