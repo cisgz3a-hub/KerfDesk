@@ -1207,22 +1207,31 @@ that owns those fields, without changing the existing Frame/Start policy.
    Open lines of a Line operation that close a region (their ends meet, cross, or stop up to
    0.5 mm short, such as a plate drawn as separate lines) may be a part's outline too, so the
    shapes inside that region get no leads either, and Job Review says to close the outline with
-   **Tools → Join paths** or choose a fixed side (ADR-626 Amendment 8). DXF import already joins
-   LINE and ARC pieces whose ends meet.
+   **Tools → Join paths** or choose a fixed side (ADR-626 Amendment 8). So may open lines that run
+   nearly all the way round, however wide the gap they leave: a path, or lines joined end to end,
+   whose two free ends are closer together than a tenth of its length, such as a plate drawn with
+   one corner left open (Amendment 10). DXF import already joins LINE and ARC pieces whose ends
+   meet. Lines that stop short of each other at two or more corners are not read as one outline:
+   join them first.
    **Always outside** and **Always inside** put every lead of the operation on that side.
 4. Leads join each closed shape where it really starts, so they follow **Start closed shapes**
    (F-A9e) and the job start point. Where no lead fits there (a hole that starts at a corner), the
    shape starts in the middle of a nearby edge instead.
 5. A lead keeps 0.2 mm, or one kerf width (twice the Kerf Offset) when that is wider, up to 1 mm,
    from every other cut line, ends on the scrap side and stays on the bed when the bed position is
-   known. A lead that does not fit is shortened, down to a quarter, or left out, and Job Review says
-   how many shapes that affects. That shape is cut as it would be without leads.
+   known. Every other cut line includes the parts this job leaves for later: with **Cut selected
+   graphics**, the unselected artwork, and the artwork of an operation with output off or a
+   disabled sub-layer, as drawn (Amendment 10). A lead never ends inside one of those parts. A lead
+   that does not fit is shortened, down to a quarter, or left out, and Job Review says how many
+   shapes that affects. That shape is cut as it would be without leads.
 6. Every pass cuts lead-in, shape, lead-out. With **Overcut** the final pass runs past the start
    first and leaves by a lead-out from where the overcut ends. Leads follow the kerf-offset path.
    Shapes with tabs and perforated lines get no leads, and Job Review says so. Open paths get none,
    including a shape that **Remove overlapping lines** opened up, but leads still keep out of it.
-   When open paths whose ends meet sit on an operation with a kerf offset or leads, or hold shapes
-   that inside-first would cut first, Job Review warns that they are cut as open lines.
+   When open paths whose ends meet, or that are left open at one place (ends closer together than
+   a tenth of their length), sit on an operation with a kerf offset or leads, or hold shapes that
+   are kerf-offset or that inside-first would cut first, Job Review warns that they are cut as open
+   lines, says how far apart their ends are and the gap **Tools → Join paths** needs to close them.
 7. Preview, Frame, both time estimates, Job Review and every output format (GRBL, Marlin,
    Smoothieware, Ruida) show the leads. On machines that take arcs, a shape that goes out as arcs
    keeps them and its arc leads go out as arcs too. CNC output never changes.
