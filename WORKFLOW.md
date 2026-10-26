@@ -6158,6 +6158,18 @@ and lifts the command's CNC-only gate.)*
    job started" for Current Position. The CNC setup reference and the Machine Setup review page
    show "None".
 
+#### Edge — CNC setup sheet of a multi-bit job (ADR-392 Amendment 3)
+1. Save G-code → **Save setup sheet + program…** opens on **One file per bit** whenever the job
+   has more than one cutter section. Each file is a complete program with no `M0`, and opens with
+   `; bit N of M: <bit>` and what to zero before it runs. Between files the controller is Idle, so
+   jog, Zero Z and probing work.
+2. **Single file · M0 bit changes** stays available. The dialog and the sheet say that a controller
+   held at an `M0` takes no jog or Zero Z and already holds the next bit's spindle start and plunge.
+   Bit changes at those stops work only from the project's own Start, which holds before each `M0`
+   (F-CNC15), or in a sender that holds at the `M0` itself (gSender). Run G-code file sends the
+   `M0`, and its review warns.
+3. A one-cutter job, or an older prepared Save with no per-bit files, stays a single file.
+
 ### F-CNC15. Re-zero Z at a tool change — Phase H.7
 
 #### Work-Z evidence at Start *(demoted by frame-first — ADR-228; this section predates it)*

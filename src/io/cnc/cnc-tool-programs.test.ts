@@ -10,6 +10,7 @@ import { emitSavePreparedOutput } from '../../ui/laser/save-output-emission';
 import { prepareOutputRequest } from '../../ui/laser/output-preparation';
 import {
   buildCncToolPrograms,
+  cncToolProgramHeader,
   nameCncToolPrograms,
   type CncToolProgramsResult,
 } from './cnc-tool-programs';
@@ -47,16 +48,17 @@ describe('ordered exact prepared cutter programs', () => {
     ]);
     for (const program of result) {
       expect(program.gcode).toBe(
-        emitPreparedGcode(
-          {
-            ...prepared,
-            job: {
-              ...prepared.job,
-              groups: program.jobGroupIndices.map((index) => prepared.job.groups[index]!),
+        cncToolProgramHeader({ order: program.order, count: 3 }, program.toolName ?? '') +
+          emitPreparedGcode(
+            {
+              ...prepared,
+              job: {
+                ...prepared.job,
+                groups: program.jobGroupIndices.map((index) => prepared.job.groups[index]!),
+              },
             },
-          },
-          { ...OPTIONS, sourceGeometryChecks: 'compiled-evidence-only' },
-        ).gcode,
+            { ...OPTIONS, sourceGeometryChecks: 'compiled-evidence-only' },
+          ).gcode,
       );
       expect(program.sha256).toBe(
         'sha256:' + createHash('sha256').update(program.gcode).digest('hex'),
@@ -71,11 +73,38 @@ describe('ordered exact prepared cutter programs', () => {
     expect(JSON.stringify(prepared.job)).toBe(original);
   });
 
+  // CNC audit v1 F8-P3-5, ADR-392 Amendment 3: once downloaded out of the setup sheet, each
+  // file still says which bit to load and what to zero, as tile bit files do.
+  it('opens each file of a multi-bit job with its bit and what to zero before it runs', () => {
+    const result = programs(buildCncToolPrograms(preparedCncToolSections(), OPTIONS));
+    expect(result.map((program) => program.gcode.split('\n').slice(0, 3))).toEqual([
+      [
+        '; bit 1 of 3: Rough cutter A',
+        '; load this bit and zero Z on the stock top before running this file',
+        '; KerfDesk',
+      ],
+      [
+        '; bit 2 of 3: Detail cutter B',
+        '; keep the same X/Y zero; change to this bit and re-zero Z on the stock top before running this file',
+        '; KerfDesk',
+      ],
+      [
+        '; bit 3 of 3: Rough cutter A',
+        '; keep the same X/Y zero; change to this bit and re-zero Z on the stock top before running this file',
+        '; KerfDesk',
+      ],
+    ]);
+    expect(cncToolProgramHeader({ order: 1, count: 1 }, 'Rough cutter A')).toBe('');
+    expect(cncToolProgramHeader({ order: 2, count: 2 }, 'Bit\nM3 S1')).toMatch(
+      /^; bit 2 of 2: Bit M3 S1\n; keep the same X\/Y zero;[^\n]*\n$/,
+    );
+  });
+
   it('starts each file with full modal state and safe lift and ends with native spindle/coolant stop and park', () => {
     const result = programs(buildCncToolPrograms(preparedCncToolSections(), {}));
     for (const program of result) {
       expect(program.gcode).toMatch(
-        /^G21\nG90\nG54\nG94\nG17\nG0 Z5\.000\nM3 S12000\nG4 P0\.250\nM8\n/,
+        /^; bit \d of 3: [^\n]+\n; [^\n]+\nG21\nG90\nG54\nG94\nG17\nG0 Z5\.000\nM3 S12000\nG4 P0\.250\nM8\n/,
       );
       expect(program.gcode).toMatch(/G0 Z8\.000\nM5\nM9\nG0 X13\.000 Y17\.000\n$/);
       expect(program.gcode).not.toMatch(/^M0$/m);
