@@ -77,8 +77,6 @@ export type {
   IntervalTestGridOptions,
 } from './interval-test-grid';
 export { generateIntervalTestGrid } from './interval-test-grid';
-export type { ToneWedge, ToneWedgeOptions, ToneWedgePatch } from './tone-calibration-wedge';
-export { generateToneCalibrationWedge, toneWedgeCommandedPercents } from './tone-calibration-wedge';
 export type {
   ScanOffsetCalibrationCell,
   ScanOffsetCalibrationPattern,

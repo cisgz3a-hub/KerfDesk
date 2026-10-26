@@ -1,4 +1,8 @@
-import { generateToneCalibrationWedge, type ToneWedgeOptions } from '../../core/job';
+// Not in the job barrel: its export count is ratcheted (ADR-015).
+import {
+  generateToneCalibrationWedge,
+  type ToneWedgeOptions,
+} from '../../core/job/tone-calibration-wedge';
 import { confirmDiscardAsync } from '../app/confirm-discard';
 import { usePlatform } from '../app/platform-context';
 import { useStore } from '../state';
