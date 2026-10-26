@@ -158,12 +158,25 @@ describe('C1 mixed pocket artwork advisory', () => {
     expect(await noteText(cncOmissionProject([CNC_OMISSION_CLOSED]))).toBe('');
   });
 
-  it.each(['profile-outside', 'profile-inside', 'profile-on-path', 'engrave'] as const)(
-    'control: %s stays quiet because its open strokes actually cut',
+  it.each(['profile-on-path', 'engrave'] as const)(
+    'control: %s stays quiet because it cuts every path on its line',
     async (cutType) => {
       expect(
         await noteText(cncOmissionProject([CNC_OMISSION_OPEN_A, CNC_OMISSION_OPEN_B], cutType)),
       ).toBe('');
+    },
+  );
+
+  // Outside and Inside cut open strokes too, but on their line, not to their
+  // side (ADR-672, meta audit M6-P1-2), so they say so instead of omitting them.
+  it.each(['profile-outside', 'profile-inside'] as const)(
+    '%s says its open strokes are cut on their line, not omitted',
+    async (cutType) => {
+      const text = await noteText(
+        cncOmissionProject([CNC_OMISSION_OPEN_A, CNC_OMISSION_OPEN_B], cutType),
+      );
+      expect(text).toContain('2 open paths are cut on their line');
+      expect(text).not.toMatch(/omit/);
     },
   );
 });

@@ -32,6 +32,8 @@ type BurnedArtwork = {
 };
 
 export function stackedCopyWarnings(project: Project): ReadonlyArray<string> {
+  // CNC cuts no images. Its twin is compile-time: exact copies of a closed
+  // outline on a filled cut are merged and reported (cnc-stacked-copies.ts).
   if (project.machine?.kind === 'cnc') return [];
   const operations = project.scene.layers.flatMap(outputOperationLayers);
   const byContent = new Map<string, BurnedArtwork[]>();

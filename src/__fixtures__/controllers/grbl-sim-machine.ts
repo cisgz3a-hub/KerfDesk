@@ -141,6 +141,8 @@ export function reduceGrblSim(
   if (event.kind === 'rx-line') return reduceGrblSimLine(state, event.line, opts);
   if (event.kind === 'alarm') return reduceAlarm(state, event.code, opts);
   if (event.kind === 'door-input') return reduceDoorInput(state, event.open);
+  if (event.kind === 'probe-input')
+    return { state: { ...state, probeClosed: event.closed }, effects: [] };
   if (event.epoch !== undefined && event.epoch !== state.resetEpoch) return { state, effects: [] };
   return reduceTimedEvent(state, event, opts);
 }
@@ -162,7 +164,9 @@ export function statusReportLine(state: GrblSimState): string {
   const spindle = isMoving ? Math.round(state.spindle) : 0;
   const wco = totalWco(state);
   const overrides = grblSimOverrideField(state.overrides, state.machine === 'Door');
-  return `<${label}|MPos:${formatVec3(state.mpos)}|FS:${feed},${spindle}|WCO:${formatVec3(wco)}${overrides}>`;
+  // GRBL prints Pn: after FS: and only while an input is active (report.c).
+  const pins = state.probeClosed === true ? '|Pn:P' : '';
+  return `<${label}|MPos:${formatVec3(state.mpos)}|FS:${feed},${spindle}${pins}|WCO:${formatVec3(wco)}${overrides}>`;
 }
 
 function reduceTimedEvent(

@@ -99,6 +99,24 @@ export function withSavedCameraModel(
   return { cameraModel: record, otherCameraModels: nonEmpty(others) };
 }
 
+/**
+ * The profile fields with `previous` replaced by `next` where it is saved, for
+ * a change that is not a new calibration (a confirmed bed frame), so the
+ * newest stays the newest.
+ */
+export function withReplacedCameraModel(
+  profile: SavedCameraFields,
+  previous: CameraModelRecord,
+  next: CameraModelRecord,
+): SavedCameraPatch {
+  return {
+    cameraModel: profile.cameraModel === previous ? next : profile.cameraModel,
+    otherCameraModels: profile.otherCameraModels?.map((model) =>
+      model === previous ? next : model,
+    ),
+  };
+}
+
 /** The profile fields after forgetting `record`; the next newest moves up. */
 export function withoutSavedCameraModel(
   profile: SavedCameraFields,

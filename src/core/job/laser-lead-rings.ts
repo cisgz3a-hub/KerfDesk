@@ -17,6 +17,13 @@
 // judged among its own rings by the same rule, its operations with leads
 // deciding. Which rings hold a ring, for the free-end check, is judged among
 // the job's own rings: those are the lines actually cut.
+//
+// Except that the lines are not all on the sheet's parts: Cut selected
+// graphics and an operation with output off leave parts uncut that stay on the
+// sheet, to be cut before or after. A lead must not burn into them either
+// (Amendment 10), so their contours join the rings and their lines the lines,
+// after the job's own, and are never led. A contour the job also cuts, by some
+// operation, or a copy of one, is left to the ring the job cuts.
 
 import { sampleArcMoves } from '../geometry/arc-fit';
 import type { Vec2 } from '../scene';
@@ -47,17 +54,31 @@ export type LeadJobLines = {
   /** The rings each ring's leads may cross and end inside: its copies, and
    * every ring another operation cuts from the same scene contour over it. */
   readonly exempt: ReadonlyArray<ReadonlyArray<number>>;
+  /** Lines from this id on are the uncut parts' (Amendment 10). */
+  readonly uncutFrom: number;
 };
+
+/** The lines the output leaves uncut, in job coordinates (Amendment 10). A
+ * closed one carries the key of its scene contour (laserLeadSourceKey). */
+export type UncutLeadLines = {
+  readonly contours: ReadonlyArray<{ readonly key: string; readonly points: ReadonlyArray<Vec2> }>;
+  readonly openLines: ReadonlyArray<ReadonlyArray<Vec2>>;
+};
+
+const NOTHING_UNCUT: UncutLeadLines = { contours: [], openLines: [] };
 
 /** `burns` says which cut groups really burn; others hold no part. `scene`:
  * the scene's contours the scrap side is judged among (sceneLeadSideContours);
  * absent, the job's own rings are. `openLines`: the scene's open Line cuts,
- * which leave a contour in a region they close without a side (Amendment 8). */
+ * which leave a contour in a region they close without a side (Amendment 8).
+ * `uncut`: the scene's lines the output does not cut, which leads keep clear
+ * of and never end inside (Amendment 10). */
 export function leadJobLines(
   job: Job,
   burns: (group: CutGroup) => boolean = isBurningLineGroup,
   scene?: ReadonlyArray<LeadSideContour>,
   openLines: ReadonlyArray<SceneOpenLine> = [],
+  uncut: UncutLeadLines = NOTHING_UNCUT,
 ): LeadJobLines {
   const lines: Array<ReadonlyArray<Vec2>> = [];
   const lineOf = new Map<string, number>();
@@ -111,9 +132,17 @@ export function leadJobLines(
   }
   const parts = pieceLookup(rings);
   const groups = owners.map((owner) => owner.group);
-  const { sides, sceneClasses } = ringSides(rings, owners, { scene, openLines }, parts);
+  const { sides, sceneClasses, verdicts } = ringSides(rings, owners, { scene, openLines }, parts);
   const representatives = classRepresentatives(sides.map((side) => side.copyClass));
   const copies = copyLists(representatives);
+  const exempt = pieceExemptions(rings, groups, copies, parts, sceneClasses);
+  const uncutFrom = lines.length;
+  appendUncut(
+    { lines, rings, sides, representatives, copies, exempt },
+    uncut,
+    verdicts,
+    new Set(sceneClasses),
+  );
   return {
     lines,
     lineOf,
@@ -122,8 +151,45 @@ export function leadJobLines(
     sides,
     holders: ringHolders(rings, representatives, copies),
     copies,
-    exempt: pieceExemptions(rings, groups, copies, parts, sceneClasses),
+    exempt,
+    uncutFrom,
   };
+}
+
+type RingLists = {
+  readonly lines: Array<ReadonlyArray<Vec2>>;
+  readonly rings: LeadRing[];
+  readonly sides: LeadSideVerdict[];
+  readonly representatives: number[];
+  readonly copies: number[][];
+  readonly exempt: number[][];
+};
+
+// Each uncut contour once, unless the job cuts it or a copy of it: as a ring
+// that holds what lies inside it, and as a line, as a cut ring is. Its own
+// leads, copies and exemptions are none. Uncut open lines are lines only.
+function appendUncut(
+  into: RingLists,
+  uncut: UncutLeadLines,
+  verdicts: ReadonlyMap<string, LeadSideVerdict>,
+  cutClasses: ReadonlySet<number>,
+): void {
+  const placed = new Set<number>();
+  for (const contour of uncut.contours) {
+    const verdict = verdicts.get(contour.key);
+    if (verdict !== undefined) {
+      if (cutClasses.has(verdict.copyClass) || placed.has(verdict.copyClass)) continue;
+      placed.add(verdict.copyClass);
+    }
+    const lineId = into.lines.length;
+    into.lines.push(closedOutline(contour.points));
+    into.representatives.push(into.rings.length);
+    into.rings.push(ring(contour.points, [lineId], contour.key));
+    into.sides.push(verdict ?? { side: 'unknown', copyClass: Number.NaN, aroundName: '' });
+    into.copies.push([]);
+    into.exempt.push([]);
+  }
+  for (const points of uncut.openLines) into.lines.push(points);
 }
 
 // Each ring's verdict: its scene contour's, or with no scene, its own among the
@@ -139,7 +205,12 @@ function ringSides(
     readonly openLines: ReadonlyArray<SceneOpenLine>;
   },
   parts: PieceLookup,
-): { readonly sides: LeadSideVerdict[]; readonly sceneClasses: ReadonlyArray<number> } {
+): {
+  readonly sides: LeadSideVerdict[];
+  readonly sceneClasses: ReadonlyArray<number>;
+  /** The scene contours' verdicts, by key; none without a scene. */
+  readonly verdicts: ReadonlyMap<string, LeadSideVerdict>;
+} {
   if (scene === undefined) {
     const own = leadSideVerdicts(
       rings.map((ring, index) => ({
@@ -150,7 +221,7 @@ function ringSides(
       })),
     );
     const sides = rings.map((_, index) => own.get(String(index)) as LeadSideVerdict);
-    return { sides, sceneClasses: sides.map((side) => side.copyClass) };
+    return { sides, sceneClasses: sides.map((side) => side.copyClass), verdicts: new Map() };
   }
   const verdicts = leadSideVerdicts(scene, openLines);
   const fresh = verdicts.size;
@@ -172,7 +243,7 @@ function ringSides(
     fresh,
     parts,
   );
-  return { sides, sceneClasses };
+  return { sides, sceneClasses, verdicts };
 }
 
 type RingOwner = Pick<LeadSideContour, 'decides' | 'operationName'> & { readonly group: number };

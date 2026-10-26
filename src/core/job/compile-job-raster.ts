@@ -3,6 +3,7 @@ import { clamp } from '../math';
 import { applyImageMaskToLuma, dither, pixelExtentForMm, resampleLuma } from '../raster';
 import { imageDitherAlgorithm, prepareImageLuma } from '../raster/image-processing';
 import { burnGridKernel } from '../raster/luma-resample';
+import { burnGridSharpen, gridSharpen, sharpenLuma } from '../raster/luma-sharpen';
 import { STREAMED_RASTER_PIXEL_THRESHOLD } from '../raster/raster-budget';
 import type { RasterPowerValues } from '../raster/raster-power-values';
 import {
@@ -326,10 +327,17 @@ function materializedRasterValues(input: MaterializedRasterInput): RasterPowerVa
         input.pixelHeight,
         burnGridKernel(imageDitherAlgorithm(input.layer)),
       );
+  // ADR-671: sharpen the burn grid itself, before the mask whitens anything,
+  // so a mask edge never gains a sharpening halo.
+  const sharpen = burnGridSharpen(input.obj, input.layer.passThrough);
+  const burnLuma =
+    sharpen === null
+      ? luma
+      : sharpenLuma(luma, input.pixelWidth, input.pixelHeight, gridSharpen(sharpen));
   const maskedLuma = applyImageMaskToLuma({
     image: input.obj,
     maskObject: input.maskObject,
-    luma,
+    luma: burnLuma,
     width: input.pixelWidth,
     height: input.pixelHeight,
   });

@@ -325,9 +325,9 @@ function validateRasterObject(obj: Record<string, unknown>, path: string): strin
     requireString(obj, `${path}.color`),
     requireLiteral(obj, `${path}.dither`, DITHER_ALGORITHMS),
     requirePositiveNumber(obj, `${path}.linesPerMm`),
-    optionalNumber(obj, `${path}.brightness`),
-    optionalNumber(obj, `${path}.contrast`),
-    optionalNumber(obj, `${path}.gamma`),
+    ...['brightness', 'contrast', 'gamma', 'sharpenAmount', 'sharpenRadius'].map((field) =>
+      optionalNumber(obj, `${path}.${field}`),
+    ),
     optionalString(obj, `${path}.imageMaskId`),
     obj['imageClip'] === undefined
       ? null

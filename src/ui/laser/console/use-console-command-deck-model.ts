@@ -90,6 +90,7 @@ export function useConsoleCommandDeckModel(
         submission.input,
         sendConsoleCommand,
         submission.kind === 'preserve-draft' ? submission.provenance : undefined,
+        useLaserStore.getState(),
       );
       if (result.status === 'sent') {
         setHistory((current) => recordSuccessfulConsoleCommand(current, result.command));

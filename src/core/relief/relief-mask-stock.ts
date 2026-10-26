@@ -17,13 +17,22 @@
 // A straight move is checked exactly against every block at the edge of the
 // excluded area within its reach (relief-mask-stock-move.ts): the nearest
 // excluded point to any point outside the area lies on its edge.
+//
+// The stock past the map's edge stands at the stock top too (ADR-412
+// Amendment 2, heightmap-outside-stock.ts), so every map has stock, masked or
+// not. It is checked the same way, as four strips past the map's sides. What
+// it requires stops at the stock top (raised by the tolerance, as the blocks
+// are): a tip there cannot cut stock no higher than it, and an unmasked
+// raster's rows run along the edge at it.
 
 import { partialCellCenter, partialCellEnd, partialCellStart } from '../grid';
 import { CNC_MASK_EMISSION_Z_CLEARANCE_MM } from '../cnc/precision';
 import type { ToolKernel } from '../sim';
 import type { Heightmap } from './heightmap';
+import { outsideStockDistanceMm, outsideStockStrips } from './heightmap-outside-stock';
 import {
   blockExcess,
+  blockRequirement,
   type BlockExcess,
   type BlockLaw,
   type Move,
@@ -39,7 +48,8 @@ const MOVE_SLACK_MM = 1e-9;
 export type MaskStock = {
   /**
    * The lowest tip of a cutter centred at (x, y) in map mm that clears every
-   * excluded block, or -Infinity when no block is in reach.
+   * excluded block and the stock past the map's edge, or -Infinity when none
+   * is in reach.
    */
   readonly tipAt: (x: number, y: number) => number;
   /**
@@ -75,12 +85,21 @@ type Stock = {
   readonly dz: (radiusMm: number) => number;
 };
 
+// The stock past the map's edge: its four strips and the capped law.
+type Outside = {
+  readonly extent: { readonly widthMm: number; readonly heightMm: number };
+  // Past x = 0, x = widthMm, y = 0 and y = heightMm, in that order.
+  readonly strips: ReadonlyArray<Rectangle>;
+  readonly law: BlockLaw;
+};
+
 /**
- * The excluded blocks of a masked map for one cutter, kept `clearanceMm` off
- * in XY; null when the map excludes nothing. With a tolerance the blocks stand
- * that much higher and a move may dip that far below them, so it never dips
- * below the blocks themselves: a straight move over the curved requirement
- * then settles after a few splits instead of splitting without end.
+ * The stock of a map for one cutter, kept `clearanceMm` off in XY: its
+ * excluded blocks, if any, and the stock past its edge; null only for a map
+ * with no cells. With a tolerance the stock stands that much higher and a move
+ * may dip that far below it, so it never dips below the stock itself: a
+ * straight move over the curved requirement then settles after a few splits
+ * instead of splitting without end.
  */
 export function createMaskStock(
   map: Heightmap,
@@ -88,13 +107,47 @@ export function createMaskStock(
   clearanceMm: number,
   toleranceMm = 0,
 ): MaskStock | null {
+  if (!(map.widthCells > 0 && map.heightCells > 0)) return null;
+  const tolerance = 16 * Number.EPSILON * Math.max(1, kernel.radiusMm, map.mmPerCell);
+  const law: BlockLaw = {
+    top: CNC_MASK_EMISSION_Z_CLEARANCE_MM + toleranceMm,
+    clearanceMm,
+    radiusMm: kernel.radiusMm,
+    reachMm: kernel.radiusMm + clearanceMm + tolerance,
+    dz: kernel.surfaceDzAtRadius,
+  };
+  const blocks = excludedStock(map, kernel, law, clearanceMm, toleranceMm, tolerance);
+  const outside: Outside = {
+    extent: { widthMm: map.widthMm, heightMm: map.heightMm },
+    strips: outsideStockStrips(map, law.reachMm),
+    law: { ...law, ceilingMm: toleranceMm },
+  };
+  const tipAt = (x: number, y: number): number =>
+    Math.max(
+      blocks === null ? Number.NEGATIVE_INFINITY : stockTipAt(blocks, x, y),
+      outsideTipAt(outside, x, y),
+    );
+  return {
+    tipAt,
+    moveExcess: (from, to) => stockMoveExcess(blocks, outside, toleranceMm, tipAt, from, to),
+  };
+}
+
+// The excluded blocks alone; null when the map excludes nothing.
+function excludedStock(
+  map: Heightmap,
+  kernel: ToolKernel,
+  law: BlockLaw,
+  clearanceMm: number,
+  toleranceMm: number,
+  tolerance: number,
+): Stock | null {
   const inclusion = map.inclusion;
   if (inclusion === undefined || !inclusion.includes(0)) return null;
   const { widthCells, heightCells, mmPerCell } = map;
-  const tolerance = 16 * Number.EPSILON * Math.max(1, kernel.radiusMm, mmPerCell);
   // An excluded cell m cells away on either axis lies at least m - 1 cells off.
   const span = Math.ceil((kernel.radiusMm + clearanceMm + tolerance) / mmPerCell) + 1;
-  const stock: Stock = {
+  return {
     inclusion,
     widthCells,
     heightCells,
@@ -105,13 +158,7 @@ export function createMaskStock(
     y1: Float64Array.from({ length: heightCells }, (_, j) => partialCellEnd(map, 'y', j)),
     near: excludedWithin(inclusion, widthCells, heightCells, span),
     edge: excludedEdge(inclusion, widthCells, heightCells),
-    law: {
-      top: CNC_MASK_EMISSION_Z_CLEARANCE_MM + toleranceMm,
-      clearanceMm,
-      radiusMm: kernel.radiusMm,
-      reachMm: kernel.radiusMm + clearanceMm + tolerance,
-      dz: kernel.surfaceDzAtRadius,
-    },
+    law,
     span,
     clearanceMm,
     toleranceMm,
@@ -119,10 +166,13 @@ export function createMaskStock(
     tolerance,
     dz: kernel.surfaceDzAtRadius,
   };
-  return {
-    tipAt: (x, y) => stockTipAt(stock, x, y),
-    moveExcess: (from, to) => stockMoveExcess(stock, from, to),
-  };
+}
+
+function outsideTipAt(outside: Outside, x: number, y: number): number {
+  const distanceMm = outsideStockDistanceMm(outside.extent, x, y);
+  return distanceMm > outside.law.reachMm
+    ? Number.NEGATIVE_INFINITY
+    : blockRequirement(outside.law, distanceMm);
 }
 
 /**
@@ -161,8 +211,15 @@ function float32AtLeast(value: number): number {
   return float32[0] ?? 0;
 }
 
+type Worst = { readonly worst: BlockExcess | null; readonly highest: number };
+
+const NOTHING_IN_REACH: Worst = { worst: null, highest: Number.NEGATIVE_INFINITY };
+
 function stockMoveExcess(
-  stock: Stock,
+  blocks: Stock | null,
+  outside: Outside,
+  toleranceMm: number,
+  tipAt: (x: number, y: number) => number,
   from: FinishingPoint,
   to: FinishingPoint,
 ): MoveExcess | null {
@@ -174,20 +231,47 @@ function stockMoveExcess(
     dy: to.y - from.y,
     dz: to.z - from.z,
   };
-  const { worst, highest } = worstBlock(stock, move);
-  if (worst === null || !(worst.h < -stock.toleranceMm - MOVE_SLACK_MM)) return null;
+  const inside = blocks === null ? NOTHING_IN_REACH : worstBlock(blocks, move);
+  const past = worstStrip(outside, move);
+  const worst =
+    inside.worst === null || (past.worst !== null && past.worst.h < inside.worst.h)
+      ? past.worst
+      : inside.worst;
+  const highest = Math.max(inside.highest, past.highest);
+  if (worst === null || !(worst.h < -toleranceMm - MOVE_SLACK_MM)) return null;
   const x = from.x + worst.t * move.dx;
   const y = from.y + worst.t * move.dy;
   const z = from.z + worst.t * move.dz;
-  return { point: { x, y, z: Math.max(z, stockTipAt(stock, x, y)) }, highest };
+  return { point: { x, y, z: Math.max(z, tipAt(x, y)) }, highest };
+}
+
+// The strip past the map's edge the move stands lowest against, of those
+// past a side it comes within reach of, and the highest requirement of any.
+function worstStrip(outside: Outside, move: Move): Worst {
+  const { reachMm } = outside.law;
+  const { widthMm, heightMm } = outside.extent;
+  const near = [
+    Math.min(move.x, move.x + move.dx) - reachMm < 0,
+    Math.max(move.x, move.x + move.dx) + reachMm > widthMm,
+    Math.min(move.y, move.y + move.dy) - reachMm < 0,
+    Math.max(move.y, move.y + move.dy) + reachMm > heightMm,
+  ];
+  let worst: BlockExcess | null = null;
+  let highest = Number.NEGATIVE_INFINITY;
+  for (let index = 0; index < outside.strips.length; index += 1) {
+    const strip = outside.strips[index];
+    if (strip === undefined || near[index] !== true) continue;
+    const excess = blockExcess(move, strip, outside.law);
+    if (excess === null) continue;
+    highest = Math.max(highest, excess.highest);
+    if (worst === null || excess.h < worst.h) worst = excess;
+  }
+  return { worst, highest };
 }
 
 // The block at the edge of the excluded area the move stands lowest against,
 // and the highest requirement of any of them along it.
-function worstBlock(
-  stock: Stock,
-  move: Move,
-): { readonly worst: BlockExcess | null; readonly highest: number } {
+function worstBlock(stock: Stock, move: Move): Worst {
   const { widthCells, heightCells, mmPerCell, law } = stock;
   const firstI = cellAt(Math.min(move.x, move.x + move.dx) - law.reachMm, widthCells, mmPerCell);
   const lastI = cellAt(Math.max(move.x, move.x + move.dx) + law.reachMm, widthCells, mmPerCell);

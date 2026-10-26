@@ -64,6 +64,21 @@ it('invalidates same-ID image adjustments and effective object power scale', () 
   expect(sink.built).toHaveLength(5);
 });
 
+it('rebuilds a same-ID preview when only its sharpening changes (ADR-671)', () => {
+  const raster = {
+      ...previewRaster(),
+      operationOverride: { ditherAlgorithm: 'grayscale' as const },
+    },
+    sink = previewSink();
+  for (const patch of [{}, { sharpenAmount: 150 }, { sharpenAmount: 150, sharpenRadius: 2 }]) {
+    const p = previewProject([{ ...raster, ...patch }]);
+    sink.drawn.length = 0;
+    sink.draw(p);
+    expect(sink.drawn.map(gray)).toEqual(normalizedCompiledPixels(p));
+  }
+  expect(sink.built).toHaveLength(3);
+});
+
 function mask(): SceneObject {
   return {
     kind: 'shape',

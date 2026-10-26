@@ -15,7 +15,9 @@
 //   scene's contours (laser-lead-sides.ts), unless the operation puts every
 //   lead outside or inside. A contour whose side is unknown gets no leads.
 // - A lead that does not fit is shortened, down to a quarter of its length,
-//   or left out (laser-lead-fit.ts); Job Review says how many.
+//   or left out (laser-lead-fit.ts); Job Review says how many. It fits only
+//   clear of every part on the sheet, those the output leaves uncut (Cut
+//   selected graphics, output off) included (Amendment 10).
 // - Passes: every pass cuts lead-in, contour, lead-out. Overcut (ADR-415) still
 //   runs on the final pass only, before the lead-out, which then leaves from
 //   where the overcut ends (`finalPassBurn`).
@@ -53,8 +55,13 @@ import {
   OBSTACLE_ARC_SAGITTA_MM,
   withoutLeadScaffolding,
   type LeadJobLines,
+  type UncutLeadLines,
 } from './laser-lead-rings';
-import { sceneLeadSideGeometry, type LeadSideVerdict } from './laser-lead-sides';
+import {
+  sceneLeadSideGeometry,
+  type LeadSideVerdict,
+  type UncutSceneLines,
+} from './laser-lead-sides';
 import {
   leadSpan,
   leadWrap,
@@ -77,6 +84,17 @@ export type LaserLeadOptions = {
   /** The whole scene, output scope aside, whose contours decide each
    * contour's scrap side (ADR-626 Amd 1); absent, the job's own do. */
   readonly scene?: Pick<Scene, 'layers' | 'objects'>;
+  /** What the output cuts of `scene`, and where the scene lies in the job.
+   * With it, the scene's lines the output leaves uncut, parts that stay on the
+   * sheet, are lines and rings a lead keeps clear of too (Amd 10). */
+  readonly output?: LeadOutputScope;
+};
+
+export type LeadOutputScope = {
+  /** The artwork the output cuts (Cut selected graphics); all when absent. */
+  readonly objectIds?: ReadonlySet<string>;
+  /** A scene point in job coordinates. */
+  readonly sceneToJob: (point: Vec2) => Vec2;
 };
 
 type LeadWorld = LeadJobLines & {
@@ -96,11 +114,21 @@ export function applyLaserLeads(job: Job, options: LaserLeadOptions): Job {
   // burns nothing, so it gets no leads and holds no part.
   const burns = (group: CutGroup): boolean =>
     isBurningLineGroup(group) && hasJobStartPower(group, options.device);
+  const { output } = options;
   const scene =
-    options.scene === undefined ? undefined : sceneLeadSideGeometry(options.scene, options.device);
-  const lines = leadJobLines(job, burns, scene?.contours, scene?.openLines);
+    options.scene === undefined
+      ? undefined
+      : sceneLeadSideGeometry(options.scene, options.device, output?.objectIds);
+  const lines = leadJobLines(
+    job,
+    burns,
+    scene?.contours,
+    scene?.openLines,
+    scene === undefined || output === undefined ? undefined : uncutInJob(scene.uncut, output),
+  );
   const obstacles = LeadObstacles.create(lines.lines, lines.rings);
-  const wrap = leadWrap(options.wrapMm, lines.lines);
+  // The job's ends are its own cut lines' (an uncut part does not run).
+  const wrap = leadWrap(options.wrapMm, lines.lines.slice(0, lines.uncutFrom));
   for (const line of lines.lines) {
     for (const copy of wrappedCopies(line, wrap)) obstacles.addLine(copy);
   }
@@ -135,6 +163,20 @@ export function applyLaserLeads(job: Job, options: LaserLeadOptions): Job {
     ...(diagnostics.length === 0
       ? {}
       : { diagnostics: [...(job.diagnostics ?? []), ...diagnostics] }),
+  };
+}
+
+// The uncut parts as they lie in the job, drawn as the scene has them: a kerf
+// offset they will be cut with later is not applied, so a lead keeps clear of
+// the part's own edge.
+function uncutInJob(uncut: UncutSceneLines, output: LeadOutputScope): UncutLeadLines {
+  const place = (points: ReadonlyArray<Vec2>): Vec2[] => points.map(output.sceneToJob);
+  return {
+    contours: uncut.contours.map((contour) => ({
+      key: contour.key,
+      points: place(contour.points),
+    })),
+    openLines: uncut.openLines.map((line) => place(line.points)),
   };
 }
 

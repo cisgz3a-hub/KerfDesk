@@ -302,8 +302,9 @@ function maskCacheKey(maskObject: SceneObject | null): string {
   });
 }
 
+// ADR-671 sharpening rewrites burn pixels too, so it keys the cached canvas.
 function adjustmentKey(obj: RasterImage): string {
-  return `${obj.brightness ?? 0}:${obj.contrast ?? 0}:${obj.gamma ?? 1}`;
+  return `${obj.brightness ?? 0}:${obj.contrast ?? 0}:${obj.gamma ?? 1}:${obj.sharpenAmount ?? 0}:${obj.sharpenRadius ?? 1}`;
 }
 
 function transformCacheKey(obj: RasterImage, device: DeviceProfile): string {

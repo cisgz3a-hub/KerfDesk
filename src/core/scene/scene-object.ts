@@ -385,6 +385,10 @@ export type RasterImage = ObjectPowerScale & {
   readonly brightness?: number; // -100..100; image engrave adjustment, default 0
   readonly contrast?: number; // -100..100; image engrave adjustment, default 0
   readonly gamma?: number; // 0.1..5; image engrave adjustment, default 1
+  // ADR-671 unsharp mask on the burn grid, after resampling and before
+  // dithering. Absent or 0 is off and compiles byte-identically.
+  readonly sharpenAmount?: number; // 0..500 percent; default 0 (off)
+  readonly sharpenRadius?: number; // 0.5..3 burn cells (Gaussian sigma); default 1
   // Non-destructive Apply Mask to Image. The referenced scene object remains
   // editable; raster processing whites pixels outside its closed geometry.
   readonly imageMaskId?: string;

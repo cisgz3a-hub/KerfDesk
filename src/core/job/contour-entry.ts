@@ -49,6 +49,13 @@ export function contourEntryBoundsForDevice(device: DeviceProfile): JobBounds {
   return { minX, minY, maxX, maxY };
 }
 
+/** True when the job omits every contour entry because the bed's position in
+ * program coordinates is unknown (ADR-343). The G-code comment and Job Review
+ * then say the entry was skipped, not effective (ADR-239 Amendment 1). */
+export function contourEntriesSkipped(job: Pick<Job, 'contourEntryBounds'>): boolean {
+  return job.contourEntryBounds === null;
+}
+
 /** Only entry-bearing jobs need this metadata. Null means the physical bed's
  * position in program coordinates is unknown, so optional entries are omitted. */
 export function withContourEntryBounds(job: Job, bounds: JobBounds | null): Job {

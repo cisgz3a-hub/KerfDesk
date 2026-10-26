@@ -40,20 +40,25 @@ describe('dilateHeightmapByTool exclusion', () => {
   });
 
   it('records included centers whose cutter kernel touches excluded stock', () => {
+    // Cell 4 of the middle row is excluded. The first and last cells of a row
+    // stand within the cutter's reach of the map's edge, whose stock holds
+    // them at the stock top too (ADR-412 Amendment 2) without touching the mask.
+    const inclusion = new Uint8Array(8 * 5).fill(1);
+    inclusion[2 * 8 + 4] = 0;
     const map: Heightmap = {
-      widthCells: 4,
-      heightCells: 1,
-      widthMm: 4,
-      heightMm: 1,
+      widthCells: 8,
+      heightCells: 5,
+      widthMm: 8,
+      heightMm: 5,
       mmPerCell: 1,
-      depth: new Float32Array(4).fill(-2),
-      inclusion: Uint8Array.from([1, 1, 0, 1]),
+      depth: new Float32Array(8 * 5).fill(-2),
+      inclusion,
     };
 
     const result = dilateHeightmapByToolWithMaskEvidence(map, THREE_CELL_KERNEL, 0);
 
-    expect([...result.tipDepth]).toEqual([-2, 0, 0, 0]);
-    expect([...(result.touchesExcluded ?? [])]).toEqual([0, 1, 0, 1]);
+    expect([...result.tipDepth.slice(16, 24)]).toEqual([0, -2, -2, 0, 0, 0, -2, 0]);
+    expect([...(result.touchesExcluded ?? []).slice(16, 24)]).toEqual([0, 0, 0, 1, 0, 1, 0, 0]);
   });
 
   it('stores a masked constraint on the stock-safe side of Float32 rounding', () => {
