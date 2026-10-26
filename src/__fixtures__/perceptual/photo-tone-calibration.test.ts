@@ -108,15 +108,19 @@ const dotGainBurn: Burn = (group) => {
   }
   const darkness = new Float64Array(group.pixelWidth * group.pixelHeight);
   for (let sy = 0; sy < height; sy += 1)
-    for (let sx = 0; sx < width; sx += 1)
-      darkness[Math.floor(sy / SUPERSAMPLE) * group.pixelWidth + Math.floor(sx / SUPERSAMPLE)] +=
-        (marked[sy * width + sx] ?? 0) / SUPERSAMPLE ** 2;
+    for (let sx = 0; sx < width; sx += 1) {
+      const cell = Math.floor(sy / SUPERSAMPLE) * group.pixelWidth + Math.floor(sx / SUPERSAMPLE);
+      darkness[cell] = (darkness[cell] ?? 0) + (marked[sy * width + sx] ?? 0) / SUPERSAMPLE ** 2;
+    }
   return darkness;
 };
 
 /** Grayscale on a material that darkens fast at low power. */
 function materialBurn(sMax: number): Burn {
-  return (group) => group.sValues.map((value) => 1 - (1 - Math.min(1, value / sMax)) ** 2.5);
+  // Float64Array.from, not .map: compiled power may be a Uint16Array, whose map
+  // would round every darkness to 0 or 1.
+  return (group) =>
+    Float64Array.from(group.sValues, (value) => 1 - (1 - Math.min(1, value / sMax)) ** 2.5);
 }
 
 /** Generate the wedge with the photo's settings, burn it, record it, fit the curve. */
