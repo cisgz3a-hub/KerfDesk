@@ -70,7 +70,7 @@ function total(values: Float64Array): number {
   return values.reduce((sum, value) => sum + value, 0);
 }
 
-describe('ADR-650 tone curve in compiled raster output', () => {
+describe('ADR-670 tone curve in compiled raster output', () => {
   it.each(['jarvis', 'grayscale'] as const)(
     'compiles %s byte-identically with no curve, an absent key or the identity curve',
     (dither) => {

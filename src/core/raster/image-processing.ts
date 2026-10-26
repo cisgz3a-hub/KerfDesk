@@ -12,7 +12,7 @@ type ImageProcessingSettings = {
 // Shared by processed-bitmap preview/export and both compiler raster paths.
 // Placement, masks, dot-width correction and the selected power range still apply;
 // image adjustments and re-dithering must not change the source pixel pattern.
-// ADR-650: a material tone calibration corrects the burn-side luma, after
+// ADR-670: a material tone calibration corrects the burn-side luma, after
 // Negative, so it means the same marks for dark and light materials.
 export function prepareImageLuma(
   source: Uint8Array,

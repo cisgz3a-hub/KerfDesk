@@ -307,7 +307,7 @@ function calibrationToolCommands(ctx: AppCommandContext): ReadonlyArray<AppComma
       'Create an interval test grid',
       guardedCalibrationAction(ctx, 'create an interval test', ctx.intervalTest),
     ),
-    // ADR-650: not guarded here. The dialog also records a burned wedge, which
+    // ADR-670: not guarded here. The dialog also records a burned wedge, which
     // keeps the project; its Generate button asks before replacing it.
     enabled(
       'tools.tone-calibration',

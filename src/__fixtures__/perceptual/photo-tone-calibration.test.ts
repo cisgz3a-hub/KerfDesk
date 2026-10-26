@@ -1,4 +1,4 @@
-// Photo tone calibration (ADR-650) — does a fitted curve make a dot-gain burn
+// Photo tone calibration (ADR-670) — does a fitted curve make a dot-gain burn
 // track the photo's tones?
 //
 // The burn model: every fired burn-grid cell marks a disc wider than the cell

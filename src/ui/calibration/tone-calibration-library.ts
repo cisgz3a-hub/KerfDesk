@@ -1,4 +1,4 @@
-// ADR-650: saved photo tone calibrations on this computer. A project keeps its
+// ADR-670: saved photo tone calibrations on this computer. A project keeps its
 // own copy of a chosen curve on the photo's operation, so it burns the same on
 // any computer; this list only offers curves to choose from.
 

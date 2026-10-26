@@ -42,7 +42,7 @@ function rows(object: RasterImage, layer: Layer): number[][] {
   );
 }
 
-describe('ADR-650 tone curve on the streamed raster path', () => {
+describe('ADR-670 tone curve on the streamed raster path', () => {
   it.each(['stucki', 'grayscale'] as const)(
     'streams %s rows corrected exactly like a source pre-mapped through the curve',
     (ditherAlgorithm) => {

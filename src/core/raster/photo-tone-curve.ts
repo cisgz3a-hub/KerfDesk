@@ -1,4 +1,4 @@
-// ADR-650: per-material photo tone calibration. A burned dot is wider than its
+// ADR-670: per-material photo tone calibration. A burned dot is wider than its
 // burn-grid cell and every material darkens differently, so a dithered tone
 // burns darker than the photo asked for. A grey step wedge, engraved with the
 // photo's own settings, measures that response once. Its inverse is applied to

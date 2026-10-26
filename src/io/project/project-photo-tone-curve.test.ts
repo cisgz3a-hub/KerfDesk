@@ -63,7 +63,7 @@ function projectWith(settings: Partial<Layer>, photoCurve = PHOTO_CURVE): Projec
   };
 }
 
-describe('ADR-650 photo tone curves in project files', () => {
+describe('ADR-670 photo tone curves in project files', () => {
   it('round-trips curves on operations, sub-operations and photo overrides', () => {
     const loaded = deserializeProject(serializeProject(projectWith({ photoToneCurve: CURVE })));
     if (loaded.kind !== 'ok') throw new Error(`Expected load, got ${loaded.kind}`);

@@ -1,4 +1,4 @@
-## ADR-650 - Per-material tone calibration corrects photo engraving tones
+## ADR-670 - Per-material tone calibration corrects photo engraving tones
 
 Date: 2026-10-20
 Status: Accepted

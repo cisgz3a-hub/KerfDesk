@@ -13,7 +13,7 @@ const portrait = readFileSync(
 
 test.use({ viewport: { width: 1440, height: 1000 } });
 
-// ADR-650: generate a wedge from the photo's settings, record the burn, apply.
+// ADR-670: generate a wedge from the photo's settings, record the burn, apply.
 test('tone calibration burns a wedge with the photo settings, records it and lightens the photo', async ({
   page,
   kerfdesk,

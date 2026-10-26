@@ -1,4 +1,4 @@
-// ADR-650: which Tone Calibration step is open, and the photo settings it uses.
+// ADR-670: which Tone Calibration step is open, and the photo settings it uses.
 
 import { create } from 'zustand';
 import { effectiveOperationForObject } from '../../core/effective-output';

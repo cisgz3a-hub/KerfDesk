@@ -31,7 +31,7 @@ function decodedLuma(image: RasterImage): Uint8Array {
   return decodeRasterLuma(image);
 }
 
-describe('ADR-650 tone calibration wedge', () => {
+describe('ADR-670 tone calibration wedge', () => {
   it('spaces the patches evenly from blank to solid, as whole burn lumas', () => {
     expect(toneWedgeBurnLumas(11)).toEqual([255, 230, 204, 179, 153, 128, 102, 77, 51, 25, 0]);
     const commanded = toneWedgeCommandedPercents(16);

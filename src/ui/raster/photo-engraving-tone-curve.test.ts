@@ -71,7 +71,7 @@ function applied(owner: PhotoEngravingOwner, draft: PhotoEngravingDraft): Raster
   return image;
 }
 
-describe('ADR-650 tone calibration in Photo engraving', () => {
+describe('ADR-670 tone calibration in Photo engraving', () => {
   beforeEach(resetStore);
 
   it('starts without a calibration and writes the chosen one into the photo override only', () => {

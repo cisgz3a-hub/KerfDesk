@@ -1,4 +1,4 @@
-// ADR-415, ADR-494, ADR-492, ADR-495, ADR-626 and ADR-650 operation settings, shared by the operation,
+// ADR-415, ADR-494, ADR-492, ADR-495, ADR-626 and ADR-670 operation settings, shared by the operation,
 // sub-operation and artwork-override validators. All optional: files written
 // before them load as they did.
 
@@ -41,7 +41,7 @@ export function cutExtrasFieldErrors(
   ];
 }
 
-// ADR-650: a curve that is not monotonic and pinned at both ends would burn
+// ADR-670: a curve that is not monotonic and pinned at both ends would burn
 // blank material or soften solid marks, so the file is refused, not repaired.
 function optionalPhotoToneCurve(value: Record<string, unknown>, path: string): string | null {
   const field = valueAtPath(value, path);

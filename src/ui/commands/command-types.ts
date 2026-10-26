@@ -274,7 +274,7 @@ export type AppCommandContext = CommandContextSlices & {
   readonly boxFitTest: () => void;
   readonly materialTest: () => void;
   readonly intervalTest: () => void;
-  /** ADR-650: opens Tone Calibration; generating its wedge asks before replacing the project. */
+  /** ADR-670: opens Tone Calibration; generating its wedge asks before replacing the project. */
   readonly toneCalibration?: () => void;
   readonly scanOffsetTest: () => void;
   readonly focusTestAvailable: boolean;

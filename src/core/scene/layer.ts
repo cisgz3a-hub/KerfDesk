@@ -84,7 +84,7 @@ export type LayerOperationSettings = {
   readonly leadLengthMm?: number | undefined;
   readonly leadAngleDeg?: number | undefined;
   readonly leadSide?: LaserLeadSide | undefined;
-  // ADR-650. Optional for the same reason: absent means no material tone
+  // ADR-670. Optional for the same reason: absent means no material tone
   // calibration, which compiles byte-identically to the output before it. An
   // Image operation applies it to the luma it dithers, after Negative.
   readonly photoToneCurve?: PhotoToneCurve | undefined;
@@ -355,7 +355,7 @@ export function layerOperationOutputEqual(
   );
 }
 
-// ADR-650: a tone curve is a value, so two operations holding equal curves
+// ADR-670: a tone curve is a value, so two operations holding equal curves
 // (each read from its own file) still match.
 function operationSettingEqual(
   left: LayerOperationSettings,

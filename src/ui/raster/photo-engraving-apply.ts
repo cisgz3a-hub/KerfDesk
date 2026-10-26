@@ -106,7 +106,7 @@ export function photoEngravingImage(
   };
 }
 
-// ADR-650: the photo's own choice. "None" over an operation that carries a
+// ADR-670: the photo's own choice. "None" over an operation that carries a
 // curve needs the identity curve, because an absent override key inherits it.
 function photoToneCurveOverride(
   operation: Layer,

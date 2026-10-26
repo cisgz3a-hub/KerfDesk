@@ -38,7 +38,7 @@ function expectMonotonic(curve: PhotoToneCurve): void {
   }
 }
 
-describe('ADR-650 photo tone curve fitting', () => {
+describe('ADR-670 photo tone curve fitting', () => {
   it('fits an identity record to an identity curve', () => {
     const curve = fitPhotoToneCurve(
       recorded((commanded) => commanded),
@@ -122,7 +122,7 @@ describe('ADR-650 photo tone curve fitting', () => {
   });
 });
 
-describe('ADR-650 photo tone curve validation', () => {
+describe('ADR-670 photo tone curve validation', () => {
   const valid = fitPhotoToneCurve(recorded(dotGain), 'Birch');
 
   it.each([
@@ -197,7 +197,7 @@ describe('ADR-650 photo tone curve validation', () => {
   });
 });
 
-describe('ADR-650 tone curve in the shared image path', () => {
+describe('ADR-670 tone curve in the shared image path', () => {
   const settings = { passThrough: false, negativeImage: false, ditherAlgorithm: 'jarvis' } as const;
   const source = Uint8Array.from({ length: 256 }, (_, index) => index);
   const curve = fitPhotoToneCurve(recorded(dotGain), 'Birch');

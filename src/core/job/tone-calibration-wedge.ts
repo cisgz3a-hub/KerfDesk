@@ -1,4 +1,4 @@
-// ADR-650: a labelled grey step wedge for photo tone calibration. Every patch
+// ADR-670: a labelled grey step wedge for photo tone calibration. Every patch
 // burns on one Image operation that copies the photo's own settings (dither,
 // interval, power, speed, Negative and the rest) without its tone curve, so the
 // burn measures the material's raw response to those exact settings.

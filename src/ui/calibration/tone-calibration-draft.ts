@@ -1,4 +1,4 @@
-// ADR-650: the Tone Calibration dialog's editable text and what it parses to.
+// ADR-670: the Tone Calibration dialog's editable text and what it parses to.
 
 import {
   TONE_WEDGE_DEFAULT_PATCHES,
@@ -17,6 +17,7 @@ import {
   type DitherAlgorithm,
   type LayerOperationSettings,
 } from '../../core/scene';
+import { PHOTO_DITHERS } from '../raster/photo-engraving-settings';
 import type { ToneCalibrationSettings } from './tone-calibration-library';
 
 /** The photo settings a wedge starts from, and where they came from. */
@@ -61,7 +62,7 @@ export const DEFAULT_TONE_WEDGE_DRAFT: ToneWedgeDraft = {
 
 /** The dithers offered for a wedge: the photo ones, Grayscale, and the seed's own. */
 export function toneWedgeDithers(seed: ToneCalibrationSeed | null): ReadonlyArray<DitherAlgorithm> {
-  const offered: DitherAlgorithm[] = ['jarvis', 'stucki', 'floyd-steinberg', 'grayscale'];
+  const offered: DitherAlgorithm[] = [...PHOTO_DITHERS, 'grayscale'];
   const own = seed?.settings.ditherAlgorithm;
   return own !== undefined && !offered.includes(own) ? [...offered, own] : offered;
 }

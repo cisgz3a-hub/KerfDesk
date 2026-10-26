@@ -11,7 +11,7 @@ const NONE = 'none';
 const IN_PROJECT = 'project';
 
 /**
- * ADR-650: choose the material tone calibration the photo burns with. The
+ * ADR-670: choose the material tone calibration the photo burns with. The
  * project stores a copy of the curve, so the list here is only this
  * computer's saved calibrations plus the one the photo already holds.
  */

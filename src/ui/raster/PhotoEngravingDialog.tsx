@@ -150,7 +150,7 @@ function PhotoEngravingGuide(props: {
   );
 }
 
-/** ADR-650: the wedge burns with the photo's settings as this window has them. */
+/** ADR-670: the wedge burns with the photo's settings as this window has them. */
 function toneCalibrationSeed(
   session: PhotoEngravingSession,
   effective: Layer,

@@ -19,7 +19,7 @@ export type PhotoEngravingDraft = {
   readonly ditherAlgorithm: PhotoDither;
   readonly linesPerMm: number;
   readonly negativeImage: boolean;
-  /** ADR-650: the material tone calibration; undefined burns the tones uncorrected. */
+  /** ADR-670: the material tone calibration; undefined burns the tones uncorrected. */
   readonly photoToneCurve: PhotoToneCurve | undefined;
 };
 
