@@ -61,10 +61,17 @@ describe('raster compact motion spelling (ADR-332)', () => {
   it('holds the modal motion word, the modal power and the trailing zeros', () => {
     const compact = emitRasterGroup(checkerRow({ compactMotionWords: true }));
 
-    // The rapid states everything; the runway G1 holds its S0; the burn moves
-    // hold the G1 and only restate S when the power changes.
+    // The rapid states everything; the runway G1 holds its S0 and is marked
+    // laser-off (ADR-415 Amendment 1); the burn moves hold the G1 and only
+    // restate S when the power changes.
     expect(compact).toContain(
-      ['G0X-0.5Y0.05S0', 'G1X0F3000', 'X0.1S1000', 'X0.2S0', 'X0.3S1000'].join('\n'),
+      [
+        'G0X-0.5Y0.05S0',
+        'G1X0F3000 ; kerfdesk:laser-off-motion',
+        'X0.1S1000',
+        'X0.2S0',
+        'X0.3S1000',
+      ].join('\n'),
     );
     expect(compact).not.toContain('X0.100');
     expect(compact).not.toContain('G1 X');
@@ -74,7 +81,11 @@ describe('raster compact motion spelling (ADR-332)', () => {
     const verbose = emitRasterGroup(checkerRow());
 
     expect(verbose).toContain(
-      ['G0 X-0.500 Y0.050 S0', 'G1 X0.000 F3000 S0', 'G1 X0.100 S1000'].join('\n'),
+      [
+        'G0 X-0.500 Y0.050 S0',
+        'G1 X0.000 F3000 S0 ; kerfdesk:laser-off-motion',
+        'G1 X0.100 S1000',
+      ].join('\n'),
     );
     expect(emitRasterGroup(checkerRow({ compactMotionWords: false }))).toBe(verbose);
   });

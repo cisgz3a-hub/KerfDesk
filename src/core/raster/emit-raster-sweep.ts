@@ -1,4 +1,5 @@
 // One planned raster sweep, including its controller-grid and modal state.
+import { INTENTIONAL_LASER_OFF_MOTION_COMMENT } from '../gcode-comments';
 import { formatGcodeFeedMmPerMin } from '../gcode/feed-word';
 import { formatGcodePowerS } from '../gcode/decimal-word';
 import {
@@ -135,10 +136,13 @@ export function emitSpanSweep(
     endsOnBurn: incoming.lit && previousHead !== null && sameRasterHead(startHead, previousHead),
   };
   const formatting = { input, feed, writer, style, line, constantPower, deferredOpening };
-  const pushRun = (x: number, s: number): void =>
-    pushRasterRun(state, x + rowShiftX, s, formatting);
+  const pushRun = (x: number, s: number, comment?: string): void =>
+    pushRasterRun(state, x + rowShiftX, s, formatting, comment);
+  // The runways are laser-off feed moves the operator asked for, marked as the
+  // Fill runways are so preflight excuses them up to the overscan (ADR-415
+  // Amendment 1).
   if (sweepPlan.leadInMm > 0) {
-    pushRun(reverse ? activeEndX : activeStartX, 0);
+    pushRun(reverse ? activeEndX : activeStartX, 0, runwayComment(sweepPlan.leadInMm));
   }
   for (const run of sweepPlan.runs) {
     pushRun(run.endXWorldMm, run.s);
@@ -154,6 +158,7 @@ export function emitSpanSweep(
     endX + rowShiftX,
     sweepPlan.leadOutMm > 0 || dotWidthCorrectionMm <= 0,
     formatting,
+    runwayComment(sweepPlan.leadOutMm),
   );
   return {
     lines: state.lines,
@@ -182,7 +187,13 @@ type SweepFormatting = RasterRunFormatting & {
   readonly deferredOpening: boolean;
 };
 
-function pushRasterRun(state: SweepState, x: number, s: number, formatting: SweepFormatting): void {
+function pushRasterRun(
+  state: SweepState,
+  x: number,
+  s: number,
+  formatting: SweepFormatting,
+  comment?: string,
+): void {
   const { line } = formatting;
   const target = line.head(x);
   const previousM3StillLit = formatting.deferredOpening && state.lines.length === 0;
@@ -195,7 +206,7 @@ function pushRasterRun(state: SweepState, x: number, s: number, formatting: Swee
     state.lines.push(...rasterEntryExcursion(line, state.headScanX, line.scanX(x), formatting));
     state.prevS = 0;
   }
-  state.lines.push(formatRunG1(x, s, state.prevS, state.feedPending, formatting));
+  state.lines.push(formatRunG1(x, s, state.prevS, state.feedPending, formatting, comment));
   state.feedEmitted ||= state.feedPending || formatting.input.modalFeedrate === false;
   state.feedPending = false;
   state.prevS = s;
@@ -209,6 +220,7 @@ function closeRasterSweep(
   x: number,
   wanted: boolean,
   formatting: SweepFormatting,
+  comment: string | undefined,
 ): void {
   const { input, feed, line, constantPower, deferredOpening } = formatting;
   const closeHead = line.head(x);
@@ -220,12 +232,17 @@ function closeRasterSweep(
   )
     return;
   state.lines.push(
-    formatLaserOffG1(x, feed, state.feedPending, input.modalFeedrate ?? true, formatting),
+    formatLaserOffG1(x, feed, state.feedPending, input.modalFeedrate ?? true, formatting, comment),
   );
   state.feedEmitted ||= state.feedPending || input.modalFeedrate === false;
   if (!sameRasterHead(closeHead, state.head)) state.endsOnBurn = false;
   state.head = closeHead;
   state.headScanX = line.scanX(x);
+}
+
+/** The laser-off marker for a run-in or run-out the overscan asked for. */
+function runwayComment(runwayMm: number): string | undefined {
+  return runwayMm > 0 ? INTENTIONAL_LASER_OFF_MOTION_COMMENT : undefined;
 }
 
 function writesRowClose(
@@ -247,6 +264,7 @@ function formatLaserOffG1(
   emitFeed: boolean,
   modalFeedrate: boolean,
   formatting: RasterRunFormatting,
+  comment: string | undefined,
 ): string {
   const { writer, style, line } = formatting;
   const motionWord = writer.motion('G1');
@@ -261,6 +279,7 @@ function formatLaserOffG1(
       'S0',
     ],
     style,
+    comment,
   );
 }
 
@@ -281,6 +300,7 @@ function formatRunG1(
   prevS: number,
   isVeryFirstG1: boolean,
   formatting: RasterRunFormatting,
+  comment?: string,
 ): string {
   const { input, feed, writer, style, line } = formatting;
   return joinMotionWords(
@@ -293,5 +313,6 @@ function formatRunG1(
         : '',
     ],
     style,
+    comment,
   );
 }
