@@ -82,6 +82,13 @@ export type PreflightCode =
   | 'cnc-layer-empty'
   // Advisory-only: exact open contours omitted by closed-only CNC operations.
   | 'cnc-open-contours-omitted'
+  // Advisory-only (ADR-672): an Outside or Inside profile cuts open paths on
+  // their line, and closes outlines whose ends meet within 0.5 mm.
+  | 'cnc-profile-open-path-on-line'
+  | 'cnc-profile-outline-closed'
+  // Advisory-only (ADR-433 Amendment 3): a profile's cutter reaches a part
+  // another operation keeps.
+  | 'cnc-profile-cuts-kept-part'
   | 'plunged-travel'
   | 'spindle-start-before-clearance'
   | 'relief-needs-cnc'

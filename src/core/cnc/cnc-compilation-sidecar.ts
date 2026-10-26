@@ -63,6 +63,7 @@ export function buildCncCompilationSidecar(
   reliefPlans: ReadonlyArray<CncReliefPlanningEvidence>,
   offsetLadderDiagnostics: ReadonlyArray<CncOffsetLadderCompilationEvidence>,
   openContourOmissions: CncOpenContourOmissions,
+  profileEvidence: Pick<CncCompilationSidecar, 'profileOpenPaths' | 'keptPartCuts'> = {},
 ): CncCompilationSidecar {
   const exactOffsetDiagnostics = uniqueOffsetDiagnostics([
     ...offsetLadderDiagnostics,
@@ -88,6 +89,7 @@ export function buildCncCompilationSidecar(
     offsetLadderDiagnostics: exactOffsetDiagnostics,
     omittedOpenContours: openContourOmissions.counts,
     omittedOpenContourSources: openContourOmissions.sources,
+    ...profileEvidence,
   };
 }
 

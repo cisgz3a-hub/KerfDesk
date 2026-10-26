@@ -15,6 +15,7 @@ import type { DeviceProfile } from '../devices';
 import { artworkOperationRuns } from '../artwork-order';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
+  layerCncTool,
   type CncLayerSettings,
   type CncMachineConfig,
   type Layer,
@@ -32,8 +33,15 @@ import type {
 import type {
   CncOpenContourOmission,
   CncOpenContourOmissionSource,
+  CncProfileOpenPaths,
 } from '../job/cnc-compilation-sidecar-types';
 import { cncOpenContourOmissions } from './cnc-open-contour-omissions';
+import { cncProfileOpenPaths } from './cnc-profile-outline-join';
+import {
+  cncKeptPartCuts,
+  keptPartCutOperation,
+  type KeptPartCutOperation,
+} from './cnc-kept-part-cuts';
 import type { ReliefMaterializationFailure } from '../relief/relief-materialization-failure';
 import { isProfileCutType } from './compile-cnc-helpers';
 import { compileReliefGroupsForLayer } from './compile-cnc-relief';
@@ -52,7 +60,7 @@ import {
   type PreparedCncCompilationArtifact,
 } from './cnc-compilation-artifact';
 import { profileLeadJobWalls } from './profile-lead-job-walls';
-import type { ProfileLeadKeptWall } from './profile-lead-kept-walls';
+import { profileLeadCutWidthMm, type ProfileLeadKeptWall } from './profile-lead-kept-walls';
 import { cncGroupForLayerResolvedWithEvidence } from './compile-cnc-layer-group';
 import {
   boundVCarveLadder,
@@ -148,6 +156,8 @@ function compileCncSnapshot(
   const reliefPlans: CncReliefPlanningEvidence[] = [];
   const omittedOpenContours: CncOpenContourOmission[] = [];
   const omittedOpenContourSources: CncOpenContourOmissionSource[] = [];
+  const profileOpenPaths: CncProfileOpenPaths[] = [];
+  const keptPartOperations: KeptPartCutOperation[] = [];
   const sourceObjects = scene.objects;
   const allSourceObjects = [...sourceObjects, ...(scene.outputDependencies ?? [])];
   const runs = artworkOperationRuns(scene);
@@ -172,6 +182,9 @@ function compileCncSnapshot(
     reliefPlans.push(...operation.reliefPlans);
     omittedOpenContours.push(...operation.openContourOmissions.counts);
     omittedOpenContourSources.push(...operation.openContourOmissions.sources);
+    profileOpenPaths.push(...operation.profileOpenPaths);
+    const measured = keptPartCutOperation(run.layer, operation.profileGroups, config);
+    if (measured !== null) keptPartOperations.push(measured);
     offsetLadderDiagnostics.push(...operation.offsetLadderDiagnostics);
     if (operation.stepoverOperation !== undefined) {
       stepoverOperations.push(operation.stepoverOperation);
@@ -187,6 +200,9 @@ function compileCncSnapshot(
     reliefPlans,
     offsetLadderDiagnostics,
     { counts: omittedOpenContours, sources: omittedOpenContourSources },
+    // ADR-672 and ADR-433 Amendment 3: outlines cut on their line, and cuts
+    // that reach a part another operation keeps.
+    { profileOpenPaths, keptPartCuts: cncKeptPartCuts(keptPartOperations, leadWalls.walls) },
   );
   return {
     kind: 'compiled',
@@ -246,6 +262,11 @@ function compileCncOperation(
     ],
     profileGroups: vectorGroups.profileGroups,
     openContourOmissions: cncOpenContourOmissions(layer, contours),
+    profileOpenPaths: cncProfileOpenPaths(
+      layer,
+      contours,
+      profileLeadCutWidthMm(layerCncTool(config, settings), settings),
+    ),
     reliefPlans: relief.evidence.plans,
     offsetLadderDiagnostics: [
       ...vectorGroups.offsetLadderDiagnostics,

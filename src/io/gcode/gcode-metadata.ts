@@ -147,7 +147,9 @@ export type GcodeMetadata = {
 // ADR-285 Amd 1 erodes the V-carve flat core with round joins, so its floor
 // passes sweep each inside corner instead of leaving a fin.
 // CNC audit v1 F4-P3-2: a drill group's header names the plunge feed it drills at.
-export const EMITTER_REVISION = 'cnc-drill-plunge-feed-20261023-v29';
+// ADR-672 closes CNC Outside/Inside outlines whose ends meet within 0.5 mm, so
+// they are offset as closed shapes (v30 is PR #1440's laser runway markers).
+export const EMITTER_REVISION = 'cnc-profile-closes-open-outlines-20261026-v31';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

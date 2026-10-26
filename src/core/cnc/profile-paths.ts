@@ -6,7 +6,9 @@
 // exactly tool-radius compensation for "cut outside, part keeps its size"
 // (holes get cut inside their boundary, so the hole keeps its size too).
 // 'inside' is the mirror case. Open polylines cannot be side-offset — they are
-// always cut on-path, matching Easel.
+// cut on-path. Outlines whose ends meet within 0.5 mm arrive here already
+// closed, and Job Review says how many stayed open and that the part or hole
+// they outline comes out one cut width off (ADR-672).
 
 import { offsetClosedPolylinesForKerf } from '../geometry/kerf-offset';
 import type { Polyline, Vec2 } from '../scene';

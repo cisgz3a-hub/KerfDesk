@@ -42,6 +42,7 @@ import { findCncMotionBoundsPreflightIssues } from './cnc-motion-bounds-prefligh
 import { hasCuttingMove } from './cutting-move';
 import { cncOpenContourIssues } from './cnc-open-contour-issues';
 import { cncProfileLeadPlungeIssues } from './cnc-profile-lead-plunge-issues';
+import { cncKeptPartCutIssues, cncProfileOpenPathIssues } from './cnc-profile-part-issues';
 import { findInvalidCncToolGeometry } from './cnc-tool-geometry';
 import { cncStarterToolFeedIssue } from './cnc-starter-tool-feed';
 import { findNoGoZoneCollisions } from './no-go-zones';
@@ -81,6 +82,10 @@ export function runCncPreflight(
   appendSourceGeometryIssues(project, config, options, issues);
   appendRampEntryPlungeIssues(project, options.compiledJob, issues);
   issues.push(...cncProfileLeadPlungeIssues(options.compiledJob));
+  // Machine positions hold only when the program runs where it was compiled.
+  const showPositions =
+    options.coordinateMode !== 'relative-origin' && options.motionOffset === undefined;
+  issues.push(...cncKeptPartCutIssues(options.compiledJob, showPositions));
   issues.push(...findCncMotionBoundsPreflightIssues(project.device, gcode, options));
   appendNonFiniteCoordIssues(gcode, issues);
   appendNoGoZoneIssues(project, config, gcode, options, issues);
@@ -97,6 +102,7 @@ function appendSourceGeometryIssues(
   issues: PreflightIssue[],
 ): void {
   issues.push(...cncOpenContourIssues(options.compiledJob));
+  issues.push(...cncProfileOpenPathIssues(options.compiledJob));
   if (options.sourceGeometryChecks === 'compiled-evidence-only') {
     appendVCarveEntryIssues(project, config, options.compiledJob, issues);
     return;

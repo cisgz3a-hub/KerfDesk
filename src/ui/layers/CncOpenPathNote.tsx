@@ -5,7 +5,9 @@
 // Which cut types those are is measured against the compiler, not assumed —
 // core/cnc/closed-contour-cut-types.ts and its test. V-carve, Pocket and Drill
 // each emit zero motion from open strokes; the profile and engrave families
-// still emit, so they are deliberately silent here.
+// still emit. Outside and Inside profiles cut an open path on its line, not to
+// their side, so they say that instead (ADR-672); the count is taken after
+// compile's own join of near-closed outlines. On path and Engrave stay silent.
 //
 // Text only — informs, never gates (rule 7). Every cut type stays selectable
 // for every layer, and nothing about Frame or Start changes.
@@ -17,6 +19,7 @@ import { useEffect, useState } from 'react';
 // Deep imports: core/cnc's barrel is a ratcheted over-cap legacy barrel
 // (scripts/index-export-baseline.json pins it at 67) and may only shrink.
 import { cutTypeNeedsClosedContours } from '../../core/cnc/closed-contour-cut-types';
+import { profileCutOffsetsToASide } from '../../core/cnc/cnc-profile-outline-join';
 import {
   cutTypeLabel,
   sceneObjectUsesOperation,
@@ -39,11 +42,10 @@ export function CncOpenPathNote(props: {
   const [isAllOpen, setIsAllOpen] = useState(false);
   const [openCount, setOpenCount] = useState(0);
   const [geometryIssue, setGeometryIssue] = useState<string | null>(null);
-  const needsClosed =
-    machine?.kind === 'cnc' && layer.output && cutTypeNeedsClosedContours(settings.cutType);
+  const kind = machine?.kind === 'cnc' && layer.output ? noteKind(settings.cutType) : null;
 
   useEffect(() => {
-    if (!needsClosed) {
+    if (kind === null) {
       setIsAllOpen(false);
       setOpenCount(0);
       setGeometryIssue(null);
@@ -64,7 +66,7 @@ export function CncOpenPathNote(props: {
       setIsAllOpen(count > 0 && count === polylines.length && !hasRelief);
     }, NOTE_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
-  }, [needsClosed, objects, layer, device]);
+  }, [kind, objects, layer, device]);
 
   if (geometryIssue !== null)
     return (
@@ -73,6 +75,8 @@ export function CncOpenPathNote(props: {
       </p>
     );
   if (openCount === 0) return null;
+  if (kind === 'sided')
+    return <SidedOpenPathNote count={openCount} outside={settings.cutType === 'profile-outside'} />;
   if (!isAllOpen)
     return (
       <p role="note" style={noteStyle}>
@@ -87,6 +91,30 @@ export function CncOpenPathNote(props: {
       {openCount === 1 ? ' is' : 's are'} omitted. {cutTypeLabel(settings.cutType)} works on closed
       outlines only, so this layer contributes no toolpath. Single-line fonts and traced centerlines
       are open by nature — cut them with “Engrave (trace path)” or “On path”, or close the shapes.
+    </p>
+  );
+}
+
+/** Which note a CNC cut type can need: closed-only types omit open paths,
+ * Outside and Inside cut them on their line; the rest cut them as drawn. */
+function noteKind(cutType: CncLayerSettings['cutType']): 'closed-only' | 'sided' | null {
+  if (cutTypeNeedsClosedContours(cutType)) return 'closed-only';
+  return profileCutOffsetsToASide(cutType) ? 'sided' : null;
+}
+
+/** An Outside or Inside profile cuts open paths on their line (ADR-672). */
+function SidedOpenPathNote(props: {
+  readonly count: number;
+  readonly outside: boolean;
+}): JSX.Element {
+  const { count, outside } = props;
+  const side = outside ? 'outside' : 'inside';
+  return (
+    <p role="note" style={noteStyle}>
+      {count} open path{count === 1 ? ' is' : 's are'} cut on {count === 1 ? 'its' : 'their'} line,
+      not {side}: only a closed shape has an {side}.{outside ? ' A part' : ' A hole'} outlined by an
+      open path comes out one cut width {outside ? 'smaller' : 'larger'} than drawn. Close the
+      outline with Tools › Join paths, or choose “On path”.
     </p>
   );
 }

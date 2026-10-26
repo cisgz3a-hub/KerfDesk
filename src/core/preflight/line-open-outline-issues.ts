@@ -6,10 +6,12 @@
 // CAD plate of four LINEs import could not join or lines that stop a hair
 // short of each other, is cut as open lines: the kerf offset and the leads
 // skip it, and the shapes inside it are not cut before it. Fill
-// (offset-fill-open-contour) and CNC (cnc-open-contours-omitted) already say
-// when they leave open contours out; this says it for Line, and only where one
-// of those settings would have applied. Advisory only (rule 7, ADR-565): the
-// lines are still cut as drawn.
+// (offset-fill-open-contour) and CNC say what they do with open contours
+// (cnc-open-contours-omitted for closed-only cuts; an Outside or Inside
+// profile closes near-closed outlines and names what it cuts on the line,
+// cnc-profile-open-path-on-line, ADR-672); this says it for Line, and only
+// where one of those settings would have applied. Advisory only (rule 7,
+// ADR-565): the lines are still cut as drawn.
 //
 // An outline is what Join paths makes of them at OPEN_OUTLINE_GAP_MM: open
 // paths of one operation whose ends each meet one other end, closing a loop.

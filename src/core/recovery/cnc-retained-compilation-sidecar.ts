@@ -58,5 +58,18 @@ export function retainedCncCompilationSidecar(
       : {
           reliefPlans: sidecar.reliefPlans.filter((entry) => retainedLayerIds.has(entry.layerId)),
         }),
+    ...(sidecar.profileOpenPaths === undefined
+      ? {}
+      : {
+          profileOpenPaths: sidecar.profileOpenPaths.filter((entry) =>
+            retainedLayerIds.has(entry.layerId),
+          ),
+        }),
+    // A cut that still runs is still close to the part, wherever that part is cut.
+    ...(sidecar.keptPartCuts === undefined
+      ? {}
+      : {
+          keptPartCuts: sidecar.keptPartCuts.filter((entry) => retainedLayerIds.has(entry.layerId)),
+        }),
   };
 }

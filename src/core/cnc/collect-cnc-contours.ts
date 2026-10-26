@@ -12,6 +12,7 @@ import {
 import { compilationPolylines } from '../job/compilation-polylines';
 import { cncTabAnchorPosition } from './cnc-tab-anchors';
 import type { CollectedCncContour } from './cnc-manual-tab-mapping';
+import { joinProfileOutlines } from './cnc-profile-outline-join';
 import { mergeTextObjectContours } from './vcarve-text-union';
 import { roundStrokeOutline } from '../geometry/round-stroke-outline';
 import { CncStrokeGeometryError } from './cnc-stroke-geometry-error';
@@ -64,7 +65,10 @@ export function collectLayerContours(
         assertNever(object, 'SceneObject');
     }
   }
-  return out;
+  // ADR-672: an Outside or Inside profile cuts a near-closed outline as the
+  // closed shape it outlines, here so every reader of the pool agrees.
+  const cutType = layer.cnc?.cutType;
+  return cutType === undefined ? out : [...joinProfileOutlines(out, cutType)];
 }
 
 function appendObjectContours(
