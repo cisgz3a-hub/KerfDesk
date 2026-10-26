@@ -104,6 +104,11 @@ export function ToneCalibrationDialog(props: {
   );
 }
 
+const STEP_TITLES: Readonly<Record<ToneCalibrationStep, string>> = {
+  generate: 'Make the grey step wedge and burn it with your photo settings',
+  record: 'Record how dark each burned patch came out',
+};
+
 function StepTab(props: {
   readonly step: ToneCalibrationStep;
   readonly current: ToneCalibrationStep;
@@ -116,6 +121,7 @@ function StepTab(props: {
       type="button"
       role="tab"
       aria-selected={selected}
+      title={STEP_TITLES[props.step]}
       className={`lf-tone-calibration__step${selected ? ' is-selected' : ''}`}
       onClick={() => props.onSelect(props.step)}
     >
