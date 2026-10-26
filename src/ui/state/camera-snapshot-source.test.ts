@@ -22,8 +22,10 @@ const bridge: CameraBridgeAdapter = {
   probeRtspCamera: async () => ({ kind: 'unavailable', reason: 'not under test' }),
   rtspStreamStatus: async () => ({ kind: 'live' }),
   discoverMachineCamera: async () => ({ kind: 'not-found' }),
-  proxiedFrameUrl: (cameraUrl) =>
-    `http://127.0.0.1:51731/frame.jpg?url=${encodeURIComponent(cameraUrl)}`,
+  registerFrameSource: async (cameraUrl) => ({
+    kind: 'ok',
+    frameUrl: `http://127.0.0.1:51731/frame.jpg?url=${encodeURIComponent(cameraUrl)}`,
+  }),
   health: async () => ({ kind: 'ok', ffmpegAvailable: false, frameProxy: true }),
 };
 
@@ -67,6 +69,8 @@ describe('startSnapshotSource', () => {
       }),
     );
     const older = useCameraStore.getState().startSnapshotSource(bridge, PHONE_URL);
+    // The camera is registered with the bridge first; wait until the older start awaits its picture.
+    await vi.waitFor(() => expect(captureSourceFrame).toHaveBeenCalledOnce());
     vi.mocked(captureSourceFrame).mockResolvedValue(PICTURE);
     const newerUrl = PHONE_URL.replace('.50:', '.51:');
     await useCameraStore.getState().startSnapshotSource(bridge, newerUrl);
@@ -86,7 +90,7 @@ describe('startSnapshotSource', () => {
       source: {
         kind: 'machine-jpeg',
         cameraUrl: PHONE_URL,
-        frameUrl: bridge.proxiedFrameUrl(PHONE_URL),
+        frameUrl: `http://127.0.0.1:51731/frame.jpg?url=${encodeURIComponent(PHONE_URL)}`,
         pollIntervalMs: SNAPSHOT_CAMERA_POLL_INTERVAL_MS,
         // The capture binding tells this camera apart from the laser's own.
         queryFingerprint: expect.stringMatching(/^hmac-sha256:/),

@@ -8,7 +8,9 @@
 // exactly against the whole-cell blocks of excluded stock and lifted where it
 // would dip into them (ADR-484, relief-mask-stock-path.ts); interpolation over
 // included subcell surface features retains ADR-289's explicit qualification
-// boundary.
+// boundary. Every raster, masked or not, is checked the same way against the
+// stock past the map's edge, so it never cuts past the relief's footprint
+// (ADR-412 Amendment 2).
 //
 // Requested row spacing is scallop-driven for ball noses: a ball of radius r
 // stepping s_row leaves planar ridges of height c with
@@ -119,7 +121,16 @@ export function reliefFinishingPasses(
       rows: rowFlags(heightCells, rows),
       columns: edgeColumns,
     }).tipDepth;
-  return unmaskedPasses(unmasked, tip, rows, options);
+  // ADR-412 Amendment 2: the samples clear the stock past the map's edge;
+  // every move between them is checked against it too, as a masked raster's
+  // are against its blocks.
+  const stock = createMaskStock(
+    unmasked,
+    options.kernel,
+    options.kernel.maskPathUncertaintyMm,
+    FINISHING_REDUCTION_TOLERANCE_MM,
+  );
+  return unmaskedPasses(unmasked, tip, rows, options, stock);
 }
 
 // One linked serpentine, or where roughing finished flats (ADR-450) the runs
@@ -129,6 +140,7 @@ function unmaskedPasses(
   tip: Float32Array,
   rows: ReadonlyArray<number>,
   options: ReliefFinishingOptions,
+  stock: MaskStock | null,
 ): ReadonlyArray<CncPass> {
   const passes: CncPass[] = [];
   const skip =
@@ -142,11 +154,11 @@ function unmaskedPasses(
           map.mmPerCell,
         );
   if (skip === null || !skip.includes(1)) {
-    appendFinishingRun(passes, linkedSerpentine(map, tip, rows));
+    appendFinishingRun(passes, linkedSerpentine(map, tip, rows), stock);
     return passes;
   }
-  for (const chain of skippingRaster(map, tip, rows, skip, options)) {
-    appendFinishingRun(passes, chain);
+  for (const chain of skippingRaster(map, tip, rows, skip, options, stock)) {
+    appendFinishingRun(passes, chain, stock);
   }
   return passes;
 }
@@ -158,6 +170,7 @@ function skippingRaster(
   rows: ReadonlyArray<number>,
   skip: Uint8Array,
   options: ReliefFinishingOptions,
+  stock: MaskStock | null,
 ): ReadonlyArray<ReadonlyArray<FinishingPoint>> {
   const runs: FinishingRun[] = [];
   for (const row of rows) {
@@ -175,7 +188,13 @@ function skippingRaster(
   return linkFinishingRuns(
     runs,
     (row) => partialCellCenter(map, 'y', row),
-    { tipAt: (x, y, lowerBound) => contact?.constraintAtPoint(x, y, lowerBound) ?? 0 },
+    {
+      tipAt: (x, y, lowerBound) =>
+        Math.max(
+          contact?.constraintAtPoint(x, y, lowerBound) ?? 0,
+          stock?.tipAt(x, y) ?? Number.NEGATIVE_INFINITY,
+        ),
+    },
     {
       maxLinkMm: SKIP_LINK_DIAMETERS * options.tool.diameterMm,
       checkSpacingMm: map.mmPerCell / 4,

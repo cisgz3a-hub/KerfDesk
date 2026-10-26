@@ -56,7 +56,7 @@ import {
   shouldGrantPermissionCheck,
   shouldGrantPermissionRequest,
 } from './trusted-renderer-policy.js';
-import { CAMERA_BRIDGE_PORT, startLocalRtspCameraBridge } from './rtsp-camera-bridge.js';
+import { CAMERA_BRIDGE_PORT } from './rtsp-camera-bridge.js';
 import { installApplicationFinalCleanup } from './application-final-cleanup.js';
 import { desktopRuntimeIdentity } from './desktop-identity.js';
 import * as nativeSmoke from './native-smoke.js';
@@ -90,7 +90,7 @@ import { installSessionEndGuard } from './session-end-guard.js';
 import { installTaskbarJobProgress } from './taskbar-job-progress.js';
 import { withDesktopWorkspaceRoutes } from './desktop-routes.js';
 import { createDesktopBackgroundStartup } from './desktop-startup.js';
-import { cameraBridgeLifecycle } from './camera-bridge-lifecycle.js';
+import { createDesktopCameraBridge } from './desktop-camera-bridge.js';
 import { createDesktopRemoteAccess } from './remote-access/desktop.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -208,8 +208,9 @@ const CSP_POLICY = [
   "form-action 'none'",
   "frame-ancestors 'none'",
 ].join('; ');
-// Runs only while a workspace is admitted past the licence window (ADR-623).
-const cameraBridge = cameraBridgeLifecycle(() => startLocalRtspCameraBridge());
+// Runs only while a workspace is admitted past the licence window (ADR-623);
+// the app://app window checks it is this launch's (ADR-141 Amendment 2).
+const cameraBridge = createDesktopCameraBridge({ keyed: !IS_DEV_SERVER_RENDERER });
 app.on('before-quit', () => {
   prepareLicenceQuit?.();
   quitRequested = true;
@@ -543,8 +544,10 @@ if (HAS_SINGLE_INSTANCE_LOCK && REFUSED_DEBUG_SWITCH === null)
         'app',
         startup.routes(
           withDesktopWorkspaceRoutes(
-            remoteAccess.routes(
-              licence.routes(DESKTOP_PROJECT_OPENS.routes(makeAppProtocolHandler(distRoot))),
+            cameraBridge.routes(
+              remoteAccess.routes(
+                licence.routes(DESKTOP_PROJECT_OPENS.routes(makeAppProtocolHandler(distRoot))),
+              ),
             ),
             SUPPORT_LOG,
             DESKTOP_DATA_PATH,

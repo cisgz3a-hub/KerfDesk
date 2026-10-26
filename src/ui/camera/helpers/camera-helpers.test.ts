@@ -45,7 +45,7 @@ function bridge(discovery: MachineCameraDiscovery): CameraBridgeAdapter {
     probeRtspCamera: async () => ({ kind: 'unavailable', reason: 'none' }),
     rtspStreamStatus: async () => ({ kind: 'live' }),
     discoverMachineCamera: vi.fn(async () => discovery),
-    proxiedFrameUrl: () => 'http://bridge.invalid/frame',
+    registerFrameSource: async () => ({ kind: 'ok', frameUrl: 'http://bridge.invalid/frame' }),
     health: async () => ({ kind: 'ok', ffmpegAvailable: true, frameProxy: true }),
   };
 }

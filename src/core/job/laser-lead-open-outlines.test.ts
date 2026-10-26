@@ -35,9 +35,48 @@ describe('openLineHolders (ADR-626 Amendment 8)', () => {
     expect(openLineHolders([HOLE, AWAY], sides(0))).toEqual(['Cut', undefined]);
   });
 
-  it('closes a gap of up to 0.5 mm, not a wider one', () => {
-    expect(openLineHolders([HOLE], sides(0.4))).toEqual(['Cut']);
-    expect(openLineHolders([HOLE], sides(0.6))).toEqual([undefined]);
+  it('holds a contour inside lines left open at one corner, however wide (Amendment 10)', () => {
+    // Up to 0.5 mm the strokes close the square; wider, the four lines still
+    // chain into one outline whose free ends are far closer together than a
+    // tenth of its length (meta audit v1 M6-P1-3: exactly 0.5 mm used to slip).
+    for (const gap of [0.4, 0.5, 0.6, 1, 1.5, 3]) {
+      expect(openLineHolders([HOLE], sides(gap)), `gap ${gap}`).toEqual(['Cut']);
+    }
+  });
+
+  it('holds a contour inside one open path left open at a corner', () => {
+    const plate = line('Cut', [1.5, 0], [40, 0], [40, 40], [0, 40], [0, 0]);
+    expect(openLineHolders([HOLE, AWAY], [plate])).toEqual(['Cut', undefined]);
+  });
+
+  it('leaves alone a contour in a U whose whole side is missing', () => {
+    const u = line('Cut', [0, 0], [40, 0], [40, 40], [0, 40]);
+    expect(openLineHolders([HOLE], [u])).toEqual([undefined]);
+  });
+
+  it('leaves alone a contour drawn on the open lines themselves', () => {
+    // A closed square on top of an open one is not inside it.
+    const drawnOn = [
+      { x: 0, y: 0 },
+      { x: 40, y: 0 },
+      { x: 40, y: 40 },
+      { x: 0, y: 40 },
+    ];
+    expect(
+      openLineHolders([drawnOn], [line('Cut', [1, 0], [40, 0], [40, 40], [0, 40], [0, 0])]),
+    ).toEqual([undefined]);
+  });
+
+  it('does not chain lines that stop short at every corner (not covered)', () => {
+    // Each corner 0.6 mm open: no two ends meet, so no outline forms. ADR-626
+    // Amendment 10 names this case; Join paths closes it.
+    const short = [
+      line('Cut', [0.6, 0], [39.4, 0]),
+      line('Cut', [40, 0.6], [40, 39.4]),
+      line('Cut', [39.4, 40], [0.6, 40]),
+      line('Cut', [0, 39.4], [0, 0.6]),
+    ];
+    expect(openLineHolders([HOLE], short)).toEqual([undefined]);
   });
 
   it('reads lines that cross past the corners as closing the square', () => {

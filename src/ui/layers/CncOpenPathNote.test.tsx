@@ -155,9 +155,27 @@ describe('CncOpenPathNote', () => {
     },
   );
 
-  // The profile and engrave families DO emit from open paths, so warning there
-  // would be telling the operator something untrue.
-  it.each(['engrave', 'profile-on-path', 'profile-inside'] as const)(
+  // Outside and Inside emit from open paths too, but on the line, not to their
+  // side, so a part comes out one cut width small (ADR-672, meta audit M6-P1-2).
+  it.each([
+    ['profile-outside', 'not outside', 'A part'],
+    ['profile-inside', 'not inside', 'A hole'],
+  ] as const)('says a %s layer cuts open paths on their line', async (cutType, side, outlined) => {
+    vi.useFakeTimers();
+    const layer: Layer = {
+      ...createLayer({ id: 'L1', color: COLOR }),
+      cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType },
+    };
+    install([stroke(false)], layer);
+    const text = await settledText(layer);
+    expect(text).toContain(`1 open path is cut on its line, ${side}`);
+    expect(text).toContain(`${outlined} outlined by an open path comes out one cut width`);
+    install([stroke(true)], layer);
+    expect(await settledText(layer)).toBe('');
+  });
+
+  // On path and Engrave cut open paths on their line, as they cut every path.
+  it.each(['engrave', 'profile-on-path'] as const)(
     'stays silent on a %s layer, which cuts open paths fine',
     async (cutType) => {
       vi.useFakeTimers();

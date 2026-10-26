@@ -7,6 +7,8 @@ import {
   CELL_MM,
   coneMap,
   exactSurface,
+  featurePasses,
+  insideEdgeWall,
   plateauFaceCentreX,
   plateauMap,
   reachesIntoWall,
@@ -42,7 +44,7 @@ function plannedOnce(name: 'plateau' | 'cone'): ReturnType<typeof planned> {
 
 describe('reliefWaterlinePasses (ADR-423)', { timeout: 30_000 }, () => {
   it('circles a boss at every level, top down, in one stay-down pass', () => {
-    const passes = plannedOnce('cone');
+    const passes = featurePasses(coneMap(), plannedOnce('cone'));
 
     expect(passes).toHaveLength(1);
     const levels = [...new Set(passes[0]?.points.map((point) => point.z))];
@@ -66,8 +68,8 @@ describe('reliefWaterlinePasses (ADR-423)', { timeout: 30_000 }, () => {
   });
 
   it('keeps the wall on the right unless asked for the other side', () => {
-    const right = plannedOnce('cone');
-    const left = planned(coneMap(), { wallOnRight: false });
+    const right = featurePasses(coneMap(), plannedOnce('cone'));
+    const left = featurePasses(coneMap(), planned(coneMap(), { wallOnRight: false }));
     const turn = (points: ReadonlyArray<{ x: number; y: number }>): number => {
       // Winding about the boss centre: negative is clockwise in map numbers.
       let sum = 0;
@@ -87,11 +89,29 @@ describe('reliefWaterlinePasses (ADR-423)', { timeout: 30_000 }, () => {
   it('leaves shallow slopes to the raster', () => {
     const gentle = sampledMap(60, (x) => -1 - 0.5 * x * 0.3);
 
-    expect(planned(gentle)).toEqual([]);
+    // Only the wall where it meets the stock past the map's edge is circled
+    // (ADR-412 Amendment 2).
+    expect(featurePasses(gentle, planned(gentle))).toEqual([]);
+  });
+
+  it("circles the wall a deep floor meets at the map's edge (ADR-412 Amendment 2)", () => {
+    const map = coneMap();
+    const inside = featurePasses(map, plannedOnce('cone'));
+    const edge = plannedOnce('cone').filter((pass) => !inside.includes(pass));
+    const points = edge.flatMap((pass) => (pass.kind === 'path3d' ? pass.points : []));
+
+    // Down the wall level by level, near the edge, and never past it.
+    expect(new Set(points.map((point) => point.z)).size).toBeGreaterThanOrEqual(10);
+    for (const point of points) {
+      expect(insideEdgeWall(map, point)).toBe(false);
+      expect(
+        Math.min(point.x, point.y, map.widthMm - point.x, map.heightMm - point.y),
+      ).toBeGreaterThan(0);
+    }
   });
 
   it('finishes a vertical wall at the level spacing', () => {
-    const passes = plannedOnce('plateau');
+    const passes = featurePasses(plateauMap(), plannedOnce('plateau'));
     // Along the face x = 9 the passes step down the wall 0.4 mm apart.
     const onFace = (passes[0]?.points ?? []).filter((p) => p.x < 8);
     const heights = [...new Set(onFace.map((p) => p.z))].sort((a, b) => b - a);
@@ -121,7 +141,13 @@ describe('waterlinePath (ADR-423)', () => {
 
   it('adds vertices off the wall where a move would cut a corner', () => {
     const tip = dilateHeightmapByTool(map, OPTIONS.kernel, 0);
-    const [loop] = waterlineContours(map, tip, -3, new Uint8Array(100 * 100).fill(1), surface);
+    const [loop] = waterlineContours(
+      map,
+      tip,
+      -3,
+      new Uint8Array(100 * 100).fill(1),
+      surface,
+    ).filter((contour) => contour.points.every((point) => insideEdgeWall(map, point)));
     // The contour's arc round the plateau's near corner, and a chord across it.
     const arc = (loop?.points ?? []).filter((p) => p.x < 9 && p.y < 9 && p.x > 7.6 && p.y > 7.6);
     const chord = [arc[0], arc[arc.length - 1]].filter((p) => p !== undefined);

@@ -64,6 +64,16 @@ function pyramidMap(depthMm: number, cells = 40, mmPerCell = 0.5): Heightmap {
   };
 }
 
+// How far a point stands from the stock past the map's edge, and how far the
+// cutter reaches it from (ADR-412 Amendment 2).
+function edgeDistance(map: Heightmap, point: { readonly x: number; readonly y: number }): number {
+  return Math.min(point.x, map.widthMm - point.x, point.y, map.heightMm - point.y);
+}
+
+function edgeReach(kernel: ToolKernel): number {
+  return kernel.radiusMm + kernel.maskPathUncertaintyMm + 1e-9;
+}
+
 function surfaceAt(map: Heightmap, x: number, y: number): number {
   const cx = Math.min(map.widthCells - 1, Math.max(0, Math.floor(x / map.mmPerCell)));
   const cy = Math.min(map.heightCells - 1, Math.max(0, Math.floor(y / map.mmPerCell)));
@@ -122,19 +132,26 @@ describe('reliefFinishingPasses', () => {
     expect(rows.at(-1)?.y).not.toBeCloseTo(rows.at(-2)?.y ?? 0, 9);
   });
 
-  it('skims a flat surface at exactly its depth on every sample', () => {
-    const passes = reliefFinishingPasses(flatMap(-3), {
-      tool: BALL_NOSE,
-      kernel: kernelForTool(BALL_NOSE, 0.5),
-      scallopMm: 0.025,
-    });
+  it('skims a flat surface at exactly its depth on every sample out of reach of its edge', () => {
+    const map = flatMap(-3);
+    const kernel = kernelForTool(BALL_NOSE, 0.5);
+    const passes = reliefFinishingPasses(map, { tool: BALL_NOSE, kernel, scallopMm: 0.025 });
     expect(passes.length).toBeGreaterThan(0);
+    let inside = 0;
     for (const pass of passes) {
       if (pass.kind !== 'path3d') throw new Error('finishing pass must be path3d');
       for (const point of pass.points) {
+        // ADR-412 Amendment 2: within the ball's reach of the map's edge it
+        // rises clear of the stock past it.
+        if (edgeDistance(map, point) <= edgeReach(kernel)) {
+          expect(point.z).toBeGreaterThan(-3);
+          continue;
+        }
         expect(point.z).toBeCloseTo(-3, 6);
+        inside += 1;
       }
     }
+    expect(inside).toBeGreaterThan(0);
   });
 
   it('never cuts below the target surface (max-plus no-gouge)', () => {
@@ -176,10 +193,19 @@ describe('reliefFinishingPasses', () => {
         expect([0.5 * map.mmPerCell, lastColumnX]).toContain(to.x);
       }
     }
+    const kernel = kernelForTool(BALL_NOSE, map.mmPerCell);
     for (const point of path.points) {
       const col = Math.round(point.x / map.mmPerCell - 0.5);
       const row = Math.round(point.y / map.mmPerCell - 0.5);
-      expect(point.z).toBe(exact[row * map.widthCells + col]);
+      const onSample =
+        point.x === (col + 0.5) * map.mmPerCell && point.y === (row + 0.5) * map.mmPerCell;
+      if (onSample) {
+        expect(point.z).toBe(exact[row * map.widthCells + col]);
+      } else {
+        // ADR-412 Amendment 2: a vertex between samples only where a move is
+        // lifted clear of the stock past the map's edge.
+        expect(edgeDistance(map, point)).toBeLessThanOrEqual(edgeReach(kernel));
+      }
     }
   });
 

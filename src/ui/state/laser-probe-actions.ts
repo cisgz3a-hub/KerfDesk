@@ -112,6 +112,9 @@ function reserveProbe(set: SetFn, affectsXy: boolean): number {
   const transactionId = nextProbeTransactionId++;
   set((state) => ({
     probeBusy: true,
+    // Each touch-off uses up its test touch (probe-test-touch.ts), so a retry
+    // after a failed cycle proves the lead again.
+    probeTestTouch: null,
     controllerOperation: {
       kind: 'probe',
       phase: 'sequence',

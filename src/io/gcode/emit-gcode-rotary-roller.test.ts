@@ -84,10 +84,12 @@ describe('emitGcode roller rotary diameter (ADR-373)', () => {
   // Digests captured before ADR-373 (9c7e63b), updated for the ASCII raster-size
   // comment in 91c1adefa (#898). Restoring only its two "x" separators to "×"
   // reproduces the original digests; all motion and power bytes are unchanged.
+  // ADR-415 Amendment 1 then marked the image run-ins and run-outs: removing
+  // every ` ; kerfdesk:laser-off-motion` reproduces the previous digests.
   // These still pin the entire output: vector + raster, forward and reversed.
   it.each([
-    [false, 'b6c57419b0995c2c6f28722e6da1a660b1249a231dd757f65fdca307374ac8f9', 3731],
-    [true, '509c2c08fb7c2f7c2df3d24f67379fcde70850df750eda613932b2c7e0cbb86f', 3681],
+    [false, 'fa916da025c516dda824c652848758b3a40c67b1fa1e316b1967ade74af3da03', 9331],
+    [true, '5683203d0774dc2a5cede29de8c7461c67a05bedb29a83cc0911aa7f1e09e6a5', 9281],
   ])(
     'keeps a roller without a roller diameter byte-identical (reverse %s)',
     (reverseAxis, digest, length) => {

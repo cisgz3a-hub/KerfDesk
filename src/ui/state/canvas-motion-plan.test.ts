@@ -121,7 +121,7 @@ describe('canvasPlanRetentionKey', () => {
 });
 
 function prepared(
-  controllerKind: 'grbl-v1.1' | 'marlin' | 'ruida' = 'grbl-v1.1',
+  controllerKind: 'grbl-v1.1' | 'marlin' | 'ruida' | 'smoothieware' = 'grbl-v1.1',
   homingEnabled = false,
 ) {
   const project = createProject({
@@ -244,6 +244,31 @@ describe('CanvasMotionPlan', () => {
       ).toEqual(toSceneCoords({ x: 30, y: 37 }, device));
     },
   );
+
+  // Rolling audit v2 03-P2-8: Smoothieware burns without M3/M4, so its live
+  // view, burn trail, job-start marker and camera check need the dialect.
+  it('reads Smoothieware burns as process, for the first plan and a rebuilt one', () => {
+    const gcode = [
+      'fire off',
+      'G21',
+      'G90',
+      'M400',
+      'M221 S100 P0',
+      'G0 X10 Y20 S0',
+      'G1 X30 S0.5 F1000',
+    ].join('\n');
+    const plan = buildCanvasMotionPlan({
+      gcode,
+      prepared: prepared('smoothieware'),
+      machine,
+      statusQuery: 'queued-poll',
+    });
+    const rebuilt = rebuildCanvasPlanForGcode(plan, gcode);
+
+    expect(plan.manifest.blocks.map((block) => block.kind)).toEqual(['travel', 'process']);
+    expect(plan.jobStart).not.toBeNull();
+    expect(rebuilt.manifest.blocks.map((block) => block.kind)).toEqual(['travel', 'process']);
+  });
 
   it('matches full, settle-only, and file-only controller capabilities', () => {
     const gcode = 'G21\nG90\nM3 S0\nG0 X10 Y20\nG1 X30 S500';
