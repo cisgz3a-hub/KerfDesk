@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { effectiveOperationForObject } from '../../core/effective-output';
+import { captureLayerOperationSettings, type Layer } from '../../core/scene';
+import type { ToneCalibrationSeed } from '../calibration/tone-calibration-draft';
 import { Button, Dialog, DialogActions } from '../kit';
 import type { PhotoEngravingApply } from './photo-engraving-apply';
 import {
@@ -20,6 +22,7 @@ export default function PhotoEngravingDialog(props: {
   readonly onCancel: () => void;
   readonly onApply: (patch: PhotoEngravingApply) => void;
   readonly onEditSource: () => void;
+  readonly onCalibrateTones: (seed: ToneCalibrationSeed) => void;
 }): JSX.Element {
   const { session } = props;
   const [draft, setDraft] = useState<PhotoEngravingDraft>(() =>
@@ -60,7 +63,12 @@ export default function PhotoEngravingDialog(props: {
           image={session.image}
           draft={draft}
           storedLinesPerMm={effective.linesPerMm}
+          power={effective.power}
+          speed={effective.speed}
           onChange={update}
+          onCalibrateTones={() =>
+            props.onCalibrateTones(toneCalibrationSeed(session, effective, draft))
+          }
         />
       </div>
       <PhotoEngravingGuide current={props.current} onEditSource={props.onEditSource} />
@@ -114,6 +122,10 @@ function PhotoEngravingGuide(props: {
           material. Use Tools → Interval Test to find spacing where marks just meet.
         </li>
         <li>
+          Burn a Tools → Tone Calibration wedge with these settings and record it, then choose that
+          material tone calibration here. It corrects how much darker the material burns.
+        </li>
+        <li>
           Choose dark or light marks to match the material. Adjust midtones first, then brightness
           and contrast.
         </li>
@@ -136,4 +148,23 @@ function PhotoEngravingGuide(props: {
       </Button>
     </details>
   );
+}
+
+/** ADR-670: the wedge burns with the photo's settings as this window has them. */
+function toneCalibrationSeed(
+  session: PhotoEngravingSession,
+  effective: Layer,
+  draft: PhotoEngravingDraft,
+): ToneCalibrationSeed {
+  return {
+    sourceName: session.image.source,
+    settings: {
+      ...captureLayerOperationSettings(effective),
+      mode: 'image',
+      ditherAlgorithm: draft.ditherAlgorithm,
+      linesPerMm: draft.linesPerMm,
+      negativeImage: draft.negativeImage,
+      passThrough: false,
+    },
+  };
 }

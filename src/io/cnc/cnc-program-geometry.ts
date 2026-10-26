@@ -14,8 +14,13 @@ import { cncProgramXyzPaths } from './cnc-program-xyz-paths';
 export type ProgramTool = { readonly id: string | null; readonly name: string | null };
 export type CncProgramSection = {
   readonly tool: ProgramTool | undefined;
+  /** Place in the tool plan: the number of M0 changes before this section. */
+  readonly planIndex: number;
   readonly paths: ReadonlyArray<ReadonlyArray<CncReachPoint>>;
+  /** Deepest parsed Z. When `truncated`, only a lower bound of the section's depth. */
   readonly depthMm: number;
+  /** The bounded review stopped inside this section; its later motion was never read. */
+  readonly truncated: boolean;
   readonly pathToleranceMm: number;
 };
 export type CncProgramGeometry = {
@@ -34,6 +39,8 @@ type Section = {
 };
 type Budget = { lines: number; estimatedSegments: number };
 type Words = NonNullable<ReturnType<typeof scanCompleteGcodeWords>>;
+// The bound limits only the fixture sweep: the reach review reads each bit's
+// depth from the compiled job (ADR-572 Amendment 2).
 const MAX_LINES = 50_000;
 const MAX_SEGMENTS = 100_000;
 
@@ -45,20 +52,23 @@ export function cncProgramGeometry(
   const review: Review = { sections: [], disclosures: new Set(), incomplete: false };
   const budget: Budget = { lines: 0, estimatedSegments: 0 };
   let section = newSection(),
-    sectionIndex = 0;
+    sectionIndex = 0,
+    truncated = false;
   for (const line of iterateLines(gcode)) {
-    if (!reserveLine(review, budget)) break;
+    truncated = !reserveLine(review, budget);
+    if (truncated) break;
     const words = programLineWords(line, review);
     if (words === null) continue;
     if (words.some((word) => word.letter === 'M' && word.value === 0)) {
-      finishSection(section, review, plan[sectionIndex]);
+      finishSection(section, review, plan, sectionIndex, false);
       sectionIndex += 1;
       section = newSection();
       continue;
     }
-    if (!appendProgramLine(line, words, section, review, budget)) break;
+    truncated = !appendProgramLine(line, words, section, review, budget);
+    if (truncated) break;
   }
-  finishSection(section, review, plan[sectionIndex]);
+  finishSection(section, review, plan, sectionIndex, truncated);
   return finishReview(review, plan.length);
 }
 
@@ -166,7 +176,13 @@ function arcTolerance(
   // chord error and formatted endpoint mismatch, rather than a universal bound.
   return radius * (1 - Math.cos(arcStepRad(radius) / 2)) + endpointMismatch;
 }
-function finishSection(section: Section, review: Review, tool: ProgramTool | undefined): void {
+function finishSection(
+  section: Section,
+  review: Review,
+  plan: ReadonlyArray<ProgramTool>,
+  planIndex: number,
+  truncated: boolean,
+): void {
   if (!section.hasSection) return;
   const result = section.parser.finish();
   if (result.kind === 'error') {
@@ -180,7 +196,14 @@ function finishSection(section: Section, review: Review, tool: ProgramTool | und
   const paths = sectionPaths(section, review, result.toolpath.steps);
   let depthMm = 0;
   for (const path of paths) for (const point of path) depthMm = Math.max(depthMm, -point.z);
-  review.sections.push({ tool, paths, depthMm, pathToleranceMm: section.tolerance });
+  review.sections.push({
+    tool: plan[planIndex],
+    planIndex,
+    paths,
+    depthMm,
+    truncated,
+    pathToleranceMm: section.tolerance,
+  });
 }
 function sectionPaths(
   section: Section,

@@ -3,6 +3,7 @@ import { useLaserStore } from '../state/laser-store';
 import type { LaserMotionOperationId } from '../state/laser-motion-operation';
 import { HOLD_DEADMAN_MS, HoldDeadman, releaseHeldMotion } from './machine-hold';
 import type { OwnedMachineOperation } from './machine-operation-state';
+import { cancelMachineOperation } from './machine-owned-operation';
 
 const MOTION = 'motion-1' as unknown as LaserMotionOperationId;
 type Overrides = Omit<Partial<OwnedMachineOperation>, 'motionId'> & {
@@ -80,5 +81,47 @@ describe('ADR-585 PC-side hold-to-jog dead-man', () => {
   it('does nothing for a hold that already finished', () => {
     releaseHeldMotion(holdOperation({ state: 'completed' }));
     expect(cancelJog).not.toHaveBeenCalled();
+  });
+
+  // ADR-585 Amendment 1 (rolling audit v2 01-P2-6): one release, one Cancel.
+  it('sends one Cancel however many stop paths release the same hold', () => {
+    const deadman = new HoldDeadman();
+    const operation = holdOperation();
+    deadman.arm('hold-1', 'client-a', operation);
+    deadman.releaseClient('client-a');
+    deadman.release('hold-1');
+    releaseHeldMotion(operation);
+    cancelMachineOperation(operation);
+    expect(cancelJog).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the receipt running when another Cancel replaced this one', async () => {
+    cancelJog.mockImplementation(async () => {
+      useLaserStore.setState({
+        motionOperation: {
+          operationId: MOTION,
+          kind: 'jog',
+          cancelRequested: true,
+          cancelAttemptId: Symbol('desktop-cancel'),
+        },
+      } as never);
+      throw new Error('Motion cancellation was replaced before its confirmation completed.');
+    });
+    const operation = holdOperation();
+    releaseHeldMotion(operation);
+    await vi.waitFor(() => expect(cancelJog).toHaveBeenCalled());
+    await Promise.resolve();
+    expect(operation.state).toBe('running');
+    expect(operation.message).toBeUndefined();
+  });
+
+  it('still reports an unconfirmed stop when the one Cancel fails', async () => {
+    cancelJog.mockRejectedValue(new Error('write failed'));
+    const operation = holdOperation();
+    releaseHeldMotion(operation);
+    await vi.waitFor(() => expect(operation.state).toBe('unknown'));
+    expect(operation.message).toBe(
+      'The held jog stop could not be confirmed. Check the machine on the PC.',
+    );
   });
 });
