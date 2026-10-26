@@ -36,9 +36,14 @@ export type SegmentEntry = {
 // retired entries as it meets them. A closed segment can bring one entry per
 // vertex, so without that every later query near a placed shape would rescan
 // its dead vertices, and ordering would stop being linear-ish in vertex count.
+//
+// `isEligible` need not be monotone: inside-first holds an outline back until
+// the shapes inside it are cut, then releases it (ADR-669). An ineligible entry
+// is skipped, never retired, so it can win a later query.
 export type NearestEntryQuery = (
   cursor: Vec2,
   isAvailable: (segmentIndex: number) => boolean,
+  isEligible?: (segmentIndex: number) => boolean,
 ) => SegmentEntry | null;
 
 // Keeps each cell near a handful of distinct points without letting the grid itself
@@ -49,7 +54,7 @@ const MAX_GRID_SIDE = 512;
 export function createNearestEntryQuery(entries: ReadonlyArray<SegmentEntry>): NearestEntryQuery {
   const grid = buildGrid(entries);
   if (grid === null) return linearQuery(entries);
-  return (cursor, isAvailable) => gridNearest(grid, cursor, isAvailable);
+  return (cursor, isAvailable, isEligible) => gridNearest(grid, cursor, isAvailable, isEligible);
 }
 
 type EntryPoint = {
@@ -134,7 +139,7 @@ function clampIndex(value: number, side: number): number {
 
 function linearQuery(entries: ReadonlyArray<SegmentEntry>): NearestEntryQuery {
   const live = [...entries];
-  return (cursor, isAvailable) => {
+  return (cursor, isAvailable, isEligible) => {
     let best: SegmentEntry | null = null;
     let bestDistSq = Number.POSITIVE_INFINITY;
     let kept = 0;
@@ -142,6 +147,7 @@ function linearQuery(entries: ReadonlyArray<SegmentEntry>): NearestEntryQuery {
       if (!isAvailable(entry.segmentIndex)) continue;
       live[kept] = entry;
       kept += 1;
+      if (isEligible !== undefined && !isEligible(entry.segmentIndex)) continue;
       const distSq = distanceSquared(cursor, entry.point);
       if (isBetter(distSq, entry, bestDistSq, best)) {
         bestDistSq = distSq;
@@ -192,10 +198,29 @@ function firstAvailable(
   return undefined;
 }
 
+// The point's tie winner among entries that are available and eligible. The
+// queue head is the first available entry, so `point.next` only ever skips
+// retired entries; held entries behind it stay queued.
+function firstEligible(
+  point: EntryPoint,
+  head: SegmentEntry,
+  isAvailable: (segmentIndex: number) => boolean,
+  isEligible: ((segmentIndex: number) => boolean) | undefined,
+): SegmentEntry | undefined {
+  if (isEligible === undefined || isEligible(head.segmentIndex)) return head;
+  for (let index = point.next + 1; index < point.entries.length; index += 1) {
+    const entry = point.entries[index];
+    if (entry !== undefined && isAvailable(entry.segmentIndex) && isEligible(entry.segmentIndex))
+      return entry;
+  }
+  return undefined;
+}
+
 function gridNearest(
   grid: Grid,
   cursor: Vec2,
   isAvailable: (segmentIndex: number) => boolean,
+  isEligible?: (segmentIndex: number) => boolean,
 ): SegmentEntry | null {
   const cx = clampIndex(Math.floor((cursor.x - grid.minX) / grid.cellWidth), grid.cols);
   const cy = clampIndex(Math.floor((cursor.y - grid.minY) / grid.cellHeight), grid.rows);
@@ -210,10 +235,12 @@ function gridNearest(
       for (const pointIndex of cell) {
         const point = grid.points[pointIndex];
         if (point === undefined) continue;
-        const entry = firstAvailable(point, isAvailable);
-        if (entry === undefined) continue;
+        const head = firstAvailable(point, isAvailable);
+        if (head === undefined) continue;
         cell[kept] = pointIndex;
         kept += 1;
+        const entry = firstEligible(point, head, isAvailable, isEligible);
+        if (entry === undefined) continue;
         const distSq = distanceSquared(cursor, entry.point);
         if (isBetter(distSq, entry, bestDistSq, best)) {
           bestDistSq = distSq;

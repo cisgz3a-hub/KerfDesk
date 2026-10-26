@@ -63,7 +63,7 @@ export function grblHalSettingsMap(
  *  COMPATIBILITY_LEVEL 1, greets as "Grbl 1.1f", and its report_grbl_settings
  *  (true) lists `$14`-`$18` and other extended settings beside the legacy
  *  ones, decimals to three places. Trimmed, with illustrative values; not
- *  captured from a board (ADR-375 Amendment 4).
+ *  captured from a board (ADR-375 Amendment 5).
  *  https://github.com/Ortur-Tech/Ortur_Laser_Firmware_17X-18X/blob/4849ac85fc1f1a15c47d0dbbfc3e69450922ad32/ESPLaserMasterGrbl/main/grbl/report.c#L461-L709 */
 export const GRBLHAL_LEVEL_1_GRBL_BANNER_DUMP: ReadonlyArray<string> = [
   '$0=10.0',

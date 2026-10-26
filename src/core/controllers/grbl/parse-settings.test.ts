@@ -127,7 +127,7 @@ describe('settingsMapToProfilePatch', () => {
   // grblHAL `$22` bit 3 is force set origin ("Set machine origin to 0",
   // settings.h#L714-L718). `$$` prints the whole bitfield, and lists `$384`,
   // only at COMPATIBILITY_LEVEL <= 1 (settings.c#L1775-L1782, system.c#L300-L317);
-  // above it `$22` is 0 or 1 and says nothing about force origin. ADR-375 Amd 3.
+  // above it `$22` is 0 or 1 and says nothing about force origin. ADR-375 Amd 4.
   it('reads grblHAL force set origin from a dump that prints the whole $22 bitfield', () => {
     expect(settingsMapToControllerSettings(grblHalSettingsMap({ 22: '9' }))).toMatchObject({
       homingEnabled: true,
@@ -217,7 +217,7 @@ describe('settingsMapToProfilePatch', () => {
 
   // `$19` (probe pull-up disable) is a legacy setting in grblHAL, so a level 2
   // build with a probe input lists it beside `$10 & 3` (core
-  // settings.c#L2373, system.c#L300-L317). ADR-375 Amendment 4.
+  // settings.c#L2373, system.c#L300-L317). ADR-375 Amendment 5.
   it('does not read a level 2 $10 as whole because the dump lists $19', () => {
     const level2WithProbe = grblHalSettingsMap({ 10: '1', 19: '0' }, GRBLHAL_LEVEL_2_DUMP);
     expect(settingsMapToControllerSettings(level2WithProbe)).not.toHaveProperty(
@@ -228,7 +228,7 @@ describe('settingsMapToProfilePatch', () => {
   // grblHAL keeps its signal invert and pull-up masks in `$14`-`$18` and lists
   // them at level 0 or 1 (core settings.c#L2368-L2372); a stock-GRBL fork
   // lists its own extras elsewhere, as Ortur's STM32 firmware lists `$33`
-  // (Ortur_Laser_Firmware_14X report.c#L233-L242). ADR-375 Amendment 4.
+  // (Ortur_Laser_Firmware_14X report.c#L233-L242). ADR-375 Amendment 5.
   it("marks a dump that lists grblHAL's $14-$18", () => {
     expect(
       settingsMapToControllerSettings(grblHalSettingsMap({}, GRBLHAL_LEVEL_1_GRBL_BANNER_DUMP)),

@@ -261,7 +261,7 @@ describe('Run G-code file dialog (ADR-630)', () => {
     });
     const body = await show('M4\nG1 X10 Y10 S800 F1000\nG0 X10 Y40\nG1 X40 Y40\nM5\n');
     expect(body.textContent).toContain('The controller reports $32=0 (laser mode off)');
-    expect(body.textContent).toContain('One G0 move in this program runs with M3 or M4 on');
+    expect(body.textContent).toContain('One rapid command in this program runs with M3 or M4 on');
     expect(body.textContent).toContain('first: line 4 of the sent program');
     expect(body.textContent).toContain('Controller reports $32=0. Enable GRBL laser mode ($32=1)');
     expect(button(body, 'Frame').disabled).toBe(false);
@@ -276,7 +276,7 @@ describe('Run G-code file dialog (ADR-630)', () => {
     });
     const body = await show('M3 S11000\nG4 P3\nG0 X10 Y10\nG1 Z-2 F300\nG0 Z5\nM5\n');
     expect(body.textContent).toContain(CNC_LASER_MODE_ENABLED_MESSAGE);
-    expect(body.textContent).not.toContain('G0 move');
+    expect(body.textContent).not.toContain('rapid command');
     expect(button(body, 'Frame').disabled).toBe(false);
   });
 
@@ -326,6 +326,16 @@ describe('Run G-code file dialog (ADR-630)', () => {
       'Line 2 (version) starts with a lowercase letter, so Smoothieware runs it as a shell command',
     );
     expect(body.textContent).toContain('Line 4 (M28notes.txt) is M28');
+    expect([...body.querySelectorAll('button')].map((each) => each.textContent)).toEqual(['Close']);
+  });
+
+  it('refuses a Marlin macro program instead of offering its incomplete Frame', async () => {
+    useLaserStore.setState({ activeControllerKind: 'marlin' });
+    const body = await show('M810 G1 X120 F600\nG1 X10 F600\nM810\nM5\n');
+    expect(body.textContent).toContain('will not send this file as a job');
+    expect(body.textContent).toContain('Line 1 (M810 G1 X120 F600) is M810');
+    expect(body.textContent).toContain('Line 3 (M810) is M810');
+    expect(body.textContent).toContain('macro stored on the controller');
     expect([...body.querySelectorAll('button')].map((each) => each.textContent)).toEqual(['Close']);
   });
 });

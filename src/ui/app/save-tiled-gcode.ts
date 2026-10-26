@@ -3,6 +3,7 @@
 // output Worker; the UI realm is limited to warnings and sequential pickers.
 
 import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
+import type { ControllerKind } from '../../core/devices';
 import type { ControllerSettingsSnapshot, ReadinessSettingsCapability } from '../../core/preflight';
 import type { OutputScope, Project } from '../../core/scene';
 import { prepareOutput } from '../../io/gcode';
@@ -43,6 +44,7 @@ export type SaveTiledGcodeCtx = ExportVariableAdvancement & {
   readonly outputScope?: OutputScope;
   readonly controllerSettings?: ControllerSettingsSnapshot | null;
   readonly settingsCapability?: ReadinessSettingsCapability;
+  readonly firmwareKind?: ControllerKind;
   readonly activeWcs?: ActiveWorkCoordinateSystem | null;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
 };
@@ -95,6 +97,7 @@ async function saveConfiguredTiledGcode(ctx: SaveTiledGcodeCtx): Promise<true> {
     ctx.project,
     ctx.controllerSettings,
     ctx.settingsCapability,
+    ctx.firmwareKind,
   )) {
     ctx.pushToast(advisory, 'warning');
   }

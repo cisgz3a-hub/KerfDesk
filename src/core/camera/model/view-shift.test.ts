@@ -6,6 +6,7 @@ import {
   MIN_MATCH_SCORE,
   surroundMask,
   viewShiftOnBedMm,
+  viewShiftOnBedOffsetMm,
   viewThumbnail,
   type ViewThumbnail,
 } from './view-shift';
@@ -161,5 +162,28 @@ describe('surroundMask and viewShiftOnBedMm', () => {
     // One thumbnail pixel is 1280 / 192 camera pixels, a few millimetres here.
     expect(mm).toBeGreaterThan(1);
     expect(mm).toBeLessThan(10);
+  });
+
+  it('retains both signs of a known bed displacement instead of only its radius', () => {
+    const centre = projectWorldPoint(lens, pose, bedPoint(200, 200));
+    const target = projectWorldPoint(lens, pose, bedPoint(203, 198));
+    if (centre === null || target === null) throw new Error('bed point off the picture');
+    const args = {
+      lens,
+      pose,
+      thumbWidth: 192,
+      thumbHeight: 108,
+      bedCentreMm: { x: 200, y: 200 },
+      centrePx: centre,
+      shift: {
+        dxPx: ((target.x - centre.x) * 192) / lens.imageWidth,
+        dyPx: ((target.y - centre.y) * 108) / lens.imageHeight,
+        score: 1,
+      },
+    };
+    const offset = viewShiftOnBedOffsetMm(args);
+    expect(offset?.x).toBeCloseTo(3, 4);
+    expect(offset?.y).toBeCloseTo(-2, 4);
+    expect(viewShiftOnBedMm(args)).toBeCloseTo(Math.sqrt(13), 4);
   });
 });

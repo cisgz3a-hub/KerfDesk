@@ -24,7 +24,7 @@
 // `$110=5O00` stored 5 with `ok`. Builds before 20261015 also read each zero
 // after the point of a whole-number setting as one more digit: `$22=1.0`
 // stored 10, which turned homing and soft limits off (controller audit v2
-// C4-P2-1, ADR-375 Amendment 3). For the GRBL settings KerfDesk knows, the
+// C4-P2-1, ADR-375 Amendment 4). For the GRBL settings KerfDesk knows, the
 // Console therefore sends only the value the Machine Settings encoder would
 // send (grbl-setting-number.ts). Other grblHAL settings, strings, addresses and
 // plugin settings among them, are left to the firmware; the `$$` re-read is
@@ -42,7 +42,7 @@
 // keeps a whole-number setting as truncf(value) the way stock GRBL does. So on
 // a stock-GRBL profile whose session shows grblHAL (grblhal-evidence.ts), the
 // value must pass the grblHAL check as well as the stock one (meta audit v1
-// M3-P3-3, ADR-375 Amendment 4).
+// M3-P3-3, ADR-375 Amendment 5).
 // https://github.com/Ortur-Tech/Ortur_Laser_Firmware_17X-18X/blob/4849ac85fc1f1a15c47d0dbbfc3e69450922ad32/ESPLaserMasterGrbl/main/grbl/settings.c#L456-L472
 // https://github.com/Ortur-Tech/Ortur_Laser_Firmware_17X-18X/blob/4849ac85fc1f1a15c47d0dbbfc3e69450922ad32/ESPLaserMasterGrbl/main/grbl/settings.c#L534
 // https://github.com/Ortur-Tech/Ortur_Laser_Firmware_17X-18X/blob/4849ac85fc1f1a15c47d0dbbfc3e69450922ad32/ESPLaserMasterGrbl/main/grbl/nuts_bolts.c#L152-L209
@@ -215,8 +215,8 @@ function olderGrblHalWholeNumber(typed: string): number | null {
 
 /**
  * Why the `$$` re-read after an acknowledged Console `$N=` write does not show
- * the typed value, or null when it does or cannot tell (ADR-375 Amendments 3
- * and 4). A numeric value is compared at the precision the controller printed.
+ * the typed value, or null when it does or cannot tell (ADR-375 Amendments 4
+ * and 5). A numeric value is compared at the precision the controller printed.
  * A value that is not one number is a mismatch only when the setting reads back
  * as a number: a string setting reads back as its text. This holds whatever the
  * driver: stock GRBL refuses such a value, so an `ok` and a number in the

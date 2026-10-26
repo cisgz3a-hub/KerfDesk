@@ -56,7 +56,7 @@ describe('statusReportFieldsOff', () => {
     expect(statusReportFieldsOff(fluidncDriver.capabilities, whole(0))).toBeNull();
   });
 
-  // Meta audit v1 M3-P3-3 (ADR-375 Amendment 4): Ortur's ESP32-S2 grblHAL
+  // Meta audit v1 M3-P3-3 (ADR-375 Amendment 5): Ortur's ESP32-S2 grblHAL
   // firmware (level 1, "Grbl 1.1f", no preset) runs under the stock-GRBL
   // profile; its `$10` has the same bits (settings.h#L331-L338) and gates
   // WCO: and Ov: on bits 5 and 6 (report.c#L1401-L1412).

@@ -7,7 +7,12 @@ import {
   type Polyline,
 } from '../scene';
 import type { CncPass } from '../job';
-import { passNeedsTabs, settingsWithStockTabGate, tabTopZMm } from './cnc-tabs';
+import {
+  depthsWithTabTopPass,
+  passNeedsTabs,
+  settingsWithStockTabGate,
+  tabTopZMm,
+} from './cnc-tabs';
 import { tabRampedPoints } from './cnc-tab-ramp';
 import { cncLayoutCutWidths } from './layout-cut-widths';
 import {
@@ -92,7 +97,16 @@ export function passesForCncLayerWithEvidence(
   if (specialized !== null) return completePasses(specialized);
 
   const contours = lineArtContoursForLayer(polylines, settings, tool.diameterMm, sourceContours);
-  const allowanceMm = profileFinishAllowanceMm(settings);
+  // The finishing wall and the tab windows ride the same offset as the
+  // toolpaths below: the cut width at the full depth (ADR-368 Amendment 2).
+  // It is also the shortest path a ramp goes over more than once (ADR-471),
+  // and it caps the finish allowance (ADR-140 Amendment 2).
+  const cutWidthMm = cncLayoutCutWidths(
+    tool,
+    settings.depthMm,
+    settings.depthPerPassMm,
+  ).wallDiameterMm;
+  const allowanceMm = profileFinishAllowanceMm(settings, cutWidthMm);
   const raw = rawToolpathsForLayer(polylines, contours, settings, tool, config, allowanceMm);
 
   const toolpaths = directedToolpaths(raw.toolpaths, settings, handedness);
@@ -103,14 +117,6 @@ export function passesForCncLayerWithEvidence(
     return { ...raw, passes: [], rampedEntry: false };
   }
 
-  // The finishing wall and the tab windows ride the same offset as the
-  // toolpaths above: the cut width at the full depth (ADR-368 Amendment 2).
-  // It is also the shortest path a ramp goes over more than once (ADR-471).
-  const cutWidthMm = cncLayoutCutWidths(
-    tool,
-    settings.depthMm,
-    settings.depthPerPassMm,
-  ).wallDiameterMm;
   const passes = passesForDepths(
     polylines,
     contours,
@@ -256,7 +262,6 @@ function passesForDepths(
     return pocketPassLinks(helicalPasses, sourcePolylines, settings, wallDiameterMm);
   }
 
-  const manualTabCenters = manualTabCentersForToolpaths(toolpaths, sourceContours);
   if (allowanceMm > 0) {
     return profilePassesWithFinishAllowance(
       contours,
@@ -265,10 +270,11 @@ function passesForDepths(
       toolpaths,
       handedness,
       sourceContours,
-      (part) => contourMajorPasses(part, depths, settings, wallDiameterMm, manualTabCenters),
+      (part, tabCenters) => contourMajorPasses(part, depths, settings, wallDiameterMm, tabCenters),
       finishingSettings,
     );
   }
+  const manualTabCenters = manualTabCentersForToolpaths(toolpaths, sourceContours);
   if (settings.cutType === 'pocket') {
     return pocketPassLinks(
       sourceRegionMajorDepthPasses(sourcePolylines, toolpaths, depths),
@@ -388,16 +394,6 @@ function passNeedsTabsForContour(
   settings: CncLayerSettings,
 ): boolean {
   return wantsTabs && toolpath.closed && passNeedsTabs(zMm, settings.depthMm, settings.tabHeightMm);
-}
-
-function depthsWithTabTopPass(
-  depths: ReadonlyArray<number>,
-  settings: CncLayerSettings,
-): ReadonlyArray<number> {
-  const tabTop = tabTopZMm(settings.depthMm, settings.tabHeightMm);
-  if (tabTop >= -1e-9 || tabTop <= -settings.depthMm + 1e-9) return depths;
-  if (depths.some((z) => Math.abs(z - tabTop) <= 1e-9)) return depths;
-  return [...depths, tabTop].sort((a, b) => b - a);
 }
 
 function appendTabbedPasses(

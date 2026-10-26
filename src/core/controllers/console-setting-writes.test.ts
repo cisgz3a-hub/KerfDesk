@@ -83,7 +83,7 @@ describe('Console setting values stock GRBL would store differently', () => {
   );
 });
 
-// Controller audit v2 C4-P2-1 (ADR-375 Amendment 3). grblHAL core keeps every
+// Controller audit v2 C4-P2-1 (ADR-375 Amendment 4). grblHAL core keeps every
 // character after `=` (system.c#L1139-L1213) and reads only the number at the
 // start (settings.c#L3527-L3552, nuts_bolts.c read_uint/read_float), answering
 // ok; d7aaee3's read_uint also takes each zero after the point as one more
@@ -136,7 +136,7 @@ describe('Console setting values grblHAL would store differently', () => {
   });
 });
 
-// Meta audit v1 M3-P3-3 (ADR-375 Amendment 4). Ortur's ESP32-S2 grblHAL
+// Meta audit v1 M3-P3-3 (ADR-375 Amendment 5). Ortur's ESP32-S2 grblHAL
 // firmware (COMPATIBILITY_LEVEL 1) greets as "Grbl 1.1f" and has no KerfDesk
 // preset, so it runs under the stock-GRBL profile. Its settings_store_global_
 // setting reads the value with read_float and never checks what follows, so

@@ -12,6 +12,7 @@ import {
   recordSuccessfulConsoleCommand,
 } from './console-command-history';
 import { runConsoleCommand } from './run-console-command';
+import { useConsoleCommandDraft } from './console-workspace-state';
 import { useStoreWithEqualityFn } from 'zustand/traditional';
 
 type ConsoleCommandSubmission =
@@ -62,6 +63,7 @@ function useConsoleCommandAvailabilityState(
 export function useConsoleCommandDeckModel(
   enableHistory: boolean,
   onCommandSent: ((command: string) => void) | undefined,
+  retainDraft = false,
 ): ConsoleCommandDeckModel {
   const connection = useLaserStore((state) => state.connection);
   const activeControllerKind = useLaserStore((state) => state.activeControllerKind);
@@ -72,7 +74,7 @@ export function useConsoleCommandDeckModel(
     activeControllerCommandSet ?? undefined,
   );
   const availabilityState = useConsoleCommandAvailabilityState(connection);
-  const [command, setCommand] = useState('');
+  const [command, setCommand] = useConsoleCommandDraft(retainDraft);
   const [history, setHistory] = useState(createConsoleCommandHistory);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);

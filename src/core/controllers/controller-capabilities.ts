@@ -116,7 +116,7 @@ export type ControllerCapabilities = {
   // mask.ts). 'grblhal-fields-if-grblhal-dump': stock GRBL's `$10`, unless the
   // same `$$` lists grblHAL's `$14`-`$18` (listsGrblHalSignalSettings): a
   // grblHAL build at COMPATIBILITY_LEVEL 1 greets as "Grbl 1.1f" and runs under
-  // a stock-GRBL profile with grblHAL's `$10` (ADR-375 Amendment 4). Absent
+  // a stock-GRBL profile with grblHAL's `$10` (ADR-375 Amendment 5). Absent
   // means stock GRBL's `$10`, which picks only MPos or WPos and the buffer
   // field: its reports carry WCO: and Ov: whatever it holds.
   readonly statusReportMask?: 'grblhal-fields' | 'grblhal-fields-if-grblhal-dump';

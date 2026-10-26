@@ -22,6 +22,7 @@ export function createLaunchQueueFileOpens(
   const listeners = new Set<Listener>();
   const waiting: ExternalFileOpenRequest[] = [];
   let installed = false;
+  let delivery = Promise.resolve();
 
   const deliver = (request: ExternalFileOpenRequest): void => {
     if (listeners.size === 0) waiting.push(request);
@@ -35,9 +36,13 @@ export function createLaunchQueueFileOpens(
     if (typeof queue?.setConsumer !== 'function') return;
     // Delivered in launch order, whichever file finishes reading first.
     queue.setConsumer((params) => {
-      void Promise.all((params.files ?? []).map(launchRequest)).then((requests) => {
-        for (const request of requests) deliver(request);
-      });
+      const ready = Promise.all((params.files ?? []).map(launchRequest));
+      delivery = delivery
+        .then(async () => {
+          const requests = await ready;
+          for (const request of requests) deliver(request);
+        })
+        .catch(() => undefined);
     });
   };
 

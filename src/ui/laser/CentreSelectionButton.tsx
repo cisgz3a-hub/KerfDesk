@@ -109,7 +109,7 @@ function ArtworkCentreAction(props: {
       title={
         props.blocked ??
         (props.dot
-          ? `Move with the beam off to this artwork’s centre on the board, then turn the laser on at low power so its dot shows where it will burn. Wear laser safety glasses. It goes off by itself after ${AUTO_OFF_S} s.`
+          ? `Move with the beam off to this artwork’s centre on the board, then turn the laser on at low power so its dot shows where it will burn. Wear laser safety glasses. KerfDesk requests off after ${AUTO_OFF_S} s while the app and connection remain responsive.`
           : 'Move with the cutting beam off to this artwork’s centre on the board, then leave the separate LED on until you switch it off.')
       }
       disabled={props.blocked !== null}
@@ -160,7 +160,7 @@ function PositioningLightControls({
           title={
             blocked ??
             (dot
-              ? `Turn the laser on at low power here, without moving the head, so its dot shows where it will burn. Wear laser safety glasses. It goes off by itself after ${AUTO_OFF_S} s.`
+              ? `Turn the laser on at low power here, without moving the head, so its dot shows where it will burn. Wear laser safety glasses. KerfDesk requests off after ${AUTO_OFF_S} s while the app and connection remain responsive.`
               : 'Switch on the separate LED here without moving the head. No timer.')
           }
           disabled={blocked !== null}

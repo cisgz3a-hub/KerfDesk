@@ -6,6 +6,7 @@ export const columnStyle: CSSProperties = { display: 'flex', flexDirection: 'col
 export const rowStyle: CSSProperties = { display: 'flex', gap: 8, flexWrap: 'wrap' };
 export const noteStyle: CSSProperties = { margin: 0, color: 'var(--lf-text-faint)' };
 export const errStyle: CSSProperties = { margin: 0, color: 'var(--lf-danger-fg)' };
+export const warnStyle: CSSProperties = { margin: 0, color: 'var(--lf-warning-fg)' };
 export const fieldStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',

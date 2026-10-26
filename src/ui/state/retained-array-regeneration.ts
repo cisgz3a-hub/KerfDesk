@@ -9,6 +9,7 @@ import {
 } from './scene-object-copy-dependencies';
 import { sceneLimitOverrun } from './scene-copy-room';
 import type { AppState } from './store';
+import { retainedArrayReplaySource } from './retained-array-source-groups';
 
 export type ArrayRegeneration =
   | { readonly ok: true; readonly project: Project; readonly selectedIds: readonly string[] }
@@ -41,8 +42,9 @@ export function regenerateRetainedArray(
       reason:
         'An instance or dependency was edited or deleted. Expand to independent copies to preserve those overrides.',
     };
-  const source = retainedArraySource(state.project, layout);
-  if (source === null) return { ok: false, reason: 'The retained source cannot be reopened.' };
+  const captured = retainedArraySource(state.project, layout);
+  if (captured === null) return { ok: false, reason: 'The retained source cannot be reopened.' };
+  const source = retainedArrayReplaySource(captured, layout);
   const temporary = applyArraySelection(
     {
       ...state,
@@ -67,6 +69,7 @@ export function regenerateRetainedArray(
     temporary.project.scene,
     objects,
     layout,
+    new Set(generated.ownedObjectIds),
     mapping,
     idFactory,
   );
@@ -101,6 +104,7 @@ function mergeRegeneratedScene(
   generated: Scene,
   objects: ReadonlyArray<SceneObject>,
   layout: RetainedArrayLayout,
+  generatedOwned: ReadonlySet<string>,
   mapping: ReadonlyMap<string, string>,
   idFactory: () => string,
 ): MergedScene {
@@ -126,7 +130,14 @@ function mergeRegeneratedScene(
   const groups = (original.groups ?? []).filter(
     (group) => !group.objectIds.some((id) => owned.has(id)),
   );
-  const newGroups = regeneratedGroups(generated.groups ?? [], groups, mapping, idFactory);
+  const newGroups = regeneratedGroups(
+    (generated.groups ?? []).filter((group) =>
+      group.objectIds.every((id) => generatedOwned.has(id)),
+    ),
+    groups,
+    mapping,
+    idFactory,
+  );
   const merged = mergeRegeneratedObjects(original.objects, objects, owned);
   const scene = {
     ...original,

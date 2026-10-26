@@ -6,7 +6,7 @@
 // picture's corner. Bouguet's calibration toolbox advises that when "the
 // uncertainty is much larger than the absolute value of the coefficient ...
 // it is preferable to disable its estimation". So after each fit the highest
-// free term is dropped while its sigma exceeds its size, and a lens that folds
+// free term is dropped while it is under two of its sigmas, and a lens that folds
 // back inside the picture is refitted with fewer terms; k1 always stays free.
 // Pure core.
 
@@ -73,10 +73,15 @@ export function lensFoldsInPicture(lens: LensModel): boolean {
   return corners.some(([u, v]) => Math.hypot((u - cx) / fx, (v - cy) / fy) >= fold);
 }
 
-// The highest free term is pinned down when its one-sigma uncertainty is
-// smaller than the term itself. An unknown sigma (a singular fit) is not.
+// The highest free term is pinned down when it is significant at two sigma
+// (ADR-441 Amendment 7). At one sigma a term that cuts the residual by about
+// 1 % was kept and bent the model by up to 0.6 mm at the bed's corners, past
+// the rings; a polynomial extrapolates unpredictably where it has no data.
+// An unknown sigma (a singular fit) is not pinned down.
+const SIGNIFICANT_SIGMAS = 2;
+
 function determined(fit: CameraFit, terms: 1 | 2 | 3 | 4): boolean {
   const sigma = fit.lensSigma[SIGMA_K1 + terms - 1] ?? Number.NaN;
   const value = fit.lens.distortion[terms - 1] ?? 0;
-  return sigma <= Math.abs(value);
+  return SIGNIFICANT_SIGMAS * sigma <= Math.abs(value);
 }

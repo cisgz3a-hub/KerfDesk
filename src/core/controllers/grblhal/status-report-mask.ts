@@ -14,7 +14,7 @@
 // A stock-GRBL profile reads `$10` this way too when its `$$` lists grblHAL's
 // `$14`-`$18`. Ortur's ESP32-S2 grblHAL firmware (COMPATIBILITY_LEVEL 1, no
 // KerfDesk preset) greets as "Grbl 1.1f", prints `$10` whole and sends WCO: and
-// Ov: only with bits 5 and 6 (meta audit v1 M3-P3-3, ADR-375 Amendment 4).
+// Ov: only with bits 5 and 6 (meta audit v1 M3-P3-3, ADR-375 Amendment 5).
 // https://github.com/Ortur-Tech/Ortur_Laser_Firmware_17X-18X/blob/4849ac85fc1f1a15c47d0dbbfc3e69450922ad32/ESPLaserMasterGrbl/main/grbl/settings.h#L331-L338
 // https://github.com/Ortur-Tech/Ortur_Laser_Firmware_17X-18X/blob/4849ac85fc1f1a15c47d0dbbfc3e69450922ad32/ESPLaserMasterGrbl/main/grbl/report.c#L1401-L1412
 

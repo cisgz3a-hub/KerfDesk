@@ -1,5 +1,5 @@
 // What a session shows of grblHAL when the profile chose another driver (meta
-// audit v1 M3-P3-3, ADR-375 Amendment 4). Connect binds the driver from the
+// audit v1 M3-P3-3, ADR-375 Amendment 5). Connect binds the driver from the
 // machine profile and a banner never switches it. grblHAL built at
 // COMPATIBILITY_LEVEL 1 greets as "Grbl 1.1f", as Ortur's ESP32-S2 firmware for
 // the Laser Master 2 Pro S1/S2 and the Aufero lasers does. KerfDesk has no

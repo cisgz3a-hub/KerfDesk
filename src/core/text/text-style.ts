@@ -89,15 +89,33 @@ function mapped(rendered: TextRenderResult, m: AffineMatrix): TextRenderResult {
 
 function emboldened(rendered: TextRenderResult, offsetMm: number): TextRenderResult {
   if (!(offsetMm > 0)) return rendered;
-  const paths = rendered.paths.map((path): ColoredPath => {
-    const closed = path.polylines.filter((polyline) => polyline.closed);
-    if (closed.length === 0) return path;
-    const grown = offsetClosedPolylinesWithRoundJoins(closed, offsetMm);
-    const open = path.polylines.filter((polyline) => !polyline.closed);
+  const glyphContours: number[][] = [];
+  const paths = rendered.paths.map((path, pathIndex): ColoredPath => {
+    const ids: number[] = [];
+    const clusters = glyphClusters(path, rendered.glyphContours?.[pathIndex]);
+    if (path.polylines.every((polyline) => !polyline.closed)) {
+      const ownership = new Map(
+        clusters.flatMap((cluster, glyph) =>
+          cluster.path.polylines.map((line) => [line, glyph] as const),
+        ),
+      );
+      glyphContours.push(path.polylines.map((line) => ownership.get(line) ?? 0));
+      return path;
+    }
+    const polylines = clusters.flatMap((cluster, glyph) => {
+      const closed = cluster.path.polylines.filter((polyline) => polyline.closed);
+      const open = cluster.path.polylines.filter((polyline) => !polyline.closed);
+      const grown =
+        closed.length === 0 ? [] : offsetClosedPolylinesWithRoundJoins(closed, offsetMm);
+      const lines = [...grown, ...open];
+      ids.push(...lines.map(() => glyph));
+      return lines;
+    });
+    glyphContours.push(ids);
     const { curves: _curves, ...rest } = path;
-    return { ...rest, polylines: [...grown, ...open] };
+    return { ...rest, polylines };
   });
-  return { ...rendered, paths, bounds: pathsBounds(paths) ?? rendered.bounds };
+  return { ...rendered, paths, glyphContours, bounds: pathsBounds(paths) ?? rendered.bounds };
 }
 
 /** Styled text bent by `bendDeg`, distorting or rigid as the style asks. */
@@ -125,9 +143,9 @@ export function bendTextUndistorted(rendered: TextRenderResult, bendDeg: number)
   const centerY = (minY + maxY) / 2;
   const radius = (maxX - minX) / angle;
   const pieces: ColoredPath[] = [];
-  for (const path of rendered.paths) {
+  for (const [pathIndex, path] of rendered.paths.entries()) {
     const glyphs: ColoredPath[] = [];
-    for (const cluster of glyphClusters(path)) {
+    for (const cluster of glyphClusters(path, rendered.glyphContours?.[pathIndex])) {
       const box = cluster.box;
       const gx = (box.minX + box.maxX) / 2;
       const theta = (gx - centerX) / radius;
@@ -179,6 +197,7 @@ function mappedPath(path: ColoredPath, m: AffineMatrix): ColoredPath {
 // belong together (a hole, the dot of an i). Curves and polylines pair by index.
 function glyphClusters(
   path: ColoredPath,
+  glyphContours?: ReadonlyArray<number>,
 ): ReadonlyArray<{ readonly path: ColoredPath; readonly box: Bounds }> {
   const entries = path.polylines.map((polyline, index) => ({
     polyline,
@@ -189,7 +208,21 @@ function glyphClusters(
     .filter((entry) => entry.box !== null)
     .sort((p, q) => (p.box?.minX ?? 0) - (q.box?.minX ?? 0));
   const clusters: { entries: typeof entries; box: Bounds }[] = [];
-  for (const entry of order) {
+  if (glyphContours?.length === entries.length) {
+    const byGlyph = new Map<number, { entries: typeof entries; box: Bounds }>();
+    entries.forEach((entry, index) => {
+      if (entry.box === null) return;
+      const glyph = glyphContours[index] as number;
+      const cluster = byGlyph.get(glyph);
+      if (cluster === undefined) byGlyph.set(glyph, { entries: [entry], box: entry.box });
+      else {
+        cluster.entries.push(entry);
+        cluster.box = union(cluster.box, entry.box);
+      }
+    });
+    clusters.push(...byGlyph.values());
+  }
+  for (const entry of glyphContours?.length === entries.length ? [] : order) {
     const box = entry.box as Bounds;
     const last = clusters.at(-1);
     if (last !== undefined && box.minX < last.box.maxX) {

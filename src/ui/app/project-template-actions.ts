@@ -69,6 +69,7 @@ export async function openTemplateFile(
     return;
   }
   const loaded = ctx.setProject(project);
+  if (loaded.kind === 'job-machine-locked') return;
   if (loaded.kind === 'desktop-required') {
     describePendingProProject(project, file.name);
     return;

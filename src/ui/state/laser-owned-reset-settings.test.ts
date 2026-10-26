@@ -3,6 +3,7 @@ import { idleCollector, settingsMapToRows } from '../../core/controllers/grbl';
 import { runGrblDisconnectTransaction } from './laser-disconnect-transaction';
 import { handleLine } from './laser-line-handler';
 import { makeLineHandlerHarness } from './laser-line-handler.test-support';
+import { readModalStateAfterOwnedReset } from './laser-owned-reset-requalify';
 import {
   noteControllerSettingsRead,
   noteControllerSettingWrite,
@@ -156,6 +157,23 @@ describe('settings across a reset KerfDesk sent (ADR-648, audit D-5)', () => {
       controllerBuildInfoRawLines: [],
       controllerBuildInfoObservation: null,
     });
+  });
+});
+
+describe('the scheduled `$G`-only qualification (ADR-648)', () => {
+  it('reads `$$` again when a `$` setting was written since the kept read', async () => {
+    const { refs, set, get, writes, safeWrite } = readSettingsHarness();
+    noteControllerSettingsRead(refs);
+    // A Console write lands while the qualification waits for status.
+    noteControllerSettingWrite(refs, '$30=500\n');
+    let fullReads = 0;
+
+    await readModalStateAfterOwnedReset(set, get, refs, safeWrite, async () => {
+      fullReads += 1;
+    });
+
+    expect(fullReads).toBe(1);
+    expect(writes).toEqual([]);
   });
 });
 

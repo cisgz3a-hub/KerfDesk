@@ -30,10 +30,12 @@ import { applyStartPointDefaults } from './start-point-defaults';
 import {
   canonicalizeOpenedProjectBed,
   withCurrentMachineAutofocus,
+  withCurrentMachineCamera,
   type ProjectBedReconciliationNotice,
 } from './project-bed-reconciliation';
 import { useToastStore } from './toast-store';
 import { projectSheetActions, type ProjectSheetActions } from './project-sheet-actions';
+import { JOB_MACHINE_OPEN_REFUSED, refuseJobMachineChange } from './job-machine-lock';
 
 type ProjectActionSet = (
   fn: AppState | Partial<AppState> | ((state: AppState) => AppState | Partial<AppState>),
@@ -88,9 +90,13 @@ export function projectActions(
       const resolution = resolveProjectMachineCapability(project, current.cncLibrary.customTools);
       const bedResolution = canonicalizeOpenedProjectBed(resolution.project, current.project);
       const autofocus = withCurrentMachineAutofocus(bedResolution.project, current.project);
+      const camera = withCurrentMachineCamera(autofocus.project, current.project);
+      // A file on another machine waits for a running job (ADR-416 Amendment 2).
+      if (refuseJobMachineChange(current.project, camera.project, JOB_MACHINE_OPEN_REFUSED))
+        return { kind: 'job-machine-locked' };
       useUiStore.getState().resetArtworkRunOrder();
       set((state) => ({
-        ...initialState(autofocus.project),
+        ...initialState(camera.project),
         ...retainedApplicationState(state),
         projectDocumentEpoch: state.projectDocumentEpoch + 1,
         cachedCncMachine: resolution.cachedCncMachine,
@@ -98,7 +104,8 @@ export function projectActions(
         dirty: bedResolution.notice?.workspaceMismatch === true,
       }));
       if (autofocus.keptCurrentCommand) noteKeptAutofocusCommand();
-      const loneArtworkId = loneSelectableArtworkId(autofocus.project.scene);
+      if (camera.keptCurrentCamera) noteKeptCameraCalibration();
+      const loneArtworkId = loneSelectableArtworkId(camera.project.scene);
       if (loneArtworkId !== null && get().selectedObjectId === null)
         get().selectObject(loneArtworkId);
       return bedResolution.notice?.workspaceMismatch === true
@@ -157,6 +164,15 @@ function claimProjectSaveRequest(set: ProjectActionSet, get: ProjectActionGet): 
   const nextEpoch = get().projectSaveRequestEpoch + 1;
   set({ projectSaveRequestEpoch: nextEpoch });
   return nextEpoch;
+}
+
+function noteKeptCameraCalibration(): void {
+  useToastStore
+    .getState()
+    .pushToast(
+      "This file's camera calibration was not used: the camera keeps your machine's current calibration.",
+      'info',
+    );
 }
 
 function noteKeptAutofocusCommand(): void {

@@ -6,8 +6,17 @@ import {
   pixelToBed,
   projectWorldPoint,
   scaleLens,
+  type LensModel,
 } from './camera-model';
-import { overheadPose, wideLens } from './model-fixtures';
+import { lensFoldsInPicture } from './fit-determined-lens';
+import { lookAt, overheadPose, wideLens } from './model-fixtures';
+
+const SHORT_LENS: LensModel = {
+  intrinsics: { fx: 800, fy: 800, cx: 639.5, cy: 359.5 },
+  distortion: [0, 0, 0, 0],
+  imageWidth: 1280,
+  imageHeight: 720,
+};
 
 describe('camera model', () => {
   const lens = wideLens();
@@ -71,6 +80,21 @@ describe('camera model', () => {
     const pixel = projectWorldPoint(folding, pose, bedPoint(seen?.x ?? 0, seen?.y ?? 0, 3));
     expect(pixel?.x).toBeCloseTo(at(0.6).x, 6);
     expect(pixel?.y).toBeCloseTo(at(0.6).y, 6);
+  });
+
+  it('does not draw a point wider than the lens images back inside the picture', () => {
+    // This lens turns back at about 63°, beyond its picture's corners, so the
+    // fit accepts it; a bed point 80° off the axis used to project to pixel
+    // x 933, which really sees the bed 115 mm from the camera, not 1739 mm.
+    const turnsOutside = { ...SHORT_LENS, distortion: [0, 0, 0, -0.05] as const };
+    expect(lensFoldsInPicture(turnsOutside)).toBe(false);
+    const straightDown = lookAt([0, 0, -300], [0, 0, 0]);
+    expect(projectWorldPoint(turnsOutside, straightDown, bedPoint(300 * Math.tan(1.4), 0))).toBe(
+      null,
+    );
+    const inside = projectWorldPoint(turnsOutside, straightDown, bedPoint(250, 0));
+    expect(inside).not.toBeNull();
+    expect(pixelToBed(turnsOutside, straightDown, inside ?? { x: 0, y: 0 })?.x).toBeCloseTo(250, 6);
   });
 
   it('rescales a lens to a resized frame about the pixel grid', () => {

@@ -1,8 +1,8 @@
-## ADR-375 Amendment 4 - grblHAL the controller shows, under a stock-GRBL profile (2026-10-23)
+## ADR-375 Amendment 5 - grblHAL the controller shows, under a stock-GRBL profile (2026-10-23)
 
 **Status:** Accepted. | **Date:** 2026-10-23
 
-Amends [Amendment 3](ADR-375-amendment-3-grblhal-envelope-and-console-values.md) decisions 3 and 4
+Amends [Amendment 4](ADR-375-amendment-4-grblhal-envelope-and-console-values.md) decisions 3 and 4
 (Console setting values) and [Amendment 2](ADR-375-amendment-2-grblhal-report-mask-names-missing-fields.md)
 decisions 1 and 2 (`$10`). It follows meta audit v1 finding M3-P3-3 on the merged fix #1379 for
 C4-P2-1, which a refuter and the coordinator both confirmed.
@@ -88,7 +88,7 @@ No hardware was available, so none of this is hardware evidence.
    Two things do not count: a fork's other extra settings, and the ambiguous `Grbl 1.1f` banner on
    its own.
 2. **On a stock-GRBL profile that shows grblHAL, a Console value must pass both checks** (amends
-   Amendment 3 decision 3):
+   Amendment 4 decision 3):
    - The stock check runs first, because this firmware truncates a whole-number value as stock
      GRBL does (`$22=0.5` keeps its stock message).
    - Then the grblHAL check runs. Its refusal adds why grblHAL applies, for example: "The profile
@@ -96,7 +96,7 @@ No hardware was available, so none of this is hardware evidence.
    - The Console's check before the confirmation prompt and the store's own check both use what
      the session showed.
    - This is refusal kind (a), as before.
-3. **The `$$` re-read reports a value stored in part, on every driver** (amends Amendment 3
+3. **The `$$` re-read reports a value stored in part, on every driver** (amends Amendment 4
    decision 4). Stock GRBL refuses a value that is not one number. So an `ok`, followed by a number
    in the re-read, means the firmware kept part of the value. This covers a level-2 grblHAL under
    the stock profile, which shows nothing before the write. A text setting still reads back as its

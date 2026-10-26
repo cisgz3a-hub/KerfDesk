@@ -21,7 +21,9 @@ import {
   captureSourceFrame,
   type ActiveCameraSource,
 } from '../frame-source';
-import { rememberCameraView } from '../helpers/moved-check';
+import { markCameraSteady } from '../helpers/moved-check';
+import { saveViewReference } from '../helpers/view-reference';
+import { viewThumbnail } from '../../../core/camera/model/view-shift';
 import { refreshCameraPicture } from '../helpers/refresh-picture';
 import type { CalibrationSettings } from './camera-calibration-store';
 import { runTransientCameraJob } from './transient-camera-job';
@@ -43,6 +45,8 @@ export async function engraveNudgeRing(
     machine: { kind: 'laser' },
     scene: generateCameraNudgeRing({
       centre: nudgeRingCentre(),
+      // The calibration's ring size: the size this camera was shown it can find.
+      ringDiameterMm: settings.ringDiameterMm,
       power: settings.powerPercent,
       speed: settings.speedMmPerMin,
     }),
@@ -58,12 +62,15 @@ export async function photographNudgeRing(args: {
   readonly source: ActiveCameraSource;
   readonly sheetThicknessMm: number;
   readonly capture?: typeof captureSourceFrame;
+  readonly signal?: AbortSignal;
 }): Promise<NudgePhotoOutcome> {
   const model = activeCameraModelNow();
   if (model === undefined || isHeadCameraModel(model)) {
     return { kind: 'failed', message: 'This fix needs a calibrated camera fixed above the bed.' };
   }
+  const burnedAtMm = nudgeRingCentre();
   const frame = await (args.capture ?? captureSourceFrame)(args.source).catch(() => null);
+  if (args.signal?.aborted) return { kind: 'failed', message: 'The photo was cancelled.' };
   if (frame === null) return { kind: 'failed', message: 'The camera picture could not be read.' };
   const binding = cameraCaptureBindingForFrame(args.source, frame.width, frame.height);
   const forFrame = cameraModelForFrame(model, binding, frame.width, frame.height);
@@ -72,7 +79,7 @@ export async function photographNudgeRing(args: {
     lens: forFrame.lens,
     pose: forFrame.pose,
     rings: detectRingMarks(toGrayImage(frame)),
-    burnedAtMm: nudgeRingCentre(),
+    burnedAtMm,
     heightMm: args.sheetThicknessMm,
   });
   switch (measure.kind) {
@@ -105,7 +112,22 @@ export function applyNudge(offsetMm: Vec2): boolean {
   if (own === undefined || isHeadCameraModel(own)) return false;
   const nudged = nudgedCameraModel(own, offsetMm);
   updateDeviceProfile(withSavedCameraModel(project.device, nudged));
-  // The view now matches the fixed calibration: keep it for the moved check.
-  void refreshCameraPicture().then(() => rememberCameraView(nudged));
+  const owner = useStore.getState();
+  // Keep the refreshed frame itself; a second asynchronous capture could
+  // belong to a camera/document selected after this Fix.
+  void refreshCameraPicture().then((outcome) => {
+    const now = useStore.getState();
+    const camera = useCameraStore.getState();
+    if (
+      outcome !== 'refreshed' ||
+      now.projectDocumentEpoch !== owner.projectDocumentEpoch ||
+      now.project.device !== owner.project.device ||
+      camera.sourceState !== sourceState ||
+      camera.overlayStill === null
+    )
+      return;
+    saveViewReference(nudged, viewThumbnail(camera.overlayStill));
+    markCameraSteady();
+  });
   return true;
 }

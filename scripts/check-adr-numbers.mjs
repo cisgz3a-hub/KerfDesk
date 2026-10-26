@@ -30,6 +30,7 @@ const DECISION_DIR = join('docs', 'decisions');
 // number, so anchoring on a separator would silently skip whole sections.
 const HEADING_PATTERN = /^## ADR-(\d+)(.*)$/;
 const AMENDMENT_PATTERN = /^\s+Amendment\b/;
+const AMENDMENT_HEADING_PATTERN = /^#{1,2} ADR-(\d+)\s+Amendment\s+(\d+)\b/;
 // `ADR-344-slug.md`, or `ADR-311-amendment-1-slug.md` for an amendment file.
 const FILENAME_PATTERN = /^ADR-(\d+)(-amendment-\d+)?-[a-z0-9-]+\.md$/u;
 
@@ -74,6 +75,11 @@ function decisionFiles() {
 }
 
 const misnamed = [];
+// Amendment files of one decision must not share an amendment number: on
+// 2026-10-22 two branches each landed "ADR-375 Amendment 3", and references to
+// it then named two different amendments.
+/** @type {Map<string, string[]>} */
+const amendmentFiles = new Map();
 collectHeadings(LEGACY_FILE, LEGACY_FILE);
 for (const name of decisionFiles()) {
   const claimed = FILENAME_PATTERN.exec(name);
@@ -84,6 +90,24 @@ for (const name of decisionFiles()) {
     continue;
   }
   const expected = Number(claimed[1]);
+  if (claimed[2] !== undefined) {
+    const expectedAmendment = Number(claimed[2].slice('-amendment-'.length));
+    const key = `ADR-${expected} Amendment ${expectedAmendment}`;
+    amendmentFiles.set(key, [...(amendmentFiles.get(key) ?? []), join(DECISION_DIR, name)]);
+    // Some amendment files use a top-level title. Check either title depth so
+    // renaming a colliding file cannot leave its old amendment identity behind.
+    readLines(join(DECISION_DIR, name)).forEach((line, index) => {
+      const heading = AMENDMENT_HEADING_PATTERN.exec(line);
+      if (heading === null) return;
+      const number = Number(heading[1]);
+      const amendment = Number(heading[2]);
+      if (number !== expected || amendment !== expectedAmendment) {
+        misnamed.push(
+          `  ${join(DECISION_DIR, name)}:${index + 1}  heading says ADR-${number} Amendment ${amendment}, filename says ${key}`,
+        );
+      }
+    });
+  }
   let claimsItsNumber = false;
   collectHeadings(join(DECISION_DIR, name), join(DECISION_DIR, name), (number, line, amendment) => {
     if (number === expected) {
@@ -114,11 +138,18 @@ const duplicates = [...decisionLines.entries()]
   .filter(([, at]) => at.length > 1)
   .sort(([a], [b]) => a - b);
 
-if (duplicates.length > 0) {
-  console.error('Duplicate ADR numbers:');
+const duplicateAmendments = [...amendmentFiles.entries()].filter(([, files]) => files.length > 1);
+
+if (duplicates.length > 0 || duplicateAmendments.length > 0) {
+  if (duplicates.length > 0) console.error('Duplicate ADR numbers:');
   for (const [number, at] of duplicates) {
     console.error(`  ADR-${number} claimed ${at.length}x`);
     for (const { file, line } of at) console.error(`    ${file}:${line}`);
+  }
+  if (duplicateAmendments.length > 0) console.error('Duplicate amendment numbers:');
+  for (const [key, files] of duplicateAmendments) {
+    console.error(`  ${key} claimed ${files.length}x`);
+    for (const file of files) console.error(`    ${file}`);
   }
   console.error('\nThe earliest-landed decision keeps the number; renumber the others and');
   console.error('update their references. Beware: references to a shared number belong to');

@@ -171,7 +171,7 @@ describe('Console setting writes on stock GRBL', () => {
   });
 });
 
-// Controller audit v2 C4-P2-1 (ADR-375 Amendment 3): grblHAL keeps only the
+// Controller audit v2 C4-P2-1 (ADR-375 Amendment 4): grblHAL keeps only the
 // number at the start of a `$N=` value and answers ok (core d7aaee3
 // settings.c#L3527-L3552), so the store refuses such a value before writing
 // and compares the `$$` re-read with what was typed.
@@ -238,7 +238,7 @@ describe('Console setting writes on grblHAL', () => {
   });
 });
 
-// Meta audit v1 M3-P3-3 (ADR-375 Amendment 4). Connect binds the driver from
+// Meta audit v1 M3-P3-3 (ADR-375 Amendment 5). Connect binds the driver from
 // the profile, and Ortur's ESP32-S2 grblHAL firmware (COMPATIBILITY_LEVEL 1, no
 // preset) greets as "Grbl 1.1f", so it runs under the default stock-GRBL
 // profile. Both fakes below sit behind that profile. The grblHAL one stores

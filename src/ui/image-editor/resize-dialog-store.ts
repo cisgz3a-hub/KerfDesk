@@ -60,6 +60,15 @@ function parseEdgeDraft(draft: string): number | null {
   return resizeEdgeDraftIsValid(draft) ? clampEdge(Number(draft)) : null;
 }
 
+function constrainedEdges(edge: number, ratio: number): readonly [number, number] {
+  const companion = Math.round(edge * ratio);
+  // If the other edge reaches the cap, reduce both axes together. Clamping
+  // only the companion would silently distort a checked aspect constraint.
+  return companion > MAX_EDGE_PX
+    ? [clampEdge(Math.round(MAX_EDGE_PX / ratio)), MAX_EDGE_PX]
+    : [edge, clampEdge(companion)];
+}
+
 export const useResizeDialogStore = create<ResizeDialogState>((set) => ({
   dialog: null,
 
@@ -87,13 +96,15 @@ export const useResizeDialogStore = create<ResizeDialogState>((set) => ({
       const w = parseEdgeDraft(widthDraft);
       if (w === null) return { dialog: { ...s.dialog, widthDraft } };
       const locked = s.dialog.kind === 'image-size' && s.dialog.lockAspect;
-      const height = locked ? clampEdge(Math.round(w / s.dialog.aspect)) : s.dialog.height;
+      const [width, height] = locked
+        ? constrainedEdges(w, 1 / s.dialog.aspect)
+        : [w, s.dialog.height];
       return {
         dialog: {
           ...s.dialog,
-          width: w,
+          width,
           height,
-          widthDraft: String(w),
+          widthDraft: String(width),
           heightDraft: locked ? String(height) : s.dialog.heightDraft,
         },
       };
@@ -105,13 +116,13 @@ export const useResizeDialogStore = create<ResizeDialogState>((set) => ({
       const h = parseEdgeDraft(heightDraft);
       if (h === null) return { dialog: { ...s.dialog, heightDraft } };
       const locked = s.dialog.kind === 'image-size' && s.dialog.lockAspect;
-      const width = locked ? clampEdge(Math.round(h * s.dialog.aspect)) : s.dialog.width;
+      const [height, width] = locked ? constrainedEdges(h, s.dialog.aspect) : [h, s.dialog.width];
       return {
         dialog: {
           ...s.dialog,
-          height: h,
+          height,
           width,
-          heightDraft: String(h),
+          heightDraft: String(height),
           widthDraft: locked ? String(width) : s.dialog.widthDraft,
         },
       };
@@ -160,6 +171,7 @@ function commitResizeDialog(dialog: ResizeDialog | null): void {
         : commitCanvasSize(session, dialog.width, dialog.height, dialog.anchor),
     // A replaced document invalidates any fit; re-fit on next layout.
     view: null,
+    pendingCrop: null,
   });
 }
 

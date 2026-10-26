@@ -60,7 +60,7 @@ export const grblDriver: ControllerDriver = {
     // limits.c:319-320: no `?` is answered during the homing cycle.
     statusWhileHoming: false,
     // A grblHAL board that greets as Grbl 1.1f shows itself in the `$$`
-    // (ADR-375 Amendment 4).
+    // (ADR-375 Amendment 5).
     statusReportMask: 'grblhal-fields-if-grblhal-dump',
   },
   realtime: {

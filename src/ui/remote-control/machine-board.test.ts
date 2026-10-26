@@ -146,6 +146,19 @@ describe('Place Board machine controls', () => {
     expect(capture).not.toHaveBeenCalled();
   });
 
+  it('refuses stale capture coordinates before remote finish invokes the panel', async () => {
+    const finish = vi.fn(async () => undefined);
+    unregister = registerBoardRemote({
+      status: () => ({ ...status(2), coordinatesCurrent: false }),
+      capture: vi.fn(async () => undefined),
+      finish,
+    });
+    const receipt = await completedOperation('finish_board');
+    expect(receipt.state).toBe('failed');
+    expect(receipt.message).toContain('coordinates changed');
+    expect(finish).not.toHaveBeenCalled();
+  });
+
   it('completes finish with the Frame reminder', async () => {
     unregister = registerBoardRemote({
       status: () => status(2),

@@ -82,7 +82,7 @@ function homeCommand(command: PreparedConsoleCommand): ConsoleCommandResult {
 }
 
 // FluidNC's `$10` is stock GRBL's whatever its `$$` lists, so it does not take
-// the stock driver's grblHAL reading of it (ADR-375 Amendment 4).
+// the stock driver's grblHAL reading of it (ADR-375 Amendment 5).
 const { statusReportMask: _grblHalDumpMask, ...grblCapabilities } = grblDriver.capabilities;
 
 export const fluidncDriver: ControllerDriver = {

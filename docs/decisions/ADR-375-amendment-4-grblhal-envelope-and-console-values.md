@@ -1,7 +1,7 @@
-## ADR-375 Amendment 3 - grblHAL's jog envelope, and Console setting values grblHAL stores differently (2026-10-22)
+## ADR-375 Amendment 4 - grblHAL's jog envelope, and Console setting values grblHAL stores differently (2026-10-22)
 
 **Status:** Accepted; decisions 3 and 4 amended by
-[Amendment 4](ADR-375-amendment-4-grblhal-evidence-under-a-grbl-profile.md) (the grblHAL value
+[Amendment 5](ADR-375-amendment-5-grblhal-evidence-under-a-grbl-profile.md) (the grblHAL value
 check also applies on a stock-GRBL profile whose controller shows grblHAL; the re-read reports a
 value stored in part on every driver). | **Date:** 2026-10-22
 

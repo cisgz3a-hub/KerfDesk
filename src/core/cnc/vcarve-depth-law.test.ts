@@ -1,11 +1,33 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_DEVICE_PROFILE, toMachineCoords } from '../devices';
 import { pointInPolygon } from '../geometry/point-in-polygon';
 import { normalizeClosedPolylinesEvenOddChecked } from '../geometry/polygon-difference';
-import type { CncTool, Polyline, Vec2 } from '../scene';
+import type { Job } from '../job';
+import { cncGrblStrategy } from '../output';
+import {
+  createLayer,
+  DEFAULT_CNC_LAYER_SETTINGS,
+  DEFAULT_CNC_MACHINE_CONFIG,
+  IDENTITY_TRANSFORM,
+  type CncTool,
+  type Polyline,
+  type Scene,
+  type Vec2,
+} from '../scene';
+import { compileCncJob } from './compile-cnc-job';
 import { conicalRadialEnvelope, radialEnvelopeDepthMm } from './radial-envelope';
 import { vcarvePlanningAngleDeg } from './vcarve-angle';
 import { vcarveMedialPasses } from './vcarve-medial';
 import type { VCarveOptions } from './vcarve-plan';
+import {
+  coneRemovedDepth,
+  distanceToLine,
+  emittedFeedChords,
+  flatRemovedDepth,
+  sourceContains,
+  sourceEdges,
+  type RemovalChord,
+} from './vcarve-removal.test-support';
 
 // End-to-end depth-law property (audit 2026-10-18). The planner's certificate
 // is built from many modules; this test holds the one physical invariant they
@@ -222,4 +244,191 @@ describe('V-carve depth law across the whole planner', () => {
       expect(audit.worstOverDepthMm).toBeLessThanOrEqual(MAX_OVER_DEPTH_MM);
     }
   });
+});
+
+// Under-cut property (CNC audit v1 F1-P3-1). The over-depth audit above cannot
+// see stock a program leaves standing. This one compiles each shape, emits its
+// G-code and sweeps the cutters along every emitted feed move with the
+// independent removal oracle (no production simulator or planner geometry).
+// Wherever the depth law asks for material to go, what is left must stay within
+// the scallop between two pointed-bit floor passes one 0.1 mm automatic floor
+// pitch apart (ADR-319 §6), plus the 0.01 mm emitted-footprint tolerance and
+// 0.001 mm XYZ rounding. A flat core squared off short of an inside corner left
+// a 0.17-0.55 mm fin there (ADR-285 Amendment 1).
+
+const END_MILL: CncTool = {
+  id: 'em3',
+  name: '3.175 mm end mill',
+  kind: 'end-mill',
+  diameterMm: 3.175,
+};
+const V90_SMALL: CncTool = { ...V90, id: 'v90-3', name: '90° V-bit, 3.175 mm', diameterMm: 3.175 };
+const FLOOR_PITCH_MM = 0.1;
+const HEIGHT_FIELD_CELL_MM = 0.05;
+const BUCKET_MM = 1;
+
+type UnderCutCase = {
+  readonly name: string;
+  readonly shape: ReadonlyArray<Polyline>;
+  readonly tool: CncTool;
+  readonly floorMm?: number;
+  readonly clear?: CncTool;
+};
+
+const UNDER_CUT_CASES: ReadonlyArray<UnderCutCase> = [
+  { name: 'L junction, 60° bit, 1 mm floor', shape: SHAPES[1]?.[1] ?? [], tool: V60, floorMm: 1 },
+  { name: 'L junction, 90° bit, 1 mm floor', shape: SHAPES[1]?.[1] ?? [], tool: V90, floorMm: 1 },
+  {
+    name: 'slab with island, 90° bit, 1 mm floor',
+    shape: SHAPES[3]?.[1] ?? [],
+    tool: V90,
+    floorMm: 1,
+  },
+  {
+    name: 'square with a 0.8 mm island, flowing 90° bit',
+    shape: [rectangle(0, 0, 10, 10), rectangle(4.6, 4.6, 5.4, 5.4)],
+    tool: V90_SMALL,
+  },
+  {
+    name: 'wide L, 90° bit after an end-mill clearing stage, 1 mm floor',
+    shape: [
+      polygon([
+        { x: 0, y: 0 },
+        { x: 14, y: 0 },
+        { x: 14, y: 14 },
+        { x: 8, y: 14 },
+        { x: 8, y: 6 },
+        { x: 0, y: 6 },
+      ]),
+    ],
+    tool: V90,
+    floorMm: 1,
+    clear: END_MILL,
+  },
+];
+
+function compileUnderCutCase(c: UnderCutCase): Job {
+  const scene: Scene = {
+    objects: [
+      {
+        kind: 'imported-svg',
+        id: 'source',
+        source: 'source.svg',
+        bounds: { minX: 0, minY: 0, maxX: 30, maxY: 30 },
+        transform: IDENTITY_TRANSFORM,
+        paths: [{ color: '#ff0000', polylines: c.shape }],
+      },
+    ],
+    layers: [
+      {
+        ...createLayer({ id: 'carve', color: '#ff0000' }),
+        cnc: {
+          ...DEFAULT_CNC_LAYER_SETTINGS,
+          cutType: 'v-carve',
+          toolId: c.tool.id,
+          vCarveFlatDepthEnabled: c.floorMm !== undefined,
+          depthMm: c.floorMm ?? 1,
+          depthPerPassMm: 10,
+          vResolutionMm: 0,
+          ...(c.clear === undefined ? {} : { vClearToolId: c.clear.id }),
+        },
+      },
+    ],
+  };
+  const tools = c.clear === undefined ? [c.tool] : [c.tool, c.clear];
+  return compileCncJob(scene, DEFAULT_DEVICE_PROFILE, {
+    ...DEFAULT_CNC_MACHINE_CONFIG,
+    tools,
+    toolId: c.tool.id,
+  });
+}
+
+function emittedChordsByCutter(job: Job, clearToolId: string | undefined) {
+  const cone: RemovalChord[] = [];
+  const flat: RemovalChord[] = [];
+  for (const group of job.groups) {
+    if (group.kind !== 'cnc') continue;
+    const program = cncGrblStrategy.emit({ groups: [group] }, DEFAULT_DEVICE_PROFILE);
+    (group.toolId === clearToolId ? flat : cone).push(...emittedFeedChords(program));
+  }
+  return { cone, flat };
+}
+
+function bucketIndex(mm: number): number {
+  return Math.floor(mm / BUCKET_MM);
+}
+
+/** Lists each chord in every 1 mm bucket its pointed cone can reach. */
+function chordBuckets(chords: ReadonlyArray<RemovalChord>, slope: number, outerRadiusMm: number) {
+  const buckets = new Map<string, RemovalChord[]>();
+  for (const chord of chords) {
+    const [a, b] = chord;
+    const reachMm = Math.min(outerRadiusMm, Math.max(-a.z, -b.z) * slope);
+    const lastX = bucketIndex(Math.max(a.x, b.x) + reachMm);
+    const lastY = bucketIndex(Math.max(a.y, b.y) + reachMm);
+    for (let ix = bucketIndex(Math.min(a.x, b.x) - reachMm); ix <= lastX; ix += 1)
+      for (let iy = bucketIndex(Math.min(a.y, b.y) - reachMm); iy <= lastY; iy += 1) {
+        const list = buckets.get(`${ix},${iy}`);
+        if (list === undefined) buckets.set(`${ix},${iy}`, [chord]);
+        else list.push(chord);
+      }
+  }
+  return buckets;
+}
+
+function shapeCells(shape: ReadonlyArray<Polyline>): Vec2[] {
+  const xs = shape.flatMap((loop) => loop.points.map((point) => point.x));
+  const ys = shape.flatMap((loop) => loop.points.map((point) => point.y));
+  const [minX, maxX, minY, maxY] = [
+    Math.min(...xs),
+    Math.max(...xs),
+    Math.min(...ys),
+    Math.max(...ys),
+  ];
+  const cells: Vec2[] = [];
+  for (let y = minY + HEIGHT_FIELD_CELL_MM / 2; y < maxY; y += HEIGHT_FIELD_CELL_MM)
+    for (let x = minX + HEIGHT_FIELD_CELL_MM / 2; x < maxX; x += HEIGHT_FIELD_CELL_MM)
+      if (sourceContains({ x, y }, shape)) cells.push({ x, y });
+  return cells;
+}
+
+function auditUnderCut(c: UnderCutCase) {
+  const angleDeg = c.tool.tipAngleDeg ?? 0;
+  const slope = Math.tan((angleDeg * Math.PI) / 360);
+  const capMm = Math.min(c.floorMm ?? Number.POSITIVE_INFINITY, c.tool.diameterMm / 2 / slope);
+  const chords = emittedChordsByCutter(compileUnderCutCase(c), c.clear?.id);
+  const buckets = chordBuckets(chords.cone, slope, c.tool.diameterMm / 2);
+  const edges = sourceEdges(c.shape);
+  let worstShortfallMm = Number.NEGATIVE_INFINITY;
+  let worstOverMm = Number.NEGATIVE_INFINITY;
+  for (const cell of shapeCells(c.shape)) {
+    const clearanceMm = Math.min(...edges.map(([a, b]) => distanceToLine(cell, a, b)));
+    const targetMm = Math.min(capMm, clearanceMm / slope);
+    const machine = toMachineCoords(cell, DEFAULT_DEVICE_PROFILE);
+    const near = (buckets.get(`${bucketIndex(machine.x)},${bucketIndex(machine.y)}`) ?? []).filter(
+      ([a, b]) => distanceToLine(machine, a, b) < Math.max(-a.z, -b.z) * slope,
+    );
+    const coneMm = coneRemovedDepth(machine, near, angleDeg);
+    const flatMm =
+      c.clear === undefined ? 0 : flatRemovedDepth(machine, chords.flat, c.clear.diameterMm);
+    const removedMm = Math.max(coneMm, flatMm);
+    worstShortfallMm = Math.max(worstShortfallMm, targetMm - removedMm);
+    worstOverMm = Math.max(worstOverMm, removedMm - targetMm);
+  }
+  return { worstShortfallMm, worstOverMm, slope, flatChords: chords.flat.length };
+}
+
+describe('V-carve leaves no more than the floor scallop standing', () => {
+  it.each(UNDER_CUT_CASES)(
+    '$name',
+    (c) => {
+      const audit = auditUnderCut(c);
+      const scallopMm = FLOOR_PITCH_MM / (2 * audit.slope);
+      const representationMm = 0.01 / audit.slope + 0.002;
+      if (c.clear !== undefined) expect(audit.flatChords).toBeGreaterThan(0);
+      expect(audit.worstShortfallMm).toBeLessThanOrEqual(scallopMm + representationMm);
+      expect(audit.worstOverMm).toBeLessThanOrEqual(0.002);
+    },
+    60_000,
+  );
 });

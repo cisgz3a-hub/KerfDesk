@@ -8,7 +8,7 @@
 // frame, yet GRBL still refuses a whole hold jog whose target leaves its
 // envelope (error:15). After this session's Home the machine position is tied
 // to the switch whatever `$20` says, so the switch inset applies with soft
-// limits off too (ADR-375 Amendment 3).
+// limits off too (ADR-375 Amendment 4).
 
 import type { ControllerSettingsSnapshot, StatusReport } from '../../core/controllers/grbl';
 import {

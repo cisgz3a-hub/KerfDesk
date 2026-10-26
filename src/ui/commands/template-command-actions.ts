@@ -11,10 +11,12 @@ export async function openTemplateCommand(
   platform: PlatformAdapter,
   pushToast: PushToast,
 ): Promise<void> {
-  const epoch = useStore.getState().projectDocumentEpoch;
+  const initial = useStore.getState();
+  const requestEpoch = initial.claimProjectOpenRequest();
   if (
     !(await confirmDiscardAsync(platform, 'start from a template')) ||
-    useStore.getState().projectDocumentEpoch !== epoch
+    useStore.getState().projectDocumentEpoch !== initial.projectDocumentEpoch ||
+    useStore.getState().projectOpenRequestEpoch !== requestEpoch
   )
     return;
   const state = useStore.getState();
@@ -23,7 +25,7 @@ export async function openTemplateCommand(
     setProject: state.setProject,
     markLoaded: state.markLoaded,
     pushToast,
-    claimProjectOpenRequest: state.claimProjectOpenRequest,
+    claimProjectOpenRequest: () => requestEpoch,
     getProjectOpenRequestEpoch: () => useStore.getState().projectOpenRequestEpoch,
     getProjectDocumentEpoch: () => useStore.getState().projectDocumentEpoch,
     getProject: () => useStore.getState().project,

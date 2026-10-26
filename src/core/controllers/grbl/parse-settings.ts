@@ -68,7 +68,7 @@ export type ControllerSettingsSnapshot = Partial<
   // This `$$` lists one of `$14`-`$18`, grblHAL's signal invert and pull-up
   // masks, which stock GRBL leaves unused. It is how a grblHAL build that
   // greets as "Grbl 1.1f" shows itself under a stock-GRBL profile
-  // (grblHalSignalSettingsField; ADR-375 Amendment 4).
+  // (grblHalSignalSettingsField; ADR-375 Amendment 5).
   readonly listsGrblHalSignalSettings?: true;
   readonly reportInches?: boolean;
   readonly homingPullOffMm?: number;
@@ -89,7 +89,7 @@ export type ControllerSettingsSnapshot = Partial<
   readonly g92PersistenceDisabled?: boolean;
   // grblHAL `$22` bit 3 "Set machine origin to 0" (force set origin), read
   // only from a dump that prints the whole `$22` bitfield (ADR-375
-  // Amendment 3); undefined for stock GRBL and FluidNC, which print 0 or 1.
+  // Amendment 4); undefined for stock GRBL and FluidNC, which print 0 or 1.
   readonly homingForceSetOrigin?: boolean;
   // `$100` / `$101` / `$102`: one step's length bounds how far the machine position a
   // status report shows can sit from the firmware's own (ADR-375).
@@ -290,7 +290,7 @@ function forceSetOriginField(
 // core d7aaee3 always lists `$15` and `$18`, and Ortur's ESP32-S2 firmware
 // (level 1, greeting "Grbl 1.1f") lists all five. A stock-GRBL fork may list
 // settings of its own, as Ortur's STM32 firmware (Grbl 1.1h) lists `$33`, so
-// only these five are taken as grblHAL's (ADR-375 Amendment 4).
+// only these five are taken as grblHAL's (ADR-375 Amendment 5).
 // https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/settings.c#L2368-L2372
 // https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/system.c#L300-L317
 // https://github.com/Ortur-Tech/Ortur_Laser_Firmware_17X-18X/blob/4849ac85fc1f1a15c47d0dbbfc3e69450922ad32/ESPLaserMasterGrbl/main/grbl/report.c#L482-L490

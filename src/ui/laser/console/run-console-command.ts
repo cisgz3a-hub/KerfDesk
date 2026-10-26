@@ -19,7 +19,7 @@ export type RunConsoleCommandResult =
  * Confirms persistent writes and delegates exclusively to the laser store's
  * sendConsoleCommand action. Rejections are returned for inline UI display.
  * `session` is what the connected controller showed of itself (ADR-375
- * Amendment 4).
+ * Amendment 5).
  */
 export async function runConsoleCommand(
   driver: ControllerDriver,

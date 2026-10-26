@@ -23,6 +23,7 @@ import {
   type CalibrationStep,
 } from './camera-calibration-store';
 import { useCalibrationPhoto, type CalibrationPhotoControls } from './use-calibration-photo';
+import { useNudgePhoto, type NudgePhotoControls } from './use-nudge-photo';
 
 type StepLabel = {
   readonly kinds: ReadonlyArray<CalibrationStep['kind']>;
@@ -83,6 +84,7 @@ function OpenWizard(): JSX.Element {
   const toggleMinimized = useCameraCalibrationStore((s) => s.toggleMinimized);
   // The request outlives the step's modal/non-modal presentation when minimized.
   const photo = useCalibrationPhoto();
+  const nudge = useNudgePhoto();
   const labels = stepLabels(mode);
   return (
     <CameraWizardFrame
@@ -107,7 +109,7 @@ function OpenWizard(): JSX.Element {
           })}
         </ol>
       )}
-      <StepBody step={step} photo={photo} />
+      <StepBody step={step} photo={photo} nudge={nudge} />
     </CameraWizardFrame>
   );
 }
@@ -115,6 +117,7 @@ function OpenWizard(): JSX.Element {
 function StepBody(props: {
   readonly step: CalibrationStep;
   readonly photo: CalibrationPhotoControls;
+  readonly nudge: NudgePhotoControls;
 }): JSX.Element {
   const { step } = props;
   switch (step.kind) {
@@ -135,9 +138,9 @@ function StepBody(props: {
     case 'nudge-setup':
       return <NudgeSetupStep note={step.note} />;
     case 'nudge-photo':
-      return <NudgePhotoStep status={step.status} />;
+      return <NudgePhotoStep status={step.status} take={props.nudge.take} />;
     case 'nudge-result':
-      return <NudgeResultStep offsetMm={step.offsetMm} />;
+      return <NudgeResultStep offsetMm={step.offsetMm} apply={props.nudge.apply} />;
     default:
       return assertNever(step, 'camera calibration step');
   }

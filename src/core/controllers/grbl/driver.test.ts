@@ -89,7 +89,7 @@ describe('grblDriver', () => {
       overrides: true,
       startProtocol: 'grbl-live',
       statusWhileHoming: false,
-      // A grblHAL board greeting as Grbl 1.1f (ADR-375 Amendment 4).
+      // A grblHAL board greeting as Grbl 1.1f (ADR-375 Amendment 5).
       statusReportMask: 'grblhal-fields-if-grblhal-dump',
     });
   });

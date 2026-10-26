@@ -295,7 +295,7 @@ function consoleSettingWriteBlockReason(
   // out of host software apart from the air settings Creality documents for
   // console use (audit settings-console-10, ADR-370). What the controller
   // showed of itself can put grblHAL under a stock-GRBL profile (ADR-375
-  // Amendment 4).
+  // Amendment 5).
   return machineKindIssue ?? consoleSettingWriteIssue(driver, command, session);
 }
 
@@ -344,6 +344,7 @@ function consoleStateEffectPatch(
         workOriginActive: false,
         workOriginSource: 'none',
         wcoCache: null,
+        ...nextWorkOriginVersion(state),
       };
     case 'coordinates-z':
     case 'tool':
@@ -357,12 +358,14 @@ function consoleStateEffectPatch(
       return {
         ...positionPatch,
         ...unknownCoordinatePatch(),
+        ...nextWorkOriginVersion(state),
         workZReferenceEpoch: state.workZReferenceEpoch + 1,
       };
     case 'reference':
       return {
         ...positionPatch,
         ...unknownCoordinatePatch(),
+        ...nextWorkOriginVersion(state),
         homingState: 'unknown',
         workZReferenceEpoch: state.workZReferenceEpoch + 1,
       };
@@ -375,6 +378,7 @@ function consoleStateEffectPatch(
       return {
         ...positionPatch,
         ...unknownCoordinatePatch(),
+        ...nextWorkOriginVersion(state),
         homingState: 'unknown',
         workZReferenceEpoch: state.workZReferenceEpoch + 1,
         ...unqualifiedControllerSettingsPatch(state),
@@ -403,6 +407,13 @@ function consoleObservationPatch(
       `[lf2] Console ${stateEffectLabel(effect)} invalidated cached machine/setup evidence: ${command}`,
     ),
   };
+}
+
+// Every XY origin change moves the version on (work-origin-state.ts), so a
+// Place Board registration bound to the old origin does not outlive a typed
+// G92, G10 or homing.
+function nextWorkOriginVersion(state: LaserState): Pick<LaserState, 'workOriginVersion'> {
+  return { workOriginVersion: (state.workOriginVersion ?? 0) + 1 };
 }
 
 function unknownCoordinatePatch(): Partial<LaserState> {

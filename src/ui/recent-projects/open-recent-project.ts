@@ -9,6 +9,7 @@ import type { PlatformAdapter, RecentFileOpenResult } from '../../platform/types
 import { errorMessage } from '../app/file-action-formatters';
 import { openProjectCommand } from '../commands/open-project-command';
 import type { ToastVariant } from '../state/toast-store';
+import { useStore } from '../state';
 import { recentProjectFolder, type RecentProjectEntry } from './recent-project-model';
 import { useRecentProjectsStore } from './recent-projects-store';
 
@@ -28,17 +29,24 @@ export async function openRecentProject(
     await openProjectCommand(platform, pushToast);
     return;
   }
+  const initial = useStore.getState();
+  const requestEpoch = initial.claimProjectOpenRequest();
   const result = await files.open(entry.ref).catch(
     (error: unknown): RecentFileOpenResult => ({
       kind: 'failed',
       message: errorMessage(error),
     }),
   );
+  if (
+    useStore.getState().projectOpenRequestEpoch !== requestEpoch ||
+    useStore.getState().projectDocumentEpoch !== initial.projectDocumentEpoch
+  )
+    return;
   const store = useRecentProjectsStore.getState();
   switch (result.kind) {
     case 'opened':
       store.setStatus(entry.id, 'present');
-      await openProjectCommand(platform, pushToast, { file: result.file });
+      await openProjectCommand(platform, pushToast, { file: result.file, requestEpoch });
       return;
     case 'missing':
       store.setStatus(entry.id, 'missing');
