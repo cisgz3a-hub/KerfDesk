@@ -103,64 +103,78 @@ describe('createMaskStock (ADR-484)', () => {
   });
 
   it('finds a nearer excluded cell one ring further out', () => {
-    // From the centre of cell (2, 2), cell (5, 5) is three rings out and
-    // 0.884 mm off; cell (6, 2) is four rings out but only 0.875 mm off.
-    const inclusion = new Uint8Array(12 * 12).fill(1);
-    inclusion[5 * 12 + 5] = 0;
-    inclusion[2 * 12 + 6] = 0;
+    // From the centre of cell (12, 12), cell (15, 15) is three rings out and
+    // 0.884 mm off; cell (16, 12) is four rings out but only 0.875 mm off. The
+    // map's edge is 3.125 mm off, out of the ball's reach.
+    const inclusion = new Uint8Array(32 * 32).fill(1);
+    inclusion[15 * 32 + 15] = 0;
+    inclusion[12 * 32 + 16] = 0;
     const map: Heightmap = {
-      widthCells: 12,
-      heightCells: 12,
-      widthMm: 3,
-      heightMm: 3,
+      widthCells: 32,
+      heightCells: 32,
+      widthMm: 8,
+      heightMm: 8,
       mmPerCell: 0.25,
-      depth: new Float32Array(144).fill(-1),
+      depth: new Float32Array(32 * 32).fill(-1),
       inclusion,
     };
     const tool = TOOLS[0] as CncTool;
     const stock = createMaskStock(map, kernelForTool(tool, map.mmPerCell), 0);
 
-    expect(stock?.tipAt(0.625, 0.625)).toBeCloseTo(
+    expect(stock?.tipAt(3.125, 3.125)).toBeCloseTo(
       CNC_MASK_EMISSION_Z_CLEARANCE_MM - cuttingSurfaceDz(tool, 0.875, tool.diameterMm / 2),
       12,
     );
   });
 
   it('stands a quantum above stock top over an excluded cell', () => {
+    // Cell (10, 8) of a 10 x 4 mm map: x 2.5 to 2.75, y 2 to 2.25. Every
+    // probe stays more than the ball's reach from the map's edge.
+    const inclusion = new Uint8Array(40 * 16).fill(1);
+    inclusion[8 * 40 + 10] = 0;
     const map: Heightmap = {
-      widthCells: 3,
-      heightCells: 1,
-      widthMm: 0.75,
-      heightMm: 0.25,
+      widthCells: 40,
+      heightCells: 16,
+      widthMm: 10,
+      heightMm: 4,
       mmPerCell: 0.25,
-      depth: new Float32Array(3).fill(-2),
-      inclusion: Uint8Array.from([1, 0, 1]),
+      depth: new Float32Array(40 * 16).fill(-2),
+      inclusion,
     };
     const tool = TOOLS[0] as CncTool;
     const stock = createMaskStock(map, kernelForTool(tool, map.mmPerCell), 0.001);
 
-    expect(stock?.tipAt(0.375, 0.125)).toBe(CNC_MASK_EMISSION_Z_CLEARANCE_MM);
+    expect(stock?.tipAt(2.625, 2.125)).toBe(CNC_MASK_EMISSION_Z_CLEARANCE_MM);
     // Just past the cell and its clearance the ball's side meets the block.
-    expect(stock?.tipAt(0.5 + 0.5 + 0.001, 0.125)).toBeCloseTo(
+    expect(stock?.tipAt(2.75 + 0.5 + 0.001, 2.125)).toBeCloseTo(
       CNC_MASK_EMISSION_Z_CLEARANCE_MM - cuttingSurfaceDz(tool, 0.5, 3.175 / 2),
       12,
     );
-    expect(stock?.tipAt(0.5 + 1.6 + 0.001, 0.125)).toBe(Number.NEGATIVE_INFINITY);
+    expect(stock?.tipAt(2.75 + 1.6 + 0.001, 2.125)).toBe(Number.NEGATIVE_INFINITY);
   });
 
-  it('is absent for a map that excludes nothing', () => {
-    const tool = TOOLS[0] as CncTool;
+  it('holds the stock past the edge of a map that excludes nothing (ADR-412 Amendment 2)', () => {
+    const tool = TOOLS[1] as CncTool;
     const map: Heightmap = {
-      widthCells: 2,
-      heightCells: 2,
-      widthMm: 0.5,
-      heightMm: 0.5,
+      widthCells: 40,
+      heightCells: 40,
+      widthMm: 10,
+      heightMm: 10,
       mmPerCell: 0.25,
-      depth: new Float32Array(4),
+      depth: new Float32Array(1600).fill(-1),
     };
     const kernel = kernelForTool(tool, map.mmPerCell);
-
-    expect(createMaskStock(map, kernel, 0)).toBeNull();
-    expect(createMaskStock({ ...map, inclusion: new Uint8Array(4).fill(1) }, kernel, 0)).toBeNull();
+    for (const candidate of [map, { ...map, inclusion: new Uint8Array(1600).fill(1) }]) {
+      const stock = createMaskStock(candidate, kernel, 0.001);
+      // Within the 2 mm end mill's reach of the edge its tip keeps to the
+      // stock top, and no higher; further in nothing is in reach.
+      expect(stock?.tipAt(0.5, 5)).toBe(0);
+      expect(stock?.tipAt(5, 9.5)).toBe(0);
+      expect(stock?.tipAt(-1, 5)).toBe(0);
+      expect(stock?.tipAt(5, 5)).toBe(Number.NEGATIVE_INFINITY);
+      // A move along the edge at the stock top passes; one into it is lifted.
+      expect(stock?.moveExcess({ x: 0.5, y: 2, z: 0 }, { x: 0.5, y: 8, z: 0 })).toBeNull();
+      expect(stock?.moveExcess({ x: 5, y: 5, z: -1 }, { x: 0.5, y: 5, z: -1 })?.point.z).toBe(0);
+    }
   });
 });

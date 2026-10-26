@@ -128,6 +128,10 @@ function removal(job: Job): { grid: RemovalGrid; at: (index: number) => { x: num
 }
 
 // Floor well clear of the cone and plateau, and the plateau top well inside.
+// The relief's edge is a wall too (ADR-412 Amendment 2): the end mill keeps its
+// allowance and the contour clearance off it and cannot reach its corners, and
+// the ball leaves its own radius as a fillet at its foot, so the floor is
+// judged 4 mm in from it as from the plateau.
 function region(x: number, y: number): 'floor' | 'plateau' | null {
   const inset = (margin: number): boolean =>
     x > PLATEAU.x0 - margin &&
@@ -136,7 +140,7 @@ function region(x: number, y: number): 'floor' | 'plateau' | null {
     y < PLATEAU.y1 + margin;
   if (inset(-1)) return 'plateau';
   const edge = Math.min(x, y, SIZE_MM - x, SIZE_MM - y);
-  if (!inset(4) && Math.hypot(x - CONE.x, y - CONE.y) > CONE.radiusMm + 4 && edge > 1)
+  if (!inset(4) && Math.hypot(x - CONE.x, y - CONE.y) > CONE.radiusMm + 4 && edge > 4)
     return 'floor';
   return null;
 }

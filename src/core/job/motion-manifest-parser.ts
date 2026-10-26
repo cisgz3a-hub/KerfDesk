@@ -19,6 +19,9 @@ type ModalState = {
   position: MotionPoint;
   spindleArmed: boolean;
   power: number;
+  /** Smoothieware only: the M221 S power scale as a fraction (Laser.cpp). */
+  smoothieScale: number;
+  readonly smoothieware: boolean;
 };
 
 type ParsedWords = {
@@ -44,7 +47,7 @@ export function buildMotionManifest(
   const initial = options.initialPosition ?? { x: 0, y: 0, z: 0 };
   const build: ManifestBuildState = {
     machineKind: options.machineKind,
-    modal: initialModalState(initial),
+    modal: initialModalState(initial, options.laserPowerControl === 'smoothieware'),
     blocks: [],
     parkBoundaries: [],
     firstProcessPoint: null,
@@ -64,8 +67,18 @@ export function buildMotionManifest(
   };
 }
 
-function initialModalState(position: MotionPoint): ModalState {
-  return { motion: 0, unitScale: 1, absolute: true, position, spindleArmed: false, power: 0 };
+// Smoothieware powers up with its M221 scale at 100%.
+function initialModalState(position: MotionPoint, smoothieware: boolean): ModalState {
+  return {
+    motion: 0,
+    unitScale: 1,
+    absolute: true,
+    position,
+    spindleArmed: false,
+    power: 0,
+    smoothieScale: 1,
+    smoothieware,
+  };
 }
 
 function appendManifestLine(
@@ -148,8 +161,13 @@ function applyModalState(state: ModalState, words: ParsedWords): void {
   words.gCodes.forEach((code) => {
     applySharedGCode(state, code);
   });
-  words.mCodes.forEach((code) => applyMCode(state, code));
   const power = words.values.get('S');
+  // On Smoothieware M221's S is the percent scale, never the motion S.
+  if (state.smoothieware && words.mCodes.includes(221)) {
+    if (power !== undefined) state.smoothieScale = power / 100;
+    return;
+  }
+  words.mCodes.forEach((code) => applyMCode(state, code));
   if (power !== undefined) state.power = power;
 }
 
@@ -196,6 +214,9 @@ function classifyMotion(
   if (xyRouteLength(points) <= EPSILON) return 'plunge';
   if (state.motion === 0) return 'travel';
   if (machineKind === 'cnc') return state.spindleArmed ? 'process' : 'travel';
+  // Smoothieware's laser module ignores M3/M4/M5: a G1-G3 fires at S times the
+  // M221 scale (ADR-096 Amendment 1).
+  if (state.smoothieware) return state.power > 0 && state.smoothieScale > 0 ? 'process' : 'travel';
   return state.spindleArmed && state.power > 0 ? 'process' : 'travel';
 }
 

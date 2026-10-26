@@ -23,6 +23,10 @@ export type BlockLaw = {
   // radiusMm + clearanceMm, with a little floating-point room.
   readonly reachMm: number;
   readonly dz: (radiusMm: number) => number;
+  // The most the block ever requires; absent: no cap. The stock past a map's
+  // edge stops at the stock top (ADR-412 Amendment 2). Capping a concave
+  // requirement keeps it concave, so h(t) stays convex.
+  readonly ceilingMm?: number;
 };
 
 export type Rectangle = {
@@ -59,14 +63,14 @@ export function blockExcess(move: Move, block: Rectangle, law: BlockLaw): BlockE
   const nearest = lowestOf((t) => distanceAt(move, block, t), 0, 1);
   const nearestMm = distanceAt(move, block, nearest);
   if (nearestMm > law.reachMm) return null;
-  const highest = requirement(law, nearestMm);
+  const highest = blockRequirement(law, nearestMm);
   // The lower end already clears the block's highest requirement.
   const lowestZ = Math.min(move.z, move.z + move.dz);
   if (lowestZ >= highest) return { t: nearest, h: lowestZ - highest, highest };
   const start = edgeOfReach(move, block, law, nearest, 0);
   const end = edgeOfReach(move, block, law, nearest, 1);
   const along = (t: number): number =>
-    move.z + t * move.dz - requirement(law, distanceAt(move, block, t));
+    move.z + t * move.dz - blockRequirement(law, distanceAt(move, block, t));
   const t = lowestOf(along, start, end);
   return { t, h: along(t), highest };
 }
@@ -90,11 +94,14 @@ function edgeOfReach(
   return reached;
 }
 
-// The tip height the block requires of a cutter whose axis stands
-// `distanceMm` from it (within reach).
-function requirement(law: BlockLaw, distanceMm: number): number {
+/**
+ * The tip height a block requires of a cutter whose axis stands `distanceMm`
+ * from it (within reach).
+ */
+export function blockRequirement(law: BlockLaw, distanceMm: number): number {
   const radiusMm = Math.max(0, distanceMm - law.clearanceMm);
-  return law.top - law.dz(Math.min(law.radiusMm, radiusMm));
+  const required = law.top - law.dz(Math.min(law.radiusMm, radiusMm));
+  return law.ceilingMm === undefined ? required : Math.min(law.ceilingMm, required);
 }
 
 function distanceAt(move: Move, block: Rectangle, t: number): number {

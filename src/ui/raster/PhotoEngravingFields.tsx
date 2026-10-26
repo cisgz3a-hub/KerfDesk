@@ -1,4 +1,9 @@
 import { dpiToLinesPerMm, linesPerMmToDpi, linesPerMmToLineIntervalMm } from '../../core/raster';
+import {
+  SHARPEN_AMOUNT_MAX,
+  SHARPEN_RADIUS_MAX,
+  SHARPEN_RADIUS_MIN,
+} from '../../core/raster/luma-sharpen';
 import type { RasterImage } from '../../core/scene';
 import { Button } from '../kit';
 import { DraftNumberInput } from '../kit/DraftNumberInput';
@@ -64,6 +69,7 @@ export function PhotoEngravingFields(props: PhotoEngravingFieldsProps): JSX.Elem
       />
       <PhotoToneFields draft={draft} onChange={onChange} />
       <PhotoResolutionFields {...props} />
+      <PhotoSharpenFields draft={draft} onChange={onChange} />
     </div>
   );
 }
@@ -141,6 +147,38 @@ function PhotoResolutionFields(props: PhotoEngravingFieldsProps): JSX.Element {
           detail.
         </p>
       ) : null}
+    </>
+  );
+}
+
+// ADR-671: sharpening runs on the engraving grid, after resampling.
+function PhotoSharpenFields({
+  draft,
+  onChange,
+}: Pick<PhotoEngravingFieldsProps, 'draft' | 'onChange'>): JSX.Element {
+  const radiusMm = draft.sharpenRadius * linesPerMmToLineIntervalMm(draft.linesPerMm);
+  return (
+    <>
+      <h3>Sharpen at engraving resolution</h3>
+      <PhotoNumber
+        label="Sharpen amount (%)"
+        value={draft.sharpenAmount}
+        min={0}
+        max={SHARPEN_AMOUNT_MAX}
+        onChange={(sharpenAmount) => onChange({ sharpenAmount })}
+      />
+      <PhotoNumber
+        label="Sharpen radius (lines)"
+        value={draft.sharpenRadius}
+        min={SHARPEN_RADIUS_MIN}
+        max={SHARPEN_RADIUS_MAX}
+        onChange={(sharpenRadius) => onChange({ sharpenRadius })}
+      />
+      <p className="lf-photo-engraving__hint">
+        {draft.sharpenAmount > 0
+          ? `Sharpens the eyes and hair after the photo is fitted to the scan lines, over ${radiusMm.toFixed(3)} mm. Higher amounts also bring out grain in skin.`
+          : 'Off. Fitting the photo to the scan lines softens its finest detail slightly; about 30% at 0.7 lines restores it.'}
+      </p>
     </>
   );
 }

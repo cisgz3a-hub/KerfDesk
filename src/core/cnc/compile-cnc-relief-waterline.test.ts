@@ -132,18 +132,33 @@ function finishPasses(
   return finish.passes;
 }
 
-// Winding of the waterline passes (after the one raster pass) about their
-// centre in machine numbers: negative is clockwise.
+// The boss's waterline stays within its 2 mm half-width plus the ball's radius
+// of the relief's centre. The floor also meets the stock past the relief's
+// edge in a wall, which the waterline circles the other way, at least 4.4 mm
+// out (ADR-412 Amendment 2).
+const BOSS_REACH_MM = 4.2;
+
+// Winding of the waterline passes (after the one raster pass) about the boss
+// in machine numbers, from its moves near the boss: negative is clockwise.
+// The raster spans the relief edge to edge, so its extent finds the centre
+// whatever the placement or origin mirrors.
 function waterlineTurn(passes: ReadonlyArray<CncPass>): number {
-  const points = passes.slice(1).flatMap((pass) => (pass.kind === 'path3d' ? pass.points : []));
-  const cx = points.reduce((sum, point) => sum + point.x, 0) / points.length;
-  const cy = points.reduce((sum, point) => sum + point.y, 0) / points.length;
+  const raster = passes[0]?.kind === 'path3d' ? passes[0].points : [];
+  const xs = raster.map((point) => point.x);
+  const ys = raster.map((point) => point.y);
+  const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+  const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+  const nearBoss = (point: { x: number; y: number }): boolean =>
+    Math.max(Math.abs(point.x - cx), Math.abs(point.y - cy)) < BOSS_REACH_MM;
   let sum = 0;
-  for (let k = 1; k < points.length; k += 1) {
-    const a = points[k - 1];
-    const b = points[k];
-    if (a === undefined || b === undefined) continue;
-    sum += (a.x - cx) * (b.y - cy) - (b.x - cx) * (a.y - cy);
+  for (const pass of passes.slice(1)) {
+    if (pass.kind !== 'path3d') continue;
+    for (let k = 1; k < pass.points.length; k += 1) {
+      const a = pass.points[k - 1];
+      const b = pass.points[k];
+      if (a === undefined || b === undefined || !nearBoss(a) || !nearBoss(b)) continue;
+      sum += (a.x - cx) * (b.y - cy) - (b.x - cx) * (a.y - cy);
+    }
   }
   return sum;
 }

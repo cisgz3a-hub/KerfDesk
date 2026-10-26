@@ -116,6 +116,7 @@ function StepTab(props: {
       type="button"
       role="tab"
       aria-selected={selected}
+      title="Go to this step of the tone calibration"
       className={`lf-tone-calibration__step${selected ? ' is-selected' : ''}`}
       onClick={() => props.onSelect(props.step)}
     >

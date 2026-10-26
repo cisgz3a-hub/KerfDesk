@@ -28,6 +28,8 @@ export type ProfileLeadKeptWall = {
   /** How far past the ring the wall's own cut already removes material:
    * zero for an outside or inside path, the cutter radius for an on-path cut. */
   readonly clearedMm: number;
+  /** The operation that keeps it; set for the job's walls (ADR-433 Amendment 3). */
+  readonly layerId?: string;
   readonly minX: number;
   readonly minY: number;
   readonly maxX: number;
@@ -61,7 +63,7 @@ export function profileLeadCutWidthMm(
 // The kerf offset and the emitter both round to 0.001 mm, and the offset drops
 // needle segments under 0.005 mm, so a contour can ride a few microns inside
 // its own cutter radius. Only a real approach past that counts as a gouge.
-const KEPT_WALL_TOLERANCE_MM = 0.005;
+export const KEPT_WALL_TOLERANCE_MM = 0.005;
 const MIN_RING_POINTS = 3;
 
 /**

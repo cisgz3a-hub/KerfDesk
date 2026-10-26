@@ -1,5 +1,6 @@
 import type { StatusQueryCapability } from '../../core/controllers';
 import { toSceneCoords, type DeviceProfile } from '../../core/devices';
+import { laserPowerControlForDevice } from '../../core/gcode-view';
 import {
   rotaryAppliesTo,
   type JobOriginPlacement,
@@ -138,6 +139,7 @@ export function buildCanvasMotionPlan(
   const initial = reportedWorkPositionMm(args.machine, args.reportInches === true);
   const manifest = buildMotionManifest(args.gcode, {
     machineKind,
+    laserPowerControl: laserPowerControlForDevice(args.prepared.project.device),
     ...(initial === null ? {} : { initialPosition: initial }),
   });
   const plan = assembleCanvasPlan(args, manifest, manifest.firstProcessPoint, initial, args.gcode);
@@ -322,6 +324,7 @@ export function rebuildCanvasPlanForGcode(
 ): CanvasMotionPlan {
   const manifest = buildMotionManifest(gcode, {
     machineKind: plan.machineKind,
+    laserPowerControl: laserPowerControlForDevice(plan.device),
     ...(initialPosition === undefined ? {} : { initialPosition }),
   });
   const jobStart =

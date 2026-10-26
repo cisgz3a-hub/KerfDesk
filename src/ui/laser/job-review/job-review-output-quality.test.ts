@@ -34,6 +34,39 @@ describe('buildOutputQualityReviewFacts', () => {
     ]);
   });
 
+  it('says plainly that no contour entry is added when the bed position is unknown', () => {
+    const layer = {
+      ...createLayer({ id: 'outline', color: '#000000', mode: 'line' }),
+      name: 'Outline',
+    };
+    const job: Job = {
+      contourEntryBounds: null,
+      groups: [
+        {
+          kind: 'cut',
+          layerId: layer.id,
+          color: layer.color,
+          power: 30,
+          speed: 1500,
+          passes: 1,
+          airAssist: false,
+          entryRunwayMm: 5,
+          segments: [],
+        },
+      ],
+    };
+
+    expect(buildOutputQualityReviewFacts(job, [layer])).toEqual([
+      {
+        label: 'Contour entry — Outline',
+        value:
+          'Not added · where the bed edges are in program coordinates is unknown, so each ' +
+          'contour starts burning from rest',
+        tone: 'warning',
+      },
+    ]);
+  });
+
   it('shows exact runway coverage and the effective 4040 fallback reason', () => {
     const layer = {
       ...createLayer({ id: 'small-text', color: '#000000', mode: 'fill' }),

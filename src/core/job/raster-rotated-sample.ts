@@ -13,6 +13,12 @@ import { toSceneCoords, type DeviceProfile } from '../devices';
 import { applyImageMaskToLuma, resampleLuma } from '../raster';
 import type { BurnGridKernel } from '../raster/luma-resample';
 import {
+  burnGridSharpen,
+  gridSharpen,
+  sharpenLuma,
+  type BurnGridSharpen,
+} from '../raster/luma-sharpen';
+import {
   isAlongXScan,
   scanToMachine,
   ALONG_X_SCAN_FRAME,
@@ -77,6 +83,8 @@ export function prepareRotatedRaster(
   input: RotatedRasterSampler,
   maskObject: SceneObject | null,
 ): PreparedRotatedRaster {
+  const sharpen = burnGridSharpen(input.obj, input.passThrough === true);
+  if (sharpen !== null) return prepareSharpenedRotatedRaster(input, maskObject, sharpen);
   const masked = applyImageMaskToLuma({
     image: input.obj,
     maskObject,
@@ -117,6 +125,22 @@ type ReducedGrid = {
 
 function reducedSampleGrid(input: RotatedRasterSampler): ReducedGrid | null {
   if ((input.kernel ?? 'area') !== 'area' || input.passThrough === true) return null;
+  const { obj } = input;
+  const cells = sourceAxisCells(input);
+  const width = reducedExtent(obj.pixelWidth, cells.alongWidth);
+  const height = reducedExtent(obj.pixelHeight, cells.alongHeight);
+  if (width === obj.pixelWidth && height === obj.pixelHeight) return null;
+  return { width, height, quarterTurn: cells.quarterTurn };
+}
+
+type SourceAxisCells = {
+  /** How many burn cells span the image along its own width and height. */
+  readonly alongWidth: number;
+  readonly alongHeight: number;
+  readonly quarterTurn: boolean;
+};
+
+function sourceAxisCells(input: RotatedRasterSampler): SourceAxisCells {
   const { obj, bounds, pixelWidth, pixelHeight } = input;
   const cellX = (bounds.maxX - bounds.minX) / pixelWidth;
   const cellY = (bounds.maxY - bounds.minY) / pixelHeight;
@@ -129,10 +153,55 @@ function reducedSampleGrid(input: RotatedRasterSampler): ReducedGrid | null {
   const cellAlongHeight = turn === null ? nominal : swapped ? cellX : cellY;
   const localWidthMm = (obj.bounds.maxX - obj.bounds.minX) * Math.abs(obj.transform.scaleX);
   const localHeightMm = (obj.bounds.maxY - obj.bounds.minY) * Math.abs(obj.transform.scaleY);
-  const width = reducedExtent(obj.pixelWidth, localWidthMm / cellAlongWidth);
-  const height = reducedExtent(obj.pixelHeight, localHeightMm / cellAlongHeight);
-  if (width === obj.pixelWidth && height === obj.pixelHeight) return null;
-  return { width, height, quarterTurn: turn !== null };
+  return {
+    alongWidth: localWidthMm / cellAlongWidth,
+    alongHeight: localHeightMm / cellAlongHeight,
+    quarterTurn: turn !== null,
+  };
+}
+
+// ADR-671: a sharpened raster sharpens its sample grid before the mask whitens
+// anything, the upright path's order, so a mask edge gains no halo; the mask
+// then applies on that grid. The radius stays in burn cells: on a reduced grid
+// one sample pixel is about one cell, on an unreduced source it is converted.
+function prepareSharpenedRotatedRaster(
+  input: RotatedRasterSampler,
+  maskObject: SceneObject | null,
+  sharpen: BurnGridSharpen,
+): PreparedRotatedRaster {
+  const { obj } = input;
+  const grid = reducedSampleGrid(input);
+  const sampleWidth = grid?.width ?? obj.pixelWidth;
+  const sampleHeight = grid?.height ?? obj.pixelHeight;
+  const unmasked =
+    grid === null
+      ? input.sourceLuma
+      : resampleLuma(
+          { luma: input.sourceLuma, width: obj.pixelWidth, height: obj.pixelHeight },
+          sampleWidth,
+          sampleHeight,
+          'area',
+        );
+  const cells = sourceAxisCells(input);
+  const sharpened = sharpenLuma(
+    unmasked,
+    sampleWidth,
+    sampleHeight,
+    gridSharpen(sharpen, cells.alongWidth / sampleWidth, cells.alongHeight / sampleHeight),
+  );
+  return {
+    ...input,
+    sampleLuma: applyImageMaskToLuma({
+      image: obj,
+      maskObject,
+      luma: sharpened,
+      width: sampleWidth,
+      height: sampleHeight,
+    }),
+    sampleWidth,
+    sampleHeight,
+    sampling: grid !== null && !grid.quarterTurn ? 'bilinear' : 'centre',
+  };
 }
 
 function reducedExtent(sourcePixels: number, cells: number): number {

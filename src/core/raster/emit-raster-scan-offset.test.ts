@@ -32,13 +32,13 @@ describe('emitRasterGroup scan-offset compensation', () => {
     const motion = out.split('\n').filter((line) => line.startsWith('G'));
     expect(motion).toEqual([
       'G0 X-1.000 Y0.500 S0',
-      'G1 X0.000 F6000 S0',
+      'G1 X0.000 F6000 S0 ; kerfdesk:laser-off-motion',
       'G1 X2.000 S500',
-      'G1 X3.000 S0',
+      'G1 X3.000 S0 ; kerfdesk:laser-off-motion',
       'G0 X4.750 Y1.500 S0',
-      'G1 X3.750 S0',
+      'G1 X3.750 S0 ; kerfdesk:laser-off-motion',
       'G1 X1.750 S700',
-      'G1 X0.750 S0',
+      'G1 X0.750 S0 ; kerfdesk:laser-off-motion',
     ]);
   });
 
@@ -58,13 +58,13 @@ describe('emitRasterGroup scan-offset compensation', () => {
     const motion = out.split('\n').filter((line) => line.startsWith('G'));
     expect(motion).toEqual([
       'G0 X-1.000 Y0.500 S0',
-      'G1 X0.000 F6000 S0',
+      'G1 X0.000 F6000 S0 ; kerfdesk:laser-off-motion',
       'G1 X2.000 S500',
-      'G1 X3.000 S0',
+      'G1 X3.000 S0 ; kerfdesk:laser-off-motion',
       'G0 X5.250 Y1.500 S0',
-      'G1 X4.250 S0',
+      'G1 X4.250 S0 ; kerfdesk:laser-off-motion',
       'G1 X2.250 S700',
-      'G1 X1.250 S0',
+      'G1 X1.250 S0 ; kerfdesk:laser-off-motion',
     ]);
   });
 

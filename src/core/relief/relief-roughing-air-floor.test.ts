@@ -287,11 +287,12 @@ describe('relief roughing air floors (ADR-489)', () => {
   });
 
   // A ball-nose ramp that doubles back along a 0.001 mm-wide loop: the
-  // check once hung on it (ADR-489 Amendment 1).
+  // check once hung on it (ADR-489 Amendment 1). Since the map's edge became
+  // stock (ADR-412 Amendment 2) its rings stand further in and some passes
+  // keep a floor; every floor must still hold.
   it('plans and holds where a ramp doubles back on itself', () => {
     const extra = { fineStepMm: 0.8, finishFlats: false, ramp: 3 };
     const report = bumpsAndCheck([{ x: 9, y: 8, h: 3, r: 5 }], BALL, 73, 1.5, extra);
-    expect(report.floored).toBe(0);
     expect(report.worstMm).toBeLessThanOrEqual(1e-6);
   });
 

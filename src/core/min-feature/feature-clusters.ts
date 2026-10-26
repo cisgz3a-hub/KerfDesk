@@ -85,6 +85,12 @@ export class FeatureClusters {
     this.best.set(p, merged(this.best.get(p), witness));
   }
 
+  /** True when a witness was recorded on any piece in [first, end). */
+  flaggedIn(first: number, end: number): boolean {
+    for (let piece = first; piece < end; piece += 1) if (this.flagged.has(piece)) return true;
+    return false;
+  }
+
   /** Join each flagged piece to the next piece along its path when that
    * piece is flagged too. Call once, after the last record. */
   joinAlongPaths(next: (piece: number) => number): void {

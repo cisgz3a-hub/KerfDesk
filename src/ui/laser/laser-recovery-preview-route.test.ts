@@ -189,7 +189,11 @@ describe('sealed laser restart preview', () => {
     expect(workers).toHaveLength(1);
     const worker = workers[0];
     if (worker === undefined || worker.request === null) throw new Error('Expected a request.');
-    expect(worker.request).toEqual({ gcode: artifact.gcode, initialPosition: null });
+    expect(worker.request).toEqual({
+      gcode: artifact.gcode,
+      initialPosition: null,
+      laserPowerControl: 'spindle',
+    });
     expect(packedManifestTransferables(packRecoveryPreviewManifest(worker.request))).toHaveLength(
       2,
     );

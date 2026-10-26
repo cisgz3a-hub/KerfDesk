@@ -288,6 +288,7 @@ function reduceGcodeLineInWcs(
   if (hasGWord(line, 10)) return { state: applyG10(state, line), effects: [emit('ok', opts)] };
   if (PROGRAM_PAUSE_RE.test(line)) return beginProgramPause(state);
   if (hasGWord(line, 4)) return beginDwell(state, line);
+  if (state.probeClosed === true && hasGWord(line, 38.2)) return failProbe(state, 4, opts);
   if (opts.probeFailure !== undefined && hasGWord(line, 38.2)) {
     return failProbe(state, opts.probeFailure, opts);
   }

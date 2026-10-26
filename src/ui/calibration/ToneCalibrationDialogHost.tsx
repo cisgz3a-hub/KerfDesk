@@ -1,4 +1,7 @@
-import { generateToneCalibrationWedge, type ToneWedgeOptions } from '../../core/job';
+import {
+  generateToneCalibrationWedge,
+  type ToneWedgeOptions,
+} from '../../core/job/tone-calibration-wedge';
 import { confirmDiscardAsync } from '../app/confirm-discard';
 import { usePlatform } from '../app/platform-context';
 import { useStore } from '../state';
