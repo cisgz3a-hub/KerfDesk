@@ -108,12 +108,16 @@ function dilateHeightmap(
         outBits,
         center,
         dilatedCell(map, kernel, cx, cy, allowanceMm, touchesExcluded, center, contact, outside),
-        // Stock in reach: past the map's edge, or excluded by its mask.
-        inclusion !== undefined || outside !== Number.NEGATIVE_INFINITY,
+        stockInReach(map, outside),
       );
     }
   }
   return { tipDepth: out, touchesExcluded };
+}
+
+// Stock the cutter may meet: excluded by the map's mask, or past its edge.
+function stockInReach(map: Heightmap, outsideConstraint: number): boolean {
+  return map.inclusion !== undefined || outsideConstraint !== Number.NEGATIVE_INFINITY;
 }
 
 function dilatedCell(

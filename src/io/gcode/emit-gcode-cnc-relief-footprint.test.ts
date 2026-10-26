@@ -21,7 +21,6 @@ import {
   type Layer,
   type Project,
   type ReliefObject,
-  type Vec2,
 } from '../../core/scene';
 import { detectCncReliefPlanningWarnings } from '../../ui/laser/cnc-relief-planning-warnings';
 import { cuttingMoves, type CuttingMove } from './cnc-cutter-clearance.test-support';

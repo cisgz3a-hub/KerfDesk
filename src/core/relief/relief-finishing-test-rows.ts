@@ -32,6 +32,33 @@ export function finishingRows(passes: ReadonlyArray<CncPass>): ReadonlyArray<Fin
   return rows;
 }
 
+// Points `steps` apart along every move of the passes, ends included. A
+// reduced flat row is one straight move, so its vertices alone say nothing of
+// the floor between them.
+export function pointsAlongMoves(
+  passes: ReadonlyArray<CncPass>,
+  steps: number,
+): ReadonlyArray<FinishingRowPoint> {
+  const along: FinishingRowPoint[] = [];
+  for (const pass of passes) {
+    if (pass.kind !== 'path3d') continue;
+    for (let index = 1; index < pass.points.length; index += 1) {
+      const from = pass.points[index - 1];
+      const to = pass.points[index];
+      if (from === undefined || to === undefined) continue;
+      for (let step = 0; step <= steps; step += 1) {
+        const t = step / steps;
+        along.push({
+          x: from.x + t * (to.x - from.x),
+          y: from.y + t * (to.y - from.y),
+          z: from.z + t * (to.z - from.z),
+        });
+      }
+    }
+  }
+  return along;
+}
+
 export function rowDirection(row: FinishingRow | undefined): number {
   const first = row?.points[0];
   const last = row?.points.at(-1);

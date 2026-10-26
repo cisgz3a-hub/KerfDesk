@@ -70,7 +70,7 @@ function referenceDilation(
         outBits,
         center,
         Math.min(0, safe + allowanceMm),
-        map.inclusion !== undefined || outside !== Number.NEGATIVE_INFINITY,
+        stockInReach(map, outside),
       );
       if (
         touchesExcluded !== undefined &&
@@ -196,6 +196,10 @@ function physicalExcludedConstraint(
     }
   }
   return best;
+}
+
+function stockInReach(map: Heightmap, outside: number): boolean {
+  return map.inclusion !== undefined || outside !== Number.NEGATIVE_INFINITY;
 }
 
 // ADR-412 Amendment 2: the stock past the map's edge is a block at the stock

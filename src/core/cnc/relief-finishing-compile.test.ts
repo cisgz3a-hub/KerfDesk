@@ -8,7 +8,7 @@ import { DEFAULT_DEVICE_PROFILE, toMachineCoords, type DeviceProfile } from '../
 import { computeJobBounds, frameBoundsSignature } from '../job';
 import { signedAreaMm2 } from '../geometry/polyline-orientation';
 import { scallopRowSpacingMm } from '../relief';
-import { finishingRows } from '../relief/relief-finishing-test-rows';
+import { finishingRows, pointsAlongMoves } from '../relief/relief-finishing-test-rows';
 import { cncGrblStrategy } from '../output';
 import {
   createLayer,
@@ -231,41 +231,21 @@ describe('relief finishing compile (H.8)', () => {
     expect(
       finish.passes.every((pass) => pass.kind === 'path3d' && pass.lateralFeed === 'z-rate-capped'),
     ).toBe(true);
-    // Within the ball's reach of the relief's 12 mm edge it rises toward the
-    // stock top to clear the stock past it (ADR-412 Amendment 2); elsewhere it
-    // skims the floor.
-    const corners = [
-      toMachineCoords({ x: 0, y: 0 }, DEFAULT_DEVICE_PROFILE),
-      toMachineCoords({ x: 12, y: 12 }, DEFAULT_DEVICE_PROFILE),
-    ];
-    const minX = Math.min(...corners.map((corner) => corner.x));
-    const minY = Math.min(...corners.map((corner) => corner.y));
-    // A flat row is one straight move, so the path is read along its moves.
-    let floor = 0;
-    for (const pass of finish.passes) {
-      if (pass.kind !== 'path3d') continue;
-      pass.points.forEach((from, index) => {
-        const to = pass.points[index + 1];
-        if (to === undefined) return;
-        for (let step = 0; step <= 16; step += 1) {
-          const t = step / 16;
-          const x = from.x + t * (to.x - from.x) - minX;
-          const y = from.y + t * (to.y - from.y) - minY;
-          const z = from.z + t * (to.z - from.z);
-          if (Math.min(x, y, 12 - x, 12 - y) > 3.175 / 2 + 0.001) {
-            // On the floor, or up to the path reduction's 0.002 mm above it.
-            expect(z).toBeGreaterThanOrEqual(-0.1 - 1e-6);
-            expect(z).toBeLessThanOrEqual(-0.1 + 0.002);
-            floor += 1;
-          } else {
-            // A lifted move stands at most the finishing tolerance above the top.
-            expect(z).toBeGreaterThanOrEqual(-0.1 - 1e-6);
-            expect(z).toBeLessThanOrEqual(0.002);
-          }
-        }
-      });
+    // Within the ball's reach of the relief's 12 mm edge it rises, at most a
+    // lifted move's 0.002 mm tolerance above the top, to clear the stock past
+    // it (ADR-412 Amendment 2); elsewhere it skims the floor, at most the path
+    // reduction's 0.002 mm above it.
+    const centre = toMachineCoords({ x: 6, y: 6 }, DEFAULT_DEVICE_PROFILE);
+    const along = pointsAlongMoves(finish.passes, 16);
+    const floor = along.filter(
+      (p) => 6 - Math.max(Math.abs(p.x - centre.x), Math.abs(p.y - centre.y)) > 3.175 / 2 + 0.001,
+    );
+    expect(floor.length).toBeGreaterThan(0);
+    for (const point of floor) expect(point.z).toBeLessThanOrEqual(-0.098);
+    for (const point of along) {
+      expect(point.z).toBeGreaterThanOrEqual(-0.1 - 1e-6);
+      expect(point.z).toBeLessThanOrEqual(0.002);
     }
-    expect(floor).toBeGreaterThan(0);
   });
 
   it('adds a relief-finish group with the finishing bit after roughing', () => {
