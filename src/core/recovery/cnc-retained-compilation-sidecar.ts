@@ -39,6 +39,13 @@ export function retainedCncCompilationSidecar(
             retainedLayerIds.has(entry.layerId),
           ),
         }),
+    ...(sidecar.mergedStackedCopies === undefined
+      ? {}
+      : {
+          mergedStackedCopies: sidecar.mergedStackedCopies.filter((entry) =>
+            retainedLayerIds.has(entry.layerId),
+          ),
+        }),
     ...(sidecar.offsetLadderDiagnostics === undefined
       ? {}
       : {

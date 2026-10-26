@@ -21,6 +21,9 @@ export type CollectedCncContour = {
   // Drawn as open paths that an Outside or Inside profile closed into this one
   // outline (ADR-672, cnc-profile-outline-join).
   readonly joinedOutline?: true;
+  // Exact closed copies merged into this contour on a filled cut, where two
+  // identical outlines would enclose nothing (cnc-stacked-copies.ts).
+  readonly stackedCopies?: number;
 };
 
 export function manualTabCentersForToolpaths(

@@ -47,6 +47,14 @@ export type CncKeptPartCut = {
   readonly cutWidthMm: number;
 };
 
+/** Exact closed copies one filled operation cut once (ADR-359 Amendment 3). */
+export type CncStackedCopyMerge = {
+  readonly layerId: string;
+  readonly cutType: CncCutType;
+  /** Copies merged into an outline already on the operation. */
+  readonly count: number;
+};
+
 /** Structured-clone-safe CNC evidence retained with the exact compiled Job. */
 export type CncCompilationSidecar = {
   readonly vcarveOperations: ReadonlyArray<CncVCarveCompilationEvidence>;
@@ -60,4 +68,6 @@ export type CncCompilationSidecar = {
   readonly profileOpenPaths?: ReadonlyArray<CncProfileOpenPaths>;
   /** Absent on jobs compiled before ADR-433 Amendment 3. */
   readonly keptPartCuts?: ReadonlyArray<CncKeptPartCut>;
+  /** Absent when no operation merged a copy, and on jobs from before the merge. */
+  readonly mergedStackedCopies?: ReadonlyArray<CncStackedCopyMerge>;
 };

@@ -13,6 +13,7 @@ import { compilationPolylines } from '../job/compilation-polylines';
 import { cncTabAnchorPosition } from './cnc-tab-anchors';
 import type { CollectedCncContour } from './cnc-manual-tab-mapping';
 import { joinProfileOutlines } from './cnc-profile-outline-join';
+import { mergeStackedClosedContours } from './cnc-stacked-copies';
 import { mergeTextObjectContours } from './vcarve-text-union';
 import { roundStrokeOutline } from '../geometry/round-stroke-outline';
 import { CncStrokeGeometryError } from './cnc-stroke-geometry-error';
@@ -66,9 +67,13 @@ export function collectLayerContours(
     }
   }
   // ADR-672: an Outside or Inside profile cuts a near-closed outline as the
-  // closed shape it outlines, here so every reader of the pool agrees.
+  // closed shape it outlines. Joined first, so an outline the join closes on
+  // top of a closed copy is merged with it below.
   const cutType = layer.cnc?.cutType;
-  return cutType === undefined ? out : [...joinProfileOutlines(out, cutType)];
+  const joined = cutType === undefined ? out : joinProfileOutlines(out, cutType);
+  // Every reader of the pool (compile, the artifact, lead walls, the narrow
+  // feature check) sees one copy of a stacked outline, as the cut does.
+  return mergeStackedClosedContours(layer, joined);
 }
 
 function appendObjectContours(

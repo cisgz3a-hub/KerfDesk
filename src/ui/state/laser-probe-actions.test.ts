@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { buildZProbeLines } from '../../core/controllers/grbl';
 import type { ProbeRequest } from '../../core/controllers/grbl/probe';
 import { useLaserStore } from './laser-store';
+import { markProbeCircuitTested } from './probe-test-touch.test-support';
 import { connectWith, makeConnection } from './laser-store-console.test-support';
 
 const Z_REQUEST = {
@@ -44,6 +45,7 @@ describe('laser probe wire ownership', () => {
     await connectWith(connection);
     writes.length = 0;
 
+    markProbeCircuitTested();
     const probe = useLaserStore.getState().probe(Z_REQUEST);
     await flush();
     const expectedSequence = ['M5', 'M9', ...buildZProbeLines(Z_REQUEST.params), 'G4 P0.01'];

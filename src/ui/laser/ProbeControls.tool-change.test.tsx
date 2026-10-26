@@ -9,6 +9,7 @@ import type { StatusReport, StreamerState } from '../../core/controllers/grbl';
 import type { ProbeRequest } from '../../core/controllers/grbl/probe';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
+import { markProbeCircuitTested } from '../state/probe-test-touch.test-support';
 import { ProbeControls } from './ProbeControls';
 
 (
@@ -48,6 +49,7 @@ describe('ProbeControls in a tool-change hold', () => {
       statusReport: IDLE,
       probe,
     } as LaserPatch);
+    markProbeCircuitTested();
     const host = document.createElement('div');
     document.body.appendChild(host);
     const root = createRoot(host);

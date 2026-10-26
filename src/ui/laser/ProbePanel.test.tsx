@@ -8,7 +8,10 @@ import type { StatusReport } from '../../core/controllers/grbl';
 import type { ProbeRequest } from '../../core/controllers/grbl/probe';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
+import { markProbeCircuitTested } from '../state/probe-test-touch.test-support';
 import { ProbePanel } from './ProbePanel';
+
+const CLOSED_PROBE_PIN = { limitX: false, limitY: false, limitZ: false, probe: true, door: false };
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -32,6 +35,7 @@ afterEach(() => {
     connection: { kind: 'disconnected' },
     statusReport: null,
     probeBusy: false,
+    probeTestTouch: null,
   } as Partial<ReturnType<typeof useLaserStore.getState>>);
 });
 
@@ -62,7 +66,7 @@ describe('ProbePanel', () => {
     }
   });
 
-  it('in CNC mode, disables Run until connected and Idle', async () => {
+  it('in CNC mode, disables Run until connected, Idle and the probe circuit is tested', async () => {
     useStore.getState().setMachineKind('cnc');
     const { host, root } = await renderPanel();
     try {
@@ -77,6 +81,26 @@ describe('ProbePanel', () => {
           statusReport: idleStatus(),
         } as Partial<ReturnType<typeof useLaserStore.getState>>);
       });
+      // Meta audit M7-P2-1 (ADR-103 Amendment 2): no seek before a test touch.
+      const circuit = (): string =>
+        host.querySelector('[aria-label="Probe circuit"]')?.textContent ?? '';
+      expect(button.disabled).toBe(true);
+      expect(button.title).toContain('Test the probe first');
+      expect(circuit()).toContain('Probe circuit: not tested');
+      await act(async () => {
+        useLaserStore.setState({
+          statusReport: { ...idleStatus(), pins: CLOSED_PROBE_PIN },
+        } as Partial<ReturnType<typeof useLaserStore.getState>>);
+        markProbeCircuitTested();
+      });
+      expect(circuit()).toContain('Probe circuit: closed');
+      expect(button.disabled).toBe(true);
+      await act(async () => {
+        useLaserStore.setState({ statusReport: idleStatus() } as Partial<
+          ReturnType<typeof useLaserStore.getState>
+        >);
+      });
+      expect(circuit()).toContain('Probe circuit: tested');
       expect(button.disabled).toBe(false);
     } finally {
       await cleanup(host, root);
@@ -92,6 +116,7 @@ describe('ProbePanel', () => {
       statusReport: idleStatus(),
       probe,
     } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    markProbeCircuitTested();
     const { host, root } = await renderPanel();
     try {
       const button = [...host.querySelectorAll('button')].find((b) =>

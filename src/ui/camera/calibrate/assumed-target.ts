@@ -33,6 +33,9 @@ type LayoutSettings = Pick<CalibrationSettings, 'marginMm' | 'headCamera' | 'hea
   Partial<Pick<CalibrationSettings, 'ringDiameterMm' | 'sheetWidthMm' | 'sheetHeightMm'>>;
 type Machine = Pick<DeviceProfile, 'profileId' | 'name' | 'bedWidth' | 'bedHeight'>;
 
+/** The saved calibration's target during a check, with the frame its rings were placed in. */
+export type KnownTarget = { readonly area: BedArea; readonly bedFrame: CameraBedFrame };
+
 /**
  * The saved calibration's own target during a check; otherwise the target
  * last engraved on this machine while the settings still describe it (the
@@ -43,21 +46,23 @@ export function assumedTarget(args: {
   readonly settings: LayoutSettings;
   readonly bedWidthMm: number;
   readonly bedHeightMm: number;
-  readonly knownArea: BedArea | null;
-  /** The saved calibration's frame, with `knownArea`; null when it was not saved. */
-  readonly knownBedFrame?: CameraBedFrame | null;
+  /**
+   * Only with its frame: a saved target read in today's frame would label the
+   * rings wrongly after a bed change (meta audit M2-P3-3).
+   */
+  readonly known: KnownTarget | null;
   readonly remembered: EngravedTarget | null;
   /** The bed frame the machine is set up with now. */
   readonly frameNow: CameraBedFrame;
 }): AssumedTarget {
-  const { settings, remembered, frameNow } = args;
-  if (args.knownArea !== null) {
-    const { width, height } = args.knownArea;
+  const { settings, remembered, frameNow, known } = args;
+  if (known !== null) {
+    const { width, height } = known.area;
     return {
-      area: args.knownArea,
+      area: known.area,
       source: 'saved-calibration',
       description: `the target of the saved calibration, ${size(width, height)}`,
-      bedFrame: args.knownBedFrame ?? frameNow,
+      bedFrame: known.bedFrame,
     };
   }
   const bedNow = size(args.bedWidthMm, args.bedHeightMm);
@@ -123,8 +128,10 @@ function assumedTargetFor(
     settings,
     bedWidthMm: device.bedWidth,
     bedHeightMm: device.bedHeight,
-    knownArea: known.area,
-    knownBedFrame: known.bedFrame,
+    known:
+      known.area === null || known.bedFrame === null
+        ? null
+        : { area: known.area, bedFrame: known.bedFrame },
     remembered: rememberedEngravedTarget(device, settings.headCamera),
     frameNow: known.frameNow,
   });

@@ -24,7 +24,7 @@ const BRIDGE: CameraBridgeAdapter = {
   }),
   rtspStreamStatus: async () => ({ kind: 'live' }),
   discoverMachineCamera: async () => ({ kind: 'not-found' }),
-  proxiedFrameUrl: () => 'http://localhost/frame.jpg',
+  registerFrameSource: async () => ({ kind: 'ok', frameUrl: 'http://localhost/frame.jpg' }),
   health: async () => ({ kind: 'ok', ffmpegAvailable: true, frameProxy: true }),
 };
 

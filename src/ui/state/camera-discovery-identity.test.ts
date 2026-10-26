@@ -16,7 +16,7 @@ function bridge(cameraUrl: string): CameraBridgeAdapter {
       cameraUrl,
       proxyFrameUrl: `http://localhost/frame.jpg?url=${encodeURIComponent(cameraUrl)}`,
     }),
-    proxiedFrameUrl: () => 'http://localhost/frame.jpg',
+    registerFrameSource: async () => ({ kind: 'ok', frameUrl: 'http://localhost/frame.jpg' }),
     health: async () => ({ kind: 'ok', ffmpegAvailable: true, frameProxy: true }),
   };
 }

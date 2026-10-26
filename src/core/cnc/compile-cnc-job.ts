@@ -34,6 +34,7 @@ import type {
   CncOpenContourOmission,
   CncOpenContourOmissionSource,
   CncProfileOpenPaths,
+  CncStackedCopyMerge,
 } from '../job/cnc-compilation-sidecar-types';
 import { cncOpenContourOmissions } from './cnc-open-contour-omissions';
 import { cncProfileOpenPaths } from './cnc-profile-outline-join';
@@ -42,6 +43,7 @@ import {
   keptPartCutOperation,
   type KeptPartCutOperation,
 } from './cnc-kept-part-cuts';
+import { cncStackedCopyMerges } from './cnc-stacked-copies';
 import type { ReliefMaterializationFailure } from '../relief/relief-materialization-failure';
 import { isProfileCutType } from './compile-cnc-helpers';
 import { compileReliefGroupsForLayer } from './compile-cnc-relief';
@@ -158,6 +160,7 @@ function compileCncSnapshot(
   const omittedOpenContourSources: CncOpenContourOmissionSource[] = [];
   const profileOpenPaths: CncProfileOpenPaths[] = [];
   const keptPartOperations: KeptPartCutOperation[] = [];
+  const mergedStackedCopies: CncStackedCopyMerge[] = [];
   const sourceObjects = scene.objects;
   const allSourceObjects = [...sourceObjects, ...(scene.outputDependencies ?? [])];
   const runs = artworkOperationRuns(scene);
@@ -185,6 +188,7 @@ function compileCncSnapshot(
     profileOpenPaths.push(...operation.profileOpenPaths);
     const measured = keptPartCutOperation(run.layer, operation.profileGroups, config);
     if (measured !== null) keptPartOperations.push(measured);
+    mergedStackedCopies.push(...operation.stackedCopyMerges);
     offsetLadderDiagnostics.push(...operation.offsetLadderDiagnostics);
     if (operation.stepoverOperation !== undefined) {
       stepoverOperations.push(operation.stepoverOperation);
@@ -200,6 +204,7 @@ function compileCncSnapshot(
     reliefPlans,
     offsetLadderDiagnostics,
     { counts: omittedOpenContours, sources: omittedOpenContourSources },
+    mergedStackedCopies,
     // ADR-672 and ADR-433 Amendment 3: outlines cut on their line, and cuts
     // that reach a part another operation keeps.
     { profileOpenPaths, keptPartCuts: cncKeptPartCuts(keptPartOperations, leadWalls.walls) },
@@ -267,6 +272,7 @@ function compileCncOperation(
       contours,
       profileLeadCutWidthMm(layerCncTool(config, settings), settings),
     ),
+    stackedCopyMerges: cncStackedCopyMerges(layer, contours),
     reliefPlans: relief.evidence.plans,
     offsetLadderDiagnostics: [
       ...vectorGroups.offsetLadderDiagnostics,
