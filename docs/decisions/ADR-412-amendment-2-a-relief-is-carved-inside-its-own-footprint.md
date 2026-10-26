@@ -90,7 +90,9 @@ it as KNOWN (rolling v2 16 K-2, CNC v1 F6), and the meta audit of 2026-10-23 rai
   became strips tall enough for a middle row, roughing coverage is counted inside the wall band,
   the waterline tests judge the contours round their feature (and one pins the new edge wall),
   and the pyramid ring-order test stands its pyramid on a plate. The roughing G-code snapshot
-  changed accordingly.
+  changed accordingly, and the G-code Inspector's relief comparison is judged inside the deep
+  rim's fillet band (99.3% within 0.25 mm there; 91.7% over the whole design).
+- `EMITTER_REVISION` moves to `relief-footprint-edge-20261027-v32`, since relief programs change.
 - Qualification is unchanged otherwise: emitted vertices and finishing moves clear the outside
   exactly; roughing's contour vertices clear it through the widened kernel; holder and shank
   clearance keep ADR-289 and ADR-294's boundary.

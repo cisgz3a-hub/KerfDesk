@@ -150,7 +150,9 @@ export type GcodeMetadata = {
 // ADR-415 Amd 1 marks image run-ins and run-outs as laser-off motion; ADR-239
 // Amd 1 says a contour entry was skipped when the bed position is unknown;
 // ADR-127 Amd 1 keeps a placed rotary job on its anchor.
-export const EMITTER_REVISION = 'laser-runway-markers-rotary-anchor-20261026-v30';
+// ADR-412 Amd 2 keeps every relief cut inside the relief's own footprint: the
+// stock past its map stands at the stock top.
+export const EMITTER_REVISION = 'relief-footprint-edge-20261027-v32';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

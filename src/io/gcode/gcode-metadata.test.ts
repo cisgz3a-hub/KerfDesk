@@ -41,7 +41,7 @@ function laserAssumptions(
 
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
-    expect(EMITTER_REVISION).toBe('laser-runway-markers-rotary-anchor-20261026-v30');
+    expect(EMITTER_REVISION).toBe('relief-footprint-edge-20261027-v32');
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {
