@@ -42,6 +42,33 @@ describe('LightBurn .lbdev import', () => {
     expect(result.ignored.map((field) => field.label)).toContain('End script');
   });
 
+  // Rolling audit v4 H4-P3-1: a vendor file's GRBL variant is not stock GRBL.
+  it.each(['GRBL-LPC', 'GRBL-M3', 'grblHAL'])(
+    'flags the %s driver for review, since it imports as stock GRBL',
+    (driver) => {
+      const result = importLightBurnDeviceProfile(
+        GRBL_LBDEV.replace('<Controller>GRBL</Controller>', `<Controller>${driver}</Controller>`),
+        { fileName: 'vendor.lbdev' },
+      );
+      if (result.kind !== 'review') throw new Error('Expected a review');
+      expect(result.canCreateProfile).toBe(true);
+      expect(result.profile.controllerKind).toBeUndefined();
+      expect(result.needsReview).toContainEqual(
+        expect.objectContaining({
+          label: 'Controller',
+          value: driver,
+          note: expect.stringContaining('stock GRBL with no vendor command set'),
+        }),
+      );
+    },
+  );
+
+  it('does not flag the plain GRBL driver', () => {
+    const result = importLightBurnDeviceProfile(GRBL_LBDEV, { fileName: 'neotronics.lbdev' });
+    if (result.kind !== 'review') throw new Error('Expected a review');
+    expect(result.needsReview).toEqual([]);
+  });
+
   it('marks non-GRBL devices as review-only without creating a usable profile', () => {
     const result = importLightBurnDeviceProfile(
       `<LightBurnDevice><Name>Ruida bed</Name><Controller>Ruida</Controller><Width>600</Width><Height>400</Height></LightBurnDevice>`,

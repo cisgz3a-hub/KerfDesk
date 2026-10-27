@@ -12,6 +12,7 @@ import { usePlatform } from '../app/platform-context';
 import { Button } from '../kit';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
+import { ReplaceSettingsConfirm } from './device-setup/ReplaceSettingsConfirm';
 import {
   buttonRowStyle,
   cardStyle,
@@ -28,18 +29,20 @@ type ImportReview =
   | { readonly kind: 'lightburn'; readonly review: LightBurnDeviceImportReview }
   | { readonly kind: 'error'; readonly message: string };
 
-export function ImportExportPanel(
-  props: {
-    readonly profile?: DeviceProfile;
-    readonly onApply?: (profile: DeviceProfile) => void;
-  } = {},
-): JSX.Element {
+type ImportExportPanelProps = {
+  readonly profile?: DeviceProfile;
+  readonly onApply?: (profile: DeviceProfile) => void;
+  /** The draft's own settings applying `profile` would replace; when any,
+   *  Apply asks first, as a list choice does (ADR-637 Amendment 3). */
+  readonly replaces?: (profile: DeviceProfile) => ReadonlyArray<string>;
+};
+
+export function ImportExportPanel(props: ImportExportPanelProps = {}): JSX.Element {
   const platform = usePlatform();
   const activeDevice = useStore((s) => s.project.device);
   const device = props.profile ?? activeDevice;
-  const replaceDeviceProfile = useStore((s) => s.replaceDeviceProfile);
   const pushToast = useToastStore((s) => s.pushToast);
-  const [review, setReview] = useState<ImportReview | null>(null);
+  const { review, showReview, askOrApply, replaceQuestion } = useImportReview(props);
 
   const exportActive = (): void => {
     void platform
@@ -61,10 +64,10 @@ export function ImportExportPanel(
       .then(async ([file]) => {
         if (file === undefined) return;
         const result = deserializeMachineProfileDocument(await file.text());
-        if (result.kind === 'ok') setReview({ kind: 'machine', document: result.document });
-        else setReview({ kind: 'error', message: importError(result) });
+        if (result.kind === 'ok') showReview({ kind: 'machine', document: result.document });
+        else showReview({ kind: 'error', message: importError(result) });
       })
-      .catch((error: unknown) => setReview({ kind: 'error', message: errorMessage(error) }));
+      .catch((error: unknown) => showReview({ kind: 'error', message: errorMessage(error) }));
   };
 
   const importLightBurn = (): void => {
@@ -73,10 +76,10 @@ export function ImportExportPanel(
       .then(async ([file]) => {
         if (file === undefined) return;
         const result = importLightBurnDeviceProfile(await file.text(), { fileName: file.name });
-        if (result.kind === 'review') setReview({ kind: 'lightburn', review: result });
-        else setReview({ kind: 'error', message: result.reason });
+        if (result.kind === 'review') showReview({ kind: 'lightburn', review: result });
+        else showReview({ kind: 'error', message: result.reason });
       })
-      .catch((error: unknown) => setReview({ kind: 'error', message: errorMessage(error) }));
+      .catch((error: unknown) => showReview({ kind: 'error', message: errorMessage(error) }));
   };
 
   return (
@@ -86,19 +89,55 @@ export function ImportExportPanel(
         <Button onClick={importKerfDesk}>Import KerfDesk profile</Button>
         <Button onClick={importLightBurn}>Import LightBurn .lbdev</Button>
       </div>
-      {review === null ? null : (
-        <ImportReviewCard
-          review={review}
-          onApply={(profile) => {
-            if (props.onApply === undefined) replaceDeviceProfile(profile);
-            else props.onApply(profile);
-            setReview(null);
-            pushToast('Machine profile applied.', 'success');
-          }}
-        />
-      )}
+      {review === null ? null : <ImportReviewCard review={review} onApply={askOrApply} />}
+      {replaceQuestion}
     </div>
   );
+}
+
+// The review card's Apply, and the question it asks before replacing tuned
+// values. A new file read closes both.
+function useImportReview(props: ImportExportPanelProps): {
+  readonly review: ImportReview | null;
+  readonly showReview: (next: ImportReview) => void;
+  readonly askOrApply: (profile: DeviceProfile) => void;
+  readonly replaceQuestion: JSX.Element | null;
+} {
+  const replaceDeviceProfile = useStore((s) => s.replaceDeviceProfile);
+  const pushToast = useToastStore((s) => s.pushToast);
+  const [review, setReview] = useState<ImportReview | null>(null);
+  const [pending, setPending] = useState<{
+    readonly profile: DeviceProfile;
+    readonly replaces: ReadonlyArray<string>;
+  } | null>(null);
+  const apply = (profile: DeviceProfile): void => {
+    if (props.onApply === undefined) replaceDeviceProfile(profile);
+    else props.onApply(profile);
+    setPending(null);
+    setReview(null);
+    pushToast('Machine profile applied.', 'success');
+  };
+  return {
+    review,
+    showReview: (next) => {
+      setPending(null);
+      setReview(next);
+    },
+    askOrApply: (profile) => {
+      const replaces = props.replaces?.(profile) ?? [];
+      if (replaces.length > 0) setPending({ profile, replaces });
+      else apply(profile);
+    },
+    replaceQuestion:
+      pending === null ? null : (
+        <ReplaceSettingsConfirm
+          subject={`Importing ${pending.profile.name}`}
+          replaces={pending.replaces}
+          onReplace={() => apply(pending.profile)}
+          onKeep={() => setPending(null)}
+        />
+      ),
+  };
 }
 
 function ImportReviewCard(props: {

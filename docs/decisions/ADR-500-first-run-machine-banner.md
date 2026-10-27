@@ -4,6 +4,8 @@
 
 Startup restoration and fresh-canvas defaults are superseded by
 [Amendment 1](ADR-500-amendment-1-machine-persistence-and-fresh-canvas.md).
+[Amendment 2](ADR-500-amendment-2-open-keeps-the-machine-in-use.md) keeps the machine in use when
+a file for it is opened, and remembers only a machine the operator chose.
 
 The banner is advisory (ADR-228): it blocks nothing and nothing waits on it.
 

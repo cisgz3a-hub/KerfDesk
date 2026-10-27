@@ -1,6 +1,9 @@
 import type { Project } from '../../core/scene';
 import type { AppState } from './store';
 
+// The opened file's machine notice travels with the machine it asks about
+// (ADR-440 Amendment 6): undoing Keep current machine brings back the file's
+// machine and the question, so nothing restores it unannounced.
 export type SetupHistoryContext = Pick<
   AppState,
   | 'jobPlacement'
@@ -9,6 +12,7 @@ export type SetupHistoryContext = Pick<
   | 'selectedObjectId'
   | 'additionalSelectedIds'
   | 'probeSetupEpoch'
+  | 'projectBedReconciliation'
 >;
 
 const contexts = new WeakMap<Project, SetupHistoryContext>();
@@ -22,6 +26,7 @@ export function captureSetupHistoryContext(project: Project, state: SetupHistory
     selectedObjectId: state.selectedObjectId,
     additionalSelectedIds: new Set(state.additionalSelectedIds),
     probeSetupEpoch: state.probeSetupEpoch,
+    projectBedReconciliation: state.projectBedReconciliation,
   });
 }
 
