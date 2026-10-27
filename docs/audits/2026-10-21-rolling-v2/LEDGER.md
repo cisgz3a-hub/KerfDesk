@@ -148,3 +148,9 @@ Coordinator checks were made on `origin/main` @ `faf5a54f1`; no audited line cha
 |---|---|---|---|
 | 12-P2-2 → **P1 by effect** (record only) | It was kept at P2 because of reach and because "Frame shows the true outline". Under METHOD §3 neither lowers a P1: Start always runs a Frame, but that beam-off trace compares nothing with the camera picture, so it is not a warning. The defect was a silent position error (Corrected by rolling v3 G6, 2026-10-27) | G6 refuter: `Start` requires a completed Frame, Frame never reads the overlay; ADR-228 Amd 1 Context says the same | fixed (#1373); record corrected |
 | 12-P2-1 → **P1 by effect** (record only) | M6 re-recorded it as a P3 record row; the same Frame reasoning applied. It was a silent camera position error (Corrected by rolling v3 G6, 2026-10-27) | G6 refuter | fixed (#1437); record corrected |
+
+## Corrections by rolling audit v3 G9 (2026-10-27)
+
+| ID | Summary | Evidence | Status |
+|---|---|---|---|
+| 15-P2-1 → **P1 by effect** (record only) | Styled variable-text records were emitted up to 47 mm from their designed place while the canvas showed the template unmoved. It was kept at P2 only because Frame and Preview showed the shift; under METHOD §3 (2026-10-27) Frame is not a warning, and no in-app warning named the mismatch (Corrected by rolling v3 G9, 2026-10-27) | G9 auditor + refuter | fixed (#1359, `b68a53beb`); record corrected |

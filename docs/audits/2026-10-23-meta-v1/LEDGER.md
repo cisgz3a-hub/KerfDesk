@@ -58,3 +58,9 @@ Method: [../2026-10-21-rolling-v2/METHOD.md](../2026-10-21-rolling-v2/METHOD.md)
 | ID | Summary | Evidence | Status |
 |---|---|---|---|
 | M2-P3-3 (P2) → **P1 by effect** (record only) | The fix gap for old camera calibrations was silent wrong position; "Frame shows the true outline" is not a §3 warning (Corrected by rolling v3 G6, 2026-10-27) | G6 refuter | fixed (#1441, ADR-440 Amd 4); record corrected |
+
+## Corrections by rolling audit v3 G9 (2026-10-27)
+
+| ID | Summary | Evidence | Status |
+|---|---|---|---|
+| M2 on 15-P2-1 → **P1 by effect** (record only) | Styled variable-text records were emitted up to 47 mm from their designed place while the canvas showed the template unmoved. It was kept at P2 only because Frame and Preview showed the shift; under METHOD §3 (2026-10-27) Frame is not a warning, and no in-app warning named the mismatch (Corrected by rolling v3 G9, 2026-10-27) | G9 auditor + refuter | fixed (#1359, `b68a53beb`); record corrected |
