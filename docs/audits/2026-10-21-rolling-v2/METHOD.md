@@ -57,6 +57,8 @@ Each area runs the lenses that apply to it. Lenses are run as separate, independ
   - that the output is not wrong, or
   - that a clear warning reaches the operator before the output is produced.
 
+**Clarification (2026-10-27, rolling v3 G6).** Frame is not a warning. Start always runs a Frame, but it is a beam-off trace of the job outline and compares it with nothing else (the camera picture, the material, the expected bed frame). The operator has to notice a mismatch unprompted. A position error that only Frame would reveal therefore stays P1. A finding may be lowered only when the app itself tells the operator about the specific mismatch before output. 12-P2-2, 12-P2-1 and M2-P3-3 were rated against this rule and are corrected in their ledgers.
+
 ## 4. Evidence bar
 
 Every finding records:

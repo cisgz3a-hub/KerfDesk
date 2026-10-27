@@ -62,6 +62,7 @@ describe('get_board', () => {
     const status = controllerStatus();
     unregister = registerBoardRemote({
       status: () => status,
+      finishReview: () => ({ refusal: null, notice: null }),
       capture: async () => undefined,
       finish: async () => undefined,
     });

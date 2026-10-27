@@ -4,24 +4,10 @@
 // all four corners are in — the measured rectangle with an off-square warning
 // before committing.
 
-import {
-  BOARD_CORNER_COUNT,
-  firstCornerOffsetMm,
-  type BestFitRectangle,
-  type Vec2,
-} from '../../../core/scene';
+import { BOARD_CORNER_COUNT, type BestFitRectangle, type Vec2 } from '../../../core/scene';
 import { Button } from '../../kit';
-import { MIN_BOARD_DIMENSION_MM } from './constants';
+import { measuredRectChecks } from './board-finish-checks';
 import { ManualSizeForm } from './ManualSizeForm';
-
-// Above this the captured corners aren't a clean rectangle square to the bed
-// (board rotated, or a corner mis-captured), so the drawn axis-aligned outline
-// won't match the real board.
-const OFF_SQUARE_WARN_MM = 5;
-// Above this the FIRST captured corner is too far from the board's bottom-left,
-// so the G92 work origin (set at the first corner) sits at the wrong corner —
-// the outline looks right but the burn is offset. See ADR-124.
-const FIRST_CORNER_WARN_MM = 5;
 
 export function BoardCaptureSteps(props: {
   readonly corners: ReadonlyArray<Vec2>;
@@ -99,11 +85,11 @@ function MeasuredBoard(props: {
   readonly disabled: boolean;
   readonly onFinish: () => void;
 }): JSX.Element {
-  const { widthMm, heightMm, offSquareMm } = props.rect;
-  const tooSmall = widthMm < MIN_BOARD_DIMENSION_MM || heightMm < MIN_BOARD_DIMENSION_MM;
-  const firstCornerOffset = firstCornerOffsetMm(props.corners);
-  const wrongFirstCorner =
-    !tooSmall && firstCornerOffset !== null && firstCornerOffset > FIRST_CORNER_WARN_MM;
+  const { widthMm, heightMm } = props.rect;
+  const { tooSmall, offSquareMm, firstCornerOffsetMm } = measuredRectChecks(
+    props.rect,
+    props.corners,
+  );
   return (
     <div style={columnStyle}>
       <div style={measureStyle}>
@@ -115,7 +101,7 @@ function MeasuredBoard(props: {
           corner.
         </p>
       ) : (
-        offSquareMm > OFF_SQUARE_WARN_MM && (
+        offSquareMm !== null && (
           <p style={warnStyle}>
             The corners aren&apos;t a clean rectangle square to the bed (off by{' '}
             {offSquareMm.toFixed(0)} mm) — the board may be rotated or a corner mis-captured, so the
@@ -124,7 +110,7 @@ function MeasuredBoard(props: {
           </p>
         )
       )}
-      {wrongFirstCorner && (
+      {firstCornerOffsetMm !== null && (
         <p style={warnStyle}>
           The first corner you captured wasn&apos;t the bottom-left, so the work origin — and the
           burn — is set at the wrong corner. Start over and capture the bottom-left corner first.

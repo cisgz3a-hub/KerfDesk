@@ -254,7 +254,6 @@ async function renderHandlers(args: {
   function Probe(): null {
     current = useBoardCaptureHandlers({
       capture: args.capture,
-      livePosition: null,
       device: { ...DEFAULT_DEVICE_PROFILE, origin: 'front-left' },
       setOriginHere: async () => undefined,
       setOriginAtMachinePoint: args.setOriginAtMachinePoint,

@@ -38,3 +38,9 @@ Method: [../2026-10-21-rolling-v2/METHOD.md](../2026-10-21-rolling-v2/METHOD.md)
 |---|---|---|---|
 | C5-P3-1 → **P1** (also rolling-v2 17-P3-2) | A comment or `/` in a `$` key (`(x)$30=255`, `$30(x)=255`, `$RST(x)=*`, `$N(x)0=G0X100`, `$22(x)=0.5`) is classified as plain G-code: no persistent-command block, no confirmation, no value check and no settings re-read, while GRBL strips the comment and stores the value. Through the real Console store, `(x)$30=255` leaves Start's power scale at 1000, so any layer above 25.5 % burns at full power (Corrected by meta-v1 M6, 2026-10-26) | **READ**: `grbl/console-command.ts:62` `SETTING_WRITE_RE = /^\$\d+=\S.*$/` misses both forms; classifier unchanged since C5. **SOURCE**: gnea/grbl `protocol.c` strips `()`/`;`/`/` before parsing. M6 + refuter REPRO | open — fix card proposed |
 | C8 clean claim (P3) | "Jogs and Frame are immune to the feed override" is false for the Falcon A1 Pro, which jogs and frames with `G1 … S0` and so follows a leftover feed override (Corrected by meta-v1 M6, 2026-10-26) | M6 + refuter | record corrected |
+
+## Corrections by rolling audit v3 G4 (2026-10-27)
+
+| ID | Summary | Evidence | Status |
+|---|---|---|---|
+| C6-P3-1 → **P1** (rolling v3 G4-P1-1) | FluidNC `[key]value` Console lines (`[13]1`, `[RST]#`, `[NVX]`) run as setting writes and commands, unguarded. `[13]1` makes later point moves land up to 2.54× off (X60 → X108.032), so the effect is wrong position: P1 under METHOD §3. #1454 did not cover the form (Corrected by rolling v3 G4, 2026-10-27) | G4 auditor + refuter REPRO; FluidNC v4.0.3 source | open — fix card proposed |

@@ -49,7 +49,8 @@ function joinedIssue(entry: CncProfileOpenPaths): PreflightIssue {
 /**
  * ADR-433 Amendment 3: per pair of profile operations, where one's cutter
  * reaches a part the other keeps. Positions are machine coordinates, so they
- * are given only when the program runs where it was compiled.
+ * are given only when the program runs where it was compiled (not from a
+ * hand-set origin, a motion offset or a tile's own zero; Amendment 5).
  */
 export function cncKeptPartCutIssues(
   job: Job | undefined,
@@ -68,10 +69,26 @@ function keptPartIssue(cut: CncKeptPartCut, showPositions: boolean): PreflightIs
       : `reaches ${parts} and cuts up to ${mm(cut.depthMm)} mm into ${one ? 'it' : 'them'}${where}`;
   return {
     code: 'cnc-profile-cuts-kept-part',
-    message:
-      `Layer "${cut.layerName}": its ${mm(cut.cutWidthMm)} mm cut ${reach}. The parts sit ` +
-      'closer together than the bit can pass between. Move them further apart.',
+    message: `Layer "${cut.layerName}": its ${mm(cut.cutWidthMm)} mm cut ${reach}. ${keptPartCause(cut)}`,
   };
+}
+
+// ADR-433 Amendment 5: when only the roughing ring reaches the part, the bit
+// does pass between the parts; the finish allowance moves roughing out to it.
+function keptPartCause(cut: CncKeptPartCut): string {
+  const allowance = cut.finishAllowanceMm;
+  if (allowance === undefined || cut.depthMm === null) {
+    return 'The parts sit closer together than the bit can pass between. Move them further apart.';
+  }
+  const them = cut.contours === 1 ? 'it' : 'them';
+  const moved = `Its ${mm(allowance)} mm finish allowance moves the roughing pass out into ${them}.`;
+  // Each 0.01 mm less allowance draws the roughing ring 0.01 mm back. Rounded
+  // down (past binary rounding), so the figure clears even where the offset's
+  // own rounding decides.
+  const clearing = Math.floor((allowance - cut.depthMm) * 100 + 1e-9) / 100;
+  return clearing > 0
+    ? `${moved} An allowance of ${mm(clearing)} mm or less clears ${them}, or move the parts apart.`
+    : `${moved} Remove the allowance or move the parts apart.`;
 }
 
 function mm(value: number): string {

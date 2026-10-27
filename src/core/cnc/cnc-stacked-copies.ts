@@ -20,7 +20,13 @@
 // so two nonzero contours merge only when they also run the same way.
 
 import type { CncStackedCopyMerge } from '../job/cnc-compilation-sidecar-types';
-import { DEFAULT_CNC_LAYER_SETTINGS, type CncCutType, type Layer, type Vec2 } from '../scene';
+import {
+  DEFAULT_CNC_LAYER_SETTINGS,
+  type CncCutType,
+  type Layer,
+  type Polyline,
+  type Vec2,
+} from '../scene';
 import type { CollectedCncContour } from './cnc-manual-tab-mapping';
 import { CNC_COORDINATE_QUANTUM_MM } from './cnc-output-precision';
 
@@ -75,6 +81,28 @@ export function mergeStackedClosedContours(
     merged[original.index] = absorbCopy(target, contour);
   }
   return merged;
+}
+
+/**
+ * Drops exact closed copies, keeping the first, for a model that fills the
+ * outlines even-odd where the cut itself follows every copy (ADR-250
+ * Amendment 4). Copies match as above, but either way round whatever the fill
+ * rule: filled even-odd, any two coincident rings cancel.
+ */
+export function withoutStackedClosedCopies(polylines: ReadonlyArray<Polyline>): Polyline[] {
+  const kept = new Map<string, Ring[]>();
+  const out: Polyline[] = [];
+  for (const polyline of polylines) {
+    const ring = polyline.closed ? quantizedRing(polyline.points) : null;
+    if (ring !== null) {
+      const signature = ringSignature(ring);
+      const bucket = kept.get(signature) ?? [];
+      if (bucket.some((candidate) => sameRing(candidate, ring, true))) continue;
+      kept.set(signature, [...bucket, ring]);
+    }
+    out.push(polyline);
+  }
+  return out;
 }
 
 /** The copies each operation merged, read from the contours it actually cut. */
