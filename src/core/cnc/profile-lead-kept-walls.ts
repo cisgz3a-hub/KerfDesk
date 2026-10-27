@@ -15,6 +15,7 @@
 import { pointInPolygon } from '../geometry';
 import { normalizeClosedPolylineTreeEvenOddChecked } from '../geometry/polygon-difference';
 import type { CncCutType, CncLayerSettings, CncTool, Polyline, Vec2 } from '../scene';
+import { cutTypeFillsClosedOutlines, withoutStackedClosedCopies } from './cnc-stacked-copies';
 import { cncLayoutCutWidths } from './layout-cut-widths';
 import { segmentsStayOnSide } from './profile-lead-side-crossings';
 import { hasFinitePoints } from './profile-paths';
@@ -69,7 +70,8 @@ const MIN_RING_POINTS = 3;
 /**
  * The walls one profile operation leaves, from the same selected contours its
  * kerf offset uses. Outside and on-path cuts keep the even-odd bodies (a hole
- * keeps the material around it); an inside cut keeps the opposite side.
+ * keeps the material around it); an inside cut keeps the opposite side. An
+ * on-path operation's stacked copies count once.
  */
 export function profileLeadKeptWalls(
   contours: ReadonlyArray<Polyline>,
@@ -87,7 +89,15 @@ export function profileLeadKeptWalls(
     (contour) =>
       contour.closed && contour.points.length >= MIN_RING_POINTS && hasFinitePoints(contour),
   );
-  const tree = normalizeClosedPolylineTreeEvenOddChecked(closed);
+  // An On path cut follows each outline, so a stacked copy is the same line
+  // cut again and leaves the same wall. Filled even-odd, the copy would cancel
+  // its twin and leave the part no wall at all (ADR-250 Amendment 4). Filled
+  // cuts merged their copies as they were collected (ADR-359 Amendment 3), so
+  // their walls read the contours their kerf offset reads.
+  const outlines = cutTypeFillsClosedOutlines(cutType)
+    ? closed
+    : withoutStackedClosedCopies(closed);
+  const tree = normalizeClosedPolylineTreeEvenOddChecked(outlines);
   // The kerf offset runs the same normalization; if it fails, this operation
   // cuts nothing, so it leaves no wall to protect.
   if (tree.kind === 'error') return [];

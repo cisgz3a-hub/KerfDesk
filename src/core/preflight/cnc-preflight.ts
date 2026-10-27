@@ -57,6 +57,9 @@ export type CncPreflightOptions = {
   /** Exact archived programs already carry their compiled Job. Requalification
    * keeps byte/invariant checks but must not rebuild source geometry. */
   readonly sourceGeometryChecks?: 'full' | 'compiled-evidence-only';
+  /** False for a program moved off `compiledJob`'s own coordinates, as a tile
+   * file is moved to the tile's zero, so that job's positions do not hold. */
+  readonly compiledPositionsHold?: boolean;
 };
 
 const MAX_REPORTED_ISSUES = 5;
@@ -85,7 +88,9 @@ export function runCncPreflight(
   issues.push(...cncProfileLeadPlungeIssues(options.compiledJob));
   // Machine positions hold only when the program runs where it was compiled.
   const showPositions =
-    options.coordinateMode !== 'relative-origin' && options.motionOffset === undefined;
+    options.compiledPositionsHold !== false &&
+    options.coordinateMode !== 'relative-origin' &&
+    options.motionOffset === undefined;
   issues.push(...cncKeptPartCutIssues(options.compiledJob, showPositions));
   issues.push(...findCncMotionBoundsPreflightIssues(project.device, gcode, options));
   appendNonFiniteCoordIssues(gcode, issues);

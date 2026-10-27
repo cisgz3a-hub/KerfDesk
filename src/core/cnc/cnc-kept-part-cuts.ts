@@ -29,6 +29,7 @@ import {
   type Vec2,
 } from '../scene';
 import { isProfileCutType } from './compile-cnc-helpers';
+import { profileFinishAllowanceMm } from './finish-allowance';
 import {
   KEPT_WALL_TOLERANCE_MM,
   profileLeadCutWidthMm,
@@ -40,6 +41,8 @@ export type KeptPartCutOperation = {
   readonly layer: Layer;
   readonly groups: ReadonlyArray<CncGroup>;
   readonly cutterRadiusMm: number;
+  /** The allowance its roughing ring stands off the finished wall (ADR-140). */
+  readonly finishAllowanceMm: number;
 };
 
 /** A toolpath this close to a wall touches or crosses it. */
@@ -71,7 +74,12 @@ export function keptPartCutOperation(
   const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
   if (!isProfileCutType(settings.cutType) || settings.reliefProjection !== undefined) return null;
   const cutWidthMm = profileLeadCutWidthMm(layerCncTool(config, settings), settings);
-  return { layer, groups, cutterRadiusMm: cutWidthMm / 2 };
+  return {
+    layer,
+    groups,
+    cutterRadiusMm: cutWidthMm / 2,
+    finishAllowanceMm: profileFinishAllowanceMm(settings, cutWidthMm),
+  };
 }
 
 /** Where each operation's cut reaches a part another operation keeps. */
@@ -102,6 +110,7 @@ export function cncKeptPartCuts(
       }
     }
     for (const [keptLayerId, tally] of tallies) {
+      const allowanceMm = operation.finishAllowanceMm;
       found.push({
         layerId: operation.layer.id,
         layerName: operation.layer.name,
@@ -111,10 +120,20 @@ export function cncKeptPartCuts(
         depthMm: tally.deepest.depthMm,
         at: tally.deepest.at,
         cutWidthMm: 2 * operation.cutterRadiusMm,
+        ...(onlyRoughingReaches(tally.deepest.depthMm, allowanceMm)
+          ? { finishAllowanceMm: allowanceMm }
+          : {}),
       });
     }
   }
   return found;
+}
+
+// The roughing ring runs the allowance further out than the finishing pass, so
+// a reach no deeper than the allowance (within the gouge tolerance) is the
+// roughing ring's alone: without the allowance nothing would be reported.
+function onlyRoughingReaches(depthMm: number | null, allowanceMm: number): boolean {
+  return allowanceMm > 0 && depthMm !== null && depthMm <= allowanceMm + KEPT_WALL_TOLERANCE_MM;
 }
 
 /** A cut onto the kept side (null depth) is deepest; otherwise the larger reach. */

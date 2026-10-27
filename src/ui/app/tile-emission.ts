@@ -86,8 +86,12 @@ export function emitTileFiles(
     const bitFiles = numberTileBitFiles(cuttingRuns(runs));
     for (const { body, ...bitFile } of bitFiles) {
       // Reuse the scoped whole-job evidence so per-tile diagnostics never
-      // re-enter V-carve planning once per tile.
-      const { issues } = runCncPreflight(project, machine, body, { compiledJob });
+      // re-enter V-carve planning once per tile. Its positions are whole-job
+      // machine coordinates; this file runs from the tile's own zero.
+      const { issues } = runCncPreflight(project, machine, body, {
+        compiledJob,
+        compiledPositionsHold: false,
+      });
       const blocking = issues.filter((issue) => COMPILE_INTEGRITY_PREFLIGHT_CODES.has(issue.code));
       if (blocking.length > 0) {
         return {
