@@ -141,3 +141,10 @@ Coordinator checks were made on `origin/main` @ `faf5a54f1`; no audited line cha
 | 03 C-D-3 / P3-10 → **P1** | Under Cut selected graphics (or with neighbours' output turned off), lead obstacles come only from the prepared job, so a laser lead burns 0.914 mm into an unselected neighbour part 0.5 mm away with no warning; the whole job burns 0 and warns. ADR-626 clause 4 promises this cannot happen; it was kept as P3 doc drift (Corrected by meta-v1 M6, 2026-10-26) | M6 + refuter REPRO on main adf300522 | open — fix card proposed |
 | 03-P2-9 gap (M6-R1, P2) | With a Line Kerf Offset, an 80 mm plate drawn open with a 0.6–1.0 mm corner gap silently loses compensation and its r5 hole is cut 0.8 mm oversize (#1345 covers gaps up to 0.5 mm only) (Corrected by meta-v1 M6, 2026-10-26) | M6 refuter REPRO | open — fix card proposed |
 | 12-P2-1 (P3 record) | Lowered as "by design" under ADR-500 Amd 1 §2, but #1437 later fixed it as a bug and ADR-440 Amd 3 reversed the basis (Corrected by meta-v1 M6, 2026-10-26) | M6 + refuter | fixed by #1437 |
+
+## Corrections by rolling audit v3 G6 (2026-10-27)
+
+| ID | Summary | Evidence | Status |
+|---|---|---|---|
+| 12-P2-2 → **P1 by effect** (record only) | It was kept at P2 because of reach and because "Frame shows the true outline". Under METHOD §3 neither lowers a P1: Start always runs a Frame, but that beam-off trace compares nothing with the camera picture, so it is not a warning. The defect was a silent position error (Corrected by rolling v3 G6, 2026-10-27) | G6 refuter: `Start` requires a completed Frame, Frame never reads the overlay; ADR-228 Amd 1 Context says the same | fixed (#1373); record corrected |
+| 12-P2-1 → **P1 by effect** (record only) | M6 re-recorded it as a P3 record row; the same Frame reasoning applied. It was a silent camera position error (Corrected by rolling v3 G6, 2026-10-27) | G6 refuter | fixed (#1437); record corrected |
