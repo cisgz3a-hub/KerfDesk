@@ -15,6 +15,10 @@ export function useMachineProfilePersistence(): void {
       // Opening/recovering a file applies that document's hardware, but must not
       // silently replace the independently saved application machine choice.
       if (state.projectDocumentEpoch !== previous.projectDocumentEpoch) return;
+      // An opened file's other machine is saved only once the operator chooses
+      // Use project machine; until then, and after Keep current machine is
+      // undone, no machine edit makes it the app's (ADR-500 Amendment 2).
+      if (state.projectBedReconciliation?.machineChanged === true) return;
       const kind = machineKindOf(state.project.machine);
       if (
         kind === machineKindOf(previous.project.machine) &&

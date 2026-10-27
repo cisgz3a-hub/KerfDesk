@@ -121,8 +121,40 @@ describe('application machine persistence', () => {
     expect(loadLastMachineSelection(localStorage)?.profile).toEqual(saved);
   });
 
-  it('persists genuine CNC hardware edits and their undo/redo after Open', () => {
+  // ADR-500 Amendment 2: the opened file's other machine is not the app's until
+  // the operator chooses Use project machine (rolling audit v4 H4-P1-1, H9-P1-1).
+  it('does not save an opened machine the operator has not chosen', () => {
     openCncFile(true);
+    useStore.getState().updateCncMachine({ params: { safeZMm: 17 } });
+    useStore.getState().updateDeviceProfile({ framingFeedMmPerMin: 2222 });
+    useStore.getState().setMachineKind('laser');
+    useStore.getState().undo();
+    expect(loadLastMachineSelection(localStorage)).toEqual({
+      profile: saved,
+      machineKind: 'laser',
+    });
+  });
+
+  it('never saves the machine rejected with Keep current machine, through Undo and Redo', () => {
+    const mine = { name: 'My machine', bedWidth: 321, bedHeight: 234 };
+    openCncFile(true);
+    useStore.getState().keepCurrentMachineForOpenedProject();
+    expect(useStore.getState().project.device).toMatchObject(mine);
+    useStore.getState().undo();
+    // Undoing Keep brings the file's machine back with its notice, not silently.
+    expect(useStore.getState().project.device.name).toBe('File CNC');
+    expect(useStore.getState().projectBedReconciliation?.machineChanged).toBe(true);
+    useStore.getState().updateDeviceProfile({ framingFeedMmPerMin: 2222 });
+    expect(loadLastMachineSelection(localStorage)?.profile).toMatchObject(mine);
+    useStore.getState().undo();
+    useStore.getState().redo();
+    expect(useStore.getState().projectBedReconciliation?.machineChanged).toBe(true);
+    expect(loadLastMachineSelection(localStorage)?.profile).toMatchObject(mine);
+  });
+
+  it('persists genuine CNC hardware edits and their undo/redo after Use project machine', () => {
+    openCncFile(true);
+    useStore.getState().acceptOpenedProjectMachine();
     useStore.getState().updateCncMachine({ params: { safeZMm: 17 } });
     expect(loadLastMachineSelection(localStorage)).toMatchObject({
       profile: { name: 'File CNC', cncSubProfile: { safeZMm: 17 } },
@@ -148,8 +180,9 @@ describe('application machine persistence', () => {
     expect(loadLastMachineSelection(localStorage)?.profile).toEqual(saved);
   });
 
-  it('persists an explicit mode change and its undo after Open', () => {
+  it('persists an explicit mode change and its undo after Use project machine', () => {
     openCncFile(true);
+    useStore.getState().acceptOpenedProjectMachine();
     useStore.getState().setMachineKind('laser');
     expect(loadLastMachineSelection(localStorage)).toMatchObject({
       profile: { name: 'File CNC' },

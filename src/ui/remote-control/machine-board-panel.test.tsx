@@ -170,6 +170,21 @@ describe('Remote Place Board capture on the real panel (G7-P3-1)', () => {
     expect(capturedBoard()?.spec).toMatchObject({ kind: 'rect', widthMm: 100, heightMm: 50 });
   });
 
+  it('undoes a remote finish and its User Origin in one step (ADR-654 Amendment 2)', async () => {
+    useStore.getState().setJobPlacement({ startFrom: 'absolute', anchor: 'front-left' });
+    await pcCapture(10, 10);
+    await pcCapture(110, 10);
+    await pcCapture(110, 60);
+    await setHead('Idle', 10, 60);
+    expect((await remote('capture_board_point')).state).toBe('completed');
+    expect((await remote('finish_board')).state).toBe('completed');
+    expect(useStore.getState().jobPlacement.startFrom).toBe('user-origin');
+
+    await act(async () => useStore.getState().undo());
+    expect(capturedBoard()).toBeUndefined();
+    expect(useStore.getState().jobPlacement.startFrom).toBe('absolute');
+  });
+
   it('refuses a remote finish the PC would warn about, and leaves the PC able to create it', async () => {
     await pcCapture(10, 10);
     await pcCapture(110, 10);

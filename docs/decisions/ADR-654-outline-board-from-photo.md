@@ -126,3 +126,46 @@ points turned the board 1.9° and moved the G92 corner 6.7 mm. Neither raised a 
 - Reach: desktop 1.0.22 and 1.0.23 carry #1362. Whether the production relay Worker does was not
   observed. If it does not, the defect was latent until the relay redeploy that rolling v2
   01-P2-3 still needs, so this amendment lands before that redeploy.
+
+### Amendment 2 - Undo and Redo restore Start From with the board (2026-10-27)
+
+**Status:** Accepted; unit-tested through the real store and history, and through the real panel
+behind the real remote adapter (`finish_board`). Not hardware-tested. Fixes rolling audit v4
+H9-P2-1 (P1 after its refuter, `docs/audits/2026-10-27-rolling-v3/H9-undo-guards.md` on
+`claude/rolling-audit-v3`).
+
+**Context.** Item 5 says "One Undo step covers the whole change", and ADR-124 capture also switches
+Start From to User Origin. All three Place Board writes (capture, outline registration, and the
+correction that resizes a captured board) pushed the old project onto the Undo stack and set the live
+placement in the same patch. Undo restores the live placement only from the setup context a step
+records with `captureSetupHistoryContext`, as Machine Setup, the Laser/CNC toggle and device
+changes do. No Place Board write recorded it. So Undo took the board and the outline's turn back
+and left Start From at User Origin. In the refuter's repro, a job at Absolute started `G0 X50 Y360`.
+After a rectangle capture and Undo the canvas again showed that layout with no board, but the job
+started `G0 X0 Y10` from the `G92` board corner. An outline registered at 5° lost its turn and still
+burned from the corner (`G0 X10 Y70`). The restored project's own saved placement said Absolute
+while the live setting said User Origin. Start From and Job Review's origin tile name the mode, but
+neither warns of that mismatch. MCP `finish_board` drives the same panel handlers, so it had the
+same gap. Camera **Add target to canvas** (ADR-440 Amendment 5) had the mirror case: it replaced
+the scene in one Undo step and then set Absolute outside it.
+
+**Decision.**
+
+1. **Place Board.** `commitCapturedBoard` (capture, Draw on canvas, and registration with no drawn
+   outline), `registerCapturedOutlineMutation` and `updateCapturedBoardMutation` record the setup
+   context before they change the project. One Undo puts the board, the artwork's turn and Start
+   From back as they were. Redo puts all three back as registered. A later edit that is undone on its
+   own leaves Start From as it is. Desktop and remote `finish_board` share these writes.
+2. **Add target to canvas.** `replaceSceneWithGeneratedScene` takes an optional placement patch.
+   With one, it records the setup context and applies the placement in the same patch as the scene,
+   with the saved job setup kept in step. The target passes `{ startFrom: 'absolute' }` when Start
+   From is not already Absolute, so Undo restores the operator's mode and Redo restores Absolute.
+3. **No new warning.** Undo and Redo can no longer split the canvas from the placement, so neither
+   Job Review nor Start gets a new check (PROJECT.md non-negotiable 21, ADR-565).
+
+**Consequences.**
+
+- Undo of a Place Board step also restores the selection and output scope recorded with it, as
+  Undo of a Machine Setup change already does.
+- The G92 the capture wrote stays on the controller after Undo. Undo restores the Start From the
+  operator had, as at any other time the work offset is set and Absolute is chosen.

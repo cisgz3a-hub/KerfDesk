@@ -6,6 +6,9 @@
 // stayed at scene (100, 100), which burns at (100, 310), while the Camera
 // panel said the picture was moved to match. After an origin change it was
 // still drawn, mirrored, and it survived opening another machine's project.
+// Rolling audit v4 H6-P1-2 (ADR-449 Amendment 2): it was also kept after the
+// material height or a height area over it changed, drawn where the old
+// heights put it.
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -22,6 +25,7 @@ import {
   bedPictureNow,
   bedPictureTakenNow,
   followBedPictureFrame,
+  HEIGHTS_CHANGED,
   ORIGIN_CHANGED,
   OTHER_MACHINE,
   useBedPictureRegion,
@@ -43,6 +47,7 @@ function picture(bedFrame: CameraBedFrame = FRAME_400): BedPicture {
     image: { data: new Uint8ClampedArray(4 * 4 * 4), width: 4, height: 4 },
     region: REGION,
     surfaceHeightMm: 3,
+    heightAreas: [],
     taken: { bedFrame, machine: 'falcon-a1-pro' },
   };
 }
@@ -103,7 +108,13 @@ describe('following Machine Setup and Open', () => {
     resetStore();
     useStore.setState({ project: createProject(MACHINE) });
     useToastStore.setState({ toasts: [] });
-    useCameraStore.setState({ bedPicture: null, overlayStill: null, overlayVisible: true });
+    useCameraStore.setState({
+      bedPicture: null,
+      overlayStill: null,
+      overlayVisible: true,
+      surfaceHeightMm: 3,
+      heightAreas: [],
+    });
     stop = followBedPictureFrame();
   });
 
@@ -144,6 +155,36 @@ describe('following Machine Setup and Open', () => {
     expect(useCameraStore.getState().bedPicture).toBeNull();
     expect(toasts()).toContain(OTHER_MACHINE);
   });
+
+  it('clears the picture when the material height changes after it was taken, and says why', () => {
+    capture();
+    // The audit's scenario B: taken at one height, Material height set to another.
+    useCameraStore.getState().setSurfaceHeightMm(6);
+    expect(useCameraStore.getState().bedPicture).toBeNull();
+    expect(toasts()).toEqual([HEIGHTS_CHANGED]);
+  });
+
+  it('clears the picture when a height area over it changes, and keeps it for one elsewhere', () => {
+    const taken = capture();
+    const elsewhere = { id: 'far', x: 300, y: 300, width: 20, height: 20, surfaceHeightMm: 20 };
+    useCameraStore.getState().addHeightArea(elsewhere);
+    expect(useCameraStore.getState().bedPicture).toBe(taken);
+    // A box standing on the pictured part of the bed, which the picture flattened at 3 mm.
+    const box = { id: 'box', x: 120, y: 120, width: 20, height: 20, surfaceHeightMm: 20 };
+    useCameraStore.getState().addHeightArea(box);
+    expect(useCameraStore.getState().bedPicture).toBeNull();
+    expect(toasts()).toEqual([HEIGHTS_CHANGED]);
+  });
+
+  it('keeps a picture flattened with a height area while the area stays as it was', () => {
+    const box = { id: 'box', x: 120, y: 120, width: 20, height: 20, surfaceHeightMm: 20 };
+    useCameraStore.getState().addHeightArea(box);
+    const taken = { ...picture(), heightAreas: [box], taken: bedPictureTakenNow() };
+    useCameraStore.getState().setBedPicture(taken);
+    expect(useCameraStore.getState().bedPicture).toBe(taken);
+    useCameraStore.getState().updateHeightArea('box', { surfaceHeightMm: 25 });
+    expect(useCameraStore.getState().bedPicture).toBeNull();
+  });
 });
 
 describe('useBedPictureRegion', () => {
@@ -157,6 +198,7 @@ describe('useBedPictureRegion', () => {
   beforeEach(() => {
     resetStore();
     useStore.setState({ project: createProject(MACHINE) });
+    useCameraStore.setState({ surfaceHeightMm: 3, heightAreas: [] });
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
@@ -174,6 +216,14 @@ describe('useBedPictureRegion', () => {
     act(() => useStore.getState().updateDeviceProfile({ bedHeight: 410 }));
     expect(JSON.parse(container.textContent ?? '')).toEqual({ ...REGION, y: 110 });
     act(() => useStore.getState().updateDeviceProfile({ origin: 'rear-left' }));
+    expect(JSON.parse(container.textContent ?? '')).toBeNull();
+  });
+
+  it('draws nothing while the material height differs from the one it was flattened at', () => {
+    const taken = picture();
+    act(() => root.render(<Probe picture={taken} />));
+    expect(JSON.parse(container.textContent ?? '')).toEqual(REGION);
+    act(() => useCameraStore.getState().setSurfaceHeightMm(6));
     expect(JSON.parse(container.textContent ?? '')).toBeNull();
   });
 });

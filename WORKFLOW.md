@@ -1654,6 +1654,22 @@ the completed physical Frame is the spatial source of truth.
    says when the camera calibration changes with it. When the file has the same machine and only
    its bed size differs, the notice gives both bed sizes, and **Keep current machine** comes first
    as the primary choice (ADR-440 Amendment 5).
+4. **Keep current machine** is one Undo step, named in the Undo list. Undoing it brings back the
+   file's machine together with the notice, so the question is asked again; Redo answers it again.
+   No Undo of an older edit, and no Redo, puts the file's machine back without the notice
+   (ADR-440 Amendment 6).
+
+#### Edge — the file carries an older copy of this machine (ADR-500 Amendment 2)
+1. A file for the machine already in use (same profile, name and bed) keeps this machine's whole
+   setup: origin, homing, no-go zones, scan offsets, controller, rotary setup, saved positions,
+   feeds, S range, air assist, Z setup and the CNC head's machine values. The file keeps its own
+   artwork, operations, stock, bits and job placement.
+2. When the file held other values, an info toast names them: `This file's machine settings were
+   not used (origin and no-go zones): your machine keeps its current setup from Machine Setup.`
+   To use the file's values, set them in Machine Setup.
+3. While a notice for another machine is open, no machine edit is remembered for the next session.
+   **Use project machine** answers it, and the next change to the machine saves that machine.
+   **Keep current machine** keeps yours.
 
 #### Edge — the file carries an Auto-focus command (ADR-400 Amendments 1 and 2)
 1. On load, an Auto-focus command that is not a focus routine is cleared, as a refused
@@ -3120,9 +3136,14 @@ authorization, Frame proof, controller command, or safety boundary.
   restore offers **Home machine** beside **Restore saved origin**: the operator homes and puts
   the origin back without closing the Review.
 - A recorded cause names what happened: **Abort** is recorded as stopped by the operator, and
-  closing or reloading KerfDesk mid-job as the app closing (its stop may not have arrived);
+  closing or reloading KerfDesk mid-job as the app closing, which sends Abort as it closes;
   only a stop nobody requested reads as unexplained. A recovery card another window has
   claimed, started or discarded refreshes in every open window.
+- Every stop that throws the controller's planner away steps the automatic restart back over the
+  moves it still had queued: Abort, a rejected line, a reboot, the reset KerfDesk sends when the
+  stream stalls or a job write fails, and the Abort the app sends as it closes. A run left active
+  by a crash, reload or power loss steps back over its controller's whole planner from the
+  progress last saved. The restart hint names the bound (ADR-398 Amendment 5).
 - **Start from line… → Choose restart point…** prepares the current project and opens the
   same route picker when a saved exact artifact is unavailable. This manual path requires the
   original work zero and preserves its existing disclosure that it creates no recovery record.
@@ -3136,6 +3157,12 @@ authorization, Frame proof, controller command, or safety boundary.
   the project's full program this control replays, so the field is not filled in and the hint
   points to the card's Review. The dialog and confirmation say which program the line counts
   (ADR-341 Amendment 10).
+  A Print-and-Cut or variable-text job is prepared as Start prepares it. Variable text keeps the
+  matched run's evaluation time, so dates and times match the part already burned. The job is
+  registered to the marks captured now when they are valid, else to the marks the matched run
+  used in this session; with neither, the restart is refused with Start's message, as it is
+  while Labs has Print and Cut switched off. The dialog and confirmation name the marks used,
+  and how far marks captured since move the job (ADR-443 Amendment 2).
   Costly image/fill preparation runs in the background for both manual and fingerprint-based
   recovery; worker failure is retryable and never falls back to blocking the canvas.
 - Recovery preserves the saved scope and resolved placement. It uses its separate source,
@@ -8724,7 +8751,16 @@ as the pane's design record.
   the nudge ring and the saved calibration (Amendment 7).
 - **Warning / camera placement with a relative Start from.** With camera placement on and Start
   from not Absolute Coordinates, Job Review says the job burns where that origin puts it, not where
-  the artwork sits on the camera picture. Advice only (ADR-228 Amendment 1).
+  the artwork sits on the camera picture. Advice only (ADR-228 Amendment 1). Camera placement turns
+  on as soon as the canvas draws a camera picture, including one from a camera that started by
+  itself with the Camera panel closed; it stays on when the picture is hidden, until **Exit camera
+  placement** (ADR-663 Amendment 4).
+- **Warning / camera placement on a Place Board job.** A job laid out on a Place Board outline is
+  told instead that it burns on the board registered at User Origin, and to lay the artwork out on
+  the outline rather than on the board in the camera picture; it is never told to choose Absolute
+  Coordinates. With Absolute Coordinates, camera or not, Job Review says the job burns at the
+  outline's centred place on the canvas, not on the board, and to choose User Origin (ADR-654
+  Amendment 3).
 - **Edge / minimized wizard.** The wizard can minimize into a small non-modal panel so the
   operator can watch the camera and reach the machine while the target engraves.
 - **Fix / a small offset (ADR-663 Amendment 2).** For a calibrated camera fixed above the bed,
@@ -9032,6 +9068,17 @@ as the pane's design record.
   and shows one joined top-down picture of the area on the canvas.
 - **Success / check.** **Check camera** on a head camera measures the saved calibration from
   wherever the head is for the check photo.
+- **Edge / Z (ADR-449 Amendment 2).** The camera rides up and down with the head, so a calibration
+  records the head's machine Z with its XY, and the panel says it ("Calibrated with the head at
+  machine Z 12.30 mm …"). After autofocus or a Z move of more than 0.2 mm, the picture, Trace from
+  camera, Find pieces and the captures are not used: the panel and **Capture** say "The head is at
+  machine Z … Move Z back to … mm, or calibrate the camera again at this height." A calibration
+  saved before Z was recorded is used at any Z, and the panel states the rule instead.
+- **Edge / raised objects and material height (ADR-449 Amendment 2).** The joined picture is
+  flattened at the material height and the height areas set when it is captured, each area at its
+  own height, and the areas are outlined on it as on the live picture. When the material height,
+  or a height area over the pictured part of the bed, changes afterwards, the picture is cleared
+  and a notice says to capture again. The burn check's picture follows the same rule.
 - **Edge / stop.** **Stop** cancels the move in progress. The panel says how many pictures were
   taken and shows them.
 - **Edge / out of reach.** When the head cannot travel far enough for the camera to see an edge

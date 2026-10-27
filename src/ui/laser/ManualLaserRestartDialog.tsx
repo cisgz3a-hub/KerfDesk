@@ -21,7 +21,7 @@ export function ManualLaserRestartDialog(props: {
   readonly initialLine: number;
   readonly onClose: () => void;
 }): JSX.Element {
-  const { source: prepared, placementNote, programNote } = props.restart;
+  const { source: prepared, placementNote, programNote, timeBoundNote } = props.restart;
   const maximumLine = prepared.canvasPlan.fingerprint.lines;
   // The preparation already parsed this program; packing it is a linear copy.
   const route = useMemo(
@@ -80,6 +80,7 @@ export function ManualLaserRestartDialog(props: {
       />
       <p>{programNote}</p>
       <p>{placementNote}</p>
+      {timeBoundNote === undefined ? null : <p>{timeBoundNote}</p>}
       <ManualRestartExplanation />
       {failure === '' ? null : <p role="alert">{failure}</p>}
       <ManualRestartActions starting={starting} onCancel={close} onStart={() => void start()} />

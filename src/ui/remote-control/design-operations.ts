@@ -1,8 +1,15 @@
-import { DEFAULT_CNC_LAYER_SETTINGS, type Layer } from '../../core/scene';
+import {
+  DEFAULT_CNC_LAYER_SETTINGS,
+  layerCncTool,
+  type CncLayerSettings,
+  type Layer,
+} from '../../core/scene';
+import { cncKeptFeedsAfterBitChange, cncKeptFeedsMessage } from '../layers/CncKeptFeedsNotice';
 import { operationProFeature } from '../licensing/pro-operation-policy';
 import { proFeaturesUnlocked } from '../licensing/edition';
 import type { AppState } from '../state/store';
 import { withManualCncFeedPatch } from '../state/cnc-feed-provenance';
+import { cncSettingsAfterOperationChoice } from '../state/cnc-operation-choice';
 import { historyProjection } from './authoring-projections';
 import { RemoteFault } from './fault';
 import { publicIdentifier } from './projections';
@@ -163,16 +170,67 @@ function ordinaryUpdates(layer: Layer, patch: RemoteOperationPatchFull) {
 }
 
 /** Merged CNC settings; introducing a Pro strategy keeps the desktop Pro admission. */
-function cncUpdate(layer: Layer, patch: RemoteOperationPatchFull): Layer['cnc'] | undefined {
+function cncUpdate(
+  state: AppState,
+  layer: Layer,
+  patch: RemoteOperationPatchFull,
+): { readonly settings: CncLayerSettings; readonly message?: string } | undefined {
   if (patch.cnc === undefined) return undefined;
-  const defined = Object.fromEntries(
+  const { toolId, ...values } = Object.fromEntries(
     Object.entries(patch.cnc).filter(([, value]) => value !== undefined),
-  ) as Partial<NonNullable<Layer['cnc']>>;
-  const next = withManualCncFeedPatch(layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS, defined);
+  ) as Partial<CncLayerSettings>;
+  const current = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
+  const withBit = toolId === undefined ? current : afterBitChange(state, layer, current, toolId);
+  const next = withManualCncFeedPatch(withBit, values);
   const feature = operationProFeature({ cnc: next });
   if (feature !== null && feature !== operationProFeature(layer) && !proFeaturesUnlocked())
     throw new RemoteFault('needs_pro');
-  return next;
+  const message = toolId === undefined ? undefined : keptFeedsMessage(state, layer, current, next);
+  return message === undefined ? { settings: next } : { settings: next, message };
+}
+
+/**
+ * A remote bit change takes the Artwork card's path: a material-recipe operation is
+ * recalculated for the new bit and a manual one keeps its values (ADR-306 Amendment 3 item 2,
+ * ADR-233 decision 5). A bit missing from Machine Setup's library is refused (Amendment 4).
+ */
+function afterBitChange(
+  state: AppState,
+  layer: Layer,
+  settings: CncLayerSettings,
+  toolId: string,
+): CncLayerSettings {
+  const machine = state.project.machine;
+  if (machine?.kind !== 'cnc' || !machine.tools.some((tool) => tool.id === toolId))
+    throw new RemoteFault('invalid_arguments');
+  const choice = { toolId };
+  const { device: profile } = state.project;
+  const { cncLiveCaps: liveCaps } = state;
+  return (
+    cncSettingsAfterOperationChoice({ layer, settings, machine, profile, liveCaps, choice }) ??
+    settings
+  );
+}
+
+/** The card's kept-values note for a manual operation, named in the receipt (Amendment 3 item 3). */
+function keptFeedsMessage(
+  state: AppState,
+  layer: Layer,
+  before: CncLayerSettings,
+  after: CncLayerSettings,
+): string | undefined {
+  const machine = state.project.machine;
+  if (machine?.kind !== 'cnc') return undefined;
+  const kept = cncKeptFeedsAfterBitChange({
+    machine,
+    layerId: layer.id,
+    before,
+    after,
+    materialKey: null,
+  });
+  return kept === null
+    ? undefined
+    : cncKeptFeedsMessage(kept, layerCncTool(machine, after).name, 'mm');
 }
 
 /** Existing ordinary fields only. CNC strategy changes keep the desktop Pro admission. */
@@ -185,9 +243,9 @@ export function updateOperationFull(
   const layer = operationLayer(state, operationId);
   assertPatchFitsMachine(state.project.machine?.kind === 'cnc', patch);
   const { updates, changedFields } = ordinaryUpdates(layer, patch);
-  const cnc = cncUpdate(layer, patch);
+  const cnc = cncUpdate(state, layer, patch);
   if (cnc !== undefined) {
-    updates.cnc = cnc;
+    updates.cnc = cnc.settings;
     changedFields.push('cnc');
   }
   const name = patch.name !== undefined && patch.name !== layer.name ? patch.name : null;
@@ -197,16 +255,17 @@ export function updateOperationFull(
       if (Object.keys(updates).length > 0) store.getState().setLayerParam(layer.id, updates);
       if (name !== null) store.getState().renameOperation(layer.id, name);
     });
-  return receipt(store, { operationId: layer.id, changedFields });
+  return receipt(store, {
+    operationId: layer.id,
+    changedFields,
+    ...(cnc?.message === undefined ? {} : { message: cnc.message }),
+  });
 }
 
 /** Runs several ordinary actions as one Undo step; nested calls join the outer step. */
-export function inOneUndoStep(store: RemoteAppStore, run: () => void): void {
+export function inOneUndoStep<T>(store: RemoteAppStore, run: () => T): T {
   const state = store.getState();
-  if (state.pendingUndo !== null) {
-    run();
-    return;
-  }
+  if (state.pendingUndo !== null) return run();
   state.beginInteraction();
   const ownedUndo = store.getState().pendingUndo;
   const ownsInteraction = () => {
@@ -225,13 +284,15 @@ export function inOneUndoStep(store: RemoteAppStore, run: () => void): void {
     )
       throw new RemoteFault('stale_revision');
   };
+  let result: T;
   try {
     assertCurrent();
-    run();
+    result = run();
     assertCurrent();
   } catch (error) {
     if (ownsInteraction()) store.getState().cancelInteraction();
     throw error;
   }
   store.getState().endInteraction();
+  return result;
 }

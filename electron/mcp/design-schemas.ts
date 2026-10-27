@@ -283,6 +283,29 @@ const designWrite = z.object({
   message: z.string().max(2048).optional(),
 });
 
+/** What an import showed on the PC, and the bed fit it applied (ADR-125 Amendment 2). */
+const importNotices = {
+  notices: z
+    .array(
+      z.object({
+        level: z.enum(['info', 'success', 'warning', 'error']),
+        message: z.string().max(2048),
+      }),
+    )
+    .max(20)
+    .optional(),
+  bedFit: z
+    .object({
+      scale: z.number(),
+      fileWidthMm: z.number(),
+      fileHeightMm: z.number(),
+      bedWidthMm: z.number(),
+      bedHeightMm: z.number(),
+    })
+    .optional(),
+};
+const importWrite = designWrite.extend(importNotices);
+
 export const mcpDesignOutputSchemas = {
   get_workspace_scene: mcpSceneOutputSchema,
   wait_for_change: z.object({
@@ -296,8 +319,8 @@ export const mcpDesignOutputSchemas = {
   reorder_operation: designWrite,
   delete_operation: designWrite,
   apply_material_recipe: designWrite,
-  add_svg: designWrite,
-  import_file: designWrite,
+  add_svg: importWrite,
+  import_file: importWrite,
   save_project: designWrite,
   apply_edits: designWrite.extend({
     results: z
@@ -306,6 +329,7 @@ export const mcpDesignOutputSchemas = {
           command: z.string().max(64),
           changedArtworkIds: z.array(id).max(200).optional(),
           operationId: id.optional(),
+          ...importNotices,
         }),
       )
       .max(40)

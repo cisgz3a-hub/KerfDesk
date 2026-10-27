@@ -8,7 +8,8 @@
 // canvas renderer uses, so the picture tracks zoom and pan. Sources, in
 // priority order: a head camera's stitched picture of the bed (ADR-449), a
 // captured still (LightBurn's Update Overlay model), else the live camera,
-// whichever kind it is.
+// whichever kind it is. Drawing one latches camera placement, however the
+// camera started (ADR-663 Amendment 4).
 
 import { useMemo, useState } from 'react';
 import type { CameraModelRecord } from '../../core/camera/model/camera-model-record';
@@ -16,6 +17,7 @@ import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
 import { useUiStore } from '../state/ui-store';
 import { useActiveCameraModel } from './active-camera-model';
+import { useCameraPlacementLatch } from './camera-placement-latch';
 import { computeView } from '../workspace/view-transform';
 import { CameraAccuracyMap } from './accuracy/CameraAccuracyMap';
 import { CameraSourceView } from './CameraSourceView';
@@ -35,6 +37,7 @@ export function WorkspaceCameraOverlay(): JSX.Element | null {
   const model = useActiveCameraModel();
   const visible = useCameraStore((s) => s.overlayVisible);
   const bedPicture = useCameraStore((s) => s.bedPicture);
+  useCameraPlacementLatch(model);
   if (!visible) return null;
   // Already on the bed's own grid, so it needs no model (or head position).
   if (bedPicture !== null) return <BedPictureOverlay picture={bedPicture} />;

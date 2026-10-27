@@ -83,9 +83,8 @@ export function useCalibrationPhoto(): CalibrationPhotoControls {
     };
     runRef.current = run;
     wizard.setStep(run.step);
-    // The head is read in today's frame; the fit is in the frame the rings were
-    // placed in, and the saved calibration is measured in that frame too.
-    const head = wizard.settings.headCamera ? headPositionNow() : null;
+    // The fit is in the frame the rings were placed in, and the saved
+    // calibration is measured in that frame too.
     const savedHere = saved === undefined ? undefined : modelInBedFrame(saved, assumed.bedFrame);
     try {
       const outcome = await photographTarget({
@@ -96,7 +95,7 @@ export function useCalibrationPhoto(): CalibrationPhotoControls {
         area: assumed.area,
         bedFrame: assumed.bedFrame,
         ...(savedHere === undefined ? {} : { saved: savedHere }),
-        headMm: head === null ? null : headInTargetFrame(head, assumed.bedFrame),
+        ...headAtPhoto(wizard.settings.headCamera, assumed.bedFrame),
         signal: run.controller.signal,
       });
       publish(
@@ -127,8 +126,16 @@ function refused(assumed: AssumedTarget): boolean {
   return true;
 }
 
-function headInTargetFrame(head: Vec2, target: CameraBedFrame): Vec2 {
-  return sceneInBedFrame(head, cameraBedFrameNow(), target);
+// Where a head camera's head is for the photo: read in today's frame, given in
+// the frame the rings were placed in, with its machine Z (ADR-449 Amendment 2).
+function headAtPhoto(
+  headCamera: boolean,
+  target: CameraBedFrame,
+): { readonly headMm: Vec2 | null; readonly headZMm: number | null } {
+  const head = headCamera ? headPositionNow() : null;
+  return head === null
+    ? { headMm: null, headZMm: null }
+    : { headMm: sceneInBedFrame(head, cameraBedFrameNow(), target), headZMm: head.z };
 }
 
 function isCurrent(runRef: RunRef, run: PhotoRun): boolean {

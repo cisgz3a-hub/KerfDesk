@@ -149,7 +149,8 @@ function rememberTarget(
  * operator who engraves it like any job: Frame, review and Start, or later
  * from another session. The rings are locked so a stray drag cannot move them
  * off the bed positions the photo will look for, and Start from becomes
- * Absolute Coordinates, the only mode that burns them there. The bed frame
+ * Absolute Coordinates, the only mode that burns them there, in the same Undo
+ * step (ADR-654 Amendment 2). The bed frame
  * remembered here stands only until a Start streams the rings, which takes
  * it again (canvas-target-burn.ts, ADR-440 Amendment 5).
  */
@@ -158,11 +159,14 @@ export function addCalibrationTargetToCanvas(settings: CalibrationSettings): voi
   const { device } = store.project;
   const area = calibrationTargetArea(device.bedWidth, device.bedHeight, settings);
   const pattern = targetPattern(area, settings);
-  store.replaceSceneWithGeneratedScene({
-    ...pattern.scene,
-    objects: pattern.scene.objects.map((object) => ({ ...object, locked: true })),
-  });
-  if (store.jobPlacement.startFrom !== 'absolute') store.setJobPlacement({ startFrom: 'absolute' });
+  store.replaceSceneWithGeneratedScene(
+    {
+      ...pattern.scene,
+      objects: pattern.scene.objects.map((object) => ({ ...object, locked: true })),
+    },
+    false,
+    store.jobPlacement.startFrom === 'absolute' ? undefined : { startFrom: 'absolute' },
+  );
   rememberTarget(device, settings, area, cameraBedFrameFor(device, useLaserStore.getState()), true);
 }
 
@@ -183,6 +187,8 @@ export async function photographTarget(args: {
   readonly saved?: CameraModelRecord;
   /** The head's bed position now, in the target's bed frame, for a camera on the head; null when unknown. */
   readonly headMm?: Vec2 | null;
+  /** The head's machine Z (mm) now, which the calibration holds at (ADR-449 Amendment 2). */
+  readonly headZMm?: number | null;
   readonly signal?: AbortSignal;
   readonly now?: () => Date;
 }): Promise<PhotoOutcome> {
@@ -219,6 +225,7 @@ export async function photographTarget(args: {
     targetRingDiameterMm: settings.ringDiameterMm,
     calibratedAt: (args.now ?? (() => new Date()))(),
     headAtCalibrationMm: head,
+    headZAtCalibrationMm: args.headZMm,
     ...(args.bedFrame === undefined ? {} : { bedFrame: args.bedFrame }),
   });
   const savedCheck =

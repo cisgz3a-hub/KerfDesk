@@ -1,6 +1,7 @@
 // The head camera's capture from the Camera panel (ADR-449): what it asks for
 // before it can capture, and Capture here turning one picture into a
-// top-down picture on the canvas where the head is.
+// top-down picture on the canvas where the head is, flattened at the height
+// areas and refused away from the calibration's Z (Amendment 2).
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CameraCaptureBinding } from '../../../core/camera/camera-capture-binding';
@@ -25,7 +26,7 @@ import {
   useHeadCaptureStore,
 } from './head-capture-store';
 
-let head: Vec2 | null = null;
+let head: (Vec2 & { readonly z?: number }) | null = null;
 const initialLaser = useLaserStore.getState();
 
 vi.mock('./head-position', () => ({
@@ -91,6 +92,7 @@ beforeEach(() => {
     bedPicture: null,
     overlayVisible: false,
     surfaceHeightMm: 0,
+    heightAreas: [],
   });
   useHeadCaptureStore.setState({ state: { kind: 'idle' } });
   vi.mocked(captureSourceFrame).mockReset();
@@ -163,6 +165,65 @@ describe('captureWithHeadCamera', () => {
     expect(region.width).toBeGreaterThan(40);
     expect(picture.image.width).toBe(Math.round(region.width * 4));
     expect(useCameraStore.getState().overlayVisible).toBe(true);
+  });
+
+  // Rolling audit v4 H6-P1-2: the picture was flattened at the material height
+  // alone, so a box with its own height area was drawn off.
+  it('flattens the picture with the height areas set now, and keeps them with it', async () => {
+    goLive();
+    head = { x: 80, y: 220, z: 0 };
+    const box = { id: 'box', x: 80, y: 210, width: 15, height: 15, surfaceHeightMm: 20 };
+    useCameraStore.setState({ surfaceHeightMm: 3, heightAreas: [box] });
+    useLaserStore.setState({
+      connection: { kind: 'connected' } as typeof initialLaser.connection,
+      motionOperation: null,
+      statusReport: {
+        state: 'Idle',
+        subState: null,
+        mPos: { x: 80, y: 220, z: 0 },
+        wPos: null,
+        wco: null,
+        feed: 0,
+        spindle: 0,
+      },
+    });
+    const grey = {
+      data: new Uint8ClampedArray(1280 * 720 * 4).fill(128),
+      width: 1280,
+      height: 720,
+    };
+    vi.mocked(captureSourceFrame).mockResolvedValue(grey);
+    await captureWithHeadCamera({ kind: 'here' });
+    expect(useCameraStore.getState().bedPicture).toMatchObject({
+      surfaceHeightMm: 3,
+      heightAreas: [box],
+    });
+  });
+
+  // Rolling audit v4 H6-P2-1: the calibration holds only at the Z it was taken at.
+  it('refuses to capture while the head is away from the Z it was calibrated at', async () => {
+    goLive();
+    const project = useStore.getState().project;
+    const calibratedAtZ = {
+      ...onHead,
+      mount: {
+        kind: 'head' as const,
+        headAtCalibrationMm: { x: 200, y: 150 },
+        headZAtCalibrationMm: 10,
+      },
+    };
+    useStore.setState({
+      project: { ...project, device: { ...project.device, cameraModel: calibratedAtZ } },
+    });
+    // After autofocus on a 6 mm sheet the head stands 6 mm away from where it was.
+    head = { x: 80, y: 220, z: 16 };
+    await captureWithHeadCamera({ kind: 'here' });
+    expect(useHeadCaptureStore.getState().state).toEqual({
+      kind: 'failed',
+      message:
+        'The head is at machine Z 16.00 mm, but this camera was calibrated with it at Z 10.00 mm, so its picture would not line up with the burn. Move Z back to 10.00 mm, or calibrate the camera again at this height.',
+    });
+    expect(captureSourceFrame).not.toHaveBeenCalled();
   });
 
   // Rolling audit 12-P2-3. Each capture move is "the same beam-off jog as
