@@ -20,6 +20,7 @@ import { createExecutionProvenance } from '../state/recovery/execution-provenanc
 import type { ExecutionProvenanceEvidenceV2 } from '../state/recovery/execution-workflow-evidence';
 import type { PreparedRecoverySource } from './start-job-source';
 import { cleanupRejectedRecoveryAttempt } from './recovery-attempt-cleanup';
+import { assertCncRecoveryOpenProject } from './cnc-recovery-open-project';
 import { finalRecoveryStartAssertion } from './recovery-start-authorization';
 
 // `recovery.job` is the newly generated recovery Job — the runway flow passes
@@ -97,6 +98,7 @@ export async function streamCncRecoveryProgram(
       runId: recoveryRunId,
       assertFinalStartAuthorized: () => {
         assertRecoveryStartAuthorized();
+        assertCncRecoveryOpenProject();
         planned.assertFinalStartConditions?.();
       },
       streamingMode: streamingModeForController(
@@ -105,6 +107,10 @@ export async function streamCncRecoveryProgram(
       ),
       rxBufferBytes: planned.source.project.device.rxBufferBytes,
       machineKind: 'cnc',
+      // The hold lifts to the saved job's safe Z, not the open project's.
+      ...(planned.source.project.machine === undefined
+        ? {}
+        : { jobMachine: planned.source.project.machine }),
       cncSetupAttestation,
       ...toolPlanOption(planned.recovery),
       canvasPlan,

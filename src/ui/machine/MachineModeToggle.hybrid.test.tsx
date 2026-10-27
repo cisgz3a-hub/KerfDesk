@@ -210,6 +210,32 @@ describe('MachineModeToggle during a job', () => {
     }
   });
 
+  // ADR-416 Amendment 3 (rolling audit v3 G2-P1-1): the lock pins the job's
+  // mode, so a CNC job held with a Laser project open can get CNC back.
+  it('offers only the running job mode when the open project is on the other one', async () => {
+    useStore.setState((state) => ({
+      project: { ...state.project, machine: LASER_MACHINE_CONFIG },
+    }));
+    useLaserStore.setState({
+      streamer: { ...createStreamer('G0 Z5\nM0\nG0 Z5\n'), status: 'tool-change', inFlight: [] },
+      activeJobMachineKind: 'cnc',
+    });
+    const { host, root } = await renderToggle();
+    try {
+      expect(modeButton(host, 'CNC').disabled).toBe(false);
+      await act(async () => modeButton(host, 'CNC').click());
+      expect(machineKindOf(useStore.getState().project.machine)).toBe('cnc');
+      const laser = modeButton(host, 'Laser');
+      expect(laser.disabled).toBe(true);
+      await act(async () => laser.click());
+      expect(machineKindOf(useStore.getState().project.machine)).toBe('cnc');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+      useLaserStore.setState({ activeJobMachineKind: null });
+    }
+  });
+
   it('switches again once the job has ended', async () => {
     useStore.setState((state) => ({
       project: { ...state.project, machine: DEFAULT_CNC_MACHINE_CONFIG },

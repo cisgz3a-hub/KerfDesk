@@ -1,5 +1,5 @@
 import type { CreateStreamerOptions } from '../../core/controllers/grbl';
-import type { MachineKind } from '../../core/scene';
+import type { MachineConfig, MachineKind } from '../../core/scene';
 import { normalizeGrblRxBufferBytes } from '../../core/grbl-streaming';
 import type { CanvasMotionPlan } from './canvas-motion-plan';
 import type { CanvasJobTimingPlanResult } from './canvas-job-timing-plan';
@@ -26,6 +26,11 @@ export type StartJobOptions = CreateStreamerOptions & {
    * the final authorization assertion and before streamer creation. */
   readonly framedRunPermit?: FramedRunPermit;
   readonly machineKind?: MachineKind;
+  /** The machine the program was compiled for, when it is not the open
+   *  project's: a CNC recovery replays its saved project's. A point move in the
+   *  job's hold lifts to its safe Z (ADR-416 Amendment 3). Default: the open
+   *  project's machine at Start. */
+  readonly jobMachine?: MachineConfig;
   readonly cncToolPlan?: ReadonlyArray<CncToolPlanEntry>;
   readonly cncSetupAttestation?: CncSetupAttestation;
   /** Session-bound $30/$32 evidence or acknowledgement plus exact-program M7-shape binding. */

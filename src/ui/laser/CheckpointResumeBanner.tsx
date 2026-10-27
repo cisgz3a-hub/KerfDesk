@@ -22,6 +22,7 @@ import { useRecoveryRepositorySelection } from '../state/use-recovery-repository
 import { CncPassRecoveryWizard } from './CncPassRecoveryWizard';
 import { LaserRecoveryReviewDialog } from './LaserRecoveryReviewDialog';
 import { frameRemainingRecoveryArea } from './laser-recovery-frame';
+import { CNC_RECOVERY_OPEN_PROJECT_NOTE } from './cnc-recovery-open-project';
 import { runLaserRecoveryCapsuleFlow } from './laser-recovery-flow';
 import { moveHeadToWorkPoint } from './laser-recovery-move';
 
@@ -216,6 +217,7 @@ function RecoveryDescription({
         Saved {capsule.artifact.machineKind === 'cnc' ? 'router' : 'laser'} run
         {startedAt === null ? '' : ` from ${startedAt}`}. It is isolated from the current canvas,
         project, profile, controller settings, origins, and ordinary Start.
+        {capsule.artifact.machineKind === 'cnc' ? ` ${CNC_RECOVERY_OPEN_PROJECT_NOTE}` : ''}
       </p>
       <p style={textStyle}>
         {exact

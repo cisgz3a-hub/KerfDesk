@@ -4,7 +4,9 @@
 // remains reachable as the advanced option (demoted per ADR-215 decision 4).
 
 import { useMemo, useRef, useState } from 'react';
+import { machineKindOf } from '../../core/scene';
 import { Dialog, DialogActions } from '../kit';
+import { useStore } from '../state';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import type { RecoveryCapsule } from '../state/recovery';
@@ -12,6 +14,7 @@ import { CncPassRecoveryChecklist } from './CncPassRecoveryChecklist';
 import { CncPassRecoveryPreview } from './CncPassRecoveryPreview';
 import { CncRecoveryPreviewWizard } from './CncRecoveryPreviewWizard';
 import { runCncPassRecoveryFlow } from './cnc-pass-recovery-flow';
+import { CNC_RECOVERY_NEEDS_CNC_PROJECT } from './cnc-recovery-open-project';
 import { cncExtractionGuidance } from './cnc-pass-recovery-guidance';
 import { buildCncPassRecoveryModel } from './cnc-pass-recovery-model';
 import { isLaterThanDefault, type CncPassRecoveryChecklistDraft } from './cnc-pass-recovery-review';
@@ -43,19 +46,17 @@ export function CncPassRecoveryWizard(props: {
   const [checklist, setChecklist] = useState<CncPassRecoveryChecklistDraft>(EMPTY_CHECKLIST);
   const [starting, setStarting] = useState(false);
   const startInFlight = useRef(false);
+  // Its bit-change holds are worked from the open project (ADR-416 Amendment 3).
+  const cncProjectOpen = useStore((state) => machineKindOf(state.project.machine) === 'cnc');
   if (advancedOpen) {
     return <CncRecoveryPreviewWizard capsule={props.capsule} onClose={props.onClose} />;
   }
   const closeReadOnly = (): void => {
     if (!startInFlight.current) props.onClose();
   };
-  const checklistComplete =
-    checklist.cutterClear &&
-    checklist.spindleStopped &&
-    checklist.workholdingConfirmed &&
-    checklist.toolConfirmed &&
-    checklist.position !== null;
-  const canStart = model.kind === 'ready' && selection !== null && checklistComplete && !starting;
+  const reviewed =
+    model.kind === 'ready' && selection !== null && checklistIsComplete(checklist) && !starting;
+  const canStart = reviewed && cncProjectOpen;
   const startRecovery = async (): Promise<void> => {
     const position = checklist.position;
     if (!canStart || selection === null || position === null || startInFlight.current) return;
@@ -80,6 +81,7 @@ export function CncPassRecoveryWizard(props: {
   return (
     <Dialog title="CNC job recovery" size="lg" onClose={closeReadOnly}>
       <ExtractionGuidance capsule={props.capsule} />
+      <OpenProjectRefusal cncProjectOpen={cncProjectOpen} />
       {model.kind === 'unavailable' ? (
         <div style={refusalStyle}>{model.reason}</div>
       ) : (
@@ -100,6 +102,25 @@ export function CncPassRecoveryWizard(props: {
         onStart={() => void startRecovery()}
       />
     </Dialog>
+  );
+}
+
+function checklistIsComplete(checklist: CncPassRecoveryChecklistDraft): boolean {
+  return (
+    checklist.cutterClear &&
+    checklist.spindleStopped &&
+    checklist.workholdingConfirmed &&
+    checklist.toolConfirmed &&
+    checklist.position !== null
+  );
+}
+
+function OpenProjectRefusal(props: { readonly cncProjectOpen: boolean }): JSX.Element | null {
+  if (props.cncProjectOpen) return null;
+  return (
+    <div role="alert" style={refusalStyle}>
+      {CNC_RECOVERY_NEEDS_CNC_PROJECT}
+    </div>
   );
 }
 
