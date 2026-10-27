@@ -182,7 +182,8 @@ describe('external program stops (ADR-630)', () => {
         'Run G-code file sends that M0 to the controller as written. The controller then takes ' +
         "no jog or Zero Z until cycle start, and the new bit's spindle start and plunge are " +
         "already sent, so it would cut at the old bit's Z zero. Start the job from its project, " +
-        'which holds for the re-zero, or save its tiles again: each bit is then its own file.',
+        'which holds for the re-zero, or save it again as one file per bit: the CNC setup sheet ' +
+        'does this by default, and so do tiles.',
     );
     // A program stop that is not KerfDesk's bit change keeps the generic notice only.
     expect(review(file, CNC).warnings.join('\n')).not.toContain('changes bits');

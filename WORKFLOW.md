@@ -2664,7 +2664,12 @@ authorization, Frame proof, controller command, or safety boundary.
 3. Blocked commands are recorded as local diagnostics and no bytes are sent.
 
 #### Error — unsafe persistent command
-1. `$RST=*`, `$RST=$`, `$RST=#`, `$N=...`, `$I=...` and grblHAL's `$DWNGRD` are blocked in Lane 2.
+1. `$RST=*`, `$RST=$`, `$RST=#`, `$N=...`, `$I=...` and grblHAL's `$DWNGRD` are blocked in Lane 2,
+   in every form the firmware reads as one (`$N0.5=...`, `$RST(x)=*`). The Console reads a line as
+   GRBL's line reader does. It refuses a line before sending anything when a comment, `;` or `/`
+   sits in or in front of a `$` command (`(x)$30=255`, `$30(x)=255`), or when a setting number is
+   not digits only (`$30.0=255`). The message says what the firmware would run instead, so the
+   operator can type the command plainly (ADR-375 Amendment 6).
 2. `$number=value` settings writes require connected, idle controller state and explicit
    confirmation. On stock GRBL a value the firmware would store differently (anything but 0 or 1
    for an on/off setting, a fraction or a value outside 0-255 for its other 8-bit settings) is
@@ -6235,6 +6240,18 @@ and lifts the command's CNC-only gate.)*
 6. Preview and the 3D view draw the program's parks: the lift to the park height and the move to
    the park at every bit change and at the job end, a configured park winning. A cut that retracts
    between passes lifts to safe Z before each replunge, as in the program.
+
+#### Edge — CNC setup sheet of a multi-bit job (ADR-392 Amendment 3)
+1. Save G-code → **Save setup sheet + program…** opens on **One file per bit** whenever the job
+   has more than one cutter section. Each file is a complete program with no `M0`, and opens with
+   `; bit N of M: <bit>` and what to zero before it runs. Between files the controller is Idle, so
+   jog, Zero Z and probing work.
+2. **Single file · M0 bit changes** stays available. The dialog and the sheet say that a controller
+   held at an `M0` takes no jog or Zero Z and already holds the next bit's spindle start and plunge.
+   Bit changes at those stops work only from the project's own Start, which holds before each `M0`
+   (F-CNC15), or in a sender that holds at the `M0` itself (gSender). Run G-code file sends the
+   `M0`, and its review warns.
+3. A one-cutter job, or an older prepared Save with no per-bit files, stays a single file.
 
 ### F-CNC15. Re-zero Z at a tool change — Phase H.7
 
