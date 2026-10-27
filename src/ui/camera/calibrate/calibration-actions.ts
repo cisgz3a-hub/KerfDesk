@@ -149,7 +149,8 @@ function rememberTarget(
  * operator who engraves it like any job: Frame, review and Start, or later
  * from another session. The rings are locked so a stray drag cannot move them
  * off the bed positions the photo will look for, and Start from becomes
- * Absolute Coordinates, the only mode that burns them there. The bed frame
+ * Absolute Coordinates, the only mode that burns them there, in the same Undo
+ * step (ADR-654 Amendment 2). The bed frame
  * remembered here stands only until a Start streams the rings, which takes
  * it again (canvas-target-burn.ts, ADR-440 Amendment 5).
  */
@@ -158,11 +159,14 @@ export function addCalibrationTargetToCanvas(settings: CalibrationSettings): voi
   const { device } = store.project;
   const area = calibrationTargetArea(device.bedWidth, device.bedHeight, settings);
   const pattern = targetPattern(area, settings);
-  store.replaceSceneWithGeneratedScene({
-    ...pattern.scene,
-    objects: pattern.scene.objects.map((object) => ({ ...object, locked: true })),
-  });
-  if (store.jobPlacement.startFrom !== 'absolute') store.setJobPlacement({ startFrom: 'absolute' });
+  store.replaceSceneWithGeneratedScene(
+    {
+      ...pattern.scene,
+      objects: pattern.scene.objects.map((object) => ({ ...object, locked: true })),
+    },
+    false,
+    store.jobPlacement.startFrom === 'absolute' ? undefined : { startFrom: 'absolute' },
+  );
   rememberTarget(device, settings, area, cameraBedFrameFor(device, useLaserStore.getState()), true);
 }
 
