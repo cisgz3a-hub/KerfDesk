@@ -5870,7 +5870,7 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 1. A `.lf2` saved before stock footprints existed loads with the default
    400 × 400 footprint at the origin; thickness is preserved.
 
-#### Edge — nesting parts on the stock (ADR-433 Amendment 3)
+#### Edge — nesting parts on the stock (ADR-433 Amendment 4)
 1. On a CNC project, Quick Nest and Quantity production open their Part spacing at the widest
    bit that cuts on or outside a part outline (an Outside or On-path profile) plus 1 mm, rounded
    up to 0.1 mm: 4.2 mm for a 1/8" bit. Never below the 2 mm laser default.

@@ -6,7 +6,6 @@
 
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
-import type { CncGroup, Job } from '../../core/job';
 import { createProject, DEFAULT_CNC_MACHINE_CONFIG, type Project } from '../../core/scene';
 import { stockNativeEvidence } from '../state/native-bed-frame.test-support';
 import {
@@ -35,24 +34,16 @@ function homedRouter(patch: Partial<CncZTopEvidence> = {}): CncZTopEvidence {
   };
 }
 
-const cncProject: Project = { ...createProject(DEVICE), machine: DEFAULT_CNC_MACHINE_CONFIG };
-
-function job(parkZMm: number | undefined): Job {
-  const group: CncGroup = {
-    kind: 'cnc',
-    layerId: 'L1',
-    color: '#000000',
-    cutType: 'profile-outside',
-    toolDiameterMm: 3.175,
-    feedMmPerMin: 1000,
-    plungeMmPerMin: 300,
-    spindleRpm: 12000,
-    spindleSpinupSec: 3,
-    safeZMm: 5,
-    ...(parkZMm === undefined ? {} : { parkZMm }),
-    passes: [{ kind: 'contour', zMm: -3, closed: false, polyline: [{ x: 0, y: 0 }, { x: 9, y: 0 }] }],
+/** A CNC project whose Machine Setup lifts to `parkZMm` (safe Z 5 mm). */
+function project(parkZMm: number | undefined): Project {
+  const { parkZMm: _unset, ...params } = DEFAULT_CNC_MACHINE_CONFIG.params;
+  return {
+    ...createProject(DEVICE),
+    machine: {
+      ...DEFAULT_CNC_MACHINE_CONFIG,
+      params: { ...params, safeZMm: 5, ...(parkZMm === undefined ? {} : { parkZMm }) },
+    },
   };
-  return { groups: [group] };
 }
 
 describe('CNC park lift against the live Z top', () => {
@@ -62,14 +53,14 @@ describe('CNC park lift against the live Z top', () => {
       overMm: 10,
       highestFitMm: 40,
     });
-    const [warning] = detectCncParkZTopWarnings(cncProject, job(50), homedRouter());
+    const [warning] = detectCncParkZTopWarnings(project(50), homedRouter());
     expect(warning).toContain('lifts to Z50 above the stock top, 10 mm past the top of Z travel');
     expect(warning).toContain('Set Park height to 40 mm or lower');
   });
 
   it('says how much room a park that fits leaves', () => {
     expect(checkCncLiftAgainstZTop(30, homedRouter())).toEqual({ kind: 'fits', roomMm: 10 });
-    expect(detectCncParkZTopWarnings(cncProject, job(30), homedRouter())).toEqual([]);
+    expect(detectCncParkZTopWarnings(project(30), homedRouter())).toEqual([]);
   });
 
   it('reads an inch offset in millimetres', () => {
@@ -100,7 +91,7 @@ describe('CNC park lift against the live Z top', () => {
     const check = checkCncLiftAgainstZTop(50, homedRouter(patch));
     expect(check.kind).toBe('unchecked');
     if (check.kind === 'unchecked') expect(check.reason).toContain(reason);
-    expect(detectCncParkZTopWarnings(cncProject, job(50), homedRouter(patch))).toEqual([]);
+    expect(detectCncParkZTopWarnings(project(50), homedRouter(patch))).toEqual([]);
   });
 
   it('checks an unhomed stock GRBL whose soft limits are on, against its own envelope', () => {
@@ -118,10 +109,10 @@ describe('CNC park lift against the live Z top', () => {
     const unread = homedRouter({ controllerSettings: settings });
     expect(checkCncLiftAgainstZTop(50, unread).kind).toBe('unchecked');
     expect(checkCncLiftAgainstZTop(50, unread, 75)).toMatchObject({ kind: 'over', overMm: 10 });
-    expect(detectCncParkZTopWarnings(cncProject, job(50), unread)).toHaveLength(1);
+    expect(detectCncParkZTopWarnings(project(50), unread)).toHaveLength(1);
   });
 
   it('lifts no higher than safe Z without a park height', () => {
-    expect(detectCncParkZTopWarnings(cncProject, job(undefined), homedRouter())).toEqual([]);
+    expect(detectCncParkZTopWarnings(project(undefined), homedRouter())).toEqual([]);
   });
 });

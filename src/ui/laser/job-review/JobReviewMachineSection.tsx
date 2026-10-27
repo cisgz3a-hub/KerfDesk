@@ -8,7 +8,11 @@ import type { MachineKind, Project } from '../../../core/scene';
 import { useStore } from '../../state';
 import { useLaserStore } from '../../state/laser-store';
 import { selectNativeBedEvidence } from '../../state/native-bed-frame';
-import { checkCncLiftAgainstZTop, type CncLiftZTopCheck } from '../cnc-park-z-top';
+import {
+  checkCncLiftAgainstZTop,
+  cncHighestLiftMm,
+  type CncLiftZTopCheck,
+} from '../cnc-park-z-top';
 import { buildMachineReviewFacts, type JobReviewFact } from './job-review-live-rows';
 import {
   detailsStyle,
@@ -77,9 +81,8 @@ function useCncParkZTop(project: Project): CncLiftZTopCheck | undefined {
   const activeWcs = useLaserStore((s) => s.activeWcs);
   const machine = project.machine;
   if (machine?.kind !== 'cnc') return undefined;
-  const { safeZMm, parkZMm } = machine.params;
   return checkCncLiftAgainstZTop(
-    Math.max(safeZMm, parkZMm ?? safeZMm),
+    cncHighestLiftMm(machine.params),
     {
       ...evidence,
       wcoCache: wcoZ === null ? null : { x: 0, y: 0, z: wcoZ },

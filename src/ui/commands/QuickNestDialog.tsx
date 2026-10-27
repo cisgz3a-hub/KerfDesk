@@ -18,7 +18,7 @@ export type QuickNestDialogProps = {
   readonly onAcceptBest?: () => void;
   readonly onReset?: () => void;
   readonly onProduction?: () => void;
-  /** A CNC project's bit-based minimum spacing (ADR-433 Amendment 3). */
+  /** A CNC project's bit-based minimum spacing (ADR-433 Amendment 4). */
   readonly cncSpacing?: CncNestSpacing | null;
 };
 type NestForm = {
@@ -111,7 +111,7 @@ export function QuickNestDialog(props: QuickNestDialogProps): JSX.Element {
   );
 }
 // A router's parts start one bit plus a margin apart, never closer than the
-// laser default (ADR-433 Amendment 3).
+// laser default (ADR-433 Amendment 4).
 function initialForm(cncSpacing: CncNestSpacing | null): NestForm {
   if (cncSpacing === null) return INITIAL;
   return { ...INITIAL, padding: String(Math.max(LASER_SPACING_MM, cncSpacing.spacingMm)) };
@@ -192,9 +192,9 @@ function NestBoundaryFields({
       </label>
       {cncSpacing !== null && nonNegative(form.padding) < cncSpacing.spacingMm && (
         <p role="status" style={spacingWarningStyle}>
-          Closer than the {cncSpacing.bitDiameterMm} mm bit plus{' '}
-          {CNC_NEST_SPACING_MARGIN_MM} mm: the bit that cuts one part out can cut into the next.
-          Use at least {cncSpacing.spacingMm} mm.
+          Closer than the {cncSpacing.bitDiameterMm} mm bit plus {CNC_NEST_SPACING_MARGIN_MM} mm:
+          the bit that cuts one part out can cut into the next. Use at least {cncSpacing.spacingMm}{' '}
+          mm.
         </p>
       )}
     </>

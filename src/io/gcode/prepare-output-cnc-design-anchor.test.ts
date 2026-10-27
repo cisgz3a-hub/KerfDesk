@@ -4,10 +4,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
-import {
-  computeFrameJobMotionBounds,
-  computeJobPlacementBounds,
-} from '../../core/job/job-bounds';
+import { computeFrameJobMotionBounds, computeJobPlacementBounds } from '../../core/job/job-bounds';
 import { buildToolpath } from '../../core/job/toolpath';
 import {
   createLayer,

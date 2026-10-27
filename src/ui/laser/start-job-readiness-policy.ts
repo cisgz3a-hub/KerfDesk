@@ -31,6 +31,7 @@ import { runCompiledWorkPreflight } from '../../core/preflight/compiled-work';
 import { machineKindOf, type Project, type Scene } from '../../core/scene';
 import { cncAccessoryStartIssue, cncOverrideStartIssue } from '../state/cnc-accessory-readiness';
 import type { StatusReportFieldsOff } from '../state/status-report-fields';
+import { detectCncParkZTopWarnings } from './cnc-park-z-top';
 import { cncWorkZeroStartIssue } from './cnc-start-advisories';
 import type { MachineStartSnapshot } from './start-job-readiness';
 
@@ -65,6 +66,8 @@ export function demotedPolicyWarnings(
     machine.controllerSessionEpoch,
   );
   if (workZeroIssue !== null) warnings.push(workZeroIssue);
+  // ADR-491 Amendment 2: the park lift against the live top of Z travel.
+  warnings.push(...detectCncParkZTopWarnings(project, machine));
   return warnings;
 }
 

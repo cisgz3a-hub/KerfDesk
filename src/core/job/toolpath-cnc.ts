@@ -117,9 +117,7 @@ function appendPassSteps(
   const safeZ = representedCncCoordinateMm(Math.max(0, group.safeZMm));
   const entryZ = cncPassEntryDepthMm(pass);
 
-  // ADR-253: the emitter lifts before a contour or path3d pass replunges.
-  if (group.retractBetweenPasses === true && (pass.kind === 'contour' || pass.kind === 'path3d'))
-    appendRetract(steps, head, safeZ, state);
+  appendRetractBeforePass(steps, head, safeZ, group, pass, state);
   const alreadyAtStart = head !== null && sameXyForPass(head, first, state);
   if (!alreadyAtStart) {
     appendRetract(steps, head, safeZ, state);
@@ -153,6 +151,19 @@ function appendPassSteps(
   state.headXText = exit.xText;
   state.headYText = exit.yText;
   return exit.point;
+}
+
+// ADR-253: the emitter lifts before a contour or path3d pass replunges.
+function appendRetractBeforePass(
+  steps: ToolpathStep[],
+  head: Vec2 | null,
+  safeZ: number,
+  group: CncGroup,
+  pass: CncPass,
+  state: CncSimState,
+): void {
+  if (group.retractBetweenPasses !== true) return;
+  if (pass.kind === 'contour' || pass.kind === 'path3d') appendRetract(steps, head, safeZ, state);
 }
 
 /** The emitter's lift to the park height and rapid to the park, for a bit

@@ -30,7 +30,7 @@ function cncProject(layers: ReadonlyArray<{ cutType: CncCutType; toolId?: string
   };
 }
 
-describe('cncNestSpacing (ADR-433 Amendment 3)', () => {
+describe('cncNestSpacing (ADR-433 Amendment 4)', () => {
   it('is the 1/8" profile bit plus 1 mm, rounded up to 0.1 mm', () => {
     expect(cncNestSpacing(cncProject([{ cutType: 'profile-outside' }]))).toEqual({
       bitDiameterMm: 3.175,

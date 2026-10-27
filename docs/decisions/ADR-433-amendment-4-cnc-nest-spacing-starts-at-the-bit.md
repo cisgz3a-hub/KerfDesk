@@ -1,8 +1,8 @@
-## ADR-433 Amendment 3 - A CNC nest starts one bit plus a margin apart (2026-10-26)
+## ADR-433 Amendment 4 - A CNC nest starts one bit plus a margin apart (2026-10-26)
 
 **Status:** Accepted; software-verified through unit tests. | **Date:** 2026-10-26
 
-Extends ADR-433 to Quick Nest and Quantity production on a CNC project. The nest still accepts any
+Extends ADR-433 (after Amendment 3, which checks whole shapes and cross-operation cuts) to Quick Nest and Quantity production on a CNC project. The nest still accepts any
 spacing the operator types, and Job Review's narrow-gap warnings are unchanged; nothing blocks
 Frame or Start (ADR-228).
 

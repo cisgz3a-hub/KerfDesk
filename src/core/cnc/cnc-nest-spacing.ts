@@ -1,4 +1,4 @@
-// Nest spacing a CNC router needs between parts (ADR-433 Amendment 3, meta
+// Nest spacing a CNC router needs between parts (ADR-433 Amendment 4, meta
 // audit M7-P2-5). A profile that cuts on or outside a part's outline sweeps
 // the bit up to one diameter past it, so parts packed closer than that bit
 // cut into each other. The spacing is the widest such bit plus a margin,

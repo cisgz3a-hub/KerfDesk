@@ -10,11 +10,9 @@
 // checks the lift and warns; otherwise it says the check could not run.
 // Advisory only, never a Start block (PROJECT.md rule 21, ADR-228).
 
-import { parkHeightMm } from '../../core/cnc/cnc-park';
 import type { StatusReport } from '../../core/controllers/grbl';
 import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
-import type { CncGroup, Job } from '../../core/job';
-import type { Project } from '../../core/scene';
+import type { CncMachineParams, Project } from '../../core/scene';
 import { resolveFirmwareZLimits } from '../state/manual-motion-limits';
 import type { NativeBedEvidence } from '../state/native-bed-frame';
 import type { WorkCoordinateOffset } from '../state/origin-actions';
@@ -63,23 +61,20 @@ export function checkCncLiftAgainstZTop(
     : { kind: 'fits', roomMm: Math.max(0, -overMm) };
 }
 
-/** The highest Z a CNC job lifts to: its park height, never below safe Z. */
-export function cncJobHighestLiftMm(job: Job): number | null {
-  const groups = job.groups.filter((group): group is CncGroup => group.kind === 'cnc');
-  if (groups.length === 0) return null;
-  const safeZMm = Math.max(...groups.map((group) => group.safeZMm));
-  return Math.max(...groups.map((group) => parkHeightMm(group, safeZMm)));
+/** The highest Z a CNC job lifts to, as the compiler stamps it on every group
+ * and the emitter lifts: the park height, never below safe Z. */
+export function cncHighestLiftMm(params: Pick<CncMachineParams, 'safeZMm' | 'parkZMm'>): number {
+  const safeZMm = Math.max(0, params.safeZMm);
+  return Math.max(safeZMm, params.parkZMm ?? safeZMm);
 }
 
-/** A Start warning when the prepared job's lift runs past the Z top. */
+/** A Start warning when a CNC job's lift runs past the Z top. */
 export function detectCncParkZTopWarnings(
   project: Project,
-  job: Job | undefined,
   evidence: CncZTopEvidence,
 ): ReadonlyArray<string> {
-  if (project.machine?.kind !== 'cnc' || job === undefined) return [];
-  const liftMm = cncJobHighestLiftMm(job);
-  if (liftMm === null) return [];
+  if (project.machine?.kind !== 'cnc') return [];
+  const liftMm = cncHighestLiftMm(project.machine.params);
   const check = checkCncLiftAgainstZTop(liftMm, evidence, project.device.zTravelMm);
   if (check.kind !== 'over') return [];
   return [

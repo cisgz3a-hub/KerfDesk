@@ -2,13 +2,17 @@
 // Amendment 1). Job Origin anchors on this, not on the cutter's reach: an
 // Outside profile's reach is one bit diameter past the drawn outline, and a
 // V-bit's reach is its full body radius however shallow it cuts. The outlines
-// are the operation's own machine-space polylines; a relief is the rectangle
-// its heightmap is carved in, placed as the relief compiler places it.
+// are the operation's own machine-space polylines, less those it omits: a cut
+// that needs closed contours cuts nothing from an open or zero-area one. A
+// relief is the rectangle its heightmap is carved in, placed as the relief
+// compiler places it.
 
 import { toMachineCoords, type DeviceProfile } from '../devices';
+import { signedAreaMm2 } from '../geometry/polyline-orientation';
 import type { CncGroup } from '../job';
 import {
   applyTransform,
+  DEFAULT_CNC_LAYER_SETTINGS,
   sceneObjectUsesOperation,
   type Bounds,
   type Layer,
@@ -17,6 +21,7 @@ import {
   type SceneObject,
   type Vec2,
 } from '../scene';
+import { cutTypeNeedsClosedContours } from './closed-contour-cut-types';
 import { reliefMachineSpaceGeometry } from './relief-machine-space';
 
 type MutableBounds = { minX: number; minY: number; maxX: number; maxY: number };
@@ -33,7 +38,11 @@ export function cncOperationDesignBounds(
     maxX: Number.NEGATIVE_INFINITY,
     maxY: Number.NEGATIVE_INFINITY,
   };
-  for (const polyline of polylines) for (const point of polyline.points) extend(b, point);
+  const closedOnly = cutTypeNeedsClosedContours((layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS).cutType);
+  for (const polyline of polylines) {
+    if (closedOnly && !enclosesArea(polyline)) continue;
+    for (const point of polyline.points) extend(b, point);
+  }
   for (const object of objects) {
     if (object.kind !== 'relief' || !sceneObjectUsesOperation(object, layer)) continue;
     for (const corner of reliefMachineCorners(object, device)) extend(b, corner);
@@ -49,6 +58,10 @@ export function withDesignBounds(
   designBounds: Bounds | null,
 ): ReadonlyArray<CncGroup> {
   return designBounds === null ? groups : groups.map((group) => ({ ...group, designBounds }));
+}
+
+function enclosesArea(polyline: Polyline): boolean {
+  return polyline.closed && Math.abs(signedAreaMm2(polyline.points)) > 1e-9;
 }
 
 function reliefMachineCorners(relief: ReliefObject, device: DeviceProfile): ReadonlyArray<Vec2> {

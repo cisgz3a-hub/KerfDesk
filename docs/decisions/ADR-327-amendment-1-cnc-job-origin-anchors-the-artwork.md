@@ -50,7 +50,8 @@ Frame traced the same widened box, so nothing told the operator the artwork was 
 
 - A placed CNC job moves by the reach it used to anchor on, toward the anchor: by one diameter for
   an Outside profile and one radius for On-path or an engraving. Saved G-code keeps its old
-  placement; preparing the project again gives the corrected program.
+  placement; preparing the project again gives the corrected program. `EMITTER_REVISION`
+  `cnc-artwork-anchor-20261027-v33` marks programs placed this way.
 - An operator who set zero on the board corner for an Outside profile now cuts past the corner by
   the bit. That is where the part's drawn edge is, as in LightBurn; Frame shows the reach.
 - The V-bit body-radius reach is unchanged where it still applies (Frame, envelope). It is the
