@@ -122,7 +122,7 @@ async function resume(
   capsule: Awaited<ReturnType<typeof saveInterruptedRun>>,
   groupIndex: number,
 ) {
-  const startJob = vi.fn(async () => undefined);
+  const startJob = vi.fn(async (_gcode: string, _options?: unknown) => undefined);
   useLaserStore.setState({ startJob });
   vi.mocked(jobAwareConfirm).mockClear();
   vi.mocked(jobAwareAlert).mockClear();
