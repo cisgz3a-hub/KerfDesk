@@ -83,8 +83,9 @@ describe('detectCncStockWarnings', () => {
 
     const warnings = detectCncStockWarnings(project, prepared);
     expect(warnings).toHaveLength(1);
-    // The warning reports swept volume, including the 3.175 mm tool radius.
-    expect(warnings[0]).toContain('150.0–173.2');
+    // The artwork corner lands on the current position (ADR-327 Amendment 1);
+    // the warning reports swept volume, one 3.175 mm bit's radius past it.
+    expect(warnings[0]).toContain('148.4–171.6');
     expect(warnings[0]).toContain('100 × 100 mm stock');
   });
 
