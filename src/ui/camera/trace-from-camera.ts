@@ -12,7 +12,7 @@ import type { RgbaImage } from '../../core/camera/rgba-image';
 import { DEFAULT_RASTER_LAYER_COLOR, IDENTITY_TRANSFORM, type RasterImage } from '../../core/scene';
 import { CAMERA_CAPTURE_SOURCE } from '../../core/scene/reference-image-output';
 import { rgbaToPngDataUrl } from './png-encode';
-import { extractLumaBase64 } from '../trace/image-loader';
+import { compositeRgbOverWhitePreservingAlpha, extractLumaBase64 } from '../trace/image-loader';
 
 // 4 px/mm ≈ 102 dpi: plenty for outline tracing without a huge warp buffer.
 export const TRACE_PIXELS_PER_MM = 4;
@@ -77,7 +77,16 @@ export function buildCameraTraceImage(args: {
       color: DEFAULT_RASTER_LAYER_COLOR,
       dither: 'floyd-steinberg',
       linesPerMm: 10,
-      lumaBase64: extractLumaBase64({ data: image.data, width: image.width, height: image.height }),
+      // Bed the camera cannot see is transparent, and transparent burns as
+      // white, as on import (rolling audit v4 H5-P3-2): read alpha 0 as black
+      // luma and a kept capture with Output on burns it at full power.
+      lumaBase64: extractLumaBase64(
+        compositeRgbOverWhitePreservingAlpha({
+          data: image.data,
+          width: image.width,
+          height: image.height,
+        }),
+      ),
     },
   };
 }

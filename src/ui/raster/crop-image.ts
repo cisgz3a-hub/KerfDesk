@@ -3,6 +3,7 @@ import {
   hasClosedImageMaskGeometry,
   type VectorRaster,
 } from '../../core/raster';
+import { bakedImageMaskClip } from '../../core/raster/image-mask-clip';
 import type { Bounds, RasterImage, SceneObject } from '../../core/scene';
 import {
   hydratePagedRasterImage,
@@ -57,6 +58,13 @@ export async function cropMaskedRasterImage(
     height: crop.maxY - crop.minY,
     luma: croppedLuma,
   };
+  // The white outside the mask would burn under Negative, so the mask's shape
+  // stays as the image's own clip, applied where the live mask was (ADR-480
+  // Amendment 1). The clip is in the image's local frame, which a crop keeps.
+  const imageClip = bakedImageMaskClip(image, maskObject);
+  if (imageClip === null) {
+    throw new Error('Could not keep the mask shape with the image.');
+  }
   const fields = await encode(croppedRaster);
   const { imageMaskId: _imageMaskId, editorDocument: _editorDocument, ...unmasked } = source;
   return {
@@ -66,6 +74,7 @@ export async function cropMaskedRasterImage(
     pixelWidth: croppedRaster.width,
     pixelHeight: croppedRaster.height,
     bounds: cropLocalBounds(image.bounds, width, height, crop),
+    imageClip,
   };
 }
 

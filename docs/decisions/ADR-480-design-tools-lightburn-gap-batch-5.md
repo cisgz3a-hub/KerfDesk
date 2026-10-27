@@ -123,7 +123,8 @@ LightBurn behaviour, read on 2026-09-27 from `https://docs.lightburnsoftware.com
 9. **Flatten Image Mask** (Tools → Image, beside Crop Image) bakes the mask into the image and crops it exactly as Crop
    Image does (greyscale, like Crop), then deletes the mask shape, as LightBurn does. The mask shape
    stays when it is locked or another image or path text still uses it, and the notice says which
-   happened. One undo step.
+   happened. One undo step. *Amended by Amendment 1: Crop and Flatten keep the mask's shape as the
+   image's own clip, so the area outside it never burns, Negative included.*
 
 ### Alternatives
 

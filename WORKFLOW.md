@@ -704,7 +704,8 @@ the linked artwork.
    and drill keep every copy, since each is cut again (ADR-359 Amendment 3).
 5. **Tools → Image → Flatten Image Mask** bakes the mask into the selected image and crops it, as
    **Crop Image** does, then deletes the mask shape. The shape stays when it is locked or another
-   image or path text uses it; the notice says which.
+   image or path text uses it; the notice says which. Both keep the mask's outline as the image's
+   own clip, so the area outside it never burns, Negative included (ADR-480 Amendment 1).
 6. Each tool is one undo step and adds none when nothing changes. None operates a machine.
 
 ### F-A6f. Trim Shapes, Cut Shapes, Warp and Deform, Copy Along Path (ADR-498)
