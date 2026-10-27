@@ -1889,7 +1889,9 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - `Cmd/Ctrl+.` — Request the controller-specific software Abort (Phase B). With no job running
   it aborts a running Home, Probe or Auto-focus the same way, turns a latched Fire off
   (ADR-362), and stops motion or a hold the controller reports that nothing in KerfDesk started,
-  as **ABORT MOTION** does (ADR-375).
+  as **ABORT MOTION** does (ADR-375). On a laser profile it turns off a laser the controller
+  reports on at Idle with nothing in KerfDesk running it, as **LASER OFF** does (ADR-375
+  Amendment 9).
 - `PageUp` / `PageDown` — Jog Z. When a scrolling list, tab panel or the Artwork panel has focus,
   the keys scroll it instead (ADR-362). Only the dedicated keys jog Z: the keypad's 9 / 3 never do,
   even with Num Lock off, when they send PageUp / PageDown (ADR-493 Amendment 1).
@@ -6616,6 +6618,10 @@ and lifts the command's CNC-only gate.)*
    or smaller grid), the save names those files once the set is written. It leaves
    earlier files intact. If the folder cannot be checked, a warning asks the operator
    to check that only this save's files are cut (ADR-668).
+   A save that stops at a failed write (a full disk, a lost permission) says the set
+   is incomplete and to save it again before cutting, and names as an error every
+   file of this save's names it did not replace, which still holds the earlier save
+   (ADR-656 Amendment 3).
    A ramp entry kept as a plunge because its source path is shorter than one
    cut width or cannot descend at coordinate precision remains disclosed in
    each affected tile's G-code header, including tabbed path3d output. Split
