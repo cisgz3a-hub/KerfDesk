@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { nestedGridsPastBudgetDxf } from '../../__fixtures__/nested-minsert';
 import {
   dxfWorkerRequests,
-  installDxfImportWorker,
-  resetDxfImportWorker,
-} from '../import/dxf-import-worker.test-support';
+  installImportWorkers,
+  resetImportWorkers,
+} from '../import/import-workers.test-support';
 import type { ImportWorkerRequest } from '../import/import-worker-protocol';
 import { useStore } from '../state/store';
 import { resultCode, testAdapter, writeArgs } from './authoring-test-support';
@@ -20,12 +20,12 @@ const dxfFile = (text: string) => ({
 let adapter: RemoteControlAdapter;
 beforeEach(() => {
   useStore.setState(useStore.getInitialState(), true);
-  installDxfImportWorker();
+  installImportWorkers();
   adapter = testAdapter();
 });
 afterEach(() => {
   adapter.dispose();
-  resetDxfImportWorker();
+  resetImportWorkers();
 });
 
 describe('remote DXF import uses the import worker, as File > Import does', () => {

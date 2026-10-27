@@ -9,10 +9,7 @@ import { combinedBBox } from '../../core/scene/hit-test';
 import { importDxfFiles } from '../app/dxf-import-action';
 import { importSvgFiles } from '../app/svg-import-action';
 import { importImageFile } from '../commands/import-image-action';
-import {
-  installDxfImportWorker,
-  resetDxfImportWorker,
-} from '../import/dxf-import-worker.test-support';
+import { installImportWorkers, resetImportWorkers } from '../import/import-workers.test-support';
 import { loadImageSamples, type LoadedImageSamples } from '../import/prepare-image-samples';
 import { makePng } from '../import/png-incremental-decoder.test-support';
 import { useStore } from '../state/store';
@@ -108,13 +105,13 @@ const noticeMessages = (receipt: Record<string, unknown>) =>
   (receipt.notices as { message: string }[]).map((notice) => notice.message);
 
 beforeEach(() => {
-  // A remote DXF parses in the import worker (ADR-269 Amendment 1); the desktop twin's
-  // text-only file parses on the main thread with the same parser.
-  installDxfImportWorker();
+  // A remote DXF or SVG parses in its import worker (ADR-269 Amendments 1 and 2); the
+  // desktop twin's text-only file parses on the main thread with the same parser.
+  installImportWorkers();
   vi.stubGlobal('File', NodeFile);
 });
 afterEach(() => {
-  resetDxfImportWorker();
+  resetImportWorkers();
   freshBed();
 });
 
