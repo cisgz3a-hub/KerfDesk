@@ -1,117 +1,93 @@
-// ADR-673: builds before it saved a picture kept behind a trace with
-// `role: 'trace-source'` and left it out of every job. Such a project still
-// opens and the marker is dropped: a kept photo engraves on its Image operation
-// like any other image, a kept camera capture stays out of the job on an
-// output-off operation, and the next save no longer writes the marker.
+// ADR-673 and its Amendment 1: builds up to 1.0.27 saved a picture kept behind
+// a trace with `role: 'trace-source'` and left it out of every job. Such a
+// project still opens and the marker is dropped, but the picture keeps the job
+// it had: its Image operation opens with Output off (or it moves to an
+// output-off copy of one other artwork shares), a kept photo is counted so the
+// reader can say so, and the next save no longer writes the marker.
 import { describe, expect, it } from 'vitest';
 import { compileJob } from '../../core/job';
-import {
-  createLayer,
-  createProject,
-  IDENTITY_TRANSFORM,
-  operationIdsForObject,
-  type Project,
-  type RasterImage,
-  type SceneObject,
-  type TracedImage,
-} from '../../core/scene';
+import { operationIdsForObject, type Project, type RasterImage } from '../../core/scene';
 import { CAMERA_CAPTURE_SOURCE } from '../../core/scene/reference-image-output';
+import {
+  legacyPhoto as photo,
+  legacyTrace as trace,
+  legacyTraceDocument as legacyDocument,
+} from '../../__fixtures__/legacy-trace-source-project';
 import { deserializeProject } from './deserialize-project';
+import type { LoadedProject } from './project-load-metadata';
 import { prepareProjectForPersistence } from './prepare-project-persistence';
 import { serializeProject } from './serialize-project';
 
-const photo: RasterImage = {
-  kind: 'raster-image',
-  id: 'photo',
-  source: 'portrait.jpg',
-  dataUrl: 'data:image/png;base64,AAAA',
-  lumaBase64: 'QEBAQA==',
-  pixelWidth: 2,
-  pixelHeight: 2,
-  bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
-  transform: IDENTITY_TRANSFORM,
-  color: '#808080',
-  dither: 'floyd-steinberg',
-  linesPerMm: 5,
-  operationIds: ['photo-operation'],
-};
-
-const trace: TracedImage = {
-  kind: 'traced-image',
-  id: 'trace',
-  source: 'portrait.jpg',
-  traceSourceId: 'photo',
-  traceMode: 'filled-contours',
-  bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
-  transform: IDENTITY_TRANSFORM,
-  operationIds: ['trace-operation'],
-  paths: [
-    {
-      color: '#000000',
-      polylines: [
-        {
-          closed: true,
-          points: [
-            { x: 2, y: 2 },
-            { x: 8, y: 2 },
-            { x: 8, y: 8 },
-            { x: 2, y: 8 },
-          ],
-        },
-      ],
-    },
-  ],
-};
-
-// A project as an earlier build saved it: the kept picture carries the marker.
-function legacyDocument(objects: ReadonlyArray<SceneObject> = [photo, trace]): string {
-  const project: Project = {
-    ...createProject(),
-    scene: {
-      objects: [...objects],
-      layers: [
-        createLayer({ id: 'photo-operation', color: '#808080', mode: 'image' }),
-        createLayer({ id: 'trace-operation', color: '#000000', mode: 'line' }),
-      ],
-      groups: [],
-      artworkOrder: objects.map((object) => object.id),
-    },
-  };
-  const json = JSON.parse(serializeProject(project)) as {
-    scene: { objects: Array<Record<string, unknown>> };
-  };
-  const [savedPhoto] = json.scene.objects;
-  if (savedPhoto === undefined) throw new Error('missing photo');
-  savedPhoto['role'] = 'trace-source';
-  return JSON.stringify(json);
+function loaded(text: string): LoadedProject {
+  const result = deserializeProject(text);
+  if (result.kind !== 'ok') throw new Error(`load failed: ${result.kind}`);
+  return result;
 }
 
 function load(text: string): Project {
-  const result = deserializeProject(text);
-  if (result.kind !== 'ok') throw new Error(`load failed: ${result.kind}`);
-  return result.project;
+  return loaded(text).project;
 }
 
-describe('a project saved with the legacy trace-source marker (ADR-673)', () => {
-  it('opens with the kept photo as an ordinary image that engraves before the trace', () => {
-    const loaded = load(legacyDocument());
-    const [loadedPhoto, loadedTrace] = loaded.scene.objects;
+function jobKinds(project: Project): string[] {
+  return compileJob(project.scene, project.device).groups.map((group) => group.kind);
+}
+
+function rasterSources(project: Project): Array<string | undefined> {
+  return compileJob(project.scene, project.device).groups.flatMap((group) =>
+    group.kind === 'raster' ? [group.sourceObjectId] : [],
+  );
+}
+
+function operationOf(project: Project, objectId: string) {
+  const object = project.scene.objects.find((candidate) => candidate.id === objectId);
+  if (object === undefined) throw new Error(`missing ${objectId}`);
+  const ids = operationIdsForObject(object, project.scene.layers);
+  return { ids, layers: project.scene.layers.filter((layer) => ids.includes(layer.id)) };
+}
+
+describe('a project saved with the legacy trace-source marker (ADR-673 Amendment 1)', () => {
+  it('opens with the kept photo out of the job, its operation Output off, and counts it', () => {
+    const result = loaded(legacyDocument());
+    const [loadedPhoto, loadedTrace] = result.project.scene.objects;
 
     expect(loadedPhoto).toMatchObject({ kind: 'raster-image', id: 'photo' });
     expect(loadedPhoto).not.toHaveProperty('role');
     expect(loadedTrace).toMatchObject({ kind: 'traced-image', traceSourceId: 'photo' });
-    expect(compileJob(loaded.scene, loaded.device).groups.map((group) => group.kind)).toEqual([
-      'raster',
-      'cut',
-    ]);
+    expect(operationOf(result.project, 'photo').ids).toEqual(['photo-operation']);
+    expect(
+      result.project.scene.layers.find((layer) => layer.id === 'photo-operation')?.output,
+    ).toBe(false);
+    // The trace-only job 1.0.27 ran.
+    expect(jobKinds(result.project)).toEqual(['cut']);
+    expect(result.keptTracePhotosOff).toBe(1);
+    expect(result.migratedFrom).toBeUndefined();
   });
 
-  it('saves without the marker and without validation drift', () => {
-    const loaded = load(legacyDocument());
-    const prepared = prepareProjectForPersistence(loaded);
+  it('engraves the photo once its operation Output is turned back on', () => {
+    const project = load(legacyDocument());
+    const turnedOn: Project = {
+      ...project,
+      scene: {
+        ...project.scene,
+        layers: project.scene.layers.map((layer) => ({ ...layer, output: true })),
+      },
+    };
+    expect(jobKinds(turnedOn)).toEqual(['raster', 'cut']);
+  });
+
+  it('saves without the marker and without validation drift, and reopens without a notice', () => {
+    const project = load(legacyDocument());
+    const prepared = prepareProjectForPersistence(project);
 
     expect(prepared.kind).toBe('ok');
-    expect(serializeProject(loaded)).not.toContain('trace-source');
+    expect(serializeProject(project)).not.toContain('trace-source');
+    const reopened = loaded(serializeProject(project));
+    expect(reopened.keptTracePhotosOff).toBeUndefined();
+    expect(jobKinds(reopened.project)).toEqual(['cut']);
+  });
+
+  it('a project without the marker carries no notice', () => {
+    expect(loaded(legacyDocument([photo, trace], [])).keptTracePhotosOff).toBeUndefined();
   });
 
   it('still refuses a role this build does not know', () => {
@@ -119,19 +95,60 @@ describe('a project saved with the legacy trace-source marker (ADR-673)', () => 
     expect(deserializeProject(unknownRole).kind).toBe('invalid');
   });
 
-  it('keeps a legacy kept camera capture out of the job on its own operation', () => {
+  it('keeps a raster trace result engraving where it shared the photo operation', () => {
+    const rasterResult: RasterImage = {
+      ...photo,
+      id: 'raster-trace',
+      source: 'portrait.jpg (trace bitmap)',
+      traceSourceId: photo.id,
+    };
+    const project = load(legacyDocument([photo, rasterResult]));
+    const photoOperation = operationOf(project, 'photo');
+
+    expect(photoOperation.ids).not.toContain('photo-operation');
+    expect(photoOperation.layers).toEqual([
+      expect.objectContaining({ mode: 'image', output: false }),
+    ]);
+    expect(project.scene.layers.find((layer) => layer.id === 'photo-operation')?.output).toBe(true);
+    // No double exposure: only the result engraves, as in 1.0.27.
+    expect(rasterSources(project)).toEqual(['raster-trace']);
+    expect(prepareProjectForPersistence(project).kind).toBe('ok');
+  });
+
+  it('keeps an ordinary image on the same operation engraving', () => {
+    const otherPhoto: RasterImage = { ...photo, id: 'other-photo', source: 'other.jpg' };
+    const result = loaded(legacyDocument([photo, otherPhoto, trace]));
+
+    expect(rasterSources(result.project)).toEqual(['other-photo']);
+    expect(operationOf(result.project, 'photo').layers).toEqual([
+      expect.objectContaining({ output: false }),
+    ]);
+    expect(result.keptTracePhotosOff).toBe(1);
+  });
+
+  it('counts each kept photo', () => {
+    const second: RasterImage = { ...photo, id: 'second', source: 'second.jpg' };
+    const result = loaded(legacyDocument([photo, second, trace], ['photo', 'second']));
+
+    expect(result.keptTracePhotosOff).toBe(2);
+    expect(jobKinds(result.project)).toEqual(['cut']);
+    expect(prepareProjectForPersistence(result.project).kind).toBe('ok');
+  });
+
+  it('keeps a legacy kept camera capture out of the job on its own operation, with no notice', () => {
     const capture: RasterImage = { ...photo, source: CAMERA_CAPTURE_SOURCE };
-    const loaded = load(legacyDocument([capture, trace]));
-    const loadedCapture = loaded.scene.objects[0];
+    const result = loaded(legacyDocument([capture, trace]));
+    const loadedCapture = result.project.scene.objects[0];
     if (loadedCapture === undefined) throw new Error('missing capture');
 
     expect(loadedCapture).not.toHaveProperty('role');
-    expect(operationIdsForObject(loadedCapture, loaded.scene.layers)).toEqual(['photo-operation']);
-    expect(loaded.scene.layers.find((layer) => layer.id === 'photo-operation')?.output).toBe(false);
-    expect(compileJob(loaded.scene, loaded.device).groups.map((group) => group.kind)).toEqual([
-      'cut',
-    ]);
-    expect(prepareProjectForPersistence(loaded).kind).toBe('ok');
+    expect(operationOf(result.project, capture.id).ids).toEqual(['photo-operation']);
+    expect(
+      result.project.scene.layers.find((layer) => layer.id === 'photo-operation')?.output,
+    ).toBe(false);
+    expect(jobKinds(result.project)).toEqual(['cut']);
+    expect(result.keptTracePhotosOff).toBeUndefined();
+    expect(prepareProjectForPersistence(result.project).kind).toBe('ok');
   });
 
   it('moves a legacy camera capture off an operation its raster trace shares', () => {
@@ -142,20 +159,15 @@ describe('a project saved with the legacy trace-source marker (ADR-673)', () => 
       source: 'camera capture (trace bitmap)',
       traceSourceId: capture.id,
     };
-    const loaded = load(legacyDocument([capture, rasterResult]));
-    const [loadedCapture] = loaded.scene.objects;
-    if (loadedCapture === undefined) throw new Error('missing capture');
-    const captureOperations = operationIdsForObject(loadedCapture, loaded.scene.layers);
-    const captureOperation = loaded.scene.layers.find((layer) => layer.id === captureOperations[0]);
+    const project = load(legacyDocument([capture, rasterResult]));
+    const captureOperation = operationOf(project, capture.id);
 
-    expect(captureOperations).not.toContain('photo-operation');
-    expect(captureOperation).toMatchObject({ mode: 'image', output: false });
-    expect(loaded.scene.layers.find((layer) => layer.id === 'photo-operation')?.output).toBe(true);
-    expect(
-      compileJob(loaded.scene, loaded.device).groups.flatMap((group) =>
-        group.kind === 'raster' ? [group.sourceObjectId] : [],
-      ),
-    ).toEqual(['raster-trace']);
-    expect(prepareProjectForPersistence(loaded).kind).toBe('ok');
+    expect(captureOperation.ids).not.toContain('photo-operation');
+    expect(captureOperation.layers).toEqual([
+      expect.objectContaining({ mode: 'image', output: false }),
+    ]);
+    expect(project.scene.layers.find((layer) => layer.id === 'photo-operation')?.output).toBe(true);
+    expect(rasterSources(project)).toEqual(['raster-trace']);
+    expect(prepareProjectForPersistence(project).kind).toBe('ok');
   });
 });

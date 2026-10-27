@@ -9,6 +9,7 @@ import { validateProjectStudioDocuments } from '../../io/project/project-studio-
 import { useToastStore } from './toast-store';
 import { trustProject } from '../licensing/project-seal';
 import { projectLoadRefused } from './project-machine-capability';
+import { pushProjectLoadNotices } from './project-load-notices';
 
 type Set = (patch: Partial<AppState> | ((state: AppState) => Partial<AppState>)) => void;
 export type ProjectSheetActions = {
@@ -59,7 +60,11 @@ export function projectSheetActions(set: Set, get: () => AppState): ProjectSheet
           archiveCurrent(current, book),
         ],
       };
-      return replace({ ...parsed.project, sheetBook });
+      if (!replace({ ...parsed.project, sheetBook })) return false;
+      // A sheet archived by an earlier build is read only now; the document's
+      // own migration was named when it opened.
+      pushProjectLoadNotices(parsed, useToastStore.getState().pushToast, { migration: false });
+      return true;
     },
     renameProjectSheet: (id, name) =>
       set((state) => {
