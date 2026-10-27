@@ -21,7 +21,7 @@
   - Refuter (2026-10-27, `origin/main` @ `0db717973`): 7 CONFIRMED, 0 PLAUSIBLE, 0 REFUTED. One severity change: J3-P2-3 is raised from P2 to P1 (§3). The ID is kept so the ledger can trace it.
   - The refuter's repros ran from this worktree's `src` (`a454a10d9`). `git diff HEAD origin/main` is empty for `src/ui/remote-control`, `src/io`, `src/ui/import`, `electron/mcp`, `services` and `src/ui/laser/jog-hold-aim.ts`. Six temporary `zz-j3r-*` files were run one at a time with the command below and then deleted.
 - **Repro:** four temporary files, run one at a time with `NODE_OPTIONS="--no-experimental-webstorage --max-old-space-size=1536" node ../../../node_modules/vitest/vitest.mjs run <file> --silent=false --reporter=verbose` (`--expose-gc` added for the heap run). All were deleted afterwards.
-  - One repro for the held finding (withheld).
+  - `src/ui/remote-control/zz-j3-svg-stall.test.ts`: the real adapter's `add_svg` and `apply_edits`, with a 5 ms `setInterval` and a `setTimeout(0)` probe.
   - `src/io/dxf/zz-j3-dxf-budget.test.ts`: the real `parseDxf`.
   - `src/ui/remote-control/zz-j3-bit-batch.test.ts`: the real adapter, plus the current and the pre-#1470 MCP output schemas.
   - `electron/mcp/zz-j3-old-design-schemas.ts`: `git show 7a459ef2d^:electron/mcp/design-schemas.ts`.
@@ -30,6 +30,7 @@
     - `machine-hold-travel.test.tsx` (6);
     - `import-dxf-worker.test.ts` (4);
     - `src/ui/laser/JogPad.native-travel.test.tsx` (5).
+  - SVG timings are under jsdom. The point-heavy cost is JavaScript path work and memory, not DOM work.
 
 ## Headline
 
@@ -41,7 +42,11 @@ All three fixes hold on the paths they patched. These hold:
 - A single remote bit change follows the Artwork card.
 - The phone XY hold stops where the PC's does.
 
-**One sibling is a security issue (J3-P1-1, with J3-P2-1).** Its details are withheld until the fix merges (security hold).
+**One sibling is a security issue (J3-P1-1, SECURITY — hold details until fixed).** #1465 moved only DXF off the UI thread. Remote **SVG** (`add_svg`, `import_file` SVG, `apply_edits` `add_svg`) still runs `parseSvg` synchronously in the renderer:
+
+- A 1,079-character `add_svg` froze the event loop for 2.1 s, with 0 timer ticks.
+- One `apply_edits` stacks 40 such parses.
+- The SVG `<use>` budget counts elements, not points (J3-P2-1). So a 3.6 KB SVG passes it with 3×10^7 points, which is enough to run the renderer out of memory.
 
 The other gaps are smaller:
 
@@ -53,13 +58,111 @@ The other gaps are smaller:
 
 ## Findings
 
-### J3-P1-1 — SECURITY — held until fixed
+### J3-P1-1 — SECURITY — hold details until fixed: remote SVG import still parses on the renderer's UI thread, uncancellable, so an edit-only client can freeze every PC software stop with about 1 KB (the H8-P1-1 sibling #1465 did not move)
 
-- Details are withheld until its fix merges (security hold); the full text is kept privately by the coordinator.
+- **Security hold lifted 2026-10-28:** fixed by #1481 (ADR-269 Amd 3), which moved remote SVG import to the cancellable document import worker and made the `<use>` budget count points. The details below were withheld from the committed report until then.
 
-### J3-P2-1 — SECURITY — held until fixed
+- **Where:**
+  - `src/ui/remote-control/design-imports.ts:44-51`: `prepareSvgImport` calls `parseSvg({ svgText, … })` synchronously. `signal.throwIfAborted()` (`:51`) runs only after the parse.
+  - Reached from three places:
+    - `addSvg` (`:196-210`);
+    - `importFile` for `image/svg+xml` (`:246-255`);
+    - `apply_edits`, through `prepareItem` (`src/ui/remote-control/design-batch.ts:66-80`). The loop at `:56` prepares up to 40 items back to back. For a non-fragment result `prepareSvgImport` awaits nothing, so no task runs between items.
+  - Desktop twin: `src/ui/app/svg-import-action.ts:85-101`. File > Import parses with `parseSvgOffThread` in the document import worker, and Escape cancels it. The main-thread parse is only the disclosed fallback when no worker can start.
+  - #1465 changed only the DXF branch (`design-imports.ts:256-285`, `parseDxfInWorker`). Its ADR scopes the premise to DXF: "Every DXF import route, desktop and remote, parses in the import worker" (ADR-269 Amd 1 Consequences).
+  - Reach:
+    - `add_svg`, `import_file` and `apply_edits` are edit-tier MCP commands (`electron/mcp/input-schemas.ts` `MCP_WRITE_COMMANDS`).
+    - The phone Import sheet sends SVG through `import_file`.
+    - Design writes are not refused during a job (H8-P1-1 refuter: `assertCurrent` checks `canWrite`, `canEdit` and the revision only).
+- **Anchor:**
+  - Contract: PROJECT.md:465, non-negotiable 9. The software Abort "is reachable from any window state during a job".
+  - Contract: ADR-269 item 7 (`DECISIONS.md:14211-14219`): "Document routes move off the UI thread". File-backed SVG runs in the worker, and the main-thread parse is only the "disclosed main-thread fallback".
+  - Twin: `svg-import-action.ts:92-98` (worker, cancellable) against `design-imports.ts:50` (UI thread).
+  - ADR-584's table (`docs/decisions/ADR-584-full-remote-design-control.md:17`) names `parseSvg` for `add_svg`, so the remote route follows ADR-584 and breaks NN9 and ADR-269 item 7. This is exactly the position H8-P1-1's DXF route was in.
+  - Trust boundary: as H8-P1-1. An edit-approved principal, or an MCP agent carrying an untrusted SVG, gets an effect on machine control.
+- **Scenario:**
+  1. A job is streaming on the PC.
+  2. A paired client with edit approval sends `add_svg` with a 1,079-character SVG. It holds a two-point path and four levels of ten `<use>` of `<use>`.
+  3. The renderer walks 10^5 instances, 222,210 instantiated elements, under the ADR-268 Amd 1 budget of 250,000. It does this on its UI thread.
+  4. No timer, input or serial callback runs meanwhile. The PC ABORT, Ctrl+. and a remote `abort_job` wait behind it.
+  5. On the default worker transport the job keeps running with every software stop frozen. On the window transport the stream starves (the H8-P1-1 refuter's split).
+  6. One `apply_edits` with 40 such items (about 45 KB) stacks 40 parses into one stall.
+  7. With a 300-point base path (3,563 characters) the same chain is 3×10^7 points. Because of J3-P2-1 the budget does not see it. At the measured cost, that is tens of seconds of stall and about 5 GB retained, which ends in a renderer OOM: no result, unsaved edits since the last autosave lost.
+- **Evidence:** REPRO (`zz-j3-svg-stall.test.ts`, real adapter).
+  - `J3-E {"svgChars":1079,"instances":100000,"instantiatedElements":222210,"code":"ok","totalMs":2056,"ticks":0,"longestStallMs":2056,"timeoutRanBeforeSettle":false,"polylines":100000,"points":200000}`
+  - `J3-A` (10^3 / 10^4 instances): 38 ms / 136 ms, `ticks:0`, `timeoutRanBeforeSettle:false`.
+  - `J3-C`, `apply_edits` with 4 `add_svg` items: `{"items":4,"code":"ok","totalMs":73,"ticks":0,"timeoutRanBeforeSettle":false,"polylines":4000}`. The stall is one block, with no task between items.
+  - `J3-D`, the point cost:
+    - `{"instances":1000,"points":300000,"totalMs":276,"ticks":0,"usPerPoint":0.92,"retainedBytesPerPoint":176}`
+    - `{"instances":2744,"points":823200,"totalMs":470,"ticks":0,"usPerPoint":0.571,"retainedBytesPerPoint":171}`
+  - The 3×10^7-point variant was not run (memory). Its scale comes from the measured 0.57–0.92 µs and about 171–176 B per point. The extrapolation method is the H8-P1-1 refuter's.
+  - Shipped: `prepareSvgImport` arrived with #1156 (`22868ee92`), an ancestor of the 1.0.21 release `faf5a54f1`.
+- **Severity:** P1 under §3, "shipped, remotely reachable security hole", on the same reasoning that made H8-P1-1 P1. The payload is smaller here (1 KB against 320 characters of base64), and the route is the one #1465 left.
+- **Novelty:** not KNOWN.
+  - H8-P1-1 and ADR-269 Amd 1 are DXF only.
+  - `14-vector-importers.md:344` checked a 20^4 `<use>` bomb with two-point paths on the import routes, not the remote UI-thread route.
+  - No open PR touches `design-imports.ts`.
+- **Refuter:** CONFIRMED. P1 kept, under §3 "shipped, remotely reachable security hole", as for H8-P1-1.
+  - *What would make it false:*
+    - a worker or a yield in the remote SVG parse;
+    - a size or `<use>` gate that stops the 1 KB chain before the walk;
+    - a permission above edit, or a job check on design writes;
+    - a stop path outside the renderer;
+    - a prior report.
+  - *REPRO* (`src/ui/remote-control/zz-j3r-svg-stall.test.ts`, real adapter, jsdom, deleted):
+    - **The stall.** `add_svg` of a 1,074-character chain (a two-point path, four levels of ten `<use>`, ten at the top) returned `{"code":"ok","totalMs":1290,"ticks":0,"timeoutRan":false,"points":200000}`. At 10^3 and 10^4 instances it took 46 and 165 ms, also with 0 ticks. The auditor measured 2,056 ms on a differently loaded PC. Both runs block the whole call.
+    - **The request's own cancel.** An `abort()` was scheduled 5 ms into a 10^4-instance `add_svg`. It ran only after the call settled. The result was `ok` and the art was inserted, so cancelling the request cannot interrupt the parse.
+    - **Batches.** `apply_edits` with four `add_svg` items of 10^4 instances returned `{"code":"ok","totalMs":751,"ticks":0}`. That is one block, with no task between the items.
+    - **The budget's reach.** A two-point chain past the budget (3×10^5 instances, 1,414 characters) is refused, but only after the walk reaches 250,000 elements: 1.85 s on the same thread. So a refused item still stalls. The element budget limits one two-point item to about 1–2 s, and `apply_edits` multiplies that by up to 40. J3-P2-1 lifts even that limit.
+  - *Guards read:*
+    - **Sizes.** `add_svg` is capped at 180,000 characters and `import_file` at 240,000 base64 characters (`electron/mcp/design-schemas.ts:32-33,142,177-195`); the phone caps its file at 178,000 bytes (`import-sheet.tsx:13`). `apply_edits` takes at most 40 items. None of these limits instances or points before the parse.
+    - **Permission.** The three commands are in `MCP_WRITE_COMMANDS` (`electron/mcp/input-schemas.ts:122-145`), so they need edit scope.
+    - **Job state.** `assertCurrent` (`adapter.ts:288-295`) checks only disposal or abort, `canWrite`, `canEdit` and the revision. `canEdit` is `pendingUndo === null` (`src/ui/remote-access/renderer-session.ts:127`). There is no job check.
+    - **Shipped.** `parseSvg(` is at `design-imports.ts:33` in the 1.0.21 tree (`faf5a54f1`). It arrived with #1156 (`22868ee92`), an ancestor of that release.
+  - *The desktop twin is off the UI thread.* File > Import passes the Blob to `parseSvgOffThread` (`svg-import-action.ts:92-98`). Its main-thread `parseSvg` runs only for a Blob-less file, or as the fallback when no worker starts, and that fallback shows a toast. The other UI-thread callers, `library-entry-insert.ts:15` and the `page-artwork-object.ts:32` fallback, are local actions. So the remote reach is what makes this P1.
+  - *Abort is blocked while the job runs.* ADR-354's Consequences: "The renderer can stop processing tasks without stopping an armed worker's acknowledgement and refill loop. UI updates and new operator actions still require the renderer."
+    - So on the default GRBL-family USB worker the job keeps running. ABORT, Ctrl+. and a remote `abort_job` wait behind the parse; the H8-P1-1 refuter's split holds.
+    - The main process has no stop path of its own. Its close dialog for an unresponsive renderer says "Software Abort and saving cannot be confirmed" (`electron/desktop-window-close.ts:99`).
+  - *Anchor correction.* ADR-269 item 7 (`DECISIONS.md:14211-14219`) names only "File-backed SVG". `add_svg` carries text, so item 7 is at most a partial anchor; it fits `import_file`, which decodes a file. NN9 (`PROJECT.md:465`) and the File > Import twin carry the finding. ADR-269 Amd 1 covers DXF only ("Every DXF import route…"), so its premise does not extend to SVG; this confirms the novelty rather than refuting it.
+  - *Not run.* The 40×10^5-instance batch and the 3×10^7-point case were not run (memory). Chromium's DOM may walk instances faster than jsdom does. The point cost, about 0.64 µs per point in J3-P2-1's repro, is JavaScript work.
+  - *Novelty.* No other v5 report and no audit raises remote SVG on the UI thread; H8's table lists only the DXF worker for this row. `gh pr list --state open` shows no open PR that touches `design-imports.ts`, `design-batch.ts` or `svg-use-expansion.ts`; the only open PR, #1476, is unrelated.
+- **Fix direction:** Route remote SVG through `parseSvgOffThread` on a Blob of the text, carrying the request signal, as #1465 did for DXF. Answer `unavailable` when no worker can start. Fix J3-P2-1 so the worker cannot be driven to OOM either.
 
-- Details are withheld until its fix merges (security hold); the full text is kept privately by the coordinator.
+### J3-P2-1 — The SVG `<use>` budget counts instantiated elements, not points; its DXF twin counts points, so a 3.6 KB SVG passes with 3×10^7 points
+
+- **Security hold lifted 2026-10-28:** fixed by #1481 (ADR-269 Amd 3), which moved remote SVG import to the cancellable document import worker and made the `<use>` budget count points. The details below were withheld from the committed report until then.
+
+- **Where:**
+  - `src/io/svg/svg-use-expansion.ts:18-25,41-56`: `spendSvgUseElement` adds 1 per instantiated element (floor 250,000, or 10 per document element). The points a referenced `<path>` carries are not counted.
+  - `src/io/svg/svg-import-budget.ts:10-15,42-56`: the polyline and point limits are advisory only.
+  - Twin: `src/io/dxf/dxf-expand.ts:250-253` counts `grid.instanceCount * pointCount(child.polylines)`, the points placed, per ADR-269 Amd 1.
+- **Anchor:**
+  - Twin: ADR-269 Amd 1 item 2 (`docs/decisions/ADR-269-amendment-1-remote-dxf-worker-and-block-budget.md:31-35`): "every point that placing a block creates counts". It calls itself the twin of ADR-268 Amd 1: "the same number of copies as ADR-268 Amendment 1's floor" (:44-46).
+  - Contract: ADR-268 Amd 1 item 1 (`docs/decisions/ADR-268-amendment-1-use-expansion-has-a-budget.md`) sizes the floor from "250,000 two-point paths instantiated through `<use>` in 2.1 s". Its Context says the growth "is not bounded by the input". With points uncounted, a fat referenced path keeps that growth unbounded: a 180,000-character file can instantiate a path of about 20,000 points about 200,000 times.
+- **Scenario:**
+  - A 3,563-character SVG holds a 300-point path and a chain of `<use>` four levels deep with ten at each level. That gives 10^5 instances, 222,210 counted elements (accepted) and 3×10^7 points.
+  - On the desktop, File > Import runs it in the import worker until memory runs out, at about 5 GB retained at the measured 171–176 B per point.
+  - Remotely it runs on the UI thread (J3-P1-1).
+  - The only signal is the advisory "Large SVG" note, after the parse, if it ever finishes.
+- **Evidence:** REPRO.
+  - `J3-E`: the 10^5-instance chain is accepted (`"code":"ok"`, 222,210 counted elements, below 250,000).
+  - `J3-B`: `{"instances":1000,"instantiatedElementsCounted":2210,"code":"ok","points":300000}`. The budget charged 2,210 elements for 300,000 points.
+  - `J3-D`: about 0.6–0.9 µs and about 171–176 retained bytes per point.
+- **Severity:** P2 for the desktop route. It needs a crafted local file. The worker share of the cost is off the UI thread, but whether a worker OOM also takes down the Electron renderer was not verified. Through the remote it is the amplifier of J3-P1-1.
+- **Novelty:** not KNOWN. 14 checked the element budget with two-point paths, and a 400,000-segment path on its own (`14-vector-importers.md:344-345`), not the two together.
+- **Refuter:** CONFIRMED. P2 kept, and kept as a finding separate from J3-P1-1.
+  - *What would make it false:* a point count in the `<use>` budget, or anywhere else before the result is built; a point cap further down; or the defect being only the remote amplifier.
+  - *READ:*
+    - `spendSvgUseElement` adds 1 per element (`svg-use-expansion.ts:41-56`).
+    - `svgImportSizeNote` is advisory (`svg-import-budget.ts:42-56`).
+    - No point cap was found on the remote insert path.
+  - *REPRO* (`zz-j3r-svg-stall.test.ts`):
+    - **Remote.** A 1,928-character SVG (a 300-point path, three levels of ten `<use>`) through the real `add_svg` returned `{"code":"ok","totalMs":192,"ticks":0,"points":300000,"heapDeltaMB":67}`. That is about 0.64 µs and about 220 B per point, including the store.
+    - **Desktop worker parser.** The worker's own parser (`parseSvgInWorker`, linkedom) was run on the same chain at 1,000 and 2,000 instances. It accepted 300,000 and 600,000 points, with only the "Large SVG" note.
+    - **The 3×10^7 case.** The element budget accepts the 10^5-instance structure (J3-P1-1's repro, 1,074 characters). The element count does not depend on how many points the path has. So the same structure with a 300-point path, about 3.6 KB, carries 3×10^7 points.
+  - *Desktop.* Escape cancels the worker while it runs (ADR-269 item 5), so the operator has a remedy. Two things were not tested in Electron: whether a worker OOM also ends the renderer, and whether a finished result of that size runs the UI thread out of memory when it is inserted. A crafted local file is still needed, so this is P2 under §3 ("security weakness that needs local access").
+  - *Why it is a separate finding.* J3-P1-1's fix, moving the remote parse into the worker, does not touch this. It has its own desktop reach and its own fix (the budget's unit). It also amplifies J3-P1-1, but J3-P1-1 stands without it: two-point chains at the element budget, up to 40 per `apply_edits`.
+- **Fix direction:** Charge each instantiated element its point count (or its path-data length), as the DXF budget charges placed points. Keep the floor's intent: about 500,000 placed points, the same as ADR-269 Amd 1.
 
 ### J3-P2-2 — A bit change inside `apply_edits` keeps a Manual operation's old-bit values with no message: the batch drops the kept-values receipt that ADR-306 Amd 4 extends to it
 
@@ -227,7 +330,7 @@ Each item was re-checked on `d2acacdbe`. For the H8 items, the remote files they
 | Hold-to-jog XY | `holdJogAim` + `continuousJogVector`, capped at 100 mm | JogPad hold (same `holdJogAim`) | **Fixed** (#1470) |
 | Hold-to-jog Z | `holdZRoomMm`, capped at 20 mm | none on the PC | New envelope clamp; withheld-MPos gap **J3-P3-3** |
 | Jog step | store `jog` | JogPad step | KNOWN 01-P3-15. Warnings PC-only (KNOWN) |
-| SVG import (`add_svg`, `import_file`, batch) | (held) | File > Import | Notices and fit **fixed**. Phone display **J3-P2-3**. Relay **J3-P3-2**. One held security item |
+| SVG import (`add_svg`, `import_file`, batch) | `parseSvg` **on the UI thread** → `insertAndPlace` (fit as its own step) → desktop toasts + receipt | File > Import: `parseSvgOffThread` (worker) | Notices and fit **fixed**. Thread **J3-P1-1**. Budget unit **J3-P2-1**. Phone display **J3-P2-3**. Relay **J3-P3-2** |
 | DXF import (`import_file`) | `parseDxfOffThread` with the request signal → `describeDxfImport` | File > Import (same worker) | **Fixed** (#1465, #1470). Budget double count **J3-P3-1** |
 | PNG/JPEG import | `importImageFile` with recorded PC toasts and the returned outcome | File > Import | Fit notice **fixed** (#1470). Decode limits not verified |
 | PDF, `.lbrn`/`.lbrn2`, `.lf2`, STL, HPGL | none (`MCP_IMPORT_TYPES` is SVG/PNG/JPEG/DXF; the phone `fileKind` is the same) | File > Open/Import | Not remotely reachable |
@@ -243,7 +346,10 @@ Each item was re-checked on `d2acacdbe`. For the H8 items, the remote files they
 Refuter (2026-10-27):
 
 - **No whole finding was refuted.**
-- One item about a held security finding is withheld until its fix merges.
+- **Sub-claims corrected:**
+  - **J3-P1-1's ADR-269 item 7 anchor.** Item 7 covers "File-backed SVG" only. It is not a contract for `add_svg`, which carries text; it fits `import_file` at most. The finding rests on NN9 and the File > Import twin.
+  - **J3-P1-1's timing.** The 1,074-character chain measured 1.29 s here against the auditor's 2.06 s; the difference is machine load. Both runs had 0 timer ticks for the whole call.
+  - **J3-P2-2's "Where".** The `apply_edits` output schema already accepts a top-level `message` (`designWrite`). Only the `results` item strips it.
 - **KNOWN items, spot-checked on `0db717973`.**
   - Since `a59f74ff9`, the only change to `machine-actions.ts`, `machine-projections.ts`, `laser-jog-warnings.ts`, `input-schemas.ts`, `machine-schemas.ts`, `writes.ts` and `design-save.ts` is #1460's board gate.
   - `executeHome` still has no homing check. "No saved connection" is unchanged. `jog_hold_stop` is still in `MCP_PRIORITY_COMMANDS`.
@@ -275,17 +381,25 @@ Candidates dropped by the auditor:
   - Test truth: the four `import-dxf-worker.test.ts` cases (worker used, cancel ends the worker, `unavailable` without a worker, refusal past the budget) each contradict the pre-fix UI-thread `parseDxf`.
   - `dxf-expansion-budget.test.ts` imports a module that did not exist before.
   - The original H8-P1-1 repro, the 150,000-instance fixture through `import_file`, now reaches the worker request (the `import-dxf-worker.test.ts` "parses the file in the import worker" case).
-- One item about a held security finding is withheld until its fix merges.
+- **#1470, ADR-125 Amd 2.**
+  - Item 1: SVG and DXF use `describeSvgImport`/`describeDxfImport`, and raster records the importer's own toasts.
+  - Item 3: the fit is its own second Undo step, computed and checked inside step 1.
+  - Item 4: `widthMm` replaces the fit.
+  - Item 5: a batch says "Undo reverts the whole batch".
+  - Test truth: `import-desktop-parity.test.ts` compares receipt notices that the pre-fix receipt lacked.
 - **#1470, ADR-306 Amd 4.** A single and a batch bit change both equal the card's `sceneWithCncStartupOperationDrafts` result. An unknown `toolId` is `invalid_arguments`.
   - Test truth: the pinned hand-edit test that asserted the opposite is replaced.
 - **#1470, ADR-375 Amd 8.** The XY hold equals the JogPad hold (dx 18 vs 18). The Z hold stops the pull-off short of the switch (dz 8) and follows `motionMachineKind`.
   - `JogPad.native-travel.test.tsx` still passes after the JogPad refactor.
   - Test truth: the pre-fix `holdVector` returned 100 mm / 20 mm, so the 18 mm and 8 mm expectations fail on it.
-- One item about a held security finding is withheld until its fix merges.
+- **MCP output.** The schemas for `add_svg`, `import_file` and `apply_edits` declare `notices` and `bedFit` (`design-schemas.ts:287-333`).
 
 ## Not verified
 
-- One item about a held security finding is withheld until its fix merges.
+- **The 3×10^7-point SVG, and the 40-item `apply_edits` stall.** Neither was run (memory). Both are extrapolated from the measured per-instance and per-point costs above.
+  - jsdom stands in for Chromium's DOM. The point cost is JavaScript.
+  - Whether an OOM in the desktop import *worker* (J3-P2-1 on File > Import) also ends the Electron renderer was not tested.
+  - The refuter did not run these cases either. It reproduced the stall at 10^5 instances, the stacking at 4 × 10^4, and 300,000 / 600,000 accepted points. Nothing was run in Chromium or Electron.
 - **The UI-thread share of a near-budget remote DXF.** The worker's packed result is unpacked, inserted, fitted and redrawn on the UI thread. ADR-269 Amd 1 measured 1.3 s of unpack for 249,000 copies. The insert and canvas cost after that was not measured.
 - **The fresh-report wait on a queued-poll controller (Marlin).** Its `M114` poll owes an `ok`. If the remote's 25 ms check lands while that `ok` is outstanding, the gate's pending-write clause may refuse with "Wait for the previous controller command to settle." Not traced to the ack counter, and not run.
 - **Remote PNG/JPEG decompression bombs** (G7's open item): still not checked.
@@ -295,8 +409,8 @@ Candidates dropped by the auditor:
 
 ```json
 [
-  {"id":"J3-P1-1","severity":"held","area":"held","file":"held","line":0,"anchor":"held","evidence":"REPRO","verdict":"CONFIRMED","known":null,"summary":"Security hold: details withheld until the fix merges."},
-  {"id":"J3-P2-1","severity":"held","area":"held","file":"held","line":0,"anchor":"held","evidence":"REPRO","verdict":"CONFIRMED","known":null,"summary":"Security hold: details withheld until the fix merges."},
+  {"id":"J3-P1-1","severity":"P1","area":"fix-remote","file":"src/ui/remote-control/design-imports.ts","line":50,"anchor":"Contract: PROJECT.md:465 NN9 (Abort reachable from any window state during a job); ADR-269 item 7 (DECISIONS.md:14211-14219) document routes incl. SVG move off the UI thread; Twin: svg-import-action.ts:92-98 parseSvgOffThread; sibling of H8-P1-1 that ADR-269 Amd 1 / #1465 scoped to DXF","evidence":"REPRO","verdict":"CONFIRMED","refuter":"REPRO zz-j3r-svg-stall (real adapter, jsdom): 1,074-char add_svg (1e5 instances) ok in 1,290 ms with 0 timer ticks; an abort scheduled 5 ms in ran only after settle and the art was inserted; apply_edits of 4 x 1e4 items one 751 ms block; a two-point chain past the element budget is refused only after a 1.85 s walk on the same thread. Guards: 180,000-char / 240,000-base64 / 40-item caps bound neither instances nor points; edit scope (MCP_WRITE_COMMANDS); assertCurrent has no job check; shipped in 1.0.21 (faf5a54f1 design-imports.ts:33). Desktop File > Import uses parseSvgOffThread, so remote reach makes it P1. ADR-354 Consequences: the worker refill keeps running while new operator actions need the renderer, so the job runs with every software stop frozen. Anchor corrected: ADR-269 item 7 covers file-backed SVG only (partial for import_file, not add_svg); NN9 and the twin carry it. P1 kept (shipped, remotely reachable security hole)","known":false,"summary":"SECURITY — hold details until fixed. Remote add_svg / import_file SVG / apply_edits add_svg still run parseSvg synchronously on the renderer UI thread: a 1,079-char add_svg (1e5 use instances, 222,210 counted < 250,000) froze the event loop 2,056 ms with 0 timer ticks; apply_edits stacks up to 40; a 3,563-char variant carries 3e7 points (J3-P2-1) at ~0.6-0.9 us and ~171-176 B per point -> tens of seconds and ~5 GB, a renderer OOM; an edit-only client freezes PC Abort, Ctrl+. and remote abort_job during a job"},
+  {"id":"J3-P2-1","severity":"P2","area":"fix-remote","file":"src/io/svg/svg-use-expansion.ts","line":41,"anchor":"Twin: ADR-269 Amd 1 item 2 DXF budget counts every placed point (dxf-expand.ts:250-253); Contract: ADR-268 Amd 1 item 1 floor sized on two-point paths, growth 'not bounded by the input'","evidence":"REPRO","verdict":"CONFIRMED","refuter":"READ spendSvgUseElement +1 per element, size note advisory, no point cap on the insert path. REPRO: remote add_svg of a 1,928-char 300-point x 1,000-instance chain ok, 300,000 points, 192 ms, 67 MB heap; the desktop worker parser (parseSvgInWorker) accepted 300,000 and 600,000 points with only the Large SVG note; the 1e5 structure passes the element budget whatever the path's points. Kept separate: J3-P1-1's worker fix does not touch it and it has its own desktop reach. P2 kept (crafted local file; Escape cancels the worker; worker-OOM effect on the renderer not tested)","known":false,"summary":"The SVG <use> budget charges 1 per instantiated element, not its points: a 3.6 KB SVG of a 300-point path in a 10x10x10x10x10 use chain passes (222,210 < 250,000) with 3e7 points; 1,000 instances of a 300-point path were charged 2,210 for 300,000 points; desktop File > Import runs it in the worker to OOM"},
   {"id":"J3-P2-2","severity":"P2","area":"fix-remote","file":"src/ui/remote-control/design-batch.ts","line":237,"anchor":"Contract: ADR-306 Amd 4 (extends Amd 3 items 2-3 to update_operation 'alone or inside apply_edits'; item 3 the receipt names kept values); Twin: single update_operation receipt and the Artwork card note","evidence":"REPRO","verdict":"CONFIRMED","refuter":"REPRO zz-j3r-bit-batch (real adapter): single receipt has message 'Bit changed. Kept from the previous bit…'; batch of one and of two items returns results [{command,operationId}] with no message, values 2400/960/2.5 kept, PC toasts []; the apply_edits schema keeps a top-level message but strips one in a results item. The card note is local state set only by the card. ADR-306 Amd 4 :6-7 extends item 3 to apply_edits. P2 kept (Manual keeping values is decided behaviour; the disclosure is what breaks, as H8-P2-1)","known":false,"summary":"apply_edits update_operation {cnc:{toolId}} on a Manual operation keeps 2400/960/2.5 on a 1/16 in bit (correct) but pick() drops the kept-values message and the MCP results item schema has no message field; single mode returns it; no PC toast in either; the message test is single-only"},
   {"id":"J3-P2-3","severity":"P1","area":"fix-remote","file":"services/remote-control/app/src/ui/import-sheet.tsx","line":36,"anchor":"Contract: ADR-125 Amd 1 item 3 (imports report the scale with a warning); Twin: MCP receipt notices/bedFit and PC toast; ADR-125 Amd 2 Consequences acknowledges the phone gap but no phone change exists","evidence":"REPRO","verdict":"CONFIRMED","refuter":"READ import-sheet.tsx:36-47 fixed 'Imported.', controller.ts:332-334 reads only changedArtworkIds, no notices/bedFit anywhere in the phone app; ADR-125 Amd 2 :58-60 states the same. RAISED P2 -> P1 (§3): H8-P1-2 was P1 because no warning reached the phone, MCP or PC; the PC toast lasts 8 s (toast-store.ts:20) and the phone-only import -> Frame -> Review -> Start workflow (ADR-569) never shows it; the phone canvas and Transform size show the result, not the mismatch; a $INSUNITS 22 DXF looks normal. P2 only if the coordinator counts a PC toast as reaching a phone operator. Raised rather than KNOWN because H8-P1-2 is closed as fixed by #1470","known":false,"summary":"H8-P1-2's phone half is unfixed: the phone Import sheet shows the fixed 'Imported.' and ignores the receipt's notices and bedFit, so a phone import scaled to 36% (or an assumed $INSUNITS) is announced as plain success; only a transient PC toast warns"},
   {"id":"J3-P3-1","severity":"P3","area":"fix-remote","file":"src/io/dxf/dxf-expand.ts","line":253,"anchor":"Contract: ADR-269 Amd 1 item 2 ('a file may place 500,000 points'; 'A large drawing whose geometry sits in a block placed once stays within it'); Twin: same drawing flat vs wrapped","evidence":"REPRO","verdict":"CONFIRMED","refuter":"REPRO zz-j3r-dxf-budget (real parseDxf): 1,000 INSERTs of a 100-point PART in SHEET (100,000 points, ~34.5 KB) through 0-4 one-INSERT wrapper blocks: 0-2 wrappers import 100,000, 3 and 4 are refused 'more than 500,000 points'; each level adds the full count. Item 2's 'at any nesting' can be read either way; :57-58 and the message disagree with the code. P3 kept","known":false,"summary":"The block budget re-counts inner copies at every nesting level: 1,000 copies of a 260-point part (260,000 points) import flat but are refused when wrapped in one SHEET block placed once (522,000 counted), with a message claiming more than 500,000 points"},
