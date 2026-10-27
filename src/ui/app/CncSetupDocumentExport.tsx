@@ -12,6 +12,10 @@ import { Button } from '../kit';
 import type { SaveGcodeCtx } from './file-actions';
 import type { PrebuiltGcodeSave } from './transactional-gcode-save';
 import { advanceExportVariables } from './advance-export-variables';
+import {
+  cncExportOtherControllersNote,
+  cncProjectExportAdvisories,
+} from './cnc-export-controller-advisory';
 import { suggestedGcodeName } from './file-action-formatters';
 
 type Props = {
@@ -40,18 +44,14 @@ export function CncSetupDocumentExport(props: Props): JSX.Element | null {
     if (!currentDocumentArtifact(props)) return;
     writing.current = true;
     setSaving(true);
+    // As Save as states it on each attempt: the programs are GRBL-only (ADR-399 Amendment 1).
+    for (const advisory of cncProjectExportAdvisories(props.artifact.project)) {
+      props.ctx.pushToast(advisory, 'warning');
+    }
     // Select one destination in this user gesture; every included program is already prepared.
     void pickSetupDestination(props, filename)
       .then(async (selected) => {
-        if (selected === null) return;
-        if (!currentDocumentArtifact(props)) return;
-        await selected.write(document.html);
-        advanceExportVariables(props.ctx);
-        props.ctx.pushToast(
-          'Saved CNC setup sheet and exact program package to ' + selected.displayName,
-          'success',
-        );
-        props.onSaved();
+        if (selected !== null) await writeSetupPackage(props, selected, document.html);
       })
       .catch((error: unknown) => {
         props.ctx.pushToast(
@@ -173,6 +173,8 @@ function useSetupDocument(props: Props, filename: string, mode: CncSetupExportMo
       warnings: [
         ...props.artifact.prepared.advisories.map((issue) => issue.message),
         ...props.artifact.prepared.machineWarnings,
+        // The printed sheet goes to the machine with the programs (ADR-399 Amendment 1).
+        ...cncProjectExportAdvisories(props.artifact.project),
       ],
       generatedAtIso: new Date().toISOString(),
     });
@@ -185,6 +187,31 @@ function currentDocumentArtifact(props: Props): boolean {
     'warning',
   );
   return false;
+}
+
+export const SETUP_PACKAGE_SAVED_BEFORE_CHANGE =
+  'Saved the setup package from before the project changed. Reopen Save G-code to include the change.';
+
+// The picker has already emptied the chosen file, so a project change while it
+// was open no longer cancels the write: the file gets the package the operator
+// clicked Save for, and says so (ADR-656 Amendment 1, rolling audit v4 H3-P3-2).
+async function writeSetupPackage(props: Props, selected: SaveTarget, html: string): Promise<void> {
+  await selected.write(html);
+  advanceExportVariables(props.ctx);
+  props.ctx.pushToast(
+    'Saved CNC setup sheet and exact program package to ' + selected.displayName,
+    'success',
+  );
+  if (useStore.getState().project !== props.artifact.project) {
+    props.ctx.pushToast(SETUP_PACKAGE_SAVED_BEFORE_CHANGE, 'warning');
+  }
+  // As after Save as: no controller confirmed the GRBL profile this session.
+  const note = cncExportOtherControllersNote(
+    props.artifact.project.device,
+    props.ctx.controllerSettings,
+  );
+  if (note !== null) props.ctx.pushToast(note, 'info');
+  props.onSaved();
 }
 async function pickSetupDestination(props: Props, filename: string): Promise<SaveTarget | null> {
   return props.ctx.platform.pickFileForSave({

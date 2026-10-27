@@ -4,6 +4,7 @@
 // caller supplies normalized bytes and the fresh inspection of those bytes.
 
 import { type ExternalProgram, type ExternalProgramReview } from '../../core/external-program';
+import type { KerfDeskBitFile } from '../../core/external-program/kerfdesk-bit-file';
 import type { ExternalRun } from './external-run';
 import type { RunStart } from './use-external-program';
 
@@ -25,6 +26,7 @@ export function prepareExternalRun(
   program: ExternalProgram,
   start: RunStart,
   review: (gcode: string) => ExternalProgramReview,
+  bitFile: KerfDeskBitFile | null = null,
 ): PreparedExternalRun {
   const result = review(program.gcode);
   if (result.envelope === null) return { kind: 'refused', reasons: [NO_FRAME_ENVELOPE] };
@@ -36,6 +38,7 @@ export function prepareExternalRun(
       envelope: result.envelope,
       start,
       ...(program.controllerKind === undefined ? {} : { controllerKind: program.controllerKind }),
+      ...(bitFile === null ? {} : { bitFile }),
     },
     program,
     review: result,

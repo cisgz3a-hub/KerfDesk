@@ -15,6 +15,7 @@ import {
 } from '../../core/controllers/grbl/surface-grid-probe';
 import { machineSettingsReadBlockReason } from './machine-settings-read-readiness';
 import { spindleOffBlockReason } from './laser-probe-policy';
+import { probeCircuitBlockReason } from './probe-test-touch';
 import { useStore } from './store';
 import type { LiveRefs, LaserState } from './laser-store';
 import type { SafeWrite } from './laser-safe-write';
@@ -40,7 +41,12 @@ export function surfaceProbeBlockReason(state: LaserState): string | null {
     return 'The controller must report Idle before measuring a surface.';
   if (!surfaceReportUnitsKnown(state))
     return 'Read current-session controller settings to establish the coordinate report units first.';
-  return spindleOffBlockReason(state.statusReport.spindle, state.accessoryCache);
+  // Each point seeks Maximum downward travel until contact, as touch-off does,
+  // so the grid needs touch-off's test touch, checked last (ADR-103 Amendment 3).
+  return (
+    spindleOffBlockReason(state.statusReport.spindle, state.accessoryCache) ??
+    probeCircuitBlockReason(state)
+  );
 }
 
 function surfaceReportUnitsKnown(state: LaserState): boolean {

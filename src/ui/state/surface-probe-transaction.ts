@@ -81,7 +81,8 @@ export class SurfaceProbeTransaction {
   }
 
   reserve(): void {
-    this.set({ probeBusy: true, controllerOperation: this.operation });
+    // The grid uses up its test touch, as a touch-off does (probe-test-touch.ts).
+    this.set({ probeBusy: true, probeTestTouch: null, controllerOperation: this.operation });
   }
 
   private owns(): boolean {

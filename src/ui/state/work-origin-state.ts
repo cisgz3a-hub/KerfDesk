@@ -13,6 +13,7 @@
 
 import type { LaserState, WorkOriginSource } from './laser-store';
 import type { WorkCoordinateOffset } from './origin-actions';
+import type { BitFileSequenceState } from './bit-file-sequence';
 
 /** What the first accepted work-offset report of a connection showed. */
 export type OriginAtConnect = {
@@ -25,7 +26,8 @@ export type OriginAtConnect = {
   readonly restoredXy: { readonly x: number; readonly y: number } | null;
 };
 
-export type WorkOriginState = {
+// A set of per-bit files holds the X/Y origin between its runs (ADR-392 Amendment 4).
+export type WorkOriginState = BitFileSequenceState & {
   readonly workOriginActive: boolean;
   readonly workOriginSource: WorkOriginSource;
   // Monotonic identity for XY work-origin mutations. Place Board registration
