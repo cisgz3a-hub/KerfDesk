@@ -6,6 +6,7 @@ Method: [../2026-10-21-rolling-v2/METHOD.md](../2026-10-21-rolling-v2/METHOD.md)
 |---|---|---|---|---|---|---|---|---|---|
 | J1 | Recovery fixes | ff63ebb4b | [J1-fix-recovery.md](J1-fix-recovery.md) | 5 | 0 (P3-3 ADR-228 half refuted) | 0 | 1 | 4 | 2 |
 | J2 | Failure paths | 19a05d355 | [J2-failure-paths.md](J2-failure-paths.md) | 4 | 0 (P2-1 CNC half refuted) | 0 | 3 | 1 | 7 |
+| J4 | Trust boundaries | d2acacdbe | [J4-trust-boundaries.md](J4-trust-boundaries.md) | 1 | 0 | 0 | 0 | 1 | 7 |
 
 ## Confirmed P1/P2 (coordinator-verified)
 
