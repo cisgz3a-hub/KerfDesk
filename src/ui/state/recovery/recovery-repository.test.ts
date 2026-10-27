@@ -326,6 +326,28 @@ describe('RecoveryRepository', () => {
     });
   });
 
+  // ADR-398 Amendment 5 (rolling audit v4 H2-P2-2 b): a crash, reload or power
+  // loss may have taken the planner with the app, and the saved progress lags,
+  // so the promoted record steps back over the run's whole planner.
+  it.each([
+    ['the family default when the run measured none', undefined, 15],
+    ['the planner the run measured', { plannerBlocksAtIdle: 100 }, 100],
+  ] as const)('promotes a stale run with %s as its backlog', async (_label, observed, blocks) => {
+    const first = harness();
+    await first.repository.stageArtifact(await artifact('run-stale', undefined, observed));
+    await first.repository.activateFreshRun('run-stale', NOW);
+    await first.repository.updateProgress('run-stale', 2, LATER);
+
+    const reopened = harness({ backend: first.backend, generation: first.generation });
+    expect((await reopened.repository.initialize()).ok).toBe(true);
+    const capsule = reopened.repository.getSnapshot().recoveryCapsule;
+    const backlog = { ackedAtStatus: 2, queuedBlocks: blocks, bound: 'planner-size' };
+    expect(capsule?.interruption.plannerBacklog).toEqual(backlog);
+    expect(reopened.repository.getSnapshot().executionHistory.at(-1)?.interruption).toEqual(
+      capsule?.interruption,
+    );
+  });
+
   it('migrates the legacy fingerprint-only slot without inventing G-code', async () => {
     const checkpoint = createJobCheckpoint({
       gcode: 'G21\nG1 X1\nM5\n',

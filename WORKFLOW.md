@@ -3136,9 +3136,14 @@ authorization, Frame proof, controller command, or safety boundary.
   restore offers **Home machine** beside **Restore saved origin**: the operator homes and puts
   the origin back without closing the Review.
 - A recorded cause names what happened: **Abort** is recorded as stopped by the operator, and
-  closing or reloading KerfDesk mid-job as the app closing (its stop may not have arrived);
+  closing or reloading KerfDesk mid-job as the app closing, which sends Abort as it closes;
   only a stop nobody requested reads as unexplained. A recovery card another window has
   claimed, started or discarded refreshes in every open window.
+- Every stop that throws the controller's planner away steps the automatic restart back over the
+  moves it still had queued: Abort, a rejected line, a reboot, the reset KerfDesk sends when the
+  stream stalls or a job write fails, and the Abort the app sends as it closes. A run left active
+  by a crash, reload or power loss steps back over its controller's whole planner from the
+  progress last saved. The restart hint names the bound (ADR-398 Amendment 5).
 - **Start from line… → Choose restart point…** prepares the current project and opens the
   same route picker when a saved exact artifact is unavailable. This manual path requires the
   original work zero and preserves its existing disclosure that it creates no recovery record.
@@ -3152,6 +3157,12 @@ authorization, Frame proof, controller command, or safety boundary.
   the project's full program this control replays, so the field is not filled in and the hint
   points to the card's Review. The dialog and confirmation say which program the line counts
   (ADR-341 Amendment 10).
+  A Print-and-Cut or variable-text job is prepared as Start prepares it. Variable text keeps the
+  matched run's evaluation time, so dates and times match the part already burned. The job is
+  registered to the marks captured now when they are valid, else to the marks the matched run
+  used in this session; with neither, the restart is refused with Start's message, as it is
+  while Labs has Print and Cut switched off. The dialog and confirmation name the marks used,
+  and how far marks captured since move the job (ADR-443 Amendment 2).
   Costly image/fill preparation runs in the background for both manual and fingerprint-based
   recovery; worker failure is retryable and never falls back to blocking the canvas.
 - Recovery preserves the saved scope and resolved placement. It uses its separate source,

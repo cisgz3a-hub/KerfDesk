@@ -27,3 +27,13 @@ export function currentPrintCutOutputRegistration(
   );
   return resolved.kind === 'valid' ? resolved.transform : null;
 }
+
+/** True when the project takes a registration but Labs has Print and Cut
+ * switched off: Start refuses its output, and a restart refuses it too, even
+ * with marks an earlier run used (ADR-443 Amendment 2). */
+export function printCutOutputSwitchedOff(project: Project): boolean {
+  return (
+    currentPrintCutOutputRegistration(project) !== undefined &&
+    !useExperimentalLaserFeatures.getState().features.printAndCut
+  );
+}
