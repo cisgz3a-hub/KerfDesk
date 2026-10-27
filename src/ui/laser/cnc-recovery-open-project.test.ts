@@ -86,7 +86,13 @@ async function settle(ms = 20): Promise<void> {
   for (let i = 0; i < 40; i += 1) await Promise.resolve();
 }
 
-function line(id: string, color: string, y: number): SceneObject {
+/** An open line from x 10 to 70 at height `y`, through the given inner xs. */
+function line(
+  id: string,
+  color: string,
+  y: number,
+  innerXs: ReadonlyArray<number> = [40],
+): SceneObject {
   return {
     kind: 'imported-svg',
     id,
@@ -96,16 +102,7 @@ function line(id: string, color: string, y: number): SceneObject {
     paths: [
       {
         color,
-        polylines: [
-          {
-            points: [
-              { x: 10, y },
-              { x: 40, y },
-              { x: 70, y },
-            ],
-            closed: false,
-          },
-        ],
+        polylines: [{ points: [10, ...innerXs, 70].map((x) => ({ x, y })), closed: false }],
       },
     ],
   };
@@ -153,27 +150,7 @@ function runwayProject(): Project {
     ...twoBitProject(),
     scene: {
       ...EMPTY_SCENE,
-      objects: [
-        {
-          ...line('a', RED, 10),
-          paths: [
-            {
-              color: RED,
-              polylines: [
-                {
-                  points: [
-                    { x: 10, y: 10 },
-                    { x: 30, y: 10 },
-                    { x: 50, y: 10 },
-                    { x: 70, y: 10 },
-                  ],
-                  closed: false,
-                },
-              ],
-            },
-          ],
-        },
-      ],
+      objects: [line('a', RED, 10, [30, 50])],
       layers: [createLayer({ id: 'red', color: RED })],
     },
   };
