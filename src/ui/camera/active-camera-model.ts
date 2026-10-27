@@ -6,7 +6,8 @@
 // the machine is set up with now (rolling audit 12-P2-2): moved when only the
 // bed size or the native offset changed, and not usable after an origin
 // change. A camera on the laser head (ADR-449) is placed where the head is
-// now, and is not usable while that is unknown.
+// now, and is not usable while that is unknown, or while the head's Z is away
+// from the Z it was calibrated at (Amendment 2).
 
 import { useMemo } from 'react';
 import {
@@ -14,21 +15,24 @@ import {
   type CameraBedFrame,
   type CameraBedFrameNote,
 } from '../../core/camera/model/camera-bed-frame';
-import { isHeadCameraModel, modelAtHead } from '../../core/camera/model/head-camera';
+import {
+  headCameraZChange,
+  isHeadCameraModel,
+  modelAtHead,
+} from '../../core/camera/model/head-camera';
 import { cameraModelInUse, ownModelFor } from '../../core/camera/model/saved-cameras';
 import type { CameraModelRecord } from '../../core/camera/model/camera-model-record';
 import type { DeviceProfile } from '../../core/devices/device-profile';
-import type { Vec2 } from '../../core/scene';
 import { useStore } from '../state';
 import { useCameraStore, type CameraSourceState } from '../state/camera-store';
 import { cameraBedFrameNow, modelInBedFrame, useCameraBedFrame } from './camera-bed-frame-now';
 import { cameraSourceIdentity } from './frame-source';
-import { headPositionNow, useHeadPositionOnBed } from './head/head-position';
+import { headPositionNow, useHeadPositionOnBed, type HeadPosition } from './head/head-position';
 
 export function activeCameraModel(
   device: Pick<DeviceProfile, 'cameraModel' | 'otherCameraModels'>,
   sourceState: CameraSourceState,
-  head: Vec2 | null = headPositionNow(),
+  head: HeadPosition | null = headPositionNow(),
   bedFrame: CameraBedFrame = cameraBedFrameNow(),
 ): CameraModelRecord | undefined {
   const model = cameraModelInUse(
@@ -48,9 +52,12 @@ const placedAt = new WeakMap<
   { readonly key: string; readonly model: CameraModelRecord }
 >();
 
-function placedModel(model: CameraModelRecord, head: Vec2 | null): CameraModelRecord | undefined {
+function placedModel(
+  model: CameraModelRecord,
+  head: HeadPosition | null,
+): CameraModelRecord | undefined {
   if (!isHeadCameraModel(model)) return model;
-  if (head === null) return undefined;
+  if (head === null || headCameraZChange(model, head.z) !== null) return undefined;
   const key = `${head.x},${head.y}`;
   const cached = placedAt.get(model);
   if (cached?.key === key) return cached.model;

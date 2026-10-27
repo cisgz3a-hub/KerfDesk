@@ -10,6 +10,7 @@ import {
 } from './execution-artifact';
 import { recoveryClaimIsExpired, type PersistedRecoverySlots } from './recovery-model';
 import { appendBoundedExecutionHistory } from './execution-history';
+import { runPlannerBlocks } from './run-planner-blocks';
 
 export type SlotMutation<T> = {
   readonly slots: PersistedRecoverySlots;
@@ -345,19 +346,37 @@ export function activateClaimedRecoveryMutation(
   };
 }
 
+/** `hydrated`: the loaded run, whose artifact names its controller's planner.
+ * A crash, reload or power loss may have taken that planner with the app (a
+ * USB-powered board, a reset at the next connect), and the saved progress lags
+ * the acknowledged lines, so the restart steps back over a whole planner from
+ * the saved count. A controller that kept running re-burns those moves, which
+ * ADR-398 Decision 2 prefers to skipping them (ADR-398 Amendment 5). */
 export function promoteStaleActiveRunMutation(
   slots: PersistedRecoverySlots,
   updatedAtIso: string,
   expectedRunId?: RunId,
+  hydrated?: { readonly runId: RunId; readonly artifact: ExecutionArtifactV1 } | null,
 ): SlotMutation<boolean> {
   const active = slots.activeRun;
   if (active === null) return unchanged(slots, false);
   // The caller checked this run's owner is gone; a different run is not its to promote.
   if (expectedRunId !== undefined && active.runId !== expectedRunId) return unchanged(slots, false);
+  const plannerBlocks =
+    hydrated?.runId === active.runId ? runPlannerBlocks(hydrated.artifact) : undefined;
   const revision = slots.revision + 1;
   const interruption = {
     kind: 'unknown' as const,
     message: 'The application restarted while this job was active.',
+    ...(plannerBlocks === undefined
+      ? {}
+      : {
+          plannerBacklog: {
+            ackedAtStatus: active.ackedLines,
+            queuedBlocks: plannerBlocks,
+            bound: 'planner-size' as const,
+          },
+        }),
   };
   const historyRecord = {
     runId: active.runId,

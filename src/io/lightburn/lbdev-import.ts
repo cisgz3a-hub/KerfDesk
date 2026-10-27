@@ -201,12 +201,28 @@ function deviceCountReview(device: ParsedLightBurnDevice): LightBurnImportReview
 }
 
 function controllerReview(device: ParsedLightBurnDevice): LightBurnImportReviewField[] {
-  if (device.isGrbl) return [];
+  if (device.isGrbl) return grblVariantReview(device);
   return [
     {
       label: 'Controller',
       value: device.controller ?? 'Unknown',
       note: 'Only GRBL-compatible LightBurn devices can become KerfDesk profiles.',
+    },
+  ];
+}
+
+// Rolling audit v4 H4-P3-1: LightBurn's GRBL-LPC, GRBL-M3 and grblHAL drivers
+// name other firmware builds (Creality's Falcon A1 Pro file says GRBL-LPC).
+// The profile is still made as stock GRBL with no vendor command set, so the
+// review says so instead of claiming the driver was mapped.
+function grblVariantReview(device: ParsedLightBurnDevice): LightBurnImportReviewField[] {
+  const driver = device.controller?.trim();
+  if (driver === undefined || driver.toLowerCase() === 'grbl') return [];
+  return [
+    {
+      label: 'Controller',
+      value: driver,
+      note: `KerfDesk set this up as stock GRBL with no vendor command set. LightBurn's ${driver} driver is another firmware build: choose the machine from the list, or its firmware in Connection options, before the first job.`,
     },
   ];
 }

@@ -18,6 +18,7 @@ export function resetStore(): void {
     projectSaveRequestEpoch: 0,
     projectSavedRequestEpoch: null,
     projectSaveWriteCoordinator: createProjectSaveWriteCoordinator(),
+    projectBedReconciliation: null,
     probeSetupEpoch: 0,
     selectedObjectId: null,
     selectedPathNode: null,

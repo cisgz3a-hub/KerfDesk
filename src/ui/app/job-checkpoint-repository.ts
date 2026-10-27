@@ -3,7 +3,7 @@
 
 import type { StreamerStatus } from '../../core/controllers/grbl';
 import type { JobInterruption } from '../../core/recovery';
-import { currentJobStopRequest } from '../state/job-stop-request';
+import { currentJobStopRequest, currentStreamWasReset } from '../state/job-stop-request';
 import { isProvisionalResetFreeze } from '../state/laser-reset-terminal-state';
 import { isUnarchivedRun } from '../state/laser-unarchived-run';
 import { useLaserStore, type LaserState } from '../state/laser-store';
@@ -71,6 +71,8 @@ export function disappearedStreamInterruption(
       currentJobStopRequest(state),
       currentRunPlannerBacklog(state),
       runStopMayHaveLostPosition(state),
+      undefined,
+      currentStreamWasReset(state),
     ) ?? {
       kind: state.connection.kind === 'connected' ? 'unknown' : 'disconnect',
       message:
@@ -99,6 +101,7 @@ export function observedStreamInterruption(
     state.streamer === null
       ? undefined
       : Math.min(state.streamer.total, state.streamer.completed + state.streamer.inFlight.length),
+    currentStreamWasReset(state),
   );
 }
 

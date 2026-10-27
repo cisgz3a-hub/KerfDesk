@@ -371,7 +371,7 @@ export class RecoveryRepository {
     // ADR-369 Amendment 1: a run another window still streams is not stale.
     return this.runOwnership.unlessLive(this.state.snapshot.activeRun?.runId, ok(false), (runId) =>
       this.mutateAndRefresh('promote stale active run to recovery', (slots) =>
-        promoteStaleActiveRunMutation(slots, this.nowIso(), runId),
+        promoteStaleActiveRunMutation(slots, this.nowIso(), runId, this.state.snapshot.activeRun),
       ),
     );
   }

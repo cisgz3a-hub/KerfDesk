@@ -32,6 +32,18 @@ export function currentJobStopRequest(state: {
   return request !== null && request.streamerEpoch === state.streamerEpoch ? request : null;
 }
 
+/** True when KerfDesk sent a reset against the current stream: Abort, the
+ * automatic stop after a rejected line, or the reset that contains a lost
+ * heartbeat or a failed job write. Any of them discards the controller's
+ * planner, so recovery steps back over it (ADR-398 Amendment 5). */
+export function currentStreamWasReset(state: {
+  readonly streamReset?: StreamReset | null;
+  readonly streamerEpoch: number;
+}): boolean {
+  const reset = state.streamReset ?? null;
+  return reset !== null && reset.streamerEpoch === state.streamerEpoch;
+}
+
 /** True when a reset KerfDesk sent against the current stream may have cost
  * position. A reset recorded for an earlier stream never describes this one. */
 export function currentStreamResetMayLosePosition(state: {
@@ -71,9 +83,12 @@ export function streamResetRecord(
   };
 }
 
+// The desktop close awaits its Abort; a web page or a forced Windows restart
+// may end first (ADR-548 Amendment 1). Either way recovery steps back over the
+// planner, so the note claims no more than that the Abort was sent.
 export function jobStopRequestMessage(reason: JobStopReason): string {
   return reason === 'app-closing'
-    ? 'KerfDesk was closed or reloaded while the job was running and sent a stop to the controller. The stop may not have arrived before the page closed.'
+    ? 'KerfDesk was closed or reloaded while the job was running, and sent the controller an Abort as it closed.'
     : 'Stopped by the operator (Abort).';
 }
 

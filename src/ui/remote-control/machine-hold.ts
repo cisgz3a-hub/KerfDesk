@@ -1,9 +1,13 @@
+import type { JogParams } from '../../core/controllers/grbl';
 import { jogAxisSignsForOrigin } from '../../core/devices';
 import { deviceForActiveHead } from '../../core/cnc/cnc-head-feeds';
-import { machineKindOf, type Project } from '../../core/scene';
-import { clampJogFeed, stepJogVector } from '../laser/jog-control-policy';
+import type { Project } from '../../core/scene';
+import { clampJogFeed, continuousJogVector } from '../laser/jog-control-policy';
+import { holdJogAim, holdZRoomMm, type HoldJogInput } from '../laser/jog-hold-aim';
 import { focusJogReady } from '../laser/FocusJogControls';
+import { motionMachineKind } from '../state/job-motion-machine';
 import { useLaserStore } from '../state/laser-store';
+import { selectNativeBedEvidence } from '../state/native-bed-frame';
 import { useStore } from '../state/store';
 import type { MachineExecutionOwner } from '../state/machine-execution-owner';
 import type { MachineExecutionContext } from './machine-execution';
@@ -18,14 +22,20 @@ import { RemoteFault } from './fault';
  * the phone releases, its socket closes, the grant ends or this renderer session ends.
  */
 export const HOLD_DEADMAN_MS = 600;
-/** One hold never travels further than an ordinary remote step (ADR-569 bound). */
+/**
+ * One hold never travels further than an ordinary remote step (ADR-569 bound), nor past the
+ * travel edge the PC's own hold stops at (ADR-375 Amendment 8).
+ */
 export const HOLD_MAX_TRAVEL_MM = 100;
 export const HOLD_MAX_Z_TRAVEL_MM = 20;
+// continuousJogVector drops a distance of 1 µm or less, so a hold never asks for less.
+const HOLD_MIN_TRAVEL_MM = 1e-3;
+const AT_LIMIT = 'The head is already at the travel limit in that direction.';
 
 type HoldInput = Extract<MachineCommand, { readonly command: 'jog_hold_start' }>;
 
 /** The bounded jog one hold may make, using the desktop's axis signs and feed limits. */
-function holdVector(input: HoldInput, project: Project) {
+function holdVector(input: HoldInput, project: Project): JogParams {
   const laser = useLaserStore.getState();
   if (!laser.capabilities.jogCancel)
     throw new MachineRefusal(
@@ -33,23 +43,53 @@ function holdVector(input: HoldInput, project: Project) {
     );
   if (laser.capabilities.jog === 'none') throw new RemoteFault('unsupported_operation');
   const z = input.args.axis === 'z';
-  if (z && !focusJogReady(project.device, machineKindOf(project.machine)))
+  // A running job's own kind decides Z jog (ADR-416 Amendment 3).
+  if (z && !focusJogReady(project.device, motionMachineKind(laser, project)))
     throw new RemoteFault('unsupported_operation');
   const maximum = deviceForActiveHead(project.device, project.machine).maxFeed;
   const feed = clampJogFeed(
     input.args.feedMmPerMin ?? (z ? 600 : 3000),
     z ? Math.min(maximum, 600) : maximum,
   );
-  if (z) return { dz: input.args.direction * HOLD_MAX_Z_TRAVEL_MM, feed };
-  return stepJogVector(
-    {
-      x: input.args.axis === 'x' ? input.args.direction : 0,
-      y: input.args.axis === 'y' ? input.args.direction : 0,
-    },
-    HOLD_MAX_TRAVEL_MM,
-    jogAxisSignsForOrigin(project.device.origin),
+  // The PC hold's own aim: up to the travel edge, measured from the head
+  // (ADR-375 decision 3, Amendments 4 and 8), and never past the remote bound.
+  const aim: HoldJogInput = {
+    device: project.device,
+    evidence: selectNativeBedEvidence(laser),
+    statusReport: laser.statusReport,
+    wcoCache: laser.wcoCache,
+    reportInches: laser.controllerSettings?.reportInches === true,
+  };
+  return z ? holdZVector(input, aim, feed) : holdXyVector(input, aim, feed);
+}
+
+function holdZVector(input: HoldInput, aim: HoldJogInput, feed: number): JogParams {
+  const { direction } = input.args;
+  const travel = Math.min(HOLD_MAX_Z_TRAVEL_MM, holdZRoomMm(aim, direction) ?? Infinity);
+  if (travel <= HOLD_MIN_TRAVEL_MM) throw new MachineRefusal(AT_LIMIT);
+  return { dz: direction * travel, feed };
+}
+
+function holdXyVector(input: HoldInput, aim: HoldJogInput, feed: number): JogParams {
+  const { axis, direction } = input.args;
+  const { bounds, position } = holdJogAim(aim);
+  const vector = continuousJogVector(
+    { x: axis === 'x' ? direction : 0, y: axis === 'y' ? direction : 0 },
+    position,
+    bounds,
+    jogAxisSignsForOrigin(aim.device.origin),
     feed,
   );
+  if (vector === null) throw new MachineRefusal(AT_LIMIT);
+  return {
+    ...(vector.dx === undefined ? {} : { dx: capped(vector.dx) }),
+    ...(vector.dy === undefined ? {} : { dy: capped(vector.dy) }),
+    feed,
+  };
+}
+
+function capped(distanceMm: number): number {
+  return Math.sign(distanceMm) * Math.min(Math.abs(distanceMm), HOLD_MAX_TRAVEL_MM);
 }
 
 export async function executeHold(

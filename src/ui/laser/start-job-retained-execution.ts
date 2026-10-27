@@ -9,7 +9,7 @@ import {
 } from '../state/laser-unarchived-run';
 import type { ExecutionArtifactV1, RecoveryRepository, RunId } from '../state/recovery';
 import { freshRunOwnershipMatches } from '../state/recovery/fresh-run-ownership';
-import { currentJobStopRequest } from '../state/job-stop-request';
+import { currentJobStopRequest, currentStreamWasReset } from '../state/job-stop-request';
 import {
   checkpointInterruption,
   currentRunPlannerBacklog,
@@ -74,6 +74,7 @@ function observedTerminal(runId: RunId, state: LaserState, previous: LaserState)
       currentRunPlannerBacklog(state),
       runStopMayHaveLostPosition(state),
       Math.min(streamer.total, streamer.completed + streamer.inFlight.length),
+      currentStreamWasReset(state),
     );
     if (interruption !== null) return interrupted(streamer.completed, interruption);
   }

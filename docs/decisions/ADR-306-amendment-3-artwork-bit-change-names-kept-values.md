@@ -1,7 +1,8 @@
 ## ADR-306 Amendment 3 - An Artwork bit change names the hand-edited values it keeps (2026-10-23)
 
-**Status:** Accepted; software-verified through unit and component tests, hardware qualification pending. |
-**Date:** 2026-10-23
+**Status:** Accepted; software-verified through unit and component tests, hardware qualification pending.
+Items 2 and 3 extended to Remote Control by
+[Amendment 4](ADR-306-amendment-4-remote-bit-change-follows-the-card.md). | **Date:** 2026-10-23
 
 ADR-306 carries two unnumbered amendments in `DECISIONS.md` (CNC setup within Essentials,
 2026-09-21; direct operation choices, 2026-09-22). This is the third. It changes no Frame or Start

@@ -30,7 +30,6 @@ import {
   type LayerMoveDirection,
   type Project,
   type RasterImage,
-  type Scene,
   type SceneObject,
   type ShapeObject,
   type TextObject,
@@ -101,7 +100,7 @@ import {
 import type { InteractionHistorySnapshot } from './interaction-history-snapshot';
 import { sceneGroupActions, type SceneGroupActions } from './scene-group-actions';
 import { sceneLockActions, type SceneLockActions } from './scene-lock-actions';
-import { generatedSceneActions } from './generated-scene-actions';
+import { generatedSceneActions, type GeneratedSceneActions } from './generated-scene-actions';
 import { projectSettingsActions, type ProjectSettingsActions } from './project-settings-actions';
 import {
   selectionTransformActions,
@@ -121,6 +120,7 @@ import {
   type PathNodeCurveCommandActions,
 } from './path-node-curve-command-actions';
 import type { ImportOutcome, TraceExistingImageOptions } from './scene-mutations';
+import type { ImportFitOptions } from './import-bed-fit';
 import type { TextInsertOptions } from './scene-mutations';
 import { objectInsertActions } from './object-insert-actions';
 import { objectDeleteActions, type ObjectDeleteActions } from './object-delete-actions';
@@ -264,7 +264,7 @@ export type AppState = PartGeneratorActions &
     readonly sceneClipboard: SceneClipboard | null;
     readonly layerDefaults: LayerDefaultsState;
 
-    readonly replaceSceneWithGeneratedScene: (scene: Scene, selectGenerated?: boolean) => void;
+    readonly replaceSceneWithGeneratedScene: GeneratedSceneActions['replaceSceneWithGeneratedScene'];
 
     // batchOffsetIdx (default 0) shifts the imported object by 10mm × N to the
     // right and down (F-A3 multi-import). The first file in a batch passes 0,
@@ -275,7 +275,11 @@ export type AppState = PartGeneratorActions &
     // display filename. Explicit re-import is a separate selected-target
     // action so filename collisions cannot silently replace artwork.
     // Raster bitmap import + ADR-026 trace-on-selection — both in import-actions.ts.
-    readonly importRasterImage: (object: SceneObject, batchIdx?: number) => ImportOutcome;
+    readonly importRasterImage: (
+      object: SceneObject,
+      batchIdx?: number,
+      options?: ImportFitOptions,
+    ) => ImportOutcome;
     // Overlay a vector trace onto an already-imported bitmap (the Trace tool).
     readonly traceExistingImage: (
       sourceId: string,

@@ -14,8 +14,12 @@ import { openMachineSetup } from '../laser/device-setup';
 import { useStore } from '../state';
 import { cncOperationMaterialKey } from '../state/cnc-feed-provenance';
 import {
+  cncOperationWithMaterialBinding,
+  cncSettingsAfterOperationChoice,
+  type CncOperationChoice,
+} from '../state/cnc-operation-choice';
+import {
   cncStartupOperationDraft,
-  sceneWithCncStartupOperationDrafts,
   type CncStartupOperationDraft,
 } from '../state/cnc-startup-setup';
 import {
@@ -25,7 +29,7 @@ import {
 } from './CncKeptFeedsNotice';
 import { CncOperationToolSelect } from './CncOperationToolSelect';
 
-type BindingPatch = Partial<Omit<CncStartupOperationDraft, 'layerId'>>;
+type BindingPatch = CncOperationChoice;
 const JOB_MATERIAL_VALUE = '__job-material__';
 
 type OperationToolProps = {
@@ -47,19 +51,20 @@ export function CncOperationToolFields(props: OperationToolProps): JSX.Element |
   const liveCaps = useStore((state) => state.cncLiveCaps);
   const [keptFeeds, setKeptFeeds] = useState<CncKeptFeeds | null>(null);
   if (machine?.kind !== 'cnc') return null;
-  const operation = operationWithMaterialBinding(props.layer, props.settings);
-  const draft = cncStartupOperationDraft(operation);
+  const draft = cncStartupOperationDraft(
+    cncOperationWithMaterialBinding(props.layer, props.settings),
+  );
   const jobDefault = machine.tools.find((tool) => tool.id === machine.toolId);
   const commit = (patch: BindingPatch): void => {
-    const scene = sceneWithCncStartupOperationDrafts({
-      scene: { layers: [operation], objects: [] },
+    const next = cncSettingsAfterOperationChoice({
+      layer: props.layer,
+      settings: props.settings,
       machine,
       profile,
       liveCaps,
-      drafts: [{ ...draft, ...patch }],
+      choice: patch,
     });
-    const next = scene.layers[0];
-    if (next === operation || next?.cnc === undefined) return;
+    if (next === null) return;
     // A primary bit that keeps hand-edited values says so (CNC audit v1 F4-P2-1).
     if ('toolId' in patch) {
       setKeptFeeds(
@@ -67,12 +72,12 @@ export function CncOperationToolFields(props: OperationToolProps): JSX.Element |
           machine,
           layerId: props.layer.id,
           before: props.settings,
-          after: next.cnc,
+          after: next,
           materialKey: cncOperationMaterialKey(props.settings) ?? props.editedFromMaterialKey,
         }),
       );
     }
-    props.onCommitSettings(next.cnc, 'materialKey' in patch || 'toolId' in patch);
+    props.onCommitSettings(next, 'materialKey' in patch || 'toolId' in patch);
   };
   return (
     <section className="lf-cnc-settings-card" aria-label="Bit and material">
@@ -240,14 +245,4 @@ function secondaryFeedHint(
 
 function materialName(key: string): string {
   return CHIPLOAD_MATERIALS.find((material) => material.value === key)?.label ?? key;
-}
-
-// Older recipes can carry their material only in provenance. Present and edit
-// that binding consistently without changing the project merely by opening it.
-function operationWithMaterialBinding(layer: Layer, settings: CncLayerSettings): Layer {
-  const materialKey = cncOperationMaterialKey(settings);
-  return {
-    ...layer,
-    cnc: materialKey === undefined ? settings : { ...settings, materialKey },
-  };
 }

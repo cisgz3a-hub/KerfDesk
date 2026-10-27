@@ -142,6 +142,9 @@ therefore sent moves the firmware refuses, or trusted values the controller had 
      point.
    - Both only shorten a move KerfDesk already sends. Step jogs, typed head moves and Frame corners
      are unchanged (ADR-232 leaves those limits to the controller). No new refusal.
+     *(Extended by [Amendment 8](ADR-375-amendment-8-phone-hold-aims-like-the-pc-hold.md): the
+     phone's hold-to-jog aims inside the same limits, capped at its 100 mm bound, and its Z hold
+     inside the firmware's Z envelope.)*
 
 4. **Fire at the power it shows** (P-2).
    - GRBL and grblHAL scale every S word by the spindle override, and an override raised during a

@@ -181,6 +181,26 @@ describe('addCalibrationTargetToCanvas', () => {
     expect(rememberedEngravedTarget(device, false)).toMatchObject({ area, layoutMm: 12 });
     useStore.setState({ project: before });
   });
+
+  it('puts the artwork and Start from back in one Undo step (ADR-654 Amendment 2)', () => {
+    const before = useStore.getState().project;
+    useStore.setState({ jobPlacement: { startFrom: 'user-origin', anchor: 'center' } });
+    addCalibrationTargetToCanvas(SETTINGS);
+    const target = useStore.getState().project;
+
+    useStore.getState().undo();
+    expect(useStore.getState().project).toBe(before);
+    expect(useStore.getState().jobPlacement).toEqual({
+      startFrom: 'user-origin',
+      anchor: 'center',
+    });
+
+    useStore.getState().redo();
+    expect(useStore.getState().project).toBe(target);
+    expect(useStore.getState().project.jobSetup.placement.startFrom).toBe('absolute');
+    expect(useStore.getState().jobPlacement).toEqual({ startFrom: 'absolute', anchor: 'center' });
+    useStore.setState({ project: before });
+  });
 });
 
 describe('engraveCalibrationTarget', () => {

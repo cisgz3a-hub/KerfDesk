@@ -80,7 +80,7 @@ async function runEntityPass(
   args: { readonly id: string; readonly source: string },
   report: ProgressReport | undefined,
 ): Promise<EntityPassOutcome> {
-  const collector = createDxfEntityCollector(metadata, args);
+  const collector = createDxfEntityCollector(metadata, args, blob.size);
   let hasSeenEntities = false;
   let hasLateMetadata = false;
   const scanner = createDxfSectionNameScanner((name) => {

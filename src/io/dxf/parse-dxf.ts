@@ -17,7 +17,11 @@ export function parseDxf(args: {
   const metadataCollector = createDxfMetadataCollector();
   const metadataResult = runLinePass(args.dxfText, metadataCollector);
   if (metadataResult.kind === 'error') return metadataResult;
-  const entityCollector = createDxfEntityCollector(metadataCollector.finish(), args);
+  const entityCollector = createDxfEntityCollector(
+    metadataCollector.finish(),
+    args,
+    args.dxfText.length,
+  );
   const entityResult = runLinePass(args.dxfText, entityCollector);
   return entityResult.kind === 'error' ? entityResult : entityCollector.finish();
 }
