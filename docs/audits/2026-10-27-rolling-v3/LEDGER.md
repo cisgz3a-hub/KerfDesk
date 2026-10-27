@@ -15,6 +15,27 @@ Method: [../2026-10-21-rolling-v2/METHOD.md](../2026-10-21-rolling-v2/METHOD.md)
 | G7 | App shell, licensing and remote | 9a2bf6b13 | [G7-app-shell-remote.md](G7-app-shell-remote.md) | 3 | 0 | 1 (P3-1 raised) | 0 | 2 | 3 (01-P2-5, 02-P3-4, 01-P2-3 relay redeploy) |
 | G8 | Release, CI and website | 9a2bf6b13 | [G8-release-ci-website.md](G8-release-ci-website.md) | 3 | 0 | 0 | 0 | 3 | 9 |
 | G9 | Canvas and scene | 9a2bf6b13 | [G9-canvas-scene.md](G9-canvas-scene.md) | 5 | 0 | 0 | 1 | 4 | 1 (15-P2-1 severity) |
+| G10 | Image, raster and trace | 9a2bf6b13 | [G10-image-raster-trace.md](G10-image-raster-trace.md) | 2 | 0 (P3-1 narrowed) | 0 | 0 | 2 | 10 (incl. G9-P2-1) |
+
+**v3 totals (2026-10-27, all ten areas):** 29 raised, 0 refuted (G10-P3-1 narrowed). P1 7, P2 5, P3 17, plus 40 KNOWN re-observed (with overlaps).
+
+- **Where the P1s are.** Every one is a path that skips a guard or a frame its sibling has:
+  - CNC recovery against the open project (G2);
+  - FluidNC `[key]value` and Smoothieware `G20` Console unit switches (G4);
+  - stacked copies in the lead wall model (G5);
+  - the camera target and stitched picture stamped at the wrong moment (G6);
+  - MCP board capture during motion (G7).
+- **The P2s.** Three are tone-calibration twins that missed the new curve or power scale (G1, G3, G9). The other two are a camera notice and nudge advice (G6).
+- **What held.**
+  - Merge-conflict resolutions kept both sides everywhere.
+  - #1442 and #1444 (merged without CI) pass their tests.
+  - The release and deploy gates held through the 2026-10-26 CI outage.
+- **Record corrections.**
+  - Rolling-v2 06-P2-5 is only partly fixed.
+  - Controller v2 C6-P3-1 rises to P1.
+  - 12-P2-2, 12-P2-1, M2-P3-3 and 15-P2-1 were P1 by effect.
+  - METHOD §3 now says Frame is not a warning.
+- **Fix cards.** Six cards cover all 7 P1s and 5 P2s.
 
 ## v4 — workflow audit
 
