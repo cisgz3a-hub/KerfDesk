@@ -89,7 +89,7 @@ export async function waitForUnreportedFrameWorkOffset(
 ): Promise<void> {
   const before = useLaserStore.getState();
   // grblHAL sends every field, WCO included, on its complete-report request
-  // (ADR-673); elsewhere this is one more ordinary status query.
+  // (ADR-674); elsewhere this is one more ordinary status query.
   if (awaitsReportedWorkOffset(before, placement)) {
     void before.requestControllerStatus({ complete: true });
   }

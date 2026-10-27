@@ -1,5 +1,5 @@
 // A caller waiting for the work offset asks for a complete report where the
-// driver has one (grblHAL 0x87, protocol audit P-4, ADR-673); every other
+// driver has one (grblHAL 0x87, protocol audit P-4, ADR-674); every other
 // driver, and every ordinary request, sends the plain status query.
 
 import { describe, expect, it, vi } from 'vitest';

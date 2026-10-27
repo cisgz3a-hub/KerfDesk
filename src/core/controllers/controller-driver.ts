@@ -25,7 +25,7 @@ export type ControllerRealtime = {
   readonly statusQuery: string | null;
   /** A status request answered with every report field at once, the work
    *  offset (`WCO:`) included (grblHAL 0x87). Stock GRBL sends WCO only every
-   *  few reports. Absent or null: the firmware has no such request (ADR-673). */
+   *  few reports. Absent or null: the firmware has no such request (ADR-674). */
   readonly completeStatusQuery?: string | null;
   /** Feed hold (GRBL '!'). */
   readonly hold: string | null;

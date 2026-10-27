@@ -1,7 +1,7 @@
-## ADR-673 - Settings are read in Alarm, step jogs queue, grblHAL sends WCO at once, and Marlin's Reset origin says what it sends
+## ADR-674 - Settings are read in Alarm, step jogs queue, grblHAL sends WCO at once, and Marlin's Reset origin says what it sends
 
 **Status:** Accepted; unit-tested, not hardware-tested. | **Date:** 2026-10-20 (rebased onto
-main 2026-10-27; drafted as ADR-648, then ADR-672, both since taken on main)
+main 2026-10-27; drafted as ADR-648, then ADR-672 and ADR-673, all taken by other decisions)
 
 Amends the qualification scheduler of ADR-400 (connection, TC-1). The Frame-first Start
 contract (PROJECT.md non-negotiable 21, ADR-565) is unchanged: nothing here adds or removes a

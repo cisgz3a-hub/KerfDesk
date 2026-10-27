@@ -212,7 +212,7 @@ describe('connect handshake while the controller is still busy (audit TC-1)', ()
     expect(qualifiedAt ?? Infinity).toBeLessThanOrEqual(2_500);
   });
 
-  // Behaviour audit F-4, ADR-673: stock GRBL with homing enabled boots locked
+  // Behaviour audit F-4, ADR-674: stock GRBL with homing enabled boots locked
   // in Alarm and answers `$$` there, so qualification no longer waits for the
   // operator to unlock.
   it('qualifies a banner-reset controller that stays in Alarm', async () => {

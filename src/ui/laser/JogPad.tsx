@@ -7,7 +7,7 @@
 // keys while it is mounted: PageUp/PageDown for Z focus, and LightBurn's XY
 // keys (ADR-493), which send the same step vector as the matching arrow.
 // While a step jog runs on a GRBL-family controller the arrows and XY keys stay
-// live for more steps, which join that jog (stepJogsOnly, ADR-673); hold, Z
+// live for more steps, which join that jog (stepJogsOnly, ADR-674); hold, Z
 // focus and the settings rows wait for it to finish.
 
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
@@ -133,7 +133,7 @@ export function JogPad({
   );
 }
 
-// A step press may join a running step jog (ADR-673); a hold never does.
+// A step press may join a running step jog (ADR-674); a hold never does.
 function useJogSenders(
   focusStep: number,
   focusFeed: number,

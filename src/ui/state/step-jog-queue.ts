@@ -1,5 +1,5 @@
 // step-jog-queue — later step presses join a running operator step jog
-// (protocol audit P-3, ADR-673). Tapping an arrow three times quickly used to
+// (protocol audit P-3, ADR-674). Tapping an arrow three times quickly used to
 // move one step: every jog proved a fresh Idle first, and the pad was disabled
 // while any motion operation ran.
 //

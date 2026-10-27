@@ -114,7 +114,7 @@ export type ControllerCapabilities = {
   // can be set at all. 'g92.1': the firmware's own G92.1 (GRBL family,
   // Smoothieware). 'machine-frame-g92': a G92 to the machine position, which
   // only a host that recorded the shift can compute (Marlin, whose stock build
-  // compiles no G92.1; ADR-673). Absent means 'g92.1' wherever `wcs` is not
+  // compiles no G92.1; ADR-674). Absent means 'g92.1' wherever `wcs` is not
   // 'none'.
   readonly transientOriginClear?: 'g92.1' | 'machine-frame-g92';
   // What `$10` turns on when a `$$` shows it whole (statusReportMaskIsFull).

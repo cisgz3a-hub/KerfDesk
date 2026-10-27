@@ -140,7 +140,7 @@ const RESET_ORIGIN_SUCCESS: Record<ResetOriginClear['mode'], string> = {
   'machine-frame-g92': 'Work origin cleared: machine coordinates restored (G92).',
 };
 
-// How this controller clears a transient origin (ADR-673, audit CS-05).
+// How this controller clears a transient origin (ADR-674, audit CS-05).
 // Marlin's restoring G92 is computed from the recorded machine position, so
 // Reset origin waits until KerfDesk knows it.
 type ResetOriginClear = {
@@ -162,7 +162,7 @@ function useResetOriginClear(): ResetOriginClear {
 //     `busy`) — the operator can re-set the origin whenever the head
 //     is at a new corner.
 //   - "Reset origin" sends G92.1, or on Marlin a G92 that restores machine
-//     coordinates (ADR-673). Only enabled when wcoCache shows a
+//     coordinates (ADR-674). Only enabled when wcoCache shows a
 //     non-trivial offset; disabled otherwise (nothing to clear).
 //   - "Release motors" sends $SLP for hand-positioning (ADR-053 P4).
 type Props = {

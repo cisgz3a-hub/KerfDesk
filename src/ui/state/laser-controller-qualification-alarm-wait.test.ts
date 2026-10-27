@@ -200,7 +200,7 @@ describe('qualification while the controller waits for the operator', () => {
     expect(h.state.incidentHistory?.[0]?.raw).toContain('Controller information refresh timed out');
   });
 
-  // ADR-673 (behaviour audit F-4): GRBL-family firmware answers `$$` in Alarm,
+  // ADR-674 (behaviour audit F-4): GRBL-family firmware answers `$$` in Alarm,
   // and stock GRBL with homing enabled boots there.
   describe('with a $$ settings dump', () => {
     function settingsHarness(): Harness {
