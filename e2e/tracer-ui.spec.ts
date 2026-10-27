@@ -33,7 +33,10 @@ test('inspects a trace without restarting the worker, edits with sliders, and co
 }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   const dialog = await openTrace(page, kerfdesk);
-  await expect(dialog.getByRole('checkbox', { name: 'Delete Image After trace' })).toBeChecked();
+  // Off by default, as in LightBurn (ADR-673): the image is kept and engraves.
+  await expect(
+    dialog.getByRole('checkbox', { name: 'Delete Image After trace' }),
+  ).not.toBeChecked();
   await dialog.getByRole('combobox', { name: 'Trace preset' }).selectOption('Sharp');
   await expect(dialog.getByText(/Trace ready/)).toBeVisible();
   const requestCount = await requests(page);
@@ -112,7 +115,8 @@ test('inspects a trace without restarting the worker, edits with sliders, and co
   if (saved === undefined) throw new Error('Missing saved trace project');
   const project = JSON.parse(saved) as { scene: { objects: { kind: string }[] } };
   expect(project.scene.objects.filter((object) => object.kind === 'traced-image')).toHaveLength(1);
-  expect(project.scene.objects.some((object) => object.kind === 'raster-image')).toBe(false);
+  expect(project.scene.objects.some((object) => object.kind === 'raster-image')).toBe(true);
+  expect(saved).not.toContain('trace-source');
 });
 
 test('keeps the preview and actions usable on a narrow screen and restores focus on Escape', async ({

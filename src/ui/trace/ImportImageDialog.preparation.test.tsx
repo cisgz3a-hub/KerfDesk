@@ -145,7 +145,11 @@ it('adopts an unfinished matching preview without a second decode or worker requ
   expect(previewWorker.terminate).not.toHaveBeenCalled();
   await finishPreview();
   expect(useUiStore.getState().imageDialog).toBeNull();
-  expect(useStore.getState().project.scene.objects[0]?.kind).toBe('traced-image');
+  // Delete Image After trace is off by default (ADR-673): the source stays.
+  expect(useStore.getState().project.scene.objects.map((object) => object.kind)).toEqual([
+    'raster-image',
+    'traced-image',
+  ]);
 });
 
 it('adopts the existing decode when Submit occurs before pixels arrive', async () => {

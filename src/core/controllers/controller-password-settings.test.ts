@@ -42,10 +42,13 @@ describe('controller password settings', () => {
     expect(maskControllerPasswords(command)).toBe(`${prefix}[password removed]`);
   });
 
+  // The Console refuses a setting number that is not plain digits (ADR-375
+  // Amendment 6), but such text can still reach a macro, a pasted log or a
+  // report, so the mask covers every form the firmware reads as a password.
   it.each(['$+075.000=SyntheticWifi', '$077 . 0 0 =SyntheticAP'])(
     'masks the equivalent firmware setting ID in %s',
     (command) => {
-      expect(prepareConsoleCommand(command).ok).toBe(true);
+      expect(prepareConsoleCommand(command).ok).toBe(false);
       const prefix = command.slice(0, command.indexOf('=') + 1);
       expect(maskControllerPasswords(command)).toBe(`${prefix}[password removed]`);
     },
@@ -58,7 +61,7 @@ describe('controller password settings', () => {
     '$0331tail=SyntheticUser',
     '$0 5 3 3 . 000001suffix=SyntheticBroker',
   ])('masks the numeric password prefix grblHAL accepts in %s', (command) => {
-    expect(prepareConsoleCommand(command).ok).toBe(true);
+    expect(prepareConsoleCommand(command).ok).toBe(false);
     const prefix = command.slice(0, command.indexOf('=') + 1);
     expect(maskControllerPasswords(command)).toBe(`${prefix}[password removed]`);
   });
@@ -70,7 +73,7 @@ describe('controller password settings', () => {
     '$330.9999999=SyntheticUser',
     '$532.9999999=SyntheticBroker',
   ])('masks a numeric alias whose float32 firmware value is a password ID: %s', (command) => {
-    expect(prepareConsoleCommand(command).ok).toBe(true);
+    expect(prepareConsoleCommand(command).ok).toBe(false);
     const prefix = command.slice(0, command.indexOf('=') + 1);
     expect(maskControllerPasswords(command)).toBe(`${prefix}[password removed]`);
   });

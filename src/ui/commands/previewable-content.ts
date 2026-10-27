@@ -25,7 +25,6 @@ function objectHasOutputGeometry(
   isCncMachine: boolean,
 ): boolean {
   if (object.kind === 'raster-image') {
-    if (object.role === 'trace-source') return false;
     if (isCncMachine) return false;
     return outputLayers.some(
       (layer) => layer.mode === 'image' && sceneObjectUsesOperation(object, layer),

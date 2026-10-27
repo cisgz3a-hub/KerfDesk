@@ -49,7 +49,6 @@ function sceneHasOutputRaster(project: Project): boolean {
   );
   if (imageColors.size === 0) return false;
   return project.scene.objects.some(
-    (obj) =>
-      obj.kind === 'raster-image' && obj.role !== 'trace-source' && imageColors.has(obj.color),
+    (obj) => obj.kind === 'raster-image' && imageColors.has(obj.color),
   );
 }

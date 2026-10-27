@@ -19,6 +19,7 @@ import {
   remapSceneObjectCopyDependencies,
   sceneObjectCopyDependencyIds,
   sceneObjectCopyClosure,
+  withoutMissingTraceSource,
 } from './scene-object-copy-dependencies';
 import { pushUndo } from './scene-mutations';
 import type { AppState } from './store';
@@ -176,6 +177,9 @@ function cloneClipboardObjects(
       }
     }
   }
+  // A pasted trace keeps its Re-trace link only to a picture that is pasted
+  // with it or already in this scene (ADR-673).
+  const liveIds = new Set([...targetIds, ...idMap.values()]);
   return {
     idMap,
     objects: objects.map((object) => {
@@ -189,7 +193,7 @@ function cloneClipboardObjects(
         },
       } as SceneObject;
       return remapSceneObjectOperationBindings(
-        remapSceneObjectCopyDependencies(clone, idMap),
+        withoutMissingTraceSource(remapSceneObjectCopyDependencies(clone, idMap), liveIds),
         sourceOperations,
         operationIdMap,
       );

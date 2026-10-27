@@ -165,6 +165,6 @@ function objectProcess(layers: ReadonlyArray<Layer>, object: SceneObject): Artwo
 // and relief artwork has no laser output.
 function producesLaserOutput(object: SceneObject, mode: LayerMode): boolean {
   if (object.kind === 'relief') return false;
-  if (object.kind === 'raster-image') return mode === 'image' && object.role !== 'trace-source';
+  if (object.kind === 'raster-image') return mode === 'image';
   return mode !== 'image';
 }

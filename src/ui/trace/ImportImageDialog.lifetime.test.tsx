@@ -215,8 +215,11 @@ describe('Trace commit dialog and document lifetime', () => {
       await act(async () => {
         next.resolve(result);
       });
-      expect(useStore.getState().project.scene.objects).toHaveLength(1);
-      expect(useStore.getState().project.scene.objects[0]?.kind).toBe('traced-image');
+      // Delete Image After trace is off by default (ADR-673): the source stays.
+      expect(useStore.getState().project.scene.objects.map((object) => object.kind)).toEqual([
+        'raster-image',
+        'traced-image',
+      ]);
       expect(pushToast).toHaveBeenCalledTimes(1);
       expect(host.querySelector('[role="dialog"]')).toBeNull();
     },

@@ -25,7 +25,6 @@ export function jigTraceableImage(
   const [id] = selectedIds;
   const object = scene.objects.find((candidate) => candidate.id === id);
   return object?.kind === 'raster-image' &&
-    object.role !== 'trace-source' &&
     object.locked !== true &&
     !isRegistrationBox(object) &&
     sceneObjectHasVisibleLayer(scene, object)
