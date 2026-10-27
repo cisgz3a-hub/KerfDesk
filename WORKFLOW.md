@@ -8730,7 +8730,7 @@ as the pane's design record.
   the outline rather than on the board in the camera picture; it is never told to choose Absolute
   Coordinates. With Absolute Coordinates, camera or not, Job Review says the job burns at the
   outline's centred place on the canvas, not on the board, and to choose User Origin (ADR-654
-  Amendment 2).
+  Amendment 3).
 - **Edge / minimized wizard.** The wizard can minimize into a small non-modal panel so the
   operator can watch the camera and reach the machine while the target engraves.
 - **Fix / a small offset (ADR-663 Amendment 2).** For a calibrated camera fixed above the bed,

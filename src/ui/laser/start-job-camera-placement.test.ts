@@ -135,7 +135,7 @@ describe('Start camera-placement integration', () => {
   });
 });
 
-// Rolling audit v4 H6-P3-2 (ADR-654 Amendment 2): a Place Board job is laid
+// Rolling audit v4 H6-P3-2 (ADR-654 Amendment 3): a Place Board job is laid
 // out on the board's outline, which Place Board centres on the canvas, and
 // burns on the registered board from User Origin. The camera warning told it
 // to choose Absolute Coordinates, which burns it at the centred outline, off

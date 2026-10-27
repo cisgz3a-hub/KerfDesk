@@ -77,7 +77,7 @@ const START_FROM_NAMES: Readonly<Record<Exclude<JobStartMode, 'absolute'>, strin
 
 // Where the job burns against where the operator laid it out: on the camera
 // picture (ADR-228 Amendment 1) or on a Place Board outline (ADR-654
-// Amendment 2). Said in Job Review, never refused.
+// Amendment 3). Said in Job Review, never refused.
 function placementWarnings(
   project: Project,
   machine: Pick<MachineStartSnapshot, 'cameraPlacementActive'>,
@@ -101,7 +101,7 @@ function hasPlaceBoardOutline(project: Project): boolean {
  * placement is said in Job Review, never refused). LightBurn expects Absolute
  * Coordinates for camera placement for the same reason. A Place Board job is
  * the exception: it is laid out on the board's outline and burns on the board
- * from User Origin, so it is told that instead (ADR-654 Amendment 2).
+ * from User Origin, so it is told that instead (ADR-654 Amendment 3).
  */
 export function cameraPlacementStartFromWarning(
   machine: Pick<MachineStartSnapshot, 'cameraPlacementActive'>,
