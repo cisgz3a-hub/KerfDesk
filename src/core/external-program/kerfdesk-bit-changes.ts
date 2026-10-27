@@ -3,7 +3,8 @@
 // host-side so the operator can re-zero Z. An external run sends it: stock
 // GRBL then parses no line, a jog included, until cycle start (protocol.c
 // loops `while (sys.suspend)`), and the next bit's spindle start and plunge
-// are already queued behind it. A warning, never a refusal (ADR-630).
+// are already queued behind it. A warning, never a refusal (ADR-630). The
+// remedy names the setup sheet's one-file-per-bit default (ADR-392 Amendment 3).
 
 import { TOOL_CHANGE_LOAD_PREFIX, extractToolChangeLabels } from '../output/tool-change-labels';
 
@@ -11,7 +12,8 @@ const BIT_CHANGE_WARNING_BODY =
   'Run G-code file sends that M0 to the controller as written. The controller then takes no ' +
   "jog or Zero Z until cycle start, and the new bit's spindle start and plunge are already " +
   "sent, so it would cut at the old bit's Z zero. Start the job from its project, which holds " +
-  'for the re-zero, or save its tiles again: each bit is then its own file.';
+  'for the re-zero, or save it again as one file per bit: the CNC setup sheet does this by ' +
+  'default, and so do tiles.';
 
 /** The bits KerfDesk's bit-change comments name, in file order. Read from the
  * file as opened: the bytes an external run sends carry no comments. */

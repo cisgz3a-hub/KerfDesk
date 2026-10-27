@@ -2,6 +2,7 @@ import { cncSideProgramName } from '../../core/cnc/cnc-two-sided-setup';
 import { useMemo, useRef, useState } from 'react';
 import {
   buildCncSetupDocument,
+  defaultCncSetupExportMode,
   safeProgramFilename,
   type CncSetupExportMode,
 } from '../../io/cnc/cnc-setup-document';
@@ -22,9 +23,16 @@ export function CncSetupDocumentExport(props: Props): JSX.Element | null {
   const [filename, setFilename] = useState(() =>
     cncSideProgramName(suggestedGcodeName(props.ctx.savedName), props.artifact.project),
   );
-  const [mode, setMode] = useState<CncSetupExportMode>('single-file');
+  const prepared = props.artifact.prepared;
+  // A multi-bit job opens on one file per bit (ADR-392 Amendment 3, CNC audit v1 F8-P2-1).
+  const [chosenMode, setMode] = useState<CncSetupExportMode>(() =>
+    defaultCncSetupExportMode(prepared.cncProgramFacts, prepared.cncToolPrograms),
+  );
   const [saving, setSaving] = useState(false);
   const writing = useRef(false);
+  const separateAvailable = (prepared.cncToolPrograms?.length ?? 0) > 0;
+  // A later artifact without tool programs cannot keep a separate-tool choice.
+  const mode = separateAvailable ? chosenMode : 'single-file';
   const document = useSetupDocument(props, filename, mode);
   if (document === null) return null;
   const save = (): void => {
@@ -69,7 +77,8 @@ export function CncSetupDocumentExport(props: Props): JSX.Element | null {
         mode={mode}
         setMode={setMode}
         saving={saving}
-        separateAvailable={(props.artifact.prepared.cncToolPrograms?.length ?? 0) > 0}
+        separateAvailable={separateAvailable}
+        severalBits={(prepared.cncProgramFacts?.toolPlan.length ?? 0) > 1}
       />
       <Button onClick={save} disabled={saving}>
         Save setup sheet + program…
@@ -85,13 +94,14 @@ function CncSetupOutputOptions(props: {
   readonly setMode: (mode: CncSetupExportMode) => void;
   readonly saving: boolean;
   readonly separateAvailable: boolean;
+  readonly severalBits: boolean;
 }): JSX.Element {
   return (
     <>
       <label>
         Output mode{' '}
         <select
-          title="Choose one program with manual tool changes or ordered separate-tool files"
+          title="Choose ordered files, one per bit, or one program that stops at an M0 for each bit change"
           aria-label="Setup sheet output mode"
           value={props.mode}
           disabled={props.saving}
@@ -101,10 +111,10 @@ function CncSetupOutputOptions(props: {
             )
           }
         >
-          <option value="single-file">Single file · manual M0 tool changes</option>
           <option value="separate-tools" disabled={!props.separateAvailable}>
-            Ordered separate-tool files
+            One file per bit · ordered separate-tool files
           </option>
+          <option value="single-file">Single file · M0 bit changes</option>
         </select>
       </label>
       <label>
@@ -123,6 +133,15 @@ function CncSetupOutputOptions(props: {
           Load files in order. Before each file, load its listed cutter and touch off Z on stock top
           while retaining G54 XY zero. Returning to the same cutter is a separate ordered file. All
           downloads are included in this one HTML save.
+        </p>
+      )}
+      {props.mode === 'single-file' && props.severalBits && (
+        <p role="note">
+          This one file stops at an M0 for each bit change. A controller held at an M0 takes no jog
+          or Zero Z, and the next bit&apos;s spindle start and plunge are already sent, so cycle
+          start would cut at the old bit&apos;s Z zero. Change bits at those stops only by starting
+          the job from this project, or in a sender that holds at the M0 itself, as gSender does.
+          Run G-code file sends the M0: choose one file per bit for it.
         </p>
       )}
     </>

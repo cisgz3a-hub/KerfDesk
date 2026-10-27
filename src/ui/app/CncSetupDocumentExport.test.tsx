@@ -214,31 +214,35 @@ it('recovers from a synchronous destination-adapter failure without advancing va
   expect(saveButton().disabled).toBe(false);
 });
 
-async function chooseSeparateTools(): Promise<void> {
+async function chooseMode(mode: 'separate-tools' | 'single-file'): Promise<void> {
   const select = host.querySelector<HTMLSelectElement>(
     'select[aria-label="Setup sheet output mode"]',
   );
   if (select === null) throw new Error('Missing output mode');
   await act(async () => {
-    select.value = 'separate-tools';
+    select.value = mode;
     select.dispatchEvent(new Event('change', { bubbles: true }));
   });
 }
+function modeCaveat(): string | null {
+  return host.querySelector('p[role="note"]')?.textContent ?? null;
+}
 
-it('packages the prepared A-B-A files in one atomic HTML write after selecting separate-tool output', async () => {
+// CNC audit v1 F8-P2-1, ADR-392 Amendment 3: a multi-bit package opens on one file per bit.
+it('packages the prepared A-B-A files in one atomic HTML write by default', async () => {
   const written: string[] = [];
   const write = vi.fn(async (data: string | Blob) => {
     written.push(typeof data === 'string' ? data : await data.text());
   });
   const pick = vi.fn(async () => ({ displayName: 'part.setup.html', write }));
   const mounted = await mount(pick, cncToolSectionProject());
-  expect(host.querySelector<HTMLSelectElement>('select')?.value).toBe('single-file');
+  expect(host.querySelector<HTMLSelectElement>('select')?.value).toBe('separate-tools');
+  expect(modeCaveat()).toBeNull();
   expect(mounted.artifact.prepared.cncToolPrograms?.map((program) => program.toolId)).toEqual([
     'A',
     'B',
     'A',
   ]);
-  await chooseSeparateTools();
   await clickSave();
   expect(pick).toHaveBeenCalledOnce();
   expect(write).toHaveBeenCalledOnce();
@@ -270,10 +274,44 @@ it('packages the prepared A-B-A files in one atomic HTML write after selecting s
   expect(mounted.onSaved).toHaveBeenCalledOnce();
 });
 
+it('keeps single-file output as an explicit choice and says where its M0 bit changes work', async () => {
+  const written: string[] = [];
+  const write = vi.fn(async (data: string | Blob) => {
+    written.push(typeof data === 'string' ? data : await data.text());
+  });
+  const mounted = await mount(
+    async () => ({ displayName: 'part.setup.html', write }),
+    cncToolSectionProject(),
+  );
+  await chooseMode('single-file');
+  expect(host.querySelector<HTMLSelectElement>('select')?.value).toBe('single-file');
+  expect(modeCaveat()).toContain(
+    'A controller held at an M0 takes no jog or Zero Z, and the next bit',
+  );
+  expect(modeCaveat()).toContain('starting the job from this project');
+  expect(modeCaveat()).toContain('Run G-code file sends the M0: choose one file per bit for it.');
+  await clickSave();
+  const html = written[0];
+  if (html === undefined) throw new Error('No package written');
+  expect(downloadedPayload(html, 'part.gcode')).toEqual(
+    Buffer.from(mounted.artifact.prepared.gcode, 'utf8'),
+  );
+  expect(mounted.artifact.prepared.gcode).toMatch(/^M0$/m);
+  expect(html).toContain('Do not change bits at an M0 the controller has received.');
+  expect(html).not.toContain('At each M0');
+  await chooseMode('separate-tools');
+  expect(modeCaveat()).toBeNull();
+});
+
+it('keeps a one-bit job on its single file with no M0 caveat', async () => {
+  await mount(async () => null);
+  expect(host.querySelector<HTMLSelectElement>('select')?.value).toBe('single-file');
+  expect(modeCaveat()).toBeNull();
+});
+
 it('does not record any separate-tool download as saved when the atomic package picker is cancelled', async () => {
   const pick = vi.fn(async () => null);
   const mounted = await mount(pick, cncToolSectionProject());
-  await chooseSeparateTools();
   await clickSave();
   expect(pick).toHaveBeenCalledOnce();
   expect(mounted.advanceVariablesAfter).not.toHaveBeenCalled();
