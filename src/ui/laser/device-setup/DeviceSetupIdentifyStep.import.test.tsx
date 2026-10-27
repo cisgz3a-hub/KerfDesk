@@ -29,7 +29,7 @@ const CLAMP = { id: 'clamp', name: 'Clamp', enabled: true, x: 0, y: 0, width: 40
 const TUNED: DeviceProfile = {
   ...ORTUR,
   noGoZones: [CLAMP],
-  ...withSavedCameraModel({ ...ORTUR, noGoZones: [CLAMP] }, savedCameraModel()),
+  ...withSavedCameraModel(ORTUR, savedCameraModel()),
   scanningOffsets: [
     { speedMmPerMin: 3000, offsetMm: 0.1 },
     { speedMmPerMin: 6000, offsetMm: 0.2 },
