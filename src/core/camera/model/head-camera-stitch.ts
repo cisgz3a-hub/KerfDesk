@@ -7,7 +7,7 @@
 // Bed points no picture saw stay transparent. Pure core.
 
 import type { RgbaImage } from '../rgba-image';
-import { warpFrameToBedImage } from './bed-image';
+import { warpFrameToBedImage, type BedImageOptions } from './bed-image';
 import type { BedArea } from './camera-model-accuracy';
 import type { Vec2 } from './camera-model';
 import { lensForFrame, type CameraModelRecord } from './camera-model-record';
@@ -86,17 +86,7 @@ function addPicture(
     picture.frame,
     lens,
     modelAtHead(record, picture.headMm).pose,
-    {
-      region: {
-        x: options.region.x + box.x0 / ppm,
-        y: options.region.y + box.y0 / ppm,
-        width: (box.x1 - box.x0) / ppm,
-        height: (box.y1 - box.y0) / ppm,
-      },
-      pixelsPerMm: ppm,
-      surfaceHeightMm: options.surfaceHeightMm,
-      ...(options.heightAreas === undefined ? {} : { heightAreas: options.heightAreas }),
-    },
+    warpOptions(options, box),
   );
   if (warped === null) return false;
   const featherMm = Math.max(1e-6, FEATHER_FRACTION * Math.min(clear.width, clear.height));
@@ -127,6 +117,23 @@ type PixelBox = {
   readonly x1: number;
   readonly y1: number;
 };
+
+// The part of the region `box` covers, flattened at the material height and
+// each height area at its own.
+function warpOptions(options: StitchOptions, box: PixelBox): BedImageOptions {
+  const ppm = options.pixelsPerMm;
+  return {
+    region: {
+      x: options.region.x + box.x0 / ppm,
+      y: options.region.y + box.y0 / ppm,
+      width: (box.x1 - box.x0) / ppm,
+      height: (box.y1 - box.y0) / ppm,
+    },
+    pixelsPerMm: ppm,
+    surfaceHeightMm: options.surfaceHeightMm,
+    ...(options.heightAreas === undefined ? {} : { heightAreas: options.heightAreas }),
+  };
+}
 
 // The output pixels (x0..x1, y0..y1 exclusive) inside both the clear box and the region.
 function pixelBox(

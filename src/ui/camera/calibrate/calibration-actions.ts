@@ -221,7 +221,7 @@ export async function photographTarget(args: {
     targetRingDiameterMm: settings.ringDiameterMm,
     calibratedAt: (args.now ?? (() => new Date()))(),
     headAtCalibrationMm: head,
-    headZAtCalibrationMm: args.headZMm ?? null,
+    headZAtCalibrationMm: args.headZMm,
     ...(args.bedFrame === undefined ? {} : { bedFrame: args.bedFrame }),
   });
   const savedCheck =

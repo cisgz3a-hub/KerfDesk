@@ -29,8 +29,8 @@ export function cameraModelFromCalibration(args: {
   readonly calibratedAt: Date;
   /** The head's bed position at the photo, for a camera on the head (ADR-449). */
   readonly headAtCalibrationMm?: Vec2 | null;
-  /** The head's machine Z at the photo (ADR-449 Amendment 2); null when unknown. */
-  readonly headZAtCalibrationMm?: number | null;
+  /** The head's machine Z at the photo (ADR-449 Amendment 2); null or absent when unknown. */
+  readonly headZAtCalibrationMm?: number | null | undefined;
   /** The bed frame the target's rings were placed in (rolling audit 12-P2-2). */
   readonly bedFrame?: CameraBedFrame;
 }): CameraModelRecord {
