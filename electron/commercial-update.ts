@@ -1,4 +1,5 @@
 import { record, verifyLicenceRelease, type PublicKeys } from './licensing-verification.js';
+import { heldReleaseState } from './update-status.js';
 
 const ORIGIN = 'https://dl.kerfdesk.com/desktop/commercial';
 const LIMIT = 256 * 1024;
@@ -35,6 +36,8 @@ type Options = {
   readonly fetch: (url: string, init: RequestInit) => Promise<Response>;
   readonly isEligible: (envelope: unknown, version: string) => Promise<boolean>;
   readonly isEligibleCached: (envelope: unknown, version: string) => boolean;
+  /** Wording only: an ineligible release that waits for a licence confirmation (ADR-547 Amd 1). */
+  readonly awaitsConfirmation?: (envelope: unknown, version: string) => Promise<boolean>;
   readonly now?: () => number;
   readonly onVerifiedDownload?: (envelope: unknown, version: string) => void;
   /** Called when a covered, newer release starts downloading (ADR-547). */
@@ -46,13 +49,15 @@ type Options = {
 /**
  * What one update check found (ADR-547). `ready` is a verified download that
  * installs when KerfDesk closes. `not-covered` names the newest release this
- * device's licence does not cover. `not-installed` is a download that failed
- * its checks, or whose licence changed while it downloaded: nothing installs.
+ * device's licence does not cover. `licence-unconfirmed` names the newest one
+ * it covers but takes only once a licence confirmation succeeds (ADR-547
+ * Amendment 1). `not-installed` is a download that failed its checks, or whose
+ * licence changed while it downloaded: nothing installs.
  */
 export type UpdateCheckOutcome =
   | { readonly kind: 'not-offered' }
   | { readonly kind: 'up-to-date' }
-  | { readonly kind: 'not-covered'; readonly version: string }
+  | { readonly kind: 'not-covered' | 'licence-unconfirmed'; readonly version: string }
   | { readonly kind: 'ready'; readonly version: string }
   | { readonly kind: 'not-installed'; readonly version: string };
 const UP_TO_DATE: UpdateCheckOutcome = { kind: 'up-to-date' };
@@ -258,9 +263,18 @@ export async function checkCommercialUpdates(
     if (compare(candidate.version, options.currentVersion) <= 0) continue;
     if (await options.isEligible(candidate.envelope, candidate.version))
       return takeCandidate(updater, options, candidate);
+    // Newest first: a release held only for a licence confirmation is the one
+    // this lane takes once the licence is confirmed (ADR-547 Amendment 1).
+    const held = await heldOutcome(options, candidate);
+    if (held.kind === 'licence-unconfirmed') return held;
     uncovered ??= candidate.version;
   }
   return uncovered === null ? UP_TO_DATE : { kind: 'not-covered', version: uncovered };
+}
+
+async function heldOutcome(options: Options, candidate: Candidate): Promise<UpdateCheckOutcome> {
+  const { envelope, version } = candidate;
+  return { kind: await heldReleaseState(options.awaitsConfirmation, envelope, version), version };
 }
 
 async function takeCandidate(
@@ -275,7 +289,7 @@ async function takeCandidate(
   if (!updateInfoMatchesManifest(result.updateInfo, candidate))
     throw new Error('Update feed does not match signed release');
   if (!(await options.isEligible(candidate.envelope, version)))
-    return { kind: 'not-covered', version };
+    return heldOutcome(options, candidate);
   options.onDownloading?.(version);
   await downloadVerifiedCandidate(updater, options, candidate);
   return updater.autoInstallOnAppQuit

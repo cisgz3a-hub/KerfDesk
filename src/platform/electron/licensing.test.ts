@@ -133,7 +133,15 @@ describe('desktop update status (ADR-547)', () => {
 
   it('keeps the macOS and Linux download-page delivery and refuses it with a download (ADR-613)', () => {
     const page = { ...ready, mode: 'manual', installOnQuit: false, delivery: 'download-page' };
-    for (const state of ['idle', 'checking', 'available', 'up-to-date', 'not-covered', 'failed'])
+    for (const state of [
+      'idle',
+      'checking',
+      'available',
+      'up-to-date',
+      'not-covered',
+      'licence-unconfirmed',
+      'failed',
+    ])
       expect(parseCommercialUpdateStatus({ ...page, state })).toMatchObject({
         state,
         delivery: 'download-page',

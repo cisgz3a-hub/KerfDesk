@@ -129,6 +129,7 @@ const UPDATE_STATES: ReadonlyArray<CommercialUpdateStatus['state']> = [
   'up-to-date',
   'ready',
   'not-covered',
+  'licence-unconfirmed',
   'failed',
 ];
 const RELEASE_VERSION = /^\d{1,16}\.\d{1,16}\.\d{1,16}$/;

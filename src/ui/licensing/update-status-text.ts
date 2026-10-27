@@ -10,13 +10,17 @@ export function updateStatusSettled(status: CommercialUpdateStatus): boolean {
 
 /** Whether Check now can start a check. */
 export function updateCheckAllowed(status: CommercialUpdateStatus | null): boolean {
-  return status !== null && ['idle', 'up-to-date', 'not-covered', 'failed'].includes(status.state);
+  return (
+    status !== null &&
+    ['idle', 'up-to-date', 'not-covered', 'licence-unconfirmed', 'failed'].includes(status.state)
+  );
 }
 
 type Describe = (
   status: CommercialUpdateStatus,
   updatesUntil: number | null,
   formatTime: (milliseconds: number) => string,
+  now: number,
 ) => string;
 
 const version = (status: CommercialUpdateStatus): string => status.version ?? 'a newer version';
@@ -36,8 +40,12 @@ const DESCRIBE: Record<CommercialUpdateStatus['state'], Describe> = {
   'up-to-date': (status, _until, formatTime) =>
     `KerfDesk is up to date.${checked(status, formatTime)}`,
   ready: readyText,
-  'not-covered': (status, updatesUntil) =>
-    `KerfDesk ${version(status)} is out, but ${coverage(updatesUntil)} The version you have keeps working.`,
+  'not-covered': (status, updatesUntil, _formatTime, now) =>
+    `KerfDesk ${version(status)} is out, but ${coverage(updatesUntil, now)} The version you have keeps working.`,
+  // The licence covers the version, but its last confirmation failed, so the
+  // update waits (ADR-561 item 5). Its updates have not ended (ADR-547 Amd 1).
+  'licence-unconfirmed': (status) =>
+    `KerfDesk ${version(status)} is out and your licence covers it, but KerfDesk couldn't confirm your licence just now, so the update waits until it does. Check your connection, then open Help > Licence, choose Refresh licence and try Check now again. The version you have keeps working.`,
   failed: (status) =>
     status.delivery === 'download-page'
       ? "KerfDesk couldn't check for updates or open the download page. Check your connection and try Check now again. Your current version keeps working."
@@ -77,9 +85,10 @@ export function updateStatusText(
   status: CommercialUpdateStatus | null,
   updatesUntil: number | null,
   formatTime: (milliseconds: number) => string = defaultTime,
+  now: number = Date.now(),
 ): string {
   if (status === null) return 'Reading the update status...';
-  return DESCRIBE[status.state](status, updatesUntil, formatTime);
+  return DESCRIBE[status.state](status, updatesUntil, formatTime, now);
 }
 
 function checked(
@@ -89,8 +98,9 @@ function checked(
   return status.checkedAt === null ? '' : ` Checked at ${formatTime(status.checkedAt)}.`;
 }
 
-function coverage(updatesUntil: number | null): string {
-  return updatesUntil === null
+/** Names the date updates ended only once it has passed (ADR-547 Amendment 1). */
+function coverage(updatesUntil: number | null, now: number): string {
+  return updatesUntil === null || updatesUntil * 1000 > now
     ? "your licence's updates don't cover it."
     : `your licence's updates ended on ${new Date(updatesUntil * 1000).toLocaleDateString()}.`;
 }

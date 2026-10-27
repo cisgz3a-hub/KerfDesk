@@ -80,6 +80,12 @@ Ask what **Help > Check for Updates** says (ADR-547).
   is running, and it installs then.
 - "... is out, but your licence's updates ended on ...": the version they have keeps
   working. A renewal covers newer versions.
+- "... is out and your licence covers it, but KerfDesk couldn't confirm your licence
+  just now": the licence's weekly confirmation (a trial's daily one) failed, so the
+  update waits (ADR-547 Amendment 1). Their updates have not ended. Once
+  `license.kerfdesk.com` is reachable, **Help > Licence > Refresh licence** and then
+  **Check now** offer it. Check whether a firewall or proxy blocks only the licence
+  service.
 - "KerfDesk couldn't check for updates": the computer could not reach
   `dl.kerfdesk.com`. Check the connection and any firewall, then **Check now**.
 - "... couldn't be prepared": the download failed its checks, and KerfDesk tries

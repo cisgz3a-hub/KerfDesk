@@ -36,9 +36,13 @@ test('postbuild envelope carries exact prebuild identity and is accepted by the 
     }).outputText;
   const moduleUrl = (code) => `data:text/javascript;base64,${Buffer.from(code).toString('base64')}`;
   const licenceUrl = moduleUrl(await compile('licensing-verification'));
+  // Its only import is a type, which compiles away (ADR-547 Amendment 1).
+  const statusUrl = moduleUrl(await compile('update-status'));
   const runtime = await import(
     moduleUrl(
-      (await compile('commercial-update')).replaceAll('./licensing-verification.js', licenceUrl),
+      (await compile('commercial-update'))
+        .replaceAll('./licensing-verification.js', licenceUrl)
+        .replaceAll('./update-status.js', statusUrl),
     )
   );
   const licence = await import(licenceUrl);

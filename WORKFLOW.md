@@ -9342,9 +9342,12 @@ Selecting **Download update** immediately shows that the request is starting. Th
    newest builds a few quiet days before stable; the choice applies from the next
    update check, and unticking it never downgrades. **Help → Check for Updates**
    shows the installed version and where updates stand (checking, downloading,
-   ready to install when KerfDesk closes, not covered by the licence, failed),
-   offers Check now and the beta choice, and the status bar shows **Update ready**
-   once a version has downloaded (ADR-547). The newest eligible
+   ready to install when KerfDesk closes, not covered by the licence, waiting for
+   the licence to be confirmed, failed), offers Check now and the beta choice, and
+   the status bar shows **Update ready** once a version has downloaded (ADR-547).
+   A failed licence confirmation holds a covered paid or trial update back, and the
+   panel says so rather than that the licence's updates ended (ADR-547 Amendment 1).
+   The newest eligible
    signed release is selected by immutable release date and version; an ineligible
    newer release cannot replace an older eligible one. Manifest hashes, native
    publisher validation and actual updater availability

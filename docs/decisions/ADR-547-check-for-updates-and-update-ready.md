@@ -1,6 +1,6 @@
 ## ADR-547 - Help > Check for Updates and an Update ready button in the desktop app (2026-09-29)
 
-**Status:** Accepted | **Date:** 2026-09-29 | **Builds on:** ADR-523 (commercial updates), ADR-541 (the weekly release train and its beta ring)
+**Status:** Accepted. Decisions 1, 2 and 4 amended by [ADR-547 Amendment 1](ADR-547-amendment-1-an-unconfirmed-licence-is-not-an-ended-update-year.md) (a release held back by a failed licence confirmation is `licence-unconfirmed`, not "not covered") | **Date:** 2026-09-29 | **Builds on:** ADR-523 (commercial updates), ADR-541 (the weekly release train and its beta ring)
 
 ### Context
 
