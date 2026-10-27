@@ -34,6 +34,18 @@ export function cncProjectExportAdvisories(project: Project): ReadonlyArray<stri
   return advisory === null ? [] : [advisory];
 }
 
+// Save as writes a multi-bit CNC job as one file with an M0 before each later
+// bit, as the setup sheet's single-file mode does, and says at the save where
+// those stops work, as that mode's note does (rolling audit v4 H3-P3-1,
+// ADR-392 Amendment 4).
+export const CNC_SAVED_M0_BIT_CHANGES_NOTE =
+  "This file changes bits at an M0 stop. A controller held at an M0 takes no jog or Zero Z, and the next bit's spindle start and plunge are already sent, so cycle start would cut at the old bit's Z zero. Change bits at those stops only by starting the job from this project, or in a sender that holds at the M0 itself, as gSender does. Run G-code file sends the M0: for it, save one file per bit from the CNC setup sheet.";
+
+/** The save-time note for a CNC file that changes bits at M0 stops, or null. */
+export function cncSavedBitChangesNote(toolPlanLength: number | undefined): string | null {
+  return (toolPlanLength ?? 0) > 1 ? CNC_SAVED_M0_BIT_CHANGES_NOTE : null;
+}
+
 // A GRBL-family profile says nothing about the controller the file ends up on.
 // KerfDesk cannot connect to PC and stand-alone controllers, so their owners
 // pick a GRBL profile and export; there the dwell and pause read differently:

@@ -3,6 +3,7 @@ import {
   MATERIAL_RECIPE_FIELDS,
   materialRecipePatch,
 } from '../../core/material-library';
+import { activePhotoToneCurve } from '../../core/raster/photo-tone-curve';
 import type { Layer } from '../../core/scene';
 import type { MaterialExperiment } from '../../core/material-library/material-experiment';
 import type { MaterialLibraryDocument, MaterialPreset } from '../../io/material-library';
@@ -17,17 +18,25 @@ export function materialRecipeDifferences(
 ): ReadonlyArray<{ readonly setting: string; readonly before: string; readonly after: string }> {
   const before = captureMaterialRecipe(layer);
   const after = materialRecipePatch(preset.recipe);
-  return MATERIAL_RECIPE_FIELDS.flatMap((key) =>
-    before[key] === after[key]
+  const curve = activePhotoToneCurve(layer.photoToneCurve);
+  return [
+    ...MATERIAL_RECIPE_FIELDS.flatMap((key) =>
+      before[key] === after[key]
+        ? []
+        : [
+            {
+              setting: SETTING_LABELS[key] ?? key,
+              before: display(before[key]),
+              after: display(after[key]),
+            },
+          ],
+    ),
+    // A recipe holds no tone curve, so applying one removes the operation's
+    // (ADR-670 Amendment 2).
+    ...(curve === undefined
       ? []
-      : [
-          {
-            setting: SETTING_LABELS[key] ?? key,
-            before: display(before[key]),
-            after: display(after[key]),
-          },
-        ],
-  );
+      : [{ setting: 'Tone calibration', before: curve.label, after: 'None' }]),
+  ];
 }
 
 export function MaterialRecipePreview(props: {

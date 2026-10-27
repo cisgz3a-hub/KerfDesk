@@ -13,6 +13,10 @@ export const PHOTO_DITHERS = [
 ] as const satisfies ReadonlyArray<DitherAlgorithm>;
 
 export type PhotoDither = (typeof PHOTO_DITHERS)[number];
+/** What the window burns with: a photo dither, or Grayscale kept for a photo
+ * that already uses it, so a Grayscale tone calibration applies as measured
+ * (ADR-670 Amendment 2). */
+export type PhotoProcessing = PhotoDither | 'grayscale';
 export type PhotoEngravingDraft = {
   readonly brightness: number;
   readonly contrast: number;
@@ -21,7 +25,7 @@ export type PhotoEngravingDraft = {
   readonly sharpenAmount: number;
   /** Gaussian sigma in burn cells. */
   readonly sharpenRadius: number;
-  readonly ditherAlgorithm: PhotoDither;
+  readonly ditherAlgorithm: PhotoProcessing;
   readonly linesPerMm: number;
   readonly negativeImage: boolean;
   /** ADR-670: the material tone calibration; undefined burns the tones uncorrected. */
@@ -39,7 +43,7 @@ export function initialPhotoEngravingDraft(
     gamma: image.gamma ?? 1,
     sharpenAmount: image.sharpenAmount ?? 0,
     sharpenRadius: image.sharpenRadius ?? DEFAULT_SHARPEN_RADIUS,
-    ditherAlgorithm: photoDither(effective.ditherAlgorithm),
+    ditherAlgorithm: photoProcessing(effective.ditherAlgorithm),
     linesPerMm: effective.linesPerMm,
     negativeImage: effective.negativeImage,
     photoToneCurve: activePhotoToneCurve(effective.photoToneCurve),
@@ -49,6 +53,19 @@ export function initialPhotoEngravingDraft(
 /** A photo dither for a stored mode; other modes start with Jarvis (ADR-581). */
 export function photoDither(value: string): PhotoDither {
   return PHOTO_DITHERS.find((dither) => dither === value) ?? 'jarvis';
+}
+
+/** The processing for a stored mode: Grayscale stays Grayscale (ADR-670
+ * Amendment 2); any other mode is a photo dither, as photoDither picks it. */
+export function photoProcessing(value: string): PhotoProcessing {
+  return value === 'grayscale' ? 'grayscale' : photoDither(value);
+}
+
+/** The window offers the photo dithers, and Grayscale too when the photo
+ * already burns with it. ADR-581 keeps Grayscale out otherwise: it modulates
+ * power, so it needs a machine and material that shade. */
+export function photoProcessingChoices(storedMode: string): ReadonlyArray<PhotoProcessing> {
+  return storedMode === 'grayscale' ? [...PHOTO_DITHERS, 'grayscale'] : PHOTO_DITHERS;
 }
 
 export function photoEngravingPatch(draft: PhotoEngravingDraft): PhotoEngravingApply {

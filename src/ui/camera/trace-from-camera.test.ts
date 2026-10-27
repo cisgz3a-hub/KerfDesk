@@ -71,6 +71,34 @@ describe('buildCameraTraceImage', () => {
   });
 });
 
+describe('the bed the camera cannot see (rolling audit v4 H5-P3-2)', () => {
+  it('stores it as white luma, which never burns, not as black', () => {
+    const opaqueGrey: RgbaImage = {
+      ...FRAME,
+      data: FRAME.data.map((value, index) => (index % 4 === 3 ? 255 : value)),
+    };
+    // A narrower lens than the fixture's sees only part of this strip.
+    const narrow = { ...lens, intrinsics: { ...lens.intrinsics, fx: 100, fy: 100 } };
+    const result = buildCameraTraceImage({
+      raw: opaqueGrey,
+      lens: narrow,
+      pose: overheadPose(),
+      bedWidthMm: 400,
+      bedHeightMm: 400,
+      surfaceHeightMm: 0,
+      heightAreas: [],
+      region: { x: 0, y: 200, width: 400, height: 10 },
+    });
+    if (result.kind !== 'ok') throw new Error('expected a trace source');
+
+    const luma = Array.from(atob(result.source.lumaBase64 ?? ''), (char) => char.charCodeAt(0));
+    expect(luma).toHaveLength(result.source.pixelWidth * result.source.pixelHeight);
+    expect(luma.filter((value) => value === 255).length).toBeGreaterThan(0);
+    expect(luma.filter((value) => value === 128).length).toBeGreaterThan(0);
+    expect(luma.every((value) => value === 128 || value === 255)).toBe(true);
+  });
+});
+
 describe('tracePixelsPerMm', () => {
   it('keeps the whole-bed density for the whole bed and doubles it for a small area', () => {
     expect(tracePixelsPerMm(null)).toBe(TRACE_PIXELS_PER_MM);

@@ -10,6 +10,7 @@ import type { PhotoEngravingApply } from './photo-engraving-apply';
 import {
   initialPhotoEngravingDraft,
   photoEngravingPatch,
+  photoProcessingChoices,
   type PhotoEngravingDraft,
 } from './photo-engraving-settings';
 import type { PhotoEngravingSession } from './photo-engraving-store';
@@ -66,6 +67,7 @@ export default function PhotoEngravingDialog(props: {
           image={session.image}
           draft={draft}
           storedLinesPerMm={effective.linesPerMm}
+          processingChoices={photoProcessingChoices(effective.ditherAlgorithm)}
           power={effectiveObjectPowerPercent(effective, session.image)}
           speed={effective.speed}
           onChange={update}

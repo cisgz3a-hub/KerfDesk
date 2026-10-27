@@ -89,6 +89,36 @@ it('does not start a motion transaction without current-session report-unit evid
   expect(writes).toEqual([]);
 });
 
+// Rolling audit v4 H3-P2-3 (ADR-103 Amendment 3): each point seeks the whole
+// Maximum downward travel, so the grid takes touch-off's probe circuit test.
+it('refuses to seek before a probe test touch, and names the test', async () => {
+  const { writes } = await surfaceSimulator({ probeCircuitTested: false });
+  const result = await useLaserStore.getState().measureSurfaceGrid(REQUEST);
+  expect(result).toMatchObject({
+    kind: 'failed',
+    reason: expect.stringContaining('Test the probe first'),
+  });
+  expect(writes).toEqual([]);
+  expect(useLaserStore.getState().probeBusy).toBe(false);
+});
+
+it('uses up the test touch, so the next grid asks for a new one', async () => {
+  const { connection, writes } = await surfaceSimulator();
+  const measuring = useLaserStore.getState().measureSurfaceGrid(REQUEST);
+  for (let i = 0; i < 30; i += 1) await flushConnect();
+  expect(useLaserStore.getState().probeTestTouch).toBeNull();
+  connection.emitLine('<Idle|MPos:100,210,5|FS:0,0>');
+  connection.emitLine('<Idle|MPos:100,210,5|FS:0,0>');
+  expect((await measuring).kind).toBe('ok');
+  const sent = writes.length;
+  const again = await useLaserStore.getState().measureSurfaceGrid(REQUEST);
+  expect(again).toMatchObject({
+    kind: 'failed',
+    reason: expect.stringContaining('Test the probe first'),
+  });
+  expect(writes).toHaveLength(sent);
+});
+
 it.each(['abort', 'disconnect'] as const)(
   'ends collection after %s without another probe contact or offset write',
   async (action) => {

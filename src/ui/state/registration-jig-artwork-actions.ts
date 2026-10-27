@@ -30,6 +30,10 @@ import { pushUndo } from './scene-mutations';
 import { removeObjectIdsFromGroups } from './scene-group-actions';
 import { repairDanglingObjectDependencies, reportDependencyRepairs } from './object-delete-actions';
 import { reliefAuthoringLinkIds } from '../../core/relief/relief-authoring-link-ids';
+import {
+  remapSceneObjectCopyDependencies,
+  sceneObjectCopyClosure,
+} from './scene-object-copy-dependencies';
 import { useToastStore } from './toast-store';
 
 const REGISTRATION_JIG_ARTWORK_FIT_FRACTION = 0.9;
@@ -172,13 +176,15 @@ function buildJigArtworkLayout(
       }
       continue;
     }
-    const copiedIds = new Map<string, string>();
-    for (const object of fitted) {
-      const id = allocateCopyId(object.id, box.id);
-      copiedIds.set(object.id, id);
-      copies.push(
-        withRegistrationJigChild(object, translatedObject(object, id, delta), box.id, 'copy'),
-      );
+    const allocated = fitted.map((object) => [object, allocateCopyId(object.id, box.id)] as const);
+    const copiedIds = new Map(allocated.map(([object, id]) => [object.id, id] as const));
+    for (const [object, id] of allocated) {
+      // Each outline's photo burns through its own copy of the mask, and its
+      // path text follows its own guide, as Duplicate and Array copies do
+      // (ADR-633 Amendment 2). The copies keep their SVG re-import identity.
+      const moved = translatedObject(object, id, delta);
+      const copy = remapSceneObjectCopyDependencies(moved, copiedIds, { preserveSvgImport: true });
+      copies.push(withRegistrationJigChild(object, copy, box.id, 'copy'));
     }
     copiedGroups.push(...cloneCompleteSelectedGroups(scene, selected, copiedIds, box.id));
   }
@@ -281,16 +287,23 @@ export function applyRegistrationJigArtworkSize(
 }
 
 function selectedArtwork(state: JigArtworkState): ReadonlyArray<SceneObject> {
+  const { scene } = state.project;
   const ids = new Set([
     ...(state.selectedObjectId === null ? [] : [state.selectedObjectId]),
     ...state.additionalSelectedIds,
   ]);
-  return state.project.scene.objects.filter(
+  const chosen = scene.objects.filter(
     (object) =>
       ids.has(object.id) &&
       !isRegistrationBox(object) &&
       object.locked !== true &&
-      sceneObjectHasVisibleLayer(state.project.scene, object),
+      sceneObjectHasVisibleLayer(scene, object),
+  );
+  // A photo's mask and a path text's guide go where it goes, as they do in
+  // Duplicate and Array: left behind, the photo would burn outside its mask
+  // (ADR-633 Amendment 2).
+  return sceneObjectCopyClosure(scene.objects, new Set(chosen.map((object) => object.id))).filter(
+    (object) => !isRegistrationBox(object),
   );
 }
 

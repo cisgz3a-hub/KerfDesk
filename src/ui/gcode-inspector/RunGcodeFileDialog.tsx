@@ -6,6 +6,7 @@
 import { useMemo, useState } from 'react';
 import { reviewExternalProgram, type ExternalProgram } from '../../core/external-program';
 import { kerfDeskBitChangeLabels } from '../../core/external-program/kerfdesk-bit-changes';
+import { kerfDeskBitFile } from '../../core/external-program/kerfdesk-bit-file';
 import { machineKindOf } from '../../core/scene';
 import { Button, Dialog, DialogActions } from '../kit';
 import { liveLaserMaxPowerS } from '../laser/connected-laser-power-scale';
@@ -77,6 +78,7 @@ function InspectExternalRun(
   // The sent bytes have no comments, so KerfDesk's bit-change labels are read
   // from the file as opened.
   const bitChanges = useMemo(() => kerfDeskBitChangeLabels(props.text), [props.text]);
+  const bitFile = useMemo(() => kerfDeskBitFile(props.text), [props.text]);
   const source = useMemo(
     () => ({
       ...deviceInspectionContext(
@@ -99,21 +101,26 @@ function InspectExternalRun(
   const result = inspection.result;
   if (!hasGcodeInspectorAnalysis(result))
     return <RefusedRun reasons={[result.parsed.reason]} onClose={props.onClose} />;
-  const prepared = prepareExternalRun(props.name, props.program, start ?? DRAWN_ORIGIN, (gcode) =>
-    reviewExternalProgram(
-      gcode,
-      result.parsed.model,
-      {
-        machineKind: machineKindOf(project.machine),
-        laserMaxPowerS,
-        ...(props.program.controllerKind === undefined
-          ? {}
-          : { controllerKind: props.program.controllerKind }),
-        start: start ?? DRAWN_ORIGIN,
-        kerfDeskBitChanges: bitChanges,
-      },
-      result.analysis.findings,
-    ),
+  const prepared = prepareExternalRun(
+    props.name,
+    props.program,
+    start ?? DRAWN_ORIGIN,
+    (gcode) =>
+      reviewExternalProgram(
+        gcode,
+        result.parsed.model,
+        {
+          machineKind: machineKindOf(project.machine),
+          laserMaxPowerS,
+          ...(props.program.controllerKind === undefined
+            ? {}
+            : { controllerKind: props.program.controllerKind }),
+          start: start ?? DRAWN_ORIGIN,
+          kerfDeskBitChanges: bitChanges,
+        },
+        result.analysis.findings,
+      ),
+    bitFile,
   );
   return prepared.kind === 'refused' ? (
     <RefusedRun reasons={prepared.reasons} onClose={props.onClose} />

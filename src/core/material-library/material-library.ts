@@ -107,10 +107,13 @@ export function materialRecipePatch(recipe: MaterialRecipe): MaterialRecipe {
 export function applyMaterialRecipe(layer: Layer, recipe: MaterialRecipe): Layer {
   // A recipe without a power mode was captured from an Auto layer, so applying
   // it returns the layer to Auto. Keeping the old override would carry one
-  // preset's dynamic power into the next preset's cut.
+  // preset's dynamic power into the next preset's cut. A tone curve is
+  // measured on one material at one dither, DPI, power and speed, and a recipe
+  // holds none yet, so the old one goes too (ADR-670 Amendment 2).
   const {
     bidirectionalScanOffsetMm: _existingOffset,
     powerMode: _existingPowerMode,
+    photoToneCurve: _existingCurve,
     ...withoutLocalOffset
   } = layer;
   return {

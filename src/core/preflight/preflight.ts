@@ -39,6 +39,7 @@ import { rotaryWrapIssue, rotaryWrapLimit, rotaryXOnlyBounds } from './rotary-bo
 import { operationScanOffsetIssues } from './scan-offset-policy';
 import { openFillContourIssues } from './open-fill-contour-issues';
 import { lineOpenOutlineIssues } from './line-open-outline-issues';
+import { imageMaskOffImageIssues } from './image-mask-off-image-issues';
 
 export type PreflightCode =
   | 'no-output-layer'
@@ -56,6 +57,9 @@ export type PreflightCode =
   // Advisory-only (ADR-626 Amd 8): open paths whose ends meet on a Line
   // operation with kerf, leads or inside-first are cut as open lines.
   | 'line-open-outline'
+  // Advisory-only (ADR-633 Amendment 2): a masked image whose mask lies
+  // wholly off it burns nothing.
+  | 'image-mask-off-image'
   | 'laser-on-travel'
   | 'long-blank-feed'
   | 'no-go-zone-collision'
@@ -166,6 +170,7 @@ export function runPreflight(
 
   issues.push(...openFillContourIssues(project.scene));
   issues.push(...lineOpenOutlineIssues(project));
+  issues.push(...imageMaskOffImageIssues(project));
 
   // A8: split the (up to ~96 MB raster) body ONCE and thread the lines through
   // every G-code scanner below, instead of each re-splitting the whole string.

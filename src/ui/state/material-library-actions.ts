@@ -5,6 +5,7 @@ import {
   materialRecipePatch,
   type MaterialRecipe,
 } from '../../core/material-library';
+import { activePhotoToneCurve } from '../../core/raster/photo-tone-curve';
 import type { Layer, Project, Scene } from '../../core/scene';
 import type { ProjectLaserMaterial } from '../../core/scene/project';
 import type { MaterialLibraryDocument } from '../../io/material-library';
@@ -213,7 +214,12 @@ function deleteMaterialPreset(set: MaterialLibrarySet, presetId: string): boolea
 function recipeMatchesLayer(layer: Layer, recipe: MaterialRecipe): boolean {
   const patch = materialRecipePatch(recipe);
   const current = materialRecipePatch(captureMaterialRecipe(layer));
-  return MATERIAL_RECIPE_FIELDS.every((field) => current[field] === patch[field]);
+  // Applying a recipe removes a tone curve (ADR-670 Amendment 2), so a layer
+  // that still holds one is not yet what the preset makes it.
+  return (
+    activePhotoToneCurve(layer.photoToneCurve) === undefined &&
+    MATERIAL_RECIPE_FIELDS.every((field) => current[field] === patch[field])
+  );
 }
 
 function bindingMatches(

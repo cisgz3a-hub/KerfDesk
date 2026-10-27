@@ -5,6 +5,7 @@ import type { ControllerLifecycleRefs } from './laser-interactive-command';
 import { controllerErrorNotice, type LaserSafetyAction } from './laser-safety-notice';
 import { finishedJobStateReset, frameProofReset } from './laser-session-reset';
 import { settledCompletedFramePatch } from './completed-frame-run';
+import { bitFileRunEndPatch } from './bit-file-sequence';
 import type { LaserState } from './laser-store';
 import { pushLog } from './laser-store-helpers';
 import { settledProgramAirAssistPatch } from './air-assist-command-state';
@@ -152,6 +153,7 @@ async function runPostJobSettle(
           controllerOperation: null,
           streamer: null,
           ...finishedJobStateReset(),
+          ...bitFileRunEndPatch(state),
           ...settledProgramAirAssistPatch(state.streamer),
           liveCanvasRun: completeLiveCanvasRun(state.liveCanvasRun ?? null),
           ...settledCompletedFramePatch(state),
