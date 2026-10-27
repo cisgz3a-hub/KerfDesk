@@ -81,6 +81,7 @@ export function PhotoStep(props: {
         {headCamera ? HEAD_GUIDANCE : FIXED_GUIDANCE}
       </p>
       <p style={noteStyle}>Looking for {assumed.description}.</p>
+      {assumed.refusal === undefined ? null : <p style={errStyle}>{assumed.refusal}</p>}
       {sourceState.kind === 'live' ? (
         <CameraSourceView source={sourceState.source} />
       ) : (
@@ -92,7 +93,7 @@ export function PhotoStep(props: {
         <button
           type="button"
           className="lf-btn lf-btn--primary"
-          disabled={sourceState.kind !== 'live' || running}
+          disabled={sourceState.kind !== 'live' || running || assumed.refusal !== undefined}
           onClick={() => void take()}
           title="Take one photo of the target and fit the camera to it."
         >

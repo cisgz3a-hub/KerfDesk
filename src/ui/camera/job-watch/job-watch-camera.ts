@@ -16,7 +16,8 @@ import { cameraBedFrameNow } from '../camera-bed-frame-now';
 import type { SurfaceHeightArea } from '../../../core/camera/model/height-areas';
 import type { RgbaImage } from '../../../core/camera/rgba-image';
 import { useStore } from '../../state';
-import { useCameraStore } from '../../state/camera-store';
+import { useCameraStore, type BedPictureTaken } from '../../state/camera-store';
+import { bedPictureTakenNow } from '../bed-picture-frame';
 import { cameraModelForFrame } from '../camera-model-frame';
 import {
   cameraCaptureBindingForFrame,
@@ -32,6 +33,8 @@ export type WatchCamera = {
   readonly modelIssue?: string;
   readonly surfaceHeightMm: number;
   readonly heightAreas: ReadonlyArray<SurfaceHeightArea>;
+  /** The bed frame and machine its flat pictures' scene mm belong to (ADR-440 Amendment 5). */
+  readonly taken: BedPictureTaken;
 };
 
 /** The running camera as the job starts, or null when none is running. */
@@ -50,6 +53,7 @@ export function watchCameraNow(): WatchCamera | null {
     ...(fixed?.kind === 'issue' ? { modelIssue: fixed.message } : {}),
     surfaceHeightMm: camera.surfaceHeightMm,
     heightAreas: camera.heightAreas,
+    taken: bedPictureTakenNow(),
   };
 }
 

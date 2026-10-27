@@ -149,7 +149,9 @@ function rememberTarget(
  * operator who engraves it like any job: Frame, review and Start, or later
  * from another session. The rings are locked so a stray drag cannot move them
  * off the bed positions the photo will look for, and Start from becomes
- * Absolute Coordinates, the only mode that burns them there.
+ * Absolute Coordinates, the only mode that burns them there. The bed frame
+ * remembered here stands only until a Start streams the rings, which takes
+ * it again (canvas-target-burn.ts, ADR-440 Amendment 5).
  */
 export function addCalibrationTargetToCanvas(settings: CalibrationSettings): void {
   const store = useStore.getState();

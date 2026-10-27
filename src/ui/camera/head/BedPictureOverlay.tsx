@@ -1,7 +1,8 @@
 // BedPictureOverlay — a head camera's stitched picture of the bed (ADR-449)
 // on the workspace canvas. The picture is already top-down in bed
 // millimetres, so it is drawn with the canvas's own fit-to-bed view (zoom and
-// pan included), with no camera model in between.
+// pan included), with no camera model in between. It is drawn where its part
+// of the bed lies as the machine is set up now (ADR-440 Amendment 5).
 
 import { useEffect, useMemo, useState } from 'react';
 import type { RgbaImage } from '../../../core/camera/rgba-image';
@@ -9,6 +10,7 @@ import { useStore } from '../../state';
 import { useCameraStore, type BedPicture } from '../../state/camera-store';
 import { useUiStore } from '../../state/ui-store';
 import { computeView } from '../../workspace/view-transform';
+import { useBedPictureRegion } from '../bed-picture-frame';
 import { useElementSize } from '../use-element-size';
 
 export function BedPictureOverlay(props: { readonly picture: BedPicture }): JSX.Element {
@@ -22,6 +24,7 @@ export function BedPictureOverlay(props: { readonly picture: BedPicture }): JSX.
   const [box, boxRef] = useElementSize();
   const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
   const source = useMemo(() => pictureCanvas(picture.image), [picture.image]);
+  const region = useBedPictureRegion(picture);
 
   useEffect(() => {
     if (canvas === null || box === null || source === null) return;
@@ -37,6 +40,7 @@ export function BedPictureOverlay(props: { readonly picture: BedPicture }): JSX.
     });
     context.setTransform(1, 0, 0, 1, 0, 0);
     context.clearRect(0, 0, canvas.width, canvas.height);
+    if (region === null) return;
     context.setTransform(
       ratio * view.scale,
       0,
@@ -47,13 +51,12 @@ export function BedPictureOverlay(props: { readonly picture: BedPicture }): JSX.
     );
     context.globalAlpha = opacityPercent / 100;
     context.imageSmoothingEnabled = true;
-    const { region } = picture;
     context.drawImage(source, region.x, region.y, region.width, region.height);
   }, [
     canvas,
     box,
     source,
-    picture,
+    region,
     bedWidthMm,
     bedHeightMm,
     opacityPercent,

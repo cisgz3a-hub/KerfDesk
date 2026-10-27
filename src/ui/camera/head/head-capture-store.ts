@@ -25,7 +25,7 @@ import { toSceneCoords, type DeviceProfile } from '../../../core/devices';
 import { nativePointToBed } from '../../../core/devices/native-bed-frame';
 import type { Vec2 } from '../../../core/scene';
 import { useStore } from '../../state';
-import { useCameraStore } from '../../state/camera-store';
+import { useCameraStore, type BedPicture } from '../../state/camera-store';
 import { useLaserStore } from '../../state/laser-store';
 import { jogFrameCommandBlockMessage } from '../../state/laser-store-helpers';
 import { resolveNativeBedFrame } from '../../state/native-bed-frame';
@@ -35,6 +35,7 @@ import {
   positionLaserNativeTarget,
   positionLaserReach,
 } from '../../workspace/position-laser-click';
+import { bedPictureTakenNow } from '../bed-picture-frame';
 import { cameraBedFrameNow } from '../camera-bed-frame-now';
 import { cameraSourceIdentity, captureSourceFrame, type ActiveCameraSource } from '../frame-source';
 import { runHeadCapture, type HeadCaptureIo, type HeadSettle } from './head-capture-run';
@@ -99,9 +100,11 @@ export async function captureWithHeadCamera(target: HeadCaptureTarget): Promise<
     return;
   }
   const { record, source, stops, region, coversArea } = setup;
+  // The frame the record and region were just read in (ADR-440 Amendment 5).
+  const taken = bedPictureTakenNow();
   store.setState({ state: { kind: 'running', taken: 0, total: stops.length, stopping: false } });
   const outcome = await runHeadCapture(stops, machineIo(target, source, stops.length));
-  const shown = showPictures(record, outcome.pictures, region);
+  const shown = showPictures(record, outcome.pictures, { region, taken });
   store.setState({ state: finalState(outcome, stops.length, shown, coversArea) });
 }
 
@@ -255,7 +258,7 @@ function settleReading(target: Vec2, stopRequested: () => boolean): HeadSettle |
 function showPictures(
   record: CameraModelRecord,
   pictures: ReadonlyArray<HeadCameraPicture>,
-  region: BedArea,
+  { region, taken }: Pick<BedPicture, 'region' | 'taken'>,
 ): boolean {
   if (pictures.length === 0) return false;
   const camera = useCameraStore.getState();
@@ -269,7 +272,7 @@ function showPictures(
     surfaceHeightMm: camera.surfaceHeightMm,
   });
   if (image === null) return false;
-  camera.setBedPicture({ image, region, surfaceHeightMm: camera.surfaceHeightMm });
+  camera.setBedPicture({ image, region, surfaceHeightMm: camera.surfaceHeightMm, taken });
   camera.setOverlayVisible(true);
   return true;
 }

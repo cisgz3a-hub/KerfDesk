@@ -140,7 +140,13 @@ function StepBody(props: {
     case 'nudge-photo':
       return <NudgePhotoStep status={step.status} take={props.nudge.take} />;
     case 'nudge-result':
-      return <NudgeResultStep offsetMm={step.offsetMm} apply={props.nudge.apply} />;
+      return (
+        <NudgeResultStep
+          offsetMm={step.offsetMm}
+          apply={props.nudge.apply}
+          ringBedUnknown={step.ringBedUnknown === true}
+        />
+      );
     default:
       return assertNever(step, 'camera calibration step');
   }

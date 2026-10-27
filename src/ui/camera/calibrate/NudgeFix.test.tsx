@@ -6,6 +6,10 @@
 import { act } from 'react';
 import type * as NudgeActions from './nudge-actions';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  cameraBedFrameNote,
+  UNVERIFIED_FRAME_NOTE,
+} from '../../../core/camera/model/camera-bed-frame';
 import { pixelToBed } from '../../../core/camera/model/camera-model';
 import {
   overheadPose,
@@ -25,6 +29,7 @@ import {
   useCameraCalibrationStore,
 } from './camera-calibration-store';
 import { engraveNudgeRing, photographNudgeRing } from './nudge-actions';
+import { HOME_BEFORE_NUDGE_NOTE, NO_HOMING_NUDGE_NOTE, RING_BED_UNKNOWN_NOTE } from './NudgeSteps';
 
 vi.mock('./nudge-actions', async (original) => ({
   ...(await original<typeof NudgeActions>()),
@@ -216,6 +221,81 @@ describe('the quick nudge fix', () => {
       expect(useCameraCalibrationStore.getState().step).toMatchObject({ kind: 'nudge-photo' });
     },
   );
+
+  // Rolling audit v3 G6-P3-3 (ADR-440 Amendment 5): the ring is an Absolute
+  // burn a camera fit is measured on, like the target, but had none of the
+  // target step's home-first advice.
+  it('asks for Home before the ring on an unhomed machine, without blocking it', async () => {
+    const withHoming = (enabled: boolean): void => {
+      const { project } = useStore.getState();
+      useStore.setState({
+        project: {
+          ...project,
+          device: { ...project.device, homing: { ...project.device.homing, enabled } },
+        },
+      });
+    };
+    withHoming(true);
+    useLaserStore.setState({ connection: { kind: 'connected' }, homingState: 'unknown' });
+    await openNudge();
+    expect(document.body.textContent).toContain(HOME_BEFORE_NUDGE_NOTE);
+    expect(control(document.body, 'Burn the ring').disabled).toBe(false);
+
+    await act(async () => useLaserStore.setState({ homingState: 'confirmed' }));
+    expect(document.body.textContent).not.toContain(HOME_BEFORE_NUDGE_NOTE);
+
+    await act(async () => withHoming(false));
+    expect(document.body.textContent).toContain(NO_HOMING_NUDGE_NOTE);
+  });
+
+  it('remembers the bed frame the ring was burned in and measures with it', async () => {
+    useLaserStore.setState({ connection: { kind: 'connected' }, homingState: 'unknown' });
+    vi.mocked(engraveNudgeRing).mockResolvedValue(true);
+    vi.mocked(photographNudgeRing).mockResolvedValue({ kind: 'ok', offsetMm: { x: 2, y: 0 } });
+    await openNudge();
+    await clickControl(document.body, 'Burn the ring');
+    const unhomed = { origin: 'front-left', bedWidthMm: 400, bedHeightMm: 400 };
+    expect(useCameraCalibrationStore.getState().nudgeRingBedFrame).toEqual(unhomed);
+    await act(async () =>
+      useLaserStore.setState({ streamer: { status: 'done', total: 2, completed: 2 } as never }),
+    );
+    await clickControl(document.body, 'Take photo');
+    expect(photographNudgeRing).toHaveBeenCalledWith(
+      expect.objectContaining({ ringBedFrame: unhomed }),
+    );
+  });
+
+  it('flags a fix measured on a ring burned before the bed position was known', async () => {
+    // Calibrated homed: the record knows where native (0, 0) sits on the bed.
+    const homedFrame = {
+      origin: 'front-left' as const,
+      bedWidthMm: 400,
+      bedHeightMm: 400,
+      nativeToBedOffsetMm: { x: 0, y: 0 },
+    };
+    const project = useStore.getState().project;
+    useStore.setState({
+      project: {
+        ...project,
+        device: { ...project.device, cameraModel: { ...savedCameraModel(), bedFrame: homedFrame } },
+      },
+    });
+    vi.mocked(photographNudgeRing).mockResolvedValue({
+      kind: 'ok',
+      offsetMm: { x: 4, y: 0 },
+      ringBedUnknown: true,
+    });
+    await openNudge();
+    await clickControl(document.body, 'Ring already burned');
+    await clickControl(document.body, 'Take photo');
+    expect(document.body.textContent).toContain(RING_BED_UNKNOWN_NOTE);
+    await clickControl(document.body, 'Fix');
+    const fixed = useStore.getState().project.device.cameraModel;
+    if (fixed === undefined) throw new Error('calibration missing');
+    expect(fixed.bedFrame).toEqual({ origin: 'front-left', bedWidthMm: 400, bedHeightMm: 400 });
+    // Once homed, the Camera panel says what the audit found missing.
+    expect(cameraBedFrameNote(fixed, homedFrame)?.message).toBe(UNVERIFIED_FRAME_NOTE);
+  });
 
   it('keeps a pending photo and its result through minimize and expand', async () => {
     let finish!: (outcome: NudgeActions.NudgePhotoOutcome) => void;
