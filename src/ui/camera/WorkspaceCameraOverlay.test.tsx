@@ -151,6 +151,7 @@ describe('WorkspaceCameraOverlay', () => {
         image,
         region: { x: 10, y: 10, width: 4, height: 4 },
         surfaceHeightMm: 0,
+        heightAreas: [],
         taken: {
           bedFrame: { origin: 'front-left', bedWidthMm: 400, bedHeightMm: 400 },
           machine: 'generic-grbl-400x400',

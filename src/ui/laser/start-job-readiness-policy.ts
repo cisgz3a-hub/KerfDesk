@@ -28,7 +28,7 @@ import { rasterPreparationTooComplex } from '../../core/job/raster-preparation-c
 import { COMPILE_INTEGRITY_PREFLIGHT_CODES, type PreflightIssue } from '../../core/preflight';
 import { laserModuleAbsentJobWarning } from '../../core/preflight/laser-module-readiness';
 import { runCompiledWorkPreflight } from '../../core/preflight/compiled-work';
-import { machineKindOf, type Project, type Scene } from '../../core/scene';
+import { findRegistrationBoxes, machineKindOf, type Project, type Scene } from '../../core/scene';
 import { cncAccessoryStartIssue, cncOverrideStartIssue } from '../state/cnc-accessory-readiness';
 import type { StatusReportFieldsOff } from '../state/status-report-fields';
 import { detectCncParkZTopWarnings } from './cnc-park-z-top';
@@ -43,9 +43,7 @@ export function demotedPolicyWarnings(
   machine: MachineStartSnapshot,
   jobOrigin?: JobOriginPlacement,
 ): string[] {
-  const warnings: string[] = [];
-  const cameraStartFrom = cameraPlacementStartFromWarning(machine, jobOrigin);
-  if (cameraStartFrom !== null) warnings.push(cameraStartFrom);
+  const warnings: string[] = placementWarnings(project, machine, jobOrigin);
   const machineKind = machineKindOf(project.machine);
   if (machineKind === 'cnc' && machine.cncJobsSupported === false) {
     warnings.push(CNC_REQUIRES_GRBL_MESSAGE);
@@ -77,19 +75,63 @@ const START_FROM_NAMES: Readonly<Record<Exclude<JobStartMode, 'absolute'>, strin
   'verified-origin': 'Verified Origin',
 };
 
+// Where the job burns against where the operator laid it out: on the camera
+// picture (ADR-228 Amendment 1) or on a Place Board outline (ADR-654
+// Amendment 2). Said in Job Review, never refused.
+function placementWarnings(
+  project: Project,
+  machine: Pick<MachineStartSnapshot, 'cameraPlacementActive'>,
+  jobOrigin: JobOriginPlacement | undefined,
+): string[] {
+  const placeBoard = hasPlaceBoardOutline(project);
+  return [
+    cameraPlacementStartFromWarning(machine, jobOrigin, placeBoard),
+    placeBoard ? placeBoardAbsoluteWarning(jobOrigin) : null,
+  ].filter((warning): warning is string => warning !== null);
+}
+
+// A Place Board outline (ADR-124, ADR-654) anchors the job to the board.
+function hasPlaceBoardOutline(project: Project): boolean {
+  return findRegistrationBoxes(project.scene).some((box) => box.provenance === 'captured-board');
+}
+
 /**
  * The camera picture shows absolute bed positions, so artwork placed on it
  * burns there only from Absolute Coordinates (ADR-228 Amendment: camera
  * placement is said in Job Review, never refused). LightBurn expects Absolute
- * Coordinates for camera placement for the same reason.
+ * Coordinates for camera placement for the same reason. A Place Board job is
+ * the exception: it is laid out on the board's outline and burns on the board
+ * from User Origin, so it is told that instead (ADR-654 Amendment 2).
  */
 export function cameraPlacementStartFromWarning(
   machine: Pick<MachineStartSnapshot, 'cameraPlacementActive'>,
   jobOrigin: JobOriginPlacement | undefined,
+  placeBoard = false,
 ): string | null {
   if (machine.cameraPlacementActive !== true || jobOrigin === undefined) return null;
   if (jobOrigin.startFrom === 'absolute') return null;
+  if (placeBoard) return placeBoardCameraWarning(jobOrigin.startFrom);
   return `Camera placement is on, but Start from is ${START_FROM_NAMES[jobOrigin.startFrom]}. The camera picture shows positions on the bed, so this job burns where ${START_FROM_NAMES[jobOrigin.startFrom]} puts it, not where the artwork sits on the camera picture. Choose Absolute Coordinates to burn it where it is placed, and watch the Frame.`;
+}
+
+function placeBoardCameraWarning(startFrom: Exclude<JobStartMode, 'absolute'>): string {
+  const outline =
+    'Camera placement is on, but this job is laid out on the Place Board outline, which sits centred on the canvas, not where the board shows on the camera picture.';
+  return startFrom === 'user-origin'
+    ? `${outline} It burns on the board that Place Board registered at User Origin. Lay the artwork out on the outline, not on the board in the camera picture, and watch the Frame.`
+    : `${outline} It burns where ${START_FROM_NAMES[startFrom]} puts the outline, not on the board that Place Board registered at User Origin. Choose User Origin to burn it on the board, lay the artwork out on the outline rather than on the camera picture, and watch the Frame.`;
+}
+
+export const PLACE_BOARD_ABSOLUTE_WARNING =
+  'This job is laid out on the Place Board outline, but Start from is Absolute Coordinates, so it burns where the outline sits on the canvas, not on the board: the outline is centred on the canvas, not drawn where the board lies on the bed. Place Board registers the board at User Origin, so choose User Origin to burn it on the board, and watch the Frame.';
+
+/** Absolute Coordinates burn a Place Board job at its centred outline, off the board. */
+export function placeBoardAbsoluteWarning(
+  jobOrigin: JobOriginPlacement | undefined,
+): string | null {
+  return jobOrigin === undefined || jobOrigin.startFrom === 'absolute'
+    ? PLACE_BOARD_ABSOLUTE_WARNING
+    : null;
 }
 
 export const LARGE_JOB_PREPARATION_WARNING =

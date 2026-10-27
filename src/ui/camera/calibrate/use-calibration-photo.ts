@@ -97,6 +97,7 @@ export function useCalibrationPhoto(): CalibrationPhotoControls {
         bedFrame: assumed.bedFrame,
         ...(savedHere === undefined ? {} : { saved: savedHere }),
         headMm: head === null ? null : headInTargetFrame(head, assumed.bedFrame),
+        headZMm: head?.z ?? null,
         signal: run.controller.signal,
       });
       publish(

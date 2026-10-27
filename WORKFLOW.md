@@ -8721,7 +8721,16 @@ as the pane's design record.
   the nudge ring and the saved calibration (Amendment 7).
 - **Warning / camera placement with a relative Start from.** With camera placement on and Start
   from not Absolute Coordinates, Job Review says the job burns where that origin puts it, not where
-  the artwork sits on the camera picture. Advice only (ADR-228 Amendment 1).
+  the artwork sits on the camera picture. Advice only (ADR-228 Amendment 1). Camera placement turns
+  on as soon as the canvas draws a camera picture, including one from a camera that started by
+  itself with the Camera panel closed; it stays on when the picture is hidden, until **Exit camera
+  placement** (ADR-663 Amendment 4).
+- **Warning / camera placement on a Place Board job.** A job laid out on a Place Board outline is
+  told instead that it burns on the board registered at User Origin, and to lay the artwork out on
+  the outline rather than on the board in the camera picture; it is never told to choose Absolute
+  Coordinates. With Absolute Coordinates, camera or not, Job Review says the job burns at the
+  outline's centred place on the canvas, not on the board, and to choose User Origin (ADR-654
+  Amendment 2).
 - **Edge / minimized wizard.** The wizard can minimize into a small non-modal panel so the
   operator can watch the camera and reach the machine while the target engraves.
 - **Fix / a small offset (ADR-663 Amendment 2).** For a calibrated camera fixed above the bed,
@@ -9028,6 +9037,17 @@ as the pane's design record.
   and shows one joined top-down picture of the area on the canvas.
 - **Success / check.** **Check camera** on a head camera measures the saved calibration from
   wherever the head is for the check photo.
+- **Edge / Z (ADR-449 Amendment 2).** The camera rides up and down with the head, so a calibration
+  records the head's machine Z with its XY, and the panel says it ("Calibrated with the head at
+  machine Z 12.30 mm …"). After autofocus or a Z move of more than 0.2 mm, the picture, Trace from
+  camera, Find pieces and the captures are not used: the panel and **Capture** say "The head is at
+  machine Z … Move Z back to … mm, or calibrate the camera again at this height." A calibration
+  saved before Z was recorded is used at any Z, and the panel states the rule instead.
+- **Edge / raised objects and material height (ADR-449 Amendment 2).** The joined picture is
+  flattened at the material height and the height areas set when it is captured, each area at its
+  own height, and the areas are outlined on it as on the live picture. When the material height,
+  or a height area over the pictured part of the bed, changes afterwards, the picture is cleared
+  and a notice says to capture again. The burn check's picture follows the same rule.
 - **Edge / stop.** **Stop** cancels the move in progress. The panel says how many pictures were
   taken and shows them.
 - **Edge / out of reach.** When the head cannot travel far enough for the camera to see an edge

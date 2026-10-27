@@ -6,8 +6,11 @@ import {
   IDENTITY_TRANSFORM,
   type Project,
 } from '../../core/scene';
+import { useStore } from '../state';
+import { resetStore } from '../state/test-helpers';
 import { frameVerificationForProject } from './frame-verification-testing';
 import { prepareStartJob } from './start-job-readiness';
+import { demotedPolicyWarnings, PLACE_BOARD_ABSOLUTE_WARNING } from './start-job-readiness-policy';
 
 const READY_CONTROLLER = { maxPowerS: 1000, minPowerS: 0, laserModeEnabled: true };
 const IDLE_STATUS = {
@@ -129,5 +132,70 @@ describe('Start camera-placement integration', () => {
     });
 
     expect(result.ok).toBe(true);
+  });
+});
+
+// Rolling audit v4 H6-P3-2 (ADR-654 Amendment 2): a Place Board job is laid
+// out on the board's outline, which Place Board centres on the canvas, and
+// burns on the registered board from User Origin. The camera warning told it
+// to choose Absolute Coordinates, which burns it at the centred outline, off
+// the board.
+describe('Start camera-placement on a Place Board job', () => {
+  function placeBoardProject(): Project {
+    resetStore();
+    useStore.setState({ project: cameraProject(true) });
+    useStore.getState().addCapturedBoard({ kind: 'rect', widthMm: 100, heightMm: 50 });
+    const { project, jobPlacement } = useStore.getState();
+    // Place Board registers the board at User Origin, front-left (ADR-654 Decision 5).
+    expect(jobPlacement).toEqual({ startFrom: 'user-origin', anchor: 'front-left' });
+    return project;
+  }
+  const latched = { ...READY_MACHINE, cameraPlacementActive: true };
+
+  it('says the job burns on the board at User Origin, and never advises Absolute Coordinates', () => {
+    const warnings = demotedPolicyWarnings(placeBoardProject(), latched, {
+      startFrom: 'user-origin',
+      anchor: 'front-left',
+    });
+    const camera = warnings.filter((warning) => warning.includes('Camera placement is on'));
+    expect(camera).toHaveLength(1);
+    expect(camera[0]).toContain(
+      'It burns on the board that Place Board registered at User Origin. Lay the artwork out on the outline, not on the board in the camera picture',
+    );
+    expect(warnings.join(' ')).not.toContain('Choose Absolute Coordinates');
+  });
+
+  it('points another relative Start from back to User Origin, not to Absolute', () => {
+    const warnings = demotedPolicyWarnings(placeBoardProject(), latched, {
+      startFrom: 'verified-origin',
+      anchor: 'front-left',
+    });
+    expect(warnings).toContainEqual(
+      expect.stringContaining(
+        'It burns where Verified Origin puts the outline, not on the board that Place Board registered at User Origin. Choose User Origin to burn it on the board',
+      ),
+    );
+    expect(warnings.join(' ')).not.toContain('Choose Absolute Coordinates');
+  });
+
+  it('warns in Job Review that Absolute Coordinates burn it at the outline, off the board, camera or not', () => {
+    const project = placeBoardProject();
+    for (const machine of [READY_MACHINE, latched]) {
+      const result = prepareStartJob(project, READY_CONTROLLER, {
+        ...machine,
+        homingState: 'confirmed',
+        frameVerification: frameVerificationForProject(project),
+      });
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.warnings).toContain(PLACE_BOARD_ABSOLUTE_WARNING);
+        expect(result.warnings.some((w) => w.includes('Camera placement is on'))).toBe(false);
+      }
+    }
+  });
+
+  it('says nothing about Place Board for a job without a board outline', () => {
+    const warnings = demotedPolicyWarnings(cameraProject(true), READY_MACHINE, undefined);
+    expect(warnings).not.toContain(PLACE_BOARD_ABSOLUTE_WARNING);
   });
 });

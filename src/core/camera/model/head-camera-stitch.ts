@@ -1,6 +1,7 @@
 // One top-down picture of an area from a head camera's pictures (ADR-449).
 // Each picture is flattened onto the bed through the model at the head
-// position it was taken from, over the box the camera sees clearly there, and
+// position it was taken from, at the material height and each height area at
+// its own (Amendment 2), over the box the camera sees clearly there, and
 // the pictures are blended where they overlap: each pixel is weighted by how
 // far it is from its own picture's edge, so seams fade instead of stepping.
 // Bed points no picture saw stay transparent. Pure core.
@@ -11,6 +12,7 @@ import type { BedArea } from './camera-model-accuracy';
 import type { Vec2 } from './camera-model';
 import { lensForFrame, type CameraModelRecord } from './camera-model-record';
 import { headCameraView, HEAD_CAMERA_USABLE_FRACTION, modelAtHead } from './head-camera';
+import type { SurfaceHeightArea } from './height-areas';
 
 export type HeadCameraPicture = {
   readonly frame: RgbaImage;
@@ -23,6 +25,11 @@ export type StitchOptions = {
   readonly region: BedArea;
   readonly pixelsPerMm: number;
   readonly surfaceHeightMm: number;
+  /**
+   * Parts of the bed whose top stands at its own height (ADR-441 Amendment 2),
+   * flattened there as the live overlay and the trace do (ADR-449 Amendment 2).
+   */
+  readonly heightAreas?: ReadonlyArray<SurfaceHeightArea>;
   readonly usableFraction?: number;
 };
 
@@ -88,6 +95,7 @@ function addPicture(
       },
       pixelsPerMm: ppm,
       surfaceHeightMm: options.surfaceHeightMm,
+      ...(options.heightAreas === undefined ? {} : { heightAreas: options.heightAreas }),
     },
   );
   if (warped === null) return false;

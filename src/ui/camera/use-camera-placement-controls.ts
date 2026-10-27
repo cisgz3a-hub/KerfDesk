@@ -1,9 +1,11 @@
-import { useEffect } from 'react';
 import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
 import { useLaserStore } from '../state/laser-store';
 import { cancelOverlayCapture, captureOverlayStill } from './capture-overlay-still';
 
+// The Camera panel's placement controls. The overlay itself latches placement
+// whenever it draws a camera picture (camera-placement-latch.ts), panel open
+// or not; these actions latch it too, at once, as the operator asks.
 export function useCameraPlacementControls(overlayGeometryReady: boolean): {
   readonly active: boolean;
   readonly homingEnabled: boolean;
@@ -14,12 +16,9 @@ export function useCameraPlacementControls(overlayGeometryReady: boolean): {
   readonly exit: () => void;
   readonly confirmPosition: () => void;
 } {
-  const sourceState = useCameraStore((s) => s.sourceState);
   const visible = useCameraStore((s) => s.overlayVisible);
   const setVisible = useCameraStore((s) => s.setOverlayVisible);
-  const still = useCameraStore((s) => s.overlayStill);
   const setStill = useCameraStore((s) => s.setOverlayStill);
-  const bedPicture = useCameraStore((s) => s.bedPicture);
   const setBedPicture = useCameraStore((s) => s.setBedPicture);
   const active = useCameraStore((s) => s.placementActive);
   const activate = useCameraStore((s) => s.activatePlacement);
@@ -29,12 +28,6 @@ export function useCameraPlacementControls(overlayGeometryReady: boolean): {
   const homingEnabled = useStore((s) => s.project.device.homing.enabled);
   const homingState = useLaserStore((s) => s.homingState);
   const positionEpoch = useLaserStore((s) => s.trustedPositionEpoch ?? 0);
-  const overlayUsable = still !== null || bedPicture !== null || sourceState.kind === 'live';
-
-  useEffect(() => {
-    if (!overlayGeometryReady || !visible || !overlayUsable || active) return;
-    activate();
-  }, [activate, active, overlayGeometryReady, overlayUsable, visible]);
 
   const toggleOverlay = (): void => {
     cancelOverlayCapture();

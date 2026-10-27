@@ -4,14 +4,16 @@
 // camera model uses to undo parallax exactly (ADR-440). Trace from camera sits
 // beside Refresh; filling blanks (ADR-442) and object heights (ADR-441
 // Amendment 2) open as folds. A camera on the laser head captures and stitches
-// pictures instead of freezing one (ADR-449). A calibration made with another
+// pictures instead of freezing one (ADR-449), and holds only at the Z it was
+// calibrated at, which the panel says (Amendment 2). A calibration made with another
 // origin corner is not drawn, and the panel says why (rolling audit 12-P2-2);
 // one saved before its bed frame was recorded can be confirmed here (ADR-440
 // Amendment 4).
 // Camera placement stays latched after hiding the image so its status remains
 // visible until the operator exits it.
 
-import { isHeadCameraModel } from '../../core/camera/model/head-camera';
+import type { CameraModelRecord } from '../../core/camera/model/camera-model-record';
+import { headCameraZChange, isHeadCameraModel } from '../../core/camera/model/head-camera';
 import { DraftNumberInput } from '../kit/DraftNumberInput';
 import { Icon } from '../kit/icons';
 import { useCameraStore } from '../state/camera-store';
@@ -22,6 +24,8 @@ import {
 } from './active-camera-model';
 import { CameraFrameNotice } from './CameraFrameNotice';
 import { HeadCaptureControls } from './head/HeadCaptureControls';
+import { useHeadPositionOnBed } from './head/head-position';
+import { headZChangedMessage, headZRule } from './head/head-z-note';
 import { CameraFold } from './panel/CameraFold';
 import { useCameraPlacementControls } from './use-camera-placement-controls';
 import { TraceFromCameraButton } from './TraceFromCameraButton';
@@ -33,25 +37,36 @@ export function OverlayControls(): JSX.Element | null {
   const model = useActiveCameraModel();
   const own = useOwnCameraModel();
   const frameNote = useOwnCameraFrameNote();
-  if (model !== undefined)
-    return <CalibratedOverlayControls headCamera={isHeadCameraModel(model)} />;
+  if (model !== undefined) {
+    return (
+      <CalibratedOverlayControls headZRule={isHeadCameraModel(model) ? headZRule(model) : null} />
+    );
+  }
   if (frameNote !== null && !frameNote.usable) {
     return <CameraFrameNotice note={frameNote} style={headNoticeStyle} />;
   }
-  return isHeadCameraModel(own) ? <HeadPositionNotice /> : null;
+  return own !== undefined && isHeadCameraModel(own) ? <HeadCameraNotice own={own} /> : null;
 }
 
-// A head camera's picture is placed by where the head is, so it waits for that.
-function HeadPositionNotice(): JSX.Element {
+// A head camera's picture is placed by where the head is, so it waits for
+// that, and for the head's Z to be back where it was calibrated.
+function HeadCameraNotice(props: { readonly own: CameraModelRecord }): JSX.Element {
+  const head = useHeadPositionOnBed();
+  const zChange = head === null ? null : headCameraZChange(props.own, head.z);
   return (
     <p role="status" style={headNoticeStyle}>
-      This camera rides on the laser head. Connect the machine and home it, so KerfDesk knows where
-      the head is and puts the camera picture in the right place.
+      {zChange === null
+        ? 'This camera rides on the laser head. Connect the machine and home it, so KerfDesk knows where the head is and puts the camera picture in the right place.'
+        : headZChangedMessage(zChange)}
     </p>
   );
 }
 
-function CalibratedOverlayControls(props: { readonly headCamera: boolean }): JSX.Element {
+function CalibratedOverlayControls(props: {
+  /** What the panel says about a head camera's Z; null for a fixed camera. */
+  readonly headZRule: string | null;
+}): JSX.Element {
+  const headCamera = props.headZRule !== null;
   const sourceState = useCameraStore((s) => s.sourceState);
   const visible = useCameraStore((s) => s.overlayVisible);
   const opacity = useCameraStore((s) => s.overlayOpacityPercent);
@@ -72,12 +87,16 @@ function CalibratedOverlayControls(props: { readonly headCamera: boolean }): JSX
         placement={placement}
         sourceLive={sourceLive}
         hasStill={still !== null || bedPicture !== null}
-        headCamera={props.headCamera}
+        headCamera={headCamera}
       />
-      {props.headCamera ? null : (
+      {props.headZRule === null ? (
         <p style={showingStyle}>{showingNow(sourceLive, still !== null || bedPicture !== null)}</p>
+      ) : (
+        <>
+          <HeadCaptureControls />
+          <p style={showingStyle}>{props.headZRule}</p>
+        </>
       )}
-      {props.headCamera ? <HeadCaptureControls /> : null}
       <div style={rowStyle}>
         <label
           style={checkStyle}
