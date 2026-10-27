@@ -15,12 +15,14 @@ export function ProjectBedReconciliationBanner(): JSX.Element | null {
     : '';
   // The same machine with another bed size is most often a file saved before
   // the bed was corrected: keeping the current machine is the safe choice
-  // (ADR-440 Amendment 5).
-  if (notice.bedSizeOnly) {
+  // (ADR-440 Amendment 5). The bed words alone fit only when nothing else
+  // differs; otherwise each other setting in use is named (Amendment 8).
+  if (notice.sameProfile) {
     return (
       <section role="status" aria-label="Opened project machine disclosure" style={bannerStyle}>
         <span>
           <strong>Opened project machine:</strong> {bedSizeWords(notice)}
+          {settingsWords(notice)}
           {cameraWords(notice.camera)}
           {mismatch} {keepWords(notice)}
         </span>
@@ -41,6 +43,7 @@ export function ProjectBedReconciliationBanner(): JSX.Element | null {
       <span>
         <strong>Opened project machine:</strong>
         {machine}
+        {otherMachineWords(notice)}
         {cameraWords(notice.camera)}
         {mismatch} Choose which machine profile this project should retain.
       </span>
@@ -55,14 +58,49 @@ export function ProjectBedReconciliationBanner(): JSX.Element | null {
 }
 
 function bedSizeWords(notice: ProjectBedReconciliationNotice): string {
-  return `This project was saved for “${notice.openedDeviceName}” with a ${size(notice.openedBed)} bed, and your “${notice.previousDeviceName}” is set up with a ${size(bedOf(notice.previousDevice))} bed. The project's ${size(notice.openedBed)} bed is in use for now.`;
+  return `This project was saved for “${notice.openedDeviceName}” with a ${size(notice.openedBed)} bed, and your “${notice.previousDeviceName}” is set up with a ${size(bedOf(notice.previousDevice))} bed.`;
+}
+
+// The file's copy of the same machine can hold an older origin or no-go zones
+// too: they are in use behind the notice, so they are named, origin first.
+function settingsWords(notice: ProjectBedReconciliationNotice): string {
+  const settings = notice.differingSettings;
+  if (settings.length === 0)
+    return ` The project's ${size(notice.openedBed)} bed is in use for now.`;
+  return ` The file's copy also differs in ${list(settings)}. Its ${list(['bed', ...settings])} are in use for now, not yours.`;
+}
+
+function otherMachineWords(notice: ProjectBedReconciliationNotice): string {
+  if (!notice.machineChanged) return '';
+  const opened = notice.openedBed;
+  const bed = sameSize(opened, bedOf(notice.previousDevice)) ? [] : [`bed (${size(opened)})`];
+  const brought = [...bed, ...notice.differingSettings];
+  if (brought.length === 0) return '';
+  const verb = brought.length === 1 ? 'is' : 'are';
+  return ` That machine's ${list(brought)} ${verb} in use for now, not yours.`;
 }
 
 function keepWords(notice: ProjectBedReconciliationNotice): string {
   const current = size(bedOf(notice.previousDevice));
-  const [what, them] =
-    notice.camera === null ? ['bed', 'it'] : ['bed and camera calibration', 'them'];
-  return `Keep current machine keeps your ${current} ${what}. Use project machine replaces ${them} with the file's, and the next change to the machine saves that in place of yours.`;
+  const kept = [
+    `${current} bed`,
+    ...notice.differingSettings,
+    ...(notice.camera === null ? [] : ['camera calibration']),
+  ];
+  const them = kept.length === 1 ? 'it' : 'them';
+  return `Keep current machine keeps your ${list(kept)}. Use project machine replaces ${them} with the file's, and the next change to the machine saves that in place of yours.`;
+}
+
+function list(items: ReadonlyArray<string>): string {
+  if (items.length <= 1) return items.join('');
+  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+}
+
+function sameSize(
+  a: { readonly width: number; readonly height: number },
+  b: { readonly width: number; readonly height: number },
+): boolean {
+  return a.width === b.width && a.height === b.height;
 }
 
 // The camera follows the machine (ADR-440 Amendment 3 Decision 4), so a

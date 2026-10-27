@@ -21,6 +21,7 @@ import {
   PREPARATION_COMPILED_SEGMENT_BUDGET,
   type Job,
   type JobOriginPlacement,
+  type JobPlacementSettings,
   type JobStartMode,
 } from '../../core/job';
 import { scenePreparationSize } from '../../core/job/preparation-complexity';
@@ -28,8 +29,15 @@ import { rasterPreparationTooComplex } from '../../core/job/raster-preparation-c
 import { COMPILE_INTEGRITY_PREFLIGHT_CODES, type PreflightIssue } from '../../core/preflight';
 import { laserModuleAbsentJobWarning } from '../../core/preflight/laser-module-readiness';
 import { runCompiledWorkPreflight } from '../../core/preflight/compiled-work';
-import { findRegistrationBoxes, machineKindOf, type Project, type Scene } from '../../core/scene';
+import {
+  findRegistrationBoxes,
+  machineKindOf,
+  registrationRunState,
+  type Project,
+  type Scene,
+} from '../../core/scene';
 import { cncAccessoryStartIssue, cncOverrideStartIssue } from '../state/cnc-accessory-readiness';
+import { placementOf } from '../state/registration-outline-run';
 import type { StatusReportFieldsOff } from '../state/status-report-fields';
 import { detectCncParkZTopWarnings } from './cnc-park-z-top';
 import { cncWorkZeroStartIssue } from './cnc-start-advisories';
@@ -76,23 +84,32 @@ const START_FROM_NAMES: Readonly<Record<Exclude<JobStartMode, 'absolute'>, strin
 };
 
 // Where the job burns against where the operator laid it out: on the camera
-// picture (ADR-228 Amendment 1) or on a Place Board outline (ADR-654
-// Amendment 3). Said in Job Review, never refused.
+// picture (ADR-228 Amendment 1), on a Place Board outline (ADR-654 Amendment
+// 3) or against a registration jig's outline (ADR-654 Amendment 4, ADR-057
+// Amendment 6). Said in Job Review, never refused.
 function placementWarnings(
   project: Project,
-  machine: Pick<MachineStartSnapshot, 'cameraPlacementActive'>,
+  machine: Pick<MachineStartSnapshot, 'cameraPlacementActive' | 'registrationOutline'>,
   jobOrigin: JobOriginPlacement | undefined,
 ): string[] {
-  const placeBoard = hasPlaceBoardOutline(project);
+  const layout = registrationLayout(project);
+  // The outline's own Start from is the one advice that keeps the artwork in
+  // the burned outline, so it stands in for the camera warning.
+  const outline = layout === 'jig' ? registrationOutlineWarning(project, machine, jobOrigin) : null;
   return [
-    cameraPlacementStartFromWarning(machine, jobOrigin, placeBoard),
-    placeBoard ? placeBoardAbsoluteWarning(jobOrigin) : null,
+    outline ?? cameraPlacementStartFromWarning(machine, jobOrigin, layout),
+    layout === 'place-board' ? placeBoardAbsoluteWarning(jobOrigin) : null,
   ].filter((warning): warning is string => warning !== null);
 }
 
-// A Place Board outline (ADR-124, ADR-654) anchors the job to the board.
-function hasPlaceBoardOutline(project: Project): boolean {
-  return findRegistrationBoxes(project.scene).some((box) => box.provenance === 'captured-board');
+type RegistrationLayout = 'place-board' | 'jig' | null;
+
+// A Place Board outline (ADR-124, ADR-654) anchors the job to the board; any
+// other registration outline is the two-run jig (ADR-057), anchored the same way.
+function registrationLayout(project: Project): RegistrationLayout {
+  const boxes = findRegistrationBoxes(project.scene);
+  if (boxes.length === 0) return null;
+  return boxes.some((box) => box.provenance === 'captured-board') ? 'place-board' : 'jig';
 }
 
 /**
@@ -101,17 +118,48 @@ function hasPlaceBoardOutline(project: Project): boolean {
  * placement is said in Job Review, never refused). LightBurn expects Absolute
  * Coordinates for camera placement for the same reason. A Place Board job is
  * the exception: it is laid out on the board's outline and burns on the board
- * from User Origin, so it is told that instead (ADR-654 Amendment 3).
+ * from User Origin, so it is told that instead (ADR-654 Amendment 3). A
+ * registration jig is the other: both runs anchor to its outline, so the
+ * artwork run must keep the outline's Start from (ADR-654 Amendment 4).
  */
 export function cameraPlacementStartFromWarning(
   machine: Pick<MachineStartSnapshot, 'cameraPlacementActive'>,
   jobOrigin: JobOriginPlacement | undefined,
-  placeBoard = false,
+  layout: RegistrationLayout = null,
 ): string | null {
   if (machine.cameraPlacementActive !== true || jobOrigin === undefined) return null;
   if (jobOrigin.startFrom === 'absolute') return null;
-  if (placeBoard) return placeBoardCameraWarning(jobOrigin.startFrom);
+  if (layout === 'place-board') return placeBoardCameraWarning(jobOrigin.startFrom);
+  if (layout === 'jig') return jigCameraWarning(jobOrigin.startFrom);
   return `Camera placement is on, but Start from is ${START_FROM_NAMES[jobOrigin.startFrom]}. The camera picture shows positions on the bed, so this job burns where ${START_FROM_NAMES[jobOrigin.startFrom]} puts it, not where the artwork sits on the camera picture. Choose Absolute Coordinates to burn it where it is placed, and watch the Frame.`;
+}
+
+function jigCameraWarning(startFrom: Exclude<JobStartMode, 'absolute'>): string {
+  return `Camera placement is on, but this is a registration jig job: it burns where ${START_FROM_NAMES[startFrom]} puts the jig outline, not where the outline shows on the camera picture, and the artwork keeps its place inside the outline. Burn the outline and the artwork from the same Start from and work origin, and do not switch to Absolute Coordinates between the runs. Lay the artwork out inside the outline on the canvas, and watch the Frame.`;
+}
+
+/** The artwork run burns inside the outline only from the Start from and job
+ * origin the outline burned with (ADR-057 Amendment 6), camera or not. */
+function registrationOutlineWarning(
+  project: Project,
+  machine: Pick<MachineStartSnapshot, 'registrationOutline'>,
+  jobOrigin: JobOriginPlacement | undefined,
+): string | null {
+  const outline = machine.registrationOutline;
+  if (outline == null || registrationRunState(project.scene) !== 'artwork') return null;
+  const artwork = placementOf(jobOrigin);
+  if (samePlacement(outline, artwork)) return null;
+  return `The jig outline burned from ${placementWords(outline)}, but this artwork run starts from ${placementWords(artwork)}. The artwork lands inside the burned outline only when both runs burn from the same Start from and job origin. Choose ${placementWords(outline)} again, keep the work origin unchanged, and watch the Frame.`;
+}
+
+function samePlacement(a: JobPlacementSettings, b: JobPlacementSettings): boolean {
+  return a.startFrom === b.startFrom && (a.startFrom === 'absolute' || a.anchor === b.anchor);
+}
+
+function placementWords(placement: JobPlacementSettings): string {
+  return placement.startFrom === 'absolute'
+    ? 'Absolute Coordinates'
+    : `${START_FROM_NAMES[placement.startFrom]} with the job origin at ${placement.anchor.replace('-', ' ')}`;
 }
 
 function placeBoardCameraWarning(startFrom: Exclude<JobStartMode, 'absolute'>): string {
