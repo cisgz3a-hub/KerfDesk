@@ -15,6 +15,8 @@ import { AutosaveDurableService } from '../state/autosave-durable';
 import { IndexedDbAutosaveRepository } from '../state/autosave-indexeddb';
 import { AutosaveSessionLocks } from '../state/autosave-session-lock';
 import { useToastStore } from '../state/toast-store';
+import { keptTracePhotosMessage } from '../state/project-load-notices';
+import { legacyTraceDocument } from '../../__fixtures__/legacy-trace-source-project';
 import {
   AUTOSAVE_FAILURE_MESSAGE,
   AUTOSAVE_RECOVERY_RETAINED_MESSAGE,
@@ -224,6 +226,36 @@ describe('runAutosaveRecovery (M15)', () => {
 // drop the dead one — otherwise the dead slot lingers (no-arg clearAutosave on
 // the first manual save only clears the current-session + legacy keys) and
 // re-prompts "Restore?" on every later empty launch.
+// ADR-673 Amendment 1: an autosave written before the kept-photo change
+// restores with the photo off, and Restore says so as File > Open does.
+describe('runAutosaveRecovery load notices', () => {
+  it('says a photo an earlier build kept behind its trace is now off', async () => {
+    const service = recoveryService();
+    const written = writeAutosave(savedProject());
+    if (written.kind !== 'ok') throw new Error('autosave write failed');
+    const record = JSON.parse(localStorage.getItem(written.storageKey) ?? '{}') as Record<
+      string,
+      unknown
+    >;
+    localStorage.setItem(
+      written.storageKey,
+      JSON.stringify({ ...record, projectJson: legacyTraceDocument() }),
+    );
+    useToastStore.setState({ toasts: [] });
+
+    await runAutosaveRecovery(() => true, service);
+
+    expect(useStore.getState().project.scene.objects.map((object) => object.id)).toEqual([
+      'photo',
+      'trace',
+    ]);
+    expect(
+      useToastStore.getState().toasts.map((toast) => [toast.message, toast.variant]),
+    ).toContainEqual([keptTracePhotosMessage(1), 'warning']);
+    await service.stop();
+  });
+});
+
 const DEAD_SESSION = 'dead';
 const DEAD_KEY = 'lf2:autosave:v1:dead';
 // Year-2020 stamp: older than the re-home write (real Date.now()) so readAutosave

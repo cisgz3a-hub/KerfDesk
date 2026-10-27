@@ -120,7 +120,7 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 - **Rulers**: top and left, mm units. Tick and label spacing follow the zoom (ADR-348): the labelled step is the smallest 1-2-5 number whose labels stay clear of each other, minor ticks subdivide it while they remain separable, and a taller half-step tick marks the middle of a division. The pointer position is marked on both strips while it is over the canvas.
 - **Grid**: light dotted, 10mm spacing, behind bed.
 - **Origin marker**: small cross at the device-profile origin.
-- **Hover size**: with the select tool and no drag in progress, resting the pointer on artwork (locked artwork too) shows its name, `W × H mm`, and the X/Y of its top-left beside the cursor, flipping to the pointer's other side near the canvas's right or bottom edge. On a laser it also shows the power and speed output runs the piece at, one line per distinct run (at most three, then `+N more settings`): the artwork's override and power scale applied, a Grayscale image (or one using original pixels) as its `min–max%` range, and a speed above Output max feed as the capped speed marked `(capped)`. A piece that output skips says why: `No operation`, `Output off`, `Trace source, not output`, or `Not engraved: operation is in Image mode` (vector artwork on an Image operation; a bitmap on Line or Fill names that mode) (ADR-348 Amendment 1). Display only — it changes no selection, no geometry, and no output.
+- **Hover size**: with the select tool and no drag in progress, resting the pointer on artwork (locked artwork too) shows its name, `W × H mm`, and the X/Y of its top-left beside the cursor, flipping to the pointer's other side near the canvas's right or bottom edge. On a laser it also shows the power and speed output runs the piece at, one line per distinct run (at most three, then `+N more settings`): the artwork's override and power scale applied, a Grayscale image (or one using original pixels) as its `min–max%` range, and a speed above Output max feed as the capped speed marked `(capped)`. A piece that output skips says why: `No operation`, `Output off`, or `Not engraved: operation is in Image mode` (vector artwork on an Image operation; a bitmap on Line or Fill names that mode) (ADR-348 Amendment 1). A picture kept behind its trace is ordinary artwork and shows its own power and speed, or `Output off` (ADR-673 and its Amendment 1). Display only — it changes no selection, no geometry, and no output.
 - **Drop hint**: centered ghost text "Drag an SVG here, or use File → Import" — visible only when scene is empty, fades out on hover.
 - **Status bar**: bottom — current cursor mm coords, zoom level, device name, scene object count.
   Telemetry scrolls in its own hidden-scrollbar lane. Ready web or desktop update actions sit in a
@@ -1693,6 +1693,22 @@ the completed physical Frame is the spatial source of truth.
 5. When the controller answers `error:9`, it was in Alarm or Jog: clear the alarm or let the jog
    finish, then retry. `error:20` means the firmware has no probe input or does not support the
    command.
+
+#### Edge — the file kept a photo behind its trace (ADR-673 Amendment 1)
+1. KerfDesk 1.0.27 and earlier marked a picture kept after Trace as the trace's source and never
+   engraved it. Such a file opens with the marker dropped and the photo still out of the job: its
+   Image operation has Output off, or, when other artwork shares that operation, the photo moves
+   to an output-off copy of it, so that artwork keeps engraving. A camera capture kept after Trace
+   from Camera opens the same way, with no notice, since it never was artwork (ADR-673).
+2. A warning toast says so: `This project kept a photo behind its trace, which earlier versions
+   never engraved. Its Image operation now has Output off, so the job is unchanged. Turn that
+   Output on to engrave the photo.` (with the count when there are several).
+3. The same notice comes from every reader of such a file: Open, Recent Projects, a drop or the
+   operating system, a local snapshot, New from template, Restore of an autosave, and switching to
+   a sheet an earlier build archived. New from template and Restore also name a schema migration
+   (`This project was saved by an earlier KerfDesk and was migrated from schema v<n>.`) and a
+   removed Auto-focus command, as Open does.
+4. Saving writes the file without the marker, so the notice does not come back.
 
 #### Edge — file is a valid .lf2 but references a device profile not on this machine
 - Project loads with the embedded device profile, adopted wholesale (`deserializeProject`).

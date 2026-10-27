@@ -10,6 +10,13 @@ import {
 import { parametricEllipseCurve } from '../../core/geometry';
 import { rectangleToCurve } from '../../core/shapes/primitives';
 import { multiplyMatrix, parseXFormText, transformCurve, type LbrnMatrix } from './lbrn-frame';
+import {
+  emptyPowerScaleLeftOut,
+  lbrnShapePowerScale,
+  noteGroupPowerScale,
+  powerScaleWarnings,
+  type LbrnPowerScaleLeftOut,
+} from './lbrn-power-scale';
 import { parseLbrnVertexList, type LbrnVertex } from './lbrn-vertex-list';
 import { SVG_IMPORT_LIMITS } from '../svg/svg-import-budget';
 
@@ -29,11 +36,13 @@ type PathTables = {
   readonly primitives: ReadonlyMap<number, PrimitiveList>;
 };
 /** How many shapes of each type were left out: a type KerfDesk does not open,
- * no geometry, or coordinates no machine output can represent. */
+ * no geometry, or coordinates no machine output can represent; and the Power
+ * Scales a shape opened without. */
 type LeftOut = {
   readonly unsupported: Map<string, number>;
   readonly empty: Map<string, number>;
   readonly outOfRange: Map<string, number>;
+  readonly powerScale: LbrnPowerScaleLeftOut;
 };
 
 const TEXT_WITHOUT_OUTLINE = 'Text without BackupPath';
@@ -49,7 +58,12 @@ export function importLbrnGeometry(
   frame: LbrnMatrix,
 ): LbrnGeometryResult {
   const objects: ImportedSvg[] = [];
-  const leftOut: LeftOut = { unsupported: new Map(), empty: new Map(), outOfRange: new Map() };
+  const leftOut: LeftOut = {
+    unsupported: new Map(),
+    empty: new Map(),
+    outOfRange: new Map(),
+    powerScale: emptyPowerScaleLeftOut(),
+  };
   const pathTables = buildPathTables(root);
   const topShapes = [...root.children].filter((element) => normalized(element.tagName) === 'shape');
   for (const shape of topShapes) visitShape(shape, frame, sourceName, objects, leftOut, pathTables);
@@ -75,7 +89,7 @@ function leftOutWarnings(leftOut: LeftOut): string[] {
     ([type, count]) =>
       `${count} ${type} shape${count === 1 ? '' : 's'} had coordinates that are not numbers or lie beyond ±${LBRN_COORDINATE_MAGNITUDE_MM.toLocaleString('en-US')} mm, and ${count === 1 ? 'was' : 'were'} not imported. The file may be damaged.`,
   );
-  return [...unsupported, ...empty, ...outOfRange];
+  return [...unsupported, ...empty, ...outOfRange, ...powerScaleWarnings(leftOut.powerScale)];
 }
 
 function shapeCount(count: number, type: string): string {
@@ -100,6 +114,7 @@ function visitShape(
 ): void {
   const type = shape.getAttribute('Type') ?? shape.getAttribute('type') ?? '';
   if (normalized(type) === 'group') {
+    noteGroupPowerScale(shape, leftOut.powerScale);
     const matrix = multiplyMatrix(parent, parseXForm(shape));
     const children = directChild(shape, 'children');
     for (const child of children === null ? [] : [...children.children]) {
@@ -169,6 +184,8 @@ function visitVectorShape(
     bounds,
     transform: IDENTITY_TRANSFORM,
     paths: [{ color, polylines, curves: transformed }],
+    // Shape Properties belong to the shape a Text's outline stands in for.
+    ...lbrnShapePowerScale(layerSource, leftOut.powerScale),
   });
 }
 
