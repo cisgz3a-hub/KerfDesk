@@ -85,7 +85,8 @@ measuring it and applying the inverse transfer curve before screening.
    calibration was measured with another dither, DPI, marking, power (the
    photo's burn power, Amendment 1) or speed,
    the window says so. **Calibrate a material…** closes the window and opens
-   Tone Calibration seeded from its current settings.
+   Tone Calibration seeded from its current settings. A Grayscale photo keeps
+   Grayscale, so a Grayscale calibration applies as measured (Amendment 2).
 
 ### Verification and limits
 
@@ -105,7 +106,8 @@ These are code and simulation results. No wedge or portrait has been burned,
 no controller was operated, and real materials may respond differently from
 the model (char, colour shift, heat build-up across a large image). Frame,
 Start, power, speed, output policy and licences are unchanged. A Material
-Library recipe (`MaterialRecipe`) does not hold a tone curve yet; the saved
+Library recipe (`MaterialRecipe`) does not hold a tone curve yet, so applying
+one removes the operation's curve (Amendment 2); the saved
 calibrations list is per computer. The older Adjust Image thumbnail (which
 ADR-581 already describes as unrepresentative) does not show a calibration;
 the canvas, Photo engraving preview, Preview (its cached canvas keyed on the

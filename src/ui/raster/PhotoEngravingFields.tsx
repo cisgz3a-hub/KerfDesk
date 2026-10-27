@@ -11,16 +11,18 @@ import { DitherSwatchPicker } from '../layers/DitherSwatchPicker';
 import { imageDensityBounds } from './image-density-bounds';
 import { PhotoToneCalibrationField } from './PhotoToneCalibrationField';
 import {
-  PHOTO_DITHERS,
-  photoDither,
+  photoProcessing,
   photoSourceDimensions,
   type PhotoEngravingDraft,
+  type PhotoProcessing,
 } from './photo-engraving-settings';
 
 type PhotoEngravingFieldsProps = {
   readonly draft: PhotoEngravingDraft;
   readonly image: RasterImage;
   readonly storedLinesPerMm: number;
+  /** From the photo's stored mode, so Grayscale stays offered after another is picked. */
+  readonly processingChoices: ReadonlyArray<PhotoProcessing>;
   /** The photo's burn power (its multiplier applied) and speed, which a tone
    * calibration also depends on. */
   readonly power: number;
@@ -38,10 +40,10 @@ export function PhotoEngravingFields(props: PhotoEngravingFieldsProps): JSX.Elem
         <span>Photo processing</span>
         <DitherSwatchPicker
           value={draft.ditherAlgorithm}
-          algorithms={PHOTO_DITHERS}
+          algorithms={props.processingChoices}
           ariaLabel="Photo processing"
           title="Choose the dot pattern used to reproduce photographic shading."
-          onChange={(algorithm) => onChange({ ditherAlgorithm: photoDither(algorithm) })}
+          onChange={(algorithm) => onChange({ ditherAlgorithm: photoProcessing(algorithm) })}
         />
       </div>
       <label>

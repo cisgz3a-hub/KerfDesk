@@ -32,7 +32,8 @@ On the main canvas, Trace Image works on the selected image and lays the trace e
    tracing that image, or any of its copies, replaces the original and each copy. Each copy's
    trace lies over the bitmap it replaces and is recorded as a jig copy of the new trace, so a
    later Centre + copy refreshes those traces instead of adding more. The commit button says how
-   many images it replaces.
+   many images it replaces. *Amended by Amendment 2: Centre + copy moves and copies a photo's mask
+   with it, and each copy uses its own outline's mask.*
 4. **A gone image is refused.** If the image leaves the jig (deleted, or undone away) before the
    trace is committed, the commit is refused with a message; Undo brings it back.
 5. **The tracer starts open.** The **Trace an image** section is open when the editor opens and
