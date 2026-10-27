@@ -1,12 +1,13 @@
 import type { SceneObject } from '../../core/scene';
 import { transformedBBox } from '../../core/scene/hit-test';
-import { parseDxf } from '../../io/dxf';
+import type { ParseDxfResult } from '../../io/dxf';
 import { parseSvg, type ParseSvgResult } from '../../io/svg';
 import { describeDxfImport } from '../app/dxf-import-action';
 import type { ImportBedFitUndo } from '../app/import-bed-fit-notice';
 import type { ToastDescriptor } from '../app/import-toasts';
 import { describeSvgImport } from '../app/svg-import-action';
 import { importImageFile } from '../commands/import-image-action';
+import { parseDxfOffThread } from '../import/import-worker-client';
 import { prepareSvgFragment } from '../import/svg-image-hydration';
 import { fitImportedObjectsToBed } from '../state/import-bed-fit';
 import type { SelectionTransformEdit } from '../state/selection-transform-actions';
@@ -253,13 +254,7 @@ export async function importFile(
     }
   }
   if (args.mimeType === 'application/dxf') {
-    const result = parseDxf({
-      dxfText: text(bytes),
-      id: crypto.randomUUID(),
-      source: args.fileName,
-    });
-    if (result.kind === 'error' || result.object === null)
-      throw new RemoteFault('invalid_arguments');
+    const result = await parseDxfInWorker(bytes, args.fileName, signal);
     const object = result.object;
     return commit(() => {
       const placed = insertAndPlace(store, args, () => {
@@ -273,6 +268,20 @@ export async function importFile(
   if (!starts(bytes, args.mimeType === 'image/png' ? PNG : JPEG))
     throw new RemoteFault('invalid_arguments');
   return importRaster(store, args, bytes, signal, commit);
+}
+
+/** File > Import's DXF parse (ADR-269 Amendment 1): the import worker, cancelled with the request. */
+async function parseDxfInWorker(
+  bytes: Uint8Array<ArrayBuffer>,
+  source: string,
+  signal: AbortSignal,
+): Promise<Extract<ParseDxfResult, { kind: 'ok' }> & { readonly object: SceneObject }> {
+  const parsing = parseDxfOffThread(new Blob([bytes]), crypto.randomUUID(), source, { signal });
+  if (parsing === null) throw new RemoteFault('unavailable');
+  const result = await parsing;
+  if (result.kind === 'error' || result.object === null) throw new RemoteFault('invalid_arguments');
+  // The whole result: its notes and skipped summary become the import's toasts.
+  return { ...result, object: result.object };
 }
 
 async function importRaster(

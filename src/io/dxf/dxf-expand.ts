@@ -20,6 +20,7 @@ import {
   splineToPolyline,
   type EntityConversion,
 } from './dxf-entities';
+import { spendDxfExpansion, type DxfExpansionBudget } from './dxf-expansion-budget';
 import { mirrorPointX, TILTED_PLANE_NOTE } from './dxf-ocs';
 import type { DxfTag } from './dxf-tags';
 import {
@@ -60,6 +61,8 @@ export type ExpandContext = {
   // Upper-case names of layers that are off or frozen.
   readonly hiddenLayers: ReadonlySet<string>;
   readonly blocks: ReadonlyMap<string, DxfBlock>;
+  // Shared by the whole entity pass; spending past it throws DxfExpansionRefusal.
+  readonly budget: DxfExpansionBudget;
 };
 
 // What block content inherits from the INSERT that places it: the color
@@ -243,11 +246,21 @@ function expandInsert(
       `INSERT "${name}" skipped: MINSERT grid has ${grid.instanceCount} instances (maximum ${MAX_MINSERT_INSTANCES})`,
     );
   }
+  // Every expansion reads the whole block, even when its entities draw nothing.
+  spendDxfExpansion(ctx.budget, block.entities.length);
   const child = expandEntities(block.entities, ctx, reference, depth + 1);
+  // Counted before the copies exist, so a refused placement never allocates them.
+  spendDxfExpansion(ctx.budget, grid.instanceCount * pointCount(child.polylines));
   const placed = placeInsertInstances(entity, block, ctx.scale, child.polylines, {
     mirrored: extrusion === 'mirrored',
   });
   return { polylines: placed, skipped: child.skipped, notes: child.notes };
+}
+
+function pointCount(polylines: ReadonlyArray<ColoredPolyline>): number {
+  let count = 0;
+  for (const { polyline } of polylines) count += polyline.points.length;
+  return count;
 }
 
 function skippedInsert(note: string): ExpandOutcome {
@@ -267,6 +280,7 @@ function placeInsertInstances(
   children: ReadonlyArray<ColoredPolyline>,
   ocs: { readonly mirrored: boolean },
 ): ColoredPolyline[] {
+  if (children.length === 0) return [];
   const insert: Vec2 = {
     x: firstNumber(entity.tags, 10) * scale,
     y: firstNumber(entity.tags, 20) * scale,

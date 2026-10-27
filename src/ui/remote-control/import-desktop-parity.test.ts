@@ -9,6 +9,10 @@ import { combinedBBox } from '../../core/scene/hit-test';
 import { importDxfFiles } from '../app/dxf-import-action';
 import { importSvgFiles } from '../app/svg-import-action';
 import { importImageFile } from '../commands/import-image-action';
+import {
+  installDxfImportWorker,
+  resetDxfImportWorker,
+} from '../import/dxf-import-worker.test-support';
 import { loadImageSamples, type LoadedImageSamples } from '../import/prepare-image-samples';
 import { makePng } from '../import/png-incremental-decoder.test-support';
 import { useStore } from '../state/store';
@@ -103,9 +107,14 @@ async function remoteImport(
 const noticeMessages = (receipt: Record<string, unknown>) =>
   (receipt.notices as { message: string }[]).map((notice) => notice.message);
 
-beforeEach(() => vi.stubGlobal('File', NodeFile));
+beforeEach(() => {
+  // A remote DXF parses in the import worker (ADR-269 Amendment 1); the desktop twin's
+  // text-only file parses on the main thread with the same parser.
+  installDxfImportWorker();
+  vi.stubGlobal('File', NodeFile);
+});
 afterEach(() => {
-  vi.unstubAllGlobals();
+  resetDxfImportWorker();
   freshBed();
 });
 
