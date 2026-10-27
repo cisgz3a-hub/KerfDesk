@@ -427,12 +427,12 @@ function installInitialStream(
       stepped.state.queued,
       gcode,
     ),
-    accessoryCache: invalidateAccessoryObservation(state.accessoryCache),
-    activeJobMachineKind: options.machineKind ?? 'laser',
     activeJobSafeZMm: startedJobSafeZMm(
       options.machineKind,
       options.jobMachine ?? useStore.getState().project.machine,
     ),
+    accessoryCache: invalidateAccessoryObservation(state.accessoryCache),
+    activeJobMachineKind: options.machineKind ?? 'laser',
     ...(options.externalProgram === true ? externalProgramControllerStatePatch(state, gcode) : {}),
   }));
   return writeOwner;
