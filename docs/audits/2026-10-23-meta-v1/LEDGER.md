@@ -52,3 +52,15 @@ Method: [../2026-10-21-rolling-v2/METHOD.md](../2026-10-21-rolling-v2/METHOD.md)
 | M7-P1-2 → P2 | 2026-09-29 P2-control-1 (ADR-491 Amd 1 item 3, CNC v1 F7 JR-3) | Known, lowered | A park height of 50 on a 75 mm Z travel with Z zero 40 mm below the top sends `G0 Z50` to machine Z +10; no check reads the live work offset. Tracked as an ADR-491 follow-up, and the value is the operator's; soft or hard limits alarm when on, and a bit-change stall is healed by the required fresh Zero Z. P2 | M7 + refuter REPRO; gnea/grbl @bfb67f0c | fix card proposed |
 | M7-P2-1..P2-5 | 2026-09-24 MC-2, CO-2, CO-3; 2026-09-29 P2-toolpath-3, P2-preview-2, P2-review-3 | Record omission | Untracked open items still on main: touch-off seeks 25 mm without checking the probe circuit; a closed shape stacked on its exact copy is not cut at all (the stacked-copy warning skips CNC); CNC Job Origin anchors on the cutter's reach (a 0.5 mm V-bit engraving lands 6.35 mm in); the preview's park/retract moves and Quick Nest's 2 mm CNC spacing (P2-4, the origin picker inviting the homing corner, lowered to P3) | M7 + refuter REPRO | fix cards proposed |
 | M7-P3-x | Older audit documents | Stale record | Five older documents still say "not merged"/"draft"/"open" for merged work; the 10-20 audits list CS-05 open though #923 fixed it; thirteen 10-19/10-20 controller items have no card or decision; the wrong "PWM255 clamps" claim left the spindle S out of the Marlin CNC export advisory | M7 + refuter | recorded here (older audits have no ledger) |
+
+## Corrections by rolling audit v3 G6 (2026-10-27)
+
+| ID | Summary | Evidence | Status |
+|---|---|---|---|
+| M2-P3-3 (P2) → **P1 by effect** (record only) | The fix gap for old camera calibrations was silent wrong position; "Frame shows the true outline" is not a §3 warning (Corrected by rolling v3 G6, 2026-10-27) | G6 refuter | fixed (#1441, ADR-440 Amd 4); record corrected |
+
+## Corrections by rolling audit v3 G9 (2026-10-27)
+
+| ID | Summary | Evidence | Status |
+|---|---|---|---|
+| M2 on 15-P2-1 → **P1 by effect** (record only) | Styled variable-text records were emitted up to 47 mm from their designed place while the canvas showed the template unmoved. It was kept at P2 only because Frame and Preview showed the shift; under METHOD §3 (2026-10-27) Frame is not a warning, and no in-app warning named the mismatch (Corrected by rolling v3 G9, 2026-10-27) | G9 auditor + refuter | fixed (#1359, `b68a53beb`); record corrected |
