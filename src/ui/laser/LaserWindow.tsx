@@ -11,6 +11,7 @@ import {
   setupBlockingJobCommandBlockMessage,
 } from '../state/laser-store-helpers';
 import { useMachineRailVisibility } from '../state/use-machine-rail-visibility';
+import { canQueueStepJog } from '../state/step-jog-queue';
 import { machineControlsLabel, machineDisplayName } from '../machine/machine-labels';
 import { CncUtilitiesPanel } from '../machine/CncUtilitiesPanel';
 import { ConsolePanel } from './ConsolePanel';
@@ -75,6 +76,9 @@ export function LaserWindow({ dockedJobActions = false }: Props = {}): JSX.Eleme
     machineOperationBusy,
     jogBlocked,
   );
+  // A running step jog takes more step presses (ADR-674); nothing else on the
+  // pad is enabled while it runs.
+  const stepJogsOnly = useLaserStore(canQueueStepJog) && jogPadDisabled && !jogBlocked;
   if (!machinePanel.isExpanded) {
     return <CollapsedMachineRail machineKind={machineKind} onExpand={machinePanel.toggle} />;
   }
@@ -105,6 +109,7 @@ export function LaserWindow({ dockedJobActions = false }: Props = {}): JSX.Eleme
         {controllerDisplay.sleep && <SleepBanner onWake={control.runWake} />}
         <MachineJogControls
           disabled={jogPadDisabled}
+          stepJogsOnly={stepJogsOnly}
           setupDisabled={setupDisabled}
           setupBusy={setupBusy}
         />
@@ -158,12 +163,14 @@ function MachineUtilityControls(props: {
 
 function MachineJogControls(props: {
   readonly disabled: boolean;
+  readonly stepJogsOnly: boolean;
   readonly setupDisabled: boolean;
   readonly setupBusy: boolean;
 }): JSX.Element {
   return (
     <JogPad
       disabled={props.disabled}
+      stepJogsOnly={props.stepJogsOnly}
       machineHome={
         <JobSetupControls
           disabled={props.setupDisabled}

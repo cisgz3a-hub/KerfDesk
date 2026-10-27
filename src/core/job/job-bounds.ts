@@ -36,7 +36,8 @@ export type JobBounds = {
 type MutableBounds = { minX: number; minY: number; maxX: number; maxY: number };
 
 // Where reverse scan rows sit: at their commanded scan-offset position, or at
-// the design position they burn on once that offset is calibrated.
+// the design position they burn on once that offset is calibrated. 'design'
+// also measures a CNC group by its artwork rather than its cutter's reach.
 type ReverseRows = 'compensated' | 'design';
 
 export function computeJobBounds(job: Job, device?: DeviceProfile): JobBounds | null {
@@ -47,7 +48,8 @@ export function computeJobBounds(job: Job, device?: DeviceProfile): JobBounds | 
  * moves commanded reverse rows so they burn on top of the forward rows, so
  * placement measures those rows at design: a table never moves the placed job,
  * its forward rows or its vector cuts. Motion, burn and Frame bounds keep the
- * commanded shift. */
+ * commanded shift. A CNC group anchors on its artwork, not its cutter's reach
+ * (ADR-327 Amendment 1); every other bound keeps the reach. */
 export function computeJobPlacementBounds(job: Job, device?: DeviceProfile): JobBounds | null {
   return computeBounds(job, false, device, false, 'design');
 }
@@ -142,6 +144,11 @@ function extendBoundsForGroup(
     case 'raster':
       return extendBoundsForRaster(b, group, includeOverscanMotion, device, reverseRows);
     case 'cnc':
+      if (reverseRows === 'design' && group.designBounds !== undefined) {
+        extendBoundsForPoint(b, { x: group.designBounds.minX, y: group.designBounds.minY });
+        extendBoundsForPoint(b, { x: group.designBounds.maxX, y: group.designBounds.maxY });
+        return true;
+      }
       return extendBoundsForCnc(b, group, useRepresentedCncMotion);
     default:
       return assertNever(group, 'Group');

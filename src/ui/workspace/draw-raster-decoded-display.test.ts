@@ -81,14 +81,11 @@ describe('drawRasterImage decoded display copy', () => {
     expect(frame.rects[0]).toEqual([0, 0, 400, 300]);
   });
 
-  it('keeps adjusted and trace-source pictures on their own display copies', async () => {
+  // A photo kept behind a trace no longer has a tinted copy of its own: it
+  // draws like any picture (ADR-673).
+  it('keeps adjusted pictures on their own display copy', async () => {
     const adjusted = { ...pictureAt('data:image/jpeg;base64,/9j/AAAC'), brightness: 20 };
-    const traceSource = {
-      ...pictureAt('data:image/jpeg;base64,/9j/AAAD'),
-      role: 'trace-source' as const,
-    };
     drawRasterImage(recordingContext().ctx, adjusted, CLOSE_UP);
-    drawRasterImage(recordingContext().ctx, traceSource, CLOSE_UP);
     await settle();
 
     expect(decodes).toBe(0);

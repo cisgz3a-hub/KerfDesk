@@ -95,6 +95,23 @@ describe('machineSettingsReadBlockReason', () => {
     expect(
       machineSettingsReadBlockReason(alarm, { requireCurrentStatusObservation: true }),
     ).toContain('Waiting for Idle');
+    // ADR-674: an Alarm the scheduler saw arrive this session qualifies.
+    expect(
+      machineSettingsReadBlockReason(alarm, {
+        requireCurrentStatusObservation: true,
+        freshAlarmObserved: true,
+      }),
+    ).toBeNull();
+    expect(
+      machineSettingsReadBlockReason(
+        state({
+          controllerSessionEpoch: epoch,
+          statusReport: { state: 'Sleep' } as LaserState['statusReport'],
+          statusObservation: null,
+        }),
+        { requireCurrentStatusObservation: true, freshAlarmObserved: true },
+      ),
+    ).not.toBeNull();
     expect(
       machineSettingsReadBlockReason(
         state({ controllerSessionEpoch: epoch, statusObservation: null }),

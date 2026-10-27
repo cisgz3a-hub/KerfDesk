@@ -68,6 +68,16 @@ export const grblHalDriver: ControllerDriver = {
   // (https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/protocol.c#L896-L899;
   // stream.h#L287-L291). Cancel waits briefly for owed replies before the
   // byte on every driver, because grblHAL can greet as stock GRBL (ADR-640).
+  realtime: {
+    ...grblDriver.realtime,
+    // CMD_STATUS_REPORT_ALL (0x87) sets every report flag and requests a
+    // status report, so WCO: arrives at once instead of at the next refresh
+    // count. Stock GRBL discards an unknown extended byte; a grblHAL that
+    // greets as stock GRBL runs the GRBL driver and gets the plain `?`.
+    // https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/grbl.h
+    // (CMD_STATUS_REPORT_ALL), protocol.c (protocol_enqueue_realtime_command).
+    completeStatusQuery: '\x87',
+  },
   capabilities: {
     ...grblDriver.capabilities,
     // grblHAL's homing loop serves status requests only with "report when

@@ -2664,7 +2664,12 @@ authorization, Frame proof, controller command, or safety boundary.
 3. Blocked commands are recorded as local diagnostics and no bytes are sent.
 
 #### Error — unsafe persistent command
-1. `$RST=*`, `$RST=$`, `$RST=#`, `$N=...`, `$I=...` and grblHAL's `$DWNGRD` are blocked in Lane 2.
+1. `$RST=*`, `$RST=$`, `$RST=#`, `$N=...`, `$I=...` and grblHAL's `$DWNGRD` are blocked in Lane 2,
+   in every form the firmware reads as one (`$N0.5=...`, `$RST(x)=*`). The Console reads a line as
+   GRBL's line reader does. It refuses a line before sending anything when a comment, `;` or `/`
+   sits in or in front of a `$` command (`(x)$30=255`, `$30(x)=255`), or when a setting number is
+   not digits only (`$30.0=255`). The message says what the firmware would run instead, so the
+   operator can type the command plainly (ADR-375 Amendment 6).
 2. `$number=value` settings writes require connected, idle controller state and explicit
    confirmation. On stock GRBL a value the firmware would store differently (anything but 0 or 1
    for an on/off setting, a fraction or a value outside 0-255 for its other 8-bit settings) is
@@ -4147,13 +4152,20 @@ settings and Job Review keep their existing read-only setup references.
    Photo paths and saved traces retain compact polylines when their line curves would only
    duplicate the same vertices. Explicit curve/node commands materialise their editable
    geometry inside the edit transaction; Undo restores the previous representation.
-   **Delete Image After trace** starts selected and removes the source bitmap only after a
-   successful commit. Uncheck it to retain the bitmap beside the trace for **Re-trace Original**. Cancel, failed tracing,
+   **Delete Image After trace** starts cleared, as in LightBurn, and when ticked removes the
+   source bitmap only after a successful commit. A kept bitmap is an ordinary image: it engraves
+   on its own Image operation (a Raster scan result burns on a copy of that operation), and
+   **Re-trace Original** can use it. Delete it or turn its operation's Output off to run only the
+   trace. A kept camera capture is a placement reference and stays on an Image operation with
+   Output off (ADR-673). Copying the trace copies only the trace. Cancel, failed tracing,
    and abandoned requests retain the source; Undo reverses the import and source deletion together.
    The committed trace records the dialog's preset, adjusted settings, output, fill style and
    boundary, and saves them with the project. **Re-trace Original** reopens the dialog with them
    and with **Delete Image After trace** cleared, so the source stays for the next re-trace
    (ADR-408). Traces made before that record reopen on the defaults.
+   Projects saved before ADR-673 marked a kept bitmap as a trace source that never engraved. They
+   open with that bitmap as an ordinary image that engraves, and a kept camera capture on an
+   output-off operation.
    In a CNC project, smoothing retains established stroke junctions at the
    source image's current physical size. In a laser project, outlines keep the
    tracer's fitted curves and store the chords the job burns within 0.025 mm;
@@ -4696,7 +4708,8 @@ on the rail, below the job actions, as the hand-placement fallback):
    **Set origin here** (User Origin), or selects **Current Position** in the
    Start from dropdown and jogs to the chosen 9-dot job anchor (the nine anchors
    name physical corners of the artwork as drawn on the canvas, on every machine
-   origin — ADR-327). Set origin is
+   origin — ADR-327; on a CNC profile too, not the cutter's reach past the
+   outline, which Frame still traces — ADR-327 Amendment 1). Set origin is
    not required while Current Position is active, but the exact completed Frame
    is required in both modes. (The former "Choose jog positioning" button was
    removed as redundant with the Start from dropdown — ADR-225.)
@@ -5869,6 +5882,13 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 1. A `.lf2` saved before stock footprints existed loads with the default
    400 × 400 footprint at the origin; thickness is preserved.
 
+#### Edge — nesting parts on the stock (ADR-433 Amendment 4)
+1. On a CNC project, Quick Nest and Quantity production open their Part spacing at the widest
+   bit that cuts on or outside a part outline (an Outside or On-path profile) plus 1 mm, rounded
+   up to 0.1 mm: 4.2 mm for a 1/8" bit. Never below the 2 mm laser default.
+2. A smaller spacing is still allowed. Quick Nest then says it is closer than the bit plus 1 mm
+   and that the bit cutting one part out can cut into the next, and names the value to use.
+
 ### F-CNC9. Import a DXF drawing — Phase H.6
 
 #### Success
@@ -6217,6 +6237,28 @@ and lifts the command's CNC-only gate.)*
    for none it names where the job ends: "Not set · program X0 Y0", or "Not set · back to where the
    job started" for Current Position. The CNC setup reference and the Machine Setup review page
    show "None".
+5. The park height is a work Z, so where it lands depends on where Z was zeroed (ADR-491
+   Amendment 2). Once this session's `$$` and Home (or soft limits on) fix the top of Z travel and
+   the controller reports its work offset, Job Review's Park height row says how far under the Z
+   top the lift stays. A lift past it is a Start warning that gives the overshoot and the highest
+   Park height that fits: with Z zeroed 40 mm below the homed top of a 75 mm axis, a 50 mm park
+   goes 10 mm past it. When the check cannot run, the row says "Z top not checked" and why. The
+   check uses the work zero set now; each bit change re-zeroes Z.
+6. Preview and the 3D view draw the program's parks: the lift to the park height and the move to
+   the park at every bit change and at the job end, a configured park winning. A cut that retracts
+   between passes lifts to safe Z before each replunge, as in the program.
+
+#### Edge — CNC setup sheet of a multi-bit job (ADR-392 Amendment 3)
+1. Save G-code → **Save setup sheet + program…** opens on **One file per bit** whenever the job
+   has more than one cutter section. Each file is a complete program with no `M0`, and opens with
+   `; bit N of M: <bit>` and what to zero before it runs. Between files the controller is Idle, so
+   jog, Zero Z and probing work.
+2. **Single file · M0 bit changes** stays available. The dialog and the sheet say that a controller
+   held at an `M0` takes no jog or Zero Z and already holds the next bit's spindle start and plunge.
+   Bit changes at those stops work only from the project's own Start, which holds before each `M0`
+   (F-CNC15), or in a sender that holds at the `M0` itself (gSender). Run G-code file sends the
+   `M0`, and its review warns.
+3. A one-cutter job, or an older prepared Save with no per-bit files, stays a single file.
 
 ### F-CNC15. Re-zero Z at a tool change — Phase H.7
 
@@ -8433,10 +8475,10 @@ as the pane's design record.
    vector-only artwork the path is **Convert to Bitmap** (F-F4) first; the
    menu tooltip says so.
 
-#### Edge — trace-source image
-1. Editing a kept trace source (ADR-026 tinted backing) changes future
-   re-traces only after Apply; the existing committed vectors are untouched
-   until the operator re-traces (F-L3).
+#### Edge — image kept after Trace
+1. Editing an image kept after Trace (ADR-026, an ordinary image since
+   ADR-673) changes future re-traces only after Apply; the existing committed
+   vectors are untouched until the operator re-traces (F-L3).
 
 #### Edge — dialog and asynchronous ownership
 1. Text, Image Size, and Canvas Size belong to the exact open editor session

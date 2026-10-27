@@ -51,7 +51,7 @@ function hasNoPhaseOrSettings(value: Record<string, unknown>): boolean {
 }
 
 function hasValidQualifyingFields(value: Record<string, unknown>): boolean {
-  const phases = ['controller-response', 'reset-cleanup', 'settings-read'];
+  const phases = ['controller-response', 'reset-cleanup', 'awaiting-ready', 'settings-read'];
   return phases.includes(String(value['phase'])) && value['settings'] === undefined;
 }
 

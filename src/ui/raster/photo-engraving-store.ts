@@ -58,7 +58,6 @@ export function openPhotoEngraving(): void {
     (state.project.machine?.kind ?? 'laser') !== 'laser' ||
     image?.kind !== 'raster-image' ||
     image.locked === true ||
-    image.role === 'trace-source' ||
     state.additionalSelectedIds.size > 0
   ) {
     useToastStore.getState().pushToast('Select one unlocked photo in the laser workspace.', 'info');

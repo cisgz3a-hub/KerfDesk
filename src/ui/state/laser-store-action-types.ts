@@ -87,9 +87,19 @@ export type LaserStoreActions = {
    * instead of waiting for the next poll tick. Inert to the planner; a no-op
    * without a realtime query or while a controller operation owns polling. */
   readonly requestControllerStatus: () => Promise<void>;
+  /** The driver's complete-report request (grblHAL 0x87), whose reply carries
+   * the work offset at once (ADR-674). A no-op on a driver without one, or
+   * while a controller operation owns polling. */
+  readonly requestCompleteControllerStatus: () => Promise<void>;
   readonly clearTranscript: () => void;
   readonly clearIncidentHistory: () => void;
-  readonly jog: (params: JogParams, owner?: MachineExecutionOwner) => Promise<void>;
+  /** `queueStep`: an operator step press, which may join a running step jog
+   * on a GRBL-family controller instead of being refused (ADR-674). */
+  readonly jog: (
+    params: JogParams,
+    owner?: MachineExecutionOwner,
+    options?: { readonly queueStep?: boolean },
+  ) => Promise<void>;
   readonly jogToMachinePosition: (x: number, y: number, feed: number) => Promise<void>;
   readonly centrePositioningLight: (
     x: number,

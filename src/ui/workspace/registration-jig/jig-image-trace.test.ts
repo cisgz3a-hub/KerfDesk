@@ -202,6 +202,5 @@ describe('the image the jig tracer offers', () => {
       ),
     });
     expect(jigTraceableImage(swap({ locked: true }), new Set([image.id]))).toBeNull();
-    expect(jigTraceableImage(swap({ role: 'trace-source' }), new Set([image.id]))).toBeNull();
   });
 });

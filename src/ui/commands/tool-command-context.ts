@@ -89,7 +89,6 @@ export function toolCommandContext(
     canPhotoEngraveSelection:
       selection.selectedIds.length === 1 &&
       selection.selected?.kind === 'raster-image' &&
-      selection.selected.role !== 'trace-source' &&
       selection.selected.locked !== true,
     saveProcessedBitmap: saveProcessedBitmapAction(platform, app, pushToast),
     traceImage: traceImageAction(selection.selected, dialogs.openImageDialog),

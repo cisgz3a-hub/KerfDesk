@@ -8,7 +8,6 @@ import { describe, expect, it } from 'vitest';
 import {
   createLayer,
   createProject,
-  DEFAULT_RASTER_LAYER_COLOR,
   IDENTITY_TRANSFORM,
   nextOperationColor,
   operationIdsForObject,
@@ -23,6 +22,8 @@ const SOURCE_ID = 'src1';
 const TRACE_ID = 'trace1';
 // OPERATION_PALETTE[0], what the allocator hands out first (blue since ADR-620).
 const FIRST_PALETTE_COLOR = nextOperationColor([]);
+// OPERATION_PALETTE[1], what it hands out once the first colour is taken.
+const SECOND_PALETTE_COLOR = nextOperationColor([{ color: FIRST_PALETTE_COLOR }]);
 
 function operationColorFor(project: Project, objectId: string): string | undefined {
   const object = project.scene.objects.find((candidate) => candidate.id === objectId);
@@ -86,19 +87,19 @@ describe('operation color assignment', () => {
     expect(operationColorFor(importedSource(), SOURCE_ID)).toBe(FIRST_PALETTE_COLOR);
   });
 
-  it('gives the traced artwork the first palette color rather than the runner-up', () => {
-    // The real ADR-026 flow: the operator imports the bitmap, then runs Trace
-    // on it. The source is retained as a tinted 'trace-source' backing — a
-    // reference object the operator is expected to delete, not output — but its
-    // operation already holds OPERATION_PALETTE[0]. The first-unused-wins
-    // allocator therefore pushes the trace (the artwork actually being cut)
-    // onto the second color.
+  it('keeps a kept photo on its colour and gives the trace the next one', () => {
+    // ADR-673: the photo the operator keeps engraves, so it is artwork like the
+    // trace and keeps its operation and colour, as a LightBurn image keeps its
+    // layer. The trace takes the next free colour, like any second artwork.
+    // This used to recolour the photo to the image grey so the trace could
+    // take the first colour, when the photo was a no-output backing.
     const result = applyTraceToExisting(
       { project: importedSource(), undoStack: [] },
       SOURCE_ID,
       tracedVector(),
     );
-    expect(operationColorFor(result.project, TRACE_ID)).toBe(FIRST_PALETTE_COLOR);
+    expect(operationColorFor(result.project, SOURCE_ID)).toBe(FIRST_PALETTE_COLOR);
+    expect(operationColorFor(result.project, TRACE_ID)).toBe(SECOND_PALETTE_COLOR);
   });
 
   it('gives the traced artwork the first palette color when the source is deleted', () => {
@@ -114,21 +115,10 @@ describe('operation color assignment', () => {
     expect(operationColorFor(result.project, TRACE_ID)).toBe(FIRST_PALETTE_COLOR);
   });
 
-  it('moves the retained backing to the reserved image grey', () => {
-    // The freed slot has to go somewhere the allocator will not immediately
-    // re-hand-out: the reserved raster grey, distinct from every palette color.
-    const result = applyTraceToExisting(
-      { project: importedSource(), undoStack: [] },
-      SOURCE_ID,
-      tracedVector(),
-    );
-    expect(operationColorFor(result.project, SOURCE_ID)).toBe(DEFAULT_RASTER_LAYER_COLOR);
-  });
-
   it('still gives a second imported artwork its own distinct color', () => {
     // The maintainer's "multiple colors with layers and different images": once
-    // the trace holds the first color, the next fresh artwork must get its own
-    // color, not collide onto it. Guards against over-correcting into a mono allocator.
+    // the photo and its trace hold two colours, the next fresh artwork must get
+    // its own color, not collide onto either. Guards against a mono allocator.
     const traced = applyTraceToExisting(
       { project: importedSource(), undoStack: [] },
       SOURCE_ID,
@@ -142,13 +132,14 @@ describe('operation color assignment', () => {
     const secondColor = operationColorFor(second.project, 'src2');
     expect(secondColor).toBeDefined();
     expect(secondColor).not.toBe(FIRST_PALETTE_COLOR);
+    expect(secondColor).not.toBe(SECOND_PALETTE_COLOR);
   });
 
   it('leaves a legacy color-bound source binding intact (audit F1)', () => {
     // A schema-v2 style source bound by COLOR (no operationIds). Recoloring its
-    // layer alone would silently re-point it at the trace's operation. The guard
-    // skips it: the legacy scene keeps today's behavior (trace stays on the
-    // runner-up) rather than gaining a corrupted binding.
+    // layer alone would silently re-point it at the trace's operation. Trace
+    // recolours no kept source (ADR-673), so the source keeps its own operation
+    // and the trace lands on the runner-up.
     const legacy = legacyColorBoundProject();
     const result = applyTraceToExisting(
       { project: legacy, undoStack: [] },
@@ -173,19 +164,33 @@ describe('operation color assignment', () => {
 });
 
 describe('rasterized (raster-output) trace color assignment', () => {
-  it('gives a rasterized trace the first palette color by reusing the source image operation', () => {
+  it('gives a rasterized trace the next colour on its copy of a kept source operation', () => {
+    // ADR-673: the kept photo engraves on its own operation; the result burns
+    // on a copy of it, which takes the next free colour.
     const result = applyRasterizedTraceToExisting(
       { project: importedSource(), undoStack: [] },
       SOURCE_ID,
       { ...sourceRaster(), id: 'rtrace1' },
     );
+    expect(operationColorFor(result.project, SOURCE_ID)).toBe(FIRST_PALETTE_COLOR);
+    expect(operationColorFor(result.project, 'rtrace1')).toBe(SECOND_PALETTE_COLOR);
+  });
+
+  it('gives a rasterized trace the first palette color by reusing a deleted source operation', () => {
+    const result = applyRasterizedTraceToExisting(
+      { project: importedSource(), undoStack: [] },
+      SOURCE_ID,
+      { ...sourceRaster(), id: 'rtrace1' },
+      { deleteSourceAfterTrace: true },
+    );
     expect(operationColorFor(result.project, 'rtrace1')).toBe(FIRST_PALETTE_COLOR);
   });
 
-  it('gives a rasterized trace the first palette color with no reusable image operation (audit F2)', () => {
+  it('gives a rasterized trace its own colour with no reusable image operation (audit F2)', () => {
     // Force the fresh-operation branch: bind the source to a LINE operation so
-    // no Image operation is reusable. The freshly allocated operation must still
-    // take the first palette color, not the runner-up.
+    // no Image operation is reusable. The kept source keeps the first colour
+    // (ADR-673), so the freshly allocated operation takes the next one rather
+    // than sharing or stealing the source's.
     const base = createProject();
     const project: Project = {
       ...base,
@@ -199,6 +204,26 @@ describe('rasterized (raster-output) trace color assignment', () => {
       ...sourceRaster(),
       id: 'rtrace1',
     });
+    expect(operationColorFor(result.project, SOURCE_ID)).toBe(FIRST_PALETTE_COLOR);
+    expect(operationColorFor(result.project, 'rtrace1')).toBe(SECOND_PALETTE_COLOR);
+  });
+
+  it('gives a rasterized trace the first colour when the source is deleted', () => {
+    const base = createProject();
+    const project: Project = {
+      ...base,
+      scene: {
+        ...base.scene,
+        objects: [{ ...sourceRaster(), operationIds: ['op-line'] }],
+        layers: [createLayer({ id: 'op-line', color: FIRST_PALETTE_COLOR, mode: 'line' })],
+      },
+    };
+    const result = applyRasterizedTraceToExisting(
+      { project, undoStack: [] },
+      SOURCE_ID,
+      { ...sourceRaster(), id: 'rtrace1' },
+      { deleteSourceAfterTrace: true },
+    );
     expect(operationColorFor(result.project, 'rtrace1')).toBe(FIRST_PALETTE_COLOR);
   });
 });

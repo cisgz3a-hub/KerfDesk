@@ -8,7 +8,6 @@
 // First paint may land before decode finishes, so callers can
 // subscribe to the load event and schedule one redraw.
 
-import { canvasTheme } from '../theme/canvas-theme';
 import {
   partialCellEnd,
   partialCellStart,
@@ -27,7 +26,7 @@ import {
   pruneAdjustedRasterDisplays,
 } from './raster-adjusted-display';
 import { decodedRasterDisplay, pruneDecodedRasterDisplays } from './raster-display-bitmap';
-import { displayLevel, releaseDisplayLevels } from './raster-display-levels';
+import { displayLevel } from './raster-display-levels';
 import type { ViewTransform } from './view-transform';
 
 type RasterImageCacheEntry = {
@@ -37,17 +36,7 @@ type RasterImageCacheEntry = {
 };
 
 const rasterImageCache = new Map<string, RasterImageCacheEntry>();
-// Tinted copies of trace-source bitmaps, keyed by dataUrl. The tint is
-// static per image, so we composite it once and reuse the canvas every
-// frame rather than re-tinting on each redraw.
-const tintedTraceSourceCache = new Map<string, HTMLCanvasElement>();
 const DEG_TO_RAD = Math.PI / 180;
-
-// ADR-026 trace-source tint. The source bitmap kept behind a trace is
-// washed with a cool blue so the operator can see two stacked layers and
-// tell which one (the tinted backing) to delete. Display only.
-const TRACE_SOURCE_TINT_COLOR = canvasTheme.traceSourceTint;
-const TRACE_SOURCE_TINT_ALPHA = 0.4;
 
 /** The display copies live objects still draw. */
 export type LiveRasterDisplayKeys = {
@@ -68,11 +57,6 @@ export function pruneRasterImageCaches(
     entry.onReady.clear();
     rasterImageCache.delete(dataUrl);
   }
-  for (const [dataUrl, canvas] of tintedTraceSourceCache) {
-    if (liveDataUrls.has(dataUrl)) continue;
-    releaseDisplayLevels(canvas);
-    tintedTraceSourceCache.delete(dataUrl);
-  }
   pruneAdjustedRasterDisplays(liveDisplays.adjusted);
   pruneDecodedRasterDisplays(liveDisplays.plain);
 }
@@ -84,7 +68,7 @@ export function liveRasterDisplayKeys(
   const plain = new Set<string>();
   const adjusted = new Map<string, Set<string>>();
   for (const obj of objects) {
-    if (!isRasterImage(obj) || obj.role === 'trace-source') continue;
+    if (!isRasterImage(obj)) continue;
     const adjustments = burnedImageAdjustments(obj, layerByColor);
     const sourceKey = rasterDisplayDataUrl(obj);
     if (!hasLumaAdjustments(adjustments)) {
@@ -128,29 +112,6 @@ export type DrawRasterImageOptions = {
   readonly adjustments?: LumaAdjustments;
 };
 
-// Return a copy of `img` whose opaque pixels are washed with the tint
-// color; transparent regions stay clear (the 'source-atop' composite
-// confines the fill to where the image already painted, so the result
-// is a tinted silhouette, not a colored box). Cached per dataUrl.
-// Returns null when an offscreen 2D context is unavailable (e.g. jsdom
-// under unit tests) so the caller falls back to the untinted image.
-function tintedTraceSource(dataUrl: string, img: HTMLImageElement): HTMLCanvasElement | null {
-  const cached = tintedTraceSourceCache.get(dataUrl);
-  if (cached !== undefined) return cached;
-  const off = document.createElement('canvas');
-  off.width = img.naturalWidth;
-  off.height = img.naturalHeight;
-  const octx = off.getContext('2d');
-  if (octx === null) return null;
-  octx.drawImage(img, 0, 0);
-  octx.globalCompositeOperation = 'source-atop';
-  octx.globalAlpha = TRACE_SOURCE_TINT_ALPHA;
-  octx.fillStyle = TRACE_SOURCE_TINT_COLOR;
-  octx.fillRect(0, 0, off.width, off.height);
-  tintedTraceSourceCache.set(dataUrl, off);
-  return off;
-}
-
 export function drawRasterImage(
   ctx: CanvasRenderingContext2D,
   obj: {
@@ -158,7 +119,6 @@ export function drawRasterImage(
     readonly imageAsset?: NonNullable<RasterImage['imageAsset']>;
     readonly bounds: AABB;
     readonly transform: ObjTransform;
-    readonly role?: 'trace-source';
     readonly imageClip?: RasterImage['imageClip'];
     readonly brightness?: number;
     readonly contrast?: number;
@@ -179,7 +139,7 @@ export function drawRasterImage(
 
   drawBitmapAtTransform(
     ctx,
-    rasterPaint(obj, displayDataUrl, img, options.adjustments ?? obj, options.onBitmapReady),
+    rasterPaint(displayDataUrl, img, options.adjustments ?? obj, options.onBitmapReady),
     obj.bounds,
     obj.transform,
     view,
@@ -187,18 +147,16 @@ export function drawRasterImage(
   );
 }
 
-// Trace-source backings draw tinted so the operator can tell the deletable
-// original apart from the trace stacked on top (ADR-026). An adjusted image
-// draws the grey tone that burns (ADR-359); an unadjusted one, its source,
-// from a copy decoded off the main thread once it lands (ADR-359 Amendment 1).
+// An adjusted image draws the grey tone that burns (ADR-359); an unadjusted
+// one, its source, from a copy decoded off the main thread once it lands
+// (ADR-359 Amendment 1). A photo kept behind a trace draws like any other
+// image: it engraves like one (ADR-673).
 function rasterPaint(
-  obj: Parameters<typeof drawRasterImage>[1],
   displayDataUrl: string,
   img: HTMLImageElement,
   adjustments: LumaAdjustments,
   onDecoded: (() => void) | undefined,
 ): CanvasImageSource {
-  if (obj.role === 'trace-source') return tintedTraceSource(displayDataUrl, img) ?? img;
   if (hasLumaAdjustments(adjustments)) {
     return adjustedRasterDisplay(displayDataUrl, img, adjustments) ?? img;
   }
@@ -226,7 +184,7 @@ export function rasterDisplayDataUrl(obj: Pick<RasterImage, 'dataUrl' | 'imageAs
 }
 
 // Blit a decoded bitmap (an HTMLImageElement, or an offscreen canvas
-// such as the tinted trace-source backing or the F.2.c dither-preview
+// such as an adjusted display copy or the F.2.c dither-preview
 // buffer) at an object's mm placement, mirroring core/scene/
 // transform.ts's applyTransform exactly:
 //   p' = translate(rotate(mirror(scale(p)))) = scale → rotate-about-0,0 → translate

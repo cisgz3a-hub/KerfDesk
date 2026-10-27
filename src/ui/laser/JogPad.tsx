@@ -6,6 +6,9 @@
 // object and no longer jog the machine (F104). The pad owns the keyboard jog
 // keys while it is mounted: PageUp/PageDown for Z focus, and LightBurn's XY
 // keys (ADR-493), which send the same step vector as the matching arrow.
+// While a step jog runs on a GRBL-family controller the arrows and XY keys stay
+// live for more steps, which join that jog (stepJogsOnly, ADR-674); hold, Z
+// focus and the settings rows wait for it to finish.
 
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import {
@@ -36,14 +39,23 @@ import { useJogShortcuts } from './use-jog-shortcuts';
 import { useZeroZAction } from './use-zero-z-action';
 
 const FOCUS_FEED_MM_PER_MIN = 600;
+const QUEUE_STEP = { queueStep: true } as const;
 
 type Props = {
   readonly disabled: boolean;
+  /** With `disabled`: XY step presses may still join the running step jog. */
+  readonly stepJogsOnly?: boolean;
   readonly machineHome?: ReactNode;
   readonly machineActions?: ReactNode;
 };
 
-export function JogPad({ disabled, machineHome, machineActions }: Props): JSX.Element {
+export function JogPad({
+  disabled,
+  stepJogsOnly = false,
+  machineHome,
+  machineActions,
+}: Props): JSX.Element {
+  const arrowsDisabled = disabled && !stepJogsOnly;
   const [focusStep, setFocusStep] = useState<number>(1);
   const step = useJogControlPreferences((state) => state.stepMm);
   const setStep = useJogControlPreferences((state) => state.setStepMm);
@@ -53,8 +65,6 @@ export function JogPad({ disabled, machineHome, machineActions }: Props): JSX.El
   const device = project.device;
   const machineKind = machineKindOf(project.machine);
   const maxFeed = deviceForActiveHead(device, project.machine).maxFeed;
-  const jog = useLaserStore((s) => s.jog);
-  const cancelJog = useLaserStore((s) => s.cancelJog);
   const continuousJogSupported = useLaserStore((s) => s.capabilities.jogCancel);
   const feed = clampJogFeed(selectedFeed, maxFeed);
   const focusFeed = Math.min(maxFeed, FOCUS_FEED_MM_PER_MIN);
@@ -67,26 +77,19 @@ export function JogPad({ disabled, machineHome, machineActions }: Props): JSX.El
   const airAssistOn = useLaserStore((s) => s.airAssistOn);
   const showManualAir = machineKind === 'laser' || airAssistOn;
 
-  const sendVector = useCallback(
-    (vector: JogVector): void => {
-      void jog(vector).catch(controllerActionFailureHandler('Jog'));
-    },
-    [jog],
-  );
-  const sendFocus = useCallback(
-    (direction: 1 | -1): void => {
-      void jog({ dz: direction * focusStep, feed: focusFeed }).catch(
-        controllerActionFailureHandler('Z jog'),
-      );
-    },
-    [focusFeed, focusStep, jog],
-  );
-  const cancelContinuousJog = useCallback((): void => {
-    void cancelJog().catch(controllerActionFailureHandler('Stop jog'));
-  }, [cancelJog]);
+  const { sendVector, sendFocus, cancelContinuousJog } = useJogSenders(focusStep, focusFeed);
   const handleZeroZ = useZeroZAction();
 
-  useJogPadShortcuts({ disabled, focusReady, sendFocus, sendVector, step, feed, signs });
+  useJogPadShortcuts({
+    disabled,
+    xyDisabled: arrowsDisabled,
+    focusReady,
+    sendFocus,
+    sendVector,
+    step,
+    feed,
+    signs,
+  });
 
   return (
     <div className="lf-jog-panel" style={containerStyle}>
@@ -98,12 +101,12 @@ export function JogPad({ disabled, machineHome, machineActions }: Props): JSX.El
       >
         <JogArrows
           centerAction={machineHome}
-          disabled={disabled}
+          disabled={arrowsDisabled}
           stepMm={step}
           feed={feed}
           signs={signs}
           bounds={bounds}
-          continuousJogSupported={continuousJogSupported}
+          continuousJogSupported={continuousJogSupported && !stepJogsOnly}
           onJog={sendVector}
           onCancel={cancelContinuousJog}
         />
@@ -128,6 +131,38 @@ export function JogPad({ disabled, machineHome, machineActions }: Props): JSX.El
       />
     </div>
   );
+}
+
+// A step press may join a running step jog (ADR-674); a hold never does.
+function useJogSenders(
+  focusStep: number,
+  focusFeed: number,
+): {
+  readonly sendVector: (vector: JogVector, mode?: 'step' | 'hold') => void;
+  readonly sendFocus: (direction: 1 | -1) => void;
+  readonly cancelContinuousJog: () => void;
+} {
+  const jog = useLaserStore((s) => s.jog);
+  const cancelJog = useLaserStore((s) => s.cancelJog);
+  const sendVector = useCallback(
+    (vector: JogVector, mode: 'step' | 'hold' = 'step'): void => {
+      const sent = mode === 'step' ? jog(vector, undefined, QUEUE_STEP) : jog(vector);
+      void sent.catch(controllerActionFailureHandler('Jog'));
+    },
+    [jog],
+  );
+  const sendFocus = useCallback(
+    (direction: 1 | -1): void => {
+      void jog({ dz: direction * focusStep, feed: focusFeed }).catch(
+        controllerActionFailureHandler('Z jog'),
+      );
+    },
+    [focusFeed, focusStep, jog],
+  );
+  const cancelContinuousJog = useCallback((): void => {
+    void cancelJog().catch(controllerActionFailureHandler('Stop jog'));
+  }, [cancelJog]);
+  return { sendVector, sendFocus, cancelContinuousJog };
 }
 
 function JogControlsLayout(props: {
@@ -223,6 +258,7 @@ function nativeTravel(bounds: NativeXyBounds): MachineBounds {
 // own step vector (ADR-493), so it is disabled exactly when the arrows are.
 function useJogPadShortcuts(pad: {
   readonly disabled: boolean;
+  readonly xyDisabled: boolean;
   readonly focusReady: boolean;
   readonly sendFocus: (direction: 1 | -1) => void;
   readonly sendVector: (vector: JogVector) => void;
@@ -233,7 +269,7 @@ function useJogPadShortcuts(pad: {
   useJogShortcuts({
     focusDisabled: pad.disabled || !pad.focusReady,
     onFocusJog: pad.sendFocus,
-    xyDisabled: pad.disabled,
+    xyDisabled: pad.xyDisabled,
     xyStep: { stepMm: pad.step, feed: pad.feed, signs: pad.signs },
     onXyJog: pad.sendVector,
   });

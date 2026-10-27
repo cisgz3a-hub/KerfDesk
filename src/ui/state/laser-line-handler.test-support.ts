@@ -127,6 +127,7 @@ function makeLaserStateActions() {
     clearTranscript: () => undefined,
     clearIncidentHistory: () => undefined,
     requestControllerStatus: async () => undefined,
+    requestCompleteControllerStatus: async () => undefined,
   };
 }
 

@@ -245,10 +245,12 @@ describe('ExecutablePlan non-live preview route', () => {
     });
     const planRoute = buildExecutablePlanPreviewToolpath(emission.sidecar.plan);
 
+    // The legacy route draws the job-end lift and park (ADR-491 Amendment 2) but
+    // still omits the preamble's first lift from an unknown Z.
     expect(comparePreviewRoutesAtEmitPrecision(legacy, planRoute)).toMatchObject({
       ok: false,
       reason: 'segment-count',
-      legacyCount: 4,
+      legacyCount: 5,
       planCount: 6,
       planSample: [
         'vertical 0,0->0,0 z:0->3.81 route:0.000->3.810',

@@ -71,6 +71,21 @@ describe('appendCncGroupSteps (via buildToolpath)', () => {
     expect(secondPlunge.toZ).toBe(-3);
   });
 
+  it('lifts to safe Z between same-XY passes when the group retracts between passes', () => {
+    const toolpath = buildToolpath(
+      { groups: [group(twoDepthPasses, { retractBetweenPasses: true })] },
+      { startPoint: { x: 0, y: 0 } },
+    );
+    const kinds = toolpath.steps.map((s) => s.kind);
+    expect(kinds).toEqual(['travel', 'plunge', 'cut', 'plunge', 'plunge', 'cut']);
+    const lift = toolpath.steps.at(3);
+    const replunge = toolpath.steps.at(4);
+    if (lift?.kind !== 'plunge' || replunge?.kind !== 'plunge') throw new Error('expected plunges');
+    expect(lift.toZ).toBe(REPRESENTED_SAFE_Z_MM);
+    expect(replunge.fromZ).toBe(REPRESENTED_SAFE_Z_MM);
+    expect(replunge.toZ).toBe(-3);
+  });
+
   it('retracts to safe Z before traveling to a different XY', () => {
     const passes: CncPass[] = [
       { kind: 'contour', zMm: -1, polyline: squareLoop(10, 5), closed: true },
@@ -344,8 +359,11 @@ describe('simulator ≡ emitter (property, 100 seeds)', () => {
   const cncJob: fc.Arbitrary<Job> = fc
     .array(
       fc
-        .array(fc.oneof(contourPass, path3dPass), { minLength: 1, maxLength: 4 })
-        .map((passes) => group(passes)),
+        .record({
+          passes: fc.array(fc.oneof(contourPass, path3dPass), { minLength: 1, maxLength: 4 }),
+          retractBetweenPasses: fc.boolean(),
+        })
+        .map(({ passes, retractBetweenPasses }) => group(passes, { retractBetweenPasses })),
       { minLength: 1, maxLength: 3 },
     )
     .map((groups) => ({ groups }));

@@ -23,6 +23,7 @@ import { useStore } from './store';
 import { isWorkZEvidenceCurrentForStart } from './work-z-zero-evidence';
 import { confirmFreshManualMotionIdle } from './manual-motion-fresh-idle';
 import { publishMotionPolicyWarning, warnJogMotionPolicy } from './laser-jog-warnings';
+import { firstStepJogQueue, queueStepJog } from './step-jog-queue';
 import {
   assertManualMotionNotCancelled,
   manualMotionCancelGeneration,
@@ -71,7 +72,7 @@ export function jogActions(
   return {
     home: () => runHomeAction(set, get, refs, safeWrite, refs.driver),
     jogToMachinePosition: (x, y, feed) => runJogToMachinePosition(context, x, y, feed),
-    jog: (params, owner) => runJog(context, params, owner),
+    jog: (params, owner, options) => runJog(context, params, owner, options),
     cancelJog: () => runCancelJog(set, get, refs, safeWrite),
     frame: (bounds, feed, candidate, jobProject, owner, external) =>
       runFrame(context, bounds, feed, candidate, jobProject, owner, external),
@@ -141,8 +142,11 @@ async function runJog(
   context: JogActionContext,
   params: Parameters<LaserState['jog']>[0],
   owner?: MachineExecutionOwner,
+  options?: Parameters<LaserState['jog']>[2],
 ): Promise<void> {
   assertMachineExecutionOwner(owner);
+  const stepPress = options?.queueStep === true && owner === undefined && params.relative !== false;
+  if (stepPress && queueStepJog(context.set, context.get, context.refs.driver, params)) return;
   context = { ...context, safeWrite: ownedMachineWrite(context.safeWrite, owner) };
   const { set, get, refs } = context;
   assertAutofocusIdle(get());
@@ -156,6 +160,7 @@ async function runJog(
   const operation = {
     ...startSettledJogOperation(refs),
     ...(owner === undefined ? {} : { executionOwner: owner }),
+    ...(stepPress ? { stepJogQueue: firstStepJogQueue(get, params) } : {}),
   };
   assertManualMotionNotCancelled(refs, cancelGeneration);
   set({ motionOperation: operation, frameVerification: null, framedRun: null, frameTrace: null });

@@ -1258,6 +1258,8 @@ overlap.
 5. The retained source is **output-eligible** (appears in G-code) until the
    user deletes it or toggles its image layer's output off — matching
    LightBurn, where the retained image is a real object on its own layer.
+   *(ADR-673, 2026-10-20: restored after a later `trace-source` exclusion
+   broke it; the tint is removed and a kept camera capture stays output-off.)*
 
 **Consequences.**
 
@@ -11150,7 +11152,9 @@ so a large source traced on the smaller grid could be committed at the wrong phy
    pixels. Boundary selections are remapped from the retained burn grid to the capped trace grid.
    The live source and complete Image-operation set are revalidated after conversion.
 4. Commit is atomic and records one undo entry. The original image is either retained as the
-   excluded `trace-source` backing or removed by the existing delete toggle; re-trace replaces the
+   excluded `trace-source` backing (superseded by ADR-673: it is retained as an ordinary image
+   that engraves, and the result then burns on copies of its operations) or removed by the
+   existing delete toggle; re-trace replaces the
    prior result in place so stacking, artwork order, and group references remain stable. Raster
    trace provenance round-trips so **Re-trace Original** still works while the backing source
    exists. Budget or conversion failure makes no scene change.
@@ -20635,7 +20639,7 @@ are accepted, so the worker's peak remains proportional to the route. No hardwar
 
 ## ADR-327 - Job placement anchors are physical corners; Frame permits survive canvas selection; Verified Origin gets User Origin parity (2026-09-20)
 
-**Status:** Accepted; amends the WORKFLOW.md F-F3 Set-origin rule (ADR-021 covers only the G92 mechanics), ADR-053 (Verified Origin coaching and remedies), ADR-193 (explicit placement choices are never rewritten) and the execution-signature scope of ADR-230/ADR-232. The completed-Frame contract of ADR-228/230/232/237 is unchanged: no ordinary Start gate is added or removed.
+**Status:** Accepted; amends the WORKFLOW.md F-F3 Set-origin rule (ADR-021 covers only the G92 mechanics), ADR-053 (Verified Origin coaching and remedies), ADR-193 (explicit placement choices are never rewritten) and the execution-signature scope of ADR-230/ADR-232. The completed-Frame contract of ADR-228/230/232/237 is unchanged: no ordinary Start gate is added or removed. On a CNC profile the anchors name the artwork, not the cutter's reach, by ADR-327 Amendment 1.
 
 ### Context
 

@@ -2,13 +2,17 @@
 // contract step-for-step so the simulator shows exactly what the emitter
 // sends: retract to safe Z before any XY travel, rapid to the pass start,
 // G1-plunge to the pass depth, feed the pass; same-XY depth chaining skips
-// the retract+travel pair. The emitter-agreement property test in
-// toolpath-cnc.test.ts locks the two together.
+// the retract+travel pair unless the group retracts between passes (ADR-253).
+// When the caller asks for parks, a bit change and the job end lift to the
+// park height and move to the park as the emitter does (ADR-491 Amendment 2).
+// The emitter-agreement property test in toolpath-cnc.test.ts locks the two
+// together.
 
 import {
   cncContourEmissionVertices,
   representedCncCoordinateMm,
 } from '../cnc/coordinate-representation';
+import { parkHeightMm, parkTarget } from '../cnc/cnc-park';
 import { circularArcLengthMm, sampleCircularArcPoints } from '../geometry/arc-representation';
 import { assertNever, type Vec2 } from '../scene';
 import { cncHelicalContourPoints } from './cnc-helical-representation';
@@ -32,15 +36,36 @@ const XY_EPS = 5e-4;
 // is the bit currently in the spindle: a retract belongs to the bit that was
 // just cutting, not to the group whose pass comes next (between those two the
 // emitter parks and pauses for the change).
+// The park fields mirror the emitter's job state: the highest safe Z seen so
+// far, whether the job changes bits, and the bit key of the current section.
+// parkFinish is the emitter's finish fallback; null draws no parks at all.
 export type CncSimState = {
   zMm: number | null;
   toolId: string | undefined;
   headXText: string | null;
   headYText: string | null;
+  maxSafeZMm: number;
+  multiTool: boolean;
+  toolKey: string | null;
+  lastGroup: CncGroup | undefined;
+  parkFinish: Vec2 | null;
 };
 
-export function createCncSimState(): CncSimState {
-  return { zMm: null, toolId: undefined, headXText: null, headYText: null };
+export function createCncSimState(
+  groups: ReadonlyArray<CncGroup> = [],
+  parkFinish: Vec2 | null = null,
+): CncSimState {
+  return {
+    zMm: null,
+    toolId: undefined,
+    headXText: null,
+    headYText: null,
+    maxSafeZMm: 0,
+    multiTool: new Set(groups.map((group) => group.toolId ?? '')).size > 1,
+    toolKey: null,
+    lastGroup: undefined,
+    parkFinish,
+  };
 }
 
 // exactOptionalPropertyTypes: an absent bit must omit the key, not set it to
@@ -56,6 +81,18 @@ export function appendCncGroupSteps(
   state: CncSimState,
 ): Vec2 | null {
   let head = initialPrevEnd;
+  state.maxSafeZMm = Math.max(state.maxSafeZMm, group.safeZMm);
+  const toolKey = group.toolId ?? '';
+  if (state.multiTool && state.toolKey !== null && toolKey !== state.toolKey) {
+    head = appendCncParkSteps(steps, head, group, state);
+    // The operator touches the new bit off on the stock top during the hold,
+    // so the emitter re-lifts from a Z it no longer tracks.
+    state.zMm = null;
+    state.headXText = null;
+    state.headYText = null;
+  }
+  state.toolKey = toolKey;
+  state.lastGroup = group;
   for (let passIndex = 0; passIndex < group.passes.length; passIndex += 1) {
     const pass = group.passes[passIndex];
     if (pass === undefined) continue;
@@ -80,6 +117,7 @@ function appendPassSteps(
   const safeZ = representedCncCoordinateMm(Math.max(0, group.safeZMm));
   const entryZ = cncPassEntryDepthMm(pass);
 
+  appendRetractBeforePass(steps, head, safeZ, group, pass, state);
   const alreadyAtStart = head !== null && sameXyForPass(head, first, state);
   if (!alreadyAtStart) {
     appendRetract(steps, head, safeZ, state);
@@ -113,6 +151,42 @@ function appendPassSteps(
   state.headXText = exit.xText;
   state.headYText = exit.yText;
   return exit.point;
+}
+
+// ADR-253: the emitter lifts before a contour or path3d pass replunges.
+function appendRetractBeforePass(
+  steps: ToolpathStep[],
+  head: Vec2 | null,
+  safeZ: number,
+  group: CncGroup,
+  pass: CncPass,
+  state: CncSimState,
+): void {
+  if (group.retractBetweenPasses !== true) return;
+  if (pass.kind === 'contour' || pass.kind === 'path3d') appendRetract(steps, head, safeZ, state);
+}
+
+/** The emitter's lift to the park height and rapid to the park, for a bit
+ * change (the incoming group) or the job end (the last group). */
+export function appendCncParkSteps(
+  steps: ToolpathStep[],
+  head: Vec2 | null,
+  group: CncGroup | undefined,
+  state: CncSimState,
+): Vec2 | null {
+  if (head === null || state.parkFinish === null) return head;
+  const parkZ = representedCncCoordinateMm(Math.max(0, parkHeightMm(group, state.maxSafeZMm)));
+  appendRetract(steps, head, parkZ, state);
+  const park = parkTarget(group, state.parkFinish);
+  if (sameXy(head, park)) return head;
+  steps.push({
+    kind: 'travel',
+    from: head,
+    to: park,
+    length: dist(head, park),
+    z: { from: parkZ, to: parkZ },
+  });
+  return park;
 }
 
 // The emitter's preamble parks at safe Z from an unknown prior position; the

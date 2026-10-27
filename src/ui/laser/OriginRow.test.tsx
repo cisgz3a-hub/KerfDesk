@@ -10,6 +10,8 @@ import { DEFAULT_JOG_STEP_MM, useJogControlPreferences } from './jog-control-pre
 import { DEFAULT_JOG_FEED_MM_PER_MIN } from './jog-control-policy';
 import { OriginTransactionCancelledError } from '../state/laser-origin-transaction';
 import { useToastStore } from '../state/toast-store';
+import { marlinDriver } from '../../core/controllers';
+import { HOST_RECORDED_RESET_UNKNOWN_MESSAGE } from '../state/host-recorded-origin';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -370,5 +372,61 @@ describe('OriginRow Set-origin attention pulse (ADR-327)', () => {
     expect(
       await setOriginClassName({ startFrom: 'current-position', wcoCache: null }),
     ).not.toContain('lf-btn--attention');
+  });
+});
+
+// ADR-674 (audit CS-05): stock Marlin compiles no G92.1, so Reset origin is a
+// G92 to the recorded machine position, offered only while KerfDesk knows it.
+describe('OriginRow Reset origin on Marlin', () => {
+  const grblCapabilities = useLaserStore.getState().capabilities;
+  afterEach(() => {
+    useLaserStore.setState({ capabilities: grblCapabilities });
+  });
+
+  async function resetButton(
+    report: LaserStatusReport | null,
+  ): Promise<{ readonly button: HTMLButtonElement; readonly cleanup: () => Promise<void> }> {
+    useLaserStore.setState({
+      capabilities: marlinDriver.capabilities,
+      statusReport: report,
+      workOriginActive: true,
+      workOriginSource: 'g92',
+      wcoCache: { x: 40, y: 30, z: 0 },
+    });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = await renderOriginRow(host);
+    return {
+      button: buttonByText(host, 'Reset origin'),
+      cleanup: async () => {
+        await act(async () => root.unmount());
+        host.remove();
+      },
+    };
+  }
+
+  it('offers the restoring G92 once the machine position is known', async () => {
+    const { button, cleanup } = await resetButton({
+      state: 'Idle',
+      mPos: null,
+      wPos: { x: 1, y: 2, z: 0 },
+    } as LaserStatusReport);
+    try {
+      expect(button.disabled).toBe(false);
+      expect(button.title).toContain('G92 to the machine position');
+      expect(button.title).not.toContain('(G92.1)');
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('waits for a position report before offering it', async () => {
+    const { button, cleanup } = await resetButton(null);
+    try {
+      expect(button.disabled).toBe(true);
+      expect(button.title).toBe(HOST_RECORDED_RESET_UNKNOWN_MESSAGE);
+    } finally {
+      await cleanup();
+    }
   });
 });

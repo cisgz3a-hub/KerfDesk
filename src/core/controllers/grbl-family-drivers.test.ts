@@ -26,7 +26,14 @@ describe('GRBL-family variant drivers', () => {
     // Same realtime bytes. grblHAL's 0x85 also flushes unparsed input in every
     // state, but grblHAL can greet as stock GRBL, so Cancel handles that on
     // every driver rather than by driver kind (ADR-640, see the next test).
-    expect(grblHalDriver.realtime).toEqual(grblDriver.realtime);
+    // grblHAL adds 0x87, which asks for a complete report, WCO included
+    // (protocol audit P-4, ADR-674).
+    expect(grblHalDriver.realtime).toEqual({
+      ...grblDriver.realtime,
+      completeStatusQuery: '\x87',
+    });
+    expect(grblDriver.realtime.completeStatusQuery ?? null).toBeNull();
+    expect(fluidncDriver.realtime.completeStatusQuery ?? null).toBeNull();
     expect(grblHalDriver.commands).toEqual(nonStockGrblCommands);
     // Neither stock GRBL's homing loop nor grblHAL's at its default settings
     // serves `?`; FluidNC's does (audit ST-4). grblHAL latches a refused

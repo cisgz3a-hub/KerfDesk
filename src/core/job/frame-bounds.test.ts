@@ -125,14 +125,19 @@ describe('computeFrameBounds', () => {
     );
   });
 
-  it('skips trace-source backing rasters just like compileJob', () => {
+  // ADR-673: a photo kept when tracing is output, so it is framed. This used to
+  // pin the opposite, when the kept photo was skipped.
+  it('frames a photo kept behind its trace just like compileJob', () => {
     const scene = {
       ...EMPTY_SCENE,
       layers: [createLayer({ id: 'image', color: '#808080', mode: 'image' })],
-      objects: [rasterObject({ role: 'trace-source' })],
+      objects: [rasterObject()],
     };
 
-    expect(computeFrameBounds(scene, DEFAULT_DEVICE_PROFILE)).toBeNull();
+    expect(computeFrameBounds(scene, DEFAULT_DEVICE_PROFILE)).toEqual(
+      computeJobBounds(compileJob(scene, DEFAULT_DEVICE_PROFILE)),
+    );
+    expect(computeFrameBounds(scene, DEFAULT_DEVICE_PROFILE)).not.toBeNull();
   });
 
   it('applies the same job-origin placement offset as the compiled job path', () => {

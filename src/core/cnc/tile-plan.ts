@@ -216,8 +216,11 @@ function clipGroupToTile(group: CncGroup, tile: CncTile): CncGroup | null {
   }
   if (passes.length === 0) return null;
   const tiledRamp = hasEntryRamp(group);
+  // Each tile is zeroed on its own frame; the whole job's artwork extent does
+  // not describe a clipped tile, so it is not carried into one.
+  const { designBounds: _designBounds, ...untiled } = group;
   return {
-    ...group,
+    ...untiled,
     ...(tiledRamp ? { rampEntryTiled: true as const } : {}),
     passes: passes.map((pass) => translatePass(pass, tile)),
   };

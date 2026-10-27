@@ -55,7 +55,6 @@ export function useTraceDialogSettings(
       height: seed.pixelHeight,
     }),
   );
-  const retrace = request.replaceTraceId !== undefined;
   const { preset, selectPreset: choosePreset } = useTracePreset(machineKind, initial.presetName);
   const boundarySelection = useBoundarySelection(
     initial,
@@ -76,9 +75,10 @@ export function useTraceDialogSettings(
     initial.fillStyle ?? 'scanline',
   );
   const [traceOutput, setTraceOutput] = useState<TraceOutput>(initial.output ?? 'vector');
-  // Re-trace Original is reachable only because the source was kept, so a
-  // re-trace keeps it again by default; deleting it would end re-tracing.
-  const [deleteSourceAfterTrace, setDeleteSourceAfterTrace] = useState(!retrace);
+  // Off by default, as in LightBurn, where the operator turns it on to drop
+  // the image (ADR-673). A kept image engraves on its own operation and keeps
+  // Re-trace Original available.
+  const [deleteSourceAfterTrace, setDeleteSourceAfterTrace] = useState(false);
   return {
     boundarySelection,
     preset,

@@ -345,6 +345,8 @@ export function connectionStatusText(
       return connectionStatusLabel(connection);
     case 'controller-response':
       return 'Connecting…';
+    case 'awaiting-ready':
+      return 'Waiting for controller…';
     case 'reset-cleanup':
     case 'settings-read':
       return 'Reading settings…';

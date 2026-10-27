@@ -13,14 +13,19 @@
 // './toolpath' importers are untouched.
 
 import type { Vec2 } from '../scene';
-import type { CutSegment, FillGroup, Group, Job } from './job';
+import type { CncGroup, CutSegment, FillGroup, Group, Job } from './job';
 import { cutSegmentBurnPolyline } from './cut-arc-moves';
 import { contourEntryPoint, type ContourEntryBounds } from './contour-entry';
 import { finalPassCutSegments } from './cut-pass-segments';
 import { expandFillHatchWithRunways } from './fill-runway';
 import { planFillSweeps, type FillSweepPlan } from './fill-sweep-plan';
 import { offsetForEmittedFeed } from './scan-offset';
-import { appendCncGroupSteps, createCncSimState, type CncSimState } from './toolpath-cnc';
+import {
+  appendCncGroupSteps,
+  appendCncParkSteps,
+  createCncSimState,
+  type CncSimState,
+} from './toolpath-cnc';
 import { appendTravelStep, dist, polylineLength } from './toolpath-math';
 import { appendRasterGroupSteps } from './toolpath-raster-steps';
 import type {
@@ -46,11 +51,15 @@ export function buildToolpath(job: Job, options: BuildToolpathOptions = {}): Too
   const steps: ToolpathStep[] = [];
   let prevEnd: Vec2 | null = options.startPoint ?? null;
   // One modal-Z state for the whole job, like the emitter's head tracker.
-  const cncState = createCncSimState();
+  const cncGroups = job.groups.filter((group): group is CncGroup => group.kind === 'cnc');
+  const cncState = createCncSimState(cncGroups, options.parkPoint ?? null);
   for (const group of job.groups) {
     prevEnd = appendGroupSteps(steps, prevEnd, group, options, cncState);
   }
-  if (options.parkPoint !== undefined && prevEnd !== null) {
+  if (cncState.lastGroup !== undefined) {
+    // A CNC job lifts to the park height before its park (ADR-491 Amendment 2).
+    prevEnd = appendCncParkSteps(steps, prevEnd, cncState.lastGroup, cncState);
+  } else if (options.parkPoint !== undefined && prevEnd !== null) {
     appendTravelStep(steps, prevEnd, options.parkPoint);
   }
   const totalLength = steps.reduce((sum, s) => sum + s.length, 0);

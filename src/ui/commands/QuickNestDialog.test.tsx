@@ -77,6 +77,36 @@ describe('QuickNestDialog', () => {
     });
   });
 
+  it('starts a CNC nest one bit plus a margin apart and warns below it', async () => {
+    const onApply = vi.fn();
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    root = createRoot(host);
+    await act(async () =>
+      root?.render(
+        <QuickNestDialog
+          boardAvailable
+          onCancel={vi.fn()}
+          onApply={onApply}
+          cncSpacing={{ bitDiameterMm: 3.175, spacingMm: 4.2 }}
+        />,
+      ),
+    );
+    const spacing = Array.from(host.querySelectorAll('label'))
+      .find((label) => label.textContent?.includes('Part spacing'))!
+      .querySelector('input')!;
+    expect(spacing.value).toBe('4.2');
+    expect(host.textContent).not.toContain('can cut into the next');
+    await act(async () => {
+      spacing.value = '2';
+      Simulate.change(spacing);
+    });
+    expect(host.textContent).toContain('Closer than the 3.175 mm bit plus 1 mm');
+    expect(host.textContent).toContain('Use at least 4.2 mm.');
+    await act(async () => Simulate.submit(host!.querySelector('form')!));
+    expect(onApply).toHaveBeenCalledWith(expect.objectContaining({ padding: 2 }));
+  });
+
   it('shows the best valid preview while searching and keeps accept inert after document drift', async () => {
     const onAcceptBest = vi.fn();
     const onStop = vi.fn();

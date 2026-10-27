@@ -154,7 +154,9 @@ export type GcodeMetadata = {
 // they are offset as closed shapes; carries forward v30 above.
 // ADR-412 Amd 2 keeps every relief cut inside the relief's own footprint: the
 // stock past its map stands at the stock top; carries forward v31 above.
-export const EMITTER_REVISION = 'relief-footprint-edge-20261027-v32';
+// ADR-327 Amd 1 places a CNC job by its artwork, not its cutter's reach, so a
+// placed CNC program's coordinates move; carries forward v32 above.
+export const EMITTER_REVISION = 'cnc-artwork-anchor-20261027-v33';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

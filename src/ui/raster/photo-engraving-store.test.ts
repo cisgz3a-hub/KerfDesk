@@ -155,34 +155,27 @@ describe('photo engraving sessions', () => {
     expect(other.output).toBe(false);
   });
 
-  it.each([
-    'locked',
-    'trace-source',
-    'multi-selection',
-    'deselected',
-    'vector',
-    'cnc',
-    'unbound',
-  ] as const)('does not open an unavailable %s selection', (kind) => {
-    const { image, state } = setup();
-    if (kind === 'locked') useStore.setState(withScene(state, [{ ...image, locked: true }]));
-    if (kind === 'trace-source')
-      useStore.setState(withScene(state, [{ ...image, role: 'trace-source' }]));
-    if (kind === 'multi-selection')
-      useStore.setState({ additionalSelectedIds: new Set(['another']) });
-    if (kind === 'deselected') useStore.setState({ selectedObjectId: null });
-    if (kind === 'vector') useStore.setState(withScene(state, [svgObj(image.id, ['#808080'])]));
-    if (kind === 'cnc')
-      useStore.setState({ project: { ...state.project, machine: DEFAULT_CNC_MACHINE_CONFIG } });
-    if (kind === 'unbound')
-      useStore.setState(withScene(state, [{ ...image, operationIds: ['missing'] }]));
-    const before = useStore.getState();
+  it.each(['locked', 'multi-selection', 'deselected', 'vector', 'cnc', 'unbound'] as const)(
+    'does not open an unavailable %s selection',
+    (kind) => {
+      const { image, state } = setup();
+      if (kind === 'locked') useStore.setState(withScene(state, [{ ...image, locked: true }]));
+      if (kind === 'multi-selection')
+        useStore.setState({ additionalSelectedIds: new Set(['another']) });
+      if (kind === 'deselected') useStore.setState({ selectedObjectId: null });
+      if (kind === 'vector') useStore.setState(withScene(state, [svgObj(image.id, ['#808080'])]));
+      if (kind === 'cnc')
+        useStore.setState({ project: { ...state.project, machine: DEFAULT_CNC_MACHINE_CONFIG } });
+      if (kind === 'unbound')
+        useStore.setState(withScene(state, [{ ...image, operationIds: ['missing'] }]));
+      const before = useStore.getState();
 
-    openPhotoEngraving();
-    expect(usePhotoEngravingStore.getState().session).toBeNull();
-    expect(useStore.getState().project).toBe(before.project);
-    expect(useStore.getState().undoStack).toBe(before.undoStack);
-  });
+      openPhotoEngraving();
+      expect(usePhotoEngravingStore.getState().session).toBeNull();
+      expect(useStore.getState().project).toBe(before.project);
+      expect(useStore.getState().undoStack).toBe(before.undoStack);
+    },
+  );
 
   it.each(['image', 'operation', 'device', 'document', 'cnc', 'selection'] as const)(
     'makes a captured session stale when its %s changes, including same-id replacements',

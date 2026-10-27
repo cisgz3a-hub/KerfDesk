@@ -56,12 +56,14 @@ function outcomeOf(pending: Promise<unknown>): { value: string } {
   return outcome;
 }
 
-/** The last KerfDesk note in the log, skipping the controller's own lines. */
+/** KerfDesk's own notes in the log, skipping the controller's lines. */
+function kerfDeskLogLines(): string[] {
+  return useLaserStore.getState().log.filter((line) => line.startsWith('[lf2]'));
+}
+
+/** The last KerfDesk note in the log. */
 function lastLogLine(): string | undefined {
-  return useLaserStore
-    .getState()
-    .log.filter((line) => line.startsWith('[lf2]'))
-    .at(-1);
+  return kerfDeskLogLines().at(-1);
 }
 
 function writesAfter(sim: GrblSimulator, count: number): string[] {
@@ -127,7 +129,9 @@ describe('stock GRBL left in its homing state by a refused single-axis Home', ()
     await vi.advanceTimersByTimeAsync(2_000);
     expect(reset.value).toBe('resolved');
     expect(useLaserStore.getState().alarmCode).toBe(6);
-    expect(lastLogLine()).toBe(
+    // The board answers settings reads in that Alarm, so qualification's own
+    // notes may follow this one (ADR-674).
+    expect(kerfDeskLogLines()).toContain(
       '[lf2] Controller reset out of its homing state and came back locked in Alarm (ALARM:6). Unlock or Home it.',
     );
   });

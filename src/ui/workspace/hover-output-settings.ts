@@ -55,9 +55,6 @@ export function hoverOutputSettings(
   unit: DisplayLengthUnit = 'mm',
 ): HoverOutputSettings | null {
   if (machineKindOf(project.machine) !== 'laser' || object.kind === 'relief') return null;
-  // A trace's source bitmap is a reference: output skips it whatever its operation says.
-  if (object.kind === 'raster-image' && object.role === 'trace-source')
-    return { kind: 'note', text: 'Trace source, not output' };
   const operations = project.scene.layers.filter((layer) =>
     sceneObjectUsesOperation(object, layer),
   );

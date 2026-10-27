@@ -5,6 +5,7 @@
 // cycle (same pattern as the sibling action modules).
 
 import type { SerialPortIdentity } from '../../platform/types';
+import { sendCompleteStatusRequest } from './laser-status-request';
 import { runConnectAction } from './laser-connect-action';
 import { cancelConnectAttempt } from './laser-connect-attempt';
 import {
@@ -190,6 +191,8 @@ function startConnectedControllerHandshake(
   // latter bump connectAttemptRevision via cancelConnectAttempt/beginConnectAttempt.
   const connectAttemptRevision = refs.connectAttemptRevision;
   void runControllerHandshake(set, get, refs, safeWrite, baudRate, ownership.adopt)
+    // The work offset of a board that did not reset on open, at once (ADR-674).
+    .then(() => sendCompleteStatusRequest(get, refs.driver, safeWrite, ownership.isCurrent))
     .catch((error: unknown) => {
       if (!ownership.isCurrent()) return;
       set((state) => {
