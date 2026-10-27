@@ -1,5 +1,7 @@
 # KerfDesk controller audit (2026-09-25)
 
+> **Status (2026-10-26, meta audit v1 M7):** The CN-track claim that PWM255 "clamps S12000 to full output" is wrong. S wraps to its low byte, so S12000 runs as 224 (ADR-567 Amd 2). See [the corrections](2026-10-23-meta-v1/M7-corrections-older-audits.md) for the current status of every item.
+
 Every controller KerfDesk talks to, checked against that firmware's own source. Every finding names the KerfDesk code and the upstream line that proves it, and was reproduced or traced. Every one is fixed, with a regression test.
 
 - **Checked:** main at 39d7f96, 25 Sep 2026
