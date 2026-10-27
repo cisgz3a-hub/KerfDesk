@@ -67,16 +67,15 @@ let captured: ConfirmedJobReview | null = null;
 beforeEach(() => {
   captured = null;
   const base = createProject();
-  useStore.getState().setProject({
-    ...base,
-    device: {
-      ...base.device,
-      origin: 'front-left',
-      bedWidth: 400,
-      bedHeight: 400,
-      maxPowerS: PROFILE_MAX_S,
-      homing: { ...base.device.homing, enabled: true },
-    },
+  // Opening a file for the machine in use keeps its setup (ADR-500 Amendment
+  // 2), so the machine is set in the profile, as the operator would.
+  useStore.getState().setProject(base);
+  useStore.getState().updateDeviceProfile({
+    origin: 'front-left',
+    bedWidth: 400,
+    bedHeight: 400,
+    maxPowerS: PROFILE_MAX_S,
+    homing: { ...base.device.homing, enabled: true },
   });
   vi.mocked(jobAwareConfirm).mockReset().mockReturnValue(true);
   vi.mocked(prepareTransientFrameController).mockImplementation(async () => ({

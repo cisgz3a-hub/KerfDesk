@@ -94,7 +94,7 @@ describe('Save and the Inspector use the connected $30 as Start does', () => {
           placement,
           laserMaxPowerS,
         );
-        opened(text, context.machineKind === 'laser' ? context.laser.maxPowerS : undefined);
+        opened(text, context.laser?.maxPowerS);
       },
     );
 
@@ -122,7 +122,7 @@ describe('Save and the Inspector use the connected $30 as Start does', () => {
           placement,
           laserMaxPowerS,
         );
-        opened(context.machineKind === 'laser' ? context.laser.maxPowerS : undefined);
+        opened(context.laser?.maxPowerS);
       },
     );
 
