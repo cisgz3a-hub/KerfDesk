@@ -16,6 +16,12 @@ export type MachineSettingsReadReadinessOptions = {
   readonly resetCleanupPending?: boolean;
   /** Automatic refresh requires a current-session Idle, independent of manual Alarm reads. */
   readonly requireCurrentStatusObservation?: boolean;
+  /** With requireCurrentStatusObservation: the caller saw the current Alarm
+   * report arrive in this controller session, so it qualifies as Idle does.
+   * An Alarm report carries no statusObservation, so only the caller can know.
+   * GRBL-family firmware answers `$$` in Alarm, and stock GRBL with homing
+   * enabled boots there (ADR-674). */
+  readonly freshAlarmObserved?: boolean;
 };
 
 /**
@@ -52,6 +58,7 @@ function automaticSettingsReadBlockReason(
   options: MachineSettingsReadReadinessOptions,
 ): string | null {
   if (options.requireCurrentStatusObservation !== true) return null;
+  if (state.statusReport?.state === 'Alarm' && options.freshAlarmObserved === true) return null;
   if (state.statusReport?.state !== 'Idle') {
     return 'Waiting for Idle before refreshing controller information automatically.';
   }

@@ -212,21 +212,18 @@ describe('connect handshake while the controller is still busy (audit TC-1)', ()
     expect(qualifiedAt ?? Infinity).toBeLessThanOrEqual(2_500);
   });
 
-  it('keeps qualification waiting while a banner-reset controller stays in Alarm', async () => {
-    let locked = true;
+  // Behaviour audit F-4, ADR-674: stock GRBL with homing enabled boots locked
+  // in Alarm and answers `$$` there, so qualification no longer waits for the
+  // operator to unlock.
+  it('qualifies a banner-reset controller that stays in Alarm', async () => {
     const controller = scriptedController({
-      status: () => (locked ? '<Alarm|MPos:0.000,0.000,0.000|FS:0,0>' : IDLE),
+      status: () => '<Alarm|MPos:0.000,0.000,0.000|FS:0,0>',
       unprompted: [[1, ["Grbl 1.1h ['$' for help]", "[MSG:'$H'|'$X' to unlock]"]]],
     });
     await useLaserStore.getState().connect(adapter(controller.connection));
-    await vi.advanceTimersByTimeAsync(20_000);
 
-    // Alarm reports clear the status observation; the moving report sequence
-    // still proves a live controller waiting for the operator (connect-3).
-    expect(useLaserStore.getState().controllerQualification.kind).toBe('qualifying');
-
-    locked = false;
     expect(await msUntilQualified(5_000)).not.toBeNull();
+    expect(useLaserStore.getState().statusReport?.state).toBe('Alarm');
   });
 });
 

@@ -14,6 +14,10 @@ import { RELEASE_MOTORS_CONFIRM } from './hand-position-copy';
 import { reportedWorkOffsetMm } from '../state/infer-machine-position';
 import { OriginTransactionCancelledError } from '../state/laser-origin-transaction';
 import { sleepUnavailableReason } from '../state/controller-sleep';
+import {
+  HOST_RECORDED_RESET_UNKNOWN_MESSAGE,
+  hostRecordedMachinePosition,
+} from '../state/host-recorded-origin';
 import { placementAfterSetOrigin } from './set-origin-placement';
 
 // ADR-053 P4 — releasing motors ($SLP) is hard to undo cleanly (waking needs a
@@ -108,11 +112,48 @@ function ReleaseMotorsButton(props: {
   );
 }
 
-function resetOriginTitle(persistentOrUnknown: boolean, hasCustom: boolean): string {
+function resetOriginTitle(
+  persistentOrUnknown: boolean,
+  hasCustom: boolean,
+  clear: ResetOriginClear,
+): string {
   if (persistentOrUnknown) return 'This origin may be stored in G54. Use Clear persistent origin.';
-  return hasCustom
-    ? 'Clear temporary work offsets (G92.1), including temporary Z zero. Any saved G54 offset remains.'
-    : 'No custom origin active. Set one with "Set origin here" first.';
+  if (!hasCustom) return 'No custom origin active. Set one with "Set origin here" first.';
+  if (clear.mode === 'g92.1') {
+    return 'Clear temporary work offsets (G92.1), including temporary Z zero. Any saved G54 offset remains.';
+  }
+  return clear.machineKnown
+    ? 'Restore machine coordinates with a G92 to the machine position KerfDesk recorded. Stock Marlin ignores G92.1.'
+    : HOST_RECORDED_RESET_UNKNOWN_MESSAGE;
+}
+
+function resetOriginReady(
+  hasCustom: boolean,
+  persistentOrUnknown: boolean,
+  clear: ResetOriginClear,
+): boolean {
+  return hasCustom && !persistentOrUnknown && clear.machineKnown;
+}
+
+const RESET_ORIGIN_SUCCESS: Record<ResetOriginClear['mode'], string> = {
+  'g92.1': 'Temporary work offsets cleared (G92.1); saved G54 is unchanged.',
+  'machine-frame-g92': 'Work origin cleared: machine coordinates restored (G92).',
+};
+
+// How this controller clears a transient origin (ADR-674, audit CS-05).
+// Marlin's restoring G92 is computed from the recorded machine position, so
+// Reset origin waits until KerfDesk knows it.
+type ResetOriginClear = {
+  readonly mode: 'g92.1' | 'machine-frame-g92';
+  readonly machineKnown: boolean;
+};
+
+function useResetOriginClear(): ResetOriginClear {
+  const mode = useLaserStore((s) => s.capabilities.transientOriginClear ?? 'g92.1');
+  const machineKnown = useLaserStore(
+    (s) => mode === 'g92.1' || hostRecordedMachinePosition(s) !== null,
+  );
+  return { mode, machineKnown };
 }
 
 // F.3 — Set / Reset the work-coordinate origin to the current head
@@ -120,7 +161,8 @@ function resetOriginTitle(persistentOrUnknown: boolean, hasCustom: boolean): str
 //   - "Set origin here" sends G92 X0 Y0. Always enabled (subject to
 //     `busy`) — the operator can re-set the origin whenever the head
 //     is at a new corner.
-//   - "Reset origin" sends G92.1. Only enabled when wcoCache shows a
+//   - "Reset origin" sends G92.1, or on Marlin a G92 that restores machine
+//     coordinates (ADR-674). Only enabled when wcoCache shows a
 //     non-trivial offset; disabled otherwise (nothing to clear).
 //   - "Release motors" sends $SLP for hand-positioning (ADR-053 P4).
 type Props = {
@@ -142,6 +184,7 @@ export function OriginRow(props: Props): JSX.Element | null {
   const workOriginSource = useLaserStore((s) => s.workOriginSource);
   const persistentOriginReady = useLaserStore((s) => s.statusReport?.state === 'Idle');
   const pushToast = useToastStore((s) => s.pushToast);
+  const resetClear = useResetOriginClear();
   const busy = props.disabled || props.streaming;
   // ADR-094: firmwares without work-coordinate-system support (Marlin v1)
   // have no origin vocabulary at all — the whole row disappears.
@@ -177,6 +220,7 @@ export function OriginRow(props: Props): JSX.Element | null {
     resetOrigin,
     releaseMotors,
     pushToast,
+    resetSuccess: RESET_ORIGIN_SUCCESS[resetClear.mode],
   });
   const setOriginButton = (
     <SetOriginButton
@@ -207,8 +251,8 @@ export function OriginRow(props: Props): JSX.Element | null {
           type="button"
           className="lf-btn"
           onClick={onReset}
-          disabled={busy || !hasCustom || persistentOrUnknown}
-          title={resetOriginTitle(persistentOrUnknown, hasCustom)}
+          disabled={busy || !resetOriginReady(hasCustom, persistentOrUnknown, resetClear)}
+          title={resetOriginTitle(persistentOrUnknown, hasCustom, resetClear)}
         >
           Reset origin
         </button>
@@ -235,6 +279,7 @@ type OriginHandlerDeps = {
   readonly resetOrigin: () => Promise<void>;
   readonly releaseMotors: () => Promise<void>;
   readonly pushToast: (message: string, variant: 'success') => void;
+  readonly resetSuccess: string;
 };
 
 // Toast on ack covers the WCO-frame latency gap — GRBL reports WCO
@@ -260,12 +305,7 @@ function makeOriginHandlers(deps: OriginHandlerDeps): {
     onReset: () => {
       void deps
         .resetOrigin()
-        .then(() =>
-          deps.pushToast(
-            'Temporary work offsets cleared (G92.1); saved G54 is unchanged.',
-            'success',
-          ),
-        )
+        .then(() => deps.pushToast(deps.resetSuccess, 'success'))
         .catch(reportOriginActionFailure);
     },
     onRelease: () => {

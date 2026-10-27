@@ -74,6 +74,7 @@ describe('ConnectionBar controller information recovery', () => {
   // ADR-611 Amendment 2: the read is progress beside the dot, not a notice.
   it.each([
     ['controller-response', 'Connecting…'],
+    ['awaiting-ready', 'Waiting for controller…'],
     ['reset-cleanup', 'Reading settings…'],
     ['settings-read', 'Reading settings…'],
   ] as const)(

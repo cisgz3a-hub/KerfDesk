@@ -185,6 +185,7 @@ release before it is tagged.
 - **Design and import:** Imports of any size — refusals become advisories, parsing moves off-thread ([#525](https://github.com/cisgz3a-hub/KerfDesk/pull/525))
 - **Design and import:** Bundle eight more faces, incl. the first stencil and bold ([#509](https://github.com/cisgz3a-hub/KerfDesk/pull/509))
 - **Design and import:** Bundle Tinos as the first serif outline font ([#491](https://github.com/cisgz3a-hub/KerfDesk/pull/491))
+- **Machine and connection:** Read GRBL settings while it boots in Alarm, queue up to three quick jog steps, ask grblHAL for the work offset at once, and name the G92 Marlin's Reset origin sends ([#1456](https://github.com/cisgz3a-hub/KerfDesk/pull/1456))
 - **Machine and connection:** Move laser to selection, typed Move-to, saved positions, finish position and keyboard jog ([#985](https://github.com/cisgz3a-hub/KerfDesk/pull/985))
 - **Machine and connection:** Connect remembers the port, and Machine Setup opens with Find my machine ([#941](https://github.com/cisgz3a-hub/KerfDesk/pull/941))
 - **Machine and connection:** Lead Machine Setup with the controller's own values and choose a profile by its whole card ([#843](https://github.com/cisgz3a-hub/KerfDesk/pull/843))

@@ -117,7 +117,7 @@ describe('qualification while the controller waits for the operator', () => {
     report(h, 'Alarm');
 
     resumeQualificationInSession(h.set, h.get, h.refs, h.refs.connection, 4);
-    expect(h.state.controllerQualification).toEqual(qualifyingController(4, 'reset-cleanup'));
+    expect(h.state.controllerQualification).toEqual(qualifyingController(4, 'awaiting-ready'));
 
     report(h, 'Idle');
     await vi.advanceTimersByTimeAsync(100);
@@ -198,6 +198,78 @@ describe('qualification while the controller waits for the operator', () => {
     expect(h.state.controllerQualification.kind).toBe('failed');
     expect(h.state.incidentHistory).toHaveLength(1);
     expect(h.state.incidentHistory?.[0]?.raw).toContain('Controller information refresh timed out');
+  });
+
+  // ADR-674 (behaviour audit F-4): GRBL-family firmware answers `$$` in Alarm,
+  // and stock GRBL with homing enabled boots there.
+  describe('with a $$ settings dump', () => {
+    function settingsHarness(): Harness {
+      const h = harness();
+      Object.assign(h.refs, { driver: { commands: { settingsQuery: '$$' } } });
+      return h;
+    }
+
+    it('reads settings on a fresh Alarm report without waiting for Idle', async () => {
+      vi.useFakeTimers();
+      const h = settingsHarness();
+      scheduleControllerQualification(h.set, h.get, h.refs, 4);
+      report(h, 'Alarm');
+      await vi.advanceTimersByTimeAsync(100);
+      expect(h.run).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not count an Alarm report that arrived before the schedule', async () => {
+      vi.useFakeTimers();
+      const h = settingsHarness();
+      report(h, 'Alarm');
+      scheduleControllerQualification(h.set, h.get, h.refs, 4);
+      await vi.advanceTimersByTimeAsync(500);
+      expect(h.run).not.toHaveBeenCalled();
+
+      report(h, 'Alarm');
+      await vi.advanceTimersByTimeAsync(100);
+      expect(h.run).toHaveBeenCalledTimes(1);
+    });
+
+    it('resumes an in-session Alarm handshake on the next Alarm report', async () => {
+      vi.useFakeTimers();
+      const h = settingsHarness();
+      h.state = {
+        ...h.state,
+        controllerQualification: qualifyingController(4, 'controller-response'),
+      };
+      report(h, 'Alarm');
+      resumeQualificationInSession(h.set, h.get, h.refs, h.refs.connection, 4);
+      expect(h.state.controllerQualification).toEqual(qualifyingController(4, 'awaiting-ready'));
+
+      report(h, 'Alarm');
+      await vi.advanceTimersByTimeAsync(100);
+      expect(h.run).toHaveBeenCalledTimes(1);
+    });
+
+    it('still waits for Idle through Sleep reports', async () => {
+      vi.useFakeTimers();
+      const h = settingsHarness();
+      scheduleControllerQualification(h.set, h.get, h.refs, 4);
+      for (let second = 0; second < 5; second += 1) {
+        report(h, 'Sleep');
+        await vi.advanceTimersByTimeAsync(1_000);
+      }
+      expect(h.run).not.toHaveBeenCalled();
+    });
+
+    it('waits for the Idle after the Alarm of a halting reset', async () => {
+      vi.useFakeTimers();
+      const h = settingsHarness();
+      requalifyAfterHaltingReset(h.set, h.get, h.refs, { softResetReboots: false });
+      report(h, 'Alarm');
+      await vi.advanceTimersByTimeAsync(200);
+      expect(h.run).not.toHaveBeenCalled();
+
+      report(h, 'Idle');
+      await vi.advanceTimersByTimeAsync(100);
+      expect(h.run).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('leaves a different connection or session alone', () => {

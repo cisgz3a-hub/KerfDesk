@@ -2,6 +2,7 @@ import type { GrblState } from '../../core/controllers/grbl';
 import type { FrameVerification } from './frame-verification';
 import type { FrameMotionCandidate } from './framed-run';
 import type { MachineExecutionOwner } from './machine-execution-owner';
+import type { StepJogQueue } from './step-jog-queue';
 
 export type LaserMotionOperationKind = 'frame' | 'jog';
 export type LaserMotionOperationId = number | symbol;
@@ -59,6 +60,9 @@ type LaserMotionOperationCommon = {
    * operator Cancel): a rejected line, a failed write or a Cancel that gave
    * up. Bounded so a persistently failing settlement cannot loop. */
   readonly automaticReleaseAttempts?: number;
+  /** An operator step jog that later step presses may extend; their lines
+   *  wait in pendingLines ahead of the settlement marker (ADR-674). */
+  readonly stepJogQueue?: StepJogQueue;
 };
 
 export type LaserMotionOperation = LaserMotionOperationCommon &
@@ -306,13 +310,23 @@ export function takeNextMotionLine(
   return {
     operation: {
       ...nextOperation,
-      ...executionOwnerPatch(operation),
-      ...(operation.mpgInterruptionId === undefined
-        ? {}
-        : { mpgInterruptionId: operation.mpgInterruptionId }),
+      ...carriedOwnershipPatch(operation),
       ...(dispatchesSettlement ? { awaitingSettlementAck: true } : {}),
     },
     line,
+  };
+}
+
+// What a dispatched line's successor keeps of its predecessor's ownership.
+function carriedOwnershipPatch(
+  operation: LaserMotionOperation,
+): Pick<LaserMotionOperationCommon, 'executionOwner' | 'stepJogQueue' | 'mpgInterruptionId'> {
+  return {
+    ...executionOwnerPatch(operation),
+    ...(operation.stepJogQueue === undefined ? {} : { stepJogQueue: operation.stepJogQueue }),
+    ...(operation.mpgInterruptionId === undefined
+      ? {}
+      : { mpgInterruptionId: operation.mpgInterruptionId }),
   };
 }
 
