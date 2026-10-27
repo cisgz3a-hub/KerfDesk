@@ -39,6 +39,7 @@ import {
 } from './cnc-supervised-recovery-stream';
 import { mergeCncRecoveryWarnings } from './merge-cnc-recovery-warnings';
 import { cncRecoveryOpenProjectIssue } from './cnc-recovery-open-project';
+import { cncRecoveryStartBitIssue } from './cnc-recovery-start-bit';
 import {
   prepareArchivedRecoverySource,
   prepareRecoverySource,
@@ -179,6 +180,15 @@ function planRecoveryProgram(
   });
   if (recovery.kind !== 'recovery-job') {
     jobAwareAlert(`Cannot start CNC recovery:\n\n${describeRecoveryRefusal(recovery.reason)}`);
+    return null;
+  }
+  const bitIssue = cncRecoveryStartBitIssue(
+    context.source.project,
+    recovery.job,
+    context.source.controllerSnapshot.workZZeroEvidence,
+  );
+  if (bitIssue !== null) {
+    jobAwareAlert(`Cannot start CNC recovery:\n\n${bitIssue}`);
     return null;
   }
   const emitted = emitPreparedGcode(

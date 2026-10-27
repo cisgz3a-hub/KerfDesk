@@ -67,6 +67,7 @@ import { createStartArmingCompletion } from './laser-start-arming-completion';
 import type { TranscriptSource } from './laser-transcript';
 import { noteControllerSettingWrite } from './laser-owned-reset-settings';
 import { externalProgramControllerStatePatch } from './external-program-controller-state';
+import { bitFileRunStartPatch } from './bit-file-sequence';
 import { startedJobSafeZMm } from './job-motion-machine';
 import { useStore } from './store';
 
@@ -436,6 +437,7 @@ function installInitialStream(
     ...(options.externalProgram === true
       ? externalProgramControllerStatePatch(state, gcode, refs.driver)
       : {}),
+    ...bitFileRunStartPatch(options.externalProgram === true ? options.externalBitFile : undefined),
   }));
   return writeOwner;
 }

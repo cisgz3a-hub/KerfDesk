@@ -44,6 +44,7 @@ import {
 } from './cnc-supervised-recovery-stream';
 import { mergeCncRecoveryWarnings } from './merge-cnc-recovery-warnings';
 import { cncRecoveryOpenProjectIssue } from './cnc-recovery-open-project';
+import { cncRecoveryStartBitIssue } from './cnc-recovery-start-bit';
 import { partitionEmitPreflight } from './start-job-readiness-policy';
 import { prepareArchivedRecoverySource, type PreparedRecoverySource } from './start-job-source';
 
@@ -133,6 +134,16 @@ function planPassRecovery(
   const resume = buildCncPassResumeJob(source.prepared.job, review.groupIndex, review.passIndex);
   if (resume.kind !== 'resume-job') {
     jobAwareAlert(`Cannot start CNC recovery:\n\n${describeResumeRefusal(resume.reason)}`);
+    return null;
+  }
+  // A resume in a later operation streams only its bit, with no M0 before it.
+  const bitIssue = cncRecoveryStartBitIssue(
+    source.project,
+    resume.job,
+    source.controllerSnapshot.workZZeroEvidence,
+  );
+  if (bitIssue !== null) {
+    jobAwareAlert(`Cannot start CNC recovery:\n\n${bitIssue}`);
     return null;
   }
   const emitted = emitPreparedGcode(

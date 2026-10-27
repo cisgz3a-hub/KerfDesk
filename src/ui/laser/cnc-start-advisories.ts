@@ -42,6 +42,8 @@ export function cncWorkZeroToolStartIssue(
   project: Project,
   evidence: WorkZZeroEvidence | null | undefined,
   firstTool: CncToolPlanEntry | undefined,
+  // What starts with `firstTool`: the job, or a recovery program cut from it.
+  subject = 'This job',
 ): string | null {
   const machine = project.machine;
   if (machine?.kind !== 'cnc' || firstTool === undefined) return null;
@@ -54,7 +56,7 @@ export function cncWorkZeroToolStartIssue(
       ? 'an unrecorded bit'
       : (machine.tools.find((tool) => tool.id === evidence.toolId)?.name ?? evidence.toolId);
   return (
-    `This job starts with ${expectedName}, but work Z was established for ${evidenceName}. ` +
+    `${subject} starts with ${expectedName}, but work Z was established for ${evidenceName}. ` +
     `Load ${expectedName}, select it as the Active bit, then touch it to the stock top and ` +
     'Zero Z — or probe again.'
   );

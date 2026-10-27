@@ -10,6 +10,8 @@ type SurfaceSimulatorOptions = {
   readonly contactWorkZ?: number;
   readonly failContactAt?: number;
   readonly pauseContactAt?: number;
+  /** False skips the test touch the grid needs first (ADR-103 Amendment 3). */
+  readonly probeCircuitTested?: boolean;
 };
 
 export async function surfaceSimulator(options: SurfaceSimulatorOptions = {}) {
@@ -70,9 +72,12 @@ export async function surfaceSimulator(options: SurfaceSimulatorOptions = {}) {
     },
   }));
   started = true;
-  connection.emitLine(
-    `<Idle|MPos:${x / scale},${y / scale},${z / scale}|WCO:${100 / scale},${200 / scale},${-5 / scale}|FS:0,0>`,
-  );
+  const idle = `<Idle|MPos:${x / scale},${y / scale},${z / scale}|WCO:${100 / scale},${200 / scale},${-5 / scale}|FS:0,0`;
+  // The operator's test touch: the probe input reads closed, then open again.
+  // The latch is not in initialLaserState, so an earlier test's touch is cleared.
+  useLaserStore.setState({ probeTestTouch: null });
+  if (options.probeCircuitTested !== false) connection.emitLine(`${idle}|Pn:P>`);
+  connection.emitLine(`${idle}>`);
   await flushConnect();
   return { connection, writes };
 }
