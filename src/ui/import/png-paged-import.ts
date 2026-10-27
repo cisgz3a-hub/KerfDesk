@@ -6,9 +6,15 @@ import {
   type PagedAssetManifest,
   type PagedAssetProgress,
 } from './paged-asset-stager';
-import { decodeIncrementalPngToLuma, type IncrementalPngProgress } from './png-incremental-decoder';
+import {
+  decodeIncrementalPngToLuma,
+  type IncrementalPngProgress,
+  type IncrementalPngResult,
+} from './png-incremental-decoder';
+import { OrientedLumaRows } from './png-oriented-luma-rows';
 import { PngThumbnailBuilder, type PngImportThumbnail } from './png-thumbnail';
 import type { ImageDensity } from '../common/image-density';
+import { orientationSwapsAxes } from '../trace/jpeg-header';
 
 export type PngPagedImportProgress =
   | (Omit<PagedAssetProgress, 'phase'> & { readonly phase: 'persisting-source' })
@@ -32,6 +38,8 @@ export type PngPagedImportOptions = {
   readonly onProgress?: (progress: PngPagedImportProgress) => void;
 };
 
+// Sizes, density, luma and thumbnail are of the PNG turned by its eXIf
+// Orientation, as Chromium shows it (ADR-404 Amendment 1).
 export type PngPagedImportResult =
   | {
       readonly kind: 'ok';
@@ -105,6 +113,8 @@ async function decodeStagedPng(
 ): Promise<PngPagedImportResult> {
   let lumaWriter: PagedAssetByteWriter | null = null;
   let thumbnailBuilder: PngThumbnailBuilder | null = null;
+  let sampledGrid: { readonly width: number; readonly height: number } | null = null;
+  let rows: OrientedLumaRows | null = null;
   try {
     const decoded = await decodeIncrementalPngToLuma(
       repository.readAssetChunks(options.assetId, options.signal),
@@ -113,8 +123,17 @@ async function decodeStagedPng(
         maxPixels: options.maxPixels,
         ...(options.signal === undefined ? {} : { signal: options.signal }),
         onProgress: (progress) => options.onProgress?.(progress),
+        // The luma and thumbnail take the turned grid (ADR-404 Amendment 1).
+        onOrientation: (orientation) => {
+          const grid = requireInitialized(sampledGrid, 'PNG sampled grid');
+          rows = new OrientedLumaRows(orientation, grid.width, grid.height, async (row) => {
+            requireThumbnailBuilder(thumbnailBuilder).accept(row);
+            await requireLumaWriter(lumaWriter).write(row);
+          });
+          thumbnailBuilder = new PngThumbnailBuilder(rows.width, rows.height);
+        },
         onHeader: async (header) => {
-          thumbnailBuilder = new PngThumbnailBuilder(header.sampledWidth, header.sampledHeight);
+          sampledGrid = { width: header.sampledWidth, height: header.sampledHeight };
           lumaWriter = await PagedAssetByteWriter.create(repository, {
             assetId: options.lumaAssetId,
             sourceName: `${options.sourceName}.luma`,
@@ -134,8 +153,7 @@ async function decodeStagedPng(
           });
         },
         onRow: async (row) => {
-          requireThumbnailBuilder(thumbnailBuilder).accept(row);
-          await requireLumaWriter(lumaWriter).write(row);
+          await requireInitialized<OrientedLumaRows>(rows, 'PNG luma rows').accept(row);
         },
       },
     );
@@ -143,9 +161,10 @@ async function decodeStagedPng(
       await cleanup(lumaWriter, repository, options);
       return decoded;
     }
+    await requireInitialized<OrientedLumaRows>(rows, 'PNG luma rows').finish();
     const lumaManifest = await requireLumaWriter(lumaWriter).finish();
     const thumbnail = requireThumbnailBuilder(thumbnailBuilder).finish();
-    return { ...decoded, sourceManifest, lumaManifest, thumbnail };
+    return { ...orientedSizes(decoded), sourceManifest, lumaManifest, thumbnail };
   } catch (error) {
     try {
       await cleanup(lumaWriter, repository, options);
@@ -157,6 +176,27 @@ async function decodeStagedPng(
     }
     throw error;
   }
+}
+
+// The stored sizes and pHYs density, turned as the luma was turned.
+function orientedSizes(
+  decoded: Extract<IncrementalPngResult, { readonly kind: 'ok' }>,
+): Extract<IncrementalPngResult, { readonly kind: 'ok' }> {
+  if (!orientationSwapsAxes(decoded.orientation)) return decoded;
+  const { density } = decoded;
+  return {
+    ...decoded,
+    width: decoded.height,
+    height: decoded.width,
+    sampledWidth: decoded.sampledHeight,
+    sampledHeight: decoded.sampledWidth,
+    density: density === null ? null : { xDpi: density.yDpi, yDpi: density.xDpi },
+  };
+}
+
+function requireInitialized<T>(value: T | null, label: string): T {
+  if (value === null) throw new Error(`${label} was not initialized.`);
+  return value;
 }
 
 function requireThumbnailBuilder(builder: PngThumbnailBuilder | null): PngThumbnailBuilder {

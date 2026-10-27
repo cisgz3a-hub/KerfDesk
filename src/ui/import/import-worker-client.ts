@@ -2,7 +2,12 @@ import type { ParseDxfResult } from '../../io/dxf';
 import type { GcodePreviewParseResult } from './gcode-preview-timing';
 import type { GcodeInspectionContext } from '../gcode-inspector/gcode-inspection-source';
 import type { ParseHpglResult } from '../../io/hpgl';
-import type { ImportWorkerRequest, ImportWorkerResponse } from './import-worker-protocol';
+import type {
+  ImportWorkerRequest,
+  ImportWorkerResponse,
+  ImportWorkerRgba,
+} from './import-worker-protocol';
+import type { BatchRasterFormat, DecodedBatchRaster } from './batch-raster-pixels';
 import type { PreparedPsdImport } from './psd-import-preparation';
 import type {
   PreparedStlImportResult,
@@ -123,6 +128,28 @@ export function prepareReliefHeightfieldPngOffThread(
 
 export function resetImportWorkerForTests(): void {
   rejectAllPendingAndRetireWorker('import worker reset');
+}
+
+/** Decode a Multi-File Trace TIFF (page 1) or Netpbm file in the import worker; null without Worker. */
+export function decodeBatchRasterOffThread(
+  blob: Blob,
+  format: BatchRasterFormat,
+  options: ImportWorkerRequestOptions = {},
+): Promise<DecodedBatchRaster> | null {
+  return request({ kind: 'batch-raster', blob, format }, 'batch-raster', options);
+}
+
+/**
+ * Resample RGBA to exactly width x height in the import worker; null without
+ * Worker. The source is copied to the worker, so the caller keeps its pixels.
+ */
+export function resampleRgbaOffThread(
+  image: ImportWorkerRgba,
+  width: number,
+  height: number,
+  options: ImportWorkerRequestOptions = {},
+): Promise<ImportWorkerRgba> | null {
+  return request({ kind: 'resample-rgba', image, width, height }, 'resample-rgba', options);
 }
 
 /** PSD has no main-thread decode fallback; the composite is prepared in the worker. */

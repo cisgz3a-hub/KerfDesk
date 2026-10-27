@@ -1,6 +1,7 @@
 // What an SVG import leaves out or changes, counted during the walk and told to
-// the operator as import notes. Notes that start with "SVG presentation:" are
-// shown as warning toasts (ui/app/import-toasts.ts).
+// the operator as import notes. Notes that start with "SVG presentation:", and
+// the root size notes ("SVG size:", svg-units.ts), are shown as warning toasts
+// (ui/app/import-toasts.ts).
 
 import { svgImportSizeNote, type SvgImportBudget } from './svg-import-budget';
 

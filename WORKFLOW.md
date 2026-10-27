@@ -307,6 +307,14 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 1. SVG without explicit units (no `mm`, `cm`, `in`, `px`): treated as mm per laser-community convention.
 2. Toast (info): `<filename> has no units — assuming millimeters`.
 
+#### Edge — SVG root size in Q or in a relative unit (ADR-046 Amendment 1)
+1. A root `width`/`height` in `Q` (quarter-millimetres, 1Q = 0.25 mm) sizes the artwork like
+   mm: `width="200Q"` imports 50 mm wide, as a browser draws it.
+2. A root size in a relative unit (`em`, `ex`, `rem`, `vw`, ...) or unreadable text is sized
+   without it, as a missing size is, and a warning toast says so:
+   `<filename>: SVG size: the root width "10em" is not a length KerfDesk can size (it reads px, mm, cm, Q, in, pt and pc), so that axis was sized without it. Check the imported size before cutting.`
+   A percentage or `auto` stays silent: the viewBox sizes it, as before.
+
 #### Edge — SVG shape positions or sizes use percentages (ADR-574)
 1. Supported rectangles, lines, circles, ellipses and `<use>` positions retain their layout in the
    nearest SVG or symbol viewport. X coordinates and widths use its width; Y coordinates and
@@ -1366,6 +1374,9 @@ that owns those fields, without changing the existing Frame/Start policy.
    invalid and **Choose Images...** waits until it is corrected.
 3. An image whose trace has nothing visible writes no file; the rest of the batch is still saved
    and the completion message names the skipped images.
+4. TIFF and Netpbm scans are decoded and resampled in the import worker, so the window, Abort
+   and Ctrl+. stay responsive during a running job; **Cancel** stops a decode under way
+   (ADR-357 Amendment 1).
 
 ### F-A9d. Export artwork as PDF, EPS or GeoJSON (ADR-468)
 
@@ -4387,6 +4398,8 @@ correct M4-mode raster G-code from Compile.
    image's DPI metadata (defaulting to LightBurn's 254 DPI when none —
    ADR-048), inserts a `RasterImage` SceneObject at the canvas centre.
    An image larger than the bed is scaled down to fit, with a warning (F-A3).
+   A JPEG or PNG whose EXIF Orientation turns it lands turned, as any image viewer shows it, at
+   its turned size, at every file size (ADR-404 and its Amendment 1).
 3. The image renders on the workspace via Canvas2D `drawImage` —
    real bitmap, scaled into mm-bounds. (Distinct from the Phase E
    "trace this image" flow, which converts to vectors immediately.)

@@ -9,6 +9,7 @@ import { resampleBuffer } from '../../core/image-resample';
 import type { RawImageData } from '../../core/trace';
 import { freezeGif, isGif } from '../import/freeze-gif';
 import { readImageHeader } from './image-header-reader';
+import { parsePngDimensions, readPngHeader } from './png-header';
 import { maskTraceSourcePixels } from './trace-source-mask';
 import { PREVIEW_MAX_EDGE_PX, scaleToCap } from './trace-decode-cap';
 import {
@@ -197,7 +198,7 @@ function hasOrientedAspect(frame: ImageDimensions, oriented: ImageDimensions): b
 
 // The HTMLImageElement route. Engines that implement CSS image-orientation
 // (Chromium 81+, Firefox 77+, Safari 13.1+) report and draw the element
-// already turned. One that reports the STORED frame of a turned JPEG has
+// already turned. One that reports the STORED frame of a turned JPEG or PNG has
 // ignored the Orientation, so the turn is drawn here instead: either way the
 // raster has the oriented aspect ratio the header, and so the import bounds,
 // promised.
@@ -322,23 +323,23 @@ function decodeImage(url: string, signal?: AbortSignal): Promise<HTMLImageElemen
   });
 }
 
+// A PNG's eXIf and a JPEG's Exif APP1 both carry an Orientation that Chromium
+// applies (ADR-404 and its Amendment 1).
 async function readHeaderImageInfo(
   file: File,
   signal?: AbortSignal,
 ): Promise<HeaderImageInfo | null> {
   const header = await readImageHeader(file, signal);
-  const png = parsePngDimensions(header);
-  if (png !== null) return { stored: png, oriented: png, orientation: 1 };
-  const jpeg = parseJpegHeader(header);
-  if (jpeg === null) return null;
+  const parsed = (await readPngHeader(file, header, signal)) ?? parseJpegHeader(header);
+  if (parsed === null) return null;
   return {
-    stored: jpeg.stored,
-    oriented: orientedDimensions(jpeg.stored, jpeg.orientation),
-    orientation: jpeg.orientation,
+    stored: parsed.stored,
+    oriented: orientedDimensions(parsed.stored, parsed.orientation),
+    orientation: parsed.orientation,
   };
 }
 
-/** Read only a PNG IHDR size, without invoking a browser image decoder. */
+/** Read only a PNG IHDR size (as stored), without invoking a browser image decoder. */
 export async function readPngHeaderDimensions(file: File): Promise<ImageDimensions | null> {
   return parsePngDimensions(await readImageHeader(file));
 }
@@ -359,35 +360,6 @@ function assertSafeDecodeDimensions(dimensions: ImageDimensions): void {
       `Image source dimensions ${dimensions.width}x${dimensions.height} px are too large to decode safely. Resize the image before importing.`,
     );
   }
-}
-
-function parsePngDimensions(header: Uint8Array): ImageDimensions | null {
-  if (header.byteLength < 24 || !hasPngSignature(header)) return null;
-  const view = new DataView(header.buffer, header.byteOffset, header.byteLength);
-  const ihdrLength = view.getUint32(8);
-  const ihdrType =
-    String.fromCharCode(header[12] ?? 0) +
-    String.fromCharCode(header[13] ?? 0) +
-    String.fromCharCode(header[14] ?? 0) +
-    String.fromCharCode(header[15] ?? 0);
-  if (ihdrLength !== 13 || ihdrType !== 'IHDR') return null;
-  const width = view.getUint32(16);
-  const height = view.getUint32(20);
-  if (width <= 0 || height <= 0) return null;
-  return { width, height };
-}
-
-function hasPngSignature(header: Uint8Array): boolean {
-  return (
-    header[0] === 0x89 &&
-    header[1] === 0x50 &&
-    header[2] === 0x4e &&
-    header[3] === 0x47 &&
-    header[4] === 0x0d &&
-    header[5] === 0x0a &&
-    header[6] === 0x1a &&
-    header[7] === 0x0a
-  );
 }
 
 // F.2.e: extract a luma buffer (one byte per pixel, ITU-R BT.601)

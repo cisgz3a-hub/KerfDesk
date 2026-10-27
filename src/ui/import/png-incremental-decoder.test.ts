@@ -1,5 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, it, vi } from 'vitest';
+import { exifTiffBlock } from '../../io/raster-decode/exif-orientation.test-support';
 import { decodeIncrementalPngToLuma } from './png-incremental-decoder';
 import { chunksOf, makePng, oneByteChunks, rgba } from './png-incremental-decoder.test-support';
 
@@ -32,11 +33,46 @@ describe('decodeIncrementalPngToLuma', () => {
       bitDepth: 8,
       colorType: 2,
       density: null,
+      orientation: 1,
     });
     expect(rows.map((row) => [...row])).toEqual([
       [76, 150],
       [29, 255],
     ]);
+  });
+
+  it('announces the eXIf Orientation before the first row, as Chromium reads it', async () => {
+    const decode = async (exif: number[], exifAfterIdat = false) => {
+      const events: string[] = [];
+      const png = makePng({ width: 1, height: 1, rows: [[0, 0, 0]], exif, exifAfterIdat });
+      const result = await decodeIncrementalPngToLuma(chunksOf(png, 3), {
+        maxEdge: 8,
+        maxPixels: 64,
+        onOrientation: (orientation) => {
+          events.push(`orientation ${orientation}`);
+        },
+        onRow: () => {
+          events.push('row');
+        },
+      });
+      return { events, orientation: result.kind === 'ok' ? result.orientation : null };
+    };
+
+    await expect(decode(exifTiffBlock({ ifd0: [{ value: 6 }] }))).resolves.toEqual({
+      events: ['orientation 6', 'row'],
+      orientation: 6,
+    });
+    await expect(decode(exifTiffBlock({ subIfd: [{ value: 8 }] }))).resolves.toMatchObject({
+      orientation: 8,
+    });
+    // After IDAT, and with an invalid entry, Chromium shows the PNG as stored.
+    await expect(decode(exifTiffBlock({ ifd0: [{ value: 6 }] }), true)).resolves.toEqual({
+      events: ['orientation 1', 'row'],
+      orientation: 1,
+    });
+    await expect(decode(exifTiffBlock({ ifd0: [{ value: 6, count: 2 }] }))).resolves.toMatchObject({
+      orientation: 1,
+    });
   });
 
   it('carries validated pHYs density without rereading the source file', async () => {

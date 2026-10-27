@@ -24,8 +24,31 @@ import type {
   PreparedDepthMapImportResult,
   PreparedReliefHeightfieldImportResult,
 } from './depth-map-import-preparation';
+import type { BatchRasterFormat, DecodedBatchRaster } from './batch-raster-pixels';
+
+/** RGBA pixels with their own transferable buffer. */
+export type ImportWorkerRgba = {
+  readonly width: number;
+  readonly height: number;
+  readonly data: Uint8ClampedArray<ArrayBuffer>;
+};
 
 export type ImportWorkerRequest =
+  // Multi-File Trace's TIFF and Netpbm decode, and its resample to a working
+  // grid, run here so a large scan does not freeze the window (ADR-357 Amendment 1).
+  | {
+      readonly id: number;
+      readonly kind: 'batch-raster';
+      readonly blob: Blob;
+      readonly format: BatchRasterFormat;
+    }
+  | {
+      readonly id: number;
+      readonly kind: 'resample-rgba';
+      readonly image: ImportWorkerRgba;
+      readonly width: number;
+      readonly height: number;
+    }
   | {
       readonly id: number;
       readonly kind: 'dxf';
@@ -71,6 +94,8 @@ export type ImportWorkerResponse =
       readonly bytesRead?: number;
       readonly totalBytes?: number;
     }
+  | { readonly id: number; readonly kind: 'batch-raster'; readonly result: DecodedBatchRaster }
+  | { readonly id: number; readonly kind: 'resample-rgba'; readonly result: ImportWorkerRgba }
   | { readonly id: number; readonly kind: 'dxf'; readonly result: PackedDxfResult }
   | { readonly id: number; readonly kind: 'hpgl'; readonly result: PackedHpglResult }
   | { readonly id: number; readonly kind: 'gcode'; readonly result: PackedGcodeResult }
