@@ -2,14 +2,19 @@
 // only oversize art is scaled down to fit, and the operator must hear about it
 // because the burn no longer matches the file. Toasts carry no action button,
 // so the notice points at Undo, which restores the original size
-// (applyImportBedFit records the scaling as its own undo step).
+// (applyImportBedFit records the scaling as its own undo step). A remote
+// `apply_edits` batch is one Undo step (ADR-584), so its notice says Undo
+// reverts the batch instead (ADR-125 Amendment 2).
 
 import type { ImportOutcome } from '../state/store';
 import type { ToastDescriptor } from './import-toasts';
 
+export type ImportBedFitUndo = 'own-step' | 'remote-batch';
+
 export function describeImportBedFit(
   filename: string,
   outcome: ImportOutcome | undefined,
+  undo: ImportBedFitUndo = 'own-step',
 ): ToastDescriptor | null {
   if (outcome?.kind !== 'added' || outcome.bedFit === undefined) return null;
   const fit = outcome.bedFit;
@@ -17,10 +22,15 @@ export function describeImportBedFit(
     message:
       `${filename} is larger than the ${formatMm(fit.bedWidthMm)} × ${formatMm(fit.bedHeightMm)} mm bed ` +
       `(${formatMm(fit.widthMm)} × ${formatMm(fit.heightMm)} mm), so it was scaled to ` +
-      `${formatPercent(fit.scale)} to fit. Undo restores the original size.`,
+      `${formatPercent(fit.scale)} to fit. ${UNDO_SENTENCE[undo]}`,
     variant: 'warning',
   };
 }
+
+const UNDO_SENTENCE: Record<ImportBedFitUndo, string> = {
+  'own-step': 'Undo restores the original size.',
+  'remote-batch': 'Undo reverts the whole batch of remote edits.',
+};
 
 // One decimal with a trailing zero trimmed, like the Job Review sizes.
 function formatMm(value: number): string {

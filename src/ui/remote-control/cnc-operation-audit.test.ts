@@ -1,6 +1,10 @@
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_CNC_LAYER_SETTINGS, type CncLayerSettings } from '../../core/scene';
 import { setActiveEdition } from '../licensing/edition';
+import {
+  cncStartupOperationDraft,
+  sceneWithCncStartupOperationDrafts,
+} from '../state/cnc-startup-setup';
 import { useStore } from '../state/store';
 import { addTestRectangle, resultCode, testAdapter, writeArgs } from './authoring-test-support';
 import type { RemoteControlAdapter } from './types';
@@ -66,12 +70,12 @@ const automatic: CncLayerSettings = {
   feedSource: { kind: 'material-recipe', materialKey: 'plywood-mdf', fluteCount: 2 },
 };
 
+// A bit change is not a hand edit: it takes the Artwork card's path (below).
 it.each([
   { feedMmPerMin: 731 },
   { plungeMmPerMin: 125 },
   { spindleRpm: 9000 },
   { depthPerPassMm: 0.5 },
-  { toolId: 'em-6350' },
 ])('keeps remote manual CNC settings from being treated as automatic: %j', async (patch) => {
   const layer = useStore.getState().project.scene.layers[0]!;
   useStore.getState().setLayerParam(layer.id, { cnc: automatic });
@@ -90,6 +94,98 @@ it.each([
   expect(current).not.toHaveProperty('materialKey');
   useStore.getState().undo();
   expect(useStore.getState().project.scene.layers[0]!.cnc).toEqual(automatic);
+});
+
+// Rolling audit v4 H8-P2-1 (ADR-306 Amendment 4): the desktop twin is the Artwork card's
+// transform, the Machine Setup tool plan's sceneWithCncStartupOperationDrafts.
+function cardChoice(
+  settings: CncLayerSettings,
+  choice: { readonly toolId?: string; readonly materialKey?: string },
+): CncLayerSettings {
+  const state = useStore.getState();
+  const machine = state.project.machine;
+  if (machine?.kind !== 'cnc') throw new Error('Not a CNC project');
+  const layer = { ...state.project.scene.layers[0]!, cnc: settings };
+  const next = sceneWithCncStartupOperationDrafts({
+    scene: { layers: [layer], objects: [] },
+    machine,
+    profile: state.project.device,
+    liveCaps: state.cncLiveCaps,
+    drafts: [{ ...cncStartupOperationDraft(layer), ...choice }],
+  }).layers[0]!.cnc;
+  if (next === undefined) throw new Error('No CNC settings');
+  return next;
+}
+
+async function changeBit(mode: 'single' | 'batch', toolId: string) {
+  const args = {
+    operationId: useStore.getState().project.scene.layers[0]!.id,
+    patch: { cnc: { toolId } },
+  };
+  return mode === 'single'
+    ? adapter.execute('update_operation', writeArgs(adapter, args))
+    : adapter.execute(
+        'apply_edits',
+        writeArgs(adapter, { edits: [{ command: 'update_operation', args }] }),
+      );
+}
+
+describe('a remote bit change takes the Artwork card’s path', () => {
+  it.each(['single', 'batch'] as const)(
+    'recalculates a material-recipe operation for the new bit (%s)',
+    async (mode) => {
+      const layer = useStore.getState().project.scene.layers[0]!;
+      // Hardwood with the 1/4" end mill, seeded by the card itself.
+      const hardwood = cardChoice(DEFAULT_CNC_LAYER_SETTINGS, {
+        toolId: 'em-6350',
+        materialKey: 'hardwood',
+      });
+      useStore.getState().setLayerParam(layer.id, { cnc: hardwood });
+      expect(hardwood.feedSource?.kind).toBe('material-recipe');
+      const card = cardChoice(hardwood, { toolId: 'em-1588' });
+      expect(card.feedMmPerMin).toBeLessThan(hardwood.feedMmPerMin);
+      expect(card.depthPerPassMm).toBeLessThan(hardwood.depthPerPassMm);
+
+      expect(resultCode(await changeBit(mode, 'em-1588'))).toBe('ok');
+      expect(useStore.getState().project.scene.layers[0]!.cnc).toEqual(card);
+      useStore.getState().undo();
+      expect(useStore.getState().project.scene.layers[0]!.cnc).toEqual(hardwood);
+    },
+  );
+
+  it('keeps a manual operation’s values and names them, as the card’s note does', async () => {
+    const layer = useStore.getState().project.scene.layers[0]!;
+    const manual: CncLayerSettings = {
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      toolId: 'em-6350',
+      feedMmPerMin: 2400,
+      plungeMmPerMin: 960,
+      spindleRpm: 12000,
+      depthPerPassMm: 2.5,
+    };
+    useStore.getState().setLayerParam(layer.id, { cnc: manual });
+    const result = await changeBit('single', 'em-1588');
+    expect(resultCode(result)).toBe('ok');
+    expect(useStore.getState().project.scene.layers[0]!.cnc).toEqual(
+      cardChoice(manual, { toolId: 'em-1588' }),
+    );
+    expect(useStore.getState().project.scene.layers[0]!.cnc).toMatchObject({
+      toolId: 'em-1588',
+      feedMmPerMin: 2400,
+      depthPerPassMm: 2.5,
+    });
+    if (!result.ok) throw new Error(result.error.code);
+    expect(result.data.message).toMatch(
+      /^Bit changed\. Kept from the previous bit: feed 2400 mm\/min, plunge 960 mm\/min, spindle 12,000 RPM, depth per pass 2\.5 mm\. Check them for .+ before cutting\.$/,
+    );
+  });
+
+  it('refuses a bit that is not in the Machine Setup library', async () => {
+    const before = useStore.getState();
+    expect(resultCode(await changeBit('single', 'no-such-bit'))).toBe('invalid_arguments');
+    expect(useStore.getState().project).toBe(before.project);
+    expect(useStore.getState().undoStack).toEqual(before.undoStack);
+  });
 });
 
 it('preserves automatic feeds when changing only the total cut depth', async () => {

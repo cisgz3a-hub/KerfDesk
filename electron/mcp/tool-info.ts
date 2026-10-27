@@ -155,12 +155,12 @@ export const mcpToolInfo: Record<KerfDeskMcpCommand, { title: string; descriptio
   add_svg: {
     title: 'Import SVG artwork',
     description:
-      'Import SVG markup (max 180,000 characters) through the desktop SVG importer. Scripts, external references and foreign content are removed. Optional xMm/yMm place the top-left and widthMm scales uniformly. Prefer simple paths with stroke colours that map to operations. Requires expectedRevision and UUID requestId.',
+      'Import SVG markup (max 180,000 characters) through the desktop SVG importer. Scripts, external references and foreign content are removed. Optional xMm/yMm place the top-left and widthMm scales uniformly. Without widthMm, art larger than the bed is scaled to fit it, reported in bedFit, and one Undo restores the file size. notices repeats what the PC showed, such as ignored text or fills imported as outlines; tell the user about every warning. Prefer simple paths with stroke colours that map to operations. Requires expectedRevision and UUID requestId.',
   },
   import_file: {
     title: 'Import a file',
     description:
-      'Import one SVG, DXF, PNG or JPEG file supplied as base64 (max 240,000 characters) through the ordinary desktop importer, optionally placed at xMm/yMm and scaled to widthMm. Requires expectedRevision and UUID requestId.',
+      'Import one SVG, DXF, PNG or JPEG file supplied as base64 (max 240,000 characters) through the ordinary desktop importer, optionally placed at xMm/yMm and scaled to widthMm. Without widthMm, art larger than the bed is scaled to fit it, reported in bedFit, and one Undo restores the file size. notices repeats what the PC showed, such as skipped DXF entities or units it had to assume; tell the user about every warning. Requires expectedRevision and UUID requestId.',
   },
   save_project: {
     title: 'Save the project',

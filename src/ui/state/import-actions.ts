@@ -20,7 +20,7 @@ import {
   type StateSlice,
   type TraceExistingImageOptions,
 } from './scene-mutations';
-import { applyImportBedFit } from './import-bed-fit';
+import { applyImportBedFit, type ImportFitOptions } from './import-bed-fit';
 import { fitAllObjects, type ProjectSlice } from './viewport-actions';
 import { projectWithFreshCncLayers } from './cnc-auto-seeding';
 import type { CncLiveCapsState } from './cnc-live-caps-actions';
@@ -48,7 +48,11 @@ export function imageImportActions(
   rawSet: ImportSet,
   get: () => ProjectSlice,
 ): {
-  readonly importRasterImage: (object: SceneObject, batchIdx?: number) => ImportOutcome;
+  readonly importRasterImage: (
+    object: SceneObject,
+    batchIdx?: number,
+    options?: ImportFitOptions,
+  ) => ImportOutcome;
   readonly traceExistingImage: (
     sourceId: string,
     traced: TracedImage,
@@ -64,13 +68,14 @@ export function imageImportActions(
   const set: ImportSet = (update) =>
     rawSet((state) => prepareProjectInsertion(state.project, () => update(state)));
   return {
-    importRasterImage: (object, batchIdx) => {
+    importRasterImage: (object, batchIdx, options) => {
       let outcome: ImportOutcome = { kind: 'added' };
       // batchIdx staggers multi-image drops by 10 mm each (F-A3); a single
       // import or the toolbar picker passes nothing → 0.
       set((s) => {
         const fitted = applyImportBedFit(
           withFreshCncLayers(s, applyFreshImport(s, object, batchIdx ?? 0)),
+          options,
         );
         outcome = fitted.outcome;
         return fitted.state;

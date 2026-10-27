@@ -1,6 +1,7 @@
 ## ADR-125 Amendment 1 - Imports keep their file size unless larger than the bed (2026-09-24)
 
-**Status:** Accepted. | **Date:** 2026-09-24
+**Status:** Accepted; item 3 extended to Remote Control by
+[Amendment 2](ADR-125-amendment-2-remote-imports-report-the-bed-fit.md). | **Date:** 2026-09-24
 
 Amends the description of `fitObjectToBed` in ADR-125 Decision 1. Changes nothing in
 `fitObjectToRegion`, auto-fit to a placed board or the array tiler.
