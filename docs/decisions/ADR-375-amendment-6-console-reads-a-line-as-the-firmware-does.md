@@ -2,6 +2,11 @@
 
 **Status:** Accepted. | **Date:** 2026-10-26
 
+**Correction:** [Amendment 7](ADR-375-amendment-7-bracket-lines-and-gcode-report-units.md)
+corrects decision 1's FluidNC claim. FluidNC also runs `[key]value` as `$key=value`, and this
+amendment's checks never saw that form (rolling audit v3 G4-P1-1). Amendment 7 reads it as its `$`
+form first.
+
 Amends ADR-375 decision 9 and the Console value checks of Amendment 4, after meta audit v1 finding
 M6-P2-1. That finding re-rated controller audit v2 C5-P3-1 and rolling audit v2 17-P3-2 from P3 to
 P1; an independent refuter and the coordinator confirmed it on main `adf300522`. Sources are gnea/grbl

@@ -389,7 +389,7 @@ async function runContinueToolChange(context: JobActionContext): Promise<void> {
 }
 
 function installInitialStream(
-  { set, get }: JobActionContext,
+  { set, get, refs }: JobActionContext,
   gcode: string,
   options: StartJobOptions,
   { stepped, labels, toolIds }: ReturnType<typeof prepareInitialStream>,
@@ -427,7 +427,9 @@ function installInitialStream(
     ),
     accessoryCache: invalidateAccessoryObservation(state.accessoryCache),
     activeJobMachineKind: options.machineKind ?? 'laser',
-    ...(options.externalProgram === true ? externalProgramControllerStatePatch(state, gcode) : {}),
+    ...(options.externalProgram === true
+      ? externalProgramControllerStatePatch(state, gcode, refs.driver)
+      : {}),
   }));
   return writeOwner;
 }

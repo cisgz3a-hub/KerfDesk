@@ -243,7 +243,10 @@ therefore sent moves the firmware refuses, or trusted values the controller had 
      [Amendment 6](ADR-375-amendment-6-console-reads-a-line-as-the-firmware-does.md): the Console
      also classifies the line GRBL's line reader would parse, so a comment or `/` in or in front of
      a `$` command, or a setting number that is not digits only, cannot pass a write or reset as
-     G-code.)*
+     G-code. Amended again by
+     [Amendment 7](ADR-375-amendment-7-bracket-lines-and-gcode-report-units.md): FluidNC's
+     `[key]value` lines are read as their `$` form, and after a Console units line Smoothieware's
+     report units are read back with `$G`.)*
    - Stock GRBL stores a non-axis setting as an 8-bit integer and still answers `ok`
      ([settings.c L229](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/settings.c#L229)), so a Console `$22=0.5` turned homing and soft limits
      off while KerfDesk reported the write as done. On the stock GRBL driver the Console now

@@ -81,6 +81,37 @@ const GRBL_NAME_BY_LONG_NAME: ReadonlyMap<string, string> = new Map(
   FLUIDNC_V403_COMMAND_NAMES.map(([grbl, long]) => [long.toUpperCase(), grbl]),
 );
 
+const BRACKET_EQUALS_REASON =
+  'FluidNC reads a line that starts with "[" as the $ command named up to the first "]", and no command name contains "=". Type the command as $name=value.';
+
+export type FluidncDollarForm =
+  | { readonly ok: true; readonly line: string }
+  | { readonly ok: false; readonly reason: string };
+
+/**
+ * The `$` line FluidNC runs for a line that starts with `[`. Its execute_line()
+ * hands a `$` or `[` line to settings_execute_line(), which splits `[key]value`
+ * at the first ']' where it splits `$key=value` at the first '=', and both go
+ * to do_command_or_setting(), "the handler for all forms of settings commands"
+ * (v4.0.3 ProcessSettings.cpp L1088-L1113, L1209-L1240). So `[13]1` is `$13=1`
+ * (inch reports), `[RST]#` is `$RST=#` and `[NVX]` is `$NVX`; the Console took
+ * them for G-code and checked none of them (rolling audit v3 G4-P1-1). The `$`
+ * form is classified and sent, as a long name is. A key with '=' in it names no
+ * command or setting on FluidNC, but would read as one in its `$` form, so it
+ * is refused. Any other line comes back unchanged.
+ * https://github.com/bdring/FluidNC/blob/v4.0.3/FluidNC/src/ProcessSettings.cpp#L1209-L1240
+ */
+export function fluidncDollarForm(input: string): FluidncDollarForm {
+  const trimmed = normalizeConsoleSpaces(input).trim();
+  if (!trimmed.startsWith('[')) return { ok: true, line: input };
+  const close = trimmed.indexOf(']');
+  const key = close < 0 ? trimmed.slice(1) : trimmed.slice(1, close);
+  if (key.includes('=')) return { ok: false, reason: BRACKET_EQUALS_REASON };
+  // `[key]` and `$key` both hand the command an empty value.
+  const value = close < 0 ? '' : trimmed.slice(close + 1);
+  return { ok: true, line: value === '' ? `$${key}` : `$${key}=${value}` };
+}
+
 /**
  * The same line with a FluidNC long command name replaced by its Grbl name
  * (`$Settings/Restore=#` becomes `$RST=#`, `$home/x` becomes `$HX`). The key is
@@ -97,6 +128,12 @@ export function fluidncGrblCommandForm(input: string): string {
 /** The compacted, upper-case command key of a `$` line (no `$`, no value). */
 export function fluidncCommandKey(line: string): string | null {
   return splitDollarCommand(line)?.key.toUpperCase() ?? null;
+}
+
+/** The value a `$` line gives its command, or null when it gives none. */
+export function fluidncCommandValue(line: string): string | null {
+  const value = splitDollarCommand(line)?.value.replace(/^=[ \t]*/, '') ?? '';
+  return value === '' ? null : value;
 }
 
 function splitDollarCommand(
