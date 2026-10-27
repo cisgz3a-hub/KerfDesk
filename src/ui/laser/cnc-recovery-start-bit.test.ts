@@ -58,10 +58,8 @@ function verticalLine(id: string, color: string, x: number): SceneObject {
 }
 
 // Scene-data colours for the two operations, not UI chrome.
-/* eslint-disable no-restricted-syntax */
 const GREEN = '#00aa00';
 const PURPLE = '#aa00aa';
-/* eslint-enable no-restricted-syntax */
 
 function twoBitProject() {
   return {

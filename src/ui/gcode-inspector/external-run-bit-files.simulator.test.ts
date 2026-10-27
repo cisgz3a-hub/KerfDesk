@@ -69,7 +69,7 @@ describe('per-bit files through Run G-code file', () => {
     expect(useLaserStore.getState().bitFileSequence).toMatchObject({ order: 1, count: 2 });
 
     // Declining the Frame's Zero Z offer leaves the next bit's file unframed.
-    vi.mocked(window.confirm).mockReturnValue(false);
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
     expect(await settle(frameExternalProgram(openedProgram(BIT_TWO)))).toBeNull();
     expect(useLaserStore.getState().frameVerification).toBeNull();
   });

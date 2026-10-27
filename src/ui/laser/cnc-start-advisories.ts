@@ -2,7 +2,7 @@
 // project), so they cannot live in detectMachineJobWarnings (which is shared
 // with the Save-G-code path and has no machine snapshot).
 
-import { machineKindOf, type Project } from '../../core/scene';
+import { machineKindOf, type CncTool, type Project } from '../../core/scene';
 import type { CncToolPlanEntry } from '../state/cnc-tool-plan';
 import {
   isWorkZEvidenceCurrentForStart,
@@ -51,13 +51,15 @@ export function cncWorkZeroToolStartIssue(
   if (evidence?.toolId === firstTool.id) return null;
 
   const expectedName = firstTool.name ?? firstTool.id;
-  const evidenceName =
-    evidence?.toolId === undefined
-      ? 'an unrecorded bit'
-      : (machine.tools.find((tool) => tool.id === evidence.toolId)?.name ?? evidence.toolId);
+  const evidenceName = evidenceToolName(machine.tools, evidence?.toolId);
   return (
     `${subject} starts with ${expectedName}, but work Z was established for ${evidenceName}. ` +
     `Load ${expectedName}, select it as the Active bit, then touch it to the stock top and ` +
     'Zero Z — or probe again.'
   );
+}
+
+function evidenceToolName(tools: ReadonlyArray<CncTool>, toolId: string | undefined): string {
+  if (toolId === undefined) return 'an unrecorded bit';
+  return tools.find((tool) => tool.id === toolId)?.name ?? toolId;
 }

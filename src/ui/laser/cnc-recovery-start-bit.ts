@@ -17,11 +17,13 @@
 import type { Job } from '../../core/job';
 import type { Project } from '../../core/scene';
 import { cncToolPlan } from '../state/cnc-tool-plan';
+import { jobAwareAlert } from '../state/job-aware-dialogs';
 import type { WorkZZeroEvidence } from '../state/work-z-zero-evidence';
 import {
   CNC_UNKNOWN_INITIAL_TOOL_START_MESSAGE,
   cncWorkZeroToolStartIssue,
 } from './cnc-start-advisories';
+import type { PreparedRecoverySource } from './start-job-source';
 
 const RECOVERY_SUBJECT = 'The recovery program';
 
@@ -50,4 +52,20 @@ export function cncRecoveryStartBitIssue(
   const firstTool = cncToolPlan(recoveryJob)[0];
   if (evidence === null || evidence === undefined || firstTool?.id === null) return null;
   return cncWorkZeroToolStartIssue(project, evidence, firstTool, RECOVERY_SUBJECT);
+}
+
+/** Alerts and returns true when `recoveryJob` may not stream on the Work Z its
+ * source was qualified against, before any claim or controller write. */
+export function refuseCncRecoveryStartBit(
+  source: Pick<PreparedRecoverySource, 'project' | 'controllerSnapshot'>,
+  recoveryJob: Job,
+): boolean {
+  const issue = cncRecoveryStartBitIssue(
+    source.project,
+    recoveryJob,
+    source.controllerSnapshot.workZZeroEvidence,
+  );
+  if (issue === null) return false;
+  jobAwareAlert(`Cannot start CNC recovery:\n\n${issue}`);
+  return true;
 }
