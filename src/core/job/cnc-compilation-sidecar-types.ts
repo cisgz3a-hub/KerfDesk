@@ -45,6 +45,9 @@ export type CncKeptPartCut = {
   readonly at: Vec2;
   /** The cut width of `layerId` at full depth. */
   readonly cutWidthMm: number;
+  /** The finish allowance `layerId` roughs with, set when only its roughing
+   * ring reaches the part: the finishing pass alone would clear it. */
+  readonly finishAllowanceMm?: number;
 };
 
 /** Exact closed copies one filled operation cut once (ADR-359 Amendment 3). */

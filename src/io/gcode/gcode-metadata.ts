@@ -156,7 +156,10 @@ export type GcodeMetadata = {
 // stock past its map stands at the stock top; carries forward v31 above.
 // ADR-327 Amd 1 places a CNC job by its artwork, not its cutter's reach, so a
 // placed CNC program's coordinates move; carries forward v32 above.
-export const EMITTER_REVISION = 'cnc-artwork-anchor-20261027-v33';
+// ADR-250 Amd 4 counts a stacked On path copy once in the kept walls, so a
+// neighbouring lead that reached the copied part plunges instead; carries
+// forward v33 above.
+export const EMITTER_REVISION = 'cnc-on-path-copy-walls-20261027-v34';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S
