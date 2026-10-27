@@ -76,7 +76,7 @@ function BoardCapturePanelBody({
   const outlineValid = useStore((state) =>
     capturedBoardOutlineMatches(state.project.scene, outlineId, geometry),
   );
-  const handlers = useBoardPanelHandlers(capture, livePosition, device);
+  const handlers = useBoardPanelHandlers(capture, device);
   const interactionDisabled = disabled || handlers.busy;
   const sessionDisabled = handlers.busy || motionActive;
   const verification = useBoardVerification({
@@ -89,7 +89,13 @@ function BoardCapturePanelBody({
     onCorrect: handlers.onCorrectBoardPoint,
   });
   const panelLocked = sessionDisabled || verification.saving || verification.cancelling;
-  useBoardRemoteRegistration(open, capture, handlers, currentEpoch, handlers.busy);
+  useBoardRemoteRegistration(open, {
+    capture,
+    handlers,
+    currentEpoch,
+    busy: handlers.busy,
+    device,
+  });
   const pendingPhoto = usePendingBoardPhoto(capture, committed, motionActive);
   useKeepBoardPanelOpenWhileBusy(open, verification, handlers.busy, onRelease);
 

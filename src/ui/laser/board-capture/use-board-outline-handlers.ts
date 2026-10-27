@@ -6,13 +6,13 @@ import {
   outlineBounds,
   outlineMachineCorner,
   outlineRegistration,
-  OUTLINE_SCALE_NOTICE_FRACTION,
   type CapturedBoardGeometry,
   type Vec2,
   type OutlineBoardGeometry,
 } from '../../../core/scene';
 import type { BoardCapture } from './use-board-capture';
 import { boardCaptureOriginOwner } from './board-capture-origin-owner';
+import { outlineScaleNotice } from './board-finish-checks';
 
 type SetMessage = Dispatch<SetStateAction<string | null>>;
 
@@ -84,13 +84,8 @@ export function outlineGeometryLargeEnough(
 }
 
 function setScaleNotice(scale: number, setNotice: SetMessage): void {
-  if (Math.abs(scale - 1) <= OUTLINE_SCALE_NOTICE_FRACTION) return;
-  const pct = Math.abs(scale - 1) * 100;
-  setNotice(
-    `The head measured the board ${pct.toFixed(1)}% ${
-      scale > 1 ? 'larger' : 'smaller'
-    } than the size you typed. KerfDesk uses the head's measurement.`,
-  );
+  const notice = outlineScaleNotice(scale);
+  if (notice !== null) setNotice(notice);
 }
 
 function errorMessage(error: unknown, fallback: string): string {

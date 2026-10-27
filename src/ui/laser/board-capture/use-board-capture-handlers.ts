@@ -17,6 +17,7 @@ import {
 } from '../../../core/scene/board-verification';
 import { useStore } from '../../state';
 import { useLaserStore } from '../../state/laser-store';
+import { boardCaptureBlockMessage, boardCapturePosition } from './board-capture-gate';
 import { MIN_BOARD_DIMENSION_MM } from './constants';
 import { capturedBoardOutlineMatches } from './captured-board-outline';
 import {
@@ -35,7 +36,6 @@ const CROSS_AXIS_NOTICE_MM = 5;
 
 type BoardCaptureHandlerArgs = {
   readonly capture: BoardCapture;
-  readonly livePosition: Vec2 | null;
   readonly device: DeviceProfile;
   readonly setOriginHere: () => Promise<void>;
   readonly setOriginAtMachinePoint: (
@@ -108,14 +108,21 @@ function useCapturePointHandler(
   const capturingRef = useRef(false);
   return async () => {
     if (capturingRef.current) throw new Error('A board point capture is already in progress.');
-    if (args.livePosition === null)
+    // The gate and the position come from one store snapshot, so a point is
+    // recorded only while the PC's Capture button would be enabled, at the
+    // position that gate judged rather than a render-old one (ADR-654 Amendment 1).
+    const laser = useLaserStore.getState();
+    const blocked = boardCaptureBlockMessage(laser);
+    if (blocked !== null) throw new Error(blocked);
+    const position = boardCapturePosition(laser);
+    if (position === null)
       throw new Error('Waiting for a machine position report on the computer.');
     capturingRef.current = true;
     setBusy(true);
     setError(null);
     setNotice(null);
     try {
-      await capturePoint(args);
+      await capturePoint(args, position);
     } catch (error) {
       setError(
         errorMessage(
@@ -131,15 +138,14 @@ function useCapturePointHandler(
   };
 }
 
-async function capturePoint(args: BoardCaptureHandlerArgs): Promise<void> {
-  if (args.livePosition === null) return;
+async function capturePoint(args: BoardCaptureHandlerArgs, position: Vec2): Promise<void> {
   if (firstCaptureSetsOrigin(args.capture)) await args.setOriginHere();
   if (!args.capture.isSessionCurrent()) {
     throw new Error('The board capture method changed while the origin was being set. Try again.');
   }
   const epoch = currentRegistrationEpoch();
   assertCaptureEpoch(args.capture, epoch);
-  args.capture.capture(args.livePosition, epoch);
+  args.capture.capture(position, epoch);
 }
 
 function createGeometryCommit(

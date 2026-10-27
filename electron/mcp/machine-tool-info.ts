@@ -57,12 +57,12 @@ export const mcpMachineToolInfo = {
   capture_board_point: {
     title: 'Capture a Place Board point',
     description:
-      "Record the laser head's current position as the next Place Board capture point (same as Capture on the computer). Jog the head onto the highlighted anchor first.",
+      "Record the laser head's current position as the next Place Board capture point (same as Capture on the computer). Jog the head onto the highlighted anchor first. Refused whenever Capture on the computer is unavailable (the head moving, a job or MPG active, a command pending), and until a new Idle position report arrives; wait for Idle, then try again.",
   },
   finish_board: {
     title: 'Create the captured board',
     description:
-      'Finish the current Place Board capture. Check every anchor on the computer, then Frame before Start.',
+      'Finish the current Place Board capture. Refused when the computer would warn before finishing (rectangle corners off square or the first corner not bottom-left); the user can still create the board on the computer. Check every anchor on the computer, then Frame before Start.',
   },
   pause_job: {
     title: 'Pause the running job',
