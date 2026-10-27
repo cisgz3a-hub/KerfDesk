@@ -2,10 +2,9 @@
 
 import { create } from 'zustand';
 import { effectiveOperationForObject } from '../../core/effective-output';
-import { captureLayerOperationSettings } from '../../core/scene';
 import { photoEngravingOperationForImage } from '../raster/photo-engraving-store';
 import { useStore } from '../state';
-import type { ToneCalibrationSeed } from './tone-calibration-draft';
+import { photoBurnSettings, type ToneCalibrationSeed } from './tone-calibration-draft';
 
 export type ToneCalibrationStep = 'generate' | 'record';
 
@@ -23,7 +22,8 @@ let nextSessionId = 1;
 
 /**
  * Open Tone Calibration. Without an explicit seed, a selected photo lends its
- * effective operation (object overrides included), as it would burn.
+ * effective operation (object overrides included) at the power it burns with
+ * (its power multiplier applied), as it would burn.
  */
 export function openToneCalibration(
   options: { readonly step?: ToneCalibrationStep; readonly seed?: ToneCalibrationSeed } = {},
@@ -50,5 +50,5 @@ function selectedPhotoSeed(): ToneCalibrationSeed | null {
   if (operation === null) return null;
   const effective = effectiveOperationForObject(operation, image);
   if (effective.mode !== 'image') return null;
-  return { sourceName: image.source, settings: captureLayerOperationSettings(effective) };
+  return { sourceName: image.source, settings: photoBurnSettings(effective, image) };
 }
