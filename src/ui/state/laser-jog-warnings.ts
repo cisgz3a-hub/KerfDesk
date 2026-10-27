@@ -33,7 +33,7 @@ type Point = { readonly x: number; readonly y: number };
 type JogXyPath = { readonly start: Point; readonly target: Point };
 
 /** `start` overrides the reported position for a step queued behind running
- *  steps, which starts where they end (ADR-672); null there means unknown. */
+ *  steps, which starts where they end (ADR-673); null there means unknown. */
 export function warnJogMotionPolicy(
   set: SetFn,
   get: GetFn,

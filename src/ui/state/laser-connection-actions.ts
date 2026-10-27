@@ -191,10 +191,8 @@ function startConnectedControllerHandshake(
   // latter bump connectAttemptRevision via cancelConnectAttempt/beginConnectAttempt.
   const connectAttemptRevision = refs.connectAttemptRevision;
   void runControllerHandshake(set, get, refs, safeWrite, baudRate, ownership.adopt)
-    // The work offset of a board that did not reset on open, at once (ADR-672).
-    .then(() =>
-      ownership.isCurrent() ? sendCompleteStatusRequest(get(), refs.driver, safeWrite) : undefined,
-    )
+    // The work offset of a board that did not reset on open, at once (ADR-673).
+    .then(() => sendCompleteStatusRequest(get, refs.driver, safeWrite, ownership.isCurrent))
     .catch((error: unknown) => {
       if (!ownership.isCurrent()) return;
       set((state) => {

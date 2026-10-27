@@ -43,7 +43,7 @@ export const marlinDriver: ControllerDriver = {
     sleep: false,
     // G92 only. Marlin 2.1.2.8 compiles G92.1 only with CNC_COORDINATE_SYSTEMS
     // (off in stock builds), so Reset origin writes a G92 that restores machine
-    // coordinates instead, from the shift KerfDesk recorded (ADR-672).
+    // coordinates instead, from the shift KerfDesk recorded (ADR-673).
     wcs: 'g92-only',
     workOffsetSource: 'host-recorded',
     transientOriginClear: 'machine-frame-g92',

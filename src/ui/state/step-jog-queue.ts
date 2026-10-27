@@ -1,5 +1,5 @@
 // step-jog-queue — later step presses join a running operator step jog
-// (protocol audit P-3, ADR-672). Tapping an arrow three times quickly used to
+// (protocol audit P-3, ADR-673). Tapping an arrow three times quickly used to
 // move one step: every jog proved a fresh Idle first, and the pad was disabled
 // while any motion operation ran.
 //
@@ -12,9 +12,15 @@
 // (https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/serial.c#L159-L162),
 // while Cancel's cancelRequested stops every pending line here.
 
+import type { ControllerDriver } from '../../core/controllers';
+import { jogXyTarget, warnJogMotionPolicy } from './laser-jog-warnings';
 import type { LaserMotionOperation } from './laser-motion-operation';
 import { isActiveJob } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
+
+type SetFn = Parameters<typeof warnJogMotionPolicy>[0];
+type GetFn = () => LaserState;
+type JogParams = Parameters<LaserState['jog']>[0];
 
 /** Steps one jog operation may owe at once, the running one included. */
 export const MAX_STEP_JOGS_PER_OPERATION = 3;
@@ -87,4 +93,37 @@ export function appendStepJog(
     pendingLines,
     ...(queue === undefined ? {} : { stepJogQueue: { ...queue, plannedEnd } }),
   };
+}
+
+/** The queue mark of an operator step jog's first step. */
+export function firstStepJogQueue(get: GetFn, params: JogParams): StepJogQueue {
+  return { sessionEpoch: get().controllerSessionEpoch, plannedEnd: jogXyTarget(get, params) };
+}
+
+// A step press while a step jog runs joins it: its line waits in the
+// operation, so the first step's fresh-Idle proof covers the run, and Cancel's
+// cancelRequested drops every queued step. Returns false to start a new jog.
+export function queueStepJog(
+  set: SetFn,
+  get: GetFn,
+  driver: ControllerDriver,
+  params: JogParams,
+): boolean {
+  const operation = get().motionOperation;
+  if (operation === null || !canQueueStepJog(get())) return false;
+  const start = operation.stepJogQueue?.plannedEnd ?? null;
+  warnJogMotionPolicy(set, get, params, start);
+  const line = `${driver.commands.buildJog(params)}\n`;
+  const plannedEnd = start === null ? null : jogXyTarget(get, params, start);
+  set((state) =>
+    state.motionOperation?.operationId === operation.operationId
+      ? {
+          motionOperation: appendStepJog(state.motionOperation, line, plannedEnd),
+          frameVerification: null,
+          framedRun: null,
+          frameTrace: null,
+        }
+      : {},
+  );
+  return true;
 }

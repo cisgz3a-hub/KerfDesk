@@ -308,7 +308,7 @@ async function startHold(button: HTMLButtonElement): Promise<void> {
   });
 }
 
-// ADR-672 (protocol audit P-3): while a step jog runs, only XY step presses
+// ADR-673 (protocol audit P-3): while a step jog runs, only XY step presses
 // stay live; they join that jog. Press-and-hold and the settings rows wait.
 describe('JogPad while a step jog can take more steps', () => {
   it('keeps the arrows live as single steps and the rest disabled', async () => {

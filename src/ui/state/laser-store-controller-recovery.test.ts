@@ -238,7 +238,7 @@ describe('controller recovery on the existing connection', () => {
     expectSameConnection(f);
   });
 
-  // Behaviour audit F-4, ADR-672: GRBL answers `$$` in Alarm, so the first
+  // Behaviour audit F-4, ADR-673: GRBL answers `$$` in Alarm, so the first
   // connect of a board locked there reads settings without waiting for Idle.
   it('keeps the initial Alarm connection open and qualifies it in Alarm', async () => {
     const f = fixture();
@@ -291,7 +291,7 @@ describe('controller recovery on the existing connection', () => {
     expectSameConnection(f);
   });
 
-  it('refreshes in Alarm after Abort without waiting for Idle (ADR-672)', async () => {
+  it('refreshes in Alarm after Abort without waiting for Idle (ADR-673)', async () => {
     const f = await connect();
     await startTestLaserJob('G1 X1 S100\nG1 X2 S100');
     f.controls.state = 'Alarm';
@@ -332,7 +332,7 @@ describe('controller recovery on the existing connection', () => {
     },
   );
 
-  // A retained Alarm report now qualifies at once (ADR-672); Sleep still waits.
+  // A retained Alarm report now qualifies at once (ADR-673); Sleep still waits.
   it.each(['Sleep'])(
     'detects silence after a retained %s report and refreshes after a late Idle response',
     async (controllerState) => {

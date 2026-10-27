@@ -27,7 +27,7 @@ describe('GRBL-family variant drivers', () => {
     // state, but grblHAL can greet as stock GRBL, so Cancel handles that on
     // every driver rather than by driver kind (ADR-640, see the next test).
     // grblHAL adds 0x87, which asks for a complete report, WCO included
-    // (protocol audit P-4, ADR-672).
+    // (protocol audit P-4, ADR-673).
     expect(grblHalDriver.realtime).toEqual({
       ...grblDriver.realtime,
       completeStatusQuery: '\x87',

@@ -22,8 +22,8 @@ import { assertAutofocusIdle, jogFrameCommandBlockMessage, pushLog } from './las
 import { useStore } from './store';
 import { isWorkZEvidenceCurrentForStart } from './work-z-zero-evidence';
 import { confirmFreshManualMotionIdle } from './manual-motion-fresh-idle';
-import { jogXyTarget, publishMotionPolicyWarning, warnJogMotionPolicy } from './laser-jog-warnings';
-import { appendStepJog, canQueueStepJog, type StepJogQueue } from './step-jog-queue';
+import { publishMotionPolicyWarning, warnJogMotionPolicy } from './laser-jog-warnings';
+import { firstStepJogQueue, queueStepJog } from './step-jog-queue';
 import {
   assertManualMotionNotCancelled,
   manualMotionCancelGeneration,
@@ -146,7 +146,7 @@ async function runJog(
 ): Promise<void> {
   assertMachineExecutionOwner(owner);
   const stepPress = options?.queueStep === true && owner === undefined && params.relative !== false;
-  if (stepPress && queueStepJog(context, params)) return;
+  if (stepPress && queueStepJog(context.set, context.get, context.refs.driver, params)) return;
   context = { ...context, safeWrite: ownedMachineWrite(context.safeWrite, owner) };
   const { set, get, refs } = context;
   assertAutofocusIdle(get());
@@ -171,37 +171,6 @@ async function runJog(
     set((state) => failOwnedMotionOperation(state, operation.operationId));
     throw error;
   }
-}
-
-// A step press while a step jog runs joins it (ADR-672): its line waits in the
-// operation, so the first step's fresh-Idle proof covers the run, and Cancel's
-// cancelRequested drops every queued step. Returns false to start a new jog.
-function queueStepJog(
-  context: JogActionContext,
-  params: Parameters<LaserState['jog']>[0],
-): boolean {
-  const { set, get, refs } = context;
-  const operation = get().motionOperation;
-  if (operation === null || !canQueueStepJog(get())) return false;
-  const start = operation.stepJogQueue?.plannedEnd ?? null;
-  warnJogMotionPolicy(set, get, params, start);
-  const line = `${refs.driver.commands.buildJog(params)}\n`;
-  const plannedEnd = start === null ? null : jogXyTarget(get, params, start);
-  set((state) =>
-    state.motionOperation?.operationId === operation.operationId
-      ? {
-          motionOperation: appendStepJog(state.motionOperation, line, plannedEnd),
-          frameVerification: null,
-          framedRun: null,
-          frameTrace: null,
-        }
-      : {},
-  );
-  return true;
-}
-
-function firstStepJogQueue(get: GetFn, params: Parameters<LaserState['jog']>[0]): StepJogQueue {
-  return { sessionEpoch: get().controllerSessionEpoch, plannedEnd: jogXyTarget(get, params) };
 }
 
 async function dispatchOwnedJog(

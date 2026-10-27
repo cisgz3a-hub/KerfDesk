@@ -20,7 +20,7 @@ export type MachineSettingsReadReadinessOptions = {
    * report arrive in this controller session, so it qualifies as Idle does.
    * An Alarm report carries no statusObservation, so only the caller can know.
    * GRBL-family firmware answers `$$` in Alarm, and stock GRBL with homing
-   * enabled boots there (ADR-672). */
+   * enabled boots there (ADR-673). */
   readonly freshAlarmObserved?: boolean;
 };
 

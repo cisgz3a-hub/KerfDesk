@@ -95,7 +95,7 @@ describe('machineSettingsReadBlockReason', () => {
     expect(
       machineSettingsReadBlockReason(alarm, { requireCurrentStatusObservation: true }),
     ).toContain('Waiting for Idle');
-    // ADR-672: an Alarm the scheduler saw arrive this session qualifies.
+    // ADR-673: an Alarm the scheduler saw arrive this session qualifies.
     expect(
       machineSettingsReadBlockReason(alarm, {
         requireCurrentStatusObservation: true,

@@ -1,5 +1,5 @@
 // A caller waiting for the work offset asks for a complete report where the
-// driver has one (grblHAL 0x87, protocol audit P-4, ADR-672); every other
+// driver has one (grblHAL 0x87, protocol audit P-4, ADR-673); every other
 // driver, and every ordinary request, sends the plain status query.
 
 import { describe, expect, it, vi } from 'vitest';
@@ -33,8 +33,8 @@ describe('sendCompleteStatusRequest', () => {
 
   it('sends 0x87 once on grblHAL and nothing on stock GRBL', async () => {
     const write = vi.fn(async () => undefined);
-    await sendCompleteStatusRequest(idle, grblHalDriver, write);
-    await sendCompleteStatusRequest(idle, grblDriver, write);
+    await sendCompleteStatusRequest(() => idle, grblHalDriver, write);
+    await sendCompleteStatusRequest(() => idle, grblDriver, write);
     expect(write.mock.calls).toEqual([['\x87', undefined, 'system']]);
   });
 
@@ -44,7 +44,7 @@ describe('sendCompleteStatusRequest', () => {
       ...idle,
       controllerOperation: { kind: 'interactive-command', pollingOwnership: 'terminal-exchange' },
     } as unknown as LaserState;
-    await sendCompleteStatusRequest(reading, grblHalDriver, write);
+    await sendCompleteStatusRequest(() => reading, grblHalDriver, write);
     expect(write).not.toHaveBeenCalled();
   });
 
@@ -52,6 +52,8 @@ describe('sendCompleteStatusRequest', () => {
     const write = vi.fn(async () => {
       throw new Error('port closed');
     });
-    await expect(sendCompleteStatusRequest(idle, grblHalDriver, write)).resolves.toBeUndefined();
+    await expect(
+      sendCompleteStatusRequest(() => idle, grblHalDriver, write),
+    ).resolves.toBeUndefined();
   });
 });

@@ -273,7 +273,7 @@ describe('connection diagnostics', () => {
     expect(useLaserStore.getState().controllerQualification.kind).toBe('failed');
   });
 
-  // ADR-672: an Alarm answer proves communication, and GRBL reads `$$` there.
+  // ADR-673: an Alarm answer proves communication, and GRBL reads `$$` there.
   it('reads settings when the first answer after 2 s is an Alarm', async () => {
     vi.useFakeTimers();
     const machine: { state: string | null } = { state: null };
