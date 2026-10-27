@@ -44,7 +44,7 @@ export function hasSvgMarkers(
 function markerReference(value: string | null): string | null | undefined {
   const trimmed = value
     ?.trim()
-    .replace(/\s*!important$/i, '')
+    .replace(/!important$/i, '')
     .trim();
   if (trimmed === undefined || trimmed === '' || trimmed === 'inherit') return undefined;
   if (trimmed === 'none') return null;

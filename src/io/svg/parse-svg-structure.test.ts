@@ -157,6 +157,22 @@ describe.each(parsers)('SVG render semantics through %s', (_name, parse) => {
     expect(colours(result)).toEqual(['#0000ff', '#ff00ff']);
   });
 
+  it('reads each written form of a stroke width', async () => {
+    const result = await parse(
+      svg(
+        '<g fill="none">' +
+          '<path d="M1 1H9" stroke="#ff0000" stroke-width="0."/>' +
+          '<path d="M1 2H9" stroke="#ff0001" stroke-width=".0"/>' +
+          '<path d="M1 3H9" stroke="#ff0002" stroke-width="0e5px"/>' +
+          '<path d="M1 4H9" stroke="#00ff00" stroke-width="1."/>' +
+          '<path d="M1 5H9" stroke="#00ff01" stroke-width="+.5"/>' +
+          '<g stroke-width="0"><path d="M1 6H9" stroke="#ff0003" stroke-width="1!"/>' +
+          '<path d="M1 7H9" stroke="#00ff02" style="stroke-width: 2   !important"/></g></g>',
+      ),
+    );
+    expect(colours(result)).toEqual(['#00ff00', '#00ff01', '#00ff02']);
+  });
+
   it('lets a descendant set visibility back to visible, but not undo display', async () => {
     const result = await parse(
       svg(

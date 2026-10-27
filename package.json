@@ -90,6 +90,7 @@
     "delaunator": "5.1.0",
     "dompurify": "3.4.17",
     "electron-updater": "6.8.10",
+    "fflate": "0.8.3",
     "harfbuzzjs": "1.6.3",
     "imagetracerjs": "^1.2.6",
     "linkedom": "0.18.13",

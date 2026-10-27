@@ -14149,7 +14149,9 @@ then a `localStorage` write whose ~5 MB cap discards the result.
 
 ADR-268's amendments are separate decision files (ADR-344):
 `docs/decisions/ADR-268-amendment-1-use-expansion-has-a-budget.md` (SVG `<use>` expansion has a
-budget, and item 2 reads literal internal-subset entities under an expansion bound).
+budget, and item 2 reads literal internal-subset entities under an expansion bound);
+`docs/decisions/ADR-268-amendment-2-readers-match-text-in-linear-time.md` (the SVG and LightBurn
+readers' number, length, paint, transform and keyword patterns match their text in linear time).
 
 ## ADR-269 - Production imports are worker-backed, pressure-disclosed, queued, and cancellable (2026-07-30)
 
