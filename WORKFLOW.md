@@ -2664,7 +2664,12 @@ authorization, Frame proof, controller command, or safety boundary.
 3. Blocked commands are recorded as local diagnostics and no bytes are sent.
 
 #### Error — unsafe persistent command
-1. `$RST=*`, `$RST=$`, `$RST=#`, `$N=...`, `$I=...` and grblHAL's `$DWNGRD` are blocked in Lane 2.
+1. `$RST=*`, `$RST=$`, `$RST=#`, `$N=...`, `$I=...` and grblHAL's `$DWNGRD` are blocked in Lane 2,
+   in every form the firmware reads as one (`$N0.5=...`, `$RST(x)=*`). The Console reads a line as
+   GRBL's line reader does. It refuses a line before sending anything when a comment, `;` or `/`
+   sits in or in front of a `$` command (`(x)$30=255`, `$30(x)=255`), or when a setting number is
+   not digits only (`$30.0=255`). The message says what the firmware would run instead, so the
+   operator can type the command plainly (ADR-375 Amendment 6).
 2. `$number=value` settings writes require connected, idle controller state and explicit
    confirmation. On stock GRBL a value the firmware would store differently (anything but 0 or 1
    for an on/off setting, a fraction or a value outside 0-255 for its other 8-bit settings) is
