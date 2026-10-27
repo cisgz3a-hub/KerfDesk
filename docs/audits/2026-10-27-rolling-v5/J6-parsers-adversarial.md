@@ -27,7 +27,10 @@
 
 **Two findings are SECURITY — hold details until fixed.**
 
-Their details are withheld until the fix merges (J6-P2-1, J6-P2-2).
+- **J6-P2-1:** three reader regexes backtrack quadratically on a long run of digits.
+- **J6-P2-2:** the TIFF decoder inflates a whole compressed strip whatever the image size.
+
+Both are reachable from a file off the internet. Only J6-P2-1 is also reachable from a remote client: remote `import_file` takes no TIFF.
 
 **An SVG whose root size is in `Q` imports at the wrong scale (J6-P3-2, raised to P1 by the refuter).** CSS Values 3 defines Q, and Chromium 152 draws `width="200Q"` at 50 mm. KerfDesk imports it at 100 mm and gives no note.
 
@@ -104,13 +107,141 @@ The rest of the readers hold: see Verified clean.
   - *Novelty.* No audit mentions PNG `eXIf`. Open PRs #1477 and #1478 touch none of these files.
 - **Fix direction:** Read the PNG `eXIf` Orientation in `readHeaderImageInfo` (the IFD0 walk `jpeg-header.ts` already has), so the header size is the turned one. Or build the import geometry from the decoded size, as ADR-404 does for engines that ignore orientation. Decide whether the qualified PNG decoder should turn too, so both size routes agree. Correct ADR-404's consequence.
 
-### J6-P2-1 — SECURITY — held until fixed
+### J6-P2-1 — SECURITY — hold details until fixed: three reader regexes backtrack quadratically on a long digit run; a CSS rule multiplies the cost by every element it styles
 
-- Details are withheld until its fix merges (security hold); the full text is kept privately by the coordinator.
+- **Security hold lifted 2026-10-28:** fixed by #1483 (ADR-268 Amd 2, ADR-357 Amd 1). The details below were withheld from the committed report until then.
 
-### J6-P2-2 — SECURITY — held until fixed
+- **Where:**
+  - `src/io/svg/svg-presentation.ts:174` (`strokeWidthZero`): `/^([+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?)(?:[a-z]+|%)?$/i`. It runs once per element, on the element's own `stroke-width` or the value a `<style>` rule gives it (`presentationStateFor`, `:143`).
+  - `src/io/svg/svg-artwork-origin.ts:6-7`: `^v1\s+(NUMBER)\s+(NUMBER)$` on the root `data-kerfdesk-artwork-origin`.
+  - `src/io/lightburn/lbrn-vertex-list.ts:25-26`: `V(NUMBER)\s+(NUMBER)…` on every `<VertList>`.
+  - All three use `\d+\.?\d*`. On a run of n digits followed by a character that fails the rest of the pattern, the split between `\d+` and `\d*` is tried every way, so the time is O(n²).
+- **Anchor:**
+  - Contract:
+    - ADR-268 decision 4 (`DECISIONS.md:14071-14072`) dropped the import ceilings because "Every one of those loops is bounded by the input". A quadratic match is not bounded linearly by its input, so that premise fails here.
+    - ADR-269 item 7 (`DECISIONS.md:14211`): "Document routes move off the UI thread."
+    - PROJECT.md:465 NN9: "the software Abort / Controller Reset control is reachable from any window state during a job".
+  - Twin: the length parsers in `svg-units.ts:92,105` use the unambiguous `\d+\.\d*|\.\d+|\d+` and stay linear on the same input.
+  - Precedent: 21-P3-7 (the `.lbdev` quadratic regex) is the same class.
+- **Scenario:**
+  - **Desktop SVG.** One `<style>.a{stroke-width:1111…1x!}</style>` rule with a long digit run, applied by class to many elements. The import worker spends n² time on every styled element.
+  - **Desktop LightBurn project.** A `<VertList>` of `V` followed by a long digit run and a non-space character stalls the document import worker.
+  - Both desktop routes are cancellable workers (`document-import-worker-client.ts:174-186` terminates the worker). Until cancelled, every later document import waits behind the stall in the shared queue.
+  - **Remote.** `prepareSvgImport` (`design-imports.ts:44-51`) runs `parseSvg` on the renderer UI thread; that entry point is the held J3-P1-1. This payload needs no `<use>`, so no point or instance budget (J3-P2-1) counts it. It fits under the `add_svg` cap of 180,000 characters (`design-validation.ts:74`).
+  - Extrapolated from the measurements below: n = 40,000 digits costs about 1.8 s per styled element. With the remaining ~140,000 characters as `<rect class="a" …/>` (~2,700 elements), the PC UI thread, and with it the software Abort, is busy for more than an hour per request.
+- **Evidence:** REPRO (`zz-j6-parsers.test.ts`; timings in ms).
+  - **Raw regexes** (node, `'1'.repeat(n)` plus a failing tail):
 
-- Details are withheld until its fix merges (security hold); the full text is kept privately by the coordinator.
+    | n | VertList | stroke-width | artwork origin |
+    |---|---|---|---|
+    | 2,000 | 3.2 | 6.5 | 3.8 |
+    | 4,000 | 12.8 | 20.7 | 11.5 |
+    | 8,000 | 46.4 | 76.8 | 38.2 |
+
+  - **Real `parseSvg` (main thread) and `parseSvgInWorker`** with the `<style>` rule:
+
+    | Case | Size | `parseSvg` | `parseSvgInWorker` |
+    |---|---|---|---|
+    | n = 2,000, k = 10 | 2,647 B | 76 | 43 |
+    | n = 4,000, k = 10 | 4,647 B | 138 | 134 |
+    | n = 4,000, k = 20 | 5,167 B | 284 | 240 |
+
+  - **`parseSvg` at n = 16,000:** k = 1 takes 346 and k = 3 takes 863. Two controls take 6 (value `1`) and 12 (16,000 valid digits), so the cost is the backtracking on the invalid tail.
+  - **Root artwork origin via `parseSvg`:** n = 4,000 takes 9 and n = 8,000 takes 26.
+  - **LightBurn:** n = 2,000 / 4,000 / 8,000 take 2 / 6 / 24 in `parseLbrnVertexList` and 5 / 8 / 26 in `importLightBurnProject`. A 1 MB VertList extrapolates to about 6 minutes.
+- **Severity:** P2 (proposed).
+  - On the desktop alone this is a cancellable worker stall, P3 as in 21-P3-7.
+  - It is rated higher because the same payload reaches a held, shipped UI-thread entry point from a remote client while staying under every expansion budget. A fix that only adds budgets would leave it open.
+- **Refuter:** CONFIRMED. P2 is kept as the amplifier of the held J3-P1-1, the same treatment J3-P2-1 got. It falls to P3 once J3-P1-1's worker move merges.
+  - *What would make it false:*
+    - V8 matches these patterns in linear time;
+    - the value's length is bounded before matching;
+    - the match is computed once per CSS rule;
+    - every route is off-thread and cancellable;
+    - no remote route reaches it.
+  - *Raw patterns* (copied from the three files; ms for n = 1,000 / 2,000 / 4,000 / 8,000 digits plus a failing tail):
+
+    | Pattern | Node 25.8.2 | Chrome 152 (browser pane) |
+    |---|---|---|
+    | stroke-width | 1.2 / 4.6 / 17.6 / 73.0 | 1.2 / 5.7 / 30.7 / 97.4 |
+    | artwork origin | 0.7 / 2.5 / 10.9 / 45.1 | 0.7 / 3.0 / 11.6 / 53.6 |
+    | VertList | 0.7 / 2.7 / 11.5 / 60.0 | 1.2 / 3.8 / 15.4 / 59.3 |
+
+    - Each doubling of n costs about 4×, in the shipped engine too, so V8 has no linear fallback here.
+    - Valid digits (`…px`) and the unambiguous `\d+(?:\.\d*)?` form take 0.0 ms at every n.
+  - *Real `parseSvg`* (`zz-j6r-parsers.test.ts`):
+    - n = 4,000 with k = 1, 8 and 16 styled `<rect>`s takes 23, 116 and 219 ms. The control (`px`, k = 16) takes 8 ms.
+    - So the cost is about 13 ms per element, linear in k: there is no per-rule cache.
+    - The root origin at n = 4,000 and 8,000 takes 36 and 80 ms.
+    - `parseLbrnVertexList` at n = 2,000, 4,000 and 8,000 takes 6, 18 and 71 ms.
+  - *Routes:*
+    - Desktop SVG goes to `parseSvgOffThread` (`svg-import-action.ts:92-98`) and LightBurn to the document worker (`project-open-parser.ts:55`). `cancelRequest` (`document-import-worker-client.ts:174-186`) retires the worker.
+    - Remote `prepareSvgImport` parses on the UI thread (`design-imports.ts:50`). `add_svg` is capped at 180,000 characters (`design-validation.ts:74`, `electron/mcp/design-schemas.ts` `MCP_SVG_TEXT_LIMIT`) and nothing else is checked first.
+    - `import_file` takes only SVG, PNG, JPEG and DXF, so the VertList pattern is desktop-only.
+  - *Same fix as J3-P1-1? Partly.*
+    - The remote UI-thread freeze is J3-P1-1's entry point. J3-P1-1's fix direction, `parseSvgOffThread` with the request signal, also closes it for this payload. A budget-only fix (J3-P2-1) would not.
+    - The regex defect is separate and survives J3-P1-1's fix in two forms:
+      - a cancellable stall of the desktop worker;
+      - on the remote worker route, the shared import queue is occupied until the request is cancelled.
+    - J3-P1-1's regression test should include this payload. The regex fix should land on its own.
+  - *Extrapolation on current main:* at about 13 ms per element at n = 4,000, n = 40,000 costs about 1.3 s per element. A minimal `<rect class="a"/>` is 17 characters, so the remaining ~140,000 characters hold about 8,000 elements: hours of UI thread per request. The auditor's "more than an hour" is conservative.
+  - *Severity:* the desktop half alone is a cancellable worker stall, P3 as 21-P3-7. The current remote reach is J3-P1-1's hole, already counted at P1. P2 records the budget-proof amplifier without double-counting that hole.
+  - *Novelty:* 21-P3-7 covers `.lbdev` only. No report or open PR names these three patterns.
+- **Fix direction:**
+  - Make each number pattern unambiguous, for example `\d+(?:\.\d*)?|\.\d+`, which `hpgl-tokenizer.ts:3` already uses.
+  - Or bound the length of the attribute being parsed before matching.
+  - Add a regression test that times a 100,000-digit value. Keep the J3-P1-1 worker move too.
+
+### J6-P2-2 — SECURITY — hold details until fixed: a compressed TIFF strip is inflated in full whatever the image size, about 1,000:1, before the decoder uses the bytes it needs
+
+- **Security hold lifted 2026-10-28:** fixed by #1483 (ADR-268 Amd 2, ADR-357 Amd 1). The details below were withheld from the committed report until then.
+
+- **Where:**
+  - `tiff` 7.1.3 (pinned in `package.json`): `node_modules/tiff/lib/zlib.js:2-5` calls fflate `decompressSync(stripUint8)` with no output limit. LZW (`lzw.js`) grows an `IOBuffer` with no limit either.
+  - `node_modules/tiff/lib/tiff_decoder.js:266-277`: each strip is inflated, then only `Math.min(stripLength, size - start)` samples are copied. The rest is dropped without an error.
+  - KerfDesk's pre-checks: `src/io/tiff/tiff-pixel-layout.ts:19-27` checks only that the compressed byte counts lie inside the file, and checks the size of uncompressed strips only. The 16384-edge cap in `tiff-page.ts:69-78` bounds the image, not the inflation.
+  - Routes: `tiff-import.worker.ts:17` (File > Import, a dedicated worker); `batch-raster-decode.ts:36` (Multi-File Trace, on the UI thread, see J6-P2-3).
+- **Anchor:**
+  - Twin, the PNG reader: KerfDesk's own streamed PNG decoder refuses the same condition. `png-filtered-row-reader.ts:59-62` throws "PNG decompressed data is too long." The PSD reader sets a working budget (`psd-structure.ts:23,58-63`, 512 MiB).
+  - Code contract: the Netpbm decoder's own rule (`src/io/pnm/decode-pnm.ts:46-47`): "a tiny corrupt header must not allocate a gigabyte on the main thread".
+  - Contract: ADR-357 item 6 (`docs/decisions/ADR-357-…md:49-52`): "Unsupported TIFF variants fail visibly instead of yielding incomplete pixels." Ignoring the excess is not failing visibly.
+- **Scenario:**
+  - A 1 × 1 px Deflate TIFF whose single strip is a zlib stream of N zero bytes passes every check and decodes successfully to one pixel. The worker allocates about 2N on the way: fflate grows its buffer by doubling, then slices it.
+  - Measured ratio: about 1,000:1. A 1 MB file asks for about 1 GiB inflated and about 2 GiB peak. A 5 MB file asks for about 5 GiB inflated.
+  - In the import worker, this ends in `RangeError: Array buffer allocation failed`, shown raw, or in system memory exhaustion. Whether an Electron renderer survives that was not tested (see Not verified).
+  - In Multi-File Trace the inflation runs on the UI thread, at about 4.8 s per inflated GiB plus the allocation.
+- **Evidence:** REPRO (`zz-j6-parsers.test.ts`, the real `decodeTiffPage`):
+  - `tiff-bomb 4 MiB inflated: file 4220 B, page 1x1, 26 ms, arrayBuffers +19.9 MiB`
+  - `tiff-bomb 16 MiB inflated: file 16450 B, page 1x1, 75 ms, arrayBuffers +32.2 MiB`
+  - Both pages decode as 1 × 1 with no error.
+- **Severity:** P2 (proposed). It is a resource-exhaustion weakness that needs a crafted file, and the size caps that look as if they cover it do not. It is held because a few-MB TIFF from the internet can force multi-GiB allocation in the renderer process, which is more than a slow import. The same rating as the desktop half of J3-P2-1.
+- **Refuter:** CONFIRMED, P2 kept.
+  - *What would make it false:*
+    - fflate or `tiff` caps the output;
+    - a KerfDesk pre-check bounds the inflation;
+    - the decoder refuses the excess data.
+  - *Repro* (`zz-j6r-parsers.test.ts`, the real `decodeTiffPage`, a 1 × 1 8-bit grey Deflate TIFF whose one strip is zlib of N zero bytes):
+
+    | N | File | Ratio | Result | Time |
+    |---|---|---|---|---|
+    | 1 MiB | 1,173 B | 894:1 | 1x1, no error | 32 ms |
+    | 4 MiB | 4,220 B | 994:1 | 1x1, no error | 30 ms |
+    | 8 MiB | 8,297 B | 1,011:1 | 1x1, no error | 99 ms |
+
+  - *Read:*
+    - `node_modules/tiff/lib/zlib.js` (7.1.3, the pinned version) calls `decompressSync(stripUint8)` with no `out`.
+    - `tiff_decoder.js` `readStripData` copies `Math.min(stripLength, size - start)` samples and drops the rest.
+    - `lzw.js:33` starts an `IOBuffer` at the compressed length and grows it with no cap. This is READ only; the LZW ratio was not measured.
+    - `tiff-pixel-layout.ts:19-27` checks the compressed counts against the file only.
+    - So there is no output-size cap anywhere.
+  - *Remote:* not reachable. `importFile` takes `'image/svg+xml' | 'image/png' | 'image/jpeg' | 'application/dxf'` (`design-imports.ts:235-242`). The routes are File > Import (`tiff-import.worker.ts`) and Multi-File Trace, on the UI thread (J6-P2-3).
+  - *Anchor correction:* ADR-357 item 6, "fail visibly instead of yielding incomplete pixels", does not fit, because the bomb decodes complete, correct pixels. The twins carry the finding: the PNG reader's refusal and the PSD 512 MiB budget. `decode-pnm.ts:46-47` is a code comment and is cited as one.
+  - *Hold:* AREAS.md holds remotely reachable holes. This one is desktop-only: the user has to open the file. The hold is a precaution, and the coordinator decides.
+  - *Novelty:* no audit mentions TIFF inflation.
+- **Fix direction:**
+  - Inflate each strip into an output buffer of exactly its expected size (fflate `decompressSync(data, { out })`, or `Inflate` with a byte budget). Refuse a strip that yields more or less than that, naming the problem.
+  - Apply the same cap to LZW.
+  - Consider the PSD-style working budget for the whole page.
 
 ### J6-P2-3 — Multi-File Trace decodes TIFF and Netpbm synchronously on the UI thread; a large scan freezes the window, and the software Abort, for seconds to minutes during a job
 
@@ -122,6 +253,7 @@ The rest of the readers hold: see Verified clean.
   1. During a long engraving, the operator starts Multi-File Trace (Pro) on scanned TIFFs.
   2. The decoder takes about 0.6 µs per pixel (2000 × 2000 grey: 2,469 ms). A 24 MP scan freezes the window for about 15 s per file, and a 16384 × 16384 page for about 165 s.
   3. Streaming runs in a worker and continues. The Abort button and Ctrl+. are on the frozen thread.
+  4. A crafted TIFF (J6-P2-2) adds the inflation on the same thread.
 - **Evidence:** REPRO (`zz-j6-parsers.test.ts`, the real `decodeTiffPage`, uncompressed grey): `tiff-time 1000x1000: 748 ms`, `tiff-time 2000x2000: 2469 ms`. The UI-thread placement is READ (`batch-raster-decode.ts:31-46`).
 - **Severity:** P2. NN9 is broken with a clear failure scenario, using an ordinary file. It is not P1: the program itself keeps streaming, and the physical E-stop is unaffected.
 - **Refuter:** CONFIRMED, P2 kept.
@@ -158,7 +290,7 @@ The rest of the readers hold: see Verified clean.
 - **Refuter:** CONFIRMED, P3 kept.
   - *Repro:* a 100 × 100 Deflate TIFF whose strip inflates to 10 bytes. `decodeTiffPage` threw "Offset is outside the bounds of the DataView".
   - *Why the named message is never reached:* the library's sample reader throws first (`tiff_decoder.js:230`, `getUint8`), so `pixelsForPage`'s "Incomplete TIFF pixel data." (`tiff-page.ts:134`) never runs.
-- **Fix direction:** Give a short strip a named error ("Incomplete TIFF pixel data").
+- **Fix direction:** The exact-size inflation in J6-P2-2's fix gives this case a named error ("Incomplete TIFF pixel data").
 
 ### J6-P3-2 (refuter: P1) — An SVG whose root `width`/`height` is in `Q` (quarter-millimetres) imports at the wrong size with no note; the same unit is read correctly everywhere else in the file
 
@@ -216,7 +348,7 @@ The rest of the readers hold: see Verified clean.
 ### KNOWN (not re-raised)
 
 - **14-P2-1** (Illustrator SVG units) and **14-P3-4** (DXF without units): re-read; unchanged.
-- **21-P3-7** (`.lbdev` quadratic regex on the main thread): unchanged.
+- **21-P3-7** (`.lbdev` quadratic regex on the main thread): unchanged. It is the precedent for J6-P2-1's desktop half.
 - **J3-P1-1 and J3-P2-1** (held): referenced by ID only.
 - **Refuter check:** all five are still present on `09f7c0087`.
   - `svg-units.ts` still fixes 96 px/in.
@@ -235,11 +367,11 @@ The refuter refuted none of the seven raised findings.
 - **G-code Inspector arcs explode on a huge radius.** `arcStepRad` clamps to between 1° and 15° per segment (`arc-sampling.ts:9-19`), and the parser has no `P` turn count. A full circle is at most 361 points.
 - **A crafted `.lf2` or machine profile hangs the Auto-focus regex** (`autofocus-command.ts:42`, the same ambiguous pattern). The length is checked first (`:81`).
 - **A `.lf2` raster `dataUrl` with a remote URL leaks a request on open.** The validator checks only that it is a string, but the CSP `img-src 'self' data: blob:` plus the camera bridge (`electron/main.ts:203`) blocks remote fetches. This was not runtime-tested.
-- One item about a held security finding is withheld until its fix merges.
+- **Ambiguous numbers in other readers.** `gcode/word-scan.ts:11` and `svg-stroke-font.ts:32` have no failing suffix after the number, so they stay linear. `svg-units.ts:92,105` uses an unambiguous alternation.
 
 ## Verified clean
 
-- One item about a held security finding is withheld until its fix merges.
+- **SVG** (beyond 14): embedded images go through the same image loader and size refusal as file imports. Only PNG, JPEG, BMP and WebP data URLs are taken (`svg-image-hydration.ts:152`, `svg-image-element.ts:25`). `<image>` with a non-data `href` is skipped with a reason. The notes cover text, gradients (first stop), patterns, masks, filters, markers and unresolved opacity (`svg-import-notes.ts:55-105`).
 - **DXF:** INSERT of an unknown block, nesting past 8, and unreadable coordinates are all skipped with a note (`dxf-expand.ts:81,185,233-236`). Arc sampling is bounded.
 - **HPGL:** arc chord and sweep ranges plus the `reservePoints` budget (`hpgl-arcs.ts:55-63`). Whole-file refusal for unknown commands and polygon-mode violations.
 - **PDF:** the page size comes from the viewport, with rotation and UserUnit, at 72 pt per inch (`pdf-artwork-source.ts:94-95`). The image route uses the page's millimetre bounds (`page-artwork-object.ts:53-57`). Passwords are refused with a message. pdf.js runs in an owned worker with WASM and scripting off, and a dead worker is reported.
@@ -248,30 +380,30 @@ The refuter refuted none of the seven raised findings.
 - **Netpbm** (`src/io/pnm/decode-pnm.ts`): the edge is capped at 16384, and the file must be able to hold the raster before the RGBA is allocated (`:46-50`).
 - **TIFF structure** (`tiff-structure.ts`): IFD cycles and EXIF/GPS pointer graphs are refused, all metadata stays inside the file, and orientation and density are handled for all eight orientations.
 - **Image density** (`image-density.ts`): PNG `pHYs` unit 0, JFIF units 0, EXIF ResolutionUnit 1 and DPI outside 10–10,000 all fall back to the 254 default. JFIF and EXIF densities swap with an axis-swapping JPEG orientation.
-- One item about a held security finding is withheld until its fix merges.
+- **JPEG header and EXIF walkers** (`jpeg-header.ts`, `svg-embedded-bitmap-size.ts`): every read is bounds-checked, fill bytes are skipped, and segment lengths below 2 stop the walk. No loop can fail to advance.
 - **Animated GIF:** imported as its first frame, with a notice (`import-image-action.ts:62`).
 - **LightBurn VertList and XForm:** coordinates out of range are reported (`lbrn-geometry.ts:88-91`). Project open runs in a worker that can be cancelled (`project-open-parser.ts:55`).
 - **Command strings from files:** only `autofocusCommand` and the positioning-light commands are free-form controller text in a machine profile or `.lf2` (`device-profile.ts:330`, `positioning-light.ts:7-8`). Both are vetted on load (13-P1-1 fix).
 
 ## Not verified
 
-- One item about a held security finding is withheld until its fix merges.
-- One item about a held security finding is withheld until its fix merges.
+- **Renderer survival after an ArrayBuffer allocation failure or system memory exhaustion in a worker** (J6-P2-2, and the PDF.js and TIFF workers in general). Not run, because this PC is low on memory.
+- **Browser-decoded formats with no pre-decode size check.** GIF (`freezeGif` builds a full-size canvas before any header check, `freeze-gif.ts:11-25`), BMP (including RLE) and SVG-embedded WebP go straight to Chromium. Only PNG and JPEG headers are measured (`image-loader.ts:325-338`). Chromium's own limits for these formats were not exercised.
 - **PDF FlateDecode bombs inside pdf.js**, and an image-route page larger than Chromium's canvas: whether `getContext('2d')` returns null, as `pageCanvas` assumes, or the page silently renders blank.
 - **APNG:** the browser takes the default (IDAT) image, which can be a fallback frame that animation-aware viewers never show. No notice is given, unlike GIF. Not reproduced.
-- One item about a held security finding is withheld until its fix merges.
+- **WebP and AVIF orientation** (EXIF, `irot`) in Chromium, for SVG-embedded WebP. This is J6-P1-1's question for those formats.
 - **Fonts:** hostile TTF/OTF in `.lf2` `embeddedFonts` or Font Import, parsed by opentype.js and HarfBuzz in the text worker. Read only up to the worker boundary.
 - **The trace dialog's own geometry for a turned PNG** (J6-P1-1 sibling via ADR-409): identified by reading only.
 - **Refuter: an Electron renderer run.** Not run, because this PC had about 700 MB free. The decode evidence is the pinned Chromium 152.0.7977.130 source, which is what the installed Electron reports, plus a Chrome 152.0.7977.167 run.
-- One item about a held security finding is withheld until its fix merges.
+- **Refuter: the LZW inflation ratio** (J6-P2-2). Read only.
 - **Refuter: whether LightBurn reads a comma-separated XForm** (J6-P3-3). LightBurn is closed source, and this was not tested.
 - **Refuter: PNG `eXIf` in the qualified decoder.** A PNG of 25 MB or more, or one past the canvas edge, imports unturned but self-consistent. Whether that counts as wrong output (an orientation of 2–4 or 5–8 that the user sees turned elsewhere) was not ruled. It belongs to J6-P1-1's fix.
 
 ```json
 [
   {"id":"J6-P1-1","severity":"P1","area":"parsers-adversarial","file":"src/ui/trace/image-loader.ts","line":331,"anchor":"Ground truth: shipped Chromium 152.0.7977.130 png_image_decoder.cc (Rust codec only) and Skia e8efd15f SkPngRustCodec.cpp L358-L367 apply PNG eXIf orientation (also 130.0.6723.0 L493-L501, Skia 81021b53 L356-L365); Contract: ADR-404 Consequences (element route 'still decodes self-consistently'); Twin: JPEG orientation path and qualified PNG decoder","evidence":"REPRO","verdict":"CONFIRMED","known":false,"summary":"A PNG with eXIf Orientation 5-8 imports with stored-size bounds (header) and Chromium-turned pixels: 40x20 px Orientation 6 gives a 4x2 mm box holding a 20x40 grid, so the engraving is distorted with no warning; same for SVG-embedded and remote PNG imports"},
-  {"id":"J6-P2-1","severity":"held","area":"held","file":"held","line":0,"anchor":"held","evidence":"REPRO","verdict":"CONFIRMED","known":null,"summary":"Security hold: details withheld until the fix merges."},
-  {"id":"J6-P2-2","severity":"held","area":"held","file":"held","line":0,"anchor":"held","evidence":"REPRO","verdict":"CONFIRMED","known":null,"summary":"Security hold: details withheld until the fix merges."},
+  {"id":"J6-P2-1","severity":"P2","area":"parsers-adversarial","file":"src/io/svg/svg-presentation.ts","line":174,"anchor":"Contract: ADR-268 decision 4 premise 'every loop is bounded by the input' (DECISIONS.md:14071), ADR-269 item 7 (DECISIONS.md:14211), PROJECT.md:465 NN9; Twin: svg-units.ts:92 unambiguous number pattern","evidence":"REPRO","verdict":"CONFIRMED","known":false,"summary":"SECURITY — hold details until fixed. Quadratic regex backtracking on long digit runs in stroke-width (multiplied per styled element via a <style> rule), the SVG artwork-origin attribute and LightBurn VertList; desktop workers stall until cancelled, and the payload reaches a held UI-thread entry point remotely under every expansion budget. Refuter: remote half closed by J3-P1-1's worker move (include this payload in its test); regex fix separate; P3 after J3-P1-1 merges"},
+  {"id":"J6-P2-2","severity":"P2","area":"parsers-adversarial","file":"src/io/tiff/tiff-pixel-layout.ts","line":25,"anchor":"Twin: png-filtered-row-reader.ts:59-62 refuses over-long decompressed data, psd-structure.ts:23 working budget; code comment decode-pnm.ts:46-47 (ADR-357 item 6 'fail visibly' does not fit: the bomb decodes complete pixels)","evidence":"REPRO","verdict":"CONFIRMED","known":false,"summary":"SECURITY — hold details until fixed. tiff 7.1.3 inflates each Deflate/LZW strip with no output limit and silently drops the excess: a 16 KB 1x1 TIFF inflates 16 MiB (about 1000:1, ~2x peak) and decodes fine, so a few-MB file forces multi-GiB allocation in the import worker or on the UI thread (Multi-File Trace)"},
   {"id":"J6-P2-3","severity":"P2","area":"parsers-adversarial","file":"src/ui/commands/batch-raster-decode.ts","line":36,"anchor":"Contract: ADR-357 item 6 'TIFF decoding is a lazy worker', PROJECT.md:465 NN9; Twin: tiff-import.worker.ts","evidence":"REPRO","verdict":"CONFIRMED","known":false,"summary":"Multi-File Trace decodes TIFF and Netpbm synchronously on the UI thread (~0.6 us/px: 2000x2000 in 2.5 s, a 24 MP scan ~15 s, 16384^2 ~165 s), freezing the window and the software Abort during a job"},
   {"id":"J6-P3-1","severity":"P3","area":"parsers-adversarial","file":"src/io/tiff/tiff-page.ts","line":28,"anchor":"Contract: ADR-357 item 6 fail visibly; METHOD L6 true message","evidence":"REPRO","verdict":"CONFIRMED","known":false,"summary":"A TIFF whose compressed strip inflates short fails with the raw 'Offset is outside the bounds of the DataView' instead of the existing 'Incomplete TIFF pixel data'"},
   {"id":"J6-P3-2","severity":"P1","area":"parsers-adversarial","file":"src/io/svg/svg-units.ts","line":25,"anchor":"Twin: CSS_LENGTH_UNITS_TO_USER_UNITS includes q (svg-units.ts:21); Ground truth: CSS Values 3 CRD 2024-03-22 §5.2 '1Q = 1/40th of 1cm', SVG 2 CR 2018-10-04 §7.8, Chromium 152 renders width=200Q at 50 mm; Contract: ADR-046 only % and unparseable lengths are undeclared","evidence":"REPRO","verdict":"CONFIRMED","known":false,"summary":"Root width/height in Q counts as undeclared: width=200Q (50 mm) with viewBox 0 0 100 100 imports at 100 mm, with no note (no viewBox: 26.46 mm). Refuter raised P3 to P1 under §3: silent wrong scale, reachable today; reach cannot lower it"},
