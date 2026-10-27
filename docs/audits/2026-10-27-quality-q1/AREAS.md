@@ -17,6 +17,8 @@ Finding IDs are `Q<area>-P<n>-<k>`.
 - **P2:** a visible quality defect against the reference, of the kind an ordinary user will notice. For example, worse edge fidelity than Potrace on the same input, dither artifacts, or wobble on straight edges.
 - **P3:** a measurable improvement opportunity or a test gap.
 
+**Clarification (2026-10-28, Q4).** For tracing (Q4, Q5), P1 also covers a trace that loses or merges shapes or holes the app promises to keep, with no warning. Example: the Auto small-mark tooltip promises to "keep drawn dots" (`TraceCheckboxRow.tsx:65`), and ADR-434 Decision 3c keeps a lone 3x3 dot. The trace preview showing the loss is not a warning, because it is the same output, as with Frame (METHOD §3, 2026-10-27).
+
 ### References (ground truth)
 - **Tracing:** Peter Selinger, *Potrace: a polygon-based tracing algorithm* (2003). Cite it pinned or archived. Also Potrace's documented parameters: `turdsize`, `turnpolicy`, `alphamax`, `opttolerance`.
 - **Dithering:** the original definitions (Floyd–Steinberg 1976; Jarvis–Judice–Ninke 1976; Stucki 1981; Atkinson; Sierra; Burkes; Bayer ordered dither; blue noise per ADR-649), plus Ulichney, *Digital Halftoning*, where it is reachable.
