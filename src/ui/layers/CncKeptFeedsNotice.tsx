@@ -52,6 +52,15 @@ export function cncKeptFeedsAfterBitChange(input: {
   };
 }
 
+/** The note's first line; a remote bit change returns it as its receipt message. */
+export function cncKeptFeedsMessage(
+  kept: CncKeptFeeds,
+  toolName: string,
+  unit: DisplayLengthUnit,
+): string {
+  return `Bit changed. Kept from the previous bit: ${describeValues(kept.values, unit)}. Check them for ${toolName} before cutting.`;
+}
+
 export function CncKeptFeedsNotice(props: {
   readonly kept: CncKeptFeeds;
   readonly layerId: string;
@@ -81,10 +90,7 @@ export function CncKeptFeedsNotice(props: {
   const name = material === null ? '' : materialName(material);
   return (
     <div className="lf-cnc-kept-feeds" role="status">
-      <p>
-        Bit changed. Kept from the previous bit: {describeValues(props.kept.values, unit)}. Check
-        them for {tool.name} before cutting.
-      </p>
+      <p>{cncKeptFeedsMessage(props.kept, tool.name, unit)}</p>
       <p>
         {recipe === null
           ? 'Choose a Material above for starting values for this bit.'

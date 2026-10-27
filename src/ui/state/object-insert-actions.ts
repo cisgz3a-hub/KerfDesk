@@ -124,7 +124,7 @@ export function objectInsertActions(
 }
 
 function importSvgObjectAction(set: Setter, get: Getter): AppState['importSvgObject'] {
-  return (object: SceneObject, batchOffsetIdx = 0): ImportOutcome => {
+  return (object: SceneObject, batchOffsetIdx = 0, options = {}): ImportOutcome => {
     let outcome: ImportOutcome = { kind: 'added' };
     set((state) => {
       const fitted = applyImportBedFit(
@@ -135,6 +135,7 @@ function importSvgObjectAction(set: Setter, get: Getter): AppState['importSvgObj
           state.cncLiveCaps,
           state.materialLibrary,
         ),
+        options,
       );
       outcome = fitted.outcome;
       return fitted.state;
@@ -311,7 +312,7 @@ function svgFragmentActions(
   get: Getter,
 ): Pick<AppState, 'importSvgFragment' | 'reimportSvgFragment'> {
   return {
-    importSvgFragment: (fragment, batchIndex = 0) => {
+    importSvgFragment: (fragment, batchIndex = 0, options = {}) => {
       let outcome: ImportOutcome = { kind: 'added' };
       set((state) => {
         const fitted = applyImportBedFit(
@@ -322,6 +323,7 @@ function svgFragmentActions(
             state.cncLiveCaps,
             state.materialLibrary,
           ),
+          options,
         );
         outcome = fitted.outcome;
         return fitted.state;

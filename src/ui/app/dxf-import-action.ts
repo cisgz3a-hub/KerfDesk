@@ -12,7 +12,7 @@ import type { ImportOutcome } from '../state/store';
 import type { ToastVariant } from '../state/toast-store';
 import { largeImportAdvisory, mainThreadImportFallbackAdvisory } from './import-size-advisory';
 import { describeImportBedFit } from './import-bed-fit-notice';
-import { describeReimportOutcome } from './import-toasts';
+import { describeReimportOutcome, type ToastDescriptor } from './import-toasts';
 import { createImportWorkerControls, isImportCancellation } from './import-worker-controls';
 import { claimImportSuccessIndex } from './import-success-index';
 
@@ -112,17 +112,31 @@ function reportDxfImport(
   outcome: ImportOutcome,
   pushToast: (message: string, variant?: ToastVariant) => void,
 ): void {
-  if (outcome.kind === 'replaced') {
-    const toast = describeReimportOutcome(outcome);
+  for (const toast of describeDxfImport(name, result, outcome)) {
     pushToast(toast.message, toast.variant);
-  } else {
-    pushToast(successMessage(name, result.pathCount, result.skippedSummary), 'success');
   }
-  // A re-import loses the same parts, so its notes are shown too.
-  pushNoteToasts(name, result.notes, pushToast);
+}
+
+/** The toasts a committed DXF import shows; Remote Control returns the same text (ADR-125 Amd 2). */
+export function describeDxfImport(
+  name: string,
+  result: Extract<ParseDxfResult, { kind: 'ok' }>,
+  outcome: ImportOutcome,
+): ReadonlyArray<ToastDescriptor> {
+  const toasts: ToastDescriptor[] = [
+    outcome.kind === 'replaced'
+      ? describeReimportOutcome(outcome)
+      : {
+          message: successMessage(name, result.pathCount, result.skippedSummary),
+          variant: 'success',
+        },
+    // A re-import loses the same parts, so its notes are shown too.
+    ...noteToasts(name, result.notes),
+  ];
   // Last, so the three-toast stack cannot push it out of view.
   const fitNotice = describeImportBedFit(name, outcome);
-  if (fitNotice !== null) pushToast(fitNotice.message, fitNotice.variant);
+  if (fitNotice !== null) toasts.push(fitNotice);
+  return toasts;
 }
 
 // Parser notes name parts the import dropped or guessed at: an unknown block,
@@ -136,12 +150,23 @@ function pushNoteToasts(
   notes: ReadonlyArray<string>,
   pushToast: (message: string, variant?: ToastVariant) => void,
 ): void {
+  for (const toast of noteToasts(name, notes)) pushToast(toast.message, toast.variant);
+}
+
+function noteToasts(name: string, notes: ReadonlyArray<string>): ToastDescriptor[] {
   const overflows = notes.length > MAX_NOTE_TOASTS;
   const shown = overflows ? notes.slice(0, MAX_NOTE_TOASTS - 1) : notes;
-  for (const note of shown) pushToast(`${name}: ${note}`, 'warning');
+  const toasts: ToastDescriptor[] = shown.map((note) => ({
+    message: `${name}: ${note}`,
+    variant: 'warning',
+  }));
   if (overflows) {
-    pushToast(`${name}: ${notes.length - shown.length} more import warnings.`, 'warning');
+    toasts.push({
+      message: `${name}: ${notes.length - shown.length} more import warnings.`,
+      variant: 'warning',
+    });
   }
+  return toasts;
 }
 
 function successMessage(name: string, pathCount: number, skippedSummary: string | null): string {

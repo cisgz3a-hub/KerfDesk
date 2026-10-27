@@ -10,7 +10,13 @@ import {
   inOneUndoStep,
   updateOperationFull,
 } from './design-operations';
-import { prepareSvgImport, type Placement, type PreparedImport } from './design-imports';
+import { importNoticeFields, pushImportToasts } from './design-import-notices';
+import {
+  prepareSvgImport,
+  type ImportReport,
+  type Placement,
+  type PreparedImport,
+} from './design-imports';
 import type { BatchItem, RemoteOperationPatchFull } from './design-validation';
 import { RemoteFault } from './fault';
 import { publicIdentifier, selectedIds } from './projections';
@@ -24,7 +30,12 @@ type Prepared = {
   readonly text?: Awaited<ReturnType<typeof prepareRemoteText>>;
   readonly svg?: PreparedImport;
 };
-type ItemResult = { command: string; changedArtworkIds?: string[]; operationId?: string };
+type ItemResult = {
+  command: string;
+  changedArtworkIds?: string[];
+  operationId?: string;
+  importReport?: ImportReport;
+};
 type Commit = (action: () => Record<string, unknown>) => Record<string, unknown>;
 const REFERENCE = /^\$(\d{1,2})$/;
 
@@ -91,6 +102,8 @@ function runBatch(
       });
     }),
   );
+  // The batch has committed, so its imports' PC toasts are now true (ADR-125 Amendment 2).
+  for (const item of results) pushImportToasts(item.importReport?.toasts ?? []);
   const changed = [...new Set(results.flatMap((item) => item.changedArtworkIds ?? []))];
   const operations = [...new Set(results.flatMap((item) => item.operationId ?? []))];
   return {
@@ -104,6 +117,9 @@ function runBatch(
         ? {}
         : { changedArtworkIds: item.changedArtworkIds.filter(publicIdentifier).slice(0, 200) }),
       ...(item.operationId === undefined ? {} : { operationId: item.operationId }),
+      ...(item.importReport === undefined
+        ? {}
+        : importNoticeFields(item.importReport.toasts, item.importReport.outcome)),
     })),
   };
 }
@@ -143,7 +159,8 @@ const ITEM_RUNNERS: Record<BatchItem['command'], ItemRunner> = {
   },
   add_svg: ({ store, args, prepared }) => {
     if (prepared?.svg === undefined) throw new RemoteFault('failed');
-    return { changedArtworkIds: prepared.svg.commit(store, args as Placement) };
+    const report = prepared.svg.commit(store, args as Placement);
+    return { changedArtworkIds: report.ids, importReport: report };
   },
   create_operation: ({ store, args }) => pick(createOperation(store, args)),
   assign_artwork_to_operation: ({ store, args }) =>
