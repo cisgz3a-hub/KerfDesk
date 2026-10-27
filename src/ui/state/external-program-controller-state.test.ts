@@ -2,6 +2,8 @@
 // program's own words may change, by the Console's rule.
 
 import { describe, expect, it } from 'vitest';
+import { grblDriver } from '../../core/controllers/grbl/driver';
+import { smoothiewareDriver } from '../../core/controllers/smoothieware/driver';
 import {
   externalProgramControllerEffects,
   externalProgramControllerStatePatch,
@@ -150,5 +152,41 @@ describe('externalProgramControllerStatePatch', () => {
     );
     expect(patch).not.toHaveProperty('activeWcs');
     expect(patch).toMatchObject({ workZZeroEvidence: null });
+  });
+});
+
+// Rolling audit v3 G4-P1-2: Smoothieware reports positions in the program's
+// units and keeps G20 through M2 (Robot.cpp L601-L602, L726-L734 @ 91fe4286).
+describe('externalProgramControllerStatePatch report units', () => {
+  const mm = (): LaserState => ({ ...useLaserStore.getState(), activeWcs: 'G54' });
+
+  it('hides the reported position after a Smoothieware program that selects G20', () => {
+    const patch = externalProgramControllerStatePatch(
+      mm(),
+      'G20G90G54\nG1X1F20\nM2\n',
+      smoothiewareDriver,
+    );
+    expect(patch).toMatchObject({ reportUnitsUnconfirmed: true, wcoCache: null });
+    expect(patch.log?.at(-1)).toContain('units the controller reports positions in');
+  });
+
+  it('changes nothing for a CAM header G21 while KerfDesk reads millimetres', () => {
+    expect(
+      externalProgramControllerStatePatch(mm(), 'G21G90G54\nG1X5F600\nM30\n', smoothiewareDriver),
+    ).toEqual({});
+  });
+
+  it('hides it after a G21 program while KerfDesk reads inches, or after an M121', () => {
+    const inches = { ...mm(), controllerSettings: { reportInches: true } };
+    expect(
+      externalProgramControllerStatePatch(inches, 'G21\nG1X5F600\n', smoothiewareDriver),
+    ).toMatchObject({ reportUnitsUnconfirmed: true });
+    expect(
+      externalProgramControllerStatePatch(mm(), 'M120\nG1X5F600\nM121\n', smoothiewareDriver),
+    ).toMatchObject({ reportUnitsUnconfirmed: true });
+  });
+
+  it('control: GRBL reports follow its 13 setting, not the program G20', () => {
+    expect(externalProgramControllerStatePatch(mm(), 'G20\nG1X1F20\n', grblDriver)).toEqual({});
   });
 });

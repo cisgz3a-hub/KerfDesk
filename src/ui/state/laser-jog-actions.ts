@@ -6,6 +6,7 @@
 // LiveRefs import — no runtime cycle.
 
 import { isAtOrAboveSafeZ } from './cnc-frame-lines';
+import { unconfirmedReportUnitsMessage } from './console-report-units';
 import { currentWorkZMm, inferCurrentMachinePosition } from './infer-machine-position';
 import { buildFrameDispatchPlan, frameRouteNoGoWarnings } from './laser-frame-motion-plan';
 import { runHomeAction } from './laser-home-action';
@@ -100,6 +101,7 @@ async function runJogToMachinePosition(
   if (current === null) {
     // A grblHAL `$10` that sends WPos and no WCO never gives one (ADR-375 Amd 2).
     const message =
+      unconfirmedReportUnitsMessage(get(), refs.driver) ??
       unknownMachinePositionMessage(laserStatusReportFieldsOff(get())) ??
       'Jog to point needs a live machine position. Wait for an Idle status report.';
     set({ lastWriteError: message, log: pushLog(get(), `[lf2] ${message}`) });
