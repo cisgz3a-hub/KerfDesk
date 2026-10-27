@@ -2,12 +2,12 @@
 // pasted onto another operation, and when a paste would change nothing.
 
 import {
-  LAYER_OPERATION_SETTING_KEYS,
   layerOperationSettingsEqual,
   type Layer,
   type LayerOperationSettings,
   type LayerSubLayer,
 } from '../../core/scene';
+import { LAYER_OPERATION_SETTING_KEYS } from '../../core/scene/layer';
 import { cncSettingsForArtworkPaste } from './cnc-settings-clipboard';
 
 export type LayerSettingsClipboard = Omit<Layer, 'id' | 'name' | 'color'>;
