@@ -1,6 +1,6 @@
 // A caller waiting for the work offset asks for a complete report where the
 // driver has one (grblHAL 0x87, protocol audit P-4, ADR-674); every other
-// driver, and every ordinary request, sends the plain status query.
+// driver sends nothing extra, and an ordinary request sends the plain query.
 
 import { describe, expect, it, vi } from 'vitest';
 import { grblDriver, grblHalDriver } from '../../core/controllers';
@@ -9,22 +9,28 @@ import { initialLaserState } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 import { sendCompleteStatusRequest, statusRequestActions } from './laser-status-request';
 
-function sent(driver: ControllerDriver, options?: { readonly complete?: boolean }) {
+function sent(driver: ControllerDriver, complete: boolean) {
   const write = vi.fn(async (_line: string) => undefined);
   const state = initialLaserState() as LaserState;
-  return statusRequestActions(() => state, { driver }, write)
-    .requestControllerStatus(options)
-    .then(() => write.mock.calls.map((call) => call[0]));
+  const actions = statusRequestActions(() => state, { driver }, write);
+  const request = complete
+    ? actions.requestCompleteControllerStatus()
+    : actions.requestControllerStatus();
+  return request.then(() => write.mock.calls.map((call) => call[0]));
 }
 
-describe('requestControllerStatus', () => {
+describe('status requests', () => {
   it('sends 0x87 on grblHAL when a complete report is asked for', async () => {
-    await expect(sent(grblHalDriver, { complete: true })).resolves.toEqual(['\x87']);
+    await expect(sent(grblHalDriver, true)).resolves.toEqual(['\x87']);
   });
 
-  it('sends the ordinary query otherwise', async () => {
-    await expect(sent(grblHalDriver)).resolves.toEqual(['?']);
-    await expect(sent(grblDriver, { complete: true })).resolves.toEqual(['?']);
+  it('sends nothing extra for a complete report on stock GRBL', async () => {
+    await expect(sent(grblDriver, true)).resolves.toEqual([]);
+  });
+
+  it('sends the ordinary query for an ordinary request', async () => {
+    await expect(sent(grblHalDriver, false)).resolves.toEqual(['?']);
+    await expect(sent(grblDriver, false)).resolves.toEqual(['?']);
   });
 });
 

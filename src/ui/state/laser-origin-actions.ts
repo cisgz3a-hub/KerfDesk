@@ -319,7 +319,7 @@ async function waitForOriginWcoFrame(get: GetFn, assertCurrent: () => void): Pro
   const deadline = Date.now() + ORIGIN_WCO_WAIT_TIMEOUT_MS;
   assertCurrent();
   // grblHAL answers its complete-report request with WCO at once (ADR-674).
-  if (get().wcoCache === null) void get().requestControllerStatus({ complete: true });
+  if (get().wcoCache === null) void get().requestCompleteControllerStatus();
   while (get().wcoCache === null && Date.now() <= deadline) {
     await sleep(ORIGIN_WCO_POLL_MS);
     assertCurrent();

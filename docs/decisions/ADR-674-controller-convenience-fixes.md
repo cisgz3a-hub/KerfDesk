@@ -76,8 +76,9 @@ Two audits found convenience gaps that need no maintainer decision:
 
 3. **grblHAL sends its complete report on request.** `ControllerRealtime` gains an optional
    `completeStatusQuery` (grblHAL `'\x87'`; absent for every other driver).
-   `requestControllerStatus({ complete: true })` sends it where the driver has one, and the
-   ordinary status query otherwise. KerfDesk sends it once at the end of the connect handshake,
+   The store action `requestCompleteControllerStatus()` sends it where the driver has one and
+   nothing otherwise, so stock GRBL sees exactly the status queries it saw before; the ordinary
+   `requestControllerStatus()` is unchanged. KerfDesk sends it once at the end of the connect handshake,
    and at the start of `waitForUnreportedFrameWorkOffset` (Frame) and `waitForOriginWcoFrame`
    (Set origin). The byte is a single realtime byte, inert to the planner, and owes no
    acknowledgement. No UI code holds the byte. Like the background poll, the request stays

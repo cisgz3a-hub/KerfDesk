@@ -14,18 +14,18 @@ type StatusRequestWrite = (
 // after the owned G54 selection so its fresh-position wait resolves in one
 // round trip; waiting for the next scheduled query instead cost up to a full
 // idle-poll period (~1 s) on every Frame that had to select G54. The query is
-// inert to the planner and owes no acknowledgement. `complete` asks for every
-// report field at once where the driver can (grblHAL 0x87), so a caller
-// waiting for WCO need not wait out GRBL's refresh count (ADR-674).
+// inert to the planner and owes no acknowledgement. The complete request asks
+// for every report field at once where the driver can (grblHAL 0x87), so a
+// caller waiting for WCO need not wait out GRBL's refresh count; elsewhere it
+// sends nothing (ADR-674).
 export function statusRequestActions(
   get: () => LaserState,
   refs: { readonly driver: ControllerDriver },
   write: StatusRequestWrite,
-): Pick<LaserState, 'requestControllerStatus'> {
+): Pick<LaserState, 'requestControllerStatus' | 'requestCompleteControllerStatus'> {
   return {
-    requestControllerStatus: async (options) => {
-      const complete = options?.complete === true ? refs.driver.realtime.completeStatusQuery : null;
-      const query = complete ?? refs.driver.realtime.statusQuery;
+    requestControllerStatus: async () => {
+      const query = refs.driver.realtime.statusQuery;
       if (query === null || controllerOperationOwnsPolling(get())) return;
       try {
         await write(query, undefined, 'system');
@@ -33,6 +33,7 @@ export function statusRequestActions(
         // The periodic poll is still running; a failed query is not a refusal.
       }
     },
+    requestCompleteControllerStatus: () => sendCompleteStatusRequest(get, refs.driver, write),
   };
 }
 

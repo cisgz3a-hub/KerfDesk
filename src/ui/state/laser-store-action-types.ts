@@ -85,10 +85,12 @@ export type LaserStoreActions = {
   /** One realtime status query outside the periodic poll, so a caller that
    * needs a fresh report after an owned command gets it in one round trip
    * instead of waiting for the next poll tick. Inert to the planner; a no-op
-   * without a realtime query or while a controller operation owns polling.
-   * `complete` uses the driver's complete-report request when it has one
-   * (grblHAL 0x87), so the reply carries the work offset (ADR-674). */
-  readonly requestControllerStatus: (options?: { readonly complete?: boolean }) => Promise<void>;
+   * without a realtime query or while a controller operation owns polling. */
+  readonly requestControllerStatus: () => Promise<void>;
+  /** The driver's complete-report request (grblHAL 0x87), whose reply carries
+   * the work offset at once (ADR-674). A no-op on a driver without one, or
+   * while a controller operation owns polling. */
+  readonly requestCompleteControllerStatus: () => Promise<void>;
   readonly clearTranscript: () => void;
   readonly clearIncidentHistory: () => void;
   /** `queueStep`: an operator step press, which may join a running step jog
