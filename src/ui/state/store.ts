@@ -30,7 +30,6 @@ import {
   type LayerMoveDirection,
   type Project,
   type RasterImage,
-  type Scene,
   type SceneObject,
   type ShapeObject,
   type TextObject,
@@ -101,7 +100,7 @@ import {
 import type { InteractionHistorySnapshot } from './interaction-history-snapshot';
 import { sceneGroupActions, type SceneGroupActions } from './scene-group-actions';
 import { sceneLockActions, type SceneLockActions } from './scene-lock-actions';
-import { generatedSceneActions } from './generated-scene-actions';
+import { generatedSceneActions, type GeneratedSceneActions } from './generated-scene-actions';
 import { projectSettingsActions, type ProjectSettingsActions } from './project-settings-actions';
 import {
   selectionTransformActions,
@@ -264,7 +263,7 @@ export type AppState = PartGeneratorActions &
     readonly sceneClipboard: SceneClipboard | null;
     readonly layerDefaults: LayerDefaultsState;
 
-    readonly replaceSceneWithGeneratedScene: (scene: Scene, selectGenerated?: boolean) => void;
+    readonly replaceSceneWithGeneratedScene: GeneratedSceneActions['replaceSceneWithGeneratedScene'];
 
     // batchOffsetIdx (default 0) shifts the imported object by 10mm × N to the
     // right and down (F-A3 multi-import). The first file in a batch passes 0,

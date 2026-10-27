@@ -27,6 +27,7 @@ import { registerCapturedOutlineMutation } from './board-outline-register';
 import { applyRegistrationOutputToScene } from './registration-output-actions';
 import type { AppState } from './store';
 import { pushUndo } from './scene-mutations';
+import { captureSetupHistoryContext } from './setup-history-context';
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
 
@@ -81,6 +82,7 @@ function updateCapturedBoardMutation(s: AppState, shape: BoardShape): Partial<Ap
     (box) => box.provenance === 'captured-board',
   );
   if (existing === undefined) return null;
+  captureSetupHistoryContext(s.project, s);
   const replacement = resizedCapturedBoard(existing, shape);
   const scene = replaceObject(s.project.scene, existing.id, replacement);
   const project = { ...s.project, scene };
@@ -206,12 +208,14 @@ function locked(box: ShapeObject): ShapeObject {
 // not a jig — the material is already placed), and anchor the next Start to the
 // work origin. Clearing registrationArtworkOutputSnapshot honors the artwork-
 // scope invariant (no saved snapshot) so a stale "burn box only" toggle can't
-// later clobber the artwork layers' output.
+// later clobber the artwork layers' output. The step records the live placement,
+// so Undo and Redo restore Start From with the board (ADR-654 Amendment 2).
 function commitCapturedBoard(
   s: AppState,
   box: ShapeObject,
   placement: JobPlacementSettings,
 ): AppState | Partial<AppState> {
+  captureSetupHistoryContext(s.project, s);
   const added = applyAddRegistrationBox(s, box);
   const scene = applyRegistrationOutputToScene(
     added.project.scene,
