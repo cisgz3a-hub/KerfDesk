@@ -80,6 +80,18 @@ export function resolveLaserPowerScale(
       };
 }
 
+/** The S value 100% means on the laser now, from the live laser state: the
+ * connected $30 when this session read it, else the profile (ADR-567). */
+export function liveLaserMaxPowerS(
+  device: DeviceProfile,
+  laser: LaserPowerScaleSource & { readonly connection: { readonly kind: string } },
+): number {
+  return resolveLaserPowerScale(device, {
+    ...laser,
+    connected: laser.connection.kind === 'connected',
+  }).maxPowerS;
+}
+
 export function laserPowerPreparationOptions(
   project: Project,
   source: LaserPowerScaleSource = {},

@@ -1,17 +1,16 @@
 // G-code command actions: Save G-code, the ADR-255 live-canvas Inspector
-// entry, and the Inspector file picker. Save and Inspect share ONE context
-// builder so the Inspector renders exactly what Save/Start would emit — the
-// Inspector simply omits the variable-text advance, which belongs to a real
-// export.
+// entry, and the Inspector file picker. Save, the Save dialog and Inspect
+// share ONE context builder (`currentSaveGcodeContext`) so the Inspector
+// renders exactly what Save/Start would emit — the Inspector simply omits the
+// variable-text advance, which belongs to a real export.
 
 import { handleSaveGcode } from '../app/file-actions';
 import { handleOpenGcodeInspector } from '../app/gcode-open-action';
 import { handleInspectCurrentGcode } from '../app/inspect-current-gcode-action';
+import { currentSaveGcodeContext } from '../app/save-gcode-context';
 import type { PlatformAdapter } from '../../platform/types';
-import { currentOutputScope } from '../state';
 import type { useStore } from '../state';
 import type { useLaserStore } from '../state/laser-store';
-import { nativeBedEvidenceSnapshot } from '../state/native-bed-frame';
 import type { useToastStore } from '../state/toast-store';
 import type { GcodeInspectionSource } from '../gcode-inspector';
 import { projectInspectionContext } from '../gcode-inspector/gcode-inspection-source';
@@ -44,12 +43,14 @@ export function saveGcodeAction(deps: GcodeActionDeps): () => void {
  */
 export function inspectCurrentGcodeAction(deps: GcodeActionDeps): () => void {
   return () =>
-    void handleInspectCurrentGcode(saveGcodeContext(deps), (programName, text, placement) =>
-      deps.openInspector(programName, {
-        kind: 'text',
-        text,
-        ...projectInspectionContext(deps.app.project, placement),
-      }),
+    void handleInspectCurrentGcode(
+      saveGcodeContext(deps),
+      (programName, text, placement, laserMaxPowerS) =>
+        deps.openInspector(programName, {
+          kind: 'text',
+          text,
+          ...projectInspectionContext(deps.app.project, placement, laserMaxPowerS),
+        }),
     );
 }
 
@@ -62,25 +63,5 @@ export function openGcodeInspectorAction(deps: GcodeActionDeps): () => void {
 export function saveGcodeContext(
   deps: GcodeActionDeps,
 ): Omit<SaveGcodeArgs, 'advanceVariablesAfter'> {
-  const { app, laser } = deps;
-  return {
-    platform: deps.platform,
-    project: app.project,
-    savedName: app.savedName,
-    jobPlacement: app.jobPlacement,
-    outputScope: currentOutputScope(app),
-    machine: {
-      ...nativeBedEvidenceSnapshot(laser),
-      statusReport: laser.statusReport,
-      workOriginActive: laser.workOriginActive,
-      wcoCache: laser.wcoCache,
-      // Current Position bakes the live WPos into the bytes; an inch-reporting
-      // controller ($13=1) must be normalized here exactly as Preview/Start do.
-      reportInches: laser.controllerSettings?.reportInches === true,
-    },
-    controllerSettings: laser.controllerSettings,
-    settingsCapability: laser.capabilities.settings,
-    activeWcs: laser.activeWcs,
-    pushToast: deps.pushToast,
-  };
+  return currentSaveGcodeContext(deps);
 }

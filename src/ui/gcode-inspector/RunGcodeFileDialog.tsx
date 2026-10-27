@@ -9,7 +9,9 @@ import { kerfDeskBitChangeLabels } from '../../core/external-program/kerfdesk-bi
 import { kerfDeskBitFile } from '../../core/external-program/kerfdesk-bit-file';
 import { machineKindOf } from '../../core/scene';
 import { Button, Dialog, DialogActions } from '../kit';
+import { liveLaserMaxPowerS } from '../laser/connected-laser-power-scale';
 import { useStore } from '../state';
+import { useLaserStore } from '../state/laser-store';
 import { deviceInspectionContext } from './gcode-inspection-source';
 import { hasGcodeInspectorAnalysis } from './gcode-inspector-worker-protocol';
 import { useGcodeInspection } from './use-gcode-inspection';
@@ -66,6 +68,9 @@ function InspectExternalRun(
   },
 ): JSX.Element {
   const project = useStore((state) => state.project);
+  // Judge S words against the range KerfDesk's own Save and Start write: the
+  // connected $30, not the profile (rolling audit v4 H1-P3-2).
+  const laserMaxPowerS = useLaserStore((laser) => liveLaserMaxPowerS(project.device, laser));
   const live = useLiveRunStart();
   const [pinned, setPinned] = useState<RunStart | null>(null);
   const [frame, setFrame] = useState<ExternalFrame | null>(null);
@@ -106,7 +111,7 @@ function InspectExternalRun(
         result.parsed.model,
         {
           machineKind: machineKindOf(project.machine),
-          laserMaxPowerS: project.device.maxPowerS,
+          laserMaxPowerS,
           ...(props.program.controllerKind === undefined
             ? {}
             : { controllerKind: props.program.controllerKind }),

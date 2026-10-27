@@ -2,11 +2,11 @@ import { recordCncPreparation } from '../state/cnc-preparation-evidence-store';
 import { CncSetupDocumentExport } from './CncSetupDocumentExport';
 import { useEffect, useState } from 'react';
 import { Button, Dialog, DialogActions } from '../kit';
-import { currentOutputScope, useStore } from '../state';
+import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
-import { nativeBedEvidenceSnapshot } from '../state/native-bed-frame';
 import { useToastStore } from '../state/toast-store';
 import { usePlatform } from './platform-context';
+import { currentSaveGcodeContext } from './save-gcode-context';
 import {
   handleSaveGcode,
   ordinaryGcodeSaveUsesPrebuiltDialog,
@@ -85,28 +85,9 @@ function saveContext(
   pushToast: ReturnType<typeof useToastStore.getState>['pushToast'],
 ): SaveGcodeCtx {
   const app = useStore.getState();
-  const laser = useLaserStore.getState();
   return {
-    platform,
-    project: app.project,
-    savedName: app.savedName,
-    jobPlacement: app.jobPlacement,
-    outputScope: currentOutputScope(app),
-    machine: {
-      connected: laser.connection.kind === 'connected',
-      ...nativeBedEvidenceSnapshot(laser),
-      statusReport: laser.statusReport,
-      workOriginActive: laser.workOriginActive,
-      wcoCache: laser.wcoCache,
-      // Current Position bakes the live WPos into the bytes; an inch-reporting
-      // controller ($13=1) must be normalized here exactly as Preview/Start do.
-      reportInches: laser.controllerSettings?.reportInches === true,
-    },
-    controllerSettings: laser.controllerSettings,
-    settingsCapability: laser.capabilities.settings,
-    activeWcs: laser.activeWcs,
+    ...currentSaveGcodeContext({ platform, app, laser: useLaserStore.getState(), pushToast }),
     advanceVariablesAfter: app.advanceVariablesAfter,
-    pushToast,
   };
 }
 
