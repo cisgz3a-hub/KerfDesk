@@ -6,18 +6,44 @@
 // start, and Abort clears it with a reset (unowned-motion-stop.ts).
 
 import type { UnownedControllerMotion } from '../state/unowned-controller-motion';
+import type { UnownedControllerOutput } from '../state/unowned-controller-output';
 
 type ControllerHold = { readonly state: 'Hold' | 'Door'; readonly doorPin: boolean } | null;
 
 export type UnownedMotionDescription = {
   readonly heading: string;
   readonly detail: string;
-  readonly abortLabel: 'ABORT MOTION';
+  readonly abortLabel: 'ABORT MOTION' | 'LASER OFF';
 };
 
 const HOLD_RELEASE = 'Release it with cycle start, or Abort to clear it with a controller reset';
 
-export function describeUnownedMotion(
+/** Motion first: the output report is Idle-only, so the two never coincide. */
+export function describeUnowned(
+  motion: UnownedControllerMotion | null,
+  output: UnownedControllerOutput | null,
+  hold: ControllerHold,
+  homingStateStuck: boolean,
+): UnownedMotionDescription | null {
+  if (motion !== null) return describeUnownedMotion(motion, hold, homingStateStuck);
+  return output === null ? null : describeUnownedOutput(output);
+}
+
+// A laser left on at Idle by a Console M3 or a file that ends lit (rolling
+// audit v5 J2-P2-1). LASER OFF sends M5, with M9 when air is on too, and no
+// reset, so the work origin and position stay.
+function describeUnownedOutput(output: UnownedControllerOutput): UnownedMotionDescription {
+  return {
+    heading: 'LASER ON',
+    detail:
+      output === 'laser-and-air'
+        ? 'The controller reports the laser and air assist on at Idle, which nothing here turned on, such as a Console M3 or a file that ended without M5'
+        : 'The controller reports the laser on at Idle, which nothing here turned on, such as a Console M3 or a file that ended without M5',
+    abortLabel: 'LASER OFF',
+  };
+}
+
+function describeUnownedMotion(
   motion: UnownedControllerMotion,
   hold: ControllerHold,
   homingStateStuck = false,

@@ -3,6 +3,9 @@
 // the same name without asking. Changed bit counts or a smaller tile grid can
 // leave older files beside the new set. Both are named as warnings, so only this
 // save's files are cut. Checked before writing: afterwards every name exists.
+// A save that stops at a failed write leaves its remaining names holding the
+// earlier save's contents, which are named as stale (rolling audit v5 J2-P2-2,
+// ADR-656 Amendment 3).
 
 import { tileNameWithoutBit } from '../../core/cnc/tile-bit-files';
 import type { SaveDirectoryTarget } from '../../platform/types';
@@ -15,6 +18,9 @@ export type TileFolderContents = {
   readonly replaced: ReadonlyArray<string>;
   /** Same-job tile files this save will not replace. */
   readonly earlier: ReadonlyArray<string>;
+  /** This save's names the folder held that it stopped before replacing: they
+   *  still hold the earlier save, under this save's names. */
+  readonly stale?: ReadonlyArray<string>;
   readonly inspectionIncomplete?: boolean;
 };
 
@@ -82,6 +88,31 @@ export async function tileFolderContents(
     filterPresent([...oneFileTiles], present),
   ]);
   return { replaced, earlier };
+}
+
+/** A set cut short replaced only the files it reached. */
+export function tileFolderAfterSave(
+  folder: TileFolderContents,
+  files: ReadonlyArray<TileFile>,
+  saved: number,
+): TileFolderContents {
+  if (saved >= files.length) return folder;
+  const written = new Set(files.slice(0, saved).map(tileDisplayName));
+  return {
+    ...folder,
+    replaced: folder.replaced.filter((name) => written.has(name)),
+    stale: folder.replaced.filter((name) => !written.has(name)),
+  };
+}
+
+/** Said as an error: these files look like this save's and are not. */
+export function staleTileWarning(contents: TileFolderContents): string | null {
+  const stale = contents.stale ?? [];
+  if (stale.length === 0) return null;
+  return (
+    'These files still hold an earlier save, not this one, because this save stopped before ' +
+    `replacing them: ${listNames(stale)}. Delete them, or save the tiles again, before cutting.`
+  );
 }
 
 export function tileFolderWarnings(contents: TileFolderContents): ReadonlyArray<string> {

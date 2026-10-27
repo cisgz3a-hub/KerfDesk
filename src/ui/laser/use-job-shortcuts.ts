@@ -17,10 +17,13 @@
 // error boundary, so it also outlives a render crash (27-P2-2).
 
 import { useEffect } from 'react';
+import { machineKindOf } from '../../core/scene';
 import { isEditableShortcutTarget } from '../common/keyboard-targets';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { unownedControllerMotion } from '../state/unowned-controller-motion';
+import { turnUnownedOutputOff, unownedControllerOutput } from '../state/unowned-controller-output';
+import { useStore } from '../state';
 import { isModalOpen, useUiStore } from '../state/ui-store';
 import { runStartJobFlow } from './start-job-flow';
 import { controllerActionFailureHandler } from './report-controller-action-failure';
@@ -103,6 +106,12 @@ function stopShortcutAction(
   // $H): the bar's ABORT MOTION, which picks the stop for its state (ADR-375 C-2).
   if (unownedControllerMotion(laser) !== null) {
     return { label: 'Abort motion', run: () => laser.stopJob() };
+  }
+  // A laser the controller reports on at Idle, with nothing here running it:
+  // the bar's LASER OFF, M5 with no reset (rolling audit v5 J2-P2-1).
+  const machineKind = machineKindOf(useStore.getState().project.machine);
+  if (unownedControllerOutput(laser, machineKind) !== null) {
+    return { label: 'Laser off', run: () => turnUnownedOutputOff(laser, machineKind) };
   }
   return null;
 }
