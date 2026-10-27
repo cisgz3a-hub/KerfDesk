@@ -117,7 +117,7 @@ async function parseRequest(request: ImportWorkerRequest): Promise<ImportWorkerR
   };
 }
 
-// Multi-File Trace's TIFF and Netpbm decode and resample (ADR-357 Amendment 1),
+// Multi-File Trace's TIFF and Netpbm decode and resample (ADR-357 Amendment 2),
 // loaded on first use, as the PSD decoder is.
 async function batchRasterRequest(
   request: Extract<ImportWorkerRequest, { kind: 'batch-raster' | 'resample-rgba' }>,

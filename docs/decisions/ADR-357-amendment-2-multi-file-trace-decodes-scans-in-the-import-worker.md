@@ -1,4 +1,4 @@
-## ADR-357 Amendment 1 - Multi-File Trace decodes TIFF and Netpbm scans in the import worker (2026-10-28)
+## ADR-357 Amendment 2 - Multi-File Trace decodes TIFF and Netpbm scans in the import worker (2026-10-28)
 
 **Status:** Accepted on 2026-10-28 |
 **Amends:** ADR-357 decision 6 ("TIFF decoding is a lazy worker"), extending it to Multi-File

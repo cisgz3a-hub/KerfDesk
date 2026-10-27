@@ -77,7 +77,7 @@ export type MultiFileTraceDeps = {
   // as a single-image import parses it, from a bounded header prefix only.
   readonly readDensity?: (file: MultiFileTraceFile) => Promise<ImageDensity | null>;
   // TIFF (page 1) and Netpbm files, decoded in the import worker rather than by
-  // the browser (ADR-357 Amendment 1); null for any other file.
+  // the browser (ADR-357 Amendment 2); null for any other file.
   readonly decodeRaster?: (file: MultiFileTraceFile) => Promise<DecodedBatchRaster | null>;
   readonly trace?: (
     image: RawImageData,

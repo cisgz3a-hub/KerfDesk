@@ -4,7 +4,7 @@
 // max-edge handling as a PNG or JPEG (ADR-409).
 //
 // Both run in the import worker, as File > Import decodes a TIFF in its own
-// worker (ADR-357 item 6 and Amendment 1). Decoding a TIFF takes about 1 us
+// worker (ADR-357 item 6 and Amendment 2). Decoding a TIFF takes about 1 us
 // per pixel, so on this thread a 24 MP scan froze the window, Abort and
 // Ctrl+. with it, for 15-24 s during a job (rolling audit v5 J6-P2-3). The
 // batch's Cancel aborts the worker request, which stops the worker. Only

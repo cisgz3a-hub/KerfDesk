@@ -1,6 +1,6 @@
 // @vitest-environment node
 // Multi-File Trace decodes TIFF and Netpbm scans, and resamples them, in the
-// import worker (ADR-357 Amendment 1, rolling audit v5 J6-P2-3): on the UI
+// import worker (ADR-357 Amendment 2, rolling audit v5 J6-P2-3): on the UI
 // thread a 24 MP TIFF froze the window, and Abort with it, for 15-24 s.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

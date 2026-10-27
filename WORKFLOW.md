@@ -1376,7 +1376,7 @@ that owns those fields, without changing the existing Frame/Start policy.
    and the completion message names the skipped images.
 4. TIFF and Netpbm scans are decoded and resampled in the import worker, so the window, Abort
    and Ctrl+. stay responsive during a running job; **Cancel** stops a decode under way
-   (ADR-357 Amendment 1).
+   (ADR-357 Amendment 2).
 
 ### F-A9d. Export artwork as PDF, EPS or GeoJSON (ADR-468)
 

@@ -1,6 +1,6 @@
 // Multi-File Trace's TIFF (page 1, as TIFF import reads it) and Netpbm decode,
 // and the resample to a planned working grid (ADR-409). Pure: the import
-// worker runs both off the UI thread (ADR-357 Amendment 1), and
+// worker runs both off the UI thread (ADR-357 Amendment 2), and
 // ui/commands/batch-raster-decode.ts runs them in place only where no Worker
 // exists, as in the node test environment.
 

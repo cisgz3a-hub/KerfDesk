@@ -35,7 +35,7 @@ export type ImportWorkerRgba = {
 
 export type ImportWorkerRequest =
   // Multi-File Trace's TIFF and Netpbm decode, and its resample to a working
-  // grid, run here so a large scan does not freeze the window (ADR-357 Amendment 1).
+  // grid, run here so a large scan does not freeze the window (ADR-357 Amendment 2).
   | {
       readonly id: number;
       readonly kind: 'batch-raster';
