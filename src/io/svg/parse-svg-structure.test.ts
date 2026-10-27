@@ -1,6 +1,7 @@
 import { Blob as NodeBlob } from 'node:buffer';
 import { describe, expect, it } from 'vitest';
 import { ciBudgetMs } from '../../__fixtures__/ci-budget';
+import { svgUseCopies } from '../../__fixtures__/svg-use-copies';
 import { parseSvg, type ParseSvgResult } from './parse-svg';
 import { readSvgDocumentFromBlob } from './parse-svg-blob';
 import { parseSvgWorkerDocument } from './parse-svg-worker';
@@ -101,6 +102,23 @@ describe.each(parsers)('SVG <use> expansion through %s', (_name, parse) => {
     async () => {
       await expect(parse(fanout(6))).rejects.toThrow(
         /SVG <use> references expand to more than 250,000 elements/,
+      );
+    },
+    ciBudgetMs(20_000, 60_000),
+  );
+
+  it('places <use> copies of a many-point path within the point budget', async () => {
+    const result = await parse(svgUseCopies(1_000, 3));
+    expect(polylineCount(result)).toBe(3);
+  });
+
+  // ADR-269 Amendment 3: the budget counts the points copies place, as the DXF
+  // block budget does, so a few hundred copies of one long path pass its floor.
+  it(
+    'refuses <use> copies whose points pass the point budget, saying how to import them',
+    async () => {
+      await expect(parse(svgUseCopies(1_000, 501))).rejects.toThrow(
+        /SVG <use> references place more than 500,000 points.*convert its clones to paths/,
       );
     },
     ciBudgetMs(20_000, 60_000),

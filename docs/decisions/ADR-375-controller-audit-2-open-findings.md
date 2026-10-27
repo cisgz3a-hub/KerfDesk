@@ -273,6 +273,9 @@ therefore sent moves the firmware refuses, or trusted values the controller had 
       the controller reports Run, Jog, Home, Hold or Door and nothing here owns it (no job,
       controller operation, jog, Frame, Fire or grblHAL pendant), the popup now shows it with
       **ABORT MOTION** and still no Resume, and Ctrl+. and the crash screen offer the same Abort.
+      *(Extended by [Amendment 9](ADR-375-amendment-9-a-laser-left-on-at-idle-gets-laser-off.md):
+      a laser the controller reports on at Idle with no owner here gets **LASER OFF**, and an
+      ordinary close turns it off.)*
     - A reset sent into a cycle, jog or homing kills the steppers and raises `ALARM:3`
       ([motion_control.c L380-L386](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/motion_control.c#L380-L386)), while a completed feed hold
       keeps position until cycle start or a reset

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { installImportWorkers, resetImportWorkers } from '../import/import-workers.test-support';
 import { useStore } from '../state/store';
 import { createRemoteControlAdapter } from './adapter';
 import type { RemoteCommandResult, RemoteControlAdapter, SafeRemoteAppStatus } from './types';
@@ -12,6 +13,7 @@ let adapter: RemoteControlAdapter;
 let sharing = true;
 beforeEach(() => {
   useStore.setState(useStore.getInitialState(), true);
+  installImportWorkers();
   sharing = true;
   adapter = createRemoteControlAdapter({
     getAppStatus: () => APP,
@@ -19,7 +21,10 @@ beforeEach(() => {
     canShareArtwork: () => sharing,
   });
 });
-afterEach(() => adapter.dispose());
+afterEach(() => {
+  adapter.dispose();
+  resetImportWorkers();
+});
 const args = (extra: Record<string, unknown> = {}) => ({
   expectedRevision: adapter.getRevision(),
   requestId: crypto.randomUUID(),

@@ -13,7 +13,6 @@ import {
   observeControllerIdleWait,
 } from './laser-interactive-command';
 import { dispatchQueuedMotionLine } from './laser-frame-dispatch';
-import { finishedJobStateReset } from './laser-session-reset';
 import { frameCompletionPatch, nextFrameDispatch, observeFrameMotion } from './laser-frame-status';
 import type { LaserState } from './laser-store';
 import type { HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
@@ -21,7 +20,10 @@ import { statusBufferPatch } from './laser-rx-capacity-evidence';
 import { statusObservationPatch, statusResponseObservationPatch } from './laser-status-observation';
 import { hasOwnedControllerReset } from './laser-reset-cleanup';
 import { isProvisionalResetFreeze } from './laser-reset-terminal-state';
-import { shouldReleaseStreamerAtIdle } from './laser-terminal-stream-release';
+import {
+  shouldReleaseStreamerAtIdle,
+  streamerEndPatchAtIdle,
+} from './laser-terminal-stream-release';
 import { statusPositionPatch } from './laser-status-position';
 import { liveCanvasLifecyclePatch, liveCanvasStatusCompletionPatch } from './live-canvas-run';
 import { observeFreshControllerStatus } from './laser-controller-status-wait';
@@ -39,7 +41,6 @@ import { resumeJogSettlementAfterMpg } from './laser-motion-operation';
 import { releaseAbandonedMotionAtIdle } from './laser-motion-release';
 import { isProbeAlarmedToolChangeHold } from './tool-change-probe-alarm';
 import { probeTestTouchPatch } from './probe-test-touch';
-import { bitFileRunEndPatch } from './bit-file-sequence';
 import { cancelActiveStreamerPatch } from './laser-alarm-stream-end';
 import {
   homeAlarmReplyWindowPatch,
@@ -82,12 +83,7 @@ export function handleStatusLine(
   // it itself — but when the settle failed or never started, no operation owns
   // the release and the same Idle-means-motion-stopped reasoning applies.
   const jobOverAtIdle = shouldReleaseStreamerAtIdle(state, report, refs);
-  // Releasing the streamer is the moment the run is over, so the run's own
-  // state goes with it — otherwise a finished CNC job left the store claiming
-  // machineKind 'cnc' and holding an unconsumed tool-change queue indefinitely.
-  const completedStreamerPatch = jobOverAtIdle
-    ? { streamer: null, ...finishedJobStateReset(), ...bitFileRunEndPatch(state) }
-    : {};
+  const completedStreamerPatch = streamerEndPatchAtIdle(state, report, jobOverAtIdle);
 
   const positionInvalidated = report.mpgActive === true && state.mpgActive !== true;
   const nextSequence = state.statusSequence + 1;

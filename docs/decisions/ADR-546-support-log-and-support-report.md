@@ -95,6 +95,33 @@ no longer promises "no password". It says KerfDesk removed licence keys and the 
 sign-ins it recognises, that the report holds no payment details, and still asks the customer to
 read the file before sending it.
 
+### Amendment 3 (2026-10-27): the crash screen keeps the safety notice and reports its Abort
+
+Rolling audit v5 finding J2-P2-3 found that after a workspace render crash no machine-safety notice
+showed. The link-lost and failed-stop notices float over the canvas (ADR-634), and the crash took
+the canvas with them. The crash screen's ABORT caught its own failure and dropped it, so a refused
+Abort changed nothing on screen. Rolling v4 finding H2-P3-1 found that a crash-screen host that
+threw went past its boundary: to the root boundary, which unmounts the job protections, or with
+none left, to a blank window.
+
+1. **The crash screen shows the safety notice** (`SafetyNoticeBanner`) beside the close notice, the
+   Save dialog and toasts, under both the root and the workspace boundary. Acknowledge and Reset
+   work there. Reconnect does not: it needs the workspace's platform and recovery card, and the
+   root boundary sits outside both.
+2. **ABORT shows its own failure** under the crash screen's buttons: "ABORT failed: <reason>. Use
+   the physical E-stop or power cutoff now if the machine may still be moving or the laser on." It
+   stays offered, so pressing it again is the retry, and a success clears the message. The click
+   still calls the stop at once, so it is written before anything else runs.
+3. **Each crash-screen host has its own boundary** (`CrashHostBoundary`), and the crash screen
+   wraps the hosts it is given in one more. A host that throws renders nothing and is kept for
+   Save Support Report as a crash; the crash screen and the other hosts stay.
+4. ABORT also appears for a laser the controller reports on at Idle, and sends `M5` for it
+   (ADR-375 Amendment 9).
+
+`src/ui/app/App.crash-safety-notice.test.tsx` checks all four on the real App and stores, and
+`src/ui/common/ErrorBoundary.test.tsx` checks a refusal thrown before any write and a host that
+throws.
+
 ### Consequences
 
 - The support page tells customers to attach the report, which covers most of

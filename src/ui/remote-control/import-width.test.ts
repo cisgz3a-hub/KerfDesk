@@ -1,9 +1,6 @@
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { combinedBBox } from '../../core/scene/hit-test';
-import {
-  installDxfImportWorker,
-  resetDxfImportWorker,
-} from '../import/dxf-import-worker.test-support';
+import { installImportWorkers, resetImportWorkers } from '../import/import-workers.test-support';
 import { useStore } from '../state/store';
 import { resultCode, testAdapter, writeArgs } from './authoring-test-support';
 import type { RemoteControlAdapter } from './types';
@@ -11,12 +8,12 @@ import type { RemoteControlAdapter } from './types';
 let adapter: RemoteControlAdapter;
 beforeEach(() => {
   useStore.setState(useStore.getInitialState(), true);
-  installDxfImportWorker();
+  installImportWorkers();
   adapter = testAdapter();
 });
 afterEach(() => {
   adapter.dispose();
-  resetDxfImportWorker();
+  resetImportWorkers();
 });
 
 const svg = (path: string) =>
