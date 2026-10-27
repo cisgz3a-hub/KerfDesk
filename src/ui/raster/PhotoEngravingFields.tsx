@@ -21,7 +21,8 @@ type PhotoEngravingFieldsProps = {
   readonly draft: PhotoEngravingDraft;
   readonly image: RasterImage;
   readonly storedLinesPerMm: number;
-  /** The photo's effective power and speed, which a tone calibration also depends on. */
+  /** The photo's burn power (its multiplier applied) and speed, which a tone
+   * calibration also depends on. */
   readonly power: number;
   readonly speed: number;
   readonly onChange: (patch: Partial<PhotoEngravingDraft>) => void;

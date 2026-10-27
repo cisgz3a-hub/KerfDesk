@@ -11,6 +11,7 @@ export type {
 } from './layer';
 export {
   LAYER_DEFAULTS,
+  LAYER_OPERATION_SETTING_KEYS,
   captureLayerOperationSettings,
   createLayer,
   createLayerSubLayer,
