@@ -52,8 +52,11 @@ const REPLAY_ADVICE =
 function plannerBacklogHint(automatic: AutomaticRestart): string | null {
   const blocks = automatic.plannerBacklogBlocks;
   if (blocks === undefined) return null;
+  // Either no status report showed the backlog, or the app restarted while the
+  // job ran (a promoted record), so the hint blames neither the controller nor
+  // the app (rolling audit v5 J1-P3-4); the record's cause says which.
   if (automatic.plannerBacklogBasis === 'planner-size') {
-    return `Automatic restarts at line ${automatic.line}: the controller does not report how many moves it had buffered, and the stop may have discarded up to ${blocks}, a whole planner, so the restart steps back over that many. ${REPLAY_ADVICE}`;
+    return `Automatic restarts at line ${automatic.line}: KerfDesk could not tell how many moves the controller still had buffered, and the stop may have discarded up to ${blocks}, a whole planner, so the restart steps back over that many. ${REPLAY_ADVICE}`;
   }
   if (automatic.plannerBacklogBasis === 'after-empty-status') {
     return `Automatic restarts at line ${automatic.line}: the controller's last status report showed an empty buffer, and the stop may have discarded the moves acknowledged after it, so the restart steps back to the first of them. ${REPLAY_ADVICE}`;
