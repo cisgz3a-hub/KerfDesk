@@ -79,11 +79,18 @@ export type GcodeInspectionSource = (
 export function projectInspectionContext(
   project: Project,
   placement?: EmittedDesignPlacement,
+  /** The S value the program's 100% was compiled to, when it is not the
+   * profile's: a connected controller's $30 (ADR-567). */
+  laserMaxPowerS?: number,
 ): GcodeInspectionContext {
   const machineKind = project.machine?.kind ?? 'laser';
   const design = projectInspectionDesign(project, placement);
+  const device =
+    laserMaxPowerS === undefined
+      ? project.device
+      : { ...project.device, maxPowerS: laserMaxPowerS };
   const context = {
-    ...deviceInspectionContext(project.device, machineKind),
+    ...deviceInspectionContext(device, machineKind),
     ...(design === undefined ? {} : { design }),
   };
   // Only an Absolute laser job is written in bed coordinates. Every other

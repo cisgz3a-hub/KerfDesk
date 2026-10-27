@@ -257,11 +257,11 @@ function useCurrentGcodeRefresh(args: {
     };
     void handleInspectCurrentGcode(
       saveGcodeContext({ platform, app, laser, pushToast, openInspector: () => undefined }),
-      (programName, text, placement) => {
+      (programName, text, placement, laserMaxPowerS) => {
         if (!current()) return;
         compiledFor.current = snapshot;
         compiledDocumentEpoch.current = documentEpoch;
-        const context = projectInspectionContext(snapshot, placement);
+        const context = projectInspectionContext(snapshot, placement, laserMaxPowerS);
         setState({ kind: 'ready', programName, text, context });
       },
       {

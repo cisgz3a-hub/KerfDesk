@@ -8656,7 +8656,10 @@ as the pane's design record.
   A4; ADR-441 Amendment 8) and thickness and, optionally (under **Engrave settings**, with power,
   speed and margin),
   the camera lens height by tape measure, and presses **Engrave target**: the ring target streams as a temporary job through the
-  normal Frame, review and Start path, leaving the project and undo history untouched. When the
+  normal Frame, review and Start path, leaving the project and undo history untouched. It compiles
+  with the controller evidence a canvas Start uses, so a homed machine Frames and burns it where
+  the same rings Started from the canvas would, at the connected `$30` range (ADR-440
+  Amendment 7). When the
   job finishes the wizard moves to the photo. The operator moves the head clear of the three solid
   discs and presses **Take photo**; the rings are found and the camera fitted in a worker. The
   result shows the average and worst error in mm, the rings found, the camera height, and the
@@ -8726,7 +8729,8 @@ as the pane's design record.
   operator can watch the camera and reach the machine while the target engraves.
 - **Fix / a small offset (ADR-663 Amendment 2).** For a calibrated camera fixed above the bed,
   **Fix a small offset…** in Camera settings burns one target-sized ring in the middle of the bed
-  (or **Ring already burned**), finds it in a photo and reports how far the picture is off.
+  (or **Ring already burned**), compiled as the target is (ADR-440 Amendment 7), finds it in a
+  photo and reports how far the picture is off.
   Under 0.2 mm nothing changes; up to 10 mm **Fix** moves the saved calibration by that much (one
   Undo step) and refreshes the picture; above 10 mm it offers **Recalibrate…**. No ring, or more
   than one near the middle, says what to check and changes nothing. A head camera is not offered
@@ -9682,7 +9686,10 @@ validation must be supervised without cutting load.
 
 1. The canvas carries a **Design / G-code 3D** switch (top-left). Choosing
    **G-code 3D** replaces the design canvas with the 3D view of the program
-   this project compiles to — the same viewer the file Inspector uses.
+   this project compiles to — the same viewer the file Inspector uses. It
+   compiles through Save's own context, so a connected controller's `$30`
+   sets its S words and burn shading as it does Save's and Start's (ADR-440
+   Amendment 7).
 2. It compiles on entry and on **Refresh**, not on every edit. After the
    design changes, the view marks itself **Design changed** so what is on
    screen is never silently stale.
@@ -9835,7 +9842,9 @@ through it and to use `M0`; grblHAL holds at `M1` too, unless optional stop is t
 Amendment 7), KerfDesk's own bit change at an `M0` (its `; tool change: load` comments, read from the
 file as opened: the controller takes no jog or Zero Z in that stop and the new bit's spindle
 start and plunge are already sent, so the new bit would cut at the old bit's Z zero; ADR-392
-Amendment 2), a program that looks like the other machine mode, zero XY extent (the Frame visits a
+Amendment 2), a program that looks like the other machine mode (on a laser, an S above the S max:
+the `$30` read this session from a connected GRBL-family controller, the range KerfDesk's own
+Save and Start write, else the profile's; ADR-440 Amendment 7), zero XY extent (the Frame visits a
 point and proves no Z clearance or depth), probing (`G38.2` to `G38.5`), `M3`/`M4` with no
 `S` anywhere (it runs at the S the controller already holds), the words the Inspector does not
 interpret, a Frame outline that leaves the configured machine bounds or overlaps an enabled

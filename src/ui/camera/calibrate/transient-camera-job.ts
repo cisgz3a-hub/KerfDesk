@@ -10,10 +10,10 @@ import {
   type LaserModeStartSnapshot,
 } from '../../state/laser-mode-start-evidence';
 import { useLaserStore } from '../../state/laser-store';
-import { isActiveJob } from '../../state/laser-store-helpers';
 import { renderVariableText } from '../../text/render-variable-text';
 import { confirmCncSetup } from '../../laser/cnc-setup-acknowledgement';
 import { framedRunReadinessIssue } from '../../laser/framed-run-readiness';
+import { machineSnapshot } from '../../laser/start-machine-snapshot';
 import {
   claimCurrentFramedRunStart,
   framedRunStartClaimIsCurrent,
@@ -56,7 +56,11 @@ async function prepareTransientCameraReview(
   const prepared = await prepareStartJobSnapshot(
     project,
     laser.controllerSettings,
-    transientMachineSnapshot(laser, camera),
+    // Start's own builder, so the rings compile with the evidence a canvas
+    // Start uses: the connection, this session's settings read (the native
+    // bed frame and the $30 power range), the vendor command set and the laser
+    // module (rolling audit v4 H1-P1-1, ADR-440 Amendment 7).
+    { ...machineSnapshot(project, laser, camera), cameraPlacementActive: true },
     DEFAULT_JOB_PLACEMENT,
     DEFAULT_OUTPUT_SCOPE,
     { clock: () => new Date(), renderVariableText, requireFrame: false },
@@ -116,38 +120,6 @@ async function prepareTransientCameraReview(
     reviewModel,
     laserModeStartEvidence,
     cncSetupAttestation: cncSetupAttestation ?? undefined,
-  };
-}
-
-function transientMachineSnapshot(
-  laser: ReturnType<typeof useLaserStore.getState>,
-  camera: ReturnType<typeof useCameraStore.getState>,
-) {
-  return {
-    statusReport: laser.statusReport,
-    alarmCode: laser.alarmCode,
-    hasActiveStreamer: isActiveJob(laser.streamer),
-    cncJobsSupported: laser.capabilities.cncJobs,
-    motionOperationActive: laser.motionOperation !== null,
-    controllerOperationActive: laser.controllerOperation !== null,
-    autofocusBusy: laser.autofocusBusy,
-    workOriginActive: laser.workOriginActive,
-    workZZeroEvidence: laser.workZZeroEvidence,
-    workZReferenceEpoch: laser.workZReferenceEpoch,
-    controllerSessionEpoch: laser.controllerSessionEpoch,
-    wcoCache: laser.wcoCache,
-    activeWcs: laser.activeWcs,
-    ovCache: laser.ovCache,
-    accessoryCache: laser.accessoryCache ?? null,
-    settingsCapability: laser.capabilities.settings,
-    activeControllerKind: laser.activeControllerKind,
-    detectedControllerKind: laser.detectedControllerKind,
-    controllerBuildInfo: laser.controllerBuildInfo,
-    controllerBuildInfoObservation: laser.controllerBuildInfoObservation,
-    cameraPlacementActive: true,
-    cameraConfirmedPositionEpoch: camera.confirmedPositionEpoch,
-    homingState: laser.homingState,
-    trustedPositionEpoch: laser.trustedPositionEpoch ?? 0,
   };
 }
 
