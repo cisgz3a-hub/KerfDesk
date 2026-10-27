@@ -12,6 +12,7 @@ import type { LaserState } from './laser-store';
 type FinishedJobState = Pick<
   LaserState,
   | 'activeJobMachineKind'
+  | 'activeJobSafeZMm'
   | 'pauseResumeTransition'
   | 'toolChangeIdleSeen'
   | 'toolChangeLabels'
@@ -44,6 +45,7 @@ type SessionScopedState = FinishedJobState &
 export function finishedJobStateReset(): FinishedJobState {
   return {
     activeJobMachineKind: null,
+    activeJobSafeZMm: null,
     pauseResumeTransition: null,
     toolChangeIdleSeen: false,
     toolChangeLabels: [],

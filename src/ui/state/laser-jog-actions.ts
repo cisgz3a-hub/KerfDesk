@@ -20,6 +20,7 @@ import { type LaserSafetyAction } from './laser-safety-notice';
 import { settleOwnedMotionPhase } from './laser-owned-motion-settlement';
 import { assertAutofocusIdle, jogFrameCommandBlockMessage, pushLog } from './laser-store-helpers';
 import { useStore } from './store';
+import { motionMachineKind, pointMoveSafeZMm } from './job-motion-machine';
 import { isWorkZEvidenceCurrentForStart } from './work-z-zero-evidence';
 import { confirmFreshManualMotionIdle } from './manual-motion-fresh-idle';
 import { publishMotionPolicyWarning, warnJogMotionPolicy } from './laser-jog-warnings';
@@ -385,14 +386,14 @@ function resetOwnedMotionPhase(set: SetFn, operationId: LaserMotionOperationId):
 // Z retract return undefined and skip it (F105). A bit already at or above safe
 // Z stays there: the absolute jog would lower it, into a probe plate still under
 // it after a probe park (ADR-192 Amendment 1). An unknown height keeps the retract.
+// A running job lifts to its own safe Z, whatever project is open (ADR-416 Amd 3).
 async function retractToCncSafeZ(
   get: GetFn,
   refs: LiveRefs,
   safeWrite: SafeWriteFn,
   feed: number,
 ): Promise<boolean> {
-  const machine = useStore.getState().project.machine;
-  const safeZMm = machine?.kind === 'cnc' ? machine.params.safeZMm : undefined;
+  const safeZMm = pointMoveSafeZMm(get(), useStore.getState().project);
   if (safeZMm === undefined) return false;
   const state = get();
   const workZMm = currentWorkZMm(
@@ -407,22 +408,34 @@ async function retractToCncSafeZ(
   return true;
 }
 
+export const CNC_POINT_MOVE_WORK_Z_MESSAGE =
+  'CNC point move blocked: set or probe Work Z before moving. The safe-Z retract uses absolute work coordinates.';
+export const CNC_POINT_MOVE_SAFE_Z_UNKNOWN_MESSAGE =
+  'CNC point move blocked: the running CNC job has no known safe Z to lift to first. Open its CNC project, or stop the job.';
+
+// A running CNC job is checked as CNC even with a Laser project open (ADR-416
+// Amendment 3): the move must lift first, so it needs Work Z and a safe Z.
 function assertCncPointMoveWorkZReady(set: SetFn, get: GetFn): void {
-  if (useStore.getState().project.machine?.kind !== 'cnc') return;
-  const state = get();
-  if (
-    isWorkZEvidenceCurrentForStart(
-      state.workZZeroEvidence,
-      state.workZReferenceEpoch,
-      state.controllerSessionEpoch,
-    )
-  ) {
-    return;
-  }
-  const message =
-    'CNC point move blocked: set or probe Work Z before moving. The safe-Z retract uses absolute work coordinates.';
+  const project = useStore.getState().project;
+  if (motionMachineKind(get(), project) !== 'cnc') return;
+  const message = cncPointMoveBlockMessage(get(), project);
+  if (message === null) return;
   set({ lastWriteError: message, log: pushLog(get(), `[lf2] ${message}`) });
   throw new Error(message);
+}
+
+function cncPointMoveBlockMessage(
+  state: LaserState,
+  project: ReturnType<typeof useStore.getState>['project'],
+): string | null {
+  if (pointMoveSafeZMm(state, project) === undefined) return CNC_POINT_MOVE_SAFE_Z_UNKNOWN_MESSAGE;
+  return isWorkZEvidenceCurrentForStart(
+    state.workZZeroEvidence,
+    state.workZReferenceEpoch,
+    state.controllerSessionEpoch,
+  )
+    ? null
+    : CNC_POINT_MOVE_WORK_Z_MESSAGE;
 }
 
 function assertJogFrameReady(set: SetFn, get: GetFn): void {

@@ -5,6 +5,7 @@ import type { GrblState } from '../../core/controllers/grbl';
 import type { MachineKind } from '../../core/scene';
 import { CollapsedRail, RailPanelHeading } from '../common';
 import { useStore } from '../state';
+import { runningJobMachineKind } from '../state/job-motion-machine';
 import { useLaserStore } from '../state/laser-store';
 import {
   jogFrameCommandBlockMessage,
@@ -64,7 +65,9 @@ export function LaserWindow({ dockedJobActions = false }: Props = {}): JSX.Eleme
   const controllerState = useLaserStore((s) => s.statusReport?.state ?? null);
   const homingEnabled = useStore((s) => s.project.device.homing.enabled);
   // ADR-101 §7: shared chrome re-labels machine-aware; behavior is identical.
-  const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
+  // A running job's own kind keeps its probe notices (ADR-416 Amendment 3).
+  const projectKind = useStore((s) => s.project.machine?.kind ?? 'laser');
+  const machineKind = useLaserStore((s) => runningJobMachineKind(s)) ?? projectKind;
   const machineOperationBusy = machineBusy(autofocusBusy, motionOperation, controllerOperation);
   // H6: mid-job jog acks corrupt RX accounting, so gate them like Home/Frame/Start.
   const jogBlocked = useJogBlocked();

@@ -38,6 +38,7 @@ import {
   streamCncRecoveryProgram,
 } from './cnc-supervised-recovery-stream';
 import { mergeCncRecoveryWarnings } from './merge-cnc-recovery-warnings';
+import { cncRecoveryOpenProjectIssue } from './cnc-recovery-open-project';
 import {
   prepareArchivedRecoverySource,
   prepareRecoverySource,
@@ -118,6 +119,12 @@ async function prepareRecoveryContext(
 ): Promise<RecoveryContext | null> {
   if (capsule.artifact.machineKind !== 'cnc') {
     jobAwareAlert('Cannot start CNC recovery:\n\nThe retained checkpoint is not a CNC job.');
+    return null;
+  }
+  // Its bit-change holds are worked from the open project (ADR-416 Amendment 3).
+  const openProjectIssue = cncRecoveryOpenProjectIssue();
+  if (openProjectIssue !== null) {
+    jobAwareAlert(`Cannot start CNC recovery:\n\n${openProjectIssue}`);
     return null;
   }
   const reviewIssue = validateReview(review);

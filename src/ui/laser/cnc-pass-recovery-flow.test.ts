@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createProject } from '../../core/scene';
+import { createProject, DEFAULT_CNC_MACHINE_CONFIG } from '../../core/scene';
 import type * as GcodeModule from '../../io/gcode';
 import {
   cncControllerEpochOf,
@@ -85,7 +85,8 @@ describe('runCncPassRecoveryFlow', () => {
   it('streams the sealed job from the default boundary without touching the open project', async () => {
     const repo = repository();
     const capsule = await saveInterruptedRun(repo);
-    const unrelatedOpenProject = createProject();
+    // Any CNC project will do (ADR-416 Amendment 3); none of it is read.
+    const unrelatedOpenProject = { ...createProject(), machine: DEFAULT_CNC_MACHINE_CONFIG };
     useStore.setState({ project: unrelatedOpenProject });
     const startJob = vi.fn<(gcode: string, options?: object) => Promise<void>>(
       async () => undefined,

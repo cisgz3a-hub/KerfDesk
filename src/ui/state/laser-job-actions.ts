@@ -67,6 +67,8 @@ import { createStartArmingCompletion } from './laser-start-arming-completion';
 import type { TranscriptSource } from './laser-transcript';
 import { noteControllerSettingWrite } from './laser-owned-reset-settings';
 import { externalProgramControllerStatePatch } from './external-program-controller-state';
+import { startedJobSafeZMm } from './job-motion-machine';
+import { useStore } from './store';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -427,6 +429,10 @@ function installInitialStream(
     ),
     accessoryCache: invalidateAccessoryObservation(state.accessoryCache),
     activeJobMachineKind: options.machineKind ?? 'laser',
+    activeJobSafeZMm: startedJobSafeZMm(
+      options.machineKind,
+      options.jobMachine ?? useStore.getState().project.machine,
+    ),
     ...(options.externalProgram === true ? externalProgramControllerStatePatch(state, gcode) : {}),
   }));
   return writeOwner;

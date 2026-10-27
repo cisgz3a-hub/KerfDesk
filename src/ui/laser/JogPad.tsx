@@ -22,6 +22,7 @@ import type { NativeXyBounds } from '../../core/devices/native-bed-frame';
 import { machineKindOf } from '../../core/scene';
 import { useStore } from '../state';
 import { inferCurrentMachinePosition } from '../state/infer-machine-position';
+import { runningJobMachineKind } from '../state/job-motion-machine';
 import { useLaserStore } from '../state/laser-store';
 import { withheldControllerMPos } from '../state/laser-status-position';
 import { firmwareJogCheckPosition, resolveManualMotionLimits } from '../state/manual-motion-limits';
@@ -63,7 +64,9 @@ export function JogPad({
   const setSelectedFeed = useJogControlPreferences((state) => state.setRequestedFeedMmPerMin);
   const project = useStore((s) => s.project);
   const device = project.device;
-  const machineKind = machineKindOf(project.machine);
+  // A running job's own kind decides Z jog and Zero Z (ADR-416 Amendment 3).
+  const runningKind = useLaserStore((s) => runningJobMachineKind(s));
+  const machineKind = runningKind ?? machineKindOf(project.machine);
   const maxFeed = deviceForActiveHead(device, project.machine).maxFeed;
   const continuousJogSupported = useLaserStore((s) => s.capabilities.jogCancel);
   const feed = clampJogFeed(selectedFeed, maxFeed);

@@ -1775,6 +1775,11 @@ the completed physical Frame is the spatial source of truth.
   history stays as it is and a warning says to finish or stop the job first. A jump in the Undo
   list stops at that step. After the job ends, the same Undo or Redo applies.
 - Opening a project on another machine waits for the job the same way; nothing is opened.
+- The lock keeps the job's own Laser / CNC mode, not whatever the open project had (ADR-416
+  Amendment 3). Should a project on the other mode be open, the switch, Undo, Redo and Open may
+  still bring it to the job's mode, and nothing else. A running CNC job's hold moves as CNC
+  either way: a point move needs Work Z and lifts to the job's own safe Z first, and Z jog,
+  Zero Z and the probe stay offered.
 
 ---
 
@@ -7515,6 +7520,13 @@ as the pane's design record.
 2. Fingerprint-only capsules (a migrated legacy checkpoint or an ADR-337 Start
    stand-in) cannot use pass recovery and are directed to the runway review
    (F-CNC27), which uses the current-project fingerprint fallback.
+3. With a Laser project open, Start stays off and the wizard says to open the
+   job's CNC project or switch the toolbar to CNC: the bit-change holds are
+   worked from the open project (the Active bit that Zero Z and the probe bind
+   to). The runway review refuses the same way, and both check again at the
+   final Start assertion, since the switch stays usable while their dialogs
+   are open. The recovery stays on its card; no job line is sent (ADR-416
+   Amendment 3).
 
 #### Empty
 1. Without a retained CNC capsule no recovery card is shown (unchanged).

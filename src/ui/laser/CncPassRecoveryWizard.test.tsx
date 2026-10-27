@@ -18,6 +18,7 @@ import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { createExecutionArtifact, type RecoveryCapsule } from '../state/recovery';
 import { runCncPassRecoveryFlow } from './cnc-pass-recovery-flow';
+import { CNC_RECOVERY_NEEDS_CNC_PROJECT } from './cnc-recovery-open-project';
 import { CncPassRecoveryWizard } from './CncPassRecoveryWizard';
 
 vi.mock('./cnc-pass-recovery-flow', () => ({
@@ -127,8 +128,13 @@ function exactCapsule(options?: {
   };
 }
 
-function renderWizard(capsule: RecoveryCapsule): { readonly onClose: ReturnType<typeof vi.fn> } {
-  useStore.setState({ project: createProject() });
+// The recovery needs a CNC project open (ADR-416 Amendment 3); an unrelated
+// CNC project proves the review still reads only the sealed capsule.
+function renderWizard(
+  capsule: RecoveryCapsule,
+  openProject: Project = { ...createProject(), machine: DEFAULT_CNC_MACHINE_CONFIG },
+): { readonly onClose: ReturnType<typeof vi.fn> } {
+  useStore.setState({ project: openProject });
   useLaserStore.setState({
     ...initialLaserState(),
     wcoCache: { x: 0, y: 0, z: 0 },
@@ -151,6 +157,12 @@ function wizardButton(label: string): HTMLButtonElement {
     throw new Error(`Expected wizard button: ${label}`);
   }
   return button;
+}
+
+function alertTexts(): ReadonlyArray<string> {
+  return [...(host?.querySelectorAll('[role="alert"]') ?? [])].map(
+    (element) => element.textContent ?? '',
+  );
 }
 
 function boundarySelect(): HTMLSelectElement {
@@ -278,6 +290,26 @@ describe('CncPassRecoveryWizard', () => {
     const retained = host?.querySelector<HTMLInputElement>('input[type="radio"]');
     expect(retained?.disabled).toBe(true);
     expect(host?.textContent).toContain('rebooted');
+  });
+
+  // Rolling audit v3 G2-P1-1: with a Laser project open, the recovery reached a
+  // bit-change hold that Zero Z and the probe could not serve.
+  it('says to open the CNC project and keeps Start off while a Laser project is open', () => {
+    renderWizard(exactCapsule(), createProject());
+    completeChecklist();
+    act(() => {
+      rezeroedRadio().click();
+    });
+
+    expect(alertTexts()).toContain(CNC_RECOVERY_NEEDS_CNC_PROJECT);
+    expect(wizardButton('Start pass recovery').disabled).toBe(true);
+
+    act(() => {
+      useStore.getState().setMachineKind('cnc');
+    });
+
+    expect(alertTexts()).not.toContain(CNC_RECOVERY_NEEDS_CNC_PROJECT);
+    expect(wizardButton('Start pass recovery').disabled).toBe(false);
   });
 
   it('opens the advanced runway wizard on request', () => {
