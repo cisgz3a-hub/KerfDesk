@@ -78,12 +78,12 @@ type SimulatedTransport = ReturnType<typeof simulatedTransport>;
 const IDLE = '<Idle|MPos:12,34,0|FS:0,0>';
 
 beforeEach(() => {
-  useStore.getState().setProject(
-    createProject({
-      ...DEFAULT_DEVICE_PROFILE,
-      homing: { ...DEFAULT_DEVICE_PROFILE.homing, enabled: true },
-    }),
-  );
+  // Opening a file for the machine in use keeps its setup (ADR-500 Amendment
+  // 2), so homing is turned on as the operator would, in the profile.
+  useStore.getState().setProject(createProject(DEFAULT_DEVICE_PROFILE));
+  useStore.getState().updateDeviceProfile({
+    homing: { ...DEFAULT_DEVICE_PROFILE.homing, enabled: true },
+  });
   useStore.setState({ dirty: false });
   vi.spyOn(window, 'confirm').mockReturnValue(true);
 });

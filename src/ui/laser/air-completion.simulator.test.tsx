@@ -125,10 +125,8 @@ describe('automatic job Air completion', () => {
     'keeps the active M8 output truthful after Open selects %s and reconciles M9 without accessory reports',
     async (nextCommand) => {
       const project = createProject();
-      useStore.getState().setProject({
-        ...project,
-        device: { ...project.device, airAssistCommand: 'M8' },
-      });
+      useStore.getState().setProject(project);
+      useStore.getState().updateDeviceProfile({ airAssistCommand: 'M8' });
       const sim = createGrblSimulator();
       await useLaserStore.getState().connect(sim.adapter);
       await vi.advanceTimersByTimeAsync(1120);
@@ -144,9 +142,11 @@ describe('automatic job Air completion', () => {
       await vi.advanceTimersByTimeAsync(10);
       expect(useLaserStore.getState().streamer?.status).toBe('streaming');
       const activeStream = useLaserStore.getState().streamer;
+      // A file for another machine brings its own air output (ADR-500
+      // Amendment 2: a file for this machine keeps the machine's).
       useStore.getState().setProject({
         ...createProject(),
-        device: { ...project.device, airAssistCommand: nextCommand },
+        device: { ...project.device, name: 'Other machine', airAssistCommand: nextCommand },
       });
       expect(useLaserStore.getState().streamer).toBe(activeStream);
       sim.port.emitLine('<Run|MPos:10.000,0.000,0.000|FS:600,100|A:F|Ov:100,100,100>');

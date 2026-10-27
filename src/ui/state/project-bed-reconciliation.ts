@@ -152,7 +152,17 @@ export function withCurrentMachineSetup(
   const device: DeviceProfile = { ...rest, ...cameraFields(project.device) };
   // With no CNC values in use, the file's come in, as its camera does.
   const kept = withCncParams({ ...project, device }, currentCncParams(previous));
+  // A matching copy opens as the file's own object, as before.
+  if (sameValue(device, project.device) && sameValue(cncParamsOf(kept), cncParamsOf(project)))
+    return { project, replaced: [] };
   return { project: kept, replaced: replacedSetupLabels(project, kept) };
+}
+
+function cncParamsOf(project: Project): unknown {
+  return [
+    project.machine?.kind === 'cnc' ? project.machine.params : null,
+    project.parkedCncMachine?.params ?? null,
+  ];
 }
 
 // The machine values the CNC head had before Open: the live CNC job's, the
