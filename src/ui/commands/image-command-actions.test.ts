@@ -32,7 +32,6 @@ function raster(): RasterImage {
     color: '#808080',
     dither: 'threshold',
     linesPerMm: 10,
-    role: 'trace-source',
   };
 }
 

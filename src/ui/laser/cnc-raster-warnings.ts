@@ -12,7 +12,6 @@ export function detectCncRasterWarnings(project: Project): ReadonlyArray<string>
   const droppedCount = project.scene.objects.filter(
     (object) =>
       object.kind === 'raster-image' &&
-      object.role !== 'trace-source' &&
       outputOperations.some((operation) => sceneObjectUsesOperation(object, operation)),
   ).length;
   if (droppedCount === 0) return [];

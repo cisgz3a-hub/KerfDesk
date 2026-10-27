@@ -4,7 +4,12 @@ import { act } from 'react';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { createProject } from '../../core/scene';
-import { applyTransform, type RasterImage, type TracedImage } from '../../core/scene';
+import {
+  applyTransform,
+  operationIdsForObject,
+  type RasterImage,
+  type TracedImage,
+} from '../../core/scene';
 import { buildBitmapFromVectors } from '../raster/vector-to-bitmap';
 import { resolveTraceCommitResult } from './trace-commit-result';
 import { retraceOriginalAction } from '../commands/image-command-actions';
@@ -51,11 +56,20 @@ describe('camera capture enters Trace as an atomic registered import', () => {
         remove
           ? undefined
           : expect.objectContaining({
-              role: 'trace-source',
               bounds: seed.bounds,
               transform: seed.transform,
             }),
       );
+      // A kept capture is a bed picture: it stays, on an output-off Image
+      // operation of its own, and never engraves (ADR-673).
+      if (kept !== undefined) {
+        const keptOperations = operationIdsForObject(kept, committed.scene.layers);
+        expect(
+          committed.scene.layers
+            .filter((layer) => keptOperations.includes(layer.id))
+            .map((layer) => layer.output),
+        ).toEqual([false]);
+      }
       const added = committed.scene.objects.find((o) => o.id === s.selectedObjectId)!;
       expect('traceSourceId' in added && added.traceSourceId).toBe(seed.id);
       expect(s.additionalSelectedIds.size).toBe(0);
@@ -128,7 +142,9 @@ describe('camera capture enters Trace as an atomic registered import', () => {
       expect(useUiStore.getState().imageDialog).toBe(next);
       expect(buildBitmapFromVectors).not.toHaveBeenCalled();
       await submit();
-      expect(useStore.getState().project.scene.objects).toHaveLength(3);
+      // The later dialog keeps its capture: Delete Image After trace is off by
+      // default (ADR-673), so capture and trace join the two existing objects.
+      expect(useStore.getState().project.scene.objects).toHaveLength(4);
     },
   );
   it.each([false, true])('abandons the bitmap-build await, delete %s', async (remove) => {

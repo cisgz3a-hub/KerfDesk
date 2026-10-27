@@ -69,7 +69,7 @@ function burnedArtworkIdentity(
   operations: ReadonlyArray<Layer>,
 ): { readonly key: string; readonly source: string } | null {
   if (obj.kind === 'raster-image') {
-    if (obj.role === 'trace-source' || !burnsAs(obj, operations, true)) return null;
+    if (!burnsAs(obj, operations, true)) return null;
     return { key: rasterContentKey(obj), source: obj.source };
   }
   if (obj.kind === 'traced-image') {

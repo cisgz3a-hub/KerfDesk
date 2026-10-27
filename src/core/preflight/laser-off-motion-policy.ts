@@ -35,7 +35,7 @@ export function maxOutputOverscanMm(scene: Scene, device: DeviceProfile): number
   const imageOverscan = Math.max(
     0,
     ...scene.objects.flatMap((object) =>
-      object.kind === 'raster-image' && object.role !== 'trace-source'
+      object.kind === 'raster-image'
         ? imageLayers
             .filter((layer) => sceneObjectUsesOperation(object, layer))
             // Along X (0 degrees) is the longest automatic runway; any scan

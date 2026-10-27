@@ -7,11 +7,13 @@ import {
   type Layer,
   type LayerOperationSettings,
   type RasterImage,
+  remapSceneObjectOperationBindings,
   removeObject,
   replaceObject,
   type Scene,
   sceneObjectUsesOperation,
 } from '../../core/scene';
+import { cloneLayerSubLayers } from '../../core/scene/layer';
 import {
   type MutationResult,
   pruneOrphanLayers,
@@ -19,7 +21,6 @@ import {
   type StateSlice,
   type TraceExistingImageOptions,
 } from './scene-mutations';
-import { releaseTraceSourcePalette } from './trace-source-palette';
 import {
   effectiveOperationForObject,
   operationOverrideForObject,
@@ -29,10 +30,15 @@ import { repairRemovedProjectObjectReferences } from './repair-object-dependenci
 /**
  * Atomically replace a trace result with an Image-pipeline raster.
  *
- * The derived bitmap shares the source photo's effective Image operations so
- * speed, power, dither, density, passes, and scan direction do not silently
- * change. A kept source is render-only; a deleted source's operation survives
- * because the result is added before orphan pruning.
+ * The derived bitmap burns with the source photo's effective Image operations
+ * so speed, power, dither, density, passes, and scan direction do not silently
+ * change. A deleted source hands its operations to the result (they survive
+ * because the result is added before orphan pruning). A kept source is an
+ * ordinary image that engraves on its own operations (ADR-673), so the result
+ * gets copies of them instead: either can then be turned off on its own, like
+ * a LightBurn image and its trace on separate layers. Re-trace in place keeps
+ * the result's own operations. The copies are reported as inherited so the
+ * fresh-operation seeding of a trace commit leaves their settings alone.
  */
 export function applyRasterizedTraceToExisting(
   s: StateSlice,
@@ -42,6 +48,7 @@ export function applyRasterizedTraceToExisting(
 ): MutationResult &
   ReturnType<typeof repairRemovedProjectObjectReferences> & {
     readonly additionalSelectedIds: ReadonlySet<string>;
+    readonly inheritedOperationIds: ReadonlyArray<string>;
   } {
   const source = s.project.scene.objects.find(
     (object): object is RasterImage => object.id === sourceId && object.kind === 'raster-image',
@@ -54,35 +61,33 @@ export function applyRasterizedTraceToExisting(
   if (options.replaceTraceId !== undefined && options.replaceTraceId !== raster.id) {
     scene = removeObject(scene, options.replaceTraceId);
   }
-  if (source !== undefined) {
-    scene =
-      options.deleteSourceAfterTrace === true
-        ? removeObject(scene, source.id)
-        : replaceObject(scene, source.id, { ...source, role: 'trace-source' });
+  if (source !== undefined && options.deleteSourceAfterTrace === true) {
+    scene = removeObject(scene, source.id);
   }
 
   const prepared = prepareRasterizedTrace(raster, sourceId, source);
-  const replaceInPlace =
-    options.replaceTraceId === raster.id && scene.objects.some((object) => object.id === raster.id);
-  let committed: RasterImage;
-  if (reusableOperationIds.length > 0) {
-    committed = { ...prepared, operationIds: reusableOperationIds };
-    scene = placeRasterizedTrace(scene, committed, replaceInPlace);
-  } else {
-    const allocated = allocateFreshRasterOperation(scene, prepared, {
-      source,
-      fallbackLayer,
-      deleteSource: options.deleteSourceAfterTrace === true,
-      replaceInPlace,
-    });
-    scene = allocated.scene;
-    committed = allocated.committed;
-  }
-  scene = pruneOrphanLayers(scene);
+  const inPlace =
+    options.replaceTraceId === raster.id
+      ? scene.objects.find((object) => object.id === raster.id)
+      : undefined;
+  // A vector result re-traced as a raster swaps kind in place; only a raster
+  // result has Image operations of its own to keep.
+  const replaced = inPlace?.kind === 'raster-image' ? inPlace : undefined;
+  const bound = bindRasterizedTrace(scene, prepared, {
+    source,
+    fallbackLayer,
+    deleteSource: options.deleteSourceAfterTrace === true,
+    replaceInPlace: inPlace !== undefined,
+    replaced,
+    reusableOperationIds,
+  });
+  const committed = bound.committed;
+  scene = pruneOrphanLayers(bound.scene);
   return {
     ...repairRemovedProjectObjectReferences({ ...s.project, scene }),
     selectedObjectId: committed.id,
     additionalSelectedIds: new Set<string>(),
+    inheritedOperationIds: bound.inheritedOperationIds ?? [],
     undoStack: pushUndo(s.project, s.undoStack),
     redoStack: [],
     dirty: true,
@@ -96,24 +101,111 @@ type FreshRasterOperationContext = {
   readonly replaceInPlace: boolean;
 };
 
+type RasterBindingContext = FreshRasterOperationContext & {
+  readonly replaced: RasterImage | undefined;
+  readonly reusableOperationIds: ReadonlyArray<string>;
+};
+
+type BoundRasterizedTrace = {
+  readonly scene: Scene;
+  readonly committed: RasterImage;
+  // Operations copied from the kept source, settings included.
+  readonly inheritedOperationIds?: ReadonlyArray<string>;
+};
+
+function bindRasterizedTrace(
+  scene: Scene,
+  prepared: RasterImage,
+  ctx: RasterBindingContext,
+): BoundRasterizedTrace {
+  const ownOperations = ctx.replaced === undefined ? null : liveBinding(scene, ctx.replaced);
+  if (ctx.replaced !== undefined && ownOperations !== null) {
+    const committed = withResultSettings(prepared, ctx.replaced, ownOperations);
+    return { scene: placeRasterizedTrace(scene, committed, true), committed };
+  }
+  if (ctx.reusableOperationIds.length === 0)
+    return allocateFreshRasterOperation(scene, prepared, ctx);
+  const shared = { ...prepared, operationIds: ctx.reusableOperationIds };
+  if (ctx.source !== undefined && !ctx.deleteSource) {
+    return copySourceOperations(scene, shared, ctx.replaceInPlace);
+  }
+  return { scene: placeRasterizedTrace(scene, shared, ctx.replaceInPlace), committed: shared };
+}
+
+// The replaced result's operation ids when every one still exists.
+function liveBinding(scene: Scene, result: RasterImage): ReadonlyArray<string> | null {
+  const ids = result.operationIds;
+  if (ids === undefined || ids.length === 0) return null;
+  return ids.every((id) => scene.layers.some((layer) => layer.id === id)) ? ids : null;
+}
+
+// Re-trace in place changes the bitmap, not the result's operations or the
+// settings the operator gave this result.
+function withResultSettings(
+  prepared: RasterImage,
+  replaced: RasterImage,
+  operationIds: ReadonlyArray<string>,
+): RasterImage {
+  const { operationOverride: _override, powerScale: _powerScale, ...content } = prepared;
+  return {
+    ...content,
+    color: replaced.color,
+    operationIds,
+    ...(replaced.operationOverride === undefined
+      ? {}
+      : { operationOverride: replaced.operationOverride }),
+    ...(replaced.powerScale === undefined ? {} : { powerScale: replaced.powerScale }),
+  };
+}
+
+// A kept source keeps its operations; the result burns with copies of them,
+// sub-operations and per-artwork settings included, after the source's.
+function copySourceOperations(
+  scene: Scene,
+  shared: RasterImage,
+  replaceInPlace: boolean,
+): BoundRasterizedTrace {
+  const sourceOperations = scene.layers.filter((layer) => shared.operationIds?.includes(layer.id));
+  let working = scene;
+  const copies = new Map<string, string>();
+  for (const operation of sourceOperations) {
+    const created = createArtworkOperation(working, shared, {
+      mode: 'image',
+      subLayers: operation.subLayers,
+    });
+    working = addLayer(working, {
+      ...operation,
+      id: created.operation.id,
+      name: created.operation.name,
+      color: created.operation.color,
+      subLayers: cloneLayerSubLayers(operation.subLayers),
+    });
+    copies.set(operation.id, created.operation.id);
+  }
+  const committed = remapSceneObjectOperationBindings(
+    shared,
+    sourceOperations,
+    copies,
+  ) as RasterImage;
+  return {
+    scene: placeRasterizedTrace(working, committed, replaceInPlace),
+    committed,
+    inheritedOperationIds: [...copies.values()],
+  };
+}
+
 // The no-reusable-Image-operation branch: allocate a fresh Image operation for
 // the rasterized trace. Extracted so applyRasterizedTraceToExisting stays under
-// the complexity cap once palette-freeing is added.
+// the complexity cap.
 function allocateFreshRasterOperation(
   scene: Scene,
   prepared: RasterImage,
   ctx: FreshRasterOperationContext,
 ): { readonly scene: Scene; readonly committed: RasterImage } {
-  // Free the source's palette slot before allocating (mirror of
-  // applyTraceToExisting) so the trace takes OPERATION_PALETTE[0], not the
-  // runner-up. A deleted source's operation is already orphaned — prune it so
-  // its slot frees too.
-  let working = scene;
-  if (ctx.source !== undefined) {
-    working = ctx.deleteSource
-      ? pruneOrphanLayers(working)
-      : releaseTraceSourcePalette(working, ctx.source);
-  }
+  // A deleted source's operation is already orphaned: prune it before
+  // allocating (mirror of applyTraceToExisting) so its colour frees. A kept
+  // source keeps its operation and colour.
+  const working = ctx.source !== undefined && ctx.deleteSource ? pruneOrphanLayers(scene) : scene;
   const created = createArtworkOperation(working, prepared, { mode: 'image' });
   const committed: RasterImage = {
     ...(created.object as RasterImage),
@@ -138,7 +230,6 @@ function prepareRasterizedTrace(
   source: RasterImage | undefined,
 ): RasterImage {
   const {
-    role: _role,
     operationIds: _operationIds,
     operationOverride: _operationOverride,
     powerScale: _powerScale,

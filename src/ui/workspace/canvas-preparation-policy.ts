@@ -51,7 +51,7 @@ function interactiveRasterPreparationIsCostly(project: Project): boolean {
   const operations = project.scene.layers.flatMap(outputOperationLayers);
   let sourcePixels = 0;
   for (const object of project.scene.objects) {
-    if (object.kind !== 'raster-image' || object.role === 'trace-source') continue;
+    if (object.kind !== 'raster-image') continue;
     const hasImageOutput = operations.some(
       (operation) =>
         sceneObjectUsesOperation(object, operation) &&

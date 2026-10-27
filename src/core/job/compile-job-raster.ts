@@ -80,7 +80,6 @@ export function compileRasterGroupsForLayer(
   };
   for (const obj of objects) {
     if (obj.kind !== 'raster-image' || !sceneObjectUsesOperation(obj, layer)) continue;
-    if (obj.role === 'trace-source') continue;
     const effectiveLayer = effectiveOperationForObject(layer, obj);
     if (effectiveLayer.mode !== 'image') continue;
     appendObjectRasterGroups(obj, effectiveLayer, device, out, {

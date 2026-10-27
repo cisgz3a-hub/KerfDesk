@@ -83,9 +83,12 @@ function committedRaster(project: Project, id = 'raster-trace'): RasterImage {
 }
 
 describe('applyRasterizedTraceToExisting', () => {
-  it('keeps the source as render-only and reuses its complete Image operation', () => {
+  // ADR-673: the kept photo is an ordinary image that engraves on its own
+  // operation, and the result burns on a copy of it, so either can be turned
+  // off alone. This used to pin the photo as render-only on a shared operation.
+  it('keeps the source as an ordinary image and gives the result a copy of its operation', () => {
     const project = projectWithSource();
-    const originalOperation = project.scene.layers[0];
+    const originalOperation = imageOperation();
     const result = applyRasterizedTraceToExisting(
       { project, undoStack: [] },
       'source-photo',
@@ -93,31 +96,51 @@ describe('applyRasterizedTraceToExisting', () => {
     );
     const source = committedRaster(result.project, 'source-photo');
     const output = committedRaster(result.project);
+    const [kept, copy] = result.project.scene.layers;
 
-    expect(source.role).toBe('trace-source');
+    expect(source).toEqual(project.scene.objects[0]);
+    expect(kept).toEqual(originalOperation);
+    expect(copy).toEqual({
+      ...originalOperation,
+      id: copy?.id,
+      name: copy?.name,
+      color: copy?.color,
+    });
+    expect(copy?.id).not.toBe(originalOperation.id);
+    expect(copy?.color).not.toBe(originalOperation.color);
     expect(output).toMatchObject({
       traceSourceId: 'source-photo',
       color: source.color,
-      operationIds: ['photo-operation'],
+      operationIds: [copy?.id],
       operationOverride: { ...source.operationOverride, negativeImage: false },
       powerScale: source.powerScale,
       dither: source.dither,
       linesPerMm: source.linesPerMm,
     });
-    expect(output.role).toBeUndefined();
-    expect(result.project.scene.layers).toEqual([originalOperation]);
 
     const groups = compileJob(result.project.scene, result.project.device).groups;
-    expect(groups).toHaveLength(1);
-    expect(groups[0]).toMatchObject({
+    const rasterSources = (job: typeof groups): ReadonlyArray<string> =>
+      job.flatMap((group) => (group.kind === 'raster' ? [group.sourceObjectId ?? ''] : [])).sort();
+    expect(rasterSources(groups)).toEqual([output.id, source.id].sort());
+    expect(
+      groups.find((group) => group.kind === 'raster' && group.sourceObjectId === output.id),
+    ).toMatchObject({
       kind: 'raster',
       sourceObjectId: output.id,
-      layerId: 'photo-operation',
+      layerId: copy?.id,
       power: 37.6,
       speed: 777,
       passes: 2,
       bidirectional: false,
     });
+
+    const photoOff = {
+      ...result.project.scene,
+      layers: result.project.scene.layers.map((layer) =>
+        layer.id === originalOperation.id ? { ...layer, output: false } : layer,
+      ),
+    };
+    expect(rasterSources(compileJob(photoOff, result.project.device).groups)).toEqual([output.id]);
   });
 
   it('can delete the source without pruning the operation now used by the result', () => {
@@ -252,7 +275,7 @@ describe('applyRasterizedTraceToExisting', () => {
     expect(groups[0]).toMatchObject({ kind: 'raster', sourceObjectId: output.id });
   });
 
-  it('reuses the parent binding when the effective Image operation is a sublayer', () => {
+  it('copies the parent operation, sub-operations included, when the Image pass is a sublayer', () => {
     const source = sourceRaster();
     const parent = createLayer({ id: 'photo-operation', color: '#336699', mode: 'line' });
     const imageSubLayer = createLayerSubLayer(parent, {
@@ -283,13 +306,17 @@ describe('applyRasterizedTraceToExisting', () => {
     const output = committedRaster(result.project);
     const groups = compileJob(result.project.scene, result.project.device).groups;
 
-    expect(output.operationIds).toEqual([parent.id]);
-    expect(result.project.scene.layers).toHaveLength(1);
-    expect(groups).toHaveLength(1);
-    expect(groups[0]).toMatchObject({
+    const copy = result.project.scene.layers[1];
+    expect(result.project.scene.layers).toHaveLength(2);
+    expect(copy?.subLayers).toEqual([imageSubLayer]);
+    expect(output.operationIds).toEqual([copy?.id]);
+    expect(groups).toHaveLength(2);
+    expect(
+      groups.find((group) => group.kind === 'raster' && group.sourceObjectId === output.id),
+    ).toMatchObject({
       kind: 'raster',
       sourceObjectId: output.id,
-      layerId: `${parent.id}:${imageSubLayer.id}`,
+      layerId: `${copy?.id}:${imageSubLayer.id}`,
       power: 37.6,
       speed: 654,
     });
@@ -353,7 +380,9 @@ describe('applyRasterizedTraceToExisting', () => {
       binaryTrace,
     );
     const output = committedRaster(result.project);
-    const group = compileJob(result.project.scene, result.project.device).groups[0];
+    const group = compileJob(result.project.scene, result.project.device).groups.find(
+      (candidate) => candidate.kind === 'raster' && candidate.sourceObjectId === output.id,
+    );
 
     expect(output.operationOverride).toEqual({ power: 47, negativeImage: false });
     expect(group?.kind).toBe('raster');

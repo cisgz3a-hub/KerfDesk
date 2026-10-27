@@ -427,15 +427,14 @@ describe('applyTraceToExisting (ADR-026)', () => {
     expect(result.undoStack[0]).toBe(project);
   });
 
-  it("tags the source raster 'trace-source' so the canvas tints the deletable backing", () => {
+  // ADR-673: a kept source is an ordinary image that engraves, as in LightBurn.
+  // This used to pin a 'trace-source' tag that left it out of every job.
+  it('leaves a kept source raster exactly as it was, on its own operation', () => {
     const project = projectWithSource();
+    const source = project.scene.objects.find((o) => o.kind === 'raster-image');
     const result = applyTraceToExisting({ project, undoStack: [] }, 'src1', tracedVector());
     const raster = result.project.scene.objects.find((o) => o.kind === 'raster-image');
-    if (raster?.kind === 'raster-image') {
-      expect(raster.role).toBe('trace-source');
-    } else {
-      throw new Error('expected a raster-image to remain in the scene');
-    }
+    expect(raster).toBe(source);
   });
 
   it('records the source raster id on the trace for Re-trace Original', () => {
@@ -445,7 +444,7 @@ describe('applyTraceToExisting (ADR-026)', () => {
     expect(trace?.traceSourceId).toBe('src1');
   });
 
-  it('degrades gracefully: missing source → trace added at its own transform, nothing tagged', () => {
+  it('degrades gracefully: missing source → trace added at its own transform', () => {
     const project = projectWithSource();
     const result = applyTraceToExisting({ project, undoStack: [] }, 'no-such-id', tracedVector());
     const objects = result.project.scene.objects;
@@ -453,9 +452,7 @@ describe('applyTraceToExisting (ADR-026)', () => {
     const raster = objects.find((o) => o.kind === 'raster-image');
     // No source to adopt → trace keeps its own placeholder transform.
     expect(trace?.transform).toEqual(IDENTITY_TRANSFORM);
-    // The unrelated existing bitmap is left untouched (not tagged).
-    if (raster?.kind === 'raster-image') {
-      expect(raster.role).toBeUndefined();
-    }
+    // The unrelated existing bitmap is left untouched.
+    expect(raster).toBe(project.scene.objects.find((o) => o.kind === 'raster-image'));
   });
 });

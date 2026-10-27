@@ -41,15 +41,6 @@ describe('hasPreviewableContent', () => {
 
     expect(hasPreviewableContent(project)).toBe(true);
   });
-
-  it('ignores trace-source raster backing images', () => {
-    const project = withScene({
-      objects: [{ ...rasterObject('image', '#808080'), role: 'trace-source' }],
-      layers: [createLayer({ id: '#808080', color: '#808080', mode: 'image' })],
-    });
-
-    expect(hasPreviewableContent(project)).toBe(false);
-  });
 });
 
 describe('hasPreviewableContent — CNC machine (H.5 / ADR-101)', () => {

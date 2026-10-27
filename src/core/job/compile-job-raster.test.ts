@@ -1,8 +1,8 @@
 // Raster-image compile tests, split from compile-job.test.ts when that file
 // hit the 400-line cap. Covers RasterGroup construction: passes, grayscale
 // power mapping, lines/mm resample, fail-safe luma, machine orientation
-// (origin flips XOR object mirror), transformed bounds, and trace-source
-// exclusion.
+// (origin flips XOR object mirror), transformed bounds, and a photo kept
+// behind its trace.
 
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../devices';
@@ -389,12 +389,16 @@ describe('compileJob raster image groups', () => {
     expect(bounds?.maxY).toBeCloseTo(dev.bedHeight);
   });
 
-  it('does not raster-engrave trace-source backing images', () => {
-    const source = { ...rasterObject('AP//AA=='), role: 'trace-source' as const };
+  // ADR-673 replaced the exclusion this test used to pin: a photo kept when
+  // tracing engraves on its Image operation, as in LightBurn, and the trace
+  // then runs on its own operation.
+  it('raster-engraves a photo kept behind its trace, then runs the trace', () => {
+    const source = rasterObject('AP//AA==');
     const trace: SceneObject = {
       kind: 'traced-image',
       id: 'T1',
       source: 'photo.png',
+      traceSourceId: source.id,
       bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
       transform: IDENTITY_TRANSFORM,
       paths: [
@@ -419,6 +423,6 @@ describe('compileJob raster image groups', () => {
       { ...createLayer({ id: 'trace', color: '#000000', mode: 'fill' }), hatchSpacingMm: 2 },
     ];
     const job = compileJob({ objects: [source, trace], layers }, dev);
-    expect(job.groups.map((g) => g.kind)).toEqual(['fill']);
+    expect(job.groups.map((g) => g.kind)).toEqual(['raster', 'fill']);
   });
 });

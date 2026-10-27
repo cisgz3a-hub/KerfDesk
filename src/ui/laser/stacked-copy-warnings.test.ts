@@ -57,11 +57,6 @@ describe('stacked copy warnings', () => {
     );
   });
 
-  it('ignores the tinted trace-source backing, which never burns', () => {
-    const copies = [wingCopy('a', 20, 20), wingCopy('b', 20, 20, { role: 'trace-source' })];
-    expect(stackedCopyWarnings(project(copies))).toEqual([]);
-  });
-
   it('treats different pixels under one generic label as different artwork', () => {
     const copies = [
       wingCopy('a', 20, 20, {

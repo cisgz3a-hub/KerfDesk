@@ -4152,13 +4152,20 @@ settings and Job Review keep their existing read-only setup references.
    Photo paths and saved traces retain compact polylines when their line curves would only
    duplicate the same vertices. Explicit curve/node commands materialise their editable
    geometry inside the edit transaction; Undo restores the previous representation.
-   **Delete Image After trace** starts selected and removes the source bitmap only after a
-   successful commit. Uncheck it to retain the bitmap beside the trace for **Re-trace Original**. Cancel, failed tracing,
+   **Delete Image After trace** starts cleared, as in LightBurn, and when ticked removes the
+   source bitmap only after a successful commit. A kept bitmap is an ordinary image: it engraves
+   on its own Image operation (a Raster scan result burns on a copy of that operation), and
+   **Re-trace Original** can use it. Delete it or turn its operation's Output off to run only the
+   trace. A kept camera capture is a placement reference and stays on an Image operation with
+   Output off (ADR-673). Copying the trace copies only the trace. Cancel, failed tracing,
    and abandoned requests retain the source; Undo reverses the import and source deletion together.
    The committed trace records the dialog's preset, adjusted settings, output, fill style and
    boundary, and saves them with the project. **Re-trace Original** reopens the dialog with them
    and with **Delete Image After trace** cleared, so the source stays for the next re-trace
    (ADR-408). Traces made before that record reopen on the defaults.
+   Projects saved before ADR-673 marked a kept bitmap as a trace source that never engraved. They
+   open with that bitmap as an ordinary image that engraves, and a kept camera capture on an
+   output-off operation.
    In a CNC project, smoothing retains established stroke junctions at the
    source image's current physical size. In a laser project, outlines keep the
    tracer's fitted curves and store the chords the job burns within 0.025 mm;
@@ -8450,10 +8457,10 @@ as the pane's design record.
    vector-only artwork the path is **Convert to Bitmap** (F-F4) first; the
    menu tooltip says so.
 
-#### Edge — trace-source image
-1. Editing a kept trace source (ADR-026 tinted backing) changes future
-   re-traces only after Apply; the existing committed vectors are untouched
-   until the operator re-traces (F-L3).
+#### Edge — image kept after Trace
+1. Editing an image kept after Trace (ADR-026, an ordinary image since
+   ADR-673) changes future re-traces only after Apply; the existing committed
+   vectors are untouched until the operator re-traces (F-L3).
 
 #### Edge — dialog and asynchronous ownership
 1. Text, Image Size, and Canvas Size belong to the exact open editor session

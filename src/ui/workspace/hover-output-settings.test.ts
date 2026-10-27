@@ -210,12 +210,13 @@ describe('hoverOutputSettings', () => {
     });
   });
 
-  it("does not show power for a trace's source bitmap, which output skips", () => {
+  // ADR-673: a photo kept behind its trace engraves, so its hover shows the
+  // power and speed it burns at. This used to read "Trace source, not output".
+  it("shows the power and speed of a trace's kept photo, which engraves", () => {
     const source: SceneObject = {
       kind: 'raster-image',
       id: 'S1',
       source: 'photo.png',
-      role: 'trace-source',
       dataUrl: 'data:,',
       pixelWidth: 10,
       pixelHeight: 10,
@@ -226,9 +227,8 @@ describe('hoverOutputSettings', () => {
       linesPerMm: 10,
     };
     const image = operation('red', '#ff0000', { mode: 'image' });
-    expect(hoverOutputSettings(projectWith([image], source), source)).toEqual({
-      kind: 'note',
-      text: 'Trace source, not output',
+    expect(hoverOutputSettings(projectWith([image], source), source)).toMatchObject({
+      kind: 'runs',
     });
   });
 

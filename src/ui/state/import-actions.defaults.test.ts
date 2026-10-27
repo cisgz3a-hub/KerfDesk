@@ -200,7 +200,24 @@ describe('image creation with legacy CNC defaults', () => {
 
     useStore.getState().commitRasterizedTrace('source', raster('output'));
 
+    // The kept photo engraves on its own operation, so the result burns on a
+    // copy of it with the same settings, not the Startup defaults (ADR-673).
+    expect(operationFor('source')).toMatchObject({ id: operation.id, cnc });
+    expect(operationFor('output').id).not.toBe(operation.id);
+    expect(operationFor('output')).toMatchObject({ cnc, linesPerMm: 17 });
+  });
+
+  it('hands a deleted source Image operation and its Startup bindings to the rasterized result', () => {
+    useStore.getState().importRasterImage(raster('source'));
+    const operation = operationFor('source');
+    const cnc = { ...DEFAULT_CNC_LAYER_SETTINGS, toolId: 'em-6350', feedMmPerMin: 876 };
+    useStore.getState().setLayerParam(operation.id, { cnc });
+    restoreLegacyDefaults();
+
+    useStore
+      .getState()
+      .commitRasterizedTrace('source', raster('output'), { deleteSourceAfterTrace: true });
+
     expect(operationFor('output')).toMatchObject({ id: operation.id, cnc, linesPerMm: 17 });
-    expect(operationFor('source').cnc).toEqual(cnc);
   });
 });

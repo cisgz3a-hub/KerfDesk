@@ -41,7 +41,11 @@ export function jigBackgroundIds(scene: Scene): ReadonlySet<string> {
 function closeOver(scene: Scene, members: Set<string>): void {
   const uses = scene.objects.map((object) => ({
     id: object.id,
-    dependencies: [...sceneObjectCopyDependencyIds(object), ...reliefLinks(object)],
+    dependencies: [
+      ...sceneObjectCopyDependencyIds(object),
+      ...traceSourceLink(object),
+      ...reliefLinks(object),
+    ],
   }));
   for (let grew = true; grew; ) {
     const before = members.size;
@@ -54,6 +58,14 @@ function closeOver(scene: Scene, members: Set<string>): void {
     }
     grew = members.size !== before;
   }
+}
+
+// A trace's kept picture is no copy dependency (ADR-673), but Re-trace Original
+// reads and can delete it, so it still belongs to the trace's jig.
+function traceSourceLink(object: SceneObject): readonly string[] {
+  return 'traceSourceId' in object && object.traceSourceId !== undefined
+    ? [object.traceSourceId]
+    : [];
 }
 
 // A retained relief keeps links to the vectors it was authored from.
