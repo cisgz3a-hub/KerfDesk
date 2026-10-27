@@ -71,7 +71,7 @@ function partObject(part: Part): ImportedSvg {
   };
 }
 
-function layer(id: 'a' | 'b', cutType: CncCutType): Layer {
+function layer(id: 'a' | 'b', cutType: CncCutType, finishAllowanceMm = 0): Layer {
   return {
     ...createLayer({ id, color: COLORS[id] }),
     name: id === 'a' ? 'Plates' : 'Brackets',
@@ -82,18 +82,23 @@ function layer(id: 'a' | 'b', cutType: CncCutType): Layer {
       depthMm: 3,
       depthPerPassMm: 1.5,
       tabsEnabled: false,
+      ...(finishAllowanceMm > 0 ? { finishAllowanceMm } : {}),
     },
   };
 }
 
-function project(parts: ReadonlyArray<Part>, cutB: CncCutType = 'profile-outside'): Project {
+function project(
+  parts: ReadonlyArray<Part>,
+  cutB: CncCutType = 'profile-outside',
+  finishAllowanceMm = 0,
+): Project {
   const ids = [...new Set(parts.map((part) => part.layer))];
   return {
     ...createProject(),
     machine: DEFAULT_CNC_MACHINE_CONFIG,
     scene: {
       objects: parts.map(partObject),
-      layers: ids.map((id) => layer(id, id === 'b' ? cutB : 'profile-outside')),
+      layers: ids.map((id) => layer(id, id === 'b' ? cutB : 'profile-outside', finishAllowanceMm)),
     },
   };
 }
@@ -108,8 +113,8 @@ function regions(source: Project, parts: ReadonlyArray<Part>): ReadonlyArray<Kep
   }));
 }
 
-function emitted(parts: ReadonlyArray<Part>) {
-  const source = project(parts);
+function emitted(parts: ReadonlyArray<Part>, finishAllowanceMm = 0) {
+  const source = project(parts, 'profile-outside', finishAllowanceMm);
   const result = emitGcode(source);
   const clearance = minimumCutterClearance(
     cuttingMoves(result.gcode),
@@ -206,5 +211,39 @@ describe('CNC profile cuts that reach a part another operation keeps', () => {
     const warning = result.preflight.issues.find((issue) => issue.code === CODE);
     expect(warning?.message).toMatch(/cuts up to 0\.6[78] mm into it\. The parts/);
     expect(warning?.message).not.toContain(' at X ');
+  });
+});
+
+// ADR-433 Amendment 5 (rolling audit v3 G5-P3-1): a finish allowance roughs
+// the allowance further out than the finished wall, so it can reach a part the
+// bit passes clear of. The line named the spacing as the cause.
+describe('a finish allowance whose roughing reaches another operation’s part', () => {
+  it('names the allowance and an allowance that clears, when only roughing reaches', () => {
+    // 3.6 mm apart the 3.175 mm bit passes with 0.425 mm to spare, but a
+    // 0.5 mm allowance roughs 2.0875 mm off each part: 0.075 mm into the other.
+    const parts = [PLATE, bracketBelow(3.6)];
+    const run = emitted(parts, 0.5);
+    expect(run.clearance.clearanceMm).toBeCloseTo(-0.075, 2);
+    expect(run.warnings).toHaveLength(2);
+    for (const warning of run.warnings) {
+      expect(warning.message).toContain(
+        'Its 0.5 mm finish allowance moves the roughing pass out into it. ' +
+          'An allowance of 0.42 mm or less clears it, or move the parts apart.',
+      );
+      expect(warning.message).not.toContain('closer together than the bit');
+    }
+    // The independent model agrees that the allowance it names clears.
+    const reduced = emitted(parts, 0.42);
+    expect(reduced.clearance.clearanceMm).toBeGreaterThanOrEqual(-ROUNDING_MM);
+    expect(reduced.warnings).toEqual([]);
+    expect(emitted(parts).warnings).toEqual([]);
+  });
+
+  it('keeps the spacing line where the finishing pass reaches the part too', () => {
+    const run = emitted([PLATE, bracketBelow(2.5)], 0.5);
+    expect(run.warnings).toHaveLength(2);
+    for (const warning of run.warnings) {
+      expect(warning.message).toContain('closer together than the bit can pass between');
+    }
   });
 });

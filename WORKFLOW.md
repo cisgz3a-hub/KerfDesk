@@ -6458,7 +6458,9 @@ and lifts the command's CNC-only gate.)*
    hole a nested part sits in. Where no lead fits, that pass plunges straight
    down on the cut line as it would with None, and Job Review warns that the
    plunge can mark that edge. The warning never blocks Frame or Start
-   (ADR-250 Amendment 3).
+   (ADR-250 Amendment 3). An On path part drawn as stacked copies counts as
+   one part here, as it does with one copy, though every copy is still cut
+   (ADR-250 Amendment 4).
 
 #### Advisory — invalid or unrepresentable V-carve entry
 1. Ordinary profile/pocket/engrave and relief roughing retain positive requested

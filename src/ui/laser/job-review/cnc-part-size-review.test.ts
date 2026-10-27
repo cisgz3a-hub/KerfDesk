@@ -1,7 +1,8 @@
 // Meta audit v1 M6-P1-2, M6-P2-2 and M6-P2-3, through the real Start path:
 // prepareCurrentStartJob compiles the job and buildJobReviewModel lists what
 // the operator reads. Each case is a CNC job that used to come out the wrong
-// size, or cut into a part, with no Job Review line that said so.
+// size, or cut into a part, with no Job Review line that said so. Rolling
+// audit v3 G5-P1-1 (ADR-250 Amendment 4) adds a stacked On path part.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -123,5 +124,54 @@ describe('CNC parts that come out the wrong size are named in Job Review', () =>
       ),
     ).toBe(true);
     expect(review.some((line) => line.startsWith('Layer "brackets": its 3.17 mm cut'))).toBe(true);
+  });
+});
+
+describe('G5-P1-1: a part stacked on its copy On path says what one copy says', () => {
+  // A bracket 2.5 mm off each side of the plate, so one faces its lead,
+  // wherever the plate's climb start falls.
+  const SIDES = [
+    rect(110, 87.5, 20, 10),
+    rect(110, 132.5, 20, 10),
+    rect(87.5, 105, 10, 20),
+    rect(142.5, 105, 10, 20),
+  ];
+
+  function stacked(copies: number): Project {
+    const base = cncReviewProject(
+      [part('plate', '#000000', rect(100, 100, 40, 30))],
+      'profile-outside',
+    );
+    const brackets = {
+      ...createLayer({ id: 'brackets', color: '#0000ff' }),
+      name: 'brackets',
+      cnc: {
+        ...DEFAULT_CNC_LAYER_SETTINGS,
+        cutType: 'profile-on-path' as const,
+        depthMm: 1,
+        depthPerPassMm: 1,
+        tabsEnabled: false,
+      },
+    };
+    // Duplicate without moving: each copy is its own object on the same line.
+    const bracketParts = SIDES.flatMap((outline, side) =>
+      Array.from({ length: copies }, (_, copy) =>
+        part(`bracket-${side}-${copy}`, '#0000ff', outline),
+      ),
+    );
+    return {
+      ...base,
+      scene: {
+        objects: [...base.scene.objects, ...bracketParts],
+        layers: [...base.scene.layers, brackets],
+      },
+    };
+  }
+
+  it('names the plate’s dropped lead beside two copies, as beside one', async () => {
+    const one = await warnings(stacked(1));
+    const two = await warnings(stacked(2));
+    expect(one.some((line) => line.includes('1 pass plunges straight down'))).toBe(true);
+    expect(two).toEqual(one);
   });
 });
