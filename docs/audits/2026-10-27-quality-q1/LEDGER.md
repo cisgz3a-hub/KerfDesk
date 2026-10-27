@@ -9,6 +9,8 @@ Method: [../2026-10-21-rolling-v2/METHOD.md](../2026-10-21-rolling-v2/METHOD.md)
 | Q3 | Dither algorithms | ef910deb6 (refuter 93334429e, cited files unchanged) | [Q3-dither-algorithms.md](Q3-dither-algorithms.md) | 5 | 0 (P3-4 Jarvis-fallback half refuted: ADR-581) | 0 | 1 | 4 | 6 |
 | Q4 | Trace vs Potrace | ef910deb6 (trace core unchanged at 93334429e) | [Q4-trace-vs-potrace.md](Q4-trace-vs-potrace.md) | 7 | 0 | 2 (P2-3 raised) | 2 | 3 | 5 |
 | Q5 | Trace real images | 93334429e (trace core; `trace-cli-source.ts` differs, PNG orientation only) | [Q5-trace-real-images.md](Q5-trace-real-images.md) | 7 | 0 | 1 (P2-2 raised) | 2 | 4 | 4 |
+| Q6 | Vector burn quality | 93334429e | [Q6-vector-burn-quality.md](Q6-vector-burn-quality.md) | 3 | 0 | 0 | 1 | 2 | 7 |
+| **Total** | | | | **30** | **0** | **6** | **7** | **17** | **34** |
 
 ## Scorecards (headline metrics per area)
 
@@ -55,6 +57,14 @@ Method: [../2026-10-21-rolling-v2/METHOD.md](../2026-10-21-rolling-v2/METHOD.md)
 | Q5 | Small marks and counters lost or merged | 15–18 of 27 cases (i-dots, full stops: Q4-P2-3; counters: Q5-P2-1) | — | **loses** |
 | Q5 | Line Art colour detail under grain | 8 specks at σ 9 → about 600 at σ 12 (cliff) | — | P3 (Q5-P3-1) |
 | Q5 | Speed | about 5–10× slower than Potrace | Potrace | **loses** (KNOWN Q4-P2-1) |
+| Q6 | Mean line dose under M4 (traced logo, 3 mm text, 1 mm circles) | 0.985–1.00, with the head at 16–30% of programmed feed | 1.00 (GRBL `laser_mode.md`) | pass |
+| Q6 | Serial demand at 115200 baud | peak 130–170 lines/s, 3.2–4.1 kB/s against 11.5 kB/s (≥ 2.8× headroom); no planner starvation | — | pass |
+| Q6 | Preview against emitted G-code, 22 scenarios | ≤ 0.0007 mm (≤ 0.011 mm with arcs) | exact twin | pass |
+| Q6 | Fill interval, angle, holes | exact (30° within 0.114°); even-odd, the ring's hole gets zero dose | as set | pass |
+| Q6 | Fill uniformity | 0.979–1.023 with the default 5 mm overscan; sd 0.0004 with Automatic | flat | pass |
+| Q6 | Corner and path-end dose under M3 (Neotronics 4040 Line) | 90° corner 3.43×; logo corners median 3.13× (p90 4.29×); path ends 1.6–5.3×; 3 mm text 1.54× overall; under M4 the same motion stays at 1.19–1.30× | LightBurn 2.0: "stick with the default of Variable Power mode" (M4) | **fails** (Q6-P2-1) |
+| Q6 | Fill position against the outline | half an interval off (0.095 mm out, 0.005 mm in at 0.1 mm) | ±½ interval | P3 (Q6-P3-1) |
+| Q6 | Job time estimate | cuts +0–7%; Island Fill +66% (stops at every G0/G1 junction, ADR-525) | planner model | P3 (Q6-P3-2) |
 
 ## Confirmed P1/P2 (coordinator-verified)
 
@@ -72,3 +82,68 @@ Method: [../2026-10-21-rolling-v2/METHOD.md](../2026-10-21-rolling-v2/METHOD.md)
 | Q5-P2-2 (P1) | Q5 | **Colour layers on Auto moves a flat-colour logo's black text onto another colour's layer** after an ordinary JPEG (quality 75 and lower), a slight blur or grain: black's share of the flat area falls from 0.633% to 0.115–0.188%, under the 0.2% floor, so the black cluster is dissolved. The text is not lost; it burns at that layer's power: on a pale logo at 41–45% instead of 100%, and on a saturated logo every other layer starts 1.2–1.45× higher (the blue square 69% → 100%). The hint promises "Auto picks the colours the artwork really uses" and "Darker colours start at more power"; nothing warns (the swatches are the output). Colours = 4 keeps the text at 100%. Raised from P2: a tone change against the app's promise, with no warning | **READ**: `keepFlatAreaColours` drops a centre whose flat-area share is under `AUTO_MIN_SHARE = 0.002` (`colour-palette.ts:24,153-181`); a pixel whose neighbours differ by more than `FLAT_DE` counts only `NON_FLAT_WEIGHT = 0.1` (`:19`), so JPEG ringing around thin text removes most of its flat area. Hints at `ColourLayerTraceSettingsControls.tsx:47,224`. Auditor + refuter REPRO | fix card proposed |
 | Q5-P2-1 | Q5 | **On slightly blurred or low-resolution small text, Smooth's and Sharp's automatic cut sits far toward the paper** (180 and 191 against a 132 ink/paper midpoint): strokes come out 33–75% too heavy and 3–16 of 22 letter counters close; Potrace keeps them (mkbitmap loses 1 at low-res). Cutting at the ink/paper midpoint keeps them (+2.7% area). The threshold, not the hole fill, is the cause. P2: no ADR, preset text or tooltip promises counters | **READ**: the global Otsu cut (`preprocess.ts:236-276`) thresholds the working raster (`trace-image.ts:217-222,294-300`); Smooth and Sharp set `useOtsuThreshold` (`trace-presets.ts:181,210`). Auditor + refuter REPRO (a manual threshold keeps every counter) | fix card proposed |
 | Q5-P2-3 | Q5 | **Mild grain sends Smooth and Sharp onto the uneven-lighting route on a photograph**: on the clean astronaut photo the gate finds 46–47% paper-like cells, just under its 50% floor; grain lifts that to 51–53% and the gate accepts a near-black-to-white "paper" range. The trace drops to IoU 0.70 against the clean photo's (121 → 829 subpaths) while Line Art and plain Potrace stay at 0.97–0.98, and the dialog says "Uneven lighting was evened out before the cut". Whether it flips depends on the noise pattern (σ 1.5 can flip Sharp; σ 2 does not). Smooth runs the gate twice and only one run reports, so the dialog can show a plain threshold while the output changed | **READ**: `flattenAgainstPaper` and its declines `isUniformPaper` / `paperRange` (`background-flatten.ts:143-190,367-380`), called from `trace-image.ts:217-220`; the note at `TraceDetectionControls.tsx:90-91`. Auditor + refuter REPRO | fix card proposed |
+| Q6-P2-1 | Q6 | **The Neotronics 4040 burns Line cuts with constant power (M3) and over-burns every corner and path end.** At the default 1500 mm/min and 500 mm/s², 90° corners get 3.43× the line dose, the traced logo's 646 corners a median 3.13× (p90 4.29×), path ends 1.6–5.3×, and 3 mm text 1.54× overall; under M4 the same motion stays at 1.19–1.30×. The 4040 gets the ADR-239 entry runway but no exit runway, never gets arcs, and with homing off (the catalogue default) a live Start skips the entry too, so every contour starts from rest at 3.39–3.88×. Nothing warns: Job Review says only "each contour starts burning from rest". ADR-239 decides an entry only; ADR-257 defers the 4040 to its own hardware pass. P2, not P1: a Line operation shows no tone, and the constant S is what the layer and dialect state. The GRBL Compatible half is counted under Q1-P2-1 (same cause, M3 with no advice) | **READ**: `neotronics-4040-safe` sets `cutPowerMode: 'constant'` (`gcode-dialects.ts:142-145`); `vectorPowerWord` uses it for Line groups unless the operation overrides the power mode (`grbl-power-modes.ts:23-30`); `controllerAcceptsLaserArcs` excludes the 4040 (`laser-arc-moves.ts:28-33`). Auditor + refuter REPRO (independent planner and dose models on the real emitted bytes) | fix card proposed |
+
+## Round summary (2026-10-28)
+
+All six areas were audited, refuted and re-verified. 30 findings were raised; none was refuted. The result is P1 6 / P2 7 / P3 17, with 34 KNOWN items re-observed.
+
+### Does KerfDesk burn exact image quality?
+
+**Yes, wherever the output reaches the controller as the Preview shows it.**
+- **Brightness → S:** within 0.2% of full scale.
+- **Preview = G-code:** raster 0 of 25,600 pixels differ; vector ≤ 0.0007 mm.
+- **Pixel placement:** 0.000 px at 1:1 in every orientation; ≤ 0.004 mm rotated.
+- **Dither kernels:** bit-exact against their published definitions.
+- **Dose under the default dynamic power (M4):** 0.99 for rasters, 0.985–1.00 for vectors.
+- **Fills:** exact interval, angle and holes.
+
+**The gaps, each with a fix card:**
+- **Dot Width Correction in Grayscale (Q1-P1-1):** cuts 36–72% of the energy.
+- **Constant-power dialects:**
+  - GRBL Compatible rasters dose 1.8× (Q1-P2-1, P1).
+  - The 4040 over-burns corners and path ends 3–5× (Q6-P2-1).
+- **Pass-through on a turned image (Q2-P1-1):** a 50% grey burns at 35–46%.
+- **Image Studio Line Screen at 0° (Q3-P2-1):** only 5 tones.
+
+### Are the tracers better than Potrace?
+
+| Comparison | KerfDesk wins / ties / losses | Verdict |
+|---|---|---|
+| 79 ground-truth shapes and letters: Line Art (default) against Potrace 1.16 | 27 / 19 / 33 | not yet |
+| Same set: Sharp | 40 / 19 / 20 | better |
+| 27 real degraded images: Smooth against mkbitmap + Potrace | 22 / 3 / 2 | better |
+| Same set: Line Art against threshold + Potrace | 18 / 7 / 2 | better |
+
+**KerfDesk already wins on:**
+- sharp corners (25 of 26 against 3 of 26);
+- topology;
+- large shapes;
+- robustness to lighting;
+- not hollowing solid logos;
+- centerline (0.06–0.17 px).
+
+**Where it loses:**
+- **Small-image smoothness and node count:** a 32 px circle gets 46 cubics against 4 (Q4-P2-1).
+- **Corner spikes on letters:** up to 3.4 px (Q4-P2-2).
+- **Lost small marks:**
+  - dots (Q4-P1-1);
+  - i-dots and full stops (Q4-P2-3, P1);
+  - counters (Q5-P2-1).
+- **Automatic decisions that flip under mild degradation:**
+  - the colour palette (Q5-P2-2, P1);
+  - the lighting gate (Q5-P2-3).
+- **Speed:** about 5–10× slower.
+
+**Beating Potrace on every preset needs two fix cards to land:** "Trace smoothness: small images and corner spikes" and "Trace auto cut: keep dots, i-dots, counters; lighting gate".
+
+### Against LightBurn's documented behaviour
+
+| Topic | LightBurn | KerfDesk | Finding |
+|---|---|---|---|
+| Dot Width Correction | trims "the length of engraved scan lines" | trims every Grayscale power change | Q1-P1-1 |
+| Pass-through | "you cannot rotate the image" | rotates it, stretching the grid | Q2-P1-1 |
+| Newsprint | "has good tonal range" | Line Screen at 0° gives 5 tones | Q3-P2-1 |
+| Power mode | "stick with the default of Variable Power mode" | M3 on GRBL Compatible and the 4040 Line output, with no advice | Q1-P2-1, Q6-P2-1 |
+
+Everything else checked matched or exceeded LightBurn's documented behaviour: image modes, overscan, crosshatch, bidirectional scan and the dither list (KerfDesk adds Burkes, three Sierras and Blue Noise).
