@@ -1,4 +1,5 @@
 import type { CncGroup } from '../../core/job';
+import { sanitizeGcodeCommentValue } from '../../core/gcode-comments';
 import { COMPILE_INTEGRITY_PREFLIGHT_CODES } from '../../core/preflight';
 import { collectIndexedCncGroups } from '../../core/output/cnc-grbl-job-groups';
 import { cncToolSectionMaximumDepthsMm } from '../../core/cnc/output-representation';
@@ -25,6 +26,8 @@ export type CncToolProgramsResult =
   | { readonly kind: 'unavailable'; readonly message: string };
 type PreparedCncOutput = Extract<PreparedOutput, { readonly ok: true }>;
 type Section = { readonly groups: CncGroup[]; readonly indices: number[] };
+/** Matches the emitter's bit-name budget in its tool-change comment. */
+const TOOL_NAME_MAX_BYTES = 40;
 
 /** Slice the already placed/compiled Job at each contiguous cutter change.
  * Re-emission uses the canonical prepared emitter, never source compilation or text splitting. */
@@ -42,7 +45,7 @@ export function buildCncToolPrograms(
       prepared,
       options,
       section,
-      index + 1,
+      { order: index + 1, count: sections.length },
       sections.length === 1 ? combinedEmission : undefined,
     );
     if (typeof result === 'string') return { kind: 'unavailable', message: result };
@@ -76,13 +79,29 @@ function contiguousSections(prepared: PreparedCncOutput): ReadonlyArray<Section>
   return sections;
 }
 
+/** Comment lines naming a file's bit and what to zero before it runs, as tile bit files carry
+ * (ADR-392 Amendments 2 and 3). A one-section job writes none: its file is the combined program. */
+export function cncToolProgramHeader(
+  step: { readonly order: number; readonly count: number },
+  toolName: string,
+): string {
+  if (step.count <= 1) return '';
+  const name = sanitizeGcodeCommentValue(toolName, TOOL_NAME_MAX_BYTES) || 'Default bit';
+  const zero =
+    step.order === 1
+      ? '; load this bit and zero Z on the stock top before running this file'
+      : '; keep the same X/Y zero; change to this bit and re-zero Z on the stock top before running this file';
+  return `; bit ${step.order} of ${step.count}: ${name}\n${zero}\n`;
+}
+
 function emitSection(
   prepared: PreparedCncOutput,
   options: EmitGcodeOptions,
   section: Section,
-  order: number,
+  step: { readonly order: number; readonly count: number },
   retainedEmission?: ReturnType<typeof emitPreparedGcode>,
 ): CncToolProgram | string {
+  const { order } = step;
   const first = section.groups[0];
   if (first === undefined) return 'A prepared CNC cutter section is empty.';
   const sectionJob = { ...prepared.job, groups: section.groups };
@@ -97,9 +116,10 @@ function emitSection(
   );
   if (emitted.gcode.length === 0 || failures.length > 0)
     return `Separate-tool export section ${order} could not be emitted: ${failures.map((issue) => issue.message).join(' ') || 'no executable bytes'}`;
-  const bytes = new TextEncoder().encode(emitted.gcode);
   const toolId = first.toolId ?? null;
   const toolName = first.toolName ?? null;
+  const gcode = cncToolProgramHeader(step, toolName ?? toolId ?? 'Default bit') + emitted.gcode;
+  const bytes = new TextEncoder().encode(gcode);
   return {
     order,
     filename: cncToolProgramFilename('job.gcode', order, toolId),
@@ -107,7 +127,7 @@ function emitSection(
     toolName,
     jobGroupIndices: [...section.indices],
     operationIds: section.groups.map((group) => group.layerId),
-    gcode: emitted.gcode,
+    gcode,
     sha256: 'sha256:' + sha256Hex([bytes]),
     byteLength: bytes.length,
     warnings: [

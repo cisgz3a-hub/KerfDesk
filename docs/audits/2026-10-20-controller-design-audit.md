@@ -1,5 +1,7 @@
 # Controller design audit — how a sender should drive a controller, and where KerfDesk differs
 
+> **Status (2026-10-26, meta audit v1 M7):** D-5 was fixed by #1333. CS-05 was fixed by #923 on 2026-09-26. See [the corrections](2026-10-23-meta-v1/M7-corrections-older-audits.md) for the current status of every item.
+
 Status: research plus read-only source audit. No hardware was operated and no controller code was
 changed. Audited: `origin/main` at `9c6e6a3d8`, with open PRs #1287 (external G-code runs,
 ADR-630), #1304 (ADR-642) and #1305 (ADR-640) taken into account. Prepared: 2026-10-20.

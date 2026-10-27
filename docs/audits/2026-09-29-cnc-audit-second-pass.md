@@ -1,5 +1,7 @@
 # KerfDesk CNC audit, second pass (2026-09-29)
 
+> **Status (2026-10-26, meta audit v1 M7):** #1019 merged on 2026-09-29. P2-relief-finish-3 was fixed by #1136, and WA-4 by #1368 and #1384. P2-relief-rough-3 is raised to P1. See [the corrections](2026-10-23-meta-v1/M7-corrections-older-audits.md) for the current status of every item.
+
 A second full pass over the router side of KerfDesk. It rechecks every finding from the [first audit](https://github.com/cisgz3a-hub/KerfDesk/blob/main/docs/audits/2026-09-24-cnc-full-audit.md) and audits everything that changed since 24 September. Every new finding was reproduced or traced to the code and is backed by a cited source.
 
 - **Checked:** main at 2f6f84de, 29 Sep 2026, against 490708c
