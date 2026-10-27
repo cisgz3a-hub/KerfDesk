@@ -14258,6 +14258,12 @@ also made it easy to mistake off-thread whole-file reads for streaming or bounde
   document-route incremental parsing, every operating-system storage/OOM threshold, a hardware
   air-cut, or physical output.
 
+### Amendments
+
+ADR-269's amendments are separate decision files (ADR-344):
+`docs/decisions/ADR-269-amendment-1-remote-dxf-worker-and-block-budget.md` (remote DXF import
+uses the same import-worker parse as the desktop, and placing DXF blocks has a budget).
+
 ## ADR-270 - V-carve ladders complete one filled region before moving to the next (2026-07-31)
 
 **Date:** 2026-07-31

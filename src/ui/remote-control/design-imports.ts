@@ -1,8 +1,8 @@
 import type { SceneObject } from '../../core/scene';
 import { transformedBBox } from '../../core/scene/hit-test';
-import { parseDxf } from '../../io/dxf';
 import { parseSvg } from '../../io/svg';
 import { importImageFile } from '../commands/import-image-action';
+import { parseDxfOffThread } from '../import/import-worker-client';
 import { prepareSvgFragment } from '../import/svg-image-hydration';
 import { useToastStore } from '../state/toast-store';
 import { historyProjection } from './authoring-projections';
@@ -201,18 +201,25 @@ export async function importFile(
     }
   }
   if (args.mimeType === 'application/dxf') {
-    const result = parseDxf({
-      dxfText: text(bytes),
-      id: crypto.randomUUID(),
-      source: args.fileName,
-    });
-    const object = result.kind === 'error' ? null : result.object;
-    if (object === null) throw new RemoteFault('invalid_arguments');
+    const object = await parseDxfInWorker(bytes, args.fileName, signal);
     return commit(() => importedReceipt(store, objectImport(object).commit(store, args)));
   }
   if (!starts(bytes, args.mimeType === 'image/png' ? PNG : JPEG))
     throw new RemoteFault('invalid_arguments');
   return importRaster(store, args, bytes, signal, commit);
+}
+
+/** File > Import's DXF parse (ADR-269 Amendment 1): the import worker, cancelled with the request. */
+async function parseDxfInWorker(
+  bytes: Uint8Array<ArrayBuffer>,
+  source: string,
+  signal: AbortSignal,
+): Promise<SceneObject> {
+  const parsing = parseDxfOffThread(new Blob([bytes]), crypto.randomUUID(), source, { signal });
+  if (parsing === null) throw new RemoteFault('unavailable');
+  const result = await parsing;
+  if (result.kind === 'error' || result.object === null) throw new RemoteFault('invalid_arguments');
+  return result.object;
 }
 
 async function importRaster(
