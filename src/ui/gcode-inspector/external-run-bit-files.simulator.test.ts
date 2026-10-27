@@ -26,6 +26,12 @@ import {
 const MOTION = 'G21 G90 G54\nG0 X5 Y5\nG1 X10 Y5 F600\nM30\n';
 const BIT_ONE = cncToolProgramHeader({ order: 1, count: 2 }, '3.175 mm (1/8") end mill') + MOTION;
 const BIT_TWO = cncToolProgramHeader({ order: 2, count: 2 }, '6.35 mm (1/4") end mill') + MOTION;
+// Long enough to be moving when Abort lands.
+const LONG_BIT_ONE =
+  cncToolProgramHeader({ order: 1, count: 2 }, '3.175 mm (1/8") end mill') +
+  'G21 G90 G54\n' +
+  'G1 X10 Y5 F600\nG1 X0 Y0\n'.repeat(30) +
+  'M30\n';
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -119,6 +125,30 @@ describe('per-bit files through Run G-code file', () => {
     expect(useLaserStore.getState().bitFileSequence).not.toBeNull();
     await resetExternalRunStores();
     expect(bitFileSequenceXyOriginBlockMessage(useLaserStore.getState())).toBeNull();
+  });
+
+  // Rolling audit v5 J1-P3-1 (ADR-392 Amendment 5): Abort leaves the streamer
+  // 'cancelled', which is never released, so the end patch never ran.
+  it('ends an aborted bit file at the next Idle, holding X/Y for the later bits', async () => {
+    await zeroedCnc();
+    await startOpenedProgram(LONG_BIT_ONE);
+    // The simulator acknowledges the lines before it moves: Abort lands mid-motion.
+    expect(useLaserStore.getState().bitFileRun).toMatchObject({ order: 1, count: 2 });
+    await settle(useLaserStore.getState().stopJob());
+    await vi.advanceTimersByTimeAsync(1_000);
+    // GRBL alarms on a reset mid-motion (ALARM:3); the bit ends at the first Idle.
+    expect(useLaserStore.getState().statusReport?.state).toBe('Alarm');
+    expect(useLaserStore.getState().bitFileRun).not.toBeNull();
+    await settle(useLaserStore.getState().unlockAlarm());
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    const laser = useLaserStore.getState();
+    expect(laser.streamer?.status).toBe('cancelled');
+    expect(laser.statusReport?.state).toBe('Idle');
+    expect(laser.bitFileRun ?? null).toBeNull();
+    expect(laser.bitFileSequence).toMatchObject({ order: 1, count: 2 });
+    expect(toolChangeXyOriginBlockMessage(laser)).toContain('ran on this X/Y origin');
+    expect(workZCurrent()).toBe(false);
   });
 
   it('keeps Work Z and sets no hold for a file with no bit header', async () => {

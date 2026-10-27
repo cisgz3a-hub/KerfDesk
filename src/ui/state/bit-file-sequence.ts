@@ -10,9 +10,10 @@
 // origin could move the X/Y zero the later bits must share.
 //
 // So the store records the per-bit file an external run streams. When that
-// run's streamer is released (completed, stopped or failed) its Work Z goes, as
-// at a hold's entry, so the next file's CNC Frame refuses until Zero Z or a
-// probe sets the new bit's zero. While later bits of the set remain, X/Y origin
+// run's streamer is released (completed or failed), or at the first Idle after
+// Abort, an alarm or a reset stopped it (its cancelled streamer is never
+// released; ADR-392 Amendment 5), its Work Z goes, as at a hold's entry, so the
+// next file's CNC Frame refuses until Zero Z or a probe sets the new bit's zero. While later bits of the set remain, X/Y origin
 // writers are refused as in a hold. The set ends when its last file has run,
 // when the controller session ends, or when the operator ends it.
 

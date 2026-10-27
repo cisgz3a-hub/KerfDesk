@@ -1,8 +1,12 @@
+import type { UnownedControllerOutput } from '../state/unowned-controller-output';
+
 export type DesktopCloseNotice = {
   readonly kind: 'pending' | 'failed' | 'unconfirmed';
   readonly message: string;
   /** Offers Retry: a failed Abort, or a Fire the app could not confirm off. */
   readonly retry?: boolean;
+  /** Names Retry when it is neither Abort nor Fire. */
+  readonly retryLabel?: string;
 };
 
 export type DesktopCloseReply =
@@ -14,6 +18,9 @@ export interface DesktopCloseSnapshot {
   /** Momentary Fire is latched on. Closing turns it off first, as it aborts a
    *  running job (controller audit electron-native-3). */
   readonly fireLatched?: boolean;
+  /** A laser the controller reports on at Idle with nothing here running it.
+   *  Closing turns it off first, as it turns a latched Fire off (J2-P2-1). */
+  readonly output?: UnownedControllerOutput | null;
   /** Identity of non-job motion still owned by the app. A stopped owner may
    * remain while controller settlement catches up; it is not physical proof. */
   readonly motionOwner?: object | number | symbol | null;
@@ -31,6 +38,9 @@ interface CloseAttempt {
   readonly wasActive: boolean;
   readonly promise: Promise<DesktopCloseReply>;
   readonly resolve: (reply: DesktopCloseReply) => void;
+  /** Kept once seen, so Retry sends the off command again although Off was
+   *  requested (and the accessory report expired) by the failed attempt. */
+  output: UnownedControllerOutput | null;
   preparedEpoch: number | null;
   preparedWarning: string | null;
   preparedDirty: boolean;
@@ -53,7 +63,7 @@ export class DesktopCloseController {
 
   constructor(
     private readonly read: () => DesktopCloseSnapshot,
-    private readonly stop: () => Promise<void>,
+    private readonly stop: (output: UnownedControllerOutput | null) => Promise<void>,
   ) {}
 
   readonly subscribe = (listener: () => void): (() => void) => {
@@ -77,10 +87,12 @@ export class DesktopCloseController {
       wasActive:
         snapshot.active ||
         snapshot.fireLatched === true ||
+        snapshot.output != null ||
         hasOwnedMotion(snapshot) ||
         this.stopFlight !== null,
       promise,
       resolve,
+      output: snapshot.output ?? null,
       preparedEpoch: null,
       preparedWarning: null,
       preparedDirty: false,
@@ -197,12 +209,12 @@ export class DesktopCloseController {
   /** Browser fallback also joins an outstanding close stop after Keep open. */
   bestEffortStop(): void {
     const snapshot = this.read();
-    if (snapshot.active || snapshot.fireLatched === true) {
-      void this.requestStop().catch(() => undefined);
+    if (snapshot.active || snapshot.fireLatched === true || snapshot.output != null) {
+      void this.requestStop(snapshot.output ?? null).catch(() => undefined);
     }
   }
 
-  private requestStop(): Promise<DesktopCloseSnapshot> {
+  private requestStop(output: UnownedControllerOutput | null): Promise<DesktopCloseSnapshot> {
     if (this.stopFlight !== null) return this.stopFlight;
     const stopping = this.read();
     let resolve: (snapshot: DesktopCloseSnapshot) => void = () => undefined;
@@ -215,7 +227,7 @@ export class DesktopCloseController {
     // Initiate synchronously: a browser's best-effort beforeunload path cannot
     // defer its first write to a future task on a page already being torn down.
     try {
-      void this.stop().then(() => resolve(stopping), reject);
+      void this.stop(output).then(() => resolve(stopping), reject);
     } catch (error) {
       reject(error);
     }
@@ -229,16 +241,16 @@ export class DesktopCloseController {
 
   private async stopForAttempt(attempt: CloseAttempt): Promise<void> {
     const snapshot = this.read();
-    const abortNeeded = snapshot.active || hasOwnedMotion(snapshot);
+    attempt.output ??= snapshot.output ?? null;
     this.setNotice({
       kind: 'pending',
       message:
-        (abortNeeded ? 'Sending Abort before closing. ' : 'Turning Fire off before closing. ') +
+        pendingStopLead(snapshot, attempt.output) +
         'Keep this window available while the request finishes. ' +
         'A completed software request does not confirm the machine is physically stopped.',
     });
     try {
-      const stopping = await this.requestStop();
+      const stopping = await this.requestStop(attempt.output);
       if (this.attempt !== attempt) return;
       attempt.stoppedOwners = stopping;
       this.prepareResult(attempt);
@@ -247,7 +259,9 @@ export class DesktopCloseController {
       // Without a job or motion owner, only Fire was being turned off: its warning
       // can be acknowledged, so a link that refuses M5 cannot trap the window.
       if (!this.read().active && !hasOwnedMotion(this.read())) {
-        this.prepareResult(attempt);
+        if (attempt.output === null || this.read().fireLatched === true)
+          this.prepareResult(attempt);
+        else this.laserOffUnconfirmed(error);
         return;
       }
       this.setNotice({
@@ -259,6 +273,20 @@ export class DesktopCloseController {
           (error instanceof Error ? error.message : String(error)),
       });
     }
+  }
+
+  // Like a Fire that could not be confirmed off: acknowledged, or retried.
+  private laserOffUnconfirmed(error: unknown): void {
+    this.shownWarning = this.read();
+    this.setNotice({
+      kind: 'unconfirmed',
+      retry: true,
+      retryLabel: 'Retry turning the laser off',
+      message:
+        'KerfDesk could not turn off the laser the controller reports on. Use the physical ' +
+        'E-stop or power cutoff if the beam may still be on. ' +
+        (error instanceof Error ? error.message : String(error)),
+    });
   }
 
   private prepareResult(
@@ -323,6 +351,16 @@ export class DesktopCloseController {
     this.notice = notice;
     for (const listener of this.listeners) listener();
   }
+}
+
+function pendingStopLead(
+  snapshot: DesktopCloseSnapshot,
+  output: UnownedControllerOutput | null,
+): string {
+  if (snapshot.active || hasOwnedMotion(snapshot)) return 'Sending Abort before closing. ';
+  return output !== null && snapshot.fireLatched !== true
+    ? 'Turning the laser off before closing. '
+    : 'Turning Fire off before closing. ';
 }
 
 function hasOwnedMotion(snapshot: DesktopCloseSnapshot): boolean {
