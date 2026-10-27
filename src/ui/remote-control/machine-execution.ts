@@ -1,11 +1,12 @@
 import { jogAxisSignsForOrigin } from '../../core/devices';
 import { deviceForActiveHead } from '../../core/cnc/cnc-head-feeds';
-import { machineKindOf, type Project } from '../../core/scene';
+import type { Project } from '../../core/scene';
 import { stepJogVector, clampJogFeed } from '../laser/jog-control-policy';
 import { focusJogReady } from '../laser/FocusJogControls';
 import { runFrameNow } from '../laser/use-frame-action';
 import { currentCompletedFrame } from '../laser/framed-run-readiness';
 import { runFramedPermitStart } from '../laser/start-job-flow';
+import { motionMachineKind } from '../state/job-motion-machine';
 import { recoveryRepository } from '../state/recovery';
 import { useLaserStore } from '../state/laser-store';
 import { useStore } from '../state/store';
@@ -117,7 +118,9 @@ async function executeJog(
   owner: MachineExecutionOwner,
 ): Promise<void> {
   const project = (context.options.store ?? useStore).getState().project;
-  if (input.args.axis === 'z' && !focusJogReady(project.device, machineKindOf(project.machine)))
+  // A running job's own kind decides Z jog (ADR-416 Amendment 3).
+  const machineKind = motionMachineKind(useLaserStore.getState(), project);
+  if (input.args.axis === 'z' && !focusJogReady(project.device, machineKind))
     throw new RemoteFault('unsupported_operation');
   if (useLaserStore.getState().capabilities.jog === 'none')
     throw new RemoteFault('unsupported_operation');

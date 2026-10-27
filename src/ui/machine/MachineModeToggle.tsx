@@ -10,6 +10,7 @@ import { machineKindOf, type MachineKind } from '../../core/scene';
 import { Icon, type IconName } from '../kit';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
+import { runningJobMachineKind } from '../state/job-motion-machine';
 import { isActiveJob, isActiveJobStatus } from '../state/laser-store-helpers';
 import { useToastStore } from '../state/toast-store';
 import {
@@ -24,11 +25,18 @@ export function MachineModeToggle(): JSX.Element {
   const setMachineKind = useStore((s) => s.setMachineKind);
   const pushToast = useToastStore((s) => s.pushToast);
   // A running or held job keeps the mode it started with. Jog, Zero Z, Probe
-  // and the safe-Z lift before a point move follow the project mode, so a switch
-  // at a CNC bit change would let the bit travel through the stock.
+  // and the safe-Z lift before a point move follow the job's mode, but the
+  // Active bit is chosen in the project, so only the job's own mode stays
+  // selectable (ADR-416 Amendment 3).
   const jobActive = useLaserStore((s) => isActiveJobStatus(s.streamer?.status ?? null));
+  const jobKind = useLaserStore((s) => runningJobMachineKind(s));
   const select = (machineKind: MachineKind): void => {
-    if (machineKind !== kind && isActiveJob(useLaserStore.getState().streamer)) {
+    const laser = useLaserStore.getState();
+    if (
+      machineKind !== kind &&
+      isActiveJob(laser.streamer) &&
+      machineKind !== runningJobMachineKind(laser)
+    ) {
       pushToast(MODE_LOCKED_DURING_JOB, 'warning');
       return;
     }
@@ -43,7 +51,7 @@ export function MachineModeToggle(): JSX.Element {
         icon="laser"
         title="Laser cutter/engraver mode: layers carry power, speed, and passes."
         active={kind === 'laser'}
-        locked={jobActive}
+        locked={jobActive && jobKind !== 'laser'}
         warning={machineModeWarning(device, 'laser')}
         onSelect={() => select('laser')}
       />
@@ -52,7 +60,7 @@ export function MachineModeToggle(): JSX.Element {
         icon="cnc"
         title="CNC router mode: layers carry cut type, depth, and feeds; G-code drives the spindle and Z axis."
         active={kind === 'cnc'}
-        locked={jobActive}
+        locked={jobActive && jobKind !== 'cnc'}
         warning={machineModeWarning(device, 'cnc')}
         onSelect={() => select('cnc')}
       />

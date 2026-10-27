@@ -14,6 +14,7 @@
 
 import type { DeviceProfile, Origin } from '../../devices/device-profile';
 import { toMachineCoords, toSceneCoords } from '../../devices/origin-transform';
+import type { BedArea } from './camera-model-accuracy';
 import type { CameraModelRecord } from './camera-model-record';
 import type { Vec2 } from './camera-model';
 import { movedModel } from './head-camera';
@@ -185,6 +186,32 @@ export function sceneInBedFrame(point: Vec2, from: CameraBedFrame, to: CameraBed
  */
 export function bedFrameShift(from: CameraBedFrame, to: CameraBedFrame): Vec2 {
   return sceneInBedFrame({ x: 0, y: 0 }, from, to);
+}
+
+/**
+ * Whether every place on the bed has the same scene position in both frames:
+ * one origin corner and no shift. A native offset only one frame knows is not
+ * a difference, as in {@link sceneInBedFrame}.
+ */
+export function sameBedPlaces(a: CameraBedFrame, b: CameraBedFrame): boolean {
+  if (a.origin !== b.origin) return false;
+  const shift = bedFrameShift(a, b);
+  return Math.abs(shift.x) < SAME_MM && Math.abs(shift.y) < SAME_MM;
+}
+
+/**
+ * The same part of the bed as `area` of frame `from`, in frame `to`: moved by
+ * the shift after a bed-size or native-offset change, or null after an origin
+ * change, which mirrors the bed.
+ */
+export function bedAreaInBedFrame(
+  area: BedArea,
+  from: CameraBedFrame,
+  to: CameraBedFrame,
+): BedArea | null {
+  if (from.origin !== to.origin) return null;
+  const shift = bedFrameShift(from, to);
+  return { ...area, x: area.x + shift.x, y: area.y + shift.y };
 }
 
 function geometry(frame: CameraBedFrame): Pick<DeviceProfile, 'origin' | 'bedWidth' | 'bedHeight'> {

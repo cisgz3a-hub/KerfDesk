@@ -5,7 +5,9 @@ import {
   outlineRegistration,
   type OutlineBoardGeometry,
 } from '../../../core/scene';
+import type { DeviceProfile } from '../../../core/devices';
 import { registerBoardRemote, type BoardRemoteStatus } from './board-capture-remote';
+import { remoteBoardFinishReview } from './board-remote-finish-review';
 import type { BoardCapture, BoardRegistrationEpoch } from './use-board-capture';
 import type { BoardCaptureHandlers } from './use-board-capture-handlers';
 
@@ -14,21 +16,20 @@ type LatestBoardCapture = {
   readonly handlers: BoardCaptureHandlers;
   readonly currentEpoch: BoardRegistrationEpoch;
   readonly busy: boolean;
+  readonly device: DeviceProfile;
 };
 
-export function useBoardRemoteRegistration(
-  open: boolean,
-  capture: BoardCapture,
-  handlers: BoardCaptureHandlers,
-  currentEpoch: BoardRegistrationEpoch,
-  busy: boolean,
-): void {
-  const latest = useRef<LatestBoardCapture>({ capture, handlers, currentEpoch, busy });
-  latest.current = { capture, handlers, currentEpoch, busy };
+export function useBoardRemoteRegistration(open: boolean, current: LatestBoardCapture): void {
+  const latest = useRef<LatestBoardCapture>(current);
+  latest.current = current;
   useEffect(() => {
     if (!open) return;
     return registerBoardRemote({
       status: () => remoteBoardStatus(latest.current),
+      finishReview: () => {
+        const { capture, handlers, device } = latest.current;
+        return remoteBoardFinishReview(capture.state, handlers.rect, device);
+      },
       capture: async () => captureRemotePoint(latest),
       finish: async () => finishRemoteBoard(latest),
     });

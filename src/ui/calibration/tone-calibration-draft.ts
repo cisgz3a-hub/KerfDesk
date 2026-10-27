@@ -9,13 +9,19 @@ import {
   TONE_WEDGE_MIN_PATCH_MM,
   type ToneWedgeOptions,
 } from '../../core/job/tone-calibration-wedge';
+import {
+  effectiveObjectMinPowerPercent,
+  effectiveObjectPowerPercent,
+} from '../../core/effective-output';
 import { dpiToLinesPerMm, linesPerMmToDpi } from '../../core/raster';
 import {
   captureLayerOperationSettings,
   DITHER_ALGORITHMS,
   LAYER_DEFAULTS,
   type DitherAlgorithm,
+  type Layer,
   type LayerOperationSettings,
+  type ObjectPowerScale,
 } from '../../core/scene';
 import { PHOTO_DITHERS } from '../raster/photo-engraving-settings';
 import type { ToneCalibrationSettings } from './tone-calibration-library';
@@ -25,6 +31,22 @@ export type ToneCalibrationSeed = {
   readonly sourceName: string;
   readonly settings: LayerOperationSettings;
 };
+
+/**
+ * A photo's operation settings at the power it burns with (ADR-670 Amd 1).
+ * Its power multiplier scales the operation's power and grayscale floor when
+ * it compiles, so the wedge burns, and a calibration is checked, at that power.
+ */
+export function photoBurnSettings(
+  effective: Layer,
+  photo: ObjectPowerScale,
+): LayerOperationSettings {
+  return {
+    ...captureLayerOperationSettings(effective),
+    power: effectiveObjectPowerPercent(effective, photo),
+    minPower: effectiveObjectMinPowerPercent(effective, photo),
+  };
+}
 
 export type ToneWedgeDraft = {
   readonly patchCount: string;
@@ -71,6 +93,11 @@ export function formatDpi(linesPerMm: number): string {
   return String(Number(linesPerMmToDpi(linesPerMm).toFixed(2)));
 }
 
+// A power times a multiplier can carry float noise (0.7 × 33% is 0.23099…%).
+export function formatPower(power: number): string {
+  return String(Number(power.toFixed(2)));
+}
+
 export function seededToneWedgeDraft(
   seed: ToneCalibrationSeed,
   stored: ToneWedgeDraft,
@@ -79,7 +106,7 @@ export function seededToneWedgeDraft(
     ...stored,
     ditherAlgorithm: seed.settings.ditherAlgorithm,
     dpi: formatDpi(seed.settings.linesPerMm),
-    power: String(seed.settings.power),
+    power: formatPower(seed.settings.power),
     speed: String(seed.settings.speed),
     marking: seed.settings.negativeImage ? 'light' : 'dark',
   };
@@ -111,12 +138,16 @@ function rangeIssue(
   return null;
 }
 
-/** The burn settings of a valid draft; an unchanged DPI keeps the seed's exact interval. */
+/**
+ * The burn settings of a valid draft. An unchanged DPI or power keeps the
+ * seed's exact interval or power, so it matches the photo's to the last digit.
+ */
 export function toneWedgeSettings(
   draft: ToneWedgeDraft,
   seed: ToneCalibrationSeed | null,
 ): ToneCalibrationSettings {
   const seededDpi = seed === null ? null : formatDpi(seed.settings.linesPerMm);
+  const seededPower = seed === null ? null : formatPower(seed.settings.power);
   const ditherAlgorithm = DITHER_ALGORITHMS.find((value) => value === draft.ditherAlgorithm);
   return {
     ditherAlgorithm: ditherAlgorithm ?? 'jarvis',
@@ -124,7 +155,10 @@ export function toneWedgeSettings(
       seed !== null && draft.dpi.trim() === seededDpi
         ? seed.settings.linesPerMm
         : dpiToLinesPerMm(Number(draft.dpi)),
-    power: Number(draft.power),
+    power:
+      seed !== null && draft.power.trim() === seededPower
+        ? seed.settings.power
+        : Number(draft.power),
     speed: Number(draft.speed),
     negativeImage: draft.marking === 'light',
   };
@@ -193,7 +227,7 @@ export function describeToneSettings(
   return [
     ditherName(settings.ditherAlgorithm),
     `${formatDpi(settings.linesPerMm)} DPI`,
-    `${settings.power}%`,
+    `${formatPower(settings.power)}%`,
     `${settings.speed} mm/min`,
     settings.negativeImage ? 'light marks' : 'dark marks',
   ].join(' · ');

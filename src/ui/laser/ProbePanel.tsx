@@ -4,6 +4,8 @@
 
 import { machineKindOf } from '../../core/scene';
 import { useStore } from '../state';
+import { runningJobMachineKind } from '../state/job-motion-machine';
+import { useLaserStore } from '../state/laser-store';
 import { ProbeControls } from './ProbeControls';
 import { ProbePlateRemovalNotice } from './ProbePlateRemovalNotice';
 import { WorkZRecoveryControl } from './WorkZRecoveryControl';
@@ -11,8 +13,10 @@ import { WorkZRecoveryControl } from './WorkZRecoveryControl';
 export function ProbePanel({
   showNotices = true,
 }: { readonly showNotices?: boolean } = {}): JSX.Element | null {
-  const isCnc = useStore((s) => machineKindOf(s.project.machine) === 'cnc');
-  if (!isCnc) return null;
+  // A running job's own kind decides (ADR-416 Amendment 3).
+  const projectKind = useStore((s) => machineKindOf(s.project.machine));
+  const runningKind = useLaserStore((s) => runningJobMachineKind(s));
+  if ((runningKind ?? projectKind) !== 'cnc') return null;
   return (
     <>
       <details style={boxStyle}>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { currentJobStopRequest } from '../state/job-stop-request';
+import { currentJobStopRequest, currentStreamWasReset } from '../state/job-stop-request';
 import { cncPauseLiftFailedNotice, type LaserSafetyNotice } from '../state/laser-safety-notice';
 import {
   checkpointInterruption,
@@ -78,14 +78,16 @@ describe('checkpointInterruption', () => {
     ).toEqual({ kind: 'cancelled', message: 'Stopped by the operator (Abort).' });
   });
 
-  it('records the app closing mid-job as a cancellation that may not have arrived', () => {
+  it('records the app closing mid-job as a cancellation by its Abort', () => {
     const interruption = checkpointInterruption('errored', null, {
       reason: 'app-closing',
       streamerEpoch: 3,
     });
     expect(interruption?.kind).toBe('cancelled');
     expect(interruption?.message).toContain('closed or reloaded');
-    expect(interruption?.message).toContain('may not have arrived');
+    expect(interruption?.message).toContain('Abort');
+    // The desktop close awaits its Abort; "the page closed" is a web-only doubt.
+    expect(interruption?.message).not.toContain('page');
   });
 
   it('lets a safety notice name the cause even when a stop was requested', () => {
@@ -248,11 +250,40 @@ describe('planner backlog on the recorded cause', () => {
     });
   });
 
-  it('leaves it out where the stop may not have arrived', () => {
+  // ADR-398 Amendment 5 (rolling audit v4 H2-P2-2): the desktop close awaits
+  // its Abort, and where it may not arrive a step back only re-burns.
+  it('records it for the app closing, which sends Abort', () => {
     const closing = { reason: 'app-closing' as const, streamerEpoch: 2 };
-    expect(checkpointInterruption('errored', null, closing, backlog)).not.toHaveProperty(
-      'plannerBacklog',
+    expect(checkpointInterruption('errored', null, closing, backlog)?.plannerBacklog).toEqual(
+      backlog,
     );
+  });
+
+  // ADR-398 Amendment 5 (rolling audit v4 H2-P2-1): heartbeat loss and a
+  // failed job write are contained with the same reset Abort sends.
+  it('records it for a stall or a failed write that KerfDesk contained with a reset', () => {
+    const stalled: LaserSafetyNotice = { kind: 'stream-stalled', message: 'Stalled.' };
+    const writeFailed: LaserSafetyNotice = {
+      kind: 'write-failed',
+      action: 'start',
+      message: 'Write failed.',
+    };
+    for (const notice of [stalled, writeFailed]) {
+      expect(
+        checkpointInterruption('errored', notice, null, backlog, true, 40, true)?.plannerBacklog,
+      ).toEqual(backlog);
+      // Without a reset (Marlin's failed write) the controller runs what it had.
+      expect(
+        checkpointInterruption('errored', notice, null, backlog, false, 40, false),
+      ).not.toHaveProperty('plannerBacklog');
+    }
+  });
+
+  it('reads a reset sent against the current stream only', () => {
+    const reset = { streamerEpoch: 4, positionMayBeLost: false };
+    expect(currentStreamWasReset({ streamerEpoch: 4, streamReset: reset })).toBe(true);
+    expect(currentStreamWasReset({ streamerEpoch: 5, streamReset: reset })).toBe(false);
+    expect(currentStreamWasReset({ streamerEpoch: 4, streamReset: null })).toBe(false);
   });
 
   it('reads only the current run snapshot', () => {

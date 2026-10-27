@@ -168,7 +168,9 @@ export const LAYER_DEFAULTS = {
   subLayers: [],
 } as const satisfies Omit<Layer, 'id' | 'name' | 'color'>;
 
-const LAYER_OPERATION_SETTING_KEYS = [
+/** Every operation setting: what operations compare, and what Copy settings
+ * carries to another operation. */
+export const LAYER_OPERATION_SETTING_KEYS = [
   'mode',
   'powerMode',
   'minPower',

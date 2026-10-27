@@ -75,3 +75,97 @@ automatically with the ADR-442 piece mask, and drew the board only after two hea
 maintainer's test the clicks did not draw the board, the trace locked onto other edges, the MCP route
 was invisible in the app, and nothing reached the canvas without a machine. Items 2, 3 and 5 replace
 that flow; the reference-sheet and automatic-trace code was removed.
+
+### Amendment 1 - Remote capture and finish keep the PC's Capture gate (2026-10-27)
+
+**Status:** Accepted; unit-tested with the real panel behind the real remote adapter, not
+hardware-tested. Fixes rolling audit v3 G7-P3-1 (P1 after its refuter,
+`docs/audits/2026-10-27-rolling-v3/G7-app-shell-remote.md`).
+
+**Context.** Item 8 gives MCP clients `capture_board_point` and `finish_board` as the panel's own
+capture, and the tool text says "same as Capture on the computer". The PC disables Capture and
+Finish unless the machine is connected, autofocus is not running, no controller write is pending,
+and `jogFrameCommandBlockMessage` is clear: no job, motion or controller operation, no MPG, and a
+known Idle status. The remote path checked none of this. The panel's `captureNow` recorded the
+last rendered position with no machine-state check after the first point, which alone goes
+through Set origin. So while a PC jog, Frame, Home, an MPG or the client's own job moved the head,
+a remote capture recorded a mid-motion position as a board point. In the refuter's repro a
+100 × 50 mm board was created as 100 × 54 mm. An outline capture 12 mm off the line between its
+points turned the board 1.9° and moved the G92 corner 6.7 mm. Neither raised a warning.
+
+**Decision.**
+
+1. **One gate.** `boardCaptureBlockMessage` (`src/ui/laser/board-capture/board-capture-gate.ts`)
+   is the PC gate as a plain function of the laser state. `useCaptureGating` selects it for the
+   buttons. `boardActionBlockMessage` (`src/ui/remote-control/machine-actions.ts`) refuses remote
+   capture and finish with it before the panel runs, so the operation fails definitely, writes
+   nothing, and gives the reason the PC button shows. `captureNow`, used by both paths, checks it
+   again and reads the position from the same store snapshot, not from the last render.
+2. **A fresh Idle report.** A remote capture records the head only after a status report that
+   arrived after the request finds the gate still clear. One status query asks for it; a
+   controller that is only polled answers on its next idle poll. The capture is refused at once
+   when that report shows the head moving, and refused when no report arrives within 3 s, the
+   controller session changes, the panel closes, or a point is captured on the computer meanwhile.
+   The PC button does not wait: its operator watches the head.
+3. **Finish checks.** One function (`measuredRectChecks`, `board-finish-checks.ts`) gives the panel
+   and remote finish the rectangle findings: too small (Create is disabled), off square by more
+   than 5 mm, and a first corner more than 5 mm from the bottom-left. The PC operator reads the two
+   warnings before choosing Create board outline. A remote client cannot, so, as with Zero Z
+   (ADR-657 item 1), remote `finish_board` is refused where the PC warns, and the board can still
+   be created on the computer. The outline scale note (more than 1 %) appears on the PC with the
+   created board, so the remote receipt carries it. An outline the PC refuses (more than 5 %) is
+   refused before the panel runs. A circle is finished on the computer.
+
+**Consequences.**
+
+- Remote board refusals are definite and safe to repeat, and the PC and remote gates cannot drift.
+- Two-point outline registration cannot detect an error square to the line between the points,
+  because a similarity always fits two points. The gate and the fresh report keep a moving head
+  out of a capture; item 7's verification is what finds a point captured in the wrong place.
+- `get_board` output is unchanged. The MCP tool descriptions name the new refusals.
+- Reach: desktop 1.0.22 and 1.0.23 carry #1362. Whether the production relay Worker does was not
+  observed. If it does not, the defect was latent until the relay redeploy that rolling v2
+  01-P2-3 still needs, so this amendment lands before that redeploy.
+
+### Amendment 2 - Undo and Redo restore Start From with the board (2026-10-27)
+
+**Status:** Accepted; unit-tested through the real store and history, and through the real panel
+behind the real remote adapter (`finish_board`). Not hardware-tested. Fixes rolling audit v4
+H9-P2-1 (P1 after its refuter, `docs/audits/2026-10-27-rolling-v3/H9-undo-guards.md` on
+`claude/rolling-audit-v3`).
+
+**Context.** Item 5 says "One Undo step covers the whole change", and ADR-124 capture also switches
+Start From to User Origin. All three Place Board writes (capture, outline registration, and the
+correction that resizes a captured board) pushed the old project onto the Undo stack and set the live
+placement in the same patch. Undo restores the live placement only from the setup context a step
+records with `captureSetupHistoryContext`, as Machine Setup, the Laser/CNC toggle and device
+changes do. No Place Board write recorded it. So Undo took the board and the outline's turn back
+and left Start From at User Origin. In the refuter's repro, a job at Absolute started `G0 X50 Y360`.
+After a rectangle capture and Undo the canvas again showed that layout with no board, but the job
+started `G0 X0 Y10` from the `G92` board corner. An outline registered at 5° lost its turn and still
+burned from the corner (`G0 X10 Y70`). The restored project's own saved placement said Absolute
+while the live setting said User Origin. Start From and Job Review's origin tile name the mode, but
+neither warns of that mismatch. MCP `finish_board` drives the same panel handlers, so it had the
+same gap. Camera **Add target to canvas** (ADR-440 Amendment 5) had the mirror case: it replaced
+the scene in one Undo step and then set Absolute outside it.
+
+**Decision.**
+
+1. **Place Board.** `commitCapturedBoard` (capture, Draw on canvas, and registration with no drawn
+   outline), `registerCapturedOutlineMutation` and `updateCapturedBoardMutation` record the setup
+   context before they change the project. One Undo puts the board, the artwork's turn and Start
+   From back as they were. Redo puts all three back as registered. A later edit that is undone on its
+   own leaves Start From as it is. Desktop and remote `finish_board` share these writes.
+2. **Add target to canvas.** `replaceSceneWithGeneratedScene` takes an optional placement patch.
+   With one, it records the setup context and applies the placement in the same patch as the scene,
+   with the saved job setup kept in step. The target passes `{ startFrom: 'absolute' }` when Start
+   From is not already Absolute, so Undo restores the operator's mode and Redo restores Absolute.
+3. **No new warning.** Undo and Redo can no longer split the canvas from the placement, so neither
+   Job Review nor Start gets a new check (PROJECT.md non-negotiable 21, ADR-565).
+
+**Consequences.**
+
+- Undo of a Place Board step also restores the selection and output scope recorded with it, as
+  Undo of a Machine Setup change already does.
+- The G92 the capture wrote stays on the controller after Undo. Undo restores the Start From the
+  operator had, as at any other time the work offset is set and Absolute is chosen.

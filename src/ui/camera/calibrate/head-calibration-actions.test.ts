@@ -145,10 +145,17 @@ describe('photographing a head camera target', () => {
       bedWidthMm: BED.width,
       bedHeightMm: BED.height,
       headMm: laterHead,
+      headZMm: 12.3,
       saved: first.result.record,
     });
     expect(check.kind).toBe('ok');
     if (check.kind !== 'ok') return;
+    // The calibration it would save holds at the head's Z (ADR-449 Amendment 2).
+    expect(check.result.record.mount).toEqual({
+      kind: 'head',
+      headAtCalibrationMm: laterHead,
+      headZAtCalibrationMm: 12.3,
+    });
     const saved = check.result.savedCheck;
     expect(saved?.kind).toBe('measured');
     if (saved?.kind !== 'measured') return;

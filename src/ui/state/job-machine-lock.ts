@@ -7,11 +7,16 @@
 // in those fields is refused, whichever command wrote it. Undo, Redo and Open
 // check first, so they can stop with their own message.
 //
+// The lock pins the job's Laser/CNC kind, not whatever the open project had
+// (Amendment 3, rolling audit v3 G2-P1-1): a project that is not on the running
+// job's kind may still be switched to it, so a CNC job held with a Laser
+// project open can get its CNC jog, Zero Z and probe back.
+//
 // The project store cannot import the laser store (the laser store imports
-// it), so the laser store registers how to tell that a job is active.
+// it), so the laser store registers how to read the running job's kind.
 
 import type { DeviceProfile } from '../../core/devices';
-import { machineKindOf, type Project } from '../../core/scene';
+import { machineKindOf, type MachineKind, type Project } from '../../core/scene';
 import { restoreSetupHistoryContext, setupHistoryContextFor } from './setup-history-context';
 import type { AppState } from './store';
 import { useToastStore } from './toast-store';
@@ -51,10 +56,16 @@ const JOB_MACHINE_DEVICE_KEYS = [
 ] as const satisfies ReadonlyArray<keyof DeviceProfile>;
 
 let activeJob: () => boolean = () => false;
+let runningJobKind: () => MachineKind | null = () => null;
 
-/** The laser store says whether a job is running, held or paused (isActiveJob). */
-export function registerActiveJobProbe(probe: () => boolean): void {
+/** The laser store says whether a job is running, held or paused (isActiveJob),
+ *  and the Laser/CNC kind it started with (null when not recorded). */
+export function registerActiveJobProbe(
+  probe: () => boolean,
+  kind: () => MachineKind | null = () => null,
+): void {
   activeJob = probe;
+  runningJobKind = kind;
 }
 
 /** True when `a` and `b` give jog, Zero Z, probing, Frame and the safe-Z lift
@@ -67,9 +78,12 @@ export function sameJobMachine(a: Project, b: Project): boolean {
 }
 
 /** Refuses turning `current` into `next` while a job is active, with `message`
- *  as the reason. False (nothing refused) when no job runs or the machine stays. */
+ *  as the reason. False (nothing refused) when no job runs, the machine stays,
+ *  or a project off the job's Laser/CNC kind is switched onto it. */
 export function refuseJobMachineChange(current: Project, next: Project, message: string): boolean {
-  if (!activeJob() || sameJobMachine(current, next)) return false;
+  if (!activeJob() || sameJobMachine(current, next) || switchesOntoJobKind(current, next)) {
+    return false;
+  }
   queueMicrotask(() =>
     useToastStore.getState().pushToast(message, 'warning', { key: 'job-machine-lock' }),
   );
@@ -95,6 +109,15 @@ export function jobMachineGuardSetter(set: Setter): Setter {
       restoreSetupHistoryContext(state.project, setupContext);
       return {};
     });
+}
+
+function switchesOntoJobKind(current: Project, next: Project): boolean {
+  const jobKind = runningJobKind();
+  return (
+    jobKind !== null &&
+    machineKindOf(current.machine) !== jobKind &&
+    machineKindOf(next.machine) === jobKind
+  );
 }
 
 function cncParams(project: Project): unknown {

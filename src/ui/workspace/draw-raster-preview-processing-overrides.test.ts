@@ -1,5 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { compileJob } from '../../core/job';
+import type { PhotoToneCurve } from '../../core/raster/photo-tone-curve';
 import { IDENTITY_TRANSFORM, type SceneObject } from '../../core/scene';
 import {
   gray,
@@ -76,6 +77,50 @@ it('rebuilds a same-ID preview when only its sharpening changes (ADR-671)', () =
     sink.draw(p);
     expect(sink.drawn.map(gray)).toEqual(normalizedCompiledPixels(p));
   }
+  expect(sink.built).toHaveLength(3);
+});
+
+// ADR-670 Amendment 1 (audit G9-P2-1): the curve keys the cached canvas, so
+// Preview shows the tones the G-code burns after a calibration is applied.
+it('rebuilds a same-ID preview when only its tone curve changes', () => {
+  const curve: PhotoToneCurve = {
+    label: 'Birch',
+    points: [
+      { input: 0, output: 0 },
+      { input: 128, output: 64 },
+      { input: 255, output: 255 },
+    ],
+  };
+  const grayscale = previewLayer({ ditherAlgorithm: 'grayscale' });
+  const raster = previewRaster(),
+    sink = previewSink();
+  const drawn = (p: ReturnType<typeof previewProject>): number[][] => {
+    sink.drawn.length = 0;
+    sink.draw(p);
+    expect(sink.drawn.map(gray)).toEqual(normalizedCompiledPixels(p));
+    return sink.drawn.map(gray);
+  };
+  const plain = drawn(previewProject([raster], [grayscale]));
+  // Photo engraving Apply writes the curve into the artwork override.
+  const overridden = drawn(
+    previewProject([{ ...raster, operationOverride: { photoToneCurve: curve } }], [grayscale]),
+  );
+  expect(overridden).not.toEqual(plain);
+  expect(sink.built).toHaveLength(2);
+  // A renamed curve burns the same tones, so its canvas is reused.
+  drawn(
+    previewProject(
+      [{ ...raster, operationOverride: { photoToneCurve: { ...curve, label: 'Birch 2' } } }],
+      [grayscale],
+    ),
+  );
+  expect(sink.built).toHaveLength(2);
+  // A process recipe can put a curve on the operation itself.
+  const steeper = {
+    ...curve,
+    points: [curve.points[0]!, { input: 128, output: 32 }, curve.points[2]!],
+  };
+  drawn(previewProject([raster], [{ ...grayscale, photoToneCurve: steeper }]));
   expect(sink.built).toHaveLength(3);
 });
 

@@ -46,7 +46,8 @@ operation. Neither behaviour is suitable for the new selected-photo workflow.
    loaded on demand.
 2. Offer Jarvis, Stucki and Floyd–Steinberg, brightness, contrast, gamma and DPI.
    Use the existing image's tones and effective density on open. Unsupported
-   photo modes start with Jarvis. Keep these continuous controls valid at
+   photo modes start with Jarvis. *Amended by ADR-670 Amendment 2: a Grayscale
+   photo keeps Grayscale, which the window then also offers.* Keep these continuous controls valid at
    fractional values; HTML step validation must not reject saved or edited
    values within their ranges. No invented speed or power recipe is supplied.
 3. Material marking is explicit: dark marks on a light surface or light marks on

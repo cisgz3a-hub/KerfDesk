@@ -7,6 +7,7 @@ import { type ProbeCorner, type ZProbeParams } from '../../core/controllers/grbl
 import { type CornerProbeParams, type ProbeRequest } from '../../core/controllers/grbl/probe';
 import { activeCncTool } from '../../core/scene';
 import { useStore } from '../state';
+import { runningJobMachineKind } from '../state/job-motion-machine';
 import { useLaserStore } from '../state/laser-store';
 import { describeProbeResult } from '../state/probe-actions';
 import {
@@ -69,7 +70,12 @@ export function ProbeControls(): JSX.Element | null {
   const setZParams = useProbeFormStore((s) => s.setZParams);
   const setBitDiameterMm = useProbeFormStore((s) => s.setBitDiameterMm);
   const setCornerGeometry = useProbeFormStore((s) => s.setCornerGeometry);
-  if (machine?.kind !== 'cnc') return null;
+  const runningKind = useLaserStore((s) => runningJobMachineKind(s));
+  if (machine?.kind !== 'cnc') {
+    // A running CNC job keeps its probe (ADR-416 Amendment 3), but the loaded
+    // bit is chosen in a CNC project, which the toolbar can still switch to.
+    return runningKind === 'cnc' ? <p style={hintStyle}>{PROBE_NEEDS_CNC_PROJECT}</p> : null;
+  }
   if (!probingSupported) {
     // The probe runner speaks the GRBL response grammar; on firmwares with a
     // different grammar a cycle could report false success and zero Z at the
@@ -217,6 +223,9 @@ function circuitStyle(circuit: ProbeCircuitCheck): React.CSSProperties {
 
 const TOOL_CHANGE_PROBE_HINT =
   'Tool change: probe Z only. The X/Y origin stays where the job started.';
+
+export const PROBE_NEEDS_CNC_PROJECT =
+  'The running job is a CNC job. Switch the toolbar to CNC to select the loaded bit as the Active bit, then probe it or Zero Z.';
 
 function probeHint(mode: ProbeMode, toolChangeHold: boolean): string {
   const hint =

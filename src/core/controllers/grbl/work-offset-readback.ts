@@ -56,6 +56,20 @@ export function parseActiveWcsFromModalResponses(
   return modalBodies.length === 1 ? activeWcsFromModal(modalBodies[0] ?? '') : null;
 }
 
+/** Whether a `$G` modal report selects inches (G20) or millimetres (G21);
+ * null unless it is exactly one GC report naming exactly one of the two.
+ * Smoothieware prints G20 or G21 from its inch mode (SimpleShell.cpp
+ * L879-L892), as GRBL does from its parser state. */
+export function parseModalUnitsFromModalResponses(
+  modalResponses: ReadonlyArray<string>,
+): 'inches' | 'millimetres' | null {
+  const modalBodies = matchingBodies(modalResponses, MODAL_REPORT_RE);
+  if (modalBodies.length !== 1) return null;
+  const units = (modalBodies[0] ?? '').split(/\s+/).filter((word) => /^G2[01]$/.test(word));
+  if (units.length !== 1) return null;
+  return units[0] === 'G20' ? 'inches' : 'millimetres';
+}
+
 function matchingBodies(lines: ReadonlyArray<string>, pattern: RegExp): string[] {
   return lines.flatMap((line) => {
     const match = pattern.exec(line.trim());

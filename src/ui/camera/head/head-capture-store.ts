@@ -13,6 +13,7 @@ import type { BedArea } from '../../../core/camera/model/camera-model-accuracy';
 import type { CameraModelRecord } from '../../../core/camera/model/camera-model-record';
 import {
   headCameraView,
+  headCameraZChange,
   isHeadCameraModel,
   planHeadCaptures,
 } from '../../../core/camera/model/head-camera';
@@ -25,7 +26,7 @@ import { toSceneCoords, type DeviceProfile } from '../../../core/devices';
 import { nativePointToBed } from '../../../core/devices/native-bed-frame';
 import type { Vec2 } from '../../../core/scene';
 import { useStore } from '../../state';
-import { useCameraStore } from '../../state/camera-store';
+import { useCameraStore, type BedPicture } from '../../state/camera-store';
 import { useLaserStore } from '../../state/laser-store';
 import { jogFrameCommandBlockMessage } from '../../state/laser-store-helpers';
 import { resolveNativeBedFrame } from '../../state/native-bed-frame';
@@ -35,10 +36,12 @@ import {
   positionLaserNativeTarget,
   positionLaserReach,
 } from '../../workspace/position-laser-click';
+import { bedPictureTakenNow } from '../bed-picture-frame';
 import { cameraBedFrameNow } from '../camera-bed-frame-now';
 import { cameraSourceIdentity, captureSourceFrame, type ActiveCameraSource } from '../frame-source';
 import { runHeadCapture, type HeadCaptureIo, type HeadSettle } from './head-capture-run';
 import { headPositionNow } from './head-position';
+import { headZChangedMessage } from './head-z-note';
 
 export type HeadCaptureState =
   | { readonly kind: 'idle' }
@@ -99,9 +102,11 @@ export async function captureWithHeadCamera(target: HeadCaptureTarget): Promise<
     return;
   }
   const { record, source, stops, region, coversArea } = setup;
+  // The frame the record and region were just read in (ADR-440 Amendment 5).
+  const taken = bedPictureTakenNow();
   store.setState({ state: { kind: 'running', taken: 0, total: stops.length, stopping: false } });
   const outcome = await runHeadCapture(stops, machineIo(target, source, stops.length));
-  const shown = showPictures(record, outcome.pictures, region);
+  const shown = showPictures(record, outcome.pictures, { region, taken });
   store.setState({ state: finalState(outcome, stops.length, shown, coversArea) });
 }
 
@@ -127,6 +132,8 @@ function captureSetup(target: HeadCaptureTarget): Setup {
   if (typeof record === 'string') return { kind: 'failed', message: record };
   const head = headPositionNow();
   if (head === null) return { kind: 'failed', message: HEAD_POSITION_UNKNOWN };
+  const zChange = headCameraZChange(record, head.z);
+  if (zChange !== null) return { kind: 'failed', message: headZChangedMessage(zChange) };
   const view = headCameraView(record, camera.surfaceHeightMm);
   if (view === null) return { kind: 'failed', message: NO_VIEW };
   const bed = { width: device.bedWidth, height: device.bedHeight };
@@ -255,7 +262,7 @@ function settleReading(target: Vec2, stopRequested: () => boolean): HeadSettle |
 function showPictures(
   record: CameraModelRecord,
   pictures: ReadonlyArray<HeadCameraPicture>,
-  region: BedArea,
+  { region, taken }: Pick<BedPicture, 'region' | 'taken'>,
 ): boolean {
   if (pictures.length === 0) return false;
   const camera = useCameraStore.getState();
@@ -263,13 +270,17 @@ function showPictures(
     MAX_PIXELS_PER_MM,
     MAX_PICTURE_SIDE_PX / Math.max(region.width, region.height),
   );
+  // Flattened at the heights set now, which the picture keeps: a later change
+  // clears it (ADR-449 Amendment 2, bed-picture-frame.ts).
+  const { surfaceHeightMm, heightAreas } = camera;
   const image = stitchHeadCameraPictures(record, pictures, {
     region,
     pixelsPerMm,
-    surfaceHeightMm: camera.surfaceHeightMm,
+    surfaceHeightMm,
+    heightAreas,
   });
   if (image === null) return false;
-  camera.setBedPicture({ image, region, surfaceHeightMm: camera.surfaceHeightMm });
+  camera.setBedPicture({ image, region, surfaceHeightMm, heightAreas, taken });
   camera.setOverlayVisible(true);
   return true;
 }

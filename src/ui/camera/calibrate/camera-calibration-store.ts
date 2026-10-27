@@ -60,7 +60,12 @@ export type CalibrationStep =
   // move the saved camera onto it.
   | { readonly kind: 'nudge-setup'; readonly note: string | null }
   | { readonly kind: 'nudge-photo'; readonly status: PhotoStatus }
-  | { readonly kind: 'nudge-result'; readonly offsetMm: Vec2 };
+  | {
+      readonly kind: 'nudge-result';
+      readonly offsetMm: Vec2;
+      /** The ring was burned before the machine's bed position was known (ADR-440 Amendment 5). */
+      readonly ringBedUnknown?: true;
+    };
 
 export type CalibrationSettings = {
   /** Thickness of the sheet the target is engraved on, mm. */
@@ -118,6 +123,9 @@ export type CameraCalibrationStore = {
   // The bed frame that area was engraved in, read only with targetArea; null
   // when the saved calibration did not keep it (rolling audit 12-P2-2).
   readonly targetBedFrame: CameraBedFrame | null;
+  // The bed frame as this nudge's ring started burning; null for a ring
+  // burned earlier, which is judged by the frame at the photo.
+  readonly nudgeRingBedFrame: CameraBedFrame | null;
   /** The guided setup from its first screen, choosing the camera (ADR-663). */
   readonly openSetup: () => void;
   /** The quick nudge fix for a calibrated camera fixed above the bed. */
@@ -156,22 +164,27 @@ const UNRECORDED_TARGET_FRAME_NOTE =
   'where its target lies on the bed now. If Machine Setup is unchanged since the calibration, choose Confirm bed and origin in ' +
   'the Camera panel and check again; otherwise recalibrate with a new engraved target. Your saved calibration is unchanged.';
 
+// A newly opened wizard knows no engraved target or burned ring yet.
+const NO_KNOWN_TARGET = {
+  targetArea: null,
+  targetBedFrame: null,
+  nudgeRingBedFrame: null,
+} as const;
+
 export const useCameraCalibrationStore = create<CameraCalibrationStore>((set) => ({
   open: false,
   mode: 'calibrate',
   minimized: false,
   step: INITIAL_STEP,
   settings: DEFAULT_CALIBRATION_SETTINGS,
-  targetArea: null,
-  targetBedFrame: null,
+  ...NO_KNOWN_TARGET,
   openSetup: () =>
     set((s) => ({
       open: true,
       mode: 'calibrate',
       minimized: false,
       step: { kind: 'camera' },
-      targetArea: null,
-      targetBedFrame: null,
+      ...NO_KNOWN_TARGET,
       settings: withRemembered(s.settings),
     })),
   openNudge: () =>
@@ -180,8 +193,7 @@ export const useCameraCalibrationStore = create<CameraCalibrationStore>((set) =>
       mode: 'nudge',
       minimized: false,
       step: { kind: 'nudge-setup', note: null },
-      targetArea: null,
-      targetBedFrame: null,
+      ...NO_KNOWN_TARGET,
       settings: withRemembered(s.settings),
     })),
   openWizard: () =>
@@ -190,8 +202,7 @@ export const useCameraCalibrationStore = create<CameraCalibrationStore>((set) =>
       mode: 'calibrate',
       minimized: false,
       step: INITIAL_STEP,
-      targetArea: null,
-      targetBedFrame: null,
+      ...NO_KNOWN_TARGET,
       settings: withRemembered(s.settings),
     })),
   // Check needs the target that was actually engraved, in the bed frame it was

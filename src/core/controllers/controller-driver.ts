@@ -188,4 +188,14 @@ export type ControllerDriver = {
   /** How the firmware's homing cycle moves, for timing a Home from its `$$`
    *  settings; absent means stock GRBL's (grbl-homing-duration.ts). */
   readonly homingCycle?: HomingCycleModel;
+  /** Present when the firmware's position reports follow its G-code units
+   *  (Smoothieware), where the GRBL family's follow `$13`: the units a line
+   *  leaves them in, or null when it selects none. A line that may leave other
+   *  units than KerfDesk reads in hides reported positions until a `[GC:]`
+   *  modal report names the units again (console-report-units.ts). */
+  readonly reportUnitsSelectedBy?: (line: string) => ReportUnitsSelection | null;
 };
+
+/** The units a line leaves position reports in; 'unknown' when it may leave
+ *  either (Smoothieware's M121 restores the units M120 saved). */
+export type ReportUnitsSelection = 'inches' | 'millimetres' | 'unknown';

@@ -1,12 +1,16 @@
 import { useState } from 'react';
-import { effectiveOperationForObject } from '../../core/effective-output';
-import { captureLayerOperationSettings, type Layer } from '../../core/scene';
-import type { ToneCalibrationSeed } from '../calibration/tone-calibration-draft';
+import {
+  effectiveObjectPowerPercent,
+  effectiveOperationForObject,
+} from '../../core/effective-output';
+import type { Layer } from '../../core/scene';
+import { photoBurnSettings, type ToneCalibrationSeed } from '../calibration/tone-calibration-draft';
 import { Button, Dialog, DialogActions } from '../kit';
 import type { PhotoEngravingApply } from './photo-engraving-apply';
 import {
   initialPhotoEngravingDraft,
   photoEngravingPatch,
+  photoProcessingChoices,
   type PhotoEngravingDraft,
 } from './photo-engraving-settings';
 import type { PhotoEngravingSession } from './photo-engraving-store';
@@ -63,7 +67,8 @@ export default function PhotoEngravingDialog(props: {
           image={session.image}
           draft={draft}
           storedLinesPerMm={effective.linesPerMm}
-          power={effective.power}
+          processingChoices={photoProcessingChoices(effective.ditherAlgorithm)}
+          power={effectiveObjectPowerPercent(effective, session.image)}
           speed={effective.speed}
           onChange={update}
           onCalibrateTones={() =>
@@ -150,7 +155,10 @@ function PhotoEngravingGuide(props: {
   );
 }
 
-/** ADR-670: the wedge burns with the photo's settings as this window has them. */
+/**
+ * ADR-670: the wedge burns with the photo's settings as this window has them,
+ * at the power the photo burns with (Amd 1).
+ */
 function toneCalibrationSeed(
   session: PhotoEngravingSession,
   effective: Layer,
@@ -159,7 +167,7 @@ function toneCalibrationSeed(
   return {
     sourceName: session.image.source,
     settings: {
-      ...captureLayerOperationSettings(effective),
+      ...photoBurnSettings(effective, session.image),
       mode: 'image',
       ditherAlgorithm: draft.ditherAlgorithm,
       linesPerMm: draft.linesPerMm,

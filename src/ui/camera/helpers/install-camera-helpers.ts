@@ -7,7 +7,10 @@
 // - take a new held picture when a job finishes, once the head has settled;
 // - finish an Alt+C that had to start the camera first;
 // - check whether the camera has moved, on each new held picture and once
-//   just after it starts (Amendment 3).
+//   just after it starts (Amendment 3);
+// - keep a bed picture where its part of the bed is, or drop it, when Machine
+//   Setup changes, and take a canvas target's bed frame at the Start that
+//   burns its rings (ADR-440 Amendment 5).
 // Each helper acts only on a camera that is not running, and the operator can
 // switch the start and the after-job refresh off in Camera settings.
 
@@ -23,6 +26,8 @@ import {
 import { useCameraStore } from '../../state/camera-store';
 import type { LiveCanvasRun } from '../../state/canvas-motion-plan';
 import { useLaserStore } from '../../state/laser-store';
+import { followBedPictureFrame } from '../bed-picture-frame';
+import { watchCanvasTargetBurns } from '../calibrate/canvas-target-burn';
 import { AFTER_SETTLE_MS } from '../job-watch/job-watch-runner';
 import { localCameraBridgeAvailable } from '../panel/camera-platform-capability';
 import { lastSourceKind, startRememberedCamera, type CameraStartDeps } from './auto-start';
@@ -32,7 +37,13 @@ import { checkCameraMoved } from './moved-check';
 import { refreshCameraPicture, reportRefresh, takePendingRefresh } from './refresh-picture';
 
 export function installCameraHelpers(deps: CameraStartDeps): () => void {
-  const stops = [rememberRunningCamera(), refreshAfterJobs(), checkForMoves()];
+  const stops = [
+    rememberRunningCamera(),
+    refreshAfterJobs(),
+    checkForMoves(),
+    followBedPictureFrame(),
+    watchCanvasTargetBurns(),
+  ];
   if (!BROWSER_FREE_BUILD) {
     stops.push(startCalibratedCamera(deps));
     void startIfCalibrated(deps);

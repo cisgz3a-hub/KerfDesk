@@ -1,17 +1,20 @@
 import type { Scene } from '../../core/scene';
+import type { JobPlacementSettings } from '../job-placement';
+import { projectWithCurrentJobSetup } from './project-job-setup';
 import { pushUndo, type StateSlice } from './scene-mutations';
+import { captureSetupHistoryContext, type SetupHistoryContext } from './setup-history-context';
 
-type GeneratedSceneState = StateSlice & {
-  readonly selectedObjectId: string | null;
-  readonly additionalSelectedIds: ReadonlySet<string>;
-  readonly redoStack: ReadonlyArray<GeneratedSceneState['project']>;
-  readonly dirty: boolean;
-};
+type GeneratedSceneState = StateSlice &
+  SetupHistoryContext & {
+    readonly redoStack: ReadonlyArray<GeneratedSceneState['project']>;
+    readonly dirty: boolean;
+  };
 
 type GeneratedScenePatch = {
   readonly project: GeneratedSceneState['project'];
   readonly selectedObjectId: string | null;
   readonly additionalSelectedIds: ReadonlySet<string>;
+  readonly jobPlacement?: JobPlacementSettings;
   readonly undoStack: ReadonlyArray<GeneratedSceneState['project']>;
   readonly redoStack: ReadonlyArray<GeneratedSceneState['project']>;
   readonly dirty: boolean;
@@ -20,21 +23,38 @@ type GeneratedScenePatch = {
 type GeneratedSceneSet = (fn: (state: GeneratedSceneState) => GeneratedScenePatch) => void;
 
 export type GeneratedSceneActions = {
-  readonly replaceSceneWithGeneratedScene: (scene: Scene, selectGenerated?: boolean) => void;
+  /** `placement` changes Start From in the same Undo step as the scene. */
+  readonly replaceSceneWithGeneratedScene: (
+    scene: Scene,
+    selectGenerated?: boolean,
+    placement?: Partial<JobPlacementSettings>,
+  ) => void;
 };
 
 export function generatedSceneActions(set: GeneratedSceneSet): GeneratedSceneActions {
   return {
-    replaceSceneWithGeneratedScene: (scene, selectGenerated = false) =>
-      set((state) => ({
-        project: { ...state.project, scene },
-        selectedObjectId: selectGenerated ? (scene.objects[0]?.id ?? null) : null,
-        additionalSelectedIds: new Set(
-          selectGenerated ? scene.objects.slice(1).map((object) => object.id) : [],
-        ),
-        undoStack: pushUndo(state.project, state.undoStack),
-        redoStack: [],
-        dirty: true,
-      })),
+    replaceSceneWithGeneratedScene: (scene, selectGenerated = false, placement) =>
+      set((state) => {
+        const project = { ...state.project, scene };
+        const patch = {
+          project,
+          selectedObjectId: selectGenerated ? (scene.objects[0]?.id ?? null) : null,
+          additionalSelectedIds: new Set(
+            selectGenerated ? scene.objects.slice(1).map((object) => object.id) : [],
+          ),
+          undoStack: pushUndo(state.project, state.undoStack),
+          redoStack: [],
+          dirty: true,
+        };
+        if (placement === undefined) return patch;
+        // Undo and Redo restore the placement with the scene (ADR-654 Amendment 2).
+        captureSetupHistoryContext(state.project, state);
+        const jobPlacement = { ...state.jobPlacement, ...placement };
+        return {
+          ...patch,
+          jobPlacement,
+          project: projectWithCurrentJobSetup({ ...state, ...patch, jobPlacement }),
+        };
+      }),
   };
 }

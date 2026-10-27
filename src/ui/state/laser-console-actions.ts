@@ -9,9 +9,9 @@ import * as detectedSettings from './detected-settings-action';
 import { unqualifiedControllerSettingsPatch } from './controller-report-units';
 import {
   beginConsoleSettingWriteEvidence,
-  rereadSettingsAfterConsoleWrite,
+  consoleSettingWriteFailed,
+  rereadAfterConsoleWrite,
 } from './laser-console-settings-write';
-import { failedControllerQualificationPatch } from './laser-controller-qualification';
 import {
   hasAccessoryCommand,
   type ConsoleStateEffect,
@@ -227,12 +227,7 @@ async function dispatchPreparedConsoleCommand(
     await writeConsoleCommand(refs, write, command, source);
   } catch (error) {
     if (settingsQuery) releaseConsoleSettingsRead(set, get, refs);
-    if (settingWrite.requalifiesSettings) {
-      const message = error instanceof Error ? error.message : String(error);
-      set((state) =>
-        failedControllerQualificationPatch(state, settingWrite.qualificationEpoch, message),
-      );
-    }
+    consoleSettingWriteFailed(set, get, command, settingWrite, error);
     throw error;
   }
   if (settingsQuery) finishConsoleSettingsRead(set, get, refs);
@@ -248,17 +243,9 @@ async function dispatchPreparedConsoleCommand(
   await trackConsoleWcs(set, get, refs, command, (line, action, next) =>
     write(line, action, next ?? 'system'),
   );
-  if (command.kind === 'setting-write' || settingWrite.reportUnitsWrite) {
-    await rereadSettingsAfterConsoleWrite(
-      set,
-      get,
-      refs.driver,
-      command.normalized,
-      settingWrite.reportUnitsWrite,
-      (settingsRead) =>
-        dispatchPreparedConsoleCommand(set, get, refs, write, settingsRead, 'system'),
-    );
-  }
+  await rereadAfterConsoleWrite(set, get, refs.driver, command, settingWrite, (read) =>
+    dispatchPreparedConsoleCommand(set, get, refs, write, read, 'system'),
+  );
 }
 
 function applyConsoleStateEffect(set: SetFn, command: PreparedConsoleCommand): void {

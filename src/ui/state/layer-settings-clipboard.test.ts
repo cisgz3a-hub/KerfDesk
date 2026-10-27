@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { DEFAULT_CNC_LAYER_SETTINGS, operationIdsForObject } from '../../core/scene';
+import { fitPhotoToneCurve } from '../../core/raster/photo-tone-curve';
+import {
+  DEFAULT_CNC_LAYER_SETTINGS,
+  layerOperationSettingsEqual,
+  operationIdsForObject,
+} from '../../core/scene';
 import { useStore } from './store';
 import { resetStore, svgObj } from './test-helpers';
 
@@ -154,7 +159,60 @@ describe('operation settings clipboard', () => {
     expect(operation(targetId)?.overcutMm).toBeUndefined();
     expect(operation(targetId)?.imageOverscanMm).toBeUndefined();
   });
+
+  // ADR-670 Amendment 1 (audit G3-P3-2): a process recipe can put a tone curve
+  // on an operation, and Copy settings is one of its operation-settings copies.
+  it('pastes a tone curve, clears it from an uncalibrated source, and records each change', () => {
+    arrangeTwoOperations();
+    const [sourceId, targetId] = operationIdsFor('O1');
+    if (sourceId === undefined || targetId === undefined) throw new Error('operations missing');
+    useStore.getState().setLayerParam(sourceId, { mode: 'image', photoToneCurve: BIRCH });
+    useStore.getState().setLayerParam(targetId, { mode: 'image' });
+    useStore.getState().copyLayerSettings(sourceId);
+    useStore.setState({ undoStack: [] });
+
+    useStore.getState().pasteLayerSettings(targetId);
+    expect(operation(targetId)?.photoToneCurve).toEqual(BIRCH);
+    expect(useStore.getState().undoStack).toHaveLength(1);
+
+    // The same curve read from another file is equal by value: nothing to paste.
+    useStore.getState().setLayerParam(sourceId, { photoToneCurve: structuredClone(BIRCH) });
+    useStore.getState().copyLayerSettings(sourceId);
+    useStore.setState({ undoStack: [] });
+    useStore.getState().pasteLayerSettings(targetId);
+    expect(useStore.getState().undoStack).toHaveLength(0);
+
+    useStore.getState().setLayerParam(sourceId, { photoToneCurve: undefined });
+    useStore.getState().copyLayerSettings(sourceId);
+    useStore.setState({ undoStack: [] });
+    useStore.getState().pasteLayerSettings(targetId);
+    expect(operation(targetId)?.photoToneCurve).toBeUndefined();
+    expect(useStore.getState().undoStack).toHaveLength(1);
+  });
+
+  it('pastes every operation setting the scene compares, including power mode and scan offset', () => {
+    arrangeTwoOperations();
+    const [sourceId, targetId] = operationIdsFor('O1');
+    if (sourceId === undefined || targetId === undefined) throw new Error('operations missing');
+    const scanOffset = {
+      allowUncalibratedBidirectionalScan: true,
+      bidirectionalScanOffsetMm: 0.12,
+    };
+    useStore.getState().setLayerParam(sourceId, scanOffset);
+    useStore.getState().setLayerParam(targetId, { powerMode: 'dynamic' });
+    useStore.getState().copyLayerSettings(sourceId);
+    useStore.getState().pasteLayerSettings(targetId);
+    expect(operation(targetId)).toMatchObject(scanOffset);
+    expect(operation(targetId)?.powerMode).toBeUndefined();
+    expect(layerOperationSettingsEqual(operation(targetId)!, operation(sourceId)!)).toBe(true);
+
+    useStore.setState({ undoStack: [] });
+    useStore.getState().pasteLayerSettings(targetId);
+    expect(useStore.getState().undoStack).toHaveLength(0);
+  });
 });
+
+const BIRCH = fitPhotoToneCurve([{ commandedPercent: 50, observedPercent: 80 }], 'Birch');
 
 function arrangeTwoOperations(): void {
   useStore.getState().importSvgObject(svgObj('O1', ['#ff0000', '#0000ff']));

@@ -13,6 +13,7 @@ import type { RasterGroup } from '../../core/job';
 import { compileRasterGroupsForLayer } from '../../core/job/compile-job-raster';
 import { rasterScanBounds } from '../../core/job/raster-bounds';
 import { pixelExtentForMm } from '../../core/raster';
+import { isIdentityPhotoToneCurve, type PhotoToneCurve } from '../../core/raster/photo-tone-curve';
 import {
   normalizedScanAngleDeg,
   rasterScanFrame,
@@ -162,7 +163,15 @@ function previewSettingsKey(
 ): string {
   const dimensions = compiledGridDimensions(obj, layer, device);
   const scanKey = `scan:${normalizedScanAngleDeg(previewScanFrame(layer, device).angleDeg)}`;
-  return `${adjustmentKey(obj)}|${layer.negativeImage ? 'negative' : 'positive'}|${layer.passThrough ? 'pass' : 'resample'}|${layer.ditherAlgorithm}|${layer.minPower}-${layer.power}-${obj.powerScale ?? 100}-${device.maxPowerS}|${layer.linesPerMm}|${dimensions.width}x${dimensions.height}|${scanKey}|${transformCacheKey(obj, device)}|${maskCacheKey(maskObject)}`;
+  return `${adjustmentKey(obj)}|${layer.negativeImage ? 'negative' : 'positive'}|${layer.passThrough ? 'pass' : 'resample'}|${layer.ditherAlgorithm}|${toneCurveKey(layer.photoToneCurve)}|${layer.minPower}-${layer.power}-${obj.powerScale ?? 100}-${device.maxPowerS}|${layer.linesPerMm}|${dimensions.width}x${dimensions.height}|${scanKey}|${transformCacheKey(obj, device)}|${maskCacheKey(maskObject)}`;
+}
+
+// ADR-670: a material tone curve rewrites the luma the ditherer sees, so its
+// points key the cached canvas. Its label changes no pixel, and the identity
+// curve burns as no curve.
+function toneCurveKey(curve: PhotoToneCurve | undefined): string {
+  if (curve === undefined || isIdentityPhotoToneCurve(curve)) return 'tone:none';
+  return `tone:${curve.points.map((point) => `${point.input},${point.output}`).join(';')}`;
 }
 
 function schedulePreviewCanvasBuild(

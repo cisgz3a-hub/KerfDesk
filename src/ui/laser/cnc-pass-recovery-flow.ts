@@ -4,6 +4,8 @@
 // staged as a new attempt artifact and durably armed BEFORE any controller
 // write, and the final wire-boundary authorization re-checks the live
 // controller. Streaming reuses cnc-supervised-recovery-stream.ts unchanged.
+// The open project must be CNC, because its bit-change holds are worked from it
+// (ADR-416 Amendment 3).
 
 import { buildCncPassResumeJob } from '../../core/recovery/cnc-pass-resume-job';
 import { emitPreparedGcode } from '../../io/gcode';
@@ -41,6 +43,7 @@ import {
   type CncRecoveryStreamPlan,
 } from './cnc-supervised-recovery-stream';
 import { mergeCncRecoveryWarnings } from './merge-cnc-recovery-warnings';
+import { cncRecoveryOpenProjectIssue } from './cnc-recovery-open-project';
 import { partitionEmitPreflight } from './start-job-readiness-policy';
 import { prepareArchivedRecoverySource, type PreparedRecoverySource } from './start-job-source';
 
@@ -85,6 +88,11 @@ export async function runCncPassRecoveryFlow(
 function sealedCncArtifact(capsule: RecoveryCapsule): ExecutionArtifactV1 | null {
   if (capsule.artifact.machineKind !== 'cnc') {
     jobAwareAlert('Cannot start CNC recovery:\n\nThe retained checkpoint is not a CNC job.');
+    return null;
+  }
+  const openProjectIssue = cncRecoveryOpenProjectIssue();
+  if (openProjectIssue !== null) {
+    jobAwareAlert(`Cannot start CNC recovery:\n\n${openProjectIssue}`);
     return null;
   }
   if (capsule.artifact.kind !== 'exact-execution') {

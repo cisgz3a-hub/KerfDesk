@@ -5,7 +5,7 @@
 // still correct it. The layout's bed frame goes with it, so the calibration
 // records the frame its rings were placed in (rolling audit 12-P2-2).
 
-import type { CameraBedFrame } from '../../../core/camera/model/camera-bed-frame';
+import { sameBedPlaces, type CameraBedFrame } from '../../../core/camera/model/camera-bed-frame';
 import type { BedArea } from '../../../core/camera/model/camera-model-accuracy';
 import { DEFAULT_RING_DIAMETER_MM } from '../../../core/camera/target/bed-target';
 import type { DeviceProfile } from '../../../core/devices';
@@ -27,6 +27,8 @@ export type AssumedTarget = {
   readonly description: string;
   /** The bed frame the layout's rings were placed in. */
   readonly bedFrame: CameraBedFrame;
+  /** Why no photo may be fitted to this layout; absent when it may. */
+  readonly refusal?: string;
 };
 
 type LayoutSettings = Pick<CalibrationSettings, 'marginMm' | 'headCamera' | 'headTargetSizeMm'> &
@@ -74,13 +76,15 @@ export function assumedTarget(args: {
     const bedThen = size(remembered.bedWidthMm, remembered.bedHeightMm);
     const changed = bedThen === bedNow ? '' : ` (the bed is now ${bedNow})`;
     const date = new Date(remembered.engravedAt).toLocaleDateString();
-    // A target put on the canvas is engraved by the operator, maybe later.
-    const how = remembered.onCanvas === true ? 'added to the canvas' : 'engraved';
+    const bedFrame = engravedTargetBedFrame(remembered, frameNow);
     return {
       area: remembered.area,
       source: 'engraved',
-      description: `the target ${how} from this computer on ${date}: ${layoutWords(settings, remembered.area, bedThen)}${changed}`,
-      bedFrame: engravedTargetBedFrame(remembered, frameNow),
+      description: `the target ${howPlaced(remembered)} from this computer on ${date}: ${layoutWords(settings, remembered.area, bedThen)}${changed}`,
+      bedFrame,
+      ...(unseenBurnAfterChange(remembered, bedFrame, frameNow)
+        ? { refusal: CANVAS_TARGET_FRAME_CHANGED }
+        : {}),
     };
   }
   const area = calibrationTargetArea(args.bedWidthMm, args.bedHeightMm, settings);
@@ -135,6 +139,26 @@ function assumedTargetFor(
     remembered: rememberedEngravedTarget(device, settings.headCamera),
     frameNow: known.frameNow,
   });
+}
+
+// A target put on the canvas is engraved by the operator, maybe later.
+function howPlaced(target: EngravedTarget): string {
+  if (target.onCanvas !== true) return 'engraved';
+  return target.burnSeen === true ? 'added to the canvas and engraved' : 'added to the canvas';
+}
+
+export const CANVAS_TARGET_FRAME_CHANGED =
+  'This target was added to the canvas while the machine was set up differently (bed size, origin or machine travel), and KerfDesk has not seen a Start burn its rings since, so it cannot tell where on the bed they are. Add the target to the canvas again and Start it, or use Engrave target.';
+
+// A target put on the canvas whose burn was not seen keeps the frame from when
+// it was added. That frame says where its rings are only while Machine Setup
+// still places the bed the same way (ADR-440 Amendment 5).
+function unseenBurnAfterChange(
+  target: EngravedTarget,
+  addedIn: CameraBedFrame,
+  now: CameraBedFrame,
+): boolean {
+  return target.onCanvas === true && target.burnSeen !== true && !sameBedPlaces(addedIn, now);
 }
 
 // The settings still describe the remembered target when they lay out the

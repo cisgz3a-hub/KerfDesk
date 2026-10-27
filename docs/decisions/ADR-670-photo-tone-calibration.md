@@ -31,8 +31,9 @@ measuring it and applying the inverse transfer curve before screening.
    (6-21 patches, default 11, evenly spaced from blank to solid) and a 7-segment
    percentage label under each patch. All patches are one raster image on one
    Image operation. That operation is the selected photo's effective operation
-   (object overrides included), or the Photo engraving window's unapplied draft
-   when it was opened from there, with the dialog's dither, DPI, power, speed
+   (object overrides included) at the power the photo burns with, its power
+   multiplier applied (Amendment 1), or the Photo engraving window's unapplied
+   draft when it was opened from there, with the dialog's dither, DPI, power, speed
    and material marking over it, Pass-through off and **no tone curve**, so the
    burn measures the raw response to those exact settings. The patch source
    pixels hold the inverse for light-marking material, so the ditherer sees the
@@ -65,7 +66,8 @@ measuring it and applying the inverse transfer curve before screening.
    after the curve rather than before, a second-order difference.
 6. **Store with the operation.** `photoToneCurve` is a new optional operation
    setting (operation, sub-operation and artwork override; captured by
-   operation-settings copies and process recipes). Absent, or the identity
+   operation-settings copies, Copy and Paste settings included (Amendment 1),
+   and process recipes). Absent, or the identity
    curve, compiles byte-identically to the output before this ADR. Operations
    compare equal curves by value. A project carries its own copy of each curve,
    so it burns the same on any computer. Project load refuses a curve that is
@@ -80,9 +82,11 @@ measuring it and applying the inverse transfer curve before screening.
    photo's scoped operation override in the same single Undo step as ADR-581.
    Choosing None over an operation that carries a curve writes the identity
    curve, because an absent override key would inherit it. When the chosen
-   calibration was measured with another dither, DPI, marking, power or speed,
+   calibration was measured with another dither, DPI, marking, power (the
+   photo's burn power, Amendment 1) or speed,
    the window says so. **Calibrate a material…** closes the window and opens
-   Tone Calibration seeded from its current settings.
+   Tone Calibration seeded from its current settings. A Grayscale photo keeps
+   Grayscale, so a Grayscale calibration applies as measured (Amendment 2).
 
 ### Verification and limits
 
@@ -102,7 +106,9 @@ These are code and simulation results. No wedge or portrait has been burned,
 no controller was operated, and real materials may respond differently from
 the model (char, colour shift, heat build-up across a large image). Frame,
 Start, power, speed, output policy and licences are unchanged. A Material
-Library recipe (`MaterialRecipe`) does not hold a tone curve yet; the saved
+Library recipe (`MaterialRecipe`) does not hold a tone curve yet, so applying
+one removes the operation's curve (Amendment 2); the saved
 calibrations list is per computer. The older Adjust Image thumbnail (which
 ADR-581 already describes as unrepresentative) does not show a calibration;
-the canvas, Photo engraving preview, Preview and G-code do.
+the canvas, Photo engraving preview, Preview (its cached canvas keyed on the
+curve, Amendment 1) and G-code do.

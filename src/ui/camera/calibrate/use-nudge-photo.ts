@@ -8,7 +8,7 @@ import { useCameraStore } from '../../state/camera-store';
 import { useLaserStore } from '../../state/laser-store';
 import { cameraBedFrameNow } from '../camera-bed-frame-now';
 import { useCameraCalibrationStore, type CalibrationStep } from './camera-calibration-store';
-import { applyNudge, photographNudgeRing } from './nudge-actions';
+import { applyNudge, photographNudgeRing, type NudgePhotoOutcome } from './nudge-actions';
 
 export type NudgePhotoControls = {
   readonly take: () => Promise<void>;
@@ -79,15 +79,10 @@ export function useNudgePhoto(): NudgePhotoControls {
       const outcome = await photographNudgeRing({
         source: camera.sourceState.source,
         sheetThicknessMm: wizard.settings.sheetThicknessMm,
+        ...(wizard.nudgeRingBedFrame === null ? {} : { ringBedFrame: wizard.nudgeRingBedFrame }),
         signal: run.controller.signal,
       });
-      publish(
-        runRef,
-        run,
-        outcome.kind === 'ok'
-          ? { kind: 'nudge-result', offsetMm: outcome.offsetMm }
-          : { kind: 'nudge-photo', status: { kind: 'failed', message: outcome.message } },
-      );
+      publish(runRef, run, stepFor(outcome));
     } catch (error: unknown) {
       publish(runRef, run, {
         kind: 'nudge-photo',
@@ -104,6 +99,17 @@ export function useNudgePhoto(): NudgePhotoControls {
   };
 }
 
+function stepFor(outcome: NudgePhotoOutcome): CalibrationStep {
+  if (outcome.kind === 'failed') {
+    return { kind: 'nudge-photo', status: { kind: 'failed', message: outcome.message } };
+  }
+  return {
+    kind: 'nudge-result',
+    offsetMm: outcome.offsetMm,
+    ...(outcome.ringBedUnknown === true ? { ringBedUnknown: true as const } : {}),
+  };
+}
+
 function applyCurrentNudge(ref: RunRef, offset: Vec2): boolean {
   const run = ref.current;
   if (
@@ -115,7 +121,7 @@ function applyCurrentNudge(ref: RunRef, offset: Vec2): boolean {
     return false;
   // Our own profile write notifies the context subscriptions synchronously.
   ref.current = null;
-  return applyNudge(offset);
+  return applyNudge(offset, run.step.ringBedUnknown === true);
 }
 
 function isCurrent(ref: RunRef, run: NudgeRun): boolean {

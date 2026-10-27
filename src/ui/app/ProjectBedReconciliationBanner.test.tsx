@@ -2,6 +2,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { savedCameraModel } from '../../core/camera/model/model-fixtures';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import {
   createLayer,
@@ -120,6 +121,75 @@ describe('ProjectBedReconciliationBanner', () => {
       expect(host.textContent).toBe('');
     },
   );
+
+  // Rolling audit v3 G6-P2-2 (ADR-440 Amendment 5): a file saved before a bed
+  // correction is "another machine" by bed size alone. The notice named the
+  // same machine twice, gave no sizes, said nothing of the camera, and its
+  // primary button reverted the bed and the calibration.
+  it('names both beds and the camera swap, and leads with keeping the current machine, when only the bed size differs', async () => {
+    const latest = { ...savedCameraModel(), calibratedAt: '2026-10-25T12:00:00.000Z' };
+    const older = { ...savedCameraModel(), calibratedAt: '2026-10-01T12:00:00.000Z' };
+    const falcon = {
+      ...DEFAULT_DEVICE_PROFILE,
+      profileId: 'creality-falcon-a1-pro',
+      name: 'Creality Falcon A1 Pro',
+      bedWidth: 400,
+      bedHeight: 410,
+    };
+    useStore.setState({ project: createProject({ ...falcon, cameraModel: latest }) });
+    useStore
+      .getState()
+      .setProject(createProject({ ...falcon, bedHeight: 400, cameraModel: older }));
+    expect(useStore.getState().projectBedReconciliation).toMatchObject({
+      machineChanged: true,
+      bedSizeOnly: true,
+      camera: {
+        openedCalibratedAt: older.calibratedAt,
+        currentCalibratedAt: latest.calibratedAt,
+      },
+    });
+    await act(async () => root.render(<ProjectBedReconciliationBanner />));
+
+    const text = host.textContent ?? '';
+    expect(text).toContain('with a 400 × 400 mm bed');
+    expect(text).toContain('is set up with a 400 × 410 mm bed');
+    expect(text).toContain(
+      `The camera now uses the file's calibration from ${new Date(older.calibratedAt).toLocaleDateString()} instead of your machine's from ${new Date(latest.calibratedAt).toLocaleDateString()}.`,
+    );
+    expect(text).toContain(
+      'Keep current machine keeps your 400 × 410 mm bed and camera calibration.',
+    );
+    const buttons = [...host.querySelectorAll('button')];
+    expect(buttons.map((button) => button.textContent)).toEqual([
+      'Keep current machine',
+      'Use project machine',
+    ]);
+    expect(buttons[0]?.className).toContain('lf-btn--primary');
+    expect(buttons[1]?.className).not.toContain('lf-btn--primary');
+
+    await act(async () => buttons[0]?.click());
+    const { device } = useStore.getState().project;
+    expect(device.bedHeight).toBe(410);
+    expect(device.cameraModel?.calibratedAt).toBe(latest.calibratedAt);
+  });
+
+  it('says when another machine brings no camera calibration', async () => {
+    useStore.setState({
+      project: createProject({
+        ...DEFAULT_DEVICE_PROFILE,
+        name: 'Current laser',
+        cameraModel: { ...savedCameraModel(), calibratedAt: '2026-10-25T12:00:00.000Z' },
+      }),
+    });
+    useStore.getState().setProject(createProject({ ...DEFAULT_DEVICE_PROFILE, name: 'Opened' }));
+    expect(useStore.getState().projectBedReconciliation).toMatchObject({ bedSizeOnly: false });
+    await act(async () => root.render(<ProjectBedReconciliationBanner />));
+    expect(host.textContent).toContain(
+      'This file has no camera calibration, so the camera is not calibrated for now',
+    );
+    // Another machine keeps its own order: the file's machine is the usual choice.
+    expect(host.querySelector('button')?.textContent).toBe('Use project machine');
+  });
 
   it('keeps exact CNC hardware and its mirror while retaining the opened CNC job', async () => {
     const hardware = {

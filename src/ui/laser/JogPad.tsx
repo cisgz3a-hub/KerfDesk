@@ -11,21 +11,13 @@
 // focus and the settings rows wait for it to finish.
 
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
-import {
-  jogAxisSignsForOrigin,
-  machineBoundsForDevice,
-  type JogAxisSigns,
-  type MachineBounds,
-} from '../../core/devices';
+import { jogAxisSignsForOrigin, type JogAxisSigns } from '../../core/devices';
 import { deviceForActiveHead } from '../../core/cnc/cnc-head-feeds';
-import type { NativeXyBounds } from '../../core/devices/native-bed-frame';
 import { machineKindOf } from '../../core/scene';
 import { useStore } from '../state';
-import { inferCurrentMachinePosition } from '../state/infer-machine-position';
+import { runningJobMachineKind } from '../state/job-motion-machine';
 import { useLaserStore } from '../state/laser-store';
-import { withheldControllerMPos } from '../state/laser-status-position';
-import { firmwareJogCheckPosition, resolveManualMotionLimits } from '../state/manual-motion-limits';
-import { resolveNativeBedFrame, selectNativeBedEvidence } from '../state/native-bed-frame';
+import { selectNativeBedEvidence } from '../state/native-bed-frame';
 import { FocusJogControls, focusJogReady } from './FocusJogControls';
 import { CentreSelectionButton } from './CentreSelectionButton';
 import { JogArrowGrid } from './JogArrowGrid';
@@ -33,6 +25,7 @@ import { JogPadAirAssist } from './JogPadAirAssist';
 import { JogSettingsRow } from './JogSettingsRow';
 import { MomentaryFireControl } from './MomentaryFireControl';
 import { clampJogFeed, type JogVector } from './jog-control-policy';
+import { holdJogAim } from './jog-hold-aim';
 import { useJogControlPreferences } from './jog-control-preferences';
 import { controllerActionFailureHandler } from './report-controller-action-failure';
 import { useJogShortcuts } from './use-jog-shortcuts';
@@ -63,13 +56,14 @@ export function JogPad({
   const setSelectedFeed = useJogControlPreferences((state) => state.setRequestedFeedMmPerMin);
   const project = useStore((s) => s.project);
   const device = project.device;
-  const machineKind = machineKindOf(project.machine);
+  // A running job's own kind decides Z jog and Zero Z (ADR-416 Amendment 3).
+  const runningKind = useLaserStore((s) => runningJobMachineKind(s));
+  const machineKind = runningKind ?? machineKindOf(project.machine);
   const maxFeed = deviceForActiveHead(device, project.machine).maxFeed;
   const continuousJogSupported = useLaserStore((s) => s.capabilities.jogCancel);
   const feed = clampJogFeed(selectedFeed, maxFeed);
   const focusFeed = Math.min(maxFeed, FOCUS_FEED_MM_PER_MIN);
   const signs = useMemo(() => jogAxisSignsForOrigin(device.origin), [device.origin]);
-  const bounds = useMemo(() => machineBoundsForDevice(device), [device]);
   const focusReady = focusJogReady(device, machineKind);
   // Manual Air sends the laser profile's air output (M7/M8), which on a router
   // is a coolant relay. CNC keeps the button only to switch off air that was
@@ -105,7 +99,6 @@ export function JogPad({
           stepMm={step}
           feed={feed}
           signs={signs}
-          bounds={bounds}
           continuousJogSupported={continuousJogSupported && !stepJogsOnly}
           onJog={sendVector}
           onCancel={cancelContinuousJog}
@@ -208,50 +201,18 @@ function machineActionAreas(showManualAir: boolean, machineKind: 'laser' | 'cnc'
 // The head position only aims a continuous jog. A disabled pad (a job, Frame or
 // another motion owns the machine) cannot start one, so it does not follow the
 // status report either; before, the whole jog panel re-rendered on every poll
-// of a running job (ADR-352).
-//
-// A hold jog runs to the travel edge, so it needs the controller's own travel
-// envelope. MPos is in native machine coordinates, which match the profile bed
-// only through a verified native frame: homed stock GRBL puts machine space
-// into negative numbers, and a machine without homing starts at MPos 0,0
-// wherever the head was at power-up. Clamping raw MPos against 0..bed made a
-// held arrow do nothing toward the origin and overshoot the other way (audit
-// jog-home-origin-3). With soft limits on, the controller checks the target in
-// MPos with or without a verified frame and refuses the whole line
-// (error:15), so this session's `$$` bounds the hold as well, and the homing
-// edge stays the pull-off clear of its switch (ADR-375). Stock GRBL checks from
-// its own MPos even after an Unlock without Home, when KerfDesk hides the
-// position, so that clamp alone aims from the controller's number then. A Home
-// in this session ties MPos to the switch, so a homed grblHAL, which never has
-// a frame, keeps the pull-off clear of its switch with soft limits off too
-// (ADR-375 Amendment 4). With no frame, no soft limits and no Home, the hold
-// asks for full travel and relies on release plus the jog-cancel byte, as it
-// does with no position.
-function JogArrows(props: Omit<Parameters<typeof JogArrowGrid>[0], 'position'>): JSX.Element {
+// of a running job (ADR-352). The hold aims inside the controller's travel
+// envelope (jog-hold-aim.ts), as the phone's hold does.
+function JogArrows(
+  props: Omit<Parameters<typeof JogArrowGrid>[0], 'position' | 'bounds'>,
+): JSX.Element {
   const statusReport = useLaserStore((s) => (props.disabled ? null : s.statusReport));
   const wcoCache = useLaserStore((s) => s.wcoCache);
   const reportInches = useLaserStore((s) => s.controllerSettings?.reportInches === true);
-  const nativeEvidence = useLaserStore(selectNativeBedEvidence);
+  const evidence = useLaserStore(selectNativeBedEvidence);
   const device = useStore((s) => s.project.device);
-  const limits = resolveManualMotionLimits(
-    resolveNativeBedFrame(device, nativeEvidence),
-    nativeEvidence,
-  );
-  const position =
-    limits === null
-      ? null
-      : (inferCurrentMachinePosition(statusReport, wcoCache, reportInches) ??
-        firmwareJogCheckPosition(
-          nativeEvidence,
-          withheldControllerMPos(statusReport),
-          reportInches,
-        ));
-  const bounds = limits === null ? props.bounds : nativeTravel(limits);
-  return <JogArrowGrid {...props} bounds={bounds} position={position} />;
-}
-
-function nativeTravel(bounds: NativeXyBounds): MachineBounds {
-  return { ...bounds, width: bounds.maxX - bounds.minX, height: bounds.maxY - bounds.minY };
+  const aim = holdJogAim({ device, evidence, statusReport, wcoCache, reportInches });
+  return <JogArrowGrid {...props} bounds={aim.bounds} position={aim.position} />;
 }
 
 // Keyboard jog is live only while the pad is mounted. An XY key sends the pad's

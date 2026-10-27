@@ -95,6 +95,7 @@ import {
   pushLog,
 } from './laser-store-helpers';
 import { registerActiveJobProbe } from './job-machine-lock';
+import { runningJobMachineKind } from './job-motion-machine';
 import type { StallProbe } from './laser-stream-stall';
 import type { ControllerIncidentState } from './laser-incident-history';
 import type { ControllerFirmwareReport } from '../../core/controllers/controller-firmware-report';
@@ -189,6 +190,9 @@ export type LaserState = LaserStoreActions &
     // can stay on through a hold at $32=0); routers require $32=0 and hold is
     // safe with the spindle spinning. null = no job started yet.
     readonly activeJobMachineKind: MachineKind | null;
+    // The running CNC job's own safe Z: a point move in its hold lifts there
+    // first, whatever project is open (ADR-416 Amendment 3). null for a laser job.
+    readonly activeJobSafeZMm?: number | null;
     // Queued writes outside the job stream (console, origin, unlock, the
     // handshake $$ …) that still owe a terminal ok/error. GRBL acks in strict
     // receive order, so Start must wait for 0: a stale ok mis-attributed to a
@@ -583,5 +587,9 @@ export const useLaserStore = create<LaserState>((set, get) => {
 
 bindControllerQualificationScheduler(useLaserStore, refs);
 // The project store refuses machine changes while a job holds the machine
-// (ADR-416 Amendment 2); it cannot import this store, so it asks through this.
-registerActiveJobProbe(() => isActiveJob(useLaserStore.getState().streamer));
+// (ADR-416 Amendments 2 and 3); it cannot import this store, so it asks
+// through this for the running job's Laser/CNC kind.
+registerActiveJobProbe(
+  () => isActiveJob(useLaserStore.getState().streamer),
+  () => runningJobMachineKind(useLaserStore.getState()),
+);
