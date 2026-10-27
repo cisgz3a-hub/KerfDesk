@@ -11,8 +11,13 @@
 // supported metadata is present, so the caller falls back to the default DPI
 // (254, ADR-048).
 
+import { pngExifOrientation } from '../../io/raster-decode/exif-orientation';
 import { readImagePrefix } from '../trace/image-header-reader';
-import { jpegExifOrientation, orientationSwapsAxes } from '../trace/jpeg-header';
+import {
+  jpegExifOrientation,
+  orientationSwapsAxes,
+  type ExifOrientation,
+} from '../trace/jpeg-header';
 
 const MM_NONE = null;
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
@@ -31,15 +36,27 @@ export type ImageDensity = {
 };
 
 export function densityFromBytes(bytes: Uint8Array): ImageDensity | null {
-  return pngDensity(bytes) ?? orientedJpegDensity(bytes) ?? bmpDensity(bytes);
+  return orientedPngDensity(bytes) ?? orientedJpegDensity(bytes) ?? bmpDensity(bytes);
 }
 
-// JFIF and EXIF densities describe the STORED frame's axes. The import sizes
-// the oriented image, so an Orientation that swaps rows and columns swaps the
-// two densities with them.
+// PNG pHYs, JFIF and EXIF densities describe the STORED frame's axes. The
+// import sizes the oriented image, so an Orientation that swaps rows and
+// columns swaps the two densities with them (ADR-404 and its Amendment 1).
 function orientedJpegDensity(bytes: Uint8Array): ImageDensity | null {
-  const density = jpegDensity(bytes);
-  if (density === null || !orientationSwapsAxes(jpegExifOrientation(bytes))) return density;
+  return swappedFor(jpegDensity(bytes), jpegExifOrientation(bytes));
+}
+
+// An eXIf beyond the bytes read reads as unturned, as the density then may be.
+function orientedPngDensity(bytes: Uint8Array): ImageDensity | null {
+  const density = pngDensity(bytes);
+  return density === null ? null : swappedFor(density, pngExifOrientation(bytes) ?? 1);
+}
+
+function swappedFor(
+  density: ImageDensity | null,
+  orientation: ExifOrientation,
+): ImageDensity | null {
+  if (density === null || !orientationSwapsAxes(orientation)) return density;
   return { xDpi: density.yDpi, yDpi: density.xDpi };
 }
 

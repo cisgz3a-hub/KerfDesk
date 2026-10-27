@@ -2,6 +2,7 @@ import { IDBFactory as FakeIDBFactory, IDBKeyRange as FakeIDBKeyRange } from 'fa
 import { Blob as NodeBlob } from 'node:buffer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { encodeRgbPng } from '../../__fixtures__/perceptual/png';
+import { exifTiffBlock, physChunk } from '../../io/raster-decode/exif-orientation.test-support';
 import { IndexedDbPagedAssetRepository } from './paged-asset-indexeddb';
 import { makePng } from './png-incremental-decoder.test-support';
 import { importPngStreamToPagedAssets, importPngToPagedAssets } from './png-paged-import';
@@ -91,6 +92,85 @@ describe('importPngToPagedAssets', () => {
     expect([...new Uint8Array(await page!.arrayBuffer())]).toEqual([255, 200]);
     // 24-bit BMP pixels start after the 54-byte header, blue first.
     expect([...result.thumbnail.bytes.subarray(54, 60)]).toEqual([255, 255, 255, 200, 200, 200]);
+  });
+
+  it.each([
+    // Orientation 6, a quarter turn clockwise: stored column 0 bottom-up is row 0.
+    [6, false, { width: 2, height: 3, luma: [40, 10, 50, 20, 60, 30] }],
+    [8, false, { width: 2, height: 3, luma: [30, 60, 20, 50, 10, 40] }],
+    [3, false, { width: 3, height: 2, luma: [60, 50, 40, 30, 20, 10] }],
+    // Chromium reads no eXIf after IDAT.
+    [6, true, { width: 3, height: 2, luma: [10, 20, 30, 40, 50, 60] }],
+  ] as const)(
+    'turns luma, thumbnail and size by an eXIf Orientation %i (after IDAT: %s)',
+    async (orientation, afterIdat, expected) => {
+      const repository = new IndexedDbPagedAssetRepository(new FakeIDBFactory(), FakeIDBKeyRange);
+      const png = makePng({
+        width: 3,
+        height: 2,
+        colorType: 0,
+        rows: [
+          [10, 20, 30],
+          [40, 50, 60],
+        ],
+        exif: exifTiffBlock({ ifd0: [{ value: orientation }] }),
+        exifAfterIdat: afterIdat,
+      });
+
+      const result = await importPngToPagedAssets(
+        new NodeBlob([png], { type: 'image/png' }) as Blob,
+        {
+          assetId: 'turned-source',
+          lumaAssetId: 'turned-luma',
+          sourceName: 'turned.png',
+          createdAtEpochMs: 5,
+          maxEdge: 8,
+          maxPixels: 64,
+        },
+        repository,
+      );
+
+      const { width, height, luma } = expected;
+      expect(result).toMatchObject({
+        kind: 'ok',
+        width,
+        height,
+        sampledWidth: width,
+        sampledHeight: height,
+        thumbnail: { width, height },
+      });
+      const page = await repository.readPage('turned-luma', 0);
+      expect([...new Uint8Array(await page!.arrayBuffer())]).toEqual(luma);
+    },
+  );
+
+  it('swaps an anisotropic pHYs density when the eXIf Orientation swaps the axes', async () => {
+    const repository = new IndexedDbPagedAssetRepository(new FakeIDBFactory(), FakeIDBKeyRange);
+    const png = makePng({
+      width: 1,
+      height: 1,
+      colorType: 0,
+      rows: [[0]],
+      exif: exifTiffBlock({ ifd0: [{ value: 6 }] }),
+    });
+    // pHYs before the eXIf: 11811 x 5906 pixels per metre, 300 x 150 DPI.
+    const phys = Uint8Array.from(physChunk(11811, 5906));
+    const withPhys = Uint8Array.from([...png.subarray(0, 33), ...phys, ...png.subarray(33)]);
+
+    const result = await importPngToPagedAssets(
+      new NodeBlob([withPhys], { type: 'image/png' }) as Blob,
+      {
+        assetId: 'dense-source',
+        lumaAssetId: 'dense-luma',
+        sourceName: 'dense.png',
+        createdAtEpochMs: 6,
+        maxEdge: 8,
+        maxPixels: 64,
+      },
+      repository,
+    );
+
+    expect(result).toMatchObject({ kind: 'ok', density: { xDpi: 150, yDpi: 300 } });
   });
 
   it('stages a readable source with backpressure before decoding its durable pages', async () => {

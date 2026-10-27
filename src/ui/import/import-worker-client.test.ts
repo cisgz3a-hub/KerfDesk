@@ -7,12 +7,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ParseGcodeProgramResult } from '../../io/gcode';
 import {
+  decodeBatchRasterOffThread,
   parseDxfOffThread,
   parseGcodeOffThread,
   parseStlOffThread,
   prepareDepthMapPngOffThread,
   prepareReliefHeightfieldPngOffThread,
   preparePsdOffThread,
+  resampleRgbaOffThread,
   resetImportWorkerForTests,
 } from './import-worker-client';
 import type { ImportWorkerRequest, ImportWorkerResponse } from './import-worker-protocol';
@@ -78,6 +80,7 @@ describe('import worker client', () => {
     expect(parseStlOffThread(blob(), stlOptions)).toBeNull();
     expect(prepareDepthMapPngOffThread(blob())).toBeNull();
     expect(prepareReliefHeightfieldPngOffThread(blob(), 'depth.png', 100, 5)).toBeNull();
+    expect(decodeBatchRasterOffThread(blob(), 'pnm')).toBeNull();
   });
 
   it('sends the blob itself rather than pre-read text', () => {
@@ -90,11 +93,37 @@ describe('import worker client', () => {
 
     const request = latest().posted[0];
     expect(request?.kind).toBe('dxf');
-    expect(request?.blob).toBe(source);
     if (request?.kind === 'dxf') {
+      expect(request.blob).toBe(source);
       expect(request.objectId).toBe('obj-1');
       expect(request.source).toBe('part.dxf');
     }
+  });
+
+  it('decodes a Multi-File Trace scan in the worker and stops the worker on Cancel', async () => {
+    const controller = new AbortController();
+    const scan = new Blob(['II*\0']);
+    const pending = decodeBatchRasterOffThread(scan, 'tiff', { signal: controller.signal });
+    const active = latest();
+    expect(active.posted[0]).toMatchObject({ kind: 'batch-raster', blob: scan, format: 'tiff' });
+
+    controller.abort();
+
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+    // Terminating the worker is what stops a decode already under way.
+    expect(active.terminated).toBe(true);
+  });
+
+  it('resamples RGBA in the worker and resolves with its pixels', async () => {
+    const image = { width: 2, height: 1, data: new Uint8ClampedArray(8) };
+    const pending = resampleRgbaOffThread(image, 1, 1);
+    const request = latest().posted[0];
+    expect(request).toMatchObject({ kind: 'resample-rgba', image, width: 1, height: 1 });
+    const result = { width: 1, height: 1, data: new Uint8ClampedArray(4) };
+
+    latest().reply({ id: request?.id ?? -1, kind: 'resample-rgba', result });
+
+    await expect(pending).resolves.toBe(result);
   });
 
   it('resolves the matching request with the parse result', async () => {

@@ -38,7 +38,7 @@ import {
   reserveSvgPolyline,
   type SvgImportBudget,
 } from './svg-import-budget';
-import { resolveUnitScale } from './svg-units';
+import { resolveUnitScale, svgRootSizeNotes } from './svg-units';
 import { rootSvgViewportMapping } from './svg-root-viewport';
 import {
   INITIAL_PRESENTATION_STATE,
@@ -415,7 +415,7 @@ export function parseSvgDocument(
     curves: bucket.curves,
   }));
   const { entries } = fragment;
-  const notes = svgImportNotes(entries.length, budget, counts);
+  const notes = [...svgRootSizeNotes(svgEl), ...svgImportNotes(entries.length, budget, counts)];
 
   return {
     object:

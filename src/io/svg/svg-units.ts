@@ -3,7 +3,8 @@
 //   * viewBox + physical width/height → user units scale by physical/viewBox
 //     per axis (the standard Inkscape/Illustrator export shape). A single
 //     declared axis drives both (preserve aspect); '%' and other unparseable
-//     lengths count as undeclared.
+//     lengths count as undeclared, and every one but '%' and auto gets an import note
+//     (svgRootSizeNotes).
 //   * viewBox only → 1 user unit = 1 mm (documented Phase A assumption).
 //   * no viewBox → user units are CSS px at 96 DPI (matches LightBurn's
 //     default import DPI for px-authored files).
@@ -14,21 +15,21 @@ import type { Bounds } from '../../core/scene';
 
 const MM_PER_INCH = 25.4;
 const CSS_PX_PER_INCH = 96;
-const CSS_LENGTH_UNITS_TO_USER_UNITS: Readonly<Record<string, number>> = {
-  in: CSS_PX_PER_INCH,
-  cm: CSS_PX_PER_INCH / 2.54,
-  mm: CSS_PX_PER_INCH / MM_PER_INCH,
-  q: CSS_PX_PER_INCH / (MM_PER_INCH * 4),
-  pt: CSS_PX_PER_INCH / 72,
-  pc: CSS_PX_PER_INCH / 6,
-};
-const SVG_LENGTH_UNITS_TO_MM: Readonly<Record<string, number>> = {
-  mm: 1,
-  cm: 10,
-  in: MM_PER_INCH,
-  pt: MM_PER_INCH / 72,
-  pc: MM_PER_INCH / 6,
-};
+// The absolute lengths of CSS Values and Units 3 section 5.2 other than px
+// ("1Q = 1/40th of 1cm"), each in mm for the root size and in user units (CSS
+// px) for element lengths. Chromium sizes an SVG root in every one of them.
+// One table, so the root and the elements always read the same units: Q was
+// once missing from the root's own table, and width="200Q" imported at the
+// viewBox size with no note (rolling audit v5 J6-P3-2).
+const ABSOLUTE_UNITS: ReadonlyMap<string, { readonly mm: number; readonly userUnits: number }> =
+  new Map([
+    ['in', { mm: MM_PER_INCH, userUnits: CSS_PX_PER_INCH }],
+    ['cm', { mm: 10, userUnits: CSS_PX_PER_INCH / 2.54 }],
+    ['mm', { mm: 1, userUnits: CSS_PX_PER_INCH / MM_PER_INCH }],
+    ['q', { mm: 0.25, userUnits: CSS_PX_PER_INCH / (MM_PER_INCH * 4) }],
+    ['pt', { mm: MM_PER_INCH / 72, userUnits: CSS_PX_PER_INCH / 72 }],
+    ['pc', { mm: MM_PER_INCH / 6, userUnits: CSS_PX_PER_INCH / 6 }],
+  ]);
 
 export type UnitScale = {
   readonly scaleX: number;
@@ -99,7 +100,7 @@ export function parseSvgLengthMmOrNull(input: string | null): number | null {
   if (!Number.isFinite(value)) return null;
   const unit = (match[2] ?? '').toLowerCase();
   if (unit === '' || unit === 'px') return pxToMm(value);
-  const mmFactor = SVG_LENGTH_UNITS_TO_MM[unit];
+  const mmFactor = ABSOLUTE_UNITS.get(unit)?.mm;
   return mmFactor === undefined ? null : value * mmFactor;
 }
 
@@ -112,8 +113,31 @@ export function parseSvgLengthUserUnitsOrNull(input: string | null): number | nu
   if (!Number.isFinite(value)) return null;
   const unit = (match[2] ?? '').toLowerCase();
   if (unit === '' || unit === 'px') return value;
-  const userUnitFactor = CSS_LENGTH_UNITS_TO_USER_UNITS[unit];
+  const userUnitFactor = ABSOLUTE_UNITS.get(unit)?.userUnits;
   return userUnitFactor === undefined ? null : value * userUnitFactor;
+}
+
+/**
+ * Import notes for a root width or height the importer cannot size: a
+ * relative unit (em, ex, vw, ...) or an unreadable length. The size then
+ * comes from the other axis, the viewBox or the 100 px default, which can be
+ * any scale of what a browser draws, so the operator is told. A percentage
+ * and auto (100% for the root) stay silent: they are relative to a page the
+ * file does not define, and ADR-046 sizes them from the viewBox by design.
+ */
+export function svgRootSizeNotes(svgEl: Element): string[] {
+  const notes: string[] = [];
+  for (const name of ['width', 'height'] as const) {
+    const raw = svgEl.getAttribute(name)?.trim();
+    if (raw === undefined || raw === '' || raw.endsWith('%') || raw.toLowerCase() === 'auto') {
+      continue;
+    }
+    if (parseSvgLengthMmOrNull(raw) !== null) continue;
+    notes.push(
+      `SVG size: the root ${name} "${raw.slice(0, 40)}" is not a length KerfDesk can size (it reads px, mm, cm, Q, in, pt and pc), so that axis was sized without it. Check the imported size before cutting.`,
+    );
+  }
+  return notes;
 }
 
 function pxToMm(px: number): number {

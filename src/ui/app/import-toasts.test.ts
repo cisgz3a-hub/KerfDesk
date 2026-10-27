@@ -77,6 +77,15 @@ describe('describeImportResult', () => {
       variant: 'warning',
     });
   });
+
+  it('warns that a root size in a unit KerfDesk cannot size was left out', () => {
+    const note =
+      'SVG size: the root width "10em" is not a length KerfDesk can size (it reads px, mm, cm, Q, in, pt and pc), so that axis was sized without it. Check the imported size before cutting.';
+    expect(describeImportResult('em.svg', baseResult({ notes: [note] }))).toContainEqual({
+      message: 'em.svg: ' + note,
+      variant: 'warning',
+    });
+  });
 });
 
 describe('describeImportError', () => {

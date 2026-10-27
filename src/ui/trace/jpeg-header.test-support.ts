@@ -12,6 +12,8 @@ export type SyntheticJpegOptions = {
   readonly byteOrder?: 'II' | 'MM';
   readonly jfifDpi?: { readonly x: number; readonly y: number };
   readonly xmpBeforeExif?: boolean;
+  /** A whole TIFF block for the EXIF APP1, in place of `orientation`'s. */
+  readonly exifTiff?: ReadonlyArray<number>;
 };
 
 export function syntheticJpegBytes(options: SyntheticJpegOptions): Uint8Array<ArrayBuffer> {
@@ -24,7 +26,9 @@ export function syntheticJpegBytes(options: SyntheticJpegOptions): Uint8Array<Ar
   if (options.xmpBeforeExif === true) {
     segment(bytes, 0xe1, [...ascii('http://ns.adobe.com/xap/1.0/'), 0, ...ascii('<x:xmpmeta/>')]);
   }
-  if (options.orientation !== undefined) {
+  if (options.exifTiff !== undefined) {
+    segment(bytes, 0xe1, [...ascii('Exif'), 0, 0, ...options.exifTiff]);
+  } else if (options.orientation !== undefined) {
     segment(
       bytes,
       0xe1,

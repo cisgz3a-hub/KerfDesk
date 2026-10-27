@@ -9,6 +9,8 @@ export function importWorkerTransferables(
   if (response.kind === 'dxf') return packedDxfTransferables(response.result);
   if (response.kind === 'gcode') return packedGcodeTransferables(response.result);
   if (response.kind === 'hpgl') return packedHpglTransferables(response.result);
+  if (response.kind === 'batch-raster') return [response.result.rgba.buffer];
+  if (response.kind === 'resample-rgba') return [response.result.data.buffer];
   if (response.kind === 'stl' && response.result.kind === 'ok') {
     const buffer = response.result.positions.buffer;
     return buffer instanceof ArrayBuffer ? [buffer] : [];

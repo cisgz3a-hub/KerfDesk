@@ -6,13 +6,17 @@
 // the turn in Orientation. Browsers display and decode the image turned
 // (CSS image-orientation: from-image, and createImageBitmap's
 // imageOrientation), so every size the loader derives must use the turned
-// size or the decode is asked for the wrong aspect ratio. The eight values
-// are those of the EXIF/TIFF specification: 1 as stored, 2 mirrored
-// left-right, 3 turned 180 degrees, 4 mirrored top-bottom, and 5-8 the four
-// cases that swap rows with columns.
+// size or the decode is asked for the wrong aspect ratio. The TIFF block
+// inside the APP1 segment is read as Chromium reads it
+// (io/raster-decode/exif-orientation.ts); png-header.ts reads a PNG's eXIf.
 
+import {
+  exifBlockOrientation,
+  type ExifOrientation,
+} from '../../io/raster-decode/exif-orientation';
+
+export type { ExifOrientation } from '../../io/raster-decode/exif-orientation';
 export type ImageDimensions = { readonly width: number; readonly height: number };
-export type ExifOrientation = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
 export type JpegHeader = {
   /** Frame size as encoded, before Orientation is applied. */
@@ -21,10 +25,6 @@ export type JpegHeader = {
 };
 
 const APP1_MARKER = 0xe1;
-const ORIENTATION_TAG = 0x0112;
-const TIFF_SHORT = 3;
-const TIFF_MAGIC = 42;
-const IFD_ENTRY_BYTES = 12;
 // "Exif\0\0" precedes the TIFF block inside APP1.
 const EXIF_IDENTIFIER = [0x45, 0x78, 0x69, 0x66, 0x00, 0x00];
 
@@ -100,49 +100,20 @@ function orientationFromSegments(
       continue;
     }
     // The first Exif APP1 is authoritative; an XMP APP1 never carries it.
-    return readExifOrientation(header, segment) ?? 1;
+    // An Orientation entry that is not one SHORT of 1-8 is skipped, as the
+    // browser skips it, so the loader never asks for a turned size the
+    // browser decoder would not produce.
+    const tiff = segment.payloadOffset + EXIF_IDENTIFIER.length;
+    return exifBlockOrientation(header, tiff, segment.nextOffset) ?? 1;
   }
   return 1;
 }
 
+// image-density.ts walks the same segments and IFD0 for its DPI tags with its
+// own loop (jpegDensity/exifDensity); merging the two walkers is a known
+// follow-up (ADR-404).
 function hasExifIdentifier(header: Uint8Array, offset: number): boolean {
   return EXIF_IDENTIFIER.every((byte, index) => header[offset + index] === byte);
-}
-
-// IFD0 of the TIFF block: a count, then 12-byte entries of tag, type, count
-// and a 4-byte value field that holds a SHORT in its first two bytes. An
-// Orientation entry must be exactly one SHORT; anything else is malformed
-// and treated as absent, the conservative reading, so the loader never asks
-// for a turned size a stricter browser decoder would not produce.
-//
-// image-density.ts walks the same segments and IFD0 for its DPI tags with its
-// own loop (jpegDensity/exifDensity); merging the two walkers onto these
-// helpers is a known follow-up, left out to keep this change's surface small.
-function readExifOrientation(header: Uint8Array, segment: JpegSegment): ExifOrientation | null {
-  const end = Math.min(segment.nextOffset, header.byteLength);
-  const tiff = segment.payloadOffset + EXIF_IDENTIFIER.length;
-  if (tiff + 8 > end) return null;
-  const view = new DataView(header.buffer, header.byteOffset, header.byteLength);
-  const byteOrder = view.getUint16(tiff, false);
-  if (byteOrder !== 0x4949 && byteOrder !== 0x4d4d) return null;
-  const little = byteOrder === 0x4949;
-  if (view.getUint16(tiff + 2, little) !== TIFF_MAGIC) return null;
-  const ifd = tiff + view.getUint32(tiff + 4, little);
-  if (ifd < tiff + 8 || ifd + 2 > end) return null;
-  const count = view.getUint16(ifd, little);
-  for (let index = 0; index < count; index += 1) {
-    const entry = ifd + 2 + index * IFD_ENTRY_BYTES;
-    if (entry + IFD_ENTRY_BYTES > end) return null;
-    if (view.getUint16(entry, little) !== ORIENTATION_TAG) continue;
-    if (view.getUint16(entry + 2, little) !== TIFF_SHORT) return null;
-    if (view.getUint32(entry + 4, little) !== 1) return null;
-    return asOrientation(view.getUint16(entry + 8, little));
-  }
-  return null;
-}
-
-function asOrientation(value: number): ExifOrientation | null {
-  return Number.isInteger(value) && value >= 1 && value <= 8 ? (value as ExifOrientation) : null;
 }
 
 type JpegSegment = {

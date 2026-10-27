@@ -1,6 +1,6 @@
 // The image a headless trace (ADR-477) hands the tracer, prepared the way the
 // app's own import prepares it: decoded on the stored grid, turned by a
-// JPEG's EXIF Orientation (as the browser decode does), RGB composited onto
+// JPEG's or PNG's EXIF Orientation (as the browser decode does), RGB composited onto
 // white with alpha kept (compositeRgbOverWhitePreservingAlpha), and sized in
 // millimetres from the density the Multi-File Trace reads (image-density),
 // the TIFF header's own resolution, or an explicit --dpi.
@@ -13,6 +13,10 @@ import {
   type ImageDensity,
 } from '../common/image-density';
 import { rasterImportGeometry, type RasterImportGeometry } from '../common/image-import';
+import {
+  orientationSourcePixel,
+  pngExifOrientation,
+} from '../../io/raster-decode/exif-orientation';
 import { compositeRgbOverWhitePreservingAlpha } from '../trace/image-loader';
 import { jpegExifOrientation, type ExifOrientation } from '../trace/jpeg-header';
 
@@ -28,8 +32,7 @@ export async function traceCliSource(
   dpiOverride: ImageDensity | null,
 ): Promise<TraceCliSource> {
   const decoded = await decodeRaster(bytes);
-  const orientation = sniffRasterFormat(bytes) === 'jpeg' ? jpegExifOrientation(bytes) : 1;
-  const oriented = orientRaster(decoded, orientation);
+  const oriented = orientRaster(decoded, rasterOrientation(bytes));
   const image = compositeRgbOverWhitePreservingAlpha(oriented);
   const embedded =
     headerDensity(bytes) ??
@@ -60,6 +63,13 @@ function headerDensity(bytes: Uint8Array): ImageDensity | null {
   }
 }
 
+// The Orientation the browser applies: a JPEG's Exif APP1 or a PNG's eXIf.
+function rasterOrientation(bytes: Uint8Array): ExifOrientation {
+  const format = sniffRasterFormat(bytes);
+  if (format === 'jpeg') return jpegExifOrientation(bytes);
+  return format === 'png' ? (pngExifOrientation(bytes) ?? 1) : 1;
+}
+
 /** Turn a stored-grid raster upright for its EXIF Orientation (1-8). */
 export function orientRaster(image: RawImageData, orientation: ExifOrientation): RawImageData {
   if (orientation === 1) return image;
@@ -70,37 +80,10 @@ export function orientRaster(image: RawImageData, orientation: ExifOrientation):
   const data = new Uint8ClampedArray(outWidth * outHeight * 4);
   for (let y = 0; y < outHeight; y += 1) {
     for (let x = 0; x < outWidth; x += 1) {
-      const [sx, sy] = sourcePixel(orientation, x, y, w, h);
+      const [sx, sy] = orientationSourcePixel(orientation, x, y, w, h);
       const from = (sy * w + sx) * 4;
       data.set(image.data.subarray(from, from + 4), (y * outWidth + x) * 4);
     }
   }
   return { width: outWidth, height: outHeight, data };
-}
-
-function sourcePixel(
-  orientation: ExifOrientation,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-): readonly [number, number] {
-  switch (orientation) {
-    case 2:
-      return [w - 1 - x, y];
-    case 3:
-      return [w - 1 - x, h - 1 - y];
-    case 4:
-      return [x, h - 1 - y];
-    case 5:
-      return [y, x];
-    case 6:
-      return [y, h - 1 - x];
-    case 7:
-      return [w - 1 - y, h - 1 - x];
-    case 8:
-      return [w - 1 - y, x];
-    case 1:
-      return [x, y];
-  }
 }

@@ -29,8 +29,8 @@ import {
   type WriteTally,
 } from './multi-file-trace-report';
 import {
-  batchRasterAtMaxEdge,
   decodeBatchRasterFile,
+  sampleBatchRaster,
   type DecodedBatchRaster,
 } from './batch-raster-decode';
 import {
@@ -76,8 +76,8 @@ export type MultiFileTraceDeps = {
   // The file's embedded density (PNG pHYs, JFIF, EXIF, BMP); omitted, parsed
   // as a single-image import parses it, from a bounded header prefix only.
   readonly readDensity?: (file: MultiFileTraceFile) => Promise<ImageDensity | null>;
-  // TIFF (page 1) and Netpbm files, decoded here rather than by the browser;
-  // null for any other file.
+  // TIFF (page 1) and Netpbm files, decoded in the import worker rather than by
+  // the browser (ADR-357 Amendment 2); null for any other file.
   readonly decodeRaster?: (file: MultiFileTraceFile) => Promise<DecodedBatchRaster | null>;
   readonly trace?: (
     image: RawImageData,
@@ -121,6 +121,7 @@ type MultiFileJobContext = {
   readonly targetPxPerMm: number;
   readonly deviceMemoryGb: number | undefined;
   readonly size: MultiFileTraceSize | undefined;
+  readonly signal: AbortSignal | undefined;
 };
 
 // With onExport, each file is handed over as soon as it is traced and the
@@ -203,12 +204,13 @@ function multiFileJobContext(deps: MultiFileTraceDeps): MultiFileJobContext {
     readNatural:
       deps.readNaturalSize ?? (deps.loadImage === undefined ? readImageNaturalSize : null),
     readDensity: deps.readDensity ?? readImageHeaderDensity,
-    decodeRaster: deps.decodeRaster ?? decodeBatchRasterFile,
+    decodeRaster: deps.decodeRaster ?? ((file) => decodeBatchRasterFile(file, signal)),
     options: deps.options ?? DEFAULT_MULTI_FILE_TRACE_OPTIONS,
     hybridMaxStrokeWidthMm: deps.hybridMaxStrokeWidthMm,
     targetPxPerMm: deps.targetPxPerMm ?? traceTargetPxPerMm(undefined, undefined),
     deviceMemoryGb: deps.deviceMemoryGb ?? browserDeviceMemoryGb(),
     size: deps.size,
+    signal,
   };
 }
 
@@ -232,7 +234,7 @@ async function multiFileTraceJob(
       (raster.sizeMm === null
         ? physicalSizeMm(natural, null)
         : { ...raster.sizeMm, densitySource: 'embedded' as const });
-    const load: GridLoader = async (maxEdge) => batchRasterAtMaxEdge(raster, maxEdge);
+    const load: GridLoader = (maxEdge) => sampleBatchRaster(raster, maxEdge, context.signal);
     const jobContext = withFileHybridWidth(context, natural, size.widthMm);
     return {
       job: planMultiFileTraceJob(file.name, natural, size, load, jobContext),
