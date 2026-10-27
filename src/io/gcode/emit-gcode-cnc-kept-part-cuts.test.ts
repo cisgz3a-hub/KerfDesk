@@ -134,6 +134,48 @@ function bracketBelow(gapMm: number, onLayer: 'a' | 'b' = 'b'): Part {
 }
 
 describe('CNC profile cuts that reach a part another operation keeps', () => {
+  it.each([false, true])(
+    'checks different closed paths sharing endpoints, wide path first: %s',
+    (wideFirst) => {
+      const narrow: Part = { id: 'outlines', layer: 'a', outer: rect(20, 20, 10, 10) };
+      const wide = rect(20, 20, 20, 10);
+      const kept: Part = { id: 'kept', layer: 'b', outer: rect(39, 24, 2, 2) };
+      const base = project([narrow, kept]);
+      const source: Project = {
+        ...base,
+        scene: {
+          layers: [layer('a', 'profile-on-path'), layer('b', 'profile-outside')],
+          objects: [
+            {
+              ...partObject(narrow),
+              bounds: { minX: 20, minY: 20, maxX: 40, maxY: 30 },
+              paths: [
+                {
+                  color: COLORS.a,
+                  polylines: wideFirst ? [wide, narrow.outer] : [narrow.outer, wide],
+                },
+              ],
+            },
+            partObject(kept),
+          ],
+        },
+      };
+      const result = emitGcode(source);
+      // Both outlines share their start, end and vertex count. Only the wider
+      // one crosses the kept part; the emitted program still cuts both.
+      const clearance = minimumCutterClearance(
+        cuttingMoves(result.gcode),
+        regions(source, [kept]),
+        RADIUS_MM,
+      );
+      expect(clearance.clearanceMm).toBeLessThan(-ROUNDING_MM);
+      const warning = result.preflight.issues.find(
+        (issue) => issue.code === CODE && issue.message.startsWith('Layer "Plates":'),
+      );
+      expect(warning?.message).toContain('cut runs into 1 part that layer "Brackets" keeps');
+    },
+  );
+
   it('reproduces the audit scene: two operations, parts 2.5 mm apart, 1/8" bit', () => {
     const run = emitted([PLATE, bracketBelow(2.5)]);
     // The independent model sees the gouge the audit measured.

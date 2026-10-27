@@ -46,18 +46,37 @@ export function lastSourceKind(
 }
 
 /** Start the remembered camera when the helper is on and no camera is running. */
-export async function startRememberedCamera(deps: CameraStartDeps): Promise<void> {
+export async function startRememberedCamera(
+  deps: CameraStartDeps,
+  signal?: AbortSignal,
+): Promise<void> {
   if (!useCameraHelpersStore.getState().settings.autoStart) return;
   const last = loadLastCameraSource();
   if (last === null || !cameraIdle()) return;
-  switch (last) {
-    case 'machine':
-      return startMachineCamera(deps);
-    case 'usb':
-      return startUsbCamera(deps.camera);
-    case 'rtsp':
-    case 'phone':
-      return startAddressCamera(last, deps);
+  const camera = useCameraStore.getState();
+  let enabled = true;
+  // Switching off is a cancellation, even if switched on again before discovery ends.
+  const stop = useCameraHelpersStore.subscribe((state) => {
+    if (!state.settings.autoStart) enabled = false;
+  });
+  const current = (): boolean =>
+    enabled &&
+    !signal?.aborted &&
+    useCameraStore.getState().sourceEpoch === camera.sourceEpoch &&
+    cameraIdle();
+  try {
+    if (!current()) return;
+    switch (last) {
+      case 'machine':
+        return await startMachineCamera(deps, current);
+      case 'usb':
+        return await startUsbCamera(deps.camera, current);
+      case 'rtsp':
+      case 'phone':
+        return await startAddressCamera(last, deps);
+    }
+  } finally {
+    stop();
   }
 }
 
@@ -80,13 +99,13 @@ function cameraIdle(): boolean {
 
 // The laser's camera answers once the laser is connected, so a camera not
 // found earlier is looked for again.
-async function startMachineCamera(deps: CameraStartDeps): Promise<void> {
+async function startMachineCamera(deps: CameraStartDeps, current: () => boolean): Promise<void> {
   if (!deps.bridgeAvailable) return;
   const { machineCamera, detectMachineCamera } = useCameraStore.getState();
   if (machineCamera.kind === 'detecting') await detectionSettled();
   else if (machineCamera.kind !== 'found') await detectMachineCamera(deps.bridge);
   const now = useCameraStore.getState();
-  if (now.machineCamera.kind === 'found' && cameraIdle()) now.activateMachineCamera();
+  if (now.machineCamera.kind === 'found' && current()) now.activateMachineCamera();
 }
 
 function detectionSettled(): Promise<void> {
@@ -105,13 +124,23 @@ function detectionSettled(): Promise<void> {
 
 // Only the USB camera that ran last: another one plugged in (a laptop's own
 // camera, say) is never started in its place.
-async function startUsbCamera(camera: CameraAdapter | undefined): Promise<void> {
+async function startUsbCamera(
+  camera: CameraAdapter | undefined,
+  current: () => boolean,
+): Promise<void> {
   const preferred = loadPreferredCameraId();
   if (camera === undefined || !camera.isSupported() || preferred === null) return;
   const store = useCameraStore.getState();
   await store.refreshCameras(camera);
   const { cameras } = useCameraStore.getState();
-  if (!cameras.some((device) => device.deviceId === preferred) || !cameraIdle()) return;
+  // Enumeration may fill an empty selection automatically. Only an explicit
+  // saved preference change supersedes this remembered device.
+  if (
+    !cameras.some((device) => device.deviceId === preferred) ||
+    loadPreferredCameraId() !== preferred ||
+    !current()
+  )
+    return;
   useCameraStore.getState().selectCamera(preferred);
   await useCameraStore.getState().startUsbSource(camera);
 }

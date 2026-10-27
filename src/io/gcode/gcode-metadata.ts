@@ -159,7 +159,10 @@ export type GcodeMetadata = {
 // ADR-250 Amd 4 counts a stacked On path copy once in the kept walls, so a
 // neighbouring lead that reached the copied part plunges instead; carries
 // forward v33 above.
-export const EMITTER_REVISION = 'cnc-on-path-copy-walls-20261027-v34';
+// The last-100 PR audit keeps self-intersecting CNC artwork in placement
+// bounds and re-scores optimized routes after choosing closed starts;
+// carries forward v34 above.
+export const EMITTER_REVISION = 'audit-placement-and-route-20261027-v35';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

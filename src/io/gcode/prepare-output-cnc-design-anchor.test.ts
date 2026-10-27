@@ -124,4 +124,63 @@ describe('CNC Job Origin anchors the artwork (ADR-327 Amendment 1)', () => {
       expect(group.designBounds?.minY).toBeCloseTo(0, 6);
     }
   });
+
+  it('anchors a pocket containing a zero-signed-area bowtie on all of its artwork', () => {
+    const base = project('pocket', 'em-3175', 1);
+    const input: Project = {
+      ...base,
+      scene: {
+        ...base.scene,
+        objects: [
+          {
+            kind: 'imported-svg',
+            id: 'bowtie-and-square',
+            source: 'bowtie-and-square.svg',
+            bounds: { minX: 20, minY: 20, maxX: 120, maxY: 80 },
+            transform: IDENTITY_TRANSFORM,
+            paths: [
+              {
+                color: COLOR,
+                polylines: [
+                  {
+                    closed: true,
+                    points: [
+                      { x: 20, y: 20 },
+                      { x: 80, y: 80 },
+                      { x: 20, y: 80 },
+                      { x: 80, y: 20 },
+                    ],
+                  },
+                  {
+                    closed: true,
+                    points: [
+                      { x: 100, y: 20 },
+                      { x: 120, y: 20 },
+                      { x: 120, y: 40 },
+                      { x: 100, y: 40 },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    };
+    const prepared = preparedAtUserOrigin(input);
+    expect(computeJobPlacementBounds(prepared.job, prepared.project.device)).toEqual({
+      minX: 0,
+      minY: 0,
+      maxX: 100,
+      maxY: 60,
+    });
+    // Check actual compiled motion too: omitting the bowtie from the anchor
+    // placed its cuts about 78 mm left and 40 mm below work zero.
+    const frame = computeFrameJobMotionBounds(prepared.job, prepared.project.device);
+    expect(frame).not.toBeNull();
+    expect(frame!.minX).toBeGreaterThanOrEqual(-0.001);
+    expect(frame!.minY).toBeGreaterThanOrEqual(-0.001);
+    expect(frame!.maxX).toBeCloseTo(100, 2);
+    expect(frame!.maxY).toBeCloseTo(60, 2);
+  });
 });
