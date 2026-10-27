@@ -2,10 +2,20 @@ import { type SvgMatrix } from './svg-curve-transform';
 
 const IDENTITY_MATRIX: SvgMatrix = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
 
+// A name starts where no letter precedes it, and no function can close after
+// the last ')', so the scan stays linear. The matches are those of the plain
+// /([a-zA-Z]+)\s*\(([^)]*)\)/g, which also starts each name at its first letter.
+const TRANSFORM_FUNCTION = /(?<![a-zA-Z])([a-zA-Z]+)\s*\(([^)]*)\)/g;
+
+/** Each `name(arguments)` of a transform list, in order. */
+export function svgTransformFunctions(input: string): RegExpExecArray[] {
+  return Array.from(input.slice(0, input.lastIndexOf(')') + 1).matchAll(TRANSFORM_FUNCTION));
+}
+
 export function parseSvgTransform(input: string | null): SvgMatrix {
   if (input === null || input.trim() === '') return IDENTITY_MATRIX;
   let matrix = IDENTITY_MATRIX;
-  for (const match of input.matchAll(/([a-zA-Z]+)\s*\(([^)]*)\)/g)) {
+  for (const match of svgTransformFunctions(input)) {
     const op = match[1]?.toLowerCase();
     const nums = parseTransformNumbers(match[2] ?? '');
     matrix = multiplySvgMatrix(

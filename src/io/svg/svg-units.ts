@@ -83,13 +83,17 @@ function parseViewBoxRect(svgEl: Element): Bounds | null {
   return { minX: x, minY: y, maxX: x + w, maxY: y + h };
 }
 
+// A number and an optional unit. The unit takes the spaces before it, so each
+// run of spaces matches one way and the match stays linear.
+const SVG_LENGTH = /^\s*([+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?)(?:\s*([a-zA-Z]+))?\s*$/;
+
 export function parseSvgLengthMm(input: string | null, fallbackPx: number): number {
   return parseSvgLengthMmOrNull(input) ?? pxToMm(fallbackPx);
 }
 
 export function parseSvgLengthMmOrNull(input: string | null): number | null {
   if (input === null || input.trim() === '') return null;
-  const match = /^\s*([+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?)\s*([a-zA-Z]*)\s*$/.exec(input);
+  const match = SVG_LENGTH.exec(input);
   if (match === null) return null;
   const value = Number(match[1]);
   if (!Number.isFinite(value)) return null;
@@ -102,7 +106,7 @@ export function parseSvgLengthMmOrNull(input: string | null): number | null {
 /** Resolves absolute geometry lengths into current SVG user units (CSS px at 96 DPI). */
 export function parseSvgLengthUserUnitsOrNull(input: string | null): number | null {
   if (input === null || input.trim() === '') return null;
-  const match = /^\s*([+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?)\s*([a-zA-Z]*)\s*$/.exec(input);
+  const match = SVG_LENGTH.exec(input);
   if (match === null) return null;
   const value = Number(match[1]);
   if (!Number.isFinite(value)) return null;

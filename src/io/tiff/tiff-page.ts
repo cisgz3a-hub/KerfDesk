@@ -23,7 +23,7 @@ export function decodeTiffPage(bytes: Uint8Array, pageNumber: number): TiffPixel
   const header = decode(source, { ...options, ignoreImageData: true })[0];
   if (header === undefined) throw new Error('This TIFF page does not exist.');
   validateHeader(header);
-  validateTiffPixelLayout(header, bytes.byteLength);
+  validateTiffPixelLayout(header, bytes);
   const orientation = header.orientation || 1;
   const page = decode(
     orientation === 1 ? source : topLeftTiffBytes(source, pageNumber),

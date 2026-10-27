@@ -11,7 +11,7 @@ export function svgOverflow(
   for (const raw of values) {
     const value = raw
       ?.trim()
-      .replace(/\s*!important$/i, '')
+      .replace(/!important$/i, '')
       .trim()
       .toLowerCase();
     if (value === 'inherit') return inherited;

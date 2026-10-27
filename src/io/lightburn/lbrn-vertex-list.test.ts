@@ -49,6 +49,18 @@ describe('parseLbrnVertexList', () => {
       { point: { x: 10, y: 10 } },
     ]);
   });
+
+  it('reads a whole number, a trailing point and a leading point alike', () => {
+    expect(parseLbrnVertexList('V5. .5c0x1.c0y.25V-1 1e1c1y2.V3.5 -.5')).toEqual([
+      { point: { x: 5, y: 0.5 }, outgoing: { x: 1, y: 0.25 } },
+      { point: { x: -1, y: 10 }, incoming: { x: 0, y: 2 } },
+      { point: { x: 3.5, y: -0.5 } },
+    ]);
+  });
+
+  it('skips a vertex whose coordinates are not two numbers', () => {
+    expect(parseLbrnVertexList('V1x 2V.V3 4V5')).toEqual([{ point: { x: 3, y: 4 } }]);
+  });
 });
 
 describe('LightBurn 2 paths with float noise', () => {

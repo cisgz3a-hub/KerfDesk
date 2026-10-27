@@ -10,7 +10,7 @@ export function inheritedSvgFillRule(
   const rule = value
     ?.trim()
     .toLowerCase()
-    .replace(/\s*!important$/, '')
+    .replace(/!important$/, '')
     .trim();
   if (rule === 'nonzero' || rule === 'evenodd') return rule;
   return inherited;

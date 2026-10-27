@@ -4,7 +4,7 @@
 // reader. Clip geometry decides what is cut, so anything this module cannot
 // read faithfully refuses the file instead of guessing (ADR-358 Amendment 2).
 
-import { parseSvgTransform } from './svg-transform-attribute';
+import { parseSvgTransform, svgTransformFunctions } from './svg-transform-attribute';
 import { svgPresentationStyles } from './svg-presentation';
 import type { SvgMatrix } from './svg-curve-transform';
 import type { SvgStyleCascade } from './svg-stylesheet';
@@ -121,7 +121,7 @@ export function clipContentTransform(element: Element): SvgMatrix {
 function normalizedDeclaration(value: string | null | undefined): string | undefined {
   return value
     ?.trim()
-    .replace(/\s*!important$/i, '')
+    .replace(/!important$/i, '')
     .trim();
 }
 
@@ -140,7 +140,7 @@ const TRANSFORM_ARITIES: Readonly<Record<string, ReadonlyArray<number>>> = {
 function validatedAttributeTransform(input: string | null): SvgMatrix | null {
   if (input === null || input.trim() === '') return parseSvgTransform(null);
   let end = 0;
-  for (const match of input.matchAll(/([a-zA-Z]+)\s*\(([^)]*)\)/g)) {
+  for (const match of svgTransformFunctions(input)) {
     if (!/^[\s,]*$/.test(input.slice(end, match.index))) return null;
     const name = match[1] ?? '';
     const argumentsText = match[2] ?? '';

@@ -261,7 +261,7 @@ export default defineConfig({
     // Document workers load these dependencies only after the first import
     // request. Pre-bundle them so a cold dev server does not discover them
     // mid-test and reload the page while an import is in flight.
-    include: ['linkedom/worker', 'saxes', 'opentype.js', 'tiff', 'ag-psd'],
+    include: ['linkedom/worker', 'saxes', 'opentype.js', 'tiff', 'fflate', 'ag-psd'],
     // Preserve its import.meta.url-relative WASM asset; the dependency optimiser
     // does not copy that binary alongside its generated development chunk.
     exclude: ['harfbuzzjs'],
