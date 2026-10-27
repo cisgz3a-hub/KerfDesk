@@ -280,6 +280,34 @@ describe('Run G-code file dialog (ADR-630)', () => {
     expect(button(body, 'Frame').disabled).toBe(false);
   });
 
+  // Rolling audit v4 H1-P3-2: KerfDesk's own connected Save writes S words in
+  // the controller's $30 range, so the review judges a program against it.
+  it.each([
+    { profileS: 255, controllerS: 1000, warned: false },
+    { profileS: 1000, controllerS: 255, warned: true },
+  ])(
+    'judges S1000 against the connected S max $controllerS under a profile S$profileS',
+    async ({ profileS, controllerS, warned }) => {
+      const project = createProject();
+      useStore.setState({
+        project: { ...project, device: { ...project.device, maxPowerS: profileS } },
+      });
+      useLaserStore.setState({
+        connection: { kind: 'connected' },
+        statusReport: parseStatusReport('<Idle|MPos:0.000,0.000,0.000|FS:0,0>'),
+        activeControllerKind: 'grbl-v1.1',
+        controllerSessionEpoch: 7,
+        controllerSettings: { laserModeEnabled: true, maxPowerS: controllerS },
+        controllerSettingsObservation: { sessionEpoch: 7, observedAt: 1 },
+      });
+      const text = (await show('M4\nG1 X10 Y10 S1000 F1000\nM5\n')).textContent ?? '';
+      expect(text.includes('above this laser')).toBe(warned);
+      expect(text.includes(`asks for S1000, above this laser's S max of ${controllerS}.`)).toBe(
+        warned,
+      );
+    },
+  );
+
   it('shows the G10 displacement warning while preserving Frame and exact sendable bytes', async () => {
     useLaserStore.setState({
       connection: { kind: 'connected' },

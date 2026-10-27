@@ -185,6 +185,8 @@ describe('heavy preparation failure never falls back to the UI thread', () => {
       'G21\nG90\n',
       // The mocked emission says nothing of where the design went.
       undefined,
+      // A CNC program has no laser S range to shade against.
+      undefined,
     );
     expect(workerMocks.prepareSnapshot).not.toHaveBeenCalled();
   });

@@ -8,6 +8,7 @@
 // the only refusal is the factual "no program could be produced" case.
 
 import { DEFAULT_JOB_PLACEMENT, resolveExportJobPlacement } from '../job-placement';
+import { laserPowerPreparationOptions } from '../laser/connected-laser-power-scale';
 import type { EmittedDesignPlacement } from '../laser/save-output-emission';
 import type { SaveGcodeCtx } from './file-actions';
 import { emitSaveGcode } from './save-gcode-emission';
@@ -29,7 +30,13 @@ export type InspectCurrentGcodeResult =
 
 export async function handleInspectCurrentGcode(
   ctx: InspectCtx,
-  openInspector: (programName: string, text: string, placement?: EmittedDesignPlacement) => void,
+  openInspector: (
+    programName: string,
+    text: string,
+    placement?: EmittedDesignPlacement,
+    /** The S value 100% was compiled to, for the burn shading; absent for CNC. */
+    laserMaxPowerS?: number,
+  ) => void,
   options: InspectCurrentGcodeOptions = {},
 ): Promise<InspectCurrentGcodeResult> {
   const placement = resolveExportJobPlacement(ctx.jobPlacement ?? DEFAULT_JOB_PLACEMENT, {
@@ -62,7 +69,11 @@ export async function handleInspectCurrentGcode(
     ctx.pushToast('Nothing to inspect — this project produces no G-code yet.', 'warning');
     return { kind: 'empty' };
   }
-  openInspector(currentProgramName(ctx.savedName), gcode, design);
+  // The range Save compiled these bytes in: the connected $30 when this
+  // session read it (ADR-567), so the shading divides by the S that means
+  // 100% (controller audit v4 E1-P3-1).
+  const { laserMaxPowerS } = laserPowerPreparationOptions(ctx.project, ctx.machine);
+  openInspector(currentProgramName(ctx.savedName), gcode, design, laserMaxPowerS);
   return { kind: 'ready' };
 }
 
