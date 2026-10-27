@@ -7,11 +7,11 @@
 // Amendment 1), so arrowing through the radios never discards them unseen.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Button } from '../../kit';
 import type { DeviceSetupAction, DeviceSetupStepProps } from './device-setup-flow';
 import { DeviceSetupCustomMachine } from './DeviceSetupCustomMachine';
 import { DeviceSetupMachineDetails, machineFacts } from './DeviceSetupMachineDetails';
-import { joinSettingLabels, machineChoiceReplaces } from './machine-choice-replaces';
+import { machineChoiceReplaces } from './machine-choice-replaces';
+import { ReplaceSettingsConfirm } from './ReplaceSettingsConfirm';
 import {
   chooseCustomMachineActions,
   chooseMachineEntryActions,
@@ -164,20 +164,13 @@ function ReplaceConfirm(props: {
   readonly onKeep: () => void;
 }): JSX.Element {
   const name = props.choice === 'custom' ? 'My machine isn’t listed' : props.choice.name;
-  const what = props.replaces.length === 0 ? 'its values' : joinSettingLabels(props.replaces);
   return (
-    <div className="lf-setup-picker-confirm" role="alert">
-      <p>
-        <strong>Replace this machine’s settings?</strong> Choosing {name} replaces the {what} set
-        for the machine in this draft. Nothing is saved until you save setup.
-      </p>
-      <div>
-        <Button variant="danger" onClick={props.onReplace}>
-          Replace settings
-        </Button>
-        <Button onClick={props.onKeep}>Keep current settings</Button>
-      </div>
-    </div>
+    <ReplaceSettingsConfirm
+      subject={`Choosing ${name}`}
+      replaces={props.replaces}
+      onReplace={props.onReplace}
+      onKeep={props.onKeep}
+    />
   );
 }
 

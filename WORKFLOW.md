@@ -1654,6 +1654,22 @@ the completed physical Frame is the spatial source of truth.
    says when the camera calibration changes with it. When the file has the same machine and only
    its bed size differs, the notice gives both bed sizes, and **Keep current machine** comes first
    as the primary choice (ADR-440 Amendment 5).
+4. **Keep current machine** is one Undo step, named in the Undo list. Undoing it brings back the
+   file's machine together with the notice, so the question is asked again; Redo answers it again.
+   No Undo of an older edit, and no Redo, puts the file's machine back without the notice
+   (ADR-440 Amendment 6).
+
+#### Edge — the file carries an older copy of this machine (ADR-500 Amendment 2)
+1. A file for the machine already in use (same profile, name and bed) keeps this machine's whole
+   setup: origin, homing, no-go zones, scan offsets, controller, rotary setup, saved positions,
+   feeds, S range, air assist, Z setup and the CNC head's machine values. The file keeps its own
+   artwork, operations, stock, bits and job placement.
+2. When the file held other values, an info toast names them: `This file's machine settings were
+   not used (origin and no-go zones): your machine keeps its current setup from Machine Setup.`
+   To use the file's values, set them in Machine Setup.
+3. While a notice for another machine is open, no machine edit is remembered for the next session.
+   **Use project machine** answers it, and the next change to the machine saves that machine.
+   **Keep current machine** keeps yours.
 
 #### Edge — the file carries an Auto-focus command (ADR-400 Amendments 1 and 2)
 1. On load, an Auto-focus command that is not a focus routine is cleared, as a refused

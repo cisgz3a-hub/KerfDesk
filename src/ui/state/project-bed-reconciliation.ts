@@ -1,3 +1,4 @@
+import { cncParamsWithOwnFeeds } from '../../core/cnc/cnc-head-feeds';
 import type { DeviceProfile } from '../../core/devices';
 import type { CncMachineParams, MachineConfig, Project } from '../../core/scene';
 
@@ -129,6 +130,119 @@ export function withCurrentMachineCamera(
     keptCurrentCamera:
       hasCameraCalibration(opened) && !sameValue(cameraFields(opened), cameraFields(current)),
   };
+}
+
+/**
+ * A file opened for the machine already in use keeps that machine's whole
+ * setup (ADR-500 Amendment 2): origin, homing, no-go zones, scan offsets,
+ * controller, rotary, saved positions and every other profile value, plus the
+ * CNC head's machine values. The file can copy the identity that hides the
+ * machine notice, and a file saved before a correction would otherwise put the
+ * old origin back with no word (rolling audit v4 H4-P1-1). Run it after the
+ * camera and Auto-focus steps: it keeps whatever camera fields they chose.
+ * `replaced` names what the file held differently, for the toast.
+ */
+export function withCurrentMachineSetup(
+  project: Project,
+  previous: Project,
+): { readonly project: Project; readonly replaced: ReadonlyArray<string> } {
+  const current = previous.device;
+  if (deviceIdentity(project.device) !== deviceIdentity(current)) return { project, replaced: [] };
+  const { cameraModel: _model, otherCameraModels: _others, ...rest } = current;
+  const device: DeviceProfile = { ...rest, ...cameraFields(project.device) };
+  // With no CNC values in use, the file's come in, as its camera does.
+  const kept = withCncParams({ ...project, device }, currentCncParams(previous));
+  return { project: kept, replaced: replacedSetupLabels(project, kept) };
+}
+
+// The machine values the CNC head had before Open: the live CNC job's, the
+// parked copy while in Laser mode, else the profile's mirror.
+function currentCncParams(previous: Project): CncMachineParams | undefined {
+  const cnc = previous.machine?.kind === 'cnc' ? previous.machine : previous.parkedCncMachine;
+  if (cnc !== undefined) return cncParamsWithOwnFeeds(cnc.params, previous.device);
+  return previous.device.cncSubProfile;
+}
+
+// Stock, bits and tiling stay the file's; only the machine values change.
+function withCncParams(project: Project, params: CncMachineParams | undefined): Project {
+  if (params === undefined) return project;
+  const machine = project.machine;
+  const parked = project.parkedCncMachine;
+  return {
+    ...project,
+    ...(machine?.kind === 'cnc' ? { machine: { ...machine, params: { ...params } } } : {}),
+    ...(parked === undefined ? {} : { parkedCncMachine: { ...parked, params: { ...params } } }),
+  };
+}
+
+// Plain names for the toast. Camera and Auto-focus have their own toasts, and
+// catalogue bookkeeping (version, evidence, vendor) is kept without a word.
+const SETUP_LABELS: ReadonlyArray<{
+  readonly label: string;
+  readonly keys: ReadonlyArray<keyof DeviceProfile>;
+}> = [
+  { label: 'origin', keys: ['origin'] },
+  { label: 'homing', keys: ['homing'] },
+  { label: 'no-go zones', keys: ['noGoZones'] },
+  {
+    label: 'scan offsets',
+    keys: ['scanningOffsets', 'scanOffsetCalibrationStatus', 'bidirectionalScanPolicy'],
+  },
+  {
+    label: 'controller',
+    keys: [
+      'controllerKind',
+      'controllerCommandSet',
+      'baudRate',
+      'streamingMode',
+      'rxBufferBytes',
+      'workerHostedStreaming',
+      'gcodeDialect',
+    ],
+  },
+  { label: 'rotary setup', keys: ['rotary'] },
+  { label: 'saved positions', keys: ['savedPositions'] },
+  { label: 'max feed', keys: ['maxFeed'] },
+  { label: 'frame speed', keys: ['framingFeedMmPerMin'] },
+  { label: 'S range', keys: ['minPowerS', 'maxPowerS', 'laserModeEnabled'] },
+  { label: 'air assist', keys: ['airAssistCommand', 'airAssistRestartUnreliable'] },
+  { label: 'Z setup', keys: ['zTravelMm', 'zTravelConfirmed', 'zProbePresent'] },
+];
+
+const UNNAMED_KEYS: ReadonlySet<string> = new Set([
+  ...SETUP_LABELS.flatMap(({ keys }) => keys),
+  'name',
+  'profileId',
+  'bedWidth',
+  'bedHeight',
+  'vendor',
+  'model',
+  'profileSource',
+  'catalogVersion',
+  'evidence',
+  'machineFamily',
+  'cameraModel',
+  'otherCameraModels',
+  'autofocusCommand',
+  'cncSubProfile',
+]);
+
+function replacedSetupLabels(opened: Project, kept: Project): ReadonlyArray<string> {
+  const a = opened.device;
+  const b = kept.device;
+  const labels = SETUP_LABELS.filter(({ keys }) =>
+    keys.some((key) => !sameValue(a[key], b[key])),
+  ).map(({ label }) => label);
+  if (!sameValue(openedCncParams(opened), openedCncParams(kept))) labels.push('CNC settings');
+  const other = (Object.keys({ ...a, ...b }) as Array<keyof DeviceProfile>).some(
+    (key) => !UNNAMED_KEYS.has(key) && !sameValue(a[key], b[key]),
+  );
+  return other ? [...labels, 'other machine settings'] : labels;
+}
+
+function openedCncParams(project: Project): unknown {
+  const cnc = project.machine?.kind === 'cnc' ? project.machine : project.parkedCncMachine;
+  return cnc?.params ?? project.device.cncSubProfile ?? null;
 }
 
 // Structural equality for saved JSON-like records: a file's copy of the same

@@ -31,8 +31,11 @@ import {
   canonicalizeOpenedProjectBed,
   withCurrentMachineAutofocus,
   withCurrentMachineCamera,
+  withCurrentMachineSetup,
   type ProjectBedReconciliationNotice,
 } from './project-bed-reconciliation';
+import { pushUndo } from './scene-mutations';
+import { captureSetupHistoryContext } from './setup-history-context';
 import { useToastStore } from './toast-store';
 import { projectSheetActions, type ProjectSheetActions } from './project-sheet-actions';
 import { JOB_MACHINE_OPEN_REFUSED, refuseJobMachineChange } from './job-machine-lock';
@@ -91,21 +94,24 @@ export function projectActions(
       const bedResolution = canonicalizeOpenedProjectBed(resolution.project, current.project);
       const autofocus = withCurrentMachineAutofocus(bedResolution.project, current.project);
       const camera = withCurrentMachineCamera(autofocus.project, current.project);
+      const setup = withCurrentMachineSetup(camera.project, current.project);
       // A file on another machine waits for a running job (ADR-416 Amendment 2).
-      if (refuseJobMachineChange(current.project, camera.project, JOB_MACHINE_OPEN_REFUSED))
+      if (refuseJobMachineChange(current.project, setup.project, JOB_MACHINE_OPEN_REFUSED))
         return { kind: 'job-machine-locked' };
       useUiStore.getState().resetArtworkRunOrder();
       set((state) => ({
-        ...initialState(camera.project),
+        ...initialState(setup.project),
         ...retainedApplicationState(state),
         projectDocumentEpoch: state.projectDocumentEpoch + 1,
-        cachedCncMachine: resolution.cachedCncMachine,
+        // A laser file's parked CNC setup, with the kept machine values.
+        cachedCncMachine: setup.project.parkedCncMachine ?? resolution.cachedCncMachine,
         projectBedReconciliation: bedResolution.notice,
         dirty: bedResolution.notice?.workspaceMismatch === true,
       }));
       if (autofocus.keptCurrentCommand) noteKeptAutofocusCommand();
       if (camera.keptCurrentCamera) noteKeptCameraCalibration();
-      const loneArtworkId = loneSelectableArtworkId(camera.project.scene);
+      if (setup.replaced.length > 0) noteKeptMachineSetup(setup.replaced);
+      const loneArtworkId = loneSelectableArtworkId(setup.project.scene);
       if (loneArtworkId !== null && get().selectedObjectId === null)
         get().selectObject(loneArtworkId);
       return bedResolution.notice?.workspaceMismatch === true
@@ -175,6 +181,21 @@ function noteKeptCameraCalibration(): void {
     );
 }
 
+// The file's copy of the machine is never used for the machine in use
+// (ADR-500 Amendment 2), and the operator hears which values it held.
+function noteKeptMachineSetup(replaced: ReadonlyArray<string>): void {
+  const what =
+    replaced.length === 1
+      ? replaced[0]
+      : `${replaced.slice(0, -1).join(', ')} and ${replaced[replaced.length - 1]}`;
+  useToastStore
+    .getState()
+    .pushToast(
+      `This file's machine settings were not used (${what}): your machine keeps its current setup from Machine Setup.`,
+      'info',
+    );
+}
+
 function noteKeptAutofocusCommand(): void {
   useToastStore
     .getState()
@@ -212,10 +233,17 @@ function keepCurrentMachinePatch(
     machineKindOf(openedMachine),
     machineKindOf(kept.machine),
   );
+  // Its own Undo step, like every other machine change (ADR-440 Amendment 6):
+  // snapshots taken before it hold the file's machine, so an Undo of an older
+  // edit, or a Redo, must not put that machine back unseen. Undoing this step
+  // brings the notice back with the file's machine; Redo takes it away again.
+  captureSetupHistoryContext(state.project, state);
   return {
     ...switched,
     cachedCncMachine: switched.project.parkedCncMachine ?? null,
     projectBedReconciliation: null,
+    undoStack: pushUndo(state.project, state.undoStack, 'Keep current machine'),
+    redoStack: [],
     dirty: true,
   };
 }
