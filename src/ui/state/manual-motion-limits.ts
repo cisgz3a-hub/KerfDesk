@@ -61,20 +61,20 @@ export function resolveManualMotionLimits(
  * whatever KerfDesk trusts, and `$X` leaves that position as it was, so a hold
  * aimed from an unknown position asked for the full travel, which GRBL refuses
  * whole (error:15) from almost anywhere. Pass only the controller MPos
- * KerfDesk withheld; nothing but this clamp may use it. grblHAL has no
- * envelope before this session's Home, and a WPos-only report ($10=0) carries
- * no MPos: both keep the full request.
+ * KerfDesk withheld; nothing but the hold clamps, XY and Z, may use it.
+ * grblHAL has no envelope before this session's Home, and a WPos-only report
+ * ($10=0) carries no MPos: both keep the full request.
  */
 export function firmwareJogCheckPosition(
   evidence: NativeBedEvidence,
   hiddenMPos: StatusReport['mPos'] | undefined,
   reportInches: boolean,
-): Vec2 | null {
+): (Vec2 & { readonly z: number }) | null {
   if (hiddenMPos == null || travelFirmware(evidence) !== 'grbl') return null;
   if (currentSessionSettings(evidence)?.softLimitsEnabled !== true) return null;
   const { x, y, z } = hiddenMPos;
-  const [xMm, yMm] = normalizeReportedMPosToMm([x, y, z], reportInches);
-  return { x: xMm, y: yMm };
+  const [xMm, yMm, zMm] = normalizeReportedMPosToMm([x, y, z], reportInches);
+  return { x: xMm, y: yMm, z: zMm };
 }
 
 /**

@@ -10,6 +10,7 @@ import { proFeaturesUnlocked } from '../licensing/edition';
 import type { AppState } from '../state/store';
 import { withManualCncFeedPatch } from '../state/cnc-feed-provenance';
 import { cncSettingsAfterOperationChoice } from '../state/cnc-operation-choice';
+import { useToastStore } from '../state/toast-store';
 import { historyProjection } from './authoring-projections';
 import { RemoteFault } from './fault';
 import { publicIdentifier } from './projections';
@@ -231,6 +232,15 @@ function keptFeedsMessage(
   return kept === null
     ? undefined
     : cncKeptFeedsMessage(kept, layerCncTool(machine, after).name, 'mm');
+}
+
+/**
+ * A remote bit change's kept-values note, shown on the PC once the change has committed, as
+ * Machine Setup's Save warns about the same values (ADR-306 Amendment 5). The card's own note
+ * appears only for a bit chosen on the card.
+ */
+export function showKeptFeedsOnPc(message: unknown): void {
+  if (typeof message === 'string') useToastStore.getState().pushToast(message, 'warning');
 }
 
 /** Existing ordinary fields only. CNC strategy changes keep the desktop Pro admission. */

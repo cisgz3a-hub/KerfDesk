@@ -14263,6 +14263,8 @@ also made it easy to mistake off-thread whole-file reads for streaming or bounde
 ADR-269's amendments are separate decision files (ADR-344):
 `docs/decisions/ADR-269-amendment-1-remote-dxf-worker-and-block-budget.md` (remote DXF import
 uses the same import-worker parse as the desktop, and placing DXF blocks has a budget);
+`docs/decisions/ADR-269-amendment-2-dxf-budget-counts-each-point-once.md` (that budget counts
+each placed point once, however many blocks wrap it);
 `docs/decisions/ADR-269-amendment-3-remote-svg-worker-and-use-point-budget.md` (remote SVG import
 uses the same document-worker parse as the desktop, and the SVG `<use>` budget counts points).
 

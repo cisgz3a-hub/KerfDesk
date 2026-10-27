@@ -1,5 +1,16 @@
 import { useMemo, useState } from 'react';
 import { controller } from '../core/controller';
+import {
+  bedFitDetail,
+  bedFitHeadline,
+  bedFitKeepLabel,
+  fileSizeRestoredText,
+  importNeedsReview,
+  importSuccessText,
+  readImportReceipt,
+  type ImportNotice,
+  type ImportReceipt,
+} from '../core/import-receipt';
 import { store } from '../core/store';
 import { Icon } from './icons';
 import { Banner, NumberField, Sheet } from './primitives';
@@ -12,6 +23,15 @@ function bedCenter(): { x: number; y: number } {
 
 const MAX_IMPORT_BYTES = 178_000;
 export function ImportSheet() {
+  const [receipt, setReceipt] = useState<ImportReceipt | null>(null);
+  return receipt === null ? (
+    <ImportForm onReview={setReceipt} />
+  ) : (
+    <ImportReview receipt={receipt} />
+  );
+}
+
+function ImportForm({ onReview }: { onReview: (receipt: ImportReceipt) => void }) {
   const [file, setFile] = useState<File | null>(null);
   const [width, setWidth] = useState<number | undefined>(undefined);
   const [busy, setBusy] = useState(false);
@@ -33,19 +53,23 @@ export function ImportSheet() {
         return;
       }
       const center = bedCenter();
-      const result = await controller.write(
-        'import_file',
-        {
-          fileName: safeFileName(file.name),
-          mimeType: prepared.mimeType,
-          dataBase64: toBase64(prepared.bytes),
-          ...(width === undefined
-            ? {}
-            : { widthMm: width, xMm: center.x - width / 2, yMm: center.y - width / 2 }),
-        },
-        { success: 'Imported.' },
-      );
-      if (result !== null) close();
+      const result = await controller.write('import_file', {
+        fileName: safeFileName(file.name),
+        mimeType: prepared.mimeType,
+        dataBase64: toBase64(prepared.bytes),
+        ...(width === undefined
+          ? {}
+          : { widthMm: width, xMm: center.x - width / 2, yMm: center.y - width / 2 }),
+      });
+      if (result === null) return;
+      // A bed fit or an import notice is shown here: the PC's toast is on a screen away from you.
+      const receipt = readImportReceipt(result);
+      if (importNeedsReview(receipt)) {
+        onReview(receipt);
+        return;
+      }
+      store.toast(importSuccessText(receipt), 'success');
+      close();
     } catch {
       setError('This file couldn’t be read.');
     } finally {
@@ -92,6 +116,84 @@ export function ImportSheet() {
         on the PC.
       </p>
       {error === null ? null : <Banner tone="danger">{error}</Banner>}
+    </Sheet>
+  );
+}
+
+const TONE = {
+  error: 'danger',
+  warning: 'warning',
+  info: 'info',
+  success: 'success',
+} as const satisfies Record<ImportNotice['level'], string>;
+
+/**
+ * What the import changed or assumed (ADR-125 Amendment 3). A bed fit makes the burn smaller
+ * than the file, so it is acknowledged with Keep or undone with Restore; only the footer closes.
+ */
+function ImportReview({ receipt }: { receipt: ImportReceipt }) {
+  const fit = receipt.bedFit;
+  const revision = receipt.revision;
+  const [busy, setBusy] = useState(false);
+  const [restoreFailed, setRestoreFailed] = useState(false);
+  const restore = async () => {
+    if (fit === null || revision === null) return;
+    setBusy(true);
+    // Sent against the import's own revision, so it undoes the fit step or is refused.
+    const result = await controller.write('undo', {}, { expectedRevision: revision });
+    setBusy(false);
+    if (result === null) {
+      setRestoreFailed(true);
+      return;
+    }
+    store.toast(fileSizeRestoredText(fit), 'warning');
+    close();
+  };
+  return (
+    <Sheet
+      title="Check this import"
+      onClose={close}
+      dismissible={fit === null}
+      footer={
+        fit === null ? (
+          <button type="button" className="btn btn-primary" onClick={close}>
+            Done
+          </button>
+        ) : (
+          <>
+            <button
+              type="button"
+              className="btn btn-soft"
+              disabled={busy || restoreFailed || revision === null}
+              onClick={() => void restore()}
+            >
+              {busy ? <span className="spinner" /> : null} Restore file size
+            </button>
+            <button type="button" className="btn btn-primary" disabled={busy} onClick={close}>
+              {bedFitKeepLabel(fit.scale)}
+            </button>
+          </>
+        )
+      }
+    >
+      {fit === null ? null : (
+        <Banner tone="warning">
+          <div>
+            <strong>{bedFitHeadline(fit)}</strong>
+            <div className="small">{bedFitDetail(fit)}</div>
+          </div>
+        </Banner>
+      )}
+      {receipt.notices.map((notice, index) => (
+        <Banner key={index} tone={TONE[notice.level]}>
+          {notice.message}
+        </Banner>
+      ))}
+      {restoreFailed ? (
+        <p className="note">
+          The fit may not have been undone. Check the size on the Design screen before you Frame.
+        </p>
+      ) : null}
     </Sheet>
   );
 }

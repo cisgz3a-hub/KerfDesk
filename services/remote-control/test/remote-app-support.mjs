@@ -129,8 +129,14 @@ const KIND = {
   pause_job: 'pause',
   resume_job: 'resume',
 };
-/** One synthetic PC: reads return the fixture; writes bump the revision; machine actions settle. */
+const REFUSED = Symbol('refused');
+/** A `state.replies` answer the relay returns as this error code instead of a result. */
+export const refusal = (code) => ({ [REFUSED]: code });
+
+/** One synthetic PC: reads return the fixture; writes bump the revision; machine actions settle.
+ *  `state.replies[name]` answers one command its own way. */
 export function respond(state, name, args) {
+  if (Object.hasOwn(state.replies ?? {}, name)) return state.replies[name](args);
   const revision = `r${state.revision}`;
   if (name === 'get_workspace') return { revision, ...state.workspace };
   if (name === 'get_workspace_scene') return { revision, ...state.scene };
@@ -244,7 +250,9 @@ export async function phonePage(browser, state, { width = 390, paired = true } =
     if (url.pathname === '/api/client/command') {
       const { name, args } = JSON.parse(route.request().postData() ?? '{}');
       state.commands.push({ name, args, csrf: route.request().headers()['x-kerfdesk-csrf'] });
-      return json({ result: await respond(state, name, args) });
+      const result = await respond(state, name, args);
+      if (result?.[REFUSED] !== undefined) return json({ error: { code: result[REFUSED] } }, 409);
+      return json({ result });
     }
     return json({ error: 'not_found' }, 404);
   });
