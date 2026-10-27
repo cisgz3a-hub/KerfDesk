@@ -44,11 +44,13 @@ function physicalToNumbers(point: Vec2, origin: Origin): Vec2 {
   };
 }
 
-function sceneAnchor(anchor: JobOriginAnchor, radius = 0): Vec2 {
+// The anchor names a corner of the artwork as drawn, on a CNC profile too: the
+// cutter's reach past the outline is not part of it (ADR-327 Amendment 1).
+function sceneAnchor(anchor: JobOriginAnchor): Vec2 {
   const [row, column] = anchor === 'center' ? ['center', 'center'] : anchor.split('-');
   return {
-    x: column === 'left' ? 31 - radius : column === 'right' ? 91 + radius : 61,
-    y: row === 'front' ? 87 + radius : row === 'back' ? 47 - radius : 67,
+    x: column === 'left' ? 31 : column === 'right' ? 91 : 61,
+    y: row === 'front' ? 87 : row === 'back' ? 47 : 67,
   };
 }
 
@@ -127,9 +129,7 @@ describe.each([false, true])('independent placement matrix, cnc=%s', (cnc) => {
         : { startFrom, anchor };
     const prepared = prepareOutput(project, { jobOrigin: placement });
     if (!prepared.ok) throw new Error(JSON.stringify(prepared.preflight));
-    const group = prepared.job.groups[0];
-    const radius = group?.kind === 'cnc' ? group.toolDiameterMm / 2 : 0;
-    const anchorNumber = physicalToNumbers(sceneAnchor(anchor, radius), origin);
+    const anchorNumber = physicalToNumbers(sceneAnchor(anchor), origin);
     const offset =
       startFrom === 'absolute'
         ? { x: 0, y: 0 }

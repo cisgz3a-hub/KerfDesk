@@ -181,6 +181,37 @@ describe('Job Review machine facts', () => {
       tone: 'warning',
     });
   });
+
+  // ADR-491 Amendment 2 (meta audit M7-P1-2): the live Z-top check on the row.
+  it('says where the park lands against the live Z top, or that it was not checked', () => {
+    const project = {
+      ...createProject({ ...DEFAULT_DEVICE_PROFILE, zTravelMm: 75 }),
+      machine: {
+        ...DEFAULT_CNC_MACHINE_CONFIG,
+        params: { ...DEFAULT_CNC_MACHINE_CONFIG.params, parkZMm: 50 },
+      },
+    };
+    const row = (zTop: Parameters<typeof buildMachineReviewFacts>[3]) =>
+      buildMachineReviewFacts(project, null, undefined, zTop).find(
+        (f) => f.label === 'Park height',
+      );
+
+    expect(row({ kind: 'over', overMm: 10, highestFitMm: 40 })).toEqual({
+      label: 'Park height',
+      value:
+        '50 mm above stock top · job end and bit changes · 10 mm past the Z top with the work ' +
+        'zero set now · Set Park height to 40 mm or lower, or zero Z higher.',
+      tone: 'warning',
+    });
+    expect(row({ kind: 'fits', roomMm: 12.5 })?.value).toBe(
+      '50 mm above stock top · job end and bit changes · 12.5 mm under the Z top',
+    );
+    expect(row({ kind: 'unchecked', reason: 'no Home' })).toEqual({
+      label: 'Park height',
+      value: '50 mm above stock top · job end and bit changes · Z top not checked: no Home',
+      tone: 'default',
+    });
+  });
 });
 
 describe('Job Review override facts (ADR-355)', () => {

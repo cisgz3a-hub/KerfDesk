@@ -22,6 +22,7 @@ import type { RasterPowerValues } from '../raster/raster-power-values';
 import type { CncCuttingStage } from '../scene/cnc-stage-recipe';
 import {
   assertNever,
+  type Bounds,
   type CncCoolantMode,
   type CncCutType,
   type CncToolKind,
@@ -366,10 +367,9 @@ export type CncGroup = {
   readonly sourceObjectId?: string;
   readonly color: string;
   readonly cutType: CncCutType;
-  // Multi-tool jobs (H.7): which bit cuts this group. Optional — absent
-  // means the machine's single active bit (pre-H.7 jobs, test fixtures);
-  // the emitter only inserts M0 tool-change blocks when a job actually
-  // switches between distinct bits.
+  // Multi-tool jobs (H.7): which bit cuts this group. Optional — absent means the machine's
+  // single active bit (pre-H.7 jobs, test fixtures); the emitter only inserts M0 tool-change
+  // blocks when a job actually switches between distinct bits.
   readonly toolId?: string;
   readonly toolName?: string;
   readonly toolDiameterMm: number;
@@ -379,10 +379,9 @@ export type CncGroup = {
   readonly toolTipAngleDeg?: number;
   readonly toolTipDiameterMm?: number;
   readonly toolFluteCount?: number;
-  // Current primary cutter for the layer that owns the shared
-  // feed/plunge/RPM/depth-per-pass settings. This differs from toolId for
-  // secondary clearing/finishing groups. It describes the current sharing
-  // relationship, not which cutter historically produced a numeric value.
+  // Current primary cutter for the layer that owns the shared feed/plunge/RPM/depth-per-pass
+  // settings. This differs from toolId for secondary clearing/finishing groups. It describes the
+  // current sharing relationship, not which cutter historically produced a numeric value.
   readonly layerPrimaryToolId?: string;
   readonly requestedDepthMm?: number;
   readonly registrationHoleDiameterMm?: number;
@@ -415,6 +414,7 @@ export type CncGroup = {
   readonly parkYMm?: number;
   // ADR-491: lift height before the park move. Absent = safe Z.
   readonly parkZMm?: number;
+  readonly designBounds?: Bounds; // ADR-327 Amd 1: the Job Origin anchor, not the reach
   readonly passes: ReadonlyArray<CncPass>;
 };
 

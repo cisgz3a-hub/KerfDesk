@@ -41,7 +41,7 @@ function laserAssumptions(
 
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
-    expect(EMITTER_REVISION).toBe('relief-footprint-edge-20261027-v32');
+    expect(EMITTER_REVISION).toBe('cnc-artwork-anchor-20261027-v33');
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {

@@ -177,9 +177,10 @@ function relativeOffset(points: ReadonlyArray<Vec2>, origin: Origin): Vec2 {
   const xs = points.map((point) => point.x);
   const ys = points.map((point) => point.y);
   return {
-    // The 6 mm fixture cutter expands the reviewed footprint by 3 mm on each edge.
-    x: -(origin.endsWith('right') ? Math.max(...xs) + 3 : Math.min(...xs) - 3),
-    y: -(origin.startsWith('rear') ? Math.max(...ys) + 3 : Math.min(...ys) - 3),
+    // The anchor is the drawn line, not the 6 mm fixture cutter's reach past it
+    // (ADR-327 Amendment 1).
+    x: -(origin.endsWith('right') ? Math.max(...xs) : Math.min(...xs)),
+    y: -(origin.startsWith('rear') ? Math.max(...ys) : Math.min(...ys)),
   };
 }
 

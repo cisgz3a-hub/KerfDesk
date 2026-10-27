@@ -78,6 +78,9 @@ export type Toolpath = {
 
 export type BuildToolpathOptions = {
   readonly startPoint?: Vec2;
+  // Where the job ends. For a CNC job it is the emitter's finish fallback: the
+  // preview then draws the park lift, each bit-change park and the job-end
+  // park, with a configured park winning as it does in the program.
   readonly parkPoint?: Vec2;
   readonly scanningOffsets?: ReadonlyArray<ScanOffsetPoint>;
   // Bed extents for bounding ADR-239 contour entries; absent previews the

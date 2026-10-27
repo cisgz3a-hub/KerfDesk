@@ -1,4 +1,5 @@
 import type { Project } from '../../core/scene';
+import { cncNestSpacing } from '../../core/cnc/cnc-nest-spacing';
 import type {
   ProductionNestDefinition,
   ProductionNestPart,
@@ -22,7 +23,7 @@ export function initialProductionDefinition(
     name: 'Quantity production',
     parts: part.kind === 'ok' ? [part.value] : [],
     sheets: [sheet],
-    padding: 2,
+    padding: cncNestSpacing(project)?.spacingMm ?? 2,
     goal: 'compact',
     method: 'outline',
     optimise: false,
