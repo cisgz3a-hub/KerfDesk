@@ -59,6 +59,28 @@ List an area's merges with `git log --first-parent --since=2026-10-21T00:00 orig
 | H9 | `undo-guards` | Every way to change the project or the machine while a job runs or after it: Undo and Redo, Open, paste, drag, settings, profile switch | S+D | Every store write path against `commitProjectEdit`, the job machine lock and Undo |
 | H10 | `distribution` | Download → install → licence (Free and Pro) → update → website claims; the release pipeline and CI gates that protect `main` | R+X | Windows, macOS and Linux; web; Free and Pro; update channels |
 
+## v4 run order after v3 (re-ranked 2026-10-27)
+
+v3's P1s clustered on entry points that skip a guard their sibling has:
+- recovery against the open project (G2);
+- Console unit switches (G4);
+- stacked copies in the lead model (G5);
+- camera frames stamped at the wrong moment (G6);
+- MCP board capture (G7).
+
+So v4 runs the journeys with the most entry points and the most v3 hits first:
+
+1. H2 `recovery-journey`
+2. H8 `remote-automation`
+3. H1 `laser-burn-journey`
+4. H4 `machine-setup-connect`
+5. H6 `camera-placement`
+6. H3 `cnc-journey`
+7. H9 `undo-guards`
+8. H5 `image-burn-journey`
+9. H7 `project-lifecycle`
+10. H10 `distribution`. G8 found the release gates sound, so this runs last.
+
 ## Batching
 
 - Two subagents run at a time.
