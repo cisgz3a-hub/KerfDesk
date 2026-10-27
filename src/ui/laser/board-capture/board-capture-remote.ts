@@ -19,8 +19,18 @@ export type BoardRemoteStatus = {
   };
 };
 
+/** What the PC panel shows around its Finish button, for a remote client that cannot see it
+ * (ADR-654 Amendment 1). */
+export type BoardFinishReview = {
+  /** A finding the PC operator reads before choosing to finish: the remote finish is refused. */
+  readonly refusal: string | null;
+  /** A note the PC shows with the created board: the remote receipt carries it. */
+  readonly notice: string | null;
+};
+
 export type BoardRemoteController = {
   readonly status: () => BoardRemoteStatus;
+  readonly finishReview: () => BoardFinishReview;
   readonly capture: () => Promise<void>;
   readonly finish: () => Promise<void>;
 };

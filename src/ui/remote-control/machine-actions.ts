@@ -11,11 +11,13 @@ import type { MachineExecutionContext } from './machine-execution';
 import type { OwnedMachineOperation } from './machine-operation-state';
 import type { MachineCommand } from './machine-types';
 import { RemoteFault } from './fault';
+import { boardCaptureBlockMessage } from '../laser/board-capture/board-capture-gate';
 import {
   currentBoardRemote,
-  type BoardRemoteStatus,
+  type BoardRemoteController,
 } from '../laser/board-capture/board-capture-remote';
 import { proFeaturesUnlocked } from '../licensing/edition';
+import { freshBoardReportRefusal } from './machine-board-fresh-report';
 
 /** A refusal whose fixed, controller-state message is safe to show remotely. */
 export class MachineRefusal extends RemoteFault {
@@ -168,14 +170,16 @@ export async function executeBoardAction(
   if (controller === null) throw new MachineRefusal('Open Place Board on the computer first.');
   // Refusals before the panel runs leave the controller untouched (state failed); once it runs,
   // a capture or finish may already have written a work origin, so a failure stays unknown.
-  const blocked = boardActionBlockMessage(controller.status(), finish);
+  const blocked = boardActionBlockMessage(controller, finish);
   if (blocked !== null) throw new MachineRefusal(blocked);
+  if (!finish) await awaitFreshBoardReport(controller, operation);
+  const notice = finish ? controller.finishReview().notice : null;
   await settle(
     operation,
     () => (finish ? controller.finish() : controller.capture()),
     finish ? 'The board could not be created.' : 'The board point could not be captured.',
     finish
-      ? 'Board created. Check every anchor on the computer, then Frame before Start.'
+      ? boardCreatedMessage(notice)
       : () => {
           const status = controller.status();
           return `Captured point ${status.captures} of ${status.capturesNeeded ?? status.captures}.`;
@@ -183,15 +187,44 @@ export async function executeBoardAction(
   );
 }
 
-function boardActionBlockMessage(status: BoardRemoteStatus, finish: boolean): string | null {
+function boardCreatedMessage(notice: string | null): string {
+  const check = 'Check every anchor on the computer, then Frame before Start.';
+  return notice === null ? `Board created. ${check}` : `Board created. ${notice} ${check}`;
+}
+
+/** The panel's own refusals, then the gate that disables the PC's Capture and Finish buttons,
+ * then what the PC shows before Finish (ADR-654 Amendment 1). */
+function boardActionBlockMessage(
+  controller: BoardRemoteController,
+  finish: boolean,
+): string | null {
+  const status = controller.status();
   if (status.busy) return 'Place Board is busy on the computer. Wait, then try again.';
   if (status.committed) return 'The board is already created. Start a new capture on the computer.';
   if (!status.coordinatesCurrent)
     return 'Machine coordinates changed during capture. Start over on the computer.';
-  if (finish) return null;
+  const machineBlocked = boardCaptureBlockMessage(useLaserStore.getState());
+  if (machineBlocked !== null) return machineBlocked;
+  if (finish) return controller.finishReview().refusal;
   return status.capturesNeeded !== null && status.captures >= status.capturesNeeded
     ? 'Every capture point is recorded. Use finish_board.'
     : null;
+}
+
+/** Waits for a report newer than the request with the gate still clear. A capture taken on the
+ * computer meanwhile refuses, so one head position is never recorded as two points. */
+async function awaitFreshBoardReport(
+  controller: BoardRemoteController,
+  operation: OwnedMachineOperation,
+): Promise<void> {
+  const captures = controller.status().captures;
+  const refusal = await freshBoardReportRefusal(operation, () => {
+    if (currentBoardRemote() !== controller) return 'Open Place Board on the computer first.';
+    if (controller.status().captures !== captures)
+      return 'Place Board changed on the computer. Check it, then try again.';
+    return boardActionBlockMessage(controller, false);
+  });
+  if (refusal !== null) throw new MachineRefusal(refusal);
 }
 
 export async function executePauseResume(
