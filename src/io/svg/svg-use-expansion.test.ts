@@ -58,7 +58,7 @@ function place(root: Element, steps: readonly number[], nesting = 1): void {
 }
 
 describe('spendSvgUsePoints', () => {
-  it('has the DXF block budget’s floor (ADR-269 Amendment 2)', () => {
+  it('has the DXF block budget’s floor (ADR-269 Amendment 3)', () => {
     expect(SVG_USE_POINT_LIMITS.floor).toBe(DXF_BLOCK_EXPANSION_LIMITS.floor);
   });
 

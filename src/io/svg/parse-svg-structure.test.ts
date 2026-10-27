@@ -112,7 +112,7 @@ describe.each(parsers)('SVG <use> expansion through %s', (_name, parse) => {
     expect(polylineCount(result)).toBe(3);
   });
 
-  // ADR-269 Amendment 2: the budget counts the points copies place, as the DXF
+  // ADR-269 Amendment 3: the budget counts the points copies place, as the DXF
   // block budget does, so a few hundred copies of one long path pass its floor.
   it(
     'refuses <use> copies whose points pass the point budget, saying how to import them',

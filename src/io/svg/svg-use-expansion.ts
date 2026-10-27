@@ -13,7 +13,7 @@
 // advisory size notes of ADR-268 item 4, this growth is not bounded by the
 // input, so past the budget the import is refused.
 //
-// The budget also counts the points those elements place (ADR-269 Amendment 2),
+// The budget also counts the points those elements place (ADR-269 Amendment 3),
 // with the DXF block budget's limit (ADR-269 Amendment 1): one instantiated
 // path can carry many points, so counting elements alone does not bound them.
 

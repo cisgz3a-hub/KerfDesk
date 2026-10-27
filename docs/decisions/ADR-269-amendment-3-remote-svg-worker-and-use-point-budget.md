@@ -1,4 +1,4 @@
-## ADR-269 Amendment 2 - Remote SVG import uses the document import worker, and the SVG `<use>` budget counts points (2026-10-27)
+## ADR-269 Amendment 3 - Remote SVG import uses the document import worker, and the SVG `<use>` budget counts points (2026-10-27)
 
 **Status:** Accepted. | **Date:** 2026-10-27
 

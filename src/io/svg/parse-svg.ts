@@ -7,7 +7,7 @@
 //    order — deterministic for snapshot tests. Nested <svg> and <symbol>
 //    viewports map and clip their content as overflow specifies, a <switch>
 //    renders one child, and <use> expansion skips circular references and has
-//    a budget of elements and points (ADR-268 Amendment 1, ADR-269 Amendment 2).
+//    a budget of elements and points (ADR-268 Amendment 1, ADR-269 Amendment 3).
 // 4. Attribute each element to stroke color, falling back to visible fill
 //    color for fill-only logo artwork. Colors cascade from presentation
 //    attributes, <style> rules and the style attribute; an unset fill is

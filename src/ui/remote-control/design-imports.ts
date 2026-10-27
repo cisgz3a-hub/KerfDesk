@@ -84,7 +84,7 @@ export async function prepareSvgImport(
 }
 
 /**
- * File > Import's SVG parse (ADR-269 Amendment 2): the document import worker, which sanitises
+ * File > Import's SVG parse (ADR-269 Amendment 3): the document import worker, which sanitises
  * first (scripts, foreignObject and external references are removed), cancelled with the request.
  */
 async function parseSvgInWorker(

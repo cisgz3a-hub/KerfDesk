@@ -105,7 +105,7 @@ const noticeMessages = (receipt: Record<string, unknown>) =>
   (receipt.notices as { message: string }[]).map((notice) => notice.message);
 
 beforeEach(() => {
-  // A remote DXF or SVG parses in its import worker (ADR-269 Amendments 1 and 2); the
+  // A remote DXF or SVG parses in its import worker (ADR-269 Amendments 1 and 3); the
   // desktop twin's text-only file parses on the main thread with the same parser.
   installImportWorkers();
   vi.stubGlobal('File', NodeFile);

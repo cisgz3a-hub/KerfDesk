@@ -1,5 +1,5 @@
 // An SVG that draws one `points`-point path `copies` times through <use>.
-// The <use> budget counts the points the copies place (ADR-269 Amendment 2),
+// The <use> budget counts the points the copies place (ADR-269 Amendment 3),
 // so 1,000 points copied 501 times is just past its 500,000-point floor.
 export function svgUseCopies(points: number, copies: number): string {
   const d = Array.from(
