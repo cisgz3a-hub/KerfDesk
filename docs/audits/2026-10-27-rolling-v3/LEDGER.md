@@ -13,6 +13,7 @@ Method: [../2026-10-21-rolling-v2/METHOD.md](../2026-10-21-rolling-v2/METHOD.md)
 | G5 | CNC changes | 9a2bf6b13 | [G5-cnc-delta.md](G5-cnc-delta.md) | 3 | 0 | 1 | 0 | 2 | 1 (G1-P3-1 extended) |
 | G6 | Camera and calibration | 9a2bf6b13 | [G6-camera-calibration.md](G6-camera-calibration.md) | 6 | 0 | 2 (P2-1, P2-3 raised) | 2 (P2-2 narrowed, P3-3 raised) | 2 | 5 (12-P3-3/4/5, G1-P3-2, G3-P3-2) |
 | G7 | App shell, licensing and remote | 9a2bf6b13 | [G7-app-shell-remote.md](G7-app-shell-remote.md) | 3 | 0 | 1 (P3-1 raised) | 0 | 2 | 3 (01-P2-5, 02-P3-4, 01-P2-3 relay redeploy) |
+| G8 | Release, CI and website | 9a2bf6b13 | [G8-release-ci-website.md](G8-release-ci-website.md) | 3 | 0 | 0 | 0 | 3 | 9 |
 
 ## v4 — workflow audit
 
