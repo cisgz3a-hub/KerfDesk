@@ -1,4 +1,5 @@
 import type { StreamerStatus } from '../../core/controllers/grbl';
+import { machineKindOf, type MachineKind } from '../../core/scene';
 import { SOFTWARE_ABORT_TITLE } from '../common/software-abort-copy';
 import {
   cncJobLaserModeEnabled,
@@ -18,6 +19,11 @@ import {
   type UnownedControllerMotion,
 } from '../state/unowned-controller-motion';
 import {
+  turnUnownedOutputOff,
+  unownedControllerOutput,
+  type UnownedControllerOutput,
+} from '../state/unowned-controller-output';
+import {
   streamProgressPercent,
   useLiveStreamProgress,
   type LiveStreamProgress,
@@ -29,7 +35,7 @@ import {
   PendingPauseResumeAction,
 } from './LiveMotionActionButton';
 import { pauseControlMessage, resumeControlTitle } from './job-control-copy';
-import { describeUnownedMotion } from './live-motion-unowned';
+import { describeUnowned } from './live-motion-unowned';
 import { controllerActionFailureHandler } from './report-controller-action-failure';
 
 const MAXIMUM_STACKING_ORDER = 2_147_483_647;
@@ -59,6 +65,8 @@ export function LiveMotionBar(): JSX.Element | null {
   const controllerHold = useLaserStore(selectControllerHold);
   const streamHold = useLaserStore((state) => state.streamHold ?? null);
   const unownedMotion = useLaserStore(unownedControllerMotion);
+  const machineKind = useStore((state) => machineKindOf(state.project.machine));
+  const unownedOutput = useLaserStore((state) => unownedControllerOutput(state, machineKind));
   const homingStateStuck = useLaserStore((state) => state.resetRequired === 'homing-state');
   const falconAirTimerHint = useStore(
     (state) => state.project.device.machineFamily === 'creality-falcon',
@@ -76,9 +84,13 @@ export function LiveMotionBar(): JSX.Element | null {
     falconAirTimerHint,
     unownedMotion,
     homingStateStuck,
+    unownedOutput,
   );
   if (description === null) return null;
-  const abort = description.abortLabel === 'LASER OFF' ? () => setFireActive(false) : stopJob;
+  const abort =
+    description.abortLabel === 'LASER OFF'
+      ? () => laserOff(fire !== null, setFireActive, machineKind)
+      : stopJob;
   return (
     <section aria-label="Live Motion" style={barStyle}>
       <div style={statusStyle} aria-live="polite">
@@ -211,6 +223,7 @@ function describeLiveMotion(
   falconAirTimerHint = false,
   unownedMotion: UnownedControllerMotion | null = null,
   homingStateStuck = false,
+  unownedOutput: UnownedControllerOutput | null = null,
 ): MotionDescription | null {
   if (isActiveJobStatus(streamProgress.status)) {
     return describeActiveJob(
@@ -246,10 +259,21 @@ function describeLiveMotion(
     };
   }
   // Motion the controller reports and nothing here owns, such as a Console
-  // G1, $J= or $H: Disconnect used to be its only stop (ADR-375 C-2).
-  return unownedMotion === null
-    ? null
-    : describeUnownedMotion(unownedMotion, controllerHold, homingStateStuck);
+  // G1, $J= or $H: Disconnect used to be its only stop (ADR-375 C-2). Then a
+  // laser it reports on at Idle, such as after a Console M3 (J2-P2-1).
+  return describeUnowned(unownedMotion, unownedOutput, controllerHold, homingStateStuck);
+}
+
+// LASER OFF puts out a latched Fire, or else the laser the controller reports
+// on with no owner here, read at the click.
+function laserOff(
+  fireLatched: boolean,
+  setFireActive: LaserState['setFireActive'],
+  machineKind: MachineKind,
+): Promise<void> {
+  return fireLatched
+    ? setFireActive(false)
+    : turnUnownedOutputOff(useLaserStore.getState(), machineKind);
 }
 
 type FireLatch = 'momentary' | 'laser-dot';

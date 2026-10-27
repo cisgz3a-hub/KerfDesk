@@ -114,6 +114,49 @@ describe('ErrorBoundary', () => {
     expect(buttons).toContain('Try again');
   });
 
+  // Rolling audit v5 J2-P2-3: a refusal thrown before any write is a failure too.
+  it('shows a crash-screen ABORT that throws, and clears it when a retry succeeds', async () => {
+    const trigger = vi
+      .fn<() => Promise<void>>()
+      .mockImplementationOnce(() => {
+        throw new Error('Connect to the laser first');
+      })
+      .mockResolvedValueOnce(undefined);
+    act(() => {
+      root.render(
+        <ErrorBoundary softwareAbort={{ isMotionLive: () => true, trigger }}>
+          <Boom shouldThrow={true} />
+        </ErrorBoundary>,
+      );
+    });
+    const abort = Array.from(container.querySelectorAll('button')).find(
+      (b) => b.textContent === 'ABORT',
+    );
+    act(() => {
+      abort?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(container.querySelector('p[role="alert"]')?.textContent).toBe(
+      'ABORT failed: Connect to the laser first. Use the physical E-stop or power cutoff now if ' +
+        'the machine may still be moving or the laser on.',
+    );
+    await act(async () => abort?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    expect(trigger).toHaveBeenCalledTimes(2);
+    expect(container.querySelector('p[role="alert"]')).toBeNull();
+  });
+
+  // A host that throws must not take the crash screen with it (v4 H2-P3-1).
+  it('keeps the crash screen when a crash host throws', () => {
+    act(() => {
+      root.render(
+        <ErrorBoundary crashHosts={<Boom shouldThrow={true} />}>
+          <Boom shouldThrow={true} />
+        </ErrorBoundary>,
+      );
+    });
+    expect(container.textContent).toContain('Something broke');
+    expect(container.textContent).toContain('Try again');
+  });
+
   // Audit 27-P2-2: the project lives in a store, so the crash screen can save it.
   it('offers Save for unsaved work and reports how it went', async () => {
     let finish: (result: 'saved' | 'cancelled' | 'failed') => void = () => undefined;

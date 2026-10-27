@@ -1900,7 +1900,9 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - `Cmd/Ctrl+.` — Request the controller-specific software Abort (Phase B). With no job running
   it aborts a running Home, Probe or Auto-focus the same way, turns a latched Fire off
   (ADR-362), and stops motion or a hold the controller reports that nothing in KerfDesk started,
-  as **ABORT MOTION** does (ADR-375).
+  as **ABORT MOTION** does (ADR-375). On a laser profile it turns off a laser the controller
+  reports on at Idle with nothing in KerfDesk running it, as **LASER OFF** does (ADR-375
+  Amendment 9).
 - `PageUp` / `PageDown` — Jog Z. When a scrolling list, tab panel or the Artwork panel has focus,
   the keys scroll it instead (ADR-362). Only the dedicated keys jog Z: the keypad's 9 / 3 never do,
   even with Num Lock off, when they send PageUp / PageDown (ADR-493 Amendment 1).
@@ -3168,10 +3170,12 @@ authorization, Frame proof, controller command, or safety boundary.
   only a stop nobody requested reads as unexplained. A recovery card another window has
   claimed, started or discarded refreshes in every open window.
 - Every stop that throws the controller's planner away steps the automatic restart back over the
-  moves it still had queued: Abort, a rejected line, a reboot, the reset KerfDesk sends when the
-  stream stalls or a job write fails, and the Abort the app sends as it closes. A run left active
-  by a crash, reload or power loss steps back over its controller's whole planner from the
-  progress last saved. The restart hint names the bound (ADR-398 Amendment 5).
+  moves it still had queued: Abort, a rejected line, a reboot, the reset KerfDesk sends to a
+  GRBL, grblHAL or FluidNC controller when the stream stalls or a job write fails, and the Abort
+  the app sends as it closes. Marlin's stall stop is the exception: its `M410` drops the planner
+  but records no step back. A run left active by a crash, reload or power loss steps back over
+  its controller's whole planner from the progress last saved. The restart hint names the bound,
+  and the record's cause says whether the app restarted (ADR-398 Amendment 5).
 - **Start from line… → Choose restart point…** prepares the current project and opens the
   same route picker when a saved exact artifact is unavailable. This manual path requires the
   original work zero and preserves its existing disclosure that it creates no recovery record.
@@ -6325,11 +6329,14 @@ and lifts the command's CNC-only gate.)*
    `M0`, and its review warns.
 3. A one-cutter job, or an older prepared Save with no per-bit files, stays a single file.
 4. Run G-code file treats the gap between per-bit files (and a tile's bit files) as a bit change
-   (ADR-392 Amendment 4). When a file headed `; bit N of M` stops streaming, Work Z goes, so the
-   next file's CNC Frame offers Zero Z or refuses until the new bit is zeroed or probed. Until the
-   last bit's file has run, Set and Reset origin and the XYZ corner probe are refused as in an
-   `M0` hold; Zero Z and the Z probe stay open. The machine panel says which bit ran and offers
-   **End bit sequence** for starting over on new stock. A new controller session ends it too.
+   (ADR-392 Amendment 4). The `; bit N of M` line is read from the file's leading comments, where
+   a tile writes it below its metadata header. When such a file has run or failed, or once the
+   controller is Idle again after an Abort or alarm stopped it (ADR-392 Amendment 5), Work Z
+   goes, so the next file's CNC Frame offers Zero Z or refuses until the new bit is zeroed or
+   probed. Until the last bit's file has run, Set and Reset origin and the XYZ corner probe are
+   refused as in an `M0` hold; Zero Z and the Z probe stay open. The machine panel says which
+   bit ran and offers **End bit sequence** for starting over on new stock. A new controller
+   session ends it too.
 5. On a profile whose controller cannot run KerfDesk CNC jobs, saving the package gives the
    GRBL-family warning Save as gives, and the printed sheet carries it (ADR-399 Amendment 1).
 6. Save as of a multi-bit job writes one file with an `M0` per bit change and adds a note saying
@@ -6629,6 +6636,10 @@ and lifts the command's CNC-only gate.)*
    or smaller grid), the save names those files once the set is written. It leaves
    earlier files intact. If the folder cannot be checked, a warning asks the operator
    to check that only this save's files are cut (ADR-668).
+   A save that stops at a failed write (a full disk, a lost permission) says the set
+   is incomplete and to save it again before cutting, and names as an error every
+   file of this save's names it did not replace, which still holds the earlier save
+   (ADR-656 Amendment 3).
    A ramp entry kept as a plunge because its source path is shorter than one
    cut width or cannot descend at coordinate precision remains disclosed in
    each affected tile's G-code header, including tabbed path3d output. Split

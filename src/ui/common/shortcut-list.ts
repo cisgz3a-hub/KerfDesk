@@ -141,7 +141,10 @@ export function shortcutFamilies(
       family: machineDisplayName(machineKind),
       rows: [
         { keys: 'Ctrl+Enter', action: 'start job' },
-        { keys: 'Ctrl+.', action: 'abort the job or machine motion, or turn a latched Fire off' },
+        {
+          keys: 'Ctrl+.',
+          action: 'abort the job or machine motion, or turn off a latched Fire or a laser left on',
+        },
         ...JOG_SHORTCUT_ROWS,
       ],
     },
