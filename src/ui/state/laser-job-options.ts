@@ -1,4 +1,5 @@
 import type { CreateStreamerOptions } from '../../core/controllers/grbl';
+import type { KerfDeskBitFile } from '../../core/external-program/kerfdesk-bit-file';
 import type { MachineConfig, MachineKind } from '../../core/scene';
 import { normalizeGrblRxBufferBytes } from '../../core/grbl-streaming';
 import type { CanvasMotionPlan } from './canvas-motion-plan';
@@ -41,6 +42,9 @@ export type StartJobOptions = CreateStreamerOptions & {
   /** An opened program (ADR-630): the WCS and Work-Z records its own words may
    *  change are dropped as its stream is installed (Amendment 6). */
   readonly externalProgram?: boolean;
+  /** An opened program's per-bit header: its end is a bit change, as an M0
+   *  hold is (bit-file-sequence.ts, ADR-392 Amendment 4). */
+  readonly externalBitFile?: KerfDeskBitFile;
 };
 
 export function normalizeStartJobOptions(options: CreateStreamerOptions): CreateStreamerOptions {

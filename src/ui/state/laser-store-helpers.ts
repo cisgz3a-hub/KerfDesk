@@ -22,6 +22,7 @@ import { sessionScopedJobStateReset } from './laser-session-reset';
 import { liveCanvasLifecyclePatch } from './live-canvas-run';
 import type { LaserState } from './laser-store';
 import { initialControllerConnectionState } from './laser-controller-initial-state';
+import { bitFileSequenceXyOriginBlockMessage } from './bit-file-sequence';
 import {
   isWorkZEvidenceCurrentForStart,
   probePlateRemovalRequired,
@@ -105,8 +106,12 @@ export function setupBlockingJobCommandBlockMessage(state: LaserState): string |
 // which re-zeroes Z only. The rest of the job runs on the X/Y origin it started
 // with, and Continue cannot see an X/Y change, so every X/Y origin writer is
 // refused for the whole hold (controller audit v2 C2-P1-1, ADR-375 Amendment 3).
-export function toolChangeXyOriginBlockMessage(state: Pick<LaserState, 'streamer'>): string | null {
-  return state.streamer?.status === 'tool-change' ? TOOL_CHANGE_XY_ORIGIN_MESSAGE : null;
+// The gap between a set's per-bit files is a bit change too (ADR-392 Amendment 4).
+export function toolChangeXyOriginBlockMessage(
+  state: Pick<LaserState, 'streamer' | 'bitFileSequence'>,
+): string | null {
+  if (state.streamer?.status === 'tool-change') return TOOL_CHANGE_XY_ORIGIN_MESSAGE;
+  return bitFileSequenceXyOriginBlockMessage(state);
 }
 
 // Ready to touch off the new bit only when the pre-M0 retract/park has fully

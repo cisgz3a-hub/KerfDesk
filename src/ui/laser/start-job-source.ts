@@ -40,6 +40,7 @@ import { publishFramePreparationProgress } from '../state/frame-preparation-stor
 import type { FrameBoundsPreview } from './frame-bounds-preview';
 import type { FramePreparationMotionOwner } from './frame-preparation-motion-owner';
 import { machineSnapshot } from './start-machine-snapshot';
+import { withoutArchivedFirstBitAdvisory } from './cnc-recovery-start-bit';
 import { recoveryRefusalMessages, savedWorkOffsetMm } from './laser-recovery-origin';
 import type { WorkCoordinateOffset } from '../state/origin-actions';
 import { projectHasVariableData } from '../../core/variables/object-variable-template';
@@ -276,11 +277,12 @@ export function prepareArchivedRecoverySource(
     return null;
   }
   const project = artifact.prepared.project;
+  const machine = machineSnapshot(project, laser, useCameraStore.getState());
   const qualified = prepareStartJobFromPrepared(
     project,
     recoveredPrepared,
     laser.controllerSettings,
-    machineSnapshot(project, laser, useCameraStore.getState()),
+    machine,
     jobPlacementForArchivedArtifact(artifact),
     artifact.outputScope,
     artifact.jobOrigin,
@@ -306,7 +308,14 @@ export function prepareArchivedRecoverySource(
             reportedWorkPositionMm(laser, laser.controllerSettings?.reportInches === true) ??
               undefined,
           ),
-    warnings: qualified.warnings,
+    // Each CNC recovery flow checks Work Z against its own program's first bit
+    // instead (cnc-recovery-start-bit.ts, ADR-215 Amendment 2).
+    warnings: withoutArchivedFirstBitAdvisory(
+      qualified.warnings,
+      project,
+      recoveredPrepared.job,
+      machine.workZZeroEvidence,
+    ),
     controllerSnapshot: laser,
     laserModeStartSnapshot: captureLaserModeStartSnapshot(laser),
     laserResumeChain: artifact.laserResumeChain ?? [],

@@ -35,6 +35,8 @@ type SessionScopedState = FinishedJobState &
     | 'rxCapacityEvidence'
     | 'plannerCapacityEvidence'
     | 'positioningLightEnabled'
+    | 'bitFileRun'
+    | 'bitFileSequence'
   >;
 
 /**
@@ -96,5 +98,8 @@ export function sessionScopedJobStateReset(): SessionScopedState {
     rxCapacityEvidence: null,
     plannerCapacityEvidence: null,
     positioningLightEnabled: false,
+    // A set of per-bit files ends with the session that ran it (bit-file-sequence.ts).
+    bitFileRun: null,
+    bitFileSequence: null,
   };
 }
