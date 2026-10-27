@@ -76,6 +76,7 @@ import {
 } from './laser-transcript-buffer';
 import { invalidateSettingsForMpgTakeover } from './laser-settings-mpg-takeover';
 import { refreshedReportUnitsPatch, retainControllerReportUnits } from './controller-report-units';
+import { modalReportUnitsPatch } from './console-report-units';
 
 export type { GetFn, HandlerRefs, SetFn } from './laser-line-shared';
 
@@ -90,7 +91,7 @@ export function handleLine(
   flushStreamAcksBefore(set, get, refs, safeWrite, cls.kind);
   const state = get();
   recordInboundLine(set, refs, state, cls, line);
-  captureActiveWcsFromModalReport(set, line);
+  captureModalReport(set, refs, line);
   latchResetRequired(set, cls);
   invalidateSettingsForMpgTakeover(set, refs, state, cls);
   publishDetectedSettings(set, get, refs, cls);
@@ -230,12 +231,17 @@ function routeAcknowledgement(
 // mismatch advisory (C6) sees a G55-G59 frame left active by a $N startup block
 // or an external session. Additive: an owned command, if any, still consumes
 // the line separately for its own logic; a non-`[GC:]` line parses to null.
-function captureActiveWcsFromModalReport(set: SetFn, line: string): void {
+// Where the position reports follow the G-code units, the same report also
+// says which units they are in (console-report-units.ts).
+function captureModalReport(set: SetFn, refs: HandlerRefs, line: string): void {
   // Runs for every inbound line (incl. the job-stream ok flood); cheap
   // substring reject before the anchored regex keeps the hot path clear.
   if (!line.includes('[GC:')) return;
   const activeWcs = parseActiveWcsFromModalResponses([line]);
   if (activeWcs !== null) set({ activeWcs });
+  if (refs.driver.reportUnitsSelectedBy !== undefined) {
+    set((state) => modalReportUnitsPatch(state, line));
+  }
 }
 
 // `[MSG:Reset to continue]` (FluidNC: `[MSG:ERR: Reset to continue]`) follows a

@@ -25,6 +25,7 @@
 // read with `$G` before the next Frame selects G54 (frame-wcs-selection.ts,
 // audit CG-2).
 
+import type { ControllerDriver } from '../../core/controllers';
 import {
   commonConsoleStateEffect,
   scanConsoleWords,
@@ -33,6 +34,7 @@ import {
 import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
 import type { GcodeWordMatch } from '../../core/gcode/word-scan';
 import { wcsSelectedByLine } from './acknowledged-wcs';
+import { lineLeavesOtherReportUnits } from './console-report-units';
 import type { LaserState } from './laser-store';
 import { pushLog } from './laser-store-helpers';
 
@@ -84,12 +86,14 @@ export function externalProgramControllerEffects(
 export function externalProgramControllerStatePatch(
   state: LaserState,
   gcode: string,
+  driver?: Pick<ControllerDriver, 'reportUnitsSelectedBy'>,
 ): Partial<LaserState> {
   const effects = externalProgramControllerEffects(gcode, state.activeWcs);
   const parts = [
     wcsPart(state, effects),
     workZPart(state, effects),
     workOriginPart(state, effects),
+    reportUnitsPart(state, gcode, driver),
   ];
   const notes = parts.flatMap((part) => (part.note === null ? [] : [part.note]));
   const patch: Partial<LaserState> = Object.assign({}, ...parts.map((part) => part.patch));
@@ -129,6 +133,28 @@ function workOriginPart(state: LaserState, effects: ExternalProgramControllerEff
   return {
     patch: { workOriginVersion, workOriginActive: false, workOriginSource: 'none', wcoCache: null },
     note: 'it changes an X/Y offset, so the work origin set before it no longer applies',
+  };
+}
+
+// Smoothieware reports positions in the units the program selects and keeps
+// G20 through M2 and M30 (Robot.cpp L726-L734), so a program that may leave
+// other units than KerfDesk reads in hides the reported position until `$G`
+// or the next Frame names them, as a Console G20 does (console-report-units.ts,
+// rolling audit v3 G4-P1-2). A CAM header's G21 changes nothing.
+// https://github.com/Smoothieware/Smoothieware/blob/91fe4286e8ee19f062260abf094b315f9cf6bedf/src/modules/robot/Robot.cpp#L726-L734
+function reportUnitsPart(
+  state: LaserState,
+  gcode: string,
+  driver: Pick<ControllerDriver, 'reportUnitsSelectedBy'> | undefined,
+): StatePart {
+  if (driver?.reportUnitsSelectedBy === undefined) return NO_PART;
+  // Most programs name no units at all; one pass over the text says so.
+  if (driver.reportUnitsSelectedBy(gcode) === null) return NO_PART;
+  const lines = gcode.split('\n');
+  if (!lines.some((line) => lineLeavesOtherReportUnits(driver, line, state))) return NO_PART;
+  return {
+    patch: { reportUnitsUnconfirmed: true, wcoCache: null },
+    note: 'it may change the units the controller reports positions in, so the machine position stays hidden until $G or the next Frame names them',
   };
 }
 

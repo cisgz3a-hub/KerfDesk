@@ -23,6 +23,7 @@ import {
 import { prepareSmoothieConsoleCommand } from './console-command';
 import { smoothieHomeVerification } from './home-verification';
 import { smoothieLaserModuleProbe } from './laser-module';
+import { smoothieReportUnitsSelectedBy } from './report-units';
 import { classifySmoothieResponse } from './response';
 
 export const SMOOTHIE_DEFAULT_BAUD_RATE = 115200;
@@ -116,4 +117,6 @@ export const smoothiewareDriver: ControllerDriver = {
   laserModuleProbe: smoothieLaserModuleProbe,
   // `$H` answers `ok` whether or not anything homed (audit SM-6).
   homeVerification: smoothieHomeVerification,
+  // MPos and WPos are in the G20/G21 units (report-units.ts).
+  reportUnitsSelectedBy: smoothieReportUnitsSelectedBy,
 };
