@@ -12,6 +12,7 @@ import type { RgbaImage } from '../../core/camera/rgba-image';
 import type { CameraCaptureBinding } from '../../core/camera/camera-capture-binding';
 import type { SurfaceHeightArea } from '../../core/camera/model/height-areas';
 import type { BedArea } from '../../core/camera/model/camera-model-accuracy';
+import type { CameraBedFrame } from '../../core/camera/model/camera-bed-frame';
 import type { CameraAdapter, CameraDevice } from '../../platform/types';
 import {
   createCameraSourceActions,
@@ -104,10 +105,19 @@ export type HeightAreaPatch = Partial<Omit<SurfaceHeightArea, 'id'>>;
 
 export type BedPicture = {
   readonly image: RgbaImage;
-  /** The part of the bed pictured, scene mm. */
+  /** The part of the bed pictured, scene mm in `taken.bedFrame`. */
   readonly region: BedArea;
   /** The surface height the pictures were flattened at, mm. */
   readonly surfaceHeightMm: number;
+  /** Where `region` lies on the bed: it is drawn moved with the bed, or dropped (ADR-440 Amendment 5). */
+  readonly taken: BedPictureTaken;
+};
+
+/** The bed frame and machine a bed picture's scene millimetres belong to. */
+export type BedPictureTaken = {
+  readonly bedFrame: CameraBedFrame;
+  /** The machine profile's id, or its name when it has none. */
+  readonly machine: string;
 };
 
 // Reselection policy on a device-list refresh: keep a still-valid deliberate

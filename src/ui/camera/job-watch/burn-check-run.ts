@@ -133,6 +133,7 @@ export function compareAfterPicture(
       image: burnCheckPicture(picture.image, pixels),
       region: watch.region,
       surfaceHeightMm: watch.camera.surfaceHeightMm,
+      taken: watch.camera.taken,
     },
   };
 }

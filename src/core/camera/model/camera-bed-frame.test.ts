@@ -8,9 +8,11 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, toMachineCoords, type DeviceProfile } from '../../devices';
 import {
+  bedAreaInBedFrame,
   bedFrameShift,
   cameraBedFrameNote,
   cameraModelInBedFrame,
+  sameBedPlaces,
   sceneInBedFrame,
   UNVERIFIED_FRAME_NOTE,
   withConfirmedBedFrame,
@@ -215,5 +217,33 @@ describe('saving the frame with the calibration', () => {
     expect(
       normalizeCameraModelRecord({ ...older, bedFrame: { origin: 'upside-down', bedWidthMm: 1 } }),
     ).toBeUndefined();
+  });
+});
+
+// ADR-440 Amendment 5: a canvas target remembered at its add, and a flat bed
+// picture, hold their scene millimetres only while the bed places stay put.
+describe('places on the bed in two frames', () => {
+  const homed: CameraBedFrame = { ...FRONT_LEFT_400, nativeToBedOffsetMm: { x: 0, y: 0 } };
+
+  it('are the same while only an unknown native offset differs', () => {
+    expect(sameBedPlaces(FRONT_LEFT_400, FRONT_LEFT_400)).toBe(true);
+    expect(sameBedPlaces(FRONT_LEFT_400, homed)).toBe(true);
+    expect(sameBedPlaces(FRONT_LEFT_400, { ...FRONT_LEFT_400, bedHeightMm: 410 })).toBe(false);
+    expect(sameBedPlaces(homed, { ...homed, nativeToBedOffsetMm: { x: 0, y: 4 } })).toBe(false);
+    expect(sameBedPlaces(FRONT_LEFT_400, { ...FRONT_LEFT_400, origin: 'rear-left' })).toBe(false);
+  });
+
+  it('move an area with the bed, or give none after an origin change', () => {
+    const area = { x: 100, y: 100, width: 50, height: 50 };
+    const now: CameraBedFrame = { ...FRONT_LEFT_400, bedHeightMm: 410 };
+    const moved = bedAreaInBedFrame(area, FRONT_LEFT_400, now);
+    expect(moved).toEqual({ ...area, y: 110 });
+    // Its corner showed machine (100, 300), and still does.
+    if (moved === null) return;
+    expect(toMachineCoords(area, device(FRONT_LEFT_400))).toEqual({ x: 100, y: 300 });
+    expect(toMachineCoords(moved, device(now))).toEqual({ x: 100, y: 300 });
+    expect(
+      bedAreaInBedFrame(area, FRONT_LEFT_400, { ...FRONT_LEFT_400, origin: 'rear-left' }),
+    ).toBeNull();
   });
 });

@@ -10,7 +10,7 @@ import { useCameraStore } from '../../state/camera-store';
 import { cameraBedFrameNow, modelInBedFrame } from '../camera-bed-frame-now';
 import { cameraSourceIdentity } from '../frame-source';
 import { headPositionNow } from '../head/head-position';
-import { currentAssumedTarget } from './assumed-target';
+import { currentAssumedTarget, type AssumedTarget } from './assumed-target';
 import { photographTarget } from './calibration-actions';
 import {
   useCameraCalibrationStore,
@@ -60,6 +60,9 @@ export function useCalibrationPhoto(): CalibrationPhotoControls {
     const wizard = useCameraCalibrationStore.getState();
     if (!mounted.current || !wizard.open || camera.sourceState.kind !== 'live') return;
     discard(runRef);
+    // The layout the wizard shows as assumed, remembered from the engraving when known.
+    const assumed = currentAssumedTarget();
+    if (refused(assumed)) return;
     // Only this camera's own calibration is compared; another camera's stays saved.
     const saved = ownModelFor(app.project.device, cameraSourceIdentity(camera.sourceState.source));
     const run: PhotoRun = {
@@ -80,8 +83,6 @@ export function useCalibrationPhoto(): CalibrationPhotoControls {
     };
     runRef.current = run;
     wizard.setStep(run.step);
-    // The layout the wizard shows as assumed, remembered from the engraving when known.
-    const assumed = currentAssumedTarget();
     // The head is read in today's frame; the fit is in the frame the rings were
     // placed in, and the saved calibration is measured in that frame too.
     const head = wizard.settings.headCamera ? headPositionNow() : null;
@@ -115,6 +116,15 @@ export function useCalibrationPhoto(): CalibrationPhotoControls {
     cancel: () => discard(runRef),
     save: (result) => saveCurrent(runRef, result),
   };
+}
+
+// A layout no photo may be fitted to says why instead (ADR-440 Amendment 5).
+function refused(assumed: AssumedTarget): boolean {
+  if (assumed.refusal === undefined) return false;
+  useCameraCalibrationStore
+    .getState()
+    .setStep({ kind: 'photo', status: { kind: 'failed', message: assumed.refusal } });
+  return true;
 }
 
 function headInTargetFrame(head: Vec2, target: CameraBedFrame): Vec2 {

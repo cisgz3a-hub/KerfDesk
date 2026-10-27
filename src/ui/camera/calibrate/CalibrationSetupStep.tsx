@@ -158,13 +158,18 @@ function TargetActions(props: {
         Target already engraved looks for {assumed.description}.
         {assumed.source === 'settings' ? correctionHint(settings.headCamera) : null}
       </p>
+      {assumed.refusal === undefined ? null : <p style={errStyle}>{assumed.refusal}</p>}
       {connected ? null : (
         <p style={noteStyle}>
           Connect the machine to engrave from here, add the target to the canvas to engrave it like
           any job, or use a target engraved earlier.
         </p>
       )}
-      <TargetPlacementNote connected={connected} />
+      <PlacementNote
+        connected={connected}
+        home={HOME_BEFORE_TARGET_NOTE}
+        noHoming={NO_HOMING_TARGET_NOTE}
+      />
       {props.note === null ? null : <p style={errStyle}>{props.note}</p>}
       <div style={rowStyle}>
         <button
@@ -208,10 +213,18 @@ function AddTargetToCanvasButton(props: { readonly settings: CalibrationSettings
   );
 }
 
-function TargetPlacementNote(props: { readonly connected: boolean }): JSX.Element | null {
+/**
+ * The home-first advice for a burn that a camera fit is measured on: the
+ * target here, the nudge ring too (ADR-440 Amendment 5).
+ */
+export function PlacementNote(props: {
+  readonly connected: boolean;
+  readonly home: string;
+  readonly noHoming: string;
+}): JSX.Element | null {
   const homingEnabled = useStore((s) => s.project.device.homing.enabled);
   const homed = useLaserStore((s) => s.homingState === 'confirmed');
-  const note = targetPlacementNote(props.connected, homingEnabled, homed);
+  const note = placementNote(props, homingEnabled, homed);
   return note === null ? null : (
     <p role="status" style={homingEnabled ? warnStyle : noteStyle}>
       {note}
@@ -228,16 +241,16 @@ export const HOME_BEFORE_TARGET_NOTE =
 export const NO_HOMING_TARGET_NOTE =
   'This machine has no homing, so the camera lines up only while the controller keeps the zero it has when the target is engraved.';
 
-// The target runs at Absolute coordinates, which name a fixed place on the bed
+// The burn runs at Absolute coordinates, which name a fixed place on the bed
 // only once the machine is homed (ADR-441 Amendment 5). Advice, not a gate.
-function targetPlacementNote(
-  connected: boolean,
+function placementNote(
+  notes: { readonly connected: boolean; readonly home: string; readonly noHoming: string },
   homingEnabled: boolean,
   homed: boolean,
 ): string | null {
-  if (!connected) return null;
-  if (!homingEnabled) return NO_HOMING_TARGET_NOTE;
-  return homed ? null : HOME_BEFORE_TARGET_NOTE;
+  if (!notes.connected) return null;
+  if (!homingEnabled) return notes.noHoming;
+  return homed ? null : notes.home;
 }
 
 // The rings are matched to the layout the settings describe, so a target

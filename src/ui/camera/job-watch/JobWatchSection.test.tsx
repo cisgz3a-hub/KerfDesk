@@ -77,6 +77,10 @@ describe('JobWatchSection', () => {
       image: { data: new Uint8ClampedArray(4), width: 1, height: 1 },
       region: { x: 10, y: 10, width: 1, height: 1 },
       surfaceHeightMm: 0,
+      taken: {
+        bedFrame: { origin: 'front-left' as const, bedWidthMm: 400, bedHeightMm: 400 },
+        machine: 'generic-grbl-400x400',
+      },
     };
     useJobWatchStore.setState({ burnCheck: { kind: 'done', report, picture } });
     const host = await mountSection();

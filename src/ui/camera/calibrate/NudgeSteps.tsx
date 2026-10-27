@@ -8,6 +8,7 @@ import { NUDGE_LIMIT_MM, NUDGE_NOTHING_MM, nudgeSizeMm } from '../../../core/cam
 import { useCameraStore } from '../../state/camera-store';
 import { useLaserStore } from '../../state/laser-store';
 import { useToastStore } from '../../state/toast-store';
+import { cameraBedFrameNow } from '../camera-bed-frame-now';
 import { CameraSourceView } from '../CameraSourceView';
 import {
   useCameraCalibrationStore,
@@ -16,7 +17,7 @@ import {
 } from './camera-calibration-store';
 import { engraveNudgeRing, nudgeRingCentre } from './nudge-actions';
 import type { NudgePhotoControls } from './use-nudge-photo';
-import { NumberField } from './CalibrationSetupStep';
+import { NumberField, PlacementNote } from './CalibrationSetupStep';
 import { columnStyle, errStyle, noteStyle, rowStyle } from './wizard-styles';
 
 export function NudgeSetupStep(props: { readonly note: string | null }): JSX.Element {
@@ -30,11 +31,14 @@ export function NudgeSetupStep(props: { readonly note: string | null }): JSX.Ele
     const earlierJob = useLaserStore.getState().streamer;
     const pending: CalibrationStep = { kind: 'engraving', started: false, earlierJob };
     setStep(pending);
+    // The frame the ring is placed in, which says whether the bed position was known.
+    const bedFrame = cameraBedFrameNow();
     const started = await engraveNudgeRing(settings);
     const wizard = useCameraCalibrationStore.getState();
     // The temporary job may finish preparing after this wizard was replaced.
     // Minimize keeps the same step; close/reopen and a new mode do not.
     if (!wizard.open || wizard.mode !== 'nudge' || wizard.step !== pending) return;
+    if (started) useCameraCalibrationStore.setState({ nudgeRingBedFrame: bedFrame });
     setStep(
       started
         ? { kind: 'engraving', started: true, earlierJob }
@@ -88,6 +92,11 @@ export function NudgeSetupStep(props: { readonly note: string | null }): JSX.Ele
       {connected ? null : (
         <p style={noteStyle}>Connect the machine to burn, or use a ring burned earlier.</p>
       )}
+      <PlacementNote
+        connected={connected}
+        home={HOME_BEFORE_NUDGE_NOTE}
+        noHoming={NO_HOMING_NUDGE_NOTE}
+      />
       {props.note === null ? null : <p style={errStyle}>{props.note}</p>}
     </div>
   );
@@ -137,9 +146,17 @@ export function NudgePhotoStep(props: {
   );
 }
 
+export const HOME_BEFORE_NUDGE_NOTE =
+  'Home the machine before burning the ring. Until it is homed, the ring is placed from wherever the head was when the machine was switched on, so the fix would hold only until the next Home.';
+export const NO_HOMING_NUDGE_NOTE =
+  'This machine has no homing, so the fix holds only while the controller keeps the zero it has when the ring is burned.';
+export const RING_BED_UNKNOWN_NOTE =
+  'This ring was burned before KerfDesk knew where the machine coordinates sit on the bed (the machine was not homed, or its settings were not read), so the offset may include where the head was at power-on. Home the machine and burn the ring again for a lasting fix. A fix made now is marked in the Camera panel as made before the bed position was known.';
+
 export function NudgeResultStep(props: {
   readonly offsetMm: Vec2;
   readonly apply: NudgePhotoControls['apply'];
+  readonly ringBedUnknown?: boolean;
 }): JSX.Element {
   const closeWizard = useCameraCalibrationStore((s) => s.closeWizard);
   const openWizard = useCameraCalibrationStore((s) => s.openWizard);
@@ -166,6 +183,11 @@ export function NudgeResultStep(props: {
       <p style={tooBig ? warnStyle : okStyle}>
         The picture is {size.toFixed(1)} mm off: {offsetWords(props.offsetMm)}.
       </p>
+      {props.ringBedUnknown === true ? (
+        <p role="status" style={warnNoteStyle}>
+          {RING_BED_UNKNOWN_NOTE}
+        </p>
+      ) : null}
       {tooBig ? (
         <p style={noteStyle}>
           That is more than a small offset: the camera or its lid has moved. Calibrate again so the
@@ -254,3 +276,4 @@ const warnStyle: React.CSSProperties = {
   fontWeight: 600,
   color: 'var(--lf-warning-fg)',
 };
+const warnNoteStyle: React.CSSProperties = { ...noteStyle, color: 'var(--lf-warning-fg)' };

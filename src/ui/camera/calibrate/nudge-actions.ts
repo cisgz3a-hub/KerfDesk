@@ -4,10 +4,19 @@
 // camera fixed above the bed is nudged: a head camera's picture is placed by
 // where the head is (ADR-449), and its own Check measures it there.
 
-import { cameraBedFrameNote } from '../../../core/camera/model/camera-bed-frame';
+import {
+  cameraBedFrameNote,
+  type CameraBedFrame,
+} from '../../../core/camera/model/camera-bed-frame';
 import { isHeadCameraModel } from '../../../core/camera/model/head-camera';
 import type { Vec2 } from '../../../core/camera/model/camera-model';
-import { measureNudge, nudgedCameraModel } from '../../../core/camera/model/nudge';
+import {
+  measureNudge,
+  nudgedCameraModel,
+  nudgeRingBeforeBedWasKnown,
+  withUnknownNativeOffset,
+  type NudgeMeasure,
+} from '../../../core/camera/model/nudge';
 import { withSavedCameraModel } from '../../../core/camera/model/saved-cameras';
 import { toGrayImage } from '../../../core/camera/gray';
 import { detectRingMarks } from '../../../core/camera/target/ring-detect';
@@ -56,13 +65,20 @@ export async function engraveNudgeRing(
 }
 
 export type NudgePhotoOutcome =
-  | { readonly kind: 'ok'; readonly offsetMm: Vec2 }
+  | {
+      readonly kind: 'ok';
+      readonly offsetMm: Vec2;
+      /** The ring was burned before the bed position was known (nudgeRingBeforeBedWasKnown). */
+      readonly ringBedUnknown?: true;
+    }
   | { readonly kind: 'failed'; readonly message: string };
 
 /** Find the burned ring in a new photo and say how far the picture is from it. */
 export async function photographNudgeRing(args: {
   readonly source: ActiveCameraSource;
   readonly sheetThicknessMm: number;
+  /** The bed frame as the ring started burning; the frame now for a ring burned earlier. */
+  readonly ringBedFrame?: CameraBedFrame;
   readonly capture?: typeof captureSourceFrame;
   readonly signal?: AbortSignal;
 }): Promise<NudgePhotoOutcome> {
@@ -88,9 +104,21 @@ export async function photographNudgeRing(args: {
     burnedAtMm,
     heightMm: args.sheetThicknessMm,
   });
+  const ringBedUnknown = nudgeRingBeforeBedWasKnown(
+    model.bedFrame,
+    args.ringBedFrame ?? cameraBedFrameNow(),
+  );
+  return nudgeOutcome(measure, ringBedUnknown);
+}
+
+function nudgeOutcome(measure: NudgeMeasure, ringBedUnknown: boolean): NudgePhotoOutcome {
   switch (measure.kind) {
     case 'found':
-      return { kind: 'ok', offsetMm: measure.offsetMm };
+      return {
+        kind: 'ok',
+        offsetMm: measure.offsetMm,
+        ...(ringBedUnknown ? { ringBedUnknown: true as const } : {}),
+      };
     case 'ambiguous':
       return {
         kind: 'failed',
@@ -116,16 +144,19 @@ function unusableCalibrationReason(): string | null {
 
 /**
  * Move the running camera's saved calibration by `offsetMm` (one undo step)
- * and show a fresh picture with it. False when there is no such calibration.
+ * and show a fresh picture with it. A ring burned before the bed position was
+ * known leaves the calibration flagged as such (ADR-440 Amendment 5). False
+ * when there is no such calibration.
  */
-export function applyNudge(offsetMm: Vec2): boolean {
+export function applyNudge(offsetMm: Vec2, ringBedUnknown = false): boolean {
   const { project, updateDeviceProfile } = useStore.getState();
   const { sourceState } = useCameraStore.getState();
   // Never another camera's calibration: with no camera running, "own" is just the newest.
   if (sourceState.kind !== 'live') return false;
   const own = ownCameraModel(project.device, sourceState);
   if (own === undefined || isHeadCameraModel(own)) return false;
-  const nudged = nudgedCameraModel(own, offsetMm);
+  const moved = nudgedCameraModel(own, offsetMm);
+  const nudged = ringBedUnknown ? withUnknownNativeOffset(moved) : moved;
   updateDeviceProfile(withSavedCameraModel(project.device, nudged));
   const owner = useStore.getState();
   // Keep the refreshed frame itself; a second asynchronous capture could

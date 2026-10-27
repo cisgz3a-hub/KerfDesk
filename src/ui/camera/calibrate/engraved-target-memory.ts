@@ -5,7 +5,9 @@
 // from the defaults after every restart, matched a target engraved with
 // another margin to the wrong bed positions. The bed frame it was engraved in
 // goes with it, so a calibration from it records that frame (rolling audit
-// 12-P2-2). Unreadable storage means nothing is remembered.
+// 12-P2-2). A target put on the canvas burns later, through an ordinary Start,
+// so its frame is taken again at that Start (ADR-440 Amendment 5). Unreadable
+// storage means nothing is remembered.
 
 import {
   normalizeCameraBedFrame,
@@ -28,6 +30,12 @@ export type EngravedTarget = {
   readonly bedFrame?: CameraBedFrame;
   /** Put on the canvas for the operator to engrave, rather than engraved by the wizard. */
   readonly onCanvas?: true;
+  /**
+   * A target put on the canvas whose rings a Start from this computer streamed:
+   * `bedFrame` and `engravedAt` are that Start's. Without it, `bedFrame` is the
+   * frame when the target was added, which holds only while Machine Setup does.
+   */
+  readonly burnSeen?: true;
   /** Outer diameter of its rings, mm; absent on targets remembered before ring sizes (10 mm). */
   readonly ringDiameterMm?: number;
 };
@@ -164,10 +172,12 @@ function parseTarget(value: unknown): EngravedTarget | null {
 // How the target was placed and how large its rings are, when remembered.
 function targetExtras(
   value: Record<string, unknown>,
-): Pick<EngravedTarget, 'onCanvas' | 'ringDiameterMm'> {
+): Pick<EngravedTarget, 'onCanvas' | 'burnSeen' | 'ringDiameterMm'> {
   const ring = value['ringDiameterMm'];
+  const onCanvas = value['onCanvas'] === true;
   return {
-    ...(value['onCanvas'] === true ? { onCanvas: true as const } : {}),
+    ...(onCanvas ? { onCanvas: true as const } : {}),
+    ...(onCanvas && value['burnSeen'] === true ? { burnSeen: true as const } : {}),
     ...(isFiniteNumber(ring) && ring > 0 ? { ringDiameterMm: ring } : {}),
   };
 }

@@ -11,6 +11,17 @@ export type ProjectBedReconciliationNotice = {
   readonly openedBed: { readonly width: number; readonly height: number };
   readonly workspaceMismatch: boolean;
   readonly machineChanged: boolean;
+  /** The same profile id and name, so only the bed size tells the two apart (ADR-440 Amendment 5). */
+  readonly bedSizeOnly: boolean;
+  /** The opened machine's camera calibration differs from the current one's; null when not. */
+  readonly camera: CameraCalibrationChange | null;
+};
+
+export type CameraCalibrationChange = {
+  /** When the file's calibration was made; null when it brings none. */
+  readonly openedCalibratedAt: string | null;
+  /** When the current machine's calibration was made; null when it has none. */
+  readonly currentCalibratedAt: string | null;
 };
 
 export function canonicalizeOpenedProjectBed(
@@ -48,7 +59,27 @@ export function canonicalizeOpenedProjectBed(
       openedBed,
       workspaceMismatch,
       machineChanged,
+      bedSizeOnly: machineChanged && sameProfile(project.device, previous.device),
+      camera: machineChanged ? cameraCalibrationChange(project.device, previous.device) : null,
     },
+  };
+}
+
+function sameProfile(a: DeviceProfile, b: DeviceProfile): boolean {
+  return (a.profileId ?? '') === (b.profileId ?? '') && a.name === b.name;
+}
+
+// A file for another machine brings its calibration (ADR-440 Amendment 3
+// Decision 4), so the notice names the swap when there is one.
+function cameraCalibrationChange(
+  opened: DeviceProfile,
+  current: DeviceProfile,
+): CameraCalibrationChange | null {
+  if (!hasCameraCalibration(opened) && !hasCameraCalibration(current)) return null;
+  if (sameValue(cameraFields(opened), cameraFields(current))) return null;
+  return {
+    openedCalibratedAt: opened.cameraModel?.calibratedAt ?? null,
+    currentCalibratedAt: current.cameraModel?.calibratedAt ?? null,
   };
 }
 

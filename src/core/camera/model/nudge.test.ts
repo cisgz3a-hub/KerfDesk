@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import { cameraBedFrameNote, UNVERIFIED_FRAME_NOTE, type CameraBedFrame } from './camera-bed-frame';
 import { bedPoint, pixelToBed, projectWorldPoint } from './camera-model';
+import type { CameraModelRecord } from './camera-model-record';
 import { overheadPose, savedCameraModel, wideLens } from './model-fixtures';
-import { measureNudge, nudgedCameraModel, nudgeSizeMm, NUDGE_SEARCH_MM } from './nudge';
+import {
+  measureNudge,
+  nudgedCameraModel,
+  nudgeRingBeforeBedWasKnown,
+  nudgeSizeMm,
+  NUDGE_SEARCH_MM,
+  withUnknownNativeOffset,
+} from './nudge';
 
 const lens = wideLens();
 const pose = overheadPose();
@@ -86,5 +95,40 @@ describe('nudgedCameraModel', () => {
     const seen = pixelToBed(nudged.lens, nudged.pose, ring, 0);
     expect(seen?.x).toBeCloseTo(burnedAtMm.x, 6);
     expect(seen?.y).toBeCloseTo(burnedAtMm.y, 6);
+  });
+});
+
+// Rolling audit v3 G6-P3-3 (ADR-440 Amendment 5): a ring burned before the
+// machine was homed sits wherever Absolute coordinates were that session. A
+// 4 mm fix of a calibration placed with the native offset known folded that
+// in, and the Camera panel's "before KerfDesk knew" note never fired.
+describe('a nudge on a ring burned before the bed position was known', () => {
+  const fitted: CameraBedFrame = { origin: 'front-left', bedWidthMm: 400, bedHeightMm: 400 };
+  const homed: CameraBedFrame = { ...fitted, nativeToBedOffsetMm: { x: 0, y: 0 } };
+  const calibrated: CameraModelRecord = { ...savedCameraModel(), bedFrame: homed };
+
+  it('is told apart from one burned homed', () => {
+    expect(nudgeRingBeforeBedWasKnown(homed, fitted)).toBe(true);
+    expect(nudgeRingBeforeBedWasKnown(homed, homed)).toBe(false);
+    // Calibrated unhomed already carries the note; the ring adds nothing.
+    expect(nudgeRingBeforeBedWasKnown(fitted, fitted)).toBe(false);
+    expect(nudgeRingBeforeBedWasKnown(undefined, fitted)).toBe(false);
+  });
+
+  it('keeps the move and says, once homed, that the bed position was not known', () => {
+    const nudged = nudgedCameraModel(calibrated, { x: 4, y: 0 });
+    // The refuter's repro: no note at all.
+    expect(cameraBedFrameNote(nudged, homed)).toBeNull();
+    const flagged = withUnknownNativeOffset(nudged);
+    expect(flagged.bedFrame).toEqual(fitted);
+    expect(flagged.pose).toBe(nudged.pose);
+    expect(cameraBedFrameNote(flagged, homed)?.message).toBe(UNVERIFIED_FRAME_NOTE);
+    // Still the 4 mm move the photo measured.
+    const pixel = { x: 640, y: 360 };
+    const before = pixelToBed(calibrated.lens, calibrated.pose, pixel, 3);
+    const after = pixelToBed(flagged.lens, flagged.pose, pixel, 3);
+    expect((after?.x ?? 0) - (before?.x ?? 0)).toBeCloseTo(4, 6);
+    // A record with no offset to drop is returned as it is.
+    expect(withUnknownNativeOffset(savedCameraModel())).toEqual(savedCameraModel());
   });
 });

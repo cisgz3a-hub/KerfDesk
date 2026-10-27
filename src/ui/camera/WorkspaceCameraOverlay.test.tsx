@@ -147,7 +147,15 @@ describe('WorkspaceCameraOverlay', () => {
   it('draws a head camera’s stitched picture without a camera model (ADR-449)', () => {
     const image = { data: new Uint8ClampedArray(4 * 4 * 4), width: 4, height: 4 };
     useCameraStore.setState({
-      bedPicture: { image, region: { x: 10, y: 10, width: 4, height: 4 }, surfaceHeightMm: 0 },
+      bedPicture: {
+        image,
+        region: { x: 10, y: 10, width: 4, height: 4 },
+        surfaceHeightMm: 0,
+        taken: {
+          bedFrame: { origin: 'front-left', bedWidthMm: 400, bedHeightMm: 400 },
+          machine: 'generic-grbl-400x400',
+        },
+      },
     });
     render();
     expect(container.querySelector('canvas')).not.toBeNull();

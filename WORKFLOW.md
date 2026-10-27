@@ -1650,7 +1650,10 @@ the completed physical Frame is the spatial source of truth.
    camera keeps your machine's current calibration.`
 2. With no camera calibration in use, the file's calibration comes in with it, as before.
 3. A file for another machine brings its own calibration with the rest of that machine, behind
-   the machine notice; **Keep current machine** restores the current calibration too.
+   the machine notice; **Keep current machine** restores the current calibration too. The notice
+   says when the camera calibration changes with it. When the file has the same machine and only
+   its bed size differs, the notice gives both bed sizes, and **Keep current machine** comes first
+   as the primary choice (ADR-440 Amendment 5).
 
 #### Edge — the file carries an Auto-focus command (ADR-400 Amendments 1 and 2)
 1. On load, an Auto-focus command that is not a focus routine is cleared, as a refused
@@ -8657,7 +8660,10 @@ as the pane's design record.
   Coordinates, remembers the layout like an engraved target, minimises the wizard at the photo
   step and says what to do next. The operator Frames and Starts it like any job, then presses
   **Expand** on the minimised wizard for the photo. Disabled with a reason while the canvas is in
-  CNC mode (ADR-441 Amendment 5).
+  CNC mode (ADR-441 Amendment 5). The bed frame is recorded at the Start that burns the rings: an
+  Absolute Start whose job holds every ring where the target put it (ADR-440 Amendment 5). If no
+  such Start was seen and Machine Setup has changed since the target was added, the photo step
+  says so and asks for the target to be added again, instead of fitting it in the old frame.
 - **Warning / not homed.** While connected, the target step says to home first on a homing machine
   that is not homed, and on a machine without homing that the camera lines up only while the
   controller keeps its zero. Advice only: **Engrave target** stays available. A calibration whose
@@ -8712,6 +8718,11 @@ as the pane's design record.
   than one near the middle, says what to check and changes nothing. A head camera is not offered
   the fix. A pending photo and its result belong to that wizard, document, camera and
   calibration; changing them retires the old result, so Fix cannot shift another setup (ADR-668).
+  While connected, the ring step gives the target step's home-first advice (ADR-440 Amendment 5).
+  A ring burned before the controller-to-bed offset was known, measured against a calibration
+  made with it known, gets a warning on the result step. **Fix** then still moves the
+  calibration, but marks it as made before the bed position was known. Once homed, the
+  calibration row says so.
 - **Warn / the camera seems to have moved (ADR-663 Amendment 3).** KerfDesk keeps a small view of
   what a fixed calibrated camera sees when its calibration is saved, a check keeps it, or a nudge
   fix is applied. Each new held picture, and one picture a few seconds after the camera starts, is
@@ -9010,6 +9021,11 @@ as the pane's design record.
   here**, the stops keep the pull-off clear of the homing switches when hard limits are on
   (ADR-449 Amendment 1).
 - **Edge / back to live.** **Live** clears the joined picture and shows the live camera again.
+- **Edge / Machine Setup changed since the capture (ADR-440 Amendment 5).** The joined picture,
+  like the burn check's picture, keeps the bed frame and machine it was taken on. After a bed-size
+  or native-frame change it is drawn where that part of the bed now is, and a notice says how far
+  it moved. After an origin change, or when a project for another machine opens, it is cleared,
+  and a notice says why. A project for the same machine keeps it.
 - **Edge / work-position reports.** A controller set to report its work position (`$10`) places
   the head at WPos plus the reported work offset (WCO), the position the status panel shows. Until
   a WCO arrives, or while KerfDesk hides the position after Unlock, Release motors or an unfinished

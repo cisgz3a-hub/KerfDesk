@@ -7,6 +7,7 @@
 // Pure core: rings in pixels and a model in, millimetres out.
 
 import type { RingMark } from '../target/ring-detect';
+import type { CameraBedFrame } from './camera-bed-frame';
 import { bedMapper, type CameraPose, type LensModel, type Vec2 } from './camera-model';
 import type { CameraModelRecord } from './camera-model-record';
 import { shiftedPose } from './head-camera';
@@ -65,4 +66,30 @@ export function nudgedCameraModel(record: CameraModelRecord, offsetMm: Vec2): Ca
 /** How big a nudge is, mm. */
 export function nudgeSizeMm(offsetMm: Vec2): number {
   return Math.hypot(offsetMm.x, offsetMm.y);
+}
+
+/**
+ * Whether the nudge ring was burned while the native offset was unknown (not
+ * homed, or settings unread) against a calibration placed with it known. The
+ * ring then sits wherever Absolute coordinates were that session, so a fix
+ * folds that offset into the calibration (ADR-440 Amendment 5).
+ */
+export function nudgeRingBeforeBedWasKnown(
+  calibration: CameraBedFrame | undefined,
+  ring: CameraBedFrame,
+): boolean {
+  return calibration?.nativeToBedOffsetMm !== undefined && ring.nativeToBedOffsetMm === undefined;
+}
+
+/**
+ * `record` lined up with a ring burned before the native offset was known: its
+ * frame no longer claims an offset, so the Camera panel says it was
+ * calibrated before KerfDesk knew where the machine sits (ADR-441 Amendment
+ * 5), and a later offset change does not move it.
+ */
+export function withUnknownNativeOffset(record: CameraModelRecord): CameraModelRecord {
+  const frame = record.bedFrame;
+  if (frame?.nativeToBedOffsetMm === undefined) return record;
+  const { nativeToBedOffsetMm: _known, ...unknown } = frame;
+  return { ...record, bedFrame: unknown };
 }
