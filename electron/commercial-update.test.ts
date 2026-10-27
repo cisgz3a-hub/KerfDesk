@@ -268,6 +268,26 @@ describe('commercial signed and licence-aware updates', () => {
       kind: 'not-covered',
       version: '1.2.0',
     });
+    // A failed licence confirmation holds back the newest covered release; the
+    // newer one its updates do not cover stays not covered (ADR-547 Amendment 1).
+    const unconfirmed = fixture([manifest('1.3.0'), manifest('1.2.0')]);
+    unconfirmed.options.isEligible.mockResolvedValue(false);
+    const awaitsConfirmation = async (_envelope: unknown, version: string) => version === '1.2.0';
+    expect(
+      await checkCommercialUpdates(unconfirmed.updater, {
+        ...unconfirmed.options,
+        awaitsConfirmation,
+      }),
+    ).toEqual({ kind: 'licence-unconfirmed', version: '1.2.0' });
+    expect(unconfirmed.updater.downloadUpdate).not.toHaveBeenCalled();
+    const lapsed = fixture();
+    lapsed.options.isEligible.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    expect(
+      await checkCommercialUpdates(lapsed.updater, {
+        ...lapsed.options,
+        awaitsConfirmation: async () => true,
+      }),
+    ).toEqual({ kind: 'licence-unconfirmed', version: '1.2.0' });
     const mismatched = fixture();
     mismatched.updater.downloadUpdate.mockImplementation(async () => {
       mismatched.events.emit('update-downloaded', feed('1.3.0'));

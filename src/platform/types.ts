@@ -107,7 +107,8 @@ export type LicenceAdapter = {
  * Where the desktop app's own updates stand (ADR-547). `unavailable` is a
  * build that does not update itself; `ready` is a downloaded version. Manual
  * updates require explicit installation consent; `not-covered` is a version this
- * licence's updates do not cover.
+ * licence's updates do not cover, and `licence-unconfirmed` one they cover that
+ * waits for a licence confirmation to succeed (ADR-547 Amendment 1).
  */
 export type CommercialUpdateStatus = {
   readonly state:
@@ -119,9 +120,10 @@ export type CommercialUpdateStatus = {
     | 'up-to-date'
     | 'ready'
     | 'not-covered'
+    | 'licence-unconfirmed'
     | 'failed';
   readonly currentVersion: string;
-  /** The newer version being downloaded, ready, not covered or not installed. */
+  /** The newer version being downloaded, ready, held back or not installed. */
   readonly version: string | null;
   /** When the last check finished, in milliseconds since 1970. */
   readonly checkedAt: number | null;

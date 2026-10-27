@@ -12,7 +12,12 @@ import {
 } from './manual-update-manifest.js';
 import { officialPlatformDownloadUrl } from './official-download-page.js';
 import type { PublicKeys } from './licensing-verification.js';
-import type { DesktopUpdates, UpdateState, UpdateStatus } from './update-status.js';
+import {
+  heldReleaseState,
+  type DesktopUpdates,
+  type UpdateState,
+  type UpdateStatus,
+} from './update-status.js';
 
 type Options = {
   readonly platform: DownloadPlatform;
@@ -21,6 +26,10 @@ type Options = {
   readonly keys: PublicKeys;
   readonly fetch: UpdateFetch;
   readonly eligible: (envelope: string, version: string) => Promise<boolean>;
+  /** Wording only: an ineligible release that waits for a licence confirmation (ADR-547 Amd 1). */
+  readonly awaitsConfirmation?:
+    | ((envelope: string, version: string) => Promise<boolean>)
+    | undefined;
   /** Opens the exact verified download page in the browser. */
   readonly openDownloadPage: (url: string) => Promise<void>;
   readonly announce?: (version: string) => void;
@@ -68,7 +77,7 @@ class PlatformUpdateService implements DesktopUpdates {
       version !== null &&
       this.notes?.candidate === this.candidate &&
       this.candidate?.release.version === version &&
-      ['available', 'not-covered'].includes(state)
+      ['available', 'not-covered', 'licence-unconfirmed'].includes(state)
         ? this.notes
         : null;
     this.value = {
@@ -126,7 +135,9 @@ class PlatformUpdateService implements DesktopUpdates {
       highlights: await fetchManualUpdateNotes(fetch, keys, next, this.now()),
     };
     if (!(await this.options.eligible(next.envelope, next.release.version))) {
-      this.set('not-covered', next.release.version);
+      const { awaitsConfirmation } = this.options;
+      const held = await heldReleaseState(awaitsConfirmation, next.envelope, next.release.version);
+      this.set(held, next.release.version);
       return;
     }
     this.set('available', next.release.version);

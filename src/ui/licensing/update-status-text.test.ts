@@ -28,13 +28,33 @@ describe('update status text (ADR-547)', () => {
   });
 
   it('says when a licence does not cover the newer version, and that nothing stops working', () => {
-    const text = updateStatusText(status('not-covered', '2026.44.0'), 1_790_000_000, at);
+    const now = 1_800_000_000_000;
+    const text = updateStatusText(status('not-covered', '2026.44.0'), 1_790_000_000, at, now);
     expect(text).toContain('KerfDesk 2026.44.0 is out, but your licence');
-    expect(text).toContain(new Date(1_790_000_000_000).toLocaleDateString());
+    expect(text).toContain(`ended on ${new Date(1_790_000_000_000).toLocaleDateString()}.`);
     expect(text).toContain('The version you have keeps working.');
-    expect(updateStatusText(status('not-covered', '2026.44.0'), null, at)).toContain(
+    expect(updateStatusText(status('not-covered', '2026.44.0'), null, at, now)).toContain(
       "updates don't cover it",
     );
+  });
+
+  it('never says updates ended on a date still to come (ADR-547 Amendment 1)', () => {
+    const now = 1_790_000_000_000;
+    const until = 1_820_000_000;
+    const text = updateStatusText(status('not-covered', '2026.44.0'), until, at, now);
+    expect(text).not.toContain('ended');
+    expect(text).not.toContain(new Date(until * 1000).toLocaleDateString());
+    expect(text).toContain("your licence's updates don't cover it.");
+  });
+
+  it('says a covered version waits for the licence to be confirmed, not that updates ended', () => {
+    const text = updateStatusText(status('licence-unconfirmed', '2026.44.0'), 1_820_000_000, at);
+    expect(text).toContain('KerfDesk 2026.44.0 is out and your licence covers it');
+    expect(text).toContain("KerfDesk couldn't confirm your licence just now");
+    expect(text).toContain('Check your connection, then open Help > Licence');
+    expect(text).toContain('choose Refresh licence and try Check now again.');
+    expect(text).toContain('The version you have keeps working.');
+    expect(text).not.toContain('ended');
   });
 
   it('points macOS and Linux to the download page instead of a download (ADR-613)', () => {
@@ -75,13 +95,14 @@ describe('update status text (ADR-547)', () => {
   });
 
   it('lets the owner check only when no check, download or install is waiting', () => {
-    const allowed = (['idle', 'up-to-date', 'not-covered', 'failed'] as const).map((state) =>
-      updateCheckAllowed(status(state)),
-    );
+    const allowed = (
+      ['idle', 'up-to-date', 'not-covered', 'licence-unconfirmed', 'failed'] as const
+    ).map((state) => updateCheckAllowed(status(state)));
     const refused = (['unavailable', 'checking', 'downloading', 'ready'] as const).map((state) =>
       updateCheckAllowed(status(state)),
     );
-    expect(allowed).toEqual([true, true, true, true]);
+    expect(allowed).toEqual([true, true, true, true, true]);
+    expect(updateStatusSettled(status('licence-unconfirmed'))).toBe(true);
     expect(refused).toEqual([false, false, false, false]);
     expect(updateStatusSettled(status('checking'))).toBe(false);
     expect(updateStatusSettled(status('ready'))).toBe(true);
