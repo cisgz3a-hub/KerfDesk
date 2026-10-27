@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { combinedBBox } from '../../core/scene/hit-test';
+import {
+  installDxfImportWorker,
+  resetDxfImportWorker,
+} from '../import/dxf-import-worker.test-support';
 import { useStore } from '../state/store';
 import { resultCode, testAdapter, writeArgs } from './authoring-test-support';
 import type { RemoteControlAdapter } from './types';
@@ -7,9 +11,13 @@ import type { RemoteControlAdapter } from './types';
 let adapter: RemoteControlAdapter;
 beforeEach(() => {
   useStore.setState(useStore.getInitialState(), true);
+  installDxfImportWorker();
   adapter = testAdapter();
 });
-afterEach(() => adapter.dispose());
+afterEach(() => {
+  adapter.dispose();
+  resetDxfImportWorker();
+});
 
 const svg = (path: string) =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="200mm" height="200mm" viewBox="0 0 200 200"><path d="${path}" fill="none" stroke="black"/></svg>`;

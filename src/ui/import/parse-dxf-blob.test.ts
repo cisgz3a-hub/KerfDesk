@@ -2,12 +2,21 @@ import { Blob as NodeBlob } from 'node:buffer';
 import { describe, expect, it, vi } from 'vitest';
 import { parseDxf } from '../../io/dxf';
 import {
+  DXF_EXPANSION_REFUSAL,
   holdsEveryNestedMinsertInstance,
+  nestedGridsPastBudgetDxf,
   nestedMinsertDxf,
 } from '../../__fixtures__/nested-minsert';
 import { parseDxfBlob } from './parse-dxf-blob';
 
 describe('parseDxfBlob', () => {
+  it('refuses nested grids past the block expansion budget, as the text parser does', async () => {
+    const blob = new NodeBlob([nestedGridsPastBudgetDxf()]) as unknown as Blob;
+    const result = await parseDxfBlob(blob, { id: 'grid', source: 'grid.dxf' });
+    expect(result.kind).toBe('error');
+    if (result.kind === 'error') expect(result.reason).toMatch(DXF_EXPANSION_REFUSAL);
+  });
+
   it("retains a small file's large nested expansion through the worker Blob parser", async () => {
     const text = nestedMinsertDxf();
     const result = await parseDxfBlob(new NodeBlob([text]) as unknown as Blob, {
