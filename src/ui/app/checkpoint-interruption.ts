@@ -23,7 +23,8 @@ import {
  * stop that may have killed the steppers mid-motion is marked position-lost
  * (ADR-215 Amendment 1). A lost link records the lines sent by then, and keeps
  * its backlog aside until the reconnect shows whether the controller
- * restarted (ADR-398 Amendment 3). */
+ * restarted (ADR-398 Amendment 3). `streamReset`: KerfDesk sent a reset
+ * against this stream, which discarded the planner whatever the cause. */
 export function checkpointInterruption(
   status: StreamerStatus,
   notice: LaserSafetyNotice | null,
@@ -31,6 +32,7 @@ export function checkpointInterruption(
   plannerBacklog?: JobInterruption['plannerBacklog'],
   positionLost = false,
   sentLines?: number,
+  streamReset = false,
 ): JobInterruption | null {
   const cause = interruptionCause(status, notice, stopRequest);
   if (cause === null) return null;
@@ -42,9 +44,7 @@ export function checkpointInterruption(
   if (interruption.kind === 'disconnect') {
     return { ...interruption, plannerBacklogIfRestarted: plannerBacklog };
   }
-  // The stop sent while the app closed may never have arrived.
-  const stopMayNotHaveArrived = stopRequest?.reason === 'app-closing';
-  return PLANNER_DISCARDING_KINDS.includes(interruption.kind) && !stopMayNotHaveArrived
+  return PLANNER_DISCARDING_KINDS.includes(interruption.kind) || streamReset
     ? { ...interruption, plannerBacklog }
     : interruption;
 }
@@ -65,10 +65,14 @@ function withSentLines(
 }
 
 // Abort and an ALARM stop with a soft reset or alarm; an auto-abort follows a
-// rejected line; a reboot loses everything. A failed write or a stall leaves
-// the controller running what it had. A lost link may do either: an
-// Arduino-class board resets when its port reopens, so the reconnect decides
-// (ADR-398 Amendment 3).
+// rejected line; a reboot loses everything. The app closing sends Abort too:
+// the desktop close awaits it, and where it may not have arrived (a web page
+// unloading, a forced Windows restart) a step back re-burns what a controller
+// that kept running had already burned, which ADR-398 Decision 2 prefers to
+// skipping. A failed write or a stall leaves the controller running what it
+// had, unless KerfDesk reset it to contain the fault (`streamReset`, ADR-398
+// Amendment 5). A lost link may do either: an Arduino-class board resets when
+// its port reopens, so the reconnect decides (ADR-398 Amendment 3).
 const PLANNER_DISCARDING_KINDS: ReadonlyArray<JobInterruption['kind']> = [
   'cancelled',
   'controller-error',

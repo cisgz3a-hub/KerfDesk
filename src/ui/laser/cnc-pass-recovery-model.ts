@@ -9,6 +9,7 @@ import { resolveCncResumePoint, type CncResumePoint } from '../../core/recovery/
 import type { Vec2 } from '../../core/scene';
 import type { WorkCoordinateOffset } from '../state/origin-actions';
 import type { RecoveryCapsule } from '../state/recovery';
+import { recordedPlannerBlocks } from '../state/recovery/run-planner-blocks';
 import { retainedPositionIssue } from './cnc-pass-recovery-review';
 import { deriveCncArtifactPassSpans } from './cnc-pass-span-derivation';
 
@@ -59,24 +60,7 @@ export function cncPassRecoveryDefaultPoint(capsule: RecoveryCapsule): CncResume
   });
 }
 
-/** The usable planner size the run's controller reported, when the run kept
- * it: the session's idle `Bf` blocks free, and the stock `$I` OPT block count
- * observed in the same session. The larger one bounds the rewind (OR-2). */
-export function recordedPlannerBlocks(
-  artifact: Extract<RecoveryCapsule['artifact'], { readonly kind: 'exact-execution' }>,
-): number | undefined {
-  const idle = artifact.archivedControllerObservation.plannerBlocksAtIdle ?? undefined;
-  const controller = artifact.provenance?.controller;
-  const buildInfo = controller?.buildInfo;
-  const fromBuildInfo =
-    buildInfo?.observation.sessionEpoch === controller?.sessionEpoch
-      ? buildInfo?.parsed?.plannerBufferBlocks
-      : undefined;
-  const recorded = [idle, fromBuildInfo].filter(
-    (blocks): blocks is number => blocks !== undefined && Number.isFinite(blocks) && blocks > 0,
-  );
-  return recorded.length === 0 ? undefined : Math.max(...recorded);
-}
+export { recordedPlannerBlocks };
 
 /** Why pass recovery refuses a fingerprint-only record: a migrated checkpoint
  * or an ADR-337 Start stand-in. Shared by the wizard and its flow. */
