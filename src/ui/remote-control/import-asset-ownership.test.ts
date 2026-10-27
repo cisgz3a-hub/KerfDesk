@@ -1,5 +1,6 @@
 import { File as NodeFile } from 'node:buffer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { installImportWorkers, resetImportWorkers } from '../import/import-workers.test-support';
 import { loadImageSamples, type LoadedImageSamples } from '../import/prepare-image-samples';
 import * as hydration from '../import/svg-image-hydration';
 import { makePng } from '../import/png-incremental-decoder.test-support';
@@ -47,6 +48,7 @@ const paged: LoadedImageSamples = {
 let adapter: RemoteControlAdapter;
 beforeEach(() => {
   useStore.setState(useStore.getInitialState(), true);
+  installImportWorkers();
   vi.stubGlobal('File', NodeFile);
   rollback.mockReset().mockResolvedValue(null);
   vi.mocked(loadImageSamples).mockReset().mockResolvedValue(paged);
@@ -86,7 +88,7 @@ it('releases paged raster assets when the desktop refuses the insertion', async 
 afterEach(() => {
   adapter.dispose();
   vi.restoreAllMocks();
-  vi.unstubAllGlobals();
+  resetImportWorkers();
 });
 
 it('keeps fragment disposal available after a rejected width placement', async () => {
