@@ -16,16 +16,34 @@
 // the project's own. A resumed recovery or a painted second pass ran a program
 // of its own whose line numbers are not these (rolling audit 2026-10-21,
 // 05-P2-1), so the confirmation says which program the line counts.
+//
+// A Print-and-Cut or variable-text job compiles as Start does (ADR-443
+// Amendment 2; rolling audit v4 H2-P1-1). It recompiled without the
+// registration, so the rest of the job burned off the print, and ran even
+// where Start refuses. The run is now matched with the registration and clock
+// it was compiled with. The restart keeps that clock, so dates and times match
+// the part already burned, and takes the marks Start would take: the ones
+// captured now when they are valid, else the ones the run used. With neither,
+// it is refused as Start refuses.
 
 import type { JobOriginPlacement } from '../../core/job';
 import { fingerprintGcode, fingerprintsEqual, type GcodeFingerprint } from '../../core/recovery';
-import type { OutputScope } from '../../core/scene';
+import type { SimilarityTransform } from '../../core/registration';
+import type { OutputScope, Project } from '../../core/scene';
+import { projectHasVariableData } from '../../core/variables/object-variable-template';
 import { currentOutputScope, useStore } from '../state';
 import { recoveryRepository, type RecoveryRepository } from '../state/recovery';
 import type { RecoveryArtifactV1 } from '../state/recovery/execution-artifact';
 import type { WorkCoordinateOffset } from '../state/origin-actions';
 import { savedWorkOffsetMm } from './laser-recovery-origin';
 import { prepareRecoverySource, type PreparedRecoverySource } from './start-job-source';
+import {
+  currentTimeBoundStartInputs,
+  registrationDisagreementMm,
+  restartTimeBoundInputs,
+  timeBoundStartInputsFor,
+  type TimeBoundStartInputs,
+} from './time-bound-start-inputs';
 
 type RunSource = 'interrupted' | 'completed' | 'manual-restart';
 
@@ -47,6 +65,9 @@ export type ManualRestartSource = {
   readonly placementNote: string;
   /** Which program the restart line counts, in words, for its confirmation. */
   readonly programNote: string;
+  /** Which Print-and-Cut marks or variable-text clock the restart is bound
+   * to, for a job whose output depends on them. */
+  readonly timeBoundNote?: string;
 };
 
 /** What a run's archived bytes are when they are not the project's own
@@ -66,37 +87,117 @@ let lastManualRestart: RunPlacement | null = null;
 export async function prepareManualRestartSource(
   repository: RecoveryRepository = recoveryRepository,
 ): Promise<ManualRestartSource | null> {
+  const project = useStore.getState().project;
+  const now = currentTimeBoundStartInputs(project);
   for (const run of runPlacementsNewestFirst(repository)) {
-    const source = await prepareRecoverySource({
-      outputScope: run.outputScope,
-      ...(run.jobOrigin === undefined ? {} : { jobOrigin: run.jobOrigin }),
-      savedWorkOffsetMm: run.savedOffsetMm ?? null,
-    });
+    const remembered = timeBoundStartInputsFor(run.fingerprint);
+    const ran = remembered === undefined ? undefined : restartTimeBoundInputs(project, remembered);
+    const inputs = ran ?? now;
+    // A registered run this session did not compile needs valid marks now.
+    if (inputs?.registration === null) continue;
+    const source = await prepareRecoverySource(runOverrides(run), inputs);
     if (source === null) return null;
-    if (fingerprintsEqual(fingerprintGcode(source.gcode), run.fingerprint)) {
-      return {
-        source,
-        outputScope: run.outputScope,
-        placementNote: runPlacementNote(run.jobOrigin),
-        programNote: programNote(source, run.source, repository),
-      };
-    }
+    if (!fingerprintsEqual(fingerprintGcode(source.gcode), run.fingerprint)) continue;
+    const restart = await withCurrentMarks(run, source, ran, now);
+    if (restart === null) return null;
+    return {
+      source: restart.source,
+      outputScope: run.outputScope,
+      placementNote: runPlacementNote(run.jobOrigin),
+      programNote: programNote(restart.source, run.source, repository),
+      ...timeBoundNoteOption(project, restart.registration, ran, now, false),
+    };
   }
   const outputScope = currentOutputScope(useStore.getState());
-  const source = await prepareRecoverySource();
+  // A registration that is not valid is refused here with Start's message.
+  const source = await prepareRecoverySource(undefined, now);
   if (source === null) return null;
   return {
     source,
     outputScope,
     placementNote: livePlacementNote(source.jobOrigin),
     programNote: programNote(source, null, repository),
+    ...timeBoundNoteOption(project, now?.registration, undefined, now, true),
   };
 }
 
+function runOverrides(run: RunPlacement): Parameters<typeof prepareRecoverySource>[0] {
+  return {
+    outputScope: run.outputScope,
+    ...(run.jobOrigin === undefined ? {} : { jobOrigin: run.jobOrigin }),
+    savedWorkOffsetMm: run.savedOffsetMm ?? null,
+  };
+}
+
+type Registration = TimeBoundStartInputs['registration'];
+
+/** The matched run's program, registered to the marks captured now when they
+ * are valid and differ from the run's, as Start would register it; the run's
+ * clock is kept either way. */
+async function withCurrentMarks(
+  run: RunPlacement,
+  matched: PreparedRecoverySource,
+  ran: TimeBoundStartInputs | undefined,
+  now: TimeBoundStartInputs | undefined,
+): Promise<{
+  readonly source: PreparedRecoverySource;
+  readonly registration: Registration;
+} | null> {
+  const matchedRegistration = (ran ?? now)?.registration;
+  const current = now?.registration;
+  if (ran === undefined || current == null || sameRegistration(current, matchedRegistration)) {
+    return { source: matched, registration: matchedRegistration };
+  }
+  const source = await prepareRecoverySource(runOverrides(run), {
+    registration: current,
+    evaluatedAtIso: ran.evaluatedAtIso,
+  });
+  return source === null ? null : { source, registration: current };
+}
+
+function sameRegistration(a: Registration, b: Registration): boolean {
+  return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+}
+
+/** Which marks the restart is registered to and, when no earlier run was
+ * reproduced (`evaluatedNow`), that its variable text was evaluated now. */
+function timeBoundNoteOption(
+  project: Project,
+  registration: Registration,
+  ran: TimeBoundStartInputs | undefined,
+  now: TimeBoundStartInputs | undefined,
+  evaluatedNow: boolean,
+): { readonly timeBoundNote?: string } {
+  const notes = [
+    registration == null ? null : registrationNote(project, registration, ran?.registration, now),
+    evaluatedNow && projectHasVariableData(project)
+      ? 'Variable text: evaluated now, so a date or time in it can differ from the part already burned.'
+      : null,
+  ].filter((note): note is string => note !== null);
+  return notes.length === 0 ? {} : { timeBoundNote: notes.join(' ') };
+}
+
+function registrationNote(
+  project: Project,
+  registration: SimilarityTransform,
+  ranWith: Registration,
+  now: TimeBoundStartInputs | undefined,
+): string {
+  if (now?.registration == null) {
+    return 'Print and Cut: registered to the marks that run used, because no marks captured since are current (a reset, reconnect or Home retires them). If the sheet has moved since that run, capture both marks again first.';
+  }
+  if (ranWith == null) return 'Print and Cut: registered to the marks captured now.';
+  const apart = registrationDisagreementMm(project, registration, ranWith);
+  return apart < 0.05
+    ? "Print and Cut: registered to the marks captured now, which match the run's."
+    : `Print and Cut: registered to the marks captured now, which place the job up to ${mm(apart)} mm from where the run's marks placed it. If the sheet has not moved, capture both marks again before you continue.`;
+}
+
 /** The notes a manual restart's confirmation carries: the program its line
- * counts, then where it is anchored. */
+ * counts, where it is anchored, then the marks and clock it is bound to. */
 export function manualRestartNotes(restart: ManualRestartSource): string {
-  return `${restart.programNote}\n\n${restart.placementNote}`;
+  const notes = `${restart.programNote}\n\n${restart.placementNote}`;
+  return restart.timeBoundNote === undefined ? notes : `${notes}\n\n${restart.timeBoundNote}`;
 }
 
 /** Remembers the placement a manual restart ran with, for the next one. */

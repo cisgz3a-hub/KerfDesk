@@ -132,3 +132,29 @@ export function holdsEveryNestedMinsertInstance(curves: ReadonlyArray<CurveSubpa
   ).sort((a, b) => a - b);
   return starts.every((x, index) => Math.abs(x - (expected[index] ?? Number.NaN)) < 1e-8);
 }
+
+// UNIT is one line; GRID places UNIT on a 100 x 100 grid; the drawing places
+// GRID on another 100 x 100 grid. Each grid is within the per-grid limit and
+// the inner one is only 20,000 points, but the whole drawing would place
+// 2 x 10^8, past the block expansion budget (ADR-269 Amendment 1), which
+// refuses it before the outer copies exist.
+export function nestedGridsPastBudgetDxf(): string {
+  const tags = (...pairs: ReadonlyArray<readonly [number, string | number]>) =>
+    pairs.map(([code, value]) => `${code}\n${value}`).join('\n');
+  return [
+    tags([0, 'SECTION'], [2, 'BLOCKS']),
+    tags([0, 'BLOCK'], [2, 'UNIT'], [10, 0], [20, 0]),
+    tags([0, 'LINE'], [10, 0], [20, 0], [11, 1], [21, 0]),
+    tags([0, 'ENDBLK']),
+    tags([0, 'BLOCK'], [2, 'GRID'], [10, 0], [20, 0]),
+    tags([0, 'INSERT'], [2, 'UNIT'], [10, 0], [20, 0], [70, 100], [71, 100], [44, 2], [45, 2]),
+    tags([0, 'ENDBLK']),
+    tags([0, 'ENDSEC']),
+    tags([0, 'SECTION'], [2, 'ENTITIES']),
+    tags([0, 'INSERT'], [2, 'GRID'], [10, 0], [20, 0], [70, 100], [71, 100], [44, 300], [45, 300]),
+    tags([0, 'ENDSEC'], [0, 'EOF']),
+    '',
+  ].join('\n');
+}
+
+export const DXF_EXPANSION_REFUSAL = /DXF block references expand to more than 500,000 points/;

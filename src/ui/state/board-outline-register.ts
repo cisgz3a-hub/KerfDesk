@@ -18,6 +18,7 @@ import { buildSelectionRotateByEdit } from '../../core/scene/selection-rotate';
 import { createRegistrationOutline } from '../../core/shapes';
 import type { JobPlacementSettings } from '../job-placement';
 import { pushUndo } from './scene-mutations';
+import { captureSetupHistoryContext } from './setup-history-context';
 import type { AppState } from './store';
 
 export type OutlineBoardShape = Extract<BoardShape, { readonly kind: 'outline' }>;
@@ -33,6 +34,9 @@ export function registerCapturedOutlineMutation(
   const boards = findRegistrationBoxes(scene);
   const existing = boards.find((box) => box.provenance === 'captured-board');
   if (existing === undefined || existing.spec.kind !== 'polyline') return null;
+  // One Undo step turns the board, its artwork and Start From back together
+  // (item 5; ADR-654 Amendment 2).
+  captureSetupHistoryContext(s.project, s);
   const drawn = existing.spec.points.map((point) => applyTransform(point, existing.transform));
   const pivot = vertexCentre(drawn);
   const centre = vertexCentre(shape.pointsMm);

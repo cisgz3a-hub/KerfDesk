@@ -7,6 +7,7 @@ import {
   type ExpandOutcome,
   type RawEntity,
 } from './dxf-expand';
+import { createDxfExpansionBudget, DxfExpansionRefusal } from './dxf-expansion-budget';
 import { createRawEntityStream, type RawEntityStream } from './dxf-raw-entity-stream';
 import { buildDxfResult, type ParseDxfResult } from './dxf-result';
 import type { DxfTag } from './dxf-tags';
@@ -170,10 +171,13 @@ function createBlockCollector(blocks: Map<string, DxfBlock>): {
 export function createDxfEntityCollector(
   metadata: DxfMetadata,
   args: { readonly id: string; readonly source: string },
+  fileBytes: number,
 ): DxfTagCollector<ParseDxfResult> {
+  const context = { ...metadata, budget: createDxfExpansionBudget(fileBytes) };
   let polylines: ColoredPolyline[] = [];
   let skipped = new Map<string, number>();
   let notes: string[] = [];
+  let refusal: string | null = null;
   let entityStream: RawEntityStream | null = null;
 
   const router = createSectionRouter(
@@ -197,7 +201,17 @@ export function createDxfEntityCollector(
   );
 
   function readEntity(entity: RawEntity): void {
-    const expanded = expandEntities([entity], metadata, null, 0);
+    if (refusal !== null) return;
+    let expanded: ExpandOutcome;
+    try {
+      expanded = expandEntities([entity], context, null, 0);
+    } catch (error) {
+      if (!(error instanceof DxfExpansionRefusal)) throw error;
+      // The rest of the file is still read, but nothing more is expanded or kept.
+      refusal = error.message;
+      polylines = [];
+      return;
+    }
     // One compact INSERT can produce an input-sized collection on its own.
     for (const polyline of expanded.polylines) polylines.push(polyline);
     for (const note of expanded.notes) notes.push(note);
@@ -210,6 +224,7 @@ export function createDxfEntityCollector(
     pushTag: router.pushTag,
     finish: () => {
       router.finish();
+      if (refusal !== null) return { kind: 'error', reason: refusal };
       const expanded: ExpandOutcome = { polylines, skipped, notes };
       return buildDxfResult(args, expanded, metadata.notes);
     },

@@ -7,13 +7,14 @@ import { importByteSize, resolveImportBlob, type BlobSourceFile } from '../impor
 import type { ImportOutcome } from '../state/store';
 import type { ToastVariant } from '../state/toast-store';
 import { createImportWorkerControls, isImportCancellation } from './import-worker-controls';
-import { describeImportBedFit } from './import-bed-fit-notice';
+import { describeImportBedFit, type ImportBedFitUndo } from './import-bed-fit-notice';
 import { largeImportAdvisory, mainThreadImportFallbackAdvisory } from './import-size-advisory';
 import {
   describeImportError,
   describeImportResult,
   describeReimportOutcome,
   describeSvgPresentationWarnings,
+  type ToastDescriptor,
 } from './import-toasts';
 
 export async function importSvgFiles(
@@ -61,20 +62,24 @@ function reportSvgImport(
   outcome: ImportOutcome | null,
   pushToast: (message: string, variant?: ToastVariant) => void,
 ): void {
-  if (outcome?.kind === 'replaced') {
-    const toast = describeReimportOutcome(outcome);
+  for (const toast of describeSvgImport(name, result, outcome)) {
     pushToast(toast.message, toast.variant);
-    for (const warning of describeSvgPresentationWarnings(name, result)) {
-      pushToast(warning.message, warning.variant);
-    }
-    return;
   }
-  for (const toast of describeImportResult(name, result)) {
-    pushToast(toast.message, toast.variant);
+}
+
+/** The toasts an SVG import shows; Remote Control returns the same text (ADR-125 Amd 2). */
+export function describeSvgImport(
+  name: string,
+  result: ParseSvgResult,
+  outcome: ImportOutcome | null,
+  undo?: ImportBedFitUndo,
+): ReadonlyArray<ToastDescriptor> {
+  if (outcome?.kind === 'replaced') {
+    return [describeReimportOutcome(outcome), ...describeSvgPresentationWarnings(name, result)];
   }
   // Last, so the three-toast stack cannot push it out of view.
-  const fitNotice = describeImportBedFit(name, outcome ?? undefined);
-  if (fitNotice !== null) pushToast(fitNotice.message, fitNotice.variant);
+  const fitNotice = describeImportBedFit(name, outcome ?? undefined, undo);
+  return [...describeImportResult(name, result), ...(fitNotice === null ? [] : [fitNotice])];
 }
 
 async function parseFile(

@@ -44,6 +44,14 @@ import { withoutArchivedFirstBitAdvisory } from './cnc-recovery-start-bit';
 import { recoveryRefusalMessages, savedWorkOffsetMm } from './laser-recovery-origin';
 import type { WorkCoordinateOffset } from '../state/origin-actions';
 import { projectHasVariableData } from '../../core/variables/object-variable-template';
+import {
+  recoverySnapshotArgs,
+  recoveryTimeBoundInputs,
+  rememberSnapshotCompile,
+  startPreparationIsTimeBound,
+  startSnapshotRequest,
+  type TimeBoundStartInputs,
+} from './time-bound-start-inputs';
 
 /** Optional observers of one Start preparation. */
 export type StartPreparationHooks = {
@@ -139,9 +147,12 @@ async function prepareCurrentStartInBackground(args: {
   readonly requireFrame: boolean;
   readonly registration: ReturnType<typeof currentPrintCutOutputRegistration>;
   readonly useSnapshot: boolean;
+  /** A restart's variable text keeps the interrupted run's clock. */
+  readonly evaluatedAtIso?: string;
   readonly signal?: AbortSignal;
   readonly hooks: StartPreparationHooks;
 }): Promise<StartJobPreparation> {
+  const snapshot = startSnapshotRequest(args);
   const owner = ownCurrentStartPreparation(
     args.app,
     args.laser,
@@ -167,14 +178,7 @@ async function prepareCurrentStartInBackground(args: {
           ? {}
           : { resolvedJobOrigin: args.resolvedJobOrigin }),
         requireFrame: args.requireFrame,
-        ...(args.useSnapshot
-          ? {
-              snapshot: {
-                evaluatedAtIso: new Date().toISOString(),
-                ...(args.registration === undefined ? {} : { registration: args.registration }),
-              },
-            }
-          : {}),
+        ...(snapshot === undefined ? {} : { snapshot }),
       },
       publishFramePreparationProgress,
       owner.signal,
@@ -185,6 +189,7 @@ async function prepareCurrentStartInBackground(args: {
     }
     const prepared = await background;
     if (owner.signal.aborted) throw new DOMException('Output preparation cancelled.', 'AbortError');
+    if (snapshot !== undefined) rememberSnapshotCompile(prepared, snapshot);
     return prepared;
   } catch (error) {
     if (isOutputPreparationAbort(error)) {
@@ -204,12 +209,7 @@ function hasVariableText(project: Project): boolean {
   return projectHasVariableData(project);
 }
 
-/** True when a compile of this project is bound to the moment it ran — a
- * Print-and-Cut registration or variable text evaluated against a clock — so
- * its bytes cannot be reused by a later Start from unchanged inputs. */
-export function startPreparationIsTimeBound(project: Project): boolean {
-  return currentPrintCutOutputRegistration(project) !== undefined || hasVariableText(project);
-}
+export { startPreparationIsTimeBound };
 
 /** Every controller and camera fact `prepareCurrentStartJob` compiles against,
  * as one comparable value: two equal keys mean the two compiles would have
@@ -222,12 +222,18 @@ export function startMachineInputsKey(
   return JSON.stringify(machineSnapshot(project, laser, camera));
 }
 
-export async function prepareRecoverySource(overrides?: {
-  readonly outputScope: OutputScope;
-  readonly jobOrigin?: JobOriginPlacement;
-  /** The work offset the run ran with, named if its origin is gone. */
-  readonly savedWorkOffsetMm?: WorkCoordinateOffset | null;
-}): Promise<PreparedRecoverySource | null> {
+/** `timeBound`: the registration and clock a registered or variable-text job
+ * compiles with, by default the ones Start would use now (ADR-443 Amendment
+ * 2). A registration that is not valid is refused as Start refuses it. */
+export async function prepareRecoverySource(
+  overrides?: {
+    readonly outputScope: OutputScope;
+    readonly jobOrigin?: JobOriginPlacement;
+    /** The work offset the run ran with, named if its origin is gone. */
+    readonly savedWorkOffsetMm?: WorkCoordinateOffset | null;
+  },
+  timeBound?: TimeBoundStartInputs,
+): Promise<PreparedRecoverySource | null> {
   const laser = useLaserStore.getState();
   if (!requireFreshControllerQualification(laser)) return null;
   const app = useStore.getState();
@@ -245,6 +251,7 @@ export async function prepareRecoverySource(overrides?: {
     overrides?.outputScope ?? currentOutputScope(app),
     overrides?.jobOrigin,
     overrides?.savedWorkOffsetMm ?? null,
+    recoveryTimeBoundInputs(app.project, timeBound),
   );
 }
 
@@ -344,37 +351,37 @@ async function prepareRecoveryProjectSource(
   outputScope: OutputScope,
   resolvedJobOrigin: JobOriginPlacement | undefined,
   savedOffsetMm: WorkCoordinateOffset | null,
+  timeBound: TimeBoundStartInputs | undefined,
 ): Promise<PreparedRecoverySource | null> {
   const { project } = app;
   const machine = machineSnapshot(project, laser, useCameraStore.getState());
   let prepared: StartJobPreparation;
   try {
-    prepared = outputPreparationShouldRunOffThread(project, outputScope)
-      ? await prepareCurrentStartInBackground({
-          app,
-          project,
-          laser,
-          machine,
-          jobPlacement,
-          outputScope,
-          ...(resolvedJobOrigin === undefined ? {} : { resolvedJobOrigin }),
-          // Recovery authorizes its own exact source and supervised re-entry.
-          // Its source must not require a new ordinary-Start Frame permit.
-          requireFrame: false,
-          registration: undefined,
-          // Re-evaluating variables/registration would alter checkpoint bytes.
-          useSnapshot: false,
-          hooks: {},
-        })
-      : prepareStartJob(
-          project,
-          laser.controllerSettings,
-          machine,
-          jobPlacement,
-          outputScope,
-          resolvedJobOrigin,
-          false,
-        );
+    prepared =
+      timeBound !== undefined || outputPreparationShouldRunOffThread(project, outputScope)
+        ? await prepareCurrentStartInBackground({
+            app,
+            project,
+            laser,
+            machine,
+            jobPlacement,
+            outputScope,
+            ...(resolvedJobOrigin === undefined ? {} : { resolvedJobOrigin }),
+            // Recovery authorizes its own exact source and supervised re-entry.
+            // Its source must not require a new ordinary-Start Frame permit.
+            requireFrame: false,
+            ...recoverySnapshotArgs(timeBound),
+            hooks: {},
+          })
+        : prepareStartJob(
+            project,
+            laser.controllerSettings,
+            machine,
+            jobPlacement,
+            outputScope,
+            resolvedJobOrigin,
+            false,
+          );
   } catch (error) {
     const message = isOutputPreparationAbort(error)
       ? 'Recovery preparation was cancelled. Try again with the current job.'

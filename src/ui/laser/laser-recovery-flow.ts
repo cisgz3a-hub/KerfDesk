@@ -30,6 +30,7 @@ import { buildLaserResumeProgram } from './laser-resume-program';
 import { cleanupRejectedRecoveryAttempt } from './recovery-attempt-cleanup';
 import { finalRecoveryStartAssertion } from './recovery-start-authorization';
 import { savedWorkOffsetMm } from './laser-recovery-origin';
+import { timeBoundStartInputsFor } from './time-bound-start-inputs';
 import {
   acceptLaserRecoveryRun,
   untrackedLaserRecovery,
@@ -353,11 +354,18 @@ async function recoverySource(capsule: RecoveryCapsule): Promise<PreparedRecover
   if (capsule.artifact.kind === 'exact-execution') {
     return prepareArchivedRecoverySource(capsule.artifact);
   }
-  const source = await prepareRecoverySource({
-    outputScope: capsule.artifact.outputScope,
-    ...(capsule.artifact.jobOrigin === undefined ? {} : { jobOrigin: capsule.artifact.jobOrigin }),
-    savedWorkOffsetMm: savedWorkOffsetMm(capsule.artifact),
-  });
+  // A registered or variable-text job reproduces the fingerprint only with
+  // the inputs it ran with (ADR-443 Amendment 2).
+  const source = await prepareRecoverySource(
+    {
+      outputScope: capsule.artifact.outputScope,
+      ...(capsule.artifact.jobOrigin === undefined
+        ? {}
+        : { jobOrigin: capsule.artifact.jobOrigin }),
+      savedWorkOffsetMm: savedWorkOffsetMm(capsule.artifact),
+    },
+    timeBoundStartInputsFor(capsule.artifact.fingerprint),
+  );
   if (source === null) return null;
   if (!fingerprintsEqual(fingerprintGcode(source.gcode), capsule.artifact.fingerprint)) {
     jobAwareAlert(

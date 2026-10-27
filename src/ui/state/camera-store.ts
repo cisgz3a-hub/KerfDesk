@@ -109,6 +109,8 @@ export type BedPicture = {
   readonly region: BedArea;
   /** The surface height the pictures were flattened at, mm. */
   readonly surfaceHeightMm: number;
+  /** The height areas they were flattened with; other heights now clear it (ADR-449 Amendment 2). */
+  readonly heightAreas: ReadonlyArray<SurfaceHeightArea>;
   /** Where `region` lies on the bed: it is drawn moved with the bed, or dropped (ADR-440 Amendment 5). */
   readonly taken: BedPictureTaken;
 };

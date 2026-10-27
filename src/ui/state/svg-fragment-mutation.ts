@@ -17,6 +17,7 @@ import {
   type StateSlice,
   type ImportOutcome,
 } from './scene-mutations';
+import type { ImportFitOptions } from './import-bed-fit';
 import { repairDanglingObjectDependencies } from './object-delete-actions';
 import { removeObjectIdsFromGroups } from './scene-group-actions';
 import {
@@ -28,9 +29,17 @@ import {
 } from './svg-fragment-reimport';
 
 export type SvgFragmentActions = {
-  readonly importSvgObject: (object: SceneObject, batchOffsetIdx?: number) => ImportOutcome;
+  readonly importSvgObject: (
+    object: SceneObject,
+    batchOffsetIdx?: number,
+    options?: ImportFitOptions,
+  ) => ImportOutcome;
   readonly reimportSvgObject: (targetObjectId: string, object: SceneObject) => ImportOutcome | null;
-  readonly importSvgFragment: (fragment: SvgArtworkFragment, batchIndex?: number) => ImportOutcome;
+  readonly importSvgFragment: (
+    fragment: SvgArtworkFragment,
+    batchIndex?: number,
+    options?: ImportFitOptions,
+  ) => ImportOutcome;
   readonly reimportSvgFragment: (
     targetId: string,
     fragment: SvgArtworkFragment,

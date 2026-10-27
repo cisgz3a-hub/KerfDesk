@@ -44,6 +44,12 @@ export type CameraMount = {
   readonly kind: 'head';
   /** The head's bed position (scene mm) when the calibration photo was taken. */
   readonly headAtCalibrationMm: Vec2;
+  /**
+   * The machine Z (mm) when the calibration photo was taken: the camera rides
+   * up and down with the head, so the calibration holds only there (ADR-449
+   * Amendment 2). Absent on records saved before it was kept.
+   */
+  readonly headZAtCalibrationMm?: number;
 };
 
 // A frame whose aspect ratio differs from the calibrated one by more than this
@@ -123,7 +129,13 @@ function normalizeMount(value: unknown): CameraMount | undefined {
   const x = finite(head['x']);
   const y = finite(head['y']);
   if (x === undefined || y === undefined) return undefined;
-  return { kind: 'head', headAtCalibrationMm: { x, y } };
+  const z = value['headZAtCalibrationMm'];
+  if (z !== undefined && finite(z) === undefined) return undefined;
+  return {
+    kind: 'head',
+    headAtCalibrationMm: { x, y },
+    ...(z === undefined ? {} : { headZAtCalibrationMm: z as number }),
+  };
 }
 
 function normalizeLens(value: unknown): LensModel | undefined {
