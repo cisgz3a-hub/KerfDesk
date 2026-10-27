@@ -6311,6 +6311,16 @@ and lifts the command's CNC-only gate.)*
    (F-CNC15), or in a sender that holds at the `M0` itself (gSender). Run G-code file sends the
    `M0`, and its review warns.
 3. A one-cutter job, or an older prepared Save with no per-bit files, stays a single file.
+4. Run G-code file treats the gap between per-bit files (and a tile's bit files) as a bit change
+   (ADR-392 Amendment 4). When a file headed `; bit N of M` stops streaming, Work Z goes, so the
+   next file's CNC Frame offers Zero Z or refuses until the new bit is zeroed or probed. Until the
+   last bit's file has run, Set and Reset origin and the XYZ corner probe are refused as in an
+   `M0` hold; Zero Z and the Z probe stay open. The machine panel says which bit ran and offers
+   **End bit sequence** for starting over on new stock. A new controller session ends it too.
+5. On a profile whose controller cannot run KerfDesk CNC jobs, saving the package gives the
+   GRBL-family warning Save as gives, and the printed sheet carries it (ADR-399 Amendment 1).
+6. Save as of a multi-bit job writes one file with an `M0` per bit change and adds a note saying
+   where those stops work (ADR-392 Amendment 4).
 
 ### F-CNC15. Re-zero Z at a tool change — Phase H.7
 
@@ -6676,7 +6686,8 @@ and lifts the command's CNC-only gate.)*
    "tested". Touches made in Alarm count. Each touch-off uses the touch up, so a
    retry asks for a new one, and so do a streamed job and a new controller
    session. Touches during a tool-change hold count. The cycle's own
-   contacts never count.
+   contacts never count. The surface grid (Measure grid) needs the same
+   test touch and uses it up too (ADR-103 Amendment 3).
 3. Z cycle: fast G38.2 seek down, 2 mm back-off, slow re-touch, then
    `G10 L20 P0 Z<thickness>` — work Z0 lands on the STOCK TOP (plate
    underside) — and a retract. Every line owns the controller response
@@ -7576,6 +7587,11 @@ as the pane's design record.
    final Start assertion, since the switch stays usable while their dialogs
    are open. The recovery stays on its card; no job line is sent (ADR-416
    Amendment 3).
+4. Work Z set for another bit than the one the recovery program starts with
+   refuses recovery and names both bits: a resume in a later operation needs
+   that operation's bit zeroed and selected as the Active bit. The runway
+   review checks the same way. Nothing is sent and the card stays retryable
+   (ADR-215 Amendment 2).
 
 #### Empty
 1. Without a retained CNC capsule no recovery card is shown (unchanged).

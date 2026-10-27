@@ -21,6 +21,7 @@ import { OverrideControls } from './OverrideControls';
 import { AccessoryResetControls } from './AccessoryResetControls';
 import { IslandFillRecoveryAction } from './IslandFillRecoveryAction';
 import { CheckpointResumeBanner } from './CheckpointResumeBanner';
+import { BitFileSequenceNotice } from './BitFileSequenceNotice';
 import { SecondPassControl } from './second-pass/SecondPassControl';
 import { StartFromLineControl } from './StartFromLineControl';
 import { NoHomingPositionGuide } from './NoHomingPositionGuide';
@@ -125,6 +126,7 @@ export function JobControls(props: Props): JSX.Element {
       )}
       <IslandFillRecoveryAction streaming={controlsBusy} />
       <CheckpointResumeBanner busy={controlsBusy} />
+      <BitFileSequenceNotice />
       <RunAgainControl disabled={disabled} busy={controlsBusy} />
       <SecondPassControl busy={controlsBusy} machineKind={machineKind} />
       {!props.machineConsole && (

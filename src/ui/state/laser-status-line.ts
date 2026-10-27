@@ -39,6 +39,7 @@ import { resumeJogSettlementAfterMpg } from './laser-motion-operation';
 import { releaseAbandonedMotionAtIdle } from './laser-motion-release';
 import { isProbeAlarmedToolChangeHold } from './tool-change-probe-alarm';
 import { probeTestTouchPatch } from './probe-test-touch';
+import { bitFileRunEndPatch } from './bit-file-sequence';
 import { cancelActiveStreamerPatch } from './laser-alarm-stream-end';
 import {
   homeAlarmReplyWindowPatch,
@@ -85,7 +86,7 @@ export function handleStatusLine(
   // state goes with it — otherwise a finished CNC job left the store claiming
   // machineKind 'cnc' and holding an unconsumed tool-change queue indefinitely.
   const completedStreamerPatch = jobOverAtIdle
-    ? { streamer: null, ...finishedJobStateReset() }
+    ? { streamer: null, ...finishedJobStateReset(), ...bitFileRunEndPatch(state) }
     : {};
 
   const positionInvalidated = report.mpgActive === true && state.mpgActive !== true;

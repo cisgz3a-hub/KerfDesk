@@ -11,6 +11,7 @@
 import { deviceForActiveHead } from '../../core/cnc/cnc-head-feeds';
 import { streamingModeForController, type ControllerKind } from '../../core/devices';
 import type { ExternalProgramEnvelope } from '../../core/external-program';
+import type { KerfDeskBitFile } from '../../core/external-program/kerfdesk-bit-file';
 import { machineKindOf, type MachineKind, type Project } from '../../core/scene';
 import { confirmCncSetup } from '../laser/cnc-setup-acknowledgement';
 import { confirmLaserModeStartEvidence } from '../laser/laser-mode-start-acknowledgement';
@@ -34,6 +35,8 @@ export type ExternalRun = {
   readonly envelope: ExternalProgramEnvelope;
   /** The work position the program was read from, where it starts. */
   readonly start: { readonly x: number; readonly y: number; readonly z: number };
+  /** The bit its KerfDesk per-bit header names, read from the file as opened. */
+  readonly bitFile?: KerfDeskBitFile;
 };
 
 /** A clean Frame of one external program, as the controller stood after it. */
@@ -254,6 +257,9 @@ export async function startExternalProgram(frame: ExternalFrame): Promise<boolea
       // Its own G54-G59, offset and tool words may change what the store
       // records; those records go as it starts (ADR-630 Amendment 6).
       externalProgram: true,
+      // Its end is a bit change: Work Z goes and the X/Y origin holds for the
+      // set's later bits (bit-file-sequence.ts, ADR-392 Amendment 4).
+      ...(frame.run.bitFile === undefined ? {} : { externalBitFile: frame.run.bitFile }),
       // Start clears the Frame record before this runs, so it checks what the
       // record was bound to. Start arming can take a while, during which the
       // Laser/CNC switch stays usable, so the machine mode is checked here too.
