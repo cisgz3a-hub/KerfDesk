@@ -1654,7 +1654,11 @@ the completed physical Frame is the spatial source of truth.
    the machine notice; **Keep current machine** restores the current calibration too. The notice
    says when the camera calibration changes with it. When the file has the same machine and only
    its bed size differs, the notice gives both bed sizes, and **Keep current machine** comes first
-   as the primary choice (ADR-440 Amendment 5).
+   as the primary choice (ADR-440 Amendment 5). When the same machine's file differs in more than
+   the bed, the notice also names the other values in use, origin first ("The file's copy also
+   differs in origin and no-go zones"), and **Keep current machine** still comes first. A notice
+   for another machine names the bed and values that machine brings in place of yours (ADR-440
+   Amendment 8).
 4. **Keep current machine** is one Undo step, named in the Undo list. Undoing it brings back the
    file's machine together with the notice, so the question is asked again; Redo answers it again.
    No Undo of an older edit, and no Redo, puts the file's machine back without the notice
@@ -3010,8 +3014,8 @@ authorization, Frame proof, controller command, or safety boundary.
    Frame, interrupted/failed runs and selected-only outline runs do not switch it. If the switch
    is refused (run numbering is open), a warning says **Outline only** stays selected.
 8. Put one blank inside each burned outline and focus on the blank's **top surface**,
-   which is higher than the outline surface. Keep X/Y placement and work origin
-   unchanged. Confirm **Artwork only** before burning the artwork. Every
+   which is higher than the outline surface. Keep X/Y placement, Start from and work
+   origin unchanged. Confirm **Artwork only** before burning the artwork. Every
    registration outline is disabled and every artwork copy on an enabled source
    operation is included in the second run. Output completes all enabled operations
    for one physical jig instance before starting the next instance in grid order;
@@ -3025,6 +3029,13 @@ authorization, Frame proof, controller command, or safety boundary.
     footprint and placement (ADR-565). Frame again if those coordinates change;
     power/speed edits retain that spatial evidence, and each Start reviews and
     claims the current exact executable program.
+11. A complete outline run that finishes cleanly records the Start from and job
+    origin it burned with, for the rest of the session (a reconnect keeps it). If the
+    artwork run starts from another Start from or job origin, Job Review warns: "The
+    jig outline burned from User Origin with the job origin at front left, but this
+    artwork run starts from Absolute Coordinates. … Choose User Origin with the job
+    origin at front left again, keep the work origin unchanged, and watch the Frame."
+    Advice only (ADR-057 Amendment 6).
 
 #### Empty and edge cases
 
@@ -8805,6 +8816,12 @@ as the pane's design record.
   Coordinates. With Absolute Coordinates, camera or not, Job Review says the job burns at the
   outline's centred place on the canvas, not on the board, and to choose User Origin (ADR-654
   Amendment 3).
+- **Warning / camera placement on a registration jig job.** A jig job (outline or artwork run) is
+  told that it burns where its Start from puts the jig outline, not where the outline shows on the
+  camera picture; to burn both runs from the same Start from and work origin; and not to switch to
+  Absolute Coordinates between the runs. It is never told to choose Absolute Coordinates (ADR-654
+  Amendment 4). When the outline's own Start from is known and the artwork run differs, the jig's
+  outline warning (F-B15a) is shown instead.
 - **Edge / minimized wizard.** The wizard can minimize into a small non-modal panel so the
   operator can watch the camera and reach the machine while the target engraves.
 - **Fix / a small offset (ADR-663 Amendment 2).** For a calibrated camera fixed above the bed,

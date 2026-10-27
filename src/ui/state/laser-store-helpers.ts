@@ -327,6 +327,7 @@ type InitialLaserState = Pick<
   | 'pauseResumeTransition'
   | 'activeRunId'
   | 'liveCanvasRun'
+  | 'registrationOutlineRun'
   | 'activeJobMachineKind'
   | 'pendingUntrackedAcks'
   | 'pendingTransportWrites'
@@ -394,6 +395,7 @@ export function initialLaserState(): InitialLaserState {
     ...{ streamer: null, streamerEpoch: 0 },
     activeRunId: null,
     liveCanvasRun: null,
+    registrationOutlineRun: null,
     pendingUntrackedAcks: 0,
     pendingTransportWrites: 0,
     homingState: 'unknown',

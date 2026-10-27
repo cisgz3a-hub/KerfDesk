@@ -33,8 +33,14 @@ shown the warning.
    (**Show on canvas**, **Refresh picture**, **Live**) and **Trace from camera** still latch at
    once, as before.
 3. **Unchanged.** The latch stays on when the picture is hidden, and **Exit camera placement**
-   clears it and hides the picture, so it does not come back by itself. A hidden picture, or a
-   camera without a calibration, latches nothing.
+   clears it and hides the picture. A hidden picture, or a camera without a calibration, latches
+   nothing. The picture does come back after the next job: with **Refresh the picture after each
+   job** on (the default) and a still held, the after-job refresh shows it and latches placement
+   again (G6-P3-1, see Consequences).
+
+**Correction (2026-10-28):** Decision 3 first said the picture "does not come back by itself" after
+**Exit camera placement**. The after-job refresh brings it back, as this amendment's Consequences
+already said (rolling audit v5 J5-P3-1). The text now says so; the behaviour is unchanged.
 
 ### Consequences
 
