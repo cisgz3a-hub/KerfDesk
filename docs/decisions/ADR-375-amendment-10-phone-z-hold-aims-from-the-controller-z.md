@@ -1,4 +1,4 @@
-## ADR-375 Amendment 9 - The phone's Z hold aims from the controller's Z after an Unlock without Home (2026-10-27)
+## ADR-375 Amendment 10 - The phone's Z hold aims from the controller's Z after an Unlock without Home (2026-10-27)
 
 **Status:** Accepted; software-verified through tests that drive the real remote hold on a
 withheld status report. Not hardware-tested. | **Date:** 2026-10-27

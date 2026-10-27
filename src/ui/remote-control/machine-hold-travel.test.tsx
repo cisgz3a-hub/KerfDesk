@@ -186,7 +186,7 @@ describe('the phone Z hold', () => {
     expect(await remoteHold('z', -1)).toEqual({ dz: -HOLD_MAX_Z_TRAVEL_MM, feed: 600 });
   });
 
-  // Rolling audit v5 J3-P3-3 (ADR-375 Amendment 9). After an Unlock without Home KerfDesk
+  // Rolling audit v5 J3-P3-3 (ADR-375 Amendment 10). After an Unlock without Home KerfDesk
   // withholds the position, yet stock GRBL with $20=1 checks a Z jog target against its own
   // MPos: 5 mm below the top a 20 mm request was refused whole (error:15), as the refuter's
   // simulator run showed. GRBL facts are pinned in JogPad.unlock-soft-limits.test.tsx.

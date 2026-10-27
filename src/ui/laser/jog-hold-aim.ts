@@ -63,7 +63,7 @@ export function holdJogAim(input: HoldJogInput): {
  * or null when that envelope or the head's machine Z is unknown. Like the XY
  * aim, it measures from the controller's own MPos when KerfDesk withholds the
  * position, since stock GRBL with `$20=1` checks the Z target against it too
- * (ADR-375 Amendment 9).
+ * (ADR-375 Amendment 10).
  */
 export function holdZRoomMm(input: HoldJogInput, direction: -1 | 1): number | null {
   const { evidence, statusReport, reportInches } = input;
