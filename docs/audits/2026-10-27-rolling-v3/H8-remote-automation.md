@@ -1,5 +1,7 @@
 # Rolling audit v4 — Remote and automation
 
+> **Security hold lifted 2026-10-27:** H8-P1-1 was held until its fix merged. #1465 (ADR-269 Amd 1: remote DXF uses the import worker, plus an expansion budget) merged, so the full text is restored.
+
 - **When:** 2026-10-27   **Tree:** origin/main @ `a59f74ff9` (the audit worktree's source under `src`,
   `electron` and `services` is identical: `git diff a59f74ff9 HEAD -- src electron services` is empty).
   The local `origin/main` has since moved to `ce0548938` (#1459, #1460). #1460 fixes the KNOWN
@@ -17,7 +19,7 @@
     `svg-import-action.ts`, `import-toasts.ts`, `import-bed-fit-notice.ts`, `JobReviewDialog.tsx`,
     `JobReviewRegistrationJig.tsx`, `use-frame-action.ts`, `start-job-flow.ts`,
     `laser-job-pause-resume.ts`.
-  - Governing: PROJECT.md non-negotiable 9, ADR-125 Amd 1,
+  - Governing: PROJECT.md non-negotiable 9, ADR-125 Amd 1, ADR-269 (Nested DXF amendment),
     ADR-306 Amd 3, ADR-569, ADR-584, ADR-585, ADR-654, ADR-657.
 - **Lenses run:** L9 entry-point parity (main pass: every phone, MCP and AI action against its desktop
   twin), L5 trust boundary (what remote input reaches), L3 twins, L7 for the pinned tests. L2 only for
@@ -25,12 +27,13 @@
   service (relay, licence server, AI provider) was contacted.
 - **Counts:** 8 raised → 0 refuted → P1 2 / P2 3 / P3 3 (+6 KNOWN re-observed). Refuter: CONFIRMED 6
   (H8-P1-1, H8-P1-2, H8-P2-1, H8-P2-2, H8-P2-3, H8-P3-1), PLAUSIBLE 2 (H8-P3-2, H8-P3-3), REFUTED 0.
-  No severity changes. One sub-claim of H8-P1-1 is refuted (held), and the unrecognized-`$INSUNITS` case of H8-P2-3 is moved into
+  No severity changes. One sub-claim of H8-P1-1 is refuted (the job stream does not starve on the
+  default desktop GRBL USB transport), and the unrecognized-`$INSUNITS` case of H8-P2-3 is moved into
   H8-P1-2 (same silent-scale route).
 - **Refuter repro:** two temporary focused Vitest files, `src/ui/remote-control/zz-h8r-refute.test.ts` and
   `zz-h8r-mem.test.ts`, run one at a time with
   `NODE_OPTIONS="--no-experimental-webstorage --max-old-space-size=1536" node ../../../node_modules/vitest/vitest.mjs run <file> --silent=false --reporter=verbose`
-  (7 passed), then deleted.
+  (7 passed), then deleted. DXF expansions were kept at or below 8,000 instances.
 - **Repro:** one temporary focused Vitest file, `src/ui/remote-control/zz-h8-parity.test.tsx`, run with
   `NODE_OPTIONS=--no-experimental-webstorage node ../../../node_modules/vitest/vitest.mjs run src/ui/remote-control/zz-h8-parity.test.tsx --silent=false --reporter=verbose`
   (5 passed), then deleted. It drove the real remote adapter (`testAdapter` from
@@ -42,7 +45,10 @@
 
 The machine half of the remote surface holds: Frame, Review, Start, Abort, origin, Zero Z, pause and
 resume run the PC's own flows with the PC's guards. What slipped is file import and two places where
-the remote calls a lower-level helper than the desktop does. **One finding is held as a security issue (H8-P1-1).** Details are withheld until its fix merges (security hold, METHOD rule for remotely reachable holes); the full text is kept privately by the coordinator. Remote SVG/DXF import also scales oversize art to the bed with no warning anywhere
+the remote calls a lower-level helper than the desktop does. **One finding is held as a security
+issue (H8-P1-1):** an edit-only client can stall the PC renderer, and with it the PC's software Abort,
+with a few hundred bytes of DXF, because the remote parses DXF on the UI thread that ADR-269 moved
+desktop DXF off. Remote SVG/DXF import also scales oversize art to the bed with no warning anywhere
 (H8-P1-2), and drops every other import notice (H8-P2-3). A remote CNC bit change keeps the old bit's
 feeds where the Artwork card recalculates them (H8-P2-1), and the phone's hold-to-jog has no travel
 clamp, so it runs up to 100 mm past the homing switch where the PC's hold stops at the edge
@@ -70,7 +76,7 @@ clamp, so it runs up to 100 mm past the homing switch where the PC's hold stops 
 | Operation edit (CNC bit) | `withManualCncFeedPatch({toolId})` | Artwork card → `sceneWithCncStartupOperationDrafts` | Recalc and kept-feeds note missing; unknown id accepted | **H8-P2-1** |
 | Create / assign / reorder / delete operation, recipe | store actions | Layers panel | Same actions; desktop delete has no confirm either | Clean |
 | Text, shapes, transform, arrange | store actions, `editableArtwork` | canvas tools | Locked/hidden refused, Pro copy admission | Clean; KNOWN G7-K-2 (`update_text` receipt) |
-| SVG / DXF / raster import | `design-imports.ts` | File > Import | Import notices, bed-fit warning and own Undo step | **H8-P1-1, H8-P1-2, H8-P2-3** |
+| SVG / DXF / raster import | `design-imports.ts` | File > Import | DXF worker, import notices, bed-fit warning and own Undo step | **H8-P1-1, H8-P1-2, H8-P2-3** |
 | Save | `saveProjectRemotely` | Save | Invalid-project salvage confirm | KNOWN 01-P3-9 (latent) |
 | Undo / Redo | `applyHistory` → store | Ctrl+Z | Same store action | Clean (H9 owns Undo guards) |
 | AI Add reviewed design | `applyAiDraft` via `commitProjectEdit` | Import seeding | Seeding (#1369), Pro/numbering guard (#1346), scene budget | Clean |
@@ -78,10 +84,124 @@ clamp, so it runs up to 100 mm past the homing switch where the PC's hold stops 
 
 ## Findings
 
-### H8-P1-1 — SECURITY — held until fixed
+### H8-P1-1 — SECURITY — hold details until fixed: remote `import_file` DXF runs the unbounded composed-INSERT expansion on the renderer's UI thread, so an edit-only client can freeze the PC (and its software Abort) with a few hundred bytes
+- **Where:**
+  - `src/ui/remote-control/design-imports.ts:203-212`: `importFile` calls `parseDxf({ dxfText: text(bytes), … })`
+    synchronously in the renderer. It is not cancellable: the request `signal` is never checked inside it.
+  - Desktop twin: `src/ui/app/dxf-import-action.ts:79-107`. Every DXF with a Blob is parsed by
+    `parseDxfOffThread` in the import worker, which Escape cancels.
+  - The expansion has per-grid and depth caps only (`src/io/dxf/dxf-expand.ts:78` `MAX_INSERT_DEPTH = 8`,
+    `:241` grid ≤ 10,000 instances), no aggregate budget (KNOWN 14 K-4 / July DXF P2-1).
+  - Reach: `import_file` is an edit-tier MCP command (`electron/mcp/input-schemas.ts` `MCP_WRITE_COMMANDS`)
+    and the phone's Import sheet sends DXF (`services/remote-control/app/src/ui/import-sheet.tsx:75,113`).
+    Base64 is capped at 240,000 characters; the payload needed is under 400.
+  - Remote design writes are accepted while a job runs (no job check in `adapter.ts:71-95` or
+    `design-writes.ts`), and remote commands, the ack pump and the Abort UI share the renderer thread.
+- **Anchor:**
+  - Contract: ADR-269 Nested DXF amendment (`DECISIONS.md:14203-14210`) accepts "no new count limit"
+    because "Every reachable DXF Blob already uses the cancellable worker path regardless of file size".
+    The remote route is a reachable DXF that does not.
+  - Contract: PROJECT.md:465, non-negotiable 9: the software Abort "is reachable from any window state
+    during a job".
+  - Twin: `dxf-import-action.ts:79-107` (worker, cancellable). ADR-584 (`docs/decisions/ADR-584-full-remote-design-control.md:18`)
+    promises "the ordinary SVG/DXF parsers", not the UI-thread one.
+  - Trust boundary: an edit-approved client (or an MCP agent fed an attacker's file) gets an effect on
+    machine control that the edit tier is meant not to have.
+- **Scenario:**
+  1. A job is streaming on the PC. A paired phone or MCP client with edit approval sends `import_file`
+     with a DXF of two nested MINSERT grids (each within the 10,000 per-grid limit).
+  2. The renderer runs the expansion on its UI thread. While it runs, no timer, input event or serial
+     callback is served: the PC's ABORT button and Ctrl+. do not respond, the stream stops being
+     refilled, and remote `abort_job` waits behind it.
+  3. The bundled 289-byte fixture (150,000 instances) blocks for about 1 s. Two 10,000 grids are about
+     10^8 instances, roughly 670 times that, which ends in a renderer OOM crash rather than a result.
+  4. Only the physical E-stop works during the stall. The crash also loses unsaved edits since the last
+     autosave.
+- **Evidence:** REPRO + READ.
+  - `zz-h8-parity.test.tsx` "H8 C": the real adapter's `import_file` with the repo fixture
+    `nestedMinsertDxf()` (`src/__fixtures__/nested-minsert.ts`), with a 5 ms `setInterval` running.
+  - Output: `H8-C-PARSE-ONLY {"kind":"ok","parseMs":1122}` and
+    `H8-C-DXF {"dxfBytes":289,"base64Chars":388,"code":"ok","importedPolylines":149980,"totalMs":909,"timerTicksDuringImport":0,"longestEventLoopStallMs":909}`.
+    Zero timer ticks in 909 ms: the event loop never turned during the import.
+  - The 10^8 case was not run (memory on this PC); the scaling is from the per-grid cap and depth, as
+    the July DXF audit computed.
+- **Refuter:** CONFIRMED, P1 kept. One sub-claim is corrected (the stream keeps running on the default
+  desktop transport; see below), and the severity rests on the security clause.
+  - *What would make it false:* a permission or size gate before the renderer, a worker or yield in
+    the remote parse, a non-UI-thread stop path, or a prior report.
+  - *Permission:* `import_file` is in `MCP_WRITE_COMMANDS` (`electron/mcp/input-schemas.ts:142`), so
+    `mcpCommandScope` makes it `edit`. Main's `renderer-queue.ts:89-92` checks only `canWrite` for it.
+    The renderer's `assertCurrent` (`adapter.ts:288-294`) checks `canWrite`, `canEdit` (which is only
+    `pendingUndo === null`, `renderer-session.ts:127`) and the revision. Nothing checks for a running
+    job. REPRO "H8R-P1-1b": an adapter with `canWrite` true and no machine authority returned `ok`.
+    The client still has to be paired, and the PC owner has to approve its edit scope
+    (`services/remote-control/src/approvals.ts:276-283`).
+  - *Limits:* the relay caps one message at 256 KiB (`services/remote-control/src/protocol.ts:12`),
+    and both schemas cap the payload at 240,000 base64 characters. Neither main nor the relay counts
+    instances. The parser's only caps are 10,000 per grid (`dxf-insert-grid.ts:4`) and depth 8. The
+    file for two nested 10,000 grids (10^8 instances) is 320 base64 characters (REPRO).
+  - *UI-thread stall:* REPRO "H8R-P1-1" used the real adapter `import_file` with a 1 ms
+    `setInterval` and a `setTimeout(0)` stand-in for a queued Abort click:
 
-- **Severity:** P1. Refuter: CONFIRMED.
-- Details are withheld until its fix merges (security hold, METHOD rule for remotely reachable holes); the full text is kept privately by the coordinator.
+    | Instances | Parse | Ticks during import | Timeout ran before settle |
+    |---|---|---|---|
+    | 500 | 14 ms | 0 | false |
+    | 1,000 | 10 ms | 0 | false |
+    | 2,000 | 23 ms | 0 | false |
+    | 4,000 | 44 ms | 0 | false |
+
+    "H8R-MEM" with `--expose-gc` measured 2,000 / 4,000 / 8,000 instances at 37 / 58 / 125 ms, retaining
+    about 220 bytes per instance. Cost is linear at about 6–15 µs per instance. So a 2×10^6-instance
+    file stalls for tens of seconds. A renderer heap of a few GB fills at about 2×10^7 instances, after
+    minutes of stall, so the 10^8 file ends in a renderer OOM, not a result.
+  - *Abort during the stall:* blocked. The PC ABORT button, Ctrl+., Pause and the remote `abort_job`
+    all run on the renderer main thread. `renderer-session.ts:263-264` gives Abort a priority lane in
+    the same thread, not a different one. Main has no stop path: the port is Web Serial in the
+    renderer or its worker. Main's own texts already tell the operator to use the physical E-stop when
+    the renderer is unreachable (`electron/renderer-crash-recovery.ts:51`,
+    `desktop-window-close.ts:100`). The physical E-stop is the only stop. PROJECT.md:465
+    (non-negotiable 9) says the software Abort is "reachable from any window state during a job" and
+    is "not a safety-rated E-stop".
+  - *Corrected sub-claim (stream starvation):* for a GRBL-family USB connection on the desktop, the
+    refill runs in a dedicated serial worker by default. ADR-354 decision 4:
+    "Background streaming is on by default for GRBL-family connections". The ADR-354 Consequences:
+    "The renderer can stop processing tasks without stopping an armed worker's acknowledgement and
+    refill loop" (`docs/decisions/ADR-354-native-worker-background-streaming.md:36,59-60`). See also
+    `serial-worker-core.ts:1-10` and `laser-connect-action.ts:303`.
+    So in the default case **the job keeps running with every software stop frozen**, which is no
+    better. The stream does starve on the window transport:
+    - network machines (`src/platform/electron/desktop-machine-network.ts:29`);
+    - Marlin and Smoothieware;
+    - a port whose identity is not unique;
+    - a profile with `workerHostedStreaming: false`.
+
+    Starvation there with an `M3` (constant power) block leaves the beam lit at the stopped head.
+    Pinned GRBL 1.1 source turns the PWM off at buffer-empty only for rate-adjusted (`M4`) blocks:
+    https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/stepper.c#L393-L397
+    "if (st.exec_block->is_pwm_rate_adjusted) { spindle_set_speed(SPINDLE_PWM_OFF_VALUE); }",
+    fetched 2026-10-27. The GRBL Compatible dialect defaults cuts, fills and rasters to constant
+    (`src/core/devices/gcode-dialects.ts:115`). KerfDesk's own `air-keep-alive.ts:9-10` treats an M3
+    stop as lit. A renderer OOM also ends its dedicated worker, so the stream stops on every transport
+    then. Whether the port close resets the board depends on the board; this was not verified.
+  - *Severity (§3):* P1 under "shipped, remotely reachable security hole".
+    - **Shipped:** it arrived with #1156 (22868ee92, 2026-10-11) and is an ancestor of the 1.0.21
+      release commit faf5a54f1.
+    - **Reachable:** through the relay by a paired client.
+    - **Boundary crossed:** an edit-only principal, which ADR-569/585 keep away from machine control,
+      can disable every software stop of a running job, or crash the PC renderer, with 320 characters.
+      An MCP agent with only edit scope can be the carrier of an untrusted DXF.
+    - **Safety effect:** independently P1 on the window-transport M3 case (beam lit at a standstill
+      while Abort is frozen). On the default worker transport it is a running job that the software
+      cannot stop; the physical E-stop remains.
+  - *Novelty:* not KNOWN. 14 K-4 is the missing aggregate budget. ADR-269 accepted that gap only
+    because "Every reachable DXF Blob already uses the cancellable worker path"
+    (`DECISIONS.md:14207`). No report under `docs/audits/` names `design-imports.ts` or a remote
+    DXF parse; G7 left only image bombs unverified (`G7-app-shell-remote.md:447-448`). The only open PR
+    on remote-control (#1462) touches `machine-execution.ts` only. `git diff a59f74ff9 origin/main`
+    does not touch `design-imports.ts` or `src/io/dxf`.
+- **Fix direction:** Route remote DXF through the same worker parse (`parseDxfOffThread` on a Blob of
+  the decoded bytes) and tie its cancel to the request signal; and add the aggregate budget the July
+  audit proposed, since a worker OOM can still take the renderer down (14 K-4).
 
 ### H8-P1-2 — Remote SVG/DXF import silently scales oversize art to the bed; the desktop warns and keeps the scale as its own Undo step
 - **Where:**
@@ -404,7 +524,8 @@ clamp, so it runs up to 100 mm past the homing switch where the PC's hold stops 
 - **G7-K-2 = 02-P3-4** `update_text` reports `changedFields` without checking the store accepted it.
 - **01-P3-15** discrete remote Z jog accepts 100 mm (`machine-schemas.ts`); still present.
 - **01-P3-11 / 01-P3-12** remote `update_operation` bounds and tool text; still present.
-- One item about the held finding H8-P1-1 is withheld until its fix merges.
+- **14 K-4 (July DXF P2-1)** no aggregate INSERT budget. Root cause of H8-P1-1; the remote UI-thread route
+  is what is new.
 - **Refuter check of this list (2026-10-27):** each was spot-checked on this tree and is still present:
   - `MCP_PRIORITY_COMMANDS` still holds `jog_hold_stop` (`input-schemas.ts`);
   - `jog_machine.distanceMm` still allows 100 on every axis (`machine-schemas.ts:67`);
@@ -419,7 +540,14 @@ clamp, so it runs up to 100 mm past the homing switch where the PC's hold stops 
 Refuter (2026-10-27):
 
 - **No whole finding was refuted.**
-- One item about the held finding H8-P1-1 is withheld until its fix merges.
+- **H8-P1-1 sub-claim: "the stream stops being refilled" during the renderer stall.**
+  - *Refuted for the default desktop case,* a GRBL-family USB connection. The native serial worker
+    owns the port, the acknowledgement loop and the refill (ADR-354 decisions 1 and 4; Consequences:
+    the renderer can stop "without stopping an armed worker's acknowledgement and refill loop").
+    There the job keeps running while the software stops are frozen.
+  - *It holds only on the window transport:* network machines, Marlin and Smoothieware, a port with
+    no unique identity, or a profile opt-out. A later audit should not re-raise starvation for the
+    worker path.
 
 Candidates dropped by the auditor while checking:
 
@@ -466,7 +594,12 @@ Candidates dropped by the auditor while checking:
 
 ## Not verified
 
-- One item about the held finding H8-P1-1 is withheld until its fix merges.
+- **The full-size H8-P1-1 bomb.** 10^8 instances was not run (memory on this PC); only the 150,000-instance
+  fixture was. Whether a worker OOM can also take the renderer down (14 K-4) was not tested.
+  - Refuter: still not run. The refuter measured 2,000–8,000 instances at about 220 retained bytes and
+    6–15 µs each, which puts a renderer-heap OOM around 2×10^7 instances.
+  - Whether a renderer OOM resets the controller when its worker's port closes depends on the
+    board; this is not verified.
 - **Beam state when the stream starves.**
   - Refuter: partly answered.
     - Starvation happens only on the window transport (see Refuted).
@@ -475,7 +608,8 @@ Candidates dropped by the auditor while checking:
   - Still not checked for grblHAL, FluidNC, Marlin or Smoothieware, or on hardware.
 - **Remote raster bed-fit notice.** Refuter: answered by READ. The remote callback returns
   `undefined`, so no fit notice is pushed (see H8-P1-2). It was not run.
-- One item about the held finding H8-P1-1 is withheld until its fix merges.
+- **Canvas cost after a large remote DXF.** Whether redrawing a scene that holds 10^5–10^6 imported
+  polylines keeps the PC renderer slow after the import settles was not measured.
 - **#1462 sibling (open PR, not on this tree).** #1462 makes `executeJog`'s Z check follow the running job's
   machine (`motionMachineKind`), but `holdVector` (`machine-hold.ts:35-37`) still uses the open project's
   kind. For the PR reviewer.
@@ -486,7 +620,7 @@ Candidates dropped by the auditor while checking:
 
 ```json
 [
-  {"id":"H8-P1-1","severity":"P1","area":"remote-automation","file":"held","line":0,"anchor":"held","evidence":"REPRO","verdict":"CONFIRMED","known":null,"summary":"Security hold: details withheld until the fix merges."},
+  {"id":"H8-P1-1","severity":"P1","area":"remote-automation","file":"src/ui/remote-control/design-imports.ts","line":204,"anchor":"Contract: ADR-269 Nested DXF amendment (DECISIONS.md:14203-14210) 'Every reachable DXF Blob already uses the cancellable worker path'; PROJECT.md:465 NN9; Twin: dxf-import-action.ts:79-107 worker parse","evidence":"REPRO","verdict":"CONFIRMED","refuter":"REPRO zz-h8r-refute: real adapter import_file with 500-4,000 nested MINSERT instances -> 0 timer ticks, setTimeout(0) never ran before settle, linear ~6-15 us and ~220 B per instance (zz-h8r-mem); edit-only adapter (no machine authority) returned ok; 1e8-instance file is 320 base64 chars; no instance cap in relay (256 KiB/message) or main (scope check only). Abort/Ctrl+./remote abort_job share the renderer thread; main has no stop path. Corrected: default desktop GRBL USB refill runs in the ADR-354 worker, so the job keeps running with software stops frozen; starvation only on the window transport, where stock GRBL M3 keeps PWM at buffer-empty (stepper.c L393-397 @bfb67f0). P1 kept under the shipped (#1156, in 1.0.21) remotely reachable security clause: edit scope disables control-tier stops. Not KNOWN: 14 K-4 is the budget, ADR-269 accepted it only because every DXF used the worker","known":false,"summary":"SECURITY — hold details until fixed. Remote import_file parses DXF on the renderer UI thread with no aggregate expansion budget; a 289-byte DXF blocked the event loop ~1 s (0 timer ticks), two 10,000 grids reach ~1e8 instances; an edit-only client can freeze every PC software stop (Abort, Ctrl+., remote abort_job) while the job keeps running on the default worker transport, starve the stream on the window transport, or OOM-crash the renderer"},
   {"id":"H8-P1-2","severity":"P1","area":"remote-automation","file":"src/ui/remote-control/design-imports.ts","line":76,"anchor":"Contract: ADR-125 Amd 1 item 3 (scale is its own undo step; SVG and DXF imports report it with a warning); Twin: import-bed-fit-notice.ts:10-23","evidence":"REPRO","verdict":"CONFIRMED","refuter":"REPRO zz-h8r-refute: add_svg and import_file both 1000x500 -> 360x180 on 400x400, receipt keys changedArtworkIds/history only, PC toasts [], undo depth 1 and one Undo removes the import; desktop store import gives depth 2 and the ADR-125 Amd 1 notice. Widened: $INSUNITS 22 DXF 10-unit LINE imports as 10 mm (file ~254 mm) with a bare ok while parseDxf notes \"Unrecognized $INSUNITS 22\"; remote raster also passes undefined outcome (READ). P1 ruled: output scale differs from the file size ADR-125 Amd 1 item 1 makes the import size, and item 3 warning never reaches phone, MCP or PC; the canvas/Frame showing the shrunk art is not a warning of the mismatch (METHOD §3 2026-10-27)","known":false,"summary":"Remote add_svg/import_file scales oversize art to the bed (1000x500 -> 360x180, 36%) with no PC toast, no receipt note and no separate Undo step; the desktop warns that the burn no longer matches the file. Refuter widened: an unrecognized $INSUNITS DXF (22 -> 10 mm for ~254 mm) is also silent remotely"},
   {"id":"H8-P2-1","severity":"P2","area":"remote-automation","file":"src/ui/remote-control/design-operations.ts","line":171,"anchor":"Contract: ADR-306 Amd 3 items 1-3 ('A material-recipe operation is recalculated for the new bit'); Twin: CncOperationToolFields.tsx:52-76 -> cnc-startup-setup.ts:78-108","evidence":"REPRO","verdict":"CONFIRMED","refuter":"REPRO zz-h8r-refute: card transform em-6350 Hardwood 2400/960/2.5 -> em-1588 960/380/0.6 material-recipe; remote toolId gives 2400/960/2.5 with material and source dropped, receipt changedFields [cnc]; no-such-bit accepted and stored. Added anchor ADR-233 decision 5 (DECISIONS.md:11017-11022) \"A material-recipe tool change instead recalculates\". P2 kept: feeds/stepdown are not a §3 physical quantity (F4-P2-1 precedent); the unknown-id bit is named in PC Job Review (JobReviewCncOperationCard.tsx:44-45)","known":false,"summary":"Remote update_operation cnc.toolId keeps the previous bit's 2400/960/2.5 on a 1/16 in bit where the card sets 960/380/0.6, drops the material with no note; an unknown toolId is accepted and projected while compile uses the job default bit"},
   {"id":"H8-P2-2","severity":"P2","area":"remote-automation","file":"src/ui/remote-control/machine-hold.ts","line":28,"anchor":"Twin: JogPad.tsx:208-246 continuousJogVector + manual-motion-limits.ts:35-55; Contract (partial): ADR-585 lines 23-24 hold offered only when the desktop hold is, at most 100 mm; Ground truth: GRBL jog.c L35-36 (refusal only with soft limits), limits.c L98-124 (hard limit -> reset + alarm)","evidence":"REPRO","verdict":"CONFIRMED","refuter":"READ holdVector passes constant HOLD_MAX_TRAVEL_MM, store jog is warn-only, executeJog/executeHold return bare completion, plus auditor REPRO (dx 18 vs 100). Added anchor ADR-375 decision 3 (hold clamped to the firmware envelope; $27 short of the switch) and Amd 4 item 2. Not P1: hold motion is operator-commanded with a dead-man; $21=1 gives a latched visible ALARM:1 and voids position; $20=0/$21=0 overrun equals the desktop 100 mm step under ADR-232 warn-only bounds and happens in front of the operator","known":false,"summary":"Phone hold-to-jog always asks for 100 mm; 20 mm from the +X switch the PC hold sends dx 18 and the remote dx 100, so with $20=0 it runs onto the switch (ALARM, position lost) or the frame; jog bounds/no-go warnings reach only the PC"},
@@ -498,6 +632,7 @@ Candidates dropped by the auditor while checking:
   {"id":"H8-K-2","severity":"P2","area":"remote-automation","file":"services/remote-control/src/limits.ts","line":28,"anchor":"Twin: control-actions.ts usesAbortReserve","evidence":"READ","verdict":"KNOWN","known":"01-P2-5 / G7-K-1","summary":"jog_hold_stop spends the Abort rate lane"},
   {"id":"H8-K-3","severity":"P3","area":"remote-automation","file":"src/ui/remote-control/writes.ts","line":95,"anchor":"Twin: drawShape insert check","evidence":"READ","verdict":"KNOWN","known":"02-P3-4 / G7-K-2","summary":"update_text receipt not checked against the store"},
   {"id":"H8-K-4","severity":"P3","area":"remote-automation","file":"electron/mcp/machine-schemas.ts","line":67,"anchor":"Twin: PC Z step","evidence":"READ","verdict":"KNOWN","known":"01-P3-15","summary":"Discrete remote Z jog accepts 100 mm"},
-  {"id":"H8-K-5","severity":"P3","area":"remote-automation","file":"electron/mcp/design-schemas.ts","line":64,"anchor":"Twin: cut-settings-draft.ts bounds","evidence":"READ","verdict":"KNOWN","known":"01-P3-11 / 01-P3-12","summary":"Remote update_operation bounds and tool description differ from the PC"}
+  {"id":"H8-K-5","severity":"P3","area":"remote-automation","file":"electron/mcp/design-schemas.ts","line":64,"anchor":"Twin: cut-settings-draft.ts bounds","evidence":"READ","verdict":"KNOWN","known":"01-P3-11 / 01-P3-12","summary":"Remote update_operation bounds and tool description differ from the PC"},
+  {"id":"H8-K-6","severity":"P3","area":"remote-automation","file":"src/io/dxf/dxf-expand.ts","line":241,"anchor":"Contract: ADR-269 Nested DXF amendment","evidence":"READ","verdict":"KNOWN","known":"docs/audits/2026-10-21-rolling-v2/14-vector-importers.md K-4 (July DXF P2-1)","summary":"No aggregate INSERT/MINSERT budget; root cause of H8-P1-1"}
 ]
 ```
