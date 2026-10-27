@@ -43,7 +43,7 @@ export function checkCncLiftAgainstZTop(
 ): CncLiftZTopCheck {
   const limits = resolveFirmwareZLimits(evidence, profileZTravelMm);
   if (limits === null) {
-    return unchecked("the Z top needs this session's $ and Home (or soft limits on)");
+    return unchecked("the Z top needs this session's $$ and Home (or soft limits on)");
   }
   // The program runs in G54; another system's offset says nothing about it.
   if (evidence.activeWcs != null && evidence.activeWcs !== 'G54') {

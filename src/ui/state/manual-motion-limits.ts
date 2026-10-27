@@ -79,7 +79,7 @@ export function firmwareJogCheckPosition(
 
 /**
  * The machine Z range the firmware's envelope allows, from this session's
- * `$` (`$132`, `$23`, `$27`, `$21`), or null when it is not known. It is
+ * `$$` (`$132`, `$23`, `$27`, `$21`), or null when it is not known. It is
  * known on the same terms as the XY box: the controller enforces it (`$20=1`)
  * or this session's Home tied the machine position to the switch. Without
  * `$132` the machine profile's recorded Z travel stands in. A CNC job's park

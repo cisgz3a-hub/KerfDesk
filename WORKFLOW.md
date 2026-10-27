@@ -6226,7 +6226,7 @@ and lifts the command's CNC-only gate.)*
    job started" for Current Position. The CNC setup reference and the Machine Setup review page
    show "None".
 5. The park height is a work Z, so where it lands depends on where Z was zeroed (ADR-491
-   Amendment 2). Once this session's `$` and Home (or soft limits on) fix the top of Z travel and
+   Amendment 2). Once this session's `$$` and Home (or soft limits on) fix the top of Z travel and
    the controller reports its work offset, Job Review's Park height row says how far under the Z
    top the lift stays. A lift past it is a Start warning that gives the overshoot and the highest
    Park height that fits: with Z zeroed 40 mm below the homed top of a 75 mm axis, a 50 mm park
