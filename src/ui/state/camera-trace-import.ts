@@ -54,8 +54,13 @@ export function applyCameraTraceImport(
     ...state.project.scene.layers,
     ...scene.layers.filter((layer) => !existingIds.has(layer.id)),
   ];
+  // The capture's operation is new, so the result's copies of it are seeded
+  // with it, not inherited from it.
+  const { inheritedOperationIds: _seededWithCapture, ...mutation } = result as typeof result & {
+    readonly inheritedOperationIds?: ReadonlyArray<string>;
+  };
   return {
-    ...result,
+    ...mutation,
     project: { ...result.project, scene: { ...scene, layers } },
     additionalSelectedIds: new Set<string>(),
     undoStack: pushUndo(state.project, state.undoStack),

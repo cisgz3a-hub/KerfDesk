@@ -80,7 +80,8 @@ Three more defects sat on the same path:
    deleted, the result reuses its Image operations (ADR-235, unchanged). With it kept, the result
    burns on copies of them (same settings, sub-operations and per-artwork settings; new id and
    colour, after the picture's), so either can be turned off on its own, as LightBurn's per-layer
-   Output allows. Re-trace in place keeps the result's own operations.
+   Output allows. Re-trace in place keeps the result's own operations. The copies count as inherited, not new, so the
+   Startup CNC seeding and the material recipe auto-apply (ADR-496) leave their settings as copied.
 6. **Copying a trace copies only the trace** (Duplicate, Copy and Paste, Array, Copy along path,
    nesting, variable arrays), as copying LightBurn's traced vectors leaves the image alone. The
    copy keeps its Re-trace link to the original picture; pasted where that picture does not exist,

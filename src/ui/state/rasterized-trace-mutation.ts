@@ -37,7 +37,8 @@ import { repairRemovedProjectObjectReferences } from './repair-object-dependenci
  * ordinary image that engraves on its own operations (ADR-673), so the result
  * gets copies of them instead: either can then be turned off on its own, like
  * a LightBurn image and its trace on separate layers. Re-trace in place keeps
- * the result's own operations.
+ * the result's own operations. The copies are reported as inherited so the
+ * fresh-operation seeding of a trace commit leaves their settings alone.
  */
 export function applyRasterizedTraceToExisting(
   s: StateSlice,
@@ -47,6 +48,7 @@ export function applyRasterizedTraceToExisting(
 ): MutationResult &
   ReturnType<typeof repairRemovedProjectObjectReferences> & {
     readonly additionalSelectedIds: ReadonlySet<string>;
+    readonly inheritedOperationIds: ReadonlyArray<string>;
   } {
   const source = s.project.scene.objects.find(
     (object): object is RasterImage => object.id === sourceId && object.kind === 'raster-image',
@@ -85,6 +87,7 @@ export function applyRasterizedTraceToExisting(
     ...repairRemovedProjectObjectReferences({ ...s.project, scene }),
     selectedObjectId: committed.id,
     additionalSelectedIds: new Set<string>(),
+    inheritedOperationIds: bound.inheritedOperationIds ?? [],
     undoStack: pushUndo(s.project, s.undoStack),
     redoStack: [],
     dirty: true,
@@ -103,7 +106,12 @@ type RasterBindingContext = FreshRasterOperationContext & {
   readonly reusableOperationIds: ReadonlyArray<string>;
 };
 
-type BoundRasterizedTrace = { readonly scene: Scene; readonly committed: RasterImage };
+type BoundRasterizedTrace = {
+  readonly scene: Scene;
+  readonly committed: RasterImage;
+  // Operations copied from the kept source, settings included.
+  readonly inheritedOperationIds?: ReadonlyArray<string>;
+};
 
 function bindRasterizedTrace(
   scene: Scene,
@@ -179,7 +187,11 @@ function copySourceOperations(
     sourceOperations,
     copies,
   ) as RasterImage;
-  return { scene: placeRasterizedTrace(working, committed, replaceInPlace), committed };
+  return {
+    scene: placeRasterizedTrace(working, committed, replaceInPlace),
+    committed,
+    inheritedOperationIds: [...copies.values()],
+  };
 }
 
 // The no-reusable-Image-operation branch: allocate a fresh Image operation for
