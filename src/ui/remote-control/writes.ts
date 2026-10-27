@@ -3,7 +3,7 @@ import { createRectangle } from '../../core/shapes/primitives/create-rectangle';
 import { DEFAULT_TEXT_COLOR } from '../../core/text';
 import type { AppState } from '../state/store';
 import type { RemoteAppStore, RemoteWrite } from './types';
-import { updateOperationFull } from './design-operations';
+import { showKeptFeedsOnPc, updateOperationFull } from './design-operations';
 import { editableArtwork, expandedArtworkGroupIds, prepareTransforms } from './transforms';
 import { prepareRemoteText } from './text';
 import { editableText, prepareTextEdit } from './text-edit';
@@ -90,8 +90,12 @@ async function applyOrdinaryRemoteWrite(
         return { changedArtworkIds: ids };
       });
     }
-    case 'update_operation':
-      return commit(() => updateOperationFull(store, write.args.operationId, write.args.patch));
+    case 'update_operation': {
+      const { operationId, patch } = write.args;
+      const receipt = commit(() => updateOperationFull(store, operationId, patch));
+      showKeptFeedsOnPc(receipt.message);
+      return receipt;
+    }
     case 'update_text': {
       const object = editableText(state, write.args.artworkId);
       const prepared = await prepareTextEdit(state, object, write.args.patch, signal);

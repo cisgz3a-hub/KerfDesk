@@ -25,7 +25,11 @@ import { startAutosaveLoop, type AutosaveSnapshotFn } from '../state/autosave-lo
 import { createAutosaveProjectSnapshot } from '../state/autosave-project-snapshot';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
-import { projectLoadRefused } from '../state/project-machine-capability';
+import {
+  projectLoadRefused,
+  type ProjectMachineCapabilityLoadResult,
+} from '../state/project-machine-capability';
+import { pushProjectLoadNotices } from '../state/project-load-notices';
 import { loadedMachineCapabilityWarningMessage } from '../machine/machine-capability-messages';
 import { preserveUnadmittedProProject } from '../state/pending-pro-project';
 import { initialLicenceStatus } from '../licensing/edition';
@@ -154,11 +158,7 @@ export async function runAutosaveRecovery(
   if (ok) {
     const loadResult = s.setProject(record.project);
     if (projectLoadRefused(loadResult)) return;
-    if (loadResult.kind === 'capability-warning') {
-      useToastStore
-        .getState()
-        .pushToast(loadedMachineCapabilityWarningMessage(loadResult.activeKind), 'warning');
-    }
+    reportRestoredProject(loadResult, record);
     // M15 (AUDIT-2026-06-10): the restored project's ONLY durable copy is
     // the autosave slot. Mark it dirty so the 30 s loop, the beforeunload
     // write, and the discard confirms all stay armed — and KEEP a slot;
@@ -182,6 +182,18 @@ export async function runAutosaveRecovery(
   }
   // Declining is an explicit discard — clearing stops the re-prompt loop.
   reportCleanupResult(await service.clearRecovered(record));
+}
+
+// What Restore changed, said as File > Open says it (ADR-673 Amendment 1).
+function reportRestoredProject(
+  loadResult: ProjectMachineCapabilityLoadResult,
+  record: AutosaveDurableSnapshot,
+): void {
+  const pushToast = useToastStore.getState().pushToast;
+  if (loadResult.kind === 'capability-warning') {
+    pushToast(loadedMachineCapabilityWarningMessage(loadResult.activeKind), 'warning');
+  }
+  pushProjectLoadNotices(record.loadNotices ?? {}, pushToast, { migration: true });
 }
 
 function recoveryAgeLabel(savedAt: number): string {

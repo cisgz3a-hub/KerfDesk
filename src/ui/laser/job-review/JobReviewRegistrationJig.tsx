@@ -41,8 +41,8 @@ export function JobReviewRegistrationJig(props: {
       <ol style={{ margin: '8px 0', paddingLeft: 20 }}>
         <li>Burn the outline on the jig base before placing the piece.</li>
         <li>
-          Place the piece inside the burned outline. Keep its X/Y placement and the work origin
-          unchanged.
+          Place the piece inside the burned outline. Keep its X/Y placement, Start from and the work
+          origin unchanged.
         </li>
         <li>Set the laser focus to the top surface of the piece, then burn the artwork.</li>
       </ol>

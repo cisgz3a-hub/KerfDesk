@@ -19,6 +19,10 @@ import {
   updatePngCrc,
 } from './png-stream-reader';
 import { normalizeImageDensity, type ImageDensity } from '../common/image-density';
+import {
+  exifBlockOrientation,
+  type ExifOrientation,
+} from '../../io/raster-decode/exif-orientation';
 
 export type IncrementalPngProgress = {
   readonly phase: 'decoding';
@@ -39,7 +43,10 @@ export type IncrementalPngResult =
       readonly sampledHeight: number;
       readonly bitDepth: number;
       readonly colorType: number;
+      /** pHYs as stored, before Orientation is applied. */
       readonly density: ImageDensity | null;
+      /** The eXIf Orientation Chromium applies; rows and sizes are as stored. */
+      readonly orientation: ExifOrientation;
     }
   | { readonly kind: 'legacy-fallback'; readonly reason: string };
 
@@ -49,6 +56,8 @@ export type IncrementalPngOptions = {
   readonly signal?: AbortSignal;
   readonly onProgress?: (progress: IncrementalPngProgress) => void;
   readonly onHeader?: (result: IncrementalPngHeaderResult) => void | Promise<void>;
+  /** Once, before the first row: the eXIf Orientation, final by the first IDAT. */
+  readonly onOrientation?: (orientation: ExifOrientation) => void | Promise<void>;
   readonly onTransparency?: (transparency: IncrementalPngTransparency) => void | Promise<void>;
   readonly onRow: (row: Uint8Array) => void | Promise<void>;
 };
@@ -61,10 +70,13 @@ export type IncrementalHeightfieldPngOptions = Omit<IncrementalPngOptions, 'maxE
 
 export type IncrementalPngHeaderResult = Omit<
   Extract<IncrementalPngResult, { readonly kind: 'ok' }>,
-  'density'
+  'density' | 'orientation'
 >;
 
 const SIGNATURE = Uint8Array.of(137, 80, 78, 71, 13, 10, 26, 10);
+// An eXIf holds a TIFF block, at most a 64 KiB thumbnail when converted from a
+// JPEG APP1; a larger one is read as recording no Orientation.
+const MAX_EXIF_BYTES = 1024 * 1024;
 
 export async function decodeIncrementalPngToLuma(
   chunks: AsyncIterable<Uint8Array>,
@@ -146,7 +158,7 @@ async function decodeIdat(
   }
   const decompressor = new DecompressionStream('deflate');
   const writer = decompressor.writable.getWriter();
-  const metadata: ChunkMetadata = { grayKey: undefined, colourKey: undefined, density: null };
+  const metadata: ChunkMetadata = emptyChunkMetadata();
   // Read as rows decode; tRNS must precede IDAT (checked when read), so it is final by then.
   const transparentKey = (): PngTransparentKey | undefined =>
     metadata.grayKey === undefined ? metadata.colourKey : [metadata.grayKey];
@@ -168,6 +180,7 @@ async function decodeIdat(
       const chunk = await readChunkHeader(reader);
       if (chunk.type === 'IDAT') {
         if (idatEnded) throw new Error('PNG IDAT chunks must be consecutive.');
+        await beforeImageData(sawIdat, options, metadata);
         sawIdat = true;
         await readChunkData(reader, chunk, async (segment) => writer.write(streamBytes(segment)));
         continue;
@@ -202,6 +215,7 @@ async function decodeIdat(
       bitDepth: format.bitDepth,
       colorType: format.colorType,
       density: metadata.density,
+      orientation: chunkOrientation(metadata),
     };
   } catch (error) {
     await writer.abort(error).catch(() => undefined);
@@ -210,12 +224,32 @@ async function decodeIdat(
   }
 }
 
-// What the chunks read so far say about the image: its tRNS key and density.
+// What the chunks read so far say about the image: its tRNS key, density and
+// Orientation (null until the first eXIf before IDAT is read).
 type ChunkMetadata = {
   grayKey: number | undefined;
   colourKey: PngTransparentKey | undefined;
   density: ImageDensity | null;
+  orientation: ExifOrientation | null;
 };
+
+function emptyChunkMetadata(): ChunkMetadata {
+  return { grayKey: undefined, colourKey: undefined, density: null, orientation: null };
+}
+
+function chunkOrientation(metadata: ChunkMetadata): ExifOrientation {
+  return metadata.orientation ?? 1;
+}
+
+// At the first IDAT the eXIf, which must precede it, is final and no row has
+// decoded yet, so the Orientation is announced there.
+async function beforeImageData(
+  sawIdat: boolean,
+  options: IncrementalPngOptions,
+  metadata: ChunkMetadata,
+): Promise<void> {
+  if (!sawIdat) await options.onOrientation?.(chunkOrientation(metadata));
+}
 
 // Validate one chunk other than IDAT and record what it says.
 async function readMetadataChunk(
@@ -252,6 +286,11 @@ async function readMetadataChunk(
     metadata.colourKey,
   );
   metadata.density = densityFromChunk(chunk.type, afterImageData, data, metadata.density);
+  // The CRC is already checked (a mismatch fails the import), so the first
+  // eXIf before IDAT decides, as in Chromium (ADR-404 Amendment 1).
+  if (chunk.type === 'eXIf' && !afterImageData && metadata.orientation === null) {
+    metadata.orientation = exifBlockOrientation(data, 0, data.byteLength) ?? 1;
+  }
 }
 
 type SettledRows = { readonly ok: true } | { readonly ok: false; readonly error: unknown };
@@ -308,7 +347,8 @@ async function readChunkData(
   chunk: ChunkHeader,
   visit: (segment: Uint8Array) => void | Promise<void> = () => undefined,
 ): Promise<Uint8Array> {
-  const retained = chunk.length <= 13 ? new Uint8Array(chunk.length) : new Uint8Array();
+  const keep = chunk.length <= 13 || (chunk.type === 'eXIf' && chunk.length <= MAX_EXIF_BYTES);
+  const retained = keep ? new Uint8Array(chunk.length) : new Uint8Array();
   let retainedOffset = 0;
   let crc = startPngCrc(chunk.typeBytes);
   await reader.readSegments(chunk.length, async (segment) => {

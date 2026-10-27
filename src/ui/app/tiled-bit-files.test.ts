@@ -16,6 +16,7 @@ import {
   type ExternalProgram,
 } from '../../core/external-program';
 import { kerfDeskBitChangeLabels } from '../../core/external-program/kerfdesk-bit-changes';
+import { kerfDeskBitFile } from '../../core/external-program/kerfdesk-bit-file';
 import { buildGcodeRenderModel } from '../../core/gcode-view';
 import { sanitizeGcodeCommentValue } from '../../core/gcode-comments';
 import { DEFAULT_CNC_TOOLS, type CncTiling, type Project } from '../../core/scene';
@@ -146,6 +147,20 @@ describe('tiled save, a separate registration cutter (E3-P2-1)', () => {
       expect(reviewWarnings(normalizedProgram(file), file.gcode).join('\n')).not.toContain(
         'changes bits',
       );
+    }
+  });
+
+  // Rolling audit v5 J1-P2-1 (ADR-392 Amendment 5): Run G-code file read only
+  // a file's first four lines, and a tile's bit line falls below its metadata
+  // header, so no tile bit file ever voided Work Z or held X/Y between bits.
+  it('names each bit file to Run G-code file, below the metadata header', () => {
+    const result = readyTiles(twoTileProject({ registration: true, park: false }));
+    const bits = [toolName('em-6350'), toolName('em-3175')];
+    for (const [index, file] of result.files.entries()) {
+      const order = (index % 2) + 1;
+      const lines = file.gcode.split('\n');
+      expect(lines.findIndex((line) => line.startsWith('; bit '))).toBeGreaterThan(3);
+      expect(kerfDeskBitFile(file.gcode)).toEqual({ order, count: 2, bitName: bits[order - 1] });
     }
   });
 

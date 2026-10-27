@@ -16,6 +16,7 @@ import { portableProjectAssets } from './portable-project-assets';
 import type { PagedRasterAssetReader } from '../import/paged-raster-hydration';
 import { createProjectSaveWriteCoordinator } from '../state/project-save-write-coordinator';
 import { describePendingProProject } from '../state/pending-pro-project';
+import { pushProjectLoadNotices } from '../state/project-load-notices';
 
 type OpenTemplateContext = ProjectOpenCompletionContext & {
   readonly platform: PlatformAdapter;
@@ -54,7 +55,7 @@ export async function openTemplateFile(
   isCurrent: () => boolean,
   isUnchanged: () => boolean = () => true,
 ): Promise<void> {
-  const { project, projectJson } = parseProjectTemplateDocument(await file.text());
+  const { project, projectJson, notices } = parseProjectTemplateDocument(await file.text());
   // Desktop Free opens a Pro template only when this computer sealed it (ADR-592).
   if (unadmittedProFeatures(project).length > 0) {
     await projectSealReady();
@@ -79,6 +80,7 @@ export async function openTemplateFile(
     `Started a new project from ${file.name}. Save will ask for a destination.`,
     'success',
   );
+  pushProjectLoadNotices(notices, ctx.pushToast, { migration: true });
   if (loaded.kind === 'capability-warning')
     ctx.pushToast(loadedMachineCapabilityWarningMessage(loaded.activeKind), 'warning');
 }

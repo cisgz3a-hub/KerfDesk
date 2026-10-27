@@ -41,8 +41,21 @@ export class LicensingUpdateCache {
   }
 
   eligible(envelope: unknown, expectedVersion: string): boolean {
-    if (this.config.channel !== 'commercial') return false;
-    return this.eligibleRelease(
+    return this.signedVerdict(envelope, expectedVersion) === 'covered';
+  }
+
+  /**
+   * A release held back only because this licence's last confirmation failed:
+   * the saved rights cover it once a confirmation succeeds. It words the update
+   * panel (ADR-547 Amendment 1) and never authorises an update (ADR-561 item 5).
+   */
+  awaitsConfirmation(envelope: unknown, expectedVersion: string): boolean {
+    return this.signedVerdict(envelope, expectedVersion) === 'unconfirmed';
+  }
+
+  private signedVerdict(envelope: unknown, expectedVersion: string): ReleaseVerdict {
+    if (this.config.channel !== 'commercial') return 'refused';
+    return this.releaseVerdict(
       verifyLicenceRelease(envelope, this.config.releaseKeys, 'update-manifest'),
       expectedVersion,
     );
@@ -62,13 +75,35 @@ export class LicensingUpdateCache {
     }
   }
 
+  /** `awaitsConfirmation` after reloading the saved licence, as `readEligible` does. */
+  readAwaits(load: Load, envelope: unknown, expectedVersion: string): Promise<boolean> {
+    return afterLoad(load, () => this.awaitsConfirmation(envelope, expectedVersion));
+  }
+
   async manualEligible(envelope: string, expectedVersion: string): Promise<boolean> {
+    return (await this.manualVerdict(envelope, expectedVersion)) === 'covered';
+  }
+
+  /** `manualEligible` after reloading the saved licence. */
+  readManualEligible(load: Load, envelope: string, expectedVersion: string): Promise<boolean> {
+    return afterLoad(load, () => this.manualEligible(envelope, expectedVersion));
+  }
+
+  /** `awaitsConfirmation` for a manual download document, after reloading the saved licence. */
+  readManualAwaits(load: Load, envelope: string, expectedVersion: string): Promise<boolean> {
+    return afterLoad(
+      load,
+      async () => (await this.manualVerdict(envelope, expectedVersion)) === 'unconfirmed',
+    );
+  }
+
+  private async manualVerdict(envelope: string, expectedVersion: string): Promise<ReleaseVerdict> {
     if (
       this.config.channel !== 'commercial' ||
       this.config.manualUpdates !== true ||
       this.config.sandbox === true
     )
-      return false;
+      return 'refused';
     try {
       // The Windows document, or this release's macOS or Linux one (ADR-613).
       const release = await verifyAnyManualDownload(
@@ -76,7 +111,7 @@ export class LicensingUpdateCache {
         manualReleaseKeySet(this.config.releaseKeys),
         this.now() * 1000,
       );
-      return this.eligibleRelease(
+      return this.releaseVerdict(
         {
           version: release.version,
           publishedAt: Math.floor(Date.parse(release.publishedAt) / 1000),
@@ -84,52 +119,66 @@ export class LicensingUpdateCache {
         expectedVersion,
       );
     } catch {
-      return false;
+      return 'refused';
     }
   }
 
-  private eligibleRelease(
+  private releaseVerdict(
     release: ReturnType<typeof verifyLicenceRelease>,
     expectedVersion: string,
-  ): boolean {
+  ): ReleaseVerdict {
     if (this.config.channel !== 'commercial' || this.mutations !== 0 || this.value === null)
-      return false;
+      return 'refused';
     const { saved, device } = this.value;
-    if (release === null || release.version !== expectedVersion) return false;
-    if (saved.pendingDeactivation !== undefined) return false;
+    if (release === null || release.version !== expectedVersion) return 'refused';
+    if (saved.pendingDeactivation !== undefined) return 'refused';
     // A device with no licence runs the Free edition, which every release
     // includes, so it always takes the newest signed release (ADR-540).
-    if (saved.credential === undefined) return true;
+    if (saved.credential === undefined) return 'covered';
     const claims = verifyEntitlement(
       saved.credential.entitlement,
       this.config.entitlementKeys,
       device,
     );
-    return (
-      claims !== null &&
-      claimsTakeRelease(claims, saved.lastSeenAt, this.now(), release, this.authenticationFailed)
-    );
+    if (claims === null) return 'refused';
+    return claimsVerdict(claims, saved.lastSeenAt, this.now(), release, this.authenticationFailed);
   }
 }
 
-function claimsTakeRelease(
+/**
+ * `covered` releases may update. `unconfirmed` ones are covered by the saved
+ * rights but wait for a licence confirmation to succeed; `refused` ones are not.
+ */
+type ReleaseVerdict = 'covered' | 'unconfirmed' | 'refused';
+type Load = () => Promise<unknown>;
+
+/** Reloads the saved licence, then answers. A licence that cannot be read refuses. */
+async function afterLoad(load: Load, answer: () => boolean | Promise<boolean>): Promise<boolean> {
+  try {
+    await load();
+    return await answer();
+  } catch {
+    return false;
+  }
+}
+
+function claimsVerdict(
   claims: LicenceClaims,
   lastSeenAt: number,
   now: number,
   release: NonNullable<ReturnType<typeof verifyLicenceRelease>>,
   authenticationFailed: boolean,
-): boolean {
+): ReleaseVerdict {
   // An ended trial leaves a Free device too. A paid licence whose updates have
   // ended keeps its covered version, so its Pro tools stay unlocked.
   if (claims.accessExpiresAt !== null && Math.max(now, lastSeenAt) >= claims.accessExpiresAt)
-    return true;
+    return 'covered';
+  if (!validTime(claims, lastSeenAt, now) || !licenceCoversRelease(claims, release))
+    return 'refused';
   // Failed licence authentication cannot authorize paid or still-active trial
-  // updates. Free devices need no grant, including a verified ended trial.
-  return (
-    !authenticationFailed &&
-    validTime(claims, lastSeenAt, now) &&
-    licenceCoversRelease(claims, release)
-  );
+  // updates (ADR-561 item 5). Free devices need no grant, including a verified
+  // ended trial. The rights still cover the release, so it is only unconfirmed.
+  return authenticationFailed ? 'unconfirmed' : 'covered';
 }
 
 function validTime(claims: LicenceClaims, lastSeenAt: number, now: number): boolean {

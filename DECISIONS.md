@@ -14149,7 +14149,9 @@ then a `localStorage` write whose ~5 MB cap discards the result.
 
 ADR-268's amendments are separate decision files (ADR-344):
 `docs/decisions/ADR-268-amendment-1-use-expansion-has-a-budget.md` (SVG `<use>` expansion has a
-budget, and item 2 reads literal internal-subset entities under an expansion bound).
+budget, and item 2 reads literal internal-subset entities under an expansion bound);
+`docs/decisions/ADR-268-amendment-2-readers-match-text-in-linear-time.md` (the SVG and LightBurn
+readers' number, length, paint, transform and keyword patterns match their text in linear time).
 
 ## ADR-269 - Production imports are worker-backed, pressure-disclosed, queued, and cancellable (2026-07-30)
 
@@ -14262,7 +14264,11 @@ also made it easy to mistake off-thread whole-file reads for streaming or bounde
 
 ADR-269's amendments are separate decision files (ADR-344):
 `docs/decisions/ADR-269-amendment-1-remote-dxf-worker-and-block-budget.md` (remote DXF import
-uses the same import-worker parse as the desktop, and placing DXF blocks has a budget).
+uses the same import-worker parse as the desktop, and placing DXF blocks has a budget);
+`docs/decisions/ADR-269-amendment-2-dxf-budget-counts-each-point-once.md` (that budget counts
+each placed point once, however many blocks wrap it);
+`docs/decisions/ADR-269-amendment-3-remote-svg-worker-and-use-point-budget.md` (remote SVG import
+uses the same document-worker parse as the desktop, and the SVG `<use>` budget counts points).
 
 ## ADR-270 - V-carve ladders complete one filled region before moving to the next (2026-07-31)
 

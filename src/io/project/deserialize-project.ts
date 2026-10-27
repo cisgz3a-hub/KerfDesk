@@ -103,9 +103,9 @@ export function deserializeProjectValue(raw: unknown): DeserializeResult {
   const shapeError = validateProjectShape(workingRaw, resolvedDocuments);
   if (shapeError !== null) return { kind: 'invalid', reason: shapeError };
 
-  let project: Project;
+  let settled: ReturnType<typeof settleLegacyTraceSources>;
   try {
-    project = settleLegacyTraceSources(normalizeProject(workingRaw, resolvedDocuments));
+    settled = settleLegacyTraceSources(normalizeProject(workingRaw, resolvedDocuments));
   } catch (error) {
     return {
       kind: 'invalid',
@@ -113,7 +113,7 @@ export function deserializeProjectValue(raw: unknown): DeserializeResult {
     };
   }
 
-  return projectLoadResult(workingRaw, project, migratedFrom);
+  return projectLoadResult(workingRaw, settled.project, migratedFrom, settled.keptPhotosOff);
 }
 
 function normalizeProject(

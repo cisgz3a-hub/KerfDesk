@@ -1,5 +1,5 @@
 import { captureMaterialRecipe } from '../src/core/material-library';
-import { DEFAULT_DEVICE_PROFILE } from '../src/core/devices';
+import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from '../src/core/devices';
 import {
   createLayer,
   createProject,
@@ -146,11 +146,12 @@ test('native-arc lead start chosen by pointer agrees with the prepared contour e
   page,
   kerfdesk,
 }, info) => {
-  const base = createProject({
-    ...DEFAULT_DEVICE_PROFILE,
-    controllerKind: 'grbl-v1.1',
-    origin: 'rear-left',
-  });
+  const machine = { controllerKind: 'grbl-v1.1', origin: 'rear-left' } as const;
+  const base = createProject({ ...DEFAULT_DEVICE_PROFILE, ...machine });
+  // Open keeps the machine in use when the file names the same one (ADR-500
+  // Amendment 2), so the native-arc GRBL machine is set up first, as Machine
+  // Setup would, and the file then opens on it.
+  await useMachine(page, machine);
   const points = Array.from({ length: 129 }, (_, index) => ({
     x: 40 + 10 * Math.cos((index * Math.PI) / 64),
     y: 40 + 10 * Math.sin((index * Math.PI) / 64),
@@ -379,6 +380,17 @@ async function screenPoint(page: Page, point: Vec2): Promise<Vec2> {
           canvas.height,
     };
   }, point);
+}
+
+// The machine in use, changed as Machine Setup changes it, left clean so Open
+// replaces the empty document without asking to save it.
+async function useMachine(page: Page, patch: Partial<DeviceProfile>) {
+  await page.evaluate(async (devicePatch) => {
+    const storePath = '/src/ui/state/store.ts';
+    const { useStore } = await import(/* @vite-ignore */ storePath);
+    useStore.getState().updateDeviceProfile(devicePatch);
+    useStore.setState({ dirty: false });
+  }, patch);
 }
 
 async function expectNoSerial(fixture: KerfDeskFixture) {

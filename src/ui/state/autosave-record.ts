@@ -2,6 +2,10 @@ import type { Project } from '../../core/scene';
 import { PROJECT_SCHEMA_VERSION } from '../../core/scene/project';
 import { deserializeProject, deserializeProjectValue } from '../../io/project/deserialize-project';
 import { prepareProjectForAutosave } from '../../io/project/prepare-project-autosave';
+import {
+  projectLoadNoticeFlags,
+  type ProjectLoadNoticeFlags,
+} from '../../io/project/project-load-metadata';
 import { sealProjectText, trustIfSealedHere } from '../licensing/project-seal';
 import { unadmittedProFeatures } from './pending-pro-project';
 
@@ -19,6 +23,8 @@ export type AutosaveSnapshot = {
   readonly savedAt: number;
   readonly storageKey: string;
   readonly sessionId?: string;
+  /** What reading the record changed; Restore reports it as Open does. */
+  readonly loadNotices?: ProjectLoadNoticeFlags;
 };
 
 export type AutosaveWriteResult =
@@ -89,6 +95,7 @@ export function readAutosaveRecord(
   // Desktop Free restores Pro work only from an autosave sealed here (ADR-592).
   if (unadmittedProFeatures(result.project).length > 0)
     trustIfSealedHere(result.project, record.projectJson);
+  const loadNotices = projectLoadNoticeFlags(result);
   return {
     kind: 'ok',
     snapshot: {
@@ -96,6 +103,7 @@ export function readAutosaveRecord(
       savedAt: record.savedAt,
       storageKey,
       ...(record.sessionId === undefined ? {} : { sessionId: record.sessionId }),
+      ...(Object.keys(loadNotices).length === 0 ? {} : { loadNotices }),
     },
   };
 }

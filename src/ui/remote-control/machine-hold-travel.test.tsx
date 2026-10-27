@@ -12,6 +12,7 @@ import { createProject, DEFAULT_CNC_MACHINE_CONFIG } from '../../core/scene';
 import { JogPad } from '../laser/JogPad';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
+import { statusPositionPatch } from '../state/laser-status-position';
 import { MachineRefusal } from './machine-actions';
 import type { MachineExecutionContext } from './machine-execution';
 import { executeHold, HOLD_MAX_TRAVEL_MM, HOLD_MAX_Z_TRAVEL_MM } from './machine-hold';
@@ -182,6 +183,29 @@ describe('the phone Z hold', () => {
     homedGrblSoftLimitsOff();
     useLaserStore.setState({ statusReport: idleAt(-200, -150, -10) });
     expect(await remoteHold('z', 1)).toEqual({ dz: 8, feed: 600 });
+    expect(await remoteHold('z', -1)).toEqual({ dz: -HOLD_MAX_Z_TRAVEL_MM, feed: 600 });
+  });
+
+  // Rolling audit v5 J3-P3-3 (ADR-375 Amendment 10). After an Unlock without Home KerfDesk
+  // withholds the position, yet stock GRBL with $20=1 checks a Z jog target against its own
+  // MPos: 5 mm below the top a 20 mm request was refused whole (error:15), as the refuter's
+  // simulator run showed. GRBL facts are pinned in JogPad.unlock-soft-limits.test.tsx.
+  it('aims from the withheld controller Z after an Unlock without Home, as the XY hold does', async () => {
+    useStore.setState((state) => ({
+      project: { ...state.project, machine: DEFAULT_CNC_MACHINE_CONFIG },
+    }));
+    homedGrblSoftLimitsOff();
+    useLaserStore.setState((state) => ({
+      homingState: 'unknown',
+      positionEvidenceSuppressed: true,
+      controllerSettings: { ...state.controllerSettings!, softLimitsEnabled: true },
+    }));
+    useLaserStore.setState(statusPositionPatch(useLaserStore.getState(), idleAt(-50, -50, -5)));
+    expect(useLaserStore.getState().statusReport?.mPos).toBeNull();
+    const up = await remoteHold('z', 1);
+    expect(up).not.toBeInstanceOf(Error);
+    expect((up as JogCall).dz).toBeGreaterThan(2.9);
+    expect((up as JogCall).dz).toBeLessThanOrEqual(3);
     expect(await remoteHold('z', -1)).toEqual({ dz: -HOLD_MAX_Z_TRAVEL_MM, feed: 600 });
   });
 

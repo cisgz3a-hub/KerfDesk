@@ -12,8 +12,15 @@ export type ProjectBedReconciliationNotice = {
   readonly openedBed: { readonly width: number; readonly height: number };
   readonly workspaceMismatch: boolean;
   readonly machineChanged: boolean;
-  /** The same profile id and name, so only the bed size tells the two apart (ADR-440 Amendment 5). */
+  /** Another bed size of the machine in use: the same profile id and name (ADR-440 Amendment 8). */
+  readonly sameProfile: boolean;
+  /** The same profile, and nothing but the bed size and the camera calibration
+   * differs, so the notice may name only those (ADR-440 Amendments 5 and 8). */
   readonly bedSizeOnly: boolean;
+  /** The machine settings the file's copy holds differently, besides the bed
+   * and the camera calibration, named as the same-machine toast names them
+   * ('origin', 'no-go zones', …). Empty when the machine is unchanged. */
+  readonly differingSettings: ReadonlyArray<string>;
   /** The opened machine's camera calibration differs from the current one's; null when not. */
   readonly camera: CameraCalibrationChange | null;
 };
@@ -60,9 +67,26 @@ export function canonicalizeOpenedProjectBed(
       openedBed,
       workspaceMismatch,
       machineChanged,
-      bedSizeOnly: machineChanged && sameProfile(project.device, previous.device),
+      ...machineDifferences(project, previous, machineChanged),
       camera: machineChanged ? cameraCalibrationChange(project.device, previous.device) : null,
     },
+  };
+}
+
+// The file's whole machine is in use behind the notice (ADR-500 Amendment 2
+// Decision 3), so its origin or no-go zones must not hide behind bed words.
+function machineDifferences(
+  project: Project,
+  previous: Project,
+  machineChanged: boolean,
+): Pick<ProjectBedReconciliationNotice, 'sameProfile' | 'bedSizeOnly' | 'differingSettings'> {
+  if (!machineChanged) return { sameProfile: false, bedSizeOnly: false, differingSettings: [] };
+  const same = sameProfile(project.device, previous.device);
+  const differingSettings = differingSetupLabels(project, previous);
+  return {
+    sameProfile: same,
+    bedSizeOnly: same && differingSettings.length === 0,
+    differingSettings,
   };
 }
 
@@ -155,7 +179,7 @@ export function withCurrentMachineSetup(
   // A matching copy opens as the file's own object, as before.
   if (sameValue(device, project.device) && sameValue(cncParamsOf(kept), cncParamsOf(project)))
     return { project, replaced: [] };
-  return { project: kept, replaced: replacedSetupLabels(project, kept) };
+  return { project: kept, replaced: differingSetupLabels(project, kept) };
 }
 
 function cncParamsOf(project: Project): unknown {
@@ -185,8 +209,11 @@ function withCncParams(project: Project, params: CncMachineParams | undefined): 
   };
 }
 
-// Plain names for the toast. Camera and Auto-focus have their own toasts, and
-// catalogue bookkeeping (version, evidence, vendor) is kept without a word.
+// Plain names for the same-machine toast and the machine notice. The camera has
+// its own words in both, and catalogue bookkeeping (version, evidence, vendor)
+// is kept without a word. A same-machine Open has already kept the Auto-focus
+// command (with its own toast) before this list is read, so only the notice
+// for another machine can name it; the job lock counts it as the machine.
 const SETUP_LABELS: ReadonlyArray<{
   readonly label: string;
   readonly keys: ReadonlyArray<keyof DeviceProfile>;
@@ -217,6 +244,7 @@ const SETUP_LABELS: ReadonlyArray<{
   { label: 'S range', keys: ['minPowerS', 'maxPowerS', 'laserModeEnabled'] },
   { label: 'air assist', keys: ['airAssistCommand', 'airAssistRestartUnreliable'] },
   { label: 'Z setup', keys: ['zTravelMm', 'zTravelConfirmed', 'zProbePresent'] },
+  { label: 'Auto-focus command', keys: ['autofocusCommand'] },
 ];
 
 const UNNAMED_KEYS: ReadonlySet<string> = new Set([
@@ -233,17 +261,18 @@ const UNNAMED_KEYS: ReadonlySet<string> = new Set([
   'machineFamily',
   'cameraModel',
   'otherCameraModels',
-  'autofocusCommand',
   'cncSubProfile',
 ]);
 
-function replacedSetupLabels(opened: Project, kept: Project): ReadonlyArray<string> {
+// What `opened` holds differently from `against`: for the toast, what the kept
+// machine replaced; for the notice, what the file's machine brings in.
+function differingSetupLabels(opened: Project, against: Project): ReadonlyArray<string> {
   const a = opened.device;
-  const b = kept.device;
+  const b = against.device;
   const labels = SETUP_LABELS.filter(({ keys }) =>
     keys.some((key) => !sameValue(a[key], b[key])),
   ).map(({ label }) => label);
-  if (!sameValue(openedCncParams(opened), openedCncParams(kept))) labels.push('CNC settings');
+  if (!sameValue(openedCncParams(opened), openedCncParams(against))) labels.push('CNC settings');
   const other = (Object.keys({ ...a, ...b }) as Array<keyof DeviceProfile>).some(
     (key) => !UNNAMED_KEYS.has(key) && !sameValue(a[key], b[key]),
   );

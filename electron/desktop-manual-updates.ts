@@ -26,6 +26,9 @@ export function desktopManualUpdates(
     readonly userDataPath: string;
     readonly fetch: UpdateFetch;
     readonly eligible: (envelope: string, version: string) => Promise<boolean>;
+    readonly awaitsConfirmation?:
+      | ((envelope: string, version: string) => Promise<boolean>)
+      | undefined;
     readonly announce: (version: string) => void;
     readonly announceDownloadPage: (version: string) => void;
     readonly openDownloadPage: (url: string) => Promise<void>;
@@ -48,6 +51,7 @@ export function desktopManualUpdates(
       keys,
       fetch: options.fetch,
       eligible: options.eligible,
+      awaitsConfirmation: options.awaitsConfirmation,
     };
     if (system === 'windows')
       return {

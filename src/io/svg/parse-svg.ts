@@ -7,7 +7,7 @@
 //    order — deterministic for snapshot tests. Nested <svg> and <symbol>
 //    viewports map and clip their content as overflow specifies, a <switch>
 //    renders one child, and <use> expansion skips circular references and has
-//    a budget (ADR-268 Amendment 1).
+//    a budget of elements and points (ADR-268 Amendment 1, ADR-269 Amendment 3).
 // 4. Attribute each element to stroke color, falling back to visible fill
 //    color for fill-only logo artwork. Colors cascade from presentation
 //    attributes, <style> rules and the style attribute; an unset fill is
@@ -38,7 +38,7 @@ import {
   reserveSvgPolyline,
   type SvgImportBudget,
 } from './svg-import-budget';
-import { resolveUnitScale } from './svg-units';
+import { resolveUnitScale, svgRootSizeNotes } from './svg-units';
 import { rootSvgViewportMapping } from './svg-root-viewport';
 import {
   INITIAL_PRESENTATION_STATE,
@@ -64,6 +64,7 @@ import { nestedSvgViewportState, rootSvgViewportState } from './svg-viewport-sta
 import {
   createSvgUseBudget,
   spendSvgUseElement,
+  spendSvgUsePoints,
   svgUseTarget,
   type SvgUseBudget,
 } from './svg-use-expansion';
@@ -268,6 +269,7 @@ function appendElementGeometry(el: Element, state: PresentationState, context: W
   const t = state.transform;
   const subs = elementToSubPaths(el, linearScaleMagnitude(t.a, t.b, t.c, t.d), state.viewport);
   if (subs.length === 0) return;
+  spendSvgUsePoints(context.useBudget, subs);
   const stroke = visibleStroke(state, context);
   const fill = visibleFill(el, state, context);
   // A pattern paint is lost whichever paint the element imports with.
@@ -413,7 +415,7 @@ export function parseSvgDocument(
     curves: bucket.curves,
   }));
   const { entries } = fragment;
-  const notes = svgImportNotes(entries.length, budget, counts);
+  const notes = [...svgRootSizeNotes(svgEl), ...svgImportNotes(entries.length, budget, counts)];
 
   return {
     object:

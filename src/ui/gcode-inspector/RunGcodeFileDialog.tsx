@@ -6,9 +6,12 @@
 import { useMemo, useState } from 'react';
 import { reviewExternalProgram, type ExternalProgram } from '../../core/external-program';
 import { kerfDeskBitChangeLabels } from '../../core/external-program/kerfdesk-bit-changes';
+import { kerfDeskBitFile } from '../../core/external-program/kerfdesk-bit-file';
 import { machineKindOf } from '../../core/scene';
 import { Button, Dialog, DialogActions } from '../kit';
+import { liveLaserMaxPowerS } from '../laser/connected-laser-power-scale';
 import { useStore } from '../state';
+import { useLaserStore } from '../state/laser-store';
 import { deviceInspectionContext } from './gcode-inspection-source';
 import { hasGcodeInspectorAnalysis } from './gcode-inspector-worker-protocol';
 import { useGcodeInspection } from './use-gcode-inspection';
@@ -65,6 +68,9 @@ function InspectExternalRun(
   },
 ): JSX.Element {
   const project = useStore((state) => state.project);
+  // Judge S words against the range KerfDesk's own Save and Start write: the
+  // connected $30, not the profile (rolling audit v4 H1-P3-2).
+  const laserMaxPowerS = useLaserStore((laser) => liveLaserMaxPowerS(project.device, laser));
   const live = useLiveRunStart();
   const [pinned, setPinned] = useState<RunStart | null>(null);
   const [frame, setFrame] = useState<ExternalFrame | null>(null);
@@ -72,6 +78,7 @@ function InspectExternalRun(
   // The sent bytes have no comments, so KerfDesk's bit-change labels are read
   // from the file as opened.
   const bitChanges = useMemo(() => kerfDeskBitChangeLabels(props.text), [props.text]);
+  const bitFile = useMemo(() => kerfDeskBitFile(props.text), [props.text]);
   const source = useMemo(
     () => ({
       ...deviceInspectionContext(
@@ -94,21 +101,26 @@ function InspectExternalRun(
   const result = inspection.result;
   if (!hasGcodeInspectorAnalysis(result))
     return <RefusedRun reasons={[result.parsed.reason]} onClose={props.onClose} />;
-  const prepared = prepareExternalRun(props.name, props.program, start ?? DRAWN_ORIGIN, (gcode) =>
-    reviewExternalProgram(
-      gcode,
-      result.parsed.model,
-      {
-        machineKind: machineKindOf(project.machine),
-        laserMaxPowerS: project.device.maxPowerS,
-        ...(props.program.controllerKind === undefined
-          ? {}
-          : { controllerKind: props.program.controllerKind }),
-        start: start ?? DRAWN_ORIGIN,
-        kerfDeskBitChanges: bitChanges,
-      },
-      result.analysis.findings,
-    ),
+  const prepared = prepareExternalRun(
+    props.name,
+    props.program,
+    start ?? DRAWN_ORIGIN,
+    (gcode) =>
+      reviewExternalProgram(
+        gcode,
+        result.parsed.model,
+        {
+          machineKind: machineKindOf(project.machine),
+          laserMaxPowerS,
+          ...(props.program.controllerKind === undefined
+            ? {}
+            : { controllerKind: props.program.controllerKind }),
+          start: start ?? DRAWN_ORIGIN,
+          kerfDeskBitChanges: bitChanges,
+        },
+        result.analysis.findings,
+      ),
+    bitFile,
   );
   return prepared.kind === 'refused' ? (
     <RefusedRun reasons={prepared.reasons} onClose={props.onClose} />

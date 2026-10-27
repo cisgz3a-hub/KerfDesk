@@ -15,11 +15,12 @@ import {
   type StagedManualUpdate,
 } from './manual-update-download.js';
 import type { PublicKeys } from './licensing-verification.js';
-import type {
-  DesktopUpdates,
-  UpdateState,
-  UpdateStatus,
-  UpdateDownloadProgress,
+import {
+  heldReleaseState,
+  type DesktopUpdates,
+  type UpdateState,
+  type UpdateStatus,
+  type UpdateDownloadProgress,
 } from './update-status.js';
 
 export type ManualUpdates = DesktopUpdates & {
@@ -33,6 +34,10 @@ type Options = {
   readonly keys: PublicKeys;
   readonly fetch: UpdateFetch;
   readonly eligible: (envelope: string, version: string) => Promise<boolean>;
+  /** Wording only: an ineligible release that waits for a licence confirmation (ADR-547 Amd 1). */
+  readonly awaitsConfirmation?:
+    | ((envelope: string, version: string) => Promise<boolean>)
+    | undefined;
   readonly announce?: (version: string) => void;
   readonly now?: () => number;
 };
@@ -140,7 +145,9 @@ class ManualUpdateService implements ManualUpdates {
       ),
     };
     if (!(await this.options.eligible(next.envelope, next.release.version))) {
-      this.set('not-covered', next.release.version);
+      const { awaitsConfirmation } = this.options;
+      const held = await heldReleaseState(awaitsConfirmation, next.envelope, next.release.version);
+      this.set(held, next.release.version);
       return;
     }
     this.set('available', next.release.version);

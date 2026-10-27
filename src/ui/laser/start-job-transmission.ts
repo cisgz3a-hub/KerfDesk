@@ -79,6 +79,7 @@ export async function transmitPreparedStart(input: {
           outputScope: input.args.outputScope,
           job: input.args.prepared.prepared.job,
           runId: input.runId,
+          jobOrigin: input.args.prepared.jobOrigin,
         })
       : null;
   const retention = observeFreshExecutionRetention(input.runId, input.args.repository);

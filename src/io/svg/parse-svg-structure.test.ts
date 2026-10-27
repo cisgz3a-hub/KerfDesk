@@ -1,6 +1,7 @@
 import { Blob as NodeBlob } from 'node:buffer';
 import { describe, expect, it } from 'vitest';
 import { ciBudgetMs } from '../../__fixtures__/ci-budget';
+import { svgUseCopies } from '../../__fixtures__/svg-use-copies';
 import { parseSvg, type ParseSvgResult } from './parse-svg';
 import { readSvgDocumentFromBlob } from './parse-svg-blob';
 import { parseSvgWorkerDocument } from './parse-svg-worker';
@@ -105,6 +106,23 @@ describe.each(parsers)('SVG <use> expansion through %s', (_name, parse) => {
     },
     ciBudgetMs(20_000, 60_000),
   );
+
+  it('places <use> copies of a many-point path within the point budget', async () => {
+    const result = await parse(svgUseCopies(1_000, 3));
+    expect(polylineCount(result)).toBe(3);
+  });
+
+  // ADR-269 Amendment 3: the budget counts the points copies place, as the DXF
+  // block budget does, so a few hundred copies of one long path pass its floor.
+  it(
+    'refuses <use> copies whose points pass the point budget, saying how to import them',
+    async () => {
+      await expect(parse(svgUseCopies(1_000, 501))).rejects.toThrow(
+        /SVG <use> references place more than 500,000 points.*convert its clones to paths/,
+      );
+    },
+    ciBudgetMs(20_000, 60_000),
+  );
 });
 
 describe.each(parsers)('SVG viewports through %s', (_name, parse) => {
@@ -155,6 +173,22 @@ describe.each(parsers)('SVG render semantics through %s', (_name, parse) => {
       ),
     );
     expect(colours(result)).toEqual(['#0000ff', '#ff00ff']);
+  });
+
+  it('reads each written form of a stroke width', async () => {
+    const result = await parse(
+      svg(
+        '<g fill="none">' +
+          '<path d="M1 1H9" stroke="#ff0000" stroke-width="0."/>' +
+          '<path d="M1 2H9" stroke="#ff0001" stroke-width=".0"/>' +
+          '<path d="M1 3H9" stroke="#ff0002" stroke-width="0e5px"/>' +
+          '<path d="M1 4H9" stroke="#00ff00" stroke-width="1."/>' +
+          '<path d="M1 5H9" stroke="#00ff01" stroke-width="+.5"/>' +
+          '<g stroke-width="0"><path d="M1 6H9" stroke="#ff0003" stroke-width="1!"/>' +
+          '<path d="M1 7H9" stroke="#00ff02" style="stroke-width: 2   !important"/></g></g>',
+      ),
+    );
+    expect(colours(result)).toEqual(['#00ff00', '#00ff01', '#00ff02']);
   });
 
   it('lets a descendant set visibility back to visible, but not undo display', async () => {

@@ -4,7 +4,9 @@ import type { UpdateCheckOutcome } from './commercial-update.js';
  * What Help > Check for Updates shows (ADR-547). `unavailable` is a build that
  * does not update itself; `ready` is a verified download. In manual mode it
  * installs after an approved close only when installOnQuit was explicitly
- * armed. `not-covered` is a newer release this licence's updates do not cover.
+ * armed. `not-covered` is a newer release this licence's updates do not cover;
+ * `licence-unconfirmed` is one they cover that waits for a licence
+ * confirmation to succeed (ADR-547 Amendment 1).
  */
 export type UpdateState =
   | 'unavailable'
@@ -15,12 +17,28 @@ export type UpdateState =
   | 'up-to-date'
   | 'ready'
   | 'not-covered'
+  | 'licence-unconfirmed'
   | 'failed';
+
+/**
+ * Why a newer, ineligible release is held back (ADR-547 Amendment 1). A failed
+ * licence confirmation still blocks the update (ADR-561 item 5), but the saved
+ * rights cover the release, so it is unconfirmed, not out of the update period.
+ */
+export async function heldReleaseState<Envelope>(
+  awaitsConfirmation: ((envelope: Envelope, version: string) => Promise<boolean>) | undefined,
+  envelope: Envelope,
+  version: string,
+): Promise<'not-covered' | 'licence-unconfirmed'> {
+  return (await awaitsConfirmation?.(envelope, version)) === true
+    ? 'licence-unconfirmed'
+    : 'not-covered';
+}
 
 export type UpdateStatus = {
   readonly state: UpdateState;
   readonly currentVersion: string;
-  /** The newer version being downloaded, ready to install, not covered or not installed. */
+  /** The newer version being downloaded, ready to install, held back or not installed. */
   readonly version: string | null;
   /** When the last check finished, in milliseconds since 1970. */
   readonly checkedAt: number | null;
@@ -83,7 +101,8 @@ export function createDesktopUpdates(options: {
     const at = now();
     if (outcome.kind === 'up-to-date') set('up-to-date', null, at);
     else if (outcome.kind === 'ready') set('ready', outcome.version, at);
-    else if (outcome.kind === 'not-covered') set('not-covered', outcome.version, at);
+    else if (outcome.kind === 'not-covered' || outcome.kind === 'licence-unconfirmed')
+      set(outcome.kind, outcome.version, at);
     else if (outcome.kind === 'not-installed') set('failed', outcome.version, at);
     else set('unavailable', null, at);
   };

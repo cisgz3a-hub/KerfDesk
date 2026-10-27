@@ -5,6 +5,7 @@ import {
   preparedCncToolSections,
 } from '../../__fixtures__/cnc-tool-programs';
 import type { CncGroup } from '../../core/job';
+import { kerfDeskBitFile } from '../../core/external-program/kerfdesk-bit-file';
 import { emitPreparedGcode, prepareOutput, type EmitGcodeOptions } from '../gcode';
 import { emitSavePreparedOutput } from '../../ui/laser/save-output-emission';
 import { prepareOutputRequest } from '../../ui/laser/output-preparation';
@@ -93,6 +94,12 @@ describe('ordered exact prepared cutter programs', () => {
         '; keep the same X/Y zero; change to this bit and re-zero Z on the stock top before running this file',
         '; KerfDesk',
       ],
+    ]);
+    // Run G-code file reads the same header from each file (ADR-392 Amendment 4).
+    expect(result.map((program) => kerfDeskBitFile(program.gcode))).toEqual([
+      { order: 1, count: 3, bitName: 'Rough cutter A' },
+      { order: 2, count: 3, bitName: 'Detail cutter B' },
+      { order: 3, count: 3, bitName: 'Rough cutter A' },
     ]);
     expect(cncToolProgramHeader({ order: 1, count: 1 }, 'Rough cutter A')).toBe('');
     expect(cncToolProgramHeader({ order: 2, count: 2 }, 'Bit\nM3 S1')).toMatch(

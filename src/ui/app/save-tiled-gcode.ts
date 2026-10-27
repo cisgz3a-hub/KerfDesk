@@ -24,10 +24,11 @@ import { controllerReadinessAdvisories } from './controller-readiness-advisories
 import { pushCncExportControllerMessages } from './cnc-export-controller-advisory';
 import type { TileFile } from './tile-emission';
 import {
+  staleTileWarning,
   tileDisplayName,
+  tileFolderAfterSave,
   tileFolderContents,
   tileFolderWarnings,
-  type TileFolderContents,
 } from './tile-folder-check';
 import { finalizeTiledOutput, type TiledOutputPreparation } from './tiled-output-preparation';
 import { tiledSaveWorkBudgetMessage } from './tiled-save-work-budget';
@@ -112,25 +113,19 @@ async function saveConfiguredTiledGcode(ctx: SaveTiledGcodeCtx): Promise<true> {
   ctx.pushToast(
     saved === preparation.files.length
       ? `Saved all ${saved} tile files. Cut them in index order, re-registering the stock between tiles.`
-      : `Saved ${saved} of ${preparation.files.length} tile files.`,
+      : `Saved ${saved} of ${preparation.files.length} tile files, so the set is incomplete. Save it again before cutting.`,
     saved === preparation.files.length ? 'success' : 'warning',
   );
-  pushWarnings(ctx, tileFolderWarnings(writtenOnly(folder, preparation.files.slice(0, saved))));
+  const after = tileFolderAfterSave(folder, preparation.files, saved);
+  const stale = staleTileWarning(after);
+  if (stale !== null) ctx.pushToast(stale, 'error');
+  pushWarnings(ctx, tileFolderWarnings(after));
   pushWarnings(
     ctx,
     [...preparation.preparationAdvisories, ...preparation.emissionAdvisories],
     true,
   );
   return true;
-}
-
-// A set cut short replaced only the files it reached.
-function writtenOnly(
-  folder: TileFolderContents,
-  written: ReadonlyArray<TileFile>,
-): TileFolderContents {
-  const names = new Set(written.map(tileDisplayName));
-  return { ...folder, replaced: folder.replaced.filter((name) => names.has(name)) };
 }
 
 function advanceAfterCompleteTileSet(

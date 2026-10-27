@@ -44,6 +44,7 @@ import {
 } from './cnc-supervised-recovery-stream';
 import { mergeCncRecoveryWarnings } from './merge-cnc-recovery-warnings';
 import { cncRecoveryOpenProjectIssue } from './cnc-recovery-open-project';
+import { refuseCncRecoveryStartBit } from './cnc-recovery-start-bit';
 import { partitionEmitPreflight } from './start-job-readiness-policy';
 import { prepareArchivedRecoverySource, type PreparedRecoverySource } from './start-job-source';
 
@@ -135,15 +136,11 @@ function planPassRecovery(
     jobAwareAlert(`Cannot start CNC recovery:\n\n${describeResumeRefusal(resume.reason)}`);
     return null;
   }
+  // A resume in a later operation streams only its bit, with no M0 before it.
+  if (refuseCncRecoveryStartBit(source, resume.job)) return null;
   const emitted = emitPreparedGcode(
     { ...source.prepared, job: resume.job },
-    {
-      outputScope: capsule.artifact.outputScope,
-      ...(source.jobOrigin === undefined ? {} : { jobOrigin: source.jobOrigin }),
-      ...(source.preflightMotionOffset === undefined
-        ? {}
-        : { preflightMotionOffset: source.preflightMotionOffset }),
-    },
+    resumeEmitOptions(capsule, source),
   );
   // Rule 7 / ADR-228: only a compile-integrity failure may refuse recovery.
   // `preflight.ok` is false for ANY issue (core/preflight/preflight.ts), so
@@ -169,6 +166,16 @@ function planPassRecovery(
     resumePoint,
     laterThanComputedDefault,
   );
+}
+
+function resumeEmitOptions(capsule: RecoveryCapsule, source: PreparedRecoverySource) {
+  return {
+    outputScope: capsule.artifact.outputScope,
+    ...(source.jobOrigin === undefined ? {} : { jobOrigin: source.jobOrigin }),
+    ...(source.preflightMotionOffset === undefined
+      ? {}
+      : { preflightMotionOffset: source.preflightMotionOffset }),
+  };
 }
 
 function passRecoveryStreamPlan(

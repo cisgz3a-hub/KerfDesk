@@ -49,7 +49,10 @@ function release(platform: 'macos' | 'linux', version = '1.0.21', overrides = {}
   };
 }
 
-function harness(platform: 'macos' | 'linux' = 'macos') {
+function harness(
+  platform: 'macos' | 'linux' = 'macos',
+  awaitsConfirmation?: (envelope: string, version: string) => Promise<boolean>,
+) {
   let latest: () => Response = () => new Response(envelope(release(platform)));
   const fetch = vi.fn(async (url: string) =>
     url.endsWith(`latest-${platform}.json`) ? latest() : new Response('Not found', { status: 404 }),
@@ -64,6 +67,7 @@ function harness(platform: 'macos' | 'linux' = 'macos') {
     keys,
     fetch,
     eligible,
+    awaitsConfirmation,
     announce,
     openDownloadPage,
     now: () => now,
@@ -170,6 +174,16 @@ describe('macOS and Linux update notices (ADR-613)', () => {
     h.updates.download?.();
     await h.updates.settled();
     expect(h.openDownloadPage).not.toHaveBeenCalled();
+  });
+
+  it('says the licence is unconfirmed, and opens nothing, while a confirmation holds it back', async () => {
+    const h = harness('linux', async () => true);
+    h.eligible.mockResolvedValue(false);
+    expect(await h.check()).toMatchObject({ state: 'licence-unconfirmed', version: '1.0.21' });
+    h.updates.download?.();
+    await h.updates.settled();
+    expect(h.openDownloadPage).not.toHaveBeenCalled();
+    expect(h.announce).not.toHaveBeenCalled();
   });
 
   it('re-checks coverage before opening the page', async () => {

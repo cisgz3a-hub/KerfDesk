@@ -328,13 +328,15 @@ describe('manual-motion limits with a verified bed frame', () => {
 describe('the hidden controller MPos a hold is aimed from', () => {
   const hidden = { x: -50, y: -40, z: 0 };
 
+  // Z too: the phone's Z hold aims from it (ADR-375 Amendment 10).
   it('is the firmware position in mm on stock GRBL enforcing soft limits this session', () => {
     expect(
       firmwareJogCheckPosition(softLimitedGrbl({ homingState: 'unknown' }), hidden, false),
-    ).toEqual({ x: -50, y: -40 });
-    expect(firmwareJogCheckPosition(softLimitedGrbl(), { x: -2, y: -1, z: 0 }, true)).toEqual({
+    ).toEqual({ x: -50, y: -40, z: 0 });
+    expect(firmwareJogCheckPosition(softLimitedGrbl(), { x: -2, y: -1, z: -0.5 }, true)).toEqual({
       x: -50.8,
       y: -25.4,
+      z: -12.7,
     });
   });
 

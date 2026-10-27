@@ -67,6 +67,11 @@ describe('desktop update status (ADR-547)', () => {
   it.each([
     [{ kind: 'up-to-date' } as const, 'up-to-date', null],
     [{ kind: 'not-covered', version: '2026.44.0' } as const, 'not-covered', '2026.44.0'],
+    [
+      { kind: 'licence-unconfirmed', version: '2026.44.0' } as const,
+      'licence-unconfirmed',
+      '2026.44.0',
+    ],
     [{ kind: 'not-installed', version: '2026.41.0' } as const, 'failed', '2026.41.0'],
   ])('maps %o to %s and lets the owner check again', async (outcome, state, version) => {
     const { subject, run, pending } = updates();

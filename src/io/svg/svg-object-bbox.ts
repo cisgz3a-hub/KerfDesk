@@ -23,6 +23,7 @@ import { parseSvgLengthUserUnitsOrNull } from './svg-units';
 import {
   createSvgUseBudget,
   spendSvgUseElement,
+  spendSvgUsePoints,
   svgUseTarget,
   type SvgUseBudget,
 } from './svg-use-expansion';
@@ -87,7 +88,7 @@ function contentBounds(
   if (depth > MAX_DEPTH) return;
   if (context.budget.nesting > 0) spendSvgUseElement(context.budget);
   const tag = element.tagName.toLowerCase();
-  if (SHAPES.has(tag)) shapeBounds(element, space, box);
+  if (SHAPES.has(tag)) shapeBounds(element, space, box, context.budget);
   else if (tag === 'image') imageBounds(element, space.matrix, box);
   else if (tag === 'use') boundsOfUse(element, space, context, box, depth);
   else if (tag === 'svg' && element !== element.ownerDocument.documentElement) {
@@ -182,9 +183,16 @@ function instanceBounds(
   }
 }
 
-function shapeBounds(element: Element, { matrix, viewport }: Space, box: Box): void {
+function shapeBounds(
+  element: Element,
+  { matrix, viewport }: Space,
+  box: Box,
+  budget: SvgUseBudget,
+): void {
   const scale = linearScaleMagnitude(matrix.a, matrix.b, matrix.c, matrix.d);
-  for (const subpath of elementToSubPaths(element, scale, viewport)) {
+  const subpaths = elementToSubPaths(element, scale, viewport);
+  spendSvgUsePoints(budget, subpaths);
+  for (const subpath of subpaths) {
     if (subpath.curve === undefined) {
       for (const point of subpath.points) include(box, applySvgMatrix(matrix, point));
       continue;

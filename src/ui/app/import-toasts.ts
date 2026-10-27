@@ -62,7 +62,7 @@ export function describeSvgPresentationWarnings(
   result: Pick<ParseSvgResult, 'notes'>,
 ): ReadonlyArray<ToastDescriptor> {
   return result.notes
-    .filter((note) => note.startsWith('SVG presentation:'))
+    .filter((note) => note.startsWith('SVG presentation:') || note.startsWith('SVG size:'))
     .map((note) => ({ message: `${filename}: ${note}`, variant: 'warning' }));
 }
 

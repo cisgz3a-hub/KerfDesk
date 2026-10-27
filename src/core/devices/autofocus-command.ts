@@ -39,8 +39,8 @@ const BEAM_M_CODES: ReadonlySet<number> = new Set([
 // G38.3 and G38.5 stop there without an error, as a plain Z move would.
 const ALARMING_PROBE_G_CODES: ReadonlySet<number> = new Set([38.2, 38.4]);
 const SILENT_PROBE_G_CODES: ReadonlySet<number> = new Set([38.3, 38.5]);
-const WORD_LINE_RE = /^(?:[A-Z][+-]?(?:\d+\.?\d*|\.\d+))+$/;
-const WORD_RE = /([A-Z])([+-]?(?:\d+\.?\d*|\.\d+))/g;
+const WORD_LINE_RE = /^(?:[A-Z][+-]?(?:\d+(?:\.\d*)?|\.\d+))+$/;
+const WORD_RE = /([A-Z])([+-]?(?:\d+(?:\.\d*)?|\.\d+))/g;
 
 const ACCEPTED_FORMS =
   'Auto-focus accepts one focus command: a vendor macro such as $HZ1, or a Z-only probe with its own feed such as G38.2 Z-10 F100.';

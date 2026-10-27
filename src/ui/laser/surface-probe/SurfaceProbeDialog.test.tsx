@@ -40,6 +40,8 @@ it('requires prepared clearance, preserves an active measurement on Close, and s
     statusReport: parseStatusReport('<Idle|MPos:0,0,10|FS:0,0>'),
     controllerSettings: { reportInches: false },
     controllerSettingsObservation: { sessionEpoch: 0, observedAt: 1 },
+    // The test touch the grid needs first (ADR-103 Amendment 3).
+    probeTestTouch: { controllerSessionEpoch: useLaserStore.getState().controllerSessionEpoch },
   });
   let finish: ((result: SurfaceGridResult) => void) | undefined;
   const measure = vi.spyOn(useLaserStore.getState(), 'measureSurfaceGrid').mockImplementation(
@@ -90,6 +92,36 @@ it('requires prepared clearance, preserves an active measurement on Close, and s
     expect(host.textContent).toContain('1.2000');
     await act(async () => button('Save reviewed CSV…')?.click());
     expect(write).toHaveBeenCalledWith(expect.stringContaining('0.0000,0.0000,1.2000,-3.8000'));
+  } finally {
+    await act(async () => root.unmount());
+  }
+});
+
+it('keeps Measure grid off and names the probe test until a test touch shows', async () => {
+  useStore.setState({
+    project: {
+      ...originalProject,
+      device: { ...originalProject.device, capabilities: ['z-axis'], zProbePresent: true },
+    },
+  });
+  useLaserStore.setState({
+    connection: { kind: 'connected' },
+    statusReport: parseStatusReport('<Idle|MPos:0,0,10|FS:0,0>'),
+    controllerSettings: { reportInches: false },
+    controllerSettingsObservation: { sessionEpoch: 0, observedAt: 1 },
+    probeTestTouch: null,
+  });
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  try {
+    await act(async () => root.render(<SurfaceProbeDialog onClose={vi.fn()} />));
+    await act(async () => host.querySelector<HTMLInputElement>('input[type=checkbox]')?.click());
+    const measure = [...host.querySelectorAll('button')].find(
+      (item) => item.textContent === 'Measure grid',
+    );
+    expect(measure?.disabled).toBe(true);
+    expect(host.textContent).toContain('Test the probe first');
   } finally {
     await act(async () => root.unmount());
   }

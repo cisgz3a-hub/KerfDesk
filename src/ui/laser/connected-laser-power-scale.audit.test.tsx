@@ -3,6 +3,7 @@ import type { ControllerKind } from '../../core/devices';
 import { DEFAULT_CNC_MACHINE_CONFIG, IDENTITY_TRANSFORM, type Project } from '../../core/scene';
 import { encodeCanonicalBase64 } from '../../core/relief/depth-map-base64';
 import { emitPreparedGcode, prepareOutput, prepareOutputSnapshot } from '../../io/gcode';
+import { currentSaveGcodeContext } from '../app/save-gcode-context';
 import { emitSaveGcode } from '../app/save-gcode-emission';
 import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
@@ -367,15 +368,14 @@ describe('prepared output preserves power parity before raster quantization', ()
     const machine = machineSnapshot(project, useLaserStore.getState(), useCameraStore.getState());
     const prepared = await currentStartOutput();
     if (!prepared.ok) throw new Error('Expected prepared start');
+    // The Save dialog's own context builder, not Start's snapshot (H1-P3-3).
     const saved = await emitSaveGcode(
-      {
-        project,
-        machine,
-        controllerSettings: machine.controllerSettings,
+      currentSaveGcodeContext({
         platform: {} as never,
-        savedName: null,
+        app: useStore.getState(),
+        laser: useLaserStore.getState(),
         pushToast: vi.fn(),
-      },
+      }),
       { ok: true },
     );
     expect(saved.kind).toBe('emitted');

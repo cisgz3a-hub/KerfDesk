@@ -11,9 +11,18 @@ import { DEFAULT_CNC_MACHINE_CONFIG } from '../../core/scene';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
-import type { SaveGcodeCtx } from './file-actions';
+import { handleSaveGcode, type SaveGcodeCtx } from './file-actions';
 import { prebuildGcodeSave } from './transactional-gcode-save';
-import { CncSetupDocumentExport } from './CncSetupDocumentExport';
+import { profileCatalogEntryById } from '../../core/devices/profile-catalog';
+import {
+  CNC_EXPORT_GRBL_FAMILY_ADVISORY,
+  CNC_SAVED_M0_BIT_CHANGES_NOTE,
+  cncExportControllerAdvisory,
+} from './cnc-export-controller-advisory';
+import {
+  CncSetupDocumentExport,
+  SETUP_PACKAGE_SAVED_BEFORE_CHANGE,
+} from './CncSetupDocumentExport';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -179,9 +188,14 @@ describe('CNC setup document export', () => {
     expect(mounted.onSaved).not.toHaveBeenCalled();
   });
 
-  it('rechecks source identity after the destination picker resolves', async () => {
+  // Rolling audit v4 H3-P3-2, ADR-656 Amendment 1: the picker has already
+  // emptied the chosen file, so it gets the package from the click, not 0 bytes.
+  it('writes the clicked package when the project changes while the picker is open', async () => {
     const target = deferred<SaveTarget | null>();
-    const write = vi.fn(async () => undefined);
+    const written: string[] = [];
+    const write = vi.fn(async (data: string | Blob) => {
+      written.push(typeof data === 'string' ? data : await data.text());
+    });
     const mounted = await mount(() => target.promise);
     await clickSave();
     expect(saveButton().disabled).toBe(true);
@@ -189,15 +203,42 @@ describe('CNC setup document export', () => {
       changeProject();
       target.resolve({ displayName: 'part.setup.html', write });
     });
-    expect(write).not.toHaveBeenCalled();
-    expect(mounted.pushToast).toHaveBeenCalledWith(
-      expect.stringContaining('project changed'),
-      'warning',
+    expect(write).toHaveBeenCalledOnce();
+    expect(downloadedPayload(written[0] ?? '', 'part.gcode')).toEqual(
+      Buffer.from(mounted.artifact.prepared.gcode, 'utf8'),
     );
-    expect(mounted.advanceVariablesAfter).not.toHaveBeenCalled();
-    expect(mounted.onSaved).not.toHaveBeenCalled();
+    expect(mounted.pushToast).toHaveBeenCalledWith(SETUP_PACKAGE_SAVED_BEFORE_CHANGE, 'warning');
+    expect(mounted.advanceVariablesAfter).toHaveBeenCalledExactlyOnceWith(
+      mounted.project,
+      'successful-export',
+    );
+    expect(mounted.onSaved).toHaveBeenCalledOnce();
     expect(saveButton().disabled).toBe(false);
   });
+
+  // Rolling audit v4 H3-P2-1, ADR-399 Amendment 1: as Save as says it.
+  it.each(['separate-tools', 'single-file'] as const)(
+    'gives the GRBL-only warning for a %s package on a Smoothieware profile',
+    async (mode) => {
+      const entry = profileCatalogEntryById('generic-smoothieware');
+      if (entry === undefined) throw new Error('Missing Smoothieware profile');
+      const written: string[] = [];
+      const write = vi.fn(async (data: string | Blob) => {
+        written.push(typeof data === 'string' ? data : await data.text());
+      });
+      const project = cncToolSectionProject();
+      const mounted = await mount(async () => ({ displayName: 'part.setup.html', write }), {
+        ...project,
+        device: { ...entry.profile, homing: { enabled: false, direction: 'front-left' } },
+      });
+      await chooseMode(mode);
+      await clickSave();
+      const advisory = cncExportControllerAdvisory(mounted.project.device);
+      expect(advisory).toContain('Smoothieware');
+      expect(mounted.pushToast).toHaveBeenCalledWith(advisory, 'warning');
+      expect(written[0]).toContain(CNC_EXPORT_GRBL_FAMILY_ADVISORY);
+    },
+  );
 });
 
 it('recovers from a synchronous destination-adapter failure without advancing variables', async () => {
@@ -335,4 +376,39 @@ it('disables separate-tool selection for an older prepared artifact that has no 
     true,
   );
   expect(host.querySelector<HTMLSelectElement>('select')?.value).toBe('single-file');
+});
+
+// Rolling audit v4 H3-P3-1: Save as writes a multi-bit job as one M0 file and
+// says at the save where those stops work, as the single-file mode's note does.
+it.each([
+  ['a multi-bit job', true],
+  ['a one-bit job', false],
+] as const)('Save as of %s notes its M0 bit changes only when it has them', async (_, multi) => {
+  const written: string[] = [];
+  const pushToast = vi.fn();
+  const project = multi
+    ? cncToolSectionProject()
+    : { ...projectWithLine(), machine: DEFAULT_CNC_MACHINE_CONFIG };
+  const ctx: SaveGcodeCtx = {
+    project,
+    savedName: 'part.lf2',
+    platform: {
+      ...mockPlatform(),
+      pickFileForSave: async () => ({
+        displayName: 'part.gcode',
+        write: async (data: string | Blob) => {
+          written.push(typeof data === 'string' ? data : await data.text());
+        },
+      }),
+    },
+    pushToast,
+  };
+  useStore.setState({ project });
+  const artifact = await prebuildGcodeSave(ctx);
+  if (artifact === null) throw new Error('CNC fixture failed to prepare');
+  await handleSaveGcode(ctx, { prebuilt: artifact });
+  expect(written).toHaveLength(1);
+  expect(/^M0$/m.test(written[0] ?? '')).toBe(multi);
+  if (multi) expect(pushToast).toHaveBeenCalledWith(CNC_SAVED_M0_BIT_CHANGES_NOTE, 'info');
+  else expect(pushToast).not.toHaveBeenCalledWith(CNC_SAVED_M0_BIT_CHANGES_NOTE, 'info');
 });

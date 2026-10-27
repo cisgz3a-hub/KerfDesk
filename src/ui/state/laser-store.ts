@@ -67,6 +67,7 @@ import type { CompletedFrameRunOwner } from './completed-frame-run';
 import type { WorkZZeroEvidence } from './work-z-zero-evidence';
 import type { WorkOriginState } from './work-origin-state';
 import type { LiveCanvasRun } from './canvas-motion-plan';
+import type { RegistrationOutlineRun } from './registration-outline-run';
 import type {
   ControllerObservationStamp,
   HomingProof,
@@ -185,6 +186,9 @@ export type LaserState = LaserStoreActions &
     /** Controller-reported canvas truth for the active or most recently
      * completed run. The started plan is immutable for the life of the run. */
     readonly liveCanvasRun?: LiveCanvasRun | null;
+    /** The Start from a jig outline last burned with; it outlives a reconnect
+     * so the artwork run is checked against it (ADR-057 Amendment 6). */
+    readonly registrationOutlineRun?: RegistrationOutlineRun | null;
     // Which machine kind the running job was compiled for. Pause safety
     // differs by kind: lasers need the $32=1 proof before feed hold (the beam
     // can stay on through a hold at $32=0); routers require $32=0 and hold is

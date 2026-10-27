@@ -8,6 +8,7 @@ import type { ProjectMachineCapabilityLoadResult } from '../state/project-machin
 import type { MarkLoadedOptions } from '../state/store-save-tracking-actions';
 import type { ToastVariant } from '../state/toast-store';
 import { describePendingProProject } from '../state/pending-pro-project';
+import { pushProjectLoadNotices } from '../state/project-load-notices';
 import { clearAutosaveAfterFileHandoff } from './autosave-file-cleanup';
 import { describeOpenResult } from './file-action-formatters';
 
@@ -49,12 +50,7 @@ export function completeNativeProjectOpen(
       `Opened ${fileName}${migration}`,
       result.migratedFrom === undefined ? 'success' : 'info',
     );
-    if (result.autofocusCommandRemoved) {
-      ctx.pushToast(
-        'The saved Auto-focus command was removed because it is not supported. Review Auto-focus in Machine Settings before using it.',
-        'warning',
-      );
-    }
+    pushProjectLoadNotices(result, ctx.pushToast, { migration: false });
     reportMachineCapabilityRepair(loadResult, ctx.pushToast);
     return true;
   }

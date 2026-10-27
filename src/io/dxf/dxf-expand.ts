@@ -55,6 +55,10 @@ export type ExpandOutcome = {
   readonly notes: ReadonlyArray<string>;
 };
 
+// An outcome and how many of its points the budget has already counted: the
+// copies its own INSERTs made (ADR-269 Amendment 2).
+type CountedOutcome = ExpandOutcome & { readonly countedPoints: number };
+
 export type ExpandContext = {
   readonly scale: number;
   readonly layerColors: ReadonlyMap<string, string>;
@@ -122,10 +126,11 @@ export function expandEntities(
   ctx: ExpandContext,
   reference: BlockReference | null,
   depth: number,
-): ExpandOutcome {
+): CountedOutcome {
   const polylines: ColoredPolyline[] = [];
   const skipped = new Map<string, number>();
   const notes: string[] = [];
+  let countedPoints = 0;
   for (const entity of entities) {
     // CAD shows a layout's paper-space content (title block, viewport frames)
     // only on that layout, never in the model a part is cut from. Block
@@ -140,6 +145,7 @@ export function expandEntities(
       const child = expandInsert(entity, ctx, { color, layer }, depth);
       // Nested grids can compose far beyond the engine's function-argument limit.
       for (const polyline of child.polylines) polylines.push(polyline);
+      countedPoints += child.countedPoints;
       mergeSkipped(skipped, child.skipped);
       for (const note of child.notes) notes.push(note);
       continue;
@@ -162,7 +168,7 @@ export function expandEntities(
       curve: conversion.curve,
     });
   }
-  return { polylines, skipped, notes };
+  return { polylines, skipped, notes, countedPoints };
 }
 
 function isInPaperSpace(tags: ReadonlyArray<DxfTag>): boolean {
@@ -225,7 +231,7 @@ function expandInsert(
   ctx: ExpandContext,
   reference: BlockReference,
   depth: number,
-): ExpandOutcome {
+): CountedOutcome {
   const name = firstString(entity.tags, 2)?.toUpperCase() ?? '';
   const block = ctx.blocks.get(name);
   // Every refusal below drops the block's parts, so each counts as a skipped
@@ -250,11 +256,19 @@ function expandInsert(
   spendDxfExpansion(ctx.budget, block.entities.length);
   const child = expandEntities(block.entities, ctx, reference, depth + 1);
   // Counted before the copies exist, so a refused placement never allocates them.
-  spendDxfExpansion(ctx.budget, grid.instanceCount * pointCount(child.polylines));
+  // The block's own INSERTs already counted the copies they made, so each placed
+  // point counts once however deeply it is nested (ADR-269 Amendment 2).
+  const placedPoints = grid.instanceCount * pointCount(child.polylines);
+  spendDxfExpansion(ctx.budget, Math.max(0, placedPoints - child.countedPoints));
   const placed = placeInsertInstances(entity, block, ctx.scale, child.polylines, {
     mirrored: extrusion === 'mirrored',
   });
-  return { polylines: placed, skipped: child.skipped, notes: child.notes };
+  return {
+    polylines: placed,
+    skipped: child.skipped,
+    notes: child.notes,
+    countedPoints: placedPoints,
+  };
 }
 
 function pointCount(polylines: ReadonlyArray<ColoredPolyline>): number {
@@ -263,8 +277,8 @@ function pointCount(polylines: ReadonlyArray<ColoredPolyline>): number {
   return count;
 }
 
-function skippedInsert(note: string): ExpandOutcome {
-  return { polylines: [], skipped: new Map([['INSERT', 1]]), notes: [note] };
+function skippedInsert(note: string): CountedOutcome {
+  return { polylines: [], skipped: new Map([['INSERT', 1]]), notes: [note], countedPoints: 0 };
 }
 
 // Apply the INSERT transform (scale about the block base point, rotate,

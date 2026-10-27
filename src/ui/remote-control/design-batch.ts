@@ -8,6 +8,7 @@ import {
   assignArtworkToOperation,
   createOperation,
   inOneUndoStep,
+  showKeptFeedsOnPc,
   updateOperationFull,
 } from './design-operations';
 import { importNoticeFields, pushImportToasts } from './design-import-notices';
@@ -34,6 +35,7 @@ type ItemResult = {
   command: string;
   changedArtworkIds?: string[];
   operationId?: string;
+  message?: string;
   importReport?: ImportReport;
 };
 type Commit = (action: () => Record<string, unknown>) => Record<string, unknown>;
@@ -102,8 +104,12 @@ function runBatch(
       });
     }),
   );
-  // The batch has committed, so its imports' PC toasts are now true (ADR-125 Amendment 2).
-  for (const item of results) pushImportToasts(item.importReport?.toasts ?? []);
+  // The batch has committed, so its imports' PC toasts are now true (ADR-125 Amendment 2),
+  // and so is each bit change's kept-values note (ADR-306 Amendment 5).
+  for (const item of results) {
+    pushImportToasts(item.importReport?.toasts ?? []);
+    if (item.command === 'update_operation') showKeptFeedsOnPc(item.message);
+  }
   const changed = [...new Set(results.flatMap((item) => item.changedArtworkIds ?? []))];
   const operations = [...new Set(results.flatMap((item) => item.operationId ?? []))];
   return {
@@ -117,6 +123,7 @@ function runBatch(
         ? {}
         : { changedArtworkIds: item.changedArtworkIds.filter(publicIdentifier).slice(0, 200) }),
       ...(item.operationId === undefined ? {} : { operationId: item.operationId }),
+      ...(item.message === undefined ? {} : { message: item.message }),
       ...(item.importReport === undefined
         ? {}
         : importNoticeFields(item.importReport.toasts, item.importReport.outcome)),
@@ -241,6 +248,8 @@ function pick(value: Record<string, unknown>): Omit<ItemResult, 'command'> {
       ? { changedArtworkIds: ids.filter((id): id is string => typeof id === 'string') }
       : {}),
     ...(typeof value.operationId === 'string' ? { operationId: value.operationId } : {}),
+    // A bit change's kept values, or a recipe that changed nothing (ADR-306 Amendment 5).
+    ...(typeof value.message === 'string' ? { message: value.message } : {}),
   };
 }
 

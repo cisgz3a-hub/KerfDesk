@@ -4,12 +4,14 @@ import { compileJob } from '../../core/job';
 import {
   DEFAULT_CNC_MACHINE_CONFIG,
   DEFAULT_OUTPUT_SCOPE,
+  findRegistrationBoxes,
   IDENTITY_TRANSFORM,
   registrationRunState,
 } from '../../core/scene';
 import { createRectangle } from '../../core/shapes/primitives';
 import { useLaserStore, type LaserState } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
+import { registrationOutlinePlacement } from '../state/registration-outline-run';
 import { useStore } from '../state/store';
 import { resetStore } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
@@ -319,5 +321,53 @@ describe('registration jig completion', () => {
       project: { ...useStore.getState().project, machine: DEFAULT_CNC_MACHINE_CONFIG },
     });
     expect(armRegistrationJigCompletion(args())).toBeNull();
+  });
+
+  // ADR-057 Amendment 6 (rolling audit v5 J5-P2-1).
+  it('records the Start from a finished outline burned with, and never a failed one', () => {
+    const userOrigin = { startFrom: 'user-origin', anchor: 'center' } as const;
+    const failed = armRegistrationJigCompletion({ ...args(), jobOrigin: userOrigin });
+    failed!.accept();
+    const ready = readyToSettle();
+    useLaserStore.setState({ ...ready, streamer: { ...ready.streamer!, status: 'errored' } });
+    useLaserStore.setState({ streamer: null, controllerOperation: null });
+    expect(useLaserStore.getState().registrationOutlineRun).toBeNull();
+
+    armRegistrationJigCompletion({ ...args(), jobOrigin: userOrigin })!.accept();
+    settle();
+    const project = useStore.getState().project;
+    const run = useLaserStore.getState().registrationOutlineRun;
+    expect(run?.placement).toEqual({ startFrom: 'user-origin', anchor: 'center' });
+    expect(registrationOutlinePlacement(project, run)).toEqual(userOrigin);
+  });
+
+  it('records Absolute Coordinates for an outline compiled without a job origin', () => {
+    armRegistrationJigCompletion(args())!.accept();
+    settle();
+    expect(useLaserStore.getState().registrationOutlineRun?.placement.startFrom).toBe('absolute');
+  });
+
+  it('keeps a record for the same outline moved on the canvas, not for another one', () => {
+    armRegistrationJigCompletion(args())!.accept();
+    settle();
+    const run = useLaserStore.getState().registrationOutlineRun;
+    const box = findRegistrationBoxes(useStore.getState().project.scene)[0]!;
+    useStore.setState(({ project }) => ({
+      project: {
+        ...project,
+        scene: {
+          ...project.scene,
+          objects: project.scene.objects.map((object) =>
+            object.id === box.id
+              ? { ...object, transform: { ...object.transform, x: object.transform.x + 30 } }
+              : object,
+          ),
+        },
+      },
+    }));
+    expect(registrationOutlinePlacement(useStore.getState().project, run)).toEqual(run!.placement);
+    useStore.getState().removeRegistrationBox();
+    useStore.getState().addRegistrationBox(100, 60);
+    expect(registrationOutlinePlacement(useStore.getState().project, run)).toBeNull();
   });
 });

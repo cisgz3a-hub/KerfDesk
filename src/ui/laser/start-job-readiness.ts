@@ -160,6 +160,9 @@ export type MachineStartSnapshot = {
   readonly cameraPlacementActive?: boolean;
   readonly cameraConfirmedPositionEpoch?: number | null;
   readonly cameraPlacementGeometryIssue?: string | null;
+  // Where this project's jig outline last burned from in this session, so the
+  // artwork run can be checked against it (ADR-057 Amendment 6). null: unseen.
+  readonly registrationOutline?: JobPlacementSettings | null;
   readonly homingState?: HomingState;
   readonly trustedPositionEpoch?: number;
   readonly statusQuery?: StatusQueryCapability;

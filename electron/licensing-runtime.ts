@@ -424,14 +424,16 @@ class LicensingService {
   readonly isReleaseEligibleCached = (releaseEnvelope: unknown, expectedVersion: string): boolean =>
     this.updateCache.eligible(releaseEnvelope, expectedVersion);
   readonly isManualReleaseEligible = (envelope: string, version: string): Promise<boolean> =>
-    this.serial(async () => {
-      try {
-        await this.load();
-        return await this.updateCache.manualEligible(envelope, version);
-      } catch {
-        return false;
-      }
-    });
+    this.serial(() => this.updateCache.readManualEligible(this.load, envelope, version));
+  /**
+   * Whether an ineligible release waits only for a licence confirmation to
+   * succeed, so the update panel says that, not that updates ended (ADR-547
+   * Amendment 1). Wording only: it never makes a release eligible.
+   */
+  readonly isReleaseAwaitingConfirmation = (releaseEnvelope: unknown, expectedVersion: string) =>
+    this.serial(() => this.updateCache.readAwaits(this.load, releaseEnvelope, expectedVersion));
+  readonly isManualReleaseAwaitingConfirmation = (envelope: string, version: string) =>
+    this.serial(() => this.updateCache.readManualAwaits(this.load, envelope, version));
   readonly proUnlocked = (): boolean =>
     this.config.channel === 'commercial' &&
     this.proLatched &&

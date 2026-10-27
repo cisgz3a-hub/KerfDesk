@@ -1,5 +1,5 @@
 import type { StreamerState } from '../../core/controllers/grbl';
-import type { Job } from '../../core/job';
+import type { Job, JobOriginPlacement } from '../../core/job';
 import {
   findRegistrationBoxes,
   machineKindOf,
@@ -12,6 +12,7 @@ import { currentOutputScope, useStore } from '../state';
 import { useLaserStore, type LaserState } from '../state/laser-store';
 import { settledCleanly } from '../state/post-job-clean-settle';
 import { applyRegistrationOutput } from '../state/registration-output-actions';
+import { registrationOutlineRunFor } from '../state/registration-outline-run';
 import type { RunId } from '../state/recovery';
 import { useToastStore } from '../state/toast-store';
 import { variableStreamOutcome } from './variable-stream-advancement';
@@ -20,12 +21,16 @@ let cancelObserver: (() => void) | null = null;
 type JigCompletionObserver = { readonly accept: () => void; readonly cancel: () => void };
 
 /** Ordinary complete-outline jobs only. Observe before handoff so a short run
- * may settle before acceptance, using the recovery ledger's completion rule. */
+ * may settle before acceptance, using the recovery ledger's completion rule.
+ * A finished outline also records the Start from it burned with, which the
+ * artwork run's Job Review checks (ADR-057 Amendment 6). */
 export function armRegistrationJigCompletion(args: {
   readonly project: Project;
   readonly outputScope: OutputScope;
   readonly job: Job;
   readonly runId: RunId;
+  /** The resolved origin the outline compiled with; absent is Absolute. */
+  readonly jobOrigin?: JobOriginPlacement | undefined;
 }): JigCompletionObserver | null {
   cancelRegistrationJigCompletion();
   const app = useStore.getState();
@@ -48,6 +53,10 @@ export function armRegistrationJigCompletion(args: {
   const finish = (): void => {
     if (!accepted || !successful || cancelled) return;
     cancel();
+    // The outline is on the material whatever happens to the switch below.
+    useLaserStore.setState({
+      registrationOutlineRun: registrationOutlineRunFor(args.project, args.jobOrigin),
+    });
     publishArtworkSelection(
       args.project,
       documentEpoch,

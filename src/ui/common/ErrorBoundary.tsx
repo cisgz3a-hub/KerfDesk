@@ -5,7 +5,8 @@
 // instead of the broken subtree. The crash screen shows the error
 // message + stack and offers these actions:
 //
-//   * ABORT, while the machine is moving (F60/F65).
+//   * ABORT, while the machine is moving or the laser on (F60/F65), which
+//     reports its own failure on the screen (rolling audit v5 J2-P2-3).
 //   * Save project, while there is unsaved work (audit 27-P2-2).
 //   * Copy diagnostic → builds a JSON blob (error + stack + timestamp +
 //     user agent + URL) and writes it to the clipboard. Falls back to a
@@ -33,7 +34,8 @@ export type SoftwareAbort = {
   // Evaluated when the crash screen renders — was the machine actually moving?
   readonly isMotionLive: () => boolean;
   // Request the controller-specific reset/de-energize path. Reads live state at call time.
-  readonly trigger: () => void;
+  // A throw or rejection is the Abort's own failure, which the crash screen shows.
+  readonly trigger: () => void | Promise<void>;
 };
 
 // The project lives in a store, not in the crashed tree, so its own Save still
@@ -52,8 +54,9 @@ type Props = {
   readonly softwareAbort?: SoftwareAbort;
   readonly crashSave?: CrashSave;
   // Store-driven dialogs and notices that Save and closing the app still open
-  // (the large-project Save dialog, the close notice, toasts). The subtree that
-  // normally mounts them is gone, so the crash screen hosts them, above itself.
+  // (the large-project Save dialog, the close notice, toasts, the safety notice).
+  // The subtree that normally mounts them is gone, so the crash screen hosts
+  // them, above itself, behind a boundary of their own (CrashHostBoundary).
   readonly crashHosts?: ReactNode;
 };
 type State =
@@ -105,9 +108,6 @@ function CrashScreen(props: {
   readonly hosts: ReactNode;
 }): JSX.Element {
   const blob = buildDiagnostic(props.error, props.when);
-  // Only offer the kill control if the machine was actually moving when the crash
-  // hit — a soft reset when idle would needlessly void the work origin.
-  const showSoftwareAbort = props.softwareAbort?.isMotionLive() === true;
   // 'manual' renders a select-all textarea instead of any native dialog. A
   // blocking window.prompt would suspend the renderer — fatal if the crash
   // happened mid-job, when the ack pump and Abort must stay alive (H13).
@@ -126,22 +126,12 @@ function CrashScreen(props: {
 
   return (
     <div role="alert" style={overlayStyle}>
-      {props.hosts}
+      <CrashHostBoundary>{props.hosts}</CrashHostBoundary>
       <h2 style={titleStyle}>Something broke</h2>
       <p style={messageStyle}>{props.error.message || 'Unknown error'}</p>
       <pre style={stackStyle}>{props.error.stack ?? '(no stack available)'}</pre>
       <div style={actionsStyle}>
-        {showSoftwareAbort && (
-          <button
-            type="button"
-            className="lf-btn lf-btn--danger"
-            style={abortStyle}
-            onClick={() => props.softwareAbort?.trigger()}
-            title={`${SOFTWARE_ABORT_TITLE} The interface crashed but the machine may still be moving.`}
-          >
-            {SOFTWARE_ABORT_LABEL}
-          </button>
-        )}
+        <CrashAbortButton softwareAbort={props.softwareAbort} />
         <CrashSaveButton crashSave={props.crashSave} />
         <button
           type="button"
@@ -172,6 +162,75 @@ function CrashScreen(props: {
         No data leaves your machine. The diagnostic is for your own bug report.
       </p>
     </div>
+  );
+}
+
+// A crash-screen host that throws renders nothing instead. Past this boundary its
+// error would reach the root boundary, which unmounts the job protections, or
+// with none left blank the whole window (rolling audit v4 H2-P3-1, v5 J2-P2-3).
+export class CrashHostBoundary extends Component<
+  { readonly children: ReactNode },
+  { readonly failed: boolean }
+> {
+  override state = { failed: false };
+
+  static getDerivedStateFromError(): { readonly failed: boolean } {
+    return { failed: true };
+  }
+
+  override componentDidCatch(error: Error): void {
+    console.error('[lf2:CrashHostBoundary]', error);
+    recordRendererProblem('crash', error);
+  }
+
+  override render(): ReactNode {
+    return this.state.failed ? null : this.props.children;
+  }
+}
+
+// The ABORT's own failure stays on screen. It used to be caught and dropped, so
+// a refused or failed Abort looked like nothing happened (rolling audit v5
+// J2-P2-3). Never disabled: pressing it again is the retry.
+function CrashAbortButton(props: {
+  readonly softwareAbort: SoftwareAbort | undefined;
+}): JSX.Element | null {
+  const [failure, setFailure] = useState<string | null>(null);
+  const softwareAbort = props.softwareAbort;
+  if (softwareAbort === undefined) return null;
+  // Only offer the kill control if the machine was actually moving or lit when
+  // the crash hit — a soft reset when idle would needlessly void the work origin.
+  const live = softwareAbort.isMotionLive();
+  const fail = (error: unknown): void =>
+    setFailure(error instanceof Error ? error.message : String(error));
+  const abort = (): void => {
+    setFailure(null);
+    // Called in the click itself, so the stop is written before anything else runs.
+    try {
+      void Promise.resolve(softwareAbort.trigger()).catch(fail);
+    } catch (error) {
+      fail(error);
+    }
+  };
+  return (
+    <>
+      {live && (
+        <button
+          type="button"
+          className="lf-btn lf-btn--danger"
+          style={abortStyle}
+          onClick={abort}
+          title={`${SOFTWARE_ABORT_TITLE} The interface crashed but the machine may still be moving or the laser on.`}
+        >
+          {SOFTWARE_ABORT_LABEL}
+        </button>
+      )}
+      {failure !== null && (
+        <p role="alert" style={abortFailureStyle}>
+          {`${SOFTWARE_ABORT_LABEL} failed: ${failure.replace(/\.?$/, '.')} Use the physical E-stop or ` +
+            'power cutoff now if the machine may still be moving or the laser on.'}
+        </p>
+      )}
+    </>
   );
 }
 
@@ -249,7 +308,20 @@ const stackStyle: React.CSSProperties = {
   fontSize: 12,
   whiteSpace: 'pre-wrap',
 };
-const actionsStyle: React.CSSProperties = { display: 'flex', gap: 8, marginTop: 12 };
+const actionsStyle: React.CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 8,
+  marginTop: 12,
+};
+// Wraps under the buttons, after Try again.
+const abortFailureStyle: React.CSSProperties = {
+  order: 1,
+  flexBasis: '100%',
+  margin: 0,
+  fontWeight: 600,
+  color: 'var(--lf-danger-fg)',
+};
 const fallbackStyle: React.CSSProperties = {
   width: '100%',
   minHeight: 120,

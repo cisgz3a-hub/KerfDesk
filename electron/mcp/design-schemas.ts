@@ -329,6 +329,8 @@ export const mcpDesignOutputSchemas = {
           command: z.string().max(64),
           changedArtworkIds: z.array(id).max(200).optional(),
           operationId: id.optional(),
+          // An update_operation bit change's kept values (ADR-306 Amendment 5).
+          message: z.string().max(2048).optional(),
           ...importNotices,
         }),
       )

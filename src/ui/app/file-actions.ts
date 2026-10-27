@@ -41,6 +41,7 @@ import {
 import {
   cncExportOtherControllersNote,
   cncProjectExportAdvisories,
+  cncSavedBitChangesNote,
 } from './cnc-export-controller-advisory';
 import { importSourceSizeAdvisory } from './import-size-advisory';
 import { prepareGcodeSave } from './prepare-gcode-save';
@@ -301,6 +302,7 @@ async function saveOrdinaryGcode(
       prepared.advisories,
       prepared.cncVCarveDepths,
       prepared.machineWarnings,
+      prepared.cncProgramFacts?.toolPlan.length,
     );
   } catch (err) {
     ctx.pushToast(`Could not save G-code: ${errorMessage(err)}`, 'error');
@@ -317,6 +319,7 @@ function pushPostSaveAdvisories(
   preflightAdvisories: ReadonlyArray<PreflightIssue>,
   cncVCarveDepths: Parameters<typeof detectCompiledVCarveDepthWarnings>[0],
   machineWarnings: ReadonlyArray<string>,
+  cncToolPlanLength?: number,
 ): void {
   for (const advisory of preflightAdvisories) {
     ctx.pushToast(advisory.message, 'warning');
@@ -336,6 +339,8 @@ function pushPostSaveAdvisories(
   if (machineKindOf(ctx.project.machine) === 'cnc') {
     const note = cncExportOtherControllersNote(ctx.project.device, ctx.controllerSettings);
     if (note !== null) ctx.pushToast(note, 'info');
+    const bitChanges = cncSavedBitChangesNote(cncToolPlanLength);
+    if (bitChanges !== null) ctx.pushToast(bitChanges, 'info');
   } else if (ctx.controllerSettings === null) {
     ctx.pushToast(
       `Exported G-code assumes GRBL $30=${ctx.project.device.maxPowerS} and laser mode ($32=1) — not verified against a connected controller this session.`,

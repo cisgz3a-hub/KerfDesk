@@ -117,7 +117,9 @@ function ReleaseSummary({ status }: Pick<Props, 'status'>): JSX.Element | null {
   const headingId = useId();
   if (
     !status?.version ||
-    !['available', 'downloading', 'ready', 'not-covered'].includes(status.state)
+    !['available', 'downloading', 'ready', 'not-covered', 'licence-unconfirmed'].includes(
+      status.state,
+    )
   )
     return null;
   const loading = status.releaseNotesState === 'loading';

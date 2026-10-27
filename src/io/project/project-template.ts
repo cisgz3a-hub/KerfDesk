@@ -1,6 +1,7 @@
 import type { Project } from '../../core/scene';
 import { deserializeProject } from './deserialize-project';
 import { prepareProjectForPersistence } from './prepare-project-persistence';
+import { projectLoadNoticeFlags, type ProjectLoadNoticeFlags } from './project-load-metadata';
 
 export function serializeProjectTemplate(
   project: Project,
@@ -22,10 +23,12 @@ export function parseProjectTemplate(contents: string): Project {
   return parseProjectTemplateDocument(contents).project;
 }
 
-/** The template's project and the project text it carries (ADR-592 seals that text). */
+/** The template's project, the project text it carries (ADR-592 seals that text)
+ * and what its load changed, which New from template reports as Open does. */
 export function parseProjectTemplateDocument(contents: string): {
   readonly project: Project;
   readonly projectJson: string;
+  readonly notices: ProjectLoadNoticeFlags;
 } {
   const raw: unknown = JSON.parse(contents);
   if (
@@ -52,5 +55,9 @@ export function parseProjectTemplateDocument(contents: string): {
   ) {
     throw new Error('This template has local image references instead of embedded pixels.');
   }
-  return { project: result.project, projectJson: raw.projectJson };
+  return {
+    project: result.project,
+    projectJson: raw.projectJson,
+    notices: projectLoadNoticeFlags(result),
+  };
 }

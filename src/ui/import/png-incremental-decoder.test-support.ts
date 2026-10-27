@@ -13,6 +13,9 @@ export type PngFixtureOptions = {
   readonly transparency?: Uint8Array;
   readonly transparencyAfterIdat?: boolean;
   readonly duplicateTransparency?: boolean;
+  /** eXIf chunk data (a TIFF block), written before IDAT unless exifAfterIdat. */
+  readonly exif?: ReadonlyArray<number>;
+  readonly exifAfterIdat?: boolean;
 };
 
 export function makePng(options: PngFixtureOptions): Uint8Array {
@@ -45,15 +48,18 @@ export function makePng(options: PngFixtureOptions): Uint8Array {
       : [chunk('pHYs', physicalDimensions(options.pixelsPerMetre))];
   const palette = options.palette === undefined ? [] : [chunk('PLTE', options.palette)];
   const transparency = transparencyChunks(options);
+  const exif = exifChunks(options);
   return concat([
     Uint8Array.of(137, 80, 78, 71, 13, 10, 26, 10),
     chunk('IHDR', ihdr),
     ...density,
     ...palette,
     ...transparency.beforeIdat,
+    ...exif.beforeIdat,
     chunk('IDAT', compressed.subarray(0, split)),
     chunk('IDAT', compressed.subarray(split)),
     ...transparency.afterIdat,
+    ...exif.afterIdat,
     chunk('IEND', new Uint8Array()),
   ]);
 }
@@ -207,4 +213,15 @@ function buildCrcTable(): Uint32Array {
     table[index] = value >>> 0;
   }
   return table;
+}
+
+function exifChunks(options: Pick<PngFixtureOptions, 'exif' | 'exifAfterIdat'>): {
+  readonly beforeIdat: Uint8Array[];
+  readonly afterIdat: Uint8Array[];
+} {
+  if (options.exif === undefined) return { beforeIdat: [], afterIdat: [] };
+  const chunks = [chunk('eXIf', Uint8Array.from(options.exif))];
+  return options.exifAfterIdat === true
+    ? { beforeIdat: [], afterIdat: chunks }
+    : { beforeIdat: chunks, afterIdat: [] };
 }
