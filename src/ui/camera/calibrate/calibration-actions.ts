@@ -187,6 +187,8 @@ export async function photographTarget(args: {
   readonly saved?: CameraModelRecord;
   /** The head's bed position now, in the target's bed frame, for a camera on the head; null when unknown. */
   readonly headMm?: Vec2 | null;
+  /** The head's machine Z (mm) now, which the calibration holds at (ADR-449 Amendment 2). */
+  readonly headZMm?: number | null;
   readonly signal?: AbortSignal;
   readonly now?: () => Date;
 }): Promise<PhotoOutcome> {
@@ -223,6 +225,7 @@ export async function photographTarget(args: {
     targetRingDiameterMm: settings.ringDiameterMm,
     calibratedAt: (args.now ?? (() => new Date()))(),
     headAtCalibrationMm: head,
+    headZAtCalibrationMm: args.headZMm,
     ...(args.bedFrame === undefined ? {} : { bedFrame: args.bedFrame }),
   });
   const savedCheck =

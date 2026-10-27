@@ -13,6 +13,7 @@ import type { BedArea } from '../../../core/camera/model/camera-model-accuracy';
 import type { CameraModelRecord } from '../../../core/camera/model/camera-model-record';
 import {
   headCameraView,
+  headCameraZChange,
   isHeadCameraModel,
   planHeadCaptures,
 } from '../../../core/camera/model/head-camera';
@@ -40,6 +41,7 @@ import { cameraBedFrameNow } from '../camera-bed-frame-now';
 import { cameraSourceIdentity, captureSourceFrame, type ActiveCameraSource } from '../frame-source';
 import { runHeadCapture, type HeadCaptureIo, type HeadSettle } from './head-capture-run';
 import { headPositionNow } from './head-position';
+import { headZChangedMessage } from './head-z-note';
 
 export type HeadCaptureState =
   | { readonly kind: 'idle' }
@@ -130,6 +132,8 @@ function captureSetup(target: HeadCaptureTarget): Setup {
   if (typeof record === 'string') return { kind: 'failed', message: record };
   const head = headPositionNow();
   if (head === null) return { kind: 'failed', message: HEAD_POSITION_UNKNOWN };
+  const zChange = headCameraZChange(record, head.z);
+  if (zChange !== null) return { kind: 'failed', message: headZChangedMessage(zChange) };
   const view = headCameraView(record, camera.surfaceHeightMm);
   if (view === null) return { kind: 'failed', message: NO_VIEW };
   const bed = { width: device.bedWidth, height: device.bedHeight };
@@ -266,13 +270,17 @@ function showPictures(
     MAX_PIXELS_PER_MM,
     MAX_PICTURE_SIDE_PX / Math.max(region.width, region.height),
   );
+  // Flattened at the heights set now, which the picture keeps: a later change
+  // clears it (ADR-449 Amendment 2, bed-picture-frame.ts).
+  const { surfaceHeightMm, heightAreas } = camera;
   const image = stitchHeadCameraPictures(record, pictures, {
     region,
     pixelsPerMm,
-    surfaceHeightMm: camera.surfaceHeightMm,
+    surfaceHeightMm,
+    heightAreas,
   });
   if (image === null) return false;
-  camera.setBedPicture({ image, region, surfaceHeightMm: camera.surfaceHeightMm, taken });
+  camera.setBedPicture({ image, region, surfaceHeightMm, heightAreas, taken });
   camera.setOverlayVisible(true);
   return true;
 }

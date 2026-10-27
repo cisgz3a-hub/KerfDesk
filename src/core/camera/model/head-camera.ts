@@ -52,8 +52,33 @@ export function modelAtHead(record: CameraModelRecord, headMm: Vec2): CameraMode
   if (shift.x === 0 && shift.y === 0) return record;
   return {
     ...movedModel(record, shift),
-    mount: { kind: 'head', headAtCalibrationMm: { x: headMm.x, y: headMm.y } },
+    mount: { ...mount, headAtCalibrationMm: { x: headMm.x, y: headMm.y } },
   };
+}
+
+// A head camera rides up and down with a moving Z, and nothing here knows
+// which way the machine's Z points, so its calibration is used only near the
+// Z it was taken at (ADR-449 Amendment 2). Raising a camera h mm above the
+// material by dz moves a point r mm from the lens axis about r·dz/h across
+// the picture; at the edge of a close-up view (r ≈ 40 mm, h ≈ 60 mm) this
+// tolerance keeps that under 0.15 mm, below a calibration's own error.
+export const HEAD_CAMERA_Z_TOLERANCE_MM = 0.2;
+
+/** The calibration's Z and the head's Z now, when they differ. */
+export type HeadCameraZChange = { readonly calibratedZMm: number; readonly zMm: number };
+
+/**
+ * The calibration's Z against the head's `zMm` (machine Z, mm) when they
+ * differ by more than {@link HEAD_CAMERA_Z_TOLERANCE_MM}; null when they
+ * agree, or when the calibration did not record its Z.
+ */
+export function headCameraZChange(
+  record: CameraModelRecord,
+  zMm: number,
+): HeadCameraZChange | null {
+  const calibratedZMm = record.mount?.headZAtCalibrationMm;
+  if (calibratedZMm === undefined) return null;
+  return Math.abs(zMm - calibratedZMm) > HEAD_CAMERA_Z_TOLERANCE_MM ? { calibratedZMm, zMm } : null;
 }
 
 /** `record` with its pose and its measured rings moved `shiftMm` across the bed. */

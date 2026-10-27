@@ -29,6 +29,8 @@ export function cameraModelFromCalibration(args: {
   readonly calibratedAt: Date;
   /** The head's bed position at the photo, for a camera on the head (ADR-449). */
   readonly headAtCalibrationMm?: Vec2 | null;
+  /** The head's machine Z at the photo (ADR-449 Amendment 2); null or absent when unknown. */
+  readonly headZAtCalibrationMm?: number | null | undefined;
   /** The bed frame the target's rings were placed in (rolling audit 12-P2-2). */
   readonly bedFrame?: CameraBedFrame;
 }): CameraModelRecord {
@@ -53,10 +55,22 @@ export function cameraModelFromCalibration(args: {
       ...(heightLeftLoose(calibration) ? { onlyAtTargetHeight: true as const } : {}),
     },
     calibratedAt: args.calibratedAt.toISOString(),
-    ...(args.headAtCalibrationMm === undefined || args.headAtCalibrationMm === null
-      ? {}
-      : { mount: { kind: 'head', headAtCalibrationMm: args.headAtCalibrationMm } }),
+    ...headMount(args.headAtCalibrationMm, args.headZAtCalibrationMm),
     ...(args.bedFrame === undefined ? {} : { bedFrame: args.bedFrame }),
+  };
+}
+
+function headMount(
+  head: Vec2 | null | undefined,
+  z: number | null | undefined,
+): Pick<CameraModelRecord, 'mount'> {
+  if (head === undefined || head === null) return {};
+  return {
+    mount: {
+      kind: 'head',
+      headAtCalibrationMm: head,
+      ...(z === undefined || z === null ? {} : { headZAtCalibrationMm: z }),
+    },
   };
 }
 

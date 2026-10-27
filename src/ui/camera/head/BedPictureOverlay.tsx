@@ -2,7 +2,9 @@
 // on the workspace canvas. The picture is already top-down in bed
 // millimetres, so it is drawn with the canvas's own fit-to-bed view (zoom and
 // pan included), with no camera model in between. It is drawn where its part
-// of the bed lies as the machine is set up now (ADR-440 Amendment 5).
+// of the bed lies as the machine is set up now (ADR-440 Amendment 5), with
+// the height areas it was flattened at outlined, as on the live overlay
+// (ADR-449 Amendment 2).
 
 import { useEffect, useMemo, useState } from 'react';
 import type { RgbaImage } from '../../../core/camera/rgba-image';
@@ -11,6 +13,7 @@ import { useCameraStore, type BedPicture } from '../../state/camera-store';
 import { useUiStore } from '../../state/ui-store';
 import { computeView } from '../../workspace/view-transform';
 import { useBedPictureRegion } from '../bed-picture-frame';
+import { HeightAreaOutlines } from '../heights/HeightAreaOutlines';
 import { useElementSize } from '../use-element-size';
 
 export function BedPictureOverlay(props: { readonly picture: BedPicture }): JSX.Element {
@@ -18,6 +21,7 @@ export function BedPictureOverlay(props: { readonly picture: BedPicture }): JSX.
   const bedWidthMm = useStore((s) => s.project.device.bedWidth);
   const bedHeightMm = useStore((s) => s.project.device.bedHeight);
   const opacityPercent = useCameraStore((s) => s.overlayOpacityPercent);
+  const heightAreas = useCameraStore((s) => s.heightAreas);
   const zoomFactor = useUiStore((s) => s.zoomFactor);
   const panX = useUiStore((s) => s.panX);
   const panY = useUiStore((s) => s.panY);
@@ -25,19 +29,21 @@ export function BedPictureOverlay(props: { readonly picture: BedPicture }): JSX.
   const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
   const source = useMemo(() => pictureCanvas(picture.image), [picture.image]);
   const region = useBedPictureRegion(picture);
+  const view = useMemo(
+    () =>
+      box === null
+        ? null
+        : computeView(box.width, box.height, bedWidthMm, bedHeightMm, { zoomFactor, panX, panY }),
+    [box, bedWidthMm, bedHeightMm, zoomFactor, panX, panY],
+  );
 
   useEffect(() => {
-    if (canvas === null || box === null || source === null) return;
+    if (canvas === null || box === null || view === null || source === null) return;
     const ratio = window.devicePixelRatio || 1;
     canvas.width = Math.round(box.width * ratio);
     canvas.height = Math.round(box.height * ratio);
     const context = canvas.getContext('2d');
     if (context === null) return;
-    const view = computeView(box.width, box.height, bedWidthMm, bedHeightMm, {
-      zoomFactor,
-      panX,
-      panY,
-    });
     context.setTransform(1, 0, 0, 1, 0, 0);
     context.clearRect(0, 0, canvas.width, canvas.height);
     if (region === null) return;
@@ -52,22 +58,14 @@ export function BedPictureOverlay(props: { readonly picture: BedPicture }): JSX.
     context.globalAlpha = opacityPercent / 100;
     context.imageSmoothingEnabled = true;
     context.drawImage(source, region.x, region.y, region.width, region.height);
-  }, [
-    canvas,
-    box,
-    source,
-    region,
-    bedWidthMm,
-    bedHeightMm,
-    opacityPercent,
-    zoomFactor,
-    panX,
-    panY,
-  ]);
+  }, [canvas, box, view, source, region, opacityPercent]);
 
   return (
     <div ref={boxRef} style={boxStyle} aria-hidden>
       <canvas ref={setCanvas} style={canvasStyle} />
+      {box === null || view === null || region === null ? null : (
+        <HeightAreaOutlines areas={heightAreas} view={view} width={box.width} height={box.height} />
+      )}
     </div>
   );
 }
