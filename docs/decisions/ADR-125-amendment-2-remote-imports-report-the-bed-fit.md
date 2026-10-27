@@ -1,7 +1,8 @@
 ## ADR-125 Amendment 2 - Remote imports report the bed fit and keep it as its own Undo step (2026-10-27)
 
 **Status:** Accepted; software-verified through tests that drive the real remote adapter against
-the desktop import actions. | **Date:** 2026-10-27
+the desktop import actions. The phone's Import sheet shows the notices and fit by
+[Amendment 3](ADR-125-amendment-3-phone-import-sheet-shows-the-fit.md). | **Date:** 2026-10-27
 
 Extends [Amendment 1](ADR-125-amendment-1-imports-keep-file-size.md) item 3 to Remote Control
 (ADR-569, ADR-584): the phone and the MCP tools `add_svg`, `import_file` and `apply_edits`. Follows

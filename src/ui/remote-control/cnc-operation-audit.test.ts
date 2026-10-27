@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { mcpOutputSchemas } from '../../../electron/mcp/output-schemas';
 import { DEFAULT_CNC_LAYER_SETTINGS, type CncLayerSettings } from '../../core/scene';
 import { setActiveEdition } from '../licensing/edition';
 import {
@@ -6,6 +7,7 @@ import {
   sceneWithCncStartupOperationDrafts,
 } from '../state/cnc-startup-setup';
 import { useStore } from '../state/store';
+import { useToastStore } from '../state/toast-store';
 import { addTestRectangle, resultCode, testAdapter, writeArgs } from './authoring-test-support';
 import type { RemoteControlAdapter } from './types';
 
@@ -146,39 +148,60 @@ describe('a remote bit change takes the Artwork card’s path', () => {
       expect(card.feedMmPerMin).toBeLessThan(hardwood.feedMmPerMin);
       expect(card.depthPerPassMm).toBeLessThan(hardwood.depthPerPassMm);
 
-      expect(resultCode(await changeBit(mode, 'em-1588'))).toBe('ok');
+      useToastStore.setState({ toasts: [] });
+      const result = await changeBit(mode, 'em-1588');
+      expect(resultCode(result)).toBe('ok');
       expect(useStore.getState().project.scene.layers[0]!.cnc).toEqual(card);
+      // Recalculated values keep nothing from the old bit, so nothing is named.
+      if (!result.ok) throw new Error(result.error.code);
+      expect(JSON.stringify(result.data)).not.toContain('Kept from the previous bit');
+      expect(useToastStore.getState().toasts).toEqual([]);
       useStore.getState().undo();
       expect(useStore.getState().project.scene.layers[0]!.cnc).toEqual(hardwood);
     },
   );
 
-  it('keeps a manual operation’s values and names them, as the card’s note does', async () => {
-    const layer = useStore.getState().project.scene.layers[0]!;
-    const manual: CncLayerSettings = {
-      ...DEFAULT_CNC_LAYER_SETTINGS,
-      toolId: 'em-6350',
-      feedMmPerMin: 2400,
-      plungeMmPerMin: 960,
-      spindleRpm: 12000,
-      depthPerPassMm: 2.5,
-    };
-    useStore.getState().setLayerParam(layer.id, { cnc: manual });
-    const result = await changeBit('single', 'em-1588');
-    expect(resultCode(result)).toBe('ok');
-    expect(useStore.getState().project.scene.layers[0]!.cnc).toEqual(
-      cardChoice(manual, { toolId: 'em-1588' }),
-    );
-    expect(useStore.getState().project.scene.layers[0]!.cnc).toMatchObject({
-      toolId: 'em-1588',
-      feedMmPerMin: 2400,
-      depthPerPassMm: 2.5,
-    });
-    if (!result.ok) throw new Error(result.error.code);
-    expect(result.data.message).toMatch(
-      /^Bit changed\. Kept from the previous bit: feed 2400 mm\/min, plunge 960 mm\/min, spindle 12,000 RPM, depth per pass 2\.5 mm\. Check them for .+ before cutting\.$/,
-    );
-  });
+  // Rolling audit v5 J3-P2-2 (ADR-306 Amendment 5): the batch item carries the message through
+  // the MCP output schema, and the PC shows it in both routes.
+  it.each(['single', 'batch'] as const)(
+    'keeps a manual operation’s values and names them, as the card’s note does (%s)',
+    async (mode) => {
+      const layer = useStore.getState().project.scene.layers[0]!;
+      const manual: CncLayerSettings = {
+        ...DEFAULT_CNC_LAYER_SETTINGS,
+        toolId: 'em-6350',
+        feedMmPerMin: 2400,
+        plungeMmPerMin: 960,
+        spindleRpm: 12000,
+        depthPerPassMm: 2.5,
+      };
+      useStore.getState().setLayerParam(layer.id, { cnc: manual });
+      useToastStore.setState({ toasts: [] });
+      const result = await changeBit(mode, 'em-1588');
+      expect(resultCode(result)).toBe('ok');
+      expect(useStore.getState().project.scene.layers[0]!.cnc).toEqual(
+        cardChoice(manual, { toolId: 'em-1588' }),
+      );
+      expect(useStore.getState().project.scene.layers[0]!.cnc).toMatchObject({
+        toolId: 'em-1588',
+        feedMmPerMin: 2400,
+        depthPerPassMm: 2.5,
+      });
+      if (!result.ok) throw new Error(result.error.code);
+      const receipt = { ...result.data, revision: result.revision };
+      const parsed =
+        mode === 'single'
+          ? mcpOutputSchemas.update_operation.parse(receipt)
+          : mcpOutputSchemas.apply_edits.parse(receipt).results?.[0];
+      const message = (parsed as { message?: string } | undefined)?.message;
+      expect(message).toMatch(
+        /^Bit changed\. Kept from the previous bit: feed 2400 mm\/min, plunge 960 mm\/min, spindle 12,000 RPM, depth per pass 2\.5 mm\. Check them for .+ before cutting\.$/,
+      );
+      expect(useToastStore.getState().toasts).toEqual([
+        expect.objectContaining({ message, variant: 'warning' }),
+      ]);
+    },
+  );
 
   it('refuses a bit that is not in the Machine Setup library', async () => {
     const before = useStore.getState();

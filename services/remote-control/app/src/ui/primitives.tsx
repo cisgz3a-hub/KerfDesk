@@ -3,37 +3,43 @@ import { parseDecimal } from '../core/numbers';
 import { useDraft } from './hooks';
 import { Icon } from './icons';
 
+/** `dismissible={false}` closes only through the footer: no Close button, backdrop or Escape. */
 export function Sheet({
   title,
   onClose,
   children,
   footer,
+  dismissible = true,
 }: {
   title: string;
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
+  dismissible?: boolean;
 }) {
   const id = useId();
   const panel = useRef<HTMLDivElement>(null);
   useEffect(() => {
     panel.current?.focus();
+    if (!dismissible) return undefined;
     const key = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, [onClose]);
+  }, [onClose, dismissible]);
   return (
     <>
-      <div className="backdrop" onClick={onClose} />
+      <div className="backdrop" onClick={dismissible ? onClose : undefined} />
       <div className="sheet" role="dialog" aria-labelledby={id} ref={panel} tabIndex={-1}>
         <div className="sheet-grip" />
         <div className="sheet-head">
           <h2 id={id}>{title}</h2>
-          <button type="button" className="btn btn-icon" aria-label="Close" onClick={onClose}>
-            <Icon name="close" />
-          </button>
+          {dismissible ? (
+            <button type="button" className="btn btn-icon" aria-label="Close" onClick={onClose}>
+              <Icon name="close" />
+            </button>
+          ) : null}
         </div>
         <div className="sheet-body">{children}</div>
         {footer === undefined ? null : <div className="sheet-foot">{footer}</div>}

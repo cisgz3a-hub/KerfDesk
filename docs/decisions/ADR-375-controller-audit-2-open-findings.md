@@ -144,7 +144,8 @@ therefore sent moves the firmware refuses, or trusted values the controller had 
      are unchanged (ADR-232 leaves those limits to the controller). No new refusal.
      *(Extended by [Amendment 8](ADR-375-amendment-8-phone-hold-aims-like-the-pc-hold.md): the
      phone's hold-to-jog aims inside the same limits, capped at its 100 mm bound, and its Z hold
-     inside the firmware's Z envelope.)*
+     inside the firmware's Z envelope; by [Amendment 9](ADR-375-amendment-9-phone-z-hold-aims-from-the-controller-z.md),
+     the Z hold measures from the withheld controller Z as the XY hold does.)*
 
 4. **Fire at the power it shows** (P-2).
    - GRBL and grblHAL scale every S word by the spindle override, and an override raised during a

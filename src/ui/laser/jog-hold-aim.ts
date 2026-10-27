@@ -60,15 +60,17 @@ export function holdJogAim(input: HoldJogInput): {
 /**
  * How far a held Z jog may run toward `direction` inside the firmware's Z
  * envelope, the one a CNC park lift is checked against (ADR-491 Amendment 2),
- * or null when that envelope or the head's machine Z is unknown.
+ * or null when that envelope or the head's machine Z is unknown. Like the XY
+ * aim, it measures from the controller's own MPos when KerfDesk withholds the
+ * position, since stock GRBL with `$20=1` checks the Z target against it too
+ * (ADR-375 Amendment 9).
  */
 export function holdZRoomMm(input: HoldJogInput, direction: -1 | 1): number | null {
-  const limits = resolveFirmwareZLimits(input.evidence, input.device.zTravelMm);
-  const position = inferCurrentMachinePosition(
-    input.statusReport,
-    input.wcoCache,
-    input.reportInches,
-  );
+  const { evidence, statusReport, reportInches } = input;
+  const limits = resolveFirmwareZLimits(evidence, input.device.zTravelMm);
+  const position =
+    inferCurrentMachinePosition(statusReport, input.wcoCache, reportInches) ??
+    firmwareJogCheckPosition(evidence, withheldControllerMPos(statusReport), reportInches);
   if (limits === null || position === null) return null;
   return Math.max(0, direction > 0 ? limits.maxMm - position.z : position.z - limits.minMm);
 }

@@ -170,7 +170,7 @@ export const mcpToolInfo: Record<KerfDeskMcpCommand, { title: string; descriptio
   apply_edits: {
     title: 'Apply several edits as one Undo step',
     description:
-      'Apply up to 40 ordered edits atomically: all succeed as one Undo step or none apply. Each item is {command, args} using add_text, add_rectangle, add_ellipse, add_polyline, add_svg, transform_artwork, arrange_artwork, set_selection, update_operation, create_operation, assign_artwork_to_operation or apply_material_recipe, without expectedRevision/requestId. Refer to artwork or an operation created by an earlier item as "$<index>", e.g. "$0". Requires expectedRevision and UUID requestId for the batch.',
+      'Apply up to 40 ordered edits atomically: all succeed as one Undo step or none apply. Each item is {command, args} using add_text, add_rectangle, add_ellipse, add_polyline, add_svg, transform_artwork, arrange_artwork, set_selection, update_operation, create_operation, assign_artwork_to_operation or apply_material_recipe, without expectedRevision/requestId. Refer to artwork or an operation created by an earlier item as "$<index>", e.g. "$0". Each results item carries that edit\'s message and import notices, such as the cutting values a bit change kept; tell the user about each. Requires expectedRevision and UUID requestId for the batch.',
   },
   ...mcpMachineToolInfo,
 };
