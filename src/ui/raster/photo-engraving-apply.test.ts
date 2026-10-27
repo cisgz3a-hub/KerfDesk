@@ -291,7 +291,7 @@ describe('photo engraving Apply', () => {
     },
   );
 
-  it.each([{ locked: true }, { role: 'trace-source' as const }, { operationIds: ['other'] }])(
+  it.each([{ locked: true }, { operationIds: ['other'] }])(
     'refuses an unavailable photo %j',
     (imagePatch) => {
       const { owner, state } = fixture(imagePatch);

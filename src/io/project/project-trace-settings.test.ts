@@ -137,7 +137,9 @@ describe('trace settings persistence (ADR-408)', () => {
     const loaded = load(LEGACY_V8_TRACE_DOCUMENT);
     expect(loaded.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
     const [source, traced] = loaded.scene.objects;
-    expect(source).toMatchObject({ kind: 'raster-image', id: 'src-1', role: 'trace-source' });
+    // The legacy 'trace-source' marker is dropped on load (ADR-673).
+    expect(source).toMatchObject({ kind: 'raster-image', id: 'src-1' });
+    expect(source).not.toHaveProperty('role');
     expect(traced).toMatchObject({
       kind: 'traced-image',
       id: 'trace-1',

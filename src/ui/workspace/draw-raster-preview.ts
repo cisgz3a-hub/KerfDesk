@@ -79,7 +79,6 @@ export function drawRasterPreview(
     for (const operationLayer of outputOperationLayers(layer)) {
       for (const obj of project.scene.objects) {
         if (obj.kind !== 'raster-image' || !sceneObjectUsesOperation(obj, operationLayer)) continue;
-        if (obj.role === 'trace-source') continue;
         const effectiveOperation = effectiveOperationForObject(operationLayer, obj);
         if (effectiveOperation.mode !== 'image') continue;
         drawOnePreview(
@@ -359,7 +358,6 @@ export function rasterPreviewDisplayAdvisory(
     for (const operationLayer of outputOperationLayers(layer)) {
       for (const obj of project.scene.objects) {
         if (obj.kind !== 'raster-image' || !sceneObjectUsesOperation(obj, operationLayer)) continue;
-        if (obj.role === 'trace-source') continue;
         const effectiveOperation = effectiveOperationForObject(operationLayer, obj);
         if (effectiveOperation.mode !== 'image') continue;
         const source = compiledGridDimensions(obj, effectiveOperation, project.device);
@@ -393,7 +391,6 @@ function activePreviewBuilds(project: Project): Map<string, Map<string, RasterIm
   const active = new Map<string, Map<string, RasterImage>>();
   for (const obj of project.scene.objects) {
     if (obj.kind !== 'raster-image') continue;
-    if (obj.role === 'trace-source') continue;
     const builds = new Map<string, RasterImage>();
     for (const operation of project.scene.layers.flatMap(outputOperationLayers)) {
       if (!sceneObjectUsesOperation(obj, operation)) continue;

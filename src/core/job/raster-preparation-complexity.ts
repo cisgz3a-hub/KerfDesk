@@ -29,7 +29,7 @@ export function rasterPreparationWorkUnits(project: Project): number {
   if (project.machine?.kind === 'cnc') return 0;
   let workUnits = 0;
   for (const obj of project.scene.objects) {
-    if (obj.kind !== 'raster-image' || obj.role === 'trace-source') continue;
+    if (obj.kind !== 'raster-image') continue;
     for (const layer of matchingImageLayers(project, obj)) {
       const effectiveLayer = effectiveOperationForObject(layer, obj);
       workUnits += rasterLayerWorkUnits(obj, effectiveLayer, project);

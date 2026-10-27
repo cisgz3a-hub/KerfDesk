@@ -87,8 +87,6 @@ export const canvasTheme = {
   noticeFill: 'rgba(255, 248, 225, 0.95)',
   noticeStroke: '#d6a100',
   noticeText: '#5f4200',
-  // Trace-source backing tint (draw-raster, ADR-026)
-  traceSourceTint: '#3b82c4',
   // Design Studio sketch geometry (design-canvas-draw, ADR-272). Sketch
   // entities have no layer yet — they only acquire one at Apply — so they need
   // their own theme-aware ink. Construction guides remain muted.

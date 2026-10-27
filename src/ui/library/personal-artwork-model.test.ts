@@ -282,7 +282,10 @@ it('retains output ordering and reuses already embedded font bytes on repeated i
   expect(new Set(twice.scene.objects.map((object) => object.id)).size).toBe(6);
 });
 
-it('carries a traced object original bitmap even when only the trace is selected', async () => {
+// ADR-673: a trace's kept picture engraves, so it is artwork of its own, not a
+// dependency. Saving only the trace saves only the trace, as copying LightBurn's
+// traced vectors leaves the image alone; this used to carry the bitmap along.
+it('saves only the trace when only the trace is selected', async () => {
   const project = artworkProject();
   const mask = project.scene.objects[0]!;
   if (!('paths' in mask)) throw new Error('fixture paths missing');
@@ -303,6 +306,39 @@ it('carries a traced object original bitmap even when only the trace is selected
     },
     selectedObjectId: trace.id,
     additionalSelectedIds: new Set(),
+  });
+  const entry = await capturePersonalArtwork(useStore.getState(), 'Traced logo', '');
+  const saved = personalArtworkProject(entry);
+  expect(saved.scene.objects.map((object) => object.id)).toEqual(['trace']);
+  useStore.setState({ project: createProject() });
+  useStore.setState((state) => insertPersonalArtwork(state, entry));
+  const added = useStore.getState().project.scene.objects;
+  expect(added.map((object) => object.kind)).toEqual(['traced-image']);
+  // No picture came with it, so no Re-trace link is left dangling.
+  expect(added[0]).not.toHaveProperty('traceSourceId');
+});
+
+it('carries the picture with its trace when both are selected', async () => {
+  const project = artworkProject();
+  const mask = project.scene.objects[0]!;
+  if (!('paths' in mask)) throw new Error('fixture paths missing');
+  const trace = {
+    kind: 'traced-image' as const,
+    id: 'trace',
+    source: 'traced.png',
+    paths: mask.paths,
+    bounds: mask.bounds,
+    transform: mask.transform,
+    operationIds: ['cut'],
+    traceSourceId: 'image',
+  };
+  useStore.setState({
+    project: {
+      ...project,
+      scene: { ...project.scene, objects: [...project.scene.objects, trace] },
+    },
+    selectedObjectId: trace.id,
+    additionalSelectedIds: new Set(['image']),
   });
   const entry = await capturePersonalArtwork(useStore.getState(), 'Traced logo', '');
   const saved = personalArtworkProject(entry);

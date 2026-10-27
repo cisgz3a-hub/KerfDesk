@@ -45,7 +45,7 @@ function selectedPhotoSeed(): ToneCalibrationSeed | null {
   const state = useStore.getState();
   if (state.additionalSelectedIds.size > 0) return null;
   const image = state.project.scene.objects.find((object) => object.id === state.selectedObjectId);
-  if (image?.kind !== 'raster-image' || image.role === 'trace-source') return null;
+  if (image?.kind !== 'raster-image') return null;
   const operation = photoEngravingOperationForImage(image, state.project.scene.layers);
   if (operation === null) return null;
   const effective = effectiveOperationForObject(operation, image);

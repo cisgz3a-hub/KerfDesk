@@ -118,23 +118,26 @@ function withFreshCncLayers(
       ReturnType<typeof repairRemovedObjectReferences>,
       'repairedImageMasks' | 'repairedPathTextGuides'
     >;
+    readonly inheritedOperationIds?: ReadonlyArray<string>;
   },
 ): MutationResult {
-  const { dependencyRepairs, ...mutation } = result;
+  const { dependencyRepairs, inheritedOperationIds, ...mutation } = result;
   if (dependencyRepairs !== undefined)
     reportDependencyRepairs(dependencyRepairs, 'unavailable-vector');
   // Laser Make Default never carries CNC settings, so every new CNC operation
   // from an import or trace is seeded from the machine setup, and every new
-  // laser operation from the job material's best recipe (ADR-496).
+  // laser operation from the job material's best recipe (ADR-496). Copies of
+  // a kept picture's operations already carry its settings (ADR-673).
+  const inherited = new Set(inheritedOperationIds);
+  const previousLayers = [
+    ...state.project.scene.layers,
+    ...result.project.scene.layers.filter((layer) => inherited.has(layer.id)),
+  ];
   return {
     ...mutation,
     project: projectWithFreshLaserRecipes(
-      state.project.scene.layers,
-      projectWithFreshCncLayers(
-        state.project.scene.layers,
-        result.project,
-        state.cncLiveCaps ?? null,
-      ),
+      previousLayers,
+      projectWithFreshCncLayers(previousLayers, result.project, state.cncLiveCaps ?? null),
       state.materialLibrary ?? null,
     ),
   };

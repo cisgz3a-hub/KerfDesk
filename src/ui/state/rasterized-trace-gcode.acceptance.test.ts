@@ -76,11 +76,14 @@ function projectWithSource(device?: DeviceProfile): Project {
   };
 }
 
+// Delete Image After trace, the dialog's default. A kept photo would engrave as
+// well (ADR-673); these tests pin the trace's own production output.
 function committedTraceProject(device?: DeviceProfile): Project {
   return applyRasterizedTraceToExisting(
     { project: projectWithSource(device), undoStack: [] },
     'source-photo',
     rasterizedTrace(),
+    { deleteSourceAfterTrace: true },
   ).project;
 }
 
@@ -127,8 +130,7 @@ describe('rasterized trace production output', () => {
   it('commits through Image settings and emits one M4 raster with an S0 runway', () => {
     const committed = committedTraceProject();
 
-    const source = committed.scene.objects.find((object) => object.id === 'source-photo');
-    expect(source).toMatchObject({ kind: 'raster-image', role: 'trace-source' });
+    expect(committed.scene.objects.map((object) => object.id)).toEqual(['rasterized-trace']);
 
     const job = compileJob(committed.scene, committed.device);
     expect(job.groups.map((group) => group.kind)).toEqual(['raster']);

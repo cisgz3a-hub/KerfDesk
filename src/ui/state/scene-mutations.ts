@@ -34,7 +34,6 @@ import {
 } from './fresh-artwork-mode';
 import { applyFreshTraceScanDirection } from './fresh-trace-scan-direction';
 import { positionTraceOverRasterSource } from './trace-placement';
-import { releaseTraceSourcePalette } from './trace-source-palette';
 import { pushUndo } from './undo-stack';
 import type { BedFit } from '../../core/scene/fit-to-bed';
 import { pruneSceneObjectOperationOverrides } from '../../core/scene/operation-binding';
@@ -258,10 +257,10 @@ export function applyFreshImport(
 // second import). We find that existing bitmap by id and give the trace a
 // transform that maps its pixel-space points onto the bitmap's mm extent
 // (positionTraceOverRasterSource) so the vectors land pixel-for-pixel over the
-// features they came from, then tag the bitmap 'trace-source' so the
-// canvas tints it as the deletable backing. The trace is appended last
-// (drawn on top) and becomes the selection, so "delete the source to
-// keep the trace" stays the obvious next gesture; a single pushUndo
+// features they came from. Delete Image After trace removes the bitmap; a
+// bitmap the operator keeps is left exactly as it was, an ordinary image that
+// engraves on its own operation as in LightBurn (ADR-673). The trace is
+// appended last (drawn on top) and becomes the selection; a single pushUndo
 // covers the change.
 //
 // Total + defensive: if `sourceId` no longer resolves to a raster
@@ -276,16 +275,11 @@ export function applyTraceToExisting(
 ): MutationResult & ReturnType<typeof repairRemovedProjectObjectReferences> {
   const existing = s.project.scene.objects.find((o) => o.id === sourceId);
   const prepared = prepareTraceSource(s.project.scene, existing, options);
-  let scene = prepared.scene;
-  // Free the source's palette slot BEFORE the trace allocates, so the artwork
-  // being cut takes OPERATION_PALETTE[0] instead of the runner-up. A deleted
-  // source leaves its operation orphaned (pruning it below would come too late
-  // to matter); a retained one stays as a no-output backing and steps aside.
-  if (prepared.source !== undefined) {
-    scene = prepared.shouldPruneLayers
-      ? pruneOrphanLayers(scene)
-      : releaseTraceSourcePalette(scene, prepared.source);
-  }
+  // A deleted source leaves its operation orphaned: prune it BEFORE the trace
+  // allocates, so the trace can take the colour it frees (pruning below would
+  // come too late to matter). A kept photo is still artwork that engraves, so
+  // it keeps its operation and colour and the trace takes the next free one.
+  let scene = prepared.shouldPruneLayers ? pruneOrphanLayers(prepared.scene) : prepared.scene;
   const positionedTrace =
     prepared.source === undefined ? traced : positionTraceOverRasterSource(prepared.source, traced);
   if (options.replaceTraceId !== undefined && options.replaceTraceId !== positionedTrace.id) {
@@ -335,12 +329,7 @@ function prepareTraceSource(
       shouldPruneLayers: true,
     };
   }
-  const taggedSource: RasterImage = { ...existing, role: 'trace-source' };
-  return {
-    scene: replaceObject(scene, existing.id, taggedSource),
-    source: existing,
-    shouldPruneLayers: false,
-  };
+  return { scene, source: existing, shouldPruneLayers: false };
 }
 
 export function applyReimport(

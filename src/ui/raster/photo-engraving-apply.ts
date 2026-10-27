@@ -59,7 +59,6 @@ export function photoEngravingOwnerIsCurrent(state: AppState, owner: PhotoEngrav
     state.additionalSelectedIds.size === 0 &&
     photoEngravingReferencesMatch(state, owner) &&
     owner.image.locked !== true &&
-    owner.image.role !== 'trace-source' &&
     sceneObjectHasVisibleLayer(scene, owner.image) &&
     sceneObjectUsesOperation(owner.image, owner.operation)
   );

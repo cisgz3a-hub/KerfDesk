@@ -29,14 +29,18 @@ export type RasterTraceInputs = {
 /** Resolve the live bitmap and every active bound Image operation. Returning
  * the actual source references lets the caller detect any transform, content,
  * binding, parent-operation, or sub-operation edit made while the asynchronous
- * bitmap worker is running. */
+ * bitmap worker is running. A source whose Image operations all have Output
+ * off, such as a camera capture kept after Trace (ADR-673), sizes the bitmap
+ * from those operations instead. */
 export function rasterTraceInputs(project: Project, sourceId: string): RasterTraceInputs | null {
   const source = project.scene.objects.find((object) => object.id === sourceId);
   if (source === undefined || source.kind !== 'raster-image') return null;
-  const operations: RasterTraceOperationInput[] = [];
-  for (const sourceLayer of project.scene.layers) {
-    operations.push(...imageOperationInputs(source, sourceLayer));
-  }
+  const inputsFor = (includeOutputOff: boolean): RasterTraceOperationInput[] =>
+    project.scene.layers.flatMap((sourceLayer) =>
+      imageOperationInputs(source, sourceLayer, includeOutputOff),
+    );
+  const active = inputsFor(false);
+  const operations = active.length > 0 ? active : inputsFor(true);
   return operations.length === 0 ? null : { source, operations };
 }
 
@@ -59,8 +63,10 @@ export function sameRasterTraceInputs(project: Project, expected: RasterTraceInp
 function imageOperationInputs(
   source: RasterImage,
   sourceLayer: Layer,
+  includeOutputOff: boolean,
 ): ReadonlyArray<RasterTraceOperationInput> {
-  if (!sourceLayer.output || !sceneObjectUsesOperation(source, sourceLayer)) return [];
+  if (!(sourceLayer.output || includeOutputOff) || !sceneObjectUsesOperation(source, sourceLayer))
+    return [];
   const operations: RasterTraceOperationInput[] = [];
   if (effectiveOperationForObject(sourceLayer, source).mode === 'image') {
     operations.push({ operation: sourceLayer, sourceLayer });
