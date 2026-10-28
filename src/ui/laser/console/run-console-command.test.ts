@@ -79,6 +79,24 @@ describe('runConsoleCommand', () => {
     expect(send).not.toHaveBeenCalled();
   });
 
+  // Rolling audit v5 J7-P1-2: a FluidNC board runs `[13]1` as `$13=1`, so once
+  // the banner shows FluidNC the stock-GRBL profile asks about it as about the
+  // `$` form, and the store gets that form (ADR-375 Amendment 11).
+  it('confirms a FluidNC bracket setting line as the setting write it runs as', async () => {
+    const send = vi.fn(async () => undefined);
+    const session = {
+      detectedControllerKind: 'fluidnc' as const,
+      controllerSettings: null,
+      controllerBuildInfoRawLines: [],
+    };
+
+    await expect(runConsoleCommand(grblDriver, '[13]1', send, undefined, session)).resolves.toEqual(
+      { status: 'sent', command: '$13=1' },
+    );
+    expect(jobAwareConfirm).toHaveBeenCalledWith('Send persistent controller setting?\n\n$13=1');
+    expect(send).toHaveBeenCalledWith('$13=1', { confirmed: true });
+  });
+
   it('returns validation and asynchronous store failures without throwing', async () => {
     const validationSend = vi.fn(async () => undefined);
     const invalid = await runConsoleCommand(grblDriver, 'G0 X0\nG0 Y0', validationSend);

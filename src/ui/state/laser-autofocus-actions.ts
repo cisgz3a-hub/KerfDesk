@@ -1,3 +1,4 @@
+import { prepareBoardConsoleCommand } from '../../core/controllers/board-console-command';
 import type { ConsoleCommandResult } from '../../core/controllers/grbl/console-command';
 import { autofocusCommandIssue } from '../../core/devices/autofocus-command';
 import { runAutofocus } from './autofocus-action';
@@ -15,6 +16,7 @@ import { controllerUnlockedPatch } from './laser-console-completion';
 import { resetRequiredBlockMessage } from './controller-reset-required';
 import { startControllerCommand } from './laser-interactive-command';
 import { continueControllerOperation } from './laser-controller-operation';
+import { beginOwnedReportUnitsLine } from './owned-report-units';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -76,7 +78,8 @@ async function runOwnedAutofocus(
   // Console policy applies: Smoothieware's shell answers words such as
   // `switch focus on` without an ok, which would leave an owed ack that fences
   // every later command (controller audit 2026-09-25 CG-9).
-  const policy = command.trim() === '' ? null : refs.driver.prepareConsoleCommand(command);
+  const policy =
+    command.trim() === '' ? null : prepareBoardConsoleCommand(refs.driver, command, get());
   if (policy !== null && !policy.ok) return { kind: 'preflight-failed', reason: policy.reason };
   // Whatever its source (Machine Setup, a machine profile, a project file), a
   // press sends only a focus routine: never a burn, an XY move or a settings
@@ -106,6 +109,8 @@ async function runOwnedAutofocus(
         })),
       refs,
       write,
+      beginSetupLine: (line) =>
+        beginOwnedReportUnitsLine(set, get, refs.driver, line, 'Auto-focus'),
     });
     set((state) => completionPatch(state, result, expectedSessionEpoch));
     return result;
