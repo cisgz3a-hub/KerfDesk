@@ -24,6 +24,7 @@ import {
 const SAME_POINT_MM = 1e-9;
 const COARSE_SAMPLES = 32;
 const REFINE_STEPS = 40;
+const HALFWAY_SAMPLES = 256;
 
 /** Number of segments a contour has, counting a closed contour's implied closing line. */
 export function curveSegmentCount(curve: CurveSubpath): number {
@@ -41,6 +42,29 @@ export function curveSegmentPoint(
   return segment === undefined
     ? null
     : segmentPoint(segmentStart(contour, segmentIndex), segment, t);
+}
+
+/** The parameter halfway along one segment by length (LightBurn's M, "the
+ *  halfway point"). A line and an arc, split by angle, are halved at t = 0.5;
+ *  a cubic's speed varies, so its half is found by length (audit L6-P3-4). */
+export function curveSegmentHalfwayT(curve: CurveSubpath, segmentIndex: number): number {
+  const contour = contourSegments(curve, curve.closed);
+  const segment = contour.segments[segmentIndex];
+  if (segment?.kind !== 'cubic') return 0.5;
+  const from = segmentStart(contour, segmentIndex);
+  const lengths = [0];
+  let previous = from;
+  for (let step = 1; step <= HALFWAY_SAMPLES; step += 1) {
+    const point = segmentPoint(from, segment, step / HALFWAY_SAMPLES);
+    lengths.push((lengths[step - 1] as number) + distance(previous, point));
+    previous = point;
+  }
+  const half = (lengths[HALFWAY_SAMPLES] as number) / 2;
+  if (!(half > 0)) return 0.5;
+  const step = lengths.findIndex((length) => length >= half);
+  const before = lengths[step - 1] as number;
+  const share = (half - before) / ((lengths[step] as number) - before);
+  return (step - 1 + share) / HALFWAY_SAMPLES;
 }
 
 /** Splits one segment at t (0 < t < 1); the new node becomes node segmentIndex + 1. */

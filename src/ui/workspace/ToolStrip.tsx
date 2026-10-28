@@ -128,9 +128,15 @@ function NodeCommandBar(props: {
       <NodeAction
         label="Smooth"
         title="Align the incoming and outgoing curve handles"
+        disabled={!node.canSmooth}
         onClick={smooth}
       />
-      <NodeAction label="Corner" title="Align handles to the adjoining chords" onClick={corner} />
+      <NodeAction
+        label="Corner"
+        title="Align handles to the adjoining chords"
+        disabled={!node.canCorner}
+        onClick={corner}
+      />
       <NodeAction
         label="Curve"
         title="Convert the outgoing segment to a cubic curve"

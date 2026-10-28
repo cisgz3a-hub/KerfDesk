@@ -1,6 +1,8 @@
 import {
+  cornerCurveNode,
   curveNodePoint,
   polylineToCurveSubpath,
+  smoothCurveNode,
   type ColoredPath,
   type CurveSubpath,
   type PathSegment,
@@ -10,6 +12,9 @@ import type { PathNodeRef } from './path-node-edit-actions';
 type CurveCommandNode = {
   readonly closed: boolean;
   readonly outgoingKind: PathSegment['kind'] | null;
+  /** Whether Smooth and Corner can act: both need a curve on each side (audit L6-P3-3). */
+  readonly canSmooth: boolean;
+  readonly canCorner: boolean;
 };
 
 /** Inspect a compact anchor without constructing the duplicate curve graph during rendering. */
@@ -29,6 +34,8 @@ export function curveCommandNode(
   return {
     closed: line.closed,
     outgoingKind: ref.pointIndex < line.points.length - 1 ? 'line' : null,
+    canSmooth: false,
+    canCorner: false,
   };
 }
 
@@ -38,7 +45,12 @@ function canonicalCommandNode(
 ): CurveCommandNode | null {
   return curve === undefined || curveNodePoint(curve, pointIndex) === null
     ? null
-    : { closed: curve.closed, outgoingKind: curve.segments[pointIndex]?.kind ?? null };
+    : {
+        closed: curve.closed,
+        outgoingKind: curve.segments[pointIndex]?.kind ?? null,
+        canSmooth: smoothCurveNode(curve, pointIndex) !== null,
+        canCorner: cornerCurveNode(curve, pointIndex) !== null,
+      };
 }
 
 /** Materialisation belongs inside the user's edit transaction so undo retains the compact source. */

@@ -1131,8 +1131,11 @@ that owns those fields, without changing the existing Frame/Start policy.
    Duplicates** keeps a copy whose placed tabs differ. A shape opened with **Break** holds them
    until a straight line closes it again (**Close Path**), which puts each one back where it was,
    except a tab on a curve that led into the break node: Break removes that curve, and its tab
-   moves to the same share of the straight line (ADR-494 Amendment 1). **Clear placed tabs** (in
-   Cut Settings or in the canvas hint) returns the artwork to automatic tabs.
+   moves to the same share of the straight line (ADR-494 Amendment 1). Edit nodes **Delete** and
+   **Radius / Fillet**, which can start a shape at another node or where a rounded corner ends,
+   also keep each tab where it was; a tab on a part of the outline they change moves to the
+   nearest point of the new outline, and the toast says so (ADR-494 Amendment 2). **Clear placed
+   tabs** (in Cut Settings or in the canvas hint) returns the artwork to automatic tabs.
 5. Job Review's detail line reads e.g. "tabs every 50 mm (at most 6) × 0.5 mm, cut at 20%" or
    "tabs 4 × 0.5 mm, 3 placed by hand". With none of this set, output is unchanged.
 6. Material presets do not store these settings; applying a preset keeps what the operation has.
