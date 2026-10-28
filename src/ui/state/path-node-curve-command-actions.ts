@@ -44,10 +44,16 @@ export type PathNodeCurveCommandActions = {
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
 
+// Smooth and Corner act on the two curve handles at a node (audit L6-P3-3).
+const NEEDS_CURVES =
+  'needs a curve on both sides of the node. Press S over a straight segment to make it a curve first.';
+
 export function pathNodeCurveCommandActions(set: Setter): PathNodeCurveCommandActions {
   return {
-    smoothSelectedCurveNode: () => set((state) => mutateSelected(state, smoothCurveNode)),
-    cornerSelectedCurveNode: () => set((state) => mutateSelected(state, cornerCurveNode)),
+    smoothSelectedCurveNode: () =>
+      setOrSay(set, (state) => mutateSelected(state, smoothCurveNode), `Smooth ${NEEDS_CURVES}`),
+    cornerSelectedCurveNode: () =>
+      setOrSay(set, (state) => mutateSelected(state, cornerCurveNode), `Corner ${NEEDS_CURVES}`),
     convertSelectedCurveSegment: (kind) =>
       set((state) =>
         mutateSelected(state, (curve, nodeIndex) => convertCurveSegment(curve, nodeIndex, kind)),
@@ -95,6 +101,21 @@ export function pathNodeCurveCommandActions(set: Setter): PathNodeCurveCommandAc
       return outcome;
     },
   };
+}
+
+// Applies `mutate`, or says why nothing changed when a node anchor is selected.
+function setOrSay(
+  set: Setter,
+  mutate: (state: AppState) => AppState | Partial<AppState>,
+  refusal: string,
+): void {
+  const outcome = { refused: false };
+  set((state) => {
+    const next = mutate(state);
+    outcome.refused = next === state && isAnchorRef(state.selectedPathNode);
+    return next;
+  });
+  if (outcome.refused) useToastStore.getState().pushToast(refusal, 'info');
 }
 
 // Keeps an edited object's tabs placed by hand in place, given the edited

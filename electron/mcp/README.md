@@ -51,7 +51,7 @@ dimensions at most 100000 mm and positive font sizes at most 1000 mm.
 | `import_file` | `fileName`, `mimeType` SVG/PNG/JPEG/DXF, `dataBase64` ≤240000, optional placement | Ordinary desktop import path; image magic bytes checked. |
 | `get_board` | none | Read Place Board status and bounded dimensions; never coordinates or artwork. |
 | `set_board_photo` | JPEG/PNG base64 plus write admission | Delivers a phone photo to Place Board → Outline on the PC. |
-| `place_on_board` | artwork IDs, center/fit/array options, write admission | Place existing artwork inside the captured board. |
+| `place_on_board` | artwork IDs, center/fit/array options, write admission | Place existing artwork inside the captured board. An array returns `placedCount`, `requestedCount` for rows × cols, and `notices` when fewer were placed or the 500-copy cap applied (ADR-125 Amendment 4). |
 | `save_project` | Only write admission | Saves to the existing file only; `saved:false` when never saved. Opens no picker and returns no path. |
 | `apply_edits` | `edits`: 1–40 `{command,args}` | All-or-nothing batch as one "Remote edits" Undo step. Allowed commands are the single edit tools above (without admission fields); `"$n"` in `artworkIds`/`operationId` refers to edit n's result. |
 | `get_machine_status` | None | Current connection, labelled work position, actual jog capabilities, Frame, job and action readiness. |
