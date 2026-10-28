@@ -1,6 +1,7 @@
 import {
   curveSubpathBounds,
   transformedBounds,
+  type AABB,
   type Bounds,
   type ColoredPath,
   type SceneObject,
@@ -38,6 +39,14 @@ export function objectIntersectsCanvas(
     minX > canvas.width + PAINT_MARGIN_PX ||
     minY > canvas.height + PAINT_MARGIN_PX
   );
+}
+
+/** A conservative world box around a vector object's paths, or null when it has none. */
+export function vectorObjectWorldBounds(
+  object: Extract<SceneObject, { readonly paths: ReadonlyArray<ColoredPath> }>,
+): AABB | null {
+  const bounds = vectorBounds(object.paths);
+  return bounds === null ? null : transformedBounds(bounds, object.transform);
 }
 
 function usableViewport(

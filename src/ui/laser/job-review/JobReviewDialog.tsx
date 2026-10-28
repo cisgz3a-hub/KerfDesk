@@ -32,6 +32,7 @@ import { JobReviewWarnings } from './JobReviewWarnings';
 import { useJobReviewRebuildTrigger } from './use-job-review-rebuild';
 import { useLaserStore } from '../../state/laser-store';
 import type { JobReviewModel } from './job-review-model';
+import type { JobReviewOmissions } from './job-review-omissions';
 
 export const SAVE_EDIT_BEFORE_START_TITLE = 'Save or discard your settings change first.';
 
@@ -81,15 +82,7 @@ function OpenJobReview(props: {
       {blocker !== null ? (
         <BlockerBanner blocker={blocker} purpose={purpose} onRetry={requestReviewRebuild} />
       ) : null}
-      <JobReviewWarnings
-        warnings={model.warnings}
-        {...(purpose === 'laser-second-pass' || model.openFillOmissions === undefined
-          ? {}
-          : { openFillOmissions: model.openFillOmissions })}
-        {...(purpose === 'laser-second-pass' || model.openCncContourOmissions === undefined
-          ? {}
-          : { openCncContourOmissions: model.openCncContourOmissions })}
-      />
+      <JobReviewWarnings warnings={model.warnings} {...reviewedArtworkActions(model, purpose)} />
       <ReviewArtwork
         model={model}
         purpose={purpose}
@@ -122,6 +115,21 @@ function OpenJobReview(props: {
       </div>
     </Dialog>
   );
+}
+
+// The canvas actions beside the warnings. A painted second pass has no source
+// artwork on the canvas to show.
+function reviewedArtworkActions(
+  model: JobReviewModel,
+  purpose: JobReviewPurpose,
+): JobReviewOmissions {
+  if (purpose === 'laser-second-pass') return {};
+  const { openFillOmissions, openCncContourOmissions, stackedFillCopies } = model;
+  return {
+    ...(openFillOmissions === undefined ? {} : { openFillOmissions }),
+    ...(openCncContourOmissions === undefined ? {} : { openCncContourOmissions }),
+    ...(stackedFillCopies === undefined ? {} : { stackedFillCopies }),
+  };
 }
 
 function ReviewArtwork(props: {

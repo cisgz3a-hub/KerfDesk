@@ -1,5 +1,8 @@
 import { canvasTheme } from '../theme/canvas-theme';
-import { applyTransform, type Polyline, type SceneObject, type Vec2 } from '../../core/scene';
+import { applyTransform, type Polyline, type Transform, type Vec2 } from '../../core/scene';
+
+/** Anything placed by a transform: a scene object, or world space for a pooled fill. */
+export type Placed = { readonly transform: Transform };
 import type { ViewTransform } from './view-transform';
 import { drawCachedClosedFill } from './filled-path-cache';
 
@@ -13,7 +16,7 @@ import { drawCachedClosedFill } from './filled-path-cache';
 // as the fill comment below requires.
 export function strokePolylinesBatched(
   ctx: CanvasRenderingContext2D,
-  obj: SceneObject,
+  obj: Placed,
   polylines: ReadonlyArray<Polyline>,
   view: ViewTransform,
 ): void {
@@ -45,7 +48,7 @@ function closingPoint(polyline: Polyline): Vec2 | null {
 
 export function fillClosedPolylinesBatched(
   ctx: CanvasRenderingContext2D,
-  obj: SceneObject,
+  obj: Placed,
   polylines: ReadonlyArray<Polyline>,
   view: ViewTransform,
   fillRule: CanvasFillRule = 'evenodd',
@@ -83,7 +86,7 @@ export function drawLargeSceneNotice(ctx: CanvasRenderingContext2D): void {
 
 function appendPolylinePath(
   ctx: CanvasRenderingContext2D,
-  obj: SceneObject,
+  obj: Placed,
   polyline: Polyline,
   view: ViewTransform,
 ): void {
@@ -96,7 +99,7 @@ function appendPolylinePath(
   }
 }
 
-function toScreenPoint(raw: Vec2, obj: SceneObject, view: ViewTransform): Vec2 {
+function toScreenPoint(raw: Vec2, obj: Placed, view: ViewTransform): Vec2 {
   const p = applyTransform(raw, obj.transform);
   return { x: view.offsetX + p.x * view.scale, y: view.offsetY + p.y * view.scale };
 }

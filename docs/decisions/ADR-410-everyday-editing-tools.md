@@ -120,3 +120,10 @@ selection on Fill layers only, and always-filled Fill artwork.
   key.
 - `src/ui/commands/AppMenuBar.control-audit.test.tsx`: every new menu entry clicks through to its
   action.
+
+### Amendment: Filled view paints a Fill operation as it burns (2026-10-28)
+
+ADR-683 item 1: Filled view no longer fills each Fill object by itself. Objects that overlap on
+one Fill operation are painted as the one even-odd region the compiler burns (ADR-486
+Amendment 2), so a shape inside another shows as a hole and an exact copy on top of a shape
+leaves only its outline (rolling audit v7 L8-P1-1). Wireframe view is unchanged.

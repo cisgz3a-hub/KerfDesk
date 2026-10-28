@@ -95,15 +95,16 @@ function hitVectorObject(
     if (!resolution.visible) continue;
     const layer = resolution.operation;
     const mode = effectiveLayerMode(obj, layer);
-    for (const polyline of hitTestPolylines(path)) {
-      if (polyline.points.length === 0) continue;
-      hasPolyline = true;
-      const hit = hitPolyline(obj, mode, polyline, point);
-      if (hit.kind === 'primary') return hit;
-      if (hit.kind === 'line-interior') {
-        lineInteriorArea =
-          lineInteriorArea === null ? hit.area : Math.min(lineInteriorArea, hit.area);
-      }
+    const polylines = hitTestPolylines(path)
+      .filter((polyline) => polyline.points.length > 0)
+      .map((polyline) => transformedPolyline(polyline, obj.transform));
+    if (polylines.length === 0) continue;
+    hasPolyline = true;
+    const hit = hitPath(obj, path, mode, polylines, point);
+    if (hit.kind === 'primary') return hit;
+    if (hit.kind === 'line-interior') {
+      lineInteriorArea =
+        lineInteriorArea === null ? hit.area : Math.min(lineInteriorArea, hit.area);
     }
   }
   // An empty vector has no rendered geometry. Its persisted bounds are useful
@@ -130,17 +131,51 @@ function hitTestPolylines(path: ColoredPath): ReadonlyArray<Polyline> {
   return polylines;
 }
 
-function hitPolyline(
+// A filled path is solid only where the canvas fills it: by its own rule over
+// all of its closed contours together (L8-P2-5). A point in one of its holes,
+// like a point inside a Line shape, is only an interior hit (ADR-196), so any
+// artwork the hole shows is picked first.
+function hitPath(
   obj: SceneObject,
+  path: ColoredPath,
   mode: LayerMode,
-  polyline: Polyline,
+  polylines: ReadonlyArray<Polyline>,
   point: Vec2,
 ): HitTestObjectResult {
-  const transformed = transformedPolyline(polyline, obj.transform);
-  if (pointNearPolyline(point, transformed.points, transformed.closed)) return { kind: 'primary' };
-  if (!transformed.closed || !pointInPolygon(point, transformed.points)) return NO_HIT;
-  if (mode === 'fill' || mode === 'image') return { kind: 'primary' };
+  if (polylines.some((polyline) => pointNearPolyline(point, polyline.points, polyline.closed))) {
+    return { kind: 'primary' };
+  }
+  const closed = polylines.filter((polyline) => polyline.closed);
+  if (!closed.some((polyline) => pointInPolygon(point, polyline.points))) return NO_HIT;
+  if ((mode === 'fill' || mode === 'image') && pointInFilledPath(obj, path, closed, point)) {
+    return { kind: 'primary' };
+  }
   return { kind: 'line-interior', area: bboxArea(transformedBBox(obj)) };
+}
+
+function pointInFilledPath(
+  obj: SceneObject,
+  path: ColoredPath,
+  closed: ReadonlyArray<Polyline>,
+  point: Vec2,
+): boolean {
+  let winding = 0;
+  for (const polyline of closed) winding += windingNumber(point, polyline.points);
+  const rule = path.fillRule ?? (obj.kind === 'text' ? 'nonzero' : 'evenodd');
+  return rule === 'nonzero' ? winding !== 0 : winding % 2 !== 0;
+}
+
+function windingNumber(point: Vec2, polygon: ReadonlyArray<Vec2>): number {
+  let winding = 0;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
+    const a = polygon[j];
+    const b = polygon[i];
+    if (a === undefined || b === undefined) continue;
+    const side = (b.x - a.x) * (point.y - a.y) - (point.x - a.x) * (b.y - a.y);
+    if (a.y <= point.y && b.y > point.y && side > 0) winding += 1;
+    else if (a.y > point.y && b.y <= point.y && side < 0) winding -= 1;
+  }
+  return winding;
 }
 
 function vectorPathsFor(obj: SceneObject): ReadonlyArray<ColoredPath> | null {

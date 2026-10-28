@@ -38,6 +38,7 @@ import { findRelativeMotionEnvelopeIssues } from './relative-motion-envelope';
 import { rotaryWrapIssue, rotaryWrapLimit, rotaryXOnlyBounds } from './rotary-bounds';
 import { operationScanOffsetIssues } from './scan-offset-policy';
 import { openFillContourIssues } from './open-fill-contour-issues';
+import { cancelledFillCopyIssues } from './cancelled-fill-copy-issues';
 import { lineOpenOutlineIssues } from './line-open-outline-issues';
 import { imageMaskOffImageIssues } from './image-mask-off-image-issues';
 
@@ -54,6 +55,9 @@ export type PreflightCode =
   | 'passes-below-one'
   | 'layer-mode-mismatch'
   | 'offset-fill-open-contour'
+  // Advisory-only (ADR-683): exact stacked copies on a laser Fill operation
+  // cancel under its pooled even-odd fill and burn nothing.
+  | 'fill-stacked-copies-cancel'
   // Advisory-only (ADR-626 Amd 8): open paths whose ends meet on a Line
   // operation with kerf, leads or inside-first are cut as open lines.
   | 'line-open-outline'
@@ -172,6 +176,7 @@ export function runPreflight(
   issues.push(...findLayerModeMismatchIssues(project.scene.objects, outputLayers));
 
   issues.push(...openFillContourIssues(project.scene));
+  issues.push(...cancelledFillCopyIssues(project));
   issues.push(...lineOpenOutlineIssues(project));
   issues.push(...imageMaskOffImageIssues(project));
 
