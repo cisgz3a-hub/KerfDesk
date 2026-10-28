@@ -77,6 +77,17 @@ export function sameJobMachine(a: Project, b: Project): boolean {
   return JOB_MACHINE_DEVICE_KEYS.every((key) => sameValue(a.device[key], b.device[key]));
 }
 
+/** True when `a` and `b` hold the same machine setup: the same Laser/CNC kind
+ *  and CNC machine, and every machine setting, not only the motion fields.
+ *  A remote Undo or Redo across a difference says so (ADR-584 Amendment 1). */
+export function sameMachineSetup(a: Project, b: Project): boolean {
+  if (a.machine === b.machine && a.device === b.device) return true;
+  const kind = machineKindOf(a.machine);
+  if (kind !== machineKindOf(b.machine)) return false;
+  // A Laser machine is its kind alone; a missing one is Laser.
+  return (kind !== 'cnc' || sameValue(a.machine, b.machine)) && sameValue(a.device, b.device);
+}
+
 /** Refuses turning `current` into `next` while a job is active, with `message`
  *  as the reason. False (nothing refused) when no job runs, the machine stays,
  *  or a project off the job's Laser/CNC kind is switched onto it. */

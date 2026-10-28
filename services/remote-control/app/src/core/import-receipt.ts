@@ -25,12 +25,20 @@ export type ImportReceipt = {
 const LEVELS = ['error', 'warning', 'info', 'success'] as const;
 
 export function readImportReceipt(result: Record<string, unknown>): ImportReceipt {
-  const notices = (Array.isArray(result.notices) ? result.notices : []).filter(isNotice);
   return {
     revision: typeof result.revision === 'string' ? result.revision : null,
-    notices: LEVELS.flatMap((level) => notices.filter((notice) => notice.level === level)),
+    notices: readReceiptNotices(result),
     bedFit: isBedFit(result.bedFit) ? result.bedFit : null,
   };
+}
+
+/**
+ * A receipt's notices, errors and warnings first: an import's, or the machine change an Undo or
+ * Redo made (ADR-584 Amendment 1). Malformed entries are ignored.
+ */
+export function readReceiptNotices(result: Record<string, unknown>): readonly ImportNotice[] {
+  const notices = (Array.isArray(result.notices) ? result.notices : []).filter(isNotice);
+  return LEVELS.flatMap((level) => notices.filter((notice) => notice.level === level));
 }
 
 /** A fit or any notice beyond the plain success line keeps the sheet open to be read. */

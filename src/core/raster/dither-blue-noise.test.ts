@@ -102,6 +102,28 @@ describe('dither — blue-noise', () => {
     expect(white.every((s) => s === 0)).toBe(true);
   });
 
+  // Quality audit Q3-P3-1: a pixel's weights follow its own level, so a white
+  // pixel beside light grey could gather more than one neighbour's worth of
+  // error and burn. Compile whitens a mask's outside before the dither, so
+  // those dots landed outside the mask (ADR-480: it never burns); holes
+  // appeared in solid black beside dark grey the same way.
+  it('never burns white or skips black beside a grey disc', () => {
+    const size = 96;
+    const radius = 40;
+    const inside = (i: number) =>
+      ((i % size) + 0.5 - size / 2) ** 2 + (Math.floor(i / size) + 0.5 - size / 2) ** 2 <
+      radius ** 2;
+    for (const [disc, field] of [
+      ...[200, 230, 240, 245, 250, 253].map((level) => [level, 255] as const),
+      ...[2, 5, 10, 15, 20, 25].map((level) => [level, 0] as const),
+    ]) {
+      const luma = Uint8Array.from({ length: size * size }, (_, i) => (inside(i) ? disc : field));
+      const burn = blueNoise(luma, size, size);
+      const outside = Array.from(burn).filter((_, i) => !inside(i));
+      expect(outside.every((s) => s === (field === 0 ? S_MAX : 0))).toBe(true);
+    }
+  });
+
   it('follows a ramp: each band burns its own tone and lighter bands burn less', () => {
     const width = 512;
     const height = 96;

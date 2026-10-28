@@ -12,6 +12,7 @@ import type { DeviceProfile } from '../../core/devices';
 import type { RasterGroup } from '../../core/job';
 import { compileRasterGroupsForLayer } from '../../core/job/compile-job-raster';
 import { rasterScanBounds } from '../../core/job/raster-bounds';
+import { rasterPassThroughDimensions } from '../../core/job/raster-pass-through-grid';
 import { pixelExtentForMm } from '../../core/raster';
 import { isIdentityPhotoToneCurve, type PhotoToneCurve } from '../../core/raster/photo-tone-curve';
 import {
@@ -338,8 +339,9 @@ function compiledGridDimensions(
   layer: Layer,
   device: DeviceProfile,
 ): { readonly width: number; readonly height: number } {
-  if (layer.passThrough) return { width: obj.pixelWidth, height: obj.pixelHeight };
-  const bounds = rasterScanBounds(obj, device, previewScanFrame(layer, device));
+  const frame = previewScanFrame(layer, device);
+  const bounds = rasterScanBounds(obj, device, frame);
+  if (layer.passThrough) return rasterPassThroughDimensions(obj, device, frame, bounds);
   return {
     width: pixelExtentForMm(bounds.maxX - bounds.minX, layer.linesPerMm),
     height: pixelExtentForMm(bounds.maxY - bounds.minY, layer.linesPerMm),

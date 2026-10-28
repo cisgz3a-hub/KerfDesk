@@ -10,8 +10,8 @@
 //
 // Only that clearly stale state is detected: a saved preset with Air output
 // Disabled whose preset now defines a command. An operator who chose another
-// command, or cleared "Air restart" after setting `$152=100`, has a configured
-// air output and is never second-guessed.
+// command, or cleared "Air restart" once an air test showed the pump
+// restarting, has a configured air output and is never second-guessed.
 import type { DeviceProfile } from './device-profile';
 import { profileCatalogEntryById } from './profile-catalog';
 

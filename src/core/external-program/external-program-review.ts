@@ -21,6 +21,7 @@ import {
 import { externalProgramBaseline } from './normalize-external-program';
 import { kerfDeskBitChangeWarnings } from './kerfdesk-bit-changes';
 import { programStopWarnings } from './program-stops';
+import { externalProgramZLifts, type ExternalProgramZLifts } from './program-z-lifts';
 
 export type ExternalProgramEnvelope = {
   readonly minX: number;
@@ -36,6 +37,8 @@ export type ExternalProgramReview = {
   readonly envelope: ExternalProgramEnvelope | null;
   readonly units: ExternalProgramUnits;
   readonly warnings: ReadonlyArray<string>;
+  /** How high the program lifts Z, checked live against the Z top (ADR-491 Amendment 3). */
+  readonly zLifts: ExternalProgramZLifts;
 };
 
 export type ExternalProgramContext = {
@@ -164,7 +167,12 @@ export function reviewExternalProgram(
     still === undefined
       ? envelopeOf(model)
       : { minX: still.x, minY: still.y, maxX: still.x, maxY: still.y };
-  return { envelope, units: declaredUnits(model), warnings };
+  return {
+    envelope,
+    units: declaredUnits(model),
+    warnings,
+    zLifts: externalProgramZLifts(reviewedText, model),
+  };
 }
 
 function controllerReviewText(gcode: string, context: ExternalProgramContext) {

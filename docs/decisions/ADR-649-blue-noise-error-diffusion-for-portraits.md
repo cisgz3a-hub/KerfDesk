@@ -51,7 +51,9 @@ weights as well.
    `PHOTO_DITHERS` is ordered smoothest first and this ADR measures it as
    smoothest. A layer whose stored mode is not a photo dither still opens the
    dialog on Jarvis (ADR-581); making Blue Noise that default is left to the
-   maintainer.
+   maintainer. *Amended by Amendment 1: the list now follows this ADR's own
+   measure, Blue Noise, Floyd–Steinberg, Stucki, Jarvis; and Blue Noise never
+   burns pure white or skips pure black.*
 
 2. **Algorithm** (`src/core/raster/dither-blue-noise.ts`):
    - Serpentine scan, mirroring the filter on odd rows. The filter writes to

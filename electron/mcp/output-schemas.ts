@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { type KerfDeskMcpCommand, MCP_MAX_ITEMS } from './input-schemas.js';
 import { mcpMachineOutputSchemas } from './machine-schemas.js';
-import { mcpDesignOutputSchemas } from './design-schemas.js';
+import { mcpDesignOutputSchemas, mcpNoticesSchema } from './design-schemas.js';
 import {
   MCP_TEXT_FIELDS,
   mcpAuthoringOutputSchemas,
@@ -59,6 +59,11 @@ export const mcpWriteResultSchema = z.object({
     .optional(),
   history: mcpHistorySchema.optional(),
   message: z.string().max(2048).optional(),
+});
+
+/** An Undo or Redo that changed the machine setup says so (ADR-584 Amendment 1). */
+const mcpHistoryResultSchema = mcpWriteResultSchema.extend({
+  notices: mcpNoticesSchema.optional(),
 });
 
 /** Deliberately projected objects: Zod strips unknown fields at every nesting level. */
@@ -238,8 +243,8 @@ export const mcpOutputSchemas = {
   update_operation: mcpWriteResultSchema,
   update_text: mcpWriteResultSchema,
   arrange_artwork: mcpWriteResultSchema,
-  undo: mcpWriteResultSchema,
-  redo: mcpWriteResultSchema,
+  undo: mcpHistoryResultSchema,
+  redo: mcpHistoryResultSchema,
   ...mcpAuthoringOutputSchemas,
   ...mcpDesignOutputSchemas,
   ...mcpMachineOutputSchemas,

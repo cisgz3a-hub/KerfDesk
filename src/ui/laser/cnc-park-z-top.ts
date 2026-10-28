@@ -21,6 +21,7 @@ import { formatMm } from './job-review/job-review-format';
 const MM_PER_INCH = 25.4;
 // Report rounding (3 decimals) on the offset and on the envelope edge.
 const TOLERANCE_MM = 0.002;
+const Z_TOP_UNKNOWN = "the Z top needs this session's $$ and Home (or soft limits on)";
 
 export type CncZTopEvidence = NativeBedEvidence & {
   readonly statusReport?: StatusReport | null;
@@ -31,7 +32,7 @@ export type CncZTopEvidence = NativeBedEvidence & {
 
 export type CncLiftZTopCheck =
   | { readonly kind: 'fits'; readonly roomMm: number }
-  /** highestFitMm: the highest work Z, above the stock top, that stays under the top. */
+  /** highestFitMm: the highest Z, in the checked coordinates, that stays under the top. */
   | { readonly kind: 'over'; readonly overMm: number; readonly highestFitMm: number }
   | { readonly kind: 'unchecked'; readonly reason: string };
 
@@ -42,9 +43,7 @@ export function checkCncLiftAgainstZTop(
   profileZTravelMm?: number,
 ): CncLiftZTopCheck {
   const limits = resolveFirmwareZLimits(evidence, profileZTravelMm);
-  if (limits === null) {
-    return unchecked("the Z top needs this session's $$ and Home (or soft limits on)");
-  }
+  if (limits === null) return unchecked(Z_TOP_UNKNOWN);
   // The program runs in G54; another system's offset says nothing about it.
   if (evidence.activeWcs != null && evidence.activeWcs !== 'G54') {
     return unchecked(`the live work offset is ${evidence.activeWcs}'s, not G54's`);
@@ -54,10 +53,25 @@ export function checkCncLiftAgainstZTop(
     return unchecked('the controller has not reported its work offset');
   }
   const scale = evidence.controllerSettings?.reportInches === true ? MM_PER_INCH : 1;
-  const topWorkZMm = limits.maxMm - wco.z * scale;
-  const overMm = liftMm - topWorkZMm;
+  return checkAgainstTop(liftMm, limits.maxMm - wco.z * scale);
+}
+
+/** Check a machine Z, as a G53 move names one, against the live machine Z top
+ * (ADR-491 Amendment 3). No work offset is needed; highestFitMm is a machine Z. */
+export function checkMachineZAgainstZTop(
+  machineZMm: number,
+  evidence: NativeBedEvidence,
+  profileZTravelMm?: number,
+): CncLiftZTopCheck {
+  const limits = resolveFirmwareZLimits(evidence, profileZTravelMm);
+  if (limits === null) return unchecked(Z_TOP_UNKNOWN);
+  return checkAgainstTop(machineZMm, limits.maxMm);
+}
+
+function checkAgainstTop(zMm: number, topMm: number): CncLiftZTopCheck {
+  const overMm = zMm - topMm;
   return overMm > TOLERANCE_MM
-    ? { kind: 'over', overMm, highestFitMm: topWorkZMm }
+    ? { kind: 'over', overMm, highestFitMm: topMm }
     : { kind: 'fits', roomMm: Math.max(0, -overMm) };
 }
 
