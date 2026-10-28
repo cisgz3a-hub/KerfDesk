@@ -21,6 +21,8 @@ import {
   type DeviceProfile,
   type GrblGcodeDialect,
 } from '../../core/devices';
+// Deep import: the devices barrel is at its public-export ratchet.
+import { machineKinematics, type MachineKinematics } from '../../core/devices/device-profile';
 import { effectiveGcodeFeedMmPerMin } from '../../core/gcode/feed-word';
 import type { CutGroup, Job, RasterGroup } from '../../core/job';
 import { alongScanAccelMmPerSec2 } from '../../core/job/automatic-overscan';
@@ -71,7 +73,11 @@ function imageWarning(
   if (!(group.power > 0) || group.pixelWidth <= 0 || group.pixelHeight <= 0) return null;
   const feed = effectiveGcodeFeedMmPerMin(group.speed);
   const pitchMm = (group.bounds.maxX - group.bounds.minX) / group.pixelWidth;
-  const accel = alongScanAccelMmPerSec2(device.accelMmPerSec2, group.scanAngleDeg ?? 0);
+  const accel = alongScanAccelMmPerSec2(
+    device.accelMmPerSec2,
+    group.scanAngleDeg ?? 0,
+    machineKinematics(device),
+  );
   const blocks =
     DEFAULT_PLANNER_BLOCKS[device.controllerKind ?? 'grbl-v1.1'] ?? STOCK_GRBL_PLANNER_BLOCKS;
   const sustainedFeed = Math.floor(60 * lookAheadSpeedMmPerSec(accel, blocks, pitchMm));
@@ -110,7 +116,11 @@ function lineWarning(
   const feed = effectiveGcodeFeedMmPerMin(group.speed);
   const startsCovered = group.entryRunwayMm !== undefined && !runwaysSkipped;
   const endsCovered = group.exitRunwayMm !== undefined && !runwaysSkipped;
-  const corner = squareCornerSpeedMmPerSec(device.accelMmPerSec2, device.junctionDeviationMm);
+  const corner = squareCornerSpeedMmPerSec(
+    device.accelMmPerSec2,
+    device.junctionDeviationMm,
+    machineKinematics(device),
+  );
   const ends = startsCovered && endsCovered ? '' : ' and starts or stops it at path ends';
   const fallback =
     startsCovered && endsCovered
@@ -131,12 +141,23 @@ function lineWarning(
 
 /**
  * GRBL's junction speed for a 90° corner of an axis-aligned square
- * (gnea/grbl planner.c: v² = a·δ·sin(θ/2)/(1 − sin(θ/2)), with the junction
- * vector on a diagonal so the axis-limited acceleration is a·√2):
- * v = sqrt(a·δ·(2 + √2)). 500 mm/s² and 0.01 mm give 4.13 mm/s.
+ * (gnea/grbl planner.c: v² = a·δ·sin(θ/2)/(1 − sin(θ/2)), with sin(θ/2) = 1/√2
+ * and the junction vector on a diagonal so the axis-limited acceleration is
+ * a·√2): v = sqrt(a·δ·(2 + √2)). 500 mm/s² and 0.01 mm give 4.13 mm/s.
+ *
+ * On CoreXY grblHAL plans in motor space (motion-planner/drive-share.ts). The
+ * corner's junction vector there points along one motor, so the junction
+ * acceleration is a, and a motor-space speed is √2 times the head's, so
+ * v² = a·δ·(1 + √2) / 2 in head speed (ADR-675): 500 mm/s² and 0.01 mm give
+ * 2.46 mm/s.
  */
-export function squareCornerSpeedMmPerSec(accel: number, junctionDeviationMm: number): number {
-  return Math.sqrt(accel * junctionDeviationMm * (2 + Math.SQRT2));
+export function squareCornerSpeedMmPerSec(
+  accel: number,
+  junctionDeviationMm: number,
+  kinematics: MachineKinematics = 'cartesian',
+): number {
+  const bend = kinematics === 'corexy' ? (1 + Math.SQRT2) / 2 : 2 + Math.SQRT2;
+  return Math.sqrt(accel * junctionDeviationMm * bend);
 }
 
 function overBurnSites(startsCovered: boolean, endsCovered: boolean): string {

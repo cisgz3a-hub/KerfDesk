@@ -61,12 +61,17 @@ describe('Falcon Console air settings', () => {
     const sim = await connectFalcon('grbl-v1.1', "Grbl 1.1f ['$' for help]");
     const send = useLaserStore.getState().sendConsoleCommand;
 
+    const readsAtConnect = sim.outbound().filter((line) => line === '$$\n').length;
     await settle(send('$152=100', { confirmed: true }));
     expect(sim.outbound()).toContain('$152=100\n');
-    expect(sim.outbound()).not.toContain('$$\n');
+    // The contract reads `$$` (ADR-322 Amendment 3): once at connect, and again
+    // after the write to see what the controller stored.
+    expect(readsAtConnect).toBe(1);
+    await pump(500);
+    expect(sim.outbound().filter((line) => line === '$$\n')).toHaveLength(2);
     expect(useLaserStore.getState().controllerQualification).toMatchObject({
       kind: 'qualified',
-      settings: 'not-required',
+      settings: 'verified',
     });
 
     await expect(send('$110=36000', { confirmed: true })).rejects.toThrow(

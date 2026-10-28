@@ -85,7 +85,7 @@ function segmentElapsedTime(plan: GcodeTimingPlan, index: number, fraction: numb
     },
     entryVelocity: plan.segmentEntryVelocityMmPerSec[index] ?? 0,
     exitVelocity: plan.segmentExitVelocityMmPerSec[index] ?? 0,
-    acceleration: plan.accelMmPerSec2,
+    acceleration: plan.segmentAccelMmPerSec2?.[index] ?? plan.accelMmPerSec2,
     distance: segmentDistance * fraction,
   });
   return elapsedInSegment * (plan.segmentTimeScale[index] ?? 1);

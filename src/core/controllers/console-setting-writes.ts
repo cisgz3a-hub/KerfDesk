@@ -3,8 +3,8 @@
 // A driver whose capabilities report `settings: 'grbl-dollar'` sends any numeric
 // setting (after the Console's confirmation and fresh-Idle checks). Every other
 // profile refuses them: FluidNC keeps its configuration in a YAML file, and the
-// Falcon A1 Pro vendor contract keeps general settings out of host software
-// (audit settings-console-10). A driver may still list the few writes its
+// Falcon A1 Pro vendor contract reads `$$` but keeps general settings out of
+// host software (audit settings-console-10, ADR-322 Amendment 3). A driver may still list the few writes its
 // vendor documents for console use, each with the value range the vendor
 // gives. Creality's Falcon A1 parameter page says to set the air-assist
 // parameters $150-$152 from a software console, and Job Review's advice for

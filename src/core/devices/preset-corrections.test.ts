@@ -60,6 +60,29 @@ describe('stalePresetCorrections', () => {
     ).toEqual([]);
   });
 
+  // Rolling audit v6 K3-P2-1/K3-P2-2 (ADR-322 Amendment 3, ADR-675): the A1 Pro
+  // preset inherited homing off and had no kinematics before 2026-10-28.
+  it('names a saved Falcon A1 Pro copy with homing off or no kinematics', () => {
+    const { kinematics: _kinematics, ...noKinematics } = FALCON_A1_PRO_GRBLHAL_PROFILE;
+    const stale = { ...noKinematics, homing: { enabled: false, direction: 'front-left' as const } };
+    expect(stalePresetCorrections(stale)).toEqual([
+      expect.objectContaining({
+        before: 'homing off',
+        now: 'homing on at the front left',
+        patch: { homing: { enabled: true, direction: 'front-left' } },
+      }),
+      expect.objectContaining({
+        before: 'the Cartesian motion model',
+        now: 'CoreXY motion',
+        patch: { kinematics: 'corexy' },
+      }),
+    ]);
+    // A layout the operator chose is theirs.
+    expect(
+      stalePresetCorrections({ ...FALCON_A1_PRO_GRBLHAL_PROFILE, kinematics: 'cartesian' }),
+    ).toEqual([]);
+  });
+
   it("leaves the operator's own values and other profiles alone", () => {
     const [xtool] = XTOOL_D1_PRO_PROFILES;
     const [s30] = S30_PRESETS;

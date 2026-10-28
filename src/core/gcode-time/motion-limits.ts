@@ -4,6 +4,8 @@
 // reads programs that may not belong to the current machine, so the caller
 // decides which limits apply and the core stays pure and testable.
 
+import type { MachineKinematics } from '../devices/device-profile';
+
 export type MotionLimits = {
   /** GRBL $120/$121 acceleration, mm/sec². */
   readonly accelMmPerSec2: number;
@@ -11,6 +13,8 @@ export type MotionLimits = {
   readonly junctionDeviationMm: number;
   /** GRBL $110/$111 max rate, mm/min — caps both rapids and feed moves. */
   readonly maxFeedMmPerMin: number;
+  /** How the limits above reach a move off the axes (ADR-675); absent is Cartesian. */
+  readonly kinematics?: MachineKinematics;
 };
 
 export const SECONDS_PER_MINUTE = 60;
@@ -21,5 +25,6 @@ export function sanitizeLimits(limits: MotionLimits): MotionLimits {
     accelMmPerSec2: Math.max(1, limits.accelMmPerSec2),
     junctionDeviationMm: Math.max(1e-6, limits.junctionDeviationMm),
     maxFeedMmPerMin: Math.max(1, limits.maxFeedMmPerMin),
+    ...(limits.kinematics === undefined ? {} : { kinematics: limits.kinematics }),
   };
 }

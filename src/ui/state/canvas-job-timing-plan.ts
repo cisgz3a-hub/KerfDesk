@@ -1,6 +1,9 @@
 import type { ControllerKind, DeviceProfile } from '../../core/devices';
 import { buildGcodeTimingPlan, type GcodeTimingPlanResult } from '../../core/gcode-time';
-import { deviceProgramTimingOptions } from '../../core/gcode-time/program-timing-options';
+import {
+  deviceMotionLimits,
+  deviceProgramTimingOptions,
+} from '../../core/gcode-time/program-timing-options';
 import type { MotionPoint } from '../../core/job/motion-manifest';
 import type { MachineKind } from '../../core/scene/machine';
 import { fingerprintGcode, fingerprintsEqual, type GcodeFingerprint } from '../../core/recovery';
@@ -71,23 +74,14 @@ export function canvasJobTimingPlan(
       evidence,
     };
   }
-  const result = buildGcodeTimingPlan(
-    gcode,
-    {
-      accelMmPerSec2: device.accelMmPerSec2,
-      junctionDeviationMm: device.junctionDeviationMm,
-      maxFeedMmPerMin: device.maxFeed,
-    },
-    initialPosition,
-    {
-      ...deviceProgramTimingOptions(
-        device,
-        context.machineKind ?? machineKind,
-        context.activeControllerKind,
-      ),
-      maxSegments: CANVAS_PROGRAM_ANALYSIS_SEGMENT_BUDGET,
-    },
-  );
+  const result = buildGcodeTimingPlan(gcode, deviceMotionLimits(device), initialPosition, {
+    ...deviceProgramTimingOptions(
+      device,
+      context.machineKind ?? machineKind,
+      context.activeControllerKind,
+    ),
+    maxSegments: CANVAS_PROGRAM_ANALYSIS_SEGMENT_BUDGET,
+  });
   if (
     result.kind === 'ok' &&
     result.plan.dwellSeconds > 0 &&

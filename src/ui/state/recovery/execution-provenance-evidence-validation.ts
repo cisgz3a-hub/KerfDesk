@@ -210,7 +210,12 @@ function hasValidLaserRequirements(value: Record<string, unknown>): boolean {
 }
 
 function hasValidSettingsCapability(value: unknown): boolean {
-  return value === 'grbl-dollar' || value === 'readonly-dump' || value === 'none';
+  return (
+    value === 'grbl-dollar' ||
+    value === 'grbl-dollar-read' ||
+    value === 'readonly-dump' ||
+    value === 'none'
+  );
 }
 
 function isOptionalBoolean(value: unknown): boolean {

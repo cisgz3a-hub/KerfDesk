@@ -18,7 +18,11 @@ import {
 import {
   isBidirectionalScanPolicy,
   isControllerCommandSet,
+  isMachineKinematics,
+  kinematicsEntry,
+  type DeviceProfile,
 } from '../../core/devices/device-profile';
+import { laserArcMovesEntry } from '../../core/devices/laser-arc-moves';
 import { cncSubProfileIssues } from '../../core/devices/cnc-sub-profile-validation';
 import { positioningLightIssue } from '../../core/devices/positioning-light';
 import {
@@ -26,7 +30,6 @@ import {
   isLaserFinishPosition,
 } from '../../core/devices/head-position-shape';
 import { isScanOffsetCalibrationStatus } from '../../core/devices/scan-offset-profile';
-export { laserArcMovesEntry } from '../../core/devices/laser-arc-moves';
 import { validateCameraProfileShape } from '../../core/camera';
 import { normalizeCameraModelRecord } from '../../core/camera/model/camera-model-record';
 import { normalizeOtherCameraModels } from '../../core/camera/model/saved-cameras';
@@ -157,6 +160,7 @@ function validateProfileMachineFields(value: Record<string, unknown>): string | 
   return (
     validateProfileStreamingFields(value) ??
     validateProfilePositiveMachineFields(value) ??
+    validateProfileKinematics(value) ??
     validateControlledLaserOffTravelFeed(value) ??
     validateProfileScalarMachineFields(value)
   );
@@ -202,6 +206,21 @@ function validateProfilePositiveMachineFields(value: Record<string, unknown>): s
     if (!isPositiveFinite(value[field])) return `profile.${field} must be positive`;
   }
   return null;
+}
+
+type OptionalChoiceFields = Pick<DeviceProfile, 'laserArcMoves' | 'kinematics'>;
+
+/** The optional choices a saved profile keeps only when they hold a known
+ *  value: Arc moves (ADR-432) and the motion layout (ADR-675). */
+export function knownOptionalChoices(profile: OptionalChoiceFields): OptionalChoiceFields {
+  return { ...laserArcMovesEntry(profile.laserArcMoves), ...kinematicsEntry(profile.kinematics) };
+}
+
+// ADR-675: absent is Cartesian.
+function validateProfileKinematics(value: Record<string, unknown>): string | null {
+  return value['kinematics'] === undefined || isMachineKinematics(value['kinematics'])
+    ? null
+    : 'profile.kinematics is invalid';
 }
 
 function validateProfileScalarMachineFields(value: Record<string, unknown>): string | null {

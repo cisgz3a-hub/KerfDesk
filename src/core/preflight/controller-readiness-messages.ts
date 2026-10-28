@@ -15,7 +15,7 @@
 export type ReadinessSettingsSource = 'dollar-settings' | 'fluidnc-yaml';
 
 export function readinessSettingsSource(
-  capability: 'grbl-dollar' | 'readonly-dump' | 'none',
+  capability: 'grbl-dollar' | 'grbl-dollar-read' | 'readonly-dump' | 'none',
 ): ReadinessSettingsSource {
   return capability === 'readonly-dump' ? 'fluidnc-yaml' : 'dollar-settings';
 }
