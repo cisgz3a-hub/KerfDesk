@@ -110,12 +110,12 @@ export const mcpToolInfo: Record<KerfDeskMcpCommand, { title: string; descriptio
   undo: {
     title: 'Undo the last workspace edit',
     description:
-      'Undo one edit in the current desktop document. Read workspace history and revision first. Requires expectedRevision and UUID requestId; never affects machine execution.',
+      'Undo one edit in the current desktop document. Read workspace history and revision first. Requires expectedRevision and UUID requestId; never affects machine execution. Undo shares the PC history, so it can undo a machine choice made on the PC, such as Keep current machine for an opened file; notices then says which machine Frame and Start now use. Tell the user about every warning.',
   },
   redo: {
     title: 'Redo the last undone workspace edit',
     description:
-      'Redo one edit in the current desktop document. Read workspace history and revision first. Requires expectedRevision and UUID requestId; never affects machine execution.',
+      'Redo one edit in the current desktop document. Read workspace history and revision first. Requires expectedRevision and UUID requestId; never affects machine execution. When the step changes the machine setup, notices says which machine Frame and Start now use. Tell the user about every warning.',
   },
   get_workspace_scene: {
     title: 'Read the workspace as vector geometry',

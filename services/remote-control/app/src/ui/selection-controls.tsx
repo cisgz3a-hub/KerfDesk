@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { controller } from '../core/controller';
+import { undoOrRedo } from '../core/history';
 import { selectableIds } from '../core/scene';
 import { canEdit, hasSelection, selectionComplete, store } from '../core/store';
 import { cancelCanvasGesture, typingTarget } from './canvas-gesture-types';
@@ -83,7 +84,7 @@ export function useDesignKeyboard(): void {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
         event.preventDefault();
         cancelCanvasGesture();
-        void controller.write(event.shiftKey ? 'redo' : 'undo');
+        void undoOrRedo(event.shiftKey ? 'redo' : 'undo');
         return;
       }
       const allowed = new Set(selectableIds(state.workspace?.artwork ?? [], state.scene));

@@ -1,4 +1,5 @@
 import { controller } from '../core/controller';
+import { undoOrRedo } from '../core/history';
 import { selectableIds } from '../core/scene';
 import { canEdit, selectionComplete, store, type Tool } from '../core/store';
 import { Canvas, fitView, useContentBox } from './Canvas';
@@ -149,7 +150,7 @@ function HistoryBar() {
         aria-label="Undo"
         title="Undo"
         disabled={history?.canUndo !== true}
-        onClick={() => void controller.write('undo')}
+        onClick={() => void undoOrRedo('undo')}
       >
         <Icon name="undo" />
       </button>
@@ -158,7 +159,7 @@ function HistoryBar() {
         aria-label="Redo"
         title="Redo"
         disabled={history?.canRedo !== true}
-        onClick={() => void controller.write('redo')}
+        onClick={() => void undoOrRedo('redo')}
       >
         <Icon name="redo" />
       </button>
