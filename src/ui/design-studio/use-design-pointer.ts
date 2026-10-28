@@ -35,6 +35,8 @@ export type DesignPointerHandlers = {
   readonly onPointerDown: (event: React.PointerEvent<HTMLCanvasElement>) => void;
   readonly onPointerMove: (event: React.PointerEvent<HTMLCanvasElement>) => void;
   readonly onPointerUp: (event: React.PointerEvent<HTMLCanvasElement>) => void;
+  readonly onPointerCancel: (event: React.PointerEvent<HTMLCanvasElement>) => void;
+  readonly onLostPointerCapture: () => void;
   readonly onPointerLeave: () => void;
   readonly onDoubleClick: (event: React.MouseEvent<HTMLCanvasElement>) => void;
 };
@@ -117,25 +119,28 @@ export function useDesignPointer(
     store.setActiveSnap(null);
   }, []);
 
-  const onDoubleClick = usePointSequenceDoubleClick(newEntityId);
+  return {
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    ...usePointerCancel(),
+    onPointerLeave,
+    onDoubleClick: usePointSequenceDoubleClick(newEntityId),
+  };
+}
 
-  // A pointer the system takes away (palm rejection, a system gesture) never
-  // sends pointerup, so the gesture used to stay open with no Undo step.
+// A pointer the system takes away (palm rejection, a system gesture) never
+// sends pointerup, so the gesture used to stay open with no Undo step.
+function usePointerCancel(): Pick<
+  DesignPointerHandlers,
+  'onPointerCancel' | 'onLostPointerCapture'
+> {
   const onPointerCancel = useCallback((event: React.PointerEvent<HTMLCanvasElement>) => {
     releasePointer(event.currentTarget, event.pointerId);
     endInterruptedGesture(true);
   }, []);
   const onLostPointerCapture = useCallback(() => endInterruptedGesture(false), []);
-
-  return {
-    onPointerDown,
-    onPointerMove,
-    onPointerUp,
-    onPointerCancel,
-    onLostPointerCapture,
-    onPointerLeave,
-    onDoubleClick,
-  };
+  return { onPointerCancel, onLostPointerCapture };
 }
 
 // A move or resize ends as its one Undo step where the pointer last was. A

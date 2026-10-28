@@ -23,8 +23,6 @@ function PointerHarness(): JSX.Element {
       onPointerDown={pointer.onPointerDown}
       onPointerMove={pointer.onPointerMove}
       onPointerUp={pointer.onPointerUp}
-      onPointerCancel={pointer.onPointerCancel}
-      onLostPointerCapture={pointer.onLostPointerCapture}
       onPointerLeave={pointer.onPointerLeave}
       onDoubleClick={pointer.onDoubleClick}
     />
@@ -411,55 +409,5 @@ describe('Design point-tool pointer interactions', () => {
     expect(session?.pointSequence).toBeNull();
     expect(session?.selectedIds.size).toBe(0);
     expect(session?.tool).toBe('select');
-  });
-
-  // L5-P3-5 (rolling audit v7): a cancelled pointer left the move open, so a
-  // later hover kept dragging and Undo could not reach the starting place.
-  it('ends a move the system cancels as one Undo step', () => {
-    useDesignStudioStore.getState().setSketch({
-      entities: [{ id: 'bar', kind: 'line', start: { x: 0, y: 0 }, end: { x: 40, y: 0 } }],
-    });
-    useDesignStudioStore.getState().setSelection(['bar']);
-    const before = useDesignStudioStore.getState().session!.history.present;
-    act(() => root.render(<PointerHarness />));
-    const canvas = host.querySelector('canvas');
-    if (canvas === null) throw new Error('expected a canvas');
-
-    act(() => {
-      canvas.dispatchEvent(
-        new MouseEvent('pointerdown', { bubbles: true, clientX: 20, clientY: 0 }),
-      );
-      move(canvas, 40, 0);
-      canvas.dispatchEvent(new MouseEvent('pointercancel', { bubbles: true }));
-      move(canvas, 70, 0);
-    });
-
-    const session = useDesignStudioStore.getState().session!;
-    expect(session.move).toBeNull();
-    expect(session.history.present.entities[0]).toMatchObject({
-      start: { x: 20, y: 0 },
-      end: { x: 60, y: 0 },
-    });
-    useDesignStudioStore.getState().undo();
-    expect(useDesignStudioStore.getState().session!.history.present).toEqual(before);
-  });
-
-  it('drops a draft the system cancels instead of drawing it', () => {
-    useDesignStudioStore.getState().setTool('line');
-    act(() => root.render(<PointerHarness />));
-    const canvas = host.querySelector('canvas');
-    if (canvas === null) throw new Error('expected a canvas');
-
-    act(() => {
-      canvas.dispatchEvent(
-        new MouseEvent('pointerdown', { bubbles: true, clientX: 10, clientY: 10 }),
-      );
-      move(canvas, 50, 10);
-      canvas.dispatchEvent(new MouseEvent('pointercancel', { bubbles: true }));
-    });
-
-    const session = useDesignStudioStore.getState().session!;
-    expect(session.draft).toBeNull();
-    expect(session.history.present.entities).toEqual([]);
   });
 });

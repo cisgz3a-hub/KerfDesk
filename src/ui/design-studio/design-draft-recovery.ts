@@ -42,12 +42,14 @@ export function restoredOwnedSession(
   epoch: number,
 ): OpenedDesignSession | Promise<OpenedDesignSession> {
   // A drawing saved without an owner was drawn on the blank start-up project.
-  // Deciding about it, or finding nothing kept, needs no project identity.
+  // Deciding about it needs no project identity, and neither does a project
+  // that no kept drawing could belong to, so those open at once.
   const blank = project.designStudioDocument === undefined && project.scene.objects.length === 0;
   const saved = readPersistedSession();
   if (saved?.projectOwner === undefined) {
     if (saved !== null && epoch === 0 && blank) return opened(restoreDraft(saved, project));
-    if (blank || readKeptDesignDrawings().length === 0) return projectSessionKeepingDraft(project);
+    const returnable = readKeptDesignDrawings().some((kept) => kept.projectOwner !== undefined);
+    if (blank || !returnable) return projectSessionKeepingDraft(project);
   }
   const restore = (key: string | undefined): OpenedDesignSession => {
     const current = readPersistedSession();

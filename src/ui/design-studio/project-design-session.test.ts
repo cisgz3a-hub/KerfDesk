@@ -191,7 +191,9 @@ describe('project-owned vector source', () => {
     expect(reapplied.project.designStudioDocument?.sketch).toEqual(updated);
   });
 
-  it('discards stale in-memory and global recovery sketches when opening another project', () => {
+  // ADR-590 Amendment 1: the other project does not open the stale drawing, and
+  // the drawing is kept for Restore rather than written over.
+  it('keeps stale in-memory and global recovery sketches out of another project', () => {
     writePersistedSession({
       sketch,
       activeLayerId: DEFAULT_DESIGN_LAYER.id,
@@ -204,8 +206,10 @@ describe('project-owned vector source', () => {
     useStore.setState({ project: createProject(), projectDocumentEpoch: 1 });
     void useDesignStudioStore.getState().openStudio();
     expect(sessionSketch(useDesignStudioStore.getState().session!).entities).toHaveLength(0);
+    expect(readKeptDesignDrawings().map((kept) => kept.sketch)).toEqual([sketch]);
     useStore.setState({ project: appliedProject(), projectDocumentEpoch: 2 });
     expect(sessionSketch(useDesignStudioStore.getState().session!)).toEqual(sketch);
+    expect(useDesignStudioStore.getState().session!.dirtySinceApply).toBe(false);
   });
 
   it('preserves main-workspace changes and only retains replacement ownership for matching geometry', () => {
