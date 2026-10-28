@@ -36,8 +36,9 @@ export function MachineSettingsPanel(props: MachineSettingsPanelProps = {}): JSX
   const lastSettingsReadAt = useLaserStore((s) => s.lastSettingsReadAt);
   const readMachineSettings = useLaserStore((s) => s.readMachineSettings);
   const readDisabledReason = useLaserStore(machineSettingsReadBlockReason);
-  // Marlin, Smoothieware, the Falcon contract and Ruida have no settings query:
-  // a read there reads nothing (controller audit CG-7).
+  // Marlin, Smoothieware and Ruida have no settings query: a read there reads
+  // nothing (controller audit CG-7). The Falcon contract reads `$$` and writes
+  // nothing (ADR-322 Amendment 3).
   const canRead = useLaserStore((s) => s.capabilities.settings !== 'none');
   const pushToast = useToastStore((s) => s.pushToast);
   const context =

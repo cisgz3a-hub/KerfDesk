@@ -91,6 +91,16 @@ async function runFalconHome(options: {
   port.onOpen(() => setTimeout(() => port.emitLine("GrblHAL 1.1f ['$' or '$HELP' for help]"), 1));
   port.onWrite((data) => {
     if (data === '?') setTimeout(() => port.emitLine(reported), 1);
+    // The contract reads `$$` at connect (ADR-322 Amendment 3). This build has
+    // the startup lock on: $22=47 adds bit 2 to the published A1 Pro's 43.
+    if (data === '$$\n') {
+      setTimeout(() => {
+        for (const setting of ['$10=511', '$22=47', '$23=3', '$30=1000', '$32=1']) {
+          port.emitLine(setting);
+        }
+        port.emitLine('ok');
+      }, 1);
+    }
     // The connect handshake and the post-Home re-read ask for the active WCS.
     if (data === '$G\n') {
       setTimeout(() => {
@@ -128,7 +138,7 @@ async function runFalconHome(options: {
     );
   await vi.advanceTimersByTimeAsync(1);
   const commandLines = () =>
-    port.outbound().filter((line) => line.endsWith('\n') && line !== '$G\n');
+    port.outbound().filter((line) => line.endsWith('\n') && line !== '$G\n' && line !== '$$\n');
   expect(commandLines()).toEqual(['$HX\n']);
 
   // $HX runs: grblHAL forces a <Home|...> report as homing starts.

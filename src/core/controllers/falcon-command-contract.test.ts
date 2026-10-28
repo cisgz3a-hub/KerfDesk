@@ -15,15 +15,18 @@ describe('Falcon A1 Pro vendor command contract', () => {
     }
   });
 
-  it('does not offer unsupported settings fetch, firmware writes, or native jog cancellation', () => {
+  // Rolling audit v6 K3-P3-1 (ADR-322 Amendment 3): `$$` is a report on grblHAL,
+  // so the contract reads it at connect and still writes nothing.
+  it('reads $$ without offering firmware writes or native jog cancellation', () => {
     const driver = selectControllerDriver('grblhal', commandSet);
-    expect(driver.commands.settingsQuery).toBeNull();
-    expect(driver.capabilities.settings).toBe('none');
+    expect(driver.commands.settingsQuery).toBe('$$');
+    expect(driver.commands.buildInfoQuery).toBeNull();
+    expect(driver.capabilities.settings).toBe('grbl-dollar-read');
     expect(driver.capabilities.firmwareSetupPanel).toBe('none');
     expect(driver.capabilities.jogCancel).toBe(false);
     expect(driver.realtime.jogCancel).toBeNull();
     expect(driver.commands.home).toBe('$HX\n$HY');
-    expect(driver.consoleQuickCommands.some(({ command }) => command === '$$')).toBe(false);
+    expect(driver.consoleQuickCommands.some(({ command }) => command === '$$')).toBe(true);
     expect(driver.prepareConsoleCommand('$HZ1')).toMatchObject({
       ok: true,
       command: { stateEffect: 'reference' },

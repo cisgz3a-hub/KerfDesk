@@ -146,6 +146,7 @@ function validateDevice(device: Record<string, unknown>): string | null {
     optionalBoolean(device, 'device.zProbePresent'),
     optionalPositiveNumber(device, 'device.framingFeedMmPerMin'),
     optionalPositiveNumber(device, 'device.accelMmPerSec2'),
+    optionalLiteral(device, 'device.kinematics', ['cartesian', 'corexy']),
     optionalPositiveNumber(device, 'device.junctionDeviationMm'),
     profileField.optionalEstimateTimeScales(device, 'device'),
     profileField.optionalRotarySetup(device, 'device.rotary'),

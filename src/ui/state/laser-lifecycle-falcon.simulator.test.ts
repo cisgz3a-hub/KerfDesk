@@ -32,11 +32,29 @@ async function connectIdle() {
   return sim;
 }
 
+// The rows of a published A1 Pro `$$` that KerfDesk reads (barebaric/rayforge
+// PR #461); the contract reads them at connect (ADR-322 Amendment 3).
+const A1_PRO_SETTINGS = [
+  '$10=511',
+  '$13=0',
+  '$22=43',
+  '$23=3',
+  '$30=1000.000',
+  '$31=0.000',
+  '$32=1',
+];
+
 async function connectVendorHomePort() {
   const port = createFakeSerialPort();
   port.onOpen(() => setTimeout(() => port.emitLine('Grbl 1.1f'), 1));
   port.onWrite((line) => {
     if (line === '?') setTimeout(() => port.emitLine('<Idle|MPos:0,0,0|FS:0,0>'), 1);
+    if (line === '$$\n') {
+      setTimeout(() => {
+        for (const setting of A1_PRO_SETTINGS) port.emitLine(setting);
+        port.emitLine('ok');
+      }, 1);
+    }
     // Connect and a completed Home read the active WCS (audit CG-2, GP-1).
     if (line === '$G\n') {
       setTimeout(() => {
@@ -53,25 +71,32 @@ async function connectVendorHomePort() {
 }
 
 function commandLines(port: Awaited<ReturnType<typeof connectVendorHomePort>>): string[] {
-  return port.outbound().filter((line) => line.endsWith('\n') && line !== '$G\n');
+  return port
+    .outbound()
+    .filter((line) => line.endsWith('\n') && line !== '$G\n' && line !== '$$\n');
 }
 
 describe('Falcon profile host command lifecycle', () => {
-  it('connects without settings fetch or automatic Home and does not wait for absent settings', async () => {
+  // Rolling audit v6 K3-P3-1 (ADR-322 Amendment 3): `$$` is a report on
+  // grblHAL, so the contract reads it at connect; it still never homes by itself.
+  it('connects reading $$ without automatic Home and re-reads on request', async () => {
     const sim = await connectIdle();
     // ADR-354: a GRBL-family profile asks for worker-hosted streaming by default.
     expect(sim.port.openRequests()).toEqual([{ baudRate: 115200, hostedStreaming: true }]);
-    expect(sim.outbound().some((line) => line.startsWith('$$') || line.startsWith('$H'))).toBe(
-      false,
-    );
+    expect(sim.outbound()).toContain('$$\n');
+    expect(sim.outbound().some((line) => line.startsWith('$H'))).toBe(false);
     expect(useLaserStore.getState().controllerQualification).toMatchObject({
       kind: 'qualified',
-      settings: 'not-required',
+      settings: 'verified',
     });
     expect(useLaserStore.getState().controllerOperation).toBeNull();
     expect(useLaserStore.getState().capabilities.jogCancel).toBe(false);
-    await useLaserStore.getState().readMachineSettings();
-    expect(sim.outbound()).not.toContain('$$\n');
+    expect(useLaserStore.getState().capabilities.settings).toBe('grbl-dollar-read');
+    const reads = sim.outbound().filter((line) => line === '$$\n').length;
+    const read = useLaserStore.getState().readMachineSettings();
+    await vi.advanceTimersByTimeAsync(500);
+    await read;
+    expect(sim.outbound().filter((line) => line === '$$\n').length).toBe(reads + 1);
   });
 
   it('settles a relative tool-off G1 jog without emitting $J', async () => {

@@ -3,7 +3,7 @@ import { selectControllerDriver } from './index';
 import { firmwareReportQuery, parseFirmwareReport } from './controller-firmware-report';
 
 describe('documented firmware report adapters', () => {
-  it('uses family queries and leaves vendor overrides and file-only controllers unsupported', () => {
+  it('uses family queries, plain $I for the Falcon contract, none for file-only controllers', () => {
     expect(
       ['grbl-v1.1', 'grblhal', 'fluidnc', 'marlin', 'smoothieware', 'ruida'].map((kind) =>
         firmwareReportQuery(
@@ -11,9 +11,27 @@ describe('documented firmware report adapters', () => {
         ),
       ),
     ).toEqual(['$I', '$I+', '$I', 'M115', 'M115', null]);
-    expect(
-      firmwareReportQuery(selectControllerDriver('grbl-v1.1', 'creality-falcon-a1-pro')),
-    ).toBeNull();
+    // ADR-322 Amendment 3: two published A1 Pro units answered a plain $I.
+    for (const kind of ['grblhal', 'grbl-v1.1'] as const) {
+      expect(firmwareReportQuery(selectControllerDriver(kind, 'creality-falcon-a1-pro'))).toBe(
+        '$I',
+      );
+    }
+  });
+  // The `$I` of a Falcon A1 Pro (barebaric/rayforge PR #461); ADR-675.
+  it('keeps the kinematics line a CoreXY grblHAL reports', () => {
+    const report = parseFirmwareReport('grblhal', [
+      '[VER:1.1f.20231005:]',
+      '[Firmware:Version v1.0.4]',
+      '[OPT:VNMC+S,512,65536,3,0]',
+      '[KINEMATICS:CoreXY v2.02]',
+      '[NEWOPT:ENUMS,RT+,HOME,TC,SED,SD,LC]',
+      '[FIRMWARE:grblHAL]',
+      '[BOARD:A1 Pro Laser Master]',
+      'ok',
+    ]);
+    expect(report.fields).toContainEqual({ name: 'KINEMATICS', value: 'CoreXY v2.02' });
+    expect(report.fields).toContainEqual({ name: 'BOARD', value: 'A1 Pro Laser Master' });
   });
   it('keeps family fields without persisting private build user strings', () => {
     const report = parseFirmwareReport('grblhal', [

@@ -70,11 +70,14 @@ describe('GRBL_MACHINE_PROFILE_CATALOG', () => {
     expect(profileCatalogEntryById('generic-grblhal')?.profile.rxBufferBytes).toBe(1024);
     expect(fallback.profile.rxBufferBytes).toBe(120);
     expect(specific.profile.name).toBe('Creality Falcon A1 Pro (vendor command set)');
-    // Creality's rated 600 mm/s. The vendor contract cannot read $110/$111, so
-    // a 10000 ceiling capped every layer at 28% of the rating (audit speed-1).
+    // Creality's rated 600 mm/s, and $110/$111 in two published dumps. A 10000
+    // ceiling capped every layer at 28% of the rating (audit speed-1).
     expect(specific.profile.maxFeed).toBe(36000);
-    // 2026-09-28: the 20 W blue module fitted, swappable for the 2 W infrared (ADR-503).
-    expect(specific.profile.catalogVersion).toBe('2026-09-28');
+    // 2026-10-28: homing on and CoreXY (ADR-322 Amendment 3, ADR-675); the
+    // 20 W blue module fitted, swappable for the 2 W infrared (ADR-503).
+    expect(specific.profile.catalogVersion).toBe('2026-10-28');
+    expect(specific.profile.homing).toEqual({ enabled: true, direction: 'front-left' });
+    expect(specific.profile.kinematics).toBe('corexy');
     expect(specific.profile.laserSubProfile?.opticalPowerW).toBe(20);
     expect(specific.profile.framingFeedMmPerMin).toBe(10000);
     expect(profileConfidenceLabel(specific.profile)).toBe('Public-spec starter');

@@ -24,8 +24,9 @@ export function zAxisStatus(profile: DeviceProfile): string {
 export function plannerStatus(profile: DeviceProfile): string {
   const cut = formatScale(profile.estimateCutTimeScale ?? 1);
   const travel = formatScale(profile.estimateTravelTimeScale ?? 1);
+  const layout = profile.kinematics === 'corexy' ? ' per motor (CoreXY)' : '';
   return (
-    `Accel ${profile.accelMmPerSec2} mm/s² · ` +
+    `Accel ${profile.accelMmPerSec2} mm/s²${layout} · ` +
     `junction ${profile.junctionDeviationMm} mm · time ${cut}/${travel}`
   );
 }

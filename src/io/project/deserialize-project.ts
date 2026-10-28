@@ -20,7 +20,7 @@ import {
   normalizeScanOffsetTable,
   streamingModeForController,
 } from '../../core/devices';
-import { isBidirectionalScanPolicy } from '../../core/devices/device-profile';
+import { isBidirectionalScanPolicy, kinematicsEntry } from '../../core/devices/device-profile';
 import { laserArcMovesEntry } from '../../core/devices/laser-arc-moves';
 import { normalizeScanOffsetCalibrationStatus } from '../../core/devices/scan-offset-profile';
 import { normalizeCameraProfile, type CameraProfile } from '../../core/camera';
@@ -316,6 +316,7 @@ function normalizeDevice(dev: Record<string, unknown>): Record<string, unknown> 
     ...current,
     ...optionalDeviceFlags(dev),
     accelMmPerSec2: numberOrDefault(dev['accelMmPerSec2'], DEFAULT_DEVICE_PROFILE.accelMmPerSec2),
+    kinematics: kinematicsEntry(dev['kinematics']).kinematics, // ADR-675
     junctionDeviationMm: numberOrDefault(
       dev['junctionDeviationMm'],
       DEFAULT_DEVICE_PROFILE.junctionDeviationMm,
