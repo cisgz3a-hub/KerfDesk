@@ -7,7 +7,7 @@ import type { SelectionAnchor } from '../../core/scene';
 import { disabled, enabled, type AppCommand, type AppCommandContext } from './command-types';
 import type { EditingToolsCommandId } from './editing-tools-command-types';
 
-export const PASTE_IN_PLACE_SHORTCUT = 'Ctrl+Shift+V';
+export const PASTE_IN_PLACE_SHORTCUT = 'Alt+V';
 export const INVERT_SELECTION_SHORTCUT = 'Ctrl+Shift+I';
 export const ROTATE_CW_SHORTCUT = '.';
 export const ROTATE_CCW_SHORTCUT = ',';

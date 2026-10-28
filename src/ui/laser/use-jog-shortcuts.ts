@@ -8,10 +8,12 @@ import { isNumpadKey, keyboardJogDirection } from './jog-keyboard-map';
 // Bare arrow keys are reserved for nudging the selected canvas object. They used
 // to ALSO jog the machine, so with the rail connected and a shape selected one
 // press both nudged the artwork and lurched the head across the bed (F104).
-// Keyboard machine jog therefore uses keys the canvas never binds: PageUp /
-// PageDown for Z focus, and LightBurn's Move-window keys for XY (ADR-493,
-// jog-keyboard-map.ts): Ctrl/Cmd+Alt+[ / ] and Ctrl/Cmd+Shift+] / [, and the
-// keypad digits with NumLock on. Only the dedicated Page keys jog Z: keypad
+// Keyboard machine jog therefore uses keys the canvas never binds: LightBurn's
+// Move-window keys for XY (ADR-493, jog-keyboard-map.ts), Ctrl/Cmd+Alt+[ / ] and
+// Ctrl/Cmd+Shift+] / [, and the keypad digits with NumLock on; and for Z focus
+// Ctrl/Cmd+Alt+PageUp / PageDown, in the same Ctrl-plus-Alt family. LightBurn
+// has no Z jog key, and its bare PgUp / PgDn change the draw order, as they now
+// do here too (ADR-493 Amendment 2). Only the dedicated Page keys jog Z: keypad
 // 9 / 3 also send PageUp / PageDown with NumLock off, and on a CNC that sent
 // the bit down from the key the pad names for +X -Y (ADR-493 Amendment 1).
 const FOCUS_JOG_KEYS: Readonly<Record<string, 1 | -1>> = {
@@ -68,11 +70,16 @@ function isMachineJogCandidate(event: KeyboardEvent): boolean {
   return !isEditableShortcutTarget(event.target) && !isScrollRegionTarget(event.target);
 }
 
+// Ctrl or Cmd, plus Alt/Option, and no Shift. Windows AltGr arrives as Ctrl+Alt,
+// so AltGr+PageUp jogs too; the Page keys type no character for it to compose.
 function focusJogDirection(event: KeyboardEvent): 1 | -1 | undefined {
-  if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return undefined;
+  if (!(event.ctrlKey || event.metaKey) || !event.altKey || event.shiftKey) return undefined;
   if (isNumpadKey(event)) return undefined;
   return FOCUS_JOG_KEYS[event.key];
 }
+
+/** The Z+ / Z- buttons' key names, for their tooltips and the shortcut list. */
+export const FOCUS_JOG_KEY_LABELS = { up: 'Ctrl+Alt+PgUp', down: 'Ctrl+Alt+PgDn' } as const;
 
 export function useJogShortcuts(args: {
   readonly focusDisabled: boolean;

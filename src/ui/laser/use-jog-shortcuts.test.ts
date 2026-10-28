@@ -1,7 +1,9 @@
-// PageUp/PageDown jog Z one focus step (MCH-07). On a CNC that is the bit going
-// down into the stock, so a Page key meant to scroll a list or the Artwork /
-// Operations panel must scroll it and never move the machine (controller audit
-// 2026-09-23, ui-panel-3). The oracle is whether a jog was requested and
+// Ctrl/Cmd+Alt+PageUp / PageDown jog Z one focus step (MCH-07; ADR-493
+// Amendment 2). On a CNC that is the bit going down into the stock, so a Page
+// key meant to scroll a list or the Artwork / Operations panel must scroll it
+// and never move the machine (controller audit 2026-09-23, ui-panel-3). Bare
+// PgUp / PgDn are LightBurn's draw-order keys and never move the machine
+// (rolling audit v7 L8-P2-3). The oracle is whether a jog was requested and
 // whether the browser's own scrolling was left alone.
 //
 // XY keyboard jog (LightBurn gap LBG-M07, ADR-493) uses LightBurn's Move-window
@@ -26,8 +28,15 @@ function mount(html: string): HTMLElement {
   return host;
 }
 
-function pressOn(target: HTMLElement, key: string): KeyboardEvent {
-  const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+// The Z jog chord: Ctrl+Alt (Cmd+Option on macOS) with a Page key.
+const Z_CHORD = { ctrlKey: true, altKey: true } as const;
+
+function pressOn(
+  target: HTMLElement,
+  key: string,
+  init: KeyboardEventInit = Z_CHORD,
+): KeyboardEvent {
+  const event = new KeyboardEvent('keydown', { key, ...init, bubbles: true, cancelable: true });
   target.dispatchEvent(event);
   return event;
 }
@@ -81,7 +90,7 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-describe('PageUp/PageDown Z-focus jog', () => {
+describe('Ctrl+Alt+PageUp/PageDown Z-focus jog', () => {
   it('jogs from a jog-pad button, as designed', () => {
     const { onFocusJog, onXyJog, uninstall } = install();
     cleanup = uninstall;
@@ -133,10 +142,39 @@ describe('PageUp/PageDown Z-focus jog', () => {
     const { onFocusJog, onXyJog, uninstall } = install();
     cleanup = uninstall;
 
-    press({ key: 'PageUp', code: 'PageUp' });
+    press({ key: 'PageUp', code: 'PageUp', ...Z_CHORD });
 
     expect(onFocusJog).toHaveBeenCalledWith(1);
     expect(onXyJog).not.toHaveBeenCalled();
+  });
+
+  it('jogs Z from Cmd+Option on macOS', () => {
+    const { onFocusJog, uninstall } = install();
+    cleanup = uninstall;
+
+    press({ key: 'PageDown', code: 'PageDown', metaKey: true, altKey: true });
+
+    expect(onFocusJog).toHaveBeenCalledWith(-1);
+  });
+
+  // LightBurn's PgUp / PgDn push the selection in draw order, and its Ctrl and
+  // Alt chords restack and align: none of them may move the machine here.
+  it.each([
+    ['bare PageUp (Bring Forward)', { key: 'PageUp', code: 'PageUp' }],
+    ['bare PageDown (Send Backward)', { key: 'PageDown', code: 'PageDown' }],
+    ['Ctrl+PageUp (Bring to Front)', { key: 'PageUp', code: 'PageUp', ctrlKey: true }],
+    ['Alt+PageDown (Align Center Y)', { key: 'PageDown', code: 'PageDown', altKey: true }],
+    ['Shift+PageUp', { key: 'PageUp', code: 'PageUp', shiftKey: true }],
+    ['Ctrl+Alt+Shift+PageDown', { key: 'PageDown', code: 'PageDown', ...Z_CHORD, shiftKey: true }],
+  ] as ReadonlyArray<[string, KeyboardEventInit]>)('%s never jogs Z', (_name, init) => {
+    const { onFocusJog, onXyJog, uninstall } = install();
+    cleanup = uninstall;
+
+    const event = press(init);
+
+    expect(onFocusJog).not.toHaveBeenCalled();
+    expect(onXyJog).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(false);
   });
 
   // A browser names the keypad by code, by location, or both; either alone
@@ -149,11 +187,11 @@ describe('PageUp/PageDown Z-focus jog', () => {
       'a keypad PageUp named only by its location',
       { key: 'PageUp', code: '', location: KeyboardEvent.DOM_KEY_LOCATION_NUMPAD },
     ],
-  ] as ReadonlyArray<[string, KeyboardEventInit]>)('%s never jogs Z', (_name, init) => {
+  ] as ReadonlyArray<[string, KeyboardEventInit]>)('%s never jogs Z, chord held', (_name, init) => {
     const { onFocusJog, onXyJog, uninstall } = install();
     cleanup = uninstall;
 
-    const event = press(init);
+    const event = press({ ...init, ...Z_CHORD });
 
     expect(onFocusJog).not.toHaveBeenCalled();
     expect(onXyJog).not.toHaveBeenCalled();
@@ -168,6 +206,7 @@ describe('PageUp/PageDown Z-focus jog', () => {
       key: 'PageDown',
       code: 'PageDown',
       location: KeyboardEvent.DOM_KEY_LOCATION_STANDARD,
+      ...Z_CHORD,
     });
 
     expect(onFocusJog).toHaveBeenCalledWith(-1);
@@ -360,7 +399,7 @@ describe('keyboard XY jog (ADR-493)', () => {
     const { onXyJog, onFocusJog, uninstall } = install({ focusDisabled: true });
     cleanup = uninstall;
 
-    press({ key: 'PageDown', code: 'PageDown' });
+    press({ key: 'PageDown', code: 'PageDown', ...Z_CHORD });
     press(numpad('2'));
 
     expect(onFocusJog).not.toHaveBeenCalled();

@@ -1,26 +1,32 @@
-// The align and distribute keys (keys and reasons in
+// The align, Move Together and draw-order keys (keys and reasons in
 // commands/arrange-shortcut-keys.ts). Each runs the same store action as its
 // Arrange menu command and names the undo step after it.
 //
 // A matched chord is always consumed, even when the command is unavailable
-// (fewer than two objects to align, three to distribute): the menu item is
-// greyed out then, and the key must not fall through to the browser, where
-// Alt+Left and Alt+Right mean Back and Forward. A held key does not repeat the
-// command, so one press is one undo step.
+// (fewer than two objects to align or move together, nothing to restack): the
+// menu item is greyed out then, and the key must not fall through to the
+// browser, where Alt+Left and Alt+Right mean Back and Forward. A held key does
+// not repeat the command, so one press is one undo step. The draw-order Page
+// keys leave a focused list, tab panel or the Artwork panel to scroll.
 
-import type { SelectionAlignKind, SelectionDistributeKind } from '../../core/scene';
-import { ALIGN_COMMANDS, DISTRIBUTE_COMMANDS } from '../commands/arrange-command-family';
+import type { SelectionAlignKind } from '../../core/scene';
+import type { DrawOrderMove } from '../../core/draw-order';
+import type { SelectionMoveTogetherAxis } from '../../core/scene/selection-move-together';
+import { ALIGN_COMMANDS } from '../commands/arrange-command-family';
 import { arrangeShortcutCommandId } from '../commands/arrange-shortcut-keys';
+import type { CommandId } from '../commands/command-types';
+import { DRAW_ORDER_STEPS, MOVE_TOGETHER_STEPS } from '../commands/layout-commands';
 import { selectedObjectIds, selectionUnitCount } from '../commands/selection-command-state';
-import { isEditableShortcutTarget } from '../common/keyboard-targets';
+import { isEditableShortcutTarget, isScrollRegionTarget } from '../common/keyboard-targets';
 import { useStore } from '../state/store';
 import { withUndoStepName } from '../state/undo-step-names';
 
 export type ArrangeShortcutCtx = {
   readonly canAlign: boolean;
-  readonly canDistribute: boolean;
+  readonly hasSelection: boolean;
   readonly alignSelection: (kind: SelectionAlignKind) => void;
-  readonly distributeSelection: (kind: SelectionDistributeKind) => void;
+  readonly moveSelectionTogether: (axis: SelectionMoveTogetherAxis) => void;
+  readonly moveSelectionInDrawOrder: (move: DrawOrderMove) => void;
 };
 
 // The context is read only for a matched chord, so ordinary typing never pays
@@ -33,19 +39,33 @@ export function handleArrangeShortcut(
   if (isEditableShortcutTarget(e.target) || e.defaultPrevented) return false;
   const id = arrangeShortcutCommandId(e);
   if (id === null) return false;
+  if (isDrawOrderKey(id) && isScrollRegionTarget(e.target)) return false;
   e.preventDefault();
-  if (e.repeat) return true;
-  const ctx = context();
+  if (!e.repeat) runArrangeCommand(id, context());
+  return true;
+}
+
+function isDrawOrderKey(id: CommandId): boolean {
+  return DRAW_ORDER_STEPS.some((step) => step.id === id);
+}
+
+function runArrangeCommand(id: CommandId, ctx: ArrangeShortcutCtx): void {
+  const drawOrder = DRAW_ORDER_STEPS.find((step) => step.id === id);
+  if (drawOrder !== undefined) {
+    if (!ctx.hasSelection) return;
+    withUndoStepName(drawOrder.label, () => ctx.moveSelectionInDrawOrder(drawOrder.value));
+    return;
+  }
+  if (!ctx.canAlign) return;
   const align = ALIGN_COMMANDS.find((spec) => spec.id === id);
   if (align !== undefined) {
-    if (ctx.canAlign) withUndoStepName(align.label, () => ctx.alignSelection(align.kind));
-    return true;
+    withUndoStepName(align.label, () => ctx.alignSelection(align.kind));
+    return;
   }
-  const distribute = DISTRIBUTE_COMMANDS.find((spec) => spec.id === id);
-  if (distribute !== undefined && ctx.canDistribute) {
-    withUndoStepName(distribute.label, () => ctx.distributeSelection(distribute.kind));
+  const together = MOVE_TOGETHER_STEPS.find((step) => step.id === id);
+  if (together !== undefined) {
+    withUndoStepName(together.label, () => ctx.moveSelectionTogether(together.value));
   }
-  return true;
 }
 
 // Groups count once, exactly as for the Arrange menu's enablement.
@@ -57,8 +77,9 @@ export function arrangeShortcutContext(): ArrangeShortcutCtx {
   );
   return {
     canAlign: units >= 2,
-    canDistribute: units >= 3,
+    hasSelection: app.selectedObjectId !== null,
     alignSelection: app.alignSelection,
-    distributeSelection: app.distributeSelection,
+    moveSelectionTogether: app.moveSelectionTogether,
+    moveSelectionInDrawOrder: app.moveSelectionInDrawOrder,
   };
 }
