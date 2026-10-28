@@ -11,6 +11,8 @@ Method: [../2026-10-21-rolling-v2/METHOD.md](../2026-10-21-rolling-v2/METHOD.md)
 | L5 | Design Studio sketch | 6e388bb56 (in-scope files unchanged at 47ff19d8d) | [L5-design-studio-sketch.md](L5-design-studio-sketch.md) | 10 | 0 (P3-2 rounded-rectangle half refuted) | 2 | 1 | 7 | 3 |
 | L6 | Node edit and curves | 6e388bb56 (cited files unchanged at 47ff19d8d) | [L6-node-edit-curves.md](L6-node-edit-curves.md) | 8 | 0 | 1 | 1 (P2-2 lowered) | 6 | 2 |
 | L7 | Design I/O round trip | 47ff19d8d (cited files unchanged at 548f67ecb) | [L7-design-io-roundtrip.md](L7-design-io-roundtrip.md) | 6 | 0 | 2 | 1 | 3 | 1 |
+| L8 | Canvas, shortcuts, history | 548f67ecb (cited lines unchanged at 353b82b09) | [L8-canvas-interaction-history.md](L8-canvas-interaction-history.md) | 17 | 0 | 1 | 4 (P2-2, P2-6, P2-7 lowered) | 12 | 7 |
+| **Total** | | | | **73** | **1** | **12** | **15** | **45** | **23** |
 
 ## Confirmed P1/P2 (coordinator-verified)
 
@@ -39,3 +41,35 @@ Method: [../2026-10-21-rolling-v2/METHOD.md](../2026-10-21-rolling-v2/METHOD.md)
 | L7-P1-1 | L7 | **Separate shapes on one Fill operation lose their holes through an SVG round trip.** KerfDesk burns them as one even-odd region, as LightBurn does: a `.lbrn` plate with an inner circle burns a 999.7 mm² ring; a plate with "KERF" a 1116.3 mm² knock-out. Export writes each object as its own filled path; KerfDesk's SVG import merges consecutive same-mode elements into one object and fills the union, so both burn 1200 mm² (hole filled, text gone), with no message (the import says "1 object, 2 colors" even for one colour). DXF keeps the holes only when both paths share one colour; in the everyday route (draw plate and circle, assign the circle to the plate's operation, set Fill) the paths differ in colour and both SVG and DXF re-import as two Fill operations burning 1400 mm² (the circle burned twice). ADR-486 Amd 2, ADR-286 item 2 and ADR-410 Amd 3 make a separate inner shape a hole; ADR-468 item 1 covers only PDF/EPS painting | **READ** (main): the pooled layer is even-odd (`fill-rule.ts:5-13`); export writes one `<path fill-rule="evenodd">` per object in its own `<g>` (`export-svg-vector.ts:65-67,233-252`, `export-scene-svg.ts:148-157`); import appends consecutive same-mode elements to one entry (`svg-import-entries.ts:34-45`). Auditor + refuter REPRO (real export, import and compile) | fix card proposed |
 | L7-P1-2 | L7 | **Paste into another project drops hand-placed tabs when the path colour equals its operation colour** (true of every LightBurn `.lbrn` import): one placed gap becomes four automatic tabs, one per edge, with no warning; same-project paste keeps it. Saved Artwork insert drops it even into the source project (it always creates new operations). The drawn-shape route reproduces when pasting into a project that already holds artwork. CNC placed anchors stop resolving (2 → 0) | **READ** (main): `remapClipboardTabAnchors` rewrites each anchor's `layerColor` through a map of operation colours (`scene-clipboard-actions.ts:380-405`), but anchors are matched against the path colour: `if (anchor.layerColor !== pathColor) return [];` (`laser-tab-anchors.ts:101,121`; `cnc-tab-anchors.ts:70,85`). Auditor + refuter REPRO | fix card proposed |
 | L7-P2-1 | L7 | **Every export (SVG, DXF, PDF, AI, EPS, GeoJSON) writes the colour stored on each path, not the colour of the operation it burns on.** Three drawn shapes on three operations export as `#000000`, `#2563eb`, `#2563eb` and re-import as two operations; Assign selection to operation never changes the exported colour. LightBurn treats colour as the layer | **READ** (main): writers take `path.color` (`export-svg-vector.ts:70`, `export-dxf.ts:45`, `vector-artwork.ts:347`); operations have their own colours (`artwork-operation.ts:45-73`). Auditor + refuter REPRO | fix card proposed |
+| L8-P1-1 | L8 | **Separate shapes on one Fill operation: the canvas shows each filled solid, the burn pools them even-odd.** A 40 × 30 plate and a separate Ø16 circle on one Fill operation show as a solid plate but burn a 999.7 mm² ring (no hatch through the circle). Everyday route: Ctrl+D (Duplicate) or Paste in Place on a Fill operation makes that part burn nothing — the two identical copies cancel, hatch 12,000 mm → 0 — while preflight and Job Review stay silent (other output exists) and the canvas still shows it solid. LightBurn 2.0 docs show such duplicates as unfilled and warn before Preview or engraving. The CNC cancellation was fixed by ADR-359 Amd 3; laser Fill has neither the merge nor a warning | **READ** (main): the canvas fills each object's own paths (`object-display.ts:211-217`, `draw-vector-strokes.ts:28-44`); the compiler pools the layer even-odd (`fill-rule.ts:5-13`). Auditor + refuter REPRO (real store, `drawScene`, `emitGcode`) | fix card proposed |
+| L8-P2-1 | L8 | **Ctrl+Shift+V (LightBurn's Flip Vertical) runs Paste in Place when the clipboard holds artwork**: an invisible copy lands on the original and burns twice (Line output 240 → 320 mm); on a Fill operation the copy cancels the part (L8-P1-1). Ctrl+Shift+H (Flip Horizontal) and Alt+V (LightBurn's Paste in Place) do nothing. Documented KerfDesk key (WORKFLOW F-A15, ADR-410 D4), but D4's "was free" is wrong — LightBurn 1.7's Arrange menu binds it | Auditor + refuter REPRO (real keyboard handler, compiled output) | fix card proposed |
+| L8-P2-3 | L8 | **PgUp / PgDn (LightBurn's draw-order keys) jog the machine's Z axis** on a connected, idle CNC or Z-equipped laser with the jog pad shown: one 0.1–5 mm step at ≤ 600 mm/min per press, no confirmation. Documented (F-A15, ADR-362, ADR-493); KerfDesk's own draw-order commands have no key. P2 by the C8-P2-1 precedent (one-step Z move) | Auditor + refuter READ/REPRO | fix card proposed |
+| L8-P2-4 | L8 | **Alt+Shift+H / V run Distribute spacing, where LightBurn runs Move H / V Together**; KerfDesk's Move Together has no key. ADR-499 D5's "LightBurn has none" is contradicted by LightBurn 1.7's Distribute page | Auditor + refuter REPRO | fix card proposed |
+| L8-P2-5 | L8 | **A Fill-mode shape with a hole is a solid click target**: artwork visible through the hole cannot be clicked, even on its outline; only Alt+click reaches it | Auditor + refuter REPRO (real hit test) | fix card proposed |
+
+## Round summary (2026-10-28)
+
+All eight design areas were audited, refuted and re-verified in main's code. 73 findings were raised and none was refuted outright. Result: P1 12 / P2 15 / P3 45, plus 23 KNOWN.
+
+**What is exact:**
+- the boolean and offset geometry (to the 1 µm grid and the 0.025 mm curve tolerance);
+- typed sizes, transforms and repeated transforms (no drift over 1,000 repeats);
+- the outline-text metrics, checked against the font files and HarfBuzz;
+- the constraint solver (about 1e-6 mm);
+- node splits and fillets;
+- SVG/DXF geometry, and the `.lf2` round trip (byte-identical G-code);
+- rulers, pointer mapping and per-command Undo/Redo.
+
+Almost every P1 sits where one subsystem hands off to another:
+- **Selection into offset:** separate holes swallowed (L1).
+- **Own bounds into rotation:** rotated W/H burns another size (L2, 08-P3-3).
+- **Spec into a toolbar stretch:** the corner radius field (L2).
+- **Font source data into layout:** single-line font sizes (L3).
+- **Bend into the variable anchor (L3).**
+- **Glyph reports into remote and variable output (L3).**
+- **Canvas scale into the sketch, and Studio storage into the project (L5).**
+- **Node restart into tabs (L6).**
+- **Fill pooling into the SVG round trip and the canvas (L7, L8).**
+- **Tab colour into paste (L7).**
+
+Fixed during the round: L1 (#1501), and L2 together with 08-P3-3 (#1502). The other clusters have fix cards.
