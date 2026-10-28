@@ -10,6 +10,7 @@ import {
   profileSupportsCapability,
   type DeviceProfile,
 } from '../../core/devices';
+import { airStandbyRemedy } from '../../core/devices/air-standby-remedy';
 import {
   SMOOTHIE_FULL_POWER_S,
   SMOOTHIE_FULL_POWER_S_REASON,
@@ -157,21 +158,28 @@ export function AirAssistRow(props: DeviceRowsProps): JSX.Element {
 // ADR-335. Creality's A1 family cannot be trusted to restart its pump inside a
 // running job, so the emitter holds air on across an Air-off operation that
 // sits between two Air-on ones. Clearing this restores plain per-operation
-// air, which is what an operator wants once `$152=100` (no standby: the pump
-// and laser module stay powered) is sent from the Console (ADR-370), or an air
-// test shows the installed firmware restarting the pump (A1 and A1 Pro firmware
-// are numbered separately). The same flag makes the job repeat the air command
-// while air is on, because that firmware's timer also stops a running pump
-// (ADR-462). Hidden while air output is disabled, where it would mean nothing.
+// air, which is what an operator wants once an A1 on stock GRBL has
+// `$152=100` (no standby: the pump and laser module stay powered) sent from
+// the Console (ADR-370), or an air test shows the installed firmware restarting
+// the pump (A1 and A1 Pro firmware are numbered separately). On the A1 Pro's
+// grblHAL, `$152` is a microstep setting, so the tooltip names only the air
+// test there (ADR-370 Amendment 1). The same flag makes the job repeat the air
+// command while air is on, because that firmware's timer also stops a running
+// pump (ADR-462). Hidden while air output is disabled, where it would mean
+// nothing.
 export function AirRestartRow({ device, update }: DeviceRowsProps): JSX.Element | null {
   if (device.airAssistCommand === 'none') return null;
+  const untick =
+    airStandbyRemedy(device) === 'standby-setting'
+      ? 'Untick once $152=100 (no standby) is sent from the Console, or after an air test shows your firmware restarting the pump.'
+      : 'Untick after an air test shows your firmware restarting the pump.';
   return (
     <Row label="Air restart">
       <input
         type="checkbox"
         checked={device.airAssistRestartUnreliable === true}
         aria-label="Controller cannot restart air assist mid-job"
-        title="Tick when the controller cannot switch air off and on again inside a running job — Creality A1 firmware holds the pump in standby after M9 and may not restart it. Air is then held on through operations that sit between two air-on operations. Air-command repeats are also attempted at movement boundaries after about 5 s of estimated time. Long moves, dwells and constant-power cutting can leave longer gaps, so this does not guarantee continuous air. Untick once $152=100 (no standby) is sent from the Console, or after an air test shows your firmware restarting the pump."
+        title={`Tick when the controller cannot switch air off and on again inside a running job — Creality A1 firmware holds the pump in standby after M9 and may not restart it. Air is then held on through operations that sit between two air-on operations. Air-command repeats are also attempted at movement boundaries after about 5 s of estimated time. Long moves, dwells and constant-power cutting can leave longer gaps, so this does not guarantee continuous air. ${untick}`}
         onChange={(event) => update({ airAssistRestartUnreliable: event.target.checked })}
       />
       <span style={{ opacity: 0.7 }}>cannot switch air off and on mid-job</span>

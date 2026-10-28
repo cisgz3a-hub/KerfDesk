@@ -586,6 +586,29 @@ describe('projected and bounded desktop responses', () => {
     }
   });
 
+  // ADR-584 Amendment 1: an Undo or Redo that changed the machine setup says so.
+  it('keeps the machine notice an Undo or Redo receipt carries', async () => {
+    const notices = [
+      {
+        level: 'warning',
+        message: "Undo brought back the opened file's machine, and the PC asks again.",
+      },
+    ];
+    const client = await connectedClient({
+      request: async () => ({
+        revision: 'revision-2',
+        changedArtworkIds: [],
+        history: { canUndo: false, canRedo: true },
+        notices,
+      }),
+    });
+    for (const name of ['undo', 'redo'] as const) {
+      const result = await client.callTool({ name, arguments: toolExamples[name] });
+      expect(result.isError).not.toBe(true);
+      expect(result.structuredContent).toMatchObject({ notices });
+    }
+  });
+
   it.each([
     {
       revision: 'revision-1',

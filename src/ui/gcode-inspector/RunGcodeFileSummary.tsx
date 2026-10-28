@@ -22,7 +22,8 @@ export function RunGcodeFileSummary(props: {
   readonly startKnown: boolean;
   /** The controller's $30/$32 findings and lit rapids (external-run-readiness.ts). */
   readonly controllerWarnings: ReadonlyArray<string>;
-  /** Where the outline lands on the bed (external-run-bed.ts). */
+  /** Where the outline lands on the bed (external-run-bed.ts), and its lifts against the Z top
+   * (external-run-z-top.ts). */
   readonly bedWarnings: ReadonlyArray<string>;
   readonly formatLength: (mm: number) => string;
   readonly formatSeconds: (seconds: number) => string;

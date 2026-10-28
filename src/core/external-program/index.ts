@@ -22,3 +22,4 @@ export {
   type ExternalProgramUnits,
 } from './external-program-review';
 export { findLitRapids, type LitRapids } from './lit-rapids';
+export { externalProgramZLifts, type ExternalProgramZLifts } from './program-z-lifts';

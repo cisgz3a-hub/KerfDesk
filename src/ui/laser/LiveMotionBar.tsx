@@ -1,4 +1,5 @@
 import type { StreamerStatus } from '../../core/controllers/grbl';
+import { airStandbyRemedy, type AirStandbyRemedy } from '../../core/devices/air-standby-remedy';
 import { machineKindOf, type MachineKind } from '../../core/scene';
 import { SOFTWARE_ABORT_TITLE } from '../common/software-abort-copy';
 import {
@@ -68,8 +69,10 @@ export function LiveMotionBar(): JSX.Element | null {
   const machineKind = useStore((state) => machineKindOf(state.project.machine));
   const unownedOutput = useLaserStore((state) => unownedControllerOutput(state, machineKind));
   const homingStateStuck = useLaserStore((state) => state.resetRequired === 'homing-state');
-  const falconAirTimerHint = useStore(
-    (state) => state.project.device.machineFamily === 'creality-falcon',
+  const falconAirTimerHint = useStore((state) =>
+    state.project.device.machineFamily === 'creality-falcon'
+      ? airStandbyRemedy(state.project.device)
+      : null,
   );
   const stopJob = useLaserStore((state) => state.stopJob);
   const setFireActive = useLaserStore((state) => state.setFireActive);
@@ -220,7 +223,7 @@ function describeLiveMotion(
   pauseResumeTransition: PauseResumeTransition | null,
   controllerHold: ControllerHold,
   streamHold: StreamHold | null = null,
-  falconAirTimerHint = false,
+  falconAirTimerHint: AirStandbyRemedy | null = null,
   unownedMotion: UnownedControllerMotion | null = null,
   homingStateStuck = false,
   unownedOutput: UnownedControllerOutput | null = null,
@@ -295,7 +298,7 @@ function describeActiveJob(
   pauseResumeTransition: PauseResumeTransition | null,
   controllerHold: ControllerHold,
   streamHold: StreamHold | null,
-  falconAirTimerHint: boolean,
+  falconAirTimerHint: AirStandbyRemedy | null,
 ): MotionDescription {
   const hostOwned = pauseResumeTransition !== null || isHostPaused(streamProgress);
   const heldReason = hostOwned
@@ -324,7 +327,7 @@ function isHostPaused(streamProgress: LiveStreamProgress): boolean {
 function streamHoldDescription(
   streamProgress: LiveStreamProgress,
   streamHold: StreamHold | null,
-  falconAirTimerHint: boolean,
+  falconAirTimerHint: AirStandbyRemedy | null,
 ): { readonly heading: string; readonly detail: string } | null {
   if (streamHold === null || streamProgress.status !== 'streaming') return null;
   return {
