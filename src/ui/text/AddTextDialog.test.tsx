@@ -323,9 +323,10 @@ describe('AddTextDialog unknown font safety', () => {
       const lineHeight = requireInput(host, 'input[aria-label="Text line height"]');
       const letterSpacing = requireInput(host, 'input[aria-label="Text letter spacing"]');
       const bend = requireInput(host, 'input[aria-label="Text bend"]');
-      expect(size.max).toBe('300');
-      expect(lineHeight.max).toBe('5');
-      expect(letterSpacing.min).toBe('-0.5');
+      // ADR-564 Amendment 1: the range remote text uses too.
+      expect(size.max).toBe('1000');
+      expect(lineHeight.max).toBe('20');
+      expect(letterSpacing.min).toBe('-1');
       expect(bend.min).toBe('-180');
       expect(bend.max).toBe('180');
 
@@ -356,17 +357,17 @@ describe('AddTextDialog unknown font safety', () => {
             readonly letterSpacing?: number;
           }
         | undefined;
-      expect(renderInput?.sizeMm).toBe(300);
-      expect(renderInput?.lineHeight).toBe(5);
-      expect(renderInput?.letterSpacing).toBe(-0.5);
+      expect(renderInput?.sizeMm).toBe(1000);
+      expect(renderInput?.lineHeight).toBe(20);
+      expect(renderInput?.letterSpacing).toBe(-1);
 
       expect(
         useStore.getState().project.scene.objects.find((obj) => obj.kind === 'text'),
       ).toMatchObject({
         kind: 'text',
-        sizeMm: 300,
-        lineHeight: 5,
-        letterSpacing: -0.5,
+        sizeMm: 1000,
+        lineHeight: 20,
+        letterSpacing: -1,
         bendDeg: 180,
       });
     } finally {

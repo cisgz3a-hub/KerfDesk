@@ -76,10 +76,12 @@ function movePolylineNodes(
   return points === undefined ? polyline : { ...polyline, points };
 }
 
+/** The paths without the selected nodes; 'too-few' when a contour would fall
+ *  below 2 (open) or 3 (closed) nodes, and null when no selected node is one. */
 export function deletePathsNodes(
   paths: ReadonlyArray<ColoredPath>,
   refs: ReadonlyArray<PathNodeRef>,
-): { readonly paths: ReadonlyArray<ColoredPath> } | null {
+): { readonly paths: ReadonlyArray<ColoredPath> } | 'too-few' | null {
   let changed = false;
   let invalid = false;
   const refsByPolyline = groupPathNodeRefsByPolyline(
@@ -114,8 +116,8 @@ export function deletePathsNodes(
     });
     return pathChanged ? replaceCompatibilityPolylines(path, polylines) : path;
   });
-  if (invalid || !changed) return null;
-  return { paths: nextPaths };
+  if (invalid) return 'too-few';
+  return changed ? { paths: nextPaths } : null;
 }
 
 // Current local-space position of a single node, or null if the ref is out of
@@ -144,7 +146,7 @@ function editCurvePathByDelta(
   if (pathRefs.length === 0) return null;
   const curves = [...path.curves];
   let changed = false;
-  for (const ref of pathRefs) {
+  for (const ref of withoutCarriedHandles(pathRefs)) {
     const curve = curves[ref.polylineIndex];
     if (curve === undefined) continue;
     const next = editCurveRef(curve, ref, dx, dy);
@@ -153,6 +155,19 @@ function editCurvePathByDelta(
     changed = true;
   }
   return changed ? materializeCurvePath(path, curves) : null;
+}
+
+// Moving an anchor carries its own handles, so a selected handle whose anchor
+// is selected too would move twice (audit L6-P3-5).
+function withoutCarriedHandles(refs: ReadonlyArray<PathNodeRef>): ReadonlyArray<PathNodeRef> {
+  const anchors = new Set(
+    refs
+      .filter((ref) => ref.handle === undefined)
+      .map((ref) => `${ref.polylineIndex}:${ref.pointIndex}`),
+  );
+  return refs.filter(
+    (ref) => ref.handle === undefined || !anchors.has(`${ref.polylineIndex}:${ref.pointIndex}`),
+  );
 }
 
 function editCurveRef(

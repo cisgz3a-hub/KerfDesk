@@ -1,6 +1,11 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import type { Project, TextObject } from '../../../core/scene';
 import { DEFAULT_FONT_KEY, DEFAULT_TEXT_SIZE_MM, FONT_REGISTRY } from '../../../core/text';
+import {
+  TEXT_SIZE_MAX_MM,
+  TEXT_SIZE_MIN_MM,
+  textSizeInRange,
+} from '../../../core/text/text-limits';
 import { FontPicker } from '../../text/FontPicker';
 import { isAdvancedJigText, renderJigText } from './jig-text-object';
 
@@ -109,9 +114,7 @@ function hasFont(project: Project, key: string): boolean {
 }
 
 function validText(content: string, size: number, fontAvailable: boolean): boolean {
-  return (
-    content.trim() !== '' && Number.isFinite(size) && size >= 1 && size <= 300 && fontAvailable
-  );
+  return content.trim() !== '' && textSizeInRange(size) && fontAvailable;
 }
 
 function JigTextForm(props: Props & { readonly existing: TextObject | undefined }): JSX.Element {
@@ -162,8 +165,9 @@ function JigTextForm(props: Props & { readonly existing: TextObject | undefined 
             className="lf-input"
             aria-label="Jig text size"
             type="number"
-            min={1}
-            max={300}
+            min={TEXT_SIZE_MIN_MM}
+            max={TEXT_SIZE_MAX_MM}
+            step={0.1}
             value={size}
             onChange={(event) => setSize(event.target.value)}
           />

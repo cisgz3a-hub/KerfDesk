@@ -1,9 +1,11 @@
 // curve-node-delete — Edit Nodes Delete on canonical curve subpaths. As in
 // LightBurn, deleting nodes combines the adjacent segments. Lines combine into
 // their chord, exactly like the polyline Delete. Anything curved becomes ONE
-// cubic that keeps the outer handle directions and least-squares fits the two
-// handle lengths to the removed segments, so the outline keeps its shape; the
-// naive reconnect through the outer handles visibly flattens the curve.
+// cubic least-squares fitted to the removed segments, so the outline keeps its
+// shape as closely as one cubic can; the naive reconnect through the outer
+// handles visibly flattens the curve. The fit keeps the outer handle
+// directions, so the joins stay smooth, unless that misses the removed curve
+// by more than a small share of its size (ADR-371 Amendment 1).
 //
 // Pure core — no I/O, no globals, deterministic.
 
@@ -17,12 +19,18 @@ import {
   type Vec2,
 } from '../scene';
 import { ellipticalArcEndDirection } from '../scene/curve-path';
-import { fitCubicWithTangents } from './cubic-fit';
+import { evaluateCubic, fitCubicWithTangents, type CubicBezier } from './cubic-fit';
+import { fitCubicFree } from './cubic-fit-free';
 
 // The polyline Delete's floors: an open run keeps one segment, a ring a triangle.
 const MIN_OPEN_NODES = 2;
 const MIN_CLOSED_NODES = 3;
 const FIT_SAMPLES_PER_SEGMENT = 24;
+// The share of the removed segments' size (their reach from the first kept
+// node) the smooth-join fit may miss them by before the handles turn freely.
+// A node of a four-node circle misses by 0.7% of it; a hump crest by 50%.
+const FIT_TOLERANCE_RATIO = 0.02;
+const MISS_SAMPLES_PER_SAMPLE = 4;
 // Flatten tolerances relative to the geometry's size: fine enough for the fit
 // to see the true curve, far inside the flattening segment budget.
 const SAMPLE_TOLERANCE_RATIO = 1e-4;
@@ -96,6 +104,11 @@ function shapedPieces(from: Vec2, run: ReadonlyArray<PathSegment>): Piece[] {
   return pieces;
 }
 
+// The cubic that keeps the outer tangent directions leaves the joins with the
+// kept segments smooth. When both directions lie along the chord, as at a hump
+// or a wave crest, every control point sits on the chord and no handle length
+// can follow the curve. Past the tolerance the handles turn freely instead, as
+// long as that at least halves the miss (ADR-371 Amendment 1).
 function fittedCubic(
   from: Vec2,
   end: Vec2,
@@ -109,9 +122,49 @@ function fittedCubic(
   const tangentEnd = pieceTangent(last, 'end');
   const samples = runSamples(from, end, run, FIT_SAMPLES_PER_SEGMENT * pieces.length);
   if (tangentStart === null || tangentEnd === null || samples === null) return null;
-  const cubic = fitCubicWithTangents(samples, tangentStart, tangentEnd);
-  if (cubic === null || !finitePoint(cubic.p1) || !finitePoint(cubic.p2)) return null;
+  const kept = finiteCubic(fitCubicWithTangents(samples, tangentStart, tangentEnd));
+  const keptMiss = kept === null ? Number.POSITIVE_INFINITY : cubicMiss(samples, kept);
+  let cubic = kept;
+  if (keptMiss > controlExtent(from, run) * FIT_TOLERANCE_RATIO) {
+    const free = finiteCubic(fitCubicFree(samples));
+    if (free !== null && cubicMiss(samples, free) < keptMiss / 2) cubic = free;
+  }
+  if (cubic === null) return null;
   return { kind: 'cubic', control1: cubic.p1, control2: cubic.p2, to: end };
+}
+
+function finiteCubic(cubic: CubicBezier | null): CubicBezier | null {
+  return cubic !== null && finitePoint(cubic.p1) && finitePoint(cubic.p2) ? cubic : null;
+}
+
+// How far the fitted cubic and the removed segments' samples stray from each
+// other, both ways: the cubic could also bulge away between samples.
+function cubicMiss(samples: ReadonlyArray<Vec2>, cubic: CubicBezier): number {
+  const count = samples.length * MISS_SAMPLES_PER_SAMPLE;
+  const traced = Array.from({ length: count + 1 }, (_, index) =>
+    evaluateCubic(cubic, index / count),
+  );
+  let miss = 0;
+  for (const point of samples) miss = Math.max(miss, distanceToPolyline(point, traced));
+  for (const point of traced) miss = Math.max(miss, distanceToPolyline(point, samples));
+  return miss;
+}
+
+function distanceToPolyline(point: Vec2, line: ReadonlyArray<Vec2>): number {
+  let nearest = Number.POSITIVE_INFINITY;
+  for (let index = 1; index < line.length; index += 1) {
+    const a = line[index - 1] as Vec2;
+    const b = line[index] as Vec2;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const lengthSq = dx * dx + dy * dy;
+    const t =
+      lengthSq > 0
+        ? Math.min(1, Math.max(0, ((point.x - a.x) * dx + (point.y - a.y) * dy) / lengthSq))
+        : 0;
+    nearest = Math.min(nearest, distance(point, { x: a.x + dx * t, y: a.y + dy * t }));
+  }
+  return nearest;
 }
 
 // Evenly spaced by arc length and ending exactly on both anchors, so the

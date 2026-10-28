@@ -7,6 +7,11 @@ import { showKeptFeedsOnPc, updateOperationFull } from './design-operations';
 import { editableArtwork, expandedArtworkGroupIds, prepareTransforms } from './transforms';
 import { prepareRemoteText } from './text';
 import { editableText, prepareTextEdit } from './text-edit';
+import {
+  missingGlyphNoticeFields,
+  showMissingGlyphsOnPc,
+  type MissingGlyphReport,
+} from './text-notices';
 import { applyHistory, prepareArrange } from './arrange';
 import { publicIdentifier, selectedIds } from './projections';
 import { prepareRemoteShape } from './touch-shapes';
@@ -74,13 +79,8 @@ async function applyOrdinaryRemoteWrite(
       const object = prepareRemoteShape(state, write);
       return commit(() => drawShape(store, object));
     }
-    case 'add_text': {
-      const object = await prepareRemoteText(write.args, signal);
-      return commit(() => {
-        store.getState().upsertTextObject(object, undefined, { placement: 'canvas' });
-        return { changedArtworkIds: [object.id] };
-      });
-    }
+    case 'add_text':
+      return addText(write.args, store, signal, commit);
     case 'transform_artwork': {
       const ids = expandedArtworkGroupIds(state, write.args.artworkIds);
       const objects = editableArtwork(state, ids);
@@ -96,18 +96,8 @@ async function applyOrdinaryRemoteWrite(
       showKeptFeedsOnPc(receipt.message);
       return receipt;
     }
-    case 'update_text': {
-      const object = editableText(state, write.args.artworkId);
-      const prepared = await prepareTextEdit(state, object, write.args.patch, signal);
-      return commit(() => {
-        if (prepared.changedFields.length > 0)
-          store.getState().upsertTextObject(prepared.object, undefined, { placement: 'canvas' });
-        return {
-          changedArtworkIds: prepared.changedFields.length > 0 ? [object.id] : [],
-          changedFields: prepared.changedFields,
-        };
-      });
-    }
+    case 'update_text':
+      return updateText(write.args, state, store, signal, commit);
     case 'arrange_artwork': {
       const action = prepareArrange(state, store, write.args.artworkIds, write.args.action);
       return commit(action);
@@ -117,6 +107,58 @@ async function applyOrdinaryRemoteWrite(
       return commit(() => applyHistory(state, store, write.command));
   }
 }
+
+type Commit = (action: () => Record<string, unknown>) => Record<string, unknown>;
+
+async function addText(
+  args: Extract<RemoteWrite, { command: 'add_text' }>['args'],
+  store: RemoteAppStore,
+  signal: AbortSignal,
+  commit: Commit,
+): Promise<Record<string, unknown>> {
+  const { object, missingCharacters } = await prepareRemoteText(args, signal);
+  const report: MissingGlyphReport = {
+    fontKey: object.fontKey,
+    missing: missingCharacters,
+    embeddedFonts: undefined,
+    clientWording: true,
+  };
+  const receipt = commit(() => {
+    store.getState().upsertTextObject(object, undefined, { placement: 'canvas' });
+    return { changedArtworkIds: [object.id], ...missingGlyphNoticeFields(report) };
+  });
+  showMissingGlyphsOnPc(report);
+  return receipt;
+}
+
+async function updateText(
+  args: Extract<RemoteWrite, { command: 'update_text' }>['args'],
+  state: AppState,
+  store: RemoteAppStore,
+  signal: AbortSignal,
+  commit: Commit,
+): Promise<Record<string, unknown>> {
+  const object = editableText(state, args.artworkId);
+  const prepared = await prepareTextEdit(state, object, args.patch, signal);
+  const report: MissingGlyphReport = {
+    fontKey: prepared.object.fontKey,
+    missing: prepared.missingCharacters,
+    embeddedFonts: state.project.embeddedFonts,
+    clientWording: args.patch.text !== undefined,
+  };
+  const receipt = commit(() => {
+    if (prepared.changedFields.length > 0)
+      store.getState().upsertTextObject(prepared.object, undefined, { placement: 'canvas' });
+    return {
+      changedArtworkIds: prepared.changedFields.length > 0 ? [object.id] : [],
+      changedFields: prepared.changedFields,
+      ...missingGlyphNoticeFields(report),
+    };
+  });
+  showMissingGlyphsOnPc(report);
+  return receipt;
+}
+
 // ADR-584: CNC workspaces create the same ordinary artwork; CNC defaults seed fresh layers.
 function addRectangle(
   store: RemoteAppStore,

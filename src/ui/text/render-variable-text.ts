@@ -41,6 +41,7 @@ export const renderVariableText: VariableTextRenderer = async ({ text, content, 
     if (placed.kind !== 'ok') throw new Error(placed.message);
     return {
       ...applyTextWeld(placed.rendered, text.fontKey, text.weldOverlaps),
+      ...missingReport(rendered),
       // The guide's transform is already baked into placed world-space paths.
       transform: { ...IDENTITY_TRANSFORM, x: placed.origin.x, y: placed.origin.y },
     };
@@ -53,8 +54,12 @@ export const renderVariableText: VariableTextRenderer = async ({ text, content, 
         text.weldOverlaps,
       ),
       transform: text.transform,
+      ...missingReport(rendered),
     };
-  return applyTextWeld(styledBentRender(rendered, text), text.fontKey, text.weldOverlaps);
+  return {
+    ...applyTextWeld(styledBentRender(rendered, text), text.fontKey, text.weldOverlaps),
+    ...missingReport(rendered),
+  };
 };
 
 // Styled but not yet bent or laid on a path.
@@ -108,4 +113,13 @@ function templateBaseline(text: TextObject, project: Project): Promise<TemplateB
     if (oldest.done !== true) templateBaselines.delete(oldest.value);
   }
   return pending;
+}
+
+// ADR-591 Amendment 1: output warns about a record's characters the font has no glyph for.
+function missingReport(rendered: TextRenderResult): {
+  readonly missingCharacters?: readonly string[];
+} {
+  return rendered.missingCharacters === undefined
+    ? {}
+    : { missingCharacters: rendered.missingCharacters };
 }

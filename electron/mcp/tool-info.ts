@@ -70,7 +70,7 @@ export const mcpToolInfo: Record<KerfDeskMcpCommand, { title: string; descriptio
   add_text: {
     title: 'Add text artwork',
     description:
-      'Add text in a Laser workspace, in millimetres. Choose an optional bundled fontId from list_fonts; otherwise use the regular default. widthMm is a maximum layout width: overflowing text shrinks uniformly. Requires expectedRevision and UUID requestId; the desktop owns admission and Undo.',
+      "Add text in a Laser workspace, in millimetres. Choose an optional bundled fontId from list_fonts; otherwise use the regular default. widthMm is a maximum layout width: overflowing text shrinks uniformly. Overlapping letters are welded, as in new desktop text. notices names any character the font has no glyph for, which engraves as the font's box or not at all; tell the user. Requires expectedRevision and UUID requestId; the desktop owns admission and Undo.",
   },
   add_rectangle: {
     title: 'Add rectangle artwork',
@@ -100,7 +100,7 @@ export const mcpToolInfo: Record<KerfDeskMcpCommand, { title: string; descriptio
   update_text: {
     title: 'Edit existing text artwork',
     description:
-      'Edit ordinary text, bundled fontId, fontSizeMm, alignment, lineHeight or letterSpacing. Path and variable text are outside this tool. Requires artworkId, expectedRevision and UUID requestId; preserves ordinary desktop admission and Undo.',
+      'Edit ordinary text, bundled fontId, fontSizeMm, alignment, lineHeight or letterSpacing. Path and variable text are outside this tool. The text keeps its desktop style, text box and weld. notices names any character of the new wording the font has no glyph for, or counts them when only other fields changed; tell the user. Requires artworkId, expectedRevision and UUID requestId; preserves ordinary desktop admission and Undo.',
   },
   arrange_artwork: {
     title: 'Arrange existing artwork',
@@ -170,7 +170,7 @@ export const mcpToolInfo: Record<KerfDeskMcpCommand, { title: string; descriptio
   apply_edits: {
     title: 'Apply several edits as one Undo step',
     description:
-      'Apply up to 40 ordered edits atomically: all succeed as one Undo step or none apply. Each item is {command, args} using add_text, add_rectangle, add_ellipse, add_polyline, add_svg, transform_artwork, arrange_artwork, set_selection, update_operation, create_operation, assign_artwork_to_operation or apply_material_recipe, without expectedRevision/requestId. Refer to artwork or an operation created by an earlier item as "$<index>", e.g. "$0". Each results item carries that edit\'s message and import notices, such as the cutting values a bit change kept; tell the user about each. Requires expectedRevision and UUID requestId for the batch.',
+      'Apply up to 40 ordered edits atomically: all succeed as one Undo step or none apply. Each item is {command, args} using add_text, add_rectangle, add_ellipse, add_polyline, add_svg, transform_artwork, arrange_artwork, set_selection, update_operation, create_operation, assign_artwork_to_operation or apply_material_recipe, without expectedRevision/requestId. Refer to artwork or an operation created by an earlier item as "$<index>", e.g. "$0". Each results item carries that edit\'s message and notices, such as the cutting values a bit change kept, an import\'s warnings or a character a text\'s font has no glyph for; tell the user about each. Requires expectedRevision and UUID requestId for the batch.',
   },
   ...mcpMachineToolInfo,
 };

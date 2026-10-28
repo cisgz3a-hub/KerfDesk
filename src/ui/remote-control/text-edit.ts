@@ -1,10 +1,8 @@
 import type { AppState } from '../state/store';
 import { findFontEntry } from '../../core/text';
-import { styledBentRender, styledTextContent } from '../../core/text/text-style';
 import type { TextObject } from '../../core/scene';
 import { transformedBBox } from '../../core/scene/hit-test';
-import { renderTextGeometry } from '../text/render-text-geometry';
-import { applyTextWeldInWorker } from '../text/text-weld-worker-client';
+import { renderStyledText } from '../text/render-styled-text';
 import { editableArtwork } from './transforms';
 import { remoteBounds } from './projections';
 import { RemoteFault } from './fault';
@@ -21,12 +19,19 @@ export function editableText(state: AppState, artworkId: string): TextObject {
   return object;
 }
 
+export type PreparedTextEdit = {
+  readonly object: TextObject;
+  readonly changedFields: readonly string[];
+  /** Characters the edited text's font has no glyph for (ADR-591 Amendment 1). */
+  readonly missingCharacters: readonly string[];
+};
+
 export async function prepareTextEdit(
   state: AppState,
   object: TextObject,
   patch: RemoteTextPatch,
   signal: AbortSignal,
-): Promise<{ readonly object: TextObject; readonly changedFields: readonly string[] }> {
+): Promise<PreparedTextEdit> {
   signal.throwIfAborted();
   const content = (patch.text ?? object.content).normalize('NFC');
   if (content.trim() === '' || content.length > 4096) throw new RemoteFault('invalid_arguments');
@@ -44,25 +49,21 @@ export async function prepareTextEdit(
   const changedFields = (Object.keys(patch) as (keyof RemoteTextPatch)[]).filter(
     (key) => fields[key] !== previous[key],
   );
-  if (changedFields.length === 0) return { object, changedFields };
-  const rendered = await renderTextGeometry({
-    fontKey,
-    embeddedFonts: state.project.embeddedFonts,
-    content: styledTextContent(content, object.textStyle),
-    sizeMm: fields.fontSizeMm,
-    alignment: fields.alignment,
-    lineHeight: fields.lineHeight,
-    letterSpacing: fields.letterSpacing,
-    color: object.color,
-  });
-  signal.throwIfAborted();
-  const final = await applyTextWeldInWorker(
-    styledBentRender(rendered, { ...object, sizeMm: fields.fontSizeMm }),
-    fontKey,
-    object.weldOverlaps,
+  if (changedFields.length === 0) return { object, changedFields, missingCharacters: [] };
+  // ADR-321 Amendment 1: the text keeps its style, text box and weld, as a desktop edit does.
+  const final = await renderStyledText(
+    {
+      ...object,
+      fontKey,
+      sizeMm: fields.fontSizeMm,
+      alignment: fields.alignment,
+      lineHeight: fields.lineHeight,
+      letterSpacing: fields.letterSpacing,
+    },
+    content,
+    state.project.embeddedFonts,
     signal,
   );
-  signal.throwIfAborted();
   const next: TextObject = {
     ...object,
     content,
@@ -79,7 +80,7 @@ export async function prepareTextEdit(
   };
   if (remoteBounds(transformedBBox(next)) === undefined)
     throw new RemoteFault('unsupported_operation');
-  return { object: next, changedFields };
+  return { object: next, changedFields, missingCharacters: final.missingCharacters ?? [] };
 }
 
 function nextTextFields(object: TextObject, patch: RemoteTextPatch, text: string, fontId: string) {
