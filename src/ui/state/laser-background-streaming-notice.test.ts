@@ -64,15 +64,15 @@ describe('background streaming fallback notice', () => {
   it('asks a browser operator to keep KerfDesk visible and records the fallback', async () => {
     await connectThrough('web', true);
     expect(warnings()).toEqual([expect.stringContaining('Keep KerfDesk visible')]);
-    expect(warnings()[0]).toContain('the beam stays on over the stopped head');
+    expect(warnings()[0]).toContain('stop the head with a constant-power beam on');
     expect(useLaserStore.getState().log).toContain(BACKGROUND_STREAMING_FALLBACK_LOG);
     expect(useLaserStore.getState().jobStreamHost).toBe('window');
   });
 
   it('shows the desktop fallback too, naming the lit stop but not visibility', async () => {
     await connectThrough('electron', true, { controllerKind: 'marlin' });
-    expect(warnings()).toEqual([expect.stringContaining('sends the job from its window')]);
-    expect(warnings()[0]).toContain('the beam stays on over the stopped head');
+    expect(warnings()).toEqual([expect.stringContaining('Job Review flags affected jobs')]);
+    expect(warnings()[0]).toContain('stop the head with a constant-power beam on');
     expect(warnings()[0]).not.toContain('Keep KerfDesk visible');
     expect(useLaserStore.getState().log).toContain(BACKGROUND_STREAMING_FALLBACK_LOG);
   });

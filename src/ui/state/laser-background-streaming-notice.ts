@@ -30,15 +30,12 @@ export const BACKGROUND_STREAMING_FALLBACK_LOG =
 export const BACKGROUND_STREAMING_OFF_LOG =
   '[lf2] Background streaming is off in Machine Setup; sending runs in the KerfDesk window.';
 
-const LIT_STOP_RISK =
-  'If the window is busy (a large edit, Undo or import), the controller can run out of moves and stop, and with constant power the beam stays on over the stopped head. Job Review says whether a job is affected.';
-
-/** The connect notice for that fallback. */
+/** The connect notice for that fallback. Kept short: the toast stack is a
+ * few lines tall, and Job Review explains the lit stop for each job. */
 export function backgroundStreamingFallbackWarning(host: Host): string {
-  const visible = hiddenWindowPausesSending(host)
-    ? ' Keep KerfDesk visible while sending the job.'
-    : '';
-  return `Background streaming is unavailable for this connection, so KerfDesk sends the job from its window.${visible} ${LIT_STOP_RISK}`;
+  return hiddenWindowPausesSending(host)
+    ? 'Background streaming is unavailable: a busy or hidden window can stop the head with a constant-power beam on. Keep KerfDesk visible.'
+    : 'Background streaming is unavailable: a busy window can stop the head with a constant-power beam on. Job Review flags affected jobs.';
 }
 
 /** Machine Setup's hint for the Background streaming preference. */
