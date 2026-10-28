@@ -119,7 +119,37 @@ export function useDesignPointer(
 
   const onDoubleClick = usePointSequenceDoubleClick(newEntityId);
 
-  return { onPointerDown, onPointerMove, onPointerUp, onPointerLeave, onDoubleClick };
+  // A pointer the system takes away (palm rejection, a system gesture) never
+  // sends pointerup, so the gesture used to stay open with no Undo step.
+  const onPointerCancel = useCallback((event: React.PointerEvent<HTMLCanvasElement>) => {
+    releasePointer(event.currentTarget, event.pointerId);
+    endInterruptedGesture(true);
+  }, []);
+  const onLostPointerCapture = useCallback(() => endInterruptedGesture(false), []);
+
+  return {
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    onPointerCancel,
+    onLostPointerCapture,
+    onPointerLeave,
+    onDoubleClick,
+  };
+}
+
+// A move or resize ends as its one Undo step where the pointer last was. A
+// cancelled draft or marquee is dropped: nobody released it, so nothing is
+// drawn or selected.
+function endInterruptedGesture(dropUnreleased: boolean): void {
+  const store = useDesignStudioStore.getState();
+  const session = store.session;
+  if (session === null) return;
+  if (session.resize !== null) return store.endResize();
+  if (session.move !== null) return store.endMove();
+  if (!dropUnreleased) return;
+  if (session.draft !== null) store.setDraft(null);
+  if (session.marquee !== null) store.setMarquee(null);
 }
 
 function usePointSequenceDoubleClick(

@@ -16,6 +16,7 @@ import {
 } from './design-session-storage';
 import { restoreProjectDesignSession } from './project-design-session';
 import { designRecoveryOwner } from './design-recovery-owner';
+import { clearKeptDesignDrawings, readKeptDesignDrawings } from './design-kept-drawings';
 
 const sketch: Sketch = {
   layers: [DEFAULT_DESIGN_LAYER],
@@ -55,6 +56,7 @@ function appliedProject() {
 beforeEach(() => {
   resetStore();
   clearPersistedSession();
+  clearKeptDesignDrawings();
   useDesignStudioStore.setState({ session: null, stash: null, documentEpoch: -1 });
 });
 
@@ -87,6 +89,8 @@ describe('project-owned vector source', () => {
     expect(readPersistedSession()?.sketch).toEqual(sketch);
     expect(readPersistedSession()?.projectOwner).toBe(owner);
   });
+  // ADR-590 Amendment 1: another revision does not open the draft, but keeps it
+  // instead of writing over it, and the draft returns with its own revision.
   it('recovers unapplied work only for the exact saved project authoring revision', async () => {
     const project = appliedProject();
     const draft = {
@@ -131,8 +135,16 @@ describe('project-owned vector source', () => {
         (entity) => entity.id === 'draft-line',
       ),
     ).toBe(false);
+    expect(readPersistedSession()).toBeNull();
+    expect(readKeptDesignDrawings().map((kept) => kept.sketch)).toEqual([draft]);
     useStore.setState({ project: createProject(), projectDocumentEpoch: 0 });
     expect(sessionSketch(useDesignStudioStore.getState().session!).entities).toHaveLength(0);
+
+    useStore.setState({ project: reopened.project, projectDocumentEpoch: 3 });
+    await useDesignStudioStore.getState().openStudio();
+    expect(sessionSketch(useDesignStudioStore.getState().session!)).toEqual(draft);
+    expect(useDesignStudioStore.getState().session!.dirtySinceApply).toBe(true);
+    expect(readKeptDesignDrawings()).toEqual([]);
   });
 
   it('does not match independently created same-shape artwork with different persisted IDs', async () => {

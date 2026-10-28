@@ -159,6 +159,21 @@ export function restoreDesignSession(saved: PersistedDesignSession): DesignSessi
   });
 }
 
+/** The durable slice of a session, as the saved and kept drawings hold it. */
+export function persistedDesignSession(
+  session: DesignSession,
+  projectOwner: string | undefined,
+): PersistedDesignSession {
+  return {
+    ...(projectOwner === undefined ? {} : { projectOwner }),
+    sketch: sessionSketch(session),
+    activeLayerId: session.activeLayerId,
+    surface3d: session.surface3d,
+    applied: session.applied,
+    dirtySinceApply: session.dirtySinceApply,
+  };
+}
+
 // The single place a sketch change enters the session, so "dirty" and history
 // can never disagree.
 export function withSketch(session: DesignSession, next: Sketch): DesignSession {

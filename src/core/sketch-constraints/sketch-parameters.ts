@@ -4,6 +4,10 @@ export type SketchParameterResult =
   | { readonly kind: 'ok'; readonly values: ReadonlyMap<string, Quantity> }
   | { readonly kind: 'error'; readonly reason: string };
 
+/** One expression token: a bracketed name, a number, a name or an operator. */
+export const SKETCH_EXPRESSION_TOKEN =
+  /\[[A-Za-z_][A-Za-z_0-9-]*\]|(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?|[A-Za-z_][A-Za-z_0-9]*|[()+*/-]/gi;
+
 /** Small arithmetic parser, never JavaScript eval. Bare numbers are scalar ratios. */
 export function resolveSketchParameters(
   parameters: ReadonlyArray<NamedSketchParameter>,
@@ -55,10 +59,7 @@ export function sketchLength(value: SketchValue, values: ReadonlyMap<string, Qua
 }
 function parseExpression(expression: string, resolve: (name: string) => Quantity): Quantity {
   if (expression.length > 512) throw new Error('Parameter expression exceeds 512 characters.');
-  const tokens =
-    expression.match(
-      /\[[A-Za-z_][A-Za-z_0-9-]*\]|(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?|[A-Za-z_][A-Za-z_0-9]*|[()+*/-]/gi,
-    ) ?? [];
+  const tokens = expression.match(SKETCH_EXPRESSION_TOKEN) ?? [];
   if (tokens.join('') !== expression.replace(/\s+/g, ''))
     throw new Error('Unsupported parameter expression.');
   if (tokens.length > 256) throw new Error('Parameter expression exceeds its token budget.');

@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useStore } from '../state';
 import { installUnsavedChangesGuard, shouldWarnBeforeUnload } from './use-unsaved-changes-guard';
+import { useDesignStudioStore } from '../design-studio/design-studio-store';
+import {
+  createDesignSession,
+  markSessionApplied,
+  withSketch,
+} from '../design-studio/design-session';
 
 describe('shouldWarnBeforeUnload', () => {
   it('warns only when there are unsaved changes and no job is running', () => {
@@ -61,6 +67,31 @@ describe('installUnsavedChangesGuard', () => {
 
     expect(event.preventDefault).not.toHaveBeenCalled();
     cleanup();
+  });
+
+  // ADR-590 Amendment 1: a Design Studio drawing not yet applied is unsaved work.
+  it('blocks unload when only the Design Studio holds a drawing not yet applied', () => {
+    useStore.setState({ dirty: false });
+    const epoch = useStore.getState().projectDocumentEpoch;
+    const drawing = withSketch(createDesignSession(), {
+      entities: [{ id: 'line', kind: 'line', start: { x: 0, y: 0 }, end: { x: 10, y: 0 } }],
+    });
+    useDesignStudioStore.setState({ documentEpoch: epoch, session: null, stash: drawing });
+    const { target, fire } = fakeWindow();
+    const cleanup = installUnsavedChangesGuard(target);
+    try {
+      const event = fakeEvent();
+      fire(event);
+      expect(event.preventDefault).toHaveBeenCalledTimes(1);
+
+      useDesignStudioStore.setState({ stash: markSessionApplied(drawing, null) });
+      const applied = fakeEvent();
+      fire(applied);
+      expect(applied.preventDefault).not.toHaveBeenCalled();
+    } finally {
+      cleanup();
+      useDesignStudioStore.setState({ documentEpoch: -1, session: null, stash: null });
+    }
   });
 
   it('removes its listener on cleanup', () => {

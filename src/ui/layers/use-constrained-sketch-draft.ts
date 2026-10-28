@@ -4,12 +4,15 @@ import type {
   SketchSolveResult,
 } from '../../core/sketch-constraints/constrained-sketch';
 import { defaultConstrainedSketch } from '../../core/sketch-constraints/default-constrained-sketch';
+import { editableConstrainedSketch } from '../../core/sketch-constraints/scale-constrained-sketch';
 import type { ImportedSvg } from '../../core/scene';
 import { useStore } from '../state';
 import type { ConstrainedSketchReview } from '../state/constrained-sketch-actions';
 export function useConstrainedSketchDraft(object: ImportedSvg | undefined, onClose: () => void) {
   const [sketch, setSketch] = useState<ConstrainedSketch2d>(
-    () => object?.constrainedSketch ?? defaultConstrainedSketch(),
+    () =>
+      (object === undefined ? undefined : editableConstrainedSketch(object)) ??
+      defaultConstrainedSketch(),
   );
   const [review, setReview] = useState<ConstrainedSketchReview | null>(null);
   const [result, setResult] = useState<SketchSolveResult | null>(null),
@@ -25,7 +28,9 @@ export function useConstrainedSketchDraft(object: ImportedSvg | undefined, onClo
     setError('');
   }
   function solve(): void {
-    const prepared = useStore.getState().reviewConstrainedSketch(sketch, object?.id);
+    const prepared = useStore
+      .getState()
+      .reviewConstrainedSketch(sketch, object?.id, object?.transform);
     if (prepared.kind === 'invalid') {
       setError(prepared.reason);
       setResult(prepared.result ?? null);

@@ -45,6 +45,8 @@ export function DesignViewport3D({
         onPointerDown={pointer.onPointerDown}
         onPointerMove={pointer.onPointerMove}
         onPointerUp={pointer.onPointerUp}
+        onPointerCancel={pointer.onPointerCancel}
+        onLostPointerCapture={pointer.onLostPointerCapture}
         onPointerLeave={pointer.onPointerLeave}
         onDoubleClick={pointer.onDoubleClick}
       />

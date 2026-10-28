@@ -13,7 +13,10 @@
 //
 // Storage is best-effort in both directions. A quota error, a private-mode
 // throw, or a corrupt payload costs the restore, never the session (rule 7:
-// nothing here may block drawing).
+// nothing here may block drawing). One thing is not best-effort: a drawing
+// this page did not open is never written over. Opening the Studio on another
+// project moves it to the kept drawings first (ADR-590 Amendment 1), and if
+// that move fails the slot is held for the rest of the page.
 
 import type { Sketch } from '../../core/design';
 import type { DesignApplyRecord } from '../state/design-apply-record';
@@ -24,7 +27,7 @@ const PERSISTED_VERSION = 1;
 // A sketch is hand-drawn geometry, so it is small; a runaway freehand path is
 // the only realistic way to approach a storage quota. Past this the drawing
 // simply is not persisted — writing a truncated sketch would be worse.
-const MAX_PERSISTED_CHARS = 2_000_000;
+export const MAX_PERSISTED_CHARS = 2_000_000;
 
 export type PersistedDesignSession = {
   readonly projectOwner?: string;
@@ -35,7 +38,7 @@ export type PersistedDesignSession = {
   readonly dirtySinceApply?: boolean;
 };
 
-type StoredShape = {
+export type StoredShape = {
   readonly projectOwner?: string;
   readonly version: number;
   readonly sketch: Sketch;
@@ -47,28 +50,17 @@ type StoredShape = {
   readonly appliedOperationsByLayer?: ReadonlyArray<readonly [string, string]>;
 };
 
+let slotHeld = false;
+
+/** Keeps a drawing that could not be moved aside from being written over. */
+export function holdPersistedSession(): void {
+  slotHeld = true;
+}
+
 export function writePersistedSession(session: PersistedDesignSession): void {
   try {
-    if (typeof localStorage === 'undefined') return;
-    const stored: StoredShape = {
-      version: PERSISTED_VERSION,
-      ...(session.projectOwner === undefined ? {} : { projectOwner: session.projectOwner }),
-      sketch: session.sketch,
-      activeLayerId: session.activeLayerId,
-      surface3d: session.surface3d,
-      ...(session.dirtySinceApply === undefined
-        ? {}
-        : { dirtySinceApply: session.dirtySinceApply }),
-      ...(session.applied === null
-        ? {}
-        : {
-            appliedObjectIds: [...session.applied.objectIds],
-            appliedOperationsByLayer: [...session.applied.operationIdByLayerId].map(
-              ([layerId, operationId]) => [layerId, operationId] as const,
-            ),
-          }),
-    };
-    const payload = JSON.stringify(stored);
+    if (typeof localStorage === 'undefined' || slotHeld) return;
+    const payload = JSON.stringify(storedDesignSession(session));
     if (payload.length > MAX_PERSISTED_CHARS) return;
     localStorage.setItem(STORAGE_KEY, payload);
   } catch {
@@ -76,18 +68,38 @@ export function writePersistedSession(session: PersistedDesignSession): void {
   }
 }
 
+export function storedDesignSession(session: PersistedDesignSession): StoredShape {
+  return {
+    version: PERSISTED_VERSION,
+    ...(session.projectOwner === undefined ? {} : { projectOwner: session.projectOwner }),
+    sketch: session.sketch,
+    activeLayerId: session.activeLayerId,
+    surface3d: session.surface3d,
+    ...(session.dirtySinceApply === undefined ? {} : { dirtySinceApply: session.dirtySinceApply }),
+    ...(session.applied === null
+      ? {}
+      : {
+          appliedObjectIds: [...session.applied.objectIds],
+          appliedOperationsByLayer: [...session.applied.operationIdByLayerId].map(
+            ([layerId, operationId]) => [layerId, operationId] as const,
+          ),
+        }),
+  };
+}
+
 export function readPersistedSession(): PersistedDesignSession | null {
   try {
     if (typeof localStorage === 'undefined') return null;
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw === null) return null;
-    return fromStored(JSON.parse(raw) as unknown);
+    return persistedFromStored(JSON.parse(raw) as unknown);
   } catch {
     return null;
   }
 }
 
 export function clearPersistedSession(): void {
+  slotHeld = false;
   try {
     if (typeof localStorage !== 'undefined') localStorage.removeItem(STORAGE_KEY);
   } catch {
@@ -97,7 +109,7 @@ export function clearPersistedSession(): void {
 
 // Untrusted input: anything shaped wrong reads as "no saved drawing" rather
 // than throwing into the open path.
-function fromStored(value: unknown): PersistedDesignSession | null {
+export function persistedFromStored(value: unknown): PersistedDesignSession | null {
   if (typeof value !== 'object' || value === null) return null;
   const stored = value as Partial<StoredShape>;
   if (stored.version !== PERSISTED_VERSION) return null;
