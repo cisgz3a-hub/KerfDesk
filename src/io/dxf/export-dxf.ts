@@ -43,7 +43,7 @@ export function exportSceneDxf(
   for (const object of vectors) {
     const matrix = svgObjectMatrix(object.transform);
     for (const path of object.paths) {
-      // ADR-678: one DXF layer per operation colour, as LightBurn reads it.
+      // ADR-681: one DXF layer per operation colour, as LightBurn reads it.
       const operation = exportOperationForPath(project, object, path);
       const color = exportPathColor(operation, path).toLowerCase();
       const bucket = byColor.get(color) ?? [];

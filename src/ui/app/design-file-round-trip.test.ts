@@ -1,4 +1,4 @@
-// Rolling v7 L7-P1-1 / L7-P2-1 (ADR-678): artwork exported as SVG or DXF and
+// Rolling v7 L7-P1-1 / L7-P2-1 (ADR-681): artwork exported as SVG or DXF and
 // imported back burns what it burned before, and keeps one colour per
 // operation. Each case goes through the real exporter, parser, store import
 // and compiler; the burned area is the hatch length times its spacing.

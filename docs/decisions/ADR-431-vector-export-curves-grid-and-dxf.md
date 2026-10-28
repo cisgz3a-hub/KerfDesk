@@ -238,7 +238,7 @@ default for an unknown preset, unchanged preset defaults, the notice). The whole
 
 ### Amendment: export colours are operation colours (2026-10-28)
 
-ADR-678 item 1: SVG, DXF and the ADR-468 formats write each path in the colour of the operation it
+ADR-681 item 1: SVG, DXF and the ADR-468 formats write each path in the colour of the operation it
 is exported under, not the colour stored on the path, so DXF has one layer per operation colour
-and distinct operations stay distinct in the file (rolling audit v7 L7-P2-1). ADR-678 item 2
+and distinct operations stay distinct in the file (rolling audit v7 L7-P2-1). ADR-681 item 2
 writes a Fill operation of two or more objects as one even-odd SVG path, the region it burns.

@@ -249,8 +249,8 @@ endpoint-only outline.
 
 Item 1's "Items are never merged" made the painted file disagree with the burn: the compiler pools
 every object on a Fill operation even-odd, so a shape inside another is a hole (ADR-486 Amendment
-2), while separate filled items paint the union. Under ADR-678 item 2, a Fill operation of two or
+2), while separate filled items paint the union. Under ADR-681 item 2, a Fill operation of two or
 more objects is one even-odd filled item holding its objects' contours (or, for an object whose own
 contours overlap, the region the compiler resolves for it); a single object keeps its per-path
 items. Items of different operations are still never merged, so two overlapping objects on
-different operations do not cancel. Every item takes its operation's colour (ADR-678 item 1).
+different operations do not cancel. Every item takes its operation's colour (ADR-681 item 1).

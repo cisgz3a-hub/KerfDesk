@@ -1,5 +1,5 @@
 // Which operation an artwork export writes a path under, in which colour, and
-// how a Fill operation's objects become the one region they burn (ADR-678).
+// how a Fill operation's objects become the one region they burn (ADR-681).
 //
 // Colour: LightBurn's model is "colour is the layer", so a path is written in
 // the colour of the operation it burns on, not the colour it happened to be

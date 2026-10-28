@@ -60,7 +60,7 @@ export type SvgVectorElement = { readonly markup: string; readonly bounds: Bound
 
 /**
  * One path of an object. A `pooled` path's closed contours are written by its
- * operation's fill compound instead (ADR-678); its open contours stay here.
+ * operation's fill compound instead (ADR-681); its open contours stay here.
  */
 export function vectorPathElement(
   object: VectorObject,
@@ -93,7 +93,7 @@ export function vectorPathElement(
   };
 }
 
-/** A Fill operation's pooled region as one even-odd path in world millimetres (ADR-678). */
+/** A Fill operation's pooled region as one even-odd path in world millimetres (ADR-681). */
 export function fillCompoundElement(
   compound: FillCompound,
   options: SvgVectorOptions,

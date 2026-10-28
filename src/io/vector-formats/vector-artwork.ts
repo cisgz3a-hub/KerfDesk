@@ -6,7 +6,7 @@
 // of a line/centreline layer), in its operation's colour. Items of different
 // operations stay separate, so two overlapping objects of one colour never
 // cancel; a Fill operation of several objects is one even-odd item, the
-// region it burns (ADR-678).
+// region it burns (ADR-681).
 //
 // Placement: each writer maps the scene frame to a Y-up page whose lower-left
 // corner is (0, 0). The grid page is the exact artwork extent by default, or
