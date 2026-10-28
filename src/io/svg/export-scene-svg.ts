@@ -22,7 +22,9 @@ import {
 import { formatSvgPathData } from '../../core/vector-export/svg-path-data';
 import { svgMatrixAttribute, svgNumber, xmlText } from './export-svg-paths';
 import {
+  planExportColors,
   planFillCompounds,
+  type ExportColors,
   type FillCompound,
   type FillCompoundPlan,
 } from './export-fill-compounds';
@@ -32,6 +34,7 @@ import { SVG_ARTWORK_ORIGIN_ATTRIBUTE, svgArtworkOriginValue } from './svg-artwo
 const MIN_PAGE_EXTENT_MM = 0.01;
 
 type SvgElement = { readonly markup: string; readonly bounds: Bounds };
+type ExportPlan = { readonly compounds: FillCompoundPlan; readonly colors: ExportColors };
 export type SvgArtworkExport = { readonly svg: string; readonly objectCount: number };
 
 export type SceneSvgExportOptions = {
@@ -67,13 +70,16 @@ export function exportSceneSvg(
   if (relief !== undefined)
     return err('SVG cannot contain a 3D relief. Select only vector and image artwork.');
   try {
-    const plan = planFillCompounds(project, objects);
+    const plan: ExportPlan = {
+      compounds: planFillCompounds(project, objects),
+      colors: planExportColors(project, objects),
+    };
     let compoundIndex = 0;
     const elements = objects.flatMap((object, index) => [
       exportObject(object, index, project, options, plan),
       // A Fill operation of several objects is written once, after its first member.
-      ...(plan.atObject.get(index) ?? []).map((compound) =>
-        exportFillCompound(compound, compoundIndex++, options),
+      ...(plan.compounds.atObject.get(index) ?? []).map((compound) =>
+        exportFillCompound(compound, compoundIndex++, options, plan.colors),
       ),
     ]);
     const page = pageBox(
@@ -145,12 +151,15 @@ function exportObject(
   index: number,
   project: Project,
   options: SvgVectorOptions,
-  plan: FillCompoundPlan,
+  plan: ExportPlan,
 ): SvgElement {
   if (object.kind === 'raster-image') return exportImage(object, index, project);
   if (object.kind === 'relief') throw new Error('A 3D relief cannot be represented in SVG.');
   const elements = object.paths.map((path, pathIndex) =>
-    vectorPathElement(object, path, project, options, plan.pooled(object, pathIndex)),
+    vectorPathElement(object, path, project, options, {
+      color: plan.colors.ofPath(object, path),
+      pooled: plan.compounds.pooled(object, pathIndex),
+    }),
   );
   if (elements.length === 0) throw new Error('Artwork ' + object.id + ' contains no paths.');
   const drawn = elements.flatMap((element) => (element.bounds === null ? [] : [element.bounds]));
@@ -176,8 +185,9 @@ function exportFillCompound(
   compound: FillCompound,
   index: number,
   options: SvgVectorOptions,
+  colors: ExportColors,
 ): SvgElement {
-  const element = fillCompoundElement(compound, options);
+  const element = fillCompoundElement(compound, colors.ofOperation(compound.operation), options);
   if (element.bounds === null) throw new Error('Artwork contains no exportable points.');
   return {
     markup:

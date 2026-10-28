@@ -3,7 +3,7 @@
 // Every writer receives the same painted items: world millimetres in the
 // scene frame (Y down), one item per artwork path, each either filled (closed
 // contours, with its fill rule) or stroked (open contours, and every contour
-// of a line/centreline layer), in its operation's colour. Items of different
+// of a line/centreline layer), one colour per operation. Items of different
 // operations stay separate, so two overlapping objects of one colour never
 // cancel; a Fill operation of several objects is one even-odd item, the
 // region it burns (ADR-681).
@@ -43,7 +43,7 @@ import { filledCurvesKept } from './collapsed-ring-subtrees';
 import {
   exportOperationFills,
   exportOperationForPath,
-  exportPathColor,
+  planExportColors,
   planFillCompounds,
 } from '../svg/export-fill-compounds';
 import { svgObjectMatrix } from '../svg/export-svg-paths';
@@ -338,6 +338,7 @@ export function sceneVectorArtwork(
   if (vectors.length === 0) return err(VECTOR_ONLY_MESSAGE);
   const items: VectorPaintItem[] = [];
   const plan = planFillCompounds(project, vectors);
+  const colors = planExportColors(project, vectors);
   for (const [index, object] of vectors.entries()) {
     const matrix = svgObjectMatrix(object.transform);
     for (const [pathIndex, path] of object.paths.entries()) {
@@ -348,11 +349,11 @@ export function sceneVectorArtwork(
       const operation = exportOperationForPath(project, object, path);
       const fillRule: VectorFillRule =
         path.fillRule ?? (object.kind === 'text' ? 'nonzero' : 'evenodd');
-      const color = exportPathColor(operation, path);
+      const color = colors.ofPath(object, path);
       pushSplit(items, color, exportOperationFills(operation, object), fillRule, curves);
     }
     for (const compound of plan.atObject.get(index) ?? []) {
-      pushSplit(items, compound.operation.color, true, 'evenodd', compound.curves);
+      pushSplit(items, colors.ofOperation(compound.operation), true, 'evenodd', compound.curves);
     }
   }
   if (items.length === 0) return err('There is no vector geometry to write.');

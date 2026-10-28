@@ -46,12 +46,20 @@ project are unchanged: only exported files, the import toast and pasted tab anch
 
 ### Decision
 
-1. **Every artwork export writes a path in the colour of the operation it is exported under**
-   (`io/svg/export-fill-compounds.ts`): the first scene operation the path uses, the same
-   operation whose effective mode decides fill or stroke. A path on no operation keeps its own
-   colour. SVG, DXF (one layer per operation colour), PDF, AI, EPS and GeoJSON all follow.
-   Operations that share a colour still share it in the file; a file has no other way to name a
-   layer.
+1. **Every artwork export writes one colour per operation** (`planExportColors` in
+   `io/svg/export-fill-compounds.ts`). A path's operation is the first scene operation it uses,
+   the same one whose effective mode decides fill or stroke.
+   - A path keeps its own colour while that colour names its operation alone in this export: all
+     of the operation's paths carry it and no other operation's path does. An imported SVG
+     (the import gives each of its colours its own operation) and a LightBurn layer stay as authored,
+     so ADR-358's "native SVG rendering is unchanged" still holds for a re-export.
+   - Otherwise the operation's paths are written in the operation's own colour: an operation
+     whose paths carry several colours (Assign selection to operation), or a colour shared by two
+     operations (shapes drawn in the first operation's colour).
+   - If that would leave two operations with one colour, every operation is written in its own
+     colour. A path on no operation keeps its colour; operations that themselves share a colour
+     still share it, since a file has no other way to name a layer.
+   - SVG, DXF (one layer per operation), PDF, AI, EPS and GeoJSON all follow.
 2. **A Fill operation holding two or more objects is written as one even-odd compound path**, in
    world millimetres, at the place of its first object (SVG `<g id="fill-N">` titled with the
    operation's name; one filled item in PDF, AI, EPS and GeoJSON). Its open contours stay strokes
@@ -87,9 +95,12 @@ project are unchanged: only exported files, the import toast and pasted tab anch
 and `sceneVectorArtwork`, imports through `parseSvg` / `parseDxf` and the store's
 `importSvgFragment` / `importSvgObject`, and measures the compiled hatch: the ring, an "O"-shaped
 non-zero knock-out and an overlapping non-zero knock-out burn the same area after the round trip,
-three drawn operations export as three colours, and the drawn plate with its circle Assigned to
-it keeps its hole through SVG and DXF. On the previous exporters all six cases fail (1200 mm²
-burned; colours `#000000`, `#2563eb`, `#2563eb`). `src/ui/state/laser-tab-actions.test.ts` pastes
+three drawn operations export as three colours, the drawn plate with its circle Assigned to it
+keeps its hole through SVG and DXF, and an imported two-colour SVG re-exports in its own
+colours. On the previous exporters the first six cases fail (1200 mm² burned; colours `#000000`,
+`#2563eb`, `#2563eb`). `e2e/composed-svg-roundtrip.e2e.ts` compares the browser's rendering of
+re-exported Illustrator, Inkscape and KerfDesk compositions with their sources, colours included;
+writing every operation's palette colour broke it, which is why item 1 keeps authored colours. `src/ui/state/laser-tab-actions.test.ts` pastes
 a tabbed part whose path colour equals its operation colour into another project and inserts it
 from Saved Artwork into this project and a new one; the laser tab still counts and both the laser
 and CNC anchors resolve to the same outline points.

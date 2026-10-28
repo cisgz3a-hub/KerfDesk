@@ -1348,8 +1348,10 @@ that owns those fields, without changing the existing Frame/Start policy.
    Machine settings and generated toolpaths are excluded; the production cursor does not advance.
    Vector coordinates are rounded so each point lies within half a 0.001 mm grid diagonal of its
    true position, and the page is the exact extent of the drawn curves, not their control points
-   (ADR-431). Each path is written in the colour of the operation it burns on, so operations stay
-   distinct in the file, and a Fill operation holding two or more objects is written as one
+   (ADR-431). The file has one colour per operation: a path keeps its own colour while that colour
+   names its operation alone (imported artwork re-exports as authored), and otherwise takes the
+   operation's colour, so operations stay distinct in the file and **Assign selection to
+   operation** reaches it. A Fill operation holding two or more objects is written as one
    even-odd path, the region it burns: a shape drawn inside another on that operation stays a hole
    in the file and after re-import (ADR-681).
 3. Cancellation writes nothing. Missing image pixels, unsupported 3D relief or invalid geometry
@@ -1371,7 +1373,8 @@ that owns those fields, without changing the existing Frame/Start policy.
 
 1. **File → Export artwork as DXF...** (or **Export selected artwork as DXF...**) writes the
    selection or scene's vector artwork as a millimetre DXF: one polyline per contour, one layer per
-   operation colour (ADR-681), circular arcs as exact bulges, cubics and elliptical arcs flattened within 0.01 mm.
+   operation, coloured as the SVG export colours it (ADR-681), circular arcs as exact bulges,
+   cubics and elliptical arcs flattened within 0.01 mm.
    Bitmaps and reliefs have no DXF form; they are left out and the completion message counts them.
 2. **Tools → Multi-File Trace...** first asks for the preset, format (SVG, DXF, PDF, EPS or
    GeoJSON), coordinate precision and, for SVG, **Group islands** (each shape with its holes);
@@ -1397,9 +1400,9 @@ that owns those fields, without changing the existing Frame/Start policy.
    page / bounding box is the exact extent of the drawn curves, rounded outward, plus half the
    0.1 mm stroke on every side when strokes are drawn, and never under 3 pt. Filled layers fill
    even-odd (text nonzero), and a Fill operation of two or more objects fills as one even-odd
-   path, as it burns (ADR-681); line layers and open contours are 0.1 mm strokes. Every path takes
-   its operation's colour. A page side over
-   5080 mm is written as PDF 1.6 with /UserUnit.
+   path, as it burns (ADR-681); line layers and open contours are 0.1 mm strokes, with one colour
+   per operation as in the SVG export. A page side over 5080 mm is written as PDF 1.6 with
+   /UserUnit.
 3. GeoJSON flattens curves within 0.01 mm into Polygon rings (outer counterclockwise, holes
    clockwise) and LineStrings. Polygons follow each shape's fill rule, so they cover what the PDF
    fills; shapes whose outlines cross are written as separate `unmerged` polygons and the export

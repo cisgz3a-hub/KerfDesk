@@ -1,9 +1,8 @@
 // Which operation an artwork export writes a path under, in which colour, and
 // how a Fill operation's objects become the one region they burn (ADR-681).
 //
-// Colour: LightBurn's model is "colour is the layer", so a path is written in
-// the colour of the operation it burns on, not the colour it happened to be
-// drawn in. Distinct operations stay distinct in the file.
+// Colour: LightBurn's model is "colour is the layer", so the file carries one
+// colour per operation and distinct operations stay distinct in it.
 //
 // Fill: the compiler pools every object on a Fill operation under even-odd
 // parity (fill-rule.ts, ADR-486 Amendment 2), so a shape drawn inside another
@@ -56,9 +55,78 @@ export function exportOperationFills(
   return operation !== undefined && effectiveOperationForObject(operation, object).mode === 'fill';
 }
 
-/** The operation's colour; a path on no operation keeps its own. */
-export function exportPathColor(operation: Layer | undefined, path: ColoredPath): string {
-  return operation?.color ?? path.color;
+export type ExportColors = {
+  /** The colour a path is written in. */
+  readonly ofPath: (object: ExportVectorObject, path: ColoredPath) => string;
+  /** The colour an operation's paths (and its fill compound) are written in. */
+  readonly ofOperation: (operation: Layer) => string;
+};
+
+/**
+ * One colour per operation in the file. A path keeps its own colour while that
+ * colour alone names its operation in this export (an imported SVG's colours,
+ * a LightBurn layer), so a re-exported file still looks as authored (ADR-358).
+ * An operation whose paths carry several colours, or share one with another
+ * operation (shapes drawn in the first operation's colour, Assign selection to
+ * operation), is written in the operation's own colour; if that would make two
+ * operations share a colour, every operation is. A path on no operation keeps
+ * its colour.
+ */
+export function planExportColors(
+  project: Project,
+  objects: ReadonlyArray<SceneObject>,
+): ExportColors {
+  const usage = operationPathColors(project, objects);
+  const written = new Map<string, string>();
+  for (const [id, { operation, colors }] of usage.byOperation) {
+    const [only, ...others] = colors;
+    const keeps = only !== undefined && others.length === 0 && usage.sharers(only[0]) === 1;
+    written.set(id, keeps ? only[1] : operation.color);
+  }
+  const distinct = new Set([...written.values()].map((color) => color.toLowerCase()));
+  if (distinct.size < written.size) {
+    for (const [id, { operation }] of usage.byOperation) written.set(id, operation.color);
+  }
+  const ofOperation = (operation: Layer): string => written.get(operation.id) ?? operation.color;
+  return {
+    ofOperation,
+    ofPath: (object, path) => {
+      const operation = exportOperationForPath(project, object, path);
+      return operation === undefined ? path.color : ofOperation(operation);
+    },
+  };
+}
+
+type ColorUsage = {
+  /** Each exported operation with its paths' colours, keyed lower-case, as first written. */
+  readonly byOperation: ReadonlyMap<
+    string,
+    { readonly operation: Layer; readonly colors: Array<[string, string]> }
+  >;
+  /** How many operations have paths in this lower-case colour. */
+  readonly sharers: (color: string) => number;
+};
+
+function operationPathColors(project: Project, objects: ReadonlyArray<SceneObject>): ColorUsage {
+  const byOperation = new Map<
+    string,
+    { readonly operation: Layer; readonly colors: Array<[string, string]> }
+  >();
+  const operationsByColor = new Map<string, Set<string>>();
+  for (const object of objects) {
+    if (object.kind === 'raster-image' || object.kind === 'relief' || !('paths' in object))
+      continue;
+    for (const path of object.paths) {
+      const operation = exportOperationForPath(project, object, path);
+      if (operation === undefined) continue;
+      const key = path.color.toLowerCase();
+      const entry = byOperation.get(operation.id) ?? { operation, colors: [] };
+      if (!entry.colors.some(([seen]) => seen === key)) entry.colors.push([key, path.color]);
+      byOperation.set(operation.id, entry);
+      operationsByColor.set(key, (operationsByColor.get(key) ?? new Set()).add(operation.id));
+    }
+  }
+  return { byOperation, sharers: (color) => operationsByColor.get(color)?.size ?? 0 };
 }
 
 export type FillCompound = {

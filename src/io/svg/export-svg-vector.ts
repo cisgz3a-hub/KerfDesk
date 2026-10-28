@@ -21,7 +21,6 @@ import {
 import {
   exportOperationFills,
   exportOperationForPath,
-  exportPathColor,
   type FillCompound,
 } from './export-fill-compounds';
 import {
@@ -59,28 +58,28 @@ export type SvgVectorOptions = {
 export type SvgVectorElement = { readonly markup: string; readonly bounds: Bounds | null };
 
 /**
- * One path of an object. A `pooled` path's closed contours are written by its
- * operation's fill compound instead (ADR-681); its open contours stay here.
+ * One path of an object, in `color` (its operation's colour in the file,
+ * ADR-681). A `pooled` path's closed contours are written by its operation's
+ * fill compound instead; its open contours stay here.
  */
 export function vectorPathElement(
   object: VectorObject,
   path: ColoredPath,
   project: Project,
   options: SvgVectorOptions,
-  pooled = false,
+  written: { readonly color: string; readonly pooled: boolean },
 ): SvgVectorElement {
   const geometry = vectorGeometry(object, path, options.precisionMm);
   const { curves, grid } = geometry;
-  const operation = exportOperationForPath(project, object, path);
-  const fill = exportOperationFills(operation, object);
+  const fill = exportOperationFills(exportOperationForPath(project, object, path), object);
   const paint: Paint = {
     transform: ' transform="' + geometry.transform + '"',
-    color: xmlText(exportPathColor(operation, path)),
+    color: xmlText(written.color),
     fillRule: path.fillRule ?? (object.kind === 'text' ? 'nonzero' : 'evenodd'),
   };
   const closed = curves.filter((curve) => curve.closed);
   const open = curves.filter((curve) => !curve.closed);
-  const closedMarkup = fill && !pooled ? filledMarkup(closed, grid, paint, options) : '';
+  const closedMarkup = fill && !written.pooled ? filledMarkup(closed, grid, paint, options) : '';
   const stroked = fill ? open : curves;
   const strokeMarkup =
     !fill && options.groupContours
@@ -96,13 +95,14 @@ export function vectorPathElement(
 /** A Fill operation's pooled region as one even-odd path in world millimetres (ADR-681). */
 export function fillCompoundElement(
   compound: FillCompound,
+  color: string,
   options: SvgVectorOptions,
 ): SvgVectorElement {
   const grid = localGrid(options.precisionMm, 1);
   const curves = quantizeCurves(compound.curves, grid);
   const paint: Paint = {
     transform: '',
-    color: xmlText(compound.operation.color),
+    color: xmlText(color),
     fillRule: 'evenodd',
   };
   return { markup: filledMarkup(curves, grid, paint, options), bounds: curvesBounds(curves) };

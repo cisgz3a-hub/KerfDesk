@@ -238,7 +238,9 @@ describe('exports write each path in its operation colour (L7-P2-1)', () => {
 
   it('keeps three operations as three colours in SVG, DXF and the painted formats', () => {
     const project = drawn([plate('a', BLACK), circle('b', BLUE), { ...plate('c', BLUE) }]);
-    const colours = ['a', 'b', 'c'].map((id) => operationOf(project, id).color);
+    // The plate's black names its operation alone and is kept; the two shapes
+    // drawn in the same blue take their operations' own colours.
+    const colours = [BLACK, operationOf(project, 'b').color, operationOf(project, 'c').color];
     expect(new Set(colours).size).toBe(3);
     const svg = svgOf(project);
     expect([...svg.matchAll(/ stroke="(#[0-9a-f]{6})"/gi)].map((m) => m[1])).toEqual(colours);
@@ -252,6 +254,21 @@ describe('exports write each path in its operation colour (L7-P2-1)', () => {
     expect(painted.value.items.map((item) => item.color)).toEqual(colours);
     const reimported = importSvg(svg);
     expect(new Set(reimported.scene.objects.flatMap(pathColours))).toEqual(new Set(colours));
+  });
+
+  it("keeps an imported SVG's own colours, so it re-exports as authored (ADR-358)", () => {
+    const authored = importSvg(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="50mm" height="20mm" viewBox="0 0 50 20">' +
+        '<path fill="none" stroke="#ff0000" d="M0 0H20V20H0Z"/>' +
+        '<path fill="none" stroke="#00aa00" d="M30 0H50V20H30Z"/></svg>',
+    );
+    const operations = authored.scene.layers.map((layer) => layer.color);
+    expect(operations).not.toContain('#ff0000');
+    const svg = svgOf(authored);
+    expect([...svg.matchAll(/ stroke="(#[0-9a-f]{6})"/gi)].map((m) => m[1])).toEqual([
+      '#ff0000',
+      '#00aa00',
+    ]);
   });
 
   it('follows Assign selection to operation, and the drawn plate keeps its hole', () => {
