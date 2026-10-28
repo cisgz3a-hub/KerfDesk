@@ -66,6 +66,42 @@ describe('selection command state', () => {
     expect(selectionCanCombine(project, ['canonical-closed', 'ordinary-closed'])).toBe(true);
   });
 
+  // Rolling audit v7 L1-P3-3: the closed-enough rule Fill, Offset Shapes and
+  // Select Open Shapes use, so a path flagged open that returns to its start
+  // can be welded, combined and offset rather than being greyed out.
+  it('counts a contour flagged open whose end returns to its start as closed', () => {
+    const returning = square(0, 0, 10);
+    const polyline = {
+      color: '#000000',
+      polylines: [{ closed: false, points: [...returning.points, returning.points[0]!] }],
+    };
+    const curve = {
+      ...canonicalPath(false, false),
+      curves: [
+        {
+          ...canonicalPath(false, false).curves![0]!,
+          segments: [
+            ...canonicalPath(false, false).curves![0]!.segments,
+            { kind: 'line' as const, to: { x: 0, y: 0 } },
+          ],
+        },
+      ],
+    };
+    const ordinaryClosed = importedSvg('ordinary-closed', squarePath('#000000', 20, 0, 10));
+    const project = {
+      ...createProject(),
+      scene: {
+        objects: [importedSvg('polyline', polyline), importedSvg('curve', curve), ordinaryClosed],
+        layers: [createLayer({ id: '#000000', color: '#000000' })],
+        groups: [],
+      },
+    };
+
+    expect(selectionCanWeld(project, ['polyline'])).toBe(true);
+    expect(selectionCanWeld(project, ['curve'])).toBe(true);
+    expect(selectionCanCombine(project, ['polyline', 'curve', 'ordinary-closed'])).toBe(true);
+  });
+
   it('offers union operations for the whole closed-vector selection and canonical geometry', () => {
     const first = importedSvg('first', canonicalPath(false, true));
     const second = {
