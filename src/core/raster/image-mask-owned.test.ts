@@ -160,6 +160,47 @@ describe('owned image clips', () => {
     ).toEqual([255, 0, 0, 255, 255, 0, 0, 255]);
   });
 
+  it('burns nothing outside the clip under Blue Noise next to a light grey (Q3-P3-1)', () => {
+    const size = 96;
+    const circle: ColoredPath = {
+      color: '#000000',
+      polylines: [
+        {
+          closed: true,
+          points: Array.from({ length: 64 }, (_, i) => ({
+            x: size / 2 + 40 * Math.cos((i * Math.PI) / 32),
+            y: size / 2 + 40 * Math.sin((i * Math.PI) / 32),
+          })),
+        },
+      ],
+    };
+    const device = { ...DEFAULT_DEVICE_PROFILE, origin: 'rear-left' as const };
+    const layer = {
+      ...createLayer({ id: 'image', color: '#808080', mode: 'image' }),
+      ditherAlgorithm: 'blue-noise' as const,
+      linesPerMm: 1, // one burn cell per image pixel
+    };
+    for (const level of [230, 240, 245, 250]) {
+      const image = raster({
+        pixelWidth: size,
+        pixelHeight: size,
+        bounds: { minX: 0, minY: 0, maxX: size, maxY: size },
+        lumaBase64: Buffer.from(new Uint8Array(size * size).fill(level)).toString('base64'),
+        imageClip: [circle],
+      });
+      const job = compileJob({ objects: [image], layers: [layer] }, device);
+      const group = job.groups[0];
+      if (group?.kind !== 'raster') throw Error('Expected raster output.');
+      expect([group.pixelWidth, group.pixelHeight]).toEqual([size, size]);
+      const inside = createImageMaskPixelTest(image, null, size, size);
+      const outside = Array.from(group.sValues).filter(
+        (s, i) => s > 0 && inside?.(i % size, Math.floor(i / size)) !== true,
+      );
+      expect(group.sValues.some((s) => s > 0)).toBe(true);
+      expect(outside).toEqual([]);
+    }
+  });
+
   it('applies the same clip in compiled and streamed raster power without an extra object', () => {
     const image = raster({ imageClip: [rectangle(1, 0, 3, 2)] });
     const device = { ...DEFAULT_DEVICE_PROFILE, origin: 'rear-left' as const };

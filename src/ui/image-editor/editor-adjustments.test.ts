@@ -53,6 +53,21 @@ describe('runAdjustment', () => {
     }
   });
 
+  it('screens at their dialog defaults keep black solid and track a mid grey', () => {
+    // Quality audit Q3-P2-1: Line Screen's default 0° drew 5 tones and striped
+    // solid black. 64 px holds whole 8 px cells at 0°.
+    for (const id of ['line-screen', 'halftone'] as const) {
+      for (const luma of [0, 128]) {
+        const doc = createRgbaBuffer(64, 64);
+        for (let i = 0; i < doc.data.length; i += 4) doc.data.fill(luma, i, i + 3);
+        runAdjustment(id, defaultParams(adjustmentById(id)), doc, null, null);
+        let black = 0;
+        for (let i = 0; i < doc.data.length; i += 4) if (doc.data[i] === 0) black += 1;
+        expect(Math.abs(black / (64 * 64) - (1 - luma / 255))).toBeLessThanOrEqual(1 / 128);
+      }
+    }
+  });
+
   it('falls back to spec defaults for missing params', () => {
     const doc = createRgbaBuffer(1, 1);
     doc.data[0] = 100;

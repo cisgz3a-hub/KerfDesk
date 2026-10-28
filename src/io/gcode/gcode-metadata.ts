@@ -162,7 +162,10 @@ export type GcodeMetadata = {
 // ADR-492 Amd 1 burns a Pass-Through image turned off its scan rows at its own
 // pixel size, not its pixel count stretched over the turned box; carries
 // forward v34 above.
-export const EMITTER_REVISION = 'raster-turned-pass-through-20261028-v35';
+// ADR-649 Amd 1 keeps Blue Noise off pure white and on pure black, so a mask's
+// outside never burns; v36 belongs to open PRs #1490 and #1491; carries
+// forward v35 above.
+export const EMITTER_REVISION = 'blue-noise-white-black-20261028-v37';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S
