@@ -33,7 +33,7 @@ export type StreamPumpResult = {
  * is not a terminal acknowledgement (a status report, a message, a banner).
  *
  * GRBL-family wire protocol: `ok`, `error:N`, `ALARM:N`. A Marlin stream
- * passes its own grammar instead (marlin/hosted-refill.ts, ADR-675).
+ * passes its own grammar instead (marlin/hosted-refill.ts, ADR-676).
  */
 export function terminalAckKind(line: string): AckKind | null {
   const kind = classifyResponse(line).kind;

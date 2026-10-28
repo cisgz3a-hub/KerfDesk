@@ -27,7 +27,7 @@ type HandoverState = {
   nextId: number;
   pending: Pending | null;
   snapshot: (() => unknown | null) | null;
-  /** The reply grammar the pending arm names; GRBL's when absent (ADR-675). */
+  /** The reply grammar the pending arm names; GRBL's when absent (ADR-676). */
   acks: HostedStreamAcks | undefined;
   /** The id of the program the worker holds, or null when it holds none. */
   workerProgram: number | null;

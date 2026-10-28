@@ -1,4 +1,4 @@
-// ADR-354 Amendment 1 and ADR-675: a requested worker transport that falls
+// ADR-354 Amendment 1 and ADR-676: a requested worker transport that falls
 // back to the window is recorded and shown on every host, since a busy window
 // can stop the machine with a constant-power beam on; only a host whose hidden
 // window pauses sending asks the operator to keep KerfDesk visible.

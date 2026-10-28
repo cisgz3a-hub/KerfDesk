@@ -65,7 +65,7 @@ export async function stopBeforeDisconnect(
     });
     return;
   }
-  // A worker-held Marlin refill comes back before the freeze (ADR-675); with
+  // A worker-held Marlin refill comes back before the freeze (ADR-676); with
   // none, the freeze below still runs before anything yields.
   if (hostedRefillArmed(refs)) {
     if (!(await releaseHostedRefillBeforeStop(refs, () => refs.connection === connection))) return;

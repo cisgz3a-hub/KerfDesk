@@ -38,7 +38,7 @@ function useMachineNetworkConnect(profile: NetworkProfile) {
       const targetPort = Number(port);
       const serial = network.serialForTarget(targetHost, targetPort, current.protocol);
       // The profile's Background streaming choice applies here as on USB: a
-      // worker streams the session unless it is turned off (ADR-675).
+      // worker streams the session unless it is turned off (ADR-676).
       await connectMachine(
         { ...platform, serial },
         { portSelection: 'choose' },

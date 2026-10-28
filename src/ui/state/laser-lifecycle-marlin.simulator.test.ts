@@ -99,7 +99,7 @@ describe('Marlin lifecycle against the simulator', () => {
       wcs: 'g92-only',
       settings: 'none',
     });
-    // Marlin asks for the worker transport too (ADR-675).
+    // Marlin asks for the worker transport too (ADR-676).
     expect(sim.port.openRequests()).toEqual([{ baudRate: 250000, hostedStreaming: true }]);
     expect(sim.outbound().some((w) => w.includes('$$'))).toBe(false);
   });

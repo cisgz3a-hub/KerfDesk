@@ -124,7 +124,7 @@ describe('Marlin Abort owns delayed transport writes', () => {
     expect(harness.get().pendingUntrackedAcks).toBe(0);
   });
 
-  // ADR-675: a worker that holds the refill comes back BEFORE the freeze, as
+  // ADR-676: a worker that holds the refill comes back BEFORE the freeze, as
   // Pause does. While it does, an `ok` still advances this side's stream as the
   // worker's own refill did, so the line the worker sent is on this ledger and
   // its reply settles the stream, not one of the stop lines.

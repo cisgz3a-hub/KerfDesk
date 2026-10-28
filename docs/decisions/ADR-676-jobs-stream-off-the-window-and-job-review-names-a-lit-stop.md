@@ -1,4 +1,4 @@
-## ADR-675 - Marlin and network jobs stream off the window, and Job Review names a lit stop where the window still streams (2026-10-28)
+## ADR-676 - Marlin and network jobs stream off the window, and Job Review names a lit stop where the window still streams (2026-10-28)
 
 **Status:** Accepted. | **Date:** 2026-10-28
 

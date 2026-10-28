@@ -1984,10 +1984,10 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    clears the session-only routing hint; no address is saved.
 5. These unencrypted services belong on a trusted local network. Keep the app open. With
    Background streaming on (the default), a worker reads and writes the network session, so a
-   busy window does not stop the refill (ADR-675). A successful socket is not controller or
+   busy window does not stop the refill (ADR-676). A successful socket is not controller or
    physical-machine qualification. Frame and Start retain their canonical workflow.
 
-#### Background streaming (ADR-354, ADR-675)
+#### Background streaming (ADR-354, ADR-676)
 1. GRBL-family and Marlin connections use background streaming by default. The selected USB
    port is opened inside a dedicated worker so its read and refill loop can continue while the
    Chrome window is minimised or busy. Marlin's worker refills one line on each `ok`. The

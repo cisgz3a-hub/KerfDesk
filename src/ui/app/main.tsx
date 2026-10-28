@@ -75,7 +75,7 @@ const adapter: PlatformAdapter = isElectronRenderer()
             reportJobActivity: createDesktopJobActivityReporter(),
             desktopWindow: createDesktopWindowCommands(),
             aiAssistant: createDesktopAiAssistant(),
-            // A worker streams each network session, off this thread (ADR-675).
+            // A worker streams each network session, off this thread (ADR-676).
             machineNetwork: createDesktopMachineNetwork(undefined, createNetworkSessionOpener()),
             cameraBridge: createHttpCameraBridge(() => desktopCameraBridgeConnection()),
           }

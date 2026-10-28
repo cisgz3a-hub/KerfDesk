@@ -148,7 +148,7 @@ async function runNoResetStopUnlessDisconnecting(
   await runNoResetStop(context, reason, ownsSession);
 }
 
-// A worker-held refill (Marlin, ADR-675) comes back first, as Pause does, so
+// A worker-held refill (Marlin, ADR-676) comes back first, as Pause does, so
 // the worker cannot send a line this side's frozen ledger does not hold. With
 // no worker refill, nothing here yields before the freeze.
 async function runNoResetStop(

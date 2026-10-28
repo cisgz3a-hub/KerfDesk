@@ -40,7 +40,7 @@ export function connectionForMachineSetup(
         baudRate,
         ...extra,
         // A network target keeps the draft's Background streaming choice
-        // (ADR-675) and always asks for its own session.
+        // (ADR-676) and always asks for its own session.
         ...(connection === undefined ? {} : { portSelection: 'choose' }),
       });
     },

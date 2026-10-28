@@ -1,4 +1,4 @@
-// The worker side of a desktop network session (ADR-675). The main process
+// The worker side of a desktop network session (ADR-676). The main process
 // owns the socket and long-polls reads for at most a second
 // (electron/machine-network-session.ts); this worker makes those reads and the
 // numbered writes itself, so the serial worker core's refill (ADR-334) runs

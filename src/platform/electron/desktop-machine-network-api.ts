@@ -5,7 +5,7 @@ export type MachineNetworkRequest = (
 
 /** The desktop main process's network routes (electron/machine-network-routes.ts).
  * The streaming worker is told this route, since it cannot import this file
- * (platform/web; ADR-675). */
+ * (platform/web; ADR-676). */
 export const MACHINE_NETWORK_ROUTE = {
   url: 'app://app/api/machine-network/',
   header: 'X-KerfDesk-Machine-Network',

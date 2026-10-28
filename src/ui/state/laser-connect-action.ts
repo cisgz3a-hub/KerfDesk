@@ -279,7 +279,7 @@ function attachRememberedConnection(
 // Every host records the fallback and shows it, since a busy window can stop
 // the machine with a constant-power beam lit; only a host whose hidden window
 // pauses sending also asks to keep KerfDesk visible (ADR-354 Amendment 1,
-// ADR-675). A profile that turned the worker off chose this: the log says so,
+// ADR-676). A profile that turned the worker off chose this: the log says so,
 // and Job Review warns for each job it affects.
 function reportBackgroundStreaming(
   set: SetFn,
@@ -310,7 +310,7 @@ function serialOpenRequest(
   driver: ControllerDriver,
 ): SerialOpenRequest {
   // The worker pump reads GRBL's and Marlin's acknowledgements; each arm names
-  // which (ADR-675). An old profile may survive a controller change or arrive
+  // which (ADR-676). An old profile may survive a controller change or arrive
   // in an imported project.
   return {
     baudRate,

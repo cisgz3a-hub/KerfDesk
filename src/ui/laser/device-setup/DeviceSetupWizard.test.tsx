@@ -63,7 +63,7 @@ describe('DeviceSetupWizard', () => {
       // Smoothieware stays on the window: its beam goes dark at every stop.
       await changeSelect(view.host, 'Controller firmware', 'smoothieware');
       expect(workerOption()).toBeNull();
-      // ADR-675: Marlin streams from the worker too.
+      // ADR-676: Marlin streams from the worker too.
       for (const controllerKind of ['marlin', 'grblhal', 'fluidnc', 'grbl-v1.1']) {
         await changeSelect(view.host, 'Controller firmware', controllerKind);
         // The explicit opt-out survives a controller change.

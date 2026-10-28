@@ -11,7 +11,7 @@
 // renders. A stall there stops the refill, the controller runs out of moves,
 // and under constant power the beam stays on over the stopped head (rolling
 // audit v6 K1). So every host now shows the fallback as a notice, not only a
-// log line, and names that risk (ADR-675). Job Review says whether the job
+// log line, and names that risk (ADR-676). Job Review says whether the job
 // about to run is affected.
 
 import type { PlatformAdapter } from '../../platform/types';

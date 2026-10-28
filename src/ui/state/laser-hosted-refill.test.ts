@@ -85,7 +85,7 @@ describe('hosted refill helpers (ADR-334)', () => {
     expect(hostedRefillArmed(refs)).toBe(true);
   });
 
-  // ADR-675: the arm names the reply grammar the worker pumps with.
+  // ADR-676: the arm names the reply grammar the worker pumps with.
   it.each([
     ['GRBL', grblDriver, 'grbl'],
     ['Marlin', marlinDriver, 'marlin'],

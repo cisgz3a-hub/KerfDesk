@@ -1,5 +1,5 @@
 // Messages between the window and the worker that streams a desktop network
-// session (ADR-675). The desktop main process owns the TCP socket; the window
+// session (ADR-676). The desktop main process owns the TCP socket; the window
 // opens the session, then hands its id to this worker, which reads and writes
 // it through the same app:// routes the window would use. So the refill no
 // longer waits for the window's thread, as on a USB port (ADR-354).

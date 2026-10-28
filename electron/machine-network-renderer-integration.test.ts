@@ -213,7 +213,7 @@ it('qualifies grblHAL through native routes and real TCP, then preserves network
 
 // Rolling audit v6 K1-P1-3: a network session streamed only from the window,
 // so a busy window starved the controller with an M3 beam lit. A worker now
-// reads and writes the session through these same routes (ADR-675).
+// reads and writes the session through these same routes (ADR-676).
 it('streams a grblHAL network job from the worker through native routes and real TCP', async () => {
   const fixture = await loopbackController({ hosted: true });
   await useLaserStore.getState().connect(fixture.networkPlatform, {

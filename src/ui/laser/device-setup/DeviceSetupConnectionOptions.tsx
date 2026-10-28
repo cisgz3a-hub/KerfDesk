@@ -269,7 +269,7 @@ function RxWindowRow(props: {
 }
 
 // Native worker ownership keeps the window out of the serial round trip, and
-// a worker reads a desktop network session the same way (ADR-675). The
+// a worker reads a desktop network session the same way (ADR-676). The
 // operator can retain the ordinary transport when needed for compatibility.
 function HostedStreamingRow(props: {
   readonly state: DeviceSetupStepProps['state'];

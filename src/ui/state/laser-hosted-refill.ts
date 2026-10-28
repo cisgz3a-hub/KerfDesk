@@ -33,7 +33,7 @@ export function hostedRefillArmed(refs: ConnectionRefs): boolean {
  * Hand the refill over from exactly this stream position. Called after the
  * first window is on the wire, so the worker adopts a state whose in-flight
  * bytes are already accounted for and simply continues. The arm names the
- * controller's reply grammar: Marlin's ping-pong `ok`, else GRBL's (ADR-675).
+ * controller's reply grammar: Marlin's ping-pong `ok`, else GRBL's (ADR-676).
  */
 export async function armHostedRefill(
   refs: ConnectionRefs & { readonly driver: { readonly kind: string } },
@@ -66,7 +66,7 @@ export async function releaseHostedRefill(refs: ConnectionRefs): Promise<void> {
 /**
  * A Marlin stop without a reset byte (Abort, Disconnect) changes the stream's
  * status itself, so a worker-held refill comes back first, while both sides'
- * streams still agree (ADR-675). A line the worker sends during the handshake
+ * streams still agree (ADR-676). A line the worker sends during the handshake
  * is then on this side's ledger too, and its reply cannot settle a stop line.
  * Callers check `hostedRefillArmed` first, so a stop with no worker refill
  * still freezes without yielding. False when the caller no longer owns the

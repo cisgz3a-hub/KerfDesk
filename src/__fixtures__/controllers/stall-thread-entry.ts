@@ -1,5 +1,5 @@
 // The controller's side of the in-window stall test (rolling audit v6 K1,
-// ADR-675), bundled by `in-window-stall-beam.thread.test.ts` and run on its own
+// ADR-676), bundled by `in-window-stall-beam.thread.test.ts` and run on its own
 // node:worker_threads thread with the real clock, the refuter's method. The
 // real store runs on the test's main thread, which the test blocks with a
 // synchronous busy loop.
@@ -36,7 +36,7 @@ export type StallThreadMessage =
       readonly kind: 'report';
       readonly litStops: ReadonlyArray<LitStop>;
       readonly received: ReadonlyArray<string>;
-      /** The reply grammar each arm named, in order (ADR-675). */
+      /** The reply grammar each arm named, in order (ADR-676). */
       readonly armAcks: ReadonlyArray<string | null>;
     };
 
@@ -231,7 +231,7 @@ function usbWorker(port: Port, controller: Controller): (message: unknown) => vo
   };
 }
 
-// A desktop network session (ADR-675): the network worker runtime reads and
+// A desktop network session (ADR-676): the network worker runtime reads and
 // writes it through faked main-process routes over this controller.
 function networkWorker(port: Port, controller: Controller): (message: unknown) => void {
   let inbound = '';

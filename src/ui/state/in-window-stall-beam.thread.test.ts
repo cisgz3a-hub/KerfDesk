@@ -1,5 +1,5 @@
 // @vitest-environment node
-// Rolling audit v6 K1 (ADR-675), by the refuter's method: the controller model
+// Rolling audit v6 K1 (ADR-676), by the refuter's method: the controller model
 // runs on its own node:worker_threads thread with the real clock; the real
 // store runs on this thread, which a synchronous busy loop blocks mid-burn,
 // as a large edit, Undo or import blocks the app window.

@@ -1,4 +1,4 @@
-// The worker refill reading Marlin's ping-pong acknowledgements (ADR-675).
+// The worker refill reading Marlin's ping-pong acknowledgements (ADR-676).
 // Marlin answers every line with `ok`, so the worker writes the next line on
 // it. Every other reply that changes what the main thread does with the stream
 // hands the refill back before it is forwarded, and any line the main thread
@@ -60,7 +60,7 @@ function kinds(posted: ReadonlyArray<SerialWorkerResponse>): ReadonlyArray<strin
   return posted.map((message) => (message.kind === 'line' ? `line:${message.line}` : message.kind));
 }
 
-describe('serial worker core with Marlin acknowledgements (ADR-675)', () => {
+describe('serial worker core with Marlin acknowledgements (ADR-676)', () => {
   it('writes the next line on each ok, one line in flight', async () => {
     const h = harness();
     armMarlin(h.core, 'marlin');

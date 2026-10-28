@@ -54,7 +54,7 @@ describe('worker transport firmware eligibility', () => {
   );
 
   // Rolling audit v6 K1-P1-1/P1-2: Marlin streamed only from the window, so a
-  // busy window left its constant-power beam on over a stopped head (ADR-675).
+  // busy window left its constant-power beam on over a stopped head (ADR-676).
   it('prefers a native worker by default for Marlin', async () => {
     const open = await requestTransport('marlin');
     expect(open).toHaveBeenCalledExactlyOnceWith({

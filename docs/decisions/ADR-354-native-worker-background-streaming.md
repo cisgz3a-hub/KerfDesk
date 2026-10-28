@@ -2,7 +2,7 @@
 
 **Status:** Accepted. Supersedes ADR-334's window-owned transferred streams, opt-in default,
 silent fallback and one-time arm. Hardware qualification remains separate. Decision 4 amended by
-ADR-675: Marlin and desktop network sessions also stream from a worker.
+ADR-676: Marlin and desktop network sessions also stream from a worker.
 
 ### Context
 

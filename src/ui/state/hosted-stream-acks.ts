@@ -1,5 +1,5 @@
 // Which drivers stream a job from a worker instead of the app window, and
-// with which acknowledgement grammar (ADR-354, ADR-675). The window's thread
+// with which acknowledgement grammar (ADR-354, ADR-676). The window's thread
 // also runs every edit, Undo, import and render, so a stall there stops the
 // refill; under constant power the controller then stops with the beam lit.
 //

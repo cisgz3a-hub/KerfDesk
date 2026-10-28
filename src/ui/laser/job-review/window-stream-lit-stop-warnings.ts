@@ -1,5 +1,5 @@
 // Job Review's warning for a job streamed from the app window whose power stays
-// on when the head stops (rolling audit v6 K1, ADR-675). The window's thread
+// on when the head stops (rolling audit v6 K1, ADR-676). The window's thread
 // also runs edits, Undo, imports and renders, and while it is busy nothing
 // refills the controller. Its buffered moves last only tens of milliseconds to
 // about a second, so the head stops, and the power the last move set stays on

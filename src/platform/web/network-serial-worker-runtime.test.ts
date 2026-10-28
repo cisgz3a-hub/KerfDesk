@@ -1,5 +1,5 @@
 // @vitest-environment node
-// The worker that streams a desktop network session (ADR-675), against a fake
+// The worker that streams a desktop network session (ADR-676), against a fake
 // of the main process's routes: `read` long-polls, `write` must arrive in
 // sequence, `close` ends the session (electron/machine-network-session.ts).
 
@@ -99,7 +99,7 @@ afterEach(() => {
   for (const session of sessions.splice(0)) session.end();
 });
 
-describe('network serial worker runtime (ADR-675)', () => {
+describe('network serial worker runtime (ADR-676)', () => {
   it('takes the session only after its own first read succeeds', async () => {
     const session = fakeSession();
     session.emit("Grbl 1.1h ['$' for help]\r\n");

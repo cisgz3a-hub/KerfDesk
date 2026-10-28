@@ -8,7 +8,7 @@ import {
 const MAX_NETWORK_LINE_LENGTH = 64 * 1024;
 
 /** Streams an open session from a worker the app's root entry supplies
- * (ADR-675), since platform/electron cannot reach platform/web. The worker
+ * (ADR-676), since platform/electron cannot reach platform/web. The worker
  * reads and writes the session itself, through `route`. Null when it could
  * not start before it touched the session: the window then streams it. */
 export type HostedNetworkSessionOpener = (args: {
@@ -16,7 +16,7 @@ export type HostedNetworkSessionOpener = (args: {
   readonly route: { readonly url: string; readonly header: string };
 }) => Promise<SerialConnection | null>;
 
-/** `hostSession` streams a session from a worker (ADR-675). Without it, or
+/** `hostSession` streams a session from a worker (ADR-676). Without it, or
  * when its worker cannot start, the window streams the session itself. */
 export function createDesktopMachineNetwork(
   request: MachineNetworkRequest = machineNetworkRequest(),

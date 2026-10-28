@@ -1,5 +1,5 @@
 // Whether a program burns with a power that stays on when the controller runs
-// out of buffered moves and stops the head (rolling audit v6 K1, ADR-675). A
+// out of buffered moves and stops the head (rolling audit v6 K1, ADR-676). A
 // stream that stops being refilled, such as one sent from a busy app window,
 // leaves the head stopped with the power its last move set. Firmware behaviour
 // at that stop, from the pinned sources the audit cites:

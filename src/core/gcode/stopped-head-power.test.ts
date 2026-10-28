@@ -43,7 +43,7 @@ function marlin(dialectId: 'marlin-inline' | 'marlin-fan'): string {
   return marlinStrategy.emit(CUT, device);
 }
 
-describe('findStoppedHeadPower (rolling audit v6 K1, ADR-675)', () => {
+describe('findStoppedHeadPower (rolling audit v6 K1, ADR-676)', () => {
   it('finds the constant-power cut GRBL Compatible emits', () => {
     expect(findStoppedHeadPower(grbl('grbl-compatible'), 'grbl')?.kind).toBe('grbl-constant');
   });

@@ -22,7 +22,7 @@ function warn(
   });
 }
 
-describe('window-stream lit-stop warning (rolling audit v6 K1, ADR-675)', () => {
+describe('window-stream lit-stop warning (rolling audit v6 K1, ADR-676)', () => {
   it.each(['grbl-v1.1', 'grblhal', 'fluidnc'] as const)(
     'warns for constant power (M3) on %s streamed from the window',
     (kind) => {

@@ -43,7 +43,7 @@ export type SerialWorkerRequest =
   /** Adopt the position captured at the matching ready barrier, reading lines
    *  from the program `programId` names. A worker that does not hold that
    *  program answers `refill-stopped` instead of `armed`. `acks` is the
-   *  controller's acknowledgement grammar, GRBL's when absent (ADR-675). */
+   *  controller's acknowledgement grammar, GRBL's when absent (ADR-676). */
   | {
       readonly kind: 'arm';
       readonly id: number;

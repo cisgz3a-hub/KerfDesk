@@ -218,7 +218,7 @@ export function modelFor(bundle: ReviewedStartBundle): ReturnType<typeof buildJo
     gcode: bundle.prepared.gcode,
   });
   // Who refills this connection's stream is live too. A beam that can stay on
-  // over a stopped head leads the list (ADR-675).
+  // over a stopped head leads the list (ADR-676).
   const litStop = liveWindowStreamLitStopWarnings(liveLaser, bundle.prepared.gcode);
   const frozenPower =
     bundle.prepared.laserSecondPassChain === undefined

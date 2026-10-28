@@ -1,4 +1,4 @@
-// The window's half of a worker-streamed desktop network session (ADR-675).
+// The window's half of a worker-streamed desktop network session (ADR-676).
 // The desktop adapter opens the session, then offers it here. The worker takes
 // it only once its own first read succeeds; until then nothing has been read,
 // so a worker that cannot start leaves the session to the window's transport.

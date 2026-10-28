@@ -1,4 +1,4 @@
-// What the off-thread refill reads in a Marlin reply (ADR-675). Marlin streams
+// What the off-thread refill reads in a Marlin reply (ADR-676). Marlin streams
 // ping-pong: each `ok` frees the one line in flight, so the worker that holds
 // the refill writes the next line on it, as it does for FluidNC.
 //

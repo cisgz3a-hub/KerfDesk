@@ -20,7 +20,7 @@
 // position, so a Resume or tool-change Continue does not send the job again.
 //
 // Each arm also names the acknowledgement grammar: GRBL's, or Marlin's
-// ping-pong `ok` (ADR-675). A Marlin stream has no realtime bytes, so any line
+// ping-pong `ok` (ADR-676). A Marlin stream has no realtime bytes, so any line
 // the main thread writes while it is armed is a stop, cleanup or console line.
 // The refill retires before that write goes out, as it does for GRBL's reset.
 
