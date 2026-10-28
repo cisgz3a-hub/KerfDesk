@@ -29,11 +29,8 @@ import { effectiveObjectMinPowerPercent, effectiveObjectPowerPercent } from './o
 import { imageScanOverscanMm } from './automatic-overscan';
 import { rasterScanBounds, type RasterMachineBounds } from './raster-bounds';
 import { decodeRasterLuma } from './raster-luma-decode';
-import {
-  needsRotatedSampling,
-  rotatedMaskedRasterLuma,
-  sourceQuarterTurn,
-} from './raster-rotated-sample';
+import { rasterPassThroughDimensions } from './raster-pass-through-grid';
+import { needsRotatedSampling, rotatedMaskedRasterLuma } from './raster-rotated-sample';
 import { resolveImageScanDirection } from './scan-direction-policy';
 import { imageScanPassRuns, type ScanPassRun } from './scan-pass-angles';
 import { validatedScanOffsetMm } from './scan-offset';
@@ -163,7 +160,7 @@ function compileRasterGroup(
   const sMax = Math.round((powerPercent / 100) * compilationMaxS);
   const sMin = Math.round((minPowerPercent / 100) * compilationMaxS);
   const bounds = rasterScanBounds(obj, device, options.scanFrame);
-  const passThroughDimensions = rasterPassThroughDimensions(obj, device, options.scanFrame);
+  const passThroughDimensions = rasterPassThroughDimensions(obj, device, options.scanFrame, bounds);
   const pixelWidth = layer.passThrough
     ? passThroughDimensions.width
     : pixelExtentForMm(bounds.maxX - bounds.minX, layer.linesPerMm);
@@ -212,21 +209,6 @@ function compileRasterGroup(
     ...(bidirectionalScanOffsetMm === undefined ? {} : { bidirectionalScanOffsetMm }),
     ...(isAlongXScan(options.scanFrame) ? {} : { scanAngleDeg: options.scanFrame.angleDeg }),
   };
-}
-
-function rasterPassThroughDimensions(
-  obj: RasterImage,
-  device: DeviceProfile,
-  scanFrame: RasterScanFrame,
-): {
-  readonly width: number;
-  readonly height: number;
-} {
-  const turn = sourceQuarterTurn(obj, device, scanFrame);
-  const swapsAxes = turn === 1 || turn === 3;
-  return swapsAxes
-    ? { width: obj.pixelHeight, height: obj.pixelWidth }
-    : { width: obj.pixelWidth, height: obj.pixelHeight };
 }
 
 function rasterValuesFor(

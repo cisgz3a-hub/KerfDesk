@@ -17,6 +17,7 @@ import {
   type RasterImage,
 } from '../scene';
 import { rasterScanBounds } from './raster-bounds';
+import { rasterPassThroughDimensions } from './raster-pass-through-grid';
 import { imageScanPassRuns } from './scan-pass-angles';
 
 export const RASTER_PREPARATION_WORK_UNIT_BUDGET = MAX_RASTER_WORK_UNITS;
@@ -48,11 +49,13 @@ function rasterLayerWorkUnits(obj: RasterImage, layer: Layer, project: Project):
   // and every cross-hatch or per-pass angle is its own scan.
   let workUnits = 0;
   for (const run of imageScanPassRuns(layer)) {
+    const frame = rasterScanFrame(run.angleDeg);
+    const bounds = rasterScanBounds(obj, project.device, frame);
     if (layer.passThrough) {
-      workUnits += obj.pixelWidth * obj.pixelHeight * run.passes;
+      const grid = rasterPassThroughDimensions(obj, project.device, frame, bounds);
+      workUnits += grid.width * grid.height * run.passes;
       continue;
     }
-    const bounds = rasterScanBounds(obj, project.device, rasterScanFrame(run.angleDeg));
     const pixelWidth = pixelExtentForMm(bounds.maxX - bounds.minX, layer.linesPerMm);
     const pixelHeight = pixelExtentForMm(bounds.maxY - bounds.minY, layer.linesPerMm);
     workUnits += pixelWidth * pixelHeight * run.passes;

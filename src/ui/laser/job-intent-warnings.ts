@@ -4,7 +4,6 @@ import {
   analyzeFillHeatRisk,
   compileJob,
   isSensitiveIslandFillPolicy,
-  rasterBoundsInMachineCoords,
   type Job,
 } from '../../core/job';
 import { shouldAdvise4040FillPolicySelection } from '../../core/job/fill-runway-policy';
@@ -21,6 +20,7 @@ import { effectiveOperationForObject } from '../../core/scene/effective-operatio
 import { compileDiagnosticWarnings } from './compile-diagnostic-warnings';
 import { constantPowerWarnings } from './constant-power-warnings';
 import { rasterEnergyWarnings } from './raster-energy-warnings';
+import { rasterPassThroughWarnings } from './raster-pass-through-warnings';
 import { rasterThresholdWarnings } from './raster-threshold-warnings';
 import { scanQualityWarnings } from './scan-quality-warnings';
 import { stackedCopyWarnings } from './stacked-copy-warnings';
@@ -44,6 +44,7 @@ export function detectJobIntentWarnings(
   const warnings = [
     ...rasterEnergyWarnings(job, project),
     ...rasterThresholdWarnings(job, project),
+    ...rasterPassThroughWarnings(job, project),
     ...scanQualityWarnings(job, project),
     ...constantPowerWarnings(job, project),
     ...stackedCopyWarnings(project),
@@ -60,7 +61,7 @@ export function detectJobIntentWarnings(
 
   for (const obj of project.scene.objects) {
     if (obj.kind === 'raster-image') {
-      const upsample = rasterUpsampleWarning(obj, outputLayers, project);
+      const upsample = rasterUpsampleWarning(obj, outputLayers);
       if (upsample !== null) warnings.push(upsample);
       continue;
     }
@@ -234,18 +235,23 @@ function isSensitiveIslandFillGroupWithOverscan(
 function rasterUpsampleWarning(
   obj: RasterImage,
   outputLayers: ReadonlyArray<Layer>,
-  project: Project,
 ): string | null {
   const layer = outputLayers.find((operation) => sceneObjectUsesOperation(obj, operation));
   if (layer === undefined || layer.mode !== 'image') return null;
-  return describeRasterUpsample(obj, layer, project);
+  return describeRasterUpsample(obj, layer);
 }
 
-function describeRasterUpsample(obj: RasterImage, layer: Layer, project: Project): string | null {
+// Quality audit Q2-P2-1: burn cells are counted along the image's own width
+// and height, as the rotated sampler and the Threshold advisory measure them.
+// The machine box around a turned image also spans its empty corners, so
+// counting cells across it called every turned image upsampled, and lowering
+// lines/mm as advised only coarsened a source that already had the detail.
+function describeRasterUpsample(obj: RasterImage, layer: Layer): string | null {
   if (layer.passThrough) return null;
-  const bounds = rasterBoundsInMachineCoords(obj, project.device);
-  const burnWidth = pixelExtentForMm(bounds.maxX - bounds.minX, layer.linesPerMm);
-  const burnHeight = pixelExtentForMm(bounds.maxY - bounds.minY, layer.linesPerMm);
+  const widthMm = (obj.bounds.maxX - obj.bounds.minX) * Math.abs(obj.transform.scaleX);
+  const heightMm = (obj.bounds.maxY - obj.bounds.minY) * Math.abs(obj.transform.scaleY);
+  const burnWidth = pixelExtentForMm(widthMm, layer.linesPerMm);
+  const burnHeight = pixelExtentForMm(heightMm, layer.linesPerMm);
   if (burnWidth <= obj.pixelWidth && burnHeight <= obj.pixelHeight) return null;
   return (
     `Image "${obj.source}" stores ${obj.pixelWidth} × ${obj.pixelHeight} px but the burn grid wants ` +
