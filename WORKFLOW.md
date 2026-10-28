@@ -385,6 +385,9 @@ destination and cannot overwrite the template source.
 1. Click on an object's visible geometry.
 2. Object highlights with blue outline; 8 resize handles + 1 rotation handle appear.
 3. Status bar updates: `1 selected · 120 × 80 mm · X 50.0, Y 50.0`.
+4. A Fill shape is solid only where it is filled. Artwork seen through one of its holes is picked
+   first; clicking an empty hole selects the shape, as clicking inside a Line shape does
+   (ADR-683).
 
 #### Multi — shift+click
 1. Shift+click on additional object.
@@ -695,6 +698,10 @@ the linked artwork.
    paths show. The menu item shows a check while it is on.
 2. It changes the canvas only: output, Preview and saved projects are unchanged. It resets to
    Filled when the app restarts.
+3. Filled view paints each Fill operation as it burns (ADR-683): its shapes combine even-odd, so a
+   shape drawn inside another on the same operation shows as a hole, and a shape with an exact
+   copy on top of it shows only as an outline, because the two cancel and neither burns. Shapes
+   on different operations fill separately.
 
 ### F-A6e. Rubber-band outline, Close Path, Reverse Direction, Delete Duplicates, Flatten Image Mask (ADR-480)
 
@@ -721,6 +728,11 @@ the linked artwork.
    compile cuts such copies once, by the same rule as this tool, also for a path an SVG draws
    twice. Job Review then says how many copies were cut once, as a warning. On path, engrave
    and drill keep every copy, since each is cut again (ADR-359 Amendment 3).
+   On a laser Fill operation, an exact copy on top of a shape cancels it and neither burns
+   (Duplicate or Paste in Place on a Fill part does this). Save and Job Review warn "N stacked
+   copies on Fill operation … burn nothing"; an odd number of copies still burns once and is
+   not named. Job Review's **Show stacked copies** closes the review and selects the extra copy
+   of each, so Delete leaves one to burn (ADR-683).
 5. **Tools → Image → Flatten Image Mask** bakes the mask into the selected image and crops it, as
    **Crop Image** does, then deletes the mask shape. The shape stays when it is locked or another
    image or path text uses it; the notice says which. Both keep the mask's outline as the image's

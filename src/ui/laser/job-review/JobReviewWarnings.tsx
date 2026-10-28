@@ -32,13 +32,16 @@ import { splitReviewWarning } from './review-warning-headline';
 import { SendRouterModeButton } from './SendRouterModeButton';
 import { ShowOmittedFillArtworkButton } from './ShowOmittedFillArtworkButton';
 import { ShowOmittedCncArtworkButton } from './ShowOmittedCncArtworkButton';
+import { ShowStackedFillCopiesButton } from './ShowStackedFillCopiesButton';
 import type { JobReviewCncContourOmissions } from './job-review-cnc-omissions';
+import type { JobReviewStackedFillCopies } from './job-review-fill-copies';
 import type { JobReviewFillOmissions } from './job-review-fill-omissions';
 
 export function JobReviewWarnings(props: {
   readonly warnings: ReadonlyArray<string>;
   readonly openFillOmissions?: JobReviewFillOmissions;
   readonly openCncContourOmissions?: JobReviewCncContourOmissions;
+  readonly stackedFillCopies?: JobReviewStackedFillCopies;
 }): JSX.Element | null {
   const count = props.warnings.length;
   if (count === 0) return null;
@@ -59,6 +62,9 @@ export function JobReviewWarnings(props: {
       )}
       {props.openCncContourOmissions === undefined ? null : (
         <ShowOmittedCncArtworkButton omissions={props.openCncContourOmissions} />
+      )}
+      {props.stackedFillCopies === undefined ? null : (
+        <ShowStackedFillCopiesButton copies={props.stackedFillCopies} />
       )}
     </section>
   );

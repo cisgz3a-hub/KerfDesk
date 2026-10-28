@@ -1,6 +1,7 @@
 import type { AppState } from '../state/store';
 import { canvasTheme } from '../theme/canvas-theme';
 import { paintObjectDisplay } from '../workspace/object-display';
+import { paintPooledObjectDisplays } from '../workspace/fill-pools';
 import type { RemoteControlOptions } from './types';
 import { RemoteFault } from './fault';
 import {
@@ -65,8 +66,10 @@ function renderPreview(
     ctx.fillRect(0, 0, sizePx, sizePx);
     const view = previewView(geometry.extent, sizePx);
     paintPreviewImageFootprints(ctx, geometry.imageFootprints, view);
-    for (const { object, display } of geometry.objects)
-      paintObjectDisplay(ctx, object, display, view);
+    // ADR-683: a Fill operation is shown as the one even-odd region it burns.
+    paintPooledObjectDisplays(ctx, geometry.objects, view, (object, display) =>
+      paintObjectDisplay(ctx, object, display, view),
+    );
     const encoded = canvas.toDataURL('image/png');
     assertActive(signal);
     if (options.canShareArtwork?.() !== true) return DISABLED;
