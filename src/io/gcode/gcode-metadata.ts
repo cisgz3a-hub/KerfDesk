@@ -162,10 +162,13 @@ export type GcodeMetadata = {
 // ADR-492 Amd 1 burns a Pass-Through image turned off its scan rows at its own
 // pixel size, not its pixel count stretched over the turned box; carries
 // forward v34 above.
+// ADR-649 Amd 1 keeps Blue Noise off pure white and on pure black, so a mask's
+// outside never burns; v36 belongs to open PRs #1490 and #1491; carries
+// forward v35 above.
 // ADR-458 Amd 1 trims Dot Width Correction only at the ends of a burned line,
 // not at each Grayscale power change, so Grayscale and Pass-through image
-// bytes change; dithered bytes do not. v36 and v37 are held by open PRs
-// #1491 and #1494; carries forward v35 above.
+// bytes change; dithered bytes do not. v36 is held by open PR #1491; carries
+// forward v37 above.
 export const EMITTER_REVISION = 'laser-dot-width-line-ends-20261028-v38';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports

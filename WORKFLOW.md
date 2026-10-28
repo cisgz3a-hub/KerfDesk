@@ -4140,13 +4140,15 @@ settings and Job Review keep their existing read-only setup references.
    halftone treatment; Image mode also offers grayscale and dithered photo engraving.
    **Colour layers** splits flat-colour artwork into a few colours (**Colours**: Auto or 2 to 8,
    counting the paper) and traces one filled layer per colour; neighbouring colours share one
-   edge with no gap or overlap (ADR-461). **Cut-out** burns each colour only in its own area;
-   **Stacked** also fills each colour under the darker colours above it. The paper colour is left
-   untraced unless **Trace background colour** is ticked; only a light border colour counts as
-   paper, so light-on-dark art traces every colour. The swatches show the traced colours,
-   lightest first. On commit each colour gets its own operation; on a laser each starts at a power
-   set by its darkness (a mid-dark or darker colour keeps the operation's power), which the
-   operator can edit. Paper (near-white, or the traced background) starts with output off.
+   edge with no gap or overlap (ADR-461). On Auto, a distinct thin colour such as small text keeps
+   its own layer even after JPEG, a slight blur or grain (ADR-461 Amendment 3). **Cut-out** burns
+   each colour only in its own area; **Stacked** also fills each colour under the darker colours
+   above it. The paper colour is left untraced unless **Trace background colour** is ticked; only
+   a light border colour counts as paper, so light-on-dark art traces every colour. The swatches
+   show the traced colours, lightest first. On commit each colour gets its own operation; on a
+   laser each starts at a power set by its darkness (a mid-dark or darker colour keeps the
+   operation's power), which the operator can edit. Paper (near-white, or the traced background)
+   starts with output off.
    For line artwork, choose **Detection** explicitly: the preset's automatic detection, a **Manual brightness band**,
    **Faint lines (keep solid areas)**, or **Sketch (local contrast)**. Faint lines adds coherent
    pale strokes to the preset's solid ink while rejecting isolated pale specks. Sketch uses
@@ -4976,11 +4978,16 @@ selected.
    spacing, or turn off **Same X / Y spacing** for independent gaps. The live
    footprint diagram and count show the exact draft before it is applied.
 4. **Array on board** → copies tile the board, the block centered, as one undo
-   step. Copies inherit the design's layer/settings.
+   step. Copies inherit the design's layer/settings. A photo's mask (Apply Mask to Image) and a
+   path text's guide move with the design, and every copy gets its own, so each tile burns the
+   whole masked photo (ADR-633 Amendment 3). A board used as the mask stays put.
 5. Undo restores the single design. After arraying, the whole grid is selected, so Array/Fit disable until you undo (or reselect one design) - this stops a re-click from silently stacking a doubled burn.
 
 **Edge / empty / error.** No board, or zero/several designs selected → both
-controls are disabled ("Select exactly one design…"). A design larger than the
+controls are disabled ("Select exactly one design…"). A photo selected with its own mask, or a
+path text with its guide, is one design for **Array on board**; **Fit to board** still takes the
+photo alone. Job Review names a masked photo that lies on only part of its mask, with how much,
+as well as one that misses it. A design larger than the
 usable board produces zero copies and leaves the scene unchanged. A fixed count
 that does not fit shows the fitting count alongside the request. A runaway count
 (huge rows, or a tiny design under "fit as many as fit") is capped at 100 per
@@ -6362,7 +6369,10 @@ and lifts the command's CNC-only gate.)*
    probed. Until the last bit's file has run, Set and Reset origin and the XYZ corner probe are
    refused as in an `M0` hold; Zero Z and the Z probe stay open. The machine panel says which
    bit ran and offers **End bit sequence** for starting over on new stock. A new controller
-   session ends it too.
+   session ends it too. When Abort, an alarm, a reset or a rejected line stopped a file before
+   its end, the panel says that bit's file did not finish: keep the same bit, Zero Z or probe
+   again, and run that file again from its start. The X/Y hold stays, the last bit's included,
+   until the file has run (ADR-392 Amendment 6).
 5. On a profile whose controller cannot run KerfDesk CNC jobs, saving the package gives the
    GRBL-family warning Save as gives, and the printed sheet carries it (ADR-399 Amendment 1).
 6. Save as of a multi-bit job writes one file with an `M0` per bit change and adds a note saying

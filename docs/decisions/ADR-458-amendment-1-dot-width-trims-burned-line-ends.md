@@ -49,7 +49,7 @@ Quality audit Q1, finding Q1-P1-1 (P1, confirmed by an independent refuter; repo
    0.001 mm. Its text now says the correction shortens "each end of a burned line". The three Dot
    Width tooltips say the same, and that power changes inside a line are not trimmed.
 6. **Emitter revision.** Grayscale and Pass-through bytes change, so `EMITTER_REVISION` becomes
-   `laser-dot-width-line-ends-20261028-v38` (#1487 merged v35; open PRs #1491 and #1494 hold v36 and v37).
+   `laser-dot-width-line-ends-20261028-v38` (#1487 merged v35 and #1494 v37; open PR #1491 holds v36).
 
 ### Consequences
 

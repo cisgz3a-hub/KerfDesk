@@ -22,6 +22,7 @@ import {
   type ExternalFrame,
 } from './external-run';
 import { externalOutlineBedWarnings } from './external-run-bed';
+import { externalZTopWarnings } from './external-run-z-top';
 import { externalControllerWarnings } from './external-run-readiness';
 import type { GcodeInspectorAnalysis } from './gcode-inspector-analysis';
 import type { PreparedExternalRun } from './prepare-external-run';
@@ -175,7 +176,10 @@ export function RunGcodeFileControls(props: {
         machineKind={machineKindOf(project.machine)}
         startKnown={props.start !== null}
         controllerWarnings={externalControllerWarnings(project, laser, litRapids)}
-        bedWarnings={externalOutlineBedWarnings(prepared.run.envelope, laser, project.device)}
+        bedWarnings={[
+          ...externalOutlineBedWarnings(prepared.run.envelope, laser, project.device),
+          ...externalZTopWarnings(prepared.review.zLifts, laser, project),
+        ]}
         formatLength={(mm) => formatLengthWithUnit(mm, unit)}
         formatSeconds={formatDuration}
       />

@@ -11770,6 +11770,13 @@ ADR-030 §3 (Proposed) already called for a dedicated Adjust-Image surface out o
   flows. IE-1 acceptance = all F-L flows demonstrable + perceptual fixtures green + zero new
   dependencies in `package.json`.
 
+### Amendments
+
+ADR-242's amendments are separate decision files (ADR-344):
+`docs/decisions/ADR-242-amendment-1-image-studio-screens-track-tone-on-the-pixel-grid.md` (at 0°
+and 90° the Halftone and Line Screen filters rank each cell's pixels into a threshold array, so
+coverage tracks ink in s² + 1 tones and solid black stays solid).
+
 ## ADR-243 - Rasters of any size stream row-by-row; the raster budget becomes advisories
 
 **Date:** 2026-07-21
