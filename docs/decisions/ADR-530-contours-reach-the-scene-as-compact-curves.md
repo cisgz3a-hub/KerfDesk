@@ -893,6 +893,9 @@ Amendment 1.
 - Anti-aliased, scanned and greyscale sources still take the enlarged trace unchanged, and so do
   Edge Detection and Centerline. Sharp never enlarges, and the hairline rule leaves it alone.
 - The hairline rule also applies where a binary loop is traced natively without any enlargement.
+- Multi-File Trace's golden bytes (`batch-trace-default-golden.test.ts`) were taken again. Its
+  fixture is a two-level 64 x 48 ring, whose SVG path falls from 2,334 to 486 bytes. Only the path
+  data changed; the fitted page follows the artwork's bounds.
 
 Not part of this amendment:
 
