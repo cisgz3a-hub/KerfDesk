@@ -4,6 +4,7 @@
 
 import {
   curveSegmentCount,
+  curveSegmentHalfwayT,
   deleteCurveSegment,
   dragCurveSegment,
   insertCurveNode,
@@ -60,15 +61,18 @@ const MIN_INSERT_T = 1e-6;
 export function pathSegmentActions(set: Setter): PathSegmentActions {
   return {
     insertPathNode: (ref, at) =>
-      set((state) => {
-        const t =
-          at === 'midpoint' ? 0.5 : Math.min(1 - MIN_INSERT_T, Math.max(MIN_INSERT_T, ref.t));
-        return mutateObjectCurve(state, nodeRef(state, ref), (curves) => {
+      set((state) =>
+        mutateObjectCurve(state, nodeRef(state, ref), (curves) => {
           const curve = curves[ref.curveIndex];
-          const next = curve === undefined ? null : insertCurveNode(curve, ref.segmentIndex, t);
+          if (curve === undefined) return null;
+          const t =
+            at === 'midpoint'
+              ? curveSegmentHalfwayT(curve, ref.segmentIndex)
+              : Math.min(1 - MIN_INSERT_T, Math.max(MIN_INSERT_T, ref.t));
+          const next = insertCurveNode(curve, ref.segmentIndex, t);
           return next === null ? null : replaceAt(curves, ref.curveIndex, [next]);
-        });
-      }),
+        }),
+      ),
     deletePathSegment: (ref) =>
       set((state) => {
         const target = nodeRef(state, ref);

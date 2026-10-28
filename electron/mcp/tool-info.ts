@@ -25,7 +25,7 @@ export const mcpToolInfo: Record<KerfDeskMcpCommand, { title: string; descriptio
   place_on_board: {
     title: 'Place artwork on the board',
     description:
-      'Center, fit or array existing artwork inside the captured board. Requires Pro, expectedRevision and UUID requestId.',
+      'Center, fit or array existing artwork inside the captured board. An array returns placedCount (the original included) and, for rows × cols, requestedCount. When fewer copies were placed than requested, or the 100-per-axis / 500-copy cap applied, notices says so: tell the user. Requires Pro, expectedRevision and UUID requestId.',
   },
   get_machine: {
     title: 'Read the selected machine',
@@ -105,7 +105,7 @@ export const mcpToolInfo: Record<KerfDeskMcpCommand, { title: string; descriptio
   arrange_artwork: {
     title: 'Arrange existing artwork',
     description:
-      'Align, distribute equal centres, mirror, group, ungroup, duplicate or delete the specified artwork. Requires expectedRevision and UUID requestId. Duplication uses the desktop Pro-copy admission; all changes retain Undo.',
+      'Align, distribute equal centres, mirror, group, ungroup, duplicate or delete the specified artwork. Align keeps the last listed artwork (with its group) still and moves the rest to it. Requires expectedRevision and UUID requestId. Duplication uses the desktop Pro-copy admission; all changes retain Undo.',
   },
   undo: {
     title: 'Undo the last workspace edit',

@@ -73,6 +73,8 @@ describe('compact trace node editing', () => {
     expect(curveCommandNode(currentPath(), selected)).toEqual({
       closed: true,
       outgoingKind: 'line',
+      canSmooth: false,
+      canCorner: false,
     });
 
     useStore.getState().convertSelectedCurveSegment('cubic');

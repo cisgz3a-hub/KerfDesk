@@ -311,4 +311,107 @@ describe('deleteCurveNodes', () => {
     expect(angleDeg(startHandle, tangentAt(0))).toBeLessThan(0.01);
     expect(angleDeg(endHandle, tangentAt(1))).toBeLessThan(0.01);
   });
+
+  it('keeps a hump whose outer handles lie along its chord instead of flattening it', () => {
+    // A 20 mm bell on a 40 mm base, horizontal at its feet and at its crest:
+    // no cubic with horizontal end handles can bulge, so the handles turn.
+    const hump: CurveSubpath = {
+      start: { x: 0, y: 0 },
+      closed: false,
+      segments: [
+        {
+          kind: 'cubic',
+          control1: { x: 10, y: 0 },
+          control2: { x: 10, y: 20 },
+          to: { x: 20, y: 20 },
+        },
+        {
+          kind: 'cubic',
+          control1: { x: 30, y: 20 },
+          control2: { x: 30, y: 0 },
+          to: { x: 40, y: 0 },
+        },
+      ],
+    };
+
+    const merged = deleteCurveNodes(hump, new Set([1]));
+
+    expect(merged?.segments).toHaveLength(1);
+    expect(merged?.segments[0]).toMatchObject({ kind: 'cubic', to: { x: 40, y: 0 } });
+    // The smooth-join fit put every control point on y = 0, 20 mm under the crest.
+    const segment = merged!.segments[0]!;
+    if (segment.kind !== 'cubic') throw new Error('expected a cubic');
+    expect(segment.control1.y).toBeGreaterThan(20);
+    expect(segment.control2.y).toBeGreaterThan(20);
+    // 20.0 mm off before; 2.05 mm measured.
+    expect(curveMiss(hump, merged!)).toBeLessThan(2.5);
+    expect(cubicPoint(merged!.start, merged!.segments[0]!, 0.5).y).toBeGreaterThan(18);
+  });
+
+  it('keeps a wave crest when its node is deleted', () => {
+    // Nodes at every crest and trough with horizontal handles, the usual SVG
+    // and font convention.
+    const wave = (x: number, y: number): PathSegment => ({
+      kind: 'cubic',
+      control1: { x: x - 15, y: y === 0 ? 10 : 0 },
+      control2: { x: x - 5, y },
+      to: { x, y },
+    });
+    const source: CurveSubpath = {
+      start: { x: 0, y: 0 },
+      closed: false,
+      segments: [wave(20, 10), wave(40, 0), wave(60, 10)],
+    };
+
+    const edited = deleteCurveNodes(source, new Set([1]));
+
+    expect(edited?.segments).toHaveLength(2);
+    expect(edited?.segments[1]).toBe(source.segments[2]);
+    // The crest sank 10 mm onto the trough line before; 0.92 mm measured.
+    expect(curveMiss(source, edited!)).toBeLessThan(1.5);
+  });
+
+  it('keeps the smooth joins of an ordinary curve when its node is deleted', () => {
+    const source = circle();
+
+    const edited = deleteCurveNodes(source, new Set([1]));
+    const merged = edited!.segments[0]!;
+    if (merged.kind !== 'cubic') throw new Error('expected a cubic');
+
+    // The handles stay vertical at (20, 0) and (-20, 0), so the joins stay smooth.
+    expect(merged.control1.x).toBeCloseTo(20, 9);
+    expect(merged.control2.x).toBeCloseTo(-20, 9);
+    expect(curveMiss(source, edited!)).toBeLessThan(0.3);
+  });
 });
+
+// Both ways, how far one outline strays from the other, on dense samples.
+function curveMiss(a: CurveSubpath, b: CurveSubpath): number {
+  const left = densePoints(a);
+  const right = densePoints(b);
+  const toLine = (point: Vec2, line: ReadonlyArray<Vec2>): number =>
+    Math.min(...line.map((other) => Math.hypot(other.x - point.x, other.y - point.y)));
+  return Math.max(
+    ...left.map((point) => toLine(point, right)),
+    ...right.map((point) => toLine(point, left)),
+  );
+}
+
+function densePoints(curve: CurveSubpath): Vec2[] {
+  const points: Vec2[] = [];
+  let from = curve.start;
+  for (const segment of curve.segments) {
+    for (let step = 0; step <= 200; step += 1) {
+      points.push(
+        segment.kind === 'cubic'
+          ? cubicPoint(from, segment, step / 200)
+          : {
+              x: from.x + ((segment.to.x - from.x) * step) / 200,
+              y: from.y + ((segment.to.y - from.y) * step) / 200,
+            },
+      );
+    }
+    from = segment.to;
+  }
+  return points;
+}
