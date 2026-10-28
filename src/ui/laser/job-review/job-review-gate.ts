@@ -43,6 +43,7 @@ import {
   type PreparedCurrentStart,
 } from './job-review-model';
 import { detectFluidncDivergenceWarnings } from './fluidnc-divergence-warnings';
+import { liveWindowStreamLitStopWarnings } from './window-stream-lit-stop-warnings';
 import { type JobReviewPurpose } from './job-review-store';
 import { refreshControllerIdentityWarnings } from '../controller-identity-warnings';
 import { appendExternalGcodePreviewWarning } from '../../state/external-gcode-preview-disclosure';
@@ -216,6 +217,9 @@ export function modelFor(bundle: ReviewedStartBundle): ReturnType<typeof buildJo
     detected: liveLaser.detectedControllerKind,
     gcode: bundle.prepared.gcode,
   });
+  // Who refills this connection's stream is live too. A beam that can stay on
+  // over a stopped head leads the list (ADR-676).
+  const litStop = liveWindowStreamLitStopWarnings(liveLaser, bundle.prepared.gcode);
   const frozenPower =
     bundle.prepared.laserSecondPassChain === undefined
       ? []
@@ -226,13 +230,11 @@ export function modelFor(bundle: ReviewedStartBundle): ReturnType<typeof buildJo
   // The Frame's own route was compared with no-go zones when it ran (ADR-232
   // Amendment 1); its findings sit beside the job's.
   const frameNoGo = bundle.frameNoGoWarnings ?? [];
+  const extra = [...frameNoGo, ...frozenPower, ...fluidnc];
   const disclosed =
-    fluidnc.length === 0 && frozenPower.length === 0 && frameNoGo.length === 0
+    extra.length === 0 && litStop.length === 0
       ? baseModel
-      : {
-          ...baseModel,
-          warnings: [...new Set([...baseModel.warnings, ...frameNoGo, ...frozenPower, ...fluidnc])],
-        };
+      : { ...baseModel, warnings: [...new Set([...litStop, ...baseModel.warnings, ...extra])] };
   const warning = bundle.frameWcsNormalizationWarning;
   const framedModel =
     warning === undefined || disclosed.warnings.includes(warning)

@@ -32,9 +32,8 @@ export type StreamPumpResult = {
  * The three-way split the streamer's accounting needs, or null for a line that
  * is not a terminal acknowledgement (a status report, a message, a banner).
  *
- * GRBL-family wire protocol: `ok`, `error:N`, `ALARM:N`. Firmwares outside
- * that family are not pumped — the hosted path is offered only for the GRBL
- * family, whose acknowledgement shape this matches.
+ * GRBL-family wire protocol: `ok`, `error:N`, `ALARM:N`. A Marlin stream
+ * passes its own grammar instead (marlin/hosted-refill.ts, ADR-676).
  */
 export function terminalAckKind(line: string): AckKind | null {
   const kind = classifyResponse(line).kind;
@@ -43,8 +42,12 @@ export function terminalAckKind(line: string): AckKind | null {
 
 /** Consume one inbound line. A line that is not a terminal acknowledgement
  * leaves the streamer untouched and sends nothing. */
-export function pumpInboundLine(streamer: StreamerState, line: string): StreamPumpResult {
-  const kind = terminalAckKind(line);
+export function pumpInboundLine(
+  streamer: StreamerState,
+  line: string,
+  ackKindOf: (line: string) => AckKind | null = terminalAckKind,
+): StreamPumpResult {
+  const kind = ackKindOf(line);
   if (kind === null) return { streamer, toSend: '', consumedAck: false };
   const stepped = step(onAck(streamer, kind).state);
   return { streamer: stepped.state, toSend: stepped.toSend, consumedAck: true };
