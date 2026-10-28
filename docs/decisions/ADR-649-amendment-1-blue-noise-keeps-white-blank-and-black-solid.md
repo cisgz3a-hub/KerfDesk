@@ -43,7 +43,7 @@ the order: it only sets the order of the Photo engraving window's list and the t
 ### Consequences
 
 - Blue Noise G-code changes wherever pure white or pure black meets another tone, including at the
-  edge of every mask. So `EMITTER_REVISION` moves to v36; v35 belongs to open PR #1478.
+  edge of every mask. So `EMITTER_REVISION` moves to v36, after v35 (ADR-492 Amendment 1).
 - Tests:
   - `dither-blue-noise.test.ts` dithers a 40 px disc of luma 200–253 on white and of luma 2–25 on
     black, and finds no dot or hole outside the disc.
