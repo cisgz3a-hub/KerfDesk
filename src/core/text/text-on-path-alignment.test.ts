@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { IDENTITY_TRANSFORM, type PathTextSettings, type SceneObject } from '../scene';
 import type { TextRenderResult } from './text-to-polylines';
-import { placeTextOnPath } from './text-on-path';
+import { pathTextAcrossFromBaseline, placeTextOnPath } from './text-on-path';
 
 // A straight 100 mm guide along y = 50 and a 20 × 5 mm block of text, so every
 // alignment lands on round numbers (Y grows downward).
@@ -93,5 +93,43 @@ describe('path text alignment (ADR-480)', () => {
     expect(place({ alongAlign: 'middle', offsetMm: 41 })).toMatchObject({ kind: 'text-too-long' });
     expect(place({ alongAlign: 'end', offsetMm: 81 })).toMatchObject({ kind: 'text-too-long' });
     expect(place({ alongAlign: 'end', offsetMm: 80 }).kind).toBe('ok');
+  });
+
+  // L3-P2-5: a variable record lies where the template's baseline lies, not
+  // on its own ink bottom, so a name with descenders keeps the same line.
+  it('lays a record by the template baseline when given one', () => {
+    const settings = { guideObjectId: 'guide', offsetMm: 0, reverse: false } as const;
+    // The template's baseline is 1 mm above its ink bottom.
+    const template = { ...TEXT, anchor: { x: 0, y: 4 } };
+    const across = pathTextAcrossFromBaseline(template, settings);
+    expect(across).toBe(1);
+    // A record whose descenders reach 3 mm below the same baseline.
+    const record: TextRenderResult = {
+      bounds: { minX: 0, minY: 0, maxX: 20, maxY: 7 },
+      paths: [
+        {
+          color: '#000000',
+          polylines: [
+            {
+              closed: true,
+              points: [
+                { x: 0, y: 0 },
+                { x: 20, y: 0 },
+                { x: 20, y: 7 },
+                { x: 0, y: 7 },
+              ],
+            },
+          ],
+        },
+      ],
+      anchor: { x: 0, y: 4 },
+    };
+    const own = placeTextOnPath(record, GUIDE, settings);
+    const shared = placeTextOnPath(record, GUIDE, settings, across);
+    if (own.kind !== 'ok' || shared.kind !== 'ok') throw new Error('placement refused');
+    // Its own ink bottom sits on the guide; the template's baseline rule lifts
+    // nothing and lowers the record 2 mm so its baseline matches.
+    expect(own.origin.y + own.rendered.bounds.maxY).toBeCloseTo(50, 12);
+    expect(shared.origin.y + shared.rendered.bounds.maxY).toBeCloseTo(52, 12);
   });
 });

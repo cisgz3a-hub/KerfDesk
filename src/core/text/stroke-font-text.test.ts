@@ -3,9 +3,10 @@ import type { CurveSubpath } from '../scene';
 import { renderStrokeFontText, type StrokeFont } from './stroke-font-text';
 
 // A square-cut "H" on an 8-unit advance with 1-unit side bearings, drawn
-// y-up from the baseline to a cap height of 10, so one unit is 1 mm at Size 10.
+// y-up from the baseline to a capital height of 10 in a 10-unit em, so one
+// unit is 1 mm at Size 10 (Size is the em, ADR-682).
 const H_FONT: StrokeFont = {
-  capHeight: 10,
+  unitsPerEm: 10,
   yAxis: 'up',
   glyphs: new Map([
     ['H', { advance: 8, paths: [stroke(1, 0, 1, 10), stroke(7, 0, 7, 10), stroke(1, 5, 7, 5)] }],

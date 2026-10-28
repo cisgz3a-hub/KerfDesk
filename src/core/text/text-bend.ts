@@ -19,7 +19,11 @@ export function bendTextRender(rendered: TextRenderResult, bendDeg: number): Tex
   const bend = bendPointMapper(rendered.bounds, (angleDeg * Math.PI) / 180);
   const paths = rendered.paths.map((path) => bendColoredPath(path, bend));
   const bounds = boundsForPaths(paths);
-  return normalizeBentPaths(paths, bounds);
+  return normalizeBentPaths(
+    paths,
+    bounds,
+    rendered.anchor === undefined ? undefined : bend(rendered.anchor),
+  );
 }
 
 export function clampBend(value: number): number {
@@ -27,7 +31,12 @@ export function clampBend(value: number): number {
   return Math.max(TEXT_BEND_MIN_DEG, Math.min(TEXT_BEND_MAX_DEG, finite));
 }
 
-function bendPointMapper(bounds: Bounds, angleRad: number): (point: Vec2) => Vec2 {
+/**
+ * The bend's point map: every point keeps its distance along and across the
+ * text's middle line, wrapped onto the arc. The alignment anchor on the first
+ * baseline lands on one definite point, so bent variable records keep it.
+ */
+export function bendPointMapper(bounds: Bounds, angleRad: number): (point: Vec2) => Vec2 {
   const centerX = (bounds.minX + bounds.maxX) / 2;
   const centerY = (bounds.minY + bounds.maxY) / 2;
   const radius = (bounds.maxX - bounds.minX) / angleRad;
@@ -95,7 +104,11 @@ function boundsForPaths(paths: ReadonlyArray<ColoredPath>): Bounds {
   };
 }
 
-function normalizeBentPaths(paths: ReadonlyArray<ColoredPath>, bounds: Bounds): TextRenderResult {
+function normalizeBentPaths(
+  paths: ReadonlyArray<ColoredPath>,
+  bounds: Bounds,
+  anchor: Vec2 | undefined,
+): TextRenderResult {
   const shift = (point: Vec2): Vec2 => ({ x: point.x - bounds.minX, y: point.y - bounds.minY });
   const normalized = paths.map((path) => bendColoredPath(path, shift));
   return {
@@ -106,5 +119,6 @@ function normalizeBentPaths(paths: ReadonlyArray<ColoredPath>, bounds: Bounds): 
       maxX: bounds.maxX - bounds.minX,
       maxY: bounds.maxY - bounds.minY,
     },
+    ...(anchor === undefined ? {} : { anchor: shift(anchor) }),
   };
 }

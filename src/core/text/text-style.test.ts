@@ -75,3 +75,56 @@ describe('text style', () => {
     expect(bent.bounds.minX).toBe(0);
   });
 });
+
+describe('text style keeps the alignment anchor (rolling v7 L3)', () => {
+  // A stem standing on the baseline (y 8) at each end; the right one is where
+  // a right-aligned line ends, so the anchor sits at its foot.
+  function stems(): TextRenderResult {
+    const stem = (x: number): Polyline => ({
+      closed: false,
+      points: [
+        { x, y: 0 },
+        { x, y: 8 },
+      ],
+    });
+    return {
+      paths: [{ color: '#000000', polylines: [stem(2), stem(18)] }],
+      glyphContours: [[0, 1]],
+      bounds: { minX: 2, minY: 0, maxX: 18, maxY: 8 },
+      anchor: { x: 18, y: 8 },
+    };
+  }
+
+  it.each([60, -60])('lands a %s° rigid bend anchor on the foot of its glyph', (bend) => {
+    const bent = bendTextUndistorted(stems(), bend);
+    const foot = bent.paths[0]?.polylines[1]?.points[1];
+    expect(bent.anchor?.x).toBeCloseTo(foot?.x ?? NaN, 12);
+    expect(bent.anchor?.y).toBeCloseTo(foot?.y ?? NaN, 12);
+  });
+
+  // L3-P3-1: text in a frame squeezes about the frame's alignment point.
+  it('squeezes framed text about the frame centre and other text about its left edge', () => {
+    const framed: TextRenderResult = {
+      ...rendered(),
+      // Centred in a 25 mm frame: the squares fill it, so the frame centre is 12.5.
+      anchor: { x: 12.5, y: 8 },
+      textBoxLayout: {
+        content: 'ab',
+        sourceStarts: [0],
+        sizeMm: 10,
+        widthMm: 25,
+        heightMm: 10,
+        lineCount: 1,
+        advanceWidthMm: 25,
+        overflow: false,
+      },
+    };
+    const squeezed = styleTextRender(framed, { maxWidthMm: 10 }, 10);
+    expect((squeezed.bounds.minX + squeezed.bounds.maxX) / 2).toBeCloseTo(12.5, 12);
+    expect(squeezed.anchor?.x).toBeCloseTo(12.5, 12);
+
+    const plain = styleTextRender(rendered(), { maxWidthMm: 10 }, 10);
+    expect(plain.bounds.minX).toBeCloseTo(0, 12);
+    expect(plain.bounds.maxX).toBeCloseTo(10, 12);
+  });
+});

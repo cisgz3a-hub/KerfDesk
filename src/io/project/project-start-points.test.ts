@@ -21,7 +21,7 @@ describe('project start point persistence', () => {
     const original = { ...createProject(), startPoints };
     const prepared = prepareProjectForPersistence(original);
     expect(prepared.kind).toBe('ok');
-    if (prepared.kind === 'ok') expect(JSON.parse(prepared.json).schemaVersion).toBe(18);
+    if (prepared.kind === 'ok') expect(JSON.parse(prepared.json).schemaVersion).toBe(19);
     const result = deserializeProject(serializeProject(original));
     expect(result.kind).toBe('ok');
     if (result.kind === 'ok') {

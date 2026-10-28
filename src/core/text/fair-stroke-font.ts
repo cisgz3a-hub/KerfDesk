@@ -30,11 +30,13 @@ const POLYLINE_DIGITIZED_FONT_KEYS: ReadonlySet<string> = new Set([
 
 // Fit tolerance scales with each stroke's own size (matches the drawing
 // fairing ratio in create-polyline.ts) and is clamped relative to the
-// font's cap height so tiny ticks are not over-smoothed and long
-// flourishes cannot wander visibly off the digitized chain.
+// font's em so tiny ticks are not over-smoothed and long flourishes cannot
+// wander visibly off the digitized chain. They are half the earlier ratios,
+// which applied to the EMS cap-height attribute of 500 (half the em), so the
+// faired glyphs are unchanged (ADR-682).
 const FIT_TOLERANCE_RATIO = 0.02;
-const MIN_FIT_TOLERANCE_CAP_RATIO = 0.006;
-const MAX_FIT_TOLERANCE_CAP_RATIO = 0.02;
+const MIN_FIT_TOLERANCE_EM_RATIO = 0.003;
+const MAX_FIT_TOLERANCE_EM_RATIO = 0.01;
 
 // A pen-reversal cusp (e.g. the switchback atop Decorous Script's J turns
 // 172 deg at one vertex) must never be smoothed — the fitter's curving-
@@ -65,30 +67,30 @@ export function fairStrokeFont(font: StrokeFont): StrokeFont {
     glyphs: new Map(
       Array.from(font.glyphs, ([character, glyph]): [string, StrokeFontGlyph] => [
         character,
-        fairGlyph(glyph, font.capHeight),
+        fairGlyph(glyph, font.unitsPerEm),
       ]),
     ),
   };
 }
 
-function fairGlyph(glyph: StrokeFontGlyph, capHeight: number): StrokeFontGlyph {
+function fairGlyph(glyph: StrokeFontGlyph, unitsPerEm: number): StrokeFontGlyph {
   return {
     ...glyph,
-    paths: glyph.paths.map((path) => fairStrokePath(path, capHeight)),
+    paths: glyph.paths.map((path) => fairStrokePath(path, unitsPerEm)),
   };
 }
 
-function fairStrokePath(path: CurveSubpath, capHeight: number): CurveSubpath {
+function fairStrokePath(path: CurveSubpath, unitsPerEm: number): CurveSubpath {
   // fairLineCurvePath returns mixed-segment and short paths unchanged, so
   // authored cubics and 2-3 point ticks pass straight through; splitting is
   // only meaningful on the open line chains the EMS data is made of.
   if (path.closed || path.segments.some((segment) => segment.kind !== 'line')) {
-    return fairLineCurvePath(path, { fitToleranceUnits: fitTolerance(path, capHeight) });
+    return fairLineCurvePath(path, { fitToleranceUnits: fitTolerance(path, unitsPerEm) });
   }
   // Fewer than 4 original points is a tick or a plain angle, not a sampled
   // curve — keep it byte-identical instead of densifying it into a fit.
   if (path.segments.length < 3) return path;
-  const tolerance = fitTolerance(path, capHeight);
+  const tolerance = fitTolerance(path, unitsPerEm);
   const runs = splitAtCusps(path).map((run) =>
     fairLineCurvePath(densify(run, tolerance * DENSIFY_STEP_TOLERANCE_RATIO), {
       fitToleranceUnits: tolerance,
@@ -164,7 +166,7 @@ function turnAt(points: ReadonlyArray<Vec2>, index: number): number {
   return Math.acos(Math.max(-1, Math.min(1, dot)));
 }
 
-function fitTolerance(path: CurveSubpath, capHeight: number): number {
+function fitTolerance(path: CurveSubpath, unitsPerEm: number): number {
   let minX = path.start.x;
   let minY = path.start.y;
   let maxX = path.start.x;
@@ -177,7 +179,7 @@ function fitTolerance(path: CurveSubpath, capHeight: number): number {
   }
   const diagonal = Math.hypot(maxX - minX, maxY - minY);
   return Math.max(
-    capHeight * MIN_FIT_TOLERANCE_CAP_RATIO,
-    Math.min(capHeight * MAX_FIT_TOLERANCE_CAP_RATIO, diagonal * FIT_TOLERANCE_RATIO),
+    unitsPerEm * MIN_FIT_TOLERANCE_EM_RATIO,
+    Math.min(unitsPerEm * MAX_FIT_TOLERANCE_EM_RATIO, diagonal * FIT_TOLERANCE_RATIO),
   );
 }

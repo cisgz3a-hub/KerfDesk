@@ -11,6 +11,7 @@
 import { PROJECT_SCHEMA_VERSION } from '../../core/scene/project';
 import { migrateV2OperationBindings } from './migrate-v2-operation-bindings';
 import { migrateV17FocusIntent } from './migrate-v17-focus-intent';
+import { migrateV18SingleLineTextEm } from './migrate-v18-single-line-text-em';
 import { migrateV3ReliefSources } from './migrate-v4-relief-heightfields';
 import { isMigrationFailure, type MigrationFailure } from './migration-failure';
 
@@ -56,6 +57,8 @@ const MIGRATORS: Readonly<Record<number, Migrator>> = {
   16: (raw) => ({ ...raw, schemaVersion: 17 }),
   // Schema 18 protects Z-moving focus samples from readers that ignore them.
   17: migrateV17FocusIntent,
+  // Schema 19 makes Size the em for single-line fonts; their text keeps its size.
+  18: migrateV18SingleLineTextEm,
 };
 
 function migrateV3ToV4(raw: RawProject): RawProject | MigrationFailure {

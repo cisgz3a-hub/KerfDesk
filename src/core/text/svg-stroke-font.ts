@@ -7,7 +7,7 @@ type SvgStrokeGlyphData = {
 };
 
 export type SvgStrokeFontData = {
-  readonly capHeight: number;
+  readonly unitsPerEm: number;
   readonly glyphs: Readonly<Record<string, SvgStrokeGlyphData>>;
 };
 
@@ -34,7 +34,7 @@ const NUMBER_AT_START = /^[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/;
 /** Compiles centerline SVG glyph data into open machining paths. */
 export function svgStrokeFont(data: SvgStrokeFontData): StrokeFont {
   return {
-    capHeight: data.capHeight,
+    unitsPerEm: data.unitsPerEm,
     yAxis: 'up',
     glyphs: new Map(
       Object.entries(data.glyphs).map(([character, glyph]) => [

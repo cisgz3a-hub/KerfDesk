@@ -156,9 +156,9 @@ function JigTextForm(props: Props & { readonly existing: TextObject | undefined 
           />
         </div>
         <label>
-          Size (mm)
+          Font size (mm)
           <input
-            title="Text height in millimetres"
+            title="The font's em height in millimetres; capital letters are about 0.6 to 0.9 of it"
             className="lf-input"
             aria-label="Jig text size"
             type="number"
