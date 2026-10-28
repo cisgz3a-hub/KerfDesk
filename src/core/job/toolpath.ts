@@ -13,9 +13,9 @@
 // './toolpath' importers are untouched.
 
 import type { Vec2 } from '../scene';
-import type { CncGroup, CutSegment, FillGroup, Group, Job } from './job';
+import type { CncGroup, CutGroup, CutSegment, FillGroup, Group, Job } from './job';
 import { cutSegmentBurnPolyline } from './cut-arc-moves';
-import { contourEntryPoint, type ContourEntryBounds } from './contour-entry';
+import { contourEntryPoint, contourExitPoint, type ContourEntryBounds } from './contour-entry';
 import { finalPassCutSegments } from './cut-pass-segments';
 import { expandFillHatchWithRunways } from './fill-runway';
 import { planFillSweeps, type FillSweepPlan } from './fill-sweep-plan';
@@ -85,7 +85,7 @@ function appendGroupSteps(
         group.segments,
         group.color,
         group.passes,
-        contourEntryOptions(group.entryRunwayMm, options),
+        contourRunwayOptions(group, options),
         group.entryRunwayMm,
         finalPassCutSegments(group),
       );
@@ -109,7 +109,7 @@ function appendFillGroupSteps(
       group.segments,
       group.color,
       group.passes,
-      contourEntryOptions(group.entryRunwayMm, options),
+      contourRunwayOptions(group, options),
       group.entryRunwayMm,
       group.segments,
     );
@@ -128,20 +128,21 @@ function appendFillGroupSteps(
   return prevEnd;
 }
 
-// ADR-239 entry context for contour previews: the group's runway length plus
-// the caller-provided bed used to bound it. Null when the group has no entry.
-type ContourEntryOptions = {
-  readonly runwayMm: number;
+// ADR-239 runway context for contour previews: the group's entry and M3 exit
+// lengths (0 when absent) plus the caller-provided bed used to bound them.
+type ContourRunwayOptions = {
+  readonly entryMm: number;
+  readonly exitMm: number;
   readonly bed: ContourEntryBounds;
 };
 
-function contourEntryOptions(
-  entryRunwayMm: number | undefined,
+function contourRunwayOptions(
+  group: CutGroup | FillGroup,
   options: BuildToolpathOptions,
-): ContourEntryOptions | null {
-  if (entryRunwayMm === undefined || entryRunwayMm <= 0) return null;
+): ContourRunwayOptions {
   return {
-    runwayMm: entryRunwayMm,
+    entryMm: group.entryRunwayMm ?? 0,
+    exitMm: group.exitRunwayMm ?? 0,
     bed: options.contourEntryBounds === undefined ? options.bedSizeMm : options.contourEntryBounds,
   };
 }
@@ -152,7 +153,7 @@ function appendContourGroupSteps(
   segments: ReadonlyArray<CutSegment>,
   color: string,
   passes: number,
-  entryOptions: ContourEntryOptions | null,
+  runways: ContourRunwayOptions,
   entryRunwayMm: number | undefined,
   finalPass: ReadonlyArray<CutSegment>,
 ): Vec2 | null {
@@ -164,10 +165,7 @@ function appendContourGroupSteps(
       if (first === undefined) continue;
       // ADR-239: preview the tangential entry the emitter produces — a rapid
       // to the entry point, then a laser-off feed ramp into the first vertex.
-      const entry =
-        entryOptions === null
-          ? null
-          : contourEntryPoint(seg.polyline, entryOptions.runwayMm, entryOptions.bed);
+      const entry = contourEntryPoint(seg.polyline, runways.entryMm, runways.bed);
       if (entry === null) {
         appendTravelStep(steps, prevEnd, first);
       } else {
@@ -185,6 +183,12 @@ function appendContourGroupSteps(
       });
       const last = seg.polyline[seg.polyline.length - 1];
       if (last !== undefined) prevEnd = last;
+      // ADR-239 Amendment 2: the M3 exit runs on along the last burn edge.
+      const exit = contourExitPoint(seg.polyline, runways.exitMm, runways.bed);
+      if (exit !== null && last !== undefined) {
+        appendTravelStep(steps, last, exit, 'feed');
+        prevEnd = exit;
+      }
     }
   }
   return prevEnd;

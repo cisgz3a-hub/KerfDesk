@@ -1,4 +1,5 @@
 import type { ControllerDriver } from '../../../core/controllers';
+import { prepareBoardConsoleCommand } from '../../../core/controllers/board-console-command';
 import { consoleSettingWriteIssue } from '../../../core/controllers/console-setting-writes';
 import type { GrblHalSessionEvidence } from '../../../core/controllers/grblhal/grblhal-evidence';
 import type { ConsoleCommandOptions } from '../../state/laser-console-actions';
@@ -19,7 +20,7 @@ export type RunConsoleCommandResult =
  * Confirms persistent writes and delegates exclusively to the laser store's
  * sendConsoleCommand action. Rejections are returned for inline UI display.
  * `session` is what the connected controller showed of itself (ADR-375
- * Amendment 5).
+ * Amendments 5 and 11).
  */
 export async function runConsoleCommand(
   driver: ControllerDriver,
@@ -28,7 +29,7 @@ export async function runConsoleCommand(
   provenance?: ConsoleCommandProvenance,
   session?: GrblHalSessionEvidence,
 ): Promise<RunConsoleCommandResult> {
-  const prepared = driver.prepareConsoleCommand(input);
+  const prepared = prepareBoardConsoleCommand(driver, input, session);
   if (!prepared.ok) {
     return { status: 'rejected', command: input.trim(), reason: prepared.reason };
   }

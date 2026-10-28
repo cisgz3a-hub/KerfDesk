@@ -30,7 +30,7 @@ function hoverMoves(count: number): void {
       snapSettings: DEFAULT_SNAP_SETTINGS,
       pxToMm: 1,
       setSnapMarker: useUiStore.getState().setSnapMarker,
-      setObjectTransform: () => {
+      setObjectTransforms: () => {
         throw new Error('Hover must not transform artwork');
       },
       setSnapGuides: useUiStore.getState().setSnapGuides,

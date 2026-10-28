@@ -3,7 +3,7 @@ import {
   selectionMetrics,
   type Project,
   type SelectionAnchor,
-  type Transform,
+  type SelectionTransform,
   type Vec2,
 } from '../../core/scene';
 import { useToastStore } from '../state/toast-store';
@@ -30,7 +30,8 @@ export function applyTransformDrag(args: {
   readonly snapSettings: SnapSettings;
   // Scene millimetres per canvas pixel, so the pixel snap reach tracks zoom.
   readonly pxToMm: number;
-  readonly setObjectTransform: (id: string, transform: Transform) => void;
+  // Each pointer move is one store write for the whole selection (J10-P2-1).
+  readonly setObjectTransforms: (updates: ReadonlyArray<SelectionTransform>) => void;
   readonly setSnapGuides: (next: ReadonlyArray<SnapGuide>) => void;
   readonly setSnapMarker: (next: SnapMarker | null) => void;
 }): void {
@@ -63,12 +64,10 @@ export function applyTransformDrag(args: {
   args.setSnapGuides(result.guides);
   args.setSnapMarker(result.marker);
   if (drag.kind === 'move') {
-    transformUpdatesForMoveDrag(drag, result.transform).forEach((update) => {
-      args.setObjectTransform(update.id, update.transform);
-    });
+    args.setObjectTransforms(transformUpdatesForMoveDrag(drag, result.transform));
     return;
   }
-  args.setObjectTransform(drag.objectId, result.transform);
+  args.setObjectTransforms([{ id: drag.objectId, transform: result.transform }]);
 }
 
 function ignoredSnapObjectIdsForDrag(
@@ -100,7 +99,7 @@ function applySelectionScaleDrag(args: {
   readonly point: Vec2;
   readonly e: DragEventModifiers;
   readonly project: Project;
-  readonly setObjectTransform: (id: string, transform: Transform) => void;
+  readonly setObjectTransforms: (updates: ReadonlyArray<SelectionTransform>) => void;
   readonly setSnapGuides: (next: ReadonlyArray<SnapGuide>) => void;
 }): boolean {
   if (args.drag.kind !== 'selection-scale') return false;
@@ -119,7 +118,7 @@ function applySelectionScaleDrag(args: {
   if (!resizeEditSetsSize(edit)) return true;
   const result = buildSelectionTransformEdit(objects, edit);
   if (result.kind === 'ok') {
-    for (const update of result.transforms) args.setObjectTransform(update.id, update.transform);
+    args.setObjectTransforms(result.transforms);
   } else if (result.reason === 'non-uniform-rotated-selection') {
     reportObliqueStretch();
   }
@@ -141,7 +140,7 @@ function applySelectionRotateDrag(args: {
   readonly drag: Extract<DragState, { kind: 'move' | 'scale' | 'rotate' }>;
   readonly point: Vec2;
   readonly e: DragEventModifiers;
-  readonly setObjectTransform: (id: string, transform: Transform) => void;
+  readonly setObjectTransforms: (updates: ReadonlyArray<SelectionTransform>) => void;
   readonly setSnapGuides: (next: ReadonlyArray<SnapGuide>) => void;
 }): boolean {
   const { drag } = args;
@@ -155,14 +154,14 @@ function applySelectionRotateDrag(args: {
     return false;
   }
   args.setSnapGuides([]);
-  rotateSelectionByDrag({
-    startTransforms: drag.selectionStartTransforms,
-    anchor: drag.rotateAnchor,
-    startPointerAngleDeg: drag.startPointerAngleDeg,
-    dragTo: args.point,
-    snap: args.e.shiftKey,
-  }).forEach((update) => {
-    args.setObjectTransform(update.id, update.transform);
-  });
+  args.setObjectTransforms(
+    rotateSelectionByDrag({
+      startTransforms: drag.selectionStartTransforms,
+      anchor: drag.rotateAnchor,
+      startPointerAngleDeg: drag.startPointerAngleDeg,
+      dragTo: args.point,
+      snap: args.e.shiftKey,
+    }),
+  );
   return true;
 }

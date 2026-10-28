@@ -1,6 +1,6 @@
 import { effectiveOperationForObject } from '../../core/effective-output';
 import { rasterScanBounds } from '../../core/job/raster-bounds';
-import { sourceQuarterTurn } from '../../core/job/raster-rotated-sample';
+import { rasterPassThroughDimensions } from '../../core/job/raster-pass-through-grid';
 import { imageScanPassRuns, type ScanPassRun } from '../../core/job/scan-pass-angles';
 import { pixelExtentForMm } from '../../core/raster';
 import { imageDitherAlgorithm } from '../../core/raster/image-processing';
@@ -144,15 +144,10 @@ function scanDimensions(
   angleDeg: number,
 ): { readonly width: number; readonly height: number } {
   const frame = rasterScanFrame(angleDeg);
-  if (layer.passThrough) {
-    const turn = sourceQuarterTurn(input.image, input.device, frame);
-    const swapsAxes = turn === 1 || turn === 3;
-    return {
-      width: swapsAxes ? input.image.pixelHeight : input.image.pixelWidth,
-      height: swapsAxes ? input.image.pixelWidth : input.image.pixelHeight,
-    };
-  }
   const bounds = rasterScanBounds(input.image, input.device, frame);
+  if (layer.passThrough) {
+    return rasterPassThroughDimensions(input.image, input.device, frame, bounds);
+  }
   return {
     width: pixelExtentForMm(bounds.maxX - bounds.minX, layer.linesPerMm),
     height: pixelExtentForMm(bounds.maxY - bounds.minY, layer.linesPerMm),

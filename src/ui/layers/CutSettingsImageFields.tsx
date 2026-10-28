@@ -70,7 +70,7 @@ export function CutSettingsImageFields(props: {
           min={0}
           max={props.deferArtworkBounds ? 1 : dotWidthCorrectionMax(props.imageLinesPerMm)}
           label="dot width correction"
-          title="Compensate for physical laser dot width when raster engraving. Shortens each burned run at both ends along the scan; it cannot widen white lines that run parallel to the scan."
+          title="Compensate for physical laser dot width when raster engraving. Shortens each burned line at both ends, where the beam turns on and off along the scan; power changes inside a line are not trimmed. It cannot widen white lines that run parallel to the scan."
         />
         <span className="lf-field-unit">mm</span>
       </Field>
@@ -209,6 +209,8 @@ function ImageExtraFields(props: {
         <p className="lf-laser-help">
           Pass-through keeps original pixels and density, skipping brightness, contrast, gamma,
           negative and dither adjustments. Power range, placement, masks and Dot Width still apply.
+          Only an image square to its scan direction keeps its pixels one for one; Job Review warns
+          about a turned one.
         </p>
       </div>
     </details>

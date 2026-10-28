@@ -11,7 +11,11 @@ import { writeTracedDrawing } from '../../io/vector-formats/traced-drawing';
 // pages, per-side margins, the Size row, streaming writes and per-file skips,
 // and must not move. A change here changes files users already export. They
 // were taken again for ADR-530 only, whose compact curves change the traced
-// paths themselves; the page, the headers and every writer are unchanged.
+// paths themselves; the page, the headers and every writer are unchanged. And
+// once more for ADR-530 Amendment 11 and ADR-439 Amendment 1: this two-level
+// 64 x 48 ring is now drawn on its own grid (4 + 4 cubics and an exact bar,
+// was 2,334 bytes of SVG path, now 486). Only the path data changed; the fitted
+// page follows the artwork's bounds (8.009 x 6.316 mm -> 8.03 x 6.36 mm).
 
 function ringImage(): RawImageData {
   const width = 64;
@@ -56,18 +60,18 @@ async function defaultHashes(page?: {
 }
 
 const IMAGE_PAGE_GOLDEN: Record<string, string> = {
-  svg: '92123a1e4f0ec8f7',
-  pdf: '5b7f7013a83f133e',
-  eps: 'defaaf4d16a1f5db',
-  dxf: 'ab4146e47b672719',
-  geojson: 'd9ba29739d87f384',
+  svg: '0036167c2df5e551',
+  pdf: '9107d43f8c812ab0',
+  eps: '619d4eb08ea176e1',
+  dxf: '375632ce4ed545a5',
+  geojson: 'ba81c62976b5bec5',
 };
 const ARTWORK_PAGE_GOLDEN: Record<string, string> = {
-  svg: '9c4f9cd8d32ed6e3',
-  pdf: '59ba1a00a78ac892',
-  eps: '05a53444023dfe23',
-  dxf: 'beec7a6bfbd5907f',
-  geojson: '99a01c90866a8c4c',
+  svg: '7632634cbb6ccd16',
+  pdf: '11289c1845296315',
+  eps: '9165854aae982eae',
+  dxf: '5eb186e03f5c9be5',
+  geojson: '9e2609b88168c6b3',
 };
 
 describe('Multi-File Trace default output is byte-identical to the base commit', () => {

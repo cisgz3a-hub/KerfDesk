@@ -6,15 +6,15 @@ vi.mock('./use-trace-worker-client', () => ({
 
 // Spy on the histogram so a test can prove the UI thread never computes the
 // whole image's Otsu cut in Enhance mode (ADR-435).
-vi.mock('../../core/trace/preprocess', async (importOriginal) => {
-  const actual = await importOriginal<typeof Preprocess>();
-  return { ...actual, otsuThreshold: vi.fn(actual.otsuThreshold) };
+vi.mock('../../core/trace/otsu-cut', async (importOriginal) => {
+  const actual = await importOriginal<typeof OtsuCut>();
+  return { ...actual, otsuSeparation: vi.fn(actual.otsuSeparation) };
 });
 
 import type { ColoredPath } from '../../core/scene';
-import type * as Preprocess from '../../core/trace/preprocess';
+import type * as OtsuCut from '../../core/trace/otsu-cut';
 import type { RawImageData, TraceBoundary, TraceOptions } from '../../core/trace';
-import { otsuThreshold } from '../../core/trace/preprocess';
+import { otsuSeparation } from '../../core/trace/otsu-cut';
 import { resolveFrozenTraceSourceOptions } from '../../core/trace/trace-source-decisions';
 import { traceImageWithBoundaryMode } from './region-enhance-trace';
 import { traceImageWithFallback } from './use-trace-worker-client';
@@ -48,7 +48,7 @@ function polyline(points: ReadonlyArray<readonly [number, number]>) {
 
 afterEach(() => {
   vi.mocked(traceImageWithFallback).mockReset();
-  vi.mocked(otsuThreshold).mockClear();
+  vi.mocked(otsuSeparation).mockClear();
 });
 
 describe('traceImageWithBoundaryMode — crop mode', () => {
@@ -290,10 +290,10 @@ describe('traceImageWithBoundaryMode � frozen decisions stay off the UI thread
       undefined,
       undefined,
     );
-    expect(otsuThreshold).not.toHaveBeenCalled();
+    expect(otsuSeparation).not.toHaveBeenCalled();
     // Control: the spy does see the UI-thread resolver when it runs.
     resolveFrozenTraceSourceOptions(source, otsuOptions);
-    expect(otsuThreshold).toHaveBeenCalled();
+    expect(otsuSeparation).toHaveBeenCalled();
   });
 
   it('reuses them while the box moves, and resolves again when a setting changes', async () => {

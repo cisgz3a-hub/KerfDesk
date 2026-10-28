@@ -140,7 +140,8 @@ function insertAndPlace(store: RemoteAppStore, placement: Placement, insert: () 
   if (step.fit === null) return { ids, outcome: { kind: 'added' } };
   const fitted = step.fit.objects;
   inOneUndoStep(store, () => {
-    for (const object of fitted) store.getState().setObjectTransform(object.id, object.transform);
+    // One write for every fitted object, not one per object (J10-P2-1).
+    store.getState().setObjectTransforms(fitted.map(({ id, transform }) => ({ id, transform })));
     applyEdits(store, step.placement);
   });
   fitAllObjects(store.getState);

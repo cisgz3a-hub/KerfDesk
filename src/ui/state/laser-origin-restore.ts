@@ -28,6 +28,7 @@ import {
 } from './laser-controller-status-wait';
 import { assertOriginActionReady, usesPrimaryWcs } from './laser-origin-readiness';
 import { runOriginTransaction, type OriginSafeWrite } from './laser-origin-transaction';
+import { beginOwnedReportUnitsLine } from './owned-report-units';
 import { pushLog } from './laser-store-helpers';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { WorkCoordinateOffset } from './origin-actions';
@@ -185,7 +186,18 @@ async function writeXyOffset(
       action.label,
       async (write) => {
         assertTargetCurrent?.();
-        if (!grblFamily) await write('G21\n');
+        if (!grblFamily) {
+          // Smoothieware's reports follow this G21 (owned-report-units.ts).
+          const acknowledged = beginOwnedReportUnitsLine(
+            set,
+            get,
+            refs.driver,
+            'G21',
+            action.label,
+          );
+          await write('G21\n');
+          acknowledged();
+        }
         assertTargetCurrent?.();
         if (usesReportedOffset) confirmation.observe();
         await write(`${line}\n`);

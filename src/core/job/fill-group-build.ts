@@ -6,7 +6,7 @@
 import type { DeviceProfile } from '../devices';
 import type { Layer } from '../scene';
 import { fillScanOverscanMm } from './automatic-overscan';
-import { contourEntryRunwayMm } from './contour-entry';
+import { contourEntryRunwayMm, contourExitRunwayMm } from './contour-entry';
 import { fillRunwayPolicyForDevice } from './fill-runway-policy';
 import type { FillGroup, FillSegment } from './job';
 import type { EffectiveScanDirection } from './scan-direction-policy';
@@ -31,12 +31,15 @@ export function buildFillGroup(args: {
   // ADR-239: Follow Shape loops get tangential feed-matched entries on the
   // 4040-safe profile; scanline/island sweeps use fillRunwayPolicy instead.
   const entryRunwayMm = isOffset ? contourEntryRunwayMm(device, layer.fillOverscanMm) : undefined;
+  // ADR-239 Amendment 2: only an M3 (constant-power) loop gets the exit.
+  const exitRunwayMm = contourExitRunwayMm(device, entryRunwayMm, 'fill', args.common.powerMode);
   return {
     ...args.common,
     kind: 'fill' as const,
     fillStyle: layer.fillStyle,
     ...(fillRunwayPolicy === undefined ? {} : { fillRunwayPolicy }),
     ...(entryRunwayMm === undefined ? {} : { entryRunwayMm }),
+    ...(exitRunwayMm === undefined ? {} : { exitRunwayMm }),
     ...(isOffset ? {} : { scanDirection: args.scanDirection }),
     ...(isOffset || scanOffsetMm === undefined ? {} : { bidirectionalScanOffsetMm: scanOffsetMm }),
     overscanMm: fillScanOverscanMm(layer, device),

@@ -19,7 +19,11 @@ export type ProjectSaveTargetResult =
   | { readonly kind: 'failed'; readonly message: string };
 
 type LargeProjectSaveResult =
-  | { readonly kind: 'prepared'; readonly json: string; readonly target: ProjectSaveTargetResult }
+  | {
+      readonly kind: 'prepared';
+      readonly json: string | Blob;
+      readonly target: ProjectSaveTargetResult;
+    }
   | Extract<ProjectSavePreparation, { readonly kind: 'invalid' | 'failed' }>
   | { readonly kind: 'cancelled' | 'stale-document' | 'stale-request' };
 

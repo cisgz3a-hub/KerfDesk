@@ -3,12 +3,16 @@ import { unpackProjectMessage } from '../packed-project-transfer';
 import type { ProjectSavePreparationMessage } from './project-save-preparation-client';
 import {
   prepareProjectForPersistence,
-  serializeProject,
+  serializeProjectChunks,
   type PreparedProjectPersistence,
 } from '../../io/project';
 
+// Canonical preparation returns validated text, which Save seals. The raw
+// recovery copy is a Blob of compact chunks that are never joined, so it
+// still reaches a file when the project's text passes the engine's longest
+// string, which is when Save itself is refused (J10-P3-3).
 export type ProjectSavePreparation =
-  | Pick<Extract<PreparedProjectPersistence, { readonly kind: 'ok' }>, 'kind' | 'json'>
+  | { readonly kind: 'ok'; readonly json: string | Blob }
   | Extract<PreparedProjectPersistence, { readonly kind: 'invalid' }>
   | { readonly kind: 'failed'; readonly reason: string };
 
@@ -35,7 +39,7 @@ export function prepareProjectSaveMessage(project: Project): ProjectSavePreparat
 
 export function prepareProjectRecoveryMessage(project: Project): ProjectSavePreparation {
   try {
-    return { kind: 'ok', json: serializeProject(project) };
+    return { kind: 'ok', json: new Blob([...serializeProjectChunks(project)]) };
   } catch (error) {
     return { kind: 'failed', reason: error instanceof Error ? error.message : String(error) };
   }

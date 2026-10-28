@@ -32,7 +32,7 @@ describe('applyTransformDrag', () => {
       snapSettings,
       pxToMm,
       setSnapMarker: () => undefined,
-      setObjectTransform: (id, transform) => updates.push({ id, transform }),
+      setObjectTransforms: (next) => updates.push(...next),
       setSnapGuides: (next) => {
         guides = next;
       },
@@ -60,7 +60,7 @@ describe('applyTransformDrag', () => {
       snapSettings,
       pxToMm,
       setSnapMarker: () => undefined,
-      setObjectTransform: (id, transform) => updates.push({ id, transform }),
+      setObjectTransforms: (next) => updates.push(...next),
       setSnapGuides: () => undefined,
     });
 
@@ -90,7 +90,7 @@ describe('applyTransformDrag', () => {
         snapSettings,
         pxToMm,
         setSnapMarker: () => undefined,
-        setObjectTransform: (id, transform) => updates.push({ id, transform }),
+        setObjectTransforms: (next) => updates.push(...next),
         setSnapGuides: () => undefined,
       });
 
@@ -122,7 +122,7 @@ describe('applyTransformDrag', () => {
       snapSettings,
       pxToMm,
       setSnapMarker: () => undefined,
-      setObjectTransform: (id, transform) => updates.push({ id, transform }),
+      setObjectTransforms: (next) => updates.push(...next),
       setSnapGuides: () => undefined,
     });
 

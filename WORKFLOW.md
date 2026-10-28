@@ -2154,6 +2154,13 @@ millimetre position report. Old position and offset numbers are discarded before
 is used. G21 remains selected, including after Cancel; work offsets and the physical origin are
 not erased. GRBL's independent `$13` reporting-unit contract is unchanged.
 
+The other G21 lines KerfDesk sends on Smoothieware are recorded the same way. These are Restore
+saved origin, Place Board's corner origin, Continue from where the head stopped and Auto-focus's
+probe setup. While such a line is in flight after a Console G20, or on a board left in G20, the
+position is hidden. Once the board acknowledges it, KerfDesk reads millimetres, and the Console says
+the board now reports millimetres. A recovery program that selects millimetres while KerfDesk reads
+inches hides the position until `$G` or the next Frame (ADR-375 Amendment 11).
+
 #### CNC — safe-Z retract and restore
 1. CNC Frame requires current-session stock-top Work-Z and a fresh known work position because its
    absolute work-frame safe-Z retract/restore program cannot otherwise be constructed (ADR-192,
@@ -2741,6 +2748,11 @@ authorization, Frame proof, controller command, or safety boundary.
    lasers) runs under the stock-GRBL profile. When its `$$` lists grblHAL's `$14`-`$18`, its
    banner reads `GrblHAL` or its `$I` names grblHAL, a value must pass the grblHAL check as well
    as the stock one, and the refusal says why grblHAL applies (ADR-375 Amendment 5).
+3. FluidNC runs a line that starts with `[` as a `$` command (`[13]1` is `$13=1`, `[RST]#` is
+   `$RST=#`). A FluidNC board can run under the stock-GRBL or grblHAL profile. When its banner names
+   FluidNC, the Console reads such a line as that `$` command and sends the `$` form. So `[13]1`
+   gets the profile's `$13=1` confirmation and `$$` re-read. `[RST]#` and `[NVX]` are blocked, as
+   they are on the FluidNC profile (ADR-375 Amendments 7 and 11).
 
 #### Edge — arbitrary G-code
 1. Single-line G-code commands are allowed only when connected, no operation is active, and GRBL reports `Idle`.
@@ -4140,13 +4152,15 @@ settings and Job Review keep their existing read-only setup references.
    halftone treatment; Image mode also offers grayscale and dithered photo engraving.
    **Colour layers** splits flat-colour artwork into a few colours (**Colours**: Auto or 2 to 8,
    counting the paper) and traces one filled layer per colour; neighbouring colours share one
-   edge with no gap or overlap (ADR-461). **Cut-out** burns each colour only in its own area;
-   **Stacked** also fills each colour under the darker colours above it. The paper colour is left
-   untraced unless **Trace background colour** is ticked; only a light border colour counts as
-   paper, so light-on-dark art traces every colour. The swatches show the traced colours,
-   lightest first. On commit each colour gets its own operation; on a laser each starts at a power
-   set by its darkness (a mid-dark or darker colour keeps the operation's power), which the
-   operator can edit. Paper (near-white, or the traced background) starts with output off.
+   edge with no gap or overlap (ADR-461). On Auto, a distinct thin colour such as small text keeps
+   its own layer even after JPEG, a slight blur or grain (ADR-461 Amendment 3). **Cut-out** burns
+   each colour only in its own area; **Stacked** also fills each colour under the darker colours
+   above it. The paper colour is left untraced unless **Trace background colour** is ticked; only
+   a light border colour counts as paper, so light-on-dark art traces every colour. The swatches
+   show the traced colours, lightest first. On commit each colour gets its own operation; on a
+   laser each starts at a power set by its darkness (a mid-dark or darker colour keeps the
+   operation's power), which the operator can edit. Paper (near-white, or the traced background)
+   starts with output off.
    For line artwork, choose **Detection** explicitly: the preset's automatic detection, a **Manual brightness band**,
    **Faint lines (keep solid areas)**, or **Sketch (local contrast)**. Faint lines adds coherent
    pale strokes to the preset's solid ink while rejecting isolated pale specks. Sketch uses
@@ -4615,8 +4629,19 @@ Contour entry moves use the prepared program's explicit physical envelope, inclu
 origins and translated work origins. If that envelope is unknown, the optional contour entry is
 omitted, and the program's layer comment (`contour-entry skipped (bed position unknown)`) and Job
 Review ("Not added …", a warning-tone fact) say so instead of calling the entry effective
-(ADR-239 Amendment 1). Preview, timing, Frame bounds and output use the same prepared result. Earlier archived
+(ADR-239 Amendment 1). A constant-power (M3) contour, which on the 4040-safe profile means Line
+cuts unless the operation's Power mode says Dynamic, also leaves its last burn point by a laser-off
+exit of the same length along its last edge, and that exit is skipped and disclosed by the same
+rule (`contour-exit …`, "Contour entry and exit", ADR-239 Amendment 2). Preview, timing, Frame bounds and output use the same prepared result. Earlier archived
 jobs retain their original entry behaviour so recovery does not silently change sealed output.
+
+Constant-power advice (ADR-257 Amendment 1). Where a dialect's default burns an operation with
+M3 on GRBL-family output, Save, Start and Job Review advise: GRBL Compatible images whose
+one-move-per-pixel rows outrun the controller's look-ahead burn darker than the Preview, and
+GRBL Compatible and 4040 Line cuts burn darker at corners (and at path starts and ends without
+runways). The advice points GRBL 1.1f and newer to GRBL Dynamic (or the operation's Dynamic
+Power mode on the 4040), as LightBurn does; with a current `$I` reply, Job Review names the
+controller's own version. An operation set to Constant by hand gets no advice.
 
 **Status readout.** `StatusDisplay` shows MPos + `Origin:` row. The
 `Origin:` row reads from `wcoCache` (cached last-seen WCO across
@@ -4744,20 +4769,34 @@ Set origin here again. It is a warning; Frame and Start are not refused (ADR-375
     way (`M8`, then `M9` after the last operation; the `M8` repeats of
     step 13 switch nothing), the pump must still be running through the middle
     operation and the last one, and Job Review must name the held
-    operation and `$152=100` (ADR-345: Creality's Falcon A1 parameter
-    page defines `$152` as the standby wait, so `100` keeps the pump
-    powered and `0` idles it immediately; the A1 Pro page does not list
-    it). Send `$152=100` from the Console while Idle: on the Falcon
-    command set it accepts `$150`, `$151` and `$152` (whole numbers
-    0-100) and still refuses every other numeric setting write
-    (ADR-370). The write clears the Frame proof, so Frame again before
-    Start. Untick "Air restart" and the same job must
+    operation. What else it names depends on the firmware (ADR-370
+    Amendment 1):
+    - **Falcon A1 Pro preset (grblHAL).** Job Review names an air test
+      on updated firmware, not `$152=100`, and its standby advisory says
+      that `$150`-`$152` set the motor microsteps on that firmware. The
+      Console refuses `$150`, `$151` and `$152`, naming the X, Y or Z
+      microstep setting, and every other numeric setting write. Do not
+      send them from another program either: on a build with the
+      Trinamic plugin, a power-of-two value changes how far that motor
+      moves.
+    - **Falcon on a stock-GRBL profile (the A1's numbering).** Job
+      Review names `$152=100` (ADR-345: Creality's Falcon A1 parameter
+      page defines `$152` as the standby wait, so `100` keeps the pump
+      powered and `0` idles it immediately). Send `$152=100` from the
+      Console while Idle: on this command set it accepts `$150`, `$151`
+      and `$152` (whole numbers 0-100) and still refuses every other
+      numeric setting write (ADR-370). It refuses them too when the
+      controller greets as grblHAL. The write clears the Frame proof, so
+      Frame again before Start.
+
+    Untick "Air restart" and the same job must
     go back to `M8 M9 M8 M9`. If the pump is audibly off for the last
     operation with the box ticked, the hold is not working; if it is
     off only with the box unticked, the firmware timer is confirmed.
 13. **Qualify air repeats on the installed firmware (ADR-462).** In a
-    separately supervised air check, record the firmware and current
-    `$152` setting. With "Air restart" ticked, inspect a short-block job
+    separately supervised air check, record the firmware and, on a
+    stock-GRBL Falcon, the current `$152` setting (the A1 Pro's
+    contract cannot read it). With "Air restart" ticked, inspect a short-block job
     of a minute or more with Air on: the program attempts `M8` repeats
     at eligible movement boundaries after about 5 s of estimated time.
     Observe whether the pump stays on and whether the enclosure fan
@@ -4765,8 +4804,9 @@ Set origin here again. It is a warning; Frame and Start are not refused (ADR-375
     dwells and continuous M3 cutting can exceed the trigger without a
     repeat, so this mitigation does not guarantee continuous air.
     Compare with "Air restart" unticked, which emits one `M8` for an
-    all-Air-on job. If air still stops, keep the firmware/`$152=100`
-    remedy from step 12 and verify it separately. Do not treat a pass
+    all-Air-on job. If air still stops, keep the remedy from step 12
+    (firmware, plus `$152=100` on a stock-GRBL Falcon only) and verify
+    it separately. Do not treat a pass
     on short blocks as qualification of every job or firmware version.
 
 When this checklist passes on the Falcon, replace the F.3 status in `PROJECT.md` Phase F
@@ -4961,11 +5001,16 @@ selected.
    spacing, or turn off **Same X / Y spacing** for independent gaps. The live
    footprint diagram and count show the exact draft before it is applied.
 4. **Array on board** → copies tile the board, the block centered, as one undo
-   step. Copies inherit the design's layer/settings.
+   step. Copies inherit the design's layer/settings. A photo's mask (Apply Mask to Image) and a
+   path text's guide move with the design, and every copy gets its own, so each tile burns the
+   whole masked photo (ADR-633 Amendment 3). A board used as the mask stays put.
 5. Undo restores the single design. After arraying, the whole grid is selected, so Array/Fit disable until you undo (or reselect one design) - this stops a re-click from silently stacking a doubled burn.
 
 **Edge / empty / error.** No board, or zero/several designs selected → both
-controls are disabled ("Select exactly one design…"). A design larger than the
+controls are disabled ("Select exactly one design…"). A photo selected with its own mask, or a
+path text with its guide, is one design for **Array on board**; **Fit to board** still takes the
+photo alone. Job Review names a masked photo that lies on only part of its mask, with how much,
+as well as one that misses it. A design larger than the
 usable board produces zero copies and leaves the scene unchanged. A fixed count
 that does not fit shows the fitting count alongside the request. A runaway count
 (huge rows, or a tiny design under "fit as many as fit") is capped at 100 per
@@ -6347,7 +6392,10 @@ and lifts the command's CNC-only gate.)*
    probed. Until the last bit's file has run, Set and Reset origin and the XYZ corner probe are
    refused as in an `M0` hold; Zero Z and the Z probe stay open. The machine panel says which
    bit ran and offers **End bit sequence** for starting over on new stock. A new controller
-   session ends it too.
+   session ends it too. When Abort, an alarm, a reset or a rejected line stopped a file before
+   its end, the panel says that bit's file did not finish: keep the same bit, Zero Z or probe
+   again, and run that file again from its start. The X/Y hold stays, the last bit's included,
+   until the file has run (ADR-392 Amendment 6).
 5. On a profile whose controller cannot run KerfDesk CNC jobs, saving the package gives the
    GRBL-family warning Save as gives, and the printed sheet carries it (ADR-399 Amendment 1).
 6. Save as of a multi-bit job writes one file with an `M0` per bit change and adds a note saying

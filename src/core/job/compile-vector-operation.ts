@@ -4,7 +4,7 @@ import { layerOperationOutputEqual } from '../scene/layer';
 import { collectFillSegmentsForLayer, islandFillGroupsForLayer } from './layer-fill';
 import { buildFillGroup } from './fill-group-build';
 import { hasExecutableFillSweep } from './fill-group-emission';
-import { contourEntryRunwayMm } from './contour-entry';
+import { contourEntryRunwayMm, contourExitRunwayMm } from './contour-entry';
 import type { CutGroup, JobDiagnostic } from './job';
 import { fillPassLayers } from './scan-pass-angles';
 import { lineLeadDiagnostics, lineLeadFields, lineOvercutFields } from './line-cut-extras';
@@ -211,7 +211,12 @@ function lineGroups(
     topologyScope: scope,
   };
   const entryRunwayMm = contourEntryRunwayMm(device, layer.fillOverscanMm);
-  const runway = entryRunwayMm === undefined ? {} : { entryRunwayMm };
+  // ADR-239 Amendment 2: an M3 contour also leaves by a laser-off exit.
+  const exitRunwayMm = contourExitRunwayMm(device, entryRunwayMm, 'cut', common.powerMode);
+  const runway = {
+    ...(entryRunwayMm === undefined ? {} : { entryRunwayMm }),
+    ...(exitRunwayMm === undefined ? {} : { exitRunwayMm }),
+  };
   const cut: ReadonlyArray<CutGroup> =
     line.segments.length === 0
       ? []

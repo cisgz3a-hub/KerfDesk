@@ -250,7 +250,10 @@ therefore sent moves the firmware refuses, or trusted values the controller had 
      G-code. Amended again by
      [Amendment 7](ADR-375-amendment-7-bracket-lines-and-gcode-report-units.md): FluidNC's
      `[key]value` lines are read as their `$` form, and after a Console units line Smoothieware's
-     report units are read back with `$G`.)*
+     report units are read back with `$G`. Amended again by
+     [Amendment 11](ADR-375-amendment-11-owned-units-lines-and-fluidnc-under-a-grbl-profile.md):
+     KerfDesk's own G21 records the units it selects, and a stock-GRBL or grblHAL profile reads a
+     FluidNC board's `[key]value` lines as their `$` form once the banner shows FluidNC.)*
    - Stock GRBL stores a non-axis setting as an 8-bit integer and still answers `ok`
      ([settings.c L229](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/settings.c#L229)), so a Console `$22=0.5` turned homing and soft limits
      off while KerfDesk reported the write as done. On the stock GRBL driver the Console now

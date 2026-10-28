@@ -143,8 +143,13 @@ describe('thin shapes keep their size and their topology (ADR-530)', () => {
       expect(outlines).toHaveLength(1);
       const change = area(flatten(outlines[0] as CurveSubpath, 64)) / inkPixels(image) - 1;
       // ADR-439 base: +41% (2 px, 0°), +20..50% (3-6 px at 15-30°) on Line Art
-      // and Smooth.
-      const [low, high] = preset === 'Sharp' ? [-0.03, 0.03] : [-0.1, 0.08];
+      // and Smooth. One cell is wider (ADR-439 Amendment 1): Smooth's 3 px bar at
+      // 30° measures +8.5% (+3.1% on the 2x route before ADR-530 Amendment 11).
+      // Its end apexes stood 2.3 px past the bar, off the ink, and are withdrawn;
+      // Smooth's coarser simplification then tilts one long side by up to 0.7 px.
+      // Line Art's, at half that tolerance, measures +1.7%.
+      const smoothThreePx = preset === 'Smooth' && width === 3 && degrees === 30;
+      const [low, high] = preset === 'Sharp' ? [-0.03, 0.03] : [-0.1, smoothThreePx ? 0.09 : 0.08];
       expect(change).toBeGreaterThanOrEqual(low);
       expect(change).toBeLessThanOrEqual(high);
     },

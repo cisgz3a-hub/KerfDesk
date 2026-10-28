@@ -36,7 +36,7 @@ import { collectOutputCorners } from './centerline/curve-refine';
 import { fitSmoothCurve } from './centerline/curve-fit';
 import { denseChordBand } from './contour-chord-band';
 import { flattenStraightRuns } from './flatten-straight-runs';
-import { isSaddleVertex, smoothBetweenCorners } from './contour-loop-shape';
+import { isHairlineRibbon, isSaddleVertex, smoothBetweenCorners } from './contour-loop-shape';
 import { smoothArcNoise } from './smooth-arc-noise';
 import { curvedTraceRing } from './trace-curves';
 import {
@@ -349,6 +349,7 @@ function finishLoop(staircase: ReadonlyArray<Vec2>, finish: LoopFinish): Finishe
     // sit on the lines it will draw (binary loops only — measured loops skip it).
     edgeNoisePx: subPixelInformed ? 0 : finish.flattenStrength,
     ...(finish.crackField === undefined ? {} : { field: finish.crackField }),
+    inkAt: (x, y) => maskInkAt(finish.mask, x, y),
   });
   const corners = separateSaddleApexes(decided, crack.points, (vertex) =>
     isSaddleVertex(finish.mask, vertex),
@@ -362,7 +363,12 @@ function finishLoop(staircase: ReadonlyArray<Vec2>, finish: LoopFinish): Finishe
   // repair as every other admitted contour.
   const retainCracks = (): ContourRefinement =>
     admittedLoopFallback(crack.points, finish.epsilonPx);
-  const retained = finishDenseLoop(staircase, spliced, subPixelInformed, finish) ?? retainCracks();
+  // A binary hairline is fitted as it was walked: the staircase stages would
+  // pinch it (isHairlineRibbon). Its corners stay binary.
+  const fitted =
+    subPixelInformed ||
+    (finish.flattenStrength > 0 && isHairlineRibbon(staircase, finish.pixelScale));
+  const retained = finishDenseLoop(staircase, spliced, fitted, finish) ?? retainCracks();
   const source = closeContour(crack.points);
   if (spliced.corners.size === 0) return { ...retained, source };
   // A corner apex extends the legs to where they meet, bounded by the corner
@@ -374,9 +380,15 @@ function finishLoop(staircase: ReadonlyArray<Vec2>, finish: LoopFinish): Finishe
     ...retained,
     source,
     withoutRebuiltCorners: () =>
-      finishDenseLoop(staircase, chainWithCorners(crack.points, []), subPixelInformed, finish) ??
+      finishDenseLoop(staircase, chainWithCorners(crack.points, []), fitted, finish) ??
       retainCracks(),
   };
+}
+
+function maskInkAt(mask: InkMask, x: number, y: number): boolean {
+  return (
+    x >= 0 && y >= 0 && x < mask.width && y < mask.height && mask.ink[y * mask.width + x] === 1
+  );
 }
 
 // Smooth the spliced chain between its corners, then run the size-class tail.

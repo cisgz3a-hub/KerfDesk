@@ -5,6 +5,12 @@ import {
   useBoardPhotoInbox,
   type BoardRemoteStatus,
 } from '../laser/board-capture/board-capture-remote';
+import {
+  burnedCellsPerPhoto,
+  masksOverTheirPhotos,
+  offImageAdvisories,
+  setUpMaskedPhotoOnBoard,
+} from '../state/board-array-masks.test-support';
 import { useStore } from '../state/store';
 import { resetStore, svgObj } from '../state/test-helpers';
 import { useUiStore } from '../state/ui-store';
@@ -182,6 +188,21 @@ describe('place_on_board', () => {
     const before = useStore.getState().project.scene.objects.length;
     expect(resultCode(await place('array', { rows: 2, cols: 2, gapMm: 1 }))).toBe('ok');
     expect(useStore.getState().project.scene.objects.length).toBeGreaterThan(before);
+  });
+
+  // Rolling audit v5 J9-P1-1 (ADR-633 Amendment 3): each tile kept the
+  // original's mask and burned a quarter of it.
+  it('arrays a masked photo with its own mask in every tile', async () => {
+    setUpMaskedPhotoOnBoard();
+    adapter.dispose();
+    adapter = testAdapter();
+    const [whole] = burnedCellsPerPhoto();
+
+    const result = await place('array', { rows: 2, cols: 2, gapMm: 2 }, ['photo']);
+    expect(resultCode(result)).toBe('ok');
+    expect(burnedCellsPerPhoto()).toEqual([whole, whole, whole, whole]);
+    expect(masksOverTheirPhotos()).toEqual([true, true, true, true]);
+    expect(offImageAdvisories()).toEqual([]);
   });
 
   it('rejects arraying multiple artwork IDs', async () => {

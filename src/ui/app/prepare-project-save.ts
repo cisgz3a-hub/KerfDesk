@@ -45,6 +45,13 @@ async function prepareUnsealedProjectSave(
     );
     switch (result.kind) {
       case 'prepared':
+        // Canonical preparation returns validated text to seal; only the raw
+        // recovery copy comes back as a Blob.
+        if (typeof result.json !== 'string')
+          return {
+            kind: 'stopped',
+            outcome: failProjectSave(owner, 'project preparation returned no project text'),
+          };
         return selectedProjectSave(owner, result.json, result.target, reuseTarget);
       case 'invalid':
         return result;

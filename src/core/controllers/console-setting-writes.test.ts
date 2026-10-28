@@ -4,15 +4,22 @@ import { consoleSettingReadbackIssue, consoleSettingWriteIssue } from './console
 import type { GrblHalSessionEvidence } from './grblhal/grblhal-evidence';
 import { selectControllerDriver } from './select-controller-driver';
 
-const falcon = selectControllerDriver('grblhal', 'creality-falcon-a1-pro');
+// The Falcon contract on stock GRBL (the A1's numbering) and on grblHAL (the
+// A1 Pro preset's firmware).
+const falcon = selectControllerDriver('grbl-v1.1', 'creality-falcon-a1-pro');
+const falconA1Pro = selectControllerDriver('grblhal', 'creality-falcon-a1-pro');
 const grbl = selectControllerDriver('grbl-v1.1');
 const grblHal = selectControllerDriver('grblhal');
 const fluidnc = selectControllerDriver('fluidnc');
 
-function issue(driver: ControllerDriver, input: string): string | null {
+function issue(
+  driver: ControllerDriver,
+  input: string,
+  session?: GrblHalSessionEvidence,
+): string | null {
   const prepared = driver.prepareConsoleCommand(input);
   if (!prepared.ok) throw new Error(prepared.reason);
-  return consoleSettingWriteIssue(driver, prepared.command);
+  return consoleSettingWriteIssue(driver, prepared.command, session);
 }
 
 describe('Console numeric setting writes (ADR-370)', () => {
@@ -20,10 +27,51 @@ describe('Console numeric setting writes (ADR-370)', () => {
     expect(issue(grblHal, '$110=6000')).toBeNull();
   });
 
-  it("sends Creality's documented air settings on the Falcon contract", () => {
+  it("sends Creality's documented Falcon A1 air settings on the stock-GRBL Falcon contract", () => {
     for (const input of ['$150=25', '$151=100', '$152=100', '$152=0', '$ 152 = 30']) {
       expect(issue(falcon, input), input).toBeNull();
     }
+  });
+
+  // Rolling audit v5 J8-P3-2 (ADR-370 Amendment 1). An A1 Pro's $I/$$ reads
+  // grblHAL with [PLUGIN:Trinamic v0.12] and $150=16 $151=16 $152=16: the X, Y
+  // and Z microsteps, which a power-of-two value changes without touching
+  // steps/mm.
+  it('sends no $150-$152 write on the grblHAL Falcon contract and names their grblHAL meaning', () => {
+    for (const [input, axis] of [
+      ['$150=32', 'X'],
+      ['$151=8', 'Y'],
+      ['$152=8', 'Z'],
+      ['$152=100', 'Z'],
+      ['$150=25', 'X'],
+    ] as const) {
+      expect(issue(falconA1Pro, input), input).toBe(
+        `KerfDesk does not send numeric $ setting writes on the ${falconA1Pro.label} profile. ` +
+          `Configure the controller with its own tools. In grblHAL's numbering ${input.slice(0, 4)} ` +
+          `is the ${axis} axis microstep setting, not a Falcon A1 air setting: on a build with the ` +
+          "Trinamic plugin, as the Falcon A1 Pro's is, a power-of-two value changes how far that " +
+          'motor moves.',
+      );
+    }
+    expect(issue(falconA1Pro, '$110=36000')).toBe(
+      `KerfDesk does not send numeric $ setting writes on the ${falconA1Pro.label} profile. Configure the controller with its own tools.`,
+    );
+  });
+
+  it('refuses the A1 air settings when a stock-GRBL Falcon profile meets a controller that shows grblHAL', () => {
+    const banner: GrblHalSessionEvidence = {
+      detectedControllerKind: 'grblhal',
+      controllerSettings: null,
+      controllerBuildInfoRawLines: [],
+    };
+    expect(issue(falcon, '$152=100', banner)).toBe(
+      '$152 (air pump standby wait in seconds, 100 = never) is listed for stock-GRBL firmware, ' +
+        "but this controller greets as grblHAL. In grblHAL's numbering $152 is the Z axis " +
+        'microstep setting, not a Falcon A1 air setting: on a build with the Trinamic plugin, as ' +
+        "the Falcon A1 Pro's is, a power-of-two value changes how far that motor moves.",
+    );
+    const stockGrbl: GrblHalSessionEvidence = { ...banner, detectedControllerKind: 'grbl-v1.1' };
+    expect(issue(falcon, '$152=100', stockGrbl)).toBeNull();
   });
 
   it('refuses an air setting outside its documented whole-number range', () => {

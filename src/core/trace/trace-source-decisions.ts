@@ -18,7 +18,7 @@
 import { shouldUseSketchTrace, sourceHasAutoSketchColour } from './auto-sketch-trace';
 import { applyMedian } from './apply-median';
 import { otsuBinarization } from './background-flatten';
-import { otsuThreshold } from './preprocess';
+import { automaticThreshold } from './otsu-cut';
 import { invertImage } from './raster-prep';
 import { resolveTraceSourceOptions, shouldTraceAlphaMask } from './trace-alpha';
 import { applyImageAdjustments, type RawImageData, type TraceOptions } from './trace-image';
@@ -66,15 +66,20 @@ function freezeMedianDecisions(image: RawImageData, options: TraceOptions): Trac
   return {
     ...options,
     ...(median ? { sourceAutoMedian: prepared !== adjusted } : {}),
-    ...(otsu ? frozenOtsuCut(prepared) : {}),
+    ...(otsu ? frozenOtsuCut(prepared, options) : {}),
   };
 }
 
 // A page whose uneven lighting the automatic cut flattens (ADR-402) has no
 // single global cut to freeze: each pass levels its own grid instead.
-function frozenOtsuCut(prepared: RawImageData): Pick<TraceOptions, 'sourceOtsuThreshold'> {
-  if (otsuBinarization(prepared).flattened) return {};
-  return { sourceOtsuThreshold: centredOtsuCut(prepared) };
+// Otherwise the frozen cut is the one the full pass applies (ADR-435
+// Amendment 1).
+function frozenOtsuCut(
+  prepared: RawImageData,
+  options: TraceOptions,
+): Pick<TraceOptions, 'sourceOtsuThreshold'> {
+  const level = otsuBinarization(prepared, options);
+  return level.flattened ? {} : { sourceOtsuThreshold: level.threshold };
 }
 
 function lumaLane(image: RawImageData, options: TraceOptions): boolean {
@@ -105,28 +110,15 @@ function polarisedSource(image: RawImageData, options: TraceOptions): RawImageDa
   return options.traceMode === 'edge' ? invertImage(image) : applyImageAdjustments(image, options);
 }
 
-/** The Otsu cut the native-grid luma lanes derive for this whole image, from
- * the same adjustments -> median -> histogram chain as the brightness path's
- * input. Where the histogram has a gap above the cut, every cut in the gap
- * splits this image identically and Otsu reports the lowest; the gap's middle
- * is returned instead, so the cut still separates ink from paper on a
- * supersampled crop whose interpolated edges fill the gap (a clean
- * black-on-white image cuts at 128, not 1). */
+/** The automatic cut the native-grid luma lanes derive for this whole image,
+ * from the same adjustments -> median -> histogram chain as the brightness
+ * path's input. Otsu resolves a gap above its cut to the gap's middle, and
+ * two-plateau art cuts at its plateaus' mid-level, so the cut still separates
+ * ink from paper on a supersampled crop whose interpolated edges fill the gap
+ * (a clean black-on-white image cuts at 128, not 1). */
 export function sourceOtsuThreshold(image: RawImageData, options: TraceOptions): number {
-  return centredOtsuCut(applyMedian(applyImageAdjustments(image, options), options.medianFilter));
-}
-
-function centredOtsuCut(prepared: RawImageData): number {
-  const cut = otsuThreshold(prepared);
-  let nextLevel = 256;
-  for (let i = 0; i < prepared.data.length; i += 4) {
-    // The rounded BT.601 luma otsuThreshold bins by.
-    const luma = Math.round(
-      0.299 * (prepared.data[i] ?? 0) +
-        0.587 * (prepared.data[i + 1] ?? 0) +
-        0.114 * (prepared.data[i + 2] ?? 0),
-    );
-    if (luma >= cut && luma < nextLevel) nextLevel = luma;
-  }
-  return nextLevel > 255 ? cut : Math.floor((cut + nextLevel) / 2);
+  return automaticThreshold(
+    applyMedian(applyImageAdjustments(image, options), options.medianFilter),
+    options,
+  );
 }
