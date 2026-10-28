@@ -4629,8 +4629,19 @@ Contour entry moves use the prepared program's explicit physical envelope, inclu
 origins and translated work origins. If that envelope is unknown, the optional contour entry is
 omitted, and the program's layer comment (`contour-entry skipped (bed position unknown)`) and Job
 Review ("Not added …", a warning-tone fact) say so instead of calling the entry effective
-(ADR-239 Amendment 1). Preview, timing, Frame bounds and output use the same prepared result. Earlier archived
+(ADR-239 Amendment 1). A constant-power (M3) contour, which on the 4040-safe profile means Line
+cuts unless the operation's Power mode says Dynamic, also leaves its last burn point by a laser-off
+exit of the same length along its last edge, and that exit is skipped and disclosed by the same
+rule (`contour-exit …`, "Contour entry and exit", ADR-239 Amendment 2). Preview, timing, Frame bounds and output use the same prepared result. Earlier archived
 jobs retain their original entry behaviour so recovery does not silently change sealed output.
+
+Constant-power advice (ADR-257 Amendment 1). Where a dialect's default burns an operation with
+M3 on GRBL-family output, Save, Start and Job Review advise: GRBL Compatible images whose
+one-move-per-pixel rows outrun the controller's look-ahead burn darker than the Preview, and
+GRBL Compatible and 4040 Line cuts burn darker at corners (and at path starts and ends without
+runways). The advice points GRBL 1.1f and newer to GRBL Dynamic (or the operation's Dynamic
+Power mode on the 4040), as LightBurn does; with a current `$I` reply, Job Review names the
+controller's own version. An operation set to Constant by hand gets no advice.
 
 **Status readout.** `StatusDisplay` shows MPos + `Origin:` row. The
 `Origin:` row reads from `wcoCache` (cached last-seen WCO across

@@ -6,8 +6,19 @@
 // uneven-lettering burn. The entry runs collinear with the contour's first
 // burn edge so GRBL's junction planner carries the entry feed straight into
 // the ink instead of stopping at the junction.
+//
+// ADR-239 Amendment 2 mirrors it at the other end for constant-power (M3)
+// contours: the head leaves the last vertex along the last burn edge, laser
+// off at burn feed, so it decelerates dark instead of stopping at full power
+// on the ink. GRBL's laser_mode.md asks for both under M3 ("add lead-in and
+// lead-out motions around the line you want to cut").
 
-import { machineBoundsForDevice, type DeviceProfile } from '../devices';
+import {
+  machineBoundsForDevice,
+  resolveGrblDialect,
+  type DeviceProfile,
+  type GrblPowerMode,
+} from '../devices';
 import type { Vec2 } from '../scene';
 import type { Job } from './job';
 import type { JobBounds } from './job-bounds';
@@ -34,6 +45,25 @@ export function contourEntryRunwayMm(
   if (fillRunwayPolicyForDevice(device) === undefined) return undefined;
   const runwayMm = feedMatchedFillRunwayMm(overscanMm);
   return runwayMm > 0 ? runwayMm : undefined;
+}
+
+/**
+ * Exit-runway length (mm) for a contour group (ADR-239 Amendment 2): the
+ * entry's length where the group burns with constant power (M3), else
+ * undefined. Under dynamic power (M4) GRBL already lowers power as the head
+ * decelerates, so an exit would only add motion. The layer's own power mode
+ * wins over the dialect's default, as in emission (`vectorPowerWord`).
+ */
+export function contourExitRunwayMm(
+  device: DeviceProfile,
+  entryRunwayMm: number | undefined,
+  kind: 'cut' | 'fill',
+  layerPowerMode: GrblPowerMode | undefined,
+): number | undefined {
+  if (entryRunwayMm === undefined) return undefined;
+  const dialect = resolveGrblDialect(device);
+  const mode = layerPowerMode ?? (kind === 'fill' ? dialect.fillPowerMode : dialect.cutPowerMode);
+  return mode === 'constant' ? entryRunwayMm : undefined;
 }
 
 // Compatibility input for archived jobs that predate explicit program bounds.
@@ -80,32 +110,59 @@ export function contourEntryPoint(
   leadMm: number,
   bed?: ContourEntryBounds,
 ): Vec2 | null {
-  const first = polyline[0];
-  if (first === undefined || leadMm <= 0 || bed === null) return null;
-  for (let i = 1; i < polyline.length; i += 1) {
+  return tangentRunwayPoint(polyline, 0, 1, leadMm, bed);
+}
+
+/**
+ * Where the laser-off exit ends for one contour (ADR-239 Amendment 2): the
+ * last vertex carried on `leadMm` along the direction of the last
+ * non-degenerate edge, bounded by the bed exactly as the entry is. Null in
+ * the same cases, including an unknown bed envelope (ADR-343).
+ */
+export function contourExitPoint(
+  polyline: ReadonlyArray<Vec2>,
+  leadMm: number,
+  bed?: ContourEntryBounds,
+): Vec2 | null {
+  return tangentRunwayPoint(polyline, polyline.length - 1, -1, leadMm, bed);
+}
+
+// The runway leaves `anchor` straight away from its nearest materially
+// distinct neighbour (searched in `step` direction), so it is collinear with
+// the burn edge that meets the anchor.
+function tangentRunwayPoint(
+  polyline: ReadonlyArray<Vec2>,
+  anchorIndex: number,
+  step: 1 | -1,
+  leadMm: number,
+  bed: ContourEntryBounds,
+): Vec2 | null {
+  const anchor = polyline[anchorIndex];
+  if (anchor === undefined || leadMm <= 0 || bed === null) return null;
+  for (let i = anchorIndex + step; i >= 0 && i < polyline.length; i += step) {
     const pt = polyline[i];
     if (pt === undefined) continue;
-    const dx = pt.x - first.x;
-    const dy = pt.y - first.y;
-    const edgeMm = Math.hypot(dx, dy);
+    const awayX = anchor.x - pt.x;
+    const awayY = anchor.y - pt.y;
+    const edgeMm = Math.hypot(awayX, awayY);
     if (edgeMm < MIN_TANGENT_EDGE_MM) continue;
-    const backX = -dx / edgeMm;
-    const backY = -dy / edgeMm;
+    const unitX = awayX / edgeMm;
+    const unitY = awayY / edgeMm;
     const boundedMm =
-      bed === undefined ? leadMm : bedBoundedLeadMm(first, backX, backY, leadMm, bed);
+      bed === undefined ? leadMm : bedBoundedLeadMm(anchor, unitX, unitY, leadMm, bed);
     if (boundedMm < MIN_TANGENT_EDGE_MM) return null;
-    return { x: first.x + backX * boundedMm, y: first.y + backY * boundedMm };
+    return { x: anchor.x + unitX * boundedMm, y: anchor.y + unitY * boundedMm };
   }
   return null;
 }
 
-// Room from `from` along the unit back-off direction before leaving the bed,
-// capped at leadMm. A start already outside the bed yields 0 (no entry) and
-// leaves the job to the existing out-of-bed preflight reporting.
+// Room from `from` along the unit runway direction before leaving the bed,
+// capped at leadMm. A start (or end) already outside the bed yields 0 (no
+// runway) and leaves the job to the existing out-of-bed preflight reporting.
 function bedBoundedLeadMm(
   from: Vec2,
-  backX: number,
-  backY: number,
+  dirX: number,
+  dirY: number,
   leadMm: number,
   bed: JobBounds | BedSizeMm,
 ): number {
@@ -114,10 +171,10 @@ function bedBoundedLeadMm(
   // Legacy size-only input retains archived output, including its old clamp.
   if ('minX' in bed && !insideBounds(from, bounds)) return 0;
   let roomMm = leadMm;
-  if (backX > 0) roomMm = Math.min(roomMm, (bounds.maxX - from.x) / backX);
-  else if (backX < 0) roomMm = Math.min(roomMm, (from.x - bounds.minX) / -backX);
-  if (backY > 0) roomMm = Math.min(roomMm, (bounds.maxY - from.y) / backY);
-  else if (backY < 0) roomMm = Math.min(roomMm, (from.y - bounds.minY) / -backY);
+  if (dirX > 0) roomMm = Math.min(roomMm, (bounds.maxX - from.x) / dirX);
+  else if (dirX < 0) roomMm = Math.min(roomMm, (from.x - bounds.minX) / -dirX);
+  if (dirY > 0) roomMm = Math.min(roomMm, (bounds.maxY - from.y) / dirY);
+  else if (dirY < 0) roomMm = Math.min(roomMm, (from.y - bounds.minY) / -dirY);
   return Math.max(0, roomMm);
 }
 

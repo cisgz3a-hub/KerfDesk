@@ -80,5 +80,45 @@ describe('compileJob ADR-239 contour entry wiring', () => {
     const group = compileFirstGroup(lineLayer(), DEFAULT_DEVICE_PROFILE);
     expect(group?.kind).toBe('cut');
     expect(group?.kind === 'cut' ? group.entryRunwayMm : undefined).toBeUndefined();
+    expect(group?.kind === 'cut' ? group.exitRunwayMm : undefined).toBeUndefined();
+  });
+});
+
+describe('compileJob ADR-239 Amendment 2 contour exit wiring', () => {
+  it('gives a 4040 Line group (M3 by its dialect) an exit as long as its entry', () => {
+    const group = compileFirstGroup({ ...lineLayer(), fillOverscanMm: 3 });
+    expect(group?.kind === 'cut' ? group.exitRunwayMm : undefined).toBe(3);
+  });
+
+  it('leaves a 4040 Line operation set to Dynamic (M4) without an exit', () => {
+    const group = compileFirstGroup({ ...lineLayer(), powerMode: 'dynamic' });
+    expect(group?.kind === 'cut' ? group.entryRunwayMm : undefined).toBe(5);
+    expect(group?.kind === 'cut' ? group.exitRunwayMm : undefined).toBeUndefined();
+  });
+
+  it('leaves 4040 Follow Shape fill (M4 by its dialect) without an exit unless set to Constant', () => {
+    const offset = {
+      ...lineLayer(),
+      mode: 'fill',
+      fillStyle: 'offset',
+      hatchSpacingMm: 1,
+    } as const;
+    const dynamic = compileFirstGroup(offset);
+    const constant = compileFirstGroup({ ...offset, powerMode: 'constant' });
+    expect(dynamic?.kind === 'fill' ? dynamic.exitRunwayMm : 'not fill').toBeUndefined();
+    expect(constant?.kind === 'fill' ? constant.exitRunwayMm : undefined).toBe(5);
+  });
+
+  it('adds no exit when overscan 0 disables the entry', () => {
+    const group = compileFirstGroup({ ...lineLayer(), fillOverscanMm: 0 });
+    expect(group?.kind === 'cut' ? group.exitRunwayMm : undefined).toBeUndefined();
+  });
+
+  it('adds no exit for GRBL Compatible, which has no ADR-239 runways', () => {
+    const group = compileFirstGroup(lineLayer(), {
+      ...DEFAULT_DEVICE_PROFILE,
+      gcodeDialect: { dialectId: 'grbl-compatible' },
+    });
+    expect(group?.kind === 'cut' ? group.exitRunwayMm : undefined).toBeUndefined();
   });
 });

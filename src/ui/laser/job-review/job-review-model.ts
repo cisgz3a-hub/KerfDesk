@@ -46,6 +46,7 @@ import { detectAirAssistCyclingWarnings } from './air-assist-cycling-warnings';
 import { detectAirAssistStartWarnings } from './air-assist-start-warnings';
 import { detectAirAssistStandbyWarnings } from './air-assist-standby-warnings';
 import { detectM7AirAssistWarnings } from './m7-air-assist-warnings';
+import { detectConstantPowerFirmwareWarnings } from './constant-power-firmware-warnings';
 import { detectManualAirAssistWarnings } from './manual-air-assist-warnings';
 import { detectMinFeatureWarnings } from './min-feature-warnings';
 import { detectPresetCorrectionWarnings } from './preset-correction-warnings';
@@ -127,6 +128,7 @@ export function buildJobReviewModel(args: JobReviewModelArgs): JobReviewModel {
         args.laserModeStartSnapshot.controllerBuildInfo,
         buildInfoObservationIsCurrent(args.laserModeStartSnapshot),
       ),
+      ...detectConstantPowerFirmwareWarnings(args),
       ...detectManualAirAssistWarnings(args.prepared.prepared.job, args.project.device),
       ...detectPresetCorrectionWarnings(args.project.device),
       ...detectStaleCatalogBitWarnings(args.project, args.prepared.cncToolPlan),

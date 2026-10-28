@@ -105,12 +105,12 @@ export type CutGroup = {
   readonly operationSettings?: LayerOperationSettings;
   readonly passes: number; // integer ≥ 1
   readonly airAssist: boolean;
-  // ADR-239: length (mm) of the tangential laser-off G1 entry each contour
-  // start receives at burn feed on the 4040-safe profile. Absent on profiles
-  // that keep legacy contour emission, so their bytes stay identical. Also
-  // carried by Follow Shape (offset) FillGroups via the Omit below; scanline
-  // and island fill use fillRunwayPolicy sweep plans instead and never set it.
+  // ADR-239: tangential laser-off G1 runways (mm) at burn feed on the 4040-safe
+  // profile: an entry before each contour and (Amendment 2) an exit after it
+  // where the group burns with M3. Absent elsewhere, so bytes stay identical.
+  // Follow Shape fill carries both via the Omit below; scanline/island never do.
   readonly entryRunwayMm?: number;
+  readonly exitRunwayMm?: number;
   // ADR-415: how far each closed segment runs past its start on the final
   // pass (see cut-pass-segments.ts). Absent when the operation has no overcut
   // or no closed segments, so existing output stays byte-identical. Offset
