@@ -3,8 +3,10 @@
 // Every writer receives the same painted items: world millimetres in the
 // scene frame (Y down), one item per artwork path, each either filled (closed
 // contours, with its fill rule) or stroked (open contours, and every contour
-// of a line/centreline layer). Items stay separate so two overlapping
-// objects of the same colour never cancel under one even-odd fill.
+// of a line/centreline layer), in its operation's colour. Items of different
+// operations stay separate, so two overlapping objects of one colour never
+// cancel; a Fill operation of several objects is one even-odd item, the
+// region it burns (ADR-678).
 //
 // Placement: each writer maps the scene frame to a Y-up page whose lower-left
 // corner is (0, 0). The grid page is the exact artwork extent by default, or
@@ -15,7 +17,6 @@
 // uses the grid page itself.
 
 import {
-  pathUsesOperation,
   polylineToCurveSubpath,
   type ColoredPath,
   type CurveSubpath,
@@ -23,7 +24,6 @@ import {
   type SceneObject,
   type Vec2,
 } from '../../core/scene';
-import { effectiveOperationForObject } from '../../core/scene/effective-operation';
 import { err, ok, type Result } from '../../core/result';
 import type { TracedLayer } from '../../core/trace/batch-trace-svg';
 import { curvesBounds, transformCurveSubpathExact } from '../../core/vector-export/affine-curves';
@@ -40,6 +40,12 @@ import {
   type DecimalGrid,
 } from '../../core/vector-export/decimal-grid';
 import { filledCurvesKept } from './collapsed-ring-subtrees';
+import {
+  exportOperationFills,
+  exportOperationForPath,
+  exportPathColor,
+  planFillCompounds,
+} from '../svg/export-fill-compounds';
 import { svgObjectMatrix } from '../svg/export-svg-paths';
 import { paintedPathBounds } from './painted-path-bounds';
 
@@ -331,20 +337,22 @@ export function sceneVectorArtwork(
   const vectors = objects.filter(isVectorArtworkObject);
   if (vectors.length === 0) return err(VECTOR_ONLY_MESSAGE);
   const items: VectorPaintItem[] = [];
-  for (const object of vectors) {
+  const plan = planFillCompounds(project, vectors);
+  for (const [index, object] of vectors.entries()) {
     const matrix = svgObjectMatrix(object.transform);
-    for (const path of object.paths) {
+    for (const [pathIndex, path] of object.paths.entries()) {
       const curves = (path.curves ?? path.polylines.map(polylineToCurveSubpath))
         .filter((curve) => curve.segments.length > 0)
+        .filter((curve) => !curve.closed || !plan.pooled(object, pathIndex))
         .map((curve) => transformCurveSubpathExact(curve, matrix));
-      const operation = project.scene.layers.find((layer) =>
-        pathUsesOperation(object, path, layer),
-      );
-      const fill =
-        operation !== undefined && effectiveOperationForObject(operation, object).mode === 'fill';
+      const operation = exportOperationForPath(project, object, path);
       const fillRule: VectorFillRule =
         path.fillRule ?? (object.kind === 'text' ? 'nonzero' : 'evenodd');
-      pushSplit(items, path.color, fill, fillRule, curves);
+      const color = exportPathColor(operation, path);
+      pushSplit(items, color, exportOperationFills(operation, object), fillRule, curves);
+    }
+    for (const compound of plan.atObject.get(index) ?? []) {
+      pushSplit(items, compound.operation.color, true, 'evenodd', compound.curves);
     }
   }
   if (items.length === 0) return err('There is no vector geometry to write.');
