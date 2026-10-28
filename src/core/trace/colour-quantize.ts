@@ -86,7 +86,7 @@ export function quantizeColours(source: RawImageData, options: QuantizeOptions):
     absorbSmallRegions(grid, options.minRegionPx);
   }
   const requested = options.colours !== undefined;
-  const palette = finalPalette(grid.labels, lab, weights, centres.length, {
+  const palette = finalPalette(grid.labels, lab, interiorWeights(grid, weights), centres.length, {
     uniform: requested,
     mergeDe: requested ? REQUESTED_MERGE_DE : AUTO_MERGE_DE,
   });
@@ -147,6 +147,30 @@ function flatnessWeights(lab: Float32Array, opaque: Uint8Array, width: number): 
   return weights;
 }
 
+// The flatness weights, with every pixel whose 4-neighbours all carry its own
+// label counted fully: it lies on no seam, so it is its colour plus noise, not
+// an edge mixture. A thin stroke that JPEG, blur or grain left with no flat
+// pixel then takes its colour from its core rather than from its edge ramp
+// (ADR-461 Amendment 3).
+function interiorWeights(
+  grid: { readonly labels: Uint8Array; readonly width: number },
+  weights: Float32Array,
+): Float32Array {
+  const { labels, width } = grid;
+  const n = labels.length;
+  const out = weights.slice();
+  for (let i = 0; i < n; i += 1) {
+    if ((out[i] as number) >= 1 || labels[i] === TRANSPARENT_LABEL) continue;
+    let interior = true;
+    for (let d = 0; d < 4 && interior; d += 1) {
+      const q = neighbour4(i, d, width, n);
+      if (q < 0 || labels[q] !== labels[i]) interior = false;
+    }
+    if (interior) out[i] = 1;
+  }
+  return out;
+}
+
 function distSqAt(lab: Float32Array, i: number, j: number): number {
   const dl = (lab[i * 3] as number) - (lab[j * 3] as number);
   const da = (lab[i * 3 + 1] as number) - (lab[j * 3 + 1] as number);
@@ -181,10 +205,11 @@ function assignLabels(
   return labels;
 }
 
-// Each label's colour is the mean of its pixels — flat pixels only count
-// fully for an automatic palette (edge mixtures would drag it), every pixel
-// counts for a requested one (the clusters were formed that way). Labels whose
-// final colours ended up within the merge distance become one.
+// Each label's colour is the mean of its pixels — flat and interior pixels
+// only count fully for an automatic palette (edge mixtures would drag it),
+// every pixel counts for a requested one (the clusters were formed that
+// way). Labels whose final colours ended up within the merge distance become
+// one.
 function finalPalette(
   labels: Uint8Array,
   lab: Float32Array,
