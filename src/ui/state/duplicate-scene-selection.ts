@@ -1,5 +1,6 @@
 import { cloneSelectionGroups } from './clone-selection-groups';
-import { addObject, type Scene, type SceneGroup, type SceneObject } from '../../core/scene';
+import type { SceneObject } from '../../core/scene';
+import { addObjects, type Scene, type SceneGroup } from '../../core/scene/scene';
 import {
   remapSceneObjectCopyDependencies,
   sceneObjectCopyClosure,
@@ -11,27 +12,30 @@ export function duplicateSceneSelection(
   newIdFor: (oldId: string) => string,
 ): { readonly scene: Scene; readonly selectedIds: ReadonlyArray<string> } {
   const selectedIds = new Set(selectedIdsInput);
-  const closureIds = sceneObjectCopyClosure(scene.objects, selectedIds).map((object) => object.id);
-  const idMap = new Map(closureIds.map((oldId) => [oldId, newIdFor(oldId)] as const));
-  const duplicated = duplicateClosure(scene, closureIds, selectedIds, idMap);
+  const closure = sceneObjectCopyClosure(scene.objects, selectedIds);
+  const idMap = new Map(closure.map((object) => [object.id, newIdFor(object.id)] as const));
+  const duplicated = duplicateClosure(scene, closure, selectedIds, idMap);
   return {
     scene: appendClonedGroups(duplicated.scene, scene.groups ?? [], idMap),
     selectedIds: duplicated.selectedIds,
   };
 }
 
+// The closure already holds the originals in scene order, and the clones are
+// appended in one copy: a lookup and an append per object made Duplicate
+// O(selected × objects) (J10-P2-1).
 function duplicateClosure(
   initialScene: Scene,
-  closureIds: ReadonlyArray<string>,
+  closure: ReadonlyArray<SceneObject>,
   selectedIds: ReadonlySet<string>,
   idMap: ReadonlyMap<string, string>,
 ): { readonly scene: Scene; readonly selectedIds: ReadonlyArray<string> } {
-  let scene = initialScene;
+  const clones: SceneObject[] = [];
   const duplicatedSelectedIds: string[] = [];
-  for (const oldId of closureIds) {
-    const original = scene.objects.find((object) => object.id === oldId);
+  for (const original of closure) {
+    const oldId = original.id;
     const newId = idMap.get(oldId);
-    if (original === undefined || newId === undefined) continue;
+    if (newId === undefined) continue;
     // Duplicate stays in place; fresh import and paste own their stagger.
     // Duplicate is an in-place artwork clone, not a process duplication.
     // Keep the exact operation bindings and object-local override so a single
@@ -42,10 +46,10 @@ function duplicateClosure(
       { ...structuredClone(original), id: newId } as SceneObject,
       idMap,
     );
-    scene = addObject(scene, clone);
+    clones.push(clone);
     if (selectedIds.has(oldId)) duplicatedSelectedIds.push(clone.id);
   }
-  return { scene, selectedIds: duplicatedSelectedIds };
+  return { scene: addObjects(initialScene, clones), selectedIds: duplicatedSelectedIds };
 }
 
 function appendClonedGroups(

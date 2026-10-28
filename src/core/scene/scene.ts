@@ -47,6 +47,19 @@ export function addObject(scene: Scene, object: SceneObject): Scene {
   };
 }
 
+// The same append for many objects, copying the scene's arrays once: adding
+// them one at a time copies every object per added object (J10-P2-1).
+export function addObjects(scene: Scene, objects: ReadonlyArray<SceneObject>): Scene {
+  if (objects.length === 0) return scene;
+  return {
+    ...scene,
+    objects: [...scene.objects, ...objects],
+    ...(scene.artworkOrder === undefined
+      ? {}
+      : { artworkOrder: [...scene.artworkOrder, ...objects.map((object) => object.id)] }),
+  };
+}
+
 export function removeObject(scene: Scene, objectId: string): Scene {
   return {
     ...scene,

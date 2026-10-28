@@ -74,9 +74,12 @@ describe('original-pixels raster output', () => {
       expect(gcode).toBe(emit(neutral));
       for (const power of [1000, 799, 598, 398])
         expect(gcode).toMatch(new RegExp(`G1[^\\n]* S${power}(?: |\\n)`));
-      // The four one-millimetre grey runs each retain a half-millimetre burn
-      // after the selected quarter-millimetre correction at both ends.
-      expect(poweredXLengths(gcode)).toEqual(new Array<number>(height * 4).fill(0.5));
+      // The four one-millimetre grey runs form one burned line. The selected
+      // quarter-millimetre correction shortens only its two ends, not each
+      // power change inside it (ADR-458 Amendment 1).
+      expect(poweredXLengths(gcode)).toEqual(
+        Array.from({ length: height }, () => [0.75, 1, 1, 0.75]).flat(),
+      );
       expect(gcode).toContain('M5');
     },
   );

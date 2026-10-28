@@ -1,6 +1,6 @@
 import type { SelectionMask } from '../../core/image-select';
 import type { RasterPowerValues } from '../../core/raster/raster-power-values';
-import { rasterRunSurvivesDotWidthCorrection } from '../../core/raster-output';
+import { forEachRasterRunLostToDotWidthCorrection } from '../../core/raster-output';
 
 type HorizontalMaskRepairInput = {
   readonly seed: SelectionMask;
@@ -15,7 +15,8 @@ type HorizontalMaskRepairInput = {
 
 /**
  * Expand a repair only along scan rows, then retain it only when every final
- * run survives the emitter's strict forward and reverse correction operands.
+ * powered run keeps a burn under the emitter's strict forward and reverse
+ * correction operands, which shorten the ends of each burned line.
  */
 export function editorHorizontalMaskRepair(input: HorizontalMaskRepairInput): SelectionMask | null {
   const radiusPx = Math.floor(input.radiusPx);
@@ -66,31 +67,28 @@ function everyRunSurvives(mask: SelectionMask, input: HorizontalMaskRepairInput)
   ) {
     return false;
   }
-  for (let y = 0; y < mask.height; y += 1) {
+  const row = new Float64Array(mask.width);
+  let isLost = false;
+  const markLost = (): void => {
+    isLost = true;
+  };
+  for (let y = 0; y < mask.height && !isLost; y += 1) {
     const rowOffset = y * mask.width;
-    let firstX = 0;
-    let s = outputSAt(mask, input, rowOffset);
-    for (let x = 1; x <= mask.width; x += 1) {
-      const nextS = x < mask.width ? outputSAt(mask, input, rowOffset + x) : -1;
-      if (nextS === s) continue;
-      if (s <= 0) {
-        firstX = x;
-        s = nextS;
-        continue;
-      }
-      const leftX = input.minXWorldMm + firstX * input.pixelWidthMm;
-      const rightX = input.minXWorldMm + x * input.pixelWidthMm;
-      if (
-        !rasterRunSurvivesDotWidthCorrection(leftX, rightX, false, input.dotWidthCorrectionMm) ||
-        !rasterRunSurvivesDotWidthCorrection(rightX, leftX, true, input.dotWidthCorrectionMm)
-      ) {
-        return false;
-      }
-      firstX = x;
-      s = nextS;
+    for (let x = 0; x < mask.width; x += 1) row[x] = outputSAt(mask, input, rowOffset + x);
+    for (const isReverse of [false, true]) {
+      forEachRasterRunLostToDotWidthCorrection(
+        row,
+        {
+          pixelWidthMm: input.pixelWidthMm,
+          isReverse,
+          dotWidthCorrectionMm: input.dotWidthCorrectionMm,
+          minXWorldMm: input.minXWorldMm,
+        },
+        markLost,
+      );
     }
   }
-  return true;
+  return !isLost;
 }
 
 function outputSAt(mask: SelectionMask, input: HorizontalMaskRepairInput, index: number): number {

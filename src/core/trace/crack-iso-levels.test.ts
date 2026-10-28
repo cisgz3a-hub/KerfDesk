@@ -18,7 +18,7 @@ import {
   type RadiusStats,
 } from './edge-precision-fixtures.test-support';
 import { TRACE_PRESETS, type RawImageData, type TraceOptions } from './index';
-import { otsuThreshold } from './preprocess';
+import { otsuThreshold } from './otsu-cut';
 import { prepareTraceForContour } from './trace-image';
 
 const DISC: Disc = { cx: 100.3, cy: 99.6, r: 60 };
@@ -151,7 +151,9 @@ describe('automatic cut: plateau mid-level on broad edges (ADR-533)', () => {
 
   // ADR-533 Amendment 1: the calibration bar's column (coverage 0.376 / 1 /
   // 0.125) under Sharp's dark Otsu cut crossed at 24.01 / 24.85 (0.84 px
-  // wide); a saturated one-row core's edges sit at their box coverage.
+  // wide); a saturated one-row core's edges sit at their box coverage. The
+  // automatic cut now sits at the plateaus' mid-level (ADR-402 Amendment 1),
+  // so the cut alone crosses at 23.69, and placement still moves it.
   it('places a saturated one-row core by box coverage; other thin ink keeps the cut', () => {
     const bar = (rows: ReadonlyArray<number>): RawImageData =>
       lumaImage(200, (x, y) => {
@@ -165,7 +167,7 @@ describe('automatic cut: plateau mid-level on broad edges (ADR-533)', () => {
       return { top: Math.min(...ys), bottom: Math.max(...ys) };
     };
     const thin = chains(bar([0.376, 1, 0.125]), preset('Sharp'));
-    expect(sides(thin.cutOnly).top).toBeGreaterThan(23.95);
+    expect(sides(thin.cutOnly).top).toBeGreaterThan(sides(thin.placed).top + 0.05);
     expect(sides(thin.placed).top).toBeCloseTo(23.624, 2);
     expect(sides(thin.placed).bottom).toBeCloseTo(25.125, 2);
     const twoRow = chains(bar([0.376, 1, 1, 0.125]), preset('Sharp'));

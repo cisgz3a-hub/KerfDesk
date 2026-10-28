@@ -31,6 +31,7 @@ import {
   type Project,
   type RasterImage,
   type SceneObject,
+  type SelectionTransform,
   type ShapeObject,
   type TextObject,
   type TracedImage,
@@ -413,6 +414,7 @@ export type AppState = PartGeneratorActions &
     readonly setCursorMm: (cursor: Vec2 | null) => void;
     readonly beginInteraction: () => void;
     readonly setObjectTransform: (id: string, transform: Transform) => void;
+    readonly setObjectTransforms: (updates: ReadonlyArray<SelectionTransform>) => void;
     readonly endInteraction: () => void;
     // Roll a drag back to the pre-interaction snapshot (Esc mid-drag, audit C4).
     readonly cancelInteraction: () => void;

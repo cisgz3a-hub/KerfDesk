@@ -165,10 +165,14 @@ export type GcodeMetadata = {
 // ADR-649 Amd 1 keeps Blue Noise off pure white and on pure black, so a mask's
 // outside never burns; v36 belongs to open PRs #1490 and #1491; carries
 // forward v35 above.
+// ADR-458 Amd 1 trims Dot Width Correction only at the ends of a burned line,
+// not at each Grayscale power change, so Grayscale and Pass-through image
+// bytes change; dithered bytes do not. v36 is held by open PR #1491; carries
+// forward v37 above.
 // ADR-239 Amd 2 leaves every constant-power (M3) contour on the 4040-safe
 // profile by a laser-off exit runway after its last burn point, so 4040 Line
 // output gains one `G1 ... S0` move per contour and a contour-exit comment;
-// carries forward v37 above (v38 belongs to open PR #1490).
+// carries forward v38 above (v36 was left unused).
 export const EMITTER_REVISION = 'm3-contour-exit-runway-20261028-v39';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports

@@ -83,6 +83,18 @@ describe('console command availability', () => {
     expect(consoleCommandDisabledReason(grblDriver, 'G4 P1', owed)).toBeNull();
     expect(consoleCommandDisabledReason(grblDriver, '$$', state())).toBeNull();
   });
+
+  // Rolling audit v5 J7-P1-2: a FluidNC board runs `[RST]#` as `$RST=#`, so a
+  // stock-GRBL profile that the banner shows talking to FluidNC disables it as
+  // it disables the `$` form (ADR-375 Amendment 11).
+  it('reads a bracket line as FluidNC runs it once the banner shows FluidNC', () => {
+    const fluidnc = { ...state(), detectedControllerKind: 'fluidnc' as const };
+    expect(consoleCommandDisabledReason(grblDriver, '[RST]#', fluidnc)).toBe(
+      consoleCommandDisabledReason(grblDriver, '$RST=#', fluidnc),
+    );
+    expect(consoleCommandDisabledReason(grblDriver, '[RST]#', fluidnc)).toMatch(/blocked/);
+    expect(consoleCommandDisabledReason(grblDriver, '[RST]#', state())).toBeNull();
+  });
 });
 
 type StateOverrides = {
@@ -118,6 +130,7 @@ function state(overrides: StateOverrides = {}): ConsoleCommandAvailabilityState 
           },
     autofocusBusy: overrides.autofocusBusy ?? false,
     pendingUntrackedAcks: overrides.pendingUntrackedAcks ?? 0,
+    detectedControllerKind: null,
   };
 }
 

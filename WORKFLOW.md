@@ -2154,6 +2154,13 @@ millimetre position report. Old position and offset numbers are discarded before
 is used. G21 remains selected, including after Cancel; work offsets and the physical origin are
 not erased. GRBL's independent `$13` reporting-unit contract is unchanged.
 
+The other G21 lines KerfDesk sends on Smoothieware are recorded the same way. These are Restore
+saved origin, Place Board's corner origin, Continue from where the head stopped and Auto-focus's
+probe setup. While such a line is in flight after a Console G20, or on a board left in G20, the
+position is hidden. Once the board acknowledges it, KerfDesk reads millimetres, and the Console says
+the board now reports millimetres. A recovery program that selects millimetres while KerfDesk reads
+inches hides the position until `$G` or the next Frame (ADR-375 Amendment 11).
+
 #### CNC — safe-Z retract and restore
 1. CNC Frame requires current-session stock-top Work-Z and a fresh known work position because its
    absolute work-frame safe-Z retract/restore program cannot otherwise be constructed (ADR-192,
@@ -2741,6 +2748,11 @@ authorization, Frame proof, controller command, or safety boundary.
    lasers) runs under the stock-GRBL profile. When its `$$` lists grblHAL's `$14`-`$18`, its
    banner reads `GrblHAL` or its `$I` names grblHAL, a value must pass the grblHAL check as well
    as the stock one, and the refusal says why grblHAL applies (ADR-375 Amendment 5).
+3. FluidNC runs a line that starts with `[` as a `$` command (`[13]1` is `$13=1`, `[RST]#` is
+   `$RST=#`). A FluidNC board can run under the stock-GRBL or grblHAL profile. When its banner names
+   FluidNC, the Console reads such a line as that `$` command and sends the `$` form. So `[13]1`
+   gets the profile's `$13=1` confirmation and `$$` re-read. `[RST]#` and `[NVX]` are blocked, as
+   they are on the FluidNC profile (ADR-375 Amendments 7 and 11).
 
 #### Edge — arbitrary G-code
 1. Single-line G-code commands are allowed only when connected, no operation is active, and GRBL reports `Idle`.

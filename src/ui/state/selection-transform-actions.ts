@@ -388,9 +388,11 @@ function layoutGroups(state: AppState): NonNullable<Scene['groups']> {
   );
 }
 
+// One id lookup per edit, not a scan of the scene per selected id (J10-P2-1).
 function selectedObjects(scene: Scene, ids: ReadonlyArray<string>): ReadonlyArray<SceneObject> {
+  const objectsById = new Map(scene.objects.map((object) => [object.id, object] as const));
   return ids
-    .map((id) => scene.objects.find((object) => object.id === id))
+    .map((id) => objectsById.get(id))
     .filter(
       (object): object is SceneObject =>
         object !== undefined && object.locked !== true && sceneObjectHasVisibleLayer(scene, object),

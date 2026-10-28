@@ -4,6 +4,7 @@ import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import {
   ProjectSaveTestWorker,
   currentProjectSaveWorker,
+  savedContentsText,
 } from '../../__fixtures__/project-save-worker';
 import { useStore } from '../state';
 import { useProjectSaveDialogStore } from '../state/project-save-dialog-store';
@@ -269,6 +270,46 @@ describe('large captured project saves', () => {
     expect(canonicalWrite).not.toHaveBeenCalled();
     expect(useStore.getState().dirty).toBe(true);
     expect(useStore.getState().savedName).toBeNull();
+  });
+
+  // Rolling audit v5 J10-P3-3: past V8's longest string, Save said only
+  // "Invalid string length" and the recovery copy failed the same way. The
+  // limit is simulated: JSON.stringify throws V8's RangeError for the project.
+  it('names the size when a project passes the text limit, and still writes its recovery copy', async () => {
+    vi.mocked(jobAwareConfirm).mockReturnValue(true);
+    const large = useStore.getState().project;
+    const recoveryWrite = vi.fn(async (_contents: string | Blob) => undefined);
+    const pick = vi.fn(async () => ({
+      displayName: 'untitled-recovery.lf2',
+      write: recoveryWrite,
+    }));
+    const saving = handleSaveProject(context(pick));
+    const stringify = JSON.stringify.bind(JSON);
+    const limit = vi.spyOn(JSON, 'stringify').mockImplementation(((
+      value: unknown,
+      replacer?: (number | string)[] | null,
+      space?: string | number,
+    ) => {
+      if (typeof value === 'object' && value !== null && 'schemaVersion' in value)
+        throw new RangeError('Invalid string length');
+      return stringify(value, replacer, space);
+    }) as typeof JSON.stringify);
+    currentProjectSaveWorker().respond(prepareProjectSaveMessage(large));
+    await vi.waitFor(() => expect(ProjectSaveTestWorker.instances).toHaveLength(2));
+    expect(jobAwareConfirm).toHaveBeenCalledExactlyOnceWith(
+      expect.stringContaining('too large for one project file'),
+    );
+    currentProjectSaveWorker().respond(prepareProjectRecoveryMessage(large));
+    limit.mockRestore();
+    await ready();
+    useProjectSaveDialogStore.getState().request!.choose();
+    await expect(saving).resolves.toBe('error');
+
+    const written = recoveryWrite.mock.calls[0]?.[0];
+    if (!(written instanceof Blob)) throw new Error('Expected a chunked recovery Blob.');
+    expect(JSON.parse(await savedContentsText(written))).toMatchObject({ notes: large.notes });
+    expect(useStore.getState().project).toBe(large);
+    expect(useStore.getState().dirty).toBe(true);
   });
 
   it('preserves canonical validation and a raw recovery offer for malformed scheduling fields', async () => {

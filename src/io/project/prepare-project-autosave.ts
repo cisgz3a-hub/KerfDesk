@@ -31,8 +31,9 @@ export type PreparedProjectAutosave =
 export function prepareProjectForAutosave(project: Project): PreparedProjectAutosave {
   let serialized: string;
   try {
-    // Recovery needs the same values, without the manual file's indentation.
-    // Compact JSON reduces first-save allocation, parsing and storage traffic.
+    // Recovery needs the same values, written compact as manual Save writes
+    // them (ADR-204 Amendment 2). Compact JSON reduces first-save allocation,
+    // parsing and storage traffic.
     serialized = serializeProject(withReferencedEmbeddedFonts(project), { compact: true });
   } catch (error) {
     return { kind: 'invalid', reason: errorMessage(error) };
