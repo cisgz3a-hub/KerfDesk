@@ -69,7 +69,7 @@ export function TextDialogNumericFields(props: {
   const { values } = props;
   return (
     <>
-      <Field label="Size">
+      <Field label="Font size">
         <NumberField
           ariaLabel="Text size"
           value={values.sizeMm}
@@ -78,7 +78,7 @@ export function TextDialogNumericFields(props: {
           step={0.1}
           onCommit={props.setSizeMm}
           style={numStyle}
-          title="Text height in millimeters."
+          title="The font's em height in mm, the usual meaning of font size in design apps. Capital letters come out smaller: about 0.6 to 0.9 of the size, depending on the font."
           debounceMs={0}
         />
         <span className="lf-field-unit">mm</span>

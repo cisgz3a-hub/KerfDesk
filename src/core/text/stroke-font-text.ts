@@ -21,7 +21,8 @@ export type StrokeFontGlyph = {
 };
 
 export type StrokeFont = {
-  readonly capHeight: number;
+  /** Font units in one em; Size is the em in mm for every font (ADR-682). */
+  readonly unitsPerEm: number;
   readonly yAxis: 'up' | 'down';
   readonly glyphs: ReadonlyMap<string, StrokeFontGlyph>;
 };
@@ -50,14 +51,14 @@ export function renderStrokeFontText(
             lineWidth(
               Array.from(line),
               font,
-              size / font.capHeight,
+              size / font.unitsPerEm,
               (input.letterSpacing ?? 0) * size,
             ),
           1,
         );
   const actual =
     layout === undefined ? input : { ...input, content: layout.content, sizeMm: layout.sizeMm };
-  const scale = actual.sizeMm / font.capHeight;
+  const scale = actual.sizeMm / font.unitsPerEm;
   const spacingMm = (actual.letterSpacing ?? 0) * actual.sizeMm;
   const text = textForLayout(actual.content);
   const lines = text.split('\n').map((line) => Array.from(line));

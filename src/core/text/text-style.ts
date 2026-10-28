@@ -22,7 +22,7 @@ import {
   type Polyline,
   type Vec2,
 } from '../scene';
-import { bendTextRender, clampBend } from './text-bend';
+import { bendPointMapper, bendTextRender, clampBend } from './text-bend';
 import type { TextRenderResult } from './text-to-polylines';
 
 const ITALIC_SLANT = Math.tan((12 * Math.PI) / 180);
@@ -55,7 +55,14 @@ export function styleTextRender(
   const max = style.maxWidthMm;
   if (max !== undefined && max > 0 && width > max) {
     const k = max / width;
-    result = mapped(result, { a: k, b: 0, c: 0, d: 1, e: result.bounds.minX * (1 - k), f: 0 });
+    // Text in a frame squeezes about the frame's alignment point, so centred
+    // or right-aligned text stays centred or right in it; other text keeps
+    // its ink's left edge.
+    const pivot =
+      result.textBoxLayout !== undefined && result.anchor !== undefined
+        ? result.anchor.x
+        : result.bounds.minX;
+    result = mapped(result, { a: k, b: 0, c: 0, d: 1, e: pivot * (1 - k), f: 0 });
   }
   if (style.italic === true) {
     const base = result.bounds.maxY;
@@ -172,9 +179,18 @@ export function bendTextUndistorted(rendered: TextRenderResult, bendDeg: number)
   const bounds = pathsBounds(pieces) ?? rendered.bounds;
   const shift: AffineMatrix = { a: 1, b: 0, c: 0, d: 1, e: -bounds.minX, f: -bounds.minY };
   const paths = pieces.map((path) => mappedPath(path, shift));
+  // The anchor belongs to no glyph, so it goes where the distorting bend puts
+  // it: the same arc, so bent variable records still share it.
+  const anchor =
+    rendered.anchor === undefined
+      ? undefined
+      : bendPointMapper(rendered.bounds, angle)(rendered.anchor);
   return {
     paths,
     bounds: { minX: 0, minY: 0, maxX: bounds.maxX - bounds.minX, maxY: bounds.maxY - bounds.minY },
+    ...(anchor === undefined
+      ? {}
+      : { anchor: { x: anchor.x - bounds.minX, y: anchor.y - bounds.minY } }),
   };
 }
 

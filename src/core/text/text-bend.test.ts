@@ -63,4 +63,38 @@ describe('bendTextRender', () => {
     expect(clampBend(-999)).toBe(-180);
     expect(clampBend(Number.NaN)).toBe(0);
   });
+
+  // L3-P1-2: bent variable records align on this anchor, so it must land
+  // exactly where the glyphs' own baseline point lands.
+  it.each([0, 10, 20])('carries a baseline anchor at x %s onto the arc with the glyphs', (x) => {
+    const baseline = 8;
+    const marked: TextRenderResult = {
+      bounds: { minX: 0, minY: 0, maxX: 20, maxY: 10 },
+      paths: [
+        {
+          color: '#000000',
+          polylines: [
+            {
+              closed: false,
+              points: [0, 10, 20].map((at) => ({ x: at, y: baseline })),
+            },
+            {
+              closed: false,
+              points: [
+                { x: 0, y: 0 },
+                { x: 20, y: 10 },
+              ],
+            },
+          ],
+        },
+      ],
+      anchor: { x, y: baseline },
+    };
+    for (const bend of [60, -60, 180]) {
+      const bent = bendTextRender(marked, bend);
+      const landed = bent.paths[0]?.polylines[0]?.points[x / 10];
+      expect(bent.anchor?.x).toBeCloseTo(landed?.x ?? NaN, 12);
+      expect(bent.anchor?.y).toBeCloseTo(landed?.y ?? NaN, 12);
+    }
+  });
 });

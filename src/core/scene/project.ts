@@ -32,7 +32,10 @@ import type { ProductionNestDefinition } from '../nesting/production-nest';
 // v16 embeds editable native studio documents; older readers must not drop them.
 // v17 preserves selected frame and cutting starts; older readers must not
 // silently replace their output semantics with automatic entry points.
-export const PROJECT_SCHEMA_VERSION = 18 as const;
+// v19 makes Size the em for single-line fonts too (ADR-682). An older reader
+// would re-render that text 1.5 to 2 times too large when it is edited or a
+// variable value changes.
+export const PROJECT_SCHEMA_VERSION = 19 as const;
 
 export type EmbeddedFont = {
   readonly key: string;
