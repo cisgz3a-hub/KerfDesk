@@ -35,9 +35,8 @@ export function PartGeneratorReview(props: {
         <p>A new named operation will be created with this part.</p>
       ) : (
         <p>
-          Artwork placement, scale, operation settings and overrides remain attached. Scale:{' '}
-          {object.transform.scaleX} × {object.transform.scaleY}; rotation:{' '}
-          {object.transform.rotationDeg}°.
+          Artwork placement, rotation ({object.transform.rotationDeg}°), operation settings and
+          overrides remain attached. The part burns at the size proposed here.
         </p>
       )}
       <p>

@@ -6,6 +6,11 @@ import { drawCachedClosedFill } from './filled-path-cache';
 // Batched-stroke helper used by line mode and fill preview paths. Display
 // simplification of enormous traces happens upstream (display-polylines.ts
 // decimates vertices); this always strokes the polylines it is given.
+//
+// A closed polyline may omit its seam vertex (Design Studio paths, DXF
+// contours); compile cuts the closing edge anyway, so it is drawn here too.
+// A plain lineTo back to the start, not closePath, keeps the batch as cheap
+// as the fill comment below requires.
 export function strokePolylinesBatched(
   ctx: CanvasRenderingContext2D,
   obj: SceneObject,
@@ -21,8 +26,21 @@ export function strokePolylinesBatched(
       if (i === 0) ctx.moveTo(cx, cy);
       else ctx.lineTo(cx, cy);
     }
+    const seam = closingPoint(polyline);
+    if (seam !== null) {
+      const { x, y } = toScreenPoint(seam, obj, view);
+      ctx.lineTo(x, y);
+    }
   }
   ctx.stroke();
+}
+
+function closingPoint(polyline: Polyline): Vec2 | null {
+  if (!polyline.closed || polyline.points.length < 3) return null;
+  const first = polyline.points[0];
+  const last = polyline.points[polyline.points.length - 1];
+  if (first === undefined || last === undefined) return null;
+  return first.x === last.x && first.y === last.y ? null : first;
 }
 
 export function fillClosedPolylinesBatched(

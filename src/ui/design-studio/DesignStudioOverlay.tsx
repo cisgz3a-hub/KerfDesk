@@ -17,6 +17,7 @@ import { useRegisterModal } from '../common/use-register-modal';
 import { useStore } from '../state';
 import { DesignCanvas } from './DesignCanvas';
 import { DesignOptionsBar } from './DesignOptionsBar';
+import { DesignKeptDrawingBar } from './DesignKeptDrawingBar';
 import { DesignStatusBar } from './DesignStatusBar';
 import { DesignToolRails } from './DesignToolRails';
 import { DesignTopBar } from './DesignTopBar';
@@ -94,6 +95,7 @@ export function DesignStudioOverlay(): JSX.Element | null {
         <>
           <DesignTopBar onFit={handleFit} />
           <DesignOptionsBar />
+          <DesignKeptDrawingBar />
           <div style={bodyStyle}>
             <DesignToolRails />
             <div style={mainColumnStyle}>

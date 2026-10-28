@@ -5,14 +5,18 @@ import type {
 } from '../../core/parts/part-generator';
 import { bakePartGenerator } from '../../core/parts/regenerate-part-generator';
 import { sameRecipeValue } from '../../core/material-library/process-recipe';
+import type { Transform } from '../../core/scene';
 import type { AppState } from './store';
 import { pushUndo } from './scene-mutations';
 import { preparePartGenerator, type PreparedPartGenerator } from './prepare-part-generator';
 
 export type PartGeneratorActions = {
+  /** `definition` holds the sizes that burn: an editor opened on a resized
+   *  part folds the resize in and passes the transform it opened on. */
   readonly preparePartGenerator: (
     definition: PartGeneratorDefinition,
     objectId?: string,
+    openedTransform?: Transform,
   ) => PartGeneratorResult<PreparedPartGenerator>;
   readonly acceptPartGenerator: (prepared: PreparedPartGenerator) => PartGeneratorResult<string>;
   readonly bakePartGenerator: (objectId: string) => PartGeneratorResult<string>;
@@ -21,8 +25,8 @@ type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
 export function partGeneratorActions(set: Setter, get: () => AppState): PartGeneratorActions {
   const owned = new WeakMap<PreparedPartGenerator, PreparedPartGenerator['nextProject']>();
   return {
-    preparePartGenerator: (definition, objectId) => {
-      const prepared = preparePartGenerator(get(), definition, objectId);
+    preparePartGenerator: (definition, objectId, openedTransform) => {
+      const prepared = preparePartGenerator(get(), definition, objectId, openedTransform);
       if (prepared.kind === 'ok') owned.set(prepared.value, prepared.value.nextProject);
       return prepared;
     },

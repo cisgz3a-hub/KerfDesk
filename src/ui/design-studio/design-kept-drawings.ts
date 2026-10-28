@@ -1,0 +1,144 @@
+// design-kept-drawings — Studio drawings set aside instead of written over
+// (ADR-590 Amendment 1).
+//
+// The saved drawing is one slot, and opening the Studio on a project it does
+// not belong to used to write that project's drawing over it: a restart that
+// opened the Studio before the autosave, or an autosave a few seconds older
+// than the drawing, lost the only copy. A drawing with work not yet applied is
+// now moved here first. The newest few are kept; one comes back by itself
+// when its project returns, and the Studio offers the rest to restore.
+//
+// Best-effort like the slot (ADR-272 Amendment 3): every read treats the
+// payload as untrusted, and a failed write reports false so the caller can
+// hold the slot rather than lose the drawing.
+
+import {
+  MAX_PERSISTED_CHARS,
+  persistedFromStored,
+  storedDesignSession,
+  type PersistedDesignSession,
+} from './design-session-storage';
+
+const KEPT_KEY = 'laserforge.design-studio-kept-drawings.v1';
+const KEPT_VERSION = 1;
+const MAX_KEPT = 5;
+
+export type KeptDesignDrawing = PersistedDesignSession & {
+  readonly id: string;
+  readonly keptAt: number;
+};
+
+let cached: { readonly raw: string | null; readonly list: readonly KeptDesignDrawing[] } = {
+  raw: null,
+  list: [],
+};
+const listeners = new Set<() => void>();
+
+/** Newest first. The same array comes back until storage changes, so React can
+ *  read it through useSyncExternalStore. */
+export function readKeptDesignDrawings(): readonly KeptDesignDrawing[] {
+  const raw = readRaw();
+  if (raw !== cached.raw) cached = { raw, list: parseKept(raw) };
+  return cached.list;
+}
+
+export function subscribeKeptDesignDrawings(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+/** A drawing worth keeping holds shapes that were never applied. */
+export function holdsUnappliedWork(draft: PersistedDesignSession): boolean {
+  return draft.sketch.entities.length > 0 && draft.dirtySinceApply !== false;
+}
+
+/** Adds `draft` as the newest kept drawing, dropping the oldest past the limit.
+ *  An identical drawing already kept is not stored twice. */
+export function keepDesignDrawing(
+  draft: PersistedDesignSession,
+  keptAt: number = Date.now(),
+): boolean {
+  const entry = { ...draft, id: crypto.randomUUID(), keptAt };
+  const same = JSON.stringify(storedDesignSession(draft));
+  const others = readKeptDesignDrawings().filter(
+    (kept) => JSON.stringify(storedDesignSession(kept)) !== same,
+  );
+  const list = [entry, ...others].sort((a, b) => b.keptAt - a.keptAt).slice(0, MAX_KEPT);
+  while (list.length > 0) {
+    if (!list.includes(entry)) return false;
+    if (writeKept(list)) return true;
+    list.pop();
+  }
+  return false;
+}
+
+/** Removes and returns the newest kept drawing that `pick` accepts. */
+export function takeKeptDesignDrawing(
+  pick: (drawing: KeptDesignDrawing) => boolean,
+): KeptDesignDrawing | null {
+  const list = readKeptDesignDrawings();
+  const taken = list.find(pick);
+  if (taken === undefined || !writeKept(list.filter((drawing) => drawing !== taken))) return null;
+  return taken;
+}
+
+export function discardKeptDesignDrawing(id: string): void {
+  writeKept(readKeptDesignDrawings().filter((drawing) => drawing.id !== id));
+}
+
+export function clearKeptDesignDrawings(): void {
+  writeKept([]);
+}
+
+function writeKept(list: readonly KeptDesignDrawing[]): boolean {
+  try {
+    if (typeof localStorage === 'undefined') return false;
+    if (list.length === 0) localStorage.removeItem(KEPT_KEY);
+    else {
+      const payload = JSON.stringify({
+        version: KEPT_VERSION,
+        drawings: list.map((drawing) => ({
+          id: drawing.id,
+          keptAt: drawing.keptAt,
+          drawing: storedDesignSession(drawing),
+        })),
+      });
+      if (payload.length > MAX_PERSISTED_CHARS) return false;
+      localStorage.setItem(KEPT_KEY, payload);
+    }
+  } catch {
+    return false;
+  }
+  for (const listener of listeners) listener();
+  return true;
+}
+
+function readRaw(): string | null {
+  try {
+    return typeof localStorage === 'undefined' ? null : localStorage.getItem(KEPT_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function parseKept(raw: string | null): readonly KeptDesignDrawing[] {
+  if (raw === null) return [];
+  try {
+    const stored = JSON.parse(raw) as { readonly version?: unknown; readonly drawings?: unknown };
+    if (stored.version !== KEPT_VERSION || !Array.isArray(stored.drawings)) return [];
+    return stored.drawings.flatMap((value: unknown): KeptDesignDrawing[] => {
+      if (typeof value !== 'object' || value === null) return [];
+      const entry = value as {
+        readonly id?: unknown;
+        readonly keptAt?: unknown;
+        drawing?: unknown;
+      };
+      const drawing = persistedFromStored(entry.drawing);
+      if (drawing === null || typeof entry.id !== 'string' || typeof entry.keptAt !== 'number')
+        return [];
+      return [{ ...drawing, id: entry.id, keptAt: entry.keptAt }];
+    });
+  } catch {
+    return [];
+  }
+}

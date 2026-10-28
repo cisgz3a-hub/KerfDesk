@@ -35,6 +35,8 @@ export type DesignPointerHandlers = {
   readonly onPointerDown: (event: React.PointerEvent<HTMLCanvasElement>) => void;
   readonly onPointerMove: (event: React.PointerEvent<HTMLCanvasElement>) => void;
   readonly onPointerUp: (event: React.PointerEvent<HTMLCanvasElement>) => void;
+  readonly onPointerCancel: (event: React.PointerEvent<HTMLCanvasElement>) => void;
+  readonly onLostPointerCapture: () => void;
   readonly onPointerLeave: () => void;
   readonly onDoubleClick: (event: React.MouseEvent<HTMLCanvasElement>) => void;
 };
@@ -117,9 +119,42 @@ export function useDesignPointer(
     store.setActiveSnap(null);
   }, []);
 
-  const onDoubleClick = usePointSequenceDoubleClick(newEntityId);
+  return {
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    ...usePointerCancel(),
+    onPointerLeave,
+    onDoubleClick: usePointSequenceDoubleClick(newEntityId),
+  };
+}
 
-  return { onPointerDown, onPointerMove, onPointerUp, onPointerLeave, onDoubleClick };
+// A pointer the system takes away (palm rejection, a system gesture) never
+// sends pointerup, so the gesture used to stay open with no Undo step.
+function usePointerCancel(): Pick<
+  DesignPointerHandlers,
+  'onPointerCancel' | 'onLostPointerCapture'
+> {
+  const onPointerCancel = useCallback((event: React.PointerEvent<HTMLCanvasElement>) => {
+    releasePointer(event.currentTarget, event.pointerId);
+    endInterruptedGesture(true);
+  }, []);
+  const onLostPointerCapture = useCallback(() => endInterruptedGesture(false), []);
+  return { onPointerCancel, onLostPointerCapture };
+}
+
+// A move or resize ends as its one Undo step where the pointer last was. A
+// cancelled draft or marquee is dropped: nobody released it, so nothing is
+// drawn or selected.
+function endInterruptedGesture(dropUnreleased: boolean): void {
+  const store = useDesignStudioStore.getState();
+  const session = store.session;
+  if (session === null) return;
+  if (session.resize !== null) return store.endResize();
+  if (session.move !== null) return store.endMove();
+  if (!dropUnreleased) return;
+  if (session.draft !== null) store.setDraft(null);
+  if (session.marquee !== null) store.setMarquee(null);
 }
 
 function usePointSequenceDoubleClick(

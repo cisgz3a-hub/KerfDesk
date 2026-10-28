@@ -13,6 +13,7 @@ import { clearPersistedSession, readPersistedSession } from './design-session-st
 import { useDesignStudioStore } from './design-studio-store';
 import { useDesignSessionPersistence } from './use-design-session-persistence';
 import { RecoveryHash } from './design-recovery-hash';
+import { clearKeptDesignDrawings, readKeptDesignDrawings } from './design-kept-drawings';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -44,6 +45,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   resetStore();
   clearPersistedSession();
+  clearKeptDesignDrawings();
   useDesignStudioStore.setState({ session: null, stash: null, documentEpoch: -1 });
 });
 
@@ -94,7 +96,9 @@ it.each(['added', 'deleted'] as const)(
   },
 );
 
-it('does not attach a pending owner refresh to a replacement project', async () => {
+// ADR-590 Amendment 1: the replacement project opens on its own drawing, and the
+// draft it does not own is kept rather than written over (it used to be lost).
+it('does not attach a pending owner refresh to a replacement project, and keeps its draft', async () => {
   const host = document.createElement('div');
   const root = createRoot(host);
   try {
@@ -116,6 +120,10 @@ it('does not attach a pending owner refresh to a replacement project', async () 
     expect(sessionSketch(useDesignStudioStore.getState().session!).entities).toEqual([]);
     await act(async () => vi.advanceTimersByTimeAsync(400));
     expect(readPersistedSession()?.sketch.entities).toEqual([]);
+    const kept = readKeptDesignDrawings();
+    expect(kept).toHaveLength(1);
+    expect(kept[0]?.sketch.entities).toEqual(draft.entities);
+    expect(kept[0]?.projectOwner).toBe(saved?.projectOwner);
   } finally {
     await act(async () => root.unmount());
   }

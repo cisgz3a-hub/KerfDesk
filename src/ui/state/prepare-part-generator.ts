@@ -1,4 +1,9 @@
-import { IDENTITY_TRANSFORM, operationIdsForObject, type Project } from '../../core/scene';
+import {
+  IDENTITY_TRANSFORM,
+  operationIdsForObject,
+  type Project,
+  type Transform,
+} from '../../core/scene';
 import type {
   GeneratedPartObject,
   PartGeneratorDefinition,
@@ -28,10 +33,11 @@ export function preparePartGenerator(
   state: AppState,
   definition: PartGeneratorDefinition,
   objectId?: string,
+  openedTransform?: Transform,
 ): PartGeneratorResult<PreparedPartGenerator> {
   const parsed = parsePartGeneratorDefinition(definition);
   if (parsed.kind === 'invalid') return parsed;
-  const target = editablePart(state.project, objectId);
+  const target = editablePart(state.project, objectId, openedTransform);
   if (target.kind === 'invalid') return target;
   const previous = target.value;
   const built =
@@ -129,6 +135,7 @@ function updatePart(
 function editablePart(
   project: Project,
   objectId: string | undefined,
+  openedTransform: Transform | undefined,
 ): PartGeneratorResult<GeneratedPartObject | undefined> {
   if (objectId === undefined) return { kind: 'ok', value: undefined };
   const existing = project.scene.objects.find((object) => object.id === objectId);
@@ -140,6 +147,15 @@ function editablePart(
     return invalid('Unlock this generated part before changing its dimensions.');
   if (existing.constrainedSketch !== undefined || existing.booleanCompound !== undefined)
     return invalid('Bake the other retained geometry source before editing this part generator.');
+  // The editor folded the scale it opened on into its lengths (ADR-573 Amendment 1).
+  const now = existing.transform;
+  if (
+    openedTransform !== undefined &&
+    (now.scaleX !== openedTransform.scaleX || now.scaleY !== openedTransform.scaleY)
+  )
+    return invalid(
+      'The part was resized after this editor opened. Close and reopen it to edit its current size.',
+    );
   return { kind: 'ok', value: existing as GeneratedPartObject };
 }
 
