@@ -1,4 +1,11 @@
-import { pathUsesOperation, type Layer, type Project, type Scene } from '../../core/scene';
+import {
+  isClosedEnough,
+  pathUsesOperation,
+  type Layer,
+  type Project,
+  type Scene,
+} from '../../core/scene';
+import { isCurveClosedEnough } from '../../core/scene/polyline-closure';
 import { selectionUnits } from '../../core/scene/selection-units';
 import { isVectorPathObject, type VectorSceneObject } from '../../core/geometry';
 import { subpathCount } from '../../core/geometry/outer-shape-groups';
@@ -160,21 +167,17 @@ export function selectionCanBreakApart(
   );
 }
 
+// The closed-enough rule Fill, Offset Shapes and Select Open Shapes use: a
+// contour flagged open whose end returns to its start counts as closed.
 function objectHasOnlyClosedContours(object: Project['scene']['objects'][number]): boolean {
   if (!isConvertibleVector(object)) return false;
   return (
     object.paths.length > 0 &&
     object.paths.every((path) => {
       if (path.curves !== undefined) {
-        return (
-          path.curves.length > 0 &&
-          path.curves.every((curve) => curve.closed && curve.segments.length > 0)
-        );
+        return path.curves.length > 0 && path.curves.every(isCurveClosedEnough);
       }
-      return (
-        path.polylines.length > 0 &&
-        path.polylines.every((polyline) => polyline.closed && polyline.points.length >= 3)
-      );
+      return path.polylines.length > 0 && path.polylines.every(isClosedEnough);
     })
   );
 }

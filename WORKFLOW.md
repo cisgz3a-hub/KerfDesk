@@ -666,8 +666,14 @@ the linked artwork.
    shapes inside other shapes. **Delete original objects** removes the selection once the offset
    is added. Round corners and end caps are chorded within the 0.025 mm machine curve tolerance
    at any distance (ADR-410 amendment 1); so are the round corners of the properties-panel offset.
+   A curved shape is flattened at 0.005 mm before either tool offsets it, so the whole result,
+   not only its corners, stays within 0.025 mm of the true offset curve (amendment 3).
 3. The dialog draws the selection in grey, the outward result in the accent colour and the inward
-   result in green, and lists each result's size. The selection is offset as one design.
+   result in green, and lists each result's size. The selection is offset as one design: shapes
+   that overlap become one outline, and a shape inside another selected shape is a hole even when
+   it was drawn as its own object, with a shape inside that hole an outline again, exactly as the
+   same art drawn as one compound path (ADR-410 amendment 3). **Outer shapes only** drops all of
+   those inner shapes.
 4. Open lines offset outward into a closed outline around the line, with caps that follow the
    corner style. **Inward** needs a closed shape; with only open lines the dialog says so and
    **Offset** is unavailable. A collapsed inward offset is explained the same way.
@@ -6890,7 +6896,9 @@ and lifts the command's CNC-only gate.)*
 2. With closed shapes selected, the layers panel shows an "Offset" row:
    distance + Outward / Inward adds a NEW offset path object (round
    joins) and leaves the sources in place — kerf compensation on a
-   laser, clearing outlines and inlay gaps on a router.
+   laser, clearing outlines and inlay gaps on a router. A shape drawn
+   inside another selected shape is offset as a hole, as in Offset
+   Shapes (F-A6c, ADR-410 amendment 3).
 3. Both work in laser AND CNC modes (geometry is machine-agnostic).
 
 #### Error — invalid input
@@ -6898,7 +6906,9 @@ and lifts the command's CNC-only gate.)*
    vector objects are selected — the menu never runs the op, so there
    is nothing to surface.
 2. Open contours are rejected — the scene is unchanged and a warning
-   toast names the reason (same rule as Weld).
+   toast names the reason (same rule as Weld). A path whose end returns
+   to its start counts as closed even when it is flagged open, as Fill,
+   Offset Shapes and Select Open Shapes count it (ADR-410 amendment 3).
 3. An inward offset large enough to collapse the shape changes nothing
    and warns why. Open contours and a collapsing offset are reachable
    cases the menu gating cannot pre-detect, so the op runs, no-ops the

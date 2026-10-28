@@ -43,16 +43,26 @@ export function withClosingPoint(
   return [...points, first];
 }
 
+/** isClosedEnough for a curve: closed, or its segments end back at its start. */
+export function isCurveClosedEnough(curve: CurveSubpath): boolean {
+  if (curve.segments.length === 0) return false;
+  return curve.closed || endsAtStart(curve);
+}
+
 /** A closed curve whose segments end at its start, so a stroke draws its closing edge. */
 export function withClosingSegment(curve: CurveSubpath): CurveSubpath {
-  const end = curve.segments.at(-1)?.to ?? curve.start;
-  // Match withClosingPoint so compatibility checks keep the same seam geometry.
-  const closedEnough =
-    Math.abs(end.x - curve.start.x) < CLOSURE_EPS_MM &&
-    Math.abs(end.y - curve.start.y) < CLOSURE_EPS_MM;
-  return !curve.closed || closedEnough
+  return !curve.closed || endsAtStart(curve)
     ? curve
     : { ...curve, segments: [...curve.segments, { kind: 'line', to: curve.start }] };
+}
+
+// Match withClosingPoint so compatibility checks keep the same seam geometry.
+function endsAtStart(curve: CurveSubpath): boolean {
+  const end = curve.segments.at(-1)?.to ?? curve.start;
+  return (
+    Math.abs(end.x - curve.start.x) < CLOSURE_EPS_MM &&
+    Math.abs(end.y - curve.start.y) < CLOSURE_EPS_MM
+  );
 }
 
 /** `path` with every closed polyline and curve carrying its explicit closing edge. */

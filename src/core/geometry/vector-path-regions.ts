@@ -1,10 +1,11 @@
 import { FillRule, unionD, type PathsD } from 'clipper2-ts';
 import { ok, type Result } from '../result';
 import type { ColoredPath } from '../scene';
+import { DEFAULT_MACHINE_CURVE_TOLERANCE_MM } from '../scene/curve-path';
 import { canonicalizeVectorPaths } from './vector-path-canonical';
 import {
   isClosedPolygon,
-  materializeVectorObject,
+  materializeVectorObjectWithin,
   polylineToPathD,
   tryVectorOp,
   type VectorOpError,
@@ -25,11 +26,14 @@ export type NormalizedVectorPathBatch = Pick<
 
 /** Normalize each render/fill batch under the same rule used by the canvas and
  * CAM: TextObject outlines are non-zero; every ordinary artwork ColoredPath is
- * an independent even-odd batch. */
+ * an independent even-odd batch. Curves are flattened to `curveToleranceMm`. */
 export function normalizeVectorObjectBatches(
   object: VectorSceneObject,
+  curveToleranceMm = DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
 ): Result<ReadonlyArray<NormalizedVectorPathBatch>, VectorOpError> {
-  const materializedResult = tryVectorOp(() => materializeVectorObject(object));
+  const materializedResult = tryVectorOp(() =>
+    materializeVectorObjectWithin(object, curveToleranceMm),
+  );
   if (materializedResult.kind === 'error') return materializedResult;
   const materialized = materializedResult.value;
   const batches: NormalizedVectorPathBatch[] = [];
@@ -78,13 +82,20 @@ export function normalizeVectorObjectRegion(
 ): Result<PathsD, VectorOpError> {
   const batches = normalizeVectorObjectBatches(object);
   if (batches.kind === 'error') return batches;
-  if (batches.value.length === 0) return ok([]);
-  const onlyBatch = batches.value[0];
-  if (batches.value.length === 1 && onlyBatch !== undefined) return ok(onlyBatch.paths);
+  return unionNormalizedBatches(batches.value);
+}
+
+/** One object's normalized render batches as its one visible region. */
+export function unionNormalizedBatches(
+  batches: ReadonlyArray<NormalizedVectorPathBatch>,
+): Result<PathsD, VectorOpError> {
+  if (batches.length === 0) return ok([]);
+  const onlyBatch = batches[0];
+  if (batches.length === 1 && onlyBatch !== undefined) return ok(onlyBatch.paths);
   return tryVectorOp(() =>
     canonicalizeVectorPaths(
       unionD(
-        batches.value.flatMap((batch) => batch.paths),
+        batches.flatMap((batch) => batch.paths),
         [],
         FillRule.NonZero,
         VECTOR_PATH_PRECISION_DECIMALS,
