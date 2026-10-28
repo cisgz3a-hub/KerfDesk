@@ -88,7 +88,13 @@ function fills(job: Job): FillGroup[] {
 describe('automatic overscan (ADR-495)', () => {
   it('runs the whole v²/2a from rest plus 10%, rounded up to 0.1 mm', () => {
     const at = (feedMmPerMin: number, scanAngleDeg = 0) =>
-      automaticOverscanMm({ feedMmPerMin, accelMmPerSec2: 500, scanAngleDeg, maxMm: 25 });
+      automaticOverscanMm({
+        feedMmPerMin,
+        accelMmPerSec2: 500,
+        kinematics: 'cartesian',
+        scanAngleDeg,
+        maxMm: 25,
+      });
     expect(at(1500)).toBe(0.7); // 0.625 mm × 1.1
     expect(at(3000)).toBe(2.8); // 2.5 mm × 1.1
     expect(at(6000)).toBe(11); // 10 mm × 1.1, not 11.1 from float noise
@@ -97,11 +103,17 @@ describe('automatic overscan (ADR-495)', () => {
   });
 
   it('needs less runway off the axes, where both axes accelerate together', () => {
-    expect(alongScanAccelMmPerSec2(500, 0)).toBe(500);
-    expect(alongScanAccelMmPerSec2(500, 90)).toBe(500);
-    expect(alongScanAccelMmPerSec2(500, 45)).toBeCloseTo(500 * Math.SQRT2, 9);
+    expect(alongScanAccelMmPerSec2(500, 0, 'cartesian')).toBe(500);
+    expect(alongScanAccelMmPerSec2(500, 90, 'cartesian')).toBe(500);
+    expect(alongScanAccelMmPerSec2(500, 45, 'cartesian')).toBeCloseTo(500 * Math.SQRT2, 9);
     const at = (scanAngleDeg: number) =>
-      automaticOverscanMm({ feedMmPerMin: 3000, accelMmPerSec2: 500, scanAngleDeg, maxMm: 25 });
+      automaticOverscanMm({
+        feedMmPerMin: 3000,
+        accelMmPerSec2: 500,
+        kinematics: 'cartesian',
+        scanAngleDeg,
+        maxMm: 25,
+      });
     expect(at(45)).toBe(2); // 2.5 / √2 × 1.1 = 1.94
     expect(at(135)).toBe(2);
     expect(at(90)).toBe(2.8);
@@ -171,6 +183,61 @@ describe('automatic overscan (ADR-495)', () => {
       ],
     };
     // The fill's 45-degree hatch would need 7.8 mm, but a pass can run along an axis.
+    expect(maxOutputOverscanMm(scene, dev)).toBe(11);
+  });
+});
+
+// Rolling audit v6 K3-P2-2 (ADR-675): grblHAL's CoreXY limits each motor, so a
+// scan at θ gets a / (|cos θ| + |sin θ|), not the Cartesian a / max(|cos θ|, |sin θ|).
+describe('automatic overscan on a CoreXY machine (ADR-675)', () => {
+  const coreXy = { ...dev, kinematics: 'corexy' as const };
+  const at = (kinematics: 'cartesian' | 'corexy', scanAngleDeg: number) =>
+    automaticOverscanMm({
+      feedMmPerMin: 10000,
+      accelMmPerSec2: 1000,
+      kinematics,
+      scanAngleDeg,
+      maxMm: 25,
+    });
+
+  it('gives a diagonal scan half the Cartesian acceleration', () => {
+    expect(alongScanAccelMmPerSec2(1000, 0, 'corexy')).toBe(1000);
+    expect(alongScanAccelMmPerSec2(1000, 90, 'corexy')).toBeCloseTo(1000, 9);
+    expect(alongScanAccelMmPerSec2(1000, 45, 'corexy')).toBeCloseTo(1000 / Math.SQRT2, 9);
+    expect(alongScanAccelMmPerSec2(1000, 30, 'corexy')).toBeCloseTo(732.05, 2);
+  });
+
+  it('runs the K3 runways at $120=1000 and 10000 mm/min', () => {
+    // Along an axis both layouts agree: 13.9 mm x 1.1.
+    expect(at('corexy', 0)).toBe(15.3);
+    expect(at('cartesian', 0)).toBe(15.3);
+    // 30 degrees: 19.0 mm needed on CoreXY; the Cartesian model gave 13.3.
+    expect(at('corexy', 30)).toBe(20.9);
+    expect(at('cartesian', 30)).toBe(13.3);
+    // 45 degrees: 19.6 mm needed on CoreXY; the Cartesian model gave 10.9.
+    expect(at('corexy', 45)).toBe(21.7);
+    expect(at('cartesian', 45)).toBe(10.9);
+  });
+
+  it('compiles a CoreXY image at 45 degrees with the longer runway', () => {
+    const layer = imageLayer({ speed: 3000, autoOverscan: true, imageScanAngleDeg: 45 });
+    const job = compileJob({ objects: [IMAGE], layers: [layer] }, coreXy);
+    // 2.5 mm x √2 x 1.1 = 3.89 mm, where Cartesian runs 2 mm.
+    expect(rasters(job).map((group) => group.overscanMm)).toEqual([3.9]);
+    const fill = fillLayer({ speed: 3000, autoOverscan: true, hatchAngleDeg: 45 });
+    expect(fillScanOverscanMm(fill, coreXy)).toBe(3.9);
+  });
+
+  it('lets preflight excuse the diagonal runway, the longest on CoreXY', () => {
+    const scene = {
+      objects: [IMAGE, SQUARE],
+      layers: [
+        imageLayer({ speed: 1500, autoOverscan: true, imageOverscanMm: 0 }),
+        fillLayer({ speed: 6000, autoOverscan: true, fillOverscanMm: 0 }),
+      ],
+    };
+    // 6000 mm/min at 500 / √2 mm/s²: 14.1 mm x 1.1.
+    expect(maxOutputOverscanMm(scene, coreXy)).toBe(15.6);
     expect(maxOutputOverscanMm(scene, dev)).toBe(11);
   });
 });

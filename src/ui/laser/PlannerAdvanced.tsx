@@ -1,12 +1,14 @@
-// PlannerFields — local estimate references: the recorded GRBL acceleration
-// and junction deviation plus the cut/travel time scales. Machine Setup's
-// Options step renders them.
+// PlannerFields — local estimate references: the recorded GRBL acceleration,
+// how it reaches a diagonal (the motion layout, ADR-675), junction deviation
+// and the cut/travel time scales. Machine Setup's Options step renders them.
 //
 // Match the controller references before calibrating systematic ETA error.
 // Acceleration also informs separately reviewed CNC recovery runways.
 
 import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { MAX_ESTIMATE_TIME_SCALE, MIN_ESTIMATE_TIME_SCALE } from '../../core/devices';
+// Deep import: the devices barrel is at its public-export ratchet.
+import { isMachineKinematics, type MachineKinematics } from '../../core/devices/device-profile';
 import { inlineCodeStyle, numInputStyle, Row, unitStyle } from './device-settings-shared';
 
 const MAX_ACCEL = 100000;
@@ -14,10 +16,12 @@ const MAX_JD_MM = 100;
 
 type PlannerFieldsProps = {
   readonly accel: number;
+  readonly kinematics: MachineKinematics;
   readonly jd: number;
   readonly cutTimeScale: number;
   readonly travelTimeScale: number;
   readonly onAccelChange: (next: number) => void;
+  readonly onKinematicsChange: (next: MachineKinematics) => void;
   readonly onJdChange: (next: number) => void;
   readonly onCutTimeScaleChange: (next: number) => void;
   readonly onTravelTimeScaleChange: (next: number) => void;
@@ -39,10 +43,11 @@ export function PlannerFields(props: PlannerFieldsProps): JSX.Element {
             onCommit={props.onAccelChange}
             style={numInputStyle}
             ariaLabel="Acceleration (mm/s²)"
-            title="Acceleration reference for time estimates and reviewed CNC recovery runways. Use the lower of the controller's $120/$121 values; editing this field does not write firmware settings or change controller acceleration."
+            title="Acceleration reference for time estimates, automatic overscan and reviewed CNC recovery runways. Use the lower of the controller's $120/$121 values, and set Motion layout to match the machine; editing this field does not write firmware settings or change controller acceleration."
           />
           <span style={unitStyle}>mm/s²</span>
         </Row>
+        <MotionLayoutRow kinematics={props.kinematics} onChange={props.onKinematicsChange} />
         <Row label="$11 junction">
           <ClearableNumberField
             min={0.001}
@@ -91,6 +96,29 @@ export function PlannerFields(props: PlannerFieldsProps): JSX.Element {
         </p>
       </div>
     </>
+  );
+}
+
+// ADR-675: how $120/$121 and $110/$111 reach a diagonal.
+function MotionLayoutRow(props: {
+  readonly kinematics: MachineKinematics;
+  readonly onChange: (next: MachineKinematics) => void;
+}): JSX.Element {
+  return (
+    <Row label="Motion layout">
+      <select
+        value={props.kinematics}
+        onChange={(event) => {
+          const next = event.target.value;
+          if (isMachineKinematics(next)) props.onChange(next);
+        }}
+        aria-label="Motion layout"
+        title="How the X and Y motors move the head. On CoreXY (two belts that both move for every move, as on the Creality Falcon A1 Pro) the controller's $120/$121 and $110/$111 limit each motor, so a diagonal gets less acceleration and speed than along an axis. Check the controller's $I: grblHAL lists [KINEMATICS:CoreXY]. This does not change emitted coordinates."
+      >
+        <option value="cartesian">Cartesian (one motor per axis)</option>
+        <option value="corexy">CoreXY</option>
+      </select>
+    </Row>
   );
 }
 

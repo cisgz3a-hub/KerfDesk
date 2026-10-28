@@ -6,12 +6,15 @@ import {
 } from './machine-setup-controller-guide';
 
 describe('machineSetupControllerGuide', () => {
-  it('matches Falcon vendor commands without advertising settings reads or writes', () => {
+  // Rolling audit v6 K3-P3-1 (ADR-322 Amendment 3): the contract reads $I and
+  // $$, and writes nothing.
+  it('matches Falcon vendor commands: reads $I and $$, advertises no writes', () => {
     const guide = machineSetupControllerGuide('grblhal', 'creality-falcon-a1-pro');
-    expect(guide.identityCommands).toEqual([]);
-    expect(guide.settingsCommands).toEqual([]);
+    expect(guide.identityCommands).toEqual(['$I']);
+    expect(guide.settingsCommands).toEqual(['$$']);
     expect(guide.homeCommand).toBe('$HX\n$HY');
     expect(guide.writePolicy).toBe('external-config');
+    expect(guide.writeExplanation).toContain('never writes them');
     expect(guide.writeExplanation).toContain('native jog cancellation is unavailable');
   });
   it('covers every supported controller and matches driver transport/commands', () => {

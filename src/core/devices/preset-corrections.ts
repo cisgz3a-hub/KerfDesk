@@ -10,7 +10,10 @@
 import type { DeviceProfile } from './device-profile';
 import { profileCatalogEntryById } from './profile-catalog';
 
-type CorrectableFields = Pick<DeviceProfile, 'origin' | 'bedWidth' | 'bedHeight'>;
+type CorrectableFields = Pick<
+  DeviceProfile,
+  'origin' | 'bedWidth' | 'bedHeight' | 'homing' | 'kinematics'
+>;
 
 type PresetCorrection = {
   readonly profileIds: ReadonlyArray<string>;
@@ -51,6 +54,31 @@ const PRESET_CORRECTIONS: ReadonlyArray<PresetCorrection> = [
     effect: 'a job near the edge can run past the real travel',
     fields: ['bedWidth', 'bedHeight'],
     predates: (device) => device.bedWidth === 400 && device.bedHeight === 400,
+  },
+  // 2026-10-28, rolling audit v6 K3-P2-1. The A1 Pro preset inherited homing
+  // off, but both published A1 Pro $$ reads give $22=43 (homing on) and
+  // $23=3 (front left), and Creality homes before every job (ADR-322
+  // Amendment 3). Without homing its bed frame never applies.
+  {
+    profileIds: ['creality-falcon-a1-pro-grblhal'],
+    before: 'homing off',
+    now: 'homing on at the front left',
+    effect:
+      'Home is offered as "Set up homing", and Start checks only the job size, refuses every no-go zone and sets no jog limits',
+    fields: ['homing'],
+    predates: (device) => !device.homing.enabled,
+  },
+  // 2026-10-28, rolling audit v6 K3-P2-2. Both A1 Pro $I reads give
+  // [KINEMATICS:CoreXY v2.02]; a copy saved before has no kinematics, which
+  // reads as Cartesian (ADR-675).
+  {
+    profileIds: ['creality-falcon-a1-pro-grblhal'],
+    before: 'the Cartesian motion model',
+    now: 'CoreXY motion',
+    effect:
+      'Automatic overscan gives a diagonal scan too short a runway when acceleration is the firmware value, and estimates run short',
+    fields: ['kinematics'],
+    predates: (device) => device.kinematics === undefined,
   },
 ];
 

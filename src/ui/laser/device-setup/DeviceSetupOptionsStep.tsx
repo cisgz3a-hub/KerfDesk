@@ -9,6 +9,8 @@ import { AutofocusEditor } from '../AutofocusEditor';
 import { ZRows } from '../DeviceProfileRows';
 import { NEW_ROTARY_SETUP } from '../rotary-setup-edit';
 import { SafetyZonesPanel } from '../MachineSetupSafetyZones';
+// Deep import: the devices barrel is at its public-export ratchet.
+import { machineKinematics } from '../../../core/devices/device-profile';
 import { PlannerFields } from '../PlannerAdvanced';
 import { ScanOffsetEditor } from '../ScanOffsetEditor';
 import { ControlledLaserOffTravelRow } from '../ControlledLaserOffTravelRow';
@@ -57,10 +59,12 @@ export function DeviceSetupOptionsStep({
       <OptionSection title="Planner and time estimate" status={plannerStatus(draft)}>
         <PlannerFields
           accel={draft.accelMmPerSec2}
+          kinematics={machineKinematics(draft)}
           jd={draft.junctionDeviationMm}
           cutTimeScale={draft.estimateCutTimeScale ?? 1}
           travelTimeScale={draft.estimateTravelTimeScale ?? 1}
           onAccelChange={(accelMmPerSec2) => update({ accelMmPerSec2 })}
+          onKinematicsChange={(kinematics) => update({ kinematics })}
           onJdChange={(junctionDeviationMm) => update({ junctionDeviationMm })}
           onCutTimeScaleChange={(estimateCutTimeScale) => update({ estimateCutTimeScale })}
           onTravelTimeScaleChange={(estimateTravelTimeScale) => update({ estimateTravelTimeScale })}

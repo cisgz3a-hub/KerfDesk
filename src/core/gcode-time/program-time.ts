@@ -11,6 +11,7 @@
 
 import { SEG_MOTION, type GcodeRenderModel } from '../gcode-view';
 import { blockTime, planVelocities, type Block } from '../motion-planner';
+import { blockAcceleration } from '../motion-planner/planner-kinematics';
 import { sanitizeLimits, type MotionLimits } from './motion-limits';
 import { segmentBlocks } from './segment-blocks';
 import { validTimeScale, type ProgramTimingOptions } from './program-timing-options';
@@ -37,6 +38,9 @@ export type ProgramTimeModel = {
   readonly segTargetVelocityMmPerSec: Float32Array;
   readonly segEntryVelocityMmPerSec: Float32Array;
   readonly segExitVelocityMmPerSec: Float32Array;
+  /** The acceleration each segment was planned at (ADR-675: below
+   * accelMmPerSec2 only off the axes of a CoreXY machine). */
+  readonly segAccelMmPerSec2: Float64Array;
   /** Cumulative seconds at each segment's end. */
   readonly segTimeEndSec: Float32Array;
   /** 1 where the move never sustained its programmed feed. */
@@ -67,6 +71,8 @@ export function buildProgramTime(
   const segTargetVelocityMmPerSec = new Float32Array(blocks.length);
   const segEntryVelocityMmPerSec = new Float32Array(blocks.length);
   const segExitVelocityMmPerSec = new Float32Array(blocks.length);
+  const segAccelMmPerSec2 = new Float64Array(blocks.length);
+  const kinematics = limits.kinematics ?? 'cartesian';
   const segTimeEndSec = new Float32Array(blocks.length);
   const segFeedLimited = new Uint8Array(blocks.length);
   let elapsed = 0;
@@ -80,6 +86,7 @@ export function buildProgramTime(
       limits.accelMmPerSec2,
       limits.junctionDeviationMm,
       context.plannerBlocks,
+      kinematics,
     );
     for (let localIndex = 0; localIndex < spanBlocks.length; localIndex += 1) {
       const index = span.startIndex + localIndex;
@@ -89,7 +96,8 @@ export function buildProgramTime(
       const rapid = model.segMotion[index] === SEG_MOTION.rapid;
       const cutting = isCutting(model, index, block, context.machineKind, power);
       const scale = cutting ? context.cutTimeScale : context.travelTimeScale;
-      const seconds = blockTime(block, entry.entryV, entry.exitV, limits.accelMmPerSec2) * scale;
+      const accel = blockAcceleration(block, limits.accelMmPerSec2, kinematics);
+      const seconds = blockTime(block, entry.entryV, entry.exitV, accel) * scale;
       if (cutting) cutSeconds += seconds;
       else if (rapid) rapidTravelSeconds += seconds;
       else feedTravelSeconds += seconds;
@@ -99,9 +107,10 @@ export function buildProgramTime(
       segTargetVelocityMmPerSec[index] = block.targetVelocity;
       segEntryVelocityMmPerSec[index] = entry.entryV;
       segExitVelocityMmPerSec[index] = entry.exitV;
+      segAccelMmPerSec2[index] = accel;
       elapsed += seconds;
       segTimeEndSec[index] = elapsed;
-      if (!reachesTargetVelocity(block, entry.entryV, entry.exitV, limits.accelMmPerSec2)) {
+      if (!reachesTargetVelocity(block, entry.entryV, entry.exitV, accel)) {
         segFeedLimited[index] = 1;
       }
     }
@@ -114,6 +123,7 @@ export function buildProgramTime(
     segTargetVelocityMmPerSec,
     segEntryVelocityMmPerSec,
     segExitVelocityMmPerSec,
+    segAccelMmPerSec2,
     segTimeEndSec,
     segFeedLimited,
     motionSeconds: elapsed,

@@ -45,6 +45,8 @@ export type ProgramTimeline = {
   readonly segmentExitVelocityMmPerSec: Float32Array;
   readonly segmentTimeScale: Float64Array;
   readonly accelMmPerSec2: number;
+  /** Each segment's planned acceleration; absent in hand-built timelines. */
+  readonly segmentAccelMmPerSec2?: Float64Array;
   readonly plannedStartSeconds: Float64Array;
   readonly plannedEndSeconds: Float64Array;
   readonly rawLineStartSeconds: Float64Array;
@@ -132,6 +134,7 @@ export function buildProgramTimeline(
       segmentExitVelocityMmPerSec: time.segExitVelocityMmPerSec,
       segmentTimeScale: time.segTimeScale,
       accelMmPerSec2: time.accelMmPerSec2,
+      segmentAccelMmPerSec2: time.segAccelMmPerSec2,
       ...segmentTiming,
       ...lineTiming,
     },

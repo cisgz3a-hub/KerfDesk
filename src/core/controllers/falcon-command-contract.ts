@@ -3,10 +3,19 @@ import { buildJogCommand, CMD_SPINDLE_OFF, type JogParams } from './grbl/command
 import { formatGcodeFeedMmPerMin } from '../gcode/feed-word';
 import { buildFramePerimeter } from '../job/frame-perimeter';
 
-/** Creality's official Falcon A1 Pro LightBurn device disables $J and settings
- * fetch and uses $HX followed by $HY for Home. These are device defaults, not
- * a claim that the vendor's GRBL-LPC label identifies a grblHAL firmware build.
- * Source: https://wiki.creality.com/falcon_a1_pro_(lightburn_2.0.00+).lbzip */
+/** Creality's official Falcon A1 Pro LightBurn device disables $J and uses $HX
+ * followed by $HY for Home. Its `AllowSettingsFetch: false` is a LightBurn
+ * connect preference, not a firmware hazard: `$$` and `$I` are reports in
+ * grblHAL (system.c), two published A1 Pro units answered both in full, and
+ * LaserGRBL, which Creality lists for live control, reads both at every
+ * connect. So this contract reads `$$` at connect, as the grblHAL driver does,
+ * to verify $30/$32 and show $22 and $62, and still sends no setting write
+ * (ADR-322 Amendment 3, ADR-370 Amendment 2; rolling audit v6 K3-P3-1). It
+ * never sends `$#` on its own: grblHAL rewrites a work-offset record it reads
+ * as corrupt.
+ * Sources: https://wiki.creality.com/falcon_a1_pro_(lightburn_2.0.00+).lbzip
+ * https://github.com/grblHAL/core/blob/04a5edcf8353f7294167d12d32e4b073d9be9ce4/system.c#L203-L262
+ * https://github.com/barebaric/rayforge/pull/461 */
 export function withFalconCommandContract(driver: ControllerDriver): ControllerDriver {
   return {
     ...driver,
@@ -16,14 +25,15 @@ export function withFalconCommandContract(driver: ControllerDriver): ControllerD
       ...driver.capabilities,
       jog: 'gcode-relative',
       jogCancel: false,
-      settings: 'none',
+      settings: 'grbl-dollar-read',
       firmwareSetupPanel: 'none',
     },
     realtime: { ...driver.realtime, jogCancel: null },
     commands: {
       ...driver.commands,
       home: '$HX\n$HY',
-      settingsQuery: null,
+      // The stock-GRBL `$I` parser takes exactly VER and OPT; grblHAL prints
+      // more, so `$I` is the Super Console's firmware report instead.
       buildInfoQuery: null,
       // Frame asserts laser-off with M5 and every perimeter line carries S0;
       // it must not touch the pump. Creality's A1 firmware treats M9 as a
@@ -43,7 +53,7 @@ export function withFalconCommandContract(driver: ControllerDriver): ControllerD
         ? { ...prepared, command: { ...prepared.command, stateEffect: 'reference' } }
         : prepared;
     },
-    consoleQuickCommands: driver.consoleQuickCommands.filter(({ command }) => command !== '$$'),
+    consoleQuickCommands: driver.consoleQuickCommands,
     // The Falcon A1's air settings exist only in stock-GRBL numbering. On
     // grblHAL, the Falcon A1 Pro's firmware, $150-$152 are the X, Y and Z
     // microsteps, so that contract sends no numeric write (ADR-370 Amendment 1).

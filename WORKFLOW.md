@@ -4745,8 +4745,9 @@ Set origin here again. It is a warning; Frame and Start are not refused (ADR-375
     511) whose bit 5 sends WCO and bit 6 sends Ov, so `$10=0` or `$10=1` there turns both off.
     Expect the status panel to read "Origin: not reported (WCO off in $10; send $10=96)" (or 97),
     and with `$10=0` "MPos: cannot be known" (ADR-375 Amendment 2).
-    Do not apply generic settings writes to the Falcon A1 vendor contract, which does
-    not offer ordinary settings fetch. See the [GRBL status documentation](https://github.com/gnea/grbl/wiki/Grbl-v1.1-Interface).
+    KerfDesk reads the Falcon A1 Pro's `$$` at connect but sends its vendor contract no
+    setting write (ADR-322 Amendment 3); do not apply generic settings writes to it either.
+    See the [GRBL status documentation](https://github.com/gnea/grbl/wiki/Grbl-v1.1-Interface).
 11. **Air pump at Start (ADR-323).** First confirm Machine Setup shows
     Air output `M8` and "Air restart" ticked. A Falcon A1 Pro profile
     saved before the preset gained `M8` (2026-09-19) still reads
@@ -4795,8 +4796,8 @@ Set origin here again. It is a warning; Frame and Start are not refused (ADR-375
     off only with the box unticked, the firmware timer is confirmed.
 13. **Qualify air repeats on the installed firmware (ADR-462).** In a
     separately supervised air check, record the firmware and, on a
-    stock-GRBL Falcon, the current `$152` setting (the A1 Pro's
-    contract cannot read it). With "Air restart" ticked, inspect a short-block job
+    stock-GRBL Falcon, the current `$152` setting (on the A1 Pro's
+    grblHAL `$152` is the Z microstep setting). With "Air restart" ticked, inspect a short-block job
     of a minute or more with Air on: the program attempts `M8` repeats
     at eligible movement boundaries after about 5 s of estimated time.
     Observe whether the pump stays on and whether the enclosure fan
@@ -4808,6 +4809,16 @@ Set origin here again. It is a warning; Frame and Start are not refused (ADR-375
     (firmware, plus `$152=100` on a stock-GRBL Falcon only) and verify
     it separately. Do not treat a pass
     on short blocks as qualification of every job or firmware version.
+14. **Homing and settings read (ADR-322 Amendment 3, ADR-675).** Read only; no write,
+    motion or laser command. Before connecting, power the machine on and watch whether the
+    head homes by itself; keep hands clear of the gantry. Connect on the Falcon A1 Pro preset:
+    the log shows the `$$` read, and Machine Setup's settings table lists `$22` (bit 0 set
+    means homing on), `$23`, `$30`, `$32`, `$62`, `$120`/`$121` and `$130`/`$131`.
+    Type `$I` in KerfDesk's Console and record `[FIRMWARE:...]`, the version line and
+    `[KINEMATICS:...]`; do not click the Console's quick buttons (they include `$X` and
+    `$#`), and never send a line with `=`. Home then reads **Home**, not **Set up homing**.
+    Keep Machine Setup's **Use detected values** unpressed: it would copy the 363 x 273 mm
+    travel over the listed 358 x 268 mm work area.
 
 When this checklist passes on the Falcon, replace the F.3 status in `PROJECT.md` Phase F
 ("Code shipped; hardware verification pending") with the recorded result and update the F.3

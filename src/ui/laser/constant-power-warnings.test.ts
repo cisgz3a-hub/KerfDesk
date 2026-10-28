@@ -107,6 +107,12 @@ describe('the planner models behind the advice', () => {
   it("reproduces the refuter's square-corner junction speed: 4.13 mm/s", () => {
     expect(squareCornerSpeedMmPerSec(500, 0.01)).toBeCloseTo(4.13, 2);
   });
+
+  // ADR-675: CoreXY plans the corner in motor space, so v² = a·δ·(1 + √2) / 2.
+  it('slows a CoreXY square corner to 2.46 mm/s at the same settings', () => {
+    expect(squareCornerSpeedMmPerSec(500, 0.01, 'corexy')).toBeCloseTo(2.46, 2);
+    expect(squareCornerSpeedMmPerSec(500, 0.01, 'cartesian')).toBeCloseTo(4.13, 2);
+  });
 });
 
 describe('constant-power (M3) image advice (Q1-P2-1)', () => {

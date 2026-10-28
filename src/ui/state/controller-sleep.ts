@@ -4,14 +4,15 @@
 // core, enter_sleep and setting_SleepEnable). The control used to send it
 // anyway: the refusal voided the work origin and raised a controller-error
 // notice while the motors stayed energized. When a `$$` read reported
-// `$62=0` the control is disabled with that fact instead. A build whose `$$`
-// was never read or does not list `$62`, such as the Falcon's, keeps the
-// control, and releaseMotors reports a refusal without touching the origin.
+// `$62=0` the control is disabled with that fact instead; the Falcon A1 Pro's
+// `$$`, read at connect, reports it (ADR-322 Amendment 3). A build whose `$$`
+// was never read or does not list `$62` keeps the control, and releaseMotors
+// reports a refusal without touching the origin.
 //
 // The advice names `$62=1` only where KerfDesk can write it (a driver with
 // `$N=` settings writes), and states `$62=0` only when `$$` reported it. The
-// Falcon contract cannot write `$62`, never reads `$$`, and a vendor build may
-// not have `$62` at all: grblHAL registers it only when SLEEP_DURATION > 0
+// Falcon contract cannot write `$62`, and a vendor build may not have `$62` at
+// all: grblHAL registers it only when SLEEP_DURATION > 0
 // (settings.c:2141-2143), and answers `$SLP` with error:3 whenever sleep is
 // disabled (system.c:572-576), so the refusal proves neither (audit HF-4).
 

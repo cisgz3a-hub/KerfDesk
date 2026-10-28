@@ -6,7 +6,10 @@ import {
   type ControllerKind,
 } from '../../core/devices';
 import type { MotionLimits } from '../../core/gcode-time';
-import { devicePlannerBlocks } from '../../core/gcode-time/program-timing-options';
+import {
+  deviceMotionLimits,
+  devicePlannerBlocks,
+} from '../../core/gcode-time/program-timing-options';
 import { laserPowerControlForDevice, type BuildRenderModelOptions } from '../../core/gcode-view';
 import type { Project } from '../../core/scene';
 // Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
@@ -145,11 +148,7 @@ export function deviceInspectionTiming(
 ): GcodeInspectionTiming {
   const plannerBlocks = devicePlannerBlocks(device, controllerKind);
   return {
-    limits: {
-      accelMmPerSec2: device.accelMmPerSec2,
-      junctionDeviationMm: device.junctionDeviationMm,
-      maxFeedMmPerMin: device.maxFeed,
-    },
+    limits: deviceMotionLimits(device),
     ...(device.estimateCutTimeScale === undefined
       ? {}
       : { cutTimeScale: device.estimateCutTimeScale }),

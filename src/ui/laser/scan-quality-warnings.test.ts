@@ -66,6 +66,30 @@ describe('compiled scan quality advisories', () => {
     expect(warnings(raster({ speed: 6000, overscanMm: 7.8, scanAngleDeg: 90 }))).toHaveLength(1);
   });
 
+  // Rolling audit v6 K3-P2-2 (ADR-675): with the firmware's $120=1000, the
+  // Cartesian model called 3.54 mm enough at 45° and 6000 mm/min; CoreXY needs 7.07.
+  it('measures a CoreXY diagonal with the per-motor acceleration', () => {
+    const coreXy = {
+      ...project,
+      device: { ...project.device, accelMmPerSec2: 1000, kinematics: 'corexy' as const },
+    };
+    const group = raster({ speed: 6000, overscanMm: 5, scanAngleDeg: 45 });
+    expect(
+      scanQualityWarnings(
+        { groups: [group] },
+        { ...coreXy, device: { ...coreXy.device, kinematics: 'cartesian' } },
+      ),
+    ).toEqual([]);
+    const short = scanQualityWarnings({ groups: [group] }, coreXy);
+    expect(short).toHaveLength(1);
+    expect(short[0]).toContain(
+      '1000 mm/s² (707.1068 mm/s² along its 45° scan on this CoreXY machine)',
+    );
+    expect(short[0]).toContain('needs about 7.0711 mm');
+    // Along an axis both layouts give the whole 1000 mm/s²: 5 mm is enough.
+    expect(scanQualityWarnings({ groups: [raster({ speed: 6000 })] }, coreXy)).toEqual([]);
+  });
+
   it('compares the qualified Fill entry rather than its larger stored setting', () => {
     const fill: FillGroup = {
       kind: 'fill',
