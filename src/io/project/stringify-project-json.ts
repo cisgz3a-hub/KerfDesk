@@ -1,11 +1,25 @@
 const CHUNK_CHARACTERS = 64 * 1024;
 
+/**
+ * Writes one value itself, through `append`, and returns true; or returns false
+ * to leave the value to the writer.
+ */
+export type JsonSubtreeWriter = (value: object, append: (text: string) => void) => boolean;
+
+type JsonTextOptions = {
+  readonly compact?: boolean;
+  readonly writeSubtree?: JsonSubtreeWriter;
+};
+
 class JsonTextWriter {
   private readonly chunks: string[] = [];
   private readonly indents = [''];
   private current = '';
 
-  constructor(readonly compact: boolean) {}
+  constructor(
+    readonly compact: boolean,
+    readonly writeSubtree: JsonSubtreeWriter | undefined,
+  ) {}
 
   append(text: string): void {
     if (this.current.length + text.length < CHUNK_CHARACTERS) {
@@ -25,9 +39,9 @@ class JsonTextWriter {
     this.append(`\n${this.indents[depth] ?? ''}`);
   }
 
-  finish(): string {
+  finish(): readonly string[] {
     this.flush();
-    return this.chunks.join('');
+    return this.chunks;
   }
 
   private flush(): void {
@@ -41,7 +55,18 @@ export function stringifyProjectJson(
   project: unknown,
   options: { readonly compact?: boolean } = {},
 ): string {
-  const writer = new JsonTextWriter(options.compact === true);
+  return stringifyProjectJsonChunks(project, options).join('');
+}
+
+/**
+ * The same text as ordered chunks that are never joined, so a project whose
+ * text passes the engine's longest string can still be written as a Blob.
+ */
+export function stringifyProjectJsonChunks(
+  project: unknown,
+  options: JsonTextOptions = {},
+): readonly string[] {
+  const writer = new JsonTextWriter(options.compact === true, options.writeSubtree);
   writePreparedValue(writer, prepareValue(project, ''), 0, new Set());
   return writer.finish();
 }
@@ -69,6 +94,16 @@ function writePreparedValue(
     writer.append(JSON.stringify(value));
     return;
   }
+  if (writer.writeSubtree?.(value, (text) => writer.append(text)) === true) return;
+  writeContainer(writer, value, depth, ancestors);
+}
+
+function writeContainer(
+  writer: JsonTextWriter,
+  value: object,
+  depth: number,
+  ancestors: Set<object>,
+): void {
   if (ancestors.has(value)) throw new TypeError('Converting circular structure to JSON');
   ancestors.add(value);
   try {

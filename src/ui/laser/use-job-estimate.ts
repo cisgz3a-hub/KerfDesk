@@ -1,7 +1,7 @@
 // useJobEstimate — debounced live ETA for the current scene + device.
 //
 // H16 (AUDIT-2026-06-10): the estimate used to recompute synchronously per
-// project identity, and setObjectTransform replaces the project on EVERY
+// project identity, and a drag (setObjectTransforms) replaces the project on EVERY
 // pointer-move — so dragging an object re-ran compile (including the raster
 // base64-decode + resample + dither pipeline, bounded only by the 4M px
 // budget) once per mousemove on the main thread. A trailing debounce keeps

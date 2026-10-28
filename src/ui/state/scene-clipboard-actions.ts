@@ -1,8 +1,8 @@
 import { cloneSelectionGroups } from './clone-selection-groups';
 import { layerWithoutFocusTest } from '../../core/scene/layer';
+import { addObjects } from '../../core/scene/scene';
 import {
   addLayer,
-  addObject,
   createArtworkOperation,
   operationIdsForObject,
   remapSceneObjectOperationBindings,
@@ -92,8 +92,7 @@ function pasteFromClipboard(state: AppState, offsetMm: number): AppState | Parti
     offsetMm,
   );
   const pasted = prepared.objects;
-  let scene = prepared.scene;
-  for (const object of pasted) scene = addObject(scene, object);
+  let scene = addObjects(prepared.scene, pasted);
   if (prepared.groups.length > 0) {
     scene = { ...scene, groups: [...(scene.groups ?? []), ...prepared.groups] };
   }

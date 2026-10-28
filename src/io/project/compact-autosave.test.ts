@@ -4,11 +4,11 @@ import type { MeshReliefObject } from '../../core/scene/relief';
 import { deserializeProject } from './deserialize-project';
 import { prepareProjectForAutosave } from './prepare-project-autosave';
 import { prepareProjectForPersistence } from './prepare-project-persistence';
-import { serializeProject } from './serialize-project';
-import { stringifyProjectJson } from './stringify-project-json';
+import { serializeProject, serializeProjectChunks } from './serialize-project';
+import { stringifyProjectJson, stringifyProjectJsonChunks } from './stringify-project-json';
 
 describe('compact autosave JSON', () => {
-  it('preserves both geometry representations and escaped text while manual files stay indented', () => {
+  it('preserves both geometry representations and escaped text, and manual files are compact too', () => {
     const project = vectorProject();
     const pretty = serializeProject(project);
     const autosave = prepareProjectForAutosave(project);
@@ -19,8 +19,14 @@ describe('compact autosave JSON', () => {
 
     expect(autosave.json).toBe(`${JSON.stringify(JSON.parse(pretty))}\n`);
     expect(pretty).toBe(`${JSON.stringify(JSON.parse(pretty), null, 2)}\n`);
-    expect(manual.json).toBe(`${JSON.stringify(JSON.parse(manual.json), null, 2)}\n`);
+    // ADR-204 Amendment 2: manual saves drop the indentation (J10-P3-3).
+    expect(manual.json).toBe(`${JSON.stringify(JSON.parse(manual.json))}\n`);
+    expect(deserializeProject(manual.json)).toEqual(deserializeProject(autosave.json));
     expect(autosave.json.length).toBeLessThan(pretty.length);
+    // The raw recovery copy's chunks are the same compact text (J10-P3-3).
+    expect(serializeProjectChunks(project).join('')).toBe(
+      serializeProject(project, { compact: true }),
+    );
     expect(deserializeProject(autosave.json)).toEqual(deserializeProject(pretty));
     const restored = deserializeProject(autosave.json);
     if (restored.kind !== 'ok') throw new Error('autosave must recover');
@@ -46,6 +52,7 @@ describe('compact autosave JSON', () => {
 
       expect(autosave.json).toBe(`${JSON.stringify(JSON.parse(pretty))}\n`);
       expect(serializeProject(project)).toBe(pretty);
+      expect(serializeProjectChunks(project).join('')).toBe(autosave.json);
       expect(deserializeProject(autosave.json)).toEqual(deserializeProject(pretty));
       expect(positions.byteLength).toBe(9 * ArrayType.BYTES_PER_ELEMENT);
     },
@@ -87,6 +94,9 @@ describe('compact autosave JSON', () => {
     };
     const plain = { ...value, typed: Array.from(value.typed) };
     expect(stringifyProjectJson(value, { compact: true })).toBe(JSON.stringify(plain));
+    expect(stringifyProjectJsonChunks(value, { compact: true }).join('')).toBe(
+      JSON.stringify(plain),
+    );
     expect(stringifyProjectJson(value)).toBe(JSON.stringify(plain, null, 2));
   });
 });

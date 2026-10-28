@@ -16,7 +16,7 @@ export function useWorkspaceDragDeps() {
   const toggleSelectObject = useStore((s) => s.toggleSelectObject);
   const setCursorMm = useStore((s) => s.setCursorMm);
   const beginInteraction = useStore((s) => s.beginInteraction);
-  const setObjectTransform = useStore((s) => s.setObjectTransform);
+  const setObjectTransforms = useStore((s) => s.setObjectTransforms);
   const endInteraction = useStore((s) => s.endInteraction);
   const cancelInteraction = useStore((s) => s.cancelInteraction);
   const drawShape = useStore((s) => s.drawShape);
@@ -38,7 +38,7 @@ export function useWorkspaceDragDeps() {
     toggleSelectObject,
     setCursorMm,
     beginInteraction,
-    setObjectTransform,
+    setObjectTransforms,
     endInteraction,
     cancelInteraction,
     drawShape,

@@ -1,4 +1,4 @@
-export { serializeProject } from './serialize-project';
+export { serializeProject, serializeProjectChunks } from './serialize-project';
 export type { DeserializeResult } from './deserialize-project';
 export { deserializeProject, deserializeProjectValue } from './deserialize-project';
 export {
