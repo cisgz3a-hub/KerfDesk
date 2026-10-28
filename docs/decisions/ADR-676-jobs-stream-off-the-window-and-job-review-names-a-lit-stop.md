@@ -96,9 +96,10 @@ Research, per the maintainer's "research what LightBurn does and copy":
    It also says how to reach the worker. It is a warning, not a refusal: the transport can still
    deliver the job (ADR-565; AGENTS.md machine policy).
 6. **Every host shows the fallback as a notice.** A requested worker that falls back to the
-   window raises a warning toast in the desktop app too. The toast names the lit-stop risk and
-   points to Job Review; only a browser also asks to keep KerfDesk visible. The Laser log line is
-   unchanged.
+   window raises a warning toast in the desktop app too. In one short clause the toast names the
+   lit-stop risk: the stack of toasts is only a few lines tall, and Job Review gives the full
+   warning for each job. The desktop toast points to Job Review; a browser's asks to keep KerfDesk
+   visible instead. The Laser log line is unchanged.
 7. **Not adopted:**
    - Switching M3 output to M4 automatically. It would change the burn, and LightBurn leaves M3 as
      the operator's choice; the warning offers it instead.
