@@ -51,7 +51,7 @@ describe('project start point persistence', () => {
     expect(migrateToCurrent(raw, 16)).toEqual({
       kind: 'ok',
       raw: { ...raw, schemaVersion: PROJECT_SCHEMA_VERSION },
-      steps: [16, 17],
+      steps: [16, 17, 18],
     });
     expect(JSON.stringify(raw)).toBe(before);
     expect(deserializeProject(before)).toMatchObject({
@@ -75,7 +75,7 @@ describe('project start point persistence', () => {
     const oldReader = await import('./deserialize-project');
     expect(oldReader.deserializeProject(saved)).toEqual({
       kind: 'schema-too-new',
-      sawVersion: 18,
+      sawVersion: 19,
     });
   });
 
