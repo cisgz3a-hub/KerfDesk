@@ -1,8 +1,10 @@
 import { selectControllerDriver } from '../controllers';
 import { isEstimateTimeScale, type ControllerKind, type DeviceProfile } from '../devices';
+import { machineKinematics } from '../devices/device-profile';
 import { laserPowerControlForDevice, type BuildRenderModelOptions } from '../gcode-view';
 import { GRBL_DEFAULT_ARC_TOLERANCE_MM } from '../gcode-view/controller-arc-points';
 import { DEFAULT_PLANNER_BLOCKS } from '../motion-planner/controller-planner-blocks';
+import type { MotionLimits } from './motion-limits';
 
 export type ProgramTimeCalibration = {
   readonly cutTimeScale: number;
@@ -32,6 +34,19 @@ export type ProgramTimingOptions = {
 
 export function validTimeScale(value: number | undefined): number {
   return isEstimateTimeScale(value) ? value : 1;
+}
+
+/** The device's planner limits, and how they reach a move off the axes (ADR-675). */
+export function deviceMotionLimits(
+  device: Pick<DeviceProfile, 'accelMmPerSec2' | 'junctionDeviationMm' | 'maxFeed' | 'kinematics'>,
+): MotionLimits {
+  const kinematics = machineKinematics(device);
+  return {
+    accelMmPerSec2: device.accelMmPerSec2,
+    junctionDeviationMm: device.junctionDeviationMm,
+    maxFeedMmPerMin: device.maxFeed,
+    ...(kinematics === 'cartesian' ? {} : { kinematics }),
+  };
 }
 
 /** Uses the same serial default as connection setup; Ruida executes an uploaded binary job. */

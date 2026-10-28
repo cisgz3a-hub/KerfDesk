@@ -37,9 +37,11 @@ function useMachineNetworkConnect(profile: NetworkProfile) {
       const targetHost = host.trim();
       const targetPort = Number(port);
       const serial = network.serialForTarget(targetHost, targetPort, current.protocol);
+      // The profile's Background streaming choice applies here as on USB: a
+      // worker streams the session unless it is turned off (ADR-676).
       await connectMachine(
         { ...platform, serial },
-        { hostedStreaming: false, portSelection: 'choose' },
+        { portSelection: 'choose' },
         { kind: current.kind, serial, host: targetHost, port: targetPort },
       );
       const result = useLaserStore.getState().connection;

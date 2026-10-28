@@ -173,7 +173,11 @@ export type GcodeMetadata = {
 // profile by a laser-off exit runway after its last burn point, so 4040 Line
 // output gains one `G1 ... S0` move per contour and a contour-exit comment;
 // carries forward v38 above (v36 was left unused).
-export const EMITTER_REVISION = 'm3-contour-exit-runway-20261028-v39';
+// ADR-675 works an automatic overscan out per motor on a CoreXY machine (the
+// Falcon A1 Pro), so a diagonal scan's runway there is longer and an axis
+// scan's is unchanged; Cartesian output is unchanged; carries forward v39
+// above.
+export const EMITTER_REVISION = 'corexy-scan-runway-20261028-v40';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

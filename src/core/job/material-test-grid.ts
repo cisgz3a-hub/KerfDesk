@@ -243,6 +243,10 @@ function materialTestLayers(args: {
   });
 }
 
+// Each row scans along X, where a Cartesian and a CoreXY machine both give the
+// whole acceleration (ADR-675), so the row's runway does not need the layout.
+const ALONG_X_ROW = { scanAngleDeg: 0, kinematics: 'cartesian' } as const;
+
 // The stored 5 mm, or longer where the row's fastest cell needs more to reach
 // speed before it burns (ADR-497). Never shorter than a Fill's default.
 export function materialTestRunwayMm(
@@ -255,7 +259,7 @@ export function materialTestRunwayMm(
   const needed = automaticOverscanMm({
     feedMmPerMin: effectiveGcodeFeedMmPerMin(fastestFeedMmPerMin),
     accelMmPerSec2,
-    scanAngleDeg: 0,
+    ...ALONG_X_ROW,
     maxMm: MAX_FILL_OVERSCAN_MM,
   });
   return Math.max(LAYER_DEFAULTS.fillOverscanMm, needed);
@@ -273,7 +277,7 @@ export function materialTestRunwayReachMmPerMin(
   const needed = automaticOverscanMm({
     feedMmPerMin: effectiveGcodeFeedMmPerMin(fastestFeedMmPerMin),
     accelMmPerSec2,
-    scanAngleDeg: 0,
+    ...ALONG_X_ROW,
     maxMm: Number.POSITIVE_INFINITY,
   });
   return needed > MAX_FILL_OVERSCAN_MM

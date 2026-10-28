@@ -17,7 +17,8 @@ import {
   MIN_LEAD_ANGLE_DEG,
   MIN_LEAD_LENGTH_MM,
 } from '../../core/job/laser-lead-settings';
-import { rematerializeParametricShape, type ParametricShapeSpec } from '../../core/shapes';
+import type { ParametricShapeSpec } from '../../core/shapes';
+import { rematerializeShapeSpecEdit } from '../../core/shapes/rectangle-resize';
 import { pushUndo, type StateSlice } from './scene-mutations';
 
 const MIN_POWER_SCALE_PERCENT = 0;
@@ -116,7 +117,7 @@ function setShapeSpec(
 ): ObjectPropertiesMutation {
   const object = state.project.scene.objects.find((candidate) => candidate.id === objectId);
   if (!isEditableParametricShape(object) || object.locked === true) return {};
-  const replacement = rematerializeParametricShape(object, spec);
+  const replacement = rematerializeShapeSpecEdit(object, spec);
   if (replacement === null || shapeSpecEqual(replacement, object)) return {};
   return mutation(
     state,

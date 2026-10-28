@@ -10,7 +10,7 @@ import {
   DEFAULT_RASTER_LAYER_COLOR,
   IDENTITY_TRANSFORM,
   applyTransform,
-  transformedBBox,
+  transformedBounds,
   type Bounds,
   type ColoredPath,
   type DitherAlgorithm,
@@ -176,13 +176,15 @@ function rasterizeConvertibles(
   return { bounds, plan, raster };
 }
 
-// Union of the selection's transformed (rotation-aware) AABBs. Callers gate
+// Union of the selection's turned own-bounds boxes, which hold every outline.
+// Not the smallest box (ADR-677): the packed photo path measures objects that
+// carry no outline, and both paths must rasterise the same grid. Callers gate
 // on a non-empty convertible selection; invalid empty input is refused.
 function combinedConvertibleBounds(objects: ReadonlyArray<ConvertibleVector>): Bounds {
   let bounds: Bounds | null = null;
   for (const o of objects) {
     if (!validSourceBounds(o.bounds)) return { minX: NaN, minY: NaN, maxX: NaN, maxY: NaN };
-    const b = transformedBBox(o);
+    const b = transformedBounds(o.bounds, o.transform);
     bounds =
       bounds === null
         ? b

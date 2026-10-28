@@ -19,6 +19,7 @@
 // write-attempt/close behavior and unconfirmed-stop notice for an active job.
 
 import { disconnectStopPlan } from './laser-disconnect-safety';
+import { hostedRefillArmed, releaseHostedRefillBeforeStop } from './laser-hosted-refill';
 import { isGrblFamilyDriver, runGrblDisconnectTransaction } from './laser-disconnect-transaction';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import type { LaserState, LiveRefs } from './laser-store';
@@ -64,6 +65,22 @@ export async function stopBeforeDisconnect(
     });
     return;
   }
+  // A worker-held Marlin refill comes back before the freeze (ADR-676); with
+  // none, the freeze below still runs before anything yields.
+  if (hostedRefillArmed(refs)) {
+    if (!(await releaseHostedRefillBeforeStop(refs, () => refs.connection === connection))) return;
+  }
+  await stopWithoutResetBeforeDisconnect(set, get, refs, safeWrite, connection, lightOff);
+}
+
+async function stopWithoutResetBeforeDisconnect(
+  set: SetFn,
+  get: GetFn,
+  refs: LiveRefs,
+  safeWrite: SafeWriteFn,
+  connection: NonNullable<LiveRefs['connection']>,
+  lightOff: string | null,
+): Promise<void> {
   // Marlin's quickstop lines when anything may still run (MA-7), else the
   // ordinary stop commands (laser-disconnect-safety.ts).
   const stopCommands = disconnectStopPlan(get(), refs.driver).commands;

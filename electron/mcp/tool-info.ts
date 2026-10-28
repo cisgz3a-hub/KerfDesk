@@ -85,7 +85,7 @@ export const mcpToolInfo: Record<KerfDeskMcpCommand, { title: string; descriptio
   add_polyline: {
     title: 'Add drawn line artwork',
     description:
-      'Add 2 to 512 scene-mm points as ordinary Laser drawing artwork with the same curve fairing as the PC pen. pointsMm use xMm/yMm; closed needs at least three distinct points. Requires expectedRevision and UUID requestId; the desktop owns admission and Undo.',
+      'Add 2 to 512 scene-mm points as ordinary Laser drawing artwork, faired into smooth curves like a freehand stroke (4 or more open or 5 or more closed points; fewer stay straight lines). pointsMm use xMm/yMm; closed needs at least three distinct points. Requires expectedRevision and UUID requestId; the desktop owns admission and Undo.',
   },
   transform_artwork: {
     title: 'Transform existing artwork',

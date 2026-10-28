@@ -1,6 +1,7 @@
 import { DEFAULT_MACHINE_CURVE_TOLERANCE_MM, flattenColoredPathCurves } from '../scene/curve-path';
 import { type PathD } from 'clipper2-ts';
 import { err, ok, type Result } from '../result';
+import { isClosedEnough } from '../scene/polyline-closure';
 import {
   IDENTITY_TRANSFORM,
   type Bounds,
@@ -68,14 +69,31 @@ export function materializeVectorObject(
   id = object.id,
   worldPolylines?: ReadonlyArray<ReadonlyArray<Polyline>>,
 ): ImportedSvg {
+  return materialize(object, id, worldPolylines, DEFAULT_MACHINE_CURVE_TOLERANCE_MM);
+}
+
+/** materializeVectorObject with curves flattened to `curveToleranceMm` of world space. */
+export function materializeVectorObjectWithin(
+  object: VectorSceneObject,
+  curveToleranceMm: number,
+): ImportedSvg {
+  return materialize(object, object.id, undefined, curveToleranceMm);
+}
+
+function materialize(
+  object: VectorSceneObject,
+  id: string,
+  worldPolylines: ReadonlyArray<ReadonlyArray<Polyline>> | undefined,
+  curveToleranceMm: number,
+): ImportedSvg {
   if (worldPolylines !== undefined && worldPolylines.length !== object.paths.length)
     throw new RangeError('Prepared geometry must match every source path.');
   const paths = object.paths.map((path, index) => {
     let polylines = worldPolylines?.[index];
     if (worldPolylines !== undefined && polylines === undefined)
       throw new RangeError('Prepared geometry is missing a source path.');
-    polylines ??= materializationPolylines(path, object.transform).map((polyline) =>
-      materializePolyline(polyline, object.transform),
+    polylines ??= materializationPolylines(path, object.transform, curveToleranceMm).map(
+      (polyline) => materializePolyline(polyline, object.transform),
     );
     return {
       color: path.color,
@@ -102,12 +120,13 @@ export function materializeVectorObject(
 function materializationPolylines(
   path: ColoredPath,
   transform: SceneObject['transform'],
+  curveToleranceMm: number,
 ): ReadonlyArray<Polyline> {
   const largestScale = Math.max(Math.abs(transform.scaleX), Math.abs(transform.scaleY));
   const localTolerance =
     largestScale > 0 && Number.isFinite(largestScale)
-      ? DEFAULT_MACHINE_CURVE_TOLERANCE_MM / largestScale
-      : DEFAULT_MACHINE_CURVE_TOLERANCE_MM;
+      ? curveToleranceMm / largestScale
+      : curveToleranceMm;
   const flattened = flattenColoredPathCurves(path, {
     toleranceMm: localTolerance,
     // Match output compilation: routing or compatibility views must never
@@ -152,8 +171,13 @@ function objectPowerScale(
   };
 }
 
+// The shared closed-enough rule (polyline-closure.ts) that Fill, Offset Shapes
+// and Select Open Shapes use, so Weld and the Booleans do not refuse a path
+// flagged open whose last point repeats its first (rolling audit v7 L1-P3-3).
 export function isClosedPolygon(polyline: Polyline): boolean {
-  return polyline.closed && normalizeClosedPoints(polyline.points).length >= MIN_CLOSED_POINTS;
+  return (
+    isClosedEnough(polyline) && normalizeClosedPoints(polyline.points).length >= MIN_CLOSED_POINTS
+  );
 }
 
 export function polylineToPathD(polyline: Polyline): PathD {

@@ -666,8 +666,14 @@ the linked artwork.
    shapes inside other shapes. **Delete original objects** removes the selection once the offset
    is added. Round corners and end caps are chorded within the 0.025 mm machine curve tolerance
    at any distance (ADR-410 amendment 1); so are the round corners of the properties-panel offset.
+   A curved shape is flattened at 0.005 mm before either tool offsets it, so the whole result,
+   not only its corners, stays within 0.025 mm of the true offset curve (amendment 3).
 3. The dialog draws the selection in grey, the outward result in the accent colour and the inward
-   result in green, and lists each result's size. The selection is offset as one design.
+   result in green, and lists each result's size. The selection is offset as one design: shapes
+   that overlap become one outline, and a shape inside another selected shape is a hole even when
+   it was drawn as its own object, with a shape inside that hole an outline again, exactly as the
+   same art drawn as one compound path (ADR-410 amendment 3). **Outer shapes only** drops all of
+   those inner shapes.
 4. Open lines offset outward into a closed outline around the line, with caps that follow the
    corner style. **Inward** needs a closed shape; with only open lines the dialog says so and
    **Offset** is unavailable. A collapsed inward offset is explained the same way.
@@ -1982,25 +1988,38 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    the network form and review recovery. To switch to USB, explicitly choose **Use a different
    port…**. Cancelling the picker retains the network choice. Forget Controller or app restart
    clears the session-only routing hint; no address is saved.
-5. These unencrypted services belong on a trusted local network. Keep the app open and responsive;
-   TCP streaming is not hosted in a background worker. A successful socket is not controller or
+5. These unencrypted services belong on a trusted local network. Keep the app open. With
+   Background streaming on (the default), a worker reads and writes the network session, so a
+   busy window does not stop the refill (ADR-676). A successful socket is not controller or
    physical-machine qualification. Frame and Start retain their canonical workflow.
 
-#### Background streaming (ADR-354)
-1. Compatible GRBL-family connections use background streaming by default. The selected USB
+#### Background streaming (ADR-354, ADR-676)
+1. GRBL-family and Marlin connections use background streaming by default. The selected USB
    port is opened inside a dedicated worker so its read and refill loop can continue while the
-   Chrome window is minimised or busy.
+   Chrome window is minimised or busy. Marlin's worker refills one line on each `ok`. The
+   desktop app's network sessions (FluidNC telnet, grblHAL raw TCP) are read and written by a
+   worker too.
 2. If the worker cannot identify the selected port uniquely or is unavailable before opening,
-   the app uses the selected window port and records that in the Laser log. In a browser it
-   also warns: "Background streaming is unavailable for this connection. Keep KerfDesk visible
-   while sending the job." The desktop app does not warn: its window keeps sending while
-   minimised (ADR-354 Amendment 1).
-3. Machine Setup's **Background streaming** preference can be turned off explicitly. Reconnect
-   to apply a change. Marlin and Smoothieware keep their existing transport.
-4. Pause releases background refill. Confirmed Resume and tool-change Continue restore it for
+   the app uses the selected window port, records that in the Laser log and shows a warning on
+   every host. The warning says that a busy window can stop the machine with a constant-power
+   beam still on. In a browser it also asks to keep KerfDesk visible; the desktop window keeps
+   sending while minimised (ADR-354 Amendment 1).
+3. Machine Setup's **Background streaming** preference can be turned off explicitly; the Laser
+   log records that at connect. Reconnect to apply a change. Smoothieware keeps the window
+   transport: its beam goes dark whenever its queue runs dry.
+4. Whenever the window streams the job (fallback, preference off, or no worker), Job Review
+   reads the exact program. If its power would stay on over a stopped head, a warning leads the
+   list:
+   - GRBL-family M3: lit for as long as the window is busy; the warning offers Dynamic (M4).
+   - Marlin's cutter: lit until its laser safety timeout, 1 s in stock builds.
+   - Marlin's fan output: lit until the window recovers, or until the E-stop.
+
+   The warning never refuses Start.
+5. Pause releases background refill. Confirmed Resume and tool-change Continue restore it for
    the same live job. Abort, disconnect or a replacement job cannot inherit an old refill queue.
-5. Browser shutdown, computer sleep and USB loss still interrupt a live serial connection.
-6. The desktop app, like Chrome, lets the window and the worker see only the ports picked in
+   Marlin's Abort and Disconnect take the refill back before their stop lines.
+6. Browser shutdown, computer sleep and USB loss still interrupt a live serial connection.
+7. The desktop app, like Chrome, lets the window and the worker see only the ports picked in
    its Select dialog, so an identical second adapter (a laser controller and an Arduino that
    both use a CH340, for example) no longer stops background streaming. A pick lasts until
    Forget Controller, and on macOS and Linux also until an app restart; picking both identical
@@ -4745,8 +4764,9 @@ Set origin here again. It is a warning; Frame and Start are not refused (ADR-375
     511) whose bit 5 sends WCO and bit 6 sends Ov, so `$10=0` or `$10=1` there turns both off.
     Expect the status panel to read "Origin: not reported (WCO off in $10; send $10=96)" (or 97),
     and with `$10=0` "MPos: cannot be known" (ADR-375 Amendment 2).
-    Do not apply generic settings writes to the Falcon A1 vendor contract, which does
-    not offer ordinary settings fetch. See the [GRBL status documentation](https://github.com/gnea/grbl/wiki/Grbl-v1.1-Interface).
+    KerfDesk reads the Falcon A1 Pro's `$$` at connect but sends its vendor contract no
+    setting write (ADR-322 Amendment 3); do not apply generic settings writes to it either.
+    See the [GRBL status documentation](https://github.com/gnea/grbl/wiki/Grbl-v1.1-Interface).
 11. **Air pump at Start (ADR-323).** First confirm Machine Setup shows
     Air output `M8` and "Air restart" ticked. A Falcon A1 Pro profile
     saved before the preset gained `M8` (2026-09-19) still reads
@@ -4795,8 +4815,8 @@ Set origin here again. It is a warning; Frame and Start are not refused (ADR-375
     off only with the box unticked, the firmware timer is confirmed.
 13. **Qualify air repeats on the installed firmware (ADR-462).** In a
     separately supervised air check, record the firmware and, on a
-    stock-GRBL Falcon, the current `$152` setting (the A1 Pro's
-    contract cannot read it). With "Air restart" ticked, inspect a short-block job
+    stock-GRBL Falcon, the current `$152` setting (on the A1 Pro's
+    grblHAL `$152` is the Z microstep setting). With "Air restart" ticked, inspect a short-block job
     of a minute or more with Air on: the program attempts `M8` repeats
     at eligible movement boundaries after about 5 s of estimated time.
     Observe whether the pump stays on and whether the enclosure fan
@@ -4808,6 +4828,16 @@ Set origin here again. It is a warning; Frame and Start are not refused (ADR-375
     (firmware, plus `$152=100` on a stock-GRBL Falcon only) and verify
     it separately. Do not treat a pass
     on short blocks as qualification of every job or firmware version.
+14. **Homing and settings read (ADR-322 Amendment 3, ADR-675).** Read only; no write,
+    motion or laser command. Before connecting, power the machine on and watch whether the
+    head homes by itself; keep hands clear of the gantry. Connect on the Falcon A1 Pro preset:
+    the log shows the `$$` read, and Machine Setup's settings table lists `$22` (bit 0 set
+    means homing on), `$23`, `$30`, `$32`, `$62`, `$120`/`$121` and `$130`/`$131`.
+    Type `$I` in KerfDesk's Console and record `[FIRMWARE:...]`, the version line and
+    `[KINEMATICS:...]`; do not click the Console's quick buttons (they include `$X` and
+    `$#`), and never send a line with `=`. Home then reads **Home**, not **Set up homing**.
+    Keep Machine Setup's **Use detected values** unpressed: it would copy the 363 x 273 mm
+    travel over the listed 358 x 268 mm work area.
 
 When this checklist passes on the Falcon, replace the F.3 status in `PROJECT.md` Phase F
 ("Code shipped; hardware verification pending") with the recorded result and update the F.3
@@ -6866,7 +6896,9 @@ and lifts the command's CNC-only gate.)*
 2. With closed shapes selected, the layers panel shows an "Offset" row:
    distance + Outward / Inward adds a NEW offset path object (round
    joins) and leaves the sources in place — kerf compensation on a
-   laser, clearing outlines and inlay gaps on a router.
+   laser, clearing outlines and inlay gaps on a router. A shape drawn
+   inside another selected shape is offset as a hole, as in Offset
+   Shapes (F-A6c, ADR-410 amendment 3).
 3. Both work in laser AND CNC modes (geometry is machine-agnostic).
 
 #### Error — invalid input
@@ -6874,7 +6906,9 @@ and lifts the command's CNC-only gate.)*
    vector objects are selected — the menu never runs the op, so there
    is nothing to surface.
 2. Open contours are rejected — the scene is unchanged and a warning
-   toast names the reason (same rule as Weld).
+   toast names the reason (same rule as Weld). A path whose end returns
+   to its start counts as closed even when it is flagged open, as Fill,
+   Offset Shapes and Select Open Shapes count it (ADR-410 amendment 3).
 3. An inward offset large enough to collapse the shape changes nothing
    and warns why. Open contours and a collapsing offset are reachable
    cases the menu gating cannot pre-detect, so the op runs, no-ops the

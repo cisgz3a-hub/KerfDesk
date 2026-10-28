@@ -118,10 +118,12 @@ export function resolveNativeBedFrame(
 function hasVendorPositiveContract(device: DeviceProfile, evidence: NativeBedEvidence): boolean {
   // Creality's official A1 Pro LightBurn device declares NegativeWorkspace=false.
   // This is an explicit vendor command contract, not a guess from a brand label.
-  // The same vendor file labels the controller GRBL-LPC, and its banner is not
-  // recorded anywhere, so a "Grbl ..." banner (stock GRBL, or grblHAL at
+  // The same vendor file labels the controller GRBL-LPC. Two published A1 Pro
+  // units greet "GrblHAL 1.1f" (rolling audit v6 K3), but other builds were not
+  // seen, so a "Grbl ..." banner (stock GRBL, or grblHAL at
   // COMPATIBILITY_LEVEL >= 1) keeps the contract as a grblHAL one does (audit
-  // HF-8); another family's banner still withdraws it.
+  // HF-8); another family's banner still withdraws it. The preset's homing is
+  // on (ADR-322 Amendment 3), so the frame applies after a Home this session.
   const detected = evidence.detectedControllerKind;
   return (
     device.controllerCommandSet === 'creality-falcon-a1-pro' &&

@@ -25,6 +25,7 @@ export type InspectorProgramTime = Omit<
   | 'segTargetVelocityMmPerSec'
   | 'segEntryVelocityMmPerSec'
   | 'segExitVelocityMmPerSec'
+  | 'segAccelMmPerSec2'
 > & {
   /** Motion seconds per move kind, indexed by SEG_KIND, for the time split. */
   readonly kindSeconds: Float64Array;
@@ -49,6 +50,7 @@ export function inspectorProgramTime(
     segTargetVelocityMmPerSec: _target,
     segEntryVelocityMmPerSec: _entry,
     segExitVelocityMmPerSec: _exit,
+    segAccelMmPerSec2: _accel,
     ...kept
   } = time;
   const kindSeconds = new Float64Array(KIND_COUNT);

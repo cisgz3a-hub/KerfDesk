@@ -293,8 +293,8 @@ export type SerialOpenRequest = {
  */
 export type HostedStreamRefill = {
   readonly isArmed: () => boolean;
-  /** Read the current position at the barrier, or null if no longer eligible. */
-  readonly arm: (readSnapshot: () => unknown | null) => Promise<void>;
+  /** Read the position at the barrier, or null if ineligible; `acks`: ADR-676. */
+  readonly arm: (readSnapshot: () => unknown | null, acks?: 'grbl' | 'marlin') => Promise<void>;
   /** Take it back before changing the stream's status. */
   readonly release: () => Promise<void>;
   /** A refill write failed out there; the caller owns the containment. */

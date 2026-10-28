@@ -26,7 +26,11 @@ import {
   requalifyAfterHaltingReset,
   type ControllerQualificationScheduleRefs,
 } from './laser-controller-qualification';
-import { releaseHostedRefill } from './laser-hosted-refill';
+import {
+  hostedRefillArmed,
+  releaseHostedRefill,
+  releaseHostedRefillBeforeStop,
+} from './laser-hosted-refill';
 import {
   cancelControllerLifecycleRefs,
   type ControllerLifecycleRefs,
@@ -144,11 +148,25 @@ async function runNoResetStopUnlessDisconnecting(
   await runNoResetStop(context, reason, ownsSession);
 }
 
+// A worker-held refill (Marlin, ADR-676) comes back first, as Pause does, so
+// the worker cannot send a line this side's frozen ledger does not hold. With
+// no worker refill, nothing here yields before the freeze.
+async function runNoResetStop(
+  context: JobStopContext,
+  reason: JobStopReason | undefined,
+  ownsSession: () => boolean,
+): Promise<void> {
+  if (hostedRefillArmed(context.refs)) {
+    if (!(await releaseHostedRefillBeforeStop(context.refs, ownsSession))) return;
+  }
+  await freezeAndStopWithoutReset(context, reason, ownsSession);
+}
+
 // A no-reset Abort must retire host refill before even the handback await.
 // Retain its sent-line ledger: their real replies still precede the stop-line
 // replies. The temporary owner keeps a fresh Idle from reopening Start while
 // cleanup is being written; cancellation is not proof of a physical stop.
-async function runNoResetStop(
+async function freezeAndStopWithoutReset(
   context: JobStopContext,
   reason: JobStopReason | undefined,
   ownsSession: () => boolean,

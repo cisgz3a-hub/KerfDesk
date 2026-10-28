@@ -62,9 +62,14 @@ describe('fairTracedImageForCnc', () => {
     expect(conditioned.map((p) => applyTransform(p, placement))).toEqual(
       conditioned.map((p) => applyTransform(p, positioned.transform)),
     );
-    expect(transformedBBox(positioned)).not.toEqual(
-      transformedBBox({ ...positioned, bounds: traced.bounds }),
-    );
+    // A turned trace is measured by its outline (ADR-677), so its box follows
+    // the conditioned points, not the stale extrema.
+    const world = conditioned.map((p) => applyTransform(p, positioned.transform));
+    const box = transformedBBox({ ...positioned, bounds: traced.bounds });
+    expect(box.minX).toBeCloseTo(Math.min(...world.map((p) => p.x)), 9);
+    expect(box.maxX).toBeCloseTo(Math.max(...world.map((p) => p.x)), 9);
+    expect(box.minY).toBeCloseTo(Math.min(...world.map((p) => p.y)), 9);
+    expect(box.maxY).toBeCloseTo(Math.max(...world.map((p) => p.y)), 9);
     expect(traced.bounds.maxY).toBe(0.4);
   });
 });

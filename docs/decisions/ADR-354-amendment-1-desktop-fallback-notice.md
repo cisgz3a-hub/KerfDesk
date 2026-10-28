@@ -1,6 +1,7 @@
 ## ADR-354 Amendment 1 - The desktop app does not ask the operator to keep KerfDesk visible (2026-09-24)
 
-**Status:** Accepted. | **Date:** 2026-09-24
+**Status:** Accepted; decision 2 amended by ADR-676, so every host now shows the fallback notice,
+naming the lit-stop risk. | **Date:** 2026-09-24
 
 Amends decision 4 of ADR-354. Changes no transport, handover or streaming behaviour.
 

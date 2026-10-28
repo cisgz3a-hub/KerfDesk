@@ -1,6 +1,9 @@
 import type { DeviceProfile } from '../devices';
 import { buildProgramTimeline, type ProgramTimeline } from '../gcode-time';
-import { deviceProgramTimingOptions } from '../gcode-time/program-timing-options';
+import {
+  deviceMotionLimits,
+  deviceProgramTimingOptions,
+} from '../gcode-time/program-timing-options';
 import { cncGrblStrategy, selectOutputStrategy } from '../output';
 import type { Vec2 } from '../scene';
 import type { Job } from './job';
@@ -70,18 +73,10 @@ function estimateEmittedJob(
     );
   if (gcode.trim() === '') return emptyDuration();
   options.onEmittedProgram?.(gcode);
-  const result = buildProgramTimeline(
-    gcode,
-    {
-      accelMmPerSec2: device.accelMmPerSec2,
-      junctionDeviationMm: device.junctionDeviationMm,
-      maxFeedMmPerMin: device.maxFeed,
-    },
-    {
-      ...deviceProgramTimingOptions(device, machineKind),
-      initialPositionMm: initialPosition(options),
-    },
-  );
+  const result = buildProgramTimeline(gcode, deviceMotionLimits(device), {
+    ...deviceProgramTimingOptions(device, machineKind),
+    initialPositionMm: initialPosition(options),
+  });
   return result.kind === 'ok'
     ? durationFromTimeline(result.timeline)
     : { ...emptyDuration(), unavailableReason: result.reason };

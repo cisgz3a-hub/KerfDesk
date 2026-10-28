@@ -12,9 +12,10 @@ import { closeConnectionOnce } from './laser-connection-teardown';
 import type { ConnectControllerOptions } from './laser-store-action-types';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { SerialOpenRequest } from '../../platform/types';
-import { isGrblFamilyDriver } from './laser-disconnect-transaction';
+import { hostedStreamAcknowledgements } from './hosted-stream-acks';
 import {
   BACKGROUND_STREAMING_FALLBACK_LOG,
+  BACKGROUND_STREAMING_OFF_LOG,
   backgroundStreamingFallbackWarning,
 } from './laser-background-streaming-notice';
 import { pushLog } from './laser-store-helpers';
@@ -164,7 +165,7 @@ async function connectSerialController(
     }
     attachRememberedConnection(attachConnection, connection, baudRate, portRef);
     liftAutoConnectPauseOnOpen(options.portSelection);
-    reportBackgroundStreaming(set, connection, adapter.id);
+    reportBackgroundStreaming(set, connection, adapter.id, optedOutOfWorker(options, driver));
   } catch (error) {
     if (!connectAttemptIsCurrent(refs, attempt)) {
       await releaseCancelledPermission().catch(() => undefined);
@@ -275,17 +276,29 @@ function attachRememberedConnection(
   attachConnection(connection, baudRate, info);
 }
 
-// Every host records the fallback; only a host whose hidden window pauses
-// sending asks the operator to keep KerfDesk visible (ADR-354 Amendment 1).
+// Every host records the fallback and shows it, since a busy window can stop
+// the machine with a constant-power beam lit; only a host whose hidden window
+// pauses sending also asks to keep KerfDesk visible (ADR-354 Amendment 1,
+// ADR-676). A profile that turned the worker off chose this: the log says so,
+// and Job Review warns for each job it affects.
 function reportBackgroundStreaming(
   set: SetFn,
   connection: LiveConnection,
   host: PlatformAdapter['id'],
+  optedOut: boolean,
 ): void {
-  if (connection.backgroundStreamingUnavailable !== true) return;
+  // Job Review warns about a lit stop only where the window refills the stream.
+  set({ jobStreamHost: connection.hostedStreaming === undefined ? 'window' : 'worker' });
+  if (connection.backgroundStreamingUnavailable !== true) {
+    if (optedOut) set((state) => ({ log: pushLog(state, BACKGROUND_STREAMING_OFF_LOG) }));
+    return;
+  }
   set((state) => ({ log: pushLog(state, BACKGROUND_STREAMING_FALLBACK_LOG) }));
-  const warning = backgroundStreamingFallbackWarning(host);
-  if (warning !== null) useToastStore.getState().pushToast(warning, 'warning');
+  useToastStore.getState().pushToast(backgroundStreamingFallbackWarning(host), 'warning');
+}
+
+function optedOutOfWorker(options: ConnectControllerOptions, driver: ControllerDriver): boolean {
+  return options.hostedStreaming === false && hostedStreamAcknowledgements(driver) !== null;
 }
 
 // Split out to keep runConnectAction under the complexity cap. The hosted
@@ -296,11 +309,12 @@ function serialOpenRequest(
   options: ConnectControllerOptions,
   driver: ControllerDriver,
 ): SerialOpenRequest {
+  // The worker pump reads GRBL's and Marlin's acknowledgements; each arm names
+  // which (ADR-676). An old profile may survive a controller change or arrive
+  // in an imported project.
   return {
     baudRate,
-    // The worker pump understands GRBL acknowledgements only. An old profile
-    // may survive a controller change or arrive through an imported project.
-    ...(options.hostedStreaming !== false && isGrblFamilyDriver(driver)
+    ...(options.hostedStreaming !== false && hostedStreamAcknowledgements(driver) !== null
       ? { hostedStreaming: true }
       : {}),
   };

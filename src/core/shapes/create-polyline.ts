@@ -26,7 +26,12 @@ const MIN_DRAWING_FIT_TOLERANCE_MM = 0.25;
 const MAX_DRAWING_FIT_TOLERANCE_MM = 3;
 const MIN_OPEN_FAIRING_POINTS = 4;
 const MIN_CLOSED_FAIRING_POINTS = 5;
-type DrawingFairingMode = 'round' | 'corner-preserving';
+// 'exact' keeps every point as a corner joined by straight lines: the PC pen's
+// plain clicks, as LightBurn's Draw Lines places corner nodes (ADR-214
+// Amendment 1). 'round' fits cubics through a freehand stroke (the phone's
+// finger drawing and add_polyline) and is what the fairing migration re-fairs
+// to. 'corner-preserving' reproduces the legacy fairing the migration detects.
+type DrawingFairingMode = 'exact' | 'round' | 'corner-preserving';
 
 // Bump when the drawing fairing engine (roundPolylineCurve / fairLineCurvePath
 // / the fit tolerances above) changes in a way that should re-fair existing
@@ -66,7 +71,7 @@ function fairDrawingPolyline(
 ): { curve: CurveSubpath; polyline: Polyline } {
   const pointCount = polyline.points.length - (polyline.closed ? 1 : 0);
   const minimumPoints = polyline.closed ? MIN_CLOSED_FAIRING_POINTS : MIN_OPEN_FAIRING_POINTS;
-  if (pointCount < minimumPoints) {
+  if (fairingMode === 'exact' || pointCount < minimumPoints) {
     return { curve: polylineToCurveSubpath(polyline), polyline };
   }
   const curve = materializeDrawingCurve(polyline, fairingMode);

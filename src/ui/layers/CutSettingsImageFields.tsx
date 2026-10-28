@@ -5,6 +5,9 @@ import {
   linesPerMmToDpi,
   linesPerMmToLineIntervalMm,
 } from '../../core/raster';
+// Deep import: the devices barrel is at its public-export ratchet.
+import { machineKinematics } from '../../core/devices/device-profile';
+import { alongScanAccelMmPerSec2 } from '../../core/job/automatic-overscan';
 import {
   accelerationDistanceMm,
   imageOverscanMmFor,
@@ -17,7 +20,11 @@ import { imageDensityBounds } from '../raster/image-density-bounds';
 import { dotWidthCorrectionMax } from './cut-settings-draft';
 import { burnsAsGrayscale, DitherSwatchPicker, originalPixelsNotice } from './DitherSwatchPicker';
 import { ImageScanPatternFields } from './CutSettingsScanPatternFields';
-import { AutoOverscanSwitch, automaticOverscanNote } from './CutSettingsAutoOverscan';
+import {
+  AutoOverscanSwitch,
+  automaticOverscanNote,
+  coreXyAlongScanNote,
+} from './CutSettingsAutoOverscan';
 import { boundsAdmitting } from './CutSettingsInputs';
 import { normalizedScanAngleDeg } from '../../core/raster/raster-scan-frame';
 
@@ -125,7 +132,14 @@ function ImageOverscanField(props: { readonly layer: Layer }): JSX.Element {
   const device = useStore((state) => state.project.device);
   const [automatic, setAutomatic] = useState(props.layer.autoOverscan === true);
   const feed = Math.min(props.layer.speed, device.maxFeed);
-  const neededMm = accelerationDistanceMm(feed, device.accelMmPerSec2);
+  const scanAngleDeg = normalizedScanAngleDeg(props.layer.imageScanAngleDeg);
+  // ADR-675: a CoreXY diagonal scan gets less acceleration than an axis.
+  const kinematics = machineKinematics(device);
+  const alongScan =
+    kinematics === 'corexy'
+      ? alongScanAccelMmPerSec2(device.accelMmPerSec2, scanAngleDeg, kinematics)
+      : device.accelMmPerSec2;
+  const neededMm = accelerationDistanceMm(feed, alongScan);
   return (
     <>
       <Field label="Overscan">
@@ -145,13 +159,23 @@ function ImageOverscanField(props: { readonly layer: Layer }): JSX.Element {
         <p className="lf-laser-help">
           {automaticOverscanNote({
             speed: props.layer.speed,
-            scanAngleDeg: normalizedScanAngleDeg(props.layer.imageScanAngleDeg),
+            scanAngleDeg,
             device,
             maxMm: MAX_IMAGE_OVERSCAN_MM,
           })}
         </p>
       ) : (
-        <ManualOverscanNote feed={feed} accel={device.accelMmPerSec2} neededMm={neededMm} />
+        <ManualOverscanNote
+          feed={feed}
+          accel={device.accelMmPerSec2}
+          alongScan={coreXyAlongScanNote(
+            device.accelMmPerSec2,
+            scanAngleDeg,
+            kinematics,
+            ` along its ${formatNumber(scanAngleDeg)}° scan`,
+          )}
+          neededMm={neededMm}
+        />
       )}
     </>
   );
@@ -160,13 +184,14 @@ function ImageOverscanField(props: { readonly layer: Layer }): JSX.Element {
 function ManualOverscanNote(props: {
   readonly feed: number;
   readonly accel: number;
+  readonly alongScan: string;
   readonly neededMm: number;
 }): JSX.Element {
-  const { feed, accel, neededMm } = props;
+  const { feed, accel, alongScan, neededMm } = props;
   return (
     <p className="lf-laser-help">
-      At the saved speed of {formatNumber(feed)} mm/min and {formatNumber(accel)} mm/s²
-      acceleration, the saved model needs about {formatNumber(neededMm)} mm to reach full speed from
+      At the saved speed of {formatNumber(feed)} mm/min and {formatNumber(accel)} mm/s² acceleration
+      {alongScan}, the saved model needs about {formatNumber(neededMm)} mm to reach full speed from
       rest. Confirm the setting with a scan-edge test on this machine.
       {neededMm > MAX_IMAGE_OVERSCAN_MM
         ? ` That is more than the ${MAX_IMAGE_OVERSCAN_MM} mm maximum, so lower the speed if the image edges burn darker.`

@@ -96,8 +96,9 @@ afterEach(async () => {
 describe('camera placement follows the picture on the canvas', () => {
   it('latches when the calibrated camera starts by itself, with the Camera panel never opened', async () => {
     const { project, jobPlacement } = useStore.getState();
-    // The Falcon A1 Pro profile ships with homing off, so a new project starts at User Origin.
-    expect(jobPlacement.startFrom).toBe('user-origin');
+    // The Falcon A1 Pro profile homes (ADR-322 Amendment 3), so a new project
+    // starts at Absolute; the User Origin case is set explicitly below.
+    expect(jobPlacement.startFrom).toBe('absolute');
     saveLastCameraSource('machine');
     stopHelpers = installCameraHelpers({
       camera: undefined,

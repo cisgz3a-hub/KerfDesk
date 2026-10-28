@@ -44,6 +44,7 @@ import { selectionReferenceId, type SelectionReferenceState } from './selection-
 import { useToastStore } from './toast-store';
 import { fitObjectToBoard, type BoardFitOptions } from '../../core/scene/fit-object-to-board';
 import { currentHierarchyFocus, groupsWithinFocus } from './design-hierarchy-store';
+import { withObjectTransform } from '../../core/shapes/rectangle-resize';
 
 export type SelectionTransformEdit = {
   readonly id: string;
@@ -360,7 +361,7 @@ function applySelectionTransformsToState(
         if (object.locked === true) return object;
         if (!sceneObjectHasVisibleLayer(state.project.scene, object)) return object;
         changed = true;
-        return { ...object, transform };
+        return withObjectTransform(object, transform);
       }),
     },
   };

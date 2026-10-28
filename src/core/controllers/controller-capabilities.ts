@@ -22,6 +22,9 @@ export type StatusQueryCapability =
 export type SettingsCapability =
   // `$$` dump + `$N=value` guarded writes (GRBL family).
   | 'grbl-dollar'
+  // The same `$$` dump, read at connect, with no `$N=value` writes beyond
+  // the few the driver lists (the Falcon A1 Pro contract, ADR-322 Amendment 3).
+  | 'grbl-dollar-read'
   // Read-only settings dump (Marlin M503); no in-app writes.
   | 'readonly-dump'
   | 'none';

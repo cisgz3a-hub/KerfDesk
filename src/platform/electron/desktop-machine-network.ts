@@ -1,10 +1,26 @@
-import type { MachineNetworkAdapter, SerialConnection } from '../types';
+import type { MachineNetworkAdapter, SerialConnection, SerialOpenRequest } from '../types';
 import { wireEncodingError } from '../../core/controllers/serial-wire-encoding';
-import { machineNetworkRequest, type MachineNetworkRequest } from './desktop-machine-network-api';
+import {
+  MACHINE_NETWORK_ROUTE,
+  machineNetworkRequest,
+  type MachineNetworkRequest,
+} from './desktop-machine-network-api';
 const MAX_NETWORK_LINE_LENGTH = 64 * 1024;
 
+/** Streams an open session from a worker the app's root entry supplies
+ * (ADR-676), since platform/electron cannot reach platform/web. The worker
+ * reads and writes the session itself, through `route`. Null when it could
+ * not start before it touched the session: the window then streams it. */
+export type HostedNetworkSessionOpener = (args: {
+  readonly sessionId: string;
+  readonly route: { readonly url: string; readonly header: string };
+}) => Promise<SerialConnection | null>;
+
+/** `hostSession` streams a session from a worker (ADR-676). Without it, or
+ * when its worker cannot start, the window streams the session itself. */
 export function createDesktopMachineNetwork(
   request: MachineNetworkRequest = machineNetworkRequest(),
+  hostSession?: HostedNetworkSessionOpener,
 ): MachineNetworkAdapter {
   return {
     serialForTarget: (host, port, protocol = 'fluidnc-telnet') => ({
@@ -13,12 +29,23 @@ export function createDesktopMachineNetwork(
       picksEndOnRestart: true,
       requestPort: async () => ({
         info: { transport: 'tcp' },
-        open: async () => {
+        open: async (req?: SerialOpenRequest) => {
           const result = await request('open', { host, port, protocol });
           const id = result['sessionId'];
           if (typeof id !== 'string' || !/^[a-f0-9-]{36}$/.test(id))
             throw new Error('Invalid desktop network session.');
-          return new DesktopMachineConnection(request, id);
+          const hostingRequested = req?.hostedStreaming === true;
+          if (hostingRequested && hostSession !== undefined) {
+            const hosted = await hostSession({
+              sessionId: id,
+              route: MACHINE_NETWORK_ROUTE,
+            }).catch(async (error: unknown) => {
+              await request('close', { sessionId: id }).catch(() => undefined);
+              throw error;
+            });
+            if (hosted !== null) return hosted;
+          }
+          return new DesktopMachineConnection(request, id, hostingRequested);
         },
       }),
     }),
@@ -26,7 +53,6 @@ export function createDesktopMachineNetwork(
 }
 
 class DesktopMachineConnection implements SerialConnection {
-  readonly backgroundStreamingUnavailable = true;
   private readonly lines = new Set<(line: string) => void>();
   private readonly closes = new Set<() => void>();
   private readonly decoder = new TextDecoder('utf-8', { fatal: true });
@@ -35,10 +61,15 @@ class DesktopMachineConnection implements SerialConnection {
   private reading = false;
   private sequence = 0;
   private writeQueue: Promise<void> = Promise.resolve();
+  /** True when a worker was asked for and could not take the session. */
+  readonly backgroundStreamingUnavailable: boolean;
   constructor(
     private readonly request: MachineNetworkRequest,
     private readonly id: string,
-  ) {}
+    hostingRequested: boolean,
+  ) {
+    this.backgroundStreamingUnavailable = hostingRequested;
+  }
   onLine(handler: (line: string) => void): () => void {
     this.lines.add(handler);
     if (!this.reading && !this.closed) {

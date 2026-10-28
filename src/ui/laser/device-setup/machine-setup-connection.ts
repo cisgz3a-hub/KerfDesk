@@ -39,7 +39,9 @@ export function connectionForMachineSetup(
         controllerKind,
         baudRate,
         ...extra,
-        ...(connection === undefined ? {} : { hostedStreaming: false, portSelection: 'choose' }),
+        // A network target keeps the draft's Background streaming choice
+        // (ADR-676) and always asks for its own session.
+        ...(connection === undefined ? {} : { portSelection: 'choose' }),
       });
     },
   };

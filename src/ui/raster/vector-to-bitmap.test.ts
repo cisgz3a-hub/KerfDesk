@@ -14,7 +14,7 @@ import {
   IDENTITY_TRANSFORM,
   createLayer,
   createProject,
-  transformedBBox,
+  transformedBounds,
   type Bounds,
   type ColoredPath,
   type ImportedSvg,
@@ -222,7 +222,7 @@ describe('isConvertibleVector', () => {
 describe('assembleBitmap', () => {
   it('sizes the bitmap from displayed bounds x lines/mm', () => {
     const source = makeSvg();
-    const bounds = transformedBBox(source);
+    const bounds = transformedBounds(source.bounds, source.transform);
     const result = assembleBitmap([source], fakeEncode, 'new-id');
     expect(result.pixelWidth).toBe(Math.round((bounds.maxX - bounds.minX) * 10));
     expect(result.pixelHeight).toBe(Math.round((bounds.maxY - bounds.minY) * 10));
@@ -230,7 +230,7 @@ describe('assembleBitmap', () => {
 
   it('rasterizes then carries the encoder output verbatim', () => {
     const source = makeSvg();
-    const bounds = transformedBBox(source);
+    const bounds = transformedBounds(source.bounds, source.transform);
     const expectedWidth = Math.round((bounds.maxX - bounds.minX) * 10);
     const expectedHeight = Math.round((bounds.maxY - bounds.minY) * 10);
     const result = assembleBitmap([source], fakeEncode, 'new-id');
@@ -242,7 +242,7 @@ describe('assembleBitmap', () => {
   it('bakes the source transform into axis-aligned bitmap bounds', () => {
     const source = makeSvg();
     const result = assembleBitmap([source], fakeEncode, 'new-id');
-    expect(result.bounds).toEqual(transformedBBox(source));
+    expect(result.bounds).toEqual(transformedBounds(source.bounds, source.transform));
     expect(result.transform).toEqual(IDENTITY_TRANSFORM);
   });
 
@@ -270,7 +270,7 @@ describe('assembleBitmap', () => {
 
   it('uses explicit DPI to set the converted bitmap density', () => {
     const source = makeSvg();
-    const bounds = transformedBBox(source);
+    const bounds = transformedBounds(source.bounds, source.transform);
     const result = assembleBitmap([source], fakeEncode, 'new-id', {
       dpi: 127,
       renderType: 'fill-all',
@@ -283,7 +283,7 @@ describe('assembleBitmap', () => {
   it('passes Outlines through so open vector strokes survive conversion', () => {
     let encoded: VectorRaster | null = null;
     const source = makeOpenSvg();
-    const bounds = transformedBBox(source);
+    const bounds = transformedBounds(source.bounds, source.transform);
     const result = assembleBitmap(
       [source],
       (raster) => {
