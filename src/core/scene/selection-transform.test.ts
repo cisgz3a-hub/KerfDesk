@@ -18,9 +18,18 @@ describe('selectionMetrics', () => {
       bbox: { minX: 10, minY: 20, maxX: 60, maxY: 60 },
       width: 50,
       height: 40,
-      rotationDeg: null,
+      rotationDeg: 0,
       count: 2,
     });
+  });
+
+  // ADR-678: the Rotation box shows the angle every object shares, else blank.
+  it('reports the angle the selected objects share, or null when they differ', () => {
+    const at = (id: string, rotationDeg: number) =>
+      objectWithTransform(id, { ...IDENTITY_TRANSFORM, rotationDeg });
+    expect(selectionMetrics([at('a', 30), at('b', 390)])?.rotationDeg).toBe(30);
+    expect(selectionMetrics([at('a', 0), at('b', 359.9999999)])?.rotationDeg).toBe(0);
+    expect(selectionMetrics([at('a', 0), at('b', 30)])?.rotationDeg).toBeNull();
   });
 });
 
@@ -187,6 +196,44 @@ describe('buildSelectionTransformEdit', () => {
     expect(next.transform.rotationDeg).toBe(90);
     expect(afterCenter.x).toBeCloseTo(beforeCenter.x, 6);
     expect(afterCenter.y).toBeCloseTo(beforeCenter.y, 6);
+  });
+
+  // Rolling audit v7 L4-P2-1 (ADR-678): several objects turn as one piece about
+  // the selection centre; the typed angle replaces the one they share.
+  it('turns a multi-object selection rigidly about its centre', () => {
+    const a = objectWithTransform('a', { ...IDENTITY_TRANSFORM, x: 10, y: 20 });
+    const b = objectWithTransform('b', { ...IDENTITY_TRANSFORM, x: 40, y: 50 });
+
+    const result = buildSelectionTransformEdit([a, b], { kind: 'rotate', rotationDeg: 90 });
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    // Centre (35, 40): each origin turns a quarter clockwise about it.
+    const turned = result.transforms.map(({ transform }) => [transform.x, transform.y]);
+    [
+      [55, 15],
+      [25, 45],
+    ].forEach(([x, y], index) => {
+      expect(turned[index]?.[0]).toBeCloseTo(x!, 12);
+      expect(turned[index]?.[1]).toBeCloseTo(y!, 12);
+    });
+    expect(result.transforms.map(({ transform }) => transform.rotationDeg)).toEqual([90, 90]);
+  });
+
+  // Rolling audit v7 L4-P3-4: the angle is reduced before the trig, so a huge
+  // typed number no longer moves the centre the turn should keep still.
+  it('keeps the centre still for a huge typed angle', () => {
+    const object = objectWithTransform('shape', { ...IDENTITY_TRANSFORM, x: 30, y: 40 });
+    const beforeCenter = transformedCenter(object);
+
+    const result = buildSelectionTransformEdit([object], { kind: 'rotate', rotationDeg: 1e17 });
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    const next = { ...object, transform: result.transforms[0]?.transform ?? object.transform };
+    expect(next.transform.rotationDeg).toBe(280);
+    expect(transformedCenter(next).x).toBeCloseTo(beforeCenter.x, 9);
+    expect(transformedCenter(next).y).toBeCloseTo(beforeCenter.y, 9);
   });
 
   it('rejects non-finite numeric edits before writing transforms', () => {

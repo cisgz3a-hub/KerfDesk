@@ -587,6 +587,11 @@ the linked artwork.
 - A horizontal or vertical line has no height or width. Its length can still be typed, with the
   aspect lock on or off; typing the missing side is refused with a notice that says to change the
   other one. Dragging a handle of several such lines in a row changes their length the same way.
+- Rotation turns the whole selection, a group or several objects, as one piece (ADR-678). One
+  object turns about the centre of its own bounds; several turn about the centre of the selection
+  box, as the rotate handle does. The box shows the angle the selected objects share, and a typed
+  angle replaces it. When they are turned to different angles the box is blank and reads "Mixed",
+  and a typed angle turns them all by that much. One undo step.
 
 #### Edge — transform pushes object out of bed
 - Permitted (user may be temporarily repositioning).
@@ -5047,6 +5052,12 @@ that does not fit shows the fitting count alongside the request. A runaway count
 axis and 500 copies, with a notice in the preview. An array that would take
 the project past its limit of 10,000 objects is refused with a notice, and
 nothing changes (F-A11).
+
+**Remote.** An MCP agent's `place_on_board` array places the same copies as the form. Its receipt
+gives `placedCount` (the original included) and, for rows × cols, `requestedCount`. When fewer were
+placed than asked, or the cap applied, `notices` says so in one line, such as "Array on board placed
+20 of the 25 requested copies: no more fit on the board.", and the PC shows the same line (ADR-125
+Amendment 4).
 
 ---
 
