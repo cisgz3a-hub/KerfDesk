@@ -30,6 +30,17 @@ describe('Falcon A1 Pro vendor command contract', () => {
     });
   });
 
+  // Rolling audit v5 J8-P3-2 (ADR-370 Amendment 1): $150-$152 are the Falcon
+  // A1's air settings in stock-GRBL numbering and grblHAL's X/Y/Z microsteps.
+  it('lists the Falcon A1 air writes on stock GRBL only, never on grblHAL', () => {
+    expect(selectControllerDriver('grblhal', commandSet).consoleSettingWrites).toEqual([]);
+    for (const kind of ['grbl-v1.1', undefined] as const) {
+      expect(
+        selectControllerDriver(kind, commandSet).consoleSettingWrites?.map(({ id }) => id),
+      ).toEqual([150, 151, 152]);
+    }
+  });
+
   it('uses finite tool-off feed-controlled G1 jogs and restores absolute mode', () => {
     const { buildJog } = selectControllerDriver('grblhal', commandSet).commands;
     expect(buildJog({ dx: -2, dy: 0, feed: 500.9 })).toBe('M5\nG21 G91\nG1 X-2.000 F500 S0\nG90');

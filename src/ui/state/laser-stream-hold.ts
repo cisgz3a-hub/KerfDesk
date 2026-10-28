@@ -10,6 +10,7 @@
 // available while the wait or recovery is unresolved.
 
 import type { StreamerState } from '../../core/controllers/grbl';
+import type { AirStandbyRemedy } from '../../core/devices/air-standby-remedy';
 import type { LaserSafetyNotice } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import { pushLog } from './laser-store-helpers';
@@ -265,8 +266,22 @@ export function controllerUnresponsiveNotice(hold: StreamHold): LaserSafetyNotic
   };
 }
 
-/** Operator-facing sentence for the live bar. */
-export function describeStreamHold(hold: StreamHold, falconAirTimerHint: boolean): string {
+// The live bar's Falcon hint names `$152` only where it is the A1's standby
+// setting; on grblHAL it is a microstep setting (ADR-370 Amendment 1).
+const FALCON_AIR_TIMER_HINT: Readonly<Record<AirStandbyRemedy, string>> = {
+  'standby-setting':
+    'If a Creality A1 enters standby unexpectedly, check its firmware and $152 standby setting after the job',
+  'grblhal-falcon':
+    'If the Falcon enters standby unexpectedly, check its firmware after the job; on its grblHAL firmware $150-$152 are motor settings, not air settings',
+  firmware: 'If the Falcon enters standby unexpectedly, check its firmware after the job',
+};
+
+/** Operator-facing sentence for the live bar. `falconAirTimer` is the
+ *  device's air standby remedy on a Creality Falcon, or null elsewhere. */
+export function describeStreamHold(
+  hold: StreamHold,
+  falconAirTimer: AirStandbyRemedy | null,
+): string {
   if (hold.dwellSeconds !== undefined) {
     return (
       `The controller is running the program's ${hold.dwellSeconds} s G4 dwell ` +
@@ -278,11 +293,7 @@ export function describeStreamHold(hold: StreamHold, falconAirTimerHint: boolean
       `${hold.unacknowledgedLines} sent lines for ${streamHoldSeconds(hold)} s. ` +
       'KerfDesk is connected and waiting; nothing was reset',
   ];
-  if (falconAirTimerHint) {
-    parts.push(
-      'If a Creality A1 enters standby unexpectedly, check its firmware and $152 standby setting after the job',
-    );
-  }
+  if (falconAirTimer !== null) parts.push(FALCON_AIR_TIMER_HINT[falconAirTimer]);
   const lineError = lineErrorClause(hold);
   if (lineError !== null) parts.push(lineError);
   return parts.join('. ');

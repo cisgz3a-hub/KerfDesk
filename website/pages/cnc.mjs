@@ -1,6 +1,7 @@
 // CNC router page. README.md:29 on main: "The entire CNC / router surface:
-// code + tests only; never cut on a machine" — so this page leads with that
-// status, repeats it beside each feature group, and never names a router as
+// Not qualified. Code + tests, plus informal cuts on a Neotronics 4040"
+// (ADR-111 records one) — so this page leads with that status, repeats it
+// beside each feature group, and never names a router as
 // compatible (brands appear only as "if you own…" presets, per
 // src/core/cnc/cnc-machine-catalog.ts). Copy lives in cnc-data.mjs.
 
@@ -42,12 +43,13 @@ function statusSection() {
     narrow: true,
     content: callout({
       tone: 'safety',
-      title: 'Tested in software. Not yet cut on a machine.',
+      title: 'Tested in software. Only informal cuts on a machine.',
       body: html`<p>${statusPill('shipped-code-and-tests')}</p>
         <p>
-          The CNC features on this page are covered by automated tests. None of them has cut
-          material on a real router yet, and that includes touch-plate probing. The tests check the
-          structure of the G-code. They can’t tell you whether a carve will look right.
+          The CNC features on this page are covered by automated tests. Beyond that, KerfDesk has
+          made only informal cuts on one router, a Neotronics 4040, which aren’t a recorded test.
+          Touch-plate probing hasn’t run on a machine. The tests check the structure of the G-code.
+          They can’t tell you whether a carve will look right.
         </p>
         <p>
           Before you cut, open the program in a separate G-code viewer, run an air cut with the bit
@@ -106,9 +108,9 @@ function routerSection() {
     content: html`<div class="prose">
       <p>
         KerfDesk writes CNC jobs for GRBL-family controllers: GRBL, grblHAL or FluidNC. Marlin and
-        Smoothieware can’t run KerfDesk CNC jobs. No router has run a KerfDesk CNC job on any of
-        these controllers yet, and FluidNC support as a whole has only been tested against a
-        simulator.
+        Smoothieware can’t run KerfDesk CNC jobs. Apart from informal cuts on a Neotronics 4040 with
+        GRBL-family firmware, no router has run a KerfDesk CNC job on any of these controllers, and
+        FluidNC support as a whole has only been tested against a simulator.
       </p>
       <p>
         If you own a Genmitsu 3018-PRO or 4040-PRO, a Shapeoko 3 or 3 XXL, an X-Carve 1000 mm, a

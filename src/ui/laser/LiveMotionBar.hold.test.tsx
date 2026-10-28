@@ -5,6 +5,8 @@ import { act, Profiler } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createStreamer, pause, step } from '../../core/controllers/grbl';
+// Deep import: the devices barrel is at its public-export ratchet.
+import { FALCON_A1_PRO_GRBLHAL_PROFILE } from '../../core/devices/falcon-profiles';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { LiveMotionBar } from './LiveMotionBar';
@@ -116,6 +118,24 @@ describe('LiveMotionBar controller holding the program', () => {
     const { host, root } = await render(<LiveMotionBar />);
     try {
       expect(host.textContent).toContain('$152 standby setting');
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  // ADR-370 Amendment 1: the A1 Pro preset runs grblHAL, where $152 is the Z
+  // microstep setting, so the bar names only its firmware.
+  it('names no $152 standby setting on the Falcon A1 Pro preset', async () => {
+    useStore.getState().updateDeviceProfile(FALCON_A1_PRO_GRBLHAL_PROFILE);
+    useLaserStore.setState({
+      streamer: streamingStreamer(),
+      statusReport: idleReport(),
+      streamHold: hold(),
+    });
+    const { host, root } = await render(<LiveMotionBar />);
+    try {
+      expect(host.textContent).toContain('check its firmware after the job');
+      expect(host.textContent).not.toContain('$152 standby setting');
     } finally {
       await act(async () => root.unmount());
     }

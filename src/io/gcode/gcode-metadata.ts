@@ -159,7 +159,10 @@ export type GcodeMetadata = {
 // ADR-250 Amd 4 counts a stacked On path copy once in the kept walls, so a
 // neighbouring lead that reached the copied part plunges instead; carries
 // forward v33 above.
-export const EMITTER_REVISION = 'cnc-on-path-copy-walls-20261027-v34';
+// ADR-492 Amd 1 burns a Pass-Through image turned off its scan rows at its own
+// pixel size, not its pixel count stretched over the turned box; carries
+// forward v34 above.
+export const EMITTER_REVISION = 'raster-turned-pass-through-20261028-v35';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S
