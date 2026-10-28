@@ -23,6 +23,7 @@ import {
   resizeEditSetsSize,
   selectionResizeEditFromDrag,
 } from '../selection-handles';
+import { withObjectTransform } from '../../../core/shapes/rectangle-resize';
 import { selectObjectsInMarquee } from '../selection-marquee';
 
 /** Objects the jig canvas may select: unlocked, on a visible layer. Locked
@@ -239,7 +240,7 @@ export function withJigTransforms(
     const transform = byId.get(object.id);
     if (transform === undefined || sameTransform(transform, object.transform)) return object;
     changed = true;
-    return { ...object, transform };
+    return withObjectTransform(object, transform);
   });
   return changed ? { ...project, scene: { ...project.scene, objects } } : project;
 }

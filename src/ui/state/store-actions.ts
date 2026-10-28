@@ -18,6 +18,7 @@ import {
   toggledSelectionReference,
 } from './selection-reference';
 import { saveUndoStepName } from './undo-step-names';
+import { withObjectTransform } from '../../core/shapes/rectangle-resize';
 import type { AppState } from './store';
 import {
   cncMachineForProfile,
@@ -423,7 +424,7 @@ function applyTransformsToScene(
       ...project.scene,
       objects: project.scene.objects.map((o) => {
         const transform = transforms.get(o.id);
-        return transform === undefined || o.locked === true ? o : { ...o, transform };
+        return transform === undefined || o.locked === true ? o : withObjectTransform(o, transform);
       }),
     },
   };

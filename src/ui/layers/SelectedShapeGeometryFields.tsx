@@ -66,9 +66,10 @@ type SetSpec = (spec: ParametricShapeSpec) => void;
  * How many bed millimetres one spec millimetre covers on each axis.
  *
  * A spec holds the shape's *authored* size; the toolbar's W/H resize scales
- * `transform` and never rewrites the spec, so the raw spec stops describing
- * what is on the bed as soon as either surface is used. These fields report
- * bed millimetres — the same quantity the toolbar names — so the two agree.
+ * `transform` (except for a rounded rectangle, which takes the size into its
+ * spec, ADR-144 Amendment 1), so the raw spec stops describing what is on the
+ * bed as soon as either surface is used. These fields report bed millimetres —
+ * the same quantity the toolbar names — so the two agree.
  * Mirroring lives in its own flags, hence the magnitude.
  */
 type SpecScale = { readonly x: number; readonly y: number };
@@ -85,6 +86,7 @@ function RectangleFields(props: {
   readonly setSpec: SetSpec;
   readonly scale: SpecScale;
 }): JSX.Element {
+  const maxRadius = Math.min(props.spec.widthMm, props.spec.heightMm) / 2;
   return (
     <>
       <ShapeNumberField
@@ -111,16 +113,38 @@ function RectangleFields(props: {
         label="Corner radius"
         ariaLabel="Rectangle corner radius"
         unit="mm"
-        value={props.spec.cornerRadiusMm}
-        // A radius has no single axis; under a non-uniform scale the smaller
-        // one is what the corner can actually fit inside.
+        // The spec keeps the authored radius; the outline clamps it to half the
+        // shorter side, so the box shows the radius that burns.
+        value={Math.min(props.spec.cornerRadiusMm, maxRadius)}
+        // A rounded rectangle stays at scale 1 (ADR-144 Amendment 1). One still
+        // stretched (sharp when it was resized, or from an older build) shows the
+        // smaller axis: the round corner an edit here gives it.
         scale={Math.min(props.scale.x, props.scale.y)}
         min={0}
-        max={Math.min(props.spec.widthMm, props.spec.heightMm) / 2}
+        max={maxRadius}
         step={0.1}
         commit={(cornerRadiusMm) => props.setSpec({ ...props.spec, cornerRadiusMm })}
       />
+      <StretchedCornerNote
+        radiusMm={Math.min(props.spec.cornerRadiusMm, maxRadius)}
+        scale={props.scale}
+      />
     </>
+  );
+}
+
+// An older build stretched a rounded rectangle's corners with a W/H resize; the
+// Corner radius box cannot name an oval corner, so say what burns.
+function StretchedCornerNote(props: {
+  readonly radiusMm: number;
+  readonly scale: SpecScale;
+}): JSX.Element | null {
+  if (props.radiusMm <= 0 || props.scale.x === props.scale.y) return null;
+  return (
+    <p role="note" style={footprintNoteStyle}>
+      The corners are stretched to {formatShapeValue(props.radiusMm * props.scale.x)} ×{' '}
+      {formatShapeValue(props.radiusMm * props.scale.y)} mm. Changing a value here makes them round.
+    </p>
   );
 }
 
@@ -300,7 +324,7 @@ function ShapeNumberInput(props: ShapeNumberFieldProps): JSX.Element {
     },
     validate: (input) => {
       const result = shapeEntry(input, props);
-      return result.kind === 'ok' ? null : result.message;
+      return result.kind === 'ok' ? lengthEntryRefusal(result.value, props) : result.message;
     },
     // Display-only rounding: a drag-resized shape stores a long float
     // (e.g. 35.107387681635146) that overflowed the box. Show a clean value
@@ -334,6 +358,16 @@ function shapeEntry(text: string, props: ShapeNumberFieldProps) {
       ? { kind: 'angle', percentOf: 100 }
       : { kind: props.unit === 'mm' ? 'length' : 'angle' },
   );
+}
+
+// A size of 0 or less is refused, as the toolbar refuses it, instead of being
+// clamped to a 0.01 mm sliver; a radius may be 0 but not negative. A positive
+// size below the minimum still clamps up to it. Counts and percentages clamp.
+function lengthEntryRefusal(value: number, props: ShapeNumberFieldProps): string | null {
+  if (props.unit !== 'mm') return null;
+  if (props.min > 0 && value <= 0) return `${props.label} must be greater than 0.`;
+  if (value < 0) return `${props.label} cannot be negative.`;
+  return null;
 }
 
 // At most 3 decimals (0.001 mm — finer than anyone types), trailing zeros

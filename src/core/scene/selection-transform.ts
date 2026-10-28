@@ -1,4 +1,4 @@
-import { combinedBBox, type AABB } from './hit-test';
+import { combinedBBox, transformedBounds, type AABB } from './hit-test';
 import { applyTransform } from './transform';
 import type { SceneObject, Transform, Vec2 } from './scene-object';
 
@@ -104,7 +104,7 @@ export function buildSelectionTransformEdit(
   if (metrics === null) return { kind: 'error', reason: 'empty-selection' };
   if (edit.kind === 'position') return positionSelection(objects, metrics.bbox, edit);
   if (edit.kind === 'resize') return resizeSelection(objects, metrics, edit);
-  return rotateSelection(objects, metrics.bbox, edit);
+  return rotateSelection(objects, edit);
 }
 
 export function buildSelectionNudgeEdit(
@@ -247,14 +247,16 @@ function resizeTransform(
 
 function rotateSelection(
   objects: ReadonlyArray<SceneObject>,
-  bbox: AABB,
   edit: Extract<SelectionTransformEdit, { readonly kind: 'rotate' }>,
 ): SelectionTransformResult {
   const object = objects[0];
   if (object === undefined) return { kind: 'error', reason: 'empty-selection' };
   if (objects.length !== 1) return { kind: 'error', reason: 'multi-rotation' };
   if (!Number.isFinite(edit.rotationDeg)) return { kind: 'error', reason: 'invalid-number' };
-  const anchor = anchorPointForBBox(bbox, 'c');
+  // The pivot is the centre of the object's own bounds, which a turn never
+  // moves, so typing an angle and then the old one puts the artwork back. The
+  // centre of the smallest box around a lopsided outline moves as it turns.
+  const anchor = anchorPointForBBox(transformedBounds(object.bounds, object.transform), 'c');
   const deltaDeg = edit.rotationDeg - object.transform.rotationDeg;
   const origin = rotatePoint({ x: object.transform.x, y: object.transform.y }, anchor, deltaDeg);
   return {
@@ -349,33 +351,21 @@ function scaleTransformInFrame(
   };
 }
 
+// The smallest box around the selection in a frame turned by frameRotationDeg:
+// each object is measured with the scene turned back by that angle about the
+// origin, so an object square to the frame reads its own width and height and
+// any other reads its outline (ADR-677).
 function combinedBBoxInFrame(
   objects: ReadonlyArray<SceneObject>,
   frameRotationDeg: number,
 ): AABB | null {
-  let minX = Number.POSITIVE_INFINITY;
-  let minY = Number.POSITIVE_INFINITY;
-  let maxX = Number.NEGATIVE_INFINITY;
-  let maxY = Number.NEGATIVE_INFINITY;
-  let any = false;
-  for (const object of objects) {
-    const corners = [
-      { x: object.bounds.minX, y: object.bounds.minY },
-      { x: object.bounds.maxX, y: object.bounds.minY },
-      { x: object.bounds.maxX, y: object.bounds.maxY },
-      { x: object.bounds.minX, y: object.bounds.maxY },
-    ];
-    for (const corner of corners) {
-      const world = applyTransform(corner, object.transform);
-      const framed = rotatePoint(world, { x: 0, y: 0 }, -frameRotationDeg);
-      minX = Math.min(minX, framed.x);
-      minY = Math.min(minY, framed.y);
-      maxX = Math.max(maxX, framed.x);
-      maxY = Math.max(maxY, framed.y);
-      any = true;
-    }
-  }
-  return any ? { minX, minY, maxX, maxY } : null;
+  return combinedBBox(
+    objects.map((object) => {
+      const origin = rotatePoint(object.transform, { x: 0, y: 0 }, -frameRotationDeg);
+      const rotationDeg = object.transform.rotationDeg - frameRotationDeg;
+      return { ...object, transform: { ...object.transform, ...origin, rotationDeg } };
+    }),
+  );
 }
 
 function rotatePoint(point: Vec2, anchor: Vec2, deltaDeg: number): Vec2 {
