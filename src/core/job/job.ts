@@ -111,6 +111,11 @@ export type CutGroup = {
   // carried by Follow Shape (offset) FillGroups via the Omit below; scanline
   // and island fill use fillRunwayPolicy sweep plans instead and never set it.
   readonly entryRunwayMm?: number;
+  // ADR-239 Amendment 2: length (mm) of the tangential laser-off G1 exit after
+  // each contour's last burn point, at burn feed. Set beside entryRunwayMm only
+  // when the group burns with constant power (M3); absent otherwise, so M4
+  // groups and archived jobs keep their bytes.
+  readonly exitRunwayMm?: number;
   // ADR-415: how far each closed segment runs past its start on the final
   // pass (see cut-pass-segments.ts). Absent when the operation has no overcut
   // or no closed segments, so existing output stays byte-identical. Offset

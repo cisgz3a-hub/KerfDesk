@@ -108,7 +108,9 @@ export const GRBL_GCODE_DIALECTS: ReadonlyArray<GrblGcodeDialect> = [
   {
     id: 'grbl-compatible',
     label: 'GRBL Compatible',
-    description: 'Conservative GRBL v1.1 output with constant-power vector cuts.',
+    // ADR-257 Amendment 1: images and fills run at constant power here too.
+    description:
+      'Constant-power (M3) GRBL output for cuts, fills and images, for GRBL 1.1e and older (LightBurn: GRBL-M3). Corners, path ends and dense image rows burn darker; GRBL 1.1f and newer should use GRBL Dynamic.',
     // ADR-257 deliberately leaves this one constant: it is the escape hatch for
     // firmware without usable dynamic power (GRBL before 1.1f), mirroring
     // LightBurn, which sends Grbl 1.1e-or-older users to its "GRBL-M3" device.

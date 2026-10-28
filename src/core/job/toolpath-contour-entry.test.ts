@@ -63,3 +63,43 @@ describe('toolpath preview with ADR-239 contour entries', () => {
     expect(toolpath.steps.at(1)?.length).toBeCloseTo(2, 9);
   });
 });
+
+describe('toolpath preview with ADR-239 Amendment 2 contour exits', () => {
+  it('previews the laser-off feed exit after the cut and continues from its end', () => {
+    const toolpath = buildToolpath(
+      {
+        groups: [
+          { ...baseGroup, entryRunwayMm: 5, exitRunwayMm: 5 },
+          {
+            ...baseGroup,
+            layerId: 'next',
+            segments: [
+              { ...square, polyline: square.polyline.map((p) => ({ x: p.x + 30, y: p.y })) },
+            ],
+          },
+        ],
+      },
+      { startPoint: { x: 0, y: 0 } },
+    );
+
+    const [, , cut, exit, nextSeek] = toolpath.steps;
+    expect(cut).toMatchObject({ kind: 'cut' });
+    expect(exit).toMatchObject({
+      kind: 'travel',
+      motion: 'feed',
+      from: { x: 10, y: 10 },
+      to: { x: 10, y: 5 },
+    });
+    expect(exit?.length).toBeCloseTo(5, 9);
+    expect(nextSeek).toMatchObject({ kind: 'travel', from: { x: 10, y: 5 }, to: { x: 40, y: 10 } });
+  });
+
+  it('skips the previewed exit with an unknown bed envelope, as emission does', () => {
+    const toolpath = buildToolpath({
+      groups: [{ ...baseGroup, entryRunwayMm: 5, exitRunwayMm: 5 }],
+      contourEntryBounds: null,
+    });
+
+    expect(toolpath.steps.map((step) => step.kind)).toEqual(['cut']);
+  });
+});

@@ -5,7 +5,8 @@ import { assertNever } from '../scene';
 import type { DeviceProfile } from '../devices';
 import { cncPassRepresentedXyPoints } from '../cnc/cnc-pass-representation';
 import { laserArcMovesEnabled } from '../devices/laser-arc-moves';
-import { contourEntryPoint, type ContourEntryBounds } from './contour-entry';
+import { contourEntryPoint, contourExitPoint, type ContourEntryBounds } from './contour-entry';
+import { finalPassCutSegments } from './cut-pass-segments';
 import { emittedCutArcMoves, extendBoundsByEmittedArcMoves } from './cut-arc-moves';
 import { expandFillHatchWithRunways } from './fill-runway';
 import { planFillSweeps } from './fill-sweep-plan';
@@ -13,6 +14,7 @@ import {
   cncPassXyPoints,
   type CncGroup,
   type CutGroup,
+  type CutSegment,
   type FillGroup,
   type Group,
   type Job,
@@ -306,12 +308,25 @@ function extendBoundsForContourEntries(
   includeOverscanMotion: boolean,
   entryBounds: ContourEntryBounds,
 ): void {
+  if (!includeOverscanMotion) return;
   const entryRunwayMm = group.entryRunwayMm ?? 0;
-  if (!includeOverscanMotion || entryRunwayMm <= 0) return;
-  for (const seg of group.segments) {
+  for (const seg of entryRunwayMm > 0 ? group.segments : []) {
     const entry = contourEntryPoint(seg.polyline, entryRunwayMm, entryBounds);
     if (entry !== null) extendBoundsForPoint(b, entry);
   }
+  // ADR-239 Amendment 2: the M3 exit leaves each pass's own last edge, which
+  // an overcut or a lead-out moves on the final pass.
+  const exitRunwayMm = group.exitRunwayMm ?? 0;
+  for (const seg of exitRunwayMm > 0 ? contourExitSegments(group) : []) {
+    const exit = contourExitPoint(seg.polyline, exitRunwayMm, entryBounds);
+    if (exit !== null) extendBoundsForPoint(b, exit);
+  }
+}
+
+function contourExitSegments(group: CutGroup | FillGroup): ReadonlyArray<CutSegment> {
+  if (group.kind === 'fill') return group.segments;
+  const finalPass = finalPassCutSegments(group);
+  return group.passes > 1 ? [...group.segments, ...finalPass] : finalPass;
 }
 
 function extendBoundsForPoint(

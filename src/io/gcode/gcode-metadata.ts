@@ -159,7 +159,11 @@ export type GcodeMetadata = {
 // ADR-250 Amd 4 counts a stacked On path copy once in the kept walls, so a
 // neighbouring lead that reached the copied part plunges instead; carries
 // forward v33 above.
-export const EMITTER_REVISION = 'cnc-on-path-copy-walls-20261027-v34';
+// ADR-239 Amd 2 leaves every constant-power (M3) contour on the 4040-safe
+// profile by a laser-off exit runway after its last burn point, so 4040 Line
+// output gains one `G1 ... S0` move per contour and a contour-exit comment;
+// carries forward v34 above (v35 is held by an open PR).
+export const EMITTER_REVISION = 'm3-contour-exit-runway-20261028-v36';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

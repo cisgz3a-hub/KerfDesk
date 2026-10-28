@@ -157,7 +157,7 @@ function OutputDialectRow(props: {
         }
       >
         {dialects.map((dialect) => (
-          <option key={dialect.id} value={dialect.id}>
+          <option key={dialect.id} value={dialect.id} title={dialect.description}>
             {dialect.label}
           </option>
         ))}

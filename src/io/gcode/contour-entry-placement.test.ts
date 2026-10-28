@@ -33,26 +33,32 @@ const MODES: readonly JobStartMode[] = [
   'current-position',
   'verified-origin',
 ];
+// first, end, entry (clipped at the edge), and the M3 exit 5 mm past the end
+// (ADR-239 Amendment 2: the 4040 burns Line cuts with constant power).
 const EDGES = {
   left: [
     { x: 2, y: 170 },
     { x: 12, y: 170 },
     { x: 0, y: 170 },
+    { x: 17, y: 170 },
   ],
   right: [
     { x: 398, y: 170 },
     { x: 388, y: 170 },
     { x: 400, y: 170 },
+    { x: 383, y: 170 },
   ],
   top: [
     { x: 170, y: 2 },
     { x: 170, y: 12 },
     { x: 170, y: 0 },
+    { x: 170, y: 17 },
   ],
   bottom: [
     { x: 170, y: 398 },
     { x: 170, y: 388 },
     { x: 170, y: 400 },
+    { x: 170, y: 383 },
   ],
 } as const;
 type Edge = keyof typeof EDGES;
@@ -79,7 +85,8 @@ function bounds(points: readonly Vec2[]): JobBounds {
   };
 }
 function fixture(origin: Origin, mode: JobStartMode, edge: Edge = 'right') {
-  const [first, end, entry] = EDGES[edge].map((point) => numbers(point, origin)) as [
+  const [first, end, entry, exit] = EDGES[edge].map((point) => numbers(point, origin)) as [
+    Vec2,
     Vec2,
     Vec2,
     Vec2,
@@ -141,6 +148,7 @@ function fixture(origin: Origin, mode: JobStartMode, edge: Edge = 'right') {
     first: translated(first, offset),
     end: translated(end, offset),
     entry: translated(entry, offset),
+    exit: translated(exit, offset),
   };
 }
 
@@ -161,6 +169,7 @@ describe('prepared contour envelopes use the final program coordinate frame', ()
     const body = grblStrategy.emit(prepared.job, f.project.device, { finishPosition: null });
     expect(body).toContain(`X${f.entry.x.toFixed(3)} Y${f.entry.y.toFixed(3)} F800 S0`);
     expect(body).toContain(`X${f.first.x.toFixed(3)} Y${f.first.y.toFixed(3)} F1500 S0`);
+    expect(body).toContain(`X${f.exit.x.toFixed(3)} Y${f.exit.y.toFixed(3)} F1500 S0`);
     const route = buildToolpath(prepared.job, {
       startPoint: { x: 0, y: 0 },
       // A legacy caller's bed dimensions must never override prepared evidence.
@@ -176,7 +185,7 @@ describe('prepared contour envelopes use the final program coordinate frame', ()
     });
     expect(computeJobBounds(prepared.job, f.project.device)).toEqual(bounds([f.first, f.end]));
     expect(computeJobMotionBounds(prepared.job, f.project.device)).toEqual(
-      bounds([f.entry, f.first, f.end]),
+      bounds([f.entry, f.first, f.end, f.exit]),
     );
     const parsed = buildGcodeRenderModel(body);
     if (parsed.kind !== 'ok') throw new Error(parsed.reason);
@@ -291,7 +300,7 @@ describe('prepared contour envelopes use the final program coordinate frame', ()
         },
       );
       expect(computeJobMotionBounds(prepared.job)).toEqual(
-        bounds([f.entry, f.first, f.end].map((p) => translated(p, shift))),
+        bounds([f.entry, f.first, f.end, f.exit].map((p) => translated(p, shift))),
       );
       const ignored = prepareOutput(f.project, {
         jobOrigin: { startFrom: 'user-origin', anchor: 'center' },
