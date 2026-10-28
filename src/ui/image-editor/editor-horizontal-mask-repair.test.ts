@@ -68,6 +68,22 @@ describe('editorHorizontalMaskRepair', () => {
   });
 
   it('rejects a repair that shortens a surviving grayscale run into a new loss', () => {
+    // The fill leaves 608 one pixel at the start of its line, inside the end trim.
+    expect(
+      editorHorizontalMaskRepair({
+        seed: { width: 4, height: 1, alpha: Uint8Array.of(0, 0, 255, 0) },
+        radiusPx: 1,
+        minXWorldMm: 0,
+        pixelWidthMm: 1,
+        dotWidthCorrectionMm: 1,
+        sourceSValues: Uint16Array.of(608, 608, 608, 0),
+        filledS: 1000,
+        outputMaskFor: (mask) => mask,
+      }),
+    ).toBeNull();
+  });
+
+  it('retains a repair whose fill meets a grayscale run inside one burned line', () => {
     expect(
       editorHorizontalMaskRepair({
         seed: { width: 3, height: 1, alpha: Uint8Array.of(255, 0, 0) },
@@ -78,8 +94,8 @@ describe('editorHorizontalMaskRepair', () => {
         sourceSValues: Uint16Array.of(1000, 608, 608),
         filledS: 1000,
         outputMaskFor: (mask) => mask,
-      }),
-    ).toBeNull();
+      })?.alpha,
+    ).toEqual(Uint8Array.of(255, 255, 0));
   });
 
   it('retains a repair when every complete post-fill power run survives', () => {

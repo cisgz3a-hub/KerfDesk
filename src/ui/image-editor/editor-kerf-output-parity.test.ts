@@ -25,6 +25,12 @@ import { kerfCheckContext } from './kerf-check-context';
 
 const DEFAULT_BOUNDS = { minX: 10, minY: 10, maxX: 12, maxY: 11 };
 const OVER_REPAIR_MASK_BUDGET_WIDTH = 250_001;
+// Black and S608 grey, each a one-pixel burned line between white: the 0.75 mm
+// correction shortens both ends of each line and removes it (ADR-458 Amd 1).
+const TWO_GREY_DOTS = {
+  luma: [0, 255, 100],
+  bounds: { minX: 10, minY: 10, maxX: 13, maxY: 11 },
+};
 
 type FixtureOptions = {
   readonly luma: ReadonlyArray<number>;
@@ -117,19 +123,34 @@ function withLayers(project: Project, layers: ReadonlyArray<Layer>): Project {
 
 describe('computeKerfOutputParity', () => {
   it('matches exact grayscale power runs erased from the prepared output', () => {
-    const { project, session } = fixture({ luma: [0, 100] });
+    const { project, session } = fixture(TWO_GREY_DOTS);
     const prepared = prepareOutput(project);
     expect(prepared.ok).toBe(true);
     if (!prepared.ok) return;
     const group = prepared.job.groups.find((candidate) => candidate.kind === 'raster');
-    expect(group?.kind === 'raster' ? [...group.sValues] : []).toEqual([1000, 608]);
+    expect(group?.kind === 'raster' ? [...group.sValues] : []).toEqual([1000, 0, 608]);
     expect(collectG1SValues(emitPreparedGcode(prepared).gcode).filter((s) => s > 0)).toEqual([]);
 
     const parity = outputParity(session, project);
     expect(parity?.removedPixels).toBe(2);
     expect(parity?.minCorrectionMm).toBe(0.75);
     expect(parity?.maxCorrectionMm).toBe(0.75);
-    expect(parity?.thickenCandidate?.removed.mask?.alpha).toEqual(new Uint8Array([255, 255]));
+    expect(parity?.thickenCandidate?.removed.mask?.alpha).toEqual(new Uint8Array([255, 0, 255]));
+  });
+
+  it('reports no loss for adjacent grayscale powers the output keeps (ADR-458 Amd 1)', () => {
+    const { project, session } = fixture({ luma: [0, 100] });
+    const prepared = prepareOutput(project);
+    expect(prepared.ok).toBe(true);
+    if (!prepared.ok) return;
+    // One two-millimetre burned line: only its ends are shortened.
+    expect(collectG1SValues(emitPreparedGcode(prepared).gcode).filter((s) => s > 0)).toEqual([
+      1000, 608,
+    ]);
+    expect(outputParity(session, project)).toMatchObject({
+      removedPixels: 0,
+      thickenCandidate: null,
+    });
   });
 
   it('compiles the raster operation override before evaluating exact run loss', () => {
@@ -167,8 +188,8 @@ describe('computeKerfOutputParity', () => {
 
   it('prepares the dirty editor composite instead of the stale stored luma', () => {
     const { project, session } = fixture({
-      luma: [0, 100],
-      storedLuma: [255, 255],
+      ...TWO_GREY_DOTS,
+      storedLuma: [255, 255, 255],
     });
     expect(outputParity(session, project)?.removedPixels).toBe(2);
   });
@@ -232,9 +253,9 @@ describe('computeKerfOutputParity', () => {
 
   it('reports resampled and rotated output loss before editor repair mapping', () => {
     const resampled = fixture({
-      luma: [0, 0, 100, 100],
-      width: 4,
-      bounds: DEFAULT_BOUNDS,
+      luma: [0, 0, 255, 255, 100, 100],
+      width: 6,
+      bounds: TWO_GREY_DOTS.bounds,
       layer: { passThrough: false },
     });
     const rotated = fixture({
@@ -287,20 +308,21 @@ describe('computeKerfOutputParity', () => {
   });
 
   it('honors adjustments, power, pass-through, and row direction', () => {
-    const adjusted = fixture({ luma: [0, 100], object: { brightness: 100 } });
+    const adjusted = fixture({ ...TWO_GREY_DOTS, object: { brightness: 100 } });
     const inverted = fixture({
       luma: [255],
       bounds: { minX: 10, minY: 10, maxX: 11, maxY: 11 },
       layer: { negativeImage: true },
     });
-    const powerOff = fixture({ luma: [0, 100], layer: { power: 0 } });
-    const forward = fixture({ luma: [0, 100] });
+    const powerOff = fixture({ ...TWO_GREY_DOTS, layer: { power: 0 } });
+    const forward = fixture(TWO_GREY_DOTS);
     const bidirectional = fixture({
-      luma: [0, 100],
+      ...TWO_GREY_DOTS,
       layer: { imageBidirectional: true },
     });
-    // Pass-through keeps original luma: black/grey still loses two short runs,
-    // while an original white pixel stays white despite the stored negative flag.
+    // Pass-through keeps original luma: the black and grey dots still lose
+    // their one-pixel lines, while an original white pixel stays white despite
+    // the stored negative flag.
     expect(outputParity(adjusted.session, adjusted.project)?.removedPixels).toBe(2);
     expect(outputParity(inverted.session, inverted.project)?.removedPixels).toBe(0);
     expect(outputParity(powerOff.session, powerOff.project)?.removedPixels).toBe(0);
@@ -310,7 +332,7 @@ describe('computeKerfOutputParity', () => {
   });
 
   it('keeps a zero-correction Image parent in scope beside a lossy Image sublayer', () => {
-    const base = fixture({ luma: [0, 100], layer: { dotWidthCorrectionMm: 0 } });
+    const base = fixture({ ...TWO_GREY_DOTS, layer: { dotWidthCorrectionMm: 0 } });
     const parent = base.project.scene.layers[0];
     if (parent === undefined) throw new Error('expected a parent operation');
     const subLayer = createLayerSubLayer(parent, {
@@ -334,7 +356,7 @@ describe('computeKerfOutputParity', () => {
 
   it('offers one output-grid candidate for a Line parent with one lossy Image sublayer', () => {
     const base = fixture({
-      luma: [0, 100],
+      ...TWO_GREY_DOTS,
       layer: { mode: 'line', dotWidthCorrectionMm: 0 },
     });
     const parent = base.project.scene.layers[0];
@@ -360,7 +382,7 @@ describe('computeKerfOutputParity', () => {
   });
 
   it('sums losses and reports the correction range across parent and sublayer operations', () => {
-    const base = fixture({ luma: [0, 100], layer: { dotWidthCorrectionMm: 0.6 } });
+    const base = fixture({ ...TWO_GREY_DOTS, layer: { dotWidthCorrectionMm: 0.6 } });
     const parent = base.project.scene.layers[0];
     if (parent === undefined) throw new Error('expected a parent operation');
     const subLayer = createLayerSubLayer(parent, {
@@ -384,7 +406,7 @@ describe('computeKerfOutputParity', () => {
 
   it('keeps separately bound zero-correction output in the multi-operation topology', () => {
     const base = fixture({
-      luma: [0, 100],
+      ...TWO_GREY_DOTS,
       object: { operationIds: ['zero', 'positive'] },
     });
     const template = base.project.scene.layers[0];
