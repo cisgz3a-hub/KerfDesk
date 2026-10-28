@@ -6,7 +6,9 @@
 // Air-on ones, because cycling it off and on again is the step that firmware
 // fails to honour. That is a real departure from what the operations table
 // says, so it is stated plainly here rather than left to be discovered in the
-// G-code, together with the controller setting that removes the need for it.
+// G-code, together with what removes the need for it: the Falcon A1's `$152`
+// standby setting on stock GRBL, otherwise an air test on updated firmware
+// (on the A1 Pro's grblHAL, `$152` is a microstep setting; ADR-370 Amendment 1).
 //
 // Advisory only (rule 7 / ADR-228). Nothing here refuses a Start: the operator
 // can turn Air on for the bridged operation to make the emitted program match
@@ -14,12 +16,28 @@
 // is fixed.
 
 import type { DeviceProfile } from '../../../core/devices';
+import { airStandbyRemedy } from '../../../core/devices/air-standby-remedy';
 import type { Job } from '../../../core/job';
 import { bridgedAirGapIndices } from '../../../core/output/air-assist-hold';
 import type { Layer } from '../../../core/scene';
 import { operationNames } from './operation-names';
 
-type AirCyclingDevice = Pick<DeviceProfile, 'airAssistCommand' | 'airAssistRestartUnreliable'>;
+type AirCyclingDevice = Pick<
+  DeviceProfile,
+  | 'airAssistCommand'
+  | 'airAssistRestartUnreliable'
+  | 'controllerKind'
+  | 'controllerCommandSet'
+  | 'machineFamily'
+>;
+
+const STANDBY_SETTING_FIX =
+  'send $152=100 from the Console (the standby wait; 100 keeps the pump and laser module ' +
+  'powered instead of idling them after the default 30 s) and untick "Air restart" in ' +
+  'Machine Setup to get per-operation air back.';
+const AIR_TEST_FIX =
+  'untick "Air restart" in Machine Setup once an air test shows the installed firmware ' +
+  'restarting the pump, to get per-operation air back.';
 
 export function detectAirAssistCyclingWarnings(
   job: Job,
@@ -42,10 +60,8 @@ export function detectAirAssistCyclingWarnings(
       'This controller does not reliably restart its pump inside a running job, so ' +
       'switching air off and back on would risk losing it for every operation after. ' +
       `Turn Air on for ${held.length === 1 ? 'that operation' : 'those operations'} to make ` +
-      'the program match the table, or send $152=100 from the Console (the standby ' +
-      'wait; 100 keeps the pump and laser module powered instead of idling them after ' +
-      'the default 30 s) and untick "Air restart" in Machine Setup to get per-operation ' +
-      'air back.',
+      'the program match the table, or ' +
+      (airStandbyRemedy(device) === 'standby-setting' ? STANDBY_SETTING_FIX : AIR_TEST_FIX),
   ];
 }
 

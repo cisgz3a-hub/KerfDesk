@@ -137,8 +137,8 @@ function notYetSection() {
   return section({
     tone: 'alt',
     eyebrow: 'Honest status',
-    title: 'Built, but not yet run on a machine',
-    lead: 'These features are covered by code and automated tests only. Tests check structure and repeatability, not whether a result looks right on material.',
+    title: 'Built, but not yet tested on a machine',
+    lead: 'None of these features has had a recorded test on a real machine. Automated tests check structure and repeatability, not whether a result looks right on material.',
     content: featureGrid(NOT_YET_ON_A_MACHINE, { columns: 4 }),
   });
 }

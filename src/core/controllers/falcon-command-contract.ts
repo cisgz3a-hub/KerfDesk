@@ -44,15 +44,28 @@ export function withFalconCommandContract(driver: ControllerDriver): ControllerD
         : prepared;
     },
     consoleQuickCommands: driver.consoleQuickCommands.filter(({ command }) => command !== '$$'),
-    consoleSettingWrites: FALCON_AIR_SETTING_WRITES,
+    // The Falcon A1's air settings exist only in stock-GRBL numbering. On
+    // grblHAL, the Falcon A1 Pro's firmware, $150-$152 are the X, Y and Z
+    // microsteps, so that contract sends no numeric write (ADR-370 Amendment 1).
+    consoleSettingWrites: driver.kind === 'grbl-v1.1' ? FALCON_A1_AIR_SETTING_WRITES : [],
   };
 }
 
 /** Creality's Falcon A1 parameter page documents these air-assist settings,
- *  each 0-100, as set from a software console. Every other numeric write stays
- *  out of host software on this contract (ADR-370). Source:
- *  https://wiki.creality.com/en/laser-engraver/falcon-a1/random-data/description-for-GRBL-configuration-parameters */
-const FALCON_AIR_SETTING_WRITES: ReadonlyArray<ConsoleSettingWrite> = [
+ *  each 0-100, as set from a software console. The A1 numbers its settings as
+ *  stock GRBL does: an A1 `$$` (LightBurn forum topic 181704, 2026-01-25) reads
+ *  `[VER:1.1f.20220810:]` and `$150=25 $151=100 $152=30`, the page's defaults.
+ *  The Falcon A1 Pro's own settings page lists none of them, and an A1 Pro
+ *  `$I`/`$$` (barebaric/rayforge PR #461) reads grblHAL with
+ *  `[PLUGIN:Trinamic v0.12]` and `$150=16 $151=16 $152=16 $153=16`: grblHAL's
+ *  axis microsteps, which the plugin changes for any power of two without
+ *  touching steps/mm. So only the stock-GRBL Falcon contract lists them. Every
+ *  other numeric write stays out of host software on this contract (ADR-370
+ *  and its Amendment 1). Sources:
+ *  https://wiki.creality.com/en/laser-engraver/falcon-a1/random-data/description-for-GRBL-configuration-parameters
+ *  https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/settings.h#L553-L562
+ *  https://github.com/grblHAL/Plugins_motor/blob/11c937c85f07f7f4a52be6dfdd0e49f4fcfe1886/trinamic.c#L245-L259 */
+const FALCON_A1_AIR_SETTING_WRITES: ReadonlyArray<ConsoleSettingWrite> = [
   { id: 150, min: 0, max: 100, meaning: 'engraving airflow level' },
   { id: 151, min: 0, max: 100, meaning: 'cutting airflow level' },
   { id: 152, min: 0, max: 100, meaning: 'air pump standby wait in seconds, 100 = never' },

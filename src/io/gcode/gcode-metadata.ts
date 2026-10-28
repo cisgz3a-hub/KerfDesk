@@ -159,11 +159,14 @@ export type GcodeMetadata = {
 // ADR-250 Amd 4 counts a stacked On path copy once in the kept walls, so a
 // neighbouring lead that reached the copied part plunges instead; carries
 // forward v33 above.
+// ADR-492 Amd 1 burns a Pass-Through image turned off its scan rows at its own
+// pixel size, not its pixel count stretched over the turned box; carries
+// forward v34 above.
 // ADR-458 Amd 1 trims Dot Width Correction only at the ends of a burned line,
 // not at each Grayscale power change, so Grayscale and Pass-through image
-// bytes change; dithered bytes do not. v35 is held by open PRs #1478 and
-// #1487; carries forward v34 above.
-export const EMITTER_REVISION = 'laser-dot-width-line-ends-20261028-v36';
+// bytes change; dithered bytes do not. v36 and v37 are held by open PRs
+// #1491 and #1494; carries forward v35 above.
+export const EMITTER_REVISION = 'laser-dot-width-line-ends-20261028-v38';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

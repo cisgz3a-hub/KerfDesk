@@ -34,7 +34,8 @@ export function AdjustFields(props: {
         <p role="status" style={{ gridColumn: '1 / -1', margin: 0, color: 'var(--lf-text-muted)' }}>
           Original pixels and density are in use. Brightness, contrast, gamma, negative and dither
           settings are kept for when Pass-through is off. The selected power range, placement, masks
-          and dot-width correction still apply.
+          and dot-width correction still apply. An image turned off square to its scan direction is
+          resampled at its own pixel size, and Job Review says so.
         </p>
       ) : null}
       <PresetField

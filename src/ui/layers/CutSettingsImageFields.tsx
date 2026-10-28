@@ -209,6 +209,8 @@ function ImageExtraFields(props: {
         <p className="lf-laser-help">
           Pass-through keeps original pixels and density, skipping brightness, contrast, gamma,
           negative and dither adjustments. Power range, placement, masks and Dot Width still apply.
+          Only an image square to its scan direction keeps its pixels one for one; Job Review warns
+          about a turned one.
         </p>
       </div>
     </details>

@@ -246,18 +246,19 @@ export type DeviceProfile = {
   // hobby controllers leave these pins unwired or use M7 only when compiled in.
   readonly airAssistCommand: AirAssistCommand;
   // Vendor firmware that cannot be trusted to restart air assist inside a
-  // running program. Creality's A1 family idles the pump (and powers the laser
+  // running program. Creality's A1 idles the pump (and powers the laser
   // module down) `$152` seconds after it decides work has finished — 0..100,
   // 100 = never, default reported as 20 or 30 (Creality wiki, GRBL configuration
   // parameters) — and LightBurn staff confirmed a firmware bug that cuts air
   // after about 30 s on both the A1 and the A1 Pro (the A1 fix was a 1.0.7
-  // debug build; A1 Pro firmware is numbered separately). For such a machine
-  // the emitter holds air on across an Air-off operation that sits between two
-  // Air-on ones instead of cycling M9/M8 over it (ADR-335).
+  // debug build; A1 Pro firmware is numbered separately, and on its grblHAL
+  // `$150`-`$152` are microstep settings: ADR-370 Amendment 1). For such a
+  // machine the emitter holds air on across an Air-off operation that sits
+  // between two Air-on ones instead of cycling M9/M8 over it (ADR-335).
   // Absent keeps the plain per-operation cycling that stock GRBL, grblHAL,
   // FluidNC, Marlin and Smoothieware each honour immediately, and is also how
   // to get per-operation air back on an A1 once `$152=100` is set on the
-  // controller or the firmware is updated.
+  // controller, or on either model once the firmware is updated.
   readonly airAssistRestartUnreliable?: boolean;
   // ADR-432: 'off' keeps every laser burn move a G1 line; 'on' lets the laser
   // emitter write G2/G3 arcs for curved line-mode work on a controller family
