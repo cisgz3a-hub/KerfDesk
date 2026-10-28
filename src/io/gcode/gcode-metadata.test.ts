@@ -41,7 +41,7 @@ function laserAssumptions(
 
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
-    expect(EMITTER_REVISION).toBe('cnc-on-path-copy-walls-20261027-v34');
+    expect(EMITTER_REVISION).toBe('blue-noise-white-black-20261028-v36');
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {

@@ -13,7 +13,9 @@
 //   - the quantizer threshold is 128 + m(level) * n(x, y), where n is white
 //     noise in [-1, 1) and m a level-dependent strength. The noise is a hash
 //     of the pixel position, never Math.random, so output is reproducible;
-//   - rows are scanned serpentine, mirroring the filter on odd rows.
+//   - rows are scanned serpentine, mirroring the filter on odd rows;
+//   - pure white never burns and pure black always does, as with the fixed
+//     kernels, so the outside of a mask stays blank (ADR-649 Amendment 1).
 //
 // diffuseBlueNoiseRow is the only implementation: dither() calls it on views
 // of its full-image buffer and dither-rows calls it on its rolling window, so
@@ -101,11 +103,23 @@ export function diffuseBlueNoiseRow(
   for (let n = 0; n < width; n += 1, x += step) {
     const level = source[x] ?? WHITE_LUMA;
     const value = current[x] ?? 0;
-    const burn = value < modulatedThreshold(x, y, MODULATION[level] ?? 0);
+    const burn = burnsAt(x, y, level, value);
     out[x] = burn ? sMax : 0;
     const err = burn ? value : value - WHITE_LUMA;
     if (err !== 0) spreadError(current, below, x, step, level, err);
   }
+}
+
+// Pure white never burns and pure black always burns, whatever error the
+// pixel gathered (ADR-649 Amendment 1). Each pixel spreads its error by its
+// own level's weights, so at a tone edge the error arriving at one pixel can
+// add up to more than one pixel's worth; without this, a few dots landed on
+// the white that compile gives a mask's outside, and holes in solid black.
+// The pixel's error still spreads, as every other kernel's does.
+function burnsAt(x: number, y: number, level: number, value: number): boolean {
+  if (level === WHITE_LUMA) return false;
+  if (level === 0) return true;
+  return value < modulatedThreshold(x, y, MODULATION[level] ?? 0);
 }
 
 // Ahead of x on this row; behind it and directly below on the next row.

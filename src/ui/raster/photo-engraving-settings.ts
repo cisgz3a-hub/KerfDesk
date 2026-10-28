@@ -4,12 +4,14 @@ import { activePhotoToneCurve, type PhotoToneCurve } from '../../core/raster/pho
 import type { DitherAlgorithm, Layer, RasterImage } from '../../core/scene';
 import type { PhotoEngravingApply } from './photo-engraving-apply';
 
-/** The dithers that suit photographs, smoothest first (ADR-649 measures it). */
+/** The dithers that suit photographs, smoothest first by ADR-649's
+ * low-frequency share (Blue Noise 0.82, Floyd–Steinberg 0.93, Stucki 1.59,
+ * Jarvis 2.15; ADR-649 Amendment 1). The list sets only the window's order. */
 export const PHOTO_DITHERS = [
   'blue-noise',
-  'jarvis',
-  'stucki',
   'floyd-steinberg',
+  'stucki',
+  'jarvis',
 ] as const satisfies ReadonlyArray<DitherAlgorithm>;
 
 export type PhotoDither = (typeof PHOTO_DITHERS)[number];

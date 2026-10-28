@@ -159,7 +159,9 @@ export type GcodeMetadata = {
 // ADR-250 Amd 4 counts a stacked On path copy once in the kept walls, so a
 // neighbouring lead that reached the copied part plunges instead; carries
 // forward v33 above.
-export const EMITTER_REVISION = 'cnc-on-path-copy-walls-20261027-v34';
+// ADR-649 Amd 1 keeps Blue Noise off pure white and on pure black, so a mask's
+// outside never burns; v35 belongs to open PR #1478; carries forward v34 above.
+export const EMITTER_REVISION = 'blue-noise-white-black-20261028-v36';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S
