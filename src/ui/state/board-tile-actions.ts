@@ -19,7 +19,7 @@ import {
   type TileOffset,
   transformedBBox,
 } from '../../core/scene';
-import { planBoardArray } from '../../core/scene/board-array-plan';
+import { planBoardArray, type BoardArrayPlan } from '../../core/scene/board-array-plan';
 import { refuseSceneLimitOverrun } from './scene-copy-room';
 import { pushUndo } from './scene-mutations';
 import {
@@ -52,12 +52,11 @@ function applyTileSelectionIntoBoard(
   layout: TileLayout,
 ): AppState | Partial<AppState> {
   const scene = state.project.scene;
-  const box = findRegistrationBoxes(scene)[0];
-  if (box === undefined) return state;
-  const target = selectedBoardArrayDesign(state);
-  if (target === undefined) return state;
+  const planned = selectionBoardArrayPlan(state, layout);
+  if (planned === undefined) return state;
+  const { target } = planned;
 
-  const [firstSlot, ...copySlots] = planBoardArray(transformedBBox(target), box, layout).offsets;
+  const [firstSlot, ...copySlots] = planned.plan.offsets;
   if (firstSlot === undefined) return state;
 
   // Move the original and its mask or guide into the first slot; build fresh
@@ -109,6 +108,21 @@ function slotCopies(
       object: remapSceneObjectCopyDependencies(copy, copiedIds, { preserveSvgImport: true }),
     };
   });
+}
+
+/**
+ * The design and the layout Array on board makes of it on the placed board, or
+ * undefined without a board or a single design. The remote receipt reads the
+ * same plan for its counts (ADR-125 Amendment 4).
+ */
+export function selectionBoardArrayPlan(
+  state: BoardArraySelection,
+  layout: TileLayout,
+): { readonly target: SceneObject; readonly plan: BoardArrayPlan } | undefined {
+  const box = findRegistrationBoxes(state.project.scene)[0];
+  const target = selectedBoardArrayDesign(state);
+  if (box === undefined || target === undefined) return undefined;
+  return { target, plan: planBoardArray(transformedBBox(target), box, layout) };
 }
 
 /**
