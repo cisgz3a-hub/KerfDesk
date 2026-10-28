@@ -193,7 +193,10 @@ describe('finishPen', () => {
     expect(useUiStore.getState().penDraft).toBeNull();
   });
 
-  it('commits dense pen drawings as tracer-faired cubic geometry', () => {
+  // ADR-214 Amendment 1 (rolling v7 L2-P2-2): plain clicks are corner nodes, as
+  // in LightBurn's Draw Lines. They were fitted with cubics once a path had 4
+  // open or 5 closed points, so a clicked house bowed 1.51 mm off its walls.
+  it('keeps every plain click a corner joined by straight lines', () => {
     const drawShape = vi.fn();
     const vertices = Array.from({ length: 11 }, (_, index) => {
       const angle = (index / 10) * Math.PI;
@@ -204,8 +207,55 @@ describe('finishPen', () => {
     expect(finishPen({ closed: false, project: createProject(), drawShape })).toBe(true);
 
     const curve = drawShape.mock.calls[0]?.[0]?.paths[0]?.curves?.[0];
-    expect(curve?.segments.every((segment: PathSegment) => segment.kind === 'cubic')).toBe(true);
-    expect(curve?.segments.length).toBeLessThan(vertices.length - 1);
+    expect(curve?.segments.every((segment: PathSegment) => segment.kind === 'line')).toBe(true);
+    expect(curve?.segments.map((segment: PathSegment) => segment.to)).toEqual(vertices.slice(1));
+  });
+
+  it('draws a clicked house with straight walls at its clicked size', () => {
+    const drawShape = vi.fn();
+    const house = [
+      { x: 100, y: 140 },
+      { x: 150, y: 100 },
+      { x: 200, y: 140 },
+      { x: 200, y: 200 },
+      { x: 100, y: 200 },
+    ];
+    useUiStore.getState().setPenDraft({ vertices: house, cursor: null });
+
+    expect(finishPen({ closed: true, project: createProject(), drawShape })).toBe(true);
+
+    const shape = drawShape.mock.calls[0]?.[0];
+    const curve = shape?.paths[0]?.curves?.[0];
+    expect(curve?.segments.map((segment: PathSegment) => segment.kind)).toEqual(
+      Array.from({ length: 5 }, () => 'line'),
+    );
+    expect(shape?.bounds).toEqual({ minX: 100, minY: 100, maxX: 200, maxY: 200 });
+  });
+
+  it('still curves only the segments beside a dragged node', () => {
+    const drawShape = vi.fn();
+    useUiStore.getState().setPenDraft({
+      vertices: [
+        { x: 0, y: 0 },
+        { x: 50, y: 0 },
+        { x: 50, y: 50 },
+        { x: 0, y: 50 },
+        { x: -20, y: 25 },
+      ],
+      handles: [null, { x: 60, y: 10 }, null, null, null],
+      cursor: null,
+    });
+
+    expect(finishPen({ closed: true, project: createProject(), drawShape })).toBe(true);
+
+    const curve = drawShape.mock.calls[0]?.[0]?.paths[0]?.curves?.[0];
+    expect(curve?.segments.map((segment: PathSegment) => segment.kind)).toEqual([
+      'cubic',
+      'cubic',
+      'line',
+      'line',
+      'line',
+    ]);
   });
 });
 

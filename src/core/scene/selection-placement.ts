@@ -18,6 +18,7 @@ export type BedSize = { readonly width: number; readonly height: number };
 
 const QUARTER_TURN_DEG = 90;
 const FULL_TURN_DEG = 360;
+const PIVOT_GRID_MM = 2 ** -30;
 
 /**
  * Rotates every object a quarter turn about the centre of the selection's
@@ -30,7 +31,11 @@ export function buildSelectionQuarterTurnEdit(
 ): SelectionTransformResult {
   const bbox = combinedBBox(objects);
   if (bbox === null) return { kind: 'error', reason: 'empty-selection' };
-  const pivot = selectionAnchorPoint(bbox, 'c');
+  const centre = selectionAnchorPoint(bbox, 'c');
+  // The box around a turned outline is measured with float noise (ADR-677); a
+  // pivot that moved by it between turns would let four turns drift, so it sits
+  // on a grid of about a nanometre, far below any machine step.
+  const pivot = { x: onPivotGrid(centre.x), y: onPivotGrid(centre.y) };
   return {
     kind: 'ok',
     transforms: objects.map((object) => {
@@ -75,6 +80,10 @@ export function buildSelectionMoveToBedEdit(
       transform: { ...object.transform, x: object.transform.x + dx, y: object.transform.y + dy },
     })),
   };
+}
+
+function onPivotGrid(value: number): number {
+  return Math.round(value / PIVOT_GRID_MM) * PIVOT_GRID_MM;
 }
 
 function quarterTurnPoint(point: Vec2, pivot: Vec2, direction: QuarterTurnDirection): Vec2 {

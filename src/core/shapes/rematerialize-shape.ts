@@ -36,10 +36,10 @@ function sanitizeRectangle(
 ): ParametricShapeSpec | null {
   if (!positiveFinite(spec.widthMm) || !positiveFinite(spec.heightMm)) return null;
   if (!nonNegativeFinite(spec.cornerRadiusMm)) return null;
-  return {
-    ...spec,
-    cornerRadiusMm: Math.min(spec.cornerRadiusMm, spec.widthMm / 2, spec.heightMm / 2),
-  };
+  // The authored radius is kept: the outline clamps it to half the shorter
+  // side, so narrowing a rectangle and widening it again brings the corner
+  // back (ADR-144 Amendment 1).
+  return spec;
 }
 
 function sanitizePolygon(

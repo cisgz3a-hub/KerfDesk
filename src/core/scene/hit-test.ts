@@ -11,6 +11,7 @@ import type { Scene } from './scene';
 import type { Bounds, ColoredPath, Polyline, SceneObject, Transform, Vec2 } from './scene-object';
 import { applyTransform } from './transform';
 import { flattenColoredPathCurves } from './curve-path';
+import { objectGeometryExtent } from './object-extent';
 import {
   resolveVisibleOperationForPath,
   sceneLayerVisibilityLookup,
@@ -252,8 +253,10 @@ export type AABB = {
   readonly maxY: number;
 };
 
+/** The smallest world-axis box holding the object's outline (ADR-677): the
+ *  box the toolbar, the selection handles, align and the bed checks measure. */
 export function transformedBBox(obj: SceneObject): AABB {
-  return transformedBounds(obj.bounds, obj.transform);
+  return objectGeometryExtent(obj) ?? transformedBounds(obj.bounds, obj.transform);
 }
 
 /**

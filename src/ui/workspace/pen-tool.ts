@@ -225,10 +225,13 @@ export function finishPen(args: {
   const min = args.closed ? MIN_PEN_VERTICES_CLOSED : MIN_PEN_VERTICES_OPEN;
   if (points.length < min) return false;
   const color = currentDrawingColor(args.project);
+  // Plain clicks are corner nodes joined by straight lines, as in LightBurn's
+  // Draw Lines and the draft preview; only dragged nodes curve (ADR-214 Amd 1).
   const shape = createPolyline({
     id: crypto.randomUUID(),
     color,
     spec: { points, closed: args.closed },
+    fairingMode: 'exact',
   });
   args.drawShape(
     penHasHandles(penDraft.handles) ? curvedPenShape(shape, penDraft, args.closed) : shape,
@@ -240,8 +243,8 @@ export function finishPen(args: {
   return true;
 }
 
-// A drawing with dragged nodes keeps its exact Bezier segments instead of the
-// fitted outline a plain click-by-click polyline gets.
+// A drawing with dragged nodes takes its exact Bezier segments: a cubic beside
+// each dragged node, a straight line between two plain clicks.
 function curvedPenShape(shape: ShapeObject, penDraft: PenDraft, closed: boolean): ShapeObject {
   const contour = penContour(penDraft.vertices, penHandles(penDraft), closed);
   const source = shape.paths[0];
