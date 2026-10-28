@@ -234,6 +234,10 @@ export const mcpOutputSchemas = {
     status: z.literal('placed'),
     action: z.enum(['center', 'fit', 'array']),
     artworkCount: count,
+    /** An array names its copies and why there are fewer than asked (ADR-125 Amendment 4). */
+    placedCount: count.optional(),
+    requestedCount: count.optional(),
+    notices: mcpNoticesSchema.optional(),
   }),
   add_text: mcpWriteResultSchema,
   add_rectangle: mcpWriteResultSchema,
