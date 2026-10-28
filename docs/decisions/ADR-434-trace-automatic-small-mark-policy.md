@@ -228,3 +228,66 @@ controls (Photo, Colour layers, Edge), which only apply to their own style.
 Tests: `TraceSmallMarkControls.semantic.test.tsx` (Auto and exact values through the real
 controls and the engine, the switch rule, the Re-trace round trip, pre-amendment records) and
 `use-trace-dialog-settings.test.tsx` (the dialog hook applies the switch rule to what it records).
+
+### Amendment 2 - i-dots and full stops stay: the pen-width rule and the coverage floor (2026-10-28)
+
+Quality audit Q4-P2-3 (P1, `docs/audits/2026-10-27-quality-q1/Q4-trace-vs-potrace.md`): Line Art's
+automatic policy removed i-dots and full stops from ordinary 20-28 px text, Line Art being the Free
+default. The audit's own render of "mini quiz. jig, ii. lit." kept 3 of 12, 8 of 11 and 2 of 11 small
+marks at 20, 24 and 28 px (anti-aliased), and 7 of 12 on 1-bit 24 px; a lone "i" at 28 px lost its
+dot. Potrace kept them all. The pages hold no dust, so this is not the trade-off the Consequences
+accept. Two rules did it:
+
+- **Rule 3d.** A tittle or a full stop sits nearer its letter's stroke than any like mark, which
+  is what 3d reads as a stroke's halo. Yet 3d says small text passes.
+- **Rule 1 on the 3x small-source grid.** Bilinear enlargement rounds a 4-5 px² anti-aliased dot,
+  so its pixels past the cut count only 2.3-2.8 source px², under the 3 px² floor. On the native
+  grid the same dots count 4.
+
+Decision (`small-mark-policy.ts`, `small-mark-neighbourhood.ts`):
+
+1. **Rule 3d, pen width.** A mark that 3d would remove because a stroke is nearer than any like
+   mark now stays when it is about as wide as that stroke where it faces the mark. Its width is
+   the diameter of a disc of its area. The stroke's width is the thinnest ink run, along the two
+   axes and two diagonals, through each pixel of the stroke within half the support radius of its
+   nearest pixel, the widest of those winning. Runs through an edge, a corner or a tip cut across
+   the stroke at a slant or one pixel deep; a pixel on the stroke's middle line spans it, and that
+   pixel lies within half a width of the nearest one. The mark stays at 0.6 of that width or more
+   (`AUTO_PEN_WIDTH_FRACTION`). A tittle or a full stop is
+   drawn with the letter's own pen; toner scatter is finer than the stroke it surrounds. Measured
+   through the trace entry: 268 marks of Roboto text at 20-28 px, 1-bit and anti-aliased, 0.75 and
+   up; the dark-noise probe's 2x2 specks beside a 5 px stroke, 0.45. Bridged, dusty, 8 px² and
+   like-supported marks are decided as before.
+2. **Rule 1, ink coverage.** A mark whose pixel count is under the floor stays a candidate when the
+   ink it carries reaches the floor. That ink is each pixel's coverage, (paper − luma) / span
+   clamped to [0, 1], summed over the mark and the paper pixels of its one-source-pixel ring, other
+   ink left out. Hard sub-floor specks carry exactly their pixel count, so they still fall under
+   it. The dust census (3b) sizes sub-floor debris the same way, so a rescued dot is not counted as
+   dust against itself. Without a grey field (alpha masks) the pixel count is all there is, as
+   before.
+
+Measured through `traceImageToColoredPaths`, small marks kept by Line Art and by Smooth
+(anti-aliased / 1-bit):
+
+| Text | Before (Line Art) | After (Line Art and Smooth) |
+|---|---|---|
+| "mini quiz. jig, ii. lit." 20 px | 3 / 12, 11 / 12 | 12 / 12, 12 / 12 |
+| same, 24 px | 8 / 11, 7 / 12 | 11 / 11, 12 / 12 |
+| same, 28 px | 2 / 11, 9 / 11 | 11 / 11, 11 / 11 |
+| lone "i", 28 px, anti-aliased | 0 / 1 | 1 / 1 |
+
+Smooth's 1-bit losses before this amendment were the tied cut of ADR-402 Amendment 1, not these
+rules. Every existing dust and noise regression in `small-mark-policy.test.ts` holds: toner scatter
+beside a stroke (clean and ±8 noise), the dust cluster, the dirty-scan bound, the JPEG-like scan,
+the mid-tone threshold noise, and the speckle fixture.
+
+Consequence: a dark speck about as wide as the stroke beside it, in a tile with no debris, now stays
+whatever made it. On small text that is the full stop the drawing has. Beside a thin stroke it
+can be toner the old rule removed. The dust veto (3b) still removes such specks wherever the scan
+leaves sub-floor or lone debris. On the astronaut photo Smooth now traces 134 subpaths instead of
+121 at the same cut (101): small dark marks beside the photo's strokes.
+
+Tests: `small-mark-policy.test.ts` (a mark as wide as its stem stays and the same mark beside a
+stroke almost twice as wide does not; a full stop's grey rim lifts it over the floor and the bare
+two pixels do not); `trace-automatic-decisions.test.ts` (every i-dot and full stop at 20, 24 and
+28 px, 1-bit and anti-aliased, Line Art and Smooth; a lone "i" at 28 px).

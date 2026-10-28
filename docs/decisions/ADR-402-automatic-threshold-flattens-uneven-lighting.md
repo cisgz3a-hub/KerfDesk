@@ -161,3 +161,139 @@ separability measure eta = between-class variance / total variance, a goodness s
   `uneven-lighting-trace.test.ts` runs the five pages above through Smooth, Sharp and Centerline,
   and checks that the uniform fixtures stay on the unmodified luma.
   `uneven-lighting-uniform-pipeline.test.ts` holds the pipeline-level equality proof.
+
+### Amendment 1 - the automatic cut on tied and two-plateau histograms (2026-10-28)
+
+Quality audit Q1 (`docs/audits/2026-10-27-quality-q1/`) found two failures of the cut itself, on
+pages the gate rightly leaves alone:
+
+- **Q4-P1-1 (P1).** On a two-level image (a 1-bit scan, a PBM, any pure black-and-white art) every
+  Otsu cut between the two levels scores the same, and Otsu kept the first one: luma 1. The
+  small-mark tone test (ADR-434 rule 2) then failed every ink mark of 3-11 px² by its cut margin, so
+  Smooth traced six lone 3x3 dots beside a square as nothing (0 of 6; Line Art, Potrace and Smooth
+  with a manual cut of 128 kept all 6). The Auto tooltip promises to keep drawn dots.
+- **Q5-P2-1 (P2).** On sparse small text that is slightly blurred or enlarged from a low
+  resolution, Otsu balances the two class variances by moving the cut deep into the paper side:
+  Smooth cut at 180 and 191 against a 132 ink/paper mid-level, strokes came out 40-75% too heavy,
+  and 5 and 15 of 22 letter counters closed (Sharp 3 and 11). Potrace kept them.
+
+Decision (`otsuSeparation` and `automaticThreshold`, moved with Otsu's cut from `preprocess.ts` into
+`core/trace/otsu-cut.ts` for size; used by `otsuBinarization`):
+
+1. **Ties resolve to the middle.** Every cut inside an empty stretch of the histogram makes the same
+   split with exactly the same score; Otsu now returns the middle of that stretch. A 0/255 image cuts
+   at 128, a 30/170 image at 100. This is the gap-centring ADR-435 already applied to its frozen cut,
+   now made where the cut is computed (ADR-435 Amendment 1). On a supersampled grid (`pixelScale`
+   above 1) a tie keeps Otsu's lowest cut, as before. There the gaps lie between interpolated levels,
+   and the middle of a gap is the bilinear saddle value between two-level pixels, where a 1 px
+   diagonal line pinches. Smooth on a binary hairline attached to a block's side, 2x grid: recall
+   1.000 at cuts 113-120 and 135-150, 0.475 at 127-129.
+2. **Two-plateau art cuts at the plateaus' mid-level.** An anti-aliased or symmetrically blurred step
+   has 50% coverage at the mid-level between its two plateaus whatever the blur width, the principle
+   ADR-533 applies to edge crossings. `otsuSeparation` therefore reads two plateaus from Otsu's
+   split: the ink level is the 2nd percentile of the dark class and the paper level the 98th
+   percentile of the light class. These are robust to noise and to the edge pixels, and they still
+   reach the ink on blurred strokes, where only the cores reach it. The art is two-plateau
+   (`twoPlateau`) when the plateaus are at least 32 levels apart and the pixels strictly inside the
+   middle half between them are between 0.5% and 25% of the frame. The upper bound leaves
+   photographs, which spread their tones across that range, on Otsu's cut. Measured middle-half
+   shares: 1.3-16% on clean, blurred, low-resolution, JPEG q35, grainy, salt-and-pepper and dim
+   text and logos and on the Arch House source; 41% on the astronaut photo, which keeps cutting at
+   101. The lower bound leaves two-level art (a 1-bit scan, a PBM: 0%) on Otsu's centred cut. Its
+   edges carry no coverage to place, and the grey of its enlargement is interpolation. On
+   two-plateau art the cut is the mid-level, rounded up (luma below it is ink).
+3. **Filled outlines only.** The mid-level applies to the filled-outline lane: Smooth and Sharp,
+   whose outline edges and counters it places (`automaticThreshold`, `cutsAtPlateauMidLevel`).
+   Centerline, and Line + fill, which binarises as Centerline does (ADR-454), read a stroke's middle
+   line, not its edges. Otsu's heavier mask keeps their thin anti-aliased strokes joined (2 px caps
+   at 45° fragmented into 71 pieces at the mid-level), so they keep Otsu's cut. Line Art's fixed
+   band is unchanged.
+4. **The supersampled grid follows the source grid.** Smooth judges two-plateau art on its source
+   grid; its 2x grid follows that verdict (`TraceOptions.sourcePlateauCut`, handed over with the
+   lighting verdict of Amendment 2) and cuts at its own plateaus' mid-level, or at Otsu's cut.
+5. The η and class contrast that the flattening fallback compares stay Otsu's own. Where the page is
+   flattened, the cut is read from the flattened luma.
+
+Measured through `traceImageToColoredPaths` (audit Q5 scenes, ink 20 on paper 245; area error
+against the glyph outlines; counters lost of 22):
+
+| Text page | Smooth before | Smooth after | Sharp before | Sharp after |
+|---|---|---|---|---|
+| clean | cut 155, +8.7%, 0 | 133, -0.4%, 0 | 144, +5.1%, 0 | 133, -2.5%, 0 |
+| blur σ 1 | 180, +40.5%, 5 | 147, +6.6%, 0 | 176, +32.9%, 3 | 143, +2.7%, 0 |
+| low-res x3 | 191, +75.0%, 15 (13 merged) | 151, +0.5%, 1 (2 merged) | 190, +69.6%, 11 | 145, -9.5%, 1 |
+| JPEG q35 | 157, +10.9%, 0 | 132, -0.7%, 0 | 148, +7.3%, 0 | 128, -2.6%, 0 |
+| grain σ 12 | 154, +9.0%, 0 | 133, -0.1%, 0 | 145, +4.9%, 0 | 128, -2.1%, 0 |
+
+Smooth's IoU against the glyphs rises on all ten Q5 text conditions (blur 0.699 to 0.839, low-res
+0.557 to 0.652). On the regression test's own render (Roboto 26 px alone, 12 counters, the
+audit's rule: a counter is lost when under half of it stays paper), σ 1 blur keeps 12 of 12 where
+Smooth kept 6 and Sharp 9, and low-res x3 keeps 7 (Smooth) and 9 (Sharp) where both kept 1. Its
+strokes never reach the ink level, so the plateau read from them is pale and the cut lands near
+158; a few small counters still close there. The six dots beside a square now trace 6 of 6 with
+Smooth on 0/255, 40/230 and 20/200 pages (cut 128 on the first).
+
+Costs, measured on the same scenes:
+
+- On the Q5 logo at low resolution (x3), the solid shapes' cores set the ink plateau, so the pale
+  20 px fine print, which never reaches the mid-level, loses 24 of 50 parts instead of 14 (holes lost
+  4 to 1). That is the behaviour of Line Art's fixed band and of plain Potrace on the same page
+  (audit Q5-P3-2 tracks pale small text separately). The other logo conditions stay within 0.006
+  IoU.
+- Sharp, which has no median, on 1% salt-and-pepper text: the black impulses pull the ink plateau to
+  0, the cut to 123, and IoU from 0.879 to 0.834. Smooth's automatic median removes the impulses
+  first (0.879 to 0.909).
+
+Tests: `trace-automatic-decisions.test.ts` (dots on three two-level pages and the reported cut;
+counters and stroke weight of blurred and low-resolution text through Smooth and Sharp);
+`background-flatten.test.ts` (the tied cut of a hand-computed histogram; anti-aliased art at its
+mid-level, two-level art and a picture on Otsu's cut, Centerline on Otsu's cut, a supplied verdict
+followed); `trace-upscale-cut-verdict.test.ts` (the 2x grid receives the source grid's verdict);
+`trace-source-decisions.test.ts`; `trace-report.test.ts` (the reported cut is the lane's automatic
+one); `crack-iso-levels.test.ts` (ADR-533's placement still moves the edge at the new cut).
+`trace-diagonal-hairline.test.ts` and the Centerline suites pass unchanged.
+
+### Amendment 2 - the lighting gate rejects tone ranges, and one verdict per trace (2026-10-28)
+
+Quality audit Q5-P2-3 (P2): on the repository's astronaut photo the gate found 45.7-47.1% paper
+cells, just under its 50% floor, and declined. Mild grain (the same N(0, σ) draw on R, G and B,
+σ 1.5-6) lifted that to 50.4-54.1% on many draws, and the gate then accepted a "paper" surface
+running from luma 1-5 to 220-224. Smooth's trace fell to IoU 0.70 against the clean photo's (121 to
+829 subpaths; Sharp 0.73), and the dialog said "Uneven lighting was evened out before the cut".
+Smooth also ran the gate twice, on the 1x detail pass and on the 2x trace pass, and only the second
+reported; on one draw the 1x pass levelled and the 2x pass did not, so the output changed while the
+dialog showed a plain threshold.
+
+Probed alternatives that did not separate the photo from paper: deciding on a 3x3 box-denoised luma
+(the clean photo then passed at 52%), and the share of each paper cell's pixels near its paper
+level (0.51-0.83 on the photo against 0.73-1.00 on the pages). The photo sits on the 50% floor by
+nature, so any cell-share rule stays a coin toss under noise.
+
+Decision (`core/trace/background-flatten.ts`):
+
+1. **A paper range, not a tone range.** Lighting dims a sheet; it does not turn it black. Flattening
+   now also needs the darkest fitted paper level to be at least a quarter of the brightest. On the
+   astronaut that ratio is 0.00-0.02 on every draw that passed the old checks, and 0.21 clean; on
+   the measured uneven pages (ADR-402's five, the same with σ 3 grain, the Q5 ramp, dim-vignette
+   and phone-photo pages, the Region Enhance ramp) it is 0.32-0.69. The ratio comes from the
+   fitted surface, so grain does not move it, and flat-fielding past it would amplify the dark
+   end's noise more than fourfold.
+2. **One verdict per trace.** `prepareTraceForContour` returns the brightness lane's verdict
+   (`lightingLevelled`). On the supersampled route, `prepareUpscaledTraceInput` hands the source
+   grid's verdict to the enlarged grid as the internal `TraceOptions.sourceLightingLevelled`.
+   `otsuBinarization` then levels exactly when the verdict says so, fitting only the surface, and
+   does not judge the interpolated pixels again. Bilinear enlargement smooths grain and adds edge
+   tones, which is why the two grids could disagree. The output and the report now come from the
+   same decision, so the dialog's "Band in use" note describes what ran. Region Enhance crops
+   (ADR-435) still judge their own grid, as before.
+
+Measured: every astronaut draw above now declines (σ 1.5, 2, 3 and 6 on seeds 7, 1234 and 99,
+per-channel σ 3, JPEG q35). Through the trace entry, against the clean photo's own trace: Smooth
+IoU 0.972-0.983 (142-181 subpaths against 134 clean), Sharp 0.967-0.983; the reported cut stays 101-102. All 16
+uneven pages above still flatten.
+
+Tests: `trace-automatic-decisions.test.ts` (the astronaut at σ 3 on two seeds and σ 1.5, Smooth and
+Sharp, IoU above 0.95 against the clean trace and no levelling report); `background-flatten.test.ts`
+(a ramp to near black is declined, a deep ramp is flattened, and a supplied verdict is followed both
+ways); `trace-upscale-cut-verdict.test.ts` (the enlarged grid receives and follows the source grid's
+verdict).

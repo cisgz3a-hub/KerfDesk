@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { shouldUseSketchTrace } from './auto-sketch-trace';
-import { otsuThreshold } from './preprocess';
+import { otsuThreshold } from './otsu-cut';
 import type { RawImageData, TraceOptions } from './trace-image';
 import { TRACE_PRESETS } from './trace-presets';
 import { resolveFrozenTraceSourceOptions } from './trace-source-decisions';
@@ -35,8 +35,9 @@ describe('resolveFrozenTraceSourceOptions (ADR-435)', () => {
 
   it('centres a cut that falls in a histogram gap', () => {
     // Levels 30 and 170 only: every cut in 31..170 splits them the same way.
+    // Otsu resolves the tie to the gap's middle itself (ADR-435 Amendment 1).
     const cut = resolveFrozenTraceSourceOptions(bimodal, preset('Sharp')).sourceOtsuThreshold;
-    expect(otsuThreshold(bimodal)).toBe(31);
+    expect(otsuThreshold(bimodal)).toBe(100);
     expect(cut).toBe(100);
     const clean = image(8, 8, (x) => (x < 4 ? [0, 0, 0, 255] : [255, 255, 255, 255]));
     expect(resolveFrozenTraceSourceOptions(clean, preset('Sharp')).sourceOtsuThreshold).toBe(128);

@@ -31,8 +31,9 @@ import { fillPinholes } from './fill-pinholes';
 import { hexToRgba } from './hex-to-rgba';
 import { smallMarkCleanupPlan } from './small-mark-policy';
 import { applyMedian } from './apply-median';
-import { despeckle, otsuThreshold } from './preprocess';
-import { levelForAutomaticThreshold } from './background-flatten';
+import { automaticThreshold } from './otsu-cut';
+import { despeckle } from './preprocess';
+import { levelForAutomaticThreshold, type AutomaticCutVerdict } from './background-flatten';
 import { adjustBrightness, adjustContrast, adjustGamma, invertImage } from './raster-prep';
 import { shouldUseSketchTrace } from './auto-sketch-trace';
 import { prepareAutomaticDetailMask } from './automatic-detail-mask';
@@ -162,6 +163,8 @@ type ContourPreparation = ReportedDetection & {
   readonly prepared: RawImageData;
   readonly crackField: CrackSubPixelField | null;
   readonly median?: ContourMedianStage;
+  /** The brightness lane's automatic-cut verdict (ADR-402 Amendments 1-2). */
+  readonly cutVerdict?: AutomaticCutVerdict;
 };
 
 export function prepareTraceForContour(
@@ -215,13 +218,17 @@ export function prepareTraceForContour(
   // explicit Cutoff/Threshold values, and a region carrying the whole
   // source's frozen cut (ADR-435) get `prepared` itself back.
   const frozenCut = options.sourceOtsuThreshold !== undefined;
-  const { source: leveled, threshold: automaticCut } = frozenCut
-    ? { source: prepared, threshold: null }
+  const level = frozenCut
+    ? { source: prepared, threshold: null, verdict: null }
     : levelForAutomaticThreshold(prepared, options);
-  const thresholded = applyThresholdWithIso(leveled, options, automaticCut);
+  const leveled = level.source;
+  const thresholded = applyThresholdWithIso(leveled, options, level.threshold);
   const field =
     thresholded.thresholdLuma === null ? null : lumaCrackField(leveled, thresholded.thresholdLuma);
-  const reported = brightnessReport(options, thresholded.thresholdLuma, leveled !== prepared);
+  const reported = {
+    ...brightnessReport(options, thresholded.thresholdLuma, leveled !== prepared),
+    ...(level.verdict === null ? {} : { cutVerdict: level.verdict }),
+  };
   if (options.faintLineRecovery === true) {
     const recovered = prepareFaintLineMask(
       thresholded.prepared,
@@ -271,7 +278,7 @@ export function crackFieldForTrace(
 
 const BACKGROUND_LUMA = 255;
 
-// `automaticCut`, when given, is otsuThreshold(prepared) already computed by
+// `automaticCut`, when given, is automaticThreshold(prepared, options) already computed by
 // levelForAutomaticThreshold; it saves a second histogram pass.
 function applyThresholdWithIso(
   prepared: RawImageData,
@@ -297,7 +304,7 @@ function applyThresholdWithIso(
     const thresholdLuma =
       frozen !== undefined && Number.isFinite(frozen)
         ? frozen
-        : (automaticCut ?? otsuThreshold(prepared));
+        : (automaticCut ?? automaticThreshold(prepared, options));
     return {
       prepared: thresholdToMonochrome(prepared, thresholdLuma),
       thresholdLuma,

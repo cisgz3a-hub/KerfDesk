@@ -29,10 +29,12 @@
 //      are excluded and the fit is repeated, so a solid ink block is bridged
 //      from the paper around it instead of being read as dark paper.
 //   3. Gate: act only when the paper surface is credible (most cells are
-//      paper and they lie on a smooth surface) and detectably non-uniform
-//      (darkest paper below a fraction of the brightest). A uniform page
-//      returns null and the caller keeps the exact historical global-Otsu
-//      path, bit for bit.
+//      paper and they lie on a smooth surface), detectably non-uniform
+//      (darkest paper below a fraction of the brightest) and a dimmed sheet
+//      rather than a tone range (darkest paper at least a quarter of the
+//      brightest). A uniform page returns null and the caller keeps the
+//      exact historical global path, bit for bit. A supersampled grid of an
+//      image the source grid already judged follows that verdict.
 //   4. Flat-field: luma × (brightest paper / local paper). The caller keeps
 //      the flattened luma only if its histogram is credibly two-class (the
 //      classes sit well apart) and flattening removes a clear share of the
@@ -47,7 +49,14 @@
 import type { RawImageData } from './trace-image';
 import type { TraceOptions } from './trace-option-types';
 import { fitSurface, type CellGrid } from './paper-surface-fit';
-import { lumaAt, otsuSeparation, otsuThreshold } from './preprocess';
+import {
+  automaticCutOf,
+  otsuSeparation,
+  usesPlateauCut,
+  type AutomaticCutLane,
+  type OtsuSeparation,
+} from './otsu-cut';
+import { lumaAt } from './preprocess';
 
 // Coarse grid: about this many cells along the long side, never smaller than
 // MIN_CELL_PX so a cell always holds a meaningful percentile sample.
@@ -76,6 +85,15 @@ const MAX_PAPER_STEP_LUMA = 12;
 // of the brightest (≈ 20 levels on white paper). JPEG noise and paper grain
 // stay far above it.
 const MAX_UNIFORM_PAPER_RATIO = 0.92;
+// Paper range (ADR-402 Amendment 2): lighting dims a sheet, it does not turn
+// it black. A "paper" surface whose darkest level is under a quarter of its
+// brightest spans most of the tone range: the smooth regions of a picture
+// joined into one, not a lit page (the astronaut photo's reaches luma 1-46
+// against 220, ratio 0.00-0.21; the measured uneven pages 0.32-0.69).
+// Flat-fielding there would also amplify the dark end's noise more than
+// fourfold. Unlike the paper-cell share, which sits at 50% on that photo
+// and flips with sensor grain, this ratio does not move with noise.
+const MIN_PAPER_LEVEL_RATIO = 0.25;
 // Fallback: flattening must remove at least this share of the histogram's
 // within-class variance (1 − η, Otsu's separability), or the global cut is
 // kept. Relative, because on dense art the ink/paper split dominates η and
@@ -107,14 +125,25 @@ export type OtsuBinarization = {
   readonly threshold: number;
   /** True when the background was flattened before thresholding. */
   readonly flattened: boolean;
+  /** True when `threshold` is the plateau mid-level (usesPlateauCut). */
+  readonly plateauCut: boolean;
+};
+
+/** The automatic cut's decisions on one grid, which an enlargement of that
+ *  grid follows (TraceOptions.sourceLightingLevelled, sourcePlateauCut). */
+export type AutomaticCutVerdict = {
+  readonly lightingLevelled: boolean;
+  readonly plateauCut: boolean;
 };
 
 export type AutomaticLevel = {
   /** The luma to threshold and to use as the sub-pixel crack field. */
   readonly source: RawImageData;
-  /** otsuThreshold(source), already computed; null when the automatic cut is
+  /** automaticThreshold(source), already computed; null when the automatic cut is
    *  not the active one (explicit Cutoff/Threshold values win). */
   readonly threshold: number | null;
+  /** What the automatic cut decided; null when it is not the active one. */
+  readonly verdict: AutomaticCutVerdict | null;
 };
 
 /** The luma the preprocessing chain should threshold: flattened when the
@@ -124,43 +153,71 @@ export type AutomaticLevel = {
  *  caller does not run a second histogram pass for it. */
 export function levelForAutomaticThreshold(
   image: RawImageData,
-  options: Pick<TraceOptions, 'cutoffLuma' | 'thresholdLuma' | 'useOtsuThreshold'>,
+  options: AutomaticCutOptions &
+    Pick<TraceOptions, 'cutoffLuma' | 'thresholdLuma' | 'useOtsuThreshold'>,
 ): AutomaticLevel {
   const automatic =
     options.useOtsuThreshold === true &&
     options.cutoffLuma === undefined &&
     options.thresholdLuma === undefined;
-  if (!automatic) return { source: image, threshold: null };
-  const { source, threshold } = otsuBinarization(image);
-  return { source, threshold };
+  if (!automatic) return { source: image, threshold: null, verdict: null };
+  const level = otsuBinarization(image, options);
+  return {
+    source: level.source,
+    threshold: level.threshold,
+    verdict: { lightingLevelled: level.flattened, plateauCut: level.plateauCut },
+  };
 }
 
-/** Automatic Otsu binarization with background flattening when, and only
- *  when, the paper is detectably uneven and flattening clearly improves the
+/** What the automatic cut reads from a trace's options: the lane, which
+ *  picks the plateau mid-level or Otsu's cut (cutsAtPlateauMidLevel), and the
+ *  source grid's verdicts for this same image, if any. */
+export type AutomaticCutOptions = AutomaticCutLane & Pick<TraceOptions, 'sourceLightingLevelled'>;
+
+/** Automatic binarization with background flattening when, and only when,
+ *  the paper is detectably uneven and flattening clearly improves the
  *  histogram's separability (see MIN_WITHIN_CLASS_REDUCTION). Otherwise
  *  `source` is the input, ref-equal, and `threshold` is exactly
- *  otsuThreshold(input). Either way `threshold` is otsuThreshold(source). */
-export function otsuBinarization(image: RawImageData): OtsuBinarization {
-  const flat = flattenAgainstPaper(image);
-  if (flat === null) return { source: image, threshold: otsuThreshold(image), flattened: false };
-  const global = otsuSeparation(image);
+ *  automaticThreshold(input, options). Either way `threshold` is
+ *  automaticThreshold(source, options).
+ *  With `sourceLightingLevelled` set, the image is levelled exactly when it is
+ *  true, without judging this grid's pixels again. */
+export function otsuBinarization(
+  image: RawImageData,
+  options: AutomaticCutOptions = {},
+): OtsuBinarization {
+  const verdict = options.sourceLightingLevelled;
+  const flat = verdict === false ? null : flattenAgainstPaper(image, verdict === true);
+  const cutOn = (
+    source: RawImageData,
+    separation: OtsuSeparation,
+    flattened: boolean,
+  ): OtsuBinarization => ({
+    source,
+    threshold: automaticCutOf(separation, options),
+    flattened,
+    plateauCut: usesPlateauCut(separation, options),
+  });
+  if (flat === null) return cutOn(image, otsuSeparation(image), false);
   const local = otsuSeparation(flat);
+  if (verdict === true) return cutOn(flat, local, true);
+  const global = otsuSeparation(image);
   const separated = local.contrast >= MIN_FLATTENED_CONTRAST;
   const residual = (1 - local.separability) / Math.max(1e-9, 1 - global.separability);
-  if (separated && residual <= 1 - MIN_WITHIN_CLASS_REDUCTION) {
-    return { source: flat, threshold: local.threshold, flattened: true };
-  }
-  return { source: image, threshold: global.threshold, flattened: false };
+  if (separated && residual <= 1 - MIN_WITHIN_CLASS_REDUCTION) return cutOn(flat, local, true);
+  return cutOn(image, global, false);
 }
 
 /** Flat-field the image against its estimated paper surface. Returns null
  *  when the paper is uniform or the paper model is not credible. The result
  *  is greyscale (R = G = B = flattened luma) with the source alpha. */
 export function flattenUnevenBackground(image: RawImageData): RawImageData | null {
-  return flattenAgainstPaper(image);
+  return flattenAgainstPaper(image, false);
 }
 
-function flattenAgainstPaper(image: RawImageData): RawImageData | null {
+// `decided`: the source grid already judged this image uneven, so only the
+// surface is fitted here (an enlarged grid has as many cells, never fewer).
+function flattenAgainstPaper(image: RawImageData, decided: boolean): RawImageData | null {
   const { width, height } = image;
   const grid = cellGrid(width, height);
   if (grid.cols < MIN_GRID_CELLS_PER_AXIS || grid.rows < MIN_GRID_CELLS_PER_AXIS) return null;
@@ -169,11 +226,21 @@ function flattenAgainstPaper(image: RawImageData): RawImageData | null {
   const paper = bootstrapPaperCells(samples, grid);
   // Cheap early exit before any fitting: the paper region's own samples are
   // already uniform (the common case, a flat scan).
-  if (isUniformPaper(samples, paper)) return null;
+  if (!decided && isUniformPaper(samples, paper)) return null;
   const surface = estimatePaperSurface(samples, paper, grid);
   const range = paperRange(surface);
-  if (range === null || range.min > range.max * MAX_UNIFORM_PAPER_RATIO) return null;
+  if (range === null || !(decided || isUnevenPaper(range))) return null;
   return flatField(image, luma, surface, range.max);
+}
+
+// The gate after fitting: a credible paper model, detectably uneven, and a
+// dimmed sheet rather than a tone range (MIN_PAPER_LEVEL_RATIO).
+function isUnevenPaper(range: PaperRange): boolean {
+  return (
+    range.credible &&
+    range.min <= range.max * MAX_UNIFORM_PAPER_RATIO &&
+    range.min >= range.max * MIN_PAPER_LEVEL_RATIO
+  );
 }
 
 function isUniformPaper(samples: Float64Array, paper: Uint8Array): boolean {
@@ -364,7 +431,15 @@ function rejectOutlierCells(
   return changed;
 }
 
-function paperRange(surface: PaperSurface): { readonly min: number; readonly max: number } | null {
+type PaperRange = {
+  readonly min: number;
+  readonly max: number;
+  /** Most cells are paper and they lie on a smooth surface. */
+  readonly credible: boolean;
+};
+
+// The fitted paper levels' range; null when no cell is paper.
+function paperRange(surface: PaperSurface): PaperRange | null {
   let count = 0;
   let min = Infinity;
   let max = -Infinity;
@@ -375,9 +450,11 @@ function paperRange(surface: PaperSurface): { readonly min: number; readonly max
     if (v < min) min = v;
     if (v > max) max = v;
   }
-  if (count < surface.level.length * MIN_PAPER_CELL_FRACTION) return null;
-  if (surface.noise > MAX_PAPER_NOISE_LUMA) return null;
-  return { min, max };
+  if (count === 0) return null;
+  const credible =
+    count >= surface.level.length * MIN_PAPER_CELL_FRACTION &&
+    surface.noise <= MAX_PAPER_NOISE_LUMA;
+  return { min, max, credible };
 }
 
 // luma × (reference paper / local paper), with the paper surface bilinearly

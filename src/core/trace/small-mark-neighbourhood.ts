@@ -21,8 +21,13 @@
 //     needs a bridge to stay, whatever its size under the candidate cap.
 //   * Support. A mark under the lone-mark floor stays only when its nearest
 //     neighbour is a LIKE mark (another small mark: stipple, a dotted row,
-//     small text) rather than a stroke. Specks closer to a stroke than to
-//     any like mark are the stroke's halo (toner scatter, spatter).
+//     small text) rather than a stroke, or when it is about as wide as the
+//     stroke it faces (a tittle, a full stop). Specks closer to a stroke than
+//     to any like mark and finer than it are the stroke's halo (toner
+//     scatter, spatter).
+//   * Coverage. Sub-floor debris is sized by the ink a speck carries, as the
+//     policy's floor is, so an anti-aliased dot that the floor keeps is not
+//     counted as dust against itself.
 //
 // Everything is in source pixels scaled to the mask grid. Labelling is one
 // linear pass; each query is bounded by a constant window (candidates are
@@ -56,6 +61,9 @@ export type InkNeighbourhoodInput = {
   /** How far a component's darkest pixel gets from paper to the ink tone,
    *  as a fraction of the span (1 without a grey field). */
   readonly reach: (pixels: ReadonlyArray<number>) => number;
+  /** The ink a component carries, in mask px (its pixel count without a grey
+   *  field): the size the floor judges, as the policy's own floor does. */
+  readonly coverage: (pixels: ReadonlyArray<number>) => number;
   /** Mask px: size floor, lone-mark floor, like-mark ceiling; support radius. */
   readonly minArea: number;
   readonly isolatedMinArea: number;
@@ -70,8 +78,16 @@ export type InkNeighbourhood = {
   /** Unbridged dark debris in the region's tile and the eight around it. */
   readonly debrisAround: (region: ReadonlyArray<number>) => number;
   /** Nearest like mark and nearest stroke, edge to edge (Infinity: none
-   *  within the support radius). */
-  readonly support: (region: ReadonlyArray<number>) => { like: number; stroke: number };
+   *  within the support radius), and that stroke's local width (mask px). */
+  readonly support: (region: ReadonlyArray<number>) => Support;
+};
+
+export type Support = {
+  readonly like: number;
+  readonly stroke: number;
+  /** The stroke's width where the mark faces it (mask px; see localWidth);
+   *  Infinity without a stroke. */
+  readonly strokeWidth: number;
 };
 
 type Box = { readonly x0: number; readonly y0: number; readonly x1: number; readonly y1: number };
@@ -94,11 +110,11 @@ export function createInkNeighbourhood(input: InkNeighbourhoodInput): InkNeighbo
     const label = labelOf(component[0] ?? 0);
     const own = (p: number): boolean => labelOf(p) === label;
     const darkness = input.reach(component);
-    const isDebris =
-      component.length < input.minArea
-        ? darkness >= AUTO_HARD_SPECK_REACH
-        : darkness >= AUTO_DARK_SPECK_REACH &&
-          !hasInkWithin(boundingBox(component, width), own, input, reach, input.supportPx);
+    const subFloor = component.length < input.minArea && input.coverage(component) < input.minArea;
+    const isDebris = subFloor
+      ? darkness >= AUTO_HARD_SPECK_REACH
+      : darkness >= AUTO_DARK_SPECK_REACH &&
+        !hasInkWithin(boundingBox(component, width), own, input, reach, input.supportPx);
     if (!isDebris || bridgedFrom(component, own)) continue;
     const p = component[0] ?? 0;
     const x = p % width;
@@ -124,10 +140,11 @@ export function createInkNeighbourhood(input: InkNeighbourhoodInput): InkNeighbo
     },
     support: (region) => {
       const members = new Set(region);
-      return nearestSupport(boundingBox(region, width), members, input, reach, (p) => {
+      const kind = (p: number): 'like' | 'stroke' | null => {
         const area = areas[labelOf(p)] ?? 0;
         return area < input.minArea ? null : area < input.likeMaxArea ? 'like' : 'stroke';
-      });
+      };
+      return nearestSupport(boundingBox(region, width), members, input, reach, kind, labelOf);
     },
   };
 }
@@ -274,15 +291,74 @@ function nearestSupport(
   input: InkNeighbourhoodInput,
   reach: number,
   kind: (p: number) => 'like' | 'stroke' | null,
-): { like: number; stroke: number } {
+  label: (p: number) => number,
+): Support {
   const best = { like: Number.POSITIVE_INFINITY, stroke: Number.POSITIVE_INFINITY };
+  let strokePixel = -1;
   scanWindow(box, input, reach, input.supportPx, (p, gap) => {
     if (members.has(p)) return false;
     const k = kind(p);
-    if (k !== null && gap < best[k]) best[k] = gap;
+    if (k === null || gap >= best[k]) return false;
+    best[k] = gap;
+    if (k === 'stroke') strokePixel = p;
     return false;
   });
-  return best;
+  const strokeWidth =
+    strokePixel < 0 ? Number.POSITIVE_INFINITY : localWidth(strokePixel, input, label);
+  return { ...best, strokeWidth };
+}
+
+// A stroke's width near its pixel p: the thinnest ink run through each pixel
+// of p's own component within half the support radius of p, widest wins.
+// Runs through an edge, a corner or a tip cut across the stroke at a slant
+// or one pixel deep; a pixel on the stroke's middle line, which lies within
+// half a width of p, spans it. Widths past the search window read as its
+// span (2r + 1).
+function localWidth(p: number, input: InkNeighbourhoodInput, label: (q: number) => number): number {
+  const { width, height, ink } = input;
+  const radius = Math.max(1, Math.round(input.supportPx / 2));
+  const cap = 2 * radius + 1;
+  const own = label(p);
+  const x = p % width;
+  const y = (p - x) / width;
+  let widest = 0;
+  for (let ny = Math.max(0, y - radius); ny <= Math.min(height - 1, y + radius); ny += 1) {
+    for (let nx = Math.max(0, x - radius); nx <= Math.min(width - 1, x + radius); nx += 1) {
+      const q = ny * width + nx;
+      if (ink[q] === 1 && label(q) === own) widest = Math.max(widest, thinnestRun(q, input, cap));
+    }
+  }
+  return widest;
+}
+
+const RUN_DIRECTIONS = [
+  [1, 0],
+  [0, 1],
+  [1, 1],
+  [1, -1],
+] as const;
+
+// Shortest ink run through p over the four directions, in mask px (diagonal
+// steps count √2), each run capped at `cap` steps so the cost stays a
+// constant window.
+function thinnestRun(p: number, input: InkNeighbourhoodInput, cap: number): number {
+  const { width, height, ink } = input;
+  const x = p % width;
+  const y = (p - x) / width;
+  let thinnest = Number.POSITIVE_INFINITY;
+  for (const [dx, dy] of RUN_DIRECTIONS) {
+    let run = 1;
+    for (const sign of [1, -1]) {
+      for (let step = 1; run < cap; step += 1) {
+        const nx = x + sign * step * dx;
+        const ny = y + sign * step * dy;
+        if (nx < 0 || ny < 0 || nx >= width || ny >= height || ink[ny * width + nx] !== 1) break;
+        run += 1;
+      }
+    }
+    thinnest = Math.min(thinnest, run * Math.hypot(dx, dy));
+  }
+  return thinnest;
 }
 
 // Visit every ink pixel whose edge gap to the box is within radius; stop

@@ -50,5 +50,6 @@ export {
 // Phase E.2 preprocessing primitives. Exposed so tests + future UI
 // (e.g. an "Advanced" trace dialog showing the auto-computed Otsu
 // threshold) can call them directly. Each is pure-core.
-export { despeckle, medianFilter, otsuThreshold } from './preprocess';
+export { otsuThreshold } from './otsu-cut';
+export { despeckle, medianFilter } from './preprocess';
 export { adjustBrightness, adjustContrast, adjustGamma, invertImage } from './raster-prep';
