@@ -102,7 +102,7 @@ export const NOT_YET_ON_A_MACHINE = [
   {
     icon: 'drill',
     title: 'CNC carving',
-    body: 'The CNC tools, touch-plate probing included, have been tested in software only and haven’t run on a real router. Air-cut before you cut material.',
+    body: 'The CNC tools are tested in software. Informal cuts on a Neotronics 4040 weren’t a recorded test, and touch-plate probing hasn’t run on a machine at all. Air-cut before you cut material.',
     status: 'shipped-code-and-tests',
   },
   {

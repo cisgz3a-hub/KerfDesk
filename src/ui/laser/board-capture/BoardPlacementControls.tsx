@@ -23,7 +23,7 @@ export function BoardPlacementControls(props: {
   readonly verification: BoardVerificationController;
   readonly onReset: () => void;
 }): JSX.Element {
-  const { canAlign, canFit, alignToBox, fitToBoard, arrayToBoard, removeBoard } =
+  const { canAlign, canFit, canArray, alignToBox, fitToBoard, arrayToBoard, removeBoard } =
     useBoardPlacement();
   return (
     <div style={columnStyle}>
@@ -46,7 +46,12 @@ export function BoardPlacementControls(props: {
           </Button>
         ))}
       </AnchorRow>
-      <FillBoardControls canFit={canFit} onFit={fitToBoard} onArray={arrayToBoard} />
+      <FillBoardControls
+        canFit={canFit}
+        canArray={canArray}
+        onFit={fitToBoard}
+        onArray={arrayToBoard}
+      />
       <BoardVerificationControls
         geometry={props.geometry}
         disabled={props.disabled}
@@ -83,13 +88,14 @@ function boardSessionIsLocked(verification: BoardVerificationController): boolea
 
 export function FillBoardControls(props: {
   readonly canFit: boolean;
+  readonly canArray: boolean;
   readonly onFit: (options: BoardFitOptions) => void;
   readonly onArray: (layout: TileLayout) => void;
 }): JSX.Element {
   return (
     <>
       <BoardFitControls disabled={!props.canFit} onFit={props.onFit} />
-      <BoardArrayForm disabled={!props.canFit} onArray={props.onArray} />
+      <BoardArrayForm disabled={!props.canArray} onArray={props.onArray} />
     </>
   );
 }

@@ -4756,20 +4756,34 @@ Set origin here again. It is a warning; Frame and Start are not refused (ADR-375
     way (`M8`, then `M9` after the last operation; the `M8` repeats of
     step 13 switch nothing), the pump must still be running through the middle
     operation and the last one, and Job Review must name the held
-    operation and `$152=100` (ADR-345: Creality's Falcon A1 parameter
-    page defines `$152` as the standby wait, so `100` keeps the pump
-    powered and `0` idles it immediately; the A1 Pro page does not list
-    it). Send `$152=100` from the Console while Idle: on the Falcon
-    command set it accepts `$150`, `$151` and `$152` (whole numbers
-    0-100) and still refuses every other numeric setting write
-    (ADR-370). The write clears the Frame proof, so Frame again before
-    Start. Untick "Air restart" and the same job must
+    operation. What else it names depends on the firmware (ADR-370
+    Amendment 1):
+    - **Falcon A1 Pro preset (grblHAL).** Job Review names an air test
+      on updated firmware, not `$152=100`, and its standby advisory says
+      that `$150`-`$152` set the motor microsteps on that firmware. The
+      Console refuses `$150`, `$151` and `$152`, naming the X, Y or Z
+      microstep setting, and every other numeric setting write. Do not
+      send them from another program either: on a build with the
+      Trinamic plugin, a power-of-two value changes how far that motor
+      moves.
+    - **Falcon on a stock-GRBL profile (the A1's numbering).** Job
+      Review names `$152=100` (ADR-345: Creality's Falcon A1 parameter
+      page defines `$152` as the standby wait, so `100` keeps the pump
+      powered and `0` idles it immediately). Send `$152=100` from the
+      Console while Idle: on this command set it accepts `$150`, `$151`
+      and `$152` (whole numbers 0-100) and still refuses every other
+      numeric setting write (ADR-370). It refuses them too when the
+      controller greets as grblHAL. The write clears the Frame proof, so
+      Frame again before Start.
+
+    Untick "Air restart" and the same job must
     go back to `M8 M9 M8 M9`. If the pump is audibly off for the last
     operation with the box ticked, the hold is not working; if it is
     off only with the box unticked, the firmware timer is confirmed.
 13. **Qualify air repeats on the installed firmware (ADR-462).** In a
-    separately supervised air check, record the firmware and current
-    `$152` setting. With "Air restart" ticked, inspect a short-block job
+    separately supervised air check, record the firmware and, on a
+    stock-GRBL Falcon, the current `$152` setting (the A1 Pro's
+    contract cannot read it). With "Air restart" ticked, inspect a short-block job
     of a minute or more with Air on: the program attempts `M8` repeats
     at eligible movement boundaries after about 5 s of estimated time.
     Observe whether the pump stays on and whether the enclosure fan
@@ -4777,8 +4791,9 @@ Set origin here again. It is a warning; Frame and Start are not refused (ADR-375
     dwells and continuous M3 cutting can exceed the trigger without a
     repeat, so this mitigation does not guarantee continuous air.
     Compare with "Air restart" unticked, which emits one `M8` for an
-    all-Air-on job. If air still stops, keep the firmware/`$152=100`
-    remedy from step 12 and verify it separately. Do not treat a pass
+    all-Air-on job. If air still stops, keep the remedy from step 12
+    (firmware, plus `$152=100` on a stock-GRBL Falcon only) and verify
+    it separately. Do not treat a pass
     on short blocks as qualification of every job or firmware version.
 
 When this checklist passes on the Falcon, replace the F.3 status in `PROJECT.md` Phase F
@@ -4973,11 +4988,16 @@ selected.
    spacing, or turn off **Same X / Y spacing** for independent gaps. The live
    footprint diagram and count show the exact draft before it is applied.
 4. **Array on board** → copies tile the board, the block centered, as one undo
-   step. Copies inherit the design's layer/settings.
+   step. Copies inherit the design's layer/settings. A photo's mask (Apply Mask to Image) and a
+   path text's guide move with the design, and every copy gets its own, so each tile burns the
+   whole masked photo (ADR-633 Amendment 3). A board used as the mask stays put.
 5. Undo restores the single design. After arraying, the whole grid is selected, so Array/Fit disable until you undo (or reselect one design) - this stops a re-click from silently stacking a doubled burn.
 
 **Edge / empty / error.** No board, or zero/several designs selected → both
-controls are disabled ("Select exactly one design…"). A design larger than the
+controls are disabled ("Select exactly one design…"). A photo selected with its own mask, or a
+path text with its guide, is one design for **Array on board**; **Fit to board** still takes the
+photo alone. Job Review names a masked photo that lies on only part of its mask, with how much,
+as well as one that misses it. A design larger than the
 usable board produces zero copies and leaves the scene unchanged. A fixed count
 that does not fit shows the fitting count alongside the request. A runaway count
 (huge rows, or a tiny design under "fit as many as fit") is capped at 100 per
@@ -6359,7 +6379,10 @@ and lifts the command's CNC-only gate.)*
    probed. Until the last bit's file has run, Set and Reset origin and the XYZ corner probe are
    refused as in an `M0` hold; Zero Z and the Z probe stay open. The machine panel says which
    bit ran and offers **End bit sequence** for starting over on new stock. A new controller
-   session ends it too.
+   session ends it too. When Abort, an alarm, a reset or a rejected line stopped a file before
+   its end, the panel says that bit's file did not finish: keep the same bit, Zero Z or probe
+   again, and run that file again from its start. The X/Y hold stays, the last bit's included,
+   until the file has run (ADR-392 Amendment 6).
 5. On a profile whose controller cannot run KerfDesk CNC jobs, saving the package gives the
    GRBL-family warning Save as gives, and the printed sheet carries it (ADR-399 Amendment 1).
 6. Save as of a multi-bit job writes one file with an `M0` per bit change and adds a note saying

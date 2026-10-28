@@ -18,6 +18,7 @@ import type { BoardVerificationController } from './use-board-verification';
 const placement = vi.hoisted(() => ({
   canAlign: true,
   canFit: true,
+  canArray: true,
   alignToBox: vi.fn(),
   fitToBoard: vi.fn(),
   arrayToBoard: vi.fn(),
@@ -53,6 +54,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   placement.canAlign = true;
   placement.canFit = true;
+  placement.canArray = true;
   useLaserStore.setState({ motionOperation: null });
   host = document.createElement('div');
   document.body.appendChild(host);

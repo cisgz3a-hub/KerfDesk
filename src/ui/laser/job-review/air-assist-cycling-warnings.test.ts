@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../../core/devices';
+import { FALCON_A1_PRO_GRBLHAL_PROFILE } from '../../../core/devices/falcon-profiles';
 import type { Job } from '../../../core/job';
 import { grblStrategy } from '../../../core/output/grbl-strategy';
 import { createLayer } from '../../../core/scene';
@@ -37,6 +38,8 @@ function namedLayer(id: string, name: string) {
   return { ...createLayer({ id, color: '#000000' }), name };
 }
 
+const { controllerCommandSet: _dropped, ...LEGACY_FALCON } = FALCON_A1_PRO_GRBLHAL_PROFILE;
+
 const UNRELIABLE = {
   ...DEFAULT_DEVICE_PROFILE,
   airAssistCommand: 'M8',
@@ -71,7 +74,8 @@ describe('detectAirAssistCyclingWarnings (ADR-335)', () => {
   });
 
   it('names the bridged operation and the controller setting that removes the hold', () => {
-    const warnings = detectAirAssistCyclingWarnings(sandwichJob(), UNRELIABLE, [
+    const falconOnGrbl = { ...UNRELIABLE, machineFamily: 'creality-falcon' };
+    const warnings = detectAirAssistCyclingWarnings(sandwichJob(), falconOnGrbl, [
       namedLayer('b', 'Score lines'),
     ]);
 
@@ -80,6 +84,16 @@ describe('detectAirAssistCyclingWarnings (ADR-335)', () => {
     expect(warnings[0]).toContain('$152=100');
     expect(warnings[0]).not.toContain('$152=0');
     expect(warnings[0]).toContain('Air assist stays on');
+  });
+
+  // Rolling audit v5 J8-P3-2 (ADR-370 Amendment 1): $152 is the Falcon A1's
+  // standby setting only in stock-GRBL numbering.
+  it('names an air test, not $152, on the Falcon A1 Pro and on other machines', () => {
+    for (const device of [FALCON_A1_PRO_GRBLHAL_PROFILE, LEGACY_FALCON, UNRELIABLE]) {
+      const [warning] = detectAirAssistCyclingWarnings(sandwichJob(), device);
+      expect(warning).toContain('once an air test shows the installed firmware restarting');
+      expect(warning).not.toContain('$152');
+    }
   });
 
   it('falls back to the operation id when the layers are not supplied', () => {
