@@ -18,6 +18,7 @@
 import { describe, expect, it } from 'vitest';
 import { dither } from '../../core/raster/dither';
 import type { DitherAlgorithm } from '../../core/scene';
+import { PHOTO_DITHERS } from '../../ui/raster/photo-engraving-settings';
 import { ciBudgetMs } from '../ci-budget';
 import { flatFieldTexture, type TextureMeasure } from './dither-texture-spectrum';
 
@@ -25,13 +26,21 @@ const BUDGET_MS = ciBudgetMs(30_000, 90_000);
 const GREYS = Array.from({ length: 15 }, (_, i) => 16 * (i + 1)); // 16 … 240
 const ONE_THIRD_TONES = [84, 172];
 
+// Each spectrum is measured once and shared by the tests below.
+const measured = new Map<string, TextureMeasure>();
+
 function texture(algorithm: DitherAlgorithm, gray: number): TextureMeasure {
-  return flatFieldTexture(gray, (level, size) =>
+  const key = `${algorithm}:${gray}`;
+  const known = measured.get(key);
+  if (known !== undefined) return known;
+  const measure = flatFieldTexture(gray, (level, size) =>
     dither(
       { luma: new Uint8Array(size * size).fill(level), width: size, height: size },
       { algorithm, sMax: 1 },
     ),
   );
+  measured.set(key, measure);
+  return measure;
 }
 
 function wantedFraction(gray: number): number {
@@ -83,6 +92,23 @@ describe('dither texture on flat greys', () => {
           );
         }
       }
+    },
+    BUDGET_MS,
+  );
+
+  // Quality audit Q3-P3-4: the Photo engraving window lists its dithers
+  // "smoothest first" (ADR-649 Amendment 1). Here, Blue Noise 0.19,
+  // Floyd–Steinberg 0.21, Stucki 0.40 and Jarvis 0.56 in total.
+  it(
+    'the Photo engraving list runs from least to most low-frequency texture',
+    () => {
+      const totals = PHOTO_DITHERS.map((algorithm) =>
+        GREYS.reduce((sum, gray) => sum + texture(algorithm, gray).lowFrequencyShare, 0),
+      );
+      totals.slice(1).forEach((total, i) => {
+        const order = `${PHOTO_DITHERS[i + 1]} after ${PHOTO_DITHERS[i]}`;
+        expect(total, order).toBeGreaterThan(totals[i] ?? 0);
+      });
     },
     BUDGET_MS,
   );

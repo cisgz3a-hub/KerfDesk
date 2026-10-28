@@ -162,11 +162,14 @@ export type GcodeMetadata = {
 // ADR-492 Amd 1 burns a Pass-Through image turned off its scan rows at its own
 // pixel size, not its pixel count stretched over the turned box; carries
 // forward v34 above.
+// ADR-649 Amd 1 keeps Blue Noise off pure white and on pure black, so a mask's
+// outside never burns; v36 belongs to open PRs #1490 and #1491; carries
+// forward v35 above.
 // ADR-239 Amd 2 leaves every constant-power (M3) contour on the 4040-safe
 // profile by a laser-off exit runway after its last burn point, so 4040 Line
 // output gains one `G1 ... S0` move per contour and a contour-exit comment;
-// carries forward v35 above.
-export const EMITTER_REVISION = 'm3-contour-exit-runway-20261028-v36';
+// carries forward v37 above (v38 belongs to open PR #1490).
+export const EMITTER_REVISION = 'm3-contour-exit-runway-20261028-v39';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

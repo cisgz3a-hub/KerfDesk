@@ -16,15 +16,28 @@
 // next file's CNC Frame refuses until Zero Z or a probe sets the new bit's zero. While later bits of the set remain, X/Y origin
 // writers are refused as in a hold. The set ends when its last file has run,
 // when the controller session ends, or when the operator ends it.
+//
+// A file that stopped before its end has not run: the operator runs it again
+// with the same bit, on the same X/Y origin, so the set holds even when it was
+// the last bit, and the panel says so instead of naming the next bit (rolling
+// audit v5 J9-P3-1, ADR-392 Amendment 6).
 
 import type { KerfDeskBitFile } from '../../core/external-program/kerfdesk-bit-file';
 import type { LaserState } from './laser-store';
 
+/** A per-bit file whose run has ended while its set still holds. */
+export type BitFileSequenceStep = KerfDeskBitFile & {
+  /** False when Abort, an alarm, a reset or a rejected line stopped the file
+   * before its end, so it is to be run again with the same bit. */
+  readonly finished: boolean;
+};
+
 export type BitFileSequenceState = {
   /** The per-bit file an external run is streaming. */
   readonly bitFileRun?: KerfDeskBitFile | null;
-  /** The last per-bit file that ran while later bits of its set remain. */
-  readonly bitFileSequence?: KerfDeskBitFile | null;
+  /** The last per-bit file that ran while later bits of its set remain, or
+   * that stopped before its end. */
+  readonly bitFileSequence?: BitFileSequenceStep | null;
 };
 
 /** Installed with every stream: an external per-bit file, or none. */
@@ -37,13 +50,15 @@ export function bitFileRunStartPatch(
 /** Applied where the streamer is released: a per-bit file's Work Z belongs to
  * its bit, and a set with later bits holds its X/Y origin. */
 export function bitFileRunEndPatch(
-  state: Pick<LaserState, 'workZReferenceEpoch'> & BitFileSequenceState,
+  state: Pick<LaserState, 'workZReferenceEpoch' | 'streamer'> & BitFileSequenceState,
 ): Partial<LaserState> {
   const run = state.bitFileRun;
   if (run === null || run === undefined) return {};
+  // Only a streamer that sent and settled its last line ran the whole file.
+  const finished = state.streamer?.status === 'done';
   return {
     bitFileRun: null,
-    bitFileSequence: run.order < run.count ? run : null,
+    bitFileSequence: !finished || run.order < run.count ? { ...run, finished } : null,
     workZZeroEvidence: null,
     workZReferenceEpoch: state.workZReferenceEpoch + 1,
   };
@@ -55,11 +70,15 @@ export const END_BIT_SEQUENCE_LABEL = 'End bit sequence';
 export function bitFileSequenceXyOriginBlockMessage(state: BitFileSequenceState): string | null {
   const ran = state.bitFileSequence;
   if (ran === null || ran === undefined) return null;
+  const bit = `Bit ${ran.order} of ${ran.count} (${ran.bitName})`;
+  const sharedBy = ran.finished
+    ? `${bit} ran on this X/Y origin, and the files for the later bits must cut on the same one.`
+    : `${bit} stopped on this X/Y origin before its file finished, and running that file again` +
+      `${ran.order < ran.count ? ' and the files for the later bits' : ''} must cut on the same one.`;
   return (
-    `Bit ${ran.order} of ${ran.count} (${ran.bitName}) ran on this X/Y origin, and the files ` +
-    'for the later bits must cut on the same one. Set or Reset origin and the XYZ corner probe ' +
-    `wait until bit ${ran.count}'s file has run; use the Z probe or Zero Z for the new bit. To ` +
-    `start over on new stock instead, choose ${END_BIT_SEQUENCE_LABEL} under Job.`
+    `${sharedBy} Set or Reset origin and the XYZ corner probe wait until bit ${ran.count}'s ` +
+    `file has run; use the Z probe or Zero Z for the ${ran.finished ? 'new ' : ''}bit. To start ` +
+    `over on new stock instead, choose ${END_BIT_SEQUENCE_LABEL} under Job.`
   );
 }
 
@@ -67,9 +86,18 @@ export function bitFileSequenceXyOriginBlockMessage(state: BitFileSequenceState)
 export function bitFileSequenceNotice(state: BitFileSequenceState): string | null {
   const ran = state.bitFileSequence;
   if (ran === null || ran === undefined) return null;
+  const xyHolds = 'The X/Y origin stays where it is until the last bit has run.';
+  if (!ran.finished) {
+    return (
+      `Bit ${ran.order} of ${ran.count} (${ran.bitName}) stopped before its file finished. ` +
+      `Keep bit ${ran.order} in, Zero Z on the stock top or probe it, then run bit ` +
+      `${ran.order}'s file again from its start: Work Z from the stopped run no longer applies. ` +
+      xyHolds
+    );
+  }
   return (
     `Bit ${ran.order} of ${ran.count} (${ran.bitName}) has run. Change to bit ${ran.order + 1}, ` +
     'then Zero Z on the stock top or probe it before its file: Work Z from the last bit no ' +
-    'longer applies. The X/Y origin stays where it is until the last bit has run.'
+    `longer applies. ${xyHolds}`
   );
 }

@@ -50,7 +50,7 @@ exit is GRBL's documented M3 advice, applied where KerfDesk already applies GRBL
 5. Preview (`buildToolpath`), timing (which times the emitted program) and the Frame motion
    envelope (`computeJobMotionBounds`) include the exit. The envelope takes each pass's own last
    edge, so an overcut or a lead-out on the final pass moves it.
-6. The emitter revision is bumped (v36).
+6. The emitter revision is bumped (v39; v36 was given up when the PR took main in after v37).
 
 ### Consequences
 

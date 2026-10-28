@@ -15,6 +15,7 @@ import { newlyIntroducedProFeature } from '../licensing/pro-operation-policy';
 import { proFeaturesUnlocked } from '../licensing/edition';
 import { withUndoStepName } from '../state/undo-step-names';
 import { historyProjection } from './authoring-projections';
+import { historyMachineNoticeFields } from './history-machine-notice';
 import { editableArtwork, expandedArtworkGroupIds, validateTransforms } from './transforms';
 import { publicIdentifier, selectedIds } from './projections';
 import { RemoteFault } from './fault';
@@ -214,5 +215,8 @@ export function applyHistory(state: AppState, store: RemoteAppStore, action: 'un
   const changedIds = [...new Set([...before.keys(), ...after.keys()])].filter(
     (id) => before.get(id) !== after.get(id),
   );
-  return authoringReceipt(next, changedIds);
+  return {
+    ...authoringReceipt(next, changedIds),
+    ...historyMachineNoticeFields(state, next, action),
+  };
 }

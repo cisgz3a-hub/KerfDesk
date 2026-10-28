@@ -143,7 +143,7 @@ function DraftCapture(
 }
 
 function OutlineLayout(): JSX.Element {
-  const { canFit, fitToBoard, arrayToBoard } = useBoardPlacement();
+  const { canFit, canArray, fitToBoard, arrayToBoard } = useBoardPlacement();
   return (
     <>
       <p style={hintStyle}>
@@ -151,7 +151,7 @@ function OutlineLayout(): JSX.Element {
         repeat it on the board.
       </p>
       <BoardFitControls disabled={!canFit} onFit={fitToBoard} />
-      <BoardArrayForm disabled={!canFit} onArray={arrayToBoard} />
+      <BoardArrayForm disabled={!canArray} onArray={arrayToBoard} />
     </>
   );
 }

@@ -204,7 +204,7 @@ export const CNC_FAQ = [
     id: 'cnc-tested',
     question: 'Has KerfDesk cut on a real router?',
     answer:
-      'Not yet. The CNC features are covered by automated tests, but none has cut material on a real machine, and touch-plate probing hasn’t been tried on real hardware either. Check the output in a separate G-code viewer and run an air cut before you cut material.',
+      'Only informally. The CNC features are covered by automated tests, and KerfDesk has made informal cuts on a Neotronics 4040. Those cuts weren’t a recorded test, and they don’t show that every feature cuts correctly. Touch-plate probing hasn’t been tried on real hardware. Check the output in a separate G-code viewer and run an air cut before you cut material.',
   },
   {
     id: 'cnc-other-sender',

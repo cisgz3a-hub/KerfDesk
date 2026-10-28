@@ -41,7 +41,7 @@ function laserAssumptions(
 
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
-    expect(EMITTER_REVISION).toBe('m3-contour-exit-runway-20261028-v36');
+    expect(EMITTER_REVISION).toBe('m3-contour-exit-runway-20261028-v39');
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {
