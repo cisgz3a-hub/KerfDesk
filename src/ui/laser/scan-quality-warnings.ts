@@ -105,7 +105,7 @@ function dotWidthWarning(group: RasterGroup, label: string): string | null {
       : `leaves only ${formatMm(remaining)} mm of a one-pixel powered run, which can disappear when coordinates are rounded`;
   return (
     `${label} has ${formatMm(pitch)} mm pixels along the scan. Dot Width Correction shortens ` +
-    `each end by ${formatMm(correction)} mm and ${effect}. ` +
+    `each end of a burned line by ${formatMm(correction)} mm and ${effect}. ` +
     'Lower Dot Width Correction or confirm the corrected output with a detail test; ' +
     'the source image alone does not show this loss.'
   );

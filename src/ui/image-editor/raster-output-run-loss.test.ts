@@ -24,14 +24,33 @@ function group(values: ReadonlyArray<number>, overrides: Partial<RasterGroup> = 
 }
 
 describe('rasterOutputRunLoss', () => {
-  it('splits adjacent pixels by exact S before evaluating full removal', () => {
+  it('keeps adjacent grayscale powers that share one burned line (ADR-458 Amendment 1)', () => {
     expect(
       rasterOutputRunLoss(group([1000, 608]), {
         shouldCaptureMask: true,
       }),
     ).toEqual({
-      mask: { width: 2, height: 1, alpha: Uint8Array.of(255, 255) },
-      pixels: 2,
+      mask: null,
+      pixels: 0,
+    });
+  });
+
+  it('marks the exact-power run an end trim consumes, not the rest of its line', () => {
+    expect(
+      rasterOutputRunLoss(group([1000, 608, 608, 0, 500]), {
+        shouldCaptureMask: true,
+      }),
+    ).toEqual({
+      mask: { width: 5, height: 1, alpha: Uint8Array.of(0, 0, 0, 0, 255) },
+      pixels: 1,
+    });
+    expect(
+      rasterOutputRunLoss(group([1000, 608, 608], { dotWidthCorrectionMm: 1.25 }), {
+        shouldCaptureMask: true,
+      }),
+    ).toEqual({
+      mask: { width: 3, height: 1, alpha: Uint8Array.of(255, 0, 0) },
+      pixels: 1,
     });
   });
 

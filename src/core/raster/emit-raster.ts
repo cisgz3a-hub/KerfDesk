@@ -79,8 +79,10 @@ export type EmitRasterInput = {
   // Distance to overshoot at each row end, in mm. 5 mm is a typical
   // default for diode lasers; higher feeds want more. 0 disables.
   readonly overscanMm: number;
-  // LightBurn-style image Dot Width Correction. Shortens non-zero scan runs
-  // at both ends to compensate for beam thickness. 0 disables.
+  // LightBurn-style image Dot Width Correction. Shortens each burned line
+  // (consecutive non-zero runs) at both ends, where the beam turns on and off,
+  // to compensate for beam thickness; power changes inside a line are not
+  // trimmed (ADR-458 Amendment 1). 0 disables.
   readonly dotWidthCorrectionMm?: number;
   // ADR-052 bidirectional scan-lag compensation. Applied to reverse rows only.
   readonly scanOffsetMm?: number;
