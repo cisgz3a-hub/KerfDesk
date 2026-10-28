@@ -13,7 +13,7 @@ export function OutlineBoardPlacementControls(props: {
   readonly verification: BoardVerificationController;
   readonly onReset: () => void;
 }): JSX.Element {
-  const { canFit, fitToBoard, arrayToBoard, removeBoard } = useBoardPlacement();
+  const { canFit, canArray, fitToBoard, arrayToBoard, removeBoard } = useBoardPlacement();
   const registration = outlineRegistration(props.geometry);
   const checked = props.geometry.measured.length;
   return (
@@ -29,7 +29,7 @@ export function OutlineBoardPlacementControls(props: {
       )}
       <p style={hintStyle}>Add your artwork, select it, then fit or repeat it inside the board.</p>
       <BoardFitControls disabled={!canFit} onFit={fitToBoard} />
-      <BoardArrayForm disabled={!canFit} onArray={arrayToBoard} />
+      <BoardArrayForm disabled={!canArray} onArray={arrayToBoard} />
       <BoardVerificationControls
         geometry={props.geometry}
         disabled={props.disabled}
