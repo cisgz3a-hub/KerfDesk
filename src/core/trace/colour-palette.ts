@@ -9,7 +9,10 @@
 //     the colours around them, not colours of their own, so pixels whose
 //     4-neighbours differ visibly count a tenth as much when choosing an
 //     automatic palette (the observation Kopf & Lischinski 2011 make for
-//     pixel art).
+//     pixel art);
+//   - a mixture lies on the sRGB segment between two colours, so a cluster
+//     with little flat area that lies on no such segment, far from every
+//     other colour, is thin ink rather than a mixture (ADR-461 Amendment 3).
 //
 // Pure core: deterministic, no clock, no random, no I/O.
 
@@ -19,10 +22,17 @@ import type { RawImageData } from './trace-image';
 /** Clustering weight of a pixel whose 4-neighbours differ visibly. */
 export const NON_FLAT_WEIGHT = 0.1;
 // Automatic count: cluster at most this many, then merge colours closer than
-// AUTO_MERGE_DE and dissolve clusters below AUTO_MIN_SHARE of the flat area.
+// AUTO_MERGE_DE and dissolve clusters below AUTO_MIN_SHARE of the flat area
+// unless they are distinct thin ink (see distinctLowFlatColours).
 const AUTO_MAX_COLOURS = 8;
 export const AUTO_MERGE_DE = 0.08;
 const AUTO_MIN_SHARE = 0.002;
+// A colour with too little flat area is still kept when it lies this far, in
+// sRGB bytes, from every flat-area colour and is no blend of two others: thin
+// ink whose pixels JPEG, blur or grain left barely flat. sRGB rather than OKLab,
+// because JPEG and grain noise are even in sRGB bytes while OKLab stretches
+// the darks (bytes 0 and 30 are 0.23 apart there, a JPEG overshoot of black).
+const DISTINCT_SRGB = 64;
 // An automatic colour lying between two others needs this much flat area.
 const AUTO_BETWEEN_MAX_SHARE = 0.03;
 // A requested count only merges true duplicates.
@@ -31,6 +41,9 @@ const LLOYD_MAX_ITERATIONS = 40;
 // A colour counts as a mixture of colours a and b when, in sRGB, it lies
 // within this fraction of |ab| from the segment ab (see isMixtureOf).
 const BETWEEN_RESIDUAL_FRACTION = 0.3;
+// A colour lying darker than that segment by more than this fraction of |ab|,
+// along the grey axis, is no edge mixture (see isEdgeBlendOf).
+const BLEND_DARKER_FRACTION = 0.1;
 const HISTOGRAM_BINS = 32768;
 
 type Histogram = {
@@ -39,6 +52,8 @@ type Histogram = {
   readonly w: Float64Array;
   /** Flat-pixel count per bin (evidence of a real colour area). */
   readonly flat: Float64Array;
+  /** Pixel count per bin. */
+  readonly n: Float64Array;
   readonly L: Float64Array;
   readonly a: Float64Array;
   readonly b: Float64Array;
@@ -53,6 +68,7 @@ function colourHistogram(
   const bins = {
     w: new Float64Array(HISTOGRAM_BINS),
     flat: new Float64Array(HISTOGRAM_BINS),
+    n: new Float64Array(HISTOGRAM_BINS),
     L: new Float64Array(HISTOGRAM_BINS),
     a: new Float64Array(HISTOGRAM_BINS),
     b: new Float64Array(HISTOGRAM_BINS),
@@ -72,6 +88,7 @@ function colourHistogram(
 type HistogramBins = {
   readonly w: Float64Array;
   readonly flat: Float64Array;
+  readonly n: Float64Array;
   readonly L: Float64Array;
   readonly a: Float64Array;
   readonly b: Float64Array;
@@ -90,6 +107,7 @@ function addToBin(
   const v = srgbToOkLab(r, g, b);
   bins.w[key] = (bins.w[key] as number) + w;
   if (pixel.flat) bins.flat[key] = (bins.flat[key] as number) + 1;
+  bins.n[key] = (bins.n[key] as number) + 1;
   bins.L[key] = (bins.L[key] as number) + w * v[0];
   bins.a[key] = (bins.a[key] as number) + w * v[1];
   bins.b[key] = (bins.b[key] as number) + w * v[2];
@@ -100,6 +118,7 @@ function compactHistogram(bins: HistogramBins): Histogram {
   for (let k = 0; k < HISTOGRAM_BINS; k += 1) if ((bins.w[k] as number) > 0) count += 1;
   const w = new Float64Array(count);
   const flat = new Float64Array(count);
+  const n = new Float64Array(count);
   const L = new Float64Array(count);
   const a = new Float64Array(count);
   const b = new Float64Array(count);
@@ -109,12 +128,13 @@ function compactHistogram(bins: HistogramBins): Histogram {
     if (bw <= 0) continue;
     w[j] = bw;
     flat[j] = bins.flat[k] as number;
+    n[j] = bins.n[k] as number;
     L[j] = (bins.L[k] as number) / bw;
     a[j] = (bins.a[k] as number) / bw;
     b[j] = (bins.b[k] as number) / bw;
     j += 1;
   }
-  return { count, w, flat, L, a, b };
+  return { count, w, flat, n, L, a, b };
 }
 
 export type Centre = { L: number; a: number; b: number; w: number };
@@ -151,17 +171,9 @@ export function choosePalette(
 }
 
 function keepFlatAreaColours(hist: Histogram, centres: ReadonlyArray<Centre>): Centre[] {
-  const flat = new Float64Array(centres.length);
-  let total = 0;
-  for (let i = 0; i < hist.count; i += 1) {
-    const f = hist.flat[i] as number;
-    if (f <= 0) continue;
-    const c = nearestCentre(hist, i, centres);
-    flat[c] = (flat[c] as number) + f;
-    total += f;
-  }
-  if (total <= 0) return [...centres];
-  const share = (c: number): number => (flat[c] as number) / total;
+  const area = clusterAreas(hist, centres);
+  if (area.flatTotal <= 0) return [...centres];
+  const share = (c: number): number => (area.flat[c] as number) / area.flatTotal;
   const kept = centres.map((_, c) => c).filter((c) => share(c) >= AUTO_MIN_SHARE);
   // Dissolve in-between colours from the least flat area up, judged against
   // the colours still kept.
@@ -178,17 +190,102 @@ function keepFlatAreaColours(hist: Histogram, centres: ReadonlyArray<Centre>): C
     )
       alive.delete(c);
   }
-  const result = centres.filter((_, c) => alive.has(c));
+  const ink = distinctLowFlatColours(centres, area, kept);
+  const result = centres.filter((_, c) => alive.has(c) || ink.includes(c));
   return result.length > 0 ? result : [...centres];
 }
 
-function liesBetween(c: Centre, others: ReadonlyArray<Centre>): boolean {
+type ClusterAreas = {
+  /** Flat pixels per centre, and over every centre. */
+  readonly flat: Float64Array;
+  readonly flatTotal: number;
+  /** Every opaque pixel per centre, and over every centre. */
+  readonly pixels: Float64Array;
+  readonly pixelTotal: number;
+};
+
+function clusterAreas(hist: Histogram, centres: ReadonlyArray<Centre>): ClusterAreas {
+  const flat = new Float64Array(centres.length);
+  const pixels = new Float64Array(centres.length);
+  let flatTotal = 0;
+  let pixelTotal = 0;
+  for (let i = 0; i < hist.count; i += 1) {
+    const c = nearestCentre(hist, i, centres);
+    const f = hist.flat[i] as number;
+    const n = hist.n[i] as number;
+    flat[c] = (flat[c] as number) + f;
+    pixels[c] = (pixels[c] as number) + n;
+    flatTotal += f;
+    pixelTotal += n;
+  }
+  return { flat, flatTotal, pixels, pixelTotal };
+}
+
+// Clusters under the flat-area floor that are colours of their own all the
+// same (ADR-461 Amendment 3): thin ink (text, hairlines) after JPEG, a slight
+// blur or grain has almost no flat pixels, yet it is no mixture. A candidate
+// covers AUTO_MIN_SHARE of the image counting every pixel and lies at least
+// DISTINCT_SRGB from every flat-area colour (closer, it is a shade of one: a
+// JPEG overshoot, grain piled up at black). It is kept when it is no edge
+// blend of two colours among the flat-area ones and the other candidates: a
+// blurred stroke's ramp is a blend of the stroke's core and the paper, so the
+// core is kept and the ramp is not (see isEdgeBlendOf). Rescued colours skip
+// the in-between dissolve: that tests a symmetric tube, while thin ink is told
+// from a blend by lying darker.
+function distinctLowFlatColours(
+  centres: ReadonlyArray<Centre>,
+  area: ClusterAreas,
+  flatKept: ReadonlyArray<number>,
+): number[] {
+  const srgb = centres.map(srgbCentre);
+  const candidates = centres
+    .map((_, c) => c)
+    .filter(
+      (c) =>
+        !flatKept.includes(c) &&
+        (area.pixels[c] as number) >= AUTO_MIN_SHARE * area.pixelTotal &&
+        flatKept.every(
+          (k) => centreCentreDistSq(srgb[c] as Centre, srgb[k] as Centre) >= DISTINCT_SRGB ** 2,
+        ),
+    );
+  const ends = [...flatKept, ...candidates];
+  return candidates.filter(
+    (c) =>
+      !liesBetween(
+        centres[c] as Centre,
+        ends.filter((o) => o !== c).map((o) => centres[o] as Centre),
+        isEdgeBlendOf,
+      ),
+  );
+}
+
+function liesBetween(
+  c: Centre,
+  others: ReadonlyArray<Centre>,
+  mixture: (m: Centre, a: Centre, b: Centre) => boolean = isMixtureOf,
+): boolean {
   for (let i = 0; i < others.length; i += 1) {
     for (let j = i + 1; j < others.length; j += 1) {
-      if (isMixtureOf(c, others[i] as Centre, others[j] as Centre)) return true;
+      if (mixture(c, others[i] as Centre, others[j] as Centre)) return true;
     }
   }
   return false;
+}
+
+/** An isMixtureOf colour that is also no darker than the sRGB segment ab.
+ *  An edge blends a and b in sRGB (on the segment) or in linear light, which
+ *  is lighter (sRGB encoding is concave), so no edge mixture lies clearly
+ *  darker than the segment. A blurred thin stroke's grey can still fall in a
+ *  long segment's tube (a dark grey sits within 0.3 |ab| of red-to-blue). */
+function isEdgeBlendOf(m: Centre, a: Centre, b: Centre): boolean {
+  if (!isMixtureOf(m, a, b)) return false;
+  const sm = srgbCentre(m);
+  const sa = srgbCentre(a);
+  const sb = srgbCentre(b);
+  const { t, length } = projectOnto(sm, sa, sb);
+  const along = (p: number, q: number, v: number): number => p + t * (q - p) - v;
+  const darker = along(sa.L, sb.L, sm.L) + along(sa.a, sb.a, sm.a) + along(sa.b, sb.b, sm.b);
+  return darker / Math.sqrt(3) <= BLEND_DARKER_FRACTION * length;
 }
 
 /** True when colour m looks like an edge mixture of a and b. Anti-aliasing

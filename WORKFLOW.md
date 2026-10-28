@@ -4140,13 +4140,15 @@ settings and Job Review keep their existing read-only setup references.
    halftone treatment; Image mode also offers grayscale and dithered photo engraving.
    **Colour layers** splits flat-colour artwork into a few colours (**Colours**: Auto or 2 to 8,
    counting the paper) and traces one filled layer per colour; neighbouring colours share one
-   edge with no gap or overlap (ADR-461). **Cut-out** burns each colour only in its own area;
-   **Stacked** also fills each colour under the darker colours above it. The paper colour is left
-   untraced unless **Trace background colour** is ticked; only a light border colour counts as
-   paper, so light-on-dark art traces every colour. The swatches show the traced colours,
-   lightest first. On commit each colour gets its own operation; on a laser each starts at a power
-   set by its darkness (a mid-dark or darker colour keeps the operation's power), which the
-   operator can edit. Paper (near-white, or the traced background) starts with output off.
+   edge with no gap or overlap (ADR-461). On Auto, a distinct thin colour such as small text keeps
+   its own layer even after JPEG, a slight blur or grain (ADR-461 Amendment 3). **Cut-out** burns
+   each colour only in its own area; **Stacked** also fills each colour under the darker colours
+   above it. The paper colour is left untraced unless **Trace background colour** is ticked; only
+   a light border colour counts as paper, so light-on-dark art traces every colour. The swatches
+   show the traced colours, lightest first. On commit each colour gets its own operation; on a
+   laser each starts at a power set by its darkness (a mid-dark or darker colour keeps the
+   operation's power), which the operator can edit. Paper (near-white, or the traced background)
+   starts with output off.
    For line artwork, choose **Detection** explicitly: the preset's automatic detection, a **Manual brightness band**,
    **Faint lines (keep solid areas)**, or **Sketch (local contrast)**. Faint lines adds coherent
    pale strokes to the preset's solid ink while rejecting isolated pale specks. Sketch uses
