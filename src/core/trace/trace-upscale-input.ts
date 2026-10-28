@@ -40,6 +40,7 @@ export function prepareUpscaledTraceInput(
     pixelScale: factor,
     ...(reuseCleanedEdge ? reusedEdgeSourceOptions(edgeInput) : {}),
     ...(luma?.options ?? {}),
+    ...sourceCutVerdict(image, options, contourInput),
   };
   const enlarged = upscaleToWorkingGrid(
     reuseCleanedEdge ? edgeInput.source : (luma?.source ?? image),
@@ -59,6 +60,28 @@ export function prepareUpscaledTraceInput(
       contourInput !== undefined && preparedInput !== undefined
         ? restoreEnlargedContourSupport(contourInput, preparedInput, factor)
         : preparedInput,
+  };
+}
+
+// The source grid already judged this image's automatic cut: whether to level
+// its lighting (ADR-402 Amendment 2) and whether it is two-plateau art cut at
+// the plateaus' mid-level (Amendment 1). Bilinear enlargement smooths grain
+// and turns the edges of two-level art into grey, so the enlarged grid could
+// judge the same page differently; it follows the source grid instead, and
+// the one verdict both shapes the trace and is what it reports.
+function sourceCutVerdict(
+  image: RawImageData,
+  options: TraceOptions,
+  contourInput: ContourTraceInput | undefined,
+): Partial<TraceOptions> {
+  if (contourInput === undefined || !contourTraceInputMatches(contourInput, image, options)) {
+    return {};
+  }
+  const verdict = contourInput.cutVerdict;
+  if (verdict === undefined) return {};
+  return {
+    sourceLightingLevelled: verdict.lightingLevelled,
+    sourcePlateauCut: verdict.plateauCut,
   };
 }
 

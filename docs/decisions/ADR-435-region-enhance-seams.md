@@ -143,3 +143,22 @@ lighting ramp above no longer inks the dark paper and there is no single global 
 image would be flattened, and each pass levels its own grid; when the cut is frozen, the
 brightness path skips leveling and uses it directly. The ramp test now compares the patch with
 the full 2x pass (IoU >= 0.99 for Sharp, Smooth and Centerline) instead of a fixed global cut.
+
+### Amendment 1 - the frozen cut is the full pass's automatic cut (2026-10-28)
+
+ADR-402 Amendment 1 changes the automatic cut itself: a tied Otsu maximum now resolves to the middle
+of its empty stretch, and two-plateau art cuts at the plateaus' mid-level. Quality audit Q4-P1-1
+noted that this decision's frozen cut already put a clean black-on-white image at 128 while the
+dialog's own full pass cut it at 1, so Region Enhance and the full trace judged the same pixels
+differently.
+
+`resolveFrozenTraceSourceOptions` now freezes the cut `otsuBinarization` hands the full pass's
+source grid for the trace's own lane (when it does not flatten), and `sourceOtsuThreshold` returns
+`automaticThreshold` of the same chain. The gap-centring helper this decision added
+(`centredOtsuCut`) is gone: Otsu centres a gap on a source grid itself, with the same result (a
+30/170 image freezes at 100, a 0/255 image at 128). The frozen cut is the source grid's automatic
+cut again, now including the plateau mid-level on filled outlines; Centerline and Line + fill
+freeze Otsu's cut, as their full pass uses.
+
+Tests: `trace-source-decisions.test.ts` (the gap cut is Otsu's own and the frozen one);
+`region-enhance-seams.test.ts` (unchanged and passing).

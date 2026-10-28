@@ -9,7 +9,10 @@
 // separates the two classes on measured art (numbers: ADR-434):
 //
 //   1. Size floor. Marks under AUTO_MIN_MARK_AREA_PX source px² are dropped
-//      (holes filled): a 1-2 px² mark is not a shape a laser can render.
+//      (holes filled): a 1-2 px² mark is not a shape a laser can render. An
+//      ink mark's size is the ink it carries (its pixels' coverage), which
+//      an anti-aliased dot keeps on an enlarged grid where its pixels past
+//      the cut shrink.
 //   2. Tone, from the pre-threshold luma, against the image's own ink and
 //      paper tones (medians of mask ink and mask paper; span = paper − ink).
 //      A genuine mark is drawn in the drawing's ink; noise is faint. A mark
@@ -31,7 +34,9 @@
 //      AUTO_ISOLATED_MARK_MIN_AREA_PX stays only if its nearest neighbour
 //      within AUTO_SUPPORT_RADIUS_PX is another small (like) mark rather
 //      than a stroke (stipple, dotted rows and small text versus toner
-//      scatter in a stroke's halo). A paper hole is enclosed by ink by
+//      scatter in a stroke's halo), or if it is about as wide as that
+//      stroke (a tittle or a full stop, drawn with the letter's own pen;
+//      scatter is finer than its stroke). A paper hole is enclosed by ink by
 //      construction, so these tests are ink-only.
 //
 // Without a grey field (alpha masks) nothing is bridged and every speck
@@ -78,6 +83,14 @@ export const AUTO_MIN_CONTRAST_FRACTION = 0.3;
 /** Unbridged dark debris in a mark's 3x3 debris tiles that marks the area
  *  as dusty. */
 export const AUTO_DUST_MIN_DEBRIS = 1;
+/** A mark nearer a stroke than any like mark stays when its width (the
+ *  diameter of a disc of its area) is at least this fraction of that
+ *  stroke's width where it faces the mark (ADR-434 Amendment 2): a tittle or
+ *  a full stop is drawn with the letter's own pen, toner scatter is finer
+ *  than the stroke it surrounds. Measured: 268 marks of Roboto text at
+ *  20-28 px, 1-bit and anti-aliased, 0.75 and up; the toner probe's 2x2
+ *  specks beside a 5 px stroke 0.45. */
+export const AUTO_PEN_WIDTH_FRACTION = 0.6;
 
 // A span narrower than this is treated as this wide: below it the image has
 // no reliable ink/paper separation to normalise against.
@@ -197,6 +210,10 @@ export function createSmallMarkClassifier(input: SmallMarkClassifierInput): Smal
     current += 1;
     for (const p of pixels) stamp[p] = current;
   };
+  const inkCoverage = (region: ReadonlyArray<number>, ink: Uint8Array): number =>
+    field === null || tones === null
+      ? region.length
+      : coverageOf(region, ink, field, tones, geometry);
   // Built on first use (a hole-only plan never needs it). `ink` is the
   // pre-erasure mask despeckle hands every judgement; it is the same array
   // each time.
@@ -210,6 +227,7 @@ export function createSmallMarkClassifier(input: SmallMarkClassifierInput): Smal
       bridgeLuma: tones === null ? null : tones.paper - AUTO_BRIDGE_FRACTION * tones.span,
       reach: (pixels) =>
         field === null || tones === null ? 1 : reachOf(pixels, field, width, tones) / tones.span,
+      coverage: (pixels) => inkCoverage(pixels, ink),
       minArea,
       isolatedMinArea,
       likeMaxArea: AUTO_LIKE_MARK_MAX_AREA_PX * areaScale,
@@ -222,7 +240,7 @@ export function createSmallMarkClassifier(input: SmallMarkClassifierInput): Smal
   return {
     inkCandidateAreaPx: AUTO_CANDIDATE_AREA_PX * areaScale,
     keepInkMark: (region, ink) => {
-      if (region.length < minArea) return false;
+      if (region.length < minArea && inkCoverage(region, ink) < minArea) return false;
       mark(region);
       if (field !== null && tones !== null) {
         const e = extremes(region, field, geometry, 'ink');
@@ -235,7 +253,11 @@ export function createSmallMarkClassifier(input: SmallMarkClassifierInput): Smal
       if (around.debrisAround(region) >= AUTO_DUST_MIN_DEBRIS) return false;
       if (region.length >= isolatedMinArea) return true;
       const support = around.support(region);
-      return support.like <= supportPx && support.like <= support.stroke;
+      if (support.like <= supportPx && support.like <= support.stroke) return true;
+      return (
+        support.stroke <= supportPx &&
+        discDiameter(region.length) >= AUTO_PEN_WIDTH_FRACTION * support.strokeWidth
+      );
     },
     fillPaperHole: (component) => {
       if (component.length < minArea) return true;
@@ -245,6 +267,41 @@ export function createSmallMarkClassifier(input: SmallMarkClassifierInput): Smal
       return !toneIsGenuine(e.value - tones.ink, e.value - e.cut, e.value - e.ring, tones);
     },
   };
+}
+
+// Diameter of the disc with this area: a compact mark's width.
+function discDiameter(area: number): number {
+  return 2 * Math.sqrt(area / Math.PI);
+}
+
+// The ink a region carries, in mask px: each pixel's coverage, (paper − luma)
+// / span clamped to [0, 1], over the region and the paper pixels of its ring
+// (other ink is left out). An anti-aliased dot keeps its area through any cut
+// or bilinear enlargement; its thresholded pixel count does not (4-5 px² full
+// stops count 2.3-2.8 source px² on the 3x small-source grid).
+function coverageOf(
+  region: ReadonlyArray<number>,
+  ink: Uint8Array,
+  field: CrackSubPixelField,
+  tones: Tones,
+  g: Pick<Geometry, 'width' | 'height' | 'ringPx'>,
+): number {
+  const own = new Set(region);
+  const seen = new Set<number>();
+  let coverage = 0;
+  for (const p of region) {
+    const x = p % g.width;
+    const y = (p - x) / g.width;
+    for (let ny = Math.max(0, y - g.ringPx); ny <= Math.min(g.height - 1, y + g.ringPx); ny += 1) {
+      for (let nx = Math.max(0, x - g.ringPx); nx <= Math.min(g.width - 1, x + g.ringPx); nx += 1) {
+        const q = ny * g.width + nx;
+        if (seen.has(q) || (ink[q] === 1 && !own.has(q))) continue;
+        seen.add(q);
+        coverage += Math.min(1, Math.max(0, (tones.paper - field.lumaAt(nx, ny)) / tones.span));
+      }
+    }
+  }
+  return coverage;
 }
 
 type Tones = { readonly ink: number; readonly paper: number; readonly span: number };

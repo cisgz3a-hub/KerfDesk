@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { otsuBinarization } from './background-flatten';
-import { otsuThreshold } from './preprocess';
+import { automaticThreshold, otsuThreshold } from './otsu-cut';
 import { prepareTraceForContour, type RawImageData, type TraceOptions } from './trace-image';
 import { TRACE_PRESETS } from './trace-presets';
 import type { TraceReport, TraceSteps } from './trace-steps';
@@ -10,12 +10,12 @@ const SHARP = TRACE_PRESETS['Sharp']!;
 const LINE_ART = TRACE_PRESETS['Line Art']!;
 
 describe('trace reports what automatic detection chose', () => {
-  it('reports the Otsu threshold, and the band ending one level lower selects the same ink', () => {
+  it('reports the automatic threshold, and the band ending one level lower selects the same ink', () => {
     const image = rampImage();
     const { prepared, report } = prepareTraceForContour(image, SHARP);
-    const automatic = otsuThreshold(image);
+    const automatic = automaticThreshold(image);
     expect(report).toEqual({ automaticThresholdLuma: automatic });
-    // The manual band is inclusive; Otsu keeps only pixels darker than its cut.
+    // The manual band is inclusive; the automatic cut keeps only pixels darker than it.
     const manual = (upper: number): TraceOptions => ({
       ...SHARP,
       useOtsuThreshold: false,
@@ -57,7 +57,7 @@ describe('trace reports what automatic detection chose', () => {
   it('keeps reporting the threshold when Faint lines replaces the colour check', () => {
     const image = rampImage([40, 90, 200]);
     expect(prepareTraceForContour(image, { ...SHARP, faintLineRecovery: true }).report).toEqual({
-      automaticThresholdLuma: otsuThreshold(image),
+      automaticThresholdLuma: automaticThreshold(image),
     });
     expect(
       prepareTraceForContour(image, { ...LINE_ART, faintLineRecovery: true }).report,
@@ -68,7 +68,7 @@ describe('trace reports what automatic detection chose', () => {
     const image = rampImage();
     const { reports, run } = reportingRunner();
     const paths = await traceImageToColoredPaths(image, SHARP, run);
-    expect(reports).toEqual([{ automaticThresholdLuma: otsuThreshold(image) }]);
+    expect(reports).toEqual([{ automaticThresholdLuma: automaticThreshold(image) }]);
     expect(paths).toEqual(await traceImageToColoredPaths(image, SHARP));
   });
 
@@ -79,7 +79,9 @@ describe('trace reports what automatic detection chose', () => {
       const preset = TRACE_PRESETS[name]!;
       const { reports, run } = reportingRunner();
       const paths = await traceImageToColoredPaths(image, preset, run);
+      // These lanes keep Otsu's cut (cutsAtPlateauMidLevel).
       expect(reports).toEqual([{ automaticThresholdLuma: otsuThreshold(image) }]);
+      expect(automaticThreshold(image, preset)).toBe(otsuThreshold(image));
       expect(paths).toEqual(await traceImageToColoredPaths(image, preset));
     },
   );

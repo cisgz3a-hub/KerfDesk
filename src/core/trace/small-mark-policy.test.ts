@@ -238,6 +238,35 @@ describe('automatic small-mark policy (Line Art and Smooth default)', () => {
     expect(components(preprocessForTrace(image, LINE_ART))).toBe(1);
   });
 
+  // ADR-434 Amendment 2. A tittle or a full stop sits nearer its letter's
+  // stroke than any like mark, as halo scatter does, but it is drawn with the
+  // letter's own pen; the scatter above is finer than its stroke (0.45).
+  it('keeps a mark as wide as the stroke beside it, and not one much finer', () => {
+    const draw = (strokeWidth: number): RawImageData => {
+      const g = page(60, 50);
+      paint(g, 20, 14, strokeWidth, 30, 0); // a letter's stem
+      paint(g, 20, 9, 3, 2, 0); // a 6 px² tittle 3 px above it
+      return rgba(g);
+    };
+    expect(inkCount(preprocessForTrace(draw(3), LINE_ART), 20, 9, 3, 2)).toBe(6);
+    expect(inkCount(preprocessForTrace(draw(5), LINE_ART), 20, 9, 3, 2)).toBe(0);
+  });
+
+  it('judges the size floor on the ink a mark carries, not its pixels past the cut', () => {
+    // An anti-aliased full stop: two pixels past the cut and a grey rim that
+    // carries the rest of its ink. The same two pixels with no rim are a
+    // 2 px² speck under the floor.
+    const draw = (rim: number): RawImageData => {
+      const g = page(60, 50);
+      paint(g, 10, 10, 2, 30, 0); // the stroke beside it
+      paint(g, 13, 37, 4, 3, rim);
+      paint(g, 14, 38, 2, 1, 0);
+      return rgba(g);
+    };
+    expect(inkCount(preprocessForTrace(draw(170), LINE_ART), 14, 38, 2, 1)).toBe(2);
+    expect(inkCount(preprocessForTrace(draw(255), LINE_ART), 14, 38, 2, 1)).toBe(0);
+  });
+
   it('removes a dark dust cluster of mixed-size specks', () => {
     const random = seeded(3);
     const g = page(80, 80);
