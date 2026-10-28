@@ -156,10 +156,12 @@ describe('first FluidNC network Connect setup recovery', () => {
     expect(link.target).toHaveBeenCalledExactlyOnceWith('192.0.2.5', 23, 'grblhal-raw');
     expect(useLaserStore.getState().activeControllerKind).toBe('grblhal');
     expect(controlsText()).toContain('Network target: 192.0.2.5:23');
-    expect(controlsText()).not.toMatch(/Try other speeds|baud|Background streaming/);
+    expect(controlsText()).not.toMatch(/Try other speeds|baud/);
     await act(async () => button('Try again').click());
     expect(open).toHaveBeenCalledTimes(2);
-    for (const [request] of open.mock.calls) expect(request).not.toHaveProperty('hostedStreaming');
+    // A worker streams the session (ADR-675), with GRBL's acknowledgements.
+    for (const [request] of open.mock.calls)
+      expect(request).toMatchObject({ hostedStreaming: true, hostedAcknowledgements: 'grbl' });
     expect(link.usbRequest).not.toHaveBeenCalled();
   });
 
@@ -189,9 +191,7 @@ describe('first FluidNC network Connect setup recovery', () => {
     expect(document.querySelector('[role="dialog"][aria-label="Machine details"]')).toBeNull();
     expect(useMachineSetupDialogStore.getState().state.kind).toBe('open');
     expect(controlsText()).toContain('Network target: 192.0.2.5:23');
-    expect(controlsText()).not.toMatch(
-      /Use a different port|Try other speeds|baud|Background streaming/,
-    );
+    expect(controlsText()).not.toMatch(/Use a different port|Try other speeds|baud/);
     expect(document.querySelector('[aria-label="Serial baud rate"]')).toBeNull();
     expect(
       document.querySelector(
@@ -228,21 +228,31 @@ describe('first FluidNC network Connect setup recovery', () => {
     expect(link.tcpRequest).toHaveBeenCalledTimes(3);
   });
 
-  it('keeps network retries on the window transport despite a saved worker preference', async () => {
-    const link = testPlatform();
-    const open = vi.fn(async (_request: SerialOpenRequest) => {
-      throw new Error('Captured TCP open');
-    });
-    link.tcpRequest.mockResolvedValue({ open });
-    useStore.setState({
-      project: createProject({ ...fluidNcProfile, workerHostedStreaming: true }),
-    });
-    await renderFirstNetworkConnect(link.platform);
-    await act(async () => button('Try again').click());
-    expect(open).toHaveBeenCalledTimes(2);
-    for (const [request] of open.mock.calls) expect(request).not.toHaveProperty('hostedStreaming');
-    expect(link.usbRequest).not.toHaveBeenCalled();
-  });
+  // Rolling audit v6 K1-P1-3: network sessions streamed only from the window,
+  // so a busy window left an M3 beam on over a stopped head (ADR-675).
+  it.each([
+    [true, { hostedStreaming: true, hostedAcknowledgements: 'grbl' }],
+    [false, {}],
+  ] as const)(
+    'network retries follow the saved worker preference (%s)',
+    async (workerHostedStreaming, expected) => {
+      const link = testPlatform();
+      const open = vi.fn(async (_request: SerialOpenRequest) => {
+        throw new Error('Captured TCP open');
+      });
+      link.tcpRequest.mockResolvedValue({ open });
+      useStore.setState({
+        project: createProject({ ...fluidNcProfile, workerHostedStreaming }),
+      });
+      await renderFirstNetworkConnect(link.platform);
+      await act(async () => button('Try again').click());
+      expect(open).toHaveBeenCalledTimes(2);
+      for (const [request] of open.mock.calls) {
+        expect(request).toEqual({ baudRate: expect.any(Number), ...expected });
+      }
+      expect(link.usbRequest).not.toHaveBeenCalled();
+    },
+  );
 
   it('retains safe reads and explicit disconnect on a connected FluidNC target', async () => {
     const link = testPlatform();

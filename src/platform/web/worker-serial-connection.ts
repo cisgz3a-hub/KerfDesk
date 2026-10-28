@@ -18,7 +18,7 @@
 // handed streams, announces its own cleanup, and closes its port before it
 // acknowledges `close`.
 
-import type { HostedStreamRefill, SerialConnection } from '../types';
+import type { HostedStreamAcks, HostedStreamRefill, SerialConnection } from '../types';
 import { createWorkerRefillHandover } from './worker-refill-handover';
 import { portStreamsReleased, settleWithin } from './worker-teardown-waits';
 import {
@@ -94,6 +94,8 @@ export function createWorkerSerialConnection(args: {
   readonly timeoutMs?: number;
   /** A native worker already owns the port; start its reader after subscribing. */
   readonly start?: () => void;
+  /** The controller's acknowledgement grammar for the refill (ADR-675). */
+  readonly acks?: HostedStreamAcks;
 }): SerialConnection {
   const link: Link = {
     bridge: args.bridge,
@@ -127,6 +129,7 @@ export function createWorkerSerialConnection(args: {
     timeoutMs: link.timeoutMs,
     onWriteError: (handler) => subscribe(session.writeErrorSubs, handler),
     fail,
+    ...(args.acks === undefined ? {} : { acks: args.acks }),
   });
   link.unsubscribeClosing =
     link.bridge.onClosing?.(() => endSessionInBackground(link)) ?? link.unsubscribeClosing;

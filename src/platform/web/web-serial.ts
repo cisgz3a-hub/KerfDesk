@@ -122,6 +122,7 @@ function makePortRef(port: SerialPort): SerialPortRef {
         const hosted = await tryOpenNativeSerialConnection({
           port,
           options: { baudRate: req.baudRate, bufferSize: SERIAL_BUFFER_BYTES },
+          ...(req.hostedAcknowledgements === undefined ? {} : { acks: req.hostedAcknowledgements }),
         });
         if (hosted !== null) return hosted;
       }

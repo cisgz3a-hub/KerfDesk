@@ -18,6 +18,11 @@
 // It also holds the run's program, which crossed once as transferred buffers
 // (ADR-354 Amendment 3). Every arm names that program and carries only the
 // position, so a Resume or tool-change Continue does not send the job again.
+//
+// Each arm also names the acknowledgement grammar: GRBL's, or Marlin's
+// ping-pong `ok` (ADR-675). A Marlin stream has no realtime bytes, so any line
+// the main thread writes while it is armed is a stop, cleanup or console line.
+// The refill retires before that write goes out, as it does for GRBL's reset.
 
 import type { StreamerState } from '../../core/controllers/grbl';
 // Deep import: the grbl barrel is at its public-export ratchet.
@@ -26,6 +31,11 @@ import { classifyResponse } from '../../core/controllers/grbl/response';
 import { detectControllerFromBanner } from '../../core/controllers/detect-controller';
 import { RT_SOFT_RESET } from '../../core/controllers/grbl/commands';
 import { isTerminal } from '../../core/controllers/grbl/streamer';
+import {
+  marlinLineStopsHostedRefill,
+  marlinTerminalAck,
+} from '../../core/controllers/marlin/hosted-refill';
+import type { HostedStreamAcks } from '../types';
 import { closeWriterBounded } from './bounded-writer-close';
 import { decodeProgramLines } from './serial-program-buffer';
 import {
@@ -65,6 +75,8 @@ type WorkerState = {
   reader: ReadableStreamDefaultReader<Uint8Array> | null;
   writer: WritableStreamDefaultWriter<Uint8Array> | null;
   streamer: StreamerState | null;
+  /** The armed stream's acknowledgement grammar. */
+  acks: HostedStreamAcks;
   program: HeldProgram | null;
   loop: Promise<void> | null;
   barrier: Promise<void> | null;
@@ -84,6 +96,7 @@ export function createSerialWorkerCore(deps: SerialWorkerCoreDeps): SerialWorker
     reader: null,
     writer: null,
     streamer: null,
+    acks: 'grbl',
     program: null,
     loop: null,
     barrier: null,
@@ -160,7 +173,9 @@ function write(
 ): void {
   // Disconnect and write-failure containment can reset without waiting
   // for release. A reset invalidates this queue before its banner arrives.
-  if (request.data.includes(RT_SOFT_RESET) && state.streamer !== null) {
+  // Marlin has no reset byte: its stop lines retire the queue the same way.
+  const retires = state.acks === 'marlin' || request.data.includes(RT_SOFT_RESET);
+  if (retires && state.streamer !== null) {
     stopRefill(state);
     deps.post({ kind: 'refill-stopped' });
   }
@@ -191,6 +206,7 @@ function adopt(
   const program = state.program;
   if (program?.id === request.programId) {
     state.streamer = { ...request.position, queued: program.lines };
+    state.acks = request.acks ?? 'grbl';
     deps.post({ kind: 'armed', id: request.id });
   } else {
     stopRefill(state);
@@ -236,10 +252,13 @@ async function writeBytes(state: WorkerState, data: string): Promise<void> {
 }
 
 function handleLine(state: WorkerState, deps: SerialWorkerCoreDeps, line: string): void {
-  const invalidated = state.streamer !== null && invalidatesRefill(line);
+  const invalidated = state.streamer !== null && invalidatesRefill(state.acks, line);
   if (invalidated) stopRefill(state);
   if (state.streamer !== null) {
-    const pumped = pumpInboundLine(state.streamer, line);
+    const pumped =
+      state.acks === 'marlin'
+        ? pumpInboundLine(state.streamer, line, marlinTerminalAck)
+        : pumpInboundLine(state.streamer, line);
     state.streamer = pumped.streamer;
     if (pumped.toSend !== '') {
       void writeBytes(state, pumped.toSend).catch((error: unknown) => {
@@ -257,7 +276,8 @@ function handleLine(state: WorkerState, deps: SerialWorkerCoreDeps, line: string
   if (invalidated) deps.post({ kind: 'refill-stopped' });
 }
 
-function invalidatesRefill(line: string): boolean {
+function invalidatesRefill(acks: HostedStreamAcks, line: string): boolean {
+  if (acks === 'marlin') return marlinLineStopsHostedRefill(line);
   const response = classifyResponse(line);
   if (response.kind === 'status') {
     return (

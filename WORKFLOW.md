@@ -1982,25 +1982,38 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    the network form and review recovery. To switch to USB, explicitly choose **Use a different
    port…**. Cancelling the picker retains the network choice. Forget Controller or app restart
    clears the session-only routing hint; no address is saved.
-5. These unencrypted services belong on a trusted local network. Keep the app open and responsive;
-   TCP streaming is not hosted in a background worker. A successful socket is not controller or
+5. These unencrypted services belong on a trusted local network. Keep the app open. With
+   Background streaming on (the default), a worker reads and writes the network session, so a
+   busy window does not stop the refill (ADR-675). A successful socket is not controller or
    physical-machine qualification. Frame and Start retain their canonical workflow.
 
-#### Background streaming (ADR-354)
-1. Compatible GRBL-family connections use background streaming by default. The selected USB
+#### Background streaming (ADR-354, ADR-675)
+1. GRBL-family and Marlin connections use background streaming by default. The selected USB
    port is opened inside a dedicated worker so its read and refill loop can continue while the
-   Chrome window is minimised or busy.
+   Chrome window is minimised or busy. Marlin's worker refills one line on each `ok`. The
+   desktop app's network sessions (FluidNC telnet, grblHAL raw TCP) are read and written by a
+   worker too.
 2. If the worker cannot identify the selected port uniquely or is unavailable before opening,
-   the app uses the selected window port and records that in the Laser log. In a browser it
-   also warns: "Background streaming is unavailable for this connection. Keep KerfDesk visible
-   while sending the job." The desktop app does not warn: its window keeps sending while
-   minimised (ADR-354 Amendment 1).
-3. Machine Setup's **Background streaming** preference can be turned off explicitly. Reconnect
-   to apply a change. Marlin and Smoothieware keep their existing transport.
-4. Pause releases background refill. Confirmed Resume and tool-change Continue restore it for
+   the app uses the selected window port, records that in the Laser log and shows a warning on
+   every host. The warning says that a busy window can stop the machine with a constant-power
+   beam still on. In a browser it also asks to keep KerfDesk visible; the desktop window keeps
+   sending while minimised (ADR-354 Amendment 1).
+3. Machine Setup's **Background streaming** preference can be turned off explicitly; the Laser
+   log records that at connect. Reconnect to apply a change. Smoothieware keeps the window
+   transport: its beam goes dark whenever its queue runs dry.
+4. Whenever the window streams the job (fallback, preference off, or no worker), Job Review
+   reads the exact program. If its power would stay on over a stopped head, a warning leads the
+   list:
+   - GRBL-family M3: lit for as long as the window is busy; the warning offers Dynamic (M4).
+   - Marlin's cutter: lit until its laser safety timeout, 1 s in stock builds.
+   - Marlin's fan output: lit until the window recovers, or until the E-stop.
+
+   The warning never refuses Start.
+5. Pause releases background refill. Confirmed Resume and tool-change Continue restore it for
    the same live job. Abort, disconnect or a replacement job cannot inherit an old refill queue.
-5. Browser shutdown, computer sleep and USB loss still interrupt a live serial connection.
-6. The desktop app, like Chrome, lets the window and the worker see only the ports picked in
+   Marlin's Abort and Disconnect take the refill back before their stop lines.
+6. Browser shutdown, computer sleep and USB loss still interrupt a live serial connection.
+7. The desktop app, like Chrome, lets the window and the worker see only the ports picked in
    its Select dialog, so an identical second adapter (a laser controller and an Arduino that
    both use a CH340, for example) no longer stops background streaming. A pick lasts until
    Forget Controller, and on macOS and Linux also until an app restart; picking both identical

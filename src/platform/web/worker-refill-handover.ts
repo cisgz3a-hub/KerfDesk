@@ -1,5 +1,5 @@
 import type { StreamerState } from '../../core/controllers/grbl';
-import type { HostedStreamRefill } from '../types';
+import type { HostedStreamAcks, HostedStreamRefill } from '../types';
 import { encodeProgramLines } from './serial-program-buffer';
 import type { SerialWorkerRequest, SerialWorkerResponse } from './serial-worker-protocol';
 
@@ -39,6 +39,8 @@ type HandoverDeps = {
   readonly timeoutMs: number;
   readonly fail: () => void;
   readonly onWriteError: HostedStreamRefill['onWriteError'];
+  /** The controller's acknowledgement grammar; GRBL's when absent (ADR-675). */
+  readonly acks?: HostedStreamAcks;
 };
 
 /** The ready barrier drains all previously forwarded lines before capturing
@@ -210,7 +212,13 @@ function captureSnapshot(state: HandoverState, deps: HandoverDeps, id: number): 
   // position and the in-flight lines, which the controller's receive buffer
   // bounds, never the program.
   state.pending?.restart(deps.timeoutMs);
-  post(deps, { kind: 'arm', id, programId, position });
+  post(deps, {
+    kind: 'arm',
+    id,
+    programId,
+    position,
+    ...(deps.acks === undefined ? {} : { acks: deps.acks }),
+  });
 }
 
 /** The id of the worker's copy of `lines`, posted first when the worker does not

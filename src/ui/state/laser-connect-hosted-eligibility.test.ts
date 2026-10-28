@@ -37,29 +37,48 @@ async function requestTransport(controllerKind?: ControllerKind, hostedStreaming
 }
 
 describe('worker transport firmware eligibility', () => {
-  it.each(['marlin', 'smoothieware'] as const)(
-    'ignores a saved worker opt-in when the selected driver is %s',
-    async (controllerKind) => {
-      const open = await requestTransport(controllerKind, true);
-      expect(open).toHaveBeenCalledExactlyOnceWith({ baudRate: 250_000 });
-    },
-  );
+  it('ignores a saved worker opt-in when the selected driver is smoothieware', async () => {
+    const open = await requestTransport('smoothieware', true);
+    expect(open).toHaveBeenCalledExactlyOnceWith({ baudRate: 250_000 });
+  });
 
   it.each(['grbl-v1.1', 'grblhal', 'fluidnc', undefined] as const)(
     'prefers a native worker by default for the GRBL-family driver %s',
     async (controllerKind) => {
       const open = await requestTransport(controllerKind);
-      expect(open).toHaveBeenCalledExactlyOnceWith({ baudRate: 250_000, hostedStreaming: true });
+      expect(open).toHaveBeenCalledExactlyOnceWith({
+        baudRate: 250_000,
+        hostedStreaming: true,
+        hostedAcknowledgements: 'grbl',
+      });
     },
   );
 
-  it('keeps the ordinary transport when the operator explicitly opts out', async () => {
-    const open = await requestTransport('grbl-v1.1', false);
-    expect(open).toHaveBeenCalledExactlyOnceWith({ baudRate: 250_000 });
+  // Rolling audit v6 K1-P1-1/P1-2: Marlin streamed only from the window, so a
+  // busy window left its constant-power beam on over a stopped head (ADR-675).
+  it("prefers a native worker by default for Marlin, with Marlin's acknowledgements", async () => {
+    const open = await requestTransport('marlin');
+    expect(open).toHaveBeenCalledExactlyOnceWith({
+      baudRate: 250_000,
+      hostedStreaming: true,
+      hostedAcknowledgements: 'marlin',
+    });
   });
+
+  it.each(['grbl-v1.1', 'marlin'] as const)(
+    'keeps the ordinary transport when the operator explicitly opts out on %s',
+    async (controllerKind) => {
+      const open = await requestTransport(controllerKind, false);
+      expect(open).toHaveBeenCalledExactlyOnceWith({ baudRate: 250_000 });
+    },
+  );
 
   it('preserves an explicit worker opt-in', async () => {
     const open = await requestTransport('grbl-v1.1', true);
-    expect(open).toHaveBeenCalledExactlyOnceWith({ baudRate: 250_000, hostedStreaming: true });
+    expect(open).toHaveBeenCalledExactlyOnceWith({
+      baudRate: 250_000,
+      hostedStreaming: true,
+      hostedAcknowledgements: 'grbl',
+    });
   });
 });

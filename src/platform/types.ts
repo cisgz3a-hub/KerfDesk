@@ -278,13 +278,29 @@ export type ExternalFileOpenSource = {
 
 // --- Serial port (Phase B) ---
 
+/** The acknowledgement grammar a worker-hosted refill reads (ADR-675). */
+export type HostedStreamAcks = 'grbl' | 'marlin';
+
 export type SerialOpenRequest = {
   readonly baudRate: number;
   /** Prefer a worker-owned native port and refill. If unavailable before
    * opening, the exact picked port remains usable on the window, with an
    * explicit backgroundStreamingUnavailable result. */
   readonly hostedStreaming?: boolean;
+  /** How the hosted refill reads acknowledgements; GRBL's when absent. */
+  readonly hostedAcknowledgements?: HostedStreamAcks;
 };
+
+/** Desktop network sessions are streamed by a worker the app's root entry
+ * supplies (ADR-675), since platform/electron cannot reach platform/web. The
+ * worker reads and writes the session itself, through `route`. Null when the
+ * worker could not start before it touched the session: the window then
+ * streams it. */
+export type HostedNetworkSessionOpener = (args: {
+  readonly sessionId: string;
+  readonly route: { readonly url: string; readonly header: string };
+  readonly acks: HostedStreamAcks;
+}) => Promise<SerialConnection | null>;
 
 /**
  * Present only on a transport that can host the character-counting refill off

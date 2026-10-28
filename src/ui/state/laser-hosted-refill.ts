@@ -58,3 +58,19 @@ export async function releaseHostedRefill(refs: ConnectionRefs): Promise<void> {
   if (refill === null) return;
   await refill.release();
 }
+
+/**
+ * A Marlin stop without a reset byte (Abort, Disconnect) changes the stream's
+ * status itself, so a worker-held refill comes back first, while both sides'
+ * streams still agree (ADR-675). A line the worker sends during the handshake
+ * is then on this side's ledger too, and its reply cannot settle a stop line.
+ * False when the caller no longer owns the stop afterwards.
+ */
+export async function releaseHostedRefillBeforeStop(
+  refs: ConnectionRefs,
+  stillOwned: () => boolean,
+): Promise<boolean> {
+  if (!hostedRefillArmed(refs)) return true;
+  await releaseHostedRefill(refs);
+  return stillOwned();
+}

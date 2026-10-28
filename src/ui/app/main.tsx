@@ -23,6 +23,7 @@ import {
 import type { PlatformAdapter } from '../../platform/types';
 import { webAdapter } from '../../platform/web';
 import { createHttpCameraBridge } from '../../platform/web/camera-bridge';
+import { createNetworkSessionOpener } from '../../platform/web/network-serial-connection';
 import { ErrorBoundary } from '../common/ErrorBoundary';
 // Design tokens + shared chrome classes (ADR-047). Imported exactly once,
 // here — jsdom tests never load main.tsx, so styling stays out of unit tests.
@@ -74,7 +75,8 @@ const adapter: PlatformAdapter = isElectronRenderer()
             reportJobActivity: createDesktopJobActivityReporter(),
             desktopWindow: createDesktopWindowCommands(),
             aiAssistant: createDesktopAiAssistant(),
-            machineNetwork: createDesktopMachineNetwork(),
+            // A worker streams each network session, off this thread (ADR-675).
+            machineNetwork: createDesktopMachineNetwork(undefined, createNetworkSessionOpener()),
             cameraBridge: createHttpCameraBridge(() => desktopCameraBridgeConnection()),
           }
         : {}),

@@ -10,6 +10,9 @@ export type ConnectionAttemptState = {
   readonly lastConnectionTransport?: 'serial' | 'tcp' | null;
   /** The baud the live connection opened at; null while disconnected. */
   readonly connectedBaudRate?: number | null;
+  /** Who refills the live connection's job stream: a worker, or the app
+   *  window, whose stalls can starve the controller (ADR-675). */
+  readonly jobStreamHost?: 'worker' | 'window' | null;
   /** Revision of the latest connect attempt or intentional disconnect. The live
    *  connection belongs to whoever started the attempt with this revision; any
    *  later connect or disconnect moves it on. Undefined reads as 0. */
