@@ -21,7 +21,7 @@ const MAX_CACHED_TEMPLATES = 64;
 const templateBaselines = new Map<string, Promise<TemplateBaseline>>();
 
 export const renderVariableText: VariableTextRenderer = async ({ text, content, project }) => {
-  const rendered = await renderStyledText(text, content, project);
+  const rendered = await styledRecordRender(text, content, project);
   const placedTemplate =
     content === text.content || (text.pathText === undefined && text.textBox === undefined)
       ? undefined
@@ -58,7 +58,7 @@ export const renderVariableText: VariableTextRenderer = async ({ text, content, 
 };
 
 // Styled but not yet bent or laid on a path.
-async function renderStyledText(
+async function styledRecordRender(
   text: TextObject,
   content: string,
   project: Project,
@@ -93,7 +93,7 @@ function templateBaseline(text: TextObject, project: Project): Promise<TemplateB
   ]);
   const cached = templateBaselines.get(key);
   if (cached !== undefined) return cached;
-  const pending = renderStyledText(text, text.content, project).then((rendered) => ({
+  const pending = styledRecordRender(text, text.content, project).then((rendered) => ({
     box: textBoxBaseline(rendered),
     acrossFromBaseline:
       text.pathText === undefined ? undefined : pathTextAcrossFromBaseline(rendered, text.pathText),
