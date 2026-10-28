@@ -12,6 +12,7 @@ import {
   fluidncCommandValue,
   fluidncDollarForm,
   fluidncGrblCommandForm,
+  type FluidncDollarForm,
 } from './fluidnc-command-names';
 
 // FluidNC report commands that only print configuration or lists. Stock GRBL
@@ -51,7 +52,7 @@ const NVS_ERASE_REASON =
 // https://github.com/bdring/FluidNC/blob/v4.0.3/FluidNC/src/Machine/MachineConfig.cpp#L86
 const REPORT_INCHES_KEY_RE = /^\/*REPORT_INCHES(?:\/|$)/;
 const REPORT_INCHES_REASON =
-  "report_inches switches FluidNC's position reports to inches ($13), and KerfDesk reads them in millimetres. KerfDesk does not send it on the FluidNC profile. Configure the controller with its own tools.";
+  "report_inches switches FluidNC's position reports to inches ($13), and KerfDesk reads them in millimetres. KerfDesk does not send it to a FluidNC controller. Configure the controller with its own tools.";
 
 // FluidNC homes with `$H`, one axis with `$HX` ... `$HW` (it has U, V and W
 // axes), and a listed set of axes or homing cycles with `$H=<axes|cycles>`
@@ -59,8 +60,15 @@ const REPORT_INCHES_REASON =
 const FLUIDNC_HOME_RE = /^\$H(?:[XYZABCUVW]?|=.*)$/;
 const IDLE_OR_ALARM: ReadonlyArray<string> = ['Idle', 'Alarm'];
 
-function prepareFluidncConsoleCommand(input: string): ConsoleCommandResult {
-  // `[key]value` is the `$key=value` FluidNC runs (fluidnc-command-names.ts).
+/**
+ * The line a FluidNC board runs for `input`, in the Grbl `$` form the shared
+ * classifier reads, or why the Console refuses it. `[key]value` is the
+ * `$key=value` FluidNC runs and a long name is its Grbl name
+ * (fluidnc-command-names.ts). A stock-GRBL or grblHAL profile that the session
+ * shows talking to FluidNC reads its lines through this too (ADR-375
+ * Amendment 11, board-console-command.ts).
+ */
+export function fluidncBoardCommandForm(input: string): FluidncDollarForm {
   const dollarForm = fluidncDollarForm(input);
   if (!dollarForm.ok) return dollarForm;
   const grblForm = fluidncGrblCommandForm(dollarForm.line);
@@ -69,7 +77,13 @@ function prepareFluidncConsoleCommand(input: string): ConsoleCommandResult {
   if (key !== null && REPORT_INCHES_KEY_RE.test(key) && fluidncCommandValue(grblForm) !== null) {
     return { ok: false, reason: REPORT_INCHES_REASON };
   }
-  const prepared = grblDriver.prepareConsoleCommand(grblForm);
+  return { ok: true, line: grblForm };
+}
+
+function prepareFluidncConsoleCommand(input: string): ConsoleCommandResult {
+  const board = fluidncBoardCommandForm(input);
+  if (!board.ok) return board;
+  const prepared = grblDriver.prepareConsoleCommand(board.line);
   if (!prepared.ok) return prepared;
   const upper = prepared.command.normalized.toUpperCase();
   if (FLUIDNC_READ_ONLY_REPORTS.has(upper)) return readOnlyReport(prepared.command);

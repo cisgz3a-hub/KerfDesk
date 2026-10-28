@@ -295,7 +295,11 @@ describe('new Frame after prior completed output: coordinate/protocol audit', ()
       });
       await vi.advanceTimersByTimeAsync(5_000);
       const before = useLaserStore.getState();
-      expect(before.wcoCache).toEqual({ x: 5, y: 2, z: 0 });
+      // The program left the board in G20, so its reports are in inches (5, 2
+      // for the 127, 50.8 mm offset). KerfDesk hides them until Frame selects
+      // G21 rather than read them as millimetres (ADR-375 Amendment 11).
+      expect(before.reportUnitsUnconfirmed).toBe(true);
+      expect(before.wcoCache).toBeNull();
       const outboundBefore = sim.outbound().length;
 
       expect(await runFrame(), JSON.stringify(useToastStore.getState().toasts)).toBe(true);

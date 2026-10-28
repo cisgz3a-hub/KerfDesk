@@ -2,6 +2,7 @@ import { stateEffectLabel } from './console-state-effect-label';
 import type { PreparedConsoleCommand, SettingsCollectorState } from '../../core/controllers/grbl';
 import { grblSettingCommandMachineKindIssue } from '../../core/controllers/grbl/grbl-setting-write';
 import type { ControllerDriver } from '../../core/controllers';
+import { prepareBoardConsoleCommand } from '../../core/controllers/board-console-command';
 import { consoleSettingWriteIssue } from '../../core/controllers/console-setting-writes';
 import type { GrblHalSessionEvidence } from '../../core/controllers/grblhal/grblhal-evidence';
 import { machineKindOf } from '../../core/scene';
@@ -96,7 +97,7 @@ export function consoleActions(
 > {
   return {
     sendConsoleCommand: async (input, options = {}) => {
-      const prepared = refs.driver.prepareConsoleCommand(input);
+      const prepared = prepareBoardConsoleCommand(refs.driver, input, get());
       if (!prepared.ok) return block(set, get, refs, prepared.reason);
       const settingWriteBlocked = consoleSettingWriteBlockReason(
         refs.driver,
