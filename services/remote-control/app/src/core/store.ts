@@ -120,12 +120,12 @@ export const store = {
     listeners.add(listener);
     return () => listeners.delete(listener);
   },
-  toast(message: string, tone: Toast['tone'] = 'info'): void {
+  toast(message: string, tone: Toast['tone'] = 'info', durationMs?: number): void {
     const id = ++toastId;
     store.set((current) => ({ toasts: [...current.toasts.slice(-2), { id, message, tone }] }));
     setTimeout(
       () => store.set((current) => ({ toasts: current.toasts.filter((toast) => toast.id !== id) })),
-      tone === 'error' ? 6000 : 3500,
+      durationMs ?? (tone === 'error' ? 6000 : 3500),
     );
   },
   reset(patch: Partial<AppState> = {}): void {
