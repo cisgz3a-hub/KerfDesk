@@ -30,15 +30,31 @@ export const MCP_TEXT_FIELDS = [
 const id = z.string().min(1).max(128);
 const text = z.string().min(1).max(4096);
 const alignment = z.enum(['left', 'center', 'right']);
-const fontSizeMm = z.number().positive().max(1000);
-const lineHeight = z.number().min(0.1).max(20);
-const letterSpacing = z.number().min(-1).max(20);
+
+/** ADR-564 Amendment 1: the desktop's one text range (`src/core/text/text-limits.ts`). */
+export const MCP_TEXT_LIMITS = {
+  fontSizeMm: { min: 0.1, max: 1000 },
+  lineHeight: { min: 0.1, max: 20 },
+  letterSpacing: { min: -1, max: 20 },
+} as const;
+export const mcpFontSizeMm = z
+  .number()
+  .min(MCP_TEXT_LIMITS.fontSizeMm.min)
+  .max(MCP_TEXT_LIMITS.fontSizeMm.max);
+const lineHeight = z
+  .number()
+  .min(MCP_TEXT_LIMITS.lineHeight.min)
+  .max(MCP_TEXT_LIMITS.lineHeight.max);
+const letterSpacing = z
+  .number()
+  .min(MCP_TEXT_LIMITS.letterSpacing.min)
+  .max(MCP_TEXT_LIMITS.letterSpacing.max);
 
 export const mcpTextPatchSchema = z
   .strictObject({
     text: text.optional(),
     fontId: id.optional(),
-    fontSizeMm: fontSizeMm.optional(),
+    fontSizeMm: mcpFontSizeMm.optional(),
     alignment: alignment.optional(),
     lineHeight: lineHeight.optional(),
     letterSpacing: letterSpacing.optional(),
@@ -91,7 +107,8 @@ export const mcpAuthoringOutputSchemas = {
     artworkId: id,
     text,
     fontId: id,
-    fontSizeMm,
+    // Text made before the shared range may be smaller; reading it back stays possible.
+    fontSizeMm: z.number().positive().max(MCP_TEXT_LIMITS.fontSizeMm.max),
     alignment,
     lineHeight,
     letterSpacing,

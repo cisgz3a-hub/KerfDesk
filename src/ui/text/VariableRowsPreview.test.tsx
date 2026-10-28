@@ -72,3 +72,40 @@ it('stops after one try when the text worker cannot start, and says so on every 
   });
   expect(worker.render).toHaveBeenCalledTimes(1);
 });
+
+// Rolling audit v7 L3-P1-4 (ADR-591 Amendment 1): the rows preview shows what burns.
+it('marks a record character the font has no glyph for instead of drawing it', async () => {
+  worker.session.missingCharacters.mockResolvedValue(['李']);
+  const variables = {
+    ...DEFAULT_PROJECT_VARIABLE_DATA,
+    csv: { sourceName: 'guests.csv', headers: ['name'], records: [['Zoe'], ['Zoë 李']] },
+  };
+  const { textBox: _box, ...natural } = textValues;
+  await act(async () =>
+    root.render(
+      <VariableRowsPreview source="{{csv:name}}" variables={variables} textValues={natural} />,
+    ),
+  );
+  const details = host.querySelector('details')!;
+  await act(async () => {
+    details.open = true;
+    Simulate.toggle(details);
+  });
+  await vi.waitFor(() => {
+    const rows = [...host.querySelectorAll('tbody tr')].map((row) =>
+      [...row.querySelectorAll('td')].slice(2).map((cell) => cell.textContent),
+    );
+    expect(rows).toEqual([
+      ['Zoe', 'Natural text size'],
+      ['Zoë □', 'No 李 in this font · Natural text size'],
+    ]);
+  });
+  expect(host.querySelector('[role="img"]')?.getAttribute('aria-label')).toBe(
+    '李 is not in this font',
+  );
+  expect(worker.session.missingCharacters).toHaveBeenCalledWith({
+    fontKey: 'roboto-regular',
+    embeddedFonts: [],
+    content: 'Zoeë 李',
+  });
+});

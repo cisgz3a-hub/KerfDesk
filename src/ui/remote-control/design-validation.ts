@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { TEXT_SIZE_MAX_MM, TEXT_SIZE_MIN_MM } from '../../core/text/text-limits';
 import { RemoteFault } from './fault';
 import { selectionArgsSchema } from './selection-validation';
 
@@ -115,7 +116,7 @@ export const batchItemSchemas = {
     yMm: coordinate,
     widthMm: size,
     text: z.string().min(1).max(4096),
-    fontSizeMm: z.number().positive().max(1000),
+    fontSizeMm: z.number().min(TEXT_SIZE_MIN_MM).max(TEXT_SIZE_MAX_MM),
     fontId: id.optional(),
   }),
   add_rectangle: z.strictObject({

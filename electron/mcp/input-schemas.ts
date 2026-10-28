@@ -1,6 +1,6 @@
 import { type StandardSchemaWithJSON } from '@modelcontextprotocol/server';
 import { z } from 'zod';
-import { MCP_ARRANGE_ACTIONS, mcpTextPatchSchema } from './authoring-schemas.js';
+import { MCP_ARRANGE_ACTIONS, mcpFontSizeMm, mcpTextPatchSchema } from './authoring-schemas.js';
 import { mcpMachineInputSchemas } from './machine-schemas.js';
 import {
   MCP_IMPORT_BASE64_LIMIT,
@@ -43,7 +43,7 @@ export const mcpInputSchemas = {
     yMm: coordinate,
     widthMm: size,
     text: z.string().min(1).max(4096),
-    fontSizeMm: z.number().positive().max(1000),
+    fontSizeMm: mcpFontSizeMm,
     fontId: id.optional(),
   }),
   add_rectangle: z.strictObject({

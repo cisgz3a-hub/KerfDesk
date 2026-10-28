@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { MCP_ARRANGE_ACTIONS } from './authoring-schemas.js';
+import { MCP_ARRANGE_ACTIONS, mcpFontSizeMm } from './authoring-schemas.js';
 import { mcpSelectionArgsSchema } from './selection-schemas.js';
 
 const id = z.string().min(1).max(128);
@@ -96,7 +96,7 @@ export const mcpBatchEditSchemas = {
     yMm: coordinate,
     widthMm: size,
     text: z.string().min(1).max(4096),
-    fontSizeMm: z.number().positive().max(1000),
+    fontSizeMm: mcpFontSizeMm,
     fontId: id.optional(),
   }),
   add_rectangle: z.strictObject({
@@ -283,8 +283,9 @@ const designWrite = z.object({
   message: z.string().max(2048).optional(),
 });
 
-/** What the PC showed for a remote edit: an import's toasts (ADR-125 Amendment 2), or the machine
- *  change an Undo or Redo made (ADR-584 Amendment 1). */
+/** What the PC showed for a remote edit: an import's toasts (ADR-125 Amendment 2), the machine
+ *  change an Undo or Redo made (ADR-584 Amendment 1), or characters a text's font has no glyph for
+ *  (ADR-591 Amendment 1). */
 export const mcpNoticesSchema = z
   .array(
     z.object({

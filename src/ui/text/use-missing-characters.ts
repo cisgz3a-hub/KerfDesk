@@ -75,7 +75,8 @@ export function useMissingCharacters(query: MissingCharacterQuery): MissingChara
   };
 }
 
-async function fontMissingCharacters(
+/** The characters an outline or single-line font has no glyph for. */
+export async function fontMissingCharacters(
   textWorker: TextWorkerSession,
   fontKey: string,
   embeddedFonts: ReadonlyArray<EmbeddedFont>,

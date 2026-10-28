@@ -1,15 +1,22 @@
 import { isBarcodeObject } from '../../core/barcode';
-import type { PreflightResult } from '../../core/preflight';
+import type { PreflightIssue, PreflightResult } from '../../core/preflight';
 import {
   DEFAULT_PROJECT_VARIABLE_DATA,
+  sceneObjectUsesOperation,
   type Bounds,
   type ColoredPath,
   type Project,
   type TextObject,
   type Transform,
+  type VariableTemplate,
   type Vec2,
 } from '../../core/scene';
-import { evaluateVariableTemplate, type VariableEvaluationContext } from '../../core/variables';
+import {
+  evaluateVariableTemplate,
+  variableTemplateCsvRecord,
+  type VariableEvaluationContext,
+} from '../../core/variables';
+import { fontDisplayName, missingCharactersSentence } from '../../core/text/missing-glyph-words';
 import { applySimilarityProject, type SimilarityTransform } from '../../core/registration';
 import { prepareOutput, type PreparedOutput, type PrepareOutputOptions } from './prepare-output';
 import { materializeVariableBarcode } from './materialize-variable-barcode';
@@ -27,6 +34,8 @@ export type VariableTextRenderResult = {
   // The render's alignment anchor (see TextRenderResult); output keeps it
   // where the placed text had its anchor. Unused when a transform is given.
   readonly anchor?: Vec2;
+  // Characters the font has no glyph for: output warns about them (ADR-591 Amendment 1).
+  readonly missingCharacters?: ReadonlyArray<string>;
 };
 export type VariableTextRenderer = (
   input: VariableTextRenderInput,
@@ -107,11 +116,51 @@ async function prepareSnapshot(
     registeredProject,
     outputOptions(options),
   );
-  return { ...prepared, evaluationContext };
+  return { ...withVariableAdvisories(prepared, evaluated.advisories), evaluationContext };
 }
 
+/**
+ * The advisories only the snapshot knows: a variable record's missing characters. Start and Save
+ * re-run the project's preflight when they emit, which cannot see evaluated records, so they add
+ * these to their warnings (ADR-591 Amendment 1).
+ */
+export function variableRecordAdvisories(prepared: PreparedOutput): ReadonlyArray<string> {
+  if (!prepared.ok) return [];
+  return (prepared.advisories ?? []).flatMap((issue) =>
+    issue.code === 'variable-text-missing-glyphs' ? [issue.message] : [],
+  );
+}
+
+// A record's missing characters inform Job Review, Start and Save; they never refuse output.
+// Only text this output burns counts: inside its scope and on an output layer.
+function withVariableAdvisories(
+  prepared: PreparedOutput,
+  advisories: ReadonlyArray<VariableRecordAdvisory>,
+): PreparedOutput {
+  if (!prepared.ok || advisories.length === 0) return prepared;
+  const { objects, layers } = prepared.project.scene;
+  const output = layers.filter((layer) => layer.output);
+  const burned = new Set(
+    objects
+      .filter((object) => output.some((layer) => sceneObjectUsesOperation(object, layer)))
+      .map((object) => object.id),
+  );
+  const issues = advisories.flatMap((advisory) =>
+    burned.has(advisory.objectId) ? [advisory.issue] : [],
+  );
+  if (issues.length === 0) return prepared;
+  return { ...prepared, advisories: [...(prepared.advisories ?? []), ...issues] };
+}
+
+/** A variable record's characters its font has no glyph for (ADR-591 Amendment 1). */
+export type VariableRecordAdvisory = { readonly objectId: string; readonly issue: PreflightIssue };
+
 type MaterializedProject =
-  | { readonly ok: true; readonly project: Project }
+  | {
+      readonly ok: true;
+      readonly project: Project;
+      readonly advisories: ReadonlyArray<VariableRecordAdvisory>;
+    }
   | { readonly ok: false; readonly preflight: PreflightResult };
 
 export async function materializeVariableText(
@@ -134,11 +183,20 @@ export async function materializeVariableText(
         objects: objects.map((result) => (result.ok ? result.object : result.fallback)),
       },
     },
+    advisories: objects.flatMap((result) =>
+      result.ok && result.advisory !== undefined
+        ? [{ objectId: result.object.id, issue: result.advisory }]
+        : [],
+    ),
   };
 }
 
 export type MaterializedObject =
-  | { readonly ok: true; readonly object: Project['scene']['objects'][number] }
+  | {
+      readonly ok: true;
+      readonly object: Project['scene']['objects'][number];
+      readonly advisory?: PreflightIssue;
+    }
   | {
       readonly ok: false;
       readonly message: string;
@@ -170,8 +228,16 @@ export async function materializeVariableObject(
         renderer,
       ));
     const { variableTemplate: _template, ...plainText } = object;
+    const advisory = missingGlyphAdvisory(
+      object,
+      object.variableTemplate,
+      { value: evaluated.value, missing: rendered.missingCharacters ?? [] },
+      project,
+      context,
+    );
     return {
       ok: true,
+      ...(advisory === undefined ? {} : { advisory }),
       // Only geometry crosses over: render notes such as the anchor stay off
       // the scene object, which array copies persist.
       object: {
@@ -194,6 +260,33 @@ export async function materializeVariableObject(
       fallback: object,
     };
   }
+}
+
+const EXCERPT_LENGTH = 40;
+
+/** "Variable text “Zoë 李” (CSV record 3): Pacifico has no 李; each engraves as …" */
+function missingGlyphAdvisory(
+  text: TextObject,
+  template: VariableTemplate,
+  record: { readonly value: string; readonly missing: ReadonlyArray<string> },
+  project: Project,
+  context: VariableEvaluationContext,
+): PreflightIssue | undefined {
+  const { value, missing } = record;
+  if (missing.length === 0) return undefined;
+  const characters = [...value.replace(/\s+/g, ' ').trim()];
+  const excerpt =
+    characters.length > EXCERPT_LENGTH
+      ? `${characters.slice(0, EXCERPT_LENGTH - 1).join('')}…`
+      : characters.join('');
+  const csvRecord = variableTemplateCsvRecord(template, project, context);
+  const font = fontDisplayName(text.fontKey, project.embeddedFonts);
+  return {
+    code: 'variable-text-missing-glyphs',
+    message:
+      `Variable text “${excerpt}”${csvRecord === null ? '' : ` (CSV record ${csvRecord})`}: ` +
+      missingCharactersSentence(font, missing, text.fontKey),
+  };
 }
 
 function resolveEvaluationContext(

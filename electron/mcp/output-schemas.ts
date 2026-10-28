@@ -61,8 +61,9 @@ export const mcpWriteResultSchema = z.object({
   message: z.string().max(2048).optional(),
 });
 
-/** An Undo or Redo that changed the machine setup says so (ADR-584 Amendment 1). */
-const mcpHistoryResultSchema = mcpWriteResultSchema.extend({
+/** A write that returns the warning the PC showed: an Undo or Redo that changed the machine setup
+ *  (ADR-584 Amendment 1), or text whose font has no glyph for a character (ADR-591 Amendment 1). */
+const mcpNoticeWriteResultSchema = mcpWriteResultSchema.extend({
   notices: mcpNoticesSchema.optional(),
 });
 
@@ -235,16 +236,16 @@ export const mcpOutputSchemas = {
     action: z.enum(['center', 'fit', 'array']),
     artworkCount: count,
   }),
-  add_text: mcpWriteResultSchema,
+  add_text: mcpNoticeWriteResultSchema,
   add_rectangle: mcpWriteResultSchema,
   add_ellipse: mcpWriteResultSchema,
   add_polyline: mcpWriteResultSchema,
   transform_artwork: mcpWriteResultSchema,
   update_operation: mcpWriteResultSchema,
-  update_text: mcpWriteResultSchema,
+  update_text: mcpNoticeWriteResultSchema,
   arrange_artwork: mcpWriteResultSchema,
-  undo: mcpHistoryResultSchema,
-  redo: mcpHistoryResultSchema,
+  undo: mcpNoticeWriteResultSchema,
+  redo: mcpNoticeWriteResultSchema,
   ...mcpAuthoringOutputSchemas,
   ...mcpDesignOutputSchemas,
   ...mcpMachineOutputSchemas,

@@ -6,14 +6,15 @@ import {
   TEXT_BEND_MIN_DEG,
   clampBend,
 } from '../../core/text';
+import {
+  TEXT_LETTER_SPACING_MAX,
+  TEXT_LETTER_SPACING_MIN,
+  TEXT_LINE_HEIGHT_MAX,
+  TEXT_LINE_HEIGHT_MIN,
+  TEXT_SIZE_MAX_MM,
+  TEXT_SIZE_MIN_MM,
+} from '../../core/text/text-limits';
 import { NumberField } from '../common/NumberField';
-
-const TEXT_SIZE_MIN_MM = 1;
-const TEXT_SIZE_MAX_MM = 300;
-const TEXT_LINE_HEIGHT_MIN = 0.5;
-const TEXT_LINE_HEIGHT_MAX = 5;
-const TEXT_LETTER_SPACING_MIN = -0.5;
-const TEXT_LETTER_SPACING_MAX = 2;
 
 export type TextDialogNumericValues = {
   readonly sizeMm: number;
@@ -74,7 +75,7 @@ export function TextDialogNumericFields(props: {
           value={values.sizeMm}
           min={TEXT_SIZE_MIN_MM}
           max={TEXT_SIZE_MAX_MM}
-          step={1}
+          step={0.1}
           onCommit={props.setSizeMm}
           style={numStyle}
           title="Text height in millimeters."
