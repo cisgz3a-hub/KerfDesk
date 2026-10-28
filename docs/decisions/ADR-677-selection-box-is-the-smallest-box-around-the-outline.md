@@ -66,6 +66,9 @@ that can contain every object in your selection"
 - A turned circle reads, resizes and places at the size and position it burns, through the
   toolbar, the canvas handles and the Inspector note. An aspect-locked resize scales every object
   evenly about the anchor, which scales the smallest box by exactly the typed factor.
+- Convert to Bitmap still covers the turned own-bounds box, which holds every outline. Its
+  packed photo path rasterises objects that carry no outline, and both paths must produce the
+  same grid, so the converted image is unchanged.
 - The fit-to-bed, fit-to-board and fit-to-region helpers still measure an object by its own
   bounds' corners and centre it by its own bounds' centre. That keeps them self-consistent and
   conservative (a turned round shape is fitted a little smaller than it could be). They are left
