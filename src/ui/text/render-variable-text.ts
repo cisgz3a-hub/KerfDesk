@@ -1,4 +1,4 @@
-import { placeTextOnPath } from '../../core/text';
+import { placeTextOnPath, type TextRenderResult } from '../../core/text';
 import { styledBentRender, styledTextContent, styleTextRender } from '../../core/text/text-style';
 import { IDENTITY_TRANSFORM } from '../../core/scene';
 import type { VariableTextRenderer } from '../../io/gcode';
@@ -28,6 +28,7 @@ export const renderVariableText: VariableTextRenderer = async ({ text, content, 
     if (placed.kind !== 'ok') throw new Error(placed.message);
     return {
       ...applyTextWeld(placed.rendered, text.fontKey, text.weldOverlaps),
+      ...missingReport(rendered),
       // The guide's transform is already baked into placed world-space paths.
       transform: { ...IDENTITY_TRANSFORM, x: placed.origin.x, y: placed.origin.y },
     };
@@ -40,6 +41,19 @@ export const renderVariableText: VariableTextRenderer = async ({ text, content, 
         text.weldOverlaps,
       ),
       transform: text.transform,
+      ...missingReport(rendered),
     };
-  return applyTextWeld(styledBentRender(rendered, text), text.fontKey, text.weldOverlaps);
+  return {
+    ...applyTextWeld(styledBentRender(rendered, text), text.fontKey, text.weldOverlaps),
+    ...missingReport(rendered),
+  };
 };
+
+// ADR-591 Amendment 1: output warns about a record's characters the font has no glyph for.
+function missingReport(rendered: TextRenderResult): {
+  readonly missingCharacters?: readonly string[];
+} {
+  return rendered.missingCharacters === undefined
+    ? {}
+    : { missingCharacters: rendered.missingCharacters };
+}

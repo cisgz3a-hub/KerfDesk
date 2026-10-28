@@ -8,20 +8,30 @@ import {
   findFontEntry,
 } from '../../core/text';
 import { renderTextGeometry } from '../text/render-text-geometry';
+import { applyTextWeldInWorker } from '../text/text-weld-worker-client';
 import type { RemoteWrite } from './types';
 import { RemoteFault } from './fault';
 import { remoteBounds } from './projections';
 import { transformedBBox } from '../../core/scene/hit-test';
 
 type TextArgs = Extract<RemoteWrite, { command: 'add_text' }>['args'];
+export type PreparedRemoteText = {
+  readonly object: TextObject;
+  /** Characters the font has no glyph for (ADR-591 Amendment 1). */
+  readonly missingCharacters: readonly string[];
+};
+
 /** Same bundled-font renderer as local text; width is a maximum, never a bed-fit request. */
-export async function prepareRemoteText(args: TextArgs, signal: AbortSignal): Promise<TextObject> {
+export async function prepareRemoteText(
+  args: TextArgs,
+  signal: AbortSignal,
+): Promise<PreparedRemoteText> {
   signal.throwIfAborted();
   const content = args.text.normalize('NFC');
   if (content.trim() === '') throw new RemoteFault('invalid_arguments');
   const fontKey = args.fontId ?? DEFAULT_FONT_KEY;
   if (findFontEntry(fontKey) === null) throw new RemoteFault('invalid_arguments');
-  const geometry = await renderTextGeometry({
+  const rendered = await renderTextGeometry({
     fontKey,
     embeddedFonts: undefined,
     content,
@@ -31,6 +41,9 @@ export async function prepareRemoteText(args: TextArgs, signal: AbortSignal): Pr
     letterSpacing: DEFAULT_TEXT_LETTER_SPACING,
     color: DEFAULT_TEXT_COLOR,
   });
+  signal.throwIfAborted();
+  // ADR-321 Amendment 1: new remote text welds its overlaps, as new desktop text does.
+  const geometry = await applyTextWeldInWorker(rendered, fontKey, true, signal);
   signal.throwIfAborted();
   const width = geometry.bounds.maxX - geometry.bounds.minX;
   if (!Number.isFinite(width) || width <= 0) throw new RemoteFault('unsupported_operation');
@@ -45,7 +58,7 @@ export async function prepareRemoteText(args: TextArgs, signal: AbortSignal): Pr
     lineHeight: DEFAULT_TEXT_LINE_HEIGHT,
     letterSpacing: DEFAULT_TEXT_LETTER_SPACING,
     bendDeg: 0,
-    weldOverlaps: false,
+    weldOverlaps: true,
     color: DEFAULT_TEXT_COLOR,
     paths: geometry.paths,
     bounds: geometry.bounds,
@@ -59,5 +72,5 @@ export async function prepareRemoteText(args: TextArgs, signal: AbortSignal): Pr
   };
   if (remoteBounds(transformedBBox(object)) === undefined)
     throw new RemoteFault('unsupported_operation');
-  return object;
+  return { object, missingCharacters: rendered.missingCharacters ?? [] };
 }

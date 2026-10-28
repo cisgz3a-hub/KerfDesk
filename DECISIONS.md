@@ -20376,6 +20376,11 @@ interaction without requiring destructive conversion.
   tests bound error below 0.011 mm after 10x scaling for 2 mm and 400 mm Dancing Script fixtures;
   this is bounded software evidence, not a claim for arbitrary transforms or physical cutting.
 
+ADR-321's amendments are separate decision files (ADR-344):
+`docs/decisions/ADR-321-amendment-1-every-re-render-keeps-the-text-style.md` (remote text edits
+and the registration-jig text editor re-render with the text's style, text box and weld, and new
+remote and jig text welds its overlaps).
+
 ## ADR-322 - Machine presets carry researched command and configuration contracts (2026-09-19)
 
 **Status:** Accepted; amends ADR-095 and ADR-096 controller/output assumptions.

@@ -13,7 +13,12 @@ import {
   DEFAULT_TEXT_LETTER_SPACING,
   DEFAULT_TEXT_LINE_HEIGHT,
 } from '../../../core/text';
-import { renderTextGeometry } from '../../text/render-text-geometry';
+import {
+  TEXT_SIZE_MAX_MM,
+  TEXT_SIZE_MIN_MM,
+  textSizeInRange,
+} from '../../../core/text/text-limits';
+import { renderStyledText } from '../../text/render-styled-text';
 
 export function isAdvancedJigText(object: TextObject): boolean {
   const binding = JSON.stringify(object.paths[0]?.operationIds ?? null);
@@ -37,8 +42,10 @@ export async function renderJigText(input: {
   if (existing && isAdvancedJigText(existing))
     throw new Error('Use the main text editor for advanced text.');
   const content = input.content.normalize('NFC');
-  if (!content.trim() || !Number.isFinite(input.sizeMm) || input.sizeMm < 1 || input.sizeMm > 300) {
-    throw new Error('Enter text and a size between 1 and 300 mm.');
+  if (!content.trim() || !textSizeInRange(input.sizeMm)) {
+    throw new Error(
+      `Enter text and a size between ${TEXT_SIZE_MIN_MM} and ${TEXT_SIZE_MAX_MM} mm.`,
+    );
   }
   const properties = {
     ...textStyle(existing),
@@ -46,10 +53,12 @@ export async function renderJigText(input: {
     fontKey: input.fontKey,
     sizeMm: input.sizeMm,
   };
-  const rendered = await renderTextGeometry({
-    ...properties,
-    embeddedFonts: project.embeddedFonts,
-  });
+  // ADR-321 Amendment 1: an edit keeps the text's style, text box and weld.
+  const rendered = await renderStyledText(
+    { ...existing, ...properties },
+    content,
+    project.embeddedFonts,
+  );
   const pathOperations = existing?.paths[0]?.operationIds;
   return {
     ...existing,
@@ -66,7 +75,10 @@ export async function renderJigText(input: {
 }
 
 function textStyle(existing: TextObject | undefined) {
+  // ADR-321 Amendment 1: new jig text welds its overlaps, as new desktop text does.
+  const weldOverlaps = existing === undefined ? true : existing.weldOverlaps;
   return {
+    ...(weldOverlaps === undefined ? {} : { weldOverlaps }),
     alignment: existing?.alignment ?? DEFAULT_TEXT_ALIGNMENT,
     lineHeight: existing?.lineHeight ?? DEFAULT_TEXT_LINE_HEIGHT,
     letterSpacing: existing?.letterSpacing ?? DEFAULT_TEXT_LETTER_SPACING,

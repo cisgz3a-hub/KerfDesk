@@ -7,10 +7,19 @@ import {
 } from '../../core/variables';
 import { Button } from '../kit';
 import { useStore } from '../state';
-import { DEFAULT_TEXT_COLOR, type TextRenderResult } from '../../core/text';
+import { DEFAULT_TEXT_COLOR, findFontEntry, type TextRenderResult } from '../../core/text';
 import { TextWorkerError } from './text-worker-session';
 import { useTextWorkerSession } from './use-text-worker-session';
 import type { DialogValues } from './use-text-dialog-fields';
+import {
+  missingCharacterLabel,
+  missingCharacterOutcome,
+} from '../../core/text/missing-glyph-words';
+import {
+  burnsWithoutGlyph,
+  recordMissingCharacters,
+  useRowMissingCharacters,
+} from './use-row-missing-characters';
 
 type Row = {
   readonly index: number;
@@ -30,7 +39,6 @@ export function VariableRowsPreview(props: {
   const [page, setPage] = useState(0);
   const [now, setNow] = useState(() => new Date());
   const { rows, total, lastPage, activePage, parsed } = useRows(props, page, now);
-  const layouts = useRowLayout(rows, opened ? props.textValues : undefined);
   return (
     <details
       aria-label="All variable rows preview"
@@ -71,30 +79,56 @@ export function VariableRowsPreview(props: {
       {!parsed.ok ? (
         <p role="alert">{parsed.message}</p>
       ) : (
-        <div style={{ maxHeight: 240, overflow: 'auto' }}>
-          <table aria-label="Evaluated variable rows" style={{ width: '100%', fontSize: 12 }}>
-            <thead>
-              <tr>
-                <th>Input row</th>
-                <th>Serial</th>
-                <th>Evaluated text</th>
-                <th>Layout</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.index}>
-                  <td>{row.index + 1}</td>
-                  <td>{row.serial}</td>
-                  <td style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{row.value}</td>
-                  <td>{row.valid ? (layouts[row.index] ?? 'Updating…') : 'Invalid field'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <RowsTable rows={rows} text={opened ? props.textValues : undefined} />
       )}
     </details>
+  );
+}
+
+function RowsTable(props: {
+  readonly rows: ReadonlyArray<Row>;
+  // The open preview's text, which its rows are laid out and checked against.
+  readonly text: DialogValues | undefined;
+}): JSX.Element {
+  const { rows, text } = props;
+  const layouts = useRowLayout(rows, text);
+  const missing = useRowMissingCharacters(
+    rows.flatMap((row) => (row.valid ? [row.value] : [])),
+    text,
+  );
+  return (
+    <div style={{ maxHeight: 240, overflow: 'auto' }}>
+      <table aria-label="Evaluated variable rows" style={{ width: '100%', fontSize: 12 }}>
+        <thead>
+          <tr>
+            <th>Input row</th>
+            <th>Serial</th>
+            <th>Evaluated text</th>
+            <th>Layout</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.index}>
+              <td>{row.index + 1}</td>
+              <td>{row.serial}</td>
+              <td style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+                {row.valid && missing !== null && text !== undefined ? (
+                  <BurnedText value={row.value} missing={missing} text={text} />
+                ) : (
+                  row.value
+                )}
+              </td>
+              <td>
+                {row.valid
+                  ? rowLayoutText(layouts[row.index], row.value, missing, text?.textStyle)
+                  : 'Invalid field'}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -154,6 +188,50 @@ function useRowLayout(
   }, [rows, values, textWorker]);
   return layouts;
 }
+
+/** The record as it burns (ADR-591 Amendment 1): a character the font lacks is marked, as ? for a
+ *  single-line font and as a box otherwise. */
+function BurnedText(props: {
+  readonly value: string;
+  readonly missing: ReadonlySet<string>;
+  readonly text: DialogValues;
+}): JSX.Element {
+  const singleLine = findFontEntry(props.text.fontKey)?.geometry === 'single-line';
+  const title = `Not in this font; ${missingCharacterOutcome(props.text.fontKey)}.`;
+  return (
+    <>
+      {[...props.value].map((character, index) =>
+        burnsWithoutGlyph(character, props.missing, props.text.textStyle) ? (
+          <span
+            key={index}
+            role="img"
+            aria-label={`${missingCharacterLabel(character)} is not in this font`}
+            title={title}
+            style={missingGlyphStyle}
+          >
+            {singleLine ? '?' : '□'}
+          </span>
+        ) : (
+          character
+        ),
+      )}
+    </>
+  );
+}
+
+function rowLayoutText(
+  layout: string | undefined,
+  value: string,
+  missing: ReadonlySet<string> | null,
+  style: DialogValues['textStyle'],
+): string {
+  const label = layout ?? 'Updating…';
+  const lacking = missing === null ? [] : recordMissingCharacters(value, missing, style);
+  if (lacking.length === 0) return label;
+  return `No ${lacking.map(missingCharacterLabel).join(' ')} in this font · ${label}`;
+}
+
+const missingGlyphStyle: React.CSSProperties = { color: 'var(--lf-warning-fg)' };
 
 function rowLayoutLabel(layout: TextRenderResult['textBoxLayout']): string {
   if (layout === undefined) return 'Natural text size';

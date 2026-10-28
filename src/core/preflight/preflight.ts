@@ -70,6 +70,9 @@ export type PreflightCode =
   | 'compiled-output-budget-exceeded'
   | 'selected-output-empty'
   | 'variable-evaluation-failed'
+  // Advisory-only (ADR-591 Amendment 1): a variable record has characters its font has no glyph
+  // for, which burn as the font's box or not at all.
+  | 'variable-text-missing-glyphs'
   | 'print-and-cut-registration-invalid'
   | 'cnc-settings-invalid'
   | 'cnc-machine-params-invalid'

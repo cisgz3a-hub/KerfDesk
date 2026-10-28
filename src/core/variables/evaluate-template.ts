@@ -51,6 +51,21 @@ export function evaluateVariableTemplate(
   return { ok: true, value: value.normalize('NFC') };
 }
 
+/** The CSV record, counted from 1, that a template's fields read in this context; null when none. */
+export function variableTemplateCsvRecord(
+  template: VariableTemplate,
+  project: Project,
+  context: VariableEvaluationContext,
+): number | null {
+  const readsCsv =
+    Array.isArray(template.tokens) &&
+    template.tokens.some((token) => isTemplateToken(token) && token.kind === 'csv');
+  if (!readsCsv || project.variables?.csv === undefined) return null;
+  const copy = copyEvaluationContext(template, project, context);
+  if (!copy.ok) return null;
+  return (copy.context.recordIndex ?? project.variables.recordIndex) + 1;
+}
+
 type EvaluatedPiece = { readonly value: string; readonly field: boolean };
 
 // A line is dropped, with its line break, when it holds at least one field and

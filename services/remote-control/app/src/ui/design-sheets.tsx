@@ -2,12 +2,15 @@ import { useEffect, useState } from 'react';
 import { controller } from '../core/controller';
 import { selectionBox } from '../core/scene';
 import { canEdit, store } from '../core/store';
+import { toastReceiptWarnings } from '../core/receipt-warnings';
 import type { TextDetails } from '../core/types';
 import { useApp } from './hooks';
 import { Icon, type IconName } from './icons';
 import { Banner, NumberField, Segmented, Sheet, Toggle } from './primitives';
 
 const close = () => store.set({ sheet: null });
+/** A font missing a character is one sentence naming it (ADR-591 Amendment 1). */
+const TEXT_NOTICE_MS = 8000;
 
 function bedCenter(): { x: number; y: number } {
   const bed = store.get().scene?.bed;
@@ -166,8 +169,11 @@ function TextEditor({ artworkId, disabled }: { artworkId: string; disabled: bool
     };
   }, [artworkId, revision]);
   if (details === null) return <div className="skeleton" style={{ height: 120 }} />;
-  const patch = (value: Record<string, unknown>) =>
-    controller.write('update_text', { artworkId, patch: value });
+  const patch = async (value: Record<string, unknown>) =>
+    toastReceiptWarnings(
+      await controller.write('update_text', { artworkId, patch: value }),
+      TEXT_NOTICE_MS,
+    );
   return (
     <div className="stack">
       <label className="field">
@@ -254,6 +260,7 @@ export function TextSheet({ at }: { at?: { x: number; y: number } }) {
       fontSizeMm: size,
       ...(fontId === '' ? {} : { fontId }),
     });
+    toastReceiptWarnings(result, TEXT_NOTICE_MS);
     if (result !== null) close();
   };
   return (
