@@ -46,6 +46,10 @@ export type CornerDialInput = {
   /** The pre-threshold field the measured cracks came from, which confirms
    *  measured apexes the crack chain alone cannot (contour-corner-field.ts). */
   readonly field?: CrackSubPixelField;
+  /** The mask's class at a working pixel. Binary leg apexes that would change
+   *  a pixel centre's class are withdrawn (contour-corner-ink.ts); omitted =
+   *  unchecked. */
+  readonly inkAt?: (x: number, y: number) => boolean;
 };
 
 export type Candidate = ContourCorner & {

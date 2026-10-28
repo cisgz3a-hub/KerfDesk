@@ -41,7 +41,8 @@
 
 import type { Vec2 } from '../scene';
 import { latticeCandidates } from './contour-corner-lattice';
-import { fitLeg, growLeg, LEG_SLOPE_TOLERANCE } from './contour-corner-leg-runs';
+import { fitLeg, growLeg, LEG_SLOPE_TOLERANCE, type Leg } from './contour-corner-leg-runs';
+import { apexContradictsInk } from './contour-corner-ink';
 import { legCandidates, legIntersection } from './contour-corner-legs';
 import {
   LATTICE_STEP_COST_PX,
@@ -108,11 +109,58 @@ export function decideContourCorners(input: CornerDialInput): ContourCorner[] {
     ? lattice
     : [...lattice.filter((c) => c.feature === true), ...legCandidates(input, scale, lattice)];
   const alive = candidates.filter((c) => c.cost > threshold);
-  const chosen = (latticeRegime ? alive : selectCompatible(alive, n, scale, input.measured))
-    .map(({ from, skip, apex, cost }) => ({ from, skip, apex, cost }))
-    .sort((a, b) => a.from - b.from);
+  const chosen = (latticeRegime ? alive : selectCompatible(alive, n, scale, input.measured)).sort(
+    (a, b) => a.from - b.from,
+  );
   const noise = (input.edgeNoisePx ?? 0) * scale;
-  return noise > 0 ? reseatApexes(input.cracks, chosen, noise, scale) : chosen;
+  const seated = noise > 0 ? reseatApexes(input.cracks, chosen, noise, scale) : chosen;
+  const kept =
+    input.measured || input.inkAt === undefined
+      ? seated
+      : inkBoundedApexes(input.cracks, seated, scale, input.inkAt);
+  return kept.map(({ from, skip, apex, cost }) => ({ from, skip, apex, cost }));
+}
+
+// ——— binary apexes bounded by the ink ———
+
+type CornerLegs = { readonly back: Leg; readonly ahead: Leg };
+type SeatedCorner = Candidate & { readonly legs?: CornerLegs };
+
+// A binary leg apex that would change a pixel centre's class
+// (contour-corner-ink.ts) is dropped, so the loop rounds that turn instead of
+// drawing a spike into the paper or a notch into the ink. A re-seated apex is
+// judged on the legs it was re-seated on; falling back to the apex decided
+// before re-seating let the same spikes through.
+function inkBoundedApexes(
+  cracks: ReadonlyArray<Vec2>,
+  seated: ReadonlyArray<SeatedCorner>,
+  scale: number,
+  inkAt: (x: number, y: number) => boolean,
+): SeatedCorner[] {
+  const n = cracks.length;
+  const legsOf = (corner: SeatedCorner): CornerLegs =>
+    corner.legs ?? {
+      back: fitLeg(cracks, corner.from, corner.legBack, -1),
+      ahead: fitLeg(cracks, (corner.from + corner.skip + 1) % n, corner.legAhead, 1),
+    };
+  return seated.filter(
+    (corner) =>
+      isLatticeApex(corner.apex) ||
+      !apexContradictsInk(
+        cracks,
+        corner.from,
+        corner.skip,
+        corner.apex,
+        legsOf(corner),
+        scale,
+        inkAt,
+      ),
+  );
+}
+
+// Lattice turns and pixel features sit on lattice vertices: exact already.
+function isLatticeApex(apex: Vec2): boolean {
+  return Number.isInteger(apex.x) && Number.isInteger(apex.y);
 }
 
 // ——— apex re-seating ———
@@ -129,10 +177,10 @@ const RESEAT_LIMIT_PX = 2;
 
 function reseatApexes(
   cracks: ReadonlyArray<Vec2>,
-  corners: ReadonlyArray<ContourCorner>,
+  corners: ReadonlyArray<Candidate>,
   noise: number,
   scale: number,
-): ContourCorner[] {
+): SeatedCorner[] {
   const n = cracks.length;
   const count = corners.length;
   const cap = Math.ceil(RESEAT_LEG_CAP_PX * scale * POINTS_PER_PX);
@@ -155,7 +203,7 @@ function reseatApexes(
     const apex = legIntersection(back, ahead);
     if (apex === null) return corner;
     const moved = Math.hypot(apex.x - corner.apex.x, apex.y - corner.apex.y);
-    return moved <= RESEAT_LIMIT_PX * scale ? { ...corner, apex } : corner;
+    return moved <= RESEAT_LIMIT_PX * scale ? { ...corner, apex, legs: { back, ahead } } : corner;
   });
 }
 

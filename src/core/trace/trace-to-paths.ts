@@ -36,6 +36,7 @@ import { prepareContourTraceInput, type ContourTraceInput } from './contour-inpu
 import { scaleTracedPaths, withCanonicalTraceCurves } from './trace-curves';
 import { traceScalePlan } from './trace-upscale-policy';
 import { prepareUpscaledTraceInput, releaseMedianStage } from './trace-upscale-input';
+import { isStaircaseSource, staircaseSourceInput } from './staircase-source';
 import { runTraceSteps, type TraceStepRunner, type TraceSteps } from './trace-steps';
 import { reportingTraceRunner, type TraceProgress } from './trace-progress';
 import { resolveTraceSourceOptions, shouldTraceAlphaMask } from './trace-alpha';
@@ -253,6 +254,16 @@ async function traceUpscaledImage(
   contourInput?: ContourTraceInput,
 ): Promise<ColoredPath[]> {
   const enlarged = prepareUpscaledTraceInput(image, options, factor, edgeInput, contourInput);
+  // A two-level source keeps the enlarged cleanup but is drawn on its own
+  // grid (ADR-530 Amendment 11).
+  if (
+    contourInput !== undefined &&
+    enlarged.contourInput !== undefined &&
+    isStaircaseSource(image, options, contourInput)
+  ) {
+    const native = staircaseSourceInput(contourInput, enlarged.contourInput);
+    return withCanonicalTraceCurves(await dispatchTrace(image, options, run, undefined, native));
+  }
   const upscaled = withCanonicalTraceCurves(
     await dispatchTrace(enlarged.image, enlarged.options, run, undefined, enlarged.contourInput),
   );
