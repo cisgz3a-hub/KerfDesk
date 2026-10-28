@@ -124,13 +124,14 @@ describe('two-level real art is drawn without the enlargement staircase (Q4-P2-1
     expect(inflectionsPer100Px(curves)).toBeLessThan(4);
   }, 60_000);
 
-  // The 2x cleanup keeps the stress test's small marks (760 rings, Potrace 772);
-  // tracing that source natively instead left 647. Before: 14,517 segments and
-  // 21.9 inflections per 100 px.
+  // The 2x cleanup keeps the stress test's small marks (760 rings on main,
+  // Potrace 772); tracing that source natively instead left 647. The floor
+  // leaves the small-mark judge (ADR-434) free to keep more. Before: 14,517
+  // segments and 21.9 inflections per 100 px.
   it('keeps every ring of the stress-test spiral the enlarged cleanup keeps', async () => {
     const image = twoLevelCrop('centerline-stress-test-20260909.png', 100, 560, 512, 512);
     const curves = curvesOf(await traceImageToColoredPaths(image, LINE_ART));
-    expect(curves).toHaveLength(760);
+    expect(curves.length).toBeGreaterThanOrEqual(760);
     expect(segments(curves)).toBeLessThan(10_000);
     expect(inflectionsPer100Px(curves)).toBeLessThan(10);
   }, 120_000);
