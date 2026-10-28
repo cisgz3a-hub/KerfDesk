@@ -4744,20 +4744,34 @@ Set origin here again. It is a warning; Frame and Start are not refused (ADR-375
     way (`M8`, then `M9` after the last operation; the `M8` repeats of
     step 13 switch nothing), the pump must still be running through the middle
     operation and the last one, and Job Review must name the held
-    operation and `$152=100` (ADR-345: Creality's Falcon A1 parameter
-    page defines `$152` as the standby wait, so `100` keeps the pump
-    powered and `0` idles it immediately; the A1 Pro page does not list
-    it). Send `$152=100` from the Console while Idle: on the Falcon
-    command set it accepts `$150`, `$151` and `$152` (whole numbers
-    0-100) and still refuses every other numeric setting write
-    (ADR-370). The write clears the Frame proof, so Frame again before
-    Start. Untick "Air restart" and the same job must
+    operation. What else it names depends on the firmware (ADR-370
+    Amendment 1):
+    - **Falcon A1 Pro preset (grblHAL).** Job Review names an air test
+      on updated firmware, not `$152=100`, and its standby advisory says
+      that `$150`-`$152` set the motor microsteps on that firmware. The
+      Console refuses `$150`, `$151` and `$152`, naming the X, Y or Z
+      microstep setting, and every other numeric setting write. Do not
+      send them from another program either: on a build with the
+      Trinamic plugin, a power-of-two value changes how far that motor
+      moves.
+    - **Falcon on a stock-GRBL profile (the A1's numbering).** Job
+      Review names `$152=100` (ADR-345: Creality's Falcon A1 parameter
+      page defines `$152` as the standby wait, so `100` keeps the pump
+      powered and `0` idles it immediately). Send `$152=100` from the
+      Console while Idle: on this command set it accepts `$150`, `$151`
+      and `$152` (whole numbers 0-100) and still refuses every other
+      numeric setting write (ADR-370). It refuses them too when the
+      controller greets as grblHAL. The write clears the Frame proof, so
+      Frame again before Start.
+
+    Untick "Air restart" and the same job must
     go back to `M8 M9 M8 M9`. If the pump is audibly off for the last
     operation with the box ticked, the hold is not working; if it is
     off only with the box unticked, the firmware timer is confirmed.
 13. **Qualify air repeats on the installed firmware (ADR-462).** In a
-    separately supervised air check, record the firmware and current
-    `$152` setting. With "Air restart" ticked, inspect a short-block job
+    separately supervised air check, record the firmware and, on a
+    stock-GRBL Falcon, the current `$152` setting (the A1 Pro's
+    contract cannot read it). With "Air restart" ticked, inspect a short-block job
     of a minute or more with Air on: the program attempts `M8` repeats
     at eligible movement boundaries after about 5 s of estimated time.
     Observe whether the pump stays on and whether the enclosure fan
@@ -4765,8 +4779,9 @@ Set origin here again. It is a warning; Frame and Start are not refused (ADR-375
     dwells and continuous M3 cutting can exceed the trigger without a
     repeat, so this mitigation does not guarantee continuous air.
     Compare with "Air restart" unticked, which emits one `M8` for an
-    all-Air-on job. If air still stops, keep the firmware/`$152=100`
-    remedy from step 12 and verify it separately. Do not treat a pass
+    all-Air-on job. If air still stops, keep the remedy from step 12
+    (firmware, plus `$152=100` on a stock-GRBL Falcon only) and verify
+    it separately. Do not treat a pass
     on short blocks as qualification of every job or firmware version.
 
 When this checklist passes on the Falcon, replace the F.3 status in `PROJECT.md` Phase F

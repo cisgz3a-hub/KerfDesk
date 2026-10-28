@@ -169,7 +169,7 @@ export const TEST_STATUS = [
   {
     area: 'CNC router tools, including touch-plate probing',
     status: 'shipped-code-and-tests',
-    note: 'Never cut on a machine, and probing has never run on one. Check the output in a separate viewer, air-cut before cutting material, and stay with your first probe.',
+    note: 'Only informal cuts on one router (a Neotronics 4040), and probing has never run on a machine. Check the output in a separate viewer, air-cut before cutting material, and stay with your first probe.',
   },
   {
     area: 'Rotary',
