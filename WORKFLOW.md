@@ -1131,7 +1131,8 @@ that owns those fields, without changing the existing Frame/Start policy.
    a tab to remove it, or drag a tab to move it; each is one undo step. Placed tabs draw filled and
    the automatic tabs they replace draw hollow. **Done** or Esc returns to Select.
 4. Placed tabs replace the automatic tabs on their shape only, and only while tabs are on. They
-   move, rotate and scale with the artwork and survive copy and paste and break apart. **Reverse
+   move, rotate and scale with the artwork and survive copy and paste (into another project too,
+   and a Saved Artwork insert, where the copy gets a new operation colour) and break apart. **Reverse
    Direction** and the Edit nodes **Start** keep them where they were on the shape, and **Delete
    Duplicates** keeps a copy whose placed tabs differ. A shape opened with **Break** holds them
    until a straight line closes it again (**Close Path**), which puts each one back where it was,
@@ -1355,7 +1356,12 @@ that owns those fields, without changing the existing Frame/Start policy.
    Machine settings and generated toolpaths are excluded; the production cursor does not advance.
    Vector coordinates are rounded so each point lies within half a 0.001 mm grid diagonal of its
    true position, and the page is the exact extent of the drawn curves, not their control points
-   (ADR-431).
+   (ADR-431). The file has one colour per operation: a path keeps its own colour while that colour
+   names its operation alone (imported artwork re-exports as authored), and otherwise takes the
+   operation's colour, so operations stay distinct in the file and **Assign selection to
+   operation** reaches it. A Fill operation holding two or more objects is written as one
+   even-odd path, the region it burns: a shape drawn inside another on that operation stays a hole
+   in the file and after re-import (ADR-681).
 3. Cancellation writes nothing. Missing image pixels, unsupported 3D relief or invalid geometry
    report an error without claiming a successful partial export. A write error reports its reason.
    The file is made before the destination is asked for, so a failure leaves an existing file as
@@ -1375,7 +1381,8 @@ that owns those fields, without changing the existing Frame/Start policy.
 
 1. **File → Export artwork as DXF...** (or **Export selected artwork as DXF...**) writes the
    selection or scene's vector artwork as a millimetre DXF: one polyline per contour, one layer per
-   colour, circular arcs as exact bulges, cubics and elliptical arcs flattened within 0.01 mm.
+   operation, coloured as the SVG export colours it (ADR-681), circular arcs as exact bulges,
+   cubics and elliptical arcs flattened within 0.01 mm.
    Bitmaps and reliefs have no DXF form; they are left out and the completion message counts them.
 2. **Tools → Multi-File Trace...** first asks for the preset, format (SVG, DXF, PDF, EPS or
    GeoJSON), coordinate precision and, for SVG, **Group islands** (each shape with its holes);
@@ -1400,8 +1407,10 @@ that owns those fields, without changing the existing Frame/Start policy.
 2. PDF (1.4, one page) and EPS (EPSF 3.0) keep lines and curves exactly (arcs become cubics); the
    page / bounding box is the exact extent of the drawn curves, rounded outward, plus half the
    0.1 mm stroke on every side when strokes are drawn, and never under 3 pt. Filled layers fill
-   even-odd (text nonzero); line layers and open contours are 0.1 mm strokes. A page side over
-   5080 mm is written as PDF 1.6 with /UserUnit.
+   even-odd (text nonzero), and a Fill operation of two or more objects fills as one even-odd
+   path, as it burns (ADR-681); line layers and open contours are 0.1 mm strokes, with one colour
+   per operation as in the SVG export. A page side over 5080 mm is written as PDF 1.6 with
+   /UserUnit.
 3. GeoJSON flattens curves within 0.01 mm into Polygon rings (outer counterclockwise, holes
    clockwise) and LineStrings. Polygons follow each shape's fill rule, so they cover what the PDF
    fills; shapes whose outlines cross are written as separate `unmerged` polygons and the export

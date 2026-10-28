@@ -235,3 +235,11 @@ truncated huge header refused before allocation);
 `multi-file-trace-settings.test.ts` (newest record, the Trace dialog's merge, the machine
 default for an unknown preset, unchanged preset defaults, the notice). The whole vitest run over `src/ui/commands`, `src/core/trace` and
 `src/io` passes.
+
+### Amendment: one export colour per operation (2026-10-28)
+
+ADR-681 item 1: SVG, DXF and the ADR-468 formats write one colour per operation. A path keeps its
+stored colour only while that colour names its operation alone, so imported artwork re-exports as
+authored; otherwise it takes the operation's colour. DXF therefore has one layer per operation and
+distinct operations stay distinct in the file (rolling audit v7 L7-P2-1). ADR-681 item 2
+writes a Fill operation of two or more objects as one even-odd SVG path, the region it burns.

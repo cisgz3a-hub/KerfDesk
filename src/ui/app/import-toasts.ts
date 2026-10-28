@@ -25,7 +25,9 @@ export function describeImportResult(
     return out;
   }
 
-  const colorCount = result.object?.paths.length ?? 0;
+  // Paths with an explicit fill rule each keep their own entry, so count
+  // distinct colours rather than paths (rolling v7 L7-P1-1).
+  const colorCount = new Set(result.object?.paths.map((path) => path.color.toLowerCase())).size;
   out.push({
     message: `Imported ${filename} — ${count} object${count === 1 ? '' : 's'}, ${colorCount} color${colorCount === 1 ? '' : 's'}`,
     variant: 'success',

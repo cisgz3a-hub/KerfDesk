@@ -21,12 +21,20 @@ import {
 } from '../../core/vector-export/decimal-grid';
 import { formatSvgPathData } from '../../core/vector-export/svg-path-data';
 import { svgMatrixAttribute, svgNumber, xmlText } from './export-svg-paths';
-import { vectorPathElement, type SvgVectorOptions } from './export-svg-vector';
+import {
+  planExportColors,
+  planFillCompounds,
+  type ExportColors,
+  type FillCompound,
+  type FillCompoundPlan,
+} from './export-fill-compounds';
+import { fillCompoundElement, vectorPathElement, type SvgVectorOptions } from './export-svg-vector';
 import { SVG_ARTWORK_ORIGIN_ATTRIBUTE, svgArtworkOriginValue } from './svg-artwork-origin';
 
 const MIN_PAGE_EXTENT_MM = 0.01;
 
 type SvgElement = { readonly markup: string; readonly bounds: Bounds };
+type ExportPlan = { readonly compounds: FillCompoundPlan; readonly colors: ExportColors };
 export type SvgArtworkExport = { readonly svg: string; readonly objectCount: number };
 
 export type SceneSvgExportOptions = {
@@ -62,7 +70,18 @@ export function exportSceneSvg(
   if (relief !== undefined)
     return err('SVG cannot contain a 3D relief. Select only vector and image artwork.');
   try {
-    const elements = objects.map((object, index) => exportObject(object, index, project, options));
+    const plan: ExportPlan = {
+      compounds: planFillCompounds(project, objects),
+      colors: planExportColors(project, objects),
+    };
+    let compoundIndex = 0;
+    const elements = objects.flatMap((object, index) => [
+      exportObject(object, index, project, options, plan),
+      // A Fill operation of several objects is written once, after its first member.
+      ...(plan.compounds.atObject.get(index) ?? []).map((compound) =>
+        exportFillCompound(compound, compoundIndex++, options, plan.colors),
+      ),
+    ]);
     const page = pageBox(
       unionBounds(elements.map((element) => element.bounds)),
       options.precisionMm,
@@ -82,7 +101,7 @@ export function exportSceneSvg(
       svgArtworkOriginValue(page.origin) +
       '" overflow="visible">\n' +
       '<desc>KerfDesk artwork. Text is outlined; machine settings are not included.</desc>\n' +
-      elements.map((element) => element.markup).join('\n') +
+      elements.flatMap((element) => (element.markup === '' ? [] : [element.markup])).join('\n') +
       '\n</svg>\n';
     return ok({ svg, objectCount: objects.length });
   } catch (error) {
@@ -132,13 +151,20 @@ function exportObject(
   index: number,
   project: Project,
   options: SvgVectorOptions,
+  plan: ExportPlan,
 ): SvgElement {
   if (object.kind === 'raster-image') return exportImage(object, index, project);
   if (object.kind === 'relief') throw new Error('A 3D relief cannot be represented in SVG.');
-  const elements = object.paths.map((path) => vectorPathElement(object, path, project, options));
+  const elements = object.paths.map((path, pathIndex) =>
+    vectorPathElement(object, path, project, options, {
+      color: plan.colors.ofPath(object, path),
+      pooled: plan.compounds.pooled(object, pathIndex),
+    }),
+  );
   if (elements.length === 0) throw new Error('Artwork ' + object.id + ' contains no paths.');
   const drawn = elements.flatMap((element) => (element.bounds === null ? [] : [element.bounds]));
   if (drawn.length === 0) throw new Error('Artwork contains no exportable points.');
+  const markup = elements.map((element) => element.markup).join('');
   const title =
     object.kind === 'text'
       ? object.content
@@ -146,15 +172,33 @@ function exportObject(
         ? object.spec.kind
         : object.source;
   return {
+    // An object whose every contour went into fill compounds has no group of its own.
     markup:
-      '<g id="artwork-' +
+      markup === ''
+        ? ''
+        : '<g id="artwork-' + index + '"><title>' + xmlText(title) + '</title>' + markup + '</g>',
+    bounds: unionBounds(drawn),
+  };
+}
+
+function exportFillCompound(
+  compound: FillCompound,
+  index: number,
+  options: SvgVectorOptions,
+  colors: ExportColors,
+): SvgElement {
+  const element = fillCompoundElement(compound, colors.ofOperation(compound.operation), options);
+  if (element.bounds === null) throw new Error('Artwork contains no exportable points.');
+  return {
+    markup:
+      '<g id="fill-' +
       index +
       '"><title>' +
-      xmlText(title) +
+      xmlText(compound.operation.name) +
       '</title>' +
-      elements.map((element) => element.markup).join('') +
+      element.markup +
       '</g>',
-    bounds: unionBounds(drawn),
+    bounds: element.bounds,
   };
 }
 
