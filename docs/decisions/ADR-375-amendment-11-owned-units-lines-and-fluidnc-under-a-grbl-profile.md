@@ -126,6 +126,9 @@ so none of this is hardware evidence.
     After each owned write, Move to position, Go to work zero and the recovery move land where they
     should. With the tracking disabled, the four repros fail and the control passes.
   - `owned-report-units.test.ts` covers the program check.
+  - `frame-after-completed-coordinate.audit.test.ts` streams a program that ends in G20, then
+    frames. Before its Frame, the offset is now hidden, where KerfDesk used to read the inch
+    report (5, 2) as millimetres. After the Frame, the G92 datum is kept as before.
   - `fluidnc-bracket-under-grbl-profile.test.ts` runs the audit's FluidNC repro through the store
     under the stock-GRBL profile. It shares `fluidnc-board.test-support.ts` with Amendment 7's
     test. It covers `[13]1` unconfirmed and confirmed, the reset and erase lines, and
