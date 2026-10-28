@@ -221,15 +221,17 @@ function selectedObjectIds(
   additionalSelectedIds: ReadonlySet<string>,
 ): ReadonlyArray<string> {
   const ids = selectedObjectId === null ? [] : [selectedObjectId];
-  return [...ids, ...additionalSelectedIds].filter(uniqueId);
+  return [...new Set([...ids, ...additionalSelectedIds])];
 }
 
+// One id lookup per mouse-down, not a scan of the scene per selected id (J10-P2-1).
 function selectedObjectsForIds(
   objects: ReadonlyArray<SceneObject>,
   ids: ReadonlyArray<string>,
 ): ReadonlyArray<SceneObject> {
+  const objectsById = new Map(objects.map((object) => [object.id, object] as const));
   return ids
-    .map((id) => objects.find((object) => object.id === id))
+    .map((id) => objectsById.get(id))
     .filter((object): object is SceneObject => object !== undefined);
 }
 
@@ -331,18 +333,14 @@ function pickSelectionScaleDrag(args: {
   };
 }
 
-function uniqueId(id: string, index: number, ids: ReadonlyArray<string>): boolean {
-  return ids.indexOf(id) === index;
-}
-
 function moveStartTransforms(
   objects: ReadonlyArray<SceneObject>,
   ids: ReadonlyArray<string>,
 ): ReadonlyArray<MoveStartTransform> {
-  return ids
-    .map((id) => objects.find((object) => object.id === id))
-    .filter((object): object is SceneObject => object !== undefined)
-    .map((object) => ({ id: object.id, transform: { ...object.transform } }));
+  return selectedObjectsForIds(objects, ids).map((object) => ({
+    id: object.id,
+    transform: { ...object.transform },
+  }));
 }
 
 export function transformUpdatesForMoveDrag(

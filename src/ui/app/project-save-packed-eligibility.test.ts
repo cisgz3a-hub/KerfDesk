@@ -3,6 +3,7 @@ import { denseProjectSaveGeometry } from '../../__fixtures__/project-save-geomet
 import {
   ProjectSaveTestWorker,
   currentProjectSaveWorker,
+  savedContentsText,
 } from '../../__fixtures__/project-save-worker';
 import { unpackProjectMessage } from '../packed-project-transfer';
 import { projectSaveGeometryCanPack } from './project-save-packed-eligibility';
@@ -64,7 +65,7 @@ describe('manual Save packed geometry eligibility', () => {
         expect(expected.kind).toBe('invalid');
       else {
         expect(expected.kind).toBe('ok');
-        if (expected.kind === 'ok') expect(expected.json).toContain('"rawExtra": "preserve"');
+        if (expected.kind === 'ok') expect(expected.json).toContain('"rawExtra":"preserve"');
       }
       const saving = prepareProjectSaveOffThread(project, new AbortController().signal);
       const worker = currentProjectSaveWorker();
@@ -91,11 +92,14 @@ describe('manual Save packed geometry eligibility', () => {
       });
       const raw = prepareProjectRecoveryMessage(project);
       worker.respond(prepareProjectSaveRequest(worker.postMessage.mock.calls[0]![0]));
-      await expect(saving).resolves.toEqual(raw);
-      if (raw.kind !== 'ok') throw new Error('Raw geometry could not be serialized.');
-      if (mutation === 'numeric-string') expect(raw.json).toContain('"x": "0"');
-      else if (mutation === 'closed-string') expect(raw.json).toContain('"closed": "false"');
-      else expect(raw.json).toContain('"rawExtra": "preserve"');
+      const saved = await saving;
+      if (raw.kind !== 'ok' || saved.kind !== 'ok')
+        throw new Error('Raw geometry could not be serialized.');
+      const text = await savedContentsText(raw.json);
+      expect(await savedContentsText(saved.json)).toBe(text);
+      if (mutation === 'numeric-string') expect(text).toContain('"x":"0"');
+      else if (mutation === 'closed-string') expect(text).toContain('"closed":"false"');
+      else expect(text).toContain('"rawExtra":"preserve"');
     },
   );
 
@@ -112,16 +116,16 @@ describe('manual Save packed geometry eligibility', () => {
       const message = worker.postMessage.mock.calls[0]![0];
       expect(message).toEqual({ project, mode, representation: 'original' });
       const prepared = prepareProjectSaveRequest(message);
-      expect(prepared).toEqual(
+      const expected =
         mode === 'canonical'
           ? prepareProjectSaveMessage(project)
-          : prepareProjectRecoveryMessage(project),
-      );
-      expect(prepared.kind).toBe('ok');
-      if (mode === 'recovery' && prepared.kind === 'ok')
-        expect(prepared.json).toContain('"kind": "packed-project"');
+          : prepareProjectRecoveryMessage(project);
+      if (prepared.kind !== 'ok' || expected.kind !== 'ok') throw new Error('Not prepared.');
+      expect(await savedContentsText(prepared.json)).toBe(await savedContentsText(expected.json));
+      if (mode === 'recovery')
+        expect(await savedContentsText(prepared.json)).toContain('"kind":"packed-project"');
       worker.respond(prepared);
-      await expect(saving).resolves.toEqual(prepared);
+      await expect(saving).resolves.toBe(prepared);
     },
   );
 });

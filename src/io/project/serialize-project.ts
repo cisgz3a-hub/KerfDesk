@@ -1,7 +1,9 @@
 // serializeProject — turns a Project into a deterministic .lf2 string.
 //
-// Manual .lf2 files use 2-space JSON indentation; autosave can omit it.
-// Both formats retain a trailing newline and LF endings. V8's
+// The default uses 2-space JSON indentation; Save, autosave and the raw
+// recovery copy write it compact (ADR-204 Amendment 2), at about a third of
+// the size for dense vector artwork. Both formats retain a trailing newline
+// and LF endings. V8's
 // JSON.stringify preserves property insertion order, and all our domain
 // constructors use consistent literal-shape orderings, so output is
 // byte-deterministic given a byte-deterministic Project.
@@ -15,26 +17,64 @@ import {
 import { isBooleanCompoundObject } from '../../core/scene/boolean-compound';
 import type { ImportedSvg } from '../../core/scene/scene-object';
 import { compactLineGeometry } from '../../core/scene/compact-line-geometry';
-import { stringifyProjectJson } from './stringify-project-json';
+import { isTextLengthLimitError } from './project-text-limit';
+import { stringifyProjectJson, stringifyProjectJsonChunks } from './stringify-project-json';
 
 export function serializeProject(
   project: Project,
   options: { readonly compact?: boolean } = {},
 ): string {
   const serializable = withCurveGeometry(project);
-  const json = hasTypedRelief(project)
+  const json = project.scene.objects.some(hasTypedRelief)
     ? stringifyProjectJson(serializable, options)
     : JSON.stringify(serializable, null, options.compact === true ? undefined : 2);
   return `${json}\n`;
 }
 
-function hasTypedRelief(project: Project): boolean {
-  return project.scene.objects.some(
-    (object) =>
-      object.kind === 'relief' &&
-      object.reliefSource.kind === 'legacy-mesh' &&
-      (object.reliefSource.meshPositions instanceof Float32Array ||
-        object.reliefSource.meshPositions instanceof Float64Array),
+/**
+ * The compact text of `serializeProject`, as ordered chunks that are never
+ * joined, so a project whose text passes the engine's longest string still
+ * reaches a file as a Blob (the raw recovery copy, J10-P3-3). Each scene
+ * object is written natively while its own text fits.
+ */
+export function serializeProjectChunks(project: Project): readonly string[] {
+  const serializable = withCurveGeometry(project);
+  const objects = serializable.scene.objects;
+  const chunks = stringifyProjectJsonChunks(serializable, {
+    compact: true,
+    writeSubtree: (value, append) => {
+      if (value !== objects) return false;
+      append('[');
+      for (let index = 0; index < objects.length; index += 1) {
+        if (index > 0) append(',');
+        for (const chunk of objectJsonChunks(objects[index])) append(chunk);
+      }
+      append(']');
+      return true;
+    },
+  });
+  return [...chunks, '\n'];
+}
+
+function objectJsonChunks(object: SceneObject | undefined): readonly string[] {
+  // An array hole, as JSON.stringify writes it.
+  if (object === undefined) return ['null'];
+  if (!hasTypedRelief(object)) {
+    try {
+      return [JSON.stringify(object)];
+    } catch (error) {
+      if (!isTextLengthLimitError(error)) throw error;
+    }
+  }
+  return stringifyProjectJsonChunks(object, { compact: true });
+}
+
+function hasTypedRelief(object: SceneObject): boolean {
+  return (
+    object.kind === 'relief' &&
+    object.reliefSource.kind === 'legacy-mesh' &&
+    (object.reliefSource.meshPositions instanceof Float32Array ||
+      object.reliefSource.meshPositions instanceof Float64Array)
   );
 }
 
