@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createStreamer, step, type StreamerState } from '../../core/controllers/grbl';
+import { grblDriver, marlinDriver } from '../../core/controllers';
 import type { HostedStreamRefill, SerialConnection } from '../../platform/types';
 import { makeLineHandlerHarness } from './laser-line-handler.test-support';
 import {
@@ -13,6 +14,7 @@ import type { SafeWriteFn } from './laser-line-shared';
 
 type FakeRefill = HostedStreamRefill & {
   readonly armCalls: () => ReadonlyArray<StreamerState>;
+  readonly armAcks: () => ReadonlyArray<string | undefined>;
   readonly releaseCalls: () => number;
   readonly setArmed: (armed: boolean) => void;
 };
@@ -20,10 +22,12 @@ type FakeRefill = HostedStreamRefill & {
 function fakeRefill(): FakeRefill {
   const state = { armed: false, releases: 0 };
   const armed: StreamerState[] = [];
+  const acks: Array<string | undefined> = [];
   return {
     isArmed: () => state.armed,
-    arm: async (readStreamer) => {
+    arm: async (readStreamer, grammar) => {
       armed.push(readStreamer() as StreamerState);
+      acks.push(grammar);
       state.armed = true;
     },
     release: async () => {
@@ -32,6 +36,7 @@ function fakeRefill(): FakeRefill {
     },
     onWriteError: () => () => undefined,
     armCalls: () => armed,
+    armAcks: () => acks,
     releaseCalls: () => state.releases,
     setArmed: (value) => {
       state.armed = value;
@@ -62,13 +67,13 @@ describe('hosted refill helpers (ADR-334)', () => {
     expect(hostedRefillArmed({})).toBe(false);
 
     // Both calls are no-ops rather than throwing on the ordinary transport.
-    await armHostedRefill({}, streamingJob);
+    await armHostedRefill({ driver: grblDriver }, streamingJob);
     await releaseHostedRefill({});
   });
 
   it('hands over only a stream that is actually streaming', async () => {
     const refill = fakeRefill();
-    const refs = { connection: connectionWith(refill) };
+    const refs = { connection: connectionWith(refill), driver: grblDriver };
 
     await armHostedRefill(refs, () => null);
     await armHostedRefill(refs, () => ({ ...streamingJob(), status: 'paused' }));
@@ -78,6 +83,16 @@ describe('hosted refill helpers (ADR-334)', () => {
     await armHostedRefill(refs, () => streaming);
     expect(refill.armCalls()).toEqual([streaming]);
     expect(hostedRefillArmed(refs)).toBe(true);
+  });
+
+  // ADR-675: the arm names the reply grammar the worker pumps with.
+  it.each([
+    ['GRBL', grblDriver, 'grbl'],
+    ['Marlin', marlinDriver, 'marlin'],
+  ] as const)('arms a %s stream with its reply grammar', async (_label, driver, grammar) => {
+    const refill = fakeRefill();
+    await armHostedRefill({ connection: connectionWith(refill), driver }, () => streamingJob());
+    expect(refill.armAcks()).toEqual([grammar]);
   });
 });
 

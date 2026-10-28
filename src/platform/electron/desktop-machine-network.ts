@@ -1,9 +1,4 @@
-import type {
-  HostedNetworkSessionOpener,
-  MachineNetworkAdapter,
-  SerialConnection,
-  SerialOpenRequest,
-} from '../types';
+import type { MachineNetworkAdapter, SerialConnection, SerialOpenRequest } from '../types';
 import { wireEncodingError } from '../../core/controllers/serial-wire-encoding';
 import {
   MACHINE_NETWORK_ROUTE,
@@ -11,6 +6,15 @@ import {
   type MachineNetworkRequest,
 } from './desktop-machine-network-api';
 const MAX_NETWORK_LINE_LENGTH = 64 * 1024;
+
+/** Streams an open session from a worker the app's root entry supplies
+ * (ADR-675), since platform/electron cannot reach platform/web. The worker
+ * reads and writes the session itself, through `route`. Null when it could
+ * not start before it touched the session: the window then streams it. */
+export type HostedNetworkSessionOpener = (args: {
+  readonly sessionId: string;
+  readonly route: { readonly url: string; readonly header: string };
+}) => Promise<SerialConnection | null>;
 
 /** `hostSession` streams a session from a worker (ADR-675). Without it, or
  * when its worker cannot start, the window streams the session itself. */
@@ -35,7 +39,6 @@ export function createDesktopMachineNetwork(
             const hosted = await hostSession({
               sessionId: id,
               route: MACHINE_NETWORK_ROUTE,
-              acks: req?.hostedAcknowledgements ?? 'grbl',
             }).catch(async (error: unknown) => {
               await request('close', { sessionId: id }).catch(() => undefined);
               throw error;

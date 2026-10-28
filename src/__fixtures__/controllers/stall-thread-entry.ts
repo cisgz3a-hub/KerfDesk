@@ -36,6 +36,8 @@ export type StallThreadMessage =
       readonly kind: 'report';
       readonly litStops: ReadonlyArray<LitStop>;
       readonly received: ReadonlyArray<string>;
+      /** The reply grammar each arm named, in order (ADR-675). */
+      readonly armAcks: ReadonlyArray<string | null>;
     };
 
 type Port = {
@@ -55,20 +57,24 @@ export async function start(port: Port, config: StallThreadConfig): Promise<void
   const controller = await openController(config.firmware);
   const litStops = sampleLitStops(controller);
   const handleSerial = attachTransport(port, config.transport, controller);
+  const armAcks: Array<string | null> = [];
   port.on('message', (raw) => {
     const message = raw as
       | { readonly channel: 'wire'; readonly data: string }
-      | { readonly channel: 'serial'; readonly message: unknown }
+      | { readonly channel: 'serial'; readonly message: { kind?: string; acks?: string } }
       | { readonly channel: 'harness'; readonly kind: 'boot' | 'report' };
     if (message.channel === 'wire') void controller.connection.write(message.data);
-    else if (message.channel === 'serial') handleSerial(message.message);
-    else if (message.kind === 'boot') controller.boot();
+    else if (message.channel === 'serial') {
+      if (message.message.kind === 'arm') armAcks.push(message.message.acks ?? null);
+      handleSerial(message.message);
+    } else if (message.kind === 'boot') controller.boot();
     else {
       port.postMessage({
         channel: 'harness',
         kind: 'report',
         litStops: litStops(),
         received: controller.received(),
+        armAcks,
       });
     }
   });

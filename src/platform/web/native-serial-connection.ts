@@ -1,4 +1,4 @@
-import type { HostedStreamAcks, SerialConnection, SerialPortIdentity } from '../types';
+import type { SerialConnection, SerialPortIdentity } from '../types';
 import {
   createWorkerSerialConnection,
   WORKER_HANDSHAKE_TIMEOUT_MS,
@@ -24,8 +24,6 @@ export async function tryOpenNativeSerialConnection(args: {
   readonly serial?: Pick<Serial, 'getPorts'>;
   readonly createWorker?: () => NativeWorker;
   readonly timeoutMs?: number;
-  /** The controller's acknowledgement grammar for the refill (ADR-675). */
-  readonly acks?: HostedStreamAcks;
 }): Promise<SerialConnection | null> {
   const serial = args.serial ?? navigator.serial;
   const timeoutMs = args.timeoutMs ?? WORKER_HANDSHAKE_TIMEOUT_MS;
@@ -59,7 +57,7 @@ export async function tryOpenNativeSerialConnection(args: {
       timeoutMs,
     );
     requireNativeOpen(opened);
-    return openedConnection(bridge, args.port, timeoutMs, args.acks);
+    return openedConnection(bridge, args.port, timeoutMs);
   } catch (error) {
     bridge.terminate();
     if (openSent) throw error;
@@ -80,10 +78,8 @@ function openedConnection(
   bridge: NativeBridge,
   port: SerialPort,
   timeoutMs: number,
-  acks: HostedStreamAcks | undefined,
 ): SerialConnection {
   return createWorkerSerialConnection({
-    ...(acks === undefined ? {} : { acks }),
     bridge: {
       postMessage: (message, transfer) => {
         if (message.kind === 'attach' || message.kind === 'reattach-readable')

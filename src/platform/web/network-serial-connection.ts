@@ -5,7 +5,7 @@
 // Once it has taken the session the worker is its only reader and writer, so a
 // later failure closes the connection instead (ADR-354 decision 3).
 
-import type { HostedNetworkSessionOpener, SerialConnection } from '../types';
+import type { SerialConnection } from '../types';
 import {
   createWorkerSerialConnection,
   WORKER_HANDSHAKE_TIMEOUT_MS,
@@ -15,12 +15,20 @@ import {
   NETWORK_ATTACH_READ_TIMEOUT_MS,
   type NetworkSerialWorkerRequest,
   type NetworkSerialWorkerResponse,
+  type NetworkSessionRoute,
 } from './network-serial-worker-protocol';
 
 type NetworkWorker = Pick<
   Worker,
   'postMessage' | 'terminate' | 'onmessage' | 'onerror' | 'onmessageerror'
 >;
+
+/** Hands an open session to the worker; null when the window must stream it.
+ * The desktop adapter's HostedNetworkSessionOpener has this shape. */
+export type NetworkSessionOpener = (args: {
+  readonly sessionId: string;
+  readonly route: NetworkSessionRoute;
+}) => Promise<SerialConnection | null>;
 
 /** The worker's first read waits up to a second on the main process. */
 const ATTACH_TIMEOUT_MS = NETWORK_ATTACH_READ_TIMEOUT_MS + 500;
@@ -29,8 +37,8 @@ export function createNetworkSessionOpener(
   createWorker: () => NetworkWorker = () =>
     new Worker(new URL('./network-serial-stream-worker.ts', import.meta.url), { type: 'module' }),
   timeoutMs: number = WORKER_HANDSHAKE_TIMEOUT_MS,
-): HostedNetworkSessionOpener {
-  return async ({ sessionId, route, acks }) => {
+): NetworkSessionOpener {
+  return async ({ sessionId, route }) => {
     let worker: NetworkWorker;
     try {
       worker = createWorker();
@@ -49,15 +57,11 @@ export function createNetworkSessionOpener(
       bridge.terminate();
       throw new Error('The network streaming worker did not answer. Connect again.');
     }
-    return openedConnection(bridge, timeoutMs, acks);
+    return openedConnection(bridge, timeoutMs);
   };
 }
 
-function openedConnection(
-  bridge: Bridge,
-  timeoutMs: number,
-  acks: Parameters<HostedNetworkSessionOpener>[0]['acks'],
-): SerialConnection {
+function openedConnection(bridge: Bridge, timeoutMs: number): SerialConnection {
   return createWorkerSerialConnection({
     bridge: {
       postMessage: (message, transfer) => {
@@ -76,7 +80,6 @@ function openedConnection(
     port: { readable: null, writable: null, close: async () => undefined },
     timeoutMs,
     start: () => bridge.post({ kind: 'network-start' }),
-    acks,
   });
 }
 
@@ -127,7 +130,7 @@ function createBridge(worker: NetworkWorker) {
 function attachReply(
   bridge: Bridge,
   sessionId: string,
-  route: Parameters<HostedNetworkSessionOpener>[0]['route'],
+  route: NetworkSessionRoute,
 ): Promise<'ready' | 'unavailable' | 'silent'> {
   return new Promise((resolve) => {
     let settled = false;

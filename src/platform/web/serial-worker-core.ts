@@ -35,7 +35,7 @@ import {
   marlinLineStopsHostedRefill,
   marlinTerminalAck,
 } from '../../core/controllers/marlin/hosted-refill';
-import type { HostedStreamAcks } from '../types';
+import type { HostedStreamAcks } from '../../core/controllers/hosted-stream-acks';
 import { closeWriterBounded } from './bounded-writer-close';
 import { decodeProgramLines } from './serial-program-buffer';
 import {

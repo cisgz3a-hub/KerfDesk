@@ -15,7 +15,7 @@
 // the job (ADR-354 Amendment 3).
 
 import type { StreamerState } from '../../core/controllers/grbl';
-import type { HostedStreamAcks } from '../types';
+import type { HostedStreamAcks } from '../../core/controllers/hosted-stream-acks';
 import type { ProgramBuffers } from './serial-program-buffer';
 
 /** Everything a refill needs from the stream except the program it reads. */

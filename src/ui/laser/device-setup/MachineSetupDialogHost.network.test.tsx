@@ -159,9 +159,9 @@ describe('first FluidNC network Connect setup recovery', () => {
     expect(controlsText()).not.toMatch(/Try other speeds|baud/);
     await act(async () => button('Try again').click());
     expect(open).toHaveBeenCalledTimes(2);
-    // A worker streams the session (ADR-675), with GRBL's acknowledgements.
+    // A worker streams the session (ADR-675).
     for (const [request] of open.mock.calls)
-      expect(request).toMatchObject({ hostedStreaming: true, hostedAcknowledgements: 'grbl' });
+      expect(request).toMatchObject({ hostedStreaming: true });
     expect(link.usbRequest).not.toHaveBeenCalled();
   });
 
@@ -231,7 +231,7 @@ describe('first FluidNC network Connect setup recovery', () => {
   // Rolling audit v6 K1-P1-3: network sessions streamed only from the window,
   // so a busy window left an M3 beam on over a stopped head (ADR-675).
   it.each([
-    [true, { hostedStreaming: true, hostedAcknowledgements: 'grbl' }],
+    [true, { hostedStreaming: true }],
     [false, {}],
   ] as const)(
     'network retries follow the saved worker preference (%s)',

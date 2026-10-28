@@ -309,13 +309,13 @@ function serialOpenRequest(
   options: ConnectControllerOptions,
   driver: ControllerDriver,
 ): SerialOpenRequest {
-  // The worker pump reads GRBL's and Marlin's acknowledgements (ADR-675). An
-  // old profile may survive a controller change or arrive in an imported project.
-  const acks = hostedStreamAcknowledgements(driver);
+  // The worker pump reads GRBL's and Marlin's acknowledgements; each arm names
+  // which (ADR-675). An old profile may survive a controller change or arrive
+  // in an imported project.
   return {
     baudRate,
-    ...(options.hostedStreaming !== false && acks !== null
-      ? { hostedStreaming: true, hostedAcknowledgements: acks }
+    ...(options.hostedStreaming !== false && hostedStreamAcknowledgements(driver) !== null
+      ? { hostedStreaming: true }
       : {}),
   };
 }

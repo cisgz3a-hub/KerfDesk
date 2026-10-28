@@ -49,10 +49,11 @@ Research, per the maintainer's "research what LightBurn does and copy":
 
 ### Decision
 
-1. **Marlin streams from the ADR-354 worker.** The arm message names the acknowledgement
-   grammar, `grbl` or `marlin` (`HostedStreamAcks`). The connection's open request carries the
-   grammar to the worker it creates. Under Marlin's grammar the worker refills one line on each
-   `ok`, ping-pong, as it already does for FluidNC.
+1. **Marlin streams from the ADR-354 worker.** Each arm message names the acknowledgement
+   grammar, `grbl` or `marlin` (`HostedStreamAcks`), which the store takes from the connection's
+   driver when it arms the refill (`HostedStreamRefill.arm`). The open request is unchanged. Under
+   Marlin's grammar the worker refills one line on each `ok`, ping-pong, as it already does for
+   FluidNC.
    - **Replies that hand the refill back.** Every `Error:`, a skipped move or an unknown command,
      `Resend:`, and a boot banner. The worker hands the refill back before it forwards the line
      (`core/controllers/marlin/hosted-refill.ts`). The main thread then handles the following `ok`
@@ -124,7 +125,8 @@ Research, per the maintainer's "research what LightBurn does and copy":
 - A hosted network session's reads and writes no longer run on the window's thread. That is the
   path where rolling audit v6 K2-P2-1 (a renderer read timeout during a long window task) and
   K2-P1-1 (a late reply against the heartbeat) were found. Neither was re-measured here.
-- The worker protocol gains `acks` on `arm`. The network worker's messages are new.
+- The worker protocol gains `acks` on `arm`, and `HostedStreamRefill.arm` an optional `acks`
+  argument. The network worker's messages are new.
   `DesktopMachineConnection` reports `backgroundStreamingUnavailable` only when a worker was
   asked for.
 
@@ -148,8 +150,9 @@ Research, per the maintainer's "research what LightBurn does and copy":
   | grblHAL (M3), desktop network worker | 1,000 ms | 0 ms |
 
   Each control run also shows Job Review's warning for that kind of stop, read from the live
-  session. Each worker run shows none, sends the program to the controller once and in order, and
-  has no job move after Abort's `M410`.
+  session. Each worker run shows none, and its arm named the controller's grammar (`marlin` for
+  Marlin, `grbl` for grblHAL). It sends the program to the controller once and in order, and has
+  no job move after Abort's `M410`.
 - **Unit tests:**
   - `serial-worker-core.marlin.test.ts`: the grammar, the lines that hand the refill back, and
     writes that retire it.

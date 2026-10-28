@@ -112,7 +112,7 @@ function windowConnection(thread: Worker): SerialConnection {
 }
 
 // The production worker transport, with the port the thread owns.
-function usbWorkerConnection(thread: Worker, request: SerialOpenRequest): SerialConnection {
+function usbWorkerConnection(thread: Worker): SerialConnection {
   const handlers = new Set<(message: SerialWorkerResponse) => void>();
   on(thread, 'serial', (message: { readonly message: SerialWorkerResponse }) => {
     for (const handler of handlers) handler(message.message);
@@ -129,9 +129,6 @@ function usbWorkerConnection(thread: Worker, request: SerialOpenRequest): Serial
     },
     port: { readable: null, writable: null, close: async () => undefined },
     start: () => thread.postMessage({ channel: 'serial', message: { kind: 'harness-start' } }),
-    ...(request.hostedAcknowledgements === undefined
-      ? {}
-      : { acks: request.hostedAcknowledgements }),
   });
 }
 
@@ -146,7 +143,7 @@ function usbAdapter(thread: Worker, transport: StallThreadConfig['transport']): 
       requestPort: async () => ({
         open: async (request: SerialOpenRequest) =>
           transport === 'usb-worker' && request.hostedStreaming === true
-            ? usbWorkerConnection(thread, request)
+            ? usbWorkerConnection(thread)
             : windowConnection(thread),
       }),
     },
@@ -183,6 +180,7 @@ function networkAdapter(thread: Worker): PlatformAdapter {
 async function report(thread: Worker): Promise<{
   readonly litStops: ReadonlyArray<LitStop>;
   readonly received: ReadonlyArray<string>;
+  readonly armAcks: ReadonlyArray<string | null>;
 }> {
   return new Promise((done) => {
     const handler = (message: StallThreadMessage): void => {
@@ -292,6 +290,7 @@ type Run = {
   readonly received: ReadonlyArray<string>;
   readonly warnings: ReadonlyArray<string>;
   readonly program: string;
+  readonly armAcks: ReadonlyArray<string | null>;
 };
 
 async function runStall(
@@ -334,6 +333,7 @@ async function runStall(
     received: measured.received.join('').split('\n'),
     warnings,
     program,
+    armAcks: measured.armAcks,
   };
 }
 
@@ -372,6 +372,8 @@ describe('a blocked window during a burn (rolling audit v6 K1)', () => {
     it('Marlin inline over a worker-owned USB port never stops lit', async () => {
       const run = await runStall(MARLIN_INLINE, 'usb-worker');
       expect(useLaserStore.getState().jobStreamHost).toBe('worker');
+      // The store armed the worker with Marlin's reply grammar.
+      expect(run.armAcks).toEqual(['marlin']);
       expect(run.litDuringStall).toBeLessThan(LIT_TOLERANCE_MS);
       expect(run.warnings).toEqual([]);
       // Every line reached the controller once, in order.
@@ -381,6 +383,7 @@ describe('a blocked window during a burn (rolling audit v6 K1)', () => {
 
     it('Marlin fan output over a worker-owned USB port never stops lit, and Abort stops clean', async () => {
       const run = await runStall(MARLIN_FAN, 'usb-worker', { abortAfterStall: true });
+      expect(run.armAcks).toEqual(['marlin']);
       expect(run.litDuringStall).toBeLessThan(LIT_TOLERANCE_MS);
       expect(run.warnings).toEqual([]);
       // Abort's quickstop (M107, M410, M5 I) takes the refill back first, so
@@ -393,6 +396,7 @@ describe('a blocked window during a burn (rolling audit v6 K1)', () => {
 
     it('grblHAL under M3 over a desktop network session never stops lit', async () => {
       const run = await runStall(GRBLHAL_COMPATIBLE, 'network-worker');
+      expect(run.armAcks).toEqual(['grbl']);
       expect(useLaserStore.getState().jobStreamHost).toBe('worker');
       expect(run.litDuringStall).toBeLessThan(LIT_TOLERANCE_MS);
       expect(run.warnings).toEqual([]);

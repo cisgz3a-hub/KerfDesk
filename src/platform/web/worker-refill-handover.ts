@@ -1,5 +1,6 @@
 import type { StreamerState } from '../../core/controllers/grbl';
-import type { HostedStreamAcks, HostedStreamRefill } from '../types';
+import type { HostedStreamAcks } from '../../core/controllers/hosted-stream-acks';
+import type { HostedStreamRefill } from '../types';
 import { encodeProgramLines } from './serial-program-buffer';
 import type { SerialWorkerRequest, SerialWorkerResponse } from './serial-worker-protocol';
 
@@ -26,6 +27,8 @@ type HandoverState = {
   nextId: number;
   pending: Pending | null;
   snapshot: (() => unknown | null) | null;
+  /** The reply grammar the pending arm names; GRBL's when absent (ADR-675). */
+  acks: HostedStreamAcks | undefined;
   /** The id of the program the worker holds, or null when it holds none. */
   workerProgram: number | null;
   nextProgramId: number;
@@ -39,8 +42,6 @@ type HandoverDeps = {
   readonly timeoutMs: number;
   readonly fail: () => void;
   readonly onWriteError: HostedStreamRefill['onWriteError'];
-  /** The controller's acknowledgement grammar; GRBL's when absent (ADR-675). */
-  readonly acks?: HostedStreamAcks;
 };
 
 /** The ready barrier drains all previously forwarded lines before capturing
@@ -56,6 +57,7 @@ export function createWorkerRefillHandover(deps: HandoverDeps): {
     nextId: 1,
     pending: null,
     snapshot: null,
+    acks: undefined,
     workerProgram: null,
     nextProgramId: 1,
     programIds: new WeakMap(),
@@ -63,11 +65,12 @@ export function createWorkerRefillHandover(deps: HandoverDeps): {
   return {
     refill: {
       isArmed: () => state.handedOver,
-      arm: (readSnapshot) => {
+      arm: (readSnapshot, acks) => {
         if (state.phase !== 'main') return state.pending?.promise ?? Promise.resolve();
         state.phase = 'preparing';
         const request = begin(state, deps);
         state.snapshot = readSnapshot;
+        state.acks = acks;
         post(deps, { kind: 'prepare-arm', id: request.id });
         return request.promise;
       },
@@ -217,7 +220,7 @@ function captureSnapshot(state: HandoverState, deps: HandoverDeps, id: number): 
     id,
     programId,
     position,
-    ...(deps.acks === undefined ? {} : { acks: deps.acks }),
+    ...(state.acks === undefined ? {} : { acks: state.acks }),
   });
 }
 

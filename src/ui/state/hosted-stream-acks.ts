@@ -9,7 +9,7 @@
 // have not been ported to the worker.
 
 import type { ControllerDriver } from '../../core/controllers';
-import type { HostedStreamAcks } from '../../platform/types';
+import type { HostedStreamAcks } from '../../core/controllers/hosted-stream-acks';
 import { isGrblFamilyDriver } from './laser-disconnect-transaction';
 
 export function hostedStreamAcknowledgements(driver: ControllerDriver): HostedStreamAcks | null {
