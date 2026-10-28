@@ -42,7 +42,9 @@ describe('manual Save packed geometry eligibility', () => {
     const expected = prepareProjectSaveMessage(project);
     expect(prepared.kind).toBe('ok');
     if (prepared.kind === 'ok' && expected.kind === 'ok')
-      expect(JSON.parse(prepared.json)).toEqual(JSON.parse(expected.json));
+      expect(JSON.parse(await savedContentsText(prepared.json))).toEqual(
+        JSON.parse(await savedContentsText(expected.json)),
+      );
     worker.respond(prepared);
     await expect(saving).resolves.toEqual(prepared);
   });
