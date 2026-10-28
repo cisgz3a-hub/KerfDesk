@@ -23,16 +23,27 @@ export type ShortcutFamily = {
   readonly rows: ReadonlyArray<ShortcutRow>;
 };
 
-// Keyboard jog, live while the jog pad is shown and enabled: Z focus on the
-// Page keys, XY on LightBurn's Move-window keys (ADR-493, jog-keyboard-map.ts).
+// Keyboard jog, live while the jog pad is shown and enabled: Z focus on
+// Ctrl+Alt+PgUp/PgDn (ADR-493 Amendment 2; bare PgUp/PgDn are LightBurn's draw
+// order), XY on LightBurn's Move-window keys (ADR-493, jog-keyboard-map.ts).
 const JOG_SHORTCUT_ROWS: ReadonlyArray<ShortcutRow> = [
-  { keys: 'PageUp/PageDown', action: 'jog Z (focus) up/down one step' },
+  { keys: 'Ctrl+Alt+PgUp / Ctrl+Alt+PgDn', action: 'jog Z (focus) up/down one step' },
   { keys: 'Ctrl+Shift+] / Ctrl+Shift+[', action: 'jog up/down one step, like the jog arrows' },
   { keys: 'Ctrl+Alt+[ / Ctrl+Alt+]', action: 'jog left/right one step' },
   {
     keys: 'Numpad 8/2/4/6 (Num Lock on)',
     action: 'jog up/down/left/right one step; 7/9/1/3 jog diagonally',
   },
+];
+
+// Flip and rotate (shortcuts.ts, editing-tool-shortcuts.ts): KerfDesk's bare H / V
+// and LightBurn's chords. LightBurn's 15° keys are Abort and Settings here.
+const FLIP_ROTATE_SHORTCUT_ROWS: ReadonlyArray<ShortcutRow> = [
+  { keys: 'H or Ctrl+Shift+H', action: 'flip horizontal' },
+  { keys: 'V or Ctrl+Shift+V', action: 'flip vertical' },
+  { keys: '. or ,', action: 'rotate 90° clockwise or counter-clockwise' },
+  { keys: 'Shift+. or Shift+,', action: 'rotate 45° clockwise or counter-clockwise' },
+  { keys: 'Ctrl+Shift+. or Ctrl+Shift+,', action: 'rotate 1.5° clockwise or counter-clockwise' },
 ];
 
 // Canvas snapping overrides (LBG-F06, workspace-pointer-snap.ts, drag-snap.ts).
@@ -53,15 +64,16 @@ const FILE_SHORTCUT_ROWS: ReadonlyArray<ShortcutRow> = [
   { keys: 'Ctrl+Shift+E', action: 'export G-code' },
 ];
 
-// Align and distribute (arrange-shortcut-keys.ts): LightBurn's Alt+arrow and
-// Alt+PgUp/PgDn, plus Alt+Shift+H/V for equal spacing.
+// Align, Move Together and draw order (arrange-shortcut-keys.ts), all LightBurn's.
 const ARRANGE_SHORTCUT_ROWS: ReadonlyArray<ShortcutRow> = [
   { keys: 'Alt+Left / Alt+Right', action: 'align left or right edges' },
   { keys: 'Alt+Up / Alt+Down', action: 'align top or bottom edges' },
   { keys: 'Alt+PgUp', action: 'align centres on one vertical line (Align Center X)' },
   { keys: 'Alt+PgDn', action: 'align centres on one horizontal line (Align Center Y)' },
-  { keys: 'Alt+Shift+H', action: 'distribute with equal horizontal spacing' },
-  { keys: 'Alt+Shift+V', action: 'distribute with equal vertical spacing' },
+  { keys: 'Alt+Shift+H', action: 'move together side by side (Move H Together)' },
+  { keys: 'Alt+Shift+V', action: 'move together edge to edge (Move V Together)' },
+  { keys: 'PgUp / PgDn', action: 'bring forward or send backward in draw order' },
+  { keys: 'Ctrl+PgUp / Ctrl+PgDn', action: 'bring to front or send to back' },
 ];
 
 // Arrow-key nudge: the distances are an app preference (Edit → Settings).
@@ -98,13 +110,13 @@ export function shortcutFamilies(
       family: 'Edit',
       rows: [
         { keys: 'Ctrl+Z', action: 'undo' },
-        { keys: 'Ctrl+Shift+Z', action: 'redo' },
+        { keys: 'Ctrl+Shift+Z or Ctrl+Y', action: 'redo' },
         { keys: 'Ctrl+A', action: 'select all' },
         { keys: 'Ctrl+Shift+I', action: 'invert selection' },
         { keys: 'Ctrl+C', action: 'copy' },
         { keys: 'Ctrl+X', action: 'cut' },
         { keys: 'Ctrl+V', action: 'paste' },
-        { keys: 'Ctrl+Shift+V', action: 'paste in place' },
+        { keys: 'Alt+V', action: 'paste in place' },
         { keys: 'Ctrl+D', action: 'duplicate' },
         { keys: 'Ctrl+G', action: 'group' },
         { keys: 'Ctrl+U', action: 'ungroup' },
@@ -117,13 +129,7 @@ export function shortcutFamilies(
     },
     {
       family: 'Transform',
-      rows: [
-        ...nudgeRows(nudgeSteps),
-        { keys: 'H', action: 'flip horizontal' },
-        { keys: 'V', action: 'flip vertical' },
-        { keys: '. or ,', action: 'rotate 90° clockwise or counter-clockwise' },
-        ...SNAP_SHORTCUT_ROWS,
-      ],
+      rows: [...nudgeRows(nudgeSteps), ...FLIP_ROTATE_SHORTCUT_ROWS, ...SNAP_SHORTCUT_ROWS],
     },
     { family: 'Arrange', rows: ARRANGE_SHORTCUT_ROWS },
     {

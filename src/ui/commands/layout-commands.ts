@@ -1,6 +1,10 @@
 // LightBurn parity layout commands in the Arrange menu: Change Draw Order,
-// Make Same Width / Height and Move H / V Together.
+// Make Same Width / Height and Move H / V Together. Their keys, LightBurn's,
+// are in arrange-shortcut-keys.ts.
 
+import type { DrawOrderMove } from '../../core/draw-order';
+import type { SelectionMoveTogetherAxis } from '../../core/scene/selection-move-together';
+import { arrangeShortcutLabel } from './arrange-shortcut-keys';
 import { disabled, enabled, type AppCommand, type AppCommandContext } from './command-types';
 import type { LayoutCommandId } from './layout-command-types';
 
@@ -36,32 +40,66 @@ type Spec = {
   readonly family?: 'arrange' | 'tools' | 'window';
 };
 
-const DRAW_ORDER: ReadonlyArray<Spec> = [
+type Step<Value> = {
+  readonly id: LayoutCommandId;
+  readonly value: Value;
+  readonly label: string;
+  readonly title: string;
+};
+
+// Read by the menu and by the draw-order and Move Together keys
+// (app/arrange-shortcuts.ts), which name their undo steps after these labels.
+export const DRAW_ORDER_STEPS: ReadonlyArray<Step<DrawOrderMove>> = [
   {
     id: 'arrange.bring-to-front',
+    value: 'front',
     label: 'Bring to Front',
     title: 'Draw the selection on top of all other artwork',
-    invoke: (ctx) => ctx.moveSelectionInDrawOrder('front'),
   },
   {
     id: 'arrange.bring-forward',
+    value: 'forward',
     label: 'Bring Forward',
     title: 'Draw the selection one step higher',
-    invoke: (ctx) => ctx.moveSelectionInDrawOrder('forward'),
   },
   {
     id: 'arrange.send-backward',
+    value: 'backward',
     label: 'Send Backward',
     title: 'Draw the selection one step lower',
-    invoke: (ctx) => ctx.moveSelectionInDrawOrder('backward'),
   },
   {
     id: 'arrange.send-to-back',
+    value: 'back',
     label: 'Send to Back',
     title: 'Draw the selection behind all other artwork',
-    invoke: (ctx) => ctx.moveSelectionInDrawOrder('back'),
   },
 ];
+
+export const MOVE_TOGETHER_STEPS: ReadonlyArray<Step<SelectionMoveTogetherAxis>> = [
+  {
+    id: 'arrange.move-together-horizontal',
+    value: 'horizontal',
+    label: 'Move H Together',
+    title: 'Close the gaps so the selection sits side by side',
+  },
+  {
+    id: 'arrange.move-together-vertical',
+    value: 'vertical',
+    label: 'Move V Together',
+    title: 'Close the gaps so the selection stacks edge to edge',
+  },
+];
+
+const DRAW_ORDER: ReadonlyArray<Spec> = DRAW_ORDER_STEPS.map(({ value, ...step }) => ({
+  ...step,
+  invoke: (ctx) => ctx.moveSelectionInDrawOrder(value),
+}));
+
+const MOVE_TOGETHER: ReadonlyArray<Spec> = MOVE_TOGETHER_STEPS.map(({ value, ...step }) => ({
+  ...step,
+  invoke: (ctx) => ctx.moveSelectionTogether(value),
+}));
 
 const REFERENCED: ReadonlyArray<Spec> = [
   {
@@ -88,18 +126,7 @@ const REFERENCED: ReadonlyArray<Spec> = [
     title: 'Match the reference height and keep each object in proportion',
     invoke: (ctx) => ctx.matchSelectionSize('height', true),
   },
-  {
-    id: 'arrange.move-together-horizontal',
-    label: 'Move H Together',
-    title: 'Close the gaps so the selection sits side by side',
-    invoke: (ctx) => ctx.moveSelectionTogether('horizontal'),
-  },
-  {
-    id: 'arrange.move-together-vertical',
-    label: 'Move V Together',
-    title: 'Close the gaps so the selection stacks edge to edge',
-    invoke: (ctx) => ctx.moveSelectionTogether('vertical'),
-  },
+  ...MOVE_TOGETHER,
   {
     id: 'arrange.mirror-across-line',
     label: 'Mirror Across Line',
@@ -224,7 +251,8 @@ export function layoutCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand
 function command(ctx: AppCommandContext, spec: Spec, on: boolean, reason: string): AppCommand {
   const invoke = () => spec.invoke(ctx);
   const family = spec.family ?? 'arrange';
+  const shortcut = arrangeShortcutLabel(spec.id);
   return on
-    ? enabled(spec.id, family, spec.label, spec.title, invoke)
-    : disabled(spec.id, family, spec.label, reason, invoke);
+    ? enabled(spec.id, family, spec.label, spec.title, invoke, shortcut)
+    : disabled(spec.id, family, spec.label, reason, invoke, shortcut);
 }

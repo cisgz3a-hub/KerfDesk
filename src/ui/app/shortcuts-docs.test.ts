@@ -24,6 +24,28 @@ describe('Shortcuts dialog completeness (UI-07)', () => {
     }
   });
 
+  // Rolling audit v7 L8: LightBurn's flip, paste-in-place, draw-order and Move
+  // Together keys, and Z jog off the bare Page keys (ADR-410 Amd 4, ADR-493 Amd 2,
+  // ADR-499 Amd 2).
+  it('lists the LightBurn keys and no longer the bindings they replaced', () => {
+    const rows = shortcutFamilies('cnc').flatMap((family) => family.rows);
+    const action = (keys: string): string | undefined =>
+      rows.find((row) => row.keys === keys)?.action;
+    const workflow = readFileSync(resolve(process.cwd(), 'WORKFLOW.md'), 'utf8');
+
+    expect(action('Alt+V')).toBe('paste in place');
+    expect(action('V or Ctrl+Shift+V')).toBe('flip vertical');
+    expect(action('PgUp / PgDn')).toContain('draw order');
+    expect(action('Alt+Shift+H')).toContain('Move H Together');
+    expect(action('Ctrl+Alt+PgUp / Ctrl+Alt+PgDn')).toContain('jog Z');
+    expect(rows.map((row) => row.keys)).not.toContain('PageUp/PageDown');
+    expect(rows.map((row) => row.keys)).not.toContain('Ctrl+Shift+V');
+    expect(workflow).toContain('`Alt+V` — Paste in Place');
+    expect(workflow).toContain('`Cmd/Ctrl+Alt+PageUp` / `Cmd/Ctrl+Alt+PageDown` — Jog Z');
+    expect(workflow).not.toContain('`PageUp` / `PageDown` — Jog Z');
+    expect(workflow).not.toContain('Distribute horizontal / vertical spacing (ADR-499)');
+  });
+
   it('documents Alt+T for Trace Image in the dialog and WORKFLOW', () => {
     const keys = shortcutFamilies('laser').flatMap((family) => family.rows.map((row) => row.keys));
     const workflow = readFileSync(resolve(process.cwd(), 'WORKFLOW.md'), 'utf8');

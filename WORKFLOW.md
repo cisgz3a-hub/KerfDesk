@@ -541,15 +541,19 @@ the linked artwork.
 - Live angle shown next to handle.
 
 #### Mirror — menu / shortcut
-- `Arrange → Flip Horizontal` (`H`)
-- `Arrange → Flip Vertical` (`V`)
+- `Arrange → Flip Horizontal` (`H`, or LightBurn's `Cmd/Ctrl+Shift+H`)
+- `Arrange → Flip Vertical` (`V`, or LightBurn's `Cmd/Ctrl+Shift+V`; ADR-410 Amendment 4)
 - Operates around selection's center.
 
 #### Rotate 90° — menu / shortcut (ADR-410)
 - `Arrange → Rotate 90° Clockwise` (`.`) and `Arrange → Rotate 90° Counter-clockwise` (`,`).
 - The selection turns as one body about the centre of its combined bounds; four turns return it
   exactly to where it started. One undo step. Locked or hidden artwork does not move.
-- `Cmd/Ctrl+.` stays Abort; the rotate keys ignore any chord with Cmd or Ctrl.
+- `Cmd/Ctrl+.` stays Abort; the 90° keys ignore any chord with Cmd or Ctrl.
+- LightBurn's step keys turn the selection the same way: `Shift+.` / `Shift+,` by 45° and
+  `Cmd/Ctrl+Shift+.` / `Cmd/Ctrl+Shift+,` by 1.5°, clockwise / counter-clockwise, one undo step
+  each. LightBurn's 15° keys are KerfDesk's Abort (`Cmd/Ctrl+.`) and Settings (`Cmd/Ctrl+,`) and
+  stay so (ADR-410 Amendment 4).
 
 #### Move to bed — menu (ADR-410)
 - `Arrange → Move to bed` → **Bed Center**, **Top Left**, **Top**, **Top Right**, **Left**,
@@ -799,8 +803,9 @@ the linked artwork.
    Settings shows the failed-save state and **Retry saving settings**; retry keeps the latest
    requested choices. The saved message returns only after all pending preference writes succeed.
 5. **Alt+arrows** align the selection left, right, top or bottom; **Alt+PgUp** and **Alt+PgDn**
-   centre it on X or Y; **Alt+Shift+H** and **Alt+Shift+V** distribute spacing. Aligning needs two
-   or more objects and distributing three or more; a group counts as one. Each is one undo step.
+   centre it on X or Y; **Alt+Shift+H** and **Alt+Shift+V** move it together (Move H / V
+   Together), as in LightBurn. Both need two or more objects; a group counts as one. Each is one
+   undo step. Distribute spacing has no key, as in LightBurn (ADR-499 Amendment 2).
 
 ### F-A6j. Show lengths in inches (ADR-629)
 
@@ -1871,11 +1876,12 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 
 #### Edit
 - `Cmd/Ctrl+Z` — Undo
-- `Cmd/Ctrl+Shift+Z` — Redo
+- `Cmd/Ctrl+Shift+Z` or `Cmd/Ctrl+Y` — Redo (ADR-499 Amendment 2)
 - `Cmd/Ctrl+X` — Cut selected objects to the scene clipboard
 - `Cmd/Ctrl+C` — Copy selected objects to the scene clipboard
 - `Cmd/Ctrl+V` — Paste the scene clipboard (offset from the source)
-- `Cmd/Ctrl+Shift+V` — Paste in Place: paste at the position the artwork was copied from (ADR-410)
+- `Alt+V` — Paste in Place: paste at the position the artwork was copied from (LightBurn's key;
+  Option+V on macOS; ADR-410 Amendment 4). `Cmd/Ctrl+Shift+V` is Flip vertical, as in LightBurn
 - `Cmd/Ctrl+D` — Duplicate selection in place (LightBurn parity)
 - `Cmd/Ctrl+A` — Select all
 - `Cmd/Ctrl+Shift+I` — Invert selection (ADR-410)
@@ -1894,10 +1900,16 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
   from a plain button it still nudges (ADR-493, ADR-499 Amendment 1).
 - `Alt+Left` / `Alt+Right` / `Alt+Up` / `Alt+Down` — Align left / right / top / bottom (ADR-499)
 - `Alt+PgUp` / `Alt+PgDn` — Align centres on X / Y (ADR-499)
-- `Alt+Shift+H` / `Alt+Shift+V` — Distribute horizontal / vertical spacing (ADR-499)
-- `H` — Flip horizontal
-- `V` — Flip vertical
+- `Alt+Shift+H` / `Alt+Shift+V` — Move H / V Together (LightBurn's keys; ADR-499 Amendment 2).
+  Distribute spacing has no key, as in LightBurn
+- `PgUp` / `PgDn` — Bring forward / send backward in draw order; `Cmd/Ctrl+PgUp` /
+  `Cmd/Ctrl+PgDn` — Bring to front / send to back (LightBurn's keys; ADR-493 Amendment 2). A
+  focused list, tab panel or the Artwork panel scrolls instead
+- `H` or `Cmd/Ctrl+Shift+H` — Flip horizontal
+- `V` or `Cmd/Ctrl+Shift+V` — Flip vertical (ADR-410 Amendment 4)
 - `.` / `,` — Rotate 90° clockwise / counter-clockwise (ADR-410)
+- `Shift+.` / `Shift+,` — Rotate 45°; `Cmd/Ctrl+Shift+.` / `Cmd/Ctrl+Shift+,` — Rotate 1.5°
+  (LightBurn's keys; ADR-410 Amendment 4)
 
 #### Tools
 - `T` - Type and edit text on the canvas (when a text field does not own keyboard input)
@@ -1916,7 +1928,7 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - `Alt+W` — Filled or wireframe view (ADR-410)
 - `F` — Fit to bed
 - `Shift+F` — Fit to selection (falls back to all-objects, then bed)
-- `+` / `=` — Zoom in
+- `+` / `=` — Zoom in (`+` typed with Shift too; ADR-499 Amendment 2)
 - `-` — Zoom out
 - `0` — Reset zoom (same as F)
 - `Ctrl+Wheel` — Zoom at cursor
@@ -1930,9 +1942,11 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
   as **ABORT MOTION** does (ADR-375). On a laser profile it turns off a laser the controller
   reports on at Idle with nothing in KerfDesk running it, as **LASER OFF** does (ADR-375
   Amendment 9).
-- `PageUp` / `PageDown` — Jog Z. When a scrolling list, tab panel or the Artwork panel has focus,
-  the keys scroll it instead (ADR-362). Only the dedicated keys jog Z: the keypad's 9 / 3 never do,
-  even with Num Lock off, when they send PageUp / PageDown (ADR-493 Amendment 1).
+- `Cmd/Ctrl+Alt+PageUp` / `Cmd/Ctrl+Alt+PageDown` — Jog Z one step (ADR-493 Amendment 2).
+  Bare PageUp / PageDown are LightBurn's draw-order keys and never move the machine. When a
+  scrolling list, tab panel or the Artwork panel has focus, the keys scroll it instead (ADR-362).
+  Only the dedicated keys jog Z: the keypad's 9 / 3 never do, even with Num Lock off, when they
+  send PageUp / PageDown (ADR-493 Amendment 1).
 - `Cmd/Ctrl+Shift+]` / `Cmd/Ctrl+Shift+[` — Jog up / down one step; `Cmd/Ctrl+Alt+[` /
   `Cmd/Ctrl+Alt+]` — Jog left / right one step (LightBurn's Move-window keys, ADR-493).
   Numpad `8`/`2`/`4`/`6` jog the same way and `7`/`9`/`1`/`3` diagonally, only with Num Lock on.

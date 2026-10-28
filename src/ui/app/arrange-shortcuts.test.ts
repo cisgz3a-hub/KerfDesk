@@ -16,9 +16,10 @@ function keydown(init: KeyboardEventInit & { readonly target?: HTMLElement }): K
 function ctx(overrides: Partial<ArrangeShortcutCtx> = {}): ArrangeShortcutCtx {
   return {
     canAlign: true,
-    canDistribute: true,
+    hasSelection: true,
     alignSelection: vi.fn(),
-    distributeSelection: vi.fn(),
+    moveSelectionTogether: vi.fn(),
+    moveSelectionInDrawOrder: vi.fn(),
     ...overrides,
   };
 }
@@ -27,7 +28,7 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
-describe('align and distribute shortcuts', () => {
+describe('align, Move Together and draw-order shortcuts', () => {
   it.each([
     ['ArrowLeft', 'left'],
     ['ArrowRight', 'right'],
@@ -41,10 +42,12 @@ describe('align and distribute shortcuts', () => {
     expect(handleArrangeShortcut(event, () => context)).toBe(true);
     expect(event.defaultPrevented).toBe(true);
     expect(context.alignSelection).toHaveBeenCalledWith(kind);
-    expect(context.distributeSelection).not.toHaveBeenCalled();
+    expect(context.moveSelectionInDrawOrder).not.toHaveBeenCalled();
   });
 
-  it('Alt+Shift+H and Alt+Shift+V distribute equal spacing, including macOS Option letters', () => {
+  // Rolling audit v7 L8-P2-4: LightBurn's Move H / V Together keys ran
+  // Distribute spacing here. LightBurn binds no Distribute-spacing key.
+  it('Alt+Shift+H and Alt+Shift+V move the selection together, including macOS Option letters', () => {
     const context = ctx();
     handleArrangeShortcut(
       keydown({ key: 'H', code: 'KeyH', altKey: true, shiftKey: true }),
@@ -55,8 +58,60 @@ describe('align and distribute shortcuts', () => {
       keydown({ key: '◊', code: 'KeyV', altKey: true, shiftKey: true }),
       () => context,
     );
-    expect(context.distributeSelection).toHaveBeenNthCalledWith(1, 'horizontal-spacing');
-    expect(context.distributeSelection).toHaveBeenNthCalledWith(2, 'vertical-spacing');
+    expect(context.moveSelectionTogether).toHaveBeenNthCalledWith(1, 'horizontal');
+    expect(context.moveSelectionTogether).toHaveBeenNthCalledWith(2, 'vertical');
+  });
+
+  // Rolling audit v7 L8-P2-3: LightBurn's draw-order keys.
+  it.each([
+    ['PgUp', { key: 'PageUp' }, 'forward'],
+    ['PgDn', { key: 'PageDown' }, 'backward'],
+    ['Ctrl+PgUp', { key: 'PageUp', ctrlKey: true }, 'front'],
+    ['Ctrl+PgDn', { key: 'PageDown', ctrlKey: true }, 'back'],
+    ['Cmd+PgDn', { key: 'PageDown', metaKey: true }, 'back'],
+  ] as ReadonlyArray<[string, KeyboardEventInit, string]>)(
+    '%s moves the selection %s in draw order',
+    (_name, init, move) => {
+      const context = ctx();
+      const event = keydown(init);
+      expect(handleArrangeShortcut(event, () => context)).toBe(true);
+      expect(event.defaultPrevented).toBe(true);
+      expect(context.moveSelectionInDrawOrder).toHaveBeenCalledExactlyOnceWith(move);
+      expect(context.alignSelection).not.toHaveBeenCalled();
+    },
+  );
+
+  it('restacks one object, which has nothing to align with', () => {
+    const context = ctx({ canAlign: false });
+    handleArrangeShortcut(keydown({ key: 'PageUp' }), () => context);
+    expect(context.moveSelectionInDrawOrder).toHaveBeenCalledExactlyOnceWith('forward');
+  });
+
+  it('leaves the draw-order Page keys to a focused list or the Artwork panel', () => {
+    const context = ctx();
+    const list = document.createElement('div');
+    list.setAttribute('role', 'listbox');
+    const panel = document.createElement('aside');
+    panel.className = 'lf-artwork-panel';
+    const row = document.createElement('button');
+    panel.appendChild(row);
+    document.body.append(list, panel);
+    for (const event of [
+      keydown({ key: 'PageDown', target: list }),
+      keydown({ key: 'PageUp', ctrlKey: true, target: list }),
+      keydown({ key: 'PageUp', target: row }),
+    ]) {
+      expect(handleArrangeShortcut(event, () => context)).toBe(false);
+      expect(event.defaultPrevented).toBe(false);
+    }
+    expect(context.moveSelectionInDrawOrder).not.toHaveBeenCalled();
+  });
+
+  it('names a draw-order undo step after the command', () => {
+    const before = createProject();
+    const context = ctx({ moveSelectionInDrawOrder: () => void pushUndo(before, []) });
+    handleArrangeShortcut(keydown({ key: 'PageDown', ctrlKey: true }), () => context);
+    expect(undoStepName(before, createProject())).toBe('Send to Back');
   });
 
   it('names the undo step after the command', () => {
@@ -68,25 +123,17 @@ describe('align and distribute shortcuts', () => {
 
   it('consumes the key without acting when too few objects are selected', () => {
     // Alt+Left must never fall through to the browser's Back.
-    const context = ctx({ canAlign: false, canDistribute: false });
+    const context = ctx({ canAlign: false, hasSelection: false });
     const align = keydown({ key: 'ArrowLeft', altKey: true });
-    const distribute = keydown({ key: 'h', code: 'KeyH', altKey: true, shiftKey: true });
-    expect(handleArrangeShortcut(align, () => context)).toBe(true);
-    expect(handleArrangeShortcut(distribute, () => context)).toBe(true);
-    expect(align.defaultPrevented).toBe(true);
+    const together = keydown({ key: 'h', code: 'KeyH', altKey: true, shiftKey: true });
+    const restack = keydown({ key: 'PageDown', ctrlKey: true });
+    for (const event of [align, together, restack]) {
+      expect(handleArrangeShortcut(event, () => context)).toBe(true);
+      expect(event.defaultPrevented).toBe(true);
+    }
     expect(context.alignSelection).not.toHaveBeenCalled();
-    expect(context.distributeSelection).not.toHaveBeenCalled();
-  });
-
-  it('distributes only with three or more objects, while aligning with two', () => {
-    const context = ctx({ canDistribute: false });
-    handleArrangeShortcut(
-      keydown({ key: 'v', code: 'KeyV', altKey: true, shiftKey: true }),
-      () => context,
-    );
-    handleArrangeShortcut(keydown({ key: 'ArrowUp', altKey: true }), () => context);
-    expect(context.distributeSelection).not.toHaveBeenCalled();
-    expect(context.alignSelection).toHaveBeenCalledWith('top');
+    expect(context.moveSelectionTogether).not.toHaveBeenCalled();
+    expect(context.moveSelectionInDrawOrder).not.toHaveBeenCalled();
   });
 
   it('ignores a held key, text fields, AltGr and other modifiers', () => {
@@ -104,16 +151,22 @@ describe('align and distribute shortcuts', () => {
       keydown({ key: 'ArrowLeft' }),
       keydown({ key: 'h', code: 'KeyH', altKey: true }),
       keydown({ key: 'h', code: 'KeyH', altKey: true, shiftKey: true, ctrlKey: true }),
+      // Ctrl/Cmd+Alt+PgUp / PgDn jog Z (ADR-493 Amendment 2); Shift+PgUp is free.
+      keydown({ key: 'PageUp', ctrlKey: true, altKey: true }),
+      keydown({ key: 'PageDown', metaKey: true, altKey: true }),
+      keydown({ key: 'PageUp', shiftKey: true }),
+      keydown({ key: 'PageDown', ctrlKey: true, shiftKey: true }),
     ]) {
       expect(handleArrangeShortcut(event, () => context)).toBe(false);
       expect(event.defaultPrevented).toBe(false);
     }
     expect(context.alignSelection).not.toHaveBeenCalled();
-    expect(context.distributeSelection).not.toHaveBeenCalled();
+    expect(context.moveSelectionTogether).not.toHaveBeenCalled();
+    expect(context.moveSelectionInDrawOrder).not.toHaveBeenCalled();
   });
 
   it('shows each key beside its Arrange menu command, whether enabled or not', () => {
-    for (const selection of [{ canAlignSelection: true, canDistributeSelection: true }, {}]) {
+    for (const selection of [{ canAlignSelection: true, hasSelection: true }, {}]) {
       const commands = buildAppCommands(baseCtx(selection));
       for (const entry of ARRANGE_SHORTCUT_KEYS) {
         expect(commands.find((command) => command.id === entry.id)?.shortcut).toBe(entry.label);
@@ -121,5 +174,15 @@ describe('align and distribute shortcuts', () => {
     }
     const labels = ARRANGE_SHORTCUT_KEYS.map((entry) => entry.label);
     expect(new Set(labels).size).toBe(labels.length);
+  });
+
+  it('gives Distribute spacing no key, as LightBurn gives none', () => {
+    const commands = buildAppCommands(baseCtx({ canDistributeSelection: true }));
+    for (const id of [
+      'arrange.distribute-horizontal-spacing',
+      'arrange.distribute-vertical-spacing',
+    ]) {
+      expect(commands.find((command) => command.id === id)?.shortcut).toBeUndefined();
+    }
   });
 });

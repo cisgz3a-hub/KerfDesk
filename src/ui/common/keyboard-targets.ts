@@ -20,9 +20,10 @@ const SCROLL_REGION_ROLES: ReadonlySet<string> = new Set([
 /**
  * A focused scroll or list region, or anything inside the Artwork/Operations
  * panel. Page and arrow keys there mean "scroll this", so a window-level
- * shortcut that moves the machine must leave them to the browser: with the
- * Z-focus jog bound to PageUp/PageDown, scrolling the operations list drove a
- * CNC bit down into the stock (audit ui-panel-3).
+ * shortcut that moves the machine must leave them to the browser: when the
+ * Z-focus jog was bound to bare PageUp/PageDown, scrolling the operations list
+ * drove a CNC bit down into the stock (audit ui-panel-3). The draw-order Page
+ * keys leave them too (ADR-493 Amendment 2).
  */
 export function isScrollRegionTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;

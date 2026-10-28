@@ -3,6 +3,7 @@
   "sinceSourceSha": "19aba0456008a5b19ae6c2096284482a1b414202",
   "highlights": [
     "Your camera calibration now stays when you open a project saved earlier for the same machine. Before, such a file could remove the calibration, and a later machine change saved over it.",
-    "Cut jobs with many pieces travel less: each piece's holes are cut just before its outline, and the route is shortened further. In tests, travel dropped by about a fifth."
+    "Cut jobs with many pieces travel less: each piece's holes are cut just before its outline, and the route is shortened further. In tests, travel dropped by about a fifth.",
+    "Keys now match LightBurn: Ctrl+Shift+H / V flip, Alt+V pastes in place, PgUp / PgDn change the draw order and Alt+Shift+H / V move artwork together. Jog Z moved to Ctrl+Alt+PgUp / PgDn. Distribute spacing has no key."
   ]
 }

@@ -51,8 +51,8 @@ afterEach(async () => {
 
 describe('machine details owns its keyboard', () => {
   it.each<KeyboardEventInit>([
-    { key: 'PageUp' },
-    { key: 'PageDown' },
+    { key: 'PageUp', ctrlKey: true, altKey: true },
+    { key: 'PageDown', ctrlKey: true, altKey: true },
     { key: '8', code: 'Numpad8' },
     { key: '[', code: 'BracketLeft', ctrlKey: true, altKey: true },
   ])('keeps $key from requesting jog while the details close button is focused', async (init) => {
