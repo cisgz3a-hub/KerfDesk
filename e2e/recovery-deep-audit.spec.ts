@@ -39,6 +39,7 @@ import {
   expectToolbarCommandVisible,
 } from './fixtures/workspace-ui';
 import { recoveryExecutionLinesSince } from './fixtures/recovery-execution-lines';
+import { useMachineInUse } from './fixtures/machine-in-use';
 
 const RECONNECTED_HEAD = { x: 777.7, y: 666.6 };
 
@@ -222,6 +223,10 @@ test('an air-assisted cut interrupted mid-layer recovers with air assist on', as
 }) => {
   test.setTimeout(180_000);
   const refusals = collectRefusals(page);
+  // The file names the machine already in use, so Open keeps that machine and
+  // not the file's air command (ADR-500 Amendment 2): set M8 as Machine Setup
+  // would, then open the file on it.
+  await useMachineInUse(page, { airAssistCommand: 'M8' });
   await kerfdesk.setOpenFiles([{ name: 'air-cut.lf2', text: airCutProjectText() }]);
   await reopenProject(page, 'air-cut.lf2');
   await connectAndHome(page, kerfdesk);

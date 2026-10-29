@@ -8,6 +8,7 @@ import {
   barcodeAcceptanceSnapshot as snapshot,
   barcodeAcceptanceHistory as history,
 } from './fixtures/barcode-acceptance-browser';
+import { useMachineInUse } from './fixtures/machine-in-use';
 import { toolbarCommand } from './fixtures/workspace-ui';
 import { createProject, IDENTITY_TRANSFORM } from '../src/core/scene';
 import { createEllipse } from '../src/core/shapes/primitives/create-ellipse';
@@ -40,14 +41,16 @@ test.beforeEach(async ({ page, kerfdesk }) => {
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   const project = createProject();
+  const homing = { ...project.device.homing, enabled: true };
+  // Each file names the machine already in use, so Open keeps that machine and
+  // not the file's homing (ADR-500 Amendment 2). Print and Cut needs a homing
+  // machine, so it is set up as Machine Setup would before the file opens.
+  await useMachineInUse(page, { homing });
   await openProject(
     page,
     kerfdesk,
     `tools-create-audit-${++projectSequence}.lf2`,
-    JSON.stringify({
-      ...project,
-      device: { ...project.device, homing: { ...project.device.homing, enabled: true } },
-    }),
+    JSON.stringify({ ...project, device: { ...project.device, homing } }),
   );
 });
 

@@ -6,6 +6,7 @@ import {
   runMenuCommand,
   serialWrites,
 } from './fixtures/recovery-flow';
+import { useMachineInUse } from './fixtures/machine-in-use';
 import { openMachineToolDropdown, toolbarCommand } from './fixtures/workspace-ui';
 
 test('manual start-from-line refuses Focus Z before sending a program', async ({
@@ -19,12 +20,16 @@ test('manual start-from-line refuses Focus Z before sending a program', async ({
     timeout: 90_000,
   });
   const project = createProject();
+  const homing = { ...project.device.homing, enabled: true };
+  // The file names the machine already in use, so Open keeps that machine and
+  // not the file's homing (ADR-500 Amendment 2): home it as Machine Setup would.
+  await useMachineInUse(page, { homing });
   await kerfdesk.setOpenFiles([
     {
       name: 'focus-resume.lf2',
       text: JSON.stringify({
         ...project,
-        device: { ...project.device, homing: { ...project.device.homing, enabled: true } },
+        device: { ...project.device, homing },
       }),
     },
   ]);

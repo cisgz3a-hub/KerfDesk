@@ -427,11 +427,12 @@ test('configures the Creality Falcon profile through the complete setup wizard',
   await setup.getByText('Connection options', { exact: true }).click();
   await setup.getByLabel('Controller firmware').selectOption('grblhal');
   await setup.getByLabel('Search machines').fill('Creality Falcon A1 Pro');
-  // project-basic's machine has values of its own, so choosing names them and
-  // waits for Replace settings (ADR-637 Amendment 1).
+  // project-basic's only value of its own is homing at the front left, and the
+  // A1 Pro preset homes there too (ADR-322 Amendment 3), so the choice replaces
+  // nothing anyone set and applies at once (ADR-637 Amendment 1).
   await page.getByRole('radio', { name: 'Use Creality Falcon A1 Pro' }).click();
-  await setup.getByRole('button', { name: 'Replace settings', exact: true }).click();
   await expect(page.getByRole('radio', { name: 'Use Creality Falcon A1 Pro' })).toBeChecked();
+  await expect(setup.getByRole('button', { name: 'Replace settings', exact: true })).toHaveCount(0);
   await setup.getByRole('button', { name: 'Next', exact: true }).click();
   await setup.getByRole('button', { name: 'Go to step 3: Review & save', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Save machine setup' })).toBeEnabled();
