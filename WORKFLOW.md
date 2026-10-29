@@ -3825,8 +3825,10 @@ again) or **Discard changes**.
      from the list keeps the type the list gives it, ADR-637 Amendment 1), and the mapped `$$`
      values. A machine chosen from the list also keeps its listed work area: `$130`/`$131` are
      the controller's travel, not the bed, so the strip shows them beside the kept area instead
-     of filling them in (ADR-637 Amendment 2). The strip lists each change the fill made that the
-     draft still holds
+     of filling them in (ADR-637 Amendment 2). On grblHAL with homing and hard limits on, the
+     mapped work area is the homed envelope, a `$27` pull-off short of `$130`/`$131` (two without
+     force origin), and the list names both (ADR-637 Amendment 4). The strip lists each change the
+     fill made that the draft still holds
      as old → new with one **Undo** that restores the draft as it was. A machine already set up
      that the operator only opens setup for keeps its values and offers **Use detected values**
      for the ones that differ (ADR-347). When the adopted firmware differs from the one it
@@ -4886,8 +4888,9 @@ Set origin here again. It is a warning; Frame and Start are not refused (ADR-375
     Type `$I` in KerfDesk's Console and record `[FIRMWARE:...]`, the version line and
     `[KINEMATICS:...]`; do not click the Console's quick buttons (they include `$X` and
     `$#`), and never send a line with `=`. Home then reads **Home**, not **Set up homing**.
-    Keep Machine Setup's **Use detected values** unpressed: it would copy the 363 x 273 mm
-    travel over the listed 358 x 268 mm work area.
+    Machine Setup should list no work-area change: grblHAL's homed area for 363 x 273 mm of
+    travel with `$27=5` is the listed 358 x 268 mm (ADR-637 Amendment 4). If it lists one, record
+    `$21`, `$22`, `$27`, `$130` and `$131` and leave **Use detected values** unpressed.
 
 When this checklist passes on the Falcon, replace the F.3 status in `PROJECT.md` Phase F
 ("Code shipped; hardware verification pending") with the recorded result and update the F.3
@@ -7354,7 +7357,8 @@ as the pane's design record.
 #### Success
 1. When a controller is connected and its `$$` snapshot differs from the current setup,
    **Machine Setup > Machine**'s connection strip shows the detected values (ADR-420, ADR-637). **Use detected
-   values** copies the reported spindle max (GRBL $30) and reported travel ($130/$131) into the setup
+   values** copies the reported spindle max (GRBL $30) and reported travel ($130/$131; on grblHAL
+   with homing and hard limits on, the homed area it gives, ADR-637 Amendment 4) into the setup
    draft; **Save machine setup** commits them, then the difference clears.
    `$30` is offered as spindle RPM only when the same dump reports `$32=0`;
    in laser mode it is a PWM scale and is not relabeled as RPM.

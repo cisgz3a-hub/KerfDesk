@@ -34,6 +34,7 @@ import { isOwnedCncPauseLiftReset, ownedLiftResetPatch } from './cnc-pause-lift-
 import {
   clearCncLiveCaps,
   consumeSettingsResponse,
+  detectedProfilePatch,
   publishCncLiveCaps,
   SETTINGS_READ_OPERATION_LABEL,
   shouldShowDetectedSettingsReview,
@@ -315,7 +316,9 @@ function publishDetectedSettings(
     // Discard raw coordinates across this boundary instead of rescaling them
     // using a setting that did not apply when those numbers were reported.
     ...refreshedReportUnitsPatch(current, detected.controllerSettings),
-    detectedSettings: shouldShowDetectedSettingsReview(detected) ? detected.patch : null,
+    detectedSettings: shouldShowDetectedSettingsReview(detected)
+      ? detectedProfilePatch(detected, current)
+      : null,
     controllerSettings: {
       ...retainControllerReportUnits(current.controllerSettings),
       ...detected.controllerSettings,

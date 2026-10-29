@@ -46,7 +46,8 @@ reported 400.
    machine chosen afterwards never reads as reported. One **Undo** still restores the draft from
    before the first fill.
 5. **Use detected values is unchanged.** It is the operator's explicit choice (ADR-347). It lists
-   the work area as old → new and copies it when pressed.
+   the work area as old → new and copies it when pressed. (Amendment 4: on grblHAL with homing
+   and hard limits on, that work area is the homed envelope, a pull-off short of `$130`/`$131`.)
 
 No controller setting is written. Offering to write the listed area to `$130`/`$131` was
 considered and left out: travel is machine-critical, Review keeps it review-only, and a write would

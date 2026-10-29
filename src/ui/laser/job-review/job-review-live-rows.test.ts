@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { FALCON_A1_PRO_DUMP } from '../../../__fixtures__/controllers/falcon-a1-pro-dump';
+import { grblHalSettingsMap } from '../../../__fixtures__/controllers/grblhal-settings-dump';
+import { settingsMapToControllerSettings } from '../../../core/controllers/grbl/parse-settings';
 import {
   DEFAULT_DEVICE_PROFILE,
   NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
@@ -260,5 +263,56 @@ describe('Job Review override facts (ADR-355)', () => {
     const args = reviewArgs('laser', { feed: 100, rapid: 100, spindle: 100 });
 
     expect(controllerReviewSummary(args)).toBe('no status yet');
+  });
+});
+
+// Rolling audit v8 N2-P2-1 (ADR-637 Amendment 4): the profile bed is compared
+// with the area the travel gives a homed machine, which grblHAL's hard limits
+// pull in by the pull-off.
+describe('Job Review travel fact', () => {
+  const a1ProSettings = settingsMapToControllerSettings(grblHalSettingsMap({}, FALCON_A1_PRO_DUMP));
+  const travelArgs = (
+    activeControllerKind: ControllerReviewArgs['activeControllerKind'],
+    profileBed: readonly [number, number],
+  ): ControllerReviewArgs => ({
+    isConnected: true,
+    machineKind: 'laser',
+    statusReport: null,
+    alarmCode: null,
+    activeControllerKind,
+    detectedControllerKind: null,
+    controllerSettings: a1ProSettings,
+    activeWcs: null,
+    overrides: null,
+    profileMaxPowerS: 1000,
+    profileBedWidth: profileBed[0],
+    profileBedHeight: profileBed[1],
+  });
+  const travelFact = (args: ControllerReviewArgs) =>
+    buildControllerReviewFacts(args).find((fact) => fact.label === 'Travel $130 × $131');
+
+  it('matches the Falcon A1 Pro preset to its homed area in the plain tone', () => {
+    expect(travelFact(travelArgs('grblhal', [358, 268]))).toEqual({
+      label: 'Travel $130 × $131',
+      value: '363 × 273 mm, homed area 358 × 268 mm',
+      tone: 'default',
+    });
+  });
+
+  it('warns about a bed widened to the travel', () => {
+    expect(travelFact(travelArgs('grblhal', [363, 273]))).toEqual({
+      label: 'Travel $130 × $131',
+      value: '363 × 273 mm, homed area 358 × 268 mm — profile bed 363 × 273 mm',
+      tone: 'warning',
+    });
+  });
+
+  it('keeps comparing stock GRBL with its full travel', () => {
+    expect(travelFact(travelArgs('grbl-v1.1', [363, 273]))).toEqual({
+      label: 'Travel $130 × $131',
+      value: '363 × 273 mm',
+      tone: 'default',
+    });
+    expect(travelFact(travelArgs('grbl-v1.1', [358, 268]))?.tone).toBe('warning');
   });
 });
