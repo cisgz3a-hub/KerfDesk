@@ -1,11 +1,13 @@
 // L5-P1-2 (rolling audit v7): opening Design Studio on a project whose recovery
 // key differed from the saved drawing's dropped the drawing and wrote over its
 // only copy. It is now kept, comes back with its project, and can be restored
-// (ADR-590 Amendment 1).
+// (ADR-590 Amendment 1). N5-P2-2 (rolling audit v8): a drawing applied after
+// the last autosave was still written over, so it is kept too (Amendment 2).
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Sketch, SketchEntity } from '../../core/design';
+import { DEFAULT_DESIGN_LAYER_ID } from '../../core/design/layers';
 import { createProject, type Project } from '../../core/scene';
 import { deserializeProject } from '../../io/project/deserialize-project';
 import { serializeProject } from '../../io/project/serialize-project';
@@ -17,6 +19,7 @@ import {
   clearKeptDesignDrawings,
   keepDesignDrawing,
   readKeptDesignDrawings,
+  worthKeeping,
 } from './design-kept-drawings';
 import { restoreKeptDesignDrawing } from './design-kept-drawing-actions';
 import { DesignKeptDrawingBar } from './DesignKeptDrawingBar';
@@ -62,6 +65,58 @@ async function drawUnappliedWork(): Promise<void> {
     useDesignStudioStore.getState().closeStudio();
     await vi.runAllTimersAsync();
   });
+}
+
+/** The Studio's Apply, as its Apply button runs it (use-design-apply). */
+function applyInStudio(): void {
+  const session = useDesignStudioStore.getState().session;
+  if (session === null) throw new Error('The Studio is closed');
+  const sketch = sessionSketch(session);
+  const record = useStore.getState().applyDesignSketch(
+    sketch,
+    sketch.entities.map(() => crypto.randomUUID()),
+    session.applied,
+    { activeLayerId: session.activeLayerId, surface3d: session.surface3d },
+  );
+  if (record === 'refused') throw new Error('Apply refused');
+  useDesignStudioStore.getState().markApplied(record);
+}
+
+/** Applies one line in the Studio and autosaves; then, inside the 30 s before
+ *  the next autosave, draws two more, applies all three and closes. */
+async function applyAfterTheAutosave(): Promise<Project> {
+  await act(async () => {
+    const opening = useDesignStudioStore.getState().openStudio();
+    await vi.runAllTimersAsync();
+    await opening;
+    useDesignStudioStore.getState().setSketch(applied);
+    applyInStudio();
+    await vi.runAllTimersAsync();
+  });
+  const autosave = autosaveOf(useStore.getState().project);
+  await act(async () => {
+    useDesignStudioStore.getState().setSketch(drawing);
+    applyInStudio();
+    useDesignStudioStore.getState().closeStudio();
+    await vi.runAllTimersAsync();
+  });
+  return autosave;
+}
+
+/** A project with a Studio drawing of its own that shares nothing with these. */
+function anotherProject(sketch: Sketch = { entities: [line('other', 70)] }): Project {
+  return {
+    ...createProject(),
+    designStudioDocument: {
+      version: 1,
+      sketch,
+      activeLayerId: DEFAULT_DESIGN_LAYER_ID,
+      surface3d: false,
+      appliedObjectIds: [],
+      appliedOperationsByLayer: [],
+      appliedEntityObjectIds: [],
+    },
+  };
 }
 
 async function restart(project: Project, epoch: number): Promise<void> {
@@ -152,6 +207,61 @@ describe('a drawing the Studio did not open is kept (ADR-590 Amendment 1)', () =
     expect(readPersistedSession()?.sketch).toEqual(drawing);
   });
 
+  it('offers back a drawing applied after the autosave a restart restores', async () => {
+    await mountPersistence();
+    const olderAutosave = await applyAfterTheAutosave();
+    expect(readPersistedSession()).toMatchObject({ sketch: drawing, dirtySinceApply: false });
+    expect(useStore.getState().project.scene.objects).toHaveLength(3);
+
+    // The crash loses the Apply from the workspace, as it loses any edit after
+    // the autosave; the Studio's own copy of it is kept.
+    await restart(olderAutosave, 1);
+    expect(useStore.getState().project.scene.objects).toHaveLength(1);
+    expect((await openStudio()).entities.map((entity) => entity.id)).toEqual(['applied']);
+    const kept = readKeptDesignDrawings();
+    expect(kept.map((entry) => entry.sketch)).toEqual([drawing]);
+
+    expect(await restoring(kept[0]!.id)).toBe(true);
+    expect(sessionSketch(useDesignStudioStore.getState().session!)).toEqual(drawing);
+    // Applied to the lost project, not this one: Apply is on, and puts it back.
+    expect(useDesignStudioStore.getState().session?.dirtySinceApply).toBe(true);
+    await act(async () => {
+      applyInStudio();
+      await vi.runAllTimersAsync();
+    });
+    expect(useStore.getState().project.scene.objects).toHaveLength(3);
+    expect(useStore.getState().project.designStudioDocument?.sketch).toEqual(drawing);
+  });
+
+  it('keeps that drawing when the restart opens the Studio before any restore', async () => {
+    await mountPersistence();
+    await applyAfterTheAutosave();
+    await restart(createProject(), 0);
+    expect((await openStudio()).entities).toEqual([]);
+    expect(readKeptDesignDrawings().map((kept) => kept.sketch)).toEqual([drawing]);
+  });
+
+  it('does not keep an applied drawing for another project with its own drawing', async () => {
+    await mountPersistence();
+    await applyAfterTheAutosave();
+    await restart(anotherProject(), 1);
+    expect((await openStudio()).entities.map((entity) => entity.id)).toEqual(['other']);
+    expect(readKeptDesignDrawings()).toEqual([]);
+  });
+
+  it('stops offering an applied drawing once a project that holds it opens', async () => {
+    keepDesignDrawing({
+      sketch: drawing,
+      activeLayerId: DEFAULT_DESIGN_LAYER_ID,
+      surface3d: false,
+      applied: null,
+      dirtySinceApply: false,
+    });
+    await restart(anotherProject(drawing), 1);
+    expect(await openStudio()).toEqual(drawing);
+    expect(readKeptDesignDrawings()).toEqual([]);
+  });
+
   it('keeps the replaced drawing when a restore would cover unapplied work', async () => {
     useStore.setState({ project: createProject(), projectDocumentEpoch: 1 });
     keepDesignDrawing({
@@ -209,12 +319,31 @@ describe('the kept drawings list', () => {
     ]);
   });
 
-  it('keeps only drawings with work not yet applied', async () => {
-    useStore.setState({ project: createProject(), projectDocumentEpoch: 1 });
-    const { holdsUnappliedWork } = await import('./design-kept-drawings');
-    expect(holdsUnappliedWork({ ...draft('a'), dirtySinceApply: false })).toBe(false);
-    expect(holdsUnappliedWork({ ...draft('a'), sketch: { entities: [] } })).toBe(false);
-    expect(holdsUnappliedWork(draft('a'))).toBe(true);
+  it('keeps unapplied work, and an Apply the opened project does not hold', () => {
+    const blank = createProject();
+    const appliedDraft = { ...draft('a'), dirtySinceApply: false };
+    expect(worthKeeping(draft('a'), anotherProject(draft('a').sketch))).toBe(true);
+    expect(worthKeeping({ ...draft('a'), sketch: { entities: [] } }, blank)).toBe(false);
+    // Applied: kept unless the opened project holds it or is another project.
+    expect(worthKeeping(appliedDraft, anotherProject(draft('a').sketch))).toBe(false);
+    expect(worthKeeping(appliedDraft, blank)).toBe(true);
+    expect(worthKeeping(appliedDraft, anotherProject())).toBe(false);
+    const grown = { ...appliedDraft, sketch: { entities: [line('a', 0), line('b', 20)] } };
+    expect(worthKeeping(grown, anotherProject(draft('a').sketch))).toBe(true);
+  });
+
+  it('names a kept drawing that was applied elsewhere', async () => {
+    keepDesignDrawing({ ...draft('elsewhere'), dirtySinceApply: false });
+    const host = document.createElement('div');
+    const bar = createRoot(host);
+    try {
+      await act(async () => bar.render(<DesignKeptDrawingBar />));
+      expect(host.textContent).toContain(
+        'An applied drawing this project does not hold was kept: 1 shape',
+      );
+    } finally {
+      await act(async () => bar.unmount());
+    }
   });
 
   it('is offered in the Studio, and Discard asks first', async () => {

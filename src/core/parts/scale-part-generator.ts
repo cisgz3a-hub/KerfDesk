@@ -11,7 +11,7 @@ export function editablePartGeneratorDefinition(
   object: GeneratedPartObject,
 ): PartGeneratorDefinition {
   const definition = object.partGenerator.definition;
-  const scale = retainedSourceScale(object.transform);
+  const scale = retainedSourceScale(object);
   return scale.kind === 'even'
     ? scalePartGeneratorDefinition(definition, scale.factor)
     : definition;

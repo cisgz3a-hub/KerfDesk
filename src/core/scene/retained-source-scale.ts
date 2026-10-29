@@ -9,24 +9,47 @@
 // different factor per axis) cannot be held by dimensions that keep holes
 // round, so regenerating removes it and the editor says so beforehand.
 
-import type { Transform } from './scene-object';
+import type { Bounds, Transform } from './scene-object';
+import { SKETCH_SOLVE_TOLERANCE_MM } from '../sketch-constraints/sketch-solve-summary';
 
 export type RetainedSourceScale =
   | { readonly kind: 'unit' }
   | { readonly kind: 'even'; readonly factor: number }
   | { readonly kind: 'stretched'; readonly x: number; readonly y: number };
 
-// A typed or dragged even resize can leave the two factors a rounding error
-// apart; neither difference is a resize anyone could see.
-const SCALE_EPSILON = 1e-9;
+/** A retained source as the canvas holds it: its own size and its resize. */
+export type RetainedSourceExtent = {
+  readonly bounds: Bounds;
+  readonly transform: Transform;
+};
 
-export function retainedSourceScale(transform: Transform): RetainedSourceScale {
-  const x = Math.abs(transform.scaleX);
-  const y = Math.abs(transform.scaleY);
+// Each factor is a size on the canvas divided by the source's own size, and a
+// solved sketch's size is good only to the solver's tolerance (ADR-573
+// Amendment 2). So typing W, then H, on a sketch solved from a sub-millimetre
+// change leaves the factors up to 4e-8 apart: no resize anyone could see, and
+// not a stretch. Two factors are one when they differ by no more than that
+// tolerance over each extent. Generated parts are exact, and a difference
+// that small is just as invisible on them.
+export function retainedSourceScale(source: RetainedSourceExtent): RetainedSourceScale {
+  const x = Math.abs(source.transform.scaleX);
+  const y = Math.abs(source.transform.scaleY);
   if (!(Number.isFinite(x) && Number.isFinite(y) && x > 0 && y > 0))
     return { kind: 'stretched', x, y };
-  if (Math.abs(x / y - 1) > SCALE_EPSILON) return { kind: 'stretched', x, y };
-  return Math.abs(x - 1) <= SCALE_EPSILON ? { kind: 'unit' } : { kind: 'even', factor: x };
+  const width = source.bounds.maxX - source.bounds.minX;
+  const height = source.bounds.maxY - source.bounds.minY;
+  if (Math.abs(x / y - 1) > factorSlack(width) + factorSlack(height))
+    return { kind: 'stretched', x, y };
+  // The longer side measures its factor more closely, so that one is folded.
+  const factor = width >= height ? x : y;
+  return Math.abs(factor - 1) <= factorSlack(Math.max(width, height))
+    ? { kind: 'unit' }
+    : { kind: 'even', factor };
+}
+
+// How far a factor measured across `extentMm` can be from the true one. A side
+// with no length has no factor to measure, so any resize along it is even.
+function factorSlack(extentMm: number): number {
+  return extentMm > 0 ? SKETCH_SOLVE_TOLERANCE_MM / extentMm : Number.POSITIVE_INFINITY;
 }
 
 /** The transform at size 1. Mirroring has its own flags, and a negative scale

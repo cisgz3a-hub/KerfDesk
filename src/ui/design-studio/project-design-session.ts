@@ -1,4 +1,5 @@
 import { designEntityToSceneObject } from '../../core/design';
+import type { DesignStudioDocument } from '../../core/design/design-studio-document';
 import { DEFAULT_DESIGN_LAYER } from '../../core/design/layers';
 import { polylineToCurveSubpath, type Project, type SceneObject } from '../../core/scene';
 import {
@@ -8,6 +9,7 @@ import {
   type DesignSession,
 } from './design-session';
 import { createDesignHistory } from './design-history';
+import type { DesignApplyRecord } from '../state/design-apply-record';
 
 export function restoreProjectDesignSession(project: Project): DesignSession {
   const saved = project.designStudioDocument;
@@ -17,14 +19,19 @@ export function restoreProjectDesignSession(project: Project): DesignSession {
       sketch: saved.sketch,
       activeLayerId: saved.activeLayerId,
       surface3d: saved.surface3d,
-      applied: {
-        objectIds: new Set(saved.appliedObjectIds),
-        operationIdByLayerId: new Map(saved.appliedOperationsByLayer),
-      },
+      applied: documentApplyRecord(saved),
       dirtySinceApply: false,
     }),
     project,
   );
+}
+
+/** What the project's own Studio drawing put in its scene. */
+export function documentApplyRecord(document: DesignStudioDocument): DesignApplyRecord {
+  return {
+    objectIds: new Set(document.appliedObjectIds),
+    operationIdByLayerId: new Map(document.appliedOperationsByLayer),
+  };
 }
 
 /** Main-workspace geometry edits take precedence over an older authoring source. */

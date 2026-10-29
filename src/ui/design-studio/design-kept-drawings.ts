@@ -5,13 +5,16 @@
 // not belong to used to write that project's drawing over it: a restart that
 // opened the Studio before the autosave, or an autosave a few seconds older
 // than the drawing, lost the only copy. A drawing with work not yet applied is
-// now moved here first. The newest few are kept; one comes back by itself
-// when its project returns, and the Studio offers the rest to restore.
+// now moved here first, and so is an applied one that the opened project does
+// not hold (ADR-590 Amendment 2). The newest few are kept; one comes back by
+// itself when its project returns, and the Studio offers the rest to restore.
 //
 // Best-effort like the slot (ADR-272 Amendment 3): every read treats the
 // payload as untrusted, and a failed write reports false so the caller can
 // hold the slot rather than lose the drawing.
 
+import type { Sketch } from '../../core/design';
+import type { Project } from '../../core/scene';
 import {
   MAX_PERSISTED_CHARS,
   persistedFromStored,
@@ -47,9 +50,57 @@ export function subscribeKeptDesignDrawings(listener: () => void): () => void {
   return () => listeners.delete(listener);
 }
 
-/** A drawing worth keeping holds shapes that were never applied. */
-export function holdsUnappliedWork(draft: PersistedDesignSession): boolean {
-  return draft.sketch.entities.length > 0 && draft.dirtySinceApply !== false;
+/** A saved drawing worth keeping when the Studio opens `project` in its place:
+ *  one with shapes never applied, or an applied one that `project` does not
+ *  hold but may be an earlier state of its project. An Apply in the 30 s
+ *  before a crash is in the drawing and not in the autosave. */
+export function worthKeeping(draft: PersistedDesignSession, project: Project): boolean {
+  if (draft.sketch.entities.length === 0) return false;
+  if (draft.dirtySinceApply !== false) return true;
+  return !projectHoldsDrawing(project, draft) && mayPrecede(project, draft);
+}
+
+/** True when `project`'s own Studio drawing is this one, so opening the
+ *  project again gives it back. */
+export function projectHoldsDrawing(project: Project, draft: PersistedDesignSession): boolean {
+  const own = project.designStudioDocument?.sketch;
+  return own !== undefined && sameSketch(own, draft.sketch);
+}
+
+// An autosave or file from before the drawing's latest Apply has no Studio
+// drawing yet (the blank start-up project has none either), or shares a shape
+// or an operation with it. Another project's own Studio drawing shares
+// neither, and its file holds it, so switching between two projects does not
+// keep each one's drawing in the other.
+function mayPrecede(project: Project, draft: PersistedDesignSession): boolean {
+  const own = project.designStudioDocument;
+  if (own === undefined) return true;
+  const shapes = new Set(own.sketch.entities.map((entity) => entity.id));
+  if (draft.sketch.entities.some((entity) => shapes.has(entity.id))) return true;
+  const operations = new Set(project.scene.layers.map((layer) => layer.id));
+  return [...(draft.applied?.operationIdByLayerId.values() ?? [])].some((id) => operations.has(id));
+}
+
+// One sketch came through the saved drawing's JSON and the other through the
+// project file, so equal JSON settles it, and otherwise they are compared with
+// their keys in one order. A sketch can hold a million points, so different
+// shapes are told apart by their ids before either is written out.
+function sameSketch(a: Sketch, b: Sketch): boolean {
+  if (a === b) return true;
+  if (
+    a.entities.length !== b.entities.length ||
+    a.entities.some((entity, index) => entity.id !== b.entities[index]?.id)
+  )
+    return false;
+  return JSON.stringify(a) === JSON.stringify(b) || canonicalJson(a) === canonicalJson(b);
+}
+
+function canonicalJson(value: unknown): string {
+  return JSON.stringify(value, (_key, item: unknown) =>
+    item !== null && typeof item === 'object' && !Array.isArray(item)
+      ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+      : item,
+  );
 }
 
 /** Adds `draft` as the newest kept drawing, dropping the oldest past the limit.
@@ -84,6 +135,16 @@ export function takeKeptDesignDrawing(
 
 export function discardKeptDesignDrawing(id: string): void {
   writeKept(readKeptDesignDrawings().filter((drawing) => drawing.id !== id));
+}
+
+/** Drops each kept drawing that was applied and that `project` holds: opening
+ *  that project gives it back, so the Studio need not offer it. */
+export function discardKeptDrawingsHeldBy(project: Project): void {
+  const list = readKeptDesignDrawings();
+  const rest = list.filter(
+    (drawing) => drawing.dirtySinceApply !== false || !projectHoldsDrawing(project, drawing),
+  );
+  if (rest.length !== list.length) writeKept(rest);
 }
 
 export function clearKeptDesignDrawings(): void {

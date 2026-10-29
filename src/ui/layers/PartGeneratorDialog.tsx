@@ -63,7 +63,7 @@ export function PartGeneratorDialog(props: {
         </div>
         <aside className="lf-authoring-review" aria-label="Part geometry review">
           <h3>Geometry preview</h3>
-          <RetainedScaleNotice transform={props.object?.transform} subject="part" />
+          <RetainedScaleNotice source={props.object} subject="part" />
           {prepared === null ? (
             <PartDraftPreview definition={definition} />
           ) : (

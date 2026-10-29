@@ -1,7 +1,8 @@
 // DesignKeptDrawingBar — offers a kept Studio drawing back (ADR-590
-// Amendment 1). A drawing not yet applied is never written over when the
-// Studio opens on another project; it waits here until it is restored or
-// discarded, or its own project opens it again.
+// Amendments 1 and 2). A drawing not yet applied, or an applied one the opened
+// project does not hold, is never written over when the Studio opens on
+// another project; it waits here until it is restored or discarded, or its own
+// project opens it again.
 
 import { useState, useSyncExternalStore } from 'react';
 import {
@@ -22,8 +23,11 @@ export function DesignKeptDrawingBar(): JSX.Element | null {
   return (
     <div role="region" aria-label="Kept drawing" style={barStyle}>
       <span style={textStyle}>
-        A drawing you had not applied was kept: {shapes} {shapes === 1 ? 'shape' : 'shapes'},{' '}
-        {keptTime(newest.keptAt)}.{older > 0 ? ` ${older} older kept.` : ''}
+        {newest.dirtySinceApply === false
+          ? 'An applied drawing this project does not hold'
+          : 'A drawing you had not applied'}{' '}
+        was kept: {shapes} {shapes === 1 ? 'shape' : 'shapes'}, {keptTime(newest.keptAt)}.
+        {older > 0 ? ` ${older} older kept.` : ''}
         {failed ? ' It could not be restored; try again.' : ''}
       </span>
       <button
