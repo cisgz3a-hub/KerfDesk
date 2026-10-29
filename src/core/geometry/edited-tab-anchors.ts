@@ -1,10 +1,16 @@
 // edited-tab-anchors — keeps tabs placed by hand where they were when an edit
 // redraws an object's contours in place: Edit nodes Delete and Radius / Fillet
-// (ADR-494 Amendment 2). A tab is a fraction of its contour from the start
-// (ADR-156), and both edits can move the start, so each tab on a changed
-// contour is re-measured at its old place, or at the nearest point of the new
-// outline when the edit removed that place. Tabs on contours the edit left
-// unchanged keep their anchors exactly.
+// (ADR-494 Amendment 2), and Optimize Shapes (Amendment 3). A tab is a fraction
+// of its contour from the start (ADR-156), and these edits can move the start,
+// so each tab on a changed contour is re-measured at its old place, or at the
+// nearest point of the new outline when the edit removed that place. Tabs on
+// contours the edit left unchanged keep their anchors exactly.
+//
+// An object rebuilt from its settings at a new size (a resized rounded
+// rectangle, a Shape Properties edit) has a new outline with its own start and
+// its own shares of edge and corner. Each tab there goes where the plain
+// stretch of the old box onto the new one puts it, on the nearest point of the
+// rebuilt outline (Amendment 3).
 //
 // Pure core — no I/O, no globals, deterministic.
 
@@ -16,6 +22,7 @@ import {
   DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
   IDENTITY_TRANSFORM,
   flattenColoredPathCurves,
+  type Bounds,
   type CncTabAnchor,
   type ColoredPath,
   type Polyline,
@@ -36,11 +43,33 @@ export type FollowedTabs<T extends SceneObject> = {
 
 type Projector = ReturnType<typeof createTabPolylineProjector>;
 
+// Where a place on the old artwork lies in the rebuilt artwork's own
+// coordinates, and how much the stretch enlarges the old outline's flattening.
+type Stretch = { readonly place: (point: Vec2) => Vec2; readonly factor: number };
+
 /** `after`, with every tab placed by hand on a contour the edit changed re-measured
  *  from `before`. The edit keeps each contour's index, as Delete and Fillet do. */
 export function withTabsFollowingEdit<T extends SceneObject>(
   before: SceneObject,
   after: T,
+): FollowedTabs<T> {
+  return followTabs(before, after, null);
+}
+
+/** `after`, `before` rebuilt from its settings with its contours in the same
+ *  order, with every tab placed by hand where stretching `before`'s box onto
+ *  `after`'s puts it, on the nearest point of the rebuilt outline. */
+export function withTabsFollowingRebuild<T extends SceneObject>(
+  before: SceneObject,
+  after: T,
+): FollowedTabs<T> {
+  return followTabs(before, after, boxStretch(before.bounds, after.bounds));
+}
+
+function followTabs<T extends SceneObject>(
+  before: SceneObject,
+  after: T,
+  stretch: Stretch | null,
 ): FollowedTabs<T> {
   if (!('paths' in before) || !('paths' in after)) return { object: after, moved: 0 };
   if (after.cncTabAnchors === undefined && after.laserTabAnchors === undefined) {
@@ -52,27 +81,40 @@ export function withTabsFollowingEdit<T extends SceneObject>(
   const contoursBefore = new Map<number, ReadonlyArray<Polyline>>();
   const contoursAfter = new Map<number, ReadonlyArray<Polyline>>();
   const projectors = new Map<Polyline, Projector>();
+  // A stretch enlarges the old outline's flattening error with it.
+  const keptPlaceMm =
+    stretch === null
+      ? TAB_KEPT_PLACE_MM
+      : DEFAULT_MACHINE_CURVE_TOLERANCE_MM * (1 + stretch.factor);
+  // Where a tab belongs on its new contour, or null when it keeps its anchor.
+  const target = (
+    anchor: CncTabAnchor,
+  ): { readonly place: Vec2; readonly next: Polyline } | null => {
+    const sourcePath = before.paths[anchor.pathIndex];
+    const editedPath = after.paths[anchor.pathIndex];
+    if (sourcePath === undefined || editedPath === undefined) return null;
+    if (stretch === null && sourcePath === editedPath) return null;
+    const old = cached(contoursBefore, anchor.pathIndex, sourcePath)[anchor.polylineIndex];
+    const next = cached(contoursAfter, anchor.pathIndex, editedPath)[anchor.polylineIndex];
+    if (old === undefined || next === undefined) return null;
+    if (stretch === null && sameOutline(old, next)) return null;
+    const located = locate(anchor);
+    if (located === null) return null;
+    return { place: stretch === null ? located : stretch.place(located), next };
+  };
   let moved = 0;
   const follow = <A extends CncTabAnchor>(anchors: ReadonlyArray<A>): ReadonlyArray<A> =>
     anchors.map((anchor) => {
-      const sourcePath = before.paths[anchor.pathIndex];
-      const editedPath = after.paths[anchor.pathIndex];
-      if (sourcePath === undefined || editedPath === undefined || sourcePath === editedPath) {
-        return anchor;
-      }
-      const old = cached(contoursBefore, anchor.pathIndex, sourcePath)[anchor.polylineIndex];
-      const next = cached(contoursAfter, anchor.pathIndex, editedPath)[anchor.polylineIndex];
-      if (old === undefined || next === undefined || sameOutline(old, next)) return anchor;
-      const place = locate(anchor);
-      if (place === null) return anchor;
-      let project = projectors.get(next);
+      const found = target(anchor);
+      if (found === null) return anchor;
+      let project = projectors.get(found.next);
       if (project === undefined) {
-        project = createTabPolylineProjector({ ...next, closed: true });
-        projectors.set(next, project);
+        project = createTabPolylineProjector({ ...found.next, closed: true });
+        projectors.set(found.next, project);
       }
-      const projected = project(place);
+      const projected = project(found.place);
       if (projected === null) return anchor;
-      if (Math.sqrt(projected.distanceSq) > TAB_KEPT_PLACE_MM) moved += 1;
+      if (Math.sqrt(projected.distanceSq) > keptPlaceMm) moved += 1;
       return projected.pathT === anchor.pathT ? anchor : { ...anchor, pathT: projected.pathT };
     });
   const object = {
@@ -83,6 +125,23 @@ export function withTabsFollowingEdit<T extends SceneObject>(
       : { laserTabAnchors: follow(after.laserTabAnchors) }),
   };
   return { object, moved };
+}
+
+// Each axis of the old box onto the new one; an axis without size keeps its scale.
+function boxStretch(from: Bounds, to: Bounds): Stretch {
+  const x = axisStretch(from.maxX - from.minX, to.maxX - to.minX);
+  const y = axisStretch(from.maxY - from.minY, to.maxY - to.minY);
+  return {
+    place: (point) => ({
+      x: to.minX + (point.x - from.minX) * x,
+      y: to.minY + (point.y - from.minY) * y,
+    }),
+    factor: Math.max(1, x, y),
+  };
+}
+
+function axisStretch(from: number, to: number): number {
+  return Number.isFinite(from) && Number.isFinite(to) && from > 0 && to > 0 ? to / from : 1;
 }
 
 function measurementCopy(object: SceneObject & { readonly paths: ReadonlyArray<ColoredPath> }) {

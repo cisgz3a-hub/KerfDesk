@@ -11,6 +11,7 @@ import { isBooleanCompoundObject } from '../../core/scene/boolean-compound';
 // becomes plain paths, as Trim Shapes makes them (keeping placement, exact
 // curves, operations and tab anchors). Locked artwork is left alone.
 
+import { withTabsFollowingEdit, type FollowedTabs } from '../../core/geometry/edited-tab-anchors';
 import { localPathArtwork } from '../../core/geometry/local-path-artwork';
 import {
   addShapeOptimizeStats,
@@ -137,6 +138,20 @@ export function planReusing(
 
 /** The object with its optimized paths, or null when none of them changed. */
 export function optimizedSceneObject(entry: OptimizedObject): SceneObject | null {
+  return optimizedSceneObjectWithTabs(entry)?.object ?? null;
+}
+
+/** The optimized object, and how many tabs placed by hand had to move. A
+ *  closed contour may now start at its first corner, so each tab is
+ *  re-measured where it was on the part (ADR-494 Amendment 3). */
+export function optimizedSceneObjectWithTabs(
+  entry: OptimizedObject,
+): FollowedTabs<SceneObject> | null {
+  const optimized = optimizedPaths(entry);
+  return optimized === null ? null : withTabsFollowingEdit(entry.source, optimized);
+}
+
+function optimizedPaths(entry: OptimizedObject): SceneObject | null {
   const { source: object, result } = entry;
   if (isBooleanCompoundObject(object) || result.paths === object.paths) return null;
   const bounds = boundsForPaths(result.paths) ?? object.bounds;
