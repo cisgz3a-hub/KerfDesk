@@ -153,7 +153,8 @@ function isStepCrack(ink: number, paper: number, mid: number): boolean {
 }
 
 // Halfway between the median ink and the median paper value: the two tones.
-// Edge pixels are a minority of either class, so they do not move a median.
+// In most art edge pixels are a minority of either class and leave a median
+// where it is; in hairline art they set the ink tone its steps share.
 function plateauMidLevel(mask: InkPlane, field: CrackSubPixelField): number {
   const ink = new Uint32Array(MAX_LEVEL + 1);
   const paper = new Uint32Array(MAX_LEVEL + 1);

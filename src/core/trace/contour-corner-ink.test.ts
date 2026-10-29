@@ -244,7 +244,10 @@ async function serifGlyph(char: string, px: number): Promise<RawImageData> {
         Math.ceil((crossings[k + 1] as number) * COVERAGE_SAMPLES - 0.5),
       );
       const base = Math.floor(row / COVERAGE_SAMPLES) * width;
-      for (let s = from; s < to; s += 1) covered[base + Math.floor(s / COVERAGE_SAMPLES)] += 1;
+      for (let s = from; s < to; s += 1) {
+        const pixel = base + Math.floor(s / COVERAGE_SAMPLES);
+        covered[pixel] = (covered[pixel] as number) + 1;
+      }
     }
   }
   const data = new Uint8ClampedArray(width * height * 4);
