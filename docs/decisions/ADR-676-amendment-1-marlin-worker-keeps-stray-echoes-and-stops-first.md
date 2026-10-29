@@ -78,8 +78,8 @@ worker path:
 ### Verification
 
 - `in-window-stall-beam.thread.test.ts` gains two cases, by the audit's method. Its harness moved
-  to `__fixtures__/controllers/stall-thread-harness.ts`. The FIFO Marlin model now echoes a line that starts with no
-  G, M or T (parser.cpp L266, gcode.cpp L1119-L1122).
+  to `__fixtures__/controllers/stall-thread-harness.ts`. The FIFO Marlin model now echoes a line
+  that starts with no G, M or T (parser.cpp L266, gcode.cpp L1119-L1122).
   - **Corrupted line, fan dialect, USB worker.** The 20th `G1` reaches Marlin without its `G`.
     Result: one echo; `jobStreamHost` stays `worker`; the window writes no job line; every other
     line arrives once and in order. A 1.6 s block leaves the head lit 0 ms. On main's code the
