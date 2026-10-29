@@ -11,7 +11,7 @@ import { materializeVariableObject } from '../../io/gcode/prepare-output-snapsho
 import { useStore } from '../state';
 import { selectedObjectIds } from '../state/scene-group-actions';
 import { useToastStore } from '../state/toast-store';
-import { renderVariableText } from '../text/render-variable-text';
+import { outputTextRenderer } from '../text/output-text-renderer';
 
 export async function bakeSelectedVariableText(
   options: {
@@ -32,18 +32,20 @@ export async function bakeSelectedVariableText(
   }
   const context = { now: (options.now ?? (() => new Date()))() };
   const baked: SceneObject[] = [];
+  const missingGlyphs: string[] = [];
   for (const object of targets) {
     const result = await materializeVariableObject(
       object,
       state.project,
       context,
-      options.render ?? renderVariableText,
+      options.render ?? outputTextRenderer,
     );
     if (!result.ok) {
       toast(`Nothing was baked. ${result.message}`, 'error');
       return;
     }
     baked.push(result.object);
+    if (result.advisory !== undefined) missingGlyphs.push(result.advisory.message);
   }
   if (!useStore.getState().commitBakedVariableObjects(state.project, baked)) {
     toast(
@@ -52,8 +54,13 @@ export async function bakeSelectedVariableText(
     );
     return;
   }
+  // ADR-591 Amendment 2: the baked text keeps the record's geometry, so a character its font
+  // lacks stays missing from the burn. Say so now, not only at Start.
   toast(
-    `Baked ${baked.length === 1 ? '1 object' : `${baked.length} objects`}: the value is now fixed and no longer advances. Undo restores the fields.`,
-    'success',
+    [
+      `Baked ${baked.length === 1 ? '1 object' : `${baked.length} objects`}: the value is now fixed and no longer advances. Undo restores the fields.`,
+      ...missingGlyphs,
+    ].join(' '),
+    missingGlyphs.length === 0 ? 'success' : 'warning',
   );
 }
