@@ -62,7 +62,8 @@ refuter confirmed every finding below, and the coordinator confirmed them on mai
      write on grblHAL (ADR-370 Amendment 1). The firmware setup panel stays off.
    - "Use detected values" is unchanged (ADR-637 Amendment 2 decision 5): it shows the
      controller's 363 x 273 travel against the listed 358 x 268 before it copies anything, and the
-     automatic fill keeps the listed work area.
+     automatic fill keeps the listed work area. (Superseded by ADR-637 Amendment 4: grblHAL's
+     homed envelope for that travel is 358 x 268, so no bed change is offered.)
 4. **`$I` is the Super Console's firmware report, not a connect query.** `firmwareReportQuery`
    gives `$I` for this contract. The stock-GRBL `$I` parser at connect takes exactly a VER and an
    OPT line, and grblHAL prints more, so `buildInfoQuery` stays null. `$ES` is not sent: nothing in
@@ -86,6 +87,8 @@ homing default should be revisited.
 
 - A1 Pro owners see Home, not Set up homing, and the first connect toasts that settings were
   read. Machine Setup lists the 363 x 273 travel and the firmware's 1000 mm/s² as differences.
+  (ADR-637 Amendment 4: the travel is shown with its 358 x 268 homed area and is no longer a
+  difference; the acceleration still is, and announces at every connect while it differs.)
 - A unit that does not home itself at power-on needs a Home before an Absolute or camera-placed
   job, as LightBurn's Absolute does.
 

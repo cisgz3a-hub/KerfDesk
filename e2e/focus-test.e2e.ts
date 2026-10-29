@@ -95,7 +95,7 @@ test('Focus Test generates, previews exact Z output, saves, reopens and undoes',
   expect(gcode).toContain('G91\nG1 Z-1.000 F300 S0\nG90');
   expect(gcode).toContain('G91\nG1 Z1.000 F300 S0\nG90');
   const saved = await saveBarcodeAcceptanceProject(page, kerfdesk);
-  expect(JSON.parse(saved).schemaVersion).toBe(19);
+  expect(JSON.parse(saved).schemaVersion).toBe(20);
   await openProject(page, kerfdesk, saved, 'focus-reopened.lf2');
   expect(
     (await snapshot(page)).project.scene.layers.map((layer) => layer.focusTest?.offsetMm),

@@ -69,6 +69,7 @@ $EvidenceRoot = Assert-ChildPath $EvidenceRoot $env:GITHUB_WORKSPACE
 . (Join-Path $PSScriptRoot 'installer-qualification-root.ps1')
 . (Join-Path $PSScriptRoot 'windows-powershell-process.ps1')
 . (Join-Path $PSScriptRoot 'installer-association-evidence.ps1')
+. (Join-Path $PSScriptRoot 'installed-app-exit-evidence.ps1')
 $ownedRoot = Assert-ChildPath (Get-InstallerQualificationRoot $env:RUNNER_TEMP $env:GITHUB_RUN_ID $env:GITHUB_RUN_ATTEMPT $Scenario) $env:RUNNER_TEMP
 $installRoot = Assert-ChildPath (Join-Path $ownedRoot 'KerfDesk Installed') $ownedRoot
 $executable = Join-Path $installRoot 'KerfDesk.exe'
@@ -291,8 +292,9 @@ function Invoke-AssociatedProject {
   $projectBefore = Get-FileEvidence $ownedProject
   $startInfo = New-AssociationProjectStartInfo $ownedProject
   $expectedTitle = 'KerfDesk — ' + [IO.Path]::GetFileName($ownedProject)
+  $opened = [DateTime]::UtcNow
   $diagnostic = [ordered]@{
-    status = 'opening'; startedAt = [DateTime]::UtcNow.ToString('o')
+    status = 'opening'; startedAt = $opened.ToString('o')
     expectedTitle = $expectedTitle; expectedExecutable = $executable
     observations = [Collections.Generic.List[object]]::new()
     lastObservation = $null; observationsTruncated = $false
@@ -319,7 +321,13 @@ function Invoke-AssociatedProject {
     if (-not $associated.CloseMainWindow() -or -not $associated.WaitForExit(30000)) {
       throw 'The associated app did not close normally.'
     }
-    if ($associated.ExitCode -ne 0) { throw "The associated app exited with $($associated.ExitCode)." }
+    # Record the code before judging it (rolling audit v8 N7-P3-2).
+    $diagnostic.exitCode = $associated.ExitCode
+    $diagnostic.exitCodeHex = Format-InstalledAppExitCode $associated.ExitCode
+    if ($associated.ExitCode -ne 0) {
+      $diagnostic.exitEvidence = Save-InstalledAppExitEvidence $profile (Join-Path $EvidenceRoot 'shell-open-saved-project-exit') $opened $executable
+      throw "The associated app exited with $($associated.ExitCode) ($($diagnostic.exitCodeHex))."
+    }
     if ((Get-FileEvidence $ownedProject).sha256 -ne $projectBefore.sha256) { throw 'Opening by association changed the saved project.' }
     $steps.Add([pscustomobject]@{
       name = 'shell-open-saved-project'; executable = $executable
@@ -414,7 +422,12 @@ function Invoke-HistoricalProfile([string]$Label, [string]$Phase, [string]$Expec
   if (-not $finished) { $process.Kill($true); $process.WaitForExit(10000) | Out-Null }
   $stdout.GetAwaiter().GetResult() | Set-Content -LiteralPath (Join-Path $EvidenceRoot "$Label-stdout.txt") -Encoding utf8
   $stderr.GetAwaiter().GetResult() | Set-Content -LiteralPath (Join-Path $EvidenceRoot "$Label-stderr.txt") -Encoding utf8
-  if (-not $finished -or $process.ExitCode -ne 0) { throw "Native historical profile qualification failed: $Label" }
+  if (-not $finished -or $process.ExitCode -ne 0) {
+    # Name the child's own recorded failure, such as the app's exit code, in the log.
+    $reason = ''
+    try { $reason = ': ' + (Get-Content -LiteralPath (Join-Path $output 'result.json') -Raw | ConvertFrom-Json).error } catch { }
+    throw "Native historical profile qualification failed: $Label$reason"
+  }
   $result = Get-Content -LiteralPath (Join-Path $output 'result.json') -Raw | ConvertFrom-Json
   if ($result.status -ne 'passed') { throw "Native historical profile qualification did not pass: $Label" }
   $steps.Add([pscustomobject]@{ name = $Label; evidence = $output; project = (Get-FileEvidence $project) })

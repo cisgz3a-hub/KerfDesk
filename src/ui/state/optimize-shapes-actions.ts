@@ -7,12 +7,13 @@
 import type { ShapeOptimizeOptions } from '../../core/geometry/shape-optimize/shape-optimize-options';
 import { clampShapeOptimizeOptions } from '../../core/geometry/shape-optimize/shape-optimize-options';
 import {
-  optimizedSceneObject,
+  optimizedSceneObjectWithTabs,
   optimizeShapesSelection,
   planReusing,
   type OptimizeShapesPlan,
 } from './optimize-shapes-plan';
 import { optimizeShapesNotice, optimizeShapesSelectionProblem } from './optimize-shapes-notice';
+import { movedTabsNotice } from './path-node-edit-actions';
 import { selectedObjectIds } from './scene-group-actions';
 import { pushUndo } from './scene-mutations';
 import type { AppState } from './store';
@@ -60,11 +61,16 @@ export function optimizeShapesMutation(
   }
   const plan = planReusing(selection.targets, options, ready);
   const replacements = new Map<string, SceneObject>();
+  let movedTabs = 0;
   for (const entry of plan.objects) {
-    const optimized = optimizedSceneObject(entry);
-    if (optimized !== null) replacements.set(entry.source.id, optimized);
+    const optimized = optimizedSceneObjectWithTabs(entry);
+    if (optimized === null) continue;
+    replacements.set(entry.source.id, optimized.object);
+    movedTabs += optimized.moved;
   }
-  notify(optimizeShapesNotice(plan, replacements.size, selection.locked), 'info');
+  const tabs = movedTabsNotice(movedTabs);
+  const notice = optimizeShapesNotice(plan, replacements.size, selection.locked);
+  notify(`${notice}${tabs === '' ? '' : ` ${tabs}`}`, 'info');
   if (replacements.size === 0) return state;
   const objects = scene.objects.map((object) => replacements.get(object.id) ?? object);
   return {

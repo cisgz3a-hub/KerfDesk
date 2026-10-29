@@ -80,9 +80,11 @@ function profileReasons(
   if (detectedControllerKind !== null) {
     reasons.push(`Detected ${controllerKindLabel(detectedControllerKind)} firmware.`);
   }
+  // The detected bed is the homed area the configured travel gives, a pull-off
+  // short of `$130` x `$131` on grblHAL (ADR-637 Amendment 4).
   if (typeof facts.bedWidth === 'number' && typeof facts.bedHeight === 'number') {
     reasons.push(
-      `Controller reports configured travel of ${facts.bedWidth} x ${facts.bedHeight} mm; usable work area is not measured.`,
+      `Controller's configured travel gives a ${facts.bedWidth} x ${facts.bedHeight} mm work area; usable work area is not measured.`,
     );
   }
   if (typeof facts.minPowerS === 'number' && typeof facts.maxPowerS === 'number') {

@@ -75,10 +75,12 @@ export function textBoxBaseline(rendered: TextRenderResult): TextBoxBaseline | u
 
 /**
  * A frame puts each render's ink top at its top, so variable records with and
- * without capitals or accents would burn on different baselines. A record laid
- * out at the template's size moves to the template's first baseline instead;
- * one the frame had to shrink keeps the frame's rule and stays inside it
- * (ADR-682).
+ * without capitals or accents would burn on different baselines. Each record
+ * moves to the template's first baseline scaled to its own size, so records
+ * the frame gives one size share a baseline whatever size the template took.
+ * A glyph taller than the template's rises above the frame top and the layout
+ * reports overflow. A record whose ink fills the frame's height cannot move
+ * without leaving it, so it keeps the frame's rule (ADR-682 Amendment 1).
  */
 export function onTextBoxBaseline(
   record: TextRenderResult,
@@ -87,8 +89,10 @@ export function onTextBoxBaseline(
   const own = textBoxBaseline(record);
   const layout = record.textBoxLayout;
   if (template === undefined || own === undefined || layout === undefined) return record;
-  if (Math.abs(own.sizeMm - template.sizeMm) > 1e-9) return record;
-  const dy = template.y - own.y;
+  if (!(template.sizeMm > 0)) return record;
+  const { minY, maxY } = record.bounds;
+  if (maxY - minY >= layout.heightMm - 1e-7) return record;
+  const dy = (template.y * own.sizeMm) / template.sizeMm - own.y;
   if (dy === 0) return record;
   const move = { scale: 1, translateX: 0, translateY: dy };
   return {
@@ -103,11 +107,11 @@ export function onTextBoxBaseline(
         ? {}
         : { curves: path.curves.map((curve) => transformCurveSubpathUniform(curve, move)) }),
     })),
-    bounds: { ...record.bounds, minY: record.bounds.minY + dy, maxY: record.bounds.maxY + dy },
-    anchor: { x: record.anchor?.x ?? 0, y: template.y },
+    bounds: { ...record.bounds, minY: minY + dy, maxY: maxY + dy },
+    anchor: { x: record.anchor?.x ?? 0, y: own.y + dy },
     textBoxLayout: {
       ...layout,
-      overflow: layout.overflow || record.bounds.maxY + dy > layout.heightMm + 1e-7,
+      overflow: layout.overflow || minY + dy < -1e-7 || maxY + dy > layout.heightMm + 1e-7,
     },
   };
 }

@@ -1157,8 +1157,16 @@ that owns those fields, without changing the existing Frame/Start policy.
    moves to the same share of the straight line (ADR-494 Amendment 1). Edit nodes **Delete** and
    **Radius / Fillet**, which can start a shape at another node or where a rounded corner ends,
    also keep each tab where it was; a tab on a part of the outline they change moves to the
-   nearest point of the new outline, and the toast says so (ADR-494 Amendment 2). **Clear placed
-   tabs** (in Cut Settings or in the canvas hint) returns the artwork to automatic tabs.
+   nearest point of the new outline, and the toast says so (ADR-494 Amendment 2). **Optimize
+   Shapes**, which can start a shape again at its first corner, keeps them where they were too. A
+   rounded rectangle that a resize rebuilds at its new size, and a drawn shape that **Shape
+   Properties** rebuilds, keep each tab where the stretch puts it; a tab the new outline no longer
+   passes, such as one on a rounded corner, moves to the nearest point of it, and Shape Properties
+   says when one moved. **Weld**, **Subtract / Intersect / Exclude**
+   and **Offset Shapes** with **Delete original objects** make new shapes without them, which then
+   take automatic tabs, and a toast says the placed tabs were removed (ADR-494 Amendment 3).
+   **Clear placed tabs** (in Cut Settings or in the canvas hint) returns the artwork to automatic
+   tabs.
 5. Job Review's detail line reads e.g. "tabs every 50 mm (at most 6) × 0.5 mm, cut at 20%" or
    "tabs 4 × 0.5 mm, 3 placed by hand". With none of this set, output is unchanged.
 6. Material presets do not store these settings; applying a preset keeps what the operation has.
@@ -3841,8 +3849,10 @@ again) or **Discard changes**.
      from the list keeps the type the list gives it, ADR-637 Amendment 1), and the mapped `$$`
      values. A machine chosen from the list also keeps its listed work area: `$130`/`$131` are
      the controller's travel, not the bed, so the strip shows them beside the kept area instead
-     of filling them in (ADR-637 Amendment 2). The strip lists each change the fill made that the
-     draft still holds
+     of filling them in (ADR-637 Amendment 2). On grblHAL with homing and hard limits on, the
+     mapped work area is the homed envelope, a `$27` pull-off short of `$130`/`$131` (two without
+     force origin), and the list names both (ADR-637 Amendment 4). The strip lists each change the
+     fill made that the draft still holds
      as old → new with one **Undo** that restores the draft as it was. A machine already set up
      that the operator only opens setup for keeps its values and offers **Use detected values**
      for the ones that differ (ADR-347). When the adopted firmware differs from the one it
@@ -4905,8 +4915,9 @@ Set origin here again. It is a warning; Frame and Start are not refused (ADR-375
     Type `$I` in KerfDesk's Console and record `[FIRMWARE:...]`, the version line and
     `[KINEMATICS:...]`; do not click the Console's quick buttons (they include `$X` and
     `$#`), and never send a line with `=`. Home then reads **Home**, not **Set up homing**.
-    Keep Machine Setup's **Use detected values** unpressed: it would copy the 363 x 273 mm
-    travel over the listed 358 x 268 mm work area.
+    Machine Setup should list no work-area change: grblHAL's homed area for 363 x 273 mm of
+    travel with `$27=5` is the listed 358 x 268 mm (ADR-637 Amendment 4). If it lists one, record
+    `$21`, `$22`, `$27`, `$130` and `$131` and leave **Use detected values** unpressed.
 
 When this checklist passes on the Falcon, replace the F.3 status in `PROJECT.md` Phase F
 ("Code shipped; hardware verification pending") with the recorded result and update the F.3
@@ -7373,7 +7384,8 @@ as the pane's design record.
 #### Success
 1. When a controller is connected and its `$$` snapshot differs from the current setup,
    **Machine Setup > Machine**'s connection strip shows the detected values (ADR-420, ADR-637). **Use detected
-   values** copies the reported spindle max (GRBL $30) and reported travel ($130/$131) into the setup
+   values** copies the reported spindle max (GRBL $30) and reported travel ($130/$131; on grblHAL
+   with homing and hard limits on, the homed area it gives, ADR-637 Amendment 4) into the setup
    draft; **Save machine setup** commits them, then the difference clears.
    `$30` is offered as spindle RPM only when the same dump reports `$32=0`;
    in laser mode it is a PWM scale and is not relabeled as RPM.
