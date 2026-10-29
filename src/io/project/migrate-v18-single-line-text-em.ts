@@ -5,7 +5,9 @@ import type { RawProject } from './migrations';
 // cap-height value instead: Relief's real capital height, and the EMS
 // sources' placeholder of 500. Each such text keeps exactly what it drew:
 // Size grows by the em over that value, and line height and letter spacing,
-// which are multiples of Size, shrink by the same factor.
+// which are multiples of Size, shrink by the same factor. A frame counted
+// each line as one of those Sizes, so it keeps counting that fraction of the
+// em (ADR-682 Amendment 1).
 const UNITS_PER_EM = 1000;
 const LEGACY_SIZE_UNITS: ReadonlyMap<string, number> = new Map([
   ['relief-single-line', 680],
@@ -38,7 +40,15 @@ function emSizedText(value: unknown): unknown {
     ...scaled(text, 'lineHeight', 1 / factor),
     ...scaled(text, 'letterSpacing', 1 / factor),
     // A shrink-to-fit frame's smallest size is a Size too.
-    ...(box === null ? {} : { textBox: { ...box, ...scaled(box, 'minSizeMm', factor) } }),
+    ...(box === null
+      ? {}
+      : {
+          textBox: {
+            ...box,
+            ...scaled(box, 'minSizeMm', factor),
+            legacyLineEm: legacyUnits / UNITS_PER_EM,
+          },
+        }),
   };
 }
 

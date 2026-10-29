@@ -39,7 +39,7 @@ function loadAsSchema18(objects: ReadonlyArray<TextObject>): ReadonlyArray<TextO
   const raw = JSON.parse(serializeProject({ ...project, scene: { ...project.scene, objects } }));
   const result = deserializeProject(JSON.stringify({ ...raw, schemaVersion: 18 }));
   if (result.kind !== 'ok') throw new Error(`load failed: ${JSON.stringify(result)}`);
-  expect(result.project.schemaVersion).toBe(19);
+  expect(result.project.schemaVersion).toBe(20);
   return result.project.scene.objects as ReadonlyArray<TextObject>;
 }
 
@@ -97,7 +97,7 @@ describe('schema 19: single-line text Size becomes the em (ADR-682)', () => {
     },
   );
 
-  it('scales a shrink-to-fit frame minimum and leaves outline text and geometry alone', () => {
+  it('scales a frame minimum, keeps its line rule, and leaves outline text and geometry alone', () => {
     const box = {
       mode: 'fixed',
       widthMm: 40,
@@ -110,19 +110,37 @@ describe('schema 19: single-line text Size becomes the em (ADR-682)', () => {
     const roboto = text('roboto', 'roboto-regular', { textBox: box });
     const [migratedRelief, migratedRoboto] = loadAsSchema18([relief, roboto]);
 
-    expect(migratedRelief?.textBox).toEqual({ ...box, minSizeMm: (4 * 1000) / 680 });
+    expect(migratedRelief?.textBox).toEqual({
+      ...box,
+      minSizeMm: (4 * 1000) / 680,
+      legacyLineEm: 0.68,
+    });
     expect(migratedRelief?.bounds).toEqual(relief.bounds);
     expect(migratedRelief?.paths).toEqual(relief.paths);
     expect(migratedRoboto).toEqual(roboto);
   });
 
+  // A schema-19 file was written under the em rule, by 1.0.28 or by this
+  // build's step 18, so nothing in it is rescaled or given the old line rule.
   it('opens a schema-19 file without rescaling it again', () => {
     const project = createProject();
-    const relief = text('relief', 'relief-single-line', { sizeMm: 14 });
-    const result = deserializeProject(
+    const relief = text('relief', 'relief-single-line', {
+      sizeMm: 14,
+      textBox: {
+        mode: 'fixed',
+        widthMm: 40,
+        heightMm: 12,
+        wrap: true,
+        fit: 'shrink',
+        minSizeMm: 4,
+      },
+    });
+    const raw = JSON.parse(
       serializeProject({ ...project, scene: { ...project.scene, objects: [relief] } }),
     );
+    const result = deserializeProject(JSON.stringify({ ...raw, schemaVersion: 19 }));
 
+    expect(result.kind === 'ok' ? result.project.schemaVersion : null).toBe(20);
     expect(result.kind === 'ok' ? result.project.scene.objects : []).toEqual([relief]);
   });
 });

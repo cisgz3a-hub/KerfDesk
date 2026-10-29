@@ -1,6 +1,7 @@
 import {
   firstError,
   isObject,
+  optionalPositiveNumber,
   requireBoolean,
   requireLiteral,
   requirePositiveNumber,
@@ -21,6 +22,7 @@ export function validateTextBox(
     requirePositiveNumber(value, `${path}.minSizeMm`),
     requireBoolean(value, `${path}.wrap`),
     requireLiteral(value, `${path}.fit`, ['none', 'shrink']),
+    optionalPositiveNumber(value, `${path}.legacyLineEm`),
   ]);
   if (fields !== null) return fields;
   if (

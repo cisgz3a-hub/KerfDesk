@@ -123,3 +123,8 @@ point on the first baseline) lands on the template's (#1359). Three placements s
   - the bend and rigid-bend anchors (`text-bend.test.ts`, `text-style.test.ts`);
   - the frame squeeze pivot (`text-style.test.ts`);
   - path text's template baseline (`text-on-path-alignment.test.ts`).
+
+**Amendment 1 (2026-10-29):** [old single-line frames keep their line rule, and boxed records share
+the template's baseline at any size](ADR-682-amendment-1-old-single-line-frames-and-record-baselines.md):
+schema 20 keeps a converted frame counting a line as the old cap-height Size, and a boxed record
+sits on the template's baseline scaled to its size.

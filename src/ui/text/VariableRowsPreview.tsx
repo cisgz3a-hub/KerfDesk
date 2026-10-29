@@ -8,6 +8,11 @@ import {
 import { Button } from '../kit';
 import { useStore } from '../state';
 import { DEFAULT_TEXT_COLOR, findFontEntry, type TextRenderResult } from '../../core/text';
+import {
+  onTextBoxBaseline,
+  textBoxBaseline,
+  type TextBoxBaseline,
+} from '../../core/text/text-box-render';
 import { TextWorkerError } from './text-worker-session';
 import { useTextWorkerSession } from './use-text-worker-session';
 import type { DialogValues } from './use-text-dialog-fields';
@@ -158,12 +163,12 @@ function useRowLayout(
     const render = async (): Promise<void> => {
       busy = true;
       const result: Record<number, string> = {};
+      const layOut = onTemplateBaseline((input) => textWorker.render(input), values);
       for (const row of rows) {
         if (!current) return;
         if (!row.valid) continue;
         try {
-          const rendered = await textWorker.render({ ...values, content: row.value });
-          result[row.index] = rowLayoutLabel(rendered.textBoxLayout);
+          result[row.index] = rowLayoutLabel((await layOut(row.value)).textBoxLayout);
         } catch (error) {
           result[row.index] = error instanceof Error ? error.message : String(error);
           // A worker that cannot start fails the same way for every later row,
@@ -232,6 +237,30 @@ function rowLayoutText(
 }
 
 const missingGlyphStyle: React.CSSProperties = { color: 'var(--lf-warning-fg)' };
+
+/**
+ * Lays rows out as output burns them: on the template's first baseline, which
+ * can carry a tall record over the frame top (ADR-682 Amendment 1). The
+ * template is laid out once, before the first row.
+ */
+function onTemplateBaseline(
+  render: (input: DialogValues) => Promise<TextRenderResult>,
+  values: DialogValues,
+): (content: string) => Promise<TextRenderResult> {
+  let template: Promise<TextBoxBaseline | undefined> | undefined;
+  return async (content) => {
+    template ??= render(values).then(textBoxBaseline, unlessUnavailable);
+    const baseline = await template;
+    return onTextBoxBaseline(await render({ ...values, content }), baseline);
+  };
+}
+
+// A template that cannot be laid out leaves each row on the frame's own rule,
+// as output does; a worker that cannot start fails every row.
+function unlessUnavailable(error: unknown): undefined {
+  if (error instanceof TextWorkerError && error.outcome === 'unavailable') throw error;
+  return undefined;
+}
 
 function rowLayoutLabel(layout: TextRenderResult['textBoxLayout']): string {
   if (layout === undefined) return 'Natural text size';

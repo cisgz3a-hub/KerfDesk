@@ -126,10 +126,11 @@ it('keeps an idle row-layout worker, and its parsed font, across an edit', async
     details.open = true;
     Simulate.toggle(details);
   });
-  await act(async () => vi.advanceTimersByTimeAsync(100));
-  expect(session.render).toHaveBeenCalledTimes(1);
-  await act(async () => show(12));
+  // Each pass lays out the template (for its baseline) and then the row.
   await act(async () => vi.advanceTimersByTimeAsync(100));
   expect(session.render).toHaveBeenCalledTimes(2);
+  await act(async () => show(12));
+  await act(async () => vi.advanceTimersByTimeAsync(100));
+  expect(session.render).toHaveBeenCalledTimes(4);
   expect(session.release).not.toHaveBeenCalled();
 });
