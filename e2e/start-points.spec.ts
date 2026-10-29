@@ -1,3 +1,4 @@
+import { useMachineInUse } from './fixtures/machine-in-use';
 import { toolbarCommand } from './fixtures/workspace-ui';
 import { expect, test, type Page } from './fixtures/kerfdesk-test';
 import type { Project } from '../src/core/scene';
@@ -126,13 +127,17 @@ test('disabled rotary starts let canvas pointer input through and remain keyboar
   kerfdesk,
 }) => {
   const project = await currentProject(page);
-  const rotaryProject: Project = {
-    ...project,
-    device: {
-      ...project.device,
-      rotary: { enabled: true, type: 'chuck', mmPerRotation: 100, objectDiameterMm: 40 },
-    },
-  };
+  const rotary = {
+    enabled: true,
+    type: 'chuck',
+    mmPerRotation: 100,
+    objectDiameterMm: 40,
+  } as const;
+  const rotaryProject: Project = { ...project, device: { ...project.device, rotary } };
+  // The file names the machine already in use, so Open keeps that machine and
+  // not the file's rotary (ADR-500 Amendment 2): set the rotary up as Rotary
+  // Setup would, then open the file on it.
+  await useMachineInUse(page, { rotary });
   await kerfdesk.setOpenFiles([{ name: 'rotary-starts.lf2', text: JSON.stringify(rotaryProject) }]);
   await (await toolbarCommand(page, 'Open...')).click();
   await expect(page).toHaveTitle(/rotary-starts\.lf2/);

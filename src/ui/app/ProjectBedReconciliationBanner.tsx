@@ -1,5 +1,10 @@
 import { Button } from '../kit';
 import { useStore } from '../state';
+import {
+  noticeBannerActionsStyle,
+  noticeBannerStyle,
+  noticeBannerTextStyle,
+} from './notice-banner-style';
 import { openedMachineNoticeWords } from './opened-machine-notice-words';
 
 export function ProjectBedReconciliationBanner(): JSX.Element | null {
@@ -11,12 +16,12 @@ export function ProjectBedReconciliationBanner(): JSX.Element | null {
   // the same machine (ADR-440 Amendment 5), so it leads there.
   const keepFirst = notice.sameProfile;
   return (
-    <section role="status" aria-label="Opened project machine disclosure" style={bannerStyle}>
-      <span>
+    <section role="status" aria-label="Opened project machine disclosure" style={noticeBannerStyle}>
+      <span style={noticeBannerTextStyle}>
         <strong>Opened project machine:</strong>
         {openedMachineNoticeWords(notice)}
       </span>
-      <span style={actionsStyle}>
+      <span style={noticeBannerActionsStyle}>
         {keepFirst ? (
           <>
             <Button variant="primary" onClick={keepCurrent}>
@@ -36,21 +41,3 @@ export function ProjectBedReconciliationBanner(): JSX.Element | null {
     </section>
   );
 }
-
-const bannerStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 12,
-  padding: '8px 12px',
-  borderBottom: '1px solid var(--lf-warning-border)',
-  background: 'var(--lf-warning-bg)',
-  color: 'var(--lf-text)',
-  fontSize: 12,
-};
-
-const actionsStyle: React.CSSProperties = {
-  display: 'flex',
-  gap: 8,
-  flexShrink: 0,
-};

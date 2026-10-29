@@ -30,3 +30,25 @@ export async function saveProjectAs(
   }
   await expect.poll(pickerCount).toBe(before + 1);
 }
+
+/** One object of a saved project, read by field rather than by its JSON text. */
+export type SavedSceneObject = Readonly<Record<string, unknown>>;
+
+/**
+ * The scene objects of every saved project file. Manual saves are compact JSON
+ * since ADR-204 Amendment 2, so callers parse instead of matching indented text.
+ */
+export async function savedSceneObjects(
+  fixture: KerfDeskFixture,
+): Promise<readonly SavedSceneObject[]> {
+  return Object.values(await fixture.savedFiles()).flatMap((text) => {
+    let project: unknown;
+    try {
+      project = JSON.parse(text);
+    } catch {
+      return [];
+    }
+    const objects = (project as { scene?: { objects?: unknown } } | null)?.scene?.objects;
+    return Array.isArray(objects) ? (objects as SavedSceneObject[]) : [];
+  });
+}

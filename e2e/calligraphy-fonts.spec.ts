@@ -1,4 +1,4 @@
-import { saveProjectAs } from './fixtures/project-save';
+import { saveProjectAs, savedSceneObjects } from './fixtures/project-save';
 import { expect, test } from './fixtures/kerfdesk-test';
 import type { AppState } from '../src/ui/state/store';
 import { CANVAS_PADDING_PX } from '../src/ui/workspace/canvas-layout';
@@ -68,8 +68,11 @@ for (const [name, fontKey] of FONTS) {
     await saveProjectAs(page, kerfdesk);
     await expect
       .poll(async () =>
-        Object.values(await kerfdesk.savedFiles()).some(
-          (file) => file.includes(`"fontKey": "${fontKey}"`) && file.includes('Élodie & André'),
+        (await savedSceneObjects(kerfdesk)).some(
+          (object) =>
+            object.kind === 'text' &&
+            object.fontKey === fontKey &&
+            object.content === 'Élodie & André',
         ),
       )
       .toBe(true);
