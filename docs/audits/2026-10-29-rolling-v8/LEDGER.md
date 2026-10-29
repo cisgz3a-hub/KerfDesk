@@ -9,6 +9,7 @@ Method: [../2026-10-21-rolling-v2/METHOD.md](../2026-10-21-rolling-v2/METHOD.md)
 | N3 | Fix: geometry (#1501, #1502, #1506) | origin/main @ 33bc394c6 (refuter c1acfdff6; no geometry change between) | [N3-fix-geometry.md](N3-fix-geometry.md) | 7 | 0 | 3 | 1 | 3 | 6 |
 | N4 | Fix: text (#1507, #1508) | origin/main @ 08b5c669b (refuter 4f71f1f41; no text change between) | [N4-fix-text.md](N4-fix-text.md) | 10 | 0 | 3 | 1 | 6 | 3 |
 | N5 | Fix: Design Studio + design I/O (#1509, #1505) | origin/main @ 4f71f1f41 | [N5-fix-studio-io.md](N5-fix-studio-io.md) | 7 | 0 | 1 (P2-2 refuter) | 1 | 5 | 5 |
+| N7 | Fix: e2e repair (#1513), the red window, release-run exit | origin/main @ 4f71f1f41 | [N7-fix-e2e-window.md](N7-fix-e2e-window.md) | 3 | 0 | 0 | 0 | 3 | 3 |
 | N8 | Tracer vs Potrace re-measure + burn spot checks | origin/main @ 33bc394c6 | [N8-tracer-remeasure.md](N8-tracer-remeasure.md) | 7 | 0 | 3 (P2-1, P2-2 refuter; P2-5 coordinator) | 2 | 2 | 7 |
 
 ## Confirmed P1/P2 (coordinator-verified)
