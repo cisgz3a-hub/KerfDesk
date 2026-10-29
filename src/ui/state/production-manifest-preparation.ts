@@ -3,6 +3,7 @@ import type { ProductionManifest, ProductionRow } from '../../core/scene/product
 import { deserializeProject, serializeProject } from '../../io/project';
 import {
   materializeVariableText,
+  plainTextGlyphIssue,
   type VariableTextRenderer,
 } from '../../io/gcode/prepare-output-snapshot';
 
@@ -47,6 +48,26 @@ export async function prepareProductionRow(
           },
         }),
   };
+}
+
+/**
+ * What a row's fixed artwork burns without: each text's characters its font has no glyph for
+ * (ADR-591 Amendment 2). Opening and capturing a row say so, as Start and Save do.
+ */
+export async function productionRowGlyphWarnings(
+  project: Project,
+  row: ProductionRow,
+  render: VariableTextRenderer,
+): Promise<ReadonlyArray<string>> {
+  const where = `production row ${row.index + 1}`;
+  const issues = await Promise.all(
+    project.scene.objects.map((object) =>
+      object.kind === 'text' && object.variableTemplate === undefined
+        ? plainTextGlyphIssue(object, project, render, where)
+        : undefined,
+    ),
+  );
+  return issues.flatMap((issue) => (issue === undefined ? [] : [issue.message]));
 }
 
 /** New variable edits in a row use the original allocation, not a later working CSV/cursor. */

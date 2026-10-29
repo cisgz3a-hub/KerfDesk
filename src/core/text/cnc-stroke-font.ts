@@ -1,4 +1,5 @@
 import { fairStrokeFont, isPolylineDigitizedFont } from './fair-stroke-font';
+import { missingCharacters, textForLayout } from './glyph-coverage';
 import {
   renderStrokeFontText,
   type StrokeFont,
@@ -18,6 +19,15 @@ export async function cncStrokeTextToPolylines(
   input: CncStrokeTextRenderInput,
 ): Promise<TextRenderResult> {
   return renderStrokeFontText(input, await loadCncStrokeFont(input.fontKey));
+}
+
+/** The characters of `content` a CNC face has no stroke for, as its render reports them. */
+export async function cncStrokeFontMissingCharacters(
+  fontKey: string,
+  content: string,
+): Promise<ReadonlyArray<string>> {
+  const font = await loadCncStrokeFont(fontKey);
+  return missingCharacters(textForLayout(content), (character) => font.glyphs.has(character));
 }
 
 async function loadCncStrokeFont(fontKey: string): Promise<StrokeFont> {

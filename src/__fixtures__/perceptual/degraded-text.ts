@@ -18,8 +18,10 @@ type Font = Awaited<ReturnType<typeof parseOutlineFont>>;
 const AA_SAMPLES = 4;
 const CURVE_STEPS = 16;
 
-export async function loadFont(file = 'Roboto-Regular.ttf'): Promise<Font> {
-  const bytes = readFileSync(resolve(__dirname, '../../ui/text/fonts', file));
+/** A shipped font: the text tool's own by default, or one from `dir` (for
+ *  example the PDF importer's Arial-metric Liberation Sans). */
+export async function loadFont(file = 'Roboto-Regular.ttf', dir = 'ui/text/fonts'): Promise<Font> {
+  const bytes = readFileSync(resolve(__dirname, '../..', dir, file));
   return parseOutlineFont(
     bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
   );

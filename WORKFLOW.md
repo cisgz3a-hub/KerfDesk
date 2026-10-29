@@ -2060,13 +2060,17 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    The warning never refuses Start.
 5. Pause releases background refill. Confirmed Resume and tool-change Continue restore it for
    the same live job. Abort, disconnect or a replacement job cannot inherit an old refill queue.
-   Marlin's Abort and Disconnect take the refill back before their stop lines.
+   Marlin's Abort and Disconnect send their stop lines right behind the refill's handback, so
+   a backlog in a window that was busy never delays them (ADR-676 Amendment 1).
 6. Browser shutdown, computer sleep and USB loss still interrupt a live serial connection.
 7. The desktop app, like Chrome, lets the window and the worker see only the ports picked in
    its Select dialog, so an identical second adapter (a laser controller and an Arduino that
    both use a CH340, for example) no longer stops background streaming. A pick lasts until
    Forget Controller, and on macOS and Linux also until an app restart; picking both identical
    adapters is still ambiguous and uses the window port (ADR-366, ADR-552).
+8. A Marlin `Unknown command` echo of the line in flight ends the job as before (MA-12). An echo
+   of any other text, such as a move whose `G` was lost on the wire, stays in the log, and the
+   worker keeps streaming the rest of the job (ADR-676 Amendment 1).
 
 #### Error — WebSerial not supported
 1. Connection button is disabled, with a red hint above: "Your browser doesn't support WebSerial. Use Chrome, Edge, Brave (may require enabling under Brave Shields/flags), or Arc, or install the Windows desktop app."
@@ -4040,7 +4044,10 @@ settings and Job Review keep their existing read-only setup references.
 - Multilingual outline text uses local shaping and bidirectional layout (ADR-591). Hebrew,
   Arabic, mixed-direction numbers and combining marks retain their glyph order and positioning
   through wrapping and path text. Choose or import a font containing the required characters;
-  missing glyphs are still reported. No online font service is used. Existing basic Latin and
+  missing glyphs are still reported: the text dialog and the jig text panel name them while you
+  type, Bake and a production row name them as they fix the text, and Job Review, Start, Save,
+  the exports and print name them for every text they output (ADR-591 Amendment 2). No online
+  font service is used. Existing basic Latin and
   single-line engraving fonts keep their established geometry.
 - The outline font picker includes Great Vibes, Allura, Alex Brush, Parisienne, Pinyon Script,
   Italianno, and Corinthia for names and calligraphic signs. Cinzel Decorative provides ornamental
@@ -4697,13 +4704,16 @@ exit of the same length along its last edge, and that exit is skipped and disclo
 rule (`contour-exit …`, "Contour entry and exit", ADR-239 Amendment 2). Preview, timing, Frame bounds and output use the same prepared result. Earlier archived
 jobs retain their original entry behaviour so recovery does not silently change sealed output.
 
-Constant-power advice (ADR-257 Amendment 1). Where a dialect's default burns an operation with
-M3 on GRBL-family output, Save, Start and Job Review advise: GRBL Compatible images whose
-one-move-per-pixel rows outrun the controller's look-ahead burn darker than the Preview, and
-GRBL Compatible and 4040 Line cuts burn darker at corners (and at path starts and ends without
-runways). The advice points GRBL 1.1f and newer to GRBL Dynamic (or the operation's Dynamic
-Power mode on the 4040), as LightBurn does; with a current `$I` reply, Job Review names the
-controller's own version. An operation set to Constant by hand gets no advice.
+Constant-power advice (ADR-257 Amendments 1 and 2). Where a dialect's default burns an operation
+with M3 on GRBL-family output, Save, Start and Job Review advise: GRBL Compatible images whose
+one-move-per-pixel rows outrun the controller's look-ahead burn darker than the Preview; GRBL
+Compatible Scan Line fills whose strokes and gaps are short enough for the same look-ahead to hold
+a row below the feed burn small text darker than wider areas, whatever the overscan; and GRBL
+Compatible and 4040 Line cuts, and GRBL Compatible offset fills, burn darker at corners (and at
+path starts and ends without runways). The advice points GRBL 1.1f and newer to GRBL Dynamic
+(or the operation's Dynamic Power mode on the 4040), as LightBurn does; with a current `$I`
+reply, Job Review names the controller's own version. An operation set to Constant by hand gets
+no advice.
 
 **Status readout.** `StatusDisplay` shows MPos + `Origin:` row. The
 `Origin:` row reads from `wcoCache` (cached last-seen WCO across

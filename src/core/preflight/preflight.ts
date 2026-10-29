@@ -77,6 +77,9 @@ export type PreflightCode =
   // Advisory-only (ADR-591 Amendment 1): a variable record has characters its font has no glyph
   // for, which burn as the font's box or not at all.
   | 'variable-text-missing-glyphs'
+  // Advisory-only (ADR-591 Amendment 2): the same for plain text from any route (the editor, Bake,
+  // a production row, the jig editor, a remote edit), which burns the geometry it was made with.
+  | 'text-missing-glyphs'
   | 'print-and-cut-registration-invalid'
   | 'cnc-settings-invalid'
   | 'cnc-machine-params-invalid'

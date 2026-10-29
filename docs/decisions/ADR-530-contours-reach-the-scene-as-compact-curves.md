@@ -903,3 +903,111 @@ Not part of this amendment:
   interpolate at a constant offset on the source grid as well, so it is measured on both routes.
 - Mixed sources above the 2% share.
 - The native small-mark judge's losses named above (ADR-434).
+
+### Amendment 12 - near two-level sources take the source grid too (2026-10-29)
+
+Rolling audit v8 N8-P2-3 (`docs/audits/2026-10-29-rolling-v8/N8-tracer-remeasure.md`) found the
+staircase of Amendment 11 back on everyday two-level art:
+
+- After a JPEG round trip at quality 75, Smooth drew the 32 px circle with 47 segments and 40
+  inflections again; at quality 60 Line Art did too. Potrace 1.16 draws 4 and 0.
+- On the Q4 ground-truth set after quality 75, Smooth fell from 55 / 17 / 7 to 45 / 17 / 17 against
+  Potrace, with 1,399 segments against Potrace's 700.
+- The cause is Decision 1's test. A crack counted as measured when the walker would place it more
+  than 0.05 px off its midpoint against the preset's cut. JPEG ringing leaves a hard edge's pixels
+  some way off both tones, and at quality 75 the cut placed up to a fifth of an image's cracks that
+  far off.
+- The first case this amendment's "Not part" list named fails the same way. Against Line Art's
+  fixed cut at 128, every crack of a disc in ink at luma 40 to 110 sits 0.09 to 0.2 px off its
+  midpoint, so the disc drew 47 segments with 40 inflections.
+
+**Decision** (`staircase-source.ts`):
+
+1. Two-level means two tones meeting in steps.
+   - The tones are the medians of the field over the mask's ink pixels and over its paper pixels.
+   - A crack is a step when its ink and paper pixels straddle the tones' mid-level and cross it
+     within 0.15 px of the crack's midpoint.
+   - A source is two-level when at most 2% of its boundary cracks are not steps. The 2% share is
+     unchanged.
+2. On the source-grid walk a step crack crosses at its midpoint, as a saturated step does, through
+   the field's walker-only crossing (ADR-533). A crack that is not a step keeps the field's own
+   crossing. A near two-level source then traces as its clean art.
+
+**Why the mid-level.** A step between ink level I and paper level P crosses (I + P) / 2 halfway
+between the two pixel centres, wherever the preset's cut sits. JPEG's error at a step is near
+symmetric, so its cracks stay near halfway. An anti-aliased edge spreads its crossings across the
+whole crack. Shares of boundary cracks more than 0.15 px off, over the 79 Q4 images:
+
+| Source | Largest share on any image | Images over 2% |
+|---|---|---|
+| Binary | 0 | 0 |
+| JPEG quality 75 / 60 / 50 | 0.0% / 0.9% / 6.0% | 0 / 0 / 13 to 14 |
+| JPEG quality 75 of red or blue ink (Smooth's field) | 1.2% | 0 |
+| Anti-aliased, also after JPEG quality 75 | 30% to 90% (0% on pixel-aligned squares) | 67 of 67 |
+
+**Rejected, measured:**
+
+- **Keeping the walker's 0.05 px test and raising the share.** After quality 60 the median image
+  had 7 to 9% of its cracks past 0.05 px and the worst 15 to 37%, so any share that passes those
+  also passes mixed art.
+- **Leaving the walk's crossings as the field places them.** A disc in ink at luma 40 to 110 drew 9
+  or 10 segments with up to 2 inflections, against 6 and 0 for black ink.
+- **Placing step cracks at the mid-level crossing instead of the midpoint.**
+  - It kept what a 0.6 px blur of a binary disc says: 0.091 px from the true circle, against
+    0.129 px at the midpoints.
+  - But quality 60 ringing then moves the cracks up to 0.15 px, which tilts short binary legs into
+    serif spikes.
+  - On the 72 glyph images of N8-P2-4, Line Art drew 50 sharp nodes 1 px or more off the outline on
+    30 images, against 12 on 10 at the midpoints and 11 on 9 for the clean 1-bit art.
+
+**Measurements.** Q4 ground-truth set (79 images), Potrace 1.16 `-t 2 -a 1 -O 0.2 -z minority` as a
+separate process on the same decoded pixels, the Q4 report's nine metrics. JPEG by libjpeg through
+sharp, 4:2:0. Main is `33bc394c6`; "this" includes ADR-439 Amendment 2.
+
+| W / T / L vs Potrace | Main | This |
+|---|---|---|
+| Clean: Line Art / Sharp / Smooth | 51 / 20 / 8, 49 / 22 / 8, 55 / 17 / 7 | unchanged, every metric |
+| JPEG 75: Line Art / Smooth | 52 / 18 / 9, 45 / 17 / 17 | 51 / 20 / 8, 54 / 17 / 8 |
+| JPEG 60: Line Art / Smooth | 31 / 19 / 29, 24 / 23 / 32 | 50 / 20 / 9, 56 / 15 / 8 |
+| 0.6 px blur of the binary art: Line Art / Smooth | 36 / 17 / 26, 37 / 19 / 23 | 39 / 14 / 26, 40 / 17 / 22 |
+
+| Aggregates, main -> this | Segments | Inflections per smooth convex shape | True corners kept (of 331) |
+|---|---|---|---|
+| Line Art, JPEG 75 | 995 -> 815 (clean 813) | 1.1 -> 1.0 | 229 -> 237 |
+| Smooth, JPEG 75 | 1,399 -> 781 (clean 771) | 2.9 -> 0.4 | 182 -> 228 |
+| Line Art, JPEG 60 | 3,524 -> 822 | 24.9 -> 1.1 | 145 -> 232 |
+| Smooth, JPEG 60 | 3,356 -> 769 | 25.0 -> 0.3 | 152 -> 225 |
+| Potrace | 700 | 0 | 143 |
+
+- Circle, d = 32 px, Line Art and Smooth on 48 and 96 px canvases: quality 75 and 60 draw 6
+  cubics with 0 inflections, as the clean circle does. Main drew 47 segments with 40 inflections
+  where the staircase came back (36 cubics and 2 lines with 30 at 96 px). Quality 50 draws 6
+  cubics with at most 1 inflection.
+- A quality 60 JPEG of a 17 degree turned square draws 6 segments, as the clean square does (main:
+  51, with 50 inflections). A disc in ink at luma 40, 80 or 110 draws 6 cubics on Line Art (main:
+  47, with 40 or 41 inflections).
+- Sharp never enlarges and is unchanged.
+
+**Consequences:**
+
+- A JPEG of two-level art traces as its clean art. On 1-bit Tinos A, K, M, N, R and W at 24 and
+  32 px after quality 60, every node lies within 0.7 px of the clean trace's outline, and on 10 of
+  the 12 images exactly on it; main's nodes stood 1.8 to 6.3 px off. A crack the ringing leaves too
+  uneven to be a step keeps its crossing and can move a node that far.
+- Two-level art in a pale or coloured ink takes the source grid on every preset.
+- Lightly blurred two-level art that passes the test traces as its staircase. Most blurred images
+  in the set stay above the share and keep the enlarged trace; the set's segments fall from 3,189
+  to 2,887 on Line Art.
+- A JPEG of anti-aliased art stays measured.
+- `crackCarriesSubPixelEdge` (`contour-boundary.ts`), whose only caller was the old test, is gone.
+- Tests: `staircase-source.test.ts` (JPEG circles and turned square, pale ink), with a JPEG model
+  in `src/__fixtures__/perceptual/jpeg-roundtrip.ts`. It reproduces sharp's trace counts exactly
+  on the cases tested.
+
+Not part of this amendment:
+
+- JPEG at quality 50 or lower: 13 to 14 of the 79 images exceed the share and keep the enlarged
+  trace.
+- Sharp on a JPEG. It walks the source natively, and quality 60 ringing tilts its binary legs:
+  sharp nodes 1 px or more off the outline rise from 5 on 5 of the 72 glyph images (clean) to 46 on
+  29, on main and here alike.

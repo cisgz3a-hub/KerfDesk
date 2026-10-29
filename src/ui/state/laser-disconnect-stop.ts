@@ -19,7 +19,7 @@
 // write-attempt/close behavior and unconfirmed-stop notice for an active job.
 
 import { disconnectStopPlan } from './laser-disconnect-safety';
-import { hostedRefillArmed, releaseHostedRefillBeforeStop } from './laser-hosted-refill';
+import { hostedRefillArmed, releaseHostedRefill } from './laser-hosted-refill';
 import { isGrblFamilyDriver, runGrblDisconnectTransaction } from './laser-disconnect-transaction';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import type { LaserState, LiveRefs } from './laser-store';
@@ -65,11 +65,6 @@ export async function stopBeforeDisconnect(
     });
     return;
   }
-  // A worker-held Marlin refill comes back before the freeze (ADR-676); with
-  // none, the freeze below still runs before anything yields.
-  if (hostedRefillArmed(refs)) {
-    if (!(await releaseHostedRefillBeforeStop(refs, () => refs.connection === connection))) return;
-  }
   await stopWithoutResetBeforeDisconnect(set, get, refs, safeWrite, connection, lightOff);
 }
 
@@ -85,18 +80,9 @@ async function stopWithoutResetBeforeDisconnect(
   // ordinary stop commands (laser-disconnect-safety.ts).
   const stopCommands = disconnectStopPlan(get(), refs.driver).commands;
   const softReset = refs.driver.realtime.softReset;
-  freezeDisconnect(set, refs);
-  let firstError: unknown = null;
-  for (const stopCommand of stopCommands) {
-    if (refs.connection !== connection) break;
-    try {
-      await writeDisconnectCommand(safeWrite, stopCommand);
-    } catch (error) {
-      // A blocked/rejected first write must not prevent attempting the other
-      // tool-off lines or closing the unusable connection.
-      firstError ??= error;
-    }
-  }
+  const firstError = hostedRefillArmed(refs)
+    ? await stopWithHostedRefillHandback(set, refs, safeWrite, stopCommands, connection)
+    : await freezeAndWriteInOrder(set, refs, safeWrite, stopCommands, connection);
   if (firstError !== null) throw firstError;
   const lightLines = lightOff === null ? [] : [`${lightOff}\n`];
   for (const line of lightLines) {
@@ -111,12 +97,75 @@ async function stopWithoutResetBeforeDisconnect(
   }
 }
 
-/** Stop host refill and pending motion before the first transport await. Keep
- * ACK debt and the nonterminal job until actual closure supplies its cause. */
-function freezeDisconnect(set: SetFn, refs: LiveRefs): void {
+/** With no worker refill, the freeze runs before anything yields. Returns the
+ * first write error, or null. */
+async function freezeAndWriteInOrder(
+  set: SetFn,
+  refs: LiveRefs,
+  safeWrite: SafeWriteFn,
+  stopCommands: ReadonlyArray<string>,
+  connection: NonNullable<LiveRefs['connection']>,
+): Promise<unknown> {
+  retireOwnedWrites(refs);
+  freezeDisconnectState(set);
+  let firstError: unknown = null;
+  for (const stopCommand of stopCommands) {
+    if (refs.connection !== connection) break;
+    try {
+      await writeDisconnectCommand(safeWrite, stopCommand);
+    } catch (error) {
+      // A blocked/rejected first write must not prevent attempting the other
+      // tool-off lines or closing the unusable connection.
+      firstError ??= error;
+    }
+  }
+  return firstError;
+}
+
+// A worker-held Marlin refill (ADR-676) comes back before the freeze, so the
+// worker cannot send a line this side's frozen ledger does not hold. The stop
+// lines do not wait for that handshake: its reply queues behind every line the
+// worker forwarded while this thread was busy, and meanwhile the controller
+// can drain and stop with the beam lit (rolling audit v8 N1-P2-1). The release
+// is posted first, so the worker stops refilling before the stop lines reach
+// it, and every stop line is posted before the first await. Their write
+// replies queue behind the same backlog, so the write bound starts once this
+// thread has caught up. A connection replaced meanwhile keeps its own state;
+// every later step here checks it.
+async function stopWithHostedRefillHandback(
+  set: SetFn,
+  refs: LiveRefs,
+  safeWrite: SafeWriteFn,
+  stopCommands: ReadonlyArray<string>,
+  connection: NonNullable<LiveRefs['connection']>,
+): Promise<unknown> {
+  retireOwnedWrites(refs);
+  const released = releaseHostedRefill(refs);
+  const written = Promise.allSettled(
+    stopCommands.map((stopCommand) => safeWrite(stopCommand, 'disconnect')),
+  );
+  await released;
+  if (refs.connection !== connection) return null;
+  freezeDisconnectState(set);
+  return boundedDisconnectWrite(written).then(firstRejection, (error: unknown) => error);
+}
+
+function firstRejection(results: ReadonlyArray<PromiseSettledResult<void>>): unknown {
+  for (const result of results) if (result.status === 'rejected') return result.reason as unknown;
+  return null;
+}
+
+/** Nothing written or awaited before Disconnect completes after it; the stop
+ * lines belong to the epoch this opens. */
+function retireOwnedWrites(refs: LiveRefs): void {
   cancelControllerLifecycleRefs(refs, 'Controller is disconnecting.');
   refs.writeEpoch = (refs.writeEpoch ?? 0) + 1;
   cancelRawControllerLineWait(refs);
+}
+
+/** Stop pending motion before the first transport await. Keep ACK debt and the
+ * nonterminal job until actual closure supplies its cause. */
+function freezeDisconnectState(set: SetFn): void {
   set((state) => ({
     ...invalidateControllerSessionEvidence(state),
     ...frameProofReset(),
@@ -130,15 +179,19 @@ function freezeDisconnect(set: SetFn, refs: LiveRefs): void {
 }
 
 function writeDisconnectCommand(safeWrite: SafeWriteFn, command: string): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
+  return boundedDisconnectWrite(safeWrite(command, 'disconnect'));
+}
+
+function boundedDisconnectWrite<T>(pending: Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(
       () => reject(new Error('Serial write timed out during controller disconnect.')),
       DISCONNECT_WRITE_TIMEOUT_MS,
     );
-    void safeWrite(command, 'disconnect').then(
-      () => {
+    void pending.then(
+      (value) => {
         clearTimeout(timer);
-        resolve();
+        resolve(value);
       },
       (error: unknown) => {
         clearTimeout(timer);

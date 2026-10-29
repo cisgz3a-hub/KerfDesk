@@ -3,7 +3,7 @@ import { cncProgramReachWarnings } from '../../io/cnc/cnc-program-reach';
 import { cncToolSectionMaximumDepthsMm } from '../../core/cnc/output-representation';
 import { cncProgramFacts, type CncProgramFacts } from '../../io/cnc/cnc-program-facts';
 import { emitPreparedGcode, type EmitGcodeOptions, type PreparedOutput } from '../../io/gcode';
-import { variableRecordAdvisories } from '../../io/gcode/prepare-output-snapshot';
+import { textGlyphAdvisories } from '../../io/gcode/text-glyph-advisory';
 import type { PreflightResult } from '../../core/preflight';
 import { sceneObjectUsesOperation, type Scene, type Vec2 } from '../../core/scene';
 import { outputPreparationFailure } from './output-preparation-errors';
@@ -92,7 +92,7 @@ export function emitSavePreparedOutput(
     cncVCarveDepths: compiledVCarveLayerDepths(prepared.job),
     ...artifacts,
     machineWarnings: [
-      ...variableRecordAdvisories(prepared),
+      ...textGlyphAdvisories(prepared),
       ...machineWarnings,
       ...toolWarnings,
       ...cncProgramReachWarnings(

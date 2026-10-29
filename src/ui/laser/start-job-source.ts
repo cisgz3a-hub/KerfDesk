@@ -16,7 +16,7 @@ import {
   type LaserModeStartSnapshot,
 } from '../state/laser-mode-start-evidence';
 import type { ExecutionArtifactV1 } from '../state/recovery';
-import { renderVariableText } from '../text/render-variable-text';
+import { outputTextRenderer } from '../text/output-text-renderer';
 import { currentPrintCutOutputRegistration } from './print-cut-output';
 import {
   prepareStartJob,
@@ -113,7 +113,7 @@ export async function prepareCurrentStartJob(
   return refusalOnThrow(() =>
     prepareStartJobSnapshot(project, laser.controllerSettings, machine, jobPlacement, outputScope, {
       clock: () => new Date(),
-      renderVariableText,
+      renderVariableText: outputTextRenderer,
       ...(registration === undefined ? {} : { registration }),
       ...(resolvedJobOrigin === undefined ? {} : { resolvedJobOrigin }),
       requireFrame,

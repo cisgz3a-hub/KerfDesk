@@ -12,7 +12,9 @@
 //      (holes filled): a 1-2 px² mark is not a shape a laser can render. An
 //      ink mark's size is the ink it carries (its pixels' coverage), which
 //      an anti-aliased dot keeps on an enlarged grid where its pixels past
-//      the cut shrink.
+//      the cut shrink; every floor (this one, the lone-mark floor, the pen
+//      width) reads that size, and a size a rounding error under a floor is
+//      at it.
 //   2. Tone, from the pre-threshold luma, against the image's own ink and
 //      paper tones (medians of mask ink and mask paper; span = paper − ink).
 //      A genuine mark is drawn in the drawing's ink; noise is faint. A mark
@@ -36,7 +38,9 @@
 //      than a stroke (stipple, dotted rows and small text versus toner
 //      scatter in a stroke's halo), or if it is about as wide as that
 //      stroke (a tittle or a full stop, drawn with the letter's own pen;
-//      scatter is finer than its stroke). A paper hole is enclosed by ink by
+//      scatter is finer than its stroke), or if it is a compact dot on the
+//      baseline of a letter nearby (a full stop with no ink near it). A mark
+//      is never dust against itself. A paper hole is enclosed by ink by
 //      construction, so these tests are ink-only.
 //
 // Without a grey field (alpha masks) nothing is bridged and every speck
@@ -61,6 +65,7 @@ import {
   AUTO_LIKE_MARK_MAX_AREA_PX,
   createInkNeighbourhood,
   type InkNeighbourhood,
+  underFloor,
 } from './small-mark-neighbourhood';
 import type { TraceOptions } from './trace-option-types';
 import type { RawImageData } from './trace-image';
@@ -210,10 +215,12 @@ export function createSmallMarkClassifier(input: SmallMarkClassifierInput): Smal
     current += 1;
     for (const p of pixels) stamp[p] = current;
   };
-  const inkCoverage = (region: ReadonlyArray<number>, ink: Uint8Array): number =>
+  // A mark's size for every floor: its pixel count or, when larger, the ink
+  // it carries (Amendment 3: the lone-mark floor and the pen width too).
+  const sizeOf = (region: ReadonlyArray<number>, ink: Uint8Array): number =>
     field === null || tones === null
       ? region.length
-      : coverageOf(region, ink, field, tones, geometry);
+      : Math.max(region.length, coverageOf(region, ink, field, tones, geometry));
   // Built on first use (a hole-only plan never needs it). `ink` is the
   // pre-erasure mask despeckle hands every judgement; it is the same array
   // each time.
@@ -227,12 +234,13 @@ export function createSmallMarkClassifier(input: SmallMarkClassifierInput): Smal
       bridgeLuma: tones === null ? null : tones.paper - AUTO_BRIDGE_FRACTION * tones.span,
       reach: (pixels) =>
         field === null || tones === null ? 1 : reachOf(pixels, field, width, tones) / tones.span,
-      coverage: (pixels) => inkCoverage(pixels, ink),
+      size: (pixels) => sizeOf(pixels, ink),
       minArea,
       isolatedMinArea,
       likeMaxArea: AUTO_LIKE_MARK_MAX_AREA_PX * areaScale,
       supportPx,
       tilePx: AUTO_DEBRIS_TILE_PX * linearScale,
+      sourcePx: linearScale,
     });
     return around;
   };
@@ -240,7 +248,10 @@ export function createSmallMarkClassifier(input: SmallMarkClassifierInput): Smal
   return {
     inkCandidateAreaPx: AUTO_CANDIDATE_AREA_PX * areaScale,
     keepInkMark: (region, ink) => {
-      if (region.length < minArea && inkCoverage(region, ink) < minArea) return false;
+      // Measured once, and only where the pixel count alone cannot decide.
+      let measured = -1;
+      const size = (): number => (measured < 0 ? (measured = sizeOf(region, ink)) : measured);
+      if (underFloor(region.length, minArea) && underFloor(size(), minArea)) return false;
       mark(region);
       if (field !== null && tones !== null) {
         const e = extremes(region, field, geometry, 'ink');
@@ -248,25 +259,37 @@ export function createSmallMarkClassifier(input: SmallMarkClassifierInput): Smal
           return false;
         }
       }
-      const around = neighbourhood(ink);
-      if (around.bridged(region)) return true;
-      if (around.debrisAround(region) >= AUTO_DUST_MIN_DEBRIS) return false;
-      if (region.length >= isolatedMinArea) return true;
-      const support = around.support(region);
-      if (support.like <= supportPx && support.like <= support.stroke) return true;
-      return (
-        support.stroke <= supportPx &&
-        discDiameter(region.length) >= AUTO_PEN_WIDTH_FRACTION * support.strokeWidth
-      );
+      return keptByNeighbourhood(neighbourhood(ink), region, size, { isolatedMinArea, supportPx });
     },
     fillPaperHole: (component) => {
-      if (component.length < minArea) return true;
+      if (underFloor(component.length, minArea)) return true;
       if (field === null || tones === null) return false;
       mark(component);
       const e = extremes(component, field, geometry, 'paper');
       return !toneIsGenuine(e.value - tones.ink, e.value - e.cut, e.value - e.ring, tones);
     },
   };
+}
+
+// Rule 3 for a dark mark that passed the floor and the tone tests: a grey
+// bridge keeps it; nearby dust (not counting the mark) removes it; a mark of
+// the lone-mark size stays; under it, a like mark nearer than any stroke, the
+// letter's own pen width, or a place on a text baseline keeps it.
+function keptByNeighbourhood(
+  around: InkNeighbourhood,
+  region: ReadonlyArray<number>,
+  size: () => number,
+  limits: { readonly isolatedMinArea: number; readonly supportPx: number },
+): boolean {
+  if (around.bridged(region)) return true;
+  if (around.debrisAround(region) >= AUTO_DUST_MIN_DEBRIS) return false;
+  if (!underFloor(size(), limits.isolatedMinArea)) return true;
+  const support = around.support(region);
+  if (support.like <= limits.supportPx && support.like <= support.stroke) return true;
+  const penWide =
+    support.stroke <= limits.supportPx &&
+    discDiameter(size()) >= AUTO_PEN_WIDTH_FRACTION * support.strokeWidth;
+  return penWide || around.onTextLine(region);
 }
 
 // Diameter of the disc with this area: a compact mark's width.

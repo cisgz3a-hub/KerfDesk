@@ -4,6 +4,7 @@ import type {
 } from '../../io/gcode/prepare-output-async';
 import { prepareOutputAsync } from '../../io/gcode/prepare-output-async';
 import { prepareOutputSnapshot, type PrepareOutputOptions } from '../../io/gcode';
+import { withTextGlyphCheck } from '../../io/gcode/prepare-output-snapshot';
 import { prepareOutputForStructuredClone } from '../../io/gcode/prepared-output-persistence';
 import { archiveCanvasMotionPlan } from '../state/recovery/execution-artifact-canvas';
 import { emitPreparedRdFile } from '../../io/rd';
@@ -19,7 +20,7 @@ import type {
 } from './output-preparation-protocol';
 import { hydratePagedRasterProject } from '../import/paged-raster-hydration';
 import { runCanvasCompilationTasks } from '../workspace/canvas-compilation-worker-pool';
-import { renderVariableText } from '../text/render-variable-text';
+import { outputTextRenderer } from '../text/output-text-renderer';
 import { detectMachineJobWarnings } from './machine-job-warnings';
 import { finalizeTiledOutput } from '../app/tiled-output-preparation';
 import type { FrameBoundsPreview } from './frame-bounds-preview';
@@ -63,7 +64,7 @@ async function prepareOnlyOutput(
   project: Project,
   context: OutputPreparationContext,
 ): Promise<OutputPreparationResponse> {
-  const prepared = await asyncPreparer(context)(project, request.options);
+  const prepared = await checkedPreparer(context)(project, request.options);
   const machineWarnings = prepared.ok
     ? detectMachineJobWarnings(
         prepared.project,
@@ -149,7 +150,7 @@ async function prepareStartOutput(
           request.outputScope,
           request.resolvedJobOrigin,
           request.requireFrame,
-          prepare,
+          checkedPreparer(context),
           context.onFrameBounds,
         )
       : await prepareStartJobSnapshot(
@@ -160,7 +161,7 @@ async function prepareStartOutput(
           request.outputScope,
           {
             clock: fixedSnapshotClock(request.snapshot.evaluatedAtIso),
-            renderVariableText,
+            renderVariableText: outputTextRenderer,
             ...request.snapshot,
             ...(request.resolvedJobOrigin === undefined
               ? {}
@@ -200,14 +201,22 @@ function prepareWithOptionalSnapshot(
 ) {
   const prepare = asyncPreparer(context);
   return request.snapshot === undefined
-    ? prepare(project, request.options)
+    ? checkedPreparer(context)(project, request.options)
     : prepareOutputSnapshot(project, {
         ...request.options,
         ...request.snapshot,
         clock: fixedSnapshotClock(request.snapshot.evaluatedAtIso),
-        renderVariableText,
+        renderVariableText: outputTextRenderer,
         prepare,
       });
+}
+
+// Without a snapshot there is nothing to evaluate, but each burned plain text is still checked for
+// characters its font lacks, as a snapshot's preparation checks it (ADR-591 Amendment 2).
+function checkedPreparer(context: OutputPreparationContext) {
+  const prepare = asyncPreparer(context);
+  return async (project: Project, options: PrepareOutputOptions) =>
+    withTextGlyphCheck(await prepare(project, options), project, outputTextRenderer);
 }
 
 function asyncPreparer(context: OutputPreparationContext) {

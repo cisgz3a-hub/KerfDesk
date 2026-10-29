@@ -1,7 +1,7 @@
 import type { CncToolPlanEntry } from '../state/cnc-tool-plan';
 import { cncToolPlan } from '../state/cnc-tool-plan';
 import type { PreparedOutput } from '../../io/gcode';
-import { variableRecordAdvisories } from '../../io/gcode/prepare-output-snapshot';
+import { textGlyphAdvisories } from '../../io/gcode/text-glyph-advisory';
 import type { MachineStartSnapshot } from './start-job-readiness';
 import { cncWorkZeroToolStartIssue } from './cnc-start-advisories';
 
@@ -23,7 +23,7 @@ export function inspectPreparedStart(
   if (!prepared.ok) {
     return { ok: false, messages: prepared.preflight.issues.map((issue) => issue.message) };
   }
-  const advisoryWarnings: string[] = [...variableRecordAdvisories(prepared)];
+  const advisoryWarnings: string[] = [...textGlyphAdvisories(prepared)];
   const toolPlan = cncToolPlan(prepared.job);
   const toolIssue = cncWorkZeroToolStartIssue(
     prepared.project,

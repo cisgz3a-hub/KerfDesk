@@ -8,19 +8,14 @@ import {
   type Project,
   type TextObject,
   type Transform,
-  type VariableTemplate,
   type Vec2,
 } from '../../core/scene';
-import {
-  evaluateVariableTemplate,
-  variableTemplateCsvRecord,
-  type VariableEvaluationContext,
-} from '../../core/variables';
-import { fontDisplayName, missingCharactersSentence } from '../../core/text/missing-glyph-words';
+import { evaluateVariableTemplate, type VariableEvaluationContext } from '../../core/variables';
 import { applySimilarityProject, type SimilarityTransform } from '../../core/registration';
 import { prepareOutput, type PreparedOutput, type PrepareOutputOptions } from './prepare-output';
 import { materializeVariableBarcode } from './materialize-variable-barcode';
 import { anchoredVariableTextTransform } from './variable-text-anchor';
+import { plainTextGlyphAdvisory, variableRecordGlyphAdvisory } from './text-glyph-advisory';
 
 export type VariableTextRenderInput = {
   readonly text: TextObject;
@@ -37,9 +32,15 @@ export type VariableTextRenderResult = {
   // Characters the font has no glyph for: output warns about them (ADR-591 Amendment 1).
   readonly missingCharacters?: ReadonlyArray<string>;
 };
-export type VariableTextRenderer = (
-  input: VariableTextRenderInput,
-) => Promise<VariableTextRenderResult>;
+export type VariableTextRenderer = {
+  (input: VariableTextRenderInput): Promise<VariableTextRenderResult>;
+  /**
+   * The characters `content` engraves that the text's font has no glyph for, as its render would
+   * report them, without laying it out. Output checks plain text with it (ADR-591 Amendment 2); a
+   * renderer without it leaves plain text unchecked.
+   */
+  readonly missingCharacters?: (input: VariableTextRenderInput) => Promise<ReadonlyArray<string>>;
+};
 
 export type PrepareOutputSnapshotOptions = PrepareOutputOptions & {
   readonly clock: () => Date;
@@ -116,26 +117,33 @@ async function prepareSnapshot(
     registeredProject,
     outputOptions(options),
   );
-  return { ...withVariableAdvisories(prepared, evaluated.advisories), evaluationContext };
+  return { ...withTextAdvisories(prepared, evaluated.advisories), evaluationContext };
 }
 
 /**
- * The advisories only the snapshot knows: a variable record's missing characters. Start and Save
- * re-run the project's preflight when they emit, which cannot see evaluated records, so they add
- * these to their warnings (ADR-591 Amendment 1).
+ * Output compiled without a snapshot has no records to evaluate, yet still names each burned plain
+ * text's missing characters, as a snapshot's preparation does (ADR-591 Amendment 2).
  */
-export function variableRecordAdvisories(prepared: PreparedOutput): ReadonlyArray<string> {
-  if (!prepared.ok) return [];
-  return (prepared.advisories ?? []).flatMap((issue) =>
-    issue.code === 'variable-text-missing-glyphs' ? [issue.message] : [],
-  );
+export async function withTextGlyphCheck(
+  prepared: PreparedOutput,
+  project: Project,
+  renderer: VariableTextRenderer,
+): Promise<PreparedOutput> {
+  if (!prepared.ok) return prepared;
+  const advisories: TextGlyphAdvisory[] = [];
+  for (const object of project.scene.objects) {
+    if (object.kind !== 'text' || object.variableTemplate !== undefined) continue;
+    const issue = await plainTextGlyphIssue(object, project, renderer);
+    if (issue !== undefined) advisories.push({ objectId: object.id, issue });
+  }
+  return withTextAdvisories(prepared, advisories);
 }
 
-// A record's missing characters inform Job Review, Start and Save; they never refuse output.
+// A text's missing characters inform Job Review, Start and Save; they never refuse output.
 // Only text this output burns counts: inside its scope and on an output layer.
-function withVariableAdvisories(
+function withTextAdvisories(
   prepared: PreparedOutput,
-  advisories: ReadonlyArray<VariableRecordAdvisory>,
+  advisories: ReadonlyArray<TextGlyphAdvisory>,
 ): PreparedOutput {
   if (!prepared.ok || advisories.length === 0) return prepared;
   const { objects, layers } = prepared.project.scene;
@@ -152,14 +160,14 @@ function withVariableAdvisories(
   return { ...prepared, advisories: [...(prepared.advisories ?? []), ...issues] };
 }
 
-/** A variable record's characters its font has no glyph for (ADR-591 Amendment 1). */
-export type VariableRecordAdvisory = { readonly objectId: string; readonly issue: PreflightIssue };
+/** A text's characters its font has no glyph for (ADR-591 Amendments 1 and 2). */
+export type TextGlyphAdvisory = { readonly objectId: string; readonly issue: PreflightIssue };
 
 type MaterializedProject =
   | {
       readonly ok: true;
       readonly project: Project;
-      readonly advisories: ReadonlyArray<VariableRecordAdvisory>;
+      readonly advisories: ReadonlyArray<TextGlyphAdvisory>;
     }
   | { readonly ok: false; readonly preflight: PreflightResult };
 
@@ -203,7 +211,10 @@ export type MaterializedObject =
       readonly fallback: Project['scene']['objects'][number];
     };
 
-/** One object with its variable text or barcode data evaluated into plain content. */
+/**
+ * One object with its variable text or barcode data evaluated into plain content. Plain text stays
+ * as it is, with the characters its font lacks when the renderer can check them.
+ */
 export async function materializeVariableObject(
   object: Project['scene']['objects'][number],
   project: Project,
@@ -212,8 +223,10 @@ export async function materializeVariableObject(
 ): Promise<MaterializedObject> {
   if (isBarcodeObject(object))
     return materializeVariableBarcode(object, project, context, renderer);
-  if (object.kind !== 'text' || object.variableTemplate === undefined) {
-    return { ok: true, object };
+  if (object.kind !== 'text') return { ok: true, object };
+  if (object.variableTemplate === undefined) {
+    const advisory = await plainTextGlyphIssue(object, project, renderer);
+    return { ok: true, object, ...(advisory === undefined ? {} : { advisory }) };
   }
   const evaluated = evaluateVariableTemplate(object.variableTemplate, object, project, context);
   if (!evaluated.ok) return { ...evaluated, fallback: object };
@@ -228,7 +241,7 @@ export async function materializeVariableObject(
         renderer,
       ));
     const { variableTemplate: _template, ...plainText } = object;
-    const advisory = missingGlyphAdvisory(
+    const advisory = variableRecordGlyphAdvisory(
       object,
       object.variableTemplate,
       { value: evaluated.value, missing: rendered.missingCharacters ?? [] },
@@ -262,31 +275,23 @@ export async function materializeVariableObject(
   }
 }
 
-const EXCERPT_LENGTH = 40;
-
-/** "Variable text “Zoë 李” (CSV record 3): Pacifico has no 李; each engraves as …" */
-function missingGlyphAdvisory(
+/**
+ * The characters a plain text's font has no glyph for, which its stored geometry already lacks
+ * (ADR-591 Amendment 2). The check never refuses output: a text it cannot check (a font that will
+ * not load) burns as before. `where` names the text's place, such as a production row.
+ */
+export async function plainTextGlyphIssue(
   text: TextObject,
-  template: VariableTemplate,
-  record: { readonly value: string; readonly missing: ReadonlyArray<string> },
   project: Project,
-  context: VariableEvaluationContext,
-): PreflightIssue | undefined {
-  const { value, missing } = record;
-  if (missing.length === 0) return undefined;
-  const characters = [...value.replace(/\s+/g, ' ').trim()];
-  const excerpt =
-    characters.length > EXCERPT_LENGTH
-      ? `${characters.slice(0, EXCERPT_LENGTH - 1).join('')}…`
-      : characters.join('');
-  const csvRecord = variableTemplateCsvRecord(template, project, context);
-  const font = fontDisplayName(text.fontKey, project.embeddedFonts);
-  return {
-    code: 'variable-text-missing-glyphs',
-    message:
-      `Variable text “${excerpt}”${csvRecord === null ? '' : ` (CSV record ${csvRecord})`}: ` +
-      missingCharactersSentence(font, missing, text.fontKey),
-  };
+  renderer: VariableTextRenderer,
+  where?: string,
+): Promise<PreflightIssue | undefined> {
+  const check = renderer.missingCharacters;
+  if (check === undefined) return undefined;
+  const missing = await check({ text, content: text.content, project }).catch(
+    (): ReadonlyArray<string> => [],
+  );
+  return plainTextGlyphAdvisory(text, missing, project, where);
 }
 
 function resolveEvaluationContext(
