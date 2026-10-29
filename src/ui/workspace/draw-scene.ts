@@ -63,7 +63,7 @@ import { drawArtworkRunFocus } from './draw-artwork-run-focus';
 import { drawBed, drawGrid, drawOriginMarker } from './draw-bed-chrome';
 import { objectIntersectsCanvas } from './object-viewport';
 import { beginArtworkSpriteFrame } from './artwork-sprite-cache';
-import { drawFillPool, planFillPools, type FillPool, type ResolvedVector } from './fill-pools';
+import { drawFillPools, drawnBitmapBox, planFillPools, type ResolvedVector } from './fill-pools';
 import type { DisplayLengthUnit } from '../display-length';
 
 export type DrawOpts = {
@@ -332,10 +332,16 @@ function drawObjects(
     palette,
   );
   // ADR-683: a Fill operation paints as the one even-odd region it burns.
-  const pools = planFillPools(placed.map((entry) => entry.vector));
+  const pools = planFillPools(
+    placed.map((entry) => entry.vector),
+    (index) => drawnBitmapBox(project.scene.objects[index], placed[index]?.onCanvas === true),
+  );
+  const poolAlpha = (ids: ReadonlyArray<string>): number | null =>
+    dimmedByRunFocus(artworkRunFocus, ids) ? UNFOCUSED_ALPHA : null;
   let simplified = false;
   for (const [index, obj] of project.scene.objects.entries()) {
-    drawFillPools(ctx, pools.poolsAt(index), view, artworkRunFocus, onRasterBitmapReady);
+    // A pool stays bright while any of its members is in the focused run.
+    drawFillPools(ctx, pools.poolsAt(index), view, poolAlpha, onRasterBitmapReady);
     ctx.save();
     if (dimmedByRunFocus(artworkRunFocus, [obj.id])) ctx.globalAlpha = UNFOCUSED_ALPHA;
     const { isVisible, onCanvas, vector } = placed[index] ?? NOT_PLACED;
@@ -417,22 +423,6 @@ function drawPlacedVector(
   if (vector === undefined || display === undefined) return false;
   if (display.paths.length > 0) drawObjectDisplay(ctx, vector.object, display, view, requestRedraw);
   return display.isSimplified;
-}
-
-// A pool stays bright while any of its members is in the focused run.
-function drawFillPools(
-  ctx: CanvasRenderingContext2D,
-  pools: ReadonlyArray<FillPool>,
-  view: ViewTransform,
-  focus: ArtworkRunFocus | undefined,
-  requestRedraw: (() => void) | undefined,
-): void {
-  for (const pool of pools) {
-    ctx.save();
-    if (dimmedByRunFocus(focus, pool.memberIds)) ctx.globalAlpha = UNFOCUSED_ALPHA;
-    drawFillPool(ctx, pool, view, requestRedraw);
-    ctx.restore();
-  }
 }
 
 type PlacedObject = {

@@ -5,7 +5,7 @@
 import type { Layer } from './layer';
 import type { Scene } from './scene';
 import type { Vec2 } from './scene-object';
-import { hitTestObject } from './hit-test';
+import { fillPoolParityAt, hitTestObject } from './hit-test';
 import { sceneLayerVisibilityLookup, sceneObjectHasVisibleLayerFromMap } from './visibility';
 
 type InteriorCandidate = {
@@ -16,13 +16,14 @@ type InteriorCandidate = {
 
 export function hitTestCandidates(scene: Scene, point: Vec2): ReadonlyArray<string> {
   const layerByColor = sceneLayerVisibilityLookup(scene.layers);
+  const pools = fillPoolParityAt(scene, layerByColor, point);
   const primary: string[] = [];
   const interiors: InteriorCandidate[] = [];
   let zRank = 0;
   for (let index = scene.objects.length - 1; index >= 0; index -= 1) {
     const object = scene.objects[index];
     if (object === undefined || !isSelectable(object, layerByColor)) continue;
-    const hit = hitTestObject(layerByColor, object, point);
+    const hit = hitTestObject(layerByColor, object, point, pools);
     if (hit.kind === 'primary') primary.push(object.id);
     if (hit.kind === 'line-interior') interiors.push({ id: object.id, area: hit.area, zRank });
     zRank += 1;

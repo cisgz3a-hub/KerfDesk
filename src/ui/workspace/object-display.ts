@@ -7,6 +7,7 @@ import {
   applyTransform,
   flattenColoredPathCurves,
   isRegistrationBox,
+  pathFillOperations,
   sceneLayerVisibility,
   type AABB,
   type ColoredPath,
@@ -49,7 +50,17 @@ export type PathDisplay = {
   readonly operationId: string | null;
   /** The scene path drawn, for callers that need every operation bound to it. */
   readonly path: ColoredPath;
+  /** A filled path's paint under every visible Fill operation that burns it (ADR-683). */
+  readonly fillOperations: ReadonlyArray<FillOperationPaint>;
 };
+
+export type FillOperationPaint = {
+  readonly operationId: string;
+  readonly color: string;
+  readonly output: boolean;
+};
+
+const NO_FILL_OPERATIONS: ReadonlyArray<FillOperationPaint> = [];
 
 export type ObjectDisplay = {
   readonly paths: ReadonlyArray<PathDisplay>;
@@ -103,7 +114,16 @@ export function resolveObjectDisplay(
     // The sprite's geometry identity is the entire immutable paths array.
     // Equal ink styles must still distinguish which paths are visible.
     styleParts.push(`${pathIndex}:${paintKey(paint)}`);
-    paths.push({ display, paint, operationId: resolution.operation?.id ?? null, path });
+    paths.push({
+      display,
+      paint,
+      operationId: resolution.operation?.id ?? null,
+      path,
+      fillOperations:
+        paint.kind === 'fill'
+          ? fillOperationPaints(obj, path, layerByColor, palette)
+          : NO_FILL_OPERATIONS,
+    });
   }
   return {
     paths,
@@ -217,6 +237,19 @@ function resolvePaint(
     };
   }
   return { kind: 'stroke', color, output: effective.output };
+}
+
+function fillOperationPaints(
+  obj: VectorSceneObject,
+  path: ColoredPath,
+  layerByColor: ReadonlyMap<string, Layer>,
+  palette: ArtworkPalette,
+): ReadonlyArray<FillOperationPaint> {
+  return pathFillOperations(obj, path, layerByColor).map(({ operation, output }) => ({
+    operationId: operation.id,
+    color: palette === 'ink' ? canvasTheme.artworkInk : canvasVectorDisplayColor(operation.color),
+    output,
+  }));
 }
 
 function paintKey(paint: PathPaint): string {

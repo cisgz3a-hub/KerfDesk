@@ -7,12 +7,19 @@
 // therefore a hole, and two stacked copies cancel and burn nothing, as in
 // LightBurn. Painting each object as its own fill showed both as solid.
 //
+// A filled path joins the pool of every visible Fill operation it is bound to
+// (Add operation binds a second one), as each burns it (Amendment 1).
 // Only objects whose boxes overlap can change one another's parity, so each
-// operation's objects are split into overlapping clusters. A lone object keeps
-// painting itself (and its sprite); a cluster of two or more is painted once,
-// as one even-odd region, where its lowest member sits in the drawing order.
-// Its members still paint their open contours and any other operation's paths
-// themselves, and keep their own selection, hover and hit test.
+// operation's objects are split into overlapping clusters. A lone object on
+// one operation keeps painting itself (and its sprite); any other cluster is
+// painted as one even-odd region where its lowest member sits in the drawing
+// order. If other artwork drawn between two members overlaps it (a photo in a
+// frame, under a caption), it is painted in parts split there instead: each
+// part where its lowest member sits, its members' own regions clipped to the
+// pool's region, so every member keeps its place in the drawing order.
+// Members still paint their open contours and any other operation's paths
+// themselves, and keep their own selection and hover; the hit test counts the
+// same pools (core/scene/hit-test.ts).
 
 import {
   normalizeClosedPolylinesEvenOddChecked,
@@ -22,13 +29,20 @@ import {
   applyTransform,
   IDENTITY_TRANSFORM,
   isRegistrationBox,
+  transformedBBox,
   type AABB,
   type Polyline,
+  type SceneObject,
 } from '../../core/scene';
 import { drawArtworkSprite, SPRITE_MIN_DISPLAY_SEGMENTS } from './artwork-sprite-cache';
 import { artworkStrokeWidthPx, countPolylineSegments } from './draw-complexity';
 import type { DisplayPolylines } from './display-polylines';
-import { fillClosedPolylinesBatched, strokePolylinesBatched } from './draw-vector-strokes';
+import {
+  clipClosedPolylines,
+  fillClosedPolylinesBatched,
+  strokePolylinesBatched,
+} from './draw-vector-strokes';
+import { overlappingGroups } from './fill-pool-clusters';
 import type { ObjectDisplay, PathDisplay, VectorSceneObject } from './object-display';
 import { vectorObjectWorldBounds } from './object-viewport';
 import type { ViewTransform } from './view-transform';
@@ -45,10 +59,12 @@ export type FillPool = {
   readonly contours: ReadonlyArray<Polyline>;
   readonly segmentCount: number;
   readonly memberIds: ReadonlyArray<string>;
+  /** One part of a split pool: these members' world regions, clipped to `contours`. */
+  readonly regions?: ReadonlyArray<ReadonlyArray<Polyline>>;
 };
 
 export type FillPoolPlan = {
-  /** Pools painted just before the object at this index, their lowest member. */
+  /** Pools, or parts of them, painted just before the object at this index. */
   readonly poolsAt: (index: number) => ReadonlyArray<FillPool>;
   /** The object's display, less the closed fills a pool paints for it. */
   readonly displayAt: (index: number) => ObjectDisplay | undefined;
@@ -60,23 +76,38 @@ type Member = {
   readonly paths: PathDisplay[];
   readonly pathIndexes: number[];
   readonly box: AABB;
+  /** Some path of it also burns under another Fill operation. */
+  shared: boolean;
 };
+
+type PoolMembers = { readonly color: string; readonly output: boolean; readonly members: Member[] };
 
 const NO_POOLS: ReadonlyArray<FillPool> = [];
 const WORLD = { transform: IDENTITY_TRANSFORM };
+const NOTHING_ELSE_DRAWN = (): AABB | null => null;
+// A pool split into many parts is clipped once per part. Past this many
+// clipped segments a frame it is painted whole at its highest member instead,
+// over the artwork between, so nothing it burns is hidden.
+const CLIP_BUDGET_SEGMENTS = 1_000_000;
 
-/** Plan the pools for resolved vectors in drawing order (undefined: not drawn). */
-export function planFillPools(entries: ReadonlyArray<ResolvedVector | undefined>): FillPoolPlan {
+/**
+ * Plan the pools for resolved vectors in drawing order (undefined: no vector
+ * drawn there). `drawnBox` is the box of anything else an index draws (a
+ * photo), or null.
+ */
+export function planFillPools(
+  entries: ReadonlyArray<ResolvedVector | undefined>,
+  drawnBox: (index: number) => AABB | null = NOTHING_ELSE_DRAWN,
+): FillPoolPlan {
   const poolsAt = new Map<number, FillPool[]>();
   const pooledPaths = new Map<number, Set<number>>();
-  for (const members of operationMembers(entries).values()) {
-    if (members.length < 2) continue;
-    for (const cluster of overlappingClusters(members)) {
-      const first = cluster[0];
-      if (cluster.length < 2 || first === undefined) continue;
-      const pools = poolsAt.get(first.index) ?? [];
-      pools.push(buildPool(cluster));
-      poolsAt.set(first.index, pools);
+  const boxAt = drawnBoxes(entries, drawnBox);
+  for (const [key, pool] of poolMembers(entries)) {
+    for (const cluster of clustersOf(key, pool.members)) {
+      if (cluster.length < 2 && !cluster.some((member) => member.shared)) continue;
+      for (const [index, part] of poolParts(key, pool, cluster, boxAt)) {
+        poolsAt.set(index, [...(poolsAt.get(index) ?? []), part]);
+      }
       for (const member of cluster) {
         const indexes = pooledPaths.get(member.index) ?? new Set<number>();
         for (const pathIndex of member.pathIndexes) indexes.add(pathIndex);
@@ -96,7 +127,31 @@ export function planFillPools(entries: ReadonlyArray<ResolvedVector | undefined>
   };
 }
 
-/** Draw a pool, from a cached sprite when it is as dense as a sprited object. */
+/** The box a photo or relief covers when it is drawn, for `planFillPools`. */
+export function drawnBitmapBox(object: SceneObject | undefined, onCanvas: boolean): AABB | null {
+  return onCanvas && (object?.kind === 'raster-image' || object?.kind === 'relief')
+    ? transformedBBox(object)
+    : null;
+}
+
+/** Draw the pools queued before one object; `alphaFor` dims one out of focus. */
+export function drawFillPools(
+  ctx: CanvasRenderingContext2D,
+  pools: ReadonlyArray<FillPool>,
+  view: ViewTransform,
+  alphaFor: (memberIds: ReadonlyArray<string>) => number | null,
+  requestRedraw?: () => void,
+): void {
+  for (const pool of pools) {
+    ctx.save();
+    const alpha = alphaFor(pool.memberIds);
+    if (alpha !== null) ctx.globalAlpha = alpha;
+    drawFillPool(ctx, pool, view, requestRedraw);
+    ctx.restore();
+  }
+}
+
+/** Draw a pool, from a cached sprite when it is whole and as dense as a sprited object. */
 export function drawFillPool(
   ctx: CanvasRenderingContext2D,
   pool: FillPool,
@@ -104,6 +159,7 @@ export function drawFillPool(
   requestRedraw?: () => void,
 ): void {
   if (
+    pool.regions === undefined &&
     pool.segmentCount >= SPRITE_MIN_DISPLAY_SEGMENTS &&
     drawArtworkSprite({
       ctx,
@@ -127,12 +183,20 @@ export function paintFillPool(
   view: ViewTransform,
 ): void {
   ctx.fillStyle = pool.color;
-  fillClosedPolylinesBatched(ctx, WORLD, pool.contours, view, 'evenodd');
   // Every contour of an even-odd region is one of its edges, so this outline
   // only shows where copies cancel: LightBurn draws them unfilled, not gone.
   ctx.strokeStyle = pool.color;
   ctx.lineWidth = pool.widthPx;
-  strokePolylinesBatched(ctx, WORLD, pool.contours, view);
+  if (pool.regions === undefined) {
+    fillClosedPolylinesBatched(ctx, WORLD, pool.contours, view, 'evenodd');
+    strokePolylinesBatched(ctx, WORLD, pool.contours, view);
+    return;
+  }
+  ctx.save();
+  clipClosedPolylines(ctx, WORLD, pool.contours, view, 'evenodd');
+  for (const region of pool.regions) fillClosedPolylinesBatched(ctx, WORLD, region, view);
+  ctx.restore();
+  for (const region of pool.regions) strokePolylinesBatched(ctx, WORLD, region, view);
 }
 
 /** Paint resolved vectors in order with their Fill operations pooled (no sprites). */
@@ -150,108 +214,165 @@ export function paintPooledObjectDisplays(
   });
 }
 
-// Every filled path with closed contours, by the operation, colour and output
-// it paints with: one pool can only hold paths that paint alike.
-function operationMembers(
-  entries: ReadonlyArray<ResolvedVector | undefined>,
-): Map<string, Member[]> {
-  const byOperation = new Map<string, Member[]>();
+// Every filled path with closed contours, under each Fill operation that burns
+// it, by the colour and output it paints with: a pool holds paths that paint alike.
+function poolMembers(entries: ReadonlyArray<ResolvedVector | undefined>): Map<string, PoolMembers> {
+  const pools = new Map<string, PoolMembers>();
   entries.forEach((entry, index) => {
     if (entry === undefined || isRegistrationBox(entry.object)) return;
     entry.display.paths.forEach((path, pathIndex) => {
-      const { paint, operationId } = path;
-      if (paint.kind !== 'fill' || operationId === null) return;
+      if (path.paint.kind !== 'fill') return;
       if (!path.display.polylines.some((polyline) => polyline.closed)) return;
-      const key = `${operationId}\n${paint.color}\n${paint.output ? 1 : 0}`;
-      const members = byOperation.get(key) ?? [];
-      let member = members.at(-1);
-      if (member?.index !== index) {
-        const box = vectorObjectWorldBounds(entry.object);
-        if (box === null) return;
-        member = { index, object: entry.object, paths: [], pathIndexes: [], box };
-        members.push(member);
-        byOperation.set(key, members);
+      for (const { operationId, color, output } of path.fillOperations) {
+        const key = `${operationId}\n${color}\n${output ? 1 : 0}`;
+        const pool = pools.get(key) ?? { color, output, members: [] };
+        let member = pool.members.at(-1);
+        if (member?.index !== index) {
+          const box = vectorObjectWorldBounds(entry.object);
+          if (box === null) return;
+          member = { index, object: entry.object, paths: [], pathIndexes: [], box, shared: false };
+          pool.members.push(member);
+          pools.set(key, pool);
+        }
+        member.paths.push(path);
+        member.pathIndexes.push(pathIndex);
+        member.shared ||= path.fillOperations.length > 1;
       }
-      member.paths.push(path);
-      member.pathIndexes.push(pathIndex);
     });
   });
-  return byOperation;
+  return pools;
 }
 
-// Members linked by overlapping boxes, each cluster in drawing order. Sweep on
-// x, so a large array of side-by-side parts stays near linear.
-function overlappingClusters(members: ReadonlyArray<Member>): Member[][] {
-  const parent = members.map((_, index) => index);
-  const root = (index: number): number => {
-    let current = index;
-    while (parent[current] !== current) current = parent[current] as number;
-    parent[index] = current;
-    return current;
-  };
-  const order = members
-    .map((_, index) => index)
-    .sort((a, b) => (members[a] as Member).box.minX - (members[b] as Member).box.minX);
-  for (let i = 0; i < order.length; i += 1) {
-    const a = order[i] as number;
-    const boxA = (members[a] as Member).box;
-    for (let j = i + 1; j < order.length; j += 1) {
-      const b = order[j] as number;
-      const boxB = (members[b] as Member).box;
-      if (boxB.minX > boxA.maxX) break;
-      if (boxB.minY <= boxA.maxY && boxB.maxY >= boxA.minY) parent[root(b)] = root(a);
-    }
+// Each operation's overlap groups are kept while its members are the same
+// objects, so a still frame does not sweep a dense cluster again (N6-P3-3).
+type ClusterGroups = {
+  readonly objects: ReadonlyArray<VectorSceneObject>;
+  readonly groups: ReadonlyArray<ReadonlyArray<number>>;
+};
+const clusterCache = new WeakMap<VectorSceneObject, Map<string, ClusterGroups>>();
+
+function clustersOf(key: string, members: ReadonlyArray<Member>): Member[][] {
+  const first = (members[0] as Member).object;
+  const byKey = clusterCache.get(first) ?? new Map<string, ClusterGroups>();
+  const cached = byKey.get(key);
+  let groups = cached?.groups;
+  if (
+    groups === undefined ||
+    cached?.objects.length !== members.length ||
+    cached.objects.some((object, i) => object !== members[i]?.object)
+  ) {
+    groups = overlappingGroups(members.map((member) => member.box));
+    byKey.set(key, { objects: members.map((member) => member.object), groups });
+    clusterCache.set(first, byKey);
   }
-  const clusters = new Map<number, Member[]>();
-  members.forEach((member, index) => {
-    const cluster = clusters.get(root(index)) ?? [];
-    cluster.push(member);
-    clusters.set(root(index), cluster);
-  });
-  return [...clusters.values()];
+  return groups.map((group) => group.map((position) => members[position] as Member));
 }
+
+// Where a cluster's pool is painted: whole at its lowest member, or in parts
+// split wherever artwork drawn between two members overlaps the cluster.
+function poolParts(
+  key: string,
+  pool: PoolMembers,
+  cluster: ReadonlyArray<Member>,
+  boxAt: (index: number) => AABB | null,
+): Array<readonly [number, FillPool]> {
+  const geometry = poolGeometry(key, cluster);
+  const whole: FillPool = {
+    color: pool.color,
+    widthPx: artworkStrokeWidthPx(geometry.segmentCount, pool.output),
+    contours: geometry.contours,
+    segmentCount: geometry.segmentCount,
+    memberIds: cluster.map((member) => member.object.id),
+  };
+  const parts = splitWhereCovered(cluster, boxAt);
+  if (parts.length === 1) return [[(cluster[0] as Member).index, whole]];
+  if (parts.length * geometry.segmentCount > CLIP_BUDGET_SEGMENTS) {
+    return [[(cluster.at(-1) as Member).index, whole]];
+  }
+  return parts.map((part) => [
+    (cluster[part[0] as number] as Member).index,
+    {
+      ...whole,
+      memberIds: part.map((position) => (cluster[position] as Member).object.id),
+      regions: part.map((position) => geometry.regions[position] ?? []),
+    },
+  ]);
+}
+
+// Positions in the cluster, in runs that no other drawn artwork overlapping
+// the cluster separates.
+function splitWhereCovered(
+  cluster: ReadonlyArray<Member>,
+  boxAt: (index: number) => AABB | null,
+): number[][] {
+  const box = unionBox(cluster);
+  const parts: number[][] = [[0]];
+  for (let position = 1; position < cluster.length; position += 1) {
+    const below = (cluster[position - 1] as Member).index;
+    const index = (cluster[position] as Member).index;
+    let covered = false;
+    for (let between = below + 1; between < index && !covered; between += 1) {
+      const drawn = boxAt(between);
+      covered = drawn !== null && boxesOverlap(drawn, box);
+    }
+    if (covered) parts.push([]);
+    parts.at(-1)?.push(position);
+  }
+  return parts;
+}
+
+function drawnBoxes(
+  entries: ReadonlyArray<ResolvedVector | undefined>,
+  drawnBox: (index: number) => AABB | null,
+): (index: number) => AABB | null {
+  const boxes = new Map<number, AABB | null>();
+  return (index) => {
+    let box = boxes.get(index);
+    if (box === undefined) {
+      const entry = entries[index];
+      box = entry === undefined ? drawnBox(index) : vectorObjectWorldBounds(entry.object);
+      boxes.set(index, box);
+    }
+    return box;
+  };
+}
+
+type PoolGeometry = {
+  readonly parts: ReadonlyArray<readonly [VectorSceneObject, ReadonlyArray<Polyline>]>;
+  /** Each member's region in world millimetres, in cluster order. */
+  readonly regions: ReadonlyArray<ReadonlyArray<Polyline>>;
+  readonly contours: ReadonlyArray<Polyline>;
+  readonly segmentCount: number;
+};
 
 // A pool's world contours are rebuilt only when one of its members changes.
-const poolContourCache = new WeakMap<
-  VectorSceneObject,
-  {
-    readonly parts: ReadonlyArray<readonly [VectorSceneObject, ReadonlyArray<Polyline>]>;
-    readonly contours: ReadonlyArray<Polyline>;
-  }
->();
+const poolGeometryCache = new WeakMap<VectorSceneObject, Map<string, PoolGeometry>>();
 
-function buildPool(cluster: ReadonlyArray<Member>): FillPool {
-  const first = cluster[0] as Member;
+function poolGeometry(key: string, cluster: ReadonlyArray<Member>): PoolGeometry {
+  const first = (cluster[0] as Member).object;
   const parts = cluster.map((member) => [member.object, memberParityContours(member)] as const);
-  const cached = poolContourCache.get(first.object);
-  const reusable =
+  const byKey = poolGeometryCache.get(first) ?? new Map<string, PoolGeometry>();
+  const cached = byKey.get(key);
+  if (
     cached !== undefined &&
     cached.parts.length === parts.length &&
     cached.parts.every(
       ([object, contours], i) => object === parts[i]?.[0] && contours === parts[i]?.[1],
-    );
-  const contours = reusable ? cached.contours : worldContours(parts);
-  if (!reusable) poolContourCache.set(first.object, { parts, contours });
-  const paint = first.paths[0]?.paint;
-  const segmentCount = countPolylineSegments(contours);
-  return {
-    color: paint?.color ?? '',
-    widthPx: artworkStrokeWidthPx(segmentCount, paint?.output !== false),
-    contours,
-    segmentCount,
-    memberIds: cluster.map((member) => member.object.id),
-  };
-}
-
-function worldContours(
-  parts: ReadonlyArray<readonly [VectorSceneObject, ReadonlyArray<Polyline>]>,
-): Polyline[] {
-  return parts.flatMap(([object, contours]) =>
+    )
+  ) {
+    return cached;
+  }
+  const regions = parts.map(([object, contours]) =>
     contours.map((contour) => ({
       closed: true,
       points: contour.points.map((point) => applyTransform(point, object.transform)),
     })),
   );
+  const contours = regions.flat();
+  const geometry = { parts, regions, contours, segmentCount: countPolylineSegments(contours) };
+  byKey.set(key, geometry);
+  poolGeometryCache.set(first, byKey);
+  return geometry;
 }
 
 // Object-space contours whose even-odd parity is this member's own region:
@@ -322,6 +443,21 @@ function withoutPooledFills(display: ObjectDisplay, pooled: ReadonlySet<number>)
     return open.length === 0 ? [] : [{ ...path, display: { ...path.display, polylines: open } }];
   });
   return { ...display, paths, styleKey: `${display.styleKey}|pooled:${[...pooled].join(',')}` };
+}
+
+function boxesOverlap(a: AABB, b: AABB): boolean {
+  return a.minX <= b.maxX && a.maxX >= b.minX && a.minY <= b.maxY && a.maxY >= b.minY;
+}
+
+function unionBox(members: ReadonlyArray<Member>): AABB {
+  let { minX, minY, maxX, maxY } = (members[0] as Member).box;
+  for (const { box } of members) {
+    minX = Math.min(minX, box.minX);
+    minY = Math.min(minY, box.minY);
+    maxX = Math.max(maxX, box.maxX);
+    maxY = Math.max(maxY, box.maxY);
+  }
+  return { minX, minY, maxX, maxY };
 }
 
 function contoursBounds(contours: ReadonlyArray<Polyline>): AABB {

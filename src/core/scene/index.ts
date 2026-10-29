@@ -176,6 +176,7 @@ export {
 } from './array-layout';
 export type { PrintAndCutDesignTargets } from './print-and-cut';
 export { sceneLayerVisibility, sceneObjectHasVisibleLayer } from './visibility';
+export { pathFillOperations, type PathFillOperation } from './fill-operations';
 
 export type { Scene, SceneGroup } from './scene';
 export type { LayerMoveDirection } from './scene';

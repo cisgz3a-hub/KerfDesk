@@ -84,6 +84,21 @@ export function resolveVisibleOperationForPath<T extends LayerVisibility>(
   return { visible: hasUnknownBinding, operation: undefined };
 }
 
+/** Every visible operation a path is bound to, in persisted order; the first styles it. */
+export function visibleOperationsForPath<T extends LayerVisibility>(
+  object: { readonly operationIds?: ReadonlyArray<string> | undefined },
+  path: Pick<ColoredPath, 'color' | 'operationIds'>,
+  operationLookup: ReadonlyMap<string, T>,
+): ReadonlyArray<T> {
+  const operationIds = path.operationIds ?? object.operationIds ?? [path.color];
+  const operations: T[] = [];
+  for (const id of operationIds) {
+    const operation = operationLookup.get(id);
+    if (operation?.visible === true && !operations.includes(operation)) operations.push(operation);
+  }
+  return operations;
+}
+
 /** Canonical cached visibility API for canvas consumers outside the Scene module. */
 export const sceneLayerVisibility = {
   lookup: sceneLayerVisibilityLookup,
