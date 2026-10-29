@@ -26,11 +26,7 @@ import {
   requalifyAfterHaltingReset,
   type ControllerQualificationScheduleRefs,
 } from './laser-controller-qualification';
-import {
-  hostedRefillArmed,
-  releaseHostedRefill,
-  releaseHostedRefillBeforeStop,
-} from './laser-hosted-refill';
+import { hostedRefillArmed, releaseHostedRefill } from './laser-hosted-refill';
 import {
   cancelControllerLifecycleRefs,
   type ControllerLifecycleRefs,
@@ -148,18 +144,33 @@ async function runNoResetStopUnlessDisconnecting(
   await runNoResetStop(context, reason, ownsSession);
 }
 
-// A worker-held refill (Marlin, ADR-676) comes back first, as Pause does, so
-// the worker cannot send a line this side's frozen ledger does not hold. With
-// no worker refill, nothing here yields before the freeze.
+type StopLineWrites = { readonly airOffSent: boolean; readonly allSent: boolean };
+
+// A worker-held refill (Marlin, ADR-676) comes back before the freeze, as on
+// Pause, so the worker cannot send a line this side's frozen ledger does not
+// hold. The stop lines do not wait for that handshake: its reply queues behind
+// every line the worker forwarded while this thread was busy, and meanwhile
+// the controller can drain and stop with the beam lit (rolling audit v8
+// N1-P2-1). The release is posted first, so the worker stops refilling before
+// the stop lines reach it; then every stop line, and only the freeze waits.
+// With no worker refill, nothing here yields before the freeze.
 async function runNoResetStop(
   context: JobStopContext,
   reason: JobStopReason | undefined,
   ownsSession: () => boolean,
 ): Promise<void> {
-  if (hostedRefillArmed(context.refs)) {
-    if (!(await releaseHostedRefillBeforeStop(context.refs, ownsSession))) return;
+  // Cancellation clears the unsent program, including any M7/M8 that requires
+  // M9 cleanup. Capture that requirement before retiring the queue.
+  const lines = noResetStopLines(context.driver(), context.get());
+  if (!hostedRefillArmed(context.refs)) {
+    await freezeAndStopWithoutReset(context, reason, ownsSession, lines);
+    return;
   }
-  await freezeAndStopWithoutReset(context, reason, ownsSession);
+  const released = releaseHostedRefill(context.refs);
+  const sent = writeStopLinesAtOnce(context, lines);
+  await released;
+  if (!ownsSession()) return;
+  await freezeAndStopWithoutReset(context, reason, ownsSession, lines, sent);
 }
 
 // A no-reset Abort must retire host refill before even the handback await.
@@ -170,12 +181,11 @@ async function freezeAndStopWithoutReset(
   context: JobStopContext,
   reason: JobStopReason | undefined,
   ownsSession: () => boolean,
+  lines: ReadonlyArray<string>,
+  sent?: Promise<StopLineWrites>,
 ): Promise<void> {
   const { set, get, refs, driver } = context;
   const initial = get();
-  // Cancellation clears the unsent program, including any M7/M8 that requires
-  // M9 cleanup. Capture that requirement before retiring the queue.
-  const lines = noResetStopLines(driver(), initial);
   const operation = isActiveJob(initial.streamer)
     ? interactiveControllerOperation('Aborting job', 'terminal-exchange')
     : null;
@@ -207,7 +217,7 @@ async function freezeAndStopWithoutReset(
     if (!ownsStop()) return;
     cancelPauseResumeTransition(refs, TRANSITION_CANCELLATION_MESSAGE);
     const stoppedWork = captureStopOutcomeOwner(context);
-    const outcome = await stopWithoutReset(context, lines, ownsStop);
+    const outcome = await stopWithoutReset(context, lines, ownsStop, sent);
     if (ownsStop()) applyStopOutcome(context, outcome, null, stoppedWork);
   } finally {
     if (operation !== null && get().controllerOperation === operation) {
@@ -373,12 +383,14 @@ async function settleResetWrite(
 // No realtime reset (Marlin): cancelling the host streamer is not proof that
 // the machine stopped, so the notice is raised before the first await; a
 // transport failure may replace it with the stronger write-failed notice.
+// `sent`: the lines already went out with a worker handback.
 async function stopWithoutReset(
   context: JobStopContext,
   lines: ReadonlyArray<string>,
   ownsStop: () => boolean,
+  sent?: Promise<StopLineWrites>,
 ): Promise<StopOutcome> {
-  const { set, get, safeWrite, driver } = context;
+  const { set, get, driver } = context;
   const activeDriver = driver();
   const quickStopped = driverQuickStops(activeDriver);
   // A halted controller runs none of the stop lines; its reset advice stays.
@@ -387,17 +399,42 @@ async function stopWithoutReset(
       safetyNotice: quickStopped ? quickStopUnconfirmedNotice() : disconnectStopUnconfirmedNotice(),
     });
   }
+  const writes = await (sent ?? writeStopLinesInOrder(context, lines, ownsStop));
+  const allSent = writes.allSent && ownsStop();
+  return {
+    airOffSent: writes.airOffSent,
+    quickStop: !quickStopped ? 'none' : allSent ? 'sent' : 'unsent',
+  };
+}
+
+async function writeStopLinesInOrder(
+  context: JobStopContext,
+  lines: ReadonlyArray<string>,
+  ownsStop: () => boolean,
+): Promise<StopLineWrites> {
   let airOffSent = false;
-  let allSent = false;
   try {
     for (const line of lines) {
-      if (!ownsStop()) break;
-      await safeWrite(line, 'stop');
+      if (!ownsStop()) return { airOffSent, allSent: false };
+      await context.safeWrite(line, 'stop');
       if (isAirOffLine(line)) airOffSent = true;
     }
-    allSent = ownsStop();
+    return { airOffSent, allSent: true };
   } catch {
     // Best effort if the transport is already gone.
+    return { airOffSent, allSent: false };
   }
-  return { airOffSent, quickStop: !quickStopped ? 'none' : allSent ? 'sent' : 'unsent' };
+}
+
+// Every line is posted before the first await, in order.
+async function writeStopLinesAtOnce(
+  context: JobStopContext,
+  lines: ReadonlyArray<string>,
+): Promise<StopLineWrites> {
+  const results = await Promise.allSettled(lines.map((line) => context.safeWrite(line, 'stop')));
+  const sent = (index: number): boolean => results[index]?.status === 'fulfilled';
+  return {
+    airOffSent: lines.some((line, index) => sent(index) && isAirOffLine(line)),
+    allSent: lines.every((_line, index) => sent(index)),
+  };
 }

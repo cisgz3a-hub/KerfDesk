@@ -252,7 +252,8 @@ async function writeBytes(state: WorkerState, data: string): Promise<void> {
 }
 
 function handleLine(state: WorkerState, deps: SerialWorkerCoreDeps, line: string): void {
-  const invalidated = state.streamer !== null && invalidatesRefill(state.acks, line);
+  const invalidated =
+    state.streamer !== null && invalidatesRefill(state.acks, state.streamer, line);
   if (invalidated) stopRefill(state);
   if (state.streamer !== null) {
     const pumped =
@@ -276,8 +277,9 @@ function handleLine(state: WorkerState, deps: SerialWorkerCoreDeps, line: string
   if (invalidated) deps.post({ kind: 'refill-stopped' });
 }
 
-function invalidatesRefill(acks: HostedStreamAcks, line: string): boolean {
-  if (acks === 'marlin') return marlinLineStopsHostedRefill(line);
+// A Marlin echo is read against the line it answers, the oldest one in flight.
+function invalidatesRefill(acks: HostedStreamAcks, streamer: StreamerState, line: string): boolean {
+  if (acks === 'marlin') return marlinLineStopsHostedRefill(line, streamer.inFlight[0]?.line);
   const response = classifyResponse(line);
   if (response.kind === 'status') {
     return (
