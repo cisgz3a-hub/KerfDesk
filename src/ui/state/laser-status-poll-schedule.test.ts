@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   hostAwareSilenceRemainingMs,
+  onSchedulePollTimeAt,
   recordStatusPollTick,
   type StatusPollScheduleRefs,
 } from './laser-status-poll-schedule';
-import { HOST_SCHEDULING_GAP_MS } from './laser-stream-heartbeat';
+import { HOST_SCHEDULING_GAP_MS, LATE_POLL_TICK_MS } from './laser-stream-heartbeat';
 
 describe('status poll schedule', () => {
   it('does not treat the first tick of a session as a resume', () => {
@@ -14,6 +15,7 @@ describe('status poll schedule', () => {
     expect(refs.statusPollSchedule).toEqual({
       lastTickAt: 1_250,
       resumedAt: Number.NEGATIVE_INFINITY,
+      onScheduleMs: 250,
     });
     // A deadline armed before the first tick counts from when it was armed.
     expect(hostAwareSilenceRemainingMs(refs.statusPollSchedule, 900, 8_000, 1_250)).toBe(7_650);
@@ -24,7 +26,29 @@ describe('status poll schedule', () => {
     recordStatusPollTick(refs, 1_000);
     recordStatusPollTick(refs, 61_000);
     recordStatusPollTick(refs, 61_250);
-    expect(refs.statusPollSchedule).toEqual({ lastTickAt: 61_250, resumedAt: 61_000 });
+    // The minute-long gap counts only as one late tick of on-schedule polling.
+    expect(refs.statusPollSchedule).toEqual({
+      lastTickAt: 61_250,
+      resumedAt: 61_000,
+      onScheduleMs: LATE_POLL_TICK_MS + 250,
+    });
+  });
+
+  it('counts on-schedule polling, a late tick at most LATE_POLL_TICK_MS of its gap', () => {
+    const refs: StatusPollScheduleRefs = {};
+    expect(onSchedulePollTimeAt(refs.statusPollSchedule, 0)).toBeNull();
+    recordStatusPollTick(refs, 0);
+    recordStatusPollTick(refs, 250);
+    // A 1.9 s task held the next tick back: below the 2 s resume rule, but not
+    // time the page ran.
+    recordStatusPollTick(refs, 2_150);
+    expect(refs.statusPollSchedule?.resumedAt).toBe(Number.NEGATIVE_INFINITY);
+    expect(onSchedulePollTimeAt(refs.statusPollSchedule, 2_150)).toBe(250 + LATE_POLL_TICK_MS);
+    // Time since the last tick counts the same way.
+    expect(onSchedulePollTimeAt(refs.statusPollSchedule, 2_250)).toBe(
+      250 + LATE_POLL_TICK_MS + 100,
+    );
+    expect(onSchedulePollTimeAt(refs.statusPollSchedule, 9_000)).toBe(250 + 2 * LATE_POLL_TICK_MS);
   });
 
   it('keeps wall-clock silence when no poll has run', () => {

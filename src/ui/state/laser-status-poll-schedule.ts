@@ -1,10 +1,14 @@
-import { HOST_SCHEDULING_GAP_MS } from './laser-stream-heartbeat';
+import { HOST_SCHEDULING_GAP_MS, LATE_POLL_TICK_MS } from './laser-stream-heartbeat';
 
 /** When the status poll's timer last ran, and when it last resumed after a
- * scheduling gap (a long task, a throttled or hidden tab, system sleep). */
+ * scheduling gap (a long task, a throttled or hidden tab, system sleep).
+ * `onScheduleMs` is how long the poll had run on schedule by its last tick:
+ * a tick counts its gap, but at most LATE_POLL_TICK_MS of it (ADR-356
+ * Amendment 2). Absent counts as zero. */
 export type StatusPollSchedule = {
   readonly lastTickAt: number;
   readonly resumedAt: number;
+  readonly onScheduleMs?: number;
 };
 
 export type StatusPollScheduleRefs = {
@@ -21,7 +25,19 @@ export function recordStatusPollTick(refs: StatusPollScheduleRefs, now: number):
   if (previous !== null) {
     resumedAt = now - previous.lastTickAt < HOST_SCHEDULING_GAP_MS ? previous.resumedAt : now;
   }
-  refs.statusPollSchedule = { lastTickAt: now, resumedAt };
+  const onScheduleMs = onSchedulePollTimeAt(previous, now) ?? 0;
+  refs.statusPollSchedule = { lastTickAt: now, resumedAt, onScheduleMs };
+}
+
+/** How long the poll has run on schedule by `now`, or null with no poll
+ * recorded. The time since the last tick counts like a tick's gap. */
+export function onSchedulePollTimeAt(
+  schedule: StatusPollSchedule | null | undefined,
+  now: number,
+): number | null {
+  if (schedule == null) return null;
+  const sinceTick = Math.min(Math.max(0, now - schedule.lastTickAt), LATE_POLL_TICK_MS);
+  return (schedule.onScheduleMs ?? 0) + sinceTick;
 }
 
 /**

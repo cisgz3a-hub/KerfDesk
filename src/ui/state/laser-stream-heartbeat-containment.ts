@@ -1,8 +1,9 @@
 import { markErrored } from '../../core/controllers/grbl';
-import type { LaserSafetyAction } from './laser-safety-notice';
+import type { LaserSafetyAction, LaserSafetyNotice } from './laser-safety-notice';
 import {
   acknowledgementStalledNotice,
   controllerLink,
+  readFailedDuringJobNotice,
   streamStalledNotice,
   writeFailedNotice,
 } from './laser-safety-notice';
@@ -110,11 +111,13 @@ export function containLostStreamHeartbeat(
     refs.heartbeatProbe = null;
     return false;
   }
+  const now = Date.now();
   const heartbeat = detectActiveStreamHeartbeatLoss(
     state.streamer,
     state.statusObservation,
     refs.heartbeatProbe,
-    Date.now(),
+    now,
+    refs.connection?.inputReadThrough?.() ?? now,
   );
   refs.heartbeatProbe = heartbeat.probe;
   if (!heartbeat.lost) return false;
@@ -143,6 +146,63 @@ export function containActiveStreamWriteFailure(
   action: LaserSafetyAction,
   owner: StreamWriteOwner,
 ): void {
+  const notice = writeFailedNotice(action);
+  void containActiveStreamTransportFault(set, refs, safeWrite, owner, {
+    incident: `[lf2] Active job transport write failed: ${notice.message}`,
+    notice: () => notice,
+  });
+}
+
+/** Routes the faults a connection reports on its own into the one containment
+ * path, while it is the live connection. */
+export function observeTransportFaults(
+  set: SetFn,
+  get: () => LaserState,
+  refs: LiveRefs,
+  safeWrite: SafeWriteFn,
+  connection: NonNullable<LiveRefs['connection']>,
+): void {
+  // A refill written out in the worker can fail the same way one written here
+  // can, and it means the same thing: bytes for a live job may or may not have
+  // reached the controller (ADR-334).
+  connection.hostedStreaming?.onWriteError(() => {
+    if (refs.connection !== connection) return;
+    containActiveStreamWriteFailure(set, refs, safeWrite, 'stream', streamWriteOwner(get()));
+  });
+  // A network session whose read failed may still take writes: a running
+  // job's reset goes out through it before it closes (ADR-398 Amendment 6).
+  connection.beforeReadFailureClose?.(async () => {
+    if (refs.connection !== connection) return;
+    await containActiveStreamReadFailure(set, refs, safeWrite, streamWriteOwner(get()));
+  });
+}
+
+/** A transport that can no longer read its session during a job, while the
+ * session may still take writes (a desktop network read that failed), gets the
+ * same bounded reset and quarantine before it closes (ADR-398 Amendment 6).
+ * Resolves once that stop has settled. */
+export function containActiveStreamReadFailure(
+  set: SetFn,
+  refs: LiveRefs,
+  safeWrite: SafeWriteFn,
+  owner: StreamWriteOwner,
+): Promise<void> {
+  return containActiveStreamTransportFault(set, refs, safeWrite, owner, {
+    incident: '[lf2] Active job transport read failed; a controller reset was requested.',
+    notice: (state) => readFailedDuringJobNotice(controllerLink(state)),
+  });
+}
+
+function containActiveStreamTransportFault(
+  set: SetFn,
+  refs: object,
+  safeWrite: SafeWriteFn,
+  owner: StreamWriteOwner,
+  fault: {
+    readonly incident: string;
+    readonly notice: (state: LaserState) => LaserSafetyNotice;
+  },
+): Promise<void> {
   let shouldQuarantine = false;
   const resetsController = isLiveRefs(refs) && isGrblFamilyDriver(refs.driver);
   set((state) => {
@@ -150,25 +210,21 @@ export function containActiveStreamWriteFailure(
     if (!isActiveJob(state.streamer) || state.streamer === null) return state;
     shouldQuarantine = true;
     return {
-      ...(isLiveRefs(refs)
-        ? publishControllerIncident(
-            refs,
-            state,
-            `[lf2] Active job transport write failed: ${writeFailedNotice(action).message}`,
-          )
-        : {}),
+      ...(isLiveRefs(refs) ? publishControllerIncident(refs, state, fault.incident) : {}),
       streamer: markErrored(state.streamer),
       ...(resetsController ? { streamReset: streamResetRecord(state) } : {}),
-      safetyNotice: state.safetyNotice ?? writeFailedNotice(action),
+      safetyNotice: state.safetyNotice ?? fault.notice(state),
       ...liveCanvasLifecyclePatch(state, 'errored'),
     };
   });
   // onClose or an earlier reset may already own this failure. Never resurrect
   // a disconnected/cancelled stream or start a second teardown around it.
-  if (!shouldQuarantine) return;
-  if (!isLiveRefs(refs) || !isGrblFamilyDriver(refs.driver)) return;
+  if (!shouldQuarantine) return Promise.resolve();
+  if (!isLiveRefs(refs) || !isGrblFamilyDriver(refs.driver)) return Promise.resolve();
   const connection = refs.connection;
-  if (connection !== null) void quarantineStreamFault(set, refs, safeWrite, connection);
+  return connection === null
+    ? Promise.resolve()
+    : quarantineStreamFault(set, refs, safeWrite, connection);
 }
 
 function streamWriteOwnerMatches(state: LaserState, owner: StreamWriteOwner): boolean {

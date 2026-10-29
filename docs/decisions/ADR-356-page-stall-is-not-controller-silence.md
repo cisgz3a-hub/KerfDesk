@@ -109,3 +109,8 @@ touched:
 - Amendment 1 (`ADR-356-amendment-1-status-silence-counts-only-on-schedule-polling.md`):
   status-silence deadlines, such as the post-job settle's, count only time the status poll ran
   on schedule.
+- Amendment 2 (`ADR-356-amendment-2-a-late-tick-does-not-judge-its-own-gap.md`): a poll tick
+  that ran late does not judge its own gap, and silence ends where the transport has read. The
+  Pause/Resume deadline and the window's network request timeout count only time the page ran.
+  Decision 2's "at most three further gaps" is corrected to a time bound of 5B + 7 s for stalls
+  of B ≥ 2 s.

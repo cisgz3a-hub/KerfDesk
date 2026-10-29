@@ -60,10 +60,11 @@ it('orders writes and preserves raw realtime bytes without sending host details 
   await serial.close();
 });
 
-it('closes on uncertain write delivery, never retries it, and refuses queued continuation', async () => {
+it('never retries an uncertain write or sends what was queued behind it, and keeps the session for a stop', async () => {
+  let failWrites = true;
   const request = vi.fn<MachineNetworkRequest>(async (action) => {
     if (action === 'open') return { sessionId: ID };
-    if (action === 'write') throw new Error('Lost delivery receipt');
+    if (action === 'write' && failWrites) throw new Error('Lost delivery receipt');
     return {};
   });
   const serial = await connection(request);
@@ -72,6 +73,17 @@ it('closes on uncertain write delivery, never retries it, and refuses queued con
   const results = await Promise.allSettled([serial.write('G1 X1\n'), serial.write('G1 X2\n')]);
   expect(results.every((result) => result.status === 'rejected')).toBe(true);
   expect(request.mock.calls.filter(([action]) => action === 'write')).toHaveLength(1);
+  // The caller owns the containment: an active job's reset still goes out,
+  // numbered after the uncertain write (ADR-398 Amendment 6).
+  expect(closed).not.toHaveBeenCalled();
+  failWrites = false;
+  await serial.write('\x18');
+  expect(request).toHaveBeenLastCalledWith('write', {
+    sessionId: ID,
+    sequence: 2,
+    data: btoa('\x18'),
+  });
+  await serial.close();
   expect(request.mock.calls.filter(([action]) => action === 'close')).toHaveLength(1);
   expect(closed).toHaveBeenCalledTimes(1);
 });

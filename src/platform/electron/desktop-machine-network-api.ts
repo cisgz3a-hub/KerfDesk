@@ -11,10 +11,35 @@ export const MACHINE_NETWORK_ROUTE = {
   header: 'X-KerfDesk-Machine-Network',
 } as const;
 
+// The request deadline counts time in steps, and one step adds at most
+// REQUEST_DEADLINE_STEP_MAX_MS: a step that ran late measured the window's own
+// stall (a long task, system sleep), during which a reply that had already
+// arrived waits behind the timer for its body to be read (ADR-356 Amendment 2).
+const REQUEST_DEADLINE_STEP_MS = 250;
+const REQUEST_DEADLINE_STEP_MAX_MS = 500;
+
+/** Calls `expire` once `timeoutMs` of time this thread was running has passed. */
+export function runningTimeDeadline(timeoutMs: number, expire: () => void): () => void {
+  let remaining = timeoutMs;
+  let last = Date.now();
+  let timer: ReturnType<typeof setTimeout>;
+  const step = (): void => {
+    const now = Date.now();
+    remaining -= Math.min(Math.max(0, now - last), REQUEST_DEADLINE_STEP_MAX_MS);
+    last = now;
+    if (remaining <= 0) expire();
+    else timer = setTimeout(step, Math.min(REQUEST_DEADLINE_STEP_MS, remaining));
+  };
+  timer = setTimeout(step, Math.min(REQUEST_DEADLINE_STEP_MS, timeoutMs));
+  return () => clearTimeout(timer);
+}
+
 export function machineNetworkRequest(fetcher: typeof fetch = fetch): MachineNetworkRequest {
   return async (action, body) => {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), action === 'open' ? 8000 : 5000);
+    const cancelDeadline = runningTimeDeadline(action === 'open' ? 8000 : 5000, () =>
+      controller.abort(),
+    );
     try {
       const response = await fetcher(`${MACHINE_NETWORK_ROUTE.url}${action}`, {
         method: 'POST',
@@ -35,7 +60,7 @@ export function machineNetworkRequest(fetcher: typeof fetch = fetch): MachineNet
         );
       return record;
     } finally {
-      clearTimeout(timer);
+      cancelDeadline();
     }
   };
 }

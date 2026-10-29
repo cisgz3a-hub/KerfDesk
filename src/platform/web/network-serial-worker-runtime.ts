@@ -190,8 +190,8 @@ function sessionStreams(
           await channel.write(sequence, bytes.subarray(offset, offset + MAX_WRITE_BYTES));
         }
       } catch (error) {
-        // The main process closes a session whose write it refused; the
-        // window's transport closed on a failed write, and so does this one.
+        // The main process closes a session whose write it refused, so this
+        // one closes too.
         failed();
         throw error;
       }

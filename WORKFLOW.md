@@ -3356,6 +3356,22 @@ authorization, Frame proof, controller command, or safety boundary.
   while Chrome is minimised or its tab is hidden is recorded as completed on the reports of the
   slowed poll, instead of timing out as interrupted (ADR-356 Amendment 1). A controller that
   stays silent once the page polls normally still fails the check after the same time.
+- A page stall of under two seconds no longer ends a healthy job (ADR-356 Amendment 2).
+  - A status poll that runs half a second or more late does not judge the silence of its own
+    gap: a reply that arrived during the stall may still be waiting to be read. A Wi-Fi or
+    Ethernet controller streamed from the window delivers its replies that way. The next tick
+    judges, and a network job is judged only on what the window has actually read.
+  - Pause and Resume count only time the status poll ran on schedule. A confirmation that
+    arrived before their two-second deadline completes them, so a stall no longer resets a
+    laser that is already back in `Run`.
+  - A network request times out only after 5 s of the window's own running time.
+  - A controller that stays silent is still reset on the first on-schedule poll after the stall.
+    A host that stalls for B ≥ 2 s before every verdict delays detection to at most 5B + 7 s.
+- If the window can no longer read or write a running job's network session, KerfDesk sends the
+  controller its reset, M5 and M9 through that session before closing it. The notice says the
+  reset may not have arrived, and the restart steps back over the planner (ADR-398
+  Amendment 6). A write whose delivery is uncertain is never repeated, and nothing queued behind
+  it is sent.
 
 #### Painted second passes (2026-09-22, ADR-341)
 
