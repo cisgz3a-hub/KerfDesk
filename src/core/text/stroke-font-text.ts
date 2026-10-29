@@ -54,7 +54,7 @@ export function renderStrokeFontText(
               size / font.unitsPerEm,
               (input.letterSpacing ?? 0) * size,
             ),
-          1,
+          input.textBox.legacyLineEm ?? 1,
         );
   const actual =
     layout === undefined ? input : { ...input, content: layout.content, sizeMm: layout.sizeMm };

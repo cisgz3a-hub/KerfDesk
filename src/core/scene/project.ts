@@ -35,7 +35,10 @@ import type { ProductionNestDefinition } from '../nesting/production-nest';
 // v19 makes Size the em for single-line fonts too (ADR-682). An older reader
 // would re-render that text 1.5 to 2 times too large when it is edited or a
 // variable value changes.
-export const PROJECT_SCHEMA_VERSION = 19 as const;
+// v20 lets a single-line text frame from before v19 keep counting a line as the
+// old cap-height Size (ADR-682 Amendment 1). A v19 reader would fit that text
+// up to half as large when it is edited or a variable value changes.
+export const PROJECT_SCHEMA_VERSION = 20 as const;
 
 export type EmbeddedFont = {
   readonly key: string;

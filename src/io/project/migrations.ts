@@ -59,6 +59,10 @@ const MIGRATORS: Readonly<Record<number, Migrator>> = {
   17: migrateV17FocusIntent,
   // Schema 19 makes Size the em for single-line fonts; their text keeps its size.
   18: migrateV18SingleLineTextEm,
+  // Schema 20 frames keep the line rule step 18 gives them. A schema-19 file
+  // has none to keep: its single-line frames were made or converted under the
+  // em rule, and they keep it.
+  19: (raw) => ({ ...raw, schemaVersion: 20 }),
 };
 
 function migrateV3ToV4(raw: RawProject): RawProject | MigrationFailure {

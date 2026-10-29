@@ -27,6 +27,14 @@ vi.mock('./font-loader', () => ({
 // Rolling audit v7 L3. Every number is read from the emitted burn moves.
 const PLACED = { ...IDENTITY_TRANSFORM, x: 100, y: 50 };
 const TEMPLATE = '{{csv:name}}';
+const FRAME: TextBoxSettings = {
+  mode: 'fixed',
+  widthMm: 80,
+  heightMm: 20,
+  wrap: true,
+  fit: 'shrink',
+  minSizeMm: 2,
+};
 
 type Burn = {
   readonly minX: number;
@@ -103,33 +111,62 @@ describe('variable records keep the template’s placement in G-code', () => {
   });
 
   // L3-P2-5: names with and without capitals burned 1.7 to 2.4 mm apart.
-  it('puts boxed records on one baseline and keeps a shrunk one inside its frame', async () => {
-    const box: TextBoxSettings = {
-      mode: 'fixed',
-      widthMm: 80,
-      heightMm: 20,
-      wrap: true,
-      fit: 'shrink',
-      minSizeMm: 2,
-    };
-    const names = ['Al', 'Ana', 'anna', 'A very long name that the frame must shrink to fit'];
-    const design = await text({ alignment: 'center', textBox: box });
+  // N4-P2-1: they still did wherever "{{csv:name}}" itself had to shrink to
+  // fit, as it does in a 40 or 50 mm name tag.
+  it.each([40, 50, 80])(
+    'puts boxed records on one baseline in a %i mm frame and keeps a shrunk one inside it',
+    async (widthMm) => {
+      const box: TextBoxSettings = { ...FRAME, widthMm };
+      const names = [
+        'Al',
+        'Anna',
+        'anna',
+        'Peggy',
+        'A very long name that the frame must shrink to fit',
+      ];
+      const design = await text({ alignment: 'center', textBox: box });
+      const placed = await burnOf(design, null, names);
+      const [al, anna, lower, peggy, long] = await Promise.all(
+        names.map((_name, recordIndex) => burnOf(design, recordIndex, names)),
+      );
+      if (
+        al === undefined ||
+        anna === undefined ||
+        lower === undefined ||
+        peggy === undefined ||
+        long === undefined
+      )
+        throw new Error('a record did not burn');
+      // "A" and "l" stand on the baseline; the bowl of "a" dips 0.1 mm below it.
+      expect(Math.abs(anna.minY - lower.minY)).toBeLessThan(0.001);
+      expect(Math.abs(al.minY - anna.minY)).toBeLessThan(0.15);
+      // Peggy's capital reaches Anna's; her descenders hang below the line.
+      expect(Math.abs(peggy.maxY - anna.maxY)).toBeLessThan(0.001);
+      // The frame still centres each record across its width.
+      for (const record of [al, anna, lower, peggy, long])
+        expect(Math.abs(centreX(record) - centreX(placed))).toBeLessThan(0.001);
+      // The long name shrinks and stays inside the 20 mm frame, whose top is
+      // the template's ink top.
+      expect(long.maxY).toBeLessThanOrEqual(placed.maxY + 0.001);
+      expect(long.minY).toBeGreaterThan(placed.maxY - 20);
+    },
+  );
+
+  // N4-P3-3: Å stands 1.66 mm taller than the template's braces. The record
+  // keeps the shared baseline and rises over the frame top (the rows preview
+  // says so; text-box-render.test.ts).
+  it('keeps an accented record on the shared baseline', async () => {
+    const names = ['Anna', 'Ågot'];
+    const design = await text({ alignment: 'center', textBox: FRAME });
     const placed = await burnOf(design, null, names);
-    const [al, ana, anna, long] = await Promise.all(
-      names.map((_name, recordIndex) => burnOf(design, recordIndex, names)),
+    const [anna, agot] = await Promise.all(
+      names.map((name) =>
+        renderVariableText({ text: design, content: name, project: project(design, names) }),
+      ),
     );
-    if (al === undefined || ana === undefined || anna === undefined || long === undefined)
-      throw new Error('a record did not burn');
-    // "A" and "l" stand on the baseline; the bowl of "a" dips 0.1 mm below it.
-    expect(Math.abs(ana.minY - anna.minY)).toBeLessThan(0.001);
-    expect(Math.abs(al.minY - ana.minY)).toBeLessThan(0.15);
-    // The frame still centres each record across its width.
-    for (const record of [al, ana, anna, long])
-      expect(Math.abs(centreX(record) - centreX(placed))).toBeLessThan(0.001);
-    // The long name shrinks, so it keeps the frame's rule: ink top at the
-    // frame top, everything inside the 20 mm frame.
-    expect(long.maxY).toBeCloseTo(placed.maxY, 3);
-    expect(long.minY).toBeGreaterThan(placed.maxY - 20);
+    expect(agot?.anchor?.y).toBeCloseTo(anna?.anchor?.y ?? NaN, 9);
+    const burn = await burnOf(design, 1, names);
+    expect(burn.maxY - placed.maxY).toBeCloseTo(1.66, 2);
   });
 
   it('lays path records on the template’s baseline, descenders below it', async () => {
