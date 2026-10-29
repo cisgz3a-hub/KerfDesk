@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import type { Project, TextObject } from '../../../core/scene';
+import type { EmbeddedFont, Project, TextObject } from '../../../core/scene';
 import { DEFAULT_FONT_KEY, DEFAULT_TEXT_SIZE_MM, FONT_REGISTRY } from '../../../core/text';
 import {
   TEXT_SIZE_MAX_MM,
@@ -7,6 +7,7 @@ import {
   textSizeInRange,
 } from '../../../core/text/text-limits';
 import { FontPicker } from '../../text/FontPicker';
+import { FontUsageHint } from '../../text/FontUsageHint';
 import { isAdvancedJigText, renderJigText } from './jig-text-object';
 
 type Props = {
@@ -106,6 +107,9 @@ function useJigTextForm(props: Props & { readonly existing: TextObject | undefin
   };
 }
 
+// One empty list, so the glyph hint's check does not restart on every render.
+const NO_EMBEDDED_FONTS: ReadonlyArray<EmbeddedFont> = [];
+
 function hasFont(project: Project, key: string): boolean {
   return (
     FONT_REGISTRY.some((font) => font.key === key) ||
@@ -156,6 +160,14 @@ function JigTextForm(props: Props & { readonly existing: TextObject | undefined 
             value={fontKey}
             embeddedFonts={props.project.embeddedFonts ?? []}
             onChange={setFontKey}
+          />
+          {/* ADR-591 Amendment 2: the main text dialog's hint for characters the font lacks. */}
+          <FontUsageHint
+            fontKey={fontKey}
+            embeddedFonts={props.project.embeddedFonts ?? NO_EMBEDDED_FONTS}
+            content={content}
+            variable={false}
+            fontAvailable={fontAvailable}
           />
         </div>
         <label>

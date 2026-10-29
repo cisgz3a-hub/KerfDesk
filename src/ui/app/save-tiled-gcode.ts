@@ -7,6 +7,7 @@ import type { ControllerKind } from '../../core/devices';
 import type { ControllerSettingsSnapshot, ReadinessSettingsCapability } from '../../core/preflight';
 import type { OutputScope, Project } from '../../core/scene';
 import { prepareOutput } from '../../io/gcode';
+import { withTextGlyphCheck } from '../../io/gcode/prepare-output-snapshot';
 import type { PlatformAdapter, SaveDirectoryTarget, SaveTarget } from '../../platform/types';
 import { hydratePagedRasterProject } from '../import/paged-raster-hydration';
 import {
@@ -34,6 +35,7 @@ import { finalizeTiledOutput, type TiledOutputPreparation } from './tiled-output
 import { tiledSaveWorkBudgetMessage } from './tiled-save-work-budget';
 import { advanceExportVariables, type ExportVariableAdvancement } from './advance-export-variables';
 import { captureProjectOutputSnapshot } from '../laser/project-output-snapshot';
+import { outputTextRenderer } from '../text/output-text-renderer';
 import type { OutputSnapshotRequest } from '../laser/output-preparation-protocol';
 
 const GCODE_EXTENSIONS = ['.gcode', '.nc'];
@@ -162,8 +164,9 @@ async function prepareTiledOutput(
     }
   }
   const hydrated = await hydratePagedRasterProject(ctx.project);
+  // Each burned text's missing characters, as the worker's compile names them (ADR-591 Amd 2).
   return finalizeTiledOutput(
-    prepareOutput(hydrated, options),
+    await withTextGlyphCheck(prepareOutput(hydrated, options), hydrated, outputTextRenderer),
     ctx.savedName,
     ctx.controllerSettings ?? null,
     ctx.activeWcs ?? null,

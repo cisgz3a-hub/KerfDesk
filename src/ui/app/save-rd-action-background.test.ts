@@ -19,9 +19,10 @@ const mocks = vi.hoisted(() => ({
   shouldRunOffThread: vi.fn(),
 }));
 
+// The direct path compiles on this thread and encodes with emitPreparedRdFile.
 vi.mock('../../io/rd', async (importOriginal) => ({
   ...(await importOriginal<typeof RdModule>()),
-  emitRdFile: mocks.direct,
+  emitPreparedRdFile: mocks.direct,
 }));
 vi.mock('../laser/output-preparation-worker-client', async (importOriginal) => ({
   ...(await importOriginal<typeof OutputWorkerModule>()),
