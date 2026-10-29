@@ -42,7 +42,7 @@
 import type { Vec2 } from '../scene';
 import { latticeCandidates } from './contour-corner-lattice';
 import { fitLeg, growLeg, LEG_SLOPE_TOLERANCE, type Leg } from './contour-corner-leg-runs';
-import { apexContradictsInk } from './contour-corner-ink';
+import { apexContradictsInk, apexStandsInPaper } from './contour-corner-ink';
 import { legCandidates, legIntersection } from './contour-corner-legs';
 import {
   LATTICE_STEP_COST_PX,
@@ -114,17 +114,33 @@ export function decideContourCorners(input: CornerDialInput): ContourCorner[] {
   );
   const noise = (input.edgeNoisePx ?? 0) * scale;
   const seated = noise > 0 ? reseatApexes(input.cracks, chosen, noise, scale) : chosen;
-  const kept =
-    input.measured || input.inkAt === undefined
-      ? seated
-      : inkBoundedApexes(input.cracks, seated, scale, input.inkAt);
+  const kept = boundedApexes(input, seated, scale);
   return kept.map(({ from, skip, apex, cost }) => ({ from, skip, apex, cost }));
 }
 
-// ——— binary apexes bounded by the ink ———
+// ——— apexes bounded by the ink ———
 
 type CornerLegs = { readonly back: Leg; readonly ahead: Leg };
 type SeatedCorner = Candidate & { readonly legs?: CornerLegs };
+
+// A binary apex is bounded by the mask, a measured one by its field
+// (contour-corner-ink.ts).
+function boundedApexes(
+  input: CornerDialInput,
+  seated: ReadonlyArray<SeatedCorner>,
+  scale: number,
+): ReadonlyArray<SeatedCorner> {
+  const { field, inkAt } = input;
+  if (!input.measured) {
+    return inkAt === undefined ? seated : inkBoundedApexes(input.cracks, seated, scale, inkAt);
+  }
+  if (field === undefined) return seated;
+  return seated.filter(
+    (corner) =>
+      isLatticeApex(corner.apex) ||
+      !apexStandsInPaper(field, input.cracks, corner.from, corner.skip, corner.apex, scale),
+  );
+}
 
 // A binary leg apex that would change a pixel centre's class
 // (contour-corner-ink.ts) is dropped, so the loop rounds that turn instead of

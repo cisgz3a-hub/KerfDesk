@@ -60,3 +60,18 @@ Design Studio already keeps its rectangle corners round (ADR-272 Amendment 4, it
   turned obliquely scales its radius with it.
 - Ellipses, polygons and stars still take a resize as transform scale. A stretched ellipse is still
   an exact ellipse, and a polygon or star has no width and height in its spec to hold one.
+
+### Coverage note (2026-10-29)
+
+Rolling audit v8 N3-P1-3 (`docs/audits/2026-10-29-rolling-v8/N3-fix-geometry.md`) found two jig
+writers that Decision 1 names but that still wrote a plain scale. In the jig editor, an r 3
+rectangle typed to 40 × 10 in the shared artwork size burned 6 × 3 mm corners, and Centre + copy
+burned r 8.1 after its 2.7× fit. Both now apply Decision 1:
+
+- the shared artwork size (`applyRegistrationJigArtworkSize`), in the jig editor and on the main
+  canvas;
+- Centre + copy (`applyCenterArtworkInRegistrationJigSet`), in the jig editor and as the main
+  canvas's centre-in-jig command.
+
+Decision 1 is unchanged. The jig's import fit is unchanged too: SVG and image imports never hold a
+rounded rectangle.

@@ -25,6 +25,7 @@ import {
   buildSelectionTransformEdit,
   type SelectionTransformError,
 } from '../../core/scene/selection-transform';
+import { withObjectTransform } from '../../core/shapes/rectangle-resize';
 import type { AppState } from './store';
 import { pushUndo } from './scene-mutations';
 import { removeObjectIdsFromGroups } from './scene-group-actions';
@@ -86,10 +87,11 @@ export function applyCenterArtworkInRegistrationJigSet(
   const selected = selectedArtwork(state);
   const firstBox = boxes[0];
   if (firstBox === undefined) return state;
+  // A rounded rectangle keeps the corner radius it had (ADR-144 Amendment 1).
   const fitted = fitSelectionToRegion(selected, boardFitRegion(firstBox), {
     marginFraction: REGISTRATION_JIG_ARTWORK_FIT_FRACTION,
     grow: true,
-  });
+  }).map((object, index) => withObjectTransform(selected[index] ?? object, object.transform));
   const selectionBounds = combinedBBox(fitted);
   if (selectionBounds === null) return state;
 
@@ -250,7 +252,7 @@ export function applyRegistrationJigArtworkSize(
       const transform = resized.transforms.find(
         (candidate) => candidate.id === object.id,
       )?.transform;
-      return transform === undefined ? object : { ...object, transform };
+      return transform === undefined ? object : withObjectTransform(object, transform);
     });
     const bounds = combinedBBox(resizedObjects);
     const box = boxesById.get(instance.boxId);
