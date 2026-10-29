@@ -64,6 +64,21 @@ export function fillClosedPolylinesBatched(
   ctx.fill(fillRule);
 }
 
+/** Clip later drawing to the region these closed polylines enclose by the rule. */
+export function clipClosedPolylines(
+  ctx: CanvasRenderingContext2D,
+  obj: Placed,
+  polylines: ReadonlyArray<Polyline>,
+  view: ViewTransform,
+  fillRule: CanvasFillRule,
+): void {
+  ctx.beginPath();
+  for (const polyline of polylines) {
+    if (polyline.closed) appendPolylinePath(ctx, obj, polyline, view);
+  }
+  ctx.clip(fillRule);
+}
+
 export function drawLargeSceneNotice(ctx: CanvasRenderingContext2D): void {
   const msg = 'Large scene - display simplified for performance';
   const x = 14;

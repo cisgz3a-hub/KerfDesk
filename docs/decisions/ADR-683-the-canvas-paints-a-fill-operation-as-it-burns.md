@@ -45,21 +45,25 @@ click selection and the advisories change.
      object's contribution is what the compiler burns for it: its single even-odd path as drawn,
      or else each path resolved by its own rule and the object's paths unioned (falling back to
      the raw contours, as the compiler does, if that fails). The pool is filled once, even-odd.
+     A path bound to several Fill operations is pooled under each of them (Amendment 1).
    - Only objects whose boxes overlap can change one another's parity, so an operation's objects
      are split into overlapping clusters. A lone object paints itself exactly as before, sprite
      included; a cluster is painted once, where its lowest member sits in the drawing order, and
-     is cached as a sprite when it is as dense as a sprited object.
+     is cached as a sprite when it is as dense as a sprited object. When other artwork drawn
+     between its members overlaps it, it is painted in parts instead, each clipped to the pool
+     where its lowest member sits (Amendment 1).
    - The pool is also outlined in its own colour at the artwork stroke width. Every contour of an
      even-odd region is one of its edges, so the outline changes nothing except where copies
      cancel: there the shapes show unfilled, as in LightBurn, rather than vanish.
    - Each member still paints its open contours and other operations' paths itself, and keeps
-     its own selection outline, hover pulse and hit test. Different operations are never pooled
+     its own selection outline and hover pulse. Different operations are never pooled
      together. Wireframe view and the Preview underlay draw outlines, so they are unchanged.
    - The phone's artwork picture (`remote-control/preview-projection.ts`) uses the same pools.
 2. **A filled shape is solid only inside its filled region.** The hit test winds the point
    against all of a path's closed contours with that path's rule (non-zero for text). A point in
    a hole is an interior hit, as inside a Line shape (ADR-196): artwork shown through the hole is
-   picked first, and an empty hole still selects the shape.
+   picked first, and an empty hole still selects the shape. The pool's parity counts too, so a
+   hole cut by another object, or cancelled copies, pass clicks through as well (Amendment 1).
 3. **Stacked Fill copies that cancel are named** (`core/job/cancelled-fill-copies.ts`).
    - On a laser machine, objects whose closed contours on one output Fill operation are the same
      rings to 0.001 mm (any start point, either direction; non-zero paths keep their winding), as

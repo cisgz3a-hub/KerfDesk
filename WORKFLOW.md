@@ -387,7 +387,8 @@ destination and cannot overwrite the template source.
 3. Status bar updates: `1 selected · 120 × 80 mm · X 50.0, Y 50.0`.
 4. A Fill shape is solid only where it is filled. Artwork seen through one of its holes is picked
    first; clicking an empty hole selects the shape, as clicking inside a Line shape does
-   (ADR-683).
+   (ADR-683). The same holds for a hole another shape on its Fill operation cuts, and inside
+   stacked copies that cancel (ADR-683 Amendment 1).
 
 #### Multi — shift+click
 1. Shift+click on additional object.
@@ -705,7 +706,10 @@ the linked artwork.
 3. Filled view paints each Fill operation as it burns (ADR-683): its shapes combine even-odd, so a
    shape drawn inside another on the same operation shows as a hole, and a shape with an exact
    copy on top of it shows only as an outline, because the two cancel and neither burns. Shapes
-   on different operations fill separately.
+   on different operations fill separately. A shape given a second Fill operation (**Add
+   operation**) shows filled wherever either operation burns it, and artwork drawn between
+   shapes of one operation, such as a photo under a caption, keeps its place in the drawing
+   order (ADR-683 Amendment 1).
 
 ### F-A6e. Rubber-band outline, Close Path, Reverse Direction, Delete Duplicates, Flatten Image Mask (ADR-480)
 
