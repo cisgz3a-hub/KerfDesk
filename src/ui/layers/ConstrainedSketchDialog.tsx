@@ -60,7 +60,7 @@ export function ConstrainedSketchDialog(props: {
         </div>
         <aside className="lf-authoring-review" aria-label="Sketch geometry review">
           <h3>Geometry preview</h3>
-          <RetainedScaleNotice transform={props.object?.transform} subject="sketch" />
+          <RetainedScaleNotice source={props.object} subject="sketch" />
           {draft.review === null ? <SketchDraftPreview sketch={draft.sketch} /> : null}
           <Button
             onClick={draft.solve}

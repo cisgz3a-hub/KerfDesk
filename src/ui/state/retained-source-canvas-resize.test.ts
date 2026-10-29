@@ -3,12 +3,20 @@
 // now opens on the sizes that burn and regenerates at scale 1 (ADR-573
 // Amendment 1).
 import { beforeEach, describe, expect, it } from 'vitest';
-import { applyTransform, IDENTITY_TRANSFORM, type ImportedSvg } from '../../core/scene';
+import { compileJob } from '../../core/job/compile-job';
+import {
+  applyTransform,
+  buildSelectionTransformEdit,
+  IDENTITY_TRANSFORM,
+  type ImportedSvg,
+} from '../../core/scene';
+import { retainedSourceScale } from '../../core/scene/retained-source-scale';
 import { defaultConstrainedSketch } from '../../core/sketch-constraints/default-constrained-sketch';
 import { editableConstrainedSketch } from '../../core/sketch-constraints/scale-constrained-sketch';
 import type { ConstrainedSketch2d } from '../../core/sketch-constraints/constrained-sketch';
 import { defaultPartGenerator, type GeneratedPartObject } from '../../core/parts/part-generator';
 import { editablePartGeneratorDefinition } from '../../core/parts/scale-part-generator';
+import { appendSketchPrimitive, sketchFromTemplate } from '../layers/sketch-geometry-draft';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
 
@@ -46,6 +54,34 @@ function resize(scaleX: number, scaleY: number): ImportedSvg {
       { id: object.id, transform: { ...object.transform, scaleX, scaleY } },
     ]);
   return only();
+}
+
+/** The toolbar's W or H field, with the aspect lock off (its default). */
+function typeSize(field: 'width' | 'height', value: number): ImportedSvg {
+  const edit = buildSelectionTransformEdit([only()], {
+    kind: 'resize',
+    anchor: 'nw',
+    [field]: value,
+    preserveAspect: false,
+  });
+  if (edit.kind !== 'ok') throw new Error(edit.reason);
+  useStore.getState().applySelectionTransforms(edit.transforms);
+  return only();
+}
+
+/** The compiled outline's size on the bed. */
+function compiledSize(): Size {
+  const { scene, device } = useStore.getState().project;
+  const points = compileJob(scene, device).groups.flatMap((group) =>
+    group.kind === 'cut' ? group.segments.flatMap((segment) => segment.polyline) : [],
+  );
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  const round = (value: number) => Math.round(value * 1000) / 1000;
+  return {
+    w: round(Math.max(...xs) - Math.min(...xs)),
+    h: round(Math.max(...ys) - Math.min(...ys)),
+  };
 }
 
 function withParameters(
@@ -114,6 +150,36 @@ describe('a canvas-resized constrained sketch (ADR-573 Amendment 1)', () => {
       .reviewConstrainedSketch(defaultConstrainedSketch(), opened.id, opened.transform);
     expect(reviewed).toMatchObject({ kind: 'invalid' });
     expect(reviewed.kind === 'invalid' ? reviewed.reason : '').toMatch(/resized after this editor/);
+  });
+
+  // N5-P2-1 (rolling audit v8): a sub-millimetre change stops the solver about
+  // 1e-6 mm short, so W and H typed as two fields left the factors 1e-8 apart.
+  // The sketch read as stretched and Apply returned it to 60 x 30 (ADR-573
+  // Amendment 2).
+  it('folds W then H typed on a sketch solved from a sub-millimetre change', () => {
+    const drawn = appendSketchPrimitive(
+      sketchFromTemplate('custom'),
+      'rectangle',
+      [0, 0, 59.5, 29.5],
+    );
+    if (drawn === null) throw new Error('Rectangle refused');
+    applySketch(drawn);
+    const solved = only();
+    if (solved.constrainedSketch === undefined) throw new Error('Missing sketch');
+    applySketch(
+      withParameters(solved.constrainedSketch, { outline1_width: 60, outline1_height: 30 }),
+      solved,
+    );
+    typeSize('width', 120);
+    const resized = typeSize('height', 60);
+    expect(compiledSize()).toEqual({ w: 120, h: 60 });
+
+    const opened = editableConstrainedSketch(resized);
+    if (opened === undefined) throw new Error('Missing sketch');
+    applySketch(opened, resized);
+    expect(compiledSize()).toEqual({ w: 120, h: 60 });
+    expect(only().transform).toMatchObject({ scaleX: 1, scaleY: 1 });
+    expect(retainedSourceScale(resized)).toMatchObject({ kind: 'even' });
   });
 });
 

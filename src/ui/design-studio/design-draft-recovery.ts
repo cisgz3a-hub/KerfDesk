@@ -1,11 +1,12 @@
 // design-draft-recovery — which drawing the Studio opens on, and what happens
 // to a saved drawing that belongs elsewhere (ADR-272 Amendment 3, ADR-590 and
-// its Amendment 1).
+// its Amendments 1 and 2).
 //
-// The saved drawing opens only on the project it was drawn on. A drawing with
-// work not yet applied that belongs to another project (another file, an older
-// autosave of this one, or the blank start-up project) is moved to the kept
-// drawings before this project's own drawing can be saved over it. A kept
+// The saved drawing opens only on the project it was drawn on. One that
+// belongs to another project (another file, an older autosave of this one, or
+// the blank start-up project) is moved to the kept drawings before this
+// project's own drawing can be saved over it, when it holds work not yet
+// applied or an Apply this project does not hold (ADR-590 Amendment 2). A kept
 // drawing whose project returns opens again by itself.
 //
 // Nothing here writes storage until the caller publishes the session: an open
@@ -21,10 +22,11 @@ import {
   type PersistedDesignSession,
 } from './design-session-storage';
 import {
-  holdsUnappliedWork,
+  discardKeptDrawingsHeldBy,
   keepDesignDrawing,
   readKeptDesignDrawings,
   takeKeptDesignDrawing,
+  worthKeeping,
 } from './design-kept-drawings';
 import {
   reconcileProjectDesignSession,
@@ -62,20 +64,22 @@ export function restoredOwnedSession(
     if (returning === undefined) return projectSessionKeepingDraft(project);
     return opened(restoreDraft(returning, project), () => {
       takeKeptDesignDrawing((drawing) => drawing.id === returning.id);
-      if (current !== null) setAside(current);
+      if (current !== null) setAside(current, project);
     });
   };
   const owner = designRecoveryOwner(project);
   return owner instanceof Promise ? owner.then(restore) : restore(owner);
 }
 
-/** The project's own applied drawing; a saved drawing with work not yet
- *  applied is kept rather than written over. Also the answer when the
- *  project's identity cannot be worked out. */
+/** The project's own applied drawing; a saved drawing worth keeping (work not
+ *  yet applied, or an Apply this project does not hold) is kept rather than
+ *  written over, and a kept Apply this project holds is no longer offered.
+ *  Also the answer when the project's identity cannot be worked out. */
 export function projectSessionKeepingDraft(project: Project): OpenedDesignSession {
   return opened(restoreProjectDesignSession(project), () => {
     const saved = readPersistedSession();
-    if (saved !== null) setAside(saved);
+    if (saved !== null) setAside(saved, project);
+    discardKeptDrawingsHeldBy(project);
   });
 }
 
@@ -98,8 +102,8 @@ function restoreDraft(saved: PersistedDesignSession, project: Project): DesignSe
   return reconcileProjectDesignSession(restoreDesignSession(saved), project);
 }
 
-function setAside(saved: PersistedDesignSession): void {
-  if (!holdsUnappliedWork(saved)) return;
+function setAside(saved: PersistedDesignSession, opening: Project): void {
+  if (!worthKeeping(saved, opening)) return;
   if (keepDesignDrawing(saved)) clearPersistedSession();
   else holdPersistedSession();
 }

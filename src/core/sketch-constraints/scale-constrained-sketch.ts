@@ -20,7 +20,7 @@ import { SKETCH_EXPRESSION_TOKEN } from './sketch-parameters';
 export function editableConstrainedSketch(object: ImportedSvg): ConstrainedSketch2d | undefined {
   const sketch = object.constrainedSketch;
   if (sketch === undefined) return undefined;
-  const scale = retainedSourceScale(object.transform);
+  const scale = retainedSourceScale(object);
   return scale.kind === 'even' ? scaleConstrainedSketch(sketch, scale.factor) : sketch;
 }
 

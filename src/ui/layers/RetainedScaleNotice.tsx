@@ -2,15 +2,17 @@
 // dimensions (ADR-573 Amendment 1). An even resize is already folded into the
 // values the editor shows; a stretch cannot be, and applying removes it.
 
-import type { Transform } from '../../core/scene';
-import { retainedSourceScale } from '../../core/scene/retained-source-scale';
+import {
+  retainedSourceScale,
+  type RetainedSourceExtent,
+} from '../../core/scene/retained-source-scale';
 
 export function RetainedScaleNotice(props: {
-  readonly transform: Transform | undefined;
+  readonly source: RetainedSourceExtent | undefined;
   readonly subject: 'sketch' | 'part';
 }): JSX.Element | null {
-  if (props.transform === undefined) return null;
-  const scale = retainedSourceScale(props.transform);
+  if (props.source === undefined) return null;
+  const scale = retainedSourceScale(props.source);
   if (scale.kind === 'unit') return null;
   if (scale.kind === 'even')
     return (
