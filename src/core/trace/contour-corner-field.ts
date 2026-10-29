@@ -171,9 +171,9 @@ function edgeShift(
   return Math.abs(shift) <= MAX_EDGE_SHIFT_PX ? shift : Number.NaN;
 }
 
-// The field's luma at a continuous point (field px), bilinear between pixel
-// centres.
-function fieldLuma(field: CrackSubPixelField, x: number, y: number): number {
+/** The field's luma at a continuous point (field px), bilinear between pixel
+ *  centres. */
+export function fieldLuma(field: CrackSubPixelField, x: number, y: number): number {
   return bilinear((px, py) => field.lumaAt(px, py), x - 0.5, y - 0.5);
 }
 

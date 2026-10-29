@@ -22,7 +22,9 @@
 // claimed centres 0.03 to 0.09 px outside the true edge.
 
 import type { Vec2 } from '../scene';
+import { fieldLuma } from './contour-corner-field';
 import type { Leg } from './contour-corner-leg-runs';
+import type { CrackSubPixelField } from './saddle-connectivity';
 
 const LEG_FIT_SLACK_PX = 0.1;
 
@@ -63,6 +65,62 @@ export function apexContradictsInk(
     }
   }
   return false;
+}
+
+// ——— measured apexes (ADR-439 Amendment 2) ———
+//
+// A measured chain is the field's iso-line at the cut, which a box-filtered
+// tip recedes from by 0.25 / tan(interior / 2) px, so the dial lets a measured
+// apex stand off it by that much and more (contour-corner-legs.ts), and an
+// acute apex past the tight allowance only on the field's word. The two legs
+// of a thin blunt end (a serif's slab, about a pixel thick) converge by a few
+// degrees and meet two to four pixels past it, where a wedge that thin covers
+// too little of each pixel for the field test to refuse it: rolling audit v8
+// N8-P2-4 measured Line Art nodes 1.7-1.9 px and Sharp nodes 2.6 px into
+// paper on anti-aliased Tinos serifs, where Potrace drew none.
+//
+// The field at a true apex is not paper. The tip's last pixels each hold some
+// of its ink, and the bilinear field at the apex interpolates them: about 3%
+// of the paper-to-ink step for a 15 degree tip, more as the tip widens. So a
+// measured leg apex where the field reads paper, darker than the local paper
+// level by less than MIN_APEX_INK of the local step, is dropped and the loop
+// rounds that turn. The levels are the brightest and darkest field pixels
+// within LEVEL_REACH_PX of the apex and of the cracks it replaces, whose ink
+// side lies within a pixel. Below MIN_LEVEL_CONTRAST the field cannot say,
+// and the apex stays.
+const MIN_APEX_INK = 0.02;
+const LEVEL_REACH_PX = 2;
+const MIN_LEVEL_CONTRAST = 48;
+
+/** True when the field reads paper at a measured corner's apex. */
+export function apexStandsInPaper(
+  field: CrackSubPixelField,
+  cracks: ReadonlyArray<Vec2>,
+  from: number,
+  skip: number,
+  apex: Vec2,
+  scale: number,
+): boolean {
+  const n = cracks.length;
+  const near = [apex];
+  for (let k = 0; k <= skip + 1; k += 1) near.push(cracks[(from + k) % n] as Vec2);
+  const reach = LEVEL_REACH_PX * scale;
+  const x0 = Math.floor(Math.min(...near.map((p) => p.x)) - reach);
+  const x1 = Math.ceil(Math.max(...near.map((p) => p.x)) + reach);
+  const y0 = Math.floor(Math.min(...near.map((p) => p.y)) - reach);
+  const y1 = Math.ceil(Math.max(...near.map((p) => p.y)) + reach);
+  let paper = -Infinity;
+  let ink = Infinity;
+  for (let y = y0; y < y1; y += 1) {
+    for (let x = x0; x < x1; x += 1) {
+      const luma = field.lumaAt(x, y);
+      paper = Math.max(paper, luma);
+      ink = Math.min(ink, luma);
+    }
+  }
+  const contrast = paper - ink;
+  if (!(contrast >= MIN_LEVEL_CONTRAST)) return false;
+  return paper - fieldLuma(field, apex.x, apex.y) < MIN_APEX_INK * contrast;
 }
 
 function footOn(leg: Leg, p: Vec2): Vec2 {

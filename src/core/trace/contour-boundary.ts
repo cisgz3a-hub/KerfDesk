@@ -120,19 +120,6 @@ export function midCrackChainWithStats(
   return { points: out, interpolatedFraction: n === 0 ? 0 : interpolated / n };
 }
 
-/** True when the walker would place the crack between ink pixel (inkX,inkY)
- *  and paper pixel (bgX,bgY) off its midpoint: the crack carries a sub-pixel
- *  edge. The same test sets a loop's interpolated fraction. */
-export function crackCarriesSubPixelEdge(
-  field: CrackSubPixelField,
-  inkX: number,
-  inkY: number,
-  bgX: number,
-  bgY: number,
-): boolean {
-  return Math.abs(crackCrossingAt(field, inkX, inkY, bgX, bgY) - MID_CRACK_T) > INTERPOLATED_T_EPS;
-}
-
 function crackCrossing(
   field: CrackSubPixelField,
   midX: number,
