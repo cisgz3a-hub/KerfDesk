@@ -7,7 +7,6 @@ import {
   applyTransform,
   flattenColoredPathCurves,
   isRegistrationBox,
-  pathFillOperations,
   sceneLayerVisibility,
   type AABB,
   type ColoredPath,
@@ -15,6 +14,7 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { effectiveOperationForObject } from '../../core/scene/effective-operation';
+import { pathFillOperations } from '../../core/scene/fill-operations';
 import { canvasTheme } from '../theme/canvas-theme';
 import { canvasVectorDisplayColor } from '../theme/canvas-vector-color';
 import { drawArtworkSprite, SPRITE_MIN_DISPLAY_SEGMENTS } from './artwork-sprite-cache';
