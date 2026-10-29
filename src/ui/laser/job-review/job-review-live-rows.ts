@@ -6,6 +6,10 @@
 import { deviceForActiveHead } from '../../../core/cnc/cnc-head-feeds';
 import type { OverrideValues, StatusReport } from '../../../core/controllers/grbl';
 import { reportedMaxPowerS } from '../../../core/controllers/grbl/parse-settings';
+import {
+  reportedWorkArea,
+  travelEnvelopeFirmware,
+} from '../../../core/controllers/grbl/reported-work-area';
 import type { ActiveWorkCoordinateSystem } from '../../../core/controllers/grbl/work-offset-readback';
 import type { ControllerKind } from '../../../core/devices';
 import type { ControllerSettingsSnapshot } from '../../../core/preflight';
@@ -350,7 +354,7 @@ function settingsFacts(args: ControllerReviewArgs): ReadonlyArray<JobReviewFact>
   return [
     laserModeFact(settings, args.machineKind),
     maxPowerFact(settings, args.profileMaxPowerS),
-    travelFact(settings, args.profileBedWidth, args.profileBedHeight),
+    travelFact(args, settings),
     fact('Homing $22', formatOnOff(settings.homingEnabled)),
     fact('Soft limits $20', formatOnOff(settings.softLimitsEnabled)),
     fact(
@@ -395,16 +399,25 @@ function maxPowerFact(
   );
 }
 
+// The profile bed is compared with the work area the travel gives a homed
+// machine, which on grblHAL with hard limits is a pull-off short of `$130` ×
+// `$131` (ADR-637 Amendment 4).
 function travelFact(
+  args: ControllerReviewArgs,
   settings: ControllerSettingsSnapshot,
-  profileBedWidth: number,
-  profileBedHeight: number,
 ): JobReviewFact {
-  if (settings.bedWidth === undefined || settings.bedHeight === undefined) {
+  const { profileBedWidth, profileBedHeight } = args;
+  const firmware = travelEnvelopeFirmware(args.activeControllerKind, args.detectedControllerKind);
+  const area = reportedWorkArea(settings, firmware);
+  if (settings.bedWidth === undefined || settings.bedHeight === undefined || area === null) {
     return fact('Travel $130 × $131', 'Unknown');
   }
-  const matches = settings.bedWidth === profileBedWidth && settings.bedHeight === profileBedHeight;
-  const value = `${formatMm(settings.bedWidth)} × ${formatMm(settings.bedHeight)} mm`;
+  const matches = area.widthMm === profileBedWidth && area.heightMm === profileBedHeight;
+  const travel = `${formatMm(settings.bedWidth)} × ${formatMm(settings.bedHeight)} mm`;
+  const value =
+    area.widthMm === settings.bedWidth && area.heightMm === settings.bedHeight
+      ? travel
+      : `${travel}, homed area ${formatMm(area.widthMm)} × ${formatMm(area.heightMm)} mm`;
   return fact(
     'Travel $130 × $131',
     matches

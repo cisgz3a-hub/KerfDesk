@@ -105,6 +105,27 @@ describe('DeviceSetupWizard detected values', () => {
     }
   });
 
+  // ADR-637 Amendment 4 (rolling audit v8 N2-P2-1): on grblHAL the offered bed
+  // is the homed area, a pull-off short of the travel the controller reports.
+  it('names the reported travel and the homed area it gives', async () => {
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      detectedSettings: { bedWidth: 358, bedHeight: 268 },
+      controllerSettings: { bedWidth: 363, bedHeight: 273 },
+      lastSettingsReadAt: 1,
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    const view = await renderWizard();
+    try {
+      const facts = view.host.querySelector('[aria-label="What the controller reported"]');
+      expect(facts?.textContent).toContain(
+        'Travel 363 × 273 mm, a 358 × 268 mm work area after the homing pull-off',
+      );
+      expect(view.host.textContent).toMatch(/Bed width: .* → 358\.000 mm/);
+    } finally {
+      await view.unmount();
+    }
+  });
+
   // Setup saved for either head counts: its signatures differ since ADR-416.
   it.each(['laser', 'cnc'] as const)(
     'keeps a machine already set up (%s) as it is until Use detected values',
@@ -134,6 +155,7 @@ function resetTestState(): void {
   useLaserStore.setState({
     connection: { kind: 'disconnected' },
     detectedSettings: null,
+    controllerSettings: null,
     detectedControllerKind: null,
     activeControllerKind: 'grbl-v1.1',
     lastSettingsReadAt: null,

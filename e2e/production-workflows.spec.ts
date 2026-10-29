@@ -451,6 +451,9 @@ test('configures the Creality Falcon profile through the complete setup wizard',
     bedWidth: 358,
     bedHeight: 268,
     framingFeedMmPerMin: 10000,
+    // The values that made Replace settings unnecessary (rolling audit v8 N2-P3-5).
+    homing: { enabled: true, direction: 'front-left' },
+    kinematics: 'corexy',
   });
 });
 
