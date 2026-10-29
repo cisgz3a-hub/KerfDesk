@@ -88,9 +88,9 @@ click gap:
 - `draw-scene-fill-pool-parts.test.ts` replays `drawScene`'s ink fills under their clips with the
   photo opaque over them, and compares the picture with the compiled hatch: Add operation on a
   plate's circle and on the upper of two overlapping parts (N6-P1-1); frame, photo, caption
-  (N6-P1-2), an unsplit control, a photo above the whole plaque, and the clip budget. The
-  Add-operation and caption cases fail on the previous main.
+  (N6-P1-2), an unsplit control, a photo above the whole plaque, and the clip budget. Four of
+  its six cases fail on the previous main (all but the two controls).
 - `hit-test-fill-pools.test.ts`: a separate window in three drawing orders, a scaled, mirrored
   and turned window, cancelled copies (and a third copy), a window a second Fill operation still
-  burns (and with it hidden), and a window on another operation (N6-P2-1). Five of its six cases
-  fail on the previous main.
+  burns (and with it hidden), and a window on another operation (N6-P2-1). Six of its seven
+  cases fail on the previous main (all but the other-operation control).
