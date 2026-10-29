@@ -18,7 +18,7 @@ import {
   failedBackgroundSaveOutput,
   type SaveOutputEmission,
 } from '../laser/save-output-emission';
-import { renderVariableText } from '../text/render-variable-text';
+import { outputTextRenderer } from '../text/output-text-renderer';
 import { buildGcodeMetadata } from './build-info';
 import type { SaveGcodeCtx } from './file-actions';
 import {
@@ -146,7 +146,7 @@ async function prepareSaveDirect(
     : ctx.project;
   const prepared = await prepareOutputSnapshot(preparationProject, {
     clock: () => new Date(),
-    renderVariableText,
+    renderVariableText: outputTextRenderer,
     ...(registration === undefined ? {} : { registration }),
     ...options,
   });

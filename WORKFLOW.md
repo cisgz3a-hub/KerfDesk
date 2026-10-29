@@ -4044,7 +4044,10 @@ settings and Job Review keep their existing read-only setup references.
 - Multilingual outline text uses local shaping and bidirectional layout (ADR-591). Hebrew,
   Arabic, mixed-direction numbers and combining marks retain their glyph order and positioning
   through wrapping and path text. Choose or import a font containing the required characters;
-  missing glyphs are still reported. No online font service is used. Existing basic Latin and
+  missing glyphs are still reported: the text dialog and the jig text panel name them while you
+  type, Bake and a production row name them as they fix the text, and Job Review, Start, Save,
+  the exports and print name them for every text they output (ADR-591 Amendment 2). No online
+  font service is used. Existing basic Latin and
   single-line engraving fonts keep their established geometry.
 - The outline font picker includes Great Vibes, Allura, Alex Brush, Parisienne, Pinyon Script,
   Italianno, and Corinthia for names and calligraphic signs. Cinzel Decorative provides ornamental

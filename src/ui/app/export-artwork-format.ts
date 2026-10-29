@@ -16,9 +16,9 @@ import {
   type VectorPaintItem,
 } from '../../io/vector-formats/vector-artwork';
 import type { PlatformAdapter } from '../../platform/types';
-import { renderVariableText } from '../text/render-variable-text';
+import { outputTextRenderer } from '../text/output-text-renderer';
 import type { ToastVariant } from '../state/toast-store';
-import { exportProjectSelection } from './export-artwork-svg';
+import { exportProjectSelection, glyphWarnings } from './export-artwork-svg';
 import { pickPreparedSaveTarget } from './pick-prepared-save-target';
 
 export type ArtworkVectorFormat = 'pdf' | 'ai' | 'eps' | 'geojson';
@@ -89,7 +89,7 @@ export type ExportArtworkFormatContext = {
   readonly savedName: string | null;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
   readonly clock?: () => Date;
-  readonly renderer?: typeof renderVariableText;
+  readonly renderer?: typeof outputTextRenderer;
 };
 
 export async function handleExportArtworkFormat(ctx: ExportArtworkFormatContext): Promise<void> {
@@ -135,12 +135,13 @@ export async function handleExportArtworkFormat(ctx: ExportArtworkFormatContext)
 function exportedToast(
   spec: FormatSpec,
   displayName: string,
-  file: { warning: string | null; objectCount: number; omittedObjectCount: number },
+  file: ExportedFile,
 ): { message: string; variant: ToastVariant } {
   const omitted = file.omittedObjectCount;
   const caveats = [
     ...(omitted > 0 ? [omitted + ' image or relief item(s) were left out.'] : []),
     ...(file.warning === null ? [] : [file.warning]),
+    ...file.glyphWarnings,
   ];
   return {
     message: [
@@ -153,6 +154,14 @@ function exportedToast(
   };
 }
 
+type ExportedFile = {
+  readonly text: string;
+  readonly warning: string | null;
+  readonly objectCount: number;
+  readonly omittedObjectCount: number;
+  readonly glyphWarnings: ReadonlyArray<string>;
+};
+
 async function exportFile(
   ctx: ExportArtworkFormatContext,
   spec: FormatSpec,
@@ -160,16 +169,11 @@ async function exportFile(
   ids: readonly string[] | undefined,
   evaluation: Parameters<typeof materializeVariableText>[1],
   title: string,
-): Promise<
-  Result<
-    { text: string; warning: string | null; objectCount: number; omittedObjectCount: number },
-    string
-  >
-> {
+): Promise<Result<ExportedFile, string>> {
   const resolved = await materializeVariableText(
     project,
     evaluation,
-    ctx.renderer ?? renderVariableText,
+    ctx.renderer ?? outputTextRenderer,
   );
   if (!resolved.ok) return err(resolved.preflight.issues.map((issue) => issue.message).join(' '));
   const artwork = sceneVectorArtwork(resolved.project, ids);
@@ -180,6 +184,7 @@ async function exportFile(
     ...written.value,
     objectCount: artwork.value.objectCount,
     omittedObjectCount: artwork.value.omittedObjectCount,
+    glyphWarnings: glyphWarnings(resolved.advisories),
   });
 }
 

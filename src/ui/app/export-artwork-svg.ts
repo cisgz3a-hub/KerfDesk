@@ -1,10 +1,13 @@
 import { DEFAULT_PROJECT_VARIABLE_DATA, type Project, type RasterImage } from '../../core/scene';
-import { materializeVariableText } from '../../io/gcode/prepare-output-snapshot';
+import {
+  materializeVariableText,
+  type TextGlyphAdvisory,
+} from '../../io/gcode/prepare-output-snapshot';
 import { exportSceneSvg } from '../../io/svg/export-scene-svg';
 import type { PlatformAdapter } from '../../platform/types';
 import { pickPreparedSaveTarget } from './pick-prepared-save-target';
 import { embedSvgRasterImages } from './svg-artwork-images';
-import { renderVariableText } from '../text/render-variable-text';
+import { outputTextRenderer } from '../text/output-text-renderer';
 import type { ToastVariant } from '../state/toast-store';
 
 export type ExportArtworkSvgContext = {
@@ -14,7 +17,7 @@ export type ExportArtworkSvgContext = {
   readonly savedName: string | null;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
   readonly clock?: () => Date;
-  readonly renderer?: typeof renderVariableText;
+  readonly renderer?: typeof outputTextRenderer;
   readonly readImageSource?: (image: RasterImage) => Promise<string>;
   /** Group each filled shape with its holes (ADR-451). Default off. */
   readonly groupContours?: boolean;
@@ -41,7 +44,7 @@ export async function handleExportArtworkSvg(ctx: ExportArtworkSvgContext): Prom
     const resolved = await materializeVariableText(
       project,
       evaluation,
-      ctx.renderer ?? renderVariableText,
+      ctx.renderer ?? outputTextRenderer,
     );
     if (!resolved.ok) {
       ctx.pushToast(
@@ -68,13 +71,17 @@ export async function handleExportArtworkSvg(ctx: ExportArtworkSvgContext): Prom
     );
     if (target === null) return;
     await target.write(new Blob([result.value.svg], { type: 'image/svg+xml' }));
+    const glyphs = glyphWarnings(resolved.advisories);
     ctx.pushToast(
-      'Exported ' +
-        result.value.objectCount +
-        ' artwork item(s) to ' +
-        target.displayName +
-        '. Text is outlined.',
-      'success',
+      [
+        'Exported ' +
+          result.value.objectCount +
+          ' artwork item(s) to ' +
+          target.displayName +
+          '. Text is outlined.',
+        ...glyphs,
+      ].join(' '),
+      glyphs.length === 0 ? 'success' : 'warning',
     );
   } catch (error) {
     ctx.pushToast(
@@ -82,6 +89,14 @@ export async function handleExportArtworkSvg(ctx: ExportArtworkSvgContext): Prom
       'error',
     );
   }
+}
+
+/**
+ * Outlined text keeps only the glyphs its font has, so an export names the characters each text
+ * lost, as Start and Save do (ADR-591 Amendment 2).
+ */
+export function glyphWarnings(advisories: ReadonlyArray<TextGlyphAdvisory>): ReadonlyArray<string> {
+  return advisories.map((advisory) => advisory.issue.message);
 }
 
 export function exportProjectSelection(
