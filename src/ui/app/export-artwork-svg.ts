@@ -81,7 +81,7 @@ export async function handleExportArtworkSvg(ctx: ExportArtworkSvgContext): Prom
           '. Text is outlined.',
         ...glyphs,
       ].join(' '),
-      glyphs.length === 0 ? 'success' : 'warning',
+      warnedVariant(glyphs),
     );
   } catch (error) {
     ctx.pushToast(
@@ -97,6 +97,10 @@ export async function handleExportArtworkSvg(ctx: ExportArtworkSvgContext): Prom
  */
 export function glyphWarnings(advisories: ReadonlyArray<TextGlyphAdvisory>): ReadonlyArray<string> {
   return advisories.map((advisory) => advisory.issue.message);
+}
+
+function warnedVariant(glyphs: ReadonlyArray<string>): ToastVariant {
+  return glyphs.length === 0 ? 'success' : 'warning';
 }
 
 export function exportProjectSelection(

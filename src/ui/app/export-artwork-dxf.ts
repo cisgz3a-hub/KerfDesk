@@ -59,12 +59,12 @@ export async function handleExportArtworkDxf(ctx: ExportArtworkDxfContext): Prom
     );
     if (target === null) return;
     await target.write(new Blob([result.value.dxf], { type: 'application/dxf' }));
-    const omitted = result.value.omittedObjectCount;
-    const glyphs = resolved.ok ? glyphWarnings(resolved.advisories) : [];
-    ctx.pushToast(
-      [exportedMessage(result.value, target.displayName), ...glyphs].join(' '),
-      omitted > 0 || glyphs.length > 0 ? 'warning' : 'success',
+    const done = exportedToast(
+      result.value,
+      target.displayName,
+      resolved.ok ? glyphWarnings(resolved.advisories) : [],
     );
+    ctx.pushToast(done.message, done.variant);
   } catch (error) {
     ctx.pushToast(
       'Could not export DXF: ' + (error instanceof Error ? error.message : String(error)),
@@ -81,6 +81,17 @@ function nothingToExport(project: Project, ids: readonly string[] | undefined): 
     return 'DXF holds vector artwork only. Select vector, text or traced artwork.';
   }
   return null;
+}
+
+function exportedToast(
+  result: DxfArtworkExport,
+  displayName: string,
+  glyphs: ReadonlyArray<string>,
+): { readonly message: string; readonly variant: ToastVariant } {
+  return {
+    message: [exportedMessage(result, displayName), ...glyphs].join(' '),
+    variant: result.omittedObjectCount > 0 || glyphs.length > 0 ? 'warning' : 'success',
+  };
 }
 
 function exportedMessage(result: DxfArtworkExport, displayName: string): string {

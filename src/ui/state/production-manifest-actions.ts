@@ -141,7 +141,7 @@ async function openRow(
     lastSaveTarget: captured.lastSaveTarget,
     dirty: true,
   });
-  warnMissingGlyphs(glyphWarnings);
+  warnMissingGlyphs(glyphWarnings, null);
   return true;
 }
 
@@ -189,13 +189,15 @@ async function captureVariant(
     'Capture production variant',
     { ...project, scene: result.project.scene, jobSetup: result.project.jobSetup },
   );
-  if (error === null) warnMissingGlyphs(glyphWarnings);
-  return error;
+  return warnMissingGlyphs(glyphWarnings, error);
 }
 
 // The row's artwork is fixed: a character its font lacks stays missing from every burn of it.
-function warnMissingGlyphs(warnings: ReadonlyArray<string>): void {
-  if (warnings.length > 0) useToastStore.getState().pushToast(warnings.join(' '), 'warning');
+// Nothing is said when the open or capture itself failed (`error`), which it returns.
+function warnMissingGlyphs(warnings: ReadonlyArray<string>, error: string | null): string | null {
+  if (error === null && warnings.length > 0)
+    useToastStore.getState().pushToast(warnings.join(' '), 'warning');
+  return error;
 }
 
 function recordResult(
