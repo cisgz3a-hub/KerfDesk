@@ -3,7 +3,6 @@ import {
   replaceSelectedAtEarliest,
   replaceIdsAtEarliest,
   selectedVectorObjects,
-  expectedSelection,
   placeRetainedCompound,
   compoundSceneBudgetIsValid,
 } from './vector-path-selection';
@@ -36,6 +35,7 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import type { PathNodeRef } from './path-node-edit-actions';
+import { combineSelectionNotingTabs } from './removed-tabs-notice';
 import { removeObjectIdsFromGroups, selectedObjectIds } from './scene-group-actions';
 import { useToastStore } from './toast-store';
 import { pruneOrphanLayers, pushUndo, type StateSlice } from './scene-mutations';
@@ -105,33 +105,27 @@ export function vectorPathActions(
     ...booleanCompoundActions(set),
     convertSelectionToPath: () => set((state) => convertSelectionToPathMutation(state)),
     weldSelection: (options = {}) =>
-      (options.keepOperands ? copySet : weldSet)(
+      combineSelectionNotingTabs(
+        options.keepOperands ? copySet : weldSet,
+        options,
+        'welded shapes',
         (state) =>
-          expectedSelection(state, options)
-            ? weldSelectionMutation(
-                state,
-                options.keepOperands === true,
-                options.retainCompound === true,
-                options.prepared,
-              )
-            : state,
-        undefined,
-        options.isCurrent,
+          weldSelectionMutation(
+            state,
+            options.keepOperands === true,
+            options.retainCompound === true,
+            options.prepared,
+          ),
       ),
     booleanSelection: (op, options = {}) =>
-      copySet(
-        (state) =>
-          expectedSelection(state, options)
-            ? booleanSelectionMutation(
-                state,
-                op,
-                options.keepOperands === true,
-                options.retainCompound === true,
-                options.prepared,
-              )
-            : state,
-        undefined,
-        options.isCurrent,
+      combineSelectionNotingTabs(copySet, options, 'combined shapes', (state) =>
+        booleanSelectionMutation(
+          state,
+          op,
+          options.keepOperands === true,
+          options.retainCompound === true,
+          options.prepared,
+        ),
       ),
     offsetSelection: (deltaMm, prepared) =>
       copySet((state) => offsetSelectionMutation(state, deltaMm, prepared)),

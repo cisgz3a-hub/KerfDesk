@@ -9,7 +9,13 @@
 // keeps its corner radius at the size it was on the bed, and is left at scale
 // 1. A sharp rectangle has no corner to keep: a scale holds its stretch exactly,
 // so it is left as it was (registration boxes and jig outlines among them).
+//
+// The rebuilt outline has its own start and its own shares of edge and corner,
+// so tabs placed by hand, which are fractions of the outline from its start
+// (ADR-156), are carried to where the stretch would have put them (ADR-494
+// Amendment 3).
 
+import { withTabsFollowingRebuild, type FollowedTabs } from '../geometry/edited-tab-anchors';
 import type { SceneObject, ShapeObject, ShapeSpec, Transform } from '../scene';
 import { rematerializeParametricShape, type ParametricShapeSpec } from './rematerialize-shape';
 
@@ -37,7 +43,9 @@ export function withObjectTransform(object: SceneObject, transform: Transform): 
     heightMm: object.spec.heightMm * after.y,
     cornerRadiusMm: object.spec.cornerRadiusMm * Math.min(before.x, before.y),
   });
-  return resized ?? { ...object, transform };
+  return resized === null
+    ? { ...object, transform }
+    : withTabsFollowingRebuild(object, resized).object;
 }
 
 /** A Shape Properties edit. `spec` is in the object's own units, as the fields
@@ -45,11 +53,17 @@ export function withObjectTransform(object: SceneObject, transform: Transform): 
  *  stretched and then given a radius, or one saved before ADR-144 Amendment 1)
  *  is regenerated at its bed size at scale 1, its corner radius at the bed size
  *  the field showed (the smaller axis scale), so the corner it burns is the
- *  round one the field names. */
+ *  round one the field names. Tabs placed by hand follow the new size, and
+ *  `moved` counts those the new outline took off their stretched place. */
 export function rematerializeShapeSpecEdit(
   object: ShapeObject,
   spec: ParametricShapeSpec,
-): ShapeObject | null {
+): FollowedTabs<ShapeObject> | null {
+  const rebuilt = rebuildForSpecEdit(object, spec);
+  return rebuilt === null ? null : withTabsFollowingRebuild(object, rebuilt);
+}
+
+function rebuildForSpecEdit(object: ShapeObject, spec: ParametricShapeSpec): ShapeObject | null {
   const scale = absoluteScale(object.transform);
   if (
     spec.kind !== 'rect' ||

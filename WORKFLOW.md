@@ -1157,8 +1157,16 @@ that owns those fields, without changing the existing Frame/Start policy.
    moves to the same share of the straight line (ADR-494 Amendment 1). Edit nodes **Delete** and
    **Radius / Fillet**, which can start a shape at another node or where a rounded corner ends,
    also keep each tab where it was; a tab on a part of the outline they change moves to the
-   nearest point of the new outline, and the toast says so (ADR-494 Amendment 2). **Clear placed
-   tabs** (in Cut Settings or in the canvas hint) returns the artwork to automatic tabs.
+   nearest point of the new outline, and the toast says so (ADR-494 Amendment 2). **Optimize
+   Shapes**, which can start a shape again at its first corner, keeps them where they were too. A
+   rounded rectangle that a resize rebuilds at its new size, and a drawn shape that **Shape
+   Properties** rebuilds, keep each tab where the stretch puts it; a tab the new outline no longer
+   passes, such as one on a rounded corner, moves to the nearest point of it, and Shape Properties
+   says when one moved. **Weld**, **Subtract / Intersect / Exclude**
+   and **Offset Shapes** with **Delete original objects** make new shapes without them, which then
+   take automatic tabs, and a toast says the placed tabs were removed (ADR-494 Amendment 3).
+   **Clear placed tabs** (in Cut Settings or in the canvas hint) returns the artwork to automatic
+   tabs.
 5. Job Review's detail line reads e.g. "tabs every 50 mm (at most 6) × 0.5 mm, cut at 20%" or
    "tabs 4 × 0.5 mm, 3 placed by hand". With none of this set, output is unchanged.
 6. Material presets do not store these settings; applying a preset keeps what the operation has.

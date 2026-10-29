@@ -7,6 +7,7 @@ import {
   DEFAULT_SHAPE_OPTIMIZE_OPTIONS,
   type ShapeOptimizeOptions,
 } from '../../core/geometry/shape-optimize/shape-optimize-options';
+import { laserTabAnchorPosition } from '../../core/job/laser-tab-anchors';
 import { createLayer } from '../../core/scene/layer';
 import { createProject, type Project } from '../../core/scene/project';
 import {
@@ -150,7 +151,14 @@ describe('optimizeSelectedShapes', () => {
     // The compatibility view follows the new curves.
     expect(polyline?.closed).toBe(true);
     expect(polyline?.points.length).toBeGreaterThan(20);
-    expect(object.laserTabAnchors).toEqual(anchors);
+    // The tab stays on its contour, re-measured where it was on the part
+    // (ADR-494 Amendment 3): the smoothed outline is a little shorter.
+    const [tab] = object.laserTabAnchors ?? [];
+    expect(tab).toMatchObject({ layerColor: '#000000', pathIndex: 0, polylineIndex: 0 });
+    expect(tab?.pathT).toBeCloseTo(0.25, 2);
+    const placed = laserTabAnchorPosition(object, tab!);
+    const was = laserTabAnchorPosition(before.scene.objects[0]!, anchors[0]!);
+    expect(Math.hypot(placed!.x - was!.x, placed!.y - was!.y)).toBeLessThan(0.1);
     expect(object.bounds.minX).toBeCloseTo(10, 1);
     expect(useStore.getState().undoStack).toEqual([before]);
     expect(useStore.getState().dirty).toBe(true);
