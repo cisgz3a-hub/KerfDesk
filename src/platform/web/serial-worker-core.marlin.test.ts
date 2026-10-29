@@ -97,7 +97,8 @@ describe('serial worker core with Marlin acknowledgements (ADR-676)', () => {
 
   it.each([
     ['a handler error', 'Error:Something went wrong'],
-    ['an unknown command', 'echo:Unknown command: "M7"'],
+    // The first window, `M3 I S0`, is the line in flight.
+    ['an unknown command naming the line in flight', 'echo:Unknown command: "m3  i s0"'],
     ['a skipped move', 'echo:Home XY First'],
     ['the stopped notice', 'Printer stopped due to errors. Fix the error and use M999 to restart.'],
     ['a resend request', 'Resend: 3'],
@@ -119,6 +120,24 @@ describe('serial worker core with Marlin acknowledgements (ADR-676)', () => {
       'line:ok',
     ]);
     expect(h.core.armedStreamer()).toBeNull();
+  });
+
+  // Rolling audit v8 N1-P1-1: Marlin echoes the bytes it read, so a command
+  // letter lost on the wire names no line KerfDesk sent. The main thread only
+  // logs such an echo and streams on, so handing back left the rest of the job
+  // on the window, unprotected and unannounced.
+  it('keeps the refill through an unknown-command echo of any other line', async () => {
+    const h = harness();
+    armMarlin(h.core, 'marlin');
+
+    h.push('echo:Unknown command: "3 I S0"\nok\n');
+    await flush();
+    h.push('ok\n');
+    await flush();
+
+    expect(h.written).toEqual(['G1 X1 S204\n', 'G1 X2\n']);
+    expect(kinds(h.posted)).not.toContain('refill-stopped');
+    expect(h.core.armedStreamer()?.completed).toBe(2);
   });
 
   it('retires the refill before any line the main thread writes while armed', async () => {

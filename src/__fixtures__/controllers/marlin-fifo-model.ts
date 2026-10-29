@@ -36,6 +36,11 @@
 //   feedrate (no G0_FEEDRATE in the stock configuration); in continuous mode a
 //   G1 S sets the block power and a G0 plans power 0.
 // - gcode/host/M114.cpp: M114 reports the projected (planned) position.
+// - gcode/parser.cpp parse() L266 and gcode/gcode.cpp L1119-L1122: a line
+//   whose first letter is not G, M or T sets no command, so Marlin echoes
+//   `Unknown command: "<the text it read>"` (parser.cpp L390-L392), skips it
+//   and answers `ok`. Over serial a line without `N` has no checksum
+//   (queue.cpp L473-L510), so a command letter lost on the wire lands here.
 // - gcode/temp/M106_M107.cpp and planner.cpp check_axes_activity()
 //   (L1388-L1399): M106 S (255 without S) and M107 set the fan speed when they
 //   run, and each block keeps the speed current when it was planned. The fan
@@ -345,6 +350,11 @@ export function createFifoMarlin(options: { readonly responseDelayMs?: number } 
   // Returns false while the head command's handler is still blocked.
   const runCommand = (entry: RingEntry): boolean => {
     const code = entry.command.toUpperCase();
+    if (!/^[GMT]/.test(code)) {
+      reply(`echo:Unknown command: "${entry.command}"`);
+      reply('ok');
+      return true;
+    }
     const done = code.startsWith('M') ? runMCode(entry, code) : runGCode(code);
     if (done) reply('ok');
     return done;

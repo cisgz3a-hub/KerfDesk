@@ -2060,13 +2060,17 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    The warning never refuses Start.
 5. Pause releases background refill. Confirmed Resume and tool-change Continue restore it for
    the same live job. Abort, disconnect or a replacement job cannot inherit an old refill queue.
-   Marlin's Abort and Disconnect take the refill back before their stop lines.
+   Marlin's Abort and Disconnect send their stop lines right behind the refill's handback, so
+   a backlog in a window that was busy never delays them (ADR-676 Amendment 1).
 6. Browser shutdown, computer sleep and USB loss still interrupt a live serial connection.
 7. The desktop app, like Chrome, lets the window and the worker see only the ports picked in
    its Select dialog, so an identical second adapter (a laser controller and an Arduino that
    both use a CH340, for example) no longer stops background streaming. A pick lasts until
    Forget Controller, and on macOS and Linux also until an app restart; picking both identical
    adapters is still ambiguous and uses the window port (ADR-366, ADR-552).
+8. A Marlin `Unknown command` echo of the line in flight ends the job as before (MA-12). An echo
+   of any other text, such as a move whose `G` was lost on the wire, stays in the log, and the
+   worker keeps streaming the rest of the job (ADR-676 Amendment 1).
 
 #### Error — WebSerial not supported
 1. Connection button is disabled, with a red hint above: "Your browser doesn't support WebSerial. Use Chrome, Edge, Brave (may require enabling under Brave Shields/flags), or Arc, or install the Windows desktop app."

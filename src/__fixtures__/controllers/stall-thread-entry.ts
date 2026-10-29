@@ -11,7 +11,12 @@
 // transport it only relays bytes, so every refill waits for the main thread.
 //
 // It samples the controller every millisecond and records each interval in
-// which the head is stopped with the beam above zero.
+// which the head is stopped with the beam above zero, and the time each line
+// reached the controller.
+//
+// `dropCommandLetterOfMove` models a byte lost on the controller's UART leg
+// (rolling audit v8 N1-P1-1, the refuter's method): Marlin reads the Nth `G1`
+// without its `G`, echoes it as an unknown command and answers `ok`.
 
 import { createFifoMarlin } from './marlin-fifo-model';
 import { createGrblSimulator } from './grbl-simulator';
@@ -24,7 +29,10 @@ import type { SerialConnection } from '../../platform/types';
 export type StallThreadConfig = {
   readonly firmware: 'marlin' | 'grbl' | 'grblhal';
   readonly transport: 'window' | 'usb-worker' | 'network-worker';
+  readonly dropCommandLetterOfMove?: number;
 };
+
+export type Arrival = { readonly at: number; readonly line: string };
 
 export type LitStop = { readonly from: number; readonly to: number; readonly beam: number };
 
@@ -36,6 +44,10 @@ export type StallThreadMessage =
       readonly kind: 'report';
       readonly litStops: ReadonlyArray<LitStop>;
       readonly received: ReadonlyArray<string>;
+      /** When each line reached the controller (the Marlin model only). */
+      readonly arrivals: ReadonlyArray<Arrival>;
+      /** Every `echo:Unknown command` the controller sent. */
+      readonly echoes: ReadonlyArray<string>;
       /** The reply grammar each arm named, in order (ADR-676). */
       readonly armAcks: ReadonlyArray<string | null>;
     };
@@ -51,11 +63,16 @@ type Controller = {
   readonly stoppedBeam: () => number;
   readonly boot: () => void;
   readonly received: () => ReadonlyArray<string>;
+  readonly arrivals: () => ReadonlyArray<Arrival>;
 };
 
 export async function start(port: Port, config: StallThreadConfig): Promise<void> {
-  const controller = await openController(config.firmware);
+  const controller = await openController(config.firmware, config.dropCommandLetterOfMove);
   const litStops = sampleLitStops(controller);
+  const echoes: string[] = [];
+  controller.connection.onLine((line) => {
+    if (line.startsWith('echo:Unknown command')) echoes.push(line);
+  });
   const handleSerial = attachTransport(port, config.transport, controller);
   const armAcks: Array<string | null> = [];
   port.on('message', (raw) => {
@@ -74,17 +91,38 @@ export async function start(port: Port, config: StallThreadConfig): Promise<void
         kind: 'report',
         litStops: litStops(),
         received: controller.received(),
+        arrivals: controller.arrivals(),
+        echoes,
         armAcks,
       });
     }
   });
 }
 
-async function openController(firmware: StallThreadConfig['firmware']): Promise<Controller> {
+async function openController(
+  firmware: StallThreadConfig['firmware'],
+  dropCommandLetterOfMove?: number,
+): Promise<Controller> {
+  const arrivals: Arrival[] = [];
   if (firmware === 'marlin') {
     const marlin = createFifoMarlin();
-    const connection = await openFirst(marlin.adapter);
+    const inner = await openFirst(marlin.adapter);
+    let moves = 0;
+    const connection: SerialConnection = {
+      ...inner,
+      write: (data) => {
+        const at = Date.now();
+        const lines = data.split('\n').map((line) => {
+          if (!/^G1\b/.test(line)) return line;
+          moves += 1;
+          return moves === dropCommandLetterOfMove ? line.slice(1) : line;
+        });
+        for (const line of lines.slice(0, -1)) arrivals.push({ at, line });
+        return inner.write(lines.join('\n'));
+      },
+    };
     return {
+      arrivals: () => arrivals,
       connection,
       stoppedBeam: () => {
         const state = marlin.state();
@@ -116,6 +154,7 @@ async function openController(firmware: StallThreadConfig['firmware']): Promise<
     },
   };
   return {
+    arrivals: () => arrivals,
     connection,
     stoppedBeam: () => (sim.planner().blocks === 0 ? beam.power() : 0),
     boot: () => sim.port.emitLine(banner),

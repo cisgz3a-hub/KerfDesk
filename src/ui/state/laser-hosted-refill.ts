@@ -56,26 +56,16 @@ export async function armHostedRefill(
  * that is about to change the stream's status must await this, or the two
  * sides would briefly disagree about who writes next. The one exception is a
  * realtime reset, which the worker treats as its own release.
+ *
+ * The release is posted before this returns its promise. A Marlin stop without
+ * a reset byte (Abort, Disconnect) posts its stop lines right after it, then
+ * awaits the reply before freezing the stream (ADR-676 Amendment 1): a line
+ * the worker sent before the release is then on this side's ledger too, and
+ * its reply cannot settle a stop line, yet the stop lines never wait behind
+ * the lines the worker forwarded while this thread was busy.
  */
 export async function releaseHostedRefill(refs: ConnectionRefs): Promise<void> {
   const refill = hostedRefill(refs);
   if (refill === null) return;
   await refill.release();
-}
-
-/**
- * A Marlin stop without a reset byte (Abort, Disconnect) changes the stream's
- * status itself, so a worker-held refill comes back first, while both sides'
- * streams still agree (ADR-676). A line the worker sends during the handshake
- * is then on this side's ledger too, and its reply cannot settle a stop line.
- * Callers check `hostedRefillArmed` first, so a stop with no worker refill
- * still freezes without yielding. False when the caller no longer owns the
- * stop afterwards.
- */
-export async function releaseHostedRefillBeforeStop(
-  refs: ConnectionRefs,
-  stillOwned: () => boolean,
-): Promise<boolean> {
-  await releaseHostedRefill(refs);
-  return stillOwned();
 }
