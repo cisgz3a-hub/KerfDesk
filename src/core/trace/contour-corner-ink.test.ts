@@ -1,6 +1,10 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
+import { jpegRoundTrip } from '../../__fixtures__/perceptual/jpeg-roundtrip';
 import type { ColoredPath, CurveSubpath, PathSegment, Vec2 } from '../scene';
+import { textToPolylines } from '../text/text-to-polylines';
 import { TRACE_PRESETS } from './trace-presets';
 import type { RawImageData, TraceOptions } from './trace-image';
 import { traceImageToColoredPaths } from './trace-to-paths';
@@ -189,4 +193,165 @@ describe('binary corner apexes stay on the ink (ADR-439 Amendment 1)', () => {
       }
     }
   });
+});
+
+// ——— anti-aliased serif text ———
+
+const SERIF_FONT = 'Tinos-Regular.ttf';
+const COVERAGE_SAMPLES = 8;
+// A pixel this light or lighter carries no ink (under 2% coverage).
+const PAPER_LUMA = 250;
+
+// One glyph of the bundled serif at `px` px per em, anti-aliased by an 8 x 8
+// coverage sample per pixel (even-odd), its ink placed off the pixel grid by
+// (+0.31, +0.17) inside a margin.
+async function serifGlyph(char: string, px: number): Promise<RawImageData> {
+  const bytes = readFileSync(resolve('src/ui/text/fonts', SERIF_FONT));
+  const fontBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+  const rendered = await textToPolylines({
+    fontBuffer: fontBuffer as ArrayBuffer,
+    content: char,
+    sizeMm: px,
+    alignment: 'left',
+    lineHeight: 1,
+    color: '#000000',
+  });
+  const pad = Math.max(6, Math.round(px * 0.15));
+  const { minX, minY, maxX, maxY } = rendered.bounds;
+  const rings = rendered.paths
+    .flatMap((path) => path.polylines)
+    .map((line) =>
+      line.points.map((p) => ({ x: p.x - minX + pad + 0.31, y: p.y - minY + pad + 0.17 })),
+    );
+  const width = Math.ceil(maxX - minX + 2 * pad);
+  const height = Math.ceil(maxY - minY + 2 * pad);
+  const covered = new Float64Array(width * height);
+  for (let row = 0; row < height * COVERAGE_SAMPLES; row += 1) {
+    const y = (row + 0.5) / COVERAGE_SAMPLES;
+    const crossings: number[] = [];
+    for (const ring of rings) {
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i, i += 1) {
+        const p = ring[i] as Vec2;
+        const q = ring[j] as Vec2;
+        if (p.y > y !== q.y > y) crossings.push(p.x + ((y - p.y) * (q.x - p.x)) / (q.y - p.y));
+      }
+    }
+    crossings.sort((a, b) => a - b);
+    for (let k = 0; k + 1 < crossings.length; k += 2) {
+      const from = Math.max(0, Math.ceil((crossings[k] as number) * COVERAGE_SAMPLES - 0.5));
+      const to = Math.min(
+        width * COVERAGE_SAMPLES,
+        Math.ceil((crossings[k + 1] as number) * COVERAGE_SAMPLES - 0.5),
+      );
+      const base = Math.floor(row / COVERAGE_SAMPLES) * width;
+      for (let s = from; s < to; s += 1) covered[base + Math.floor(s / COVERAGE_SAMPLES)] += 1;
+    }
+  }
+  const data = new Uint8ClampedArray(width * height * 4);
+  covered.forEach((count, p) => {
+    const luma = Math.round(255 * (1 - count / COVERAGE_SAMPLES ** 2));
+    data.set([luma, luma, luma, 255], p * 4);
+  });
+  return { width, height, data };
+}
+
+// How far `p` stands from every pixel that carries ink: 0 on or beside ink.
+function intoPaper(image: RawImageData, p: Vec2): number {
+  let best = Infinity;
+  for (let y = 0; y < image.height; y += 1) {
+    for (let x = 0; x < image.width; x += 1) {
+      if ((image.data[(y * image.width + x) * 4] as number) >= PAPER_LUMA) continue;
+      const dx = Math.max(x - p.x, 0, p.x - x - 1);
+      const dy = Math.max(y - p.y, 0, p.y - y - 1);
+      best = Math.min(best, Math.hypot(dx, dy));
+    }
+  }
+  return best;
+}
+
+describe('measured corner apexes stay on the field ink (ADR-439 Amendment 2)', () => {
+  // Rolling audit v8 N8-P2-4: on anti-aliased Tinos the legs of a serif's
+  // blunt end met past it, and Line Art drew sharp nodes up to 1.7 px into
+  // pure paper (N at 32 px), Sharp up to 2.5 px (M at 36 px). Potrace drew none.
+  it.each([24, 32, 40])(
+    'draws no node into the paper of anti-aliased serif text at %i px',
+    async (px) => {
+      for (const char of ['A', 'K', 'M', 'N', 'R', 'W']) {
+        const image = await serifGlyph(char, px);
+        for (const preset of ['Line Art', 'Smooth', 'Sharp']) {
+          for (const node of nodes(await trace(image, preset))) {
+            expect(
+              intoPaper(image, node),
+              `${preset} ${char} at (${node.x}, ${node.y})`,
+            ).toBeLessThanOrEqual(0.5);
+          }
+        }
+      }
+    },
+  );
+});
+
+// The 1-bit picture of an anti-aliased one (a pixel is ink when it is mostly
+// covered), optionally after a JPEG round trip at `quality`.
+function oneBit(image: RawImageData, quality?: number): RawImageData {
+  const { width, height } = image;
+  const luma = Array.from({ length: width * height }, (_, p) =>
+    (image.data[p * 4] as number) < 128 ? 0 : 255,
+  );
+  const values = quality === undefined ? luma : jpegRoundTrip(luma, width, height, quality);
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let p = 0; p < width * height; p += 1) {
+    const value = values[p] as number;
+    data.set([value, value, value, 255], p * 4);
+  }
+  return { width, height, data };
+}
+
+// Points along every traced outline, a sixteenth of each segment apart.
+function outlinePoints(paths: ReadonlyArray<ColoredPath>): Vec2[] {
+  const points: Vec2[] = [];
+  for (const curve of paths.flatMap((path) => path.curves ?? []) as CurveSubpath[]) {
+    let at = curve.start;
+    for (const segment of curve.segments) {
+      for (let k = 0; k < 16; k += 1) {
+        const t = k / 16;
+        const u = 1 - t;
+        if (segment.kind !== 'cubic') {
+          points.push({ x: at.x + t * (segment.to.x - at.x), y: at.y + t * (segment.to.y - at.y) });
+          continue;
+        }
+        const [a, b, c, d] = [u * u * u, 3 * u * u * t, 3 * u * t * t, t * t * t];
+        const { control1: p1, control2: p2, to } = segment;
+        points.push({
+          x: a * at.x + b * p1.x + c * p2.x + d * to.x,
+          y: a * at.y + b * p1.y + c * p2.y + d * to.y,
+        });
+      }
+      at = segment.to;
+    }
+  }
+  return points;
+}
+
+describe('a JPEG of two-level text traces as the clean text (ADR-530 Amendment 12)', () => {
+  // Placed at the field's crossing, a quality 60 JPEG's ringing moved the
+  // cracks of the source-grid walk up to 0.15 px and tilted the short legs of
+  // serifs into spikes 1.4 to 2.9 px off the clean outline; main's enlarged
+  // walk drew the staircase 1.8 to 6.3 px off it. A crack the ringing leaves
+  // too uneven to be a step keeps its crossing, so a node may move a little.
+  it.each([24, 32])(
+    'draws a quality 60 JPEG of 1-bit serif text at %i px on the clean outline',
+    async (px) => {
+      for (const char of ['A', 'M', 'N', 'R']) {
+        const image = await serifGlyph(char, px);
+        for (const preset of PRESETS) {
+          const clean = outlinePoints(await trace(oneBit(image), preset));
+          for (const node of nodes(await trace(oneBit(image, 60), preset))) {
+            const off = Math.min(...clean.map((p) => Math.hypot(p.x - node.x, p.y - node.y)));
+            expect(off, `${preset} ${char} at (${node.x}, ${node.y})`).toBeLessThanOrEqual(1);
+          }
+        }
+      }
+    },
+  );
 });

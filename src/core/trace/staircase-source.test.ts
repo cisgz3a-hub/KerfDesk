@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { jpegRoundTrip } from '../../__fixtures__/perceptual/jpeg-roundtrip';
 import type { ColoredPath, CurveSubpath, Vec2 } from '../scene';
 import { isStaircaseSource } from './staircase-source';
 import { TRACE_PRESETS } from './trace-presets';
@@ -124,6 +125,98 @@ describe('two-level sources trace on their own grid (ADR-530 Amendment 11)', () 
         expect(curve.segments.length).toBeLessThanOrEqual(8);
         expect(inflections(outline(curve))).toBe(0);
       }
+    },
+  );
+});
+
+// A square of side `side` turned 17 degrees on a `canvas` px canvas, centred
+// off the pixel grid as the disc is; a pixel is ink when its centre is inside.
+function turnedSquare(canvas: number, side: number): RawImageData {
+  const turn = (17 * Math.PI) / 180;
+  const cx = canvas / 2 + 0.31;
+  const cy = canvas / 2 + 0.17;
+  const data = new Uint8ClampedArray(canvas * canvas * 4).fill(255);
+  for (let y = 0; y < canvas; y += 1) {
+    for (let x = 0; x < canvas; x += 1) {
+      const dx = x + 0.5 - cx;
+      const dy = y + 0.5 - cy;
+      const u = dx * Math.cos(turn) + dy * Math.sin(turn);
+      const v = -dx * Math.sin(turn) + dy * Math.cos(turn);
+      if (Math.abs(u) < side / 2 && Math.abs(v) < side / 2)
+        data.set([0, 0, 0], (y * canvas + x) * 4);
+    }
+  }
+  return { width: canvas, height: canvas, data };
+}
+
+// The same picture after a baseline JPEG round trip at `quality`.
+function jpeg(image: RawImageData, quality: number): RawImageData {
+  const { width, height } = image;
+  const luma = Array.from({ length: width * height }, (_, p) => image.data[p * 4] as number);
+  const data = new Uint8ClampedArray(width * height * 4);
+  jpegRoundTrip(luma, width, height, quality).forEach((value, p) => {
+    data.set([value, value, value, 255], p * 4);
+  });
+  return { width, height, data };
+}
+
+// The same two-level picture with its ink at luma `ink` instead of black.
+function inked(image: RawImageData, ink: number): RawImageData {
+  const data = image.data.map((value, i) => (i % 4 !== 3 && value === 0 ? ink : value));
+  return { ...image, data };
+}
+
+async function onlyCurve(image: RawImageData, options: TraceOptions): Promise<CurveSubpath> {
+  const curves = curvesOf(await traceImageToColoredPaths(image, options));
+  expect(curves).toHaveLength(1);
+  return curves[0] as CurveSubpath;
+}
+
+describe('near two-level sources (ADR-530 Amendment 12)', () => {
+  it('counts a JPEG of two-level art as two-level, but not a JPEG of anti-aliased art', () => {
+    for (const options of [LINE_ART, SMOOTH]) {
+      for (const quality of [75, 60]) {
+        expect(isStaircaseSource(jpeg(disc(48, 32, true), quality), options)).toBe(true);
+        expect(isStaircaseSource(jpeg(disc(48, 32, false), quality), options)).toBe(false);
+      }
+    }
+  });
+
+  // Rolling audit v8 N8-P2-3: after a JPEG round trip at quality 75 Smooth,
+  // and at 60 Line Art too, drew this circle with 47 segments and 40
+  // inflections again (the clean source: 6 and 0; Potrace: 4 and 0).
+  it.each([75, 60])(
+    'draws a quality %i JPEG of a 32 px two-level circle as it draws the clean one',
+    async (quality) => {
+      for (const options of [LINE_ART, SMOOTH]) {
+        const curve = await onlyCurve(jpeg(disc(48, 32, true), quality), options);
+        expect(curve.segments.length).toBeLessThanOrEqual(8);
+        expect(inflections(outline(curve))).toBe(0);
+      }
+    },
+  );
+
+  // At quality 60 the turned square drew 51 segments with 50 inflections. Both
+  // sources round one corner; the JPEG's single cubic there bows enough to
+  // count two inflections.
+  it('draws a quality 60 JPEG of a turned square with its four sides', async () => {
+    for (const options of [LINE_ART, SMOOTH]) {
+      const clean = await onlyCurve(turnedSquare(64, 24), options);
+      const curve = await onlyCurve(jpeg(turnedSquare(64, 24), 60), options);
+      expect(curve.segments.length).toBeLessThanOrEqual(clean.segments.length + 1);
+      expect(inflections(outline(curve))).toBeLessThanOrEqual(inflections(outline(clean)) + 2);
+    }
+  });
+
+  // Line Art's fixed cut at 128 put every crack of a disc in a pale ink off its
+  // midpoint, so the source failed the two-level test and drew 47 segments.
+  it.each([40, 110])(
+    'draws a two-level circle in ink at luma %i as it draws black ink',
+    async (ink) => {
+      expect(isStaircaseSource(inked(disc(48, 32, true), ink), LINE_ART)).toBe(true);
+      const curve = await onlyCurve(inked(disc(48, 32, true), ink), LINE_ART);
+      expect(curve.segments.length).toBeLessThanOrEqual(8);
+      expect(inflections(outline(curve))).toBe(0);
     },
   );
 });

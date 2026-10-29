@@ -323,3 +323,82 @@ Line Art keeps 45 of 46 corners at 200 px. Hausdorff distance to the true outlin
 - The apex of a 30 degree triangle still lands 1.3 to 1.7 px short of the true tip at 32 and
   200 px. It did so before this amendment (main 1.66 px at 200 px).
 - One 105 degree base corner of the 30 degree triangle at 32 px moves from 0.16 to 0.92 px.
+
+### Amendment 2 - measured leg apexes are bounded by the field (2026-10-29)
+
+Rolling audit v8 N8-P2-4 (`docs/audits/2026-10-29-rolling-v8/N8-tracer-remeasure.md`):
+
+- Anti-aliased loops are measured and skipped Amendment 1's bound. On 72 glyph images (Tinos
+  A M N V W k v x y z R K 4 7 and Roboto y v w A k K M W 4 7 at 24, 32 and 48 px), Line Art drew 7
+  sharp nodes 1 px or more off the true outline on 7 images, Smooth 7 on 7 and Sharp 25 on 18.
+  Potrace 1.16 drew none.
+- The worst stood in pure paper: Line Art 1.69 px from any pixel with ink (Tinos N at 32 px), Sharp
+  4.25 px (Tinos V at 48 px).
+- They are serif ends. A serif's slab is about a pixel thick, and its top and bottom legs converge
+  by 15 to 20 degrees, so they meet 2 to 4 px past its blunt end.
+- Decision 3's loose allowance for such an acute apex is 0.25 / tan(interior / 2) +
+  0.4 / sin(interior / 2), about 5 px at 15 degrees. The apex then needs the field's confirmation
+  (`contour-corner-field.ts`). But a wedge that thin covers only about 0.1 to 0.15 of each pixel
+  near its tip, inside the fit's 0.2 coverage tolerance, so the field confirmed it (on Tinos N at
+  32 px the apex stood 2.5 px off the chain, past the tight allowance of 1.45 px).
+
+**Decision** (`contour-corner-ink.ts`, `contour-corners.ts`):
+
+- A measured leg apex is dropped when the field at the apex reads paper, and the loop then rounds
+  that turn. Lattice apexes are exact and exempt, as in Amendment 1.
+  - "Reads paper" means that the field, interpolated bilinearly between its pixel centres, is
+    lighter than the paper level by less than 2% of the step from paper to ink.
+  - The levels are the brightest and the darkest field pixels within 2 source px of the apex and
+    of the cracks it replaces. The chain's ink side lies within a pixel of those cracks.
+  - Below 48 luma of contrast the field cannot say, and the apex stays.
+- **Why the field at the apex.**
+  - A true tip's last pixels each hold some of its ink, and the bilinear field at the apex
+    interpolates them: about 3% of the step for a 15 degree tip, more as the tip widens.
+  - The apex of two legs extrapolated past a blunt end stands where every pixel within a pixel of
+    it is paper.
+  - It is the measured counterpart of Amendment 1. The pixel centres of an anti-aliased source do
+    not bound a tip, because a thin true tip covers less than half of each pixel it crosses. The
+    field's coverage does bound it.
+- Binary loops keep Amendment 1.
+
+**Rejected, measured:**
+
+- **A cap on the apex's distance to the ink for binary loops,** to also catch the 1-bit spikes
+  outside Amendment 1's 15 images. Amendment 1 measured it on the Q4 set, and the 72 glyph images
+  agree. The 1-bit spikes left stand 0.72 to 2.37 px off the ink, while true binary tips stand up
+  to 2.08 px off it: the 30 degree corners of the 120 degree triangle at 32 px.
+
+**Measurements** (main `33bc394c6`, then this with ADR-530 Amendment 12):
+
+| Anti-aliased, 72 glyph images | Main | This | Potrace |
+|---|---|---|---|
+| Line Art: sharp nodes 1 px or more off the outline | 7 on 7 | 0 | 0 |
+| Smooth | 7 on 7 | 0 | 0 |
+| Sharp | 25 on 18 | 0 | 0 |
+
+- **Depth into paper.** This is the distance from a node to the nearest pixel with more than 2% ink.
+  Over every node of anti-aliased Tinos A M N V W K R k v x y z 4 7 at 20 to 40 px, the deepest
+  was:
+  - Line Art 1.69 -> 0.45 px;
+  - Smooth 1.69 -> 0.46 px;
+  - Sharp 2.51 -> 0.47 px.
+- **Anti-aliased Q4 set** (the 79 ground-truth shapes rendered with 8 x 8 coverage, Potrace on the
+  same greymap):
+  - win / tie / lose is unchanged: Line Art 69 / 10 / 0, Sharp 67 / 11 / 1, Smooth 66 / 10 / 3;
+  - true corners kept sharp fall by two on each preset (225 -> 223, 295 -> 293, 219 -> 217), all on
+    Tinos R at 24 px;
+  - those were serif overshoots: that image's Hausdorff distance falls from 0.83 to 0.75 px on
+    Line Art and Smooth.
+- The clean binary Q4 set is unchanged in every metric. The 1-bit spikes on the 72 glyph images are
+  unchanged too: 11 on 9, 11 on 9 and 5 on 5.
+- Test: `contour-corner-ink.test.ts` traces anti-aliased Tinos A, K, M, N, R and W at 24, 32 and
+  40 px and allows no node more than 0.5 px into paper. On main it fails at every size.
+
+**Follow-ups:**
+
+- The 1-bit spikes outside Amendment 1's set remain, the worst Roboto A at 24 px (2.01 px off the
+  outline, 2.37 px off the ink).
+  - The legs of a narrow stroke's flat end meet in a needle that threads between paper centres, and
+    true acute tips stand as far off the ink.
+  - Neither the centre test nor a distance cap separates them. It needs another discriminator.
+- On Sharp, which walks a JPEG natively, see ADR-530 Amendment 12's "Not part" list.

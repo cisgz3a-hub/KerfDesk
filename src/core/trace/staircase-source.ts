@@ -18,9 +18,22 @@
 // tail models it. Each source pixel takes the class of the enlarged pixel at
 // its centre: a nearest-neighbour enlargement's block, and on a 3x grid the
 // centre of the block, which the bilinear rounding of a corner never reaches.
+//
+// Two-level means two tones meeting in steps, not two exact values (ADR-530
+// Amendment 12). A JPEG of such art rings: its edge pixels sit some way off
+// both tones, and at quality 75 the cut placed a sub-pixel edge on up to a
+// fifth of an image's cracks (rolling audit v8 N8-P2-3). A step between ink
+// level I and paper level P still crosses their mid-level (I + P) / 2 halfway
+// between the two pixel centres, and JPEG's error at a step is near symmetric,
+// so placed against that level its cracks stay within STEP_CROSSING_TOLERANCE
+// of the midpoint (q60: at most 1% of any Q4 image's cracks beyond it). An
+// anti-aliased edge spreads its crossings across the whole crack (30-90% of
+// the cracks beyond it). The mid-level also keeps a step between paper and a
+// pale ink (red, at luma 75) a step, where a fixed cut at 128 would place
+// every one of its cracks 0.2 px off the midpoint.
 
 import { inkMaskFromPrepared } from './centerline';
-import { crackCarriesSubPixelEdge, type CrackSubPixelField } from './contour-boundary';
+import type { CrackSubPixelField } from './contour-boundary';
 import { contourTraceInputMatches, type ContourTraceInput } from './contour-input';
 import { prepareTraceForContour, type RawImageData, type TraceOptions } from './trace-image';
 
@@ -28,9 +41,14 @@ import { prepareTraceForContour, type RawImageData, type TraceOptions } from './
 // while it still counts as two-level: a few grey pixels (a stray anti-aliased
 // mark, a soft corner) do not make the rest of the art a measurement.
 const STAIRCASE_MAX_MEASURED_FRACTION = 0.02;
+// How far (px) a crack's mid-level crossing may sit from its midpoint while it
+// is still a step.
+const STEP_CROSSING_TOLERANCE = 0.15;
+const MID_CRACK = 0.5;
+const MAX_LEVEL = 255;
 
-/** True when, on the source's own grid, almost no boundary crack carries a
- *  sub-pixel edge: the walker would trace every loop as a binary staircase. */
+/** True when, on the source's own grid, almost every boundary crack is a step
+ *  between the source's two tones: the art has no sub-pixel edge to measure. */
 export function isStaircaseSource(
   image: RawImageData,
   options: TraceOptions,
@@ -49,7 +67,7 @@ export function isStaircaseSource(
 
 /** The source-grid input for a two-level source: its own field and options,
  *  with the mask the enlarged grid's cleanup left, sampled at each source
- *  pixel centre. */
+ *  pixel centre. Its step cracks sit at their midpoints (stepField). */
 export function staircaseSourceInput(
   native: ContourTraceInput,
   enlarged: ContourTraceInput,
@@ -68,13 +86,37 @@ export function staircaseSourceInput(
     }
   }
   const { median: _released, ...input } = native;
-  return { ...input, prepared: { ...native.prepared, data } };
+  const prepared = { ...native.prepared, data };
+  const field = native.crackField === null ? null : stepField(native.crackField, prepared);
+  return { ...input, prepared, crackField: field };
+}
+
+// The walker places a crack where the field crosses the cut, and on a step
+// that crossing says nothing about the edge. Off the tones' mid-level it is
+// the cut's own bias: a fixed cut at 128 puts every crack of a disc in ink at
+// luma 80 0.2 px off its midpoint, the loop reads as a measurement and its fit
+// follows the staircase (10 segments where black ink draws 6). On a JPEG it
+// is the ringing: placed even at the mid-level, quality 60 moves the cracks up
+// to 0.15 px, enough to tilt short binary legs into serif spikes (72 glyph
+// images: 50 spikes, against 11 on the clean art). So a step crack crosses at
+// its midpoint, as a saturated step does, and a near two-level source traces
+// as its clean art. Cracks that are not steps keep the field's crossing.
+function stepField(field: CrackSubPixelField, prepared: RawImageData): CrackSubPixelField {
+  const mid = plateauMidLevel(inkMaskFromPrepared(prepared), field);
+  return {
+    ...field,
+    crackCrossingAt: (inkX, inkY, bgX, bgY) =>
+      isStepCrack(field.lumaAt(inkX, inkY), field.lumaAt(bgX, bgY), mid)
+        ? MID_CRACK
+        : field.crackCrossingAt?.(inkX, inkY, bgX, bgY),
+  };
 }
 
 type InkPlane = { readonly width: number; readonly height: number; readonly ink: Uint8Array };
 
 // Every ink/paper crack of the mask, the image border included (off-grid
-// pixels are paper), and how many of them the walker would interpolate.
+// pixels are paper), and how many of them are not a step between the two
+// tones.
 function boundaryCrackCounts(
   mask: InkPlane,
   field: CrackSubPixelField,
@@ -82,16 +124,17 @@ function boundaryCrackCounts(
   const { width, height } = mask;
   const inkAt = (x: number, y: number): boolean =>
     x >= 0 && y >= 0 && x < width && y < height && mask.ink[y * width + x] === 1;
+  const mid = plateauMidLevel(mask, field);
   let cracks = 0;
   let measured = 0;
   const visit = (ax: number, ay: number, bx: number, by: number): void => {
     const aInk = inkAt(ax, ay);
     if (aInk === inkAt(bx, by)) return;
     cracks += 1;
-    const edge = aInk
-      ? crackCarriesSubPixelEdge(field, ax, ay, bx, by)
-      : crackCarriesSubPixelEdge(field, bx, by, ax, ay);
-    if (edge) measured += 1;
+    const step = aInk
+      ? isStepCrack(field.lumaAt(ax, ay), field.lumaAt(bx, by), mid)
+      : isStepCrack(field.lumaAt(bx, by), field.lumaAt(ax, ay), mid);
+    if (!step) measured += 1;
   };
   for (let y = -1; y < height; y += 1) {
     for (let x = -1; x < width; x += 1) {
@@ -100,4 +143,37 @@ function boundaryCrackCounts(
     }
   }
   return { cracks, measured };
+}
+
+// A crack between ink luma `ink` and paper luma `paper` is a step when the
+// two straddle the mid-level and cross it within the tolerance of halfway.
+function isStepCrack(ink: number, paper: number, mid: number): boolean {
+  if (!(paper > mid && ink <= mid)) return false;
+  return Math.abs((paper - mid) / (paper - ink) - MID_CRACK) <= STEP_CROSSING_TOLERANCE;
+}
+
+// Halfway between the median ink and the median paper value: the two tones.
+// Edge pixels are a minority of either class, so they do not move a median.
+function plateauMidLevel(mask: InkPlane, field: CrackSubPixelField): number {
+  const ink = new Uint32Array(MAX_LEVEL + 1);
+  const paper = new Uint32Array(MAX_LEVEL + 1);
+  for (let y = 0; y < mask.height; y += 1) {
+    for (let x = 0; x < mask.width; x += 1) {
+      const level = Math.max(0, Math.min(MAX_LEVEL, Math.round(field.lumaAt(x, y))));
+      const counts = mask.ink[y * mask.width + x] === 1 ? ink : paper;
+      counts[level] = (counts[level] as number) + 1;
+    }
+  }
+  return (medianLevel(ink, 0) + medianLevel(paper, MAX_LEVEL)) / 2;
+}
+
+function medianLevel(counts: Uint32Array, empty: number): number {
+  const total = counts.reduce((sum, count) => sum + count, 0);
+  if (total === 0) return empty;
+  let seen = 0;
+  for (let level = 0; level <= MAX_LEVEL; level += 1) {
+    seen += counts[level] as number;
+    if (2 * seen >= total) return level;
+  }
+  return empty;
 }
