@@ -42,10 +42,9 @@ import {
   finalizeForgottenControllerOnce,
 } from './laser-forget-finalization';
 import {
-  containActiveStreamWriteFailure,
   containLostStreamHeartbeat,
   containStalledStreamAcknowledgements,
-  streamWriteOwner,
+  observeTransportFaults,
 } from './laser-stream-heartbeat-containment';
 import { observeStreamHoldTick } from './laser-stream-hold';
 import { reconcileLostStreamAcknowledgements } from './laser-lost-ack-reconcile';
@@ -145,13 +144,7 @@ function attachConnectedController(
     if (refs.connection !== connection) return;
     handleLine(set, get, refs, safeWrite, line);
   });
-  // A refill written out in the worker can fail the same way one written here
-  // can, and it means the same thing: bytes for a live job may or may not have
-  // reached the controller. Route it into the one containment path (ADR-334).
-  connection.hostedStreaming?.onWriteError(() => {
-    if (refs.connection !== connection) return;
-    containActiveStreamWriteFailure(set, refs, safeWrite, 'stream', streamWriteOwner(get()));
-  });
+  observeTransportFaults(set, get, refs, safeWrite, connection);
   observeSerialLineErrors(set, get, refs, connection);
   refs.unsubscribeClose = connection.onClose(() => {
     if (refs.connection !== connection) return;

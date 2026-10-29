@@ -280,9 +280,8 @@ export type ExternalFileOpenSource = {
 
 export type SerialOpenRequest = {
   readonly baudRate: number;
-  /** Prefer a worker-owned native port and refill. If unavailable before
-   * opening, the exact picked port remains usable on the window, with an
-   * explicit backgroundStreamingUnavailable result. */
+  /** Prefer a worker-owned port and refill. If unavailable before opening, the
+   * exact picked port stays usable on the window (backgroundStreamingUnavailable). */
   readonly hostedStreaming?: boolean;
 };
 
@@ -307,12 +306,16 @@ export type SerialConnection = {
   // platform/web/serial-wire.ts). Resolves when the bytes have been queued to
   // the OS — does not wait for the device to ack. Reads decode UTF-8.
   readonly write: (data: string) => Promise<void>;
-  // Subscribe to line events (incoming data split on '\n', \r stripped).
-  // Returns an unsubscribe function.
+  // Subscribe to lines (data split on '\n', \r stripped); returns an unsubscribe.
   readonly onLine: (handler: (line: string) => void) => () => void;
-  // Subscribe to the close event (port physically disconnected, OS revoked,
-  // or close() called).
+  // Subscribe to the close event (unplugged, OS revoked, or close() called).
   readonly onClose: (handler: () => void) => () => void;
+  // When (Date.now) every byte that had reached the host was last delivered as
+  // lines. Absent: lines are delivered as they are read (ADR-356 Amendment 2).
+  readonly inputReadThrough?: () => number;
+  // A transport that ends its session on a failed read awaits these first,
+  // bounded, so a stop can still be written through it (ADR-398 Amendment 6).
+  readonly beforeReadFailureClose?: (handler: () => Promise<void>) => () => void;
   // Subscribe to UART line errors the transport survived (Web Serial's
   // BreakError, BufferOverrunError, FramingError, ParityError): bytes at the
   // error were lost, the port stayed open and reading goes on. The handler
@@ -351,17 +354,15 @@ export type SerialPortRef = {
   // Open the port at the requested baud rate. The returned SerialConnection
   // is the active duplex stream until close() is called or the port drops.
   readonly open: (req: SerialOpenRequest) => Promise<SerialConnection>;
-  // Revoke a permission granted by the picker before the port was opened.
-  // Used when an in-flight Connect is cancelled by Forget Controller.
+  // Revoke the picker's grant before opening (Forget cancelled a Connect).
   readonly forget?: () => Promise<void>;
 };
 
 export type SerialAdapter = {
   /** Network adapters identify their route before opening; omitted means serial. */
   readonly transport?: 'serial' | 'tcp';
-  // True when the underlying platform exposes a Serial API (Chromium-based
-  // browsers / Electron with the right flags). UI gates Phase B features
-  // behind this.
+  // True when the platform exposes a Serial API (Chromium browsers, Electron
+  // with the right flags). UI gates Phase B features behind this.
   readonly isSupported: () => boolean;
   // Prompt the user to pick a serial port. Resolves to null when cancelled.
   readonly requestPort: () => Promise<SerialPortRef | null>;
@@ -372,9 +373,8 @@ export type SerialAdapter = {
   // A picked port was plugged in or unplugged. The handler re-reads
   // grantedPorts(); it never opens a port by itself.
   readonly onGrantedPortsChange?: (handler: () => void) => () => void;
-  // True where a pick lasts only until the app closes, so every start begins
-  // with no granted port (ADR-366). Chrome and the desktop app on Windows,
-  // macOS and Linux remember picks (ADR-420, ADR-552, ADR-607).
+  // True where a pick lasts only until the app closes (ADR-366). Chrome and the
+  // desktop app on Windows, macOS and Linux remember picks (ADR-420, 552, 607).
   readonly picksEndOnRestart?: boolean;
 };
 

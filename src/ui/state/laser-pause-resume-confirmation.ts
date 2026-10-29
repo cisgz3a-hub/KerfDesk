@@ -155,11 +155,16 @@ function extendsLiveness(
   action: PauseResumeTransitionAction,
   accept: (report: StatusReport) => boolean,
 ): boolean {
+  // The confirming report restarts the window under every policy. What is
+  // left is the host's own work (a Resume's refill write and worker handshake,
+  // each settling on a later task), and a confirmation that arrived before the
+  // deadline must complete the transition (ADR-356 Amendment 2).
+  if (accept(report)) return true;
   switch (liveness) {
     case 'none':
       return false;
     case 'cnc-door':
-      return isDoorTransitionProgress(report, action) || accept(report);
+      return isDoorTransitionProgress(report, action);
     case 'door-restore':
       // A laser keeps the beam dark through the whole restore: GRBL and
       // grblHAL skip the spin-up delay in laser mode and switch the laser on

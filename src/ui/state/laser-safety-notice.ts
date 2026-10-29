@@ -211,6 +211,22 @@ export function disconnectDuringJobNotice(link: ControllerLink = 'usb'): LaserSa
   return { kind: 'disconnect-during-job', message: disconnectDuringJobMessage(link) };
 }
 
+// ADR-398 Amendment 6: the transport could no longer read its session during a
+// job (the desktop main process stopped answering, or sent a reply KerfDesk
+// could not use), but the session could still take writes, so KerfDesk asked
+// for its reset before closing it. The same kind as a lost link: nothing proves
+// the reset arrived.
+export function readFailedDuringJobNotice(link: ControllerLink = 'usb'): LaserSafetyNotice {
+  return {
+    kind: 'disconnect-during-job',
+    message:
+      `KerfDesk could no longer read the ${link === 'usb' ? 'USB' : 'network'} connection during ` +
+      'an active job. It requested a controller soft reset before closing the connection; if the ' +
+      'reset did not arrive, the machine may still be moving from buffered commands. Use physical ' +
+      `E-stop or power cutoff now if unsafe. ${RECONNECT[link]} and home before continuing.`,
+  };
+}
+
 function disconnectDuringMotionMessage(link: ControllerLink): string {
   return (
     `${LINK_LOST[link]} while the machine was moving (a jog, Frame, Home, probe or ` +
