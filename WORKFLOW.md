@@ -4697,13 +4697,16 @@ exit of the same length along its last edge, and that exit is skipped and disclo
 rule (`contour-exit …`, "Contour entry and exit", ADR-239 Amendment 2). Preview, timing, Frame bounds and output use the same prepared result. Earlier archived
 jobs retain their original entry behaviour so recovery does not silently change sealed output.
 
-Constant-power advice (ADR-257 Amendment 1). Where a dialect's default burns an operation with
-M3 on GRBL-family output, Save, Start and Job Review advise: GRBL Compatible images whose
-one-move-per-pixel rows outrun the controller's look-ahead burn darker than the Preview, and
-GRBL Compatible and 4040 Line cuts burn darker at corners (and at path starts and ends without
-runways). The advice points GRBL 1.1f and newer to GRBL Dynamic (or the operation's Dynamic
-Power mode on the 4040), as LightBurn does; with a current `$I` reply, Job Review names the
-controller's own version. An operation set to Constant by hand gets no advice.
+Constant-power advice (ADR-257 Amendments 1 and 2). Where a dialect's default burns an operation
+with M3 on GRBL-family output, Save, Start and Job Review advise: GRBL Compatible images whose
+one-move-per-pixel rows outrun the controller's look-ahead burn darker than the Preview; GRBL
+Compatible Scan Line fills whose strokes and gaps are short enough for the same look-ahead to hold
+a row below the feed burn small text darker than wider areas, whatever the overscan; and GRBL
+Compatible and 4040 Line cuts, and GRBL Compatible offset fills, burn darker at corners (and at
+path starts and ends without runways). The advice points GRBL 1.1f and newer to GRBL Dynamic
+(or the operation's Dynamic Power mode on the 4040), as LightBurn does; with a current `$I`
+reply, Job Review names the controller's own version. An operation set to Constant by hand gets
+no advice.
 
 **Status readout.** `StatusDisplay` shows MPos + `Origin:` row. The
 `Origin:` row reads from `wcoCache` (cached last-seen WCO across

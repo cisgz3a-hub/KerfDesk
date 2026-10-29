@@ -21,7 +21,8 @@ import {
 } from './constant-power-warnings';
 import { detectJobIntentWarnings } from './job-intent-warnings';
 
-// ADR-257 Amendment 1 (quality audit Q1-P2-1, Q6-P2-1).
+// ADR-257 Amendment 1 (quality audit Q1-P2-1, Q6-P2-1) and Amendment 2
+// (rolling audit v8 N8-P2-5).
 
 const GRBL_COMPATIBLE: DeviceProfile = {
   ...DEFAULT_DEVICE_PROFILE,
@@ -204,5 +205,109 @@ describe('constant-power (M3) Line advice (Q6-P2-1)', () => {
     const project = lineProject(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE);
     const all = detectJobIntentWarnings(project, compileJob(project.scene, project.device));
     expect(all.filter((warning) => warning.includes('constant power (M3)'))).toHaveLength(1);
+  });
+});
+
+// ADR-257 Amendment 2 (rolling audit v8 N8-P2-5): twenty bars 3 mm tall, the
+// audit's stand-in for small text. 0.3 mm strokes 0.3 mm apart make every
+// emitted move 0.3 mm, so 15 blocks at 500 mm/s² hold the rows to
+// sqrt(2·500·14·0.3) = 64.8 mm/s, 3888 mm/min.
+function bars(strokeMm: number, gapMm: number): SceneObject {
+  const pitch = strokeMm + gapMm;
+  const polylines = Array.from({ length: 20 }, (_, index) => {
+    const x = 20 + index * pitch;
+    const points = [
+      { x, y: 20 },
+      { x: x + strokeMm, y: 20 },
+      { x: x + strokeMm, y: 23 },
+      { x, y: 23 },
+    ];
+    return { points, closed: true };
+  });
+  return {
+    kind: 'imported-svg',
+    id: 'bars',
+    source: 'bars.svg',
+    bounds: { minX: 20, minY: 20, maxX: 20 + 19 * pitch + strokeMm, maxY: 23 },
+    transform: IDENTITY_TRANSFORM,
+    paths: [{ color: COLOR, polylines }],
+  };
+}
+
+function fillProject(
+  device: DeviceProfile,
+  patch: Partial<Layer> = {},
+  object: SceneObject = bars(0.3, 0.3),
+): Project {
+  const layer = createLayer({ id: COLOR, name: 'Small text', color: COLOR, mode: 'fill' });
+  return projectFor(device, { ...layer, speed: 6000, ...patch }, [object]);
+}
+
+function fillAdvice(project: Project): ReadonlyArray<string> {
+  const job = compileJob(project.scene, project.device);
+  return detectJobIntentWarnings(project, job).filter((warning) =>
+    warning.includes('constant power (M3)'),
+  );
+}
+
+describe('constant-power (M3) Fill advice (N8-P2-5)', () => {
+  it('warns for a GRBL Compatible small-text fill whose rows outrun the look-ahead', () => {
+    const result = fillAdvice(fillProject(GRBL_COMPATIBLE));
+    expect(result).toHaveLength(1);
+    expect(result[0]).toContain('Fill operation "Small text" burns with constant power (M3)');
+    expect(result[0]).toContain('as the GRBL Compatible dialect does for fills');
+    expect(result[0]).toContain('Where they are narrowest they average 0.3 mm');
+    expect(result[0]).toContain('holds those rows to about 3888 mm/min');
+    expect(result[0]).toContain('small text and thin strokes can burn darker');
+    expect(result[0]).toContain('If the controller runs GRBL 1.1f or newer, choose GRBL Dynamic');
+    expect(result[0]).toContain('lower the speed to about 3888 mm/min');
+  });
+
+  // The audit's refuter found the runway advisory silent here: this advice is
+  // the only notice left.
+  it('warns under Automatic overscan too', () => {
+    const project = fillProject(GRBL_COMPATIBLE, { autoOverscan: true });
+    const [group] = compileJob(project.scene, project.device).groups;
+    expect(group).toMatchObject({ kind: 'fill', overscanMm: 11 });
+    const result = fillAdvice(project);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toContain('holds those rows to about 3888 mm/min');
+  });
+
+  it('does not appear under GRBL Dynamic (M4), with either overscan', () => {
+    expect(fillAdvice(fillProject(GRBL_DYNAMIC))).toEqual([]);
+    expect(fillAdvice(fillProject(GRBL_DYNAMIC, { autoOverscan: true }))).toEqual([]);
+    // The 4040 fills with M4 as well (it keeps M3 for Line cuts only).
+    expect(fillAdvice(fillProject(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE))).toEqual([]);
+  });
+
+  it('stays quiet where the look-ahead keeps the programmed feed', () => {
+    expect(fillAdvice(fillProject(GRBL_COMPATIBLE, { speed: 3800 }))).toEqual([]);
+    // 1.2 mm strokes 0.3 mm apart: 0.75 mm moves hold 6148 mm/min.
+    expect(fillAdvice(fillProject(GRBL_COMPATIBLE, {}, bars(1.2, 0.3)))).toEqual([]);
+    // Short strokes far apart: 14 moves still cover 18.9 mm.
+    expect(fillAdvice(fillProject(GRBL_COMPATIBLE, {}, bars(0.3, 2.4)))).toEqual([]);
+  });
+
+  it('says nothing to an operation set to a power mode by hand', () => {
+    expect(fillAdvice(fillProject(GRBL_COMPATIBLE, { powerMode: 'constant' }))).toEqual([]);
+    expect(fillAdvice(fillProject(GRBL_COMPATIBLE, { powerMode: 'dynamic' }))).toEqual([]);
+  });
+
+  it("uses grblHAL's deeper planner, which holds these short rows", () => {
+    const grblHal = { ...GRBL_COMPATIBLE, controllerKind: 'grblhal' as const };
+    expect(fillAdvice(fillProject(grblHal))).toEqual([]);
+  });
+
+  it('gives an offset fill the corner advice, without Lead-in / Lead-out', () => {
+    const result = fillAdvice(lineProject(GRBL_COMPATIBLE, { mode: 'fill', fillStyle: 'offset' }));
+    expect(result).toHaveLength(1);
+    expect(result[0]).toContain('Fill operation "Outline" burns with constant power (M3)');
+    expect(result[0]).toContain('as the GRBL Compatible dialect does for fills');
+    expect(result[0]).toContain('so corners, path starts and path ends burn darker');
+    expect(result[0]).toContain('choose GRBL Dynamic in Machine Setup');
+    expect(result[0]).not.toContain('Lead-in');
+    const dynamic = lineProject(GRBL_DYNAMIC, { mode: 'fill', fillStyle: 'offset' });
+    expect(fillAdvice(dynamic)).toEqual([]);
   });
 });
