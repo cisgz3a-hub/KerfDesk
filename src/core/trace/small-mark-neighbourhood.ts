@@ -25,9 +25,11 @@
 //     stroke it faces (a tittle, a full stop). Specks closer to a stroke than
 //     to any like mark and finer than it are the stroke's halo (toner
 //     scatter, spatter).
-//   * Coverage. Sub-floor debris is sized by the ink a speck carries, as the
-//     policy's floor is, so an anti-aliased dot that the floor keeps is not
-//     counted as dust against itself.
+//   * Coverage. Debris is sized by the ink a speck carries, as the policy's
+//     floors are, so an anti-aliased dot that a floor keeps is not counted as
+//     dust; and no mark is counted as dust against itself (Amendment 3).
+//   * Text line. A lone dot that sits on the baseline of a letter nearby is a
+//     full stop, not a lone speck (small-mark-text-line.ts).
 //
 // Everything is in source pixels scaled to the mask grid. Labelling is one
 // linear pass; each query is bounded by a constant window (candidates are
@@ -37,6 +39,17 @@
 // Our own design from connected-component analysis (ADR-017).
 
 import type { CrackSubPixelField } from './contour-boundary';
+import { sitsOnTextLine, type LabelBoxes } from './small-mark-text-line';
+
+/** A size within this many mask px under a floor is AT the floor: coverage
+ *  is a floating-point sum, and a hard 3 px² dot on the 3x grid sums to
+ *  26.999999999999989 against 27 (ADR-434 Amendment 3). */
+export const FLOOR_TOLERANCE_PX = 1e-6;
+
+/** true = a mark of this size (mask px) is under the floor. */
+export function underFloor(size: number, floor: number): boolean {
+  return size < floor - FLOOR_TOLERANCE_PX;
+}
 
 /** Other small marks up to this many source px² count as like marks. */
 export const AUTO_LIKE_MARK_MAX_AREA_PX = 32;
@@ -61,22 +74,27 @@ export type InkNeighbourhoodInput = {
   /** How far a component's darkest pixel gets from paper to the ink tone,
    *  as a fraction of the span (1 without a grey field). */
   readonly reach: (pixels: ReadonlyArray<number>) => number;
-  /** The ink a component carries, in mask px (its pixel count without a grey
-   *  field): the size the floor judges, as the policy's own floor does. */
-  readonly coverage: (pixels: ReadonlyArray<number>) => number;
-  /** Mask px: size floor, lone-mark floor, like-mark ceiling; support radius. */
+  /** A component's size in mask px, its pixel count or, when larger, the ink
+   *  it carries: the size the floors judge, as the policy's own do. */
+  readonly size: (pixels: ReadonlyArray<number>) => number;
+  /** Mask px: size floor, lone-mark floor, like-mark ceiling; support radius;
+   *  one source pixel. */
   readonly minArea: number;
   readonly isolatedMinArea: number;
   readonly likeMaxArea: number;
   readonly supportPx: number;
   readonly tilePx: number;
+  readonly sourcePx: number;
 };
 
 export type InkNeighbourhood = {
   /** Grey joins the region to other ink inside the support window. */
   readonly bridged: (region: ReadonlyArray<number>) => boolean;
-  /** Unbridged dark debris in the region's tile and the eight around it. */
+  /** Unbridged dark debris in the region's tile and the eight around it,
+   *  the region itself left out. */
   readonly debrisAround: (region: ReadonlyArray<number>) => number;
+  /** A compact, solid dot on the baseline of a letter nearby (a full stop). */
+  readonly onTextLine: (region: ReadonlyArray<number>) => boolean;
   /** Nearest like mark and nearest stroke, edge to edge (Infinity: none
    *  within the support radius), and that stroke's local width (mask px). */
   readonly support: (region: ReadonlyArray<number>) => Support;
@@ -94,32 +112,46 @@ type Box = { readonly x0: number; readonly y0: number; readonly x1: number; read
 
 export function createInkNeighbourhood(input: InkNeighbourhoodInput): InkNeighbourhood {
   const { width, height } = input;
-  const { labels, areas, small } = labelInk(input);
+  const { labels, areas, boxes, small } = labelInk(input);
   const reach = Math.floor(input.supportPx) + 1;
   const tile = Math.max(1, Math.round(input.tilePx));
   const tilesX = Math.ceil(width / tile);
   const tilesY = Math.ceil(height / tile);
   const debris = new Uint32Array(tilesX * tilesY);
+  // The tile each debris component was counted in, by label, so a mark is
+  // never dust against itself.
+  const debrisTile = new Map<number, number>();
   const labelOf = (p: number): number => labels[p] ?? 0;
+  const tileOf = (p: number): readonly [number, number] => {
+    const x = p % width;
+    return [Math.floor(x / tile), Math.floor((p - x) / width / tile)];
+  };
+  const textLine = { width, height, ink: input.ink, boxes, labelOf, baselinePx: input.sourcePx };
 
   const bridgedFrom = (pixels: ReadonlyArray<number>, own: (p: number) => boolean): boolean =>
     input.bridgeLuma !== null &&
     hasGreyBridge(pixels, own, input, input.bridgeLuma, boundingBox(pixels, width), reach);
+  // Sized by its ink only where that can change the verdict (coverage is the
+  // costly part of a dirty scan's census).
+  const isLoneSpeck = (component: ReadonlyArray<number>, own: (p: number) => boolean): boolean =>
+    !hasInkWithin(boundingBox(component, width), own, input, reach, input.supportPx) &&
+    underFloor(input.size(component), input.isolatedMinArea) &&
+    !sitsOnTextLine(component, textLine);
 
   for (const component of small) {
     const label = labelOf(component[0] ?? 0);
     const own = (p: number): boolean => labelOf(p) === label;
     const darkness = input.reach(component);
-    const subFloor = component.length < input.minArea && input.coverage(component) < input.minArea;
-    const isDebris = subFloor
-      ? darkness >= AUTO_HARD_SPECK_REACH
-      : darkness >= AUTO_DARK_SPECK_REACH &&
-        !hasInkWithin(boundingBox(component, width), own, input, reach, input.supportPx);
+    if (darkness < AUTO_DARK_SPECK_REACH) continue;
+    const subFloor =
+      underFloor(component.length, input.minArea) &&
+      underFloor(input.size(component), input.minArea);
+    const isDebris = subFloor ? darkness >= AUTO_HARD_SPECK_REACH : isLoneSpeck(component, own);
     if (!isDebris || bridgedFrom(component, own)) continue;
-    const p = component[0] ?? 0;
-    const x = p % width;
-    const t = Math.floor((p - x) / width / tile) * tilesX + Math.floor(x / tile);
+    const [tx, ty] = tileOf(component[0] ?? 0);
+    const t = ty * tilesX + tx;
     debris[t] = (debris[t] ?? 0) + 1;
+    debrisTile.set(label, t);
   }
 
   return {
@@ -128,16 +160,18 @@ export function createInkNeighbourhood(input: InkNeighbourhoodInput): InkNeighbo
       return bridgedFrom(region, (p) => members.has(p));
     },
     debrisAround: (region) => {
-      const p = region[0] ?? 0;
-      const x = p % width;
-      const tx = Math.floor(x / tile);
-      const ty = Math.floor((p - x) / width / tile);
+      const [tx, ty] = tileOf(region[0] ?? 0);
       let count = 0;
       for (let y = Math.max(0, ty - 1); y <= Math.min(tilesY - 1, ty + 1); y += 1)
         for (let x2 = Math.max(0, tx - 1); x2 <= Math.min(tilesX - 1, tx + 1); x2 += 1)
           count += debris[y * tilesX + x2] ?? 0;
-      return count;
+      const self = debrisTile.get(labelOf(region[0] ?? 0));
+      if (self === undefined) return count;
+      const sx = self % tilesX;
+      const sy = (self - sx) / tilesX;
+      return Math.abs(sx - tx) <= 1 && Math.abs(sy - ty) <= 1 ? count - 1 : count;
     },
+    onTextLine: (region) => sitsOnTextLine(region, textLine),
     support: (region) => {
       const members = new Set(region);
       const kind = (p: number): 'like' | 'stroke' | null => {
@@ -149,38 +183,45 @@ export function createInkNeighbourhood(input: InkNeighbourhoodInput): InkNeighbo
   };
 }
 
-// Eight-connected labels and areas, plus the pixel lists of components under
-// the lone-mark floor (the only ones debris counting needs).
+// Eight-connected labels, areas and boxes, plus the pixel lists of components
+// under the lone-mark floor (the only ones debris counting needs).
 function labelInk(input: InkNeighbourhoodInput): {
   readonly labels: Int32Array;
   readonly areas: number[];
+  readonly boxes: LabelBoxes;
   readonly small: number[][];
 } {
   const labels = new Int32Array(input.width * input.height);
   const stack = new Int32Array(input.width * input.height);
   const areas: number[] = [0];
+  const boxes = { x0: [0], y0: [0], x1: [0], y1: [0] };
   const small: number[][] = [];
   for (let start = 0; start < input.ink.length; start += 1) {
     if (input.ink[start] !== 1 || labels[start] !== 0) continue;
     const component = floodLabel(input, { labels, stack }, start, areas.length);
     areas.push(component.area);
+    boxes.x0.push(component.box.x0);
+    boxes.y0.push(component.box.y0);
+    boxes.x1.push(component.box.x1);
+    boxes.y1.push(component.box.y1);
     if (component.pixels !== null) small.push(component.pixels);
   }
-  return { labels, areas, small };
+  return { labels, areas, boxes, small };
 }
 
-// Label the eight-connected ink component at `start`: its area, and its
-// pixels in flood order while it stays under the lone-mark floor (null for a
-// larger one). Inlined neighbour loops: this is the one full-image pass.
+// Label the eight-connected ink component at `start`: its area and box, and
+// its pixels in flood order while it stays under the lone-mark floor (null
+// for a larger one). Inlined neighbour loops: this is the one full-image pass.
 function floodLabel(
   input: InkNeighbourhoodInput,
   scratch: { readonly labels: Int32Array; readonly stack: Int32Array },
   start: number,
   label: number,
-): { readonly area: number; readonly pixels: number[] | null } {
+): { readonly area: number; readonly box: Box; readonly pixels: number[] | null } {
   const { width, height, ink } = input;
   const { labels, stack } = scratch;
   const pixels: number[] = [];
+  const box = { x0: width, y0: height, x1: -1, y1: -1 };
   let area = 0;
   let top = 1;
   stack[0] = start;
@@ -192,6 +233,7 @@ function floodLabel(
     if (area < input.isolatedMinArea) pixels.push(p);
     const x = p % width;
     const y = (p - x) / width;
+    growBox(box, x, y);
     const x0 = x > 0 ? x - 1 : x;
     const x1 = x < width - 1 ? x + 1 : x;
     const y1 = y < height - 1 ? y + 1 : y;
@@ -204,7 +246,14 @@ function floodLabel(
       }
     }
   }
-  return { area, pixels: area < input.isolatedMinArea ? pixels : null };
+  return { area, box, pixels: area < input.isolatedMinArea ? pixels : null };
+}
+
+function growBox(box: { x0: number; y0: number; x1: number; y1: number }, x: number, y: number) {
+  if (x < box.x0) box.x0 = x;
+  if (x > box.x1) box.x1 = x;
+  if (y < box.y0) box.y0 = y;
+  if (y > box.y1) box.y1 = y;
 }
 
 function forEachNeighbour(p: number, width: number, height: number, visit: (q: number) => void) {
