@@ -2,7 +2,7 @@
 
 **Requested:** the maintainer, on 2026-11-02: "design another loop for speed and performance".
 
-**Status:** designed, not started. It should start after rolling v9 finishes, because timings taken beside other audit agents are not comparable (see Measurement rules).
+**Status:** approved by the maintainer on 2026-11-02 ("yes go"), budgets as proposed. It starts as soon as rolling v9 finishes, because timings taken beside other audit agents are not comparable (see Measurement rules).
 
 **How this differs from the rolling rounds:** like [Q1](../2026-10-27-quality-q1/AREAS.md), this round measures as well as finds defects. Each area produces:
 - a scorecard with one row per operation: input size | median and worst time | longest UI block | peak memory | budget | verdict;
@@ -15,7 +15,7 @@ Finding IDs are `S<area>-P<n>-<k>`. Temp files are `zz-s<N>-*`, and refuter file
 
 **A speed fix may not change the burn.** It must prove that compiled G-code is byte-identical on the fixture set. Any fix that simplifies geometry, lowers resolution or adds a limit is a product decision for the maintainer, with its own ADR. It is not a performance fix. This continues ADR-598 and the 2026-09-09 canvas work, which moved work between threads without changing output.
 
-## Budgets (proposed; the maintainer can change them)
+## Budgets (approved 2026-11-02; the maintainer can change them)
 
 | Moment | Budget | Why |
 |---|---|---|
