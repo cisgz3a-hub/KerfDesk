@@ -19,6 +19,7 @@ import { ConsolePanel } from './ConsolePanel';
 import { SuperConsoleLauncher } from './super-console/SuperConsoleLauncher';
 import { AlarmBanner } from './AlarmBanner';
 import { ControllerPinNotice } from './ControllerPinNotice';
+import { HeldResumeTailNotice } from './HeldResumeTailNotice';
 import { openMachineSetup } from './device-setup';
 import { StatusDisplay } from './StatusDisplay';
 import { JogPad } from './JogPad';
@@ -109,6 +110,7 @@ export function LaserWindow({ dockedJobActions = false }: Props = {}): JSX.Eleme
           />
         )}
         <ControllerPinNotice />
+        <HeldResumeTailNotice onReset={control.runReset} />
         {controllerDisplay.sleep && <SleepBanner onWake={control.runWake} />}
         <MachineJogControls
           disabled={jogPadDisabled}

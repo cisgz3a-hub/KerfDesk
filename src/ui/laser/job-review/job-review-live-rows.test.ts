@@ -316,3 +316,35 @@ describe('Job Review travel fact', () => {
     expect(travelFact(travelArgs('grbl-v1.1', [358, 268]))?.tone).toBe('warning');
   });
 });
+
+describe('Job Review held paused move (ADR-684)', () => {
+  const args = (heldResumeTail: boolean): ControllerReviewArgs => ({
+    isConnected: true,
+    machineKind: 'laser',
+    statusReport: null,
+    alarmCode: null,
+    activeControllerKind: 'grblhal',
+    detectedControllerKind: 'grblhal',
+    controllerSettings: null,
+    activeWcs: null,
+    overrides: null,
+    profileMaxPowerS: 1000,
+    profileBedWidth: 358,
+    profileBedHeight: 268,
+    heldResumeTail,
+  });
+
+  it('warns in the facts and in the collapsed summary', () => {
+    expect(buildControllerReviewFacts(args(true))).toContainEqual(
+      expect.objectContaining({ label: 'Paused move', tone: 'warning' }),
+    );
+    expect(controllerReviewSummary(args(true))).toContain('may hold a paused move, reset first');
+  });
+
+  it('adds nothing when no paused move can be held', () => {
+    expect(buildControllerReviewFacts(args(false)).map((fact) => fact.label)).not.toContain(
+      'Paused move',
+    );
+    expect(controllerReviewSummary(args(false))).not.toContain('paused move');
+  });
+});

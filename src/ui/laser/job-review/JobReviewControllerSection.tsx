@@ -5,6 +5,7 @@
 
 import type { MachineKind, Project } from '../../../core/scene';
 import { useStore } from '../../state';
+import { currentHeldResumeTail } from '../../state/held-resume-tail';
 import { useLaserStore } from '../../state/laser-store';
 import {
   buildControllerReviewFacts,
@@ -68,6 +69,7 @@ function useControllerReviewArgs(
   const controllerSettings = useLaserStore((s) => s.controllerSettings);
   const activeWcs = useLaserStore((s) => s.activeWcs);
   const overrides = useLaserStore((s) => s.ovCache);
+  const heldResumeTail = useLaserStore((s) => currentHeldResumeTail(s) !== null);
   const profileMaxPowerS = useStore((s) =>
     s.project.machine?.kind === 'cnc'
       ? s.project.machine.params.spindleMaxRpm
@@ -88,5 +90,6 @@ function useControllerReviewArgs(
     profileMaxPowerS: project?.device.maxPowerS ?? profileMaxPowerS,
     profileBedWidth: project?.device.bedWidth ?? profileBedWidth,
     profileBedHeight: project?.device.bedHeight ?? profileBedHeight,
+    heldResumeTail,
   };
 }

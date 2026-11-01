@@ -2518,6 +2518,21 @@ minimum target size.
    `Run` or a completed `Idle` transition. `Hold` and Door restore substates do not release the sender.
 3. Only after that proof does the streamer resume and send more G-code.
 
+#### Warning — grblHAL Idle after resuming the job's tail (ADR-684)
+1. When a laser Resume has no G-code left to send, the controller is grblHAL, and the report that
+   confirms it is `Idle` rather than `Run`, the app records that the controller may still hold the
+   paused move. This applies to any build whose `$I` does not report 20260928 or later. grblHAL
+   builds before 20260928 can go Idle short of the job's last line and run the rest, at its laser
+   power, when the next motion starts (grblHAL issue #1024).
+2. The console logs the warning once.
+3. The machine rail shows it with **Reset (Ctrl-X)**, which is disabled while a stream or
+   controller operation is active.
+4. Job Review lists a "Paused move" warning fact, and the collapsed Controller summary reads
+   "may hold a paused move, reset first".
+5. Nothing is blocked: Pause, Start, Frame, jog and Save behave as before.
+6. The warning retires itself on a new controller session (a reset or reconnect) or as soon as the
+   machine position moves.
+
 #### Success — controller without Safety Door confirmation
 1. A controller family that exposes Resume but no Safety Door byte keeps the established behavior:
    the host stream resumes after the owned Resume transport write settles.
