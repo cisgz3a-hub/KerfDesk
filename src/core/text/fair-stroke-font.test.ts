@@ -5,7 +5,7 @@ import { fairStrokeFont, isPolylineDigitizedFont } from './fair-stroke-font';
 import type { StrokeFont } from './stroke-font-text';
 import { svgStrokeFont } from './svg-stroke-font';
 
-const CAP_HEIGHT = 500;
+const UNITS_PER_EM = 1000;
 
 describe('isPolylineDigitizedFont', () => {
   it('flags exactly the EMS faces, never Relief', () => {
@@ -40,9 +40,9 @@ describe('fairStrokeFont', () => {
     expect(samePoint(faired.start, arc.start)).toBe(true);
     expect(samePoint(endPoint(faired), endPoint(arc))).toBe(true);
     // The fit must stay near the digitized chain (tolerance is 2% of the
-    // path diagonal, capped at 2% of cap height = 10 units here; the fitter
+    // path diagonal, capped at 1% of the em = 10 units here; the fitter
     // guards at 4x tolerance).
-    expect(maxDeviationFromChain(faired, chainPoints(arc))).toBeLessThan(CAP_HEIGHT * 0.08);
+    expect(maxDeviationFromChain(faired, chainPoints(arc))).toBeLessThan(UNITS_PER_EM * 0.04);
   });
 
   it('keeps hard drawn corners exactly in place', () => {
@@ -97,7 +97,7 @@ describe('fairStrokeFont', () => {
     const native = svgStrokeFont(data);
     const faired = fairStrokeFont(native);
 
-    expect(faired.capHeight).toBe(native.capHeight);
+    expect(faired.unitsPerEm).toBe(native.unitsPerEm);
     expect(faired.glyphs.size).toBe(native.glyphs.size);
     let cubicSegments = 0;
     for (const [character, glyph] of faired.glyphs) {
@@ -123,7 +123,7 @@ function fairOnePath(path: CurveSubpath): CurveSubpath {
 
 function strokeFont(paths: ReadonlyArray<CurveSubpath>): StrokeFont {
   return {
-    capHeight: CAP_HEIGHT,
+    unitsPerEm: UNITS_PER_EM,
     yAxis: 'up',
     glyphs: new Map([['x', { advance: 500, paths }]]),
   };

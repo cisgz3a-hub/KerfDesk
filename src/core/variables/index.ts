@@ -6,6 +6,7 @@ export {
 } from './sequence-offset';
 export {
   evaluateVariableTemplate,
+  variableTemplateCsvRecord,
   type VariableEvaluationContext,
   type VariableEvaluationResult,
 } from './evaluate-template';

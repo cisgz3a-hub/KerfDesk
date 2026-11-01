@@ -1,7 +1,7 @@
 import type { SelectionMask } from '../../core/image-select';
 import type { RasterGroup } from '../../core/job';
 import type { RasterPowerValues } from '../../core/raster/raster-power-values';
-import { rasterRunSurvivesDotWidthCorrection } from '../../core/raster-output';
+import { forEachRasterRunLostToDotWidthCorrection } from '../../core/raster-output';
 
 /** Compact prepared-raster mask for exact-power runs removed from output. */
 export type RasterOutputLoss = {
@@ -30,7 +30,8 @@ type RowLossInput = {
 };
 
 /**
- * Find positive exact-S raster runs that disappear after dot-width correction.
+ * Find positive exact-S raster runs that keep no burn once dot-width
+ * correction shortens the ends of their burned line (ADR-458 Amendment 1).
  *
  * Rows are consumed once in provider order, so streamed error diffusion keeps
  * its forward-only memory bound. Each pixel and exact-power run is visited
@@ -74,37 +75,19 @@ export function rasterOutputRunLoss(
 }
 
 function appendRemovedRuns(input: RowLossInput): boolean {
-  let firstX = 0;
-  let s = input.row[0] ?? 0;
-  let hasActiveRun = s > 0;
-  for (let x = 1; x <= input.row.length; x += 1) {
-    const nextS = x < input.row.length ? (input.row[x] ?? 0) : -1;
-    if (nextS === s) continue;
-    if (s > 0) {
-      hasActiveRun = true;
-      appendRemovedRun(input, firstX, x);
-    }
-    firstX = x;
-    s = nextS;
-  }
-  return hasActiveRun;
+  return forEachRasterRunLostToDotWidthCorrection(
+    input.row,
+    {
+      pixelWidthMm: input.pixelWidthMm,
+      isReverse: input.isReverse,
+      dotWidthCorrectionMm: input.group.dotWidthCorrectionMm,
+      minXWorldMm: input.group.bounds.minX,
+    },
+    (firstX, endX) => appendRemovedRun(input, firstX, endX),
+  );
 }
 
 function appendRemovedRun(input: RowLossInput, firstX: number, endX: number): void {
-  const leftX = input.group.bounds.minX + firstX * input.pixelWidthMm;
-  const rightX = input.group.bounds.minX + endX * input.pixelWidthMm;
-  const startX = input.isReverse ? rightX : leftX;
-  const endWorldX = input.isReverse ? leftX : rightX;
-  if (
-    rasterRunSurvivesDotWidthCorrection(
-      startX,
-      endWorldX,
-      input.isReverse,
-      input.group.dotWidthCorrectionMm,
-    )
-  ) {
-    return;
-  }
   if (input.loss.alpha === null && input.loss.shouldCaptureMask) {
     input.loss.alpha = new Uint8Array(input.group.pixelWidth * input.group.pixelHeight);
   }

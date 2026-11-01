@@ -7,7 +7,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_CNC_MACHINE_CONFIG } from '../../core/scene';
 import { cncToolProgramHeader } from '../../io/cnc/cnc-tool-programs';
-import { bitFileSequenceXyOriginBlockMessage } from '../state/bit-file-sequence';
+import {
+  bitFileSequenceNotice,
+  bitFileSequenceXyOriginBlockMessage,
+} from '../state/bit-file-sequence';
 import { useLaserStore } from '../state/laser-store';
 import { toolChangeXyOriginBlockMessage } from '../state/laser-store-helpers';
 import { useStore } from '../state/store';
@@ -26,6 +29,12 @@ import {
 const MOTION = 'G21 G90 G54\nG0 X5 Y5\nG1 X10 Y5 F600\nM30\n';
 const BIT_ONE = cncToolProgramHeader({ order: 1, count: 2 }, '3.175 mm (1/8") end mill') + MOTION;
 const BIT_TWO = cncToolProgramHeader({ order: 2, count: 2 }, '6.35 mm (1/4") end mill') + MOTION;
+// Long enough to be moving when Abort lands.
+const LONG_MOTION = 'G21 G90 G54\n' + 'G1 X10 Y5 F600\nG1 X0 Y0\n'.repeat(30) + 'M30\n';
+const LONG_BIT_ONE =
+  cncToolProgramHeader({ order: 1, count: 2 }, '3.175 mm (1/8") end mill') + LONG_MOTION;
+const LONG_BIT_TWO =
+  cncToolProgramHeader({ order: 2, count: 2 }, '6.35 mm (1/4") end mill') + LONG_MOTION;
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -66,7 +75,14 @@ describe('per-bit files through Run G-code file', () => {
     await startOpenedProgram(BIT_ONE);
     await finishRun();
     expect(workZCurrent()).toBe(false);
-    expect(useLaserStore.getState().bitFileSequence).toMatchObject({ order: 1, count: 2 });
+    expect(useLaserStore.getState().bitFileSequence).toMatchObject({
+      order: 1,
+      count: 2,
+      finished: true,
+    });
+    expect(bitFileSequenceNotice(useLaserStore.getState())).toContain(
+      'Bit 1 of 2 (3.175 mm (1/8") end mill) has run. Change to bit 2,',
+    );
 
     // Declining the Frame's Zero Z offer leaves the next bit's file unframed.
     vi.spyOn(window, 'confirm').mockReturnValue(false);
@@ -119,6 +135,69 @@ describe('per-bit files through Run G-code file', () => {
     expect(useLaserStore.getState().bitFileSequence).not.toBeNull();
     await resetExternalRunStores();
     expect(bitFileSequenceXyOriginBlockMessage(useLaserStore.getState())).toBeNull();
+  });
+
+  // Rolling audit v5 J1-P3-1 (ADR-392 Amendment 5): Abort leaves the streamer
+  // 'cancelled', which is never released, so the end patch never ran.
+  async function abortMidFile(): Promise<void> {
+    // The simulator acknowledges the lines before it moves: Abort lands mid-motion.
+    await settle(useLaserStore.getState().stopJob());
+    await vi.advanceTimersByTimeAsync(1_000);
+    // GRBL alarms on a reset mid-motion (ALARM:3); the bit ends at the first Idle.
+    expect(useLaserStore.getState().statusReport?.state).toBe('Alarm');
+    expect(useLaserStore.getState().bitFileRun).not.toBeNull();
+    await settle(useLaserStore.getState().unlockAlarm());
+    await vi.advanceTimersByTimeAsync(1_000);
+  }
+
+  it('ends an aborted bit file at the next Idle, holding X/Y for the later bits', async () => {
+    await zeroedCnc();
+    await startOpenedProgram(LONG_BIT_ONE);
+    expect(useLaserStore.getState().bitFileRun).toMatchObject({ order: 1, count: 2 });
+    await abortMidFile();
+
+    const laser = useLaserStore.getState();
+    expect(laser.streamer?.status).toBe('cancelled');
+    expect(laser.statusReport?.state).toBe('Idle');
+    expect(laser.bitFileRun ?? null).toBeNull();
+    expect(laser.bitFileSequence).toMatchObject({ order: 1, count: 2, finished: false });
+    expect(toolChangeXyOriginBlockMessage(laser)).toContain(
+      'stopped on this X/Y origin before its file finished',
+    );
+    expect(workZCurrent()).toBe(false);
+  });
+
+  // Rolling audit v5 J9-P3-1 (ADR-392 Amendment 6): the panel said the stopped
+  // file "has run" and to change to bit 2, skipping bit 1's remaining paths.
+  it('tells the operator to re-run a stopped bit file with the same bit', async () => {
+    await zeroedCnc();
+    await startOpenedProgram(LONG_BIT_ONE);
+    await abortMidFile();
+
+    const notice = bitFileSequenceNotice(useLaserStore.getState());
+    expect(notice).toContain('Bit 1 of 2 (3.175 mm (1/8") end mill) stopped before its file');
+    expect(notice).toContain(
+      "Keep bit 1 in, Zero Z on the stock top or probe it, then run bit 1's",
+    );
+    expect(notice).not.toContain('end mill) has run');
+    expect(notice).not.toContain('Change to bit 2');
+  });
+
+  it('holds the set after a stopped last bit, so its file runs again on the same X/Y', async () => {
+    await zeroedCnc();
+    await startOpenedProgram(BIT_ONE);
+    await finishRun();
+    await settle(useLaserStore.getState().zeroZHere());
+    await startOpenedProgram(LONG_BIT_TWO);
+    await abortMidFile();
+
+    const laser = useLaserStore.getState();
+    expect(laser.bitFileSequence).toMatchObject({ order: 2, count: 2, finished: false });
+    expect(bitFileSequenceNotice(laser)).toContain("run bit 2's file again from its start");
+    const held = toolChangeXyOriginBlockMessage(laser);
+    expect(held).toContain('running that file again must cut on the same one');
+    expect(held).not.toContain('later bits');
+    expect(workZCurrent()).toBe(false);
   });
 
   it('keeps Work Z and sets no hold for a file with no bit header', async () => {

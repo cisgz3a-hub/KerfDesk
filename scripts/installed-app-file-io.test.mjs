@@ -300,10 +300,14 @@ test('disk evidence rejects stale, future and malformed project schemas', () => 
     15,
     16,
     17,
+    18,
     19,
+    21,
     '16',
     '17',
     '18',
+    '19',
+    '20',
     null,
     undefined,
   ]) {
@@ -324,6 +328,8 @@ test('historical schemas require the explicit known-upgrade contract and retain 
     15,
     16,
     17,
+    18,
+    19,
     CURRENT_QUALIFICATION_PROJECT_SCHEMA,
   ]) {
     const project = { ...projectFixture(), schemaVersion };
@@ -334,7 +340,20 @@ test('historical schemas require the explicit known-upgrade contract and retain 
     () => validateProject(Buffer.from(JSON.stringify(projectFixture())), { schemaMode: 'any' }),
     /Unknown qualification schema mode/,
   );
-  for (const schemaVersion of [11, 19, '12', '13', '14', '15', '16', '17', '18', null]) {
+  for (const schemaVersion of [
+    11,
+    21,
+    '12',
+    '13',
+    '14',
+    '15',
+    '16',
+    '17',
+    '18',
+    '19',
+    '20',
+    null,
+  ]) {
     assert.throws(
       () =>
         validateProject(

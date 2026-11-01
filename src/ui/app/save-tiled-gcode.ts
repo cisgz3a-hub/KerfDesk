@@ -7,6 +7,7 @@ import type { ControllerKind } from '../../core/devices';
 import type { ControllerSettingsSnapshot, ReadinessSettingsCapability } from '../../core/preflight';
 import type { OutputScope, Project } from '../../core/scene';
 import { prepareOutput } from '../../io/gcode';
+import { withTextGlyphCheck } from '../../io/gcode/prepare-output-snapshot';
 import type { PlatformAdapter, SaveDirectoryTarget, SaveTarget } from '../../platform/types';
 import { hydratePagedRasterProject } from '../import/paged-raster-hydration';
 import {
@@ -24,15 +25,17 @@ import { controllerReadinessAdvisories } from './controller-readiness-advisories
 import { pushCncExportControllerMessages } from './cnc-export-controller-advisory';
 import type { TileFile } from './tile-emission';
 import {
+  staleTileWarning,
   tileDisplayName,
+  tileFolderAfterSave,
   tileFolderContents,
   tileFolderWarnings,
-  type TileFolderContents,
 } from './tile-folder-check';
 import { finalizeTiledOutput, type TiledOutputPreparation } from './tiled-output-preparation';
 import { tiledSaveWorkBudgetMessage } from './tiled-save-work-budget';
 import { advanceExportVariables, type ExportVariableAdvancement } from './advance-export-variables';
 import { captureProjectOutputSnapshot } from '../laser/project-output-snapshot';
+import { outputTextRenderer } from '../text/output-text-renderer';
 import type { OutputSnapshotRequest } from '../laser/output-preparation-protocol';
 
 const GCODE_EXTENSIONS = ['.gcode', '.nc'];
@@ -112,25 +115,19 @@ async function saveConfiguredTiledGcode(ctx: SaveTiledGcodeCtx): Promise<true> {
   ctx.pushToast(
     saved === preparation.files.length
       ? `Saved all ${saved} tile files. Cut them in index order, re-registering the stock between tiles.`
-      : `Saved ${saved} of ${preparation.files.length} tile files.`,
+      : `Saved ${saved} of ${preparation.files.length} tile files, so the set is incomplete. Save it again before cutting.`,
     saved === preparation.files.length ? 'success' : 'warning',
   );
-  pushWarnings(ctx, tileFolderWarnings(writtenOnly(folder, preparation.files.slice(0, saved))));
+  const after = tileFolderAfterSave(folder, preparation.files, saved);
+  const stale = staleTileWarning(after);
+  if (stale !== null) ctx.pushToast(stale, 'error');
+  pushWarnings(ctx, tileFolderWarnings(after));
   pushWarnings(
     ctx,
     [...preparation.preparationAdvisories, ...preparation.emissionAdvisories],
     true,
   );
   return true;
-}
-
-// A set cut short replaced only the files it reached.
-function writtenOnly(
-  folder: TileFolderContents,
-  written: ReadonlyArray<TileFile>,
-): TileFolderContents {
-  const names = new Set(written.map(tileDisplayName));
-  return { ...folder, replaced: folder.replaced.filter((name) => names.has(name)) };
 }
 
 function advanceAfterCompleteTileSet(
@@ -167,8 +164,9 @@ async function prepareTiledOutput(
     }
   }
   const hydrated = await hydratePagedRasterProject(ctx.project);
+  // Each burned text's missing characters, as the worker's compile names them (ADR-591 Amd 2).
   return finalizeTiledOutput(
-    prepareOutput(hydrated, options),
+    await withTextGlyphCheck(prepareOutput(hydrated, options), hydrated, outputTextRenderer),
     ctx.savedName,
     ctx.controllerSettings ?? null,
     ctx.activeWcs ?? null,

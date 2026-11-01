@@ -44,7 +44,7 @@ afterEach(() => {
 // The three-stage shell and searchable-catalog behavior are pinned in
 // DeviceSetupWizard.catalog.test.tsx.
 describe('DeviceSetupWizard', () => {
-  it('defaults worker streaming on for GRBL-family controllers and keeps an explicit opt-out', async () => {
+  it('defaults worker streaming on for GRBL-family and Marlin controllers and keeps an explicit opt-out', async () => {
     const view = await renderWizard();
     const workerOption = () =>
       view.host.querySelector<HTMLInputElement>(
@@ -60,11 +60,11 @@ describe('DeviceSetupWizard', () => {
       await act(async () => option.click());
       expect(workerOption()?.checked).toBe(false);
 
-      for (const controllerKind of ['marlin', 'smoothieware']) {
-        await changeSelect(view.host, 'Controller firmware', controllerKind);
-        expect(workerOption()).toBeNull();
-      }
-      for (const controllerKind of ['grblhal', 'fluidnc', 'grbl-v1.1']) {
+      // Smoothieware stays on the window: its beam goes dark at every stop.
+      await changeSelect(view.host, 'Controller firmware', 'smoothieware');
+      expect(workerOption()).toBeNull();
+      // ADR-676: Marlin streams from the worker too.
+      for (const controllerKind of ['marlin', 'grblhal', 'fluidnc', 'grbl-v1.1']) {
         await changeSelect(view.host, 'Controller firmware', controllerKind);
         // The explicit opt-out survives a controller change.
         expect(workerOption()?.checked).toBe(false);

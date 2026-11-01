@@ -20,10 +20,12 @@ import {
 import { useStore } from '../state/store';
 import { resetStore } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
+import { useCameraStore } from '../state/camera-store';
 import { installFramedRunPermitForCurrentState } from './framed-run-testing';
 import { cancelRegistrationJigCompletion } from './registration-jig-stream-completion';
 import { hashOnSimulatedClock } from './host-sha256-testing';
 import { runStartJobFlow } from './start-job-flow';
+import { prepareCurrentStartJob } from './start-job-source';
 
 let untrack: (() => void) | null = null;
 let uninstallReview: (() => void) | null = null;
@@ -53,6 +55,7 @@ afterEach(async () => {
     useToastStore.getState().dismissToast(toast.id);
   }
   vi.useRealTimers();
+  useCameraStore.setState({ placementActive: false });
   await useLaserStore.getState().disconnect();
   useLaserStore.setState(initialLaserState());
   resetStore();
@@ -112,7 +115,7 @@ function prepareOutlineScene(): { enabled: string; disabled: string } {
   return { enabled, disabled };
 }
 
-async function startOutline(rejectSettlement = false) {
+async function startOutline(rejectSettlement = false, beforeStart?: () => Promise<void>) {
   // Reject only the post-job settlement marker, not any earlier dwell in the run.
   const rejectedMarker = /^G4 P0\.01$/;
   vi.spyOn(rejectedMarker, 'test').mockImplementation(
@@ -127,6 +130,7 @@ async function startOutline(rejectSettlement = false) {
   await vi.advanceTimersByTimeAsync(1120);
   expect(useLaserStore.getState().controllerOperation).toBeNull();
   expect(useLaserStore.getState().statusReport?.state).toBe('Idle');
+  await beforeStart?.();
   await installFramedRunPermitForCurrentState();
   const repository = new RecoveryRepository({
     backend: new MemoryRecoveryStorageBackend(),
@@ -172,6 +176,55 @@ describe('registration jig completion through the real Start flow', () => {
         .getState()
         .toasts.some((toast) => toast.message.includes('set focus for its top surface')),
     ).toBe(true);
+  });
+
+  // Rolling audit v5 J5-P2-1 (ADR-057 Amendment 6, ADR-654 Amendment 4): the
+  // outline burned from User Origin at WCO (15, 25). With the camera picture
+  // latched between the runs, the artwork run was told to choose Absolute
+  // Coordinates, which burns it far from the outline.
+  it('records the outline’s Start from, and checks the artwork run against it', async () => {
+    prepareOutlineScene();
+    await startOutline(false, async () => {
+      const jogging = useLaserStore.getState().jog({ dx: 15, dy: 25, feed: 1000 });
+      await vi.advanceTimersByTimeAsync(2000);
+      await jogging;
+      const origin = useLaserStore.getState().setOriginHere();
+      await vi.advanceTimersByTimeAsync(2000);
+      await origin;
+      useStore.getState().setJobPlacement({ startFrom: 'user-origin', anchor: 'front-left' });
+      expect(useLaserStore.getState().wcoCache).toMatchObject({ x: 15, y: 25 });
+    });
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(registrationRunState(useStore.getState().project.scene)).toBe('artwork');
+    expect(useLaserStore.getState().registrationOutlineRun?.placement).toEqual({
+      startFrom: 'user-origin',
+      anchor: 'front-left',
+    });
+
+    // The after-job refresh, or a look at the picture, latches placement.
+    useCameraStore.setState({ placementActive: true });
+    const artworkWarnings = async (): Promise<ReadonlyArray<string>> => {
+      const prepared = await prepareCurrentStartJob(
+        useStore.getState(),
+        useLaserStore.getState(),
+        useCameraStore.getState(),
+        undefined,
+        false,
+      );
+      expect(prepared.ok).toBe(true);
+      return prepared.ok ? prepared.warnings : [];
+    };
+    const kept = (await artworkWarnings()).join(' ');
+    expect(kept).toContain('this is a registration jig job');
+    expect(kept).not.toContain('Choose Absolute Coordinates');
+    expect(kept).not.toContain('The jig outline burned from');
+
+    useStore.getState().setJobPlacement({ startFrom: 'absolute' });
+    expect(await artworkWarnings()).toContainEqual(
+      expect.stringContaining(
+        'The jig outline burned from User Origin with the job origin at front left, but this artwork run starts from Absolute Coordinates.',
+      ),
+    );
   });
 
   it('keeps Outline only after a rejected settlement marker even when later Idle releases the stream', async () => {

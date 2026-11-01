@@ -1,8 +1,8 @@
 import { cloneSelectionGroups } from './clone-selection-groups';
 import { layerWithoutFocusTest } from '../../core/scene/layer';
+import { addObjects } from '../../core/scene/scene';
 import {
   addLayer,
-  addObject,
   createArtworkOperation,
   operationIdsForObject,
   remapSceneObjectOperationBindings,
@@ -92,8 +92,7 @@ function pasteFromClipboard(state: AppState, offsetMm: number): AppState | Parti
     offsetMm,
   );
   const pasted = prepared.objects;
-  let scene = prepared.scene;
-  for (const object of pasted) scene = addObject(scene, object);
+  let scene = addObjects(prepared.scene, pasted);
   if (prepared.groups.length > 0) {
     scene = { ...scene, groups: [...(scene.groups ?? []), ...prepared.groups] };
   }
@@ -303,7 +302,10 @@ function materializeClipboardObjects(
       ownedTargetOperationIds.has(id),
     );
     if (sourceOwnedOperationIds.length > 0) {
-      materialized.push(remapClipboardTabAnchors(object, copiedLayers, operationIdMap, out.layers));
+      // Placed laser and CNC tabs are keyed by their PATH colour (ADR-494
+      // item 4), and paste never recolours a path, so they travel unchanged
+      // even when the copy lands on a new operation colour.
+      materialized.push(object);
       continue;
     }
     // Malformed/legacy clipboard artwork with no resolvable binding must not
@@ -376,33 +378,6 @@ function freshUnresolvedOperationId(reservedIds: Set<string>): string {
   while (reservedIds.has(id)) id = crypto.randomUUID();
   reservedIds.add(id);
   return id;
-}
-
-function remapClipboardTabAnchors(
-  object: SceneObject,
-  sourceOperations: ReadonlyArray<Layer>,
-  operationIdMap: ReadonlyMap<string, string>,
-  targetOperations: ReadonlyArray<Layer>,
-): SceneObject {
-  const cnc = object.cncTabAnchors ?? [];
-  const laser = object.laserTabAnchors ?? [];
-  if (cnc.length === 0 && laser.length === 0) return object;
-  const colorMap = new Map<string, string>();
-  for (const source of sourceOperations) {
-    const targetId = operationIdMap.get(source.id);
-    const target = targetOperations.find((operation) => operation.id === targetId);
-    if (target !== undefined) colorMap.set(source.color.toLowerCase(), target.color);
-  }
-  const remap = <T extends { readonly layerColor: string }>(anchor: T): T => ({
-    ...anchor,
-    layerColor: colorMap.get(anchor.layerColor.toLowerCase()) ?? anchor.layerColor,
-  });
-  return {
-    ...object,
-    ...(cnc.length === 0 ? {} : { cncTabAnchors: cnc.map(remap) }),
-    // ADR-494: pasted laser tabs follow their operation's colour the same way.
-    ...(laser.length === 0 ? {} : { laserTabAnchors: laser.map(remap) }),
-  } as SceneObject;
 }
 
 function cloneSceneObject(object: SceneObject): SceneObject {

@@ -25,7 +25,7 @@ export const mcpToolInfo: Record<KerfDeskMcpCommand, { title: string; descriptio
   place_on_board: {
     title: 'Place artwork on the board',
     description:
-      'Center, fit or array existing artwork inside the captured board. Requires Pro, expectedRevision and UUID requestId.',
+      'Center, fit or array existing artwork inside the captured board. An array returns placedCount (the original included) and, for rows × cols, requestedCount. When fewer copies were placed than requested, or the 100-per-axis / 500-copy cap applied, notices says so: tell the user. Requires Pro, expectedRevision and UUID requestId.',
   },
   get_machine: {
     title: 'Read the selected machine',
@@ -70,7 +70,7 @@ export const mcpToolInfo: Record<KerfDeskMcpCommand, { title: string; descriptio
   add_text: {
     title: 'Add text artwork',
     description:
-      'Add text in a Laser workspace, in millimetres. Choose an optional bundled fontId from list_fonts; otherwise use the regular default. widthMm is a maximum layout width: overflowing text shrinks uniformly. Requires expectedRevision and UUID requestId; the desktop owns admission and Undo.',
+      "Add text in a Laser workspace, in millimetres. Choose an optional bundled fontId from list_fonts; otherwise use the regular default. widthMm is a maximum layout width: overflowing text shrinks uniformly. Overlapping letters are welded, as in new desktop text. notices names any character the font has no glyph for, which engraves as the font's box or not at all; tell the user. Requires expectedRevision and UUID requestId; the desktop owns admission and Undo.",
   },
   add_rectangle: {
     title: 'Add rectangle artwork',
@@ -85,7 +85,7 @@ export const mcpToolInfo: Record<KerfDeskMcpCommand, { title: string; descriptio
   add_polyline: {
     title: 'Add drawn line artwork',
     description:
-      'Add 2 to 512 scene-mm points as ordinary Laser drawing artwork with the same curve fairing as the PC pen. pointsMm use xMm/yMm; closed needs at least three distinct points. Requires expectedRevision and UUID requestId; the desktop owns admission and Undo.',
+      'Add 2 to 512 scene-mm points as ordinary Laser drawing artwork, faired into smooth curves like a freehand stroke (4 or more open or 5 or more closed points; fewer stay straight lines). pointsMm use xMm/yMm; closed needs at least three distinct points. Requires expectedRevision and UUID requestId; the desktop owns admission and Undo.',
   },
   transform_artwork: {
     title: 'Transform existing artwork',
@@ -100,22 +100,22 @@ export const mcpToolInfo: Record<KerfDeskMcpCommand, { title: string; descriptio
   update_text: {
     title: 'Edit existing text artwork',
     description:
-      'Edit ordinary text, bundled fontId, fontSizeMm, alignment, lineHeight or letterSpacing. Path and variable text are outside this tool. Requires artworkId, expectedRevision and UUID requestId; preserves ordinary desktop admission and Undo.',
+      'Edit ordinary text, bundled fontId, fontSizeMm, alignment, lineHeight or letterSpacing. Path and variable text are outside this tool. The text keeps its desktop style, text box and weld. notices names any character of the new wording the font has no glyph for, or counts them when only other fields changed; tell the user. Requires artworkId, expectedRevision and UUID requestId; preserves ordinary desktop admission and Undo.',
   },
   arrange_artwork: {
     title: 'Arrange existing artwork',
     description:
-      'Align, distribute equal centres, mirror, group, ungroup, duplicate or delete the specified artwork. Requires expectedRevision and UUID requestId. Duplication uses the desktop Pro-copy admission; all changes retain Undo.',
+      'Align, distribute equal centres, mirror, group, ungroup, duplicate or delete the specified artwork. Align keeps the last listed artwork (with its group) still and moves the rest to it. Requires expectedRevision and UUID requestId. Duplication uses the desktop Pro-copy admission; all changes retain Undo.',
   },
   undo: {
     title: 'Undo the last workspace edit',
     description:
-      'Undo one edit in the current desktop document. Read workspace history and revision first. Requires expectedRevision and UUID requestId; never affects machine execution.',
+      'Undo one edit in the current desktop document. Read workspace history and revision first. Requires expectedRevision and UUID requestId; never affects machine execution. Undo shares the PC history, so it can undo a machine choice made on the PC, such as Keep current machine for an opened file; notices then says which machine Frame and Start now use. Tell the user about every warning.',
   },
   redo: {
     title: 'Redo the last undone workspace edit',
     description:
-      'Redo one edit in the current desktop document. Read workspace history and revision first. Requires expectedRevision and UUID requestId; never affects machine execution.',
+      'Redo one edit in the current desktop document. Read workspace history and revision first. Requires expectedRevision and UUID requestId; never affects machine execution. When the step changes the machine setup, notices says which machine Frame and Start now use. Tell the user about every warning.',
   },
   get_workspace_scene: {
     title: 'Read the workspace as vector geometry',
@@ -170,7 +170,7 @@ export const mcpToolInfo: Record<KerfDeskMcpCommand, { title: string; descriptio
   apply_edits: {
     title: 'Apply several edits as one Undo step',
     description:
-      'Apply up to 40 ordered edits atomically: all succeed as one Undo step or none apply. Each item is {command, args} using add_text, add_rectangle, add_ellipse, add_polyline, add_svg, transform_artwork, arrange_artwork, set_selection, update_operation, create_operation, assign_artwork_to_operation or apply_material_recipe, without expectedRevision/requestId. Refer to artwork or an operation created by an earlier item as "$<index>", e.g. "$0". Requires expectedRevision and UUID requestId for the batch.',
+      'Apply up to 40 ordered edits atomically: all succeed as one Undo step or none apply. Each item is {command, args} using add_text, add_rectangle, add_ellipse, add_polyline, add_svg, transform_artwork, arrange_artwork, set_selection, update_operation, create_operation, assign_artwork_to_operation or apply_material_recipe, without expectedRevision/requestId. Refer to artwork or an operation created by an earlier item as "$<index>", e.g. "$0". Each results item carries that edit\'s message and notices, such as the cutting values a bit change kept, an import\'s warnings or a character a text\'s font has no glyph for; tell the user about each. Requires expectedRevision and UUID requestId for the batch.',
   },
   ...mcpMachineToolInfo,
 };

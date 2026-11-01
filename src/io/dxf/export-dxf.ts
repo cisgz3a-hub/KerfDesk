@@ -11,6 +11,7 @@ import {
 import { err, ok, type Result } from '../../core/result';
 import type { TracedLayer, TracedVectorOptions } from '../../core/trace/batch-trace-svg';
 import { transformCurveSubpathExact } from '../../core/vector-export/affine-curves';
+import { planExportColors } from '../svg/export-fill-compounds';
 import { svgObjectMatrix } from '../svg/export-svg-paths';
 import { writeDxfDocument, type DxfWriteOptions } from './dxf-writer';
 
@@ -39,10 +40,12 @@ export function exportSceneDxf(
     return err('DXF holds vector artwork only. Select vector, text or traced artwork.');
   }
   const byColor = new Map<string, CurveSubpath[]>();
+  const colors = planExportColors(project, vectors);
   for (const object of vectors) {
     const matrix = svgObjectMatrix(object.transform);
     for (const path of object.paths) {
-      const color = path.color.toLowerCase();
+      // ADR-681: one DXF layer per operation, as LightBurn reads colours.
+      const color = colors.ofPath(object, path).toLowerCase();
       const bucket = byColor.get(color) ?? [];
       for (const curve of path.curves ?? path.polylines.map(polylineToCurveSubpath)) {
         bucket.push(transformCurveSubpathExact(curve, matrix));

@@ -2,6 +2,14 @@
 
 **Status:** Accepted. | **Date:** 2026-10-27
 
+**Correction:**
+[Amendment 11](ADR-375-amendment-11-owned-units-lines-and-fluidnc-under-a-grbl-profile.md)
+corrects the Consequence that Smoothieware's units "are not changed behind the operator's back".
+KerfDesk's own origin writes and Auto-focus sent a plain G21, so the board went back to millimetres
+while KerfDesk read inches (rolling audit v5 J7-P1-1). Those lines now record the units they
+select, as Frame does. Amendment 11 also does the "Not done" stock-GRBL item when the banner shows
+FluidNC (J7-P1-2).
+
 Amends ADR-375 decision 9 and corrects
 [Amendment 6](ADR-375-amendment-6-console-reads-a-line-as-the-firmware-does.md) decision 1, after
 rolling audit v3 findings G4-P1-1 and G4-P1-2 (both P1). Independent refuters confirmed both against

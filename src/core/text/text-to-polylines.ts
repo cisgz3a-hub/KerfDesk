@@ -93,10 +93,12 @@ export type TextRenderResult = {
   /**
    * The alignment anchor, in the same frame as `paths` and `bounds`: the
    * point on the first line's baseline where every line starts, centres or
-   * ends (left, center or right alignment). Each render re-roots at its own
-   * ink top-left, so variable output uses this to keep a changing value
-   * where the operator placed it. Absent when the text has no ink, or when
-   * bending or path placement reshaped it and no single anchor survives.
+   * ends (left, center or right alignment); in a text box, the frame's left
+   * edge, centre or right edge. A bend carries it onto the arc with the
+   * glyphs. Each render re-roots at its own ink top-left, so variable output
+   * uses this to keep a changing value where the operator placed it. Absent
+   * when the text has no ink, and after path placement, which lays the text
+   * in world space.
    */
   readonly anchor?: Vec2;
   /**

@@ -10,6 +10,7 @@ import type {
   GeneratedPartObject,
 } from './part-generator';
 import { materializePartGenerator } from './materialize-part-generator';
+import { withUnitScale } from '../scene/retained-source-scale';
 
 export function regeneratePartGenerator(
   object: GeneratedPartObject,
@@ -27,6 +28,8 @@ export function regeneratePartGenerator(
     kind: 'ok',
     value: {
       ...object,
+      // The definition is the size that burns (ADR-573 Amendment 1).
+      transform: withUnitScale(object.transform),
       bounds: geometry.bounds,
       paths,
       partGenerator: geometry.source,

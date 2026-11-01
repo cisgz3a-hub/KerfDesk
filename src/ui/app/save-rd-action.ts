@@ -3,7 +3,15 @@
 // target, write bytes. The exported file is EXPERIMENTAL - the toast repeats
 // the not-hardware-verified warning every time so it cannot be missed.
 
-import { emitRdFile, type EmitRdOptions, type EmitRdResult } from '../../io/rd';
+import type { Project } from '../../core/scene';
+import { prepareOutput } from '../../io/gcode';
+import { withTextGlyphCheck } from '../../io/gcode/prepare-output-snapshot';
+import {
+  emitPreparedRdFile,
+  rdPreparationOptions,
+  type EmitRdOptions,
+  type EmitRdResult,
+} from '../../io/rd';
 import type { SaveTarget } from '../../platform/types';
 import type { ResolvedJobPlacement } from '../job-placement';
 import {
@@ -21,6 +29,7 @@ import { advanceExportVariables } from './advance-export-variables';
 import { pickPreparedSaveTarget } from './pick-prepared-save-target';
 import { savePreflightFrameOptions } from './save-gcode-emission';
 import { captureProjectOutputSnapshot } from '../laser/project-output-snapshot';
+import { outputTextRenderer } from '../text/output-text-renderer';
 import type { OutputSnapshotRequest } from '../laser/output-preparation-protocol';
 
 const RD_EXPERIMENTAL_WARNING =
@@ -43,12 +52,22 @@ export async function handleSaveRd(
   // worker failure is never retried on the browser thread.
   const result =
     snapshot === undefined && !outputPreparationShouldRunOffThread(ctx.project, ctx.outputScope)
-      ? emitRdFile(ctx.project, options)
+      ? await emitRdChecked(ctx.project, options)
       : await prepareBackgroundRd(ctx, options, snapshot);
   if (result === null) return;
   if (!result.ok) return showRdFailure(result.messages);
   const target = await pickRdTarget(ctx);
   if (target !== null) await writeRdResult(ctx, target, result);
+}
+
+// The direct compile names each burned text's missing characters, as the worker's compile does
+// (ADR-591 Amendment 2).
+async function emitRdChecked(project: Project, options: EmitRdOptions): Promise<EmitRdResult> {
+  const prepared = prepareOutput(project, rdPreparationOptions(options));
+  return emitPreparedRdFile(
+    await withTextGlyphCheck(prepared, project, outputTextRenderer),
+    options,
+  );
 }
 
 async function pickRdTarget(ctx: SaveGcodeCtx): Promise<SaveTarget | null> {

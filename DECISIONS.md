@@ -11770,6 +11770,13 @@ ADR-030 §3 (Proposed) already called for a dedicated Adjust-Image surface out o
   flows. IE-1 acceptance = all F-L flows demonstrable + perceptual fixtures green + zero new
   dependencies in `package.json`.
 
+### Amendments
+
+ADR-242's amendments are separate decision files (ADR-344):
+`docs/decisions/ADR-242-amendment-1-image-studio-screens-track-tone-on-the-pixel-grid.md` (at 0°
+and 90° the Halftone and Line Screen filters rank each cell's pixels into a threshold array, so
+coverage tracks ink in s² + 1 tones and solid black stays solid).
+
 ## ADR-243 - Rasters of any size stream row-by-row; the raster budget becomes advisories
 
 **Date:** 2026-07-21
@@ -14149,7 +14156,9 @@ then a `localStorage` write whose ~5 MB cap discards the result.
 
 ADR-268's amendments are separate decision files (ADR-344):
 `docs/decisions/ADR-268-amendment-1-use-expansion-has-a-budget.md` (SVG `<use>` expansion has a
-budget, and item 2 reads literal internal-subset entities under an expansion bound).
+budget, and item 2 reads literal internal-subset entities under an expansion bound);
+`docs/decisions/ADR-268-amendment-2-readers-match-text-in-linear-time.md` (the SVG and LightBurn
+readers' number, length, paint, transform and keyword patterns match their text in linear time).
 
 ## ADR-269 - Production imports are worker-backed, pressure-disclosed, queued, and cancellable (2026-07-30)
 
@@ -14262,7 +14271,11 @@ also made it easy to mistake off-thread whole-file reads for streaming or bounde
 
 ADR-269's amendments are separate decision files (ADR-344):
 `docs/decisions/ADR-269-amendment-1-remote-dxf-worker-and-block-budget.md` (remote DXF import
-uses the same import-worker parse as the desktop, and placing DXF blocks has a budget).
+uses the same import-worker parse as the desktop, and placing DXF blocks has a budget);
+`docs/decisions/ADR-269-amendment-2-dxf-budget-counts-each-point-once.md` (that budget counts
+each placed point once, however many blocks wrap it);
+`docs/decisions/ADR-269-amendment-3-remote-svg-worker-and-use-point-budget.md` (remote SVG import
+uses the same document-worker parse as the desktop, and the SVG `<use>` budget counts points).
 
 ## ADR-270 - V-carve ladders complete one filled region before moving to the next (2026-07-31)
 
@@ -20362,6 +20375,11 @@ interaction without requiring destructive conversion.
   the text's **Size** regenerates the outline at the requested size. Independent dense-reference
   tests bound error below 0.011 mm after 10x scaling for 2 mm and 400 mm Dancing Script fixtures;
   this is bounded software evidence, not a claim for arbitrary transforms or physical cutting.
+
+ADR-321's amendments are separate decision files (ADR-344):
+`docs/decisions/ADR-321-amendment-1-every-re-render-keeps-the-text-style.md` (remote text edits
+and the registration-jig text editor re-render with the text's style, text box and weld, and new
+remote and jig text welds its overlaps).
 
 ## ADR-322 - Machine presets carry researched command and configuration contracts (2026-09-19)
 

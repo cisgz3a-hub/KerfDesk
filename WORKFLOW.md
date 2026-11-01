@@ -307,6 +307,14 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 1. SVG without explicit units (no `mm`, `cm`, `in`, `px`): treated as mm per laser-community convention.
 2. Toast (info): `<filename> has no units — assuming millimeters`.
 
+#### Edge — SVG root size in Q or in a relative unit (ADR-046 Amendment 1)
+1. A root `width`/`height` in `Q` (quarter-millimetres, 1Q = 0.25 mm) sizes the artwork like
+   mm: `width="200Q"` imports 50 mm wide, as a browser draws it.
+2. A root size in a relative unit (`em`, `ex`, `rem`, `vw`, ...) or unreadable text is sized
+   without it, as a missing size is, and a warning toast says so:
+   `<filename>: SVG size: the root width "10em" is not a length KerfDesk can size (it reads px, mm, cm, Q, in, pt and pc), so that axis was sized without it. Check the imported size before cutting.`
+   A percentage or `auto` stays silent: the viewBox sizes it, as before.
+
 #### Edge — SVG shape positions or sizes use percentages (ADR-574)
 1. Supported rectangles, lines, circles, ellipses and `<use>` positions retain their layout in the
    nearest SVG or symbol viewport. X coordinates and widths use its width; Y coordinates and
@@ -377,6 +385,10 @@ destination and cannot overwrite the template source.
 1. Click on an object's visible geometry.
 2. Object highlights with blue outline; 8 resize handles + 1 rotation handle appear.
 3. Status bar updates: `1 selected · 120 × 80 mm · X 50.0, Y 50.0`.
+4. A Fill shape is solid only where it is filled. Artwork seen through one of its holes is picked
+   first; clicking an empty hole selects the shape, as clicking inside a Line shape does
+   (ADR-683). The same holds for a hole another shape on its Fill operation cuts, and inside
+   stacked copies that cancel (ADR-683 Amendment 1).
 
 #### Multi — shift+click
 1. Shift+click on additional object.
@@ -533,15 +545,19 @@ the linked artwork.
 - Live angle shown next to handle.
 
 #### Mirror — menu / shortcut
-- `Arrange → Flip Horizontal` (`H`)
-- `Arrange → Flip Vertical` (`V`)
+- `Arrange → Flip Horizontal` (`H`, or LightBurn's `Cmd/Ctrl+Shift+H`)
+- `Arrange → Flip Vertical` (`V`, or LightBurn's `Cmd/Ctrl+Shift+V`; ADR-410 Amendment 4)
 - Operates around selection's center.
 
 #### Rotate 90° — menu / shortcut (ADR-410)
 - `Arrange → Rotate 90° Clockwise` (`.`) and `Arrange → Rotate 90° Counter-clockwise` (`,`).
 - The selection turns as one body about the centre of its combined bounds; four turns return it
   exactly to where it started. One undo step. Locked or hidden artwork does not move.
-- `Cmd/Ctrl+.` stays Abort; the rotate keys ignore any chord with Cmd or Ctrl.
+- `Cmd/Ctrl+.` stays Abort; the 90° keys ignore any chord with Cmd or Ctrl.
+- LightBurn's step keys turn the selection the same way: `Shift+.` / `Shift+,` by 45° and
+  `Cmd/Ctrl+Shift+.` / `Cmd/Ctrl+Shift+,` by 1.5°, clockwise / counter-clockwise, one undo step
+  each. LightBurn's 15° keys are KerfDesk's Abort (`Cmd/Ctrl+.`) and Settings (`Cmd/Ctrl+,`) and
+  stay so (ADR-410 Amendment 4).
 
 #### Move to bed — menu (ADR-410)
 - `Arrange → Move to bed` → **Bed Center**, **Top Left**, **Top**, **Top Right**, **Left**,
@@ -579,6 +595,11 @@ the linked artwork.
 - A horizontal or vertical line has no height or width. Its length can still be typed, with the
   aspect lock on or off; typing the missing side is refused with a notice that says to change the
   other one. Dragging a handle of several such lines in a row changes their length the same way.
+- Rotation turns the whole selection, a group or several objects, as one piece (ADR-678). One
+  object turns about the centre of its own bounds; several turn about the centre of the selection
+  box, as the rotate handle does. The box shows the angle the selected objects share, and a typed
+  angle replaces it. When they are turned to different angles the box is blank and reads "Mixed",
+  and a typed angle turns them all by that much. One undo step.
 
 #### Edge — transform pushes object out of bed
 - Permitted (user may be temporarily repositioning).
@@ -658,8 +679,14 @@ the linked artwork.
    shapes inside other shapes. **Delete original objects** removes the selection once the offset
    is added. Round corners and end caps are chorded within the 0.025 mm machine curve tolerance
    at any distance (ADR-410 amendment 1); so are the round corners of the properties-panel offset.
+   A curved shape is flattened at 0.005 mm before either tool offsets it, so the whole result,
+   not only its corners, stays within 0.025 mm of the true offset curve (amendment 3).
 3. The dialog draws the selection in grey, the outward result in the accent colour and the inward
-   result in green, and lists each result's size. The selection is offset as one design.
+   result in green, and lists each result's size. The selection is offset as one design: shapes
+   that overlap become one outline, and a shape inside another selected shape is a hole even when
+   it was drawn as its own object, with a shape inside that hole an outline again, exactly as the
+   same art drawn as one compound path (ADR-410 amendment 3). **Outer shapes only** drops all of
+   those inner shapes.
 4. Open lines offset outward into a closed outline around the line, with caps that follow the
    corner style. **Inward** needs a closed shape; with only open lines the dialog says so and
    **Offset** is unavailable. A collapsed inward offset is explained the same way.
@@ -676,6 +703,13 @@ the linked artwork.
    paths show. The menu item shows a check while it is on.
 2. It changes the canvas only: output, Preview and saved projects are unchanged. It resets to
    Filled when the app restarts.
+3. Filled view paints each Fill operation as it burns (ADR-683): its shapes combine even-odd, so a
+   shape drawn inside another on the same operation shows as a hole, and a shape with an exact
+   copy on top of it shows only as an outline, because the two cancel and neither burns. Shapes
+   on different operations fill separately. A shape given a second Fill operation (**Add
+   operation**) shows filled wherever either operation burns it, and artwork drawn between
+   shapes of one operation, such as a photo under a caption, keeps its place in the drawing
+   order (ADR-683 Amendment 1).
 
 ### F-A6e. Rubber-band outline, Close Path, Reverse Direction, Delete Duplicates, Flatten Image Mask (ADR-480)
 
@@ -702,6 +736,11 @@ the linked artwork.
    compile cuts such copies once, by the same rule as this tool, also for a path an SVG draws
    twice. Job Review then says how many copies were cut once, as a warning. On path, engrave
    and drill keep every copy, since each is cut again (ADR-359 Amendment 3).
+   On a laser Fill operation, an exact copy on top of a shape cancels it and neither burns
+   (Duplicate or Paste in Place on a Fill part does this). Save and Job Review warn "N stacked
+   copies on Fill operation … burn nothing"; an odd number of copies still burns once and is
+   not named. Job Review's **Show stacked copies** closes the review and selects the extra copy
+   of each, so Delete leaves one to burn (ADR-683).
 5. **Tools → Image → Flatten Image Mask** bakes the mask into the selected image and crops it, as
    **Crop Image** does, then deletes the mask shape. The shape stays when it is locked or another
    image or path text uses it; the notice says which. Both keep the mask's outline as the image's
@@ -780,8 +819,9 @@ the linked artwork.
    Settings shows the failed-save state and **Retry saving settings**; retry keeps the latest
    requested choices. The saved message returns only after all pending preference writes succeed.
 5. **Alt+arrows** align the selection left, right, top or bottom; **Alt+PgUp** and **Alt+PgDn**
-   centre it on X or Y; **Alt+Shift+H** and **Alt+Shift+V** distribute spacing. Aligning needs two
-   or more objects and distributing three or more; a group counts as one. Each is one undo step.
+   centre it on X or Y; **Alt+Shift+H** and **Alt+Shift+V** move it together (Move H / V
+   Together), as in LightBurn. Both need two or more objects; a group counts as one. Each is one
+   undo step. Distribute spacing has no key, as in LightBurn (ADR-499 Amendment 2).
 
 ### F-A6j. Show lengths in inches (ADR-629)
 
@@ -1112,13 +1152,25 @@ that owns those fields, without changing the existing Frame/Start policy.
    a tab to remove it, or drag a tab to move it; each is one undo step. Placed tabs draw filled and
    the automatic tabs they replace draw hollow. **Done** or Esc returns to Select.
 4. Placed tabs replace the automatic tabs on their shape only, and only while tabs are on. They
-   move, rotate and scale with the artwork and survive copy and paste and break apart. **Reverse
+   move, rotate and scale with the artwork and survive copy and paste (into another project too,
+   and a Saved Artwork insert, where the copy gets a new operation colour) and break apart. **Reverse
    Direction** and the Edit nodes **Start** keep them where they were on the shape, and **Delete
    Duplicates** keeps a copy whose placed tabs differ. A shape opened with **Break** holds them
    until a straight line closes it again (**Close Path**), which puts each one back where it was,
    except a tab on a curve that led into the break node: Break removes that curve, and its tab
-   moves to the same share of the straight line (ADR-494 Amendment 1). **Clear placed tabs** (in
-   Cut Settings or in the canvas hint) returns the artwork to automatic tabs.
+   moves to the same share of the straight line (ADR-494 Amendment 1). Edit nodes **Delete** and
+   **Radius / Fillet**, which can start a shape at another node or where a rounded corner ends,
+   also keep each tab where it was; a tab on a part of the outline they change moves to the
+   nearest point of the new outline, and the toast says so (ADR-494 Amendment 2). **Optimize
+   Shapes**, which can start a shape again at its first corner, keeps them where they were too. A
+   rounded rectangle that a resize rebuilds at its new size, and a drawn shape that **Shape
+   Properties** rebuilds, keep each tab where the stretch puts it; a tab the new outline no longer
+   passes, such as one on a rounded corner, moves to the nearest point of it, and Shape Properties
+   says when one moved. **Weld**, **Subtract / Intersect / Exclude**
+   and **Offset Shapes** with **Delete original objects** make new shapes without them, which then
+   take automatic tabs, and a toast says the placed tabs were removed (ADR-494 Amendment 3).
+   **Clear placed tabs** (in Cut Settings or in the canvas hint) returns the artwork to automatic
+   tabs.
 5. Job Review's detail line reads e.g. "tabs every 50 mm (at most 6) × 0.5 mm, cut at 20%" or
    "tabs 4 × 0.5 mm, 3 placed by hand". With none of this set, output is unchanged.
 6. Material presets do not store these settings; applying a preset keeps what the operation has.
@@ -1333,7 +1385,12 @@ that owns those fields, without changing the existing Frame/Start policy.
    Machine settings and generated toolpaths are excluded; the production cursor does not advance.
    Vector coordinates are rounded so each point lies within half a 0.001 mm grid diagonal of its
    true position, and the page is the exact extent of the drawn curves, not their control points
-   (ADR-431).
+   (ADR-431). The file has one colour per operation: a path keeps its own colour while that colour
+   names its operation alone (imported artwork re-exports as authored), and otherwise takes the
+   operation's colour, so operations stay distinct in the file and **Assign selection to
+   operation** reaches it. A Fill operation holding two or more objects is written as one
+   even-odd path, the region it burns: a shape drawn inside another on that operation stays a hole
+   in the file and after re-import (ADR-681).
 3. Cancellation writes nothing. Missing image pixels, unsupported 3D relief or invalid geometry
    report an error without claiming a successful partial export. A write error reports its reason.
    The file is made before the destination is asked for, so a failure leaves an existing file as
@@ -1353,7 +1410,8 @@ that owns those fields, without changing the existing Frame/Start policy.
 
 1. **File → Export artwork as DXF...** (or **Export selected artwork as DXF...**) writes the
    selection or scene's vector artwork as a millimetre DXF: one polyline per contour, one layer per
-   colour, circular arcs as exact bulges, cubics and elliptical arcs flattened within 0.01 mm.
+   operation, coloured as the SVG export colours it (ADR-681), circular arcs as exact bulges,
+   cubics and elliptical arcs flattened within 0.01 mm.
    Bitmaps and reliefs have no DXF form; they are left out and the completion message counts them.
 2. **Tools → Multi-File Trace...** first asks for the preset, format (SVG, DXF, PDF, EPS or
    GeoJSON), coordinate precision and, for SVG, **Group islands** (each shape with its holes);
@@ -1366,6 +1424,9 @@ that owns those fields, without changing the existing Frame/Start policy.
    invalid and **Choose Images...** waits until it is corrected.
 3. An image whose trace has nothing visible writes no file; the rest of the batch is still saved
    and the completion message names the skipped images.
+4. TIFF and Netpbm scans are decoded and resampled in the import worker, so the window, Abort
+   and Ctrl+. stay responsive during a running job; **Cancel** stops a decode under way
+   (ADR-357 Amendment 2).
 
 ### F-A9d. Export artwork as PDF, EPS or GeoJSON (ADR-468)
 
@@ -1375,8 +1436,10 @@ that owns those fields, without changing the existing Frame/Start policy.
 2. PDF (1.4, one page) and EPS (EPSF 3.0) keep lines and curves exactly (arcs become cubics); the
    page / bounding box is the exact extent of the drawn curves, rounded outward, plus half the
    0.1 mm stroke on every side when strokes are drawn, and never under 3 pt. Filled layers fill
-   even-odd (text nonzero); line layers and open contours are 0.1 mm strokes. A page side over
-   5080 mm is written as PDF 1.6 with /UserUnit.
+   even-odd (text nonzero), and a Fill operation of two or more objects fills as one even-odd
+   path, as it burns (ADR-681); line layers and open contours are 0.1 mm strokes, with one colour
+   per operation as in the SVG export. A page side over 5080 mm is written as PDF 1.6 with
+   /UserUnit.
 3. GeoJSON flattens curves within 0.01 mm into Polygon rings (outer counterclockwise, holes
    clockwise) and LineStrings. Polygons follow each shape's fill rule, so they cover what the PDF
    fills; shapes whose outlines cross are written as separate `unmerged` polygons and the export
@@ -1654,7 +1717,11 @@ the completed physical Frame is the spatial source of truth.
    the machine notice; **Keep current machine** restores the current calibration too. The notice
    says when the camera calibration changes with it. When the file has the same machine and only
    its bed size differs, the notice gives both bed sizes, and **Keep current machine** comes first
-   as the primary choice (ADR-440 Amendment 5).
+   as the primary choice (ADR-440 Amendment 5). When the same machine's file differs in more than
+   the bed, the notice also names the other values in use, origin first ("The file's copy also
+   differs in origin and no-go zones"), and **Keep current machine** still comes first. A notice
+   for another machine names the bed and values that machine brings in place of yours (ADR-440
+   Amendment 8).
 4. **Keep current machine** is one Undo step, named in the Undo list. Undoing it brings back the
    file's machine together with the notice, so the question is asked again; Redo answers it again.
    No Undo of an older edit, and no Redo, puts the file's machine back without the notice
@@ -1833,11 +1900,12 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 
 #### Edit
 - `Cmd/Ctrl+Z` — Undo
-- `Cmd/Ctrl+Shift+Z` — Redo
+- `Cmd/Ctrl+Shift+Z` or `Cmd/Ctrl+Y` — Redo (ADR-499 Amendment 2)
 - `Cmd/Ctrl+X` — Cut selected objects to the scene clipboard
 - `Cmd/Ctrl+C` — Copy selected objects to the scene clipboard
 - `Cmd/Ctrl+V` — Paste the scene clipboard (offset from the source)
-- `Cmd/Ctrl+Shift+V` — Paste in Place: paste at the position the artwork was copied from (ADR-410)
+- `Alt+V` — Paste in Place: paste at the position the artwork was copied from (LightBurn's key;
+  Option+V on macOS; ADR-410 Amendment 4). `Cmd/Ctrl+Shift+V` is Flip vertical, as in LightBurn
 - `Cmd/Ctrl+D` — Duplicate selection in place (LightBurn parity)
 - `Cmd/Ctrl+A` — Select all
 - `Cmd/Ctrl+Shift+I` — Invert selection (ADR-410)
@@ -1856,10 +1924,16 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
   from a plain button it still nudges (ADR-493, ADR-499 Amendment 1).
 - `Alt+Left` / `Alt+Right` / `Alt+Up` / `Alt+Down` — Align left / right / top / bottom (ADR-499)
 - `Alt+PgUp` / `Alt+PgDn` — Align centres on X / Y (ADR-499)
-- `Alt+Shift+H` / `Alt+Shift+V` — Distribute horizontal / vertical spacing (ADR-499)
-- `H` — Flip horizontal
-- `V` — Flip vertical
+- `Alt+Shift+H` / `Alt+Shift+V` — Move H / V Together (LightBurn's keys; ADR-499 Amendment 2).
+  Distribute spacing has no key, as in LightBurn
+- `PgUp` / `PgDn` — Bring forward / send backward in draw order; `Cmd/Ctrl+PgUp` /
+  `Cmd/Ctrl+PgDn` — Bring to front / send to back (LightBurn's keys; ADR-493 Amendment 2). A
+  focused list, tab panel or the Artwork panel scrolls instead
+- `H` or `Cmd/Ctrl+Shift+H` — Flip horizontal
+- `V` or `Cmd/Ctrl+Shift+V` — Flip vertical (ADR-410 Amendment 4)
 - `.` / `,` — Rotate 90° clockwise / counter-clockwise (ADR-410)
+- `Shift+.` / `Shift+,` — Rotate 45°; `Cmd/Ctrl+Shift+.` / `Cmd/Ctrl+Shift+,` — Rotate 1.5°
+  (LightBurn's keys; ADR-410 Amendment 4)
 
 #### Tools
 - `T` - Type and edit text on the canvas (when a text field does not own keyboard input)
@@ -1878,7 +1952,7 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - `Alt+W` — Filled or wireframe view (ADR-410)
 - `F` — Fit to bed
 - `Shift+F` — Fit to selection (falls back to all-objects, then bed)
-- `+` / `=` — Zoom in
+- `+` / `=` — Zoom in (`+` typed with Shift too; ADR-499 Amendment 2)
 - `-` — Zoom out
 - `0` — Reset zoom (same as F)
 - `Ctrl+Wheel` — Zoom at cursor
@@ -1889,10 +1963,14 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - `Cmd/Ctrl+.` — Request the controller-specific software Abort (Phase B). With no job running
   it aborts a running Home, Probe or Auto-focus the same way, turns a latched Fire off
   (ADR-362), and stops motion or a hold the controller reports that nothing in KerfDesk started,
-  as **ABORT MOTION** does (ADR-375).
-- `PageUp` / `PageDown` — Jog Z. When a scrolling list, tab panel or the Artwork panel has focus,
-  the keys scroll it instead (ADR-362). Only the dedicated keys jog Z: the keypad's 9 / 3 never do,
-  even with Num Lock off, when they send PageUp / PageDown (ADR-493 Amendment 1).
+  as **ABORT MOTION** does (ADR-375). On a laser profile it turns off a laser the controller
+  reports on at Idle with nothing in KerfDesk running it, as **LASER OFF** does (ADR-375
+  Amendment 9).
+- `Cmd/Ctrl+Alt+PageUp` / `Cmd/Ctrl+Alt+PageDown` — Jog Z one step (ADR-493 Amendment 2).
+  Bare PageUp / PageDown are LightBurn's draw-order keys and never move the machine. When a
+  scrolling list, tab panel or the Artwork panel has focus, the keys scroll it instead (ADR-362).
+  Only the dedicated keys jog Z: the keypad's 9 / 3 never do, even with Num Lock off, when they
+  send PageUp / PageDown (ADR-493 Amendment 1).
 - `Cmd/Ctrl+Shift+]` / `Cmd/Ctrl+Shift+[` — Jog up / down one step; `Cmd/Ctrl+Alt+[` /
   `Cmd/Ctrl+Alt+]` — Jog left / right one step (LightBurn's Move-window keys, ADR-493).
   Numpad `8`/`2`/`4`/`6` jog the same way and `7`/`9`/`1`/`3` diagonally, only with Num Lock on.
@@ -1965,29 +2043,46 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    the network form and review recovery. To switch to USB, explicitly choose **Use a different
    port…**. Cancelling the picker retains the network choice. Forget Controller or app restart
    clears the session-only routing hint; no address is saved.
-5. These unencrypted services belong on a trusted local network. Keep the app open and responsive;
-   TCP streaming is not hosted in a background worker. A successful socket is not controller or
+5. These unencrypted services belong on a trusted local network. Keep the app open. With
+   Background streaming on (the default), a worker reads and writes the network session, so a
+   busy window does not stop the refill (ADR-676). A successful socket is not controller or
    physical-machine qualification. Frame and Start retain their canonical workflow.
 
-#### Background streaming (ADR-354)
-1. Compatible GRBL-family connections use background streaming by default. The selected USB
+#### Background streaming (ADR-354, ADR-676)
+1. GRBL-family and Marlin connections use background streaming by default. The selected USB
    port is opened inside a dedicated worker so its read and refill loop can continue while the
-   Chrome window is minimised or busy.
+   Chrome window is minimised or busy. Marlin's worker refills one line on each `ok`. The
+   desktop app's network sessions (FluidNC telnet, grblHAL raw TCP) are read and written by a
+   worker too.
 2. If the worker cannot identify the selected port uniquely or is unavailable before opening,
-   the app uses the selected window port and records that in the Laser log. In a browser it
-   also warns: "Background streaming is unavailable for this connection. Keep KerfDesk visible
-   while sending the job." The desktop app does not warn: its window keeps sending while
-   minimised (ADR-354 Amendment 1).
-3. Machine Setup's **Background streaming** preference can be turned off explicitly. Reconnect
-   to apply a change. Marlin and Smoothieware keep their existing transport.
-4. Pause releases background refill. Confirmed Resume and tool-change Continue restore it for
+   the app uses the selected window port, records that in the Laser log and shows a warning on
+   every host. The warning says that a busy window can stop the machine with a constant-power
+   beam still on. In a browser it also asks to keep KerfDesk visible; the desktop window keeps
+   sending while minimised (ADR-354 Amendment 1).
+3. Machine Setup's **Background streaming** preference can be turned off explicitly; the Laser
+   log records that at connect. Reconnect to apply a change. Smoothieware keeps the window
+   transport: its beam goes dark whenever its queue runs dry.
+4. Whenever the window streams the job (fallback, preference off, or no worker), Job Review
+   reads the exact program. If its power would stay on over a stopped head, a warning leads the
+   list:
+   - GRBL-family M3: lit for as long as the window is busy; the warning offers Dynamic (M4).
+   - Marlin's cutter: lit until its laser safety timeout, 1 s in stock builds.
+   - Marlin's fan output: lit until the window recovers, or until the E-stop.
+
+   The warning never refuses Start.
+5. Pause releases background refill. Confirmed Resume and tool-change Continue restore it for
    the same live job. Abort, disconnect or a replacement job cannot inherit an old refill queue.
-5. Browser shutdown, computer sleep and USB loss still interrupt a live serial connection.
-6. The desktop app, like Chrome, lets the window and the worker see only the ports picked in
+   Marlin's Abort and Disconnect send their stop lines right behind the refill's handback, so
+   a backlog in a window that was busy never delays them (ADR-676 Amendment 1).
+6. Browser shutdown, computer sleep and USB loss still interrupt a live serial connection.
+7. The desktop app, like Chrome, lets the window and the worker see only the ports picked in
    its Select dialog, so an identical second adapter (a laser controller and an Arduino that
    both use a CH340, for example) no longer stops background streaming. A pick lasts until
    Forget Controller, and on macOS and Linux also until an app restart; picking both identical
    adapters is still ambiguous and uses the window port (ADR-366, ADR-552).
+8. A Marlin `Unknown command` echo of the line in flight ends the job as before (MA-12). An echo
+   of any other text, such as a move whose `G` was lost on the wire, stays in the log, and the
+   worker keeps streaming the rest of the job (ADR-676 Amendment 1).
 
 #### Error — WebSerial not supported
 1. Connection button is disabled, with a red hint above: "Your browser doesn't support WebSerial. Use Chrome, Edge, Brave (may require enabling under Brave Shields/flags), or Arc, or install the Windows desktop app."
@@ -2136,6 +2231,13 @@ KerfDesk confirms Idle, selects G21 through an acknowledged command, then requir
 millimetre position report. Old position and offset numbers are discarded before the new snapshot
 is used. G21 remains selected, including after Cancel; work offsets and the physical origin are
 not erased. GRBL's independent `$13` reporting-unit contract is unchanged.
+
+The other G21 lines KerfDesk sends on Smoothieware are recorded the same way. These are Restore
+saved origin, Place Board's corner origin, Continue from where the head stopped and Auto-focus's
+probe setup. While such a line is in flight after a Console G20, or on a board left in G20, the
+position is hidden. Once the board acknowledges it, KerfDesk reads millimetres, and the Console says
+the board now reports millimetres. A recovery program that selects millimetres while KerfDesk reads
+inches hides the position until `$G` or the next Frame (ADR-375 Amendment 11).
 
 #### CNC — safe-Z retract and restore
 1. CNC Frame requires current-session stock-top Work-Z and a fresh known work position because its
@@ -2724,6 +2826,11 @@ authorization, Frame proof, controller command, or safety boundary.
    lasers) runs under the stock-GRBL profile. When its `$$` lists grblHAL's `$14`-`$18`, its
    banner reads `GrblHAL` or its `$I` names grblHAL, a value must pass the grblHAL check as well
    as the stock one, and the refusal says why grblHAL applies (ADR-375 Amendment 5).
+3. FluidNC runs a line that starts with `[` as a `$` command (`[13]1` is `$13=1`, `[RST]#` is
+   `$RST=#`). A FluidNC board can run under the stock-GRBL or grblHAL profile. When its banner names
+   FluidNC, the Console reads such a line as that `$` command and sends the `$` form. So `[13]1`
+   gets the profile's `$13=1` confirmation and `$$` re-read. `[RST]#` and `[NVX]` are blocked, as
+   they are on the FluidNC profile (ADR-375 Amendments 7 and 11).
 
 #### Edge — arbitrary G-code
 1. Single-line G-code commands are allowed only when connected, no operation is active, and GRBL reports `Idle`.
@@ -3008,8 +3115,8 @@ authorization, Frame proof, controller command, or safety boundary.
    Frame, interrupted/failed runs and selected-only outline runs do not switch it. If the switch
    is refused (run numbering is open), a warning says **Outline only** stays selected.
 8. Put one blank inside each burned outline and focus on the blank's **top surface**,
-   which is higher than the outline surface. Keep X/Y placement and work origin
-   unchanged. Confirm **Artwork only** before burning the artwork. Every
+   which is higher than the outline surface. Keep X/Y placement, Start from and work
+   origin unchanged. Confirm **Artwork only** before burning the artwork. Every
    registration outline is disabled and every artwork copy on an enabled source
    operation is included in the second run. Output completes all enabled operations
    for one physical jig instance before starting the next instance in grid order;
@@ -3023,6 +3130,13 @@ authorization, Frame proof, controller command, or safety boundary.
     footprint and placement (ADR-565). Frame again if those coordinates change;
     power/speed edits retain that spatial evidence, and each Start reviews and
     claims the current exact executable program.
+11. A complete outline run that finishes cleanly records the Start from and job
+    origin it burned with, for the rest of the session (a reconnect keeps it). If the
+    artwork run starts from another Start from or job origin, Job Review warns: "The
+    jig outline burned from User Origin with the job origin at front left, but this
+    artwork run starts from Absolute Coordinates. … Choose User Origin with the job
+    origin at front left again, keep the work origin unchanged, and watch the Frame."
+    Advice only (ADR-057 Amendment 6).
 
 #### Empty and edge cases
 
@@ -3157,10 +3271,12 @@ authorization, Frame proof, controller command, or safety boundary.
   only a stop nobody requested reads as unexplained. A recovery card another window has
   claimed, started or discarded refreshes in every open window.
 - Every stop that throws the controller's planner away steps the automatic restart back over the
-  moves it still had queued: Abort, a rejected line, a reboot, the reset KerfDesk sends when the
-  stream stalls or a job write fails, and the Abort the app sends as it closes. A run left active
-  by a crash, reload or power loss steps back over its controller's whole planner from the
-  progress last saved. The restart hint names the bound (ADR-398 Amendment 5).
+  moves it still had queued: Abort, a rejected line, a reboot, the reset KerfDesk sends to a
+  GRBL, grblHAL or FluidNC controller when the stream stalls or a job write fails, and the Abort
+  the app sends as it closes. Marlin's stall stop is the exception: its `M410` drops the planner
+  but records no step back. A run left active by a crash, reload or power loss steps back over
+  its controller's whole planner from the progress last saved. The restart hint names the bound,
+  and the record's cause says whether the app restarted (ADR-398 Amendment 5).
 - **Start from line… → Choose restart point…** prepares the current project and opens the
   same route picker when a saved exact artifact is unavailable. This manual path requires the
   original work zero and preserves its existing disclosure that it creates no recovery record.
@@ -3252,6 +3368,22 @@ authorization, Frame proof, controller command, or safety boundary.
   while Chrome is minimised or its tab is hidden is recorded as completed on the reports of the
   slowed poll, instead of timing out as interrupted (ADR-356 Amendment 1). A controller that
   stays silent once the page polls normally still fails the check after the same time.
+- A page stall of under two seconds no longer ends a healthy job (ADR-356 Amendment 2).
+  - A status poll that runs half a second or more late does not judge the silence of its own
+    gap: a reply that arrived during the stall may still be waiting to be read. A Wi-Fi or
+    Ethernet controller streamed from the window delivers its replies that way. The next tick
+    judges, and a network job is judged only on what the window has actually read.
+  - Pause and Resume count only time the status poll ran on schedule. A confirmation that
+    arrived before their two-second deadline completes them, so a stall no longer resets a
+    laser that is already back in `Run`.
+  - A network request times out only after 5 s of the window's own running time.
+  - A controller that stays silent is still reset on the first on-schedule poll after the stall.
+    A host that stalls for B ≥ 2 s before every verdict delays detection to at most 5B + 7 s.
+- If the window can no longer read or write a running job's network session, KerfDesk sends the
+  controller its reset, M5 and M9 through that session before closing it. The notice says the
+  reset may not have arrived, and the restart steps back over the planner (ADR-398
+  Amendment 6). A write whose delivery is uncertain is never repeated, and nothing queued behind
+  it is sent.
 
 #### Painted second passes (2026-09-22, ADR-341)
 
@@ -3721,8 +3853,10 @@ again) or **Discard changes**.
      from the list keeps the type the list gives it, ADR-637 Amendment 1), and the mapped `$$`
      values. A machine chosen from the list also keeps its listed work area: `$130`/`$131` are
      the controller's travel, not the bed, so the strip shows them beside the kept area instead
-     of filling them in (ADR-637 Amendment 2). The strip lists each change the fill made that the
-     draft still holds
+     of filling them in (ADR-637 Amendment 2). On grblHAL with homing and hard limits on, the
+     mapped work area is the homed envelope, a `$27` pull-off short of `$130`/`$131` (two without
+     force origin), and the list names both (ADR-637 Amendment 4). The strip lists each change the
+     fill made that the draft still holds
      as old → new with one **Undo** that restores the draft as it was. A machine already set up
      that the operator only opens setup for keeps its values and offers **Use detected values**
      for the ones that differ (ADR-347). When the adopted firmware differs from the one it
@@ -3940,7 +4074,10 @@ settings and Job Review keep their existing read-only setup references.
 - Multilingual outline text uses local shaping and bidirectional layout (ADR-591). Hebrew,
   Arabic, mixed-direction numbers and combining marks retain their glyph order and positioning
   through wrapping and path text. Choose or import a font containing the required characters;
-  missing glyphs are still reported. No online font service is used. Existing basic Latin and
+  missing glyphs are still reported: the text dialog and the jig text panel name them while you
+  type, Bake and a production row name them as they fix the text, and Job Review, Start, Save,
+  the exports and print name them for every text they output (ADR-591 Amendment 2). No online
+  font service is used. Existing basic Latin and
   single-line engraving fonts keep their established geometry.
 - The outline font picker includes Great Vibes, Allura, Alex Brush, Parisienne, Pinyon Script,
   Italianno, and Corinthia for names and calligraphic signs. Cinzel Decorative provides ornamental
@@ -4114,13 +4251,15 @@ settings and Job Review keep their existing read-only setup references.
    halftone treatment; Image mode also offers grayscale and dithered photo engraving.
    **Colour layers** splits flat-colour artwork into a few colours (**Colours**: Auto or 2 to 8,
    counting the paper) and traces one filled layer per colour; neighbouring colours share one
-   edge with no gap or overlap (ADR-461). **Cut-out** burns each colour only in its own area;
-   **Stacked** also fills each colour under the darker colours above it. The paper colour is left
-   untraced unless **Trace background colour** is ticked; only a light border colour counts as
-   paper, so light-on-dark art traces every colour. The swatches show the traced colours,
-   lightest first. On commit each colour gets its own operation; on a laser each starts at a power
-   set by its darkness (a mid-dark or darker colour keeps the operation's power), which the
-   operator can edit. Paper (near-white, or the traced background) starts with output off.
+   edge with no gap or overlap (ADR-461). On Auto, a distinct thin colour such as small text keeps
+   its own layer even after JPEG, a slight blur or grain (ADR-461 Amendment 3). **Cut-out** burns
+   each colour only in its own area; **Stacked** also fills each colour under the darker colours
+   above it. The paper colour is left untraced unless **Trace background colour** is ticked; only
+   a light border colour counts as paper, so light-on-dark art traces every colour. The swatches
+   show the traced colours, lightest first. On commit each colour gets its own operation; on a
+   laser each starts at a power set by its darkness (a mid-dark or darker colour keeps the
+   operation's power), which the operator can edit. Paper (near-white, or the traced background)
+   starts with output off.
    For line artwork, choose **Detection** explicitly: the preset's automatic detection, a **Manual brightness band**,
    **Faint lines (keep solid areas)**, or **Sketch (local contrast)**. Faint lines adds coherent
    pale strokes to the preset's solid ink while rejecting isolated pale specks. Sketch uses
@@ -4387,6 +4526,8 @@ correct M4-mode raster G-code from Compile.
    image's DPI metadata (defaulting to LightBurn's 254 DPI when none —
    ADR-048), inserts a `RasterImage` SceneObject at the canvas centre.
    An image larger than the bed is scaled down to fit, with a warning (F-A3).
+   A JPEG or PNG whose EXIF Orientation turns it lands turned, as any image viewer shows it, at
+   its turned size, at every file size (ADR-404 and its Amendment 1).
 3. The image renders on the workspace via Canvas2D `drawImage` —
    real bitmap, scaled into mm-bounds. (Distinct from the Phase E
    "trace this image" flow, which converts to vectors immediately.)
@@ -4587,8 +4728,22 @@ Contour entry moves use the prepared program's explicit physical envelope, inclu
 origins and translated work origins. If that envelope is unknown, the optional contour entry is
 omitted, and the program's layer comment (`contour-entry skipped (bed position unknown)`) and Job
 Review ("Not added …", a warning-tone fact) say so instead of calling the entry effective
-(ADR-239 Amendment 1). Preview, timing, Frame bounds and output use the same prepared result. Earlier archived
+(ADR-239 Amendment 1). A constant-power (M3) contour, which on the 4040-safe profile means Line
+cuts unless the operation's Power mode says Dynamic, also leaves its last burn point by a laser-off
+exit of the same length along its last edge, and that exit is skipped and disclosed by the same
+rule (`contour-exit …`, "Contour entry and exit", ADR-239 Amendment 2). Preview, timing, Frame bounds and output use the same prepared result. Earlier archived
 jobs retain their original entry behaviour so recovery does not silently change sealed output.
+
+Constant-power advice (ADR-257 Amendments 1 and 2). Where a dialect's default burns an operation
+with M3 on GRBL-family output, Save, Start and Job Review advise: GRBL Compatible images whose
+one-move-per-pixel rows outrun the controller's look-ahead burn darker than the Preview; GRBL
+Compatible Scan Line fills whose strokes and gaps are short enough for the same look-ahead to hold
+a row below the feed burn small text darker than wider areas, whatever the overscan; and GRBL
+Compatible and 4040 Line cuts, and GRBL Compatible offset fills, burn darker at corners (and at
+path starts and ends without runways). The advice points GRBL 1.1f and newer to GRBL Dynamic
+(or the operation's Dynamic Power mode on the 4040), as LightBurn does; with a current `$I`
+reply, Job Review names the controller's own version. An operation set to Constant by hand gets
+no advice.
 
 **Status readout.** `StatusDisplay` shows MPos + `Origin:` row. The
 `Origin:` row reads from `wcoCache` (cached last-seen WCO across
@@ -4692,8 +4847,9 @@ Set origin here again. It is a warning; Frame and Start are not refused (ADR-375
     511) whose bit 5 sends WCO and bit 6 sends Ov, so `$10=0` or `$10=1` there turns both off.
     Expect the status panel to read "Origin: not reported (WCO off in $10; send $10=96)" (or 97),
     and with `$10=0` "MPos: cannot be known" (ADR-375 Amendment 2).
-    Do not apply generic settings writes to the Falcon A1 vendor contract, which does
-    not offer ordinary settings fetch. See the [GRBL status documentation](https://github.com/gnea/grbl/wiki/Grbl-v1.1-Interface).
+    KerfDesk reads the Falcon A1 Pro's `$$` at connect but sends its vendor contract no
+    setting write (ADR-322 Amendment 3); do not apply generic settings writes to it either.
+    See the [GRBL status documentation](https://github.com/gnea/grbl/wiki/Grbl-v1.1-Interface).
 11. **Air pump at Start (ADR-323).** First confirm Machine Setup shows
     Air output `M8` and "Air restart" ticked. A Falcon A1 Pro profile
     saved before the preset gained `M8` (2026-09-19) still reads
@@ -4716,20 +4872,34 @@ Set origin here again. It is a warning; Frame and Start are not refused (ADR-375
     way (`M8`, then `M9` after the last operation; the `M8` repeats of
     step 13 switch nothing), the pump must still be running through the middle
     operation and the last one, and Job Review must name the held
-    operation and `$152=100` (ADR-345: Creality's Falcon A1 parameter
-    page defines `$152` as the standby wait, so `100` keeps the pump
-    powered and `0` idles it immediately; the A1 Pro page does not list
-    it). Send `$152=100` from the Console while Idle: on the Falcon
-    command set it accepts `$150`, `$151` and `$152` (whole numbers
-    0-100) and still refuses every other numeric setting write
-    (ADR-370). The write clears the Frame proof, so Frame again before
-    Start. Untick "Air restart" and the same job must
+    operation. What else it names depends on the firmware (ADR-370
+    Amendment 1):
+    - **Falcon A1 Pro preset (grblHAL).** Job Review names an air test
+      on updated firmware, not `$152=100`, and its standby advisory says
+      that `$150`-`$152` set the motor microsteps on that firmware. The
+      Console refuses `$150`, `$151` and `$152`, naming the X, Y or Z
+      microstep setting, and every other numeric setting write. Do not
+      send them from another program either: on a build with the
+      Trinamic plugin, a power-of-two value changes how far that motor
+      moves.
+    - **Falcon on a stock-GRBL profile (the A1's numbering).** Job
+      Review names `$152=100` (ADR-345: Creality's Falcon A1 parameter
+      page defines `$152` as the standby wait, so `100` keeps the pump
+      powered and `0` idles it immediately). Send `$152=100` from the
+      Console while Idle: on this command set it accepts `$150`, `$151`
+      and `$152` (whole numbers 0-100) and still refuses every other
+      numeric setting write (ADR-370). It refuses them too when the
+      controller greets as grblHAL. The write clears the Frame proof, so
+      Frame again before Start.
+
+    Untick "Air restart" and the same job must
     go back to `M8 M9 M8 M9`. If the pump is audibly off for the last
     operation with the box ticked, the hold is not working; if it is
     off only with the box unticked, the firmware timer is confirmed.
 13. **Qualify air repeats on the installed firmware (ADR-462).** In a
-    separately supervised air check, record the firmware and current
-    `$152` setting. With "Air restart" ticked, inspect a short-block job
+    separately supervised air check, record the firmware and, on a
+    stock-GRBL Falcon, the current `$152` setting (on the A1 Pro's
+    grblHAL `$152` is the Z microstep setting). With "Air restart" ticked, inspect a short-block job
     of a minute or more with Air on: the program attempts `M8` repeats
     at eligible movement boundaries after about 5 s of estimated time.
     Observe whether the pump stays on and whether the enclosure fan
@@ -4737,9 +4907,21 @@ Set origin here again. It is a warning; Frame and Start are not refused (ADR-375
     dwells and continuous M3 cutting can exceed the trigger without a
     repeat, so this mitigation does not guarantee continuous air.
     Compare with "Air restart" unticked, which emits one `M8` for an
-    all-Air-on job. If air still stops, keep the firmware/`$152=100`
-    remedy from step 12 and verify it separately. Do not treat a pass
+    all-Air-on job. If air still stops, keep the remedy from step 12
+    (firmware, plus `$152=100` on a stock-GRBL Falcon only) and verify
+    it separately. Do not treat a pass
     on short blocks as qualification of every job or firmware version.
+14. **Homing and settings read (ADR-322 Amendment 3, ADR-675).** Read only; no write,
+    motion or laser command. Before connecting, power the machine on and watch whether the
+    head homes by itself; keep hands clear of the gantry. Connect on the Falcon A1 Pro preset:
+    the log shows the `$$` read, and Machine Setup's settings table lists `$22` (bit 0 set
+    means homing on), `$23`, `$30`, `$32`, `$62`, `$120`/`$121` and `$130`/`$131`.
+    Type `$I` in KerfDesk's Console and record `[FIRMWARE:...]`, the version line and
+    `[KINEMATICS:...]`; do not click the Console's quick buttons (they include `$X` and
+    `$#`), and never send a line with `=`. Home then reads **Home**, not **Set up homing**.
+    Machine Setup should list no work-area change: grblHAL's homed area for 363 x 273 mm of
+    travel with `$27=5` is the listed 358 x 268 mm (ADR-637 Amendment 4). If it lists one, record
+    `$21`, `$22`, `$27`, `$130` and `$131` and leave **Use detected values** unpressed.
 
 When this checklist passes on the Falcon, replace the F.3 status in `PROJECT.md` Phase F
 ("Code shipped; hardware verification pending") with the recorded result and update the F.3
@@ -4933,17 +5115,28 @@ selected.
    spacing, or turn off **Same X / Y spacing** for independent gaps. The live
    footprint diagram and count show the exact draft before it is applied.
 4. **Array on board** → copies tile the board, the block centered, as one undo
-   step. Copies inherit the design's layer/settings.
+   step. Copies inherit the design's layer/settings. A photo's mask (Apply Mask to Image) and a
+   path text's guide move with the design, and every copy gets its own, so each tile burns the
+   whole masked photo (ADR-633 Amendment 3). A board used as the mask stays put.
 5. Undo restores the single design. After arraying, the whole grid is selected, so Array/Fit disable until you undo (or reselect one design) - this stops a re-click from silently stacking a doubled burn.
 
 **Edge / empty / error.** No board, or zero/several designs selected → both
-controls are disabled ("Select exactly one design…"). A design larger than the
+controls are disabled ("Select exactly one design…"). A photo selected with its own mask, or a
+path text with its guide, is one design for **Array on board**; **Fit to board** still takes the
+photo alone. Job Review names a masked photo that lies on only part of its mask, with how much,
+as well as one that misses it. A design larger than the
 usable board produces zero copies and leaves the scene unchanged. A fixed count
 that does not fit shows the fitting count alongside the request. A runaway count
 (huge rows, or a tiny design under "fit as many as fit") is capped at 100 per
 axis and 500 copies, with a notice in the preview. An array that would take
 the project past its limit of 10,000 objects is refused with a notice, and
 nothing changes (F-A11).
+
+**Remote.** An MCP agent's `place_on_board` array places the same copies as the form. Its receipt
+gives `placedCount` (the original included) and, for rows × cols, `requestedCount`. When fewer were
+placed than asked, or the cap applied, `notices` says so in one line, such as "Array on board placed
+20 of the 25 requested copies: no more fit on the board.", and the PC shows the same line (ADR-125
+Amendment 4).
 
 ---
 
@@ -6312,11 +6505,17 @@ and lifts the command's CNC-only gate.)*
    `M0`, and its review warns.
 3. A one-cutter job, or an older prepared Save with no per-bit files, stays a single file.
 4. Run G-code file treats the gap between per-bit files (and a tile's bit files) as a bit change
-   (ADR-392 Amendment 4). When a file headed `; bit N of M` stops streaming, Work Z goes, so the
-   next file's CNC Frame offers Zero Z or refuses until the new bit is zeroed or probed. Until the
-   last bit's file has run, Set and Reset origin and the XYZ corner probe are refused as in an
-   `M0` hold; Zero Z and the Z probe stay open. The machine panel says which bit ran and offers
-   **End bit sequence** for starting over on new stock. A new controller session ends it too.
+   (ADR-392 Amendment 4). The `; bit N of M` line is read from the file's leading comments, where
+   a tile writes it below its metadata header. When such a file has run or failed, or once the
+   controller is Idle again after an Abort or alarm stopped it (ADR-392 Amendment 5), Work Z
+   goes, so the next file's CNC Frame offers Zero Z or refuses until the new bit is zeroed or
+   probed. Until the last bit's file has run, Set and Reset origin and the XYZ corner probe are
+   refused as in an `M0` hold; Zero Z and the Z probe stay open. The machine panel says which
+   bit ran and offers **End bit sequence** for starting over on new stock. A new controller
+   session ends it too. When Abort, an alarm, a reset or a rejected line stopped a file before
+   its end, the panel says that bit's file did not finish: keep the same bit, Zero Z or probe
+   again, and run that file again from its start. The X/Y hold stays, the last bit's included,
+   until the file has run (ADR-392 Amendment 6).
 5. On a profile whose controller cannot run KerfDesk CNC jobs, saving the package gives the
    GRBL-family warning Save as gives, and the printed sheet carries it (ADR-399 Amendment 1).
 6. Save as of a multi-bit job writes one file with an `M0` per bit change and adds a note saying
@@ -6616,6 +6815,10 @@ and lifts the command's CNC-only gate.)*
    or smaller grid), the save names those files once the set is written. It leaves
    earlier files intact. If the folder cannot be checked, a warning asks the operator
    to check that only this save's files are cut (ADR-668).
+   A save that stops at a failed write (a full disk, a lost permission) says the set
+   is incomplete and to save it again before cutting, and names as an error every
+   file of this save's names it did not replace, which still holds the earlier save
+   (ADR-656 Amendment 3).
    A ramp entry kept as a plunge because its source path is shorter than one
    cut width or cannot descend at coordinate precision remains disclosed in
    each affected tile's G-code header, including tabbed path3d output. Split
@@ -6783,7 +6986,9 @@ and lifts the command's CNC-only gate.)*
 2. With closed shapes selected, the layers panel shows an "Offset" row:
    distance + Outward / Inward adds a NEW offset path object (round
    joins) and leaves the sources in place — kerf compensation on a
-   laser, clearing outlines and inlay gaps on a router.
+   laser, clearing outlines and inlay gaps on a router. A shape drawn
+   inside another selected shape is offset as a hole, as in Offset
+   Shapes (F-A6c, ADR-410 amendment 3).
 3. Both work in laser AND CNC modes (geometry is machine-agnostic).
 
 #### Error — invalid input
@@ -6791,7 +6996,9 @@ and lifts the command's CNC-only gate.)*
    vector objects are selected — the menu never runs the op, so there
    is nothing to surface.
 2. Open contours are rejected — the scene is unchanged and a warning
-   toast names the reason (same rule as Weld).
+   toast names the reason (same rule as Weld). A path whose end returns
+   to its start counts as closed even when it is flagged open, as Fill,
+   Offset Shapes and Select Open Shapes count it (ADR-410 amendment 3).
 3. An inward offset large enough to collapse the shape changes nothing
    and warns why. Open contours and a collapsing offset are reachable
    cases the menu gating cannot pre-detect, so the op runs, no-ops the
@@ -7181,7 +7388,8 @@ as the pane's design record.
 #### Success
 1. When a controller is connected and its `$$` snapshot differs from the current setup,
    **Machine Setup > Machine**'s connection strip shows the detected values (ADR-420, ADR-637). **Use detected
-   values** copies the reported spindle max (GRBL $30) and reported travel ($130/$131) into the setup
+   values** copies the reported spindle max (GRBL $30) and reported travel ($130/$131; on grblHAL
+   with homing and hard limits on, the homed area it gives, ADR-637 Amendment 4) into the setup
    draft; **Save machine setup** commits them, then the difference clears.
    `$30` is offered as spindle RPM only when the same dump reports `$32=0`;
    in laser mode it is a PWM scale and is not relabeled as RPM.
@@ -8794,6 +9002,12 @@ as the pane's design record.
   Coordinates. With Absolute Coordinates, camera or not, Job Review says the job burns at the
   outline's centred place on the canvas, not on the board, and to choose User Origin (ADR-654
   Amendment 3).
+- **Warning / camera placement on a registration jig job.** A jig job (outline or artwork run) is
+  told that it burns where its Start from puts the jig outline, not where the outline shows on the
+  camera picture; to burn both runs from the same Start from and work origin; and not to switch to
+  Absolute Coordinates between the runs. It is never told to choose Absolute Coordinates (ADR-654
+  Amendment 4). When the outline's own Start from is known and the artwork run differs, the jig's
+  outline warning (F-B15a) is shown instead.
 - **Edge / minimized wizard.** The wizard can minimize into a small non-modal panel so the
   operator can watch the camera and reach the machine while the target engraves.
 - **Fix / a small offset (ADR-663 Amendment 2).** For a calibrated camera fixed above the bed,

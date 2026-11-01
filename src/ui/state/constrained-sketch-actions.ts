@@ -13,7 +13,9 @@ import {
   type Project,
   type ColoredPath,
   type Bounds,
+  type Transform,
 } from '../../core/scene';
+import { withUnitScale } from '../../core/scene/retained-source-scale';
 import { DEFAULT_TEXT_COLOR } from '../../core/text/text-object';
 import type { AppState } from './store';
 import { pushUndo } from './scene-mutations';
@@ -34,9 +36,13 @@ export type ConstrainedSketchReviewResult =
   | { readonly kind: 'ok'; readonly review: ConstrainedSketchReview }
   | { readonly kind: 'invalid'; readonly reason: string; readonly result?: SketchSolveResult };
 export type ConstrainedSketchActions = {
+  /** `sketch` holds the sizes that burn: an editor opened on a resized sketch
+   *  folds the resize in (`editableConstrainedSketch`) and passes the
+   *  transform it opened on, so a later resize asks for a reopen. */
   readonly reviewConstrainedSketch: (
     sketch: ConstrainedSketch2d,
     objectId?: string,
+    openedTransform?: Transform,
   ) => ConstrainedSketchReviewResult;
   readonly applyConstrainedSketch: (review: ConstrainedSketchReview) => boolean;
   readonly bakeConstrainedSketch: (object: ImportedSvg, epoch: number) => boolean;
@@ -48,8 +54,8 @@ export function constrainedSketchActions(
 ): ConstrainedSketchActions {
   const owned = new WeakMap<ConstrainedSketchReview, Project>();
   return {
-    reviewConstrainedSketch: (sketch, objectId) => {
-      const result = prepareSketchReview(get(), sketch, objectId);
+    reviewConstrainedSketch: (sketch, objectId, openedTransform) => {
+      const result = prepareSketchReview(get(), sketch, objectId, openedTransform);
       if (result.kind === 'ok') owned.set(result.review, result.review.nextProject);
       return result;
     },
@@ -82,22 +88,28 @@ function prepareSketchReview(
   state: AppState,
   sketch: ConstrainedSketch2d,
   objectId: string | undefined,
+  openedTransform?: Transform,
 ): ConstrainedSketchReviewResult {
   const selected = sketchSource(state.project, objectId);
   if (selected.kind === 'invalid') return selected;
   const source = selected.source;
+  if (source !== null && openedTransform !== undefined && !sameScale(source, openedTransform))
+    return { kind: 'invalid', reason: RESIZED_WHILE_OPEN };
   const built = solvedSketchGeometry(sketch, source);
   if (built.kind === 'invalid') return built;
   const generated = retainSketchTabBindings(
     source,
     {
-      ...(source ?? {
-        kind: 'imported-svg' as const,
-        id: crypto.randomUUID(),
-        source: 'Constrained sketch',
-        name: sketch.name,
-        transform: IDENTITY_TRANSFORM,
-      }),
+      ...(source === null
+        ? {
+            kind: 'imported-svg' as const,
+            id: crypto.randomUUID(),
+            source: 'Constrained sketch',
+            name: sketch.name,
+            transform: IDENTITY_TRANSFORM,
+          }
+        : // The reviewed dimensions are the size that burns (ADR-573 Amendment 1).
+          { ...source, transform: withUnitScale(source.transform) }),
       paths: built.paths,
       bounds: built.bounds,
       constrainedSketch: built.result.sketch,
@@ -146,6 +158,11 @@ function sketchSource(
   if (source.locked === true)
     return { kind: 'invalid', reason: 'Unlock the sketch before editing dimensions.' };
   return { kind: 'ok', source };
+}
+const RESIZED_WHILE_OPEN =
+  'The sketch was resized after this editor opened. Close and reopen it to edit its current size.';
+function sameScale(source: ImportedSvg, opened: Transform): boolean {
+  return source.transform.scaleX === opened.scaleX && source.transform.scaleY === opened.scaleY;
 }
 function ownsReview(state: AppState, review: ConstrainedSketchReview): boolean {
   return (

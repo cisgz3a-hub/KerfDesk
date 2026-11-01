@@ -1,8 +1,12 @@
 {
   "schemaVersion": 1,
-  "sinceSourceSha": "19aba0456008a5b19ae6c2096284482a1b414202",
+  "sinceSourceSha": "adf300522692a09aad8a29754621a0b4a034b1c8",
   "highlights": [
-    "Your camera calibration now stays when you open a project saved earlier for the same machine. Before, such a file could remove the calibration, and a later machine change saved over it.",
-    "Cut jobs with many pieces travel less: each piece's holes are cut just before its outline, and the route is shortened further. In tests, travel dropped by about a fifth."
+    "Safer jobs: Marlin and network-connected machines now stream in the background, so a busy window no longer leaves the beam on over a stopped head. A laser left on at Idle gets a LASER OFF button.",
+    "Burns match the preview more closely: Dot Width Correction trims only the ends of a burned line in Grayscale, turned images that use their original pixels keep their pixel size, and constant-power machines get clear advice.",
+    "Tracing keeps drawn dots, i-dots and letter holes, follows smooth curves on small images, and no longer leaves spiky corners on lettering.",
+    "Design fixes: Offset keeps holes drawn as separate shapes, turned artwork is measured by its outline, rounded corners stay round when resized, pen clicks make corners, and the canvas shows Fill holes as they burn.",
+    "Falcon A1 Pro: the preset now homes, plans run-ups for its CoreXY motion, reads its settings, and no longer offers Console writes to $150 to $152, which are motor settings on this machine.",
+    "Keys now match LightBurn: Ctrl+Shift+H / V flip, Alt+V pastes in place, PgUp / PgDn change the draw order and Alt+Shift+H / V move artwork together. Jog Z moved to Ctrl+Alt+PgUp / PgDn. Distribute spacing has no key."
   ]
 }

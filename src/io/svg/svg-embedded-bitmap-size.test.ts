@@ -1,4 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import {
+  exifChunk,
+  exifTiffBlock,
+  pngChunk,
+  syntheticPngBytes,
+} from '../raster-decode/exif-orientation.test-support';
 import { embeddedBitmapSize } from './svg-embedded-bitmap-size';
 
 const dataUrl = (type: string, bytes: readonly number[]) =>
@@ -79,6 +85,34 @@ describe('embeddedBitmapSize', () => {
     expect(embeddedBitmapSize(dataUrl('jpeg', jpeg(exif(3), sof(300, 200))))).toEqual({
       width: 300,
       height: 200,
+    });
+  });
+
+  it('turns a PNG by the Orientation of an eXIf before IDAT, as Chromium does', () => {
+    const turned = (before: number[][], after: number[][] = []) =>
+      embeddedBitmapSize(
+        dataUrl(
+          'png',
+          Array.from(
+            syntheticPngBytes({ width: 40, height: 20, beforeIdat: before, afterIdat: after }),
+          ),
+        ),
+      );
+    expect(turned([exifChunk(6)])).toEqual({ width: 20, height: 40 });
+    expect(turned([exifChunk(8, 'II')])).toEqual({ width: 20, height: 40 });
+    expect(turned([exifChunk(3)])).toEqual({ width: 40, height: 20 });
+    expect(turned([], [exifChunk(6)])).toEqual({ width: 40, height: 20 });
+    // Behind a chunk larger than the first read.
+    const text = pngChunk({ type: 'tEXt', data: new Array<number>(100_000).fill(65) });
+    expect(turned([text, exifChunk(6)])).toEqual({ width: 20, height: 40 });
+  });
+
+  it('reads a JPEG Orientation recorded only in the Exif sub-IFD', () => {
+    const block = exifTiffBlock({ subIfd: [{ value: 6 }] });
+    const app1 = segment(0xe1, [...ascii('Exif'), 0, 0, ...block]);
+    expect(embeddedBitmapSize(dataUrl('jpeg', jpeg(app1, sof(300, 200))))).toEqual({
+      width: 200,
+      height: 300,
     });
   });
 

@@ -1,15 +1,18 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { laserTabAnchorPosition } from '../../core/job/laser-tab-anchors';
+import { cncTabAnchorPosition } from '../../core/cnc/cnc-tab-anchors';
+import { laserTabAnchorPosition, placedLaserTabCount } from '../../core/job/laser-tab-anchors';
 import {
   applyTransform,
   createLayer,
   createProject,
   IDENTITY_TRANSFORM,
+  pathUsesOperation,
   type ImportedSvg,
   type Project,
   type SceneObject,
 } from '../../core/scene';
 import type { LaserTabAnchor } from '../../core/scene/scene-object';
+import { capturePersonalArtwork, insertPersonalArtwork } from '../library/personal-artwork-model';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
 
@@ -160,6 +163,59 @@ describe('placed laser tabs follow their artwork (ADR-494)', () => {
     const objects = useStore.getState().project.scene.objects;
     expect(objects).toHaveLength(2);
     expect(objects[1]?.laserTabAnchors).toEqual(PLACED.laserTabAnchors);
+  });
+
+  // Rolling v7 L7-P1-2: a LightBurn import's path colour IS its operation
+  // colour. A paste into another project (or a Saved Artwork insert) gives the
+  // copy a new operation colour but keeps the path colour, so the placed tabs
+  // must keep the path colour too, or they stop counting and automatic tabs
+  // are cut elsewhere.
+  const TABBED: ImportedSvg = {
+    ...PLACED,
+    cncTabAnchors: [{ layerColor: RED, pathIndex: 0, polylineIndex: 0, pathT: 0.625 }],
+  };
+
+  function expectTabsResolve(object: SceneObject | undefined): void {
+    if (object === undefined || !('paths' in object)) throw new Error('pasted part missing');
+    const scene = useStore.getState().project.scene;
+    const operation = scene.layers.find((layer) =>
+      pathUsesOperation(object, object.paths[0]!, layer),
+    );
+    expect(operation?.color).not.toBe(RED);
+    expect(object.paths[0]?.color).toBe(RED);
+    expect(object.laserTabAnchors).toEqual(TABBED.laserTabAnchors);
+    expect(placedLaserTabCount([object], operation!)).toBe(1);
+    const laser = laserTabAnchorPosition(object, object.laserTabAnchors![0]!);
+    expect(laser?.x).toBeCloseTo(object.transform.x + 5, 9);
+    expect(laser?.y).toBeCloseTo(object.transform.y, 9);
+    const cnc = cncTabAnchorPosition(object, object.cncTabAnchors![0]!);
+    expect(cnc?.x).toBeCloseTo(object.transform.x + 5, 9);
+    expect(cnc?.y).toBeCloseTo(object.transform.y + 10, 9);
+  }
+
+  it('keep counting after Paste in Place into another project', () => {
+    install(TABBED);
+    useStore.getState().copySelection();
+    useStore.getState().newProject();
+    // The new project already uses the source colour, as a busy destination does.
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        scene: { ...state.project.scene, layers: [createLayer({ id: 'other', color: RED })] },
+      },
+    }));
+    useStore.getState().pasteClipboardInPlace();
+    expectTabsResolve(useStore.getState().project.scene.objects.at(-1));
+  });
+
+  it('keep counting after a Saved Artwork insert, into this project or another', async () => {
+    install(TABBED);
+    const entry = await capturePersonalArtwork(useStore.getState(), 'Tabbed part', 'Parts');
+    useStore.setState((state) => insertPersonalArtwork(state, entry));
+    expectTabsResolve(useStore.getState().project.scene.objects.at(-1));
+    useStore.getState().newProject();
+    useStore.setState((state) => insertPersonalArtwork(state, entry));
+    expectTabsResolve(useStore.getState().project.scene.objects.at(-1));
   });
 
   it('go with their contour when the artwork is broken apart', () => {

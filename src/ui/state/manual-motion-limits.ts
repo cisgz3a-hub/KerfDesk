@@ -21,6 +21,7 @@ import {
   normalizeReportedMPosToMm,
   type AxisBounds,
 } from '../../core/controllers/grbl/machine-envelope';
+import { travelEnvelopeFirmware } from '../../core/controllers/grbl/reported-work-area';
 import type { NativeBedFrame, NativeXyBounds } from '../../core/devices/native-bed-frame';
 import type { Vec2 } from '../../core/scene';
 import type { NativeBedEvidence } from './native-bed-frame';
@@ -29,14 +30,20 @@ import type { NativeBedEvidence } from './native-bed-frame';
  * The native XY box a manual move may reach, or null when there is neither a
  * verified bed frame nor a firmware envelope that the controller enforces or
  * that this session's Home tied to the switch. With a frame, the firmware
- * limits only pull its edges in; a frame with no settings read this session
- * (the Falcon vendor contract) is used as is.
+ * limits only pull its edges in; a frame with no settings read this session is
+ * used as is. Under the Falcon vendor contract only grblHAL's homed envelope
+ * pulls the frame in: it bounds the machine whatever command moves it, so a
+ * bed widened to `$130` × `$131` still stops a pull-off short of the far edge
+ * (ADR-637 Amendment 4).
  */
 export function resolveManualMotionLimits(
   frame: NativeBedFrame | null,
   evidence: NativeBedEvidence,
 ): NativeXyBounds | null {
-  const settings = jogTravelSettings(evidence);
+  const settings = jogTravelSettings(
+    evidence,
+    frame === null ? travelFirmware(evidence) : frameTravelFirmware(evidence),
+  );
   const limits = settings === null ? null : jogTravelLimits(settings);
   const firmware =
     limits === null
@@ -61,20 +68,20 @@ export function resolveManualMotionLimits(
  * whatever KerfDesk trusts, and `$X` leaves that position as it was, so a hold
  * aimed from an unknown position asked for the full travel, which GRBL refuses
  * whole (error:15) from almost anywhere. Pass only the controller MPos
- * KerfDesk withheld; nothing but this clamp may use it. grblHAL has no
- * envelope before this session's Home, and a WPos-only report ($10=0) carries
- * no MPos: both keep the full request.
+ * KerfDesk withheld; nothing but the hold clamps, XY and Z, may use it.
+ * grblHAL has no envelope before this session's Home, and a WPos-only report
+ * ($10=0) carries no MPos: both keep the full request.
  */
 export function firmwareJogCheckPosition(
   evidence: NativeBedEvidence,
   hiddenMPos: StatusReport['mPos'] | undefined,
   reportInches: boolean,
-): Vec2 | null {
+): (Vec2 & { readonly z: number }) | null {
   if (hiddenMPos == null || travelFirmware(evidence) !== 'grbl') return null;
   if (currentSessionSettings(evidence)?.softLimitsEnabled !== true) return null;
   const { x, y, z } = hiddenMPos;
-  const [xMm, yMm] = normalizeReportedMPosToMm([x, y, z], reportInches);
-  return { x: xMm, y: yMm };
+  const [xMm, yMm, zMm] = normalizeReportedMPosToMm([x, y, z], reportInches);
+  return { x: xMm, y: yMm, z: zMm };
 }
 
 /**
@@ -110,8 +117,10 @@ export function resolveFirmwareZLimits(
   });
 }
 
-function jogTravelSettings(evidence: NativeBedEvidence): JogTravelSettings | null {
-  const firmware = travelFirmware(evidence);
+function jogTravelSettings(
+  evidence: NativeBedEvidence,
+  firmware: JogTravelFirmware | null,
+): JogTravelSettings | null {
   const settings = currentSessionSettings(evidence);
   if (firmware === null || settings === null) return null;
   // grblHAL keeps no envelope for an axis until it is homed.
@@ -134,15 +143,21 @@ function jogTravelSettings(evidence: NativeBedEvidence): JogTravelSettings | nul
 }
 
 // A vendor command contract does not jog with stock `$J=` lines, and another
-// family's banner means neither envelope applies. A "Grbl 1.1" banner can
-// also come from grblHAL in a compatibility build, so a grblHAL profile or
-// banner selects grblHAL.
+// family's banner means neither envelope applies.
 function travelFirmware(evidence: NativeBedEvidence): JogTravelFirmware | null {
   if (evidence.activeControllerCommandSet != null) return null;
-  const detected = evidence.detectedControllerKind ?? null;
-  if (detected !== null && detected !== 'grbl-v1.1' && detected !== 'grblhal') return null;
-  if (evidence.activeControllerKind === 'grblhal' || detected === 'grblhal') return 'grblhal';
-  return evidence.activeControllerKind === 'grbl-v1.1' ? 'grbl' : null;
+  return travelEnvelopeFirmware(evidence.activeControllerKind, evidence.detectedControllerKind);
+}
+
+// The envelope that pulls a verified frame in. grblHAL's homed envelope ends a
+// pull-off short of the far edge under any command set; stock GRBL's adds only
+// the `$J=` homing-edge inset, which a vendor contract's G1 moves do not need.
+function frameTravelFirmware(evidence: NativeBedEvidence): JogTravelFirmware | null {
+  const firmware = travelEnvelopeFirmware(
+    evidence.activeControllerKind,
+    evidence.detectedControllerKind,
+  );
+  return evidence.activeControllerCommandSet == null || firmware === 'grblhal' ? firmware : null;
 }
 
 function currentSessionSettings(evidence: NativeBedEvidence): ControllerSettingsSnapshot | null {

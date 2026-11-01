@@ -15,6 +15,7 @@
 // the job (ADR-354 Amendment 3).
 
 import type { StreamerState } from '../../core/controllers/grbl';
+import type { HostedStreamAcks } from '../../core/controllers/hosted-stream-acks';
 import type { ProgramBuffers } from './serial-program-buffer';
 
 /** Everything a refill needs from the stream except the program it reads. */
@@ -41,12 +42,14 @@ export type SerialWorkerRequest =
   | ({ readonly kind: 'program'; readonly programId: number } & ProgramBuffers)
   /** Adopt the position captured at the matching ready barrier, reading lines
    *  from the program `programId` names. A worker that does not hold that
-   *  program answers `refill-stopped` instead of `armed`. */
+   *  program answers `refill-stopped` instead of `armed`. `acks` is the
+   *  controller's acknowledgement grammar, GRBL's when absent (ADR-676). */
   | {
       readonly kind: 'arm';
       readonly id: number;
       readonly programId: number;
       readonly position: StreamPosition;
+      readonly acks?: HostedStreamAcks;
     }
   /** Give the refill back to the main thread (pause, resume, tool change,
    * abort, or any other status change it owns). */

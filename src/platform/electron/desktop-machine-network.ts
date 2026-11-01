@@ -1,10 +1,30 @@
-import type { MachineNetworkAdapter, SerialConnection } from '../types';
+import type { MachineNetworkAdapter, SerialConnection, SerialOpenRequest } from '../types';
 import { wireEncodingError } from '../../core/controllers/serial-wire-encoding';
-import { machineNetworkRequest, type MachineNetworkRequest } from './desktop-machine-network-api';
+import {
+  MACHINE_NETWORK_ROUTE,
+  machineNetworkRequest,
+  runningTimeDeadline,
+  type MachineNetworkRequest,
+} from './desktop-machine-network-api';
 const MAX_NETWORK_LINE_LENGTH = 64 * 1024;
+// How long a failed read waits for the stop it lets the store write through
+// the session before closing it (ADR-398 Amendment 6).
+const READ_FAILURE_STOP_WAIT_MS = 3_000;
 
+/** Streams an open session from a worker the app's root entry supplies
+ * (ADR-676), since platform/electron cannot reach platform/web. The worker
+ * reads and writes the session itself, through `route`. Null when it could
+ * not start before it touched the session: the window then streams it. */
+export type HostedNetworkSessionOpener = (args: {
+  readonly sessionId: string;
+  readonly route: { readonly url: string; readonly header: string };
+}) => Promise<SerialConnection | null>;
+
+/** `hostSession` streams a session from a worker (ADR-676). Without it, or
+ * when its worker cannot start, the window streams the session itself. */
 export function createDesktopMachineNetwork(
   request: MachineNetworkRequest = machineNetworkRequest(),
+  hostSession?: HostedNetworkSessionOpener,
 ): MachineNetworkAdapter {
   return {
     serialForTarget: (host, port, protocol = 'fluidnc-telnet') => ({
@@ -13,12 +33,23 @@ export function createDesktopMachineNetwork(
       picksEndOnRestart: true,
       requestPort: async () => ({
         info: { transport: 'tcp' },
-        open: async () => {
+        open: async (req?: SerialOpenRequest) => {
           const result = await request('open', { host, port, protocol });
           const id = result['sessionId'];
           if (typeof id !== 'string' || !/^[a-f0-9-]{36}$/.test(id))
             throw new Error('Invalid desktop network session.');
-          return new DesktopMachineConnection(request, id);
+          const hostingRequested = req?.hostedStreaming === true;
+          if (hostingRequested && hostSession !== undefined) {
+            const hosted = await hostSession({
+              sessionId: id,
+              route: MACHINE_NETWORK_ROUTE,
+            }).catch(async (error: unknown) => {
+              await request('close', { sessionId: id }).catch(() => undefined);
+              throw error;
+            });
+            if (hosted !== null) return hosted;
+          }
+          return new DesktopMachineConnection(request, id, hostingRequested);
         },
       }),
     }),
@@ -26,19 +57,29 @@ export function createDesktopMachineNetwork(
 }
 
 class DesktopMachineConnection implements SerialConnection {
-  readonly backgroundStreamingUnavailable = true;
   private readonly lines = new Set<(line: string) => void>();
   private readonly closes = new Set<() => void>();
+  private readonly readFailures = new Set<() => Promise<void>>();
   private readonly decoder = new TextDecoder('utf-8', { fatal: true });
   private partialLine = '';
   private closed = false;
   private reading = false;
   private sequence = 0;
   private writeQueue: Promise<void> = Promise.resolve();
+  private writeGeneration = 0;
+  // When the last completed read was issued. The main process answers a read
+  // with every byte it had queued, so all that reached it before then has
+  // been delivered (ADR-356 Amendment 2).
+  private readThroughAt = Date.now();
+  /** True when a worker was asked for and could not take the session. */
+  readonly backgroundStreamingUnavailable: boolean;
   constructor(
     private readonly request: MachineNetworkRequest,
     private readonly id: string,
-  ) {}
+    hostingRequested: boolean,
+  ) {
+    this.backgroundStreamingUnavailable = hostingRequested;
+  }
   onLine(handler: (line: string) => void): () => void {
     this.lines.add(handler);
     if (!this.reading && !this.closed) {
@@ -52,12 +93,22 @@ class DesktopMachineConnection implements SerialConnection {
     else this.closes.add(handler);
     return () => this.closes.delete(handler);
   }
+  inputReadThrough(): number {
+    return this.readThroughAt;
+  }
+  beforeReadFailureClose(handler: () => Promise<void>): () => void {
+    this.readFailures.add(handler);
+    return () => this.readFailures.delete(handler);
+  }
   write(data: string): Promise<void> {
     const bytes = machineWireBytes(data);
     if (bytes.byteLength === 0 || bytes.byteLength > 64 * 1024)
       return Promise.reject(new Error('Network writes must contain 1–65536 wire bytes.'));
+    const generation = this.writeGeneration;
     const operation = this.writeQueue.then(async () => {
       if (this.closed) throw new Error('Network connection is closed.');
+      if (generation !== this.writeGeneration)
+        throw new Error('Network write was not sent: an earlier write may not have arrived.');
       this.sequence += 1;
       try {
         await this.request('write', {
@@ -66,7 +117,12 @@ class DesktopMachineConnection implements SerialConnection {
           data: encodeBase64(bytes),
         });
       } catch (error) {
-        await this.close();
+        // Delivery is uncertain and never retried, and nothing queued behind
+        // it is sent. The session stays open for writes issued after this
+        // failure, so an active job's stop can still go out (ADR-398
+        // Amendment 6); the main process closes a session whose write it
+        // refused, and the next read reports that.
+        this.writeGeneration += 1;
         throw error;
       }
     });
@@ -86,12 +142,14 @@ class DesktopMachineConnection implements SerialConnection {
     }
     this.lines.clear();
     this.closes.clear();
+    this.readFailures.clear();
     // Closing may fail after renderer/network loss; the native lease also expires.
     await this.request('close', { sessionId: this.id }).catch(() => undefined);
   }
   private async readLoop(): Promise<void> {
     try {
       while (!this.closed) {
+        const issuedAt = Date.now();
         const result = await this.request('read', { sessionId: this.id });
         if (this.closed) return;
         const payload = result['data'];
@@ -99,6 +157,7 @@ class DesktopMachineConnection implements SerialConnection {
           throw new Error('Invalid network read response.');
         // A closing read still carries the controller's last lines (ALARM, error).
         this.deliverLines(this.decoder.decode(decodeBase64(payload), { stream: true }));
+        this.readThroughAt = issuedAt;
         if (result['closed'] === true) {
           const reason = result['error'];
           if (typeof reason === 'string') console.warn(`Network controller session: ${reason}`);
@@ -107,8 +166,23 @@ class DesktopMachineConnection implements SerialConnection {
         }
       }
     } catch {
-      await this.close();
+      await this.stopBeforeClosing();
     }
+  }
+  // The read failed here, not on the controller's socket, so the session may
+  // still take writes: let the store send its stop before closing it.
+  private async stopBeforeClosing(): Promise<void> {
+    const handlers = [...this.readFailures];
+    if (!this.closed && handlers.length > 0) {
+      let cancelWait = (): void => undefined;
+      const waited = new Promise<void>((resolve) => {
+        cancelWait = runningTimeDeadline(READ_FAILURE_STOP_WAIT_MS, resolve);
+      });
+      const stops = handlers.map((handler) => Promise.resolve().then(handler));
+      await Promise.race([Promise.allSettled(stops), waited]);
+      cancelWait();
+    }
+    await this.close();
   }
   private deliverLines(chunk: string): void {
     const parts = chunk.split('\n');

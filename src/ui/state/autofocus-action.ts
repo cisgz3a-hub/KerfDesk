@@ -45,6 +45,10 @@ export type RunAutofocusArgs = {
     assertBeforeWrite?: () => void,
   ) => Promise<void>;
   readonly timeoutMs?: number;
+  /** Before each setup line; the step it returns runs once the controller
+   *  has acknowledged the line (owned-report-units.ts). The focus command
+   *  itself holds one G or M word, never G20 or G21 (autofocus-command.ts). */
+  readonly beginSetupLine?: (line: string) => () => void;
 };
 
 export async function runAutofocus(args: RunAutofocusArgs): Promise<AutofocusResult> {
@@ -66,24 +70,7 @@ export async function runAutofocus(args: RunAutofocusArgs): Promise<AutofocusRes
     };
     assertSession();
     args.onDispatch?.();
-    // Console and opened programs can leave G91 or G20 behind. Establish the
-    // editor's absolute millimetre target before probing, with each setup
-    // acknowledgement owned separately. Vendor focus macros keep their contract.
-    // Match validation and the controller's removal of horizontal blanks,
-    // including blanks inside the G word's numeric value. Keep sent bytes intact.
-    const first = scanGcodeWords(command.replaceAll(/[ \t]/g, ''))[0];
-    if (first?.letter === 'G' && (first.value === 38.2 || first.value === 38.4)) {
-      for (const setup of ['G21', 'G90']) {
-        assertSession();
-        await startControllerCommand(args.refs, write, {
-          kind: 'autofocus',
-          label: 'Auto-focus coordinate setup',
-          command: `${setup}\n`,
-          source: 'motion',
-          timeoutMs,
-        });
-      }
-    }
+    await sendProbeSetupLines(args, { command, write, assertSession, timeoutMs });
     assertSession();
     await startControllerCommand(args.refs, write, {
       kind: 'autofocus',
@@ -100,6 +87,38 @@ export async function runAutofocus(args: RunAutofocusArgs): Promise<AutofocusRes
     return { kind: 'ok' };
   } catch (err) {
     return autofocusFailureResult(err);
+  }
+}
+
+type ProbeSetupContext = {
+  readonly command: string;
+  readonly write: RunAutofocusArgs['write'];
+  readonly assertSession: () => void;
+  readonly timeoutMs: number;
+};
+
+// Console and opened programs can leave G91 or G20 behind. Establish the
+// editor's absolute millimetre target before probing, with each setup
+// acknowledgement owned separately. Vendor focus macros keep their contract.
+// Match validation and the controller's removal of horizontal blanks,
+// including blanks inside the G word's numeric value. Keep sent bytes intact.
+async function sendProbeSetupLines(
+  args: RunAutofocusArgs,
+  context: ProbeSetupContext,
+): Promise<void> {
+  const first = scanGcodeWords(context.command.replaceAll(/[ \t]/g, ''))[0];
+  if (first?.letter !== 'G' || (first.value !== 38.2 && first.value !== 38.4)) return;
+  for (const setup of ['G21', 'G90']) {
+    context.assertSession();
+    const acknowledged = args.beginSetupLine?.(setup);
+    await startControllerCommand(args.refs, context.write, {
+      kind: 'autofocus',
+      label: 'Auto-focus coordinate setup',
+      command: `${setup}\n`,
+      source: 'motion',
+      timeoutMs: context.timeoutMs,
+    });
+    acknowledged?.();
   }
 }
 

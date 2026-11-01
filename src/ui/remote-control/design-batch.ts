@@ -8,6 +8,7 @@ import {
   assignArtworkToOperation,
   createOperation,
   inOneUndoStep,
+  showKeptFeedsOnPc,
   updateOperationFull,
 } from './design-operations';
 import { importNoticeFields, pushImportToasts } from './design-import-notices';
@@ -20,21 +21,28 @@ import {
 import type { BatchItem, RemoteOperationPatchFull } from './design-validation';
 import { RemoteFault } from './fault';
 import { publicIdentifier, selectedIds } from './projections';
-import { prepareRemoteText } from './text';
+import { prepareRemoteText, type PreparedRemoteText } from './text';
+import {
+  missingGlyphNoticeFields,
+  showMissingGlyphsOnPc,
+  type MissingGlyphReport,
+} from './text-notices';
 import type { RemoteAppStore, RemoteWrite } from './types';
 import { applyRemoteWrite } from './writes';
 import { prepareRemoteSelection } from './selection';
 import type { RemoteSelectionArgs } from './selection-validation';
 
 type Prepared = {
-  readonly text?: Awaited<ReturnType<typeof prepareRemoteText>>;
+  readonly text?: PreparedRemoteText;
   readonly svg?: PreparedImport;
 };
 type ItemResult = {
   command: string;
   changedArtworkIds?: string[];
   operationId?: string;
+  message?: string;
   importReport?: ImportReport;
+  missingGlyphs?: MissingGlyphReport;
 };
 type Commit = (action: () => Record<string, unknown>) => Record<string, unknown>;
 const REFERENCE = /^\$(\d{1,2})$/;
@@ -102,8 +110,13 @@ function runBatch(
       });
     }),
   );
-  // The batch has committed, so its imports' PC toasts are now true (ADR-125 Amendment 2).
-  for (const item of results) pushImportToasts(item.importReport?.toasts ?? []);
+  // The batch has committed, so its imports' PC toasts are now true (ADR-125 Amendment 2),
+  // and so is each bit change's kept-values note (ADR-306 Amendment 5).
+  for (const item of results) {
+    pushImportToasts(item.importReport?.toasts ?? []);
+    if (item.missingGlyphs !== undefined) showMissingGlyphsOnPc(item.missingGlyphs);
+    if (item.command === 'update_operation') showKeptFeedsOnPc(item.message);
+  }
   const changed = [...new Set(results.flatMap((item) => item.changedArtworkIds ?? []))];
   const operations = [...new Set(results.flatMap((item) => item.operationId ?? []))];
   return {
@@ -117,9 +130,11 @@ function runBatch(
         ? {}
         : { changedArtworkIds: item.changedArtworkIds.filter(publicIdentifier).slice(0, 200) }),
       ...(item.operationId === undefined ? {} : { operationId: item.operationId }),
+      ...(item.message === undefined ? {} : { message: item.message }),
       ...(item.importReport === undefined
         ? {}
         : importNoticeFields(item.importReport.toasts, item.importReport.outcome)),
+      ...(item.missingGlyphs === undefined ? {} : missingGlyphNoticeFields(item.missingGlyphs)),
     })),
   };
 }
@@ -152,10 +167,18 @@ const ordinary: ItemRunner = ({ store, args, signal }, command) =>
 /** One runner per batch command; the Record type keeps the list exhaustive. */
 const ITEM_RUNNERS: Record<BatchItem['command'], ItemRunner> = {
   add_text: ({ store, prepared }) => {
-    const object = prepared?.text;
-    if (object === undefined) throw new RemoteFault('failed');
+    if (prepared?.text === undefined) throw new RemoteFault('failed');
+    const { object, missingCharacters } = prepared.text;
     store.getState().upsertTextObject(object, undefined, { placement: 'canvas' });
-    return { changedArtworkIds: [object.id] };
+    return {
+      changedArtworkIds: [object.id],
+      missingGlyphs: {
+        fontKey: object.fontKey,
+        missing: missingCharacters,
+        embeddedFonts: undefined,
+        clientWording: true,
+      },
+    };
   },
   add_svg: ({ store, args, prepared }) => {
     if (prepared?.svg === undefined) throw new RemoteFault('failed');
@@ -241,6 +264,8 @@ function pick(value: Record<string, unknown>): Omit<ItemResult, 'command'> {
       ? { changedArtworkIds: ids.filter((id): id is string => typeof id === 'string') }
       : {}),
     ...(typeof value.operationId === 'string' ? { operationId: value.operationId } : {}),
+    // A bit change's kept values, or a recipe that changed nothing (ADR-306 Amendment 5).
+    ...(typeof value.message === 'string' ? { message: value.message } : {}),
   };
 }
 

@@ -1,12 +1,13 @@
 export type {
   RasterPixelRun,
   RasterPixelSpan,
+  RasterRunGeometry,
   RasterSweepRun,
-  RasterSweepRunsForPixelRunInput,
+  RasterSweepRunsForPixelRunsInput,
 } from './raster-power-runs';
 export {
+  forEachRasterRunLostToDotWidthCorrection,
   rasterPixelRuns,
-  rasterRunSurvivesDotWidthCorrection,
-  rasterSweepRunsForPixelRun,
+  rasterSweepRunsForPixelRuns,
 } from './raster-power-runs';
 export { originFlipsRasterX, originFlipsRasterY } from './raster-orientation';

@@ -3,13 +3,23 @@
 // A driver whose capabilities report `settings: 'grbl-dollar'` sends any numeric
 // setting (after the Console's confirmation and fresh-Idle checks). Every other
 // profile refuses them: FluidNC keeps its configuration in a YAML file, and the
-// Falcon A1 Pro vendor contract keeps general settings out of host software
-// (audit settings-console-10). A driver may still list the few writes its
+// Falcon A1 Pro vendor contract reads `$$` but keeps general settings out of
+// host software (audit settings-console-10, ADR-322 Amendment 3). A driver may still list the few writes its
 // vendor documents for console use, each with the value range the vendor
 // gives. Creality's Falcon A1 parameter page says to set the air-assist
 // parameters $150-$152 from a software console, and Job Review's advice for
-// the A1 air pump is `$152=100`, so the Falcon contract lists those three
-// (ADR-370).
+// the A1 air pump is `$152=100`, so the Falcon contract on stock GRBL lists
+// those three (ADR-370).
+//
+// They are the A1's, in stock-GRBL numbering. grblHAL numbers $150-$152 as the
+// X, Y and Z microsteps, and on the Falcon A1 Pro (grblHAL with the Trinamic
+// plugin) a power-of-two value there changes how far that motor moves while
+// steps/mm stay as they were. So the Falcon contract on grblHAL lists no write,
+// its refusal names the microstep meaning, and a listed write is refused when
+// the session shows grblHAL under a stock-GRBL profile (rolling audit v5
+// J8-P3-2, ADR-370 Amendment 1).
+// https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/settings.h#L553-L562
+// https://github.com/grblHAL/Plugins_motor/blob/11c937c85f07f7f4a52be6dfdd0e49f4fcfe1886/trinamic.c#L245-L259
 //
 // On stock GRBL the value is checked too: the firmware keeps its integer
 // settings in 8 bits, drops the fraction and still answers `ok`, so `$22=0.5`
@@ -86,10 +96,26 @@ export function consoleSettingWriteIssue(
   if (driver.capabilities.settings === 'grbl-dollar') {
     return grblDollarValueIssue(driver, command.normalized, session);
   }
-  const match = SETTING_WRITE_RE.exec(command.normalized);
+  return listedWriteIssue(driver, command.normalized, session);
+}
+
+// A driver that sends only the writes it lists (ADR-370 and its Amendment 1).
+function listedWriteIssue(
+  driver: ControllerDriver,
+  normalized: string,
+  session: GrblHalSessionEvidence | undefined,
+): string | null {
+  const match = SETTING_WRITE_RE.exec(normalized);
+  const id = Number(match?.[1]);
   const allowed = driver.consoleSettingWrites ?? [];
-  const write = allowed.find((candidate) => candidate.id === Number(match?.[1]));
-  if (match === null || write === undefined) return refusal(driver.label, allowed);
+  const write = allowed.find((candidate) => candidate.id === id);
+  if (match === null || write === undefined) return refusal(driver, allowed, id);
+  // A listed write is documented for the driver's own firmware family; under a
+  // stock-GRBL profile, a controller that shows grblHAL numbers it differently.
+  const evidence = driver.kind === 'grblhal' ? null : grblHalEvidence(session);
+  if (evidence !== null) {
+    return `$${id} (${write.meaning}) is listed for stock-GRBL firmware, but this controller ${GRBLHAL_EVIDENCE_TEXT[evidence]}.${grblHalMicrostepNote(id)}`;
+  }
   const value = (match[2] ?? '').trim();
   const number = Number(value);
   if (/^\d+$/.test(value) && number >= write.min && number <= write.max) return null;
@@ -243,9 +269,29 @@ export function consoleSettingReadbackIssue(
   return `The controller reports $${match[1]}=${reported} after the re-read, not ${typed}: it stored a different value. Write $${match[1]} again with the intended value.`;
 }
 
-function refusal(label: string, allowed: ReadonlyArray<ConsoleSettingWrite>): string {
+function refusal(
+  driver: Pick<ControllerDriver, 'kind' | 'label'>,
+  allowed: ReadonlyArray<ConsoleSettingWrite>,
+  id: number,
+): string {
   const except = allowed.length === 0 ? '' : ` other than ${listIds(allowed)}`;
-  return `KerfDesk does not send numeric $ setting writes${except} on the ${label} profile. Configure the controller with its own tools.`;
+  const note = driver.kind === 'grblhal' ? grblHalMicrostepNote(id) : '';
+  return `KerfDesk does not send numeric $ setting writes${except} on the ${driver.label} profile. Configure the controller with its own tools.${note}`;
+}
+
+// grblHAL core's Setting_AxisMicroSteps, X to Z; the Falcon A1's air settings
+// sit at the same numbers in stock-GRBL numbering.
+const GRBLHAL_MICROSTEP_AXES: ReadonlyMap<number, string> = new Map([
+  [150, 'X'],
+  [151, 'Y'],
+  [152, 'Z'],
+]);
+
+function grblHalMicrostepNote(id: number): string {
+  const axis = GRBLHAL_MICROSTEP_AXES.get(id);
+  return axis === undefined
+    ? ''
+    : ` In grblHAL's numbering $${id} is the ${axis} axis microstep setting, not a Falcon A1 air setting: on a build with the Trinamic plugin, as the Falcon A1 Pro's is, a power-of-two value changes how far that motor moves.`;
 }
 
 function listIds(allowed: ReadonlyArray<ConsoleSettingWrite>): string {

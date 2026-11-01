@@ -69,3 +69,11 @@ Use focused geometry, decoder, adapter and worker regressions, rendered browser
 checks and production builds. Software verification is not machine qualification.
 This work does not operate hardware, alter Frame/Start policy, add entitlement
 gates, merge, deploy or publish a release.
+
+**Amendment 1 (2026-10-28):** [a character the font has no glyph for is a warning wherever text is
+made or burned](ADR-591-amendment-1-missing-glyphs-warn-wherever-text-is-made-or-burned.md):
+remote text receipts, variable records at output, and the rows preview.
+
+**Amendment 2 (2026-10-29):** [output checks every text for missing glyphs, whichever route made
+it](ADR-591-amendment-2-output-checks-every-text-for-missing-glyphs.md): plain text at Start, Save,
+exports and print, Bake, a production row's open and capture, and the jig text panel.

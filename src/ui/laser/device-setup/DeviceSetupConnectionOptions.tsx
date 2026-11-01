@@ -12,7 +12,7 @@ import { selectControllerDriver } from '../../../core/controllers';
 import { usePlatformOptional } from '../../app/platform-context';
 import { DraftNumberInput } from '../../kit/DraftNumberInput';
 import { backgroundStreamingPreferenceTitle } from '../../state/laser-background-streaming-notice';
-import { isGrblFamilyDriver } from '../../state/laser-disconnect-transaction';
+import { hostedStreamAcknowledgements } from '../../state/hosted-stream-acks';
 import { mutedStyle } from '../MachineSetupStyles';
 import { Row } from '../device-settings-shared';
 import { deviceSetupSupportsMachineKind, type DeviceSetupStepProps } from './device-setup-flow';
@@ -157,7 +157,7 @@ function OutputDialectRow(props: {
         }
       >
         {dialects.map((dialect) => (
-          <option key={dialect.id} value={dialect.id}>
+          <option key={dialect.id} value={dialect.id} title={dialect.description}>
             {dialect.label}
           </option>
         ))}
@@ -228,12 +228,18 @@ function AdvancedConnection(props: {
         {props.state.draft.streamingMode === 'char-counted' ? (
           <RxWindowRow state={props.state} update={props.update} />
         ) : null}
-        {props.networkTarget === undefined &&
-        isGrblFamilyDriver(selectControllerDriver(props.controllerKind)) ? (
-          <HostedStreamingRow state={props.state} update={props.update} />
+        {hostedStreamAcknowledgements(selectControllerDriver(props.controllerKind)) !== null ? (
+          <HostedStreamingRow
+            state={props.state}
+            update={props.update}
+            network={props.networkTarget !== undefined}
+          />
         ) : null}
         {props.networkTarget === undefined ? null : (
-          <p style={mutedStyle}>Network streaming runs in this window. Reconnect explicitly.</p>
+          <p style={mutedStyle}>
+            With Background streaming on, a worker streams the network session. Reconnect
+            explicitly.
+          </p>
         )}
         <p style={mutedStyle}>{guide.streamingExplanation}</p>
       </div>
@@ -262,11 +268,13 @@ function RxWindowRow(props: {
   );
 }
 
-// Native worker ownership keeps the window out of the serial round trip.
-// The operator can retain the ordinary transport when needed for compatibility.
+// Native worker ownership keeps the window out of the serial round trip, and
+// a worker reads a desktop network session the same way (ADR-676). The
+// operator can retain the ordinary transport when needed for compatibility.
 function HostedStreamingRow(props: {
   readonly state: DeviceSetupStepProps['state'];
   readonly update: (patch: Partial<DeviceProfile>) => void;
+  readonly network: boolean;
 }): JSX.Element {
   const platform = usePlatformOptional();
   return (
@@ -274,7 +282,11 @@ function HostedStreamingRow(props: {
       <input
         type="checkbox"
         checked={props.state.draft.workerHostedStreaming !== false}
-        aria-label="Read the serial port and refill the job stream in a worker"
+        aria-label={
+          props.network
+            ? 'Read the network session and refill the job stream in a worker'
+            : 'Read the serial port and refill the job stream in a worker'
+        }
         title={backgroundStreamingPreferenceTitle(platform?.id)}
         onChange={(event) => props.update({ workerHostedStreaming: event.target.checked })}
       />

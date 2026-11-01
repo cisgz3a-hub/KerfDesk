@@ -113,7 +113,7 @@ describe('compatibility-polyline node editing', () => {
         edit === 'move'
           ? editPathsNodesByDelta([path], refs, 20, 20)
           : deletePathsNodes([path], refs);
-      if (edited === null) throw new Error('Expected a canonical edit.');
+      if (edited === null || edited === 'too-few') throw new Error('Expected a canonical edit.');
       const object: TracedImage = {
         id: 'art',
         kind: 'traced-image',
@@ -134,7 +134,8 @@ describe('compatibility-polyline node editing', () => {
     ['move', () => editPathsNodesByDelta([SOURCE_PATH], [nodeRef(1)], 2, 3)],
     ['delete', () => deletePathsNodes([SOURCE_PATH], [nodeRef(1)])],
   ])('preserves output metadata while invalidating stale curves after a %s', (_name, edit) => {
-    const path = edit()?.paths[0];
+    const edited = edit();
+    const path = edited === 'too-few' ? undefined : edited?.paths[0];
 
     expect(path?.operationIds).toEqual(['cut-operation']);
     expect(path?.strokeWidthMm).toBe(0.8);

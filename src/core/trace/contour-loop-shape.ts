@@ -46,3 +46,25 @@ export function smoothBetweenCorners(
   }
   return out;
 }
+
+// A loop this narrow on average (twice its area over its perimeter, source px)
+// is a hairline ribbon: both sides of it lie one staircase step apart.
+const HAIRLINE_MEAN_WIDTH_PX = 1.5;
+
+/** True for a hairline ribbon of a binary loop (ADR-530 Amendment 11). The
+ *  binary tail's staircase model (straight-run flattening, simplification and
+ *  the spline resample) moves each side by up to its own tolerance, which on a
+ *  ribbon this narrow pinches it: a 1-px 30 or 60 degree diagonal kept 0.41 of
+ *  its pixels on Smooth and 0.70 on Line Art. Its crack chain is fitted
+ *  directly instead, as a measured loop's is. */
+export function isHairlineRibbon(staircase: ReadonlyArray<Vec2>, pixelScale: number): boolean {
+  const n = staircase.length;
+  let twiceArea = 0;
+  for (let i = 0; i < n; i += 1) {
+    const p = staircase[i] as Vec2;
+    const q = staircase[(i + 1) % n] as Vec2;
+    twiceArea += p.x * q.y - q.x * p.y;
+  }
+  // The staircase has one point per unit step, so n is its perimeter.
+  return Math.abs(twiceArea) < HAIRLINE_MEAN_WIDTH_PX * n * pixelScale;
+}

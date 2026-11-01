@@ -174,7 +174,9 @@ describe('editable text overlap welding integration', () => {
         const text = await buildTextObject({ mode: 'add' }, values({ ...placed, weldOverlaps }));
         const variable: TextObject = {
           ...text,
-          content: '{{csv:name}}',
+          // A path record lies on its template's baseline (ADR-682). A template
+          // of the record's own letters puts it where a fresh "boo" would go.
+          content: placement === 'path' ? 'obo' : '{{csv:name}}',
           variableTemplate: { tokens: [{ kind: 'csv', column: 'name' }] },
         };
         const before = JSON.stringify(variable);

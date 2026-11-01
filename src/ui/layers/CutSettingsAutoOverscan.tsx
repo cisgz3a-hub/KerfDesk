@@ -3,7 +3,13 @@
 // shown, since an unchecked box sends nothing (cut-settings-draft.ts).
 
 import type { DeviceProfile } from '../../core/devices';
-import { automaticOverscanMm, scanFeedMmPerMin } from '../../core/job/automatic-overscan';
+// Deep import: the devices barrel is at its public-export ratchet.
+import { machineKinematics, type MachineKinematics } from '../../core/devices/device-profile';
+import {
+  alongScanAccelMmPerSec2,
+  automaticOverscanMm,
+  scanFeedMmPerMin,
+} from '../../core/job/automatic-overscan';
 
 export function AutoOverscanSwitch(props: {
   readonly checked: boolean;
@@ -37,13 +43,15 @@ export function AutoOverscanSwitch(props: {
 export function automaticOverscanNote(input: {
   readonly speed: number;
   readonly scanAngleDeg: number;
-  readonly device: Pick<DeviceProfile, 'maxFeed' | 'accelMmPerSec2'>;
+  readonly device: Pick<DeviceProfile, 'maxFeed' | 'accelMmPerSec2' | 'kinematics'>;
   readonly maxMm: number;
 }): string {
   const feed = scanFeedMmPerMin({ speed: input.speed }, input.device);
+  const kinematics = machineKinematics(input.device);
   const runwayMm = automaticOverscanMm({
     feedMmPerMin: feed,
     accelMmPerSec2: input.device.accelMmPerSec2,
+    kinematics,
     scanAngleDeg: input.scanAngleDeg,
     maxMm: input.maxMm,
   });
@@ -51,10 +59,28 @@ export function automaticOverscanNote(input: {
   return (
     `Automatic runs ${formatNumber(runwayMm)} mm${capped}: the run-up from rest at ` +
     `${formatNumber(feed)} mm/min with ${formatNumber(input.device.accelMmPerSec2)} mm/s² ` +
-    `acceleration along a ${formatNumber(input.scanAngleDeg)}° scan, plus 10%. It follows the ` +
+    `acceleration${coreXyAlongScanNote(input.device.accelMmPerSec2, input.scanAngleDeg, kinematics, '')} ` +
+    `along a ${formatNumber(input.scanAngleDeg)}° scan, plus 10%. It follows the ` +
     'speed, the angle and Machine Setup whenever the job is prepared. If the machine acceleration ' +
     'was not read from the controller, check the scan edges on scrap.'
   );
+}
+
+/**
+ * On a CoreXY machine a scan off the axes gets less than the saved value
+ * (ADR-675): the parenthesis that says how much, or '' where it gets it all.
+ * `along` names the scan, such as " along its 45° scan".
+ */
+export function coreXyAlongScanNote(
+  accelMmPerSec2: number,
+  scanAngleDeg: number,
+  kinematics: MachineKinematics,
+  along: string,
+): string {
+  if (kinematics !== 'corexy') return '';
+  const reached = alongScanAccelMmPerSec2(accelMmPerSec2, scanAngleDeg, kinematics);
+  if (Math.abs(reached - accelMmPerSec2) < 0.05) return '';
+  return ` (${formatNumber(reached)} mm/s²${along} on this CoreXY machine)`;
 }
 
 function formatNumber(value: number): string {

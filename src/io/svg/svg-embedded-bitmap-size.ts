@@ -1,20 +1,22 @@
 // The pixel size of an embedded PNG, JPEG, BMP or WebP image, read from its
 // header without decoding it. preserveAspectRatio fits the image by this size,
-// so a JPEG whose EXIF Orientation turns it a quarter turn reports the turned
-// size a browser displays and KerfDesk's decoder produces
-// (ui/trace/jpeg-header.ts reads the same fields for file imports; the io
-// layer cannot import it). Formats are sniffed from the bytes, as browsers
-// decode data URLs by content. PNG eXIf orientation is not read.
+// so a JPEG or PNG whose EXIF Orientation turns it a quarter turn reports the
+// turned size a browser displays and KerfDesk's decoder produces. The
+// Orientation is read as Chromium reads it (io/raster-decode/exif-orientation.ts,
+// shared with the file import's ui/trace/jpeg-header.ts and png-header.ts).
+// Formats are sniffed from the bytes, as browsers decode data URLs by content.
+
+import { exifBlockOrientation, pngExifOrientation } from '../raster-decode/exif-orientation';
 
 export type BitmapSize = { readonly width: number; readonly height: number };
 
 const PAYLOAD = /^data:image\/[a-z]+;base64,/i;
 // Bytes enough for every fixed-position header below.
 const FIXED_HEADER_BYTES = 32;
-// A JPEG frame header follows its metadata segments; read further only as needed.
-const FIRST_JPEG_READ = 64 * 1024;
+// A JPEG frame header follows its metadata segments, and a PNG eXIf chunk may
+// follow others before IDAT; read further only as needed.
+const FIRST_METADATA_READ = 64 * 1024;
 const EXIF_IDENTIFIER = [0x45, 0x78, 0x69, 0x66, 0x00, 0x00];
-const ORIENTATION_TAG = 0x0112;
 
 /** The displayed pixel size of a base64 bitmap data URL, or null when its header cannot be read. */
 export function embeddedBitmapSize(dataUrl: string): BitmapSize | null {
@@ -24,7 +26,9 @@ export function embeddedBitmapSize(dataUrl: string): BitmapSize | null {
   const bytes = base64Prefix(payload, FIXED_HEADER_BYTES);
   if (bytes === null) return null;
   if (bytes[0] === 0xff && bytes[1] === 0xd8) return jpegSize(payload);
-  return pngSize(bytes) ?? bmpSize(bytes) ?? webpSize(bytes);
+  const png = pngSize(bytes);
+  if (png !== null) return orientedPngSize(payload, png);
+  return bmpSize(bytes) ?? webpSize(bytes);
 }
 
 // Decodes the first `byteCount` bytes, skipping the XML whitespace an exporter
@@ -79,13 +83,29 @@ function webpSize(bytes: Uint8Array): BitmapSize | null {
 }
 
 function jpegSize(payload: string): BitmapSize | null {
-  for (let wanted = FIRST_JPEG_READ; ; wanted *= 4) {
+  const size = readGrowingPrefix(payload, jpegFrameSize);
+  // 'more': the payload ended before the frame header.
+  return size === 'more' ? null : size;
+}
+
+// An eXIf the payload ends before is no Orientation: the browser reads none.
+function orientedPngSize(payload: string, stored: BitmapSize): BitmapSize {
+  const orientation = readGrowingPrefix(payload, (bytes) => pngExifOrientation(bytes) ?? 'more');
+  if (orientation === 'more' || orientation === null || orientation < 5) return stored;
+  return { width: stored.height, height: stored.width };
+}
+
+// Decodes ever longer prefixes of the payload until `read` stops asking for
+// 'more' or the payload ends (then 'more'); null when the base64 is unreadable.
+function readGrowingPrefix<T>(
+  payload: string,
+  read: (bytes: Uint8Array) => T | 'more',
+): T | 'more' | null {
+  for (let wanted = FIRST_METADATA_READ; ; wanted *= 4) {
     const bytes = base64Prefix(payload, wanted);
     if (bytes === null) return null;
-    const size = jpegFrameSize(bytes);
-    if (size !== 'more') return size;
-    // The payload ended before the frame header.
-    if (bytes.length < wanted) return null;
+    const result = read(bytes);
+    if (result !== 'more' || bytes.length < wanted) return result;
   }
 }
 
@@ -133,36 +153,12 @@ function isStartOfFrame(marker: number): boolean {
   return marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc;
 }
 
-// IFD0 of the Exif TIFF block holds Orientation as one SHORT. Anything
-// malformed reads as 1, as stored, the conservative reading; an APP1 that is
-// not Exif (XMP) is null, so the first Exif segment decides.
+// The TIFF block after "Exif\0\0", read as Chromium reads it. A block with no
+// valid Orientation reads as 1, as stored; an APP1 that is not Exif (XMP) is
+// null, so the first Exif segment decides.
 function exifOrientation(bytes: Uint8Array, start: number, end: number): number | null {
   if (!EXIF_IDENTIFIER.every((byte, index) => bytes[start + index] === byte)) return null;
-  const tiff = start + EXIF_IDENTIFIER.length;
-  const order = ascii(bytes, tiff, 2);
-  if (order !== 'II' && order !== 'MM') return 1;
-  const little = order === 'II';
-  const ifd = tiff + uint(bytes, tiff + 4, 4, little);
-  if (ifd < tiff + 8 || ifd + 2 > end) return 1;
-  return ifdOrientation(bytes, { ifd, end, little });
-}
-
-function ifdOrientation(
-  bytes: Uint8Array,
-  at: { readonly ifd: number; readonly end: number; readonly little: boolean },
-): number {
-  const { ifd, end, little } = at;
-  const count = uint(bytes, ifd, 2, little);
-  for (let index = 0; index < count; index += 1) {
-    const entry = ifd + 2 + index * 12;
-    if (entry + 12 > end) return 1;
-    if (uint(bytes, entry, 2, little) !== ORIENTATION_TAG) continue;
-    const value = uint(bytes, entry + 8, 2, little);
-    const single =
-      uint(bytes, entry + 2, 2, little) === 3 && uint(bytes, entry + 4, 4, little) === 1;
-    return single && value >= 1 && value <= 8 ? value : 1;
-  }
-  return 1;
+  return exifBlockOrientation(bytes, start + EXIF_IDENTIFIER.length, end) ?? 1;
 }
 
 function positive(width: number, height: number): BitmapSize | null {

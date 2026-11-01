@@ -18,13 +18,25 @@ const CLIPPER_DEFAULT_ARC_RATIO = 0.002;
 // so the stored chords, not just the exact ones, stay within it.
 const GRID_STEP_MM = 10 ** -VECTOR_PATH_PRECISION_DECIMALS;
 
-export const OFFSET_ARC_TOLERANCE_CAP_MM = DEFAULT_MACHINE_CURVE_TOLERANCE_MM - GRID_STEP_MM;
+/**
+ * How finely both tools flatten a curved source before offsetting it, as the
+ * kerf offset does (ADR-486 decision 3). The offset of a chord sits as far
+ * inside the offset curve as the chord sits inside its curve, and the round
+ * corner at each chord vertex adds its own chords to that, so the two errors
+ * share the machine curve tolerance (ADR-410 Amendment 3). At the usual 0.025 mm
+ * an r 10 circle offset 50 mm sat 0.031 mm off the true r 60 circle.
+ */
+export const OFFSET_SOURCE_CURVE_TOLERANCE_MM = 0.005;
+
+export const OFFSET_ARC_TOLERANCE_CAP_MM =
+  DEFAULT_MACHINE_CURVE_TOLERANCE_MM - OFFSET_SOURCE_CURVE_TOLERANCE_MM - GRID_STEP_MM;
 
 /**
  * The arc tolerance (the widest a chord may sit inside its circle, in mm) for a
  * round join or cap at this offset distance: Clipper's own fine default, capped
- * so a big offset never chords coarser than the machine curve tolerance.
- * Offsets up to about 12 mm are therefore unchanged.
+ * so a big offset never chords coarser than what the machine curve tolerance
+ * leaves after the source's own flattening. Offsets up to about 9.5 mm are
+ * therefore unchanged.
  */
 export function offsetArcToleranceMm(distanceMm: number): number {
   if (!Number.isFinite(distanceMm)) return OFFSET_ARC_TOLERANCE_CAP_MM;

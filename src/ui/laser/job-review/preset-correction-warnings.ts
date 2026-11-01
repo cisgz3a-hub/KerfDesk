@@ -7,7 +7,10 @@ import {
 
 /** Job Review advisory for a saved preset copy that predates a correction. */
 export function detectPresetCorrectionWarnings(
-  device: Pick<DeviceProfile, 'profileId' | 'origin' | 'bedWidth' | 'bedHeight'>,
+  device: Pick<
+    DeviceProfile,
+    'profileId' | 'origin' | 'bedWidth' | 'bedHeight' | 'homing' | 'kinematics'
+  >,
 ): ReadonlyArray<string> {
   const withdrawn = withdrawnPresetCopy(device);
   return [

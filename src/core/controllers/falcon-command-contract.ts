@@ -3,10 +3,19 @@ import { buildJogCommand, CMD_SPINDLE_OFF, type JogParams } from './grbl/command
 import { formatGcodeFeedMmPerMin } from '../gcode/feed-word';
 import { buildFramePerimeter } from '../job/frame-perimeter';
 
-/** Creality's official Falcon A1 Pro LightBurn device disables $J and settings
- * fetch and uses $HX followed by $HY for Home. These are device defaults, not
- * a claim that the vendor's GRBL-LPC label identifies a grblHAL firmware build.
- * Source: https://wiki.creality.com/falcon_a1_pro_(lightburn_2.0.00+).lbzip */
+/** Creality's official Falcon A1 Pro LightBurn device disables $J and uses $HX
+ * followed by $HY for Home. Its `AllowSettingsFetch: false` is a LightBurn
+ * connect preference, not a firmware hazard: `$$` and `$I` are reports in
+ * grblHAL (system.c), two published A1 Pro units answered both in full, and
+ * LaserGRBL, which Creality lists for live control, reads both at every
+ * connect. So this contract reads `$$` at connect, as the grblHAL driver does,
+ * to verify $30/$32 and show $22 and $62, and still sends no setting write
+ * (ADR-322 Amendment 3, ADR-370 Amendment 2; rolling audit v6 K3-P3-1). It
+ * never sends `$#` on its own: grblHAL rewrites a work-offset record it reads
+ * as corrupt.
+ * Sources: https://wiki.creality.com/falcon_a1_pro_(lightburn_2.0.00+).lbzip
+ * https://github.com/grblHAL/core/blob/04a5edcf8353f7294167d12d32e4b073d9be9ce4/system.c#L203-L262
+ * https://github.com/barebaric/rayforge/pull/461 */
 export function withFalconCommandContract(driver: ControllerDriver): ControllerDriver {
   return {
     ...driver,
@@ -16,14 +25,15 @@ export function withFalconCommandContract(driver: ControllerDriver): ControllerD
       ...driver.capabilities,
       jog: 'gcode-relative',
       jogCancel: false,
-      settings: 'none',
+      settings: 'grbl-dollar-read',
       firmwareSetupPanel: 'none',
     },
     realtime: { ...driver.realtime, jogCancel: null },
     commands: {
       ...driver.commands,
       home: '$HX\n$HY',
-      settingsQuery: null,
+      // The stock-GRBL `$I` parser takes exactly VER and OPT; grblHAL prints
+      // more, so `$I` is the Super Console's firmware report instead.
       buildInfoQuery: null,
       // Frame asserts laser-off with M5 and every perimeter line carries S0;
       // it must not touch the pump. Creality's A1 firmware treats M9 as a
@@ -43,16 +53,29 @@ export function withFalconCommandContract(driver: ControllerDriver): ControllerD
         ? { ...prepared, command: { ...prepared.command, stateEffect: 'reference' } }
         : prepared;
     },
-    consoleQuickCommands: driver.consoleQuickCommands.filter(({ command }) => command !== '$$'),
-    consoleSettingWrites: FALCON_AIR_SETTING_WRITES,
+    consoleQuickCommands: driver.consoleQuickCommands,
+    // The Falcon A1's air settings exist only in stock-GRBL numbering. On
+    // grblHAL, the Falcon A1 Pro's firmware, $150-$152 are the X, Y and Z
+    // microsteps, so that contract sends no numeric write (ADR-370 Amendment 1).
+    consoleSettingWrites: driver.kind === 'grbl-v1.1' ? FALCON_A1_AIR_SETTING_WRITES : [],
   };
 }
 
 /** Creality's Falcon A1 parameter page documents these air-assist settings,
- *  each 0-100, as set from a software console. Every other numeric write stays
- *  out of host software on this contract (ADR-370). Source:
- *  https://wiki.creality.com/en/laser-engraver/falcon-a1/random-data/description-for-GRBL-configuration-parameters */
-const FALCON_AIR_SETTING_WRITES: ReadonlyArray<ConsoleSettingWrite> = [
+ *  each 0-100, as set from a software console. The A1 numbers its settings as
+ *  stock GRBL does: an A1 `$$` (LightBurn forum topic 181704, 2026-01-25) reads
+ *  `[VER:1.1f.20220810:]` and `$150=25 $151=100 $152=30`, the page's defaults.
+ *  The Falcon A1 Pro's own settings page lists none of them, and an A1 Pro
+ *  `$I`/`$$` (barebaric/rayforge PR #461) reads grblHAL with
+ *  `[PLUGIN:Trinamic v0.12]` and `$150=16 $151=16 $152=16 $153=16`: grblHAL's
+ *  axis microsteps, which the plugin changes for any power of two without
+ *  touching steps/mm. So only the stock-GRBL Falcon contract lists them. Every
+ *  other numeric write stays out of host software on this contract (ADR-370
+ *  and its Amendment 1). Sources:
+ *  https://wiki.creality.com/en/laser-engraver/falcon-a1/random-data/description-for-GRBL-configuration-parameters
+ *  https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/settings.h#L553-L562
+ *  https://github.com/grblHAL/Plugins_motor/blob/11c937c85f07f7f4a52be6dfdd0e49f4fcfe1886/trinamic.c#L245-L259 */
+const FALCON_A1_AIR_SETTING_WRITES: ReadonlyArray<ConsoleSettingWrite> = [
   { id: 150, min: 0, max: 100, meaning: 'engraving airflow level' },
   { id: 151, min: 0, max: 100, meaning: 'cutting airflow level' },
   { id: 152, min: 0, max: 100, meaning: 'air pump standby wait in seconds, 100 = never' },

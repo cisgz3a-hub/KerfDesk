@@ -1,7 +1,8 @@
 import { isBarcodeObject } from '../../core/barcode';
-import type { PreflightResult } from '../../core/preflight';
+import type { PreflightIssue, PreflightResult } from '../../core/preflight';
 import {
   DEFAULT_PROJECT_VARIABLE_DATA,
+  sceneObjectUsesOperation,
   type Bounds,
   type ColoredPath,
   type Project,
@@ -14,6 +15,7 @@ import { applySimilarityProject, type SimilarityTransform } from '../../core/reg
 import { prepareOutput, type PreparedOutput, type PrepareOutputOptions } from './prepare-output';
 import { materializeVariableBarcode } from './materialize-variable-barcode';
 import { anchoredVariableTextTransform } from './variable-text-anchor';
+import { plainTextGlyphAdvisory, variableRecordGlyphAdvisory } from './text-glyph-advisory';
 
 export type VariableTextRenderInput = {
   readonly text: TextObject;
@@ -27,10 +29,18 @@ export type VariableTextRenderResult = {
   // The render's alignment anchor (see TextRenderResult); output keeps it
   // where the placed text had its anchor. Unused when a transform is given.
   readonly anchor?: Vec2;
+  // Characters the font has no glyph for: output warns about them (ADR-591 Amendment 1).
+  readonly missingCharacters?: ReadonlyArray<string>;
 };
-export type VariableTextRenderer = (
-  input: VariableTextRenderInput,
-) => Promise<VariableTextRenderResult>;
+export type VariableTextRenderer = {
+  (input: VariableTextRenderInput): Promise<VariableTextRenderResult>;
+  /**
+   * The characters `content` engraves that the text's font has no glyph for, as its render would
+   * report them, without laying it out. Output checks plain text with it (ADR-591 Amendment 2); a
+   * renderer without it leaves plain text unchecked.
+   */
+  readonly missingCharacters?: (input: VariableTextRenderInput) => Promise<ReadonlyArray<string>>;
+};
 
 export type PrepareOutputSnapshotOptions = PrepareOutputOptions & {
   readonly clock: () => Date;
@@ -107,11 +117,58 @@ async function prepareSnapshot(
     registeredProject,
     outputOptions(options),
   );
-  return { ...prepared, evaluationContext };
+  return { ...withTextAdvisories(prepared, evaluated.advisories), evaluationContext };
 }
 
+/**
+ * Output compiled without a snapshot has no records to evaluate, yet still names each burned plain
+ * text's missing characters, as a snapshot's preparation does (ADR-591 Amendment 2).
+ */
+export async function withTextGlyphCheck(
+  prepared: PreparedOutput,
+  project: Project,
+  renderer: VariableTextRenderer,
+): Promise<PreparedOutput> {
+  if (!prepared.ok) return prepared;
+  const advisories: TextGlyphAdvisory[] = [];
+  for (const object of project.scene.objects) {
+    if (object.kind !== 'text' || object.variableTemplate !== undefined) continue;
+    const issue = await plainTextGlyphIssue(object, project, renderer);
+    if (issue !== undefined) advisories.push({ objectId: object.id, issue });
+  }
+  return withTextAdvisories(prepared, advisories);
+}
+
+// A text's missing characters inform Job Review, Start and Save; they never refuse output.
+// Only text this output burns counts: inside its scope and on an output layer.
+function withTextAdvisories(
+  prepared: PreparedOutput,
+  advisories: ReadonlyArray<TextGlyphAdvisory>,
+): PreparedOutput {
+  if (!prepared.ok || advisories.length === 0) return prepared;
+  const { objects, layers } = prepared.project.scene;
+  const output = layers.filter((layer) => layer.output);
+  const burned = new Set(
+    objects
+      .filter((object) => output.some((layer) => sceneObjectUsesOperation(object, layer)))
+      .map((object) => object.id),
+  );
+  const issues = advisories.flatMap((advisory) =>
+    burned.has(advisory.objectId) ? [advisory.issue] : [],
+  );
+  if (issues.length === 0) return prepared;
+  return { ...prepared, advisories: [...(prepared.advisories ?? []), ...issues] };
+}
+
+/** A text's characters its font has no glyph for (ADR-591 Amendments 1 and 2). */
+export type TextGlyphAdvisory = { readonly objectId: string; readonly issue: PreflightIssue };
+
 type MaterializedProject =
-  | { readonly ok: true; readonly project: Project }
+  | {
+      readonly ok: true;
+      readonly project: Project;
+      readonly advisories: ReadonlyArray<TextGlyphAdvisory>;
+    }
   | { readonly ok: false; readonly preflight: PreflightResult };
 
 export async function materializeVariableText(
@@ -134,18 +191,30 @@ export async function materializeVariableText(
         objects: objects.map((result) => (result.ok ? result.object : result.fallback)),
       },
     },
+    advisories: objects.flatMap((result) =>
+      result.ok && result.advisory !== undefined
+        ? [{ objectId: result.object.id, issue: result.advisory }]
+        : [],
+    ),
   };
 }
 
 export type MaterializedObject =
-  | { readonly ok: true; readonly object: Project['scene']['objects'][number] }
+  | {
+      readonly ok: true;
+      readonly object: Project['scene']['objects'][number];
+      readonly advisory?: PreflightIssue;
+    }
   | {
       readonly ok: false;
       readonly message: string;
       readonly fallback: Project['scene']['objects'][number];
     };
 
-/** One object with its variable text or barcode data evaluated into plain content. */
+/**
+ * One object with its variable text or barcode data evaluated into plain content. Plain text stays
+ * as it is, with the characters its font lacks when the renderer can check them.
+ */
 export async function materializeVariableObject(
   object: Project['scene']['objects'][number],
   project: Project,
@@ -154,8 +223,10 @@ export async function materializeVariableObject(
 ): Promise<MaterializedObject> {
   if (isBarcodeObject(object))
     return materializeVariableBarcode(object, project, context, renderer);
-  if (object.kind !== 'text' || object.variableTemplate === undefined) {
-    return { ok: true, object };
+  if (object.kind !== 'text') return { ok: true, object };
+  if (object.variableTemplate === undefined) {
+    const advisory = await plainTextGlyphIssue(object, project, renderer);
+    return { ok: true, object, ...(advisory === undefined ? {} : { advisory }) };
   }
   const evaluated = evaluateVariableTemplate(object.variableTemplate, object, project, context);
   if (!evaluated.ok) return { ...evaluated, fallback: object };
@@ -170,8 +241,16 @@ export async function materializeVariableObject(
         renderer,
       ));
     const { variableTemplate: _template, ...plainText } = object;
+    const advisory = variableRecordGlyphAdvisory(
+      object,
+      object.variableTemplate,
+      { value: evaluated.value, missing: rendered.missingCharacters ?? [] },
+      project,
+      context,
+    );
     return {
       ok: true,
+      ...(advisory === undefined ? {} : { advisory }),
       // Only geometry crosses over: render notes such as the anchor stay off
       // the scene object, which array copies persist.
       object: {
@@ -194,6 +273,25 @@ export async function materializeVariableObject(
       fallback: object,
     };
   }
+}
+
+/**
+ * The characters a plain text's font has no glyph for, which its stored geometry already lacks
+ * (ADR-591 Amendment 2). The check never refuses output: a text it cannot check (a font that will
+ * not load) burns as before. `where` names the text's place, such as a production row.
+ */
+export async function plainTextGlyphIssue(
+  text: TextObject,
+  project: Project,
+  renderer: VariableTextRenderer,
+  where?: string,
+): Promise<PreflightIssue | undefined> {
+  const check = renderer.missingCharacters;
+  if (check === undefined) return undefined;
+  const missing = await check({ text, content: text.content, project }).catch(
+    (): ReadonlyArray<string> => [],
+  );
+  return plainTextGlyphAdvisory(text, missing, project, where);
 }
 
 function resolveEvaluationContext(

@@ -32,6 +32,7 @@ import type { OutputEmitOptions, OutputStrategy } from './output-strategy';
 import { bridgedAirGapIndices } from './air-assist-hold';
 import { withAirKeepAlive } from './air-keep-alive';
 import { emitScanlineFillGroup } from './grbl-fill-emission';
+import { contourExitComment, contourExitLines, contourRunways } from './grbl-contour-exit';
 import {
   LINE_END,
   contourEntryComment,
@@ -116,8 +117,8 @@ function postamble(
 }
 
 // Shared emission context for contour segments (Line mode and offset fill).
-// entryRunwayMm carries the group's ADR-239 tangential entry; undefined keeps
-// legacy byte-identical approach motion.
+// entryRunwayMm carries the group's ADR-239 tangential entry and exitRunwayMm
+// its M3 exit (Amendment 2); undefined keeps legacy byte-identical motion.
 type SegmentEmissionContext = {
   readonly laserPowerScaleVersion: LaserPowerScaleVersion;
   readonly s: number;
@@ -125,6 +126,7 @@ type SegmentEmissionContext = {
   readonly device: DeviceProfile;
   readonly dialect: GrblGcodeDialect;
   readonly entryRunwayMm?: number | undefined;
+  readonly exitRunwayMm?: number | undefined;
   readonly entryBounds: ContourEntryBounds;
   readonly cursor: LaserOutputCursor;
   /** ADR-432: the machine takes G2/G3, so fitted arc moves may be written. */
@@ -154,7 +156,7 @@ function emitSegment(seg: CutSegment, context: SegmentEmissionContext): string[]
   ];
   if (context.s > 0) noteBurn(cursor, burns.end);
   else noteLaserOffMove(cursor, burns.end);
-  return lines;
+  return [...lines, ...contourExitLines(seg, context)];
 }
 
 type SegmentBurnContext = Pick<
@@ -282,10 +284,10 @@ function emitGroup(group: CutGroup, context: GroupEmissionContext): string {
   const feed = roundedPositiveFeed(group.speed, `Layer ${group.layerId}`);
   const chunks: string[] = [];
   chunks.push(
-    `; layer ${gcodeCommentLabel(group.layerId)} color ${gcodeCommentLabel(group.color)} power ${group.power}% ${feedComment(group, feed)} passes ${group.passes}${contourEntryComment(group.entryRunwayMm, context.entryBounds)}${overcutComment(group.finalPassOvercutMm)}${leadComment(group.laserLeads)}${tabSpanComment(group.tabSpanPowerPercent)}`,
+    `; layer ${gcodeCommentLabel(group.layerId)} color ${gcodeCommentLabel(group.color)} power ${group.power}% ${feedComment(group, feed)} passes ${group.passes}${contourEntryComment(group.entryRunwayMm, context.entryBounds)}${contourExitComment(group.exitRunwayMm, context.entryBounds)}${overcutComment(group.finalPassOvercutMm)}${leadComment(group.laserLeads)}${tabSpanComment(group.tabSpanPowerPercent)}`,
   );
   pushOperationProvenanceComment(chunks, group);
-  const segmentContext = { ...context, s, feed, entryRunwayMm: group.entryRunwayMm };
+  const segmentContext = { ...context, s, feed, ...contourRunways(group) };
   const finalPass = finalPassCutSegments(group);
   for (let p = 0; p < group.passes; p += 1) {
     chunks.push(`; pass ${p + 1} of ${group.passes}`);
@@ -309,10 +311,10 @@ function emitOffsetFillGroup(group: FillGroup, context: GroupEmissionContext): s
   const feed = roundedPositiveFeed(group.speed, `Layer ${group.layerId}`);
   const chunks: string[] = [];
   chunks.push(
-    `; offset fill layer ${gcodeCommentLabel(group.layerId)} color ${gcodeCommentLabel(group.color)} power ${group.power}% ${feedComment(group, feed)} passes ${group.passes}${contourEntryComment(group.entryRunwayMm, context.entryBounds)}`,
+    `; offset fill layer ${gcodeCommentLabel(group.layerId)} color ${gcodeCommentLabel(group.color)} power ${group.power}% ${feedComment(group, feed)} passes ${group.passes}${contourEntryComment(group.entryRunwayMm, context.entryBounds)}${contourExitComment(group.exitRunwayMm, context.entryBounds)}`,
   );
   pushOperationProvenanceComment(chunks, group);
-  const segmentContext = { ...context, s, feed, entryRunwayMm: group.entryRunwayMm };
+  const segmentContext = { ...context, s, feed, ...contourRunways(group) };
   for (let p = 0; p < group.passes; p += 1) {
     chunks.push(`; pass ${p + 1} of ${group.passes}`);
     for (const seg of group.segments) {
@@ -489,7 +491,8 @@ function emitJob(job: Job, device: DeviceProfile, options: OutputEmitOptions = {
   // Job end: air off and M5 follow the last burn, and the park runs after
   // them. Under M3 that stops the head with the beam still lit: no laser-off
   // move is left to take the drain before the laser is switched off. The stop
-  // is inherent to constant power and is deliberately left as is (OR-1). Held
+  // is inherent to constant power and is deliberately left as is (OR-1), except
+  // after a contour exit runway (ADR-239 Amendment 2), which is that move. Held
   // air changes are for groups that burned nothing and are dropped rather
   // than drained lit (ADR-398 Amendment 1); the air off follows what was
   // actually written.

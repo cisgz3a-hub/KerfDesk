@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { MCP_ARRANGE_ACTIONS } from './authoring-schemas.js';
+import { MCP_ARRANGE_ACTIONS, mcpFontSizeMm } from './authoring-schemas.js';
 import { mcpSelectionArgsSchema } from './selection-schemas.js';
 
 const id = z.string().min(1).max(128);
@@ -96,7 +96,7 @@ export const mcpBatchEditSchemas = {
     yMm: coordinate,
     widthMm: size,
     text: z.string().min(1).max(4096),
-    fontSizeMm: z.number().positive().max(1000),
+    fontSizeMm: mcpFontSizeMm,
     fontId: id.optional(),
   }),
   add_rectangle: z.strictObject({
@@ -283,17 +283,21 @@ const designWrite = z.object({
   message: z.string().max(2048).optional(),
 });
 
+/** What the PC showed for a remote edit: an import's toasts (ADR-125 Amendment 2), the machine
+ *  change an Undo or Redo made (ADR-584 Amendment 1), or characters a text's font has no glyph for
+ *  (ADR-591 Amendment 1). */
+export const mcpNoticesSchema = z
+  .array(
+    z.object({
+      level: z.enum(['info', 'success', 'warning', 'error']),
+      message: z.string().max(2048),
+    }),
+  )
+  .max(20);
+
 /** What an import showed on the PC, and the bed fit it applied (ADR-125 Amendment 2). */
 const importNotices = {
-  notices: z
-    .array(
-      z.object({
-        level: z.enum(['info', 'success', 'warning', 'error']),
-        message: z.string().max(2048),
-      }),
-    )
-    .max(20)
-    .optional(),
+  notices: mcpNoticesSchema.optional(),
   bedFit: z
     .object({
       scale: z.number(),
@@ -329,6 +333,8 @@ export const mcpDesignOutputSchemas = {
           command: z.string().max(64),
           changedArtworkIds: z.array(id).max(200).optional(),
           operationId: id.optional(),
+          // An update_operation bit change's kept values (ADR-306 Amendment 5).
+          message: z.string().max(2048).optional(),
           ...importNotices,
         }),
       )

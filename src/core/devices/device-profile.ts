@@ -41,8 +41,9 @@ export function isKnownControllerKind(value: unknown): value is ControllerKind {
 }
 
 // Vendor command contracts are independent of a firmware-family label. The
-// Falcon LightBurn device file disables $J jogging and settings fetch and
-// supplies axis-specific Home commands; it does not identify a firmware build.
+// Falcon LightBurn device file disables $J jogging and LightBurn's settings
+// fetch and supplies axis-specific Home commands; it does not identify a
+// firmware build (two published A1 Pro `$I` reads do: falcon-profiles.ts).
 export type ControllerCommandSet = 'creality-falcon-a1-pro';
 
 export function isControllerCommandSet(value: unknown): value is ControllerCommandSet {
@@ -145,6 +146,30 @@ export type HomingConfig = {
   readonly direction: Origin;
 };
 
+/**
+ * How the X and Y motors move the head (ADR-675). `cartesian` gives each axis
+ * its own motor. `corexy` drives two belts together, motor A = X + Y and motor
+ * B = X - Y, as the Creality Falcon A1 Pro's grblHAL reports
+ * (`[KINEMATICS:CoreXY v2.02]`). The firmware limits speed and acceleration
+ * per motor, so the two layouts give a diagonal move different limits
+ * (motion-planner/drive-share.ts).
+ */
+export type MachineKinematics = 'cartesian' | 'corexy';
+
+export function isMachineKinematics(value: unknown): value is MachineKinematics {
+  return value === 'cartesian' || value === 'corexy';
+}
+
+/** The profile's kinematics; a profile saved without one is Cartesian. */
+export function machineKinematics(profile: Pick<DeviceProfile, 'kinematics'>): MachineKinematics {
+  return profile.kinematics ?? 'cartesian';
+}
+
+/** A loaded profile's `kinematics`: a known value survives, anything else is dropped. */
+export function kinematicsEntry(value: unknown): Pick<DeviceProfile, 'kinematics'> {
+  return isMachineKinematics(value) ? { kinematics: value } : {};
+}
+
 export type LaserSubProfile = {
   readonly model: string;
   readonly technology?: LaserTechnology;
@@ -246,18 +271,19 @@ export type DeviceProfile = {
   // hobby controllers leave these pins unwired or use M7 only when compiled in.
   readonly airAssistCommand: AirAssistCommand;
   // Vendor firmware that cannot be trusted to restart air assist inside a
-  // running program. Creality's A1 family idles the pump (and powers the laser
+  // running program. Creality's A1 idles the pump (and powers the laser
   // module down) `$152` seconds after it decides work has finished — 0..100,
   // 100 = never, default reported as 20 or 30 (Creality wiki, GRBL configuration
   // parameters) — and LightBurn staff confirmed a firmware bug that cuts air
   // after about 30 s on both the A1 and the A1 Pro (the A1 fix was a 1.0.7
-  // debug build; A1 Pro firmware is numbered separately). For such a machine
-  // the emitter holds air on across an Air-off operation that sits between two
-  // Air-on ones instead of cycling M9/M8 over it (ADR-335).
+  // debug build; A1 Pro firmware is numbered separately, and on its grblHAL
+  // `$150`-`$152` are microstep settings: ADR-370 Amendment 1). For such a
+  // machine the emitter holds air on across an Air-off operation that sits
+  // between two Air-on ones instead of cycling M9/M8 over it (ADR-335).
   // Absent keeps the plain per-operation cycling that stock GRBL, grblHAL,
   // FluidNC, Marlin and Smoothieware each honour immediately, and is also how
   // to get per-operation air back on an A1 once `$152=100` is set on the
-  // controller or the firmware is updated.
+  // controller, or on either model once the firmware is updated.
   readonly airAssistRestartUnreliable?: boolean;
   // ADR-432: 'off' keeps every laser burn move a G1 line; 'on' lets the laser
   // emitter write G2/G3 arcs for curved line-mode work on a controller family
@@ -309,8 +335,12 @@ export type DeviceProfile = {
   // estimator's planner. Generic default of 500; stock GRBL ships 10
   // mm/sec^2 (defaults.h), so read $120/$121 from the controller or tune
   // per machine if estimates are systematically off. Phase D will
-  // auto-read this from the `$$` settings dump on connect.
+  // auto-read this from the `$$` settings dump on connect. It is a limit
+  // per axis, or per motor on a CoreXY machine (`kinematics`).
   readonly accelMmPerSec2: number;
+  // Absent is Cartesian (ADR-675). Only how a per-axis or per-motor limit
+  // reaches a move depends on it; emitted coordinates never do.
+  readonly kinematics?: MachineKinematics;
   // GRBL junction deviation ($11) in mm. Controls cornering velocity:
   // larger → faster corners but more shake; smaller → slower corners,
   // smoother motion. Grbl's shipping default is 0.010 mm; rarely

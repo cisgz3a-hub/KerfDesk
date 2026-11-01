@@ -4,7 +4,7 @@
 // continuous jog; release, pointer loss, blur, and unmount all route through the
 // controller's jog-cancel command. Bare arrow keys nudge the selected canvas
 // object and no longer jog the machine (F104). The pad owns the keyboard jog
-// keys while it is mounted: PageUp/PageDown for Z focus, and LightBurn's XY
+// keys while it is mounted: Ctrl+Alt+PageUp/PageDown for Z focus, and LightBurn's XY
 // keys (ADR-493), which send the same step vector as the matching arrow.
 // While a step jog runs on a GRBL-family controller the arrows and XY keys stay
 // live for more steps, which join that jog (stepJogsOnly, ADR-674); hold, Z

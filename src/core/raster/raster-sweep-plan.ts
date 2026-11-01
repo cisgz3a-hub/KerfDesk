@@ -3,10 +3,14 @@
 // without overlap, keeping acceleration and braking outside the burn where
 // the available runway permits (ADR-445).
 
-import { rasterPixelRuns, rasterSweepRunsForPixelRun, type RasterSweepRun } from '../raster-output';
+import {
+  rasterPixelRuns,
+  rasterSweepRunsForPixelRuns,
+  type RasterSweepRun,
+} from '../raster-output';
 import type { RasterPowerValues } from './raster-power-values';
 
-export { rasterRunSurvivesDotWidthCorrection, type RasterSweepRun } from '../raster-output';
+export type { RasterSweepRun } from '../raster-output';
 
 const RASTER_GAP_RAPID_THRESHOLD_MM = 5;
 
@@ -138,16 +142,13 @@ function planRasterSweepRuns(
   minXWorldMm: number,
 ): RasterSweepRun[] {
   const pixelRuns = rasterPixelRuns(row, span);
-  const orderedRuns = reverse ? [...pixelRuns].reverse() : pixelRuns;
-  return orderedRuns.flatMap((run) =>
-    rasterSweepRunsForPixelRun({
-      run,
-      pixelWidthMm,
-      isReverse: reverse,
-      dotWidthCorrectionMm,
-      minXWorldMm,
-    }),
-  );
+  return rasterSweepRunsForPixelRuns({
+    runs: reverse ? [...pixelRuns].reverse() : pixelRuns,
+    pixelWidthMm,
+    isReverse: reverse,
+    dotWidthCorrectionMm,
+    minXWorldMm,
+  });
 }
 
 export function rasterControllerCoordinateMm(value: number): number {

@@ -24,7 +24,11 @@ import {
   type ControllerSettingsSnapshot,
 } from '../../core/controllers/grbl';
 import type { ControllerEvent } from '../../core/controllers';
-import type { DeviceProfile } from '../../core/devices';
+import {
+  reportedWorkArea,
+  travelEnvelopeFirmware,
+} from '../../core/controllers/grbl/reported-work-area';
+import type { ControllerKind, DeviceProfile } from '../../core/devices';
 import { deviceProfileWithInteractivePatch } from '../../core/devices/device-profile-patch';
 import { useStore } from './store';
 import { cncLiveCapsFromController } from './cnc-controller-caps';
@@ -127,6 +131,31 @@ export function publishCncLiveCaps(settings: ControllerSettingsSnapshot): void {
 
 export function clearCncLiveCaps(): void {
   useStore.getState().setCncLiveCaps(null);
+}
+
+/**
+ * The profile values a completed dump offers. Its bed is the work area the
+ * settings give a homed machine: `$130` × `$131`, or on grblHAL with homing on
+ * the homed envelope, which hard limits pull in by the pull-off (ADR-637
+ * Amendment 4). The controller snapshot keeps the raw travel.
+ */
+export function detectedProfilePatch(
+  detected: DetectedSettingsResult,
+  session: {
+    readonly activeControllerKind: ControllerKind;
+    readonly detectedControllerKind: ControllerKind | null;
+  },
+): Partial<DeviceProfile> {
+  const firmware = travelEnvelopeFirmware(
+    session.activeControllerKind,
+    session.detectedControllerKind,
+  );
+  const area = reportedWorkArea(detected.controllerSettings, firmware);
+  const { patch } = detected;
+  if (area === null || (area.widthMm === patch.bedWidth && area.heightMm === patch.bedHeight)) {
+    return patch;
+  }
+  return { ...patch, bedWidth: area.widthMm, bedHeight: area.heightMm };
 }
 
 /** Whether a completed dump has anything for Machine Setup's review lane. */

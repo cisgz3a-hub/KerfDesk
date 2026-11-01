@@ -10,9 +10,11 @@ import {
   removeCurveFillets,
   type FilletMode,
 } from '../../core/geometry/curve-fillet';
+import { withTabsFollowingEdit } from '../../core/geometry/edited-tab-anchors';
 import { polylineToCurveSubpath, type CurveSubpath } from '../../core/scene';
 import { isPathEditable } from './path-cleanup-actions';
 import { materializeCurves } from './path-node-curve-command-actions';
+import { movedTabsNotice } from './path-node-edit-actions';
 import { boundsForPaths } from './path-node-edit-geometry';
 import { synchronizePolylineShapeGeometry } from './path-node-shape-sync';
 import { selectedObjectIds } from './scene-group-actions';
@@ -45,6 +47,7 @@ function filletMutation(
   const ids = new Set(selectedObjectIds(state));
   let corners = 0;
   let stretched = 0;
+  let movedTabs = 0;
   const objects = state.project.scene.objects.map((object) => {
     if (!ids.has(object.id) || object.locked === true || !isPathEditable(object)) return object;
     const { scaleX, scaleY } = object.transform;
@@ -78,11 +81,21 @@ function filletMutation(
     });
     if (!changed) return object;
     const bounds = boundsForPaths(paths);
-    return object.kind === 'shape'
-      ? (synchronizePolylineShapeGeometry(object, paths, bounds) ?? object)
-      : { ...object, paths, bounds };
+    const edited =
+      object.kind === 'shape'
+        ? synchronizePolylineShapeGeometry(object, paths, bounds)
+        : { ...object, paths, bounds };
+    if (edited === null) return object;
+    // Rounding a contour's start corner moves its start to the arc's end, so
+    // tabs placed by hand are re-measured where they were (ADR-494 Amendment 2).
+    const followed = withTabsFollowingEdit(object, edited);
+    movedTabs += followed.moved;
+    return followed.object;
   });
-  useToastStore.getState().pushToast(message(action, corners, stretched), 'info');
+  const tabs = movedTabsNotice(movedTabs);
+  useToastStore
+    .getState()
+    .pushToast(`${message(action, corners, stretched)}${tabs === '' ? '' : ` ${tabs}`}`, 'info');
   if (corners === 0) return state;
   return {
     project: { ...state.project, scene: { ...state.project.scene, objects } },

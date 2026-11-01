@@ -9,6 +9,7 @@
 
 import { SEG_KIND, SEG_MOTION, type GcodeRenderModel } from '../gcode-view';
 import type { Block } from '../motion-planner';
+import { plannedDriveShare } from '../motion-planner/planner-kinematics';
 import { SECONDS_PER_MINUTE, type MotionLimits } from './motion-limits';
 
 const FLOATS_PER_SEGMENT = 6;
@@ -28,16 +29,23 @@ function segmentBlock(model: GcodeRenderModel, index: number, limits: MotionLimi
   const dz = (model.positions[base + 5] ?? 0) - (model.positions[base + 2] ?? 0);
   const length = Math.hypot(dx, dy, dz);
   const isRapid = model.segMotion[index] === SEG_MOTION.rapid;
+  const direction =
+    length > 0 ? { x: dx / length, y: dy / length, z: dz / length } : { x: 0, y: 0, z: 0 };
+  const maxRate = maxRateAlong(direction, limits);
   return {
     kind: isCutting(model, index) ? 'cut' : 'travel',
     motion: isRapid ? 'rapid' : 'feed',
     distance: segmentDistance(model, index, length),
     targetVelocity: isRapid
-      ? limits.maxFeedMmPerMin / SECONDS_PER_MINUTE
-      : feedMmPerSec(model.segFeed[index] ?? 0, limits.maxFeedMmPerMin),
-    direction:
-      length > 0 ? { x: dx / length, y: dy / length, z: dz / length } : { x: 0, y: 0, z: 0 },
+      ? maxRate / SECONDS_PER_MINUTE
+      : feedMmPerSec(model.segFeed[index] ?? 0, maxRate),
+    direction,
   };
+}
+
+// The max rate is per motor on CoreXY, so a diagonal tops out below it (ADR-675).
+function maxRateAlong(direction: Block['direction'], limits: MotionLimits): number {
+  return limits.maxFeedMmPerMin / plannedDriveShare(limits.kinematics ?? 'cartesian', direction);
 }
 
 function segmentDistance(model: GcodeRenderModel, index: number, chordLength: number): number {

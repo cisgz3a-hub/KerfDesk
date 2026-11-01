@@ -1,6 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { despeckle, hasImpulseNoise, medianFilter, otsuThreshold } from './preprocess';
+import { otsuThreshold } from './otsu-cut';
+import { despeckle, hasImpulseNoise, medianFilter } from './preprocess';
 import type { RawImageData } from './trace-image';
 
 // ITU-R BT.601 luma, rounded — matches preprocess.ts's lumaAt exactly. The

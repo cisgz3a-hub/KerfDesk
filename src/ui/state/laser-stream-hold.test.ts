@@ -168,11 +168,16 @@ describe('sameStreamHoldEpisode / copy', () => {
       unacknowledgedBytes: 1008,
       controllerState: 'Idle',
     };
-    expect(describeStreamHold(hold, false)).toBe(
+    expect(describeStreamHold(hold, null)).toBe(
       'The controller reports Idle and has not acknowledged the last 41 sent lines for 12 s. ' +
         'KerfDesk is connected and waiting; nothing was reset',
     );
-    expect(describeStreamHold(hold, true)).toContain('$152 standby setting');
+    expect(describeStreamHold(hold, 'standby-setting')).toContain('$152 standby setting');
+    // ADR-370 Amendment 1: on the A1 Pro's grblHAL, $152 is a microstep setting.
+    const a1Pro = describeStreamHold(hold, 'grblhal-falcon');
+    expect(a1Pro).toContain('check its firmware after the job');
+    expect(a1Pro).toContain('$150-$152 are motor settings, not air settings');
+    expect(a1Pro).not.toContain('$152 standby setting');
     expect(controllerUnresponsiveNotice(hold).message).toContain('Completion is still unconfirmed');
     expect(controllerUnresponsiveNotice(hold).message).not.toContain('Falcon');
   });
@@ -211,12 +216,12 @@ describe('sameStreamHoldEpisode / copy', () => {
     const hold = patches.at(-1)?.streamHold;
     expect(hold?.serialLineError).toBe('FramingError');
     const named = hold as StreamHold;
-    expect(describeStreamHold(named, false)).toBe(
+    expect(describeStreamHold(named, null)).toBe(
       'The controller reports Idle and has not acknowledged the last 4 sent lines for 12 s. ' +
         'KerfDesk is connected and waiting; nothing was reset. The serial link reported a line ' +
         'error (FramingError) during this job, and an acknowledgement lost with it never arrives',
     );
-    expect(describeStreamHold(named, true)).toMatch(
+    expect(describeStreamHold(named, 'standby-setting')).toMatch(
       /\$152 standby setting after the job\. The serial link/,
     );
     expect(controllerUnresponsiveNotice(named).message).toMatch(/line error \(FramingError\).*\.$/);
@@ -239,7 +244,7 @@ describe('stream hold evidence', () => {
     const state = streamingState({ statusObservation: STALE });
     const hold = streamHoldFromProbe(state, probeAt(1_000, state), 4_000) as StreamHold;
     expect(hold.controllerState).toBeNull();
-    expect(describeStreamHold(hold, false)).toBe(
+    expect(describeStreamHold(hold, null)).toBe(
       'The controller has sent no fresh status report and has not acknowledged the last 4 sent ' +
         'lines for 3 s. KerfDesk is connected and waiting; nothing was reset',
     );
@@ -256,7 +261,7 @@ describe('stream hold evidence', () => {
     });
     const hold = streamHoldFromProbe(state, probeAt(1_000, state), 91_000) as StreamHold;
     expect(hold).toMatchObject({ controllerState: null, statusNotPolled: true });
-    expect(describeStreamHold(hold, false)).toBe(
+    expect(describeStreamHold(hold, null)).toBe(
       'The controller, whose status is not polled while it streams, has not acknowledged the ' +
         'last 4 sent lines for 90 s. KerfDesk is connected and waiting; nothing was reset',
     );
@@ -318,7 +323,7 @@ describe('a programmed G4 dwell', () => {
     const hold = streamHoldFromProbe(state, probeUntil(state, 14_000), 14_000) as StreamHold;
     expect(hold.dwellSeconds).toBe(5);
     expect(streamHoldHeading(hold)).toBe('DWELLING (SPINDLE SPIN-UP)');
-    expect(describeStreamHold(hold, true)).toBe(
+    expect(describeStreamHold(hold, 'standby-setting')).toBe(
       "The controller is running the program's 5 s G4 dwell (4 s so far). KerfDesk is " +
         'connected and waiting; nothing was reset',
     );

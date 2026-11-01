@@ -17,8 +17,11 @@ import {
   MIN_LEAD_ANGLE_DEG,
   MIN_LEAD_LENGTH_MM,
 } from '../../core/job/laser-lead-settings';
-import { rematerializeParametricShape, type ParametricShapeSpec } from '../../core/shapes';
+import type { ParametricShapeSpec } from '../../core/shapes';
+import { rematerializeShapeSpecEdit } from '../../core/shapes/rectangle-resize';
+import { movedTabsNotice } from './path-node-edit-actions';
 import { pushUndo, type StateSlice } from './scene-mutations';
+import { useToastStore } from './toast-store';
 
 const MIN_POWER_SCALE_PERCENT = 0;
 const MAX_POWER_SCALE_PERCENT = 100;
@@ -60,12 +63,15 @@ export function objectPropertiesActions(set: ObjectPropertiesSet): ObjectPropert
     setObjectsPowerScale: (objectIds, powerScale) =>
       set((state) => setObjectsPowerScale(state, new Set(objectIds), powerScale)),
     setSelectedShapeSpec: (spec) =>
-      set((state) =>
+      setShapeSpecWithNotice(set, (state, movedTabs) =>
         state.selectedObjectId === null || state.additionalSelectedIds.size > 0
           ? {}
-          : setShapeSpec(state, state.selectedObjectId, spec),
+          : setShapeSpec(state, state.selectedObjectId, spec, movedTabs),
       ),
-    setShapeSpec: (objectId, spec) => set((state) => setShapeSpec(state, objectId, spec)),
+    setShapeSpec: (objectId, spec) =>
+      setShapeSpecWithNotice(set, (state, movedTabs) =>
+        setShapeSpec(state, objectId, spec, movedTabs),
+      ),
     setSelectedObjectsOperationOverride: (patch) =>
       set((state) => setObjectsOperationOverride(state, selectedObjectIds(state), patch)),
     setObjectsOperationOverrideForOperation: (objectIds, operationId, patch) =>
@@ -109,21 +115,36 @@ function setObjectsPowerScale(
   return changed ? mutation(state, objects) : {};
 }
 
+// Tabs placed by hand follow the new size; a tab the new outline took off its
+// stretched place moved to the nearest point of it, and the note says so
+// (ADR-494 Amendment 3).
 function setShapeSpec(
   state: ObjectPropertiesState,
   objectId: string,
   spec: ParametricShapeSpec,
+  movedTabs: { count: number },
 ): ObjectPropertiesMutation {
   const object = state.project.scene.objects.find((candidate) => candidate.id === objectId);
   if (!isEditableParametricShape(object) || object.locked === true) return {};
-  const replacement = rematerializeParametricShape(object, spec);
-  if (replacement === null || shapeSpecEqual(replacement, object)) return {};
+  const edit = rematerializeShapeSpecEdit(object, spec);
+  if (edit === null || shapeSpecEqual(edit.object, object)) return {};
+  movedTabs.count = edit.moved;
   return mutation(
     state,
     state.project.scene.objects.map((candidate) =>
-      candidate.id === object.id ? replacement : candidate,
+      candidate.id === object.id ? edit.object : candidate,
     ),
   );
+}
+
+function setShapeSpecWithNotice(
+  set: ObjectPropertiesSet,
+  edit: (state: ObjectPropertiesState, movedTabs: { count: number }) => ObjectPropertiesMutation,
+): void {
+  const movedTabs = { count: 0 };
+  set((state) => edit(state, movedTabs));
+  const notice = movedTabsNotice(movedTabs.count);
+  if (notice !== '') useToastStore.getState().pushToast(notice, 'info');
 }
 
 function mutation(

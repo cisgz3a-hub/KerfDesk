@@ -22,17 +22,23 @@ export function buildContourEntryReviewFacts(
     ) {
       continue;
     }
-    const key = `${group.layerId}:${group.entryRunwayMm}`;
+    const withExit = group.exitRunwayMm !== undefined;
+    const key = `${group.layerId}:${group.entryRunwayMm}:${withExit}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    const label = `Contour entry — ${operationName(group.layerId, layers)}`;
+    const label = `${withExit ? 'Contour entry and exit' : 'Contour entry'} — ${operationName(group.layerId, layers)}`;
     // ADR-239 Amendment 1: say so when the emitter adds no entry (ADR-343).
+    // Amendment 2: an M3 group's exit follows the same rule.
     facts.push(
       skipped
-        ? { label, value: SKIPPED_ENTRY_VALUE, tone: 'warning' }
+        ? {
+            label,
+            value: withExit ? SKIPPED_ENTRY_AND_EXIT_VALUE : SKIPPED_ENTRY_VALUE,
+            tone: 'warning',
+          }
         : {
             label,
-            value: `${formatMm(group.entryRunwayMm)} mm effective target at operation feed · laser off`,
+            value: `${formatMm(group.entryRunwayMm)} mm effective target at operation feed${withExit ? ', each end' : ''} · laser off`,
             tone: 'default',
           },
     );
@@ -43,6 +49,11 @@ export function buildContourEntryReviewFacts(
 const SKIPPED_ENTRY_VALUE =
   'Not added · where the bed edges are in program coordinates is unknown, so each contour ' +
   'starts burning from rest';
+
+const SKIPPED_ENTRY_AND_EXIT_VALUE =
+  'Not added · where the bed edges are in program coordinates is unknown, so each contour ' +
+  'starts burning from rest and slows to a stop at full constant power (M3) at its end; ' +
+  'both ends burn darker';
 
 function operationName(layerId: string, layers: ReadonlyArray<Layer>): string {
   const direct = layers.find((layer) => layer.id === layerId);

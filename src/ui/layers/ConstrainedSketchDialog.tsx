@@ -8,6 +8,7 @@ import { SketchSolveReview } from './SketchSolveReview';
 import { SketchDraftPreview } from './SketchDraftPreview';
 import { sketchFromTemplate, type SketchTemplate } from './sketch-geometry-draft';
 import { useConstrainedSketchDraft } from './use-constrained-sketch-draft';
+import { RetainedScaleNotice } from './RetainedScaleNotice';
 import './design-authoring-dialog.css';
 export function ConstrainedSketchDialog(props: {
   readonly object: ImportedSvg | undefined;
@@ -59,6 +60,7 @@ export function ConstrainedSketchDialog(props: {
         </div>
         <aside className="lf-authoring-review" aria-label="Sketch geometry review">
           <h3>Geometry preview</h3>
+          <RetainedScaleNotice source={props.object} subject="sketch" />
           {draft.review === null ? <SketchDraftPreview sketch={draft.sketch} /> : null}
           <Button
             onClick={draft.solve}

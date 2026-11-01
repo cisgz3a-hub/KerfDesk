@@ -4,7 +4,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TRACE_PRESETS, cropRawImageData, type RawImageData } from '../../core/trace';
-import { otsuThreshold } from '../../core/trace/preprocess';
+import { automaticThreshold } from '../../core/trace/otsu-cut';
 import type { TraceWorkerRequest, TraceWorkerResponse } from './trace-worker';
 
 afterEach(() => {
@@ -53,7 +53,9 @@ describe('trace results carry the trace report', () => {
     const result = await client.traceImage(image, TRACE_PRESETS['Sharp']!);
 
     expect(result.paths.length).toBeGreaterThan(0);
-    expect(result.report).toEqual({ automaticThresholdLuma: otsuThreshold(image) });
+    expect(result.report).toEqual({
+      automaticThresholdLuma: automaticThreshold(image, TRACE_PRESETS['Sharp']),
+    });
   });
 
   it('keeps the cropped trace report through a Crop region', async () => {
@@ -66,7 +68,10 @@ describe('trace results carry the trace report', () => {
 
     expect(result).toMatchObject({ width: 48, height: 32 });
     expect(result.report).toEqual({
-      automaticThresholdLuma: otsuThreshold(cropRawImageData(image, region)),
+      automaticThresholdLuma: automaticThreshold(
+        cropRawImageData(image, region),
+        TRACE_PRESETS['Sharp'],
+      ),
     });
   });
 });

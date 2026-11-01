@@ -1,5 +1,6 @@
 import type { EmbeddedFont } from '../../core/scene';
 import { findFontEntry } from '../../core/text';
+import { missingCharactersSentence } from '../../core/text/missing-glyph-words';
 import { useStore } from '../state';
 import { useMissingCharacters } from './use-missing-characters';
 
@@ -34,7 +35,12 @@ export function FontUsageHint(props: {
       )}
       {missing.length > 0 && (
         <span role="status" style={warningStyle}>
-          {missingCharactersMessage(missing, singleLine, props.variable)}
+          {missingCharactersSentence(
+            'This font',
+            missing,
+            props.fontKey,
+            props.variable ? ' (in this text or the CSV values it uses)' : '',
+          )}
         </span>
       )}
       {unchecked !== null && (
@@ -44,23 +50,6 @@ export function FontUsageHint(props: {
       )}
     </small>
   );
-}
-
-function missingCharactersMessage(
-  missing: ReadonlyArray<string>,
-  singleLine: boolean,
-  variable: boolean,
-): string {
-  const where = variable ? ' (in this text or the CSV values it uses)' : '';
-  const outcome = singleLine ? 'each engraves as ?' : 'each engraves as a box, or not at all';
-  return `This font has no ${missing.map(characterLabel).join(' ')}${where}; ${outcome}.`;
-}
-
-// Spaces, controls and combining marks would be invisible in the list.
-function characterLabel(character: string): string {
-  if (/^[\p{L}\p{N}\p{P}\p{S}]$/u.test(character)) return character;
-  const code = character.codePointAt(0) ?? 0;
-  return `U+${code.toString(16).toUpperCase().padStart(4, '0')}`;
 }
 
 const hintStyle: React.CSSProperties = {

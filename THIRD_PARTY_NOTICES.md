@@ -51,6 +51,7 @@ generated release notices.
 | bidi-js 1.1.0 | MIT | Loov Communications — https://github.com/lojjic/bidi-js |
 | Unicode 17 script data | Unicode-3.0 | © Unicode, Inc. — https://www.unicode.org/Public/17.0.0/ucd/ |
 | ag-psd 31.0.3 | MIT | Agamnentzar — https://github.com/Agamnentzar/ag-psd |
+| fflate 0.8.3 | MIT | © 2026 Arjun Barrett — https://github.com/101arrowz/fflate |
 | PackingSolver 49bf6c7 and its solver dependencies | MIT, with permissive runtime notices | Florian Fontan and contributors — https://github.com/fontanf/packingsolver |
 | imagetracerjs | Unlicense (public domain) | András Jankovics — https://github.com/jankovicsandras/imagetracerjs |
 | clipper2-ts | BSL-1.0 (Boost Software License 1.0) | Port of Angus Johnson's Clipper2 — https://github.com/ErikSom/Clipper2-ts |

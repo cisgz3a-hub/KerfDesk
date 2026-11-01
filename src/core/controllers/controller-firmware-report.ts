@@ -15,7 +15,9 @@ export type ControllerFirmwareReport = {
 };
 
 export function firmwareReportQuery(driver: ControllerDriver): string | null {
-  // Vendor command sets need their own documented report contract.
+  // Vendor command sets need their own documented report contract. Two
+  // published Falcon A1 Pro units answered a plain `$I` (ADR-322 Amendment 3).
+  if (driver.commandSet === 'creality-falcon-a1-pro') return '$I';
   if (driver.commandSet !== undefined) return null;
   switch (driver.kind) {
     case 'grbl-v1.1':
@@ -34,6 +36,8 @@ export function firmwareReportQuery(driver: ControllerDriver): string | null {
 
 const HAL_FIELDS = new Set([
   'AXS',
+  // A CoreXY build limits each motor, not each axis (ADR-675).
+  'KINEMATICS',
   'NEWOPT',
   'FIRMWARE',
   'DRIVER',

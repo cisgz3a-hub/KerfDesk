@@ -1,12 +1,13 @@
 import type { SceneObject } from '../../core/scene';
 import { transformedBBox } from '../../core/scene/hit-test';
 import type { ParseDxfResult } from '../../io/dxf';
-import { parseSvg, type ParseSvgResult } from '../../io/svg';
+import type { ParseSvgResult } from '../../io/svg';
 import { describeDxfImport } from '../app/dxf-import-action';
 import type { ImportBedFitUndo } from '../app/import-bed-fit-notice';
 import type { ToastDescriptor } from '../app/import-toasts';
 import { describeSvgImport } from '../app/svg-import-action';
 import { importImageFile } from '../commands/import-image-action';
+import { parseSvgOffThread } from '../import/document-import-worker-client';
 import { parseDxfOffThread } from '../import/import-worker-client';
 import { prepareSvgFragment } from '../import/svg-image-hydration';
 import { fitImportedObjectsToBed } from '../state/import-bed-fit';
@@ -42,13 +43,11 @@ type Commit = (action: () => Record<string, unknown>) => Record<string, unknown>
 const AT_FILE_SIZE = { fitToBed: false } as const;
 
 export async function prepareSvgImport(
-  svgText: string,
+  svg: string | Uint8Array<ArrayBuffer>,
   source: string,
   signal: AbortSignal,
 ): Promise<PreparedImport> {
-  // parseSvg sanitises first: scripts, foreignObject and external references are removed.
-  const result = parseSvg({ svgText, id: crypto.randomUUID(), source });
-  signal.throwIfAborted();
+  const result = await parseSvgInWorker(svg, source, signal);
   if (result.fragment !== undefined && result.fragment.entries.length > 0) {
     const prepared = await prepareSvgFragment(result.fragment, { signal });
     const fragment = {
@@ -82,6 +81,23 @@ export async function prepareSvgImport(
     accept: () => undefined,
     dispose: () => Promise.resolve(),
   };
+}
+
+/**
+ * File > Import's SVG parse (ADR-269 Amendment 3): the document import worker, which sanitises
+ * first (scripts, foreignObject and external references are removed), cancelled with the request.
+ */
+async function parseSvgInWorker(
+  svg: string | Uint8Array<ArrayBuffer>,
+  source: string,
+  signal: AbortSignal,
+): Promise<ParseSvgResult> {
+  const blob = new Blob([svg], { type: 'image/svg+xml' });
+  const parsing = parseSvgOffThread(blob, crypto.randomUUID(), source, { signal });
+  if (parsing === null) throw new RemoteFault('unavailable');
+  const result = await parsing;
+  signal.throwIfAborted();
+  return result;
 }
 
 function svgReport(
@@ -124,7 +140,8 @@ function insertAndPlace(store: RemoteAppStore, placement: Placement, insert: () 
   if (step.fit === null) return { ids, outcome: { kind: 'added' } };
   const fitted = step.fit.objects;
   inOneUndoStep(store, () => {
-    for (const object of fitted) store.getState().setObjectTransform(object.id, object.transform);
+    // One write for every fitted object, not one per object (J10-P2-1).
+    store.getState().setObjectTransforms(fitted.map(({ id, transform }) => ({ id, transform })));
     applyEdits(store, step.placement);
   });
   fitAllObjects(store.getState);
@@ -220,13 +237,6 @@ function decode(base64: string): Uint8Array<ArrayBuffer> {
   for (let index = 0; index < raw.length; index += 1) bytes[index] = raw.charCodeAt(index);
   return bytes;
 }
-function text(bytes: Uint8Array): string {
-  try {
-    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-  } catch {
-    throw new RemoteFault('invalid_arguments');
-  }
-}
 const PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 const JPEG = [0xff, 0xd8, 0xff];
 const starts = (bytes: Uint8Array, magic: readonly number[]) =>
@@ -244,7 +254,8 @@ export async function importFile(
 ): Promise<Record<string, unknown>> {
   const bytes = decode(args.dataBase64);
   if (args.mimeType === 'image/svg+xml') {
-    const prepared = await prepareSvgImport(text(bytes), args.fileName, signal);
+    // The file's bytes, as File > Import passes them to the worker.
+    const prepared = await prepareSvgImport(bytes, args.fileName, signal);
     try {
       const receipt = commit(() => reportedReceipt(store, prepared.commit(store, args)));
       prepared.accept();

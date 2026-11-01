@@ -6,8 +6,8 @@ import {
 import {
   type Project,
   type SelectionAnchor,
+  type SelectionTransform,
   type ShapeObject,
-  type Transform,
   type Vec2,
 } from '../../core/scene';
 import { useStore } from '../state';
@@ -174,7 +174,7 @@ function runWorkspaceDragMove(args: {
     setSelectedCncTabAnchorDuringInteraction: deps.setSelectedCncTabAnchorDuringInteraction,
     selectionAnchor: deps.selectionAnchor,
     snapSettings: deps.snapSettings,
-    setObjectTransform: deps.setObjectTransform,
+    setObjectTransforms: deps.setObjectTransforms,
     setSnapGuides: deps.setSnapGuides,
   });
 }
@@ -313,7 +313,7 @@ function updateWorkspaceDrag(args: {
   ) => void;
   readonly selectionAnchor: SelectionAnchor;
   readonly snapSettings: SnapSettings;
-  readonly setObjectTransform: (id: string, transform: Transform) => void;
+  readonly setObjectTransforms: (updates: ReadonlyArray<SelectionTransform>) => void;
   readonly setSnapGuides: (next: ReadonlyArray<SnapGuide>) => void;
 }): void {
   const canvas = args.ref.current;

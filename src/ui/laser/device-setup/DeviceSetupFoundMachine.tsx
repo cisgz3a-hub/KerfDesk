@@ -4,6 +4,7 @@
 // Use detected values (ADR-347), so opening setup never rewrites a finished one.
 
 import { selectControllerDriver } from '../../../core/controllers';
+import type { ControllerSettingsSnapshot } from '../../../core/controllers/grbl';
 import type { DeviceProfile } from '../../../core/devices';
 import { numbersClose } from '../../../core/util';
 import { useLaserStore } from '../../state/laser-store';
@@ -25,8 +26,9 @@ export function DeviceSetupFoundMachine(
   props: DeviceSetupStepProps & { readonly automatic?: DeviceSetupAutomatic | undefined },
 ): JSX.Element {
   const detected = useLaserStore((s) => s.detectedSettings);
+  const controller = useLaserStore((s) => s.controllerSettings);
   const record = props.automatic?.record ?? null;
-  const facts = reportedFacts(detected ?? {});
+  const facts = reportedFacts(detected ?? {}, controller);
   return (
     <div className="lf-setup-found">
       {facts.length > 0 ? (
@@ -46,6 +48,7 @@ export function DeviceSetupFoundMachine(
           record={record}
           after={props.state}
           detected={detected ?? {}}
+          controller={controller}
           onUndo={props.automatic?.undo}
         />
       ) : (
@@ -59,6 +62,7 @@ function AutoFilled(props: {
   readonly record: AppliedAutoFill;
   readonly after: DeviceSetupState;
   readonly detected: Partial<DeviceProfile>;
+  readonly controller: ControllerSettingsSnapshot | null;
   readonly onUndo: (() => void) | undefined;
 }): JSX.Element {
   const rows = autoFilledRows(props.record, props.after);
@@ -85,7 +89,7 @@ function AutoFilled(props: {
           </li>
         ))}
       </ul>
-      <KeptWorkArea state={props.after} detected={props.detected} />
+      <KeptWorkArea state={props.after} detected={props.detected} controller={props.controller} />
       <p className="lf-setup-muted">
         Everything stays editable, and nothing is saved until the last step. Configured travel is
         the controller&apos;s limit, not a measured work area.
@@ -104,10 +108,12 @@ function AutoFilled(props: {
 function KeptWorkArea(props: {
   readonly state: DeviceSetupState;
   readonly detected: Partial<DeviceProfile>;
+  readonly controller: ControllerSettingsSnapshot | null;
 }): JSX.Element | null {
   const { draft } = props.state;
   const { bedWidth, bedHeight } = props.detected;
-  if (bedWidth === undefined || bedHeight === undefined) return null;
+  const travel = reportedTravel(props.detected, props.controller);
+  if (bedWidth === undefined || bedHeight === undefined || travel === null) return null;
   if (numbersClose(bedWidth, draft.bedWidth) && numbersClose(bedHeight, draft.bedHeight)) {
     return null;
   }
@@ -127,8 +133,9 @@ function KeptWorkArea(props: {
         Work area kept at {draft.bedWidth} × {draft.bedHeight} mm
       </strong>
       , as listed for the {listed.name}. Your controller&apos;s configured travel ($130 × $131) is{' '}
-      {bedWidth} × {bedHeight} mm, which is not filled in. Change the work area in Essentials only
-      if your machine differs from the listed one.
+      {travel.width} × {travel.height} mm{homedAreaNote(props.detected, travel)}, which is not
+      filled in. Change the work area in Essentials only if your machine differs from the listed
+      one.
     </p>
   );
 }
@@ -179,10 +186,35 @@ function AppliedNote(): JSX.Element {
   );
 }
 
-function reportedFacts(detected: Partial<DeviceProfile>): ReadonlyArray<string> {
+// The detected bed is the work area a homed machine gets, which on grblHAL is a
+// pull-off short of the travel the controller reports (ADR-637 Amendment 4).
+type Travel = { readonly width: number; readonly height: number };
+
+function reportedTravel(
+  detected: Partial<DeviceProfile>,
+  controller: ControllerSettingsSnapshot | null,
+): Travel | null {
+  if (detected.bedWidth === undefined || detected.bedHeight === undefined) return null;
+  return {
+    width: controller?.bedWidth ?? detected.bedWidth,
+    height: controller?.bedHeight ?? detected.bedHeight,
+  };
+}
+
+function homedAreaNote(detected: Partial<DeviceProfile>, travel: Travel): string {
+  return detected.bedWidth === travel.width && detected.bedHeight === travel.height
+    ? ''
+    : `, a ${detected.bedWidth} × ${detected.bedHeight} mm work area after the homing pull-off`;
+}
+
+function reportedFacts(
+  detected: Partial<DeviceProfile>,
+  controller: ControllerSettingsSnapshot | null,
+): ReadonlyArray<string> {
   const facts: string[] = [];
-  if (detected.bedWidth !== undefined && detected.bedHeight !== undefined) {
-    facts.push(`Travel ${detected.bedWidth} × ${detected.bedHeight} mm`);
+  const travel = reportedTravel(detected, controller);
+  if (travel !== null) {
+    facts.push(`Travel ${travel.width} × ${travel.height} mm${homedAreaNote(detected, travel)}`);
   }
   if (detected.maxFeed !== undefined) facts.push(`Max speed ${detected.maxFeed} mm/min`);
   if (detected.maxPowerS !== undefined) {

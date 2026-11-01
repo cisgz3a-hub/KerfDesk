@@ -32,19 +32,23 @@ export function hostedRefillArmed(refs: ConnectionRefs): boolean {
 /**
  * Hand the refill over from exactly this stream position. Called after the
  * first window is on the wire, so the worker adopts a state whose in-flight
- * bytes are already accounted for and simply continues.
+ * bytes are already accounted for and simply continues. The arm names the
+ * controller's reply grammar: Marlin's ping-pong `ok`, else GRBL's (ADR-676).
  */
 export async function armHostedRefill(
-  refs: ConnectionRefs,
+  refs: ConnectionRefs & { readonly driver: { readonly kind: string } },
   readStreamer: () => StreamerState | null,
 ): Promise<void> {
   const refill = hostedRefill(refs);
   const streamer = readStreamer();
   if (refill === null || streamer === null || streamer.status !== 'streaming') return;
-  await refill.arm(() => {
-    const current = readStreamer();
-    return current?.status === 'streaming' ? current : null;
-  });
+  await refill.arm(
+    () => {
+      const current = readStreamer();
+      return current?.status === 'streaming' ? current : null;
+    },
+    refs.driver.kind === 'marlin' ? 'marlin' : 'grbl',
+  );
 }
 
 /**
@@ -52,6 +56,13 @@ export async function armHostedRefill(
  * that is about to change the stream's status must await this, or the two
  * sides would briefly disagree about who writes next. The one exception is a
  * realtime reset, which the worker treats as its own release.
+ *
+ * The release is posted before this returns its promise. A Marlin stop without
+ * a reset byte (Abort, Disconnect) posts its stop lines right after it, then
+ * awaits the reply before freezing the stream (ADR-676 Amendment 1): a line
+ * the worker sent before the release is then on this side's ledger too, and
+ * its reply cannot settle a stop line, yet the stop lines never wait behind
+ * the lines the worker forwarded while this thread was busy.
  */
 export async function releaseHostedRefill(refs: ConnectionRefs): Promise<void> {
   const refill = hostedRefill(refs);

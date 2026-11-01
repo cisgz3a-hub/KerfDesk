@@ -16,10 +16,29 @@ export type PathTextResult =
   | { readonly kind: 'ok'; readonly rendered: TextRenderResult; readonly origin: Vec2 }
   | { readonly kind: 'invalid-guide' | 'text-too-long'; readonly message: string };
 
+/**
+ * Where the guide crosses a text, measured down from its first baseline: its
+ * ink bottom, middle or top for on top of, centred on or hanging below. Absent
+ * when the text has no anchor.
+ */
+export function pathTextAcrossFromBaseline(
+  rendered: TextRenderResult,
+  settings: PathTextSettings,
+): number | undefined {
+  if (rendered.anchor === undefined) return undefined;
+  return acrossReferenceY(rendered.bounds, settings.acrossAlign ?? 'above') - rendered.anchor.y;
+}
+
+/**
+ * Lays rendered text along the guide. `acrossFromBaseline` (from the
+ * template's own render) puts a variable record's baseline where the
+ * template's sits, instead of laying each record by its own ink.
+ */
 export function placeTextOnPath(
   rendered: TextRenderResult,
   guide: SceneObject,
   settings: PathTextSettings,
+  acrossFromBaseline?: number,
 ): PathTextResult {
   const guidePoints = guidePolyline(guide, settings.reverse);
   if (guidePoints === null) {
@@ -31,7 +50,10 @@ export function placeTextOnPath(
   if (start === null) {
     return { kind: 'text-too-long', message: 'Text is longer than the available guide path.' };
   }
-  const baseline = acrossReferenceY(rendered.bounds, settings.acrossAlign ?? 'above');
+  const baseline =
+    acrossFromBaseline !== undefined && rendered.anchor !== undefined
+      ? rendered.anchor.y + acrossFromBaseline
+      : acrossReferenceY(rendered.bounds, settings.acrossAlign ?? 'above');
   const map = (point: Vec2): Vec2 => {
     const sample = samplePath(metric, start + point.x - rendered.bounds.minX);
     const height = baseline - point.y;

@@ -140,6 +140,10 @@ machine's work area when the controller is read, and shows `$130`/`$131` beside 
 Amendment 3 (`ADR-637-amendment-3-profile-import-asks-before-it-replaces.md`) has the Machine
 stage's profile imports ask the same question as item 2 before they replace values someone set.
 
+Amendment 4 (`ADR-637-amendment-4-grblhal-work-area-is-its-homed-envelope.md`) maps a grblHAL
+`$130`/`$131` with homing and hard limits on to the homed envelope's size, which is what the fill,
+**Use detected values** and Job Review's travel fact use.
+
 Verification: `device-setup-auto-fill.test.ts` (a listed laser and a CNC preset keep their type),
 `machine-picker-entries.test.ts` (the CNC reset), and `DeviceSetupMachinePicker.customised.test.tsx`
 (the draft's facts and type question, the replace notice for a CNC preset, **My machine isn't

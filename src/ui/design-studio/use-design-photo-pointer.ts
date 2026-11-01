@@ -56,6 +56,11 @@ export function useDesignPhotoPointer(
       }
       pointer.onPointerUp(event);
     },
+    onPointerCancel(event) {
+      photoGesture.current = false;
+      pointer.onPointerCancel(event);
+    },
+    onLostPointerCapture: pointer.onLostPointerCapture,
     onPointerLeave: pointer.onPointerLeave,
     onDoubleClick(event) {
       // React's double-click has the same position fields; mapping needs no pointer-only data.

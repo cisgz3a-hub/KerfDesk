@@ -8,6 +8,7 @@ import { offsetShapes, type OffsetShapesOptions } from '../../core/geometry/offs
 import { ok } from '../../core/result';
 import { addObject, type ImportedSvg, type Project, type Scene } from '../../core/scene';
 import { repairDanglingObjectDependencies, reportDependencyRepairs } from './object-delete-actions';
+import { removedTabsNotice } from './removed-tabs-notice';
 import { removeObjectIdsFromGroups, selectedObjectIds } from './scene-group-actions';
 import { pruneOrphanLayers, pushUndo, type StateSlice } from './scene-mutations';
 import { useToastStore } from './toast-store';
@@ -171,5 +172,9 @@ function removeOriginals(
   };
   const repaired = repairDanglingObjectDependencies(removeObjectIdsFromGroups(kept, ids));
   afterCommit(() => reportDependencyRepairs(repaired));
+  // The offset outlines are new objects without the originals' tabs placed by
+  // hand (ADR-494 Amendment 3).
+  const tabs = removedTabsNotice(targets, 'deleted originals');
+  if (tabs !== '') afterCommit(() => useToastStore.getState().pushToast(tabs, 'info'));
   return pruneOrphanLayers(repaired.scene);
 }

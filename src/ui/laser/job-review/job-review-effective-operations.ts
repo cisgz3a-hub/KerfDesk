@@ -281,9 +281,11 @@ function contourEntrySummary(group: Exclude<Group, CncGroup>, skipped: boolean):
     group.entryRunwayMm !== undefined
   ) {
     // ADR-239 Amendment 1: the emitter adds no entry without a bed envelope.
+    // Amendment 2: an M3 group's exit is added, or skipped, beside it.
+    const runway = group.exitRunwayMm === undefined ? 'contour entry' : 'contour entry and exit';
     return skipped
-      ? ' · contour entry not added (bed position unknown)'
-      : ` · contour entry ${formatNumber(group.entryRunwayMm)} mm effective (laser off)`;
+      ? ` · ${runway} not added (bed position unknown)`
+      : ` · ${runway} ${formatNumber(group.entryRunwayMm)} mm effective (laser off)`;
   }
   return '';
 }

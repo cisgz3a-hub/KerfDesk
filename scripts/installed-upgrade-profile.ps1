@@ -40,9 +40,11 @@ if (Test-Path -LiteralPath $EvidenceRoot) { throw 'Historical phase evidence mus
 New-Item -ItemType Directory -Path $EvidenceRoot | Out-Null
 . (Join-Path $PSScriptRoot 'installed-upgrade-controls.ps1')
 . (Join-Path $PSScriptRoot 'windows-powershell-process.ps1')
+. (Join-Path $PSScriptRoot 'installed-app-exit-evidence.ps1')
 $app = $null
+$phaseStarted = [DateTime]::UtcNow
 $receipt = [ordered]@{
-  schemaVersion = 1; status = 'running'; startedAt = [DateTime]::UtcNow.ToString('o')
+  schemaVersion = 1; status = 'running'; startedAt = $phaseStarted.ToString('o')
   phase = $Phase; expectedVersion = $ExpectedVersion; expectedCommit = $ExpectedCommit
   executable = $Executable; expectedProfile = $ExpectedProfile; project = $Project
   mode = 'normal installed launch, Windows accessibility and real native file dialogs; no CDP or smoke mode'
@@ -104,12 +106,23 @@ function Wait-UpgradeTitle([string]$File) {
   throw 'Saved project was not reflected in the normal window title.'
 }
 $proEdition = 'Edition: Pro. Open licence settings'
+# Records how the owned app ended before anything judges it, so a failed phase
+# still says how (rolling audit v8 N7-P3-2). A non-zero code also keeps the
+# app's support log tail and Windows crash events beside the receipt.
+function Save-UpgradeAppExit {
+  $receipt.exitCode = $app.ExitCode
+  $receipt.exitCodeHex = Format-InstalledAppExitCode $app.ExitCode
+  if ($app.ExitCode -ne 0) {
+    $receipt.exitEvidence = Save-InstalledAppExitEvidence $ExpectedProfile (Join-Path $EvidenceRoot 'app-exit') $phaseStarted $Executable $licenceKey
+  }
+}
 function Close-UpgradeAppNormally {
   Assert-UpgradeApp
   if (-not $app.CloseMainWindow() -or -not $app.WaitForExit(30000)) { throw 'Owned app did not close normally.' }
   $app.Refresh()
-  if ($app.ExitCode -ne 0) { throw 'Owned app exited unsuccessfully.' }
-  $receipt.exitCode = $app.ExitCode; $receipt.status = 'passed'
+  Save-UpgradeAppExit
+  if ($app.ExitCode -ne 0) { throw "Owned app exited unsuccessfully: exit code $($receipt.exitCode) ($($receipt.exitCodeHex))." }
+  $receipt.status = 'passed'
 }
 function Wait-UpgradeEnabled($Control, [string]$Name) {
   $deadline = [DateTime]::UtcNow.AddSeconds(10)
@@ -266,6 +279,10 @@ try {
       Assert-UpgradeApp
       $app.Kill(); $app.WaitForExit(10000) | Out-Null
       $receipt.failureCleanup = 'only the verified owned app PID was stopped'
+    } elseif (-not $receipt.Contains('exitCode')) {
+      # The app ended on its own before a normal close. Keep how, without
+      # replacing the failure already recorded.
+      try { Save-UpgradeAppExit } catch { $receipt.exitEvidenceError = $_.ToString() }
     }
     $app.Dispose()
   }

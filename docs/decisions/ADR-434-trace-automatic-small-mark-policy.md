@@ -228,3 +228,177 @@ controls (Photo, Colour layers, Edge), which only apply to their own style.
 Tests: `TraceSmallMarkControls.semantic.test.tsx` (Auto and exact values through the real
 controls and the engine, the switch rule, the Re-trace round trip, pre-amendment records) and
 `use-trace-dialog-settings.test.tsx` (the dialog hook applies the switch rule to what it records).
+
+### Amendment 2 - i-dots and full stops stay: the pen-width rule and the coverage floor (2026-10-28)
+
+Quality audit Q4-P2-3 (P1, `docs/audits/2026-10-27-quality-q1/Q4-trace-vs-potrace.md`): Line Art's
+automatic policy removed i-dots and full stops from ordinary 20-28 px text, Line Art being the Free
+default. The audit's own render of "mini quiz. jig, ii. lit." kept 3 of 12, 8 of 11 and 2 of 11 small
+marks at 20, 24 and 28 px (anti-aliased), and 7 of 12 on 1-bit 24 px; a lone "i" at 28 px lost its
+dot. Potrace kept them all. The pages hold no dust, so this is not the trade-off the Consequences
+accept. Two rules did it:
+
+- **Rule 3d.** A tittle or a full stop sits nearer its letter's stroke than any like mark, which
+  is what 3d reads as a stroke's halo. Yet 3d says small text passes.
+- **Rule 1 on the 3x small-source grid.** Bilinear enlargement rounds a 4-5 px² anti-aliased dot,
+  so its pixels past the cut count only 2.3-2.8 source px², under the 3 px² floor. On the native
+  grid the same dots count 4.
+
+Decision (`small-mark-policy.ts`, `small-mark-neighbourhood.ts`):
+
+1. **Rule 3d, pen width.** A mark that 3d would remove because a stroke is nearer than any like
+   mark now stays when it is about as wide as that stroke where it faces the mark. Its width is
+   the diameter of a disc of its area. The stroke's width is the thinnest ink run, along the two
+   axes and two diagonals, through each pixel of the stroke within half the support radius of its
+   nearest pixel, the widest of those winning. Runs through an edge, a corner or a tip cut across
+   the stroke at a slant or one pixel deep; a pixel on the stroke's middle line spans it, and that
+   pixel lies within half a width of the nearest one. The mark stays at 0.6 of that width or more
+   (`AUTO_PEN_WIDTH_FRACTION`). A tittle or a full stop is
+   drawn with the letter's own pen; toner scatter is finer than the stroke it surrounds. Measured
+   through the trace entry: 268 marks of Roboto text at 20-28 px, 1-bit and anti-aliased, 0.75 and
+   up; the dark-noise probe's 2x2 specks beside a 5 px stroke, 0.45. Bridged, dusty, 8 px² and
+   like-supported marks are decided as before.
+2. **Rule 1, ink coverage.** A mark whose pixel count is under the floor stays a candidate when the
+   ink it carries reaches the floor. That ink is each pixel's coverage, (paper − luma) / span
+   clamped to [0, 1], summed over the mark and the paper pixels of its one-source-pixel ring, other
+   ink left out. Hard sub-floor specks carry exactly their pixel count, so they still fall under
+   it. The dust census (3b) sizes sub-floor debris the same way, so a rescued dot is not counted as
+   dust against itself. Without a grey field (alpha masks) the pixel count is all there is, as
+   before.
+
+Measured through `traceImageToColoredPaths`, small marks kept by Line Art and by Smooth
+(anti-aliased / 1-bit):
+
+| Text | Before (Line Art) | After (Line Art and Smooth) |
+|---|---|---|
+| "mini quiz. jig, ii. lit." 20 px | 3 / 12, 11 / 12 | 12 / 12, 12 / 12 |
+| same, 24 px | 8 / 11, 7 / 12 | 11 / 11, 12 / 12 |
+| same, 28 px | 2 / 11, 9 / 11 | 11 / 11, 11 / 11 |
+| lone "i", 28 px, anti-aliased | 0 / 1 | 1 / 1 |
+
+Smooth's 1-bit losses before this amendment were the tied cut of ADR-402 Amendment 1, not these
+rules. Every existing dust and noise regression in `small-mark-policy.test.ts` holds: toner scatter
+beside a stroke (clean and ±8 noise), the dust cluster, the dirty-scan bound, the JPEG-like scan,
+the mid-tone threshold noise, and the speckle fixture.
+
+Consequence: a dark speck about as wide as the stroke beside it, in a tile with no debris, now stays
+whatever made it. On small text that is the full stop the drawing has. Beside a thin stroke it
+can be toner the old rule removed. The dust veto (3b) still removes such specks wherever the scan
+leaves sub-floor or lone debris. On the astronaut photo Smooth now traces 134 subpaths instead of
+121 at the same cut (101): small dark marks beside the photo's strokes.
+
+Tests: `small-mark-policy.test.ts` (a mark as wide as its stem stays and the same mark beside a
+stroke almost twice as wide does not; a full stop's grey rim lifts it over the floor and the bare
+two pixels do not); `trace-automatic-decisions.test.ts` (every i-dot and full stop at 20, 24 and
+28 px, 1-bit and anti-aliased, Line Art and Smooth; a lone "i" at 28 px).
+
+### Amendment 3 - full stops away from ink, and every floor reads the ink a mark carries (2026-10-29)
+
+Rolling audit v8 N8-P2-1 and N8-P2-2 (both P1; they reopen Q4-P2-3,
+`docs/audits/2026-10-29-rolling-v8/N8-tracer-remeasure.md`): Line Art (the Free default) and
+Smooth still deleted full stops from ordinary 20-28 px text, and i-dots from small 1-bit words.
+Amendment 2's test sentence put every full stop beside an 'i' or a 'z'. A stop after a letter with
+no ink at its foot ('y', 'T', '7') fell to four causes:
+
+- **Self-veto (3b).** With no ink within 5 px, the stop was a "lone speck" in the dust census, and
+  `debrisAround` summed the stop's own tile, so it was its own debris. Lone stops a few words
+  apart were each other's debris too.
+- **Pixel counts on the enlarged grid (3c, 3d).** Rule 3c (8 px²) and the pen-width disc read the
+  thresholded pixel count, which shrinks on the 2x grid while the ink does not. A Roboto 28 px
+  stop is 8 px² natively and 6.5-6.75 px² on the 2x grid. Arial "day." at 24 px measured a disc
+  of 4.787 against a need of 4.8.
+- **The floor's arithmetic (1).** On the 3x small-source grid a hard 3 px² tittle's coverage sums to
+  26.999999999999989 against a floor of 27. It was dropped, and then counted as hard sub-floor
+  debris against the stop beside it ("lit." at 20 px, 1-bit: 0 of 2 kept).
+- **No rule for a lone stop.** Even without the veto, rule 3d has no stroke within 5 px to compare
+  the stop with, so it removed it.
+
+Decision (`small-mark-policy.ts`, `small-mark-neighbourhood.ts`, new `small-mark-text-line.ts`):
+
+1. **Tolerant floors.** A size within 10⁻⁶ mask px under a floor is at the floor
+   (`underFloor`, `FLOOR_TOLERANCE_PX`). The judge and the census use the same comparison.
+2. **One size per mark.** Every floor reads the mark's size, its pixel count or, when larger, the
+   ink it carries (Amendment 2's coverage). That covers the 3 px² floor, the 8 px² lone-mark floor
+   of 3c, the census's sub-floor and lone-speck sizes, and the pen-width disc of 3d. Coverage is
+   computed only where the pixel count alone cannot decide.
+3. **Never dust against itself.** The census records the tile each debris component was counted
+   in, and `debrisAround` leaves the mark's own entry out.
+4. **Text baseline (new 3e).** A mark under the lone-mark floor stays when it is a compact, solid
+   dot sitting on the baseline of a letter nearby. Such a dot is also not a lone speck in the
+   census, so stops do not veto each other. The test:
+   - Compact and solid: its box is at most 2:1 and its pixels fill at least half of it.
+   - On a baseline: its bottom row is within one source pixel of the bottom row of another
+     component that is 3-12 times its height.
+   - Nearby: that component is found within 12 dot heights (about an em) on the rows around the
+     dot's bottom edge.
+   A speck in clean paper has no such letter. The dirty-scan probes' neighbours are other specks
+   and 3 px strokes, too low to be letters beside a compact dot at least 2 px tall. The dust veto
+   (3b) still runs first, so a stop beside real debris goes as before.
+
+Arial itself is not shipped. The tests use the PDF importer's Arial-metric Liberation Sans; the
+hinted-text measurement below used Windows Arial through Pango/FreeType (sharp).
+
+Measured through `traceImageToColoredPaths` with the shipped presets, main `33bc394c6` → this
+amendment:
+
+| Case | Line Art | Smooth |
+|---|---|---|
+| Roboto, anti-aliased, 20 / 24 / 28 px: "Have a good day.", "Call us today." (final stop) | 0 / 6 → 6 / 6 | 0 / 6 → 6 / 6 |
+| same: "Made in Italy." (stop and tittle) | 3 / 6 → 6 / 6 | 3 / 6 → 6 / 6 |
+| same: "easy. any. say. buy. dry." | 0 / 15 → 15 / 15 | 0 / 15 → 15 / 15 |
+| same: "big jig. bag. dog. pug. egg." | 13 / 24 → 24 / 24 | 14 / 24 → 24 / 24 |
+| Hinted Arial (Pango/FreeType), final stop of 8 sentences × 3 sizes | 12 / 24 → 24 / 24 | 12 / 24 → 24 / 24 |
+| Hinted Roboto / Calibri / Verdana, same | 2 / 19 / 24 → 24 / 24 / 24 | the same |
+| "so X." after 61 characters, 20 + 24 + 28 px, anti-aliased, Roboto / Tinos | 146 / 169 → 183 / 180 of 183 | 143 / 173 → 183 / 183 |
+| same, 1-bit, Roboto / Tinos | 163 / 175 → 183 / 182 | 159 / 175 → 183 / 182 |
+| 192 small 1-bit words (i, lit., mini., jig.; 18-24 px; 4 placements) | 265 → 355 of 492 marks | 346 → 357 |
+
+Potrace 1.16 keeps every stop above, and 435 of the 492 small-word marks. Sharp keeps every stop.
+The three Tinos 20 px strip stops Line Art "loses" are in the output: they trace as 2 px loops
+that cover less than half of the stop's pixel centres. Judged on the glyph's own 4 x 4 samples,
+as the new test does, all 183 are kept.
+
+Nothing else moved:
+
+- **Q4 scorecard.** The 79-image set against Potrace gives identical per-image metrics (80 of 80
+  rows): Line Art 51 / 20 / 8, Sharp 49 / 22 / 8, Smooth 55 / 17 / 7.
+- **Q5 real cases.** The 27 degraded real cases: A (Line Art against plain Potrace) 23 / 3 / 1 and
+  B (Smooth against mkbitmap + Potrace) 26 / 1 / 0, both unchanged; C (best against best)
+  23 / 3 / 1 → 24 / 2 / 1. 10 of 160 rows changed, each a logo part regained (lost 1 → 0). No row
+  added a mark, and the 48 Arch House stability rows are identical.
+- **Dark-noise probes** (`preprocessForTrace`, Line Art components):
+  - toner scatter, clean and noisy: 1 and 1;
+  - the dust cluster: 3;
+  - the 512² dirty scan: 182;
+  - the 2048² dirty scan: 2,715 → 2,717 of about 30,000 specks;
+  - three text lines with 60 lone 3-7 px² hard specks in the clean paper around them: 4 / 5 / 5
+    specks kept, before and after.
+  Every dust and noise regression in `small-mark-policy.test.ts` holds.
+- **Cost.** No measurable change: 2048² dirty scan, median of four alternating runs, 3.9 s before
+  and 3.6 s after on a busy machine.
+
+Considered and not used:
+
+- **An x-height test for i-dots.** No i-dot in the measured sets failed once the floors,
+  self-exclusion and sizes were fixed; a tittle sits within the support radius of its stem.
+- **Keeping a glyph's own sub-floor pieces out of the census.** This is audit N8's K3: a 2 px²
+  tittle or a 1 px descender tip is a real sub-floor speck, and this ADR's Consequences accept the
+  veto it casts. It is most of the remaining gap to Potrace on the small-word sweep. Tinos "lit."
+  at 20 px, 1-bit, still keeps 0 of 2 (its tittle is 2 px²; Potrace keeps the stop).
+
+Consequence: a compact dark dot on the baseline of a letter, within about an em of it, now stays
+whatever made it. A speck that lands there is indistinguishable from a full stop, and Potrace keeps
+both. The dust veto still removes it wherever the scan leaves sub-floor or lone debris nearby.
+
+Tests:
+- `small-mark-policy.test.ts`:
+  - a lone dot carrying a 3x3 dot of ink stays, and its bare 2x3 core does not;
+  - a lone dot on a letter's baseline stays, and the same dot off the baseline or far from text
+    does not;
+  - three baseline stops in each other's debris tiles all stay.
+- `src/__fixtures__/perceptual/trace-full-stops.test.ts`:
+  - the final stop of everyday sentences in Roboto, Tinos and Liberation Sans at 20, 24 and 28 px;
+  - the 61-character strip in Roboto and Tinos;
+  - 1-bit "lit." at 20 px.
+
+  All of them fail on main `33bc394c6`.

@@ -1,4 +1,5 @@
 import type { ControllerDriver } from '../../../core/controllers';
+import { prepareBoardConsoleCommand } from '../../../core/controllers/board-console-command';
 import { consoleOwnedExchangeWaitReason } from '../../state/console-command-ownership';
 import { consoleAllowedStateReason } from '../../state/console-command-readiness';
 import { controllerOperationCommandBlockMessage } from '../../state/laser-controller-operation';
@@ -21,6 +22,7 @@ export type ConsoleCommandAvailabilityState = Pick<
   | 'controllerOperation'
   | 'autofocusBusy'
   | 'pendingUntrackedAcks'
+  | 'detectedControllerKind'
 >;
 
 /**
@@ -37,7 +39,7 @@ export function consoleCommandDisabledReason(
     return 'Connect to the laser before sending console commands.';
   }
 
-  const prepared = driver.prepareConsoleCommand(input);
+  const prepared = prepareBoardConsoleCommand(driver, input, state);
   if (!prepared.ok) return prepared.reason;
 
   if (prepared.command.requiresNoActiveOperation) {

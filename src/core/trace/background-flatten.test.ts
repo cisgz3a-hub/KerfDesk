@@ -4,7 +4,7 @@ import {
   levelForAutomaticThreshold,
   otsuBinarization,
 } from './background-flatten';
-import { otsuSeparation, otsuThreshold } from './preprocess';
+import { automaticThreshold, otsuSeparation, otsuThreshold } from './otsu-cut';
 import type { RawImageData } from './trace-image';
 
 const W = 400;
@@ -59,17 +59,51 @@ describe('otsuSeparation', () => {
     // Luma {0, 0, 100, 200}: mean 75, total scatter 2·75² + 25² + 125² =
     // 27,500. Cut after 0: classes {0, 0} | {100, 200}, between-class
     // scatter wB·wF·Δ²/N = 2·2·150²/4 = 22,500. Cut after 100: {0, 0, 100}
-    // | {200}, 3·1·(200 − 100/3)²/4 ≈ 20,833. So the cut is after 0
-    // (threshold 1: luma < 1 is ink), η = 22,500 / 27,500 = 9/11, and the
-    // class means are 150 apart.
+    // | {200}, 3·1·(200 − 100/3)²/4 ≈ 20,833. So the split is {0, 0} |
+    // {100, 200}: η = 22,500 / 27,500 = 9/11, and the class means are 150
+    // apart. Every cut from 1 to 100 makes that split and scores the same;
+    // the tie resolves to the middle of the stretch, threshold 50.
     const result = otsuSeparation(greyPixels([0, 0, 100, 200]));
-    expect(result.threshold).toBe(1);
+    expect(result.threshold).toBe(50);
     expect(result.separability).toBeCloseTo(9 / 11, 12);
     expect(result.contrast).toBe(150);
   });
 
   it('reads a clean two-level page as almost perfectly separable', () => {
     expect(otsuSeparation(paintedImage(() => 240)).separability).toBeGreaterThan(0.99);
+  });
+
+  // ADR-402 Amendment 1.
+  it('cuts anti-aliased art at its plateaus mid-level, and keeps Otsu on two-level art', () => {
+    // A blurred 4 px bar every 20 px, ink 20 on paper 245: the edges' grey
+    // pulls Otsu toward the paper; their 50% coverage level is 133.
+    const blurred = paintedImage(() => 245);
+    for (let i = 0; i < blurred.data.length; i += 4) {
+      const x = (i / 4) % W;
+      const d = Math.abs((x % 20) - 10);
+      const coverage = Math.min(1, Math.max(0, (3.5 - d) / 3));
+      const v = Math.round(245 - 225 * coverage);
+      blurred.data.set([v, v, v, 255], i);
+    }
+    const art = otsuSeparation(blurred);
+    expect(art.twoPlateau).toBe(true);
+    expect(art.midLevel).toBe(133);
+    expect(art.threshold).toBeGreaterThan(art.midLevel);
+    expect(automaticThreshold(blurred)).toBe(133);
+    expect(automaticThreshold(blurred, { traceMode: 'centerline' })).toBe(art.threshold);
+    // Two levels carry no coverage: Otsu's tie, centred in the gap.
+    const twoLevel = otsuSeparation(paintedImage(() => 240));
+    expect(twoLevel.twoPlateau).toBe(false);
+    expect(automaticThreshold(paintedImage(() => 240))).toBe(twoLevel.threshold);
+    expect(twoLevel.threshold).toBe(150);
+    // An enlarged grid follows its source grid's verdict either way.
+    expect(automaticThreshold(blurred, { sourcePlateauCut: false })).toBe(art.threshold);
+  });
+
+  it('keeps Otsu on a picture whose tones fill the range between its plateaus', () => {
+    const photo = paintedImage((x, y) => Math.round(20 + ((x * 7 + y * 13) % 225)));
+    expect(otsuSeparation(photo).twoPlateau).toBe(false);
+    expect(automaticThreshold(photo)).toBe(otsuThreshold(photo));
   });
 });
 
@@ -152,12 +186,47 @@ describe('flattenUnevenBackground', () => {
 });
 
 describe('otsuBinarization', () => {
-  it('returns the input ref-equal with the historical cut on a uniform page', () => {
+  it('returns the input ref-equal with the automatic cut on a uniform page', () => {
     const image = paintedImage(() => 235);
     const result = otsuBinarization(image);
     expect(result.flattened).toBe(false);
     expect(result.source).toBe(image);
-    expect(result.threshold).toBe(otsuThreshold(image));
+    expect(result.threshold).toBe(automaticThreshold(image));
+  });
+
+  it('declines a "paper" that runs from white to near black: a tone range, not lighting', () => {
+    // ADR-402 Amendment 2. Every cell step is gradual, so the whole ramp is
+    // one smooth region; the old gate flattened it. Its darkest fitted level
+    // is under a quarter of its brightest, as on the astronaut photo.
+    const image = paintedImage((x) => Math.round(250 - (230 * x) / (W - 1)));
+    expect(flattenUnevenBackground(image)).toBeNull();
+    const result = otsuBinarization(image);
+    expect(result.flattened).toBe(false);
+    expect(result.source).toBe(image);
+  });
+
+  it('still flattens a deep but credible falloff (250 to 80)', () => {
+    const image = paintedImage((x) => Math.round(250 - (170 * x) / (W - 1)));
+    const result = otsuBinarization(image);
+    expect(result.flattened).toBe(true);
+    expect(inkClassification(result.source, result.threshold)).toEqual({ fp: 0, fn: 0 });
+  });
+
+  it("follows the source grid's verdict instead of judging the pixels again", () => {
+    // ADR-402 Amendment 2: a supersampled grid of the same trace.
+    const uneven = paintedImage(ramp);
+    const declined = otsuBinarization(uneven, { sourceLightingLevelled: false });
+    expect(declined.flattened).toBe(false);
+    expect(declined.source).toBe(uneven);
+    const uniform = paintedImage(() => 235);
+    const levelled = otsuBinarization(uniform, { sourceLightingLevelled: true });
+    expect(levelled.flattened).toBe(true);
+    expect(levelled.threshold).toBe(automaticThreshold(levelled.source));
+    expect(inkClassification(levelled.source, levelled.threshold)).toEqual({ fp: 0, fn: 0 });
+    expect(
+      levelForAutomaticThreshold(uneven, { useOtsuThreshold: true, sourceLightingLevelled: false })
+        .source,
+    ).toBe(uneven);
   });
 
   it('is not fooled by a white margin brighter than the paper', () => {
@@ -238,7 +307,7 @@ describe('levelForAutomaticThreshold', () => {
     // The caller thresholds with this value instead of a second Otsu pass.
     for (const image of [paintedImage(() => 235), paintedImage(ramp)]) {
       const level = levelForAutomaticThreshold(image, automatic);
-      expect(level.threshold).toBe(otsuThreshold(level.source));
+      expect(level.threshold).toBe(automaticThreshold(level.source));
     }
   });
 
@@ -252,6 +321,7 @@ describe('levelForAutomaticThreshold', () => {
       expect(levelForAutomaticThreshold(image, options)).toEqual({
         source: image,
         threshold: null,
+        verdict: null,
       });
     }
   });

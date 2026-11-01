@@ -38,12 +38,12 @@ export function machineSetupControllerGuide(
   if (driver.commandSet === 'creality-falcon-a1-pro') {
     return {
       ...common,
-      identityCommands: [],
-      settingsCommands: [],
+      identityCommands: ['$I'],
+      settingsCommands: ['$$'],
       configurationSurface: 'Creality Falcon A1 Pro vendor configuration',
       writePolicy: 'external-config',
       writeExplanation:
-        'Creality disables settings fetch and native $J jogging in its A1 Pro device file. Use the vendor workflow for firmware settings. KerfDesk uses finite, tool-off G1 jogs and frames, and homes X then Y; native jog cancellation is unavailable.',
+        "KerfDesk reads the A1 Pro's $$ settings at connect to check its power scale and laser mode, and never writes them. Use Creality's workflow to change firmware settings. Creality's device file disables native $J jogging, so KerfDesk uses finite, tool-off G1 jogs and frames, and homes X then Y; native jog cancellation is unavailable.",
     };
   }
 

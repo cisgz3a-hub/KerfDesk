@@ -8,7 +8,7 @@ export const FALCON_A1_PRO_GRBLHAL_PROFILE: DeviceProfile = {
   vendor: 'Creality',
   model: 'Falcon A1 Pro',
   name: 'Creality Falcon A1 Pro (vendor command set)',
-  catalogVersion: '2026-09-28',
+  catalogVersion: '2026-10-28',
   machineFamily: 'creality-falcon',
   controllerKind: 'grblhal',
   controllerCommandSet: 'creality-falcon-a1-pro',
@@ -16,6 +16,15 @@ export const FALCON_A1_PRO_GRBLHAL_PROFILE: DeviceProfile = {
   // its product page instead lists the two lengths without X/Y labels.
   bedWidth: 358,
   bedHeight: 268,
+  // Two published A1 Pro `$$` reads give `$22=43` (homing on, single-axis
+  // cycles, machine origin 0 at home; the startup lock off) and `$23=3` (X and Y
+  // home toward their minimum, the front left), and both `$I` list HOME. Home
+  // sends $HX then $HY, as Creality's own Home macro does (ADR-322 §4 and
+  // Amendment 3; rolling audit v6 K3-P2-1).
+  homing: { enabled: true, direction: 'front-left' },
+  // Both `$I` reads give `[KINEMATICS:CoreXY v2.02]`: grblHAL limits each motor
+  // to $110/$111 and $120/$121, so a diagonal move gets less (ADR-675, K3-P2-2).
+  kinematics: 'corexy',
   baudRate: 115200,
   // grblHAL keeps a >= 1 KiB serial receive ring; a maintainer's A1 Pro, profiled as
   // grblHAL, reported `Bf:512,65535` on 2026-07-19 (informal, not qualification). The
@@ -25,20 +34,21 @@ export const FALCON_A1_PRO_GRBLHAL_PROFILE: DeviceProfile = {
   airAssistCommand: 'M8',
   // The A1's own air control is timer-backed, so a mid-program M9 is not a
   // clean off: `$152` (standby wait, reported default 20-30 s; 100 = never) idles the pump
-  // afterwards and the restart is what users report failing. Air is held
-  // across an Air-off operation that sits between two Air-on ones rather than
-  // cycled over it (ADR-335).
+  // afterwards and the restart is what users report failing, on the A1 Pro too.
+  // The A1 Pro documents no such setting, and on its grblHAL `$150`-`$152` are
+  // microsteps (ADR-370 Amendment 1). Air is held across an Air-off operation
+  // that sits between two Air-on ones rather than cycled over it (ADR-335).
   airAssistRestartUnreliable: true,
   autofocusCommand: '$HZ1',
   // The 20 W blue module ships fitted; the 2 W infrared module swaps with it
   // (laser-modules.ts, ADR-503).
   laserSubProfile: FALCON_A1_PRO_BLUE_20W_MODULE,
-  // The output ceiling follows Creality's rated 600 mm/s (36000 mm/min). The
-  // vendor contract disables `$$`, so $110/$111 can never correct this value,
-  // and the old 10000 (chosen to speed up Frame) held every layer at 28% of the
-  // rating with no way to go faster from the Speed field (controller audit
-  // 2026-09-23, realtime-1/speed-1). The firmware still slows each move to its
-  // own $110/$111, so a ceiling above them costs nothing but estimate accuracy.
+  // The output ceiling follows Creality's rated 600 mm/s (36000 mm/min), which
+  // both published `$$` reads give as $110/$111. The old 10000 (chosen to speed
+  // up Frame) held every layer at 28% of the rating with no way to go faster
+  // from the Speed field (controller audit 2026-09-23, realtime-1/speed-1). The
+  // firmware still slows each move to its own $110/$111, per motor on this
+  // CoreXY, so a diagonal tops out at 36000 / √2 (ADR-675).
   maxFeed: 36000,
   framingFeedMmPerMin: 10000,
   capabilities: [
@@ -56,12 +66,12 @@ export const FALCON_A1_PRO_GRBLHAL_PROFILE: DeviceProfile = {
     {
       label: 'Creality Falcon A1 Pro rated speed',
       status: 'public-spec-starter',
-      note: 'Creality lists the Falcon A1 Pro at 600 mm/s maximum working speed (36000 mm/min); its consumable parameter guide recommends material speeds up to 10000 mm/min. The firmware max rates $110/$111 are not published and cannot be read under the vendor command set. Sources: https://www.creality.com/products/falcon-a1-pro-20w, https://wiki.creality.com/en/laser-engraver/falcon-a1-pro/consumable-parameter-guide',
+      note: 'Creality lists the Falcon A1 Pro at 600 mm/s maximum working speed (36000 mm/min); its consumable parameter guide recommends material speeds up to 10000 mm/min. Two published A1 Pro $$ reads give $110=$111=36000 and $120=$121=1000, limits per motor on its CoreXY. Sources: https://www.creality.com/products/falcon-a1-pro-20w, https://wiki.creality.com/en/laser-engraver/falcon-a1-pro/consumable-parameter-guide, https://github.com/barebaric/rayforge/pull/461, https://forum.lightburnsoftware.com/t/several-errors-in-the-same-work-creality-falcon-a1-pro/177926',
     },
     {
       label: 'Creality Falcon A1 Pro manufacturer configuration',
       status: 'public-spec-starter',
-      note: 'Creality LightBurn bundle checked 2026-09-19: Width 358, Height 268, S scale 1000, baud 115200, M8 air, autofocus $HZ1, no $J jogging or settings fetch. Vendor labels the connection GRBL-LPC; the exact firmware build is not independently established. The retained grblHAL family selection uses model-specific command overrides; it is not hardware qualification. A live 2026-07-19 status report from a maintainer A1 Pro read Bf:512,65535 (512 planner blocks and 65535 receive-buffer bytes free; informal, not qualification), so the profile requests the grblHAL 1024-byte streaming window; Start bounds it by the controller-reported capacity (ADR-331). Source: https://wiki.creality.com/en/laser-engraver/falcon-a1-pro/lightburn-guide',
+      note: 'Creality LightBurn bundle checked 2026-09-19: Width 358, Height 268, S scale 1000, baud 115200, M8 air, autofocus $HZ1, Home macro $HX then $HY, no $J jogging or settings fetch. Vendor labels the connection GRBL-LPC. Two published A1 Pro reads (rayforge PR #461, 2026-09; LightBurn forum topic 177926 post 3, 2025-08) show a grblHAL build by Creality: banner GrblHAL 1.1f, [VER:1.1f.20231005:], [Firmware:Version v1.0.4] with builds 20260706154934 and 20250618205542, [FIRMWARE:grblHAL], [BOARD:A1 Pro Laser Master], [KINEMATICS:CoreXY v2.02]; $22=43 (homing on), $23=3, $30=1000, $32=1, $62=0, $130=363 and $131=273 (the 358 x 268 area plus the 5 mm $27 pull-off). KerfDesk reads $$ at connect and writes no setting (ADR-322 Amendment 3). The A1 Pro of the KerfDesk maintainer has not been read. The retained grblHAL family selection uses model-specific command overrides; it is not hardware qualification. A live 2026-07-19 status report from a maintainer A1 Pro read Bf:512,65535 (512 planner blocks and 65535 receive-buffer bytes free; informal, not qualification), so the profile requests the grblHAL 1024-byte streaming window; Start bounds it by the controller-reported capacity (ADR-331). Source: https://wiki.creality.com/en/laser-engraver/falcon-a1-pro/lightburn-guide',
     },
     {
       label: 'Creality Falcon A1 Pro laser modules',

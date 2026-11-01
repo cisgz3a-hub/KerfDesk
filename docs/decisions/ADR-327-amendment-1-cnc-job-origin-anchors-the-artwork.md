@@ -78,4 +78,4 @@ three points contributes a centre hole, even when collinear, so its artwork also
 Regression tests cover the empty-contour controls and a compiled bowtie-plus-square pocket at
 User Origin; its complete artwork anchors at zero while Frame still measures actual motion.
 The correction and closed-start route re-scoring use emitter revision
-`audit-placement-and-route-20261027-v35`. No placement policy or Frame/Start gate changes.
+`audit-placement-and-route-20261102-v41`. No placement policy or Frame/Start gate changes.

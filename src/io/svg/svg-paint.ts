@@ -26,7 +26,9 @@ export type SvgColorValue = SvgNoPaint | SvgColorPaint;
 export const NO_PAINT: SvgNoPaint = { kind: 'none' };
 export const BLACK_PAINT: SvgColorPaint = { kind: 'color', color: '#000000' };
 
-const URL_PAINT = /^url\(\s*(?:"([^"]*)"|'([^']*)'|([^\s"')]*))\s*\)\s*(.*)$/is;
+// Each reference form takes its own trailing spaces and an empty `url()` has
+// none, so every run of spaces matches one way and the match stays linear.
+const URL_PAINT = /^url\(\s*(?:"([^"]*)"\s*|'([^']*)'\s*|([^\s"')]+)\s*)?\)\s*(.*)$/is;
 
 /**
  * The paint `value` specifies; 'inherit' for the parent's paint; null when the
@@ -84,6 +86,6 @@ function simplePaint(text: string): SvgSimplePaint | null {
 function withoutImportance(value: string): string {
   return value
     .trim()
-    .replace(/\s*!\s*important$/i, '')
+    .replace(/!\s*important$/i, '')
     .trim();
 }

@@ -327,6 +327,7 @@ type InitialLaserState = Pick<
   | 'pauseResumeTransition'
   | 'activeRunId'
   | 'liveCanvasRun'
+  | 'registrationOutlineRun'
   | 'activeJobMachineKind'
   | 'pendingUntrackedAcks'
   | 'pendingTransportWrites'
@@ -394,6 +395,7 @@ export function initialLaserState(): InitialLaserState {
     ...{ streamer: null, streamerEpoch: 0 },
     activeRunId: null,
     liveCanvasRun: null,
+    registrationOutlineRun: null,
     pendingUntrackedAcks: 0,
     pendingTransportWrites: 0,
     homingState: 'unknown',
@@ -441,6 +443,7 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     ...sessionScopedJobStateReset(),
     connection: { kind: 'disconnected' },
     serialPortInfo: null,
+    jobStreamHost: null,
     connectedBaudRate: null,
     statusReport: null,
     controllerSessionEpoch: state.controllerSessionEpoch + 1,

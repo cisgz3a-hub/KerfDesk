@@ -1,3 +1,6 @@
+import type { DeviceProfile } from '../../core/devices';
+// Deep import: the devices barrel is at its public-export ratchet.
+import { machineKinematics } from '../../core/devices/device-profile';
 import type { FillGroup, Job, RasterGroup } from '../../core/job';
 import { effectiveGcodeFeedMmPerMin } from '../../core/gcode/feed-word';
 import {
@@ -24,7 +27,7 @@ export function scanQualityWarnings(job: Job, project: Project): ReadonlyArray<s
       group.kind === 'raster'
         ? `Image "${group.source ?? 'image'}" on "${operationName}"`
         : `Fill operation "${operationName}"`;
-    const runway = runwayWarning(group, label, project.device.accelMmPerSec2);
+    const runway = runwayWarning(group, label, project.device);
     if (runway !== null) warnings.add(runway);
     if (group.kind !== 'raster') continue;
     const correction = dotWidthWarning(group, label);
@@ -48,19 +51,22 @@ function isPoweredScan(group: Job['groups'][number]): group is FillGroup | Raste
 function runwayWarning(
   group: FillGroup | RasterGroup,
   label: string,
-  acceleration: number,
+  device: Pick<DeviceProfile, 'accelMmPerSec2' | 'kinematics'>,
 ): string | null {
   const feed = effectiveGcodeFeedMmPerMin(group.speed);
-  // ADR-495: a scan off the axes gets more acceleration than either axis alone.
+  const acceleration = device.accelMmPerSec2;
+  // ADR-495, ADR-675: a scan off the axes gets more acceleration than either
+  // axis alone on a Cartesian machine, and less on a CoreXY one.
   const angleDeg = scanAngleDegOf(group);
-  const alongScan = alongScanAccelMmPerSec2(acceleration, angleDeg);
+  const kinematics = machineKinematics(device);
+  const alongScan = alongScanAccelMmPerSec2(acceleration, angleDeg, kinematics);
   const needed = accelerationDistanceMm(feed, alongScan);
   const available = maximumRunway(group);
   if (!Number.isFinite(needed) || needed <= available + CONTROLLER_GRID_MM) return null;
   const accelText =
     alongScan === acceleration
       ? `${formatMm(acceleration)} mm/s²`
-      : `${formatMm(acceleration)} mm/s² (${formatMm(alongScan)} mm/s² along its ${formatMm(angleDeg)}° scan)`;
+      : `${formatMm(acceleration)} mm/s² (${formatMm(alongScan)} mm/s² along its ${formatMm(angleDeg)}° scan${kinematics === 'corexy' ? ' on this CoreXY machine' : ''})`;
   return (
     `${label} has at most ${formatMm(available)} mm of scan-entry runway. ` +
     `At ${formatMm(feed)} mm/min, the saved acceleration of ${accelText} ` +
@@ -105,7 +111,7 @@ function dotWidthWarning(group: RasterGroup, label: string): string | null {
       : `leaves only ${formatMm(remaining)} mm of a one-pixel powered run, which can disappear when coordinates are rounded`;
   return (
     `${label} has ${formatMm(pitch)} mm pixels along the scan. Dot Width Correction shortens ` +
-    `each end by ${formatMm(correction)} mm and ${effect}. ` +
+    `each end of a burned line by ${formatMm(correction)} mm and ${effect}. ` +
     'Lower Dot Width Correction or confirm the corrected output with a detail test; ' +
     'the source image alone does not show this loss.'
   );

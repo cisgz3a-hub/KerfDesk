@@ -131,6 +131,16 @@ function crackCrossing(
   const inkY = Math.floor(midY + MID_CRACK_T * rightY);
   const bgX = Math.floor(midX - MID_CRACK_T * rightX);
   const bgY = Math.floor(midY - MID_CRACK_T * rightY);
+  return crackCrossingAt(field, inkX, inkY, bgX, bgY);
+}
+
+function crackCrossingAt(
+  field: CrackSubPixelField,
+  inkX: number,
+  inkY: number,
+  bgX: number,
+  bgY: number,
+): number {
   const placed = field.crackCrossingAt?.(inkX, inkY, bgX, bgY);
   if (placed !== undefined) return placed;
   const inkLuma = field.lumaAt(inkX, inkY);

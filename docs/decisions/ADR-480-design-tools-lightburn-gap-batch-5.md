@@ -242,3 +242,10 @@ legacy flags, mismatches, deduplicated counts, exact prepared scope, repaired/re
 same-ID replacement, structured clones, cancellation, selection fit, group boundaries and
 archive/second-pass exclusions. Existing diagnostics, closure, review and preflight controls
 remain applicable. These are software tests; no physical-machine qualification is claimed.
+
+### Amendment: stacked Fill copies are named before they burn nothing (2026-10-28)
+
+ADR-683 item 3: on a laser Fill operation, the exact copies Delete Duplicates compares cancel
+under the pooled even-odd fill. An even-count set now gives the preflight advisory
+`fill-stacked-copies-cancel`, shown by Save and Job Review, and Job Review's **Show stacked
+copies** selects the extra copy of each, as LightBurn's Show Me does (rolling audit v7 L8-P1-1).

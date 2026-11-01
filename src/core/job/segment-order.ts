@@ -199,11 +199,14 @@ function refinedSegmentRoute<T extends CutSegment>(
   // Refinement scored the old entry/exit points. Moving a closed start also
   // changes its outgoing hop, so a locally nearer start can undo the saving.
   // Compare the complete route, including the park, with the valid base (its
-  // holds and pinned first contour already checked when it was selected).
+  // holds and pinned first contour already checked when it was selected). The
+  // base keeps its order but takes the same start policy: a given-order base
+  // still has drawn starts, which the operator's setting replaces.
+  const base = restartClosedSegments(segments, start, policy);
   return routeCost(restarted, start, refinement.returnTo) <=
-    routeCost(segments, start, refinement.returnTo)
+    routeCost(base, start, refinement.returnTo)
     ? restarted
-    : [...segments];
+    : base;
 }
 
 // Holds re-indexed from source segments to their route positions.

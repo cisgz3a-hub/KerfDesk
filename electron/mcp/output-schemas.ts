@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { type KerfDeskMcpCommand, MCP_MAX_ITEMS } from './input-schemas.js';
 import { mcpMachineOutputSchemas } from './machine-schemas.js';
-import { mcpDesignOutputSchemas } from './design-schemas.js';
+import { mcpDesignOutputSchemas, mcpNoticesSchema } from './design-schemas.js';
 import {
   MCP_TEXT_FIELDS,
   mcpAuthoringOutputSchemas,
@@ -59,6 +59,12 @@ export const mcpWriteResultSchema = z.object({
     .optional(),
   history: mcpHistorySchema.optional(),
   message: z.string().max(2048).optional(),
+});
+
+/** A write that returns the warning the PC showed: an Undo or Redo that changed the machine setup
+ *  (ADR-584 Amendment 1), or text whose font has no glyph for a character (ADR-591 Amendment 1). */
+const mcpNoticeWriteResultSchema = mcpWriteResultSchema.extend({
+  notices: mcpNoticesSchema.optional(),
 });
 
 /** Deliberately projected objects: Zod strips unknown fields at every nesting level. */
@@ -229,17 +235,21 @@ export const mcpOutputSchemas = {
     status: z.literal('placed'),
     action: z.enum(['center', 'fit', 'array']),
     artworkCount: count,
+    /** An array names its copies and why there are fewer than asked (ADR-125 Amendment 4). */
+    placedCount: count.optional(),
+    requestedCount: count.optional(),
+    notices: mcpNoticesSchema.optional(),
   }),
-  add_text: mcpWriteResultSchema,
+  add_text: mcpNoticeWriteResultSchema,
   add_rectangle: mcpWriteResultSchema,
   add_ellipse: mcpWriteResultSchema,
   add_polyline: mcpWriteResultSchema,
   transform_artwork: mcpWriteResultSchema,
   update_operation: mcpWriteResultSchema,
-  update_text: mcpWriteResultSchema,
+  update_text: mcpNoticeWriteResultSchema,
   arrange_artwork: mcpWriteResultSchema,
-  undo: mcpWriteResultSchema,
-  redo: mcpWriteResultSchema,
+  undo: mcpNoticeWriteResultSchema,
+  redo: mcpNoticeWriteResultSchema,
   ...mcpAuthoringOutputSchemas,
   ...mcpDesignOutputSchemas,
   ...mcpMachineOutputSchemas,

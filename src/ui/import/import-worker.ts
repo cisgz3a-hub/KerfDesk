@@ -42,6 +42,9 @@ async function handleRequest(request: ImportWorkerRequest): Promise<void> {
 }
 
 async function parseRequest(request: ImportWorkerRequest): Promise<ImportWorkerResponse> {
+  if (request.kind === 'batch-raster' || request.kind === 'resample-rgba') {
+    return batchRasterRequest(request);
+  }
   postProgress(request.id, 'reading');
   if (request.kind === 'hpgl') return parseHpglRequest(request);
   if (request.kind === 'psd') {
@@ -112,6 +115,24 @@ async function parseRequest(request: ImportWorkerRequest): Promise<ImportWorkerR
     kind: 'stl',
     result: prepareParsedStlImport(parsed, request.options),
   };
+}
+
+// Multi-File Trace's TIFF and Netpbm decode and resample (ADR-357 Amendment 2),
+// loaded on first use, as the PSD decoder is.
+async function batchRasterRequest(
+  request: Extract<ImportWorkerRequest, { kind: 'batch-raster' | 'resample-rgba' }>,
+): Promise<ImportWorkerResponse> {
+  const { decodeBatchRasterBytes, resampleBatchRaster } = await import('./batch-raster-pixels');
+  if (request.kind === 'resample-rgba') {
+    const { image, width, height } = request;
+    const result = resampleBatchRaster({ ...image, rgba: image.data }, width, height);
+    return { id: request.id, kind: 'resample-rgba', result };
+  }
+  postProgress(request.id, 'reading');
+  const bytes = new Uint8Array(await request.blob.arrayBuffer());
+  postProgress(request.id, 'parsing');
+  const result = decodeBatchRasterBytes(bytes, request.format);
+  return { id: request.id, kind: 'batch-raster', result };
 }
 
 async function parseHpglRequest(

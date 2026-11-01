@@ -7,13 +7,17 @@ import { Button, Dialog, DialogActions } from '../kit';
 import { PartGeneratorFields } from './PartGeneratorFields';
 import { PartGeneratorReview } from './PartGeneratorReview';
 import { PartDraftPreview } from './PartDraftPreview';
+import { RetainedScaleNotice } from './RetainedScaleNotice';
+import { editablePartGeneratorDefinition } from '../../core/parts/scale-part-generator';
 import './design-authoring-dialog.css';
 export function PartGeneratorDialog(props: {
   readonly object?: GeneratedPartObject;
   readonly onClose: () => void;
 }): JSX.Element {
-  const [definition, setDefinition] = useState<PartGeneratorDefinition>(
-    () => props.object?.partGenerator.definition ?? defaultPartGenerator('panel'),
+  const [definition, setDefinition] = useState<PartGeneratorDefinition>(() =>
+    props.object === undefined
+      ? defaultPartGenerator('panel')
+      : editablePartGeneratorDefinition(props.object),
   );
   const [prepared, setPrepared] = useState<PreparedPartGenerator | null>(null);
   const [error, setError] = useState('');
@@ -22,7 +26,9 @@ export function PartGeneratorDialog(props: {
   const stale =
     prepared !== null && (prepared.project !== project || prepared.documentEpoch !== epoch);
   function preview(): void {
-    const result = useStore.getState().preparePartGenerator(definition, props.object?.id);
+    const result = useStore
+      .getState()
+      .preparePartGenerator(definition, props.object?.id, props.object?.transform);
     setPrepared(result.kind === 'ok' ? result.value : null);
     setError(result.kind === 'invalid' ? result.reason : '');
   }
@@ -57,6 +63,7 @@ export function PartGeneratorDialog(props: {
         </div>
         <aside className="lf-authoring-review" aria-label="Part geometry review">
           <h3>Geometry preview</h3>
+          <RetainedScaleNotice source={props.object} subject="part" />
           {prepared === null ? (
             <PartDraftPreview definition={definition} />
           ) : (
@@ -71,19 +78,33 @@ export function PartGeneratorDialog(props: {
           {error ? <p role="alert">{error}</p> : null}
         </aside>
       </div>
-      <DialogActions>
-        <Button onClick={props.onClose} title="Close without applying the part preview">
-          Cancel
-        </Button>
-        <Button
-          variant="primary"
-          disabled={prepared === null || stale}
-          onClick={accept}
-          title="Apply the current reviewed part geometry and operation bindings"
-        >
-          Apply reviewed part
-        </Button>
-      </DialogActions>
+      <PartDialogActions
+        canApply={prepared !== null && !stale}
+        onApply={accept}
+        onClose={props.onClose}
+      />
     </Dialog>
+  );
+}
+
+function PartDialogActions(props: {
+  readonly canApply: boolean;
+  readonly onApply: () => void;
+  readonly onClose: () => void;
+}): JSX.Element {
+  return (
+    <DialogActions>
+      <Button onClick={props.onClose} title="Close without applying the part preview">
+        Cancel
+      </Button>
+      <Button
+        variant="primary"
+        disabled={!props.canApply}
+        onClick={props.onApply}
+        title="Apply the current reviewed part geometry and operation bindings"
+      >
+        Apply reviewed part
+      </Button>
+    </DialogActions>
   );
 }

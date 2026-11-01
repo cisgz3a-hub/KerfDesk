@@ -324,7 +324,7 @@ function DotWidthCorrectionInput(props: {
       onBlur={debounced.onBlur}
       style={inputStyle}
       aria-label={`Dot width correction for ${labelContext}`}
-      title="Compensate for physical laser dot width when raster engraving this layer. Shortens each burned run at both ends along the scan; it cannot widen white lines that run parallel to the scan."
+      title="Compensate for physical laser dot width when raster engraving this layer. Shortens each burned line at both ends, where the beam turns on and off along the scan; power changes inside a line are not trimmed. It cannot widen white lines that run parallel to the scan."
     />
   );
 }

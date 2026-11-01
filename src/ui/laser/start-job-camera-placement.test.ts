@@ -3,9 +3,12 @@ import {
   createLayer,
   createProject,
   EMPTY_SCENE,
+  findRegistrationBoxes,
   IDENTITY_TRANSFORM,
+  registrationRunState,
   type Project,
 } from '../../core/scene';
+import { createRectangle } from '../../core/shapes/primitives';
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
 import { frameVerificationForProject } from './frame-verification-testing';
@@ -197,5 +200,130 @@ describe('Start camera-placement on a Place Board job', () => {
   it('says nothing about Place Board for a job without a board outline', () => {
     const warnings = demotedPolicyWarnings(cameraProject(true), READY_MACHINE, undefined);
     expect(warnings).not.toContain(PLACE_BOARD_ABSOLUTE_WARNING);
+  });
+});
+
+// Rolling audit v5 J5-P2-1 (ADR-654 Amendment 4, ADR-057 Amendment 6): a
+// registration jig anchors both runs to its outline. Its artwork run, with the
+// camera picture latched, was told to choose Absolute Coordinates, which burns
+// the artwork about 198 mm from the outline run 1 burned at User Origin.
+describe('Start camera-placement on a registration jig job', () => {
+  const USER_ORIGIN = { startFrom: 'user-origin', anchor: 'front-left' } as const;
+  const ABSOLUTE = { startFrom: 'absolute', anchor: 'front-left' } as const;
+
+  function jigProject(run: 'box' | 'artwork' = 'artwork'): Project {
+    resetStore();
+    useStore.setState({ project: cameraProject(true) });
+    useStore.getState().addRegistrationBox(100, 60);
+    useStore.getState().drawShape(
+      createRectangle({
+        id: 'jig-art',
+        color: '#0000ff',
+        transform: { ...IDENTITY_TRANSFORM, x: 190, y: 190 },
+        spec: { widthMm: 20, heightMm: 20, cornerRadiusMm: 0 },
+      }),
+    );
+    useStore.getState().setRegistrationOutput(run);
+    const { project } = useStore.getState();
+    expect(registrationRunState(project.scene)).toBe(run);
+    expect(findRegistrationBoxes(project.scene)[0]?.provenance).toBeUndefined();
+    return project;
+  }
+  const latched = { ...READY_MACHINE, cameraPlacementActive: true };
+
+  it('keeps the jig’s Start from and never advises Absolute Coordinates, through Start', () => {
+    const project = jigProject();
+    const wco = { x: 15, y: 25, z: 0 };
+    const result = prepareStartJob(
+      project,
+      READY_CONTROLLER,
+      {
+        ...latched,
+        homingState: 'confirmed',
+        workOriginActive: true,
+        wcoCache: wco,
+        frameVerification: frameVerificationForProject(project, {
+          jobOrigin: USER_ORIGIN,
+          wco,
+          workOriginActive: true,
+        }),
+      },
+      USER_ORIGIN,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const camera = result.warnings.filter((w) => w.includes('Camera placement is on'));
+    expect(camera).toEqual([
+      expect.stringContaining(
+        'this is a registration jig job: it burns where User Origin puts the jig outline',
+      ),
+    ]);
+    expect(camera[0]).toContain('do not switch to Absolute Coordinates between the runs');
+    expect(result.warnings.join(' ')).not.toContain('Choose Absolute Coordinates');
+  });
+
+  it('gives the outline run the same advice', () => {
+    const warnings = demotedPolicyWarnings(jigProject('box'), latched, USER_ORIGIN);
+    expect(warnings.join(' ')).toContain('this is a registration jig job');
+    expect(warnings.join(' ')).not.toContain('Choose Absolute Coordinates');
+  });
+
+  it('warns an artwork run at Absolute Coordinates when the outline burned from User Origin', () => {
+    const project = jigProject();
+    for (const machine of [READY_MACHINE, latched]) {
+      const result = prepareStartJob(project, READY_CONTROLLER, {
+        ...machine,
+        registrationOutline: USER_ORIGIN,
+        homingState: 'confirmed',
+        frameVerification: frameVerificationForProject(project),
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) continue;
+      expect(result.warnings).toContainEqual(
+        'The jig outline burned from User Origin with the job origin at front left, but this artwork run starts from Absolute Coordinates. The artwork lands inside the burned outline only when both runs burn from the same Start from and job origin. Choose User Origin with the job origin at front left again, keep the work origin unchanged, and watch the Frame.',
+      );
+    }
+  });
+
+  it('names another job origin, and the outline’s Absolute Coordinates, in place of the camera advice', () => {
+    const project = jigProject();
+    const centre = demotedPolicyWarnings(
+      project,
+      { ...latched, registrationOutline: USER_ORIGIN },
+      { startFrom: 'user-origin', anchor: 'center' },
+    );
+    expect(centre).toContainEqual(
+      expect.stringContaining(
+        'this artwork run starts from User Origin with the job origin at center.',
+      ),
+    );
+    expect(centre.join(' ')).not.toContain('Camera placement is on');
+
+    const absoluteOutline = demotedPolicyWarnings(
+      project,
+      { ...latched, registrationOutline: ABSOLUTE },
+      USER_ORIGIN,
+    );
+    expect(absoluteOutline).toEqual([
+      expect.stringContaining(
+        'The jig outline burned from Absolute Coordinates, but this artwork run starts from User Origin',
+      ),
+    ]);
+    expect(absoluteOutline[0]).toContain('Choose Absolute Coordinates again');
+  });
+
+  it('says nothing about the outline when the artwork run matches it, or on the outline run', () => {
+    const matching = demotedPolicyWarnings(
+      jigProject(),
+      { ...READY_MACHINE, registrationOutline: USER_ORIGIN },
+      USER_ORIGIN,
+    );
+    expect(matching).toEqual([]);
+    const outlineRun = demotedPolicyWarnings(
+      jigProject('box'),
+      { ...READY_MACHINE, registrationOutline: USER_ORIGIN },
+      undefined,
+    );
+    expect(outlineRun.join(' ')).not.toContain('The jig outline burned from');
   });
 });

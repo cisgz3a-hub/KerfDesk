@@ -41,7 +41,12 @@ type PickedRecoveryTarget =
 
 export async function handleSalvageExportProject(
   ctx: SalvageExportCtx,
-  prebuilt?: { readonly project: Project; readonly raw: string; readonly target: SaveTarget },
+  // A large project's copy is a Blob prepared off the canvas thread (J10-P3-3).
+  prebuilt?: {
+    readonly project: Project;
+    readonly raw: string | Blob;
+    readonly target: SaveTarget;
+  },
 ): Promise<SalvageExportOutcome> {
   if (prebuilt !== undefined) {
     if (prebuilt.project !== ctx.project)
@@ -60,7 +65,8 @@ export async function handleSalvageExportProject(
 
 function prepareRecovery(ctx: SalvageExportCtx): PreparedRecovery {
   try {
-    return { kind: 'ready', raw: serializeProject(ctx.project) };
+    // Compact like Save (ADR-204 Amendment 2); only small projects come here.
+    return { kind: 'ready', raw: serializeProject(ctx.project, { compact: true }) };
   } catch (err) {
     // The project cannot even be serialized — nothing can be recovered to a
     // file. Say so honestly rather than writing empty or partial bytes.
@@ -87,7 +93,7 @@ async function pickRecoveryTarget(ctx: SalvageExportCtx): Promise<PickedRecovery
 async function writeRecoveryTarget(
   ctx: SalvageExportCtx,
   target: SaveTarget,
-  raw: string,
+  raw: string | Blob,
 ): Promise<SalvageExportOutcome> {
   try {
     await (ctx.writeTarget === undefined ? target.write(raw) : ctx.writeTarget(target, raw));

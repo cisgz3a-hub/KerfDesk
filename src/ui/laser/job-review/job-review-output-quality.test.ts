@@ -67,6 +67,40 @@ describe('buildOutputQualityReviewFacts', () => {
     ]);
   });
 
+  // ADR-239 Amendment 2: an M3 contour group carries an exit beside its entry.
+  it('names the constant-power exit beside the entry, and its skip', () => {
+    const layer = {
+      ...createLayer({ id: 'outline', color: '#000000', mode: 'line' }),
+      name: 'Outline',
+    };
+    const group = {
+      kind: 'cut' as const,
+      layerId: layer.id,
+      color: layer.color,
+      power: 30,
+      speed: 1500,
+      passes: 1,
+      airAssist: false,
+      entryRunwayMm: 5,
+      exitRunwayMm: 5,
+      segments: [],
+    };
+
+    expect(buildOutputQualityReviewFacts({ groups: [group] }, [layer])).toEqual([
+      {
+        label: 'Contour entry and exit — Outline',
+        value: '5 mm effective target at operation feed, each end · laser off',
+        tone: 'default',
+      },
+    ]);
+    const skipped = buildOutputQualityReviewFacts({ groups: [group], contourEntryBounds: null }, [
+      layer,
+    ]);
+    expect(skipped[0]?.label).toBe('Contour entry and exit — Outline');
+    expect(skipped[0]?.value).toContain('slows to a stop at full constant power (M3) at its end');
+    expect(skipped[0]?.tone).toBe('warning');
+  });
+
   it('shows exact runway coverage and the effective 4040 fallback reason', () => {
     const layer = {
       ...createLayer({ id: 'small-text', color: '#000000', mode: 'fill' }),

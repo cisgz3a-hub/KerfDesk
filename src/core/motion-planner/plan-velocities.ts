@@ -1,8 +1,10 @@
 // Two-pass lookahead velocity planning (extracted from core/job/planner.ts,
 // ADR-255 stage 8a — pure move, no behavior change).
 
+import type { MachineKinematics } from '../devices/device-profile';
 import type { Block } from './block';
 import { junctionVelocity } from './junction';
+import { blockAcceleration, junctionPlanningLimits } from './planner-kinematics';
 
 export type PlanEntry = { entryV: number; exitV: number };
 
@@ -13,18 +15,21 @@ export type PlanEntry = { entryV: number; exitV: number };
 //
 // `plannerBlocks` is how many blocks the controller's planner holds, counting
 // the one executing (ADR-525). Without it the whole span is planned at once,
-// as if the controller could see every later move.
+// as if the controller could see every later move. `kinematics` sets how the
+// profile's acceleration reaches each block (ADR-675, planner-kinematics.ts).
 export function planVelocities(
   blocks: ReadonlyArray<Block>,
   accel: number,
   jd: number,
   plannerBlocks?: number,
+  kinematics: MachineKinematics = 'cartesian',
 ): PlanEntry[] {
   const plan: PlanEntry[] = blocks.map(() => ({ entryV: 0, exitV: 0 }));
-  capJunctionEntries(blocks, plan, accel, jd);
-  if (isPlannerWindow(plannerBlocks)) capPlannerWindowEntries(blocks, plan, accel, plannerBlocks);
-  backwardPass(blocks, plan, accel);
-  forwardPass(blocks, plan, accel);
+  const accels = blocks.map((block) => blockAcceleration(block, accel, kinematics));
+  capJunctionEntries(blocks, plan, { accel, jd, kinematics });
+  if (isPlannerWindow(plannerBlocks)) capPlannerWindowEntries(blocks, plan, accels, plannerBlocks);
+  backwardPass(blocks, plan, accels);
+  forwardPass(blocks, plan, accels);
   return plan;
 }
 
@@ -42,7 +47,7 @@ function isPlannerWindow(plannerBlocks: number | undefined): plannerBlocks is nu
 function capPlannerWindowEntries(
   blocks: ReadonlyArray<Block>,
   plan: PlanEntry[],
-  accel: number,
+  accels: ReadonlyArray<number>,
   plannerBlocks: number,
 ): void {
   const stoppingBlocks = plannerBlocks - 1;
@@ -52,7 +57,8 @@ function capPlannerWindowEntries(
   }
   for (let i = 1; i < blocks.length; i += 1) {
     const p = plan[i];
-    if (p === undefined) continue;
+    const accel = accels[i];
+    if (p === undefined || accel === undefined) continue;
     const windowEnd = Math.min(blocks.length, i + stoppingBlocks);
     const roomMm = Math.max(0, (distanceBefore[windowEnd] ?? 0) - (distanceBefore[i] ?? 0));
     p.entryV = Math.min(p.entryV, Math.sqrt(2 * accel * roomMm));
@@ -65,15 +71,15 @@ function capPlannerWindowEntries(
 function capJunctionEntries(
   blocks: ReadonlyArray<Block>,
   plan: PlanEntry[],
-  accel: number,
-  jd: number,
+  limits: { readonly accel: number; readonly jd: number; readonly kinematics: MachineKinematics },
 ): void {
   for (let i = 1; i < blocks.length; i += 1) {
     const prev = blocks[i - 1];
     const next = blocks[i];
     const p = plan[i];
     if (prev === undefined || next === undefined || p === undefined) continue;
-    const vJunction = junctionVelocity(prev, next, accel, jd);
+    const corner = junctionPlanningLimits(prev, next, limits.accel, limits.jd, limits.kinematics);
+    const vJunction = junctionVelocity(prev, next, corner.accel, corner.jd);
     // Clamp to BOTH adjacent blocks' target speeds (GRBL mins the junction
     // against both nominal speeds). Omitting prev.targetVelocity let the slower
     // block inherit an exitV above its own target via backwardPass, which made
@@ -84,11 +90,16 @@ function capJunctionEntries(
 
 // Backward pass: ensure each entry is reachable by decel from exit.
 // Last block exits to rest (postamble decel to zero).
-function backwardPass(blocks: ReadonlyArray<Block>, plan: PlanEntry[], accel: number): void {
+function backwardPass(
+  blocks: ReadonlyArray<Block>,
+  plan: PlanEntry[],
+  accels: ReadonlyArray<number>,
+): void {
   for (let i = blocks.length - 1; i >= 0; i -= 1) {
     const block = blocks[i];
     const p = plan[i];
-    if (block === undefined || p === undefined) continue;
+    const accel = accels[i];
+    if (block === undefined || p === undefined || accel === undefined) continue;
     const exit = i === blocks.length - 1 ? 0 : (plan[i + 1]?.entryV ?? 0);
     p.exitV = exit;
     const maxEntry = Math.sqrt(exit * exit + 2 * accel * block.distance);
@@ -97,11 +108,16 @@ function backwardPass(blocks: ReadonlyArray<Block>, plan: PlanEntry[], accel: nu
 }
 
 // Forward pass: ensure each exit is reachable by accel from entry.
-function forwardPass(blocks: ReadonlyArray<Block>, plan: PlanEntry[], accel: number): void {
+function forwardPass(
+  blocks: ReadonlyArray<Block>,
+  plan: PlanEntry[],
+  accels: ReadonlyArray<number>,
+): void {
   for (let i = 0; i < blocks.length; i += 1) {
     const block = blocks[i];
     const p = plan[i];
-    if (block === undefined || p === undefined) continue;
+    const accel = accels[i];
+    if (block === undefined || p === undefined || accel === undefined) continue;
     const entry = i === 0 ? 0 : (plan[i - 1]?.exitV ?? 0);
     p.entryV = Math.min(p.entryV, entry, block.targetVelocity);
     const maxExit = Math.sqrt(p.entryV ** 2 + 2 * accel * block.distance);

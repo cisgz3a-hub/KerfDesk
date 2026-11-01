@@ -54,7 +54,9 @@ Save click) and the `PlatformAdapter.pickFileForSave` contract in `src/platform/
    (`FileSystemDirectoryHandle.removeEntry`), and an existing file keeps its old contents. A
    temporary name plus rename was considered, but `FileSystemHandle.move()` is not in the WHATWG
    File System standard or TypeScript's DOM types, and its support for files in user-picked
-   folders could not be confirmed. `removeEntry` is standard.
+   folders could not be confirmed. `removeEntry` is standard. *(Extended by
+   [Amendment 3](ADR-656-amendment-3-a-tile-set-cut-short-names-its-stale-files.md): a tiled save
+   that stops at a failed write names the earlier files it left under its names.)*
 6. **Tests model Chromium.** `src/platform/web/chromium-save-picker.test-support.ts` empties the
    chosen file on pick and stages writes in a swap file. Each fixed save has a regression test
    that runs the real web adapter against it.

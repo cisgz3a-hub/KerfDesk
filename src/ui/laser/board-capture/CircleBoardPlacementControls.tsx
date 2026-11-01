@@ -12,7 +12,7 @@ export function CircleBoardPlacementControls(props: {
   readonly verification: BoardVerificationController;
   readonly onReset: () => void;
 }): JSX.Element {
-  const { canAlign, canFit, alignToBox, fitToBoard, arrayToBoard, removeBoard } =
+  const { canAlign, canFit, canArray, alignToBox, fitToBoard, arrayToBoard, removeBoard } =
     useBoardPlacement();
   return (
     <div style={columnStyle}>
@@ -30,7 +30,12 @@ export function CircleBoardPlacementControls(props: {
           Center
         </Button>
       </AnchorRow>
-      <FillBoardControls canFit={canFit} onFit={fitToBoard} onArray={arrayToBoard} />
+      <FillBoardControls
+        canFit={canFit}
+        canArray={canArray}
+        onFit={fitToBoard}
+        onArray={arrayToBoard}
+      />
       <BoardVerificationControls
         geometry={props.geometry}
         disabled={props.disabled}

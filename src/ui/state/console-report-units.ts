@@ -11,7 +11,8 @@
 // report in units KerfDesk does not know (rolling audit v3 G4-P1-2). The `$13`
 // write is the GRBL-family twin, read back with `$$`
 // (laser-console-settings-write.ts); Frame selects G21 itself
-// (frame-report-units.ts).
+// (frame-report-units.ts), and KerfDesk's other own units lines record what
+// they select (owned-report-units.ts).
 // https://github.com/Smoothieware/Smoothieware/blob/91fe4286e8ee19f062260abf094b315f9cf6bedf/src/modules/utils/simpleshell/SimpleShell.cpp#L879-L892
 
 import type { ControllerDriver } from '../../core/controllers';

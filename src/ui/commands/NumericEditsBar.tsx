@@ -66,6 +66,11 @@ const ROTATION_ENTRY: EntrySpec = {
   accepts: 'Type an angle in degrees or math like 45+15, 360/7 or atan(3/4).',
   retry: 'Type a number of degrees or a sum like 45+15.',
 };
+// ADR-678: R turns a multi-object selection or a group as one piece. Objects
+// turned to different angles leave it blank, and a typed angle turns them by it.
+const ROTATION_HINT = 'Turns the whole selection about its centre.';
+const MIXED_ROTATION_HINT =
+  'The selected objects are turned to different angles, so the box is blank: an angle typed here turns them all by that much about the selection centre.';
 
 export function NumericEditsBar(): JSX.Element {
   const model = useNumericEditModel();
@@ -146,6 +151,7 @@ function useNumericEditModel(): NumericEditModel {
 function NumericFields(props: { readonly model: NumericEditModel }): JSX.Element {
   const { model } = props;
   const lengthUnit = useLengthUnit();
+  const mixedRotation = model.hasSelection && model.rotationValue === null;
   return (
     <>
       <div className="lf-numeric-field-group">
@@ -176,8 +182,10 @@ function NumericFields(props: { readonly model: NumericEditModel }): JSX.Element
         label="Selection rotation"
         caption="R"
         value={model.rotationValue}
-        disabled={model.rotationValue === null}
+        disabled={!model.hasSelection}
         unit="°"
+        hint={mixedRotation ? MIXED_ROTATION_HINT : ROTATION_HINT}
+        placeholder={mixedRotation ? 'Mixed' : ''}
         entry={ROTATION_ENTRY}
         onCommit={(rotationDeg) => model.commit({ kind: 'rotate', rotationDeg })}
       />
@@ -251,16 +259,15 @@ function NumberField(props: {
   readonly unit?: string;
   readonly lengthUnit?: DisplayLengthUnit;
   readonly hideUnit?: boolean;
+  /** What the box does; length boxes measure from the anchor point. */
+  readonly hint?: string;
+  readonly placeholder?: string;
   readonly entry: EntrySpec;
   readonly onCommit: (value: number) => void;
 }): JSX.Element {
   const lengthUnit = props.lengthUnit;
   const format = (value: number | null): string => formatNumber(value, lengthUnit);
   const unitLabel = lengthUnit === undefined ? (props.unit ?? '') : lengthUnitLabel(lengthUnit);
-  const accepts =
-    lengthUnit === 'in'
-      ? props.entry.accepts.replace(LENGTH_ACCEPTS, INCH_LENGTH_ACCEPTS)
-      : props.entry.accepts;
   const step = lengthUnit === 'in' ? INCH_STEP_MM : props.entry.step;
   const shown = format(props.value);
   const [draft, setDraft] = useState(shown);
@@ -315,11 +322,12 @@ function NumberField(props: {
       <input
         className="lf-input"
         aria-label={props.label}
-        title={`${props.label}. Values are measured from the selected anchor point. ${accepts}`}
+        title={fieldTitle(props.label, props.hint, props.entry, lengthUnit)}
         type="text"
         inputMode="decimal"
         autoComplete="off"
         spellCheck={false}
+        placeholder={props.placeholder}
         value={draft}
         disabled={props.disabled}
         aria-invalid={!draftIsValid}
@@ -331,6 +339,20 @@ function NumberField(props: {
       {!props.hideUnit && <span className="lf-numeric-edit-unit">{unitLabel}</span>}
     </label>
   );
+}
+
+// The hover text: what the box does, then what it accepts in the display unit.
+function fieldTitle(
+  label: string,
+  hint: string | undefined,
+  entry: EntrySpec,
+  lengthUnit: DisplayLengthUnit | undefined,
+): string {
+  const accepts =
+    lengthUnit === 'in'
+      ? entry.accepts.replace(LENGTH_ACCEPTS, INCH_LENGTH_ACCEPTS)
+      : entry.accepts;
+  return `${label}. ${hint ?? 'Values are measured from the selected anchor point.'} ${accepts}`;
 }
 
 type FieldKeyActions = {
@@ -417,7 +439,6 @@ function messageForError(reason: string): string {
   if (reason === 'non-uniform-rotated-selection') {
     return 'Unlocked width/height edits need every selected object turned by a multiple of 90°. Lock the aspect ratio to scale evenly.';
   }
-  if (reason === 'multi-rotation') return 'Rotate one object at a time in Numeric Edits.';
   if (reason === 'invalid-dimension') return 'Width and height must be greater than 0.';
   if (reason === 'invalid-number') return 'Numeric values must be finite.';
   if (reason === 'zero-height-selection') {

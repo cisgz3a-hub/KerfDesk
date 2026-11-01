@@ -2,10 +2,11 @@
 // pages on the exact historical path. Each fixture is traced twice through
 // the real preprocessing chain (adjustments, median, the Smooth supersample,
 // the detail detector's own pass): once as shipped, and once with
-// levelForAutomaticThreshold forced to identity, which is the pre-ADR-402
-// chain (applyThresholdWithIso then runs its own Otsu cut on the unmodified
-// luma). The traced paths must be identical. A ramp page is the positive
-// control: there the two runs must differ, so the bypass is known to bite.
+// levelForAutomaticThreshold told the lighting is even, which is the chain
+// without flattening (the same automatic cut, ADR-402 Amendment 1, on the
+// unmodified luma, and the same verdicts handed to the supersampled grid).
+// The traced paths must be identical. A ramp page is the positive control:
+// there the two runs must differ, so the bypass is known to bite.
 
 import { describe, expect, it, vi } from 'vitest';
 import { TRACE_PRESETS, traceImageToColoredPaths } from '../../core/trace';
@@ -29,7 +30,12 @@ vi.mock('../../core/trace/background-flatten', async (importOriginal) => {
       image: RawImageData,
       options: Parameters<typeof actual.levelForAutomaticThreshold>[1],
     ) => {
-      if (gate.bypass) return { source: image, threshold: null };
+      if (gate.bypass) {
+        return actual.levelForAutomaticThreshold(image, {
+          ...options,
+          sourceLightingLevelled: false,
+        });
+      }
       const level = actual.levelForAutomaticThreshold(image, options);
       if (level.source !== image) gate.flattenedCalls += 1;
       return level;

@@ -8,7 +8,7 @@ import { usePlatform } from '../app/platform-context';
 import { confirmDiscardAsync } from '../app/confirm-discard';
 import { Button, Dialog, DialogActions } from '../kit';
 import { useStore } from '../state';
-import { renderVariableText } from '../text/render-variable-text';
+import { outputTextRenderer } from '../text/output-text-renderer';
 
 export function ProductionManifestButton(): JSX.Element {
   const [open, setOpen] = useState(false);
@@ -124,7 +124,7 @@ function useProductionEditor() {
     void run(async (current) => {
       if (!(await confirmDiscardAsync(platform, 'open a production row')) || !current())
         return 'Opening cancelled.';
-      return (await useStore.getState().openProductionRow(id, renderVariableText, current))
+      return (await useStore.getState().openProductionRow(id, outputTextRenderer, current))
         ? 'Opened fixed row artwork. Review and Frame it before output.'
         : 'The document changed; opening was cancelled.';
     });
@@ -134,7 +134,7 @@ function useProductionEditor() {
       async (current) =>
         (await useStore
           .getState()
-          .captureProductionVariant(renderVariableText, new Date(), current)) ??
+          .captureProductionVariant(outputTextRenderer, new Date(), current)) ??
         'Captured this working variant. This record does not supply a completed Frame.',
     );
   };

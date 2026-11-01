@@ -65,4 +65,22 @@ describe('strokePolylinesBatched', () => {
 
     expect(calls.lineTo).toBe(2);
   });
+
+  it('draws the closing edge of a closed polyline that omits its seam vertex', () => {
+    const triangle = [
+      { x: 0, y: 0 },
+      { x: 4, y: 0 },
+      { x: 0, y: 3 },
+    ];
+    const open = countingContext();
+    strokePolylinesBatched(open.ctx, object(), [{ closed: false, points: triangle }], view);
+    expect(open.calls.lineTo).toBe(2);
+    const closed = countingContext();
+    strokePolylinesBatched(closed.ctx, object(), [{ closed: true, points: triangle }], view);
+    expect(closed.calls.lineTo).toBe(3);
+    const seamed = countingContext();
+    const withSeam = [...triangle, { x: 0, y: 0 }];
+    strokePolylinesBatched(seamed.ctx, object(), [{ closed: true, points: withSeam }], view);
+    expect(seamed.calls.lineTo).toBe(3);
+  });
 });

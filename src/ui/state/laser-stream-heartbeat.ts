@@ -18,6 +18,13 @@ export const HOST_SCHEDULING_GAP_MS = ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS;
 // count still declares a silent controller lost if the host keeps stalling.
 export const ACTIVE_STREAM_SCHEDULING_GRACES = 3;
 
+// A poll tick this long after the previous one ran late: the page was busy or
+// its timers were throttled. Input that reached the host during the gap may
+// still be queued behind the tick (a network reply's body is read on a later
+// task), so a late tick vouches for silence only up to the tick before it
+// (ADR-356 Amendment 2).
+export const LATE_POLL_TICK_MS = 500;
+
 export type ActiveStreamHeartbeatProbe = {
   readonly sessionEpoch: number;
   readonly statusSequence: number;
@@ -27,12 +34,16 @@ export type ActiveStreamHeartbeatProbe = {
   readonly schedulingGracesUsed: number;
 } | null;
 
-/** Detects loss of fresh controller output while a host stream is active. */
+/** Detects loss of fresh controller output while a host stream is active.
+ * `inputReadThrough` is when the transport last had every byte that reached
+ * the host in hand (`SerialConnection.inputReadThrough`); silence after it is
+ * not yet the controller's. */
 export function detectActiveStreamHeartbeatLoss(
   streamer: StreamerState | null,
   observation: ControllerObservationStamp | null,
   previous: ActiveStreamHeartbeatProbe,
   now: number,
+  inputReadThrough = now,
 ): { readonly probe: ActiveStreamHeartbeatProbe; readonly lost: boolean } {
   // `done` only means every line was parsed and acknowledged. GRBL may still
   // be executing buffered planner motion until a later Idle report releases
@@ -56,21 +67,37 @@ export function detectActiveStreamHeartbeatLoss(
       lost: false,
     };
   }
+  return judgeUnchangedObservation(previous, now, inputReadThrough);
+}
+
+function judgeUnchangedObservation(
+  previous: NonNullable<ActiveStreamHeartbeatProbe>,
+  now: number,
+  inputReadThrough: number,
+): { readonly probe: ActiveStreamHeartbeatProbe; readonly lost: boolean } {
   // Hidden tabs, a blocked event loop, or system sleep can postpone both the
   // polling callback and the serial reader. Let the resumed callback issue a
   // fresh query before treating old timestamps as a failed transport. The
   // allowance belongs to the unchanged observation and is bounded: repeated
   // late ticks cannot extend it indefinitely while the controller stays silent.
-  const schedulingGap = now - previous.checkedAt >= HOST_SCHEDULING_GAP_MS;
+  const gap = now - previous.checkedAt;
   const retryAfterGap =
-    schedulingGap && previous.schedulingGracesUsed < ACTIVE_STREAM_SCHEDULING_GRACES;
+    gap >= HOST_SCHEDULING_GAP_MS &&
+    previous.schedulingGracesUsed < ACTIVE_STREAM_SCHEDULING_GRACES;
   const probe = {
     ...previous,
     at: retryAfterGap ? now : previous.at,
     checkedAt: now,
     schedulingGracesUsed: previous.schedulingGracesUsed + (retryAfterGap ? 1 : 0),
   };
-  return { probe, lost: now - probe.at >= ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS };
+  // The silence this tick has actually observed ends where the host last had
+  // all of the controller's output in hand. A late tick leaves the verdict on
+  // its own gap to the next tick; that costs no grace (ADR-356 Amendment 2).
+  const observedThrough = Math.min(
+    gap >= LATE_POLL_TICK_MS ? previous.checkedAt : now,
+    inputReadThrough,
+  );
+  return { probe, lost: observedThrough - probe.at >= ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS };
 }
 
 function observationIdentity(

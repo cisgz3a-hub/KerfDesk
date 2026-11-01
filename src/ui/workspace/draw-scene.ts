@@ -34,6 +34,7 @@ import {
   isVectorSceneObject,
   resolveObjectDisplay,
   type ArtworkPalette,
+  type ObjectDisplay,
   type ObjectDisplayMode,
 } from './object-display';
 import type { PathNodeRef } from '../state/path-node-edit-actions';
@@ -62,6 +63,7 @@ import { drawArtworkRunFocus } from './draw-artwork-run-focus';
 import { drawBed, drawGrid, drawOriginMarker } from './draw-bed-chrome';
 import { objectIntersectsCanvas } from './object-viewport';
 import { beginArtworkSpriteFrame } from './artwork-sprite-cache';
+import { drawFillPools, drawnBitmapBox, planFillPools, type ResolvedVector } from './fill-pools';
 import type { DisplayLengthUnit } from '../display-length';
 
 export type DrawOpts = {
@@ -320,33 +322,35 @@ function drawObjects(
   beginArtworkSpriteFrame();
   const layerByColor = sceneLayerVisibility.lookup(project.scene.layers);
   scheduleReliefPreviews(project.scene.objects, layerByColor, onRasterBitmapReady);
+  const placed = placeObjects(
+    ctx,
+    project.scene.objects,
+    layerByColor,
+    view,
+    displayPolylineCache,
+    displayMode,
+    palette,
+  );
+  // ADR-683: a Fill operation paints as the one even-odd region it burns.
+  const pools = planFillPools(
+    placed.map((entry) => entry.vector),
+    (index) => drawnBitmapBox(project.scene.objects[index], placed[index]?.onCanvas === true),
+  );
+  const poolAlpha = (ids: ReadonlyArray<string>): number | null =>
+    dimmedByRunFocus(artworkRunFocus, ids) ? UNFOCUSED_ALPHA : null;
   let simplified = false;
-  for (const obj of project.scene.objects) {
+  for (const [index, obj] of project.scene.objects.entries()) {
+    // A pool stays bright while any of its members is in the focused run.
+    drawFillPools(ctx, pools.poolsAt(index), view, poolAlpha, onRasterBitmapReady);
     ctx.save();
-    if (artworkRunFocus !== undefined && !artworkRunFocus.objectIds.includes(obj.id)) {
-      ctx.globalAlpha = 0.24;
-    }
-    const isVisible = sceneLayerVisibility.hasObject(obj, layerByColor);
-    const onCanvas = isVisible && objectIntersectsCanvas(obj, view, ctx.canvas);
+    if (dimmedByRunFocus(artworkRunFocus, [obj.id])) ctx.globalAlpha = UNFOCUSED_ALPHA;
+    const { isVisible, onCanvas, vector } = placed[index] ?? NOT_PLACED;
     // ImportedSvg and TextObject share the same polyline shape after text renders
     // to paths — single drawing path. ADR-057: dash the jig box so it reads as a
     // placement fixture, not artwork; reset after, before the overlays below.
     ctx.setLineDash(isRegistrationBox(obj) ? [8, 5] : []);
-    if (
-      onCanvas &&
-      drawObjectPolylines(
-        ctx,
-        obj,
-        layerByColor,
-        view,
-        displayPolylineCache,
-        onRasterBitmapReady,
-        displayMode,
-        palette,
-      )
-    ) {
-      simplified = true;
-    }
+    const display = pools.displayAt(index);
+    if (drawPlacedVector(ctx, vector, display, view, onRasterBitmapReady)) simplified = true;
     ctx.setLineDash([]);
     if (onCanvas) drawObjectBitmap(ctx, obj, layerByColor, view, onRasterBitmapReady);
     drawObjectSelectionOverlay(ctx, obj, view, {
@@ -402,31 +406,60 @@ function selectedObjectsForOverlay(
   );
 }
 
+const UNFOCUSED_ALPHA = 0.24;
+
+function dimmedByRunFocus(focus: ArtworkRunFocus | undefined, ids: ReadonlyArray<string>): boolean {
+  return focus !== undefined && !ids.some((id) => focus.objectIds.includes(id));
+}
+
+/** Draw what is left of a vector after its pools; true when its display was simplified. */
+function drawPlacedVector(
+  ctx: CanvasRenderingContext2D,
+  vector: ResolvedVector | undefined,
+  display: ObjectDisplay | undefined,
+  view: ViewTransform,
+  requestRedraw: (() => void) | undefined,
+): boolean {
+  if (vector === undefined || display === undefined) return false;
+  if (display.paths.length > 0) drawObjectDisplay(ctx, vector.object, display, view, requestRedraw);
+  return display.isSimplified;
+}
+
+type PlacedObject = {
+  readonly isVisible: boolean;
+  readonly onCanvas: boolean;
+  readonly vector: ResolvedVector | undefined;
+};
+
+const NOT_PLACED: PlacedObject = { isVisible: false, onCanvas: false, vector: undefined };
+
 // imported-svg, text, traced-image and shape all carry the same ColoredPath[]
 // shape — one resolution + one painter (object-display.ts). Dense objects are
 // blitted from a cached sprite; the rest paint directly, one beginPath/stroke
 // per path (per-polyline stroke() was the original post-import freeze).
-function drawObjectPolylines(
+function placeObjects(
   ctx: CanvasRenderingContext2D,
-  obj: SceneObject,
+  objects: ReadonlyArray<SceneObject>,
   layerByColor: Map<string, Layer>,
   view: ViewTransform,
   displayPolylineCache: DisplayPolylineCache | undefined,
-  requestRedraw: (() => void) | undefined,
   displayMode: ObjectDisplayMode,
   palette: ArtworkPalette,
-): boolean {
-  if (!isVectorSceneObject(obj)) return false;
-  const resolved = resolveObjectDisplay(
-    obj,
-    layerByColor,
-    view,
-    displayPolylineCache,
-    displayMode,
-    palette,
-  );
-  drawObjectDisplay(ctx, obj, resolved, view, requestRedraw);
-  return resolved.isSimplified;
+): PlacedObject[] {
+  return objects.map((obj) => {
+    const isVisible = sceneLayerVisibility.hasObject(obj, layerByColor);
+    const onCanvas = isVisible && objectIntersectsCanvas(obj, view, ctx.canvas);
+    if (!onCanvas || !isVectorSceneObject(obj)) return { isVisible, onCanvas, vector: undefined };
+    const display = resolveObjectDisplay(
+      obj,
+      layerByColor,
+      view,
+      displayPolylineCache,
+      displayMode,
+      palette,
+    );
+    return { isVisible, onCanvas, vector: { object: obj, display } };
+  });
 }
 
 // F-A3/A6/A8 — overlay any object whose transformed bbox extends past the

@@ -61,11 +61,6 @@ function kerfDeskLogLines(): string[] {
   return useLaserStore.getState().log.filter((line) => line.startsWith('[lf2]'));
 }
 
-/** The last KerfDesk note in the log. */
-function lastLogLine(): string | undefined {
-  return kerfDeskLogLines().at(-1);
-}
-
 function writesAfter(sim: GrblSimulator, count: number): string[] {
   return sim
     .outbound()
@@ -104,7 +99,9 @@ describe('stock GRBL left in its homing state by a refused single-axis Home', ()
     expect(useLaserStore.getState()).toMatchObject({ resetRequired: false, alarmCode: 6 });
     expect(useLaserStore.getState().statusReport?.state).toBe('Alarm');
     // Home with this profile would send `$HX` again, so the log says Unlock.
-    expect(lastLogLine()).toBe(
+    // The Falcon contract reads `$$` too (ADR-322 Amendment 3), so
+    // qualification's own notes may follow this one (ADR-674).
+    expect(kerfDeskLogLines()).toContain(
       '[lf2] Controller reset out of its homing state and came back locked in Alarm (ALARM:6). Unlock it: Home with this device profile sends $HX, which leaves stock GRBL built without single-axis homing stuck again.',
     );
 

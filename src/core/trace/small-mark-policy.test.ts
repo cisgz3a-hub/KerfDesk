@@ -238,6 +238,76 @@ describe('automatic small-mark policy (Line Art and Smooth default)', () => {
     expect(components(preprocessForTrace(image, LINE_ART))).toBe(1);
   });
 
+  // ADR-434 Amendment 2. A tittle or a full stop sits nearer its letter's
+  // stroke than any like mark, as halo scatter does, but it is drawn with the
+  // letter's own pen; the scatter above is finer than its stroke (0.45).
+  it('keeps a mark as wide as the stroke beside it, and not one much finer', () => {
+    const draw = (strokeWidth: number): RawImageData => {
+      const g = page(60, 50);
+      paint(g, 20, 14, strokeWidth, 30, 0); // a letter's stem
+      paint(g, 20, 9, 3, 2, 0); // a 6 px² tittle 3 px above it
+      return rgba(g);
+    };
+    expect(inkCount(preprocessForTrace(draw(3), LINE_ART), 20, 9, 3, 2)).toBe(6);
+    expect(inkCount(preprocessForTrace(draw(5), LINE_ART), 20, 9, 3, 2)).toBe(0);
+  });
+
+  it('judges the size floor on the ink a mark carries, not its pixels past the cut', () => {
+    // An anti-aliased full stop: two pixels past the cut and a grey rim that
+    // carries the rest of its ink. The same two pixels with no rim are a
+    // 2 px² speck under the floor.
+    const draw = (rim: number): RawImageData => {
+      const g = page(60, 50);
+      paint(g, 10, 10, 2, 30, 0); // the stroke beside it
+      paint(g, 13, 37, 4, 3, rim);
+      paint(g, 14, 38, 2, 1, 0);
+      return rgba(g);
+    };
+    expect(inkCount(preprocessForTrace(draw(170), LINE_ART), 14, 38, 2, 1)).toBe(2);
+    expect(inkCount(preprocessForTrace(draw(255), LINE_ART), 14, 38, 2, 1)).toBe(0);
+  });
+
+  // ADR-434 Amendment 3. A lone dot is sized by its ink for the lone-mark
+  // floor too, and is never counted as dust against itself: before, a lone
+  // anti-aliased dot under 8 px² by pixel count was its own debris.
+  it('keeps a lone dot that carries a 3x3 dot of ink, not its bare core', () => {
+    const draw = (rim: number): RawImageData => {
+      const g = page(60, 40);
+      paint(g, 20, 15, 4, 5, rim);
+      paint(g, 21, 16, 2, 3, 0); // 6 px past the cut, 3.3 px² more in the rim
+      return rgba(g);
+    };
+    expect(inkCount(preprocessForTrace(draw(170), LINE_ART), 21, 16, 2, 3)).toBe(6);
+    expect(inkCount(preprocessForTrace(draw(255), LINE_ART), 21, 16, 2, 3)).toBe(0);
+  });
+
+  // A full stop after a letter with no ink at its foot ('y', '7') has nothing
+  // within the support radius. It sits on the baseline of the letters beside
+  // it, which a speck in clean paper does not.
+  it('keeps a lone full stop on a baseline, not the same dot off it or far from text', () => {
+    const draw = (dotX: number, dotBottom: number): RawImageData => {
+      const g = page(120, 50);
+      paint(g, 10, 20, 2, 14, 0); // an 'l' ending on the baseline (row 33)
+      paint(g, 16, 24, 8, 10, 0); // an 'o'
+      paint(g, dotX, dotBottom - 1, 2, 2, 0);
+      return rgba(g);
+    };
+    expect(inkCount(preprocessForTrace(draw(31, 33), LINE_ART), 31, 32, 2, 2)).toBe(4);
+    expect(inkCount(preprocessForTrace(draw(31, 28), LINE_ART), 31, 27, 2, 2)).toBe(0);
+    expect(inkCount(preprocessForTrace(draw(80, 33), LINE_ART), 80, 32, 2, 2)).toBe(0);
+  });
+
+  it('does not count full stops on a baseline as dust against each other', () => {
+    // "a. b. c.": three lone stops 24 px apart, inside each other's debris tiles.
+    const g = page(100, 50);
+    for (const x of [10, 34, 58]) {
+      paint(g, x, 20, 2, 12, 0);
+      paint(g, x + 9, 30, 2, 2, 0);
+    }
+    const cleaned = preprocessForTrace(rgba(g), LINE_ART);
+    for (const x of [10, 34, 58]) expect(inkCount(cleaned, x + 9, 30, 2, 2)).toBe(4);
+  });
+
   it('removes a dark dust cluster of mixed-size specks', () => {
     const random = seeded(3);
     const g = page(80, 80);

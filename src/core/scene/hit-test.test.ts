@@ -351,3 +351,84 @@ describe('hitTestCandidates', () => {
     expect(hitTestCandidates(scene, { x: 10, y: 10 })).toEqual(['bottom']);
   });
 });
+
+// L8-P2-5 (rolling audit v7): a Fill shape's hole is drawn empty and burns
+// nothing, so it must not be a solid click target over the artwork inside it.
+describe('hitTest — Fill shapes with holes', () => {
+  function plateWithWindow(id: string, color: string, fillRule?: 'evenodd' | 'nonzero') {
+    const outer = rectPolyline({ minX: 0, minY: 0, maxX: 100, maxY: 100 });
+    // The window winds the other way, so it is a hole under either rule.
+    const window = {
+      closed: true,
+      points: [...rectPolyline({ minX: 30, minY: 30, maxX: 70, maxY: 70 }).points].reverse(),
+    };
+    const plate: SceneObject = {
+      kind: 'imported-svg',
+      id,
+      source: `${id}.svg`,
+      bounds: { minX: 0, minY: 0, maxX: 100, maxY: 100 },
+      transform: IDENTITY_TRANSFORM,
+      paths: [
+        { color, ...(fillRule === undefined ? {} : { fillRule }), polylines: [outer, window] },
+      ],
+    };
+    return plate;
+  }
+
+  it.each([undefined, 'nonzero'] as const)(
+    'picks artwork seen through the hole of a filled plate drawn above it (rule %s)',
+    (fillRule) => {
+      const square = outlinedRect({
+        id: 'square',
+        minX: 45,
+        minY: 45,
+        maxX: 55,
+        maxY: 55,
+        color: '#0000ff',
+      });
+      const scene = withObjectsAndLayerModes(
+        new Map([['#ff0000', 'fill']]),
+        square,
+        plateWithWindow('plate', '#ff0000', fillRule),
+      );
+
+      expect(hitTest(scene, { x: 45, y: 50 })).toBe('square');
+      expect(hitTest(scene, { x: 50, y: 50 })).toBe('square');
+      expect(hitTest(scene, { x: 15, y: 50 })).toBe('plate');
+      // An empty hole selects its plate as a Line shape's interior would.
+      expect(hitTest(scene, { x: 35, y: 50 })).toBe('plate');
+      expect(hitTestCandidates(scene, { x: 45, y: 50 })).toEqual(['square', 'plate']);
+    },
+  );
+
+  it('keeps a non-zero shape solid where its own contours overlap', () => {
+    const overlapping: SceneObject = {
+      kind: 'imported-svg',
+      id: 'block',
+      source: 'block.svg',
+      bounds: { minX: 0, minY: 0, maxX: 30, maxY: 20 },
+      transform: IDENTITY_TRANSFORM,
+      paths: [
+        {
+          color: '#ff0000',
+          fillRule: 'nonzero',
+          polylines: [
+            rectPolyline({ minX: 0, minY: 0, maxX: 20, maxY: 20 }),
+            rectPolyline({ minX: 10, minY: 0, maxX: 30, maxY: 20 }),
+          ],
+        },
+      ],
+    };
+    const below = outlinedRect({
+      id: 'below',
+      minX: 14,
+      minY: 9,
+      maxX: 16,
+      maxY: 11,
+      color: '#0000ff',
+    });
+    const scene = withObjectsAndLayerModes(new Map([['#ff0000', 'fill']]), below, overlapping);
+
+    expect(hitTest(scene, { x: 15, y: 15 })).toBe('block');
+  });
+});

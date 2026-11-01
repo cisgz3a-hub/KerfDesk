@@ -1,3 +1,4 @@
+import { machineKindOf } from '../../core/scene';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
@@ -10,6 +11,12 @@ import { useToastStore } from '../state/toast-store';
 import { useFramePreparationStore } from '../state/frame-preparation-store';
 import { pendingTransportWriteCount } from '../state/laser-start-queue-fence';
 import { useJobReviewStore } from '../laser/job-review/job-review-store';
+import {
+  outputOffCommand,
+  reportedAccessories,
+  unownedControllerOutput,
+  type UnownedControllerOutput,
+} from '../state/unowned-controller-output';
 import { DesktopCloseController, type DesktopCloseReply } from './desktop-close-controller';
 import { checkpointBeforeProjectDecision } from './project-decision-checkpoint';
 
@@ -26,6 +33,7 @@ export const desktopCloseController = new DesktopCloseController(() => {
   return {
     active: isActiveJob(laser.streamer),
     fireLatched: laser.fireActive,
+    output: unownedControllerOutput(laser, machineKindOf(useStore.getState().project.machine)),
     motionOwner: laser.motionOperation?.operationId ?? null,
     controllerOwner: controllerOwner(laser),
     epoch: laser.streamerEpoch,
@@ -50,11 +58,10 @@ function observedControllerBusy(laser: ReturnType<typeof useLaserStore.getState>
   if (laser.connection.kind !== 'connected') return false;
   const report = laser.statusReport;
   if (report !== null && ['Run', 'Jog', 'Home', 'Hold', 'Door'].includes(report.state)) return true;
-  // GRBL omits A:/Ov: between accessory observations. The canonical cache
-  // also retains grblHAL tool-change/secondary-spindle evidence.
-  const accessories = laser.accessoryCache ?? report?.accessories;
+  // The same evidence the close turns a laser off for (reportedAccessories).
+  const accessories = reportedAccessories(laser);
   return (
-    accessories != null &&
+    accessories !== null &&
     (accessories.spindleCw ||
       accessories.spindleCcw ||
       accessories.toolChangePending === true ||
@@ -65,8 +72,13 @@ function observedControllerBusy(laser: ReturnType<typeof useLaserStore.getState>
 // A latched Fire is turned off before a running job is aborted. Web pages
 // cannot await a write while they unload, so the desktop handoff is the one
 // place that M5 is sure to be written (controller audit electron-native-3).
-async function stopBeforeClose(): Promise<void> {
+// A laser the controller reports on at Idle with nothing here running it gets
+// the same M5, with M9 for air, as LASER OFF sends (rolling audit v5 J2-P2-1).
+async function stopBeforeClose(output: UnownedControllerOutput | null): Promise<void> {
   if (useLaserStore.getState().fireActive) await useLaserStore.getState().setFireActive(false);
+  else if (output !== null) {
+    await useLaserStore.getState().sendConsoleCommand(outputOffCommand(output));
+  }
   // Recovery records this stop as the app closing, not as an operator Abort.
   const laser = useLaserStore.getState();
   if (

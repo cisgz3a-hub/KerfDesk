@@ -29,3 +29,15 @@ export function currentProjectSaveWorker(): ProjectSaveTestWorker {
   if (worker === undefined) throw new Error('Project save worker is missing.');
   return worker;
 }
+
+/** Save text, or the raw recovery copy's Blob read back (jsdom's Blob has no `text()`). */
+export async function savedContentsText(contents: string | Blob): Promise<string> {
+  if (typeof contents === 'string') return contents;
+  if (typeof FileReader === 'undefined') return contents.text();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error ?? new Error('The Blob could not be read.'));
+    reader.readAsText(contents);
+  });
+}

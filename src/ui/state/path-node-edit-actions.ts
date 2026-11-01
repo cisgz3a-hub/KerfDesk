@@ -8,8 +8,10 @@ import {
   type Transform,
   type Vec2,
 } from '../../core/scene';
+import { withTabsFollowingEdit } from '../../core/geometry/edited-tab-anchors';
 import type { AppState } from './store';
 import { pushUndo } from './scene-mutations';
+import { useToastStore } from './toast-store';
 import {
   pathNodeCoordinateActions,
   type PathNodeCoordinateActions,
@@ -49,7 +51,15 @@ export function pathNodeEditActions(set: Setter): PathNodeEditActions {
     selectPathNode: (ref, options = {}) =>
       set((state) => selectPathNode(state, ref, options.additive === true)),
     nudgeSelectedPathNode: (dx, dy) => set((state) => nudgeSelectedPathNode(state, dx, dy)),
-    deleteSelectedPathNodes: () => set((state) => deleteSelectedPathNodes(state)),
+    deleteSelectedPathNodes: () => {
+      const notice = { text: '' };
+      set((state) => {
+        const result = deleteSelectedPathNodes(state);
+        notice.text = result.notice;
+        return result.state;
+      });
+      if (notice.text !== '') useToastStore.getState().pushToast(notice.text, 'info');
+    },
     setSelectedPathNodePositionDuringInteraction: (scenePoint) =>
       set((state) => setSelectedPathNodePositionDuringInteraction(state, scenePoint)),
   };
@@ -124,12 +134,18 @@ function nudgeSelectedPathNode(
   };
 }
 
-function deleteSelectedPathNodes(state: AppState): AppState | Partial<AppState> {
+type NodeDeletion = { readonly state: AppState | Partial<AppState>; readonly notice: string };
+
+// Deleting a contour's start node restarts it at the next kept node, so tabs
+// placed by hand are re-measured where they were (ADR-494 Amendment 2).
+function deleteSelectedPathNodes(state: AppState): NodeDeletion {
   const refs = activePathNodeRefs(state);
-  if (refs.length === 0) return state;
+  if (refs.length === 0) return { state, notice: '' };
   const refsByObject = groupPathNodeRefsByObject(refs);
 
   let changed = false;
+  let tooFew = false;
+  let movedTabs = 0;
   const nextProject: Project = {
     ...state.project,
     scene: {
@@ -138,21 +154,41 @@ function deleteSelectedPathNodes(state: AppState): AppState | Partial<AppState> 
         const objectRefs = refsByObject.get(object.id);
         if (objectRefs === undefined) return object;
         const edited = deleteObjectNodes(object, objectRefs);
-        if (edited === object) return object;
+        if (edited === 'too-few') tooFew = true;
+        if (edited === object || edited === 'too-few') return object;
         changed = true;
-        return edited;
+        const followed = withTabsFollowingEdit(object, edited);
+        movedTabs += followed.moved;
+        return followed.object;
       }),
     },
   };
-  if (!changed) return state;
+  if (!changed) {
+    return {
+      state,
+      notice: tooFew
+        ? 'Node not deleted: a closed path keeps at least 3 nodes, an open path 2.'
+        : '',
+    };
+  }
   return {
-    project: nextProject,
-    selectedPathNode: null,
-    selectedPathNodes: [],
-    undoStack: pushUndo(state.project, state.undoStack),
-    redoStack: [],
-    dirty: true,
+    state: {
+      project: nextProject,
+      selectedPathNode: null,
+      selectedPathNodes: [],
+      undoStack: pushUndo(state.project, state.undoStack),
+      redoStack: [],
+      dirty: true,
+    },
+    notice: movedTabsNotice(movedTabs),
   };
+}
+
+/** The note for placed tabs an edit moved onto the changed outline; empty for none. */
+export function movedTabsNotice(moved: number): string {
+  if (moved === 0) return '';
+  const tabs = moved === 1 ? '1 placed tab sat' : `${moved} placed tabs sat`;
+  return `${tabs} on the changed outline and moved to the nearest point of it. Undo restores them.`;
 }
 
 // Drag the whole selected-node set (audit C6): move the primary node under the
@@ -207,7 +243,10 @@ function editObjectNodes(
   return { ...object, paths: edit.paths, bounds };
 }
 
-function deleteObjectNodes(object: SceneObject, refs: ReadonlyArray<PathNodeRef>): SceneObject {
+function deleteObjectNodes(
+  object: SceneObject,
+  refs: ReadonlyArray<PathNodeRef>,
+): SceneObject | 'too-few' {
   if (object.locked === true || isBooleanCompoundObject(object)) return object;
   if (object.kind === 'raster-image' || object.kind === 'relief' || object.kind === 'text') {
     return object;
@@ -215,6 +254,7 @@ function deleteObjectNodes(object: SceneObject, refs: ReadonlyArray<PathNodeRef>
   if (object.kind === 'shape' && object.spec.kind !== 'polyline') return object;
 
   const edit = deletePathsNodes(object.paths, refs);
+  if (edit === 'too-few') return edit;
   if (edit === null) return object;
   const bounds = boundsForPaths(edit.paths);
   if (object.kind === 'shape') return editPolylineShape(object, edit.paths, bounds);

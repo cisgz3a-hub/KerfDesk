@@ -34,7 +34,8 @@ export function AdjustFields(props: {
         <p role="status" style={{ gridColumn: '1 / -1', margin: 0, color: 'var(--lf-text-muted)' }}>
           Original pixels and density are in use. Brightness, contrast, gamma, negative and dither
           settings are kept for when Pass-through is off. The selected power range, placement, masks
-          and dot-width correction still apply.
+          and dot-width correction still apply. An image turned off square to its scan direction is
+          resampled at its own pixel size, and Job Review says so.
         </p>
       ) : null}
       <PresetField
@@ -293,7 +294,7 @@ function numberFieldTitle(name: string, label: string): string {
     case 'imageDpi':
       return 'Image engraving resolution in dots per inch.';
     case 'dotWidthCorrectionMm':
-      return 'Compensate for physical laser dot width when raster engraving. Shortens each burned run at both ends along the scan; it cannot widen white lines that run parallel to the scan.';
+      return 'Compensate for physical laser dot width when raster engraving. Shortens each burned line at both ends, where the beam turns on and off along the scan; power changes inside a line are not trimmed. It cannot widen white lines that run parallel to the scan.';
     case 'minPower':
       return 'Lowest laser power used by grayscale image engraving.';
     default:

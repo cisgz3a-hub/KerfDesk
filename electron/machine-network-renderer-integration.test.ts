@@ -15,6 +15,10 @@ import { installAutoConnect } from '../src/ui/app/use-auto-connect-controller';
 import type { PlatformAdapter } from '../src/platform/types';
 import { createDesktopMachineNetwork } from '../src/platform/electron/desktop-machine-network';
 import { machineNetworkRequest } from '../src/platform/electron/desktop-machine-network-api';
+import { createNetworkSessionOpener } from '../src/platform/web/network-serial-connection';
+import type { NetworkSerialWorkerRequest } from '../src/platform/web/network-serial-worker-protocol';
+import { createNetworkSerialWorkerRuntime } from '../src/platform/web/network-serial-worker-runtime';
+import { startTestLaserJob } from '../src/ui/state/laser-test-start-helpers';
 
 vi.mock('electron', () => ({ app: { once: vi.fn() } }));
 
@@ -53,7 +57,27 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
-async function loopbackController() {
+/** The network streaming worker, run in this thread on the real runtime. */
+function inProcessNetworkWorker(fetcher: typeof fetch): Worker {
+  const worker = {
+    onmessage: null as ((event: MessageEvent) => void) | null,
+    onerror: null,
+    onmessageerror: null,
+    postMessage: (message: NetworkSerialWorkerRequest) => {
+      queueMicrotask(() => runtime.handle(message));
+    },
+    terminate: () => {
+      void runtime.close();
+    },
+  };
+  const runtime = createNetworkSerialWorkerRuntime({
+    post: (message) => queueMicrotask(() => worker.onmessage?.({ data: message } as MessageEvent)),
+    fetch: fetcher,
+  });
+  return worker as unknown as Worker;
+}
+
+async function loopbackController(options: { readonly hosted?: boolean } = {}) {
   const commands: string[] = [];
   const realtime: number[] = [];
   let connectionCount = 0;
@@ -92,7 +116,12 @@ async function loopbackController() {
     bridge,
   );
   const fetcher = vi.fn<typeof fetch>(async (input, options) => route(new Request(input, options)));
-  const network = createDesktopMachineNetwork(machineNetworkRequest(fetcher));
+  const network = createDesktopMachineNetwork(
+    machineNetworkRequest(fetcher),
+    options.hosted === true
+      ? createNetworkSessionOpener(() => inProcessNetworkWorker(fetcher))
+      : undefined,
+  );
   const usbOpen = vi.fn(async () => {
     throw new Error('USB must not open from this network flow');
   });
@@ -180,4 +209,37 @@ it('qualifies grblHAL through native routes and real TCP, then preserves network
   expect(fixture.usbOpen).not.toHaveBeenCalled();
   expect(fixture.connectionCount()).toBe(1);
   expect(fixture.nativeOpen).toHaveBeenCalledOnce();
+});
+
+// Rolling audit v6 K1-P1-3: a network session streamed only from the window,
+// so a busy window starved the controller with an M3 beam lit. A worker now
+// reads and writes the session through these same routes (ADR-676).
+it('streams a grblHAL network job from the worker through native routes and real TCP', async () => {
+  const fixture = await loopbackController({ hosted: true });
+  await useLaserStore.getState().connect(fixture.networkPlatform, {
+    controllerKind: 'grblhal',
+    portSelection: 'choose',
+  });
+  await vi.waitFor(
+    () => {
+      expect(useLaserStore.getState().controllerQualification.kind).toBe('qualified');
+      expect(useLaserStore.getState().controllerOperation).toBeNull();
+    },
+    { timeout: 4000 },
+  );
+  expect(useLaserStore.getState().jobStreamHost).toBe('worker');
+  expect(useLaserStore.getState().log.join('\n')).not.toContain('Background streaming');
+
+  const job = Array.from({ length: 60 }, (_, i) => `G1 X${i + 1} Y1 F3000 S0`);
+  await startTestLaserJob(job.join('\n'));
+  await vi.waitFor(() => expect(useLaserStore.getState().streamer?.status).toBe('done'), {
+    timeout: 6000,
+  });
+
+  // Every job line reached the controller once, in order. This fake keeps the
+  // realtime override resets Start sends (0x90-0x99) on the next line.
+  const sent = fixture.commands
+    .map((command) => command.replace(/[\u0080-ÿ]/g, ''))
+    .filter((command) => command.startsWith('G1 X'));
+  expect(sent).toEqual(job);
 });

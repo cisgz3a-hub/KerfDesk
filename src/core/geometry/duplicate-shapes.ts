@@ -105,6 +105,11 @@ function orderedKeys(keys: string[], anchored: boolean): string[] {
   return anchored ? keys : keys.sort();
 }
 
+/** A closed contour's key: the same ring from any start point, and either way round unless winding matters. */
+export function closedContourKey(polyline: Polyline, preserveWinding: boolean): string {
+  return contourKey({ ...polyline, closed: true }, false, preserveWinding);
+}
+
 function contourKey(polyline: Polyline, anchored: boolean, preserveWinding: boolean): string {
   const points = polyline.points.map(snap);
   if (anchored) return `${polyline.closed ? 'C' : 'O'}${encode(points)}`;

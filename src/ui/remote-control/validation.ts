@@ -1,4 +1,5 @@
 import type { RemoteWriteCommand, RemoteReadCommand, RemoteWrite } from './types';
+import { TEXT_SIZE_MAX_MM, TEXT_SIZE_MIN_MM } from '../../core/text/text-limits';
 import { validTextPatch } from './text-validation';
 import { RemoteFault } from './fault';
 import { selectionArgsSchema } from './selection-validation';
@@ -208,7 +209,7 @@ function textValues(args: RecordValue): boolean {
     typeof args['text'] === 'string' &&
     args['text'].length > 0 &&
     args['text'].length <= 4096 &&
-    finite(args['fontSizeMm'], Number.MIN_VALUE, 1000) &&
+    finite(args['fontSizeMm'], TEXT_SIZE_MIN_MM, TEXT_SIZE_MAX_MM) &&
     (args['fontId'] === undefined || identifier(args['fontId']))
   );
 }

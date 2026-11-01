@@ -13,6 +13,7 @@ import { validateProductionManifest } from '../../io/project/project-manifest-va
 import { validateProjectShape } from '../../io/project/project-shape-validator';
 import {
   prepareProductionRow,
+  productionRowGlyphWarnings,
   productionVariantJson,
   productionRowProject,
 } from './production-manifest-preparation';
@@ -121,6 +122,7 @@ async function openRow(
   const row = manifest?.rows.find((entry) => entry.id === id);
   if (manifest === undefined || row === undefined) return false;
   const prepared = await prepareProductionRow(manifest, row, render);
+  const glyphWarnings = await productionRowGlyphWarnings(prepared, row, render);
   if (!currentDocument(context, captured) || isCurrent?.() === false) return false;
   const project: Project = {
     ...prepared,
@@ -139,6 +141,7 @@ async function openRow(
     lastSaveTarget: captured.lastSaveTarget,
     dirty: true,
   });
+  warnMissingGlyphs(glyphWarnings, null);
   return true;
 }
 
@@ -165,11 +168,14 @@ async function captureVariant(
     },
     render,
   );
+  const glyphWarnings = result.ok
+    ? await productionRowGlyphWarnings(result.project, row, render)
+    : [];
   if (!currentDocument(context, captured) || isCurrent?.() === false)
     return 'The working document changed; capture was cancelled.';
   if (!result.ok) return result.preflight.issues.map((issue) => issue.message).join(' ');
   const reviewedProjectJson = productionVariantJson(result.project);
-  return update(
+  const error = update(
     context,
     {
       ...manifest,
@@ -183,6 +189,15 @@ async function captureVariant(
     'Capture production variant',
     { ...project, scene: result.project.scene, jobSetup: result.project.jobSetup },
   );
+  return warnMissingGlyphs(glyphWarnings, error);
+}
+
+// The row's artwork is fixed: a character its font lacks stays missing from every burn of it.
+// Nothing is said when the open or capture itself failed (`error`), which it returns.
+function warnMissingGlyphs(warnings: ReadonlyArray<string>, error: string | null): string | null {
+  if (error === null && warnings.length > 0)
+    useToastStore.getState().pushToast(warnings.join(' '), 'warning');
+  return error;
 }
 
 function recordResult(

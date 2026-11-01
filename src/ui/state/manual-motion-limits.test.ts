@@ -6,6 +6,7 @@
 // (https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/machine_limits.c#L686-L699).
 
 import { describe, expect, it } from 'vitest';
+import { FALCON_A1_PRO_DUMP } from '../../__fixtures__/controllers/falcon-a1-pro-dump';
 import {
   GRBLHAL_LASER_DUMP,
   GRBLHAL_LEVEL_2_DUMP,
@@ -282,7 +283,7 @@ describe('manual-motion limits with a verified bed frame', () => {
     });
   });
 
-  it('uses the Falcon vendor frame as is, since that contract reads no settings', () => {
+  it('uses the Falcon vendor frame as is without settings this session', () => {
     const falcon = {
       ...DEVICE,
       controllerKind: 'grblhal' as const,
@@ -297,8 +298,8 @@ describe('manual-motion limits with a verified bed frame', () => {
       controllerSettings: null,
     };
     expect(limitsFor(falcon, evidence)).toEqual({ minX: 0, maxX: 400, minY: 0, maxY: 300 });
-    // Its banner can read as stock GRBL (audit HF-8), and a Console `$$` can
-    // report soft limits; neither brings a `$J=` envelope to a vendor contract.
+    // Its banner can read as stock GRBL (audit HF-8). A `$$` whose envelope
+    // sits elsewhere in machine space disagrees about the bed, so the frame stays.
     const consoleSettings = softLimitedGrbl().controllerSettings ?? null;
     for (const detectedControllerKind of ['grbl-v1.1', 'grblhal'] as const) {
       expect(
@@ -310,6 +311,44 @@ describe('manual-motion limits with a verified bed frame', () => {
         }),
       ).toEqual({ minX: 0, maxX: 400, minY: 0, maxY: 300 });
     }
+  });
+
+  // Rolling audit v8 N2-P2-1 (ADR-637 Amendment 4): 1.0.28 offered the A1 Pro's
+  // 363 x 273 travel as its bed. grblHAL's homed envelope still ends at 358 x
+  // 268, and the contract's G1 moves bypass the firmware's `$J=` clamp.
+  it('pulls a widened Falcon A1 Pro frame in to grblHAL’s homed envelope', () => {
+    const widened = {
+      ...DEVICE,
+      bedWidth: 363,
+      bedHeight: 273,
+      controllerKind: 'grblhal' as const,
+      controllerCommandSet: 'creality-falcon-a1-pro' as const,
+    };
+    const evidence: NativeBedEvidence = {
+      controllerSessionEpoch: 3,
+      homingState: 'confirmed',
+      activeControllerKind: 'grblhal',
+      activeControllerCommandSet: 'creality-falcon-a1-pro',
+      detectedControllerKind: 'grblhal',
+      controllerSettings: settingsMapToControllerSettings(
+        grblHalSettingsMap({}, FALCON_A1_PRO_DUMP),
+      ),
+      controllerSettingsObservation: { sessionEpoch: 3, observedAt: 1 },
+    };
+    expect(resolveNativeBedFrame(widened, evidence)?.nativeBounds).toEqual({
+      minX: 0,
+      maxX: 363,
+      minY: 0,
+      maxY: 273,
+    });
+    expect(limitsFor(widened, evidence)).toEqual({ minX: 0, maxX: 358, minY: 0, maxY: 268 });
+    // The preset's own bed already ends there.
+    expect(limitsFor({ ...widened, bedWidth: 358, bedHeight: 268 }, evidence)).toEqual({
+      minX: 0,
+      maxX: 358,
+      minY: 0,
+      maxY: 268,
+    });
   });
 
   it('keeps a frame the firmware box does not overlap', () => {
@@ -328,13 +367,15 @@ describe('manual-motion limits with a verified bed frame', () => {
 describe('the hidden controller MPos a hold is aimed from', () => {
   const hidden = { x: -50, y: -40, z: 0 };
 
+  // Z too: the phone's Z hold aims from it (ADR-375 Amendment 10).
   it('is the firmware position in mm on stock GRBL enforcing soft limits this session', () => {
     expect(
       firmwareJogCheckPosition(softLimitedGrbl({ homingState: 'unknown' }), hidden, false),
-    ).toEqual({ x: -50, y: -40 });
-    expect(firmwareJogCheckPosition(softLimitedGrbl(), { x: -2, y: -1, z: 0 }, true)).toEqual({
+    ).toEqual({ x: -50, y: -40, z: 0 });
+    expect(firmwareJogCheckPosition(softLimitedGrbl(), { x: -2, y: -1, z: -0.5 }, true)).toEqual({
       x: -50.8,
       y: -25.4,
+      z: -12.7,
     });
   });
 

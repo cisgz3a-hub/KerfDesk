@@ -4,11 +4,11 @@ import type { SvgArtworkFragment } from '../state/svg-fragment-mutation';
 //
 // Categories:
 //   * File: Cmd/Ctrl+N, O, S, I; Cmd/Ctrl+Shift+E for Save G-code
-//   * Edit: Cmd/Ctrl+Z, Shift+Z, Delete/Backspace, Escape
+//   * Edit: Cmd/Ctrl+Z, Shift+Z, Y, Delete/Backspace, Escape
 //   * Tools: T, Cmd/Ctrl+R/E/L, Alt+M (measure), Alt+T (trace image),
 //     Alt+C (refresh the camera picture), Cmd/Ctrl+Shift+B (convert to bitmap)
 //   * Transform: arrow keys (nudge; Shift large, Ctrl/Cmd fine), H/V (flip)
-//   * View: P (preview toggle)
+//   * View: P (preview toggle), fit and zoom (view-shortcuts.ts, re-exported)
 
 import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
 import type { ControllerSettingsSnapshot, ReadinessSettingsCapability } from '../../core/preflight';
@@ -101,17 +101,7 @@ export type TransformCtx = {
   readonly nudgeSteps?: NudgeSteps;
 };
 
-export type ViewCtx = {
-  readonly togglePreview: () => void;
-  readonly resetView: () => void; // F (fit) and 0 (100%) both call this in Phase A
-  readonly zoomBy: (factor: number) => void;
-  // Shift+F — zoom the viewport to the current selection's combined
-  // bounding box. No-op when nothing's selected (falls through to the
-  // default F behaviour at the call site? No — the binding skips so
-  // the bare F keypress still fires next).
-  readonly fitToSelection: () => void;
-  readonly toggleSidePanels: () => void;
-};
+export { handleViewShortcut, type ViewCtx } from './view-shortcuts';
 
 function hasMeta(e: KeyboardEvent): boolean {
   return e.ctrlKey || e.metaKey;
@@ -245,6 +235,11 @@ const EDIT_BINDINGS: ReadonlyArray<KeyBinding<EditCtx>> = [
   },
   {
     match: (e) => hasMeta(e) && e.key.toLowerCase() === 'z' && e.shiftKey,
+    invoke: (c) => c.redo(),
+  },
+  {
+    // Ctrl/Cmd+Y — Redo, the Windows convention and Design Studio's key too.
+    match: (e) => hasMeta(e) && e.key.toLowerCase() === 'y' && !e.shiftKey,
     invoke: (c) => c.redo(),
   },
   {
@@ -446,54 +441,4 @@ export function handleTransformShortcut(e: KeyboardEvent, ctx: TransformCtx): bo
   if (hasMeta(e) || e.altKey) return false;
   if (tryFlip(e, ctx)) return true;
   return false;
-}
-
-// Shift+F = fit-to-selection. Pulled out of handleViewShortcut so
-// the parent function stays under the cyclomatic-complexity lint cap.
-function tryShiftFitToSelection(e: KeyboardEvent, ctx: ViewCtx): boolean {
-  if (!e.shiftKey || hasMeta(e)) return false;
-  if (e.key.toLowerCase() !== 'f') return false;
-  e.preventDefault();
-  ctx.fitToSelection();
-  return true;
-}
-
-export function handleViewShortcut(e: KeyboardEvent, ctx: ViewCtx): boolean {
-  if (isEditableTarget(e)) return false;
-  if (tryToggleSidePanels(e, ctx)) return true;
-  if (tryShiftFitToSelection(e, ctx)) return true;
-  if (hasMeta(e) || e.shiftKey) return false;
-  const key = e.key.toLowerCase();
-  // F-A15 View shortcuts. Phase A treats F (fit) and 0 (100%) identically
-  // since the only "100%" state we model is fit-to-bed; if a Phase C ADR
-  // introduces real device-units zoom, '0' will diverge from F.
-  switch (key) {
-    case 'p':
-      e.preventDefault();
-      ctx.togglePreview();
-      return true;
-    case 'f':
-    case '0':
-      e.preventDefault();
-      ctx.resetView();
-      return true;
-    case '+':
-    case '=': // '=' is shift-less '+', the literal key in most keyboards
-      e.preventDefault();
-      ctx.zoomBy(1.25);
-      return true;
-    case '-':
-      e.preventDefault();
-      ctx.zoomBy(1 / 1.25);
-      return true;
-    default:
-      return false;
-  }
-}
-
-function tryToggleSidePanels(e: KeyboardEvent, ctx: ViewCtx): boolean {
-  if (e.key !== 'F12' || hasMeta(e) || e.altKey || e.shiftKey) return false;
-  e.preventDefault();
-  ctx.toggleSidePanels();
-  return true;
 }

@@ -1,14 +1,18 @@
 import type { TiffIfd } from 'tiff';
+import { decompressedBlockLength, TIFF_DATA_INCOMPLETE } from './tiff-decompressed-length';
 
 type PixelLayout = {
   readonly offsets: unknown;
   readonly byteCounts: unknown;
   readonly count: number;
+  /** The bytes the decoder reads from each block. */
   readonly blockBytes: (index: number) => number;
+  /** The most any block may hold: a whole tile, or a strip of RowsPerStrip rows. */
+  readonly fullBlockBytes: number;
 };
 
 /** Qualify the blocks the decoder will read before it allocates image data. */
-export function validateTiffPixelLayout(page: TiffIfd, byteLength: number): void {
+export function validateTiffPixelLayout(page: TiffIfd, bytes: Uint8Array): void {
   if ((page.get('FillOrder') ?? 1) !== 1) {
     throw new Error('Export this TIFF with most-significant-bit-first samples or as PNG.');
   }
@@ -17,17 +21,36 @@ export function validateTiffPixelLayout(page: TiffIfd, byteLength: number): void
   const offsets = blockValues(layout.offsets, layout.count, 'offsets', 8);
   const byteCounts = blockValues(layout.byteCounts, layout.count, 'byte counts', 1);
   for (let index = 0; index < layout.count; index += 1) {
-    const offset = offsets[index] ?? byteLength;
+    const offset = offsets[index] ?? bytes.byteLength;
     const count = byteCounts[index] ?? 0;
-    if (offset + count > byteLength) {
+    if (offset + count > bytes.byteLength) {
       throw new Error('TIFF pixel data extends beyond the file.');
     }
     if (page.compression === 1 && count < layout.blockBytes(index)) {
       throw new Error('Incomplete uncompressed TIFF pixel data.');
     }
   }
+  if (page.compression !== 1) {
+    const blocks = offsets.map((offset, index) =>
+      bytes.subarray(offset, offset + (byteCounts[index] ?? 0)),
+    );
+    validateDecompressedBlocks(blocks, page.compression, layout);
+  }
 }
 
+// A compressed block decompresses to its rows or tile, never past a full one.
+function validateDecompressedBlocks(
+  blocks: readonly Uint8Array[],
+  compression: number,
+  layout: PixelLayout,
+): void {
+  blocks.forEach((block, index) => {
+    const length = decompressedBlockLength(block, compression, layout.fullBlockBytes);
+    if (length < layout.blockBytes(index)) throw new Error(TIFF_DATA_INCOMPLETE);
+  });
+}
+
+// A last strip may hold all RowsPerStrip rows, the image's and padding.
 function stripLayout(page: TiffIfd): PixelLayout {
   const rows = positiveInteger(page.get('RowsPerStrip') ?? 2 ** 32 - 1, 'rows per strip');
   const rowBytes = Math.ceil((page.width * page.components * page.bitsPerSample) / 8);
@@ -36,6 +59,7 @@ function stripLayout(page: TiffIfd): PixelLayout {
     byteCounts: page.stripByteCounts,
     count: Math.ceil(page.height / rows),
     blockBytes: (index) => rowBytes * Math.min(rows, page.height - index * rows),
+    fullBlockBytes: rowBytes * Math.min(rows, page.height),
   };
 }
 
@@ -59,6 +83,7 @@ function tileLayout(page: TiffIfd): PixelLayout {
     byteCounts: page.tileByteCounts,
     count: Math.ceil(page.width / width) * Math.ceil(page.height / height),
     blockBytes: () => bytes,
+    fullBlockBytes: bytes,
   };
 }
 

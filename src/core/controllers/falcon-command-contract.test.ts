@@ -15,19 +15,33 @@ describe('Falcon A1 Pro vendor command contract', () => {
     }
   });
 
-  it('does not offer unsupported settings fetch, firmware writes, or native jog cancellation', () => {
+  // Rolling audit v6 K3-P3-1 (ADR-322 Amendment 3): `$$` is a report on grblHAL,
+  // so the contract reads it at connect and still writes nothing.
+  it('reads $$ without offering firmware writes or native jog cancellation', () => {
     const driver = selectControllerDriver('grblhal', commandSet);
-    expect(driver.commands.settingsQuery).toBeNull();
-    expect(driver.capabilities.settings).toBe('none');
+    expect(driver.commands.settingsQuery).toBe('$$');
+    expect(driver.commands.buildInfoQuery).toBeNull();
+    expect(driver.capabilities.settings).toBe('grbl-dollar-read');
     expect(driver.capabilities.firmwareSetupPanel).toBe('none');
     expect(driver.capabilities.jogCancel).toBe(false);
     expect(driver.realtime.jogCancel).toBeNull();
     expect(driver.commands.home).toBe('$HX\n$HY');
-    expect(driver.consoleQuickCommands.some(({ command }) => command === '$$')).toBe(false);
+    expect(driver.consoleQuickCommands.some(({ command }) => command === '$$')).toBe(true);
     expect(driver.prepareConsoleCommand('$HZ1')).toMatchObject({
       ok: true,
       command: { stateEffect: 'reference' },
     });
+  });
+
+  // Rolling audit v5 J8-P3-2 (ADR-370 Amendment 1): $150-$152 are the Falcon
+  // A1's air settings in stock-GRBL numbering and grblHAL's X/Y/Z microsteps.
+  it('lists the Falcon A1 air writes on stock GRBL only, never on grblHAL', () => {
+    expect(selectControllerDriver('grblhal', commandSet).consoleSettingWrites).toEqual([]);
+    for (const kind of ['grbl-v1.1', undefined] as const) {
+      expect(
+        selectControllerDriver(kind, commandSet).consoleSettingWrites?.map(({ id }) => id),
+      ).toEqual([150, 151, 152]);
+    }
   });
 
   it('uses finite tool-off feed-controlled G1 jogs and restores absolute mode', () => {

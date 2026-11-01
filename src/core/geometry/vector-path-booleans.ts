@@ -20,10 +20,13 @@ import {
   type VectorOpError,
   type VectorSceneObject,
 } from './vector-path-tools';
-import { offsetArcToleranceMm } from './offset-arc-tolerance';
+import { OFFSET_SOURCE_CURVE_TOLERANCE_MM, offsetArcToleranceMm } from './offset-arc-tolerance';
 import { canonicalizeVectorPaths, compareCanonicalVectorPaths } from './vector-path-canonical';
+import { nestedSelectionRegion } from './vector-path-nesting';
 import {
+  normalizeVectorObjectBatches,
   normalizeVectorObjectRegion,
+  unionNormalizedBatches,
   unionNormalizedRegions,
   VECTOR_PATH_PRECISION_DECIMALS,
 } from './vector-path-regions';
@@ -106,12 +109,7 @@ export function offsetVectorObjects(
       message: 'Offset distance must be a non-zero number of millimeters.',
     });
   }
-  const regions = objects.map(normalizeVectorObjectRegion);
-  const regionError = regions.find((region) => region.kind === 'error');
-  if (regionError?.kind === 'error') return regionError;
-  const world = unionNormalizedRegions(
-    regions.flatMap((region) => (region.kind === 'ok' ? [region.value] : [])),
-  );
+  const world = offsetSourceRegion(objects);
   if (world.kind === 'error') return world;
   const inflated = tryVectorOp(() =>
     canonicalizeVectorPaths(
@@ -141,6 +139,33 @@ export function offsetVectorObjects(
   }
   return ok(
     resultObject(id, `Offset paths (${deltaMm > 0 ? '+' : ''}${deltaMm} mm)`, paths, first),
+  );
+}
+
+// ADR-410 Amendment 3: a shape inside another selected shape is a hole, as in
+// Offset Shapes; with nothing nested, the selection is the union it always was.
+function offsetSourceRegion(
+  objects: ReadonlyArray<VectorSceneObject>,
+): Result<PathsD, VectorOpError> {
+  const objectBatches = objects.map((object) =>
+    normalizeVectorObjectBatches(object, OFFSET_SOURCE_CURVE_TOLERANCE_MM),
+  );
+  const batchError = objectBatches.find((batches) => batches.kind === 'error');
+  if (batchError?.kind === 'error') return batchError;
+  const batches = objectBatches.flatMap((batches) =>
+    batches.kind === 'ok' ? [batches.value] : [],
+  );
+  const nested = nestedSelectionRegion(
+    batches.flatMap((objectBatch) => objectBatch.map((batch) => batch.paths)),
+    false,
+  );
+  if (nested.kind === 'error') return nested;
+  if (nested.value !== null) return ok(nested.value);
+  const regions = batches.map(unionNormalizedBatches);
+  const regionError = regions.find((region) => region.kind === 'error');
+  if (regionError?.kind === 'error') return regionError;
+  return unionNormalizedRegions(
+    regions.flatMap((region) => (region.kind === 'ok' ? [region.value] : [])),
   );
 }
 

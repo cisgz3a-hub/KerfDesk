@@ -58,7 +58,7 @@ describe('pinned OFL CNC stroke-font data', () => {
     (data) => {
       const font = svgStrokeFont(data);
 
-      expect(font.capHeight).toBeGreaterThan(0);
+      expect(font.unitsPerEm).toBe(1000);
       for (const character of [' ', '?', 'A', 'a', '0', '\u00e9']) {
         expect(font.glyphs.has(character), `${data.displayName} glyph ${character}`).toBe(true);
       }
@@ -81,4 +81,21 @@ describe('pinned OFL CNC stroke-font data', () => {
       }
     },
   );
+
+  // The EMS sources declare cap-height="500", a placeholder their capitals
+  // never follow (L3-P1-1), so the generator records the H's own top.
+  it('records each capital height as the top of its H, not the source attribute', () => {
+    const tops = CNC_STROKE_FONT_DATA.map((data) => {
+      const paths = svgStrokeFont(data).glyphs.get('H')?.paths ?? [];
+      const ys = paths.flatMap((path) => [path.start.y, ...path.segments.map((s) => s.to.y)]);
+      return { key: data.key, capHeight: data.capHeight, top: Math.max(...ys) };
+    });
+
+    expect(tops).toEqual([
+      { key: 'relief-single-line', capHeight: 680, top: 680 },
+      { key: 'ems-nixish', capHeight: 690, top: 690 },
+      { key: 'ems-decorous-script', capHeight: 639, top: 639 },
+      { key: 'ems-casual-hand', capHeight: 910, top: 910 },
+    ]);
+  });
 });

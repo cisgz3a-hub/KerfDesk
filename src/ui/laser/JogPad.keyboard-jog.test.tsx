@@ -209,9 +209,10 @@ describe('JogPad keyboard XY jog (ADR-493)', () => {
     }
     expect(jog).not.toHaveBeenCalled();
 
-    // Z focus is live on a CNC: the dedicated key still jogs it, and the
-    // NumLock-on keypad 3 still sends what its +X -Y arrow sends.
-    await press({ key: 'PageDown', code: 'PageDown' });
+    // Z focus is live on a CNC: the dedicated key, with its Ctrl+Alt chord,
+    // still jogs it, and the NumLock-on keypad 3 still sends what its +X -Y
+    // arrow sends.
+    await press({ key: 'PageDown', code: 'PageDown', ctrlKey: true, altKey: true });
     expect(jog).toHaveBeenCalledWith({ dz: -1, feed: 600 });
     jog.mockClear();
     await press(numpad('3'));
@@ -251,7 +252,27 @@ describe('JogPad keyboard XY jog (ADR-493)', () => {
     await unmount();
   });
 
-  it('keeps PageUp jogging Z focus', async () => {
+  // Rolling audit v7 L8-P2-3: LightBurn's draw-order PgUp / PgDn sent a
+  // connected CNC's bit one focus step. Only Ctrl+Alt+PgUp / PgDn jog Z now.
+  it('jogs a CNC Z from Ctrl+Alt+PgDn only, never from a bare PgUp or PgDn', async () => {
+    const jog = vi.fn(async () => undefined);
+    useLaserStore.setState({ jog });
+    useStore.setState({ project: { ...createProject(), machine: DEFAULT_CNC_MACHINE_CONFIG } });
+    const { unmount } = await renderJogPad();
+
+    for (const key of ['PageUp', 'PageDown']) {
+      const event = await press({ key, code: key });
+      expect(event.defaultPrevented, key).toBe(false);
+    }
+    expect(jog).not.toHaveBeenCalled();
+
+    await press({ key: 'PageDown', code: 'PageDown', ctrlKey: true, altKey: true });
+    expect(jog).toHaveBeenCalledExactlyOnceWith({ dz: -1, feed: 600 });
+
+    await unmount();
+  });
+
+  it('keeps Ctrl+Alt+PageUp jogging Z focus', async () => {
     const jog = vi.fn(async () => undefined);
     useLaserStore.setState({ jog });
     useStore.getState().updateDeviceProfile({
@@ -262,7 +283,7 @@ describe('JogPad keyboard XY jog (ADR-493)', () => {
     });
     const { unmount } = await renderJogPad();
 
-    await press({ key: 'PageUp', code: 'PageUp' });
+    await press({ key: 'PageUp', code: 'PageUp', ctrlKey: true, altKey: true });
 
     expect(jog).toHaveBeenCalledWith({ dz: 1, feed: 600 });
 

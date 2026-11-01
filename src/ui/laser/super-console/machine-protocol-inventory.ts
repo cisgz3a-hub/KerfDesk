@@ -1,8 +1,15 @@
-import { selectControllerDriver } from '../../../core/controllers';
+import { selectControllerDriver, type SettingsCapability } from '../../../core/controllers';
 import { firmwareReportQuery } from '../../../core/controllers/controller-firmware-report';
 import type { DeviceProfile } from '../../../core/devices';
 import type { LaserState } from '../../state/laser-store';
 import { machineNetworkProfileForDevice } from '../machine-network-profile';
+
+const SETTINGS_ADAPTER: Readonly<Record<SettingsCapability, string>> = {
+  'grbl-dollar': 'Owned read and selected explicit writes',
+  'grbl-dollar-read': 'Owned $$ read; no setting writes',
+  'readonly-dump': 'Owned read-only dump',
+  none: 'No generic settings adapter',
+};
 
 export function machineProtocolInventory(device: DeviceProfile, laser: LaserState) {
   const driver = selectControllerDriver(device.controllerKind, device.controllerCommandSet);
@@ -32,15 +39,7 @@ export function machineProtocolInventory(device: DeviceProfile, laser: LaserStat
       name: 'Firmware identity',
       value: firmwareReportQuery(driver) ?? 'No documented report adapter for this command set',
     },
-    {
-      name: 'Settings',
-      value:
-        caps.settings === 'grbl-dollar'
-          ? 'Owned read and selected explicit writes'
-          : caps.settings === 'readonly-dump'
-            ? 'Owned read-only dump'
-            : 'No generic settings adapter',
-    },
+    { name: 'Settings', value: SETTINGS_ADAPTER[caps.settings] },
     {
       name: 'Focus',
       value:

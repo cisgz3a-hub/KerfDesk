@@ -17,3 +17,7 @@ No shell, arbitrary file, console/G-code, machine connection, motion, spindle/la
 **Consequences.** The computer must remain awake, online and running KerfDesk. Cloudflare plan/quotas and client eligibility require current primary/provider evidence. Standard MCP operation is distinct from ChatGPT public plugin review or mobile custom-client availability; a shipped endpoint does not prove those external outcomes. OAuth/KV provisioning, live pairing, protocol and actual desktop/phone-client evidence are required before claiming a deployed integration. There are no model API calls or bundled model API keys in this service.
 
 **Pairing and discovery repair, 2026-10-02.** The mobile product website now includes a canvas-free Phone & MCP setup page and navigates to the existing control service as a first-party page. It does not embed the control service in an iframe or relax Origin, cookie or framing protections. Desktop status snapshots have main-owned ordering, new offers are correlated to the current creation request, and unsolicited approval prompts focus their surface. The relay supplies bounded remaining lifetime alongside the existing absolute expiry; the desktop uses monotonic local deadlines while the relay retains expiry authority. These repairs do not alter permissions, licence admission, machine execution or retention.
+
+**Amendment 1 (2026-10-28):** [desktop and remote text share one size, line height and spacing
+range](ADR-564-amendment-1-one-text-range-for-desktop-and-remote.md), so a desktop edit never
+clamps what the remote set.

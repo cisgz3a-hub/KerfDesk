@@ -1,7 +1,13 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import type { Project, TextObject } from '../../../core/scene';
+import type { EmbeddedFont, Project, TextObject } from '../../../core/scene';
 import { DEFAULT_FONT_KEY, DEFAULT_TEXT_SIZE_MM, FONT_REGISTRY } from '../../../core/text';
+import {
+  TEXT_SIZE_MAX_MM,
+  TEXT_SIZE_MIN_MM,
+  textSizeInRange,
+} from '../../../core/text/text-limits';
 import { FontPicker } from '../../text/FontPicker';
+import { FontUsageHint } from '../../text/FontUsageHint';
 import { isAdvancedJigText, renderJigText } from './jig-text-object';
 
 type Props = {
@@ -101,6 +107,9 @@ function useJigTextForm(props: Props & { readonly existing: TextObject | undefin
   };
 }
 
+// One empty list, so the glyph hint's check does not restart on every render.
+const NO_EMBEDDED_FONTS: ReadonlyArray<EmbeddedFont> = [];
+
 function hasFont(project: Project, key: string): boolean {
   return (
     FONT_REGISTRY.some((font) => font.key === key) ||
@@ -109,9 +118,7 @@ function hasFont(project: Project, key: string): boolean {
 }
 
 function validText(content: string, size: number, fontAvailable: boolean): boolean {
-  return (
-    content.trim() !== '' && Number.isFinite(size) && size >= 1 && size <= 300 && fontAvailable
-  );
+  return content.trim() !== '' && textSizeInRange(size) && fontAvailable;
 }
 
 function JigTextForm(props: Props & { readonly existing: TextObject | undefined }): JSX.Element {
@@ -154,16 +161,25 @@ function JigTextForm(props: Props & { readonly existing: TextObject | undefined 
             embeddedFonts={props.project.embeddedFonts ?? []}
             onChange={setFontKey}
           />
+          {/* ADR-591 Amendment 2: the main text dialog's hint for characters the font lacks. */}
+          <FontUsageHint
+            fontKey={fontKey}
+            embeddedFonts={props.project.embeddedFonts ?? NO_EMBEDDED_FONTS}
+            content={content}
+            variable={false}
+            fontAvailable={fontAvailable}
+          />
         </div>
         <label>
-          Size (mm)
+          Font size (mm)
           <input
-            title="Text height in millimetres"
+            title="The font's em height in millimetres; capital letters are about 0.6 to 0.9 of it"
             className="lf-input"
             aria-label="Jig text size"
             type="number"
-            min={1}
-            max={300}
+            min={TEXT_SIZE_MIN_MM}
+            max={TEXT_SIZE_MAX_MM}
+            step={0.1}
             value={size}
             onChange={(event) => setSize(event.target.value)}
           />

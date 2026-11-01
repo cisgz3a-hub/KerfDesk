@@ -88,7 +88,8 @@ describe('persistent editable photo documents', () => {
     expect(photo.editorDocument).toEqual(document());
     const encoded = photo.editorDocument?.layers[1]?.rgbaBase64 ?? '';
     expect(Uint8Array.from(atob(encoded), (char) => char.charCodeAt(0))).toEqual(pixels);
-    expect(serializeProject(reopened.project)).toBe(saved.json);
+    // Manual saves are compact (ADR-204 Amendment 2).
+    expect(serializeProject(reopened.project, { compact: true })).toBe(saved.json);
     const autosave = prepareProjectForAutosave(original);
     expect(autosave.kind).toBe('ok');
     if (autosave.kind === 'ok')

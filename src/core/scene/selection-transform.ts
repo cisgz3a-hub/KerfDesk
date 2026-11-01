@@ -1,4 +1,4 @@
-import { combinedBBox, type AABB } from './hit-test';
+import { combinedBBox, transformedBounds, type AABB } from './hit-test';
 import { applyTransform } from './transform';
 import type { SceneObject, Transform, Vec2 } from './scene-object';
 
@@ -21,6 +21,7 @@ export type SelectionMetrics = {
   readonly bbox: AABB;
   readonly width: number;
   readonly height: number;
+  /** The angle every selected object is turned to, or null when they differ (ADR-678). */
   readonly rotationDeg: number | null;
   readonly count: number;
 };
@@ -46,6 +47,7 @@ export type SelectionTransformEdit =
   // the 9-dot anchor governs the X/Y reference and the resize corner only.
   // Pivoting rotation at that anchor shifted the artwork off its spot, because
   // the anchor defaults to 'nw' (ui-store.ts) for the X/Y readout's sake.
+  // The typed angle replaces the shared one; a mixed selection turns by it.
   | { readonly kind: 'rotate'; readonly rotationDeg: number };
 
 export type SelectionTransformError =
@@ -58,7 +60,6 @@ export type SelectionTransformError =
   | 'zero-height-selection'
   | 'invalid-dimension'
   | 'invalid-number'
-  | 'multi-rotation'
   | 'non-uniform-rotated-selection';
 
 export type SelectionTransformResult =
@@ -72,7 +73,7 @@ export function selectionMetrics(objects: ReadonlyArray<SceneObject>): Selection
     bbox,
     width: bbox.maxX - bbox.minX,
     height: bbox.maxY - bbox.minY,
-    rotationDeg: objects.length === 1 ? normalizeDeg(objects[0]?.transform.rotationDeg ?? 0) : null,
+    rotationDeg: sharedRotationDeg(objects),
     count: objects.length,
   };
 }
@@ -91,7 +92,7 @@ export function selectionMetricsInFrame(
     bbox,
     width: bbox.maxX - bbox.minX,
     height: bbox.maxY - bbox.minY,
-    rotationDeg: objects.length === 1 ? normalizeDeg(objects[0]?.transform.rotationDeg ?? 0) : null,
+    rotationDeg: sharedRotationDeg(objects),
     count: objects.length,
   };
 }
@@ -104,7 +105,7 @@ export function buildSelectionTransformEdit(
   if (metrics === null) return { kind: 'error', reason: 'empty-selection' };
   if (edit.kind === 'position') return positionSelection(objects, metrics.bbox, edit);
   if (edit.kind === 'resize') return resizeSelection(objects, metrics, edit);
-  return rotateSelection(objects, metrics.bbox, edit);
+  return rotateSelection(objects, metrics, edit);
 }
 
 export function buildSelectionNudgeEdit(
@@ -245,31 +246,37 @@ function resizeTransform(
     : scaleTransformInFrame(transform, anchor, factors.x, factors.y, frameRotationDeg);
 }
 
+// ADR-678: a typed angle turns the selection as one piece, as LightBurn's
+// Rotate field and the remote rotate do. One object pivots about the centre of
+// its own bounds, which a turn never moves, so typing an angle and then the old
+// one puts it back (the centre of the smallest box around a lopsided outline
+// moves as it turns). Several pivot about the selection box's centre, as the
+// rotate handle does. The typed angle is reduced before the trig, so the orbit
+// and the stored rotation agree however large the number (audit L4-P3-4).
 function rotateSelection(
   objects: ReadonlyArray<SceneObject>,
-  bbox: AABB,
+  metrics: SelectionMetrics,
   edit: Extract<SelectionTransformEdit, { readonly kind: 'rotate' }>,
 ): SelectionTransformResult {
-  const object = objects[0];
-  if (object === undefined) return { kind: 'error', reason: 'empty-selection' };
-  if (objects.length !== 1) return { kind: 'error', reason: 'multi-rotation' };
   if (!Number.isFinite(edit.rotationDeg)) return { kind: 'error', reason: 'invalid-number' };
-  const anchor = anchorPointForBBox(bbox, 'c');
-  const deltaDeg = edit.rotationDeg - object.transform.rotationDeg;
-  const origin = rotatePoint({ x: object.transform.x, y: object.transform.y }, anchor, deltaDeg);
+  const single = objects.length === 1 ? objects[0] : undefined;
+  const targetDeg = normalizeDeg(edit.rotationDeg);
+  const pivot = anchorPointForBBox(
+    single === undefined ? metrics.bbox : transformedBounds(single.bounds, single.transform),
+    'c',
+  );
+  const deltaDeg = targetDeg - (single?.transform.rotationDeg ?? metrics.rotationDeg ?? 0);
   return {
     kind: 'ok',
-    transforms: [
-      {
+    transforms: objects.map((object) => {
+      const origin = rotatePoint(object.transform, pivot, deltaDeg);
+      const rotationDeg =
+        single === undefined ? normalizeDeg(object.transform.rotationDeg + deltaDeg) : targetDeg;
+      return {
         id: object.id,
-        transform: {
-          ...object.transform,
-          x: origin.x,
-          y: origin.y,
-          rotationDeg: normalizeDeg(edit.rotationDeg),
-        },
-      },
-    ],
+        transform: { ...object.transform, x: origin.x, y: origin.y, rotationDeg },
+      };
+    }),
   };
 }
 
@@ -349,33 +356,21 @@ function scaleTransformInFrame(
   };
 }
 
+// The smallest box around the selection in a frame turned by frameRotationDeg:
+// each object is measured with the scene turned back by that angle about the
+// origin, so an object square to the frame reads its own width and height and
+// any other reads its outline (ADR-677).
 function combinedBBoxInFrame(
   objects: ReadonlyArray<SceneObject>,
   frameRotationDeg: number,
 ): AABB | null {
-  let minX = Number.POSITIVE_INFINITY;
-  let minY = Number.POSITIVE_INFINITY;
-  let maxX = Number.NEGATIVE_INFINITY;
-  let maxY = Number.NEGATIVE_INFINITY;
-  let any = false;
-  for (const object of objects) {
-    const corners = [
-      { x: object.bounds.minX, y: object.bounds.minY },
-      { x: object.bounds.maxX, y: object.bounds.minY },
-      { x: object.bounds.maxX, y: object.bounds.maxY },
-      { x: object.bounds.minX, y: object.bounds.maxY },
-    ];
-    for (const corner of corners) {
-      const world = applyTransform(corner, object.transform);
-      const framed = rotatePoint(world, { x: 0, y: 0 }, -frameRotationDeg);
-      minX = Math.min(minX, framed.x);
-      minY = Math.min(minY, framed.y);
-      maxX = Math.max(maxX, framed.x);
-      maxY = Math.max(maxY, framed.y);
-      any = true;
-    }
-  }
-  return any ? { minX, minY, maxX, maxY } : null;
+  return combinedBBox(
+    objects.map((object) => {
+      const origin = rotatePoint(object.transform, { x: 0, y: 0 }, -frameRotationDeg);
+      const rotationDeg = object.transform.rotationDeg - frameRotationDeg;
+      return { ...object, transform: { ...object.transform, ...origin, rotationDeg } };
+    }),
+  );
 }
 
 function rotatePoint(point: Vec2, anchor: Vec2, deltaDeg: number): Vec2 {
@@ -447,6 +442,16 @@ function isUniformScale(factors: { readonly x: number; readonly y: number }): bo
 
 function isOptionalFiniteNumber(value: number | undefined): boolean {
   return value === undefined || Number.isFinite(value);
+}
+
+// The angle every object is turned to, or null when any differs.
+function sharedRotationDeg(objects: ReadonlyArray<SceneObject>): number | null {
+  const first = normalizeDeg(objects[0]?.transform.rotationDeg ?? 0);
+  const same = (object: SceneObject): boolean => {
+    const apart = normalizeDeg(object.transform.rotationDeg - first);
+    return apart <= ROTATION_EPSILON_DEG || FULL_TURN_DEG - apart <= ROTATION_EPSILON_DEG;
+  };
+  return objects.every(same) ? first : null;
 }
 
 function normalizeDeg(deg: number): number {

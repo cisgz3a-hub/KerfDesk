@@ -77,3 +77,41 @@ describe('job bounds with ADR-239 contour entries', () => {
     });
   });
 });
+
+describe('job bounds with ADR-239 Amendment 2 contour exits', () => {
+  const withExit: CutGroup = { ...lineGroup, exitRunwayMm: 5 };
+
+  it('extends the motion envelope to the exit point, not the artwork AABB', () => {
+    const job: Job = { groups: [withExit] };
+    expect(computeJobBounds(job)).toEqual({ minX: 10, minY: 10, maxX: 20, maxY: 20 });
+    expect(computeJobMotionBounds(job)).toEqual({ minX: 5, minY: 5, maxX: 20, maxY: 20 });
+  });
+
+  it("bounds the final pass's exit after its overcut, and an earlier pass's exit too", () => {
+    const overcut: CutGroup = {
+      ...withExit,
+      entryRunwayMm: 1,
+      exitRunwayMm: 15,
+      finalPassOvercutMm: 2,
+    };
+    // The overcut ends at (12, 10) heading +x, so its exit reaches x = 27; the
+    // closing edge's exit (10, -5) belongs to no pass when there is only one.
+    expect(computeJobMotionBounds({ groups: [overcut] })).toEqual({
+      minX: 9,
+      minY: 10,
+      maxX: 27,
+      maxY: 20,
+    });
+    expect(computeJobMotionBounds({ groups: [{ ...overcut, passes: 2 }] })).toEqual({
+      minX: 9,
+      minY: -5,
+      maxX: 27,
+      maxY: 20,
+    });
+  });
+
+  it('adds no exit with an unknown bed envelope', () => {
+    const job: Job = { groups: [withExit], contourEntryBounds: null };
+    expect(computeJobMotionBounds(job)).toEqual({ minX: 10, minY: 10, maxX: 20, maxY: 20 });
+  });
+});

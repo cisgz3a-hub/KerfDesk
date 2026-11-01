@@ -123,4 +123,47 @@ describe('Marlin Abort owns delayed transport writes', () => {
     for (let index = 0; index < 4; index += 1) harness.emit('ok');
     expect(harness.get().pendingUntrackedAcks).toBe(0);
   });
+
+  // ADR-676: a worker that holds the refill comes back BEFORE the freeze, as
+  // Pause does. While it does, an `ok` still advances this side's stream as the
+  // worker's own refill did, so the line the worker sent is on this ledger and
+  // its reply settles the stream, not one of the stop lines. Amendment 1: the
+  // stop lines go out with the release, not after its reply, which queues
+  // behind every line the worker forwarded meanwhile (rolling audit v8 N1-P2-1).
+  it('takes an armed worker refill back before freezing, keeping both ledgers in step', async () => {
+    const handback = deferred();
+    let armed = true;
+    const writes: string[] = [];
+    const hosted: HostedStreamRefill = {
+      isArmed: () => armed,
+      arm: async () => undefined,
+      release: vi.fn(async () => {
+        await handback.promise;
+        armed = false;
+      }),
+      onWriteError: () => () => undefined,
+    };
+    const harness = stopHarness(async (line) => {
+      writes.push(line);
+    }, hosted);
+    const stopping = harness.stop();
+    expect(hosted.release).toHaveBeenCalledOnce();
+    expect(writes).toEqual(STOP_LINES);
+    expect(harness.get().streamer?.status).toBe('streaming');
+    // The worker answered this ok by writing the next job line itself, before
+    // the release reached it; the stop lines' replies are still owed.
+    harness.emit('ok');
+    expect(harness.get().streamer).toMatchObject({ status: 'streaming', completed: 1 });
+    expect(harness.get().pendingUntrackedAcks).toBe(4);
+
+    handback.resolve();
+    await stopping;
+    expect(harness.get().streamer?.status).toBe('cancelled');
+    expect(writes).toEqual(STOP_LINES);
+    harness.emit('ok');
+    expect(harness.get().streamer).toMatchObject({ completed: 2, inFlight: [] });
+    expect(harness.get().pendingUntrackedAcks).toBe(4);
+    for (let index = 0; index < 4; index += 1) harness.emit('ok');
+    expect(harness.get().pendingUntrackedAcks).toBe(0);
+  });
 });

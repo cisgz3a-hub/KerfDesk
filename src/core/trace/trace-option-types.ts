@@ -98,6 +98,17 @@ export type TraceOptions = {
   // is on, so an Enhance crop cuts where the full pass cut. Dropping
   // useOtsuThreshold (the relaxed retry) drops it with it.
   readonly sourceOtsuThreshold?: number;
+  // INTERNAL uneven-lighting verdict (ADR-402 Amendment 2): whether the
+  // automatic cut levelled this image's lighting on the source grid. The
+  // supersampled grid of the same trace follows it instead of judging its
+  // own interpolated pixels, so one verdict shapes the output and reaches the
+  // dialog. Absent = judge the image given.
+  readonly sourceLightingLevelled?: boolean;
+  // INTERNAL two-plateau verdict (ADR-402 Amendment 1): whether the source
+  // grid's automatic cut was its plateau mid-level. The supersampled grid
+  // follows it, since bilinear grey between two-level pixels is not coverage.
+  // Absent = judge the image given.
+  readonly sourcePlateauCut?: boolean;
   // medianFilter: 3×3 median filter (RGBA → greyscale) applied
   // BEFORE thresholding. Kills salt-and-pepper noise and JPEG
   // artefacts without rounding off real edges the way a Gaussian

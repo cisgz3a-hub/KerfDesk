@@ -1,12 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { isRegistrationBox } from '../../core/scene';
 import { UNRESTRICTED_EDITION, setActiveEdition } from '../licensing/edition';
 import {
   registerBoardRemote,
   useBoardPhotoInbox,
   type BoardRemoteStatus,
 } from '../laser/board-capture/board-capture-remote';
+import {
+  burnedCellsPerPhoto,
+  masksOverTheirPhotos,
+  offImageAdvisories,
+  setUpMaskedPhotoOnBoard,
+} from '../state/board-array-masks.test-support';
 import { useStore } from '../state/store';
 import { resetStore, svgObj } from '../state/test-helpers';
+import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import { REMOTE_IMPORT_BASE64_LIMIT } from './design-validation';
 import { resultCode, testAdapter, writeArgs } from './authoring-test-support';
@@ -182,6 +190,96 @@ describe('place_on_board', () => {
     const before = useStore.getState().project.scene.objects.length;
     expect(resultCode(await place('array', { rows: 2, cols: 2, gapMm: 1 }))).toBe('ok');
     expect(useStore.getState().project.scene.objects.length).toBeGreaterThan(before);
+  });
+
+  // Rolling audit v5 J9-P1-1 (ADR-633 Amendment 3): each tile kept the
+  // original's mask and burned a quarter of it.
+  it('arrays a masked photo with its own mask in every tile', async () => {
+    setUpMaskedPhotoOnBoard();
+    adapter.dispose();
+    adapter = testAdapter();
+    const [whole] = burnedCellsPerPhoto();
+
+    const result = await place('array', { rows: 2, cols: 2, gapMm: 2 }, ['photo']);
+    expect(resultCode(result)).toBe('ok');
+    expect(burnedCellsPerPhoto()).toEqual([whole, whole, whole, whole]);
+    expect(masksOverTheirPhotos()).toEqual([true, true, true, true]);
+    expect(offImageAdvisories()).toEqual([]);
+  });
+
+  // Rolling audit v7 L4-P2-2 (ADR-125 Amendment 4): the receipt said "placed"
+  // however many copies fit, where the desktop form names the shortfall.
+  describe('array counts', () => {
+    // svgObj is a 10 x 10 mm box; scale it to the design size on a 200 x 100 board.
+    function setupDesign(widthMm: number, heightMm: number): void {
+      useStore.getState().importSvgObject(svgObj('art', ['#ff0000']));
+      useStore.getState().addCapturedBoardBox(200, 100);
+      const art = useStore.getState().project.scene.objects.find((object) => object.id === 'art');
+      useStore.getState().applySelectionTransforms([
+        {
+          id: 'art',
+          transform: { ...art!.transform, scaleX: widthMm / 10, scaleY: heightMm / 10 },
+        },
+      ]);
+      useToastStore.setState({ toasts: [] });
+      adapter.dispose();
+      adapter = testAdapter();
+    }
+
+    const toasts = () =>
+      useToastStore.getState().toasts.map(({ message, variant }) => ({ message, variant }));
+    const copies = () =>
+      useStore.getState().project.scene.objects.filter((object) => !isRegistrationBox(object))
+        .length;
+
+    it('names the placed and requested counts when fewer fit, on the PC too', async () => {
+      setupDesign(30, 20);
+      const message =
+        'Array on board placed 20 of the 25 requested copies: no more fit on the board.';
+
+      const result = await place('array', { rows: 5, cols: 5, gapMm: 2 });
+
+      expect(result).toMatchObject({
+        ok: true,
+        data: {
+          status: 'placed',
+          action: 'array',
+          placedCount: 20,
+          requestedCount: 25,
+          notices: [{ level: 'warning', message }],
+        },
+      });
+      expect(copies()).toBe(20);
+      expect(toasts()).toEqual([{ message, variant: 'warning' }]);
+    });
+
+    it('names the 500-copy cap when filling the board with a tiny design', async () => {
+      setupDesign(1, 1);
+
+      const result = await place('array');
+
+      const message =
+        'Array on board placed 484 copies: the layout is capped at 100 per axis and 500 copies.';
+      expect(result).toMatchObject({
+        ok: true,
+        data: { placedCount: 484, notices: [{ level: 'warning', message }] },
+      });
+      expect((result as { data: Record<string, unknown> }).data).not.toHaveProperty(
+        'requestedCount',
+      );
+      expect(copies()).toBe(484);
+      expect(toasts()).toEqual([{ message, variant: 'warning' }]);
+    });
+
+    it('gives the counts and no notice when every requested copy fits', async () => {
+      setupDesign(30, 20);
+
+      const result = await place('array', { rows: 2, cols: 3, gapMm: 2 });
+
+      expect(result).toMatchObject({ ok: true, data: { placedCount: 6, requestedCount: 6 } });
+      expect((result as { data: Record<string, unknown> }).data).not.toHaveProperty('notices');
+      expect(toasts()).toEqual([]);
+    });
   });
 
   it('rejects arraying multiple artwork IDs', async () => {

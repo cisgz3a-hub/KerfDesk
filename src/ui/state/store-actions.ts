@@ -4,7 +4,7 @@ import {
   moveLayer as moveSceneLayer,
   sceneObjectHasVisibleLayer,
   type Project,
-  type Transform,
+  type SelectionTransform,
 } from '../../core/scene';
 import { jobPlacementAfterDeviceChange, jobPlacementAfterProfileSelection } from '../job-placement';
 import { fitToSelection } from './viewport-actions';
@@ -18,6 +18,7 @@ import {
   toggledSelectionReference,
 } from './selection-reference';
 import { saveUndoStepName } from './undo-step-names';
+import { withObjectTransform } from '../../core/shapes/rectangle-resize';
 import type { AppState } from './store';
 import {
   cncMachineForProfile,
@@ -325,6 +326,7 @@ export function interactionActions(
   AppState,
   | 'beginInteraction'
   | 'setObjectTransform'
+  | 'setObjectTransforms'
   | 'endInteraction'
   | 'cancelInteraction'
   | 'applyObjectTransform'
@@ -344,7 +346,19 @@ export function interactionActions(
         },
       })),
     setObjectTransform: (id, transform) =>
-      set((s) => ({ project: applyTransformToScene(s.project, id, transform), dirty: true })),
+      set((s) => ({
+        project: applyTransformsToScene(s.project, [{ id, transform }]),
+        dirty: true,
+      })),
+    // A drag frame moves the whole selection in one write. One write per
+    // object copied every object each time: O(selected × objects) per pointer
+    // move, about 2 s at 8,000 objects (J10-P2-1).
+    setObjectTransforms: (updates) =>
+      set((s) =>
+        updates.length === 0
+          ? s
+          : { project: applyTransformsToScene(s.project, updates), dirty: true },
+      ),
     // Esc mid-drag: restore the pre-interaction project snapshot and drop it,
     // pushing no undo entry (the drag never happened). No-op if nothing was
     // snapshotted (audit C4).
@@ -367,7 +381,7 @@ export function interactionActions(
       }),
     applyObjectTransform: (id, transform) =>
       set((s) => ({
-        project: applyTransformToScene(s.project, id, transform),
+        project: applyTransformsToScene(s.project, [{ id, transform }]),
         undoStack: pushUndo(s.project, s.undoStack),
         redoStack: [],
         dirty: true,
@@ -379,11 +393,13 @@ export function visibleSelectionState(
   state: Pick<AppState, 'selectedObjectId' | 'additionalSelectedIds'>,
   project: Project,
 ): Pick<AppState, 'selectedObjectId' | 'additionalSelectedIds'> {
+  // One lookup for the whole selection, not a scan of the scene per id (J10-P2-1).
+  const objectsById = new Map(project.scene.objects.map((object) => [object.id, object] as const));
   const selectedIds = [
     ...(state.selectedObjectId === null ? [] : [state.selectedObjectId]),
     ...state.additionalSelectedIds,
   ].filter((id) => {
-    const object = project.scene.objects.find((candidate) => candidate.id === id);
+    const object = objectsById.get(id);
     return (
       object !== undefined &&
       object.locked !== true &&
@@ -397,14 +413,19 @@ export function visibleSelectionState(
   };
 }
 
-function applyTransformToScene(project: Project, id: string, transform: Transform): Project {
+function applyTransformsToScene(
+  project: Project,
+  updates: ReadonlyArray<SelectionTransform>,
+): Project {
+  const transforms = new Map(updates.map((update) => [update.id, update.transform] as const));
   return {
     ...project,
     scene: {
       ...project.scene,
-      objects: project.scene.objects.map((o) =>
-        o.id === id && o.locked !== true ? { ...o, transform } : o,
-      ),
+      objects: project.scene.objects.map((o) => {
+        const transform = transforms.get(o.id);
+        return transform === undefined || o.locked === true ? o : withObjectTransform(o, transform);
+      }),
     },
   };
 }

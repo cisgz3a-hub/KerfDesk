@@ -1,3 +1,4 @@
+import { onSchedulePollTimeAt, type StatusPollScheduleRefs } from './laser-status-poll-schedule';
 import { ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS } from './laser-stream-heartbeat';
 
 export type PauseResumeTransitionAction = 'pause' | 'resume';
@@ -27,7 +28,7 @@ export type PauseResumeTransitionRequest = {
   maximumTimer: ReturnType<typeof setTimeout> | null;
 };
 
-export type PauseResumeTransitionRefs = {
+export type PauseResumeTransitionRefs = StatusPollScheduleRefs & {
   pauseResumeTransition?: PauseResumeTransitionRequest | null;
   pauseResumePendingWrites?: Map<symbol, PauseResumePendingWrite>;
 };
@@ -256,11 +257,35 @@ function rejectPauseResumeTransition(
   request.reject(error);
 }
 
+// The silence deadline counts only time the status poll ran on schedule, as
+// the heartbeat does (ADR-356 Amendment 2). While the page is stalled no query
+// is written, and a reply that did arrive may wait behind this timer, so a
+// stall that ends past a wall-clock deadline is not the controller's silence.
+// After a stall the overdue poll tick runs first, since it fell due earlier; a
+// poll that has not ticked since arming is not running, and the deadline keeps
+// its wall-clock meaning.
 function scheduleLivenessTimeout(
   refs: PauseResumeTransitionRefs,
   request: PauseResumeTransitionRequest,
 ): ReturnType<typeof setTimeout> {
-  return setTimeout(() => rejectForTimeout(refs, request), request.livenessTimeoutMs);
+  const armedAt = Date.now();
+  const armedOnSchedule = onSchedulePollTimeAt(refs.statusPollSchedule, armedAt);
+  const check = (): void => {
+    const now = Date.now();
+    const schedule = refs.statusPollSchedule;
+    const onSchedule =
+      schedule != null && schedule.lastTickAt >= armedAt
+        ? onSchedulePollTimeAt(schedule, now)
+        : null;
+    const elapsed =
+      armedOnSchedule === null || onSchedule === null
+        ? now - armedAt
+        : onSchedule - armedOnSchedule;
+    const remaining = request.livenessTimeoutMs - elapsed;
+    if (remaining <= 0) rejectForTimeout(refs, request);
+    else request.livenessTimer = setTimeout(check, Math.min(remaining, request.livenessTimeoutMs));
+  };
+  return setTimeout(check, request.livenessTimeoutMs);
 }
 
 function rejectForTimeout(

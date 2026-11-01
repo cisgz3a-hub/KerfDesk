@@ -1,7 +1,10 @@
 // Optimize Shapes on one object's paths (LightBurn gap LBG-T22), one contour
 // at a time so a dialog can spread a large trace over several frames. Every
 // contour keeps its place in its path, so tab anchors, which name a contour by
-// path and index, still point at it.
+// path and index, still point at it. A closed contour may start again at its
+// first corner, though, which moves what a tab's fraction of the contour
+// measures from: the caller re-measures the tabs (`withTabsFollowingEdit`,
+// ADR-494 Amendment 3).
 //
 // A path whose curves pair one to one with its polylines is optimized from its
 // exact curves; a path of plain polylines from its points. A path whose curves

@@ -1,5 +1,7 @@
 import { profileSupportsCapability, type DeviceProfile } from '../../core/devices';
 import type { MachineKind } from '../../core/scene';
+import { shortcutLabel } from '../common/shortcut-label';
+import { FOCUS_JOG_KEY_LABELS } from './use-jog-shortcuts';
 
 const FOCUS_STEPS_MM = [0.1, 0.5, 1, 2, 5] as const;
 
@@ -100,7 +102,7 @@ function FocusButton(props: {
       disabled={props.disabled}
       style={buttonStyle}
       aria-label={props.label}
-      title={`${props.label} (${props.glyph === 'Z+' ? 'PageUp' : 'PageDown'})`}
+      title={`${props.label} (${shortcutLabel(FOCUS_JOG_KEY_LABELS[props.glyph === 'Z+' ? 'up' : 'down'])})`}
     >
       {props.glyph}
     </button>

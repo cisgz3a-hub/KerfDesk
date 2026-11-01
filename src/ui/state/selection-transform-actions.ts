@@ -44,6 +44,7 @@ import { selectionReferenceId, type SelectionReferenceState } from './selection-
 import { useToastStore } from './toast-store';
 import { fitObjectToBoard, type BoardFitOptions } from '../../core/scene/fit-object-to-board';
 import { currentHierarchyFocus, groupsWithinFocus } from './design-hierarchy-store';
+import { withObjectTransform } from '../../core/shapes/rectangle-resize';
 
 export type SelectionTransformEdit = {
   readonly id: string;
@@ -360,7 +361,7 @@ function applySelectionTransformsToState(
         if (object.locked === true) return object;
         if (!sceneObjectHasVisibleLayer(state.project.scene, object)) return object;
         changed = true;
-        return { ...object, transform };
+        return withObjectTransform(object, transform);
       }),
     },
   };
@@ -388,9 +389,11 @@ function layoutGroups(state: AppState): NonNullable<Scene['groups']> {
   );
 }
 
+// One id lookup per edit, not a scan of the scene per selected id (J10-P2-1).
 function selectedObjects(scene: Scene, ids: ReadonlyArray<string>): ReadonlyArray<SceneObject> {
+  const objectsById = new Map(scene.objects.map((object) => [object.id, object] as const));
   return ids
-    .map((id) => scene.objects.find((object) => object.id === id))
+    .map((id) => objectsById.get(id))
     .filter(
       (object): object is SceneObject =>
         object !== undefined && object.locked !== true && sceneObjectHasVisibleLayer(scene, object),

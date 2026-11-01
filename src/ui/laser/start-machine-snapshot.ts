@@ -6,6 +6,7 @@ import type { useCameraStore } from '../state/camera-store';
 import type { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { connectedLaserModuleEvidence } from '../state/laser-module-probe';
+import { registrationOutlinePlacement } from '../state/registration-outline-run';
 import { laserStatusReportFieldsOff } from '../state/status-report-fields';
 import { isRestoredWorkOrigin } from '../state/work-origin-state';
 import { controllerReportsWorkOffset } from './work-offset-assumption';
@@ -49,6 +50,7 @@ export function machineSnapshot(
     cameraPlacementActive: camera.placementActive,
     cameraConfirmedPositionEpoch: camera.confirmedPositionEpoch,
     cameraPlacementGeometryIssue: cameraPlacementGeometryIssue(project.device.cameraModel),
+    registrationOutline: registrationOutlinePlacement(project, laser.registrationOutlineRun),
     homingState: laser.homingState,
     trustedPositionEpoch: laser.trustedPositionEpoch ?? 0,
     reportInches: laser.controllerSettings?.reportInches === true,

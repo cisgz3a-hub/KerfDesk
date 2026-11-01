@@ -1,4 +1,4 @@
-import { deflateSync } from 'node:zlib';
+import { deflateSync, gzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { tiffDocument } from '../../__fixtures__/tiff-document';
 import { decodeTiffPage } from './tiff-page';
@@ -99,7 +99,7 @@ describe('TIFF pixel block integrity', () => {
     const incomplete = tiffDocument([
       { width: 2, height: 2, rowsPerStrip: 1, compression: 8, blocks: [blocks[0] ?? [], short] },
     ]);
-    expect(() => decodeTiffPage(incomplete, 1)).toThrow();
+    expect(() => decodeTiffPage(incomplete, 1)).toThrow(/^Incomplete TIFF pixel data\.$/);
   });
 
   it('rejects tiled RGB before the upstream decoder drops or shifts colour channels', () => {
@@ -218,5 +218,127 @@ describe('TIFF pixel block integrity', () => {
     expect(firstChannel(supported)).toEqual([255, 0, 0, 0, 0, 0, 0, 0]);
     const invalid = tiffDocument([{ fillOrder: 0 }]);
     expect(() => decodeTiffPage(invalid, 1)).toThrow(/most-significant-bit-first/);
+  });
+});
+
+// A TIFF LZW stream of the given codes, most significant bit first. Each code
+// but the first after a Clear adds a table entry, and the code width grows by
+// a bit when the table reaches 511, 1023 and 2047 entries (TIFF 6.0 section 13).
+function lzwCodes(codes: readonly number[]): number[] {
+  const bytes: number[] = [];
+  let buffer = 0;
+  let bits = 0;
+  let width = 9;
+  let table = 258;
+  let first = false;
+  for (const code of codes) {
+    buffer = (buffer << width) | code;
+    bits += width;
+    while (bits >= 8) {
+      bits -= 8;
+      bytes.push((buffer >> bits) & 255);
+    }
+    if (code === 256) [width, table, first] = [9, 258, true];
+    else if (first) first = false;
+    else if (code !== 257 && [511, 1023, 2047].includes(++table)) width += 1;
+  }
+  if (bits > 0) bytes.push((buffer << (8 - bits)) & 255);
+  return bytes;
+}
+
+const LZW = 5;
+const DEFLATE = 8;
+const encoders = [
+  [
+    'Deflate',
+    DEFLATE,
+    (pixels: readonly number[]) => Array.from(deflateSync(Uint8Array.from(pixels))),
+  ],
+  ['LZW', LZW, (pixels: readonly number[]) => lzwCodes([256, ...pixels, 257])],
+] as const;
+
+describe.each(encoders)('TIFF %s strips decompress to their rows', (_name, compression, encode) => {
+  const twoRows = (strips: readonly (readonly number[])[], rowsPerStrip = 1) =>
+    tiffDocument([{ width: 2, height: 2, rowsPerStrip, compression, blocks: strips.map(encode) }]);
+
+  it('decodes each strip', () => {
+    expect(
+      firstChannel(
+        twoRows([
+          [10, 20],
+          [30, 40],
+        ]),
+      ),
+    ).toEqual([10, 20, 30, 40]);
+  });
+
+  it('refuses a strip that holds more than its rows', () => {
+    expect(() =>
+      decodeTiffPage(
+        twoRows([
+          [10, 20],
+          [30, 40, 50],
+        ]),
+        1,
+      ),
+    ).toThrow(/^TIFF decompressed data is too long\.$/);
+  });
+
+  it('refuses a strip that holds fewer samples than its rows', () => {
+    expect(() => decodeTiffPage(twoRows([[10, 20], [30]]), 1)).toThrow(
+      /^Incomplete TIFF pixel data\.$/,
+    );
+    expect(() => decodeTiffPage(twoRows([[10, 20], []]), 1)).toThrow(
+      /^Incomplete TIFF pixel data\.$/,
+    );
+  });
+
+  it('accepts a last strip padded to whole rows', () => {
+    const blocks = [
+      [10, 20, 30, 40],
+      [50, 60, 0, 0],
+    ].map(encode);
+    const bytes = tiffDocument([{ width: 2, height: 3, rowsPerStrip: 2, compression, blocks }]);
+    expect(firstChannel(bytes)).toEqual([10, 20, 30, 40, 50, 60]);
+  });
+
+  it('holds a compressed tile to its tile size', () => {
+    const tile = Array.from({ length: 256 }, (_, index) => index % 200);
+    const tiled = (blocks: readonly (readonly number[])[]) =>
+      tiffDocument([{ width: 16, height: 1, tileSize: [16, 16], compression, blocks }]);
+    expect(firstChannel(tiled([encode(tile)]))).toEqual(tile.slice(0, 16));
+    expect(() => decodeTiffPage(tiled([encode([...tile, 0])]), 1)).toThrow(
+      /^TIFF decompressed data is too long\.$/,
+    );
+  });
+});
+
+describe('TIFF compressed data the decoder cannot read', () => {
+  const oneRow = (compression: number, block: readonly number[]) =>
+    tiffDocument([{ width: 2, height: 1, compression, blocks: [block] }]);
+
+  it('refuses an LZW code that names an entry the strip has not made', () => {
+    expect(() => decodeTiffPage(oneRow(LZW, lzwCodes([256, 300, 257])), 1)).toThrow(
+      /^TIFF compressed data is damaged\.$/,
+    );
+    expect(() => decodeTiffPage(oneRow(LZW, lzwCodes([256, 10, 400, 257])), 1)).toThrow(
+      /^TIFF compressed data is damaged\.$/,
+    );
+  });
+
+  it('holds a gzip-wrapped strip to the length its trailer states', () => {
+    const wrapped = Array.from(gzipSync(Uint8Array.from([10, 20])));
+    expect(firstChannel(oneRow(DEFLATE, wrapped))).toEqual([10, 20]);
+    const stated = wrapped.slice();
+    stated.splice(-4, 4, 3, 0, 0, 0);
+    expect(() => decodeTiffPage(oneRow(DEFLATE, stated), 1)).toThrow(
+      /^TIFF decompressed data is too long\.$/,
+    );
+  });
+
+  it('names a Deflate strip whose blocks cannot be read', () => {
+    expect(() => decodeTiffPage(oneRow(DEFLATE, [0x78, 0x9c, 0xff, 0xff, 0, 0, 0, 0]), 1)).toThrow(
+      /^TIFF compressed data is damaged\.$/,
+    );
   });
 });

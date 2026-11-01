@@ -36,6 +36,16 @@
 //   feedrate (no G0_FEEDRATE in the stock configuration); in continuous mode a
 //   G1 S sets the block power and a G0 plans power 0.
 // - gcode/host/M114.cpp: M114 reports the projected (planned) position.
+// - gcode/parser.cpp parse() L266 and gcode/gcode.cpp L1119-L1122: a line
+//   whose first letter is not G, M or T sets no command, so Marlin echoes
+//   `Unknown command: "<the text it read>"` (parser.cpp L390-L392), skips it
+//   and answers `ok`. Over serial a line without `N` has no checksum
+//   (queue.cpp L473-L510), so a command letter lost on the wire lands here.
+// - gcode/temp/M106_M107.cpp and planner.cpp check_axes_activity()
+//   (L1388-L1399): M106 S (255 without S) and M107 set the fan speed when they
+//   run, and each block keeps the speed current when it was planned. The fan
+//   output follows the running block, and the current speed once the planner
+//   is empty; nothing times it out (rolling audit v6 K1-P1-1).
 
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 
@@ -53,6 +63,8 @@ type Block = {
   readonly to: Point;
   readonly durationMs: number;
   readonly power: number;
+  /** The fan speed current when the block was planned. */
+  readonly fan: number;
 };
 
 type RingEntry = { readonly command: string; started: boolean };
@@ -69,6 +81,8 @@ export type FifoMarlin = {
     readonly plannedBlocks: number;
     readonly moving: boolean;
     readonly output: number;
+    /** The fan output now: the running block's speed, else the current one. */
+    readonly fan: number;
     readonly position: Point;
   };
 };
@@ -88,6 +102,7 @@ type Machine = {
   outputSince: number;
   safetyTimer: ReturnType<typeof setTimeout> | null;
   beam: BeamInterval[];
+  fan: number;
   feed: number;
   absolute: boolean;
   planned: Point;
@@ -111,6 +126,7 @@ function newMachine(): Machine {
     outputSince: 0,
     safetyTimer: null,
     beam: [],
+    fan: 0,
     feed: DEFAULT_FEED_MM_PER_MIN,
     absolute: true,
     planned: { x: 0, y: 0 },
@@ -264,6 +280,7 @@ export function createFifoMarlin(options: { readonly responseDelayMs?: number } 
       to,
       durationMs: (distance / m.feed) * 60_000,
       power: m.continuous ? m.inlinePower : 0,
+      fan: m.fan,
     });
     m.planned = to;
     startNextBlock();
@@ -305,6 +322,14 @@ export function createFifoMarlin(options: { readonly responseDelayMs?: number } 
   const runMCode = (entry: RingEntry, code: string): boolean => {
     if (/^M410\b/.test(code)) return runM410(entry);
     if (/^M400\b/.test(code)) return drained();
+    if (/^M106\b/.test(code)) {
+      m.fan = Math.min(255, words(code).get('S') ?? 255);
+      return true;
+    }
+    if (/^M107\b/.test(code)) {
+      m.fan = 0;
+      return true;
+    }
     if (/^M5\b/.test(code)) return runM5(code);
     if (/^M[34]\b/.test(code)) return runM3(code);
     if (/^M114\b/.test(code)) {
@@ -325,6 +350,11 @@ export function createFifoMarlin(options: { readonly responseDelayMs?: number } 
   // Returns false while the head command's handler is still blocked.
   const runCommand = (entry: RingEntry): boolean => {
     const code = entry.command.toUpperCase();
+    if (!/^[GMT]/.test(code)) {
+      reply(`echo:Unknown command: "${entry.command}"`);
+      reply('ok');
+      return true;
+    }
     const done = code.startsWith('M') ? runMCode(entry, code) : runGCode(code);
     if (done) reply('ok');
     return done;
@@ -397,6 +427,7 @@ export function createFifoMarlin(options: { readonly responseDelayMs?: number } 
       plannedBlocks: m.planner.length + (m.executing === null ? 0 : 1),
       moving: m.executing !== null,
       output: m.output,
+      fan: m.executing === null ? m.fan : m.executing.block.fan,
       position: m.actual,
     }),
   };

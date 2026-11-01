@@ -7,8 +7,8 @@
 import { DEFAULT_PROJECT_VARIABLE_DATA, type Project } from '../../core/scene';
 import { materializeVariableText } from '../../io/gcode/prepare-output-snapshot';
 import { exportSceneSvg } from '../../io/svg/export-scene-svg';
-import { renderVariableText } from '../text/render-variable-text';
-import { exportProjectSelection } from './export-artwork-svg';
+import { outputTextRenderer } from '../text/output-text-renderer';
+import { exportProjectSelection, glyphWarnings } from './export-artwork-svg';
 import { embedSvgRasterImages } from './svg-artwork-images';
 
 export type PrintOptions = {
@@ -40,7 +40,13 @@ export async function printableArtworkSvg(
   options: PrintOptions,
   now: Date,
 ): Promise<
-  { readonly ok: true; readonly svg: string } | { readonly ok: false; readonly message: string }
+  | {
+      readonly ok: true;
+      readonly svg: string;
+      /** Characters a printed text's font lacks, as an export names them. */
+      readonly warnings: ReadonlyArray<string>;
+    }
+  | { readonly ok: false; readonly message: string }
 > {
   const ids = selectedIds.length > 0 ? [...selectedIds] : undefined;
   const scoped = exportProjectSelection(project, ids);
@@ -50,7 +56,7 @@ export async function printableArtworkSvg(
   const resolved = await materializeVariableText(
     scoped,
     { now, recordIndex: variables.recordIndex, serialValue: variables.serialValue },
-    renderVariableText,
+    outputTextRenderer,
   );
   if (!resolved.ok) {
     return {
@@ -65,7 +71,11 @@ export async function printableArtworkSvg(
       ids,
     );
     if (exported.kind === 'error') return { ok: false, message: exported.error };
-    return { ok: true, svg: styledPrintSvg(exported.value.svg, options) };
+    return {
+      ok: true,
+      svg: styledPrintSvg(exported.value.svg, options),
+      warnings: glyphWarnings(resolved.advisories),
+    };
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : String(error) };
   }

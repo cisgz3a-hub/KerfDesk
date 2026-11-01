@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mockPlatform } from '../../__fixtures__/file-actions';
+import { savedContentsText } from '../../__fixtures__/project-save-worker';
 import { createProject, type Project } from '../../core/scene';
 import { deserializeProject, serializeProject } from '../../io/project';
 import { assetReader, pagedProject } from '../library/personal-artwork-test-fixtures';
@@ -134,7 +135,8 @@ describe('ordinary portable project sheet Save', () => {
     );
     expect(result.kind).toBe('prepared');
     if (result.kind !== 'prepared') throw new Error('raw recovery did not prepare');
-    expect(result.json).toBe(serializeProject(source));
+    // The raw recovery copy is a Blob of compact chunks (J10-P3-3).
+    expect(await savedContentsText(result.json)).toBe(serializeProject(source, { compact: true }));
     expect(vi.mocked(prepareProjectSaveOffThread).mock.calls[0]![0]).toBe(source);
     expect(vi.mocked(prepareProjectSaveOffThread).mock.calls[0]![2]).toBe('recovery');
   });

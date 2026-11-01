@@ -10,7 +10,7 @@
 import { useEffect } from 'react';
 import type { Project } from '../../core/scene';
 import { useStore } from '../state';
-import { sessionSketch, type DesignSession } from './design-session';
+import { persistedDesignSession, type DesignSession } from './design-session';
 import { useDesignStudioStore } from './design-studio-store';
 import { writePersistedSession } from './design-session-storage';
 import {
@@ -94,14 +94,7 @@ async function saveCurrentSession(teardown: boolean): Promise<void> {
     return; // Preserve the last recovery draft when work was cancelled/refused.
   }
   if (!stillOwnsRecovery(project, projectDocumentEpoch, session)) return;
-  writePersistedSession({
-    ...(projectOwner === undefined ? {} : { projectOwner }),
-    sketch: sessionSketch(session),
-    activeLayerId: session.activeLayerId,
-    surface3d: session.surface3d,
-    applied: session.applied,
-    dirtySinceApply: session.dirtySinceApply,
-  });
+  writePersistedSession(persistedDesignSession(session, projectOwner));
 }
 
 function stillOwnsRecovery(project: Project, epoch: number, session: DesignSession): boolean {

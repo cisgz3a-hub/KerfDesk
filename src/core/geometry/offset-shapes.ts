@@ -19,15 +19,16 @@ import { IDENTITY_TRANSFORM, isClosedEnough, type ColoredPath, type ImportedSvg 
 import {
   boundsForPaths,
   isClosedPolygon,
-  materializeVectorObject,
+  materializeVectorObjectWithin,
   pathDToPolyline,
   polylineToPathD,
   tryVectorOp,
   type VectorOpError,
   type VectorSceneObject,
 } from './vector-path-tools';
-import { offsetArcToleranceMm } from './offset-arc-tolerance';
+import { OFFSET_SOURCE_CURVE_TOLERANCE_MM, offsetArcToleranceMm } from './offset-arc-tolerance';
 import { canonicalizeVectorPaths } from './vector-path-canonical';
+import { nestedSelectionRegion } from './vector-path-nesting';
 import { VECTOR_PATH_PRECISION_DECIMALS } from './vector-path-regions';
 
 export type OffsetDirection = 'outward' | 'inward' | 'both';
@@ -182,20 +183,26 @@ function worldGeometry(
   objects: ReadonlyArray<VectorSceneObject>,
   outerShapesOnly: boolean,
 ): Result<WorldGeometry, VectorOpError> {
-  const closedBatches: PathsD = [];
+  const closedBatches: PathsD[] = [];
   const open: PathsD = [];
   for (const object of objects) {
-    const materialized = tryVectorOp(() => materializeVectorObject(object));
+    const materialized = tryVectorOp(() =>
+      materializeVectorObjectWithin(object, OFFSET_SOURCE_CURVE_TOLERANCE_MM),
+    );
     if (materialized.kind === 'error') return materialized;
     for (const path of materialized.value.paths) {
       const batch = splitPath(path);
       const normalized = normalizeBatch(batch.closed, path);
       if (normalized.kind === 'error') return normalized;
-      closedBatches.push(...normalized.value);
+      closedBatches.push(normalized.value);
       open.push(...batch.open);
     }
   }
-  const region = unionAll(closedBatches);
+  // ADR-410 Amendment 3: a shape inside another selected shape is a hole.
+  const nested = nestedSelectionRegion(closedBatches, outerShapesOnly);
+  if (nested.kind === 'error') return nested;
+  if (nested.value !== null) return ok({ region: nested.value, open });
+  const region = unionAll(closedBatches.flat());
   if (region.kind === 'error') return region;
   if (!outerShapesOnly) return ok({ region: region.value, open });
   const outers = unionAll(region.value.filter((path) => isPositiveD(path)));

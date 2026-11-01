@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, KNOWN_CONTROLLER_KINDS } from '../../core/devices';
 import type { FillGroup, Job, RasterGroup } from '../../core/job';
+import { emitRasterGroup } from '../../core/raster';
 import { createLayer, createProject, DEFAULT_CNC_MACHINE_CONFIG } from '../../core/scene';
 import { detectJobIntentWarnings } from './job-intent-warnings';
 import { scanQualityWarnings } from './scan-quality-warnings';
@@ -65,6 +66,30 @@ describe('compiled scan quality advisories', () => {
     expect(warnings(raster({ speed: 6000, overscanMm: 7.8, scanAngleDeg: 90 }))).toHaveLength(1);
   });
 
+  // Rolling audit v6 K3-P2-2 (ADR-675): with the firmware's $120=1000, the
+  // Cartesian model called 3.54 mm enough at 45° and 6000 mm/min; CoreXY needs 7.07.
+  it('measures a CoreXY diagonal with the per-motor acceleration', () => {
+    const coreXy = {
+      ...project,
+      device: { ...project.device, accelMmPerSec2: 1000, kinematics: 'corexy' as const },
+    };
+    const group = raster({ speed: 6000, overscanMm: 5, scanAngleDeg: 45 });
+    expect(
+      scanQualityWarnings(
+        { groups: [group] },
+        { ...coreXy, device: { ...coreXy.device, kinematics: 'cartesian' } },
+      ),
+    ).toEqual([]);
+    const short = scanQualityWarnings({ groups: [group] }, coreXy);
+    expect(short).toHaveLength(1);
+    expect(short[0]).toContain(
+      '1000 mm/s² (707.1068 mm/s² along its 45° scan on this CoreXY machine)',
+    );
+    expect(short[0]).toContain('needs about 7.0711 mm');
+    // Along an axis both layouts give the whole 1000 mm/s²: 5 mm is enough.
+    expect(scanQualityWarnings({ groups: [raster({ speed: 6000 })] }, coreXy)).toEqual([]);
+  });
+
   it('compares the qualified Fill entry rather than its larger stored setting', () => {
     const fill: FillGroup = {
       kind: 'fill',
@@ -98,6 +123,39 @@ describe('compiled scan quality advisories', () => {
       'removes an isolated one-pixel powered run',
     );
     expect(warnings(raster({ dotWidthCorrectionMm: 0.025 }))).toEqual([]);
+  });
+
+  it('fires for the isolated dot the output loses, not for Grayscale tone it keeps', () => {
+    // ADR-458 Amendment 1: the correction trims a burned line where the beam
+    // turns on and off, so a one-pixel line loses both ends and a Grayscale
+    // line keeps every power change.
+    const burnedS = (sValues: Float64Array, dotWidthCorrectionMm: number) =>
+      emitRasterGroup({
+        sValues,
+        width: sValues.length,
+        height: 1,
+        bounds: { minX: 10, minY: 10, maxX: 10 + 0.1 * sValues.length, maxY: 10.1 },
+        feedMmPerMin: 1500,
+        overscanMm: 0,
+        dotWidthCorrectionMm,
+        layerId: 'image',
+        color: '#000000',
+        powerPercent: 30,
+      })
+        .split('\n')
+        .flatMap((line) => /^G1 .*\bS([1-9][\d.]*)/.exec(line)?.[1] ?? []);
+    expect(warnings(raster({ dotWidthCorrectionMm: 0.05 }))[0]).toContain(
+      'shortens each end of a burned line by 0.05 mm and removes an isolated one-pixel powered run',
+    );
+    expect(burnedS(Float64Array.of(0, 300, 0), 0.05)).toEqual([]);
+    const tone = raster({
+      sValues: Float64Array.of(300, 600, 900),
+      pixelWidth: 3,
+      bounds: { minX: 10, minY: 10, maxX: 10.3, maxY: 10.1 },
+      dotWidthCorrectionMm: 0.02,
+    });
+    expect(warnings(tone)).toEqual([]);
+    expect(burnedS(Float64Array.of(300, 600, 900), 0.02)).toEqual(['300', '600', '900']);
   });
 
   it('uses the horizontal pitch of anisotropic pass-through output', () => {

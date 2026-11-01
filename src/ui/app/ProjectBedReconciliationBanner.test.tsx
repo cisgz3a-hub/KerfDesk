@@ -67,6 +67,30 @@ describe('ProjectBedReconciliationBanner', () => {
     expect(host.textContent).toContain('Keep current machine');
   });
 
+  // The buttons never shrank, so a phone-width window squeezed the words into
+  // a column one word wide. Once the notice named what another machine brings
+  // (ADR-440 Amendment 8) it outgrew a 390 × 844 window and left the panel tabs
+  // under the status bar. jsdom has no layout, so the wrap contract is read.
+  it('lets its buttons wrap beneath its words on a narrow window', async () => {
+    useStore
+      .getState()
+      .setProject(createProject({ ...DEFAULT_DEVICE_PROFILE, name: 'Opened machine' }));
+
+    await act(async () => root.render(<ProjectBedReconciliationBanner />));
+
+    const banner = host.querySelector<HTMLElement>(
+      'section[aria-label="Opened project machine disclosure"]',
+    );
+    const [words, actions] = [...(banner?.children ?? [])] as HTMLElement[];
+    expect(banner?.style.flexWrap).toBe('wrap');
+    expect(words?.textContent).toContain('Opened project machine:');
+    expect(words?.style.flexGrow).toBe('1');
+    expect(words?.style.flexBasis).toBe('20em');
+    expect(actions?.textContent).toContain('Use project machine');
+    expect(actions?.style.flexShrink).not.toBe('0');
+    expect(actions?.style.flexWrap).toBe('wrap');
+  });
+
   it.each(['Use project machine', 'Keep current machine'])(
     '%s retains the chosen profile and clears the disclosure',
     async (label) => {

@@ -13,6 +13,7 @@ import {
   type Polyline,
   type Vec2,
 } from '../scene';
+import { createEllipse } from '../shapes/primitives';
 import { offsetShapes, type OffsetShapesOptions } from './offset-shapes';
 import { offsetVectorObjects } from './vector-path-booleans';
 
@@ -187,5 +188,67 @@ describe('offset round corners stay within the machine curve tolerance', () => {
     // A flat 0.025 mm chord error would cut a 1 mm corner into 4 chords, not 13.
     expect(shapes.worstMm).toBeLessThanOrEqual(FINE_RATIO * mm + GRID_MM);
     expect(quick.worstMm).toBeLessThanOrEqual(FINE_RATIO * mm + GRID_MM);
+  });
+});
+
+// Rolling audit v7 L1-P3-2 (ADR-410 Amendment 3): a curved source was flattened
+// at the full 0.025 mm before the offset, and each round corner centred on a
+// chord vertex added its own chords on top, so an r 10 circle offset 50 mm sat
+// 0.031 mm off the true r 60 circle. Both tools now flatten curved sources at
+// OFFSET_SOURCE_CURVE_TOLERANCE_MM and give the round corners the rest.
+describe('offsets of a curved source stay within the tolerance of the offset curve', () => {
+  const RADIUS = 10;
+  const disc = createEllipse({
+    id: 'disc',
+    color: '#000000',
+    spec: { widthMm: 2 * RADIUS, heightMm: 2 * RADIUS },
+  });
+  const centre = {
+    x: (disc.bounds.minX + disc.bounds.maxX) / 2,
+    y: (disc.bounds.minY + disc.bounds.maxY) / 2,
+  };
+
+  // The farthest any point of the outline, edges sampled, lies off the circle.
+  function circleDeviation(outline: ImportedSvg | null, radius: number): number {
+    if (outline === null) throw new Error('the offset produced no object');
+    let worst = 0;
+    for (const polyline of outline.paths.flatMap((path) => path.polylines)) {
+      const { points } = polyline;
+      points.forEach((a, index) => {
+        const b = points[(index + 1) % points.length]!;
+        for (let step = 0; step <= 20; step += 1) {
+          const t = step / 20;
+          const x = a.x + (b.x - a.x) * t - centre.x;
+          const y = a.y + (b.y - a.y) * t - centre.y;
+          worst = Math.max(worst, Math.abs(Math.hypot(x, y) - radius));
+        }
+      });
+    }
+    return worst;
+  }
+
+  it.each([2, 12, 25, 50, 100])('outward %s mm', (mm) => {
+    const shapes = offsetShapes(
+      [disc],
+      { distanceMm: mm, direction: 'outward', cornerStyle: 'round', outerShapesOnly: false },
+      IDS,
+    );
+    if (shapes.kind !== 'ok') throw new Error(shapes.error.message);
+    const quick = offsetVectorObjects([disc], mm, 'offset');
+    if (quick.kind !== 'ok') throw new Error(quick.error.message);
+    expect(circleDeviation(shapes.value.outward, RADIUS + mm)).toBeLessThanOrEqual(
+      DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
+    );
+    expect(circleDeviation(quick.value, RADIUS + mm)).toBeLessThanOrEqual(
+      DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
+    );
+  });
+
+  it.each([2, 5, 9])('inward %s mm', (mm) => {
+    const quick = offsetVectorObjects([disc], -mm, 'offset');
+    if (quick.kind !== 'ok') throw new Error(quick.error.message);
+    expect(circleDeviation(quick.value, RADIUS - mm)).toBeLessThanOrEqual(
+      DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
+    );
   });
 });

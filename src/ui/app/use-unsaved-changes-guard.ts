@@ -23,6 +23,7 @@ import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { desktopCloseController } from './desktop-close-runtime';
+import { designStudioHoldsUnappliedDrawing } from '../design-studio/design-kept-drawing-actions';
 
 export function shouldWarnBeforeUnload(args: {
   readonly dirty: boolean;
@@ -36,7 +37,8 @@ export function installUnsavedChangesGuard(target: Window): () => void {
     // Desktop close already asked Save, Don't Save or Cancel before arming
     // this one-use unload. Active-job close has its separate Abort handoff.
     if (desktopCloseController.handleBeforeUnload(e)) return;
-    const dirty = useStore.getState().dirty;
+    // A Studio drawing not yet applied is unsaved work too (ADR-590 Amendment 1).
+    const dirty = useStore.getState().dirty || designStudioHoldsUnappliedDrawing();
     const jobActive = isActiveJob(useLaserStore.getState().streamer);
     if (!shouldWarnBeforeUnload({ dirty, jobActive })) return;
     // preventDefault triggers the native prompt in modern browsers; the empty

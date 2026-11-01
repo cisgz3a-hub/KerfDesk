@@ -9,7 +9,6 @@
 // actually written, after the transform.
 
 import {
-  pathUsesOperation,
   polylineToCurveSubpath,
   type Bounds,
   type ColoredPath,
@@ -19,7 +18,11 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
-import { effectiveOperationForObject } from '../../core/scene/effective-operation';
+import {
+  exportOperationFills,
+  exportOperationForPath,
+  type FillCompound,
+} from './export-fill-compounds';
 import {
   affineMaxGain,
   curvesBounds,
@@ -54,25 +57,29 @@ export type SvgVectorOptions = {
 
 export type SvgVectorElement = { readonly markup: string; readonly bounds: Bounds | null };
 
+/**
+ * One path of an object, in `color` (its operation's colour in the file,
+ * ADR-681). A `pooled` path's closed contours are written by its operation's
+ * fill compound instead; its open contours stay here.
+ */
 export function vectorPathElement(
   object: VectorObject,
   path: ColoredPath,
   project: Project,
   options: SvgVectorOptions,
+  written: { readonly color: string; readonly pooled: boolean },
 ): SvgVectorElement {
   const geometry = vectorGeometry(object, path, options.precisionMm);
   const { curves, grid } = geometry;
-  const operation = project.scene.layers.find((layer) => pathUsesOperation(object, path, layer));
-  const fill =
-    operation !== undefined && effectiveOperationForObject(operation, object).mode === 'fill';
+  const fill = exportOperationFills(exportOperationForPath(project, object, path), object);
   const paint: Paint = {
     transform: ' transform="' + geometry.transform + '"',
-    color: xmlText(path.color),
+    color: xmlText(written.color),
     fillRule: path.fillRule ?? (object.kind === 'text' ? 'nonzero' : 'evenodd'),
   };
   const closed = curves.filter((curve) => curve.closed);
   const open = curves.filter((curve) => !curve.closed);
-  const closedMarkup = fill ? filledMarkup(closed, grid, paint, options) : '';
+  const closedMarkup = fill && !written.pooled ? filledMarkup(closed, grid, paint, options) : '';
   const stroked = fill ? open : curves;
   const strokeMarkup =
     !fill && options.groupContours
@@ -83,6 +90,22 @@ export function vectorPathElement(
     markup: closedMarkup + strokeMarkup,
     bounds: geometry.bounds,
   };
+}
+
+/** A Fill operation's pooled region as one even-odd path in world millimetres (ADR-681). */
+export function fillCompoundElement(
+  compound: FillCompound,
+  color: string,
+  options: SvgVectorOptions,
+): SvgVectorElement {
+  const grid = localGrid(options.precisionMm, 1);
+  const curves = quantizeCurves(compound.curves, grid);
+  const paint: Paint = {
+    transform: '',
+    color: xmlText(color),
+    fillRule: 'evenodd',
+  };
+  return { markup: filledMarkup(curves, grid, paint, options), bounds: curvesBounds(curves) };
 }
 
 type VectorGeometry = {

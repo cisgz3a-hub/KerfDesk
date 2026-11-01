@@ -169,21 +169,26 @@ function visibilityState(
   };
 }
 
+// Each numeral matches one way only (`\d+(?:\.\d*)?`, not `\d+\.?\d*`), so
+// the match runs in linear time; no stroke-width is longer than the cap.
+const STROKE_WIDTH = /^([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?)(?:[a-z]+|%)?$/i;
+const STROKE_WIDTH_MAX_LENGTH = 256;
+
 // A negative or unreadable stroke-width is invalid, so the inherited one applies.
 function strokeWidthZero(value: string | null, inherited: boolean): boolean {
-  const match = /^([+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?)(?:[a-z]+|%)?$/i.exec(
-    keyword(value) ?? '',
-  );
+  const text = keyword(value) ?? '';
+  const match = text.length > STROKE_WIDTH_MAX_LENGTH ? null : STROKE_WIDTH.exec(text);
   if (match === null) return inherited;
   const width = Number(match[1]);
   return width < 0 ? inherited : width === 0;
 }
 
+// The trim after each replace takes the spaces before `!important`.
 function keyword(value: string | null): string | null {
   return (
     value
       ?.trim()
-      .replace(/\s*!important$/i, '')
+      .replace(/!important$/i, '')
       .trim()
       .toLowerCase() ?? null
   );
@@ -279,7 +284,7 @@ function parseOpacity(input: string | null): number {
   if (input === null) return 1;
   const normalized = input
     .trim()
-    .replace(/\s*!important$/i, '')
+    .replace(/!important$/i, '')
     .trim();
   const value = Number.parseFloat(normalized);
   if (!Number.isFinite(value)) return 1;
@@ -302,7 +307,7 @@ function clipReferences(
 export function svgClipPathId(value: string | null): string | null {
   const trimmed = value
     ?.trim()
-    .replace(/\s*!important$/i, '')
+    .replace(/!important$/i, '')
     .trim();
   if (trimmed === undefined || trimmed === 'none') return null;
   const match = /^url\(\s*['"]?#([^\s'")]+)['"]?\s*\)$/.exec(trimmed);

@@ -38,6 +38,8 @@ function PrintArtworkDialog(): JSX.Element {
       return;
     }
     close();
+    if (result.warnings.length > 0)
+      useToastStore.getState().pushToast(result.warnings.join(' '), 'warning');
     printSvg(result.svg);
   };
   return (

@@ -159,10 +159,28 @@ export type GcodeMetadata = {
 // ADR-250 Amd 4 counts a stacked On path copy once in the kept walls, so a
 // neighbouring lead that reached the copied part plunges instead; carries
 // forward v33 above.
+// ADR-492 Amd 1 burns a Pass-Through image turned off its scan rows at its own
+// pixel size, not its pixel count stretched over the turned box; carries
+// forward v34 above.
+// ADR-649 Amd 1 keeps Blue Noise off pure white and on pure black, so a mask's
+// outside never burns; v36 belongs to open PRs #1490 and #1491; carries
+// forward v35 above.
+// ADR-458 Amd 1 trims Dot Width Correction only at the ends of a burned line,
+// not at each Grayscale power change, so Grayscale and Pass-through image
+// bytes change; dithered bytes do not. v36 is held by open PR #1491; carries
+// forward v37 above.
+// ADR-239 Amd 2 leaves every constant-power (M3) contour on the 4040-safe
+// profile by a laser-off exit runway after its last burn point, so 4040 Line
+// output gains one `G1 ... S0` move per contour and a contour-exit comment;
+// carries forward v38 above (v36 was left unused).
+// ADR-675 works an automatic overscan out per motor on a CoreXY machine (the
+// Falcon A1 Pro), so a diagonal scan's runway there is longer and an axis
+// scan's is unchanged; Cartesian output is unchanged; carries forward v39
+// above.
 // The last-100 PR audit keeps self-intersecting CNC artwork in placement
-// bounds and re-scores optimized routes after choosing closed starts;
-// carries forward v34 above.
-export const EMITTER_REVISION = 'audit-placement-and-route-20261027-v35';
+// bounds and re-scores optimized routes after choosing closed starts; carries
+// forward v40 above.
+export const EMITTER_REVISION = 'audit-placement-and-route-20261102-v41';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

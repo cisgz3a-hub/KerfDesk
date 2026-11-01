@@ -46,7 +46,11 @@ export type ControllerReadinessWarningCode =
 
 /** How the connected firmware exposes settings — mirrors
  *  ControllerCapabilities['settings'] without importing the driver layer. */
-export type ReadinessSettingsCapability = 'grbl-dollar' | 'readonly-dump' | 'none';
+export type ReadinessSettingsCapability =
+  | 'grbl-dollar'
+  | 'grbl-dollar-read'
+  | 'readonly-dump'
+  | 'none';
 
 export type ControllerReadinessMessage<Code extends string> = {
   readonly code: Code;
@@ -110,8 +114,9 @@ export function runControllerReadiness(
   // errors. Those errors do NOT refuse Start: since #291 the Start path maps
   // them to Job Review warnings (start-job-controller-policy.ts). Since #482
   // they no longer refuse Save/export either — that path states them as
-  // advisory toasts (controller-readiness-advisories.ts). grbl-dollar keeps
-  // absent = error: a real GRBL $$ always reports $30/$31/$32.
+  // advisory toasts (controller-readiness-advisories.ts). grbl-dollar and
+  // grbl-dollar-read keep absent = error: a real GRBL $$ always reports
+  // $30/$31/$32.
   const absentPolicy: AbsentSettingPolicy =
     settingsCapability === 'readonly-dump' ? 'warn' : 'error';
 

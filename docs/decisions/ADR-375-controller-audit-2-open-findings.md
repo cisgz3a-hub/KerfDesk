@@ -144,7 +144,8 @@ therefore sent moves the firmware refuses, or trusted values the controller had 
      are unchanged (ADR-232 leaves those limits to the controller). No new refusal.
      *(Extended by [Amendment 8](ADR-375-amendment-8-phone-hold-aims-like-the-pc-hold.md): the
      phone's hold-to-jog aims inside the same limits, capped at its 100 mm bound, and its Z hold
-     inside the firmware's Z envelope.)*
+     inside the firmware's Z envelope; by [Amendment 10](ADR-375-amendment-10-phone-z-hold-aims-from-the-controller-z.md),
+     the Z hold measures from the withheld controller Z as the XY hold does.)*
 
 4. **Fire at the power it shows** (P-2).
    - GRBL and grblHAL scale every S word by the spindle override, and an override raised during a
@@ -249,7 +250,10 @@ therefore sent moves the firmware refuses, or trusted values the controller had 
      G-code. Amended again by
      [Amendment 7](ADR-375-amendment-7-bracket-lines-and-gcode-report-units.md): FluidNC's
      `[key]value` lines are read as their `$` form, and after a Console units line Smoothieware's
-     report units are read back with `$G`.)*
+     report units are read back with `$G`. Amended again by
+     [Amendment 11](ADR-375-amendment-11-owned-units-lines-and-fluidnc-under-a-grbl-profile.md):
+     KerfDesk's own G21 records the units it selects, and a stock-GRBL or grblHAL profile reads a
+     FluidNC board's `[key]value` lines as their `$` form once the banner shows FluidNC.)*
    - Stock GRBL stores a non-axis setting as an 8-bit integer and still answers `ok`
      ([settings.c L229](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/settings.c#L229)), so a Console `$22=0.5` turned homing and soft limits
      off while KerfDesk reported the write as done. On the stock GRBL driver the Console now
@@ -273,6 +277,9 @@ therefore sent moves the firmware refuses, or trusted values the controller had 
       the controller reports Run, Jog, Home, Hold or Door and nothing here owns it (no job,
       controller operation, jog, Frame, Fire or grblHAL pendant), the popup now shows it with
       **ABORT MOTION** and still no Resume, and Ctrl+. and the crash screen offer the same Abort.
+      *(Extended by [Amendment 9](ADR-375-amendment-9-a-laser-left-on-at-idle-gets-laser-off.md):
+      a laser the controller reports on at Idle with no owner here gets **LASER OFF**, and an
+      ordinary close turns it off.)*
     - A reset sent into a cycle, jog or homing kills the steppers and raises `ALARM:3`
       ([motion_control.c L380-L386](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/motion_control.c#L380-L386)), while a completed feed hold
       keeps position until cycle start or a reset

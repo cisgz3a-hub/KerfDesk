@@ -6,7 +6,7 @@
 import { findRegistrationBoxes } from '../../../core/scene';
 import { useStore } from '../../state';
 import { useLaserStore } from '../../state/laser-store';
-import { selectedBoardArrayDesign } from '../../state/board-tile-actions';
+import { selectedBoardArrayDesign, selectedBoardFitDesign } from '../../state/board-tile-actions';
 
 export function useBoardPlacement() {
   const scene = useStore((s) => s.project.scene);
@@ -22,16 +22,16 @@ export function useBoardPlacement() {
   const nonBoxSelectedCount = [selectedObjectId, ...additionalSelectedIds].filter(
     (id): id is string => id !== null && !boxIds.has(id),
   ).length;
-  const arrayDesign = selectedBoardArrayDesign({
-    project: { scene },
-    selectedObjectId,
-    additionalSelectedIds,
-  });
+  const selection = { project: { scene }, selectedObjectId, additionalSelectedIds };
+  const arrayDesign = selectedBoardArrayDesign(selection);
 
   return {
     canAlign: boxIds.size > 0 && nonBoxSelectedCount > 0,
     // Fit/array scale or tile ONE design; several would pile up, so require one.
-    canFit: boxIds.size > 0 && arrayDesign !== undefined,
+    // Array also takes a photo's mask or a text's guide selected with it, which
+    // its copies carry (ADR-633 Amendment 3); Fit scales one object only.
+    canFit: boxIds.size > 0 && selectedBoardFitDesign(selection) !== undefined,
+    canArray: boxIds.size > 0 && arrayDesign !== undefined,
     arrayBoard: findRegistrationBoxes(scene)[0],
     arrayDesign,
     alignToBox,

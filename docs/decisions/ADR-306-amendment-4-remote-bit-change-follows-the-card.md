@@ -1,7 +1,9 @@
 ## ADR-306 Amendment 4 - A remote bit change takes the Artwork card's path (2026-10-27)
 
 **Status:** Accepted; software-verified through tests that drive the real remote adapter against
-the card's transform. Hardware qualification pending. | **Date:** 2026-10-27
+the card's transform. Hardware qualification pending. Item 3 completed for `apply_edits`, with a PC
+toast, by [Amendment 5](ADR-306-amendment-5-batch-bit-change-names-kept-values.md). |
+**Date:** 2026-10-27
 
 Extends [Amendment 3](ADR-306-amendment-3-artwork-bit-change-names-kept-values.md) items 2 and 3
 to Remote Control's `update_operation` (ADR-584), alone or inside `apply_edits`. Follows rolling
