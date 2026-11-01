@@ -10,6 +10,7 @@ import { DraftNumberInput } from '../kit/DraftNumberInput';
 import { DitherSwatchPicker } from '../layers/DitherSwatchPicker';
 import { imageDensityBounds } from './image-density-bounds';
 import { PhotoToneCalibrationField } from './PhotoToneCalibrationField';
+import { PHOTO_RECIPES, photoRecipe } from './photo-recipes';
 import {
   photoProcessing,
   photoSourceDimensions,
@@ -17,10 +18,18 @@ import {
   type PhotoProcessing,
 } from './photo-engraving-settings';
 
+const NO_RECIPE = 'none';
+
 type PhotoEngravingFieldsProps = {
   readonly draft: PhotoEngravingDraft;
   readonly image: RasterImage;
   readonly storedLinesPerMm: number;
+  /** ADR-685: the chosen material recipe, and whether Auto tones can read the photo yet. */
+  readonly recipeId: string | null;
+  readonly onRecipe: (recipeId: string | null) => void;
+  readonly autoTonesReady: boolean;
+  readonly onAutoTones: () => void;
+  readonly spotSizeMm?: { readonly x: number; readonly y: number } | undefined;
   /** From the photo's stored mode, so Grayscale stays offered after another is picked. */
   readonly processingChoices: ReadonlyArray<PhotoProcessing>;
   /** The photo's burn power (its multiplier applied) and speed, which a tone
@@ -35,6 +44,7 @@ export function PhotoEngravingFields(props: PhotoEngravingFieldsProps): JSX.Elem
   const { draft, onChange } = props;
   return (
     <div className="lf-photo-engraving__controls">
+      <PhotoRecipeField {...props} />
       {/* A div, not a label: a label would hand a click on its name to the first swatch. */}
       <div className="lf-photo-engraving__field">
         <span>Photo processing</span>
@@ -70,24 +80,72 @@ export function PhotoEngravingFields(props: PhotoEngravingFieldsProps): JSX.Elem
         onChange={onChange}
         onCalibrate={props.onCalibrateTones}
       />
-      <PhotoToneFields draft={draft} onChange={onChange} />
+      <PhotoToneFields {...props} />
       <PhotoResolutionFields {...props} />
       <PhotoSharpenFields draft={draft} onChange={onChange} />
     </div>
   );
 }
 
-function PhotoToneFields({
-  draft,
-  onChange,
-}: Pick<PhotoEngravingFieldsProps, 'draft' | 'onChange'>): JSX.Element {
+// ADR-685: one choice that prepares the portrait for a kind of material.
+function PhotoRecipeField(props: PhotoEngravingFieldsProps): JSX.Element {
+  const recipe = photoRecipe(props.recipeId);
+  return (
+    <>
+      <label>
+        <span>Material recipe</span>
+        <select
+          className="lf-select"
+          aria-label="Material recipe"
+          title="Prepare the portrait for a kind of material: marking, dot pattern, tones and sharpening. Power, speed and DPI stay as they are."
+          value={recipe?.id ?? NO_RECIPE}
+          onChange={(event) =>
+            props.onRecipe(event.target.value === NO_RECIPE ? null : event.target.value)
+          }
+        >
+          <option value={NO_RECIPE}>Choose a material…</option>
+          {PHOTO_RECIPES.map((choice) => (
+            <option key={choice.id} value={choice.id}>
+              {choice.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="lf-photo-engraving__hint">
+        {recipe === null
+          ? 'Sets the marking, Blue Noise dots, auto tones and a light sharpen for a portrait on that material. Power, speed and DPI stay yours to test.'
+          : `${recipe.note}${recipe.mirror ? ' Flip the photo horizontally on the canvas before burning, because you view it through the material.' : ''}${props.autoTonesReady ? '' : ' Auto tones apply once the preview has read the photo.'}`}
+      </p>
+    </>
+  );
+}
+
+function PhotoToneFields(props: PhotoEngravingFieldsProps): JSX.Element {
+  const { draft, onChange } = props;
   return (
     <>
       <div className="lf-photo-engraving__tone-heading">
         <h3>Photo tones</h3>
-        <Button variant="ghost" onClick={() => onChange({ brightness: 0, contrast: 0, gamma: 1 })}>
-          Reset tones
-        </Button>
+        <span>
+          <Button
+            variant="ghost"
+            disabled={!props.autoTonesReady}
+            title={
+              props.autoTonesReady
+                ? 'Set brightness, contrast and midtones from this photo: its darkest and lightest 0.5% become solid and blank, and its middle tone stays put. Clears stray dots from highlights and background. Works best on a photo cropped to the face.'
+                : 'Available once the preview has read the photo.'
+            }
+            onClick={props.onAutoTones}
+          >
+            Auto tones
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => onChange({ brightness: 0, contrast: 0, gamma: 1 })}
+          >
+            Reset tones
+          </Button>
+        </span>
       </div>
       <PhotoNumber
         label="Brightness"
@@ -144,6 +202,7 @@ function PhotoResolutionFields(props: PhotoEngravingFieldsProps): JSX.Element {
         {dimensions.widthMm.toFixed(1)} × {dimensions.heightMm.toFixed(1)} mm. Source detail: about{' '}
         {Math.round(dimensions.sourceDpi)} DPI at this size.
       </p>
+      <SpotIntervalHint spotSizeMm={props.spotSizeMm} linesPerMm={draft.linesPerMm} />
       {dpi > dimensions.sourceDpi * 1.05 ? (
         <p className="lf-photo-engraving__hint">
           Increasing DPI beyond the source resolution adds dots, but cannot recover missing facial
@@ -151,6 +210,27 @@ function PhotoResolutionFields(props: PhotoEngravingFieldsProps): JSX.Element {
         </p>
       ) : null}
     </>
+  );
+}
+
+// ADR-685: lines just touch when the interval matches the spot (LightBurn's
+// Working With Images); a finer interval overlaps the dots.
+function SpotIntervalHint(props: {
+  readonly spotSizeMm?: { readonly x: number; readonly y: number } | undefined;
+  readonly linesPerMm: number;
+}): JSX.Element | null {
+  const spot = props.spotSizeMm;
+  if (spot === undefined || !(spot.y > 0)) return null;
+  const intervalMm = linesPerMmToLineIntervalMm(props.linesPerMm);
+  const touchingDpi = Math.round(25.4 / spot.y);
+  return (
+    <p className="lf-photo-engraving__hint">
+      This laser's {spot.x.toFixed(2)} × {spot.y.toFixed(2)} mm spot makes scan lines that just
+      touch at about {spot.y.toFixed(2)} mm ({touchingDpi} DPI).{' '}
+      {intervalMm < spot.y * 0.95
+        ? `At ${intervalMm.toFixed(3)} mm each dot overlaps its neighbours, so the burn darkens; Auto tones and a tone calibration help. Confirm with Tools → Interval Test.`
+        : 'Confirm with Tools → Interval Test on your material.'}
+    </p>
   );
 }
 

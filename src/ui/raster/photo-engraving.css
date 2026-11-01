@@ -38,6 +38,25 @@
   margin-bottom: 8px;
 }
 
+.lf-photo-engraving__preview-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+}
+
+.lf-photo-engraving__preview-caption span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lf-photo-engraving__preview-caption select {
+  font-weight: normal;
+  width: auto;
+}
+
 .lf-photo-engraving__preview-surface {
   border: 1px solid var(--lf-border);
   border-radius: 6px;
