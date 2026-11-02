@@ -1,6 +1,7 @@
 import type { Project } from '../../core/scene';
 import type { SaveTarget } from '../../platform/types';
 import type { AppState } from './store';
+import { noteProjectCopyOnDisk } from './design-document-copies';
 import { saveTargetsShareDestination } from './project-save-write-coordinator';
 
 /** How a loaded document starts: unsaved, and where Save writes. Open sets the
@@ -48,17 +49,23 @@ export function saveTrackingActions(
           projectSavedRequestEpoch: expectedProjectSaveRequestEpoch,
         };
       });
+      // The file holds the project it was written from, current or not.
+      if (get().projectDocumentEpoch === expectedProjectDocumentEpoch)
+        noteProjectCopyOnDisk(expectedProject);
       return savedCurrentProject;
     },
     markProjectSaveUncertain: createProjectSaveUncertaintyAction(set, get),
-    markLoaded: (filename, options) =>
+    markLoaded: (filename, options) => {
       set({
         dirty: options?.dirty ?? false,
         savedName: filename,
         // Save writes over the KerfDesk project just opened (ADR-550).
         lastSaveTarget: options?.saveTarget ?? null,
         projectSavedRequestEpoch: null,
-      }),
+      });
+      // The opened file holds what it opened as.
+      noteProjectCopyOnDisk(get().project);
+    },
   };
 }
 

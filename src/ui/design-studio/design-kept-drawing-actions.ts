@@ -4,16 +4,12 @@
 
 import { useStore } from '../state';
 import { designRecoveryOwner } from './design-recovery-owner';
-import {
-  persistedDesignSession,
-  restoreDesignSession,
-  sessionSketch,
-  type DesignSession,
-} from './design-session';
+import { restoreDesignSession, sessionSketch, type DesignSession } from './design-session';
 import { useDesignStudioStore } from './design-studio-store';
 import {
   keepDesignDrawing,
   projectHoldsDrawing,
+  savedDesignDrawing,
   takeKeptDesignDrawing,
   worthKeeping,
 } from './design-kept-drawings';
@@ -41,7 +37,7 @@ export async function restoreKeptDesignDrawing(id: string): Promise<boolean> {
     return false;
   const kept = takeKeptDesignDrawing((drawing) => drawing.id === id);
   if (kept === null) return false;
-  const replaced = persistedDesignSession(current, owner);
+  const replaced = savedDesignDrawing(current, owner, project, latest.savedName);
   if (worthKeeping(replaced, project) && !keepDesignDrawing(replaced)) {
     keepDesignDrawing(kept, kept.keptAt);
     return false;

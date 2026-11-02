@@ -241,12 +241,14 @@ describe('a drawing the Studio did not open is kept (ADR-590 Amendment 1)', () =
     expect(readKeptDesignDrawings().map((kept) => kept.sketch)).toEqual([drawing]);
   });
 
-  it('does not keep an applied drawing for another project with its own drawing', async () => {
+  // Amendment 2 did not keep it: the other project shares nothing with it. No
+  // file or autosave holds this Apply, so Amendment 3 keeps it (R6-P1-1).
+  it('keeps an Apply no copy holds for another project with its own drawing', async () => {
     await mountPersistence();
     await applyAfterTheAutosave();
     await restart(anotherProject(), 1);
     expect((await openStudio()).entities.map((entity) => entity.id)).toEqual(['other']);
-    expect(readKeptDesignDrawings()).toEqual([]);
+    expect(readKeptDesignDrawings().map((kept) => kept.sketch)).toEqual([drawing]);
   });
 
   it('stops offering an applied drawing once a project that holds it opens', async () => {
@@ -319,12 +321,22 @@ describe('the kept drawings list', () => {
     ]);
   });
 
-  it('keeps unapplied work, and an Apply the opened project does not hold', () => {
+  it('keeps unapplied work, and an Apply that only the drawing holds', () => {
     const blank = createProject();
     const appliedDraft = { ...draft('a'), dirtySinceApply: false };
     expect(worthKeeping(draft('a'), anotherProject(draft('a').sketch))).toBe(true);
     expect(worthKeeping({ ...draft('a'), sketch: { entities: [] } }, blank)).toBe(false);
-    // Applied: kept unless the opened project holds it or is another project.
+    // Applied: kept unless the opened project holds it, or a file or an
+    // autosave does (Amendment 3).
+    const onlyCopy = { ...appliedDraft, projectHoldsApply: false };
+    const held = { ...appliedDraft, projectHoldsApply: true };
+    expect(worthKeeping(onlyCopy, anotherProject(draft('a').sketch))).toBe(false);
+    expect(worthKeeping(onlyCopy, blank)).toBe(true);
+    expect(worthKeeping(onlyCopy, anotherProject())).toBe(true);
+    expect(worthKeeping(held, blank)).toBe(false);
+    expect(worthKeeping(held, anotherProject())).toBe(false);
+    // A drawing saved before Amendment 3 does not say, so Amendment 2's guess
+    // stands: kept unless another project's drawing shares nothing with it.
     expect(worthKeeping(appliedDraft, anotherProject(draft('a').sketch))).toBe(false);
     expect(worthKeeping(appliedDraft, blank)).toBe(true);
     expect(worthKeeping(appliedDraft, anotherProject())).toBe(false);
