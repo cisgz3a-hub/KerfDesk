@@ -119,5 +119,24 @@ refill back and writing the beam-off.
   | Fan, 743,593 lines | 368-575 ms | 0.016-0.019 ms |
   | Inline, 737,105 lines | 417-828 ms | 0.32-0.62 ms |
 
-- **Chromium** (the S1 harness, production bundle): see the PR.
+- **Chromium, the S1 harness** (`zz-s1`, Chrome 156 against production bundles).
+  - Setup: worker route, fan dialect, simulator at 300 blocks/s. "Before" is the harness's
+    `dist-main`, built after #1534; nothing on the Pause path changed between it and `02c02616e`.
+  - Same sitting; calibration 73-101 ms. Rep 0 of each set is discarded.
+
+  | Program | Pauses | Block at the click | Pause `M107` reaches Marlin | Head lit after the click |
+  |---|---|---|---|---|
+  | 739,048 lines, before | 6 + 4 | 285-381 ms, every Pause | +287 to +382 ms | 297-307 ms in 4 of the first 6 |
+  | 739,048 lines, after | 6 + 4 | none | +2 to +4 ms | 0-1 ms |
+  | 29,212 lines, before | 6 | none | +23 to +33 ms | 23-29 ms in 3 of 6 |
+  | 29,212 lines, after | 6 | none | +2 to +3 ms | 0-1 ms |
+
+  - **The slices.** Three idle windows straight after Start on the 739k job had no long task, and
+    the longest timer gap was 13 ms. On the fan dialect the slices read only the facts.
+  - **Start.** Start's own longest block (S1-P2-2) was 2.0-2.2 s after against 1.7-1.8 s before,
+    n=2 each. This change adds only a timer to Start, so that difference is within the noise on this
+    PC.
+  - **Not measured in Chromium:** an inline-dialect job's replay slices (Node: p50 4.7 ms per slice).
+    The second set's simulator ran the inline beam model, but the project compiled to the fan
+    dialect.
 - **Not verified:** hardware.
