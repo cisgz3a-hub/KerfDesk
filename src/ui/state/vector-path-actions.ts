@@ -35,7 +35,7 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import type { PathNodeRef } from './path-node-edit-actions';
-import { combineSelectionNotingTabs } from './removed-tabs-notice';
+import { combineSelectionNotingTabs, removedTabsNotice } from './removed-tabs-notice';
 import { removeObjectIdsFromGroups, selectedObjectIds } from './scene-group-actions';
 import { useToastStore } from './toast-store';
 import { pruneOrphanLayers, pushUndo, type StateSlice } from './scene-mutations';
@@ -129,20 +129,31 @@ export function vectorPathActions(
       ),
     offsetSelection: (deltaMm, prepared) =>
       copySet((state) => offsetSelectionMutation(state, deltaMm, prepared)),
-    dogboneSelection: (bitDiameterMm) =>
-      set((state) => dogboneSelectionMutation(state, bitDiameterMm)),
+    dogboneSelection: (bitDiameterMm) => {
+      let notice = '';
+      set((state) =>
+        dogboneSelectionMutation(state, bitDiameterMm, (relieved) => {
+          notice = removedTabsNotice(relieved, 'relieved shapes');
+        }),
+      );
+      if (notice !== '') useToastStore.getState().pushToast(notice, 'info');
+    },
   };
 }
 
-// Replace each selected object with its corner-relieved version, in place.
+// Replace each selected object with its corner-relieved version, in place. The
+// relieved outline has none of the tabs placed by hand on its source (ADR-494
+// Amendment 4), so `onRelieved` names the objects that lost theirs.
 function dogboneSelectionMutation(
   state: VectorPathState,
   bitDiameterMm: number,
+  onRelieved: (relieved: ReadonlyArray<SceneObject>) => void,
 ): VectorPathMutation | VectorPathState {
   const selected = selectedVectorObjects(state.project.scene, selectedObjectIds(state));
   if (selected.length === 0 || selected.some((object) => object.locked === true)) return state;
   let scene = state.project.scene;
   let changed = false;
+  const relieved: SceneObject[] = [];
   for (const object of selected) {
     // Per-object skip on error (no qualifying corners / open contour) is the
     // intended silent behavior â€” dogbone a selection, relieve what qualifies,
@@ -156,8 +167,10 @@ function dogboneSelectionMutation(
     const prepared = prepareDogboneEdit(scene, object, result.value);
     scene = replaceObject(prepared.scene, object.id, prepared.object);
     changed = true;
+    relieved.push(object);
   }
   if (!changed) return state;
+  onRelieved(relieved);
   return {
     project: { ...state.project, scene },
     selectedObjectId: state.selectedObjectId,

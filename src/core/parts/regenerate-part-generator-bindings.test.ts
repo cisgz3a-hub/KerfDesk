@@ -10,7 +10,10 @@ describe('generated part machining identity after manual path edits', () => {
     const result = regeneratePartGenerator(edited, original.partGenerator.definition);
     const actual =
       result.kind === 'ok'
-        ? { kind: result.kind, restoredBoundaryOperations: result.value.paths[0]?.operationIds }
+        ? {
+            kind: result.kind,
+            restoredBoundaryOperations: result.value.object.paths[0]?.operationIds,
+          }
         : result;
     expect(actual).toEqual({
       kind: 'invalid',
@@ -40,7 +43,7 @@ describe('generated part machining identity after manual path edits', () => {
     };
     const result = requirePart(
       regeneratePartGenerator(reordered, { ...definition, widthMm: 80, columns: 5 }),
-    );
+    ).object;
     for (const [index, key] of original.partGenerator.pathKeys.entries()) {
       const nextIndex = result.partGenerator.pathKeys.indexOf(key);
       expect(result.paths[nextIndex]?.operationIds).toEqual(['cut-' + key]);

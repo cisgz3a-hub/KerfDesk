@@ -1169,8 +1169,13 @@ that owns those fields, without changing the existing Frame/Start policy.
    says when one moved. **Weld**, **Subtract / Intersect / Exclude**
    and **Offset Shapes** with **Delete original objects** make new shapes without them, which then
    take automatic tabs, and a toast says the placed tabs were removed (ADR-494 Amendment 3).
-   **Clear placed tabs** (in Cut Settings or in the canvas hint) returns the artwork to automatic
-   tabs.
+   A **Design Studio** part or sketch keeps each tab on its own edge at its new size, and its review
+   names any tab it cannot keep. One handle drag is measured from where it began, so a drag that
+   shrinks and returns leaves tabs in place. **Shear**, **Warp** and **Deform** carry each tab
+   through the same map as its outline. **Dogbone** removes them and says so. A text edit keeps a
+   tab while its contour is the same outline, and otherwise removes it and says how many
+   (ADR-494 Amendment 4). **Clear placed tabs** (in Cut Settings or in the canvas hint) returns the
+   artwork to automatic tabs.
 5. Job Review's detail line reads e.g. "tabs every 50 mm (at most 6) × 0.5 mm, cut at 20%" or
    "tabs 4 × 0.5 mm, 3 placed by hand". With none of this set, output is unchanged.
 6. Material presets do not store these settings; applying a preset keeps what the operation has.

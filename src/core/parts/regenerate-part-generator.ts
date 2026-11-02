@@ -11,11 +11,22 @@ import type {
 } from './part-generator';
 import { materializePartGenerator } from './materialize-part-generator';
 import { withUnitScale } from '../scene/retained-source-scale';
+import { placedTabCount } from '../scene/object-tab-anchors';
+import { withTabsFollowingRebuiltContours } from '../geometry/rebuilt-contour-tabs';
+
+/** A regenerated part, and what the rebuild did to its tabs placed by hand. */
+export type RegeneratedPart = {
+  readonly object: GeneratedPartObject;
+  /** Tabs with no matching edge on the new outline, moved to the nearest point of it. */
+  readonly movedTabs: number;
+  /** Tabs on paths the new dimensions removed. */
+  readonly removedTabs: number;
+};
 
 export function regeneratePartGenerator(
   object: GeneratedPartObject,
   definition: PartGeneratorDefinition,
-): PartGeneratorResult<GeneratedPartObject> {
+): PartGeneratorResult<RegeneratedPart> {
   const materialized = materializePartGenerator(definition);
   if (materialized.kind === 'invalid') return materialized;
   const retained = retainedPartPaths(object);
@@ -24,34 +35,33 @@ export function regeneratePartGenerator(
   const paths = geometry.paths.map((path, index) =>
     retainPathSettings(object, geometry.source.pathKeys[index] ?? 'boundary', retained.value, path),
   );
+  const { currentKeys } = retained.value;
+  const { pathKeys } = geometry.source;
+  const rebuilt: GeneratedPartObject = {
+    ...object,
+    // The definition is the size that burns (ADR-573 Amendment 1).
+    transform: withUnitScale(object.transform),
+    bounds: geometry.bounds,
+    paths,
+    partGenerator: geometry.source,
+    ...(object.name === object.partGenerator.definition.name ? { name: definition.name } : {}),
+    ...(object.cncTabAnchors === undefined
+      ? {}
+      : { cncTabAnchors: retainTabs(object.cncTabAnchors, currentKeys, pathKeys) }),
+    ...(object.laserTabAnchors === undefined
+      ? {}
+      : { laserTabAnchors: retainTabs(object.laserTabAnchors, currentKeys, pathKeys) }),
+  };
+  const followed = withTabsFollowingRebuiltContours(object, rebuilt, (pathIndex) => {
+    const previous = currentKeys.indexOf(pathKeys[pathIndex] ?? '');
+    return previous < 0 ? undefined : previous;
+  });
   return {
     kind: 'ok',
     value: {
-      ...object,
-      // The definition is the size that burns (ADR-573 Amendment 1).
-      transform: withUnitScale(object.transform),
-      bounds: geometry.bounds,
-      paths,
-      partGenerator: geometry.source,
-      ...(object.name === object.partGenerator.definition.name ? { name: definition.name } : {}),
-      ...(object.cncTabAnchors === undefined
-        ? {}
-        : {
-            cncTabAnchors: retainTabs(
-              object.cncTabAnchors,
-              retained.value.currentKeys,
-              geometry.source.pathKeys,
-            ),
-          }),
-      ...(object.laserTabAnchors === undefined
-        ? {}
-        : {
-            laserTabAnchors: retainTabs(
-              object.laserTabAnchors,
-              retained.value.currentKeys,
-              geometry.source.pathKeys,
-            ),
-          }),
+      object: followed.object,
+      movedTabs: followed.moved,
+      removedTabs: placedTabCount(object) - placedTabCount(followed.object),
     },
   };
 }

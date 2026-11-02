@@ -37,7 +37,7 @@ import { positionTraceOverRasterSource } from './trace-placement';
 import { pushUndo } from './undo-stack';
 import type { BedFit } from '../../core/scene/fit-to-bed';
 import { pruneSceneObjectOperationOverrides } from '../../core/scene/operation-binding';
-import { objectTabAnchorFields } from '../../core/scene/object-tab-anchors';
+import { textTabAnchorsAfterEdit } from '../../core/text/text-edit-tab-anchors';
 import { withColourLayerPowers, type ColourLayerCommit } from '../../core/trace/colour-layer-power';
 import { repairRemovedProjectObjectReferences } from './repair-object-dependencies';
 
@@ -455,7 +455,7 @@ export function applyUpsertText(
         ? {}
         : { operationOverride: existing.operationOverride }),
       ...(existing.locked === undefined ? {} : { locked: existing.locked }),
-      ...objectTabAnchorFields(existing),
+      ...textTabAnchorsAfterEdit(existing, text).fields,
       transform: text.pathText === undefined ? existing.transform : text.transform,
       ...(existing.operationIds === undefined ? {} : { operationIds: existing.operationIds }),
       paths: text.paths.map((path, index) => {

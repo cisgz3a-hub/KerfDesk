@@ -6,6 +6,7 @@ import { warpDeformHandlesUnmoved, type WarpDeformGrid } from '../../core/geomet
 import { WARP_DEFORM_TOLERANCE_MM } from '../../core/geometry/warp-deform-paths';
 import { isVectorPathObject } from '../../core/geometry/vector-path-tools';
 import type { Project, Scene } from '../../core/scene';
+import { movedTabsNotice } from './path-node-edit-actions';
 import { selectedObjectIds } from './scene-group-actions';
 import { pushUndo } from './scene-mutations';
 import type { AppState } from './store';
@@ -64,7 +65,10 @@ function applyWarpDeformMutation(
     toast(plan.failure);
     return state;
   }
-  toast(warpDeformNotice(request.grid, plan, leftAlone(scene, selectedObjectIds(state))));
+  const tabs = movedTabsNotice(plan.movedTabs);
+  toast(
+    `${warpDeformNotice(request.grid, plan, leftAlone(scene, selectedObjectIds(state)))}${tabs === '' ? '' : ` ${tabs}`}`,
+  );
   if (plan.warped === 0) return state;
   return {
     project: { ...state.project, scene: { ...scene, objects: plan.objects } },
