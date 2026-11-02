@@ -15,6 +15,17 @@
 // stays flat.
 
 import type { Vec2 } from '../scene';
+import { fairChainSegments } from './fair-chain';
+import { flattenStraightRuns } from './flatten-straight-runs';
+
+// Binary loops from this many chain points up relax their stairs and take the
+// fairing-by-fitting tail, as organic measured loops do. The simplify + spline
+// tail follows the stairs of a gentle arc: its arc evening's window is shorter
+// than they are past a radius of about 100 px, so it fits a tight circle to one
+// riser and pulls the chain up to 1 px off the curve, and simplify then keeps
+// those points (rolling audit v9 R2-P2-2, ADR-530 Amendment 14). Shorter loops
+// are glyphs and small shapes, whose corners that tail is tuned for.
+const LONG_BINARY_MIN_CHAIN_POINTS = 400;
 
 const MIN_RELAXED_RUN_POINTS = 6;
 const MAX_CAP_TO_NEXT_RUN = 4;
@@ -25,6 +36,31 @@ type Run = {
   /** The chain turns the same way entering and leaving it. */
   readonly isCap: boolean;
 };
+
+/** True when a binary loop's mid-crack chain is long enough for this tail. */
+export function isLongBinaryLoop(
+  chain: ReadonlyArray<Vec2>,
+  finish: { readonly pixelScale: number },
+): boolean {
+  return chain.length >= LONG_BINARY_MIN_CHAIN_POINTS * finish.pixelScale;
+}
+
+/** The long binary loop's evened chain, its straight runs flattened between
+ *  corners and the whole faired, ready for the compact fit. */
+export function fairLongBinaryChain(
+  evened: ReadonlyArray<Vec2>,
+  corners: ReadonlySet<Vec2>,
+  flattenStrength: number,
+  pixelScale: number,
+): Vec2[] {
+  // The flatten keeps only a straight run's ends, and the fairing works by
+  // index, so the chain goes back to an even spacing between them.
+  const flattened =
+    corners.size === 0
+      ? evened
+      : evenlySpaced(flattenStraightRuns(evened, true, corners, flattenStrength, pixelScale));
+  return fairChainSegments(flattened, true, corners, pixelScale);
+}
 
 /** A copy of a closed mid-crack chain with its long stair runs relaxed. Corner
  *  objects and every point outside a long run are the same objects. */
@@ -131,7 +167,7 @@ function edgeDirection(chain: ReadonlyArray<Vec2>, i: number): number {
 
 // A closed chain with points added along its long edges, about a chain point
 // apart. Its own points stay the same objects, so corners stay pinned.
-export function evenlySpaced(chain: ReadonlyArray<Vec2>): Vec2[] {
+function evenlySpaced(chain: ReadonlyArray<Vec2>): Vec2[] {
   const out: Vec2[] = [];
   chain.forEach((p, i) => {
     const q = chain[(i + 1) % chain.length] as Vec2;
