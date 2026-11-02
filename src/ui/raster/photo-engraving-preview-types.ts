@@ -8,12 +8,29 @@ export type PhotoEngravingPreviewInput = {
   readonly layer: Layer;
   readonly device: DeviceProfile;
   readonly sceneObjects: readonly SceneObject[];
+  /** ADR-685: also draw the marks as the laser spot spreads them. */
+  readonly materialView?: boolean;
 };
+
+/** ADR-685: how the material view drew each mark. */
+export type PhotoMaterialSpread =
+  | {
+      readonly kind: 'spot';
+      readonly spotMm: number;
+      readonly cellMm: number;
+      readonly subdivisions: number;
+    }
+  | { readonly kind: 'unknown-spot' };
 
 export type PhotoEngravingPreviewResult =
   | {
       readonly kind: 'ok';
       readonly rgba: Uint8ClampedArray<ArrayBuffer>;
+      /** ADR-685: marks spread by the laser spot, when the material view was asked for. */
+      readonly materialRgba?: Uint8ClampedArray<ArrayBuffer>;
+      readonly materialSpread?: PhotoMaterialSpread;
+      /** ADR-685: the source photo's 256-level luma histogram, for Auto tones. */
+      readonly sourceHistogram: Uint32Array<ArrayBuffer>;
       readonly width: number;
       readonly height: number;
       readonly sourceWidth: number;

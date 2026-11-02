@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import decodeQr from '../../../scripts/scanner-decoder-entry.js';
 import { claimPairing, readSession, type SessionState } from '../core/phone-transport';
+import { cameraProblem, createQrReader, requestCamera, stopCamera } from '../core/qr-scanner';
 import { RemoteError } from '../core/transport';
 import type { PhoneSession, Scope } from '../core/types';
 import { useNow } from './hooks';
@@ -273,78 +273,81 @@ function Scanner({
   onCancel: () => void;
 }) {
   const video = useRef<HTMLVideoElement>(null);
+  const found = useRef(onFound);
+  found.current = onFound;
   const [problem, setProblem] = useState<string | null>(null);
   useEffect(() => {
+    const reader = createQrReader();
     let stream: MediaStream | null = null;
     let timer: ReturnType<typeof setTimeout> | null = null;
-    let live = true;
-    const detector =
-      'BarcodeDetector' in window
-        ? new (
-            window as unknown as {
-              BarcodeDetector: new (o: object) => {
-                detect: (s: CanvasImageSource) => Promise<{ rawValue: string }[]>;
-              };
-            }
-          ).BarcodeDetector({ formats: ['qr_code'] })
-        : null;
-    const canvas = document.createElement('canvas');
-    const read = async () => {
-      const element = video.current;
-      if (!live || element === null || element.readyState < 2) {
-        timer = setTimeout(() => void read(), 200);
-        return;
-      }
-      let text: string | null = null;
-      try {
-        if (detector !== null) text = (await detector.detect(element))[0]?.rawValue ?? null;
-        else {
-          const scale = Math.min(1, 720 / Math.max(element.videoWidth, element.videoHeight));
-          canvas.width = Math.round(element.videoWidth * scale);
-          canvas.height = Math.round(element.videoHeight * scale);
-          const context = canvas.getContext('2d', { willReadFrequently: true });
-          context?.drawImage(element, 0, 0, canvas.width, canvas.height);
-          const pixels = context?.getImageData(0, 0, canvas.width, canvas.height);
-          text =
-            pixels === undefined
-              ? null
-              : (decodeQr(pixels.data, pixels.width, pixels.height)?.data ?? null);
-        }
-      } catch {
-        text = null;
-      }
-      const found = text === null ? null : pairingFromLink(text);
-      if (found !== null) {
-        navigator.vibrate?.(20);
-        onFound(found);
-        return;
-      }
-      if (text !== null) setProblem('That isn’t a KerfDesk pairing code.');
-      timer = setTimeout(() => void read(), 200);
+    let session = 0;
+    let running = false;
+    const stop = () => {
+      running = false;
+      session += 1;
+      if (timer !== null) clearTimeout(timer);
+      timer = null;
+      stopCamera(stream);
+      stream = null;
+      if (video.current !== null) video.current.srcObject = null;
     };
-    void navigator.mediaDevices
-      ?.getUserMedia({ video: { facingMode: 'environment' }, audio: false })
-      .then((value) => {
-        if (!live) {
-          value.getTracks().forEach((track) => track.stop());
+    const start = async () => {
+      if (running) return;
+      running = true;
+      const current = ++session;
+      let value: MediaStream;
+      try {
+        value = await requestCamera();
+      } catch (error) {
+        if (current !== session) return;
+        running = false;
+        setProblem(cameraProblem(error));
+        return;
+      }
+      if (current !== session) {
+        stopCamera(value);
+        return;
+      }
+      stream = value;
+      setProblem(null);
+      if (video.current !== null) {
+        video.current.srcObject = value;
+        void video.current.play().catch(() => undefined);
+      }
+      const read = await reader;
+      const tick = async () => {
+        if (current !== session) return;
+        let text: string | null = null;
+        try {
+          text = video.current === null ? null : await read(video.current);
+        } catch {
+          text = null;
+        }
+        if (current !== session) return;
+        const pairing = text === null ? null : pairingFromLink(text);
+        if (pairing !== null) {
+          stop();
+          navigator.vibrate?.(20);
+          found.current(pairing);
           return;
         }
-        stream = value;
-        if (video.current !== null) {
-          video.current.srcObject = value;
-          void video.current.play();
-        }
-        void read();
-      })
-      .catch(() => setProblem('The camera isn’t available. Enter the code instead.'));
-    const stop = () => {
-      live = false;
-      if (timer !== null) clearTimeout(timer);
-      stream?.getTracks().forEach((track) => track.stop());
+        if (text !== null) setProblem('That isn’t a KerfDesk pairing code.');
+        timer = setTimeout(() => void tick(), 200);
+      };
+      void tick();
     };
-    document.addEventListener('visibilitychange', stop, { once: true });
-    return stop;
-  }, [onFound]);
+    // The camera is released while the page is hidden and reopened when it returns.
+    const visibility = () => {
+      if (document.hidden) stop();
+      else void start();
+    };
+    document.addEventListener('visibilitychange', visibility);
+    void start();
+    return () => {
+      document.removeEventListener('visibilitychange', visibility);
+      stop();
+    };
+  }, []);
   return (
     <div className="stack" style={{ marginTop: 20 }}>
       <h1 className="screen-title" style={{ margin: 0 }}>

@@ -67,6 +67,9 @@ export type SerialWorkerCore = {
   readonly readLoop: () => Promise<void> | null;
   /** Releases both stream locks before reporting the transport closed. */
   readonly close: () => Promise<void>;
+  /** Writes from here on use this stream: a network session outlives a write
+   * that failed, whose stream is left errored (ADR-398 Amendment 7). */
+  readonly replaceWriter: (writable: WritableStream<Uint8Array>) => void;
 };
 
 type HeldProgram = { readonly id: number; readonly lines: ReadonlyArray<string> };
@@ -77,6 +80,8 @@ type WorkerState = {
   streamer: StreamerState | null;
   /** The armed stream's acknowledgement grammar. */
   acks: HostedStreamAcks;
+  /** The armed stream's refill failure was reported; once is enough. */
+  refillFailureReported: boolean;
   program: HeldProgram | null;
   loop: Promise<void> | null;
   barrier: Promise<void> | null;
@@ -97,6 +102,7 @@ export function createSerialWorkerCore(deps: SerialWorkerCoreDeps): SerialWorker
     writer: null,
     streamer: null,
     acks: 'grbl',
+    refillFailureReported: false,
     program: null,
     loop: null,
     barrier: null,
@@ -117,6 +123,9 @@ export function createSerialWorkerCore(deps: SerialWorkerCoreDeps): SerialWorker
     heldProgram: () => state.program?.id ?? null,
     readLoop: () => state.loop,
     close: () => closeCore(state, deps, state.loop),
+    replaceWriter: (writable) => {
+      if (!state.closed) state.writer = writable.getWriter();
+    },
   };
 }
 
@@ -207,6 +216,7 @@ function adopt(
   if (program?.id === request.programId) {
     state.streamer = { ...request.position, queued: program.lines };
     state.acks = request.acks ?? 'grbl';
+    state.refillFailureReported = false;
     deps.post({ kind: 'armed', id: request.id });
   } else {
     stopRefill(state);
@@ -264,8 +274,11 @@ function handleLine(state: WorkerState, deps: SerialWorkerCoreDeps, line: string
     if (pumped.toSend !== '') {
       void writeBytes(state, pumped.toSend).catch((error: unknown) => {
         // The main thread owns containment: it holds the safety notice, the
-        // quarantine and the fail-dark path.
+        // quarantine and the fail-dark path. Refills queued behind the failed
+        // one fail with it, and that is one failure.
         stopRefill(state);
+        if (state.refillFailureReported) return;
+        state.refillFailureReported = true;
         deps.post({ kind: 'stream-write-error', message: describeError(error) });
         deps.post({ kind: 'refill-stopped' });
       });

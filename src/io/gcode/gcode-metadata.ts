@@ -177,7 +177,10 @@ export type GcodeMetadata = {
 // Falcon A1 Pro), so a diagonal scan's runway there is longer and an axis
 // scan's is unchanged; Cartesian output is unchanged; carries forward v39
 // above.
-export const EMITTER_REVISION = 'corexy-scan-runway-20261028-v40';
+// The last-100 PR audit keeps self-intersecting CNC artwork in placement
+// bounds and re-scores optimized routes after choosing closed starts; carries
+// forward v40 above.
+export const EMITTER_REVISION = 'audit-placement-and-route-20261102-v41';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

@@ -9,6 +9,11 @@
 // leaves the session to the window. After that the worker is its only reader
 // and writer, and any failure closes the connection rather than handing it
 // back (ADR-354 decision 3).
+//
+// Closing the socket does not stop a controller, and a request that failed
+// between here and the main process says nothing about the socket. So a failed
+// read waits, bounded, for the store's stop, and a failed write leaves the
+// session open for it, as the window's route does (ADR-398 Amendments 6 and 7).
 
 import { createSerialWorkerCore, type SerialWorkerCore } from './serial-worker-core';
 import {
@@ -43,17 +48,29 @@ type RuntimeState = {
   channel: SessionChannel | null;
   firstRead: ReadResult | null;
   closing: Promise<void> | null;
+  /** Ends the wait for the store's stop after a failed read. */
+  endReadFailureWait: (() => void) | null;
 };
 
 const READ_TIMEOUT_MS = 5_000;
 const WRITE_TIMEOUT_MS = 5_000;
+// How long a failed read waits for the stop it lets the store write through the
+// session; the same bound as the window's route. A plain timer: this thread does
+// not stall with the window.
+const READ_FAILURE_STOP_WAIT_MS = 3_000;
 // The route accepts 1-65536 wire bytes per write (desktop-machine-network.ts).
 const MAX_WRITE_BYTES = 64 * 1024;
 const MAX_READ_PAYLOAD_CHARS = 700_000;
 const MAX_RESPONSE_CHARS = 800_000;
 
 export function createNetworkSerialWorkerRuntime(deps: RuntimeDeps): NetworkSerialWorkerRuntime {
-  const state: RuntimeState = { phase: 'idle', channel: null, firstRead: null, closing: null };
+  const state: RuntimeState = {
+    phase: 'idle',
+    channel: null,
+    firstRead: null,
+    closing: null,
+    endReadFailureWait: null,
+  };
   const core = createSerialWorkerCore({
     post: (message) => {
       // The core has let go of both streams; finish here, then say so.
@@ -85,7 +102,9 @@ function handleRequest(
   } else if (request.kind === 'network-attach') {
     if (state.phase === 'idle') void attach(state, deps, request);
   } else if (request.kind === 'network-start') {
-    start(state, core, close);
+    start(state, core, deps, close);
+  } else if (request.kind === 'read-failure-settled') {
+    state.endReadFailureWait?.();
   } else if (state.phase === 'started') {
     core.handle(request);
   } else if (request.kind === 'write') {
@@ -116,7 +135,12 @@ async function attach(
   }
 }
 
-function start(state: RuntimeState, core: SerialWorkerCore, close: () => Promise<void>): void {
+function start(
+  state: RuntimeState,
+  core: SerialWorkerCore,
+  deps: RuntimeDeps,
+  close: () => Promise<void>,
+): void {
   if (state.phase === 'started') return;
   const channel = state.channel;
   const first = state.firstRead;
@@ -127,10 +151,32 @@ function start(state: RuntimeState, core: SerialWorkerCore, close: () => Promise
   state.phase = 'started';
   state.firstRead = null;
   try {
-    core.handle({ kind: 'attach', ...sessionStreams(channel, first, () => void close()) });
+    const streams = sessionStreams(channel, first, {
+      readFailed: () => waitForReadFailureStop(state, deps),
+      writeFailed: core.replaceWriter,
+    });
+    core.handle({ kind: 'attach', ...streams });
   } catch {
     void close();
   }
+}
+
+// The core's reader waits on this read while its writer still takes the store's
+// stop. A close of the session, or the bound, ends the wait.
+function waitForReadFailureStop(state: RuntimeState, deps: RuntimeDeps): Promise<void> {
+  return new Promise((resolve) => {
+    if (state.phase !== 'started') {
+      resolve();
+      return;
+    }
+    const timer = setTimeout(() => state.endReadFailureWait?.(), READ_FAILURE_STOP_WAIT_MS);
+    state.endReadFailureWait = () => {
+      clearTimeout(timer);
+      state.endReadFailureWait = null;
+      resolve();
+    };
+    deps.post({ kind: 'read-failing' });
+  });
 }
 
 async function closeRuntime(
@@ -140,6 +186,7 @@ async function closeRuntime(
 ): Promise<void> {
   const owned = state.channel;
   state.phase = 'closing';
+  state.endReadFailureWait?.();
   // Releasing the writer closes the session too; the second close is a
   // no-op on the main process and covers a session that never started.
   await core.close();
@@ -150,24 +197,39 @@ async function closeRuntime(
   deps.post({ kind: 'closed' });
 }
 
+type SessionFailureHooks = {
+  /** Awaited before a failed read ends the stream. */
+  readonly readFailed: () => Promise<void>;
+  /** Takes the fresh stream that replaces one a failed write left errored. */
+  readonly writeFailed: (writable: WritableStream<Uint8Array>) => void;
+};
+
 /** The session as the byte streams the serial worker core reads and writes. */
 function sessionStreams(
   channel: SessionChannel,
   first: ReadResult,
-  failed: () => void,
+  hooks: SessionFailureHooks,
 ): {
   readonly readable: ReadableStream<Uint8Array>;
   readonly writable: WritableStream<Uint8Array>;
 } {
   let pending: ReadResult | null = first;
   let cancelled = false;
-  let sequence = 0;
+  const nextRead = async (): Promise<ReadResult> => {
+    if (pending !== null) return pending;
+    try {
+      return await channel.read(READ_TIMEOUT_MS);
+    } catch (error) {
+      await hooks.readFailed();
+      throw error;
+    }
+  };
   const readable = new ReadableStream<Uint8Array>({
     // A pull that enqueues nothing is not called again, so keep reading until
     // bytes arrive or the session ends. Each read waits up to a second.
     pull: async (controller) => {
       for (;;) {
-        const result = pending ?? (await channel.read(READ_TIMEOUT_MS));
+        const result = await nextRead();
         pending = null;
         if (cancelled) return;
         if (result.bytes.byteLength > 0) controller.enqueue(result.bytes);
@@ -182,24 +244,36 @@ function sessionStreams(
       cancelled = true;
     },
   });
-  const writable = new WritableStream<Uint8Array>({
-    write: async (bytes) => {
-      try {
-        for (let offset = 0; offset < bytes.byteLength; offset += MAX_WRITE_BYTES) {
-          sequence += 1;
-          await channel.write(sequence, bytes.subarray(offset, offset + MAX_WRITE_BYTES));
+  return { readable, writable: sessionWritable(channel, hooks) };
+}
+
+// Delivery of a failed write is uncertain, so it is never retried, and the
+// errored stream rejects whatever was queued behind it: a job line must not
+// follow one that may be lost. Writes issued after the failure go out on a fresh
+// stream, numbered after it, so a stop can still reach the controller. The main
+// process closes a session whose write it refused, and the next read reports that.
+function sessionWritable(
+  channel: SessionChannel,
+  hooks: SessionFailureHooks,
+): WritableStream<Uint8Array> {
+  let sequence = 0;
+  const open = (): WritableStream<Uint8Array> =>
+    new WritableStream<Uint8Array>({
+      write: async (bytes) => {
+        try {
+          for (let offset = 0; offset < bytes.byteLength; offset += MAX_WRITE_BYTES) {
+            sequence += 1;
+            await channel.write(sequence, bytes.subarray(offset, offset + MAX_WRITE_BYTES));
+          }
+        } catch (error) {
+          hooks.writeFailed(open());
+          throw error;
         }
-      } catch (error) {
-        // The main process closes a session whose write it refused, so this
-        // one closes too.
-        failed();
-        throw error;
-      }
-    },
-    close: () => channel.close(),
-    abort: () => channel.close(),
-  });
-  return { readable, writable };
+      },
+      close: () => channel.close(),
+      abort: () => channel.close(),
+    });
+  return open();
 }
 
 function sessionChannel(

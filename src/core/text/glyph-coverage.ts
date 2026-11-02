@@ -9,6 +9,14 @@ export function textForLayout(content: string): string {
   return content.replace(/\r/g, '').replace(/\t/g, ' ');
 }
 
+/**
+ * Text without bidi controls. A single-line font has no bidi layout and no glyphs for them, so it
+ * would draw each as "?"; it burns left to right instead (ADR-591 Amendment 3).
+ */
+export function withoutBidiControls(content: string): string {
+  return content.replace(/[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '');
+}
+
 /** Each character of `text` the font has no glyph for, once, in reading order. */
 export function missingCharacters(
   text: string,

@@ -32,6 +32,8 @@ it('the worker transfers only bounded display pixels from the real compiled grid
   if (response?.result.kind !== 'ok') throw new Error('Expected success');
   expect(response.result.sourceWidth).toBe(80);
   expect(response.result.width).toBe(16);
-  expect(transfers).toEqual([response.result.rgba.buffer]);
+  // ADR-685: the 256-level source histogram travels with the display pixels.
+  expect(transfers).toEqual([response.result.rgba.buffer, response.result.sourceHistogram.buffer]);
+  expect(response.result.sourceHistogram.byteLength).toBe(256 * 4);
   expect(response.result.rgba.byteLength).toBe(16 * 8 * 4);
 });

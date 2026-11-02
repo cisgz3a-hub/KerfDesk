@@ -46,6 +46,13 @@
 //   run, and each block keeps the speed current when it was planned. The fan
 //   output follows the running block, and the current speed once the planner
 //   is empty; nothing times it out (rolling audit v6 K1-P1-1).
+// - planner.cpp synchronize() loops in idle() until Planner::busy() clears, so
+//   a handler held by the quickstop's cleaning window is always released when
+//   it ends. Here that is a wake-up re-armed each time the handler is found
+//   still blocked with no motion left to wake it. `Date.now()` reads the wall
+//   clock and timers the monotonic one, so a single wake-up can land just short
+//   of the deadline, and a second one is dropped while a service hop is pending
+//   (rolling audit v9 R1-P3-2: 123 hangs in 18,000 trials, 0 in 12,000 re-armed).
 
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 
@@ -84,6 +91,10 @@ export type FifoMarlin = {
     /** The fan output now: the running block's speed, else the current one. */
     readonly fan: number;
     readonly position: Point;
+    /** The commands read but not finished, oldest first. */
+    readonly ring: ReadonlyArray<string>;
+    /** Milliseconds left of the quickstop's cleaning window; negative when over. */
+    readonly discardIn: number;
   };
 };
 
@@ -94,6 +105,7 @@ type Machine = {
   handlerBusySince: number | null;
   keepaliveTimer: ReturnType<typeof setTimeout> | null;
   servicePending: boolean;
+  drainWake: ReturnType<typeof setTimeout> | null;
   killed: boolean;
   discardMovesUntil: number;
   continuous: boolean;
@@ -118,6 +130,7 @@ function newMachine(): Machine {
     handlerBusySince: null,
     keepaliveTimer: null,
     servicePending: false,
+    drainWake: null,
     killed: false,
     discardMovesUntil: -1,
     continuous: false,
@@ -370,12 +383,24 @@ export function createFifoMarlin(options: { readonly responseDelayMs?: number } 
     }, 0);
   }
 
+  // A handler blocked with nothing moving waits only on the clock, so nothing
+  // else will wake it: poll, as idle() does.
+  function rearmDrainWake(): void {
+    if (m.executing !== null || m.planner.length > 0 || m.drainWake !== null) return;
+    const remaining = Math.max(0, m.discardMovesUntil - Date.now());
+    m.drainWake = setTimeout(() => {
+      m.drainWake = null;
+      service();
+    }, remaining + 1);
+  }
+
   function runRing(): void {
     readSerial();
     for (let head = m.ring[0]; head !== undefined; head = m.ring[0]) {
       if (!runCommand(head)) {
         blocked();
         readSerial(); // idle() -> manage_inactivity() reads while blocked
+        rearmDrainWake();
         return;
       }
       m.ring.shift();
@@ -429,6 +454,8 @@ export function createFifoMarlin(options: { readonly responseDelayMs?: number } 
       output: m.output,
       fan: m.executing === null ? m.fan : m.executing.block.fan,
       position: m.actual,
+      ring: m.ring.map((entry) => entry.command),
+      discardIn: m.discardMovesUntil - Date.now(),
     }),
   };
 }

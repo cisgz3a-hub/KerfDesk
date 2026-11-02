@@ -12,7 +12,7 @@ import {
 } from '../scene';
 import { layoutTextBox } from './text-box-layout';
 import { finishTextBoxRender } from './text-box-render';
-import { missingCharacters, textForLayout } from './glyph-coverage';
+import { missingCharacters, textForLayout, withoutBidiControls } from './glyph-coverage';
 import type { TextRenderResult } from './text-to-polylines';
 
 export type StrokeFontGlyph = {
@@ -39,9 +39,10 @@ export type StrokeTextRenderInput = {
 
 /** Renders native open-stroke glyphs and deterministic machining polylines. */
 export function renderStrokeFontText(
-  input: StrokeTextRenderInput,
+  styled: StrokeTextRenderInput,
   font: StrokeFont,
 ): TextRenderResult {
+  const input = { ...styled, content: withoutBidiControls(styled.content) };
   const layout =
     input.textBox === undefined
       ? undefined

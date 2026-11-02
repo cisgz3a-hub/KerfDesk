@@ -18,6 +18,21 @@ export type PauseResumeTransitionState = {
   readonly action: PauseResumeTransitionAction;
 };
 
+/** A laser Resume that left grblHAL Idle at the end of a job, which may still
+ * hold the paused move's tail (ADR-684; held-resume-tail.ts reads it). */
+export type HeldResumeTail = {
+  readonly sessionEpoch: number;
+  /** Machine position when Resume confirmed; null when it was unknown. */
+  readonly machinePosition: { readonly x: number; readonly y: number; readonly z: number } | null;
+};
+
+/** The laser store's Pause/Resume fields. */
+export type PauseResumeStoreState = {
+  readonly pauseResumeTransition: PauseResumeTransitionState | null;
+  /** Read through currentHeldResumeTail (ADR-684). */
+  readonly heldResumeTail?: HeldResumeTail | null;
+};
+
 export type PauseResumeTransitionRequest = {
   readonly token: PauseResumeTransitionToken;
   readonly markFailDarkExternallyOwned: () => void;

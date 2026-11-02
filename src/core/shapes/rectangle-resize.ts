@@ -16,6 +16,7 @@
 // Amendment 3).
 
 import { withTabsFollowingRebuild, type FollowedTabs } from '../geometry/edited-tab-anchors';
+import { objectTabAnchorFields } from '../scene/object-tab-anchors';
 import type { SceneObject, ShapeObject, ShapeSpec, Transform } from '../scene';
 import { rematerializeParametricShape, type ParametricShapeSpec } from './rematerialize-shape';
 
@@ -30,8 +31,16 @@ const UNIFORM_RATIO_EPSILON = 1e-12;
 
 /** The object with `transform` applied: what every resize, move and turn
  *  writes. A rounded rectangle whose scale changes is regenerated at its new
- *  size. */
-export function withObjectTransform(object: SceneObject, transform: Transform): SceneObject {
+ *  size. A drag frame passes the object as the drag found it in `dragStart`:
+ *  the size still comes from the current object, which the frame's scale is
+ *  relative to, but its tabs come from the start. A frame that brought a tab
+ *  into a corner has lost its old place, so measuring from the previous frame
+ *  would move it for good (ADR-494 Amendment 4). */
+export function withObjectTransform(
+  object: SceneObject,
+  transform: Transform,
+  dragStart?: SceneObject,
+): SceneObject {
   if (!isRoundedRectangle(object) || !resizesRectangle(object.transform, transform)) {
     return { ...object, transform };
   }
@@ -43,9 +52,12 @@ export function withObjectTransform(object: SceneObject, transform: Transform): 
     heightMm: object.spec.heightMm * after.y,
     cornerRadiusMm: object.spec.cornerRadiusMm * Math.min(before.x, before.y),
   });
-  return resized === null
-    ? { ...object, transform }
-    : withTabsFollowingRebuild(object, resized).object;
+  if (resized === null) return { ...object, transform };
+  if (dragStart === undefined || !isRoundedRectangle(dragStart)) {
+    return withTabsFollowingRebuild(object, resized).object;
+  }
+  return withTabsFollowingRebuild(dragStart, { ...resized, ...objectTabAnchorFields(dragStart) })
+    .object;
 }
 
 /** A Shape Properties edit. `spec` is in the object's own units, as the fields

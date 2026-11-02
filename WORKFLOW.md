@@ -1169,8 +1169,13 @@ that owns those fields, without changing the existing Frame/Start policy.
    says when one moved. **Weld**, **Subtract / Intersect / Exclude**
    and **Offset Shapes** with **Delete original objects** make new shapes without them, which then
    take automatic tabs, and a toast says the placed tabs were removed (ADR-494 Amendment 3).
-   **Clear placed tabs** (in Cut Settings or in the canvas hint) returns the artwork to automatic
-   tabs.
+   A **Design Studio** part or sketch keeps each tab on its own edge at its new size, and its review
+   names any tab it cannot keep. One handle drag is measured from where it began, so a drag that
+   shrinks and returns leaves tabs in place. **Shear**, **Warp** and **Deform** carry each tab
+   through the same map as its outline. **Dogbone** removes them and says so. A text edit keeps a
+   tab while its contour is the same outline, and otherwise removes it and says how many
+   (ADR-494 Amendment 4). **Clear placed tabs** (in Cut Settings or in the canvas hint) returns the
+   artwork to automatic tabs.
 5. Job Review's detail line reads e.g. "tabs every 50 mm (at most 6) × 0.5 mm, cut at 20%" or
    "tabs 4 × 0.5 mm, 3 placed by hand". With none of this set, output is unchanged.
 6. Material presets do not store these settings; applying a preset keeps what the operation has.
@@ -2073,16 +2078,23 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 5. Pause releases background refill. Confirmed Resume and tool-change Continue restore it for
    the same live job. Abort, disconnect or a replacement job cannot inherit an old refill queue.
    Marlin's Abort and Disconnect send their stop lines right behind the refill's handback, so
-   a backlog in a window that was busy never delays them (ADR-676 Amendment 1).
+   a backlog in a window that was busy never delays them (ADR-676 Amendment 1). Marlin's Pause
+   sends its beam-off the same way and still freezes at the line where the worker stopped. It
+   may queue an `M107` or `M5 I` with nothing to switch off; Resume waits for its reply as usual
+   (ADR-676 Amendment 2).
 6. Browser shutdown, computer sleep and USB loss still interrupt a live serial connection.
 7. The desktop app, like Chrome, lets the window and the worker see only the ports picked in
    its Select dialog, so an identical second adapter (a laser controller and an Arduino that
    both use a CH340, for example) no longer stops background streaming. A pick lasts until
    Forget Controller, and on macOS and Linux also until an app restart; picking both identical
    adapters is still ambiguous and uses the window port (ADR-366, ADR-552).
-8. A Marlin `Unknown command` echo of the line in flight ends the job as before (MA-12). An echo
-   of any other text, such as a move whose `G` was lost on the wire, stays in the log, and the
-   worker keeps streaming the rest of the job (ADR-676 Amendment 1).
+8. A Marlin `Unknown command` echo during a job means Marlin skipped the line in flight, so the
+   job stops as errored with the beam off, on either transport. That holds when the echo reads
+   differently from the line, as it does when a line loses its first byte on the wire and a
+   skipped beam-off would burn the next travel across the work. The notice names what KerfDesk
+   sent and what the controller read. Only an echo of a non-job line still owed a reply, such as
+   a Console query, stays in the log, and the job runs on (ADR-676 Amendment 2). A damaged line
+   usually gives no echo at all, so this does not catch every one.
 
 #### Error — WebSerial not supported
 1. Connection button is disabled, with a red hint above: "Your browser doesn't support WebSerial. Use Chrome, Edge, Brave (may require enabling under Brave Shields/flags), or Arc, or install the Windows desktop app."
@@ -2517,6 +2529,21 @@ minimum target size.
 2. The Live Motion bar shows **JOB RESUMING** until a fresh same-session post-write report proves
    `Run` or a completed `Idle` transition. `Hold` and Door restore substates do not release the sender.
 3. Only after that proof does the streamer resume and send more G-code.
+
+#### Warning — grblHAL Idle after resuming the job's tail (ADR-684)
+1. When a laser Resume has no G-code left to send, the controller is grblHAL, and the report that
+   confirms it is `Idle` rather than `Run`, the app records that the controller may still hold the
+   paused move. This applies to any build whose `$I` does not report 20260928 or later. grblHAL
+   builds before 20260928 can go Idle short of the job's last line and run the rest, at its laser
+   power, when the next motion starts (grblHAL issue #1024).
+2. The console logs the warning once.
+3. The machine rail shows it with **Reset (Ctrl-X)**, which is disabled while a stream or
+   controller operation is active.
+4. Job Review lists a "Paused move" warning fact, and the collapsed Controller summary reads
+   "may hold a paused move, reset first".
+5. Nothing is blocked: Pause, Start, Frame, jog and Save behave as before.
+6. The warning retires itself on a new controller session (a reset or reconnect) or as soon as the
+   machine position moves.
 
 #### Success — controller without Safety Door confirmation
 1. A controller family that exposes Resume but no Safety Door byte keeps the established behavior:
@@ -3383,7 +3410,10 @@ authorization, Frame proof, controller command, or safety boundary.
   controller its reset, M5 and M9 through that session before closing it. The notice says the
   reset may not have arrived, and the restart steps back over the planner (ADR-398
   Amendment 6). A write whose delivery is uncertain is never repeated, and nothing queued behind
-  it is sent.
+  it is sent. The background worker that streams a network job by default does the same when one
+  of its requests fails, waiting up to 3 s for that stop before it closes the session (ADR-398
+  Amendment 7). A stalled desktop app also carries the socket, so nothing reaches the controller
+  until it answers, and a window that is hung for those 3 s sends no stop.
 
 #### Painted second passes (2026-09-22, ADR-341)
 
@@ -4503,6 +4533,19 @@ enabled. If all assigned operations have output off, it prepares the first one
 and clearly reports that output must be enabled before those settings engrave.
 Fractional DPI and tone values remain valid within their displayed ranges.
 
+**Material recipe** (ADR-685) prepares a portrait for wood, leather or cork, white tile or
+coated metal, black slate or stone, black anodized aluminium or a painted surface, or clear
+acrylic or glass engraved from the back. It sets the marking, Blue Noise, Auto tones and a
+light sharpen (30% at 0.7 lines). It never changes power, speed, DPI, tone calibration or
+placement. For clear material, flip the photo horizontally on the canvas yourself. **Auto
+tones** turns the photo's darkest and lightest 0.5% solid and blank, then puts its middle tone
+back where it was. Pure white is not counted, so a removed background does not mask the skin.
+This clears stray dots from skin highlights and backgrounds, and works best on a photo cropped
+to the face. The **Dots / On material** view draws each mark as wide as the machine profile's
+laser spot, in the recipe's colours, so overlapping dots darken before anything burns. Without
+a profile spot size it draws one-cell marks and says so. It models spot geometry, not how the
+material chars.
+
 Focus and use Material Test and Interval Test for the actual machine/material.
 Higher DPI can darken a portrait through overlapping marks. The photo tool supplies
 no universal power/speed recipe. Review all passes in the job Preview, then use
@@ -4734,11 +4777,14 @@ exit of the same length along its last edge, and that exit is skipped and disclo
 rule (`contour-exit …`, "Contour entry and exit", ADR-239 Amendment 2). Preview, timing, Frame bounds and output use the same prepared result. Earlier archived
 jobs retain their original entry behaviour so recovery does not silently change sealed output.
 
-Constant-power advice (ADR-257 Amendments 1 and 2). Where a dialect's default burns an operation
+Constant-power advice (ADR-257 Amendments 1, 2 and 3). Where a dialect's default burns an operation
 with M3 on GRBL-family output, Save, Start and Job Review advise: GRBL Compatible images whose
 one-move-per-pixel rows outrun the controller's look-ahead burn darker than the Preview; GRBL
 Compatible Scan Line fills whose strokes and gaps are short enough for the same look-ahead to hold
-a row below the feed burn small text darker than wider areas, whatever the overscan; and GRBL
+a row below the feed burn small text darker than wider areas, whatever the overscan; GRBL
+Compatible Island Fills, at every overscan, whose rows cannot reach the feed on their own runways
+(capped at half the row, and none at Overscan 0) burn row ends and small islands darker, and the
+advice says how much Overscan or which speed holds; and GRBL
 Compatible and 4040 Line cuts, and GRBL Compatible offset fills, burn darker at corners (and at
 path starts and ends without runways). The advice points GRBL 1.1f and newer to GRBL Dynamic
 (or the operation's Dynamic Power mode on the 4040), as LightBurn does; with a current `$I`

@@ -12,6 +12,9 @@
 //     gap between strokes, so small text is held back as image rows are; an
 //     offset fill's rings slow at corners as Line cuts do (Amendment 2,
 //     rolling audit v8 N8-P2-5).
+//   - Island Fill rows reach speed only on their own laser-off runways, capped
+//     at half the row and absent at Overscan 0, so a short row never reaches
+//     the feed (Amendment 3, rolling audit v9 R2-P2-3).
 // LightBurn's GRBL guide puts GRBL 1.1f and newer on dynamic power (M4) and
 // keeps 1.1e and older on constant power, its "GRBL-M3" device; its Shared
 // Settings page says to "stick with the default of Variable Power mode". The
@@ -30,6 +33,7 @@ import { machineKinematics, type MachineKinematics } from '../../core/devices/de
 import { effectiveGcodeFeedMmPerMin } from '../../core/gcode/feed-word';
 import type { CutGroup, FillGroup, Job, RasterGroup } from '../../core/job';
 import { alongScanAccelMmPerSec2 } from '../../core/job/automatic-overscan';
+import { MAX_FILL_OVERSCAN_MM } from '../../core/job/compile-job-defaults';
 import { contourEntriesSkipped } from '../../core/job/contour-entry';
 import { planFillSweeps } from '../../core/job/fill-sweep-plan';
 import type { FillSpan } from '../../core/job/fill-sweeps';
@@ -48,21 +52,50 @@ export function constantPowerWarnings(job: Job, project: Project): ReadonlyArray
   const names = new Map(
     project.scene.layers.flatMap(outputOperationLayers).map((layer) => [layer.id, layer.name]),
   );
+  const nameOf = (group: Job['groups'][number]) => names.get(group.layerId) ?? group.layerId;
   const runwaysSkipped = contourEntriesSkipped(job);
-  const warnings = new Set<string>();
+  const warnings = [
+    ...job.groups
+      .filter((group) => !isIslandFill(group))
+      .map((group) => groupWarning(group, nameOf(group), dialect, project.device, runwaysSkipped)),
+    ...islandFillOperations(job).map((groups) =>
+      groups[0] === undefined
+        ? null
+        : islandFillWarning(groups, nameOf(groups[0]), dialect, project.device),
+    ),
+  ];
+  return [...new Set(warnings.filter((warning) => warning !== null))];
+}
+
+function groupWarning(
+  group: Job['groups'][number],
+  name: string,
+  dialect: GrblGcodeDialect,
+  device: DeviceProfile,
+  runwaysSkipped: boolean,
+): string | null {
+  if (group.kind === 'raster') return imageWarning(group, name, dialect, device);
+  if (group.kind === 'cut') return lineWarning(group, name, dialect, device, runwaysSkipped);
+  if (group.kind === 'fill') return fillWarning(group, name, dialect, device, runwaysSkipped);
+  return null;
+}
+
+function isIslandFill(group: Job['groups'][number]): group is FillGroup {
+  return group.kind === 'fill' && group.fillStyle === 'island';
+}
+
+// Island Fill compiles one group per island, so a job of small text holds
+// hundreds for one operation. A speed set per object keeps its own advice.
+function islandFillOperations(job: Job): ReadonlyArray<ReadonlyArray<FillGroup>> {
+  const operations = new Map<string, FillGroup[]>();
   for (const group of job.groups) {
-    const name = names.get(group.layerId) ?? group.layerId;
-    const warning =
-      group.kind === 'raster'
-        ? imageWarning(group, name, dialect, project.device)
-        : group.kind === 'cut'
-          ? lineWarning(group, name, dialect, project.device, runwaysSkipped)
-          : group.kind === 'fill'
-            ? fillWarning(group, name, dialect, project.device, runwaysSkipped)
-            : null;
-    if (warning !== null) warnings.add(warning);
+    if (!isIslandFill(group)) continue;
+    const key = `${group.layerId}|${group.speed}`;
+    const operation = operations.get(key);
+    if (operation === undefined) operations.set(key, [group]);
+    else operation.push(group);
   }
-  return [...warnings];
+  return [...operations.values()];
 }
 
 function plannerBlocks(device: DeviceProfile): number {
@@ -128,9 +161,18 @@ function fillWarning(
   if (group.fillStyle === 'offset') {
     return contourWarning(group, name, dialect, device, runwaysSkipped);
   }
-  const feed = effectiveGcodeFeedMmPerMin(group.speed);
+  return lookAheadFillWarning([group], name, dialect, device);
+}
+
+function lookAheadFillWarning(
+  groups: ReadonlyArray<FillGroup>,
+  name: string,
+  dialect: GrblGcodeDialect,
+  device: DeviceProfile,
+): string | null {
+  const feed = effectiveGcodeFeedMmPerMin(groups[0]?.speed ?? 0);
   const blocks = plannerBlocks(device);
-  const stretch = narrowestFillStretch(group, blocks, device);
+  const stretch = narrowestFillStretch(groups, blocks, device);
   if (stretch === null) return null;
   const sustainedFeed = Math.floor(
     60 * lookAheadSpeedMmPerSec(stretch.accel, blocks, stretch.moveMm),
@@ -146,6 +188,110 @@ function fillWarning(
 }
 
 /**
+ * An Island Fill row is one burn between two laser-off runways, with a corner
+ * or a reversal beyond each, so the head holds the feed through the ink only if
+ * it can reach it on one runway and stop on the other. That is the look-ahead's
+ * v = sqrt(2 * a * D) with D the shorter runway: a row is too few moves for the
+ * planner's depth to be the limit. At this speed the row's dose is exactly 1.
+ */
+function islandFillWarning(
+  operation: ReadonlyArray<FillGroup>,
+  name: string,
+  dialect: GrblGcodeDialect,
+  device: DeviceProfile,
+): string | null {
+  if (dialect.fillPowerMode !== 'constant') return null;
+  const groups = operation.filter(
+    (group) => group.powerMode === undefined && group.power > 0 && group.segments.length > 0,
+  );
+  const row = tightestIslandRow(groups, device);
+  const feed = effectiveGcodeFeedMmPerMin(groups[0]?.speed ?? 0);
+  if (row === null || feed <= reachableFeed(row.accel, row.runwayMm)) {
+    return lookAheadFillWarning(groups, name, dialect, device);
+  }
+  const blocks = plannerBlocks(device);
+  const stretch = narrowestFillStretch(groups, blocks, device);
+  const lookAheadFeed =
+    stretch === null
+      ? Number.POSITIVE_INFINITY
+      : Math.floor(60 * lookAheadSpeedMmPerSec(stretch.accel, blocks, stretch.moveMm));
+  const runway =
+    row.runwayMm > 0
+      ? `has ${formatNumber(row.runwayMm, 4)} mm of laser-off runway at each end, so with the saved acceleration (${formatNumber(row.accel, 1)} mm/s² along the scan) the head reaches the ink at about ${reachableFeed(row.accel, row.runwayMm)} mm/min`
+      : 'has no laser-off runway because Overscan is 0, so the head starts and stops on the ink';
+  return [
+    `Fill operation "${name}" burns with constant power (M3), as the ${dialect.label} dialect does for fills.`,
+    `At ${feed} mm/min each Island Fill row reaches speed only on its own runway. The shortest row is ${formatNumber(row.rowMm, 4)} mm and ${runway}.`,
+    'M3 keeps full power while the head runs slower, so row ends, small islands and thin strokes can burn darker than the rest of the fill.',
+    constantRemedy(dialect, device, islandFillFallback(row, feed, lookAheadFeed)),
+    SAVED_MOTION_NOTE,
+  ].join(' ');
+}
+
+type IslandRow = { readonly accel: number; readonly rowMm: number; readonly runwayMm: number };
+
+/** The row with the least room to reach speed; among equals, the shortest. */
+function tightestIslandRow(
+  groups: ReadonlyArray<FillGroup>,
+  device: DeviceProfile,
+): IslandRow | null {
+  const kinematics = machineKinematics(device);
+  let tightest: IslandRow | null = null;
+  for (const plan of groups.flatMap((group) => planFillSweeps(group))) {
+    const first = plan.sweep.spans[0];
+    const last = plan.sweep.spans[plan.sweep.spans.length - 1];
+    if (first === undefined || last === undefined) continue;
+    const rowMm = Math.hypot(last.end.x - first.start.x, last.end.y - first.start.y);
+    if (!(rowMm > 0)) continue;
+    const accel = sweepAccel(first, last, device, kinematics);
+    const row = { accel, rowMm, runwayMm: Math.min(plan.leadInMm, plan.leadOutMm) };
+    if (tightest === null || isTighter(row, tightest)) tightest = row;
+  }
+  return tightest;
+}
+
+function isTighter(row: IslandRow, than: IslandRow): boolean {
+  const room = row.accel * row.runwayMm;
+  const thanRoom = than.accel * than.runwayMm;
+  return room < thanRoom || (room === thanRoom && row.accel * row.rowMm < than.accel * than.rowMm);
+}
+
+function reachableFeed(accel: number, runwayMm: number): number {
+  return Math.floor(60 * Math.sqrt(2 * accel * runwayMm));
+}
+
+/**
+ * What holds the row. Island Fill caps a runway at half its row (ADR-033), so
+ * Overscan helps only up to that; past it, only a lower speed does. With no
+ * runway no speed holds, because the head always starts on the ink.
+ */
+function islandFillFallback(row: IslandRow, feed: number, lookAheadFeed: number): string {
+  const held = Math.min(reachableFeed(row.accel, row.runwayMm), lookAheadFeed);
+  const lower = `lower the speed to about ${held} mm/min`;
+  const room = Math.min(row.rowMm / 2, MAX_FILL_OVERSCAN_MM);
+  if (row.runwayMm >= room) return lower;
+  const needed = (feed / 60) ** 2 / (2 * row.accel);
+  const overscan = formatNumber(Math.ceil(Math.min(room, needed) * 10) / 10, 1);
+  const roomFeed = Math.min(reachableFeed(row.accel, room), lookAheadFeed);
+  const raise =
+    feed <= roomFeed
+      ? `raise Overscan to about ${overscan} mm`
+      : `raise Overscan to about ${overscan} mm and lower the speed to about ${roomFeed} mm/min`;
+  return row.runwayMm > 0 ? `${raise}, or ${lower}` : raise;
+}
+
+function sweepAccel(
+  first: FillSpan,
+  last: FillSpan,
+  device: DeviceProfile,
+  kinematics: MachineKinematics,
+): number {
+  const angleDeg =
+    (Math.atan2(last.end.y - first.start.y, last.end.x - first.start.x) * 180) / Math.PI;
+  return alongScanAccelMmPerSec2(device.accelMmPerSec2, angleDeg, kinematics);
+}
+
+/**
  * The stretch of a Scan Line fill the look-ahead holds back most. Each sweep
  * is emitted as one G1 per ink span and one S0 G1 per gap between spans
  * (grbl-fill-emission.ts), so from the start of a burn move the planner sees
@@ -156,21 +302,19 @@ function fillWarning(
  * and the acceleration along its sweep, or null when no window fits.
  */
 function narrowestFillStretch(
-  group: FillGroup,
+  groups: ReadonlyArray<FillGroup>,
   blocks: number,
   device: DeviceProfile,
 ): { readonly moveMm: number; readonly accel: number } | null {
   const ahead = Math.max(1, blocks - 1);
   const kinematics = machineKinematics(device);
   let slowest: { readonly moveMm: number; readonly accel: number } | null = null;
-  for (const { sweep } of planFillSweeps(group)) {
+  for (const { sweep } of groups.flatMap((group) => planFillSweeps(group))) {
     const moves = sweepMoveLengths(sweep.spans);
     const first = sweep.spans[0];
     const last = sweep.spans[sweep.spans.length - 1];
     if (first === undefined || last === undefined || moves.length < ahead) continue;
-    const angleDeg =
-      (Math.atan2(last.end.y - first.start.y, last.end.x - first.start.x) * 180) / Math.PI;
-    const accel = alongScanAccelMmPerSec2(device.accelMmPerSec2, angleDeg, kinematics);
+    const accel = sweepAccel(first, last, device, kinematics);
     let window = moves.slice(0, ahead).reduce((sum, move) => sum + move, 0);
     for (let start = 0; start + ahead <= moves.length; start += 1) {
       if (start > 0) window += (moves[start + ahead - 1] ?? 0) - (moves[start - 1] ?? 0);

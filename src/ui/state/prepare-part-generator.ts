@@ -28,6 +28,9 @@ export type PreparedPartGenerator = {
   readonly operationNames: readonly string[];
   readonly removedPathKeys: readonly string[];
   readonly geometryMismatch: boolean;
+  /** Placed tabs with no matching edge on the new outline, and on removed holes. */
+  readonly movedTabs: number;
+  readonly removedTabs: number;
 };
 export function preparePartGenerator(
   state: AppState,
@@ -70,13 +73,21 @@ export function preparePartGenerator(
           (key) => !object.partGenerator.pathKeys.includes(key),
         ) ?? [],
       geometryMismatch: previous !== undefined && !partGeneratorGeometryMatches(previous),
+      movedTabs: built.value.movedTabs,
+      removedTabs: built.value.removedTabs,
     },
   };
 }
+type BuiltPart = {
+  readonly object: GeneratedPartObject;
+  readonly project: Project;
+  readonly movedTabs: number;
+  readonly removedTabs: number;
+};
 function createPart(
   state: AppState,
   definition: PartGeneratorDefinition,
-): PartGeneratorResult<{ readonly object: GeneratedPartObject; readonly project: Project }> {
+): PartGeneratorResult<BuiltPart> {
   const generated = materializePartGenerator(definition);
   if (generated.kind === 'invalid') return generated;
   const geometry = generated.value;
@@ -93,7 +104,12 @@ function createPart(
   const prepared = prepareDimensionedVector(state, source);
   return {
     kind: 'ok',
-    value: { object: prepared.object as GeneratedPartObject, project: prepared.project },
+    value: {
+      object: prepared.object as GeneratedPartObject,
+      project: prepared.project,
+      movedTabs: 0,
+      removedTabs: 0,
+    },
   };
 }
 function replacementProject(
@@ -119,15 +135,15 @@ function updatePart(
   project: Project,
   before: GeneratedPartObject,
   definition: PartGeneratorDefinition,
-): PartGeneratorResult<{ readonly object: GeneratedPartObject; readonly project: Project }> {
+): PartGeneratorResult<BuiltPart> {
   const regenerated = regeneratePartGenerator(before, definition);
   return regenerated.kind === 'invalid'
     ? regenerated
     : {
         kind: 'ok',
         value: {
-          object: regenerated.value,
-          project: replacementProject(project, before, regenerated.value),
+          ...regenerated.value,
+          project: replacementProject(project, before, regenerated.value.object),
         },
       };
 }

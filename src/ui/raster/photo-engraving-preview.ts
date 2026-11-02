@@ -3,9 +3,12 @@ import {
   effectiveOperationForObject,
 } from '../../core/effective-output';
 import { compileRasterGroupsForLayer } from '../../core/job/compile-job-raster';
+import { decodeRasterLuma } from '../../core/job/raster-luma-decode';
 import { rasterCompilationPowerScale } from '../../core/raster/controller-power-scale';
+import { lumaHistogram } from '../../core/raster/portrait-auto-tones';
 import { compiledRasterPreview } from '../workspace/compiled-raster-preview';
 import { photoEngravingPreviewInputError } from './photo-engraving-preview-budget';
+import { photoMaterialPreview } from './photo-material-preview';
 import {
   photoPreviewMaxEdge,
   type PhotoEngravingPreviewInput,
@@ -48,9 +51,17 @@ export function computePhotoEngravingPreview(
       { ...input.device, maxPowerS: displayPower },
       maxEdge,
     );
+    const material =
+      input.materialView === true
+        ? photoMaterialPreview(group, input.device, displayPower, preview)
+        : null;
     return {
       kind: 'ok',
       rgba: preview.rgba,
+      ...(material === null
+        ? {}
+        : { materialRgba: material.rgba, materialSpread: material.spread }),
+      sourceHistogram: lumaHistogram(decodeRasterLuma(input.image)),
       width: preview.width,
       height: preview.height,
       sourceWidth: preview.sourceWidth,

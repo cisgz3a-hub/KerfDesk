@@ -6,6 +6,7 @@ import {
   type TextObject,
   type TracedImage,
 } from '../../../core/scene';
+import { textTabAnchorsAfterEdit } from '../../../core/text/text-edit-tab-anchors';
 import { applyFreshImport, applyUpsertText, pruneOrphanLayers } from '../../state/scene-mutations';
 import { removeObjectIdsFromGroups } from '../../state/scene-group-actions';
 import { repairDanglingObjectDependencies } from '../../state/object-delete-actions';
@@ -67,7 +68,11 @@ export function upsertJigText(session: JigEditorSession, object: TextObject): Ji
           ...project,
           scene: {
             ...project.scene,
-            objects: project.scene.objects.map((item) => (item.id === object.id ? object : item)),
+            objects: project.scene.objects.map((item) =>
+              item.id === object.id
+                ? { ...object, ...textTabAnchorsAfterEdit(item, object).fields }
+                : item,
+            ),
           },
         },
       }

@@ -52,7 +52,7 @@ export function bedPictureNow(
   if (picture.taken.machine !== now.machine) return { kind: 'dropped', message: OTHER_MACHINE };
   const region = bedAreaInBedFrame(picture.region, picture.taken.bedFrame, now.bedFrame);
   if (region === null) return { kind: 'dropped', message: ORIGIN_CHANGED };
-  if (heights !== undefined && !sameHeights(picture, heights)) {
+  if (heights !== undefined && !sameHeights(picture, heights, region)) {
     return { kind: 'dropped', message: HEIGHTS_CHANGED };
   }
   const movedMm = Math.hypot(region.x - picture.region.x, region.y - picture.region.y);
@@ -125,18 +125,22 @@ export const HEIGHTS_CHANGED =
 
 // The heights over the picture's own part of the bed; an area elsewhere
 // changes nothing in it.
-function sameHeights(picture: BedPicture, now: PictureHeights): boolean {
+function sameHeights(picture: BedPicture, now: PictureHeights, regionNow: BedArea): boolean {
   if (picture.surfaceHeightMm !== now.surfaceHeightMm) return false;
   const then = areasOver(picture.region, picture.heightAreas);
-  const current = areasOver(picture.region, now.heightAreas);
+  const current = areasOver(regionNow, now.heightAreas);
+  // The displayed image and its captured height areas move together. Current
+  // areas are already in today's frame; compare the same physical bed patch.
+  const dx = regionNow.x - picture.region.x;
+  const dy = regionNow.y - picture.region.y;
   return (
     then.length === current.length &&
     then.every((area, i) => {
       const other = current[i];
       return (
         other !== undefined &&
-        area.x === other.x &&
-        area.y === other.y &&
+        Math.abs(area.x + dx - other.x) < SAME_MM &&
+        Math.abs(area.y + dy - other.y) < SAME_MM &&
         area.width === other.width &&
         area.height === other.height &&
         area.surfaceHeightMm === other.surfaceHeightMm

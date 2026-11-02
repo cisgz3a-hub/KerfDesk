@@ -6,7 +6,10 @@
 
 import { DEFAULT_PROJECT_VARIABLE_DATA, type Project } from '../../core/scene';
 import { err, ok, type Result } from '../../core/result';
-import { materializeVariableText } from '../../io/gcode/prepare-output-snapshot';
+import {
+  materializeVariableText,
+  textAdvisoryWarnings,
+} from '../../io/gcode/prepare-output-snapshot';
 import { writeEpsDocument } from '../../io/vector-formats/eps-writer';
 import { writeGeoJsonDocument } from '../../io/vector-formats/geojson-writer';
 import { writePdfDocument } from '../../io/vector-formats/pdf-writer';
@@ -18,7 +21,7 @@ import {
 import type { PlatformAdapter } from '../../platform/types';
 import { outputTextRenderer } from '../text/output-text-renderer';
 import type { ToastVariant } from '../state/toast-store';
-import { exportProjectSelection, glyphWarnings } from './export-artwork-svg';
+import { exportProjectSelection } from './export-artwork-svg';
 import { pickPreparedSaveTarget } from './pick-prepared-save-target';
 
 export type ArtworkVectorFormat = 'pdf' | 'ai' | 'eps' | 'geojson';
@@ -141,7 +144,7 @@ function exportedToast(
   const caveats = [
     ...(omitted > 0 ? [omitted + ' image or relief item(s) were left out.'] : []),
     ...(file.warning === null ? [] : [file.warning]),
-    ...file.glyphWarnings,
+    ...file.textWarnings,
   ];
   return {
     message: [
@@ -159,7 +162,7 @@ type ExportedFile = {
   readonly warning: string | null;
   readonly objectCount: number;
   readonly omittedObjectCount: number;
-  readonly glyphWarnings: ReadonlyArray<string>;
+  readonly textWarnings: ReadonlyArray<string>;
 };
 
 async function exportFile(
@@ -184,7 +187,7 @@ async function exportFile(
     ...written.value,
     objectCount: artwork.value.objectCount,
     omittedObjectCount: artwork.value.omittedObjectCount,
-    glyphWarnings: glyphWarnings(resolved.advisories),
+    textWarnings: textAdvisoryWarnings(resolved.advisories),
   });
 }
 

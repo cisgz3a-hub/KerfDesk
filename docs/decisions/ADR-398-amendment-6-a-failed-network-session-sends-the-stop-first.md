@@ -1,7 +1,8 @@
 ## ADR-398 Amendment 6 - A failed network read or write lets the job's reset go out before the session closes (2026-10-30)
 
 **Status:** Accepted. Extends ADR-398 Decision 2 and Amendment 5 to a desktop network session the
-window could no longer read or write. | **Date:** 2026-10-30
+window could no longer read or write. Amendment 7 (2026-11-02) extends it to sessions streamed from
+the worker, which Decision 4 left out. | **Date:** 2026-10-30
 
 ### Context
 

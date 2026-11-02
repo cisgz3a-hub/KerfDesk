@@ -1,5 +1,6 @@
 import type { ControllerDriver } from '../../core/controllers';
 import { pause as pauseStreamer } from '../../core/controllers/grbl';
+import { heldResumeTailPatch, recordConfirmedState } from './held-resume-tail';
 import { cancelFreshControllerStatusWait } from './laser-controller-status-wait';
 import {
   sendRealtimeAndConfirmPauseResume,
@@ -49,6 +50,7 @@ import { armHostedRefill, releaseHostedRefill } from './laser-hosted-refill';
 import { captureHostedRefillStream } from './laser-hosted-refill-owner';
 import {
   assertStreamPauseResumeReady,
+  postBeamOffBehindRelease,
   queueStreamPauseBeamOff,
   restoreStreamPauseBeam,
   streamPausePlan,
@@ -102,9 +104,12 @@ export async function runConfirmedPauseJob(context: PauseResumeContext): Promise
   // so the host must freeze at the line where the worker stopped. The
   // handshake runs before the transition owner starts, so it cannot eat the
   // confirmation deadline and turn a slow handover into a fail-dark reset.
-  await releaseHostedRefill(context.refs);
-  assertCurrentConnection();
+  // A stream-side beam-off does not wait for it (ADR-676 Amendment 2).
   const activeDriver = context.driver();
+  const released = releaseHostedRefill(context.refs);
+  const postedBeamOff = postBeamOffBehindRelease(context, activeDriver);
+  await released;
+  assertCurrentConnection();
   const laserJob = context.get().activeJobMachineKind !== 'cnc';
   // ADR-180 amendment 2 (2026-07-25): CNC Pause now takes the same safety-door
   // byte as laser instead of a bare feed hold. GRBL's Door state decelerates in
@@ -132,7 +137,9 @@ export async function runConfirmedPauseJob(context: PauseResumeContext): Promise
     // Marlin: a beam-off queued behind the buffered motion (MA-1).
     const plan = streamPausePlan(context.get(), activeDriver);
     const message =
-      plan === null ? PAUSE_UNSUPPORTED_MESSAGE : streamSidePauseMessage(plan.offLines);
+      plan === null
+        ? PAUSE_UNSUPPORTED_MESSAGE
+        : streamSidePauseMessage([...new Set([...postedBeamOff.lines, ...plan.offLines])]);
     context.get().pushSystemNotice(`[lf2] ${message}`);
     await queueStreamPauseBeamOff(
       {
@@ -143,6 +150,7 @@ export async function runConfirmedPauseJob(context: PauseResumeContext): Promise
         },
       },
       plan,
+      postedBeamOff,
     );
     return;
   }
@@ -216,6 +224,9 @@ export async function runConfirmedResumeJob(context: PauseResumeContext): Promis
       ? trackControllerDoorHold(() => context.get().accessoryCache)
       : null;
   let finishedWithoutRefill = false;
+  const confirmation = recordConfirmedState(
+    (report) => report.state === 'Run' || report.state === 'Idle',
+  );
 
   const resumeWork = async (token: PauseResumeTransitionToken): Promise<void> => {
     assertResumeCommandOwnership(context);
@@ -224,7 +235,7 @@ export async function runConfirmedResumeJob(context: PauseResumeContext): Promis
         token,
         command: resumeByte,
         expectedSession: controlSession,
-        accept: (report) => report.state === 'Run' || report.state === 'Idle',
+        accept: confirmation.accept,
         timeoutMessage,
         action: 'resume',
         liveness: laserJob ? 'door-restore' : 'cnc-door',
@@ -260,6 +271,9 @@ export async function runConfirmedResumeJob(context: PauseResumeContext): Promis
     doorHold?.isHeld,
   );
   assertResumeCommandOwnership(context);
+  // ADR-684: a grblHAL that answered with Idle may still hold the tail.
+  const outcome = { laserJob, finishedWithoutRefill, confirmedState: confirmation.state() };
+  context.set((state) => heldResumeTailPatch(state, activeDriver, outcome));
   if (finishedWithoutRefill) {
     beginPostJobSettle(context.set, context.get, context.refs, context.safeWrite);
   }

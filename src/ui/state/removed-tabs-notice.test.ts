@@ -58,6 +58,35 @@ describe('an edit that drops tabs placed by hand says so', () => {
       'Placed tabs on the deleted originals were removed. Undo restores them.',
     );
   });
+
+  // Rolling audit v9 R3-P2-1: Dogbone rebuilt the outline without them, silently.
+  it('Dogbone', () => {
+    const before = load([plate(true)]);
+
+    useStore.getState().dogboneSelection(6);
+
+    expectReliefsWithoutTabs('plate');
+    expect(messages()).toEqual([
+      'Placed tabs on the relieved shapes were removed. Undo restores them.',
+    ]);
+    useStore.getState().undo();
+    expect(useStore.getState().project).toBe(before);
+    useStore.getState().redo();
+    expectReliefsWithoutTabs('plate');
+  });
+
+  it('Dogbone on a selection names them once, when any part held one', () => {
+    load([plate(true), box('other', 100, 0, 40)]);
+
+    useStore.getState().dogboneSelection(6);
+
+    expectReliefsWithoutTabs('plate');
+    expectReliefsWithoutTabs('other');
+    expect(messages()).toEqual([
+      'Placed tabs on the relieved shapes were removed. Undo restores them.',
+    ]);
+    expect(useStore.getState().undoStack).toHaveLength(1);
+  });
 });
 
 describe('an edit that keeps them, or had none, says nothing about tabs', () => {
@@ -72,6 +101,38 @@ describe('an edit that keeps them, or had none, says nothing about tabs', () => 
     load([plate(false), box('feature', 35, 5)]);
     useStore.getState().weldSelection();
     expect(messages().filter((message) => message.includes('Placed tabs'))).toEqual([]);
+  });
+
+  it('Dogbone on a part with no placed tabs', () => {
+    load([plate(false)]);
+    useStore.getState().dogboneSelection(6);
+    expectReliefsWithoutTabs('plate');
+    expect(messages()).toEqual([]);
+  });
+
+  it('Dogbone that relieves nothing keeps the tabs and says nothing', () => {
+    // An open contour has no corner to relieve, so the part stays as it was.
+    const open: ImportedSvg = {
+      ...plate(true),
+      paths: [
+        {
+          color: COLOR,
+          polylines: [
+            {
+              closed: false,
+              points: [
+                { x: 0, y: 0 },
+                { x: 40, y: 0 },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const before = load([open]);
+    useStore.getState().dogboneSelection(6);
+    expect(useStore.getState().project).toBe(before);
+    expect(messages()).toEqual([]);
   });
 });
 
@@ -164,6 +225,14 @@ function load(objects: ReadonlyArray<ImportedSvg>): Project {
 
 function messages(): ReadonlyArray<string> {
   return useToastStore.getState().toasts.map((toast) => toast.message);
+}
+
+function expectReliefsWithoutTabs(id: string): void {
+  const object = useStore.getState().project.scene.objects.find((item) => item.id === id);
+  if (object === undefined || !('paths' in object)) throw new Error('the part is gone');
+  expect(object.paths[0]?.polylines[0]?.points.length).toBeGreaterThan(5);
+  expect(object.laserTabAnchors).toBeUndefined();
+  expect(object.cncTabAnchors).toBeUndefined();
 }
 
 function expectNoPlacedTabs(): void {

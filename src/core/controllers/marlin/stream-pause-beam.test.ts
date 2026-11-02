@@ -2,7 +2,7 @@
 // job's own power commands behind the buffered motion, and Resume switches the
 // beam back on in those commands (ADR-364's transform-3 rules).
 import { describe, expect, it } from 'vitest';
-import { planMarlinStreamPauseBeam } from './stream-pause-beam';
+import { marlinStreamPauseOffLinesFrom, planMarlinStreamPauseBeam } from './stream-pause-beam';
 
 function streamLines(text: string): ReadonlyArray<string> {
   return text
@@ -121,5 +121,41 @@ describe('planMarlinStreamPauseBeam — neither', () => {
       restoreLines: [],
       restatedLine: null,
     });
+  });
+});
+
+describe('the beam-off lines a Pause posts before it knows where the worker stopped', () => {
+  const lines = (...text: ReadonlyArray<string>) => text.map((line) => `${line}\n`);
+
+  it('covers a fan the stream has not reached yet', () => {
+    const stream = lines('M107', 'G0 X10', 'M106 S204', 'G1 X20', 'M107');
+    expect(planMarlinStreamPauseBeam(stream, 2).offLines).toEqual([]);
+    expect(marlinStreamPauseOffLinesFrom(stream, 2)).toEqual(['M107']);
+  });
+
+  it('covers an inline beam the stream has not reached yet', () => {
+    const stream = lines('G0 X10', 'M3 I S0', 'G1 X20 S204', 'M5 I');
+    expect(planMarlinStreamPauseBeam(stream, 1).offLines).toEqual([]);
+    expect(marlinStreamPauseOffLinesFrom(stream, 1)).toEqual(['M5 I']);
+  });
+
+  it('keeps what the stream already holds, though later lines switch it off', () => {
+    const stream = lines('M106 S204', 'G1 X20', 'M107', 'G0 X0');
+    expect(marlinStreamPauseOffLinesFrom(stream, 2)).toEqual(['M107']);
+  });
+
+  it('covers every position the worker could have reached', () => {
+    const stream = lines('M107', 'M3 I S0', 'G1 X1 S9', 'M5 I', 'G0 X2', 'M106', 'G1 X3', 'M107');
+    for (let from = 0; from <= stream.length; from += 1) {
+      const posted = marlinStreamPauseOffLinesFrom(stream, from);
+      for (let reached = from; reached <= stream.length; reached += 1) {
+        const needed = planMarlinStreamPauseBeam(stream, reached).offLines;
+        expect(posted).toEqual(expect.arrayContaining([...needed]));
+      }
+    }
+  });
+
+  it('posts nothing for a job with no beam to switch off', () => {
+    expect(marlinStreamPauseOffLinesFrom(lines('G0 X1', 'M106 S0', 'G0 X2'), 0)).toEqual([]);
   });
 });

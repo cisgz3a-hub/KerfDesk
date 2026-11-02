@@ -43,7 +43,7 @@ describe('centred single-row and single-column part grids', () => {
     const original = generatedPart(grid({ rows: 2, columns: 1 }));
     const next = requirePart(
       regeneratePartGenerator(original, { ...original.partGenerator.definition, widthMm: 6 }),
-    );
+    ).object;
     expect(next.bounds.maxX).toBe(6);
     expect(next.partGenerator.pathKeys).toEqual(original.partGenerator.pathKeys);
     expect(next.paths.map((path) => path.operationIds)).toEqual(

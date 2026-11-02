@@ -34,9 +34,11 @@ import { lastSourceKind, startRememberedCamera, type CameraStartDeps } from './a
 import { captureSourceFrame } from '../frame-source';
 import { useCameraHelpersStore } from './camera-helpers-store';
 import { checkCameraMoved } from './moved-check';
+import { scheduleAfterJobRefresh } from './schedule-after-job-refresh';
 import { refreshCameraPicture, reportRefresh, takePendingRefresh } from './refresh-picture';
 
 export function installCameraHelpers(deps: CameraStartDeps): () => void {
+  const starts = new AbortController();
   const stops = [
     rememberRunningCamera(),
     refreshAfterJobs(),
@@ -45,10 +47,13 @@ export function installCameraHelpers(deps: CameraStartDeps): () => void {
     watchCanvasTargetBurns(),
   ];
   if (!BROWSER_FREE_BUILD) {
-    stops.push(startCalibratedCamera(deps));
-    void startIfCalibrated(deps);
+    stops.push(startCalibratedCamera(deps, starts.signal));
+    void startIfCalibrated(deps, starts.signal);
   }
-  return () => stops.forEach((stop) => stop());
+  return () => {
+    starts.abort();
+    stops.forEach((stop) => stop());
+  };
 }
 
 export function useCameraHelpers(): void {
@@ -80,22 +85,22 @@ function rememberRunningCamera(): () => void {
 
 // A calibrated camera puts the bed on the canvas, so it starts by itself; one
 // without a calibration starts when the Camera panel opens.
-function startIfCalibrated(deps: CameraStartDeps): Promise<void> {
+function startIfCalibrated(deps: CameraStartDeps, signal: AbortSignal): Promise<void> {
   if (useStore.getState().project.device.cameraModel === undefined) return Promise.resolve();
   if (loadLastCameraSource() === null) return Promise.resolve();
-  return startRememberedCamera(deps);
+  return startRememberedCamera(deps, signal);
 }
 
-function startCalibratedCamera(deps: CameraStartDeps): () => void {
+function startCalibratedCamera(deps: CameraStartDeps, signal: AbortSignal): () => void {
   const stopLaser = useLaserStore.subscribe((state, previous) => {
     if (state.connection.kind === 'connected' && previous.connection.kind !== 'connected') {
-      void startIfCalibrated(deps);
+      void startIfCalibrated(deps, signal);
     }
   });
   const stopProject = useStore.subscribe((state, previous) => {
     const model = state.project.device.cameraModel;
     if (model !== undefined && previous.project.device.cameraModel === undefined) {
-      void startIfCalibrated(deps);
+      void startIfCalibrated(deps, signal);
     }
   });
   return () => {
@@ -143,22 +148,18 @@ export const MOVED_CHECK_SETTLE_MS = 3000;
 // Only a held picture needs refreshing: the live camera follows the job anyway.
 function refreshAfterJobs(): () => void {
   let refreshed: LiveCanvasRun['plan'] | null = null;
-  let timer: ReturnType<typeof setTimeout> | null = null;
+  let cancelRefresh: (() => void) | null = null;
   const stop = useLaserStore.subscribe((state) => {
     const run = state.liveCanvasRun ?? null;
     if (run === null || run.lifecycle !== 'finished' || refreshed === run.plan) return;
     refreshed = run.plan;
     if (!useCameraHelpersStore.getState().settings.refreshAfterJob) return;
     if (useCameraStore.getState().overlayStill === null) return;
-    if (timer !== null) clearTimeout(timer);
-    // The same wait as the burn check's after picture: smoke clears, the head settles.
-    timer = setTimeout(() => {
-      timer = null;
-      void refreshCameraPicture();
-    }, AFTER_SETTLE_MS);
+    cancelRefresh?.();
+    cancelRefresh = scheduleAfterJobRefresh(run.plan, AFTER_SETTLE_MS);
   });
   return () => {
     stop();
-    if (timer !== null) clearTimeout(timer);
+    cancelRefresh?.();
   };
 }

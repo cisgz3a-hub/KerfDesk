@@ -31,6 +31,9 @@ export type ConstrainedSketchReview = {
   readonly result: Extract<SketchSolveResult, { kind: 'solved' }>;
   readonly replacesManualGeometry: boolean;
   readonly affectedOperationIds: readonly string[];
+  /** Placed tabs with no matching edge on the new outline, and on removed entities. */
+  readonly movedTabs: number;
+  readonly removedTabs: number;
 };
 export type ConstrainedSketchReviewResult =
   | { readonly kind: 'ok'; readonly review: ConstrainedSketchReview }
@@ -97,7 +100,7 @@ function prepareSketchReview(
     return { kind: 'invalid', reason: RESIZED_WHILE_OPEN };
   const built = solvedSketchGeometry(sketch, source);
   if (built.kind === 'invalid') return built;
-  const generated = retainSketchTabBindings(
+  const followed = retainSketchTabBindings(
     source,
     {
       ...(source === null
@@ -116,6 +119,7 @@ function prepareSketchReview(
     },
     built.previousPathKeys,
   );
+  const generated = followed.object;
   const staged =
     source === null
       ? prepareDimensionedVector(state, generated)
@@ -137,6 +141,8 @@ function prepareSketchReview(
       result: built.result,
       replacesManualGeometry: source !== null && !sketchGeometryMatches(source),
       affectedOperationIds: operationIdsForObject(staged.object, staged.project.scene.layers),
+      movedTabs: followed.movedTabs,
+      removedTabs: followed.removedTabs,
     },
   };
 }

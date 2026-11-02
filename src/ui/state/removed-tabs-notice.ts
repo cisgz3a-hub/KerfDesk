@@ -23,6 +23,14 @@ export function removedTabsNotice(removed: ReadonlyArray<SceneObject>, what: str
     : '';
 }
 
+/** The note for tabs a text edit dropped because their contour is no longer the
+ *  same glyph (ADR-494 Amendment 4); empty for none. */
+export function droppedTextTabsNotice(dropped: number): string {
+  if (dropped === 0) return '';
+  const tabs = dropped === 1 ? '1 placed tab was' : `${dropped} placed tabs were`;
+  return `${tabs} on letters this edit changed, so ${dropped === 1 ? 'it was' : 'they were'} removed. Undo restores ${dropped === 1 ? 'it' : 'them'}.`;
+}
+
 /** Weld or a Boolean through `set`. The combined outline has none of the
  *  selection's tabs placed by hand, so when it replaces the selection the note
  *  says so once the edit commits; kept originals keep theirs. */

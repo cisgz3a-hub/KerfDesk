@@ -1,3 +1,4 @@
+import { RebuiltTabsNote } from './RebuiltTabsNote';
 import { VectorGeometryPreview } from './VectorGeometryPreview';
 import type { SketchSolveResult } from '../../core/sketch-constraints/constrained-sketch';
 import type { ConstrainedSketchReview } from '../state/constrained-sketch-actions';
@@ -39,6 +40,11 @@ function SketchGeometryPreview(props: { readonly review: ConstrainedSketchReview
         Size {(bounds.maxX - bounds.minX).toFixed(3)} × {(bounds.maxY - bounds.minY).toFixed(3)} mm.{' '}
         {review.affectedOperationIds.length} bound operations retain their assignments.
       </p>
+      <RebuiltTabsNote
+        previous={review.sourceObject}
+        movedTabs={review.movedTabs}
+        removedTabs={review.removedTabs}
+      />
       {review.replacesManualGeometry ? (
         <p role="alert">
           The visible geometry has manual edits. Applying this reviewed source replaces those edits;

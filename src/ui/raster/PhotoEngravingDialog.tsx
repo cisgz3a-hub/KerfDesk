@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   effectiveObjectPowerPercent,
   effectiveOperationForObject,
@@ -13,7 +13,9 @@ import {
   photoProcessingChoices,
   type PhotoEngravingDraft,
 } from './photo-engraving-settings';
+import type { PhotoEngravingPreviewResult } from './photo-engraving-preview';
 import type { PhotoEngravingSession } from './photo-engraving-store';
+import { autoTonesPatch, photoRecipe, photoRecipePatch } from './photo-recipes';
 import { PhotoEngravingFields } from './PhotoEngravingFields';
 import { PhotoEngravingPreview } from './PhotoEngravingPreview';
 import { usePhotoEngravingPreview } from './use-photo-engraving-preview';
@@ -29,13 +31,9 @@ export default function PhotoEngravingDialog(props: {
   readonly onCalibrateTones: (seed: ToneCalibrationSeed) => void;
 }): JSX.Element {
   const { session } = props;
-  const [draft, setDraft] = useState<PhotoEngravingDraft>(() =>
-    initialPhotoEngravingDraft(session.image, session.operation),
-  );
-  const result = usePhotoEngravingPreview(session, draft, props.current);
+  const workbench = usePhotoWorkbench(session, props.current);
+  const { draft, update, result, histogram, recipeId, materialView } = workbench;
   const effective = effectiveOperationForObject(session.operation, session.image);
-  const update = (patch: Partial<PhotoEngravingDraft>): void =>
-    setDraft((previous) => ({ ...previous, ...patch }));
   return (
     <Dialog
       title="Photo engraving"
@@ -62,11 +60,20 @@ export default function PhotoEngravingDialog(props: {
           result={result}
           negativeImage={draft.negativeImage}
           current={props.current}
+          materialView={materialView}
+          onMaterialViewChange={workbench.setMaterialView}
+          colours={workbench.material ?? undefined}
+          materialName={workbench.material?.surfaceName}
         />
         <PhotoEngravingFields
           image={session.image}
           draft={draft}
           storedLinesPerMm={effective.linesPerMm}
+          recipeId={recipeId}
+          onRecipe={workbench.chooseRecipe}
+          autoTonesReady={histogram !== null}
+          onAutoTones={workbench.autoTones}
+          spotSizeMm={session.device.laserSubProfile?.spotSizeMm}
           processingChoices={photoProcessingChoices(effective.ditherAlgorithm)}
           power={effectiveObjectPowerPercent(effective, session.image)}
           speed={effective.speed}
@@ -77,6 +84,18 @@ export default function PhotoEngravingDialog(props: {
         />
       </div>
       <PhotoEngravingGuide current={props.current} onEditSource={props.onEditSource} />
+      <PhotoEngravingFooter current={props.current} error={props.error} onCancel={props.onCancel} />
+    </Dialog>
+  );
+}
+
+function PhotoEngravingFooter(props: {
+  readonly current: boolean;
+  readonly error: string | null;
+  readonly onCancel: () => void;
+}): JSX.Element {
+  return (
+    <>
       <p className="lf-photo-engraving__hint">
         Applies an Image operation to this photo. Power and speed use its current operation
         settings. Review the job, then Frame and Start when ready.
@@ -93,8 +112,53 @@ export default function PhotoEngravingDialog(props: {
           Apply photo settings
         </Button>
       </DialogActions>
-    </Dialog>
+    </>
   );
+}
+
+/** The draft, its preview and the ADR-685 recipe, Auto tones and material view state. */
+function usePhotoWorkbench(session: PhotoEngravingSession, current: boolean) {
+  const [draft, setDraft] = useState<PhotoEngravingDraft>(() =>
+    initialPhotoEngravingDraft(session.image, session.operation),
+  );
+  const [recipeId, setRecipeId] = useState<string | null>(null);
+  const [materialView, setMaterialView] = useState(false);
+  const result = usePhotoEngravingPreview(session, draft, current, materialView);
+  const histogram = useSourceHistogram(result);
+  const update = (patch: Partial<PhotoEngravingDraft>): void =>
+    setDraft((previous) => ({ ...previous, ...patch }));
+  const recipe = photoRecipe(recipeId);
+  return {
+    draft,
+    update,
+    result,
+    histogram,
+    recipeId,
+    materialView,
+    setMaterialView,
+    /** The recipe's colours, while its marking still matches the draft's. */
+    material: recipe !== null && recipe.lightMarks === draft.negativeImage ? recipe : null,
+    chooseRecipe: (id: string | null): void => {
+      setRecipeId(id);
+      const chosen = photoRecipe(id);
+      if (chosen === null) return;
+      update(photoRecipePatch(chosen, histogram));
+      setMaterialView(true);
+    },
+    autoTones: (): void => {
+      const tones = autoTonesPatch(histogram);
+      if (tones !== null) update(tones);
+    },
+  };
+}
+
+/** ADR-685: the photo's histogram from the latest preview; the source never changes in a session. */
+function useSourceHistogram(result: PhotoEngravingPreviewResult | null): Uint32Array | null {
+  const [histogram, setHistogram] = useState<Uint32Array | null>(null);
+  useEffect(() => {
+    if (result?.kind === 'ok') setHistogram(result.sourceHistogram);
+  }, [result]);
+  return histogram;
 }
 
 function PhotoOperationHint({ session }: { readonly session: PhotoEngravingSession }): JSX.Element {
@@ -140,8 +204,9 @@ function PhotoEngravingGuide(props: {
         </li>
       </ol>
       <p>
-        More DPI can make a burn darker through overlapping marks. Jarvis and Stucki are starting
-        options; test a small portrait before the full size.
+        More DPI can make a burn darker through overlapping marks; the On material preview shows how
+        much. Blue Noise keeps the most facial detail in KerfDesk&apos;s portrait measurements, with
+        Jarvis and Stucki as alternatives; test a small portrait before the full size.
       </p>
       <p>For a lined illustration instead, use Trace Image → Photo shading.</p>
       <Button

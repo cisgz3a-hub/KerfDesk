@@ -12,6 +12,7 @@ export function usePhotoEngravingPreview(
   session: PhotoEngravingSession,
   draft: PhotoEngravingDraft,
   current: boolean,
+  materialView = false,
 ): PhotoEngravingPreviewResult | null {
   const hydratedSource = useRef<{
     readonly session: PhotoEngravingSession;
@@ -20,11 +21,14 @@ export function usePhotoEngravingPreview(
   const [completed, setCompleted] = useState<{
     readonly draft: PhotoEngravingDraft;
     readonly session: PhotoEngravingSession;
+    readonly materialView: boolean;
     readonly result: PhotoEngravingPreviewResult;
   } | null>(null);
   useEffect(() => {
     if (!current) return;
     const abort = new AbortController();
+    const finish = (result: PhotoEngravingPreviewResult): void =>
+      setCompleted({ draft, session, materialView, result });
     const timer = window.setTimeout(() => {
       void (async () => {
         try {
@@ -33,13 +37,9 @@ export function usePhotoEngravingPreview(
             sourceWorkingBytesPerPixel: 12,
           });
           if (sourceBudget.kind === 'too-large') {
-            setCompleted({
-              draft,
-              session,
-              result: {
-                kind: 'error',
-                message: `Photo preview is unavailable at this size: ${sourceBudget.reason}. You can still apply the settings.`,
-              },
+            finish({
+              kind: 'error',
+              message: `Photo preview is unavailable at this size: ${sourceBudget.reason}. You can still apply the settings.`,
             });
             return;
           }
@@ -60,20 +60,17 @@ export function usePhotoEngravingPreview(
               layer: session.operation,
               device: session.device,
               sceneObjects: session.sceneObjects,
+              materialView,
             },
             abort.signal,
           );
-          if (!abort.signal.aborted) setCompleted({ draft, session, result });
+          if (!abort.signal.aborted) finish(result);
         } catch (error) {
           if (abort.signal.aborted) return;
-          setCompleted({
-            draft,
-            session,
-            result: {
-              kind: 'error',
-              message:
-                error instanceof Error ? error.message : 'Photo preview could not be prepared.',
-            },
+          finish({
+            kind: 'error',
+            message:
+              error instanceof Error ? error.message : 'Photo preview could not be prepared.',
           });
         }
       })();
@@ -82,8 +79,11 @@ export function usePhotoEngravingPreview(
       window.clearTimeout(timer);
       abort.abort();
     };
-  }, [session, draft, current]);
-  return current && completed?.draft === draft && completed.session === session
+  }, [session, draft, current, materialView]);
+  return current &&
+    completed?.draft === draft &&
+    completed.session === session &&
+    completed.materialView === materialView
     ? completed.result
     : null;
 }

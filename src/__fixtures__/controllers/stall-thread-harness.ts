@@ -9,14 +9,7 @@ import { Worker } from 'node:worker_threads';
 import { resolve } from 'node:path';
 import { build } from 'vite';
 import { expect } from 'vitest';
-import {
-  DEFAULT_DEVICE_PROFILE,
-  type ControllerKind,
-  type DeviceProfile,
-} from '../../core/devices';
-import type { Job } from '../../core/job';
-import { grblStrategy } from '../../core/output/grbl-strategy';
-import { marlinStrategy } from '../../core/output/marlin-strategy';
+import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { createDesktopMachineNetwork } from '../../platform/electron/desktop-machine-network';
 import type { PlatformAdapter, SerialConnection, SerialOpenRequest } from '../../platform/types';
 import { createNetworkSessionOpener } from '../../platform/web/network-serial-connection';
@@ -25,7 +18,14 @@ import type {
   SerialWorkerResponse,
 } from '../../platform/web/serial-worker-protocol';
 import { createWorkerSerialConnection } from '../../platform/web/worker-serial-connection';
-import type { Arrival, LitStop, StallThreadConfig, StallThreadMessage } from './stall-thread-entry';
+import type { StallCase } from './stall-thread-cases';
+import type {
+  Arrival,
+  LitStop,
+  LostByte,
+  StallThreadConfig,
+  StallThreadMessage,
+} from './stall-thread-entry';
 import { liveWindowStreamLitStopWarnings } from '../../ui/laser/job-review/window-stream-lit-stop-warnings';
 import { useLaserStore } from '../../ui/state/laser-store';
 import { startTestLaserJob } from '../../ui/state/laser-test-start-helpers';
@@ -191,12 +191,33 @@ async function report(thread: Worker): Promise<ThreadReport> {
   });
 }
 
+/** Waits for `condition`. A timeout says what the store and the controller were
+ * doing, so a failure on CI classifies itself (rolling audit v9 R1-P3-2). */
 export async function until(condition: () => boolean, ms: number): Promise<void> {
   const deadline = Date.now() + ms;
   while (!condition()) {
-    if (Date.now() > deadline) throw new Error('timed out');
+    if (Date.now() > deadline) throw new Error(`timed out: ${await describeStallState()}`);
     await new Promise((settle) => setTimeout(settle, 5));
   }
+}
+
+async function describeStallState(): Promise<string> {
+  const { pendingUntrackedAcks, streamer, jobStreamHost } = useLaserStore.getState();
+  const thread = threads.at(-1);
+  const controller =
+    thread === undefined
+      ? 'no thread'
+      : await Promise.race([
+          report(thread).then((measured) => measured.controllerState),
+          new Promise<string>((settle) => setTimeout(() => settle('no answer'), 1_000)),
+        ]);
+  return JSON.stringify({
+    pendingUntrackedAcks,
+    jobStreamHost,
+    status: streamer?.status ?? null,
+    inFlight: streamer?.inFlight.map((entry) => entry.line) ?? null,
+    controller,
+  });
 }
 
 /** The synchronous stall: nothing else on this thread runs until it ends. */
@@ -219,75 +240,12 @@ export function litMsDuring(
   );
 }
 
-// A fine zigzag engrave: 0.28 mm moves at 1,500 mm/min, about 11 ms each, so
-// the 16-block Marlin planner holds under 0.2 s (the audit's engrave case).
-function engraveJob(segments: number): Job {
-  return {
-    groups: [
-      {
-        kind: 'cut',
-        layerId: 'L1',
-        color: '#ff0000',
-        power: 80,
-        speed: 1500,
-        passes: 1,
-        airAssist: false,
-        segments: [
-          {
-            polyline: Array.from({ length: segments + 1 }, (_, i) => ({
-              x: 10 + i * 0.2,
-              y: 50 + (i % 2) * 0.2,
-            })),
-            closed: false,
-          },
-        ],
-      },
-    ],
-  };
-}
-
-export type StallCase = {
-  readonly firmware: StallThreadConfig['firmware'];
-  readonly controllerKind: ControllerKind;
-  readonly device: Partial<DeviceProfile>;
-  readonly program: (device: DeviceProfile) => string;
-  readonly streamingMode?: 'ping-pong';
-  readonly stallMs: number;
-};
-
-export const MARLIN_INLINE: StallCase = {
-  firmware: 'marlin',
-  controllerKind: 'marlin',
-  device: {
-    controllerKind: 'marlin',
-    maxPowerS: 255,
-    gcodeDialect: { dialectId: 'marlin-inline' },
-  },
-  program: (device) => marlinStrategy.emit(engraveJob(360), device),
-  streamingMode: 'ping-pong',
-  stallMs: 1_600,
-};
-export const MARLIN_FAN: StallCase = {
-  ...MARLIN_INLINE,
-  device: { controllerKind: 'marlin', maxPowerS: 255, gcodeDialect: { dialectId: 'marlin-fan' } },
-};
-export const GRBL_COMPATIBLE: StallCase = {
-  firmware: 'grbl',
-  controllerKind: 'grbl-v1.1',
-  device: { controllerKind: 'grbl-v1.1', gcodeDialect: { dialectId: 'grbl-compatible' } },
-  program: (device) => grblStrategy.emit(engraveJob(420), device),
-  stallMs: 1_000,
-};
-export const GRBLHAL_COMPATIBLE: StallCase = {
-  ...GRBL_COMPATIBLE,
-  firmware: 'grblhal',
-  controllerKind: 'grblhal',
-  device: { controllerKind: 'grblhal', gcodeDialect: { dialectId: 'grbl-compatible' } },
-};
-
-export type StallRun = {
+export type StallRun = StallMeasure & {
   readonly litDuringStall: number;
   readonly stall: { readonly from: number; readonly to: number };
+};
+
+export type StallMeasure = {
   readonly litStops: ReadonlyArray<LitStop>;
   readonly received: ReadonlyArray<string>;
   readonly arrivals: ReadonlyArray<Arrival>;
@@ -302,7 +260,8 @@ export type StallRun = {
 export type StallOptions = {
   readonly hostedStreaming?: boolean;
   readonly abortAfterStall?: boolean;
-  readonly dropCommandLetterOfMove?: number;
+  readonly pauseAfterStall?: boolean;
+  readonly loseFirstByte?: LostByte;
   readonly lineCostMs?: number;
   /** How long after the stall the controller keeps being sampled. */
   readonly settleMs?: number;
@@ -313,12 +272,61 @@ export async function runStall(
   transport: StallThreadConfig['transport'],
   options: StallOptions = {},
 ): Promise<StallRun> {
+  const started = await startStallJob(testCase, transport, options);
+  await new Promise((settle) => setTimeout(settle, 700));
+  expect(useLaserStore.getState().streamer?.status).toBe('streaming');
+  const stall = blockThisThread(testCase.stallMs);
+  if (options.abortAfterStall === true) await useLaserStore.getState().stopJob();
+  else if (options.pauseAfterStall === true) await useLaserStore.getState().pauseJob();
+  else await until(() => useLaserStore.getState().streamer?.status === 'done', 15_000);
+  const settleUntil = stall.to + (options.settleMs ?? 0);
+  await new Promise((settle) => setTimeout(settle, Math.max(200, settleUntil - Date.now())));
+  const measured = await measureRun(started);
+  return {
+    ...measured,
+    litDuringStall: litMsDuring(measured.litStops, { from: stall.from, to: stall.to + 50 }),
+    stall,
+  };
+}
+
+/** Runs a job with no stall until it ends, however it ends. */
+export async function runToJobEnd(
+  testCase: StallCase,
+  transport: StallThreadConfig['transport'],
+  options: StallOptions = {},
+): Promise<StallMeasure> {
+  const started = await startStallJob(testCase, transport, options);
+  await until(() => {
+    const status = useLaserStore.getState().streamer?.status;
+    return status === 'done' || status === 'errored';
+  }, 15_000);
+  await new Promise((settle) => setTimeout(settle, 200));
+  return measureRun(started);
+}
+
+/** What the controller has seen so far, for a test that carries on after a run. */
+export async function measureAgain(run: StallMeasure): Promise<StallMeasure> {
+  const thread = threads.at(-1);
+  if (thread === undefined) throw new Error('No stall thread is running.');
+  return measureRun({ ...run, thread });
+}
+
+type StartedStallJob = {
+  readonly thread: Worker;
+  readonly program: string;
+  readonly warnings: ReadonlyArray<string>;
+  readonly windowWrites: ReadonlyArray<string>;
+};
+
+async function startStallJob(
+  testCase: StallCase,
+  transport: StallThreadConfig['transport'],
+  options: StallOptions,
+): Promise<StartedStallJob> {
   const thread = spawn({
     firmware: testCase.firmware,
     transport,
-    ...(options.dropCommandLetterOfMove === undefined
-      ? {}
-      : { dropCommandLetterOfMove: options.dropCommandLetterOfMove }),
+    ...(options.loseFirstByte === undefined ? {} : { loseFirstByte: options.loseFirstByte }),
   });
   useStore.getState().updateDeviceProfile(testCase.device);
   const device = { ...DEFAULT_DEVICE_PROFILE, ...testCase.device };
@@ -348,17 +356,13 @@ export async function runStall(
     program,
     testCase.streamingMode === undefined ? {} : { streamingMode: testCase.streamingMode },
   );
-  await new Promise((settle) => setTimeout(settle, 700));
-  expect(useLaserStore.getState().streamer?.status).toBe('streaming');
-  const stall = blockThisThread(testCase.stallMs);
-  if (options.abortAfterStall === true) await useLaserStore.getState().stopJob();
-  else await until(() => useLaserStore.getState().streamer?.status === 'done', 15_000);
-  const settleUntil = stall.to + (options.settleMs ?? 0);
-  await new Promise((settle) => setTimeout(settle, Math.max(200, settleUntil - Date.now())));
-  const measured = await report(thread);
+  return { thread, program, warnings, windowWrites };
+}
+
+async function measureRun(started: StartedStallJob): Promise<StallMeasure> {
+  const { program, warnings, windowWrites } = started;
+  const measured = await report(started.thread);
   return {
-    litDuringStall: litMsDuring(measured.litStops, { from: stall.from, to: stall.to + 50 }),
-    stall,
     litStops: measured.litStops,
     received: measured.received.join('').split('\n'),
     arrivals: measured.arrivals,

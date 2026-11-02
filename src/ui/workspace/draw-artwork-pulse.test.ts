@@ -200,7 +200,8 @@ describe('ArtworkPulsePainter (ADR-620)', () => {
   it('blits each piece at an alpha on every frame, with no blur on the overlay', () => {
     const { project } = repeatedImports(3);
     const { ctx, drawImages, shadowBlurs } = recordingContext();
-    const painter = new ArtworkPulsePainter();
+    // Every piece renders on the first frame, however slow the machine.
+    const painter = new ArtworkPulsePainter({ renderBudgetMs: Infinity });
     const pieces = project.scene.objects.map((object, index) => glowing(object.id, `op-${index}`));
     for (let frame = 0; frame < 6; frame += 1) painter.draw(ctx, project, view, pieces);
     // Bloom, edge and colour: three plain blits per piece per frame.
@@ -212,7 +213,8 @@ describe('ArtworkPulsePainter (ADR-620)', () => {
     const { project } = repeatedImports(2);
     const { ctx, drawArgs } = recordingContext();
     const created = vi.spyOn(document, 'createElement');
-    const painter = new ArtworkPulsePainter();
+    // Both bitmaps exist after the first draw, however slow the machine.
+    const painter = new ArtworkPulsePainter({ renderBudgetMs: Infinity });
     const pieces = [pulse('piece-0', 'op-0'), pulse('piece-1', 'op-1')];
     painter.draw(ctx, project, view, pieces, 'design', 0);
     created.mockClear();
