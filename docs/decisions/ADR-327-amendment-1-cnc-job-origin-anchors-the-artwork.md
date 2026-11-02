@@ -67,3 +67,15 @@ Frame traced the same widened box, so nothing told the operator the artwork was 
 - `src/core/job/coordinate-origin-audit.test.ts` now pins the artwork anchor for CNC on every
   origin, anchor and Start-from mode, the same matrix as laser.
 - Code and test evidence only. Nothing was cut on a machine.
+
+### Implementation correction (2026-10-27 last-100 PR audit)
+
+A closed bowtie can have zero algebraic signed area while its two lobes are both pocketed.
+The bounds calculation now resolves that ambiguous case with the compiler's even-odd fill
+normalization instead of discarding the outline. Collinear and retraced empty pocket outlines
+remain omitted. Drill follows its own compiler rule: every finite closed contour with at least
+three points contributes a centre hole, even when collinear, so its artwork also stays in bounds.
+Regression tests cover the empty-contour controls and a compiled bowtie-plus-square pocket at
+User Origin; its complete artwork anchors at zero while Frame still measures actual motion.
+The correction and closed-start route re-scoring use emitter revision
+`audit-placement-and-route-20261102-v41`. No placement policy or Frame/Start gate changes.

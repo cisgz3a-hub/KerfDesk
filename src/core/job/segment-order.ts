@@ -194,9 +194,19 @@ function refinedSegmentRoute<T extends CutSegment>(
         });
   // Under Nearest point or Nearest corner, each closed start is chosen again
   // where the head now arrives (a given-order base still has drawn starts).
-  return policy.closedShapeStart === 'drawn'
-    ? [...ordered]
-    : restartClosedSegments(ordered, start, policy);
+  if (policy.closedShapeStart === 'drawn') return [...ordered];
+  const restarted = restartClosedSegments(ordered, start, policy);
+  // Refinement scored the old entry/exit points. Moving a closed start also
+  // changes its outgoing hop, so a locally nearer start can undo the saving.
+  // Compare the complete route, including the park, with the valid base (its
+  // holds and pinned first contour already checked when it was selected). The
+  // base keeps its order but takes the same start policy: a given-order base
+  // still has drawn starts, which the operator's setting replaces.
+  const base = restartClosedSegments(segments, start, policy);
+  return routeCost(restarted, start, refinement.returnTo) <=
+    routeCost(base, start, refinement.returnTo)
+    ? restarted
+    : base;
 }
 
 // Holds re-indexed from source segments to their route positions.

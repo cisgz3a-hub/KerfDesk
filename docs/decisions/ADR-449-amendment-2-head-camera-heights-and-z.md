@@ -73,3 +73,11 @@ calibration recorded the head's X and Y, never its Z.
 - Nothing new gates Frame, Start or output (ADR-228). The completed Frame stays the placement
   proof.
 - WORKFLOW F-CAM12 describes both edges. Neither is tried on a real head camera.
+
+### Implementation correction (2026-10-27 last-100 PR audit)
+
+After a bed-size or known native-offset correction, height validity is checked over the picture's
+displayed region. Its captured height areas are translated by the same shift before comparing
+them with current areas. Tests cover new areas over the moved image, areas only over its old
+scene location, equivalent translated areas, native offsets, and immediate overlay invalidation.
+This implements the same height and bed-frame rules together; it adds no gate or hardware claim.

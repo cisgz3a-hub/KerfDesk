@@ -7,9 +7,19 @@ import { cameraCaptureBindingForFrame, captureSourceFrame } from './frame-source
 
 export type OverlayCaptureOutcome = 'captured' | 'superseded' | 'failed' | 'no-camera';
 let cancelCurrent: (() => void) | null = null;
+const pendingCancellations = new Set<() => void>();
+
+/** Deferred refreshes share Live/hide/exit and newer capture cancellation. */
+export function onOverlayCaptureCancelled(cancel: () => void): () => void {
+  pendingCancellations.add(cancel);
+  return () => {
+    pendingCancellations.delete(cancel);
+  };
+}
 
 /** Live/hide/exit can abandon a request even if the store values were already the same. */
 export function cancelOverlayCapture(): void {
+  for (const cancel of pendingCancellations) cancel();
   cancelCurrent?.();
 }
 
