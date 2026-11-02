@@ -358,6 +358,7 @@ type InitialLaserState = Pick<
   | 'workOriginActive'
   | 'workOriginSource'
   | 'workOriginVersion'
+  | 'originStatusFence'
   | 'originAtConnect'
   | 'workZZeroEvidence'
   | 'toolChangeIdleSeen'
@@ -419,6 +420,7 @@ export function initialLaserState(): InitialLaserState {
     workOriginActive: false,
     workOriginSource: 'none',
     workOriginVersion: 0,
+    originStatusFence: null,
     originAtConnect: null,
     workZZeroEvidence: null,
     frameVerification: null,

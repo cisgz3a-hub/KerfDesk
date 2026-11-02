@@ -33,6 +33,10 @@ export type WorkOriginState = BitFileSequenceState & {
   // Monotonic identity for XY work-origin mutations. Place Board registration
   // binds to this so a later G92/G92.1/G10 cannot silently reuse stale targets.
   readonly workOriginVersion?: number;
+  /** The status sequence when the last origin write was acknowledged: reports
+   *  up to it predate the write (origin-status-fence.ts). Optional so
+   *  hand-built test states stay valid; absent or null reads as none. */
+  readonly originStatusFence?: number | null;
   /** Optional so hand-built test states stay valid; absent reads as unseen. */
   readonly originAtConnect?: OriginAtConnect | null;
 };

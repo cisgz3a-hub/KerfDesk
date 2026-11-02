@@ -6,6 +6,7 @@ import {
   resolveJobPlacement,
   type JobPlacementSettings,
 } from '../job-placement';
+import { statusPredatesOriginChange } from '../state/origin-status-fence';
 import { workOffsetOffFor } from '../state/status-report-fields';
 import { waitForControllerStatus } from './frame-status-wait';
 import { controllerWillReportWorkOffset } from './work-offset-assumption';
@@ -13,6 +14,39 @@ import { controllerWillReportWorkOffset } from './work-offset-assumption';
 const FRAME_POSITION_TIMEOUT_MS = 3_000;
 const FRAME_POSITION_POLL_MS = 25;
 const FRAME_OFFSET_QUERY_MS = 100;
+
+export const FRAME_STATUS_AFTER_ORIGIN_MESSAGE =
+  'The controller has not reported its position since the work origin changed, so Frame cannot tell where the head is in the new origin. Wait for a status report, then Frame again.';
+
+/** A report read before the last origin write still holds the old work frame
+ * (origin-status-fence.ts), so a Frame that took its placement or its return
+ * point from it sent the head the whole offset astray (rolling audit v9
+ * R8-P1-1). Wait for a report the controller sent after the write, asking for
+ * one where the driver has a realtime query and otherwise waiting for the
+ * poll. False when none arrives, so the caller refuses before any motion. */
+export async function waitForStatusAfterOriginChange(): Promise<boolean> {
+  const before = useLaserStore.getState();
+  if (!statusPredatesOriginChange(before)) return true;
+  const deadline = Date.now() + FRAME_POSITION_TIMEOUT_MS;
+  let nextQuery = Date.now();
+  while (Date.now() <= deadline) {
+    const current = useLaserStore.getState();
+    if (
+      current.connection.kind !== 'connected' ||
+      current.controllerSessionEpoch !== before.controllerSessionEpoch
+    )
+      return false;
+    if (!statusPredatesOriginChange(current)) return true;
+    if (Date.now() >= nextQuery) {
+      void current.requestControllerStatus();
+      nextQuery = Date.now() + FRAME_OFFSET_QUERY_MS;
+    }
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, FRAME_POSITION_POLL_MS);
+    });
+  }
+  return !statusPredatesOriginChange(useLaserStore.getState());
+}
 
 /** Home settles before its first unsuppressed offset report. Let that report
  * arrive before capturing compilation inputs; never clear a real work origin. */

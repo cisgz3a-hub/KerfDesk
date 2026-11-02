@@ -302,6 +302,11 @@ describe('laser-store origin actions', () => {
     // Zero Z (G92 Z0) is what establishes the stock-top contract.
     const zeroZ = useLaserStore.getState().zeroZHere();
     await flush();
+    // The report that arrived with Set origin's `ok` is read before the
+    // transaction resumes, so it counts as predating the write, and Zero Z
+    // asks for a fresh one first (ADR-375 Amendment 12).
+    connection.emitLine('<Idle|WPos:0.000,0.000,0.000|WCO:12.000,34.000,0.000|FS:0,0>');
+    await flush();
     expect(write).toHaveBeenCalledWith('G54 G92 Z0\n');
     expect(useLaserStore.getState().workZZeroEvidence).toBeNull();
     connection.emitLine('ok');
