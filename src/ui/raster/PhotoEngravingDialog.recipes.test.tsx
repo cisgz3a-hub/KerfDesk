@@ -1,5 +1,6 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { Simulate } from 'react-dom/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { createLayer, IDENTITY_TRANSFORM, type Layer, type RasterImage } from '../../core/scene';
@@ -198,5 +199,51 @@ describe('Photo engraving material recipes and Auto tones (ADR-685)', () => {
     expect(patch.imagePatch.contrast).toBeGreaterThan(40);
     // Auto tones alone keeps the operation's dither and marking.
     expect(patch.layerPatch).toMatchObject({ ditherAlgorithm: 'jarvis', negativeImage: false });
+  });
+
+  // Rolling audit v9 R8-P2-3: a recipe picked before the first preview applied
+  // no tones and the promise of them then disappeared.
+  it('applies a recipe’s Auto tones when the preview arrives after it', async () => {
+    const onApply = vi.fn<(patch: PhotoEngravingApply) => void>();
+    await render(onApply);
+    await choose('Material recipe', 'Wood');
+    expect(document.body.textContent).toContain(
+      'Auto tones apply once the preview has read the photo.',
+    );
+
+    preview.result = okResult();
+    await render(onApply);
+    const patch = await apply(onApply);
+    expect(patch.imagePatch.contrast).toBeGreaterThan(40);
+    expect(patch.imagePatch.gamma).not.toBe(1);
+    expect(document.body.textContent).not.toContain('Auto tones apply once');
+  });
+
+  it('keeps a tone the operator set while the recipe waited for the preview', async () => {
+    const onApply = vi.fn<(patch: PhotoEngravingApply) => void>();
+    await render(onApply);
+    await choose('Material recipe', 'Wood');
+    const brightness = document.body.querySelector('input[aria-label="Photo brightness"]');
+    if (!(brightness instanceof HTMLInputElement)) throw new Error('brightness missing');
+    await act(async () => {
+      brightness.value = '12';
+      Simulate.change(brightness);
+    });
+    await act(async () => Simulate.blur(brightness));
+    expect(document.body.textContent).not.toContain('Auto tones apply once');
+
+    preview.result = okResult();
+    await render(onApply);
+    const patch = await apply(onApply);
+    expect(patch.imagePatch).toMatchObject({ brightness: 12, contrast: 0, gamma: 1 });
+  });
+
+  // R8-P3-1: light marks invert the photo, so a white background burns solid.
+  it('says how to keep a removed background from burning on light-mark materials', async () => {
+    await render();
+    await choose('Material recipe', 'Black slate');
+    expect(document.body.textContent).toContain('Apply Mask to Image');
+    await choose('Material recipe', 'Wood');
+    expect(document.body.textContent).not.toContain('Apply Mask to Image');
   });
 });

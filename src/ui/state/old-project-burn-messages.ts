@@ -13,7 +13,11 @@ export function oldProjectBurnMessages(notice: OldProjectBurnNotice): {
 } {
   return {
     frames: [repairedFramesMessage(notice), uncertainFramesMessage(notice)].flatMap(present),
-    burn: [movedRecordsMessage(notice), imageDoseMessage(notice)].flatMap(present),
+    burn: [
+      movedRecordsMessage(notice),
+      imageDoseMessage(notice),
+      cncJobOriginMessage(notice),
+    ].flatMap(present),
   };
 }
 
@@ -74,6 +78,24 @@ function imageDoseMessage({ imageDose }: OldProjectBurnNotice): string | null {
   ];
   if (parts.length === 0) return null;
   return `Images tuned on an earlier version burn more energy now: ${parts.join('; ')}. Run a test before you burn real stock.`;
+}
+
+// Rolling audit v9 R8-P2-1: the new place is the canvas anchor, so it stays;
+// a part clamped for the old cut needs telling before a re-run.
+function cncJobOriginMessage({ cncJobOrigin }: OldProjectBurnNotice): string | null {
+  const shift = cncJobOrigin[0];
+  if (shift === undefined) return null;
+  const axes = [
+    ...(Math.abs(shift.xMm) < 0.005 ? [] : [`${Math.abs(shift.xMm).toFixed(2)} mm in X`]),
+    ...(Math.abs(shift.yMm) < 0.005 ? [] : [`${Math.abs(shift.yMm).toFixed(2)} mm in Y`]),
+  ];
+  if (axes.length === 0) return null;
+  return (
+    `This CNC job now cuts ${axes.join(' and ')} away from where KerfDesk 1.0.28 and earlier cut it. ` +
+    'Its Job Origin now counts every contour the job cuts, such as a crossing loop or a flat Drill ' +
+    'contour, so the cut sits where the canvas shows it. If the stock is clamped for the old cut, ' +
+    'move it or the origin, and Frame before you run it.'
+  );
 }
 
 function labelOf(image: { readonly label: string }): string {

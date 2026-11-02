@@ -110,6 +110,27 @@ describe('photo engraving preview', () => {
     );
   });
 
+  // Rolling audit v9 R8-P3-2: Auto tones counted pixels the mask keeps from burning.
+  it('builds the Auto tones histogram from the pixels the mask lets burn', () => {
+    const input = photoPreviewFixture();
+    const mask = createRectangle({
+      id: 'mask',
+      color: '#000000',
+      spec: { widthMm: 4, heightMm: 4, cornerRadiusMm: 0 },
+    });
+    const unmasked = preview(input).sourceHistogram;
+    const masked = preview({
+      ...input,
+      image: { ...input.image, imageMaskId: mask.id },
+      sceneObjects: [mask],
+    }).sourceHistogram;
+    const total = (histogram: ArrayLike<number>) =>
+      Array.from(histogram).reduce((a, b) => a + b, 0);
+    expect(total(unmasked)).toBe(8);
+    // The mask covers half of the 4 x 2 photo.
+    expect(total(masked)).toBe(4);
+  });
+
   it('uses the actual rotated scan grid and discloses multiple scans', () => {
     const input = photoPreviewFixture();
     const staged = {

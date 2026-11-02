@@ -29,11 +29,19 @@ import { hasFinitePoints } from './profile-paths';
 
 type MutableBounds = { minX: number; minY: number; maxX: number; maxY: number };
 
+/** Which closed contours count. 'release-1.0.28' is the rule every release up
+ * to 1.0.28 used: only a contour whose signed area is not zero, so a crossing
+ * loop and a flat Drill contour were left out. It is kept only to tell the
+ * operator of an older project how far its cut moved (rolling audit v9
+ * R8-P2-1). */
+export type DesignBoundsRule = 'current' | 'release-1.0.28';
+
 export function cncOperationDesignBounds(
   polylines: ReadonlyArray<Polyline>,
   objects: ReadonlyArray<SceneObject>,
   layer: Layer,
   device: DeviceProfile,
+  rule: DesignBoundsRule = 'current',
 ): Bounds | null {
   const b: MutableBounds = {
     minX: Number.POSITIVE_INFINITY,
@@ -41,10 +49,9 @@ export function cncOperationDesignBounds(
     maxX: Number.NEGATIVE_INFINITY,
     maxY: Number.NEGATIVE_INFINITY,
   };
-  const cutType = (layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS).cutType;
-  const closedOnly = cutTypeNeedsClosedContours(cutType);
+  const counts = countedContours(layer, rule);
   for (const polyline of polylines) {
-    if (closedOnly && !contributesClosedGeometry(polyline, cutType)) continue;
+    if (!counts(polyline)) continue;
     for (const point of polyline.points) extend(b, point);
   }
   for (const object of objects) {
@@ -62,6 +69,14 @@ export function withDesignBounds(
   designBounds: Bounds | null,
 ): ReadonlyArray<CncGroup> {
   return designBounds === null ? groups : groups.map((group) => ({ ...group, designBounds }));
+}
+
+function countedContours(layer: Layer, rule: DesignBoundsRule): (polyline: Polyline) => boolean {
+  const cutType = (layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS).cutType;
+  if (!cutTypeNeedsClosedContours(cutType)) return () => true;
+  return rule === 'current'
+    ? (polyline) => contributesClosedGeometry(polyline, cutType)
+    : (polyline) => polyline.closed && Math.abs(signedAreaMm2(polyline.points)) > 1e-9;
 }
 
 function contributesClosedGeometry(polyline: Polyline, cutType: CncCutType): boolean {

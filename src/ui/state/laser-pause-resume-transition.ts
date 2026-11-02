@@ -24,6 +24,9 @@ export type HeldResumeTail = {
   readonly sessionEpoch: number;
   /** Machine position when Resume confirmed; null when it was unknown. */
   readonly machinePosition: { readonly x: number; readonly y: number; readonly z: number } | null;
+  /** The job's streamer epoch; a later job has a new one and runs the tail.
+   *  Optional so hand-built test states stay valid. */
+  readonly streamerEpoch?: number;
 };
 
 /** The laser store's Pause/Resume fields. */

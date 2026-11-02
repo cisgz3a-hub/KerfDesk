@@ -2,7 +2,9 @@
 // builds before 20260928 the controller can still hold the paused move's
 // tail and run it, with its laser power, at the next motion. KerfDesk records
 // what it saw and warns; it blocks nothing. A reset (a new controller
-// session) or any motion since retires the warning.
+// session) or any motion since retires the warning, for good: a Frame returns
+// to where it started, so a warning read from the position alone came back
+// after the very Frame that ran the tail (rolling audit v9 R8-P2-2).
 
 import type { GrblState, StatusReport } from '../../core/controllers/grbl';
 import {
@@ -63,6 +65,7 @@ export function heldResumeTailPatch(
     heldResumeTail: {
       sessionEpoch: state.controllerSessionEpoch,
       machinePosition: inferCurrentMachinePosition(state.statusReport, state.wcoCache),
+      streamerEpoch: state.streamerEpoch,
     },
     log: pushLog(state, `[lf2] ${HELD_RESUME_TAIL_MESSAGE}`),
   };
@@ -82,6 +85,26 @@ export function currentHeldResumeTail(
   if (tail.machinePosition === null) return tail;
   const now = inferCurrentMachinePosition(state.statusReport, state.wcoCache);
   return now === null || samePoint(now, tail.machinePosition) ? tail : null;
+}
+
+/** Clears the recorded tail once motion has run it: a Frame or jog the
+ * controller was sent, a later job, or a report away from the point where
+ * Resume confirmed. Applied with every status report, so a Frame that comes
+ * back to the same point, or a jog away and back, does not revive it. */
+export function heldResumeTailRetirementPatch(
+  state: Pick<LaserState, 'heldResumeTail' | 'motionOperation' | 'streamerEpoch'>,
+  next: Pick<LaserState, 'statusReport' | 'wcoCache'>,
+): Partial<Pick<LaserState, 'heldResumeTail'>> {
+  const tail = state.heldResumeTail ?? null;
+  if (tail === null) return {};
+  const retired = { heldResumeTail: null };
+  if (state.motionOperation?.dispatchComplete === true) return retired;
+  if (tail.streamerEpoch !== undefined && tail.streamerEpoch !== state.streamerEpoch) {
+    return retired;
+  }
+  if (tail.machinePosition === null) return {};
+  const now = inferCurrentMachinePosition(next.statusReport, next.wcoCache);
+  return now !== null && !samePoint(now, tail.machinePosition) ? retired : {};
 }
 
 function samePoint(a: Point, b: Point): boolean {
