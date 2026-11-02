@@ -1,0 +1,113 @@
+{
+  "measuredOn": "1.0.27",
+  "burns": {
+    "relief-unframed": {
+      "as-placed": {
+        "width": 39.588,
+        "height": 10,
+        "minX": 100,
+        "minY": 340,
+        "length": 117.296,
+        "dose": 35188.802
+      }
+    },
+    "roboto-frame": {
+      "as-placed": {
+        "width": 27.036,
+        "height": 7.109,
+        "minX": 126.482,
+        "minY": 342.891,
+        "length": 152.922,
+        "dose": 45876.467
+      }
+    },
+    "variable-unframed": {
+      "ANNA": {
+        "width": 39.588,
+        "height": 10,
+        "minX": 123.493,
+        "minY": 339.5,
+        "length": 117.296,
+        "dose": 35188.802
+      },
+      "Anna": {
+        "width": 33.28,
+        "height": 9.926,
+        "minX": 126.279,
+        "minY": 339.5,
+        "length": 95.318,
+        "dose": 28595.537
+      },
+      "Hello": {
+        "width": 32.985,
+        "height": 10.956,
+        "minX": 127.162,
+        "minY": 339.5,
+        "length": 98.655,
+        "dose": 29596.643
+      },
+      "Maximilian": {
+        "width": 72.721,
+        "height": 11.544,
+        "minX": 106.963,
+        "minY": 339.5,
+        "length": 209.783,
+        "dose": 62934.917
+      },
+      "Peggy": {
+        "width": 39.942,
+        "height": 12.647,
+        "minX": 123.904,
+        "minY": 336.706,
+        "length": 138.248,
+        "dose": 41474.421
+      },
+      "Ågot": {
+        "width": 31.368,
+        "height": 16.265,
+        "minX": 127.676,
+        "minY": 336.706,
+        "length": 105.347,
+        "dose": 31603.963
+      },
+      "Al": {
+        "width": 12.618,
+        "height": 10.956,
+        "minX": 137.088,
+        "minY": 339.5,
+        "length": 38.937,
+        "dose": 11681.027
+      }
+    },
+    "plain-rectangle": {
+      "as-placed": {
+        "width": 40,
+        "height": 30,
+        "minX": 100,
+        "minY": 270,
+        "length": 140,
+        "dose": 42000
+      }
+    },
+    "dithered-dot-width": {
+      "as-placed": {
+        "width": 23.8,
+        "height": 23.8,
+        "minX": 60.1,
+        "minY": 316.1,
+        "length": 725.2,
+        "dose": 435120
+      }
+    },
+    "upright-pass-through": {
+      "as-placed": {
+        "width": 24,
+        "height": 23.5,
+        "minX": 60,
+        "minY": 316.25,
+        "length": 1152,
+        "dose": 342888
+      }
+    }
+  }
+}

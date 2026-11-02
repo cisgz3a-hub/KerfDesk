@@ -1,0 +1,81 @@
+{
+  "measuredOn": "1.0.27",
+  "burns": {
+    "relief-tag": {
+      "ANNA": {
+        "width": 39.588,
+        "height": 10,
+        "minX": 120.206,
+        "minY": 340,
+        "length": 117.297,
+        "dose": 35189.103
+      },
+      "Maximilian": {
+        "width": 69.292,
+        "height": 11,
+        "minX": 105.354,
+        "minY": 339,
+        "length": 199.891,
+        "dose": 59967.369
+      }
+    },
+    "roboto-bent": {
+      "ANNA": {
+        "width": 23.858,
+        "height": 10.077,
+        "minX": 100.007,
+        "minY": 339.923,
+        "length": 143.908,
+        "dose": 43172.308
+      },
+      "Maximilian": {
+        "width": 46.884,
+        "height": 12.538,
+        "minX": 100,
+        "minY": 337.458,
+        "length": 251.559,
+        "dose": 75467.676
+      }
+    },
+    "tabbed-rectangle": {
+      "as-placed": {
+        "width": 120,
+        "height": 45,
+        "minX": 100,
+        "minY": 155,
+        "length": 311.279,
+        "dose": 93383.612
+      }
+    },
+    "stretched-sketch": {
+      "as-placed": {
+        "width": 90,
+        "height": 30,
+        "minX": 200,
+        "minY": 170,
+        "length": 269.653,
+        "dose": 80895.849
+      }
+    },
+    "grayscale-dot-width": {
+      "as-placed": {
+        "width": 23.8,
+        "height": 23.8,
+        "minX": 60.1,
+        "minY": 316.1,
+        "length": 1728,
+        "dose": 513660
+      }
+    },
+    "turned-pass-through": {
+      "as-placed": {
+        "width": 32.785,
+        "height": 32.101,
+        "minX": 48,
+        "minY": 307.557,
+        "length": 841.475,
+        "dose": 250459.841
+      }
+    }
+  }
+}
