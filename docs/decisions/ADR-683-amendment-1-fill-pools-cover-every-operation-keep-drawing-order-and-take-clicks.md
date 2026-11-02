@@ -81,6 +81,7 @@ click gap:
 - **Not changed:**
   - A path whose first visible operation is Line and a later one Fill is still stroked only
     (the KNOWN canvas styling of multi-bound artwork, 2026-07-17 layers-panel parity line 13).
+    Amendment 2 retires this: the burn differed from it, on the path and on other objects.
   - N6-P3-2 (the stacked-copy advisory wording with a Line sub-layer) and the other N6 P3s.
 
 ### Verification

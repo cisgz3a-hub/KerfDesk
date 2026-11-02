@@ -48,7 +48,8 @@ project are unchanged: only exported files, the import toast and pasted tab anch
 
 1. **Every artwork export writes one colour per operation** (`planExportColors` in
    `io/svg/export-fill-compounds.ts`). A path's operation is the first scene operation it uses,
-   the same one whose effective mode decides fill or stroke.
+   the same one whose effective mode decides fill or stroke. Amendment 1 prefers one that outputs,
+   and adds every Fill operation the path burns under.
    - A path keeps its own colour while that colour names its operation alone in this export: all
      of the operation's paths carry it and no other operation's path does. An imported SVG
      (the import gives each of its colours its own operation) and a LightBurn layer stay as authored,

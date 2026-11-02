@@ -3,7 +3,8 @@
 // it only once its own first read succeeds; until then nothing has been read,
 // so a worker that cannot start leaves the session to the window's transport.
 // Once it has taken the session the worker is its only reader and writer, so a
-// later failure closes the connection instead (ADR-354 decision 3).
+// later failure closes the connection instead (ADR-354 decision 3), once the
+// store's stop has gone out through the worker (ADR-398 Amendment 7).
 
 import type { SerialConnection } from '../types';
 import {
@@ -62,7 +63,7 @@ export function createNetworkSessionOpener(
 }
 
 function openedConnection(bridge: Bridge, timeoutMs: number): SerialConnection {
-  return createWorkerSerialConnection({
+  const connection = createWorkerSerialConnection({
     bridge: {
       postMessage: (message, transfer) => {
         if (message.kind === 'attach' || message.kind === 'reattach-readable')
@@ -81,6 +82,27 @@ function openedConnection(bridge: Bridge, timeoutMs: number): SerialConnection {
     timeoutMs,
     start: () => bridge.post({ kind: 'network-start' }),
   });
+  return { ...connection, beforeReadFailureClose: readFailureStops(bridge) };
+}
+
+// The worker bounds this wait: its thread is not the one a busy window stalls.
+function readFailureStops(bridge: Bridge): NonNullable<SerialConnection['beforeReadFailureClose']> {
+  const handlers = new Set<() => Promise<void>>();
+  bridge.subscribe((message) => {
+    if (message.kind !== 'read-failing') return;
+    const stops = [...handlers].map((handler) => Promise.resolve().then(handler));
+    void Promise.allSettled(stops).then(() => {
+      try {
+        bridge.post({ kind: 'read-failure-settled' });
+      } catch {
+        // The stop closed the connection; the worker has nothing left to wait for.
+      }
+    });
+  });
+  return (handler) => {
+    handlers.add(handler);
+    return () => handlers.delete(handler);
+  };
 }
 
 type Reply = (message: NetworkSerialWorkerResponse) => void;

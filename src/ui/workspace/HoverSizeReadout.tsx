@@ -10,13 +10,8 @@
 // also the conventional tooltip feel — you have to mean it.
 
 import { useEffect, useState } from 'react';
-import {
-  artworkOperationName,
-  hitTest,
-  transformedBBox,
-  type Project,
-  type Vec2,
-} from '../../core/scene';
+import { artworkOperationName, transformedBBox, type Project, type Vec2 } from '../../core/scene';
+import { workspaceHitTest } from './workspace-hit-test';
 import { useStore } from '../state';
 import { useLengthUnit } from '../state/display-units';
 import { formatDisplayLengthFixed, type DisplayLengthUnit } from '../display-length';
@@ -108,7 +103,7 @@ function useDwellHit(cursor: Vec2 | null, project: Project): Hover | null {
     const timer = setTimeout(() => {
       // Locked artwork too, like the hover pulse (ADR-620): the piece under a
       // locked one must not answer for it.
-      const id = hitTest(project.scene, point, { includeLocked: true });
+      const id = workspaceHitTest(project.scene, point, { includeLocked: true });
       setHover(id === null ? null : { id, point });
     }, DWELL_MS);
     return () => clearTimeout(timer);

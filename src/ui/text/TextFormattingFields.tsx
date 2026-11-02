@@ -68,7 +68,11 @@ export function TextFormattingFields(props: Props): JSX.Element {
         setLetterSpacing={fields.setLetterSpacing}
         setBendDeg={fields.setBendDeg}
       />
-      <TextStyleFields style={values.textStyle} setStyle={fields.setTextStyle} />
+      <TextStyleFields
+        style={values.textStyle}
+        setStyle={fields.setTextStyle}
+        singleLineFont={!outline}
+      />
       <TextBoxFields fields={fields} />
       <PathTextFields
         enabled={fields.pathEnabled}

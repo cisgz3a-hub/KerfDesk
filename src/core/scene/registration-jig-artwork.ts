@@ -178,6 +178,13 @@ export function registrationJigReplacedArtworkIds(
   return removed;
 }
 
+/** The instances a job compiles in runs of their own: one box keeps ordinary operation order. */
+export function separatelyCompiledJigInstances(
+  scene: Scene,
+): ReadonlyArray<RegistrationJigArtworkInstance> {
+  return findRegistrationBoxes(scene).length < 2 ? [] : registrationJigArtworkInstances(scene);
+}
+
 /** Returns the active jig artwork in physical outline order, one complete piece per entry. */
 export function registrationJigArtworkInstances(
   scene: Scene,

@@ -38,7 +38,10 @@ import type { ProductionNestDefinition } from '../nesting/production-nest';
 // v20 lets a single-line text frame from before v19 keep counting a line as the
 // old cap-height Size (ADR-682 Amendment 1). A v19 reader would fit that text
 // up to half as large when it is edited or a variable value changes.
-export const PROJECT_SCHEMA_VERSION = 20 as const;
+// v21 gives that rule back to frames a v19 writer converted and saved, read from
+// their stored geometry (ADR-682 Amendment 3). The file itself changes only by
+// the field v20 added; the bump makes the check run once.
+export const PROJECT_SCHEMA_VERSION = 21 as const;
 
 export type EmbeddedFont = {
   readonly key: string;

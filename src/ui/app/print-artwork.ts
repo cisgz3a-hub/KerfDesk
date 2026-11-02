@@ -5,10 +5,13 @@
 // SVG export. Nothing about the job or the project changes.
 
 import { DEFAULT_PROJECT_VARIABLE_DATA, type Project } from '../../core/scene';
-import { materializeVariableText } from '../../io/gcode/prepare-output-snapshot';
+import {
+  materializeVariableText,
+  textAdvisoryWarnings,
+} from '../../io/gcode/prepare-output-snapshot';
 import { exportSceneSvg } from '../../io/svg/export-scene-svg';
 import { outputTextRenderer } from '../text/output-text-renderer';
-import { exportProjectSelection, glyphWarnings } from './export-artwork-svg';
+import { exportProjectSelection } from './export-artwork-svg';
 import { embedSvgRasterImages } from './svg-artwork-images';
 
 export type PrintOptions = {
@@ -74,7 +77,7 @@ export async function printableArtworkSvg(
     return {
       ok: true,
       svg: styledPrintSvg(exported.value.svg, options),
-      warnings: glyphWarnings(resolved.advisories),
+      warnings: textAdvisoryWarnings(resolved.advisories),
     };
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : String(error) };

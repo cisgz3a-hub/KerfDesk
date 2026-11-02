@@ -14,9 +14,9 @@
 // which the head is stopped with the beam above zero, and the time each line
 // reached the controller.
 //
-// `dropCommandLetterOfMove` models a byte lost on the controller's UART leg
-// (rolling audit v8 N1-P1-1, the refuter's method): Marlin reads the Nth `G1`
-// without its `G`, echoes it as an unknown command and answers `ok`.
+// `loseFirstByte` models a byte lost on the controller's UART leg (rolling audit
+// v8 N1-P1-1 and v9 R1-P1-1, the refuters' method): Marlin reads the chosen line
+// without its first letter, echoes it as an unknown command and answers `ok`.
 
 import { createFifoMarlin } from './marlin-fifo-model';
 import { createGrblSimulator } from './grbl-simulator';
@@ -29,8 +29,12 @@ import type { SerialConnection } from '../../platform/types';
 export type StallThreadConfig = {
   readonly firmware: 'marlin' | 'grbl' | 'grblhal';
   readonly transport: 'window' | 'usb-worker' | 'network-worker';
-  readonly dropCommandLetterOfMove?: number;
+  readonly loseFirstByte?: LostByte;
 };
+
+/** Which lines reach Marlin without their first byte: those matching `pattern`,
+ * or only the `nth` of them (counting from 1). */
+export type LostByte = { readonly pattern: string; readonly nth?: number };
 
 export type Arrival = { readonly at: number; readonly line: string };
 
@@ -50,6 +54,8 @@ export type StallThreadMessage =
       readonly echoes: ReadonlyArray<string>;
       /** The reply grammar each arm named, in order (ADR-676). */
       readonly armAcks: ReadonlyArray<string | null>;
+      /** The controller's own state, printed when a wait times out. */
+      readonly controllerState: unknown;
     };
 
 type Port = {
@@ -64,10 +70,11 @@ type Controller = {
   readonly boot: () => void;
   readonly received: () => ReadonlyArray<string>;
   readonly arrivals: () => ReadonlyArray<Arrival>;
+  readonly debugState: () => unknown;
 };
 
 export async function start(port: Port, config: StallThreadConfig): Promise<void> {
-  const controller = await openController(config.firmware, config.dropCommandLetterOfMove);
+  const controller = await openController(config.firmware, config.loseFirstByte);
   const litStops = sampleLitStops(controller);
   const echoes: string[] = [];
   controller.connection.onLine((line) => {
@@ -94,6 +101,7 @@ export async function start(port: Port, config: StallThreadConfig): Promise<void
         arrivals: controller.arrivals(),
         echoes,
         armAcks,
+        controllerState: controller.debugState(),
       });
     }
   });
@@ -101,22 +109,18 @@ export async function start(port: Port, config: StallThreadConfig): Promise<void
 
 async function openController(
   firmware: StallThreadConfig['firmware'],
-  dropCommandLetterOfMove?: number,
+  loseFirstByte?: LostByte,
 ): Promise<Controller> {
   const arrivals: Arrival[] = [];
   if (firmware === 'marlin') {
     const marlin = createFifoMarlin();
     const inner = await openFirst(marlin.adapter);
-    let moves = 0;
+    const corrupt = lineCorrupter(loseFirstByte);
     const connection: SerialConnection = {
       ...inner,
       write: (data) => {
         const at = Date.now();
-        const lines = data.split('\n').map((line) => {
-          if (!/^G1\b/.test(line)) return line;
-          moves += 1;
-          return moves === dropCommandLetterOfMove ? line.slice(1) : line;
-        });
+        const lines = data.split('\n').map(corrupt);
         for (const line of lines.slice(0, -1)) arrivals.push({ at, line });
         return inner.write(lines.join('\n'));
       },
@@ -130,6 +134,7 @@ async function openController(
       },
       boot: () => marlin.emitLine('start'),
       received: () => marlin.outbound(),
+      debugState: () => marlin.state(),
     };
   }
   // Stock GRBL buffers: 15 planner blocks and a 128-byte receive ring, each
@@ -159,6 +164,18 @@ async function openController(
     stoppedBeam: () => (sim.planner().blocks === 0 ? beam.power() : 0),
     boot: () => sim.port.emitLine(banner),
     received: () => sim.outbound(),
+    debugState: () => sim.planner(),
+  };
+}
+
+function lineCorrupter(lost: LostByte | undefined): (line: string) => string {
+  if (lost === undefined) return (line) => line;
+  const pattern = new RegExp(lost.pattern);
+  let matched = 0;
+  return (line) => {
+    if (!pattern.test(line)) return line;
+    matched += 1;
+    return lost.nth === undefined || matched === lost.nth ? line.slice(1) : line;
   };
 }
 

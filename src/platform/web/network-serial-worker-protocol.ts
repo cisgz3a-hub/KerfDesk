@@ -23,7 +23,9 @@ export type NetworkSerialWorkerRequest =
       readonly route: NetworkSessionRoute;
     }
   /** Begin forwarding lines; sent once the window has subscribed. */
-  | { readonly kind: 'network-start' };
+  | { readonly kind: 'network-start' }
+  /** The store's stop after `read-failing` has settled. */
+  | { readonly kind: 'read-failure-settled' };
 
 export type NetworkSerialWorkerResponse =
   | SerialWorkerResponse
@@ -31,4 +33,8 @@ export type NetworkSerialWorkerResponse =
   | { readonly kind: 'network-ready'; readonly id: number }
   /** The first read failed cleanly: nothing was read, so the window can
    *  stream the session itself. */
-  | { readonly kind: 'network-unavailable'; readonly id: number; readonly reason: string };
+  | { readonly kind: 'network-unavailable'; readonly id: number; readonly reason: string }
+  /** A read failed here, not on the controller's socket, so the session may
+   *  still take writes. It stays open, for a bounded time, for the store's stop
+   *  (ADR-398 Amendment 7). */
+  | { readonly kind: 'read-failing' };

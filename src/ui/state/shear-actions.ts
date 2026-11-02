@@ -3,6 +3,7 @@
 // artwork can take a shear: text, drawn rectangles and ellipses, and images
 // rebuild their own geometry, so they are left alone and reported.
 
+import { tabKeptPlaceMm, withTabsFollowingMap } from '../../core/geometry/edited-tab-anchors';
 import {
   bakeCurves,
   localBakeMatrix,
@@ -12,6 +13,7 @@ import {
 import { combinedBBox, polylineToCurveSubpath } from '../../core/scene';
 import { isPathEditable } from './path-cleanup-actions';
 import { materializeCurves } from './path-node-curve-command-actions';
+import { movedTabsNotice } from './path-node-edit-actions';
 import { boundsForPaths } from './path-node-edit-geometry';
 import { synchronizePolylineShapeGeometry } from './path-node-shape-sync';
 import { selectedObjectIds } from './scene-group-actions';
@@ -52,6 +54,7 @@ function shearMutation(state: AppState, ax: number, ay: number): AppState | Part
   const world = worldShear({ x: (box.minX + box.maxX) / 2, y: (box.minY + box.maxY) / 2 }, ax, ay);
   const targetIds = new Set(targets.map((object) => object.id));
   let sheared = 0;
+  let movedTabs = 0;
   const objects = state.project.scene.objects.map((object) => {
     if (!targetIds.has(object.id) || !isPathEditable(object)) return object;
     const matrix = localBakeMatrix(object.transform, world);
@@ -67,14 +70,29 @@ function shearMutation(state: AppState, ax: number, ay: number): AppState | Part
         : { ...object, paths, bounds };
     if (next === null) return object;
     sheared += 1;
-    return next;
+    // A shear lengthens some edges and not others, so a tab keeps its place on
+    // the sheared outline rather than its share of the whole contour.
+    const followed = withTabsFollowingMap(object, next, {
+      place: (point) => ({
+        x: matrix.a * point.x + matrix.c * point.y + matrix.e,
+        y: matrix.b * point.x + matrix.d * point.y + matrix.f,
+      }),
+      keptPlaceMm: tabKeptPlaceMm(
+        Math.max(Math.hypot(matrix.a, matrix.b), Math.hypot(matrix.c, matrix.d)),
+      ),
+    });
+    movedTabs += followed.moved;
+    return followed.object;
   });
   if (sheared === 0) return state;
   const note =
     skipped === 0
       ? ''
       : ` ${skipped === 1 ? '1 object was' : `${skipped} objects were`} left unchanged: convert text, shapes and images to paths to shear them.`;
-  toast(`Sheared ${sheared === 1 ? '1 object' : `${sheared} objects`}.${note}`);
+  const tabs = movedTabsNotice(movedTabs);
+  toast(
+    `Sheared ${sheared === 1 ? '1 object' : `${sheared} objects`}.${note}${tabs === '' ? '' : ` ${tabs}`}`,
+  );
   return {
     project: { ...state.project, scene: { ...state.project.scene, objects } },
     undoStack: pushUndo(state.project, state.undoStack),

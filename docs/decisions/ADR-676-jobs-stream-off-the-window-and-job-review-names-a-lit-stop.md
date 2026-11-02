@@ -1,8 +1,9 @@
 ## ADR-676 - Marlin and network jobs stream off the window, and Job Review names a lit stop where the window still streams (2026-10-28)
 
-**Status:** Accepted. Decisions 1 and 2 amended by Amendment 1 (2026-10-29): only an
-unknown-command echo of the line in flight hands the Marlin refill back, and a Marlin stop posts
-its stop lines right behind the release. | **Date:** 2026-10-28
+**Status:** Accepted. Decisions 1 and 2 amended by Amendment 1 (2026-10-29): a Marlin stop posts
+its stop lines right behind the release. Amendment 2 (2026-11-02): every unknown-command echo
+with a line in flight hands the refill back and ends the job, and Pause posts its beam-off the
+same way. | **Date:** 2026-10-28
 
 Amends ADR-354 decision 4, which kept Marlin on the window transport, and ADR-354 Amendment 1
 decision 2, which showed the fallback only in a browser. It carries ADR-398 Decision 1 ("no

@@ -1,0 +1,15 @@
+{
+  "measuredOn": "1.0.27",
+  "burns": {
+    "near-closed-profile": {
+      "as-placed": {
+        "width": 40,
+        "height": 30,
+        "minX": 20,
+        "minY": 350,
+        "length": 139.98,
+        "dose": 1679760
+      }
+    }
+  }
+}

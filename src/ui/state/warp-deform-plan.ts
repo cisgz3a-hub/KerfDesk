@@ -5,8 +5,11 @@ import { isBooleanCompoundObject } from '../../core/scene/boolean-compound';
 // only their paths change. Text and drawn rectangles, ellipses, polygons,
 // stars and barcodes rebuild their paths from their settings, so they become
 // plain paths first, as Convert to Path makes them, keeping their id, their
-// operation bindings and their tab anchors.
+// operation bindings and their tab anchors. A bend changes each edge's share of
+// its contour, so each tab goes through the same map as its outline
+// (ADR-494 Amendment 4).
 
+import { tabKeptPlaceMm, withTabsFollowingMap } from '../../core/geometry/edited-tab-anchors';
 import {
   initialWarpDeformHandles,
   warpDeformBox,
@@ -15,7 +18,12 @@ import {
   type PointMap,
   type WarpDeformGrid,
 } from '../../core/geometry/warp-deform-map';
-import { WarpDeformGeometryError, warpObjectPaths } from '../../core/geometry/warp-deform-paths';
+import {
+  WARP_DEFORM_TOLERANCE_MM,
+  WarpDeformGeometryError,
+  warpObjectPaths,
+  worldToLocal,
+} from '../../core/geometry/warp-deform-paths';
 import {
   boundsForPaths,
   isVectorPathObject,
@@ -35,6 +43,8 @@ export type WarpDeformPlan = {
   readonly convertedText: number;
   readonly convertedShapes: number;
   readonly curvesFlattened: boolean;
+  /** Placed tabs the bend left off the outline, moved to the nearest point of it. */
+  readonly movedTabs: number;
   readonly failure?: string;
 };
 
@@ -88,6 +98,7 @@ export function planWarpDeform(scene: Scene, request: WarpDeformRequest): WarpDe
       convertedText: 0,
       convertedShapes: 0,
       curvesFlattened: false,
+      movedTabs: 0,
       failure: error.message,
     };
   }
@@ -101,6 +112,7 @@ function prepareWarpDeform(scene: Scene, request: WarpDeformRequest): WarpDeform
   let convertedText = 0;
   let convertedShapes = 0;
   let curvesFlattened = false;
+  let movedTabs = 0;
   const objects = scene.objects.map((object) => {
     if (isBooleanCompoundObject(object)) return object;
     if (!ids.has(object.id) || object.locked === true || !isVectorPathObject(object)) {
@@ -111,9 +123,16 @@ function prepareWarpDeform(scene: Scene, request: WarpDeformRequest): WarpDeform
     if (result.converted === 'text') convertedText += 1;
     if (result.converted === 'shape') convertedShapes += 1;
     curvesFlattened = curvesFlattened || result.curvesFlattened;
-    return result.object;
+    const followed = withTabsFollowingMap(object, result.object, {
+      place: (point) =>
+        worldToLocal(map.apply(applyTransform(point, object.transform)), result.object.transform),
+      // The bent outline strays from the true bend by up to its own tolerance.
+      keptPlaceMm: tabKeptPlaceMm(stretch) + WARP_DEFORM_TOLERANCE_MM,
+    });
+    movedTabs += followed.moved;
+    return followed.object;
   });
-  return { objects, warped, convertedText, convertedShapes, curvesFlattened };
+  return { objects, warped, convertedText, convertedShapes, curvesFlattened, movedTabs };
 }
 
 function warpSceneObject(object: VectorSceneObject, map: PointMap, stretch: number): WarpedObject {

@@ -7,6 +7,26 @@ export type ProjectLoadNoticeFlags = {
   readonly autofocusCommandRemoved?: true;
   /** Photos kept behind a trace by an earlier build, now on Output off (ADR-673 Amd 1). */
   readonly keptTracePhotosOff?: number;
+  /** What this older project burns differently now (ADR-682 Amendment 3). */
+  readonly oldProjectBurn?: OldProjectBurnNotice;
+};
+
+type InkSize = { readonly widthMm: number; readonly heightMm: number };
+type NoticedObject = { readonly objectId: string; readonly label: string };
+
+export type OldProjectBurnNotice = {
+  /** Frames that got their old line rule back. `record` is set on variable text. */
+  readonly repairedFrames: ReadonlyArray<
+    NoticedObject & { readonly record?: string; readonly before: InkSize; readonly after: InkSize }
+  >;
+  /** Variable frames the file cannot place. `now` is the em rule, `before` the old one. */
+  readonly uncertainFrames: ReadonlyArray<
+    NoticedObject & { readonly record?: string; readonly now?: InkSize; readonly before?: InkSize }
+  >;
+  readonly movedRecords: ReadonlyArray<NoticedObject>;
+  readonly imageDose: ReadonlyArray<
+    NoticedObject & { readonly change: 'dot-width' | 'turned-pass-through' }
+  >;
 };
 
 export type LoadedProject = ProjectLoadNoticeFlags & {
@@ -26,6 +46,7 @@ export function projectLoadResult(
   project: Project,
   migratedFrom: number | undefined,
   keptTracePhotosOff = 0,
+  oldProjectBurn?: OldProjectBurnNotice,
 ): LoadedProject {
   const device = raw['device'];
   const savedFocus = isObject(device) ? device['autofocusCommand'] : undefined;
@@ -39,5 +60,6 @@ export function projectLoadResult(
     ...(migratedFrom === undefined ? {} : { migratedFrom }),
     ...(autofocusCommandRemoved ? { autofocusCommandRemoved: true as const } : {}),
     ...(keptTracePhotosOff > 0 ? { keptTracePhotosOff } : {}),
+    ...(oldProjectBurn === undefined ? {} : { oldProjectBurn }),
   };
 }

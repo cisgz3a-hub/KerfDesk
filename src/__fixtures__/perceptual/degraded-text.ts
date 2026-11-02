@@ -17,6 +17,7 @@ type Font = Awaited<ReturnType<typeof parseOutlineFont>>;
 
 const AA_SAMPLES = 4;
 const CURVE_STEPS = 16;
+const MARGIN = 10;
 
 /** A shipped font: the text tool's own by default, or one from `dir` (for
  *  example the PDF importer's Arial-metric Liberation Sans). */
@@ -46,6 +47,58 @@ export function renderText(
   const width = Math.ceil(box.x2 + 8);
   const height = Math.ceil(box.y2 + 8);
   const outlines = flattenCommands(path.commands);
+  const truth = rasterizePolylines(
+    scaled(outlines, AA_SAMPLES),
+    width * AA_SAMPLES,
+    height * AA_SAMPLES,
+  );
+  const centres = options.antiAliased ? null : rasterizePolylines(outlines, width, height);
+  return {
+    image: greyImage(width, height, (x, y) => {
+      const coverage =
+        centres === null ? boxCoverage(truth, x, y) : (centres.data[y * width + x] ?? 0);
+      return options.paper - (options.paper - options.ink) * coverage;
+    }),
+    truth,
+  };
+}
+
+/** The same text turned by `degrees` clockwise about its start, slanted first
+ *  by `shear` (x gains shear * y, a skewed scan's lean), and moved onto a
+ *  canvas with a margin; off the pixel grid, as a scan's would be. */
+export function renderTurnedText(
+  font: Font,
+  text: string,
+  px: number,
+  options: {
+    readonly antiAliased: boolean;
+    readonly ink: number;
+    readonly paper: number;
+    readonly degrees: number;
+    readonly shear?: number;
+  },
+): RenderedText {
+  const c = Math.cos((options.degrees * Math.PI) / 180);
+  const s = Math.sin((options.degrees * Math.PI) / 180);
+  const turned = flattenCommands(font.getPath(text, 0, 0, px).commands).map((outline) => ({
+    closed: true,
+    points: outline.points.map((p) => {
+      const x = p.x + (options.shear ?? 0) * p.y;
+      return { x: x * c - p.y * s, y: x * s + p.y * c };
+    }),
+  }));
+  const points = turned.flatMap((outline) => outline.points);
+  const minX = Math.min(...points.map((p) => p.x));
+  const minY = Math.min(...points.map((p) => p.y));
+  const width = Math.ceil(Math.max(...points.map((p) => p.x)) - minX + 2 * MARGIN);
+  const height = Math.ceil(Math.max(...points.map((p) => p.y)) - minY + 2 * MARGIN);
+  const outlines = turned.map((outline) => ({
+    closed: true,
+    points: outline.points.map((p) => ({
+      x: p.x - minX + MARGIN + 0.31,
+      y: p.y - minY + MARGIN + 0.17,
+    })),
+  }));
   const truth = rasterizePolylines(
     scaled(outlines, AA_SAMPLES),
     width * AA_SAMPLES,

@@ -50,6 +50,7 @@ import { armHostedRefill, releaseHostedRefill } from './laser-hosted-refill';
 import { captureHostedRefillStream } from './laser-hosted-refill-owner';
 import {
   assertStreamPauseResumeReady,
+  postBeamOffBehindRelease,
   queueStreamPauseBeamOff,
   restoreStreamPauseBeam,
   streamPausePlan,
@@ -103,9 +104,12 @@ export async function runConfirmedPauseJob(context: PauseResumeContext): Promise
   // so the host must freeze at the line where the worker stopped. The
   // handshake runs before the transition owner starts, so it cannot eat the
   // confirmation deadline and turn a slow handover into a fail-dark reset.
-  await releaseHostedRefill(context.refs);
-  assertCurrentConnection();
+  // A stream-side beam-off does not wait for it (ADR-676 Amendment 2).
   const activeDriver = context.driver();
+  const released = releaseHostedRefill(context.refs);
+  const postedBeamOff = postBeamOffBehindRelease(context, activeDriver);
+  await released;
+  assertCurrentConnection();
   const laserJob = context.get().activeJobMachineKind !== 'cnc';
   // ADR-180 amendment 2 (2026-07-25): CNC Pause now takes the same safety-door
   // byte as laser instead of a bare feed hold. GRBL's Door state decelerates in
@@ -133,7 +137,9 @@ export async function runConfirmedPauseJob(context: PauseResumeContext): Promise
     // Marlin: a beam-off queued behind the buffered motion (MA-1).
     const plan = streamPausePlan(context.get(), activeDriver);
     const message =
-      plan === null ? PAUSE_UNSUPPORTED_MESSAGE : streamSidePauseMessage(plan.offLines);
+      plan === null
+        ? PAUSE_UNSUPPORTED_MESSAGE
+        : streamSidePauseMessage([...new Set([...postedBeamOff.lines, ...plan.offLines])]);
     context.get().pushSystemNotice(`[lf2] ${message}`);
     await queueStreamPauseBeamOff(
       {
@@ -144,6 +150,7 @@ export async function runConfirmedPauseJob(context: PauseResumeContext): Promise
         },
       },
       plan,
+      postedBeamOff,
     );
     return;
   }

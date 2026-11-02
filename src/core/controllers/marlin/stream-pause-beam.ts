@@ -69,6 +69,48 @@ export function planMarlinStreamPauseBeam(
   };
 }
 
+/** Every beam-off a Pause could need when the stream has gone no further back
+ * than `queueIndex`, but may be anywhere past it: a worker holds the refill, and
+ * the lines it forwarded have not been read yet. The stop must not wait for them
+ * (rolling audit v9 R1-P2-1, ADR-676 Amendment 2). A beam-off with nothing to
+ * switch off costs one `ok`, and Resume re-arms only what the final position
+ * held, so a line too many is harmless. */
+export function marlinStreamPauseOffLinesFrom(
+  streamLines: ReadonlyArray<string>,
+  queueIndex: number,
+): ReadonlyArray<string> {
+  const sent = Math.max(0, Math.min(queueIndex, streamLines.length));
+  const fan = heldFanPower(streamLines, sent) !== null || someLineFrom(streamLines, sent, litsFan);
+  const inline =
+    heldInlineBeam(streamLines, sent) !== null || someLineFrom(streamLines, sent, armsInline);
+  return [...(fan ? ['M107'] : []), ...(inline ? ['M5 I'] : [])];
+}
+
+function someLineFrom(
+  lines: ReadonlyArray<string>,
+  from: number,
+  matches: (line: string) => boolean,
+): boolean {
+  for (let index = from; index < lines.length; index += 1) {
+    if (matches(lines[index] ?? '')) return true;
+  }
+  return false;
+}
+
+function litsFan(line: string): boolean {
+  if (!/m/i.test(line)) return false;
+  const words = wordsForLine(line);
+  const command = marlinCommand(words);
+  return (
+    command?.letter === 'M' && command.value === 106 && (lastWord(words, 'S') ?? FULL_FAN).value > 0
+  );
+}
+
+function armsInline(line: string): boolean {
+  if (!isInlineModeSwitch(line)) return false;
+  return marlinCommand(wordsForLine(line))?.value !== 5;
+}
+
 /** The fan speed the sent lines left, when it is above zero. */
 function heldFanPower(lines: ReadonlyArray<string>, sent: number): PowerWord | null {
   for (let index = sent - 1; index >= 0; index -= 1) {

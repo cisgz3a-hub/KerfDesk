@@ -1,6 +1,6 @@
 import { normalizeSceneObject } from './normalize-scene-object';
 import { settleLegacyTraceSources } from './legacy-trace-source';
-import { projectLoadResult, type LoadedProject } from './project-load-metadata';
+import type { LoadedProject } from './project-load-metadata';
 import { normalizePositioningLight } from '../../core/devices/positioning-light';
 import type { ReliefAuthoringResolutions } from './project-relief-authoring-validator';
 // deserializeProject - parses a .lf2 string and returns a typed Project, or a
@@ -42,6 +42,7 @@ import {
   overlapMergeTolerance,
 } from './normalize-optimization-fields';
 import { migrateToCurrent } from './migrations';
+import { upgradedLoadResult } from './old-project-burn-notice';
 import { normalizeCncTools } from './normalize-cnc-tools';
 import { normalizeCncMachiningSetup } from './project-cnc-setup-validator';
 import { defaultCncMachiningSetup } from '../../core/scene/cnc-machining-setup';
@@ -113,7 +114,7 @@ export function deserializeProjectValue(raw: unknown): DeserializeResult {
     };
   }
 
-  return projectLoadResult(workingRaw, settled.project, migratedFrom, settled.keptPhotosOff);
+  return upgradedLoadResult(raw, workingRaw, settled, migratedFrom, deserializeProject);
 }
 
 function normalizeProject(

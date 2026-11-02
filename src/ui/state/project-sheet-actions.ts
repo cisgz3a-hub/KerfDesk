@@ -63,7 +63,10 @@ export function projectSheetActions(set: Set, get: () => AppState): ProjectSheet
       if (!replace({ ...parsed.project, sheetBook })) return false;
       // A sheet archived by an earlier build is read only now; the document's
       // own migration was named when it opened.
-      pushProjectLoadNotices(parsed, useToastStore.getState().pushToast, { migration: false });
+      pushProjectLoadNotices(parsed, useToastStore.getState().pushToast, {
+        migration: false,
+        keepEarlierReview: true,
+      });
       return true;
     },
     renameProjectSheet: (id, name) =>

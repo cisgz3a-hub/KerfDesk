@@ -388,7 +388,8 @@ destination and cannot overwrite the template source.
 4. A Fill shape is solid only where it is filled. Artwork seen through one of its holes is picked
    first; clicking an empty hole selects the shape, as clicking inside a Line shape does
    (ADR-683). The same holds for a hole another shape on its Fill operation cuts, and inside
-   stacked copies that cancel (ADR-683 Amendment 1).
+   stacked copies that cancel (ADR-683 Amendment 1). In Wireframe, where nothing is filled, every
+   shape's interior lets clicks through this way (ADR-683 Amendment 2).
 
 #### Multi — shift+click
 1. Shift+click on additional object.
@@ -709,7 +710,11 @@ the linked artwork.
    on different operations fill separately. A shape given a second Fill operation (**Add
    operation**) shows filled wherever either operation burns it, and artwork drawn between
    shapes of one operation, such as a photo under a caption, keeps its place in the drawing
-   order (ADR-683 Amendment 1).
+   order (ADR-683 Amendment 1). What it shows is what the job does (ADR-683 Amendment 2): an
+   operation with Output off does not count beside one with Output on, a shape on Line then Fill
+   shows its outline and its fill (a LightBurn Cut layer with a Scan sub-layer opens this way), and
+   with two or more jig outlines each piece burns on its own, so a label on a jig copy shows
+   filled, not as a hole. Artwork on an operation with Output off still shows what it would burn.
 
 ### F-A6e. Rubber-band outline, Close Path, Reverse Direction, Delete Duplicates, Flatten Image Mask (ADR-480)
 
@@ -1169,8 +1174,13 @@ that owns those fields, without changing the existing Frame/Start policy.
    says when one moved. **Weld**, **Subtract / Intersect / Exclude**
    and **Offset Shapes** with **Delete original objects** make new shapes without them, which then
    take automatic tabs, and a toast says the placed tabs were removed (ADR-494 Amendment 3).
-   **Clear placed tabs** (in Cut Settings or in the canvas hint) returns the artwork to automatic
-   tabs.
+   A **Design Studio** part or sketch keeps each tab on its own edge at its new size, and its review
+   names any tab it cannot keep. One handle drag is measured from where it began, so a drag that
+   shrinks and returns leaves tabs in place. **Shear**, **Warp** and **Deform** carry each tab
+   through the same map as its outline. **Dogbone** removes them and says so. A text edit keeps a
+   tab while its contour is the same outline, and otherwise removes it and says how many
+   (ADR-494 Amendment 4). **Clear placed tabs** (in Cut Settings or in the canvas hint) returns the
+   artwork to automatic tabs.
 5. Job Review's detail line reads e.g. "tabs every 50 mm (at most 6) × 0.5 mm, cut at 20%" or
    "tabs 4 × 0.5 mm, 3 placed by hand". With none of this set, output is unchanged.
 6. Material presets do not store these settings; applying a preset keeps what the operation has.
@@ -1694,7 +1704,8 @@ the completed physical Frame is the spatial source of truth.
 
 #### Success — schema older
 1. Migration runs to current version.
-2. Toast (info) identifies the migration, for example: `Project migrated from v1 to v2.`
+2. Toast (info) identifies the migration, for example: `Project migrated from v1 to v2.` Any change
+   to what it burns follows as a warning (see "an older project burns differently now").
 3. Nothing is written until the user saves. Save then writes the migrated project over the file
    (ADR-550); earlier KerfDesk versions report it as newer instead of misreading it.
 
@@ -1776,6 +1787,32 @@ the completed physical Frame is the spatial source of truth.
    (`This project was saved by an earlier KerfDesk and was migrated from schema v<n>.`) and a
    removed Auto-focus command, as Open does.
 4. Saving writes the file without the marker, so the notice does not come back.
+
+#### Edge — an older project burns differently now (ADR-682 Amendment 3)
+What the file holds decides these, not one release's update notes, which a user who skips that
+release never sees. Each reader above gives them: Open, Recent Projects, a drop or the operating
+system, a local snapshot, New from template, Restore of an autosave, and switching to a sheet an
+earlier build archived. A frozen production design in the file counts too. Job Review repeats the
+same words while those objects are in the project. Saving settles it: the next open says nothing.
+
+1. **Framed text saved through 1.0.28.** 1.0.28 converted single-line shrink frames without their
+   line rule, so records came out up to a third smaller. If the stored geometry shows the old rule
+   drew the frame, the frame gets its rule back and burns as it did on 1.0.27. A warning names each
+   text and both sizes, for example: `“{{csv:name}}”: “ANNA” goes from 29.61 × 7.48 mm back to
+   39.59 × 10.00 mm`, and says to lower Size if the smaller size was kept on purpose.
+2. **A variable frame the file cannot place.** When both rules draw the template the same, the file
+   cannot show which one it was designed under. The frame stays on the current rule and the warning
+   names the sizes under both, unless every CSV record fits the same under either, when nothing is
+   said. A plain frame is not mentioned: it burns its stored geometry either way.
+3. **Variable records that move.** A bent, on-a-path or framed record from before schema 19, or a
+   framed record from schema 19, now takes its template's baseline, and a framed one may refit a little
+   smaller to stay in its frame (ADR-682 Amendment 2). A warning names the text and says to Frame
+   before a batch.
+4. **Images that burn more.** From before schema 19: Grayscale or Pass-Through with Dot Width, and
+   Pass-Through turned off the scan's axes. A warning names each image and says to test first.
+
+At most two toasts appear, frames in one and burn changes in the other, because only the newest three
+are shown. Nothing here is a gate: Frame, Start and Save are unchanged.
 
 #### Edge — file is a valid .lf2 but references a device profile not on this machine
 - Project loads with the embedded device profile, adopted wholesale (`deserializeProject`).
@@ -2073,16 +2110,23 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 5. Pause releases background refill. Confirmed Resume and tool-change Continue restore it for
    the same live job. Abort, disconnect or a replacement job cannot inherit an old refill queue.
    Marlin's Abort and Disconnect send their stop lines right behind the refill's handback, so
-   a backlog in a window that was busy never delays them (ADR-676 Amendment 1).
+   a backlog in a window that was busy never delays them (ADR-676 Amendment 1). Marlin's Pause
+   sends its beam-off the same way and still freezes at the line where the worker stopped. It
+   may queue an `M107` or `M5 I` with nothing to switch off; Resume waits for its reply as usual
+   (ADR-676 Amendment 2).
 6. Browser shutdown, computer sleep and USB loss still interrupt a live serial connection.
 7. The desktop app, like Chrome, lets the window and the worker see only the ports picked in
    its Select dialog, so an identical second adapter (a laser controller and an Arduino that
    both use a CH340, for example) no longer stops background streaming. A pick lasts until
    Forget Controller, and on macOS and Linux also until an app restart; picking both identical
    adapters is still ambiguous and uses the window port (ADR-366, ADR-552).
-8. A Marlin `Unknown command` echo of the line in flight ends the job as before (MA-12). An echo
-   of any other text, such as a move whose `G` was lost on the wire, stays in the log, and the
-   worker keeps streaming the rest of the job (ADR-676 Amendment 1).
+8. A Marlin `Unknown command` echo during a job means Marlin skipped the line in flight, so the
+   job stops as errored with the beam off, on either transport. That holds when the echo reads
+   differently from the line, as it does when a line loses its first byte on the wire and a
+   skipped beam-off would burn the next travel across the work. The notice names what KerfDesk
+   sent and what the controller read. Only an echo of a non-job line still owed a reply, such as
+   a Console query, stays in the log, and the job runs on (ADR-676 Amendment 2). A damaged line
+   usually gives no echo at all, so this does not catch every one.
 
 #### Error — WebSerial not supported
 1. Connection button is disabled, with a red hint above: "Your browser doesn't support WebSerial. Use Chrome, Edge, Brave (may require enabling under Brave Shields/flags), or Arc, or install the Windows desktop app."
@@ -3398,7 +3442,10 @@ authorization, Frame proof, controller command, or safety boundary.
   controller its reset, M5 and M9 through that session before closing it. The notice says the
   reset may not have arrived, and the restart steps back over the planner (ADR-398
   Amendment 6). A write whose delivery is uncertain is never repeated, and nothing queued behind
-  it is sent.
+  it is sent. The background worker that streams a network job by default does the same when one
+  of its requests fails, waiting up to 3 s for that stop before it closes the session (ADR-398
+  Amendment 7). A stalled desktop app also carries the socket, so nothing reaches the controller
+  until it answers, and a window that is hung for those 3 s sends no stop.
 
 #### Painted second passes (2026-09-22, ADR-341)
 
@@ -4762,11 +4809,14 @@ exit of the same length along its last edge, and that exit is skipped and disclo
 rule (`contour-exit …`, "Contour entry and exit", ADR-239 Amendment 2). Preview, timing, Frame bounds and output use the same prepared result. Earlier archived
 jobs retain their original entry behaviour so recovery does not silently change sealed output.
 
-Constant-power advice (ADR-257 Amendments 1 and 2). Where a dialect's default burns an operation
+Constant-power advice (ADR-257 Amendments 1, 2 and 3). Where a dialect's default burns an operation
 with M3 on GRBL-family output, Save, Start and Job Review advise: GRBL Compatible images whose
 one-move-per-pixel rows outrun the controller's look-ahead burn darker than the Preview; GRBL
 Compatible Scan Line fills whose strokes and gaps are short enough for the same look-ahead to hold
-a row below the feed burn small text darker than wider areas, whatever the overscan; and GRBL
+a row below the feed burn small text darker than wider areas, whatever the overscan; GRBL
+Compatible Island Fills, at every overscan, whose rows cannot reach the feed on their own runways
+(capped at half the row, and none at Overscan 0) burn row ends and small islands darker, and the
+advice says how much Overscan or which speed holds; and GRBL
 Compatible and 4040 Line cuts, and GRBL Compatible offset fills, burn darker at corners (and at
 path starts and ends without runways). The advice points GRBL 1.1f and newer to GRBL Dynamic
 (or the operation's Dynamic Power mode on the 4040), as LightBurn does; with a current `$I`

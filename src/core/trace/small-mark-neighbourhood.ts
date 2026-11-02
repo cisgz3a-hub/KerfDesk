@@ -13,7 +13,9 @@
 //     have none.
 //   * Debris. A dirty scan scatters dark specks of EVERY size, so it leaves
 //     sub-floor specks (under the size floor) and lone specks (no ink within
-//     the support radius) in clean paper around its larger ones. An
+//     the support radius) in clean paper around its larger ones. A sub-floor
+//     speck within two pixels of a letter is that letter's own piece instead
+//     (a 1-bit tittle, a tail's tip): it is not debris. An
 //     anti-aliased drawing's own sub-floor specks come out grey (partial
 //     pixel coverage) and its lone specks are rare (owl: 16 in 1 M px² of
 //     paper; a dirty scan with one speck per 105 px²: 114 per 100 000 px²).
@@ -28,8 +30,10 @@
 //   * Coverage. Debris is sized by the ink a speck carries, as the policy's
 //     floors are, so an anti-aliased dot that a floor keeps is not counted as
 //     dust; and no mark is counted as dust against itself (Amendment 3).
-//   * Text line. A lone dot that sits on the baseline of a letter nearby is a
-//     full stop, not a lone speck (small-mark-text-line.ts).
+//   * Text line. A lone dot on the baseline of a letter nearby, at whatever
+//     angle the text runs, is a full stop; so is one just past a descender,
+//     and a like dot straight above either is a colon's: none is a lone speck
+//     (small-mark-text-line.ts).
 //
 // Everything is in source pixels scaled to the mask grid. Labelling is one
 // linear pass; each query is bounded by a constant window (candidates are
@@ -39,7 +43,7 @@
 // Our own design from connected-component analysis (ADR-017).
 
 import type { CrackSubPixelField } from './contour-boundary';
-import { sitsOnTextLine, type LabelBoxes } from './small-mark-text-line';
+import { createTextLine, type LabelBoxes } from './small-mark-text-line';
 
 /** A size within this many mask px under a floor is AT the floor: coverage
  *  is a floating-point sum, and a hard 3 px² dot on the 3x grid sums to
@@ -93,8 +97,11 @@ export type InkNeighbourhood = {
   /** Unbridged dark debris in the region's tile and the eight around it,
    *  the region itself left out. */
   readonly debrisAround: (region: ReadonlyArray<number>) => number;
-  /** A compact, solid dot on the baseline of a letter nearby (a full stop). */
+  /** A compact, solid dot on the baseline of a letter nearby (a full stop),
+   *  just past a descender, or a colon's other dot. */
   readonly onTextLine: (region: ReadonlyArray<number>) => boolean;
+  /** A dot straight above a dot on a baseline, however small. */
+  readonly colonDot: (region: ReadonlyArray<number>) => boolean;
   /** Nearest like mark and nearest stroke, edge to edge (Infinity: none
    *  within the support radius), and that stroke's local width (mask px). */
   readonly support: (region: ReadonlyArray<number>) => Support;
@@ -126,7 +133,15 @@ export function createInkNeighbourhood(input: InkNeighbourhoodInput): InkNeighbo
     const x = p % width;
     return [Math.floor(x / tile), Math.floor((p - x) / width / tile)];
   };
-  const textLine = { width, height, ink: input.ink, boxes, labelOf, baselinePx: input.sourcePx };
+  const textLine = createTextLine({
+    width,
+    height,
+    ink: input.ink,
+    boxes,
+    labelOf,
+    areas,
+    baselinePx: input.sourcePx,
+  });
 
   const bridgedFrom = (pixels: ReadonlyArray<number>, own: (p: number) => boolean): boolean =>
     input.bridgeLuma !== null &&
@@ -136,7 +151,7 @@ export function createInkNeighbourhood(input: InkNeighbourhoodInput): InkNeighbo
   const isLoneSpeck = (component: ReadonlyArray<number>, own: (p: number) => boolean): boolean =>
     !hasInkWithin(boundingBox(component, width), own, input, reach, input.supportPx) &&
     underFloor(input.size(component), input.isolatedMinArea) &&
-    !sitsOnTextLine(component, textLine);
+    !textLine.holds(component);
 
   for (const component of small) {
     const label = labelOf(component[0] ?? 0);
@@ -146,7 +161,11 @@ export function createInkNeighbourhood(input: InkNeighbourhoodInput): InkNeighbo
     const subFloor =
       underFloor(component.length, input.minArea) &&
       underFloor(input.size(component), input.minArea);
-    const isDebris = subFloor ? darkness >= AUTO_HARD_SPECK_REACH : isLoneSpeck(component, own);
+    const isDebris = subFloor
+      ? darkness >= AUTO_HARD_SPECK_REACH &&
+        !textLine.besideLetter(component) &&
+        !textLine.colonDot(component)
+      : isLoneSpeck(component, own);
     if (!isDebris || bridgedFrom(component, own)) continue;
     const [tx, ty] = tileOf(component[0] ?? 0);
     const t = ty * tilesX + tx;
@@ -171,7 +190,8 @@ export function createInkNeighbourhood(input: InkNeighbourhoodInput): InkNeighbo
       const sy = (self - sx) / tilesX;
       return Math.abs(sx - tx) <= 1 && Math.abs(sy - ty) <= 1 ? count - 1 : count;
     },
-    onTextLine: (region) => sitsOnTextLine(region, textLine),
+    onTextLine: textLine.holds,
+    colonDot: textLine.colonDot,
     support: (region) => {
       const members = new Set(region);
       const kind = (p: number): 'like' | 'stroke' | null => {

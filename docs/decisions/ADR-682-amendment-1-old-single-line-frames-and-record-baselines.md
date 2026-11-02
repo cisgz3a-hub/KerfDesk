@@ -1,7 +1,9 @@
 ## ADR-682 Amendment 1 - Old single-line frames keep their line rule, and boxed records share the template's baseline at any size (2026-10-29)
 
 **Status:** Accepted; tested against emitted G-code from a schema-18 project that the parent of
-#1507 built and saved. Not hardware-tested. | **Date:** 2026-10-29
+#1507 built and saved. Not hardware-tested. Decision 1's "cannot be undone" is replaced by
+[Amendment 3](ADR-682-amendment-3-recovering-frames-and-announcing-old-project-burns.md). |
+**Date:** 2026-10-29
 
 Amends Decision 4 and Decision 6 and the frame bullet of the Consequences. Fixes rolling audit v8
 N4-P1-1 (P1, a regression from #1507) and N4-P2-1 (P2), and settles N4-P3-3

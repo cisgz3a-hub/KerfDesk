@@ -1,5 +1,6 @@
 import type { MouseEvent, RefObject } from 'react';
-import { hitTest, type Project } from '../../core/scene';
+import { type Project } from '../../core/scene';
+import { workspaceHitTest } from './workspace-hit-test';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import type { DragState } from './drag-state';
@@ -22,7 +23,7 @@ export function openContextBarForRightClick(args: {
     if (!selectTracePartForContextMenu(args)) return;
   } else {
     const point = canvasMouseToScene(args.e, args.ref.current, args.project, args.viewState);
-    const hitId = point === null ? null : hitTest(args.project.scene, point);
+    const hitId = point === null ? null : workspaceHitTest(args.project.scene, point);
     args.selectObject(hitId);
   }
   const current = useStore.getState();

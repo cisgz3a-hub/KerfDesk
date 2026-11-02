@@ -31,7 +31,12 @@ export function reserveWrite(
   const owedAcks = owedTerminalAcks(line, source);
   const writeEpoch = refs.writeEpoch ?? 0;
   const ownedMotionOperationId = currentMotionOperationId(get, action);
-  const reservation = reserveUntrackedAcks(refs, owedAcks, ownedMotionOperationId ?? null);
+  const reservation = reserveUntrackedAcks(
+    refs,
+    owedAcks,
+    ownedMotionOperationId ?? null,
+    owedAcks > 0 ? line.split('\n').filter((text) => text !== '') : [],
+  );
   // A same-tick terminal response must already have its exact FIFO owner.
   set((state) => ({
     pendingTransportWrites: (state.pendingTransportWrites ?? 0) + 1,
