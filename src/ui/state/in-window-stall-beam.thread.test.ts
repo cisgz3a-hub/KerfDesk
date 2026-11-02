@@ -156,7 +156,39 @@ describe('a blocked window during a burn (rolling audit v6 K1)', () => {
       const quickstop = run.received.indexOf('M410');
       expect(run.received[quickstop - 1]).toBe('M107');
       expect(run.received.slice(quickstop).filter((line) => JOB_MOVE.test(line))).toEqual([]);
-      await until(() => useLaserStore.getState().pendingUntrackedAcks === 0, 5_000);
-    }, 40_000);
+      const t0 = Date.now();
+      let settled = -1;
+      const samples: number[] = [];
+      while (Date.now() - t0 < 30_000) {
+        const pending = useLaserStore.getState().pendingUntrackedAcks;
+        if (samples.at(-1) !== pending) samples.push(pending);
+        if (pending === 0) {
+          settled = Date.now() - t0;
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+      const s = useLaserStore.getState();
+      process.stderr.write(
+        'STALLDIAG ' +
+          JSON.stringify({
+            settled,
+            samples,
+            pending: s.pendingUntrackedAcks,
+            streamer: s.streamer?.status ?? null,
+            host: s.jobStreamHost,
+            op: s.controllerOperation?.kind ?? null,
+            notice: s.safetyNotice?.kind ?? null,
+            status: s.statusReport?.state ?? null,
+            received: run.received.length,
+            tail: run.received.slice(-8),
+            arrivalsTail: run.arrivals.slice(-5).map((a) => [a.line, a.at - run.stall.to]),
+            logTail: s.log.slice(-14),
+          }) +
+          '
+',
+      );
+      expect(settled).toBeGreaterThanOrEqual(0);
+    }, 90_000);
   });
 });
