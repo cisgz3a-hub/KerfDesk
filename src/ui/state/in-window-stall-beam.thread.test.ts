@@ -185,8 +185,7 @@ describe('a blocked window during a burn (rolling audit v6 K1)', () => {
             arrivalsTail: run.arrivals.slice(-5).map((a) => [a.line, a.at - run.stall.to]),
             logTail: s.log.slice(-14),
           }) +
-          '
-',
+          String.fromCharCode(10),
       );
       expect(settled).toBeGreaterThanOrEqual(0);
     }, 90_000);
