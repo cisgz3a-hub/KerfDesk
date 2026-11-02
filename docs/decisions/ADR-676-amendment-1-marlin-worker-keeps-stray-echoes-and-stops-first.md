@@ -1,6 +1,9 @@
 ## ADR-676 Amendment 1 - The Marlin worker keeps its refill through a stray Unknown-command echo, and a Marlin stop sends its lines ahead of the handback (2026-10-29)
 
-**Status:** Accepted on 2026-10-29 |
+**Status:** Accepted on 2026-10-29. Decision 1 is replaced by Amendment 2 (2026-11-02): the echo
+that does not name the line in flight means Marlin skipped that line, so the job ends. Its aim
+stands: the refill never moves to the window with nothing said. Decision 2 stands, and Amendment 2
+gives Pause the same order. |
 **Amends:** ADR-676 decision 1 (which Marlin replies hand the refill back), decision 2 (the
 order of a Marlin stop's release and stop lines) and its Consequences (the stop's wait)
 

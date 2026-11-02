@@ -180,6 +180,12 @@ export type ControllerDriver = {
     streamLines: ReadonlyArray<string>,
     queueIndex: number,
   ) => StreamPauseBeamPlan;
+  /** Every beam-off Pause could need with the stream at `queueIndex` or anywhere
+   *  past it, for a worker-held refill whose position is not known yet. */
+  readonly streamPauseOffLinesFrom?: (
+    streamLines: ReadonlyArray<string>,
+    queueIndex: number,
+  ) => ReadonlyArray<string>;
   /** Present when the firmware can run without its laser output module. */
   readonly laserModuleProbe?: LaserModuleProbe;
   /** Present when the firmware's Home answers `ok` whether or not anything
