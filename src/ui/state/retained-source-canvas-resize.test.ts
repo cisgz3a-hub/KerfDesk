@@ -183,6 +183,77 @@ describe('a canvas-resized constrained sketch (ADR-573 Amendment 1)', () => {
   });
 });
 
+// R6-P2-2 (rolling audit v9): the toolbar shows W and H to 3 decimals in mm
+// and 4 in inches, so a size that does not divide evenly is typed rounded.
+// 120 x 70 typed to W 100, H 58.333 read "stretched (83.33%, 83.33%)" and
+// Apply returned it to 120 x 70 (ADR-573 Amendment 4).
+describe('W then H typed as the toolbar shows them (ADR-573 Amendment 4)', () => {
+  const MM_PER_INCH = 25.4;
+  const asShown = {
+    mm: (valueMm: number) => Number(valueMm.toFixed(3)),
+    in: (valueMm: number) => Number((valueMm / MM_PER_INCH).toFixed(4)) * MM_PER_INCH,
+  };
+
+  function drawRectangle(widthMm: number, heightMm: number): ImportedSvg {
+    const drawn = appendSketchPrimitive(sketchFromTemplate('custom'), 'rectangle', [0, 0, 10, 10]);
+    if (drawn === null) throw new Error('Rectangle refused');
+    applySketch(drawn);
+    const first = only();
+    if (first.constrainedSketch === undefined) throw new Error('Missing sketch');
+    applySketch(
+      withParameters(first.constrainedSketch, {
+        outline1_width: widthMm,
+        outline1_height: heightMm,
+      }),
+      first,
+    );
+    return only();
+  }
+
+  // Round sources with a factor that does not terminate, and sources that are
+  // not round themselves (a hexagon's bounds, thirds, a root of two).
+  const cases = [
+    { w: 120, h: 70, toW: 100 },
+    { w: 70, h: 45, toW: 100 },
+    { w: 30, h: 17, toW: 100 },
+    { w: 60, h: 30, toW: 100 },
+    { w: 100, h: 86.60254, toW: 200 },
+    { w: 100 / 3, h: 20, toW: (2 * 100) / 3 },
+    { w: 70, h: 70 / 3, toW: 140 },
+    { w: 41.4214, h: 12.5, toW: 41.4214 * 1.5 },
+  ];
+  for (const unit of ['mm', 'in'] as const) {
+    for (const { w, h, toW } of cases) {
+      it(`folds ${w.toFixed(3)} x ${h.toFixed(3)} typed in ${unit} to W ${toW.toFixed(3)}`, () => {
+        drawRectangle(w, h);
+        const typedW = asShown[unit](toW);
+        const typedH = asShown[unit]((h * toW) / w);
+        typeSize('width', typedW);
+        const resized = typeSize('height', typedH);
+        expect(retainedSourceScale(resized)).toMatchObject({ kind: 'even' });
+
+        const opened = editableConstrainedSketch(resized);
+        if (opened === undefined) throw new Error('Missing sketch');
+        applySketch(opened, resized);
+        expect(only().transform).toMatchObject({ scaleX: 1, scaleY: 1 });
+        const burned = compiledSize();
+        expect(Math.abs(burned.w - typedW)).toBeLessThanOrEqual(0.002);
+        expect(Math.abs(burned.h - typedH)).toBeLessThanOrEqual(0.002);
+      });
+    }
+  }
+
+  it('keeps a 0.01 mm stretch typed into H as a stretch', () => {
+    for (const { w, h, toW } of cases) {
+      resetStore();
+      drawRectangle(w, h);
+      typeSize('width', asShown.mm(toW));
+      const resized = typeSize('height', asShown.mm((h * toW) / w + 0.01));
+      expect(retainedSourceScale(resized)).toMatchObject({ kind: 'stretched' });
+    }
+  });
+});
+
 describe('a canvas-resized generated part (ADR-573 Amendment 1)', () => {
   function createPanel(): GeneratedPartObject {
     const prepared = useStore.getState().preparePartGenerator(defaultPartGenerator('panel'));
