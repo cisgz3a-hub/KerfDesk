@@ -2,7 +2,7 @@
 
 **Requested:** the maintainer, on 2026-11-02: "design another loop for speed and performance".
 
-**Status:** approved by the maintainer on 2026-11-02 ("yes go"), budgets as proposed. It starts as soon as rolling v9 finishes, because timings taken beside other audit agents are not comparable (see Measurement rules).
+**Status:** approved by the maintainer on 2026-11-02 ("yes go"), budgets as proposed. Started 2026-11-02, after rolling v9 (#1540) merged.
 
 **How this differs from the rolling rounds:** like [Q1](../2026-10-27-quality-q1/AREAS.md), this round measures as well as finds defects. Each area produces:
 - a scorecard with one row per operation: input size | median and worst time | longest UI block | peak memory | budget | verdict;
