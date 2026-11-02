@@ -76,7 +76,9 @@ describe('bounded linked part generators', () => {
     expect(legacy.paths[0]?.curves?.[0]?.segments).toHaveLength(3);
     expect(partGeneratorGeometryMatches(legacy)).toBe(true);
     const definition = legacy.partGenerator.definition;
-    const next = requirePart(regeneratePartGenerator(legacy, { ...definition, widthMm: 90 }));
+    const next = requirePart(
+      regeneratePartGenerator(legacy, { ...definition, widthMm: 90 }),
+    ).object;
     expect(next.paths[0]?.operationIds).toEqual(['boundary']);
     expect(next.paths[0]?.curves?.[0]?.segments).toHaveLength(4);
     expect(partGeneratorGeometryMatches(next)).toBe(true);
@@ -98,7 +100,7 @@ describe('bounded linked part generators', () => {
     };
     const result = requirePart(
       regeneratePartGenerator(edited, { ...definition, widthMm: 80, columns: 5 }),
-    );
+    ).object;
     const nextIndex = result.partGenerator.pathKeys.indexOf(key);
     expect(nextIndex).not.toBe(index);
     expect(result.paths[nextIndex]).toMatchObject({
@@ -121,7 +123,7 @@ describe('bounded linked part generators', () => {
     const definition = original.partGenerator.definition as FixtureGenerator;
     const next = requirePart(
       regeneratePartGenerator(original, { ...definition, rows: 3, columns: 4, widthMm: 80 }),
-    );
+    ).object;
     expect(next.partGenerator.pathKeys.slice(0, 5)).toEqual(
       original.partGenerator.pathKeys.slice(0, 5),
     );

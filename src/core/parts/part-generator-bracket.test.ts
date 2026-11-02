@@ -21,7 +21,9 @@ describe('bracket hole offsets use the actual hole edge clearance', () => {
 
   it('regenerates valid inset holes without changing operation ownership or source geometry', () => {
     const original = generatedPart(bracket);
-    const next = requirePart(regeneratePartGenerator(original, { ...bracket, holeOffsetMm: 37 }));
+    const next = requirePart(
+      regeneratePartGenerator(original, { ...bracket, holeOffsetMm: 37 }),
+    ).object;
     expect(next.paths[1]?.curves?.[0]?.start).toEqual({ x: 25, y: 6 });
     expect(next.paths[2]?.curves?.[0]?.start).toEqual({ x: 8, y: 3 });
     expect(next.paths.map((path) => path.operationIds)).toEqual(

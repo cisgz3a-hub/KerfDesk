@@ -12,6 +12,9 @@
 // stretch of the old box onto the new one puts it, on the nearest point of the
 // rebuilt outline (Amendment 3).
 //
+// Shear, Warp and Deform bend an outline through a known map, so each tab goes
+// through the same map as the outline it sits on (Amendment 4).
+//
 // Pure core — no I/O, no globals, deterministic.
 
 import {
@@ -43,9 +46,9 @@ export type FollowedTabs<T extends SceneObject> = {
 
 type Projector = ReturnType<typeof createTabPolylineProjector>;
 
-// Where a place on the old artwork lies in the rebuilt artwork's own
-// coordinates, and how much the stretch enlarges the old outline's flattening.
-type Stretch = { readonly place: (point: Vec2) => Vec2; readonly factor: number };
+/** Where a place on the old artwork lies in the new artwork's own coordinates,
+ *  and how far from the new outline that place may lie and still be on it. */
+export type TabPlaceMap = { readonly place: (point: Vec2) => Vec2; readonly keptPlaceMm: number };
 
 /** `after`, with every tab placed by hand on a contour the edit changed re-measured
  *  from `before`. The edit keeps each contour's index, as Delete and Fillet do. */
@@ -66,10 +69,27 @@ export function withTabsFollowingRebuild<T extends SceneObject>(
   return followTabs(before, after, boxStretch(before.bounds, after.bounds));
 }
 
+/** `after`, `before` bent through `map` with its contours in the same order,
+ *  with every tab placed by hand at the nearest point of the bent outline to
+ *  where the map puts it. */
+export function withTabsFollowingMap<T extends SceneObject>(
+  before: SceneObject,
+  after: T,
+  map: TabPlaceMap,
+): FollowedTabs<T> {
+  return followTabs(before, after, map);
+}
+
+/** The distance within which a place `factor` times larger than the old outline
+ *  still counts as on the new one: a stretch enlarges the old flattening error. */
+export function tabKeptPlaceMm(factor: number): number {
+  return DEFAULT_MACHINE_CURVE_TOLERANCE_MM * (1 + factor);
+}
+
 function followTabs<T extends SceneObject>(
   before: SceneObject,
   after: T,
-  stretch: Stretch | null,
+  stretch: TabPlaceMap | null,
 ): FollowedTabs<T> {
   if (!('paths' in before) || !('paths' in after)) return { object: after, moved: 0 };
   if (after.cncTabAnchors === undefined && after.laserTabAnchors === undefined) {
@@ -81,11 +101,7 @@ function followTabs<T extends SceneObject>(
   const contoursBefore = new Map<number, ReadonlyArray<Polyline>>();
   const contoursAfter = new Map<number, ReadonlyArray<Polyline>>();
   const projectors = new Map<Polyline, Projector>();
-  // A stretch enlarges the old outline's flattening error with it.
-  const keptPlaceMm =
-    stretch === null
-      ? TAB_KEPT_PLACE_MM
-      : DEFAULT_MACHINE_CURVE_TOLERANCE_MM * (1 + stretch.factor);
+  const keptPlaceMm = stretch === null ? TAB_KEPT_PLACE_MM : stretch.keptPlaceMm;
   // Where a tab belongs on its new contour, or null when it keeps its anchor.
   const target = (
     anchor: CncTabAnchor,
@@ -94,8 +110,12 @@ function followTabs<T extends SceneObject>(
     const editedPath = after.paths[anchor.pathIndex];
     if (sourcePath === undefined || editedPath === undefined) return null;
     if (stretch === null && sourcePath === editedPath) return null;
-    const old = cached(contoursBefore, anchor.pathIndex, sourcePath)[anchor.polylineIndex];
-    const next = cached(contoursAfter, anchor.pathIndex, editedPath)[anchor.polylineIndex];
+    const old = flattenedContours(contoursBefore, anchor.pathIndex, sourcePath)[
+      anchor.polylineIndex
+    ];
+    const next = flattenedContours(contoursAfter, anchor.pathIndex, editedPath)[
+      anchor.polylineIndex
+    ];
     if (old === undefined || next === undefined) return null;
     if (stretch === null && sameOutline(old, next)) return null;
     const located = locate(anchor);
@@ -127,8 +147,8 @@ function followTabs<T extends SceneObject>(
   return { object, moved };
 }
 
-// Each axis of the old box onto the new one; an axis without size keeps its scale.
-function boxStretch(from: Bounds, to: Bounds): Stretch {
+/** Each axis of the old box onto the new one; an axis without size keeps its scale. */
+export function boxStretch(from: Bounds, to: Bounds): TabPlaceMap {
   const x = axisStretch(from.maxX - from.minX, to.maxX - to.minX);
   const y = axisStretch(from.maxY - from.minY, to.maxY - to.minY);
   return {
@@ -136,7 +156,7 @@ function boxStretch(from: Bounds, to: Bounds): Stretch {
       x: to.minX + (point.x - from.minX) * x,
       y: to.minY + (point.y - from.minY) * y,
     }),
-    factor: Math.max(1, x, y),
+    keptPlaceMm: tabKeptPlaceMm(Math.max(1, x, y)),
   };
 }
 
@@ -144,7 +164,10 @@ function axisStretch(from: number, to: number): number {
   return Number.isFinite(from) && Number.isFinite(to) && from > 0 && to > 0 ? to / from : 1;
 }
 
-function measurementCopy(object: SceneObject & { readonly paths: ReadonlyArray<ColoredPath> }) {
+/** A closed copy in the artwork's own coordinates, for locating a tab on it. */
+export function measurementCopy(
+  object: SceneObject & { readonly paths: ReadonlyArray<ColoredPath> },
+) {
   return {
     ...object,
     transform: IDENTITY_TRANSFORM,
@@ -158,8 +181,8 @@ function measurementCopy(object: SceneObject & { readonly paths: ReadonlyArray<C
   };
 }
 
-// The contours as the tab resolvers flatten them, closed like the measurement copy.
-function cached(
+/** The contours as the tab resolvers flatten them, closed like the measurement copy. */
+export function flattenedContours(
   cache: Map<number, ReadonlyArray<Polyline>>,
   pathIndex: number,
   path: ColoredPath,
@@ -175,8 +198,8 @@ function cached(
   return polylines;
 }
 
-// The same points from the same start: every tab on it is already in place.
-function sameOutline(a: Polyline, b: Polyline): boolean {
+/** The same points from the same start: every tab on it is already in place. */
+export function sameOutline(a: Polyline, b: Polyline): boolean {
   const left = withoutClosingPoint(a.points);
   const right = withoutClosingPoint(b.points);
   return (
@@ -185,7 +208,7 @@ function sameOutline(a: Polyline, b: Polyline): boolean {
   );
 }
 
-function withoutClosingPoint(points: ReadonlyArray<Vec2>): ReadonlyArray<Vec2> {
+export function withoutClosingPoint(points: ReadonlyArray<Vec2>): ReadonlyArray<Vec2> {
   const first = points[0];
   const last = points.at(-1);
   return points.length > 1 &&
