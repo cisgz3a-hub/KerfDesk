@@ -71,6 +71,7 @@ import { ownedProgramReportUnitsPatch } from './owned-report-units';
 import { bitFileRunStartPatch } from './bit-file-sequence';
 import { startedJobSafeZMm } from './job-motion-machine';
 import { useStore } from './store';
+import { prepareStreamPauseBeamBehindStart } from './laser-stream-pause-beam';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -440,5 +441,6 @@ function installInitialStream(
       : ownedProgramReportUnitsPatch(state, gcode, refs.driver)),
     ...bitFileRunStartPatch(options.externalProgram === true ? options.externalBitFile : undefined),
   }));
+  prepareStreamPauseBeamBehindStart(get, refs.driver);
   return writeOwner;
 }

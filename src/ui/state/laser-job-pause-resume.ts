@@ -46,12 +46,12 @@ import {
 import type { LaserState } from './laser-store';
 import { mpgCommandBlockMessage, pushLog } from './laser-store-helpers';
 import type { ConnectionTeardownOwnershipRefs } from './laser-connection-teardown';
-import { armHostedRefill, releaseHostedRefill } from './laser-hosted-refill';
+import { armHostedRefill } from './laser-hosted-refill';
 import { captureHostedRefillStream } from './laser-hosted-refill-owner';
 import {
   assertStreamPauseResumeReady,
-  postBeamOffBehindRelease,
   queueStreamPauseBeamOff,
+  releaseRefillWithBeamOff,
   restoreStreamPauseBeam,
   streamPausePlan,
   streamSidePauseMessage,
@@ -104,10 +104,10 @@ export async function runConfirmedPauseJob(context: PauseResumeContext): Promise
   // so the host must freeze at the line where the worker stopped. The
   // handshake runs before the transition owner starts, so it cannot eat the
   // confirmation deadline and turn a slow handover into a fail-dark reset.
-  // A stream-side beam-off does not wait for it (ADR-676 Amendment 2).
+  // A stream-side beam-off does not wait for it (ADR-676 Amendment 2), and
+  // nothing runs between the release and it (Amendment 3).
   const activeDriver = context.driver();
-  const released = releaseHostedRefill(context.refs);
-  const postedBeamOff = postBeamOffBehindRelease(context, activeDriver);
+  const { released, posted: postedBeamOff } = releaseRefillWithBeamOff(context, activeDriver);
   await released;
   assertCurrentConnection();
   const laserJob = context.get().activeJobMachineKind !== 'cnc';

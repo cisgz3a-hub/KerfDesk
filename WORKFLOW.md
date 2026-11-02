@@ -2113,7 +2113,9 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    a backlog in a window that was busy never delays them (ADR-676 Amendment 1). Marlin's Pause
    sends its beam-off the same way and still freezes at the line where the worker stopped. It
    may queue an `M107` or `M5 I` with nothing to switch off; Resume waits for its reply as usual
-   (ADR-676 Amendment 2).
+   (ADR-676 Amendment 2). It decides those lines before the handback, from a table of the
+   program read in slices behind Start, so a large job adds no wait before the beam-off
+   (ADR-676 Amendment 3).
 6. Browser shutdown, computer sleep and USB loss still interrupt a live serial connection.
 7. The desktop app, like Chrome, lets the window and the worker see only the ports picked in
    its Select dialog, so an identical second adapter (a laser controller and an Arduino that
