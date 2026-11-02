@@ -27,6 +27,9 @@ export type OldProjectBurnNotice = {
   readonly imageDose: ReadonlyArray<
     NoticedObject & { readonly change: 'dot-width' | 'turned-pass-through' }
   >;
+  /** A CNC job whose cut moved, in machine mm, when the Job Origin anchor began
+   *  to count every contour it cuts (rolling audit v9 R8-P2-1). At most one. */
+  readonly cncJobOrigin: ReadonlyArray<{ readonly xMm: number; readonly yMm: number }>;
 };
 
 export type LoadedProject = ProjectLoadNoticeFlags & {
