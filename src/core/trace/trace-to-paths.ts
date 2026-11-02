@@ -32,11 +32,12 @@ import { traceHybridPathsSteps } from './hybrid/trace-hybrid';
 import { isBinaryContourPreset, traceImageToContourColoredPathsSteps } from './contour-trace';
 import { traceImageToEdgePathsSteps } from './edge-trace';
 import { prepareEdgeTraceInput, type EdgeTraceInput } from './edge-input';
-import { prepareContourTraceInput, type ContourTraceInput } from './contour-input';
+import type { ContourTraceInput } from './contour-input';
 import { scaleTracedPaths, withCanonicalTraceCurves } from './trace-curves';
 import { traceScalePlan } from './trace-upscale-policy';
 import { prepareUpscaledTraceInput, releaseMedianStage } from './trace-upscale-input';
 import { isStaircaseSource, staircaseSourceInput } from './staircase-source';
+import { asCleanArtWhereTwoLevel, reportingAs } from './trace-clean-art';
 import { runTraceSteps, type TraceStepRunner, type TraceSteps } from './trace-steps';
 import { reportingTraceRunner, type TraceProgress } from './trace-progress';
 import { resolveTraceSourceOptions, shouldTraceAlphaMask } from './trace-alpha';
@@ -153,20 +154,23 @@ export async function traceImageToColoredPaths(
   runner: TraceStepRunner = runTraceSteps,
   progress?: TraceProgress,
 ): Promise<ColoredPath[]> {
-  const run = reportingTraceRunner(runner, progress);
+  const reporter = reportingTraceRunner(runner, progress);
   // Photo shading and Colour layers own their whole pipeline.
   const dedicated = dedicatedTraceSteps(requestedImage, requestedOptions);
-  if (dedicated !== undefined) return run(dedicated);
+  if (dedicated !== undefined) return reporter(dedicated);
   const polarised = invertBeforePolicy(
     requestedImage,
     resolveTraceSourceOptions(requestedImage, requestedOptions),
   );
-  const image = polarised.image;
   // The auto-sketch verdict is read once, on the polarised source, so the
   // scale plan and the working grid it chooses take one route (ADR-532).
-  const options = shouldTraceAlphaMask(image, polarised.options)
+  const polarisedOptions = shouldTraceAlphaMask(polarised.image, polarised.options)
     ? polarised.options
-    : withSourceAutoSketch(image, polarised.options);
+    : withSourceAutoSketch(polarised.image, polarised.options);
+  const source = asCleanArtWhereTwoLevel(polarised.image, polarisedOptions);
+  const { image, options } = source;
+  // The dialog goes on reading what the source's own preparation decided.
+  const run = source.report === undefined ? reporter : reportingAs(reporter, source.report);
   // Sparse small/thin sources trace poorly at native resolution, so their
   // scale plan supersamples them. Dense color pictures instead stay native or
   // trace on a bounded working grid so photo texture cannot multiply the
@@ -177,10 +181,7 @@ export async function traceImageToColoredPaths(
   // SOURCE-pixel semantics on the supersampled raster.
   const edgeInput =
     options.traceMode === 'edge' ? prepareEdgeTraceInput(image, options) : undefined;
-  let contourInput =
-    options.supersampleContour === true && isBinaryContourPreset(options)
-      ? prepareContourTraceInput(image, options)
-      : undefined;
+  let contourInput = source.contourInput;
   const scalePlan = traceScalePlan(image, options, edgeInput, contourInput);
   if (scalePlan.kind === 'downscale') {
     // The native mask was only needed for the resolution decision. Release

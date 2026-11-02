@@ -402,3 +402,38 @@ Rolling audit v8 N8-P2-4 (`docs/audits/2026-10-29-rolling-v8/N8-tracer-remeasure
     true acute tips stand as far off the ink.
   - Neither the centre test nor a distance cap separates them. It needs another discriminator.
 - On Sharp, which walks a JPEG natively, see ADR-530 Amendment 12's "Not part" list.
+
+### Amendment 3 - the measured apex bound allows for the paper's own noise (2026-11-02)
+
+Rolling audit v9 R2-P2-4 (`docs/audits/2026-11-02-rolling-v9/R2-tracer-remeasure.md`): after JPEG
+quality 75 the anti-aliased serifs grew spikes again. Line Art and Smooth drew sharp nodes 1 px or
+more off the outline on 4 of the 72 glyph images, Sharp 10 on 7; Tinos M at 32 px stood 2.5 px from
+any pixel holding ink. Potrace drew none.
+
+**Cause.** Amendment 2 drops a measured apex when the field there reads within 2% of the step of
+the paper level, and took the paper level as the brightest pixel near the apex. JPEG ringing both
+raises that brightest pixel and moves the field at a paper apex by more than 2% of the step (about
+5 levels).
+
+**Decision** (`contour-corner-ink.ts`): the paper level is the median of the window's levels on the
+paper side of the middle, and an apex is dropped when the field there reads within the larger of 2%
+of the step and 3 times the median distance of those paper levels from their median. Clean paper is
+one level, so on clean art the test reads as it did.
+
+**Measurements** (72 glyph images, sharp nodes 1 px or more off the outline):
+
+| Input | Main: Line Art / Smooth / Sharp | This | Potrace |
+|---|---|---|---|
+| Anti-aliased | 0 / 0 / 0 | 0 / 0 / 0 | 0 |
+| Anti-aliased, JPEG 75 | 4 on 4 / 4 on 4 / 10 on 7 (2.60 px) | 0 / 0 / 4 on 4 (1.35 px) | 0 |
+| 1-bit | 11 on 9 / 11 on 9 / 5 on 5 | unchanged | 0 |
+| 1-bit, JPEG 75 | 12 on 10 / 12 on 10 / 17 on 13 | 11 on 9 / 11 on 9 / 5 on 5 | 0 |
+
+The 1-bit JPEG row is ADR-530 Amendment 13 (the JPEG traces as its clean art). The anti-aliased Q4
+set is unchanged: 69 / 10 / 0, 67 / 11 / 1, 66 / 10 / 3.
+
+Test: `contour-corner-ink.test.ts` traces Tinos A, M, N, V, k and x at 24, 32 and 48 px after
+quality 75 and allows no Line Art or Smooth node more than 1 px from the clean glyph's ink.
+
+**Follow-up:** Sharp keeps 4 anti-aliased JPEG nodes of 1.0 to 1.35 px. ADR-530 Amendment 12 lists
+Sharp's native walk of a JPEG.

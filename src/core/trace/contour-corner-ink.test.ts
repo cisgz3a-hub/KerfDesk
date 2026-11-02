@@ -294,6 +294,34 @@ describe('measured corner apexes stay on the field ink (ADR-439 Amendment 2)', (
   );
 });
 
+describe('measured apexes allow for JPEG ringing in the paper (ADR-439 Amendment 3)', () => {
+  // Rolling audit v9 R2-P2-4: after quality 75 the field at a serif apex moved
+  // by more than 2% of the step, and Tinos M at 32 px drew a node 2.5 px from
+  // any ink. Judged on the clean glyph's ink: the ringing itself is not ink.
+  it.each([24, 32, 48])(
+    'draws no node into the paper of a JPEG of serif text at %i px',
+    async (px) => {
+      for (const char of ['A', 'M', 'N', 'V', 'k', 'x']) {
+        const image = await serifGlyph(char, px);
+        const { width, height } = image;
+        const luma = Array.from({ length: width * height }, (_, p) => image.data[p * 4] as number);
+        const data = new Uint8ClampedArray(width * height * 4);
+        jpegRoundTrip(luma, width, height, 75).forEach((value, p) => {
+          data.set([value, value, value, 255], p * 4);
+        });
+        for (const preset of ['Line Art', 'Smooth']) {
+          for (const node of nodes(await trace({ width, height, data }, preset))) {
+            expect(
+              intoPaper(image, node),
+              `${preset} ${char} at (${node.x}, ${node.y})`,
+            ).toBeLessThanOrEqual(1);
+          }
+        }
+      }
+    },
+  );
+});
+
 // The 1-bit picture of an anti-aliased one (a pixel is ink when it is mostly
 // covered), optionally after a JPEG round trip at `quality`.
 function oneBit(image: RawImageData, quality?: number): RawImageData {

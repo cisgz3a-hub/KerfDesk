@@ -38,6 +38,7 @@ import { denseChordBand } from './contour-chord-band';
 import { flattenStraightRuns } from './flatten-straight-runs';
 import { isHairlineRibbon, isSaddleVertex, smoothBetweenCorners } from './contour-loop-shape';
 import { smoothArcNoise } from './smooth-arc-noise';
+import { evenlySpaced, relaxStairRuns } from './contour-stair-runs';
 import { curvedTraceRing } from './trace-curves';
 import {
   keptForest,
@@ -104,6 +105,14 @@ const ARC_EVENING_MIN_CHAIN_POINTS = 260;
 // Measured loops above this size are organic art boundaries: Whittaker-faired
 // between their corners before the looser organic fit.
 const ORGANIC_MIN_CHAIN_POINTS = 4096;
+// Binary loops from this many chain points up relax their stairs and take the
+// fairing-by-fitting tail, as organic measured loops do. The simplify + spline
+// tail follows the stairs of a gentle arc: its arc evening's window is shorter
+// than they are past a radius of about 100 px, so it fits a tight circle to one
+// riser and pulls the chain up to 1 px off the curve, and simplify then keeps
+// those points (rolling audit v9 R2-P2-2, ADR-530 Amendment 14). Shorter loops
+// are glyphs and small shapes, whose corners that tail is tuned for.
+const LONG_BINARY_MIN_CHAIN_POINTS = 400;
 const NO_CORNERS: ReadonlySet<Polyline['points'][number]> = new Set();
 // A loop whose cracks mostly interpolated is a sub-pixel MEASUREMENT (see
 // finishLoop): above this fraction the wobble stages disable for that loop.
@@ -404,7 +413,14 @@ function finishDenseLoop(
   // the residual staircase jogs read as corners downstream and long straight
   // edges come out wobbly (maintainer-observed on the arch-house H stems) —
   // run span by span so every corner apex stays exactly where it was decided.
-  const dense = smoothBetweenCorners(spliced.points, corners);
+  const longBinary =
+    !subPixelInformed &&
+    finish.flattenStrength > 0 &&
+    spliced.points.length >= LONG_BINARY_MIN_CHAIN_POINTS * finish.pixelScale;
+  const dense = smoothBetweenCorners(
+    longBinary ? relaxStairRuns(spliced.points, corners) : spliced.points,
+    corners,
+  );
   // When quantization smoothing is off, a terminal pixel is deliberate
   // detail. Keep its cap through simplification. The pins are existing
   // pre-smoothed points, so the spline can still round them; they are not
@@ -448,6 +464,18 @@ function finishDenseLoop(
           FIT_TOLERANCE_ORGANIC_PX,
         )
       : fitLoopTail(arcSmoothed, corners, finish, FIT_TOLERANCE_PX);
+  }
+  if (longBinary) {
+    // The flatten keeps only a straight run's ends, and the fairing works by
+    // index, so the chain goes back to an even spacing between them.
+    const flattened =
+      corners.size === 0
+        ? evened
+        : evenlySpaced(
+            flattenStraightRuns(evened, true, corners, denoiseStrength, finish.pixelScale),
+          );
+    const fair = fairChainSegments(flattened, true, corners, finish.pixelScale);
+    return fitLoopTail(fair, corners, finish, FIT_TOLERANCE_ORGANIC_PX);
   }
   return finishLegacyLoop(arcSmoothed, corners, denoiseStrength, finish, featureAnchors);
 }
