@@ -72,6 +72,7 @@ export default function PhotoEngravingDialog(props: {
           recipeId={recipeId}
           onRecipe={workbench.chooseRecipe}
           autoTonesReady={histogram !== null}
+          recipeTonesPending={workbench.tonesPending}
           onAutoTones={workbench.autoTones}
           spotSizeMm={session.device.laserSubProfile?.spotSizeMm}
           processingChoices={photoProcessingChoices(effective.ditherAlgorithm)}
@@ -123,10 +124,21 @@ function usePhotoWorkbench(session: PhotoEngravingSession, current: boolean) {
   );
   const [recipeId, setRecipeId] = useState<string | null>(null);
   const [materialView, setMaterialView] = useState(false);
+  // A recipe picked before the first preview owes its Auto tones until the
+  // histogram arrives, unless the operator sets a tone first (R8-P2-3).
+  const [tonesPending, setTonesPending] = useState(false);
   const result = usePhotoEngravingPreview(session, draft, current, materialView);
   const histogram = useSourceHistogram(result);
-  const update = (patch: Partial<PhotoEngravingDraft>): void =>
+  const update = (patch: Partial<PhotoEngravingDraft>): void => {
+    if (TONE_KEYS.some((key) => key in patch)) setTonesPending(false);
     setDraft((previous) => ({ ...previous, ...patch }));
+  };
+  useEffect(() => {
+    if (!tonesPending || histogram === null) return;
+    setTonesPending(false);
+    const tones = autoTonesPatch(histogram);
+    if (tones !== null) setDraft((previous) => ({ ...previous, ...tones }));
+  }, [tonesPending, histogram]);
   const recipe = photoRecipe(recipeId);
   return {
     draft,
@@ -134,6 +146,7 @@ function usePhotoWorkbench(session: PhotoEngravingSession, current: boolean) {
     result,
     histogram,
     recipeId,
+    tonesPending,
     materialView,
     setMaterialView,
     /** The recipe's colours, while its marking still matches the draft's. */
@@ -141,8 +154,12 @@ function usePhotoWorkbench(session: PhotoEngravingSession, current: boolean) {
     chooseRecipe: (id: string | null): void => {
       setRecipeId(id);
       const chosen = photoRecipe(id);
-      if (chosen === null) return;
+      if (chosen === null) {
+        setTonesPending(false);
+        return;
+      }
       update(photoRecipePatch(chosen, histogram));
+      setTonesPending(histogram === null);
       setMaterialView(true);
     },
     autoTones: (): void => {
@@ -151,6 +168,8 @@ function usePhotoWorkbench(session: PhotoEngravingSession, current: boolean) {
     },
   };
 }
+
+const TONE_KEYS = ['brightness', 'contrast', 'gamma'] as const;
 
 /** ADR-685: the photo's histogram from the latest preview; the source never changes in a session. */
 function useSourceHistogram(result: PhotoEngravingPreviewResult | null): Uint32Array | null {

@@ -142,3 +142,7 @@ The material view models geometry, not chemistry. Wood grain, char, heat build-u
 not round, or a profile whose spot size is wrong all change a real burn. The recipe colours are a
 display guide. Frame, Start, power, speed, the compiler, the emitter (`EMITTER_REVISION`), Job
 Review, licences and output policy are unchanged.
+
+**Amendment 1 (2026-11-02):** [a recipe's Auto tones wait for the preview, read only the pixels
+that burn, and light marks say how to keep a background](ADR-685-amendment-1-recipe-tones-wait-for-the-preview.md):
+fixes rolling audit v9 R8-P2-3, R8-P3-1 and R8-P3-2.
