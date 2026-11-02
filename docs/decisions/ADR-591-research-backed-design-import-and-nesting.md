@@ -77,3 +77,7 @@ remote text receipts, variable records at output, and the rows preview.
 **Amendment 2 (2026-10-29):** [output checks every text for missing glyphs, whichever route made
 it](ADR-591-amendment-2-output-checks-every-text-for-missing-glyphs.md): plain text at Start, Save,
 exports and print, Bake, a production row's open and capture, and the jig text panel.
+
+**Amendment 3 (2026-11-02):** [text notices share one toast per output, and single-line fonts say
+Right-to-left is not supported](ADR-591-amendment-3-text-notices-share-a-toast-and-right-to-left-on-single-line-fonts.md):
+fixes rolling audit v9 R4-P2-3 and R4-P2-4.

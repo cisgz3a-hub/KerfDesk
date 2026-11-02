@@ -4,6 +4,7 @@ import { pathTextAcrossFromBaseline } from '../../core/text/text-on-path';
 import {
   onTextBoxBaseline,
   textBoxBaseline,
+  textBoxOverflowMm,
   type TextBoxBaseline,
 } from '../../core/text/text-box-render';
 import { IDENTITY_TRANSFORM, type Project, type TextObject } from '../../core/scene';
@@ -46,16 +47,17 @@ export const renderVariableText: VariableTextRenderer = async ({ text, content, 
       transform: { ...IDENTITY_TRANSFORM, x: placed.origin.x, y: placed.origin.y },
     };
   }
-  if (text.textBox !== undefined)
+  if (text.textBox !== undefined) {
+    const framed = onTextBoxBaseline(rendered, placedTemplate?.box, text.textBox);
     return {
-      ...applyTextWeld(
-        onTextBoxBaseline(rendered, placedTemplate?.box),
-        text.fontKey,
-        text.weldOverlaps,
-      ),
-      transform: text.transform,
+      ...applyTextWeld(framed, text.fontKey, text.weldOverlaps),
+      // An Auto width frame is each record's own width, so its left edge is
+      // not a place the records share: output keeps the alignment point instead.
+      ...(text.textBox.mode === 'auto-width' ? {} : { transform: text.transform }),
       ...missingReport(rendered),
+      ...frameOverflowReport(framed, text),
     };
+  }
   return {
     ...applyTextWeld(styledBentRender(rendered, text), text.fontKey, text.weldOverlaps),
     ...missingReport(rendered),
@@ -113,6 +115,23 @@ function templateBaseline(text: TextObject, project: Project): Promise<TemplateB
     if (oldest.done !== true) templateBaselines.delete(oldest.value);
   }
   return pending;
+}
+
+// ADR-682 Amendment 2: output warns about a record that burns past its frame, in the millimetres
+// the object burns at. Less than this is no wider than the beam.
+const FRAME_OVERFLOW_NOTICE_MM = 0.05;
+
+function frameOverflowReport(
+  framed: TextRenderResult,
+  text: TextObject,
+): { readonly frameOverflowMm?: number } {
+  if (framed.textBoxLayout === undefined || text.textBox === undefined) return {};
+  const past = textBoxOverflowMm(framed.bounds, framed.textBoxLayout, text.textBox);
+  const overflowMm = Math.max(
+    past.widthMm * Math.abs(text.transform.scaleX),
+    past.heightMm * Math.abs(text.transform.scaleY),
+  );
+  return overflowMm < FRAME_OVERFLOW_NOTICE_MM ? {} : { frameOverflowMm: overflowMm };
 }
 
 // ADR-591 Amendment 1: output warns about a record's characters the font has no glyph for.

@@ -1,5 +1,5 @@
 import { fairStrokeFont, isPolylineDigitizedFont } from './fair-stroke-font';
-import { missingCharacters, textForLayout } from './glyph-coverage';
+import { missingCharacters, textForLayout, withoutBidiControls } from './glyph-coverage';
 import {
   renderStrokeFontText,
   type StrokeFont,
@@ -27,7 +27,9 @@ export async function cncStrokeFontMissingCharacters(
   content: string,
 ): Promise<ReadonlyArray<string>> {
   const font = await loadCncStrokeFont(fontKey);
-  return missingCharacters(textForLayout(content), (character) => font.glyphs.has(character));
+  return missingCharacters(textForLayout(withoutBidiControls(content)), (character) =>
+    font.glyphs.has(character),
+  );
 }
 
 async function loadCncStrokeFont(fontKey: string): Promise<StrokeFont> {
