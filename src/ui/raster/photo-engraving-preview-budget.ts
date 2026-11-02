@@ -21,6 +21,8 @@ import {
 // use its existing streamed compiler without these preview-only limits.
 const SOURCE_WORKING_BYTES_PER_PIXEL = 12;
 const DISPLAY_WORKING_BYTES_PER_PIXEL = 16;
+// ADR-685: the material view's display sums and colour pixels.
+const MATERIAL_VIEW_BYTES_PER_PIXEL = 12;
 const MAX_PREVIEW_SCAN_RUNS = 256;
 
 /** Cheap validation before source cloning, luma decoding or compilation. */
@@ -82,7 +84,10 @@ function scanBudgetError(
   maxEdge: number,
 ): string | null {
   let workUnits = 0;
-  let workingBytes = maxEdge * maxEdge * DISPLAY_WORKING_BYTES_PER_PIXEL + maskWorkingBytes(input);
+  const displayBytesPerPixel =
+    DISPLAY_WORKING_BYTES_PER_PIXEL +
+    (input.materialView === true ? MATERIAL_VIEW_BYTES_PER_PIXEL : 0);
+  let workingBytes = maxEdge * maxEdge * displayBytesPerPixel + maskWorkingBytes(input);
   const seenAngles = new Set<number>();
   for (const run of runs) {
     const { width, height } = scanDimensions(input, layer, run.angleDeg);

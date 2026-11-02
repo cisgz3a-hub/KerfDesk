@@ -4518,6 +4518,19 @@ enabled. If all assigned operations have output off, it prepares the first one
 and clearly reports that output must be enabled before those settings engrave.
 Fractional DPI and tone values remain valid within their displayed ranges.
 
+**Material recipe** (ADR-685) prepares a portrait for wood, leather or cork, white tile or
+coated metal, black slate or stone, black anodized aluminium or a painted surface, or clear
+acrylic or glass engraved from the back. It sets the marking, Blue Noise, Auto tones and a
+light sharpen (30% at 0.7 lines). It never changes power, speed, DPI, tone calibration or
+placement. For clear material, flip the photo horizontally on the canvas yourself. **Auto
+tones** turns the photo's darkest and lightest 0.5% solid and blank, then puts its middle tone
+back where it was. Pure white is not counted, so a removed background does not mask the skin.
+This clears stray dots from skin highlights and backgrounds, and works best on a photo cropped
+to the face. The **Dots / On material** view draws each mark as wide as the machine profile's
+laser spot, in the recipe's colours, so overlapping dots darken before anything burns. Without
+a profile spot size it draws one-cell marks and says so. It models spot geometry, not how the
+material chars.
+
 Focus and use Material Test and Interval Test for the actual machine/material.
 Higher DPI can darken a portrait through overlapping marks. The photo tool supplies
 no universal power/speed recipe. Review all passes in the job Preview, then use
