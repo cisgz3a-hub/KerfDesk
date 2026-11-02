@@ -32,7 +32,9 @@ import {
 } from './frame-controller-readiness';
 import {
   absoluteFrameOffsetRefusal,
+  FRAME_STATUS_AFTER_ORIGIN_MESSAGE,
   waitForAbsoluteFrameOffset,
+  waitForStatusAfterOriginChange,
   waitForUnreportedFrameWorkOffset,
 } from './frame-position-readiness';
 import { clearStartBlockers } from './start-blocker-invalidation';
@@ -177,9 +179,9 @@ export async function prepareTransientFrameController(
     reportFramePreparationRefusal(wcsNormalization.messages, wcsNormalization.warning);
     return null;
   }
-  const reportUnitsIssues = await normalizeFrameControllerReportUnits(signal);
-  if (reportUnitsIssues.length > 0) {
-    reportFramePreparationRefusal(reportUnitsIssues, wcsNormalization.warning);
+  const reportIssues = await frameReportIssues(signal);
+  if (reportIssues.length > 0) {
+    reportFramePreparationRefusal(reportIssues, wcsNormalization.warning);
     return null;
   }
   signal?.throwIfAborted();
@@ -249,12 +251,9 @@ async function prepareFrameContext(
     reportFramePreparationRefusal(wcsNormalization.messages, wcsNormalization.warning);
     return null;
   }
-  const reportUnitsIssues = await normalizeFrameControllerReportUnits(
-    signal,
-    frameExecutionOwner(options),
-  );
-  if (reportUnitsIssues.length > 0) {
-    reportFramePreparationRefusal(reportUnitsIssues, wcsNormalization.warning);
+  const reportIssues = await frameReportIssues(signal, frameExecutionOwner(options));
+  if (reportIssues.length > 0) {
+    reportFramePreparationRefusal(reportIssues, wcsNormalization.warning);
     return null;
   }
   signal.throwIfAborted();
@@ -292,6 +291,17 @@ async function prepareFrameContext(
       ? {}
       : { wcsNormalizationWarning: wcsNormalization.warning }),
   };
+}
+
+/** The report units, then a status report sent after the last origin write:
+ * one read before it holds the old work frame (ADR-375 Amendment 12). */
+async function frameReportIssues(
+  signal: AbortSignal | undefined,
+  owner?: ReturnType<typeof frameExecutionOwner>,
+): Promise<ReadonlyArray<string>> {
+  const reportUnitsIssues = await normalizeFrameControllerReportUnits(signal, owner);
+  if (reportUnitsIssues.length > 0) return reportUnitsIssues;
+  return (await waitForStatusAfterOriginChange()) ? [] : [FRAME_STATUS_AFTER_ORIGIN_MESSAGE];
 }
 
 function exactFrameBundle(
