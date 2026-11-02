@@ -25,6 +25,7 @@ import {
   streamerEndPatchAtIdle,
 } from './laser-terminal-stream-release';
 import { statusPositionPatch } from './laser-status-position';
+import { heldResumeTailRetirementPatch } from './held-resume-tail';
 import { liveCanvasLifecyclePatch, liveCanvasStatusCompletionPatch } from './live-canvas-run';
 import { observeFreshControllerStatus } from './laser-controller-status-wait';
 import { framedRunInterruptionPatch } from './framed-run-interruption';
@@ -128,6 +129,7 @@ export function handleStatusLine(
     ...permitInterruptionPatch,
     ...jogMpgInterruption,
     ...(jobOverAtIdle ? {} : mpgJobInterruptionPatch(state, report)),
+    ...heldResumeTailRetirementPatch(state, { ...state, ...positionPatch }),
   });
   observeStatusConsumers(set, refs, state, nextSequence, report);
   if (queuedFrameDispatch !== null)

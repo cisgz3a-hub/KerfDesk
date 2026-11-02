@@ -71,3 +71,7 @@ of move. Ref. issue #1024." (fix commit `451a539c6`).
   - Builds that report `$I` on a stock-GRBL profile are judged by their `[VER:` date.
   - The one-step loss of #1023 (0.0125 mm on the A1 Pro) is not detected.
 - No new Start guard, account, licence or entitlement check is added.
+
+**Amendment 1 (2026-11-02):** [the warning retires for good once a Frame, jog or job has run, and
+its advice names what a reset costs](ADR-684-amendment-1-the-held-tail-warning-retires-for-good.md):
+fixes rolling audit v9 R8-P2-2.
