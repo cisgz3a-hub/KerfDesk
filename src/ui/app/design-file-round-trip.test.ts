@@ -289,3 +289,101 @@ describe('exports write each path in its operation colour (L7-P2-1)', () => {
     expect(burnedAreaMm2(importDxfAsFill(source))).toBeCloseTo(before, 0);
   });
 });
+
+// Rolling v9 R5-P2-1 (ADR-681 Amendment 1): a path exports as it burns, under
+// every Fill operation it burns under, so Print and SVG show what the canvas does.
+describe('a path bound to several Fill operations exports as it burns', () => {
+  const SOLID_MM2 = 40 * 30;
+
+  /** The real Add operation on a plate's circle, its copied operation's output as given. */
+  function addOperationOnCircle(output = true): Project {
+    useStore.setState({
+      project: oneFillOperation([plate('plate', BLACK), circle('circle', BLACK)]),
+      selectedObjectId: 'circle',
+    });
+    useStore.getState().addOperationForSelection();
+    const added = useStore.getState().project.scene.layers[1]!;
+    if (!output) useStore.getState().setLayerParam(added.id, { output: false });
+    return useStore.getState().project;
+  }
+
+  it('writes the Add operation circle as a compound of its own, so it stays inked', () => {
+    const source = addOperationOnCircle();
+    const before = burnedAreaMm2(source);
+    // The ring and the circle, each burned by one operation.
+    expect(Math.abs(before - SOLID_MM2)).toBeLessThan(3);
+
+    const svg = svgOf(source);
+    expect(svg.match(/<g id="fill-\d+"/g)).toHaveLength(2);
+    expect(svg).toContain('<title>Operation</title>');
+    expect(svg).toContain('<title>Operation 2</title>');
+    expect(new Set(fillColours(svg)).size).toBe(2);
+    expect(burnedAreaMm2(importSvg(svg))).toBeCloseTo(before, 0);
+    expect(burnedAreaMm2(importDxfAsFill(source))).toBeCloseTo(before, 0);
+  });
+
+  it('gives Print and the other formats the same two items', () => {
+    const artwork = sceneVectorArtwork(addOperationOnCircle());
+    if (artwork.kind !== 'ok') throw new Error(artwork.error);
+
+    expect(artwork.value.items.map((item) => [item.paint, item.fillRule])).toEqual([
+      ['fill', 'evenodd'],
+      ['fill', 'evenodd'],
+    ]);
+    expect(new Set(artwork.value.items.map((item) => item.color)).size).toBe(2);
+  });
+
+  it('leaves an Output-off operation out: the circle is the hole the job burns', () => {
+    const source = addOperationOnCircle(false);
+    expect(Math.abs(burnedAreaMm2(source) - RING_MM2)).toBeLessThan(1.5);
+
+    const svg = svgOf(source);
+    expect(svg.match(/<g id="fill-\d+"/g)).toHaveLength(1);
+    expect(svg).not.toContain('Operation 2');
+    expect(burnedAreaMm2(importSvg(svg))).toBeCloseTo(burnedAreaMm2(source), 0);
+  });
+
+  it('writes Line then Fill as its outline and the Fill it burns', () => {
+    const base = createProject();
+    const source: Project = {
+      ...base,
+      scene: {
+        ...base.scene,
+        layers: [
+          createLayer({ id: 'line', color: BLUE, mode: 'line' }),
+          createLayer({ id: 'fill', color: BLACK, mode: 'fill' }),
+        ],
+        objects: [
+          { ...plate('plate', BLACK), operationIds: ['fill'] },
+          { ...circle('circle', BLACK), operationIds: ['line', 'fill'] },
+        ],
+      },
+    };
+
+    const svg = svgOf(source);
+    expect(svg.match(/fill-rule="evenodd"/g)).toHaveLength(1);
+    expect(svg.match(/ stroke="#[0-9a-f]{6}"/gi)?.length).toBeGreaterThan(0);
+    const artwork = sceneVectorArtwork(source);
+    if (artwork.kind !== 'ok') throw new Error(artwork.error);
+    expect(artwork.value.items.map((item) => item.paint).sort()).toEqual(['fill', 'stroke']);
+  });
+
+  it('a lone Line then Fill path still burns as a fill in the file', () => {
+    const base = createProject();
+    const source: Project = {
+      ...base,
+      scene: {
+        ...base.scene,
+        layers: [
+          createLayer({ id: 'line', color: BLUE, mode: 'line' }),
+          createLayer({ id: 'fill', color: BLACK, mode: 'fill' }),
+        ],
+        objects: [{ ...plate('plate', BLACK), operationIds: ['line', 'fill'] }],
+      },
+    };
+
+    const svg = svgOf(source);
+    expect(svg).toContain('fill-rule="evenodd"');
+    expect(svg).toContain(' stroke="');
+  });
+});

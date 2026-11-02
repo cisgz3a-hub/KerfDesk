@@ -14,6 +14,11 @@
 // have even-odd parity (every shape, ordinary text); one whose own contours
 // overlap (script text with Weld off, overlapping paths) is written as the
 // region the compiler resolves for it.
+//
+// A path burns under every output Fill operation it uses, so it joins each of
+// their compounds, as the canvas pools it (ADR-681 Amendment 1, ADR-683
+// Amendment 2): the Add operation circle on a plate is the plate's hole AND a
+// compound of its own, which paints it back.
 
 import { compilationPolylines } from '../../core/job/compilation-polylines';
 import {
@@ -33,18 +38,30 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { effectiveOperationForObject } from '../../core/scene/effective-operation';
+import { fillOperationsAmong, fillPoolRuns } from '../../core/scene/fill-operations';
 import { transformCurveSubpathExact } from '../../core/vector-export/affine-curves';
 import { svgObjectMatrix } from './export-svg-paths';
 
 export type ExportVectorObject = Extract<SceneObject, { readonly paths: readonly ColoredPath[] }>;
 
-/** The operation a path is exported under: the first scene operation it uses. */
+/** The operation a path is exported under: the first scene operation it uses that outputs, else the first. */
 export function exportOperationForPath(
   project: Project,
   object: ExportVectorObject,
   path: ColoredPath,
 ): Layer | undefined {
-  return project.scene.layers.find((layer) => pathUsesOperation(object, path, layer));
+  const used = project.scene.layers.filter((layer) => pathUsesOperation(object, path, layer));
+  return used.find((layer) => layer.output) ?? used[0];
+}
+
+/** Every Fill operation whose compound holds this path: the ones it burns under. */
+function exportFillOperations(
+  project: Project,
+  object: ExportVectorObject,
+  path: ColoredPath,
+): ReadonlyArray<Layer> {
+  const used = project.scene.layers.filter((layer) => pathUsesOperation(object, path, layer));
+  return fillOperationsAmong(object, used).map((fill) => fill.operation);
 }
 
 /** Whether that operation fills this object (its effective mode, after overrides). */
@@ -58,6 +75,8 @@ export function exportOperationFills(
 export type ExportColors = {
   /** The colour a path is written in. */
   readonly ofPath: (object: ExportVectorObject, path: ColoredPath) => string;
+  /** That colour, then those of the other Fill operations it burns under. */
+  readonly ofPathBurns: (object: ExportVectorObject, path: ColoredPath) => ReadonlyArray<string>;
   /** The colour an operation's paths (and its fill compound) are written in. */
   readonly ofOperation: (operation: Layer) => string;
 };
@@ -94,6 +113,12 @@ export function planExportColors(
       const operation = exportOperationForPath(project, object, path);
       return operation === undefined ? path.color : ofOperation(operation);
     },
+    ofPathBurns: (object, path) => {
+      const first = exportOperationForPath(project, object, path);
+      if (first === undefined) return [path.color];
+      const burns = new Set([first, ...exportFillOperations(project, object, path)]);
+      return [...burns].map(ofOperation);
+    },
   };
 }
 
@@ -117,13 +142,15 @@ function operationPathColors(project: Project, objects: ReadonlyArray<SceneObjec
     if (object.kind === 'raster-image' || object.kind === 'relief' || !('paths' in object))
       continue;
     for (const path of object.paths) {
-      const operation = exportOperationForPath(project, object, path);
-      if (operation === undefined) continue;
+      const first = exportOperationForPath(project, object, path);
+      if (first === undefined) continue;
       const key = path.color.toLowerCase();
-      const entry = byOperation.get(operation.id) ?? { operation, colors: [] };
-      if (!entry.colors.some(([seen]) => seen === key)) entry.colors.push([key, path.color]);
-      byOperation.set(operation.id, entry);
-      operationsByColor.set(key, (operationsByColor.get(key) ?? new Set()).add(operation.id));
+      for (const operation of new Set([first, ...exportFillOperations(project, object, path)])) {
+        const entry = byOperation.get(operation.id) ?? { operation, colors: [] };
+        if (!entry.colors.some(([seen]) => seen === key)) entry.colors.push([key, path.color]);
+        byOperation.set(operation.id, entry);
+        operationsByColor.set(key, (operationsByColor.get(key) ?? new Set()).add(operation.id));
+      }
     }
   }
   return { byOperation, sharers: (color) => operationsByColor.get(color)?.size ?? 0 };
@@ -142,7 +169,12 @@ export type FillCompoundPlan = {
   readonly pooled: (object: SceneObject, pathIndex: number) => boolean;
 };
 
-type Member = { readonly object: ExportVectorObject; readonly pathIndexes: number[] };
+type Member = {
+  readonly object: ExportVectorObject;
+  readonly pathIndexes: number[];
+  /** Paths the object itself does not fill, or that burn under another operation too. */
+  needsCompound: boolean;
+};
 type Pool = { readonly operation: Layer; readonly first: number; readonly members: Member[] };
 
 export function planFillCompounds(
@@ -150,24 +182,36 @@ export function planFillCompounds(
   objects: ReadonlyArray<SceneObject>,
 ): FillCompoundPlan {
   const pools = new Map<string, Pool>();
+  const runOf = fillPoolRuns(project.scene);
   objects.forEach((object, index) => {
     if (object.kind === 'raster-image' || object.kind === 'relief' || !('paths' in object)) return;
     object.paths.forEach((path, pathIndex) => {
-      const operation = exportOperationForPath(project, object, path);
-      if (operation === undefined || !exportOperationFills(operation, object)) return;
+      const fills = exportFillOperations(project, object, path);
       if (!authoredCurves(path).some((curve) => curve.closed && curve.segments.length > 0)) return;
-      const pool = pools.get(operation.id) ?? { operation, first: index, members: [] };
-      const last = pool.members.at(-1);
-      if (last?.object === object) last.pathIndexes.push(pathIndex);
-      else pool.members.push({ object, pathIndexes: [pathIndex] });
-      pools.set(operation.id, pool);
+      const paintsItself = exportOperationFills(
+        exportOperationForPath(project, object, path),
+        object,
+      );
+      for (const operation of fills) {
+        // As in the job, a compile run's objects burn together, and only they do.
+        const key = `${runOf(object)}\n${operation.id}`;
+        const pool: Pool = pools.get(key) ?? { operation, first: index, members: [] };
+        let member: Member | undefined = pool.members.at(-1);
+        if (member?.object !== object) {
+          member = { object, pathIndexes: [], needsCompound: false };
+          pool.members.push(member);
+        }
+        member.pathIndexes.push(pathIndex);
+        member.needsCompound ||= fills.length > 1 || !paintsItself;
+        pools.set(key, pool);
+      }
     });
   });
   const atObject = new Map<number, FillCompound[]>();
   const pooled = new Map<SceneObject, Set<number>>();
   for (const pool of pools.values()) {
     // One object alone already paints what it burns, path by path.
-    if (pool.members.length < 2) continue;
+    if (pool.members.length < 2 && pool.members[0]?.needsCompound !== true) continue;
     const curves = pool.members.flatMap((member) =>
       parityCurves(
         member.object,
@@ -178,7 +222,12 @@ export function planFillCompounds(
     if (curves.length === 0) continue;
     for (const member of pool.members) {
       const indexes = pooled.get(member.object) ?? new Set<number>();
-      for (const pathIndex of member.pathIndexes) indexes.add(pathIndex);
+      for (const pathIndex of member.pathIndexes) {
+        // A path written as a stroke keeps it: only its fill went into the compound.
+        const path = member.object.paths[pathIndex] as ColoredPath;
+        const operation = exportOperationForPath(project, member.object, path);
+        if (exportOperationFills(operation, member.object)) indexes.add(pathIndex);
+      }
       pooled.set(member.object, indexes);
     }
     const list = atObject.get(pool.first) ?? [];

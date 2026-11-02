@@ -8,7 +8,6 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  hitTest,
   machineKindOf,
   transformedBBox,
   type Project,
@@ -16,6 +15,7 @@ import {
   type SceneObject,
   type Vec2,
 } from '../../core/scene';
+import { workspaceHitTest } from './workspace-hit-test';
 import { usePrefersReducedMotion } from '../common/use-prefers-reduced-motion';
 import { useStore } from '../state';
 import type { EditedArtwork } from '../state/artwork-color-hint';
@@ -161,7 +161,7 @@ function useCanvasHoverObject(
     // Locked artwork still shows its settings, and must not let the piece
     // beneath it answer for it.
     dwellTimer.current = setTimeout(
-      () => setHovered(hitTest(scene, point, { includeLocked: true })),
+      () => setHovered(workspaceHitTest(scene, point, { includeLocked: true })),
       PULSE_HOVER_DWELL_MS,
     );
     return () => {

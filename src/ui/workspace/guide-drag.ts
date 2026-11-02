@@ -5,7 +5,8 @@ import type { GuideAxis, ProjectGuide } from '../../core/scene/guides';
 // releasing a guide back over a ruler deletes it. Each drag is one undo step,
 // and a click on a ruler that creates nothing leaves no history.
 
-import { hitTest, type Project, type Vec2 } from '../../core/scene';
+import { type Project, type Vec2 } from '../../core/scene';
+import { workspaceHitTest } from './workspace-hit-test';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { RULER_THICKNESS_PX } from './canvas-layout';
@@ -60,7 +61,7 @@ export function beginGuideDrag(args: PointerArgs): GuideDragState | null {
     app.setGuidesDuringInteraction([...guides, guide]);
     return { kind: 'guide', id: guide.id, axis: ruler, created: true };
   }
-  if (hitTest(args.project.scene, point) !== null) return null;
+  if (workspaceHitTest(args.project.scene, point) !== null) return null;
   const reach = GUIDE_HIT_PX * pxToMmForCanvas(args.canvas, args.project, args.viewState);
   const hit = guides.find(
     (guide) => Math.abs(guide.positionMm - along(point, guide.axis)) <= reach,

@@ -63,6 +63,7 @@ import { drawArtworkRunFocus } from './draw-artwork-run-focus';
 import { drawBed, drawGrid, drawOriginMarker } from './draw-bed-chrome';
 import { objectIntersectsCanvas } from './object-viewport';
 import { beginArtworkSpriteFrame } from './artwork-sprite-cache';
+import { fillPoolRuns } from '../../core/scene/fill-operations';
 import { drawFillPools, drawnBitmapBox, planFillPools, type ResolvedVector } from './fill-pools';
 import type { DisplayLengthUnit } from '../display-length';
 
@@ -335,6 +336,7 @@ function drawObjects(
   const pools = planFillPools(
     placed.map((entry) => entry.vector),
     (index) => drawnBitmapBox(project.scene.objects[index], placed[index]?.onCanvas === true),
+    fillPoolRuns(project.scene),
   );
   const poolAlpha = (ids: ReadonlyArray<string>): number | null =>
     dimmedByRunFocus(artworkRunFocus, ids) ? UNFOCUSED_ALPHA : null;
