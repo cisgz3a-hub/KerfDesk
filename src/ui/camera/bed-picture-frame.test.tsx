@@ -99,6 +99,39 @@ describe('where a bed picture is drawn now', () => {
     const now = { bedFrame: FRAME_400, machine: 'generic-grbl-400x400' };
     expect(bedPictureNow(picture(), now)).toEqual({ kind: 'dropped', message: OTHER_MACHINE });
   });
+
+  it('compares captured height areas after moving them into the current frame', () => {
+    const box = { id: 'box', x: 120, y: 120, width: 10, height: 10, surfaceHeightMm: 20 };
+    const taken = { ...picture(), heightAreas: [box] };
+    const now = { bedFrame: { ...FRAME_400, bedHeightMm: 410 }, machine: 'falcon-a1-pro' };
+    expect(
+      bedPictureNow(taken, now, {
+        surfaceHeightMm: 3,
+        heightAreas: [{ ...box, y: 130 }],
+      }),
+    ).toMatchObject({ kind: 'shown', region: { ...REGION, y: 110 } });
+    // The old scene coordinates now describe a different physical patch.
+    expect(
+      bedPictureNow(taken, now, {
+        surfaceHeightMm: 3,
+        heightAreas: [box],
+      }),
+    ).toEqual({ kind: 'dropped', message: HEIGHTS_CHANGED });
+  });
+
+  it('checks new raised areas against a picture moved by the native offset', () => {
+    const taken = picture({ ...FRAME_400, nativeToBedOffsetMm: { x: 0, y: 0 } });
+    const now = {
+      bedFrame: { ...FRAME_400, nativeToBedOffsetMm: { x: 10, y: 0 } },
+      machine: 'falcon-a1-pro',
+    };
+    expect(
+      bedPictureNow(taken, now, {
+        surfaceHeightMm: 3,
+        heightAreas: [{ id: 'new', x: 152, y: 120, width: 5, height: 5, surfaceHeightMm: 20 }],
+      }),
+    ).toEqual({ kind: 'dropped', message: HEIGHTS_CHANGED });
+  });
 });
 
 describe('following Machine Setup and Open', () => {
@@ -185,6 +218,36 @@ describe('following Machine Setup and Open', () => {
     useCameraStore.getState().updateHeightArea('box', { surfaceHeightMm: 25 });
     expect(useCameraStore.getState().bedPicture).toBeNull();
   });
+
+  it('clears a moved picture for a new area over its displayed region', () => {
+    capture();
+    useStore.getState().updateDeviceProfile({ bedHeight: 410 });
+    useCameraStore.getState().addHeightArea({
+      id: 'raised',
+      x: 120,
+      y: 152,
+      width: 10,
+      height: 5,
+      surfaceHeightMm: 20,
+    });
+    expect(useCameraStore.getState().bedPicture).toBeNull();
+    expect(toasts()).toContain(HEIGHTS_CHANGED);
+  });
+
+  it('keeps a moved picture when a new area overlaps only its old scene region', () => {
+    const taken = capture();
+    useStore.getState().updateDeviceProfile({ bedHeight: 410 });
+    useCameraStore.getState().addHeightArea({
+      id: 'elsewhere',
+      x: 120,
+      y: 102,
+      width: 10,
+      height: 5,
+      surfaceHeightMm: 20,
+    });
+    expect(useCameraStore.getState().bedPicture).toBe(taken);
+    expect(toasts()).not.toContain(HEIGHTS_CHANGED);
+  });
 });
 
 describe('useBedPictureRegion', () => {
@@ -224,6 +287,23 @@ describe('useBedPictureRegion', () => {
     act(() => root.render(<Probe picture={taken} />));
     expect(JSON.parse(container.textContent ?? '')).toEqual(REGION);
     act(() => useCameraStore.getState().setSurfaceHeightMm(6));
+    expect(JSON.parse(container.textContent ?? '')).toBeNull();
+  });
+
+  it('stops drawing a moved image immediately when a raised area overlaps it', () => {
+    const taken = picture();
+    act(() => root.render(<Probe picture={taken} />));
+    act(() => useStore.getState().updateDeviceProfile({ bedHeight: 410 }));
+    act(() =>
+      useCameraStore.getState().addHeightArea({
+        id: 'raised',
+        x: 120,
+        y: 152,
+        width: 10,
+        height: 5,
+        surfaceHeightMm: 20,
+      }),
+    );
     expect(JSON.parse(container.textContent ?? '')).toBeNull();
   });
 });

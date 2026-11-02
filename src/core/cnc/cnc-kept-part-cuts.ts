@@ -150,9 +150,11 @@ function distinctToolpaths(groups: ReadonlyArray<CncGroup>): Toolpath[] {
     for (const pass of group.passes) {
       const xy = cncPassXyPoints(pass);
       const first = xy[0];
-      const last = xy.at(-1);
-      if (first === undefined || last === undefined || xy.length < 2) continue;
-      const key = `${xy.length}:${first.x}:${first.y}:${last.x}:${last.y}:${pass.closed}`;
+      if (first === undefined || xy.length < 2) continue;
+      // Shared endpoints and vertex counts do not prove equal geometry. Key
+      // every XY vertex in order, including sampled arcs, in linear time.
+      // Deliberately omit Z so repeated depth passes still share one check.
+      const key = `${pass.closed}:${xy.map(({ x, y }) => `${x},${y}`).join(';')}`;
       if (seen.has(key)) continue;
       seen.add(key);
       const points = pass.closed ? [...xy, first] : xy;

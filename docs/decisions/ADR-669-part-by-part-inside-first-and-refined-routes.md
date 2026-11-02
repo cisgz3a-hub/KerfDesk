@@ -66,6 +66,13 @@ optimizing the wrong thing:
    - When the given order already keeps inside-first and is strictly shorter than the
      nearest-neighbour route, refinement starts from it. So a route is never made longer than the
      order it came in, and planning a planned job returns it.
+   - Implementation correction (2026-10-27 PR audit): after reselecting closed starts, compare the
+     complete travel, including the park, with that valid base route. Keep the base if the new
+     starts undo the saving. Three disjoint rectangles exposed a 415.27 to 492.78 mm regression
+     under both Nearest point and Nearest corner. This final linear comparison retains the base's
+     inside-first and pinned-first constraints; Drawn starts need no additional comparison. The base
+     keeps its order but takes the same start policy, so falling back never drops Nearest point or
+     Nearest corner.
    - Refinement applies to Line groups, Offset Fill rings, single-pass topology groups and, as whole
      packets that keep their passes and contour routes, to the topology packet route. It does not
      apply under Keep source order or Cut in direction order.
