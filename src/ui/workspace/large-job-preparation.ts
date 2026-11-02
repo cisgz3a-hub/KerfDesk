@@ -9,6 +9,7 @@ import {
 } from '../laser/live-job-estimate';
 import { buildPreviewToolpathFromPrepared } from './draw-preview';
 import { serializeExecutablePlanPreviewRoute } from './executable-plan-preview-route';
+import { withPreviewRouteSummary } from './preview-route-summary';
 import type { PreviewToolpath } from './preview-status';
 import { registerPreviewJobOriginOffset } from './preview-scene-frame';
 
@@ -94,7 +95,9 @@ export function largeJobPreparationFromPrepared(
     allowPlanEmission: false,
     ...(emittedProgram === undefined ? {} : { emittedProgram }),
   });
-  const serializedToolpath = serializeExecutablePlanPreviewRoute(toolpath);
+  // The summary Preview reads from the whole route is built here, beside the
+  // route, so the UI thread never walks it (ADR-598 Amendment 2).
+  const serializedToolpath = withPreviewRouteSummary(serializeExecutablePlanPreviewRoute(toolpath));
   const jobOriginOffset = prepared.ok ? prepared.jobOriginOffset : { x: 0, y: 0 };
   registerPreviewJobOriginOffset(serializedToolpath, jobOriginOffset);
   return {

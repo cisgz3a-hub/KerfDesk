@@ -4,6 +4,7 @@ import { prepareOutput } from '../../io/gcode';
 import type * as Gcode from '../../io/gcode';
 import { estimateLiveJobFromPrepared } from '../laser/live-job-estimate';
 import { coordinateEntryProject } from './runtime-coordinate.test-support';
+import { withPreviewRouteSummary } from './preview-route-summary';
 import type {
   PreparationWorkerRequest,
   PreparationWorkerResponse,
@@ -109,7 +110,7 @@ describe('preparation worker result projection', () => {
     expect(workerScope.postMessage).toHaveBeenLastCalledWith({
       id: 17,
       kind: 'ok',
-      toolpath: { steps: [], totalLength: 42 },
+      toolpath: withPreviewRouteSummary({ steps: [], totalLength: 42 }),
       estimate: expectedEstimate,
       jobOriginOffset: { x: 0, y: 0 },
     });
@@ -217,7 +218,7 @@ describe('preparation worker result projection', () => {
     expect(workerScope.postMessage).toHaveBeenCalledExactlyOnceWith({
       id: 9,
       kind: 'ok',
-      toolpath,
+      toolpath: withPreviewRouteSummary(toolpath),
       estimate: expectedEstimate,
       jobOriginOffset: { x: 0, y: 0 },
     });
