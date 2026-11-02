@@ -1,3 +1,4 @@
+import { LEGACY_SIZE_UNITS, UNITS_PER_EM } from '../../core/text/single-line-frame-rule';
 import type { RawProject } from './migrations';
 
 // Schema 19 makes Size the em for single-line fonts, as it already was for
@@ -8,13 +9,6 @@ import type { RawProject } from './migrations';
 // which are multiples of Size, shrink by the same factor. A frame counted
 // each line as one of those Sizes, so it keeps counting that fraction of the
 // em (ADR-682 Amendment 1).
-const UNITS_PER_EM = 1000;
-const LEGACY_SIZE_UNITS: ReadonlyMap<string, number> = new Map([
-  ['relief-single-line', 680],
-  ['ems-nixish', 500],
-  ['ems-decorous-script', 500],
-  ['ems-casual-hand', 500],
-]);
 
 export function migrateV18SingleLineTextEm(raw: RawProject): RawProject {
   const scene = record(raw['scene']);

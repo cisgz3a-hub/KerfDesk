@@ -12,6 +12,7 @@ import { PROJECT_SCHEMA_VERSION } from '../../core/scene/project';
 import { migrateV2OperationBindings } from './migrate-v2-operation-bindings';
 import { migrateV17FocusIntent } from './migrate-v17-focus-intent';
 import { migrateV18SingleLineTextEm } from './migrate-v18-single-line-text-em';
+import { migrateV20RecoverFrameLineRule } from './migrate-v20-recover-frame-line-rule';
 import { migrateV3ReliefSources } from './migrate-v4-relief-heightfields';
 import { isMigrationFailure, type MigrationFailure } from './migration-failure';
 
@@ -59,10 +60,11 @@ const MIGRATORS: Readonly<Record<number, Migrator>> = {
   17: migrateV17FocusIntent,
   // Schema 19 makes Size the em for single-line fonts; their text keeps its size.
   18: migrateV18SingleLineTextEm,
-  // Schema 20 frames keep the line rule step 18 gives them. A schema-19 file
-  // has none to keep: its single-line frames were made or converted under the
-  // em rule, and they keep it.
+  // Schema 20 frames keep the line rule step 18 gives them. Step 20 finds the
+  // ones a schema-19 file lost.
   19: (raw) => ({ ...raw, schemaVersion: 20 }),
+  // Schema 21 gives back the line rule of a frame 1.0.28 converted and saved.
+  20: migrateV20RecoverFrameLineRule,
 };
 
 function migrateV3ToV4(raw: RawProject): RawProject | MigrationFailure {

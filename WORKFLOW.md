@@ -1699,7 +1699,8 @@ the completed physical Frame is the spatial source of truth.
 
 #### Success — schema older
 1. Migration runs to current version.
-2. Toast (info) identifies the migration, for example: `Project migrated from v1 to v2.`
+2. Toast (info) identifies the migration, for example: `Project migrated from v1 to v2.` Any change
+   to what it burns follows as a warning (see "an older project burns differently now").
 3. Nothing is written until the user saves. Save then writes the migrated project over the file
    (ADR-550); earlier KerfDesk versions report it as newer instead of misreading it.
 
@@ -1781,6 +1782,32 @@ the completed physical Frame is the spatial source of truth.
    (`This project was saved by an earlier KerfDesk and was migrated from schema v<n>.`) and a
    removed Auto-focus command, as Open does.
 4. Saving writes the file without the marker, so the notice does not come back.
+
+#### Edge — an older project burns differently now (ADR-682 Amendment 3)
+What the file holds decides these, not one release's update notes, which a user who skips that
+release never sees. Each reader above gives them: Open, Recent Projects, a drop or the operating
+system, a local snapshot, New from template, Restore of an autosave, and switching to a sheet an
+earlier build archived. A frozen production design in the file counts too. Job Review repeats the
+same words while those objects are in the project. Saving settles it: the next open says nothing.
+
+1. **Framed text saved through 1.0.28.** 1.0.28 converted single-line shrink frames without their
+   line rule, so records came out up to a third smaller. If the stored geometry shows the old rule
+   drew the frame, the frame gets its rule back and burns as it did on 1.0.27. A warning names each
+   text and both sizes, for example: `“{{csv:name}}”: “ANNA” goes from 29.61 × 7.48 mm back to
+   39.59 × 10.00 mm`, and says to lower Size if the smaller size was kept on purpose.
+2. **A variable frame the file cannot place.** When both rules draw the template the same, the file
+   cannot show which one it was designed under. The frame stays on the current rule and the warning
+   names the sizes under both, unless every CSV record fits the same under either, when nothing is
+   said. A plain frame is not mentioned: it burns its stored geometry either way.
+3. **Variable records that move.** A bent, on-a-path or framed record from before schema 19, or a
+   framed record from schema 19, now takes its template's baseline, and a framed one may refit a little
+   smaller to stay in its frame (ADR-682 Amendment 2). A warning names the text and says to Frame
+   before a batch.
+4. **Images that burn more.** From before schema 19: Grayscale or Pass-Through with Dot Width, and
+   Pass-Through turned off the scan's axes. A warning names each image and says to test first.
+
+At most two toasts appear, frames in one and burn changes in the other, because only the newest three
+are shown. Nothing here is a gate: Frame, Start and Save are unchanged.
 
 #### Edge — file is a valid .lf2 but references a device profile not on this machine
 - Project loads with the embedded device profile, adopted wholesale (`deserializeProject`).

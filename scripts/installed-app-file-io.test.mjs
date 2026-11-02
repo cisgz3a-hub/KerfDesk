@@ -302,12 +302,13 @@ test('disk evidence rejects stale, future and malformed project schemas', () => 
     17,
     18,
     19,
-    21,
+    22,
     '16',
     '17',
     '18',
     '19',
     '20',
+    '21',
     null,
     undefined,
   ]) {
@@ -342,7 +343,7 @@ test('historical schemas require the explicit known-upgrade contract and retain 
   );
   for (const schemaVersion of [
     11,
-    21,
+    22,
     '12',
     '13',
     '14',
@@ -352,6 +353,7 @@ test('historical schemas require the explicit known-upgrade contract and retain 
     '18',
     '19',
     '20',
+    '21',
     null,
   ]) {
     assert.throws(
