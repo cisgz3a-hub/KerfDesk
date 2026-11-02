@@ -17,20 +17,30 @@
 // line moved the rest of the job back to the window, and an Abort right after
 // a stall wrote its stop lines only once this thread had worked through the
 // lines the worker forwarded meanwhile.
+//
+// Rolling audit v9 R1 found the same order in Pause, and that the corrupted line
+// was skipped with the job running on to `done`. A lost beam-off burned the next
+// travel across the workpiece (ADR-676 Amendment 2).
 
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createStreamer } from '../../core/controllers/grbl';
 import { useLaserStore } from './laser-store';
 import { initialLaserState } from './laser-store-helpers';
 import {
-  buildStallThread,
-  containsRun,
   GRBL_COMPATIBLE,
   GRBLHAL_COMPATIBLE,
-  litMsDuring,
   MARLIN_FAN,
+  MARLIN_FAN_TWO_CUTS,
   MARLIN_INLINE,
+  MARLIN_INLINE_TWO_CUTS,
+} from '../../__fixtures__/controllers/stall-thread-cases';
+import {
+  buildStallThread,
+  containsRun,
+  litMsDuring,
+  measureAgain,
   runStall,
+  runToJobEnd,
   terminateStallThreads,
   until,
 } from '../../__fixtures__/controllers/stall-thread-harness';
@@ -92,7 +102,8 @@ describe('a blocked window during a burn (rolling audit v6 K1)', () => {
     it('Marlin fan output over a worker-owned USB port never stops lit, and Abort stops clean', async () => {
       const run = await runStall(MARLIN_FAN, 'usb-worker', { abortAfterStall: true });
       expect(run.armAcks).toEqual(['marlin']);
-      expect(run.litDuringStall).toBeLessThan(LIT_TOLERANCE_MS);
+      // Up to the end of the stall: Abort's own residue has its measure below.
+      expect(litMsDuring(run.litStops, run.stall)).toBeLessThan(LIT_TOLERANCE_MS);
       expect(run.warnings).toEqual([]);
       // Abort's quickstop (M107, M410, M5 I) follows the refill's release, so
       // no job move follows it on the wire.
@@ -112,28 +123,6 @@ describe('a blocked window during a burn (rolling audit v6 K1)', () => {
   });
 
   describe('rolling audit v8 N1: the Marlin worker keeps the protection to the end', () => {
-    it('keeps the refill through the echo of a corrupted line, so a later stall never stops lit', async () => {
-      // The refuter's trigger: the 20th G1 reaches Marlin without its G, so it
-      // echoes `Unknown command: "1 X…"`, skips the move and answers ok.
-      const corrupted = 20;
-      const run = await runStall(MARLIN_FAN, 'usb-worker', { dropCommandLetterOfMove: corrupted });
-      expect(run.echoes).toEqual([expect.stringMatching(/^echo:Unknown command: "1 X/)]);
-      expect(useLaserStore.getState().jobStreamHost).toBe('worker');
-      expect(run.litDuringStall).toBeLessThan(LIT_TOLERANCE_MS);
-      // Every refill stayed in the worker: this thread wrote no job line.
-      expect(run.windowWrites.filter((data) => JOB_MOVE.test(data))).toEqual([]);
-      // Every line reached the controller once, in order, the corrupted one
-      // as Marlin read it.
-      let moves = 0;
-      const expected = createStreamer(run.program).queued.map((queuedLine) => {
-        const line = queuedLine.trimEnd();
-        if (!/^G1\b/.test(line)) return line;
-        moves += 1;
-        return moves === corrupted ? line.slice(1) : line;
-      });
-      expect(containsRun(run.received, expected)).toBe(true);
-    }, 40_000);
-
     it('sends Abort’s stop lines before this thread works through the stall’s backlog', async () => {
       // Each forwarded line costs this thread 4 ms, as a renderer's would: the
       // audit's model, under which the fan stayed lit 226 ms after the stall.
@@ -158,5 +147,99 @@ describe('a blocked window during a burn (rolling audit v6 K1)', () => {
       expect(run.received.slice(quickstop).filter((line) => JOB_MOVE.test(line))).toEqual([]);
       await until(() => useLaserStore.getState().pendingUntrackedAcks === 0, 5_000);
     }, 40_000);
+  });
+
+  describe('rolling audit v9 R1-P1-1: a line Marlin skipped ends the job with a notice', () => {
+    const TRANSPORTS = ['usb-worker', 'window'] as const;
+    // Each loses its first byte on Marlin's UART, so Marlin echoes the rest as
+    // an unknown command, skips the whole line and answers ok. The fan program
+    // opens with an M107 of its own, and the inline one reaches its first cut
+    // with a G0: the second of each ends the first cut.
+    const CASES = [
+      ['fan beam-off', MARLIN_FAN_TWO_CUTS, { pattern: '^M107$', nth: 2 }, '107'],
+      ['inline beam-off', MARLIN_INLINE_TWO_CUTS, { pattern: '^G0\\b', nth: 2 }, '0 X10'],
+      ['fan move, every one', MARLIN_FAN_TWO_CUTS, { pattern: '^G1\\b' }, '1 X'],
+      ['inline move, every one', MARLIN_INLINE_TWO_CUTS, { pattern: '^G1\\b' }, '1 X'],
+    ] as const;
+
+    describe.each(TRANSPORTS)('%s', (transport) => {
+      it.each(CASES)(
+        '%s',
+        async (_label, testCase, loseFirstByte, echoed) => {
+          const run = await runToJobEnd(testCase, transport, { loseFirstByte });
+
+          expect(run.echoes).toEqual([expect.stringContaining(`echo:Unknown command: "${echoed}`)]);
+          const state = useLaserStore.getState();
+          expect(state.streamer?.status).toBe('errored');
+          expect(state.safetyNotice?.kind).toBe('controller-error');
+          expect(state.safetyNotice?.message).toContain(`"Unknown command" to ${echoed}`);
+          expect(state.safetyNotice?.message).toContain('KerfDesk sent');
+          // The stop went out, and no job move followed the skipped line.
+          const skipped = run.received.findIndex((line) => line.startsWith(echoed));
+          const after = run.received.slice(skipped + 1);
+          expect(after).toEqual(expect.arrayContaining(['M410']));
+          expect(after.filter((line) => JOB_MOVE.test(line))).toEqual([]);
+          // The head is not left lit: the job's beam is off once the stop has run.
+          await until(() => useLaserStore.getState().pendingUntrackedAcks === 0, 5_000);
+          const settled = await measureAgain(run);
+          expect(settled.litStops.at(-1)?.to ?? 0).toBeLessThan(Date.now() - 5);
+        },
+        40_000,
+      );
+    });
+
+    it('a clean job on the same programs still ends done, with no notice', async () => {
+      const run = await runToJobEnd(MARLIN_FAN_TWO_CUTS, 'usb-worker');
+      expect(run.echoes).toEqual([]);
+      expect(useLaserStore.getState().streamer?.status).toBe('done');
+      expect(useLaserStore.getState().safetyNotice).toBeNull();
+    }, 40_000);
+  });
+
+  describe('rolling audit v9 R1-P2-1: Pause after a stall stops ahead of the backlog', () => {
+    it.each([
+      ['fan output', MARLIN_FAN, 'M107'],
+      ['inline', MARLIN_INLINE, 'M5 I'],
+    ] as const)(
+      '%s: the beam-off leads, Pause freezes where the worker stopped, and Resume finishes',
+      async (_label, testCase, beamOff) => {
+        // Each forwarded line costs this thread 4 ms, as a renderer's would.
+        const settleMs = 1_500;
+        const run = await runStall(testCase, 'usb-worker', {
+          pauseAfterStall: true,
+          lineCostMs: 4,
+          settleMs,
+        });
+        const arrived = run.arrivals.find(
+          (arrival) => arrival.line === beamOff && arrival.at >= run.stall.to,
+        );
+        expect(arrived).toBeDefined();
+        expect((arrived?.at ?? Infinity) - run.stall.to).toBeLessThan(100);
+
+        // The worker wrote no job line after the beam-off.
+        const beamOffAt = run.received.lastIndexOf(beamOff);
+        expect(run.received.slice(beamOffAt).filter((line) => JOB_MOVE.test(line))).toEqual([]);
+        // This side froze at exactly the line where the worker stopped, so
+        // nothing is sent twice or skipped when the job goes on.
+        const paused = useLaserStore.getState().streamer;
+        expect(paused?.status).toBe('paused');
+        const queued = paused?.queued ?? [];
+        const queueIndex = paused?.queueIndex ?? 0;
+        const sentLines = queued.slice(0, queueIndex).map((line) => line.trimEnd());
+        expect(containsRun(run.received, sentLines)).toBe(true);
+        expect(run.received[beamOffAt - 1]).toBe(sentLines.at(-1));
+        // Every reply settled its own ledger, the beam-off's too, so Resume can run.
+        await until(() => useLaserStore.getState().pendingUntrackedAcks === 0, 5_000);
+
+        await useLaserStore.getState().resumeJob();
+        await until(() => useLaserStore.getState().streamer?.status === 'done', 20_000);
+        const finished = await measureAgain(run);
+        const restOfJob = (useLaserStore.getState().streamer?.queued ?? [])
+          .slice(queueIndex)
+          .map((line) => line.trimEnd());
+        expect(containsRun(finished.received.slice(beamOffAt), restOfJob)).toBe(true);
+      },
+      60_000,
+    );
   });
 });

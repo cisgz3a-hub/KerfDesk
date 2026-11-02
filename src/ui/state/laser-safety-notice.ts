@@ -315,12 +315,15 @@ export function isControllerHaltedNotice(notice: LaserSafetyNotice | null): bool
 }
 
 /** The controller skipped a command it has no handler for: its firmware
- * build lacks the option that provides it (controller audit MA-12). */
+ * build lacks the option that provides it (controller audit MA-12), or the
+ * line reached it damaged (ADR-676 Amendment 2). */
 export type SkippedCommand = {
   readonly command: string;
   readonly raw: string;
   /** The build option that provides the command, when the driver knows it. */
   readonly requirement: string | null;
+  /** The job line KerfDesk sent, when the controller read something else. */
+  readonly damagedLine?: string;
 };
 
 export function skippedCommandReason(skipped: SkippedCommand): string {
@@ -332,6 +335,7 @@ export function skippedCommandNotice(
   skipped: SkippedCommand,
   rejectedLine: string,
 ): LaserSafetyNotice {
+  if (skipped.damagedLine !== undefined) return damagedLineNotice(skipped, skipped.damagedLine);
   return {
     kind: 'controller-error',
     code: null,
@@ -342,6 +346,22 @@ export function skippedCommandNotice(
       'KerfDesk stopped the job, because the rest of it would run without that command. Use the ' +
       'physical E-stop or power cutoff now if unsafe. Enable that option in the firmware, or ' +
       'change the device profile so the job does not send the command, then home before re-running.',
+  };
+}
+
+function damagedLineNotice(skipped: SkippedCommand, sentLine: string): LaserSafetyNotice {
+  return {
+    kind: 'controller-error',
+    code: null,
+    raw: skipped.raw,
+    rejectedLine: sentLine,
+    message:
+      `The controller skipped a job line it could not read: KerfDesk sent ${sentLine} and the ` +
+      `controller answered "Unknown command" to ${skipped.command}, so the line was probably ` +
+      'damaged on the way. KerfDesk stopped the job, because the rest of it would run without ' +
+      'that line. If it was a beam-off, the laser may have burned a line across the work. Use ' +
+      'the physical E-stop or power cutoff now if unsafe. Check the USB cable and connection, ' +
+      'then home before re-running.',
   };
 }
 

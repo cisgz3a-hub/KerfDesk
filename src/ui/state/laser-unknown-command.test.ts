@@ -13,6 +13,7 @@ import { handleLine } from './laser-line-handler';
 import { makeLineHandlerHarness } from './laser-line-handler.test-support';
 import { useLaserStore } from './laser-store';
 import { startTestLaserJob } from './laser-test-start-helpers';
+import { reserveUntrackedAcks } from './laser-untracked-ack-ledger';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
 import { disconnectOnTestClock } from './laser-disconnect-testing';
@@ -83,14 +84,73 @@ describe('a job line Marlin skipped', () => {
     expect(safeWrite).not.toHaveBeenCalledWith('G1 X10\n', undefined, 'job');
   });
 
-  it('leaves the job running when the echo names another line', () => {
+  // Rolling audit v9 R1-P1-1: Marlin echoes the bytes it read, so a first byte
+  // lost on the wire reads differently from the line sent, and the line was
+  // skipped all the same.
+  it.each([
+    ['a beam-off', 'M107\nG0 X10\n', '107', 'M107'],
+    ['a move', 'G1 X10\nG1 X20\n', '1 X10', 'G1 X10'],
+  ])('stops the job when %s reaches Marlin damaged', (_label, program, echoed, sent) => {
     const { refs, set, get, safeWrite } = marlinHarness();
-    set({
-      streamer: step(createStreamer('G1 X10\nG1 X20\n', { streamingMode: 'ping-pong' })).state,
-    });
-    handleLine(set, get, refs, safeWrite, 'echo:Unknown command: "M9"');
+    set({ streamer: step(createStreamer(program, { streamingMode: 'ping-pong' })).state });
+    handleLine(set, get, refs, safeWrite, `echo:Unknown command: "${echoed}"`);
+    expect(get().streamer?.status).toBe('streaming');
     handleLine(set, get, refs, safeWrite, 'ok');
-    expect(get().streamer).toMatchObject({ status: 'streaming', completed: 1 });
+
+    expect(get().streamer).toMatchObject({ status: 'errored', completed: 1, inFlight: [] });
+    expect(get().safetyNotice).toMatchObject({ kind: 'controller-error', rejectedLine: sent });
+    expect(get().safetyNotice?.message).toContain(`KerfDesk sent ${sent}`);
+    expect(get().safetyNotice?.message).toContain(`"Unknown command" to ${echoed}`);
+    // It says nothing of a missing build option: the build was not the problem.
+    expect(get().safetyNotice?.message).not.toContain('firmware build lacks');
+    // The next job line stays unsent; the stop lines go out instead.
+    expect(safeWrite).not.toHaveBeenCalledWith(expect.stringMatching(/^G/), undefined, 'job');
+    expect(safeWrite).toHaveBeenCalledWith('M107\n', 'stop', 'system');
+  });
+
+  describe('an echo of a non-job line still owed a reply', () => {
+    function streamWithConsoleLineOwed(line: string) {
+      const harness = marlinHarness();
+      const { refs, set } = harness;
+      set({
+        streamer: step(createStreamer('G1 X10\nG1 X20\n', { streamingMode: 'ping-pong' })).state,
+        pendingUntrackedAcks: 1,
+      });
+      reserveUntrackedAcks(refs, 1, null, [line]);
+      return harness;
+    }
+
+    it('stays in the log, and the job runs on', () => {
+      const { refs, set, get, safeWrite } = streamWithConsoleLineOwed('M119');
+      handleLine(set, get, refs, safeWrite, 'echo:Unknown command: "M119"');
+      handleLine(set, get, refs, safeWrite, 'ok');
+      expect(get().streamer).toMatchObject({ status: 'streaming', completed: 1 });
+      expect(get().safetyNotice).toBeNull();
+    });
+
+    it('does not excuse the job line in flight when that is what the echo names', () => {
+      const { refs, set, get, safeWrite } = streamWithConsoleLineOwed('G1 X10');
+      handleLine(set, get, refs, safeWrite, 'echo:Unknown command: "G1 X10"');
+      handleLine(set, get, refs, safeWrite, 'ok');
+      expect(get().streamer?.status).toBe('errored');
+    });
+
+    it('does not excuse an echo that reads as no line sent', () => {
+      const { refs, set, get, safeWrite } = streamWithConsoleLineOwed('M119');
+      handleLine(set, get, refs, safeWrite, 'echo:Unknown command: "1 X10"');
+      handleLine(set, get, refs, safeWrite, 'ok');
+      expect(get().streamer?.status).toBe('errored');
+      expect(get().safetyNotice?.message).toContain('KerfDesk sent G1 X10');
+    });
+  });
+
+  it('holds no echo when no job line is in flight', () => {
+    const { refs, set, get, safeWrite } = marlinHarness();
+    const stream = step(createStreamer('G1 X10\nG1 X20\n', { streamingMode: 'ping-pong' })).state;
+    set({ streamer: { ...stream, status: 'paused', inFlight: [] } });
+    handleLine(set, get, refs, safeWrite, 'echo:Unknown command: "FROM THE LCD"');
+    handleLine(set, get, refs, safeWrite, 'ok');
+    expect(get().streamer?.status).toBe('paused');
     expect(get().safetyNotice).toBeNull();
   });
 });

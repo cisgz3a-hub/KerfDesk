@@ -6,6 +6,8 @@ export type UntrackedAckReservation = {
    * console/poll/system ownership. Repeated for every ack in a multi-line
    * reservation so an unrelated error can never retire active motion. */
   readonly motionOperationId: LaserMotionOperationId | null;
+  /** The lines this write put on the wire, so an echo can name its owner. */
+  readonly lines: ReadonlyArray<string>;
   remaining: number;
 };
 
@@ -19,12 +21,26 @@ export function reserveUntrackedAcks(
   refs: UntrackedAckLedgerRefs,
   count: number,
   motionOperationId: LaserMotionOperationId | null = null,
+  lines: ReadonlyArray<string> = [],
 ): UntrackedAckReservation | null {
   if (count <= 0) return null;
   const queue = currentQueue(refs);
-  const reservation = { writeEpoch: refs.writeEpoch ?? 0, motionOperationId, remaining: count };
+  const reservation = {
+    writeEpoch: refs.writeEpoch ?? 0,
+    motionOperationId,
+    lines,
+    remaining: count,
+  };
   queue.push(reservation);
   return reservation;
+}
+
+/** True when a current-session write still owed a reply put such a line on the wire. */
+export function owesUntrackedLine(
+  refs: UntrackedAckLedgerRefs,
+  matches: (line: string) => boolean,
+): boolean {
+  return currentQueue(refs).some((reservation) => reservation.lines.some(matches));
 }
 
 /** The command a nonterminal rejection describes, without settling its debt. */
