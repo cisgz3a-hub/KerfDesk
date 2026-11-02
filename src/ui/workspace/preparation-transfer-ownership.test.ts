@@ -70,6 +70,7 @@ describe('worker-owned preparation transfer', () => {
     expect(owned.toolpath.steps.every((step) => step === undefined)).toBe(true);
     expect(project).toEqual(sourceBefore);
     expect(structuredClone(prepared)).toEqual(preparedBefore);
-    expect(largeJobPreparationFromPrepared(project, prepared, {})).toEqual(before);
+    // Cloned like `before`: a clone's typed arrays come from another realm.
+    expect(structuredClone(largeJobPreparationFromPrepared(project, prepared, {}))).toEqual(before);
   });
 });

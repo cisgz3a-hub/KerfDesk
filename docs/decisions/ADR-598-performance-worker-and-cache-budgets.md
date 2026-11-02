@@ -39,3 +39,67 @@ Focused tests reproduce silent-worker and queued-wait expiry, retain healthy
 non-preemption, and check that preparation failure preserves committed recovery,
 permits an explicitly queued clear, and allows later valid writes. This bounds
 worker preparation, not an unresponsive IndexedDB transaction or session lock.
+
+### Amendment 2 — Preview's whole-route summary is built beside the route (2026-11-02)
+
+Performance audit S1-P2-1 (raised to P1) measured the UI thread blocked for
+0.6–1.6 s when Preview opened during a 375k-line job. Two Aborts pressed inside
+the block reached the controller 1,223 and 1,357 ms after the key. The route
+itself was already built in the ADR-244 preparation worker. But four UI
+consumers then each walked every step of it: the playback timeline, the
+distance stats, the CNC pass stepper and the display-decimation notice. Each
+read went through `unpackToolpathStep`, which builds a step object and a
+polyline array per index.
+
+1. The preparation worker builds a `PreviewRouteSummary` beside the route
+   (`withPreviewRouteSummary` in `largeJobPreparationFromPrepared`). It holds
+   the distance totals, the pass-start fractions, the display decimation of
+   the route Preview draws, and the timeline basis. The basis is three running
+   distance sums (cut, rapid travel, laser-off feed travel), one entry per step
+   of nonzero length. The summary travels in the route's header on all three
+   transports (`ok`, chunked, packed). With a packed route, its three buffers
+   are transferred, not cloned. It adds 24 bytes per step: 8.6 MB at 375k.
+2. The UI reads `previewRouteSummary(toolpath)`. It uses a carried summary
+   only when its step count and total length match the route. Otherwise it
+   builds one on this thread and caches it per route object. Only routes
+   inside the synchronous Preview budget, and imported programs, take that
+   path.
+3. The timeline is built from the basis and the live estimate's breakdown,
+   with no step loop. Time is linear in each category's distance, so each span
+   is the running sums scaled by three rates. Lookups use a binary search,
+   which also removes a per-frame linear scan during playback. An imported
+   program keeps its explicit per-line spans, dwells included, and the same
+   lookups serve both forms.
+4. Whole-route walks that remain read step facts (kind, length, travel motion,
+   plunge direction, segment count) from the packed columns
+   (`visitToolpathStepFacts`), never step objects. This covers the worker's
+   summary, the fallback in 2 and `summarizeToolpathDistances`.
+
+Preview shows the same content. Distances, pass starts and decimation are
+exactly equal to the walks they replace. Timeline positions agree to floating-
+point rounding (1e-6 s and 1e-9 of the scrubber), because spans are sums of
+category distances, not a running sum of span durations. A reference test runs
+the replaced walks over random plain and packed routes. No compile, emission or
+streaming code changed, so the G-code is untouched. A guard test sends a
+130k-step route through the real packed transport and hydration. It then builds
+the timeline and renders the stats, pass stepper and notices, and asserts zero
+reads of the route other than its length. Without the carried summary, the
+guard fails.
+
+The Abort path was not reordered. Its key handler runs in the capture phase
+and calls `stopJob` synchronously, and the stop path posts its reset before its
+first await (ADR-334 §4). The measured delay was the blocked thread, not the
+handler. Putting the reset ahead of the session-evidence invalidation it now
+follows would let a boot banner overtake the armed cleanup.
+
+Measured in Node 25 on the audit PC, timing the UI-thread work from when the
+worker route arrives (median of 5, worst in brackets): at 374,843 lines,
+1,205 ms (1,298) before and under 0.1 ms after. At 18,527 lines, 81 ms (92)
+before and 0.02 ms after. A playback frame's lookup at 375k went from 5.4 ms to
+under 0.01 ms. The worker spends 35 ms more building the summary, off the UI
+thread. The fallback in 2 costs 45 ms at 375k on a route that never crossed the
+worker. Not measured: the browser re-run of the audit's PV375 set, including
+Abort latency inside Preview. This PC lacked the memory for a 375k-line browser
+job while other sessions were working. With no block left to wait behind, Abort
+inside Preview should match the audit's idle 1–18 ms. That remains an
+inference until the harness re-measures it.

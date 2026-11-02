@@ -7,7 +7,7 @@ import { iterateLines } from '../../core/util';
 import { createGcodeProgramLineParser, type ParseGcodeProgramResult } from '../../io/gcode';
 import type { GcodeInspectionContext } from '../gcode-inspector/gcode-inspection-source';
 import type { LiveJobEstimate } from '../laser/live-job-estimate';
-import type { PreviewTimeline } from '../workspace/preview-timeline';
+import type { PreviewTimeline, PreviewTimelineSegment } from '../workspace/preview-timeline';
 import {
   CANVAS_PROGRAM_ANALYSIS_LINE_BUDGET,
   CANVAS_PROGRAM_ANALYSIS_SEGMENT_BUDGET,
@@ -152,7 +152,7 @@ function sourceLineTimeline(
 ): PreviewTimeline | null {
   const motionSeconds = motionSecondsByLine(model, segmentSeconds);
   const dwells = dwellSecondsByLine(model);
-  const segments: PreviewTimeline['segments'][number][] = [];
+  const segments: PreviewTimelineSegment[] = [];
   let distance = 0;
   let elapsed = 0;
   let motionIndex = 0;

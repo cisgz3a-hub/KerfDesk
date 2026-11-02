@@ -1,6 +1,7 @@
 import { packedToolpathTransferables } from '../../core/job/packed-toolpath';
 import { packedToolpathOf } from '../../core/job/packed-toolpath-steps';
 import type { LargeJobPreparation } from './large-job-preparation';
+import { previewRouteSummaryTransferables } from './preview-route-summary';
 import type { ToolpathStep } from '../../core/job';
 import type { PreparationWorkerResponse } from './preparation-worker-protocol';
 import {
@@ -95,10 +96,10 @@ export class PreparationTransferSender {
     if (packed === null || preparation.toolpath.executablePlanPreview !== undefined) return false;
     const { toolpath, ...preparedHeader } = preparation;
     const { steps: _steps, executablePlanPreview: _plan, ...toolpathHeader } = toolpath;
-    this.post(
-      { ...preparedHeader, id, kind: 'packed', toolpath: toolpathHeader, packed },
-      packedToolpathTransferables(packed),
-    );
+    this.post({ ...preparedHeader, id, kind: 'packed', toolpath: toolpathHeader, packed }, [
+      ...packedToolpathTransferables(packed),
+      ...previewRouteSummaryTransferables(toolpath.routeSummary),
+    ]);
     return true;
   }
 }

@@ -1,4 +1,5 @@
-import type { Toolpath, ToolpathStep } from '../../core/job';
+import type { Toolpath } from '../../core/job';
+import { visitToolpathStepFacts, type ToolpathStepFacts } from '../../core/job/toolpath-step-facts';
 import { LARGE_SCENE_SEGMENT_THRESHOLD, strideForSegmentBudget } from './draw-complexity';
 
 export type PreviewDisplayDecimation = {
@@ -13,20 +14,24 @@ export function previewDisplayDecimation(
   toolpath: Toolpath,
   threshold = LARGE_SCENE_SEGMENT_THRESHOLD,
 ): PreviewDisplayDecimation | null {
+  // The drawn steps are displayStepIndices' picks: every stride-th index and
+  // the last. Testing each index against the stride in the same walk keeps
+  // this one pass over the step facts, with no step object built (S1-P2-1).
+  const stepCount = toolpath.steps.length;
+  const stride = strideForSegmentBudget(stepCount, threshold);
   let sourceSegments = 0;
-  for (const step of toolpath.steps) sourceSegments += sourceSegmentCount(step);
   let drawnSteps = 0;
   let drawnSegments = 0;
-  for (const index of displayStepIndices(toolpath.steps.length, threshold)) {
-    const step = toolpath.steps.at(index);
-    if (step === undefined) continue;
+  visitToolpathStepFacts(toolpath.steps, (step, index) => {
+    sourceSegments += step.segmentCount;
+    if (index % stride !== 0 && index !== stepCount - 1) return;
     drawnSteps += 1;
     drawnSegments += displaySegmentCount(step, threshold);
-  }
-  if (drawnSteps === toolpath.steps.length && drawnSegments === sourceSegments) return null;
+  });
+  if (drawnSteps === stepCount && drawnSegments === sourceSegments) return null;
   return {
     threshold,
-    sourceSteps: toolpath.steps.length,
+    sourceSteps: stepCount,
     drawnSteps,
     sourceSegments,
     drawnSegments,
@@ -64,14 +69,8 @@ export function* displayPolylinePointIndices(
   if (finalIndex > last) yield finalIndex;
 }
 
-function sourceSegmentCount(step: ToolpathStep): number {
-  if (step.kind === 'travel') return 1;
-  if (step.kind === 'plunge') return 0;
-  return Math.max(0, step.polyline.length - 1);
-}
-
-function displaySegmentCount(step: ToolpathStep, threshold: number): number {
-  const source = sourceSegmentCount(step);
+function displaySegmentCount(step: ToolpathStepFacts, threshold: number): number {
+  const source = step.segmentCount;
   if (step.kind !== 'cut') return source;
   const stride = strideForSegmentBudget(source, threshold);
   return stride <= 1 ? source : Math.ceil(source / stride);
