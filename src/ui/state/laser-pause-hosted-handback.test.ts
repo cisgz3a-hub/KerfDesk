@@ -96,6 +96,48 @@ describe('Marlin Pause with an armed worker refill', () => {
     expect(h.get().pendingUntrackedAcks).toBe(0);
   });
 
+  it(
+    'decides the beam-off before the release, so nothing reads the program between them',
+    { timeout: 30_000 },
+    async () => {
+      // Performance audit S1-P1-1 (ADR-676 Amendment 3): the old walk of a large
+      // program ran between the release and the beam-off, and the drained head
+      // stood lit for it.
+      const h = pauseHarness({ armed: true });
+      const program = 'M106 S204\nG1 X1\nM107\nG0 X0\n'.repeat(50_000);
+      const stream = step(createStreamer(program, { streamingMode: 'ping-pong' })).state;
+      let reads = 0;
+      const queued = new Proxy(stream.queued, {
+        get(target, key, receiver) {
+          if (typeof key === 'string' && /^\d+$/.test(key)) reads += 1;
+          return Reflect.get(target, key, receiver) as unknown;
+        },
+      });
+      while (marlinDriver.prepareStreamPauseBeam?.(queued) === false);
+      h.set({ streamer: { ...stream, queued } });
+      const connection = h.refs.connection as SerialConnection;
+      const hosted = connection.hostedStreaming as HostedStreamRefill;
+      const events: string[] = [];
+      reads = 0;
+      vi.mocked(hosted.release).mockImplementationOnce(async () => {
+        events.push(`release after ${reads} line reads`);
+        await h.handback.promise;
+      });
+      const write = connection.write.bind(connection);
+      (connection as { write: SerialConnection['write'] }).write = async (line) => {
+        events.push(`${line.trim()} after ${reads} line reads`);
+        await write(line);
+      };
+
+      const pausing = runConfirmedPauseJob(h.context);
+      await Promise.resolve();
+      expect(events).toEqual(['release after 0 line reads', 'M107 after 0 line reads']);
+      h.handback.resolve();
+      await pausing;
+      expect(h.get().streamer?.status).toBe('paused');
+    },
+  );
+
   it('writes nothing more when the connection is replaced behind the backlog', async () => {
     const h = pauseHarness({ armed: true });
 

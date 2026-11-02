@@ -21,7 +21,12 @@ import {
 } from './commands';
 import { prepareMarlinConsoleCommand } from './console-command';
 import { classifyMarlinResponse } from './response';
-import { marlinStreamPauseOffLinesFrom, planMarlinStreamPauseBeam } from './stream-pause-beam';
+import {
+  carryMarlinStreamPauseBeam,
+  marlinStreamPauseOffLinesFrom,
+  planMarlinStreamPauseBeam,
+  prepareMarlinStreamPauseBeamSlice,
+} from './stream-pause-beam';
 
 export const MARLIN_DEFAULT_BAUD_RATE = 250000;
 
@@ -110,4 +115,6 @@ export const marlinDriver: ControllerDriver = {
   isSetupOnlyPayload: (payload) => /(^|\n)\s*M50[02]\b/i.test(payload),
   planStreamPauseBeam: planMarlinStreamPauseBeam,
   streamPauseOffLinesFrom: marlinStreamPauseOffLinesFrom,
+  prepareStreamPauseBeam: (streamLines) => prepareMarlinStreamPauseBeamSlice(streamLines),
+  carryStreamPauseBeam: carryMarlinStreamPauseBeam,
 };
