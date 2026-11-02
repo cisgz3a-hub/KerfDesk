@@ -1,0 +1,373 @@
+{
+  "measuredOn": "1.0.29",
+  "burns": {
+    "relief-tag": {
+      "ANNA": {
+        "width": 39.588,
+        "height": 10,
+        "minX": 120.206,
+        "minY": 339.5,
+        "length": 117.297,
+        "dose": 35189.103
+      },
+      "Anna": {
+        "width": 33.28,
+        "height": 9.926,
+        "minX": 123.36,
+        "minY": 339.5,
+        "length": 95.319,
+        "dose": 28595.728
+      },
+      "Hello": {
+        "width": 32.986,
+        "height": 10.956,
+        "minX": 123.507,
+        "minY": 339.5,
+        "length": 98.656,
+        "dose": 29596.786
+      },
+      "Maximilian": {
+        "width": 69.292,
+        "height": 11,
+        "minX": 105.354,
+        "minY": 339,
+        "length": 199.891,
+        "dose": 59967.369
+      },
+      "Peggy": {
+        "width": 34.74,
+        "height": 11,
+        "minX": 122.63,
+        "minY": 339,
+        "length": 120.227,
+        "dose": 36068.217
+      },
+      "Ågot": {
+        "width": 21.214,
+        "height": 11,
+        "minX": 129.393,
+        "minY": 339,
+        "length": 71.201,
+        "dose": 21360.21
+      },
+      "Al": {
+        "width": 12.618,
+        "height": 10.956,
+        "minX": 133.691,
+        "minY": 339.5,
+        "length": 38.937,
+        "dose": 11681.027
+      }
+    },
+    "casual-tag": {
+      "ANNA": {
+        "width": 29.022,
+        "height": 12,
+        "minX": 125.489,
+        "minY": 338,
+        "length": 119.016,
+        "dose": 35704.736
+      },
+      "Anna": {
+        "width": 27.148,
+        "height": 12,
+        "minX": 126.426,
+        "minY": 338,
+        "length": 103.511,
+        "dose": 31053.223
+      },
+      "Hello": {
+        "width": 19.91,
+        "height": 12,
+        "minX": 130.045,
+        "minY": 338,
+        "length": 82.487,
+        "dose": 24746.194
+      },
+      "Maximilian": {
+        "width": 42.774,
+        "height": 12,
+        "minX": 118.613,
+        "minY": 338,
+        "length": 164.144,
+        "dose": 49243.156
+      },
+      "Peggy": {
+        "width": 20.816,
+        "height": 11.992,
+        "minX": 129.592,
+        "minY": 338.002,
+        "length": 92.757,
+        "dose": 27827.189
+      },
+      "Ågot": {
+        "width": 13.084,
+        "height": 11.987,
+        "minX": 133.458,
+        "minY": 338.004,
+        "length": 57.442,
+        "dose": 17232.638
+      },
+      "Al": {
+        "width": 8.866,
+        "height": 12,
+        "minX": 135.567,
+        "minY": 338,
+        "length": 42.835,
+        "dose": 12850.52
+      }
+    },
+    "nixish-tag": {
+      "ANNA": {
+        "width": 49.776,
+        "height": 10.996,
+        "minX": 115.112,
+        "minY": 339.004,
+        "length": 189.822,
+        "dose": 56946.689
+      },
+      "Anna": {
+        "width": 42.854,
+        "height": 10.988,
+        "minX": 118.573,
+        "minY": 339.012,
+        "length": 146.422,
+        "dose": 43926.52
+      },
+      "Hello": {
+        "width": 39.867,
+        "height": 11,
+        "minX": 120.066,
+        "minY": 339,
+        "length": 148.43,
+        "dose": 44529.08
+      },
+      "Maximilian": {
+        "width": 78.618,
+        "height": 9.55,
+        "minX": 100.691,
+        "minY": 339.423,
+        "length": 282.203,
+        "dose": 84660.898
+      },
+      "Peggy": {
+        "width": 37.964,
+        "height": 10.987,
+        "minX": 121.018,
+        "minY": 339.008,
+        "length": 153.382,
+        "dose": 46014.741
+      },
+      "Ågot": {
+        "width": 20.732,
+        "height": 10.976,
+        "minX": 129.634,
+        "minY": 339.024,
+        "length": 83.099,
+        "dose": 24929.551
+      },
+      "Al": {
+        "width": 15.922,
+        "height": 11,
+        "minX": 132.039,
+        "minY": 339,
+        "length": 61.834,
+        "dose": 18550.237
+      }
+    },
+    "decorous-roomy-tag": {
+      "ANNA": {
+        "width": 63.253,
+        "height": 13.685,
+        "minX": 108.385,
+        "minY": 335.957,
+        "length": 242.515,
+        "dose": 72754.614
+      },
+      "Anna": {
+        "width": 53.301,
+        "height": 13.685,
+        "minX": 113.361,
+        "minY": 335.957,
+        "length": 197.466,
+        "dose": 59239.895
+      },
+      "Hello": {
+        "width": 46.165,
+        "height": 14.47,
+        "minX": 116.926,
+        "minY": 335.964,
+        "length": 193.003,
+        "dose": 57900.873
+      },
+      "Maximilian": {
+        "width": 80,
+        "height": 10.76,
+        "minX": 100,
+        "minY": 339.563,
+        "length": 332.754,
+        "dose": 99826.272
+      },
+      "Peggy": {
+        "width": 46.208,
+        "height": 14.993,
+        "minX": 116.9,
+        "minY": 335.005,
+        "length": 198.498,
+        "dose": 59549.374
+      },
+      "Ågot": {
+        "width": 26.812,
+        "height": 14.98,
+        "minX": 126.598,
+        "minY": 335.002,
+        "length": 110.354,
+        "dose": 33106.129
+      },
+      "Al": {
+        "width": 23.561,
+        "height": 14.477,
+        "minX": 128.231,
+        "minY": 335.957,
+        "length": 82.987,
+        "dose": 24895.968
+      }
+    },
+    "nixish-narrow-tag": {
+      "ANNA": {
+        "width": 23.622,
+        "height": 19.996,
+        "minX": 108.189,
+        "minY": 330.004,
+        "length": 181.701,
+        "dose": 54510.164
+      },
+      "Anna": {
+        "width": 32.12,
+        "height": 19.98,
+        "minX": 103.94,
+        "minY": 330.02,
+        "length": 140.364,
+        "dose": 42109.196
+      },
+      "Hello": {
+        "width": 29.078,
+        "height": 20,
+        "minX": 105.461,
+        "minY": 330,
+        "length": 142.148,
+        "dose": 42644.422
+      },
+      "Maximilian": {
+        "width": 38.768,
+        "height": 16.087,
+        "minX": 100.616,
+        "minY": 332.959,
+        "length": 251.626,
+        "dose": 75487.766
+      },
+      "Peggy": {
+        "width": 23.722,
+        "height": 19.987,
+        "minX": 108.139,
+        "minY": 330.008,
+        "length": 164.966,
+        "dose": 49489.907
+      },
+      "Ågot": {
+        "width": 22.674,
+        "height": 19.996,
+        "minX": 108.663,
+        "minY": 330.004,
+        "length": 113.436,
+        "dose": 34030.832
+      },
+      "Al": {
+        "width": 19.15,
+        "height": 13.23,
+        "minX": 110.425,
+        "minY": 335.33,
+        "length": 74.371,
+        "dose": 22311.293
+      }
+    },
+    "relief-plain": {
+      "as-placed": {
+        "width": 39.588,
+        "height": 10,
+        "minX": 120.206,
+        "minY": 340,
+        "length": 117.297,
+        "dose": 35189.103
+      }
+    },
+    "relief-plain-roomy": {
+      "as-placed": {
+        "width": 39.588,
+        "height": 10,
+        "minX": 120.206,
+        "minY": 340,
+        "length": 117.297,
+        "dose": 35189.103
+      }
+    },
+    "roboto-tag": {
+      "ANNA": {
+        "width": 27.036,
+        "height": 7.11,
+        "minX": 126.482,
+        "minY": 342.202,
+        "length": 152.937,
+        "dose": 45881.018
+      },
+      "Anna": {
+        "width": 22.314,
+        "height": 7.208,
+        "minX": 128.843,
+        "minY": 342.104,
+        "length": 120.566,
+        "dose": 36169.931
+      },
+      "Hello": {
+        "width": 21.708,
+        "height": 7.598,
+        "minX": 129.146,
+        "minY": 342.104,
+        "length": 129.337,
+        "dose": 38801.241
+      },
+      "Maximilian": {
+        "width": 47.05,
+        "height": 7.598,
+        "minX": 116.475,
+        "minY": 342.104,
+        "length": 278.387,
+        "dose": 83516.179
+      },
+      "Peggy": {
+        "width": 26.612,
+        "height": 9.244,
+        "minX": 126.694,
+        "minY": 340.068,
+        "length": 170.746,
+        "dose": 51223.751
+      },
+      "Ågot": {
+        "width": 20.62,
+        "height": 11.538,
+        "minX": 129.69,
+        "minY": 340.122,
+        "length": 131.67,
+        "dose": 39501.032
+      },
+      "Al": {
+        "width": 8.052,
+        "height": 7.5,
+        "minX": 135.974,
+        "minY": 342.202,
+        "length": 51.198,
+        "dose": 15359.423
+      }
+    }
+  }
+}

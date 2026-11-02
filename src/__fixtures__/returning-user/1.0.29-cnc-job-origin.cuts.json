@@ -1,0 +1,18 @@
+{
+  "savedBy": "df2279e26 (1.0.29)",
+  "reading": "cnc-cut-extent.ts",
+  "cuts": {
+    "1.0.29-cnc-bowtie-pocket": {
+      "minX": 1.588,
+      "minY": 1.588,
+      "maxX": 98.413,
+      "maxY": 77.033
+    },
+    "1.0.29-cnc-flat-drill": {
+      "minX": -35,
+      "minY": -20,
+      "maxX": 30,
+      "maxY": 40
+    }
+  }
+}
