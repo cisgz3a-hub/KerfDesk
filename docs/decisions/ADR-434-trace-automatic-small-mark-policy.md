@@ -402,3 +402,156 @@ Tests:
   - 1-bit "lit." at 20 px.
 
   All of them fail on main `33bc394c6`.
+
+### Amendment 4 - text marks at any angle: turned baselines, colons, stops past descenders (2026-11-02)
+
+Rolling audit v9 R2-P1-2 and R2-P1-3 (both P1, `docs/audits/2026-11-02-rolling-v9/R2-tracer-remeasure.md`):
+Amendment 3's text-baseline rule read only horizontal lines, and three kinds of mark still fell.
+
+- **Turned text.** A letter's box bottom is its foot only when upright. Past a few degrees the rule
+  found no baseline, and the stop was a lone speck. An upside-down scan's stops sit at the top of
+  their letters.
+- **A colon.** Its top dot sits on no baseline, so it was a lone speck, and as debris it vetoed the
+  bottom dot, which was on one. Amendment 3's Decision 4 fixed this between stops, not between the
+  two dots of one character.
+- **A stop past descenders ("spy.", "happy.", the refuter's open question).** Reach is 12 dot heights.
+  Hinted Arial 22-26 px gives a 2 px tall stop, so 24 px, and "py" is about 25 px. The 's' was out
+  of reach, and 'p' and 'y' do not end on the baseline. So the rule's reach and its letter's foot
+  failed together, not the 's' itself.
+
+On 1-bit art two further causes showed in the probes: a hinted colon's top dot can be 2 px²
+(under the floor, and hard sub-floor debris against the bottom dot), and a letter's own sub-floor
+piece (a tittle, a tail's tip) vetoed the marks around it. Amendment 3 left that as audit N8's K3.
+
+Decision (`small-mark-text-line.ts`, new `small-mark-text-direction.ts`, `small-mark-neighbourhood.ts`,
+`small-mark-policy.ts`):
+
+1. **The text's direction comes from its letters.** Each letter-sized component (longer side 6-54
+   source px) keeps its convex hull's support in each of 180 directions, 2° apart. In the tile
+   around a mark, the direction where the most feet fall within one source pixel of each other is
+   how the text runs. The mark plays no part in that vote. Two letters always share a tangent, so a
+   line fitted through a speck would pass almost any speck beside text.
+2. **Rule 3e reads that direction.** A compact, solid dot is on a baseline when its foot is within
+   one source pixel of the foot of a letter 3-12 times its height, within 12 dot heights, along a
+   direction at or within 20% of the best vote.
+   - Where three or more letters name the direction, one letter is enough on the side with more
+     feet, and two on the other side (its letters' heads), which is what reads upside-down text.
+   - Where only two letters do, the direction must line up on both sides of the text and two letters
+     must reach the dot's line. This is what removes the chance tangent.
+   - **Letters that plainly run another way switch the upright rule off.** Without this, any letter's
+     box bottom on a 90° page was one more place for a speck to line up.
+3. **A stop past a descender.** Upright or along the text's direction, a dot just past a letter (at
+   most 2 dot heights beyond its box), with its foot 55-92% down that letter, stays when the letter
+   narrows there: its ink within 1.5 dot heights below the foot is at most 0.6 as wide as its ink
+   above, and carries on at least that far. 'o', 'l' and 'T' fail this; 'y', 'p', 'g' and 'q' pass it.
+4. **A colon's other dot.** A dot of about the same pixels (at most 2:1), straight above a dot on the
+   baseline (at most 6 dot heights above it, leaning at most 0.3 of the distance between them), is a
+   text mark, so neither vetoes the other. It also stays when under the 3 px² floor, the one
+   exception to rule 1: on 1-bit art it is often a hinted 2 px².
+5. **A letter's own piece is not debris.** A sub-floor speck within 2 source px of a letter-sized
+   component is no longer counted in the census (3b). It is still removed by rule 1; it just no
+   longer vetoes its neighbours. A dirty scan still leaves plenty of debris out on the paper.
+
+Measured through `traceImageToColoredPaths`, main `54e0e19b8` → this amendment. Text is SVG through
+sharp (Pango and librsvg), the mark drawn in its own colour so its ink is known, kept at 30% of its
+ink (the refuter's method, rebuilt; the same set sizes). Potrace 1.16 on the 1-bit input, as a
+separate test-only process.
+
+| Full stops of 7 sentences, 6 fonts, 20-28 px (of 126) | Line Art AA | Line Art 1-bit | Smooth AA | Smooth 1-bit | Potrace 1-bit |
+|---|---|---|---|---|---|
+| 0° | 126 → 126 | 126 → 126 | 126 → 126 | 126 → 126 | 126 |
+| 5° | 116 → **126** | 117 → **125** | 117 → **126** | 116 → **125** | 126 |
+| 45° | 112 → **126** | 108 → **123** | 110 → **126** | 99 → **123** | 125 |
+| 90° | 112 → **124** | 111 → **123** | 115 → **124** | 111 → **123** | 126 |
+| 180° | 113 → **126** | 111 → **126** | 115 → **126** | 111 → **126** | 126 |
+
+| Marks | Line Art AA | Line Art 1-bit | Smooth AA | Smooth 1-bit | Potrace 1-bit |
+|---|---|---|---|---|---|
+| "Scale 1:10", 8 fonts, 18-28 px, colon dots of 96 | 84 → 90 | 78 → 88 | 90 → 96 | 78 → 88 | 90 |
+| 5 colon strings, 8 fonts, 16-32 px, of 640 | 571 → 577 | 556 → **593** | 625 → 633 | 555 → **597** | 584 |
+| Stops after 6 descender strings, 8 fonts, 16-32 px, of 384 | 324 → 339 | 290 → 326 | 351 → 366 | 305 → 332 | 348 |
+
+Line Art 1-bit colons now pass Potrace. Stops after descenders close most of the gap and do not
+pass it. The loss that remains on Line Art anti-aliased is mostly at 16-18 px and in Courier New: the
+policy keeps the mark and Line Art's fixed cut leaves almost none of it past the cut (Smooth keeps
+those), or the strokes fall apart into pieces that really are debris.
+
+Siblings, 6 fonts, 18-28 px, Line Art AA / 1-bit before → after, Potrace 1-bit last: colons 279 → 279 /
+264 → 286 of 288 (274); semicolons 287 → 287 / 278 → 281 of 288 (283); commas 144 / 144 of 144 (144);
+apostrophes 144 / 139 → 144 of 144 (129); quotation marks 384 / 382 → 384 of 384 (362); "!" 272 / 268 →
+270 of 276 (264); "?" 242 / 234 of 242 (234); decimals 172 / 162 of 180 (162); stops after descenders
+169 → 171 / 163 → 169 of 180 (169); rows of dots 314 / 291 → 294 of 324 (301).
+
+**Dust did not come back, and on turned pages it fell.**
+
+- **One speck on a clean page of two text lines, nothing to veto it** (the hardest case: 100 random
+  places within 30 px of Roboto or Arial, 24 px, 3-6 px² hard specks; Line Art AA / 1-bit, kept):
+
+  | Angle | Roboto | Arial |
+  |---|---|---|
+  | 0° | 13 → 14 / 15 → 15 | 9 → 10 / 10 → 11 |
+  | 5° | 12 → 13 / 13 → 14 | 10 → 11 / 11 → 12 |
+  | 45° | 8 → 5 / 12 → 8 | 17 → 13 / 18 → 13 |
+  | 90° | 26 → 12 / 33 → 20 | 23 → 14 / 22 → 13 |
+  | 180° | 6 → 6 / 7 → 7 | 13 → 13 / 13 → 13 |
+
+  So 0° and 5° gain at most one speck in 100, from the descender and direction rules, and 45° and
+  90° improve because the upright rule stops reading turned text. Potrace keeps all of them.
+- **The audit's page: 60 hard specks around three text lines:** 2 of 60 kept, unchanged at 0°. Turned:
+  5° 4 → 4, 45° 8 → 7, 90° 3 → 2, 180° 6 → 6.
+- **Dark-noise probes** (`preprocessForTrace`, Line Art components): toner scatter 1 → 1; dust cluster
+  3 → 3; 512² dirty scan 182 → 183; 2048² dirty scan 2,633 → 2,679 of 32,690; 2048² page of letter
+  blocks turned 20° with 12,000 specks 5,488 → 5,501 of 13,732.
+- Every dust and noise regression in `small-mark-policy.test.ts` holds.
+
+Nothing else moved:
+
+- **Q4 scorecard.** The 79-image set against Potrace gives identical per-image rows (80 of 80): Line Art
+  51 / 20 / 8, Sharp 49 / 22 / 8, Smooth 55 / 17 / 7.
+- **Q5 real cases.** A (Line Art against plain Potrace) 23 / 3 / 1, B (Smooth against mkbitmap +
+  Potrace) 26 / 1 / 0, C (best against best) 24 / 2 / 1, all unchanged. 2 of 160 rows changed, each a
+  logo part regained (Line Art `ramp40` lost 3 → 2, `paper` lost 1 → 0).
+- **Cost, mask stage, median of 3, run side by side on a busy machine:** 512² dirty scan 144 → 259 ms;
+  2048² dirty scan 1,978 → 2,703 ms; the turned dirty page 1,698 → 2,391 ms. About 40% on a page
+  full of dust; the sweep's sort is most of it. A speck with no letter in reach never pays for a sweep.
+
+Considered and not used:
+
+- **A compact dot within an em of letter-sized ink, the veto still first** (the audit's second
+  direction). It would keep every speck near text. The single-speck test exists to catch that.
+- **Fitting a line through the dot and the letters beside it.** Any two letters share a tangent, so
+  in a paragraph almost any speck finds a pair. The direction has to come from the letters alone.
+- **Requiring two letters on every turned line.** It costs real stops (45° 126 → 122, 90° 124 → 119 on
+  anti-aliased), and the single-speck test barely moved on the angles it was run at.
+- **A wider reach than 12 dot heights.** It would fix "spy." and put more specks on the baseline
+  rule; "happy." needs more than an em anyway.
+- **A 3 px glyph-piece gap.** It kept no more marks and added dust (2048² dirty scan 2,679 → 2,705).
+
+Consequences:
+
+- A dot on a line of text at any angle now stays whatever made it, as Amendment 3 already accepted for
+  upright text, and Potrace keeps both. The dust veto still removes it wherever the scan leaves debris.
+- A speck in a colon's place, or just past a descender at the baseline, is indistinguishable from the
+  mark and stays.
+- A turned word of one letter and a stop ("y." at 45°, "a." at 90°) has no direction to read. Its stop
+  goes unless a neighbouring line names one. Upright, "y." is kept.
+- Hinted 18-22 px marks stay below a clean sweep. `trace-text-marks.test.ts` pins
+  no loss from 24 px up and a measured ceiling under it, as a ratchet, not a claim that they are solved.
+- A letter's sub-floor piece no longer vetoes marks nearby. On a dirty scan with very little debris out
+  on the paper, a few more marks survive beside letters (the 2048² probe gains 46 components across all of this
+  amendment's rules).
+
+Tests:
+
+- `small-mark-text-marks.test.ts`: a stop on a line turned 5-270° stays, and the same dot 6 px off the
+  line at 0-180° goes; a line of specks with no letters goes at 0°, 30° and 90°; a row of specks in
+  line with a baseline but out of reach goes; a colon stays at 0-180°, two stacked specks with no
+  baseline go, and a speck too far above a stop goes; a stop past a descender stays and the same dot
+  past a block goes; a sub-floor speck beside a letter does not veto a stop, and one on clean paper does.
+- `src/__fixtures__/perceptual/trace-text-marks.test.ts`, through the Trace dialog's entry, Line Art and
+  Smooth, anti-aliased and 1-bit: turned and skewed sentences; "Scale 1:10" at 18-28 px; turned colons;
+  "spy.", "happy." and "y."; and one test per sibling family (`: ; , ' " ! ?`, i and j dots, decimals,
+  stops after descenders, rows of dots) at 18-28 px. On main `54e0e19b8` these fail: every turned-line
+  test, the colon and descender tests, and the colon, "!" and descender families. The other families
+  and the skewed scan pass there too: they guard what already held, with their ceilings at the measured
+  count.
