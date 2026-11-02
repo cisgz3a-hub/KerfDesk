@@ -38,7 +38,7 @@ import {
   textOnPlate,
   withCopiesOverlapped,
   withLabelOnCopy,
-} from './draw-scene-burn-parity-scenes';
+} from './draw-scene-burn-parity-scenes.test-support';
 
 export type ProbePoint = readonly [at: Vec2, shown: 'ink' | 'nothing' | 'photo', burned: boolean];
 export type Row = {

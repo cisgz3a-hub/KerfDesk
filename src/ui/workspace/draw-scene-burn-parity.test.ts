@@ -1,5 +1,5 @@
 // Rolling audit v9 R5 (ADR-683 Amendment 2): the canvas paints exactly what the
-// job burns. Each row (draw-scene-burn-parity-rows.ts) builds a scene, replays
+// job burns. Each row (draw-scene-burn-parity-rows.test-support.ts) builds a scene, replays
 // drawScene's fills and compares every point of a grid with compileJob's hatch,
 // then checks clicks. A point shown and not burned is allowed only in a row's
 // named Output-off area, and one burned and not shown only under a hidden
@@ -15,8 +15,8 @@ import {
   paintEvents,
   shownAt,
   type PaintEvent,
-} from './draw-scene-burn-parity-harness';
-import { ROWS } from './draw-scene-burn-parity-rows';
+} from './draw-scene-burn-parity-harness.test-support';
+import { ROWS } from './draw-scene-burn-parity-rows.test-support';
 import {
   caption,
   CENTRE,
@@ -33,7 +33,7 @@ import {
   project,
   square,
   SQUARE_EDGE,
-} from './draw-scene-burn-parity-scenes';
+} from './draw-scene-burn-parity-scenes.test-support';
 import { workspaceHitTest, workspaceHitTestCandidates } from './workspace-hit-test';
 
 const painted = vi.hoisted(() => ({ events: [] as unknown[] }));

@@ -16,12 +16,15 @@ import {
 import { createEllipse, createRectangle } from '../../core/shapes/primitives';
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
-import { SPACING_MM } from './draw-scene-burn-parity-harness';
+import { SPACING_MM } from './draw-scene-burn-parity-harness.test-support';
 
+// Scene-data colours: the operations and paths under test, not UI chrome.
+/* eslint-disable no-restricted-syntax */
 const INK = '#000000';
 const BLUE = '#2563eb';
 const RED = '#ff0000';
 const GREY = '#808080';
+/* eslint-enable no-restricted-syntax */
 
 export const PLATE_BOX = { minX: 10, minY: 10, maxX: 50, maxY: 40 };
 export const BODY: Vec2 = { x: 14, y: 14 };
