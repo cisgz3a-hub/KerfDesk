@@ -388,7 +388,8 @@ destination and cannot overwrite the template source.
 4. A Fill shape is solid only where it is filled. Artwork seen through one of its holes is picked
    first; clicking an empty hole selects the shape, as clicking inside a Line shape does
    (ADR-683). The same holds for a hole another shape on its Fill operation cuts, and inside
-   stacked copies that cancel (ADR-683 Amendment 1).
+   stacked copies that cancel (ADR-683 Amendment 1). In Wireframe, where nothing is filled, every
+   shape's interior lets clicks through this way (ADR-683 Amendment 2).
 
 #### Multi — shift+click
 1. Shift+click on additional object.
@@ -709,7 +710,11 @@ the linked artwork.
    on different operations fill separately. A shape given a second Fill operation (**Add
    operation**) shows filled wherever either operation burns it, and artwork drawn between
    shapes of one operation, such as a photo under a caption, keeps its place in the drawing
-   order (ADR-683 Amendment 1).
+   order (ADR-683 Amendment 1). What it shows is what the job does (ADR-683 Amendment 2): an
+   operation with Output off does not count beside one with Output on, a shape on Line then Fill
+   shows its outline and its fill (a LightBurn Cut layer with a Scan sub-layer opens this way), and
+   with two or more jig outlines each piece burns on its own, so a label on a jig copy shows
+   filled, not as a hole. Artwork on an operation with Output off still shows what it would burn.
 
 ### F-A6e. Rubber-band outline, Close Path, Reverse Direction, Delete Duplicates, Flatten Image Mask (ADR-480)
 

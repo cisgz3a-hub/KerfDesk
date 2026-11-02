@@ -7,7 +7,14 @@
 
 import type { Layer, LayerMode } from './layer';
 import { effectiveOperationForObject } from './effective-operation';
-import { fillPoolKey, pathFillOperations, type PathFillOperation } from './fill-operations';
+import {
+  fillPoolKey,
+  fillPoolRuns,
+  pathFillOperations,
+  pathStylingOperation,
+  type FillPoolRuns,
+  type PathFillOperation,
+} from './fill-operations';
 import { isRegistrationBox } from './registration-layer';
 import type { Scene } from './scene';
 import type { Bounds, ColoredPath, Polyline, SceneObject, Transform, Vec2 } from './scene-object';
@@ -33,15 +40,17 @@ const NO_HIT: HitTestObjectResult = { kind: 'none' };
 /**
  * Selection skips locked artwork. `includeLocked` is for display-only uses
  * (the hover colour pulse, ADR-620) where the piece under the pointer is the
- * answer even if it cannot be picked.
+ * answer even if it cannot be picked. `wireframe` is the Wireframe view, which
+ * outlines Fill artwork (ADR-410), so its interiors are not solid to a click.
  */
 export function hitTest(
   scene: Scene,
   point: Vec2,
-  options: { readonly includeLocked?: boolean } = {},
+  options: { readonly includeLocked?: boolean; readonly wireframe?: boolean } = {},
 ): string | null {
   const layerByColor = sceneLayerVisibilityLookup(scene.layers);
-  const pools = fillPoolParityAt(scene, layerByColor, point);
+  const pools =
+    options.wireframe === true ? OUTLINES_ONLY : fillPoolParityAt(scene, layerByColor, point);
   let bestLineInterior: { readonly id: string; readonly area: number } | null = null;
 
   // Topmost first: later-added objects render on top so direct hits win first.
@@ -88,19 +97,23 @@ export function hitTestObject(
   }
   if (!pointInExpandedObjectBBox(point, obj, VECTOR_STROKE_HIT_TOLERANCE_MM)) return NO_HIT;
   // The canvas paints a jig box by itself, never in a pool (fill-pools.ts).
-  const pooled = pools === undefined || isRegistrationBox(obj) ? undefined : pools;
+  const pooled = pools !== OUTLINES_ONLY && isRegistrationBox(obj) ? undefined : pools;
   return hitVectorObject(layerByColor, obj, paths, point, pooled);
 }
 
-/** Whether a Fill pool covers the point an odd number of times, so the canvas paints it there. */
-export type FillPoolParity = (fill: PathFillOperation) => boolean;
+/** Whether this object's Fill pool covers the point an odd number of times, so the canvas paints it there. */
+export type FillPoolParity = (object: SceneObject, fill: PathFillOperation) => boolean;
+
+/** The Wireframe view: no pool is painted anywhere. */
+export const OUTLINES_ONLY: FillPoolParity = () => false;
 
 /**
  * A point that an even number of a Fill operation's objects cover is drawn
  * and burned empty (ADR-683), whichever object made the hole. Each pool is
  * counted once, when a filled path under the point first asks: every object
  * of it covering the point (its paths unioned, each by its own rule, as the
- * compiler burns one object) flips the parity.
+ * compiler burns one object) flips the parity. A pool stays inside its compile
+ * run (fill-operations.ts), so a jig copy never makes a hole in ordinary artwork.
  */
 export function fillPoolParityAt(
   scene: Scene,
@@ -108,12 +121,15 @@ export function fillPoolParityAt(
   point: Vec2,
 ): FillPoolParity {
   const parity = new Map<string, boolean>();
-  return (fill) => {
-    const key = fillPoolKey(fill);
+  let runs: FillPoolRuns | undefined;
+  return (object, fill) => {
+    runs ??= fillPoolRuns(scene);
+    const runOf = runs;
+    const key = fillPoolKey(fill, runOf(object));
     let odd = parity.get(key);
     if (odd === undefined) {
-      const covering = scene.objects.filter((object) =>
-        coversInPool(layerByColor, object, key, point),
+      const covering = scene.objects.filter((candidate) =>
+        coversInPool(layerByColor, candidate, key, runOf, point),
       );
       odd = covering.length % 2 === 1;
       parity.set(key, odd);
@@ -126,6 +142,7 @@ function coversInPool(
   layerByColor: ReadonlyMap<string, Layer>,
   object: SceneObject,
   key: string,
+  runOf: FillPoolRuns,
   point: Vec2,
 ): boolean {
   const paths = vectorPathsFor(object);
@@ -137,8 +154,9 @@ function coversInPool(
     local !== null &&
     paths.some(
       (path) =>
-        pathFillOperations(object, path, layerByColor).some((fill) => fillPoolKey(fill) === key) &&
-        pointInFilledPath(object, path, hitTestPolylines(path), local),
+        pathFillOperations(object, path, layerByColor).some(
+          (fill) => fillPoolKey(fill, runOf(object)) === key,
+        ) && pointInFilledPath(object, path, hitTestPolylines(path), local),
     )
   );
 }
@@ -167,20 +185,18 @@ function hitVectorObject(
   let hasPolyline = false;
   let lineInteriorArea: number | null = null;
   for (const path of paths) {
-    const resolution = resolveVisibleOperationForPath(obj, path, layerByColor);
-    if (!resolution.visible) continue;
-    const layer = resolution.operation;
-    const mode = effectiveLayerMode(obj, layer);
+    if (!resolveVisibleOperationForPath(obj, path, layerByColor).visible) continue;
     const polylines = worldPolylines(path, obj.transform);
     if (polylines.length === 0) continue;
     hasPolyline = true;
-    const inPool = (): boolean => {
-      if (pools === undefined || mode !== 'fill') return true;
-      // A path no visible Fill operation owns has no pool, and stands alone.
+    const solid = (): boolean => {
       const fills = pathFillOperations(obj, path, layerByColor);
-      return fills.length === 0 || fills.some(pools);
+      if (fills.length > 0) return pools === undefined || fills.some((fill) => pools(obj, fill));
+      // A path no Fill operation owns has no pool, and stands alone.
+      const mode = effectiveLayerMode(obj, pathStylingOperation(obj, path, layerByColor));
+      return mode === 'fill' || mode === 'image';
     };
-    const hit = hitPath(obj, path, mode, polylines, point, inPool);
+    const hit = hitPath(obj, path, polylines, point, solid);
     if (hit.kind === 'primary') return hit;
     if (hit.kind === 'line-interior') {
       lineInteriorArea =
@@ -219,23 +235,16 @@ function hitTestPolylines(path: ColoredPath): ReadonlyArray<Polyline> {
 function hitPath(
   obj: SceneObject,
   path: ColoredPath,
-  mode: LayerMode,
   polylines: ReadonlyArray<Polyline>,
   point: Vec2,
-  inPool: () => boolean,
+  solid: () => boolean,
 ): HitTestObjectResult {
   if (polylines.some((polyline) => pointNearPolyline(point, polyline.points, polyline.closed))) {
     return { kind: 'primary' };
   }
   const closed = polylines.filter((polyline) => polyline.closed);
   if (!closed.some((polyline) => pointInPolygon(point, polyline.points))) return NO_HIT;
-  if (
-    (mode === 'fill' || mode === 'image') &&
-    pointInFilledPath(obj, path, closed, point) &&
-    inPool()
-  ) {
-    return { kind: 'primary' };
-  }
+  if (pointInFilledPath(obj, path, closed, point) && solid()) return { kind: 'primary' };
   return { kind: 'line-interior', area: bboxArea(transformedBBox(obj)) };
 }
 

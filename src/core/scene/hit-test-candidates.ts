@@ -5,7 +5,7 @@
 import type { Layer } from './layer';
 import type { Scene } from './scene';
 import type { Vec2 } from './scene-object';
-import { fillPoolParityAt, hitTestObject } from './hit-test';
+import { fillPoolParityAt, hitTestObject, OUTLINES_ONLY } from './hit-test';
 import { sceneLayerVisibilityLookup, sceneObjectHasVisibleLayerFromMap } from './visibility';
 
 type InteriorCandidate = {
@@ -14,9 +14,14 @@ type InteriorCandidate = {
   readonly zRank: number;
 };
 
-export function hitTestCandidates(scene: Scene, point: Vec2): ReadonlyArray<string> {
+export function hitTestCandidates(
+  scene: Scene,
+  point: Vec2,
+  options: { readonly wireframe?: boolean } = {},
+): ReadonlyArray<string> {
   const layerByColor = sceneLayerVisibilityLookup(scene.layers);
-  const pools = fillPoolParityAt(scene, layerByColor, point);
+  const pools =
+    options.wireframe === true ? OUTLINES_ONLY : fillPoolParityAt(scene, layerByColor, point);
   const primary: string[] = [];
   const interiors: InteriorCandidate[] = [];
   let zRank = 0;

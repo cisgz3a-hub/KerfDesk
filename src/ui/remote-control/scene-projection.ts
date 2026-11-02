@@ -161,7 +161,7 @@ function resolveDisplays(
       object,
       paths: display.paths.map((path) => ({
         color: path.paint.color.toLowerCase(),
-        fill: path.paint.kind === 'fill',
+        fill: path.paint.kind === 'fill' || path.fillOperations.length > 0,
         output: path.paint.output,
         polylines: path.display.polylines.map((polyline) => ({
           closed: polyline.closed,
