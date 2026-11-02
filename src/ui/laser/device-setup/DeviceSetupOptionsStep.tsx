@@ -17,6 +17,7 @@ import { ControlledLaserOffTravelRow } from '../ControlledLaserOffTravelRow';
 import { ScanDirectionPolicyEditor } from '../ScanDirectionPolicyEditor';
 import {
   autofocusStatus,
+  calibratedCameraCount,
   cameraStatus,
   noGoZoneStatus,
   plannerStatus,
@@ -179,10 +180,10 @@ function CameraStatusBody({ profile }: { readonly profile: DeviceProfile }): JSX
   return (
     <>
       <dl style={definitionStyle}>
-        <dt>Camera profile</dt>
-        <dd>{profile.cameraProfile === undefined ? 'Not selected' : 'Configured'}</dd>
-        <dt>Calibration</dt>
-        <dd>{profile.cameraModel === undefined ? 'Pending' : 'Saved'}</dd>
+        <dt>Calibrated cameras</dt>
+        <dd>{calibratedCameraCount(profile)}</dd>
+        <dt>Latest calibration</dt>
+        <dd>{profile.cameraModel === undefined ? 'None yet' : 'Saved'}</dd>
       </dl>
       <p style={mutedStyle}>
         Calibration takes one photo of an engraved target through the live camera, so use the Camera

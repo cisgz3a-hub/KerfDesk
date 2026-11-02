@@ -92,6 +92,19 @@ describe('CNC preparation dependency evidence', () => {
     expect(statuses(changed, base).map((item) => item.status)).toEqual(['ready', 'ready']);
   });
 
+  // Camera audit 2026-11-02: a camera calibration never reaches the toolpath.
+  it('keeps execution preparation ready when a camera is calibrated again', () => {
+    const base = project();
+    const model = { calibratedAt: '2026-11-02T00:00:00Z' } as unknown as NonNullable<
+      Project['device']['cameraModel']
+    >;
+    const recalibrated: Project = {
+      ...base,
+      device: { ...base.device, cameraModel: model, otherCameraModels: [model] },
+    };
+    expect(statuses(recalibrated, base).map((item) => item.status)).toEqual(['ready', 'ready']);
+  });
+
   it('keeps a label change ready without retaining an executable cache', () => {
     const base = project();
     const renamed = {

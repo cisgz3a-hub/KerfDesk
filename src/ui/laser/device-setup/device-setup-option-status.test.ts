@@ -95,4 +95,14 @@ describe('device-setup option status summaries', () => {
 
     expect(cameraStatus(withPatch({}))).toBe('Not set up');
   });
+
+  // Camera audit 2026-11-02: the app never writes the legacy cameraProfile, so
+  // keying the status on it showed "Not set up" for every calibrated machine.
+  it('reports a camera as set up once a calibration is saved', () => {
+    const model = {} as NonNullable<DeviceProfile['cameraModel']>;
+    expect(cameraStatus(withPatch({ cameraModel: model }))).toBe('Calibrated');
+    expect(cameraStatus(withPatch({ cameraModel: model, otherCameraModels: [model, model] }))).toBe(
+      '3 cameras calibrated',
+    );
+  });
 });

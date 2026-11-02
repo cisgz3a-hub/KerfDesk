@@ -51,9 +51,16 @@ export function rotaryStatus(profile: DeviceProfile): string {
   return rotaryAttachmentSummary(rotary);
 }
 
+// The camera calibrations (ADR-440, ADR-446) are what set a camera up; the
+// older cameraProfile is never written by the app, so it says nothing here.
 export function cameraStatus(profile: DeviceProfile): string {
-  if (profile.cameraProfile === undefined) return 'Not set up';
-  return profile.cameraModel === undefined ? 'Calibration pending' : 'Calibrated';
+  const count = calibratedCameraCount(profile);
+  if (count === 0) return 'Not set up';
+  return count === 1 ? 'Calibrated' : `${count} cameras calibrated`;
+}
+
+export function calibratedCameraCount(profile: DeviceProfile): number {
+  return (profile.cameraModel === undefined ? 0 : 1) + (profile.otherCameraModels?.length ?? 0);
 }
 
 function formatScale(value: number): string {
