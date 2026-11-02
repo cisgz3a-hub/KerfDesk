@@ -1,7 +1,7 @@
 import type { Project } from '../../core/scene';
 import type { SaveTarget } from '../../platform/types';
 import type { AppState } from './store';
-import { noteProjectCopyOnDisk } from './design-document-copies';
+import { noteProjectCopyInDoubt, noteProjectCopyOnDisk } from './design-document-copies';
 import { saveTargetsShareDestination } from './project-save-write-coordinator';
 
 /** How a loaded document starts: unsaved, and where Save writes. Open sets the
@@ -109,6 +109,7 @@ function createProjectSaveUncertaintyAction(
       markedUncertain = true;
       return { dirty: true };
     });
+    if (markedUncertain) noteProjectCopyInDoubt(get().project);
     if (markedUncertain && restoration !== undefined) {
       void restoration.completed
         .then((restored) => {

@@ -154,15 +154,14 @@ export function keepDesignDrawing(
 
 // The cheapest to lose goes first (ADR-590 Amendment 3): an applied drawing a
 // copy on disk may hold, then an applied one only it holds, then unapplied
-// work; the oldest first within each. The drawing being kept is never dropped.
+// work; the oldest first within each. The drawing being kept is never dropped,
+// so the list holds one other.
 function dropOne(list: KeptDesignDrawing[], keeping: KeptDesignDrawing): KeptDesignDrawing {
-  let index = -1;
-  list.forEach((drawing, at) => {
-    if (drawing === keeping) return;
-    const current = list[index];
-    if (current === undefined || dropRank(drawing) <= dropRank(current)) index = at;
-  });
-  return list.splice(index, 1)[0]!;
+  const dropped = list
+    .filter((drawing) => drawing !== keeping)
+    .reduce((cheapest, drawing) => (dropRank(drawing) <= dropRank(cheapest) ? drawing : cheapest));
+  list.splice(list.indexOf(dropped), 1);
+  return dropped;
 }
 
 function dropRank(drawing: KeptDesignDrawing): number {

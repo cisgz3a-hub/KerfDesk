@@ -160,7 +160,11 @@ function frameTravelFirmware(evidence: NativeBedEvidence): JogTravelFirmware | n
   return evidence.activeControllerCommandSet == null || firmware === 'grblhal' ? firmware : null;
 }
 
-function currentSessionSettings(evidence: NativeBedEvidence): ControllerSettingsSnapshot | null {
+/** The controller settings this session's `$$` read, or null when the read
+ *  belongs to an earlier session or never finished. */
+export function currentSessionSettings(
+  evidence: NativeBedEvidence,
+): ControllerSettingsSnapshot | null {
   const epoch = evidence.controllerSessionEpoch;
   const settings = evidence.controllerSettings;
   return settings != null &&

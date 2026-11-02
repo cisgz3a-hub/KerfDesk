@@ -28,6 +28,14 @@ export function noteProjectCopyOnDisk(project: Project): void {
   for (const listener of listeners) listener();
 }
 
+/** Records that the file `project` was saved to may no longer hold it: a
+ *  later write to it did not finish. The next autosave records it again. */
+export function noteProjectCopyInDoubt(project: Project): void {
+  const document = project.designStudioDocument;
+  if (document === undefined || !held.delete(document)) return;
+  for (const listener of listeners) listener();
+}
+
 /** True when a file or autosave holds this Studio document. */
 export function diskCopyHoldsDesignDocument(document: DesignStudioDocument | undefined): boolean {
   return document !== undefined && held.has(document);

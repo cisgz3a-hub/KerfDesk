@@ -137,6 +137,15 @@ export function persistedFromStored(value: unknown): PersistedDesignSession | nu
     ...(typeof stored.dirtySinceApply === 'boolean'
       ? { dirtySinceApply: stored.dirtySinceApply }
       : {}),
+    ...sourceFromStored(stored),
+  };
+}
+
+// What ADR-590 Amendment 3 records; absent from drawings saved before it.
+function sourceFromStored(
+  stored: Partial<StoredShape>,
+): Pick<PersistedDesignSession, 'projectName' | 'projectHoldsApply'> {
+  return {
     ...(typeof stored.projectName === 'string' || stored.projectName === null
       ? { projectName: stored.projectName }
       : {}),

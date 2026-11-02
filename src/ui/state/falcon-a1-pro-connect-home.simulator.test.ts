@@ -9,6 +9,8 @@
 // preset, and a bed already widened to the travel still jogs no further than
 // the envelope. Host command evidence only; no hardware was operated.
 
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createFakeSerialPort } from '../../__fixtures__/controllers/fake-serial-port';
 import {
@@ -17,8 +19,11 @@ import {
 } from '../../__fixtures__/controllers/falcon-a1-pro-dump';
 import type { DeviceProfile } from '../../core/devices';
 import { FALCON_A1_PRO_GRBLHAL_PROFILE } from '../../core/devices/falcon-profiles';
+import type { Project } from '../../core/scene';
 import { connectOptionsForDevice } from '../commands/connect-options';
 import { describePatch } from '../laser/DetectedSettingsBanner';
+import { withFrameNoGoWarnings } from '../laser/frame-dispatch-support';
+import { describeBedCorrection } from '../laser/HomedBedCorrectionOffer';
 import {
   resetAnnouncedDetectedSettings,
   shouldAnnounceDetectedSettings,
@@ -27,6 +32,9 @@ import { deviceProfileSignature } from '../laser/device-setup/device-setup-nudge
 import { buildControllerReviewFacts } from '../laser/job-review/job-review-live-rows';
 import { dispatchPositionLaser } from '../workspace/position-laser-click';
 import { applyDetectedSettingsPatch } from './detected-settings-action';
+import { bedWiderThanHomedArea } from './homed-area-bed';
+import { frameRouteNoGoWarnings } from './laser-frame-motion-plan';
+import { loadLastMachineSelection } from './last-machine-persistence';
 import { useLaserStore } from './laser-store';
 import { resolveManualMotionLimits } from './manual-motion-limits';
 import { resolveNativeBedFrame, selectNativeBedEvidence } from './native-bed-frame';
@@ -140,7 +148,87 @@ describe('Falcon A1 Pro with its published banner and full $$', () => {
     expect(jog).toContain('G1 X358.000');
     expect(sentWrites(port)).toEqual([]);
   });
+
+  // R6-P2-3 (rolling audit v9): the profile 1.0.28 saved after Use detected
+  // values, as its own code wrote it (src/__fixtures__/returning-user). Move
+  // laser here stopped at X 358, but Frame and Start went to X 362 and said
+  // nothing. Connect names the correction; until it is taken, a Frame past
+  // the homed area warns by name, and Start's Job Review carries it
+  // (ADR-637 Amendment 5).
+  it('offers a profile 1.0.28 widened its homed area by name, and warns at Frame and Start until it is taken', async () => {
+    const saved = readFileSync(
+      resolve('src/__fixtures__/returning-user/1.0.28-a1-pro-widened-last-machine.json'),
+      'utf8',
+    );
+    const selection = loadLastMachineSelection({ getItem: () => saved, setItem: () => undefined });
+    if (selection === null) throw new Error('The 1.0.28 profile did not load');
+    useStore.getState().updateDeviceProfile(selection.profile);
+    const device = useStore.getState().project.device;
+    expect(device).toMatchObject({ bedWidth: 363, bedHeight: 273, origin: 'front-left' });
+    const port = await connectA1Pro(device);
+
+    const evidence = () => selectNativeBedEvidence(useLaserStore.getState());
+    const widened = bedWiderThanHomedArea(device, evidence());
+    expect(widened).toEqual({
+      bed: { widthMm: 363, heightMm: 273 },
+      homedArea: { widthMm: 358, heightMm: 268 },
+    });
+    expect(describeBedCorrection(device.origin, widened!)).toBe(
+      "This profile's bed is 363 × 273 mm, the controller's whole travel. After the homing " +
+        'pull-off its homed area is 358 × 268 mm, and nothing stops a Frame or a job past it. ' +
+        'Correct the bed from 363 × 273 mm to 358 × 268 mm? Artwork already placed moves 5 mm ' +
+        'in machine Y.',
+    );
+
+    await homeThroughDriver(port);
+    await vi.advanceTimersByTimeAsync(600);
+    port.emitLine(IDLE);
+    await vi.advanceTimersByTimeAsync(5);
+    const reach = { minX: 0, minY: 0, maxX: 362, maxY: 100 };
+    const warnings = frameRouteNoGoWarnings(useLaserStore.getState(), reach, undefined, {
+      ...useStore.getState().project,
+    });
+    expect(warnings).toEqual([
+      "The Frame reaches X 362 on the bed, past the controller's homed area (X 0 to 358, " +
+        "Y 0 to 268 mm after the homing pull-off). This profile's bed is 363 × 273 mm, the " +
+        "controller's whole travel; correct it to 358 × 268 mm in Machine Setup. The Frame is " +
+        'sent unchanged; watch the move and stop it, or use the physical E-stop, if needed.',
+    ]);
+    // The Frame candidate carries it into Start's Job Review.
+    const candidate = withFrameNoGoWarnings(
+      useLaserStore.getState(),
+      reach,
+      framedRunCandidate(useStore.getState().project),
+    );
+    expect(candidate.frameNoGoWarnings).toEqual(warnings);
+    // Inside the homed area nothing is said.
+    expect(
+      frameRouteNoGoWarnings(
+        useLaserStore.getState(),
+        { minX: 0, minY: 0, maxX: 358, maxY: 268 },
+        undefined,
+        useStore.getState().project,
+      ),
+    ).toEqual([]);
+
+    // The offer's Correct writes only the profile bed.
+    applyDetectedSettingsPatch({ bedWidth: 358, bedHeight: 268 });
+    const corrected = useStore.getState().project.device;
+    expect(corrected).toMatchObject({ bedWidth: 358, bedHeight: 268 });
+    expect(bedWiderThanHomedArea(corrected, evidence())).toBeNull();
+    expect(
+      frameRouteNoGoWarnings(useLaserStore.getState(), PRESET_BED, undefined, {
+        ...useStore.getState().project,
+      }),
+    ).toEqual([]);
+    expect(sentWrites(port)).toEqual([]);
+  });
 });
+
+/** The run a project Frame's candidate stands for; only its project is read. */
+function framedRunCandidate(project: Project): Parameters<typeof withFrameNoGoWarnings>[2] {
+  return { project } as Parameters<typeof withFrameNoGoWarnings>[2];
+}
 
 function useA1Pro(patch: Partial<DeviceProfile> = {}): DeviceProfile {
   useStore.getState().updateDeviceProfile({ ...FALCON_A1_PRO_GRBLHAL_PROFILE, ...patch });

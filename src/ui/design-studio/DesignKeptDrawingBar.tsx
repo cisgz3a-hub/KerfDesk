@@ -27,8 +27,8 @@ export function DesignKeptDrawingBar(): JSX.Element | null {
   return (
     <div role="region" aria-label="Kept drawing" style={barStyle}>
       <span style={textStyle}>
-        {keptDrawingLead(newest)} was kept: {shapeCount(newest)}, kept {keptTimeLabel(newest.keptAt)}.
-        {older > 0 ? ` ${older} older kept.` : ''}
+        {keptDrawingLead(newest)} was kept: {shapeCount(newest)}, kept{' '}
+        {keptTimeLabel(newest.keptAt)}.{older > 0 ? ` ${older} older kept.` : ''}
         {failed ? ' It could not be restored; try again.' : ''}
       </span>
       <button

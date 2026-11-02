@@ -227,8 +227,9 @@ export function modelFor(bundle: ReviewedStartBundle): ReturnType<typeof buildJo
           ...bundle.laser,
           connected: bundle.laser.connection.kind === 'connected',
         });
-  // The Frame's own route was compared with no-go zones when it ran (ADR-232
-  // Amendment 1); its findings sit beside the job's.
+  // The Frame's own route was compared with no-go zones and grblHAL's homed
+  // area when it ran (ADR-232 Amendment 1, ADR-637 Amendment 5); its findings
+  // sit beside the job's.
   const frameNoGo = bundle.frameNoGoWarnings ?? [];
   const extra = [...frameNoGo, ...frozenPower, ...fluidnc];
   const disclosed =

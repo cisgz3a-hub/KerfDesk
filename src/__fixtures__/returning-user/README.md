@@ -21,6 +21,18 @@ store, compile them to G-code, and compare with the sidecar.
 | `1.0.27-cnc`                           | 1.0.27                                                    | A CNC profile on a near-closed outline                                    |
 | `1.0.27-unaffected`, `1.0.28-unaffected` | The release named                                       | Nothing the upgrade changes: the notices stay silent                      |
 
+Browser storage and projects saved by 1.0.28's own hooks and store, the same way (rolling audit v9
+R6): a temporary test under the export's `src` drove the Studio's Apply with its persistence hook
+mounted, and connected its laser store to the published A1 Pro banner and `$$` with its profile
+persistence hook mounted.
+
+| File                                      | Read by                                        | Holds                                                                    |
+| ----------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------ |
+| `1.0.28-studio-storage.json`              | `design-kept-drawings-copies.test.tsx`         | The Studio's saved drawing (3 lines applied) and a kept drawing (2 lines never applied) |
+| `1.0.28-studio-older.lf2`                 | `design-kept-drawings-copies.test.tsx`         | That project after its first Apply (1 line), as an older autosave         |
+| `1.0.28-studio-newer.lf2`                 | `design-kept-drawings-copies.test.tsx`         | That project after its second Apply (3 lines)                             |
+| `1.0.28-a1-pro-widened-last-machine.json` | `falcon-a1-pro-connect-home.simulator.test.ts` | The last-machine document after Use detected values: bed 363 × 273 mm     |
+
 Add one set per release at release time. To make one, export the release into a folder inside your
 worktree, build the scene in a temporary test under its `src`, save with its
 `prepareProjectForPersistence`, measure with this folder's reading, and run Vitest with `--root`.
