@@ -3,7 +3,7 @@
 // of the main process's routes: `read` long-polls, `write` must arrive in
 // sequence, `close` ends the session (electron/machine-network-session.ts).
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createStreamer, step } from '../../core/controllers/grbl';
 import { encodeProgramLines } from './serial-program-buffer';
 import { createNetworkSerialWorkerRuntime } from './network-serial-worker-runtime';
@@ -20,6 +20,7 @@ type FakeSession = {
   readonly emit: (text: string) => void;
   readonly end: () => void;
   failReads: boolean;
+  failWrites: boolean;
 };
 
 const sessions: FakeSession[] = [];
@@ -32,6 +33,7 @@ function fakeSession(): FakeSession {
     writes: [],
     actions: [],
     failReads: false,
+    failWrites: false,
     emit: (text) => {
       inbound += text;
       waiter?.();
@@ -63,6 +65,7 @@ function fakeSession(): FakeSession {
       }
       if (action === 'write') {
         const sequence = body['sequence'] as number;
+        if (session.failWrites) throw new TypeError('Failed to fetch');
         session.writes.push({ sequence, text: atob(String(body['data'])) });
         return Response.json({ written: true });
       }
@@ -175,6 +178,129 @@ describe('network serial worker runtime (ADR-676)', () => {
 
     // The closing read still carried the controller's last line.
     expect(lines(posted)).toEqual(['ALARM:1']);
+  });
+
+  // Rolling audit v9 R1-P2-2 (ADR-398 Amendment 7). The request failed on its
+  // way to the main process, so the socket may be fine, and closing it stops
+  // nothing: the store's stop goes out first.
+  describe('a request that fails while the session may still take writes', () => {
+    async function started(session: FakeSession) {
+      const opened = runtimeOn(session);
+      opened.runtime.handle({ kind: 'network-attach', id: 1, sessionId: SESSION, route: ROUTE });
+      await until(() => opened.posted.some((m) => m.kind === 'network-ready'));
+      opened.runtime.handle({ kind: 'network-start' });
+      return opened;
+    }
+
+    it('keeps the session open for the stop after a failed read, then closes it', async () => {
+      const session = fakeSession();
+      const { runtime, posted } = await started(session);
+
+      session.failReads = true;
+      await until(() => posted.some((m) => m.kind === 'read-failing'));
+      expect(posted.some((m) => m.kind === 'closed')).toBe(false);
+      expect(session.actions).not.toContain('close');
+
+      runtime.handle({ kind: 'write', id: 1, data: '\x18' });
+      await until(() => posted.some((m) => m.kind === 'write-ack'));
+      expect(session.writes).toEqual([{ sequence: 1, text: '\x18' }]);
+
+      runtime.handle({ kind: 'read-failure-settled' });
+      await until(() => posted.some((m) => m.kind === 'closed'));
+      expect(session.actions.at(-1)).toBe('close');
+    });
+
+    it('stops waiting when the session is closed meanwhile', async () => {
+      const session = fakeSession();
+      const { runtime, posted } = await started(session);
+      session.failReads = true;
+      await until(() => posted.some((m) => m.kind === 'read-failing'));
+
+      runtime.handle({ kind: 'close' });
+
+      await until(() => posted.some((m) => m.kind === 'closed'));
+      expect(posted.filter((m) => m.kind === 'closed')).toHaveLength(1);
+    });
+
+    it('closes after 3 s when the stop never settles', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      try {
+        const session = fakeSession();
+        const { runtime, posted } = runtimeOn(session);
+        runtime.handle({ kind: 'network-attach', id: 1, sessionId: SESSION, route: ROUTE });
+        await vi.advanceTimersByTimeAsync(50);
+        runtime.handle({ kind: 'network-start' });
+        session.failReads = true;
+        await vi.advanceTimersByTimeAsync(50);
+        expect(posted.some((m) => m.kind === 'read-failing')).toBe(true);
+
+        await vi.advanceTimersByTimeAsync(2_900);
+        expect(posted.some((m) => m.kind === 'closed')).toBe(false);
+        await vi.advanceTimersByTimeAsync(200);
+        expect(posted.some((m) => m.kind === 'closed')).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('still closes at once when the main process reports its socket gone', async () => {
+      const session = fakeSession();
+      const { posted } = await started(session);
+
+      session.end();
+      await until(() => posted.some((m) => m.kind === 'closed'));
+
+      expect(posted.some((m) => m.kind === 'read-failing')).toBe(false);
+    });
+
+    it('stays open after a failed write, numbering the stop after it', async () => {
+      const session = fakeSession();
+      const { runtime, posted } = await started(session);
+      const first = step(createStreamer('G1 X1\nG1 X2\nG1 X3\n', { streamingMode: 'ping-pong' }));
+      runtime.handle({ kind: 'write', id: 1, data: first.toSend });
+      await until(() => session.writes.length === 1);
+      const { queued, ...position } = first.state;
+      runtime.handle({ kind: 'program', programId: 1, ...encodeProgramLines(queued) });
+      runtime.handle({ kind: 'prepare-arm', id: 2 });
+      runtime.handle({ kind: 'arm', id: 2, programId: 1, position });
+      await until(() => posted.some((m) => m.kind === 'armed'));
+
+      session.failWrites = true;
+      session.emit('ok\r\n');
+      await until(() => posted.some((m) => m.kind === 'stream-write-error'));
+      session.failWrites = false;
+
+      expect(posted.filter((m) => m.kind === 'stream-write-error')).toHaveLength(1);
+      expect(posted.some((m) => m.kind === 'closed')).toBe(false);
+
+      runtime.handle({ kind: 'write', id: 3, data: '\x18' });
+      await until(() => session.writes.length === 2);
+
+      // Sequence 2 was the failed refill: never repeated, and nothing after it.
+      expect(session.writes).toEqual([
+        { sequence: 1, text: 'G1 X1\n' },
+        { sequence: 3, text: '\x18' },
+      ]);
+      expect(session.actions).not.toContain('close');
+      await runtime.close();
+    });
+
+    it('rejects a write queued behind the failed one, and sends it to nobody', async () => {
+      const session = fakeSession();
+      const { runtime, posted } = await started(session);
+
+      session.failWrites = true;
+      runtime.handle({ kind: 'write', id: 1, data: 'G1 X1\n' });
+      runtime.handle({ kind: 'write', id: 2, data: 'G1 X2\n' });
+      await until(() => posted.filter((m) => m.kind === 'write-error').length === 2);
+      session.failWrites = false;
+
+      runtime.handle({ kind: 'write', id: 3, data: 'M5\n' });
+      await until(() => posted.some((m) => m.kind === 'write-ack' && m.id === 3));
+
+      expect(session.writes).toEqual([{ sequence: 2, text: 'M5\n' }]);
+      await runtime.close();
+    });
   });
 
   it('closes the session when asked, then says closed', async () => {

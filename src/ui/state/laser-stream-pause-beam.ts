@@ -5,7 +5,10 @@
 // (core/controllers/marlin/stream-pause-beam.ts) says which beam-off to queue
 // behind that motion and how Resume switches the beam back on in the job's
 // own commands. Every line owes an acknowledgement:
-//  - Pause writes the beam-off lines as ordinary queued lines.
+//  - Pause writes the beam-off lines as ordinary queued lines. With a worker
+//    holding the refill they go out right behind the release: its reply queues
+//    behind every line the worker forwarded while this thread was busy, and
+//    meanwhile the controller can drain and stop lit (ADR-676 Amendment 2).
 //  - Resume first requires those acknowledgements: the untracked ledger can
 //    only attribute an acknowledgement owed before the stream's own lines if
 //    nothing else is owed when the stream refills. It then restates the held
@@ -14,6 +17,7 @@
 
 import type { ControllerDriver } from '../../core/controllers';
 import type { StreamPauseBeamPlan } from '../../core/controllers/controller-driver';
+import { hostedRefillArmed } from './laser-hosted-refill';
 import { startControllerCommand } from './laser-interactive-command';
 import { writeWhilePauseResumeOwner } from './laser-pause-resume-confirmation';
 import {
@@ -67,12 +71,45 @@ export function streamPausePlan(
   return driver.planStreamPauseBeam(streamer.queued, streamer.queueIndex);
 }
 
-/** Pause: queue the beam-off lines behind the buffered motion. */
+/** The beam-off lines that went out with the refill's release. */
+export type PostedPauseBeamOff = {
+  readonly lines: ReadonlyArray<string>;
+  readonly writes: Promise<ReadonlyArray<PromiseSettledResult<void>>>;
+};
+
+/** Posts any beam-off a stream-side Pause may need right behind the release of a
+ * worker-held refill, so the worker writes no job line after them. The caller then
+ * awaits the worker's reply: until it arrives each forwarded `ok` steps this side's
+ * stream as it stepped the worker's, so Pause still freezes at the line where the
+ * worker stopped, and a job line's reply cannot settle a beam-off. */
+export function postBeamOffBehindRelease(
+  context: StreamPauseBeamContext,
+  driver: ControllerDriver,
+): PostedPauseBeamOff {
+  const streamer = context.get().streamer;
+  const lines =
+    streamer?.status === 'streaming' && hostedRefillArmed(context.refs)
+      ? (driver.streamPauseOffLinesFrom?.(streamer.queued, streamer.queueIndex) ?? [])
+      : [];
+  return {
+    lines,
+    writes: Promise.allSettled(lines.map((line) => context.safeWrite(`${line}\n`, 'pause'))),
+  };
+}
+
+/** Pause: queue the beam-off lines behind the buffered motion, after any that
+ * already went out with the release. */
 export async function queueStreamPauseBeamOff(
   context: StreamPauseBeamContext,
   plan: StreamPauseBeamPlan | null,
+  posted: PostedPauseBeamOff,
 ): Promise<void> {
-  for (const line of plan?.offLines ?? []) await context.safeWrite(`${line}\n`, 'pause');
+  for (const result of await posted.writes) {
+    if (result.status === 'rejected') throw result.reason;
+  }
+  for (const line of plan?.offLines ?? []) {
+    if (!posted.lines.includes(line)) await context.safeWrite(`${line}\n`, 'pause');
+  }
 }
 
 /** Before Resume on a driver with a stream-side Pause plan. */

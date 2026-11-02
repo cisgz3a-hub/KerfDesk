@@ -18,9 +18,14 @@ const FLAGS: ReadonlyArray<readonly [Flag, string, string]> = [
   ],
 ];
 
+const RTL_UNSUPPORTED =
+  'Single-line fonts cannot lay text out right to left; they burn left to right.';
+
 export function TextStyleFields(props: {
   readonly style: TextStyle | undefined;
   readonly setStyle: (style: TextStyle | undefined) => void;
+  /** Single-line fonts have no bidi layout, so Right-to-left does nothing on them. */
+  readonly singleLineFont?: boolean;
 }): JSX.Element {
   const style = props.style ?? {};
   const update = (patch: Partial<TextStyle>): void => {
@@ -33,17 +38,21 @@ export function TextStyleFields(props: {
   return (
     <fieldset style={{ display: 'flex', flexWrap: 'wrap', gap: 10, border: 0, padding: 0 }}>
       <legend className="lf-field-label lf-field-label--sm">Style</legend>
-      {FLAGS.map(([key, label, title]) => (
-        <label key={key} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-          <input
-            type="checkbox"
-            title={title}
-            checked={style[key] === true}
-            onChange={(event) => update({ [key]: event.currentTarget.checked })}
-          />
-          {label}
-        </label>
-      ))}
+      {FLAGS.map(([key, label, title]) => {
+        const unsupported = key === 'forceRtl' && props.singleLineFont === true;
+        return (
+          <label key={key} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <input
+              type="checkbox"
+              title={unsupported ? RTL_UNSUPPORTED : title}
+              checked={style[key] === true}
+              disabled={unsupported}
+              onChange={(event) => update({ [key]: event.currentTarget.checked })}
+            />
+            {unsupported ? `${label} (not on single-line fonts)` : label}
+          </label>
+        );
+      })}
       <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
         Max width
         <input

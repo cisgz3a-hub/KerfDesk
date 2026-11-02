@@ -1,9 +1,10 @@
 import { DEFAULT_PROJECT_VARIABLE_DATA, type Project } from '../../core/scene';
 import type { ProductionManifest, ProductionRow } from '../../core/scene/production-manifest';
 import { deserializeProject, serializeProject } from '../../io/project';
+import { mergeTextNotices } from '../../io/gcode/text-glyph-advisory';
 import {
   materializeVariableText,
-  plainTextGlyphIssue,
+  plainTextNotices,
   type VariableTextRenderer,
 } from '../../io/gcode/prepare-output-snapshot';
 
@@ -60,14 +61,14 @@ export async function productionRowGlyphWarnings(
   render: VariableTextRenderer,
 ): Promise<ReadonlyArray<string>> {
   const where = `production row ${row.index + 1}`;
-  const issues = await Promise.all(
+  const notices = await Promise.all(
     project.scene.objects.map((object) =>
       object.kind === 'text' && object.variableTemplate === undefined
-        ? plainTextGlyphIssue(object, project, render, where)
-        : undefined,
+        ? plainTextNotices(object, project, render, where)
+        : [],
     ),
   );
-  return issues.flatMap((issue) => (issue === undefined ? [] : [issue.message]));
+  return mergeTextNotices(notices.flat()).map((issue) => issue.message);
 }
 
 /** New variable edits in a row use the original allocation, not a later working CSV/cursor. */

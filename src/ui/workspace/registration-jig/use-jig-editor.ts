@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import {
   findRegistrationBoxes,
   type Project,
@@ -6,8 +6,11 @@ import {
   type TextObject,
   type TracedImage,
 } from '../../../core/scene';
+import { textTabAnchorsAfterEdit } from '../../../core/text/text-edit-tab-anchors';
 import { useStore } from '../../state';
 import { reportDependencyRepairs } from '../../state/object-delete-actions';
+import { droppedTextTabsNotice } from '../../state/removed-tabs-notice';
+import { useToastStore } from '../../state/toast-store';
 import type { RegistrationJigSetSpec } from '../../state/registration-jig-set-actions';
 import {
   changeJigDraft,
@@ -33,6 +36,25 @@ import {
 import { useJigArtworkImport } from './JigArtworkImport';
 import { jigSelectAll } from './jig-canvas-selection';
 import { jigViewProject, withJigBackground } from './jig-editor-scope';
+
+// A text edit that drops a tab placed by hand says so, as the main canvas does
+// (ADR-494 Amendment 4), once for the edit rather than from the session updater.
+function useJigTextUpsert(
+  objects: ReadonlyArray<SceneObject>,
+  setSession: Dispatch<SetStateAction<JigEditorSession>>,
+) {
+  return useCallback(
+    (object: TextObject) => {
+      setSession((current) => upsertJigText(current, object));
+      const existing = objects.find((item) => item.id === object.id);
+      const notice = droppedTextTabsNotice(
+        existing === undefined ? 0 : textTabAnchorsAfterEdit(existing, object).dropped,
+      );
+      if (notice !== '') useToastStore.getState().pushToast(notice, 'info');
+    },
+    [objects, setSession],
+  );
+}
 
 export function useJigEditor(onClose: () => void) {
   const [session, setSession] = useState(() => createJigEditorSession(useStore.getState()));
@@ -64,10 +86,7 @@ export function useJigEditor(onClose: () => void) {
       setSession((current) => importJigArtwork(current, object, placement)),
     [],
   );
-  const onUpsert = useCallback(
-    (object: TextObject) => setSession((current) => upsertJigText(current, object)),
-    [],
-  );
+  const onUpsert = useJigTextUpsert(session.draft.project.scene.objects, setSession);
   const onTraceImage = useCallback(
     (imageId: string, traced: TracedImage) =>
       setSession((current) => traceJigImage(current, imageId, traced)),

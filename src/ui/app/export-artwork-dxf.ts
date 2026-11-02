@@ -1,5 +1,8 @@
 import { DEFAULT_PROJECT_VARIABLE_DATA, type Project } from '../../core/scene';
-import { materializeVariableText } from '../../io/gcode/prepare-output-snapshot';
+import {
+  materializeVariableText,
+  textAdvisoryWarnings,
+} from '../../io/gcode/prepare-output-snapshot';
 import { err } from '../../core/result';
 import {
   exportSceneDxf,
@@ -9,7 +12,7 @@ import {
 import type { PlatformAdapter } from '../../platform/types';
 import { outputTextRenderer } from '../text/output-text-renderer';
 import type { ToastVariant } from '../state/toast-store';
-import { exportProjectSelection, glyphWarnings } from './export-artwork-svg';
+import { exportProjectSelection } from './export-artwork-svg';
 import { pickPreparedSaveTarget } from './pick-prepared-save-target';
 
 export type ExportArtworkDxfContext = {
@@ -62,7 +65,7 @@ export async function handleExportArtworkDxf(ctx: ExportArtworkDxfContext): Prom
     const done = exportedToast(
       result.value,
       target.displayName,
-      resolved.ok ? glyphWarnings(resolved.advisories) : [],
+      resolved.ok ? textAdvisoryWarnings(resolved.advisories) : [],
     );
     ctx.pushToast(done.message, done.variant);
   } catch (error) {

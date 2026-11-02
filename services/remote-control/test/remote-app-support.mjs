@@ -190,13 +190,14 @@ export function respond(state, name, args) {
 }
 
 /** Serves the built phone app under its real CSP and fakes the relay API and live socket. */
-export async function phonePage(browser, state, { width = 390, paired = true } = {}) {
+export async function phonePage(browser, state, { width = 390, paired = true, init } = {}) {
   const context = await browser.newContext({
     viewport: { width, height: 800 },
     serviceWorkers: 'block',
     hasTouch: true,
   });
   const page = await context.newPage();
+  if (init) await page.addInitScript(init.script, init.arg);
   let approved = paired;
   let claimed = false;
   // Like the relay: a claimed phone stays pending until the PC approves it.

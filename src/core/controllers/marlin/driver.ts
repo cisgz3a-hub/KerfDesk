@@ -21,7 +21,7 @@ import {
 } from './commands';
 import { prepareMarlinConsoleCommand } from './console-command';
 import { classifyMarlinResponse } from './response';
-import { planMarlinStreamPauseBeam } from './stream-pause-beam';
+import { marlinStreamPauseOffLinesFrom, planMarlinStreamPauseBeam } from './stream-pause-beam';
 
 export const MARLIN_DEFAULT_BAUD_RATE = 250000;
 
@@ -109,4 +109,5 @@ export const marlinDriver: ControllerDriver = {
   // same way GRBL blocks $-lines mid-job.
   isSetupOnlyPayload: (payload) => /(^|\n)\s*M50[02]\b/i.test(payload),
   planStreamPauseBeam: planMarlinStreamPauseBeam,
+  streamPauseOffLinesFrom: marlinStreamPauseOffLinesFrom,
 };

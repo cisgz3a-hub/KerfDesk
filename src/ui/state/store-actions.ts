@@ -347,7 +347,7 @@ export function interactionActions(
       })),
     setObjectTransform: (id, transform) =>
       set((s) => ({
-        project: applyTransformsToScene(s.project, [{ id, transform }]),
+        project: applyTransformsToScene(s.project, [{ id, transform }], s.pendingUndo?.project),
         dirty: true,
       })),
     // A drag frame moves the whole selection in one write. One write per
@@ -357,7 +357,10 @@ export function interactionActions(
       set((s) =>
         updates.length === 0
           ? s
-          : { project: applyTransformsToScene(s.project, updates), dirty: true },
+          : {
+              project: applyTransformsToScene(s.project, updates, s.pendingUndo?.project),
+              dirty: true,
+            },
       ),
     // Esc mid-drag: restore the pre-interaction project snapshot and drop it,
     // pushing no undo entry (the drag never happened). No-op if nothing was
@@ -413,18 +416,28 @@ export function visibleSelectionState(
   };
 }
 
+// `dragStart` is the project as the interaction found it: a frame measures each
+// tab from there, so a drag that shrinks and returns leaves it where it was.
 function applyTransformsToScene(
   project: Project,
   updates: ReadonlyArray<SelectionTransform>,
+  dragStart?: Project,
 ): Project {
   const transforms = new Map(updates.map((update) => [update.id, update.transform] as const));
+  const started = new Map(
+    dragStart?.scene.objects
+      .filter((object) => transforms.has(object.id))
+      .map((object) => [object.id, object] as const),
+  );
   return {
     ...project,
     scene: {
       ...project.scene,
       objects: project.scene.objects.map((o) => {
         const transform = transforms.get(o.id);
-        return transform === undefined || o.locked === true ? o : withObjectTransform(o, transform);
+        return transform === undefined || o.locked === true
+          ? o
+          : withObjectTransform(o, transform, started.get(o.id));
       }),
     },
   };

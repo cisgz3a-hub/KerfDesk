@@ -267,8 +267,8 @@ function invertibleTransform(transform: Transform): boolean {
   );
 }
 
-// The inverse of applyTransform: untranslate, unrotate, unmirror, unscale.
-function worldToLocal(point: Vec2, transform: Transform): Vec2 {
+/** The inverse of applyTransform: untranslate, unrotate, unmirror, unscale. */
+export function worldToLocal(point: Vec2, transform: Transform): Vec2 {
   const dx = point.x - transform.x;
   const dy = point.y - transform.y;
   const rad = (transform.rotationDeg * Math.PI) / 180;

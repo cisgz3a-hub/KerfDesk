@@ -314,7 +314,7 @@ export type SerialConnection = {
   // lines. Absent: lines are delivered as they are read (ADR-356 Amendment 2).
   readonly inputReadThrough?: () => number;
   // A transport that ends its session on a failed read awaits these first,
-  // bounded, so a stop can still be written through it (ADR-398 Amendment 6).
+  // bounded, so a stop can still be written through it (ADR-398 Amendments 6, 7).
   readonly beforeReadFailureClose?: (handler: () => Promise<void>) => () => void;
   // Subscribe to UART line errors the transport survived (Web Serial's
   // BreakError, BufferOverrunError, FramingError, ParityError): bytes at the

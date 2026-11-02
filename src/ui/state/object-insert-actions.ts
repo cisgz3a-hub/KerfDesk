@@ -20,7 +20,9 @@ import {
 } from './box-insert-mutation';
 import { applyCarveSettingsToOperations, applyDesignSketch } from './design-apply-mutation';
 import { reportDependencyRepairs } from './object-delete-actions';
+import { droppedTextTabsNotice } from './removed-tabs-notice';
 import { refuseSceneLimitOverrun } from './scene-copy-room';
+import { textTabAnchorsAfterEdit } from '../../core/text/text-edit-tab-anchors';
 import { validateDesignStudioDocument } from '../../io/project/project-design-studio-validator';
 import { useToastStore } from './toast-store';
 import { withReferencedEmbeddedFonts } from '../../core/text/embedded-font-set';
@@ -178,15 +180,22 @@ function reimportSvgObjectAction(set: Setter, get: Getter): AppState['reimportSv
 
 function upsertTextObjectAction(set: Setter): AppState['upsertTextObject'] {
   return (text: TextObject, embeddedFont?: EmbeddedFont, options?: TextInsertOptions) => {
-    set((state) =>
-      applyLayerDefaultsToFreshLayers(
+    let droppedTabs = 0;
+    set((state) => {
+      const existing = state.project.scene.objects.find((object) => object.id === text.id);
+      const next = applyLayerDefaultsToFreshLayers(
         state.project.scene.layers,
         applyTextAndEmbeddedFont(state, text, embeddedFont, options),
         state.layerDefaults,
         state.cncLiveCaps,
         state.materialLibrary,
-      ),
-    );
+      );
+      droppedTabs = existing === undefined ? 0 : textTabAnchorsAfterEdit(existing, text).dropped;
+      return next;
+    });
+    // After the commit: the insertion guard refuses an over-budget project by throwing.
+    const notice = droppedTextTabsNotice(droppedTabs);
+    if (notice !== '') useToastStore.getState().pushToast(notice, 'info');
   };
 }
 

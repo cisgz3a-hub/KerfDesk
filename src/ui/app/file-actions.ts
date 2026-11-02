@@ -321,8 +321,18 @@ function pushPostSaveAdvisories(
   machineWarnings: ReadonlyArray<string>,
   cncToolPlanLength?: number,
 ): void {
-  for (const advisory of preflightAdvisories) {
-    ctx.pushToast(advisory.message, 'warning');
+  // Only the newest toasts show, so notes go first and the preflight's findings (such as a job
+  // off the bed) last, where a list of text notices cannot push them out (ADR-591 Amendment 3).
+  if (machineKindOf(ctx.project.machine) === 'cnc') {
+    const note = cncExportOtherControllersNote(ctx.project.device, ctx.controllerSettings);
+    if (note !== null) ctx.pushToast(note, 'info');
+    const bitChanges = cncSavedBitChangesNote(cncToolPlanLength);
+    if (bitChanges !== null) ctx.pushToast(bitChanges, 'info');
+  } else if (ctx.controllerSettings === null) {
+    ctx.pushToast(
+      `Exported G-code assumes GRBL $30=${ctx.project.device.maxPowerS} and laser mode ($32=1) — not verified against a connected controller this session.`,
+      'info',
+    );
   }
   const warningProject = outputScopedWarningProject(ctx);
   for (const warning of machineWarnings) {
@@ -336,16 +346,8 @@ function pushPostSaveAdvisories(
       ctx.pushToast(warning, 'warning');
     }
   }
-  if (machineKindOf(ctx.project.machine) === 'cnc') {
-    const note = cncExportOtherControllersNote(ctx.project.device, ctx.controllerSettings);
-    if (note !== null) ctx.pushToast(note, 'info');
-    const bitChanges = cncSavedBitChangesNote(cncToolPlanLength);
-    if (bitChanges !== null) ctx.pushToast(bitChanges, 'info');
-  } else if (ctx.controllerSettings === null) {
-    ctx.pushToast(
-      `Exported G-code assumes GRBL $30=${ctx.project.device.maxPowerS} and laser mode ($32=1) — not verified against a connected controller this session.`,
-      'info',
-    );
+  for (const advisory of preflightAdvisories) {
+    ctx.pushToast(advisory.message, 'warning');
   }
 }
 

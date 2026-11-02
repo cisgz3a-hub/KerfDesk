@@ -1,5 +1,5 @@
 import { isBarcodeObject } from '../../core/barcode';
-import type { PreflightIssue, PreflightResult } from '../../core/preflight';
+import type { PreflightResult } from '../../core/preflight';
 import {
   DEFAULT_PROJECT_VARIABLE_DATA,
   sceneObjectUsesOperation,
@@ -15,7 +15,15 @@ import { applySimilarityProject, type SimilarityTransform } from '../../core/reg
 import { prepareOutput, type PreparedOutput, type PrepareOutputOptions } from './prepare-output';
 import { materializeVariableBarcode } from './materialize-variable-barcode';
 import { anchoredVariableTextTransform } from './variable-text-anchor';
-import { plainTextGlyphAdvisory, variableRecordGlyphAdvisory } from './text-glyph-advisory';
+import {
+  asksRightToLeftOnSingleLine,
+  mergeTextNotices,
+  plainTextGlyphAdvisory,
+  rightToLeftAdvisory,
+  variableRecordGlyphAdvisory,
+  variableRecordOverflowAdvisory,
+  type TextNotice,
+} from './text-glyph-advisory';
 
 export type VariableTextRenderInput = {
   readonly text: TextObject;
@@ -31,6 +39,8 @@ export type VariableTextRenderResult = {
   readonly anchor?: Vec2;
   // Characters the font has no glyph for: output warns about them (ADR-591 Amendment 1).
   readonly missingCharacters?: ReadonlyArray<string>;
+  // How far the record's ink passes its frame: output warns (ADR-682 Amendment 2).
+  readonly frameOverflowMm?: number;
 };
 export type VariableTextRenderer = {
   (input: VariableTextRenderInput): Promise<VariableTextRenderResult>;
@@ -59,6 +69,8 @@ export type PrepareOutputSnapshotOptions = PrepareOutputOptions & {
 export type PreparedOutputSnapshot = PreparedOutput & {
   readonly evaluationContext: VariableEvaluationContext;
 };
+
+const OLDER_GEOMETRY_TOLERANCE_MM = 0.01;
 
 export const PRINT_CUT_REGISTRATION_INVALID_MESSAGE =
   'Print-and-Cut registration is not valid. Capture both machine points again.';
@@ -130,20 +142,21 @@ export async function withTextGlyphCheck(
   renderer: VariableTextRenderer,
 ): Promise<PreparedOutput> {
   if (!prepared.ok) return prepared;
-  const advisories: TextGlyphAdvisory[] = [];
+  const advisories: TextAdvisory[] = [];
   for (const object of project.scene.objects) {
     if (object.kind !== 'text' || object.variableTemplate !== undefined) continue;
-    const issue = await plainTextGlyphIssue(object, project, renderer);
-    if (issue !== undefined) advisories.push({ objectId: object.id, issue });
+    for (const issue of await plainTextNotices(object, project, renderer))
+      advisories.push({ objectId: object.id, issue });
   }
   return withTextAdvisories(prepared, advisories);
 }
 
-// A text's missing characters inform Job Review, Start and Save; they never refuse output.
-// Only text this output burns counts: inside its scope and on an output layer.
+// What a text's font or frame does to it informs Job Review, Start and Save; it never refuses
+// output. Only text this output burns counts: inside its scope and on an output layer. The merged
+// notices come first, so a route that toasts in order leaves the newest place to its other checks.
 function withTextAdvisories(
   prepared: PreparedOutput,
-  advisories: ReadonlyArray<TextGlyphAdvisory>,
+  advisories: ReadonlyArray<TextAdvisory>,
 ): PreparedOutput {
   if (!prepared.ok || advisories.length === 0) return prepared;
   const { objects, layers } = prepared.project.scene;
@@ -157,17 +170,29 @@ function withTextAdvisories(
     burned.has(advisory.objectId) ? [advisory.issue] : [],
   );
   if (issues.length === 0) return prepared;
-  return { ...prepared, advisories: [...(prepared.advisories ?? []), ...issues] };
+  return { ...prepared, advisories: [...mergeTextNotices(issues), ...(prepared.advisories ?? [])] };
 }
 
-/** A text's characters its font has no glyph for (ADR-591 Amendments 1 and 2). */
-export type TextGlyphAdvisory = { readonly objectId: string; readonly issue: PreflightIssue };
+/**
+ * The warnings a set of texts raises, one per kind however many texts: an export or a print says
+ * them where output would (ADR-591 Amendment 3).
+ */
+export function textAdvisoryWarnings(
+  advisories: ReadonlyArray<TextAdvisory>,
+): ReadonlyArray<string> {
+  return mergeTextNotices(advisories.map((advisory) => advisory.issue)).map(
+    (issue) => issue.message,
+  );
+}
+
+/** What a text's font or frame does to its burn (ADR-591 Amendments 1 to 3, ADR-682 Amendment 2). */
+export type TextAdvisory = { readonly objectId: string; readonly issue: TextNotice };
 
 type MaterializedProject =
   | {
       readonly ok: true;
       readonly project: Project;
-      readonly advisories: ReadonlyArray<TextGlyphAdvisory>;
+      readonly advisories: ReadonlyArray<TextAdvisory>;
     }
   | { readonly ok: false; readonly preflight: PreflightResult };
 
@@ -192,8 +217,8 @@ export async function materializeVariableText(
       },
     },
     advisories: objects.flatMap((result) =>
-      result.ok && result.advisory !== undefined
-        ? [{ objectId: result.object.id, issue: result.advisory }]
+      result.ok
+        ? (result.notices ?? []).map((issue) => ({ objectId: result.object.id, issue }))
         : [],
     ),
   };
@@ -203,7 +228,7 @@ export type MaterializedObject =
   | {
       readonly ok: true;
       readonly object: Project['scene']['objects'][number];
-      readonly advisory?: PreflightIssue;
+      readonly notices?: ReadonlyArray<TextNotice>;
     }
   | {
       readonly ok: false;
@@ -213,7 +238,7 @@ export type MaterializedObject =
 
 /**
  * One object with its variable text or barcode data evaluated into plain content. Plain text stays
- * as it is, with the characters its font lacks when the renderer can check them.
+ * as it is, with what its font does to it when the renderer can check that.
  */
 export async function materializeVariableObject(
   object: Project['scene']['objects'][number],
@@ -225,8 +250,8 @@ export async function materializeVariableObject(
     return materializeVariableBarcode(object, project, context, renderer);
   if (object.kind !== 'text') return { ok: true, object };
   if (object.variableTemplate === undefined) {
-    const advisory = await plainTextGlyphIssue(object, project, renderer);
-    return { ok: true, object, ...(advisory === undefined ? {} : { advisory }) };
+    const notices = await plainTextNotices(object, project, renderer);
+    return { ok: true, object, ...(notices.length === 0 ? {} : { notices }) };
   }
   const evaluated = evaluateVariableTemplate(object.variableTemplate, object, project, context);
   if (!evaluated.ok) return { ...evaluated, fallback: object };
@@ -241,16 +266,27 @@ export async function materializeVariableObject(
         renderer,
       ));
     const { variableTemplate: _template, ...plainText } = object;
-    const advisory = variableRecordGlyphAdvisory(
-      object,
-      object.variableTemplate,
-      { value: evaluated.value, missing: rendered.missingCharacters ?? [] },
-      project,
-      context,
-    );
+    const notices = [
+      variableRecordGlyphAdvisory(
+        object,
+        object.variableTemplate,
+        { value: evaluated.value, missing: rendered.missingCharacters ?? [] },
+        project,
+        context,
+      ),
+      variableRecordOverflowAdvisory(
+        object.variableTemplate,
+        { value: evaluated.value, overflowMm: rendered.frameOverflowMm },
+        project,
+        context,
+      ),
+      asksRightToLeftOnSingleLine(object)
+        ? rightToLeftAdvisory(object, evaluated.value, project)
+        : undefined,
+    ].filter((notice) => notice !== undefined);
     return {
       ok: true,
-      ...(advisory === undefined ? {} : { advisory }),
+      ...(notices.length === 0 ? {} : { notices }),
       // Only geometry crosses over: render notes such as the anchor stay off
       // the scene object, which array copies persist.
       object: {
@@ -276,22 +312,52 @@ export async function materializeVariableObject(
 }
 
 /**
- * The characters a plain text's font has no glyph for, which its stored geometry already lacks
- * (ADR-591 Amendment 2). The check never refuses output: a text it cannot check (a font that will
- * not load) burns as before. `where` names the text's place, such as a production row.
+ * What a plain text's font does to it: the characters it has no glyph for, which its stored
+ * geometry already lacks (ADR-591 Amendment 2), and a Right-to-left it cannot lay out (Amendment
+ * 3). The check never refuses output: a text it cannot check (a font that will not load) burns as
+ * before. `where` names the text's place, such as a production row.
  */
-export async function plainTextGlyphIssue(
+export async function plainTextNotices(
   text: TextObject,
   project: Project,
   renderer: VariableTextRenderer,
   where?: string,
-): Promise<PreflightIssue | undefined> {
+): Promise<ReadonlyArray<TextNotice>> {
   const check = renderer.missingCharacters;
-  if (check === undefined) return undefined;
+  if (check === undefined) return [];
   const missing = await check({ text, content: text.content, project }).catch(
     (): ReadonlyArray<string> => [],
   );
-  return plainTextGlyphAdvisory(text, missing, project, where);
+  const glyphs = plainTextGlyphAdvisory(text, missing, project, where);
+  return [
+    ...(glyphs === undefined ? [] : [glyphs]),
+    ...(asksRightToLeftOnSingleLine(text)
+      ? [
+          rightToLeftAdvisory(
+            text,
+            text.content,
+            project,
+            await holdsOlderBidiMarks(text, project, renderer),
+            where,
+          ),
+        ]
+      : []),
+  ];
+}
+
+// Plain text burns its stored geometry. An older build drew each bidi mark as a ?, so that
+// geometry is wider than the same text drawn now. Path text is placed in world space and has no
+// such comparison, so it is not called out.
+async function holdsOlderBidiMarks(
+  text: TextObject,
+  project: Project,
+  renderer: VariableTextRenderer,
+): Promise<boolean> {
+  if (text.pathText !== undefined) return false;
+  const fresh = await renderer({ text, content: text.content, project }).catch(() => undefined);
+  if (fresh === undefined) return false;
+  const width = (bounds: Bounds): number => bounds.maxX - bounds.minX;
+  return Math.abs(width(fresh.bounds) - width(text.bounds)) > OLDER_GEOMETRY_TOLERANCE_MM;
 }
 
 function resolveEvaluationContext(

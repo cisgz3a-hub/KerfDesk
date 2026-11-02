@@ -1,4 +1,5 @@
 import type { PreparedPartGenerator } from '../state/prepare-part-generator';
+import { RebuiltTabsNote } from './RebuiltTabsNote';
 import { VectorGeometryPreview } from './VectorGeometryPreview';
 export function PartGeneratorReview(props: {
   readonly prepared: PreparedPartGenerator;
@@ -39,6 +40,11 @@ export function PartGeneratorReview(props: {
           overrides remain attached. The part burns at the size proposed here.
         </p>
       )}
+      <RebuiltTabsNote
+        previous={previousObject}
+        movedTabs={prepared.movedTabs}
+        removedTabs={prepared.removedTabs}
+      />
       <p>
         Affected operations:{' '}
         {prepared.operationNames.length === 0
