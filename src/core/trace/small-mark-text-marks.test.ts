@@ -125,8 +125,8 @@ describe('text marks at any angle, and dust that lines up', () => {
 
   it.each([0, 30, 90, 180])('keeps both dots of a colon at %d°', (degrees) => {
     const dots: Rect[] = [
-      [58, -3, 2, 3],
-      [58, -12, 2, 3],
+      [58, -2.7, 2.7, 2.7],
+      [58, -12, 2.7, 2.7],
     ];
     const cleaned = preprocessForTrace(turned(degrees, dots), LINE_ART);
     for (const dot of dots) expect(inkOfMark(cleaned, degrees, dot)).toBeGreaterThanOrEqual(4);
