@@ -13,7 +13,10 @@ import { useCameraStore } from '../state/camera-store';
 import { useLaserStore, type LaserState } from '../state/laser-store';
 import { resolveLiveFramePlacement } from './camera-frame-placement';
 import { reportFrameRefusal } from './frame-dispatch-support';
-import { hasFreshIdleFramePosition } from './frame-position-readiness';
+import {
+  hasFreshIdleFramePosition,
+  waitForStatusAfterOriginChange,
+} from './frame-position-readiness';
 import { waitForControllerStatus } from './frame-status-wait';
 import { isAlarmRefusalMessage, offerAlarmFixForBlockedStart } from './start-blocked-alarm-offers';
 import { offerSetupFixForBlockedStart } from './start-blocked-setup-offers';
@@ -25,6 +28,10 @@ import { machineSnapshot } from './start-machine-snapshot';
  * has been reported. True lets the Frame proceed to its ordinary gates. */
 export async function offerFrameBlockerFixes(): Promise<boolean> {
   await waitForControllerStatus((laser) => laser.statusReport !== null);
+  // A report from before the last origin write holds the old work frame; the
+  // offers below judge the placement, so let the next one land first. If none
+  // comes, the Frame's preparation refuses with its own message.
+  await waitForStatusAfterOriginChange();
   const machineIssues = currentMachineIssues();
   if (machineIssues.length > 0) {
     // Alarm is the one machine block with an in-place fix. Motion still

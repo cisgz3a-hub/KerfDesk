@@ -407,3 +407,8 @@ therefore sent moves the firmware refuses, or trusted values the controller had 
   homing state the log line names Sleep or a critical alarm, not the homing state; with the
   Falcon command set on the stock GRBL driver, Home sends `$HX` again after that reset and gets
   stuck again, so Unlock is the way out; the simulator does not model `$10` WPos reports.
+
+**Amendment 12 (2026-11-02):** [a position is read only from a status report sent after the last
+origin write](ADR-375-amendment-12-positions-wait-for-a-report-after-an-origin-write.md): fixes
+rolling audit v9 R8-P1-1. The origin write records a status fence, Frame waits for a report past
+it, and manual motion queries again.
