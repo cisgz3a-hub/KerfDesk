@@ -1,4 +1,4 @@
-import { transformCurveSubpathUniform, type TextAlignment } from '../scene';
+import { transformCurveSubpathUniform, type Bounds, type TextAlignment } from '../scene';
 import type { TextBoxSettings } from '../scene/text-box';
 import type { TextRenderResult } from './text-to-polylines';
 import type { TextBoxLayout } from './text-box-layout';
@@ -74,44 +74,109 @@ export function textBoxBaseline(rendered: TextRenderResult): TextBoxBaseline | u
 }
 
 /**
+ * How far a render's ink passes the frame edges the user typed: all four of a
+ * fixed frame, the sides of an Auto height frame, none of an Auto width frame.
+ * Each axis is the larger of its two edges.
+ */
+export function textBoxOverflowMm(
+  bounds: Bounds,
+  layout: TextBoxLayout,
+  box: TextBoxSettings,
+): { readonly widthMm: number; readonly heightMm: number } {
+  const past = (low: number, high: number, size: number): number => Math.max(0, -low, high - size);
+  return {
+    widthMm: box.mode === 'auto-width' ? 0 : past(bounds.minX, bounds.maxX, layout.widthMm),
+    heightMm: box.mode === 'fixed' ? past(bounds.minY, bounds.maxY, layout.heightMm) : 0,
+  };
+}
+
+/**
  * A frame puts each render's ink top at its top, so variable records with and
  * without capitals or accents would burn on different baselines. Each record
  * moves to the template's first baseline scaled to its own size, so records
  * the frame gives one size share a baseline whatever size the template took.
+ *
  * A glyph taller than the template's rises above the frame top and the layout
- * reports overflow. A record whose ink fills the frame's height cannot move
- * without leaving it, so it keeps the frame's rule (ADR-682 Amendment 1).
+ * reports overflow; no size cures that, because the baseline scales with the
+ * glyph. A record whose ink fills the frame's height cannot move without
+ * leaving it, so it keeps the frame's rule (ADR-682 Amendment 1). In a
+ * shrink-to-fit frame, a record the baseline would carry past the bottom
+ * shrinks until it fits on that baseline (ADR-682 Amendment 2).
  */
 export function onTextBoxBaseline(
   record: TextRenderResult,
   template: TextBoxBaseline | undefined,
+  box: TextBoxSettings | undefined,
 ): TextRenderResult {
   const own = textBoxBaseline(record);
   const layout = record.textBoxLayout;
   if (template === undefined || own === undefined || layout === undefined) return record;
-  if (!(template.sizeMm > 0)) return record;
-  const { minY, maxY } = record.bounds;
+  if (box === undefined || !(template.sizeMm > 0)) return record;
+  const { minX, maxX, minY, maxY } = record.bounds;
   if (maxY - minY >= layout.heightMm - 1e-7) return record;
-  const dy = (template.y * own.sizeMm) / template.sizeMm - own.y;
-  if (dy === 0) return record;
-  const move = { scale: 1, translateX: 0, translateY: dy };
+  const baselineY = (template.y * own.sizeMm) / template.sizeMm;
+  const scale = bottomRefitScale(baselineY + maxY - own.y, own.sizeMm, layout.heightMm, box);
+  if (baselineY === own.y && scale === 1) return record;
+  // The alignment point stays put across the frame, so a refit record stays
+  // left, centred or right in it.
+  const anchorX = record.anchor?.x ?? 0;
+  const move = {
+    scale,
+    translateX: anchorX * (1 - scale),
+    translateY: (baselineY - own.y) * scale,
+  };
+  const bounds = {
+    minX: minX * scale + move.translateX,
+    maxX: maxX * scale + move.translateX,
+    minY: minY * scale + move.translateY,
+    maxY: maxY * scale + move.translateY,
+  };
   return {
     ...record,
-    paths: record.paths.map((path) => ({
-      ...path,
-      polylines: path.polylines.map((line) => ({
-        ...line,
-        points: line.points.map((point) => ({ x: point.x, y: point.y + dy })),
-      })),
-      ...(path.curves === undefined
-        ? {}
-        : { curves: path.curves.map((curve) => transformCurveSubpathUniform(curve, move)) }),
-    })),
-    bounds: { ...record.bounds, minY: minY + dy, maxY: maxY + dy },
-    anchor: { x: record.anchor?.x ?? 0, y: own.y + dy },
+    paths: movedPaths(record.paths, move),
+    bounds,
+    anchor: { x: anchorX, y: baselineY * scale },
     textBoxLayout: {
       ...layout,
-      overflow: layout.overflow || minY + dy < -1e-7 || maxY + dy > layout.heightMm + 1e-7,
+      sizeMm: own.sizeMm * scale,
+      overflow: layout.overflow || passesFrame(bounds, layout, box),
     },
   };
+}
+
+function passesFrame(bounds: Bounds, layout: TextBoxLayout, box: TextBoxSettings): boolean {
+  const { widthMm, heightMm } = textBoxOverflowMm(bounds, layout, box);
+  return widthMm > 1e-7 || heightMm > 1e-7;
+}
+
+function movedPaths(
+  paths: TextRenderResult['paths'],
+  move: { readonly scale: number; readonly translateX: number; readonly translateY: number },
+): TextRenderResult['paths'] {
+  return paths.map((path) => ({
+    ...path,
+    polylines: path.polylines.map((line) => ({
+      ...line,
+      points: line.points.map((point) => ({
+        x: point.x * move.scale + move.translateX,
+        y: point.y * move.scale + move.translateY,
+      })),
+    })),
+    ...(path.curves === undefined
+      ? {}
+      : { curves: path.curves.map((curve) => transformCurveSubpathUniform(curve, move)) }),
+  }));
+}
+
+// Baseline and ink both scale with the record, so the bottom scales linearly
+// from the frame top. The frame's smallest size still holds; a record that
+// needs less overflows and says so.
+function bottomRefitScale(
+  bottomMm: number,
+  sizeMm: number,
+  frameHeightMm: number,
+  box: TextBoxSettings,
+): number {
+  if (box.mode !== 'fixed' || box.fit !== 'shrink' || bottomMm <= frameHeightMm + 1e-7) return 1;
+  return Math.max(frameHeightMm / bottomMm, Math.min(1, box.minSizeMm / sizeMm));
 }

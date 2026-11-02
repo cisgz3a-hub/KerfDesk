@@ -8,6 +8,7 @@ import type { SceneObject } from '../../core/scene';
 import { objectVariableTemplate } from '../../core/variables/object-variable-template';
 import type { VariableTextRenderer } from '../../io/gcode';
 import { materializeVariableObject } from '../../io/gcode/prepare-output-snapshot';
+import { mergeTextNotices, type TextNotice } from '../../io/gcode/text-glyph-advisory';
 import { useStore } from '../state';
 import { selectedObjectIds } from '../state/scene-group-actions';
 import { useToastStore } from '../state/toast-store';
@@ -32,7 +33,7 @@ export async function bakeSelectedVariableText(
   }
   const context = { now: (options.now ?? (() => new Date()))() };
   const baked: SceneObject[] = [];
-  const missingGlyphs: string[] = [];
+  const notices: TextNotice[] = [];
   for (const object of targets) {
     const result = await materializeVariableObject(
       object,
@@ -45,7 +46,7 @@ export async function bakeSelectedVariableText(
       return;
     }
     baked.push(result.object);
-    if (result.advisory !== undefined) missingGlyphs.push(result.advisory.message);
+    notices.push(...(result.notices ?? []));
   }
   if (!useStore.getState().commitBakedVariableObjects(state.project, baked)) {
     toast(
@@ -55,12 +56,14 @@ export async function bakeSelectedVariableText(
     return;
   }
   // ADR-591 Amendment 2: the baked text keeps the record's geometry, so a character its font
-  // lacks stays missing from the burn. Say so now, not only at Start.
+  // lacks stays missing from the burn, and an overflow stays past its frame. Say so now, not only
+  // at Start.
+  const warnings = mergeTextNotices(notices).map((issue) => issue.message);
   toast(
     [
       `Baked ${baked.length === 1 ? '1 object' : `${baked.length} objects`}: the value is now fixed and no longer advances. Undo restores the fields.`,
-      ...missingGlyphs,
+      ...warnings,
     ].join(' '),
-    missingGlyphs.length === 0 ? 'success' : 'warning',
+    warnings.length === 0 ? 'success' : 'warning',
   );
 }

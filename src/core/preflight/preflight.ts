@@ -80,6 +80,10 @@ export type PreflightCode =
   // Advisory-only (ADR-591 Amendment 2): the same for plain text from any route (the editor, Bake,
   // a production row, the jig editor, a remote edit), which burns the geometry it was made with.
   | 'text-missing-glyphs'
+  // Advisory-only (ADR-682 Amendment 2): a variable record burns past the frame the user typed.
+  | 'variable-text-overflow'
+  // Advisory-only (ADR-591 Amendment 3): a single-line font cannot lay a text out right to left.
+  | 'text-rtl-unsupported'
   | 'print-and-cut-registration-invalid'
   | 'cnc-settings-invalid'
   | 'cnc-machine-params-invalid'

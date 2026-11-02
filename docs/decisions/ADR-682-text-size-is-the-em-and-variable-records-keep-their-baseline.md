@@ -128,3 +128,7 @@ point on the first baseline) lands on the template's (#1359). Three placements s
 the template's baseline at any size](ADR-682-amendment-1-old-single-line-frames-and-record-baselines.md):
 schema 20 keeps a converted frame counting a line as the old cap-height Size, and a boxed record
 sits on the template's baseline scaled to its size.
+
+**Amendment 2 (2026-11-02):** [a boxed record refits rather than leaves its frame, Auto width records
+keep the alignment, and an overflow warns at output](ADR-682-amendment-2-frame-records-refit-keep-alignment-and-warn.md):
+fixes rolling audit v9 R4-P1-1, R4-P1-2 and R4-P2-1.

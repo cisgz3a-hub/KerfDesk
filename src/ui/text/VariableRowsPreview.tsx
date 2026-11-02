@@ -251,7 +251,7 @@ function onTemplateBaseline(
   return async (content) => {
     template ??= render(values).then(textBoxBaseline, unlessUnavailable);
     const baseline = await template;
-    return onTextBoxBaseline(await render({ ...values, content }), baseline);
+    return onTextBoxBaseline(await render({ ...values, content }), baseline, values.textBox);
   };
 }
 

@@ -1,7 +1,7 @@
 import { DEFAULT_PROJECT_VARIABLE_DATA, type Project, type RasterImage } from '../../core/scene';
 import {
   materializeVariableText,
-  type TextGlyphAdvisory,
+  textAdvisoryWarnings,
 } from '../../io/gcode/prepare-output-snapshot';
 import { exportSceneSvg } from '../../io/svg/export-scene-svg';
 import type { PlatformAdapter } from '../../platform/types';
@@ -71,7 +71,7 @@ export async function handleExportArtworkSvg(ctx: ExportArtworkSvgContext): Prom
     );
     if (target === null) return;
     await target.write(new Blob([result.value.svg], { type: 'image/svg+xml' }));
-    const glyphs = glyphWarnings(resolved.advisories);
+    const glyphs = textAdvisoryWarnings(resolved.advisories);
     ctx.pushToast(
       [
         'Exported ' +
@@ -89,14 +89,6 @@ export async function handleExportArtworkSvg(ctx: ExportArtworkSvgContext): Prom
       'error',
     );
   }
-}
-
-/**
- * Outlined text keeps only the glyphs its font has, so an export names the characters each text
- * lost, as Start and Save do (ADR-591 Amendment 2).
- */
-export function glyphWarnings(advisories: ReadonlyArray<TextGlyphAdvisory>): ReadonlyArray<string> {
-  return advisories.map((advisory) => advisory.issue.message);
 }
 
 function warnedVariant(glyphs: ReadonlyArray<string>): ToastVariant {
