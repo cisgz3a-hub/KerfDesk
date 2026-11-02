@@ -11,6 +11,7 @@ import {
   travelEnvelopeFirmware,
 } from '../../../core/controllers/grbl/reported-work-area';
 import type { ActiveWorkCoordinateSystem } from '../../../core/controllers/grbl/work-offset-readback';
+import { HELD_RESUME_TAIL_MESSAGE } from '../../../core/controllers/grblhal/held-resume-tail';
 import type { ControllerKind } from '../../../core/devices';
 import type { ControllerSettingsSnapshot } from '../../../core/preflight';
 import {
@@ -55,13 +56,18 @@ export type ControllerReviewArgs = {
   readonly profileMaxPowerS: number;
   readonly profileBedWidth: number;
   readonly profileBedHeight: number;
+  /** grblHAL may still hold a paused move's tail (ADR-684). */
+  readonly heldResumeTail?: boolean;
 };
 
 const DEFAULT_WCS = 'G54';
 
 export function controllerReviewSummary(args: ControllerReviewArgs): string {
   if (!args.isConnected) return 'not connected';
-  const state = args.statusReport?.state ?? 'no status yet';
+  const reported = args.statusReport?.state ?? 'no status yet';
+  // ADR-684: the warning is named in the summary, which shows while collapsed.
+  const state =
+    args.heldResumeTail === true ? `${reported} · may hold a paused move, reset first` : reported;
   if (overridesAreBaseline(args.overrides)) return `${state}`;
   // A laser Start resets leftover overrides (ADR-355); CNC keeps its own
   // override policy and only flags them.
@@ -77,6 +83,9 @@ export function buildControllerReviewFacts(
   return [
     fact('Firmware', firmwareLabel(args)),
     fact('State', machineStateLabel(args), machineStateTone(args)),
+    ...(args.heldResumeTail === true
+      ? [fact('Paused move', HELD_RESUME_TAIL_MESSAGE, 'warning')]
+      : []),
     ...positionFacts(args.statusReport),
     fact(
       'Active WCS',

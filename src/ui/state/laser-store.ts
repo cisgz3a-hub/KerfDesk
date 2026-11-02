@@ -56,7 +56,7 @@ import type { StreamHold } from './laser-stream-hold';
 import type { CncPauseLiftStoreState } from './cnc-pause-lift-state';
 import type { JobStopRequest, StreamReset } from './job-stop-request';
 import type { TranscriptBufferRefs } from './laser-transcript-buffer';
-import type { PauseResumeTransitionState } from './laser-pause-resume-transition';
+import type { PauseResumeStoreState } from './laser-pause-resume-transition';
 import { controllerOverrideActions } from './laser-override-admission';
 import { probeActions } from './laser-probe-actions';
 import type { OverrideValues } from '../../core/controllers/grbl';
@@ -125,6 +125,7 @@ export type LaserState = LaserStoreActions &
   ControllerIncidentState &
   ControllerBuildInfoState &
   CncPauseLiftStoreState &
+  PauseResumeStoreState &
   WorkOriginState &
   ConnectionAttemptState & {
     readonly connection: ConnectionState;
@@ -180,7 +181,6 @@ export type LaserState = LaserStoreActions &
      * and whether it may have cost position; read through
      * currentStreamResetMayLosePosition (ADR-215 Amendment 1). */
     readonly streamReset?: StreamReset | null;
-    readonly pauseResumeTransition: PauseResumeTransitionState | null;
     /** Immutable recovery/replay ownership for the current streamer. */
     readonly activeRunId: RunId | null;
     /** Controller-reported canvas truth for the active or most recently

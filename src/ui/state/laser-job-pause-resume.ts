@@ -1,5 +1,6 @@
 import type { ControllerDriver } from '../../core/controllers';
 import { pause as pauseStreamer } from '../../core/controllers/grbl';
+import { heldResumeTailPatch, recordConfirmedState } from './held-resume-tail';
 import { cancelFreshControllerStatusWait } from './laser-controller-status-wait';
 import {
   sendRealtimeAndConfirmPauseResume,
@@ -216,6 +217,9 @@ export async function runConfirmedResumeJob(context: PauseResumeContext): Promis
       ? trackControllerDoorHold(() => context.get().accessoryCache)
       : null;
   let finishedWithoutRefill = false;
+  const confirmation = recordConfirmedState(
+    (report) => report.state === 'Run' || report.state === 'Idle',
+  );
 
   const resumeWork = async (token: PauseResumeTransitionToken): Promise<void> => {
     assertResumeCommandOwnership(context);
@@ -224,7 +228,7 @@ export async function runConfirmedResumeJob(context: PauseResumeContext): Promis
         token,
         command: resumeByte,
         expectedSession: controlSession,
-        accept: (report) => report.state === 'Run' || report.state === 'Idle',
+        accept: confirmation.accept,
         timeoutMessage,
         action: 'resume',
         liveness: laserJob ? 'door-restore' : 'cnc-door',
@@ -260,6 +264,9 @@ export async function runConfirmedResumeJob(context: PauseResumeContext): Promis
     doorHold?.isHeld,
   );
   assertResumeCommandOwnership(context);
+  // ADR-684: a grblHAL that answered with Idle may still hold the tail.
+  const outcome = { laserJob, finishedWithoutRefill, confirmedState: confirmation.state() };
+  context.set((state) => heldResumeTailPatch(state, activeDriver, outcome));
   if (finishedWithoutRefill) {
     beginPostJobSettle(context.set, context.get, context.refs, context.safeWrite);
   }
