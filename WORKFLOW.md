@@ -9239,6 +9239,13 @@ as the pane's design record.
   the three-second status timeout can take about seven seconds. The RTSP section then shows
   **Reconnect**. Pressing it probes again and creates a fresh session. No background FFmpeg respawn
   or automatic camera reconnection runs after failure.
+- **Edge / RTSP camera with a login.** The probe's DESCRIBE request line never carries the
+  login written into the address (`rtsp://user:password@host/...`). When the camera answers 401,
+  the probe repeats DESCRIBE once on the same connection, as FFmpeg does, with an Authorization
+  header (Digest MD5, with or without qop=auth, or Basic). An address without a login gets "the camera needs a user name and
+  password"; a second 401 gets "the camera refused the user name or password". A challenge the
+  probe cannot answer (for example Digest SHA-256) still counts as a camera found, and FFmpeg logs
+  in for the preview.
 - **Edge / older bridge.** A bridge that returns a usable RTSP preview but no liveness session does
   not block the preview. The RTSP section labels it unmonitored and explains that a frozen image
   may not be detected; no session is fabricated and no automatic reconnect or probe runs.
