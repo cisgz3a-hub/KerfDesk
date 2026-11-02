@@ -1800,8 +1800,9 @@ same words while those objects are in the project. Saving settles it: the next o
    names the sizes under both, unless every CSV record fits the same under either, when nothing is
    said. A plain frame is not mentioned: it burns its stored geometry either way.
 3. **Variable records that move.** A bent, on-a-path or framed record from before schema 19, or a
-   framed record from schema 19, now takes its template's baseline. A warning names the text and says
-   to Frame before a batch.
+   framed record from schema 19, now takes its template's baseline, and a framed one may refit a little
+   smaller to stay in its frame (ADR-682 Amendment 2). A warning names the text and says to Frame
+   before a batch.
 4. **Images that burn more.** From before schema 19: Grayscale or Pass-Through with Dot Width, and
    Pass-Through turned off the scan's axes. A warning names each image and says to test first.
 

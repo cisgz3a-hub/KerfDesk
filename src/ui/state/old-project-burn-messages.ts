@@ -53,7 +53,7 @@ function movedRecordsMessage({ movedRecords }: OldProjectBurnNotice): string | n
   return (
     `Variable text now follows its template's baseline, so records of ` +
     `${listed(movedRecords, (text) => quoted(text.label))} can burn in a different place than ` +
-    'in an earlier version. Frame before you run a batch.'
+    'in an earlier version, or a little smaller to stay in a frame. Frame before you run a batch.'
   );
 }
 

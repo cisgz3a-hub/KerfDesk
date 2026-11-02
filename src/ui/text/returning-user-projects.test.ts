@@ -174,12 +174,14 @@ describe('frames the repair must not touch (R7-P1-1)', () => {
       const text = textById(project, object.id);
       expect(text.textBox?.legacyLineEm, object.id).toBeUndefined();
       if (text.variableTemplate === undefined) continue;
-      for (const [index, name] of recordNames(project).entries())
-        expectSameSize(
-          burnMetrics(await gcodeOf(project, object.id, index)),
-          measured[object.id]?.[name],
-          `${object.id} ${name}`,
-        );
+      // Never up to the old rule's size. A record that would leave the frame on
+      // the shared baseline refits a little smaller (ADR-682 Amendment 2).
+      for (const [index, name] of recordNames(project).entries()) {
+        const burn = burnMetrics(await gcodeOf(project, object.id, index));
+        const was = measured[object.id]?.[name]?.width ?? NaN;
+        expect(burn.width, `${object.id} ${name}`).toBeLessThanOrEqual(was + 0.01);
+        expect(burn.width, `${object.id} ${name}`).toBeGreaterThan(was * 0.9);
+      }
     }
     const name = measured['fresh-relief-new-size']?.['ANNA'];
     expect(name?.width).toBeCloseTo(29.612, 3);

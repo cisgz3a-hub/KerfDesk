@@ -76,8 +76,9 @@ is a repair at load or a warning, and nothing adds or removes a Start guard.
 ### The name below the frame (R7-P2-1)
 
 The audit's Casual Hand name that ends 1.883 mm below the frame bottom is one case of R4-P1-1: the shared
-baseline does not check the bottom edge, and "Gypsy" goes 3.552 mm below. That finding has its own fix,
-so this amendment does not change the placement. The move notice covers these records in the meantime.
+baseline did not check the bottom edge, and "Gypsy" went 3.552 mm below. Amendment 2 fixed that by refitting
+such a record, so this amendment leaves the placement alone. Because that refit can make a record a little
+smaller on a file 1.0.28 saved, the move notice says so as well.
 
 ### Consequences
 
