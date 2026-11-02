@@ -120,6 +120,19 @@ function strokes(size: number, ink: Rgb): RawImageData {
   return { width: size, height: size, data };
 }
 
+/** The same picture with its edges softened along x, so its cracks are measured. */
+function softened(image: RawImageData): RawImageData {
+  const { width, height, data } = image;
+  const out = Uint8ClampedArray.from(data);
+  for (let y = 0; y < height; y += 1)
+    for (let x = 1; x + 1 < width; x += 1)
+      for (let c = 0; c < 3; c += 1) {
+        const o = (y * width + x) * 4 + c;
+        out[o] = ((data[o - 4] as number) + 2 * (data[o] as number) + (data[o + 4] as number)) / 4;
+      }
+  return { width, height, data: out };
+}
+
 describe('thin pale-toned strokes (ADR-532)', () => {
   it('vetoes 2 px greige strokes at source scale', () => {
     expect(shouldUseSketchTrace(strokes(300, GREIGE), LINE_ART)).toBe(false);
@@ -132,10 +145,22 @@ describe('thin pale-toned strokes (ADR-532)', () => {
     const image = strokes(90, TONED_BROWN);
     expect(shouldUseSketchTrace(image, LINE_ART)).toBe(false);
     expect(shouldUseSketchTrace(upscaleBy(image, 2), LINE_ART)).toBe(true);
-    const traced = await traceImageToColoredPaths(image, LINE_ART);
-    const vetoed = await traceImageToColoredPaths(image, { ...LINE_ART, sourceAutoSketch: false });
-    const promoted = await traceImageToColoredPaths(image, { ...LINE_ART, sourceAutoSketch: true });
+    const soft = softened(image);
+    expect(shouldUseSketchTrace(soft, LINE_ART)).toBe(false);
+    expect(shouldUseSketchTrace(upscaleBy(soft, 2), LINE_ART)).toBe(true);
+    const traced = await traceImageToColoredPaths(soft, LINE_ART);
+    const vetoed = await traceImageToColoredPaths(soft, { ...LINE_ART, sourceAutoSketch: false });
+    const promoted = await traceImageToColoredPaths(soft, { ...LINE_ART, sourceAutoSketch: true });
     expect(traced).toEqual(vetoed);
     expect(traced).not.toEqual(promoted);
+  });
+
+  // Hard strokes trace as their black twin before any verdict is read (ADR-530
+  // Amendment 13), so neither verdict can move them.
+  it('traces hard strokes the same under either verdict', async () => {
+    const image = strokes(90, TONED_BROWN);
+    expect(await traceImageToColoredPaths(image, { ...LINE_ART, sourceAutoSketch: true })).toEqual(
+      await traceImageToColoredPaths(image, { ...LINE_ART, sourceAutoSketch: false }),
+    );
   });
 });

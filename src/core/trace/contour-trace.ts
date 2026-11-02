@@ -38,6 +38,7 @@ import { denseChordBand } from './contour-chord-band';
 import { flattenStraightRuns } from './flatten-straight-runs';
 import { isHairlineRibbon, isSaddleVertex, smoothBetweenCorners } from './contour-loop-shape';
 import { smoothArcNoise } from './smooth-arc-noise';
+import { fairLongBinaryChain, isLongBinaryLoop, relaxStairRuns } from './contour-stair-runs';
 import { curvedTraceRing } from './trace-curves';
 import {
   keptForest,
@@ -404,7 +405,12 @@ function finishDenseLoop(
   // the residual staircase jogs read as corners downstream and long straight
   // edges come out wobbly (maintainer-observed on the arch-house H stems) —
   // run span by span so every corner apex stays exactly where it was decided.
-  const dense = smoothBetweenCorners(spliced.points, corners);
+  const longBinary =
+    !subPixelInformed && finish.flattenStrength > 0 && isLongBinaryLoop(spliced.points, finish);
+  const dense = smoothBetweenCorners(
+    longBinary ? relaxStairRuns(spliced.points, corners) : spliced.points,
+    corners,
+  );
   // When quantization smoothing is off, a terminal pixel is deliberate
   // detail. Keep its cap through simplification. The pins are existing
   // pre-smoothed points, so the spline can still round them; they are not
@@ -448,6 +454,10 @@ function finishDenseLoop(
           FIT_TOLERANCE_ORGANIC_PX,
         )
       : fitLoopTail(arcSmoothed, corners, finish, FIT_TOLERANCE_PX);
+  }
+  if (longBinary) {
+    const fair = fairLongBinaryChain(evened, corners, denoiseStrength, finish.pixelScale);
+    return fitLoopTail(fair, corners, finish, FIT_TOLERANCE_ORGANIC_PX);
   }
   return finishLegacyLoop(arcSmoothed, corners, denoiseStrength, finish, featureAnchors);
 }

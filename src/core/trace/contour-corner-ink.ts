@@ -88,7 +88,13 @@ export function apexContradictsInk(
 // within LEVEL_REACH_PX of the apex and of the cracks it replaces, whose ink
 // side lies within a pixel. Below MIN_LEVEL_CONTRAST the field cannot say,
 // and the apex stays.
+//
+// JPEG ringing moves the field at such an apex by more than that 2% (rolling
+// audit v9 R2-P2-4: anti-aliased Tinos M at 32 px after quality 75 drew a node
+// 2.5 px from any ink), so the paper level is the window's own and an apex must
+// also read below the paper's noise, PAPER_NOISE_MARGIN times its spread.
 const MIN_APEX_INK = 0.02;
+const PAPER_NOISE_MARGIN = 3;
 const LEVEL_REACH_PX = 2;
 const MIN_LEVEL_CONTRAST = 48;
 
@@ -109,18 +115,35 @@ export function apexStandsInPaper(
   const x1 = Math.ceil(Math.max(...near.map((p) => p.x)) + reach);
   const y0 = Math.floor(Math.min(...near.map((p) => p.y)) - reach);
   const y1 = Math.ceil(Math.max(...near.map((p) => p.y)) + reach);
-  let paper = -Infinity;
+  let brightest = -Infinity;
   let ink = Infinity;
+  const levels: number[] = [];
   for (let y = y0; y < y1; y += 1) {
     for (let x = x0; x < x1; x += 1) {
       const luma = field.lumaAt(x, y);
-      paper = Math.max(paper, luma);
+      levels.push(luma);
+      brightest = Math.max(brightest, luma);
       ink = Math.min(ink, luma);
     }
   }
-  const contrast = paper - ink;
+  const contrast = brightest - ink;
   if (!(contrast >= MIN_LEVEL_CONTRAST)) return false;
-  return paper - fieldLuma(field, apex.x, apex.y) < MIN_APEX_INK * contrast;
+  const { level: paper, noise } = paperPlateau(levels, (brightest + ink) / 2);
+  const margin = Math.max(MIN_APEX_INK * contrast, PAPER_NOISE_MARGIN * noise);
+  return paper - fieldLuma(field, apex.x, apex.y) < margin;
+}
+
+// The median of the levels on the paper side of the middle, and their median
+// distance from it. Clean paper is one level, so both read as they always did;
+// a JPEG's ringing spreads it, and its brightest pixel is not the paper's level.
+function paperPlateau(
+  levels: ReadonlyArray<number>,
+  middle: number,
+): { readonly level: number; readonly noise: number } {
+  const bright = levels.filter((level) => level > middle).sort((a, b) => a - b);
+  const level = bright[bright.length >> 1] as number;
+  const spread = bright.map((value) => Math.abs(value - level)).sort((a, b) => a - b);
+  return { level, noise: spread[spread.length >> 1] as number };
 }
 
 function footOn(leg: Leg, p: Vec2): Vec2 {

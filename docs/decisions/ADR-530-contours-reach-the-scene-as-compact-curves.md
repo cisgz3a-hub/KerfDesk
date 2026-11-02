@@ -1011,3 +1011,178 @@ Not part of this amendment:
 - Sharp on a JPEG. It walks the source natively, and quality 60 ringing tilts its binary legs:
   sharp nodes 1 px or more off the outline rise from 5 on 5 of the 72 glyph images (clean) to 46 on
   29, on main and here alike.
+
+### Amendment 13 - a two-level source in any tones traces as its black-and-white twin (2026-11-02)
+
+Rolling audit v9 R2 (`docs/audits/2026-11-02-rolling-v9/R2-tracer-remeasure.md`) found Amendment
+12's promise, "a near two-level source then traces as its clean art", broken in three ways:
+
+- **R2-P1-1, a regression from Amendment 12.** On Line Art's 2x route the source grid took each
+  pixel's class from one enlarged pixel, `2x + 1`, a quarter pixel from the next source pixel. Ink at
+  luma 90 to 120 read as paper there: 2 px grey bars kept 49% of their ink (before Amendment 12,
+  95 to 100%), and 1-bit Arial at 20 px in luma 100 tore into 34 parts with none of its 10 holes.
+  Coloured ink took Line Art's local-contrast mask and grew a pixel: red 3 px bars +35%. The
+  refuter showed the coloured half was older than Amendment 12 (+0 to +98% by bar placement).
+- **R2-P2-1.** The step field ran only on the upscale route. Hard non-black art at 100 px and up
+  walked natively against the fixed cut and followed its staircase: a grey 40 disc drew 4 segments
+  at 99 px and 33 at 100 px, a teal disc 149 at 400 px, red "Logo & Co" 176 segments and 68
+  inflections (black 103 / 22, Potrace 103 / 18). Luma 80 art scored 38 / 14 / 27 on the Q4 set.
+- **Two inks on one sheet** failed the 2% share on every preset: half of their cracks are not steps
+  against one image-wide mid-level.
+
+**Decision** (`staircase-source.ts`, `trace-clean-art.ts`):
+
+1. Before any route is chosen, a binary contour preset prepares the source once and asks whether
+   it is two-level. If so, and it is not already black and white, its pixels are rewritten as its
+   clean art, and the trace continues on that art with neutral tone options and no colour
+   verdict. Every later choice (scale plan, enlarged cleanup, small-mark judge, fit) is then the
+   black twin's, at every size and on every preset, Sharp included.
+   - A pixel is ink when the luma's own cut calls it ink, so the twin's cleanup judges the same
+     marks the source's would.
+   - A pixel beside a crack that is not a step keeps its ramp between the two tones (a stray soft
+     mark under the 2% share stays a measurement).
+   - The Trace dialog goes on showing what the source's own preparation decided.
+2. The two-level test reads two inks and shaded paper.
+   - A crack the image-wide tones refuse is judged against the median ink and paper levels within
+     3 px of it. Tones closer than 48 levels are a shaded field, not an ink on a paper, and never
+     make a step.
+   - A JPEG's error is a number of levels whatever the contrast, so the 0.15 px tolerance widens
+     by the square of 255 / contrast, at most to 0.3 px. Linear widening left a quality 60 disc at
+     luma 80 on the staircase.
+   - A fixed cut close above a mid-grey ink loses its edge pixels to ringing. A paper pixel beside
+     ink that is still on the ink's side of the tones' mid-level counts as ink, for two passes.
+3. Not cleaned: a manual band with a lower cutoff, an alpha mask, Faint lines and Sketch. Each has
+   no single cut through the luma. On the source-grid route they keep, a pixel takes the enlarged
+   class only when its whole enlarged block agrees, so the enlargement's ramp across an edge cannot
+   move that edge (2 px grey bars through a manual band keep 100%).
+
+**Rejected, measured:**
+
+- **Sampling the enlarged block instead of one pixel, alone** (the refuter's variant). It fixes the
+  bars on the 2x route, but not the native route (R2-P2-1), two inks, or text on the local-contrast
+  mask, where the trace still differs from the twin.
+- **A majority of the enlarged block.** An eroded grey edge pixel and a falsely grown red pixel are
+  both 2 of 4 in their block, with opposite right answers (the auditor's arithmetic).
+
+**Measurements.** Same method as Amendment 12 (Q4 79 images, Potrace 1.16 on the same decoded
+pixels, nine metrics; JPEG by libjpeg through sharp). Main is `54e0e19b8`; "this" includes
+Amendment 14 and ADR-439 Amendment 3.
+
+| W / T / L vs Potrace: Line Art, Sharp, Smooth | Main | This |
+|---|---|---|
+| Clean | 51 / 20 / 8, 49 / 22 / 8, 55 / 17 / 7 | 53 / 18 / 8, 49 / 22 / 8, 57 / 15 / 7 |
+| JPEG 75 | 51 / 20 / 8, 48 / 22 / 9, 54 / 17 / 8 | 53 / 18 / 8, 49 / 22 / 8, 57 / 15 / 7 |
+| JPEG 60 | 50 / 20 / 9, 49 / 20 / 10, 56 / 15 / 8 | 53 / 18 / 8, 49 / 22 / 8, 57 / 15 / 7 |
+| Hard ink at luma 80 | 38 / 14 / 27, 49 / 22 / 8, 55 / 17 / 7 | 53 / 18 / 8, 49 / 22 / 8, 57 / 15 / 7 |
+| Hard ink on a 170-255 paper ramp | 39 / 25 / 15, 47 / 24 / 8, 55 / 17 / 7 | 53 / 18 / 8, 49 / 22 / 8, 57 / 15 / 7 |
+| Anti-aliased (8 x 8) | 69 / 10 / 0, 67 / 11 / 1, 66 / 10 / 3 | unchanged |
+
+Every row of the JPEG, luma 80 and ramp sets is now the clean row: the art traces as its twin.
+Q5 real cases: A (Line Art vs plain Potrace) 23 / 3 / 1 -> 24 / 2 / 1 (text JPEG 35 tie -> win), B
+(Smooth vs mkbitmap + Potrace) 26 / 1 / 0 unchanged, C (best vs best) 24 / 2 / 1 unchanged.
+
+| Hard art, Line Art | Main | This (= black) | Potrace |
+|---|---|---|---|
+| 2 px bars 300 x 100, grey 100 / red | 49% / 100% +51 | 100% | 90% |
+| 3 px bars 90 x 60, grey 100 / red | 68% / 100% +35 | 100% | 94% |
+| 2 px grid 300 x 200, grey 100 | 52% | 97% | 100% |
+| 1-bit Arial 20 px "Sample gear 8ab", luma 100: parts / holes | 32 / 0 | 13 / 9 | 13 / 9 |
+| Disc 100 px, grey 40: segments / inflections | 33 / 24 | 3 / 0 | 10 / 0 |
+| Disc 400 px, teal | 149 / 121 | 4 / 0 | 9 / 0 |
+| Disc 1024 px, red | 391 / 358 | 6 / 0 | 13 / 0 |
+| "Logo & Co" 72 px, red | 176 / 68 | 103 / 22 | 103 / 18 |
+| Disc half black, half luma 90, 150 px | 44 / 24 | 4 / 0 | 5 / 0 |
+| Disc 64-400 px, luma 40-120, red, teal, after JPEG 75 | up to 144 / 118 | 3-7 / 0-1 | |
+
+**Consequences:**
+
+- Hard art in grey, colour or two inks traces exactly as its black twin; the tests compare the two
+  outputs for equality.
+- Anti-aliased art, soft discs in grey and colour, hinted text and gradients keep the measured
+  route: their traces are unchanged (`staircase-source-inks.test.ts`).
+- Sharp on a JPEG of two-level art now traces the clean art: Amendment 12's "Not part" item is
+  closed for quality 75 (1-bit serif spikes 17 on 13 -> 5 on 5 of the 72 glyph images, the clean
+  count).
+- A binary contour preset prepares the source once more on every trace (Sharp's input is prepared
+  twice); a cleaned source is prepared again as its twin.
+- `toned-monochrome.test.ts` pins the source colour verdict on softened strokes; hard strokes no
+  longer depend on it.
+
+Not part of this amendment:
+
+- **A 64 px disc in red after JPEG 60** stays on the staircase (61 segments, as main). Its chroma is
+  subsampled, and on 160 cracks a few uneven ones pass the 2% share.
+- **Anti-aliased mid-grey art on Line Art** still thins at its fixed cut of 128 (anti-aliased Arial
+  at 20 px in luma 100 keeps 35% of its ink, as on main). That is the cut, not this route; Smooth's
+  cut follows the tones.
+- JPEG at quality 50 or lower.
+
+### Amendment 14 - large binary loops relax their stairs and take the fairing tail (2026-11-02)
+
+Rolling audit v9 R2-P2-2 found large one-bit curves losing to Potrace: a 1024 px disc drew 62
+segments 0.53 px off the circle where Potrace drew 13 at 0.155 px; 31 shapes at 400 and 800 px
+scored 17 / 4 / 10. The audit's stated cause, the straight-run flatten, was refuted (with its second
+pass off the disc drew 402 segments) and the cause was left open.
+
+**Cause.** Measured stage by stage on the 1024 px disc (mean / max px off the circle): the
+mid-crack chain 0.196 / 0.50, after Taubin evening 0.128 / 0.50, after `smoothArcNoise`
+**0.366 / 1.13**, after simplify 0.503 / 1.13. On a 256 px disc the same stage lowers the error
+(0.134 -> 0.125). The arc evening fits a circle in a fixed window of plus or minus 12 points. A
+gentle arc's stairs lengthen as the square root of its radius, and at the top of the 1024 px disc a
+run is 37 px long, so the window sees a single riser between two flats, fits a tight circle to it
+and pulls the chain up to 1 px off the curve. Simplify keeps those points and the fit follows them.
+
+**Decision** (`contour-stair-runs.ts`, `contour-trace.ts`): a binary loop of 400 chain points or more
+(at 1x; Line Art and Smooth, not Sharp) takes another tail.
+
+1. **Its stairs relax first.** Along a shallow edge a binary outline crosses each crack's level at
+   the middle of the run between two risers, and a run's ends stand up to half a pixel off it. The
+   points of a run of 6 or more are moved onto the chords joining its middle to the middles of the
+   runs either side. Two long runs meeting are two drawn edges: their chords end at the joint. A
+   cap (a run turning the same way at both ends) longer than 4 times the next run along its axis is
+   a straight edge between rounded corners and stays.
+2. **Then the measured organic tail:** Taubin evening, the straight-run flatten on loops with
+   corners (the flatten keeps a run's ends only, so the chain is spaced evenly again for the
+   index-based fairing), Whittaker fairing between corners, and the compact fit at 0.55 px.
+
+**Rejected, measured:**
+
+- **Widening the arc evening's window to span three stair turns each side:** 1024 px disc 0.405 px
+  mean, 32 cubics and 35 lines.
+- **Relaxation with the existing tail:** the arc evening still moved the chain to 0.305 / 1.23 px.
+- **The fairing tail on loops from 260 points:** clean set Line Art 53 / 17 / 9, one more loss.
+- **Keeping the simplify chain's hard turns as corners:** clean 51 / 18 / 10; it splits triangle
+  sides.
+- **Flattening after fairing:** large glyphs 0 / 0 / 10.
+
+**Measurements** (the disc as Q4: diameter 0.66 of the canvas, centred off the grid):
+
+| Disc, Line Art = Smooth | Main | This | Potrace |
+|---|---|---|---|
+| 256 px canvas: segments / inflections / mean error | 7 / 1 / 0.128 | 4 / 0 / 0.150 | 9 / 0 / 0.189 |
+| 512 | 41 / 7 / 0.364 | 4 / 0 / 0.081 | 12 / 0 / 0.164 |
+| 1024 | 62 / 0 / 0.522 | 6 / 0 / 0.065 | 13 / 0 / 0.134 |
+| 1500 | 80 / 2 / 0.471 | 6 / 0 / 0.131 | 15 / 1 / 0.122 |
+
+| W / T / L vs Potrace | Main | This |
+|---|---|---|
+| 31 shapes at 400 and 800 px: Line Art, Smooth | 17 / 4 / 10, 17 / 4 / 10 | 24 / 5 / 2, 24 / 5 / 2 |
+| Same, segments (Potrace 262) and mean error (0.128) | 1,060 / 0.123, 1,134 / 0.173 | 725 / 0.068, 718 / 0.070 |
+| Glyphs at 192 and 384 px: Line Art, Smooth | 0 / 1 / 9, 0 / 2 / 8 | 0 / 1 / 9, 0 / 1 / 9 |
+| Same, segments (Potrace 314) | 335, 312 | 216, 213 |
+| Q4 79 images, segments Line Art / Smooth | 813 / 771 | 777 / 752 |
+
+**Consequences:**
+
+- Large curved binary art draws a few cubics near the curve: fewer segments than Potrace and a
+  lower mean error at 400 px and up.
+- The two large-shape losses are the 1 px stroke at 800 px (lost on main too: a hairline keeps its
+  own tail, 362 segments) and the 3 px stroke at 800 px. Long 2 and 3 px strokes reach a Hausdorff
+  distance of 1.1 to 1.4 px at their ends, where the old tail kept a hard corner (0.3 to 0.7 px).
+- Tests: `contour-stair-runs.test.ts`; discs at 512, 1024 and 2048 px and a large rounded square's
+  straight sides in `staircase-source-inks.test.ts`.
+
+**Follow-up:** large glyphs still lose 9 of 10 at 192 and 384 px. They now draw fewer segments than
+Potrace at the same mean error, and lose on corners kept (49 against Potrace's 75) and Hausdorff
+(about 2 px at bowl joins and stroke ends). The corner dial at that size is the next thing to
+measure.
