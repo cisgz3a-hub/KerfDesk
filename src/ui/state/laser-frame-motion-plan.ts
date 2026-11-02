@@ -1,5 +1,6 @@
 import { buildCncFrameMotion, type CncFrameMotionPlan } from './cnc-frame-lines';
 import { frameMotionFeeds } from './frame-feed-limits';
+import { frameHomedAreaWarning } from './frame-homed-area-warning';
 import { frameNoGoZoneWarnings } from './frame-no-go-warnings';
 import { currentWorkZMm } from './infer-machine-position';
 import { useStore } from './store';
@@ -74,7 +75,8 @@ export function buildFrameDispatchPlan(
 }
 
 /** The configured no-go zones this Frame's route crosses (approach, perimeter
- * and return), for the same project, start point and return leg
+ * and return), and grblHAL's homed area when the route leaves it (ADR-637
+ * Amendment 5), for the same project, start point and return leg
  * buildFrameDispatchPlan sends. Warnings only (ADR-232 Amendment 1). */
 export function frameRouteNoGoWarnings(
   state: LaserState,
@@ -84,12 +86,11 @@ export function frameRouteNoGoWarnings(
   external?: Parameters<LaserState['frame']>[5],
 ): ReadonlyArray<string> {
   const project = framedProject(candidate, jobProject);
-  return frameNoGoZoneWarnings(
-    state,
-    project,
-    frameBoundsForProject(bounds, project),
-    frameReturnTarget(candidate, external),
-  );
+  const frameBounds = frameBoundsForProject(bounds, project);
+  const returnTarget = frameReturnTarget(candidate, external);
+  const homedArea = frameHomedAreaWarning(state, project, frameBounds, returnTarget);
+  const noGo = frameNoGoZoneWarnings(state, project, frameBounds, returnTarget);
+  return homedArea === null ? noGo : [...noGo, homedArea];
 }
 
 function framedProject(

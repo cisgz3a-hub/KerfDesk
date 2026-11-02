@@ -23,13 +23,15 @@ export type RetainedSourceExtent = {
   readonly transform: Transform;
 };
 
-// Each factor is a size on the canvas divided by the source's own size, and a
+// Each factor is a size on the canvas divided by the source's own size. A
 // solved sketch's size is good only to the solver's tolerance (ADR-573
-// Amendment 2). So typing W, then H, on a sketch solved from a sub-millimetre
-// change leaves the factors up to 4e-8 apart: no resize anyone could see, and
-// not a stretch. Two factors are one when they differ by no more than that
-// tolerance over each extent. Generated parts are exact, and a difference
-// that small is just as invisible on them.
+// Amendment 2), and a size typed into the toolbar only to what its field
+// shows: 3 decimals in mm, 4 in inches (Amendment 4). So W, then H, typed as
+// the fields show them leave the factors up to a few 1e-5 apart on a size
+// that does not divide evenly: no resize anyone could see, and not a stretch.
+// Two factors are one when they differ by no more than both errors over each
+// side. Generated parts are exact, and a difference that small is just as
+// invisible on them.
 export function retainedSourceScale(source: RetainedSourceExtent): RetainedSourceScale {
   const x = Math.abs(source.transform.scaleX);
   const y = Math.abs(source.transform.scaleY);
@@ -37,19 +39,29 @@ export function retainedSourceScale(source: RetainedSourceExtent): RetainedSourc
     return { kind: 'stretched', x, y };
   const width = source.bounds.maxX - source.bounds.minX;
   const height = source.bounds.maxY - source.bounds.minY;
-  if (Math.abs(x / y - 1) > factorSlack(width) + factorSlack(height))
+  if (Math.abs(x / y - 1) > factorSlack(width, x) + factorSlack(height, y))
     return { kind: 'stretched', x, y };
   // The longer side measures its factor more closely, so that one is folded.
-  const factor = width >= height ? x : y;
-  return Math.abs(factor - 1) <= factorSlack(Math.max(width, height))
+  const longer = width >= height;
+  const factor = longer ? x : y;
+  return Math.abs(factor - 1) <= factorSlack(longer ? width : height, factor)
     ? { kind: 'unit' }
     : { kind: 'even', factor };
 }
 
-// How far a factor measured across `extentMm` can be from the true one. A side
-// with no length has no factor to measure, so any resize along it is even.
-function factorSlack(extentMm: number): number {
-  return extentMm > 0 ? SKETCH_SOLVE_TOLERANCE_MM / extentMm : Number.POSITIVE_INFINITY;
+/** How far a typed size can be from the one it stands for: half the step of
+ *  the coarser size field, 4 decimals of an inch. The mm field's 3 decimals
+ *  are within 0.0005 mm. */
+const SIZE_FIELD_ROUNDING_MM = (0.0001 * 25.4) / 2;
+
+// How far, relative to itself, a factor can be from the true one when it is
+// measured across `extentMm` of a solved source and typed as the canvas size
+// `extentMm × factor`. A side with no length has no factor to measure, so any
+// resize along it is even.
+function factorSlack(extentMm: number, factor: number): number {
+  return extentMm > 0
+    ? SKETCH_SOLVE_TOLERANCE_MM / extentMm + SIZE_FIELD_ROUNDING_MM / (extentMm * factor)
+    : Number.POSITIVE_INFINITY;
 }
 
 /** The transform at size 1. Mirroring has its own flags, and a negative scale

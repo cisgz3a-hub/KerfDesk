@@ -1,0 +1,101 @@
+{
+  "session": {
+    "version": 1,
+    "projectOwner": "sha256:7afdd525dac0ef97f6b9c58cd1a5c2cc9fbfbea9121390a01c891805062efa69",
+    "sketch": {
+      "entities": [
+        {
+          "id": "applied",
+          "kind": "line",
+          "start": {
+            "x": 0,
+            "y": 0
+          },
+          "end": {
+            "x": 10,
+            "y": 10
+          }
+        },
+        {
+          "id": "l1",
+          "kind": "line",
+          "start": {
+            "x": 20,
+            "y": 0
+          },
+          "end": {
+            "x": 30,
+            "y": 10
+          }
+        },
+        {
+          "id": "l2",
+          "kind": "line",
+          "start": {
+            "x": 40,
+            "y": 0
+          },
+          "end": {
+            "x": 50,
+            "y": 10
+          }
+        }
+      ]
+    },
+    "activeLayerId": "design-layer-1",
+    "surface3d": false,
+    "dirtySinceApply": false,
+    "appliedObjectIds": [
+      "f7ba2c59-177f-4af8-a1b8-1c68faadb3d6",
+      "71a61507-f94f-4fb1-b499-92ef4b9db4fe",
+      "45f809c5-3745-4448-ae1f-08e70d492588"
+    ],
+    "appliedOperationsByLayer": [
+      ["design-layer-1", "operation-72d7734f-58eb-4902-8234-84939180897e"]
+    ]
+  },
+  "kept": {
+    "version": 1,
+    "drawings": [
+      {
+        "id": "1a7762f3-2fb5-410d-868f-eca4cb66ce93",
+        "keptAt": 1793618433599,
+        "drawing": {
+          "version": 1,
+          "projectOwner": "sha256:5ff197b8fe6ef322d079379f87a9a5f19a73632cebdd54968635fc89d388121c",
+          "sketch": {
+            "entities": [
+              {
+                "id": "u1",
+                "kind": "line",
+                "start": {
+                  "x": 100,
+                  "y": 0
+                },
+                "end": {
+                  "x": 110,
+                  "y": 10
+                }
+              },
+              {
+                "id": "u2",
+                "kind": "line",
+                "start": {
+                  "x": 120,
+                  "y": 0
+                },
+                "end": {
+                  "x": 130,
+                  "y": 10
+                }
+              }
+            ]
+          },
+          "activeLayerId": "design-layer-1",
+          "surface3d": false,
+          "dirtySinceApply": true
+        }
+      }
+    ]
+  }
+}

@@ -10,9 +10,11 @@
 import { useEffect } from 'react';
 import type { Project } from '../../core/scene';
 import { useStore } from '../state';
-import { persistedDesignSession, type DesignSession } from './design-session';
+import { subscribeDesignDocumentCopies } from '../state/design-document-copies';
+import type { DesignSession } from './design-session';
 import { useDesignStudioStore } from './design-studio-store';
 import { writePersistedSession } from './design-session-storage';
+import { savedDesignDrawing } from './design-kept-drawings';
 import {
   cancelPendingDesignRecoveryOwner,
   designRecoveryOwner,
@@ -53,11 +55,14 @@ export function useDesignSessionPersistence(): void {
     // Studio drawing is stashed. Keep that same document's recovery owner current.
     const unsubscribeProject = useStore.subscribe((next, previous) => {
       if (
-        next.project !== previous.project &&
-        next.projectDocumentEpoch === previous.projectDocumentEpoch
+        next.projectDocumentEpoch === previous.projectDocumentEpoch &&
+        (next.project !== previous.project || next.savedName !== previous.savedName)
       )
         scheduleSave();
     });
+    // A save, open or autosave that now holds the Apply is recorded with the
+    // drawing (ADR-590 Amendment 3).
+    const unsubscribeCopies = subscribeDesignDocumentCopies(scheduleSave);
     prepareOwner();
 
     const flush = () => {
@@ -71,6 +76,7 @@ export function useDesignSessionPersistence(): void {
     return () => {
       unsubscribe();
       unsubscribeProject();
+      unsubscribeCopies();
       window.removeEventListener('pagehide', flush);
       flush();
     };
@@ -94,7 +100,9 @@ async function saveCurrentSession(teardown: boolean): Promise<void> {
     return; // Preserve the last recovery draft when work was cancelled/refused.
   }
   if (!stillOwnsRecovery(project, projectDocumentEpoch, session)) return;
-  writePersistedSession(persistedDesignSession(session, projectOwner));
+  writePersistedSession(
+    savedDesignDrawing(session, projectOwner, project, useStore.getState().savedName),
+  );
 }
 
 function stillOwnsRecovery(project: Project, epoch: number, session: DesignSession): boolean {

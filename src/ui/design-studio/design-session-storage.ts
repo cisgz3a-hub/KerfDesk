@@ -36,6 +36,12 @@ export type PersistedDesignSession = {
   readonly surface3d: boolean;
   readonly applied: DesignApplyRecord | null;
   readonly dirtySinceApply?: boolean;
+  /** The file the drawing's project was saved or opened as; null while it
+   *  has none. Absent from drawings saved before ADR-590 Amendment 3. */
+  readonly projectName?: string | null;
+  /** True when a saved file or an autosave holds the drawing's last Apply,
+   *  false when only this drawing does. Absent when not known. */
+  readonly projectHoldsApply?: boolean;
 };
 
 export type StoredShape = {
@@ -45,6 +51,8 @@ export type StoredShape = {
   readonly activeLayerId: string;
   readonly surface3d: boolean;
   readonly dirtySinceApply?: boolean;
+  readonly projectName?: string | null;
+  readonly projectHoldsApply?: boolean;
   // Sets and Maps do not survive JSON, so they travel as arrays.
   readonly appliedObjectIds?: ReadonlyArray<string>;
   readonly appliedOperationsByLayer?: ReadonlyArray<readonly [string, string]>;
@@ -76,6 +84,10 @@ export function storedDesignSession(session: PersistedDesignSession): StoredShap
     activeLayerId: session.activeLayerId,
     surface3d: session.surface3d,
     ...(session.dirtySinceApply === undefined ? {} : { dirtySinceApply: session.dirtySinceApply }),
+    ...(session.projectName === undefined ? {} : { projectName: session.projectName }),
+    ...(session.projectHoldsApply === undefined
+      ? {}
+      : { projectHoldsApply: session.projectHoldsApply }),
     ...(session.applied === null
       ? {}
       : {
@@ -124,6 +136,21 @@ export function persistedFromStored(value: unknown): PersistedDesignSession | nu
     applied: appliedFromStored(stored),
     ...(typeof stored.dirtySinceApply === 'boolean'
       ? { dirtySinceApply: stored.dirtySinceApply }
+      : {}),
+    ...sourceFromStored(stored),
+  };
+}
+
+// What ADR-590 Amendment 3 records; absent from drawings saved before it.
+function sourceFromStored(
+  stored: Partial<StoredShape>,
+): Pick<PersistedDesignSession, 'projectName' | 'projectHoldsApply'> {
+  return {
+    ...(typeof stored.projectName === 'string' || stored.projectName === null
+      ? { projectName: stored.projectName }
+      : {}),
+    ...(typeof stored.projectHoldsApply === 'boolean'
+      ? { projectHoldsApply: stored.projectHoldsApply }
       : {}),
   };
 }

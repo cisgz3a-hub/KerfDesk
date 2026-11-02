@@ -22,7 +22,7 @@ import { resolveNativeBedFrame, selectNativeBedEvidence } from './native-bed-fra
 
 type Point = { readonly x: number; readonly y: number };
 type FrameLeg = 'approach' | 'outline' | 'return';
-type LegPath = { readonly leg: FrameLeg; readonly points: ReadonlyArray<Point> };
+export type LegPath = { readonly leg: FrameLeg; readonly points: ReadonlyArray<Point> };
 
 /** One warning per enabled zone the Frame route crosses. `bounds` carries the
  * Frame's start point; it and `returnToWorkPosition` are in work coordinates.
@@ -55,7 +55,9 @@ export function frameNoGoZoneWarnings(
   });
 }
 
-function frameRouteOnBed(
+/** The Frame's route on the bed, through a verified native-to-bed frame and the
+ *  controller's own work offset, or null without either. */
+export function frameRouteOnBed(
   state: LaserState,
   project: Project,
   bounds: FrameBounds,

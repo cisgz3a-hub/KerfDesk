@@ -144,6 +144,10 @@ Amendment 4 (`ADR-637-amendment-4-grblhal-work-area-is-its-homed-envelope.md`) m
 `$130`/`$131` with homing and hard limits on to the homed envelope's size, which is what the fill,
 **Use detected values** and Job Review's travel fact use.
 
+Amendment 5 (`ADR-637-amendment-5-a-bed-widened-to-the-travel-is-named-and-warned.md`) names the
+correction once at connect for a grblHAL bed widened to `$130`/`$131`, and warns by name at Frame
+and Start while a route leaves the homed area.
+
 Verification: `device-setup-auto-fill.test.ts` (a listed laser and a CNC preset keep their type),
 `machine-picker-entries.test.ts` (the CNC reset), and `DeviceSetupMachinePicker.customised.test.tsx`
 (the draft's facts and type question, the replace notice for a CNC preset, **My machine isn't
