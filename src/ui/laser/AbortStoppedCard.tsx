@@ -150,7 +150,12 @@ function AlarmActions(props: {
   return (
     <>
       {props.showHome && (
-        <button type="button" disabled={props.running} onClick={props.onHome}>
+        <button
+          type="button"
+          disabled={props.running}
+          onClick={props.onHome}
+          title={`Send ${home.sequence} to clear the alarm and measure the machine again. The head moves to its home switches.`}
+        >
           {home.label}
         </button>
       )}
