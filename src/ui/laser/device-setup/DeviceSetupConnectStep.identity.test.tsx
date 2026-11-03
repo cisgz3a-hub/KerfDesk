@@ -111,8 +111,9 @@ describe('Find my machine identity (ADR-375)', () => {
   it('names the command set the connection uses when it differs from the setup', () => {
     renderStep(GRBLHAL_PROFILE, { ...FALCON_CONNECTION, detectedControllerKind: 'grblhal' });
     expect(host.textContent).toContain(
-      'Connected as Falcon A1 Pro (GRBL-compatible commands); the controller reports grblHAL; ' +
-        'this setup uses grblHAL.',
+      'You are connected with the Falcon A1 Pro (GRBL-compatible commands), but this setup ' +
+        'uses the generic grblHAL commands, so Home, jog and Frame would use the wrong ones. ' +
+        'Saving reconnects to use this setup’s commands. The controller reports grblHAL.',
     );
     expect(button('Reconnect using selected profile')).toBeDefined();
   });

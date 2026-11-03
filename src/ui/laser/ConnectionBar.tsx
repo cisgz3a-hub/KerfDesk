@@ -71,6 +71,8 @@ export type ConnectionBarProps = {
   readonly setup?: ReactNode;
   /** The Laser / CNC switch, first in the row. */
   readonly mode?: ReactNode;
+  /** The live driver is not the saved profile's (U2-P2-1): say so, offer Reconnect now. */
+  readonly driverMismatch?: { readonly text: string; readonly onReconnect: () => void } | undefined;
 };
 
 type Props = ConnectionBarProps;
@@ -124,6 +126,19 @@ export function ConnectionBar(props: Props): JSX.Element {
         disabled={props.disabled}
         notice={notice}
       />
+      {props.driverMismatch === undefined ? null : (
+        <p role="alert" className="lf-connection-driver-mismatch">
+          <span>{props.driverMismatch.text}</span>{' '}
+          <button
+            type="button"
+            className="lf-btn lf-btn--primary"
+            disabled={props.disabled}
+            onClick={props.driverMismatch.onReconnect}
+          >
+            Reconnect now
+          </button>
+        </p>
+      )}
       {connection.kind === 'failed' && (
         <p role="alert" className="lf-connection-card-error">
           {connectionFailureText(connection.error, props.machineNoun)}

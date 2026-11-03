@@ -148,6 +148,10 @@ Amendment 5 (`ADR-637-amendment-5-a-bed-widened-to-the-travel-is-named-and-warne
 correction once at connect for a grblHAL bed widened to `$130`/`$131`, and warns by name at Frame
 and Start while a route leaves the homed area.
 
+Amendment 6 (`ADR-637-amendment-6-save-switches-the-live-driver.md`) has Save reconnect with the
+saved machine's driver when the live connection uses another, or say why not and offer
+**Reconnect now** in the toolbar, which no longer names a vendor command set that is not live.
+
 Verification: `device-setup-auto-fill.test.ts` (a listed laser and a CNC preset keep their type),
 `machine-picker-entries.test.ts` (the CNC reset), and `DeviceSetupMachinePicker.customised.test.tsx`
 (the draft's facts and type question, the replace notice for a CNC preset, **My machine isn't
