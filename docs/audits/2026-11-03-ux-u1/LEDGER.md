@@ -9,6 +9,7 @@ Method: [../2026-10-21-rolling-v2/METHOD.md](../2026-10-21-rolling-v2/METHOD.md)
 | U3 | First design | origin/main @ c93fbb3bc (refuter c93fbb3bc) | [U3-first-design.md](U3-first-design.md) | 10 | 0 | 1 (P2-2 refuter) | 2 | 7 | 7 |
 | U4 | First burn | origin/main @ c93fbb3bc (refuter c93fbb3bc) | [U4-first-burn.md](U4-first-burn.md) | 14 | 0 | 0 | 5 | 9 | 8 |
 | U5 | Errors and recovery | origin/main @ c93fbb3bc (refuter c93fbb3bc) | [U5-errors-recovery.md](U5-errors-recovery.md) | 14 | 0 | 0 | 1 | 13 | 5 |
+| U6 | Help and discoverability | origin/main @ c93fbb3bc (refuter 19faee6f1; no cited line changed) | [U6-help-discoverability.md](U6-help-discoverability.md) | 7 | 0 | 0 | 0 (P2-1 → P3, refuter: ADR-604 scope; ways out exist) | 7 | 9 |
 
 ## Confirmed P1/P2 (coordinator-verified)
 
