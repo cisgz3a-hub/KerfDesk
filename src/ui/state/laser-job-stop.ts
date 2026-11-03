@@ -19,7 +19,8 @@ import type { SerialConnection } from '../../platform/types';
 import type { OwnedResetSettingsRefs } from './laser-owned-reset-settings';
 import { clearCncLiveCaps } from './detected-settings-action';
 import { isGrblFamilyDriver, runGrblDisconnectTransaction } from './laser-disconnect-transaction';
-import { streamResetRecord, type JobStopReason } from './job-stop-request';
+import { reportedWorkOffsetMm } from './infer-machine-position';
+import { streamResetRecord, type JobStopReason, type JobStopRequest } from './job-stop-request';
 import { invalidateControllerSessionEvidence } from './laser-controller-evidence';
 import { recordControllerRecoveryReset } from './laser-controller-operation';
 import {
@@ -338,9 +339,17 @@ async function stopWithOwnedReset(
 ): Promise<StopOutcome> {
   const { set, refs, safeWrite, driver } = context;
   set((state) => ({
+    // The reset below clears the work offset this session knows, so the G92
+    // origin is read now, for the Alarm 3 card (ADR-341 Amendment 11).
     ...(reason === undefined || state.streamer === null
       ? {}
-      : { jobStopRequest: { reason, streamerEpoch: state.streamerEpoch } }),
+      : {
+          jobStopRequest: {
+            reason,
+            streamerEpoch: state.streamerEpoch,
+            ...g92OriginAtStop(state),
+          },
+        }),
     ...(state.streamer === null
       ? {}
       : { streamReset: streamResetRecord(state, pauseResumeSettling) }),
@@ -356,6 +365,15 @@ async function stopWithOwnedReset(
   await releaseHostedRefill(refs);
   await resetWrite;
   return { airOffSent: true, quickStop: 'none' };
+}
+
+function g92OriginAtStop(state: LaserState): Pick<JobStopRequest, 'originAtStopMm'> {
+  if (!state.workOriginActive || state.workOriginSource !== 'g92') return {};
+  const offset = reportedWorkOffsetMm(
+    state.wcoCache,
+    state.controllerSettings?.reportInches === true,
+  );
+  return offset === null ? {} : { originAtStopMm: { x: offset.x, y: offset.y } };
 }
 
 // A quickstop that may have reached the controller leaves homing and position

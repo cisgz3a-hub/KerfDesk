@@ -75,8 +75,12 @@ export function nativePointsOnBed(
   return state.homingState === 'confirmed' ? null : points;
 }
 
-/** The configured XY bounds machine motion is compared with. */
-export function configuredMotionBounds(device: DeviceProfile): {
+/** The configured XY bounds machine motion is compared with. A Frame passes
+ *  its framed job's machine kind; a jog uses the open project's. */
+export function configuredMotionBounds(
+  device: DeviceProfile,
+  machineKind = useStore.getState().project.machine?.kind,
+): {
   readonly minX: number;
   readonly minY: number;
   readonly maxX: number;
@@ -85,7 +89,7 @@ export function configuredMotionBounds(device: DeviceProfile): {
   const baseBounds = machineBoundsForDevice(device);
   // Rotary is a laser attachment (never applied to CNC output), so a router
   // keeps the bed's own Y range.
-  const rotary = useStore.getState().project.machine?.kind === 'cnc' ? undefined : device.rotary;
+  const rotary = machineKind === 'cnc' ? undefined : device.rotary;
   return isRotaryActive(rotary)
     ? { ...baseBounds, minY: 0, maxY: rotaryYLimitMm(rotary) }
     : baseBounds;

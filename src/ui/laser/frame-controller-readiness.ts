@@ -2,6 +2,7 @@ import type { FrameWcsSelection } from '../state/frame-wcs-selection';
 import { useLaserStore } from '../state/laser-store';
 import { hasPendingControllerWrite } from '../state/laser-start-queue-fence';
 import { waitForFreshIdleFramePosition } from './frame-position-readiness';
+import { FRAME_G54_POSITION_UNREPORTED_MESSAGE } from './frame-position-withheld';
 import {
   assertMachineExecutionOwner,
   type MachineExecutionOwner,
@@ -94,12 +95,7 @@ export async function normalizeFrameWorkCoordinateSystem(
   // cost up to a full idle-poll period (~1 s) on every Frame that selected G54.
   void useLaserStore.getState().requestControllerStatus();
   if (!(await waitForFreshIdleFramePosition(afterSelectionSequence))) {
-    return normalizationFailure(
-      [
-        'G54 was selected, but the controller did not report a fresh Idle position in that coordinate system. Wait for a complete status report, then Frame again.',
-      ],
-      warning,
-    );
+    return normalizationFailure([FRAME_G54_POSITION_UNREPORTED_MESSAGE], warning);
   }
   if (useLaserStore.getState().activeWcs !== 'G54') {
     return normalizationFailure(

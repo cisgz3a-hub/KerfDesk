@@ -12,6 +12,11 @@ export type JobStopReason = 'operator' | 'app-closing';
 export type JobStopRequest = {
   readonly reason: JobStopReason;
   readonly streamerEpoch: number;
+  /** The Set origin here (G92) XY work offset in effect when an operator Abort
+   * reset the controller, in mm from machine zero. Stock GRBL and FluidNC
+   * clear it at that reset, so the Alarm 3 card offers it back (ADR-341
+   * Amendment 11). Absent when no G92 origin was set. */
+  readonly originAtStopMm?: { readonly x: number; readonly y: number };
 };
 
 /** A soft reset KerfDesk sent against the stream of `streamerEpoch` (Abort,
