@@ -24,11 +24,15 @@ describe('fillRunwayPolicyForDevice', () => {
   });
 
   it('does not advise a machine saved as not listed, which was declared not a 4040', () => {
-    expect(shouldAdvise4040FillPolicySelection({ ...DEFAULT_DEVICE_PROFILE, name: 'My diode laser' })).toBe(
-      false,
-    );
     expect(
-      shouldAdvise4040FillPolicySelection({ ...DEFAULT_DEVICE_PROFILE, bedWidth: 300, bedHeight: 200 }),
+      shouldAdvise4040FillPolicySelection({ ...DEFAULT_DEVICE_PROFILE, name: 'My diode laser' }),
+    ).toBe(false);
+    expect(
+      shouldAdvise4040FillPolicySelection({
+        ...DEFAULT_DEVICE_PROFILE,
+        bedWidth: 300,
+        bedHeight: 200,
+      }),
     ).toBe(false);
   });
 

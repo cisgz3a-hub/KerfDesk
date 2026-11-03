@@ -9,10 +9,7 @@ import type { SvgArtworkFragment } from '../state/svg-fragment-mutation';
 import { selectControllerDriver } from '../../core/controllers';
 import type { ControllerKind, DeviceProfile } from '../../core/devices';
 import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
-import type {
-  ControllerSettingsSnapshot,
-  ReadinessSettingsCapability,
-} from '../../core/preflight';
+import type { ControllerSettingsSnapshot, ReadinessSettingsCapability } from '../../core/preflight';
 import type { OutputScope, Project, SceneObject } from '../../core/scene';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import type { ImportOutcome } from '../state/store';

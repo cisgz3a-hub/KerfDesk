@@ -60,7 +60,11 @@ const outlineCut: Layer = {
   power: 100,
   speed: 300,
 };
-const nameFill: Layer = { ...createLayer({ id: 'fill', color: ENGRAVE_COLOR }), name: 'Hi', mode: 'fill' };
+const nameFill: Layer = {
+  ...createLayer({ id: 'fill', color: ENGRAVE_COLOR }),
+  name: 'Hi',
+  mode: 'fill',
+};
 
 // U3's coaster: the outline drawn first, then the name inside it.
 function coaster(order: 'cut-first' | 'engrave-first' = 'cut-first'): Project {

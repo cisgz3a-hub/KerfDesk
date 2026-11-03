@@ -111,7 +111,6 @@ describe('Save G-code notices', () => {
     pushSavedGcodeNotices(
       {
         project: createProject(),
-        controllerSettings: undefined,
         pushToast: useToastStore.getState().pushToast,
       },
       'untitled.gcode',

@@ -42,15 +42,10 @@ export function cutsBeforeEngraving(job: Job): ReadonlyArray<CutBeforeEngraving>
   for (const group of job.groups) {
     if (group.kind === 'cnc' || ('focusTest' in group && group.focusTest !== undefined)) continue;
     const strength = lineOperationStrength(group);
-    const bounds = computeJobBounds({ groups: [group] });
-    if (bounds !== null) {
-      for (const cut of earlierCuts) {
-        if (cut.layerId === group.layerId || strength >= cut.strength) continue;
-        if (!cut.outlines.some((ring) => ringHoldsBounds(ring, bounds))) continue;
-        const inside = found.get(cut.layerId) ?? new Set<string>();
-        inside.add(group.layerId);
-        found.set(cut.layerId, inside);
-      }
+    for (const cut of cutsHolding(earlierCuts, group, strength)) {
+      const inside = found.get(cut.layerId) ?? new Set<string>();
+      inside.add(group.layerId);
+      found.set(cut.layerId, inside);
     }
     if (group.kind === 'cut') {
       const outlines = closedOutlines(group);
@@ -61,6 +56,22 @@ export function cutsBeforeEngraving(job: Job): ReadonlyArray<CutBeforeEngraving>
     cutLayerId,
     engravingLayerIds: [...inside],
   }));
+}
+
+/** Earlier, stronger cuts of another operation whose outline holds this burn. */
+function cutsHolding(
+  earlierCuts: ReadonlyArray<CutOutline>,
+  group: Exclude<Job['groups'][number], { readonly kind: 'cnc' }>,
+  strength: number,
+): ReadonlyArray<CutOutline> {
+  const bounds = computeJobBounds({ groups: [group] });
+  if (bounds === null) return [];
+  return earlierCuts.filter(
+    (cut) =>
+      cut.layerId !== group.layerId &&
+      strength < cut.strength &&
+      cut.outlines.some((ring) => ringHoldsBounds(ring, bounds)),
+  );
 }
 
 function closedOutlines(group: CutGroup): ReadonlyArray<OutlineRing> {
@@ -101,4 +112,3 @@ function ringHoldsBounds(
   const centre = { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 };
   return pointInPolygon(centre, outline.polyline);
 }
-

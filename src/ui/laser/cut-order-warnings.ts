@@ -13,9 +13,9 @@ export function cutOrderWarnings(job: Job, layers: ReadonlyArray<Layer>): Readon
   const found = cutsBeforeEngraving(job);
   if (found.length === 0) return [];
   const cuts = found.map((entry) => operationName(entry.cutLayerId, layers));
-  const inside = [
-    ...new Set(found.flatMap((entry) => entry.engravingLayerIds)),
-  ].map((id) => operationName(id, layers));
+  const inside = [...new Set(found.flatMap((entry) => entry.engravingLayerIds))].map((id) =>
+    operationName(id, layers),
+  );
   return [
     `${CUT_BEFORE_ENGRAVING_PREFIX}${nameList(cuts)} ${cuts.length === 1 ? 'runs' : 'run'} before ${nameList(inside)}. ` +
       'Once a part is cut free it can drop or shift, and the engraving lands in the wrong place. ' +

@@ -156,16 +156,24 @@ describe('Job Review warning ranking', () => {
   const other = 'Image "logo.png" stores 10 × 10 px but the burn grid wants 40 × 40 px.';
 
   it("leads with the beginner's warnings and folds the technical notes", async () => {
-    const host = await renderWarnings([runway, other, scanOffsets, starter, UNKNOWN_NATIVE_BED_MESSAGE]);
+    const host = await renderWarnings([
+      runway,
+      other,
+      scanOffsets,
+      starter,
+      UNKNOWN_NATIVE_BED_MESSAGE,
+    ]);
 
     expect(host.querySelector('h3')?.textContent).toContain('3 warnings');
-    const visible = [...host.querySelectorAll(':scope section > ul > li')].map((li) => li.textContent);
+    const visible = [...host.querySelectorAll(':scope section > ul > li')].map(
+      (li) => li.textContent,
+    );
     expect(visible).toEqual([
       expect.stringContaining('still using the uncalibrated defaults'),
       expect.stringContaining("KerfDesk can't check where this job sits on your bed"),
       expect.stringContaining('logo.png'),
     ]);
-    const folded = host.querySelector('section > details');
+    const folded = host.querySelector<HTMLDetailsElement>('section > details');
     expect(folded?.open).toBe(false);
     expect(folded?.querySelector(':scope > summary')?.textContent).toBe('Technical notes (2)');
     expect(folded?.textContent).toContain('scan-offset table');
@@ -175,6 +183,8 @@ describe('Job Review warning ranking', () => {
     const host = await renderWarnings([scanOffsets]);
 
     expect(host.querySelector('h3')?.textContent).toContain('Notes');
-    expect(host.querySelector('section > details > summary')?.textContent).toBe('Technical notes (1)');
+    expect(host.querySelector('section > details > summary')?.textContent).toBe(
+      'Technical notes (1)',
+    );
   });
 });

@@ -65,7 +65,9 @@ export function detectJobIntentWarnings(
     ...constantPowerWarnings(job, project),
     ...stackedCopyWarnings(project),
     ...detectUncalibratedJobWarnings(job, project.scene.layers),
-    ...(machineKindOf(project.machine) === 'cnc' ? [] : cutOrderWarnings(job, project.scene.layers)),
+    ...(machineKindOf(project.machine) === 'cnc'
+      ? []
+      : cutOrderWarnings(job, project.scene.layers)),
     ...compileDiagnosticWarnings(job),
   ];
   append4040FillPolicyWarning(project, job, warnings);

@@ -43,34 +43,20 @@ export function pushSavedGcodeNotices(
     readonly cncToolPlanLength?: number;
   },
 ): void {
-  const notes: Notice[] = [];
+  const notes: Notice[] = controllerNotes(ctx, findings.cncToolPlanLength).map((message) => ({
+    message,
+    variant: 'info',
+  }));
   const others: string[] = [];
   const leading: Notice[] = [];
-  if (machineKindOf(ctx.project.machine) === 'cnc') {
-    const note = cncExportOtherControllersNote(ctx.project.device, ctx.controllerSettings);
-    if (note !== null) notes.push({ message: note, variant: 'info' });
-    const bitChanges = cncSavedBitChangesNote(findings.cncToolPlanLength);
-    if (bitChanges !== null) notes.push({ message: bitChanges, variant: 'info' });
-  } else if (ctx.controllerSettings === null) {
-    notes.push({
-      message: `Exported G-code assumes GRBL $30=${ctx.project.device.maxPowerS} and laser mode ($32=1) — not verified against a connected controller this session.`,
-      variant: 'info',
-    });
-  }
   for (const warning of findings.machineWarnings) {
     const rank = reviewNoteRank(warning);
     if (rank === 'technical') notes.push({ message: warning, variant: 'warning' });
     else if (rank === 'beginner') leading.push({ message: warning, variant: 'warning' });
     else others.push(warning);
   }
-  const warningProject = outputScopedWarningProject(ctx);
-  if (warningProject.machine?.kind === 'cnc') {
-    for (const warning of detectCompiledVCarveDepthWarnings(
-      findings.cncVCarveDepths,
-      warningProject.machine.stock.thicknessMm,
-    )) {
-      leading.push({ message: warning, variant: 'warning' });
-    }
+  for (const warning of vCarveDepthWarnings(ctx, findings.cncVCarveDepths)) {
+    leading.push({ message: warning, variant: 'warning' });
   }
   for (const advisory of findings.preflightAdvisories) {
     leading.push({ message: advisory.message, variant: 'warning' });
@@ -79,6 +65,32 @@ export function pushSavedGcodeNotices(
   for (const warning of others) ctx.pushToast(warning, 'warning');
   for (const notice of leading) ctx.pushToast(notice.message, notice.variant);
   ctx.pushToast(`Saved G-code to ${savedName}`, 'success');
+}
+
+// What the file assumes about the controller it was not checked against.
+function controllerNotes(
+  ctx: SavedGcodeNoticeCtx,
+  cncToolPlanLength: number | undefined,
+): ReadonlyArray<string> {
+  if (machineKindOf(ctx.project.machine) === 'cnc') {
+    return [
+      cncExportOtherControllersNote(ctx.project.device, ctx.controllerSettings),
+      cncSavedBitChangesNote(cncToolPlanLength),
+    ].filter((note): note is string => note !== null);
+  }
+  if (ctx.controllerSettings !== null) return [];
+  return [
+    `Exported G-code assumes GRBL $30=${ctx.project.device.maxPowerS} and laser mode ($32=1) — not verified against a connected controller this session.`,
+  ];
+}
+
+function vCarveDepthWarnings(
+  ctx: SavedGcodeNoticeCtx,
+  depths: Parameters<typeof detectCompiledVCarveDepthWarnings>[0],
+): ReadonlyArray<string> {
+  const warningProject = outputScopedWarningProject(ctx);
+  if (warningProject.machine?.kind !== 'cnc') return [];
+  return detectCompiledVCarveDepthWarnings(depths, warningProject.machine.stock.thicknessMm);
 }
 
 function pushFoldedNotes(ctx: SavedGcodeNoticeCtx, notes: ReadonlyArray<Notice>): void {
