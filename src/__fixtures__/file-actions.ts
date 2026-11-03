@@ -137,7 +137,7 @@ export function reject(message: string): Promise<never> {
 type RecordedToast = {
   readonly message: string;
   readonly variant?: string;
-  /** Notes folded under a Save G-code toast (ADR-686). */
+  /** Notes folded under a Save G-code toast (ADR-687). */
   readonly details?: ReadonlyArray<string>;
 };
 

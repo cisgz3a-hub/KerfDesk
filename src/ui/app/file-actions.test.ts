@@ -187,7 +187,7 @@ describe('file actions contextual failure handling', () => {
 
     expect(written).toHaveLength(1);
     expect(written[0]).toContain('; assumes: GRBL $30=');
-    // Folded with the other notes when there are several (ADR-686).
+    // Folded with the other notes when there are several (ADR-687).
     expect(
       toast.messages
         .flatMap((m) => [m.message, ...(m.details ?? [])])

@@ -43,7 +43,7 @@ export function fillRunwayPolicyForDevice(
 // "My machine isn't listed" saves its machine on the generic starter's
 // profile id (ADR-637), but the 4040 is in that list, so a machine named
 // there, or given another bed, has been declared not to be one (UX audit
-// U3-P3-6, ADR-686). Only the starter as it ships is still ambiguous.
+// U3-P3-6, ADR-687). Only the starter as it ships is still ambiguous.
 export function shouldAdvise4040FillPolicySelection(device: DeviceProfile): boolean {
   if (fillRunwayPolicyForDevice(device) !== undefined) return false;
   return (

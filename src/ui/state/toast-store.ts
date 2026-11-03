@@ -7,7 +7,7 @@
 // Variants intentionally limited to four — anything richer than this (e.g.
 // action buttons) belongs in a modal, not a toast. The one exception is a
 // short list of notes folded under one line (`details`), so a burst of
-// expert notes after Save G-code takes one slot (UX audit U3-P3-6, ADR-686).
+// expert notes after Save G-code takes one slot (UX audit U3-P3-6, ADR-687).
 
 import { create } from 'zustand';
 

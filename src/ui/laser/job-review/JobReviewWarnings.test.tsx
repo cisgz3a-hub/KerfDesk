@@ -9,7 +9,9 @@ import {
 import { FOCUS_TEST_Z_UNCONFIRMED_WARNING } from '../../../core/job/focus-test';
 import { jobAwareConfirm } from '../../state/job-aware-dialogs';
 import { useLaserStore } from '../../state/laser-store';
+import { UNKNOWN_NATIVE_BED_MESSAGE } from '../../state/native-bed-frame';
 import { useToastStore } from '../../state/toast-store';
+import { describeUncalibratedOperations } from '../uncalibrated-job-warnings';
 import { JobReviewWarnings } from './JobReviewWarnings';
 import { ROUTER_MODE_CONFIRMED_MESSAGE, SEND_ROUTER_MODE_PROMPT } from './SendRouterModeButton';
 
@@ -141,5 +143,38 @@ describe('JobReviewWarnings', () => {
       message: `$32=0 was not written: ${reason}`,
       variant: 'warning',
     });
+  });
+});
+
+// UX audit U4-P2-6 (ADR-687): a first job's review led with four expert
+// notes. A beginner's warnings now lead, and technical notes fold.
+describe('Job Review warning ranking', () => {
+  const runway =
+    'Generic Scan Line feed-matched entry and exit runways are active. The Neotronics-qualified 4040 fill policy is not selected.';
+  const scanOffsets = 'Bidirectional scan output at 1500 mm/min has no saved scan-offset table.';
+  const starter = describeUncalibratedOperations(['Rectangle'], []);
+  const other = 'Image "logo.png" stores 10 × 10 px but the burn grid wants 40 × 40 px.';
+
+  it("leads with the beginner's warnings and folds the technical notes", async () => {
+    const host = await renderWarnings([runway, other, scanOffsets, starter, UNKNOWN_NATIVE_BED_MESSAGE]);
+
+    expect(host.querySelector('h3')?.textContent).toContain('3 warnings');
+    const visible = [...host.querySelectorAll(':scope section > ul > li')].map((li) => li.textContent);
+    expect(visible).toEqual([
+      expect.stringContaining('still using the uncalibrated defaults'),
+      expect.stringContaining("KerfDesk can't check where this job sits on your bed"),
+      expect.stringContaining('logo.png'),
+    ]);
+    const folded = host.querySelector('section > details');
+    expect(folded?.open).toBe(false);
+    expect(folded?.querySelector(':scope > summary')?.textContent).toBe('Technical notes (2)');
+    expect(folded?.textContent).toContain('scan-offset table');
+  });
+
+  it('shows technical notes alone without calling them warnings', async () => {
+    const host = await renderWarnings([scanOffsets]);
+
+    expect(host.querySelector('h3')?.textContent).toContain('Notes');
+    expect(host.querySelector('section > details > summary')?.textContent).toBe('Technical notes (1)');
   });
 });

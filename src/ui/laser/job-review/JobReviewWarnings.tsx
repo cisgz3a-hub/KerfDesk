@@ -8,7 +8,9 @@
 // and a cut that runs before the engraving inside it a one-click Cut last
 // (ADR-480 Amendment 2).
 // Never gates Confirm — these are the strings the start flow used to flash
-// in a toast, plus the job-intent set, held still and grouped.
+// in a toast, plus the job-intent set, held still and grouped. A beginner's
+// warnings lead, and motion-policy notes they cannot act on fold under
+// Technical notes (UX audit U4-P2-6, ADR-687; review-note-rank.ts).
 
 import { useState } from 'react';
 import { Icon } from '../../kit';
@@ -32,6 +34,7 @@ import {
 import { isFocusTestMachineWarning } from '../../../core/job/focus-test';
 import { isControllerIdentityWarning } from '../controller-identity-warnings';
 import { isCutBeforeEngravingWarning } from '../cut-order-warnings';
+import { rankReviewNotes, technicalNotesLabel } from '../review-note-rank';
 import { CutLastButton } from './CutLastButton';
 import { splitReviewWarning } from './review-warning-headline';
 import { SendRouterModeButton } from './SendRouterModeButton';
@@ -48,20 +51,36 @@ export function JobReviewWarnings(props: {
   readonly openCncContourOmissions?: JobReviewCncContourOmissions;
   readonly stackedFillCopies?: JobReviewStackedFillCopies;
 }): JSX.Element | null {
-  const count = props.warnings.length;
-  if (count === 0) return null;
+  const ranked = rankReviewNotes(props.warnings);
+  const shown = [...ranked.beginner, ...ranked.warnings];
+  const count = shown.length;
+  if (count === 0 && ranked.technical.length === 0) return null;
   return (
     <section aria-label="Warnings" style={warnBoxStyle}>
       <h3 style={warnTitleStyle}>
         <Icon name="warning" size={13} />
-        {count} {count === 1 ? 'warning' : 'warnings'}
+        {count === 0 ? 'Notes' : `${count} ${count === 1 ? 'warning' : 'warnings'}`}
         <span style={warnHintStyle}>· none block the start</span>
       </h3>
-      <ul style={warnListStyle}>
-        {props.warnings.map((warning) => (
-          <WarningItem key={warning} warning={warning} />
-        ))}
-      </ul>
+      {count === 0 ? null : (
+        <ul style={warnListStyle}>
+          {shown.map((warning) => (
+            <WarningItem key={warning} warning={warning} />
+          ))}
+        </ul>
+      )}
+      {ranked.technical.length === 0 ? null : (
+        <details>
+          <summary style={warnItemSummaryStyle}>
+            {technicalNotesLabel(ranked.technical.length)}
+          </summary>
+          <ul style={warnListStyle}>
+            {ranked.technical.map((warning) => (
+              <WarningItem key={warning} warning={warning} />
+            ))}
+          </ul>
+        </details>
+      )}
       {props.openFillOmissions === undefined ? null : (
         <ShowOmittedFillArtworkButton omissions={props.openFillOmissions} />
       )}

@@ -4,11 +4,12 @@
 // H.2) via the machine-aware selector.
 //
 // Only the newest three toasts show (Toasts.tsx), so the order is a ranking
-// (UX audit U3-P3-6, ADR-686). Pushed last, and so seen first: the saved
-// confirmation, then the preflight's findings such as a job off the bed
-// (ADR-591 Amendment 3), then the warnings written for a beginner. Everything
-// else (controller assumptions, scan offsets, power scale, runway policy) folds
-// into one toast whose notes open on a click.
+// (UX audit U3-P3-6, ADR-687), shared with Job Review (review-note-rank.ts).
+// Pushed last, and so seen first: the saved confirmation, then the preflight's
+// findings such as a job off the bed (ADR-591 Amendment 3), then the warnings
+// written for a beginner, then any other warning. The technical notes and the
+// controller assumptions fold into one "Technical notes (n)" toast whose notes
+// open on a click.
 import type { PreflightIssue } from '../../core/preflight';
 import {
   DEFAULT_OUTPUT_SCOPE,
@@ -17,8 +18,7 @@ import {
   type Project,
 } from '../../core/scene';
 import { detectCompiledVCarveDepthWarnings } from '../laser/cnc-compiled-depth-warnings';
-import { isCutBeforeEngravingWarning } from '../laser/cut-order-warnings';
-import { isUncalibratedDefaultsWarning } from '../laser/uncalibrated-job-warnings';
+import { reviewNoteRank, technicalNotesLabel } from '../laser/review-note-rank';
 import type { ToastVariant } from '../state/toast-store';
 import {
   cncExportOtherControllersNote,
@@ -44,6 +44,7 @@ export function pushSavedGcodeNotices(
   },
 ): void {
   const notes: Notice[] = [];
+  const others: string[] = [];
   const leading: Notice[] = [];
   if (machineKindOf(ctx.project.machine) === 'cnc') {
     const note = cncExportOtherControllersNote(ctx.project.device, ctx.controllerSettings);
@@ -57,7 +58,10 @@ export function pushSavedGcodeNotices(
     });
   }
   for (const warning of findings.machineWarnings) {
-    (isBeginnerWarning(warning) ? leading : notes).push({ message: warning, variant: 'warning' });
+    const rank = reviewNoteRank(warning);
+    if (rank === 'technical') notes.push({ message: warning, variant: 'warning' });
+    else if (rank === 'beginner') leading.push({ message: warning, variant: 'warning' });
+    else others.push(warning);
   }
   const warningProject = outputScopedWarningProject(ctx);
   if (warningProject.machine?.kind === 'cnc') {
@@ -71,21 +75,13 @@ export function pushSavedGcodeNotices(
   for (const advisory of findings.preflightAdvisories) {
     leading.push({ message: advisory.message, variant: 'warning' });
   }
-  pushFoldedNotes(ctx, notes, leading.length > 0);
+  pushFoldedNotes(ctx, notes);
+  for (const warning of others) ctx.pushToast(warning, 'warning');
   for (const notice of leading) ctx.pushToast(notice.message, notice.variant);
   ctx.pushToast(`Saved G-code to ${savedName}`, 'success');
 }
 
-// Warnings a beginner can act on before burning: a material test, cut last.
-function isBeginnerWarning(warning: string): boolean {
-  return isUncalibratedDefaultsWarning(warning) || isCutBeforeEngravingWarning(warning);
-}
-
-function pushFoldedNotes(
-  ctx: SavedGcodeNoticeCtx,
-  notes: ReadonlyArray<Notice>,
-  afterOthers: boolean,
-): void {
+function pushFoldedNotes(ctx: SavedGcodeNoticeCtx, notes: ReadonlyArray<Notice>): void {
   const [only] = notes;
   if (only === undefined) return;
   if (notes.length === 1) {
@@ -93,8 +89,7 @@ function pushFoldedNotes(
     return;
   }
   const variant = notes.some((note) => note.variant === 'warning') ? 'warning' : 'info';
-  const count = `${notes.length} ${afterOthers ? 'more notes' : 'notes'}`;
-  ctx.pushToast(`${count} about this G-code.`, variant, {
+  ctx.pushToast(`${technicalNotesLabel(notes.length)} about this G-code.`, variant, {
     details: notes.map((note) => note.message),
   });
 }

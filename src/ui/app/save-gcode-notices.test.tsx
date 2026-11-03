@@ -1,6 +1,7 @@
 // UX audit U3-P3-6: Save G-code shows only the newest three toasts, and the
 // beginner's material-test warning and the saved confirmation sat behind three
-// expert notes. They now show first, and the expert notes fold into one.
+// expert notes. They now show first, and the technical notes fold into one
+// (ADR-687).
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -68,7 +69,7 @@ describe('Save G-code notices', () => {
 
     const toasts = useToastStore.getState().toasts;
     expect(toasts.map((toast) => toast.message)).toEqual([
-      '4 more notes about this G-code.',
+      'Technical notes (4) about this G-code.',
       STARTER_VALUES,
       'Saved G-code to untitled.gcode',
     ]);
@@ -88,9 +89,20 @@ describe('Save G-code notices', () => {
     save([POWER_SCALE_NOTE, CUT_ORDER], ['Job extends past the bed.']);
 
     expect(useToastStore.getState().toasts.map((toast) => toast.message)).toEqual([
-      '2 more notes about this G-code.',
+      'Technical notes (2) about this G-code.',
       CUT_ORDER,
       'Job extends past the bed.',
+      'Saved G-code to untitled.gcode',
+    ]);
+  });
+
+  it('keeps a warning it does not know in view', () => {
+    const other = 'Image "logo.png" stores 10 × 10 px but the burn grid wants 40 × 40 px.';
+    save([other, RUNWAY_NOTE]);
+
+    expect(useToastStore.getState().toasts.map((toast) => toast.message)).toEqual([
+      'Technical notes (2) about this G-code.',
+      other,
       'Saved G-code to untitled.gcode',
     ]);
   });
@@ -129,7 +141,7 @@ describe('Save G-code notices', () => {
     await act(async () => vi.advanceTimersByTime(60_000));
 
     expect(useToastStore.getState().toasts.map((toast) => toast.message)).toEqual([
-      '3 notes about this G-code.',
+      'Technical notes (3) about this G-code.',
     ]);
   });
 });
