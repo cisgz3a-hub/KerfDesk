@@ -44,7 +44,12 @@ export type PhotoEngravingPreviewResult =
       /** Relative marks, not calibrated material colour, power or motion. */
       readonly normalization: 'relative-marks';
     }
-  | { readonly kind: 'error'; readonly message: string };
+  | {
+      readonly kind: 'error';
+      readonly message: string;
+      /** The photo's histogram when only the burn grid was too big to preview. */
+      readonly sourceHistogram?: Uint32Array<ArrayBuffer>;
+    };
 
 export const PHOTO_ENGRAVING_PREVIEW_MAX_EDGE = 1000;
 

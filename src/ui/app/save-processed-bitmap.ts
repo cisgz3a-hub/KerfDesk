@@ -7,8 +7,11 @@ import {
   type RasterImage,
   type SceneObject,
 } from '../../core/scene';
-import { evaluateRasterBudget } from '../../core/raster';
-import { buildProcessedRasterBitmap, processedRasterDimensions } from '../raster/processed-bitmap';
+import {
+  buildProcessedRasterBitmap,
+  processedBitmapSizeLimit,
+  processedRasterDimensions,
+} from '../raster/processed-bitmap';
 import { rgbaToPngBlob } from '../raster/luma-bitmap';
 import type { ToastVariant } from '../state/toast-store';
 import { hydratePagedRasterImage } from '../import/paged-raster-hydration';
@@ -48,9 +51,9 @@ export async function handleSaveProcessedBitmap(ctx: SaveProcessedBitmapCtx): Pr
     return;
   }
   const { width, height } = processedRasterDimensions(selected, layer);
-  const budget = evaluateRasterBudget(width, height);
-  if (budget.kind === 'too-large') {
-    ctx.pushToast(`Could not save processed bitmap: ${budget.reason}`, 'error');
+  const limit = processedBitmapSizeLimit(selected, layer, width, height);
+  if (limit !== null) {
+    ctx.pushToast(`Could not save processed bitmap: ${limit}`, 'error');
     return;
   }
   try {
