@@ -302,7 +302,7 @@
 }
 
 .lf-run-order :is(button, input, [tabindex]):focus-visible {
-  outline: 2px solid var(--lf-accent);
+  outline: 2px solid var(--lf-focus-accent);
   outline-offset: 2px;
 }
 
@@ -334,6 +334,6 @@
 }
 
 .lf-run-order-navigation > summary:focus-visible {
-  outline: 2px solid var(--lf-accent);
+  outline: 2px solid var(--lf-focus-accent);
   outline-offset: 2px;
 }

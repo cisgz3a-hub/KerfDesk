@@ -148,7 +148,8 @@ describe('LiveMotionBar', () => {
       try {
         expect(host.textContent).toContain(heading);
         const pendingButton = buttonByText(host, buttonLabel);
-        expect(pendingButton?.disabled).toBe(true);
+        // Unavailable, but it keeps focus while it flips (UX audit U7-P3-1).
+        expect(pendingButton?.getAttribute('aria-disabled')).toBe('true');
         expect(buttonByText(host, duplicateLabel)).toBeUndefined();
         expect(buttonByText(host, 'ABORT JOB')?.disabled).toBe(false);
         await act(async () => pendingButton?.click());
@@ -268,7 +269,7 @@ describe('LiveMotionBar', () => {
     });
     const { host, root } = await render(<LiveMotionBar />);
     try {
-      expect(buttonByText(host, 'Continue')?.disabled).toBe(true);
+      expect(buttonByText(host, 'Continue')?.getAttribute('aria-disabled')).toBe('true');
       expect(buttonByText(host, 'ABORT JOB')).toBeDefined();
       await act(async () => {
         useLaserStore.setState({
@@ -279,7 +280,7 @@ describe('LiveMotionBar', () => {
         });
       });
       const continueButton = buttonByText(host, 'Continue');
-      expect(continueButton?.disabled).toBe(false);
+      expect(continueButton?.hasAttribute('aria-disabled')).toBe(false);
       expect(continueButton?.title).toContain('safe Z with the spindle off');
       await act(async () => continueButton?.click());
       expect(continueToolChange).toHaveBeenCalledOnce();
@@ -306,7 +307,8 @@ describe('LiveMotionBar', () => {
   it('renders nothing while the machine is idle', async () => {
     const { host, root } = await render(<LiveMotionBar />);
     try {
-      expect(host.firstElementChild).toBeNull();
+      // Only the announcer's empty regions stay mounted between jobs.
+      expect(host.querySelector('section[aria-label="Live Motion"]')).toBeNull();
     } finally {
       await act(async () => root.unmount());
     }
