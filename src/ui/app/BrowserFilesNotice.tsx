@@ -1,4 +1,4 @@
-// ADR-686: the web app is Chromium-only (PROJECT.md "Delivery targets"), with
+// ADR-688: the web app is Chromium-only (PROJECT.md "Delivery targets"), with
 // no second persistence path. Firefox and Safari load and draw, then fail at
 // the first Open, Import or Save, so the app says so as it opens, says what
 // still works, and points at a browser or the desktop app that can save.

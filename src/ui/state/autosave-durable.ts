@@ -185,7 +185,7 @@ export class AutosaveDurableService {
 
   /**
    * Unsaved work from earlier sessions, newest first, for File > Recover
-   * unsaved work (ADR-686). This window's own slot is the work on screen and
+   * unsaved work (ADR-688). This window's own slot is the work on screen and
    * a live window's slot is that window's, so neither is listed. Unreadable
    * slots are left for startup recovery to report and retire.
    */

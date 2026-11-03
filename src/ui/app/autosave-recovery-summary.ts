@@ -1,5 +1,5 @@
 // What the returning-work card and File > Recover unsaved work show for an
-// autosaved project (ADR-686): a count of its objects and, for vector work, a
+// autosaved project (ADR-688): a count of its objects and, for vector work, a
 // small picture of it. Autosaves carry no file name, so the picture is what
 // tells one unsaved design from another.
 

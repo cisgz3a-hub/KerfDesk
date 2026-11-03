@@ -6,7 +6,7 @@ import { AutosaveDurableService } from './autosave-durable';
 import { IndexedDbAutosaveRepository } from './autosave-indexeddb';
 import { AutosaveSessionLocks } from './autosave-session-lock';
 
-// U1-P2-3 (ADR-686): a beginner who misses the recovery offer and starts new
+// U1-P2-3 (ADR-688): a beginner who misses the recovery offer and starts new
 // work must still be able to reach the first design from the app.
 describe('AutosaveDurableService.readRecent', () => {
   beforeEach(() => {

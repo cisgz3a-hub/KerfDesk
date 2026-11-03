@@ -521,7 +521,7 @@ export type PlatformAdapter = {
   readonly id: 'web' | 'electron' | 'mock';
 
   /** False where the open and save pickers are missing (Firefox, Safari), so
-   * the app can say so before a pick fails (ADR-686). Absent means present. */
+   * the app can say so before a pick fails (ADR-688). Absent means present. */
   readonly filePickersAvailable?: () => boolean;
 
   // Show a file-open picker. Resolves to the chosen files (may be empty if

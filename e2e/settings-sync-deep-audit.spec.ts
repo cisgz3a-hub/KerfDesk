@@ -184,7 +184,7 @@ test('actual autosave recovery restores job settings without replacing computer 
   // Exercise the production interval and IndexedDB backend, not a manually seeded recovery slot.
   await page.waitForTimeout(31_000);
   await page.reload();
-  // ADR-686: the offer is a card on the canvas, not a status-bar link.
+  // ADR-688: the offer is a card on the canvas, not a status-bar link.
   const recovery = page.getByRole('region', {
     name: "Your last session wasn't saved. Restore it?",
     exact: true,

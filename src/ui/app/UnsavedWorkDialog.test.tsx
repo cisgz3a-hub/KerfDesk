@@ -58,7 +58,7 @@ afterEach(async () => {
   resetStore();
 });
 
-describe('File > Recover unsaved work (ADR-686)', () => {
+describe('File > Recover unsaved work (ADR-688)', () => {
   it('lists earlier sessions newest first and restores the one chosen', async () => {
     const newer = snapshot('second-design', 5);
     const older = snapshot('first-design', 90);

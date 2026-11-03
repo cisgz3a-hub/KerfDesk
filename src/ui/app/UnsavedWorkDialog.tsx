@@ -1,4 +1,4 @@
-// File > Recover unsaved work (ADR-686): the autosaves of earlier sessions
+// File > Recover unsaved work (ADR-688): the autosaves of earlier sessions
 // that were never saved as a file. Starting new work never removes one, so a
 // design the startup card was not used for stays reachable here until it is
 // restored, or discarded with Don't Save after it has been restored.

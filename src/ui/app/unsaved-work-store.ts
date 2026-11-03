@@ -1,4 +1,4 @@
-// Whether File > Recover unsaved work is open (ADR-686).
+// Whether File > Recover unsaved work is open (ADR-688).
 
 import { create } from 'zustand';
 

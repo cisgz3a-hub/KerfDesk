@@ -1,4 +1,4 @@
-// File > Recover unsaved work (ADR-686): restore an earlier session's autosave
+// File > Recover unsaved work (ADR-688): restore an earlier session's autosave
 // over whatever is open. The open document goes through the ordinary Save /
 // Don't Save / Cancel question first, as File > Open does, and the restore
 // keeps a durable copy exactly as startup recovery does.

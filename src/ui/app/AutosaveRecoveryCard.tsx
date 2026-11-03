@@ -1,4 +1,4 @@
-// ADR-686: unsaved work from the last session is offered on the canvas, where
+// ADR-688: unsaved work from the last session is offered on the canvas, where
 // a returning beginner looks, not as a link in the status bar (#1137). The
 // card blocks nothing and takes no focus. Restore loads the work; Start fresh
 // keeps the autosave, which File > Recover unsaved work still lists, and any

@@ -1391,7 +1391,7 @@ that owns those fields, without changing the existing Frame/Start policy.
 7. The File System Access API is required (Chromium-only, per PROJECT.md "Delivery targets"); there
    is **no browser-download fallback**. If unavailable, the save reports a clear error toast that
    names Chrome, Edge and the desktop app, and a banner has said so since the app opened (F-C3,
-   ADR-686).
+   ADR-688).
 
 #### Error — pre-flight failure
 - See F-A10.
@@ -3896,7 +3896,7 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
 
 - F-C1. Settings → Device Profile editor
 - F-C2. Settings → Preferences
-- F-C3. Autosave + recovery — specified below (ADR-305, ADR-686)
+- F-C3. Autosave + recovery — specified below (ADR-305, ADR-688)
 - F-C4. Re-import changed SVG with diff
 - F-C5. Copy / paste / duplicate
   Copy and Paste carry the imported fonts used by copied text across documents, so that text stays

@@ -1,4 +1,4 @@
-/* ADR-686: centred on the empty canvas, clear of the corner cards. */
+/* ADR-688: centred on the empty canvas, clear of the corner cards. */
 .lf-autosave-recovery {
   position: absolute;
   top: 50%;

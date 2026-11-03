@@ -34,7 +34,7 @@ function acceptTypesFor(accept: ReadonlyArray<string>): FilePickerAcceptType[] {
   return [{ description: 'Files', accept: { 'application/octet-stream': [...accept] } }];
 }
 
-// Firefox and Safari have no file pickers. The app says so on load (ADR-686),
+// Firefox and Safari have no file pickers. The app says so on load (ADR-688),
 // and these errors say what to do instead of naming the missing API.
 export const BROWSER_CANNOT_OPEN_FILES =
   "This browser can't open files. Use Chrome or Edge, or the KerfDesk desktop app. You can still drag files onto the canvas to import them.";

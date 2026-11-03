@@ -227,7 +227,7 @@ export type AppCommandContext = CommandContextSlices & {
   readonly openProject: () => void;
   // Recent Projects manager (ADR-378); the File menu also lists entries inline.
   readonly openRecentProjects: () => void;
-  // Earlier sessions' autosaves that were never saved as a file (ADR-686).
+  // Earlier sessions' autosaves that were never saved as a file (ADR-688).
   readonly openUnsavedWork: () => void;
   readonly saveProject: () => void;
   readonly saveProjectAs: () => void;

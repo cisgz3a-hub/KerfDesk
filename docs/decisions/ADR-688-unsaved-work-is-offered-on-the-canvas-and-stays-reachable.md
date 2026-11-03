@@ -1,4 +1,4 @@
-## ADR-686 - Unsaved work is offered on the canvas and stays reachable; a browser that can't save says so
+## ADR-688 - Unsaved work is offered on the canvas and stays reachable; a browser that can't save says so
 
 **Status:** Accepted; code and unit evidence. | **Date:** 2026-11-03
 

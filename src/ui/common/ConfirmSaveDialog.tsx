@@ -38,7 +38,7 @@ function ConfirmSavePanel(props: { readonly request: ConfirmSaveRequest }): JSX.
   );
 }
 
-// ADR-686: in a browser without file pickers Save always fails, so it is not
+// ADR-688: in a browser without file pickers Save always fails, so it is not
 // offered. Cancel leads and takes the initial focus: it keeps the work, which
 // stays in this browser's autosave.
 function CannotSavePanel(props: { readonly request: ConfirmSaveRequest }): JSX.Element {

@@ -51,7 +51,7 @@ export async function readLatestDurableAutosave(
 }
 
 // Earlier sessions keep their own slots until restored or discarded, so the
-// work of a session that was never restored stays listable (ADR-686).
+// work of a session that was never restored stays listable (ADR-688).
 export async function readDurableAutosaves(
   repository: AutosaveDurableRepository,
   locks: AutosaveSessionLocks,

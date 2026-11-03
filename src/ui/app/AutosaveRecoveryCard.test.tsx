@@ -92,7 +92,7 @@ afterEach(async () => {
   resetStore();
 });
 
-describe('AutosaveRecoveryCard (ADR-686)', () => {
+describe('AutosaveRecoveryCard (ADR-688)', () => {
   it('asks on the canvas whether to restore the last session, without stealing focus', async () => {
     const service = mockRecovery();
     const editorInput = document.createElement('input');

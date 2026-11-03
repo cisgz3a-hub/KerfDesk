@@ -9,7 +9,7 @@
 //   Stops scheduling on unmount; the browser releases session ownership.
 //
 // Recovery is offered by AutosaveRecoveryCard without blocking startup, and
-// File > Recover unsaved work lists earlier sessions' slots (ADR-686).
+// File > Recover unsaved work lists earlier sessions' slots (ADR-688).
 // Restoring keeps a durable copy until the first manual save (M15).
 
 import { useEffect } from 'react';
@@ -171,7 +171,7 @@ export async function runAutosaveRecovery(
   const ok = await chooseRestore(recoveryAgeLabel(record.savedAt), record);
   // The nonblocking choice may stay open while the user imports, edits, or
   // starts a new document. Neither restore nor cleanup may act on that work.
-  // null means Start fresh/unmount: leave the only backup intact (ADR-686).
+  // null means Start fresh/unmount: leave the only backup intact (ADR-688).
   if (ok === null || !isUntouched()) return;
   if (ok) {
     await restoreAutosaveSnapshot(record, service);

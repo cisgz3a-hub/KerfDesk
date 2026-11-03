@@ -9,7 +9,7 @@ type RecoveryOffer = {
   readonly ageLabel: string;
   readonly project: Project;
   readonly restore: () => void;
-  /** Keep the autosave, reachable from File > Recover unsaved work (ADR-686). */
+  /** Keep the autosave, reachable from File > Recover unsaved work (ADR-688). */
   readonly startFresh: () => void;
 };
 

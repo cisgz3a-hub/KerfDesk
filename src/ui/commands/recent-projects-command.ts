@@ -14,7 +14,7 @@ export function recentProjectsCommand(ctx: AppCommandContext): AppCommand {
   );
 }
 
-// File > Recover unsaved work (ADR-686). Always available: the list says when
+// File > Recover unsaved work (ADR-688). Always available: the list says when
 // no earlier session left unsaved work.
 export function unsavedWorkCommand(ctx: AppCommandContext): AppCommand {
   return enabled(
