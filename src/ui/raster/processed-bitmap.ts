@@ -14,6 +14,7 @@ import {
   whiteLuma,
 } from '../../core/raster';
 import { rasterCompilationPowerScale } from '../../core/raster/controller-power-scale';
+import { MAX_RASTER_SOURCE_READ_PIXELS } from '../../core/raster/raster-budget';
 import { imageDitherAlgorithm, prepareImageLuma } from '../../core/raster/image-processing';
 import { burnGridKernel } from '../../core/raster/luma-resample';
 import { burnGridSharpen, gridSharpen, sharpenLuma } from '../../core/raster/luma-sharpen';
@@ -54,14 +55,8 @@ export function buildProcessedRasterBitmap(
   const layer = effectiveOperationForObject(operation, image);
   const outputDimensions = processedRasterDimensions(image, layer);
   const { width, height } = capRasterDimensions(outputDimensions, options.maxEdge);
-  const budget = evaluateRasterBudget(width, height, {
-    sourcePixelCount: image.pixelWidth * image.pixelHeight,
-    sourceWorkingBytesPerPixel: options.maxEdge === undefined ? 3 : 1,
-    ditherAlgorithm: imageDitherAlgorithm(layer),
-  });
-  if (budget.kind === 'too-large') {
-    return { kind: 'too-large', width, height, reason: budget.reason };
-  }
+  const limit = processedBitmapSizeLimit(image, layer, width, height);
+  if (limit !== null) return { kind: 'too-large', width, height, reason: limit };
   const decodedLuma = decodeLuma(image.lumaBase64, image.pixelWidth * image.pixelHeight);
   // Adjust at source resolution, then resample once — the burn's own order.
   // Averaging first and adjusting after would differ for any non-linear curve.
@@ -109,6 +104,30 @@ export function buildProcessedRasterBitmap(
   );
   const rgba = new Uint8ClampedArray(rasterPreviewRgba(sValues, sMax, width, height));
   return { kind: 'ok', width, height, rgba };
+}
+
+/**
+ * Why the bitmap cannot be built, in plain words, or null. ADR-581 Amendment 1:
+ * the source is one read under its own pixel ceiling; the 64 MB budget is for
+ * the bitmap built at the output grid.
+ */
+export function processedBitmapSizeLimit(
+  image: RasterImage,
+  operation: Layer,
+  width: number,
+  height: number,
+): string | null {
+  const sourcePixels = image.pixelWidth * image.pixelHeight;
+  if (sourcePixels > MAX_RASTER_SOURCE_READ_PIXELS) {
+    return `the photo has too many pixels (${(sourcePixels / 1_000_000).toFixed(0)} megapixels; up to ${MAX_RASTER_SOURCE_READ_PIXELS / 1_000_000} can be read). Crop it in Image Studio or import a smaller copy.`;
+  }
+  const layer = effectiveOperationForObject(operation, image);
+  const budget = evaluateRasterBudget(width, height, {
+    ditherAlgorithm: imageDitherAlgorithm(layer),
+  });
+  return budget.kind === 'ok'
+    ? null
+    : 'the bitmap is too big at this size and resolution. Lower the resolution or make the photo smaller.';
 }
 
 export function processedRasterPreviewDimensions(

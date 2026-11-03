@@ -14,6 +14,13 @@ import { whiteLuma } from '../raster';
 import { type RasterImage } from '../scene';
 
 const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+const PADDING = 0x3d; // '='
+const WHITESPACE = -2;
+const INVALID = -1;
+// Character code -> 6-bit value, WHITESPACE or INVALID. Decoding reads the
+// original string through this table: building a cleaned copy one character at
+// a time cost ~500 MB of rope nodes for a 12 MP photo (UX audit U3-P2-3).
+const BASE64_VALUES = base64ValueTable();
 
 const decodeCache = new WeakMap<RasterImage, Uint8Array>();
 
@@ -31,14 +38,16 @@ export function decodeRasterLuma(obj: RasterImage): Uint8Array {
 }
 
 function decodeBase64Luma(base64: string, expectedLength: number): Uint8Array {
-  const clean = cleanBase64Luma(base64);
-  const dataLength = base64DataLength(clean);
+  const dataLength = validatedBase64DataLength(base64);
   const out = whiteLuma(expectedLength);
   let outIndex = 0;
   let buffer = 0;
   let bitCount = 0;
-  for (let index = 0; index < dataLength; index += 1) {
-    const value = BASE64_ALPHABET.indexOf(clean[index] ?? '');
+  let dataSeen = 0;
+  for (let index = 0; dataSeen < dataLength; index += 1) {
+    const value = BASE64_VALUES[base64.charCodeAt(index)] ?? INVALID;
+    if (value === WHITESPACE) continue;
+    dataSeen += 1;
     buffer = (buffer << 6) | value;
     bitCount += 6;
     if (bitCount >= 8) {
@@ -58,33 +67,40 @@ function decodeBase64Luma(base64: string, expectedLength: number): Uint8Array {
   return out;
 }
 
-function cleanBase64Luma(base64: string): string {
-  let clean = '';
-  for (const char of base64) {
-    if (isBase64Whitespace(char)) continue;
-    if (char !== '=' && BASE64_ALPHABET.indexOf(char) === -1) {
+/**
+ * The count of data characters before any padding. Whitespace is skipped;
+ * any other character outside the alphabet, padding that is not the last one
+ * or two characters, and a length no base64 text can have are malformed.
+ */
+function validatedBase64DataLength(base64: string): number {
+  let cleanLength = 0;
+  let paddingStart = -1;
+  for (let index = 0; index < base64.length; index += 1) {
+    const code = base64.charCodeAt(index);
+    const value = BASE64_VALUES[code] ?? INVALID;
+    if (value === WHITESPACE) continue;
+    if (code === PADDING) {
+      if (paddingStart === -1) paddingStart = cleanLength;
+    } else if (value === INVALID || paddingStart !== -1) {
       throw new Error('compileRasterGroup: lumaBase64 is malformed');
     }
-    clean += char;
+    cleanLength += 1;
   }
-  return clean;
-}
-
-function base64DataLength(clean: string): number {
-  const paddingStart = clean.indexOf('=');
-  if (clean.length % 4 === 1) throw new Error('compileRasterGroup: lumaBase64 is malformed');
-  if (paddingStart === -1) return clean.length;
-  const paddingCount = clean.length - paddingStart;
-  if (
-    paddingCount > 2 ||
-    clean.length % 4 !== 0 ||
-    clean.slice(paddingStart).replaceAll('=', '') !== ''
-  ) {
+  if (cleanLength % 4 === 1) throw new Error('compileRasterGroup: lumaBase64 is malformed');
+  if (paddingStart === -1) return cleanLength;
+  if (cleanLength - paddingStart > 2 || cleanLength % 4 !== 0) {
     throw new Error('compileRasterGroup: lumaBase64 is malformed');
   }
   return paddingStart;
 }
 
-function isBase64Whitespace(char: string): boolean {
-  return char === ' ' || char === '\n' || char === '\r' || char === '\t';
+function base64ValueTable(): Int8Array {
+  const table = new Int8Array(128).fill(INVALID);
+  for (let value = 0; value < BASE64_ALPHABET.length; value += 1) {
+    table[BASE64_ALPHABET.charCodeAt(value)] = value;
+  }
+  for (const char of [' ', '\n', '\r', '\t']) table[char.charCodeAt(0)] = WHITESPACE;
+  // Padding is validated by position, not decoded.
+  table[PADDING] = INVALID;
+  return table;
 }

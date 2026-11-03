@@ -312,6 +312,8 @@ describe('CanvasMotionBadge artwork-relative laser status', () => {
     try {
       const status = host.querySelector('[data-testid="canvas-motion-status"]');
       expect(status?.textContent).toBe('Relative view — physical bed position unverified');
+      // Its hover explains it in plain words (UX audit U1-P3-2).
+      expect(status?.getAttribute('title')).toMatch(/can't yet tell where on the bed/);
     } finally {
       await unmount();
     }

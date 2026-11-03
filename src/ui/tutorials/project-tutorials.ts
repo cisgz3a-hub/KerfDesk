@@ -51,6 +51,76 @@ export const PROJECT_TUTORIALS: readonly Tutorial[] = [
     related: ['import', 'operations', 'preview', 'frame-start'],
   },
   {
+    // Plain meanings for the words the app and the other lessons use without
+    // explaining them (UX audit U1-P3-7).
+    id: 'words',
+    title: "Words you'll see",
+    summary: 'What G-code, GRBL, homing, origin, Frame and kerf mean.',
+    category: 'Getting started',
+    machine: 'all',
+    minutes: 2,
+    location: 'Anywhere in KerfDesk',
+    prerequisites: 'None. You can read this before you connect a machine.',
+    visual: 'workspace',
+    steps: [
+      {
+        title: 'G-code',
+        instruction:
+          'G-code is the list of moves and laser or spindle commands KerfDesk sends to your machine. KerfDesk writes it for you from your artwork and operations.',
+        focus: 'G-code',
+        result: 'You know what KerfDesk sends to the machine.',
+      },
+      {
+        title: 'GRBL',
+        instruction:
+          'GRBL is the firmware on the controller board of many hobby lasers and CNC routers. It reads the G-code and drives the motors. Some machines use a relative of it, such as grblHAL or FluidNC.',
+        focus: 'Controller',
+        result: 'You know what reads the G-code on your machine.',
+      },
+      {
+        title: 'Homing',
+        instruction:
+          'Homing drives the machine to its limit switches to find a known corner, so a position on the bed means the same thing every time. A machine without switches cannot home.',
+        focus: 'Home',
+        result: 'You know why a machine homes before a job.',
+      },
+      {
+        title: 'Origin',
+        instruction:
+          "The origin is the point your job's position is measured from, for example a bed corner or where the laser head stands. The origin lesson shows each choice.",
+        focus: 'Origin',
+        result: 'You know where a job is measured from.',
+      },
+      {
+        title: 'Frame',
+        instruction:
+          'Frame traces the outline of your job with the laser off, so you can check where it will burn. Start unlocks after a clean Frame.',
+        focus: 'Frame job',
+        result: 'You know why Frame comes before Start.',
+      },
+      {
+        title: 'Kerf',
+        instruction:
+          'Kerf is the width of material the beam or bit removes as it cuts. Kerf Offset on a Line operation makes up for it so cut parts keep their size.',
+        focus: 'Kerf Offset',
+        result: 'You know why a cut part can come out slightly small.',
+      },
+    ],
+    tip: 'Hover over a control to see what it does. Most settings explain themselves there.',
+    keywords: [
+      'glossary',
+      'words',
+      'meaning',
+      'g-code',
+      'grbl',
+      'homing',
+      'origin',
+      'kerf',
+      'frame',
+    ],
+    related: ['first-project', 'origin', 'frame-start'],
+  },
+  {
     id: 'projects',
     title: 'Open and save projects',
     summary: 'Save your work so you can edit it later.',

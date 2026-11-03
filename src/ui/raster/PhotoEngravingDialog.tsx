@@ -175,7 +175,7 @@ const TONE_KEYS = ['brightness', 'contrast', 'gamma'] as const;
 function useSourceHistogram(result: PhotoEngravingPreviewResult | null): Uint32Array | null {
   const [histogram, setHistogram] = useState<Uint32Array | null>(null);
   useEffect(() => {
-    if (result?.kind === 'ok') setHistogram(result.sourceHistogram);
+    if (result?.sourceHistogram !== undefined) setHistogram(result.sourceHistogram);
   }, [result]);
   return histogram;
 }
