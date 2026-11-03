@@ -11,17 +11,25 @@
 // Every total here is the same floating-point value the timeline reports: the
 // same parse and planner, per-line sums accumulated in segment order, then
 // line by line, exactly as buildLineTiming does, and the same transport clock.
+//
+// The planner runs in columns as the parser reads each move, so neither the
+// render model's moves nor a Block per move is kept (ADR-244 Amendment 2).
 
 import { isSendableGcodeLine } from '../controllers/grbl';
 import type { GcodeRenderModel } from '../gcode-view';
+import { createGcodeRenderModelBuilder } from '../gcode-view/gcode-render-model-builder';
+import type { ChunkedColumn } from '../motion-planner/chunked-column';
+import { iterateLines } from '../util/iterate-lines';
 import type { MotionLimits } from './motion-limits';
-import { buildProgramMotionTotals, type ProgramMotionBreakdown } from './program-time';
+import type { ProgramMotionBreakdown } from './program-time';
 import {
-  parseTimedProgram,
+  checkTimedParse,
+  timedParseOptions,
   type ProgramTimelineOptions,
   type ProgramTimelineResult,
 } from './program-timeline';
 import { createTransportClock, forEachRawLine } from './program-transport-time';
+import { StreamedMotion } from './streamed-motion';
 
 export type ProgramDuration = {
   readonly totalSeconds: number;
@@ -43,15 +51,20 @@ export function buildProgramDuration(
   limits: MotionLimits,
   options: ProgramTimelineOptions = {},
 ): ProgramDurationResult {
-  const parsed = parseTimedProgram(gcode, options);
+  const { timingOptions, renderOptions } = timedParseOptions(options);
+  const stream = new StreamedMotion(limits, timingOptions);
+  const builder = createGcodeRenderModelBuilder(renderOptions, stream.segments, stream.events);
+  // The lines buildGcodeRenderModel reads.
+  for (const line of iterateLines(gcode)) {
+    builder.pushLine(line);
+    stream.endLine();
+  }
+  const parsed = checkTimedParse(builder.finish(), timingOptions, stream.missingFeedLine());
   if (parsed.kind !== 'ok') return parsed;
-  const { model, timingOptions } = parsed;
+  const { model } = parsed;
+  const motion = stream.finish();
   // Seconds of motion per raw line, as perLineDurations sums them.
-  const lineSeconds = new Float64Array(model.lineCount);
-  const motion = buildProgramMotionTotals(model, limits, timingOptions, (index, seconds) => {
-    const line = model.segLine[index];
-    if (line !== undefined) lineSeconds[line] = (lineSeconds[line] ?? 0) + seconds;
-  });
+  const lineSeconds = stream.lineSeconds;
   const lineDwell = dwellByLine(model);
   // Running motion and dwell, line by line, as buildLineTiming accumulates
   // them. lineSeconds is overwritten in place with each line's start time,
@@ -59,8 +72,8 @@ export function buildProgramDuration(
   let motionSeconds = 0;
   let dwellSeconds = 0;
   for (let line = 0; line < model.lineCount; line += 1) {
-    const ownMotion = lineSeconds[line] ?? 0;
-    lineSeconds[line] = motionSeconds + dwellSeconds;
+    const ownMotion = lineSeconds.get(line);
+    lineSeconds.set(line, motionSeconds + dwellSeconds);
     motionSeconds += ownMotion;
     dwellSeconds += lineDwell[line] ?? 0;
   }
@@ -93,7 +106,7 @@ function dwellByLine(model: GcodeRenderModel): Float64Array {
 function walkRawLines(
   gcode: string,
   model: GcodeRenderModel,
-  rawLineStartSeconds: Float64Array,
+  rawLineStartSeconds: ChunkedColumn<Float64Array>,
   options: ProgramTimelineOptions,
 ): { readonly transportSeconds: number; readonly pauseCount: number } {
   const clock = createTransportClock(options.baudRate, options.hostToolChangePauses);
@@ -110,7 +123,7 @@ function walkRawLines(
     const pauses = pausesByLine.get(index);
     if (pauses !== undefined && isSendableGcodeLine(rawLine)) pauseCount += pauses;
     if (clock === null) return;
-    const transport = clock.line(rawLine, rawLineStartSeconds[index] ?? 0);
+    const transport = clock.line(rawLine, rawLineStartSeconds.get(index));
     if (index === lastLine) transportSeconds = transport;
   });
   return { transportSeconds, pauseCount };

@@ -9,10 +9,12 @@
 // sustained their programmed feed because acceleration or cornering got in
 // the way first — "why is my job slow", answered from the program itself.
 
-import { SEG_MOTION, type GcodeRenderModel } from '../gcode-view';
-import { blockTime, planVelocities, type Block } from '../motion-planner';
+import { SEG_MOTION, type GcodeRenderModel, type ProgramEvent } from '../gcode-view';
+import { blockTime, planVelocities, type Block, type BlockKind } from '../motion-planner';
+import type { PlannedBlock } from '../motion-planner/columnar-plan';
 import { blockAcceleration } from '../motion-planner/planner-kinematics';
 import { sanitizeLimits, type MotionLimits } from './motion-limits';
+import { motionSpans } from './motion-spans';
 import { segmentBlocks } from './segment-blocks';
 import { validTimeScale, type ProgramTimingOptions } from './program-timing-options';
 
@@ -115,22 +117,6 @@ export type ProgramMotionTotals = {
   readonly breakdown: ProgramMotionBreakdown;
 };
 
-/**
- * The same planner walk as buildProgramTime, reporting each segment's seconds
- * instead of keeping nine per-segment arrays. A job ETA reads only totals; on
- * a bed-sized photo (8 million segments) those arrays were 360 MB (S3-P2-3).
- */
-export function buildProgramMotionTotals(
-  model: GcodeRenderModel,
-  rawLimits: MotionLimits,
-  options: ProgramTimingOptions,
-  onSegmentSeconds: (index: number, seconds: number) => void,
-): ProgramMotionTotals {
-  return walkProgramMotion(model, rawLimits, options, undefined, (index, _b, _e, seconds) =>
-    onSegmentSeconds(index, seconds),
-  );
-}
-
 type SegmentVisit = (
   index: number,
   block: Block,
@@ -152,10 +138,7 @@ function walkProgramMotion(
   const context = motionContext(options, machineKind);
   const power = model.segPower;
   const kinematics = limits.kinematics ?? 'cartesian';
-  let elapsed = 0;
-  let cutSeconds = 0;
-  let rapidTravelSeconds = 0;
-  let feedTravelSeconds = 0;
+  const tally = new MotionTally(context);
   for (const span of motionSpans(model, model.segmentCount)) {
     // Blocks are built per span, so no whole-program block array outlives it.
     const spanBlocks = segmentBlocks(model, limits, span.startIndex, span.endIndex);
@@ -172,28 +155,19 @@ function walkProgramMotion(
       const entry = plan[localIndex];
       if (block === undefined || entry === undefined) continue;
       const rapid = model.segMotion[index] === SEG_MOTION.rapid;
-      const cutting = isCutting(model, index, block, context.machineKind, power);
-      const scale = cutting ? context.cutTimeScale : context.travelTimeScale;
+      const cutting = isCuttingMove(rapid, block.kind, context.machineKind, power[index] ?? 0);
       const accel = blockAcceleration(block, limits.accelMmPerSec2, kinematics);
-      const seconds = blockTime(block, entry.entryV, entry.exitV, accel) * scale;
-      if (cutting) cutSeconds += seconds;
-      else if (rapid) rapidTravelSeconds += seconds;
-      else feedTravelSeconds += seconds;
-      elapsed += seconds;
-      visit(index, block, entry, seconds, scale, accel, elapsed);
+      const seconds = tally.add(block, entry.entryV, entry.exitV, accel, cutting, rapid);
+      const scale = cutting ? context.cutTimeScale : context.travelTimeScale;
+      visit(index, block, entry, seconds, scale, accel, tally.elapsed);
     }
   }
-  return {
-    motionSeconds: elapsed,
-    dwellSeconds: totalDwellSeconds(model),
-    accelMmPerSec2: limits.accelMmPerSec2,
-    breakdown: { cutSeconds, rapidTravelSeconds, feedTravelSeconds },
-  };
+  return tally.totals(totalDwellSeconds(model.events), limits.accelMmPerSec2);
 }
 
-type MotionSpan = { readonly startIndex: number; readonly endIndex: number };
+export type MotionContext = ReturnType<typeof motionContext>;
 
-function motionContext(
+export function motionContext(
   options: ProgramTimingOptions,
   machineKind: ProgramTimingOptions['machineKind'],
 ) {
@@ -207,65 +181,59 @@ function motionContext(
   };
 }
 
-function isCutting(
-  model: GcodeRenderModel,
-  index: number,
-  block: Block,
+export function isCuttingMove(
+  rapid: boolean,
+  kind: BlockKind,
   machineKind: ProgramTimingOptions['machineKind'],
-  power: Float32Array,
+  power: number,
 ): boolean {
-  if (model.segMotion[index] === SEG_MOTION.rapid) return false;
-  return block.kind === 'cut' && (machineKind !== 'laser' || (power[index] ?? 0) > 0);
+  if (rapid) return false;
+  return kind === 'cut' && (machineKind !== 'laser' || power > 0);
 }
-type SynchronizationBoundary = { readonly line: number; readonly isBeforeMotion: boolean };
 
-function motionSpans(model: GcodeRenderModel, segmentCount: number): ReadonlyArray<MotionSpan> {
-  const spans: MotionSpan[] = [];
-  let startIndex = 0;
-  for (const boundary of synchronizationBoundaries(model)) {
-    let endIndex = startIndex;
-    while (
-      endIndex < segmentCount &&
-      segmentPrecedesBoundary(model.segLine[endIndex] ?? 0, boundary)
-    ) {
-      endIndex += 1;
-    }
-    if (endIndex > startIndex) spans.push({ startIndex, endIndex });
-    startIndex = endIndex;
+/**
+ * Each planned block's scaled seconds, summed in program order. The timeline
+ * and the totals-only ETA both add their blocks here, so their totals are the
+ * same doubles.
+ */
+export class MotionTally {
+  elapsed = 0;
+  private cutSeconds = 0;
+  private rapidTravelSeconds = 0;
+  private feedTravelSeconds = 0;
+
+  constructor(private readonly context: MotionContext) {}
+
+  /** Adds one block and returns its seconds. */
+  add(
+    block: PlannedBlock,
+    entryV: number,
+    exitV: number,
+    accel: number,
+    cutting: boolean,
+    rapid: boolean,
+  ): number {
+    const scale = cutting ? this.context.cutTimeScale : this.context.travelTimeScale;
+    const seconds = blockTime(block, entryV, exitV, accel) * scale;
+    if (cutting) this.cutSeconds += seconds;
+    else if (rapid) this.rapidTravelSeconds += seconds;
+    else this.feedTravelSeconds += seconds;
+    this.elapsed += seconds;
+    return seconds;
   }
-  if (startIndex < segmentCount) spans.push({ startIndex, endIndex: segmentCount });
-  return spans;
-}
 
-function synchronizationBoundaries(
-  model: GcodeRenderModel,
-): ReadonlyArray<SynchronizationBoundary> {
-  const boundaries = new Map<number, number>();
-  for (const event of model.events) {
-    let isBeforeMotion: boolean;
-    if (event.kind === 'dwell') isBeforeMotion = event.isBeforeMotion === true;
-    // GRBL drains the planner at M2/M30 after the block's motion (gcode.c,
-    // protocol_buffer_synchronize) and then runs any lines that follow.
-    else if (event.kind === 'pause' || event.kind === 'program-end') isBeforeMotion = false;
-    else if (event.kind === 'synchronization') isBeforeMotion = event.isBeforeMotion;
-    else continue;
-    // One block can have both G4 before motion and M0 after it. Keep both
-    // boundaries instead of allowing one event to hide the other.
-    boundaries.set(event.line, (boundaries.get(event.line) ?? 0) | (isBeforeMotion ? 1 : 2));
+  totals(dwellSeconds: number, accelMmPerSec2: number): ProgramMotionTotals {
+    return {
+      motionSeconds: this.elapsed,
+      dwellSeconds,
+      accelMmPerSec2,
+      breakdown: {
+        cutSeconds: this.cutSeconds,
+        rapidTravelSeconds: this.rapidTravelSeconds,
+        feedTravelSeconds: this.feedTravelSeconds,
+      },
+    };
   }
-  return [...boundaries]
-    .flatMap(([line, sides]) => [
-      ...((sides & 1) === 0 ? [] : [{ line, isBeforeMotion: true }]),
-      ...((sides & 2) === 0 ? [] : [{ line, isBeforeMotion: false }]),
-    ])
-    .sort(
-      (left, right) =>
-        left.line - right.line || Number(right.isBeforeMotion) - Number(left.isBeforeMotion),
-    );
-}
-
-function segmentPrecedesBoundary(segmentLine: number, boundary: SynchronizationBoundary): boolean {
-  return boundary.isBeforeMotion ? segmentLine < boundary.line : segmentLine <= boundary.line;
 }
 
 // Trapezoid test: the move reaches its target only if there is room to
@@ -283,9 +251,9 @@ function reachesTargetVelocity(
   return rampUp + rampDown <= block.distance;
 }
 
-function totalDwellSeconds(model: GcodeRenderModel): number {
+export function totalDwellSeconds(events: Iterable<ProgramEvent>): number {
   let total = 0;
-  for (const event of model.events) {
+  for (const event of events) {
     if (event.kind === 'dwell') total += event.seconds;
   }
   return total;

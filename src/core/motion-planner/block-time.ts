@@ -21,7 +21,12 @@ type SinglePhaseElapsedTimeInput = {
 
 // Generalized trapezoidal time from v_entry through optional v_peak
 // to v_exit over a given distance, capped at v_target.
-export function blockTime(block: Block, entryV: number, exitV: number, accel: number): number {
+export function blockTime(
+  block: Pick<Block, 'distance' | 'targetVelocity'>,
+  entryV: number,
+  exitV: number,
+  accel: number,
+): number {
   return blockElapsedTimeAtDistance({
     block,
     entryVelocity: entryV,
