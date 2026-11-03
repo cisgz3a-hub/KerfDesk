@@ -28,23 +28,56 @@ export function segmentBlocks(
   return blocks;
 }
 
-function segmentBlock(model: GcodeRenderModel, index: number, limits: MotionLimits): Block {
+/**
+ * One segment's values as the render model stores them: positions, feed and
+ * route ends rounded to Float32, the precise length as a double. A parser can
+ * time a segment it never stores from the same values (ADR-244 Amendment 2).
+ */
+export type StoredSegment = {
+  readonly dx: number;
+  readonly dy: number;
+  readonly dz: number;
+  readonly motion: number;
+  readonly kind: number;
+  readonly feed: number;
+  readonly lengthMm: number | undefined;
+  /** The route length before this segment and through it (segRouteEndMm). */
+  readonly routeStartMm: number;
+  readonly routeEndMm: number;
+};
+
+/** The block for one segment of the model. */
+export function segmentBlock(model: GcodeRenderModel, index: number, limits: MotionLimits): Block {
   const base = index * FLOATS_PER_SEGMENT;
-  const dx = (model.positions[base + 3] ?? 0) - (model.positions[base] ?? 0);
-  const dy = (model.positions[base + 4] ?? 0) - (model.positions[base + 1] ?? 0);
-  const dz = (model.positions[base + 5] ?? 0) - (model.positions[base + 2] ?? 0);
+  const at = (offset: number) => model.positions[base + offset] ?? 0;
+  return storedSegmentBlock(
+    {
+      dx: at(3) - at(0),
+      dy: at(4) - at(1),
+      dz: at(5) - at(2),
+      motion: model.segMotion[index] ?? 0,
+      kind: model.segKind[index] ?? 0,
+      feed: model.segFeed[index] ?? 0,
+      lengthMm: model.segLengthMm?.[index],
+      routeStartMm: index === 0 ? 0 : (model.segRouteEndMm[index - 1] ?? 0),
+      routeEndMm: model.segRouteEndMm[index] ?? 0,
+    },
+    limits,
+  );
+}
+
+export function storedSegmentBlock(segment: StoredSegment, limits: MotionLimits): Block {
+  const { dx, dy, dz } = segment;
   const length = Math.hypot(dx, dy, dz);
-  const isRapid = model.segMotion[index] === SEG_MOTION.rapid;
+  const isRapid = segment.motion === SEG_MOTION.rapid;
   const direction =
     length > 0 ? { x: dx / length, y: dy / length, z: dz / length } : { x: 0, y: 0, z: 0 };
   const maxRate = maxRateAlong(direction, limits);
   return {
-    kind: isCutting(model, index) ? 'cut' : 'travel',
+    kind: isCutting(segment) ? 'cut' : 'travel',
     motion: isRapid ? 'rapid' : 'feed',
-    distance: segmentDistance(model, index, length),
-    targetVelocity: isRapid
-      ? maxRate / SECONDS_PER_MINUTE
-      : feedMmPerSec(model.segFeed[index] ?? 0, maxRate),
+    distance: segmentDistance(segment, length),
+    targetVelocity: isRapid ? maxRate / SECONDS_PER_MINUTE : feedMmPerSec(segment.feed, maxRate),
     direction,
   };
 }
@@ -54,29 +87,27 @@ function maxRateAlong(direction: Block['direction'], limits: MotionLimits): numb
   return limits.maxFeedMmPerMin / plannedDriveShare(limits.kinematics ?? 'cartesian', direction);
 }
 
-function segmentDistance(model: GcodeRenderModel, index: number, chordLength: number): number {
-  const preciseLength = model.segLengthMm?.[index];
+function segmentDistance(segment: StoredSegment, chordLength: number): number {
+  const preciseLength = segment.lengthMm;
   if (preciseLength !== undefined && Number.isFinite(preciseLength) && preciseLength > 0) {
     return preciseLength;
   }
-  const motion = model.segMotion[index];
+  const motion = segment.motion;
   if (motion !== SEG_MOTION.cw && motion !== SEG_MOTION.ccw) return chordLength;
   // Compatibility for render-only models that did not retain precise lengths.
   // Execution timelines use the non-cumulative lengths above, since display
   // route differences can round to zero after a long prior route.
-  const start = index === 0 ? 0 : model.segRouteEndMm[index - 1];
-  const end = model.segRouteEndMm[index];
-  const routeLength = start === undefined || end === undefined ? 0 : end - start;
+  const routeLength = segment.routeEndMm - segment.routeStartMm;
   return Number.isFinite(routeLength) && routeLength > 0 ? routeLength : chordLength;
 }
 
-function isCutting(model: GcodeRenderModel, index: number): boolean {
-  const kind = model.segKind[index];
+function isCutting(segment: StoredSegment): boolean {
+  const kind = segment.kind;
   if (kind === SEG_KIND.cut || kind === SEG_KIND.plunge) return true;
   // A Z-only retract commanded at feed rate is the chip clear inside a peck
   // cycle, not a seek: the tool is still in the hole at working feed and the
   // preview counts it in the cut step. Only a rapid retract is travel.
-  return kind === SEG_KIND.retract && model.segMotion[index] !== SEG_MOTION.rapid;
+  return kind === SEG_KIND.retract && segment.motion !== SEG_MOTION.rapid;
 }
 
 // A feed move with no F word is a program defect (Program Health reports it);

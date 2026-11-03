@@ -3,6 +3,8 @@ import {
   buildGcodeRenderModel,
   LINE_CATEGORY,
   SEG_MOTION,
+  type BuildRenderModelOptions,
+  type BuildRenderModelResult,
   type GcodeRenderModel,
   type ProgramEvent,
 } from '../gcode-view';
@@ -101,16 +103,33 @@ export function parseTimedProgram(
   gcode: string,
   options: ProgramTimelineOptions = {},
 ): TimedProgramParse {
+  const { timingOptions, renderOptions } = timedParseOptions(options);
+  return checkTimedParse(buildGcodeRenderModel(gcode, renderOptions), timingOptions);
+}
+
+/** The timing options a strict clock uses, and the render options it parses with. */
+export function timedParseOptions(options: ProgramTimelineOptions): {
+  readonly timingOptions: ProgramTimelineOptions;
+  readonly renderOptions: BuildRenderModelOptions;
+} {
   const timingOptions = {
     ...options,
     ...(options.laserPowerControl === undefined && options.fanPower === true
       ? { laserPowerControl: 'fan' as const }
       : {}),
   };
-  const parsed = buildGcodeRenderModel(gcode, {
-    ...timingOptions,
-    retainPreciseSegmentLengths: true,
-  });
+  return { timingOptions, renderOptions: { ...timingOptions, retainPreciseSegmentLengths: true } };
+}
+
+/**
+ * A parse checked for strict timing. A parse that kept no moves passes the
+ * line of its first feed move without a feed (ADR-244 Amendment 2).
+ */
+export function checkTimedParse(
+  parsed: BuildRenderModelResult,
+  timingOptions: ProgramTimelineOptions,
+  missingFeedLine?: number | null,
+): TimedProgramParse {
   if (parsed.kind === 'error') {
     return parsed.segmentLimit === undefined
       ? parsed
@@ -119,7 +138,7 @@ export function parseTimedProgram(
           reason: 'Exact emitted program exceeds the live countdown segment budget.',
         };
   }
-  const unavailableReason = timingUnavailableReason(parsed.model);
+  const unavailableReason = timingUnavailableReason(parsed.model, missingFeedLine);
   if (unavailableReason !== null) return { kind: 'unavailable', reason: unavailableReason };
   return { kind: 'ok', model: parsed.model, timingOptions };
 }
@@ -161,7 +180,10 @@ export function buildProgramTimeline(
   };
 }
 
-export function timingUnavailableReason(model: GcodeRenderModel): string | null {
+export function timingUnavailableReason(
+  model: GcodeRenderModel,
+  missingFeedLine = firstMissingFeedSegment(model),
+): string | null {
   const skipped = model.skippedMotions[0];
   if (skipped !== undefined) {
     return `Skipped motion at raw line ${skipped.line + 1}: ${skipped.reason}.`;
@@ -170,16 +192,15 @@ export function timingUnavailableReason(model: GcodeRenderModel): string | null 
   if (unsupported !== undefined) {
     return `Unsupported timing syntax ${unsupported.word} at raw line ${unsupported.firstLine + 1}.`;
   }
-  if ([...model.lineCategories].includes(LINE_CATEGORY.junk)) {
+  if (model.lineCategories.includes(LINE_CATEGORY.junk)) {
     return 'Unsupported timing syntax appears on a junk program line.';
   }
   const unknownEvent = model.events.find(isTimingUnknownEvent);
   if (unknownEvent !== undefined) {
     return `Timing-unknown ${unknownEvent.kind} at raw line ${unknownEvent.line + 1}.`;
   }
-  const missingFeedSegment = firstMissingFeedSegment(model);
-  if (missingFeedSegment !== null) {
-    return `Feed rate unavailable for feed motion at raw line ${missingFeedSegment + 1}.`;
+  if (missingFeedLine !== null) {
+    return `Feed rate unavailable for feed motion at raw line ${missingFeedLine + 1}.`;
   }
   return null;
 }

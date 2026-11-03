@@ -75,9 +75,16 @@ export type GcodeRenderModelBuilder = {
   readonly finish: () => BuildRenderModelResult;
 };
 
+/**
+ * `segments` and `events` can be the caller's, so it can use each move and
+ * event as the line that makes it is read: a totals-only ETA times the moves
+ * without keeping them (ADR-244 Amendment 2). Every event of a line is pushed
+ * while that line is read.
+ */
 export function createGcodeRenderModelBuilder(
   options: BuildRenderModelOptions = {},
   segments: SegmentBuilder = createSegmentBuilder(options.retainPreciseSegmentLengths),
+  events: ProgramEvent[] = [],
 ): GcodeRenderModelBuilder {
   // No line or display ceiling (rule 7 / ADR-268). `maxSegments` stays because
   // it is opt-in: only the live countdown passes it as a responsiveness budget
@@ -91,7 +98,7 @@ export function createGcodeRenderModelBuilder(
     segments,
     program: createProgramBoundsTracker(options.initialPositionMm),
     placement: options.boundsFromStart === true ? createPlacementReader() : null,
-    events: [],
+    events,
     skipped: [],
     unsupported: new Map(),
     recognizedWords: 0,
