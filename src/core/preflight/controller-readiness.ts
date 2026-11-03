@@ -5,6 +5,7 @@ import type { Project } from '../scene';
 import {
   CNC_LASER_MODE_ENABLED_MESSAGE,
   FLUIDNC_CNC_LASER_MODE_ENABLED_MESSAGE,
+  LASER_MODE_DISABLED_MESSAGE,
   laserMaxPowerMismatchMessage,
   laserModeDisabledMessage,
   laserMinPowerNonzeroMessage,
@@ -211,7 +212,11 @@ export const CNC_LASER_MODE_UNKNOWN_MESSAGE =
   'Controller did not report GRBL $32. KerfDesk cannot prove the controller is in router mode.';
 export const CNC_LASER_MODE_UNVERIFIED_MESSAGE =
   "The controller's settings dump did not include $32, so router mode ($32=0) is NOT verified against the firmware. Confirm it before cutting.";
-export { CNC_LASER_MODE_ENABLED_MESSAGE, FLUIDNC_CNC_LASER_MODE_ENABLED_MESSAGE };
+export {
+  CNC_LASER_MODE_ENABLED_MESSAGE,
+  FLUIDNC_CNC_LASER_MODE_ENABLED_MESSAGE,
+  LASER_MODE_DISABLED_MESSAGE,
+};
 
 export function isCncLaserModeMessage(message: string): boolean {
   return (

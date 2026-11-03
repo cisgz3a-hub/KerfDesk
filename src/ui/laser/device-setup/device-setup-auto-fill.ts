@@ -6,7 +6,6 @@
 
 import { selectControllerDriver } from '../../../core/controllers';
 import type { ControllerKind, DeviceProfile } from '../../../core/devices';
-import type { MachineKind } from '../../../core/scene';
 import { setupChangeRows, type SetupChangeRow } from './device-setup-accept-detected';
 import {
   deviceSetupReducer,
@@ -20,8 +19,6 @@ export type DeviceSetupAutoFillSummary = {
   readonly controllerKind: ControllerKind | null;
   /** The baud that answered, when it differed from the draft. */
   readonly baudRate: number | null;
-  /** Set from the reported laser mode ($32), when it changed the machine type. */
-  readonly machineKind: MachineKind | null;
   /** True when the reported work area, speed and power values were copied. */
   readonly values: boolean;
 };
@@ -113,7 +110,6 @@ function mergeAutoFillSummary(
   return {
     controllerKind: next.controllerKind ?? first.controllerKind,
     baudRate: next.baudRate ?? first.baudRate,
-    machineKind: next.machineKind ?? first.machineKind,
     values: first.values || next.values,
   };
 }
@@ -136,10 +132,10 @@ export function planControllerAutoFill(
   // actually answered is written after it.
   const baudRate = adoptedBaudRate(state, controllerKind, report.baudRate);
   if (baudRate !== null) actions.push({ kind: 'edit', patch: { baudRate } });
-  const machineKind = listed ? null : machineKindFromLaserMode(state, report.detected);
-  if (machineKind !== null) {
-    actions.push({ kind: 'set-machine-kinds', machineKinds: [machineKind] });
-  }
+  // The machine type is never taken from `$32`: stock GRBL ships with laser
+  // mode off, so `$32=0` cannot tell a laser from a router. The type stays the
+  // one chosen, and the card asks a laser to turn laser mode on (ADR-637
+  // Amendment 7, replacing ADR-420 rule 5's type from `$32`).
   const values = Object.keys(report.detected).length > 0;
   if (values) {
     // `$130`/`$131` are travel, not the bed (ADR-420 rule 8): a listed
@@ -151,7 +147,7 @@ export function planControllerAutoFill(
     });
   }
   if (actions.length === 0) return null;
-  return { actions, summary: { controllerKind, baudRate, machineKind, values } };
+  return { actions, summary: { controllerKind, baudRate, values } };
 }
 
 function adoptedControllerKind(
@@ -174,21 +170,4 @@ function adoptedBaudRate(
       ? (state.draft.baudRate ?? selectControllerDriver(state.draft.controllerKind).defaultBaudRate)
       : selectControllerDriver(controllerKind).defaultBaudRate;
   return connectedBaudRate === draftBaud ? null : connectedBaudRate;
-}
-
-// GRBL's $32 is the one reported fact about the tool: laser mode on is how a
-// laser runs, off is how a spindle runs. A two-tool machine keeps both. A
-// machine chosen from the list already says what it is, and $32 is a setting
-// of its controller, not a measurement of the machine (ADR-240 #2), so the
-// caller keeps its type; the reported laser mode still reaches the draft
-// (ADR-637 Amendment 1).
-function machineKindFromLaserMode(
-  state: DeviceSetupState,
-  detected: Partial<DeviceProfile>,
-): MachineKind | null {
-  if (state.machineKinds.length !== 1) return null;
-  const laserMode: DeviceProfile['laserModeEnabled'] | undefined = detected.laserModeEnabled;
-  if (laserMode === undefined) return null;
-  const reported: MachineKind = laserMode ? 'laser' : 'cnc';
-  return state.machineKinds[0] === reported ? null : reported;
 }

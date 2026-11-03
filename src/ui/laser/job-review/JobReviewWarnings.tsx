@@ -2,11 +2,13 @@
 // headline per warning, always visible, with the rest of its text one click
 // away. Controller-identity evidence, a router job whose controller has laser
 // mode on or unconfirmed ($32, where the spindle skips its spin-up: CNC audit
-// JR-1, MC-1), a Focus Test without confirmed Z and a cut that runs before the
-// engraving inside it open their detail at once.
-// The laser-mode-on row carries a one-click Send $32=0 (ADR-180 Amendment 6),
-// and a cut that runs before the engraving inside it a one-click Cut last
-// (ADR-480 Amendment 2).
+// JR-1, MC-1), a laser job whose controller has laser mode off, a Focus Test
+// without confirmed Z and a cut that runs before the engraving inside it open
+// their detail at once.
+// The router laser-mode-on row carries a one-click Send $32=0 (ADR-180
+// Amendment 6), its laser twin with laser mode off a Send $32=1 (ADR-637
+// Amendment 7), and a cut that runs before the engraving inside it a one-click
+// Cut last (ADR-480 Amendment 2).
 // Never gates Confirm — these are the strings the start flow used to flash
 // in a toast, plus the job-intent set, held still and grouped. A beginner's
 // warnings lead, and motion-policy notes they cannot act on fold under
@@ -29,6 +31,7 @@ import {
 } from './job-review.styles';
 import {
   CNC_LASER_MODE_ENABLED_MESSAGE,
+  LASER_MODE_DISABLED_MESSAGE,
   isCncLaserModeMessage,
 } from '../../../core/preflight/controller-readiness';
 import { isFocusTestMachineWarning } from '../../../core/job/focus-test';
@@ -37,6 +40,7 @@ import { isCutBeforeEngravingWarning } from '../cut-order-warnings';
 import { rankReviewNotes, technicalNotesLabel } from '../review-note-rank';
 import { CutLastButton } from './CutLastButton';
 import { splitReviewWarning } from './review-warning-headline';
+import { SendLaserModeButton } from './SendLaserModeButton';
 import { SendRouterModeButton } from './SendRouterModeButton';
 import { ShowOmittedFillArtworkButton } from './ShowOmittedFillArtworkButton';
 import { ShowOmittedCncArtworkButton } from './ShowOmittedCncArtworkButton';
@@ -113,6 +117,7 @@ function WarningItem(props: { readonly warning: string }): JSX.Element {
           />
         )}
         {props.warning === CNC_LASER_MODE_ENABLED_MESSAGE ? <SendRouterModeButton /> : null}
+        {props.warning === LASER_MODE_DISABLED_MESSAGE ? <SendLaserModeButton /> : null}
         {isCutBeforeEngravingWarning(props.warning) ? <CutLastButton /> : null}
       </div>
     </li>
@@ -143,6 +148,7 @@ function opensWarningDetail(warning: string): boolean {
   return (
     isControllerIdentityWarning(warning) ||
     isCncLaserModeMessage(warning) ||
+    warning === LASER_MODE_DISABLED_MESSAGE ||
     isFocusTestMachineWarning(warning) ||
     isCutBeforeEngravingWarning(warning)
   );

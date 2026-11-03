@@ -5,7 +5,9 @@ import {
   CNC_LASER_MODE_ENABLED_MESSAGE,
   CNC_LASER_MODE_UNVERIFIED_MESSAGE,
   FLUIDNC_CNC_LASER_MODE_ENABLED_MESSAGE,
+  LASER_MODE_DISABLED_MESSAGE,
 } from '../../../core/preflight/controller-readiness';
+import { laserModeDisabledMessage } from '../../../core/preflight/controller-readiness-messages';
 import { FOCUS_TEST_Z_UNCONFIRMED_WARNING } from '../../../core/job/focus-test';
 import { jobAwareConfirm } from '../../state/job-aware-dialogs';
 import { useLaserStore } from '../../state/laser-store';
@@ -13,6 +15,8 @@ import { UNKNOWN_NATIVE_BED_MESSAGE } from '../../state/native-bed-frame';
 import { useToastStore } from '../../state/toast-store';
 import { describeUncalibratedOperations } from '../uncalibrated-job-warnings';
 import { JobReviewWarnings } from './JobReviewWarnings';
+import { LASER_MODE_CONFIRMED_MESSAGE } from '../laser-mode-write';
+import { SEND_LASER_MODE_PROMPT } from './SendLaserModeButton';
 import { ROUTER_MODE_CONFIRMED_MESSAGE, SEND_ROUTER_MODE_PROMPT } from './SendRouterModeButton';
 
 vi.mock('../../state/job-aware-dialogs', () => ({
@@ -144,7 +148,65 @@ describe('JobReviewWarnings', () => {
       variant: 'warning',
     });
   });
+
+  // UX audit U8-P2-1 (ADR-637 Amendment 7): the laser twin. A laser whose
+  // controller has laser mode off gets Send $32=1 on its row, opened at once.
+  it('offers Send $32=1 on the laser-mode-off row and writes it after a confirm', async () => {
+    const write = vi.fn(async () => undefined);
+    useLaserStore.setState({ writeGrblSetting: write });
+    const host = await renderWarnings(['Other advisory.', LASER_MODE_DISABLED_MESSAGE]);
+    expect(sendButton(host)).toBeUndefined();
+    expect(host.querySelector('summary')?.textContent).toContain('Laser mode is off ($32=0)');
+    expect(host.querySelector('details')?.open).toBe(true);
+
+    await act(async () => laserButton(host)?.click());
+
+    expect(jobAwareConfirm).toHaveBeenCalledWith(SEND_LASER_MODE_PROMPT);
+    expect(write).toHaveBeenCalledExactlyOnceWith(32, '1');
+    expect(useToastStore.getState().toasts.at(-1)).toMatchObject({
+      message: LASER_MODE_CONFIRMED_MESSAGE,
+      variant: 'success',
+    });
+  });
+
+  it('leaves Send $32=1 off the FluidNC row and off a driver that writes no $ settings', async () => {
+    expect(laserButton(await renderWarnings([FLUIDNC_LASER_MODE_DISABLED]))).toBeUndefined();
+    const capabilities = useLaserStore.getState().capabilities;
+    useLaserStore.setState({ capabilities: { ...capabilities, settings: 'grbl-dollar-read' } });
+    try {
+      expect(laserButton(await renderWarnings([LASER_MODE_DISABLED_MESSAGE]))).toBeUndefined();
+    } finally {
+      useLaserStore.setState({ capabilities });
+    }
+  });
+
+  it('writes no $32=1 when the operator declines, and reports a refusal', async () => {
+    vi.mocked(jobAwareConfirm).mockReturnValue(false);
+    const write = vi.fn(async () => undefined);
+    useLaserStore.setState({ writeGrblSetting: write });
+    const declined = await renderWarnings([LASER_MODE_DISABLED_MESSAGE]);
+    await act(async () => laserButton(declined)?.click());
+    expect(write).not.toHaveBeenCalled();
+
+    vi.mocked(jobAwareConfirm).mockReturnValue(true);
+    const reason = 'Machine must report Idle before writing firmware settings.';
+    useLaserStore.setState({
+      writeGrblSetting: vi.fn(async () => Promise.reject(new Error(reason))),
+    });
+    const refused = await renderWarnings([LASER_MODE_DISABLED_MESSAGE]);
+    await act(async () => laserButton(refused)?.click());
+    expect(useToastStore.getState().toasts.at(-1)).toMatchObject({
+      message: `$32=1 was not written: ${reason}`,
+      variant: 'warning',
+    });
+  });
 });
+
+const FLUIDNC_LASER_MODE_DISABLED = laserModeDisabledMessage('fluidnc-yaml');
+
+function laserButton(host: HTMLElement): HTMLButtonElement | undefined {
+  return [...host.querySelectorAll('button')].find((b) => b.textContent === 'Send $32=1');
+}
 
 // UX audit U4-P2-6 (ADR-687): a first job's review led with four expert
 // notes. A beginner's warnings now lead, and technical notes fold.

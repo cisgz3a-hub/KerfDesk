@@ -20,10 +20,16 @@ export function readinessSettingsSource(
   return capability === 'readonly-dump' ? 'fluidnc-yaml' : 'dollar-settings';
 }
 
+// With laser mode off, GRBL "will briefly pause upon any spindle speed or state
+// change" (gnea/grbl v1.1h laser_mode.md): every S change empties the planner
+// first, so the head stops with the old power still on (UX audit U8-P2-1).
+export const LASER_MODE_DISABLED_MESSAGE =
+  'Laser mode is off ($32=0): the laser stops with the beam on at every power change, which burns dots and slows the job. Send $32=1 to turn laser mode on.';
+
 export function laserModeDisabledMessage(source: ReadinessSettingsSource): string {
   return source === 'fluidnc-yaml'
     ? "Controller reports $32=0: its spindle is not a Laser spindle. FluidNC's $32 follows the spindle type and cannot be set with $32=1, so configure the spindle as Laser in the FluidNC YAML config, or choose the GRBL Compatible (constant-power) output dialect in Machine Setup: dynamic power (M4) needs a Laser spindle."
-    : 'Controller reports $32=0. Enable GRBL laser mode ($32=1) before starting from KerfDesk.';
+    : LASER_MODE_DISABLED_MESSAGE;
 }
 
 export function laserModeUnverifiedMessage(source: ReadinessSettingsSource): string {
