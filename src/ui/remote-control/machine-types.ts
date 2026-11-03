@@ -93,7 +93,11 @@ export type MachineReview = {
     readonly totalStats: number;
     readonly totalSummaries: number;
   };
-  readonly acknowledgement: JobReviewModel['acknowledgement'];
+  // The prompt leads with the Before you start points (ADR-689).
+  readonly acknowledgement: {
+    readonly kind: JobReviewModel['acknowledgement']['kind'];
+    readonly prompt: string;
+  };
   readonly frame: { readonly required: true; readonly complete: boolean };
 };
 export type MachineOperationKind =

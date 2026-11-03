@@ -9,6 +9,7 @@ import {
   useMachineSetupDialogStore,
 } from './device-setup/machine-setup-dialog-store';
 import { JogPad } from './JogPad';
+import { MANUAL_FOCUS_HINT } from './FocusJogControls';
 import { DEFAULT_JOG_STEP_MM, useJogControlPreferences } from './jog-control-preferences';
 import { DEFAULT_JOG_FEED_MM_PER_MIN } from './jog-control-policy';
 
@@ -283,7 +284,7 @@ describe('JogPad accessible labels', () => {
   it('shows manual focus guidance when the active profile has no powered Z axis', async () => {
     const { host, unmount } = await renderJogPad();
 
-    expect(host.textContent).toContain('Manual focus: adjust the laser head by hand.');
+    expect(host.textContent).toContain(MANUAL_FOCUS_HINT);
     expect(buttonByLabel(host, 'Jog Z+ 1 mm')).toBeNull();
 
     await unmount();

@@ -190,6 +190,12 @@ export const warnItemSummaryStyle: CSSProperties = {
   listStyle: 'none',
 };
 
+// Keeps the disclosure marker so a folded block still reads as one (ADR-689).
+export const beforeYouStartSummaryStyle: CSSProperties = {
+  cursor: 'pointer',
+  fontWeight: 600,
+};
+
 export const warnChevronStyle: CSSProperties = {
   display: 'inline-flex',
   marginLeft: 6,
