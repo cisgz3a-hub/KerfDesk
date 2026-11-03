@@ -208,6 +208,17 @@ startup crash is shown at once. It introduces no startup interaction or modal.
    (warning): `Opening <filename>. Ignored <n> other dropped file(s); drop artwork again once the
    project opens.`
 
+#### Success — a logo with white parts (ADR-686)
+1. User drops a logo with white shapes over a darker fill: a white diamond on a black badge, or
+   white letters on a black plate, written as `fill="#fff"`, `white`, a `style` or a CSS class.
+2. White is the material showing through. Each white fill is cut out of the fills painted before
+   it, and the white shape itself is left out, so nothing burns where the logo is white. A shape
+   painted over the white stays whole; a white background painted first is simply left out.
+3. A design drawn only in white (for dark material) is imported as before and burns its shapes.
+4. Toast (warning, last): `logo.svg: 1 white shape will not burn, as in the file: it was cut out of
+   the shapes under it. To burn the white too, Undo: it returns on its own operation.` The first
+   Undo puts the white shapes back on their own operation; the next removes the import.
+
 #### Success — SVG with embedded raster image
 1. Embedded PNG, JPEG, BMP and WebP pixels are decoded into raster artwork, preserving the SVG
    image bounds, rotation, unequal scale and mirroring. Bitmap DPI does not change SVG placement.

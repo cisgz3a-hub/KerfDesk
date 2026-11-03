@@ -42,6 +42,7 @@ import {
 } from './scene-mutations';
 import { applyDrawShape } from './draw-shape-mutation';
 import { applyImportBedFit } from './import-bed-fit';
+import { applyImportWhiteKnockout, withWhiteKnockout } from './import-white-knockout';
 import {
   applyAddRegistrationBox,
   applyRemoveRegistrationBox,
@@ -334,8 +335,10 @@ function svgFragmentActions(
           ),
           options,
         );
-        outcome = fitted.outcome;
-        return fitted.state;
+        // After the fit, so the first Undo puts back the white shapes (ADR-686).
+        const knocked = applyImportWhiteKnockout(fitted.state);
+        outcome = withWhiteKnockout(fitted.outcome, knocked.whiteKnockout);
+        return knocked.state;
       });
       fitAllObjects(get);
       return outcome;
@@ -345,14 +348,17 @@ function svgFragmentActions(
       set((state) => {
         const next = applySvgFragmentReimport(state, targetId, fragment);
         if (next === null) return state;
-        outcome = next.outcome;
-        return applyLayerDefaultsToFreshLayers(
-          state.project.scene.layers,
-          next.state,
-          svgStructuralDefaults(state.layerDefaults),
-          state.cncLiveCaps,
-          state.materialLibrary,
+        const knocked = applyImportWhiteKnockout(
+          applyLayerDefaultsToFreshLayers(
+            state.project.scene.layers,
+            next.state,
+            svgStructuralDefaults(state.layerDefaults),
+            state.cncLiveCaps,
+            state.materialLibrary,
+          ),
         );
+        outcome = withWhiteKnockout(next.outcome, knocked.whiteKnockout);
+        return knocked.state;
       });
       if (outcome !== null) fitAllObjects(get);
       return outcome;
