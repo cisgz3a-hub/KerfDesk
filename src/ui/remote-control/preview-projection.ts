@@ -2,7 +2,7 @@ import { fillPoolRuns, type FillPoolRuns } from '../../core/scene/fill-operation
 import type { AppState } from '../state/store';
 import { canvasTheme } from '../theme/canvas-theme';
 import { paintObjectDisplay } from '../workspace/object-display';
-import { paintPooledObjectDisplays } from '../workspace/fill-pools';
+import { paintPooledObjectDisplays } from '../workspace/fill-pool-paint';
 import type { RemoteControlOptions } from './types';
 import { RemoteFault } from './fault';
 import {

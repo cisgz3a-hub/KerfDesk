@@ -2,7 +2,12 @@
 // sweep. It has to answer exactly what scanning every gap answers.
 import { describe, expect, it } from 'vitest';
 import type { AABB } from '../../core/scene';
-import { drawnOverClusters, type DrawnCluster } from './fill-pool-clusters';
+import {
+  drawnOverClusters,
+  overlappingGroups,
+  regroupMoved,
+  type DrawnCluster,
+} from './fill-pool-clusters';
 
 function bruteForce(
   clusters: ReadonlyArray<DrawnCluster>,
@@ -82,5 +87,54 @@ describe('drawnOverClusters', () => {
     };
 
     expect(drawnOverClusters([cluster], 6, boxAt)).toEqual([[]]);
+  });
+});
+
+describe('drawnOverClusters with the members’ boxes (S2-P2-3)', () => {
+  const cluster = {
+    indexes: [0, 2],
+    box: { minX: 0, minY: 0, maxX: 30, maxY: 30 },
+    boxes: [
+      { minX: 0, minY: 0, maxX: 20, maxY: 20 },
+      { minX: 10, minY: 10, maxX: 30, maxY: 30 },
+    ],
+  };
+
+  it('leaves out artwork in a corner of the cluster’s box that meets no member', () => {
+    const corner = { minX: 22, minY: 2, maxX: 26, maxY: 6 };
+
+    expect(drawnOverClusters([cluster], 3, () => corner)).toEqual([[]]);
+  });
+
+  it('still counts artwork that meets a member', () => {
+    const over = { minX: 18, minY: 2, maxX: 26, maxY: 6 };
+
+    expect(drawnOverClusters([cluster], 3, () => over)).toEqual([[1]]);
+  });
+});
+
+describe('regroupMoved', () => {
+  it.each([1, 2, 3, 4, 5, 6])('gives what a full sweep gives (seed %i)', (seed) => {
+    const random = seeded(seed);
+    const boxes = Array.from({ length: 150 }, () => randomBox(random));
+    const moved = [
+      ...new Set(Array.from({ length: 1 + (seed % 5) }, () => Math.floor(random() * 150))),
+    ].sort((a, b) => a - b);
+    const stay = boxes.flatMap((_, position) => (moved.includes(position) ? [] : [position]));
+    const restGroups = overlappingGroups(stay.map((position) => boxes[position] as AABB)).map(
+      (group) => group.map((slot) => stay[slot] as number),
+    );
+
+    expect(regroupMoved(boxes, restGroups, moved)).toEqual(overlappingGroups(boxes));
+  });
+
+  it('joins two groups a moved box bridges', () => {
+    const boxes = [
+      { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+      { minX: 20, minY: 0, maxX: 30, maxY: 10 },
+      { minX: 8, minY: 0, maxX: 22, maxY: 10 },
+    ];
+
+    expect(regroupMoved(boxes, [[0], [1]], [2])).toEqual([[0, 1, 2]]);
   });
 });
