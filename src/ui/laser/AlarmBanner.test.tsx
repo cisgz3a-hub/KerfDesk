@@ -53,11 +53,38 @@ function buttons(container: HTMLElement): string[] {
 
 describe('AlarmBanner', () => {
   it('offers only Reset while the controller requires a soft reset', async () => {
-    const { host, props } = await render({ resetRequired: true });
+    const { host, props } = await render({ code: 2, resetRequired: true });
     expect(buttons(host)).toEqual(['Reset (Ctrl-X)']);
     expect(host.textContent).toContain('accepts only a soft reset');
     await act(async () => (host.querySelector('button') as HTMLButtonElement).click());
     expect(props.onReset).toHaveBeenCalledOnce();
+  });
+
+  // UX audit U5-P3-2: the alarm's own physical step comes before the reset; a
+  // reset with the E-stop still pressed only raises the alarm again.
+  it.each([
+    [1, 'grbl-v1.1', 'move it off the limit switch'],
+    [10, 'grblhal', 'Release the E-stop'],
+    // A banner-less grblHAL board runs on the stock driver; stock GRBL's own
+    // alarm 10 is never critical.
+    [10, 'grbl-v1.1', 'Release the E-stop'],
+    [13, 'fluidnc', 'Release the E-stop'],
+  ] as const)('ALARM:%i on %s names its own step before Reset', async (code, kind, step) => {
+    const { host } = await render({ code, controllerKind: kind, resetRequired: true });
+    expect(buttons(host)).toEqual(['Reset (Ctrl-X)']);
+    const text = host.textContent ?? '';
+    expect(text).toContain(step);
+    expect(text.indexOf(step)).toBeLessThan(text.indexOf('Then press Reset (Ctrl-X)'));
+  });
+
+  // UX audit U5-P2-1: no ALARM:N was seen, so the lock predates the connection.
+  it('says a lock from before the connection needs a reset, and nothing about Unlock first', async () => {
+    const { host } = await render({ code: null, resetRequired: true });
+    expect(buttons(host)).toEqual(['Reset (Ctrl-X)']);
+    expect(host.textContent).toContain('Controller needs a reset');
+    expect(host.textContent).toContain('before KerfDesk connected');
+    expect(host.textContent).toContain('Release the E-stop or move the head off the switch');
+    expect(host.textContent).not.toContain('until the machine is homed or unlocked');
   });
 
   // Controller audit A-7 (ADR-375): stock GRBL refused a `$HX` with error:3 and

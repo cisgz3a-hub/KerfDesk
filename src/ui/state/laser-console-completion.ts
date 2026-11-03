@@ -83,7 +83,8 @@ export function isSettingsReadOperation(operation: LaserState['controllerOperati
  *  carry them (probe-failure-alarm.ts). Work Z is void either way. The alarm
  *  code stays until a report that is not Alarm clears it: FluidNC acknowledges
  *  `$X` in its Critical state without unlocking, and its next report still
- *  reads Alarm (controller audit 2026-09-25 HF-2). */
+ *  reads Alarm (controller audit 2026-09-25 HF-2), which latches a reset
+ *  (controller-reset-required.ts; UX audit U5-P2-1). */
 export function controllerUnlockedPatch(
   state: LaserState,
   unlockedAlarm: number | null,
@@ -94,6 +95,7 @@ export function controllerUnlockedPatch(
     homingProof: null,
     ...(probeFailed ? {} : positionLostAtUnlockPatch(state)),
     statusReport: null,
+    unlockAwaitsReport: true,
     statusObservation: null,
     workZZeroEvidence: null,
     workZReferenceEpoch: state.workZReferenceEpoch + 1,
