@@ -9,6 +9,7 @@ import { assertNever } from '../../../core/scene';
 import { helpProps } from '../../help/help-topics';
 import { Button } from '../../kit';
 import type { DeviceSetupStepProps } from './device-setup-flow';
+import { DeviceSetupConnectHelp } from './DeviceSetupConnectHelp';
 import { DeviceSetupConnectionOptions } from './DeviceSetupConnectionOptions';
 import { DeviceSetupFoundMachine } from './DeviceSetupFoundMachine';
 import { DeviceSetupUseDetectedController } from './DeviceSetupUseDetectedController';
@@ -42,6 +43,7 @@ export function DeviceSetupConnectStep(props: Props): JSX.Element {
         <FindActions model={model} phase={phase} />
       </div>
       {model.connectionBlocked === null ? null : <p role="alert">{model.connectionBlocked}</p>}
+      <DeviceSetupConnectHelp connection={model.laser.connection} phase={phase.kind} />
       {phase.kind === 'found' ? (
         <DeviceSetupFoundMachine
           state={props.state}

@@ -30,13 +30,13 @@ describe('machineSettingsReadBlockReason', () => {
       'Connect to the laser first.',
     );
     expect(machineSettingsReadBlockReason(state({ statusReport: null }))).toBe(
-      'Controller must report Idle or Alarm before reading machine settings.',
+      'The machine has not reported Idle or Alarm yet, so its settings cannot be read.',
     );
     expect(
       machineSettingsReadBlockReason(
         state({ statusReport: { state: 'Run' } as LaserState['statusReport'] }),
       ),
-    ).toBe('Controller must report Idle or Alarm before reading machine settings.');
+    ).toBe('The machine has not reported Idle or Alarm yet, so its settings cannot be read.');
     expect(
       machineSettingsReadBlockReason(
         state({ statusReport: { state: 'Alarm' } as LaserState['statusReport'] }),

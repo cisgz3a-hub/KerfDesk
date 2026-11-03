@@ -191,6 +191,27 @@ draft means an operator change Save would apply: device, machine or CNC values, 
 queued firmware writes or the staged CNC job plan. A new machine's automatic fill from its
 controller alone does not ask, since the next Connect repeats it; nor does an edit put back.
 
+#### Amendment 5 - An empty or cancelled port picker says so; Can't connect? inside Machine Setup (2026-11-03)
+
+The new-user audit found the most likely first-day blocker still silent: with no CH340 or CP210x
+driver, the browser's port list is empty, and after Cancel KerfDesk returned to "Not connected"
+with nothing else (UX audit U2, KNOWN since the 2026-07-10 sweep's S12-F2; WORKFLOW.md specified
+the silence). Help > Can't connect? was a `window.alert` ending in a repository path that the app
+does not ship (S12-F1), and the modal Machine Setup window covered the Help menu (U2-P3-6).
+
+- A Connect that showed the picker and got no port leaves the connection `disconnected` with
+  `noPortChosen`, and logs one line. Web Serial reports Cancel and an empty list alike
+  (`NotFoundError`), so the hint names both: "No port was chosen. Don’t see your machine in the
+  list? It may need its USB driver (CH340 or CP210x)." It shows in the toolbar and in Machine
+  Setup's connection strip with **Can’t connect?**, and lasts until the next attempt. An automatic
+  or remembered-only connect shows no picker, so it never shows the hint. Still no toast, error
+  state or incident: nothing failed. The desktop app's own "No serial ports found" box
+  (`electron/serial-port-wait.ts`) is unchanged; Cancel there gives the same hint.
+- Can't connect? is an in-app dialog with the same plain text and a **Full guide on
+  kerfdesk.com** button for the published `kerfdesk.com/docs/#troubleshooting`. Help opens it;
+  the strip offers it while the machine has not answered (idle, failed, silent), over the setup
+  window, as the CNC wrap reference already nests.
+
 #### Existing consequences
 
 - On Windows, and for adapters with a USB serial number elsewhere, a machine set up once connects

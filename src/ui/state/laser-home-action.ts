@@ -1,4 +1,5 @@
 import type { ControllerDriver } from '../../core/controllers';
+import type { ControllerKind } from '../../core/devices';
 import {
   ControllerCommandRefusedError,
   startControllerCommand,
@@ -302,7 +303,8 @@ function recordHomeFailure(set: SetFn, error: unknown, epochs: HomeEpochs): void
       homingProof: null,
       ...refusedHomePositionPatch(state, operation, error, epochs),
       lastWriteError: message,
-      safetyNotice: state.safetyNotice ?? homeFailureNotice(error, message),
+      safetyNotice:
+        state.safetyNotice ?? homeFailureNotice(error, message, state.activeControllerKind),
       log: pushLog(state, `[lf2] Home failed: ${message}`),
     };
   });
@@ -310,13 +312,17 @@ function recordHomeFailure(set: SetFn, error: unknown, epochs: HomeEpochs): void
 
 // Only a line the controller answered with error:N was rejected; a timeout, an
 // alarm or a voided attempt is a Home that did not finish (audit ST-4).
-function homeFailureNotice(error: unknown, message: string): LaserSafetyNotice {
+function homeFailureNotice(
+  error: unknown,
+  message: string,
+  controllerKind: ControllerKind,
+): LaserSafetyNotice {
   if (error instanceof HomeNotConfirmedError) return homeNotConfirmedNotice(message);
   if (!(error instanceof ControllerCommandRefusedError)) return homeUnfinishedNotice(message);
   const code = /^error:(\d+)$/i.exec(message.trim());
   return code === null
-    ? controllerErrorNotice(null, 'command', message)
-    : controllerErrorNotice(Number(code[1]), 'command');
+    ? controllerErrorNotice(null, 'command', message, undefined, controllerKind)
+    : controllerErrorNotice(Number(code[1]), 'command', undefined, undefined, controllerKind);
 }
 
 // KD-HOME-03/04 hides status positions after a failed Home because the cycle

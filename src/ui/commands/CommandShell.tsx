@@ -1,7 +1,7 @@
 import { useCallback, useState, type ComponentType } from 'react';
 import { APP_DISPLAY_NAME } from '../../core/app-branding';
 import { primaryOperationForObject } from '../../core/scene';
-import { CONNECTION_HELP_TEXT } from '../help/connection-help';
+import { ConnectionHelpHost, showConnectionHelp } from '../help/ConnectionHelpDialog';
 import { SAFETY_NOTICE_TEXT } from '../help/safety-notice';
 import { LicenseNoticeHost } from '../help/LicenseNoticeDialog';
 import { useStore } from '../state';
@@ -118,7 +118,7 @@ export function CommandShell(): JSX.Element {
     requestUndoHistory: () => setUndoHistoryOpen(true),
     requestCloseOpenFillContoursWithTolerance: () => setCloseToleranceDialogOpen(true),
     showAbout: () => jobAwareAlert(aboutText()),
-    showConnectionHelp: () => jobAwareAlert(CONNECTION_HELP_TEXT),
+    showConnectionHelp,
     showSafety: () => jobAwareAlert(SAFETY_NOTICE_TEXT),
   });
   return (
@@ -186,6 +186,7 @@ function StoreOpenedDialogs(): JSX.Element {
       <PhotoEngravingDialogHost />
       <ToneCalibrationDialogHost />
       <LicenseNoticeHost />
+      <ConnectionHelpHost />
     </>
   );
 }

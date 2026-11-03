@@ -177,7 +177,15 @@ async function runPostJobSettle(
             controllerOperation: null,
             ...frameProofReset(),
             lastWriteError: message,
-            safetyNotice: state.safetyNotice ?? controllerErrorNotice(null, 'command', message),
+            safetyNotice:
+              state.safetyNotice ??
+              controllerErrorNotice(
+                null,
+                'command',
+                message,
+                undefined,
+                state.activeControllerKind,
+              ),
             log: pushLog(state, `[lf2] Post-job controller settle failed: ${message}`),
             ...liveCanvasLifecyclePatch(state, 'errored'),
             ...liveCanvasTimingUnavailablePatch(

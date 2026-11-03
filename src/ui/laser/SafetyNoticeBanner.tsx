@@ -8,7 +8,16 @@
 
 import { useLaserStore } from '../state/laser-store';
 import type { LaserSafetyNotice } from '../state/laser-safety-notice';
+import type { RecoveryRepositorySnapshot } from '../state/recovery';
+import { useRecoveryRepositorySelection } from '../state/use-recovery-repository';
+import { openMachineSetup } from './device-setup/machine-setup-dialog-store';
 import { controllerActionFailureHandler } from './report-controller-action-failure';
+
+// The checkpoint paragraph only where a job left one, or one is running: a
+// refused Home or jog before any job has none to tell apart (UX audit U2-P2-2).
+function selectCheckpointHeld(snapshot: RecoveryRepositorySnapshot): boolean {
+  return snapshot.activeRun !== null || snapshot.recoveryCapsule !== null;
+}
 
 const SAFETY_NOTICE_TITLES: Record<LaserSafetyNotice['kind'], string> = {
   'write-failed': 'Controller write failed',
@@ -30,6 +39,10 @@ function safetyNoticeTitle(notice: LaserSafetyNotice): string {
   if (notice.kind === 'disconnect-during-job' && notice.cause === 'motion') {
     return 'Connection lost while moving';
   }
+  // A halt rejected nothing: the firmware stopped itself (UX audit U5-P3-6).
+  if (notice.kind === 'controller-error' && notice.halted === true) {
+    return 'Controller halted: press its reset button';
+  }
   return SAFETY_NOTICE_TITLES[notice.kind];
 }
 
@@ -48,6 +61,7 @@ export function SafetyNoticeBanner(props: Props = {}): JSX.Element | null {
   const controllerOperation = useLaserStore((s) => s.controllerOperation);
   const clear = useLaserStore((s) => s.clearSafetyNotice);
   const wakeController = useLaserStore((s) => s.wakeController);
+  const checkpointHeld = useRecoveryRepositorySelection(selectCheckpointHeld);
   if (notice === null) return null;
   const title = safetyNoticeTitle(notice);
   const resetAvailable = connection.kind === 'connected' && statusState === 'Sleep';
@@ -58,10 +72,12 @@ export function SafetyNoticeBanner(props: Props = {}): JSX.Element | null {
     <div style={bannerStyle} role="alert">
       <strong style={titleStyle}>{title}</strong>
       <p style={messageStyle}>{notice.message}</p>
-      <p style={guidanceStyle}>
-        This warning is separate from the interrupted-job checkpoint. Reconnecting or resetting the
-        controller does not resume the job and does not erase that checkpoint.
-      </p>
+      {checkpointHeld ? (
+        <p style={guidanceStyle}>
+          This warning is separate from the interrupted-job checkpoint. Reconnecting or resetting
+          the controller does not resume the job and does not erase that checkpoint.
+        </p>
+      ) : null}
       <div style={actionsStyle}>
         {reconnectRecommended && props.onReconnect !== undefined ? (
           <button
@@ -72,6 +88,16 @@ export function SafetyNoticeBanner(props: Props = {}): JSX.Element | null {
             title="Close any stale serial session and reconnect the controller. This ends any paused job."
           >
             {connection.kind === 'connecting' ? 'Reconnecting…' : 'Reconnect controller…'}
+          </button>
+        ) : null}
+        {notice.kind === 'controller-error' && notice.homingOff === true ? (
+          <button
+            type="button"
+            onClick={() => openMachineSetup({ kind: 'step', step: 'confirm' })}
+            style={recoverStyle}
+            title="Open Machine Setup at Essentials, where Enable Home is set."
+          >
+            Open Machine Setup
           </button>
         ) : null}
         {resetAvailable ? (

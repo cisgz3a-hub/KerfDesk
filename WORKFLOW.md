@@ -2133,8 +2133,20 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 #### Error — WebSerial not supported
 1. Connection button is disabled, with a red hint above: "Your browser doesn't support WebSerial. Use Chrome, Edge, Brave (may require enabling under Brave Shields/flags), or Arc, or install the Windows desktop app."
 
-#### Error — user cancels picker
-1. App returns to disconnected state, no error surfaced.
+#### Error — user cancels picker, or the picker lists no port
+1. App returns to the disconnected state with no error and no incident. Web Serial reports a
+   Cancel and an empty list the same way, and an empty list on Windows usually means the USB
+   chip's driver is missing, so the toolbar and Machine Setup's connection strip both say:
+   "No port was chosen. Don’t see your machine in the list? It may need its USB driver (CH340
+   or CP210x)." with **Can’t connect?**, which opens the connection help. The hint stays until
+   the next connect attempt. An automatic connect never shows the picker, so it never shows
+   this hint (UX audit U2, 2026-07-10 S12-F2).
+2. The desktop app keeps an empty picker open behind its own "No serial ports found" box, which
+   names the same drivers and offers Retry; Cancel there gives the same hint.
+3. **Can’t connect?** is an in-app dialog, reachable from Help, from the hint, and from Machine
+   Setup's connection strip while the machine has not answered, because the setup window is
+   modal and covers the Help menu. Its full guide is the published page,
+   kerfdesk.com/docs/#troubleshooting.
 
 #### Error — port open failure
 1. App stays in `failed` state: the card reads **Couldn’t connect** with the reason inline. A port
@@ -2178,7 +2190,16 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 2. Status polling shows the controller entering `Home` then returning to `Idle`.
 
 #### Error — homing not enabled
-1. Controller replies `error:10`. UI surfaces the message from `describeError(10)`.
+1. GRBL and grblHAL reply `error:5` (`$22=0`); FluidNC replies `error:18`. Nothing moves.
+2. The red notice decodes it and says what to do: homing is turned off in the controller; if
+   the machine has no homing switches, untick Enable Home in Machine Setup and set the origin
+   by hand; if it has switches, homing can be turned on with `$22=1`, never on a machine without
+   switches. **Open Machine Setup** opens Essentials. The Console line says the same
+   (UX audit U2-P2-2, U2-P3-9).
+3. Every beginner-facing controller notice and action toast decodes `error:N` and `ALARM:N`
+   with the Console's tables for the connected firmware (GRBL, grblHAL, FluidNC); Marlin's text
+   reply is quoted. Notices name the **Console** as the place every reply is shown. The
+   interrupted-job checkpoint paragraph shows only when a job is running or left a checkpoint.
 
 ### F-B4. Frame
 

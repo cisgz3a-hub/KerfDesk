@@ -1,10 +1,21 @@
-// Plain-text connection-troubleshooting help, shown from the Machine/Help menu
-// (audit finding #41: in-product help was only an About alert). The medium is a
-// text alert (jobAwareAlert), so this is deliberately plain — NO Markdown. The
+// Plain-text connection-troubleshooting help, shown from Help and from Machine
+// Setup's connection strip (audit finding #41; UX audit U2-P3-6). It is shown
+// pre-formatted in an in-app dialog, so it stays plain: NO Markdown. The
 // long-form version, including the full USB-chip driver table, lives in
-// docs/connection-troubleshooting.md; keep the two in sync when either changes.
+// docs/connection-troubleshooting.md, and the published one on the website's
+// Get started page; keep them in sync when either changes. The app ships
+// without docs/, so the help names the published page (2026-07-10 S12-F1).
 
-export const CONNECTION_HELP_TEXT = [
+/** The published troubleshooting section (website/pages/docs.mjs). */
+export const CONNECTION_GUIDE_URL = 'https://kerfdesk.com/docs/#troubleshooting';
+
+export const CONNECTION_HELP_TITLE = "Can't connect?";
+
+/** Opens the connection help dialog from anywhere (Help menu, toolbar hint). */
+export const CONNECTION_HELP_EVENT = 'kerfdesk:connection-help';
+
+/** The steps, without the closing pointer to the published guide. */
+export const CONNECTION_HELP_STEPS = [
   "Can't connect to your machine?",
   '',
   'Most connection problems are one of these. Try them in order:',
@@ -44,6 +55,6 @@ export const CONNECTION_HELP_TEXT = [
   ' - Use a short, shielded USB cable, away from spindle and laser power leads.',
   '',
   'CAMERA: USB webcams work directly. RTSP/IP cameras need ffmpeg installed.',
-  '',
-  'Full guide: docs/connection-troubleshooting.md',
 ].join('\n');
+
+export const CONNECTION_HELP_TEXT = `${CONNECTION_HELP_STEPS}\n\nFull guide: ${CONNECTION_GUIDE_URL}`;

@@ -433,7 +433,7 @@ describe('handleLine controller error (P0-1)', () => {
       code: null,
       raw: 'error:7002009',
       rejectedLine: 'G1 X1',
-      message: expect.stringContaining('unrecognized controller error response: error:7002009'),
+      message: expect.stringContaining('so the job was stopped: error:7002009.'),
     });
   });
 });
