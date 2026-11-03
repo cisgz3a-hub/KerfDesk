@@ -39,11 +39,25 @@ export function fillRunwayPolicyForDevice(
 // accidentally leave selected on a real 4040. Surface a conditional advisory
 // for that starter (and for a declared 4040 profile whose dialect drifted)
 // without warning Falcon or unrelated custom profiles.
+//
+// "My machine isn't listed" saves its machine on the generic starter's
+// profile id (ADR-637), but the 4040 is in that list, so a machine named
+// there, or given another bed, has been declared not to be one (UX audit
+// U3-P3-6, ADR-686). Only the starter as it ships is still ambiguous.
 export function shouldAdvise4040FillPolicySelection(device: DeviceProfile): boolean {
   if (fillRunwayPolicyForDevice(device) !== undefined) return false;
   return (
-    device.profileId === DEFAULT_DEVICE_PROFILE.profileId ||
+    isUnnamedGenericStarter(device) ||
     device.profileId === NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.profileId ||
     device.machineFamily === NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.machineFamily
+  );
+}
+
+function isUnnamedGenericStarter(device: DeviceProfile): boolean {
+  return (
+    device.profileId === DEFAULT_DEVICE_PROFILE.profileId &&
+    device.name === DEFAULT_DEVICE_PROFILE.name &&
+    device.bedWidth === DEFAULT_DEVICE_PROFILE.bedWidth &&
+    device.bedHeight === DEFAULT_DEVICE_PROFILE.bedHeight
   );
 }

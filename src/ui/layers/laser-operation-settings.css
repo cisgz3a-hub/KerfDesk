@@ -212,6 +212,16 @@
   border-radius: 0 6px 6px 0;
 }
 
+.lf-laser-link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--lf-accent-fg);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 /* Full-width tracks leave room for dragging and exact numeric entry. */
 .lf-laser-essentials__grid {
   display: grid;

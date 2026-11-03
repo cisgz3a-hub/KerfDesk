@@ -5,7 +5,9 @@
 // inside React render code.
 //
 // Variants intentionally limited to four — anything richer than this (e.g.
-// action buttons, "show details" expansion) belongs in a modal, not a toast.
+// action buttons) belongs in a modal, not a toast. The one exception is a
+// short list of notes folded under one line (`details`), so a burst of
+// expert notes after Save G-code takes one slot (UX audit U3-P3-6, ADR-686).
 
 import { create } from 'zustand';
 
@@ -27,15 +29,22 @@ export type Toast = {
   readonly variant: ToastVariant;
   /** A keyed toast is one slot: pushing the same key again rewrites it. */
   readonly key?: string;
+  /** Notes folded under the message, shown when the operator opens them. */
+  readonly details?: ReadonlyArray<string>;
 };
 
-export type ToastOptions = { readonly key?: string };
+export type ToastOptions = {
+  readonly key?: string;
+  readonly details?: ReadonlyArray<string>;
+};
 
 type ToastState = {
   readonly toasts: ReadonlyArray<Toast>;
   readonly pushToast: (message: string, variant?: ToastVariant, options?: ToastOptions) => void;
   readonly dismissToast: (id: string) => void;
   readonly dismissToastKey: (key: string) => void;
+  /** Stops a toast's auto-dismiss: the operator opened it to read. */
+  readonly holdToast: (id: string) => void;
 };
 
 // Active auto-dismiss timers, keyed by toast id. Held outside the store
@@ -50,13 +59,16 @@ const timers = new Map<string, ReturnType<typeof setTimeout>>();
 export const useToastStore = create<ToastState>((set, get) => ({
   toasts: [],
   pushToast: (message, variant = 'info', options = {}) => {
-    const { key } = options;
+    const { key, details } = options;
+    const folded = details === undefined || details.length === 0 ? {} : { details };
     const existing = key === undefined ? undefined : get().toasts.find((t) => t.key === key);
     if (existing !== undefined) {
       // Same slot, new text: progress reads as one updating line, not a stack.
       clearTimeout(timers.get(existing.id));
       set((s) => ({
-        toasts: s.toasts.map((t) => (t.id === existing.id ? { ...t, message, variant } : t)),
+        toasts: s.toasts.map((t) =>
+          t.id === existing.id ? { ...withoutDetails(t), message, variant, ...folded } : t,
+        ),
       }));
       scheduleDismiss(existing.id, variant, get);
       return;
@@ -66,7 +78,10 @@ export const useToastStore = create<ToastState>((set, get) => ({
         ? crypto.randomUUID()
         : `t-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     set((s) => ({
-      toasts: [...s.toasts, { id, message, variant, ...(key === undefined ? {} : { key }) }],
+      toasts: [
+        ...s.toasts,
+        { id, message, variant, ...(key === undefined ? {} : { key }), ...folded },
+      ],
     }));
     scheduleDismiss(id, variant, get);
   },
@@ -82,7 +97,17 @@ export const useToastStore = create<ToastState>((set, get) => ({
     const keyed = get().toasts.find((t) => t.key === key);
     if (keyed !== undefined) get().dismissToast(keyed.id);
   },
+  holdToast: (id) => {
+    clearTimeout(timers.get(id));
+    timers.delete(id);
+  },
 }));
+
+function withoutDetails(toast: Toast): Toast {
+  if (toast.details === undefined) return toast;
+  const { details: _details, ...rest } = toast;
+  return rest;
+}
 
 function scheduleDismiss(id: string, variant: ToastVariant, get: () => ToastState): void {
   // Schedule auto-dismiss out of band — toast lifetime is decoupled from

@@ -9,6 +9,7 @@ import {
 import { shouldAdvise4040FillPolicySelection } from '../../core/job/fill-runway-policy';
 import { pixelExtentForMm } from '../../core/raster';
 import {
+  machineKindOf,
   pathUsesOperation,
   sceneObjectUsesOperation,
   type Layer,
@@ -19,6 +20,7 @@ import {
 import { effectiveOperationForObject } from '../../core/scene/effective-operation';
 import { compileDiagnosticWarnings } from './compile-diagnostic-warnings';
 import { constantPowerWarnings } from './constant-power-warnings';
+import { cutOrderWarnings } from './cut-order-warnings';
 import { rasterEnergyWarnings } from './raster-energy-warnings';
 import { rasterPassThroughWarnings } from './raster-pass-through-warnings';
 import { rasterThresholdWarnings } from './raster-threshold-warnings';
@@ -49,6 +51,7 @@ export function detectJobIntentWarnings(
     ...constantPowerWarnings(job, project),
     ...stackedCopyWarnings(project),
     ...detectUncalibratedJobWarnings(job, project.scene.layers),
+    ...(machineKindOf(project.machine) === 'cnc' ? [] : cutOrderWarnings(job, project.scene.layers)),
     ...compileDiagnosticWarnings(job),
   ];
   append4040FillPolicyWarning(project, job, warnings);

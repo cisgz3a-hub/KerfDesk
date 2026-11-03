@@ -134,14 +134,29 @@ export function reject(message: string): Promise<never> {
   return Promise.reject(new Error(message));
 }
 
+type RecordedToast = {
+  readonly message: string;
+  readonly variant?: string;
+  /** Notes folded under a Save G-code toast (ADR-686). */
+  readonly details?: ReadonlyArray<string>;
+};
+
 export function toasts(): {
-  readonly pushToast: (message: string, variant?: string) => void;
-  readonly messages: ReadonlyArray<{ readonly message: string; readonly variant?: string }>;
+  readonly pushToast: (
+    message: string,
+    variant?: string,
+    options?: { readonly details?: ReadonlyArray<string> },
+  ) => void;
+  readonly messages: ReadonlyArray<RecordedToast>;
 } {
-  const messages: Array<{ readonly message: string; readonly variant?: string }> = [];
+  const messages: RecordedToast[] = [];
   return {
-    pushToast: (message, variant) => {
-      messages.push(variant === undefined ? { message } : { message, variant });
+    pushToast: (message, variant, options) => {
+      messages.push({
+        message,
+        ...(variant === undefined ? {} : { variant }),
+        ...(options?.details === undefined ? {} : { details: options.details }),
+      });
     },
     messages,
   };

@@ -196,6 +196,19 @@ describe('detectJobIntentWarnings', () => {
     }
   });
 
+  // UX audit U3-P3-6: "My machine isn't listed" keeps the generic starter's
+  // profile id, but it declares the machine is not a listed one like the 4040.
+  it('does not emit the 4040 profile warning for a machine saved as not listed', () => {
+    const fill = projectWith(closedTraced, 'fill');
+    const project: Project = { ...fill, device: { ...fill.device, name: 'My diode laser' } };
+
+    expect(
+      detectJobIntentWarnings(project).some((item) =>
+        item.includes(NEOTRONICS_POLICY_NOT_SELECTED_TEXT),
+      ),
+    ).toBe(false);
+  });
+
   it('limits the 4040 profile warning to ordinary Scanline Fill', () => {
     const line = projectWith(largeIsland, 'line');
     const image = projectWith(smallRaster, 'image');

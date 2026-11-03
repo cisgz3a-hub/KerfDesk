@@ -2,8 +2,11 @@
 // headline per warning, always visible, with the rest of its text one click
 // away. Controller-identity evidence, a router job whose controller has laser
 // mode on or unconfirmed ($32, where the spindle skips its spin-up: CNC audit
-// JR-1, MC-1) and a Focus Test without confirmed Z open their detail at once.
-// The laser-mode-on row carries a one-click Send $32=0 (ADR-180 Amendment 6).
+// JR-1, MC-1), a Focus Test without confirmed Z and a cut that runs before the
+// engraving inside it open their detail at once.
+// The laser-mode-on row carries a one-click Send $32=0 (ADR-180 Amendment 6),
+// and a cut that runs before the engraving inside it a one-click Cut last
+// (ADR-480 Amendment 2).
 // Never gates Confirm — these are the strings the start flow used to flash
 // in a toast, plus the job-intent set, held still and grouped.
 
@@ -28,6 +31,8 @@ import {
 } from '../../../core/preflight/controller-readiness';
 import { isFocusTestMachineWarning } from '../../../core/job/focus-test';
 import { isControllerIdentityWarning } from '../controller-identity-warnings';
+import { isCutBeforeEngravingWarning } from '../cut-order-warnings';
+import { CutLastButton } from './CutLastButton';
 import { splitReviewWarning } from './review-warning-headline';
 import { SendRouterModeButton } from './SendRouterModeButton';
 import { ShowOmittedFillArtworkButton } from './ShowOmittedFillArtworkButton';
@@ -86,6 +91,7 @@ function WarningItem(props: { readonly warning: string }): JSX.Element {
           />
         )}
         {props.warning === CNC_LASER_MODE_ENABLED_MESSAGE ? <SendRouterModeButton /> : null}
+        {isCutBeforeEngravingWarning(props.warning) ? <CutLastButton /> : null}
       </div>
     </li>
   );
@@ -115,6 +121,7 @@ function opensWarningDetail(warning: string): boolean {
   return (
     isControllerIdentityWarning(warning) ||
     isCncLaserModeMessage(warning) ||
-    isFocusTestMachineWarning(warning)
+    isFocusTestMachineWarning(warning) ||
+    isCutBeforeEngravingWarning(warning)
   );
 }

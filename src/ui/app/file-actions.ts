@@ -11,20 +11,12 @@ import type { ControllerKind, DeviceProfile } from '../../core/devices';
 import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
 import type {
   ControllerSettingsSnapshot,
-  PreflightIssue,
   ReadinessSettingsCapability,
 } from '../../core/preflight';
-import {
-  DEFAULT_OUTPUT_SCOPE,
-  machineKindOf,
-  validateOutputScope,
-  type OutputScope,
-  type Project,
-  type SceneObject,
-} from '../../core/scene';
+import type { OutputScope, Project, SceneObject } from '../../core/scene';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import type { ImportOutcome } from '../state/store';
-import type { ToastVariant } from '../state/toast-store';
+import type { ToastOptions, ToastVariant } from '../state/toast-store';
 import { projectLoadRefused } from '../state/project-machine-capability';
 import {
   type JobPlacementSettings,
@@ -38,18 +30,14 @@ import {
   controllerReadinessAdvisories,
   readinessFirmwareKind,
 } from './controller-readiness-advisories';
-import {
-  cncExportOtherControllersNote,
-  cncProjectExportAdvisories,
-  cncSavedBitChangesNote,
-} from './cnc-export-controller-advisory';
+import { cncProjectExportAdvisories } from './cnc-export-controller-advisory';
 import { importSourceSizeAdvisory } from './import-size-advisory';
 import { prepareGcodeSave } from './prepare-gcode-save';
-import { detectCompiledVCarveDepthWarnings } from '../laser/cnc-compiled-depth-warnings';
 import { parseOpenedProjectFile, type OpenProjectFile } from './project-open-parser';
 import { importSvgFiles } from './svg-import-action';
 import { createImportWorkerControls, isImportCancellation } from './import-worker-controls';
 import { saveGcodePlacement, type PrebuiltGcodeSave } from './transactional-gcode-save';
+import { pushSavedGcodeNotices } from './save-gcode-notices';
 import { errorMessage, suggestedGcodeName } from './file-action-formatters';
 import {
   completeLightBurnProjectOpen,
@@ -171,7 +159,7 @@ export type SaveGcodeCtx = {
   // Operator-selected active WCS (C6): a non-G54 value warns the saved job's
   // G54 emission will mismatch a placement measured from the active offset.
   readonly activeWcs?: ActiveWorkCoordinateSystem | null;
-  readonly pushToast: (message: string, variant?: ToastVariant) => void;
+  readonly pushToast: (message: string, variant?: ToastVariant, options?: ToastOptions) => void;
   readonly advanceVariablesAfter?: (
     expectedProject: Project,
     trigger: 'successful-export',
@@ -296,65 +284,17 @@ async function saveOrdinaryGcode(
   try {
     await target.write(prepared.gcode);
     advanceExportVariables(ctx);
-    ctx.pushToast(`Saved G-code to ${target.displayName}`, 'success');
-    pushPostSaveAdvisories(
-      ctx,
-      prepared.advisories,
-      prepared.cncVCarveDepths,
-      prepared.machineWarnings,
-      prepared.cncProgramFacts?.toolPlan.length,
-    );
+    pushSavedGcodeNotices(ctx, target.displayName, {
+      preflightAdvisories: prepared.advisories,
+      cncVCarveDepths: prepared.cncVCarveDepths,
+      machineWarnings: prepared.machineWarnings,
+      ...(prepared.cncProgramFacts === undefined
+        ? {}
+        : { cncToolPlanLength: prepared.cncProgramFacts.toolPlan.length }),
+    });
   } catch (err) {
     ctx.pushToast(`Could not save G-code: ${errorMessage(err)}`, 'error');
   }
-}
-
-// H12 (AUDIT-2026-06-10): the saved file is valid, but the operator should
-// still see the same job-intent warnings the Start path surfaces (luma
-// upsample softer than preview, uncalibrated defaults, trace-vector cut
-// risk) — non-blocking, since the export itself succeeded. CNC mode has
-// its own advisory set (stock footprint, H.2) via the machine-aware selector.
-function pushPostSaveAdvisories(
-  ctx: SaveGcodeCtx,
-  preflightAdvisories: ReadonlyArray<PreflightIssue>,
-  cncVCarveDepths: Parameters<typeof detectCompiledVCarveDepthWarnings>[0],
-  machineWarnings: ReadonlyArray<string>,
-  cncToolPlanLength?: number,
-): void {
-  // Only the newest toasts show, so notes go first and the preflight's findings (such as a job
-  // off the bed) last, where a list of text notices cannot push them out (ADR-591 Amendment 3).
-  if (machineKindOf(ctx.project.machine) === 'cnc') {
-    const note = cncExportOtherControllersNote(ctx.project.device, ctx.controllerSettings);
-    if (note !== null) ctx.pushToast(note, 'info');
-    const bitChanges = cncSavedBitChangesNote(cncToolPlanLength);
-    if (bitChanges !== null) ctx.pushToast(bitChanges, 'info');
-  } else if (ctx.controllerSettings === null) {
-    ctx.pushToast(
-      `Exported G-code assumes GRBL $30=${ctx.project.device.maxPowerS} and laser mode ($32=1) — not verified against a connected controller this session.`,
-      'info',
-    );
-  }
-  const warningProject = outputScopedWarningProject(ctx);
-  for (const warning of machineWarnings) {
-    ctx.pushToast(warning, 'warning');
-  }
-  if (warningProject.machine?.kind === 'cnc') {
-    for (const warning of detectCompiledVCarveDepthWarnings(
-      cncVCarveDepths,
-      warningProject.machine.stock.thicknessMm,
-    )) {
-      ctx.pushToast(warning, 'warning');
-    }
-  }
-  for (const advisory of preflightAdvisories) {
-    ctx.pushToast(advisory.message, 'warning');
-  }
-}
-
-function outputScopedWarningProject(ctx: SaveGcodeCtx): Project {
-  const scoped = validateOutputScope(ctx.project.scene, ctx.outputScope ?? DEFAULT_OUTPUT_SCOPE);
-  if (!scoped.ok || scoped.scene === ctx.project.scene) return ctx.project;
-  return { ...ctx.project, scene: scoped.scene };
 }
 
 export type OpenProjectCtx = ProjectOpenCompletionContext & {

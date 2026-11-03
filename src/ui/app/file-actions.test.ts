@@ -187,8 +187,11 @@ describe('file actions contextual failure handling', () => {
 
     expect(written).toHaveLength(1);
     expect(written[0]).toContain('; assumes: GRBL $30=');
+    // Folded with the other notes when there are several (ADR-686).
     expect(
-      toast.messages.some((m) => m.message.includes('not verified against a connected controller')),
+      toast.messages
+        .flatMap((m) => [m.message, ...(m.details ?? [])])
+        .some((text) => text.includes('not verified against a connected controller')),
     ).toBe(true);
   });
 
