@@ -2447,7 +2447,12 @@ inches hides the position until `$G` or the next Frame (ADR-375 Amendment 11).
    depths, feeds and spindle speed; a CNC **Material & stock** card; folded read-only Controller and
    Machine facts side by side; and the applicable laser acknowledgement or CNC
    workholding/exclusive-access attestation. A verified laser session shows a **Laser mode
-   verified** chip in the header instead. If Frame preparation
+   verified** chip in the header instead. Above the acknowledgement, every Start review shows a
+   **Before you start** block (ADR-689): laser safety glasses, focus on the material's top,
+   staying with the laser with an extinguisher close, and air assist and ventilation; for CNC, eye
+   and ear protection, clamps clear of the toolpath, and staying with the machine. It starts open;
+   folding it is remembered per machine profile and never gates Start. The phone remote shows the
+   same points as its acknowledgement prompt. If Frame preparation
    selected G54 from G55-G59, the durable warning names the original WCS and says the active
    selection changed, stored offsets were not erased, and Cancel leaves G54 selected. Placement is
    not editable in review; the sticky footer echoes the resolved origin beside Cancel and **Start
