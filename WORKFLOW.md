@@ -2734,6 +2734,16 @@ minimum target size.
 #### Success — unlock
 1. User clicks **$X — Unlock**. App writes `$X\n`. Alarm cleared from UI.
 
+#### Edge — reset required
+1. After a critical event (hard or soft limit, E-stop, motor fault) the controller accepts only a
+   soft reset. The banner names the alarm's own step first, such as "Release the E-stop", and
+   offers only **Reset (Ctrl-X)**; Unlock, Home and the Console are held (ADR-393).
+2. A lock raised before KerfDesk connected is recognised from grblHAL's `error:79` to Unlock or
+   Home, from an E-stop input (`Pn:E`) in an Alarm report, or from FluidNC acknowledging `$X`
+   while it still reports Alarm. The banner then reads "Controller needs a reset" and says to
+   release the E-stop or move off the switch first. The reset clears the `error:79` notice
+   (ADR-393 Amendment 1).
+
 ### F-B10. Status polling
 
 App writes real-time `?` every 250 ms while active — a streaming job, a motion or controller operation, probing, or auto-focus — and about once a second (every 4th tick) when the machine is idle. Replies are parsed by `parseStatusReport`. The latest report drives the Status panel and the bottom status bar.
