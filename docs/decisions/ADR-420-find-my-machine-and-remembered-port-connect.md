@@ -66,7 +66,9 @@ Platform limits that shape the design:
    this browser, or the operator pressed **Find my machine**, the draft adopts, as ordinary draft
    actions: the firmware the banner named (only a serial firmware), the baud that answered, the
    machine type from `$32` (a Laser + CNC draft keeps both), and the mapped `$$` values (a listed
-   machine keeps its type and work area: ADR-637 Amendments 1 and 2). The card
+   machine keeps its type and work area: ADR-637 Amendments 1 and 2). ADR-637 Amendment 7 later
+   removed the type from `$32`: the type stays the one chosen, and a laser reporting `$32=0` is
+   asked to turn laser mode on. The card
    lists every change as old → new with one **Undo** that restores the draft it started from.
    Nothing reaches the project before **Save machine setup**. A machine already set up, for
    either head, that the operator only opens setup for keeps its values and keeps the explicit

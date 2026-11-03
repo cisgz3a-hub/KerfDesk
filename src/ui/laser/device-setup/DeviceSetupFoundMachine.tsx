@@ -2,6 +2,8 @@
 // A new machine's setup is filled in by itself and lists each change with one
 // Undo; a machine already set up keeps its values and offers the explicit
 // Use detected values (ADR-347), so opening setup never rewrites a finished one.
+// A laser whose controller has laser mode off is asked to turn it on; the type
+// is never taken from $32 (ADR-637 Amendment 7).
 
 import { selectControllerDriver } from '../../../core/controllers';
 import type { ControllerSettingsSnapshot } from '../../../core/controllers/grbl';
@@ -13,6 +15,7 @@ import { acceptDetectedPatch, setupChangeRows } from './device-setup-accept-dete
 import { autoFilledRows, type DeviceSetupAutoFillRecord } from './device-setup-auto-fill';
 import type { DeviceSetupState, DeviceSetupStepProps } from './device-setup-flow';
 import { DeviceSetupDetectedApply } from './DeviceSetupDetectedApply';
+import { DeviceSetupLaserModeOff } from './DeviceSetupLaserModeOff';
 import {
   listedProfileOf,
   machinePickerEntries,
@@ -43,6 +46,7 @@ export function DeviceSetupFoundMachine(
           values in the next step.
         </p>
       )}
+      <DeviceSetupLaserModeOff state={props.state} dispatch={props.dispatch} />
       {record?.status === 'applied' ? (
         <AutoFilled
           record={record}
@@ -77,12 +81,6 @@ function AutoFilled(props: {
           </li>
         ) : null}
         {summary.baudRate !== null ? <li>Baud rate set to {summary.baudRate}</li> : null}
-        {summary.machineKind !== null ? (
-          <li>
-            Machine type set to {summary.machineKind === 'cnc' ? 'CNC' : 'Laser'}: laser mode is{' '}
-            {summary.machineKind === 'cnc' ? 'off ($32=0)' : 'on ($32=1)'}
-          </li>
-        ) : null}
         {rows.map((row) => (
           <li key={row.label}>
             {row.label}: {row.oldText} → <strong>{row.newText}</strong>

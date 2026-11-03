@@ -13,6 +13,7 @@ import { machineSetupValidationIssues } from './device-setup-flow';
 import { computeFirmwareDiffs } from './device-setup-firmware-diff';
 import { DeviceSetupCncReview } from './DeviceSetupCncReview';
 import { DeviceSetupFirmwareStep } from './DeviceSetupFirmwareStep';
+import { DeviceSetupLaserModeOff } from './DeviceSetupLaserModeOff';
 import { DeviceSetupReviewSections } from './DeviceSetupReviewSections';
 import './device-setup-review.css';
 
@@ -35,6 +36,7 @@ export function DeviceSetupReviewStep({
   return (
     <section className="lf-setup-review">
       <SoftwareStatus issues={issues} driverSwitch={driverSwitch} />
+      <DeviceSetupLaserModeOff state={state} dispatch={dispatch} />
       {state.machineKind === 'cnc' ? (
         <p>
           Machining setup: <strong>{state.cncSetupDraft.name}</strong> · G54 · stock top Z0 ·{' '}

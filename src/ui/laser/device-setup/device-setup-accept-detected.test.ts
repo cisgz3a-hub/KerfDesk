@@ -14,6 +14,7 @@ import {
 } from '../../../core/scene';
 import { setupChangeRows } from './device-setup-accept-detected';
 import { planControllerAutoFill } from './device-setup-auto-fill';
+import { routerAnswerActions } from './DeviceSetupLaserModeOff';
 import {
   deviceSetupReducer,
   initDeviceSetup,
@@ -91,20 +92,40 @@ describe('accepting the controller max rate per head', () => {
   });
 
   it("Find my machine's fill of a new router lands on CNC's own Max feed", () => {
-    const state = initDeviceSetup(
+    const opened = initDeviceSetup(
       { ...DEFAULT_DEVICE_PROFILE, maxFeed: 6000 },
       { maxFeed: REPORTED_FEED, laserModeEnabled: false },
       { machine: LASER_MACHINE_CONFIG, controllerRead: true },
     );
-    const plan = planControllerAutoFill(state, {
-      detected: state.detected,
-      controllerKind: null,
-      baudRate: null,
-    });
-    const filled = (plan?.actions ?? []).reduce(deviceSetupReducer, state);
+    const state = deviceSetupReducer(opened, { kind: 'set-machine-kinds', machineKinds: ['cnc'] });
+    const filled = fill(state);
     expect(filled.machineKinds).toEqual(['cnc']);
     expect(cncFeed(filled)).toBe(REPORTED_FEED);
     expect(filled.cncDraft.params.maxFeedMmPerMin).toBe(REPORTED_FEED);
     expect(setupChangeRows(state, filled).map((row) => row.label)).toContain('CNC max feed');
   });
+
+  // ADR-637 Amendment 7: a laser starter stays a laser on $32=0, and "This is
+  // a CNC router" gives the router the reported Max feed the fill would have.
+  it("answering This is a CNC router lands on CNC's own Max feed", () => {
+    const state = initDeviceSetup(
+      { ...DEFAULT_DEVICE_PROFILE, maxFeed: 6000 },
+      { maxFeed: REPORTED_FEED, laserModeEnabled: false },
+      { machine: LASER_MACHINE_CONFIG, controllerRead: true },
+    );
+    const filled = fill(state);
+    expect(filled.machineKinds).toEqual(['laser']);
+    const router = routerAnswerActions(filled).reduce(deviceSetupReducer, filled);
+    expect(router.machineKinds).toEqual(['cnc']);
+    expect(cncFeed(router)).toBe(REPORTED_FEED);
+  });
 });
+
+function fill(state: DeviceSetupState): DeviceSetupState {
+  const plan = planControllerAutoFill(state, {
+    detected: state.detected,
+    controllerKind: null,
+    baudRate: null,
+  });
+  return (plan?.actions ?? []).reduce(deviceSetupReducer, state);
+}

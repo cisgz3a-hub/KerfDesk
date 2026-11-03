@@ -63,7 +63,7 @@ describe('runControllerReadiness', () => {
     expect(result.errors).toContainEqual({
       code: 'laser-mode-disabled',
       message:
-        'Controller reports $32=0. Enable GRBL laser mode ($32=1) before starting from KerfDesk.',
+        'Laser mode is off ($32=0): the laser stops with the beam on at every power change, which burns dots and slows the job. Send $32=1 to turn laser mode on.',
     });
   });
 
@@ -172,7 +172,7 @@ describe('runControllerReadiness', () => {
       const laserMessage = laserOff.errors.find((e) => e.code === 'laser-mode-disabled')?.message;
       expect(laserMessage).toContain('configure the spindle as Laser in the FluidNC YAML config');
       expect(laserMessage).toContain('GRBL Compatible (constant-power) output dialect');
-      expect(laserMessage).not.toContain('Enable GRBL laser mode ($32=1)');
+      expect(laserMessage).not.toContain('Send $32=1');
 
       const scale = runControllerReadiness(
         createProject(),

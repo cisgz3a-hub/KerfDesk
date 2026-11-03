@@ -67,7 +67,7 @@ const idleStatus: StatusReport = {
 const LASER_MODE_GENERIC_WARNING =
   "The controller's settings dump did not include $32, so laser mode is NOT verified against the firmware. Confirm $32=1 in the controller's configuration before burning.";
 const LASER_MODE_DISABLED_WARNING =
-  'Controller reports $32=0. Enable GRBL laser mode ($32=1) before starting from KerfDesk.';
+  'Laser mode is off ($32=0): the laser stops with the beam on at every power change, which burns dots and slows the job. Send $32=1 to turn laser mode on.';
 const UNRELATED_CAMERA_WARNING = 'Controller $31 minimum S is 5.';
 
 function preparedMarkerJob(warnings: ReadonlyArray<string> = []): StartJobPreparation {

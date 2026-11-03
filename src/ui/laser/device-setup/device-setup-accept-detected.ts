@@ -89,6 +89,11 @@ function profilePatchForSetup(
     delete shared.maxPowerS;
     delete shared.minPowerS;
     delete shared.laserModeEnabled;
+  } else if (shared.laserModeEnabled === false) {
+    // `$32=0` is how the controller is set, not what a laser needs: the laser
+    // keeps expecting laser mode on, so Review and Job Review offer `$32=1`
+    // (ADR-637 Amendment 7).
+    delete shared.laserModeEnabled;
   }
   // Without a laser the device's Max feed is no head's; CNC takes its own below.
   if (!deviceSetupSupportsMachineKind(state, 'laser')) delete shared.maxFeed;

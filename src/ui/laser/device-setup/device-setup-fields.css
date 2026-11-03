@@ -241,6 +241,19 @@
   padding-left: 18px;
   line-height: 1.6;
 }
+.lf-setup-laser-mode-off {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  padding: 10px 12px;
+  border-left: 3px solid var(--lf-warning);
+  border-radius: 8px;
+  background: var(--lf-bg-0);
+  font-size: 12px;
+}
+.lf-setup-laser-mode-off p {
+  margin: 0;
+}
 .lf-setup-kept-area {
   margin: 0;
   line-height: 1.5;

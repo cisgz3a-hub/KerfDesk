@@ -152,6 +152,11 @@ Amendment 6 (`ADR-637-amendment-6-save-switches-the-live-driver.md`) has Save re
 saved machine's driver when the live connection uses another, or say why not and offer
 **Reconnect now** in the toolbar, which no longer names a vendor command set that is not live.
 
+Amendment 7 (`ADR-637-amendment-7-laser-mode-off-asks-instead-of-making-a-cnc.md`) stops taking
+the machine type from `$32`: a laser whose controller reports `$32=0` stays a laser, is asked to
+turn laser mode on with one guarded click, and becomes a CNC only when the operator says so. Job
+Review's laser-mode-off row gets **Send $32=1**.
+
 Verification: `device-setup-auto-fill.test.ts` (a listed laser and a CNC preset keep their type),
 `machine-picker-entries.test.ts` (the CNC reset), and `DeviceSetupMachinePicker.customised.test.tsx`
 (the draft's facts and type question, the replace notice for a CNC preset, **My machine isn't
