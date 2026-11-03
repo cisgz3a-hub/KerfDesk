@@ -2,7 +2,7 @@
 
 **Requested:** the maintainer, on 2026-11-02: "design another loop for speed and performance".
 
-**Status:** approved 2026-11-02 ("yes go"), budgets as proposed. Started 2026-11-02 after rolling v9 (#1540). **Paused after S3 on 2026-11-03** at the maintainer's request for a different loop; S4–S9 to do.
+**Status:** approved 2026-11-02 ("yes go"), budgets as proposed. Started 2026-11-02 after rolling v9 (#1540). Paused after S3 on 2026-11-03 for the new-user experience audit (#1560). **Resumed at S4 on 2026-11-03** at the maintainer's choice ("next loop", then "Resume performance S4–S9").
 
 **How this differs from the rolling rounds:** like [Q1](../2026-10-27-quality-q1/AREAS.md), this round measures as well as finds defects. Each area produces:
 - a scorecard with one row per operation: input size | median and worst time | longest UI block | peak memory | budget | verdict;
