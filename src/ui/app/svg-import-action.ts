@@ -8,6 +8,7 @@ import type { ImportOutcome } from '../state/store';
 import type { ToastVariant } from '../state/toast-store';
 import { createImportWorkerControls, isImportCancellation } from './import-worker-controls';
 import { describeImportBedFit, type ImportBedFitUndo } from './import-bed-fit-notice';
+import { describeImportWhiteKnockout } from './import-white-knockout-notice';
 import { largeImportAdvisory, mainThreadImportFallbackAdvisory } from './import-size-advisory';
 import {
   describeImportError,
@@ -74,12 +75,22 @@ export function describeSvgImport(
   outcome: ImportOutcome | null,
   undo?: ImportBedFitUndo,
 ): ReadonlyArray<ToastDescriptor> {
+  const knockoutNotice = describeImportWhiteKnockout(name, outcome ?? undefined, undo);
+  const knockout = knockoutNotice === null ? [] : [knockoutNotice];
   if (outcome?.kind === 'replaced') {
-    return [describeReimportOutcome(outcome), ...describeSvgPresentationWarnings(name, result)];
+    return [
+      describeReimportOutcome(outcome),
+      ...describeSvgPresentationWarnings(name, result),
+      ...knockout,
+    ];
   }
-  // Last, so the three-toast stack cannot push it out of view.
+  // Last, so the three-toast stack cannot push them out of view.
   const fitNotice = describeImportBedFit(name, outcome ?? undefined, undo);
-  return [...describeImportResult(name, result), ...(fitNotice === null ? [] : [fitNotice])];
+  return [
+    ...describeImportResult(name, result, outcome?.whiteKnockout),
+    ...(fitNotice === null ? [] : [fitNotice]),
+    ...knockout,
+  ];
 }
 
 async function parseFile(

@@ -45,10 +45,17 @@ type CompileRasterGroupsOptions = {
   readonly laserPowerScaleVersion?: LaserPowerScaleVersion;
   readonly sceneObjects?: ReadonlyArray<SceneObject>;
   readonly sourceLumaByObjectId?: ReadonlyMap<string, Uint8Array>;
+  /**
+   * Grids above this many pixels stream their rows. Output keeps the default;
+   * the photo preview lowers it to bound its memory (ADR-581 Amendment 1).
+   * Streamed rows are bit-identical to the materialized grid (ADR-243).
+   */
+  readonly streamedPixelThreshold?: number;
 };
 
 type CompileRasterGroupOptions = {
   readonly laserPowerScaleVersion?: LaserPowerScaleVersion;
+  readonly streamedPixelThreshold: number;
   readonly objects: ReadonlyArray<SceneObject>;
   readonly sourceLumaOverride: Uint8Array | undefined;
   readonly scanFrame: RasterScanFrame;
@@ -83,6 +90,7 @@ export function compileRasterGroupsForLayer(
       objects: sceneObjects,
       sourceLumaOverride: options.sourceLumaByObjectId?.get(obj.id),
       laserPowerScaleVersion: options.laserPowerScaleVersion ?? CURRENT_LASER_POWER_SCALE_VERSION,
+      streamedPixelThreshold: options.streamedPixelThreshold ?? STREAMED_RASTER_PIXEL_THRESHOLD,
     });
   }
   return out;
@@ -183,7 +191,7 @@ function compileRasterGroup(
     scanFrame: options.scanFrame,
     laserPowerScaleVersion: options.laserPowerScaleVersion ?? CURRENT_LASER_POWER_SCALE_VERSION,
   };
-  const rasterValues = rasterValuesFor(rasterInput);
+  const rasterValues = rasterValuesFor(rasterInput, options.streamedPixelThreshold);
   return {
     kind: 'raster',
     layerId: layer.id,
@@ -213,6 +221,7 @@ function compileRasterGroup(
 
 function rasterValuesFor(
   input: MaterializedRasterInput,
+  streamedPixelThreshold: number,
 ): Pick<RasterGroup, 'sValues' | 'rowProvider'> {
   const compilationMaxS = rasterCompilationPowerScale(input.device, input.laserPowerScaleVersion);
   const toDeviceUnits = (values: RasterPowerValues): RasterPowerValues =>
@@ -226,7 +235,7 @@ function rasterValuesFor(
         );
   // Streaming works for every dither algorithm and mask (ADR-243); only size
   // chooses between one-shot materialization and an O(width) row provider.
-  if (input.pixelWidth * input.pixelHeight <= STREAMED_RASTER_PIXEL_THRESHOLD) {
+  if (input.pixelWidth * input.pixelHeight <= streamedPixelThreshold) {
     return { sValues: toDeviceUnits(materializedRasterValues(input)) };
   }
   const rowProvider = streamedRasterRowProvider({

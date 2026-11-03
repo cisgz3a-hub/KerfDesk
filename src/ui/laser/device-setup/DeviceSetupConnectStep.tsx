@@ -5,7 +5,9 @@
 // It is one line until there is something to show: choosing a machine below
 // never needs a connection.
 
+import { selectControllerDriver } from '../../../core/controllers';
 import { assertNever } from '../../../core/scene';
+import { driverCommandsName } from '../live-driver-mismatch';
 import { helpProps } from '../../help/help-topics';
 import { Button } from '../../kit';
 import type { DeviceSetupStepProps } from './device-setup-flow';
@@ -191,18 +193,19 @@ function ConnectionMismatch(
   const detected = model.laser.detectedControllerKind;
   const reported =
     detected === null ? 'unknown firmware' : machineSetupControllerGuide(detected).label;
-  const active = machineSetupControllerGuide(
+  const live = selectControllerDriver(
     model.laser.activeControllerKind,
     model.laser.activeControllerCommandSet ?? undefined,
-  ).label;
+  );
   return (
     <div role="alert" className="lf-setup-find-mismatch">
       {model.driverMismatch ? (
         <>
           <strong>The connection does not match this setup.</strong>
           <span>
-            Connected as {active}; the controller reports {reported}; this setup uses{' '}
-            {model.guide.label}.
+            You are connected with {driverCommandsName(live)}, but this setup uses{' '}
+            {driverCommandsName(model.driver)}, so Home, jog and Frame would use the wrong ones.
+            Saving reconnects to use this setup’s commands. The controller reports {reported}.
           </span>
         </>
       ) : (

@@ -17,6 +17,12 @@ import {
   useControllerReconnect,
 } from './controller-reconnect';
 import { ConnectedMachineProfile } from './ConnectedMachineProfile';
+import { connectOptionsForDevice } from '../commands/connect-options';
+import {
+  liveDriverMismatch,
+  toolbarDriverMismatchText,
+  toolbarMachineName,
+} from './live-driver-mismatch';
 import { LaserModuleRow } from './LaserModuleRow';
 import { DeviceSetupControls } from './device-setup';
 import { controllerActionFailureHandler } from './report-controller-action-failure';
@@ -47,8 +53,11 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
   const wentSilent = useControllerWentSilent(connection.kind === 'connected');
   const stoppedResponding = useControllerStoppedResponding(connection.kind === 'connected');
   const disconnectController = useLaserStore((state) => state.disconnect);
+  const connectController = useLaserStore((state) => state.connect);
   const controllerKind = useStore((state) => state.project.device.controllerKind);
-  const machineName = useStore((state) => state.project.device.name || 'Unnamed machine');
+  const device = useStore((state) => state.project.device);
+  const driverMismatch = useLiveDriverMismatch(device);
+  const machineName = toolbarMachineName(device.name || 'Unnamed machine', driverMismatch);
   const supportsSerial = platform.serial.isSupported();
   const isFileOnlyProfile = isFileOnlyController(controllerKind);
   const connect = (): void => {
@@ -67,6 +76,12 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
   const choosePort = async (): Promise<void> => {
     if (useLaserStore.getState().connection.kind === 'connected') await disconnect();
     await connectMachine(platform, { portSelection: 'choose' });
+  };
+  // The saved profile's driver replaces the live one: the same reconnect as
+  // Machine Setup's, offered when its Save could not switch it (U2-P2-1).
+  const reconnectWithProfile = async (): Promise<void> => {
+    await disconnectController();
+    await connectController(platform, connectOptionsForDevice(useStore.getState().project.device));
   };
   const autoConnect = useAutoConnectPreference();
   return (
@@ -95,10 +110,30 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
         controllerStoppedResponding={stoppedResponding}
         onRetryQualification={retryControllerInformation}
         onReconnectQualification={reconnect}
+        driverMismatch={
+          driverMismatch === null
+            ? undefined
+            : {
+                text: toolbarDriverMismatchText(driverMismatch),
+                onReconnect: () =>
+                  void reconnectWithProfile().catch(controllerActionFailureHandler('Reconnect')),
+              }
+        }
         disabled={!supportsSerial || controlsBusy || isFileOnlyProfile}
       />
     </>
   );
+}
+
+function useLiveDriverMismatch(device: ReturnType<typeof useStore.getState>['project']['device']) {
+  const connected = useLaserStore((state) => state.connection.kind === 'connected');
+  const activeControllerKind = useLaserStore((state) => state.activeControllerKind);
+  const activeControllerCommandSet = useLaserStore((state) => state.activeControllerCommandSet);
+  return liveDriverMismatch(device, {
+    connected,
+    activeControllerKind,
+    activeControllerCommandSet,
+  });
 }
 
 function MachineDetailsContent(): JSX.Element {

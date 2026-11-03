@@ -64,11 +64,12 @@ it('rejects an oversized source before reading or encoding paged pixels', async 
   const original = owner();
   const session = {
     ...original,
-    image: { ...original.image, pixelWidth: 8192, pixelHeight: 4096 },
+    // 60 MP: above the 50 MP the preview reads (ADR-581 Amendment 1).
+    image: { ...original.image, pixelWidth: 10_000, pixelHeight: 6_000 },
   };
   await render(session, initialPhotoEngravingDraft(session.image, session.operation));
   await advance();
-  expect(host.textContent).toContain('Photo preview is unavailable at this size');
+  expect(host.textContent).toContain('This photo has too many pixels to preview (60 megapixels');
   expect(hydratePagedRasterImage).not.toHaveBeenCalled();
   expect(previewPhotoEngravingInWorker).not.toHaveBeenCalled();
 });

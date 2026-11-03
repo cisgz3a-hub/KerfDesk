@@ -201,6 +201,21 @@ describe('Photo engraving material recipes and Auto tones (ADR-685)', () => {
     expect(patch.layerPatch).toMatchObject({ ditherAlgorithm: 'jarvis', negativeImage: false });
   });
 
+  // UX audit U3-P2-3: a burn grid too big to preview still read the photo, so
+  // Auto tones stays offered beside the plain-words limit.
+  it('keeps Auto tones when only the burn grid is too big to preview', async () => {
+    const onApply = vi.fn<(patch: PhotoEngravingApply) => void>();
+    preview.result = {
+      kind: 'error',
+      message: 'This photo is too big to preview at this size and resolution.',
+      sourceHistogram: HISTOGRAM,
+    };
+    await render(onApply);
+    expect(button('Auto tones').disabled).toBe(false);
+    await act(async () => button('Auto tones').click());
+    expect((await apply(onApply)).imagePatch.contrast).toBeGreaterThan(40);
+  });
+
   // Rolling audit v9 R8-P2-3: a recipe picked before the first preview applied
   // no tones and the promise of them then disappeared.
   it('applies a recipe’s Auto tones when the preview arrives after it', async () => {

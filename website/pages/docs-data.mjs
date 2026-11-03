@@ -52,8 +52,9 @@ export const CONTENTS = [
 export const STEP_COPY = {
   open: ({ site }) =>
     html`<p>
-        Open <a href="${site.appUrl}">KerfDesk in your browser</a>. You land straight in the
-        workspace. There’s no sign-up, no welcome tour and no license key.
+        Open <a href="${site.appUrl}">KerfDesk in your browser</a>. On your first visit, choose
+        <strong>Continue with Free</strong> to go to the workspace. There’s no sign-up and no
+        license key.
       </p>
       <p>
         You can install the web app from your browser. After it has loaded once online, it keeps
@@ -61,9 +62,10 @@ export const STEP_COPY = {
         is idle.
       </p>
       <p>
-        Prefer a desktop app? <a href="/download/">Desktop Preview builds</a> are available for
-        Windows 10 and 11 (64-bit) and macOS 13 or newer. They are unsigned, you install and update
-        them yourself, and install testing on real computers is still pending.
+        Prefer a desktop app? <a href="/download/">KerfDesk for Windows</a> runs on Windows 10 and
+        11 (64-bit). It opens in KerfDesk Free; the Pro tools need a trial or licence. Its installer
+        isn’t code-signed yet, so the download page shows how to get past the browser and
+        SmartScreen warnings.
       </p>
       <p>
         New here? Click <strong>Learn</strong> in the top toolbar and start with the short “Make
