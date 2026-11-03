@@ -1,6 +1,6 @@
 ## ADR-632 Amendment 1 - The pulse stays smooth with many pieces (2026-10-19)
 
-**Status:** Accepted. Amends ADR-632 decision 3 and ADR-620 decision 8 (drawing cost). | **Date:** 2026-10-19
+**Status:** Accepted. Amends ADR-632 decision 3 and ADR-620 decision 8 (drawing cost). Decision 3 (scaled bitmaps while the view moves) superseded by ADR-620 Amendment 1. | **Date:** 2026-10-19
 
 ### Context
 

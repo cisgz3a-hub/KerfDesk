@@ -13,6 +13,7 @@
 import { IDENTITY_TRANSFORM, type AABB, type Polyline } from '../../core/scene';
 import { ONE_FILL_POOL_RUN, type FillPoolRuns } from '../../core/scene/fill-operations';
 import { drawArtworkSprite, SPRITE_MIN_DISPLAY_SEGMENTS } from './artwork-sprite-cache';
+import { hairlineFrameWidthPx } from './draw-complexity';
 import {
   clipClosedPolylines,
   fillClosedPolylinesBatched,
@@ -32,18 +33,23 @@ export type FillPoolPainter = {
   readonly flush: () => void;
 };
 
-/** One frame's pool painter; `alphaFor` dims a pool out of focus. */
+/**
+ * One frame's pool painter; `alphaFor` dims a pool out of focus. On a
+ * `hairline` frame (ADR-346 Amendment 1) the outlines painted directly are at
+ * most one device pixel wide; sprites and rasters are blitted as they are.
+ */
 export function createFillPoolPainter(
   ctx: CanvasRenderingContext2D,
   view: ViewTransform,
   alphaFor: (memberIds: ReadonlyArray<string>) => number | null,
   requestRedraw?: () => void,
+  hairline = false,
 ): FillPoolPainter {
   beginFillPoolRasterFrame();
   let queued: FillPool[] = [];
   const flush = (): void => {
-    if (queued.length === 1) paintAlone(ctx, queued[0] as FillPool, view, requestRedraw);
-    else if (queued.length > 1) paintTogether(ctx, queued, view, requestRedraw);
+    if (queued.length === 1) paintAlone(ctx, queued[0] as FillPool, view, requestRedraw, hairline);
+    else if (queued.length > 1) paintTogether(ctx, queued, view, requestRedraw, hairline);
     queued = [];
   };
   return {
@@ -65,7 +71,7 @@ export function createFillPoolPainter(
         flush();
         ctx.save();
         if (alpha !== null) ctx.globalAlpha = alpha;
-        drawFillPool(ctx, pool, view, requestRedraw);
+        drawFillPool(ctx, pool, view, requestRedraw, hairline);
         ctx.restore();
       }
     },
@@ -77,9 +83,10 @@ function paintAlone(
   pool: FillPool,
   view: ViewTransform,
   requestRedraw: (() => void) | undefined,
+  hairline: boolean,
 ): void {
   ctx.save();
-  drawFillPool(ctx, pool, view, requestRedraw);
+  drawFillPool(ctx, pool, view, requestRedraw, hairline);
   ctx.restore();
 }
 
@@ -131,13 +138,14 @@ function paintTogether(
   pools: ReadonlyArray<FillPool>,
   view: ViewTransform,
   requestRedraw: (() => void) | undefined,
+  hairline: boolean,
 ): void {
   const first = pools[0] as FillPool;
   const batch = batchOf(pools);
-  const paint = (target: CanvasRenderingContext2D, at: ViewTransform): void => {
+  const paint = (target: CanvasRenderingContext2D, at: ViewTransform, widthPx = first.widthPx) => {
     target.fillStyle = first.color;
     target.strokeStyle = first.color;
-    target.lineWidth = first.widthPx;
+    target.lineWidth = widthPx;
     fillClosedPolylinesBatched(target, WORLD, batch.contours, at, 'evenodd');
     strokePolylinesBatched(target, WORLD, batch.contours, at);
   };
@@ -155,7 +163,7 @@ function paintTogether(
       requestRedraw,
     })
   ) {
-    paint(ctx, view);
+    paint(ctx, view, hairline ? hairlineFrameWidthPx(first.widthPx) : first.widthPx);
   }
   ctx.restore();
 }
@@ -185,6 +193,7 @@ export function drawFillPool(
   pool: FillPool,
   view: ViewTransform,
   requestRedraw?: () => void,
+  hairline = false,
 ): void {
   if (!isSmall(pool)) {
     if (pool.regions === undefined && drawLargeFillPool(ctx, pool, view, requestRedraw)) return;
@@ -207,7 +216,8 @@ export function drawFillPool(
       return;
     }
   }
-  paintFillPool(ctx, pool, view);
+  const widthPx = hairline ? hairlineFrameWidthPx(pool.widthPx) : pool.widthPx;
+  paintFillPool(ctx, widthPx === pool.widthPx ? pool : { ...pool, widthPx }, view);
 }
 
 export function paintFillPool(
