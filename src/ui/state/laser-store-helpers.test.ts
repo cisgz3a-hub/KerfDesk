@@ -7,11 +7,14 @@ import {
 } from '../../core/controllers/grbl';
 import {
   buildPortClosePatch,
+  CONNECT_MACHINE_FIRST,
   detectStreamStall,
   initialLaserState,
+  jogFrameCommandBlockMessage,
   STREAM_STALL_RUNNING_TIMEOUT_MS,
   STREAM_STALL_TIMEOUT_MS,
   type StallProbe,
+  UNKNOWN_IDLE_STATUS_MESSAGE,
 } from './laser-store-helpers';
 import {
   interactiveControllerOperation,
@@ -314,5 +317,23 @@ describe('buildPortClosePatch safety notice', () => {
     for (const notice of [job, motion.safetyNotice, fire]) {
       expect(notice?.message).not.toContain('USB');
     }
+  });
+});
+
+describe('jogFrameCommandBlockMessage without a status report', () => {
+  // Wording only: both answers block, but a disconnected beginner is told to
+  // connect rather than to wait for a report that will never come (U1-P2-4).
+  it('says to connect when no machine is connected', () => {
+    const state: LaserState = { ...useLaserStore.getState(), ...initialLaserState() };
+    expect(jogFrameCommandBlockMessage(state)).toBe(CONNECT_MACHINE_FIRST);
+  });
+
+  it('keeps the Idle wording for a connected controller that has not reported', () => {
+    const state: LaserState = {
+      ...useLaserStore.getState(),
+      ...initialLaserState(),
+      connection: { kind: 'connected' },
+    };
+    expect(jogFrameCommandBlockMessage(state)).toBe(UNKNOWN_IDLE_STATUS_MESSAGE);
   });
 });

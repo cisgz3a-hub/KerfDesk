@@ -8,7 +8,10 @@ import { rasterCompilationPowerScale } from '../../core/raster/controller-power-
 import { createImageMaskPixelTest } from '../../core/raster/image-mask';
 import { lumaHistogram } from '../../core/raster/portrait-auto-tones';
 import { compiledRasterPreview } from '../workspace/compiled-raster-preview';
-import { photoEngravingPreviewInputError } from './photo-engraving-preview-budget';
+import {
+  photoEngravingPreviewPlan,
+  type PhotoEngravingPreviewPlan,
+} from './photo-engraving-preview-budget';
 import { photoMaterialPreview } from './photo-material-preview';
 import {
   photoPreviewMaxEdge,
@@ -27,11 +30,12 @@ export function computePhotoEngravingPreview(
   requestedMaxEdge?: number,
 ): PhotoEngravingPreviewResult {
   const maxEdge = photoPreviewMaxEdge(requestedMaxEdge);
-  const error = photoEngravingPreviewInputError(input, maxEdge);
-  if (error !== null) return { kind: 'error', message: error };
+  const plan = photoEngravingPreviewPlan(input, maxEdge);
+  if (plan.kind === 'limit') return limitResult(input, plan);
   try {
     const compiled = compileRasterGroupsForLayer([input.image], input.layer, input.device, {
       sceneObjects: input.sceneObjects,
+      streamedPixelThreshold: plan.streamedPixelThreshold,
     });
     const group = compiled.groups[0];
     if (group === undefined)
@@ -74,6 +78,20 @@ export function computePhotoEngravingPreview(
       scanPasses: compiled.groups.reduce((total, scan) => total + scan.passes, 0),
       normalization: 'relative-marks',
     };
+  } catch (cause) {
+    return { kind: 'error', message: cause instanceof Error ? cause.message : String(cause) };
+  }
+}
+
+// A grid too big to preview still leaves Auto tones its histogram: the source
+// fits one read, and the operator can lower the resolution after (U3-P2-3).
+function limitResult(
+  input: PhotoEngravingPreviewInput,
+  plan: Extract<PhotoEngravingPreviewPlan, { kind: 'limit' }>,
+): PhotoEngravingPreviewResult {
+  if (!plan.sourceReadable) return { kind: 'error', message: plan.message };
+  try {
+    return { kind: 'error', message: plan.message, sourceHistogram: burnedSourceHistogram(input) };
   } catch (cause) {
     return { kind: 'error', message: cause instanceof Error ? cause.message : String(cause) };
   }

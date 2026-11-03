@@ -69,6 +69,9 @@ describe('searchCommands over the real registry', () => {
     ['undo', 'edit.undo'],
     ['find', 'help.find-command'],
     ['save gcode', 'file.save-gcode'],
+    // Units live in Settings; a beginner searches the word, not the window (U1-P3-4).
+    ['units', 'edit.settings'],
+    ['inch', 'edit.settings'],
   ])('puts the expected command first for "%s"', (query, expected) => {
     expect(top(query)).toBe(expected);
   });

@@ -29,6 +29,7 @@ export function CanvasMotionBadge(props: {
               data-testid="canvas-motion-status"
               aria-busy={overlay.planIsCurrent === false}
               style={overlay.run === null ? cautionMessageStyle : messageStyle}
+              title={overlay.run === null ? idleViewHelp(message) : undefined}
             >
               {message}
             </span>,
@@ -206,11 +207,20 @@ function markerDescription(overlay: CanvasMotionOverlay): string {
   return `${frameText}; ${jobText}${previous}`;
 }
 
+const RELATIVE_VIEW_REASON = 'Relative view — physical bed position unverified';
+
+// The red line alone reads as an error the beginner caused (UX audit U1-P3-2),
+// so its hover says what it means and that it is expected before setup.
+function idleViewHelp(message: string): string | undefined {
+  if (!message.includes(RELATIVE_VIEW_REASON)) return undefined;
+  return "KerfDesk can't yet tell where on the bed this job will burn, so the start markers are shown relative to your origin. This is normal until your machine is connected and homed.";
+}
+
 // Why an idle plan's markers may not show where the job burns.
 function idleViewReason(overlay: CanvasMotionOverlay, cameraOverlay: boolean): string | null {
   const frame = overlay.plan.coordinateFrame;
   if (frame.kind !== 'relative') return overlay.plan.unavailableReason;
-  if (frame.bed === undefined) return 'Relative view — physical bed position unverified';
+  if (frame.bed === undefined) return RELATIVE_VIEW_REASON;
   // A User Origin job drawn over its artwork knows its bed position (ADR-642).
   // The camera's picture shows the real bed, where the route drawn over the
   // artwork does not burn, so that view says so.

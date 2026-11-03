@@ -68,8 +68,13 @@ the browser document or native desktop window is hidden does not consume the hol
 startup crash is shown at once. It introduces no startup interaction or modal.
 
 1. App opens to **empty workspace** state (see F-A2).
-2. Status bar shows: `Ready · No device configured · Empty workspace`.
-3. **No** welcome modal, **no** onboarding tour, **no** "what's new" dialog. Just the workspace.
+2. Status bar shows the cursor, selection and counts, then the machine: `Cursor: — · Nothing selected · Objects: 0 · Operations: 0 (0 output) · Device: Default 400×400 · Bed: 400 × 400 mm · Zoom: …`.
+   The Artwork panel's empty state reads **Your artwork starts here**: "Import or draw artwork to
+   create its first operation."
+3. **No** onboarding tour and **no** "what's new" dialog. The desktop app opens straight into the
+   workspace. Browser Free shows its first-visit welcome, **Choose your workspace.**, once, with a
+   Windows download and **Continue with Free** (ADR-540 Amendment 1 item 7); closing it continues in
+   Free.
    When no saved machine can be restored, a card over the canvas's top right corner says the
    machine is the generic starter (ADR-500 Amendment 1). **Set up machine** opens Machine Setup.
    A document on the generic starter can still offer **Use *name*** as one undo step.
@@ -121,7 +126,7 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 - **Grid**: light dotted, 10mm spacing, behind bed.
 - **Origin marker**: small cross at the device-profile origin.
 - **Hover size**: with the select tool and no drag in progress, resting the pointer on artwork (locked artwork too) shows its name, `W × H mm`, and the X/Y of its top-left beside the cursor, flipping to the pointer's other side near the canvas's right or bottom edge. On a laser it also shows the power and speed output runs the piece at, one line per distinct run (at most three, then `+N more settings`): the artwork's override and power scale applied, a Grayscale image (or one using original pixels) as its `min–max%` range, and a speed above Output max feed as the capped speed marked `(capped)`. A piece that output skips says why: `No operation`, `Output off`, or `Not engraved: operation is in Image mode` (vector artwork on an Image operation; a bitmap on Line or Fill names that mode) (ADR-348 Amendment 1). A picture kept behind its trace is ordinary artwork and shows its own power and speed, or `Output off` (ADR-673 and its Amendment 1). Display only — it changes no selection, no geometry, and no output.
-- **Drop hint**: centered ghost text "Drag an SVG here, or use File → Import" — visible only when scene is empty, fades out on hover.
+- **Empty-scene prompt**: there is no canvas drop hint. With nothing in the scene the Artwork panel says **Your artwork starts here** ("Import or draw artwork to create its first operation. Then choose how to cut, engrave or carve it."). Files can still be dropped onto the workspace to import them.
 - **Status bar**: bottom — current cursor mm coords, zoom level, device name, scene object count.
   Telemetry scrolls in its own hidden-scrollbar lane. Ready web or desktop update actions sit in a
   fixed trailing rail that remains inside 640, 390, and 320 px viewports; machine/job state never

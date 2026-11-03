@@ -83,6 +83,11 @@ describe('Workspace job dock', () => {
     render(<WorkspaceJobActions />);
     expect(button('Frame job').disabled).toBe(true);
     expect(button('Start').disabled).toBe(true);
+    // No machine connected: no report will ever come, so the hint says to
+    // connect, not to wait for Idle (UX audit U1-P2-4).
+    expect(button('Frame job').title).toMatch(/^Connect your machine first\./);
+    expect(button('Frame job').title).not.toContain('Idle');
+    expect(button('Start').title).toMatch(/^Connect your machine first\./);
 
     act(() => useLaserStore.setState({ connection: { kind: 'connected' } }));
     expect(button('Frame job').disabled).toBe(true);
