@@ -5,6 +5,7 @@
 // Kept here so both file-menu and drag-drop entry points produce identical
 // messaging — and so this logic is unit-testable without React.
 
+import { KNOCKOUT_WHITE, type WhiteKnockout } from '../../core/geometry/white-fill-knockout';
 import type { ParseSvgResult } from '../../io/svg';
 import type { ImportOutcome } from '../state/store';
 
@@ -16,18 +17,17 @@ export type ToastDescriptor = {
 export function describeImportResult(
   filename: string,
   result: ParseSvgResult,
+  whiteKnockout?: WhiteKnockout,
 ): ReadonlyArray<ToastDescriptor> {
   const out: ToastDescriptor[] = [];
 
-  const count = importObjectCount(result);
+  const count = importObjectCount(result) - (whiteKnockout?.removedObjects ?? 0);
   if (count === 0) {
     out.push({ message: `${filename} has no drawable content`, variant: 'warning' });
     return out;
   }
 
-  // Paths with an explicit fill rule each keep their own entry, so count
-  // distinct colours rather than paths (rolling v7 L7-P1-1).
-  const colorCount = new Set(result.object?.paths.map((path) => path.color.toLowerCase())).size;
+  const colorCount = importColorCount(result, whiteKnockout);
   out.push({
     message: `Imported ${filename} — ${count} object${count === 1 ? '' : 's'}, ${colorCount} color${colorCount === 1 ? '' : 's'}`,
     variant: 'success',
@@ -109,6 +109,15 @@ function describeStripped(s: ParseSvgResult['stripped']): string | null {
   }
   if (parts.length === 0) return null;
   return `sanitized ${parts.join(', ')}`;
+}
+
+// Paths with an explicit fill rule each keep their own entry, so count
+// distinct colours rather than paths (rolling v7 L7-P1-1). White shapes left
+// unburned are not a colour the operations hold (ADR-686).
+function importColorCount(result: ParseSvgResult, whiteKnockout?: WhiteKnockout): number {
+  const colors = new Set(result.object?.paths.map((path) => path.color.toLowerCase()));
+  if (whiteKnockout !== undefined) colors.delete(KNOCKOUT_WHITE);
+  return colors.size;
 }
 
 function importObjectCount(result: ParseSvgResult): number {
