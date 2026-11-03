@@ -22,6 +22,7 @@ export function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandC
     openTemplate: vi.fn(),
     saveTemplate: vi.fn(),
     openRecentProjects: vi.fn(),
+    openUnsavedWork: vi.fn(),
     barcodeGenerator: vi.fn(),
     exportDxf: vi.fn(),
     ...baseCtxEditingTools(),

@@ -8,7 +8,8 @@
 //     interval snapshot because unload cannot await IndexedDB.
 //   Stops scheduling on unmount; the browser releases session ownership.
 //
-// Recovery is offered by AutosaveRecoveryControl without blocking startup.
+// Recovery is offered by AutosaveRecoveryCard without blocking startup, and
+// File > Recover unsaved work lists earlier sessions' slots (ADR-686).
 // Restoring keeps a durable copy until the first manual save (M15).
 
 import { useEffect } from 'react';
@@ -131,7 +132,10 @@ type AutosaveRecoveryService = {
 };
 
 export async function runAutosaveRecovery(
-  chooseRestore: (ageLabel: string) => boolean | null | Promise<boolean | null>,
+  chooseRestore: (
+    ageLabel: string,
+    snapshot: AutosaveDurableSnapshot,
+  ) => boolean | null | Promise<boolean | null>,
   service: AutosaveRecoveryService = projectAutosaveService,
 ): Promise<void> {
   const entryState = useStore.getState();
@@ -164,41 +168,53 @@ export async function runAutosaveRecovery(
     await service.retainRecovered(record);
     return;
   }
-  const ok = await chooseRestore(recoveryAgeLabel(record.savedAt));
+  const ok = await chooseRestore(recoveryAgeLabel(record.savedAt), record);
   // The nonblocking choice may stay open while the user imports, edits, or
   // starts a new document. Neither restore nor cleanup may act on that work.
-  // null means Hide/unmount: leave the only backup intact.
+  // null means Start fresh/unmount: leave the only backup intact (ADR-686).
   if (ok === null || !isUntouched()) return;
-  const s = useStore.getState();
   if (ok) {
-    const loadResult = s.setProject(record.project);
-    if (projectLoadRefused(loadResult)) return;
-    reportRestoredProject(loadResult, record);
-    // The autosave it came from holds it until the first manual save.
-    noteProjectCopyOnDisk(useStore.getState().project);
-    // M15 (AUDIT-2026-06-10): the restored project's ONLY durable copy is
-    // the autosave slot. Mark it dirty so the 30 s loop, the beforeunload
-    // write, and the discard confirms all stay armed — and KEEP a slot;
-    // handleSaveProject clears it after the first successful manual save.
-    useStore.setState({ dirty: true });
-    // PST-01: the restore may have come from a *dead* window session's slot
-    // (or the legacy key). Re-home the copy into THIS session's slot so the
-    // first manual save's no-arg clearAutosave() actually clears it — the dead
-    // slot would otherwise linger and re-prompt on every later empty launch.
-    // Re-write BEFORE clearing so a durable copy always exists (M15); on a
-    // write failure keep the source slot rather than lose the only backup.
-    // When the source already IS this session's slot (same-tab reload), the
-    // re-home targets the same key, so skip the clear and leave it in place.
-    const rehome = await service.write(record.project);
-    if (rehome.kind === 'ok') {
-      reportCleanupResult(await service.clearRecovered(record, rehome.storageKey));
-    } else {
-      useToastStore.getState().pushToast(AUTOSAVE_FAILURE_MESSAGE, 'warning');
-    }
+    await restoreAutosaveSnapshot(record, service);
     return;
   }
   // Declining is an explicit discard — clearing stops the re-prompt loop.
   reportCleanupResult(await service.clearRecovered(record));
+}
+
+/**
+ * Load an autosaved snapshot as the open document, keeping a durable copy.
+ * Startup recovery and File > Recover unsaved work both restore through here;
+ * the caller has already settled what happens to the document it replaces.
+ */
+export async function restoreAutosaveSnapshot(
+  record: AutosaveDurableSnapshot,
+  service: Pick<AutosaveRecoveryService, 'write' | 'clearRecovered'> = projectAutosaveService,
+): Promise<boolean> {
+  const loadResult = useStore.getState().setProject(record.project);
+  if (projectLoadRefused(loadResult)) return false;
+  reportRestoredProject(loadResult, record);
+  // The autosave it came from holds it until the first manual save.
+  noteProjectCopyOnDisk(useStore.getState().project);
+  // M15 (AUDIT-2026-06-10): the restored project's ONLY durable copy is
+  // the autosave slot. Mark it dirty so the 30 s loop, the beforeunload
+  // write, and the discard confirms all stay armed — and KEEP a slot;
+  // handleSaveProject clears it after the first successful manual save.
+  useStore.setState({ dirty: true });
+  // PST-01: the restore may have come from a *dead* window session's slot
+  // (or the legacy key). Re-home the copy into THIS session's slot so the
+  // first manual save's no-arg clearAutosave() actually clears it — the dead
+  // slot would otherwise linger and re-prompt on every later empty launch.
+  // Re-write BEFORE clearing so a durable copy always exists (M15); on a
+  // write failure keep the source slot rather than lose the only backup.
+  // When the source already IS this session's slot (same-tab reload), the
+  // re-home targets the same key, so skip the clear and leave it in place.
+  const rehome = await service.write(record.project);
+  if (rehome.kind === 'ok') {
+    reportCleanupResult(await service.clearRecovered(record, rehome.storageKey));
+  } else {
+    useToastStore.getState().pushToast(AUTOSAVE_FAILURE_MESSAGE, 'warning');
+  }
+  return true;
 }
 
 // What Restore changed, said as File > Open says it (ADR-673 Amendment 1).
@@ -213,7 +229,7 @@ function reportRestoredProject(
   pushProjectLoadNotices(record.loadNotices ?? {}, pushToast, { migration: true });
 }
 
-function recoveryAgeLabel(savedAt: number): string {
+export function recoveryAgeLabel(savedAt: number): string {
   const ageMin = Math.max(0, Math.round((Date.now() - savedAt) / 60_000));
   return ageMin === 0 ? 'less than a minute ago' : `${ageMin} minute${ageMin === 1 ? '' : 's'} ago`;
 }

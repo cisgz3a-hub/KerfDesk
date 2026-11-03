@@ -17,6 +17,11 @@ export const FILE_COMMAND_HELP: Readonly<
     tooltip:
       'Reopen a project you recently opened or saved on this computer, and pin, remove or clear entries.',
   },
+  'file.recover-unsaved': {
+    family: 'file',
+    tooltip:
+      'Restore work from an earlier session that was never saved as a file. Starting new work keeps it here.',
+  },
   'file.save': {
     family: 'file',
     tooltip: 'Save the current project to its existing file.',

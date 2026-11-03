@@ -19,6 +19,7 @@ export function ConfirmSaveDialog(): JSX.Element | null {
 
 function ConfirmSavePanel(props: { readonly request: ConfirmSaveRequest }): JSX.Element {
   const choose = useConfirmSaveStore((s) => s.choose);
+  if (props.request.canSave === false) return <CannotSavePanel request={props.request} />;
   return (
     <Dialog size="sm" title="Save changes?" onClose={() => choose('cancel')}>
       <p style={bodyStyle}>
@@ -32,6 +33,31 @@ function ConfirmSavePanel(props: { readonly request: ConfirmSaveRequest }): JSX.
         </Button>
         <Button onClick={() => choose('discard')}>Don&apos;t Save</Button>
         <Button onClick={() => choose('cancel')}>Cancel</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+// ADR-686: in a browser without file pickers Save always fails, so it is not
+// offered. Cancel leads and takes the initial focus: it keeps the work, which
+// stays in this browser's autosave.
+function CannotSavePanel(props: { readonly request: ConfirmSaveRequest }): JSX.Element {
+  const choose = useConfirmSaveStore((s) => s.choose);
+  return (
+    <Dialog size="sm" title="Unsaved changes" onClose={() => choose('cancel')}>
+      <p style={bodyStyle}>
+        {props.request.projectName} has unsaved changes, and this browser can&apos;t save files.
+        Cancel keeps working on them here; they stay in this browser&apos;s autosave. To keep them
+        as a file, open KerfDesk in Chrome or Edge, or use the desktop app.
+      </p>
+      <p style={hintStyle}>
+        Don&apos;t Save discards the changes permanently and goes on to {props.request.action}.
+      </p>
+      <DialogActions>
+        <Button variant="primary" onClick={() => choose('cancel')}>
+          Cancel
+        </Button>
+        <Button onClick={() => choose('discard')}>Don&apos;t Save</Button>
       </DialogActions>
     </Dialog>
   );

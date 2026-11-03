@@ -1,3 +1,4 @@
+import { useUnsavedWorkStore } from '../app/unsaved-work-store';
 import { useRecentProjectsStore } from '../recent-projects/recent-projects-store';
 import { enabled, type AppCommand, type AppCommandContext } from './command-types';
 
@@ -13,6 +14,24 @@ export function recentProjectsCommand(ctx: AppCommandContext): AppCommand {
   );
 }
 
-export function recentProjectsCommandContext(): Pick<AppCommandContext, 'openRecentProjects'> {
-  return { openRecentProjects: () => useRecentProjectsStore.getState().openDialog() };
+// File > Recover unsaved work (ADR-686). Always available: the list says when
+// no earlier session left unsaved work.
+export function unsavedWorkCommand(ctx: AppCommandContext): AppCommand {
+  return enabled(
+    'file.recover-unsaved',
+    'file',
+    'Recover unsaved work...',
+    'Restore work from an earlier session that was never saved',
+    ctx.openUnsavedWork,
+  );
+}
+
+export function recentProjectsCommandContext(): Pick<
+  AppCommandContext,
+  'openRecentProjects' | 'openUnsavedWork'
+> {
+  return {
+    openRecentProjects: () => useRecentProjectsStore.getState().openDialog(),
+    openUnsavedWork: () => useUnsavedWorkStore.getState().openDialog(),
+  };
 }

@@ -29,7 +29,9 @@ import { CncStockCanvasHud, RegistrationJigPanel, ToolStrip, Workspace } from '.
 import { WorkspaceViewport } from '../workspace/WorkspaceViewport';
 import { PwaUpdateWatcherGate } from './PwaUpdateWatcherGate';
 import { useAutosave } from './use-autosave';
-import { AutosaveRecoveryControl } from './AutosaveRecoveryControl';
+import { AutosaveRecoveryCard } from './AutosaveRecoveryCard';
+import { UnsavedWorkHost } from './UnsavedWorkDialog';
+import { BrowserFilesNotice } from './BrowserFilesNotice';
 import { ProProjectDesktopDialog } from './ProProjectDesktopDialog';
 import { useActiveJobWakeLock } from './use-active-job-wake-lock';
 import { useJobWatch } from '../camera/job-watch/job-watch-runner';
@@ -93,12 +95,14 @@ function AppWorkspace(): JSX.Element {
   return (
     <div className="lf-app-shell" style={shellStyle}>
       <CommandShell />
+      <BrowserFilesNotice />
       <DesktopCloseNotice />
       <DesktopSessionEndNotice />
       <ProProjectDesktopDialog />
       <ProjectBedReconciliationBanner />
       <ExternalGcodePreviewBanner />
       <RecentProjectsHost />
+      <UnsavedWorkHost />
       <main style={mainStyle}>
         <ToolStrip />
         <CanvasArea />
@@ -113,9 +117,7 @@ function AppWorkspace(): JSX.Element {
         */}
         <WorkspaceSidePanels />
       </main>
-      <StatusBar>
-        <AutosaveRecoveryControl />
-      </StatusBar>
+      <StatusBar />
       {/* Window-level popups (ADR-207 amendment). Both are `position: fixed`,
           so they take no layout space anywhere: mounting either one cannot
           resize the workspace or shift the rails. Neither may overlay the
@@ -171,7 +173,7 @@ function WorkspaceLifecycle(): null {
 // hours, the tab-close laser-off with the desktop close handshake (C3,
 // ADR-549) and the unsaved-changes prompt (H-U6).
 function AppProtections(): null {
-  // Recovery stays in a nonblocking banner. Background autosave protects
+  // Recovery stays a nonblocking canvas card. Background autosave protects
   // edits throughout the session; global handlers catch asynchronous errors.
   useAutosave();
   useMachineProfilePersistence();
@@ -205,6 +207,7 @@ function CanvasArea(): JSX.Element {
       <BoardCapturePanel />
       {!showGcode ? <CncStockCanvasHud /> : null}
       <MachineSetupBanner />
+      <AutosaveRecoveryCard />
       <UpdatePrompt />
       <WorkspaceSafetyNotice />
     </>

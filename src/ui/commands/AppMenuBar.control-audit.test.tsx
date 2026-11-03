@@ -31,6 +31,7 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'file.new': { callback: 'newProject', guard: 'start a new project' },
   'file.open': { callback: 'openProject' },
   'file.open-recent': { callback: 'openRecentProjects' },
+  'file.recover-unsaved': { callback: 'openUnsavedWork' },
   'file.save': { callback: 'saveProject' },
   'file.save-as': { callback: 'saveProjectAs' },
   'file.open-template': { callback: 'openTemplate' },

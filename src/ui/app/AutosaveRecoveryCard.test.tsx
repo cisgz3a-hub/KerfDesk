@@ -9,7 +9,7 @@ import {
   type AutosaveDurableSnapshot,
 } from '../state/autosave-durable';
 import { resetStore, svgObj } from '../state/test-helpers';
-import { AutosaveRecoveryControl } from './AutosaveRecoveryControl';
+import { AutosaveRecoveryCard } from './AutosaveRecoveryCard';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -52,14 +52,14 @@ function mockRecovery(snapshot = recoverySnapshot()) {
   return { snapshot, readLatest, write, clearRecovered };
 }
 
-async function mountControl(): Promise<void> {
+async function mountCard(): Promise<void> {
   host = document.createElement('div');
   document.body.appendChild(host);
   root = createRoot(host);
   await act(async () => {
     root?.render(
       <StrictMode>
-        <AutosaveRecoveryControl />
+        <AutosaveRecoveryCard />
       </StrictMode>,
     );
   });
@@ -73,11 +73,14 @@ function button(label: string): HTMLButtonElement {
   return match as HTMLButtonElement;
 }
 
-function controls(): NodeListOf<HTMLElement> | undefined {
-  return host?.querySelectorAll('[aria-label="Recover autosave"]');
+function cards(): NodeListOf<HTMLElement> | undefined {
+  return host?.querySelectorAll('[data-autosave-recovery-card]');
 }
 
-beforeEach(resetStore);
+beforeEach(() => {
+  localStorage.clear();
+  resetStore();
+});
 
 afterEach(async () => {
   await act(async () => root?.unmount());
@@ -85,24 +88,30 @@ afterEach(async () => {
   host?.remove();
   host = null;
   vi.restoreAllMocks();
+  localStorage.clear();
   resetStore();
 });
 
-describe('AutosaveRecoveryControl', () => {
-  it('offers one nonblocking recovery choice in StrictMode without stealing focus', async () => {
+describe('AutosaveRecoveryCard (ADR-686)', () => {
+  it('asks on the canvas whether to restore the last session, without stealing focus', async () => {
     const service = mockRecovery();
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     const editorInput = document.createElement('input');
     document.body.appendChild(editorInput);
     editorInput.focus();
     try {
-      await mountControl();
+      await mountCard();
 
-      expect(controls()).toHaveLength(1);
-      expect(button('Recover autosave').getAttribute('aria-expanded')).toBe('false');
-      expect(document.querySelector('[role="dialog"], [aria-modal="true"]')).toBeNull();
+      expect(cards()).toHaveLength(1);
+      const card = cards()?.[0];
+      expect(card?.querySelector('h2')?.textContent).toBe(
+        "Your last session wasn't saved. Restore it?",
+      );
+      expect(card?.textContent).toContain('1 object, autosaved 196 minutes ago in this browser.');
+      expect(card?.textContent).toContain('File > Recover unsaved work');
+      expect(button('Restore')).toBeDefined();
+      expect(button('Start fresh')).toBeDefined();
+      expect(document.querySelector('[aria-modal="true"]')).toBeNull();
       expect(document.activeElement).toBe(editorInput);
-      expect(confirm).not.toHaveBeenCalled();
       expect(service.write).not.toHaveBeenCalled();
       expect(service.clearRecovered).not.toHaveBeenCalled();
     } finally {
@@ -110,12 +119,11 @@ describe('AutosaveRecoveryControl', () => {
     }
   });
 
-  it('restores only on request and preserves a dirty durable copy before clearing its source', async () => {
+  it('restores on request and preserves a dirty durable copy before clearing its source', async () => {
     const service = mockRecovery();
-    await mountControl();
+    await mountCard();
     expect(useStore.getState().project.scene.objects).toHaveLength(0);
 
-    await act(async () => button('Recover autosave').click());
     await act(async () => button('Restore').click());
 
     expect(useStore.getState().project.scene.objects.map((object) => object.id)).toEqual([
@@ -130,73 +138,45 @@ describe('AutosaveRecoveryControl', () => {
     expect(service.write.mock.invocationCallOrder[0]).toBeLessThan(
       service.clearRecovered.mock.invocationCallOrder[0]!,
     );
-    expect(controls()).toHaveLength(0);
+    expect(cards()).toHaveLength(0);
   });
 
-  it('closes with Escape and returns focus without dismissing the recovery offer', async () => {
+  it('starts fresh without discarding or rewriting the autosave, and does not ask about it again', async () => {
     const service = mockRecovery();
-    await mountControl();
-    const trigger = button('Recover autosave');
-    await act(async () => trigger.click());
-    expect(document.activeElement).toBe(button('Restore'));
-    const panel = document.querySelector('[role="dialog"][aria-label="Autosaved project"]');
-    expect(panel).not.toBeNull();
-    await act(async () => {
-      panel?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    });
-    expect(document.querySelector('[role="dialog"]')).toBeNull();
-    expect(document.activeElement).toBe(trigger);
-    expect(trigger.getAttribute('aria-expanded')).toBe('false');
-    expect(service.write).not.toHaveBeenCalled();
-    expect(service.clearRecovered).not.toHaveBeenCalled();
-    await act(async () => trigger.click());
-    expect(button('Restore')).toBeDefined();
-  });
+    await mountCard();
 
-  it('closes when the trigger is clicked again after focus returns from the panel', async () => {
-    mockRecovery();
-    await mountControl();
-    const trigger = button('Recover autosave');
-    await act(async () => trigger.click());
-    expect(document.activeElement).toBe(button('Restore'));
-    await act(async () => trigger.focus());
-    await act(async () => trigger.click());
-    expect(document.querySelector('[role="dialog"]')).toBeNull();
-    expect(trigger.getAttribute('aria-expanded')).toBe('false');
-  });
-
-  it('closes when keyboard focus leaves through the trigger and retains the backup', async () => {
-    const service = mockRecovery();
-    await mountControl();
-    const trigger = button('Recover autosave');
-    await act(async () => trigger.click());
-    await act(async () => trigger.focus());
-    const next = document.createElement('button');
-    document.body.appendChild(next);
-    try {
-      await act(async () => next.focus());
-      expect(document.querySelector('[role="dialog"]')).toBeNull();
-      expect(controls()).toHaveLength(1);
-      expect(service.write).not.toHaveBeenCalled();
-      expect(service.clearRecovered).not.toHaveBeenCalled();
-    } finally {
-      next.remove();
-    }
-  });
-
-  it('hides the choice without discarding or rewriting the backup', async () => {
-    const service = mockRecovery();
-    await mountControl();
-
-    await act(async () => button('Recover autosave').click());
-    await act(async () => button('Hide').click());
+    await act(async () => button('Start fresh').click());
     await act(async () => useStore.getState().setCursorMm({ x: 5, y: 10 }));
 
-    expect(controls()).toHaveLength(0);
+    expect(cards()).toHaveLength(0);
     expect(useStore.getState().project.scene.objects).toHaveLength(0);
     expect(useStore.getState().dirty).toBe(false);
     expect(service.write).not.toHaveBeenCalled();
     expect(service.clearRecovered).not.toHaveBeenCalled();
+
+    // The next launch finds the same snapshot: File > Recover unsaved work
+    // still lists it, but the card does not ask again.
+    await act(async () => root?.unmount());
+    host?.remove();
+    await mountCard();
+    expect(cards()).toHaveLength(0);
+    expect(service.clearRecovered).not.toHaveBeenCalled();
+  });
+
+  it('still asks about newer unsaved work after an earlier Start fresh', async () => {
+    const service = mockRecovery();
+    await mountCard();
+    await act(async () => button('Start fresh').click());
+    await act(async () => root?.unmount());
+    host?.remove();
+
+    service.readLatest.mockResolvedValue({
+      snapshot: { ...service.snapshot, savedAt: Date.now() - 60_000 },
+      warnings: [],
+      unreadable: [],
+    });
+    await mountCard();
+    expect(cards()).toHaveLength(1);
   });
 
   it.each([
@@ -204,11 +184,10 @@ describe('AutosaveRecoveryControl', () => {
     ['opening an empty project', () => useStore.getState().setProject(createProject())],
     ['New Project', () => useStore.getState().newProject()],
   ] as const)(
-    'withdraws recovery after %s and cannot replace the current project',
+    'withdraws the card after %s and cannot replace the current project',
     async (_, change) => {
       const service = mockRecovery();
-      await mountControl();
-      await act(async () => button('Recover autosave').click());
+      await mountCard();
       const restore = button('Restore');
 
       await act(async () => {
@@ -217,7 +196,7 @@ describe('AutosaveRecoveryControl', () => {
         restore.click();
       });
 
-      expect(controls()).toHaveLength(0);
+      expect(cards()).toHaveLength(0);
       expect(useStore.getState().project.scene.objects).toHaveLength(0);
       expect(service.write).not.toHaveBeenCalled();
       expect(service.clearRecovered).not.toHaveBeenCalled();
@@ -231,14 +210,14 @@ describe('AutosaveRecoveryControl', () => {
       resolveRead = resolve;
     });
     service.readLatest.mockReturnValue(pendingRead);
-    await mountControl();
+    await mountCard();
 
     await act(async () => {
       useStore.getState().newProject();
       resolveRead({ snapshot: service.snapshot, warnings: [], unreadable: [] });
     });
 
-    expect(controls()).toHaveLength(0);
+    expect(cards()).toHaveLength(0);
     expect(useStore.getState().project.scene.objects).toHaveLength(0);
     expect(service.write).not.toHaveBeenCalled();
     expect(service.clearRecovered).not.toHaveBeenCalled();

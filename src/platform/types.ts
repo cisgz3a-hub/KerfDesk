@@ -520,6 +520,10 @@ export type PlatformAdapter = {
   readonly machineNetwork?: MachineNetworkAdapter;
   readonly id: 'web' | 'electron' | 'mock';
 
+  /** False where the open and save pickers are missing (Firefox, Safari), so
+   * the app can say so before a pick fails (ADR-686). Absent means present. */
+  readonly filePickersAvailable?: () => boolean;
+
   // Show a file-open picker. Resolves to the chosen files (may be empty if
   // the user cancels).
   readonly pickFilesForOpen: (req: FileOpenRequest) => Promise<ReadonlyArray<FileHandle>>;

@@ -19,10 +19,10 @@ import { PlatformProvider } from './platform-context';
 
 const leaf = vi.hoisted(() => ({ crash: false }));
 
-// One ordinary status-bar leaf stands in for any render bug in the workspace.
-vi.mock('./AutosaveRecoveryControl', () => ({
-  AutosaveRecoveryControl: (): null => {
-    if (leaf.crash) throw new Error('status bar render bug');
+// One ordinary canvas leaf stands in for any render bug in the workspace.
+vi.mock('./AutosaveRecoveryCard', () => ({
+  AutosaveRecoveryCard: (): null => {
+    if (leaf.crash) throw new Error('canvas card render bug');
     return null;
   },
 }));
@@ -115,7 +115,7 @@ it('keeps the job protections and offers Save when the workspace crashes mid-job
   leaf.crash = true;
   await act(async () => root.render(tree()));
   expect(host.textContent).toContain('Something broke');
-  expect(host.textContent).toContain('status bar render bug');
+  expect(host.textContent).toContain('canvas card render bug');
   expect(button(SOFTWARE_ABORT_LABEL)).toBeDefined();
   expect(release).not.toHaveBeenCalled();
 

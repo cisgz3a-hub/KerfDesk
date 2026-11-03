@@ -1389,7 +1389,9 @@ that owns those fields, without changing the existing Frame/Start policy.
    folder for their generated set of files.
 6. Toast: `Saved G-code to <filename>`.
 7. The File System Access API is required (Chromium-only, per PROJECT.md "Delivery targets"); there
-   is **no browser-download fallback**. If unavailable, the save reports a clear error toast.
+   is **no browser-download fallback**. If unavailable, the save reports a clear error toast that
+   names Chrome, Edge and the desktop app, and a banner has said so since the app opened (F-C3,
+   ADR-686).
 
 #### Error — pre-flight failure
 - See F-A10.
@@ -3894,7 +3896,7 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
 
 - F-C1. Settings → Device Profile editor
 - F-C2. Settings → Preferences
-- F-C3. Autosave + recovery
+- F-C3. Autosave + recovery — specified below (ADR-305, ADR-686)
 - F-C4. Re-import changed SVG with diff
 - F-C5. Copy / paste / duplicate
   Copy and Paste carry the imported fonts used by copied text across documents, so that text stays
@@ -3902,6 +3904,37 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
   kept distinct. A Paste exceeding the project's existing font or scene limit leaves it unchanged.
 - F-C6. Crash reporter
 - F-C7. Unified Machine Setup — specified below (ADR-205; supersedes the split ADR-092 surface)
+
+### F-C3. Autosave + recovery
+
+Every 30 s, and when the window closes, unsaved work is written to this window's autosave slot in
+the browser's storage (ADR-305). Each window session has its own slot, kept until it is restored or
+discarded.
+
+#### Success — return to unsaved work
+1. The user reopens KerfDesk to an empty, untouched project while an earlier session's slot holds
+   unsaved work.
+2. A card in the middle of the canvas reads **Your last session wasn't saved. Restore it?** It
+   shows a picture of the artwork (vector work only), the object count and how long ago it was
+   autosaved. It is not modal and takes no focus.
+3. **Restore** opens the work as an unsaved project (dirty, Save asks for a destination) and moves
+   its copy into this window's slot.
+
+#### Alternate — Start fresh, or drawing without answering
+1. **Start fresh**, any edit, New or Open closes the card. The slot is kept. After Start fresh the
+   card does not ask about that same autosave again; newer unsaved work is still asked about.
+2. **File > Recover unsaved work…** lists earlier sessions' unsaved work, newest first (up to 10),
+   with picture, object count and save time. **Restore** first asks Save / Don't Save / Cancel for
+   the open project, then restores as above.
+3. The list leaves out this window's own work and work open in another live window.
+
+#### Edge — browser without file pickers (Firefox, Safari)
+1. A banner above the workspace reads **This browser can't open or save files. Use Chrome or Edge,
+   or the desktop app.** It adds that dragging files onto the canvas still imports them and that
+   work is autosaved in this browser, links to the download page, and hides with **Not now** until
+   the next launch.
+2. The question before New, Open or a restore offers **Cancel** and **Don't Save** only, and says
+   why there is no Save.
 
 ### F-C7. Unified Machine Setup
 

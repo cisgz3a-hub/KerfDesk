@@ -184,27 +184,17 @@ test('actual autosave recovery restores job settings without replacing computer 
   // Exercise the production interval and IndexedDB backend, not a manually seeded recovery slot.
   await page.waitForTimeout(31_000);
   await page.reload();
-  const recover = page.getByRole('button', { name: 'Recover autosave', exact: true });
-  await expect(
-    page
-      .getByRole('contentinfo', { name: 'Status bar' })
-      .getByRole('button', { name: 'Recover autosave', exact: true }),
-  ).toBeVisible();
-  const recovery = page.getByRole('dialog', { name: 'Autosaved project', exact: true });
-  await expect(recovery).toHaveCount(0);
-  await page.screenshot({ path: testInfo.outputPath('recovery-status-bar.png') });
-  await recover.click();
+  // ADR-686: the offer is a card on the canvas, not a status-bar link.
+  const recovery = page.getByRole('region', {
+    name: "Your last session wasn't saved. Restore it?",
+    exact: true,
+  });
   await expect(recovery).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath('recovery-options.png') });
-  await recover.click();
-  await expect(recovery).toHaveCount(0);
-  await recover.click();
-  await page.keyboard.press('Escape');
-  await expect(recover).toBeFocused();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath('recovery-card.png') });
   await page.setViewportSize({ width: 600, height: 700 });
-  await expect(recover).toBeInViewport();
-  await recover.click();
   await expect(recovery.getByRole('button', { name: 'Restore', exact: true })).toBeInViewport();
+  await expect(recovery.getByRole('button', { name: 'Start fresh', exact: true })).toBeInViewport();
   await page.screenshot({ path: testInfo.outputPath('recovery-compact.png') });
   await page.setViewportSize({ width: 1536, height: 864 });
   await recovery.getByRole('button', { name: 'Restore', exact: true }).click();

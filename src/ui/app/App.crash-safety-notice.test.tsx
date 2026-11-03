@@ -24,10 +24,10 @@ import { PlatformProvider } from './platform-context';
 
 const leaf = vi.hoisted(() => ({ crash: false, hostCrash: false }));
 
-// One ordinary status-bar leaf stands in for any render bug in the workspace.
-vi.mock('./AutosaveRecoveryControl', () => ({
-  AutosaveRecoveryControl: (): null => {
-    if (leaf.crash) throw new Error('status bar render bug');
+// One ordinary canvas leaf stands in for any render bug in the workspace.
+vi.mock('./AutosaveRecoveryCard', () => ({
+  AutosaveRecoveryCard: (): null => {
+    if (leaf.crash) throw new Error('canvas card render bug');
     return null;
   },
 }));
