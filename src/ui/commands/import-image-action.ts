@@ -42,11 +42,13 @@ export async function importImageFile(
     // encoded edge exceeds the browser canvas boundary.
     const pageBacked = shouldPageBackPng(file);
     const dimensionQualified = !pageBacked && (await shouldDecodeDimensionQualifiedPng(file));
-    controls =
-      pageBacked || dimensionQualified
-        ? createPngImportControls(file.name, pushToast, options.signal)
-        : null;
-    const loaded = await loadImageSamples(file, pageBacked, dimensionQualified, controls?.options);
+    // Every route can be cancelled with Esc; the worker routes say so in a
+    // progress notice, the embedded photo decode once it runs past 300 ms.
+    controls = createPngImportControls(file.name, pushToast, options.signal);
+    const loaded = await loadImageSamples(file, pageBacked, dimensionQualified, {
+      ...controls.options,
+      onSlowDecode: controls.showDecoding,
+    });
     warnImageCleanup(loaded, pushToast);
     rollback = loaded.kind === 'paged' ? loaded.rollback : null;
     const signal = pngImportSignal(controls, options.signal);
@@ -160,6 +162,7 @@ type PngImportControls = {
     readonly signal: AbortSignal;
     readonly onProgress: (progress: PngImportWorkerProgress) => void;
   };
+  readonly showDecoding: () => void;
   readonly dispose: () => void;
 };
 
@@ -178,6 +181,11 @@ function createPngImportControls(
   if (signal?.aborted === true) abort();
   else signal?.addEventListener('abort', abort, { once: true });
   let lastPhase = '';
+  const show = (phase: string, message: string): void => {
+    if (phase === lastPhase) return;
+    lastPhase = phase;
+    pushToast(message, 'info', { key: progressKey });
+  };
   const handleKeyDown = (event: KeyboardEvent): void => {
     if (event.key === 'Escape') controller.abort();
   };
@@ -185,12 +193,9 @@ function createPngImportControls(
   return {
     options: {
       signal: controller.signal,
-      onProgress: (progress) => {
-        if (progress.phase === lastPhase) return;
-        lastPhase = progress.phase;
-        pushToast(pngProgressMessage(name, progress), 'info', { key: progressKey });
-      },
+      onProgress: (progress) => show(progress.phase, pngProgressMessage(name, progress)),
     },
+    showDecoding: () => show('decoding', decodingMessage(name)),
     dispose: () => {
       window.removeEventListener('keydown', handleKeyDown);
       signal?.removeEventListener('abort', abort);
@@ -206,10 +211,12 @@ function pngProgressMessage(name: string, progress: PngImportWorkerProgress): st
   if (progress.phase === 'persisting-source') {
     return `${name}: staging source in worker. Press Esc to cancel.`;
   }
-  if (progress.phase === 'decoding') {
-    return `${name}: decoding and sampling in worker. Press Esc to cancel.`;
-  }
+  if (progress.phase === 'decoding') return decodingMessage(name);
   return `${name}: storing sampled rows in worker. Press Esc to cancel.`;
+}
+
+function decodingMessage(name: string): string {
+  return `${name}: decoding and sampling in worker. Press Esc to cancel.`;
 }
 
 function isAbortError(error: unknown): boolean {

@@ -7,4 +7,13 @@ describe('bytesToBase64', () => {
 
     expect(bytesToBase64(bytes)).toBe(Buffer.from(bytes).toString('base64'));
   });
+
+  it('gives the same text on the chunked route an engine without toBase64 takes', () => {
+    for (const length of [0, 1, 2, 3, 48 * 1024, 3 * 48 * 1024 + 2]) {
+      const bytes = Uint8Array.from({ length }, (_, index) => (index * 37 + 11) & 0xff);
+      Object.defineProperty(bytes, 'toBase64', { value: undefined });
+
+      expect(bytesToBase64(bytes)).toBe(Buffer.from(bytes).toString('base64'));
+    }
+  });
 });

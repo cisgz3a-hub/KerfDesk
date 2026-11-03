@@ -18,6 +18,14 @@ export type AutosavePreparationRequest = {
   readonly sealKey?: string;
 };
 
+/** Preparation outlived its deadline; the failure toast names this, not storage. */
+export class AutosavePreparationTimeoutError extends Error {
+  constructor() {
+    super('Autosave preparation timed out after 60 seconds.');
+    this.name = 'AutosavePreparationTimeoutError';
+  }
+}
+
 // Each interval write owns a short-lived worker. Keep serialization and recovery
 // validation off the canvas thread, and release their temporary project/JSON
 // copies before the durable service commits the returned record.
@@ -43,18 +51,25 @@ export async function prepareAutosaveRecordOffThread(
     // waiting as well: an earlier worker must not block the durable clear tail
     // forever. Failure retains the previous committed recovery generation.
     const timer = setTimeout(() => {
-      const error = new Error('Autosave preparation timed out after 60 seconds.');
+      const error = new AutosavePreparationTimeoutError();
       cancelWorker?.(error);
       cancelReservation();
       finish(preparationFailure(error));
     }, 60_000);
-    const cancelReservation = reserveWorkerMemory((release) => {
-      cancelWorker = prepareWithWorker(
-        { project, savedAt, sessionId, storageKey },
-        finish,
-        release,
-      );
-    });
+    // Interactive: a recovery copy at most one interval old outranks the
+    // background job preparation, which yields its heap and restarts after
+    // this short worker (ADR-598 Amendment 3, ADR-288 Amendment 3). Behind a
+    // preparation of bed-sized photos the copy otherwise waited minutes.
+    const cancelReservation = reserveWorkerMemory(
+      (release) => {
+        cancelWorker = prepareWithWorker(
+          { project, savedAt, sessionId, storageKey },
+          finish,
+          release,
+        );
+      },
+      { priority: 'interactive' },
+    );
   });
   return sealAutosavePreparation(prepared);
 }

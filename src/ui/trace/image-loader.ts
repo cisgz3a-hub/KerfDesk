@@ -7,7 +7,9 @@
 
 import { resampleBuffer } from '../../core/image-resample';
 import type { RawImageData } from '../../core/trace';
+import { bytesToBase64 } from '../import/base64-bytes';
 import { freezeGif, isGif } from '../import/freeze-gif';
+import { compositeChannel, lumaBytesFromCompositedRgba } from '../import/rgba-luma';
 import { readImageHeader } from './image-header-reader';
 import { parsePngDimensions, readPngHeader } from './png-header';
 import { maskTraceSourcePixels } from './trace-source-mask';
@@ -46,7 +48,6 @@ export function burnDecodeMaxEdge(naturalWidth: number, naturalHeight: number): 
   return Math.max(1, Math.min(BURN_MAX_EDGE_PX, Math.floor(Math.max(width, height) * pixelScale)));
 }
 
-const PAPER_WHITE = 255;
 // The PLATFORM's real 2D-canvas ceiling, measured in Chromium rather than
 // assumed: a 16384x16384 OffscreenCanvas allocates, draws and reads back;
 // 16385x16385 fails outright. Above these the browser factually cannot
@@ -85,11 +86,31 @@ export async function loadImageAsRawData(
   return maskTraceSourcePixels(file, pixels);
 }
 
-async function decodeImageAsRawData(
+function decodeImageAsRawData(
   file: File,
   maxEdge: number,
   signal?: AbortSignal,
 ): Promise<RawImageData> {
+  return decodeImageOntoCanvas(file, maxEdge, readCompositedPixels, signal);
+}
+
+/** Reads a canvas the loader has just drawn, before it is released. */
+export type DrawnImageReader<T> = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => T;
+
+/**
+ * The loader's decode and drawing, exactly: the same canvas, size, EXIF turn
+ * and browser resize, handed to `read` while it holds the image. The photo
+ * import snapshots it as an ImageBitmap so its readback and luma run in a
+ * worker; the pixels are those getImageData returns here (S3-P2-1). The
+ * canvas matters: Chromium may convert a JPEG's YUV to RGB on the GPU for an
+ * accelerated canvas, which differs by 1 in some bytes from a CPU decode.
+ */
+export async function decodeImageOntoCanvas<T>(
+  file: File,
+  maxEdge: number,
+  read: DrawnImageReader<T>,
+  signal?: AbortSignal,
+): Promise<T> {
   checkTraceSignal(signal);
   if (isGif(file)) file = await awaitTraceSignal(freezeGif(file), signal);
   checkTraceSignal(signal);
@@ -102,7 +123,7 @@ async function decodeImageAsRawData(
     if (resizedBitmap !== null) {
       try {
         checkTraceSignal(signal);
-        return rasterizeImage(resizedBitmap, target.width, target.height);
+        return rasterizeImage(resizedBitmap, target.width, target.height, read);
       } finally {
         resizedBitmap.close();
       }
@@ -118,7 +139,7 @@ async function decodeImageAsRawData(
   try {
     const img = await decodeImage(url, signal);
     checkTraceSignal(signal);
-    return rasterizeDecodedElement(img, header, maxEdge);
+    return rasterizeDecodedElement(img, header, maxEdge, read);
   } finally {
     URL.revokeObjectURL(url);
   }
@@ -202,17 +223,18 @@ function hasOrientedAspect(frame: ImageDimensions, oriented: ImageDimensions): b
 // ignored the Orientation, so the turn is drawn here instead: either way the
 // raster has the oriented aspect ratio the header, and so the import bounds,
 // promised.
-function rasterizeDecodedElement(
+function rasterizeDecodedElement<T>(
   img: HTMLImageElement,
   header: HeaderImageInfo | null,
   maxEdge: number,
-): RawImageData {
+  read: DrawnImageReader<T>,
+): T {
   const natural = { width: img.width, height: img.height };
   const orientation =
     header !== null && engineIgnoredOrientation(natural, header) ? header.orientation : 1;
   const oriented = orientedDimensions(natural, orientation);
   const { width, height } = scaleToCap(oriented.width, oriented.height, maxEdge);
-  return rasterizeImage(img, width, height, orientation);
+  return rasterizeImage(img, width, height, read, orientation);
 }
 
 function engineIgnoredOrientation(natural: ImageDimensions, header: HeaderImageInfo): boolean {
@@ -225,12 +247,13 @@ function engineIgnoredOrientation(natural: ImageDimensions, header: HeaderImageI
   );
 }
 
-function rasterizeImage(
+function rasterizeImage<T>(
   source: CanvasImageSource,
   width: number,
   height: number,
+  read: DrawnImageReader<T>,
   orientation: ExifOrientation = 1,
-): RawImageData {
+): T {
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
@@ -246,7 +269,14 @@ function rasterizeImage(
     ctx.drawImage(source, 0, 0, swap ? height : width, swap ? width : height);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
   }
-  const imgd = ctx.getImageData(0, 0, width, height);
+  return read(canvas, ctx);
+}
+
+function readCompositedPixels(
+  canvas: HTMLCanvasElement,
+  ctx: CanvasRenderingContext2D,
+): RawImageData {
+  const imgd = ctx.getImageData(0, 0, canvas.width, canvas.height);
   return compositeRgbOverWhitePreservingAlpha({
     width: imgd.width,
     height: imgd.height,
@@ -266,11 +296,6 @@ export function compositeRgbOverWhitePreservingAlpha(image: RawImageData): RawIm
     data[i + 3] = alpha;
   }
   return { width: image.width, height: image.height, data, rgbCompositedOnWhite: true };
-}
-
-function compositeChannel(value: number | undefined, opacity: number): number {
-  const source = value ?? 0;
-  return Math.round(source * opacity + PAPER_WHITE * (1 - opacity));
 }
 
 export async function readImageNaturalSize(
@@ -367,24 +392,10 @@ function assertSafeDecodeDimensions(dimensions: ImageDimensions): void {
 // Used by the Add Image flow so compile-job can dither pure-core
 // from RasterImage.lumaBase64 without touching the DOM.
 export function extractLumaBase64(image: RawImageData): string {
-  const pixelCount = image.width * image.height;
-  const buf = new Uint8Array(pixelCount);
-  for (let i = 0; i < pixelCount; i += 1) {
-    const r = image.data[i * 4] ?? 0;
-    const g = image.data[i * 4 + 1] ?? 0;
-    const b = image.data[i * 4 + 2] ?? 0;
-    buf[i] = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
-  }
-  // btoa wants a "binary string" (each char's code point = byte). One char
-  // per byte rather than String.fromCharCode(...buf) because the spread
-  // form hits V8's argument-count limit at ~64K pixels (LU10: an earlier
-  // comment claimed chunking that never existed — this loop is O(n) appends,
-  // not chunked, and that is fine).
-  let bin = '';
-  for (const v of buf) {
-    bin += String.fromCharCode(v);
-  }
-  return btoa(bin);
+  // Encoded in 48 KiB chunks (or natively): the earlier one-character-per-pixel
+  // string appends cost a 12 MP photo about 0.5 s, half of it garbage
+  // collection (performance audit S3-P2-1). The text is byte-identical.
+  return bytesToBase64(lumaBytesFromCompositedRgba(image.data, image.width * image.height));
 }
 
 // Read a File's bytes as a base64 data URL ('data:image/png;base64,…').

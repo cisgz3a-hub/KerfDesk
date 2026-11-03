@@ -12,6 +12,7 @@ import {
 import { useStore } from '../state';
 import { clearAutosave, readAutosave, writeAutosave } from '../state/autosave';
 import { AutosaveDurableService } from '../state/autosave-durable';
+import { AutosavePreparationTimeoutError } from '../state/autosave-preparation-client';
 import { IndexedDbAutosaveRepository } from '../state/autosave-indexeddb';
 import { AutosaveSessionLocks } from '../state/autosave-session-lock';
 import { useToastStore } from '../state/toast-store';
@@ -19,6 +20,7 @@ import { keptTracePhotosMessage } from '../state/project-load-notices';
 import { legacyTraceDocument } from '../../__fixtures__/legacy-trace-source-project';
 import {
   AUTOSAVE_FAILURE_MESSAGE,
+  AUTOSAVE_TIMEOUT_MESSAGE,
   AUTOSAVE_RECOVERY_RETAINED_MESSAGE,
   AUTOSAVE_RECOVERY_STORAGE_MESSAGE,
   AUTOSAVE_RECOVERY_VERSION_MESSAGE,
@@ -37,6 +39,27 @@ describe('createAutosaveFailureReporter', () => {
     expect(pushToast).toHaveBeenCalledTimes(1);
     expect(pushToast).toHaveBeenCalledWith(AUTOSAVE_FAILURE_MESSAGE, 'warning');
     expect(AUTOSAVE_FAILURE_MESSAGE).toContain('Save the .lf2 file manually');
+  });
+
+  it('names a preparation timeout as a deadline, not browser storage (S3-P2-2)', () => {
+    const pushToast = vi.fn();
+    const reportFailure = createAutosaveFailureReporter(pushToast);
+    const timedOut = {
+      kind: 'failed',
+      reason: 'storage-error',
+      error: new AutosavePreparationTimeoutError(),
+    } as const;
+
+    reportFailure(timedOut);
+    reportFailure(timedOut);
+    reportFailure({ kind: 'failed', reason: 'quota', error: new Error('full') });
+
+    expect(pushToast.mock.calls).toEqual([
+      [AUTOSAVE_TIMEOUT_MESSAGE, 'warning'],
+      [AUTOSAVE_FAILURE_MESSAGE, 'warning'],
+    ]);
+    expect(AUTOSAVE_TIMEOUT_MESSAGE).not.toContain('storage');
+    expect(AUTOSAVE_TIMEOUT_MESSAGE).toContain('Save the .lf2 file manually');
   });
 });
 

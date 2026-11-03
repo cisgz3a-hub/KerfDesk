@@ -11,8 +11,14 @@ import {
   tryDecodeQualifiedPng,
   type QualifiedPngDecodeOptions,
 } from './qualified-png-raster';
+import { decodeBurnLumaOffThread } from './image-luma-worker-client';
 
 type ImageDimensions = { readonly width: number; readonly height: number };
+
+export type ImageSamplesOptions = QualifiedPngDecodeOptions & {
+  /** The embedded decode is taking long enough to show its progress notice. */
+  readonly onSlowDecode?: () => void;
+};
 
 export type LoadedImageSamples =
   | {
@@ -38,7 +44,7 @@ export async function loadImageSamples(
   file: File,
   pageBacked: boolean,
   dimensionQualified: boolean,
-  options: QualifiedPngDecodeOptions = {},
+  options: ImageSamplesOptions = {},
 ): Promise<LoadedImageSamples> {
   if (pageBacked) {
     const qualified = await tryDecodeQualifiedPng(file, options);
@@ -56,8 +62,16 @@ export async function loadImageSamples(
       };
     }
   }
-  const natural = await readImageNaturalSize(file);
-  const sampled = await loadImageAsRawData(file, burnDecodeMaxEdge(natural.width, natural.height));
+  const natural = await readImageNaturalSize(file, options.signal);
+  const maxEdge = burnDecodeMaxEdge(natural.width, natural.height);
+  // Decode, sampling and luma run in a worker; the UI-thread loader below is
+  // the fallback for engines or files the worker cannot reproduce exactly.
+  const offThread = await decodeBurnLumaOffThread(file, maxEdge, {
+    ...(options.signal === undefined ? {} : { signal: options.signal }),
+    ...(options.onSlowDecode === undefined ? {} : { onSlow: options.onSlowDecode }),
+  });
+  if (offThread !== null) return { kind: 'embedded', natural, ...offThread };
+  const sampled = await loadImageAsRawData(file, maxEdge, options.signal);
   return {
     kind: 'embedded',
     natural,

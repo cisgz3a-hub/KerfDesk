@@ -3,9 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createProject, type Project } from '../../core/scene';
 import { reserveWorkerMemory } from '../worker-memory-lane';
 import {
+  AutosavePreparationTimeoutError,
   prepareAutosaveRecordOffThread,
   type AutosavePreparationRequest,
 } from './autosave-preparation-client';
+import { startAutosaveLoop } from './autosave-loop';
 import * as records from './autosave-record';
 import type { AutosavePreparation } from './autosave-record';
 
@@ -59,7 +61,11 @@ describe('off-thread autosave preparation', () => {
       await vi.advanceTimersByTimeAsync(60_000);
       expectReleased(worker);
       expect(nextStarted).toBe(true);
-      await expect(preparing).resolves.toMatchObject({ kind: 'failed', reason: 'storage-error' });
+      await expect(preparing).resolves.toMatchObject({
+        kind: 'failed',
+        reason: 'storage-error',
+        error: expect.any(AutosavePreparationTimeoutError),
+      });
       lateReply({
         data: records.prepareAutosaveRecord(createProject(), 123, SESSION_ID, STORAGE_KEY),
       } as MessageEvent<AutosavePreparation>);
@@ -200,7 +206,7 @@ describe('off-thread autosave preparation', () => {
     cancelNext();
   });
 
-  it('waits for an active preparation before constructing or cloning the snapshot', async () => {
+  it('waits for a non-preemptible owner such as Save before constructing or cloning the snapshot', async () => {
     const releasePreparation = reserveWorkerMemory(() => undefined);
     const project = createProject();
     const expected = records.prepareAutosaveRecord(project, 100, SESSION_ID, STORAGE_KEY);
@@ -217,6 +223,65 @@ describe('off-thread autosave preparation', () => {
     worker.respond(expected);
     await expect(preparing).resolves.toEqual(expected);
     expectReleased(worker);
+  });
+
+  it('preempts a background job preparation instead of queueing behind it (S3-P2-2)', async () => {
+    const preparation = simulatedPreparation(120_000);
+    const project = createProject();
+    const expected = records.prepareAutosaveRecord(project, 100, SESSION_ID, STORAGE_KEY);
+    const preparing = prepareAutosaveRecordOffThread(project, 100, SESSION_ID, STORAGE_KEY);
+    try {
+      // The preparation retired its heap before the autosave worker was built.
+      expect(preparation.preemptions).toBe(1);
+      const worker = FakeWorker.instances[0]!;
+      expect(preparation.running).toBe(false);
+      worker.respond(expected);
+      await expect(preparing).resolves.toEqual(expected);
+      // It restarts behind the short autosave worker, which is retired first.
+      expect(preparation.running).toBe(true);
+      expect(preparation.starts).toBe(2);
+    } finally {
+      preparation.stop();
+    }
+  });
+
+  it('lands the first autosave on its 30 s tick while four bed-sized photos are prepared', async () => {
+    vi.useFakeTimers();
+    // Measured in the audit: the four-photo preparation runs 112-164 s, and the
+    // first write after an edit came about 125 s later.
+    const preparation = simulatedPreparation(150_000);
+    const edited = { ...createProject(), notes: 'edit before the preparation' };
+    const writes: number[] = [];
+    const startedAt = Date.now();
+    const stop = startAutosaveLoop(
+      () => ({ project: edited, dirty: true, isStreaming: false }),
+      30_000,
+      undefined,
+      async (project) => {
+        const prepared = await prepareAutosaveRecordOffThread(project, 1, SESSION_ID, STORAGE_KEY);
+        writes.push(Date.now() - startedAt);
+        return prepared.kind === 'ok'
+          ? { kind: 'ok', savedAt: 1, storageKey: STORAGE_KEY }
+          : prepared;
+      },
+    );
+    try {
+      await vi.advanceTimersByTimeAsync(30_000);
+      const worker = FakeWorker.instances[0]!;
+      expect(worker).toBeDefined();
+      await vi.advanceTimersByTimeAsync(2_000);
+      worker.respond(records.prepareAutosaveRecord(edited, 1, SESSION_ID, STORAGE_KEY));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(writes).toEqual([32_000]);
+      // One preemption per changed project: later ticks find it already written.
+      await vi.advanceTimersByTimeAsync(150_000);
+      expect(preparation.preemptions).toBe(1);
+      expect(preparation.completions).toBe(1);
+      expect(FakeWorker.instances).toHaveLength(1);
+    } finally {
+      stop();
+      preparation.stop();
+    }
   });
 
   it('reports a constructor failure without attempting synchronous preparation', async () => {
@@ -294,6 +359,47 @@ describe('off-thread autosave preparation', () => {
     expect(FakeWorker.instances).toHaveLength(0);
   });
 });
+
+/** A background preparation owner as preparation-worker-client reserves it:
+ * preemptible, retiring its heap and requeueing its unchanged request. */
+function simulatedPreparation(durationMs: number) {
+  const state = { starts: 0, preemptions: 0, completions: 0, running: false };
+  let cancel: (() => void) | null = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let stopped = false;
+  const reserve = (): void => {
+    cancel = reserveWorkerMemory(
+      (release) => {
+        state.starts += 1;
+        state.running = true;
+        timer = setTimeout(() => {
+          state.running = false;
+          state.completions += 1;
+          release();
+        }, durationMs);
+      },
+      {
+        onPreempt: () => {
+          state.preemptions += 1;
+          state.running = false;
+          if (timer !== null) clearTimeout(timer);
+          const previous = cancel;
+          reserve();
+          previous?.();
+        },
+      },
+    );
+  };
+  reserve();
+  return Object.assign(state, {
+    stop: () => {
+      if (stopped) return;
+      stopped = true;
+      if (timer !== null) clearTimeout(timer);
+      cancel?.();
+    },
+  });
+}
 
 function expectReleased(worker: FakeWorker): void {
   expect(worker.terminate).toHaveBeenCalledTimes(1);
