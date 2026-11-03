@@ -113,19 +113,26 @@ export function laserPowerScaleWarnings(
   return [...laserPowerScaleSourceWarnings(project, scale), ...(steps === null ? [] : [steps])];
 }
 
+const POWER_SCALE_SOURCE_PREFIX = 'Output power uses ';
+
+/** Which S value 100 % means: a technical note (ADR-687). */
+export function isPowerScaleSourceNote(warning: string): boolean {
+  return warning.startsWith(POWER_SCALE_SOURCE_PREFIX);
+}
+
 function laserPowerScaleSourceWarnings(
   project: Project,
   scale: LaserPowerScale,
 ): ReadonlyArray<string> {
   if (scale.source === 'profile') {
     return [
-      `Output power uses saved profile S${scale.maxPowerS}; no current controller power range was verified. 100% means S${scale.maxPowerS} under that profile assumption, not measured optical power.`,
+      `${POWER_SCALE_SOURCE_PREFIX}saved profile S${scale.maxPowerS}; no current controller power range was verified. 100% means S${scale.maxPowerS} under that profile assumption, not measured optical power.`,
     ];
   }
   return scale.maxPowerS === project.device.maxPowerS
     ? []
     : [
-        `Output power uses the connected controller's $30=${scale.maxPowerS}: 100% means S${scale.maxPowerS}. The saved profile remains S${project.device.maxPowerS}.`,
+        `${POWER_SCALE_SOURCE_PREFIX}the connected controller's $30=${scale.maxPowerS}: 100% means S${scale.maxPowerS}. The saved profile remains S${project.device.maxPowerS}.`,
       ];
 }
 

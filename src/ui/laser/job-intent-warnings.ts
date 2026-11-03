@@ -9,6 +9,7 @@ import {
 import { shouldAdvise4040FillPolicySelection } from '../../core/job/fill-runway-policy';
 import { pixelExtentForMm } from '../../core/raster';
 import {
+  machineKindOf,
   pathUsesOperation,
   sceneObjectUsesOperation,
   type Layer,
@@ -19,6 +20,7 @@ import {
 import { effectiveOperationForObject } from '../../core/scene/effective-operation';
 import { compileDiagnosticWarnings } from './compile-diagnostic-warnings';
 import { constantPowerWarnings } from './constant-power-warnings';
+import { cutOrderWarnings } from './cut-order-warnings';
 import { rasterEnergyWarnings } from './raster-energy-warnings';
 import { rasterPassThroughWarnings } from './raster-pass-through-warnings';
 import { rasterThresholdWarnings } from './raster-threshold-warnings';
@@ -31,8 +33,22 @@ import { detectUncalibratedJobWarnings } from './uncalibrated-job-warnings';
 // scorch the runway exists to prevent. Advisory only — never a gate (rule 7).
 const OVERSCAN_ZERO_DISABLES_4040_FILL_RUNWAY_WARNING =
   'Fill overscan is 0, which disables the 4040-safe burn-entry runway: split fill fragments will start burning straight out of a rapid and can scorch where each fragment begins. Restore fill overscan (KerfDesk uses up to 5 mm of it as feed-matched runway).';
+const SENSITIVE_ISLAND_FILL_ACTIVE_NOTE =
+  '4040-safe Island Fill is active. KerfDesk will use local clustered, unidirectional sweeps with full laser-off runway; this may run slower but is safer for sensitive motion.';
+const GENERIC_SCAN_LINE_4040_PREFIX = 'Generic Scan Line feed-matched';
+const SCAN_OFFSET_PREFIX = 'Bidirectional scan output at';
 const GENERIC_SCAN_LINE_4040_POLICY_WARNING = (deviceName: string): string =>
-  `Generic Scan Line feed-matched entry and exit runways are active. The Neotronics-qualified 4040 fill policy is not selected because ${deviceName} is selected. KerfDesk cannot identify a Neotronics 4040 from bed size or controller settings. If this is that machine, open Machine Setup, choose Neotronics 4040 Max / LT-4LDS-V2, review it, and Save before this Scanline Fill.`;
+  `${GENERIC_SCAN_LINE_4040_PREFIX} entry and exit runways are active. The Neotronics-qualified 4040 fill policy is not selected because ${deviceName} is selected. KerfDesk cannot identify a Neotronics 4040 from bed size or controller settings. If this is that machine, open Machine Setup, choose Neotronics 4040 Max / LT-4LDS-V2, review it, and Save before this Scanline Fill.`;
+
+/** Motion-policy notes a beginner cannot act on: Job Review and Save G-code
+ *  fold them under Technical notes (UX audit U3-P3-6, U4-P2-6, ADR-687). */
+export function isTechnicalJobIntentNote(warning: string): boolean {
+  return (
+    warning.startsWith(GENERIC_SCAN_LINE_4040_PREFIX) ||
+    warning.startsWith(SCAN_OFFSET_PREFIX) ||
+    warning === SENSITIVE_ISLAND_FILL_ACTIVE_NOTE
+  );
+}
 
 export function detectJobIntentWarnings(
   project: Project,
@@ -49,6 +65,9 @@ export function detectJobIntentWarnings(
     ...constantPowerWarnings(job, project),
     ...stackedCopyWarnings(project),
     ...detectUncalibratedJobWarnings(job, project.scene.layers),
+    ...(machineKindOf(project.machine) === 'cnc'
+      ? []
+      : cutOrderWarnings(job, project.scene.layers)),
     ...compileDiagnosticWarnings(job),
   ];
   append4040FillPolicyWarning(project, job, warnings);
@@ -89,7 +108,7 @@ function appendScanOffsetCoverageWarnings(project: Project, job: Job, warnings: 
   const points = project.device.scanningOffsets;
   if (points.length === 0) {
     warnings.push(
-      `Bidirectional scan output at ${formatFeedList(feeds)} has no saved scan-offset table. KerfDesk will emit 0 mm scan correction; calibrate these speeds or select one-way scanning if alignment is not verified.`,
+      `${SCAN_OFFSET_PREFIX} ${formatFeedList(feeds)} has no saved scan-offset table. KerfDesk will emit 0 mm scan correction; calibrate these speeds or select one-way scanning if alignment is not verified.`,
     );
     return;
   }
@@ -99,7 +118,7 @@ function appendScanOffsetCoverageWarnings(project: Project, job: Job, warnings: 
   const uncovered = feeds.filter((feed) => feed < min || feed > max);
   if (uncovered.length === 0) return;
   warnings.push(
-    `Bidirectional scan output at ${formatFeedList(uncovered)} is outside the saved scan-offset table (${min}–${max} mm/min). Below the first sample, correction scales from zero; above the last sample, it stays at the last offset. Add measured rows covering these emitted speeds or select one-way scanning.`,
+    `${SCAN_OFFSET_PREFIX} ${formatFeedList(uncovered)} is outside the saved scan-offset table (${min}–${max} mm/min). Below the first sample, correction scales from zero; above the last sample, it stays at the last offset. Add measured rows covering these emitted speeds or select one-way scanning.`,
   );
 }
 
@@ -179,9 +198,7 @@ function appendFillHeatWarnings(
       `4040-safe Island Fill has ${heat.sensitiveIslandShortSweepCount} short sweep(s) that can overburn or darken small details even with full laser-off runway. Use Scanline Fill for final 4040 burns until Island Fill is calibrated for this machine.`,
     );
   } else if (job.groups.some(isSensitiveIslandFillGroupWithOverscan)) {
-    warnings.push(
-      '4040-safe Island Fill is active. KerfDesk will use local clustered, unidirectional sweeps with full laser-off runway; this may run slower but is safer for sensitive motion.',
-    );
+    warnings.push(SENSITIVE_ISLAND_FILL_ACTIVE_NOTE);
   }
   if (heat.islandNoRunwayShortSweepCount > 0) {
     warnings.push(

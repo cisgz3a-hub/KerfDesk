@@ -58,8 +58,10 @@ export const selectNativeBedEvidence = memoizeOnInputs(
   nativeBedEvidenceSnapshot,
 );
 
+// Worded for a beginner (UX audit U4-P2-6): the headline says what is not
+// known, and the rest says what to look at before Start.
 export const UNKNOWN_NATIVE_BED_MESSAGE =
-  'The controller-to-bed coordinate mapping is unverified. The canvas is artwork-relative; physical bed position and no-go-zone clearance must be checked at the machine.';
+  "KerfDesk can't check where this job sits on your bed. The controller does not report how its coordinates map to the bed, so the canvas shows the artwork, not the bed. The box Frame traces is where it will burn: check that your material is under it and that it clears clamps and no-go zones.";
 
 export function nativeBedCaptureFrameKey(
   device: DeviceProfile,

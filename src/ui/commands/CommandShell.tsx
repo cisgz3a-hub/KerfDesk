@@ -78,7 +78,7 @@ export function CommandShell(): JSX.Element {
   const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
   const [boxGeneratorOpen, setBoxGeneratorOpen] = useState(false);
   const [boxFitTestOpen, setBoxFitTestOpen] = useState(false);
-  const [materialTestDialogOpen, setMaterialTestDialogOpen] = useState(false);
+  const materialTestDialogOpen = useUiStore((state) => state.materialTestDialogOpen);
   const [intervalTestDialogOpen, setIntervalTestDialogOpen] = useState(false);
   const [scanOffsetTestDialogOpen, setScanOffsetTestDialogOpen] = useState(false);
   const [settingsDialog, setSettingsDialog] = useState<SettingsDialogKind>(null);
@@ -99,7 +99,7 @@ export function CommandShell(): JSX.Element {
     requestBoxGenerator: () => setBoxGeneratorOpen(true),
     requestBarcodeGenerator: () => useBarcodeDialogStore.getState().open({ mode: 'insert' }),
     requestBoxFitTest: () => setBoxFitTestOpen(true),
-    requestMaterialTest: () => setMaterialTestDialogOpen(true),
+    requestMaterialTest: () => useUiStore.getState().openMaterialTestDialog(),
     requestIntervalTest: () => setIntervalTestDialogOpen(true),
     requestScanOffsetTest: () => setScanOffsetTestDialogOpen(true),
     requestFocusTest: () => setSettingsDialog('focus'),
@@ -137,7 +137,7 @@ export function CommandShell(): JSX.Element {
         fitTestOpen={boxFitTestOpen}
         onFitTestClose={() => setBoxFitTestOpen(false)}
         materialOpen={materialTestDialogOpen}
-        onMaterialClose={() => setMaterialTestDialogOpen(false)}
+        onMaterialClose={() => useUiStore.getState().closeMaterialTestDialog()}
         intervalOpen={intervalTestDialogOpen}
         onIntervalClose={() => setIntervalTestDialogOpen(false)}
         scanOffsetOpen={scanOffsetTestDialogOpen}

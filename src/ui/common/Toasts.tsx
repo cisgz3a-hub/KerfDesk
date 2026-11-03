@@ -4,14 +4,14 @@
 // placement hook decides which. Reads from useToastStore; auto-dismiss lives
 // in the store. Per ADR-015 / CLAUDE.md this component is a thin renderer.
 //
-// The toast body ignores pointer input and only its dismiss control is
-// interactive: a click-to-dismiss toast over the drawing surface had the
+// The toast body ignores pointer input and only its dismiss control (and a
+// folded list of notes' summary) is interactive: a click-to-dismiss toast over the drawing surface had the
 // import worker's "parsing in worker" advisory swallow the mousedown that
 // started a rectangle drag (e2e shape-properties caught it).
 
 import { createPortal } from 'react-dom';
 import { Icon } from '../kit/icons';
-import { useToastStore, type ToastVariant } from '../state/toast-store';
+import { useToastStore, type Toast, type ToastVariant } from '../state/toast-store';
 import { useToastPlacement } from './use-toast-placement';
 import { useToastScrollability } from './use-toast-scrollability';
 import './Toasts.css';
@@ -45,6 +45,7 @@ export function Toasts(): JSX.Element {
             <span className="lf-toast__message">
               <strong>{variantLabel}: </strong>
               {toast.message}
+              {toast.details === undefined ? null : <ToastDetails toast={toast} />}
             </span>
             <button
               type="button"
@@ -61,6 +62,30 @@ export function Toasts(): JSX.Element {
     </div>
   );
   return placement.host === null ? notifications : createPortal(notifications, placement.host);
+}
+
+// Opening the notes holds the toast until it is dismissed, so it cannot expire
+// mid-read (UX audit U3-P3-6).
+function ToastDetails(props: { readonly toast: Toast }): JSX.Element {
+  const hold = useToastStore((s) => s.holdToast);
+  const details = props.toast.details ?? [];
+  return (
+    <details
+      className="lf-toast__details"
+      onToggle={(event) => {
+        if (event.currentTarget.open) hold(props.toast.id);
+      }}
+    >
+      <summary title="Show these notes. The notice then stays until you dismiss it.">
+        {details.length === 1 ? 'Show the note' : `Show all ${details.length}`}
+      </summary>
+      <ul>
+        {details.map((detail) => (
+          <li key={detail}>{detail}</li>
+        ))}
+      </ul>
+    </details>
+  );
 }
 
 function toastVariantLabel(variant: ToastVariant): string {

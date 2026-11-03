@@ -223,6 +223,12 @@ export type UiState = ArtworkRunOrderUiState &
     readonly convertBitmapDialogOpen: boolean;
     readonly openConvertBitmapDialog: () => void;
     readonly closeConvertBitmapDialog: () => void;
+    // Tools → Material Test. Here too, so the laser Operation panel's
+    // starter-values notice can open it (ADR-500 Amendment 1 decision 5,
+    // UX audit U3-P2-1).
+    readonly materialTestDialogOpen: boolean;
+    readonly openMaterialTestDialog: () => void;
+    readonly closeMaterialTestDialog: () => void;
     // Transactional G-code export prepares bytes before a separate,
     // user-activated destination-selection click.
     readonly gcodeSaveDialogOpen: boolean;
@@ -291,6 +297,9 @@ function uiDialogSlice(
   | 'convertBitmapDialogOpen'
   | 'openConvertBitmapDialog'
   | 'closeConvertBitmapDialog'
+  | 'materialTestDialogOpen'
+  | 'openMaterialTestDialog'
+  | 'closeMaterialTestDialog'
   | 'gcodeSaveDialogOpen'
   | 'openGcodeSaveDialog'
   | 'closeGcodeSaveDialog'
@@ -308,6 +317,9 @@ function uiDialogSlice(
     convertBitmapDialogOpen: false,
     openConvertBitmapDialog: () => set({ convertBitmapDialogOpen: true }),
     closeConvertBitmapDialog: () => set({ convertBitmapDialogOpen: false }),
+    materialTestDialogOpen: false,
+    openMaterialTestDialog: () => set({ materialTestDialogOpen: true }),
+    closeMaterialTestDialog: () => set({ materialTestDialogOpen: false }),
     gcodeSaveDialogOpen: false,
     openGcodeSaveDialog: () => set({ gcodeSaveDialogOpen: true }),
     closeGcodeSaveDialog: () => set({ gcodeSaveDialogOpen: false }),
