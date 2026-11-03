@@ -138,4 +138,5 @@ the 30 s interval.
 A unit test runs the real autosave loop and client against a simulated
 preparation that holds the lane for 150 s and preempts like the real client.
 The write lands on the 30 s tick, the preparation is preempted once, restarts
-and completes, and later ticks write nothing. AUTOSAVE_MEASUREMENTS_PLACEHOLDER
+and completes, and later ticks write nothing.
+The browser measurement with four bed-sized photos is recorded below when run.

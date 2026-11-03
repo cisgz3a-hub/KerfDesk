@@ -57,4 +57,5 @@ RGBA with every alpha value, the chunk boundary of the encoder on both routes, e
 decision, cancellation, the slow-decode notice, and a count-based guard that a worker decode runs
 neither `loadImageAsRawData` nor `extractLumaBase64` on the UI thread.
 
-MEASUREMENTS_PLACEHOLDER
+The browser measurement on a production build (import block for a 12 MP JPEG, the 4096 x 4096
+PNG and a TIFF page, and the luma hashes of each fixture against main) is recorded below when run.
