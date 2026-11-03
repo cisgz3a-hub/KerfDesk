@@ -1,6 +1,6 @@
 ## ADR-620 - Artwork rests in ink; operation colours pulse on hover (2026-10-18)
 
-**Status:** Accepted; the pulse's timing, strength, glow and edge (decision 2) amended by ADR-632; its drawing cost (decision 8) by ADR-632 Amendment 1. | **Date:** 2026-10-18
+**Status:** Accepted; the pulse's timing, strength, glow and edge (decision 2) amended by ADR-632; its drawing cost (decision 8) by ADR-632 Amendment 1 and ADR-620 Amendment 1 (only pieces in view; rests while the view moves). | **Date:** 2026-10-18
 
 ### Context
 

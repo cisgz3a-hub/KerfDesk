@@ -1,4 +1,5 @@
 import type { Polyline } from '../../core/scene';
+import { SPRITE_MIN_DISPLAY_SEGMENTS } from './artwork-sprite-cache';
 
 // Above this many segments the canvas draws a DECIMATED display copy (see
 // display-polylines.ts). The budget is a parachute for megabyte-scale
@@ -27,6 +28,38 @@ export function artworkStrokeWidthPx(displaySegmentCount: number, output: boolea
   return displaySegmentCount >= HAIRLINE_STROKE_SEGMENT_THRESHOLD
     ? ARTWORK_HAIRLINE_WIDTH_PX
     : ARTWORK_STROKE_WIDTH_PX;
+}
+
+// The stroker's cost is per segment, so thousands of small objects cost what
+// one dense object does (ADR-346 Amendment 1). While the view pans or zooms, or
+// artwork is dragged, a frame that paints at least this many segments directly
+// (objects below the sprite size) strokes them as hairlines. The settled frame
+// after the motion draws them at their own width again.
+export const MOVING_FRAME_HAIRLINE_SEGMENTS = HAIRLINE_STROKE_SEGMENT_THRESHOLD;
+
+/** Whether a frame strokes as hairlines, from the displays it draws (undefined: none there). */
+export function movingFrameDrawsHairlines(
+  displays: Iterable<{ readonly displaySegmentCount: number } | undefined>,
+  moving: boolean,
+): boolean {
+  return moving && directSegmentCount(displays) >= MOVING_FRAME_HAIRLINE_SEGMENTS;
+}
+
+/** Segments a frame paints itself: its objects too small to be blitted from a sprite. */
+export function directSegmentCount(
+  displays: Iterable<{ readonly displaySegmentCount: number } | undefined>,
+): number {
+  let count = 0;
+  for (const display of displays) {
+    const segments = display?.displaySegmentCount ?? 0;
+    if (segments < SPRITE_MIN_DISPLAY_SEGMENTS) count += segments;
+  }
+  return count;
+}
+
+/** A width on a hairline frame: never wider than one device pixel. */
+export function hairlineFrameWidthPx(widthPx: number): number {
+  return Math.min(widthPx, ARTWORK_HAIRLINE_WIDTH_PX);
 }
 
 export function countPolylineSegments(polylines: ReadonlyArray<Polyline>): number {

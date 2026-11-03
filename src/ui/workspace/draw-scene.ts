@@ -60,6 +60,7 @@ import { drawLargeSceneNotice, strokePolylinesBatched } from './draw-vector-stro
 import { drawArtworkRunFocus } from './draw-artwork-run-focus';
 import { drawBed, drawGrid, drawOriginMarker } from './draw-bed-chrome';
 import { beginArtworkSpriteFrame } from './artwork-sprite-cache';
+import { movingFrameDrawsHairlines } from './draw-complexity';
 import { fillPoolRuns } from '../../core/scene/fill-operations';
 import { drawnBitmapBox, type ResolvedVector } from './fill-pools';
 import { createFillPoolPainter } from './fill-pool-paint';
@@ -123,6 +124,9 @@ export type DrawOpts = {
   readonly operationColors?: boolean;
   // ADR-629: rulers count in the operator's display unit.
   readonly lengthUnit?: DisplayLengthUnit;
+  // ADR-346 Amendment 1: the view is panning or zooming, or artwork is being
+  // dragged. A busy moving frame strokes its small objects as hairlines.
+  readonly viewMoving?: boolean;
 };
 
 export function drawScene(
@@ -170,6 +174,7 @@ export function drawScene(
       opts.onRasterBitmapReady,
       opts.displayPolylineCache,
       opts.artworkRunFocus,
+      opts.viewMoving === true,
     );
     if (simplified) drawLargeSceneNotice(ctx);
     if (opts.artworkRunFocus !== undefined) {
@@ -319,6 +324,7 @@ function drawObjects(
   onRasterBitmapReady?: () => void,
   displayPolylineCache?: DisplayPolylineCache,
   artworkRunFocus?: ArtworkRunFocus,
+  viewMoving = false,
 ): boolean {
   beginArtworkSpriteFrame();
   const layerByColor = sceneLayerVisibility.lookup(project.scene.layers);
@@ -336,12 +342,16 @@ function drawObjects(
     (index) => drawnBitmapBox(project.scene.objects[index], placed[index]?.isVisible === true),
     fillPoolRuns(project.scene),
   );
+  // ADR-346 Amendment 1: a busy moving frame strokes its small objects thin.
+  const drawn = placed.map((entry) => entry.vector?.display);
+  const thin = movingFrameDrawsHairlines(drawn, viewMoving);
   // A pool stays bright while any of its members is in the focused run.
   const painter = createFillPoolPainter(
     ctx,
     view,
     (ids) => (dimmedByRunFocus(artworkRunFocus, ids) ? UNFOCUSED_ALPHA : null),
     onRasterBitmapReady,
+    thin,
   );
   const selection = { selectedId, additional: additionalSelectedIds };
   let simplified = false;
@@ -357,7 +367,7 @@ function drawObjects(
     // to paths — single drawing path. ADR-057: dash the jig box so it reads as a
     // placement fixture, not artwork; reset after, before the overlays below.
     ctx.setLineDash(isRegistrationBox(obj) ? [8, 5] : []);
-    if (drawPlacedVector(ctx, vector, display, view, onRasterBitmapReady)) simplified = true;
+    if (drawPlacedVector(ctx, vector, display, view, onRasterBitmapReady, thin)) simplified = true;
     ctx.setLineDash([]);
     if (onCanvas) drawObjectBitmap(ctx, obj, layerByColor, view, onRasterBitmapReady);
     drawObjectSelectionOverlay(ctx, obj, view, {
@@ -426,10 +436,11 @@ function drawPlacedVector(
   vector: ResolvedVector | undefined,
   display: ObjectDisplay | undefined,
   view: ViewTransform,
-  requestRedraw: (() => void) | undefined,
+  redraw: (() => void) | undefined,
+  thin: boolean,
 ): boolean {
   if (vector === undefined || display === undefined) return false;
-  if (display.paths.length > 0) drawObjectDisplay(ctx, vector.object, display, view, requestRedraw);
+  if (display.paths.length > 0) drawObjectDisplay(ctx, vector.object, display, view, redraw, thin);
   return display.isSimplified;
 }
 

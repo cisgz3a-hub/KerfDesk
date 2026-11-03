@@ -18,7 +18,11 @@ import { pathFillOperations, pathStylingOperation } from '../../core/scene/fill-
 import { canvasTheme } from '../theme/canvas-theme';
 import { canvasVectorDisplayColor } from '../theme/canvas-vector-color';
 import { drawArtworkSprite, SPRITE_MIN_DISPLAY_SEGMENTS } from './artwork-sprite-cache';
-import { artworkStrokeWidthPx, countPolylineSegments } from './draw-complexity';
+import {
+  artworkStrokeWidthPx,
+  countPolylineSegments,
+  hairlineFrameWidthPx,
+} from './draw-complexity';
 import {
   buildDisplayPolylines,
   buildFillDisplayPolylines,
@@ -147,7 +151,8 @@ export function resolveObjectDisplay(
  * Draw a resolved object: dense objects come from their cached sprite
  * (artwork-sprite-cache.ts), everything else is painted directly. Both paths
  * run the same per-path painter, so a sprite shows exactly what a direct
- * paint would.
+ * paint would. `hairline` thins a direct paint on a moving frame; a sprite
+ * keeps its own width, because a blit costs the same either way.
  */
 export function drawObjectDisplay(
   ctx: CanvasRenderingContext2D,
@@ -155,6 +160,7 @@ export function drawObjectDisplay(
   resolved: ObjectDisplay,
   view: ViewTransform,
   requestRedraw?: () => void,
+  hairline = false,
 ): void {
   if (
     resolved.displaySegmentCount >= SPRITE_MIN_DISPLAY_SEGMENTS &&
@@ -172,7 +178,7 @@ export function drawObjectDisplay(
   ) {
     return;
   }
-  paintObjectDisplay(ctx, obj, resolved, view);
+  paintObjectDisplay(ctx, obj, resolved, view, hairline);
 }
 
 /** Paint a resolved object exactly as the workspace draws it, path by path. */
@@ -181,9 +187,11 @@ export function paintObjectDisplay(
   obj: VectorSceneObject,
   resolved: ObjectDisplay,
   view: ViewTransform,
+  hairline = false,
 ): void {
   for (const { display, paint } of resolved.paths) {
-    const widthPx = artworkStrokeWidthPx(resolved.displaySegmentCount, paint.output);
+    const width = artworkStrokeWidthPx(resolved.displaySegmentCount, paint.output);
+    const widthPx = hairline ? hairlineFrameWidthPx(width) : width;
     if (paint.kind === 'fill') {
       paintFilledGeometry(ctx, obj, display, paint, widthPx, view);
       continue;
