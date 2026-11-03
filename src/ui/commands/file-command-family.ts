@@ -1,7 +1,7 @@
 import { enabled, type AppCommand, type AppCommandContext } from './command-types';
 import { gcodeInspectorCommands } from './gcode-command-family';
 import { templateCommands } from './template-command-family';
-import { recentProjectsCommand } from './recent-projects-command';
+import { recentProjectsCommand, unsavedWorkCommand } from './recent-projects-command';
 
 export function fileCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   return [
@@ -19,6 +19,7 @@ export function fileCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> 
     ),
     enabled('file.open', 'file', 'Open...', 'Open project', ctx.openProject, 'Ctrl+O'),
     recentProjectsCommand(ctx),
+    unsavedWorkCommand(ctx),
     enabled('file.save', 'file', 'Save', 'Save project', ctx.saveProject, 'Ctrl+S'),
     enabled(
       'file.save-as',

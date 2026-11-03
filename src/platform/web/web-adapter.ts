@@ -34,9 +34,23 @@ function acceptTypesFor(accept: ReadonlyArray<string>): FilePickerAcceptType[] {
   return [{ description: 'Files', accept: { 'application/octet-stream': [...accept] } }];
 }
 
+// Firefox and Safari have no file pickers. The app says so on load (ADR-688),
+// and these errors say what to do instead of naming the missing API.
+export const BROWSER_CANNOT_OPEN_FILES =
+  "This browser can't open files. Use Chrome or Edge, or the KerfDesk desktop app. You can still drag files onto the canvas to import them.";
+export const BROWSER_CANNOT_SAVE_FILES =
+  "This browser can't save files. Use Chrome or Edge, or the KerfDesk desktop app. Your work stays in this browser's autosave.";
+
+function filePickersAvailable(): boolean {
+  return (
+    typeof window.showOpenFilePicker === 'function' &&
+    typeof window.showSaveFilePicker === 'function'
+  );
+}
+
 async function pickFilesForOpen(req: FileOpenRequest): Promise<ReadonlyArray<FileHandle>> {
   if (typeof window.showOpenFilePicker !== 'function') {
-    throw new Error('File System Access API is required to open files in the web app.');
+    throw new Error(BROWSER_CANNOT_OPEN_FILES);
   }
   let handles: FileSystemFileHandle[];
   try {
@@ -61,7 +75,7 @@ async function pickFilesForOpen(req: FileOpenRequest): Promise<ReadonlyArray<Fil
 // all bytes before picking (ADR-656).
 async function pickFileForSave(req: FileSaveRequest): Promise<SaveTarget | null> {
   if (typeof window.showSaveFilePicker !== 'function') {
-    throw new Error('File System Access API is required to save files in the web app.');
+    throw new Error(BROWSER_CANNOT_SAVE_FILES);
   }
   let handle: FileSystemFileHandle;
   try {
@@ -282,6 +296,7 @@ async function abortWritable(writable: FileSystemWritableFileStream): Promise<vo
 
 export const webAdapter: PlatformAdapter = {
   id: 'web',
+  filePickersAvailable,
   pickFilesForOpen,
   pickFileForSave,
   reserveFileForSave,

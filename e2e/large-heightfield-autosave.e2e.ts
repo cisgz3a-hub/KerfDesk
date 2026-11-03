@@ -125,8 +125,10 @@ test('real IndexedDB autosave restores a 2048x2048 canonical field after reload'
     await dialog.dismiss();
   });
   await page.reload();
-  await page.getByRole('button', { name: 'Recover autosave', exact: true }).click();
-  const recoveryBar = page.getByRole('dialog', { name: 'Autosaved project', exact: true });
+  const recoveryBar = page.getByRole('region', {
+    name: "Your last session wasn't saved. Restore it?",
+    exact: true,
+  });
   await expect(recoveryBar).toBeVisible();
   await recoveryBar.getByRole('button', { name: 'Restore', exact: true }).click();
   await expect(recoveryBar).toBeHidden();

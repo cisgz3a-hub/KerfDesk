@@ -18,6 +18,9 @@ export type ConfirmSaveRequest = {
   // What proceeding would do, phrased as a verb clause ("start a new
   // project"), interpolated into the dialog body.
   readonly action: string;
+  // False where Save cannot succeed (a browser without file pickers): the
+  // dialog explains instead of offering a Save that fails (ADR-688).
+  readonly canSave?: boolean;
   readonly resolve: (choice: ConfirmSaveChoice) => void;
 };
 

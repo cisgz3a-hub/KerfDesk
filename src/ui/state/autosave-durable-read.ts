@@ -36,11 +36,27 @@ export type AutosaveDurableReadResult = {
   readonly unreadable: ReadonlyArray<AutosaveUnreadableSlot>;
 };
 
+export type AutosaveDurableListResult = Omit<AutosaveDurableReadResult, 'snapshot'> & {
+  /** Every recoverable snapshot no live window owns, newest first. */
+  readonly snapshots: ReadonlyArray<AutosaveDurableSnapshot>;
+};
+
 export async function readLatestDurableAutosave(
   repository: AutosaveDurableRepository,
   locks: AutosaveSessionLocks,
   currentSessionId: string,
 ): Promise<AutosaveDurableReadResult> {
+  const { snapshots, ...rest } = await readDurableAutosaves(repository, locks, currentSessionId);
+  return { snapshot: snapshots[0] ?? null, ...rest };
+}
+
+// Earlier sessions keep their own slots until restored or discarded, so the
+// work of a session that was never restored stays listable (ADR-688).
+export async function readDurableAutosaves(
+  repository: AutosaveDurableRepository,
+  locks: AutosaveSessionLocks,
+  currentSessionId: string,
+): Promise<AutosaveDurableListResult> {
   // Startup recovery must verify this computer's seal after its protected key
   // has loaded, otherwise valid Pro work would be refused as shared work.
   await projectSealReady();
@@ -49,7 +65,7 @@ export async function readLatestDurableAutosave(
   const candidates = await readCandidates(repository, warnings, unreadable);
   const eligible = await eligibleCandidates(locks, candidates, currentSessionId, warnings);
   eligible.sort((a, b) => b.savedAt - a.savedAt);
-  return { snapshot: eligible[0] ?? null, warnings: [...new Set(warnings)], unreadable };
+  return { snapshots: eligible, warnings: [...new Set(warnings)], unreadable };
 }
 
 async function readCandidates(

@@ -519,9 +519,9 @@ export type PlatformAdapter = {
   readonly aiAssistant?: AiAssistant;
   readonly machineNetwork?: MachineNetworkAdapter;
   readonly id: 'web' | 'electron' | 'mock';
+  readonly filePickersAvailable?: () => boolean; // false in Firefox/Safari; absent = yes (ADR-688)
 
-  // Show a file-open picker. Resolves to the chosen files (may be empty if
-  // the user cancels).
+  // Show a file-open picker; resolves to the chosen files (empty if the user cancels).
   readonly pickFilesForOpen: (req: FileOpenRequest) => Promise<ReadonlyArray<FileHandle>>;
 
   // Show a file-save picker. Resolves to a SaveTarget the caller writes

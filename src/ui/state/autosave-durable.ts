@@ -18,6 +18,7 @@ import {
 } from './autosave-local-storage';
 import { IndexedDbAutosaveRepository } from './autosave-indexeddb';
 import {
+  readDurableAutosaves,
   readLatestDurableAutosave,
   type AutosaveDurableReadResult,
   type AutosaveDurableSnapshot,
@@ -180,6 +181,19 @@ export class AutosaveDurableService {
     const result = await readLatestDurableAutosave(this.repository, this.locks, session.sessionId);
     await this.retireUnreadable(result.unreadable);
     return result;
+  }
+
+  /**
+   * Unsaved work from earlier sessions, newest first, for File > Recover
+   * unsaved work (ADR-688). This window's own slot is the work on screen and
+   * a live window's slot is that window's, so neither is listed. Unreadable
+   * slots are left for startup recovery to report and retire.
+   */
+  async readRecent(): Promise<ReadonlyArray<AutosaveDurableSnapshot>> {
+    await this.tail;
+    const session = await this.session();
+    const result = await readDurableAutosaves(this.repository, this.locks, session.sessionId);
+    return result.snapshots.filter((snapshot) => snapshot.ownership !== 'current');
   }
 
   // Retire the exact unreadable record the scan reported, after checking

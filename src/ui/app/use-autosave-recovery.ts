@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react';
+import type { Project } from '../../core/scene';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { AUTOSAVE_RECOVERY_STORAGE_MESSAGE, runAutosaveRecovery } from './use-autosave';
+import { rememberStartFresh, startedFreshFrom } from './autosave-recovery-summary';
 
 type RecoveryOffer = {
   readonly ageLabel: string;
+  readonly project: Project;
   readonly restore: () => void;
-  readonly hide: () => void;
+  /** Keep the autosave, reachable from File > Recover unsaved work (ADR-688). */
+  readonly startFresh: () => void;
 };
 
 export function useAutosaveRecovery(): RecoveryOffer | null {
@@ -20,7 +24,8 @@ export function useAutosaveRecovery(): RecoveryOffer | null {
       settle?.(choice);
       settle = undefined;
     };
-    // A fresh document (even an empty one) or any edit retires the offer.
+    // A fresh document (even an empty one) or any edit retires the offer. The
+    // autosave itself stays listed in File > Recover unsaved work.
     const unsubscribe = useStore.subscribe((state) => {
       if (cancelled) return;
       if (
@@ -32,11 +37,19 @@ export function useAutosaveRecovery(): RecoveryOffer | null {
         finish(null);
       }
     });
-    void runAutosaveRecovery((ageLabel) => {
-      if (cancelled) return null;
+    void runAutosaveRecovery((ageLabel, snapshot) => {
+      if (cancelled || startedFreshFrom(snapshot)) return null;
       return new Promise<boolean | null>((resolve) => {
         settle = resolve;
-        setOffer({ ageLabel, restore: () => finish(true), hide: () => finish(null) });
+        setOffer({
+          ageLabel,
+          project: snapshot.project,
+          restore: () => finish(true),
+          startFresh: () => {
+            rememberStartFresh(snapshot);
+            finish(null);
+          },
+        });
       });
     }).catch(() => {
       if (!cancelled) {

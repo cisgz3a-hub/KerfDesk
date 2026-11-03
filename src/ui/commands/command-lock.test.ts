@@ -52,6 +52,7 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     newProject: vi.fn(),
     openProject: vi.fn(),
     openRecentProjects: vi.fn(),
+    openUnsavedWork: vi.fn(),
     saveProject: vi.fn(),
     saveProjectAs: vi.fn(),
     openTemplate: vi.fn(),
