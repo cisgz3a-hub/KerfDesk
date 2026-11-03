@@ -61,7 +61,6 @@ export function SafetyNoticeBanner(props: Props = {}): JSX.Element | null {
   const controllerOperation = useLaserStore((s) => s.controllerOperation);
   const clear = useLaserStore((s) => s.clearSafetyNotice);
   const wakeController = useLaserStore((s) => s.wakeController);
-  const checkpointHeld = useRecoveryRepositorySelection(selectCheckpointHeld);
   if (notice === null) return null;
   const title = safetyNoticeTitle(notice);
   const resetAvailable = connection.kind === 'connected' && statusState === 'Sleep';
@@ -72,12 +71,7 @@ export function SafetyNoticeBanner(props: Props = {}): JSX.Element | null {
     <div style={bannerStyle} role="alert">
       <strong style={titleStyle}>{title}</strong>
       <p style={messageStyle}>{notice.message}</p>
-      {checkpointHeld ? (
-        <p style={guidanceStyle}>
-          This warning is separate from the interrupted-job checkpoint. Reconnecting or resetting
-          the controller does not resume the job and does not erase that checkpoint.
-        </p>
-      ) : null}
+      <CheckpointGuidance />
       <div style={actionsStyle}>
         {reconnectRecommended && props.onReconnect !== undefined ? (
           <button
@@ -90,16 +84,7 @@ export function SafetyNoticeBanner(props: Props = {}): JSX.Element | null {
             {connection.kind === 'connecting' ? 'Reconnecting…' : 'Reconnect controller…'}
           </button>
         ) : null}
-        {notice.kind === 'controller-error' && notice.homingOff === true ? (
-          <button
-            type="button"
-            onClick={() => openMachineSetup({ kind: 'step', step: 'confirm' })}
-            style={recoverStyle}
-            title="Open Machine Setup at Essentials, where Enable Home is set."
-          >
-            Open Machine Setup
-          </button>
-        ) : null}
+        <HomingOffSetupButton notice={notice} />
         {resetAvailable ? (
           <button
             type="button"
@@ -121,6 +106,32 @@ export function SafetyNoticeBanner(props: Props = {}): JSX.Element | null {
         </button>
       </div>
     </div>
+  );
+}
+
+function CheckpointGuidance(): JSX.Element | null {
+  const checkpointHeld = useRecoveryRepositorySelection(selectCheckpointHeld);
+  if (!checkpointHeld) return null;
+  return (
+    <p style={guidanceStyle}>
+      This warning is separate from the interrupted-job checkpoint. Reconnecting or resetting the
+      controller does not resume the job and does not erase that checkpoint.
+    </p>
+  );
+}
+
+// Home refused with homing off is fixed in Machine Setup's Essentials (U2-P2-2).
+function HomingOffSetupButton(props: { readonly notice: LaserSafetyNotice }): JSX.Element | null {
+  if (props.notice.kind !== 'controller-error' || props.notice.homingOff !== true) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => openMachineSetup({ kind: 'step', step: 'confirm' })}
+      style={recoverStyle}
+      title="Open Machine Setup at Essentials, where Enable Home is set."
+    >
+      Open Machine Setup
+    </button>
   );
 }
 
