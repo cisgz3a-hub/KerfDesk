@@ -23,8 +23,8 @@ function ConfirmSavePanel(props: { readonly request: ConfirmSaveRequest }): JSX.
   return (
     <Dialog size="sm" title="Save changes?" onClose={() => choose('cancel')}>
       <p style={bodyStyle}>
-        {props.request.projectName} has unsaved changes. Save them before you {props.request.action}
-        ?
+        {sentenceSubject(props.request.projectName)} has unsaved changes. Save them before you{' '}
+        {props.request.action}?
       </p>
       <p style={hintStyle}>Don&apos;t Save discards the changes permanently.</p>
       <DialogActions>
@@ -46,9 +46,9 @@ function CannotSavePanel(props: { readonly request: ConfirmSaveRequest }): JSX.E
   return (
     <Dialog size="sm" title="Unsaved changes" onClose={() => choose('cancel')}>
       <p style={bodyStyle}>
-        {props.request.projectName} has unsaved changes, and this browser can&apos;t save files.
-        Cancel keeps working on them here; they stay in this browser&apos;s autosave. To keep them
-        as a file, open KerfDesk in Chrome or Edge, or use the desktop app.
+        {sentenceSubject(props.request.projectName)} has unsaved changes, and this browser
+        can&apos;t save files. Cancel keeps working on them here; they stay in this browser&apos;s
+        autosave. To keep them as a file, open KerfDesk in Chrome or Edge, or use the desktop app.
       </p>
       <p style={hintStyle}>
         Don&apos;t Save discards the changes permanently and goes on to {props.request.action}.
@@ -69,3 +69,8 @@ const hintStyle: React.CSSProperties = {
   fontSize: 12,
   color: 'var(--lf-text-muted)',
 };
+
+// An unnamed project is called "this project", which opens the sentence.
+function sentenceSubject(projectName: string): string {
+  return projectName === 'this project' ? 'This project' : projectName;
+}

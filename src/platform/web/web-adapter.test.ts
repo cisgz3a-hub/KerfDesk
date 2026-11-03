@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { chromiumDirectory, installChromiumSavePicker } from './chromium-save-picker.test-support';
-import { webAdapter } from './web-adapter';
+import { BROWSER_CANNOT_OPEN_FILES, BROWSER_CANNOT_SAVE_FILES, webAdapter } from './web-adapter';
 
 const originalSavePickerDescriptor = Object.getOwnPropertyDescriptor(window, 'showSaveFilePicker');
 const originalDirectoryPickerDescriptor = Object.getOwnPropertyDescriptor(
@@ -116,10 +116,12 @@ describe('webAdapter save target', () => {
     expect(isSameEntry).toHaveBeenCalledWith(secondHandle);
   });
 
-  it('reports unsupported browsers with a clear File System Access error', async () => {
+  it('reports unsupported browsers with a clear error that names a browser that can save (ADR-688)', async () => {
     Object.defineProperty(window, 'showSaveFilePicker', { configurable: true, value: undefined });
 
-    await expect(webAdapter.pickFileForSave(saveRequest)).rejects.toThrow(/File System Access API/);
+    await expect(webAdapter.pickFileForSave(saveRequest)).rejects.toThrow(
+      BROWSER_CANNOT_SAVE_FILES,
+    );
   });
 
   it('keeps an operator-chosen filename without creating the destination until write', async () => {
@@ -207,7 +209,7 @@ describe('webAdapter open picker', () => {
 
     await expect(
       webAdapter.pickFilesForOpen({ multiple: false, accept: ['.lf2'] }),
-    ).rejects.toThrow(/File System Access API/);
+    ).rejects.toThrow(BROWSER_CANNOT_OPEN_FILES);
   });
 
   it('remembers the picked handle so Recent Projects can reopen the file', async () => {
