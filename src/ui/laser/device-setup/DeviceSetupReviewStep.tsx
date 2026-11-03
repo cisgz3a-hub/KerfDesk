@@ -2,6 +2,11 @@
 import { useEffect, useState } from 'react';
 import { Icon } from '../../kit/icons';
 import { useLaserStore } from '../../state/laser-store';
+import {
+  liveDriverMismatch,
+  reviewDriverSwitchText,
+  reviewStatusText,
+} from '../live-driver-mismatch';
 import type { CncStartupOperationDraft } from '../../state/cnc-startup-setup';
 import type { DeviceSetupStepProps } from './device-setup-flow';
 import { machineSetupValidationIssues } from './device-setup-flow';
@@ -19,6 +24,7 @@ export function DeviceSetupReviewStep({
   readonly operationDrafts: ReadonlyArray<CncStartupOperationDraft>;
 }): JSX.Element {
   const issues = machineSetupValidationIssues(state);
+  const driverSwitch = useDraftDriverSwitch(state.draft);
   const rows = useLaserStore((store) => store.grblSettingsRows);
   const queuedFirmwareWrites = computeFirmwareDiffs(state.draft, rows, {
     machine: state.draftMachine,
@@ -28,7 +34,7 @@ export function DeviceSetupReviewStep({
   );
   return (
     <section className="lf-setup-review">
-      <SoftwareStatus issues={issues} />
+      <SoftwareStatus issues={issues} driverSwitch={driverSwitch} />
       {state.machineKind === 'cnc' ? (
         <p>
           Machining setup: <strong>{state.cncSetupDraft.name}</strong> · G54 · stock top Z0 ·{' '}
@@ -59,20 +65,42 @@ export function DeviceSetupReviewStep({
   );
 }
 
-function SoftwareStatus({ issues }: { readonly issues: ReadonlyArray<string> }): JSX.Element {
+// The live connection's driver, when Save has to switch it (U2-P2-1).
+function useDraftDriverSwitch(draft: DeviceSetupStepProps['state']['draft']): string | null {
+  const connected = useLaserStore((store) => store.connection.kind === 'connected');
+  const activeControllerKind = useLaserStore((store) => store.activeControllerKind);
+  const activeControllerCommandSet = useLaserStore((store) => store.activeControllerCommandSet);
+  const mismatch = liveDriverMismatch(draft, {
+    connected,
+    activeControllerKind,
+    activeControllerCommandSet,
+  });
+  return mismatch === null ? null : reviewDriverSwitchText(mismatch);
+}
+
+function SoftwareStatus({
+  issues,
+  driverSwitch,
+}: {
+  readonly issues: ReadonlyArray<string>;
+  readonly driverSwitch: string | null;
+}): JSX.Element {
   const ready = issues.length === 0;
+  const settled = ready && driverSwitch === null;
   return (
-    <div className={`lf-setup-review-status ${ready ? 'is-ready' : 'has-issues'}`} role="status">
+    <div className={`lf-setup-review-status ${settled ? 'is-ready' : 'has-issues'}`} role="status">
       <span className="lf-setup-review-status-mark" aria-hidden="true">
-        <Icon name={ready ? 'check' : 'warning'} size={20} />
+        <Icon name={settled ? 'check' : 'warning'} size={20} />
       </span>
       <div>
-        <strong>{ready ? 'Ready to save' : 'A few settings need attention'}</strong>
-        <p>
-          {ready
-            ? 'Software configuration is internally consistent. Saving will not run or home the machine.'
-            : 'Fix the issues below, then return here to save your setup.'}
-        </p>
+        <strong>
+          {!ready
+            ? 'A few settings need attention'
+            : settled
+              ? 'Ready to save'
+              : 'Ready to save: Save reconnects'}
+        </strong>
+        <p>{reviewStatusText(issues, driverSwitch)}</p>
         {!ready ? (
           <ul>
             {issues.map((issue) => (

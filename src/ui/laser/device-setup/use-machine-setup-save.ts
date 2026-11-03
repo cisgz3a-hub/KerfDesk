@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { DeviceProfile } from '../../../core/devices';
 import type { CncTool } from '../../../core/scene';
 import { cncRetainedFeedAdvisoriesAfterSetupChange } from '../../common/cnc-bit-change-advisory';
+import { usePlatformOptional } from '../../app/platform-context';
 import { machineCapabilityWarningMessage } from '../../machine/machine-capability-messages';
 import { useStore } from '../../state';
 import type { CncStartupOperationDraft } from '../../state/cnc-startup-setup';
@@ -11,6 +12,7 @@ import { useToastStore } from '../../state/toast-store';
 import type { DeviceSetupState } from './device-setup-flow';
 import { machineSetupProfile } from './device-setup-flow';
 import { computeFirmwareDiffs, type FirmwareDiff } from './device-setup-firmware-diff';
+import { switchDriverAfterSave } from './save-driver-switch';
 
 // A running or held job keeps the machine it started with, as the toolbar's
 // Laser/CNC switch does (ADR-416 Amendment 1). Save replaces the machine type,
@@ -34,6 +36,7 @@ export function useMachineSetupSave(input: {
   readonly onSave: () => void;
 } {
   const [saving, setSaving] = useState(false);
+  const platform = usePlatformOptional();
   const replaceMachineSetup = useStore((store) => store.replaceMachineSetup);
   const replaceCncStartupSetup = useStore((store) => store.replaceCncStartupSetup);
   const rows = useLaserStore((store) => store.grblSettingsRows);
@@ -82,6 +85,9 @@ export function useMachineSetupSave(input: {
     input.onConfigured?.(profile);
     await syncFirmware(writes, writeGrblSetting, pushToast);
     input.onClose();
+    // The firmware writes went out on the connection their rows were read
+    // from; the saved profile's driver takes over after them (U2-P2-1).
+    await switchDriverAfterSave(platform);
   };
   return { saving, firmwareWriteCount: writes.length, lockedByJob, onSave };
 }
