@@ -87,12 +87,20 @@ type LineTiming = Pick<
   | 'pauseBarriers'
 >;
 
-/** Builds a strict execution timeline from the exact program sent to the controller. */
-export function buildProgramTimeline(
+/** A program parsed for strict timing, or why it cannot be timed. */
+export type TimedProgramParse =
+  | {
+      readonly kind: 'ok';
+      readonly model: GcodeRenderModel;
+      readonly timingOptions: ProgramTimelineOptions;
+    }
+  | Exclude<ProgramTimelineResult, { readonly kind: 'ok' }>;
+
+/** The parse and timing checks every strict program clock starts from. */
+export function parseTimedProgram(
   gcode: string,
-  limits: MotionLimits,
   options: ProgramTimelineOptions = {},
-): ProgramTimelineResult {
+): TimedProgramParse {
   const timingOptions = {
     ...options,
     ...(options.laserPowerControl === undefined && options.fanPower === true
@@ -113,6 +121,18 @@ export function buildProgramTimeline(
   }
   const unavailableReason = timingUnavailableReason(parsed.model);
   if (unavailableReason !== null) return { kind: 'unavailable', reason: unavailableReason };
+  return { kind: 'ok', model: parsed.model, timingOptions };
+}
+
+/** Builds a strict execution timeline from the exact program sent to the controller. */
+export function buildProgramTimeline(
+  gcode: string,
+  limits: MotionLimits,
+  options: ProgramTimelineOptions = {},
+): ProgramTimelineResult {
+  const parsed = parseTimedProgram(gcode, options);
+  if (parsed.kind !== 'ok') return parsed;
+  const { timingOptions } = parsed;
   const time = buildProgramTime(parsed.model, limits, timingOptions);
   const lineTiming = buildLineTiming(gcode, parsed.model, time, timingOptions);
   const segmentTiming = buildSegmentTiming(parsed.model, time, lineTiming);

@@ -61,26 +61,104 @@ export function buildProgramTime(
   options: ProgramTimingOptions = {},
   machineKind?: ProgramTimingOptions['machineKind'],
 ): ProgramTimeModel {
+  const count = model.segmentCount;
+  const segSeconds = new Float64Array(count);
+  const segTimeScale = new Float64Array(count);
+  const segDistanceMm = new Float32Array(count);
+  const segTargetVelocityMmPerSec = new Float32Array(count);
+  const segEntryVelocityMmPerSec = new Float32Array(count);
+  const segExitVelocityMmPerSec = new Float32Array(count);
+  const segAccelMmPerSec2 = new Float64Array(count);
+  const segTimeEndSec = new Float32Array(count);
+  const segFeedLimited = new Uint8Array(count);
+  const walked = walkProgramMotion(
+    model,
+    rawLimits,
+    options,
+    machineKind,
+    (index, block, entry, seconds, scale, accel, elapsed) => {
+      segSeconds[index] = seconds;
+      segTimeScale[index] = scale;
+      segDistanceMm[index] = block.distance;
+      segTargetVelocityMmPerSec[index] = block.targetVelocity;
+      segEntryVelocityMmPerSec[index] = entry.entryV;
+      segExitVelocityMmPerSec[index] = entry.exitV;
+      segAccelMmPerSec2[index] = accel;
+      segTimeEndSec[index] = elapsed;
+      if (!reachesTargetVelocity(block, entry.entryV, entry.exitV, accel)) {
+        segFeedLimited[index] = 1;
+      }
+    },
+  );
+  return {
+    segSeconds,
+    segTimeScale,
+    segDistanceMm,
+    segTargetVelocityMmPerSec,
+    segEntryVelocityMmPerSec,
+    segExitVelocityMmPerSec,
+    segAccelMmPerSec2,
+    segTimeEndSec,
+    segFeedLimited,
+    motionSeconds: walked.motionSeconds,
+    dwellSeconds: walked.dwellSeconds,
+    totalSeconds: walked.motionSeconds + walked.dwellSeconds,
+    accelMmPerSec2: walked.accelMmPerSec2,
+    breakdown: walked.breakdown,
+  };
+}
+
+export type ProgramMotionTotals = {
+  readonly motionSeconds: number;
+  readonly dwellSeconds: number;
+  readonly accelMmPerSec2: number;
+  readonly breakdown: ProgramMotionBreakdown;
+};
+
+/**
+ * The same planner walk as buildProgramTime, reporting each segment's seconds
+ * instead of keeping nine per-segment arrays. A job ETA reads only totals; on
+ * a bed-sized photo (8 million segments) those arrays were 360 MB (S3-P2-3).
+ */
+export function buildProgramMotionTotals(
+  model: GcodeRenderModel,
+  rawLimits: MotionLimits,
+  options: ProgramTimingOptions,
+  onSegmentSeconds: (index: number, seconds: number) => void,
+): ProgramMotionTotals {
+  return walkProgramMotion(model, rawLimits, options, undefined, (index, _b, _e, seconds) =>
+    onSegmentSeconds(index, seconds),
+  );
+}
+
+type SegmentVisit = (
+  index: number,
+  block: Block,
+  entry: { readonly entryV: number; readonly exitV: number },
+  seconds: number,
+  scale: number,
+  accel: number,
+  elapsed: number,
+) => void;
+
+function walkProgramMotion(
+  model: GcodeRenderModel,
+  rawLimits: MotionLimits,
+  options: ProgramTimingOptions,
+  machineKind: ProgramTimingOptions['machineKind'],
+  visit: SegmentVisit,
+): ProgramMotionTotals {
   const limits = sanitizeLimits(rawLimits);
   const context = motionContext(options, machineKind);
-  const blocks = segmentBlocks(model, limits);
   const power = model.segPower;
-  const segSeconds = new Float64Array(blocks.length);
-  const segTimeScale = new Float64Array(blocks.length);
-  const segDistanceMm = new Float32Array(blocks.length);
-  const segTargetVelocityMmPerSec = new Float32Array(blocks.length);
-  const segEntryVelocityMmPerSec = new Float32Array(blocks.length);
-  const segExitVelocityMmPerSec = new Float32Array(blocks.length);
-  const segAccelMmPerSec2 = new Float64Array(blocks.length);
   const kinematics = limits.kinematics ?? 'cartesian';
-  const segTimeEndSec = new Float32Array(blocks.length);
-  const segFeedLimited = new Uint8Array(blocks.length);
   let elapsed = 0;
   let cutSeconds = 0;
   let rapidTravelSeconds = 0;
   let feedTravelSeconds = 0;
-  for (const span of motionSpans(model, blocks.length)) {
-    const spanBlocks = blocks.slice(span.startIndex, span.endIndex);
+  for (const span of motionSpans(model, model.segmentCount)) {
+    // Blocks are built per span, so no whole-program block array outlives it.
+    const spanBlocks = segmentBlocks(model, limits, span.startIndex, span.endIndex);
     const plan = planVelocities(
       spanBlocks,
       limits.accelMmPerSec2,
@@ -101,34 +179,13 @@ export function buildProgramTime(
       if (cutting) cutSeconds += seconds;
       else if (rapid) rapidTravelSeconds += seconds;
       else feedTravelSeconds += seconds;
-      segSeconds[index] = seconds;
-      segTimeScale[index] = scale;
-      segDistanceMm[index] = block.distance;
-      segTargetVelocityMmPerSec[index] = block.targetVelocity;
-      segEntryVelocityMmPerSec[index] = entry.entryV;
-      segExitVelocityMmPerSec[index] = entry.exitV;
-      segAccelMmPerSec2[index] = accel;
       elapsed += seconds;
-      segTimeEndSec[index] = elapsed;
-      if (!reachesTargetVelocity(block, entry.entryV, entry.exitV, accel)) {
-        segFeedLimited[index] = 1;
-      }
+      visit(index, block, entry, seconds, scale, accel, elapsed);
     }
   }
-  const dwellSeconds = totalDwellSeconds(model);
   return {
-    segSeconds,
-    segTimeScale,
-    segDistanceMm,
-    segTargetVelocityMmPerSec,
-    segEntryVelocityMmPerSec,
-    segExitVelocityMmPerSec,
-    segAccelMmPerSec2,
-    segTimeEndSec,
-    segFeedLimited,
     motionSeconds: elapsed,
-    dwellSeconds,
-    totalSeconds: elapsed + dwellSeconds,
+    dwellSeconds: totalDwellSeconds(model),
     accelMmPerSec2: limits.accelMmPerSec2,
     breakdown: { cutSeconds, rapidTravelSeconds, feedTravelSeconds },
   };

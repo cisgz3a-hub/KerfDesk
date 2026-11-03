@@ -1,5 +1,6 @@
 import type { DeviceProfile } from '../devices';
-import { buildProgramTimeline, type ProgramTimeline } from '../gcode-time';
+import type { ProgramTimeline } from '../gcode-time';
+import { buildProgramDuration, type ProgramDuration } from '../gcode-time/program-duration';
 import {
   deviceMotionLimits,
   deviceProgramTimingOptions,
@@ -73,12 +74,15 @@ function estimateEmittedJob(
     );
   if (gcode.trim() === '') return emptyDuration();
   options.onEmittedProgram?.(gcode);
-  const result = buildProgramTimeline(gcode, deviceMotionLimits(device), {
+  // Totals only: the same clock as buildProgramTimeline without its per-line
+  // and per-segment arrays, which held gigabytes for a bed-sized photo
+  // (performance audit S3-P2-3, ADR-598 Amendment 4).
+  const result = buildProgramDuration(gcode, deviceMotionLimits(device), {
     ...deviceProgramTimingOptions(device, machineKind),
     initialPositionMm: initialPosition(options),
   });
   return result.kind === 'ok'
-    ? durationFromTimeline(result.timeline)
+    ? durationFromProgram(result.duration)
     : { ...emptyDuration(), unavailableReason: result.reason };
 }
 
@@ -91,20 +95,27 @@ function initialPosition(options: JobDurationEstimateOptions) {
 }
 
 function durationFromTimeline(timeline: ProgramTimeline): JobDurationEstimate {
-  const { cutSeconds, rapidTravelSeconds, feedTravelSeconds } = timeline.breakdown;
+  return durationFromProgram({ ...timeline, pauseCount: timeline.pauseBarriers.length });
+}
+
+function durationFromProgram(
+  duration: Pick<
+    ProgramDuration,
+    'totalSeconds' | 'breakdown' | 'dwellSeconds' | 'transportSeconds' | 'pauseCount'
+  >,
+): JobDurationEstimate {
+  const { cutSeconds, rapidTravelSeconds, feedTravelSeconds } = duration.breakdown;
   return {
-    totalSeconds: timeline.totalSeconds,
+    totalSeconds: duration.totalSeconds,
     breakdown: {
       cutSeconds,
       travelSeconds: rapidTravelSeconds + feedTravelSeconds,
       rapidTravelSeconds,
       feedTravelSeconds,
-      dwellSeconds: timeline.dwellSeconds,
-      transportSeconds: timeline.transportSeconds,
+      dwellSeconds: duration.dwellSeconds,
+      transportSeconds: duration.transportSeconds,
     },
-    ...(timeline.pauseBarriers.length === 0
-      ? {}
-      : { manualPauseCount: timeline.pauseBarriers.length }),
+    ...(duration.pauseCount === 0 ? {} : { manualPauseCount: duration.pauseCount }),
   };
 }
 
