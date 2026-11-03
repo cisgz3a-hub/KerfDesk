@@ -47,7 +47,9 @@ for (const choice of ['Cancel', "Don't Save"] as const) {
     await holdNextProjectRead(page);
     await (await toolbarCommand(page, 'Open...')).click();
     await expect.poll(() => page.evaluate(() => Boolean(window.__documentReadReady))).toBe(true);
-    const power = page.getByRole('spinbutton', { name: /^Power for/ });
+    // Read again behind the modal "Save changes?", which hides the workspace
+    // from assistive technology (ADR-207 Amendment 2).
+    const power = page.getByRole('spinbutton', { name: /^Power for/, includeHidden: true });
     await power.fill('73');
     await power.press('Tab');
     await expect(power).toHaveValue('73');

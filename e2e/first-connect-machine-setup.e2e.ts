@@ -364,8 +364,10 @@ test('menu Connect offers setup with the compact Machine rail collapsed', async 
   await expectConnectReadsOnly(kerfdesk);
 });
 
+// Machine Setup is modal, so the toolbar behind it is aria-hidden while it is
+// open (ADR-207 Amendment 2); these checks read the connection behind it.
 function machineToolbar(page: Page): Locator {
-  return page.getByRole('region', { name: 'Machine toolbar', exact: true });
+  return page.getByRole('region', { name: 'Machine toolbar', exact: true, includeHidden: true });
 }
 
 function machineSetup(page: Page): Locator {
@@ -373,8 +375,12 @@ function machineSetup(page: Page): Locator {
 }
 
 async function expectConnected(toolbar: Locator): Promise<void> {
-  await expect(toolbar.getByRole('button', { name: 'Disconnect', exact: true })).toBeEnabled();
-  await expect(toolbar.getByRole('status').filter({ hasText: /^Connected$/ })).toBeVisible();
+  await expect(
+    toolbar.getByRole('button', { name: 'Disconnect', exact: true, includeHidden: true }),
+  ).toBeEnabled();
+  await expect(
+    toolbar.getByRole('status', { includeHidden: true }).filter({ hasText: /^Connected$/ }),
+  ).toBeVisible();
 }
 
 async function saveSetup(setup: Locator): Promise<void> {
