@@ -20,6 +20,7 @@ import { hasMixedFields, type MixedOperationFields } from './selected-operation-
 import { mixedCheckboxProps } from './mixed-operation-input';
 import { useCutSettingsLauncher } from './use-cut-settings-launcher';
 import { LaserProcessField } from './LaserProcessField';
+import { StarterValuesNotice, usesStarterValues } from './StarterValuesNotice';
 import './laser-operation-settings.css';
 
 export function LaserOperationFields(props: {
@@ -70,6 +71,9 @@ export function LaserOperationFields(props: {
       />
       {props.processNotice}
       <LaserEssentialsFields layer={props.operation} operationTarget={target} compact />
+      {!hasMixedFields(props.mixedFields) && usesStarterValues(props.operation) ? (
+        <StarterValuesNotice />
+      ) : null}
       {modeMixed ? null : <ProcessEssentials layer={props.operation} target={target} />}
       <div className="lf-laser-toggles">
         <ScanDirectionField layer={props.operation} operationTarget={target} />

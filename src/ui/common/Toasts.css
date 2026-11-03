@@ -65,6 +65,25 @@
   padding: 2px 0;
 }
 
+.lf-toast__details {
+  margin-top: 4px;
+}
+
+.lf-toast__details > summary {
+  cursor: pointer;
+  pointer-events: auto;
+  text-decoration: underline;
+}
+
+.lf-toast__details > ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.lf-toast__details > ul > li + li {
+  margin-top: 4px;
+}
+
 .lf-toast__dismiss {
   flex: 0 0 auto;
   width: 24px;

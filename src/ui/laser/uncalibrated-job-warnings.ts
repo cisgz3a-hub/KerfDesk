@@ -4,6 +4,7 @@ import { LAYER_DEFAULTS, type Layer } from '../../core/scene';
 // One grouped message instead of one per layer: a ten-layer import used to
 // produce ten near-identical warnings that drowned the rest of the review.
 const MAX_NAMED_OPERATIONS = 4;
+const UNCALIBRATED_DEFAULTS_PHRASE = 'still using the uncalibrated defaults';
 
 /** Reports emitted laser groups that still use the first-run recipe — one
  * grouped warning naming the affected operations (never their raw ids). */
@@ -40,9 +41,14 @@ export function describeUncalibratedOperations(
   const advice = 'Run a material test on scrap before burning final material.';
   const [first] = names;
   if (names.length === 1 && first !== undefined) {
-    return `Operation "${first}" is still using the uncalibrated defaults (${recipe}). ${advice}`;
+    return `Operation "${first}" is ${UNCALIBRATED_DEFAULTS_PHRASE} (${recipe}). ${advice}`;
   }
-  return `${names.length} operations are still using the uncalibrated defaults (${recipe}): ${nameList(names)}. ${advice}`;
+  return `${names.length} operations are ${UNCALIBRATED_DEFAULTS_PHRASE} (${recipe}): ${nameList(names)}. ${advice}`;
+}
+
+/** The grouped starter-values warning, which Save G-code ranks with a beginner's notes. */
+export function isUncalibratedDefaultsWarning(warning: string): boolean {
+  return warning.includes(UNCALIBRATED_DEFAULTS_PHRASE);
 }
 
 function nameList(names: ReadonlyArray<string>): string {

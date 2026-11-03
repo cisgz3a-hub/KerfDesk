@@ -135,7 +135,7 @@ describe('native negative runtime placement', () => {
       x: 50,
       y: 238,
     });
-    expect(result.warnings.join('\n')).not.toMatch(/outside.*bed|mapping is unverified/i);
+    expect(result.warnings.join('\n')).not.toMatch(/outside.*bed|can't check where this job sits/i);
   });
 
   it('keeps User Origin work geometry while checking its physical bed location', () => {
@@ -236,7 +236,7 @@ describe('native negative runtime placement', () => {
     expect(runtimeCoordinatePreparationOptions(p.device, { ok: true }, unknown)).toEqual({
       contourEntryBounds: null,
     });
-    expect(prepared.warnings.join('\n')).toContain('mapping is unverified');
+    expect(prepared.warnings.join('\n')).toContain("can't check where this job sits");
     expect(prepared.prepared.jobOriginOffset).toEqual({ x: 0, y: 0 });
 
     const verified = resolveJobPlacement(
