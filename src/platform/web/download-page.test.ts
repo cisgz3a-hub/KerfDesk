@@ -47,6 +47,32 @@ describe('desktop Preview download page', () => {
     expect(page).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   });
 
+  it('walks the unsigned Windows installer past the browser hold, then SmartScreen (U1-P2-2)', () => {
+    const page = downloadPage();
+    const steps = page.slice(
+      page.indexOf('id="commercial-steps"'),
+      page.indexOf('</ol>', page.indexOf('id="commercial-steps"')),
+    );
+    const titles = [...steps.matchAll(/<h3>([^<]+)<\/h3>/g)].map((match) => match[1]);
+
+    expect(page).toContain('Install in four steps');
+    expect(titles).toEqual([
+      'Keep the download',
+      'Open the installer',
+      'Allow it in SmartScreen',
+      'Start using KerfDesk',
+    ]);
+    // Microsoft's documented Edge path for an unknown file (Learn, "Microsoft
+    // Edge support for Microsoft Defender SmartScreen").
+    expect(steps).toMatch(
+      /<strong>Keep<\/strong>,\s+<strong>Show more<\/strong> and\s+<strong>Keep anyway<\/strong>/,
+    );
+    expect(steps).toContain("isn't code-signed yet");
+    expect(steps).toContain('<strong>More info</strong>');
+    expect(steps).toContain('<strong>Run anyway</strong>');
+    expect(steps).toContain('<strong>Make your first project</strong>');
+  });
+
   it('keeps the licensed Windows trial separate from the free Preview', () => {
     const page = downloadPage();
     const commercial = page.slice(

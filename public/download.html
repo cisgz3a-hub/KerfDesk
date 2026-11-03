@@ -482,7 +482,7 @@
       }
       @media (min-width: 900px) {
         .steps {
-          grid-template-columns: repeat(3, minmax(0, 1fr));
+          grid-template-columns: repeat(2, minmax(0, 1fr));
         }
       }
       .step {
@@ -983,9 +983,20 @@
           <div class="wrap">
             <div class="section__head">
               <p class="eyebrow">Install</p>
-              <h2>Install in three steps</h2>
+              <h2>Install in four steps</h2>
             </div>
             <ol class="steps" id="commercial-steps">
+              <li class="step">
+                <h3>Keep the download</h3>
+                <p>
+                  The installer isn't code-signed yet, so your browser may hold it as an uncommon
+                  file. In <strong>Edge</strong>, open the download's <strong>…</strong> menu, then
+                  choose <strong>Keep</strong>, <strong>Show more</strong> and
+                  <strong>Keep anyway</strong>. In <strong>Chrome</strong>, open the warning in the
+                  download list and choose to keep the file. Only keep a file from this page whose
+                  name starts with <strong>KerfDesk-</strong>.
+                </p>
+              </li>
               <li class="step">
                 <h3>Open the installer</h3>
                 <p>Open the downloaded <code>KerfDesk-…-windows-x64-setup.exe</code>.</p>
@@ -993,16 +1004,18 @@
               <li class="step">
                 <h3>Allow it in SmartScreen</h3>
                 <p>
-                  The installer isn't code-signed yet, so Windows may warn you. Select
-                  <strong>More info</strong>, check the name starts with <strong>KerfDesk-</strong>,
-                  then <strong>Run anyway</strong>.
+                  For the same reason, Windows may show <strong>Windows protected your PC</strong>.
+                  Select <strong>More info</strong>, check the name starts with
+                  <strong>KerfDesk-</strong>, then <strong>Run anyway</strong>.
                 </p>
               </li>
               <li class="step">
                 <h3>Start using KerfDesk</h3>
                 <p>
                   KerfDesk installs for your Windows account only and needs no administrator
-                  password.
+                  password. Open it from the Start menu. New to KerfDesk? Choose
+                  <strong>Learn</strong>, then <strong>Make your first project</strong>; it needs no
+                  machine.
                 </p>
               </li>
             </ol>
@@ -1547,6 +1560,10 @@
                   <div>
                     <h4>Windows SmartScreen</h4>
                     <ol class="numbered">
+                      <li>
+                        If your browser holds the download as an uncommon file, keep it the same way
+                        as step 1 above.
+                      </li>
                       <li>Run the downloaded setup file.</li>
                       <li>
                         Only continue if it came from the verified Preview links above and its
