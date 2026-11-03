@@ -5,9 +5,10 @@ store and `prepareProjectForPersistence`, from a `git archive` of its tag commit
 hand-shaped. `src/ui/text/returning-user-*.test.ts` open them through `deserializeProject` and the
 store, compile them to G-code, and compare with the sidecar.
 
-- 1.0.27 is `adf300522` (schema 18). 1.0.28 is `33bc394c6` (schema 19).
-- The CNC files' sidecar `1.0.28-cnc-job-origin.cuts.json` holds where 1.0.28 cut each one, read
-  with `cnc-cut-extent.ts` (rolling audit v9 R8-P2-1).
+- 1.0.27 is `adf300522` (schema 18). 1.0.28 is `33bc394c6` (schema 19). 1.0.29 is `df2279e26`
+  (schema 21).
+- The CNC files' sidecars `1.0.28-cnc-job-origin.cuts.json` and `1.0.29-cnc-job-origin.cuts.json`
+  hold where that release cut each one, read with `cnc-cut-extent.ts` (rolling audit v9 R8-P2-1).
 - `*.burns.json` holds the burn of each object and each CSV record, measured on the saving release
   with `burn-metrics.ts`. A deliberate burn change updates the test's expectation with its ADR
   number; it never rewrites a sidecar.
@@ -25,6 +26,21 @@ store, compile them to G-code, and compare with the sidecar.
 | `1.0.28-cnc-bowtie-pocket`             | 1.0.28                                                    | A Pocket crossing loop beside a square, User Origin front-left            |
 | `1.0.28-cnc-flat-drill`                | 1.0.28                                                    | A flat Drill contour beside a square, User Origin centre                  |
 | `1.0.28-cnc-bowtie-absolute`           | 1.0.28                                                    | The Pocket bowtie on Absolute: no move, no notice                         |
+| `1.0.29-repaired-frames`               | 1.0.27, then saved on 1.0.28, then opened and saved on 1.0.29 | The 1.0.28-converted frames with the line rule 1.0.29 gave back at open |
+| `1.0.29-line-rule-frames`              | 1.0.27, then opened on 1.0.29, every text rebuilt, saved   | Single-line frames that keep their line rule through an edit              |
+| `1.0.29-placed-tabs`                   | 1.0.29                                                    | Laser tabs placed by hand, then a toolbar 2× width and a handle-drag height |
+| `1.0.29-fill-pool`                     | 1.0.29                                                    | A square and a circle in one Fill pool, beside another Fill operation     |
+| `1.0.29-photo-recipe`                  | 1.0.29                                                    | Wood and Slate recipes with Auto tones from the dialog's preview histogram |
+| `1.0.29-unaffected`                    | 1.0.29                                                    | Nothing a later release should change: the notices stay silent            |
+| `1.0.29-cnc-bowtie-pocket`             | 1.0.29                                                    | The 1.0.28 Pocket bowtie, cut at the canvas anchor                        |
+| `1.0.29-cnc-flat-drill`                | 1.0.29                                                    | The 1.0.28 flat Drill contour, cut at the canvas anchor                   |
+
+The 1.0.29 set was built through 1.0.29's store actions: Import, Draw, the laser tab tool, the
+toolbar and a handle drag, the operation settings, and the Photo engraving dialog's own preview,
+recipe patch and Apply update. Its `1.0.29-fill-pool.burns.json` also holds the whole job
+(`whole-job`), since a pool burns only together, and `1.0.29-placed-tabs.burns.json` holds where
+1.0.29 burned each tab, read with `burned-tab-spans.ts` (`tabSpans`). `returning-user-1-0-29.test.ts`
+reads them.
 
 Browser storage and projects saved by 1.0.28's own hooks and store, the same way (rolling audit v9
 R6): a temporary test under the export's `src` drove the Studio's Apply with its persistence hook

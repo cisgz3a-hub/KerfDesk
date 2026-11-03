@@ -1,0 +1,25 @@
+{
+  "measuredOn": "1.0.29",
+  "burns": {
+    "wood-portrait": {
+      "as-placed": {
+        "width": 24,
+        "height": 23.9,
+        "minX": 60,
+        "minY": 316.05,
+        "length": 3033.3,
+        "dose": 909990
+      }
+    },
+    "slate-portrait": {
+      "as-placed": {
+        "width": 24,
+        "height": 23.9,
+        "minX": 100,
+        "minY": 316.05,
+        "length": 2681.6,
+        "dose": 804480
+      }
+    }
+  }
+}
