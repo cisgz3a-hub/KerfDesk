@@ -216,8 +216,9 @@ function installSection() {
           </li>
         </ol>
         <p>
-          The signed Windows edition is different: its installer is code-signed. If Windows reports
-          an unknown publisher for it, don’t run it. Download it again from the download page.
+          These steps are for Preview files. The commercial Windows edition isn’t code-signed yet
+          either, so SmartScreen may warn about it the same way; its file name has no
+          <code>-preview.</code>. Follow the install steps on the download page for it.
         </p>
         <h3>macOS</h3>
         <ol>

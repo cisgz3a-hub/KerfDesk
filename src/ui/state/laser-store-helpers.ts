@@ -10,6 +10,7 @@ import * as controllerOperation from './laser-controller-operation';
 import { hasPendingControllerWrite } from './laser-start-queue-fence';
 import { disconnectedControllerQualification } from './laser-controller-qualification';
 import { emptyControllerBuildInfoState } from './laser-controller-build-info';
+import { noStatusReportMessage } from './status-unknown-message';
 import {
   controllerLink,
   disconnectDuringFireNotice,
@@ -34,8 +35,7 @@ const AUTOFOCUS_BUSY_MESSAGE =
   'Auto-focus is running. Wait for it to finish before sending other motion commands.';
 export const ACTIVE_JOB_COMMAND_MESSAGE =
   'A job is active. Request ABORT before sending setup, jog, home, unlock, origin, settings, or autofocus commands.';
-export const UNKNOWN_IDLE_STATUS_MESSAGE =
-  'Controller status is not known yet. Wait for an Idle status report before jogging or framing.';
+export { CONNECT_MACHINE_FIRST, UNKNOWN_IDLE_STATUS_MESSAGE } from './status-unknown-message';
 export const MOTION_OPERATION_ACTIVE_MESSAGE =
   'A jog or frame operation is active. Wait for GRBL to report Idle, or cancel the operation, before sending another motion command.';
 export const FIRE_ACTIVE_COMMAND_MESSAGE =
@@ -231,7 +231,7 @@ export function jogFrameCommandBlockMessage(state: LaserState): string | null {
   );
   if (controllerOperationMessage !== null) return controllerOperationMessage;
   if (state.mpgActive === true) return MPG_ACTIVE_MOTION_MESSAGE;
-  if (state.statusReport === null) return UNKNOWN_IDLE_STATUS_MESSAGE;
+  if (state.statusReport === null) return noStatusReportMessage(state);
   if (state.statusReport.state !== 'Idle') {
     return `Machine must be Idle before jogging or framing (currently ${state.statusReport.state}).`;
   }
