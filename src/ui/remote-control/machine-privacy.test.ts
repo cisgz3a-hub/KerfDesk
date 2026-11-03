@@ -10,6 +10,7 @@ import { machineOperationProjection } from './machine-projections';
 import { reliefMaterializationFailure } from '../../io/gcode/relief-materialization-failure';
 import type { OwnedMachineOperation } from './machine-operation-state';
 import { testAdapter, writeArgs } from './authoring-test-support';
+import { remoteReviewAcknowledgement } from '../laser/job-review/before-you-start';
 import type { RemoteControlAdapter, RemoteCommandResult } from './types';
 
 const execution = vi.hoisted(() => vi.fn());
@@ -138,7 +139,9 @@ describe('machine operation final delivery privacy', () => {
     );
     expect(JSON.stringify(snapshot)).not.toContain(privateLabel);
     expect(JSON.stringify(snapshot)).toContain('0.20 mm');
-    expect(snapshot.review?.acknowledgement).toEqual(acknowledgement);
+    expect(snapshot.review?.acknowledgement).toEqual(
+      remoteReviewAcknowledgement(acknowledgement, 'laser'),
+    );
   });
   it.each(['get_machine_status', 'get_control_operation'] as const)(
     '%s reprojects private review wording after opt-out at the promise boundary',
@@ -168,7 +171,7 @@ describe('machine operation final delivery privacy', () => {
       expect(
         (delivered.data['operation'] as { review: { acknowledgement: unknown } }).review
           .acknowledgement,
-      ).toEqual(acknowledgement);
+      ).toEqual(remoteReviewAcknowledgement(acknowledgement, 'laser'));
     },
   );
 });
