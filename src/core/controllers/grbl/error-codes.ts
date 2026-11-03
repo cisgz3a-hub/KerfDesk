@@ -28,10 +28,13 @@ const ERRORS: ReadonlyArray<ErrorDescription> = [
   },
   {
     // Official: "Homing cycle failure. Homing is not enabled via settings."
-    // Fires when $H is issued while $22=0 — NOT on a settings write.
+    // Fires when $H is issued while $22=0 — NOT on a settings write. Turning
+    // homing on without switches sends the head into the frame looking for
+    // one, so the advice names switches first (UX audit U2-P3-9).
     code: 5,
     title: 'Homing cycle disabled',
-    detail: 'The homing cycle ($H) was refused because homing is not enabled. Set $22=1 first.',
+    detail:
+      'The homing cycle ($H) was refused because homing is turned off ($22=0). Turn it on ($22=1) only if the machine has homing switches; otherwise turn Home off in Machine Setup.',
   },
   {
     code: 6,
@@ -74,7 +77,14 @@ const ERRORS: ReadonlyArray<ErrorDescription> = [
   },
   { code: 13, title: 'Safety door open', detail: 'Close the safety door before resuming.' },
   { code: 14, title: 'Build info too long', detail: '$I value exceeds storage.' },
-  { code: 15, title: 'Jog target exceeds travel', detail: 'Reduce the jog distance.' },
+  {
+    // Official: "Jog target exceeds machine travel. Command ignored." Soft
+    // limits ($20=1) check jogs against the travel in $130-$132.
+    code: 15,
+    title: 'Jog target exceeds travel',
+    detail:
+      'The jog would end past the machine travel the controller knows, so it was ignored and nothing moved. Jog a shorter distance.',
+  },
   { code: 16, title: 'Invalid jog command', detail: 'Jog syntax not recognized.' },
   {
     // Official: "Laser mode requires PWM output." Fires when a $32=1 write is

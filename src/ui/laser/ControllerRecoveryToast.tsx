@@ -51,12 +51,23 @@ export function ControllerRecoveryToast(props: Props): JSX.Element {
           <Icon name="close" size={16} />
         </button>
       </div>
-      <p>{props.message}</p>
+      <p>{plainRecoveryMessage(props.message)}</p>
       {props.readBlockReason != null && (
         <p role="status">Waiting to retry: {props.readBlockReason}</p>
       )}
       <RecoveryActions {...props} />
     </section>
+  );
+}
+
+// The store's wait timeout is worded for GRBL ("fresh Idle"); every firmware
+// reaches it, Marlin included, so the card says it plainly (UX audit U2-P3-4).
+const IDLE_WAIT_TIMEOUT = 'Timed out waiting for fresh Idle.';
+
+function plainRecoveryMessage(message: string): string {
+  return message.replace(
+    IDLE_WAIT_TIMEOUT,
+    'The machine did not report that it was ready (Idle) in time.',
   );
 }
 

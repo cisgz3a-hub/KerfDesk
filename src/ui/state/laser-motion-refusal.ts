@@ -55,7 +55,7 @@ function advice(refusal: MotionRefusal, retry: string): string {
     // Plain M999 also flushes the queue and asks for a line resend (M999.cpp),
     // which KerfDesk does not support; M999 S1 only clears the stopped state.
     return (
-      'Read the error in the Laser Log, send M999 S1 from the Console to restart the ' +
+      'Read the error in the Console, send M999 S1 there to restart the ' +
       `controller, then home and ${retry}.`
     );
   }

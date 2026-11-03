@@ -11,7 +11,9 @@
 // quiet: releasing a held jog or retiring an origin transaction is not a
 // failure.
 
+import { controllerRejectionText } from '../state/controller-rejection-text';
 import { OriginTransactionCancelledError } from '../state/laser-origin-transaction';
+import { useLaserStore } from '../state/laser-store';
 import { MANUAL_MOTION_CANCELLED_MESSAGE } from '../state/manual-motion-intent';
 import { useToastStore } from '../state/toast-store';
 
@@ -34,10 +36,21 @@ export function isDeliberateCancellation(error: unknown): boolean {
 export function reportControllerActionFailure(action: string, error: unknown): void {
   if (isDeliberateCancellation(error)) return;
   const reason = error instanceof Error ? error.message : String(error);
-  const message = `${action}: ${reason}`;
+  const message = `${action}: ${decodedReason(reason)}`;
   const toasts = useToastStore.getState();
   if (toasts.toasts.some((toast) => toast.message === message)) return;
   toasts.pushToast(message, 'error');
+}
+
+// A bare controller reply ("error:5", "ALARM:2") reads as its meaning, the way
+// the notice and the Console show it (UX audit U2-P2-2). Every other reason is
+// already KerfDesk's own sentence.
+const BARE_REPLY_RE = /^(?:error|ALARM):\d+$/i;
+
+function decodedReason(reason: string): string {
+  if (!BARE_REPLY_RE.test(reason.trim())) return reason;
+  const kind = useLaserStore.getState().activeControllerKind;
+  return controllerRejectionText(kind, null, reason.trim()).reason;
 }
 
 /** `.catch` handler for a controller action started from a click or key. */

@@ -112,7 +112,8 @@ export type { StartJobOptions } from './laser-job-options';
 /** Connect-time controller selection. Omitted fields fall back to the GRBL
  *  driver and its default baud — the only behavior that existed pre-ADR-094. */
 export type ConnectionState =
-  | { readonly kind: 'disconnected' }
+  // noPortChosen: a picker returned no port, Cancel or an empty list (ADR-420 Amendment 5).
+  | { readonly kind: 'disconnected'; readonly noPortChosen?: true }
   | { readonly kind: 'connecting' }
   | { readonly kind: 'connected' }
   | { readonly kind: 'failed'; readonly error: string };

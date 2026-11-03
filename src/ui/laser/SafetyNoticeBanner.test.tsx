@@ -5,10 +5,13 @@ import { JOB_CHECKPOINT_STORAGE_KEY } from '../state/job-checkpoint-storage';
 import { useLaserStore } from '../state/laser-store';
 import {
   CNC_PAUSE_RESUME_STALLED_MESSAGE,
+  controllerErrorNotice,
+  controllerHaltedNotice,
   disconnectDuringJobNotice,
   disconnectDuringMotionNotice,
   STREAM_STALLED_MESSAGE,
 } from '../state/laser-safety-notice';
+import { useMachineSetupDialogStore } from './device-setup/machine-setup-dialog-store';
 import { SafetyNoticeBanner } from './SafetyNoticeBanner';
 
 const originalWakeController = useLaserStore.getState().wakeController;
@@ -79,6 +82,47 @@ describe('SafetyNoticeBanner', () => {
       expect(useLaserStore.getState().safetyNotice).toBeNull();
       expect(host.querySelector('[role="alert"]')).toBeNull();
       expect(localStorage.getItem(JOB_CHECKPOINT_STORAGE_KEY)).toBe('retained-checkpoint');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  // UX audit U2-P2-2: a refused Home before any job showed the interrupted-job
+  // paragraph, and its only way on was "I made the machine safe".
+  it('offers Machine Setup for a Home refused with homing off, without a checkpoint paragraph', async () => {
+    useLaserStore.setState({
+      safetyNotice: controllerErrorNotice(5, 'command', 'error:5', '$H', 'grbl-v1.1'),
+    });
+    const { host, root } = await renderBanner();
+    try {
+      const alert = host.querySelector('[role="alert"]');
+      expect(alert?.textContent).toContain('Homing is turned off in the controller');
+      expect(alert?.textContent).not.toContain('interrupted-job checkpoint');
+      const open = [...host.querySelectorAll('button')].find(
+        (b) => b.textContent === 'Open Machine Setup',
+      );
+      expect(open).toBeInstanceOf(HTMLButtonElement);
+      await act(async () => open?.click());
+      expect(useMachineSetupDialogStore.getState().state).toMatchObject({
+        kind: 'open',
+        target: { kind: 'step', step: 'confirm' },
+      });
+    } finally {
+      useMachineSetupDialogStore.getState().close();
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('titles a firmware halt as a halt, not a rejected command (UX audit U5-P3-6)', async () => {
+    useLaserStore.setState({
+      safetyNotice: controllerHaltedNotice('Error:Printer halted. kill() called!'),
+    });
+    const { host, root } = await renderBanner();
+    try {
+      const title = host.querySelector('[role="alert"] strong')?.textContent;
+      expect(title).toBe('Controller halted: press its reset button');
     } finally {
       await act(async () => root.unmount());
       host.remove();

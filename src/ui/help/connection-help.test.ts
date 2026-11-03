@@ -33,6 +33,8 @@ describe('CONNECTION_HELP_TEXT', () => {
   });
 
   it('points to the full guide', () => {
-    expect(CONNECTION_HELP_TEXT).toContain('docs/connection-troubleshooting.md');
+    // The app ships without docs/, so the guide is the published page (S12-F1).
+    expect(CONNECTION_HELP_TEXT).toContain('https://kerfdesk.com/docs/#troubleshooting');
+    expect(CONNECTION_HELP_TEXT).not.toContain('docs/connection-troubleshooting.md');
   });
 });

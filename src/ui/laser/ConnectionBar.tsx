@@ -24,7 +24,9 @@ import { AnchoredPopover, movePopoverFocus } from '../common/AnchoredPopover';
 import { isLinuxDesktop } from '../common/operating-system';
 import type { ControllerQualification } from '../state/laser-controller-qualification';
 import type { ConnectionState } from '../state/laser-store';
+import { showConnectionHelp } from '../help/ConnectionHelpDialog';
 import { CompactConnectionControls } from './CompactConnectionControls';
+import { NoPortChosenHint, noPortChosen } from './NoPortChosenHint';
 import {
   QualificationNotice,
   useControllerNotice,
@@ -145,6 +147,9 @@ export function ConnectionBar(props: Props): JSX.Element {
           {connectionFailureText(connection.error, props.machineNoun)}
         </p>
       )}
+      {noPortChosen(connection) ? (
+        <NoPortChosenHint className="lf-connection-auto-hint" onHelp={showConnectionHelp} />
+      ) : null}
       {connection.kind === 'disconnected' && props.autoConnectSkipped != null ? (
         <p className="lf-connection-auto-hint">
           {autoConnectSkippedText(props.autoConnectSkipped, props.machineNoun)}

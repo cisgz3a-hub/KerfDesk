@@ -46,7 +46,7 @@ export function machineSettingsReadBlockReason(
   const exactAlarmEvidence =
     controllerState === 'Alarm' || (controllerState === null && state.alarmCode !== null);
   if (controllerState !== 'Idle' && !exactAlarmEvidence) {
-    return 'Controller must report Idle or Alarm before reading machine settings.';
+    return 'The machine has not reported Idle or Alarm yet, so its settings cannot be read.';
   }
   const freshnessBlock = automaticSettingsReadBlockReason(state, options);
   if (freshnessBlock !== null) return freshnessBlock;

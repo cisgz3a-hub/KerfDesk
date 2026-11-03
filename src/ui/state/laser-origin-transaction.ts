@@ -217,11 +217,25 @@ function originControllerFailurePatch(
     const code = Number.parseInt(alarmMatch[1], 10);
     return {
       alarmCode: code,
-      safetyNotice: controllerErrorNotice(code, 'command', message, pendingLine),
+      safetyNotice: controllerErrorNotice(
+        code,
+        'command',
+        message,
+        pendingLine,
+        state.activeControllerKind,
+      ),
     };
   }
   const errorMatch = /(?:^|\s)error(?::(\d+))?/i.exec(message);
   if (errorMatch === null) return {};
   const code = errorMatch[1] === undefined ? null : Number.parseInt(errorMatch[1], 10);
-  return { safetyNotice: controllerErrorNotice(code, 'command', message, pendingLine) };
+  return {
+    safetyNotice: controllerErrorNotice(
+      code,
+      'command',
+      message,
+      pendingLine,
+      state.activeControllerKind,
+    ),
+  };
 }

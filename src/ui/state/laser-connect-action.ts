@@ -10,7 +10,7 @@ import { runConnectAfterPermissionCleanup } from './laser-connect-permission-cle
 import { disconnectedControllerQualification } from './laser-controller-qualification';
 import { closeConnectionOnce } from './laser-connection-teardown';
 import type { ConnectControllerOptions } from './laser-store-action-types';
-import type { LaserState, LiveRefs } from './laser-store';
+import type { ConnectionState, LaserState, LiveRefs } from './laser-store';
 import type { SerialOpenRequest } from '../../platform/types';
 import { hostedStreamAcknowledgements } from './hosted-stream-acks';
 import {
@@ -150,9 +150,11 @@ async function connectSerialController(
       return;
     }
     if (portRef === null) {
+      const noPortChosen = picksPort(options.portSelection);
       set((state) => ({
-        connection: { kind: 'disconnected' },
+        connection: noPortChosen ? NO_PORT_CHOSEN : { kind: 'disconnected' },
         controllerQualification: disconnectedControllerQualification(state.controllerSessionEpoch),
+        ...(noPortChosen ? { log: pushLog(state, `[lf2] ${NO_PORT_CHOSEN_LOG}`) } : {}),
       }));
       return;
     }
@@ -260,9 +262,23 @@ async function resolveSerialPort(
     // A cancelled attempt may retire its selected grant, never launch a picker.
     if (!isCurrent()) return null;
   }
-  if (selection === 'automatic' || selection === 'remembered-only') return null;
+  if (!picksPort(selection)) return null;
   return adapter.serial.requestPort();
 }
+
+function picksPort(selection: ConnectControllerOptions['portSelection']): boolean {
+  return selection !== 'automatic' && selection !== 'remembered-only';
+}
+
+// A port picker that returns nothing was cancelled or listed no port. Web
+// Serial reports both as NotFoundError, so the hint names both, and the usual
+// cause of an empty list: a missing USB-serial driver. The desktop app's own
+// empty-list box says the same (electron/serial-port-wait.ts). It used to
+// return silently to "Not connected" (2026-07-10 S12-F2, UX audit U2 KNOWN).
+const NO_PORT_CHOSEN: ConnectionState = { kind: 'disconnected', noPortChosen: true };
+
+const NO_PORT_CHOSEN_LOG =
+  'No port was chosen. If the machine was not in the list, its USB driver (CH340 or CP210x) may be missing.';
 
 // The port that opened is the one Connect reuses next time (ADR-420).
 function attachRememberedConnection(

@@ -2,7 +2,11 @@ import type { ControllerDriver } from '../../core/controllers';
 import type { SerialConnection } from '../../platform/types';
 import { startControllerCommand, waitForFreshIdle } from './laser-interactive-command';
 import type { ControllerLifecycleRefs } from './laser-interactive-command';
-import { controllerErrorNotice, type LaserSafetyAction } from './laser-safety-notice';
+import {
+  controllerErrorNotice,
+  type LaserSafetyAction,
+  type LaserSafetyNotice,
+} from './laser-safety-notice';
 import { finishedJobStateReset, frameProofReset } from './laser-session-reset';
 import { settledCompletedFramePatch } from './completed-frame-run';
 import { bitFileRunEndPatch } from './bit-file-sequence';
@@ -87,6 +91,10 @@ export function beginPostJobSettle(
     log: pushLog(state, '[lf2] Job lines acknowledged. Settling controller before ready.'),
   });
   void runPostJobSettle(set, refs, safeWrite, ownsCurrent, `${driver.commands.settleDwell}\n`);
+}
+
+function settleFailureNotice(state: LaserState, message: string): LaserSafetyNotice {
+  return controllerErrorNotice(null, 'command', message, undefined, state.activeControllerKind);
 }
 
 function retainsAcknowledgedTail(
@@ -177,7 +185,7 @@ async function runPostJobSettle(
             controllerOperation: null,
             ...frameProofReset(),
             lastWriteError: message,
-            safetyNotice: state.safetyNotice ?? controllerErrorNotice(null, 'command', message),
+            safetyNotice: state.safetyNotice ?? settleFailureNotice(state, message),
             log: pushLog(state, `[lf2] Post-job controller settle failed: ${message}`),
             ...liveCanvasLifecyclePatch(state, 'errored'),
             ...liveCanvasTimingUnavailablePatch(

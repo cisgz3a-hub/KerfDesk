@@ -94,6 +94,8 @@ export type LaserSafetyNotice =
       readonly message: string;
       /** The firmware halted itself and needs a reset or power cycle. */
       readonly halted?: true;
+      /** Home was refused because homing is off in the controller (UX audit U2-P2-2). */
+      readonly homingOff?: true;
     }
   | {
       readonly kind: 'cnc-transition-unconfirmed';
@@ -481,52 +483,9 @@ export function writeFailedNotice(action: LaserSafetyAction): LaserSafetyNotice 
   return { kind: 'write-failed', action, message: writeFailedMessage(action) };
 }
 
-// P0-1: GRBL rejected a line mid-job (error:N). The streamer goes terminal
-// ('errored') so no more bytes are sent, but the rejected move may have left
-// the head mispositioned and a subsequent laser-on line may have fired out of
-// place. The copy names the PHYSICAL control for the same reason as the others.
-export type ControllerErrorContext = 'job' | 'frame' | 'jog' | 'command';
-
-export function controllerErrorMessage(
-  code: number | null,
-  context: ControllerErrorContext = 'job',
-  raw?: string,
-  rejectedLine?: string,
-): string {
-  const errorText =
-    code === null ? `unrecognized controller error response: ${raw ?? 'error'}` : `error:${code}`;
-  const rejectedText = rejectedLine === undefined ? '' : ` Rejected line: ${rejectedLine.trim()}`;
-  if (context === 'job') {
-    return (
-      `The controller rejected a command (${errorText}) during the job, so the job was ` +
-      'stopped. The head may be mispositioned and the laser may have fired out of place. ' +
-      `Use physical E-stop or power cutoff now if unsafe, then home before re-running.${rejectedText}`
-    );
-  }
-  if (context === 'frame' || context === 'jog') {
-    return (
-      `The controller rejected a ${context} command (${errorText}). ` +
-      'Wait until the controller reports Idle before jogging or framing again. ' +
-      `If the head moved unexpectedly, use physical E-stop or power cutoff now if unsafe.${rejectedText}`
-    );
-  }
-  return (
-    `The controller rejected a command (${errorText}). ` +
-    `Check the Laser Log, wait for Idle, and home before continuing if position is uncertain.${rejectedText}`
-  );
-}
-
-export function controllerErrorNotice(
-  code: number | null,
-  context: ControllerErrorContext = 'job',
-  raw?: string,
-  rejectedLine?: string,
-): LaserSafetyNotice {
-  return {
-    kind: 'controller-error',
-    code,
-    ...(raw === undefined ? {} : { raw }),
-    ...(rejectedLine === undefined ? {} : { rejectedLine: rejectedLine.trim() }),
-    message: controllerErrorMessage(code, context, raw, rejectedLine),
-  };
-}
+// error:N / ALARM:N notices live in controller-error-notice.ts (UX audit U2-P2-2).
+export {
+  controllerErrorMessage,
+  controllerErrorNotice,
+  type ControllerErrorContext,
+} from './controller-error-notice';

@@ -187,6 +187,7 @@ function rejectionNotice(
     controllerErrorContext(state),
     rejection.raw,
     rejectedLine,
+    state.activeControllerKind,
   );
 }
 

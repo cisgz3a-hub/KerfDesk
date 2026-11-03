@@ -182,8 +182,31 @@ describe('connect port selection', () => {
     await useLaserStore.getState().connect(platform, { portSelection: 'automatic' });
 
     expect(requestPort).not.toHaveBeenCalled();
-    expect(useLaserStore.getState().connection.kind).toBe('disconnected');
+    expect(useLaserStore.getState().connection).toEqual({ kind: 'disconnected' });
   });
+
+  // A cancelled picker and an empty one (no CH340/CP210x driver) both return
+  // nothing. It used to end silently in "Not connected" (UX audit U2 KNOWN).
+  it.each(['remembered', 'choose'] as const)(
+    'records that a %s picker came back with no port, until the next attempt',
+    async (portSelection) => {
+      const { platform, requestPort } = adapter({ granted: [], picked: null });
+
+      await useLaserStore.getState().connect(platform, { portSelection });
+
+      expect(requestPort).toHaveBeenCalledTimes(1);
+      expect(useLaserStore.getState().connection).toEqual({
+        kind: 'disconnected',
+        noPortChosen: true,
+      });
+      expect(useLaserStore.getState().log.at(-1)).toContain('(CH340 or CP210x)');
+
+      const opened: SerialPortIdentity[] = [];
+      const retry = adapter({ granted: [], picked: portStub(CH340, opened) });
+      await useLaserStore.getState().connect(retry.platform, { portSelection: 'choose' });
+      expect(useLaserStore.getState().connection).not.toHaveProperty('noPortChosen');
+    },
+  );
 
   it('forgets the remembered port with Forget Controller', async () => {
     rememberSerialPort(localStorage, CH340);

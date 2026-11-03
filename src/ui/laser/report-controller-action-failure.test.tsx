@@ -66,6 +66,18 @@ describe('reportControllerActionFailure', () => {
     expect(toastMessages()).toEqual(['Jog: Wait for the previous controller write.']);
   });
 
+  // UX audit U2-P2-2: the toast read "Home: error:5".
+  it('decodes a bare controller reply for the connected firmware', () => {
+    reportControllerActionFailure('Home', new Error('error:5'));
+    reportControllerActionFailure('Jog', new Error('error:15'));
+    reportControllerActionFailure('Unlock', new Error('ALARM:1'));
+    expect(toastMessages()).toEqual([
+      'Home: Homing cycle disabled (error:5)',
+      'Jog: Jog target exceeds travel (error:15)',
+      'Unlock: Hard limit triggered (ALARM:1)',
+    ]);
+  });
+
   it('stays quiet for deliberate cancellations', () => {
     reportControllerActionFailure('Jog', new Error(MANUAL_MOTION_CANCELLED_MESSAGE));
     reportControllerActionFailure(

@@ -175,7 +175,7 @@ describe('SuperConsoleSettingsPane', () => {
     const { host, unmount } = await renderPane();
     expect(readMachineSettings).not.toHaveBeenCalled();
     expect(host.textContent).toContain(
-      'Auto-read waiting: Controller must report Idle or Alarm before reading machine settings.',
+      'Auto-read waiting: The machine has not reported Idle or Alarm yet, so its settings cannot be read.',
     );
     expect(useLaserStore.getState().lastWriteError).toBeNull();
     expect(useLaserStore.getState().log).toEqual([]);
@@ -285,7 +285,7 @@ describe('SuperConsoleSettingsPane', () => {
     });
 
     expect(host.textContent).not.toContain('stale session failure');
-    expect(host.textContent).toContain('Auto-read waiting: Controller must report Idle');
+    expect(host.textContent).toContain('Auto-read waiting: The machine has not reported Idle');
     await act(async () => {
       useLaserStore.setState({
         statusReport: { state: 'Idle' } as LaserState['statusReport'],

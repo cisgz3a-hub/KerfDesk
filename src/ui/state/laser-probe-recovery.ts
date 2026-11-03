@@ -95,7 +95,8 @@ function markProbeFailed(
       ...(alarmFailure ? { alarmCode: result.alarmCode } : {}),
       lastWriteError: message,
       safetyNotice:
-        state.safetyNotice ?? controllerErrorNotice(null, 'command', message, pendingLine),
+        state.safetyNotice ??
+        controllerErrorNotice(null, 'command', message, pendingLine, state.activeControllerKind),
       log: pushLog(state, `[lf2] Probe transaction ${transactionId} failed: ${message}`),
       ...(alarmFailure || disconnected
         ? { controllerOperation: null, probeBusy: false }
