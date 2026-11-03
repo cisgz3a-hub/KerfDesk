@@ -18,7 +18,7 @@ export function usesStarterValues(
 
 export function StarterValuesNotice(): JSX.Element {
   return (
-    <p className="lf-laser-help lf-laser-notice" role="note">
+    <p className="lf-laser-help lf-laser-notice">
       <strong>Starter values, not a recipe.</strong> Choose power and speed from your material's
       settings or your laser's manual, or run a{' '}
       <button

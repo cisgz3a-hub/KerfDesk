@@ -124,7 +124,7 @@ describe('Absolute placement retains machine coordinates with a work offset', ()
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error(result.messages.join('\n'));
     expect(result.gcode).toContain('X-150.398 Y-140.323');
-    expect(result.warnings.join('\n')).toContain('mapping is unverified');
+    expect(result.warnings.join('\n')).toContain("can't check where this job sits");
     const resolved = resolveJobPlacement(placement, m);
     if (!resolved.ok) throw new Error('known offset fixture');
     expect(

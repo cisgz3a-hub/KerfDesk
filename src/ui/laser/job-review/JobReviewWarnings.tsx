@@ -71,7 +71,10 @@ export function JobReviewWarnings(props: {
       )}
       {ranked.technical.length === 0 ? null : (
         <details>
-          <summary style={warnItemSummaryStyle}>
+          <summary
+            style={warnItemSummaryStyle}
+            title="Show notes about motion and power settings. None needs action for a first job."
+          >
             {technicalNotesLabel(ranked.technical.length)}
           </summary>
           <ul style={warnListStyle}>

@@ -76,7 +76,9 @@ function ToastDetails(props: { readonly toast: Toast }): JSX.Element {
         if (event.currentTarget.open) hold(props.toast.id);
       }}
     >
-      <summary>{details.length === 1 ? 'Show the note' : `Show all ${details.length}`}</summary>
+      <summary title="Show these notes. The notice then stays until you dismiss it.">
+        {details.length === 1 ? 'Show the note' : `Show all ${details.length}`}
+      </summary>
       <ul>
         {details.map((detail) => (
           <li key={detail}>{detail}</li>

@@ -289,7 +289,7 @@ describe('prepareStartJob job placement', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.gcode).toContain('X-5.000');
-      expect(result.warnings.join('\n')).not.toMatch(/out of bed|mapping is unverified/i);
+      expect(result.warnings.join('\n')).not.toMatch(/out of bed|can't check where this job sits/i);
     }
   });
 
