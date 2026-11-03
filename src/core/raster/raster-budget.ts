@@ -3,6 +3,13 @@ import type { DitherAlgorithm } from '../scene';
 export const MAX_RASTER_WORKING_BYTES = 64 * 1024 * 1024;
 export const MAX_RASTER_WORK_UNITS = 50_000_000;
 export const STREAMED_RASTER_PIXEL_THRESHOLD = 4_000_000;
+/**
+ * ADR-581 Amendment 1: the most source pixels a preview or processed bitmap
+ * reads. The read is the burn's own (base64 text, decoded luma and one tone
+ * pass, about 5 bytes a pixel), so it is bounded apart from the 64 MB budget
+ * for what is built at the output grid. 50 MP takes a 48 MP phone photo.
+ */
+export const MAX_RASTER_SOURCE_READ_PIXELS = 50_000_000;
 /** @deprecated Use MAX_RASTER_WORK_UNITS; retained for API compatibility. */
 export const MAX_RASTER_PIXELS = MAX_RASTER_WORK_UNITS;
 export const MAX_RASTER_LINES_PER_MM = 25;

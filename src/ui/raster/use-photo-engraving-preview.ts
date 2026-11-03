@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RasterImage } from '../../core/scene';
-import { evaluateRasterBudget } from '../../core/raster/raster-budget';
 import { hydratePagedRasterImage } from '../import/paged-raster-hydration';
 import { photoEngravingImage } from './photo-engraving-apply';
 import { previewPhotoEngravingInWorker } from './photo-engraving-preview-client';
+import { photoPreviewSourceSizeError } from './photo-engraving-preview-budget';
 import type { PhotoEngravingPreviewResult } from './photo-engraving-preview';
 import { photoEngravingPatch, type PhotoEngravingDraft } from './photo-engraving-settings';
 import type { PhotoEngravingSession } from './photo-engraving-store';
@@ -32,15 +32,12 @@ export function usePhotoEngravingPreview(
     const timer = window.setTimeout(() => {
       void (async () => {
         try {
-          const sourceBudget = evaluateRasterBudget(1, 1, {
-            sourcePixelCount: session.image.pixelWidth * session.image.pixelHeight,
-            sourceWorkingBytesPerPixel: 12,
-          });
-          if (sourceBudget.kind === 'too-large') {
-            finish({
-              kind: 'error',
-              message: `Photo preview is unavailable at this size: ${sourceBudget.reason}. You can still apply the settings.`,
-            });
+          const sourceError = photoPreviewSourceSizeError(
+            session.image.pixelWidth,
+            session.image.pixelHeight,
+          );
+          if (sourceError !== null) {
+            finish({ kind: 'error', message: sourceError });
             return;
           }
           const hydrated =
