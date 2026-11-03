@@ -132,6 +132,7 @@ export function ConnectionBar(props: Props): JSX.Element {
           <button
             type="button"
             className="lf-btn lf-btn--primary"
+            title="Close the port and reconnect with this machine profile's commands. Nothing moves."
             disabled={props.disabled}
             onClick={props.driverMismatch.onReconnect}
           >
