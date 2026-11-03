@@ -214,7 +214,7 @@ describe('handleSaveProcessedBitmap', () => {
     expect(toast.messages).toEqual([
       {
         message:
-          'Could not save processed bitmap: ~123 MB materialized working set exceeds the 64 MB budget',
+          'Could not save processed bitmap: the bitmap is too big at this size and resolution. Lower the resolution or make the photo smaller.',
         variant: 'error',
       },
     ]);

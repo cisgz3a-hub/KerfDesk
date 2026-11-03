@@ -1,4 +1,4 @@
-import { photoEngravingPreviewInputError } from './photo-engraving-preview-budget';
+import { photoEngravingPreviewPlan } from './photo-engraving-preview-budget';
 import {
   photoPreviewMaxEdge,
   type PhotoEngravingPreviewInput,
@@ -33,8 +33,12 @@ export function previewPhotoEngravingInWorker(
   if (signal?.aborted === true) return Promise.reject(abortError());
   if (activeRequest !== null) abortRequest(activeRequest);
   const maxEdge = photoPreviewMaxEdge(requestedMaxEdge);
-  const error = photoEngravingPreviewInputError(input, maxEdge);
-  if (error !== null) return Promise.resolve({ kind: 'error', message: error });
+  // A grid too big to preview still goes to the worker, which reads the
+  // photo's histogram for Auto tones; nothing else that fails is sent.
+  const plan = photoEngravingPreviewPlan(input, maxEdge);
+  if (plan.kind === 'limit' && !plan.sourceReadable) {
+    return Promise.resolve({ kind: 'error', message: plan.message });
+  }
   const worker = createWorker();
   if (worker === null) {
     return Promise.resolve({
@@ -78,7 +82,11 @@ function requestPreview(
     const id = ++nextRequestId;
     const onAbort = (): void => abortRequest(request);
     const timer = setTimeout(
-      () => settleError(request, 'Photo preview timed out.'),
+      () =>
+        settleError(
+          request,
+          'Photo preview took too long at this size and resolution. Lower the resolution or make the photo smaller. You can still apply the settings.',
+        ),
       PREVIEW_WORKER_TIMEOUT_MS,
     );
     const request: Pending = { id, worker, timer, signal, onAbort, resolve, reject };
