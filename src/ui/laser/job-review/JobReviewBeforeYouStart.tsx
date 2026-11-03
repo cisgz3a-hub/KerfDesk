@@ -12,7 +12,7 @@ import {
   writeBeforeYouStartFolded,
 } from './before-you-start';
 import type { MachineKind } from '../../../core/scene';
-import { bannerListStyle, bannerStyle, warnItemSummaryStyle } from './job-review.styles';
+import { bannerListStyle, bannerStyle, beforeYouStartSummaryStyle } from './job-review.styles';
 
 export function JobReviewBeforeYouStart(props: { readonly machineKind: MachineKind }): JSX.Element {
   const deviceId = useStore((s) => s.project.device.profileId ?? s.project.device.name);
@@ -41,7 +41,7 @@ function BeforeYouStartBlock(props: {
         }}
       >
         <summary
-          style={warnItemSummaryStyle}
+          style={beforeYouStartSummaryStyle}
           title={isOpen ? 'Fold for this machine' : 'Show the safety points'}
         >
           {BEFORE_YOU_START_HEADING}
