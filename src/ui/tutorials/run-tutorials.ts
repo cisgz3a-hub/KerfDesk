@@ -7,7 +7,7 @@ export const RUN_TUTORIALS: readonly Tutorial[] = [
     summary: 'Follow the sequence from a physical Frame to the final Start job action.',
     category: 'Machine & setup',
     machine: 'all',
-    minutes: 4,
+    minutes: 5,
     location: 'Machine controls → Job',
     prerequisites:
       'For a real run, prepared artwork, the intended operation settings and origin, and a connected machine with suitable workholding.',
@@ -20,6 +20,15 @@ export const RUN_TUTORIALS: readonly Tutorial[] = [
         focus: 'Exact artwork and placement',
         result: 'You have identified the job that will be prepared for Frame.',
         visual: 'preview',
+      },
+      {
+        title: 'Focus on this material',
+        examplePhase: 0,
+        instruction:
+          'Laser: set the gap between the laser and the top of your material with the focus gauge or spacer that came with your laser (see its manual), then tighten the head. The gap changes with material thickness, so focus again whenever the material changes. A powered Z or auto-focus is in the machine controls. CNC: set Z zero on the top of your stock.',
+        focus: 'Focus and material thickness',
+        result:
+          'The laser is focused on the surface it will burn, so a faint first burn is not a focus problem.',
       },
       {
         title: 'Complete the physical Frame',
@@ -40,6 +49,16 @@ export const RUN_TUTORIALS: readonly Tutorial[] = [
         visual: 'frame',
       },
       {
+        title: 'Before you start',
+        examplePhase: 1,
+        instruction:
+          "Laser: wear laser safety glasses rated for your laser's wavelength, stay with the laser while it runs, keep a fire extinguisher close, and use air assist and ventilation. CNC: wear eye and ear protection, clamp the material with the clamps clear of the toolpath, and stay with the machine. Watching on a camera or phone is not supervision.",
+        focus: 'Before you start',
+        result:
+          'Job Review lists these points above Start job. You can fold them for a machine you know; they never block the start.',
+        visual: 'frame',
+      },
+      {
         title: 'Make the final start decision',
         examplePhase: 2,
         instruction:
@@ -50,7 +69,20 @@ export const RUN_TUTORIALS: readonly Tutorial[] = [
       },
     ],
     tip: 'Warnings remain information for your review. A completed Frame for the exact job is the ordinary Start policy gate; the controller and executable handoff must also be able to accept the run.',
-    keywords: ['frame', 'start', 'run', 'job review', 'framed job', 'placement', 'warnings'],
+    keywords: [
+      'frame',
+      'start',
+      'run',
+      'job review',
+      'framed job',
+      'placement',
+      'warnings',
+      'safety',
+      'glasses',
+      'fire',
+      'focus',
+      'first burn',
+    ],
     related: ['preview', 'origin', 'operations', 'cnc-probe', 'recovery'],
   },
   {
