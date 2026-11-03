@@ -139,4 +139,13 @@ A unit test runs the real autosave loop and client against a simulated
 preparation that holds the lane for 150 s and preempts like the real client.
 The write lands on the 30 s tick, the preparation is preempted once, restarts
 and completes, and later ticks write nothing.
-The browser measurement with four bed-sized photos is recorded below when run.
+
+Browser check on production builds (Chrome 156, the audit's `zz-s3` harness probe), one
+bed-sized photo (4000 × 3000 at 400 × 300 mm, 10 lines/mm) plus 200 vector objects, with the
+edit timed 6 s before an autosave tick so the tick falls inside the preparation. On main the
+preparation ran from 2.9 s to 29.1 s after the edit, the tick waited, and the recovery copy was
+written 29.8 s after the edit. With this amendment the preparation was retired at the tick, the
+autosave worker ran for 0.33 s, the preparation restarted, and the copy was written 6.3 s after
+the edit. The four-photo case was not run in the browser: on this 16 GB PC, with other work
+running, free memory fell below 1.0 GB within 2 s of opening it (S3-P2-3), and the measurement
+stopped there to keep the PC usable. The unit test above covers that timing.

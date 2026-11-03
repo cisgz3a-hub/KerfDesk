@@ -60,9 +60,27 @@ re-encoded as PNG on the UI thread; only its second decode moved.
 ### Verification and limits
 
 Unit tests check the worker's bytes against a verbatim copy of the pre-change luma builder on
-RGBA with every alpha value, the chunk boundary of the encoder on both routes, every fallback
-decision, cancellation, the slow-decode notice, and a count-based guard that a worker decode runs
-neither `loadImageAsRawData` nor `extractLumaBase64` on the UI thread.
+RGBA with every alpha value, the encoder's chunk boundary on both routes, the fallbacks,
+cancellation, the slow-decode notice, and a count-based guard: a worker decode makes no
+`getImageData` call on the UI thread and runs neither `loadImageAsRawData` nor
+`extractLumaBase64` there.
 
-The browser measurement on a production build (import block for a 12 MP JPEG, the 4096 x 4096
-PNG and a TIFF page, and the luma hashes of each fixture against main) is recorded below when run.
+Measured on production builds in Chrome 156 (headless, Playwright; main = `1405bc777`, whose
+import path is unchanged on today's main), on the audit PC while other sessions were running
+(calibration 72-89 ms against the audit's idle 36-47 ms, so absolute times read high):
+
+- **Luma bytes.** Six fixtures imported into one project and saved by each build gave the same
+  SHA-256 of every `lumaBase64` and the same grid and bounds: a 4000 x 3000 JPEG, a 1200 x 900 PNG
+  with every alpha value, JPEGs with EXIF Orientation 6 and 3, a 9000 x 1200 JPEG resized to
+  8192 x 1092, and an opaque 1500 x 1500 PNG. The stored raster is the compiler's only input
+  from the import, so the compiled G-code is unchanged too. A page-made WebP did not import in
+  either build in headless Chrome, so WebP was not compared.
+- **Longest UI task during Import** (runs 1-3 of 4, run 0 dropped): 12 MP JPEG 1,553-1,700 ms on
+  main, 110-138 ms with this change; 4096 x 4096 PNG 1,889-2,181 ms, 103-110 ms; 9 MP 16-bit TIFF
+  page 1,118-1,245 ms, 54-68 ms. Time to the object shown: JPEG 1.77-1.89 s, 0.70-0.84 s. Peak
+  memory of the measuring Chrome fell slightly (JPEG 2.24-2.29 GB, 1.99-2.18 GB).
+
+What remains on the UI thread is the decode, the draw onto the loader's canvas and the snapshot,
+about 100-140 ms for a 12 MP photo here. A slower PC may still pass 200 ms on a very large image;
+the progress notice and Esc cover that case. Not measured: the packaged desktop app and a PC
+without GPU canvas acceleration.
