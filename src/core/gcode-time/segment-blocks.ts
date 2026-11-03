@@ -14,9 +14,15 @@ import { SECONDS_PER_MINUTE, type MotionLimits } from './motion-limits';
 
 const FLOATS_PER_SEGMENT = 6;
 
-export function segmentBlocks(model: GcodeRenderModel, limits: MotionLimits): ReadonlyArray<Block> {
+/** Blocks for segments [start, end); each block depends only on its own segment. */
+export function segmentBlocks(
+  model: GcodeRenderModel,
+  limits: MotionLimits,
+  start = 0,
+  end = model.segmentCount,
+): ReadonlyArray<Block> {
   const blocks: Block[] = [];
-  for (let index = 0; index < model.segmentCount; index += 1) {
+  for (let index = start; index < end; index += 1) {
     blocks.push(segmentBlock(model, index, limits));
   }
   return blocks;
