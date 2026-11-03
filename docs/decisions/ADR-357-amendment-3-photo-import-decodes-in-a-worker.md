@@ -23,19 +23,26 @@ refuter showed that chunked encoding gives byte-identical base64 4.4 times faste
 
 ### Decision
 
-1. **The embedded photo route runs in a short-lived worker.** After the header gives the oriented
-   size and the burn decode cap, a worker (`image-luma-worker.ts`) calls `createImageBitmap` with
-   `imageOrientation: 'from-image'`, resized only when the UI-thread loader would resize. It draws
-   the bitmap 1:1 onto an `OffscreenCanvas`, composites over white and takes the BT.601 luma in
-   one pass, encodes the base64 and returns only the size and that string. The worker is
-   terminated when it answers.
-2. **The bytes may not change.** The worker reproduces the loader's grid exactly or declines.
-   When the decoded grid differs from the target (an engine that ignored the EXIF Orientation,
-   or an unparsed header above the cap that the loader would scale on its canvas), when no worker
-   or `OffscreenCanvas` exists, when the source carries a trace mask, or when the worker fails,
-   the UI-thread loader takes the file as before. That loader also reports any real decode
-   error. The composite and luma arithmetic live in one DOM-free module (`rgba-luma.ts`) that both
-   routes use, so the luma bytes, and with them the compiled G-code, are unchanged.
+1. **The readback and luma run in a short-lived worker.** The UI thread still decodes and draws
+   the photo with the loader's own code (`decodeImageOntoCanvas`): the same `<canvas>`, size,
+   EXIF turn and browser resize as before. It then takes `createImageBitmap(canvas)`, a snapshot,
+   releases the canvas and transfers the snapshot to a worker (`image-luma-worker.ts`). The
+   worker draws it 1:1 onto an `OffscreenCanvas`, reads it back, composites over white and takes
+   the BT.601 luma in one pass, encodes the base64 and returns only the size and that string. The
+   worker is terminated when it answers. With no `Worker`, `OffscreenCanvas` or
+   `createImageBitmap`, with a trace-masked source, or when the worker fails, the UI-thread
+   loader runs as before; a real decode error is reported as before.
+2. **The bytes may not change, so the canvas may not change either.** A first version decoded in
+   the worker with `createImageBitmap(file)`. Its PNG luma was identical, but a JPEG drawn at its
+   own size differed by 1 in about a third of the bytes. In Chromium (Chrome 156 here, on Intel
+   Iris Xe, headless and headed) the loader's accelerated `<canvas>` converts a JPEG's YUV to RGB
+   on the GPU, while every CPU route (`createImageBitmap`, `willReadFrequently`, a worker)
+   converts it in the decoder. Reading back a snapshot of the loader's own canvas gave 0
+   differing bytes at 1600 x 1200 and 4000 x 3000. That is why the drawing stays on the UI
+   thread. (It also means the stored luma of a JPEG imported before this change could already
+   differ by 1 between a computer whose canvas is accelerated and one whose canvas is not.) The
+   composite and luma arithmetic live in one DOM-free module (`rgba-luma.ts`) used by both
+   routes.
 3. **Encoding never builds a pixel-sized binary string.** `extractLumaBase64` and every other
    caller (camera trace, Image Studio, crop) encode with `bytesToBase64`: native
    `Uint8Array.prototype.toBase64` where the engine has it, otherwise 48 KiB chunks, which give

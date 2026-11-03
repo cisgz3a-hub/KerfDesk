@@ -86,11 +86,31 @@ export async function loadImageAsRawData(
   return maskTraceSourcePixels(file, pixels);
 }
 
-async function decodeImageAsRawData(
+function decodeImageAsRawData(
   file: File,
   maxEdge: number,
   signal?: AbortSignal,
 ): Promise<RawImageData> {
+  return decodeImageOntoCanvas(file, maxEdge, readCompositedPixels, signal);
+}
+
+/** Reads a canvas the loader has just drawn, before it is released. */
+export type DrawnImageReader<T> = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => T;
+
+/**
+ * The loader's decode and drawing, exactly: the same canvas, size, EXIF turn
+ * and browser resize, handed to `read` while it holds the image. The photo
+ * import snapshots it as an ImageBitmap so its readback and luma run in a
+ * worker; the pixels are those getImageData returns here (S3-P2-1). The
+ * canvas matters: Chromium may convert a JPEG's YUV to RGB on the GPU for an
+ * accelerated canvas, which differs by 1 in some bytes from a CPU decode.
+ */
+export async function decodeImageOntoCanvas<T>(
+  file: File,
+  maxEdge: number,
+  read: DrawnImageReader<T>,
+  signal?: AbortSignal,
+): Promise<T> {
   checkTraceSignal(signal);
   if (isGif(file)) file = await awaitTraceSignal(freezeGif(file), signal);
   checkTraceSignal(signal);
@@ -103,7 +123,7 @@ async function decodeImageAsRawData(
     if (resizedBitmap !== null) {
       try {
         checkTraceSignal(signal);
-        return rasterizeImage(resizedBitmap, target.width, target.height);
+        return rasterizeImage(resizedBitmap, target.width, target.height, read);
       } finally {
         resizedBitmap.close();
       }
@@ -119,27 +139,10 @@ async function decodeImageAsRawData(
   try {
     const img = await decodeImage(url, signal);
     checkTraceSignal(signal);
-    return rasterizeDecodedElement(img, header, maxEdge);
+    return rasterizeDecodedElement(img, header, maxEdge, read);
   } finally {
     URL.revokeObjectURL(url);
   }
-}
-
-/** What a burn decode of this file will produce, read from its header alone:
- * the oriented target grid and whether the browser must resize to reach it.
- * Null when the header is not one the loader parses (the element route then
- * measures the decoded image itself). */
-export async function readBurnDecodePlan(
-  file: File,
-  maxEdge: number,
-  signal?: AbortSignal,
-): Promise<{ readonly target: ImageDimensions; readonly resize: boolean } | null> {
-  const header = await awaitTraceSignal(readHeaderImageInfo(file, signal), signal);
-  if (header === null) return null;
-  assertSafeDecodeDimensions(header.oriented);
-  const target = scaleToCap(header.oriented.width, header.oriented.height, maxEdge);
-  const resize = target.width !== header.oriented.width || target.height !== header.oriented.height;
-  return { target, resize };
 }
 
 /**
@@ -220,17 +223,18 @@ function hasOrientedAspect(frame: ImageDimensions, oriented: ImageDimensions): b
 // ignored the Orientation, so the turn is drawn here instead: either way the
 // raster has the oriented aspect ratio the header, and so the import bounds,
 // promised.
-function rasterizeDecodedElement(
+function rasterizeDecodedElement<T>(
   img: HTMLImageElement,
   header: HeaderImageInfo | null,
   maxEdge: number,
-): RawImageData {
+  read: DrawnImageReader<T>,
+): T {
   const natural = { width: img.width, height: img.height };
   const orientation =
     header !== null && engineIgnoredOrientation(natural, header) ? header.orientation : 1;
   const oriented = orientedDimensions(natural, orientation);
   const { width, height } = scaleToCap(oriented.width, oriented.height, maxEdge);
-  return rasterizeImage(img, width, height, orientation);
+  return rasterizeImage(img, width, height, read, orientation);
 }
 
 function engineIgnoredOrientation(natural: ImageDimensions, header: HeaderImageInfo): boolean {
@@ -243,12 +247,13 @@ function engineIgnoredOrientation(natural: ImageDimensions, header: HeaderImageI
   );
 }
 
-function rasterizeImage(
+function rasterizeImage<T>(
   source: CanvasImageSource,
   width: number,
   height: number,
+  read: DrawnImageReader<T>,
   orientation: ExifOrientation = 1,
-): RawImageData {
+): T {
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
@@ -264,7 +269,14 @@ function rasterizeImage(
     ctx.drawImage(source, 0, 0, swap ? height : width, swap ? width : height);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
   }
-  const imgd = ctx.getImageData(0, 0, width, height);
+  return read(canvas, ctx);
+}
+
+function readCompositedPixels(
+  canvas: HTMLCanvasElement,
+  ctx: CanvasRenderingContext2D,
+): RawImageData {
+  const imgd = ctx.getImageData(0, 0, canvas.width, canvas.height);
   return compositeRgbOverWhitePreservingAlpha({
     width: imgd.width,
     height: imgd.height,

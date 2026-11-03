@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { compositeRgbOverWhitePreservingAlpha, extractLumaBase64 } from '../trace/image-loader';
-import { decodeImageLuma, type ImageLumaDecodeHost } from './image-luma-decode';
+import { lumaFromDrawnImage } from './image-luma-decode';
 
 // The loader's luma builder as it stood before S3-P2-1 (one string append per
 // pixel, then btoa), kept verbatim so the new routes are checked against the
@@ -53,31 +53,27 @@ function photoRgba(width: number, height: number, seed = 7): Uint8ClampedArray {
   return data;
 }
 
-function fakeHost(rgba: Uint8ClampedArray, width: number, height: number) {
+function fakeBitmap(width: number, height: number) {
   const close = vi.fn();
-  const createImageBitmap = vi.fn(
-    async (_image: Blob, _options: ImageBitmapOptions) =>
-      ({ width, height, close }) as unknown as ImageBitmap,
-  );
-  const drawImage = vi.fn();
-  const host: ImageLumaDecodeHost = {
-    createImageBitmap,
-    createContext: () => ({ drawImage, getImageData: () => ({ data: rgba }) }),
-  };
-  return { host, createImageBitmap, drawImage, close };
+  return { bitmap: { width, height, close } as unknown as ImageBitmap, close };
 }
 
-describe('decodeImageLuma (photo import worker)', () => {
-  it("gives the UI-thread loader's luma bytes exactly, transparent pixels included", async () => {
+function readback(rgba: Uint8ClampedArray) {
+  const drawImage = vi.fn();
+  const getImageData = vi.fn(() => ({ data: rgba }));
+  return { context: { drawImage, getImageData }, drawImage, getImageData };
+}
+
+describe('lumaFromDrawnImage (photo import worker)', () => {
+  it("gives the UI-thread loader's luma bytes exactly, transparent pixels included", () => {
     const width = 301;
     const height = 207;
     const rgba = photoRgba(width, height);
-    const { host } = fakeHost(rgba, width, height);
+    const { bitmap, close } = fakeBitmap(width, height);
+    const { context, drawImage, getImageData } = readback(rgba);
+    const createContext = vi.fn(() => context);
 
-    const result = await decodeImageLuma(
-      { file: new Blob(), target: { width, height }, resize: false, maxEdge: 8192 },
-      host,
-    );
+    const result = lumaFromDrawnImage(bitmap, createContext);
 
     const legacy = legacyExtractLumaBase64({ width, height, data: legacyComposite(rgba) });
     const loader = extractLumaBase64(
@@ -85,6 +81,11 @@ describe('decodeImageLuma (photo import worker)', () => {
     );
     expect(loader).toBe(legacy);
     expect(result).toEqual({ kind: 'ok', width, height, lumaBase64: legacy });
+    // A 1:1 copy of the snapshot at its own size, read back whole.
+    expect(createContext).toHaveBeenCalledWith(width, height);
+    expect(drawImage).toHaveBeenCalledWith(bitmap, 0, 0);
+    expect(getImageData).toHaveBeenCalledWith(0, 0, width, height);
+    expect(close).toHaveBeenCalledOnce();
   });
 
   it("keeps the loader's chunked luma identical past one base64 chunk", () => {
@@ -96,54 +97,19 @@ describe('decodeImageLuma (photo import worker)', () => {
     );
   });
 
-  it("asks the browser for the header's oriented grid, resized only when the loader resizes", async () => {
-    const rgba = photoRgba(40, 30);
-    const plain = fakeHost(rgba, 40, 30);
-    await decodeImageLuma(
-      { file: new Blob(), target: { width: 40, height: 30 }, resize: false, maxEdge: 8192 },
-      plain.host,
-    );
-    expect(plain.createImageBitmap.mock.calls[0]?.[1]).toEqual({ imageOrientation: 'from-image' });
-    expect(plain.drawImage).toHaveBeenCalledWith(expect.anything(), 0, 0, 40, 30);
-    expect(plain.close).toHaveBeenCalledOnce();
+  it('reports a failure, and still releases the snapshot, when it cannot read it', () => {
+    const missing = fakeBitmap(4, 3);
+    expect(lumaFromDrawnImage(missing.bitmap, () => null)).toMatchObject({ kind: 'failed' });
+    expect(missing.close).toHaveBeenCalledOnce();
 
-    const resized = fakeHost(rgba, 40, 30);
-    await decodeImageLuma(
-      { file: new Blob(), target: { width: 40, height: 30 }, resize: true, maxEdge: 40 },
-      resized.host,
-    );
-    expect(resized.createImageBitmap.mock.calls[0]?.[1]).toEqual({
-      resizeWidth: 40,
-      resizeHeight: 30,
-      resizeQuality: 'high',
-      imageOrientation: 'from-image',
-    });
-  });
-
-  it('declines a decode that would need the canvas to scale or turn it', async () => {
-    // An engine that ignored the EXIF turn returns the stored, swapped grid.
-    const turned = fakeHost(photoRgba(30, 40), 30, 40);
-    await expect(
-      decodeImageLuma(
-        { file: new Blob(), target: { width: 40, height: 30 }, resize: false, maxEdge: 8192 },
-        turned.host,
-      ),
-    ).resolves.toMatchObject({ kind: 'fallback' });
-    expect(turned.drawImage).not.toHaveBeenCalled();
-    expect(turned.close).toHaveBeenCalledOnce();
-
-    // Unparsed header: the loader would scale an over-cap element on its canvas.
-    const overCap = fakeHost(photoRgba(50, 20), 50, 20);
-    await expect(
-      decodeImageLuma({ file: new Blob(), target: null, resize: false, maxEdge: 25 }, overCap.host),
-    ).resolves.toMatchObject({ kind: 'fallback' });
-  });
-
-  it("takes an unparsed header's natural grid when it is within the cap", async () => {
-    const rgba = photoRgba(50, 20);
-    const { host } = fakeHost(rgba, 50, 20);
-    await expect(
-      decodeImageLuma({ file: new Blob(), target: null, resize: false, maxEdge: 8192 }, host),
-    ).resolves.toMatchObject({ kind: 'ok', width: 50, height: 20 });
+    const throwing = fakeBitmap(4, 3);
+    const result = lumaFromDrawnImage(throwing.bitmap, () => ({
+      drawImage: () => {
+        throw new Error('context lost');
+      },
+      getImageData: () => ({ data: new Uint8ClampedArray(48) }),
+    }));
+    expect(result).toEqual({ kind: 'failed', reason: 'context lost' });
+    expect(throwing.close).toHaveBeenCalledOnce();
   });
 });
