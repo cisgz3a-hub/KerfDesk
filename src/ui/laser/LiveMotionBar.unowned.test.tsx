@@ -170,7 +170,8 @@ describe('LiveMotionBar with motion the controller reports and nothing here owns
     useLaserStore.setState({ statusReport: report('Run'), ...patch });
     const { host, root } = await render();
     try {
-      expect(host.firstElementChild).toBeNull();
+      // Only the announcer's empty regions stay mounted between jobs.
+      expect(host.querySelector('section[aria-label="Live Motion"]')).toBeNull();
     } finally {
       await act(async () => root.unmount());
     }

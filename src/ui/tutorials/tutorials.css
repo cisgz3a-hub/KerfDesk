@@ -36,7 +36,7 @@
 .lf-learn button:focus-visible,
 .lf-learn input:focus-visible,
 .lf-learn summary:focus-visible {
-  outline: 2px solid var(--lf-accent);
+  outline: 2px solid var(--lf-focus-accent);
   outline-offset: 3px;
 }
 .lf-learn-header {

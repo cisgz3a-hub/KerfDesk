@@ -78,7 +78,9 @@ it('offers Done after the real store settles a simulated job and sends no comman
   act(() => button?.click());
   expect(useLaserStore.getState().liveCanvasRun).toBeNull();
   expect(simulator.outbound()).toEqual(before);
-  expect(host.firstElementChild).toBeNull();
+  // Only the Live Motion announcer stays mounted between jobs, having said so.
+  expect(host.querySelector('section')).toBeNull();
+  expect(host.textContent).toBe('Job finished');
 });
 
 it('offers Done after an unknown-dwell run settles even though its live estimate was unavailable', async () => {

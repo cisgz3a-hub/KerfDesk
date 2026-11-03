@@ -48,7 +48,7 @@
 }
 
 .lf-connection-menu-item:focus-visible {
-  outline: 1px solid var(--lf-accent);
+  outline: 1px solid var(--lf-focus-accent);
   outline-offset: -1px;
 }
 

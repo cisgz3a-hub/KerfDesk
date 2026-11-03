@@ -21,7 +21,7 @@
   color: var(--lf-accent);
 }
 .lf-tutorial-button:focus-visible {
-  outline: 2px solid var(--lf-accent);
+  outline: 2px solid var(--lf-focus-accent);
   outline-offset: 2px;
 }
 .lf-tutorial-button--compact {

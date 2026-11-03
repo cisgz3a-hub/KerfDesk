@@ -39,7 +39,7 @@
   cursor: default;
 }
 .lf-start-handle:focus-visible {
-  outline: 2px solid var(--lf-accent);
+  outline: 2px solid var(--lf-focus-accent);
 }
 .lf-start-label {
   visibility: hidden;
