@@ -74,7 +74,7 @@ export function AlarmRecoveryActions(props: {
   );
 }
 
-function useActiveDriverCommands(): ReturnType<typeof selectControllerDriver>['commands'] {
+export function useActiveDriverCommands(): ReturnType<typeof selectControllerDriver>['commands'] {
   const kind = useLaserStore((state) => state.activeControllerKind);
   const commandSet = useLaserStore((state) => state.activeControllerCommandSet);
   return selectControllerDriver(kind, commandSet ?? undefined).commands;
@@ -82,7 +82,10 @@ function useActiveDriverCommands(): ReturnType<typeof selectControllerDriver>['c
 
 /** A one-line command is named on the button; a multi-line sequence (the
  *  Falcon's `$HX` then `$HY`) is spelled out in the tooltip. */
-function commandLabels(command: string): { readonly label: string; readonly sequence: string } {
+export function commandLabels(command: string): {
+  readonly label: string;
+  readonly sequence: string;
+} {
   const lines = command.split(/\r?\n/).filter((line) => line.trim() !== '');
   return lines.length === 1
     ? { label: `Home (${command})`, sequence: command }

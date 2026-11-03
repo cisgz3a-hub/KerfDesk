@@ -17,7 +17,8 @@ import { machineControlsLabel, machineDisplayName } from '../machine/machine-lab
 import { CncUtilitiesPanel } from '../machine/CncUtilitiesPanel';
 import { ConsolePanel } from './ConsolePanel';
 import { SuperConsoleLauncher } from './super-console/SuperConsoleLauncher';
-import { AlarmBanner } from './AlarmBanner';
+import { AlarmCard } from './AlarmBanner';
+import { operatorAbortAlarm } from './abort-alarm-recovery';
 import { ControllerPinNotice } from './ControllerPinNotice';
 import { HeldResumeTailNotice } from './HeldResumeTailNotice';
 import { openMachineSetup } from './device-setup';
@@ -51,6 +52,7 @@ export function LaserWindow({ dockedJobActions = false }: Props = {}): JSX.Eleme
   const machinePanel = useMachineRailVisibility();
   const connection = useLaserStore((s) => s.connection);
   const alarmCode = useLaserStore((s) => s.alarmCode);
+  const operatorAbort = useLaserStore(operatorAbortAlarm);
   const controllerKind = useLaserStore((s) => s.activeControllerKind);
   const control = useControllerActions();
   const autofocusBusy = useLaserStore((s) => s.autofocusBusy);
@@ -96,13 +98,15 @@ export function LaserWindow({ dockedJobActions = false }: Props = {}): JSX.Eleme
       <MachineRailHeading machineKind={machineKind} onCollapse={machinePanel.toggle} />
       <section className="lf-machine-primary-controls" aria-label="Jog and positioning">
         {controllerDisplay.showAlarmBanner && (
-          <AlarmBanner
+          <AlarmCard
             code={alarmCode}
             controllerKind={controllerKind}
             homingEnabled={homingEnabled}
             homeFromAlarm={control.homeFromAlarm}
             canUnlock={control.canUnlock}
             resetRequired={control.resetRequired}
+            operatorAbort={operatorAbort}
+            machineKind={machineKind}
             onHome={control.runHome}
             onConfigureHoming={openHomingSetup}
             onUnlock={control.runUnlock}

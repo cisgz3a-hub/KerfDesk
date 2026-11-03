@@ -1,5 +1,6 @@
 import { buildCncFrameMotion, type CncFrameMotionPlan } from './cnc-frame-lines';
 import { frameMotionFeeds } from './frame-feed-limits';
+import { frameBedEdgeWarning } from './frame-bed-edge-warning';
 import { frameHomedAreaWarning } from './frame-homed-area-warning';
 import { frameNoGoZoneWarnings } from './frame-no-go-warnings';
 import { currentWorkZMm } from './infer-machine-position';
@@ -75,9 +76,10 @@ export function buildFrameDispatchPlan(
 }
 
 /** The configured no-go zones this Frame's route crosses (approach, perimeter
- * and return), and grblHAL's homed area when the route leaves it (ADR-637
- * Amendment 5), for the same project, start point and return leg
- * buildFrameDispatchPlan sends. Warnings only (ADR-232 Amendment 1). */
+ * and return), and grblHAL's homed area (ADR-637 Amendment 5) or else the
+ * configured bed (ADR-232 Amendment 2) when the route leaves it, for the same
+ * project, start point and return leg buildFrameDispatchPlan sends. Warnings
+ * only (ADR-232 Amendment 1). */
 export function frameRouteNoGoWarnings(
   state: LaserState,
   bounds: Parameters<LaserState['frame']>[0],
@@ -88,9 +90,12 @@ export function frameRouteNoGoWarnings(
   const project = framedProject(candidate, jobProject);
   const frameBounds = frameBoundsForProject(bounds, project);
   const returnTarget = frameReturnTarget(candidate, external);
-  const homedArea = frameHomedAreaWarning(state, project, frameBounds, returnTarget);
+  // grblHAL's homed-area warning already names the bed it runs past.
+  const bedArea =
+    frameHomedAreaWarning(state, project, frameBounds, returnTarget) ??
+    frameBedEdgeWarning(state, project, frameBounds, returnTarget);
   const noGo = frameNoGoZoneWarnings(state, project, frameBounds, returnTarget);
-  return homedArea === null ? noGo : [...noGo, homedArea];
+  return bedArea === null ? noGo : [...noGo, bedArea];
 }
 
 function framedProject(

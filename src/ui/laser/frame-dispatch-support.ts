@@ -6,8 +6,10 @@ import type { FrameMotionCandidate } from '../state/framed-run';
 import { frameRouteNoGoWarnings } from '../state/laser-frame-motion-plan';
 import { useLaserStore } from '../state/laser-store';
 import type { LaserMotionOperation, LaserMotionOperationId } from '../state/laser-motion-operation';
+import { useStore } from '../state/store';
 import { useToastStore } from '../state/toast-store';
 import { frameControllerQueueIssue } from './frame-controller-readiness';
+import { withPositionWithheldRemedy } from './frame-position-withheld';
 import { reportStartBlockers } from './start-blocker-invalidation';
 
 // Shared by the exact Frame (use-frame-action.ts) and the split Frame that
@@ -17,8 +19,7 @@ import { reportStartBlockers } from './start-blocker-invalidation';
 
 export const FRAME_SETUP_CHANGED_BEFORE_DISPATCH_MESSAGE =
   'The job or machine setup changed before Frame could run. Frame the current job again.';
-export const FRAME_WORK_POSITION_UNKNOWN_MESSAGE =
-  'The controller did not report a usable work position. Wait for a complete status report, then Frame again.';
+export { FRAME_WORK_POSITION_UNKNOWN_MESSAGE } from './frame-position-withheld';
 export const FRAME_NOT_DISPATCHED_MESSAGE =
   'The controller did not dispatch framing motion. No job was authorized to start.';
 export const FRAME_COMPLETED_BUT_CHANGED_MESSAGE =
@@ -134,7 +135,12 @@ export function frameVerificationBounds(
   return machineKind === 'cnc' ? jobBounds : motionBounds;
 }
 
-export function reportFrameRefusal(messages: ReadonlyArray<string>): void {
+export function reportFrameRefusal(refusals: ReadonlyArray<string>): void {
+  const messages = withPositionWithheldRemedy(
+    refusals,
+    useLaserStore.getState(),
+    useStore.getState().project.device.homing.enabled,
+  );
   reportStartBlockers(messages, 'frame');
   useToastStore.getState().pushToast(messages[0] ?? 'The job cannot be framed.', 'error');
 }

@@ -11,10 +11,16 @@
 // homing state and reports Home, not Alarm, until a reset; the banner offers
 // the same Reset for it (controller-reset-required.ts; controller audit A-7,
 // ADR-375).
+//
+// AlarmCard shows AbortStoppedCard instead for the ALARM:3 that answers the
+// operator's own Abort (ADR-341 Amendment 11).
 
 import { presentAlarm } from '../../core/controllers/grbl/response-presentation';
 import type { ControllerKind } from '../../core/devices';
+import type { MachineKind } from '../../core/scene';
+import type { JobStopRequest } from '../state/job-stop-request';
 import { resetOfferMessage } from '../state/controller-reset-required';
+import { AbortStoppedCard } from './AbortStoppedCard';
 import { AlarmRecoveryActions } from './AlarmRecoveryActions';
 import { STATUS_ALARM_START_MESSAGE } from './start-job-readiness';
 
@@ -90,3 +96,28 @@ const alarmStyle: React.CSSProperties = {
   borderRadius: 4,
 };
 const alarmDetailStyle: React.CSSProperties = { margin: '4px 0' };
+
+/** The rail's Alarm card: the stopped-job card for the ALARM:3 of the
+ *  operator's own Abort (ADR-341 Amendment 11), else AlarmBanner. A reset the
+ *  controller still requires keeps AlarmBanner's Reset offer. */
+export function AlarmCard(
+  props: Parameters<typeof AlarmBanner>[0] & {
+    readonly operatorAbort: JobStopRequest | null;
+    readonly machineKind: MachineKind;
+  },
+): JSX.Element {
+  const { operatorAbort, machineKind, ...banner } = props;
+  if (operatorAbort === null || props.resetRequired !== false) return <AlarmBanner {...banner} />;
+  return (
+    <AbortStoppedCard
+      request={operatorAbort}
+      controllerKind={props.controllerKind}
+      machineKind={machineKind}
+      homingEnabled={props.homingEnabled}
+      homeFromAlarm={props.homeFromAlarm}
+      canUnlock={props.canUnlock}
+      onHome={props.onHome}
+      onUnlock={props.onUnlock}
+    />
+  );
+}
