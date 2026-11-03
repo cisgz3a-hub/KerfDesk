@@ -1,6 +1,6 @@
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import { type Project, type Vec2 } from '../../core/scene';
-import { hitTestCandidates } from '../../core/scene/hit-test-candidates';
+import { workspaceHitTestCandidates } from './workspace-hit-test';
 
 export function nextSelectionHit(
   candidates: ReadonlyArray<string>,
@@ -21,7 +21,7 @@ export function handleAltSelectionCycle(args: {
 }): boolean {
   if (args.e.button !== 0 || !args.e.altKey) return false;
   const hitId = nextSelectionHit(
-    hitTestCandidates(args.project.scene, args.point),
+    workspaceHitTestCandidates(args.project.scene, args.point),
     args.selectedObjectId,
   );
   if (hitId === null) return true;

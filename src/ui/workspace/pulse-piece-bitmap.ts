@@ -51,8 +51,10 @@ export type PlacedBitmap = {
 
 export type PieceBitmap = {
   readonly color: string;
-  /** The view these were rendered for; another view draws them scaled until a re-render. */
+  /** The view these were rendered for. */
   readonly view: ViewTransform;
+  /** Not cut at the overlay's edge, so a pan can move them as they are. */
+  readonly whole: boolean;
   readonly flood: PlacedBitmap;
   /** Tight halo for the resting edge. */
   readonly edge: PlacedBitmap;
@@ -65,6 +67,8 @@ type Region = {
   readonly top: number;
   readonly width: number;
   readonly height: number;
+  /** The padded box fits on the overlay uncut. */
+  readonly whole: boolean;
 };
 
 export function renderPieceBitmap(args: {
@@ -104,10 +108,20 @@ export function renderPieceBitmap(args: {
   return {
     color,
     view,
+    whole: region.whole,
     flood: { canvas: flood.canvas, left: region.left, top: region.top },
     edge,
     bloom,
   };
+}
+
+/** Whether the piece's bitmaps would land on the overlay in this view. */
+export function pieceInView(
+  object: SceneObject,
+  view: ViewTransform,
+  canvas: { readonly width: number; readonly height: number },
+): boolean {
+  return screenRegion(object, view, canvas) !== null;
 }
 
 export function pieceBitmapPixels(bitmap: PieceBitmap | null | undefined): number {
@@ -236,27 +250,21 @@ function traceClosed(ctx: CanvasRenderingContext2D, points: ReadonlyArray<Vec2>)
 function screenRegion(
   object: SceneObject,
   view: ViewTransform,
-  canvas: HTMLCanvasElement,
+  canvas: { readonly width: number; readonly height: number },
 ): Region | null {
   const box = transformedBBox(object);
-  const left = Math.max(
-    -BITMAP_PAD_PX,
-    Math.floor(view.offsetX + box.minX * view.scale) - BITMAP_PAD_PX,
-  );
-  const top = Math.max(
-    -BITMAP_PAD_PX,
-    Math.floor(view.offsetY + box.minY * view.scale) - BITMAP_PAD_PX,
-  );
-  const right = Math.min(
-    canvas.width + BITMAP_PAD_PX,
-    Math.ceil(view.offsetX + box.maxX * view.scale) + BITMAP_PAD_PX,
-  );
-  const bottom = Math.min(
-    canvas.height + BITMAP_PAD_PX,
-    Math.ceil(view.offsetY + box.maxY * view.scale) + BITMAP_PAD_PX,
-  );
+  const fullLeft = Math.floor(view.offsetX + box.minX * view.scale) - BITMAP_PAD_PX;
+  const fullTop = Math.floor(view.offsetY + box.minY * view.scale) - BITMAP_PAD_PX;
+  const fullRight = Math.ceil(view.offsetX + box.maxX * view.scale) + BITMAP_PAD_PX;
+  const fullBottom = Math.ceil(view.offsetY + box.maxY * view.scale) + BITMAP_PAD_PX;
+  const left = Math.max(-BITMAP_PAD_PX, fullLeft);
+  const top = Math.max(-BITMAP_PAD_PX, fullTop);
+  const right = Math.min(canvas.width + BITMAP_PAD_PX, fullRight);
+  const bottom = Math.min(canvas.height + BITMAP_PAD_PX, fullBottom);
   if (!(right > left && bottom > top)) return null;
-  return { left, top, width: right - left, height: bottom - top };
+  const whole =
+    left === fullLeft && top === fullTop && right === fullRight && bottom === fullBottom;
+  return { left, top, width: right - left, height: bottom - top, whole };
 }
 
 function createBitmap(

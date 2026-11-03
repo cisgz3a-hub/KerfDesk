@@ -1,7 +1,8 @@
+import { fillPoolRuns, type FillPoolRuns } from '../../core/scene/fill-operations';
 import type { AppState } from '../state/store';
 import { canvasTheme } from '../theme/canvas-theme';
 import { paintObjectDisplay } from '../workspace/object-display';
-import { paintPooledObjectDisplays } from '../workspace/fill-pools';
+import { paintPooledObjectDisplays } from '../workspace/fill-pool-paint';
 import type { RemoteControlOptions } from './types';
 import { RemoteFault } from './fault';
 import {
@@ -35,7 +36,7 @@ export async function workspacePreviewProjection(
   if (options.canShareArtwork?.() !== true) return DISABLED;
   try {
     const geometry = resolvePreviewGeometry(state.project, 768);
-    return renderPreview(geometry, options, signal);
+    return renderPreview(geometry, fillPoolRuns(state.project.scene), options, signal);
   } catch (error) {
     assertActive(signal);
     if (options.canShareArtwork?.() !== true) return DISABLED;
@@ -51,6 +52,7 @@ export async function workspacePreviewProjection(
 
 function renderPreview(
   geometry: PreviewGeometry,
+  runOf: FillPoolRuns,
   options: RemoteControlOptions,
   signal?: AbortSignal,
 ): Record<string, unknown> {
@@ -67,8 +69,12 @@ function renderPreview(
     const view = previewView(geometry.extent, sizePx);
     paintPreviewImageFootprints(ctx, geometry.imageFootprints, view);
     // ADR-683: a Fill operation is shown as the one even-odd region it burns.
-    paintPooledObjectDisplays(ctx, geometry.objects, view, (object, display) =>
-      paintObjectDisplay(ctx, object, display, view),
+    paintPooledObjectDisplays(
+      ctx,
+      geometry.objects,
+      view,
+      (object, display) => paintObjectDisplay(ctx, object, display, view),
+      runOf,
     );
     const encoded = canvas.toDataURL('image/png');
     assertActive(signal);

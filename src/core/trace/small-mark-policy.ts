@@ -14,7 +14,8 @@
 //      an anti-aliased dot keeps on an enlarged grid where its pixels past
 //      the cut shrink; every floor (this one, the lone-mark floor, the pen
 //      width) reads that size, and a size a rounding error under a floor is
-//      at it.
+//      at it. One exception: a colon's other dot, on 1-bit art a hinted 2 px²,
+//      goes by its partner on the baseline.
 //   2. Tone, from the pre-threshold luma, against the image's own ink and
 //      paper tones (medians of mask ink and mask paper; span = paper − ink).
 //      A genuine mark is drawn in the drawing's ink; noise is faint. A mark
@@ -38,10 +39,12 @@
 //      than a stroke (stipple, dotted rows and small text versus toner
 //      scatter in a stroke's halo), or if it is about as wide as that
 //      stroke (a tittle or a full stop, drawn with the letter's own pen;
-//      scatter is finer than its stroke), or if it is a compact dot on the
-//      baseline of a letter nearby (a full stop with no ink near it). A mark
-//      is never dust against itself. A paper hole is enclosed by ink by
-//      construction, so these tests are ink-only.
+//      scatter is finer than its stroke), or if it is a compact dot in a line
+//      of text at any angle: on the baseline of a letter nearby (a full stop
+//      with no ink near it), just past a descender, or straight above a dot on
+//      the baseline (a colon). A mark is never dust against itself, and a
+//      letter's own sub-floor piece is not dust. A paper hole is enclosed by
+//      ink by construction, so these tests are ink-only.
 //
 // Without a grey field (alpha masks) nothing is bridged and every speck
 // counts as dark; 1 and 3 apply.
@@ -251,7 +254,13 @@ export function createSmallMarkClassifier(input: SmallMarkClassifierInput): Smal
       // Measured once, and only where the pixel count alone cannot decide.
       let measured = -1;
       const size = (): number => (measured < 0 ? (measured = sizeOf(region, ink)) : measured);
-      if (underFloor(region.length, minArea) && underFloor(size(), minArea)) return false;
+      if (
+        underFloor(region.length, minArea) &&
+        underFloor(size(), minArea) &&
+        !neighbourhood(ink).colonDot(region)
+      ) {
+        return false;
+      }
       mark(region);
       if (field !== null && tones !== null) {
         const e = extremes(region, field, geometry, 'ink');

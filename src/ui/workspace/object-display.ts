@@ -14,11 +14,15 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { effectiveOperationForObject } from '../../core/scene/effective-operation';
-import { pathFillOperations } from '../../core/scene/fill-operations';
+import { pathFillOperations, pathStylingOperation } from '../../core/scene/fill-operations';
 import { canvasTheme } from '../theme/canvas-theme';
 import { canvasVectorDisplayColor } from '../theme/canvas-vector-color';
 import { drawArtworkSprite, SPRITE_MIN_DISPLAY_SEGMENTS } from './artwork-sprite-cache';
-import { artworkStrokeWidthPx, countPolylineSegments } from './draw-complexity';
+import {
+  artworkStrokeWidthPx,
+  countPolylineSegments,
+  hairlineFrameWidthPx,
+} from './draw-complexity';
 import {
   buildDisplayPolylines,
   buildFillDisplayPolylines,
@@ -50,8 +54,11 @@ export type PathDisplay = {
   readonly operationId: string | null;
   /** The scene path drawn, for callers that need every operation bound to it. */
   readonly path: ColoredPath;
-  /** A filled path's paint under every visible Fill operation that burns it (ADR-683). */
+  /** The path's paint under every visible Fill operation that burns it (ADR-683). */
   readonly fillOperations: ReadonlyArray<FillOperationPaint>;
+  /** The contours and rule its Fill operations burn, even when it is drawn as a stroke. */
+  readonly fillDisplay: DisplayPolylines;
+  readonly fillRule: CanvasFillRule;
 };
 
 export type FillOperationPaint = {
@@ -107,8 +114,13 @@ export function resolveObjectDisplay(
   for (const [pathIndex, path] of obj.paths.entries()) {
     const resolution = sceneLayerVisibility.resolvePath(obj, path, layerByColor);
     if (!resolution.visible) continue;
-    const paint = resolvePaint(obj, path, resolution.operation, mode, palette);
+    const operation = pathStylingOperation(obj, path, layerByColor);
+    const paint = resolvePaint(obj, path, operation, mode, palette);
     const display = displayPathFor(path, obj, view, cache, paint.kind === 'fill');
+    const fillOperations =
+      mode === 'design'
+        ? fillOperationPaints(obj, path, layerByColor, palette)
+        : NO_FILL_OPERATIONS;
     displaySegmentCount += countPolylineSegments(display.polylines);
     isSimplified ||= display.isSimplified;
     // The sprite's geometry identity is the entire immutable paths array.
@@ -117,12 +129,14 @@ export function resolveObjectDisplay(
     paths.push({
       display,
       paint,
-      operationId: resolution.operation?.id ?? null,
+      operationId: operation?.id ?? null,
       path,
-      fillOperations:
-        paint.kind === 'fill'
-          ? fillOperationPaints(obj, path, layerByColor, palette)
-          : NO_FILL_OPERATIONS,
+      fillOperations,
+      fillDisplay:
+        paint.kind === 'fill' || fillOperations.length === 0
+          ? display
+          : displayPathFor(path, obj, view, cache, true),
+      fillRule: fillRuleOf(obj, path),
     });
   }
   return {
@@ -137,7 +151,8 @@ export function resolveObjectDisplay(
  * Draw a resolved object: dense objects come from their cached sprite
  * (artwork-sprite-cache.ts), everything else is painted directly. Both paths
  * run the same per-path painter, so a sprite shows exactly what a direct
- * paint would.
+ * paint would. `hairline` thins a direct paint on a moving frame; a sprite
+ * keeps its own width, because a blit costs the same either way.
  */
 export function drawObjectDisplay(
   ctx: CanvasRenderingContext2D,
@@ -145,6 +160,7 @@ export function drawObjectDisplay(
   resolved: ObjectDisplay,
   view: ViewTransform,
   requestRedraw?: () => void,
+  hairline = false,
 ): void {
   if (
     resolved.displaySegmentCount >= SPRITE_MIN_DISPLAY_SEGMENTS &&
@@ -162,7 +178,7 @@ export function drawObjectDisplay(
   ) {
     return;
   }
-  paintObjectDisplay(ctx, obj, resolved, view);
+  paintObjectDisplay(ctx, obj, resolved, view, hairline);
 }
 
 /** Paint a resolved object exactly as the workspace draws it, path by path. */
@@ -171,9 +187,11 @@ export function paintObjectDisplay(
   obj: VectorSceneObject,
   resolved: ObjectDisplay,
   view: ViewTransform,
+  hairline = false,
 ): void {
   for (const { display, paint } of resolved.paths) {
-    const widthPx = artworkStrokeWidthPx(resolved.displaySegmentCount, paint.output);
+    const width = artworkStrokeWidthPx(resolved.displaySegmentCount, paint.output);
+    const widthPx = hairline ? hairlineFrameWidthPx(width) : width;
     if (paint.kind === 'fill') {
       paintFilledGeometry(ctx, obj, display, paint, widthPx, view);
       continue;
@@ -233,10 +251,14 @@ function resolvePaint(
       kind: 'fill',
       color,
       output: effective.output,
-      fillRule: path.fillRule ?? (obj.kind === 'text' ? 'nonzero' : 'evenodd'),
+      fillRule: fillRuleOf(obj, path),
     };
   }
   return { kind: 'stroke', color, output: effective.output };
+}
+
+function fillRuleOf(obj: VectorSceneObject, path: ColoredPath): CanvasFillRule {
+  return path.fillRule ?? (obj.kind === 'text' ? 'nonzero' : 'evenodd');
 }
 
 function fillOperationPaints(

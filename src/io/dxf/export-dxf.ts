@@ -44,13 +44,16 @@ export function exportSceneDxf(
   for (const object of vectors) {
     const matrix = svgObjectMatrix(object.transform);
     for (const path of object.paths) {
-      // ADR-681: one DXF layer per operation, as LightBurn reads colours.
-      const color = colors.ofPath(object, path).toLowerCase();
-      const bucket = byColor.get(color) ?? [];
-      for (const curve of path.curves ?? path.polylines.map(polylineToCurveSubpath)) {
-        bucket.push(transformCurveSubpathExact(curve, matrix));
+      // ADR-681: one DXF layer per operation, as LightBurn reads colours, and
+      // a path on each operation it burns under (Amendment 1).
+      const curves = (path.curves ?? path.polylines.map(polylineToCurveSubpath)).map((curve) =>
+        transformCurveSubpathExact(curve, matrix),
+      );
+      const written = colors.ofPathBurns(object, path).map((color) => color.toLowerCase());
+      // Two operations of one colour share a layer: once there, or the copies cancel.
+      for (const color of new Set(written)) {
+        byColor.set(color, [...(byColor.get(color) ?? []), ...curves]);
       }
-      byColor.set(color, bucket);
     }
   }
   try {

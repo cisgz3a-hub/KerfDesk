@@ -7,6 +7,7 @@
 import type { Toolpath } from '../../core/job';
 import type { Project } from '../../core/scene';
 import type { ExecutablePlanPreviewCarrier } from './executable-plan-preview-route';
+import type { PreviewRouteSummaryCarrier } from './preview-route-summary';
 
 export type PreviewIssue =
   | { readonly kind: 'too-complex' }
@@ -28,7 +29,8 @@ export type PreviewIssue =
   | { readonly kind: 'placement-unavailable'; readonly messages: ReadonlyArray<string> };
 
 export type PreviewToolpath = Toolpath &
-  ExecutablePlanPreviewCarrier & {
+  ExecutablePlanPreviewCarrier &
+  PreviewRouteSummaryCarrier & {
     readonly previewIssue?: PreviewIssue;
   };
 

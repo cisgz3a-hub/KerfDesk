@@ -79,3 +79,7 @@ Regression tests cover the empty-contour controls and a compiled bowtie-plus-squ
 User Origin; its complete artwork anchors at zero while Frame still measures actual motion.
 The correction and closed-start route re-scoring use emitter revision
 `audit-placement-and-route-20261102-v41`. No placement policy or Frame/Start gate changes.
+
+**Amendment 2 (2026-11-02):** [an older CNC job whose Job Origin now counts more contours says how
+far its cut moved](ADR-327-amendment-2-older-cnc-jobs-say-how-far-the-cut-moved.md): fixes rolling
+audit v9 R8-P2-1.

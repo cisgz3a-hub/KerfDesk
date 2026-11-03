@@ -10,7 +10,8 @@ import { RT_SAFETY_DOOR } from '../../core/controllers/grbl/commands';
 import { HELD_RESUME_TAIL_MESSAGE } from '../../core/controllers/grblhal/held-resume-tail';
 import type { ControllerKind } from '../../core/devices';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
-import { currentHeldResumeTail } from './held-resume-tail';
+import { currentHeldResumeTail, heldResumeTailRetirementPatch } from './held-resume-tail';
+import { markMotionOperationDispatched, startMotionOperation } from './laser-motion-operation';
 import { useLaserStore } from './laser-store';
 import { captureTestLaserStartFenceAck, startTestLaserJob } from './laser-test-start-helpers';
 
@@ -140,6 +141,21 @@ describe('a Resume that leaves grblHAL Idle at the end of a job', () => {
     expect(currentHeldResumeTail(useLaserStore.getState())).toBeNull();
   });
 
+  // Rolling audit v9 R8-P2-2: retirement was recomputed from the position on
+  // every read, so a jog away and back revived the warning.
+  it('stays retired once the machine has moved, even back to the same point', async () => {
+    const connection = await pauseAndResumeTail('grblhal', '<Idle|MPos:0.600,0.000,0.000|FS:0,0>');
+    connection.emitLine('<Idle|MPos:0.600,0.000,0.000|FS:0,0>');
+    await flush();
+    expect(currentHeldResumeTail(useLaserStore.getState())).not.toBeNull();
+
+    connection.emitLine('<Jog|MPos:5.000,0.000,0.000|FS:1000,0>');
+    connection.emitLine('<Idle|MPos:0.600,0.000,0.000|FS:0,0>');
+    await flush();
+    expect(useLaserStore.getState().heldResumeTail).toBeNull();
+    expect(currentHeldResumeTail(useLaserStore.getState())).toBeNull();
+  });
+
   it('stays quiet when grblHAL answers Resume with Run', async () => {
     await pauseAndResumeTail(
       'grblhal',
@@ -151,5 +167,50 @@ describe('a Resume that leaves grblHAL Idle at the end of a job', () => {
   it('stays quiet on stock GRBL, which keeps the held block', async () => {
     await pauseAndResumeTail('grbl-v1.1', '<Idle|MPos:0.600,0.000,0.000|FS:0,0>');
     expect(useLaserStore.getState().heldResumeTail ?? null).toBeNull();
+  });
+});
+
+// A Frame returns to where it started, so no report need ever leave the
+// point. The Frame or jog the controller was sent ran the tail; so does a
+// later job (R8-P2-2).
+describe('heldResumeTailRetirementPatch', () => {
+  const tail = { sessionEpoch: 1, machinePosition: { x: 0.6, y: 0, z: 0 }, streamerEpoch: 3 };
+  const atPoint = {
+    statusReport: {
+      state: 'Idle' as const,
+      subState: null,
+      mPos: { x: 0.6, y: 0, z: 0 },
+      wPos: null,
+      wco: null,
+      feed: 0,
+      spindle: 0,
+    },
+    wcoCache: null,
+  };
+
+  it('retires on a dispatched Frame even when the head is back at the point', () => {
+    const frame = startMotionOperation('frame');
+    const dispatched = markMotionOperationDispatched(frame, 'frame', frame.operationId);
+    expect(
+      heldResumeTailRetirementPatch(
+        { heldResumeTail: tail, motionOperation: frame, streamerEpoch: 3 },
+        atPoint,
+      ),
+    ).toEqual({});
+    expect(
+      heldResumeTailRetirementPatch(
+        { heldResumeTail: tail, motionOperation: dispatched, streamerEpoch: 3 },
+        atPoint,
+      ),
+    ).toEqual({ heldResumeTail: null });
+  });
+
+  it('retires when a later job starts', () => {
+    expect(
+      heldResumeTailRetirementPatch(
+        { heldResumeTail: tail, motionOperation: null, streamerEpoch: 4 },
+        atPoint,
+      ),
+    ).toEqual({ heldResumeTail: null });
   });
 });

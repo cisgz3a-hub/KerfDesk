@@ -92,8 +92,16 @@ export function usedTools(layer: Layer, tools: ReadonlyArray<CncTool>, defaultId
       tipAngleDeg: tool.tipAngleDeg,
     }));
 }
+// Camera setup never reaches the toolpath: recalibrating a camera must not
+// mark a CNC preparation out of date (camera audit 2026-11-02).
 export function executionDevice(project: Project): unknown {
-  const { name: _name, cameraProfile: _camera, ...device } = project.device;
+  const {
+    name: _name,
+    cameraProfile: _camera,
+    cameraModel: _cameraModel,
+    otherCameraModels: _otherCameraModels,
+    ...device
+  } = project.device;
   return device;
 }
 export function hash(value: unknown): string {

@@ -111,7 +111,9 @@ describe('Preview overlay derived-work reuse', () => {
       <PreviewStatusOverlays project={outOfBoundsProject(project)} toolpath={route.toolpath} />,
     );
     expect(view.textContent).toContain('Some objects extend past the bed');
-    expect(route.reads()).toBeGreaterThan(initialReads);
+    // The route summary belongs to the route (ADR-598 Amendment 2), so a
+    // changed project refreshes its warnings without rescanning the route.
+    expect(route.reads()).toBe(initialReads);
     await renderOverlay(<PreviewStatusOverlays project={project} toolpath={route.toolpath} />);
     expect(view.textContent).toBe('');
     const failed = observedRoute(steps, {

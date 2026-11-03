@@ -16,9 +16,10 @@ import { FFMPEG_MISSING_REASON } from './ffmpeg-path.js';
 import { rtspCameraUrlPolicy } from './rtsp-camera-bridge-policy.js';
 import { RtspPreviewSessions } from './rtsp-camera-session.js';
 import { hasFfmpeg, hasFreeFfmpegSlot, streamWithFfmpeg } from './rtsp-camera-stream.js';
-import { sendRtspDescribe } from './rtsp-describe.js';
+import { probeRtsp } from './rtsp-probe.js';
 
 export { completeRtspDescribeResponse } from './rtsp-describe-response.js';
+export { RTSP_LOGIN_REFUSED_REASON, RTSP_NEEDS_LOGIN_REASON, rtspProbeIsOk } from './rtsp-probe.js';
 
 export const CAMERA_BRIDGE_PORT = 51731;
 
@@ -259,23 +260,6 @@ async function handleStream(
     onFailure: lifecycle.markFailed,
     onClosed: lifecycle.markClosed,
   });
-}
-
-async function probeRtsp(url: URL): Promise<{ readonly codec?: string }> {
-  const port = Number(url.port || '554');
-  const response = await sendRtspDescribe(url.hostname, port, url.toString());
-  if (!rtspProbeIsOk(response)) throw new Error('RTSP camera did not accept DESCRIBE.');
-  const codec = parseCodec(response);
-  return codec === undefined ? {} : { codec };
-}
-
-export function rtspProbeIsOk(response: string): boolean {
-  return /^RTSP\/\d+(?:\.\d+)?\s+200\b/i.test(response);
-}
-
-function parseCodec(response: string): string | undefined {
-  const match = /^a=rtpmap:\d+\s+([^/\r\n]+)/im.exec(response);
-  return match?.[1]?.trim();
 }
 
 function setCorsHeaders(req: IncomingMessage, res: ServerResponse, keyed: boolean): void {

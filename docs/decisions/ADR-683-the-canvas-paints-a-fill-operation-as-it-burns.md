@@ -45,7 +45,9 @@ click selection and the advisories change.
      object's contribution is what the compiler burns for it: its single even-odd path as drawn,
      or else each path resolved by its own rule and the object's paths unioned (falling back to
      the raw contours, as the compiler does, if that fails). The pool is filled once, even-odd.
-     A path bound to several Fill operations is pooled under each of them (Amendment 1).
+     A path bound to several Fill operations is pooled under each of them (Amendment 1). Who is in
+     a pool is taken from what output does: Output on, the compile run, and every operation a path
+     burns under, wherever it comes in the path's bindings (Amendment 2).
    - Only objects whose boxes overlap can change one another's parity, so an operation's objects
      are split into overlapping clusters. A lone object paints itself exactly as before, sprite
      included; a cluster is painted once, where its lowest member sits in the drawing order, and

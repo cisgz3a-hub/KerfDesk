@@ -23,6 +23,7 @@ import {
 } from '../state/autosave-durable';
 import { startAutosaveLoop, type AutosaveSnapshotFn } from '../state/autosave-loop';
 import { createAutosaveProjectSnapshot } from '../state/autosave-project-snapshot';
+import { noteProjectCopyOnDisk } from '../state/design-document-copies';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import {
@@ -94,7 +95,9 @@ export function useAutosave(): void {
       // applies once the page is unloading.
       if (snap.dirty) {
         const result = writeAutosave(snap.project);
-        if (result.kind !== 'ok') reportAutosaveFailure();
+        // Before the Studio's own last write, which records that it is held.
+        if (result.kind === 'ok') noteProjectCopyOnDisk(snap.project);
+        else reportAutosaveFailure();
       }
     };
     window.addEventListener('beforeunload', onBeforeUnload);
@@ -159,6 +162,8 @@ export async function runAutosaveRecovery(
     const loadResult = s.setProject(record.project);
     if (projectLoadRefused(loadResult)) return;
     reportRestoredProject(loadResult, record);
+    // The autosave it came from holds it until the first manual save.
+    noteProjectCopyOnDisk(useStore.getState().project);
     // M15 (AUDIT-2026-06-10): the restored project's ONLY durable copy is
     // the autosave slot. Mark it dirty so the 30 s loop, the beforeunload
     // write, and the discard confirms all stay armed — and KEEP a slot;

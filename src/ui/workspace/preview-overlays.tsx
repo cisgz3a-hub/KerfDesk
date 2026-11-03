@@ -6,7 +6,7 @@
 
 import { useMemo } from 'react';
 import { IconFrame } from '../kit/icon-frame';
-import { summarizeToolpathDistances, type Toolpath } from '../../core/job';
+import type { Toolpath } from '../../core/job';
 import type { Project } from '../../core/scene';
 // Deep type import: core/sim's public barrel is hard-capped at 20 exports by
 // its index contract, so this display-resolution type remains on a leaf path.
@@ -20,6 +20,7 @@ import type { PreviewIssue } from './preview-status';
 import { RasterPreviewDisplayBanner } from './RasterPreviewDisplayBanner';
 import { RoutePreviewDisplayBanner } from './RoutePreviewDisplayBanner';
 import { previewStatusOverlayModel } from './preview-status-overlay-model';
+import { previewRouteSummary } from './preview-route-summary';
 
 function PreviewIssueBanner(props: { readonly issue: PreviewIssue | null }): JSX.Element | null {
   if (props.issue?.kind === 'too-complex') {
@@ -106,7 +107,7 @@ export function PreviewStatsPanel(props: {
   const external = useStore((state) => state.externalGcodePreview);
   const showPreviewTravel = useUiStore((s) => s.showPreviewTravel);
   const setShowPreviewTravel = useUiStore((s) => s.setShowPreviewTravel);
-  const stats = useMemo(() => summarizeToolpathDistances(props.toolpath), [props.toolpath]);
+  const stats = useMemo(() => previewRouteSummary(props.toolpath).distances, [props.toolpath]);
   return (
     <div style={statsPanelStyle} role="group" aria-label="Preview options">
       <div style={routeLabelStyle} aria-label="Route preview scope">
@@ -176,7 +177,12 @@ export function PreviewControlsPanel(props: {
   // ADR-103 G4: present only when a CNC removal grid exists to render.
   readonly onOpen3D?: () => void;
 }): JSX.Element {
-  const passBoundaries = useMemo(() => passBoundaryFractions(props.toolpath), [props.toolpath]);
+  // CNC pass starts (downward plunges) drive the Prev/Next pass stepper;
+  // laser toolpaths have none, hiding the buttons.
+  const passBoundaries = useMemo(
+    () => previewRouteSummary(props.toolpath).passBoundaries,
+    [props.toolpath],
+  );
   return (
     <div
       style={previewControlsPanelStyle}
@@ -203,21 +209,6 @@ export function PreviewControlsPanel(props: {
       />
     </div>
   );
-}
-
-// CNC pass starts = downward plunges. Their arc-length fractions drive the
-// Prev/Next pass stepper; laser toolpaths have none, hiding the buttons.
-function passBoundaryFractions(toolpath: Toolpath): ReadonlyArray<number> {
-  if (toolpath.totalLength <= 0) return [];
-  const fractions: number[] = [];
-  let walked = 0;
-  for (const step of toolpath.steps) {
-    if (step.kind === 'plunge' && step.toZ < step.fromZ) {
-      fractions.push(walked / toolpath.totalLength);
-    }
-    walked += step.length;
-  }
-  return fractions;
 }
 
 export function PreviewRouteControls(

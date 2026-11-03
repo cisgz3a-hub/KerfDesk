@@ -282,6 +282,53 @@ export function packedStepLength(packed: PackedToolpath, index: number): number 
   return packed.stepValues[offset] ?? 0;
 }
 
+/** The step facts a whole-route summary reads (toolpath-step-facts.ts). */
+export type PackedStepFacts = {
+  kind: ToolpathStep['kind'];
+  length: number;
+  motion: 'rapid' | 'feed' | undefined;
+  descends: boolean;
+  segmentCount: number;
+};
+
+/**
+ * Fill `into` with one step's summary facts, read from the columns alone.
+ * Like packedStepLength, this exists so a walk over every step of a
+ * multi-million-step route never builds a step object or its polyline.
+ */
+export function readPackedStepFacts(
+  packed: PackedToolpath,
+  index: number,
+  into: PackedStepFacts,
+): void {
+  const kind = valueAt(packed.stepKinds, index, 'step kind');
+  const base = index * STEP_VALUE_WIDTH;
+  into.motion = undefined;
+  into.descends = false;
+  if (kind === STEP_TRAVEL) {
+    const flags = valueAt(packed.stepFlags, index, 'step flags');
+    into.kind = 'travel';
+    into.length = valueAt(packed.stepValues, base + 4, 'step');
+    if (hasFlag(flags, FLAG_MOTION)) into.motion = hasFlag(flags, FLAG_FEED) ? 'feed' : 'rapid';
+    into.segmentCount = 1;
+    return;
+  }
+  if (kind === STEP_PLUNGE) {
+    into.kind = 'plunge';
+    into.length = valueAt(packed.stepValues, base + 4, 'step');
+    into.descends =
+      valueAt(packed.stepValues, base + 3, 'step') < valueAt(packed.stepValues, base + 2, 'step');
+    into.segmentCount = 0;
+    return;
+  }
+  if (kind !== STEP_CUT) throw new Error(`Unknown packed toolpath step kind ${kind}.`);
+  const pointStart = valueAt(packed.polylineOffsets, index, 'point start');
+  const pointEnd = valueAt(packed.polylineOffsets, index + 1, 'point end');
+  into.kind = 'cut';
+  into.length = valueAt(packed.stepValues, base, 'step');
+  into.segmentCount = Math.max(0, pointEnd - pointStart - 1);
+}
+
 export function unpackToolpathStep(packed: PackedToolpath, index: number): ToolpathStep {
   const kind = valueAt(packed.stepKinds, index, 'step kind');
   const flags = valueAt(packed.stepFlags, index, 'step flags');

@@ -388,7 +388,8 @@ destination and cannot overwrite the template source.
 4. A Fill shape is solid only where it is filled. Artwork seen through one of its holes is picked
    first; clicking an empty hole selects the shape, as clicking inside a Line shape does
    (ADR-683). The same holds for a hole another shape on its Fill operation cuts, and inside
-   stacked copies that cancel (ADR-683 Amendment 1).
+   stacked copies that cancel (ADR-683 Amendment 1). In Wireframe, where nothing is filled, every
+   shape's interior lets clicks through this way (ADR-683 Amendment 2).
 
 #### Multi — shift+click
 1. Shift+click on additional object.
@@ -709,7 +710,11 @@ the linked artwork.
    on different operations fill separately. A shape given a second Fill operation (**Add
    operation**) shows filled wherever either operation burns it, and artwork drawn between
    shapes of one operation, such as a photo under a caption, keeps its place in the drawing
-   order (ADR-683 Amendment 1).
+   order (ADR-683 Amendment 1). What it shows is what the job does (ADR-683 Amendment 2): an
+   operation with Output off does not count beside one with Output on, a shape on Line then Fill
+   shows its outline and its fill (a LightBurn Cut layer with a Scan sub-layer opens this way), and
+   with two or more jig outlines each piece burns on its own, so a label on a jig copy shows
+   filled, not as a hole. Artwork on an operation with Output off still shows what it would burn.
 
 ### F-A6e. Rubber-band outline, Close Path, Reverse Direction, Delete Duplicates, Flatten Image Mask (ADR-480)
 
@@ -2108,7 +2113,9 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    a backlog in a window that was busy never delays them (ADR-676 Amendment 1). Marlin's Pause
    sends its beam-off the same way and still freezes at the line where the worker stopped. It
    may queue an `M107` or `M5 I` with nothing to switch off; Resume waits for its reply as usual
-   (ADR-676 Amendment 2).
+   (ADR-676 Amendment 2). It decides those lines before the handback, from a table of the
+   program read in slices behind Start, so a large job adds no wait before the beam-off
+   (ADR-676 Amendment 3).
 6. Browser shutdown, computer sleep and USB loss still interrupt a live serial connection.
 7. The desktop app, like Chrome, lets the window and the worker see only the ports picked in
    its Select dialog, so an identical second adapter (a laser controller and an Arduino that
@@ -9234,6 +9241,13 @@ as the pane's design record.
   the three-second status timeout can take about seven seconds. The RTSP section then shows
   **Reconnect**. Pressing it probes again and creates a fresh session. No background FFmpeg respawn
   or automatic camera reconnection runs after failure.
+- **Edge / RTSP camera with a login.** The probe's DESCRIBE request line never carries the
+  login written into the address (`rtsp://user:password@host/...`). When the camera answers 401,
+  the probe repeats DESCRIBE once on the same connection, as FFmpeg does, with an Authorization
+  header (Digest MD5, with or without qop=auth, or Basic). An address without a login gets "the camera needs a user name and
+  password"; a second 401 gets "the camera refused the user name or password". A challenge the
+  probe cannot answer (for example Digest SHA-256) still counts as a camera found, and FFmpeg logs
+  in for the preview.
 - **Edge / older bridge.** A bridge that returns a usable RTSP preview but no liveness session does
   not block the preview. The RTSP section labels it unmonitored and explains that a frozen image
   may not be detected; no session is fabricated and no automatic reconnect or probe runs.

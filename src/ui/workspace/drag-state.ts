@@ -7,13 +7,13 @@
 
 import {
   combinedBBox,
-  hitTest,
   type Project,
   type SceneObject,
   type SelectionAnchor,
   type Transform,
   type Vec2,
 } from '../../core/scene';
+import { workspaceHitTest } from './workspace-hit-test';
 import { useUiStore } from '../state/ui-store';
 import { type HandleKind, hitHandle, scaleObjectByHandleDrag } from './handles';
 import { hitAabbHandle } from './selection-handles';
@@ -193,7 +193,7 @@ export function computeMouseDownDrag(args: MouseDownDragArgs): DragState | null 
     ...(args.selectionAnchor === undefined ? {} : { selectionAnchor: args.selectionAnchor }),
   });
   if (handleDrag !== null) return handleDrag;
-  const hitId = hitTest(project.scene, point);
+  const hitId = workspaceHitTest(project.scene, point);
   if (hitId === null) {
     return { kind: 'marquee', startScenePoint: point, additive: e.shiftKey };
   }

@@ -12,6 +12,7 @@ import {
   assertManualMotionNotCancelled,
   markManualMotionStatusWaitCancellable,
 } from './manual-motion-intent';
+import { statusPredatesOriginChange } from './origin-status-fence';
 
 type GetFn = () => LaserState;
 type WriteFn = (
@@ -155,8 +156,11 @@ function freshCachedIdle(
   now: number,
 ): StatusReport | null {
   const report = state.statusReport;
+  // A report read before the last origin write holds the old work frame, so
+  // a motion that takes a position from it asks again (origin-status-fence).
   const fresh =
     report?.state === 'Idle' &&
+    !statusPredatesOriginChange(state) &&
     observation !== null &&
     observation.sessionEpoch === state.controllerSessionEpoch &&
     observation.positionEpoch === (state.trustedPositionEpoch ?? 0) &&

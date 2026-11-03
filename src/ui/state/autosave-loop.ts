@@ -17,6 +17,7 @@
 import type { Project } from '../../core/scene';
 import { AUTOSAVE_INTERVAL_MS, autosaveSlotGeneration, writeAutosave } from './autosave';
 import type { AutosaveWriteFailure, AutosaveWriteResult } from './autosave';
+import { noteProjectCopyOnDisk } from './design-document-copies';
 
 type AutosaveLoopWriteResult = AutosaveWriteResult | { readonly kind: 'superseded' };
 type AutosaveLoopWriter = (
@@ -102,7 +103,8 @@ export function startAutosaveLoop(
     const finish = (result: AutosaveLoopWriteResult): void => {
       if (result.kind !== 'superseded') {
         memo = nextTickMemo(memo, { project: snap.project, generation }, result);
-        if (result.kind !== 'ok') onWriteFailure?.(result);
+        if (result.kind === 'ok') noteProjectCopyOnDisk(snap.project);
+        else onWriteFailure?.(result);
       }
       inFlight = false;
     };

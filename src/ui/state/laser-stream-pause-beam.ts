@@ -9,6 +9,10 @@
 //    holding the refill they go out right behind the release: its reply queues
 //    behind every line the worker forwarded while this thread was busy, and
 //    meanwhile the controller can drain and stop lit (ADR-676 Amendment 2).
+//    They are decided before the release, as Abort decides its stop lines, and
+//    from what was read of the program behind Start, so nothing walks the
+//    program between the worker's last line and the beam-off (performance
+//    audit S1-P1-1, ADR-676 Amendment 3).
 //  - Resume first requires those acknowledgements: the untracked ledger can
 //    only attribute an acknowledgement owed before the stream's own lines if
 //    nothing else is owed when the stream refills. It then restates the held
@@ -17,7 +21,8 @@
 
 import type { ControllerDriver } from '../../core/controllers';
 import type { StreamPauseBeamPlan } from '../../core/controllers/controller-driver';
-import { hostedRefillArmed } from './laser-hosted-refill';
+import { isTerminal } from '../../core/controllers/grbl/streamer';
+import { hostedRefillArmed, releaseHostedRefill } from './laser-hosted-refill';
 import { startControllerCommand } from './laser-interactive-command';
 import { writeWhilePauseResumeOwner } from './laser-pause-resume-confirmation';
 import {
@@ -71,29 +76,52 @@ export function streamPausePlan(
   return driver.planStreamPauseBeam(streamer.queued, streamer.queueIndex);
 }
 
+/** Reads the started stream's beam facts in slices behind Start, one slice per
+ * task, while the job runs. A slice reads the stream current then, so the
+ * reading follows Resume's restated copy. */
+export function prepareStreamPauseBeamBehindStart(
+  get: () => LaserState,
+  driver: ControllerDriver,
+): void {
+  const prepare = driver.prepareStreamPauseBeam;
+  if (prepare === undefined) return;
+  const slice = (): void => {
+    const streamer = get().streamer;
+    if (streamer === null || isTerminal(streamer.status)) return;
+    if (!prepare(streamer.queued)) setTimeout(slice, 0);
+  };
+  setTimeout(slice, 0);
+}
+
 /** The beam-off lines that went out with the refill's release. */
 export type PostedPauseBeamOff = {
   readonly lines: ReadonlyArray<string>;
   readonly writes: Promise<ReadonlyArray<PromiseSettledResult<void>>>;
 };
 
-/** Posts any beam-off a stream-side Pause may need right behind the release of a
- * worker-held refill, so the worker writes no job line after them. The caller then
- * awaits the worker's reply: until it arrives each forwarded `ok` steps this side's
- * stream as it stepped the worker's, so Pause still freezes at the line where the
- * worker stopped, and a job line's reply cannot settle a beam-off. */
-export function postBeamOffBehindRelease(
+/** Releases a worker-held refill and posts right behind the release any beam-off
+ * a stream-side Pause may need, so the worker writes no job line after them. The
+ * lines are decided first, so nothing runs between the release and them. The
+ * caller then awaits `released`: until the worker's reply arrives each forwarded
+ * `ok` steps this side's stream as it stepped the worker's, so Pause still
+ * freezes at the line where the worker stopped, and a job line's reply cannot
+ * settle a beam-off. */
+export function releaseRefillWithBeamOff(
   context: StreamPauseBeamContext,
   driver: ControllerDriver,
-): PostedPauseBeamOff {
+): { readonly released: Promise<void>; readonly posted: PostedPauseBeamOff } {
   const streamer = context.get().streamer;
   const lines =
     streamer?.status === 'streaming' && hostedRefillArmed(context.refs)
       ? (driver.streamPauseOffLinesFrom?.(streamer.queued, streamer.queueIndex) ?? [])
       : [];
+  const released = releaseHostedRefill(context.refs);
   return {
-    lines,
-    writes: Promise.allSettled(lines.map((line) => context.safeWrite(`${line}\n`, 'pause'))),
+    released,
+    posted: {
+      lines,
+      writes: Promise.allSettled(lines.map((line) => context.safeWrite(`${line}\n`, 'pause'))),
+    },
   };
 }
 
@@ -129,7 +157,7 @@ export async function restoreStreamPauseBeam(
 ): Promise<void> {
   const plan = streamPausePlan(context.get(), driver);
   if (plan === null) return;
-  applyRestatedLine(context, plan);
+  applyRestatedLine(context, plan, driver);
   // Each restore line owes its own `ok` (source 'system'), and the stream
   // refills only once it has arrived.
   const ownedContext = {
@@ -153,7 +181,12 @@ export async function restoreStreamPauseBeam(
 
 // The held power goes on the next burn move of the queue, in place, so the
 // stream's line count (and the recovery checkpoint built on it) is unchanged.
-function applyRestatedLine(context: StreamPauseBeamContext, plan: StreamPauseBeamPlan): void {
+// What was read of the program holds for the copy.
+function applyRestatedLine(
+  context: StreamPauseBeamContext,
+  plan: StreamPauseBeamPlan,
+  driver: ControllerDriver,
+): void {
   const restated = plan.restatedLine;
   if (restated === null) return;
   context.set((state) => {
@@ -165,6 +198,7 @@ function applyRestatedLine(context: StreamPauseBeamContext, plan: StreamPauseBea
     }
     const queued = [...streamer.queued];
     queued[index] = restated.line;
+    driver.carryStreamPauseBeam?.(streamer.queued, queued);
     return { streamer: { ...streamer, queued } };
   });
 }

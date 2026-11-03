@@ -1,3 +1,4 @@
+import { cncAnchorShiftSince1028 } from '../../core/cnc/cnc-anchor-shift-since-1028';
 import { passThroughLinesUpWithScan } from '../../core/job/raster-pass-through-grid';
 import { imageScanPassRuns } from '../../core/job/scan-pass-angles';
 import { rasterScanFrame } from '../../core/raster/raster-scan-frame';
@@ -85,6 +86,7 @@ function oldProjectBurnNotice(
     uncertainFrames: uncertainFrames(version, original, project),
     movedRecords: movedRecords(version, project),
     imageDose: version < FIRST_EM_SCHEMA ? imageDoseChanges(project) : [],
+    cncJobOrigin: version < FIRST_RULE_SCHEMA ? cncJobOriginShift(project) : [],
   };
   return Object.values(notice).some((list) => list.length > 0) ? notice : undefined;
 }
@@ -99,7 +101,15 @@ export function mergedBurnNotices(
     uncertainFrames: [...first.uncertainFrames, ...second.uncertainFrames],
     movedRecords: [...first.movedRecords, ...second.movedRecords],
     imageDose: [...first.imageDose, ...second.imageDose],
+    cncJobOrigin: [...first.cncJobOrigin, ...second.cncJobOrigin].slice(0, 1),
   };
+}
+
+// Every release up to 1.0.28 (schema 19) left a crossing loop or a flat Drill
+// contour out of the Job Origin anchor (cnc-anchor-shift-since-1028.ts).
+function cncJobOriginShift(project: Project): OldProjectBurnNotice['cncJobOrigin'] {
+  const shift = cncAnchorShiftSince1028(project);
+  return shift === null ? [] : [{ xMm: shift.x, yMm: shift.y }];
 }
 
 function textObjects(project: Project): ReadonlyArray<TextObject> {

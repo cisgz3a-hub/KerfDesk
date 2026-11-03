@@ -2,6 +2,7 @@ import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { ControllerConnectionControls } from './ControllerConnectionControls';
 import { DetectedSettingsToast } from './DetectedSettingsToast';
+import { HomedBedCorrectionOffer } from './HomedBedCorrectionOffer';
 import { confirmForgetController } from './controller-connection-actions';
 import './MachineConnectionToolbar.css';
 
@@ -14,6 +15,7 @@ export function MachineConnectionToolbar(): JSX.Element {
   return (
     <section className="lf-machine-toolbar" aria-label="Machine toolbar">
       <DetectedSettingsToast />
+      <HomedBedCorrectionOffer />
       <ControllerConnectionControls
         machineKind={machineKind}
         autofocusBusy={autofocusBusy}

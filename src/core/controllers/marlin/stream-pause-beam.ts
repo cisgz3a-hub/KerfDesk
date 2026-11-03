@@ -24,32 +24,29 @@
 // a G1 after `M3 I S0` runs at 0.
 // https://github.com/MarlinFirmware/Marlin/blob/2.1.2.8/Marlin/src/module/planner.cpp#L1388-L1399
 // https://github.com/MarlinFirmware/Marlin/blob/2.1.2.8/Marlin/src/gcode/control/M3-M5.cpp#L75-L154
+//
+// A Pause does no per-line work (performance audit S1-P1-1, ADR-676
+// Amendment 3): what the program holds at a position is read from
+// stream-pause-beam-index.ts, which reads each stream once.
 
 import type { StreamPauseBeamPlan } from '../controller-driver';
+import { withPowerText, wordsForLine, type GcodeWord } from '../grbl/laser-resume-reentry';
+import type { PowerWord } from '../grbl/native-laser-resume-beam';
 import {
-  stripComments,
-  withPowerText,
-  wordsForLine,
-  type GcodeWord,
-} from '../grbl/laser-resume-reentry';
-import {
-  applyNativeBeamLine,
-  createNativeLaserBeam,
-  nativeBeamArmed,
-  type PowerWord,
-} from '../grbl/native-laser-resume-beam';
+  heldFanPower,
+  heldInlineBeam,
+  laterBeamLights,
+  lastWord,
+  marlinCommand,
+  type HeldInlineBeam,
+} from './stream-pause-beam-index';
 
-type HeldInlineBeam = {
-  /** The inline mode the program selected; M5 I leaves it. */
-  readonly mode: 'M3' | 'M4';
-  /** The inline output is enabled (M3 I / M4 I), so moves burn. */
-  readonly armed: boolean;
-  /** The power a burn move without its own S word runs at. */
-  readonly power: PowerWord | null;
-};
+export {
+  carryMarlinStreamPauseBeam,
+  prepareMarlinStreamPauseBeam,
+  prepareMarlinStreamPauseBeamSlice,
+} from './stream-pause-beam-index';
 
-// M106 without S runs the fan at full speed (M106_M107.cpp: dspeed = 255).
-const FULL_FAN: PowerWord = { value: 255, text: '255' };
 const MOVE_AXES: ReadonlySet<string> = new Set(['X', 'Y', 'Z', 'I', 'J']);
 
 /** The beam handling of a Marlin stream-side Pause at `queueIndex`, the
@@ -74,80 +71,18 @@ export function planMarlinStreamPauseBeam(
  * the lines it forwarded have not been read yet. The stop must not wait for them
  * (rolling audit v9 R1-P2-1, ADR-676 Amendment 2). A beam-off with nothing to
  * switch off costs one `ok`, and Resume re-arms only what the final position
- * held, so a line too many is harmless. */
+ * held, so a line too many is harmless. A line of the other dialect is not:
+ * Marlin without LASER_FEATURE answers `M5 I` as an unknown command, which ends
+ * the job, so each is sent only when the program uses it. */
 export function marlinStreamPauseOffLinesFrom(
   streamLines: ReadonlyArray<string>,
   queueIndex: number,
 ): ReadonlyArray<string> {
   const sent = Math.max(0, Math.min(queueIndex, streamLines.length));
-  const fan = heldFanPower(streamLines, sent) !== null || someLineFrom(streamLines, sent, litsFan);
-  const inline =
-    heldInlineBeam(streamLines, sent) !== null || someLineFrom(streamLines, sent, armsInline);
+  const later = laterBeamLights(streamLines, sent);
+  const fan = later.fan || heldFanPower(streamLines, sent) !== null;
+  const inline = later.inline || heldInlineBeam(streamLines, sent) !== null;
   return [...(fan ? ['M107'] : []), ...(inline ? ['M5 I'] : [])];
-}
-
-function someLineFrom(
-  lines: ReadonlyArray<string>,
-  from: number,
-  matches: (line: string) => boolean,
-): boolean {
-  for (let index = from; index < lines.length; index += 1) {
-    if (matches(lines[index] ?? '')) return true;
-  }
-  return false;
-}
-
-function litsFan(line: string): boolean {
-  if (!/m/i.test(line)) return false;
-  const words = wordsForLine(line);
-  const command = marlinCommand(words);
-  return (
-    command?.letter === 'M' && command.value === 106 && (lastWord(words, 'S') ?? FULL_FAN).value > 0
-  );
-}
-
-function armsInline(line: string): boolean {
-  if (!isInlineModeSwitch(line)) return false;
-  return marlinCommand(wordsForLine(line))?.value !== 5;
-}
-
-/** The fan speed the sent lines left, when it is above zero. */
-function heldFanPower(lines: ReadonlyArray<string>, sent: number): PowerWord | null {
-  for (let index = sent - 1; index >= 0; index -= 1) {
-    const line = lines[index] ?? '';
-    if (!/m/i.test(line)) continue;
-    const words = wordsForLine(line);
-    const command = marlinCommand(words);
-    if (command?.letter !== 'M') continue;
-    if (command.value === 107) return null;
-    if (command.value !== 106) continue;
-    const power = lastWord(words, 'S') ?? FULL_FAN;
-    return power.value > 0 ? power : null;
-  }
-  return null;
-}
-
-/** The inline cutter the sent lines left, or null when inline mode is off.
- * Only the lines since the last inline mode switch (M3 I, M4 I, M5 I) matter,
- * so a long job is scanned from there. */
-function heldInlineBeam(lines: ReadonlyArray<string>, sent: number): HeldInlineBeam | null {
-  let start = sent - 1;
-  while (start >= 0 && !isInlineModeSwitch(lines[start] ?? '')) start -= 1;
-  if (start < 0) return null;
-  const beam = createNativeLaserBeam('marlin-inline');
-  for (let index = start; index < sent; index += 1) {
-    const line = lines[index] ?? '';
-    applyNativeBeamLine(beam, line, wordsForLine(line));
-  }
-  if (beam.inlineMode === null) return null;
-  return { mode: beam.inlineMode, armed: nativeBeamArmed(beam), power: beam.power };
-}
-
-function isInlineModeSwitch(line: string): boolean {
-  if (!/m/i.test(line)) return false;
-  const command = marlinCommand(wordsForLine(line));
-  if (command?.letter !== 'M' || ![3, 4, 5].includes(command.value)) return false;
-  return /\bI(?=\s|$)/i.test(stripComments(line));
 }
 
 /** `M106 S<held>` when the next line is the move it must light, unless the
@@ -209,18 +144,4 @@ function movesHead(words: ReadonlyArray<GcodeWord>): boolean {
     command.value <= 3 &&
     words.some(({ letter }) => MOVE_AXES.has(letter))
   );
-}
-
-// Marlin runs one command per line: the first G or M word; the rest are its
-// parameters.
-function marlinCommand(words: ReadonlyArray<GcodeWord>): GcodeWord | null {
-  return words.find(({ letter }) => letter === 'G' || letter === 'M') ?? null;
-}
-
-function lastWord(words: ReadonlyArray<GcodeWord>, letter: string): PowerWord | null {
-  for (let index = words.length - 1; index >= 0; index -= 1) {
-    const word = words[index];
-    if (word?.letter === letter) return word;
-  }
-  return null;
 }

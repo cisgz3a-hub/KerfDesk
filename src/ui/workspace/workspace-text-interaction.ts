@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { hitTest, type Project, type TextObject } from '../../core/scene';
+import { type Project, type TextObject } from '../../core/scene';
+import { workspaceHitTest } from './workspace-hit-test';
 import { useStore } from '../state';
 import { isModalOpen, useUiStore } from '../state/ui-store';
 import {
@@ -56,7 +57,7 @@ export function workspaceTextPointerHandlers(args: TextPointerArgs): OwnedPointe
         if (position === null) return;
         event.preventDefault();
         ui.closeWorkspaceContextBar();
-        const hit = hitTest(args.project.scene, position);
+        const hit = workspaceHitTest(args.project.scene, position);
         const object = args.project.scene.objects.find((candidate) => candidate.id === hit);
         if (object?.kind === 'text') useCanvasTextStore.getState().beginEdit(object);
         else useCanvasTextStore.getState().beginAdd(position);
@@ -135,7 +136,7 @@ function openCanvasObjectEditor(
   // Numbering's clicks name a run; an editor opened now could not save.
   if (ui.artworkNumbering.kind === 'active') return;
   const point = canvasMouseToScene(event, event.currentTarget, app.project, ui);
-  const id = point === null ? null : hitTest(app.project.scene, point);
+  const id = point === null ? null : workspaceHitTest(app.project.scene, point);
   if (id === null) return;
   app.selectObject(id);
   openEditorForSelectedObject(id);

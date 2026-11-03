@@ -8,7 +8,6 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  hitTest,
   machineKindOf,
   transformedBBox,
   type Project,
@@ -16,6 +15,7 @@ import {
   type SceneObject,
   type Vec2,
 } from '../../core/scene';
+import { workspaceHitTest } from './workspace-hit-test';
 import { usePrefersReducedMotion } from '../common/use-prefers-reduced-motion';
 import { useStore } from '../state';
 import type { EditedArtwork } from '../state/artwork-color-hint';
@@ -76,7 +76,7 @@ export function ArtworkPulseOverlay(props: {
         : edited !== null
           ? { kind: 'edit', ...edited, serial: editSerial(edited) }
           : null;
-  usePulseLoop(ref, props.project, view, seed, hoveredObjectId);
+  usePulseLoop(ref, props.project, view, seed, hoveredObjectId, props.canvasHoverPaused ?? false);
   // Holding Alt shows every operation in its own colour on the canvas below;
   // a group pulsing in one shared colour would paint over exactly that.
   const peek = useUiStore((state) => state.operationColorPeek);
@@ -161,7 +161,7 @@ function useCanvasHoverObject(
     // Locked artwork still shows its settings, and must not let the piece
     // beneath it answer for it.
     dwellTimer.current = setTimeout(
-      () => setHovered(hitTest(scene, point, { includeLocked: true })),
+      () => setHovered(workspaceHitTest(scene, point, { includeLocked: true })),
       PULSE_HOVER_DWELL_MS,
     );
     return () => {
@@ -230,14 +230,15 @@ function usePulseLoop(
   view: ViewTransform,
   seed: PulseSeed | null,
   canvasObjectId: string | null,
+  held: boolean,
 ): void {
   const reducedMotion = usePrefersReducedMotion();
   const colorScheme = useCanvasColorScheme();
   const wireframe = useUiStore((state) => state.wireframeView);
   const displayMode = wireframe ? 'wireframe' : 'design';
   const [trigger] = useState(() => new PulseTrigger());
-  const latest = useRef<PulseLoopState>({ project, view, reducedMotion, displayMode });
-  latest.current = { project, view, reducedMotion, displayMode };
+  const latest = useRef<PulseLoopState>({ project, view, reducedMotion, displayMode, held });
+  latest.current = { project, view, reducedMotion, displayMode, held };
   const [loop] = useState(() =>
     createPulseLoop(() => ({
       ctx: ref.current?.getContext('2d') ?? null,
@@ -273,6 +274,8 @@ type PulseLoopState = {
   readonly view: ViewTransform;
   readonly reducedMotion: boolean;
   readonly displayMode: ObjectDisplayMode;
+  /** A drag owns the pointer: artwork it moves rests the glow (ADR-620 Amendment 1). */
+  readonly held: boolean;
 };
 
 /**
@@ -290,7 +293,8 @@ function createPulseLoop(
     const { ctx, state } = read();
     if (ctx === null) return;
     const frame = clock.frame(now, state.reducedMotion);
-    const pending = painter.draw(ctx, state.project, state.view, frame.pieces, state.displayMode);
+    const { project, view, displayMode, held } = state;
+    const pending = painter.draw(ctx, project, view, frame.pieces, displayMode, now, held);
     if (frame.busy || pending) kick();
   }
   function kick(): void {

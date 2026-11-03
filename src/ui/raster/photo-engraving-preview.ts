@@ -5,6 +5,7 @@ import {
 import { compileRasterGroupsForLayer } from '../../core/job/compile-job-raster';
 import { decodeRasterLuma } from '../../core/job/raster-luma-decode';
 import { rasterCompilationPowerScale } from '../../core/raster/controller-power-scale';
+import { createImageMaskPixelTest } from '../../core/raster/image-mask';
 import { lumaHistogram } from '../../core/raster/portrait-auto-tones';
 import { compiledRasterPreview } from '../workspace/compiled-raster-preview';
 import { photoEngravingPreviewInputError } from './photo-engraving-preview-budget';
@@ -61,7 +62,7 @@ export function computePhotoEngravingPreview(
       ...(material === null
         ? {}
         : { materialRgba: material.rgba, materialSpread: material.spread }),
-      sourceHistogram: lumaHistogram(decodeRasterLuma(input.image)),
+      sourceHistogram: burnedSourceHistogram(input),
       width: preview.width,
       height: preview.height,
       sourceWidth: preview.sourceWidth,
@@ -76,4 +77,26 @@ export function computePhotoEngravingPreview(
   } catch (cause) {
     return { kind: 'error', message: cause instanceof Error ? cause.message : String(cause) };
   }
+}
+
+// Auto tones reads the pixels that can burn. Compile whitens the pixels a mask
+// or the image's own clip keeps from burning, and white is left out of the
+// tones, so those pixels are left out here too (rolling audit v9 R8-P3-2).
+function burnedSourceHistogram(input: PhotoEngravingPreviewInput): Uint32Array<ArrayBuffer> {
+  const { image } = input;
+  const luma = decodeRasterLuma(image);
+  const maskObject =
+    image.imageMaskId === undefined
+      ? null
+      : (input.sceneObjects.find((object) => object.id === image.imageMaskId) ?? null);
+  const burns = createImageMaskPixelTest(image, maskObject, image.pixelWidth, image.pixelHeight);
+  if (burns === null) return lumaHistogram(luma);
+  const histogram = new Uint32Array(256);
+  for (let y = 0; y < image.pixelHeight; y += 1) {
+    for (let x = 0; x < image.pixelWidth; x += 1) {
+      const level = luma[y * image.pixelWidth + x];
+      if (level !== undefined && burns(x, y)) histogram[level] = (histogram[level] ?? 0) + 1;
+    }
+  }
+  return histogram;
 }

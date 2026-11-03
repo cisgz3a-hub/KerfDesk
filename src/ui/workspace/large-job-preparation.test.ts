@@ -18,6 +18,7 @@ import {
   serializeExecutablePlanPreviewRoute,
 } from './executable-plan-preview-route';
 import { buildPreviewToolpathFromPrepared } from './draw-preview';
+import { withPreviewRouteSummary } from './preview-route-summary';
 import { estimateLiveJobFromPrepared } from '../laser/live-job-estimate';
 
 describe('prepareLargeJob', () => {
@@ -47,8 +48,10 @@ describe('prepareLargeJob', () => {
       const prepared = prepareOutput(project);
       const exactProgram = emitPreparedGcode(prepared).gcode;
       expect(exactProgram.length).toBeGreaterThan(0);
-      const expectedRoute = serializeExecutablePlanPreviewRoute(
-        buildPreviewToolpathFromPrepared(project, prepared, undefined, { executablePlan: true }),
+      const expectedRoute = withPreviewRouteSummary(
+        serializeExecutablePlanPreviewRoute(
+          buildPreviewToolpathFromPrepared(project, prepared, undefined, { executablePlan: true }),
+        ),
       );
       const emit = vi.spyOn(
         kind === 'cnc' ? cncGrblStrategy : selectOutputStrategy(project.device),
@@ -90,7 +93,9 @@ describe('prepareLargeJob', () => {
     const prepared = prepareOutput(project);
     const exactProgram = emitPreparedGcode(prepared).gcode;
     expect(exactProgram.length).toBeGreaterThan(MAX_REUSABLE_PREVIEW_PROGRAM_CHARS);
-    const expectedRoute = buildPreviewToolpathFromPrepared(project, prepared);
+    const expectedRoute = withPreviewRouteSummary(
+      buildPreviewToolpathFromPrepared(project, prepared),
+    );
     const expectedEstimate = estimateLiveJobFromPrepared(prepared, undefined, { unbounded: true });
     const emit = vi.spyOn(selectOutputStrategy(project.device), 'emit');
     try {

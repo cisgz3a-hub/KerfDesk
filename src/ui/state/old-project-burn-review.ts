@@ -1,3 +1,4 @@
+import { cncAnchorShiftSince1028 } from '../../core/cnc/cnc-anchor-shift-since-1028';
 import type { Project } from '../../core/scene';
 import type { OldProjectBurnNotice } from '../../io/project/project-load-metadata';
 import { mergedBurnNotices } from '../../io/project/old-project-burn-notice';
@@ -27,6 +28,13 @@ export function oldProjectBurnReviewWarnings(project: Project): ReadonlyArray<st
     uncertainFrames: present(remembered.uncertainFrames),
     movedRecords: present(remembered.movedRecords),
     imageDose: present(remembered.imageDose),
+    cncJobOrigin: remembered.cncJobOrigin.length === 0 ? [] : liveCncJobOrigin(project),
   });
   return [...frames, ...burn];
+}
+
+// The move as the job stands now: an edit since the load can change it or end it.
+function liveCncJobOrigin(project: Project): OldProjectBurnNotice['cncJobOrigin'] {
+  const shift = cncAnchorShiftSince1028(project);
+  return shift === null ? [] : [{ xMm: shift.x, yMm: shift.y }];
 }

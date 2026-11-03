@@ -1,0 +1,45 @@
+{
+  "measuredOn": "1.0.29",
+  "burns": {
+    "pool-outer": {
+      "as-placed": {
+        "width": 40,
+        "height": 39.5,
+        "minX": 100,
+        "minY": 260,
+        "length": 3200,
+        "dose": 1280000
+      }
+    },
+    "pool-hole": {
+      "as-placed": {
+        "width": 20,
+        "height": 19,
+        "minX": 110,
+        "minY": 270.5,
+        "length": 624.268,
+        "dose": 249707.2
+      }
+    },
+    "other-operation": {
+      "as-placed": {
+        "width": 30,
+        "height": 30,
+        "minX": 125,
+        "minY": 245,
+        "length": 1799.952,
+        "dose": 449987.906
+      }
+    },
+    "whole-job": {
+      "as-placed": {
+        "width": 55,
+        "height": 54.5,
+        "minX": 100,
+        "minY": 245,
+        "length": 4375.684,
+        "dose": 1480280.706
+      }
+    }
+  }
+}

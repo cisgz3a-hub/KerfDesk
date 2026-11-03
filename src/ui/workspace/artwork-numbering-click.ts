@@ -3,7 +3,8 @@ import {
   artworkRunUnits,
   moveArtworkRunUnitsToPosition,
 } from '../../core/artwork-run-units';
-import { hitTest, type Project, type Vec2 } from '../../core/scene';
+import { type Project, type Vec2 } from '../../core/scene';
+import { workspaceHitTest } from './workspace-hit-test';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { canvasTheme } from '../theme/canvas-theme';
@@ -26,7 +27,7 @@ export function artworkNumberingHit(args: {
   readonly nextPosition: number;
   readonly assignedUnitKeys: ReadonlyArray<string>;
 }): ArtworkNumberingHit {
-  const objectId = hitTest(args.project.scene, args.point);
+  const objectId = workspaceHitTest(args.project.scene, args.point);
   if (objectId === null) return { kind: 'empty' };
   const unit = artworkRunUnitForObject(args.project.scene, objectId);
   if (unit === null) return { kind: 'empty' };

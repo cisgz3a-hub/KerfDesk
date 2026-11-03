@@ -8,6 +8,7 @@ import {
 import { controllerErrorNotice, type LaserSafetyAction } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import { mpgCommandBlockMessage, pushLog } from './laser-store-helpers';
+import { originStatusFencePatch, statusPredatesOriginChange } from './origin-status-fence';
 import type { TranscriptSource } from './laser-transcript';
 
 type SetFn = (
@@ -47,6 +48,9 @@ export async function runOriginTransaction(
     label,
   };
   let pendingLine = '';
+  // The status sequence at the last acknowledged line: reports up to it may
+  // predate the write (origin-status-fence.ts).
+  let statusFence: number | null = null;
   const { ownsTransaction, assertCurrent } = originTransactionOwner(get, refs, operation);
   set({
     controllerOperation: operation,
@@ -75,6 +79,7 @@ export async function runOriginTransaction(
         },
       );
       assertCurrent();
+      statusFence = get().statusSequence;
       // GRBL-family origin blocks select G54; the store follows the controller.
       set((state) => (ownsTransaction(state) ? acknowledgedWcsPatch(state, line, label) : {}));
     });
@@ -87,6 +92,7 @@ export async function runOriginTransaction(
       ownsTransaction(state)
         ? {
             ...patch,
+            ...(statusFence === null ? {} : originStatusFencePatch(state, patch, statusFence)),
             ...(options.changesXyOrigin === true
               ? { workOriginVersion: (state.workOriginVersion ?? 0) + 1 }
               : {}),
@@ -97,6 +103,9 @@ export async function runOriginTransaction(
           }
         : state,
     );
+    // Ask now rather than at the next idle poll, so a report in the new
+    // origin arrives within one round trip.
+    if (statusPredatesOriginChange(get())) void get().requestControllerStatus();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const failure = { error, message, label, pendingLine, operation, options };

@@ -46,7 +46,7 @@ import type { LaserTabEditor } from './laser-tab-editor';
 import type { WarpDeformRequest } from '../state/warp-deform-session';
 import { useCanvasDisplay } from './use-warp-deform-preview';
 import { useLengthUnit } from '../state/display-units';
-import type { DisplayLengthUnit } from '../display-length';
+import { useCanvasMotion } from './canvas-motion';
 
 export function Workspace(): JSX.Element {
   const ref = useRef<HTMLCanvasElement | null>(null);
@@ -61,14 +61,14 @@ export function Workspace(): JSX.Element {
   const viewState = useViewState();
   const previewToolpath = usePreviewToolpath(project, previewMode);
   const canvasMotionOverlay = useCanvasMotionOverlay(project, previewMode);
-  const jobEstimate = usePreviewEstimate();
-  usePreviewPlayback(previewMode, previewToolpath, jobEstimate);
+  const jobEstimate = usePreviewEstimatePlayback(previewMode, previewToolpath);
   const cncRemoval = useCncRemovalGridState(project, previewMode, previewToolpath, scrubberT);
   const cncRemovalGrid = cncRemoval.grid;
   const canvasSize = useCanvasBitmapSize(ref);
   const previewBitmap = usePreviewBitmapRenderer(previewMode);
   const canvas = useCanvasDisplay(project, previewMode, selectedObjectId, additionalSelectedIds);
   const { warpDeformFailure, ...display } = canvas;
+  const { handlers, dragKind } = useDragMove(ref, project, previewMode, viewState);
   useWorkspaceDraw({
     ref,
     ...display,
@@ -86,9 +86,8 @@ export function Workspace(): JSX.Element {
     canvasSize,
     previewBitmap,
     artworkRunFocus,
+    dragging: dragKind !== null,
   });
-
-  const { handlers, dragKind } = useDragMove(ref, project, previewMode, viewState);
   useWorkspaceWheelZoom(ref);
   useDropPenDraftOnProjectReplace(project);
   const dragOverlay = useUiStore((s) => s.dragOverlay);
@@ -128,6 +127,15 @@ export function Workspace(): JSX.Element {
       />
     </div>
   );
+}
+
+function usePreviewEstimatePlayback(
+  previewMode: boolean,
+  previewToolpath: ReturnType<typeof usePreviewToolpath>,
+): ReturnType<typeof usePreviewEstimate> {
+  const jobEstimate = usePreviewEstimate();
+  usePreviewPlayback(previewMode, previewToolpath, jobEstimate);
+  return jobEstimate;
 }
 
 function useWorkspaceSelection() {
@@ -241,11 +249,15 @@ type WorkspaceDrawArgs = {
   readonly canvasSize: CanvasBitmapSize;
   readonly previewBitmap: ReturnType<typeof usePreviewBitmapRenderer>;
   readonly artworkRunFocus: ReturnType<typeof useUiStore.getState>['artworkRunFocus'];
+  /** A move, scale or rotate drag is under way (ADR-346 Amendment 1). */
+  readonly dragging: boolean;
 };
 
-function useWorkspaceDraw(args: WorkspaceDrawArgs): void {
+type WorkspaceOverlayState = ReturnType<typeof useWorkspaceOverlayState>;
+
+function useWorkspaceOverlayState() {
   // Phase G (B5): the live shape being dragged out, rendered as a dashed
-  // preview. Identity changes each mouse-move, so it belongs in the deps below.
+  // preview. Identity changes each mouse-move, so it belongs in the draw deps.
   const draftShape = useUiStore((s) => s.draftShape);
   const selectionMarquee = useUiStore((s) => s.selectionMarquee);
   const snapGuides = useUiStore((s) => s.snapGuides);
@@ -258,6 +270,22 @@ function useWorkspaceDraw(args: WorkspaceDrawArgs): void {
   const wireframe = useUiStore((s) => s.wireframeView);
   const operationColors = useUiStore((s) => s.operationColorPeek);
   const lengthUnit = useLengthUnit();
+  return {
+    draftShape,
+    selectionMarquee,
+    snapGuides,
+    snapMarker,
+    gridMm,
+    measureDraft,
+    penDraft,
+    wireframe,
+    operationColors,
+    lengthUnit,
+  };
+}
+
+function useWorkspaceDraw(args: WorkspaceDrawArgs): void {
+  const overlay = useWorkspaceOverlayState();
   const [rasterRedrawTick, setRasterRedrawTick] = useState(0);
   const colorScheme = useCanvasColorScheme();
   const previewBackgroundKey = useMemo(
@@ -265,6 +293,7 @@ function useWorkspaceDraw(args: WorkspaceDrawArgs): void {
     [args.project, args.cncRemovalGrid, rasterRedrawTick, colorScheme],
   );
   const displayPolylineCache = useDisplayPolylineCache();
+  const motion = useCanvasMotion();
   const requestRasterRedraw = useCallback(() => {
     setRasterRedrawTick((tick) => tick + 1);
   }, []);
@@ -273,20 +302,19 @@ function useWorkspaceDraw(args: WorkspaceDrawArgs): void {
     if (canvas === null) return;
     const ctx = canvas.getContext('2d');
     if (ctx === null) return;
+    const drag = args.dragging || overlay.selectionMarquee !== null;
+    const viewMoving = motion.nextFrame(
+      args.viewState,
+      drag,
+      args.project,
+      overlay.selectionMarquee,
+    );
     drawWorkspaceScene(ctx, canvas, args, {
       requestRasterRedraw,
       previewBackgroundKey,
       displayPolylineCache,
-      draftShape,
-      penDraft,
-      selectionMarquee,
-      measureDraft,
-      snapGuides,
-      snapMarker,
-      gridMm,
-      wireframe,
-      operationColors,
-      lengthUnit,
+      ...overlay,
+      viewMoving,
     });
     // `args` is recreated by Workspace; its consumed fields are listed below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -309,22 +337,23 @@ function useWorkspaceDraw(args: WorkspaceDrawArgs): void {
     args.previewBitmap.drawRoute,
     args.previewBitmap.revision,
     args.artworkRunFocus,
-    measureDraft,
+    overlay.measureDraft,
     rasterRedrawTick,
     previewBackgroundKey,
     displayPolylineCache,
     args.previewToolpath,
     args.cncRemovalGrid,
     requestRasterRedraw,
-    draftShape,
-    penDraft,
-    selectionMarquee,
-    snapGuides,
-    snapMarker,
-    gridMm,
-    wireframe,
-    operationColors,
-    lengthUnit,
+    overlay.draftShape,
+    overlay.penDraft,
+    overlay.selectionMarquee,
+    overlay.snapGuides,
+    overlay.snapMarker,
+    overlay.gridMm,
+    overlay.wireframe,
+    overlay.operationColors,
+    overlay.lengthUnit,
+    motion.settledTick,
   ]);
 }
 
@@ -332,20 +361,11 @@ function drawWorkspaceScene(
   ctx: CanvasRenderingContext2D,
   canvas: HTMLCanvasElement,
   args: Parameters<typeof useWorkspaceDraw>[0],
-  state: {
+  state: WorkspaceOverlayState & {
     readonly requestRasterRedraw: () => void;
     readonly previewBackgroundKey: object;
     readonly displayPolylineCache: DisplayPolylineCache;
-    readonly draftShape: ReturnType<typeof useUiStore.getState>['draftShape'];
-    readonly penDraft: ReturnType<typeof useUiStore.getState>['penDraft'];
-    readonly selectionMarquee: ReturnType<typeof useUiStore.getState>['selectionMarquee'];
-    readonly measureDraft: ReturnType<typeof useUiStore.getState>['measureDraft'];
-    readonly snapGuides: ReturnType<typeof useUiStore.getState>['snapGuides'];
-    readonly snapMarker: ReturnType<typeof useUiStore.getState>['snapMarker'];
-    readonly gridMm: number;
-    readonly wireframe: boolean;
-    readonly operationColors: boolean;
-    readonly lengthUnit: DisplayLengthUnit;
+    readonly viewMoving: boolean;
   },
 ): void {
   drawScene(ctx, canvas.width, canvas.height, args.project, {
@@ -378,6 +398,7 @@ function drawWorkspaceScene(
     wireframe: state.wireframe,
     operationColors: state.operationColors,
     lengthUnit: state.lengthUnit,
+    viewMoving: state.viewMoving,
   });
   // Startup reveals the editor after a successful artwork/chrome paint, not
   // merely after React has inserted an empty canvas element.

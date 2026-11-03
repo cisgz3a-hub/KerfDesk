@@ -6,6 +6,7 @@ import type * as DrawPreview from './draw-preview';
 import type * as LiveEstimate from '../laser/live-job-estimate';
 import { largeJobPreparationFromPrepared } from './large-job-preparation';
 import { serializeExecutablePlanPreviewRoute } from './executable-plan-preview-route';
+import { withPreviewRouteSummary } from './preview-route-summary';
 
 const retained = vi.hoisted(() => ({ preview: false }));
 vi.mock('./draw-preview', async (original) => {
@@ -122,10 +123,12 @@ describe('large-job preparation allocation lifetime', () => {
       const duration = await vi.importActual<typeof LiveEstimate>('../laser/live-job-estimate');
       // Derive the historical route-first result independently of the guarded
       // production entry. The lifetime change must preserve its complete value.
-      const expectedToolpath = serializeExecutablePlanPreviewRoute(
-        preview.buildPreviewToolpathFromPrepared(project, prepared, undefined, {
-          executablePlan: true,
-        }),
+      const expectedToolpath = withPreviewRouteSummary(
+        serializeExecutablePlanPreviewRoute(
+          preview.buildPreviewToolpathFromPrepared(project, prepared, undefined, {
+            executablePlan: true,
+          }),
+        ),
       );
       const expectedEstimate = duration.estimateLiveJobFromPrepared(prepared, undefined, {
         unbounded: true,

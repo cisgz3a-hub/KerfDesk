@@ -19,7 +19,7 @@ export const GRBLHAL_HELD_TAIL_FIX_BUILD = 20260928;
 const VERSION_LINE = /^\[VER:\d+\.\d+[a-z]?\.(\d{8})[:\]]/;
 
 export const HELD_RESUME_TAIL_MESSAGE =
-  'Resume ended with the controller Idle before it moved again. grblHAL builds before 20260928 can keep the rest of the paused move and run it, at its laser power, when the next motion starts (grblHAL issue #1024), so the job’s last line may also be short. Reset the controller (Ctrl-X) before the next Frame, jog or job, and home it if it asks.';
+  'Resume ended with the controller Idle before it moved again. grblHAL builds before 20260928 can keep the rest of the paused move and run it, at its laser power, when the next motion starts (grblHAL issue #1024), so the job’s last line may also be short. Reset the controller (Ctrl-X) before the next Frame, jog or job, and home it if it asks. A reset also ends the current Frame, so Frame the job again before Start. Any Frame, jog or job clears this warning, because it runs whatever was held.';
 
 /** The build date a `$I` `[VER:` line reports, or null when none does. */
 export function reportedGrblBuildDate(lines: ReadonlyArray<string>): number | null {

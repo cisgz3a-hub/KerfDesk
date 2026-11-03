@@ -1,10 +1,12 @@
 // Paints the operation colour pulse (ADR-620, ADR-632 Amendment 1) on its own
 // pointer-transparent canvas above the workspace, so a pulse never redraws the
 // scene. Each piece's bitmaps (pulse-piece-bitmap.ts) are rendered once per
-// hover; a frame only blits them at an alpha, with no blur. While the view
-// zooms or pans they are drawn scaled, and re-render once it has settled.
-// Missing bitmaps render within a per-frame budget, the most visible first, so
-// pointing at one of many same-settings pieces never stalls a frame.
+// hover; a frame only blits them at an alpha, with no blur. Only pieces in view
+// are drawn, and the glow rests while the view zooms or pans: it comes back,
+// re-rendered for the new view, once the view has settled (ADR-620 Amendment 1).
+// Missing bitmaps render within a per-frame time and pixel budget, the most
+// visible first, so a large same-settings group lights over a few frames
+// instead of stalling one.
 
 import {
   operationIdsForObject,
@@ -20,6 +22,7 @@ import { createDisplayPolylineCache } from './display-polylines';
 import type { ObjectDisplayMode } from './object-display';
 import {
   pieceBitmapPixels,
+  pieceInView,
   releasePieceBitmap,
   renderPieceBitmap,
   type PieceBitmap,
@@ -33,7 +36,12 @@ const RETAINED_PIECES = 8;
 const RETAINED_PIXELS = 16_000_000;
 /** Rendering stops for the frame after this long; at least one piece always renders. */
 const RENDER_BUDGET_MS = 6;
-/** Bitmaps drawn scaled during a zoom or pan re-render once the view is still this long. */
+/**
+ * Or after this many bitmap pixels: the blurs run on the GPU after the script
+ * returns, so the time budget alone does not bound them.
+ */
+const RENDER_BUDGET_PIXELS = 1_500_000;
+/** The glow rests while the view moves, and returns once it is still this long. */
 const VIEW_SETTLE_MS = 140;
 
 type Identity = {
@@ -51,6 +59,8 @@ type Identity = {
 type CacheEntry = Identity & {
   /** The view and overlay size the bitmap was rendered for. */
   readonly viewKey: string;
+  /** The scale and overlay size alone: a whole bitmap pans as it is. */
+  readonly scaleKey: string;
   readonly bitmap: PieceBitmap | null;
 };
 
@@ -67,8 +77,6 @@ type RenderJob = {
   readonly key: string;
   readonly identity: Identity;
   readonly piece: PulsePieceFrame;
-  /** The right artwork rendered for another view: drawn scaled until it re-renders. */
-  readonly stale: PieceBitmap | null;
 };
 
 export class ArtworkPulsePainter {
@@ -84,16 +92,23 @@ export class ArtworkPulsePainter {
     { readonly layers: ReadonlyArray<Layer>; readonly ids: ReadonlyArray<string> }
   >();
   private readonly renderBudgetMs: number;
+  private readonly renderBudgetPixels: number;
   private viewKey = '';
+  private scaleKey = '';
   private viewChangedAt = Number.NEGATIVE_INFINITY;
+  private lastProject: Project | null = null;
 
-  constructor(options: { readonly renderBudgetMs?: number } = {}) {
+  constructor(
+    options: { readonly renderBudgetMs?: number; readonly renderBudgetPixels?: number } = {},
+  ) {
     this.renderBudgetMs = options.renderBudgetMs ?? RENDER_BUDGET_MS;
+    this.renderBudgetPixels = options.renderBudgetPixels ?? RENDER_BUDGET_PIXELS;
   }
 
   /**
    * Paints one frame. Returns true while a piece still waits for its bitmap,
-   * or for the view to settle, so the caller schedules another frame.
+   * or for the view to settle, so the caller schedules another frame. While
+   * the view moves, or a `held` drag moves artwork, the overlay stays clear.
    */
   draw(
     ctx: CanvasRenderingContext2D,
@@ -102,15 +117,22 @@ export class ArtworkPulsePainter {
     pieces: ReadonlyArray<PulsePieceFrame>,
     displayMode: ObjectDisplayMode = 'design',
     now: number = performance.now(),
+    held = false,
   ): boolean {
     const { width, height } = ctx.canvas;
     ctx.clearRect(0, 0, width, height);
     this.indexScene(project);
     const viewKey = `${view.scale}|${view.offsetX}|${view.offsetY}|${width}x${height}`;
     if (viewKey !== this.viewKey) {
+      // The overlay's first view is where it starts, not a move.
+      if (this.viewKey !== '') this.viewChangedAt = now;
       this.viewKey = viewKey;
-      this.viewChangedAt = now;
+      this.scaleKey = `${view.scale}|${width}x${height}`;
     }
+    // A drag that moves artwork rests the glow as a moving view does.
+    if (held && this.lastProject !== null && project !== this.lastProject) this.viewChangedAt = now;
+    this.lastProject = project;
+    if (now - this.viewChangedAt < VIEW_SETTLE_MS) return pieces.length > 0;
     const frame: FrameWork = {
       layers: project.scene.layers,
       displayMode,
@@ -119,12 +141,15 @@ export class ArtworkPulsePainter {
       jobs: [],
     };
     for (const piece of pieces) this.drawCurrent(ctx, piece, view, frame);
-    const pending = this.render(ctx, frame.jobs, view, now - this.viewChangedAt >= VIEW_SETTLE_MS);
+    const pending = this.render(ctx, frame.jobs, view);
     this.retain(frame.live);
     return pending;
   }
 
-  /** Draws the piece's bitmaps that are current for this view; queues the rest to render. */
+  /**
+   * Draws the piece's bitmaps that are current for this view; queues the rest
+   * to render. A piece out of view is skipped: it lights once it is in view.
+   */
   private drawCurrent(
     ctx: CanvasRenderingContext2D,
     piece: PulsePieceFrame,
@@ -132,7 +157,7 @@ export class ArtworkPulsePainter {
     frame: FrameWork,
   ): void {
     const object = this.objectById.get(piece.objectId);
-    if (object === undefined) return;
+    if (object === undefined || !pieceInView(object, view, ctx.canvas)) return;
     // Only the piece's own operations: a group of N same-settings imports
     // carries N operations, and pairing every piece with every one of them
     // would render N² empty bitmaps.
@@ -151,39 +176,43 @@ export class ArtworkPulsePainter {
         colorScheme: frame.colorScheme,
       };
       const cached = this.touch(key);
-      const current = cached !== undefined && sameIdentity(cached, identity);
-      if (current && cached.viewKey === this.viewKey) {
+      if (cached !== undefined && sameIdentity(cached, identity) && this.fitsView(cached)) {
         if (cached.bitmap !== null) drawPiece(ctx, cached.bitmap, piece, view);
       } else {
-        frame.jobs.push({ key, identity, piece, stale: current ? cached.bitmap : null });
+        frame.jobs.push({ key, identity, piece });
       }
     }
   }
 
+  /** Rendered for this view, or whole at this scale so a pan only moves it. */
+  private fitsView(cached: CacheEntry): boolean {
+    return (
+      cached.viewKey === this.viewKey ||
+      (cached.bitmap?.whole === true && cached.scaleKey === this.scaleKey)
+    );
+  }
+
   /**
    * Renders what is missing, the most visible piece first, until the frame's
-   * budget runs out. A piece that only needs the current view keeps drawing
-   * its scaled bitmap until the view has settled.
+   * time or pixel budget runs out. The rest light on later frames; a bitmap
+   * for an earlier view is not drawn scaled meanwhile, which would cost every
+   * waiting piece a blit on each of those frames.
    */
   private render(
     ctx: CanvasRenderingContext2D,
     jobs: ReadonlyArray<RenderJob>,
     view: ViewTransform,
-    settled: boolean,
   ): boolean {
-    const ordered = [...jobs].sort(
-      (a, b) =>
-        Number(a.stale !== null) - Number(b.stale !== null) ||
-        visibility(b.piece) - visibility(a.piece),
-    );
+    const ordered = [...jobs].sort((a, b) => visibility(b.piece) - visibility(a.piece));
     const deadline = performance.now() + this.renderBudgetMs;
     let rendered = 0;
+    let pixels = 0;
     let pending = false;
     for (const job of ordered) {
-      const inBudget = rendered === 0 || performance.now() < deadline;
-      if (!inBudget || (job.stale !== null && !settled)) {
+      const inBudget =
+        rendered === 0 || (pixels < this.renderBudgetPixels && performance.now() < deadline);
+      if (!inBudget) {
         pending = true;
-        if (job.stale !== null) drawPiece(ctx, job.stale, job.piece, view);
         continue;
       }
       const { identity } = job;
@@ -198,8 +227,10 @@ export class ArtworkPulsePainter {
         displayMode: identity.displayMode,
       });
       rendered += 1;
+      pixels += pieceBitmapPixels(bitmap);
       const replaced = this.entries.get(job.key)?.bitmap;
-      this.entries.set(job.key, { ...identity, viewKey: this.viewKey, bitmap });
+      const { viewKey, scaleKey } = this;
+      this.entries.set(job.key, { ...identity, viewKey, scaleKey, bitmap });
       if (replaced !== bitmap) releasePieceBitmap(replaced);
       if (bitmap !== null) drawPiece(ctx, bitmap, job.piece, view);
     }
@@ -288,7 +319,10 @@ function drawPiece(
   ctx.globalAlpha = 1;
 }
 
-/** Draws a bitmap where it belongs in `view`, scaled when it was rendered for another view. */
+/**
+ * Draws a bitmap where it belongs in `view`, moved by the pan since it was
+ * rendered. Only bitmaps rendered at this scale are drawn (`fitsView`).
+ */
 function blit(
   ctx: CanvasRenderingContext2D,
   bitmap: PieceBitmap,
@@ -299,16 +333,9 @@ function blit(
   if (!(alpha > 0)) return;
   ctx.globalAlpha = Math.min(1, alpha);
   const from = bitmap.view;
-  if (from.scale === view.scale && from.offsetX === view.offsetX && from.offsetY === view.offsetY) {
-    ctx.drawImage(placed.canvas, placed.left, placed.top);
-    return;
-  }
-  const k = view.scale / from.scale;
   ctx.drawImage(
     placed.canvas,
-    view.offsetX + (placed.left - from.offsetX) * k,
-    view.offsetY + (placed.top - from.offsetY) * k,
-    placed.canvas.width * k,
-    placed.canvas.height * k,
+    placed.left + view.offsetX - from.offsetX,
+    placed.top + view.offsetY - from.offsetY,
   );
 }

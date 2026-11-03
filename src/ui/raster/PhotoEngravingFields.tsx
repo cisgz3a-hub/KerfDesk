@@ -28,6 +28,8 @@ type PhotoEngravingFieldsProps = {
   readonly recipeId: string | null;
   readonly onRecipe: (recipeId: string | null) => void;
   readonly autoTonesReady: boolean;
+  /** A recipe's Auto tones still wait for the preview's histogram. */
+  readonly recipeTonesPending?: boolean;
   readonly onAutoTones: () => void;
   readonly spotSizeMm?: { readonly x: number; readonly y: number } | undefined;
   /** From the photo's stored mode, so Grayscale stays offered after another is picked. */
@@ -114,11 +116,16 @@ function PhotoRecipeField(props: PhotoEngravingFieldsProps): JSX.Element {
       <p className="lf-photo-engraving__hint">
         {recipe === null
           ? 'Sets the marking, Blue Noise dots, auto tones and a light sharpen for a portrait on that material. Power, speed and DPI stay yours to test.'
-          : `${recipe.note}${recipe.mirror ? ' Flip the photo horizontally on the canvas before burning, because you view it through the material.' : ''}${props.autoTonesReady ? '' : ' Auto tones apply once the preview has read the photo.'}`}
+          : `${recipe.note}${recipe.mirror ? ' Flip the photo horizontally on the canvas before burning, because you view it through the material.' : ''}${recipe.lightMarks ? LIGHT_MARKS_BACKGROUND : ''}${props.recipeTonesPending === true ? ' Auto tones apply once the preview has read the photo.' : ''}`}
       </p>
     </>
   );
 }
+
+// Light marks invert the photo, so a background removed to white burns solid
+// (rolling audit v9 R8-P3-1). A mask leaves it unburned.
+const LIGHT_MARKS_BACKGROUND =
+  ' A background removed to white burns solid with light marks: draw a closed shape around the subject and use Tools → Apply Mask to Image instead.';
 
 function PhotoToneFields(props: PhotoEngravingFieldsProps): JSX.Element {
   const { draft, onChange } = props;

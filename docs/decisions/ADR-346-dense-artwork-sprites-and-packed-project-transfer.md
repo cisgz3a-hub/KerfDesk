@@ -1,6 +1,6 @@
 ## ADR-346 - Dense artwork is blitted from cached sprites, and projects cross worker boundaries as packed geometry (2026-09-22)
 
-**Status:** Accepted; browser-measured on one laptop, hardware qualification not applicable. | **Date:** 2026-09-22
+**Status:** Accepted; browser-measured on one laptop, hardware qualification not applicable. Decision 2 extended to moving frames by ADR-346 Amendment 1. | **Date:** 2026-09-22
 
 ### Context
 

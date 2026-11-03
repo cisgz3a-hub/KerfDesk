@@ -19,7 +19,7 @@ export function HeldResumeTailNotice(props: { readonly onReset: () => void }): J
         type="button"
         onClick={props.onReset}
         disabled={busy}
-        title="Send Ctrl-X soft reset. It empties the controller's motion buffer; home again if the controller asks."
+        title="Send Ctrl-X soft reset. It empties the controller's motion buffer and ends the current Frame, so Frame again before Start; home again if the controller asks."
       >
         Reset (Ctrl-X)
       </button>

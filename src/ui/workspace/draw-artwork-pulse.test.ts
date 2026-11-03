@@ -209,25 +209,106 @@ describe('ArtworkPulsePainter (ADR-620)', () => {
     expect(shadowBlurs()).toEqual([]);
   });
 
-  it('draws its bitmaps scaled while the view moves, and re-renders once it settles', () => {
+  it('rests the glow while the view zooms, and re-renders it once the view settles', () => {
     const { project } = repeatedImports(2);
-    const { ctx, drawArgs } = recordingContext();
+    const { ctx, drawImages, drawArgs } = recordingContext();
     const created = vi.spyOn(document, 'createElement');
     // Both bitmaps exist after the first draw, however slow the machine.
     const painter = new ArtworkPulsePainter({ renderBudgetMs: Infinity });
     const pieces = [pulse('piece-0', 'op-0'), pulse('piece-1', 'op-1')];
     painter.draw(ctx, project, view, pieces, 'design', 0);
+    expect(drawImages()).toBe(2);
     created.mockClear();
     const zoomed = { scale: 1.5, offsetX: -20, offsetY: 4 };
-    // Zooming: the cached bitmaps stretch into place and nothing re-renders.
+    // ADR-620 Amendment 1: while the view moves, nothing is drawn or rendered.
     expect(painter.draw(ctx, project, zoomed, pieces, 'design', 16)).toBe(true);
     expect(painter.draw(ctx, project, zoomed, pieces, 'design', 100)).toBe(true);
     expect(created).not.toHaveBeenCalled();
-    expect(drawArgs().slice(-2)).toEqual([5, 5]);
-    // Once the view has been still long enough, both re-render sharp.
+    expect(drawImages()).toBe(2);
+    // Once the view has been still long enough, both re-render for it, unscaled.
     expect(painter.draw(ctx, project, zoomed, pieces, 'design', 400)).toBe(false);
     expect(created.mock.calls.filter(([tag]) => tag === 'canvas')).toHaveLength(8);
     expect(drawArgs().slice(-2)).toEqual([3, 3]);
+  });
+
+  it('rests the glow while a held drag moves artwork, and not for an edit without a drag', () => {
+    const { project } = repeatedImports(2);
+    const { ctx, drawImages } = recordingContext();
+    const painter = new ArtworkPulsePainter({ renderBudgetMs: Infinity });
+    const pieces = [pulse('piece-0', 'op-0'), pulse('piece-1', 'op-1')];
+    painter.draw(ctx, project, view, pieces, 'design', 0, true);
+    expect(drawImages()).toBe(2);
+    // Each drag step is a new project: the overlay stays clear meanwhile.
+    const steps = [{ ...project }, { ...project }];
+    expect(painter.draw(ctx, steps[0] as Project, view, pieces, 'design', 16, true)).toBe(true);
+    expect(painter.draw(ctx, steps[1] as Project, view, pieces, 'design', 32, true)).toBe(true);
+    expect(drawImages()).toBe(2);
+    // Held still long enough, the glow returns.
+    painter.draw(ctx, steps[1] as Project, view, pieces, 'design', 400, true);
+    expect(drawImages()).toBe(4);
+    // A change with no drag (a typed width) keeps the glow on.
+    painter.draw(ctx, { ...project }, view, pieces, 'design', 416);
+    expect(drawImages()).toBe(6);
+  });
+
+  it('moves whole bitmaps after a pan instead of rendering them again', () => {
+    const { project } = repeatedImports(3);
+    const { ctx, drawImages } = recordingContext();
+    const painter = new ArtworkPulsePainter({ renderBudgetMs: Infinity });
+    const pieces = project.scene.objects.map((object, index) => pulse(object.id, `op-${index}`));
+    painter.draw(ctx, project, view, pieces, 'design', 0);
+    const painted = vi.spyOn(objectDisplay, 'paintObjectDisplay');
+    const panned = { ...view, offsetX: 40, offsetY: 20 };
+    painter.draw(ctx, project, panned, pieces, 'design', 16);
+    expect(painter.draw(ctx, project, panned, pieces, 'design', 400)).toBe(false);
+    expect(painted).not.toHaveBeenCalled();
+    expect(drawImages()).toBe(3 + 3);
+  });
+
+  it('lights every same-settings piece in view and none outside it', () => {
+    // 60 pieces 10 mm apart on an 800 px overlay at 2 px/mm: the first 41
+    // reach into view (piece 40 starts at 800 px, inside its 8 px padding).
+    const { project, layers } = repeatedImports(60);
+    const colorSources = new Map(layers.map((layer) => [layer.id, 'op-0']));
+    const pieces = project.scene.objects.map((object) => ({
+      ...pulse(object.id, object.operationIds?.[0] ?? ''),
+      colorSources,
+    }));
+    const painted = vi.spyOn(objectDisplay, 'paintObjectDisplay');
+    const { ctx, drawImages } = recordingContext();
+    const painter = new ArtworkPulsePainter({ renderBudgetMs: Infinity });
+    const scaled = { scale: 2, offsetX: 0, offsetY: 0 };
+
+    expect(painter.draw(ctx, project, scaled, pieces)).toBe(false);
+
+    const inView = Array.from({ length: 41 }, (_, index) => `piece-${index}`);
+    expect(painted.mock.calls.map(([, object]) => object.id).sort()).toEqual([...inView].sort());
+    // One blit per piece (colour only in this frame), every one of them in view.
+    expect(drawImages()).toBe(41);
+  });
+
+  it('bounds the bitmap pixels it renders per frame, so a large group lights over frames', () => {
+    const count = 40;
+    const { project } = repeatedImports(count);
+    const pieces = project.scene.objects.map((object, index) => pulse(object.id, `op-${index}`));
+    const painted = vi.spyOn(objectDisplay, 'paintObjectDisplay');
+    const { ctx } = recordingContext();
+    // One piece's bitmaps are about 8,000 pixels at this scale: four fit.
+    const painter = new ArtworkPulsePainter({
+      renderBudgetMs: Infinity,
+      renderBudgetPixels: 30_000,
+    });
+    const perFrame: number[] = [];
+    let pending = true;
+    for (let frame = 0; pending && frame < 50; frame += 1) {
+      painted.mockClear();
+      pending = painter.draw(ctx, project, view, pieces);
+      perFrame.push(painted.mock.calls.length);
+    }
+    expect(pending).toBe(false);
+    expect(perFrame.reduce((sum, rendered) => sum + rendered, 0)).toBe(count);
+    expect(perFrame.length).toBeGreaterThan(2);
+    expect(Math.max(...perFrame)).toBeLessThan(count / 2);
   });
 
   it('renders new pieces within the frame budget, the most visible first', () => {

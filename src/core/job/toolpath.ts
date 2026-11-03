@@ -28,6 +28,7 @@ import {
 } from './toolpath-cnc';
 import { appendTravelStep, dist, polylineLength } from './toolpath-math';
 import { appendRasterGroupSteps } from './toolpath-raster-steps';
+import { visitToolpathStepFacts } from './toolpath-step-facts';
 import type {
   BuildToolpathOptions,
   Toolpath,
@@ -198,11 +199,11 @@ export function summarizeToolpathDistances(toolpath: Toolpath): ToolpathDistance
   let cutMm = 0;
   let travelMm = 0;
   let plungeMm = 0;
-  for (const step of toolpath.steps) {
+  visitToolpathStepFacts(toolpath.steps, (step) => {
     if (step.kind === 'cut') cutMm += step.length;
     else if (step.kind === 'plunge') plungeMm += step.length;
     else travelMm += step.length;
-  }
+  });
   return { cutMm, travelMm, plungeMm, totalMm: cutMm + travelMm + plungeMm };
 }
 

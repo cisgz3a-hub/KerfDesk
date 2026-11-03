@@ -186,6 +186,16 @@ export type ControllerDriver = {
     streamLines: ReadonlyArray<string>,
     queueIndex: number,
   ) => ReadonlyArray<string>;
+  /** Reads one slice of what the two above need from a stream, so a Pause does
+   *  no per-line work; true once nothing is left. Unread lines are read by the
+   *  call that needs them, so the answers never depend on how far this got. */
+  readonly prepareStreamPauseBeam?: (streamLines: ReadonlyArray<string>) => boolean;
+  /** `restated` is `streamLines` with the plan's `restatedLine` in place: what
+   *  was read for one holds for the other. */
+  readonly carryStreamPauseBeam?: (
+    streamLines: ReadonlyArray<string>,
+    restated: ReadonlyArray<string>,
+  ) => void;
   /** Present when the firmware can run without its laser output module. */
   readonly laserModuleProbe?: LaserModuleProbe;
   /** Present when the firmware's Home answers `ok` whether or not anything
