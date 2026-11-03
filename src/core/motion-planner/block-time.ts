@@ -21,8 +21,10 @@ type SinglePhaseElapsedTimeInput = {
 
 // Generalized trapezoidal time from v_entry through optional v_peak
 // to v_exit over a given distance, capped at v_target.
+// Reads only the distance and target speed, so a columnar plan can pass just
+// those; a whole Block (or a literal of one) is still accepted.
 export function blockTime(
-  block: Pick<Block, 'distance' | 'targetVelocity'>,
+  block: Pick<Block, 'distance' | 'targetVelocity'> & Partial<Block>,
   entryV: number,
   exitV: number,
   accel: number,
