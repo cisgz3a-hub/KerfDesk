@@ -28,7 +28,8 @@ for a screen reader while a dialog is open.
 1. **The bar is not a live region.** One always-mounted polite region (`LiveMotionAnnouncer.tsx`)
    speaks only changes of the bar's heading (job running, paused, resumed, a hold and why, machine
    finishing, framing, laser on) and, while the job runs, its progress at each 10 %. When a job
-   ends it says aborted, finished, or that the controller disconnected. An assertive region says
+   ends it says aborted, finished, or that the controller disconnected or reported an error, read
+   from the streamer's last status or else the run record (`liveCanvasRun.lifecycle`). An assertive region says
    when an alarm stops what the bar showed. The status bar's run line is no longer `role="status"`
    while a run is shown; its idle cautions still are.
 2. **A modal hides what is behind it from assistive technology** (`hide-outside-modal.ts`):

@@ -11,6 +11,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { StreamerStatus } from '../../core/controllers/grbl';
 import { MODAL_REACHABLE_ATTRIBUTE } from '../common/hide-outside-modal';
+import type { LiveCanvasLifecycle } from '../state/canvas-motion-plan';
 import { useLaserStore } from '../state/laser-store';
 import { streamProgressPercent, type LiveStreamProgress } from './use-live-stream-progress';
 
@@ -61,6 +62,8 @@ export function nextLiveMotionAnnouncement(
   previous: LiveMotionAnnounced,
   shown: LiveMotionShown | null,
   progress: LiveStreamProgress,
+  /** How the store's run record says the job ended, when it has. */
+  runLifecycle: LiveCanvasLifecycle | null,
 ): { readonly announced: LiveMotionAnnounced; readonly text: string | null } {
   const job = shown?.job === true;
   const decile = job ? progressDecile(progress) : 0;
@@ -71,7 +74,8 @@ export function nextLiveMotionAnnouncement(
     lastJobStatus: job ? progress.status : previous.lastJobStatus,
     decile: continuing ? Math.max(previous.decile, decile) : decile,
   };
-  const ending = previous.job && !job ? jobEnding(previous.lastJobStatus, progress.status) : null;
+  const ending =
+    previous.job && !job ? jobEnding(previous.lastJobStatus, progress.status, runLifecycle) : null;
   const change = stateChange(previous, shown, progress, continuing && decile > previous.decile);
   const parts = [ending, change].filter((part): part is string => part !== null);
   return { announced, text: parts.length === 0 ? null : parts.join('. ') };
@@ -104,11 +108,25 @@ function headingSentence(shown: LiveMotionShown, previousHeading: string | null)
   return shown.spokenDetail === null ? heading : `${heading}. ${shown.spokenDetail}`;
 }
 
-function jobEnding(lastJobStatus: StreamerStatus | null, status: StreamerStatus | null): string {
+const RUN_ENDINGS: Partial<Record<LiveCanvasLifecycle, string>> = {
+  finished: 'Job finished',
+  stopped: 'Job aborted',
+  disconnected: 'Job stopped: the controller disconnected',
+  errored: 'Job stopped: the controller reported an error',
+};
+
+// A finished stream can go from streaming to released between two renders,
+// so the run record, settled in the same Idle update, names the ending.
+function jobEnding(
+  lastJobStatus: StreamerStatus | null,
+  status: StreamerStatus | null,
+  runLifecycle: LiveCanvasLifecycle | null,
+): string {
   if (status === 'cancelled') return 'Job aborted';
-  if (status === 'disconnected') return 'Job stopped: the controller disconnected';
-  if (lastJobStatus === 'done') return 'Job finished';
-  return 'Job ended';
+  if (status === 'disconnected') return RUN_ENDINGS.disconnected ?? '';
+  const recorded = runLifecycle === null ? undefined : RUN_ENDINGS[runLifecycle];
+  if (recorded !== undefined) return recorded;
+  return lastJobStatus === 'done' ? 'Job finished' : 'Job ended';
 }
 
 function sentenceCase(heading: string): string {
@@ -142,19 +160,20 @@ function usePoliteAnnouncement(
 ): Spoken | null {
   const announced = useRef(NOTHING_ANNOUNCED);
   const [spoken, setSpoken] = useState<Spoken | null>(null);
+  const runLifecycle = useLaserStore((state) => state.liveCanvasRun?.lifecycle ?? null);
   // By value: the bar builds a fresh description on every render.
   const heading = shown?.heading ?? null;
   const spokenDetail = shown?.spokenDetail ?? null;
   const job = shown?.job === true;
   useEffect(() => {
     const current = heading === null ? null : { heading, spokenDetail, job };
-    const next = nextLiveMotionAnnouncement(announced.current, current, progress);
+    const next = nextLiveMotionAnnouncement(announced.current, current, progress, runLifecycle);
     announced.current = next.announced;
     const text = next.text;
     if (text === null) return;
     // A fresh node each time, so a repeated sentence is spoken again.
     setSpoken((previous) => ({ text, serial: (previous?.serial ?? 0) + 1 }));
-  }, [heading, spokenDetail, job, progress]);
+  }, [heading, spokenDetail, job, progress, runLifecycle]);
   return spoken;
 }
 

@@ -52,7 +52,7 @@ function sequence(
 ): Array<string | null> {
   let announced: LiveMotionAnnounced = NOTHING_ANNOUNCED;
   return steps.map(([shown, value]) => {
-    const next = nextLiveMotionAnnouncement(announced, shown, value);
+    const next = nextLiveMotionAnnouncement(announced, shown, value, null);
     announced = next.announced;
     return next.text;
   });
@@ -103,6 +103,20 @@ describe('nextLiveMotionAnnouncement', () => {
         ],
       ]),
     ).toEqual(['Job running', 'Job aborted. Laser on. The controller reports the laser on']);
+  });
+
+  it('takes the ending from the run record when the streamer is released at once', () => {
+    const started = nextLiveMotionAnnouncement(
+      NOTHING_ANNOUNCED,
+      running,
+      progress('streaming', 40),
+      null,
+    );
+    const end = (lifecycle: 'finished' | 'errored' | null): string | null =>
+      nextLiveMotionAnnouncement(started.announced, null, progress(null, 0, 0), lifecycle).text;
+    expect(end('finished')).toBe('Job finished');
+    expect(end('errored')).toBe('Job stopped: the controller reported an error');
+    expect(end(null)).toBe('Job ended');
   });
 
   it('names why a job is held, once', () => {
