@@ -2,6 +2,8 @@
 
 **Requested:** the maintainer, on 2026-11-03: "next loop. different loop. different area", choosing **New-user experience** from the options offered. The performance audit S1 is paused after its third area ([PR #1553](../2026-11-02-performance-s1/LEDGER.md)).
 
+**Status:** done 2026-11-03; all eight areas ledgered (P1 3 / P2 16 / P3 68). See [LEDGER.md](LEDGER.md#round-summary-2026-11-03).
+
 **The question:** can someone who has never used KerfDesk or LightBurn install it, set up their machine, make a first design and burn it, safely, by following only what the app tells them? Where do they get stuck, misled or put at risk?
 
 Finding IDs are `U<area>-P<n>-<k>`. Temp files are `zz-u<N>-*`, and refuter files `zz-u<N>r-*`.
