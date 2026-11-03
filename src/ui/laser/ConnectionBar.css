@@ -164,6 +164,18 @@
   margin: 0;
 }
 
+.lf-connection-driver-mismatch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  max-width: 520px;
+  margin: 0;
+  color: var(--lf-warning-fg);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
 .lf-connection-machine-popover {
   display: grid;
   gap: 10px;

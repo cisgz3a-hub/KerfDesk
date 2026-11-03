@@ -3,6 +3,8 @@ import type { OutputCompilationProgress } from '../../io/gcode/prepare-output-as
 import { Icon } from '../kit/icons';
 import { jobTimeNoun } from '../machine/machine-labels';
 import { useStore } from '../state';
+import { useLaserStore } from '../state/laser-store';
+import { CONNECT_MACHINE_FIRST } from '../state/status-unknown-message';
 import { isFramedRunCandidate } from '../state/framed-run';
 import {
   cancelOwnedFramePreparation,
@@ -90,6 +92,7 @@ function useJobActionModel(props: { readonly disabled: boolean; readonly streami
   const app = useExecutionSignatureAppState();
   const laser = useFramedRunLaserState();
   const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
+  const connected = useLaserStore((s) => s.connection.kind === 'connected');
   const estimate = useJobEstimate();
   const framePending = useFramePreparationStore((state) => state.pending);
   const progress = useFramePreparationStore((state) => state.progress);
@@ -104,7 +107,7 @@ function useJobActionModel(props: { readonly disabled: boolean; readonly streami
   const frame = currentCompletedFrame(laser);
   const framedRunIssue = framedRunReadinessIssue(frame, app, laser);
   const framedReady = framedRunIssue === null;
-  const frameControl = frameControlProps(busy, laser.statusReport?.state);
+  const frameControl = frameControlProps(busy, laser.statusReport?.state, connected);
   return {
     onFrame,
     framedRunIssue,
@@ -121,7 +124,9 @@ function useJobActionModel(props: { readonly disabled: boolean; readonly streami
       disabled: busy || !framedReady,
       title: framedReady
         ? startJobTitle(estimate, jobTimeNoun(machineKind))
-        : 'Start unlocks after a clean Frame of this footprint and placement. Press Frame job first.',
+        : connected
+          ? 'Start unlocks after a clean Frame of this footprint and placement. Press Frame job first.'
+          : `${CONNECT_MACHINE_FIRST} Then Frame the job; Start unlocks after a clean Frame.`,
     },
     statusText: framedRunStatusText({
       frameActive,
@@ -224,7 +229,9 @@ function framedRunStatusText(args: {
 // Alarm stays pressable: Frame offers Home or Unlock in place
 // (frame-blocker-repair). Every other non-Idle state has no in-place fix, so
 // the button waits for the controller instead of refusing after a click.
-function frameControlProps(busy: boolean, state: string | undefined) {
+// With no machine connected nothing will report, so the hint says to connect
+// rather than to wait (UX audit U1-P2-4).
+export function frameControlProps(busy: boolean, state: string | undefined, connected: boolean) {
   const ready = state === 'Idle' || state === 'Alarm';
   return {
     disabled: busy || !ready,
@@ -233,7 +240,7 @@ function frameControlProps(busy: boolean, state: string | undefined) {
         ? "Trace the job's generated motion envelope with the tool off. A clean Frame stays valid while its footprint and placement remain unchanged."
         : state === 'Alarm'
           ? 'The controller is in Alarm. Frame offers Home or Unlock first.'
-          : frameBlockedTitle(state),
+          : frameBlockedTitle(state, connected),
   };
 }
 
@@ -262,7 +269,10 @@ function preparingFrameStatusText(
   return `${lead} — ${phase} ${progress.completed}/${progress.total}…`;
 }
 
-function frameBlockedTitle(state: string | undefined): string {
+function frameBlockedTitle(state: string | undefined, connected: boolean): string {
+  if (!connected) {
+    return `${CONNECT_MACHINE_FIRST} Frame then traces the job outline with the laser off.`;
+  }
   if (state === undefined) return 'Wait for an Idle status report before framing.';
   return `Machine must be Idle before framing (currently ${state}).`;
 }

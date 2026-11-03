@@ -200,6 +200,30 @@ describe('compact machine connection', () => {
     expect(document.querySelector('[aria-label="Machine details"]')).toBeNull();
     expect(button(host, 'Disconnect')).toBeInstanceOf(HTMLButtonElement);
   });
+
+  it('offers Reconnect now while the live driver is not the profile’s (U2-P2-1)', async () => {
+    const onReconnect = vi.fn();
+    const text = 'Connected with the generic GRBL v1.1 commands. This machine uses …';
+    const host = await renderBar({
+      machineName: 'Creality Falcon A1 Pro (connected with GRBL v1.1 commands)',
+      connection: { kind: 'connected' },
+      driverMismatch: { text, onReconnect },
+    });
+    expect(machineTrigger(host)?.getAttribute('aria-label')).toBe(
+      'Machine details: Creality Falcon A1 Pro (connected with GRBL v1.1 commands)',
+    );
+    expect(host.querySelector('.lf-connection-driver-mismatch')?.textContent).toContain(text);
+    await act(async () => button(host, 'Reconnect now')?.click());
+    expect(onReconnect).toHaveBeenCalledOnce();
+
+    await renderBar(
+      { connection: { kind: 'connected' }, disabled: true, driverMismatch: { text, onReconnect } },
+      host,
+    );
+    expect(button(host, 'Reconnect now')?.disabled).toBe(true);
+    await renderBar({ connection: { kind: 'connected' } }, host);
+    expect(button(host, 'Reconnect now')).toBeUndefined();
+  });
 });
 
 let mountedRoot: Root | null = null;

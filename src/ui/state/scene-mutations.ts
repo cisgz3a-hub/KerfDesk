@@ -36,6 +36,7 @@ import { applyFreshTraceScanDirection } from './fresh-trace-scan-direction';
 import { positionTraceOverRasterSource } from './trace-placement';
 import { pushUndo } from './undo-stack';
 import type { BedFit } from '../../core/scene/fit-to-bed';
+import type { WhiteKnockout } from '../../core/geometry/white-fill-knockout';
 import { pruneSceneObjectOperationOverrides } from '../../core/scene/operation-binding';
 import { textTabAnchorsAfterEdit } from '../../core/text/text-edit-tab-anchors';
 import { withColourLayerPowers, type ColourLayerCommit } from '../../core/trace/colour-layer-power';
@@ -53,6 +54,8 @@ export type ImportOutcome =
       readonly kind: 'added';
       // Present only when art larger than the bed was scaled down to fit it.
       readonly bedFit?: BedFit;
+      // Present only when white fills were cut out of the fills under them (ADR-686).
+      readonly whiteKnockout?: WhiteKnockout;
     }
   | {
       readonly kind: 'replaced';
@@ -60,6 +63,7 @@ export type ImportOutcome =
       readonly kept: number;
       readonly added: number;
       readonly removed: number;
+      readonly whiteKnockout?: WhiteKnockout;
     };
 
 // Minimal slice of AppState these helpers need. Avoids a circular

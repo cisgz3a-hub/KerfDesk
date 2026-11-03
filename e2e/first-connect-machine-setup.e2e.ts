@@ -60,13 +60,41 @@ test('first explicit Connect opens Machine setup, connects, and saved catalog se
   });
   await profile.check();
   await expect(profile).toBeChecked();
+  // Connect bound the starter's stock GRBL driver. Review says Save switches
+  // it instead of calling the setup internally consistent (U2-P2-1).
+  await setup.getByRole('button', { name: 'Go to step 3: Review & save', exact: true }).click();
+  await expect(setup.getByRole('status').filter({ hasText: 'Ready to save' })).toContainText(
+    'Saving reconnects to use them',
+  );
+  await expect(setup).not.toContainText('internally consistent');
   await saveSetup(setup);
   const details = toolbar.getByRole('button', { name: /^Machine details:/ });
-  await expect(details).toHaveAccessibleName(/Creality Falcon A1 Pro/);
+  await expect(details).toHaveAccessibleName(
+    'Machine details: Creality Falcon A1 Pro (vendor command set)',
+  );
   await expect(details).toHaveAccessibleDescription('Connected');
+  await expect(toolbar.getByRole('button', { name: 'Reconnect now', exact: true })).toHaveCount(0);
+  await expect
+    .poll(async () => (await kerfdesk.events()).filter((e) => e.kind === 'serial-open').length)
+    .toBe(2);
   const saved = await configuredSignatures(page);
   expect(saved).toHaveLength(1);
   expect(saved[0]).toContain('358x268');
+
+  // Home now uses the saved Falcon A1 Pro's own cycle, not stock GRBL's $H.
+  const beforeHome = (await kerfdesk.events()).length;
+  await page.getByRole('tab', { name: 'Machine', exact: true }).click();
+  const home = page.getByRole('button', { name: 'Home', exact: true });
+  await expect(home).toBeEnabled({ timeout: 10_000 });
+  await home.click();
+  const homeWrites = async (): Promise<string> =>
+    (await kerfdesk.events())
+      .slice(beforeHome)
+      .filter((event) => event.kind === 'serial-write')
+      .map((event) => String(event['text']))
+      .join('');
+  await expect.poll(homeWrites).toMatch(/\$HX\n[\s\S]*\$HY\n/);
+  expect(await homeWrites()).not.toMatch(/(?:^|\n)\$H\n/);
 
   await toolbar.getByRole('button', { name: 'Disconnect', exact: true }).click();
   await toolbar.getByRole('button', { name: 'Connect', exact: true }).click();
