@@ -64,6 +64,11 @@ writes no controller setting without the operator's click, a saved backup and a 
    before-the-burn notes (ADR-687), and carries **Send $32=1**: the twin of **Send $32=0**, with
    a confirm that names the effect and the same guarded write. A driver that sends no `$` setting
    writes gets no button.
+   - Job Review also rebuilds when a controller operation ends. The write's `$` read-back
+     reaches the store while the write still holds its operation, and preparation refuses during
+     an operation, so before this the review stuck on "A controller operation is active" with the
+     fixed row still shown. That was true of **Send $32=0** as well, whose Amendment 6 promised
+     that the warning clears. Both rows now clear after a verified write.
 5. **Other firmwares.**
    - grblHAL writes `$32` exactly as GRBL does.
    - FluidNC's `$32` follows the spindle type in its YAML configuration and cannot be written.
@@ -102,5 +107,10 @@ writes no controller setting without the operator's click, a saved backup and a 
 - `JobReviewWarnings.test.tsx`: the laser row opens with **Send $32=1**, writes `$32=1` after the
   confirm, writes nothing when declined, reports a refusal, and shows no button for FluidNC or a
   driver without `$` setting writes.
+- `use-job-review-rebuild.test.tsx`: the end of a controller operation requests a rebuild.
+- A production build driven on the U8 refuter's fake GRBL (stock `$32=0`): the first Connect keeps
+  "Machine Setup" and Laser, the card's one click saves the backup, confirms, sends `$32=1` then
+  `$`, and leaves; saved without it, Job Review's row offers **Send $32=1**, which sends
+  `$32=1` then `$`.
 - `grbl-strategy.laser-mode-expectation.test.ts`: the same job emits the same bytes whether the
   profile expects laser mode on or off.

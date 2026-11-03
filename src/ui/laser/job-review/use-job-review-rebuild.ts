@@ -42,7 +42,13 @@ export function useJobReviewRebuildTrigger(): () => void {
       }, REBUILD_DEBOUNCE_MS);
     });
     const unsubscribeLaser = useLaserStore.subscribe((current, previous) => {
+      // A settings write's read-back lands while its operation still runs, and
+      // preparation refuses during an operation, so its end rebuilds too: Send
+      // $32=1/$32=0 then clear their row (ADR-637 Amendment 7).
+      const operationEnded =
+        previous.controllerOperation !== null && current.controllerOperation === null;
       if (
+        !operationEnded &&
         current.controllerSessionEpoch === previous.controllerSessionEpoch &&
         current.controllerSettings === previous.controllerSettings &&
         current.controllerSettingsObservation === previous.controllerSettingsObservation &&
