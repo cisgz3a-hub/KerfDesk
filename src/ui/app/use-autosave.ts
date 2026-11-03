@@ -13,7 +13,8 @@
 
 import { useEffect } from 'react';
 import { useStore } from '../state';
-import { AUTOSAVE_INTERVAL_MS, writeAutosave } from '../state/autosave';
+import { AUTOSAVE_INTERVAL_MS, writeAutosave, type AutosaveWriteFailure } from '../state/autosave';
+import { AutosavePreparationTimeoutError } from '../state/autosave-preparation-client';
 import {
   projectAutosaveService,
   type AutosaveDurableClearResult,
@@ -38,6 +39,10 @@ import { isAutosaveDiscardPending } from './autosave-file-cleanup';
 
 export const AUTOSAVE_FAILURE_MESSAGE =
   'Autosave could not preserve the newest project. Save the .lf2 file manually; image-heavy projects can exceed browser storage.';
+// A deadline, not storage: the recovery copy was not ready within 60 seconds
+// (performance audit S3-P2-2 found the storage wording sent users the wrong way).
+export const AUTOSAVE_TIMEOUT_MESSAGE =
+  'Autosave could not prepare a recovery copy of the newest project within 60 seconds. Save the .lf2 file manually.';
 export const AUTOSAVE_RECOVERY_DEGRADED_MESSAGE =
   'The newest autosave was unavailable; KerfDesk recovered the previous complete snapshot.';
 export const AUTOSAVE_RECOVERY_STORAGE_MESSAGE =
@@ -49,12 +54,19 @@ export const AUTOSAVE_RECOVERY_VERSION_MESSAGE =
 
 type PushToast = ReturnType<typeof useToastStore.getState>['pushToast'];
 
-export function createAutosaveFailureReporter(pushToast: PushToast): () => void {
-  let hasWarned = false;
-  return () => {
-    if (hasWarned) return;
-    hasWarned = true;
-    pushToast(AUTOSAVE_FAILURE_MESSAGE, 'warning');
+/** Warns once per session for each cause, naming the cause the failure carries. */
+export function createAutosaveFailureReporter(
+  pushToast: PushToast,
+): (failure?: AutosaveWriteFailure) => void {
+  const warned = new Set<string>();
+  return (failure) => {
+    const message =
+      failure?.kind === 'failed' && failure.error instanceof AutosavePreparationTimeoutError
+        ? AUTOSAVE_TIMEOUT_MESSAGE
+        : AUTOSAVE_FAILURE_MESSAGE;
+    if (warned.has(message)) return;
+    warned.add(message);
+    pushToast(message, 'warning');
   };
 }
 

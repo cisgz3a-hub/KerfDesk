@@ -103,3 +103,39 @@ Abort latency inside Preview. This PC lacked the memory for a 375k-line browser
 job while other sessions were working. With no block left to wait behind, Abort
 inside Preview should match the audit's idle 1–18 ms. That remains an
 inference until the harness re-measures it.
+
+### Amendment 3 — Autosave preempts background job preparation (2026-11-03)
+
+Performance audit S1, area S3, confirmed S3-P2-2. Autosave reserved the shared
+worker memory lane without priority, so decision 2 queued it behind a running
+background job preparation. With four bed-sized photos (400 × 300 mm at
+10 lines/mm) that preparation runs 112–164 s, and the first autosave after an
+edit landed about 125 s later. At 60 s Amendment 1's deadline fired and the
+failure toast said "image-heavy projects can exceed browser storage", which was
+not the cause. A normal close still warns, so the loss needed a crash, kill or
+power cut inside that window. With one bed-sized photo the wait stayed inside
+the 30 s interval.
+
+1. Autosave's reservation is `'interactive'`. A running preparation (Preview,
+   ETA or idle markers, which already support preemption) retires its worker,
+   keeps its request and consumers, and restarts behind the autosave worker.
+   This changes decision 2's "Non-preemptible work, including an active
+   autosave, finishes normally" only in which queue autosave waits in: an
+   active autosave still has no `onPreempt` and is never interrupted, and
+   among interactive work (Save, trace-part, autosave) the lane stays FIFO.
+2. The cost is one restart of background preparation per autosave write. The
+   autosave loop writes only when the project changed since its last write
+   (`isTickRedundant`), and an edit already restarts the preparation, so a
+   preparation is preempted at most once per edit. A long preparation then
+   finishes up to one autosave interval plus the autosave's own run later.
+   The lane still holds one heap at a time, so peak memory is unchanged.
+3. Amendment 1's deadline stays at 60 s. Its expiry is now an
+   `AutosavePreparationTimeoutError`, and the failure toast names it: "Autosave
+   could not prepare a recovery copy of the newest project within 60 seconds.
+   Save the .lf2 file manually." Storage failures keep the storage wording.
+   Each cause warns once per session.
+
+A unit test runs the real autosave loop and client against a simulated
+preparation that holds the lane for 150 s and preempts like the real client.
+The write lands on the 30 s tick, the preparation is preempted once, restarts
+and completes, and later ticks write nothing. AUTOSAVE_MEASUREMENTS_PLACEHOLDER

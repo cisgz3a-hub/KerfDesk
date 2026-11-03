@@ -214,7 +214,11 @@ describe('raster-image import resolution', () => {
       vi.fn(),
     );
 
-    expect(imageLoader.loadImageAsRawData).toHaveBeenCalledWith(expect.any(File), 8192);
+    expect(imageLoader.loadImageAsRawData).toHaveBeenCalledWith(
+      expect.any(File),
+      8192,
+      expect.any(AbortSignal),
+    );
     expect(importRasterImage).toHaveBeenCalledWith(
       expect.objectContaining({ pixelWidth: 6000, pixelHeight: 3000 }),
     );
