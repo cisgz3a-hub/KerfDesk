@@ -77,6 +77,21 @@ export function outputVectorPreparationTooComplex(
   );
 }
 
+/**
+ * Whether vector and Fill work together reach `budget` (budget below
+ * PREPARATION_COMPILED_SEGMENT_BUDGET). outputVectorPreparationTooComplex
+ * judges each on its own, so a design that is half outlines and half small
+ * fills stayed under both while emitting a program as large as either.
+ * Routing only, like the predicate above.
+ */
+export function outputPreparationWorkReaches(project: Project, budget: number): boolean {
+  if (project.machine?.kind === 'cnc') {
+    return cncVectorPreparationWorkUnits(project.scene, budget) >= budget;
+  }
+  const vector = laserVectorPreparationWorkUnits(project.scene, budget);
+  return vector >= budget || vector + laserFillPreparationWorkUnits(project.scene) >= budget;
+}
+
 export function countOutputVectorSegments(scene: Scene): number {
   let count = 0;
   for (const layer of scene.layers.flatMap(outputOperationLayers)) {

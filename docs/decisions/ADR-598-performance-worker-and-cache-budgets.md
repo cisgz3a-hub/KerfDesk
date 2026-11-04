@@ -149,3 +149,111 @@ autosave worker ran for 0.33 s, the preparation restarted, and the copy was writ
 the edit. The four-photo case was not run in the browser: on this 16 GB PC, with other work
 running, free memory fell below 1.0 GB within 2 s of opening it (S3-P2-3), and the measurement
 stopped there to keep the PC usable. The unit test above covers that timing.
+
+### Amendment 4 — Ordinary jobs prepare in a worker, and a prepared job reaches the window in slices (2026-11-04)
+
+Performance audit S1, area S4, with S1-P2-2. Three findings share one cause:
+output work that ran, or landed, on the UI thread in one piece.
+
+- **S4-P2-1 (P3).** A 200-object design of 100 Line circles and 100 small Fill
+  rectangles (53,987 lines) stayed under the 20,000-unit "direct" budget
+  (`canvas-preparation-policy.ts`), because that budget judged outlines and
+  fills separately. So Preview, the estimate, Frame, Start and Save each
+  compiled and emitted the whole job on the UI thread: Preview blocked
+  527 ms, Frame 497 ms, Start 574 ms, Save 185 ms (refuter medians).
+- **S1-P2-2 (P2).** At 374,843 lines, Start → Job Review held the UI thread in
+  one task of 723–874 ms after the worker had finished. In that task the
+  window deserialized the worker's result (472 ms: half the prepared
+  project's scene, half the compiled fill segments) and built the Job Review
+  model (300 ms: the fill heat analysis twice, then several walks of the
+  5 MB program).
+- **S4-P3-2 (P3).** Save G-code prepared the whole program again on every
+  Save of an unchanged project: 13–16 s each time for a bed-sized photo.
+
+1. **Routing.** `outputPreparationPrefersWorker` sends every job of 2,000 work
+   units or more (outlines and fills counted together,
+   `outputPreparationWorkReaches`) to the existing workers for Preview, the
+   estimate, Frame, Start and Save, when the window can start a worker.
+   Without one those jobs prepare on the window as before. The 20,000-unit
+   `costlyCanvasPreparation` budget is unchanged for the Machine Setup and
+   Design advisories, which compile only and would go blank if routed away.
+   An estimate pending for this reason reads "estimating…", not "large job".
+2. **The Start boundary** (`start-preparation-wire.ts`). The prepared
+   project's scene objects are the request's own objects inside the worker,
+   so they travel as indices and the window re-attaches the originals the
+   worker's copy was unpacked from (decision 1). Objects the worker made
+   (hydrated rasters, materialized relief) travel whole. Fill segments of the
+   plain shape travel as transferred columns and are rebuilt in slices of
+   about 24 ms, each its own task, before the preparation resolves; a cancel
+   between slices stops it. The rebuilt preparation equals the worker's field
+   by field and in key order.
+3. **Job Review reads facts measured once.** The fill heat analysis is
+   memoized by job and offset values (both callers now use the memo), and the
+   worker sends the value it already computed for its warnings. The program
+   facts Job Review walked the program for (M7 use, streamed lines and bytes,
+   longest sendable line, line count, archive size; `program-facts.ts`) are
+   measured once per preparation object, in the worker beside the program.
+   Each is the value of the same function the review called. A line longer
+   than the RX window is still found by the full scan whenever the longest
+   line could exceed it.
+4. **Save reuse** (`save-emission-reuse.ts`). The last emitted Save program is
+   kept for its Project object and an exact serialization of the request
+   (emit options, scope, machine and controller evidence; -0, NaN and
+   undefined kept apart). Time-bound saves are never kept, and the entry is
+   dropped when the open project changes.
+
+Start's bindings are unchanged: Start still prepares the current exact
+program, Job Review's Confirm still compares the rebuilt bytes and model,
+and the Frame permit's execution signature is computed as before.
+
+The G-code does not change: the same compiler and emitter run, only in
+another thread or once instead of twice. Tests prove it on the fixtures. A
+Fill job and a streamed photo go through the real Start preparation, the
+wire, a structured clone with its transfer list and the window's rebuild:
+the result equals a plain clone of the worker's (`toEqual` and JSON, so key
+order too), its scene objects are the window's own, and its job emits the
+worker's bytes. Segments of another shape and objects made in the worker
+still travel whole. A cancel between slices rejects. The seeded fill
+analysis and program facts are the values that arrived, equal to a fresh
+measurement, and a copy with other bytes measures its own. The longest-line
+shortcut agrees with the full scan at every limit. The guard counts
+compiles, not milliseconds: with workers available, Preview, the estimate
+and the Start, Frame and Save router compile the 200-object mix zero times
+on the window, a tiny job still compiles here, and without workers the mix
+compiles here as before. Two Saves of an unchanged project prepare once; a
+change to the project, scope, WCS or time-bound text prepares again.
+
+Measured on production builds in Chrome 156 (the audit's `r.mjs` driver with
+a simulated GRBL on the USB worker route), main `ede14589b` against this
+change in the same sitting, a fresh browser context per flow run, the first
+run of each set dropped, median (worst) of five:
+
+| 200-object mix (53,987 lines) | Longest UI block | Ready |
+|---|---|---|
+| Preview | 1,013 (1,251) → 0 ms | 1,411 → 76 ms |
+| Preview again | 803 (975) → 0 ms | 955 → 63 ms |
+| Frame | 892 (988) → 0 ms | 4.2 → 3.4 s |
+| Start → Job Review | 1,109 (1,248) → 60 (70) ms | 1.23 → 1.43 s |
+| Save G-code | 336 (453) → 0 ms | 365 → 532 ms |
+| Save G-code again | 244 (420) → 0 ms | 262 → 24 ms |
+
+At 374,843 lines (the S1 ring-grid fill) Start → Job Review's longest block
+fell from 1,087 (1,249) to 82 (106) ms and Frame's from 484 (744) to 0 ms;
+Start → Review took 8.8 → 8.2 s and Confirm → first line 649 → 514 ms. A
+repeated Save G-code took 2,120 → 64 ms for the 100 mm photo, 857 → 53 ms
+for 200 Fill rectangles and 63 → 35 ms for 200 circles. Every Save's SHA-256
+matched main's: mix `73c4cbbdb8fc4543`, 100 mm photo `3d9d08525362d519`,
+200 circles `2aaeb3eecbfcc70d`, 200 rectangles `eae6547a0381bce1`.
+
+Limits. The calibration loop read 37–75 ms in the flow sets but drifted
+80 → 105 ms across both 375k sets, before and after alike; those two are
+loaded and their ratio, not their milliseconds, is the result. Ordinary jobs
+now wait for a worker: Start → Review on the mix is about 0.2 s longer and
+the first Save about 0.17 s longer, with no block. The first Frame after
+opening or editing a 375k-line project still blocks about 0.2–0.3 s while
+the window computes the Frame permit's execution signature (ADR-327) once
+for that project; this amendment leaves the signature as it was. The bed-
+sized photo's repeated Save was not measured after the change: other
+sessions held the PC (free memory fell under 1 GB), and the 100 mm photo
+stands for it. Preview of a photo (S4-P3-1) and the archive built after the
+first line (S4-P2-3) are separate findings and unchanged here.

@@ -53,8 +53,10 @@ export function evaluateM7AirAssistReadiness(
   gcode: string,
   buildInfo: GrblBuildInfo | null,
   buildInfoIsCurrent: boolean,
+  /** gcodeUsesM7(gcode), when the caller already measured it. */
+  usesM7: boolean = gcodeUsesM7(gcode),
 ): M7AirAssistReadiness {
-  if (!gcodeUsesM7(gcode)) return { kind: 'not-required' };
+  if (!usesM7) return { kind: 'not-required' };
   if (!buildInfoIsCurrent || buildInfo === null) {
     return { kind: 'unknown', message: M7_AIR_ASSIST_UNVERIFIED_MESSAGE };
   }

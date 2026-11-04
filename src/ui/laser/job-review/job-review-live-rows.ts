@@ -14,12 +14,7 @@ import type { ActiveWorkCoordinateSystem } from '../../../core/controllers/grbl/
 import { HELD_RESUME_TAIL_MESSAGE } from '../../../core/controllers/grblhal/held-resume-tail';
 import type { ControllerKind } from '../../../core/devices';
 import type { ControllerSettingsSnapshot } from '../../../core/preflight';
-import {
-  analyzeFillHeatRisk,
-  type Job,
-  type JobOriginPlacement,
-  type ScanOffsetPoint,
-} from '../../../core/job';
+import { type Job, type JobOriginPlacement, type ScanOffsetPoint } from '../../../core/job';
 import type { ScanDirectionReason } from '../../../core/job/scan-direction-policy';
 import { machineKindOf, type Layer, type MachineKind, type Project } from '../../../core/scene';
 import { layerSubLayerOperationId } from '../../../core/scene/layer';
@@ -36,6 +31,7 @@ import type { CncLiftZTopCheck } from '../cnc-park-z-top';
 import { buildContourEntryReviewFacts } from './job-review-contour-entry-facts';
 import { rotaryReviewSummary } from '../rotary-summary';
 import { laserModuleFacts } from './job-review-laser-module';
+import { memoizedFillHeatRisk } from './fill-heat-risk-memo';
 
 export type JobReviewFact = {
   readonly label: string;
@@ -210,7 +206,7 @@ function buildFillRunwayFacts(
   scanningOffsets: ReadonlyArray<ScanOffsetPoint>,
 ): ReadonlyArray<JobReviewFact> {
   const facts: JobReviewFact[] = [];
-  const coverage = analyzeFillHeatRisk(job, scanningOffsets);
+  const coverage = memoizedFillHeatRisk(job, scanningOffsets);
   if (coverage.fillSweepCount > 0) {
     facts.push(
       fact(

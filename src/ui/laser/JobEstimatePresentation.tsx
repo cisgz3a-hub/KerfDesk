@@ -4,7 +4,9 @@ import type { LiveJobEstimate } from './live-job-estimate';
 export function startJobTitle(estimate: LiveJobEstimate, timeNoun: string): string {
   if (estimate.kind === 'estimated') return `Estimated ${timeNoun} time: ${estimate.label}`;
   if (estimate.kind === 'too-large') {
-    return 'Large job: the live estimate is paused to keep the canvas responsive.';
+    return estimate.ordinary === true
+      ? 'Estimating the job time in the background.'
+      : 'Large job: the live estimate is paused to keep the canvas responsive.';
   }
   if (estimate.kind === 'preparation-failed') {
     return `Live estimate unavailable: ${estimate.message}`;
@@ -25,7 +27,11 @@ export function EstimateBadge({
       </span>
     );
   if (estimate.kind === 'too-large') {
-    return (
+    return estimate.ordinary === true ? (
+      <span style={estimateStyle} title="Estimating the job time in the background.">
+        estimating…
+      </span>
+    ) : (
       <span style={estimateStyle} title="Live estimate paused so large traces stay responsive.">
         large job
       </span>

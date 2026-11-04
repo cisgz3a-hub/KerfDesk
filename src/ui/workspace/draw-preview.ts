@@ -30,7 +30,10 @@ import {
   type PrepareOutputSnapshotOptions,
 } from '../../io/gcode';
 import { hydratePagedRasterProject } from '../import/paged-raster-hydration';
-import { costlyCanvasPreparation } from './canvas-preparation-policy';
+import {
+  costlyCanvasPreparation,
+  outputPreparationPrefersWorker,
+} from './canvas-preparation-policy';
 import type { DisplayPolylineCache } from './display-polylines';
 import { drawObjectDisplay, resolveObjectDisplay } from './object-display';
 import {
@@ -121,6 +124,11 @@ export function buildPreviewToolpath(
   // unbounded off-thread instead.
   const issue = previewPreparationIssue(project, options);
   if (issue !== null) return emptyPreviewToolpath(issue);
+  // Here, not in previewPreparationIssue: the 3D carve pane shares that
+  // predicate and treats any issue as "render nothing" (see
+  // vcarve-preparation-routing.ts). 'too-complex' sends the job to the worker.
+  if (outputPreparationPrefersWorker(project, options.outputScope))
+    return emptyPreviewToolpath({ kind: 'too-complex' });
   return buildPreviewToolpathUnbounded(project, options);
 }
 

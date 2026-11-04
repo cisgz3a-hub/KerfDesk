@@ -22,6 +22,11 @@ import { outputTextRenderer } from '../text/output-text-renderer';
 import { buildGcodeMetadata } from './build-info';
 import type { SaveGcodeCtx } from './file-actions';
 import {
+  rememberSaveEmission,
+  reusableSaveEmission,
+  saveEmissionRequestKey,
+} from './save-emission-reuse';
+import {
   hydratePagedRasterProject,
   projectHasPagedRasterAssets,
 } from '../import/paged-raster-hydration';
@@ -46,10 +51,22 @@ export async function emitSaveGcode(
   const registration = currentPrintCutOutputRegistration(ctx.project);
   const options = saveGcodeOptions(ctx, placement);
   const useSnapshot = registration !== undefined || hasVariableText(ctx.project);
-  if (useSnapshot || outputPreparationShouldRunOffThread(ctx.project, ctx.outputScope)) {
-    return prepareSaveInBackground(ctx, options, registration, useSnapshot, execution);
-  }
-  return prepareSaveDirect(ctx, options, registration);
+  if (useSnapshot) return prepareSaveInBackground(ctx, options, registration, true, execution);
+  // Everything the emission reads besides the Project (S4-P3-2).
+  const key = saveEmissionRequestKey({
+    options,
+    outputScope: ctx.outputScope,
+    machine: ctx.machine,
+    controllerSettings: ctx.controllerSettings,
+    activeWcs: ctx.activeWcs,
+  });
+  const reused = reusableSaveEmission(ctx.project, key);
+  if (reused !== null) return reused;
+  const emission = await (outputPreparationShouldRunOffThread(ctx.project, ctx.outputScope)
+    ? prepareSaveInBackground(ctx, options, registration, false, execution)
+    : prepareSaveDirect(ctx, options, registration));
+  rememberSaveEmission(ctx.project, key, emission);
+  return emission;
 }
 
 function saveGcodeOptions(

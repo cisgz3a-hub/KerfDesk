@@ -1,13 +1,9 @@
 import { resolveGrblDialect, type GrblPowerMode } from '../../core/devices';
 import { effectiveGcodeFeedMmPerMin } from '../../core/gcode/feed-word';
-import {
-  analyzeFillHeatRisk,
-  compileJob,
-  isSensitiveIslandFillPolicy,
-  type Job,
-} from '../../core/job';
+import { compileJob, isSensitiveIslandFillPolicy, type Job } from '../../core/job';
 import { shouldAdvise4040FillPolicySelection } from '../../core/job/fill-runway-policy';
 import { pixelExtentForMm } from '../../core/raster';
+import { memoizedFillHeatRisk } from './job-review/fill-heat-risk-memo';
 import {
   machineKindOf,
   pathUsesOperation,
@@ -186,7 +182,7 @@ function appendFillHeatWarnings(
   scanningOffsets: Project['device']['scanningOffsets'],
   warnings: string[],
 ): void {
-  const heat = analyzeFillHeatRisk(job, scanningOffsets);
+  const heat = memoizedFillHeatRisk(job, scanningOffsets);
   if (
     heat.fillDisabledRunwaySweepCount > 0 &&
     job.groups.some(isRunwayDisabledFeedMatchedFillGroup)

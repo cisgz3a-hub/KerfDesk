@@ -25,6 +25,7 @@ import type { ControllerKind } from '../../../core/devices';
 // Deep import: the devices barrel is at its public-export ratchet.
 import { GRBLHAL_DEFAULT_RX_BUFFER_BYTES } from '../../../core/grbl-streaming';
 import type { StartStreamWindow } from '../../state/laser-job-effective-stream-options';
+import type { ProgramFacts } from './program-facts';
 
 export type StreamThroughputInput = {
   readonly gcode: string;
@@ -34,6 +35,8 @@ export type StreamThroughputInput = {
   readonly transportSeconds: number;
   readonly window: StartStreamWindow;
   readonly controllerKind: ControllerKind;
+  /** The program's measured facts, when already known (program-facts.ts). */
+  readonly program?: Pick<ProgramFacts, 'sendable' | 'longestSendableSpan'>;
 };
 
 /**
@@ -70,7 +73,11 @@ export function detectStreamThroughputWarnings(
 // which on grblHAL may be wider than the window this session proved — without
 // this advisory the refusal would first appear after a completed Frame.
 function oversizedLineWarning(input: StreamThroughputInput): ReadonlyArray<string> {
-  const oversized = findOversizedLine(input.gcode, input.window.bytes);
+  const oversized = findOversizedLine(
+    input.gcode,
+    input.window.bytes,
+    input.program?.longestSendableSpan,
+  );
   if (oversized === null) return [];
   return [
     `${OVERSIZED_LINE_WARNING_PREFIX} ${oversized.lineNumber} is ${oversized.bytes} bytes, longer ` +
@@ -80,7 +87,7 @@ function oversizedLineWarning(input: StreamThroughputInput): ReadonlyArray<strin
 }
 
 function bufferedMotionWarning(input: StreamThroughputInput): ReadonlyArray<string> {
-  const program = measureProgram(input.gcode);
+  const program = input.program?.sendable ?? measureProgram(input.gcode);
   if (program.lines < MIN_LINES_FOR_ADVISORY || !(input.motionSeconds > 0)) return [];
   const msPerLine = (input.motionSeconds * 1000) / program.lines;
   const linesInWindow = linesInFlight(input.window, program.bytes / program.lines);

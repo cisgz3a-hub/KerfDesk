@@ -5,9 +5,10 @@ import {
   findFirstSendableLineOver,
   findFirstUnencodableSendableLine,
   hasSendableGcodeLine,
+  longestSendableLineSpan,
   unencodableLineMessage,
 } from './sendable-line-scan';
-import { isSendableGcodeLine } from './streamer';
+import { findOversizedLine, isSendableGcodeLine } from './streamer';
 
 // The definition the scans must keep: splitLines in streamer.ts.
 function splitLinesOracle(gcode: string): string[] {
@@ -106,5 +107,24 @@ describe('allocation-light sendable-line scans', () => {
       /^G-code line 4: Not sent: the command contains "Ø"/,
     );
     expect(findFirstUnencodableSendableLine('G21\nG1 X1 Y2 ; plain\n')).toBeNull();
+  });
+});
+
+describe('longestSendableLineSpan', () => {
+  // Job Review skips the oversized-line scan below this span (ADR-598 Amd 4),
+  // so the shortcut must agree with the scan at every limit.
+  const programs = [
+    '',
+    'G21\n',
+    '  G1 X1 Y2   \n; a long comment that is never sent to the controller at all\nM5\n',
+    '\tG0 X100.25 Y20.5\r\n\nG1 X1\n   \n(paren) G1 X2\n',
+    `G21\n${'G1 X1.234 Y5.678 S1000 F6000'.repeat(4)}   \nM5`,
+  ];
+  it.each(programs)('finds no line over any limit at or above it in %j', (gcode) => {
+    const span = longestSendableLineSpan(gcode);
+    for (let limit = 1; limit <= span + 4; limit += 1) {
+      if (limit >= span) expect(findFirstSendableLineOver(gcode, limit)).toBeNull();
+      expect(findOversizedLine(gcode, limit, span)).toEqual(findOversizedLine(gcode, limit));
+    }
   });
 });

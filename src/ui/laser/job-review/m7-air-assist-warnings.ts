@@ -7,8 +7,9 @@ export function detectM7AirAssistWarnings(
   gcode: string,
   buildInfo: GrblBuildInfo | null,
   buildInfoIsCurrent: boolean,
+  usesM7?: boolean,
 ): ReadonlyArray<string> {
-  const readiness = evaluateM7AirAssistReadiness(gcode, buildInfo, buildInfoIsCurrent);
+  const readiness = evaluateM7AirAssistReadiness(gcode, buildInfo, buildInfoIsCurrent, usesM7);
   return readiness.kind === 'unknown' || readiness.kind === 'unsupported'
     ? [readiness.message]
     : [];

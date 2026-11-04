@@ -164,8 +164,11 @@ export type OversizedLine = {
 export function findOversizedLine(
   gcode: string,
   rxBufferBytes: number = DEFAULT_RX_BUFFER_BYTES,
+  /** longestSendableLineSpan(gcode), when the caller already measured it. */
+  longestSendableSpan?: number,
 ): OversizedLine | null {
   const limit = normalizeGrblRxBufferBytes(rxBufferBytes);
+  if (longestSendableSpan !== undefined && longestSendableSpan <= limit) return null;
   const oversized = findFirstSendableLineOver(gcode, limit);
   return oversized === null ? null : { ...oversized, limit };
 }
