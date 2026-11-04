@@ -205,3 +205,55 @@ output work that ran, or landed, on the UI thread in one piece.
 Start's bindings are unchanged: Start still prepares the current exact
 program, Job Review's Confirm still compares the rebuilt bytes and model,
 and the Frame permit's execution signature is computed as before.
+
+The G-code does not change: the same compiler and emitter run, only in
+another thread or once instead of twice. Tests prove it on the fixtures. A
+Fill job and a streamed photo go through the real Start preparation, the
+wire, a structured clone with its transfer list and the window's rebuild:
+the result equals a plain clone of the worker's (`toEqual` and JSON, so key
+order too), its scene objects are the window's own, and its job emits the
+worker's bytes. Segments of another shape and objects made in the worker
+still travel whole. A cancel between slices rejects. The seeded fill
+analysis and program facts are the values that arrived, equal to a fresh
+measurement, and a copy with other bytes measures its own. The longest-line
+shortcut agrees with the full scan at every limit. The guard counts
+compiles, not milliseconds: with workers available, Preview, the estimate
+and the Start, Frame and Save router compile the 200-object mix zero times
+on the window, a tiny job still compiles here, and without workers the mix
+compiles here as before. Two Saves of an unchanged project prepare once; a
+change to the project, scope, WCS or time-bound text prepares again.
+
+Measured on production builds in Chrome 156 (the audit's `r.mjs` driver with
+a simulated GRBL on the USB worker route), main `ede14589b` against this
+change in the same sitting, a fresh browser context per flow run, the first
+run of each set dropped, median (worst) of five:
+
+| 200-object mix (53,987 lines) | Longest UI block | Ready |
+|---|---|---|
+| Preview | 1,013 (1,251) → 0 ms | 1,411 → 76 ms |
+| Preview again | 803 (975) → 0 ms | 955 → 63 ms |
+| Frame | 892 (988) → 0 ms | 4.2 → 3.4 s |
+| Start → Job Review | 1,109 (1,248) → 60 (70) ms | 1.23 → 1.43 s |
+| Save G-code | 336 (453) → 0 ms | 365 → 532 ms |
+| Save G-code again | 244 (420) → 0 ms | 262 → 24 ms |
+
+At 374,843 lines (the S1 ring-grid fill) Start → Job Review's longest block
+fell from 1,087 (1,249) to 82 (106) ms and Frame's from 484 (744) to 0 ms;
+Start → Review took 8.8 → 8.2 s and Confirm → first line 649 → 514 ms. A
+repeated Save G-code took 2,120 → 64 ms for the 100 mm photo, 857 → 53 ms
+for 200 Fill rectangles and 63 → 35 ms for 200 circles. Every Save's SHA-256
+matched main's: mix `73c4cbbdb8fc4543`, 100 mm photo `3d9d08525362d519`,
+200 circles `2aaeb3eecbfcc70d`, 200 rectangles `eae6547a0381bce1`.
+
+Limits. The calibration loop read 37–75 ms in the flow sets but drifted
+80 → 105 ms across both 375k sets, before and after alike; those two are
+loaded and their ratio, not their milliseconds, is the result. Ordinary jobs
+now wait for a worker: Start → Review on the mix is about 0.2 s longer and
+the first Save about 0.17 s longer, with no block. The first Frame after
+opening or editing a 375k-line project still blocks about 0.2–0.3 s while
+the window computes the Frame permit's execution signature (ADR-327) once
+for that project; this amendment leaves the signature as it was. The bed-
+sized photo's repeated Save was not measured after the change: other
+sessions held the PC (free memory fell under 1 GB), and the 100 mm photo
+stands for it. Preview of a photo (S4-P3-1) and the archive built after the
+first line (S4-P2-3) are separate findings and unchanged here.
