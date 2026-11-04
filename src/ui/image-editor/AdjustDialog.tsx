@@ -3,10 +3,10 @@
 // dialog grammar). A floating panel, not a modal backdrop, so the operator
 // can still pan/zoom the canvas to inspect the preview.
 
-import { useEffect } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { DraftNumberInput } from '../kit/DraftNumberInput';
 import { lumaHistogram } from '../../core/image-adjust';
-import { maskBounds } from '../../core/image-select';
+import { selectionBounds } from './adjust-preview-window';
 import {
   refreshAdjustPreview,
   useAdjustDialogStore,
@@ -39,15 +39,7 @@ function PanelBody(props: {
   const { dialog, session } = props;
   const spec = adjustmentById(dialog.id);
   const store = useAdjustDialogStore.getState();
-
-  // Live preview: recompute on a short timer so slider drags coalesce.
-  // A timer, not requestAnimationFrame: rAF is queued (not run) while the
-  // window is occluded, which left the preview stale until the next paint.
-  useEffect(() => {
-    if (!dialog.previewEnabled) return;
-    const timer = window.setTimeout(refreshAdjustPreview, PREVIEW_DEBOUNCE_MS);
-    return () => window.clearTimeout(timer);
-  }, [dialog.id, dialog.params, dialog.curvePoints, dialog.previewEnabled]);
+  useLivePreview(dialog);
 
   return (
     <div
@@ -120,6 +112,20 @@ function PanelBody(props: {
   );
 }
 
+// Live preview: recompute on a short timer so slider drags coalesce.
+// A timer, not requestAnimationFrame: rAF is queued (not run) while the
+// window is occluded, which left the preview stale until the next paint.
+// The preview covers only the visible window, so pan/zoom recompute it.
+function useLivePreview(dialog: AdjustDialog): void {
+  const view = useImageEditorStore((s) => s.view);
+  const viewportSize = useImageEditorStore((s) => s.viewportSize);
+  useEffect(() => {
+    if (!dialog.previewEnabled) return;
+    const timer = window.setTimeout(refreshAdjustPreview, PREVIEW_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [dialog.id, dialog.params, dialog.curvePoints, dialog.previewEnabled, view, viewportSize]);
+}
+
 function PaperRemovalHelp(): JSX.Element {
   return (
     <p style={{ fontSize: 12, margin: '8px 0', maxWidth: 300 }}>
@@ -171,21 +177,28 @@ const HISTOGRAM_WIDTH = 256;
 const HISTOGRAM_HEIGHT = 56;
 
 // The histogram reflects the doc at dialog-open time; painting and undo are
-// parked while a dialog is up, so it cannot go stale.
+// parked while a dialog is up, so it cannot go stale. It is computed once per
+// source, not per render: a slider step re-renders this panel, and the
+// whole-document scan was over half of each step at 12 MP (S5-P2-1).
 function Histogram(props: { readonly session: EditorSession }): JSX.Element {
-  const { session } = props;
+  const { doc, selection, revision } = props.session;
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const bins = useMemo(
+    () => lumaHistogram(doc, selectionBounds(selection), selection),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- revision is the doc's change signal
+    [doc, selection, revision],
+  );
+  useEffect(() => {
+    const ctx = canvasRef.current?.getContext('2d') ?? null;
+    if (ctx !== null) drawHistogram(ctx, bins);
+  }, [bins]);
   return (
     <canvas
+      ref={canvasRef}
       width={HISTOGRAM_WIDTH}
       height={HISTOGRAM_HEIGHT}
       style={histogramStyle}
       aria-label="Luma histogram of the current image"
-      ref={(canvas) => {
-        const ctx = canvas?.getContext('2d') ?? null;
-        if (ctx === null) return;
-        const rect = session.selection === null ? null : maskBounds(session.selection);
-        drawHistogram(ctx, lumaHistogram(session.doc, rect, session.selection));
-      }}
     />
   );
 }

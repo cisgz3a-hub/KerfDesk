@@ -5,12 +5,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { RgbaBuffer } from '../../core/image-edit';
 import { usePrefersReducedMotion } from '../common/use-prefers-reduced-motion';
-import { useAdjustPreviewDoc } from './adjust-dialog-store';
+import { useAdjustPreview } from './adjust-dialog-store';
 import {
   docToCanvas,
   drawEditorScene,
+  paintBufferCanvas,
   drawQuickMaskOverlay,
   drawTransformPreview,
+  type DocOverlay,
 } from './editor-canvas-draw';
 import { useImageEditorStore } from './image-editor-store';
 import { useQuickMaskStore } from './quick-mask-store';
@@ -45,15 +47,11 @@ export function EditorCanvas(props: EditorCanvasProps): JSX.Element {
   const [antsPhase, setAntsPhase] = useState(0);
   const prefersReducedMotion = usePrefersReducedMotion();
 
-  const revision = session?.revision ?? -1;
-  // The canvas shows the layer composite (identity for single-layer
-  // sessions); an enabled adjustment preview substitutes for it.
-  const adjustPreview = useAdjustPreviewDoc();
-  const doc = adjustPreview ?? props.composite;
-  // The doc canvas rebuilds only when pixels changed (revision bump or a
-  // fresh preview buffer identity).
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- revision is the doc's change signal
-  const docCanvas = useMemo(() => (doc === undefined ? null : docToCanvas(doc)), [doc, revision]);
+  // The layer composite (identity for single-layer sessions), rebuilt only
+  // when pixels changed; an adjustment preview is drawn over its window.
+  const doc = props.composite;
+  const docCanvas = useDocCanvas(doc, session?.revision ?? -1);
+  const overlay = useAdjustOverlay();
   useCanvasFit(hostRef, canvasRef, doc, view === null);
 
   // Ants animation ticks only while a selection exists and motion is welcome (F-L2).
@@ -84,6 +82,7 @@ export function EditorCanvas(props: EditorCanvasProps): JSX.Element {
         widthPx: brush.diameterPx,
       },
       pendingCrop,
+      overlay,
     );
     if (rubylith !== null) drawQuickMaskOverlay(ctx, activeView, rubylith);
     if (transform !== null) {
@@ -118,6 +117,23 @@ export function EditorCanvas(props: EditorCanvasProps): JSX.Element {
       <div ref={hover.infoRef} style={INFO_READOUT_STYLE} aria-hidden="true" />
     </div>
   );
+}
+
+function useDocCanvas(doc: RgbaBuffer | undefined, revision: number): HTMLCanvasElement | null {
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- revision is the doc's change signal
+  return useMemo(() => (doc === undefined ? null : docToCanvas(doc)), [doc, revision]);
+}
+
+// Each adjustment preview step repaints one reused, display-sized canvas
+// drawn over its document window (S5-P2-1), not a document-sized bitmap.
+function useAdjustOverlay(): DocOverlay | null {
+  const adjustPreview = useAdjustPreview();
+  const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  return useMemo(() => {
+    if (adjustPreview === null) return null;
+    previewCanvasRef.current = paintBufferCanvas(adjustPreview.buffer, previewCanvasRef.current);
+    return { canvas: previewCanvasRef.current, rect: adjustPreview.rect };
+  }, [adjustPreview]);
 }
 
 const hostStyle: React.CSSProperties = {
