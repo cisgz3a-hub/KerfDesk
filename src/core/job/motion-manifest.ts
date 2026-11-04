@@ -1,4 +1,5 @@
 import type { MachineKind } from '../scene';
+import type { MotionBlockSequence } from './motion-block-columns';
 
 export type MotionPoint = {
   readonly x: number;
@@ -23,7 +24,9 @@ export type MotionBlock = {
 };
 
 export type MotionManifest = {
-  readonly blocks: ReadonlyArray<MotionBlock>;
+  /** Columns from the parser (`MotionBlockColumns`); a plain array from
+   * fixtures and from archives written before ADR-244 Amendment 3. */
+  readonly blocks: MotionBlockSequence;
   readonly totalRouteMm: number;
   readonly sendableLineCount: number;
   readonly firstProcessPoint: MotionPoint | null;
@@ -41,3 +44,9 @@ export type BuildMotionManifestOptions = {
 };
 
 export { buildMotionManifest } from './motion-manifest-parser';
+export {
+  findMotionBlock,
+  MotionBlockColumns,
+  motionBlocksHaveProgramLineNumbers,
+  type MotionBlockSequence,
+} from './motion-block-columns';

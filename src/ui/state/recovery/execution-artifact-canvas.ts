@@ -1,12 +1,15 @@
 import type { CanvasMotionPlan } from '../canvas-motion-plan';
-import type { MotionManifest } from '../../../core/job/motion-manifest';
+import { MotionBlockColumns, type MotionManifest } from '../../../core/job/motion-manifest';
 import type { ExecutionArtifactV1 } from './execution-artifact';
+import { canvasExecutablePlan, registerCanvasExecutablePlan } from '../canvas-preview-motion';
 import {
+  hasColumnPackedEncoding,
   hasPackedMotionEncoding,
-  isPackedMotionManifest,
+  isArchivedPackedMotionManifest,
   packMotionManifest,
   unpackMotionManifest,
-  type PackedMotionManifest,
+  unpackTrustedMotionManifest,
+  type ArchivedPackedMotionManifest,
   type PackMotionManifestOptions,
 } from './packed-motion-manifest';
 
@@ -16,7 +19,7 @@ const PACK_MANIFEST_MINIMUM_POINTS = PACK_MANIFEST_MINIMUM_BLOCKS * 2;
 export type ArchivedCanvasMotionPlan =
   | CanvasMotionPlan
   | (Omit<CanvasMotionPlan, 'manifest'> & {
-      readonly manifest: PackedMotionManifest;
+      readonly manifest: ArchivedPackedMotionManifest;
     });
 
 const hydratedPlans = new WeakMap<ArchivedCanvasMotionPlan, CanvasMotionPlan>();
@@ -32,9 +35,21 @@ export function archiveCanvasMotionPlan(
   plan: CanvasMotionPlan,
   options: PackMotionManifestOptions = {},
 ): ArchivedCanvasMotionPlan {
-  // Minimal pre-existing fixtures and small legacy plans retain their shape.
-  if (plan.manifest === undefined || !manifestNeedsCompaction(plan.manifest)) return plan;
-  return { ...plan, manifest: packMotionManifest(plan.manifest, options) };
+  if (plan.manifest === undefined) return plan;
+  if (manifestNeedsCompaction(plan.manifest)) {
+    return { ...plan, manifest: packMotionManifest(plan.manifest, options) };
+  }
+  // Minimal fixtures and small plans keep plain blocks, as before columns: a
+  // structured clone would strip the columns' class (ADR-244 Amendment 3).
+  if (!(plan.manifest.blocks instanceof MotionBlockColumns)) return plan;
+  const plain = {
+    ...plan,
+    manifest: { ...plan.manifest, blocks: Array.from(plan.manifest.blocks) },
+  };
+  // The same program, so a verified plan this thread associated stays with it.
+  const executable = canvasExecutablePlan(plan);
+  if (executable !== undefined) registerCanvasExecutablePlan(plain, executable);
+  return plain;
 }
 
 function manifestNeedsCompaction(manifest: MotionManifest): boolean {
@@ -58,7 +73,7 @@ export function executionArtifactCanvasPlan(
   if (!hasPackedMotionEncoding(plan.manifest)) return plan as CanvasMotionPlan;
   const cached = hydratedPlans.get(plan);
   if (cached !== undefined) return cached;
-  if (!isPackedMotionManifest(plan.manifest))
+  if (!isArchivedPackedMotionManifest(plan.manifest))
     throw new Error('The archived motion manifest is invalid.');
   const hydrated = { ...plan, manifest: unpackMotionManifest(plan.manifest) };
   hydratedPlans.set(plan, hydrated);
@@ -82,5 +97,15 @@ export function isArchivedCanvasMotionPlan(
         Array.isArray((manifest as Record<string, unknown>)['blocks']))
     );
   }
-  return isPackedMotionManifest(manifest, { rawLines, sendableLines });
+  return isArchivedPackedMotionManifest(manifest, { rawLines, sendableLines });
+}
+
+/** The Start handoff from the preparation worker (ADR-345): its columns are
+ * wrapped, not validated or copied. Archives use `executionArtifactCanvasPlan`. */
+export function transferredCanvasMotionPlan(plan: ArchivedCanvasMotionPlan): CanvasMotionPlan {
+  if (!hasPackedMotionEncoding(plan.manifest)) return plan as CanvasMotionPlan;
+  if (!hasColumnPackedEncoding(plan.manifest)) {
+    return executionArtifactCanvasPlan({ canvasPlan: plan });
+  }
+  return { ...plan, manifest: unpackTrustedMotionManifest(plan.manifest) };
 }

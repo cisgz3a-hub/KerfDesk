@@ -45,10 +45,10 @@ function blockAtRoute(manifest: MotionManifest, route: number): MotionBlock | un
   let high = manifest.blocks.length - 1;
   while (low < high) {
     const middle = (low + high) >>> 1;
-    if ((manifest.blocks[middle]?.routeEndMm ?? 0) < route) low = middle + 1;
+    if ((manifest.blocks.at(middle)?.routeEndMm ?? 0) < route) low = middle + 1;
     else high = middle;
   }
-  return manifest.blocks[low];
+  return manifest.blocks.at(low);
 }
 
 function firstSegmentAtLine(model: InspectorRenderModel, line: number): number {

@@ -86,7 +86,7 @@ export function buildLaserRecoveryPreviewRoute(
 export function recoveryRouteFromCanvasPlan(plan: CanvasMotionPlan): RecoveryPreviewRoute | null {
   const manifest: CanvasMotionPlan['manifest'] | undefined = plan.manifest;
   if (
-    !Array.isArray(manifest?.blocks) ||
+    manifest?.blocks === undefined ||
     plan.device === undefined ||
     plan.coordinateFrame === undefined
   ) {

@@ -10,13 +10,14 @@
 // handoff-consistency checks — the program factually cannot be produced or
 // streamed, or the reviewed evidence does not bind to these bytes.
 
-import { findOversizedLine, isSendableGcodeLine } from '../../core/controllers/grbl';
+import { findOversizedLine } from '../../core/controllers/grbl';
 import {
   findLineBufferOverflow,
   lineBufferOverflowMessage,
 } from '../../core/controllers/grbl/line-buffer-limit';
 import {
   findFirstUnencodableSendableLine,
+  hasSendableGcodeLine,
   unencodableLineMessage,
 } from '../../core/controllers/grbl/sendable-line-scan';
 import { findFluidncNonExecutableLines } from '../../core/controllers/fluidnc/fluidnc-line-limit';
@@ -35,7 +36,7 @@ export const EMPTY_PROGRAM_MESSAGE = 'The job contains no sendable G-code comman
 
 /** Throws when the program carries no line the streamer could ever send. */
 export function assertProgramHasSendableLine(gcode: string): void {
-  if (gcode.split('\n').some(isSendableGcodeLine)) return;
+  if (hasSendableGcodeLine(gcode)) return;
   throw new Error(EMPTY_PROGRAM_MESSAGE);
 }
 

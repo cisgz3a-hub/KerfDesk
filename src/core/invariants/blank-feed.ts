@@ -22,7 +22,7 @@
 
 import { scanModalMotionLine, type GcodeMotionMode } from '../gcode/modal-motion-line';
 import type { Issue } from './predicates';
-import { asGcodeLines, parseGcodeWord, stripGcodeComment } from './gcode-words';
+import { iterateGcodeLines, parseGcodeWord, stripGcodeComment } from './gcode-words';
 
 export type BlankFeedIssue = Issue & { readonly distanceMm: number };
 
@@ -34,11 +34,11 @@ export type BlankFeedOptions = { readonly thresholdMm: number };
 const DISTANCE_QUANTIZATION_TOLERANCE_MM = 0.002;
 
 export function findLongBlankFeedMoves(
-  gcode: string | ReadonlyArray<string>,
+  gcode: string | Iterable<string>,
   options: BlankFeedOptions,
 ): readonly BlankFeedIssue[] {
   const threshold = options.thresholdMm;
-  const lines = asGcodeLines(gcode);
+  let lineNumber = 0;
   const issues: BlankFeedIssue[] = [];
   // The controller starts parked at the origin; X/Y/S are modal thereafter.
   let x = 0;
@@ -49,9 +49,8 @@ export function findLongBlankFeedMoves(
   // Motion is modal: a compact coordinate-only block inherits G0-G3 from the
   // previous one, so requiring a leading G word would skip it entirely.
   let motion: GcodeMotionMode | null = 0;
-  for (let i = 0; i < lines.length; i += 1) {
-    const raw = lines[i];
-    if (raw === undefined) continue;
+  for (const raw of iterateGcodeLines(gcode)) {
+    lineNumber += 1;
     const stripped = stripGcodeComment(raw);
     if (stripped === '') continue;
     const sVal = parseGcodeWord(stripped, 'S');
@@ -72,7 +71,7 @@ export function findLongBlankFeedMoves(
     const distanceMm = Math.hypot(x - fromX, y - fromY);
     if (distanceMm - threshold > DISTANCE_QUANTIZATION_TOLERANCE_MM) {
       issues.push({
-        lineNumber: i + 1,
+        lineNumber,
         line: raw,
         reason: `blank G1 feed move ${distanceMm.toFixed(3)} mm exceeds ${threshold.toFixed(3)} mm`,
         distanceMm,

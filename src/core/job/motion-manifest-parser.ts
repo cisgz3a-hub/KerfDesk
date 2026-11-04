@@ -1,7 +1,10 @@
 import { isSendableGcodeLine } from '../controllers/grbl';
 import { applySharedGCode, resolveAxisTarget, scanGcodeWords, stripInlineComments } from '../gcode';
 import type { MachineKind } from '../scene';
+import { iterateLines } from '../util/iterate-lines';
 import { sampleMotionArc } from './motion-manifest-arc';
+import { polylineLength } from './motion-block-columns';
+import { MotionBlockColumnsBuilder } from './motion-block-columns-builder';
 import type {
   BuildMotionManifestOptions,
   MotionBlock,
@@ -33,7 +36,7 @@ type ParsedWords = {
 type ManifestBuildState = {
   readonly machineKind: MachineKind;
   readonly modal: ModalState;
-  readonly blocks: MotionBlock[];
+  readonly blocks: MotionBlockColumnsBuilder;
   readonly parkBoundaries: number[];
   firstProcessPoint: MotionPoint | null;
   sendableLineIndex: number;
@@ -48,23 +51,36 @@ export function buildMotionManifest(
   const build: ManifestBuildState = {
     machineKind: options.machineKind,
     modal: initialModalState(initial, options.laserPowerControl === 'smoothieware'),
-    blocks: [],
+    blocks: new MotionBlockColumnsBuilder(lineCountUpperBound(gcode)),
     parkBoundaries: [],
     firstProcessPoint: null,
     sendableLineIndex: 0,
     routeMm: 0,
   };
-  for (const [rawLineIndex, rawLine] of gcode.split(/\r\n|\n|\r/).entries()) {
+  // One line at a time: the lines `split(/\r\n|\n|\r/)` gives, never all at once.
+  let rawLineIndex = 0;
+  for (const rawLine of iterateLines(gcode)) {
     appendManifestLine(build, rawLine, rawLineIndex);
+    rawLineIndex += 1;
   }
-  const classified = classifyParks(build.blocks, build.parkBoundaries);
+  classifyParks(build.blocks, build.parkBoundaries);
   return {
-    blocks: classified,
+    blocks: build.blocks.finish(),
     totalRouteMm: build.routeMm,
     sendableLineCount: build.sendableLineIndex,
     firstProcessPoint: build.firstProcessPoint,
-    finalPoint: classified.at(-1)?.points.at(-1) ?? null,
+    finalPoint: build.blocks.lastBlockPoint(),
   };
+}
+
+/** A line yields at most one block, so this sizes the block columns once. */
+function lineCountUpperBound(gcode: string): number {
+  let lines = 1;
+  for (let index = 0; index < gcode.length; index += 1) {
+    const character = gcode.charCodeAt(index);
+    if (character === 10 || character === 13) lines += 1;
+  }
+  return lines;
 }
 
 // Smoothieware powers up with its M221 scale at 100%.
@@ -220,38 +236,45 @@ function classifyMotion(
   return state.spindleArmed && state.power > 0 ? 'process' : 'travel';
 }
 
+// Every park is found from the kinds as parsed and only then applied, so one
+// boundary's park never hides the travel another boundary picks.
 function classifyParks(
-  blocks: ReadonlyArray<MotionBlock>,
+  blocks: MotionBlockColumnsBuilder,
   parkBoundaries: ReadonlyArray<number>,
-): ReadonlyArray<MotionBlock> {
-  const lastProcess = blocks.findLastIndex((block) => block.kind === 'process');
-  if (lastProcess < 0) return blocks;
+): void {
+  const lastProcess = lastBlockWhere(blocks.length, (index) => blocks.kindAt(index) === 'process');
+  if (lastProcess < 0) return;
   const parkIndexes = new Set<number>();
-  const finalParkIndex = blocks.findLastIndex(
-    (block, index) => index > lastProcess && block.kind === 'travel',
+  const finalParkIndex = lastBlockWhere(
+    blocks.length,
+    (index) => index > lastProcess && blocks.kindAt(index) === 'travel',
   );
   if (finalParkIndex >= 0) parkIndexes.add(finalParkIndex);
   for (const boundary of parkBoundaries) {
-    const index = blocks.findLastIndex(
-      (block) => block.rawLineIndex < boundary && block.kind === 'travel',
+    // Blocks are in raw-line order, so those before the boundary are a prefix.
+    const index = lastBlockWhere(
+      firstBlockAtOrAfterLine(blocks, boundary),
+      (candidate) => blocks.kindAt(candidate) === 'travel',
     );
     if (index >= 0) parkIndexes.add(index);
   }
-  return blocks.map((block, index) =>
-    parkIndexes.has(index) ? { ...block, kind: 'park' } : block,
-  );
+  for (const index of parkIndexes) blocks.setKind(index, 'park');
 }
 
-function polylineLength(points: ReadonlyArray<MotionPoint>): number {
-  let length = 0;
-  for (let index = 1; index < points.length; index += 1) {
-    const a = points[index - 1];
-    const b = points[index];
-    if (a !== undefined && b !== undefined) {
-      length += Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
-    }
+function lastBlockWhere(end: number, matches: (index: number) => boolean): number {
+  for (let index = end - 1; index >= 0; index -= 1) if (matches(index)) return index;
+  return -1;
+}
+
+function firstBlockAtOrAfterLine(blocks: MotionBlockColumnsBuilder, rawLine: number): number {
+  let low = 0;
+  let high = blocks.length;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (blocks.rawLineIndexAt(middle) < rawLine) low = middle + 1;
+    else high = middle;
   }
-  return length;
+  return low;
 }
 
 /** Distance travelled in the XY plane, ignoring Z, along the sampled path. */

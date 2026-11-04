@@ -130,10 +130,10 @@ function streamAgainstOracle(
   let headIndex = 0;
   while (accepted < manifest.sendableLineCount) {
     accepted = Math.min(manifest.sendableLineCount, accepted + 1 + Math.floor(random() * 60));
-    while ((manifest.blocks[endIndex]?.sendableLineIndex ?? Infinity) < accepted) endIndex += 1;
+    while ((manifest.blocks.at(endIndex)?.sendableLineIndex ?? Infinity) < accepted) endIndex += 1;
     if (endIndex === 0) continue;
     headIndex = Math.max(headIndex, endIndex - 1 - Math.floor(random() * Math.min(endIndex, 100)));
-    const head = manifest.blocks[headIndex]!;
+    const head = manifest.blocks.at(headIndex)!;
     const offRoute = random() < 0.1;
     const reported = pointOnBlock(head, random, offRoute ? 0 : 0.6);
     const input: RouteReconciliationInput = {

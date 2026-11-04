@@ -29,7 +29,7 @@ import {
   currentReplayExecutionSignature,
   replayCompilationMatches,
 } from '../start-job-execution-tracking';
-import { requiredFrameIssueFromPrepared } from '../required-frame-readiness';
+import { requiredFrameIssueFromStart } from '../required-frame-readiness';
 import {
   prepareCurrentStartJob,
   startMachineInputsKey,
@@ -475,9 +475,6 @@ function frameFirstRefusal(
   bundle: ReviewedStartBundle,
 ): Extract<RebuiltStart, { readonly ok: false }> | null {
   if (purpose !== 'start') return null;
-  const frameIssue = requiredFrameIssueFromPrepared({
-    prepared: bundle.prepared.prepared,
-    machine: bundle.laser,
-  });
+  const frameIssue = requiredFrameIssueFromStart(bundle.prepared, bundle.laser);
   return frameIssue === null ? null : { ok: false, messages: [frameIssue], display: bundle };
 }

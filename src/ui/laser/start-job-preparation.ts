@@ -21,7 +21,10 @@ import {
   type CanvasMotionPlan,
 } from '../state/canvas-motion-plan';
 import { canvasExecutablePlan } from '../state/canvas-preview-motion';
-import { canvasExecutableSidecarWithinBudget } from '../state/canvas-program-analysis-budget';
+import {
+  canvasExecutableSidecarWithinBudget,
+  canvasProgramExceedsLineBudget,
+} from '../state/canvas-program-analysis-budget';
 import type { CncToolPlanEntry } from '../state/cnc-tool-plan';
 import { inferCurrentMachinePosition } from '../state/infer-machine-position';
 import type { MachineStartSnapshot, StartJobPreparation } from './start-job-readiness';
@@ -74,15 +77,6 @@ export function okPreparation(
   reportInches: boolean,
   retentionKey: string,
 ): StartJobPreparation {
-  const canvasPlan = buildCanvasMotionPlan({
-    gcode,
-    prepared,
-    machine,
-    ...(machine.statusQuery === undefined ? {} : { statusQuery: machine.statusQuery }),
-    reportInches,
-    retentionKey,
-    ...(jobOrigin === undefined ? {} : { jobOrigin }),
-  });
   const jobTimingPlan = canvasJobTimingPlan(
     gcode,
     deviceForActiveHead(prepared.project.device, prepared.project.machine),
@@ -94,25 +88,44 @@ export function okPreparation(
       activeControllerKind: machine.activeControllerKind,
       detectedControllerKind: machine.detectedControllerKind,
     },
-    canvasPlan.machineKind,
+    machineKindOf(prepared.project.machine),
   );
-  const executablePlan = executablePlanForCalculatedBounds({
-    canvasPlan,
+  const metricsFor = (executablePlan: ExecutablePlanV1 | undefined) =>
+    buildPreparedJobMetrics(prepared, jobOrigin, executablePlan, {
+      gcode,
+      ...(jobTimingPlan.kind === 'ok'
+        ? { timeline: jobTimingPlan.plan }
+        : jobTimingPlan.reason === DWELL_EVIDENCE_UNAVAILABLE_REASON
+          ? { unavailableReason: jobTimingPlan.reason }
+          : {}),
+      ...(jobTimingPlan.evidence.initialPosition === null
+        ? {}
+        : { initialPosition: jobTimingPlan.evidence.initialPosition }),
+    });
+  // Past the analysis line budget no executable sidecar exists to take bounds
+  // from, so the metrics need no canvas plan. Building them first frees the
+  // duration planner's columns before the motion manifest is allocated: a
+  // bed-sized photo held both at once (ADR-244 Amendment 3).
+  const denseMetrics = canvasProgramExceedsLineBudget(gcode) ? metricsFor(undefined) : undefined;
+  const canvasPlan = buildCanvasMotionPlan({
     gcode,
     prepared,
+    machine,
+    ...(machine.statusQuery === undefined ? {} : { statusQuery: machine.statusQuery }),
+    reportInches,
+    retentionKey,
     ...(jobOrigin === undefined ? {} : { jobOrigin }),
   });
-  const metrics = buildPreparedJobMetrics(prepared, jobOrigin, executablePlan, {
-    gcode,
-    ...(jobTimingPlan.kind === 'ok'
-      ? { timeline: jobTimingPlan.plan }
-      : jobTimingPlan.reason === DWELL_EVIDENCE_UNAVAILABLE_REASON
-        ? { unavailableReason: jobTimingPlan.reason }
-        : {}),
-    ...(jobTimingPlan.evidence.initialPosition === null
-      ? {}
-      : { initialPosition: jobTimingPlan.evidence.initialPosition }),
-  });
+  const metrics =
+    denseMetrics ??
+    metricsFor(
+      executablePlanForCalculatedBounds({
+        canvasPlan,
+        gcode,
+        prepared,
+        ...(jobOrigin === undefined ? {} : { jobOrigin }),
+      }),
+    );
   return {
     ok: true,
     gcode,

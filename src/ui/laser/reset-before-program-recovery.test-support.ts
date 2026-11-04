@@ -189,7 +189,9 @@ export async function resetBoundaryRecoveryFixture() {
   });
   const capsule = repository.getSnapshot().recoveryCapsule;
   if (capsule === null) throw new Error('Expected the original recovery capsule.');
-  const first = prepared.canvasPlan.manifest.blocks.find((block) => block.kind === 'process');
+  const first = Array.from(prepared.canvasPlan.manifest.blocks).find(
+    (block) => block.kind === 'process',
+  );
   if (first === undefined) throw new Error('Expected process movement.');
   return { project, prepared, artifact, repository, capsule, fromLine: first.rawLineIndex + 1 };
 }

@@ -21,6 +21,8 @@ import { useCameraStore } from '../state/camera-store';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { createExecutionArtifact, type ExecutionArtifactV1 } from '../state/recovery';
+import { executionArtifactCanvasPlan } from '../state/recovery/execution-artifact-canvas';
+import type { CanvasMotionPlan } from '../state/canvas-motion-plan';
 import { resetStore } from '../state/test-helpers';
 import { frameVerificationForProject } from './frame-verification-testing';
 import { prepareStartJob } from './start-job-readiness';
@@ -143,6 +145,10 @@ afterEach(() => {
   useLaserStore.setState(initialLaserState());
 });
 
+function withBlocksRead(plan: CanvasMotionPlan) {
+  return { ...plan, manifest: { ...plan.manifest, blocks: Array.from(plan.manifest.blocks) } };
+}
+
 describe('archived exact costly recovery', () => {
   it('qualifies the bound artifact without synchronously recompiling its project', () => {
     const fixture = exactVCarveArtifact();
@@ -156,7 +162,11 @@ describe('archived exact costly recovery', () => {
     expect(gcodeMocks.prepareOutput).not.toHaveBeenCalled();
     expect(recovered).not.toBeNull();
     expect(recovered?.gcode).toBe(fixture.artifact.gcode);
-    expect(recovered?.canvasPlan).toEqual(fixture.artifact.canvasPlan);
+    // The archive keeps a small plan's blocks plain; the qualified plan holds
+    // the parser's columns (ADR-244 Amendment 3). The blocks are the same.
+    expect(recovered === null ? null : withBlocksRead(recovered.canvasPlan)).toEqual(
+      withBlocksRead(executionArtifactCanvasPlan(fixture.artifact)),
+    );
     expect(recovered?.prepared.job).toEqual(fixture.artifact.prepared.job);
     expectNoSourceGeometryPlanning();
   });

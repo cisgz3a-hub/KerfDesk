@@ -28,7 +28,7 @@ export function legacyReconcileReportedPosition(
     input.previous.confirmedRouteMm - BACKTRACK_ALLOWANCE_MM,
   );
   for (let blockIndex = startIndex; blockIndex < input.manifest.blocks.length; blockIndex += 1) {
-    const block = input.manifest.blocks[blockIndex];
+    const block = input.manifest.blocks.at(blockIndex);
     if (block === undefined) continue;
     if (block.sendableLineIndex > lineCeiling) break;
     if (!blockMayBeExecuting(block, lineCeiling, hasProgramLineNumbers, input)) continue;
@@ -54,7 +54,7 @@ export function legacyReconcileReportedPosition(
 function manifestHasProgramLineNumbers(manifest: MotionManifest): boolean {
   const cached = lineNumberPresenceCache.get(manifest);
   if (cached !== undefined) return cached;
-  const present = manifest.blocks.some((block) => block.programLineNumber !== null);
+  const present = Array.from(manifest.blocks).some((block) => block.programLineNumber !== null);
   lineNumberPresenceCache.set(manifest, present);
   return present;
 }
@@ -64,7 +64,7 @@ function firstForwardBlockIndex(blocks: MotionManifest['blocks'], routeFloorMm: 
   let high = blocks.length;
   while (low < high) {
     const middle = Math.floor((low + high) / 2);
-    const block = blocks[middle];
+    const block = blocks.at(middle);
     if (block !== undefined && block.routeEndMm >= routeFloorMm) high = middle;
     else low = middle + 1;
   }

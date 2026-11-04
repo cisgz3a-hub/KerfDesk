@@ -41,6 +41,37 @@ function visitSendableLines(gcode: string, visit: (first: number, end: number) =
   }
 }
 
+/** Index after the last character of [first, end) that trim() would keep. */
+function lastKept(text: string, first: number, end: number): number {
+  let index = end;
+  while (index > first && isTrimWhitespace(text, index - 1)) index -= 1;
+  return index;
+}
+
+export function countSendableGcodeLines(gcode: string): number {
+  let count = 0;
+  visitSendableLines(gcode, () => {
+    count += 1;
+    return false;
+  });
+  return count;
+}
+
+/** The streamer's queue as counts: its lines and their streamed bytes. */
+export function measureSendableLines(gcode: string): {
+  readonly lines: number;
+  readonly bytes: number;
+} {
+  let lines = 0;
+  let bytes = 0;
+  visitSendableLines(gcode, (first, end) => {
+    lines += 1;
+    bytes += lastKept(gcode, first, end) - first + 1;
+    return false;
+  });
+  return { lines, bytes };
+}
+
 export function hasSendableGcodeLine(gcode: string): boolean {
   let found = false;
   visitSendableLines(gcode, () => {

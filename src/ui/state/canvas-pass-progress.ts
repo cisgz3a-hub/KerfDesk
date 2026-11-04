@@ -9,7 +9,11 @@
 
 import type { DeviceProfile } from '../../core/devices';
 import type { Job } from '../../core/job';
-import type { MotionBlock, MotionManifest } from '../../core/job/motion-manifest';
+import type {
+  MotionBlock,
+  MotionBlockSequence,
+  MotionManifest,
+} from '../../core/job/motion-manifest';
 import {
   emitCncJobWithPassSpans,
   type CncPassSpan,
@@ -77,18 +81,18 @@ export function cncPassPosition(
 // forward walk maps every span without rescanning the manifest.
 function mapSpansToRoute(
   spans: ReadonlyArray<CncPassSpan>,
-  blocks: ReadonlyArray<MotionBlock>,
+  blocks: MotionBlockSequence,
 ): ReadonlyArray<CncPassRouteSpan> {
   const mapped: CncPassRouteSpan[] = [];
   let blockIndex = 0;
   for (const span of spans) {
-    while (blockIndex < blocks.length && rawLineOf(blocks[blockIndex]) < span.firstRawLine) {
+    while (blockIndex < blocks.length && rawLineOf(blocks.at(blockIndex)) < span.firstRawLine) {
       blockIndex += 1;
     }
     let routeStartMm = Number.POSITIVE_INFINITY;
     let routeEndMm = Number.NEGATIVE_INFINITY;
-    while (blockIndex < blocks.length && rawLineOf(blocks[blockIndex]) <= span.lastRawLine) {
-      const block = blocks[blockIndex];
+    while (blockIndex < blocks.length && rawLineOf(blocks.at(blockIndex)) <= span.lastRawLine) {
+      const block = blocks.at(blockIndex);
       if (block !== undefined) {
         routeStartMm = Math.min(routeStartMm, block.routeStartMm);
         routeEndMm = Math.max(routeEndMm, block.routeEndMm);

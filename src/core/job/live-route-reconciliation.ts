@@ -1,3 +1,4 @@
+import { motionBlocksHaveProgramLineNumbers } from './motion-block-columns';
 import type { MotionBlock, MotionManifest, MotionPoint } from './motion-manifest';
 
 export type RouteCandidate = {
@@ -64,7 +65,7 @@ export function reconcileReportedPosition(
   const endIndex = firstBlockIndexWhere(blocks, (block) => block.sendableLineIndex > lineCeiling);
   const startIndex = scanStartIndex(blocks, endIndex, input.previous.confirmedRouteMm);
   for (let blockIndex = startIndex; blockIndex < endIndex; blockIndex += 1) {
-    const block = blocks[blockIndex];
+    const block = blocks.at(blockIndex);
     if (block === undefined) continue;
     if (!blockMayBeExecuting(block, lineCeiling, hasProgramLineNumbers, input)) continue;
     collectBlockCandidates(
@@ -89,7 +90,7 @@ export function reconcileReportedPosition(
 function manifestHasProgramLineNumbers(manifest: MotionManifest): boolean {
   const cached = lineNumberPresenceCache.get(manifest);
   if (cached !== undefined) return cached;
-  const present = manifest.blocks.some((block) => block.programLineNumber !== null);
+  const present = motionBlocksHaveProgramLineNumbers(manifest.blocks);
   lineNumberPresenceCache.set(manifest, present);
   return present;
 }
@@ -122,7 +123,7 @@ function firstBlockIndexWhere(
   let high = blocks.length;
   while (low < high) {
     const middle = Math.floor((low + high) / 2);
-    const block = blocks[middle];
+    const block = blocks.at(middle);
     if (block !== undefined && isAtOrPast(block)) high = middle;
     else low = middle + 1;
   }

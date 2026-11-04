@@ -94,9 +94,9 @@ describe('owned image clips in displayed and emitted raster output', () => {
 
       const emitted = emitGcode(project);
       expect(emitted.gcode.length).toBeGreaterThan(0);
-      const powered = buildMotionManifest(emitted.gcode, { machineKind: 'laser' }).blocks.filter(
-        (block) => block.kind === 'process',
-      );
+      const powered = Array.from(
+        buildMotionManifest(emitted.gcode, { machineKind: 'laser' }).blocks,
+      ).filter((block) => block.kind === 'process');
       const width = (group.bounds.maxX - group.bounds.minX) / 4;
       const height = (group.bounds.maxY - group.bounds.minY) / 4;
       const actual = Array.from({ length: 16 }, (_value, index) =>

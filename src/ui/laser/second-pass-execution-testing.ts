@@ -50,7 +50,9 @@ export async function createSecondPassExecutionFixture(
   await repository.stageArtifact(source);
   await repository.activateFreshRun(source.runId);
   await repository.completeRun(source.runId);
-  const process = original.canvasPlan.manifest.blocks.find((block) => block.kind === 'process');
+  const process = Array.from(original.canvasPlan.manifest.blocks).find(
+    (block) => block.kind === 'process',
+  );
   const from = process?.points[0];
   const to = process?.points.at(-1);
   if (from === undefined || to === undefined)
