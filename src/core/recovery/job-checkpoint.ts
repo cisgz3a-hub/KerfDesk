@@ -15,6 +15,7 @@
 // Pure core: timestamps are passed in as ISO strings; no clock, no storage.
 
 import { isSendableGcodeLine } from '../controllers/grbl';
+import { isSendableLineSpan } from '../controllers/grbl/sendable-line-scan';
 import { JOB_ORIGIN_ANCHORS, type JobOriginAnchor, type JobOriginPlacement } from '../job';
 import type { OutputScope, Vec2 } from '../scene';
 import { parseOptionalJobInterruption, type JobInterruption } from './job-interruption';
@@ -79,7 +80,8 @@ export function fingerprintGcode(gcode: string): GcodeFingerprint {
 
 export function* fingerprintGcodeSteps(gcode: string): WorkSteps<GcodeFingerprint> {
   let hash = FNV_OFFSET_BASIS;
-  // One more than the line feeds: the length of the program's '\n' split.
+  // `split('\n').length`, counted in the same pass: splitting an 8 M line
+  // program built 8 M strings to read one number (ADR-244 Amendment 3).
   let lines = 1;
   for (let start = 0; start < gcode.length; start += TEXT_STEP_CHARS) {
     const end = Math.min(gcode.length, start + TEXT_STEP_CHARS);
@@ -100,19 +102,22 @@ export function fingerprintsEqual(a: GcodeFingerprint, b: GcodeFingerprint): boo
   return a.fnv1a === b.fnv1a && a.chars === b.chars && a.lines === b.lines;
 }
 
+/** `isSendableGcodeLine` over `split('\n')`, counted without the split. */
 export function countSendableLines(gcode: string): number {
   return runWorkSteps(countSendableLinesSteps(gcode));
 }
 
-/** Visits the same lines as the program's '\n' split, the last one included. */
+/** Visits the same lines as the program's '\n' split, the last one included,
+ * testing each in place (ADR-244 Amendment 3). */
 export function* countSendableLinesSteps(gcode: string): WorkSteps<number> {
   let count = 0;
   let start = 0;
   let checkpoint = TEXT_STEP_CHARS;
   for (;;) {
-    const end = gcode.indexOf('\n', start);
-    if (isSendableGcodeLine(end < 0 ? gcode.slice(start) : gcode.slice(start, end))) count += 1;
-    if (end < 0) return count;
+    const newline = gcode.indexOf('\n', start);
+    const end = newline < 0 ? gcode.length : newline;
+    if (isSendableLineSpan(gcode, start, end)) count += 1;
+    if (newline < 0) return count;
     start = end + 1;
     if (start >= checkpoint) {
       checkpoint = start + TEXT_STEP_CHARS;

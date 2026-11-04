@@ -4,6 +4,7 @@ import { mapControllerPointToScene, type CanvasMotionPlan } from '../state/canva
 import {
   canvasPreviewMotionSequence,
   type CanvasPreviewMotion,
+  type CanvasPreviewMotionSequence,
 } from '../state/canvas-preview-motion';
 
 export type RouteSegment = {
@@ -23,7 +24,7 @@ export function routeMotionAt(
   routeMm: number,
 ): CanvasPreviewMotion | undefined {
   const motions = canvasPreviewMotionSequence(plan).motions;
-  const motion = motions[firstMotionEndingAfter(motions, routeMm)];
+  const motion = motions.at(firstMotionEndingAfter(motions, routeMm));
   return motion !== undefined && motion.routeStartMm <= routeMm ? motion : undefined;
 }
 
@@ -46,7 +47,7 @@ export function visitRouteRange(
   const motions = canvasPreviewMotionSequence(plan).motions;
   const first = firstMotionEndingAfter(motions, fromRouteMm);
   for (let index = first; index < motions.length; index += 1) {
-    const motion = motions[index];
+    const motion = motions.at(index);
     if (motion === undefined || motion.routeStartMm >= toRouteMm) break;
     visitMotionRange(plan, motion, fromRouteMm, toRouteMm, visit);
   }
@@ -168,7 +169,7 @@ export function walkRouteLines(
     index < motions.length;
     index += 1
   ) {
-    const motion = motions[index];
+    const motion = motions.at(index);
     if (motion === undefined || motion.routeStartMm >= toRouteMm) break;
     const stoppedAt = walkMotionLines(motion, fromRouteMm, toRouteMm, map, visit);
     if (stoppedAt !== null) return stoppedAt;
@@ -228,14 +229,14 @@ function snapUnit(value: number): number {
 }
 
 function firstMotionEndingAfter(
-  motions: ReadonlyArray<CanvasPreviewMotion>,
+  motions: CanvasPreviewMotionSequence['motions'],
   routeMm: number,
 ): number {
   let low = 0;
   let high = motions.length;
   while (low < high) {
     const middle = Math.floor((low + high) / 2);
-    const motion = motions[middle];
+    const motion = motions.at(middle);
     if (motion !== undefined && motion.routeEndMm > routeMm) high = middle;
     else low = middle + 1;
   }

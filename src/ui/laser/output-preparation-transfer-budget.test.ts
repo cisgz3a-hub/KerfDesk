@@ -6,16 +6,15 @@ import { describe, expect, it } from 'vitest';
 import type { MotionManifest, MotionPoint } from '../../core/job/motion-manifest';
 import type { CanvasMotionPlan } from '../state/canvas-motion-plan';
 import { archiveCanvasMotionPlan } from '../state/recovery/execution-artifact-canvas';
-import {
-  packedMotionManifestBytes,
-  PACKED_POINT_WIDTH,
-} from '../state/recovery/packed-motion-manifest';
+import { packedMotionManifestBytes } from '../state/recovery/packed-motion-manifest';
 import { MAX_EXECUTION_ARTIFACT_ESTIMATED_BYTES } from '../state/recovery/execution-artifact-size';
 
 /** A manifest whose packed encoding is provably past the archive budget. */
 function oversizedManifest(): MotionManifest {
   const pointsPerBlock = 64;
-  const bytesPerBlock = (10 + pointsPerBlock * PACKED_POINT_WIDTH) * Float64Array.BYTES_PER_ELEMENT;
+  // Block columns (raw, sendable, kind, point end, route end) and x/y doubles:
+  // no block starts where the previous one ended, so every point is stored.
+  const bytesPerBlock = 4 + 4 + 1 + 4 + 8 + pointsPerBlock * 16;
   const blockCount = Math.ceil(MAX_EXECUTION_ARTIFACT_ESTIMATED_BYTES / bytesPerBlock) + 1;
   const points: MotionPoint[] = Array.from({ length: pointsPerBlock }, (_unused, index) => ({
     x: index,

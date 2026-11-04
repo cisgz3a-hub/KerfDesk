@@ -8,6 +8,7 @@ import type { PreparedOutput } from '../../io/gcode';
 import { isVerifiedFrameValid, type FrameVerification } from '../state/frame-verification';
 import type { WorkCoordinateOffset } from '../state/origin-actions';
 import { frameVerificationBlockedMessage } from './frame-verification-policy';
+import type { PreparedJobMetrics } from './prepared-job-metrics';
 
 export type RequiredFrameSnapshot = {
   readonly frameVerification?: FrameVerification | null;
@@ -24,8 +25,17 @@ export type RequiredFrameSnapshot = {
 export function requiredFrameIssueFromPrepared(args: {
   readonly prepared: Extract<PreparedOutput, { readonly ok: true }>;
   readonly machine: RequiredFrameSnapshot;
+  /** The Frame bounds the preparation measured on the job it compiled
+   * (`preparedStartFrameBounds`). Required for a preparation that crossed the
+   * worker boundary: its streamed raster rows arrive only as a recipe
+   * (prepareOutputForStructuredClone), so measuring its job again would find
+   * no image and refuse a Frame that matches (ADR-244 Amendment 3). */
+  readonly measuredFrameBounds?: JobBounds | null;
 }): string | null {
-  const bounds = preparedFrameBounds(args.prepared);
+  const bounds =
+    args.measuredFrameBounds === undefined
+      ? preparedFrameBounds(args.prepared)
+      : args.measuredFrameBounds;
   if (bounds === null) return null;
   const valid = isVerifiedFrameValid(args.machine.frameVerification ?? null, {
     boundsSignature: frameBoundsSignature(bounds),
@@ -36,6 +46,30 @@ export function requiredFrameIssueFromPrepared(args: {
 }
 
 type PreparedOk = Extract<PreparedOutput, { readonly ok: true }>;
+
+/** The frame-first gate for a Start preparation, from the bounds it measured. */
+export function requiredFrameIssueFromStart(
+  start: Parameters<typeof preparedStartFrameBounds>[0],
+  machine: RequiredFrameSnapshot,
+): string | null {
+  return requiredFrameIssueFromPrepared({
+    prepared: start.prepared,
+    machine,
+    measuredFrameBounds: preparedStartFrameBounds(start),
+  });
+}
+
+/** What `preparedFrameBounds` gives, from the metrics the preparation took
+ * of the same machine-space job while its raster rows still existed. */
+export function preparedStartFrameBounds(start: {
+  readonly prepared: PreparedOk;
+  readonly metrics: Pick<PreparedJobMetrics, 'frameJobBounds' | 'frameMotionBounds'>;
+}): JobBounds | null {
+  const { frameJobBounds, frameMotionBounds } = start.metrics;
+  return start.prepared.project.machine?.kind === 'cnc'
+    ? frameJobBounds
+    : (frameMotionBounds ?? frameJobBounds);
+}
 
 // Job Review checks the same immutable compile when it opens and again at
 // Confirm, and walking a dense fill for its envelope cost ~0.2 s each time,

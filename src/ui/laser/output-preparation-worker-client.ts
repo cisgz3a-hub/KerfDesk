@@ -43,7 +43,7 @@ import type {
   TransferredStartJobPreparation,
 } from './output-preparation-protocol';
 import { registerCanvasProgramSource } from '../state/canvas-program-source';
-import { executionArtifactCanvasPlan } from '../state/recovery/execution-artifact-canvas';
+import { transferredCanvasMotionPlan } from '../state/recovery/execution-artifact-canvas';
 import type { PreparedOutput } from '../../io/gcode';
 import type { SaveOutputEmission } from './save-output-emission';
 import type { OutputCompilationProgress } from '../../io/gcode/prepare-output-async';
@@ -96,7 +96,7 @@ export function hydrateTransferredStartPreparation(
   result: TransferredStartJobPreparation,
 ): StartJobPreparation {
   if (!result.ok) return result;
-  const canvasPlan = executionArtifactCanvasPlan({ canvasPlan: result.canvasPlan });
+  const canvasPlan = transferredCanvasMotionPlan(result.canvasPlan);
   registerCanvasProgramSource(canvasPlan, result.gcode);
   return { ...result, canvasPlan };
 }

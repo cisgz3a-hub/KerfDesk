@@ -1,6 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { buildMotionManifest, type MotionManifest } from '../../../core/job/motion-manifest';
+import type { MotionBlockColumnData } from '../../../core/job/motion-block-columns';
+import { buildMotionManifest } from '../../../core/job/motion-manifest';
 import { runWorkSteps, type WorkSteps } from '../../../core/recovery';
 import { ARCHIVE_SLICE_MS, createCooperativeArchiveRunner } from './cooperative-archive-runner';
 import {
@@ -10,7 +11,10 @@ import {
 } from './execution-artifact-size';
 import { utf8BytesSteps } from './execution-provenance';
 import {
+  isPackedMotionManifest,
   isPackedMotionManifestSteps,
+  packedMotionManifestBytes,
+  packedMotionManifestBytesSteps,
   packMotionManifest,
   packMotionManifestSteps,
 } from './packed-motion-manifest';
@@ -24,37 +28,11 @@ function drain<T>(steps: WorkSteps<T>): { readonly value: T; readonly yields: nu
   }
 }
 
-/** The per-block packing these steps replaced (ADR-337 Amendment 1), kept as
- * the oracle for the stored doubles. */
-function referencePackedData(manifest: MotionManifest) {
-  const kinds = ['travel', 'process', 'plunge', 'park'];
-  let pointCount = 0;
-  for (const block of manifest.blocks) pointCount += block.points.length;
-  const blockData = new Float64Array(manifest.blocks.length * 10);
-  const pointData = new Float64Array(pointCount * 3);
-  let pointOffset = 0;
-  manifest.blocks.forEach((block, index) => {
-    blockData.set(
-      [
-        block.rawLineIndex,
-        block.sendableLineIndex,
-        kinds.indexOf(block.kind),
-        pointOffset,
-        block.points.length,
-        block.programLineNumber === null ? 0 : 1,
-        block.programLineNumber ?? 0,
-        block.lengthMm,
-        block.routeStartMm,
-        block.routeEndMm,
-      ],
-      index * 10,
-    );
-    for (const point of block.points) {
-      pointData.set([point.x, point.y, point.z], pointOffset * 3);
-      pointOffset += 1;
-    }
-  });
-  return { blockData, pointData };
+/** A copy of `column` whose last entry is `value`. */
+function withLast<T extends Float64Array | Uint32Array | Uint8Array>(column: T, value: number): T {
+  const copy = column.slice() as T;
+  copy[copy.length - 1] = value;
+  return copy;
 }
 
 function routeProgram(moves: number): string {
@@ -72,22 +50,35 @@ function routeProgram(moves: number): string {
 }
 
 describe('archive work steps', () => {
-  it('pack every block and point to the doubles the single pass stored, with checkpoints', () => {
+  it('validate packed columns with checkpoints, finding a fault past the first one', () => {
     const manifest = buildMotionManifest(routeProgram(40_000), { machineKind: 'laser' });
-    const { value: packed, yields } = drain(packMotionManifestSteps(manifest));
-    const reference = referencePackedData(manifest);
-    expect(
-      Buffer.from(packed.blockData.buffer).equals(Buffer.from(reference.blockData.buffer)),
-    ).toBe(true);
-    expect(
-      Buffer.from(packed.pointData.buffer).equals(Buffer.from(reference.pointData.buffer)),
-    ).toBe(true);
-    const again = packMotionManifest(manifest);
-    expect(Buffer.from(again.pointData.buffer).equals(Buffer.from(packed.pointData.buffer))).toBe(
-      true,
-    );
-    expect(yields).toBeGreaterThan(4);
-    expect(drain(isPackedMotionManifestSteps(packed)).value).toBe(true);
+    const packed = packMotionManifest(manifest);
+    const { value: valid, yields } = drain(isPackedMotionManifestSteps(packed));
+    expect(valid).toBe(true);
+    expect(isPackedMotionManifest(packed)).toBe(true);
+    expect(yields).toBeGreaterThanOrEqual(2);
+    const last = packed.columns.count - 1;
+    const faults: Array<(columns: MotionBlockColumnData) => MotionBlockColumnData> = [
+      (columns) => ({ ...columns, x: withLast(columns.x, Number.NaN) }),
+      (columns) => ({ ...columns, rawLine: withLast(columns.rawLine, 0) }),
+      (columns) => ({ ...columns, kind: withLast(columns.kind, 0x7f) }),
+    ];
+    for (const fault of faults) {
+      const broken = { ...packed, columns: fault(packed.columns) };
+      expect(broken.columns.count).toBe(last + 1);
+      expect(drain(isPackedMotionManifestSteps(broken)).value).toBe(false);
+    }
+  });
+
+  it('measure object blocks as the columns they would become, with checkpoints', () => {
+    const manifest = buildMotionManifest(routeProgram(40_000), { machineKind: 'laser' });
+    const objects = { ...manifest, blocks: Array.from(manifest.blocks) };
+    const { value: bytes, yields } = drain(packedMotionManifestBytesSteps(objects));
+    expect(bytes).toBe(packedMotionManifestBytes(manifest));
+    expect(packedMotionManifestBytes(objects)).toBe(bytes);
+    expect(yields).toBeGreaterThan(1);
+    // Columns the parser built are stored as they are: nothing to walk.
+    expect(drain(packMotionManifestSteps(manifest)).yields).toBe(0);
   });
 
   it('encode UTF-8 exactly as TextEncoder does, never splitting a surrogate pair', () => {

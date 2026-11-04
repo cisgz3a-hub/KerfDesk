@@ -98,7 +98,7 @@ describe('dense Falcon image recovery archive', () => {
     void restoredManifest;
     expect(restoredPlacement).toEqual(sourcePlacement);
     expect(executionArtifactCanvasPlan(capsule.artifact)).toBe(restored);
-    const block = source.canvasPlan.manifest.blocks.find(
+    const block = Array.from(source.canvasPlan.manifest.blocks).find(
       (candidate) => candidate.kind === 'process' && candidate.sendableLineIndex >= halfway,
     );
     if (block === undefined || block.points[0] === undefined || block.points[1] === undefined) {
@@ -140,8 +140,8 @@ function expectExactRoute(actual: MotionManifest, expected: MotionManifest): voi
     'routeEndMm',
   ] as const;
   for (let index = 0; index < expected.blocks.length; index += 1) {
-    const left = actual.blocks[index];
-    const right = expected.blocks[index];
+    const left = actual.blocks.at(index);
+    const right = expected.blocks.at(index);
     if (
       left === undefined ||
       right === undefined ||

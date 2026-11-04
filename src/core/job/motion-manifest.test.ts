@@ -17,16 +17,16 @@ describe('buildMotionManifest', () => {
       ].join('\n'),
       { machineKind: 'laser', initialPosition: { x: 5, y: 5, z: 0 } },
     );
-    expect(manifest.blocks.map((block) => block.kind)).toEqual([
+    expect(Array.from(manifest.blocks).map((block) => block.kind)).toEqual([
       'travel',
       'process',
       'travel',
       'park',
     ]);
     expect(manifest.firstProcessPoint).toEqual({ x: 10, y: 10, z: 0 });
-    expect(manifest.blocks[1]?.rawLineIndex).toBe(5);
-    expect(manifest.blocks[1]?.sendableLineIndex).toBe(4);
-    expect(manifest.blocks[1]?.programLineNumber).toBeNull();
+    expect(manifest.blocks.at(1)?.rawLineIndex).toBe(5);
+    expect(manifest.blocks.at(1)?.sendableLineIndex).toBe(4);
+    expect(manifest.blocks.at(1)?.programLineNumber).toBeNull();
   });
 
   it('samples helical CNC arcs and records Z geometry', () => {
@@ -97,7 +97,7 @@ describe('buildMotionManifest', () => {
       machineKind: 'laser',
       initialPosition: { x: 10, y: 20, z: 0 },
     });
-    expect(manifest.blocks[0]?.points.at(-1)).toEqual({ x: 35.4, y: 32.7, z: 0 });
+    expect(manifest.blocks.at(0)?.points.at(-1)).toEqual({ x: 35.4, y: 32.7, z: 0 });
   });
 
   it('recognizes Marlin fan PWM as process power', () => {
@@ -105,7 +105,7 @@ describe('buildMotionManifest', () => {
       machineKind: 'laser',
     });
     expect(manifest.firstProcessPoint).toEqual({ x: 2, y: 0, z: 0 });
-    expect(manifest.blocks.map((block) => block.kind)).toEqual(['travel', 'process']);
+    expect(Array.from(manifest.blocks).map((block) => block.kind)).toEqual(['travel', 'process']);
   });
 
   it('classifies CNC tool-change and final park destinations', () => {
@@ -113,7 +113,7 @@ describe('buildMotionManifest', () => {
       'G21\nG90\nM3 S10000\nG1 X5\nM5\nG0 X0\nM0\nM3 S10000\nG1 X10\nM5\nG0 X0',
       { machineKind: 'cnc' },
     );
-    expect(manifest.blocks.map((block) => block.kind)).toEqual([
+    expect(Array.from(manifest.blocks).map((block) => block.kind)).toEqual([
       'process',
       'park',
       'process',

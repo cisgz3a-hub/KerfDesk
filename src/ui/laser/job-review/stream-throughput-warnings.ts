@@ -19,7 +19,8 @@
 // Warnings only. A completed Frame for the exact job remains the sole ordinary
 // Start policy gate (ADR-228); none of these can refuse a Start.
 
-import { createStreamer, findOversizedLine } from '../../../core/controllers/grbl';
+import { findOversizedLine } from '../../../core/controllers/grbl';
+import { measureSendableLines } from '../../../core/controllers/grbl/sendable-line-scan';
 import type { ControllerKind } from '../../../core/devices';
 // Deep import: the devices barrel is at its public-export ratchet.
 import { GRBLHAL_DEFAULT_RX_BUFFER_BYTES } from '../../../core/grbl-streaming';
@@ -146,13 +147,11 @@ function windowProvenance(input: StreamThroughputInput): string {
   return 'Raise the RX window in Machine Setup if the controller has more room.';
 }
 
-// Counted through the streamer itself, so "line" and "byte" mean exactly what
-// the character-counting window means.
+// Counted as the streamer queues lines, so "line" and "byte" mean exactly what
+// the character-counting window means, without building its queue (one bed
+// photo's queue was 6.8 M strings, twice per review; ADR-244 Amendment 3).
 function measureProgram(gcode: string): { readonly lines: number; readonly bytes: number } {
-  const queued = createStreamer(gcode).queued;
-  let bytes = 0;
-  for (const line of queued) bytes += line.length;
-  return { lines: queued.length, bytes };
+  return measureSendableLines(gcode);
 }
 
 function formatMs(value: number): string {

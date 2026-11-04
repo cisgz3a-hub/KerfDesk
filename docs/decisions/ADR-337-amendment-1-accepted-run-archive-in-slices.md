@@ -29,9 +29,11 @@ stream, status and Pause waited too.
 
 1. Every whole-program and whole-manifest pass on this path is written once, as resumable steps
    (`WorkSteps`, `src/core/recovery/work-steps.ts`): the fingerprint, the sendable-line count,
-   the checkpoint and start intent, manifest packing and validation, the archive size walk,
-   artifact building and validation, and the UTF-8 encoding that feeds SHA-256. A step covers a
-   bounded chunk: 64 Ki characters of program text, 16 Ki manifest blocks plus points, 64 Ki
+   the checkpoint and start intent, measuring and validating the manifest's block columns
+   (`isMotionBlockColumnDataSteps`), the archive size walk, artifact building and validation,
+   and the UTF-8 encoding that feeds SHA-256. Packing the parser's columns copies nothing
+   (ADR-244 Amendment 3), so only a manifest held as objects is walked to measure it. A step
+   covers a bounded chunk: 64 Ki characters of program text, 16 Ki manifest blocks, 64 Ki
    stored doubles, 4 Ki measured values or 256 Ki encoded characters. A yield is a checkpoint,
    never a decision. The synchronous functions every other caller uses (`fingerprintGcode`,
    `createExecutionArtifact`, `isExecutionArtifact` and the rest) drain the same steps in one
@@ -68,8 +70,9 @@ Production bundles of main `a96bc8950` and of this change, measured under the au
 (AREAS.md): Chrome, the simulated GRBL controller over a fake serial port on the USB worker
 route, a fresh context per set, six Frame → Start → Abort cycles per set with the first
 dropped, the calibration loop before and after every set, and each fixture's before and after
-sets run back to back on a quiet PC. "Block" is the longest task that ends after the job's
-first line reached the controller.
+sets run back to back on a quiet PC. "Block" is the longest task that starts after the job's
+first line reached the controller. These sets were run before #1572 (block columns) reached
+main; the merged build was measured again below.
 
 Longest task after the first line, median of the five kept cycles (range), with the
 calibration loop before / after each set:
@@ -105,12 +108,15 @@ after it (it draws the job's route on the canvas). That task is unchanged by thi
 and is the "overlapping" figure in the Abort sets (median 85 ms worker, 96 ms window); it is
 left as a follow-up.
 
+MERGED_LINE
+
 Byte identity: `start-job-archive-slices.test.ts` stores the archive of a 60,000-move laser
 program (packed manifest, arcs, blanks, a non-ASCII comment) through
 `stageFreshExecutionArtifact`, drained in one call and with a yield after every step. Both
-records hash to the digest the same test produced on main `a96bc8950`
-(`7462f0a5…`, a canonical digest of key order, every double's bits, every string's code units
-and every view's bytes). The G-code is not touched by this change: no emitter or preparation
+records hash to the digest the same test produced on main `ede14589b` (`58b026e9…`; before
+#1572 changed the stored manifest encoding, the same check matched main `a96bc8950`'s
+`7462f0a5…`). The digest covers key order, every double's bits, every string's code units
+and every view's bytes. The G-code is not touched by this change: no emitter or preparation
 file is in the diff, the archive above stores the program string itself, and the repository's
 G-code golden fixtures pass unchanged.
 

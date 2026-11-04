@@ -57,8 +57,10 @@ const fill = (x: number): FillGroup => ({
 });
 
 function wireBounds(job: Job, outputDevice = device) {
-  const points = buildMotionManifest(grblStrategy.emit(job, outputDevice), { machineKind: 'laser' })
-    .blocks.filter((block) => block.kind === 'process')
+  const points = Array.from(
+    buildMotionManifest(grblStrategy.emit(job, outputDevice), { machineKind: 'laser' }).blocks,
+  )
+    .filter((block) => block.kind === 'process')
     .flatMap((block) => block.points);
   return {
     minX: Math.min(...points.map((p) => p.x)),

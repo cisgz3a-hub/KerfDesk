@@ -4,7 +4,7 @@
 // total X/Y motion extent must fit the bed even at the worst-case placement.
 import { scanModalMotionLine, type GcodeMotionMode } from '../gcode/modal-motion-line';
 import { arcAabb } from '../invariants/arc-bounds';
-import { asGcodeLines } from '../invariants/gcode-words';
+import { iterateGcodeLines } from '../invariants/gcode-words';
 import { isGcodeCommand, parseGcodeWord, stripGcodeComment } from '../invariants';
 
 type Bounds = { minX: number; minY: number; maxX: number; maxY: number };
@@ -12,7 +12,7 @@ type Point = { readonly x: number; readonly y: number };
 type MotionEnvelope = { readonly next: Point; readonly arcBounds?: Bounds };
 
 export function findRelativeMotionEnvelopeIssues(
-  gcode: string | ReadonlyArray<string>,
+  gcode: string | Iterable<string>,
   bed: { readonly width: number; readonly height: number },
 ): ReadonlyArray<string> {
   const bounds = collectRelativeMotionEnvelope(gcode);
@@ -35,13 +35,13 @@ export function findRelativeMotionEnvelopeIssues(
 
 /** Y span of the program's own motion. The start point is left out: it is
  * wherever the head already is, which on a rotary is the cylinder's turn. */
-export function programMotionYSpan(gcode: string | ReadonlyArray<string>): number | null {
+export function programMotionYSpan(gcode: string | Iterable<string>): number | null {
   const bounds = collectRelativeMotionEnvelope(gcode, false);
   return bounds === null ? null : bounds.maxY - bounds.minY;
 }
 
 function collectRelativeMotionEnvelope(
-  gcode: string | ReadonlyArray<string>,
+  gcode: string | Iterable<string>,
   includeStart = true,
 ): Bounds | null {
   const bounds: Bounds = {
@@ -54,7 +54,7 @@ function collectRelativeMotionEnvelope(
   let absolute = true;
   let modalMotion: GcodeMotionMode | null = 0;
   let any = false;
-  for (const raw of asGcodeLines(gcode)) {
+  for (const raw of iterateGcodeLines(gcode)) {
     const stripped = stripGcodeComment(raw);
     absolute = absoluteModeAfterLine(stripped, absolute);
     const scanned = scanModalMotionLine(stripped, modalMotion);

@@ -1,7 +1,7 @@
 import type { MachineBounds, NoGoZone } from '../devices';
 import { scanModalMotionLine, type GcodeMotionMode } from '../gcode/modal-motion-line';
 import { arcIntersectsRect } from '../invariants/arc-rect-intersection';
-import { asGcodeLines } from '../invariants/gcode-words';
+import { iterateGcodeLines } from '../invariants/gcode-words';
 import {
   isGcodeCommand,
   parseGcodeWord,
@@ -57,7 +57,7 @@ export function zonesOverlappingRect(
 }
 
 export function findNoGoZoneCollisions(
-  gcode: string | ReadonlyArray<string>,
+  gcode: string | Iterable<string>,
   zones: ReadonlyArray<NoGoZone>,
   bed: MachineBounds,
   options: {
@@ -79,7 +79,9 @@ export function findNoGoZoneCollisions(
   let motion: GcodeMotionMode | null = 0;
   let cutterRadiusMm = validRadius(options.defaultCutterRadiusMm);
 
-  for (const [index, raw] of asGcodeLines(gcode).entries()) {
+  let index = -1;
+  for (const raw of iterateGcodeLines(gcode)) {
+    index += 1;
     cutterRadiusMm = cutterRadiusFromToolComment(raw) ?? cutterRadiusMm;
     const stripped = stripComment(raw);
     if (stripped === '') continue;

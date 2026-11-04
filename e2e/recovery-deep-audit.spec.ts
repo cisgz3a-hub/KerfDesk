@@ -285,9 +285,9 @@ test('editing the design while a job runs still offers darkening when it complet
   await expect(field).toHaveValue('47');
   await drainHeldSerialWrites(page, kerfdesk, baselineLines, 400);
   await kerfdesk.emitSerialLine(IDLE);
-  await expect(
-    page.getByRole('button', { name: 'Paint a second pass…', exact: true }),
-  ).toBeVisible();
+  // The completion dialog is modal (ADR-207 Amendment 2): it hides the Machine
+  // panel from assistive tech, so the offer is read from the dialog first and
+  // the panel's way back only once the dialog is closed.
   const complete = page.getByRole('dialog', { name: 'Job complete', exact: true });
   const offered = await complete
     .waitFor({ state: 'visible', timeout: 5_000 })
@@ -308,6 +308,14 @@ test('editing the design while a job runs still offers darkening when it complet
     };
   });
   expect({ offered, diagnostics }).toMatchObject({ offered: true });
+  await expect(
+    complete.getByRole('button', { name: 'Darken selected areas…', exact: true }),
+  ).toBeEnabled();
+  await complete.getByRole('button', { name: 'Not now', exact: true }).click();
+  await expect(complete).toHaveCount(0);
+  await expect(
+    page.getByRole('button', { name: 'Paint a second pass…', exact: true }),
+  ).toBeEnabled();
 });
 
 test('a page reload mid-job saves a recoverable capsule no older than one checkpoint', async ({

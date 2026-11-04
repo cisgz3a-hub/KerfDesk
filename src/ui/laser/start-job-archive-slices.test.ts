@@ -58,8 +58,8 @@ vi.mock('../app/build-info', () => ({
 const RUN_ID = 'run-archive-slices';
 const NOW = new Date('2026-11-04T09:00:00.000Z');
 /** sha256 of the archive `stageFreshExecutionArtifact` stored for this fixture
- * on main a96bc8950, before the archive was sliced. */
-const GOLDEN_ARCHIVE_DIGEST = '7462f0a57c738a9cf0a0c7ee82c8546430f52901c5d509b59f28bd395680889b';
+ * on main ede14589b, before the archive was sliced. */
+const GOLDEN_ARCHIVE_DIGEST = '58b026e93a5bac50f8c1b626599cf5981ea05d9ee11964d7e76d73f5213ff4a4';
 
 function program(moves: number): string {
   const lines = ['G21', 'G90', '; café', 'M4 S0'];
@@ -261,9 +261,10 @@ describe('the accepted run archive in slices', () => {
     const longest = Math.max(...encode.mock.calls.map(([text]) => text?.length ?? 0));
     expect(longest).toBeLessThanOrEqual(1 << 18);
     expect(longest).toBeLessThan(gcode.length);
-    // The program is several chunks long, and each of its passes (build,
-    // validate, measure, encode, hash, intent) went through the runner.
+    // The program is several chunks long, and each of its passes (fingerprint
+    // and count when built and validated, both encodings, the intent) went
+    // through the runner.
     expect(gcode.length).toBeGreaterThan(16 * (1 << 16));
-    expect(runner.steps()).toBeGreaterThan(8 * Math.floor(gcode.length / (1 << 16)));
+    expect(runner.steps()).toBeGreaterThan(6 * Math.floor(gcode.length / (1 << 16)));
   });
 });

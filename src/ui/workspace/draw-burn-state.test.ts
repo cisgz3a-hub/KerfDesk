@@ -86,7 +86,9 @@ function recorder() {
 describe('burn indicator state and segmentation', () => {
   it('does not show a hot beam on an entirely M5/G0 route', () => {
     const canvasPlan = plan('G21\nG90\nM5\nG0 X40');
-    expect(canvasPlan.manifest.blocks.every((block) => block.kind !== 'process')).toBe(true);
+    expect(Array.from(canvasPlan.manifest.blocks).every((block) => block.kind !== 'process')).toBe(
+      true,
+    );
     const recorded = recorder();
     drawCanvasMotionOverlay(
       recorded.ctx,
@@ -127,7 +129,7 @@ describe('burn indicator state and segmentation', () => {
       const canvasPlan = plan('G21\nG90\nM3 S0\nG0 X0\nG1 X10 S500\nG1 X20 S0');
       const active = run(canvasPlan, 5);
       const uncertain = state === 'uncertain';
-      const travelIndex = canvasPlan.manifest.blocks.findIndex(
+      const travelIndex = Array.from(canvasPlan.manifest.blocks).findIndex(
         (block) => block.routeStartMm === 10,
       );
       expect(travelIndex).toBeGreaterThanOrEqual(0);

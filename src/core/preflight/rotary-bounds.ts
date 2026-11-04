@@ -25,7 +25,10 @@ export function rotaryXOnlyBounds(bounds: MachineBounds): MachineBounds {
 }
 
 /** A program taller than one turn burns onto its own start. */
-export function rotaryWrapIssue(gcodeLines: ReadonlyArray<string>, wrapMm: number): string | null {
+export function rotaryWrapIssue(
+  gcodeLines: string | Iterable<string>,
+  wrapMm: number,
+): string | null {
   const span = programMotionYSpan(gcodeLines);
   if (span === null || span <= wrapMm) return null;
   return (

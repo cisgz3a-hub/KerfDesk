@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  countSendableGcodeLines,
+  measureSendableLines,
   findFirstSendableLineOver,
   findFirstUnencodableSendableLine,
   hasSendableGcodeLine,
@@ -71,6 +73,12 @@ describe('allocation-light sendable-line scans', () => {
       const limit = [8, 20, 120, 127, 128, 4096][seed % 6] ?? 120;
       expect(hasSendableGcodeLine(gcode)).toBe(splitLinesOracle(gcode).length > 0);
       expect(findFirstSendableLineOver(gcode, limit)).toEqual(oversizedOracle(gcode, limit));
+      const queued = splitLinesOracle(gcode);
+      expect(countSendableGcodeLines(gcode)).toBe(queued.length);
+      expect(measureSendableLines(gcode)).toEqual({
+        lines: queued.length,
+        bytes: queued.reduce((sum, line) => sum + line.length, 0),
+      });
     }
   });
 

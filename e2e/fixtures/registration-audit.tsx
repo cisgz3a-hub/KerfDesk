@@ -16,6 +16,7 @@ import {
   DEFAULT_CALIBRATION_SETTINGS,
   useCameraCalibrationStore,
 } from '../../src/ui/camera/calibrate/camera-calibration-store';
+import { MODAL_REACHABLE_ATTRIBUTE } from '../../src/ui/common/hide-outside-modal';
 import { BoardCapturePanel } from '../../src/ui/laser/board-capture/BoardCapturePanel';
 import { PrintAndCutDialogHost } from '../../src/ui/laser/PrintAndCutDialogHost';
 import { currentPrintCutOutputRegistration } from '../../src/ui/laser/print-cut-output';
@@ -169,7 +170,11 @@ function Harness(): JSX.Element {
         </button>
         <button onClick={() => setPrintCut(true)}>Reopen Print and Cut</button>
       </div>
+      {/* Stands in for the machine itself (its own jog keys or pendant), which
+          a dialog cannot hide: it stays exposed above Print and Cut's
+          backdrop, as the Live Motion bar does (ADR-207 Amendment 2). */}
       <fieldset
+        {...{ [MODAL_REACHABLE_ATTRIBUTE]: '' }}
         style={{
           position: 'fixed',
           top: 0,
