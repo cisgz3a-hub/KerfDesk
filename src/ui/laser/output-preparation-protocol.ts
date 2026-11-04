@@ -96,11 +96,7 @@ export type TransferredStartJobPreparation =
  * writable G-code.
  */
 export type OutputPreparationResponse =
-  | {
-      readonly kind: 'start';
-      /** The worker sends the wire form; the client restores the preparation. */
-      readonly result: TransferredStartJobPreparation | StartPreparationWire;
-    }
+  | { readonly kind: 'start'; readonly result: TransferredStartJobPreparation }
   | { readonly kind: 'save'; readonly result: SaveOutputEmission }
   | { readonly kind: 'rd'; readonly result: EmitRdResult }
   | { readonly kind: 'tiles'; readonly result: TiledOutputPreparation }
@@ -138,10 +134,19 @@ export type OutputPreparationWireEnvelope = Omit<OutputPreparationEnvelope, 'req
  * Start request may first report the Frame rectangles of the job it is
  * compiling (ADR-353); the response that follows carries the exact program
  * built from that same compile. */
+/** What the worker posts: a Start in its wire form, which the client restores
+ * before any caller sees it (start-preparation-wire.ts, ADR-598 Amendment 4). */
+export type OutputPreparationWireResponse =
+  | Exclude<OutputPreparationResponse, { readonly kind: 'start' }>
+  | {
+      readonly kind: 'start';
+      readonly result: TransferredStartJobPreparation | StartPreparationWire;
+    };
+
 export type OutputPreparationResult =
   | {
       readonly requestId: number;
-      readonly response: OutputPreparationResponse;
+      readonly response: OutputPreparationWireResponse;
     }
   | {
       readonly requestId: number;

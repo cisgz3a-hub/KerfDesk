@@ -34,7 +34,7 @@ import type {
   OutputPreparationEnvelope,
   OutputPreparationWireEnvelope,
   OutputPreparationRequest,
-  OutputPreparationResponse,
+  OutputPreparationWireResponse,
   OutputPreparationResult,
   PrepareOnlyOutputPreparationRequest,
   RdOutputPreparationRequest,
@@ -184,7 +184,7 @@ export function resetOutputPreparationWorkerForTests(): void {
   rejectAllPendingAndRetireWorker(new Error(WORKER_RESET_MESSAGE));
 }
 
-type PreparedResponse = Exclude<OutputPreparationResponse, { readonly kind: 'error' }>;
+type PreparedResponse = Exclude<OutputPreparationWireResponse, { readonly kind: 'error' }>;
 
 type PendingRequest = {
   readonly envelope: OutputPreparationEnvelope;

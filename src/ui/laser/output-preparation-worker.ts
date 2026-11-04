@@ -5,6 +5,7 @@ import type {
   OutputPreparationWireEnvelope,
   OutputPreparationResponse,
   OutputPreparationResult,
+  OutputPreparationWireResponse,
 } from './output-preparation-protocol';
 import { acceptCanvasCompilationBridgeConnection } from '../workspace/canvas-compilation-worker-pool';
 import { unpackProjectMessage } from '../packed-project-transfer';
@@ -22,7 +23,7 @@ self.onmessage = (event: MessageEvent<OutputPreparationWireEnvelope>): void => {
 
 async function prepare(envelope: OutputPreparationWireEnvelope): Promise<void> {
   const { requestId, request } = envelope;
-  let response: OutputPreparationResponse;
+  let response: OutputPreparationWireResponse;
   let transfer: Transferable[] = [];
   try {
     const project = unpackProjectMessage(request.project);
@@ -58,8 +59,8 @@ async function prepare(envelope: OutputPreparationWireEnvelope): Promise<void> {
 function wireResponse(
   response: OutputPreparationResponse,
   requestProject: Project,
-): { readonly response: OutputPreparationResponse; readonly transfer: Transferable[] } {
-  if (response.kind !== 'start' || 'wire' in response.result) return { response, transfer: [] };
+): { readonly response: OutputPreparationWireResponse; readonly transfer: Transferable[] } {
+  if (response.kind !== 'start') return { response, transfer: [] };
   const manifest = response.result.ok ? response.result.canvasPlan.manifest : null;
   const manifestTransfer =
     manifest !== null && hasColumnPackedEncoding(manifest)
