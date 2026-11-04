@@ -140,3 +140,17 @@ the photo open, and Start adds:
 
 Save G-code of the bed photo still takes 14.7-15.4 s on every save, all of it emission and
 preflight; this amendment does not change it.
+
+### Correction (2026-11-04): the second-pass worker's handoff
+
+Decision 2 covered the preparation worker but not the second-pass worker
+(`src/ui/laser/second-pass/second-pass-worker.ts`), which posted the columns it parsed by structured
+clone. A clone keeps the data and drops the class, so the window's manifest had no `at` or
+iteration, and "Darken selected areas" stopped at "blocks is not iterable" before its review (main's
+full browser smoke, `production-workflows.spec.ts` and `second-pass-replay.spec.ts`). That worker now
+hands off both of its manifests the same way: the compiled pass's canvas plan through
+`archiveCanvasMotionPlan` and its Frame geometry through `packMotionManifest`, buffers transferred,
+and the client wraps them before any caller reads them (`second-pass-worker-protocol.ts`). The
+second-pass program is unchanged; `second-pass-worker-handoff.test.ts` sends the worker's replies
+through a structured clone and compares every block with the manifest parsed on one thread.
+Workers that post a manifest go through these helpers.
