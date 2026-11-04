@@ -57,12 +57,12 @@ describe('useAdjustDialogStore', () => {
     expect(useImageEditorStore.getState().session?.doc.data[0]).toBe(255);
   });
 
-  it('refreshAdjustPreview fills previewDoc without mutating the session', () => {
+  it('refreshAdjustPreview fills the preview without mutating the session', () => {
     seedSession();
     useAdjustDialogStore.getState().open('threshold');
     refreshAdjustPreview();
     const dialog = useAdjustDialogStore.getState().dialog;
-    expect(dialog?.previewDoc?.data[0]).toBe(255); // white stays white at 128
+    expect(dialog?.preview?.buffer.data[0]).toBe(255); // white stays white at 128
     expect(useImageEditorStore.getState().session?.doc.data[0]).toBe(255);
   });
 

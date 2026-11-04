@@ -65,6 +65,12 @@ export type AdjustmentSpec = {
   readonly params: readonly AdjustParamSpec[];
   /** Levels/Threshold render the luma histogram behind their sliders. */
   readonly hasHistogram: boolean;
+  /**
+   * Each output pixel depends only on the same input pixel (a LUT or a
+   * per-pixel unmix), so the dialog may preview it on a display-sized
+   * sample. Neighbourhood filters preview at full resolution (ADR-245 Amd 1).
+   */
+  readonly pointwise: boolean;
 };
 
 const FULL_RANGE = { min: 0, max: 255, step: 1 };
@@ -76,6 +82,7 @@ const BY_ID: Record<AdjustmentId, AdjustmentSpec> = {
     menu: 'adjust',
     shortcutHint: '',
     hasHistogram: false,
+    pointwise: true,
     params: [
       { key: 'brightness', label: 'Brightness', min: -100, max: 100, step: 1, defaultValue: 0 },
       { key: 'contrast', label: 'Contrast', min: -100, max: 100, step: 1, defaultValue: 0 },
@@ -87,6 +94,7 @@ const BY_ID: Record<AdjustmentId, AdjustmentSpec> = {
     menu: 'adjust',
     shortcutHint: 'Ctrl+L',
     hasHistogram: true,
+    pointwise: true,
     params: [
       { key: 'inBlack', label: 'Input black', ...FULL_RANGE, max: 254, defaultValue: 0 },
       { key: 'inWhite', label: 'Input white', ...FULL_RANGE, min: 1, defaultValue: 255 },
@@ -102,6 +110,7 @@ const BY_ID: Record<AdjustmentId, AdjustmentSpec> = {
     shortcutHint: 'Ctrl+M',
     // The point editor draws its own histogram backdrop.
     hasHistogram: false,
+    pointwise: true,
     params: [],
   },
   threshold: {
@@ -110,6 +119,7 @@ const BY_ID: Record<AdjustmentId, AdjustmentSpec> = {
     menu: 'adjust',
     shortcutHint: '',
     hasHistogram: true,
+    pointwise: true,
     params: [{ key: 'level', label: 'Level', ...FULL_RANGE, min: 1, defaultValue: 128 }],
   },
   posterize: {
@@ -118,6 +128,7 @@ const BY_ID: Record<AdjustmentId, AdjustmentSpec> = {
     menu: 'adjust',
     shortcutHint: '',
     hasHistogram: false,
+    pointwise: true,
     params: [{ key: 'levels', label: 'Levels', min: 2, max: 32, step: 1, defaultValue: 4 }],
   },
   invert: {
@@ -126,6 +137,7 @@ const BY_ID: Record<AdjustmentId, AdjustmentSpec> = {
     menu: 'adjust',
     shortcutHint: 'Ctrl+I',
     hasHistogram: false,
+    pointwise: true,
     params: [],
   },
   desaturate: {
@@ -134,6 +146,7 @@ const BY_ID: Record<AdjustmentId, AdjustmentSpec> = {
     menu: 'adjust',
     shortcutHint: 'Ctrl+Shift+U',
     hasHistogram: false,
+    pointwise: true,
     params: [],
   },
   'gaussian-blur': {
@@ -142,6 +155,7 @@ const BY_ID: Record<AdjustmentId, AdjustmentSpec> = {
     menu: 'filter',
     shortcutHint: '',
     hasHistogram: false,
+    pointwise: false,
     params: [{ key: 'sigma', label: 'Radius (px)', min: 0.5, max: 50, step: 0.5, defaultValue: 2 }],
   },
   'remove-white-background': {
@@ -150,6 +164,7 @@ const BY_ID: Record<AdjustmentId, AdjustmentSpec> = {
     menu: 'adjust',
     shortcutHint: '',
     hasHistogram: false,
+    pointwise: true,
     params: [
       { key: 'cleanup', label: 'Paper cleanup (%)', min: 0, max: 95, step: 1, defaultValue: 0 },
     ],
@@ -160,6 +175,7 @@ const BY_ID: Record<AdjustmentId, AdjustmentSpec> = {
     menu: 'filter',
     shortcutHint: '',
     hasHistogram: false,
+    pointwise: false,
     params: [
       { key: 'amount', label: 'Amount (%)', min: 1, max: 500, step: 1, defaultValue: 100 },
       { key: 'sigma', label: 'Radius (px)', min: 0.5, max: 50, step: 0.5, defaultValue: 2 },
@@ -172,6 +188,7 @@ const BY_ID: Record<AdjustmentId, AdjustmentSpec> = {
     menu: 'filter',
     shortcutHint: '',
     hasHistogram: false,
+    pointwise: false,
     params: [{ key: 'sigma', label: 'Radius (px)', min: 0.5, max: 50, step: 0.5, defaultValue: 4 }],
   },
   median: {
@@ -180,6 +197,7 @@ const BY_ID: Record<AdjustmentId, AdjustmentSpec> = {
     menu: 'filter',
     shortcutHint: '',
     hasHistogram: false,
+    pointwise: false,
     params: [{ key: 'radius', label: 'Radius (px)', min: 1, max: 4, step: 1, defaultValue: 1 }],
   },
   halftone: {
@@ -188,6 +206,7 @@ const BY_ID: Record<AdjustmentId, AdjustmentSpec> = {
     menu: 'filter',
     shortcutHint: '',
     hasHistogram: false,
+    pointwise: false,
     params: [
       { key: 'spacing', label: 'Cell size (px)', min: 4, max: 64, step: 1, defaultValue: 8 },
       { key: 'angle', label: 'Angle (°)', min: 0, max: 90, step: 1, defaultValue: 45 },
@@ -199,6 +218,7 @@ const BY_ID: Record<AdjustmentId, AdjustmentSpec> = {
     menu: 'filter',
     shortcutHint: '',
     hasHistogram: false,
+    pointwise: false,
     params: [
       { key: 'spacing', label: 'Line pitch (px)', min: 4, max: 64, step: 1, defaultValue: 8 },
       { key: 'angle', label: 'Angle (°)', min: 0, max: 90, step: 1, defaultValue: 0 },
@@ -230,6 +250,7 @@ type RunArgs = {
   readonly doc: RgbaBuffer;
   readonly rect: PixelRect | null;
   readonly mask: SelectionMask | null;
+  readonly curvePoints: readonly CurvePoint[] | undefined;
 };
 
 // Record dispatch keeps each runner at trivial complexity and the compiler
@@ -244,9 +265,10 @@ const RUNNERS: Record<AdjustmentId, (args: RunArgs) => void> = {
     ),
   levels: ({ spec, params, doc, rect, mask }) =>
     applyLutInPlace(doc, levelsLut(levelsFrom(spec, params)), rect, mask),
-  // Custom point lists route through the session bridge; the catalog runner
-  // stays total with the identity diagonal.
-  curves: ({ doc, rect, mask }) => applyLutInPlace(doc, curveLut(DEFAULT_CURVE_POINTS), rect, mask),
+  // Curves carries its point list outside the numeric-params record; without
+  // one the runner stays total with the identity diagonal.
+  curves: ({ doc, rect, mask, curvePoints }) =>
+    applyLutInPlace(doc, curveLut(curvePoints ?? DEFAULT_CURVE_POINTS), rect, mask),
   threshold: ({ spec, params, doc, rect, mask }) =>
     applyLumaLutInPlace(doc, thresholdLut(p(spec, params, 'level')), rect, mask),
   posterize: ({ spec, params, doc, rect, mask }) =>
@@ -285,8 +307,9 @@ export function runAdjustment(
   doc: RgbaBuffer,
   rect: PixelRect | null,
   mask: SelectionMask | null,
+  curvePoints?: readonly CurvePoint[],
 ): void {
-  RUNNERS[id]({ spec: BY_ID[id], params, doc, rect, mask });
+  RUNNERS[id]({ spec: BY_ID[id], params, doc, rect, mask, curvePoints });
 }
 
 function screenFrom(

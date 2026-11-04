@@ -18,6 +18,12 @@ export type TransformPreview = {
   readonly affine: AffineTransform;
 };
 
+/** An adjustment preview: a display-sized bitmap covering `rect` (doc px). */
+export type DocOverlay = {
+  readonly canvas: HTMLCanvasElement;
+  readonly rect: PixelRect;
+};
+
 export const ANTS_DASH_PX = 4;
 
 // Canvas-rendered drawing colors, not DOM chrome: marching ants are
@@ -42,6 +48,27 @@ export function docToCanvas(doc: RgbaBuffer): HTMLCanvasElement {
   if (ctx !== null) {
     ctx.putImageData(new ImageData(new Uint8ClampedArray(doc.data), doc.width, doc.height), 0, 0);
   }
+  return canvas;
+}
+
+/**
+ * Paint `buffer` into `reuse` (or a new canvas) without copying its bytes:
+ * the adjustment preview repaints one small canvas per slider step.
+ */
+export function paintBufferCanvas(
+  buffer: RgbaBuffer,
+  reuse: HTMLCanvasElement | null,
+): HTMLCanvasElement {
+  const canvas = reuse ?? document.createElement('canvas');
+  if (canvas.width !== buffer.width) canvas.width = buffer.width;
+  if (canvas.height !== buffer.height) canvas.height = buffer.height;
+  // ImageData takes only an ArrayBuffer-backed array; the preview's buffers
+  // always are one, so this copy is a guard, never the per-step path.
+  const data =
+    buffer.data.buffer instanceof ArrayBuffer
+      ? (buffer.data as Uint8ClampedArray<ArrayBuffer>)
+      : new Uint8ClampedArray(buffer.data);
+  canvas.getContext('2d')?.putImageData(new ImageData(data, buffer.width, buffer.height), 0, 0);
   return canvas;
 }
 
@@ -72,6 +99,7 @@ export function drawEditorScene(
   antsPhase: number,
   previewStyle: { readonly color: string; readonly widthPx: number },
   pendingCrop: PixelRect | null = null,
+  overlay: DocOverlay | null = null,
 ): void {
   ctx.save();
   ctx.fillStyle = EDITOR_BACKDROP;
@@ -80,6 +108,10 @@ export function drawEditorScene(
   ctx.scale(view.scale, view.scale);
   ctx.imageSmoothingEnabled = view.scale < 1;
   ctx.drawImage(docCanvas, 0, 0);
+  if (overlay !== null) {
+    const { rect } = overlay;
+    ctx.drawImage(overlay.canvas, rect.x, rect.y, rect.width, rect.height);
+  }
   if (pendingCrop !== null) drawPendingCrop(ctx, pendingCrop, docCanvas, view);
   drawDragPreview(ctx, drag, view, previewStyle);
   if (selection !== null) drawAnts(ctx, selection, view, antsPhase);
