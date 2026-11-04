@@ -21,7 +21,7 @@ describe('reconcileReportedPosition', () => {
       ),
       { machineKind: 'laser' },
     );
-    const protectedPrefix = longManifest.blocks.map((block, index, blocks) =>
+    const protectedPrefix = Array.from(longManifest.blocks).map((block, index, blocks) =>
       index < blocks.length - 20
         ? new Proxy(block, {
             get(target, property, receiver) {

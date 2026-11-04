@@ -2,14 +2,14 @@ import type { MotionPoint } from '../../core/job/motion-manifest';
 import type { Vec2 } from '../../core/scene';
 import { mapControllerPointToScene } from '../state/canvas-motion-plan';
 import {
-  PACKED_POINT_WIDTH,
   packedBlockCount,
   packedBlockKind,
   packedBlockPointCount,
-  packedBlockPointOffset,
+  packedBlockPoints,
+  packedBlockPointX,
+  packedBlockPointY,
   packedBlockRawLineIndex,
   packedBlockSendableLineIndex,
-  packedPoint,
   type PackedMotionManifest,
 } from '../state/recovery/packed-motion-manifest';
 import type { RecoveryPreviewRoute } from './laser-recovery-preview-route';
@@ -145,12 +145,7 @@ export function firstRecoveryMovement(
   }
   for (let index = low; index < count; index += 1) {
     if (packedBlockKind(manifest, index) !== 'process') continue;
-    const offset = packedBlockPointOffset(manifest, index);
-    const pointCount = packedBlockPointCount(manifest, index);
-    const points: MotionPoint[] = [];
-    for (let point = 0; point < pointCount; point += 1) {
-      points.push(packedPoint(manifest, offset + point));
-    }
+    const points = packedBlockPoints(manifest, index);
     return { blockIndex: index, rawLine: packedBlockRawLineIndex(manifest, index) + 1, points };
   }
   return null;
@@ -170,16 +165,18 @@ export function remainingRecoveryWorkBounds(
   fromLine: number,
 ): RecoveryWorkBounds | null {
   const manifest = route.manifest;
-  const data = manifest.pointData;
   const bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
   const count = packedBlockCount(manifest);
   for (let block = 0; block < count; block += 1) {
     if (packedBlockKind(manifest, block) !== 'process') continue;
     if (packedBlockRawLineIndex(manifest, block) + 1 < fromLine) continue;
-    const start = packedBlockPointOffset(manifest, block) * PACKED_POINT_WIDTH;
-    const end = start + packedBlockPointCount(manifest, block) * PACKED_POINT_WIDTH;
-    for (let at = start; at < end; at += PACKED_POINT_WIDTH) {
-      includeWorkPoint(bounds, data[at] ?? Number.NaN, data[at + 1] ?? Number.NaN);
+    const points = packedBlockPointCount(manifest, block);
+    for (let point = 0; point < points; point += 1) {
+      includeWorkPoint(
+        bounds,
+        packedBlockPointX(manifest, block, point),
+        packedBlockPointY(manifest, block, point),
+      );
     }
   }
   return Number.isFinite(bounds.minX) && Number.isFinite(bounds.minY) ? bounds : null;
@@ -252,15 +249,13 @@ function visitBlockSegments(
   mapping: RecoveryPreviewIndex,
   visit: SegmentVisitor,
 ): void {
-  const data = manifest.pointData;
-  const start = packedBlockPointOffset(manifest, block) * PACKED_POINT_WIDTH;
-  const end = start + packedBlockPointCount(manifest, block) * PACKED_POINT_WIDTH;
-  for (let at = start + PACKED_POINT_WIDTH; at < end; at += PACKED_POINT_WIDTH) {
+  const points = packedBlockPointCount(manifest, block);
+  for (let point = 1; point < points; point += 1) {
     visit(
-      (data[at - PACKED_POINT_WIDTH] ?? 0) * mapping.scaleX + mapping.offset.x,
-      (data[at - PACKED_POINT_WIDTH + 1] ?? 0) * mapping.scaleY + mapping.offset.y,
-      (data[at] ?? 0) * mapping.scaleX + mapping.offset.x,
-      (data[at + 1] ?? 0) * mapping.scaleY + mapping.offset.y,
+      packedBlockPointX(manifest, block, point - 1) * mapping.scaleX + mapping.offset.x,
+      packedBlockPointY(manifest, block, point - 1) * mapping.scaleY + mapping.offset.y,
+      packedBlockPointX(manifest, block, point) * mapping.scaleX + mapping.offset.x,
+      packedBlockPointY(manifest, block, point) * mapping.scaleY + mapping.offset.y,
       block,
     );
   }
@@ -290,18 +285,16 @@ function recoveryPreviewIndex(route: RecoveryPreviewRoute): RecoveryPreviewIndex
   const manifest = route.manifest;
   const count = packedBlockCount(manifest);
   const bounds = emptyChunkBounds(Math.ceil(count / BLOCKS_PER_PREVIEW_CHUNK));
-  const data = manifest.pointData;
   for (let block = 0; block < count; block += 1) {
     if (packedBlockKind(manifest, block) !== 'process') continue;
     const at = Math.floor(block / BLOCKS_PER_PREVIEW_CHUNK) * 4;
-    const start = packedBlockPointOffset(manifest, block) * PACKED_POINT_WIDTH;
-    const end = start + packedBlockPointCount(manifest, block) * PACKED_POINT_WIDTH;
-    for (let point = start; point < end; point += PACKED_POINT_WIDTH) {
+    const points = packedBlockPointCount(manifest, block);
+    for (let point = 0; point < points; point += 1) {
       includeChunkPoint(
         bounds,
         at,
-        (data[point] ?? 0) * scaleX + offset.x,
-        (data[point + 1] ?? 0) * scaleY + offset.y,
+        packedBlockPointX(manifest, block, point) * scaleX + offset.x,
+        packedBlockPointY(manifest, block, point) * scaleY + offset.y,
       );
     }
   }

@@ -187,24 +187,23 @@ export function runPreflight(
   issues.push(...lineOpenOutlineIssues(project));
   issues.push(...imageMaskOffImageIssues(project));
 
-  // A8: split the (up to ~96 MB raster) body ONCE and thread the lines through
-  // every G-code scanner below, instead of each re-splitting the whole string.
-  const gcodeLines = gcode.split('\n');
+  // Every scanner below walks the body one line at a time (`iterateGcodeLines`:
+  // the lines `split('\n')` gives) and never holds them all. One split of a
+  // bed-sized photo held 8 M strings at once (ADR-244 Amendment 3, after A8).
+  appendBoundsIssues(project, gcode, issues, options);
 
-  appendBoundsIssues(project, gcodeLines, issues, options);
+  appendNonFiniteCoordIssues(gcode, issues);
 
-  appendNonFiniteCoordIssues(gcodeLines, issues);
+  appendNoGoZoneIssues(project, gcode, issues, options);
 
-  appendNoGoZoneIssues(project, gcodeLines, issues, options);
+  appendLaserOnTravelIssues(gcode, issues);
 
-  appendLaserOnTravelIssues(gcodeLines, issues);
-
-  appendLongBlankFeedIssues(project, gcodeLines, issues);
+  appendLongBlankFeedIssues(project, gcode, issues);
 
   // Modal: raster rows may hold an inherited G1 and pack their words, so the
   // emptiness test has to read motion rather than match on `G1` (ADR-332).
   // Missing output operations already have the actionable issue above.
-  if (outputLayers.length > 0 && !hasFeedMotion(gcodeLines)) {
+  if (outputLayers.length > 0 && !hasFeedMotion(gcode)) {
     issues.push(emptyOutputIssue(project, outputLayers));
   }
 
@@ -236,7 +235,7 @@ function emptyOutputIssue(project: Project, outputLayers: ReadonlyArray<Layer>):
 
 function appendNoGoZoneIssues(
   project: Project,
-  gcodeLines: ReadonlyArray<string>,
+  gcode: string,
   issues: PreflightIssue[],
   options: PreflightOptions,
 ): void {
@@ -259,7 +258,7 @@ function appendNoGoZoneIssues(
       : { initialMachinePosition: options.initialMachinePosition }),
   };
   const collisions = findNoGoZoneCollisions(
-    gcodeLines,
+    gcode,
     zones,
     machineBoundsForDevice(project.device),
     collisionOptions,
@@ -313,17 +312,17 @@ function layerSpeedOutOfRange(speed: number, maxFeed: number): boolean {
 
 function appendBoundsIssues(
   project: Project,
-  gcodeLines: ReadonlyArray<string>,
+  gcode: string,
   issues: PreflightIssue[],
   options: PreflightOptions,
 ): void {
   const wrapMm = rotaryWrapLimit(options.boundsHeightOverrideMm);
   const bed = machineBoundsForDevice(project.device);
   const machineBounds = wrapMm === null ? bed : rotaryXOnlyBounds(bed);
-  const wrapIssue = wrapMm === null ? null : rotaryWrapIssue(gcodeLines, wrapMm);
+  const wrapIssue = wrapMm === null ? null : rotaryWrapIssue(gcode, wrapMm);
   if (wrapIssue !== null) issues.push({ code: 'out-of-bed', message: wrapIssue });
   if (options.coordinateMode === 'relative-origin' && options.motionOffset === undefined) {
-    const envelopeIssues = findRelativeMotionEnvelopeIssues(gcodeLines, {
+    const envelopeIssues = findRelativeMotionEnvelopeIssues(gcode, {
       width: machineBounds.width,
       height: machineBounds.height,
     });
@@ -332,7 +331,7 @@ function appendBoundsIssues(
     }
     return;
   }
-  const oob = findOutOfBoundsCoords(gcodeLines, machineBounds, {
+  const oob = findOutOfBoundsCoords(gcode, machineBounds, {
     motionOffset: options.motionOffset,
   });
   for (const issue of oob.slice(0, MAX_BOUNDS_ISSUES)) {
@@ -362,11 +361,8 @@ function appendBoundsIssues(
 // nulls a malformed word exactly as it nulls an absent one — so a NaN produced
 // by any non-import producer (numeric edits, geometry ops, kerf/tabs) would
 // otherwise pass every other check. See non-finite-coords.ts.
-function appendNonFiniteCoordIssues(
-  gcodeLines: ReadonlyArray<string>,
-  issues: PreflightIssue[],
-): void {
-  const nonFinite = findNonFiniteCoords(gcodeLines);
+function appendNonFiniteCoordIssues(gcode: string, issues: PreflightIssue[]): void {
+  const nonFinite = findNonFiniteCoords(gcode);
   for (const issue of nonFinite.slice(0, MAX_BOUNDS_ISSUES)) {
     issues.push({
       code: 'non-finite-coordinate',
@@ -375,11 +371,8 @@ function appendNonFiniteCoordIssues(
   }
 }
 
-function appendLaserOnTravelIssues(
-  gcodeLines: ReadonlyArray<string>,
-  issues: PreflightIssue[],
-): void {
-  const travelIssues = findLaserOnTravelIssues(gcodeLines);
+function appendLaserOnTravelIssues(gcode: string, issues: PreflightIssue[]): void {
+  const travelIssues = findLaserOnTravelIssues(gcode);
   for (const issue of travelIssues.slice(0, MAX_BOUNDS_ISSUES)) {
     issues.push({
       code: 'laser-on-travel',
@@ -394,10 +387,10 @@ function appendLaserOnTravelIssues(
 // post-ADR-035 output is clean; a hit means a regression or an old export.
 function appendLongBlankFeedIssues(
   project: Project,
-  gcodeLines: ReadonlyArray<string>,
+  gcode: string,
   issues: PreflightIssue[],
 ): void {
-  const blankFeed = findLongBlankFeedMoves(gcodeLines, {
+  const blankFeed = findLongBlankFeedMoves(gcode, {
     thresholdMm: LONG_BLANK_FEED_THRESHOLD_MM,
   }).filter((issue) => !isConfiguredIntentionalLaserOffMotion(project, issue));
   for (const issue of blankFeed.slice(0, MAX_BLANK_FEED_ISSUES)) {

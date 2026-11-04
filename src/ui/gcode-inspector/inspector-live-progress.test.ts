@@ -19,7 +19,7 @@ describe('confirmed Inspector route', () => {
     const source = 'G21 G90\nG0 X10 Y0\nG3 X0 Y10 Z-2 I-10 J0 F300';
     const model = liveInspectorModel(source);
     const manifest = buildMotionManifest(source, { machineKind: 'cnc' });
-    const arc = manifest.blocks[1];
+    const arc = manifest.blocks.at(1);
     if (arc === undefined) throw new Error('Expected arc');
     const at = inspectorPlayheadAtRoute(model, manifest, arc.routeStartMm + arc.lengthMm / 2);
     expect(at?.point?.x).toBeCloseTo(7.07, 1);

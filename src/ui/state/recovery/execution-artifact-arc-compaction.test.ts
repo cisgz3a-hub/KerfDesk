@@ -29,8 +29,8 @@ describe('sampled arc archive compaction', () => {
     expect(restored.manifest.blocks.length).toBe(manifest.blocks.length);
     expect(restored.manifest.totalRouteMm).toBe(manifest.totalRouteMm);
     for (let index = 0; index < manifest.blocks.length; index += 1) {
-      const original = manifest.blocks[index];
-      const decoded = restored.manifest.blocks[index];
+      const original = manifest.blocks.at(index);
+      const decoded = restored.manifest.blocks.at(index);
       if (canonicalMovement(original) !== canonicalMovement(decoded)) {
         throw new Error(`Arc movement ${index} did not survive exact archive roundtrip.`);
       }

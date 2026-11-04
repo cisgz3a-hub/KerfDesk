@@ -32,6 +32,7 @@ import {
   formatBoundsSize,
   formatCount,
   formatGcodeSize,
+  formatTrimmedLineCount,
   originTileDetail,
   originTileValue,
   toolPlanLabels,
@@ -410,10 +411,9 @@ function operationsTile(
 }
 
 function gcodeTile(gcode: string): JobReviewStatTile {
-  const lineCount = gcode.length === 0 ? 0 : gcode.trimEnd().split('\n').length;
   return {
     label: 'G-code',
-    value: `${formatCount(lineCount)} lines`,
+    value: `${formatCount(formatTrimmedLineCount(gcode))} lines`,
     detail: formatGcodeSize(gcode.length),
   };
 }

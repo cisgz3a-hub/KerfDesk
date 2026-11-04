@@ -85,7 +85,7 @@ export function timingRouteAtManifestRoute(
   if (routeMm <= 0) return 0;
   if (routeMm >= manifest.totalRouteMm) return plan.totalRouteMm;
   const blockIndex = manifestBlockIndexAtRoute(manifest.blocks, routeMm);
-  const block = manifest.blocks[blockIndex];
+  const block = manifest.blocks.at(blockIndex);
   if (block === undefined) {
     return manifest.blocks.length === 0 ? null : plan.totalRouteMm;
   }
@@ -213,7 +213,7 @@ function manifestBlockIndexAtRoute(blocks: MotionManifest['blocks'], routeMm: nu
   let high = blocks.length;
   while (low < high) {
     const middle = Math.floor((low + high) / 2);
-    if ((blocks[middle]?.routeEndMm ?? Number.POSITIVE_INFINITY) >= routeMm) high = middle;
+    if ((blocks.at(middle)?.routeEndMm ?? Number.POSITIVE_INFINITY) >= routeMm) high = middle;
     else low = middle + 1;
   }
   return low;
@@ -226,12 +226,12 @@ function manifestRouteSpanForRawLine(
 ): { readonly start: number; readonly end: number } {
   let first = blockIndex;
   let last = blockIndex;
-  while (first > 0 && blocks[first - 1]?.rawLineIndex === block.rawLineIndex) first -= 1;
-  while (last + 1 < blocks.length && blocks[last + 1]?.rawLineIndex === block.rawLineIndex)
+  while (first > 0 && blocks.at(first - 1)?.rawLineIndex === block.rawLineIndex) first -= 1;
+  while (last + 1 < blocks.length && blocks.at(last + 1)?.rawLineIndex === block.rawLineIndex)
     last += 1;
   return {
-    start: blocks[first]?.routeStartMm ?? block.routeStartMm,
-    end: blocks[last]?.routeEndMm ?? block.routeEndMm,
+    start: blocks.at(first)?.routeStartMm ?? block.routeStartMm,
+    end: blocks.at(last)?.routeEndMm ?? block.routeEndMm,
   };
 }
 

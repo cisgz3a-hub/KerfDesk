@@ -103,7 +103,7 @@ function countingManifest(manifest: MotionManifest): {
   readonly scanned: Set<number>;
 } {
   const scanned = new Set<number>();
-  const blocks = manifest.blocks.map(
+  const blocks = Array.from(manifest.blocks).map(
     (block, index) =>
       new Proxy(block, {
         get(target, property, receiver) {
@@ -129,8 +129,8 @@ describe('reconcileReportedPosition execution window', () => {
         // About three rows per 250 ms status (~360 mm/s), with the ceiling up
         // to a grblHAL-default planner depth ahead of the head.
         headIndex += 800 + ((report * 37) % 200);
-        const head = raster.blocks[headIndex]!;
-        const ceiling = raster.blocks[headIndex + ((report * 53) % 100)]!;
+        const head = raster.blocks.at(headIndex)!;
+        const ceiling = raster.blocks.at(headIndex + ((report * 53) % 100))!;
         const input: RouteReconciliationInput = {
           manifest: raster,
           previous: state,
@@ -160,7 +160,7 @@ describe('reconcileReportedPosition execution window', () => {
       const raster = longRaster();
       const { manifest, scanned } = countingManifest(raster);
       const frozen: RouteReconciliationState = {
-        confirmedRouteMm: raster.blocks[1_000]!.routeStartMm,
+        confirmedRouteMm: raster.blocks.at(1_000)!.routeStartMm,
         candidates: [],
         uncertain: true,
       };
@@ -195,10 +195,10 @@ describe('reconcileReportedPosition execution window', () => {
     () => {
       const raster = longRaster();
       const passBlocks = ROWS_PER_PASS + 1;
-      const lastPassStart = raster.blocks[(PASSES - 1) * passBlocks]!;
-      const head = raster.blocks[(PASSES - 1) * passBlocks + 6_000]!;
+      const lastPassStart = raster.blocks.at((PASSES - 1) * passBlocks)!;
+      const head = raster.blocks.at((PASSES - 1) * passBlocks + 6_000)!;
       const frozen: RouteReconciliationState = {
-        confirmedRouteMm: raster.blocks[1_000]!.routeStartMm,
+        confirmedRouteMm: raster.blocks.at(1_000)!.routeStartMm,
         candidates: [],
         uncertain: true,
       };
@@ -218,7 +218,7 @@ describe('reconcileReportedPosition execution window', () => {
       // the unbounded scan settled on them although they left the planner
       // passes ago.
       expect(legacyReconcileReportedPosition(input).confirmedRouteMm).toBeLessThan(
-        raster.blocks[passBlocks]!.routeStartMm,
+        raster.blocks.at(passBlocks)!.routeStartMm,
       );
     },
     LONG_JOB_TIMEOUT_MS,

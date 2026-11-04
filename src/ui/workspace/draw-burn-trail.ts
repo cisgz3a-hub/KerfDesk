@@ -31,7 +31,7 @@ export function burnIsActive(run: LiveCanvasRun): boolean {
   // Never paint a powered head when one of those locations is laser-off travel.
   if (
     run.route.candidates.some(
-      (candidate) => run.plan.manifest.blocks[candidate.blockIndex]?.kind !== 'process',
+      (candidate) => run.plan.manifest.blocks.at(candidate.blockIndex)?.kind !== 'process',
     )
   )
     return false;

@@ -15,6 +15,7 @@
 // Pure core: timestamps are passed in as ISO strings; no clock, no storage.
 
 import { isSendableGcodeLine } from '../controllers/grbl';
+import { countSendableGcodeLines } from '../controllers/grbl/sendable-line-scan';
 import { JOB_ORIGIN_ANCHORS, type JobOriginAnchor, type JobOriginPlacement } from '../job';
 import type { OutputScope, Vec2 } from '../scene';
 import { parseOptionalJobInterruption, type JobInterruption } from './job-interruption';
@@ -73,23 +74,27 @@ export type JobCheckpoint = {
 
 export function fingerprintGcode(gcode: string): GcodeFingerprint {
   let hash = FNV_OFFSET_BASIS;
+  // `split('\n').length`, counted in the same pass: splitting an 8 M line
+  // program built 8 M strings to read one number (ADR-244 Amendment 3).
+  let lines = 1;
   for (let i = 0; i < gcode.length; i += 1) {
-    hash ^= gcode.charCodeAt(i);
+    const code = gcode.charCodeAt(i);
+    if (code === 10) lines += 1;
+    hash ^= code;
     // hash * 0x01000193 without leaving 32-bit integer safety: the prime is
     // 2^24 + 2^8 + 2^7 + 2^4 + 2^1 + 2^0, composed here from shifts.
     hash = (hash + (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24)) >>> 0;
   }
-  return { fnv1a: hash, chars: gcode.length, lines: gcode.split('\n').length };
+  return { fnv1a: hash, chars: gcode.length, lines };
 }
 
 export function fingerprintsEqual(a: GcodeFingerprint, b: GcodeFingerprint): boolean {
   return a.fnv1a === b.fnv1a && a.chars === b.chars && a.lines === b.lines;
 }
 
+/** `isSendableGcodeLine` over `split('\n')`, counted without the split. */
 export function countSendableLines(gcode: string): number {
-  let count = 0;
-  for (const line of gcode.split('\n')) if (isSendableGcodeLine(line)) count += 1;
-  return count;
+  return countSendableGcodeLines(gcode);
 }
 
 export function createJobCheckpoint(args: {

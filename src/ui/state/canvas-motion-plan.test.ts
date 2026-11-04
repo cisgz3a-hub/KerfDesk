@@ -265,9 +265,15 @@ describe('CanvasMotionPlan', () => {
     });
     const rebuilt = rebuildCanvasPlanForGcode(plan, gcode);
 
-    expect(plan.manifest.blocks.map((block) => block.kind)).toEqual(['travel', 'process']);
+    expect(Array.from(plan.manifest.blocks).map((block) => block.kind)).toEqual([
+      'travel',
+      'process',
+    ]);
     expect(plan.jobStart).not.toBeNull();
-    expect(rebuilt.manifest.blocks.map((block) => block.kind)).toEqual(['travel', 'process']);
+    expect(Array.from(rebuilt.manifest.blocks).map((block) => block.kind)).toEqual([
+      'travel',
+      'process',
+    ]);
   });
 
   it('matches full, settle-only, and file-only controller capabilities', () => {

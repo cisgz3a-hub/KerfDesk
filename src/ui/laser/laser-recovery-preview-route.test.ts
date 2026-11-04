@@ -89,7 +89,7 @@ describe('sealed laser restart preview', () => {
       });
       const alteredManifest = {
         ...canvasPlan.manifest,
-        blocks: canvasPlan.manifest.blocks.map((block, index) => ({
+        blocks: Array.from(canvasPlan.manifest.blocks).map((block, index) => ({
           ...block,
           // A finite, in-range, monotonic edit passes the diagnostic shape guard.
           rawLineIndex: index === 1 ? block.rawLineIndex + 1 : block.rawLineIndex,
@@ -144,7 +144,7 @@ describe('sealed laser restart preview', () => {
       },
     });
     const preview = buildLaserRecoveryPreviewRoute(artifact);
-    expect(unpackMotionManifest(preview.manifest).blocks[0]?.points).toEqual([
+    expect(unpackMotionManifest(preview.manifest).blocks.at(0)?.points).toEqual([
       { x: 25.4, y: 50.8, z: 0 },
       { x: 35.4, y: 50.8, z: 0 },
     ]);
@@ -194,8 +194,9 @@ describe('sealed laser restart preview', () => {
       initialPosition: null,
       laserPowerControl: 'spindle',
     });
+    // The block and point columns: no N-words and a flat Z add none.
     expect(packedManifestTransferables(packRecoveryPreviewManifest(worker.request))).toHaveLength(
-      2,
+      7,
     );
     worker.answer();
     const route = await pending;

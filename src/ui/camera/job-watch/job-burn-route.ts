@@ -12,6 +12,7 @@ import {
   type RouteMasks,
 } from '../../../core/camera/job-watch/route-mask';
 import { jobWatchRegion } from '../../../core/camera/job-watch/job-area';
+import { findMotionBlock } from '../../../core/job/motion-block-columns';
 import { BURN_TOLERANCE_MM } from '../../../core/camera/job-watch/burn-comparison';
 import { artworkToBedShift, type CanvasMotionPlan } from '../../state/canvas-motion-plan';
 import { walkRouteLines, type RouteLineVisitor } from '../../workspace/route-range-walk';
@@ -123,6 +124,6 @@ function walkBedLines(
 
 /** Where the first lit move starts along the route, mm; null when nothing burns. */
 export function firstBurnRouteMm(plan: CanvasMotionPlan): number | null {
-  const first = plan.manifest.blocks.find((block) => block.kind === 'process');
+  const first = findMotionBlock(plan.manifest.blocks, (block) => block.kind === 'process');
   return first?.routeStartMm ?? null;
 }

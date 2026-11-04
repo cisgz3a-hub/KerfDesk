@@ -23,7 +23,13 @@
 import { isToolChangeLine } from '../controllers/grbl/streamer';
 import type { ControllerKind } from '../devices';
 import { formatGcodeCoordinateMm } from '../gcode';
-import { buildMotionManifest, type MotionBlock, type MotionPoint } from '../job/motion-manifest';
+import {
+  buildMotionManifest,
+  findMotionBlock,
+  type MotionBlock,
+  type MotionBlockSequence,
+  type MotionPoint,
+} from '../job/motion-manifest';
 import { cncResumePlannerReserveLines } from './cnc-resume-point';
 import {
   scanCncReentryProgram,
@@ -108,7 +114,8 @@ export function planCncPauseReentry(input: CncPauseReentryInput): CncPauseReentr
   const manifest = buildMotionManifest(input.lines.slice(0, windowEnd).join(''), {
     machineKind: 'cnc',
   });
-  const block = manifest.blocks.find(
+  const block = findMotionBlock(
+    manifest.blocks,
     (candidate) =>
       candidate.sendableLineIndex >= windowStart &&
       distanceToPolyline(input.stopPoint, candidate.points) <= CNC_REENTRY_MATCH_TOLERANCE_MM,
@@ -127,7 +134,7 @@ type CompletedScan = Extract<ReturnType<typeof scanCncReentryProgram>, { readonl
 function planFromScan(
   stopPoint: MotionPoint,
   block: MotionBlock,
-  blocks: ReadonlyArray<MotionBlock>,
+  blocks: MotionBlockSequence,
   scan: CompletedScan,
   rapidsFrom: number,
 ): CncPauseReentryResult {
@@ -180,7 +187,7 @@ function spinupAtStop(
 
 /** The plunge feed back into the kerf, or why none is known. */
 function plungeFeedAt(
-  blocks: ReadonlyArray<MotionBlock>,
+  blocks: MotionBlockSequence,
   k: number,
   scan: CompletedScan,
 ): number | string {
@@ -212,7 +219,7 @@ function lastToolChangeBoundary(lines: ReadonlyArray<string>, acked: number): nu
 // a safe height for the bit in the spindle now. The program lifts to safe
 // height again after every M0 before its M3 (cnc-grbl-transitions.ts).
 function highestRapidZ(
-  blocks: ReadonlyArray<MotionBlock>,
+  blocks: MotionBlockSequence,
   fromIndex: number,
   resumeIndex: number,
   motionAt: Uint8Array,
@@ -231,7 +238,7 @@ function highestRapidZ(
 // The feed of the program's latest straight-down G1, up to and including the
 // resume line itself.
 function lastPlungeFeed(
-  blocks: ReadonlyArray<MotionBlock>,
+  blocks: MotionBlockSequence,
   resumeIndex: number,
   scan: { readonly motionAt: Uint8Array; readonly feedAt: Float64Array },
 ): number | null {

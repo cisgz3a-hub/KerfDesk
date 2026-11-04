@@ -8,6 +8,8 @@ import {
   type PackedMotionManifest,
 } from '../state/recovery/packed-motion-manifest';
 
+export { packedManifestTransferables } from '../state/recovery/packed-motion-manifest';
+
 /** Shared by the restart-preview worker and its client. Kept free of UI-store
  * imports so the worker bundle carries only the parser and the packer. */
 export type LaserRecoveryPreviewRequest = {
@@ -34,10 +36,4 @@ export function packRecoveryPreviewManifest(
     ...(request.initialPosition === null ? {} : { initialPosition: request.initialPosition }),
   });
   return packMotionManifest(manifest, { enforceArchiveBudget: false });
-}
-
-export function packedManifestTransferables(packed: PackedMotionManifest): ArrayBuffer[] {
-  return [packed.blockData.buffer, packed.pointData.buffer].filter(
-    (buffer): buffer is ArrayBuffer => buffer instanceof ArrayBuffer,
-  );
 }

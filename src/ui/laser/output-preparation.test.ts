@@ -15,6 +15,7 @@ import {
   type Project,
 } from '../../core/scene';
 import { emitPreparedGcode } from '../../io/gcode';
+import { buildMotionManifest } from '../../core/job/motion-manifest';
 import { hydratePreparedExecutionOutput } from '../../io/gcode/prepared-output-persistence';
 import { canvasExecutablePlan } from '../state/canvas-preview-motion';
 import { selectExecutablePlanCalculatedBounds } from './executable-plan-calculated-bounds';
@@ -22,6 +23,11 @@ import { PagedAssetByteWriter } from '../import/paged-asset-byte-writer';
 import { IndexedDbPagedAssetRepository } from '../import/paged-asset-indexeddb';
 import { prepareOutputRequest } from './output-preparation';
 import { hydrateTransferredStartPreparation } from './output-preparation-worker-client';
+import { frameVerificationForProject } from './frame-verification-testing';
+import {
+  preparedStartFrameBounds,
+  requiredFrameIssueFromPrepared,
+} from './required-frame-readiness';
 
 const IDLE: StatusReport = {
   state: 'Idle',
@@ -113,6 +119,75 @@ describe('output preparation worker payload', () => {
         outputScope: DEFAULT_OUTPUT_SCOPE,
       }).gcode,
     ).toBe(response.result.gcode);
+  });
+
+  // ADR-244 Amendment 3 moved the manifest into columns and the program's line
+  // scans off split('\n'); neither may change a byte or a block.
+  it.each([
+    ['a streamed photo', streamedProject],
+    ['a Fill job', fillProject],
+  ])('emits the bytes Save writes for %s and hands its motion over intact', async (_name, make) => {
+    const project = make();
+    const response = await prepareOutputRequest({
+      kind: 'start',
+      project,
+      controllerSettings: null,
+      machine: { statusReport: IDLE, alarmCode: null, hasActiveStreamer: false },
+      jobPlacement: DEFAULT_JOB_PLACEMENT,
+      outputScope: DEFAULT_OUTPUT_SCOPE,
+      requireFrame: false,
+    });
+    if (response.kind !== 'start' || !response.result.ok) throw new Error('Start did not prepare.');
+    const sealed = hydratePreparedExecutionOutput(response.result.prepared);
+    expect(
+      emitPreparedGcode(sealed ?? response.result.prepared, { outputScope: DEFAULT_OUTPUT_SCOPE })
+        .gcode,
+    ).toBe(response.result.gcode);
+    // Past 4,096 blocks the plan crosses as packed columns.
+    expect('encoding' in response.result.canvasPlan.manifest).toBe(true);
+    const received = hydrateTransferredStartPreparation(structuredClone(response.result));
+    if (!received.ok) throw new Error('Start did not hydrate.');
+    const parsed = buildMotionManifest(response.result.gcode, {
+      machineKind: 'laser',
+      initialPosition: { x: 0, y: 0, z: 0 },
+    });
+    expect(Array.from(received.canvasPlan.manifest.blocks)).toEqual(Array.from(parsed.blocks));
+    expect(parsed.blocks.length).toBeGreaterThan(4_096);
+  });
+
+  // The bed-sized photo of performance audit S4 (S4-P2-2): its Start review
+  // revoked the Frame it had just matched, because the window measured a job
+  // whose streamed rows had stayed in the worker.
+  it('passes the frame-first gate of a streamed image with the bounds the worker measured', async () => {
+    const project = streamedProject();
+    const response = await prepareOutputRequest({
+      kind: 'start',
+      project,
+      controllerSettings: null,
+      machine: {
+        statusReport: IDLE,
+        alarmCode: null,
+        hasActiveStreamer: false,
+        settingsCapability: 'none',
+      },
+      jobPlacement: DEFAULT_JOB_PLACEMENT,
+      outputScope: DEFAULT_OUTPUT_SCOPE,
+      requireFrame: false,
+    });
+    if (response.kind !== 'start' || !response.result.ok) throw new Error('Start did not prepare.');
+    const hydrated = hydrateTransferredStartPreparation(response.result);
+    if (!hydrated.ok) throw new Error('Start did not hydrate.');
+    const machine = { frameVerification: frameVerificationForProject(project) };
+
+    // Measured again on this side, the image has no rows and no bounds.
+    expect(requiredFrameIssueFromPrepared({ prepared: hydrated.prepared, machine })).not.toBeNull();
+    expect(
+      requiredFrameIssueFromPrepared({
+        prepared: hydrated.prepared,
+        machine,
+        measuredFrameBounds: preparedStartFrameBounds(hydrated),
+      }),
+    ).toBeNull();
   });
 
   it('rehydrates each angle of a cross-hatched streamed image to the sealed bytes', async () => {
@@ -254,6 +329,34 @@ function streamedProject(): Project {
         ditherAlgorithm: 'threshold',
         fillOverscanMm: 0,
       },
+    ),
+  };
+}
+
+function fillProject(): Project {
+  const base = createProject();
+  const color = '#2255ff';
+  const square = (size: number) => ({
+    points: [
+      { x: 5, y: 5 },
+      { x: 5 + size, y: 5 },
+      { x: 5 + size, y: 5 + size },
+      { x: 5, y: 5 + size },
+    ],
+    closed: true,
+  });
+  return {
+    ...base,
+    scene: addLayer(
+      addObject(base.scene, {
+        kind: 'imported-svg',
+        id: 'fill',
+        source: 'fill.svg',
+        bounds: { minX: 5, minY: 5, maxX: 255, maxY: 255 },
+        transform: IDENTITY_TRANSFORM,
+        paths: [{ color, polylines: [square(250)] }],
+      }),
+      { ...createLayer({ id: 'fill', color, mode: 'fill' }), linesPerMm: 10 },
     ),
   };
 }

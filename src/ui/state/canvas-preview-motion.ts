@@ -4,6 +4,11 @@ import type {
   ExecutablePlanV1,
 } from '../../core/execution-plan';
 import type { MotionBlock, MotionManifest } from '../../core/job/motion-manifest';
+import {
+  mappedSequence,
+  MotionBlockColumns,
+  type IndexedSequence,
+} from '../../core/job/motion-block-columns';
 
 type ExecutablePlanMotion = ExecutablePlanV1['motions'][number];
 
@@ -16,7 +21,8 @@ export type CanvasPreviewMotion = {
 
 export type CanvasPreviewMotionSequence = {
   readonly source: 'executable-plan' | 'legacy-manifest';
-  readonly motions: ReadonlyArray<CanvasPreviewMotion>;
+  /** The executable plan's array, or a view over the manifest's blocks. */
+  readonly motions: IndexedSequence<CanvasPreviewMotion>;
   readonly totalRouteMm: number;
 };
 
@@ -59,6 +65,51 @@ export function canvasPreviewMotionSequence(plan: CanvasPreviewPlan): CanvasPrev
   return sequence;
 }
 
+export type PreviewSegmentVisitor = (
+  intent: ExecutablePlanMotionIntent,
+  fromX: number,
+  fromY: number,
+  toX: number,
+  toY: number,
+) => void;
+
+/** Every segment of the plan's preview sequence, in route order. Over the
+ * manifest's columns it reads coordinates in place: a bed-sized photo's walk
+ * through `motions` made five objects per block, 3 GB for one route
+ * (ADR-244 Amendment 3). */
+export function visitPreviewMotionSegments(
+  plan: CanvasPreviewPlan,
+  visit: PreviewSegmentVisitor,
+): void {
+  const sequence = canvasPreviewMotionSequence(plan);
+  const blocks = plan.manifest.blocks;
+  if (sequence.source === 'legacy-manifest' && blocks instanceof MotionBlockColumns) {
+    for (let block = 0; block < blocks.length; block += 1) {
+      const intent = blocks.kindAt(block);
+      const count = blocks.pointCountAt(block);
+      for (let point = 1; point < count; point += 1) {
+        visit(
+          intent,
+          blocks.pointXAt(block, point - 1),
+          blocks.pointYAt(block, point - 1),
+          blocks.pointXAt(block, point),
+          blocks.pointYAt(block, point),
+        );
+      }
+    }
+    return;
+  }
+  for (const motion of sequence.motions) {
+    const points = motion.pointsMm;
+    for (let index = 1; index < points.length; index += 1) {
+      const start = points[index - 1];
+      const end = points[index];
+      if (start !== undefined && end !== undefined)
+        visit(motion.intent, start.x, start.y, end.x, end.y);
+    }
+  }
+}
+
 function executableSequence(plan: ExecutablePlanV1): CanvasPreviewMotionSequence {
   return {
     source: 'executable-plan',
@@ -70,7 +121,7 @@ function executableSequence(plan: ExecutablePlanV1): CanvasPreviewMotionSequence
 function legacySequence(manifest: MotionManifest): CanvasPreviewMotionSequence {
   return {
     source: 'legacy-manifest',
-    motions: manifest.blocks.map((block) => ({
+    motions: mappedSequence(manifest.blocks, (block) => ({
       intent: legacyIntent(block),
       pointsMm: block.points,
       routeStartMm: block.routeStartMm,
@@ -89,7 +140,7 @@ function previewRouteMatches(plan: ExecutablePlanV1, manifest: MotionManifest): 
     return false;
   }
   return plan.motions.every((motion, index) => {
-    const block = manifest.blocks[index];
+    const block = manifest.blocks.at(index);
     return block !== undefined && previewMotionMatches(motion, block);
   });
 }

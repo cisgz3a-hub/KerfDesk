@@ -1,5 +1,5 @@
 import type { CanvasMotionPlan } from '../state/canvas-motion-plan';
-import { canvasPreviewMotionSequence } from '../state/canvas-preview-motion';
+import { visitPreviewMotionSegments } from '../state/canvas-preview-motion';
 import { scenePointMapper, walkRouteLines, type MutableScenePoint } from './route-range-walk';
 
 /** Scene-space (millimetre) rectangle. */
@@ -54,20 +54,14 @@ export function plannedRoute(plan: CanvasMotionPlan, PathCtor: typeof Path2D): P
   const travel = new ChainedPath(new PathCtor());
   const process = new RouteChunkBuilder(PathCtor);
   let segmentCount = 0;
-  for (const motion of canvasPreviewMotionSequence(plan).motions) {
-    if (motion.intent === 'plunge' || motion.intent === 'retract') continue;
-    const points = motion.pointsMm;
-    for (let index = 1; index < points.length; index += 1) {
-      const start = points[index - 1];
-      const end = points[index];
-      if (start === undefined || end === undefined) continue;
-      map(start.x, start.y, from);
-      map(end.x, end.y, to);
-      if (motion.intent === 'process') process.line(from.x, from.y, to.x, to.y);
-      else travel.line(from.x, from.y, to.x, to.y);
-      segmentCount += 1;
-    }
-  }
+  visitPreviewMotionSegments(plan, (intent, fromX, fromY, toX, toY) => {
+    if (intent === 'plunge' || intent === 'retract') return;
+    map(fromX, fromY, from);
+    map(toX, toY, to);
+    if (intent === 'process') process.line(from.x, from.y, to.x, to.y);
+    else travel.line(from.x, from.y, to.x, to.y);
+    segmentCount += 1;
+  });
   const built = {
     pathConstructor: PathCtor,
     travel: travel.path,
