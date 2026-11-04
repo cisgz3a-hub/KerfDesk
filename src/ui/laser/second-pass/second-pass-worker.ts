@@ -5,12 +5,21 @@ import {
   type LaserSecondPassSelection,
 } from '../../../core/laser-second-pass';
 import { fingerprintGcode } from '../../../core/recovery';
-import type { PreparedStartProgram } from '../../state/framed-run';
 import type { ExecutionArtifactV1 } from '../../state/recovery';
+import { archiveCanvasMotionPlan } from '../../state/recovery/execution-artifact-canvas';
+import {
+  packMotionManifest,
+  packedManifestTransferables,
+} from '../../state/recovery/packed-motion-manifest';
 import { executionArtifactIntegrityIsValid } from '../../state/recovery/execution-artifact-integrity';
 import { recoveryArtifactPreparedProgramMatches } from '../recovery-artifact-binding';
 import { secondPassDrawing, sourceInitialPosition } from './second-pass-preview';
 import { secondPassProjectEligible } from './second-pass-eligibility';
+import {
+  packedPlanTransferables,
+  type TransferredSecondPassFrameGeometry,
+  type TransferredSecondPassPreview,
+} from './second-pass-worker-protocol';
 
 let source: ExecutionArtifactV1 | null = null;
 let sourceGeneration = 0;
@@ -54,19 +63,23 @@ async function process(request: WorkerRequest): Promise<void> {
     return;
   }
   if (source && request.gcode && request.initialPosition) {
-    self.postMessage({
-      id: request.id,
-      value: {
-        manifest: buildMotionManifest(request.gcode, {
+    const value: TransferredSecondPassFrameGeometry = {
+      manifest: packMotionManifest(
+        buildMotionManifest(request.gcode, {
           machineKind: 'laser',
           initialPosition: request.initialPosition,
         }),
-        duration: estimateJobDuration(source.prepared.job, source.prepared.project.device, {
-          gcode: request.gcode,
-          initialPosition: request.initialPosition,
-        }),
-      },
-    });
+        { enforceArchiveBudget: false },
+      ),
+      duration: estimateJobDuration(source.prepared.job, source.prepared.project.device, {
+        gcode: request.gcode,
+        initialPosition: request.initialPosition,
+      }),
+    };
+    self.postMessage(
+      { id: request.id, value },
+      { transfer: packedManifestTransferables(value.manifest) },
+    );
     return;
   }
   if (!source || !request.selection)
@@ -74,18 +87,27 @@ async function process(request: WorkerRequest): Promise<void> {
   const value = compileSelectedPass(source, request.selection);
   self.postMessage(
     { id: request.id, value },
-    { transfer: [value.drawing.segments.buffer, value.drawing.chunkBounds.buffer] },
+    {
+      transfer: [
+        value.drawing.segments.buffer,
+        value.drawing.chunkBounds.buffer,
+        ...packedPlanTransferables(value.prepared.canvasPlan),
+      ],
+    },
   );
 }
 
-function compileSelectedPass(source: ExecutionArtifactV1, selection: LaserSecondPassSelection) {
+function compileSelectedPass(
+  source: ExecutionArtifactV1,
+  selection: LaserSecondPassSelection,
+): TransferredSecondPassPreview {
   const result = buildLaserSecondPassProgram(source.gcode, selection);
   if (result.kind === 'error') throw new Error(result.message);
   const device = source.prepared.project.device;
   const manifest = buildMotionManifest(result.gcode, { machineKind: 'laser' });
   const fingerprint = fingerprintGcode(result.gcode);
   const motionBounds = result.motionBounds;
-  const prepared: PreparedStartProgram = {
+  const prepared: TransferredSecondPassPreview['prepared'] = {
     ok: true,
     gcode: result.gcode,
     prepared: source.prepared,
@@ -106,21 +128,25 @@ function compileSelectedPass(source: ExecutionArtifactV1, selection: LaserSecond
       frameMotionBounds: motionBounds,
       parkTarget: null,
     },
-    canvasPlan: {
-      manifest,
-      fingerprint,
-      retentionKey: `second-pass:${source.runId}:${fingerprint.fnv1a}:${fingerprint.chars}`,
-      device,
-      machineKind: 'laser',
-      coordinateFrame: { kind: 'relative', jobOriginOffset: { x: 0, y: 0 } },
-      framePerimeter: [],
-      jobStart: null,
-      approachFrom: null,
-      capability: 'settle-only',
-      unavailableReason: null,
-      resumed: false,
-      positionEpoch: 0,
-    },
+    // This worker posts the columns once and never reads them again.
+    canvasPlan: archiveCanvasMotionPlan(
+      {
+        manifest,
+        fingerprint,
+        retentionKey: `second-pass:${source.runId}:${fingerprint.fnv1a}:${fingerprint.chars}`,
+        device,
+        machineKind: 'laser',
+        coordinateFrame: { kind: 'relative', jobOriginOffset: { x: 0, y: 0 } },
+        framePerimeter: [],
+        jobStart: null,
+        approachFrom: null,
+        capability: 'settle-only',
+        unavailableReason: null,
+        resumed: false,
+        positionEpoch: 0,
+      },
+      { enforceArchiveBudget: false },
+    ),
   };
   const drawing = secondPassDrawing(result.gcode, device);
   return { prepared, drawing, burnLengthMm: result.burnLengthMm, clamped: result.clamped };
