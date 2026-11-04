@@ -50,7 +50,7 @@ function ditheredImage(compact: boolean): string {
 }
 
 function motionBlocks(gcode: string): ReadonlyArray<MotionBlock> {
-  return buildMotionManifest(gcode, { machineKind: 'laser' }).blocks;
+  return Array.from(buildMotionManifest(gcode, { machineKind: 'laser' }).blocks);
 }
 
 function byteLength(gcode: string): number {

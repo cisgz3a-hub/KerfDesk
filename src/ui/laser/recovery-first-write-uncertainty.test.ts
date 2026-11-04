@@ -271,7 +271,9 @@ async function fixture() {
 }
 
 function firstBurnLine(prepared: Awaited<ReturnType<typeof fixture>>['prepared']): number {
-  const first = prepared.canvasPlan.manifest.blocks.find((block) => block.kind === 'process');
+  const first = Array.from(prepared.canvasPlan.manifest.blocks).find(
+    (block) => block.kind === 'process',
+  );
   if (first === undefined) throw new Error('Expected process movement.');
   return first.rawLineIndex + 1;
 }

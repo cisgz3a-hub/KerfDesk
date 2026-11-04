@@ -51,6 +51,9 @@ export function handleAlarmLine(
     // ALARM:N supersedes any prior Run/Hold report. Clearing it lets the
     // numbered alarm itself be the exact recovery evidence for Home.
     statusReport: null,
+    // A new alarm after `$X`, not an unlock that left Alarm in place
+    // (controller-reset-required.ts).
+    unlockAwaitsReport: false,
     wcoCache: null,
     accessoryCache: null,
     // ALARM:N is not a new transport session, so it cannot clear a latched

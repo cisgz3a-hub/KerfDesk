@@ -1,21 +1,21 @@
 import type { LaserSecondPassSelection } from '../../../core/laser-second-pass';
-import type { PreparedStartProgram } from '../../state/framed-run';
 import type { ExecutionArtifactV1 } from '../../state/recovery';
 import type { SecondPassDrawing } from './second-pass-preview';
+import {
+  hydrateSecondPassFrameGeometry,
+  hydrateSecondPassPreview,
+  type SecondPassPreview,
+  type TransferredSecondPassFrameGeometry,
+  type TransferredSecondPassPreview,
+} from './second-pass-worker-protocol';
 import {
   captureLaserSecondPassSource,
   laserSecondPassSourceMatches,
   registerVerifiedLaserSecondPassPreparation,
-  type LaserSecondPassFrameGeometry,
   type LaserSecondPassSourceSnapshot,
 } from '../second-pass-preparation-proof';
 
-export type SecondPassPreview = {
-  prepared: PreparedStartProgram;
-  drawing: SecondPassDrawing;
-  burnLengthMm: number;
-  clamped: boolean;
-};
+export type { SecondPassPreview } from './second-pass-worker-protocol';
 
 /** One owner per workbench. Closing it terminates expensive verification/compilation. */
 export class SecondPassWorkerClient {
@@ -67,7 +67,9 @@ export class SecondPassWorkerClient {
     if (source === null || snapshot === null)
       throw new Error('Open a saved laser job before preparing a second pass.');
     this.assertSourceCurrent(source, snapshot);
-    const result = (await this.request({ selection: frozen })) as SecondPassPreview;
+    const result = hydrateSecondPassPreview(
+      (await this.request({ selection: frozen })) as TransferredSecondPassPreview,
+    );
     this.assertSourceCurrent(source, snapshot);
     registerVerifiedLaserSecondPassPreparation(
       source,
@@ -75,10 +77,12 @@ export class SecondPassWorkerClient {
       frozen,
       async (initialPosition) => {
         this.assertSourceCurrent(source, snapshot);
-        const geometry = (await this.request({
-          gcode: result.prepared.gcode,
-          initialPosition,
-        })) as LaserSecondPassFrameGeometry;
+        const geometry = hydrateSecondPassFrameGeometry(
+          (await this.request({
+            gcode: result.prepared.gcode,
+            initialPosition,
+          })) as TransferredSecondPassFrameGeometry,
+        );
         this.assertSourceCurrent(source, snapshot);
         return geometry;
       },

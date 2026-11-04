@@ -242,7 +242,7 @@ function recoveryCanvas(): SVGSVGElement {
 function clickFirstBurn(svg: SVGSVGElement, capsule: RecoveryCapsule): number {
   if (capsule.artifact.kind !== 'exact-execution') throw new Error('Expected exact artifact.');
   const plan = executionArtifactCanvasPlan(capsule.artifact);
-  const block = plan.manifest.blocks.find((item) => item.kind === 'process');
+  const block = Array.from(plan.manifest.blocks).find((item) => item.kind === 'process');
   const first = block?.points[0];
   const last = block?.points.at(-1);
   if (block === undefined || first === undefined || last === undefined)

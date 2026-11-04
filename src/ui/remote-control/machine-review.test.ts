@@ -15,6 +15,7 @@ import { recoveryRepository } from '../state/recovery';
 import type * as Recovery from '../state/recovery';
 import { useToastStore } from '../state/toast-store';
 import { REVIEW_EDITING_MESSAGE } from './machine-review-presenter';
+import { remoteReviewAcknowledgement } from '../laser/job-review/before-you-start';
 
 vi.mock('../state/job-aware-dialogs', () => ({
   jobAwareAlert: vi.fn(),
@@ -148,7 +149,9 @@ describe('remote Start uses the ordinary exact review and one-use claim', () => 
     expect(visible.review?.frame).toEqual({ required: true, complete: true });
     const native = useJobReviewStore.getState().state;
     if (native.kind !== 'open') throw new Error('canonical review did not open');
-    expect(visible.review?.acknowledgement).toEqual(native.model.acknowledgement);
+    expect(visible.review?.acknowledgement).toEqual(
+      remoteReviewAcknowledgement(native.model.acknowledgement, native.model.machineKind),
+    );
     expect(useLaserStore.getState().startJob).not.toHaveBeenCalled();
     const approval = writeArgs(adapter, { reviewId: visible.review!.reviewId });
     await adapter.execute('start_job', approval);

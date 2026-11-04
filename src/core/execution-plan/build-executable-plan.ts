@@ -70,7 +70,9 @@ function buildAlignedPlan(
     machineKind: options.machineKind,
     ...(options.controller === 'smoothieware' ? { laserPowerControl: 'smoothieware' } : {}),
   });
-  const aligned = alignPlanMotions(model, manifest.blocks);
+  // The sidecar is built only within the canvas analysis budget, so
+  // materialising its blocks is bounded.
+  const aligned = alignPlanMotions(model, Array.from(manifest.blocks));
   if (aligned.motions === null) {
     return { kind: 'error', reason: 'semantic-mismatch', issues: aligned.issues };
   }

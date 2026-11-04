@@ -68,7 +68,7 @@ function parserEndpoints(gcode: string): Endpoint[] {
 
 function manifestEndpoints(gcode: string): Endpoint[] {
   const manifest = buildMotionManifest(gcode, { machineKind: 'cnc' });
-  return manifest.blocks.map((block) => {
+  return Array.from(manifest.blocks).map((block) => {
     const last = block.points[block.points.length - 1];
     if (last === undefined) throw new Error('manifest produced an empty block');
     return { x: last.x, y: last.y, z: last.z };

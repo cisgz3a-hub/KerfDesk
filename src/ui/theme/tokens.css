@@ -101,6 +101,8 @@
   --lf-accent-wash: rgba(168, 90, 42, 0.08);
 
   --lf-focus: #2463b4;
+  /* Copper focus rings for controls that keep the accent family. */
+  --lf-focus-accent: #a85a2a;
   --lf-backdrop: rgba(38, 34, 30, 0.35);
   /* Floating-surface shadow (toasts; modal panels use --lf-backdrop) */
   --lf-shadow: 0 2px 8px rgba(28, 25, 21, 0.18);
@@ -172,6 +174,9 @@
   --lf-burn-preview-material: #d6cfc3;
   --lf-burn-preview-mark: #1c1a18;
   --lf-focus: #90bfff;
+  /* --lf-accent is 2.79:1 on bg-0/bg-2 here, under the 3:1 a focus ring needs
+   * (WCAG 1.4.11, UX audit U7-P3-4); the dark accent text is 6.08:1. */
+  --lf-focus-accent: #e39a63;
   --lf-backdrop: rgba(12, 11, 9, 0.6);
   --lf-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
@@ -289,6 +294,18 @@ body {
 .lf-btn--pressed:active:not(:disabled),
 .lf-btn[aria-pressed='true']:active:not(:disabled) {
   background: var(--lf-accent-active);
+}
+
+/* A control that is unavailable but keeps its focus, so a button that flips
+   (Pause → Pausing… → Resume) does not drop focus to the page (UX audit
+   U7-P3-1). Matches :disabled, after every variant so their hover loses. */
+.lf-btn[aria-disabled='true'],
+.lf-btn[aria-disabled='true']:hover,
+.lf-btn[aria-disabled='true']:active {
+  color: var(--lf-text-faint);
+  background: var(--lf-bg-1);
+  border-color: var(--lf-border);
+  cursor: default;
 }
 
 /* Attention pulse — coaches the one next required step (e.g. "Set origin

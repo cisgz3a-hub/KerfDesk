@@ -41,6 +41,20 @@ export function formatBoundsRange(bounds: JobBounds): string {
   return `X ${formatMm(bounds.minX)} to ${formatMm(bounds.maxX)} · Y ${formatMm(bounds.minY)} to ${formatMm(bounds.maxY)} mm`;
 }
 
+/** `gcode.trimEnd().split('\n').length` without copying or splitting the
+ * program: one bed-sized photo's split built 6.8 M strings (ADR-244 Amd 3). */
+export function formatTrimmedLineCount(gcode: string): number {
+  if (gcode.length === 0) return 0;
+  let end = gcode.length;
+  while (end > 0 && /\s/.test(gcode.charAt(end - 1))) end -= 1;
+  let lines = 1;
+  for (let index = gcode.indexOf('\n'); index !== -1 && index < end; ) {
+    lines += 1;
+    index = gcode.indexOf('\n', index + 1);
+  }
+  return lines;
+}
+
 export function formatGcodeSize(byteLength: number): string {
   if (byteLength < BYTES_PER_KILOBYTE) return `${byteLength} B`;
   const kilobytes = byteLength / BYTES_PER_KILOBYTE;

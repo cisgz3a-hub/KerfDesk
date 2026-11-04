@@ -4,6 +4,7 @@ import { isWorkZEvidenceCurrentForStart } from '../state/work-z-zero-evidence';
 import { CNC_FRAME_WORK_Z_REQUIRED_MESSAGE } from '../state/cnc-frame-lines';
 import { waitForFreshIdleFramePosition } from './frame-position-readiness';
 import { reportFramePreparationRefusal } from './frame-dispatch-support';
+import { FRAME_ZERO_Z_POSITION_UNREPORTED_MESSAGE } from './frame-position-withheld';
 
 export async function prepareFrameLaser(
   isCnc: boolean,
@@ -38,9 +39,7 @@ export async function prepareFrameLaser(
     await laser.zeroZHere();
     if (!(await waitForFreshIdleFramePosition(positionSequenceBeforeZero))) {
       reportFramePreparationRefusal(
-        [
-          'Work Z was set, but the controller did not report the fresh Idle position needed to build an exact Frame. Wait for a complete status report, then Frame again.',
-        ],
+        [FRAME_ZERO_Z_POSITION_UNREPORTED_MESSAGE],
         wcsNormalizationWarning,
       );
       return null;

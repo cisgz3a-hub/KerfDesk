@@ -1,0 +1,273 @@
+// The motion manifest parser as it was before ADR-244 Amendment 3, one object
+// per block and per point. Kept only as the reference the column parser must
+// match field for field (motion-block-columns.test.ts).
+import { isSendableGcodeLine } from '../controllers/grbl';
+import { applySharedGCode, resolveAxisTarget, scanGcodeWords, stripInlineComments } from '../gcode';
+import type { MachineKind } from '../scene';
+import { sampleMotionArc } from './motion-manifest-arc';
+import type {
+  BuildMotionManifestOptions,
+  MotionBlock,
+  MotionBlockKind,
+  MotionManifest,
+  MotionPoint,
+} from './motion-manifest';
+
+export type ObjectMotionManifest = Omit<MotionManifest, 'blocks'> & {
+  readonly blocks: ReadonlyArray<MotionBlock>;
+};
+
+const EPSILON = 1e-9;
+
+type ModalState = {
+  motion: 0 | 1 | 2 | 3;
+  unitScale: number;
+  absolute: boolean;
+  position: MotionPoint;
+  spindleArmed: boolean;
+  power: number;
+  /** Smoothieware only: the M221 S power scale as a fraction (Laser.cpp). */
+  smoothieScale: number;
+  readonly smoothieware: boolean;
+};
+
+type ParsedWords = {
+  readonly values: ReadonlyMap<string, number>;
+  readonly gCodes: ReadonlyArray<number>;
+  readonly mCodes: ReadonlyArray<number>;
+};
+
+type ManifestBuildState = {
+  readonly machineKind: MachineKind;
+  readonly modal: ModalState;
+  readonly blocks: MotionBlock[];
+  readonly parkBoundaries: number[];
+  firstProcessPoint: MotionPoint | null;
+  sendableLineIndex: number;
+  routeMm: number;
+};
+
+export function buildObjectMotionManifest(
+  gcode: string,
+  options: BuildMotionManifestOptions,
+): ObjectMotionManifest {
+  const initial = options.initialPosition ?? { x: 0, y: 0, z: 0 };
+  const build: ManifestBuildState = {
+    machineKind: options.machineKind,
+    modal: initialModalState(initial, options.laserPowerControl === 'smoothieware'),
+    blocks: [],
+    parkBoundaries: [],
+    firstProcessPoint: null,
+    sendableLineIndex: 0,
+    routeMm: 0,
+  };
+  for (const [rawLineIndex, rawLine] of gcode.split(/\r\n|\n|\r/).entries()) {
+    appendManifestLine(build, rawLine, rawLineIndex);
+  }
+  const classified = classifyParks(build.blocks, build.parkBoundaries);
+  return {
+    blocks: classified,
+    totalRouteMm: build.routeMm,
+    sendableLineCount: build.sendableLineIndex,
+    firstProcessPoint: build.firstProcessPoint,
+    finalPoint: classified.at(-1)?.points.at(-1) ?? null,
+  };
+}
+
+// Smoothieware powers up with its M221 scale at 100%.
+function initialModalState(position: MotionPoint, smoothieware: boolean): ModalState {
+  return {
+    motion: 0,
+    unitScale: 1,
+    absolute: true,
+    position,
+    spindleArmed: false,
+    power: 0,
+    smoothieScale: 1,
+    smoothieware,
+  };
+}
+
+function appendManifestLine(
+  build: ManifestBuildState,
+  rawLine: string,
+  rawLineIndex: number,
+): void {
+  if (!isSendableGcodeLine(rawLine)) return;
+  const sendableLineIndex = build.sendableLineIndex;
+  build.sendableLineIndex += 1;
+  const words = parseWords(stripInlineComments(rawLine));
+  if (words.mCodes.some(isProgramStop)) build.parkBoundaries.push(rawLineIndex);
+  applyModalState(build.modal, words);
+  const points = motionPoints(build.modal, words);
+  if (points === null) return;
+  const lengthMm = polylineLength(points);
+  if (lengthMm <= EPSILON) {
+    updateModalPosition(build.modal, points);
+    return;
+  }
+  const block = createMotionBlock(build, words, points, rawLineIndex, sendableLineIndex, lengthMm);
+  build.blocks.push(block);
+  if (build.firstProcessPoint === null && isMaterialEntry(build.machineKind, build.modal, block)) {
+    build.firstProcessPoint = block.points[0] ?? null;
+  }
+  build.routeMm = block.routeEndMm;
+  updateModalPosition(build.modal, points);
+}
+
+function isProgramStop(code: number): boolean {
+  return code === 0 || code === 1;
+}
+
+function createMotionBlock(
+  build: ManifestBuildState,
+  words: ParsedWords,
+  points: ReadonlyArray<MotionPoint>,
+  rawLineIndex: number,
+  sendableLineIndex: number,
+  lengthMm: number,
+): MotionBlock {
+  return {
+    rawLineIndex,
+    sendableLineIndex,
+    programLineNumber: words.values.get('N') ?? null,
+    kind: classifyMotion(build.machineKind, build.modal, points),
+    points,
+    lengthMm,
+    routeStartMm: build.routeMm,
+    routeEndMm: build.routeMm + lengthMm,
+  };
+}
+
+function updateModalPosition(state: ModalState, points: ReadonlyArray<MotionPoint>): void {
+  state.position = points.at(-1) ?? state.position;
+}
+
+function isMaterialEntry(machineKind: MachineKind, state: ModalState, block: MotionBlock): boolean {
+  if (block.kind === 'process') return true;
+  if (machineKind !== 'cnc' || block.kind !== 'plunge' || state.motion === 0) return false;
+  const from = block.points[0];
+  const to = block.points.at(-1);
+  return state.spindleArmed && from !== undefined && to !== undefined && to.z < from.z;
+}
+
+function parseWords(line: string): ParsedWords {
+  const values = new Map<string, number>();
+  const gCodes: number[] = [];
+  const mCodes: number[] = [];
+  for (const match of scanGcodeWords(line)) {
+    if (!Number.isFinite(match.value)) continue;
+    if (match.letter === 'G') gCodes.push(match.value);
+    else if (match.letter === 'M') mCodes.push(match.value);
+    else values.set(match.letter, match.value);
+  }
+  return { values, gCodes, mCodes };
+}
+
+function applyModalState(state: ModalState, words: ParsedWords): void {
+  words.gCodes.forEach((code) => {
+    applySharedGCode(state, code);
+  });
+  const power = words.values.get('S');
+  // On Smoothieware M221's S is the percent scale, never the motion S.
+  if (state.smoothieware && words.mCodes.includes(221)) {
+    if (power !== undefined) state.smoothieScale = power / 100;
+    return;
+  }
+  words.mCodes.forEach((code) => applyMCode(state, code));
+  if (power !== undefined) state.power = power;
+}
+
+function applyMCode(state: ModalState, code: number): void {
+  if (code === 3 || code === 4 || code === 106) state.spindleArmed = true;
+  else if (code === 5 || code === 107) {
+    state.spindleArmed = false;
+    if (code === 107) state.power = 0;
+  }
+}
+
+function motionPoints(state: ModalState, words: ParsedWords): ReadonlyArray<MotionPoint> | null {
+  const hasAxis = ['X', 'Y', 'Z'].some((axis) => words.values.has(axis));
+  if (!hasAxis) return null;
+  const target = resolveTarget(state, words.values);
+  if (state.motion !== 2 && state.motion !== 3) return [state.position, target];
+  const i = words.values.get('I');
+  const j = words.values.get('J');
+  const r = words.values.get('R');
+  return sampleMotionArc({
+    from: state.position,
+    to: target,
+    clockwise: state.motion === 2,
+    ...(i === undefined ? {} : { i }),
+    ...(j === undefined ? {} : { j }),
+    ...(r === undefined ? {} : { r }),
+    unitScale: state.unitScale,
+  });
+}
+
+function resolveTarget(state: ModalState, words: ReadonlyMap<string, number>): MotionPoint {
+  return resolveAxisTarget(state.position, words, state);
+}
+
+function classifyMotion(
+  machineKind: MachineKind,
+  state: ModalState,
+  points: ReadonlyArray<MotionPoint>,
+): MotionBlockKind {
+  // A closed arc ends where it started, so endpoint displacement is zero while the
+  // path still sweeps the XY plane. Measure the travelled XY route instead, or a
+  // full circle is classified as a vertical plunge and never counts as material
+  // entry (ADR-271 mathematical contract, section 5).
+  if (xyRouteLength(points) <= EPSILON) return 'plunge';
+  if (state.motion === 0) return 'travel';
+  if (machineKind === 'cnc') return state.spindleArmed ? 'process' : 'travel';
+  // Smoothieware's laser module ignores M3/M4/M5: a G1-G3 fires at S times the
+  // M221 scale (ADR-096 Amendment 1).
+  if (state.smoothieware) return state.power > 0 && state.smoothieScale > 0 ? 'process' : 'travel';
+  return state.spindleArmed && state.power > 0 ? 'process' : 'travel';
+}
+
+function classifyParks(
+  blocks: ReadonlyArray<MotionBlock>,
+  parkBoundaries: ReadonlyArray<number>,
+): ReadonlyArray<MotionBlock> {
+  const lastProcess = blocks.findLastIndex((block) => block.kind === 'process');
+  if (lastProcess < 0) return blocks;
+  const parkIndexes = new Set<number>();
+  const finalParkIndex = blocks.findLastIndex(
+    (block, index) => index > lastProcess && block.kind === 'travel',
+  );
+  if (finalParkIndex >= 0) parkIndexes.add(finalParkIndex);
+  for (const boundary of parkBoundaries) {
+    const index = blocks.findLastIndex(
+      (block) => block.rawLineIndex < boundary && block.kind === 'travel',
+    );
+    if (index >= 0) parkIndexes.add(index);
+  }
+  return blocks.map((block, index) =>
+    parkIndexes.has(index) ? { ...block, kind: 'park' } : block,
+  );
+}
+
+function polylineLength(points: ReadonlyArray<MotionPoint>): number {
+  let length = 0;
+  for (let index = 1; index < points.length; index += 1) {
+    const a = points[index - 1];
+    const b = points[index];
+    if (a !== undefined && b !== undefined) {
+      length += Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
+    }
+  }
+  return length;
+}
+
+/** Distance travelled in the XY plane, ignoring Z, along the sampled path. */
+function xyRouteLength(points: ReadonlyArray<MotionPoint>): number {
+  let length = 0;
+  for (let index = 1; index < points.length; index += 1) {
+    const a = points[index - 1];
+    const b = points[index];
+    if (a !== undefined && b !== undefined) length += Math.hypot(b.x - a.x, b.y - a.y);
+  }
+  return length;
+}

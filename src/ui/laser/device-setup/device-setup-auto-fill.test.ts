@@ -73,7 +73,6 @@ describe('planControllerAutoFill', () => {
     expect(plan?.summary).toEqual({
       controllerKind: null,
       baudRate: null,
-      machineKind: null,
       values: true,
     });
     const filled = run(state, plan?.actions ?? []);
@@ -97,39 +96,54 @@ describe('planControllerAutoFill', () => {
     expect(planControllerAutoFill(state, report(state, null))?.summary.controllerKind).toBeNull();
   });
 
-  it('sets the machine type from laser mode, and leaves a two-tool machine alone', () => {
-    const cnc = reported({ ...REPORTED, laserModeEnabled: false });
-    const plan = planControllerAutoFill(cnc, report(cnc, null));
-    expect(plan?.summary.machineKind).toBe('cnc');
-    const filled = run(cnc, plan?.actions ?? []);
-    expect(filled.machineKinds).toEqual(['cnc']);
-    // A CNC draft keeps its spindle ceiling: $30 is not RPM without the explicit choice.
-    expect(filled.cncDraft.params.spindleMaxRpm).toBe(
-      DEFAULT_CNC_MACHINE_CONFIG.params.spindleMaxRpm,
-    );
+  // UX audit U8-P2-1 (ADR-637 Amendment 7): stock GRBL ships with $32=0, so
+  // laser mode off cannot tell a laser from a router. The generic laser starter
+  // stays a laser that still expects laser mode on, so setup asks for $32=1.
+  it('never sets the machine type from laser mode', () => {
+    const laser = reported({ ...REPORTED, laserModeEnabled: false });
+    const filled = run(laser, planControllerAutoFill(laser, report(laser, null))?.actions ?? []);
+    expect(filled.machineKinds).toEqual(['laser']);
+    expect(filled.draft.laserModeEnabled).toBe(true);
+    expect(filled.draft).toMatchObject({ bedWidth: 430, bedHeight: 390, maxPowerS: 1000 });
 
-    const hybrid = deviceSetupReducer(cnc, {
+    // A router chosen before Connect stays a router whatever $32 says, and
+    // keeps its spindle ceiling: $30 is not RPM without the explicit choice.
+    for (const laserModeEnabled of [false, true]) {
+      const router = deviceSetupReducer(reported({ ...REPORTED, laserModeEnabled }), {
+        kind: 'set-machine-kinds',
+        machineKinds: ['cnc'],
+      });
+      const routerFilled = run(
+        router,
+        planControllerAutoFill(router, report(router, null))?.actions ?? [],
+      );
+      expect(routerFilled.machineKinds).toEqual(['cnc']);
+      expect(routerFilled.cncDraft.params.spindleMaxRpm).toBe(
+        DEFAULT_CNC_MACHINE_CONFIG.params.spindleMaxRpm,
+      );
+    }
+
+    const hybrid = deviceSetupReducer(laser, {
       kind: 'set-machine-kinds',
       machineKinds: ['laser', 'cnc'],
     });
-    expect(planControllerAutoFill(hybrid, report(hybrid, null))?.summary.machineKind).toBeNull();
+    expect(
+      run(hybrid, planControllerAutoFill(hybrid, report(hybrid, null))?.actions ?? []).machineKinds,
+    ).toEqual(['laser', 'cnc']);
   });
 
   // ADR-637 Amendment 1: $32 is a controller setting, not a measurement of the
   // machine (ADR-240 #2), so a machine chosen from the list keeps its type.
+  // Amendment 7: a listed laser also keeps expecting laser mode on.
   it('keeps the type of a machine chosen from the list', () => {
     const ortur = chooseListed(reported({ ...REPORTED, laserModeEnabled: false }), 'Ortur');
-    const plan = planControllerAutoFill(ortur, report(ortur, null));
-    expect(plan?.summary.machineKind).toBeNull();
-    const filled = run(ortur, plan?.actions ?? []);
+    const filled = run(ortur, planControllerAutoFill(ortur, report(ortur, null))?.actions ?? []);
     expect(filled.machineKinds).toEqual(['laser']);
-    // The observation is kept: the draft records laser mode as off.
-    expect(filled.draft.laserModeEnabled).toBe(false);
+    expect(filled.draft.laserModeEnabled).toBe(true);
     expect(selectedMachineEntry(filled, machinePickerEntries(filled))?.brand).toBe('Ortur');
 
     const router = chooseListed(reported(REPORTED), 'Genmitsu');
     const routerPlan = planControllerAutoFill(router, report(router, null));
-    expect(routerPlan?.summary.machineKind).toBeNull();
     expect(run(router, routerPlan?.actions ?? []).machineKinds).toEqual(['cnc']);
   });
 

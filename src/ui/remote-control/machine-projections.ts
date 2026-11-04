@@ -15,6 +15,7 @@ import {
 import { hasPendingControllerWrite } from '../state/laser-start-queue-fence';
 import { useFramePreparationStore } from '../state/frame-preparation-store';
 import { useJobReviewStore } from '../laser/job-review/job-review-store';
+import { remoteReviewAcknowledgement } from '../laser/job-review/before-you-start';
 import { reviewMessageProjector } from './review-message-sharing';
 import type { OwnedMachineOperation } from './machine-operation-state';
 import type { RemoteControlOptions } from './types';
@@ -275,7 +276,7 @@ function reviewProjection(
     mode: model.machineKind,
     artworkShared,
     ...machineReviewPage(model, projectMessage, page),
-    acknowledgement: model.acknowledgement,
+    acknowledgement: remoteReviewAcknowledgement(model.acknowledgement, model.machineKind),
     frame: { required: true, complete: framedRunReadinessIssue(currentCompletedFrame()) === null },
   };
 }

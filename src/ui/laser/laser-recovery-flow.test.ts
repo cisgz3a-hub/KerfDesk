@@ -231,7 +231,7 @@ describe('exact laser recovery activation', () => {
     const repository = recoveryHarness();
     const capsule = await interruptedCapsule(repository);
     if (capsule.artifact.kind !== 'exact-execution') throw new Error('Expected exact artifact.');
-    const movement = executionArtifactCanvasPlan(capsule.artifact).manifest.blocks.find(
+    const movement = Array.from(executionArtifactCanvasPlan(capsule.artifact).manifest.blocks).find(
       (block) => block.kind === 'process',
     );
     if (movement === undefined) throw new Error('Expected a burn movement.');

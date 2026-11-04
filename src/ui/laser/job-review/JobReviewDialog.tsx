@@ -21,6 +21,7 @@ import {
   startButtonContentStyle,
 } from './job-review.styles';
 import { JobReviewAcknowledgement } from './JobReviewAcknowledgement';
+import { JobReviewBeforeYouStart } from './JobReviewBeforeYouStart';
 import { JobReviewCncOwnerActions } from './JobReviewCncOwnerActions';
 import { JobReviewControllerSection } from './JobReviewControllerSection';
 import { JobReviewHeader } from './JobReviewHeader';
@@ -90,6 +91,7 @@ function OpenJobReview(props: {
         onEditingChange={reportEditing}
       />
       <ReviewMachineFacts model={model} purpose={purpose} />
+      {purpose === 'frame' ? null : <JobReviewBeforeYouStart machineKind={model.machineKind} />}
       <JobReviewAcknowledgement acknowledgement={model.acknowledgement} purpose={purpose} />
       <div style={footerBarStyle}>
         <span

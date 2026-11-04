@@ -19,11 +19,13 @@
 // Warnings only. A completed Frame for the exact job remains the sole ordinary
 // Start policy gate (ADR-228); none of these can refuse a Start.
 
-import { createStreamer, findOversizedLine } from '../../../core/controllers/grbl';
+import { findOversizedLine } from '../../../core/controllers/grbl';
+import { measureSendableLines } from '../../../core/controllers/grbl/sendable-line-scan';
 import type { ControllerKind } from '../../../core/devices';
 // Deep import: the devices barrel is at its public-export ratchet.
 import { GRBLHAL_DEFAULT_RX_BUFFER_BYTES } from '../../../core/grbl-streaming';
 import type { StartStreamWindow } from '../../state/laser-job-effective-stream-options';
+import type { ProgramFacts } from './program-facts';
 
 export type StreamThroughputInput = {
   readonly gcode: string;
@@ -33,6 +35,8 @@ export type StreamThroughputInput = {
   readonly transportSeconds: number;
   readonly window: StartStreamWindow;
   readonly controllerKind: ControllerKind;
+  /** The program's measured facts, when already known (program-facts.ts). */
+  readonly program?: Pick<ProgramFacts, 'sendable' | 'longestSendableSpan'>;
 };
 
 /**
@@ -69,7 +73,11 @@ export function detectStreamThroughputWarnings(
 // which on grblHAL may be wider than the window this session proved — without
 // this advisory the refusal would first appear after a completed Frame.
 function oversizedLineWarning(input: StreamThroughputInput): ReadonlyArray<string> {
-  const oversized = findOversizedLine(input.gcode, input.window.bytes);
+  const oversized = findOversizedLine(
+    input.gcode,
+    input.window.bytes,
+    input.program?.longestSendableSpan,
+  );
   if (oversized === null) return [];
   return [
     `${OVERSIZED_LINE_WARNING_PREFIX} ${oversized.lineNumber} is ${oversized.bytes} bytes, longer ` +
@@ -79,7 +87,7 @@ function oversizedLineWarning(input: StreamThroughputInput): ReadonlyArray<strin
 }
 
 function bufferedMotionWarning(input: StreamThroughputInput): ReadonlyArray<string> {
-  const program = measureProgram(input.gcode);
+  const program = input.program?.sendable ?? measureProgram(input.gcode);
   if (program.lines < MIN_LINES_FOR_ADVISORY || !(input.motionSeconds > 0)) return [];
   const msPerLine = (input.motionSeconds * 1000) / program.lines;
   const linesInWindow = linesInFlight(input.window, program.bytes / program.lines);
@@ -146,13 +154,11 @@ function windowProvenance(input: StreamThroughputInput): string {
   return 'Raise the RX window in Machine Setup if the controller has more room.';
 }
 
-// Counted through the streamer itself, so "line" and "byte" mean exactly what
-// the character-counting window means.
+// Counted as the streamer queues lines, so "line" and "byte" mean exactly what
+// the character-counting window means, without building its queue (one bed
+// photo's queue was 6.8 M strings, twice per review; ADR-244 Amendment 3).
 function measureProgram(gcode: string): { readonly lines: number; readonly bytes: number } {
-  const queued = createStreamer(gcode).queued;
-  let bytes = 0;
-  for (const line of queued) bytes += line.length;
-  return { lines: queued.length, bytes };
+  return measureSendableLines(gcode);
 }
 
 function formatMs(value: number): string {

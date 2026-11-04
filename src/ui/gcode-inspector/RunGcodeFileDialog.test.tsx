@@ -263,7 +263,9 @@ describe('Run G-code file dialog (ADR-630)', () => {
     expect(body.textContent).toContain('The controller reports $32=0 (laser mode off)');
     expect(body.textContent).toContain('One rapid command in this program runs with M3 or M4 on');
     expect(body.textContent).toContain('first: line 4 of the sent program');
-    expect(body.textContent).toContain('Controller reports $32=0. Enable GRBL laser mode ($32=1)');
+    expect(body.textContent).toContain(
+      'Laser mode is off ($32=0): the laser stops with the beam on',
+    );
     expect(button(body, 'Frame').disabled).toBe(false);
   });
 

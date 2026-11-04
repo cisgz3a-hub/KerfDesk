@@ -9,14 +9,15 @@ import { originAtConnectPatch } from './work-origin-state';
 // (after Unlock, Release motors, a failed Home or an origin write that ended
 // unknown). With $20=1 stock GRBL checks a jog target against it whatever
 // KerfDesk trusts, and $X leaves it as it was (ADR-375), so the hold-to-jog
-// clamp alone aims from it. Kept beside the stored report rather than in a
+// clamp aims from it (and Restore saved origin, whose G92 is relative to it). Kept beside the stored report rather than in a
 // store field, it goes when that report is replaced or cleared. A WPos-only
 // report ($10=0) carries none, and unconfirmed report units make the number
 // meaningless, so neither keeps one.
 const withheldMPos = new WeakMap<StatusReport, NonNullable<StatusReport['mPos']>>();
 
 /** The MPos, in report units, that KerfDesk withheld from this report, or
- *  null. Only the hold-to-jog clamp may use it. */
+ *  null. Only the hold-to-jog clamp and Restore saved origin's G92, which
+ *  is relative to the controller's own count, may use it. */
 export function withheldControllerMPos(report: StatusReport | null): StatusReport['mPos'] {
   return report === null ? null : (withheldMPos.get(report) ?? null);
 }

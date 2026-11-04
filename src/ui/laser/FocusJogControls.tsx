@@ -5,6 +5,10 @@ import { FOCUS_JOG_KEY_LABELS } from './use-jog-shortcuts';
 
 const FOCUS_STEPS_MM = [0.1, 0.5, 1, 2, 5] as const;
 
+// Says how to focus, not only that it is manual (UX U4-P2-2, ADR-689).
+export const MANUAL_FOCUS_HINT =
+  'Manual focus: before each job, set the gap between the laser and the top of your material with the focus gauge or spacer that came with your laser (see its manual), then tighten the head. Thicker material needs the head raised.';
+
 export function FocusJogControls(props: {
   readonly device: DeviceProfile;
   readonly machineKind: MachineKind;
@@ -20,7 +24,7 @@ export function FocusJogControls(props: {
     return (
       <p style={hintStyle}>
         {props.device.autofocusCommand.trim() === ''
-          ? 'Manual focus: adjust the laser head by hand.'
+          ? MANUAL_FOCUS_HINT
           : 'Use Auto-focus in the machine controls to focus this head.'}
       </p>
     );

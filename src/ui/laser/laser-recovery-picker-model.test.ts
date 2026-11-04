@@ -38,7 +38,7 @@ const RASTER = [
 describe('laser recovery route selection', () => {
   it('selects an original raw movement across comments, modal raster power and saved origin', () => {
     const plan = planFor(RASTER);
-    const before = structuredClone(plan);
+    const before = materialised(plan);
     const route = routeFor(plan);
     expect(pickRecoveryMovement(route, { x: 5, y: 0.05 }, 0.1, 1)).toBe(6);
     expect(pickRecoveryMovement(route, { x: 15, y: 0 }, 0.1, 1)).toBeNull();
@@ -49,7 +49,7 @@ describe('laser recovery route selection', () => {
     expect(firstRecoveryMovement(route, 11)).toBeNull();
     expect(acknowledgedRecoveryMovement(route, 6)).toBe(8);
     expect(acknowledgedRecoveryMovement(route, 7)).toBe(10);
-    expect(plan).toEqual(before);
+    expect(materialised(plan)).toEqual(before);
   });
 
   it('uses the saved physical mapping for mirrored device origins', () => {
@@ -110,8 +110,9 @@ describe('laser recovery route selection', () => {
     const detail = recoveryPreviewPath(route, { x: 0, y: 24_986.5, width: 20, height: 1 });
     expect(detail.shown).toBe(1);
     expect(detail.sampled).toBe(false);
-    // The packed route holds every point once; no per-point objects are retained.
-    expect(route.manifest.pointData.length).toBe(count * 2 * 3);
+    // The packed route holds every point once, in columns; no per-point objects
+    // are retained.
+    expect(route.manifest.columns.x.length).toBe(count * 2);
   });
 
   it('keeps the cursor anchor fixed while zooming and bounds magnification', () => {
@@ -123,6 +124,11 @@ describe('laser recovery route selection', () => {
     expect(zoomRecoveryPreview(fit, fit, 1e-9).width).toBe(fit.width / 1_024);
   });
 });
+
+/** The plan with its columns read out, to show that nothing changed them. */
+function materialised(plan: CanvasMotionPlan) {
+  return { ...plan, manifest: { ...plan.manifest, blocks: Array.from(plan.manifest.blocks) } };
+}
 
 function routeFor(plan: CanvasMotionPlan): RecoveryPreviewRoute {
   const route = recoveryRouteFromCanvasPlan(plan);

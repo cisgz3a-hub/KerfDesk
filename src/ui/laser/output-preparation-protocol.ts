@@ -14,6 +14,7 @@ import type { TiledOutputPreparation } from '../app/tiled-output-preparation';
 import type { FrameBoundsPreview } from './frame-bounds-preview';
 import type { LaserPowerScaleSource } from './connected-laser-power-scale';
 import type { ProjectMessage } from '../packed-project-transfer';
+import type { StartPreparationWire } from './start-preparation-wire';
 
 export type OutputSnapshotRequest = {
   readonly registration?: SimilarityTransform | null;
@@ -133,10 +134,19 @@ export type OutputPreparationWireEnvelope = Omit<OutputPreparationEnvelope, 'req
  * Start request may first report the Frame rectangles of the job it is
  * compiling (ADR-353); the response that follows carries the exact program
  * built from that same compile. */
+/** What the worker posts: a Start in its wire form, which the client restores
+ * before any caller sees it (start-preparation-wire.ts, ADR-598 Amendment 4). */
+export type OutputPreparationWireResponse =
+  | Exclude<OutputPreparationResponse, { readonly kind: 'start' }>
+  | {
+      readonly kind: 'start';
+      readonly result: TransferredStartJobPreparation | StartPreparationWire;
+    };
+
 export type OutputPreparationResult =
   | {
       readonly requestId: number;
-      readonly response: OutputPreparationResponse;
+      readonly response: OutputPreparationWireResponse;
     }
   | {
       readonly requestId: number;

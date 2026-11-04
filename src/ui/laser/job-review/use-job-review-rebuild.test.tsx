@@ -4,6 +4,8 @@ import fc from 'fast-check';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createLayer, createProject, EMPTY_SCENE } from '../../../core/scene';
 import { useStore } from '../../state';
+import { readOnlyControllerOperation } from '../../state/laser-controller-operation';
+import { useLaserStore } from '../../state/laser-store';
 import { resetStore } from '../../state/test-helpers';
 import type { JobReviewModel } from './job-review-model';
 import { useJobReviewStore } from './job-review-store';
@@ -64,6 +66,7 @@ afterEach(async () => {
   host.remove();
   useJobReviewStore.getState().close();
   resetStore();
+  useLaserStore.setState({ controllerOperation: null });
   vi.useRealTimers();
 });
 
@@ -139,6 +142,22 @@ describe('useJobReviewRebuildTrigger', () => {
 
     act(() => useStore.setState({ selectedObjectId: 'second' }));
     await act(async () => vi.advanceTimersByTimeAsync(250));
+
+    expect(useJobReviewStore.getState().pendingSignal).toBe('rebuild');
+  });
+
+  // ADR-637 Amendment 7: Send $32=1's read-back reaches the store while the
+  // write still holds its operation, and preparation refuses then. The end of
+  // the operation rebuilds, so the fixed $32 row clears.
+  it('requests a rebuild when a controller operation ends', async () => {
+    root = createRoot(host);
+    await act(async () => root?.render(<RebuildHarness />));
+    act(() =>
+      useLaserStore.setState({ controllerOperation: readOnlyControllerOperation('Verifying $32') }),
+    );
+    useJobReviewStore.setState({ waiter: null, pendingSignal: null });
+
+    act(() => useLaserStore.setState({ controllerOperation: null }));
 
     expect(useJobReviewStore.getState().pendingSignal).toBe('rebuild');
   });

@@ -24,10 +24,11 @@ export function detectArchiveCapacityWarnings(
   /** True for a laser job, which keeps a short record instead; a painted
    * second pass does not, since no project reproduces it. */
   keepsShortRecord = false,
+  /** stringBytes(prepared.gcode), when already measured (program-facts.ts). */
+  programBytes: number = stringBytes(prepared.gcode),
 ): ReadonlyArray<string> {
   // The same lower bound the archive itself checks first (execution-artifact.ts).
-  const bytes =
-    stringBytes(prepared.gcode) + packedMotionManifestBytes(prepared.canvasPlan.manifest);
+  const bytes = programBytes + packedMotionManifestBytes(prepared.canvasPlan.manifest);
   if (bytes <= MAX_EXECUTION_ARTIFACT_ESTIMATED_BYTES) return [];
   return [
     `This job is too large to keep a recovery copy: its program and motion data need about ` +

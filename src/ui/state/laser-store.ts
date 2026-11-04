@@ -99,6 +99,7 @@ import { registerActiveJobProbe } from './job-machine-lock';
 import { runningJobMachineKind } from './job-motion-machine';
 import type { StallProbe } from './laser-stream-stall';
 import type { ControllerIncidentState } from './laser-incident-history';
+import type { AlarmLockState } from './controller-reset-required';
 import type { ControllerFirmwareReport } from '../../core/controllers/controller-firmware-report';
 import { firmwareReportActions } from './controller-firmware-report-action';
 import { surfaceProbeActions } from './laser-surface-probe-actions';
@@ -123,6 +124,7 @@ export type WorkOriginSource = 'none' | 'g92' | 'g54-persistent' | 'unknown';
 export type { ConnectControllerOptions } from './laser-store-action-types';
 
 export type LaserState = LaserStoreActions &
+  AlarmLockState &
   ControllerIncidentState &
   ControllerBuildInfoState &
   CncPauseLiftStoreState &
@@ -139,12 +141,6 @@ export type LaserState = LaserStoreActions &
     /** Current communication evidence, including Alarm/Sleep replies. This does
      * not establish position, homing, Frame or settings authority. */
     readonly statusResponseObservation?: SessionObservationStamp | null;
-    readonly alarmCode: number | null;
-    // The firmware printed "Reset to continue" after a critical event: only a
-    // soft reset is accepted until the reboot banner (controller-reset-required.ts).
-    // 'homing-state': stock GRBL stays in its homing state after refusing a
-    // `$HX`; the banner offers the same reset and nothing is held (audit A-7).
-    readonly resetRequired?: boolean | 'homing-state';
     readonly lastError: number | null;
     readonly lastWriteError: string | null;
     // Operator-requested coolant/air state for the manual jog-panel control.

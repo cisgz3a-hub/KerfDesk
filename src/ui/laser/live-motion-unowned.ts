@@ -16,7 +16,10 @@ export type UnownedMotionDescription = {
   readonly abortLabel: 'ABORT MOTION' | 'LASER OFF';
 };
 
-const HOLD_RELEASE = 'Release it with cycle start, or Abort to clear it with a controller reset';
+// Most hobby lasers have no cycle-start button, so the bar's own ABORT MOTION
+// is named as the way out (UX audit U5-P3-5).
+const HOLD_RELEASE =
+  "Release it with the machine's cycle-start button if it has one, or press ABORT MOTION here to clear it with a controller reset";
 
 /** Motion first: the output report is Idle-only, so the two never coincide. */
 export function describeUnowned(
@@ -82,8 +85,8 @@ function describeUnownedMotion(
       return unowned(
         'CONTROLLER DOOR HOLD',
         hold?.doorPin === true
-          ? 'The controller reports its door or lid input open and has stopped motion. Close it, then release it with cycle start or clear it with Abort'
-          : `The controller is in its door-safety state and has stopped motion. ${HOLD_RELEASE}`,
+          ? "The controller reports its door or lid input open and has stopped motion. Close it, then press the machine's cycle-start button if it has one, or ABORT MOTION here to clear it with a controller reset"
+          : `The controller paused when its door or lid input opened, and stays paused after it closes. ${HOLD_RELEASE}`,
       );
   }
 }

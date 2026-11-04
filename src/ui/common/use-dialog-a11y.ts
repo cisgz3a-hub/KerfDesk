@@ -6,6 +6,8 @@
 //   2. Tab / Shift+Tab cycle within the dialog (focus trap).
 //   3. Initial focus lands on the first main control on mount.
 //   4. Closing returns focus to whatever was focused before opening.
+//   5. The workspace behind it is hidden from assistive technology, apart
+//      from the Live Motion bar and alerts (hide-outside-modal.ts).
 //
 // Caller wires `useDialogA11y(ref, onClose)` and passes the same `ref`
 // onto the dialog's outermost element. The hook also reminds the caller
@@ -16,7 +18,15 @@
 // - The focusable-element query matches the standard cross-browser set:
 //   buttons, links with href, inputs/selects/textareas not disabled,
 //   anything with explicit non-negative tabindex. Items with
-//   inert / hidden / disabled / aria-hidden are excluded.
+//   inert / hidden / disabled / aria-hidden are excluded. The Tab cycle
+//   also counts each <details>' own <summary>, which the browser focuses
+//   natively: without it Job Review's warning rows were never reached
+//   (UX audit U7-P2-3). Initial focus still skips them.
+// - A dialog that mounts inside an inert tree (the first-visit welcome,
+//   behind the start-up splash) cannot take focus; it takes it once the
+//   tree is released, unless something else has been focused by then
+//   (UX audit U7-P2-2). Tab and Escape pressed with focus on <body> still
+//   reach the topmost dialog.
 // - The Tab handler measures focusable elements at keydown time (not
 //   at mount), so dynamic fields appearing later still join the cycle.
 // - We capture `previouslyFocused` during the first render, before a child
@@ -24,6 +34,7 @@
 //   retain that original opener.
 
 import { useEffect, useRef, useState, type RefObject } from 'react';
+import { hideOutsideModal } from './hide-outside-modal';
 import {
   dialogControlIsUnavailable,
   recoverDialogFocus,
@@ -38,6 +49,7 @@ const FOCUSABLE_SELECTOR = [
   'textarea:not([disabled])',
   '[tabindex]:not([tabindex="-1"])',
 ].join(',');
+const TAB_CYCLE_SELECTOR = `${FOCUSABLE_SELECTOR},details > summary:first-of-type`;
 
 type DialogInitialFocus = 'first-control' | 'surface';
 
@@ -77,9 +89,13 @@ export function useDialogA11y(
     // Initial focus — the first main control, or the dialog itself
     // (which becomes focusable when we set tabindex="-1" on it in JSX).
     initialFocusTarget(node, optionsRef.current).focus();
+    const releaseInertFocus = focusOnceInteractive(node, () =>
+      isTopmostModal(node) ? initialFocusTarget(node, optionsRef.current) : null,
+    );
     const releaseFocusRecovery = recoverDialogFocus(node, FOCUSABLE_SELECTOR, () =>
       isTopmostModal(node),
     );
+    const releaseHidden = hideOutsideModal(node, () => isTopmostModal(node));
 
     const onKeyDown = (e: KeyboardEvent): void => {
       if (!isTopmostModal(node)) return;
@@ -100,10 +116,19 @@ export function useDialogA11y(
       if (e.key !== 'Tab') return;
       trapTabWithin(node, e);
     };
+    // With focus on <body> a key never passes through the dialog, so Tab
+    // walked the hidden workspace and Escape did nothing.
+    const onUnfocusedKeyDown = (e: KeyboardEvent): void => {
+      if (e.target === document.body) onKeyDown(e);
+    };
 
     node.addEventListener('keydown', onKeyDown);
+    document.addEventListener('keydown', onUnfocusedKeyDown);
     return (): void => {
       node.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('keydown', onUnfocusedKeyDown);
+      releaseInertFocus();
+      releaseHidden();
       releaseFocusRecovery();
       // Return focus to whatever opened us — typically a toolbar button.
       // Guard against the element having been removed from the DOM in
@@ -127,26 +152,66 @@ function initialFocusTarget(node: HTMLElement, options: DialogA11yOptions): HTML
   );
 }
 
+// Focusing inside an inert tree does nothing. Wait for the tree to be
+// released, then focus the dialog if focus is still nowhere.
+function focusOnceInteractive(node: HTMLElement, target: () => HTMLElement | null): () => void {
+  if (node.closest('[inert]') === null) return () => undefined;
+  const observer = new MutationObserver(() => {
+    if (!node.isConnected || node.closest('[inert]') !== null) return;
+    observer.disconnect();
+    const active = document.activeElement;
+    if (active !== null && active !== document.body) return;
+    target()?.focus();
+  });
+  observer.observe(document.documentElement, {
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['inert'],
+  });
+  return () => observer.disconnect();
+}
+
 function isTopmostModal(node: HTMLElement): boolean {
   const dialogs = document.querySelectorAll<HTMLElement>('[role="dialog"][aria-modal="true"]');
   return dialogs[dialogs.length - 1] === node;
 }
 
-function trapTabWithin(node: HTMLElement, event: KeyboardEvent): void {
-  const focusables = Array.from(node.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
-    (element) => !dialogControlIsUnavailable(element) && element.offsetParent !== null,
+/** The controls Tab cycles through, in document order. */
+export function dialogTabStops(node: HTMLElement): HTMLElement[] {
+  return Array.from(node.querySelectorAll<HTMLElement>(TAB_CYCLE_SELECTOR)).filter(
+    (element) =>
+      !dialogControlIsUnavailable(element) &&
+      element.offsetParent !== null &&
+      !insideClosedDetails(element),
   );
+}
+
+function trapTabWithin(node: HTMLElement, event: KeyboardEvent): void {
+  const focusables = dialogTabStops(node);
   const first = focusables[0];
   const last = focusables[focusables.length - 1];
   if (first === undefined || last === undefined) return;
   const active = document.activeElement as HTMLElement | null;
-  if (event.shiftKey && (active === first || active === node)) {
+  // Focus on <body>, or anywhere else outside, enters the dialog at its edge.
+  const outside = active === null || !node.contains(active);
+  if (event.shiftKey && (outside || active === first || active === node)) {
     event.preventDefault();
     last.focus();
     return;
   }
-  if (!event.shiftKey && (active === node || active === last)) {
+  if (!event.shiftKey && (outside || active === node || active === last)) {
     event.preventDefault();
     first.focus();
   }
+}
+
+// A control inside a closed <details> is not rendered; its summary is.
+function insideClosedDetails(element: HTMLElement): boolean {
+  let details = element.parentElement?.closest('details:not([open])') ?? null;
+  while (details !== null) {
+    const summary = details.querySelector(':scope > summary');
+    if (summary === null || !summary.contains(element)) return true;
+    details = details.parentElement?.closest('details:not([open])') ?? null;
+  }
+  return false;
 }

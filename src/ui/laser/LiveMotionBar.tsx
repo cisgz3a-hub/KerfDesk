@@ -1,7 +1,8 @@
+import { useRef } from 'react';
 import type { StreamerStatus } from '../../core/controllers/grbl';
 import { airStandbyRemedy, type AirStandbyRemedy } from '../../core/devices/air-standby-remedy';
 import { machineKindOf, type MachineKind } from '../../core/scene';
-import { SOFTWARE_ABORT_TITLE } from '../common/software-abort-copy';
+import { MODAL_REACHABLE_ATTRIBUTE } from '../common/hide-outside-modal';
 import {
   cncJobLaserModeEnabled,
   cncPauseControllerKind,
@@ -31,13 +32,14 @@ import {
 } from './use-live-stream-progress';
 import {
   LiveMotionActionButton,
-  LIVE_MOTION_ACTION_BUTTON_STYLE,
-  PendingCncLiftAction,
-  PendingPauseResumeAction,
+  pendingCncLiftButton,
+  pendingPauseResumeButton,
 } from './LiveMotionActionButton';
 import { pauseControlMessage, resumeControlTitle } from './job-control-copy';
 import { describeUnowned } from './live-motion-unowned';
-import { controllerActionFailureHandler } from './report-controller-action-failure';
+import { LiveMotionAnnouncer, shownForAnnouncer } from './LiveMotionAnnouncer';
+import { LiveMotionAbortButton } from './LiveMotionAbortButton';
+import { useJobStartFocus } from './use-job-start-focus';
 
 const MAXIMUM_STACKING_ORDER = 2_147_483_647;
 const TOOL_CHANGE_CONTINUE_TITLE =
@@ -53,6 +55,8 @@ type MotionDescription = {
   readonly heading: string;
   readonly detail: string;
   readonly abortLabel: 'ABORT JOB' | 'ABORT MOTION' | 'LASER OFF';
+  /** What a screen reader hears with a job's heading: why it is held. */
+  readonly heldDetail?: string;
 };
 
 export function LiveMotionBar(): JSX.Element | null {
@@ -89,35 +93,43 @@ export function LiveMotionBar(): JSX.Element | null {
     homingStateStuck,
     unownedOutput,
   );
-  if (description === null) return null;
+  const barRef = useRef<HTMLElement>(null);
+  useJobStartFocus(barRef, description?.abortLabel === 'ABORT JOB');
+  const announcer = (
+    <LiveMotionAnnouncer shown={shownForAnnouncer(description)} progress={streamProgress} />
+  );
+  if (description === null) return announcer;
   const abort =
     description.abortLabel === 'LASER OFF'
       ? () => laserOff(fire !== null, setFireActive, machineKind)
       : stopJob;
+  // Not a live region: the line count changes up to every 120 ms. The
+  // announcer speaks the changes of state (UX audit U7-P2-1). The bar stays
+  // exposed to assistive technology behind an open modal.
   return (
-    <section aria-label="Live Motion" style={barStyle}>
-      <div style={statusStyle} aria-live="polite">
-        <div style={statusLineStyle}>
-          <strong style={headingStyle}>{description.heading}</strong>
-          <span style={detailStyle}>{description.detail}</span>
+    <>
+      {announcer}
+      <section
+        ref={barRef}
+        aria-label="Live Motion"
+        style={barStyle}
+        {...{ [MODAL_REACHABLE_ATTRIBUTE]: '' }}
+      >
+        <div style={statusStyle}>
+          <div style={statusLineStyle}>
+            <strong style={headingStyle}>{description.heading}</strong>
+            <span style={detailStyle}>{description.detail}</span>
+          </div>
+          <span style={safetyStyle}>
+            Software controller stop — use the physical E-stop or power isolation for danger.
+          </span>
         </div>
-        <span style={safetyStyle}>
-          Software controller stop — use the physical E-stop or power isolation for danger.
-        </span>
-      </div>
-      <div role="group" aria-label="Live machine controls" style={actionsStyle}>
-        <LiveMotionPrimaryAction status={streamProgress.status} />
-        <button
-          type="button"
-          className="lf-btn lf-btn--danger"
-          style={abortButtonStyle}
-          title={SOFTWARE_ABORT_TITLE}
-          onClick={() => void abort().catch(controllerActionFailureHandler('Abort'))}
-        >
-          {description.abortLabel}
-        </button>
-      </div>
-    </section>
+        <div role="group" aria-label="Live machine controls" style={actionsStyle}>
+          <LiveMotionPrimaryAction status={streamProgress.status} />
+          <LiveMotionAbortButton label={description.abortLabel} abort={abort} />
+        </div>
+      </section>
+    </>
   );
 }
 
@@ -145,13 +157,8 @@ function LiveMotionPrimaryAction({ status }: { readonly status: StreamerStatus |
   );
   const pauseResumeTransition = useLaserStore((state) => state.pauseResumeTransition);
   if (pauseResumeTransition !== null) {
-    return (
-      <PendingPauseResumeAction
-        action={pauseResumeTransition.action}
-        pauseJob={pauseJob}
-        resumeJob={resumeJob}
-      />
-    );
+    const pending = { action: pauseResumeTransition.action, pauseJob, resumeJob };
+    return <LiveMotionActionButton {...pendingPauseResumeButton(pending)} />;
   }
   const canPause = status === 'streaming' || (status === 'done' && isControllerRunning);
   if (canPause) {
@@ -172,9 +179,8 @@ function LiveMotionPrimaryAction({ status }: { readonly status: StreamerStatus |
   // interrupts it (ADR-411).
   const movingLift = liftPhase === 'lifted' ? null : liftPhase;
   if (movingLift !== null) {
-    return (
-      <PendingCncLiftAction phase={movingLift} title={resumeAdvisory ?? ''} resumeJob={resumeJob} />
-    );
+    const lift = { phase: movingLift, title: resumeAdvisory ?? '', resumeJob };
+    return <LiveMotionActionButton {...pendingCncLiftButton(lift)} />;
   }
   if (status === 'paused') {
     return (
@@ -313,6 +319,7 @@ function describeActiveJob(
         ? jobProgress(streamProgress)
         : `${heldReason.detail} · ${jobProgress(streamProgress)}`,
     abortLabel: 'ABORT JOB',
+    ...(heldReason === null ? {} : { heldDetail: heldReason.detail }),
   };
 }
 
@@ -442,10 +449,4 @@ const actionsStyle: React.CSSProperties = {
   justifyContent: 'flex-end',
   gap: 12,
   marginLeft: 'auto',
-};
-const abortButtonStyle: React.CSSProperties = {
-  ...LIVE_MOTION_ACTION_BUTTON_STYLE,
-  minWidth: 144,
-  fontWeight: 800,
-  letterSpacing: 0.4,
 };

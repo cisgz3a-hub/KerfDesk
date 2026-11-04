@@ -32,7 +32,7 @@
   background: var(--lf-tint-accent);
 }
 .lf-workspace-layout-option:focus-visible {
-  outline: 1px solid var(--lf-accent);
+  outline: 1px solid var(--lf-focus-accent);
   outline-offset: -1px;
 }
 .lf-workspace-layout-check {

@@ -30,15 +30,63 @@ function firstKept(text: string, start: number, end: number): number {
   return index;
 }
 
+/** Whether the line [start, end) of `text` is sendable, without slicing it. */
+export function isSendableLineSpan(text: string, start: number, end: number): boolean {
+  const first = firstKept(text, start, end);
+  return first < end && text.charCodeAt(first) !== 59 /* ; */;
+}
+
 function visitSendableLines(gcode: string, visit: (first: number, end: number) => boolean): void {
   let start = 0;
   while (start <= gcode.length) {
     const newline = gcode.indexOf('\n', start);
     const end = newline === -1 ? gcode.length : newline;
-    const first = firstKept(gcode, start, end);
-    if (first < end && gcode.charCodeAt(first) !== 59 /* ; */ && visit(first, end)) return;
+    if (isSendableLineSpan(gcode, start, end) && visit(firstKept(gcode, start, end), end)) return;
     start = end + 1;
   }
+}
+
+/** Index after the last character of [first, end) that trim() would keep. */
+function lastKept(text: string, first: number, end: number): number {
+  let index = end;
+  while (index > first && isTrimWhitespace(text, index - 1)) index -= 1;
+  return index;
+}
+
+export function countSendableGcodeLines(gcode: string): number {
+  let count = 0;
+  visitSendableLines(gcode, () => {
+    count += 1;
+    return false;
+  });
+  return count;
+}
+
+/** The streamer's queue as counts: its lines and their streamed bytes. */
+export function measureSendableLines(gcode: string): {
+  readonly lines: number;
+  readonly bytes: number;
+} {
+  let lines = 0;
+  let bytes = 0;
+  visitSendableLines(gcode, (first, end) => {
+    lines += 1;
+    bytes += lastKept(gcode, first, end) - first + 1;
+    return false;
+  });
+  return { lines, bytes };
+}
+
+/** The widest raw sendable line (first kept character to its end, plus the
+ * '\n'). findFirstSendableLineOver finds nothing for any limit at or above it,
+ * because it measures only lines wider than the limit. */
+export function longestSendableLineSpan(gcode: string): number {
+  let longest = 0;
+  visitSendableLines(gcode, (first, end) => {
+    if (end - first + 1 > longest) longest = end - first + 1;
+    return false;
+  });
+  return longest;
 }
 
 export function hasSendableGcodeLine(gcode: string): boolean {

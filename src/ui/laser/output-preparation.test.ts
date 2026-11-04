@@ -21,6 +21,7 @@ import { selectExecutablePlanCalculatedBounds } from './executable-plan-calculat
 import { PagedAssetByteWriter } from '../import/paged-asset-byte-writer';
 import { IndexedDbPagedAssetRepository } from '../import/paged-asset-indexeddb';
 import { prepareOutputRequest } from './output-preparation';
+import { streamedProject } from './output-preparation-fixtures.test-support';
 import { hydrateTransferredStartPreparation } from './output-preparation-worker-client';
 
 const IDLE: StatusReport = {
@@ -227,36 +228,6 @@ describe('output preparation worker payload', () => {
     expect(response.kind === 'save' ? response.result.gcode : '').toContain('S300');
   });
 });
-
-function streamedProject(): Project {
-  const base = createProject();
-  const color = '#111111';
-  return {
-    ...base,
-    scene: addLayer(
-      addObject(base.scene, {
-        kind: 'raster-image',
-        id: 'large-image',
-        color,
-        source: 'large.png',
-        dataUrl: 'data:image/png;base64,source',
-        lumaBase64: 'AA==',
-        pixelWidth: 1,
-        pixelHeight: 1,
-        dither: 'threshold',
-        linesPerMm: 10,
-        bounds: { minX: 0, minY: 0, maxX: 201, maxY: 201 },
-        transform: IDENTITY_TRANSFORM,
-      }),
-      {
-        ...createLayer({ id: 'image', color, mode: 'image' }),
-        linesPerMm: 10,
-        ditherAlgorithm: 'threshold',
-        fillOverscanMm: 0,
-      },
-    ),
-  };
-}
 
 function fullBedLineProject(): Project {
   const base = createProject();

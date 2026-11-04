@@ -30,6 +30,7 @@ import { assertOriginActionReady, usesPrimaryWcs } from './laser-origin-readines
 import { runOriginTransaction, type OriginSafeWrite } from './laser-origin-transaction';
 import { beginOwnedReportUnitsLine } from './owned-report-units';
 import { pushLog } from './laser-store-helpers';
+import { withheldControllerMPos } from './laser-status-position';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { WorkCoordinateOffset } from './origin-actions';
 
@@ -129,11 +130,23 @@ export async function setOriginAtProgramPoint(
   return outcome.offsetMm;
 }
 
-type XyOffsetWrite = { readonly label: string; readonly unconfirmedNotice: string };
+type XyOffsetWrite = {
+  readonly label: string;
+  readonly unconfirmedNotice: string;
+  /** May aim from the MPos KerfDesk withholds after Unlock (ADR-341 Amendment 11). */
+  readonly readsWithheldPosition?: true;
+};
 
+// After Unlock KerfDesk withholds the reported position until Home or an
+// origin write (laser-status-position.ts), so the Alarm 3 card's restore had no
+// MPos to aim from. `G92 X(m - s)` needs only the controller's own count m,
+// which `$X` leaves as it was (ADR-375): the offset becomes s in the frame
+// the controller measures in, as Set origin here's G92 X0 Y0 does, and the
+// written origin then re-establishes position evidence like Set origin here.
 const RESTORE_ORIGIN_WRITE: XyOffsetWrite = {
   label: 'Restore saved origin',
   unconfirmedNotice: RESTORE_ORIGIN_UNCONFIRMED_NOTICE,
+  readsWithheldPosition: true,
 };
 
 const HEAD_STOP_ORIGIN_WRITE: XyOffsetWrite = {
@@ -167,7 +180,9 @@ async function writeXyOffset(
   assertTargetCurrent?.();
   const before = get();
   const reportInches = before.controllerSettings?.reportInches === true;
-  const machineMm = inferCurrentMachinePosition(before.statusReport, before.wcoCache, reportInches);
+  const machineMm =
+    inferCurrentMachinePosition(before.statusReport, before.wcoCache, reportInches) ??
+    (action.readsWithheldPosition === true ? withheldMachineMm(before, reportInches) : null);
   if (machineMm === null) throw new Error(RESTORE_ORIGIN_POSITION_UNKNOWN_MESSAGE);
   const savedMm = targetFor(machineMm);
   const grblFamily = usesPrimaryWcs(before);
@@ -278,6 +293,13 @@ function restoredOffsetConfirmation(
       }
     },
   };
+}
+
+function withheldMachineMm(state: LaserState, reportInches: boolean): SavedXyOffsetMm | null {
+  const withheld = withheldControllerMPos(state.statusReport);
+  if (withheld === null) return null;
+  const scale = reportInches ? 25.4 : 1;
+  return { x: withheld.x * scale, y: withheld.y * scale };
 }
 
 function offsetMatches(state: LaserState, savedMm: SavedXyOffsetMm): boolean {

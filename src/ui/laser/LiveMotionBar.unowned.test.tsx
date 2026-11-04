@@ -107,9 +107,24 @@ describe('LiveMotionBar with motion the controller reports and nothing here owns
     const { host, root } = await render();
     try {
       expect(host.textContent).toContain('CONTROLLER HOLD');
-      expect(host.textContent).toContain('cycle start');
+      expect(host.textContent).toContain("machine's cycle-start button if it has one");
       expect(buttonByText(host, 'ABORT MOTION')).toBeInstanceOf(HTMLButtonElement);
       expect(buttonByText(host, 'Resume')).toBeUndefined();
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  // UX audit U5-P3-5: most hobby lasers have no cycle-start button, so a door
+  // hold left after the lid closes names the bar's own ABORT MOTION.
+  it('names ABORT MOTION as the way out of a door hold after the door closes', async () => {
+    useLaserStore.setState({ connection: { kind: 'connected' }, statusReport: report('Door', 0) });
+    const { host, root } = await render();
+    try {
+      expect(host.textContent).toContain('stays paused after it closes');
+      expect(host.textContent).toContain('press ABORT MOTION here');
+      expect(host.textContent).not.toContain('Release it with cycle start');
+      expect(buttonByText(host, 'ABORT MOTION')).toBeInstanceOf(HTMLButtonElement);
     } finally {
       await act(async () => root.unmount());
     }
@@ -155,7 +170,8 @@ describe('LiveMotionBar with motion the controller reports and nothing here owns
     useLaserStore.setState({ statusReport: report('Run'), ...patch });
     const { host, root } = await render();
     try {
-      expect(host.firstElementChild).toBeNull();
+      // Only the announcer's empty regions stay mounted between jobs.
+      expect(host.querySelector('section[aria-label="Live Motion"]')).toBeNull();
     } finally {
       await act(async () => root.unmount());
     }

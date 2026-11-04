@@ -1,258 +1,216 @@
 import type {
-  MotionBlock,
   MotionBlockKind,
   MotionManifest,
   MotionPoint,
 } from '../../../core/job/motion-manifest';
+import {
+  MotionBlockColumns,
+  motionBlockColumnBuffers,
+  motionBlockColumnBytes,
+  type MotionBlockColumnData,
+  type MotionBlockSequence,
+} from '../../../core/job/motion-block-columns';
+import { motionBlockColumnsFrom } from '../../../core/job/motion-block-columns-builder';
+import { isMotionBlockColumnDataSteps } from '../../../core/job/motion-block-columns-validation';
+import { runWorkSteps, type WorkSteps } from '../../../core/recovery/work-steps';
 import { assertExecutionArtifactSizeWithinBudget } from './execution-artifact-size';
+import {
+  hasValidSummary,
+  isLegacyPackedMotionManifest,
+  unpackLegacyMotionManifest,
+  type LegacyPackedMotionManifest,
+} from './packed-motion-manifest-v1';
 
-const ENCODING = 'packed-motion-manifest-v1';
-const BLOCK_WIDTH = 10;
-/** Doubles per stored point: x, y, z. */
-export const PACKED_POINT_WIDTH = 3;
-const KINDS: ReadonlyArray<MotionBlockKind> = ['travel', 'process', 'plunge', 'park'];
+const ENCODING = 'packed-motion-manifest-v2';
+/** Object blocks measured per step of the accepted run's archive (ADR-337 Amendment 1). */
+const MEASURE_STEP_BLOCKS = 1 << 14;
 
-/** All numbers retain their original IEEE-754 doubles. Each block stores raw
- * line, sendable line, kind, point offset/count, N-word presence/value, length,
- * and route start/end. Points store x/y/z triples; no path is simplified. */
+/** A manifest as it crosses a structured clone: its summary and its block
+ * columns, exact to the last bit (ADR-244 Amendment 3). Packing columns the
+ * parser built copies nothing, and the columns' buffers can be transferred. */
 export type PackedMotionManifest = Omit<MotionManifest, 'blocks'> & {
   readonly encoding: typeof ENCODING;
-  readonly blockData: Float64Array;
-  readonly pointData: Float64Array;
+  readonly columns: MotionBlockColumnData;
 };
 
-/** Bytes the packed encoding of `manifest` occupies, without allocating it.
- * One pass over the block list; no point is visited. A plain (unpacked)
- * manifest is charged at least this much by the artifact estimator, so the
- * figure is a lower bound on any archive that embeds the manifest. */
-export function packedMotionManifestBytes(manifest: MotionManifest): number {
-  let pointCount = 0;
-  for (const block of manifest.blocks) pointCount += block.points.length;
-  return (
-    (manifest.blocks.length * BLOCK_WIDTH + pointCount * PACKED_POINT_WIDTH) *
-    Float64Array.BYTES_PER_ELEMENT
-  );
-}
+export type ArchivedPackedMotionManifest = PackedMotionManifest | LegacyPackedMotionManifest;
 
 export type PackMotionManifestOptions = {
   /** Archives must fit the per-artifact budget; transient previews need not. */
   readonly enforceArchiveBudget?: boolean;
 };
 
+/** Bytes the packed columns of `manifest` occupy. Columns report their own
+ * size; blocks held as objects are measured without building columns. */
+export function packedMotionManifestBytes(manifest: MotionManifest): number {
+  return runWorkSteps(packedMotionManifestBytesSteps(manifest));
+}
+
+export function* packedMotionManifestBytesSteps(manifest: MotionManifest): WorkSteps<number> {
+  if (manifest.blocks instanceof MotionBlockColumns) {
+    return motionBlockColumnBytes(manifest.blocks.data);
+  }
+  return yield* objectBlockColumnBytesSteps(manifest.blocks);
+}
+
 export function packMotionManifest(
   manifest: MotionManifest,
   options: PackMotionManifestOptions = {},
 ): PackedMotionManifest {
-  let pointCount = 0;
-  for (const block of manifest.blocks) pointCount += block.points.length;
-  const bytes = packedMotionManifestBytes(manifest);
-  // Bound allocations before constructing either buffer. The complete artifact
-  // is measured again with these exact stored buffers before persistence.
-  if (options.enforceArchiveBudget !== false) assertExecutionArtifactSizeWithinBudget({}, bytes);
-  const blockData = new Float64Array(manifest.blocks.length * BLOCK_WIDTH);
-  const pointData = new Float64Array(pointCount * PACKED_POINT_WIDTH);
-  let pointOffset = 0;
-  manifest.blocks.forEach((block, index) => {
-    blockData.set(
-      [
-        block.rawLineIndex,
-        block.sendableLineIndex,
-        KINDS.indexOf(block.kind),
-        pointOffset,
-        block.points.length,
-        block.programLineNumber === null ? 0 : 1,
-        block.programLineNumber ?? 0,
-        block.lengthMm,
-        block.routeStartMm,
-        block.routeEndMm,
-      ],
-      index * BLOCK_WIDTH,
-    );
-    for (const point of block.points) {
-      pointData.set([point.x, point.y, point.z], pointOffset * PACKED_POINT_WIDTH);
-      pointOffset += 1;
-    }
-  });
-  const { blocks, ...summary } = manifest;
-  void blocks;
-  const packed = { ...summary, encoding: ENCODING, blockData, pointData } as const;
-  if (!isPackedMotionManifest(packed))
-    throw new Error('Cannot archive an invalid motion manifest.');
-  return packed;
+  return runWorkSteps(packMotionManifestSteps(manifest, options));
 }
 
-export function isPackedMotionManifest(
-  value: unknown,
-  limits?: { readonly rawLines: number; readonly sendableLines: number },
-): value is PackedMotionManifest {
-  if (!isRecord(value) || value['encoding'] !== ENCODING) return false;
-  const blockData = value['blockData'];
-  const pointData = value['pointData'];
-  if (!isFloat64Array(blockData) || !isFloat64Array(pointData)) return false;
-  if (blockData.length % BLOCK_WIDTH !== 0 || pointData.length % PACKED_POINT_WIDTH !== 0)
-    return false;
-  if (!hasValidSummary(value, limits?.sendableLines)) return false;
-  if (!pointData.every(Number.isFinite)) return false;
-  return validBlocks(
-    blockData,
-    pointData.length / PACKED_POINT_WIDTH,
-    value.totalRouteMm,
-    value.sendableLineCount,
-    limits?.rawLines,
-  );
-}
-
-function hasValidSummary(
-  value: Record<string, unknown>,
-  sendableLines: number | undefined,
-): value is Record<string, unknown> & Omit<MotionManifest, 'blocks'> {
-  return (
-    isNonNegativeNumber(value['totalRouteMm']) &&
-    isIndex(value['sendableLineCount']) &&
-    (sendableLines === undefined || value['sendableLineCount'] === sendableLines) &&
-    isNullablePoint(value['firstProcessPoint']) &&
-    isNullablePoint(value['finalPoint'])
-  );
-}
-
-function validBlocks(
-  data: Float64Array,
-  pointCount: number,
-  totalRoute: number,
-  sendableLines: number,
-  rawLines = Number.MAX_SAFE_INTEGER,
-): boolean {
-  let nextPoint = 0;
-  let previousRaw = -1;
-  let previousSendable = -1;
-  let route = 0;
-  for (let index = 0; index < data.length; index += BLOCK_WIDTH) {
-    if (!validLineIndices(data, index, previousRaw, previousSendable, rawLines, sendableLines))
-      return false;
-    if (!validPointReference(data, index, nextPoint) || !validProgramNumber(data, index))
-      return false;
-    if (!validRouteRange(data, index, route)) return false;
-    nextPoint += data[index + 4] as number;
-    if (nextPoint > pointCount) return false;
-    previousRaw = data[index] as number;
-    previousSendable = data[index + 1] as number;
-    route = data[index + 9] as number;
+/** Packing columns copies nothing; only measuring object blocks is a walk. */
+export function* packMotionManifestSteps(
+  manifest: MotionManifest,
+  options: PackMotionManifestOptions = {},
+): WorkSteps<PackedMotionManifest> {
+  // Bound allocations before constructing any column. The complete artifact is
+  // measured again with these exact stored buffers before persistence.
+  if (options.enforceArchiveBudget !== false) {
+    assertExecutionArtifactSizeWithinBudget({}, yield* packedMotionManifestBytesSteps(manifest));
   }
-  return nextPoint === pointCount && route === totalRoute;
-}
-
-function validLineIndices(
-  data: Float64Array,
-  index: number,
-  previousRaw: number,
-  previousSendable: number,
-  rawLines: number,
-  sendableLines: number,
-): boolean {
-  const raw = data[index];
-  const sendable = data[index + 1];
-  return (
-    isIndex(raw) &&
-    raw > previousRaw &&
-    raw < rawLines &&
-    isIndex(sendable) &&
-    sendable > previousSendable &&
-    sendable < sendableLines &&
-    sendable <= raw
-  );
-}
-
-function validPointReference(data: Float64Array, index: number, nextPoint: number): boolean {
-  const kind = data[index + 2];
-  const count = data[index + 4];
-  return (
-    isIndex(kind) &&
-    kind < KINDS.length &&
-    data[index + 3] === nextPoint &&
-    isIndex(count) &&
-    count >= 2
-  );
-}
-
-function validProgramNumber(data: Float64Array, index: number): boolean {
-  const present = data[index + 5];
-  const number = data[index + 6];
-  return (
-    (present === 0 || present === 1) && Number.isFinite(number) && (present !== 0 || number === 0)
-  );
-}
-
-function validRouteRange(data: Float64Array, index: number, route: number): boolean {
-  const length = data[index + 7];
-  const end = data[index + 9];
-  return (
-    isNonNegativeNumber(length) &&
-    data[index + 8] === route &&
-    isNonNegativeNumber(end) &&
-    end === route + length
-  );
-}
-
-/** Columnar readers: consumers such as the restart picker walk a packed route
- * directly instead of materialising one object per point. Callers pass indices
- * from `packedBlockCount`; the layout stays private to this module. */
-export function packedBlockCount(packed: PackedMotionManifest): number {
-  return packed.blockData.length / BLOCK_WIDTH;
-}
-
-export function packedBlockRawLineIndex(packed: PackedMotionManifest, block: number): number {
-  return packed.blockData[block * BLOCK_WIDTH] as number;
-}
-
-export function packedBlockSendableLineIndex(packed: PackedMotionManifest, block: number): number {
-  return packed.blockData[block * BLOCK_WIDTH + 1] as number;
-}
-
-export function packedBlockKind(packed: PackedMotionManifest, block: number): MotionBlockKind {
-  return KINDS[packed.blockData[block * BLOCK_WIDTH + 2] as number] as MotionBlockKind;
-}
-
-export function packedBlockPointOffset(packed: PackedMotionManifest, block: number): number {
-  return packed.blockData[block * BLOCK_WIDTH + 3] as number;
-}
-
-export function packedBlockPointCount(packed: PackedMotionManifest, block: number): number {
-  return packed.blockData[block * BLOCK_WIDTH + 4] as number;
-}
-
-export function packedPoint(packed: PackedMotionManifest, point: number): MotionPoint {
-  const at = point * PACKED_POINT_WIDTH;
+  const columns =
+    manifest.blocks instanceof MotionBlockColumns
+      ? manifest.blocks
+      : motionBlockColumnsFrom(manifest.blocks, manifest.blocks.length);
   return {
-    x: packed.pointData[at] as number,
-    y: packed.pointData[at + 1] as number,
-    z: packed.pointData[at + 2] as number,
+    encoding: ENCODING,
+    totalRouteMm: manifest.totalRouteMm,
+    sendableLineCount: manifest.sendableLineCount,
+    firstProcessPoint: manifest.firstProcessPoint,
+    finalPoint: manifest.finalPoint,
+    columns: columns.data,
   };
 }
 
-export function unpackMotionManifest(packed: PackedMotionManifest): MotionManifest {
+export type PackedMotionManifestLimits = {
+  readonly rawLines: number;
+  readonly sendableLines: number;
+};
+
+export function isPackedMotionManifest(
+  value: unknown,
+  limits?: PackedMotionManifestLimits,
+): value is PackedMotionManifest {
+  return runWorkSteps(isPackedMotionManifestSteps(value, limits));
+}
+
+export function* isPackedMotionManifestSteps(
+  value: unknown,
+  limits?: PackedMotionManifestLimits,
+): WorkSteps<boolean> {
+  if (!isRecord(value) || value['encoding'] !== ENCODING) return false;
+  if (!hasValidSummary(value, limits?.sendableLines)) return false;
+  const columns = value['columns'];
+  const valid = yield* isMotionBlockColumnDataSteps(columns, {
+    ...(limits === undefined ? {} : { rawLines: limits.rawLines }),
+    sendableLines: value.sendableLineCount,
+  });
+  if (!valid) return false;
+  const data = columns as MotionBlockColumnData;
+  const lastRouteEnd = data.count === 0 ? 0 : data.routeEnd[data.count - 1];
+  return lastRouteEnd === value.totalRouteMm;
+}
+
+/** Archives from builds before ADR-244 Amendment 3 hold the v1 encoding. */
+export function isArchivedPackedMotionManifest(
+  value: unknown,
+  limits?: PackedMotionManifestLimits,
+): value is ArchivedPackedMotionManifest {
+  return runWorkSteps(isArchivedPackedMotionManifestSteps(value, limits));
+}
+
+/** Only the current encoding is stepped: a run archives v2, and v1 is read back. */
+export function* isArchivedPackedMotionManifestSteps(
+  value: unknown,
+  limits?: PackedMotionManifestLimits,
+): WorkSteps<boolean> {
+  return (
+    (yield* isPackedMotionManifestSteps(value, limits)) ||
+    isLegacyPackedMotionManifest(value, limits)
+  );
+}
+
+export function unpackMotionManifest(packed: ArchivedPackedMotionManifest): MotionManifest {
+  if (packed.encoding !== ENCODING) return unpackLegacyMotionManifest(packed);
   if (!isPackedMotionManifest(packed)) throw new Error('The archived motion manifest is invalid.');
-  const blocks: MotionBlock[] = [];
-  const data = packed.blockData;
-  for (let index = 0; index < data.length; index += BLOCK_WIDTH) {
-    const points: MotionPoint[] = [];
-    const offset = data[index + 3] as number;
-    const count = data[index + 4] as number;
-    for (let point = offset; point < offset + count; point += 1) {
-      points.push(packedPoint(packed, point));
-    }
-    blocks.push({
-      rawLineIndex: data[index] as number,
-      sendableLineIndex: data[index + 1] as number,
-      kind: KINDS[data[index + 2] as number] as MotionBlockKind,
-      points,
-      programLineNumber: data[index + 5] === 0 ? null : (data[index + 6] as number),
-      lengthMm: data[index + 7] as number,
-      routeStartMm: data[index + 8] as number,
-      routeEndMm: data[index + 9] as number,
-    });
-  }
+  return manifestFromColumns(packed);
+}
+
+/** The preparation worker's own handoff: the same application built these
+ * columns a moment ago, so they are wrapped as they arrive. Walking an 8 M
+ * line photo's columns to validate them would hold the window for seconds;
+ * archives and other threads' replies go through `unpackMotionManifest`. */
+export function unpackTrustedMotionManifest(packed: PackedMotionManifest): MotionManifest {
+  if (packed.encoding !== ENCODING) throw new Error('The motion manifest handoff is invalid.');
+  return manifestFromColumns(packed);
+}
+
+export function packedManifestTransferables(packed: PackedMotionManifest): ArrayBuffer[] {
+  return motionBlockColumnBuffers(packed.columns);
+}
+
+export function hasPackedMotionEncoding(value: unknown): boolean {
+  return isRecord(value) && 'encoding' in value;
+}
+
+/** The encoding tag only; the content is not validated. */
+export function hasColumnPackedEncoding(value: unknown): value is PackedMotionManifest {
+  return isRecord(value) && value['encoding'] === ENCODING;
+}
+
+/** Columnar readers: the restart picker walks a packed route directly instead
+ * of materialising one object per point. Points are numbered 0 to
+ * `packedBlockPointCount - 1` within their block. */
+export function packedBlockCount(packed: PackedMotionManifest): number {
+  return packed.columns.count;
+}
+
+export function packedBlockRawLineIndex(packed: PackedMotionManifest, block: number): number {
+  return columnsOf(packed).rawLineIndexAt(block);
+}
+
+export function packedBlockSendableLineIndex(packed: PackedMotionManifest, block: number): number {
+  return columnsOf(packed).sendableLineIndexAt(block);
+}
+
+export function packedBlockKind(packed: PackedMotionManifest, block: number): MotionBlockKind {
+  return columnsOf(packed).kindAt(block);
+}
+
+export function packedBlockPointCount(packed: PackedMotionManifest, block: number): number {
+  return columnsOf(packed).pointCountAt(block);
+}
+
+export function packedBlockPointX(packed: PackedMotionManifest, block: number, point: number) {
+  return columnsOf(packed).pointXAt(block, point);
+}
+
+export function packedBlockPointY(packed: PackedMotionManifest, block: number, point: number) {
+  return columnsOf(packed).pointYAt(block, point);
+}
+
+export function packedBlockPoints(
+  packed: PackedMotionManifest,
+  block: number,
+): ReadonlyArray<MotionPoint> {
+  return columnsOf(packed).pointsAt(block);
+}
+
+const columnViews = new WeakMap<MotionBlockColumnData, MotionBlockColumns>();
+
+function columnsOf(packed: PackedMotionManifest): MotionBlockColumns {
+  const cached = columnViews.get(packed.columns);
+  if (cached !== undefined) return cached;
+  const columns = new MotionBlockColumns(packed.columns);
+  columnViews.set(packed.columns, columns);
+  return columns;
+}
+
+function manifestFromColumns(packed: PackedMotionManifest): MotionManifest {
   return {
-    blocks,
+    blocks: columnsOf(packed),
     totalRouteMm: packed.totalRouteMm,
     sendableLineCount: packed.sendableLineCount,
     firstProcessPoint: packed.firstProcessPoint,
@@ -260,30 +218,41 @@ export function unpackMotionManifest(packed: PackedMotionManifest): MotionManife
   };
 }
 
-export function hasPackedMotionEncoding(value: unknown): boolean {
-  return isRecord(value) && 'encoding' in value;
+/** What `motionBlockColumnsFrom` would allocate, counted exactly. */
+function* objectBlockColumnBytesSteps(blocks: MotionBlockSequence): WorkSteps<number> {
+  const count: StoredPointCount = { stored: 0, zVaries: false, firstZ: undefined };
+  let programLines = false;
+  let last: MotionPoint | undefined;
+  let visited = 0;
+  for (const block of blocks) {
+    if (visited > 0 && visited % MEASURE_STEP_BLOCKS === 0) yield;
+    visited += 1;
+    const shared = last !== undefined && samePoint(block.points[0], last);
+    countStoredPoints(count, block.points, shared ? 1 : 0);
+    programLines ||= block.programLineNumber !== null;
+    last = block.points.at(-1) ?? last;
+  }
+  const perBlock = 4 + 4 + 1 + 4 + 8 + (programLines ? 8 : 0);
+  return blocks.length * perBlock + count.stored * (count.zVaries ? 24 : 16);
 }
 
-function isFloat64Array(value: unknown): value is Float64Array {
-  // IndexedDB and jsdom structured clone may return a different realm's view.
-  return (
-    ArrayBuffer.isView(value) && Object.prototype.toString.call(value) === '[object Float64Array]'
-  );
+type StoredPointCount = { stored: number; zVaries: boolean; firstZ: number | undefined };
+
+function countStoredPoints(
+  count: StoredPointCount,
+  points: ReadonlyArray<MotionPoint>,
+  from: number,
+): void {
+  for (let at = from; at < points.length; at += 1) {
+    const z = (points[at] as MotionPoint).z;
+    count.firstZ ??= z;
+    count.zVaries ||= !Object.is(z, count.firstZ);
+    count.stored += 1;
+  }
 }
 
-function isIndex(value: unknown): value is number {
-  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
-}
-
-function isNonNegativeNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
-}
-
-function isNullablePoint(value: unknown): boolean {
-  return (
-    value === null ||
-    (isRecord(value) && ['x', 'y', 'z'].every((axis) => Number.isFinite(value[axis])))
-  );
+function samePoint(a: MotionPoint | undefined, b: MotionPoint): boolean {
+  return a !== undefined && Object.is(a.x, b.x) && Object.is(a.y, b.y) && Object.is(a.z, b.z);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

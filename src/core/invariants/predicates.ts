@@ -11,7 +11,6 @@
 // just GrblStrategy's output.
 import { scanModalMotionLine, type GcodeMotionMode } from '../gcode/modal-motion-line';
 import {
-  asGcodeLines,
   isGcodeCommand,
   iterateGcodeLines,
   parseGcodeWord,
@@ -51,15 +50,14 @@ type BoundsRect = {
 //       Marlin fan-mode dialect — ADR-095),
 //   (c) the most recent S value seen is 0 (sticky firmware state; `M107`
 //       counts as S0 because it zeroes the fan-laser PWM).
-export function findLaserOnTravelIssues(gcode: string | ReadonlyArray<string>): readonly Issue[] {
-  const lines = asGcodeLines(gcode);
+export function findLaserOnTravelIssues(gcode: string | Iterable<string>): readonly Issue[] {
   const issues: Issue[] = [];
+  let lineNumber = 0;
   let lastEffective = '';
   let stickyS: number | null = null;
   let motion: GcodeMotionMode | null = 0;
-  for (let i = 0; i < lines.length; i += 1) {
-    const raw = lines[i];
-    if (raw === undefined) continue;
+  for (const raw of iterateGcodeLines(gcode)) {
+    lineNumber += 1;
     const stripped = stripGcodeComment(raw);
     if (stripped === '') continue;
     const scanned = scanModalMotionLine(stripped, motion);
@@ -74,7 +72,7 @@ export function findLaserOnTravelIssues(gcode: string | ReadonlyArray<string>): 
       const okSticky = stickyS === 0;
       if (!okInline && !okPriorOff && !okSticky) {
         issues.push({
-          lineNumber: i + 1,
+          lineNumber,
           line: raw,
           reason: 'G0 without S0 and no preceding M5/M107 / sticky S0',
         });
@@ -228,9 +226,9 @@ function collectG1WordValues(gcode: string, word: 'S' | 'F'): readonly number[] 
  * coordinate-only block that inherits G1 from an earlier line (ADR-332); a
  * pattern match on `G1` cannot, and misses a packed `G1X95` besides.
  */
-export function hasFeedMotion(gcode: string | ReadonlyArray<string>): boolean {
+export function hasFeedMotion(gcode: string | Iterable<string>): boolean {
   let motion: GcodeMotionMode | null = 0;
-  for (const raw of iterateGcodeLines(asGcodeLines(gcode))) {
+  for (const raw of iterateGcodeLines(gcode)) {
     const stripped = stripGcodeComment(raw);
     if (stripped === '') continue;
     const scanned = scanModalMotionLine(stripped, motion);

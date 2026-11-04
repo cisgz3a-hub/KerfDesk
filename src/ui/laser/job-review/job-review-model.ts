@@ -5,12 +5,7 @@ import { compiledFocusTestWarnings } from './focus-test-warnings';
 // compiled facts come from the prepared job.
 
 import type { OverrideValues } from '../../../core/controllers/grbl';
-import {
-  formatDuration,
-  type Job,
-  type JobOriginPlacement,
-  type ScanOffsetPoint,
-} from '../../../core/job';
+import type { JobOriginPlacement } from '../../../core/job';
 import {
   DEFAULT_OUTPUT_SCOPE,
   machineKindOf,
@@ -18,7 +13,6 @@ import {
   type OutputScope,
   type Project,
 } from '../../../core/scene';
-import type { CncToolPlanEntry } from '../../state/cnc-tool-plan';
 import type { LaserModeStartSnapshot } from '../../state/laser-mode-start-evidence';
 import { cncSetupAttestationPrompt } from '../cnc-setup-acknowledgement';
 import {
@@ -28,18 +22,14 @@ import {
 import type { prepareCurrentStartJob } from '../start-job-source';
 import {
   describeJobOrigin,
-  formatBoundsRange,
-  formatBoundsSize,
   formatCount,
-  formatGcodeSize,
-  originTileDetail,
-  originTileValue,
   toolPlanLabels,
   uniqueReviewWarnings,
 } from './job-review-format';
 import { buildEffectiveOperationReview } from './job-review-effective-operations';
 import { buildReviewedOmissions, type JobReviewOmissions } from './job-review-omissions';
-import { memoizedFillHeatRisk } from './fill-heat-risk-memo';
+import { programFactsOf, type ProgramFacts } from './program-facts';
+import { buildStatTiles, gcodeTile, originTile, sizeTile, timeTile } from './job-review-stat-tiles';
 import { buildOutputQualityReviewFacts, type JobReviewFact } from './job-review-live-rows';
 import { detectArchiveCapacityWarnings } from './archive-capacity-warnings';
 import { detectAirAssistCyclingWarnings } from './air-assist-cycling-warnings';
@@ -107,6 +97,7 @@ export function buildJobReviewModel(args: JobReviewModelArgs): JobReviewModel {
   if (args.prepared.laserSecondPassChain !== undefined) return buildSecondPassReviewModel(args);
   const machineKind = machineKindOf(args.project.machine);
   const outputScope = args.outputScope ?? DEFAULT_OUTPUT_SCOPE;
+  const program = programFactsOf(args.prepared);
   return {
     machineKind,
     ...jig.facts(args.project, args.prepared.prepared.job, outputScope),
@@ -116,6 +107,7 @@ export function buildJobReviewModel(args: JobReviewModelArgs): JobReviewModel {
       machineKind,
       args.project.device.scanningOffsets,
       outputScope,
+      program,
     ),
     // prepared.warnings already carries controller/readiness/WCS/override
     // warnings; the intent set (raster upsample, trace-as-vector, fill heat)
@@ -128,6 +120,7 @@ export function buildJobReviewModel(args: JobReviewModelArgs): JobReviewModel {
         args.prepared.gcode,
         args.laserModeStartSnapshot.controllerBuildInfo,
         buildInfoObservationIsCurrent(args.laserModeStartSnapshot),
+        program.usesM7,
       ),
       ...detectConstantPowerFirmwareWarnings(args),
       ...detectManualAirAssistWarnings(args.prepared.prepared.job, args.project.device),
@@ -154,16 +147,13 @@ export function buildJobReviewModel(args: JobReviewModelArgs): JobReviewModel {
         args.prepared.prepared.project,
         args.prepared.prepared.job,
       ),
-      ...detectArchiveCapacityWarnings(args.prepared, machineKind === 'laser'),
+      ...detectArchiveCapacityWarnings(
+        args.prepared,
+        machineKind === 'laser',
+        program.archiveBytes,
+      ),
       ...detectMinFeatureWarnings(args.prepared.prepared.project, args.prepared.jobOrigin),
-      ...(args.streamThroughput === undefined
-        ? []
-        : detectStreamThroughputWarnings({
-            ...args.streamThroughput,
-            gcode: args.prepared.gcode,
-            motionSeconds: commandedMotionSeconds(args.prepared.metrics.duration),
-            transportSeconds: args.prepared.metrics.duration.breakdown.transportSeconds ?? 0,
-          })),
+      ...throughputWarnings(args, program),
     ]),
     resolvedOriginLabel: describeJobOrigin(args.prepared.jobOrigin),
     startFrom: args.prepared.jobOrigin?.startFrom ?? 'absolute',
@@ -222,7 +212,7 @@ function buildSecondPassReviewModel(args: JobReviewModelArgs): JobReviewModel {
         buildInfoObservationIsCurrent(args.laserModeStartSnapshot),
       ),
       ...detectArchiveCapacityWarnings(prepared),
-      ...secondPassThroughputWarnings(args),
+      ...throughputWarnings(args),
     ]),
     resolvedOriginLabel: describeJobOrigin(prepared.jobOrigin),
     startFrom: prepared.jobOrigin?.startFrom ?? 'absolute',
@@ -249,13 +239,17 @@ function buildSecondPassReviewModel(args: JobReviewModelArgs): JobReviewModel {
   };
 }
 
-function secondPassThroughputWarnings(args: JobReviewModelArgs): ReadonlyArray<string> {
+function throughputWarnings(
+  args: JobReviewModelArgs,
+  program?: ProgramFacts,
+): ReadonlyArray<string> {
   if (args.streamThroughput === undefined) return [];
   return detectStreamThroughputWarnings({
     ...args.streamThroughput,
     gcode: args.prepared.gcode,
     motionSeconds: commandedMotionSeconds(args.prepared.metrics.duration),
     transportSeconds: args.prepared.metrics.duration.breakdown.transportSeconds ?? 0,
+    ...(program === undefined ? {} : { program }),
   });
 }
 
@@ -268,154 +262,6 @@ function commandedMotionSeconds(estimate: PreparedCurrentStart['metrics']['durat
 
 function buildInfoObservationIsCurrent(snapshot: LaserModeStartSnapshot): boolean {
   return snapshot.buildInfoObservation?.sessionEpoch === snapshot.controllerSessionEpoch;
-}
-
-function buildStatTiles(
-  prepared: PreparedCurrentStart,
-  machineKind: MachineKind,
-  scanningOffsets: ReadonlyArray<ScanOffsetPoint>,
-  outputScope: OutputScope,
-): ReadonlyArray<JobReviewStatTile> {
-  const job = prepared.prepared.job;
-  return [
-    timeTile(prepared.metrics.duration, machineKind),
-    sizeTile(prepared.metrics.jobBounds, prepared.metrics.motionBounds),
-    operationsTile(job, machineKind, prepared.cncToolPlan),
-    ...fillRunwayTiles(job, scanningOffsets),
-    gcodeTile(prepared.gcode),
-    originTile(prepared.jobOrigin),
-    outputScopeTile(outputScope),
-  ];
-}
-
-function outputScopeTile(outputScope: OutputScope): JobReviewStatTile {
-  if (!outputScope.cutSelectedGraphics) {
-    return {
-      label: 'Output scope',
-      value: 'Entire job',
-      detail: 'All visible, enabled artwork is included',
-      emphasis: 'text',
-    };
-  }
-  const selectedCount = new Set(outputScope.selectedObjectIds).size;
-  return {
-    label: 'Output scope',
-    value: 'Selected artwork only',
-    detail: `${formatCount(selectedCount)} selected object${selectedCount === 1 ? '' : 's'} included`,
-    emphasis: 'text',
-  };
-}
-
-function fillRunwayTiles(
-  job: Job,
-  scanningOffsets: ReadonlyArray<ScanOffsetPoint>,
-): ReadonlyArray<JobReviewStatTile> {
-  const coverage = memoizedFillHeatRisk(job, scanningOffsets);
-  if (coverage.fillSweepCount === 0) return [];
-  const requested = coverage.fillRequestedRunwayValuesMm.join(' / ');
-  return [
-    {
-      label: 'Fill runway',
-      value: `${formatCount(coverage.fillFullRunwaySweepCount)} / ${formatCount(coverage.fillSweepCount)} full`,
-      detail:
-        `Effective target ${requested} mm · ` +
-        `${formatCount(coverage.fillPartialRunwaySweepCount)} partial · ` +
-        `${formatCount(coverage.fillNoRunwaySweepCount)} skipped · ` +
-        `${formatCount(coverage.fillDisabledRunwaySweepCount)} disabled`,
-    },
-  ];
-}
-
-// Placement controls live on the machine rail (v2 dropped them from the
-// review); this read-only tile keeps the one safety-relevant placement fact
-// in front of the operator right up to Confirm.
-function originTile(origin: PreparedCurrentStart['jobOrigin']): JobReviewStatTile {
-  return {
-    label: 'Origin',
-    value: originTileValue(origin),
-    detail: originTileDetail(origin),
-    emphasis: 'text',
-  };
-}
-
-function timeTile(
-  estimate: PreparedCurrentStart['metrics']['duration'],
-  machineKind: MachineKind,
-): JobReviewStatTile {
-  if (estimate.unavailableReason !== undefined)
-    return {
-      label: 'Estimated time',
-      value: 'Unavailable',
-      detail: estimate.unavailableReason,
-    };
-  const cutLabel = machineKind === 'cnc' ? 'Cut + plunge' : 'Cut';
-  const dwellLabel = machineKind === 'cnc' ? 'spindle dwell' : 'dwell';
-  const details = [
-    `${cutLabel} ${formatDuration(estimate.breakdown.cutSeconds)}`,
-    `travel ${formatDuration(estimate.breakdown.travelSeconds)}`,
-  ];
-  if ((estimate.breakdown.dwellSeconds ?? 0) > 0)
-    details.push(`${dwellLabel} ${formatDuration(estimate.breakdown.dwellSeconds ?? 0)}`);
-  if ((estimate.breakdown.transportSeconds ?? 0) >= 0.5)
-    details.push(`streaming ${formatDuration(estimate.breakdown.transportSeconds ?? 0)}`);
-  if ((estimate.manualPauseCount ?? 0) > 0) details.push('plus manual tool-change time');
-  return {
-    label: 'Estimated time',
-    value: formatDuration(estimate.totalSeconds),
-    detail: details.join(' · '),
-  };
-}
-
-function sizeTile(
-  bounds: PreparedCurrentStart['metrics']['jobBounds'],
-  motionBounds: PreparedCurrentStart['metrics']['motionBounds'],
-): JobReviewStatTile {
-  if (bounds === null) return { label: 'Job size', value: '—', detail: 'No cut motion' };
-  const motionDiffers =
-    motionBounds !== null &&
-    (motionBounds.minX !== bounds.minX ||
-      motionBounds.minY !== bounds.minY ||
-      motionBounds.maxX !== bounds.maxX ||
-      motionBounds.maxY !== bounds.maxY);
-  const motionSuffix = motionDiffers ? ` · motion ${formatBoundsSize(motionBounds)}` : '';
-  return {
-    label: 'Job size',
-    value: formatBoundsSize(bounds),
-    detail: `${formatBoundsRange(bounds)}${motionSuffix}`,
-  };
-}
-
-function operationsTile(
-  job: Job,
-  machineKind: MachineKind,
-  toolPlan: ReadonlyArray<CncToolPlanEntry> | undefined,
-): JobReviewStatTile {
-  if (machineKind === 'cnc' && toolPlan !== undefined && toolPlan.length > 0) {
-    const changes = toolPlan.length - 1;
-    return {
-      label: 'Cutters',
-      value: `${formatCount(toolPlan.length)} bit${toolPlan.length === 1 ? '' : 's'}`,
-      detail: `${formatCount(changes)} tool change${changes === 1 ? '' : 's'}`,
-    };
-  }
-  const totalPasses = job.groups.reduce(
-    (sum, group) => sum + (group.kind === 'cnc' ? group.passes.length : group.passes),
-    0,
-  );
-  return {
-    label: 'Operations',
-    value: `${formatCount(job.groups.length)} operation${job.groups.length === 1 ? '' : 's'}`,
-    detail: `${formatCount(totalPasses)} pass${totalPasses === 1 ? '' : 'es'} total`,
-  };
-}
-
-function gcodeTile(gcode: string): JobReviewStatTile {
-  const lineCount = gcode.length === 0 ? 0 : gcode.trimEnd().split('\n').length;
-  return {
-    label: 'G-code',
-    value: `${formatCount(lineCount)} lines`,
-    detail: formatGcodeSize(gcode.length),
-  };
 }
 
 function buildAcknowledgement(

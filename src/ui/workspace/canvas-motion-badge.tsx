@@ -25,7 +25,10 @@ export function CanvasMotionBadge(props: {
         ? null
         : createPortal(
             <span
-              role="status"
+              // A run's line names its elapsed seconds and is re-rendered every
+              // second, so it is not a live region; the Live Motion announcer
+              // speaks the job's changes (UX audit U7-P2-1).
+              role={overlay.run === null ? 'status' : undefined}
               data-testid="canvas-motion-status"
               aria-busy={overlay.planIsCurrent === false}
               style={overlay.run === null ? cautionMessageStyle : messageStyle}

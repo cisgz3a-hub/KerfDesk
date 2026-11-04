@@ -16,13 +16,14 @@
 // this decision from adding a second recovery payload format.
 
 import {
-  createJobCheckpoint,
   parseJobCheckpoint,
   serializeJobCheckpoint,
   withJobInterruption,
   type JobCheckpoint,
   type JobMachineKind,
 } from '../../../core/recovery';
+import { createJobCheckpointSteps } from '../../../core/recovery/job-checkpoint';
+import { runWorkSteps, type WorkSteps } from '../../../core/recovery/work-steps';
 import type { JobOriginPlacement } from '../../../core/job';
 import type { OutputScope } from '../../../core/scene';
 import type { LegacyFingerprintOnlyArtifactV1 } from './execution-artifact';
@@ -38,14 +39,20 @@ export const START_INTENT_INTERRUPTION_MESSAGE =
  * stamped at creation: this record only ever becomes visible to an operator
  * along the path where the app did not survive to accept the run, so its
  * meaning is fixed the moment it is written. */
-export function createStartIntent(args: {
+type CreateStartIntentArgs = {
   readonly gcode: string;
   readonly machineKind: JobMachineKind;
   readonly outputScope: OutputScope;
   readonly jobOrigin?: JobOriginPlacement;
   readonly nowIso: string;
-}): JobCheckpoint {
-  const checkpoint = createJobCheckpoint({
+};
+
+export function createStartIntent(args: CreateStartIntentArgs): JobCheckpoint {
+  return runWorkSteps(createStartIntentSteps(args));
+}
+
+export function* createStartIntentSteps(args: CreateStartIntentArgs): WorkSteps<JobCheckpoint> {
+  const checkpoint = yield* createJobCheckpointSteps({
     gcode: args.gcode,
     machineKind: args.machineKind,
     outputScope: args.outputScope,

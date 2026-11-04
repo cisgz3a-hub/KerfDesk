@@ -1,11 +1,12 @@
 // Which of a job's warnings a beginner sees first (UX audit U3-P3-6, U4-P2-6,
 // ADR-687). Job Review and Save G-code share one ranking:
 // - beginner: what to do before the burn (a material test, cut last, check the
-//   material under the Frame box);
+//   material under the Frame box, turn laser mode on);
 // - warning: everything not named here, kept in view as before;
 // - technical: motion-policy notes a beginner cannot act on, folded under
 //   Technical notes (scan offsets, which S value 100 % means, runway policy).
 // Unknown text ranks as a warning, so a new warning is never hidden.
+import { LASER_MODE_DISABLED_MESSAGE } from '../../core/preflight/controller-readiness';
 import { UNKNOWN_NATIVE_BED_MESSAGE } from '../state/native-bed-frame';
 import { isPowerScaleSourceNote } from './connected-laser-power-scale';
 import { isCutBeforeEngravingWarning } from './cut-order-warnings';
@@ -18,6 +19,7 @@ export function reviewNoteRank(note: string): ReviewNoteRank {
   if (
     isUncalibratedDefaultsWarning(note) ||
     isCutBeforeEngravingWarning(note) ||
+    note === LASER_MODE_DISABLED_MESSAGE ||
     note.startsWith(UNKNOWN_NATIVE_BED_MESSAGE)
   ) {
     return 'beginner';

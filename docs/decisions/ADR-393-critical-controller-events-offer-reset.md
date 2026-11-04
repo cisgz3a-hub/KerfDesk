@@ -74,3 +74,57 @@ reset brings the controller back locked in Alarm was reported as a failure (HF-5
   `laser-unlock-alarm.test.ts`, `laser-console-completion.test.ts`,
   `response-presentation.test.ts`, `start-blocked-fix-offers.test.ts`,
   `laser-wake-into-alarm.test.ts` and `laser-wake-into-alarm-grbl.test.ts`.
+
+### Amendment 1 - A lock from before the connection latches too (2026-11-03)
+
+UX audit 2026-11-03 U5-P2-1, with U5-P3-2 (before the reset) and U5-P3-5. A board that does not
+reset when the port opens (most 32-bit and ESP32 boards) keeps a critical lock it raised while
+KerfDesk was not listening: the E-stop was pressed before connecting, a limit tripped while
+another program had the port, or the page was reloaded. Its "Reset to continue" went to nobody,
+so the latch never tripped. The Alarm card offered Unlock and Home, grblHAL refused both with
+`error:79`, and nothing offered Reset. Disconnect then Connect worked only because Disconnect
+happens to send Ctrl-X.
+
+1. **Three more replies latch `resetRequired`** (`controller-reset-required.ts`):
+   - `error:79` to any line on a GRBL-family driver. Only grblHAL sends it, and only while a
+     critical event blocks the command (`Status_NotAllowedCriticalEvent`, d7aaee3d
+     system.c:1179-1181). Stock GRBL stops at `error:38` and FluidNC's codes skip from 70 to 80,
+     so the stock driver a banner-less grblHAL board connects on reads it the same way.
+   - An Alarm report whose `Pn:` holds `E`, except on FluidNC. grblHAL raises its critical E-stop
+     alarm whenever that input is on (protocol.c `protocol_main_loop`). FluidNC's E input raises
+     a critical Hard Stop only when it trips outside Alarm (Protocol.cpp
+     `protocol_do_fault_pin`), and the next rule covers that state.
+   - An Alarm report straight after the controller acknowledged `$X`, with no `ALARM:N` between
+     them. That is FluidNC's `State::Critical`, which reports `Alarm` (Report.cpp `state_name`)
+     and answers `$X` with `ok` (decision 3). Every other GRBL-family unlock either leaves Alarm
+     or answers an error. `unlockAwaitsReport` carries the acknowledged `$X` to that report.
+   The status `Alarm:N` substate is deliberately not evidence: grblHAL keeps the critical code
+   in `sys.alarm` after the reset that cleared it, so it would offer Reset for ever.
+2. **Stock GRBL needs nothing new.** Its critical loop answers nothing, not even `?`, so the
+   stopped-answering card (ADR-642) appears, and its Reconnect sends the Ctrl-X that frees it.
+   Chrome asserts DTR on open, which reboots most AVR boards and clears the lock anyway.
+3. **The card.** With no `ALARM:N` seen and the latch set, the card is titled "Controller needs
+   a reset" and says: "The controller was stopped by its E-stop or a limit switch before
+   KerfDesk connected, and accepts only a reset. Release the E-stop or move the head off the
+   switch, then press Reset (Ctrl-X). After the reset, Unlock or Home." With a known code, the
+   alarm's own physical step comes first: alarm 1 "Clear whatever the head ran into, and move it
+   off the limit switch."; grblHAL alarm 10 (also on the stock driver, where alarm 10 is never
+   critical) "Release the E-stop (twist or pull the button out)."; grblHAL 17 "Check the motor
+   drivers and their wiring."; FluidNC 13 "Release the E-stop, or clear the fault the controller
+   reports." Then "Then press Reset (Ctrl-X): the controller accepts nothing else until it is
+   reset. After the reset, Unlock or Home." Other codes keep decision 2's text. A reset with the
+   E-stop still pressed raises the alarm again, which the first sentence now explains.
+4. **The notice goes with the latch.** The reboot banner that ends the latch also clears a
+   controller-error notice for `error:79` whose rejected line was a `$` command: a refused `$X`
+   or `$H` moved nothing, so there is nothing left to warn about. A job's notice stays.
+5. **Unowned holds name a control.** The Live Motion bar's controller hold and door hold that no
+   job started said "release it with cycle start", which most hobby lasers have no button for.
+   They now say to use the machine's cycle-start button if it has one, or ABORT MOTION here to
+   clear it with a controller reset. The ADR-375 rule of no Resume for a hold KerfDesk never
+   requested is unchanged; the owned bar's mid-job hold (U4-P3-2) is not touched here.
+
+Not covered: a banner-less grblHAL board still connects on the stock GRBL driver (UX audit
+U5-P3-4, owned by the driver work), where alarm 10 decodes as the stock dual-axis homing failure
+outside the latch. G-code output is unchanged. Regression tests:
+`controller-reset-required.test.ts` (fake grblHAL locked before the port opens, on both drivers;
+E-stop input; FluidNC), `AlarmBanner.test.tsx` and `LiveMotionBar.unowned.test.tsx`.

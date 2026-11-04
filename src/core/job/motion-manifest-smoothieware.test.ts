@@ -50,10 +50,11 @@ const square: Job = {
 };
 
 function kinds(gcode: string, device: DeviceProfile): ReadonlyArray<string> {
-  return buildMotionManifest(gcode, {
+  const manifest = buildMotionManifest(gcode, {
     machineKind: 'laser',
     laserPowerControl: laserPowerControlForDevice(device),
-  }).blocks.map((block) => block.kind);
+  });
+  return Array.from(manifest.blocks, (block) => block.kind);
 }
 
 describe('motion manifest on Smoothieware (03-P2-8)', () => {
@@ -79,7 +80,7 @@ describe('motion manifest on Smoothieware (03-P2-8)', () => {
       machineKind: 'laser',
       laserPowerControl: 'smoothieware',
     });
-    const process = manifest.blocks.filter((block) => block.kind === 'process');
+    const process = Array.from(manifest.blocks).filter((block) => block.kind === 'process');
 
     expect(process.map((block) => block.rawLineIndex + 1)).toEqual(
       oracle.burns.filter((burn) => burn.power > 0).map((burn) => burn.line),
@@ -95,7 +96,7 @@ describe('motion manifest on Smoothieware (03-P2-8)', () => {
       { machineKind: 'laser', laserPowerControl: 'smoothieware' },
     );
 
-    expect(manifest.blocks.map((block) => block.kind)).toEqual(['travel', 'process']);
+    expect(Array.from(manifest.blocks).map((block) => block.kind)).toEqual(['travel', 'process']);
   });
 
   it('never reads a G0 as a burn, whatever its S', () => {
@@ -104,7 +105,7 @@ describe('motion manifest on Smoothieware (03-P2-8)', () => {
       laserPowerControl: 'smoothieware',
     });
 
-    expect(manifest.blocks.map((block) => block.kind)).toEqual(['travel']);
+    expect(Array.from(manifest.blocks).map((block) => block.kind)).toEqual(['travel']);
   });
 
   it('gives the executable plan the burned length', () => {

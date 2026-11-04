@@ -87,7 +87,7 @@ describe('Frame preparation optional sidecar allocation', () => {
     expect(sidecar.mock.calls.length).toBe(0);
     expect(plan.manifest.blocks).toHaveLength(301);
     expect(
-      plan.manifest.blocks.reduce((count, block) => count + block.points.length - 1, 0),
+      Array.from(plan.manifest.blocks).reduce((count, block) => count + block.points.length - 1, 0),
     ).toBeGreaterThan(25_000);
     expect(plan.manifest.finalPoint).toEqual({ x: 100, y: 0, z: 0 });
     expect(canvasProgramSource(plan)).toBe(gcode);

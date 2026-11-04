@@ -10971,7 +10971,9 @@ overhangs the bed` without attempting the trace the operator explicitly chose as
 ADR-232's amendments are separate decision files (ADR-344):
 `docs/decisions/ADR-232-amendment-1-frame-route-and-resume-reentry-reach-the-no-go-check.md` (the
 Frame's own route and a laser resume's re-entry move are compared with no-go zones as warnings, and
-the CNC envelope uses the full bit diameter).
+the CNC envelope uses the full bit diameter) and
+`docs/decisions/ADR-232-amendment-2-a-frame-past-the-bed-is-warned-on-every-controller.md` (a
+Frame past the configured bed is warned on every controller, never refused).
 ---
 
 ## ADR-233 - Revisioned machine-aware CNC starters initialize new operations without rewriting jobs
@@ -21388,6 +21390,11 @@ evidence of any kind — no machine is available to this project. The timings ab
 V8 measurements of the same modules, not browser profiles; the earlier figures quoted from a
 vitest/jsdom run overstated this traversal by about 6.5x and should not be compared against.
 
+### Amendments
+
+ADR-337's amendments are separate decision files (ADR-344):
+`docs/decisions/ADR-337-amendment-1-accepted-run-archive-in-slices.md`.
+
 ## ADR-338 - The bend scan reads the chain by index instead of copying it (2026-09-21)
 
 **Status:** Accepted. A pure performance change: the traced geometry is byte-identical, verified
@@ -21752,8 +21759,9 @@ ADR-341's amendments are separate decision files (ADR-344):
 `docs/decisions/ADR-341-amendment-6-continue-from-where-the-head-stopped.md`,
 `docs/decisions/ADR-341-amendment-7-second-pass-for-jobs-too-large-to-archive.md`,
 `docs/decisions/ADR-341-amendment-8-oversized-jobs-keep-a-short-record.md`,
-`docs/decisions/ADR-341-amendment-9-second-pass-output-and-workbench-quality.md` and
-`docs/decisions/ADR-341-amendment-10-recovery-numbering-done-tail-alarms-and-untracked-runs.md`.
+`docs/decisions/ADR-341-amendment-9-second-pass-output-and-workbench-quality.md`,
+`docs/decisions/ADR-341-amendment-10-recovery-numbering-done-tail-alarms-and-untracked-runs.md` and
+`docs/decisions/ADR-341-amendment-11-the-abort-card-restores-the-origin.md`.
 Amendment 1 was first appended here on 2026-09-22 and was moved there verbatim.
 
 ---

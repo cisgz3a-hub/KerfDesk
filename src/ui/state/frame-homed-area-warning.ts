@@ -55,8 +55,9 @@ export function frameHomedAreaWarning(
   );
 }
 
-// The route point farthest outside the box, named by the axes it is outside on.
-function farthestOutside(
+/** The route point farthest outside the box, named by the axes it is outside
+ *  on (frame-bed-edge-warning.ts uses it too). */
+export function farthestOutside(
   points: ReadonlyArray<Point>,
   box: { minX: number; minY: number; maxX: number; maxY: number },
 ): string | null {

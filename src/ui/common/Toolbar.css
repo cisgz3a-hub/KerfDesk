@@ -175,7 +175,7 @@
 .lf-toolbar-overflow-command:hover:not(:disabled),
 .lf-toolbar-overflow-command:focus-visible {
   background: var(--lf-tint-accent);
-  outline: 1px solid var(--lf-accent);
+  outline: 1px solid var(--lf-focus-accent);
   outline-offset: -1px;
 }
 .lf-toolbar-overflow-command:disabled {

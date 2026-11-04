@@ -2447,7 +2447,12 @@ inches hides the position until `$G` or the next Frame (ADR-375 Amendment 11).
    depths, feeds and spindle speed; a CNC **Material & stock** card; folded read-only Controller and
    Machine facts side by side; and the applicable laser acknowledgement or CNC
    workholding/exclusive-access attestation. A verified laser session shows a **Laser mode
-   verified** chip in the header instead. If Frame preparation
+   verified** chip in the header instead. Above the acknowledgement, every Start review shows a
+   **Before you start** block (ADR-689): laser safety glasses, focus on the material's top,
+   staying with the laser with an extinguisher close, and air assist and ventilation; for CNC, eye
+   and ear protection, clamps clear of the toolpath, and staying with the machine. It starts open;
+   folding it is remembered per machine profile and never gates Start. The phone remote shows the
+   same points as its acknowledgement prompt. If Frame preparation
    selected G54 from G55-G59, the durable warning names the original WCS and says the active
    selection changed, stored offsets were not erased, and Cancel leaves G54 selected. Placement is
    not editable in review; the sticky footer echoes the resolved origin beside Cancel and **Start
@@ -2733,6 +2738,16 @@ minimum target size.
 
 #### Success — unlock
 1. User clicks **$X — Unlock**. App writes `$X\n`. Alarm cleared from UI.
+
+#### Edge — reset required
+1. After a critical event (hard or soft limit, E-stop, motor fault) the controller accepts only a
+   soft reset. The banner names the alarm's own step first, such as "Release the E-stop", and
+   offers only **Reset (Ctrl-X)**; Unlock, Home and the Console are held (ADR-393).
+2. A lock raised before KerfDesk connected is recognised from grblHAL's `error:79` to Unlock or
+   Home, from an E-stop input (`Pn:E`) in an Alarm report, or from FluidNC acknowledging `$X`
+   while it still reports Alarm. The banner then reads "Controller needs a reset" and says to
+   release the E-stop or move off the switch first. The reset clears the `error:79` notice
+   (ADR-393 Amendment 1).
 
 ### F-B10. Status polling
 

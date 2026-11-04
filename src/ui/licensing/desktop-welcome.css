@@ -244,7 +244,7 @@
 }
 .lf-desktop-welcome button:focus-visible,
 .lf-desktop-welcome a:focus-visible {
-  outline: 2px solid var(--lf-accent);
+  outline: 2px solid var(--lf-focus-accent);
   outline-offset: 3px;
 }
 @media (max-width: 680px) {

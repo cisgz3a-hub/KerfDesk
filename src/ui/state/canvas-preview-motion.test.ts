@@ -48,8 +48,8 @@ describe('canvasPreviewMotionSequence', () => {
 
     expect(sequence.source).toBe('legacy-manifest');
     expect(sequence.totalRouteMm).toBe(manifest.totalRouteMm);
-    expect(sequence.motions.map(({ pointsMm }) => pointsMm)).toEqual(
-      manifest.blocks.map(({ points }) => points),
+    expect(Array.from(sequence.motions).map(({ pointsMm }) => pointsMm)).toEqual(
+      Array.from(manifest.blocks).map(({ points }) => points),
     );
   });
 
