@@ -70,6 +70,21 @@ describe('archive work steps', () => {
     }
   });
 
+  it('bound a validation step by points as well as blocks, as a photo needs', () => {
+    // Few blocks, each with many sampled points, like a photo's scan lines.
+    const circles = ['G21', 'G90', 'G0 X0 Y0', 'M4 S0'];
+    for (let i = 0; i < 1_200; i += 1) circles.push('G2 X0 Y0 I60 J0 S500');
+    const packed = packMotionManifest(
+      buildMotionManifest(circles.join('\n'), { machineKind: 'laser' }),
+    );
+    expect(packed.columns.count).toBeLessThan(1 << 14);
+    const points = packed.columns.x.length;
+    expect(points).toBeGreaterThan(4 * (1 << 14));
+    const { value, yields } = drain(isPackedMotionManifestSteps(packed));
+    expect(value).toBe(true);
+    expect(yields).toBeGreaterThanOrEqual(Math.floor(points / (1 << 14)));
+  });
+
   it('measure object blocks as the columns they would become, with checkpoints', () => {
     const manifest = buildMotionManifest(routeProgram(40_000), { machineKind: 'laser' });
     const objects = { ...manifest, blocks: Array.from(manifest.blocks) };

@@ -8,9 +8,10 @@ import {
 } from './motion-block-columns';
 import { runWorkSteps, type WorkSteps } from '../recovery/work-steps';
 
-// Checkpoints for the accepted run's archive (ADR-337 Amendment 1): blocks and
-// stored values a step may visit before the next yield.
-const BLOCK_STEP = 1 << 14;
+// Checkpoints for the accepted run's archive (ADR-337 Amendment 1). A block's
+// route check reads every one of its points, so a step is bounded by blocks
+// plus points: a photo's few long scan lines cost what many short moves do.
+const BLOCK_STEP_UNITS = 1 << 14;
 const VALUE_STEP = 1 << 16;
 
 export type MotionBlockColumnLimits = {
@@ -41,9 +42,15 @@ export function* isMotionBlockColumnDataSteps(
   const columns = new MotionBlockColumns(data);
   const rawLines = limits?.rawLines ?? Number.MAX_SAFE_INTEGER;
   const sendableLines = limits?.sendableLines ?? Number.MAX_SAFE_INTEGER;
+  let units = 0;
   for (let block = 0; block < data.count; block += 1) {
-    if (block > 0 && block % BLOCK_STEP === 0) yield;
     if (!validBlock(columns, block, rawLines, sendableLines)) return false;
+    // Counted once the block's point range is known to be sound.
+    units += 1 + columns.pointCountAt(block);
+    if (units >= BLOCK_STEP_UNITS && block + 1 < data.count) {
+      units = 0;
+      yield;
+    }
   }
   const storedPoints = data.count === 0 ? 0 : (data.pointEnd[data.count - 1] as number);
   return storedPoints === data.x.length;
