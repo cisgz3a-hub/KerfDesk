@@ -728,8 +728,14 @@ test('frames, pauses, resumes, alarms, stops, and homes back to a safe ready sta
     fixture.emitSerialLine('ALARM:3');
     fixture.emitSerialLine('<Alarm|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
   });
-  const alarm = page.getByRole('alert').filter({ hasText: 'Alarm 3' });
+  // This ALARM:3 answers the operator's own ABORT JOB, so the rail says so in
+  // plain words instead of "Alarm 3: Reset during motion" (ADR-341 Amendment
+  // 11). It is still an alert a screen reader announces; any other alarm keeps
+  // the ordinary "Alarm N" card (AbortStoppedCard.test.tsx).
+  const alarm = page.getByRole('alert').filter({ hasText: 'You stopped the job' });
   await expect(alarm).toBeVisible();
+  await expect(alarm).toContainText('The laser is off.');
+  await expect(page.getByRole('alert').filter({ hasText: 'Reset during motion' })).toHaveCount(0);
   await expect(informationWarning).toHaveCount(0);
   await kerfdesk.setAutoAcknowledge(false);
   await kerfdesk.setSerialStatusAfterCommand(
