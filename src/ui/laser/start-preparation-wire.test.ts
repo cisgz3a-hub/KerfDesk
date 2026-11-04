@@ -43,8 +43,7 @@ async function workerStart(project: Project) {
     outputScope: DEFAULT_OUTPUT_SCOPE,
     requireFrame: false,
   });
-  if (response.kind !== 'start' || !response.result.ok)
-    throw new Error('Start did not prepare.');
+  if (response.kind !== 'start' || !response.result.ok) throw new Error('Start did not prepare.');
   return { workerProject, result: response.result };
 }
 
