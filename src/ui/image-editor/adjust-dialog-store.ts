@@ -5,8 +5,14 @@
 
 import { create } from 'zustand';
 import type { CurvePoint } from '../../core/image-adjust';
-import type { RgbaBuffer } from '../../core/image-edit';
-import { commitAdjustment, computeAdjustPreview } from './editor-adjust-session';
+import type { PixelRect, RgbaBuffer } from '../../core/image-edit';
+import {
+  computeWindowPreview,
+  previewWindow,
+  selectionBounds,
+  type AdjustPreviewCache,
+} from './adjust-preview-window';
+import { commitAdjustment } from './editor-adjust-session';
 import {
   adjustmentById,
   DEFAULT_CURVE_POINTS,
@@ -15,6 +21,16 @@ import {
 } from './editor-adjustments';
 import { useImageEditorStore } from './image-editor-store';
 
+/**
+ * The dialog's live preview: the visible document window `rect` (doc px),
+ * rendered at display resolution into `buffer` (ADR-245 Amendment 1). The
+ * buffer is reused between steps; each step publishes a new wrapper.
+ */
+export type AdjustPreview = {
+  readonly buffer: RgbaBuffer;
+  readonly rect: PixelRect;
+};
+
 export type AdjustDialog = {
   readonly id: AdjustmentId;
   readonly params: Readonly<Record<string, number>>;
@@ -22,8 +38,8 @@ export type AdjustDialog = {
   readonly curvePoints: readonly CurvePoint[] | null;
   /** Preview ✓ (Photoshop): off shows the untouched document. */
   readonly previewEnabled: boolean;
-  /** Latest computed preview buffer; null until the first compute lands. */
-  readonly previewDoc: RgbaBuffer | null;
+  /** Latest computed preview; null until the first compute lands or off screen. */
+  readonly preview: AdjustPreview | null;
 };
 
 type AdjustDialogState = {
@@ -32,14 +48,14 @@ type AdjustDialogState = {
   readonly setParams: (params: Readonly<Record<string, number>>) => void;
   readonly setCurvePoints: (points: readonly CurvePoint[]) => void;
   readonly setPreviewEnabled: (enabled: boolean) => void;
-  readonly setPreviewDoc: (doc: RgbaBuffer) => void;
+  readonly setPreview: (preview: AdjustPreview | null) => void;
   /** Reset every slider to its default (the Photoshop Alt-Reset behavior). */
   readonly reset: () => void;
   readonly commit: () => void;
   readonly cancel: () => void;
 };
 
-const EMPTY_DIALOG = { previewEnabled: true, previewDoc: null } as const;
+const EMPTY_DIALOG = { previewEnabled: true, preview: null } as const;
 
 function freshDialog(id: AdjustmentId): AdjustDialog {
   return {
@@ -78,8 +94,8 @@ export const useAdjustDialogStore = create<AdjustDialogState>((set, get) => ({
   setPreviewEnabled: (previewEnabled) =>
     set((s) => (s.dialog === null ? s : { dialog: { ...s.dialog, previewEnabled } })),
 
-  setPreviewDoc: (previewDoc) =>
-    set((s) => (s.dialog === null ? s : { dialog: { ...s.dialog, previewDoc } })),
+  setPreview: (preview) =>
+    set((s) => (s.dialog === null ? s : { dialog: { ...s.dialog, preview } })),
 
   reset: () => set((s) => (s.dialog === null ? s : { dialog: freshDialog(s.dialog.id) })),
 
@@ -101,22 +117,37 @@ export const useAdjustDialogStore = create<AdjustDialogState>((set, get) => ({
   cancel: () => set({ dialog: null }),
 }));
 
-/** The buffer the canvas should draw instead of the document, if any. */
-export function useAdjustPreviewDoc(): RgbaBuffer | null {
+/** The preview the canvas should draw over the document, if any. */
+export function useAdjustPreview(): AdjustPreview | null {
   return useAdjustDialogStore((s) =>
-    s.dialog !== null && s.dialog.previewEnabled ? s.dialog.previewDoc : null,
+    s.dialog !== null && s.dialog.previewEnabled ? s.dialog.preview : null,
   );
 }
 
-/** Recompute the preview for the current dialog params (rAF-scheduled by the dialog). */
+// One dialog's reused preview buffers; released when the dialog closes.
+const previewCache: AdjustPreviewCache = { current: null };
+
+/** Recompute the preview for the current dialog params and view (timer-scheduled by the dialog). */
 export function refreshAdjustPreview(): void {
-  const { dialog, setPreviewDoc } = useAdjustDialogStore.getState();
-  const { session } = useImageEditorStore.getState();
+  const { dialog, setPreview } = useAdjustDialogStore.getState();
+  const { session, view, viewportSize } = useImageEditorStore.getState();
   if (dialog === null || session === null || !dialog.previewEnabled) return;
-  setPreviewDoc(
-    computeAdjustPreview(session, dialog.id, dialog.params, dialog.curvePoints ?? undefined),
-  );
+  const win = previewWindow(session.doc, view, viewportSize, selectionBounds(session.selection));
+  if (win === null) {
+    setPreview(null);
+    return;
+  }
+  const request = {
+    id: dialog.id,
+    params: dialog.params,
+    curvePoints: dialog.curvePoints ?? undefined,
+  };
+  setPreview({ buffer: computeWindowPreview(previewCache, session, request, win), rect: win.rect });
 }
+
+useAdjustDialogStore.subscribe((state) => {
+  if (state.dialog === null) previewCache.current = null;
+});
 
 // A closed or different session invalidates the dialog and its preview
 // buffer (the overlay itself never asks anything on close — CLAUDE.md #7).
