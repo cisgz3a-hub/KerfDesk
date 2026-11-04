@@ -108,7 +108,15 @@ after it (it draws the job's route on the canvas). That task is unchanged by thi
 and is the "overlapping" figure in the Abort sets (median 85 ms worker, 96 ms window); it is
 left as a follow-up.
 
-MERGED_LINE
+After merging main `ede14589b` (#1572, block columns), the merged build was measured once on a
+PC that was not quiet (calibration 67–137 ms, so these numbers are not admissible as
+evidence). The run found one regression from the merge, and it was fixed. Column validation
+builds each block's points to check its route, and its steps had been bounded by blocks alone.
+On the 100 mm photo, whose few scan lines hold most of the points, the whole check ran as one
+step: tasks of 109–176 ms after the first line. Steps are now bounded by blocks plus points, a
+point-heavy unit test holds that, and the 375k set on the same noisy run had no long task after
+the first line. A quiet-PC re-measure of the merged build, against main `ede14589b`, is still
+owed.
 
 Byte identity: `start-job-archive-slices.test.ts` stores the archive of a 60,000-move laser
 program (packed manifest, arcs, blanks, a non-ASCII comment) through
