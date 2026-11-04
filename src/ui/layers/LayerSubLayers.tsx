@@ -9,6 +9,7 @@ import {
 import { useStore } from '../state';
 import { DraftNumberInput } from '../kit/DraftNumberInput';
 import { CutSettingsDialog } from './CutSettingsDialog';
+import { LASER_POWER_TITLE } from './LayerSpeedInput';
 import type { LayerPatch } from './cut-settings-draft';
 
 const panelStyle: React.CSSProperties = {
@@ -173,7 +174,7 @@ function PowerInput(props: {
         });
       }}
       aria-label={`Power for ${props.subLayer.label} ${props.layer.color}`}
-      title="Laser power percentage for this sub-layer."
+      title={LASER_POWER_TITLE}
       style={numericStyle}
     />
   );
