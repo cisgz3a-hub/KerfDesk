@@ -21390,6 +21390,11 @@ evidence of any kind — no machine is available to this project. The timings ab
 V8 measurements of the same modules, not browser profiles; the earlier figures quoted from a
 vitest/jsdom run overstated this traversal by about 6.5x and should not be compared against.
 
+### Amendments
+
+ADR-337's amendments are separate decision files (ADR-344):
+`docs/decisions/ADR-337-amendment-1-accepted-run-archive-in-slices.md`.
+
 ## ADR-338 - The bend scan reads the chain by index instead of copying it (2026-09-21)
 
 **Status:** Accepted. A pure performance change: the traced geometry is byte-identical, verified

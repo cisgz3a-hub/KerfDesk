@@ -3,12 +3,12 @@ import type { ControllerKind } from '../../../core/devices';
 import type { JobOriginPlacement } from '../../../core/job';
 import type { ControllerSettingsSnapshot } from '../../../core/preflight';
 import { MAX_RASTER_WORKING_BYTES } from '../../../core/raster/raster-budget';
+import type { GcodeFingerprint, JobMachineKind } from '../../../core/recovery';
 import {
-  countSendableLines,
-  fingerprintGcode,
-  type GcodeFingerprint,
-  type JobMachineKind,
-} from '../../../core/recovery';
+  countSendableLinesSteps,
+  fingerprintGcodeSteps,
+} from '../../../core/recovery/job-checkpoint';
+import { runWorkSteps, type WorkSteps } from '../../../core/recovery/work-steps';
 import {
   buildCncRecoveryEventManifest,
   type CncRecoveryEventManifest,
@@ -22,21 +22,18 @@ import type { CncToolPlanEntry } from '../cnc-tool-plan';
 import type { WorkCoordinateOffset } from '../origin-actions';
 import type { WorkZZeroEvidence } from '../work-z-zero-evidence';
 import {
-  archiveCanvasMotionPlan,
-  isArchivedCanvasMotionPlan,
+  archiveCanvasMotionPlanSteps,
+  isArchivedCanvasMotionPlanSteps,
   type ArchivedCanvasMotionPlan,
 } from './execution-artifact-canvas';
-import { packedMotionManifestBytes } from './packed-motion-manifest';
+import { packedMotionManifestBytesSteps } from './packed-motion-manifest';
 import { archivedLaserPowerScaleVersion } from '../../../core/output/laser-power-scale-version';
 import {
   isExecutionProvenance,
   type ExecutionProvenance,
   type ExecutionProvenanceV2,
 } from './execution-provenance';
-import {
-  assertExecutionArtifactSizeWithinBudget,
-  measureExecutionArtifactBytesWithinBudget,
-} from './execution-artifact-size';
+import { measureExecutionArtifactBytesWithinBudgetSteps } from './execution-artifact-size';
 import {
   isLaserResumeStep,
   isLaserSecondPassChain,
@@ -191,9 +188,18 @@ type CreateExecutionArtifactArgs = CreateExecutionArtifactBase &
   );
 
 export function createExecutionArtifact(args: CreateExecutionArtifactArgs): ExecutionArtifactV1 {
+  return runWorkSteps(createExecutionArtifactSteps(args));
+}
+
+/** The same artifact in resumable steps, for a running job (ADR-337 Amendment 1). */
+export function* createExecutionArtifactSteps(
+  args: CreateExecutionArtifactArgs,
+): WorkSteps<ExecutionArtifactV1> {
   const archived = args.enforceArchiveBudget !== false;
-  assertArchiveMayFit(args);
-  const canvasPlan = archiveCanvasMotionPlan(args.canvasPlan, { enforceArchiveBudget: archived });
+  yield* assertArchiveMayFitSteps(args);
+  const canvasPlan = yield* archiveCanvasMotionPlanSteps(args.canvasPlan, {
+    enforceArchiveBudget: archived,
+  });
   // No budget walk here: the measurement below walks the finished artifact,
   // which holds the same job, and enforces the same budget. Walking the inputs
   // first doubled a node-per-motion-point traversal that runs while the first
@@ -205,14 +211,16 @@ export function createExecutionArtifact(args: CreateExecutionArtifactArgs): Exec
   const cncRecoveryManifest =
     machineKind === 'cnc' ? buildCncRecoveryEventManifest(prepared.job) : undefined;
   const archivedControllerObservation = archivedObservationForArtifact(args);
+  const fingerprint = yield* fingerprintGcodeSteps(args.gcode);
+  const sendableLines = yield* countSendableLinesSteps(args.gcode);
   const artifact: ExecutionArtifactV1 = {
     schemaVersion: args.artifactSchemaVersion ?? EXECUTION_ARTIFACT_SCHEMA_VERSION,
     kind: 'exact-execution',
     runId: args.runId,
     createdAtIso: args.createdAtIso,
     gcode: args.gcode,
-    fingerprint: fingerprintGcode(args.gcode),
-    sendableLines: countSendableLines(args.gcode),
+    fingerprint,
+    sendableLines,
     machineKind,
     controller: {
       kind:
@@ -237,16 +245,16 @@ export function createExecutionArtifact(args: CreateExecutionArtifactArgs): Exec
     archivedControllerObservation,
     ...(args.provenance === undefined ? {} : { provenance: args.provenance }),
   };
-  return withArchiveSize(artifact, archived);
+  return yield* withArchiveSizeSteps(artifact, archived);
 }
 
 // One traversal, not two: the budget guard already produced the exact size
-// whenever it did not throw, and this runs between Start and the first byte.
-function withArchiveSize(artifact: ExecutionArtifactV1, archived: boolean): ExecutionArtifactV1 {
+// whenever it did not throw.
+function* withArchiveSizeSteps(artifact: ExecutionArtifactV1, archived: boolean) {
   if (!archived) return artifact;
   return {
     ...artifact,
-    estimatedArtifactBytes: measureExecutionArtifactBytesWithinBudget(artifact),
+    estimatedArtifactBytes: yield* measureExecutionArtifactBytesWithinBudgetSteps(artifact),
   };
 }
 
@@ -255,16 +263,15 @@ function withArchiveSize(artifact: ExecutionArtifactV1, archived: boolean): Exec
 // thread right after the first window of the job is on the wire. Packing the
 // points and building the full artifact only to measure it cost a dense fill
 // over a second of acknowledgement latency at every Start (ADR-345).
-function assertArchiveMayFit(
+function* assertArchiveMayFitSteps(
   args: Pick<CreateExecutionArtifactArgs, 'gcode' | 'canvasPlan' | 'enforceArchiveBudget'>,
-): void {
+): WorkSteps<void> {
   if (args.enforceArchiveBudget === false) return;
   const manifest = args.canvasPlan.manifest;
-  assertExecutionArtifactSizeWithinBudget(
-    { gcode: args.gcode },
-    manifest === undefined ? 0 : packedMotionManifestBytes(manifest),
-    true,
-  );
+  const manifestBytes =
+    manifest === undefined ? 0 : yield* packedMotionManifestBytesSteps(manifest);
+  // The program is one string, measured in one scan of its text.
+  yield* measureExecutionArtifactBytesWithinBudgetSteps({ gcode: args.gcode }, manifestBytes, true);
 }
 
 function archivedObservationForArtifact(args: {
@@ -296,6 +303,10 @@ export function isRunId(value: unknown): value is RunId {
 }
 
 export function isExecutionArtifact(value: unknown): value is ExecutionArtifactV1 {
+  return runWorkSteps(isExecutionArtifactSteps(value));
+}
+
+export function* isExecutionArtifactSteps(value: unknown): WorkSteps<boolean> {
   if (!isRecord(value)) return false;
   if (!hasExecutionHeader(value) || !hasExecutionPayload(value)) return false;
   if (!hasValidLaserResumeChain(value)) return false;
@@ -306,18 +317,26 @@ export function isExecutionArtifact(value: unknown): value is ExecutionArtifactV
     return false;
   }
   const gcode = value['gcode'];
-  const expected = fingerprintGcode(gcode);
+  const expected = yield* fingerprintGcodeSteps(gcode);
   if (!fingerprintsMatch(value['fingerprint'], expected)) return false;
-  if (!isArchivedCanvasMotionPlan(value['canvasPlan'], expected.lines, value['sendableLines']))
+  const sendableLines = value['sendableLines'];
+  if (!(yield* isArchivedCanvasMotionPlanSteps(value['canvasPlan'], expected.lines, sendableLines)))
     return false;
-  return value['sendableLines'] === countSendableLines(gcode);
+  return sendableLines === (yield* countSendableLinesSteps(gcode));
 }
 
 /** Current trust boundary for staging, hydration, archive export, and external
  * decode. Legacy exact artifacts are retained only as untrusted historical
  * data and are never authorized for runtime execution. */
 export function isCurrentExecutionArtifact(value: unknown): value is CurrentExecutionArtifactV2 {
-  return isExecutionArtifact(value) && executionArtifactIsCurrent(value);
+  return runWorkSteps(isCurrentExecutionArtifactSteps(value));
+}
+
+export function* isCurrentExecutionArtifactSteps(value: unknown): WorkSteps<boolean> {
+  return (
+    (yield* isExecutionArtifactSteps(value)) &&
+    executionArtifactIsCurrent(value as ExecutionArtifactV1)
+  );
 }
 
 /** The schema half of `isCurrentExecutionArtifact`, for a caller that already

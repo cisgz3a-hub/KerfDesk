@@ -11,7 +11,8 @@ import {
   type MotionBlockSequence,
 } from '../../../core/job/motion-block-columns';
 import { motionBlockColumnsFrom } from '../../../core/job/motion-block-columns-builder';
-import { isMotionBlockColumnData } from '../../../core/job/motion-block-columns-validation';
+import { isMotionBlockColumnDataSteps } from '../../../core/job/motion-block-columns-validation';
+import { runWorkSteps, type WorkSteps } from '../../../core/recovery/work-steps';
 import { assertExecutionArtifactSizeWithinBudget } from './execution-artifact-size';
 import {
   hasValidSummary,
@@ -21,6 +22,8 @@ import {
 } from './packed-motion-manifest-v1';
 
 const ENCODING = 'packed-motion-manifest-v2';
+/** Object blocks measured per step of the accepted run's archive (ADR-337 Amendment 1). */
+const MEASURE_STEP_BLOCKS = 1 << 14;
 
 /** A manifest as it crosses a structured clone: its summary and its block
  * columns, exact to the last bit (ADR-244 Amendment 3). Packing columns the
@@ -40,20 +43,32 @@ export type PackMotionManifestOptions = {
 /** Bytes the packed columns of `manifest` occupy. Columns report their own
  * size; blocks held as objects are measured without building columns. */
 export function packedMotionManifestBytes(manifest: MotionManifest): number {
+  return runWorkSteps(packedMotionManifestBytesSteps(manifest));
+}
+
+export function* packedMotionManifestBytesSteps(manifest: MotionManifest): WorkSteps<number> {
   if (manifest.blocks instanceof MotionBlockColumns) {
     return motionBlockColumnBytes(manifest.blocks.data);
   }
-  return objectBlockColumnBytes(manifest.blocks);
+  return yield* objectBlockColumnBytesSteps(manifest.blocks);
 }
 
 export function packMotionManifest(
   manifest: MotionManifest,
   options: PackMotionManifestOptions = {},
 ): PackedMotionManifest {
+  return runWorkSteps(packMotionManifestSteps(manifest, options));
+}
+
+/** Packing columns copies nothing; only measuring object blocks is a walk. */
+export function* packMotionManifestSteps(
+  manifest: MotionManifest,
+  options: PackMotionManifestOptions = {},
+): WorkSteps<PackedMotionManifest> {
   // Bound allocations before constructing any column. The complete artifact is
   // measured again with these exact stored buffers before persistence.
   if (options.enforceArchiveBudget !== false) {
-    assertExecutionArtifactSizeWithinBudget({}, packedMotionManifestBytes(manifest));
+    assertExecutionArtifactSizeWithinBudget({}, yield* packedMotionManifestBytesSteps(manifest));
   }
   const columns =
     manifest.blocks instanceof MotionBlockColumns
@@ -69,31 +84,52 @@ export function packMotionManifest(
   };
 }
 
+export type PackedMotionManifestLimits = {
+  readonly rawLines: number;
+  readonly sendableLines: number;
+};
+
 export function isPackedMotionManifest(
   value: unknown,
-  limits?: { readonly rawLines: number; readonly sendableLines: number },
+  limits?: PackedMotionManifestLimits,
 ): value is PackedMotionManifest {
+  return runWorkSteps(isPackedMotionManifestSteps(value, limits));
+}
+
+export function* isPackedMotionManifestSteps(
+  value: unknown,
+  limits?: PackedMotionManifestLimits,
+): WorkSteps<boolean> {
   if (!isRecord(value) || value['encoding'] !== ENCODING) return false;
   if (!hasValidSummary(value, limits?.sendableLines)) return false;
   const columns = value['columns'];
-  if (
-    !isMotionBlockColumnData(columns, {
-      ...(limits === undefined ? {} : { rawLines: limits.rawLines }),
-      sendableLines: value.sendableLineCount,
-    })
-  ) {
-    return false;
-  }
-  const lastRouteEnd = columns.count === 0 ? 0 : columns.routeEnd[columns.count - 1];
+  const valid = yield* isMotionBlockColumnDataSteps(columns, {
+    ...(limits === undefined ? {} : { rawLines: limits.rawLines }),
+    sendableLines: value.sendableLineCount,
+  });
+  if (!valid) return false;
+  const data = columns as MotionBlockColumnData;
+  const lastRouteEnd = data.count === 0 ? 0 : data.routeEnd[data.count - 1];
   return lastRouteEnd === value.totalRouteMm;
 }
 
 /** Archives from builds before ADR-244 Amendment 3 hold the v1 encoding. */
 export function isArchivedPackedMotionManifest(
   value: unknown,
-  limits?: { readonly rawLines: number; readonly sendableLines: number },
+  limits?: PackedMotionManifestLimits,
 ): value is ArchivedPackedMotionManifest {
-  return isPackedMotionManifest(value, limits) || isLegacyPackedMotionManifest(value, limits);
+  return runWorkSteps(isArchivedPackedMotionManifestSteps(value, limits));
+}
+
+/** Only the current encoding is stepped: a run archives v2, and v1 is read back. */
+export function* isArchivedPackedMotionManifestSteps(
+  value: unknown,
+  limits?: PackedMotionManifestLimits,
+): WorkSteps<boolean> {
+  return (
+    (yield* isPackedMotionManifestSteps(value, limits)) ||
+    isLegacyPackedMotionManifest(value, limits)
+  );
 }
 
 export function unpackMotionManifest(packed: ArchivedPackedMotionManifest): MotionManifest {
@@ -183,25 +219,36 @@ function manifestFromColumns(packed: PackedMotionManifest): MotionManifest {
 }
 
 /** What `motionBlockColumnsFrom` would allocate, counted exactly. */
-function objectBlockColumnBytes(blocks: MotionBlockSequence): number {
-  let stored = 0;
+function* objectBlockColumnBytesSteps(blocks: MotionBlockSequence): WorkSteps<number> {
+  const count: StoredPointCount = { stored: 0, zVaries: false, firstZ: undefined };
   let programLines = false;
-  let zVaries = false;
-  let firstZ: number | undefined;
   let last: MotionPoint | undefined;
+  let visited = 0;
   for (const block of blocks) {
+    if (visited > 0 && visited % MEASURE_STEP_BLOCKS === 0) yield;
+    visited += 1;
     const shared = last !== undefined && samePoint(block.points[0], last);
-    for (let at = shared ? 1 : 0; at < block.points.length; at += 1) {
-      const z = (block.points[at] as MotionPoint).z;
-      firstZ ??= z;
-      zVaries ||= !Object.is(z, firstZ);
-      stored += 1;
-    }
+    countStoredPoints(count, block.points, shared ? 1 : 0);
     programLines ||= block.programLineNumber !== null;
     last = block.points.at(-1) ?? last;
   }
   const perBlock = 4 + 4 + 1 + 4 + 8 + (programLines ? 8 : 0);
-  return blocks.length * perBlock + stored * (zVaries ? 24 : 16);
+  return blocks.length * perBlock + count.stored * (count.zVaries ? 24 : 16);
+}
+
+type StoredPointCount = { stored: number; zVaries: boolean; firstZ: number | undefined };
+
+function countStoredPoints(
+  count: StoredPointCount,
+  points: ReadonlyArray<MotionPoint>,
+  from: number,
+): void {
+  for (let at = from; at < points.length; at += 1) {
+    const z = (points[at] as MotionPoint).z;
+    count.firstZ ??= z;
+    count.zVaries ||= !Object.is(z, count.firstZ);
+    count.stored += 1;
+  }
 }
 
 function samePoint(a: MotionPoint | undefined, b: MotionPoint): boolean {

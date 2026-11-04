@@ -1,12 +1,14 @@
 import type { CanvasMotionPlan } from '../canvas-motion-plan';
 import { MotionBlockColumns, type MotionManifest } from '../../../core/job/motion-manifest';
+import { runWorkSteps, type WorkSteps } from '../../../core/recovery/work-steps';
 import type { ExecutionArtifactV1 } from './execution-artifact';
 import { canvasExecutablePlan, registerCanvasExecutablePlan } from '../canvas-preview-motion';
 import {
   hasColumnPackedEncoding,
   hasPackedMotionEncoding,
   isArchivedPackedMotionManifest,
-  packMotionManifest,
+  isArchivedPackedMotionManifestSteps,
+  packMotionManifestSteps,
   unpackMotionManifest,
   unpackTrustedMotionManifest,
   type ArchivedPackedMotionManifest,
@@ -35,9 +37,16 @@ export function archiveCanvasMotionPlan(
   plan: CanvasMotionPlan,
   options: PackMotionManifestOptions = {},
 ): ArchivedCanvasMotionPlan {
+  return runWorkSteps(archiveCanvasMotionPlanSteps(plan, options));
+}
+
+export function* archiveCanvasMotionPlanSteps(
+  plan: CanvasMotionPlan,
+  options: PackMotionManifestOptions = {},
+): WorkSteps<ArchivedCanvasMotionPlan> {
   if (plan.manifest === undefined) return plan;
   if (manifestNeedsCompaction(plan.manifest)) {
-    return { ...plan, manifest: packMotionManifest(plan.manifest, options) };
+    return { ...plan, manifest: yield* packMotionManifestSteps(plan.manifest, options) };
   }
   // Minimal fixtures and small plans keep plain blocks, as before columns: a
   // structured clone would strip the columns' class (ADR-244 Amendment 3).
@@ -85,6 +94,14 @@ export function isArchivedCanvasMotionPlan(
   rawLines: number,
   sendableLines: number,
 ): value is ArchivedCanvasMotionPlan {
+  return runWorkSteps(isArchivedCanvasMotionPlanSteps(value, rawLines, sendableLines));
+}
+
+export function* isArchivedCanvasMotionPlanSteps(
+  value: unknown,
+  rawLines: number,
+  sendableLines: number,
+): WorkSteps<boolean> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
   const manifest = (value as Record<string, unknown>)['manifest'];
   if (!hasPackedMotionEncoding(manifest)) {
@@ -97,7 +114,7 @@ export function isArchivedCanvasMotionPlan(
         Array.isArray((manifest as Record<string, unknown>)['blocks']))
     );
   }
-  return isArchivedPackedMotionManifest(manifest, { rawLines, sendableLines });
+  return yield* isArchivedPackedMotionManifestSteps(manifest, { rawLines, sendableLines });
 }
 
 /** The Start handoff from the preparation worker (ADR-345): its columns are

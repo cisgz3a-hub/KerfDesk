@@ -1,3 +1,5 @@
+import { runWorkSteps, TEXT_STEP_CHARS, type WorkSteps } from '../../../core/recovery/work-steps';
+
 export const MAX_EXECUTION_ARTIFACT_ESTIMATED_BYTES = 64 * 1024 * 1024;
 
 /** Thrown when a job and its data outgrow the archive budget; a laser recovery
@@ -14,6 +16,8 @@ const ENTRY_OVERHEAD_BYTES = 8;
 const PRIMITIVE_BYTES = 24;
 /** Any code unit other than printable ASCII, tab, line feed or carriage return. */
 const WIDE_CODE_UNIT = /[^\t\n\r\x20-\x7e]/;
+/** Values measured between checkpoints (ADR-337 Amendment 1). */
+const ESTIMATE_STEP_VALUES = 1 << 12;
 
 /** Conservative, allocation-free structured-clone size estimate. A string of
  * printable ASCII, tabs and line breaks (G-code, base64) counts one byte per
@@ -32,23 +36,40 @@ export function estimateExecutionArtifactBytes(
   stopAfterBytes = Number.MAX_SAFE_INTEGER,
   allowTransientFunctions = false,
 ): number {
+  return runWorkSteps(
+    estimateExecutionArtifactBytesSteps(value, stopAfterBytes, allowTransientFunctions),
+  );
+}
+
+export function* estimateExecutionArtifactBytesSteps(
+  value: unknown,
+  stopAfterBytes = Number.MAX_SAFE_INTEGER,
+  allowTransientFunctions = false,
+): WorkSteps<number> {
   try {
     let total = 0;
+    let work = 0;
     const pending: unknown[] = [value];
     const seenContainers = new WeakSet<object>();
     const seenBackingBuffers = new WeakSet<object>();
     while (pending.length > 0 && total <= stopAfterBytes) {
       const item = pending.pop();
-      total = boundedAdd(
-        total,
-        executionArtifactValueBytes(
-          item,
-          pending,
-          seenContainers,
-          seenBackingBuffers,
-          allowTransientFunctions,
-        ),
-      );
+      const bytes =
+        typeof item === 'string' && item.length > TEXT_STEP_CHARS
+          ? yield* stringBytesSteps(item)
+          : executionArtifactValueBytes(
+              item,
+              pending,
+              seenContainers,
+              seenBackingBuffers,
+              allowTransientFunctions,
+            );
+      total = boundedAdd(total, bytes);
+      work += 1;
+      if (work >= ESTIMATE_STEP_VALUES) {
+        work = 0;
+        yield;
+      }
     }
     return total;
   } catch {
@@ -155,6 +176,16 @@ export function stringBytes(value: string): number {
   return WIDE_CODE_UNIT.test(value) ? value.length * 3 : value.length;
 }
 
+// The class matches one code unit, so testing consecutive slices finds a wide
+// unit exactly when testing the whole string does.
+function* stringBytesSteps(value: string): WorkSteps<number> {
+  for (let start = 0; start < value.length; start += TEXT_STEP_CHARS) {
+    if (WIDE_CODE_UNIT.test(value.slice(start, start + TEXT_STEP_CHARS))) return value.length * 3;
+    yield;
+  }
+  return value.length;
+}
+
 function supportedCloneContainerBytes(value: object, pending: unknown[]): number | null {
   if (value instanceof Map) return mapBytes(value, pending);
   if (value instanceof Set) return setBytes(value, pending);
@@ -233,6 +264,20 @@ export function measureExecutionArtifactBytesWithinBudget(
   additionalBinaryBytes = 0,
   allowTransientFunctions = false,
 ): number {
+  return runWorkSteps(
+    measureExecutionArtifactBytesWithinBudgetSteps(
+      value,
+      additionalBinaryBytes,
+      allowTransientFunctions,
+    ),
+  );
+}
+
+export function* measureExecutionArtifactBytesWithinBudgetSteps(
+  value: unknown,
+  additionalBinaryBytes = 0,
+  allowTransientFunctions = false,
+): WorkSteps<number> {
   if (
     !Number.isSafeInteger(additionalBinaryBytes) ||
     additionalBinaryBytes < 0 ||
@@ -241,7 +286,11 @@ export function measureExecutionArtifactBytesWithinBudget(
     throw new ExecutionArtifactTooLargeError();
   }
   const remaining = MAX_EXECUTION_ARTIFACT_ESTIMATED_BYTES - additionalBinaryBytes;
-  const bytes = estimateExecutionArtifactBytes(value, remaining, allowTransientFunctions);
+  const bytes = yield* estimateExecutionArtifactBytesSteps(
+    value,
+    remaining,
+    allowTransientFunctions,
+  );
   if (bytes > remaining) {
     throw new ExecutionArtifactTooLargeError();
   }

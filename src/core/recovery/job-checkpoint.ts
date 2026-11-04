@@ -15,10 +15,11 @@
 // Pure core: timestamps are passed in as ISO strings; no clock, no storage.
 
 import { isSendableGcodeLine } from '../controllers/grbl';
-import { countSendableGcodeLines } from '../controllers/grbl/sendable-line-scan';
+import { isSendableLineSpan } from '../controllers/grbl/sendable-line-scan';
 import { JOB_ORIGIN_ANCHORS, type JobOriginAnchor, type JobOriginPlacement } from '../job';
 import type { OutputScope, Vec2 } from '../scene';
 import { parseOptionalJobInterruption, type JobInterruption } from './job-interruption';
+import { runWorkSteps, TEXT_STEP_CHARS, type WorkSteps } from './work-steps';
 
 // v3 (R1): the checkpoint stores the RESOLVED job origin, not the placement
 // settings. A 'current-position' start freezes the live head XY into
@@ -32,6 +33,7 @@ export const JOB_CHECKPOINT_SCHEMA_VERSION = 3;
 // prime 0x01000193 appears only as its shift decomposition inside
 // fingerprintGcode.
 const FNV_OFFSET_BASIS = 0x811c9dc5;
+const LINE_FEED = 0x0a;
 
 export type GcodeFingerprint = {
   // FNV-1a 32-bit over UTF-16 code units, as an unsigned integer.
@@ -73,17 +75,25 @@ export type JobCheckpoint = {
 };
 
 export function fingerprintGcode(gcode: string): GcodeFingerprint {
+  return runWorkSteps(fingerprintGcodeSteps(gcode));
+}
+
+export function* fingerprintGcodeSteps(gcode: string): WorkSteps<GcodeFingerprint> {
   let hash = FNV_OFFSET_BASIS;
   // `split('\n').length`, counted in the same pass: splitting an 8 M line
   // program built 8 M strings to read one number (ADR-244 Amendment 3).
   let lines = 1;
-  for (let i = 0; i < gcode.length; i += 1) {
-    const code = gcode.charCodeAt(i);
-    if (code === 10) lines += 1;
-    hash ^= code;
-    // hash * 0x01000193 without leaving 32-bit integer safety: the prime is
-    // 2^24 + 2^8 + 2^7 + 2^4 + 2^1 + 2^0, composed here from shifts.
-    hash = (hash + (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24)) >>> 0;
+  for (let start = 0; start < gcode.length; start += TEXT_STEP_CHARS) {
+    const end = Math.min(gcode.length, start + TEXT_STEP_CHARS);
+    for (let i = start; i < end; i += 1) {
+      const code = gcode.charCodeAt(i);
+      if (code === LINE_FEED) lines += 1;
+      hash ^= code;
+      // hash * 0x01000193 without leaving 32-bit integer safety: the prime is
+      // 2^24 + 2^8 + 2^7 + 2^4 + 2^1 + 2^0, composed here from shifts.
+      hash = (hash + (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24)) >>> 0;
+    }
+    if (end < gcode.length) yield;
   }
   return { fnv1a: hash, chars: gcode.length, lines };
 }
@@ -94,21 +104,48 @@ export function fingerprintsEqual(a: GcodeFingerprint, b: GcodeFingerprint): boo
 
 /** `isSendableGcodeLine` over `split('\n')`, counted without the split. */
 export function countSendableLines(gcode: string): number {
-  return countSendableGcodeLines(gcode);
+  return runWorkSteps(countSendableLinesSteps(gcode));
 }
 
-export function createJobCheckpoint(args: {
+/** Visits the same lines as the program's '\n' split, the last one included,
+ * testing each in place (ADR-244 Amendment 3). */
+export function* countSendableLinesSteps(gcode: string): WorkSteps<number> {
+  let count = 0;
+  let start = 0;
+  let checkpoint = TEXT_STEP_CHARS;
+  for (;;) {
+    const newline = gcode.indexOf('\n', start);
+    const end = newline < 0 ? gcode.length : newline;
+    if (isSendableLineSpan(gcode, start, end)) count += 1;
+    if (newline < 0) return count;
+    start = end + 1;
+    if (start >= checkpoint) {
+      checkpoint = start + TEXT_STEP_CHARS;
+      yield;
+    }
+  }
+}
+
+export type CreateJobCheckpointArgs = {
   readonly gcode: string;
   readonly machineKind: JobMachineKind;
   readonly outputScope: OutputScope;
   // The resolved job origin the run compiled with; undefined = Absolute (R1).
   readonly jobOrigin?: JobOriginPlacement;
   readonly nowIso: string;
-}): JobCheckpoint {
+};
+
+export function createJobCheckpoint(args: CreateJobCheckpointArgs): JobCheckpoint {
+  return runWorkSteps(createJobCheckpointSteps(args));
+}
+
+export function* createJobCheckpointSteps(args: CreateJobCheckpointArgs): WorkSteps<JobCheckpoint> {
+  const fingerprint = yield* fingerprintGcodeSteps(args.gcode);
+  const sendableLines = yield* countSendableLinesSteps(args.gcode);
   return {
     schemaVersion: JOB_CHECKPOINT_SCHEMA_VERSION,
-    fingerprint: fingerprintGcode(args.gcode),
-    sendableLines: countSendableLines(args.gcode),
+    fingerprint,
+    sendableLines,
     ackedLines: 0,
     resumeInFlight: false,
     machineKind: args.machineKind,

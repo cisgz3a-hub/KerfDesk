@@ -30,13 +30,18 @@ function firstKept(text: string, start: number, end: number): number {
   return index;
 }
 
+/** Whether the line [start, end) of `text` is sendable, without slicing it. */
+export function isSendableLineSpan(text: string, start: number, end: number): boolean {
+  const first = firstKept(text, start, end);
+  return first < end && text.charCodeAt(first) !== 59 /* ; */;
+}
+
 function visitSendableLines(gcode: string, visit: (first: number, end: number) => boolean): void {
   let start = 0;
   while (start <= gcode.length) {
     const newline = gcode.indexOf('\n', start);
     const end = newline === -1 ? gcode.length : newline;
-    const first = firstKept(gcode, start, end);
-    if (first < end && gcode.charCodeAt(first) !== 59 /* ; */ && visit(first, end)) return;
+    if (isSendableLineSpan(gcode, start, end) && visit(firstKept(gcode, start, end), end)) return;
     start = end + 1;
   }
 }

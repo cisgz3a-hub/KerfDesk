@@ -1,4 +1,5 @@
 import { fingerprintGcode, fingerprintsEqual } from '../../core/recovery';
+import { runWorkSteps, type WorkStepsRunner } from '../../core/recovery/work-steps';
 import type { SimilarityTransform } from '../../core/registration';
 import type { JobOriginPlacement } from '../../core/job';
 import type { MachineKind, OutputScope } from '../../core/scene';
@@ -11,13 +12,14 @@ import type { LaserModeStartEvidence } from '../state/laser-mode-start-evidence'
 import {
   createArchivedControllerObservation,
   createExecutionArtifact,
+  createExecutionArtifactSteps,
   type ExecutionArtifactV1,
   type LastCompletedReceipt,
   type RecoveryRepository,
   type RunId,
 } from '../state/recovery';
 import { reportedWorkOffsetMm } from '../state/infer-machine-position';
-import { createStartIntent } from '../state/recovery/start-intent';
+import { createStartIntentSteps } from '../state/recovery/start-intent';
 import type { UntrackedRunRecord } from '../state/recovery/untracked-run-record';
 import { useToastStore } from '../state/toast-store';
 import type { JobReviewModel } from './job-review';
@@ -108,7 +110,11 @@ export async function stageFreshExecutionArtifact(args: {
   readonly laserModeStartEvidence?: LaserModeStartEvidence;
   readonly cncSetupAttestation?: CncSetupAttestation;
   readonly completedReplaySourceRunId?: RunId;
+  /** Drains the whole-program work; the accepted run's archive yields between
+   * slices so Abort and status never wait behind it (ADR-337 Amendment 1). */
+  readonly run?: WorkStepsRunner;
 }): Promise<FreshExecutionArchive> {
+  const run = args.run ?? runWorkSteps;
   let keep: (() => ExecutionArtifactV1) | null = null;
   try {
     const evidence = ordinaryExecutionEvidence({
@@ -131,16 +137,21 @@ export async function stageFreshExecutionArtifact(args: {
       observedAtIso: createdAtIso,
       controllerObservation: startControllerObservation(args.laser),
     });
-    const provenance = await createExecutionProvenance({
-      gcode: args.prepared.gcode,
-      profile: args.prepared.prepared.project.device,
-      laser: args.laser,
-      archivedControllerObservation,
-      ...evidence,
-      ...(args.prepared.laserSecondPassChain === undefined
-        ? {}
-        : { workflow: { kind: 'laser-second-pass', stages: args.prepared.laserSecondPassChain } }),
-    });
+    const provenance = await createExecutionProvenance(
+      {
+        gcode: args.prepared.gcode,
+        profile: args.prepared.prepared.project.device,
+        laser: args.laser,
+        archivedControllerObservation,
+        ...evidence,
+        ...(args.prepared.laserSecondPassChain === undefined
+          ? {}
+          : {
+              workflow: { kind: 'laser-second-pass', stages: args.prepared.laserSecondPassChain },
+            }),
+      },
+      run,
+    );
     const artifactArgs: Parameters<typeof createExecutionArtifact>[0] = {
       runId: args.runId,
       gcode: args.prepared.gcode,
@@ -160,9 +171,9 @@ export async function stageFreshExecutionArtifact(args: {
       provenance,
     };
     keep = () => createExecutionArtifact({ ...artifactArgs, enforceArchiveBudget: false });
-    const artifact = createExecutionArtifact(artifactArgs);
+    const artifact = await run(createExecutionArtifactSteps(artifactArgs));
     keep = () => artifact;
-    const staged = await args.repository.stageArtifact(artifact);
+    const staged = await args.repository.stageArtifact(artifact, run);
     if (staged.ok) return { staged: true, keep };
   } catch {
     // Recovery persistence is best-effort and must never refuse current Start.
@@ -180,7 +191,7 @@ export async function activateAcceptedFreshRun(
   repository: RecoveryRepository,
   retention: FreshExecutionRetention,
   prepared: PreparedCurrentStart,
-  untrackedRecord: () => UntrackedRunRecord | undefined,
+  untrackedRecord: () => UntrackedRunRecord | undefined | Promise<UntrackedRunRecord | undefined>,
 ): Promise<void> {
   if (!retention.current()) {
     await repository.discardStagedRun(runId);
@@ -203,7 +214,7 @@ export async function activateAcceptedFreshRun(
       ? archive.keep
       : null,
   );
-  const untracked = untrackedRecord();
+  const untracked = await untrackedRecord();
   const fallback = await repository.noteUntrackedRunAccepted(runId, untracked, retention);
   await retention.settle();
   if (!retention.current()) return;
@@ -228,23 +239,28 @@ export async function activateAcceptedFreshRun(
 
 /** The short record a laser run without an archive keeps instead (ADR-341
  * Amendment 8): its Start intent and the work offset at Start. */
-export function untrackedLaserRunRecord(args: {
-  readonly runId: RunId;
-  readonly gcode: string;
-  readonly machineKind: MachineKind;
-  readonly outputScope: OutputScope;
-  readonly jobOrigin: JobOriginPlacement | undefined;
-  readonly laser: LaserState;
-}): UntrackedRunRecord | undefined {
+export async function untrackedLaserRunRecord(
+  args: {
+    readonly runId: RunId;
+    readonly gcode: string;
+    readonly machineKind: MachineKind;
+    readonly outputScope: OutputScope;
+    readonly jobOrigin: JobOriginPlacement | undefined;
+    readonly laser: LaserState;
+  },
+  run: WorkStepsRunner = runWorkSteps,
+): Promise<UntrackedRunRecord | undefined> {
   if (args.machineKind !== 'laser') return undefined;
   try {
-    const intent = createStartIntent({
-      gcode: args.gcode,
-      machineKind: args.machineKind,
-      outputScope: args.outputScope,
-      ...(args.jobOrigin === undefined ? {} : { jobOrigin: args.jobOrigin }),
-      nowIso: new Date().toISOString(),
-    });
+    const intent = await run(
+      createStartIntentSteps({
+        gcode: args.gcode,
+        machineKind: args.machineKind,
+        outputScope: args.outputScope,
+        ...(args.jobOrigin === undefined ? {} : { jobOrigin: args.jobOrigin }),
+        nowIso: new Date().toISOString(),
+      }),
+    );
     return { runId: args.runId, intent, startWorkOffsetMm: laserWorkOffsetMm(args.laser) };
   } catch {
     // Best-effort like the archive: an accepted run is never held up by it.

@@ -138,8 +138,8 @@ export class RecoveryRepository {
     return this.snapshotCoordinator.refresh();
   }
 
-  stageArtifact = (artifact: ExecutionArtifactV1): Promise<RecoveryRepositoryResult<RunId>> =>
-    this.artifactStore.stage(artifact);
+  stageArtifact: RecoveryArtifactStore['stage'] = (artifact, run) =>
+    this.artifactStore.stage(artifact, run);
 
   getArchivedExecution = (runId: RunId): Promise<RecoveryRepositoryResult<ExecutionArtifactV1>> =>
     this.artifactStore.archived(runId);

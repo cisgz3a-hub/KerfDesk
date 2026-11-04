@@ -6,6 +6,13 @@ import {
   SHARED_START,
   type MotionBlockColumnData,
 } from './motion-block-columns';
+import { runWorkSteps, type WorkSteps } from '../recovery/work-steps';
+
+// Checkpoints for the accepted run's archive (ADR-337 Amendment 1). A block's
+// route check reads every one of its points, so a step is bounded by blocks
+// plus points: a photo's few long scan lines cost what many short moves do.
+const BLOCK_STEP_UNITS = 1 << 14;
+const VALUE_STEP = 1 << 16;
 
 export type MotionBlockColumnLimits = {
   readonly rawLines: number;
@@ -22,26 +29,54 @@ export function isMotionBlockColumnData(
   value: unknown,
   limits?: Partial<MotionBlockColumnLimits>,
 ): value is MotionBlockColumnData {
-  if (!hasColumnShape(value)) return false;
-  const columns = new MotionBlockColumns(value);
-  const rawLines = limits?.rawLines ?? Number.MAX_SAFE_INTEGER;
-  const sendableLines = limits?.sendableLines ?? Number.MAX_SAFE_INTEGER;
-  for (let block = 0; block < value.count; block += 1) {
-    if (!validBlockFlags(value, block)) return false;
-    if (!validLines(value, block, rawLines, sendableLines)) return false;
-    if (!validPointRange(value, block)) return false;
-    if (!validRoute(columns, block)) return false;
-  }
-  const storedPoints = value.count === 0 ? 0 : (value.pointEnd[value.count - 1] as number);
-  return storedPoints === value.x.length;
+  return runWorkSteps(isMotionBlockColumnDataSteps(value, limits));
 }
 
-function hasColumnShape(value: unknown): value is MotionBlockColumnData {
+/** `isMotionBlockColumnData` as resumable steps; a yield is a checkpoint. */
+export function* isMotionBlockColumnDataSteps(
+  value: unknown,
+  limits?: Partial<MotionBlockColumnLimits>,
+): WorkSteps<boolean> {
+  if (!(yield* hasColumnShapeSteps(value))) return false;
+  const data = value as MotionBlockColumnData;
+  const columns = new MotionBlockColumns(data);
+  const rawLines = limits?.rawLines ?? Number.MAX_SAFE_INTEGER;
+  const sendableLines = limits?.sendableLines ?? Number.MAX_SAFE_INTEGER;
+  let units = 0;
+  for (let block = 0; block < data.count; block += 1) {
+    if (!validBlock(columns, block, rawLines, sendableLines)) return false;
+    // Counted once the block's point range is known to be sound.
+    units += 1 + columns.pointCountAt(block);
+    if (units >= BLOCK_STEP_UNITS && block + 1 < data.count) {
+      units = 0;
+      yield;
+    }
+  }
+  const storedPoints = data.count === 0 ? 0 : (data.pointEnd[data.count - 1] as number);
+  return storedPoints === data.x.length;
+}
+
+function validBlock(
+  columns: MotionBlockColumns,
+  block: number,
+  rawLines: number,
+  sendableLines: number,
+): boolean {
+  const data = columns.data;
+  return (
+    validBlockFlags(data, block) &&
+    validLines(data, block, rawLines, sendableLines) &&
+    validPointRange(data, block) &&
+    validRoute(columns, block)
+  );
+}
+
+function* hasColumnShapeSteps(value: unknown): WorkSteps<boolean> {
   if (typeof value !== 'object' || value === null) return false;
   const data = value as Record<string, unknown>;
   const count = data['count'];
   if (data['encoding'] !== MOTION_BLOCK_COLUMNS_ENCODING || !isIndex(count)) return false;
-  return hasBlockColumns(data, count) && hasPointColumns(data);
+  return hasBlockColumns(data, count) && (yield* hasPointColumnsSteps(data));
 }
 
 function hasBlockColumns(data: Record<string, unknown>, count: number): boolean {
@@ -55,7 +90,7 @@ function hasBlockColumns(data: Record<string, unknown>, count: number): boolean 
   );
 }
 
-function hasPointColumns(data: Record<string, unknown>): boolean {
+function* hasPointColumnsSteps(data: Record<string, unknown>): WorkSteps<boolean> {
   if (!isView(data['x'], '[object Float64Array]')) return false;
   const points = (data['x'] as Float64Array).length;
   const z = data['z'];
@@ -63,9 +98,9 @@ function hasPointColumns(data: Record<string, unknown>): boolean {
   return (
     isView(data['y'], '[object Float64Array]', points) &&
     Number.isFinite(data['zConstant']) &&
-    finiteColumn(data['x'] as Float64Array) &&
-    finiteColumn(data['y'] as Float64Array) &&
-    (z === null || finiteColumn(z as Float64Array))
+    (yield* finiteColumnSteps(data['x'] as Float64Array)) &&
+    (yield* finiteColumnSteps(data['y'] as Float64Array)) &&
+    (z === null || (yield* finiteColumnSteps(z as Float64Array)))
   );
 }
 
@@ -113,8 +148,12 @@ function isView(value: unknown, tag: string, length?: number): boolean {
   return length === undefined || (value as unknown as { length: number }).length === length;
 }
 
-function finiteColumn(column: Float64Array): boolean {
-  return column.every(Number.isFinite);
+function* finiteColumnSteps(column: Float64Array): WorkSteps<boolean> {
+  for (let start = 0; start < column.length; start += VALUE_STEP) {
+    if (start > 0) yield;
+    if (!column.subarray(start, start + VALUE_STEP).every(Number.isFinite)) return false;
+  }
+  return true;
 }
 
 function isIndex(value: unknown): value is number {
