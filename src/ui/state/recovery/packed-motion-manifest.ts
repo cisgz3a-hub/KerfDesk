@@ -4,6 +4,7 @@ import type {
   MotionManifest,
   MotionPoint,
 } from '../../../core/job/motion-manifest';
+import { runWorkSteps, type WorkSteps } from '../../../core/recovery/work-steps';
 import { assertExecutionArtifactSizeWithinBudget } from './execution-artifact-size';
 
 const ENCODING = 'packed-motion-manifest-v1';
@@ -11,6 +12,10 @@ const BLOCK_WIDTH = 10;
 /** Doubles per stored point: x, y, z. */
 export const PACKED_POINT_WIDTH = 3;
 const KINDS: ReadonlyArray<MotionBlockKind> = ['travel', 'process', 'plunge', 'park'];
+/** Blocks plus points visited between checkpoints (ADR-337 Amendment 1). */
+const MANIFEST_STEP_UNITS = 1 << 14;
+/** Stored doubles checked between checkpoints. */
+const DATA_STEP_VALUES = 1 << 16;
 
 /** All numbers retain their original IEEE-754 doubles. Each block stores raw
  * line, sendable line, kind, point offset/count, N-word presence/value, length,
@@ -26,12 +31,31 @@ export type PackedMotionManifest = Omit<MotionManifest, 'blocks'> & {
  * manifest is charged at least this much by the artifact estimator, so the
  * figure is a lower bound on any archive that embeds the manifest. */
 export function packedMotionManifestBytes(manifest: MotionManifest): number {
-  let pointCount = 0;
-  for (const block of manifest.blocks) pointCount += block.points.length;
+  return runWorkSteps(packedMotionManifestBytesSteps(manifest));
+}
+
+export function* packedMotionManifestBytesSteps(manifest: MotionManifest): WorkSteps<number> {
+  return packedBytes(manifest.blocks.length, yield* manifestPointCountSteps(manifest));
+}
+
+function packedBytes(blockCount: number, pointCount: number): number {
   return (
-    (manifest.blocks.length * BLOCK_WIDTH + pointCount * PACKED_POINT_WIDTH) *
-    Float64Array.BYTES_PER_ELEMENT
+    (blockCount * BLOCK_WIDTH + pointCount * PACKED_POINT_WIDTH) * Float64Array.BYTES_PER_ELEMENT
   );
+}
+
+function* manifestPointCountSteps(manifest: MotionManifest): WorkSteps<number> {
+  let pointCount = 0;
+  let work = 0;
+  for (const block of manifest.blocks) {
+    pointCount += block.points.length;
+    work += 1;
+    if (work >= MANIFEST_STEP_UNITS) {
+      work = 0;
+      yield;
+    }
+  }
+  return pointCount;
 }
 
 export type PackMotionManifestOptions = {
@@ -43,48 +67,73 @@ export function packMotionManifest(
   manifest: MotionManifest,
   options: PackMotionManifestOptions = {},
 ): PackedMotionManifest {
-  let pointCount = 0;
-  for (const block of manifest.blocks) pointCount += block.points.length;
-  const bytes = packedMotionManifestBytes(manifest);
+  return runWorkSteps(packMotionManifestSteps(manifest, options));
+}
+
+export function* packMotionManifestSteps(
+  manifest: MotionManifest,
+  options: PackMotionManifestOptions = {},
+): WorkSteps<PackedMotionManifest> {
+  const pointCount = yield* manifestPointCountSteps(manifest);
   // Bound allocations before constructing either buffer. The complete artifact
   // is measured again with these exact stored buffers before persistence.
-  if (options.enforceArchiveBudget !== false) assertExecutionArtifactSizeWithinBudget({}, bytes);
+  if (options.enforceArchiveBudget !== false) {
+    assertExecutionArtifactSizeWithinBudget({}, packedBytes(manifest.blocks.length, pointCount));
+  }
   const blockData = new Float64Array(manifest.blocks.length * BLOCK_WIDTH);
   const pointData = new Float64Array(pointCount * PACKED_POINT_WIDTH);
   let pointOffset = 0;
-  manifest.blocks.forEach((block, index) => {
-    blockData.set(
-      [
-        block.rawLineIndex,
-        block.sendableLineIndex,
-        KINDS.indexOf(block.kind),
-        pointOffset,
-        block.points.length,
-        block.programLineNumber === null ? 0 : 1,
-        block.programLineNumber ?? 0,
-        block.lengthMm,
-        block.routeStartMm,
-        block.routeEndMm,
-      ],
-      index * BLOCK_WIDTH,
-    );
+  let work = 0;
+  for (let index = 0; index < manifest.blocks.length; index += 1) {
+    const block = manifest.blocks[index] as MotionBlock;
+    const at = index * BLOCK_WIDTH;
+    blockData[at] = block.rawLineIndex;
+    blockData[at + 1] = block.sendableLineIndex;
+    blockData[at + 2] = KINDS.indexOf(block.kind);
+    blockData[at + 3] = pointOffset;
+    blockData[at + 4] = block.points.length;
+    blockData[at + 5] = block.programLineNumber === null ? 0 : 1;
+    blockData[at + 6] = block.programLineNumber ?? 0;
+    blockData[at + 7] = block.lengthMm;
+    blockData[at + 8] = block.routeStartMm;
+    blockData[at + 9] = block.routeEndMm;
     for (const point of block.points) {
-      pointData.set([point.x, point.y, point.z], pointOffset * PACKED_POINT_WIDTH);
+      const stored = pointOffset * PACKED_POINT_WIDTH;
+      pointData[stored] = point.x;
+      pointData[stored + 1] = point.y;
+      pointData[stored + 2] = point.z;
       pointOffset += 1;
     }
-  });
+    work += 1 + block.points.length;
+    if (work >= MANIFEST_STEP_UNITS) {
+      work = 0;
+      yield;
+    }
+  }
   const { blocks, ...summary } = manifest;
   void blocks;
   const packed = { ...summary, encoding: ENCODING, blockData, pointData } as const;
-  if (!isPackedMotionManifest(packed))
+  if (!(yield* isPackedMotionManifestSteps(packed)))
     throw new Error('Cannot archive an invalid motion manifest.');
   return packed;
 }
 
+export type PackedMotionManifestLimits = {
+  readonly rawLines: number;
+  readonly sendableLines: number;
+};
+
 export function isPackedMotionManifest(
   value: unknown,
-  limits?: { readonly rawLines: number; readonly sendableLines: number },
+  limits?: PackedMotionManifestLimits,
 ): value is PackedMotionManifest {
+  return runWorkSteps(isPackedMotionManifestSteps(value, limits));
+}
+
+export function* isPackedMotionManifestSteps(
+  value: unknown,
+  limits?: PackedMotionManifestLimits,
+): WorkSteps<boolean> {
   if (!isRecord(value) || value['encoding'] !== ENCODING) return false;
   const blockData = value['blockData'];
   const pointData = value['pointData'];
@@ -92,14 +141,25 @@ export function isPackedMotionManifest(
   if (blockData.length % BLOCK_WIDTH !== 0 || pointData.length % PACKED_POINT_WIDTH !== 0)
     return false;
   if (!hasValidSummary(value, limits?.sendableLines)) return false;
-  if (!pointData.every(Number.isFinite)) return false;
-  return validBlocks(
+  if (!(yield* allFiniteSteps(pointData))) return false;
+  return yield* validBlocksSteps(
     blockData,
     pointData.length / PACKED_POINT_WIDTH,
     value.totalRouteMm,
     value.sendableLineCount,
     limits?.rawLines,
   );
+}
+
+function* allFiniteSteps(data: Float64Array): WorkSteps<boolean> {
+  for (let start = 0; start < data.length; start += DATA_STEP_VALUES) {
+    const end = Math.min(data.length, start + DATA_STEP_VALUES);
+    for (let index = start; index < end; index += 1) {
+      if (!Number.isFinite(data[index])) return false;
+    }
+    if (end < data.length) yield;
+  }
+  return true;
 }
 
 function hasValidSummary(
@@ -115,18 +175,23 @@ function hasValidSummary(
   );
 }
 
-function validBlocks(
+function* validBlocksSteps(
   data: Float64Array,
   pointCount: number,
   totalRoute: number,
   sendableLines: number,
   rawLines = Number.MAX_SAFE_INTEGER,
-): boolean {
+): WorkSteps<boolean> {
   let nextPoint = 0;
   let previousRaw = -1;
   let previousSendable = -1;
   let route = 0;
+  let checkpoint = DATA_STEP_VALUES;
   for (let index = 0; index < data.length; index += BLOCK_WIDTH) {
+    if (index >= checkpoint) {
+      checkpoint = index + DATA_STEP_VALUES;
+      yield;
+    }
     if (!validLineIndices(data, index, previousRaw, previousSendable, rawLines, sendableLines))
       return false;
     if (!validPointReference(data, index, nextPoint) || !validProgramNumber(data, index))

@@ -105,10 +105,14 @@ describe('laser job too large for the recovery archive', () => {
     vi.mocked(jobAwareConfirm).mockReset().mockReturnValue(true);
     useJobReviewStore.getState().close();
     uninstallAutoReview = installAutoJobReview('confirm');
-    // Every archive, the job's and its recovery's, is over the budget.
-    vi.spyOn(artifactSize, 'measureExecutionArtifactBytesWithinBudget').mockImplementation(() => {
-      throw new artifactSize.ExecutionArtifactTooLargeError();
-    });
+    // Every archive, the job's and its recovery's, is over the budget. Both
+    // build through the measuring steps (ADR-337 Amendment 1).
+    vi.spyOn(artifactSize, 'measureExecutionArtifactBytesWithinBudgetSteps').mockImplementation(
+      // eslint-disable-next-line require-yield -- refuses before any step.
+      function* () {
+        throw new artifactSize.ExecutionArtifactTooLargeError();
+      },
+    );
   });
 
   afterEach(() => {

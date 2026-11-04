@@ -1,5 +1,10 @@
 import type { GrblBuildInfo } from '../../../core/controllers/grbl/build-info';
 import type { ControllerKind, DeviceProfile, MachineProfileSource } from '../../../core/devices';
+import {
+  runWorkSteps,
+  type WorkSteps,
+  type WorkStepsRunner,
+} from '../../../core/recovery/work-steps';
 import type { GcodeMetadata } from '../../../io/gcode';
 import { serializeCanonicalDeviceProfile } from '../../../io/machine-profile/machine-profile-io';
 import { buildGcodeMetadata } from '../../app/build-info';
@@ -87,6 +92,8 @@ export type ExecutionProvenanceV2 = ExecutionProvenanceBase & {
 export type ExecutionProvenance = ExecutionProvenanceV1 | ExecutionProvenanceV2;
 type UnsignedExecutionProvenanceV2 = Omit<ExecutionProvenanceV2, 'envelopeSha256'>;
 
+/** `run` drains the program's encoding; a running job's archive passes one
+ * that yields between slices (ADR-337 Amendment 1). */
 export async function createExecutionProvenance(
   args: {
     readonly gcode: string;
@@ -94,13 +101,16 @@ export async function createExecutionProvenance(
     readonly laser: LaserState;
     readonly archivedControllerObservation: ArchivedControllerObservationV1;
   } & ExecutionProvenanceEvidenceV2,
+  run: WorkStepsRunner = runWorkSteps,
 ): Promise<ExecutionProvenanceV2> {
   const canonicalProfile = serializeCanonicalDeviceProfile(args.profile);
-  const gcodeUtf8Bytes = new TextEncoder().encode(args.gcode).byteLength;
+  // One encoding serves both the byte count and the digest.
+  const gcodeUtf8 = await run(utf8BytesSteps(args.gcode));
+  const gcodeUtf8Bytes = gcodeUtf8.byteLength;
   const canonicalProfileUtf8Bytes = new TextEncoder().encode(canonicalProfile).byteLength;
   const [gcodeSha256, canonicalProfileSha256, archivedControllerObservationSha256] =
     await Promise.all([
-      sha256Utf8(args.gcode),
+      sha256Bytes(gcodeUtf8),
       sha256Utf8(canonicalProfile),
       computeArchivedControllerObservationSha256(args.archivedControllerObservation),
     ]);
@@ -247,11 +257,51 @@ function canonicalJsonObject(value: object, depth: number, ancestors: Set<object
   return `{${fields.join(',')}}`;
 }
 
-export async function sha256Utf8(value: string): Promise<`sha256:${string}`> {
+export async function sha256Utf8(
+  value: string,
+  run: WorkStepsRunner = runWorkSteps,
+): Promise<`sha256:${string}`> {
+  return sha256Bytes(await run(utf8BytesSteps(value)));
+}
+
+export async function sha256Bytes(bytes: Uint8Array<ArrayBuffer>): Promise<`sha256:${string}`> {
   const subtle = globalThis.crypto?.subtle;
   if (subtle === undefined) throw new Error('SHA-256 is unavailable in this runtime.');
-  const digest = await subtle.digest('SHA-256', new TextEncoder().encode(value));
+  const digest = await subtle.digest('SHA-256', bytes);
   return `sha256:${[...new Uint8Array(digest)]
     .map((byte) => byte.toString(16).padStart(2, '0'))
     .join('')}`;
+}
+
+const UTF8_STEP_CHARS = 1 << 18;
+
+/** The bytes `TextEncoder.encode(value)` returns, encoded a slice at a time. */
+export function* utf8BytesSteps(value: string): WorkSteps<Uint8Array<ArrayBuffer>> {
+  const encoder = new TextEncoder();
+  if (value.length <= UTF8_STEP_CHARS) return encoder.encode(value);
+  const parts: Uint8Array[] = [];
+  let total = 0;
+  for (let start = 0; start < value.length; ) {
+    let end = Math.min(value.length, start + UTF8_STEP_CHARS);
+    // Never cut between the halves of a surrogate pair: each half alone would
+    // encode as U+FFFD. A lone high surrogate encodes as U+FFFD either way.
+    if (end < value.length && isHighSurrogate(value.charCodeAt(end - 1))) end -= 1;
+    const part = encoder.encode(value.slice(start, end));
+    parts.push(part);
+    total += part.byteLength;
+    start = end;
+    yield;
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const part of parts) {
+    bytes.set(part, offset);
+    offset += part.byteLength;
+    yield;
+  }
+  return bytes;
+}
+
+function isHighSurrogate(code: number): boolean {
+  return code >= 0xd800 && code <= 0xdbff;
 }

@@ -1,4 +1,5 @@
 import { streamingModeForController } from '../../core/devices';
+import type { WorkStepsRunner } from '../../core/recovery';
 import type { MachineKind, OutputScope, Project } from '../../core/scene';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import type { StartJobOptions, useLaserStore } from '../state/laser-store';
@@ -29,6 +30,7 @@ import type { FramedRunStartClaim } from './framed-run-start-claim';
 import { assertMachineExecutionOwner } from '../state/machine-execution-owner';
 import type { FramedStartOptions } from './framed-start-options';
 import { isJobStartTransmissionError } from '../state/laser-start-transmission-error';
+import { createCooperativeArchiveRunner } from '../state/recovery/cooperative-archive-runner';
 import {
   observeFreshExecutionRetention,
   type FreshExecutionRetention,
@@ -96,8 +98,9 @@ export async function transmitPreparedStart(input: {
     jigCompletion?.accept();
     handoffArmed = false;
     // ADR-337: the archive is built and stored only now, off the path between
-    // Start and motion. The handoff armed before the wire already carries the
-    // operator-facing truth if this never completes.
+    // Start and motion, in slices that leave the running job's thread to Abort
+    // and status (Amendment 1). The handoff armed before the wire already
+    // carries the operator-facing truth if this never completes.
     await archiveAcceptedFreshRun(input.args, input.runId, retention);
     return true;
   } catch (error) {
@@ -143,7 +146,22 @@ async function archiveAcceptedFreshRun(
   runId: ReturnType<typeof createRunId>,
   retention: FreshExecutionRetention,
 ): Promise<void> {
+  const runner = createCooperativeArchiveRunner();
+  try {
+    await archiveAcceptedFreshRunInSlices(args, runId, retention, runner.run);
+  } finally {
+    runner.close();
+  }
+}
+
+async function archiveAcceptedFreshRunInSlices(
+  args: PreparedStartArgs,
+  runId: ReturnType<typeof createRunId>,
+  retention: FreshExecutionRetention,
+  run: WorkStepsRunner,
+): Promise<void> {
   const staged = await stageFreshExecutionArtifact({
+    run,
     runId,
     prepared: args.prepared,
     outputScope: args.outputScope,
@@ -166,14 +184,17 @@ async function archiveAcceptedFreshRun(
   const untracked = () =>
     args.prepared.laserSecondPassChain !== undefined
       ? undefined
-      : untrackedLaserRunRecord({
-          runId,
-          gcode: args.prepared.gcode,
-          machineKind: args.machineKind,
-          outputScope: args.outputScope,
-          jobOrigin: args.prepared.jobOrigin,
-          laser: args.laser,
-        });
+      : untrackedLaserRunRecord(
+          {
+            runId,
+            gcode: args.prepared.gcode,
+            machineKind: args.machineKind,
+            outputScope: args.outputScope,
+            jobOrigin: args.prepared.jobOrigin,
+            laser: args.laser,
+          },
+          run,
+        );
   await activateAcceptedFreshRun(
     runId,
     staged,

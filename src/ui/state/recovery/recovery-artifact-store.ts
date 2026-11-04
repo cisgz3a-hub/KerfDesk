@@ -1,5 +1,7 @@
+import { runWorkSteps, type WorkSteps, type WorkStepsRunner } from '../../../core/recovery';
 import {
   isCurrentExecutionArtifact,
+  isCurrentExecutionArtifactSteps,
   isExecutionArtifact,
   type ExecutionArtifactV1,
   type RunId,
@@ -10,7 +12,7 @@ import {
 } from './execution-artifact-integrity';
 import { matchesStoredArtifact } from './recovery-artifact-identity';
 import {
-  estimateExecutionArtifactBytes,
+  estimateExecutionArtifactBytesSteps,
   MAX_EXECUTION_ARTIFACT_ESTIMATED_BYTES,
 } from './execution-artifact-size';
 import { recoverySnapshotReferencesRun } from './recovery-artifact-cleanup';
@@ -48,19 +50,18 @@ export class RecoveryArtifactStore {
     this.stagedRecords.delete(runId);
   }
 
-  async stage(artifact: ExecutionArtifactV1): Promise<RecoveryRepositoryResult<RunId>> {
-    if (
-      !isCurrentExecutionArtifact(artifact) ||
-      !artifactClaimsArchiveBudget(artifact) ||
-      !(await executionArtifactIntegrityIsValid(artifact))
-    ) {
-      return failure('conflict');
-    }
+  /** `run` drains the whole-program checks; a running job's archive passes
+   * one that yields between slices (ADR-337 Amendment 1). */
+  async stage(
+    artifact: ExecutionArtifactV1,
+    run: WorkStepsRunner = runWorkSteps,
+  ): Promise<RecoveryRepositoryResult<RunId>> {
+    if (!(await artifactMayStage(artifact, run))) return failure('conflict');
     const ready = await this.host.ensureLoaded();
     if (!ready.ok) return ready;
     // Integrity and repository loading both yield. Recompute immediately before
     // persistence so a caller cannot grow a mutable extra during either await.
-    if (!artifactFitsArchiveBudget(artifact)) return failure('conflict');
+    if (!(await run(artifactFitsArchiveBudgetSteps(artifact)))) return failure('conflict');
     try {
       const generation = this.host.currentGeneration();
       const priorStaged = this.stagedRecords.get(artifact.runId);
@@ -147,10 +148,23 @@ export class RecoveryArtifactStore {
   }
 }
 
-function artifactFitsArchiveBudget(artifact: ExecutionArtifactV1): boolean {
+async function artifactMayStage(
+  artifact: ExecutionArtifactV1,
+  run: WorkStepsRunner,
+): Promise<boolean> {
   return (
-    estimateExecutionArtifactBytes(artifact, MAX_EXECUTION_ARTIFACT_ESTIMATED_BYTES) <=
-    MAX_EXECUTION_ARTIFACT_ESTIMATED_BYTES
+    (await run(isCurrentExecutionArtifactSteps(artifact))) &&
+    artifactClaimsArchiveBudget(artifact) &&
+    (await executionArtifactIntegrityIsValid(artifact, run))
+  );
+}
+
+function* artifactFitsArchiveBudgetSteps(artifact: ExecutionArtifactV1): WorkSteps<boolean> {
+  return (
+    (yield* estimateExecutionArtifactBytesSteps(
+      artifact,
+      MAX_EXECUTION_ARTIFACT_ESTIMATED_BYTES,
+    )) <= MAX_EXECUTION_ARTIFACT_ESTIMATED_BYTES
   );
 }
 

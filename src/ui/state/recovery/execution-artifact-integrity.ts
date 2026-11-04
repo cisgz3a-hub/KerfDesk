@@ -1,4 +1,4 @@
-import { fingerprintsEqual } from '../../../core/recovery';
+import { fingerprintsEqual, runWorkSteps, type WorkStepsRunner } from '../../../core/recovery';
 import { serializeCanonicalDeviceProfile } from '../../../io/machine-profile/machine-profile-io';
 import {
   isCurrentExecutionArtifact,
@@ -11,7 +11,9 @@ import {
   computeArchivedControllerObservationSha256,
   computeExecutionProvenanceEnvelopeSha256,
   isExecutionProvenance,
+  sha256Bytes,
   sha256Utf8,
+  utf8BytesSteps,
 } from './execution-provenance';
 import { laserSecondPassChainsEqual } from './laser-second-pass-lineage';
 
@@ -23,6 +25,7 @@ import { laserSecondPassChainsEqual } from './laser-second-pass-lineage';
  * provenance, even when it carries the old migration-origin label. */
 export async function executionArtifactIntegrityIsValid(
   artifact: ExecutionArtifactV1,
+  run: WorkStepsRunner = runWorkSteps,
 ): Promise<boolean> {
   if (artifact.schemaVersion === LEGACY_EXECUTION_ARTIFACT_SCHEMA_VERSION) return false;
   const provenance = artifact.provenance;
@@ -35,7 +38,7 @@ export async function executionArtifactIntegrityIsValid(
     return false;
   }
   try {
-    return await cryptographicBindingsAreValid(artifact);
+    return await cryptographicBindingsAreValid(artifact, run);
   } catch {
     return false;
   }
@@ -55,15 +58,20 @@ export async function storedExecutionArtifactIntegrityIsValid(
   );
 }
 
-async function cryptographicBindingsAreValid(artifact: ExecutionArtifactV1): Promise<boolean> {
+async function cryptographicBindingsAreValid(
+  artifact: ExecutionArtifactV1,
+  run: WorkStepsRunner,
+): Promise<boolean> {
   const provenance = artifact.provenance;
   if (provenance === undefined) return true;
   const profile = artifact.prepared.project.device;
   const canonicalProfile = serializeCanonicalDeviceProfile(profile);
-  if (!artifactClaimsMatch(artifact, canonicalProfile)) return false;
+  // One encoding of the program serves both its byte count and its digest.
+  const gcodeUtf8 = await run(utf8BytesSteps(artifact.gcode));
+  if (!artifactClaimsMatch(artifact, canonicalProfile, gcodeUtf8.byteLength)) return false;
   const [gcodeSha256, canonicalProfileSha256, envelopeSha256, observationSha256] =
     await Promise.all([
-      sha256Utf8(artifact.gcode),
+      sha256Bytes(gcodeUtf8),
       sha256Utf8(canonicalProfile),
       provenanceEnvelopeDigest(provenance),
       archivedObservationDigest(artifact),
@@ -75,12 +83,16 @@ async function cryptographicBindingsAreValid(artifact: ExecutionArtifactV1): Pro
   );
 }
 
-function artifactClaimsMatch(artifact: ExecutionArtifactV1, canonicalProfile: string): boolean {
+function artifactClaimsMatch(
+  artifact: ExecutionArtifactV1,
+  canonicalProfile: string,
+  gcodeUtf8Bytes: number,
+): boolean {
   const provenance = artifact.provenance;
   if (provenance === undefined) return true;
   const profile = artifact.prepared.project.device;
   return (
-    provenance.content.gcodeUtf8Bytes === utf8Bytes(artifact.gcode) &&
+    provenance.content.gcodeUtf8Bytes === gcodeUtf8Bytes &&
     provenance.content.canonicalProfileUtf8Bytes === utf8Bytes(canonicalProfile) &&
     artifact.controller.streamingMode === profile.streamingMode &&
     artifact.controller.rxBufferBytes === profile.rxBufferBytes &&

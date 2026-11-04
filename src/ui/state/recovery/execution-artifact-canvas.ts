@@ -1,10 +1,12 @@
 import type { CanvasMotionPlan } from '../canvas-motion-plan';
 import type { MotionManifest } from '../../../core/job/motion-manifest';
+import { runWorkSteps, type WorkSteps } from '../../../core/recovery/work-steps';
 import type { ExecutionArtifactV1 } from './execution-artifact';
 import {
   hasPackedMotionEncoding,
   isPackedMotionManifest,
-  packMotionManifest,
+  isPackedMotionManifestSteps,
+  packMotionManifestSteps,
   unpackMotionManifest,
   type PackedMotionManifest,
   type PackMotionManifestOptions,
@@ -32,9 +34,16 @@ export function archiveCanvasMotionPlan(
   plan: CanvasMotionPlan,
   options: PackMotionManifestOptions = {},
 ): ArchivedCanvasMotionPlan {
+  return runWorkSteps(archiveCanvasMotionPlanSteps(plan, options));
+}
+
+export function* archiveCanvasMotionPlanSteps(
+  plan: CanvasMotionPlan,
+  options: PackMotionManifestOptions = {},
+): WorkSteps<ArchivedCanvasMotionPlan> {
   // Minimal pre-existing fixtures and small legacy plans retain their shape.
   if (plan.manifest === undefined || !manifestNeedsCompaction(plan.manifest)) return plan;
-  return { ...plan, manifest: packMotionManifest(plan.manifest, options) };
+  return { ...plan, manifest: yield* packMotionManifestSteps(plan.manifest, options) };
 }
 
 function manifestNeedsCompaction(manifest: MotionManifest): boolean {
@@ -70,6 +79,14 @@ export function isArchivedCanvasMotionPlan(
   rawLines: number,
   sendableLines: number,
 ): value is ArchivedCanvasMotionPlan {
+  return runWorkSteps(isArchivedCanvasMotionPlanSteps(value, rawLines, sendableLines));
+}
+
+export function* isArchivedCanvasMotionPlanSteps(
+  value: unknown,
+  rawLines: number,
+  sendableLines: number,
+): WorkSteps<boolean> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
   const manifest = (value as Record<string, unknown>)['manifest'];
   if (!hasPackedMotionEncoding(manifest)) {
@@ -82,5 +99,5 @@ export function isArchivedCanvasMotionPlan(
         Array.isArray((manifest as Record<string, unknown>)['blocks']))
     );
   }
-  return isPackedMotionManifest(manifest, { rawLines, sendableLines });
+  return yield* isPackedMotionManifestSteps(manifest, { rawLines, sendableLines });
 }
