@@ -1,9 +1,5 @@
-import {
-  fingerprintGcode,
-  fingerprintsEqual,
-  runWorkSteps,
-  type WorkStepsRunner,
-} from '../../core/recovery';
+import { fingerprintGcode, fingerprintsEqual } from '../../core/recovery';
+import { runWorkSteps, type WorkStepsRunner } from '../../core/recovery/work-steps';
 import type { SimilarityTransform } from '../../core/registration';
 import type { JobOriginPlacement } from '../../core/job';
 import type { MachineKind, OutputScope } from '../../core/scene';

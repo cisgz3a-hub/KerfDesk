@@ -16,15 +16,14 @@
 // this decision from adding a second recovery payload format.
 
 import {
-  createJobCheckpointSteps,
   parseJobCheckpoint,
-  runWorkSteps,
   serializeJobCheckpoint,
   withJobInterruption,
   type JobCheckpoint,
   type JobMachineKind,
-  type WorkSteps,
 } from '../../../core/recovery';
+import { createJobCheckpointSteps } from '../../../core/recovery/job-checkpoint';
+import { runWorkSteps, type WorkSteps } from '../../../core/recovery/work-steps';
 import type { JobOriginPlacement } from '../../../core/job';
 import type { OutputScope } from '../../../core/scene';
 import type { LegacyFingerprintOnlyArtifactV1 } from './execution-artifact';

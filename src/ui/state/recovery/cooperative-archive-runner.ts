@@ -12,7 +12,7 @@
 // MessageChannel rather than a timer: nested timers clamp to 4 ms and hidden
 // windows throttle them, which would only make the archive finish later.
 
-import type { WorkSteps, WorkStepsRunner } from '../../../core/recovery';
+import type { WorkSteps, WorkStepsRunner } from '../../../core/recovery/work-steps';
 
 /** Longest stretch of archive work one task may run before yielding. */
 export const ARCHIVE_SLICE_MS = 8;

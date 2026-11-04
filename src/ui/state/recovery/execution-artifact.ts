@@ -3,14 +3,12 @@ import type { ControllerKind } from '../../../core/devices';
 import type { JobOriginPlacement } from '../../../core/job';
 import type { ControllerSettingsSnapshot } from '../../../core/preflight';
 import { MAX_RASTER_WORKING_BYTES } from '../../../core/raster/raster-budget';
+import type { GcodeFingerprint, JobMachineKind } from '../../../core/recovery';
 import {
   countSendableLinesSteps,
   fingerprintGcodeSteps,
-  runWorkSteps,
-  type GcodeFingerprint,
-  type JobMachineKind,
-  type WorkSteps,
-} from '../../../core/recovery';
+} from '../../../core/recovery/job-checkpoint';
+import { runWorkSteps, type WorkSteps } from '../../../core/recovery/work-steps';
 import {
   buildCncRecoveryEventManifest,
   type CncRecoveryEventManifest,

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { buildMotionManifest } from '../../core/job/motion-manifest';
 import { DEFAULT_OUTPUT_SCOPE, createProject } from '../../core/scene';
-import type { WorkSteps, WorkStepsRunner } from '../../core/recovery';
+import type { WorkSteps, WorkStepsRunner } from '../../core/recovery/work-steps';
 import type { CanvasMotionPlan } from '../state/canvas-motion-plan';
 import { initialLaserState } from '../state/laser-store-helpers';
 import type { LaserState } from '../state/laser-store';
@@ -56,6 +56,8 @@ vi.mock('../app/build-info', () => ({
 }));
 
 const RUN_ID = 'run-archive-slices';
+/** Two archives of a 60,000-move program, one yielding a task per step. */
+const ARCHIVE_TEST_TIMEOUT_MS = 30_000;
 const NOW = new Date('2026-11-04T09:00:00.000Z');
 /** sha256 of the archive `stageFreshExecutionArtifact` stored for this fixture
  * on main ede14589b, before the archive was sliced. */
@@ -220,51 +222,59 @@ afterEach(() => {
 });
 
 describe('the accepted run archive in slices', () => {
-  it('stores the archive main stored, whether drained in one call or a step per task', async () => {
-    const whole = await fixture();
-    const staged = await stageFreshExecutionArtifact(whole.args);
-    expect(staged.staged).toBe(true);
-    const wholeDigest = await storedArchiveDigest(whole.backend);
-    expect(wholeDigest).toBe(GOLDEN_ARCHIVE_DIGEST);
+  it(
+    'stores the archive main stored, whether drained in one call or a step per task',
+    async () => {
+      const whole = await fixture();
+      const staged = await stageFreshExecutionArtifact(whole.args);
+      expect(staged.staged).toBe(true);
+      const wholeDigest = await storedArchiveDigest(whole.backend);
+      expect(wholeDigest).toBe(GOLDEN_ARCHIVE_DIGEST);
 
-    const sliced = await fixture();
-    const runner = everyStepRunner();
-    const stagedInSlices = await stageFreshExecutionArtifact({ ...sliced.args, run: runner.run });
-    expect(stagedInSlices.staged).toBe(true);
-    expect(await storedArchiveDigest(sliced.backend)).toBe(wholeDigest);
-    expect(stagedInSlices.keep?.()).toEqual(staged.keep?.());
-  });
+      const sliced = await fixture();
+      const runner = everyStepRunner();
+      const stagedInSlices = await stageFreshExecutionArtifact({ ...sliced.args, run: runner.run });
+      expect(stagedInSlices.staged).toBe(true);
+      expect(await storedArchiveDigest(sliced.backend)).toBe(wholeDigest);
+      expect(stagedInSlices.keep?.()).toEqual(staged.keep?.());
+    },
+    ARCHIVE_TEST_TIMEOUT_MS,
+  );
 
-  it('never runs a whole-program pass inside one task while the job runs', async () => {
-    const { args, gcode, laser } = await fixture();
-    const runner = everyStepRunner();
-    const encode = vi.spyOn(TextEncoder.prototype, 'encode');
-    sync.watching = true;
-    const staged = await stageFreshExecutionArtifact({ ...args, run: runner.run });
-    const untracked = await untrackedLaserRunRecord(
-      {
-        runId: RUN_ID,
-        gcode,
-        machineKind: 'laser',
-        outputScope: DEFAULT_OUTPUT_SCOPE,
-        jobOrigin: undefined,
-        laser,
-      },
-      runner.run,
-    );
-    sync.watching = false;
-    expect(staged.staged).toBe(true);
-    expect(untracked?.intent.sendableLines).toBeGreaterThan(60_000);
-    // Every synchronous drain finished inside one checkpoint's worth of work.
-    expect(sync.checkpointsCrossed).toBe(0);
-    // Nothing encoded more than one slice of the program at once.
-    const longest = Math.max(...encode.mock.calls.map(([text]) => text?.length ?? 0));
-    expect(longest).toBeLessThanOrEqual(1 << 18);
-    expect(longest).toBeLessThan(gcode.length);
-    // The program is several chunks long, and each of its passes (fingerprint
-    // and count when built and validated, both encodings, the intent) went
-    // through the runner.
-    expect(gcode.length).toBeGreaterThan(16 * (1 << 16));
-    expect(runner.steps()).toBeGreaterThan(6 * Math.floor(gcode.length / (1 << 16)));
-  });
+  it(
+    'never runs a whole-program pass inside one task while the job runs',
+    async () => {
+      const { args, gcode, laser } = await fixture();
+      const runner = everyStepRunner();
+      const encode = vi.spyOn(TextEncoder.prototype, 'encode');
+      sync.watching = true;
+      const staged = await stageFreshExecutionArtifact({ ...args, run: runner.run });
+      const untracked = await untrackedLaserRunRecord(
+        {
+          runId: RUN_ID,
+          gcode,
+          machineKind: 'laser',
+          outputScope: DEFAULT_OUTPUT_SCOPE,
+          jobOrigin: undefined,
+          laser,
+        },
+        runner.run,
+      );
+      sync.watching = false;
+      expect(staged.staged).toBe(true);
+      expect(untracked?.intent.sendableLines).toBeGreaterThan(60_000);
+      // Every synchronous drain finished inside one checkpoint's worth of work.
+      expect(sync.checkpointsCrossed).toBe(0);
+      // Nothing encoded more than one slice of the program at once.
+      const longest = Math.max(...encode.mock.calls.map(([text]) => text?.length ?? 0));
+      expect(longest).toBeLessThanOrEqual(1 << 18);
+      expect(longest).toBeLessThan(gcode.length);
+      // The program is several chunks long, and each of its passes (fingerprint
+      // and count when built and validated, both encodings, the intent) went
+      // through the runner.
+      expect(gcode.length).toBeGreaterThan(16 * (1 << 16));
+      expect(runner.steps()).toBeGreaterThan(6 * Math.floor(gcode.length / (1 << 16)));
+    },
+    ARCHIVE_TEST_TIMEOUT_MS,
+  );
 });

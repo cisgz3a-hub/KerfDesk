@@ -1,5 +1,5 @@
 import { streamingModeForController } from '../../core/devices';
-import type { WorkStepsRunner } from '../../core/recovery';
+import type { WorkStepsRunner } from '../../core/recovery/work-steps';
 import type { MachineKind, OutputScope, Project } from '../../core/scene';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import type { StartJobOptions, useLaserStore } from '../state/laser-store';

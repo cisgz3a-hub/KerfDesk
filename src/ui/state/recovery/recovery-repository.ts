@@ -1,4 +1,4 @@
-import type { JobCheckpoint, JobInterruption, WorkStepsRunner } from '../../../core/recovery';
+import type { JobCheckpoint, JobInterruption } from '../../../core/recovery';
 import type { ExecutionArtifactV1, RunId } from './execution-artifact';
 import { RecoveryActivationCoordinator } from './recovery-activation-coordinator';
 import { RecoveryArtifactCleanupCoordinator } from './recovery-artifact-cleanup-coordinator';
@@ -138,7 +138,7 @@ export class RecoveryRepository {
     return this.snapshotCoordinator.refresh();
   }
 
-  stageArtifact = (artifact: ExecutionArtifactV1, run?: WorkStepsRunner) =>
+  stageArtifact: RecoveryArtifactStore['stage'] = (artifact, run) =>
     this.artifactStore.stage(artifact, run);
 
   getArchivedExecution = (runId: RunId): Promise<RecoveryRepositoryResult<ExecutionArtifactV1>> =>

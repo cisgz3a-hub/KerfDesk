@@ -1,4 +1,5 @@
-import { fingerprintsEqual, runWorkSteps, type WorkStepsRunner } from '../../../core/recovery';
+import { fingerprintsEqual } from '../../../core/recovery';
+import { runWorkSteps, type WorkStepsRunner } from '../../../core/recovery/work-steps';
 import { serializeCanonicalDeviceProfile } from '../../../io/machine-profile/machine-profile-io';
 import {
   isCurrentExecutionArtifact,

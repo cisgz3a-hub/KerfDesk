@@ -2,7 +2,7 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import type { MotionBlockColumnData } from '../../../core/job/motion-block-columns';
 import { buildMotionManifest } from '../../../core/job/motion-manifest';
-import { runWorkSteps, type WorkSteps } from '../../../core/recovery';
+import { runWorkSteps, type WorkSteps } from '../../../core/recovery/work-steps';
 import { ARCHIVE_SLICE_MS, createCooperativeArchiveRunner } from './cooperative-archive-runner';
 import {
   estimateExecutionArtifactBytes,

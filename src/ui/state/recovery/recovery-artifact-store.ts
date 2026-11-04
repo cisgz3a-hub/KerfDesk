@@ -1,4 +1,8 @@
-import { runWorkSteps, type WorkSteps, type WorkStepsRunner } from '../../../core/recovery';
+import {
+  runWorkSteps,
+  type WorkSteps,
+  type WorkStepsRunner,
+} from '../../../core/recovery/work-steps';
 import {
   isCurrentExecutionArtifact,
   isCurrentExecutionArtifactSteps,
