@@ -1,6 +1,7 @@
-// Main-thread client for the output preparation worker. Start and Save compile
-// the whole core/job + core/preflight + io/gcode graph off-thread when the
-// scene is over the ADR-241/ADR-243 responsiveness budgets.
+// Main-thread client for the output preparation worker. Start, Frame and Save
+// compile the whole core/job + core/preflight + io/gcode graph off-thread when
+// the scene is over the ADR-241/ADR-243 responsiveness budgets, and for every
+// job of ordinary size up when a worker can start (ADR-598 Amendment 4).
 //
 // ONE worker is created lazily and reused for the rest of the session. It used
 // to be constructed per click and terminated after its single message, so
@@ -19,8 +20,8 @@
 // client. Region-local tasks then share the bounded, fair subworker pool;
 // undispatched tasks stay coordinator-side.
 //
-// No watchdog timeout, on purpose: this path only runs for over-budget jobs,
-// where a legitimate preparation can take minutes. A fatal failure rejects
+// No watchdog timeout, on purpose: over-budget jobs take this path too, where
+// a legitimate preparation can take minutes. A fatal failure rejects
 // every pending caller. Aborting active synchronous outer-worker work retires
 // that Worker and dispatches queued work on a fresh one; queued aborts are
 // removed without a restart. Capacity, compiler and infrastructure failures
@@ -43,6 +44,8 @@ import type {
   TransferredStartJobPreparation,
 } from './output-preparation-protocol';
 import { registerCanvasProgramSource } from '../state/canvas-program-source';
+import { unpackStartPreparationFromWire } from './start-preparation-wire';
+import { carryProgramFacts } from './job-review/program-facts';
 import { transferredCanvasMotionPlan } from '../state/recovery/execution-artifact-canvas';
 import type { PreparedOutput } from '../../io/gcode';
 import type { SaveOutputEmission } from './save-output-emission';
@@ -50,7 +53,7 @@ import type { OutputCompilationProgress } from '../../io/gcode/prepare-output-as
 import type { EmitRdResult } from '../../io/rd';
 import type { TiledOutputPreparation } from '../app/tiled-output-preparation';
 import type { FrameBoundsPreview } from './frame-bounds-preview';
-import { costlyCanvasPreparation } from '../workspace/canvas-preparation-policy';
+import { outputPreparationPrefersWorker } from '../workspace/canvas-preparation-policy';
 import {
   BACKGROUND_OUTPUT_PREPARATION_BUSY_MESSAGE,
   OutputPreparationError,
@@ -66,7 +69,7 @@ export function outputPreparationShouldRunOffThread(
   project: Project,
   outputScope?: OutputScope,
 ): boolean {
-  return costlyCanvasPreparation(project, outputScope);
+  return outputPreparationPrefersWorker(project, outputScope);
 }
 
 export function prepareStartOutputOffThread(
@@ -80,9 +83,16 @@ export function prepareStartOutputOffThread(
 ): Promise<StartJobPreparation> | null {
   const pending = runWorker(request, onProgress, signal, onFrameBounds);
   if (pending === null) return null;
-  return pending.then((response) => {
+  return pending.then(async (response) => {
     if (response.kind !== 'start') throw new Error('Background Start preparation returned no job.');
-    return hydrateTransferredStartPreparation(response.result);
+    // Rebuilt in slices, so receiving a dense job never holds the UI thread
+    // for one long task (ADR-598 Amendment 4).
+    const transferred = await unpackStartPreparationFromWire(
+      response.result,
+      request.project,
+      signal,
+    );
+    return hydrateTransferredStartPreparation(transferred);
   });
 }
 
@@ -98,7 +108,9 @@ export function hydrateTransferredStartPreparation(
   if (!result.ok) return result;
   const canvasPlan = transferredCanvasMotionPlan(result.canvasPlan);
   registerCanvasProgramSource(canvasPlan, result.gcode);
-  return { ...result, canvasPlan };
+  const hydrated = { ...result, canvasPlan };
+  carryProgramFacts(result, hydrated);
+  return hydrated;
 }
 
 /**

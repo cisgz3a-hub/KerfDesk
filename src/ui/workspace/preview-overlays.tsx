@@ -419,7 +419,7 @@ function formatMm(value: number): string {
 
 function formatEstimate(estimate: LiveJobEstimate): string {
   if (estimate.kind === 'estimated') return estimate.label;
-  if (estimate.kind === 'too-large') return 'ETA skipped';
+  if (estimate.kind === 'too-large') return estimate.ordinary === true ? 'ETA…' : 'ETA skipped';
   if (estimate.kind === 'preparation-failed') return 'ETA unavailable';
   return '-';
 }

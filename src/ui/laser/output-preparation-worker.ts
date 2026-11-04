@@ -8,6 +8,8 @@ import type {
 } from './output-preparation-protocol';
 import { acceptCanvasCompilationBridgeConnection } from '../workspace/canvas-compilation-worker-pool';
 import { unpackProjectMessage } from '../packed-project-transfer';
+import type { Project } from '../../core/scene';
+import { packStartPreparationForWire } from './start-preparation-wire';
 import {
   hasColumnPackedEncoding,
   packedManifestTransferables,
@@ -21,9 +23,11 @@ self.onmessage = (event: MessageEvent<OutputPreparationWireEnvelope>): void => {
 async function prepare(envelope: OutputPreparationWireEnvelope): Promise<void> {
   const { requestId, request } = envelope;
   let response: OutputPreparationResponse;
+  let transfer: Transferable[] = [];
   try {
-    response = await prepareOutputRequest(
-      { ...request, project: unpackProjectMessage(request.project) },
+    const project = unpackProjectMessage(request.project);
+    const prepared = await prepareOutputRequest(
+      { ...request, project },
       {
         jobId: `output:${requestId}`,
         onProgress: (progress) => {
@@ -36,6 +40,7 @@ async function prepare(envelope: OutputPreparationWireEnvelope): Promise<void> {
         },
       },
     );
+    ({ response, transfer } = wireResponse(prepared, project));
   } catch (error) {
     response = {
       kind: 'error',
@@ -43,14 +48,26 @@ async function prepare(envelope: OutputPreparationWireEnvelope): Promise<void> {
     };
   }
   const result: OutputPreparationResult = { requestId, response };
-  self.postMessage(result, { transfer: responseTransferables(response) });
+  self.postMessage(result, { transfer });
 }
 
 // A Start's motion columns move to the window instead of being copied: one
-// bed-sized photo's are hundreds of megabytes (ADR-244 Amendment 3). This
-// worker never reads a finished preparation again.
-function responseTransferables(response: OutputPreparationResponse): Transferable[] {
-  if (response.kind !== 'start' || !response.result.ok) return [];
-  const manifest = response.result.canvasPlan.manifest;
-  return hasColumnPackedEncoding(manifest) ? packedManifestTransferables(manifest) : [];
+// bed-sized photo's are hundreds of megabytes (ADR-244 Amendment 3). Its scene
+// and fill segments cross as indices and columns (start-preparation-wire.ts,
+// ADR-598 Amendment 4). This worker never reads a finished preparation again.
+function wireResponse(
+  response: OutputPreparationResponse,
+  requestProject: Project,
+): { readonly response: OutputPreparationResponse; readonly transfer: Transferable[] } {
+  if (response.kind !== 'start' || 'wire' in response.result) return { response, transfer: [] };
+  const manifest = response.result.ok ? response.result.canvasPlan.manifest : null;
+  const manifestTransfer =
+    manifest !== null && hasColumnPackedEncoding(manifest)
+      ? packedManifestTransferables(manifest)
+      : [];
+  const wire = packStartPreparationForWire(response.result, requestProject);
+  return {
+    response: { kind: 'start', result: wire.message },
+    transfer: [...manifestTransfer, ...wire.transfer],
+  };
 }

@@ -72,6 +72,18 @@ export function measureSendableLines(gcode: string): {
   return { lines, bytes };
 }
 
+/** The widest raw sendable line (first kept character to its end, plus the
+ * '\n'). findFirstSendableLineOver finds nothing for any limit at or above it,
+ * because it measures only lines wider than the limit. */
+export function longestSendableLineSpan(gcode: string): number {
+  let longest = 0;
+  visitSendableLines(gcode, (first, end) => {
+    if (end - first + 1 > longest) longest = end - first + 1;
+    return false;
+  });
+  return longest;
+}
+
 export function hasSendableGcodeLine(gcode: string): boolean {
   let found = false;
   visitSendableLines(gcode, () => {

@@ -1,4 +1,7 @@
-import { outputVectorPreparationTooComplex } from '../../core/job/preparation-complexity';
+import {
+  outputPreparationWorkReaches,
+  outputVectorPreparationTooComplex,
+} from '../../core/job/preparation-complexity';
 import {
   rasterPreparationTooComplex,
   rasterPreparationWorkUnits,
@@ -106,4 +109,42 @@ function cncReliefPreparationIsCostly(project: Project): boolean {
 
 export function costlyCanvasPreparation(project: Project, outputScope?: OutputScope): boolean {
   return classifyCanvasPreparation(project, outputScope) === 'background-worker';
+}
+
+// Preview, the estimate, Frame, Start and Save emit, check and time the whole
+// program, about 34 µs of UI thread per work unit for a design of outlines
+// and small fills (S4-P2-1: 16k units blocked 0.5 s). 2,000 units stay under
+// about 70 ms. The 20,000-unit budget above stays for the Machine Setup and
+// Design advisories, which compile only and go blank when routed away.
+const DIRECT_OUTPUT_WORK_BUDGET = 2_000;
+
+/**
+ * Where Preview, the estimate, Frame, Start and Save prepare output: in a
+ * worker for every costly job (above), and for any job of DIRECT_OUTPUT_WORK_BUDGET
+ * or more when this window can start one. Without workers those mid-sized
+ * jobs keep preparing here, as before (ADR-598 Amendment 4).
+ */
+export function outputPreparationPrefersWorker(
+  project: Project,
+  outputScope?: OutputScope,
+): boolean {
+  return (
+    costlyCanvasPreparation(project, outputScope) ||
+    ordinaryOutputPrefersWorker(project, outputScope)
+  );
+}
+
+/** The part of outputPreparationPrefersWorker beyond costlyCanvasPreparation. */
+export function ordinaryOutputPrefersWorker(project: Project, outputScope?: OutputScope): boolean {
+  if (!windowCanStartWorkers()) return false;
+  const scoped = outputScope === undefined ? null : validateOutputScope(project.scene, outputScope);
+  if (scoped !== null && !scoped.ok) return false;
+  const scene = scoped === null ? project.scene : scoped.scene;
+  const scopedProject = scene === project.scene ? project : { ...project, scene };
+  return outputPreparationWorkReaches(scopedProject, DIRECT_OUTPUT_WORK_BUDGET);
+}
+
+// A worker realm has no window; its own compile is already off the UI thread.
+function windowCanStartWorkers(): boolean {
+  return typeof window !== 'undefined' && typeof Worker !== 'undefined';
 }

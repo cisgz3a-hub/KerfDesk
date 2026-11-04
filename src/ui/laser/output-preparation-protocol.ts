@@ -14,6 +14,7 @@ import type { TiledOutputPreparation } from '../app/tiled-output-preparation';
 import type { FrameBoundsPreview } from './frame-bounds-preview';
 import type { LaserPowerScaleSource } from './connected-laser-power-scale';
 import type { ProjectMessage } from '../packed-project-transfer';
+import type { StartPreparationWire } from './start-preparation-wire';
 
 export type OutputSnapshotRequest = {
   readonly registration?: SimilarityTransform | null;
@@ -95,7 +96,11 @@ export type TransferredStartJobPreparation =
  * writable G-code.
  */
 export type OutputPreparationResponse =
-  | { readonly kind: 'start'; readonly result: TransferredStartJobPreparation }
+  | {
+      readonly kind: 'start';
+      /** The worker sends the wire form; the client restores the preparation. */
+      readonly result: TransferredStartJobPreparation | StartPreparationWire;
+    }
   | { readonly kind: 'save'; readonly result: SaveOutputEmission }
   | { readonly kind: 'rd'; readonly result: EmitRdResult }
   | { readonly kind: 'tiles'; readonly result: TiledOutputPreparation }

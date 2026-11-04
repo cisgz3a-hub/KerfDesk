@@ -149,3 +149,59 @@ autosave worker ran for 0.33 s, the preparation restarted, and the copy was writ
 the edit. The four-photo case was not run in the browser: on this 16 GB PC, with other work
 running, free memory fell below 1.0 GB within 2 s of opening it (S3-P2-3), and the measurement
 stopped there to keep the PC usable. The unit test above covers that timing.
+
+### Amendment 4 — Ordinary jobs prepare in a worker, and a prepared job reaches the window in slices (2026-11-04)
+
+Performance audit S1, area S4, with S1-P2-2. Three findings share one cause:
+output work that ran, or landed, on the UI thread in one piece.
+
+- **S4-P2-1 (P3).** A 200-object design of 100 Line circles and 100 small Fill
+  rectangles (53,987 lines) stayed under the 20,000-unit "direct" budget
+  (`canvas-preparation-policy.ts`), because that budget judged outlines and
+  fills separately. So Preview, the estimate, Frame, Start and Save each
+  compiled and emitted the whole job on the UI thread: Preview blocked
+  527 ms, Frame 497 ms, Start 574 ms, Save 185 ms (refuter medians).
+- **S1-P2-2 (P2).** At 374,843 lines, Start → Job Review held the UI thread in
+  one task of 723–874 ms after the worker had finished. In that task the
+  window deserialized the worker's result (472 ms: half the prepared
+  project's scene, half the compiled fill segments) and built the Job Review
+  model (300 ms: the fill heat analysis twice, then several walks of the
+  5 MB program).
+- **S4-P3-2 (P3).** Save G-code prepared the whole program again on every
+  Save of an unchanged project: 13–16 s each time for a bed-sized photo.
+
+1. **Routing.** `outputPreparationPrefersWorker` sends every job of 2,000 work
+   units or more (outlines and fills counted together,
+   `outputPreparationWorkReaches`) to the existing workers for Preview, the
+   estimate, Frame, Start and Save, when the window can start a worker.
+   Without one those jobs prepare on the window as before. The 20,000-unit
+   `costlyCanvasPreparation` budget is unchanged for the Machine Setup and
+   Design advisories, which compile only and would go blank if routed away.
+   An estimate pending for this reason reads "estimating…", not "large job".
+2. **The Start boundary** (`start-preparation-wire.ts`). The prepared
+   project's scene objects are the request's own objects inside the worker,
+   so they travel as indices and the window re-attaches the originals the
+   worker's copy was unpacked from (decision 1). Objects the worker made
+   (hydrated rasters, materialized relief) travel whole. Fill segments of the
+   plain shape travel as transferred columns and are rebuilt in slices of
+   about 24 ms, each its own task, before the preparation resolves; a cancel
+   between slices stops it. The rebuilt preparation equals the worker's field
+   by field and in key order.
+3. **Job Review reads facts measured once.** The fill heat analysis is
+   memoized by job and offset values (both callers now use the memo), and the
+   worker sends the value it already computed for its warnings. The program
+   facts Job Review walked the program for (M7 use, streamed lines and bytes,
+   longest sendable line, line count, archive size; `program-facts.ts`) are
+   measured once per preparation object, in the worker beside the program.
+   Each is the value of the same function the review called. A line longer
+   than the RX window is still found by the full scan whenever the longest
+   line could exceed it.
+4. **Save reuse** (`save-emission-reuse.ts`). The last emitted Save program is
+   kept for its Project object and an exact serialization of the request
+   (emit options, scope, machine and controller evidence; -0, NaN and
+   undefined kept apart). Time-bound saves are never kept, and the entry is
+   dropped when the open project changes.
+
+Start's bindings are unchanged: Start still prepares the current exact
+program, Job Review's Confirm still compares the rebuilt bytes and model,
+and the Frame permit's execution signature is computed as before.

@@ -30,7 +30,10 @@ import {
 } from '../../io/gcode';
 import type { SimilarityTransform } from '../../core/registration';
 import { hydratePagedRasterProject } from '../import/paged-raster-hydration';
-import { costlyCanvasPreparation } from '../workspace/canvas-preparation-policy';
+import {
+  costlyCanvasPreparation,
+  ordinaryOutputPrefersWorker,
+} from '../workspace/canvas-preparation-policy';
 
 export { countOutputVectorSegments };
 export const LIVE_ESTIMATE_RAW_VECTOR_SEGMENT_BUDGET = PREPARATION_RAW_VECTOR_SEGMENT_BUDGET;
@@ -50,7 +53,9 @@ export type LiveJobEstimate =
       readonly breakdown: JobDurationBreakdown;
       readonly manualPauseCount?: number;
     }
-  | { readonly kind: 'too-large' }
+  /** Prepared in a worker instead. `ordinary`: only to keep the window
+   * responsive (ADR-598 Amendment 4), so the job is not called large. */
+  | { readonly kind: 'too-large'; readonly ordinary?: true }
   | { readonly kind: 'preparation-failed'; readonly message: string };
 
 export function estimateLiveJob(
@@ -74,6 +79,7 @@ export function estimateLiveJob(
   // 0.5% of the budget). Without it the ETA compiled V-carve on the main
   // thread the moment the cut type was selected.
   if (costlyCanvasPreparation(outputProject)) return { kind: 'too-large' };
+  if (ordinaryOutputPrefersWorker(outputProject)) return { kind: 'too-large', ordinary: true };
 
   // Same prepared job as Save / Start / Preview, so ETA times the path the
   // machine runs.
@@ -102,6 +108,7 @@ export async function estimateLiveJobSnapshot(
   // still runs its compile on this thread, so the amplifying cut type has to
   // pause the estimate here too.
   if (costlyCanvasPreparation(outputProject)) return { kind: 'too-large' };
+  if (ordinaryOutputPrefersWorker(outputProject)) return { kind: 'too-large', ordinary: true };
   const hydrated = await hydratePagedRasterProject(project);
   const prepared = await prepareOutputSnapshot(hydrated, {
     ...options,
