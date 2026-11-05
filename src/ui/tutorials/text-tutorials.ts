@@ -22,8 +22,8 @@ export const TEXT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose a font and size',
         instruction:
-          'In Text formatting, choose a Font. Set Size in millimetres. Check the result on the canvas.',
-        focus: 'Font · Size',
+          'In the Text panel, choose a Font. Set Font size in millimetres. Check the result on the canvas.',
+        focus: 'Font · Font size',
         result: 'You can see the font and size before saving.',
       },
       {
@@ -45,7 +45,7 @@ export const TEXT_TUTORIALS: readonly Tutorial[] = [
     category: 'Drawing & editing',
     machine: 'all',
     minutes: 3,
-    location: 'Text formatting → Bend or Path text',
+    location: 'Text → Bend or Path text',
     prerequisites: 'Editable text; a suitable vector guide in the project for Path text.',
     visual: 'text-path',
     steps: [
@@ -83,7 +83,7 @@ export const TEXT_TUTORIALS: readonly Tutorial[] = [
     category: 'Layout & production',
     machine: 'all',
     minutes: 4,
-    location: 'Text formatting → Variable text',
+    location: 'Text → Variable text',
     prerequisites: 'Editable text; a CSV with column headers if you want personalised records.',
     visual: 'variable-text',
     steps: [

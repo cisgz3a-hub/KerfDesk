@@ -33,6 +33,7 @@ export function JogSettingsRow(props: {
           onChange={(event) => props.onStep(Number(event.target.value))}
           disabled={props.disabled}
           aria-label="Jog step size"
+          data-search-target="jog"
           title="Distance moved by each jog arrow click."
         >
           {jogStepOptions(unit, props.step).map((option) => (

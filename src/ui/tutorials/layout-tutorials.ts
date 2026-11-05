@@ -297,8 +297,8 @@ export const LAYOUT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Check shared settings',
         instruction:
-          'Read the Affects count before editing. If an operation is shared, use Make unique when only this selection should change. Add an operation when the artwork needs another process.',
-        focus: 'Affects · Make unique · Add operation',
+          'Read the "Shared by N artworks" line before editing. If an operation is shared, use Make unique when only this selection should change. Add an operation when the artwork needs another process.',
+        focus: 'Shared by · Make unique · Add operation',
         result: 'The intended artwork receives the intended process.',
       },
       {

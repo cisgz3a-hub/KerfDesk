@@ -10,6 +10,8 @@
 
 import { describe, expect, it } from 'vitest';
 import { shortcutFamilies } from '../common/shortcut-list';
+import { buildAppCommands } from '../commands/command-registry';
+import { baseCtx } from '../commands/command-registry-test-helpers';
 import { TUTORIALS, findTutorial } from './tutorial-catalog';
 import type { Tutorial } from './tutorial-types';
 
@@ -69,6 +71,27 @@ describe('lesson fidelity against the shipped app', () => {
       .map((tutorial) => ({ id: tutorial.id, prefix: firstSegment(tutorial.location) }))
       .filter(({ prefix }) => !MENU_LABELS.includes(prefix) && !NON_MENU_PREFIXES.includes(prefix))
       .map(({ id, prefix }) => `${id}: "${prefix}"`);
+    expect(wrong).toEqual([]);
+  });
+
+  it('names a real command after a Tools path', () => {
+    // "Tools → Optimization Settings → Cut Planner" named a menu item that does
+    // not exist (UX audit U6-P3-3). Each item a Tools path lists must be a Tools
+    // command's own label, without its "...".
+    const labels = new Set(
+      buildAppCommands(baseCtx())
+        .filter((command) => command.family === 'tools')
+        .map((command) => command.label.replace(/(\.\.\.|…)$/, '').replace(/ \(Pro\)$/, '')),
+    );
+    const wrong = TUTORIALS.filter(
+      (tutorial) => firstSegment(tutorial.location) === 'Tools',
+    ).flatMap((tutorial) =>
+      (tutorial.location.split('→')[1] ?? '')
+        .split(/,|;| or /)
+        .map((item) => item.trim().replace(/^(top toolbar|laser mode also offers) /, ''))
+        .filter((item) => item !== '' && item !== 'Machine Setup' && !labels.has(item))
+        .map((item) => `${tutorial.id}: "${item}"`),
+    );
     expect(wrong).toEqual([]);
   });
 

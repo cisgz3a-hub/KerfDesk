@@ -270,3 +270,16 @@
     font-size: 25px;
   }
 }
+
+/* A lesson that teaches a Pro tool, in KerfDesk Free (UX audit U6-P3-4). */
+.lf-learn-pro-badge {
+  margin-left: 6px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--lf-tint-accent);
+  color: var(--lf-accent-fg);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  vertical-align: middle;
+}

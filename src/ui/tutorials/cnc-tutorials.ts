@@ -135,6 +135,7 @@ export const CNC_TUTORIALS: readonly Tutorial[] = [
   },
   {
     id: 'cnc-vcarve',
+    pro: 'vcarve',
     title: 'Carve lettering with a V-bit',
     summary:
       'See how stroke width and bit angle create changing depth, with optional flat-floor clearing.',

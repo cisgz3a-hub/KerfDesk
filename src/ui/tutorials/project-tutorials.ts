@@ -292,7 +292,7 @@ export const PROJECT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Browse or search',
         instruction:
-          'Click Lib on the left toolbar. Choose a collection or search for the kind of design you need.',
+          'Click Open design library (the books icon) at the bottom of the left toolbar. Choose a collection or search for the kind of design you need.',
         focus: 'Search and collections',
         result: 'Matching designs appear as visual cards.',
       },
