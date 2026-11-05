@@ -9,6 +9,7 @@
 import { checkProjectMinimumFeatures, type MinFeatureReport } from '../../core/min-feature';
 import type { Project } from '../../core/scene';
 import { formatFeatureMm } from '../laser/job-review/min-feature-warnings';
+import { minOf } from '../../core/util';
 
 function plural(count: number, one: string, many: string): string {
   return `${count.toLocaleString('en-US')} ${count === 1 ? one : many}`;
@@ -16,7 +17,7 @@ function plural(count: number, one: string, many: string): string {
 
 function narrowestWidth(report: MinFeatureReport): number {
   const widths = [report.analysis.widths.minWidthMm, report.analysis.gaps.minWidthMm];
-  return Math.min(...widths.map((width) => width ?? Infinity));
+  return minOf(widths.map((width) => width ?? Infinity));
 }
 
 function reportNotice(report: MinFeatureReport): string {

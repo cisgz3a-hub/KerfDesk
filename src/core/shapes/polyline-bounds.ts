@@ -1,4 +1,5 @@
 import type { Bounds, Polyline } from '../scene';
+import { maxOf, minOf } from '../util';
 
 export function boundsOfPolylines(polylines: ReadonlyArray<Polyline>): Bounds {
   const xs: number[] = [];
@@ -11,9 +12,9 @@ export function boundsOfPolylines(polylines: ReadonlyArray<Polyline>): Bounds {
   }
   if (xs.length === 0) return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
   return {
-    minX: Math.min(...xs),
-    minY: Math.min(...ys),
-    maxX: Math.max(...xs),
-    maxY: Math.max(...ys),
+    minX: minOf(xs),
+    minY: minOf(ys),
+    maxX: maxOf(xs),
+    maxY: maxOf(ys),
   };
 }

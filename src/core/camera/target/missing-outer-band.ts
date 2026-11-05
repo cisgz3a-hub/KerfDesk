@@ -8,6 +8,7 @@
 // would be. Pure core.
 
 import type { BedTargetLayout, BedTargetMark } from './bed-target';
+import { maxOf, minOf } from '../../util';
 
 export type MissingOuterBand = {
   /** The complete grid the found rings form, in rings. */
@@ -78,10 +79,10 @@ function extentOf(marks: ReadonlyArray<BedTargetMark>): Extent | null {
   const cols = marks.map((m) => m.col);
   const rows = marks.map((m) => m.row);
   return {
-    minCol: Math.min(...cols),
-    maxCol: Math.max(...cols),
-    minRow: Math.min(...rows),
-    maxRow: Math.max(...rows),
+    minCol: minOf(cols),
+    maxCol: maxOf(cols),
+    minRow: minOf(rows),
+    maxRow: maxOf(rows),
   };
 }
 

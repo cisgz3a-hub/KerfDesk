@@ -21,6 +21,7 @@ import {
   type NestRect,
   type QuickNestResult,
 } from './quick-nest';
+import { maxOf } from '../util';
 
 export type NestOutline = ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>;
 
@@ -286,8 +287,8 @@ function placementScore(
     const item = byId.get(placement.id);
     return item === undefined ? [] : [placedState(item, placement, padding).bounds];
   });
-  const width = Math.max(...bounds.map((rect) => rect.maxX)) - bin.minX;
-  const height = Math.max(...bounds.map((rect) => rect.maxY)) - bin.minY;
+  const width = maxOf(bounds.map((rect) => rect.maxX)) - bin.minX;
+  const height = maxOf(bounds.map((rect) => rect.maxY)) - bin.minY;
   return [width * height, height, width];
 }
 
@@ -360,8 +361,8 @@ function footprintScore(
   const bounds = states.map((state, index) =>
     index === replacingIndex ? candidate.bounds : state.bounds,
   );
-  const maxX = Math.max(...bounds.map((rect) => rect.maxX));
-  const maxY = Math.max(...bounds.map((rect) => rect.maxY));
+  const maxX = maxOf(bounds.map((rect) => rect.maxX));
+  const maxY = maxOf(bounds.map((rect) => rect.maxY));
   const width = maxX - bin.minX;
   const height = maxY - bin.minY;
   return [width * height, height, width, candidate.placement.y, candidate.placement.x];

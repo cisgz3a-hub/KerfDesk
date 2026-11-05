@@ -1,3 +1,4 @@
+import { maxOf, minOf } from '../util';
 export type FitPoint = { readonly x: number; readonly y: number };
 export type FitPair = { readonly from: FitPoint; readonly to: FitPoint };
 export type FittedSimilarity = {
@@ -61,7 +62,7 @@ export function fitSimilarity(
   if (residualsMm.some((value) => !Number.isFinite(value))) {
     return failure('Similarity fit residuals exceed the supported numeric range.');
   }
-  const maxResidualMm = Math.max(...residualsMm);
+  const maxResidualMm = maxOf(residualsMm);
   const rmsResidualMm = Math.sqrt(
     residualsMm.reduce((sum, residual) => sum + residual * residual, 0) / residualsMm.length,
   );
@@ -94,7 +95,7 @@ function finitePoint(point: FitPoint): boolean {
 function sourceSpread(pairs: ReadonlyArray<FitPair>): number {
   const xs = pairs.map(({ from }) => from.x);
   const ys = pairs.map(({ from }) => from.y);
-  return Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+  return Math.hypot(maxOf(xs) - minOf(xs), maxOf(ys) - minOf(ys));
 }
 
 function failure(reason: string): { readonly ok: false; readonly reason: string } {

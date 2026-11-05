@@ -13,6 +13,7 @@
 import { packToolpath, unpackToolpathStep, type PackedToolpath } from './packed-toolpath';
 import type { ToolpathStepList } from './toolpath-steps';
 import type { ToolpathStep } from './toolpath-types';
+import { appendAll } from '../util';
 
 export class PackedToolpathSteps implements ToolpathStepList {
   readonly length: number;
@@ -51,7 +52,7 @@ export class PackedToolpathSteps implements ToolpathStepList {
     const mapped: T[] = [];
     for (let index = 0; index < this.length; index += 1) {
       const value = callback(unpackToolpathStep(this.packed, index), index);
-      if (Array.isArray(value)) mapped.push(...(value as ReadonlyArray<T>));
+      if (Array.isArray(value)) appendAll(mapped, value as ReadonlyArray<T>);
       else mapped.push(value as T);
     }
     return mapped;

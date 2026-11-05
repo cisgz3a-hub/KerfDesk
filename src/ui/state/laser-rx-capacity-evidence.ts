@@ -22,6 +22,7 @@ import { DEFAULT_PLANNER_BLOCKS } from '../../core/recovery/planner-backlog-rest
 import type { SessionObservationStamp } from './laser-controller-observation';
 import { hasUnsettledStreamAcks, isActiveJob } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
+import { maxOf } from '../../core/util';
 
 export type RxCapacityEvidence = {
   /** Largest free RX byte count reported while the host had nothing in flight. */
@@ -142,7 +143,7 @@ export function controllerPlannerSizeBlocks(state: PlannerSizeSource): number | 
     idle?.sessionEpoch === session ? idle?.plannerBlocksFree : undefined,
     build?.sessionEpoch === session ? state.controllerBuildInfo?.plannerBufferBlocks : undefined,
   ].filter((blocks): blocks is number => blocks !== undefined && blocks > 0);
-  if (measured.length > 0) return Math.max(...measured);
+  if (measured.length > 0) return maxOf(measured);
   const kind = state.activeControllerKind;
   return kind === undefined ? undefined : DEFAULT_PLANNER_BLOCKS[kind];
 }

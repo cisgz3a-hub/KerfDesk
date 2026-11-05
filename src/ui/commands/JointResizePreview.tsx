@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import type { JointCandidate, JointResizeObject } from '../../core/geometry/joint-resize';
 import type { Vec2 } from '../../core/scene';
 import { applyTransform } from '../../core/scene/transform';
+import { maxOf, minOf } from '../../core/util';
 
 export function JointResizePreview(props: {
   readonly before: ReadonlyArray<JointResizeObject>;
@@ -15,10 +16,10 @@ export function JointResizePreview(props: {
   const after = useMemo(() => geometry(props.after), [props.after]);
   const points = [...before.points, ...after.points];
   if (points.length === 0) return null;
-  const minX = Math.min(...points.map((p) => p.x)),
-    minY = Math.min(...points.map((p) => p.y));
-  const width = Math.max(1, Math.max(...points.map((p) => p.x)) - minX);
-  const height = Math.max(1, Math.max(...points.map((p) => p.y)) - minY);
+  const minX = minOf(points.map((p) => p.x)),
+    minY = minOf(points.map((p) => p.y));
+  const width = Math.max(1, maxOf(points.map((p) => p.x)) - minX);
+  const height = Math.max(1, maxOf(points.map((p) => p.y)) - minY);
   const margin = Math.max(width, height) * 0.08;
   const labelSize = Math.max(width, height) / 45;
   return (

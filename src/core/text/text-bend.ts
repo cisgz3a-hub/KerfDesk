@@ -1,5 +1,4 @@
 import {
-  curveSubpathBounds,
   type Bounds,
   type ColoredPath,
   type CurveSubpath,
@@ -8,6 +7,7 @@ import {
   type Vec2,
 } from '../scene';
 import type { TextRenderResult } from './text-to-polylines';
+import { coloredPathsBounds } from './colored-paths-bounds';
 
 export const TEXT_BEND_MIN_DEG = -180;
 export const TEXT_BEND_MAX_DEG = 180;
@@ -18,7 +18,7 @@ export function bendTextRender(rendered: TextRenderResult, bendDeg: number): Tex
   if (Math.abs(angleDeg) < 1e-9 || width <= 0) return rendered;
   const bend = bendPointMapper(rendered.bounds, (angleDeg * Math.PI) / 180);
   const paths = rendered.paths.map((path) => bendColoredPath(path, bend));
-  const bounds = boundsForPaths(paths);
+  const bounds = coloredPathsBounds(paths);
   return normalizeBentPaths(
     paths,
     bounds,
@@ -83,25 +83,6 @@ function mapSegment(segment: PathSegment, map: (point: Vec2) => Vec2): PathSegme
     };
   }
   return { kind: 'line', to: map(segment.to) };
-}
-
-function boundsForPaths(paths: ReadonlyArray<ColoredPath>): Bounds {
-  const curveBounds = paths.flatMap((path) => path.curves?.map(curveSubpathBounds) ?? []);
-  const points = paths.flatMap((path) => path.polylines.flatMap((polyline) => polyline.points));
-  const xs = [
-    ...curveBounds.flatMap((bounds) => [bounds.minX, bounds.maxX]),
-    ...points.map((p) => p.x),
-  ];
-  const ys = [
-    ...curveBounds.flatMap((bounds) => [bounds.minY, bounds.maxY]),
-    ...points.map((p) => p.y),
-  ];
-  return {
-    minX: Math.min(...xs),
-    minY: Math.min(...ys),
-    maxX: Math.max(...xs),
-    maxY: Math.max(...ys),
-  };
 }
 
 function normalizeBentPaths(

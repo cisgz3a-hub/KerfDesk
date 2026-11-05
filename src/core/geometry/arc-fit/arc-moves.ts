@@ -9,6 +9,7 @@ import {
   ARC_FIT_MIN_RADIUS_MM,
 } from './arc-fit-limits';
 import { arcSweep } from './arc-primitives';
+import { appendAll } from '../../util';
 
 export type ArcMove =
   | { readonly kind: 'line'; readonly to: Vec2 }
@@ -130,7 +131,7 @@ export function sampleArcMoves(
   const points: Vec2[] = [start];
   let from = start;
   for (const move of moves) {
-    if (move.kind === 'arc') points.push(...arcInteriorPoints(from, move, maxSagittaMm));
+    if (move.kind === 'arc') appendAll(points, arcInteriorPoints(from, move, maxSagittaMm));
     points.push(move.to);
     from = move.to;
   }

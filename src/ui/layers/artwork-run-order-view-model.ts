@@ -12,6 +12,7 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { artworkDisplayName, artworkDisplayNames } from './artwork-display-names';
+import { maxOf, minOf } from '../../core/util';
 
 export type ArtworkRunOrderRowModel = {
   readonly key: string;
@@ -134,10 +135,10 @@ function operationSummary(layers: ReadonlyArray<Layer>): string {
 function combinedDimensions(objects: ReadonlyArray<SceneObject>): string {
   if (objects.length === 0) return '0 × 0 mm';
   const boxes = objects.map(transformedBBox);
-  const minX = Math.min(...boxes.map((box) => box.minX));
-  const minY = Math.min(...boxes.map((box) => box.minY));
-  const maxX = Math.max(...boxes.map((box) => box.maxX));
-  const maxY = Math.max(...boxes.map((box) => box.maxY));
+  const minX = minOf(boxes.map((box) => box.minX));
+  const minY = minOf(boxes.map((box) => box.minY));
+  const maxX = maxOf(boxes.map((box) => box.maxX));
+  const maxY = maxOf(boxes.map((box) => box.maxY));
   return `${formatNumber(maxX - minX)} × ${formatNumber(maxY - minY)} mm`;
 }
 

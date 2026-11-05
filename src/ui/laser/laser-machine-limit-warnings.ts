@@ -15,6 +15,7 @@ import type { DeviceProfile } from '../../core/devices';
 import { sceneObjectUsesOperation, type Layer, type Project } from '../../core/scene';
 import { operationOverrideForObject } from '../../core/effective-output';
 import { reportedAxisFeedLimit } from './reported-axis-feed-limit';
+import { maxOf } from '../../core/util';
 
 // A profile within float-noise / rounding of the reported travel must not nag.
 const BED_TRAVEL_TOLERANCE_MM = 1;
@@ -82,7 +83,7 @@ function maxOutputSpeed(project: Project): number | null {
     ...outputLayers.map((layer) => layer.speed),
     ...objectOverrideSpeedsOnOutputLayers(project, outputLayers),
   ];
-  return speeds.length === 0 ? null : Math.max(...speeds);
+  return speeds.length === 0 ? null : maxOf(speeds);
 }
 
 function objectOverrideSpeedsOnOutputLayers(

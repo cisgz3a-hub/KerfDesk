@@ -14,6 +14,7 @@ import type { CutGroup } from '../../job';
 import { cutSegmentsForPass, finalPassCutSegments } from '../../job/cut-pass-segments';
 import type { Vec2 } from '../../scene';
 import { mmToUm } from './rd-numbers';
+import { maxOf, minOf } from '../../util';
 
 export type RdPoint = { readonly xUm: number; readonly yUm: number };
 export type RdMotionStep = RdPoint & { readonly cut: boolean };
@@ -53,10 +54,10 @@ export function planRdMotion(groups: ReadonlyArray<CutGroup>): ReadonlyArray<RdM
 
 export function unionBounds(parts: ReadonlyArray<{ readonly bounds: RdBoundsUm }>): RdBoundsUm {
   return {
-    minX: Math.min(...parts.map((part) => part.bounds.minX)),
-    minY: Math.min(...parts.map((part) => part.bounds.minY)),
-    maxX: Math.max(...parts.map((part) => part.bounds.maxX)),
-    maxY: Math.max(...parts.map((part) => part.bounds.maxY)),
+    minX: minOf(parts.map((part) => part.bounds.minX)),
+    minY: minOf(parts.map((part) => part.bounds.minY)),
+    maxX: maxOf(parts.map((part) => part.bounds.maxX)),
+    maxY: maxOf(parts.map((part) => part.bounds.maxY)),
   };
 }
 

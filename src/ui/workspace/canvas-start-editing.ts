@@ -9,6 +9,7 @@ import type { PreparedOutput } from '../../io/gcode';
 import { mapControllerPointToScene, type CanvasMotionPlan } from '../state/canvas-motion-plan';
 import { currentPrintCutOutputRegistration } from '../laser/print-cut-output';
 import { loadCanvasStartBounds } from '../state/canvas-start-bounds-loader';
+import { maxOf, minOf } from '../../core/util';
 
 type Prepared = Extract<PreparedOutput, { readonly ok: true }>;
 export type StartEditingContext = {
@@ -153,10 +154,10 @@ function controllerFrameBounds(plan: CanvasMotionPlan) {
   if (plan.framePerimeter.length < 2) return null;
   const points = plan.framePerimeter.map((point) => sceneToController(point, plan));
   return {
-    minX: Math.min(...points.map((point) => point.x)),
-    minY: Math.min(...points.map((point) => point.y)),
-    maxX: Math.max(...points.map((point) => point.x)),
-    maxY: Math.max(...points.map((point) => point.y)),
+    minX: minOf(points.map((point) => point.x)),
+    minY: minOf(points.map((point) => point.y)),
+    maxX: maxOf(points.map((point) => point.x)),
+    maxY: maxOf(points.map((point) => point.y)),
   };
 }
 

@@ -1,6 +1,7 @@
 import { formatGcodeCoordinateMm } from '../../core/gcode';
 import type { Toolpath, ToolpathStep } from '../../core/job';
 import type { Vec2 } from '../../core/scene';
+import { appendAll } from '../../core/util';
 
 export type PreviewRouteParityResult =
   | { readonly ok: true }
@@ -153,7 +154,7 @@ function routeSegments(toolpath: Toolpath): ReadonlyArray<PreviewRouteSegment> {
   const segments: PreviewRouteSegment[] = [];
   let routeStartMm = 0;
   for (const step of toolpath.steps) {
-    segments.push(...segmentsForStep(step, routeStartMm));
+    appendAll(segments, segmentsForStep(step, routeStartMm));
     routeStartMm += step.length;
   }
   return segments;

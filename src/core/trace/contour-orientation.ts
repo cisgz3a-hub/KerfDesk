@@ -1,4 +1,5 @@
 import type { Vec2 } from '../scene';
+import { minOf } from '../util';
 
 const FRACTION_BITS = 52n;
 const EXPONENT_MASK = 2047n;
@@ -96,7 +97,7 @@ export class ContourOrientation {
 }
 
 function exactOrientation(values: ReadonlyArray<Dyadic>): number {
-  const exponent = Math.min(...values.map((value) => value.exponent));
+  const exponent = minOf(values.map((value) => value.exponent));
   const integers = values.map((value) => value.integer << BigInt(value.exponent - exponent));
   // The fixed six-coordinate list establishes all six entries.
   const [ax, ay, bx, by, cx, cy] = integers as [bigint, bigint, bigint, bigint, bigint, bigint];
