@@ -79,6 +79,7 @@ export function storedSegmentBlock(segment: StoredSegment, limits: MotionLimits)
     distance: segmentDistance(segment, length),
     targetVelocity: isRapid ? maxRate / SECONDS_PER_MINUTE : feedMmPerSec(segment.feed, maxRate),
     direction,
+    ...(limits.laserModeMotion === true ? { laserModeMotion: true } : {}),
   };
 }
 

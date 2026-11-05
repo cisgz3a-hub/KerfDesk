@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from '../devices';
 import { buildGcodeRenderModel } from '../gcode-view';
 import { buildProgramTime } from '../gcode-time/program-time';
+import { deviceRunsRapidsAsLaserMotion } from '../gcode-time/program-timing-options';
 import { grblStrategy } from '../output/grbl-strategy';
 import { estimateJobDuration } from './estimate-duration';
 import type { CutGroup, FillGroup, Job, RasterGroup } from './job';
@@ -45,6 +46,8 @@ function compareProgram(job: Job, finishX: number, profile = device): number {
     accelMmPerSec2: profile.accelMmPerSec2,
     junctionDeviationMm: profile.junctionDeviationMm,
     maxFeedMmPerMin: profile.maxFeed,
+    // The estimate's own controller rule (ADR-255 Amendment 3).
+    ...(deviceRunsRapidsAsLaserMotion(profile, 'laser') ? { laserModeMotion: true } : {}),
   });
   const estimate = estimateJobDuration(job, profile, options);
   const executionSeconds = estimate.totalSeconds - (estimate.breakdown.transportSeconds ?? 0);

@@ -1,6 +1,6 @@
 # Performance audit S1 — P3 sweep (S1–S6)
 
-**Requested:** the maintainer, 2026-11-05: "fix the P3s". This table holds every P3 of reports S1–S6, and the KNOWN items those reports recommend fixing, with where each one stands on `main`. S7–S9 add their own rows when those areas finish.
+**Requested:** the maintainer, 2026-11-05: "fix the P3s". This table holds every P3 of reports S1–S7, and the KNOWN items those reports recommend fixing, with where each one stands on `main`. S8 and S9 add their own rows when those areas finish.
 
 **Rules held by every fix** ([AREAS.md](AREAS.md)): a speed fix may not change the burn or the committed geometry (G-code, traced paths or result hashes byte-identical on the fixture set); before and after are the median of five plus the worst, production bundle, with the calibration loop before and after each set; each fix adds a guard that counts work or checks a worker boundary, not wall-clock time. Route or burn changes, lower resolution and new limits are listed as maintainer decisions instead.
 
@@ -22,13 +22,15 @@
 | S4-P2-1 (P3) | Everyday jobs under 20,000 units compile on the UI thread for Preview, Frame, Start, ETA and Save separately | 200 ms block | **Already fixed (#1575)** (ADR-598 Amd 4) |
 | S4-P3-1 | Photo Preview compiles the raster on the UI thread: 100 mm 203–212 ms, bed-sized 673–737 ms | 200 ms block | _this sweep_ |
 | S4-P3-2 | Save G-code re-prepares the whole program for an unchanged project: bed photo 16.2 then 15.5 s | reuse | **Already fixed (#1575).** `app/save-emission-reuse.ts` keeps the last emitted Save per project and exact request; repeated Save of a 100 mm photo 2,120 → 64 ms |
-| S4-P3-3 | The ETA stops at every rapid/feed junction, which GRBL 1.1 laser mode does not: 200-object mix 3 h 05 min against 1 h 51 min modelled | — | _this sweep_ (maintainer approved 2026-11-05: "Use GRBL laser model"; ADR-255 Amd 3) |
+| S4-P3-3 | The ETA stops at every rapid/feed junction, which GRBL 1.1 laser mode does not: 200-object mix 3 h 05 min against 1 h 51 min modelled | — | **Fixed by this sweep (#1585)** (maintainer approved 2026-11-05: "Use GRBL laser model"; ADR-255 Amd 3). Laser jobs on GRBL 1.1 and grblHAL with `$32=1` blend a rapid/feed junction by junction deviation; CNC, `$32=0`, FluidNC, Marlin, Smoothieware and Ruida keep the stop. On S4's eight fixture projects G-code is byte-identical and the estimate moves: mix-200 3 h 05 min → 1 h 52 min (−39.7 %; S4's independent model 1 h 51 min), line-200 −1.8 %, fill-200 and fill-5000 −0.6 %, CNC 0.0 % |
 | S5-P3-1 | Sharp traces large pages 1.7–2.6 × slower than 1.0.28 for identical paths: the clean-art check prepares the source again | within 1.1 × 1.0.28 | _this sweep_ |
 | S5-P3-2 | The cooperative fallback (no trace worker) still traces in stretches of 205–285 ms | 200 ms block | _pending_ |
 | S5-P3-3 | Pressing Trace on a 12 MP photo or 4096 page decodes the source on the UI thread: 335–342 ms block | 100 ms on commit | _this sweep_ |
 | S6-P3-1 | Outer shapes only pays the whole nesting-depth search: 100 rings 443 ms against 67 ms in 1.0.23, same output | within 1.5 × 1.0.23 | **Fixed by this sweep (#1583)** (ADR-410 Amd 5). Depths try the deepest enclosing ring first. Engine, S6 harness, base vs fix alternating, same result hash: 100 rings 824 → 35 ms (worst 1,596 → 87), 300 rings 6,776 → 108 ms (calibration 118–126 and 84–242 ms, so about 3 × a quiet PC; 1.0.23 was 26–36 ms at 100 rings on a quiet PC, about 11 ms here when scaled) |
 | S6-P3-2 | Exclude folds the selection one shape at a time: 500 shapes 2.5 s, 2,000 shapes 55 s | 2,000 shapes under 5 s | **Maintainer decision** (below) |
 | S6-P3-3 | Optimize / Combine Shapes' before/after preview rebuilds every outline on the UI thread: 2,000 outlines 262–328 ms | 100 ms opening task | _this sweep_ |
+| S7-P3-1 | Shrink-to-fit re-shapes every line prefix through opentype.js: a 200-character paragraph previews 1.4–1.55 s after each key (text worker) | 100 ms response | _pending_ (S7 ledgered by #1584; memoized line shaping gave identical outlines 3.5–5.7 × faster) |
+| S7-P3-2 | A 2,000-character frame rebuilds its preview SVG path on every key: 51–280 ms a key, typing falls 1.2 s behind | 100 ms response | _pending_ |
 
 ### Machine job time (S4's route and overscan section)
 
@@ -41,6 +43,7 @@
 
 | ID | Title | Status |
 |---|---|---|
+| N4-P3-2 (S7 KNOWN) | Remote and jig edits lay text frames out on the UI thread: a 500-character frame 3.8–4.2 s, 2,000 characters 23–24 s (Node) | _pending_ (S7-P3-1's memoization helps; moving the layout to the text worker removes the freeze). The S7 P2s belong to a separate card |
 | N3-P3-1 (S6 KNOWN) | Offset's nesting step grows with the cube of the nesting depth: 100 rings 1.5 s, 300 rings 31 s | **Fixed by this sweep (#1583)** (ADR-410 Amd 5). When every ring keeps 4 µm clear of every other edge, a level is painted only against the rings it can change. Same result hash on every S6 fixture; a seeded test compares with the level-by-level painter on 250 scenes (1,500 run locally). Offset 100 rings 3,801 → 391 ms, Offset outlines row 3,352 → 359 ms (calibration 108–128 ms); 300 rings 78 s → 2.6 s in a smoke run (timed set below when it lands). 20 everyday shapes and 200 overlapping circles unchanged (ratios 1.04 and 1.12, inside noise) |
 
 The other KNOWN items in S1–S6 are re-observations of P1/P2 findings fixed elsewhere (S1-P2-2, S2-P2-1/2, S3-P2-3), items owned by other audits (Q4-P2-1 trace speed against Potrace, K1-P1-1's window route, 21-P3-7), or confirmations that a fix holds (J10-P3-2, J10-P3-3, R1-P2-1).
