@@ -1,6 +1,7 @@
 // Perf audit S1, S5-P3-3: the trace dialog's decode reads its canvas back in a
 // worker. The window draws and snapshots the canvas, nothing more.
 
+import type * as ImageLoader from './image-loader';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { RawImageData } from '../../core/trace';
 import {
@@ -12,7 +13,7 @@ import { decodeTraceSourceImage } from './off-thread-trace-decode';
 const loader = vi.hoisted(() => ({ readBacks: 0, loads: 0 }));
 
 vi.mock('./image-loader', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./image-loader')>();
+  const actual = await importOriginal<typeof ImageLoader>();
   return {
     ...actual,
     decodeImageOntoCanvas: async <T>(
@@ -69,7 +70,7 @@ describe('trace dialog decode (perf audit S5-P3-3)', () => {
   it('reads the loader’s canvas back in a worker, not in the window', async () => {
     const bitmap = { width: 1, height: 1, close: vi.fn() };
     vi.stubGlobal('Worker', FakeWorker);
-    vi.stubGlobal('OffscreenCanvas', class {});
+    vi.stubGlobal('OffscreenCanvas', vi.fn());
     vi.stubGlobal(
       'createImageBitmap',
       vi.fn(async () => bitmap),

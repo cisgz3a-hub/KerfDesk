@@ -1,6 +1,7 @@
 // Perf audit S1, S4-P3-1: the canvas Preview compiles a raster's burned image
 // in a worker. The window only posts the request and draws the bitmap back.
 
+import type * as RasterPreviewBitmapModule from './raster-preview-bitmap';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createLayer, createProject, IDENTITY_TRANSFORM, type RasterImage } from '../../core/scene';
 import type { RasterPreviewBitmap } from './raster-preview-bitmap';
@@ -9,7 +10,7 @@ import { buildRasterPreviewBitmap } from './raster-preview-worker-client';
 const compiled = vi.hoisted(() => ({ count: 0 }));
 
 vi.mock('./raster-preview-bitmap', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./raster-preview-bitmap')>();
+  const actual = await importOriginal<typeof RasterPreviewBitmapModule>();
   return {
     ...actual,
     rasterPreviewBitmap: (...args: Parameters<typeof actual.rasterPreviewBitmap>) => {
