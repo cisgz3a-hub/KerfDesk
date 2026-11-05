@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
-import { materializeVectorObject, type VectorSceneObject } from '../../core/geometry';
-import type { ColoredPath } from '../../core/scene';
+import type { VectorSceneObject } from '../../core/geometry';
+import { comparisonOutline } from './vector-comparison-outline';
 
 /** Display both geometries in one world-coordinate view, without changing the job. */
 export function VectorComparisonPreview(props: {
@@ -10,8 +10,8 @@ export function VectorComparisonPreview(props: {
 }): JSX.Element | null {
   const [showBefore, setShowBefore] = useState(true);
   const [showAfter, setShowAfter] = useState(true);
-  const original = useMemo(() => previewGeometry(props.before), [props.before]);
-  const result = useMemo(() => previewGeometry(props.after), [props.after]);
+  const original = useMemo(() => comparisonOutline(props.before), [props.before]);
+  const result = useMemo(() => comparisonOutline(props.after), [props.after]);
   const boxes = [original.bounds, result.bounds].filter((box) => box !== null);
   if (boxes.length === 0) return null;
   const minX = Math.min(...boxes.map((box) => box.minX));
@@ -78,31 +78,4 @@ export function VectorComparisonPreview(props: {
       </div>
     </div>
   );
-}
-function previewGeometry(objects: ReadonlyArray<VectorSceneObject>) {
-  const paths = objects.flatMap((object) => materializeVectorObject(object).paths);
-  let bounds: { minX: number; minY: number; maxX: number; maxY: number } | null = null;
-  const d = paths
-    .flatMap((path: ColoredPath) => path.polylines)
-    .map((polyline) => {
-      const first = polyline.points[0];
-      if (first === undefined) return '';
-      const parts: string[] = [];
-      polyline.points.forEach((point, index) => {
-        if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return;
-        bounds =
-          bounds === null
-            ? { minX: point.x, minY: point.y, maxX: point.x, maxY: point.y }
-            : {
-                minX: Math.min(bounds.minX, point.x),
-                minY: Math.min(bounds.minY, point.y),
-                maxX: Math.max(bounds.maxX, point.x),
-                maxY: Math.max(bounds.maxY, point.y),
-              };
-        parts.push(`${index === 0 ? 'M' : 'L'}${point.x} ${point.y}`);
-      });
-      return parts.join('') + (polyline.closed ? 'Z' : '');
-    })
-    .join('');
-  return { d, bounds: bounds as { minX: number; minY: number; maxX: number; maxY: number } | null };
 }
