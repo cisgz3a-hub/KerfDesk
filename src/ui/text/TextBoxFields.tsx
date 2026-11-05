@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { TextBoxSettings } from '../../core/scene/text-box';
 import { evaluateNumericEntry } from '../../core/numeric-expression';
 import type { TextRenderResult } from '../../core/text';
+import { textFramePreviewGeometry } from './text-frame-preview-path';
 import { useTextWorkerSession } from './use-text-worker-session';
 import type { DialogFields, DialogValues } from './use-text-dialog-fields';
 
@@ -114,10 +115,19 @@ function TextBoxPreview({ values }: { readonly values: DialogValues }): JSX.Elem
       window.clearTimeout(timer);
     };
   }, [values, textWorker]);
+  // Each key re-renders this while the next layout is still in the worker, so
+  // the path is built once per result (perf audit S7-P3-2).
+  const geometry = useMemo(
+    () =>
+      preview?.textBoxLayout === undefined || preview === null
+        ? null
+        : textFramePreviewGeometry(preview, preview.textBoxLayout),
+    [preview],
+  );
   const layout = preview?.textBoxLayout;
-  if (layout === undefined || preview === null)
+  if (layout === undefined || preview === null || geometry === null)
     return <p role="status">{error ?? 'Updating text frame…'}</p>;
-  const { minX, width, height, paths } = previewGeometry(preview, layout);
+  const { minX, width, height, paths } = geometry;
   return (
     <>
       <svg
@@ -220,23 +230,4 @@ function TextBoxOptions({
       />
     </>
   );
-}
-
-function previewGeometry(
-  preview: TextRenderResult,
-  layout: NonNullable<TextRenderResult['textBoxLayout']>,
-) {
-  const minX = Math.min(0, preview.bounds.minX);
-  const width = Math.max(layout.widthMm, preview.bounds.maxX, 1) - minX;
-  const height = Math.max(layout.heightMm, preview.bounds.maxY, 1);
-  const paths = preview.paths
-    .flatMap((path) => path.polylines)
-    .map(
-      (line) =>
-        line.points
-          .map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x} ${point.y}`)
-          .join(' ') + (line.closed ? ' Z' : ''),
-    )
-    .join(' ');
-  return { minX, width, height, paths };
 }
