@@ -15,6 +15,7 @@ export {
 import { resolveStockAwareRestPocket } from './cnc-rest-stock-operation';
 import type { Cnc2dStockEvidence } from './cnc-pocket-stock';
 import { planRestPocketToolpaths } from './rest-pocket';
+import { sameInputMemo } from './same-input-memo';
 
 export type CncRestPocketPlanningEvidence = {
   readonly offsetFailed: boolean;
@@ -46,7 +47,25 @@ const NO_REST_POCKET_EVIDENCE: CncRestPocketPlanningEvidence = {
   stepoverUsed: false,
 };
 
+// The compile's passes, its roughing group and emit preflight each ask for
+// the same rest pocket; it is planned once (S8-P3-1, same-input-memo.ts).
+const memoizedRestPocketOperation = sameInputMemo(planRestPocketOperation);
+
 export function resolveRestPocketOperation(
+  contours: ReadonlyArray<Polyline>,
+  settings: CncLayerSettings,
+  config: CncMachineConfig,
+): CncRestPocketOperation {
+  // Only a requested rest pass is kept; anything else answers at once.
+  const requested =
+    settings.cutType === 'pocket' &&
+    (settings.pocketRestStock !== undefined || settings.pocketRoughToolId !== undefined);
+  return requested
+    ? memoizedRestPocketOperation(contours, settings, config)
+    : planRestPocketOperation(contours, settings, config);
+}
+
+function planRestPocketOperation(
   contours: ReadonlyArray<Polyline>,
   settings: CncLayerSettings,
   config: CncMachineConfig,

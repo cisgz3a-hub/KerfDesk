@@ -9,6 +9,7 @@ import { verifyAdaptivePocket, type AdaptivePocketVerification } from './adaptiv
 import { contourPassFromPolyline } from './compile-cnc-helpers';
 import type { FrameHandedness } from './machine-frame-handedness';
 import { cutDirectionClockwise, enforceCutDirection } from './motion-polish';
+import { sameInputMemo } from './same-input-memo';
 
 export type AdaptivePocketOperation =
   | { readonly kind: 'not-requested' }
@@ -27,6 +28,10 @@ export function adaptiveOptimalLoadMm(settings: CncLayerSettings, toolDiameterMm
   return settings.adaptiveOptimalLoadMm ?? toolDiameterMm * DEFAULT_LOAD_RATIO;
 }
 
+// The compile and emit preflight each ask for the same plan and verification;
+// they are made once (S8-P3-1, same-input-memo.ts).
+const memoizedAdaptivePocketOperation = sameInputMemo(planAdaptivePocketOperation);
+
 export function resolveAdaptivePocketOperation(
   contours: ReadonlyArray<Polyline>,
   settings: CncLayerSettings,
@@ -35,6 +40,14 @@ export function resolveAdaptivePocketOperation(
   if (settings.cutType !== 'pocket' || settings.pocketStrategy !== 'adaptive') {
     return { kind: 'not-requested' };
   }
+  return memoizedAdaptivePocketOperation(contours, settings, tool);
+}
+
+function planAdaptivePocketOperation(
+  contours: ReadonlyArray<Polyline>,
+  settings: CncLayerSettings,
+  tool: CncTool,
+): AdaptivePocketOperation {
   if (settings.pocketRestStock !== undefined)
     return {
       kind: 'error',
