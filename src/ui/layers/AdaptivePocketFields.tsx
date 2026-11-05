@@ -32,8 +32,12 @@ export function AdaptivePocketFields(props: {
       <p role="note" style={feedbackBoundaryStyle}>
         Geometry only — no live load sensing or automatic feed adjustment. Island partitions use
         independent entries, plunge-feed seed slotting and final wall cleanup; those phases can
-        engage more stock than the clearing-ring limit. Unverified plans use a disclosed
-        offset-pocket fallback.
+        engage more stock than the clearing-ring limit.
+      </p>
+      <p role="note" style={feedbackBoundaryStyle}>
+        Adaptive opens each pocket from one entry. A pocket it can&apos;t open that way, such as one
+        longer than it is wide, cuts offset rings instead (full-width first pass); Preview and Job
+        Review say when.
       </p>
     </>
   );

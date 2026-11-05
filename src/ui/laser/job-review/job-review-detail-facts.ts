@@ -28,6 +28,7 @@ import { materialBindingStatus } from '../../layers/material-binding-status';
 import { closedShapesGetTabs, cncDepthParts } from './job-review-cnc-depth';
 import { formatMm } from './job-review-format';
 import { laserTabsPart } from './job-review-laser-tabs';
+import type { CncStrategyFallback } from '../../../core/job/cnc-compilation-sidecar-types';
 
 const FILL_STYLE_LABELS: Readonly<Record<LayerOperationSettings['fillStyle'], string>> = {
   scanline: 'Scanline',
@@ -191,7 +192,8 @@ export type CompiledReliefFacts = {
  * do `relief` when the operation cut relief objects (ADR-224 Amendment 3),
  * `unrampedShapes` when none of its shape groups records the ramp it asks for
  * (ADR-273 Amendment 2) and `compiledTabs`, whether any of its passes rises
- * into a holding tab (ADR-258 Amendment 4); undefined when no job is known. */
+ * into a holding tab (ADR-258 Amendment 4); undefined when no job is known.
+ * `strategyFallback` is the strategy the compile cut instead (S8-P2-1). */
 export function cncOperationDetail(
   settings: CncLayerSettings,
   stockThicknessMm?: number,
@@ -199,6 +201,7 @@ export function cncOperationDetail(
   relief?: CompiledReliefFacts,
   unrampedShapes = false,
   compiledTabs?: boolean,
+  strategyFallback?: CncStrategyFallback['kind'],
 ): string {
   // A relief roughs to its own depth, level by level, and takes no tabs. An
   // operation that cut only reliefs cut no shape of its cut type, so that
@@ -221,7 +224,7 @@ export function cncOperationDetail(
     ...cncEntryPart(settings, plungingReliefStages, shapes, unrampedShapes),
     ...(shapes ? cncVCarveClearPart(settings) : []),
     ...cncFinishAllowancePart(settings),
-    ...(shapes ? cncPocketStrategyPart(settings) : []),
+    ...(shapes ? cncPocketStrategyPart(settings, strategyFallback) : []),
     feedSourcePart(settings),
   ].join(SEPARATOR);
 }
@@ -293,7 +296,13 @@ function cncFinishAllowancePart(settings: CncLayerSettings): ReadonlyArray<strin
     : [];
 }
 
-function cncPocketStrategyPart(settings: CncLayerSettings): ReadonlyArray<string> {
+function cncPocketStrategyPart(
+  settings: CncLayerSettings,
+  strategyFallback: CncStrategyFallback['kind'] | undefined,
+): ReadonlyArray<string> {
+  // Name what the program cuts, not only what the operation asked for.
+  if (strategyFallback === 'adaptive-offset') return ['offset rings (adaptive fell back)'];
+  if (strategyFallback === 'rest-full-pocket') return ['whole pocket (rest machining fell back)'];
   const strategy = settings.pocketStrategy;
   return strategy !== undefined && strategy !== 'offset' ? [`${strategy} pocket`] : [];
 }

@@ -99,6 +99,36 @@ export function adaptivePocketPasses(
   return passes;
 }
 
+/** An adaptive layer's passes, or why it cuts the ordinary offset pocket
+ * instead: the compile keeps the reason so Preview can say so (performance
+ * audit S8-P2-1). */
+export type AdaptivePocketCompilation =
+  | { readonly kind: 'not-requested' }
+  | { readonly kind: 'offset-fallback'; readonly reason: string }
+  | { readonly kind: 'passes'; readonly passes: ReadonlyArray<CncPass> };
+
+export function compileAdaptivePocketForSettings(
+  contours: ReadonlyArray<Polyline>,
+  settings: CncLayerSettings,
+  tool: CncTool,
+  depths: ReadonlyArray<number>,
+  handedness: FrameHandedness = 1,
+): AdaptivePocketCompilation {
+  const operation = resolveAdaptivePocketOperation(contours, settings, tool);
+  if (operation.kind === 'not-requested') return operation;
+  if (operation.kind === 'error') return { kind: 'offset-fallback', reason: operation.reason };
+  return {
+    kind: 'passes',
+    passes: adaptivePocketPasses(
+      operation,
+      depths,
+      settings.cutDirection === undefined
+        ? undefined
+        : { cutDirection: settings.cutDirection, handedness },
+    ),
+  };
+}
+
 export function adaptivePocketPassesForSettings(
   contours: ReadonlyArray<Polyline>,
   settings: CncLayerSettings,
@@ -106,17 +136,8 @@ export function adaptivePocketPassesForSettings(
   depths: ReadonlyArray<number>,
   handedness: FrameHandedness = 1,
 ): ReadonlyArray<CncPass> | null {
-  const operation = resolveAdaptivePocketOperation(contours, settings, tool);
-  if (operation.kind === 'not-requested') return null;
-  return operation.kind === 'ok'
-    ? adaptivePocketPasses(
-        operation,
-        depths,
-        settings.cutDirection === undefined
-          ? undefined
-          : { cutDirection: settings.cutDirection, handedness },
-      )
-    : null;
+  const compiled = compileAdaptivePocketForSettings(contours, settings, tool, depths, handedness);
+  return compiled.kind === 'passes' ? compiled.passes : null;
 }
 
 function withoutRepeatedPoints(points: ReadonlyArray<Vec2>): ReadonlyArray<Vec2> {

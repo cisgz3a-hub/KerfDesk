@@ -5,6 +5,7 @@
 
 import { machineBoundsForDevice, type DeviceProfile } from '../devices';
 import type { CncGroup } from '../job';
+import type { CncStrategyFallback } from '../job/cnc-compilation-sidecar-types';
 import {
   layerCncTool,
   type CncLayerSettings,
@@ -28,6 +29,7 @@ export type CompiledLayerGroup = {
   readonly offsetFailed: boolean;
   readonly passLimited: boolean;
   readonly stepoverUsed: boolean;
+  readonly strategyFallback?: Omit<CncStrategyFallback, 'layerId'>;
 };
 
 export function cncGroupForLayerResolvedWithEvidence(
@@ -92,6 +94,7 @@ export function cncGroupForLayerResolvedWithEvidence(
     offsetFailed: result.offsetFailed,
     passLimited: result.passLimited,
     stepoverUsed: result.stepoverUsed,
+    ...(result.strategyFallback === undefined ? {} : { strategyFallback: result.strategyFallback }),
   };
 }
 
