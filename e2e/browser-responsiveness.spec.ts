@@ -70,26 +70,25 @@ test('responsive acceptance still rejects a heartbeat gap at the 1000 ms limit',
 
 // Exact telemetry from main's Browser smoke: run 41962522778 (790b95c4a) and
 // run 41900286281 (9372060f7). Both gaps passed on re-run; no page work filled them.
-const CI_RUNNER_STALLS: readonly ResponsivenessMeasurement[] = [
-  {
-    ticks: 430,
-    elapsedMs: 7302.6,
-    maxGapMs: 1345.03,
-    maxGapLongTaskMs: 79,
-    longTaskCount: 2,
-    maxLongTaskMs: 79,
-    longTaskObserverSupported: true,
-  },
-  {
-    ticks: 146,
-    elapsedMs: 4443.6,
-    maxGapMs: 1592.9,
-    maxGapLongTaskMs: 0,
-    longTaskCount: 0,
-    maxLongTaskMs: 0,
-    longTaskObserverSupported: true,
-  },
-];
+const HEAVY_CANVAS_STALL: ResponsivenessMeasurement = {
+  ticks: 430,
+  elapsedMs: 7302.6,
+  maxGapMs: 1345.03,
+  maxGapLongTaskMs: 79,
+  longTaskCount: 2,
+  maxLongTaskMs: 79,
+  longTaskObserverSupported: true,
+};
+const RELIEF_STALL: ResponsivenessMeasurement = {
+  ticks: 146,
+  elapsedMs: 4443.6,
+  maxGapMs: 1592.9,
+  maxGapLongTaskMs: 0,
+  longTaskCount: 0,
+  maxLongTaskMs: 0,
+  longTaskObserverSupported: true,
+};
+const CI_RUNNER_STALLS = [HEAVY_CANVAS_STALL, RELIEF_STALL];
 
 test('CI tolerates a runner stall the page did not cause, and local runs do not', ({}, testInfo) => {
   for (const stall of CI_RUNNER_STALLS) {
@@ -135,7 +134,7 @@ test('without a Long Task observer the CI tolerance does not apply', ({}, testIn
     assertResponsivePhase(
       testInfo,
       'unobserved stall',
-      { ...CI_RUNNER_STALLS[1]!, longTaskObserverSupported: false },
+      { ...RELIEF_STALL, longTaskObserverSupported: false },
       heartbeatGapCeilingMs(true),
     ),
   ).toThrow(/maximum heartbeat gap/);
