@@ -15,16 +15,26 @@ export type MotionLimits = {
   readonly maxFeedMmPerMin: number;
   /** How the limits above reach a move off the axes (ADR-675); absent is Cartesian. */
   readonly kinematics?: MachineKinematics;
+  /** GRBL 1.1 or grblHAL in laser mode ($32=1): a G0 with axis words is laser
+   * motion, so the planner blends it into a G1 like any other junction instead
+   * of stopping (perf audit S4-P3-3, ADR-255 Amendment 3). */
+  readonly laserModeMotion?: boolean;
 };
 
 export const SECONDS_PER_MINUTE = 60;
 
-/** Guards against a zero/negative limit producing NaN or Infinity time. */
-export function sanitizeLimits(limits: MotionLimits): MotionLimits {
+/** Guards against a zero/negative limit producing NaN or Infinity time. A
+ * caller's timing options may add the controller's laser-mode motion. */
+export function sanitizeLimits(
+  limits: MotionLimits,
+  options: { readonly laserModeMotion?: boolean } = {},
+): MotionLimits {
+  const laserModeMotion = limits.laserModeMotion === true || options.laserModeMotion === true;
   return {
     accelMmPerSec2: Math.max(1, limits.accelMmPerSec2),
     junctionDeviationMm: Math.max(1e-6, limits.junctionDeviationMm),
     maxFeedMmPerMin: Math.max(1, limits.maxFeedMmPerMin),
     ...(limits.kinematics === undefined ? {} : { kinematics: limits.kinematics }),
+    ...(laserModeMotion ? { laserModeMotion: true } : {}),
   };
 }

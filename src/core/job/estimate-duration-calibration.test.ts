@@ -40,8 +40,13 @@ describe('job duration calibration', () => {
     const fastJob: Job = {
       groups: job.groups.map((group) => ({ ...group, speed: 12000 })),
     };
-    const estimate = estimateJobDuration(fastJob, device);
+    // A controller that stops where the rapid meets the cut ($32=0).
+    const estimate = estimateJobDuration(fastJob, { ...device, laserModeEnabled: false });
     expect(estimate.breakdown.cutSeconds).toBeCloseTo(1.1, 2);
+    // GRBL in laser mode enters the cut from the collinear rapid at 100 mm/s
+    // (ADR-255 Amendment 3), so only the final 0.05 s deceleration is added.
+    const blended = estimateJobDuration(fastJob, { ...device, laserModeEnabled: true });
+    expect(blended.breakdown.cutSeconds).toBeCloseTo(1.05, 2);
   });
 
   it('applies independent cut and travel factors after motion planning', () => {

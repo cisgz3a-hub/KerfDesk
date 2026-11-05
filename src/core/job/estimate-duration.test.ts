@@ -163,17 +163,35 @@ describe('estimateJobDuration', () => {
         }),
       ],
     };
-    const r = estimateJobDuration(j, device);
+    // A controller that stops where a rapid meets a cut ($32=0 here).
+    const r = estimateJobDuration(j, { ...device, laserModeEnabled: false });
     expect(r.breakdown.cutSeconds).toBeCloseTo(1.233, 2);
     expect(r.breakdown.travelSeconds).toBeCloseTo(1.2, 2);
+    // GRBL in laser mode blends the collinear cut → G0 → cut (ADR-255
+    // Amendment 3): the first cut leaves at 16.667 mm/s instead of braking,
+    // and the second enters at it, so each cut is 0.0167 + 9.861/16.667 =
+    // 0.608 s. The 40 mm hop runs 16.667 → 100 → 16.667 mm/s: 2 × 0.0833 s
+    // over 2 × 4.861 mm, plus 30.28 mm at 100 = 0.469 s; the reversal back
+    // to the start still stops (0.7 s).
+    const blended = estimateJobDuration(j, { ...device, laserModeEnabled: true });
+    expect(blended.breakdown.cutSeconds).toBeCloseTo(1.2167, 3);
+    expect(blended.breakdown.travelSeconds).toBeCloseTo(1.169, 2);
   });
 
   it('includes fill overscan runway time in the travel estimate', () => {
-    const zero = estimateJobDuration({ groups: [fillGroup(0)] }, device);
-    const overscan = estimateJobDuration({ groups: [fillGroup(5)] }, device);
+    const stopping = { ...device, laserModeEnabled: false };
+    const zero = estimateJobDuration({ groups: [fillGroup(0)] }, stopping);
+    const overscan = estimateJobDuration({ groups: [fillGroup(5)] }, stopping);
     expect(overscan.breakdown.cutSeconds).toBeCloseTo(zero.breakdown.cutSeconds, 6);
     expect(overscan.breakdown.travelSeconds).toBeGreaterThan(zero.breakdown.travelSeconds);
     expect(overscan.totalSeconds).toBeGreaterThan(zero.totalSeconds);
+    // GRBL in laser mode blends the runway into the row (ADR-255 Amendment 3),
+    // which is what overscan is for: the row is cut at speed throughout.
+    const laser = { ...device, laserModeEnabled: true };
+    const blendedZero = estimateJobDuration({ groups: [fillGroup(0)] }, laser);
+    const blended = estimateJobDuration({ groups: [fillGroup(5)] }, laser);
+    expect(blended.breakdown.cutSeconds).toBeLessThan(blendedZero.breakdown.cutSeconds);
+    expect(blended.breakdown.travelSeconds).toBeGreaterThan(blendedZero.breakdown.travelSeconds);
   });
 
   it('estimates the longer full runway for sensitive Island Fill sweeps', () => {
