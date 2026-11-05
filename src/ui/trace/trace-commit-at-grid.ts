@@ -5,14 +5,14 @@
 
 import type { TraceBoundary, TraceOptions } from '../../core/trace';
 import type { TracePhase } from '../../core/trace/trace-progress';
-import { loadImageAsRawData, readImageNaturalSize } from './image-loader';
+import { readImageNaturalSize } from './image-loader';
+import { decodeTraceSourceImage } from './off-thread-trace-decode';
 import {
   matchingPreparedTrace,
   type PendingPreparedTrace,
   type PreparedTrace,
 } from './prepared-trace';
 import { traceImageWithBoundaryMode, type BoundaryMode } from './region-enhance-trace';
-import { rawImageHasTransparency } from './raw-image-transparency';
 import { maskTraceSourceResult } from './trace-source-mask';
 import { traceBoundaryForWorkingGrid, type TraceGrid } from './trace-boundary-grid';
 import { checkTraceSignal, isTraceAbort } from './trace-cancellation';
@@ -106,9 +106,12 @@ async function traceDecoded(
   plan: TraceCommitGridPlan,
 ): Promise<TraceResult> {
   args.progress?.('decoding');
-  const image = await loadImageAsRawData(args.file, plan.maxEdge, args.signal);
+  const { image, hasTransparency: sourceHasTransparency } = await decodeTraceSourceImage(
+    args.file,
+    plan.maxEdge,
+    args.signal,
+  );
   checkTraceSignal(args.signal);
-  const sourceHasTransparency = rawImageHasTransparency(image);
   const boundary = traceBoundaryForWorkingGrid(args.boundary, args.sourceGrid, image);
   const result = await traceImageWithBoundaryMode(
     image,
