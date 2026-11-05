@@ -100,7 +100,12 @@ describe('Inspector timing context (ADR-425)', () => {
       plannerBlocks: 15,
       deviceName: 'Shop laser',
     };
-    expect(contextWithTiming({ ...project, device }).timing).toEqual(expected);
+    // A laser job on GRBL in laser mode blends rapids into feed moves, as Job
+    // Review times it (ADR-255 Amendment 3); a CNC job keeps the stop.
+    expect(contextWithTiming({ ...project, device }).timing).toEqual({
+      ...expected,
+      limits: { ...expected.limits, laserModeMotion: true },
+    });
     expect(
       contextWithTiming({ ...project, device, machine: DEFAULT_CNC_MACHINE_CONFIG }).timing,
     ).toEqual(expected);

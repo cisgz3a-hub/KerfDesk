@@ -76,10 +76,18 @@ export function deviceProgramTimingOptions(
     ...(laserPowerControl === undefined ? {} : { laserPowerControl }),
     ...(controllerKind === 'ruida' ? {} : { baudRate }),
     ...(plannerBlocks === undefined ? {} : { plannerBlocks }),
-    ...(deviceRunsRapidsAsLaserMotion(device, machineKind, controllerKind)
-      ? { laserModeMotion: true }
-      : {}),
+    ...laserModeTiming(device, machineKind, controllerKind),
   };
+}
+
+function laserModeTiming(
+  device: DeviceProfile,
+  machineKind: 'laser' | 'cnc',
+  controllerKind: ControllerKind,
+): Pick<ProgramTimingOptions, 'laserModeMotion'> {
+  return deviceRunsRapidsAsLaserMotion(device, machineKind, controllerKind)
+    ? { laserModeMotion: true }
+    : {};
 }
 
 /**
