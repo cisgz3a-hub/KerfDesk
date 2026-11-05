@@ -41,6 +41,18 @@ export class JsonTokenizer {
     if (this.ended) throw new Error('JSON tokenizer is already ended');
     let index = 0;
     while (index < input.length) {
+      if (this.state === 'string') {
+        // A project's photos are base64 strings, so nearly every byte of a
+        // large file is plain string text: take it a run at a time (perf
+        // audit S3-P3-1). The quote, backslash or control character that ends
+        // the run goes through consumeString below, as before.
+        const end = plainStringRunEnd(input, index);
+        if (end > index) {
+          this.appendString(input.slice(index, end));
+          index = end;
+          continue;
+        }
+      }
       const character = input[index];
       if (character === undefined) break;
       if (this.consumeCharacter(character)) index += 1;
@@ -182,6 +194,18 @@ export class JsonTokenizer {
   private emit(token: JsonTokenType, value?: unknown): void {
     this.onToken(value === undefined ? { token } : { token, value });
   }
+}
+
+// The end of the run of string characters from `start` that need no handling:
+// anything but a quote, a backslash or a control character.
+function plainStringRunEnd(input: string, start: number): number {
+  let end = start;
+  while (end < input.length) {
+    const code = input.charCodeAt(end);
+    if (code === 0x22 || code === 0x5c || code <= 0x1f) break;
+    end += 1;
+  }
+  return end;
 }
 
 function simpleEscape(character: string): string | null {

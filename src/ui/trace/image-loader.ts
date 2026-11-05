@@ -9,7 +9,8 @@ import { resampleBuffer } from '../../core/image-resample';
 import type { RawImageData } from '../../core/trace';
 import { bytesToBase64 } from '../import/base64-bytes';
 import { freezeGif, isGif } from '../import/freeze-gif';
-import { compositeChannel, lumaBytesFromCompositedRgba } from '../import/rgba-luma';
+import { lumaBytesFromCompositedRgba } from '../import/rgba-luma';
+import { compositeRgbOverWhitePreservingAlpha } from './composited-pixels';
 import { readImageHeader } from './image-header-reader';
 import { parsePngDimensions, readPngHeader } from './png-header';
 import { maskTraceSourcePixels } from './trace-source-mask';
@@ -93,6 +94,8 @@ function decodeImageAsRawData(
 ): Promise<RawImageData> {
   return decodeImageOntoCanvas(file, maxEdge, readCompositedPixels, signal);
 }
+
+export { compositeRgbOverWhitePreservingAlpha } from './composited-pixels';
 
 /** Reads a canvas the loader has just drawn, before it is released. */
 export type DrawnImageReader<T> = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => T;
@@ -282,20 +285,6 @@ function readCompositedPixels(
     height: imgd.height,
     data: imgd.data,
   });
-}
-
-export function compositeRgbOverWhitePreservingAlpha(image: RawImageData): RawImageData {
-  if (image.rgbCompositedOnWhite === true) return image;
-  const data = new Uint8ClampedArray(image.data.length);
-  for (let i = 0; i < image.data.length; i += 4) {
-    const alpha = image.data[i + 3] ?? 255;
-    const opacity = alpha / 255;
-    data[i] = compositeChannel(image.data[i], opacity);
-    data[i + 1] = compositeChannel(image.data[i + 1], opacity);
-    data[i + 2] = compositeChannel(image.data[i + 2], opacity);
-    data[i + 3] = alpha;
-  }
-  return { width: image.width, height: image.height, data, rgbCompositedOnWhite: true };
 }
 
 export async function readImageNaturalSize(

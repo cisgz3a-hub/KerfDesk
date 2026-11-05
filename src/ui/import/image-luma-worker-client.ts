@@ -46,7 +46,7 @@ export async function decodeBurnLumaOffThread(
   }
 }
 
-async function snapshotCanvas(canvas: HTMLCanvasElement): Promise<ImageBitmap> {
+export async function snapshotCanvas(canvas: HTMLCanvasElement): Promise<ImageBitmap> {
   try {
     return await createImageBitmap(canvas);
   } finally {
@@ -100,7 +100,7 @@ function offThreadResult(response: ImageLumaResponse): OffThreadImageLuma | null
   };
 }
 
-function offThreadImageDecodeAvailable(): boolean {
+export function offThreadImageDecodeAvailable(): boolean {
   return (
     typeof Worker !== 'undefined' &&
     typeof OffscreenCanvas !== 'undefined' &&

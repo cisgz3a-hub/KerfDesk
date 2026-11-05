@@ -12,6 +12,20 @@ const START_FROM_LABELS: Readonly<Record<JobStartMode, string>> = {
   'verified-origin': 'Verified Origin',
 };
 
+// What each mode does with the design's place on the canvas, which the four
+// names alone never said (UX audit U2-P3-7): under User Origin a design at
+// canvas X 110 framed at the head.
+export const START_FROM_HINTS: Readonly<Record<JobStartMode, string>> = {
+  absolute:
+    "Burns where the design sits on the bed, measured from the machine's own zero, which is right only after Home.",
+  'user-origin':
+    'Burns from the origin you set with Set origin here. Where the design sits on the canvas does not matter; Job origin picks the point of the design that goes there.',
+  'current-position':
+    'Burns from wherever the head is when you Frame. Where the design sits on the canvas does not matter; Job origin picks the point of the design that goes there.',
+  'verified-origin':
+    'Burns from an origin you set by hand and checked. Where the design sits on the canvas does not matter; Job origin picks the point of the design that goes there.',
+};
+
 const ANCHOR_LABELS: Readonly<Record<JobOriginAnchor, string>> = {
   'back-left': 'BL',
   'back-center': 'BC',
@@ -57,7 +71,7 @@ export function JobPlacementControls(props: { readonly streaming: boolean }): JS
             onChange={(e) => setJobPlacement({ startFrom: e.currentTarget.value as JobStartMode })}
           >
             {Object.entries(START_FROM_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
+              <option key={value} value={value} title={START_FROM_HINTS[value as JobStartMode]}>
                 {label}
               </option>
             ))}
@@ -76,6 +90,9 @@ export function JobPlacementControls(props: { readonly streaming: boolean }): JS
           onChange={(value) => setProjectOptimization({ lineStartRegion: value })}
         />
       </div>
+      <p className="lf-placement-mode-hint" style={modeHintStyle}>
+        {START_FROM_HINTS[placement.startFrom]}
+      </p>
       <OutputScopeControls placement={placement} disabled={busy} />
     </div>
   );
@@ -161,6 +178,12 @@ const placementLabelStyle: React.CSSProperties = {
 // The select stretches to the rail edge so the placement block forms one
 // column of aligned controls instead of a short field floating mid-row.
 const startFromSelectStyle: React.CSSProperties = { flex: 1, minWidth: 0 };
+const modeHintStyle: React.CSSProperties = {
+  margin: 0,
+  fontSize: 'var(--lf-text-sm)',
+  color: 'var(--lf-text-muted)',
+  lineHeight: 1.4,
+};
 const fieldNameStyle: React.CSSProperties = {
   fontSize: 12,
   color: 'var(--lf-text-muted)',

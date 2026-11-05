@@ -23,6 +23,9 @@ const DEVICE = {
   accelMmPerSec2: 1000,
   estimateCutTimeScale: 2,
   estimateTravelTimeScale: 3,
+  // The arithmetic below stops where the rapid meets the cut; GRBL in laser
+  // mode would blend it (ADR-255 Amendment 3), which junction tests cover.
+  laserModeEnabled: false,
 };
 const JOB: Job = {
   groups: [

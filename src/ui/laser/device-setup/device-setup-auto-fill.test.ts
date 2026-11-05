@@ -67,6 +67,21 @@ const S30_FIRMWARE: Partial<DeviceProfile> = {
 };
 
 describe('planControllerAutoFill', () => {
+  // UX audit U2-P3-1: a Falcon 2 saved from the fill read "Default 400×400"
+  // beside "Bed: 400 × 415 mm".
+  it('stops calling a filled unlisted machine the starter', () => {
+    const state = reported({ ...REPORTED, bedWidth: 400, bedHeight: 415 });
+    expect(state.draft.name).toBe(DEFAULT_DEVICE_PROFILE.name);
+    const filled = run(state, planControllerAutoFill(state, report(state, 115200))?.actions ?? []);
+    expect(filled.draft).toMatchObject({ name: 'My machine', bedWidth: 400, bedHeight: 415 });
+  });
+
+  it('keeps a name the operator typed before the fill', () => {
+    const named = run(reported(REPORTED), [{ kind: 'edit', patch: { name: 'Falcon 2 22W' } }]);
+    const filled = run(named, planControllerAutoFill(named, report(named, 115200))?.actions ?? []);
+    expect(filled.draft.name).toBe('Falcon 2 22W');
+  });
+
   it('copies the reported work area, speed and power into the draft', () => {
     const state = reported(REPORTED);
     const plan = planControllerAutoFill(state, report(state, 115200));

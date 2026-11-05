@@ -68,7 +68,7 @@ export class StreamedMotion {
   private firstMissingFeedLine: number | null = null;
 
   constructor(rawLimits: MotionLimits, options: ProgramTimingOptions) {
-    this.limits = sanitizeLimits(rawLimits);
+    this.limits = sanitizeLimits(rawLimits, options);
     this.context = motionContext(options, undefined);
     this.tally = new MotionTally(this.context);
     this.segments = {

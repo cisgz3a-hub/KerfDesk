@@ -1,10 +1,12 @@
 import { useLaserStore } from '../../state/laser-store';
+import { PORT_OPEN_NO_ANSWER, portOpenWithoutAnswer } from '../../state/port-open-no-answer';
 import { originLabel } from '../DeviceProfileFields';
 import type { DeviceSetupState } from './device-setup-flow';
 import { machineSetupControllerGuide } from './machine-setup-controller-guide';
 
 export function DeviceSetupSummary({ state }: { readonly state: DeviceSetupState }): JSX.Element {
   const connection = useLaserStore((s) => s.connection.kind);
+  const noAnswer = useLaserStore(portOpenWithoutAnswer);
   const guide = machineSetupControllerGuide(
     state.draft.controllerKind ?? 'grbl-v1.1',
     state.draft.controllerCommandSet,
@@ -14,11 +16,13 @@ export function DeviceSetupSummary({ state }: { readonly state: DeviceSetupState
   const status =
     guide.transportLabel !== 'USB serial'
       ? 'File export'
-      : connection === 'connected'
-        ? 'Connected'
-        : connection === 'connecting'
-          ? 'Connecting…'
-          : 'Not connected';
+      : noAnswer
+        ? PORT_OPEN_NO_ANSWER
+        : connection === 'connected'
+          ? 'Connected'
+          : connection === 'connecting'
+            ? 'Connecting…'
+            : 'Not connected';
   return (
     <section className="lf-setup-summary" aria-label="Current setup summary">
       <span className="lf-setup-eyebrow">Your machine</span>
@@ -36,7 +40,7 @@ export function DeviceSetupSummary({ state }: { readonly state: DeviceSetupState
         <dd>{guide.label}</dd>
       </dl>
       <span className="lf-setup-connection">
-        <span data-connected={connection === 'connected'} />
+        <span data-connected={connection === 'connected' && !noAnswer} />
         {status}
       </span>
     </section>

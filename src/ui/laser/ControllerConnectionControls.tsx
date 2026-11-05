@@ -7,6 +7,7 @@ import { useStore } from '../state';
 import { browserLocalStorage } from '../state/browser-local-storage';
 import { useLaserStore } from '../state/laser-store';
 import { motionOwnerAwaitsMissingReply } from '../state/laser-motion-release';
+import { portOpenWithoutAnswer } from '../state/port-open-no-answer';
 import { loadAutoConnectPreference, saveAutoConnectPreference } from '../state/serial-port-memory';
 import { pauseAutoConnect, useAutoConnectSession } from '../state/auto-connect-session';
 import { ConnectionBar, type ConnectionBarProps } from './ConnectionBar';
@@ -51,6 +52,7 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
   const reconnectRecommended = useLaserStore((state) => state.getControllerReconnectRecommended());
   const controlsBusy = useConnectionControlsBusy(props);
   const wentSilent = useControllerWentSilent(connection.kind === 'connected');
+  const neverAnswered = useLaserStore(portOpenWithoutAnswer);
   const stoppedResponding = useControllerStoppedResponding(connection.kind === 'connected');
   const disconnectController = useLaserStore((state) => state.disconnect);
   const connectController = useLaserStore((state) => state.connect);
@@ -107,6 +109,7 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
         qualificationReadBlockReason={qualificationReadBlockReason}
         reconnectRecommended={reconnectRecommended}
         controllerWentSilent={wentSilent}
+        controllerNeverAnswered={neverAnswered}
         controllerStoppedResponding={stoppedResponding}
         onRetryQualification={retryControllerInformation}
         onReconnectQualification={reconnect}
