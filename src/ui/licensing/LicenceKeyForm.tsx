@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { findLicenceKey, looksLikePartialLicenceKey } from '../../../public/licence-key-text.mjs';
 import type { LicenceAdapter } from '../../platform/types';
+import { checkedSubmit } from '../kit/form-validity';
 
 type Props = {
   readonly value: string;
@@ -41,7 +42,11 @@ export function LicenceActivationForm({
   };
   const note = pasteNote ?? keyNote(value);
   return (
-    <form onSubmit={submit} style={{ display: 'grid', gap: 10, marginTop: 12 }}>
+    <form
+      noValidate
+      onSubmit={checkedSubmit(submit)}
+      style={{ display: 'grid', gap: 10, marginTop: 12 }}
+    >
       <label htmlFor="kerfdesk-licence-key">Licence key</label>
       <div style={{ display: 'flex', gap: 8 }}>
         <input

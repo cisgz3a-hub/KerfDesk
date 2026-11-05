@@ -5,6 +5,7 @@
 export { Button, type ButtonProps } from './Button';
 export { Dialog, DialogActions } from './Dialog';
 export { Field } from './Field';
+export { checkedSubmit, formProblemReported } from './form-validity';
 export { Icon, type IconName } from './icons';
 export { IconButton } from './IconButton';
 export { NumberInput, type NumberInputProps } from './NumberInput';
