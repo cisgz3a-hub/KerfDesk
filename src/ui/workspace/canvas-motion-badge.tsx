@@ -265,7 +265,7 @@ function badgeMessage(
 // A run that has ended keeps the last report it saw ("Run" after an Abort, a
 // limit alarm or a pulled cable), so the ending wins (UX audit U4-P3-3). A
 // Door hold KerfDesk's Pause asked for reads as a pause (U4-P3-1).
-function runStateLabel(
+export function runStateLabel(
   run: NonNullable<CanvasMotionOverlay['run']>,
   machineKind: CanvasMotionOverlay['plan']['machineKind'],
 ): string {

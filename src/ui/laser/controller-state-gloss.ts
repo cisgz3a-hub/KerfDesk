@@ -21,6 +21,7 @@ export function controllerStateGloss(
         return `stopping, ${off}`;
       case 3:
         return 'resuming';
+      case null:
       default:
         return `paused, ${off}`;
     }

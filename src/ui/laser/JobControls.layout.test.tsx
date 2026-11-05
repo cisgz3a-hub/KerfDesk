@@ -84,6 +84,8 @@ describe('JobControls action hierarchy', () => {
       expect(
         precedes(button(view.host, 'Start'), elementContaining(view.host, 'Framing exact job')),
       ).toBe(true);
+      // A Frame keeps the controls busy, but no job is running yet.
+      expect(view.host.textContent).not.toContain('Running the framed job');
     } finally {
       await view.unmount();
     }
@@ -118,6 +120,9 @@ describe('JobControls action hierarchy', () => {
       expect(labels).not.toContain('Pause');
       expect(labels).not.toContain('ABORT');
       expect(labels).not.toContain('ABORT JOB');
+      // UX audit U4-P3-3: the job's spent Frame permit is not news mid-run.
+      expect(view.host.textContent).toContain('Running the framed job');
+      expect(view.host.textContent).not.toContain('Frame expired');
     } finally {
       await view.unmount();
     }

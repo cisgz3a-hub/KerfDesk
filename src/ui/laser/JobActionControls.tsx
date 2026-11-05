@@ -101,6 +101,8 @@ function useJobActionModel(props: { readonly disabled: boolean; readonly streami
   const markPending = useJobStartMarkPreparation((state) => state.pending);
   const expiredBecause = useFrameExpiryNote((state) => state.reason);
   const frameActive = laser.motionOperation?.kind === 'frame';
+  // The job itself, not controlsBusy: a Frame in progress is busy too.
+  const jobRunning = useLaserStore((s) => JOB_RUNNING.has(s.streamer?.status ?? 'idle'));
   const frameDeferred = frameIsDeferred(laser.motionOperation);
   const preparingFrame = framePending && !frameActive;
   const busy = [props.disabled, props.streaming, framePending, markPending].some(Boolean);
@@ -138,7 +140,7 @@ function useJobActionModel(props: { readonly disabled: boolean; readonly streami
       expiredBecause,
       preparingFrame,
       progress,
-      streaming: props.streaming,
+      jobRunning,
     }),
     estimate,
   };
@@ -200,6 +202,8 @@ function JobActionButtons(props: {
   );
 }
 
+const JOB_RUNNING: ReadonlySet<string> = new Set(['streaming', 'paused', 'tool-change']);
+
 function framedRunStatusText(args: {
   readonly frameActive: boolean;
   readonly frameDeferred: boolean;
@@ -210,11 +214,11 @@ function framedRunStatusText(args: {
   readonly expiredBecause: string | null;
   readonly preparingFrame: boolean;
   readonly progress: OutputCompilationProgress | null;
-  readonly streaming: boolean;
+  readonly jobRunning: boolean;
 }): string {
   // The running job holds its one-use Frame permit, so readiness reads as
   // expired; that is not news while the framed job runs (UX audit U4-P3-3).
-  if (args.streaming) return 'Running the framed job';
+  if (args.jobRunning) return 'Running the framed job';
   if (args.frameActive) {
     // A split Frame traces the compiled outline while the exact program is
     // still being prepared (ADR-353); no permit exists until it arrives.
