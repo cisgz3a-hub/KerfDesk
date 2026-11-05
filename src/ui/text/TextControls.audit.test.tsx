@@ -18,6 +18,10 @@ import { CanvasTextPanel } from './CanvasTextPanel';
 import { AddTextDialog } from './AddTextDialog';
 import { useTextDialogFields, type DialogFields } from './use-text-dialog-fields';
 import { useCanvasTextVariables } from './use-canvas-text-variables';
+import { pathTextTitle } from './PathTextFields';
+
+// The checkbox's hover names why it is off until a path exists (UX audit U6-P3-6).
+const PATH_TEXT_TOGGLE = `input[title="${pathTextTitle(true)}"], input[title="${pathTextTitle(false)}"]`;
 
 vi.mock('./font-loader', () => ({
   cssFamilyForFont: (key: string) => `lf2-${key}`,
@@ -137,17 +141,11 @@ it('formatting radio, weld, path enable/reverse and variable toggles update the 
   expect(latest!.values, 'weld checkbox updates draft').toMatchObject({
     weldOverlaps: !previousWeld,
   });
-  await clickElement(
-    host.querySelector<HTMLInputElement>('[title="Place text along a selected vector path."]'),
-  );
+  await clickElement(host.querySelector<HTMLInputElement>(PATH_TEXT_TOGGLE));
   expect(latest!, 'path checkbox enables draft guide').toMatchObject({ pathEnabled: true });
-  await clickElement(
-    host.querySelector<HTMLInputElement>('[title="Place text along a selected vector path."]'),
-  );
+  await clickElement(host.querySelector<HTMLInputElement>(PATH_TEXT_TOGGLE));
   expect(latest!, 'path checkbox disables draft guide').toMatchObject({ pathEnabled: false });
-  await clickElement(
-    host.querySelector<HTMLInputElement>('[title="Place text along a selected vector path."]'),
-  );
+  await clickElement(host.querySelector<HTMLInputElement>(PATH_TEXT_TOGGLE));
   await clickElement(
     host.querySelector<HTMLInputElement>('[title="Reverse text direction along the guide."]'),
   );
@@ -191,10 +189,7 @@ it('canvas text Done and Cancel invoke separate owners and variable field insert
     );
   }
   const host = await mountControl(<Harness />);
-  expect(
-    host.querySelector<HTMLInputElement>('[title="Place text along a selected vector path."]')
-      ?.disabled,
-  ).toBe(true);
+  expect(host.querySelector<HTMLInputElement>(PATH_TEXT_TOGGLE)?.disabled).toBe(true);
   await clickElement(
     host.querySelector<HTMLInputElement>(
       '[title="Evaluate typed fields when previewing, framing, exporting, or starting this job."]',

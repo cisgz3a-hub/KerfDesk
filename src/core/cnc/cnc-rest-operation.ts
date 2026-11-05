@@ -15,6 +15,7 @@ export {
 import { resolveStockAwareRestPocket } from './cnc-rest-stock-operation';
 import type { Cnc2dStockEvidence } from './cnc-pocket-stock';
 import { planRestPocketToolpaths } from './rest-pocket';
+import type { CncStrategyFallback } from '../job/cnc-compilation-sidecar-types';
 
 export type CncRestPocketPlanningEvidence = {
   readonly offsetFailed: boolean;
@@ -29,6 +30,8 @@ export type CncRestPocketOperation =
       readonly kind: 'ok';
       readonly stockEvidence?: Cnc2dStockEvidence;
       readonly findings?: ReadonlyArray<string>;
+      /** Set when stock-aware rest clears the whole pocket instead, and why. */
+      readonly strategyFallback?: Omit<CncStrategyFallback, 'layerId'>;
       readonly roughTool: CncTool;
       readonly finishTool: CncTool;
       readonly roughToolpaths: ReadonlyArray<Polyline>;

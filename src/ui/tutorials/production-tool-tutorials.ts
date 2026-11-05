@@ -8,14 +8,14 @@ export const PRODUCTION_TOOL_TUTORIALS: readonly Tutorial[] = [
     category: 'Layout & production',
     machine: 'laser',
     minutes: 3,
-    location: 'Tools → Optimization Settings → Cut Planner',
+    location: 'Tools → Cut Planner',
     prerequisites: 'Several laser paths or operations so you can compare their processing order.',
     visual: 'preview',
     steps: [
       {
         title: 'Choose the travel policy',
         instruction:
-          'Open Optimization Settings. Under Travel policy, choose Reduce travel to plan a shorter route or Keep source order to retain the existing path sequence within the chosen operation order.',
+          'Open Tools → Cut Planner. Under Travel policy, choose Reduce travel to plan a shorter route or Keep source order to retain the existing path sequence within the chosen operation order.',
         focus: 'Reduce travel / Keep source order',
         result: 'The planner follows the selected policy when ordering the laser paths.',
       },

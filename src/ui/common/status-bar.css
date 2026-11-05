@@ -6,6 +6,13 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* More text past the right edge: fade it, since the scrollbar is hidden
+   (use-scroll-overflow-cue.ts, UX audit U7-P3-7). */
+.lf-status-bar__telemetry[data-more-right] {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+}
+
 .lf-status-bar__telemetry::-webkit-scrollbar {
   display: none;
   width: 0;

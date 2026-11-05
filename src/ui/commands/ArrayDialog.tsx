@@ -46,6 +46,8 @@ export function ArrayDialog(props: {
   readonly hasVariableText?: boolean;
   readonly errorMessage?: string;
   readonly preparing?: boolean;
+  /** Copies rendered so far while `preparing` (performance audit S7-P2-1). */
+  readonly progress?: { readonly done: number; readonly total: number };
 }): JSX.Element {
   const selected = props.selected ?? NO_OBJECTS;
   const context = useMemo<ArrayDialogContext>(
@@ -91,7 +93,7 @@ export function ArrayDialog(props: {
       )}
       <p role="status" aria-live="polite" style={statusStyle}>
         {props.preparing === true
-          ? 'Preparing variable copies…'
+          ? preparingStatus(props.progress)
           : (problem ?? summaryFor(spec, context))}
       </p>
       {props.errorMessage === undefined ? null : <p role="alert">{props.errorMessage}</p>}
@@ -208,6 +210,14 @@ function ArrayFields(props: {
 }
 
 // A circle centred on a selected object copies the rest of the selection.
+function preparingStatus(
+  progress: { readonly done: number; readonly total: number } | undefined,
+): string {
+  return progress === undefined
+    ? 'Preparing variable copies…'
+    : `Preparing variable copies… ${progress.done} of ${progress.total}`;
+}
+
 function summaryFor(spec: ArraySpec, context: ArrayDialogContext): string {
   const centreId = spec.kind === 'circular' ? spec.centerObjectId : undefined;
   const copied =

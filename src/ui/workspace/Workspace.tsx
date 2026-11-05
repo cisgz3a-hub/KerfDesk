@@ -316,6 +316,8 @@ function useWorkspaceDraw(args: WorkspaceDrawArgs): void {
       ...overlay,
       viewMoving,
     });
+    // "still" once the settled frame after a pan or zoom has been drawn.
+    canvas.dataset['viewMotion'] = viewMoving ? 'moving' : 'still';
     // `args` is recreated by Workspace; its consumed fields are listed below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [

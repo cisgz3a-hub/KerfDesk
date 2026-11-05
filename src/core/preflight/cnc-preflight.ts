@@ -148,7 +148,12 @@ function appendSourceGeometryIssues(
   for (const issue of findCncAdaptivePocketIssues(project.scene, project.device, config)) {
     issues.push({
       code: 'cnc-adaptive-clearing-invalid',
-      message: `Layer ${issue.layerId}: ${issue.reason} Adjust Radial engagement or choose another fill method.`,
+      // A fallback's notice carries its own advice: Radial engagement cannot
+      // open a pocket one entry cannot (performance audit S8-P2-1).
+      message:
+        issue.fallback === true
+          ? `Layer ${issue.layerId}: ${issue.reason}`
+          : `Layer ${issue.layerId}: ${issue.reason} Adjust Radial engagement or choose another fill method.`,
     });
   }
   for (const issue of findCncInlayIssues(project.scene, project.device, config)) {

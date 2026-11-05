@@ -3,6 +3,7 @@ import { useTutorialStore } from './tutorial-store';
 import type { Tutorial } from './tutorial-types';
 import { TutorialExample } from './TutorialExample';
 import { TUTORIAL_PHOTOS } from './tutorial-photos';
+import { TutorialProBadge } from './TutorialProBadge';
 
 type ReaderProps = {
   readonly tutorial: Tutorial;
@@ -33,7 +34,7 @@ export function TutorialReader({ tutorial, progress, remember }: ReaderProps): J
       onKeyDown={(event) => navigateWithArrow(event, stepIndex, tutorial.steps.length, go)}
     >
       <div className="lf-learn-reading">
-        <h1 className="lf-learn-lesson-heading">{tutorial.title}</h1>
+        <LessonHeading tutorial={tutorial} />
         <div className="lf-learn-step-detail">
           <p className="lf-learn-step-count">
             Step {stepIndex + 1} of {tutorial.steps.length}
@@ -140,5 +141,14 @@ function LessonNotes({
         )}
       </dl>
     </details>
+  );
+}
+
+function LessonHeading(props: { readonly tutorial: Tutorial }): JSX.Element {
+  return (
+    <h1 className="lf-learn-lesson-heading">
+      {props.tutorial.title}
+      <TutorialProBadge tutorial={props.tutorial} />
+    </h1>
   );
 }

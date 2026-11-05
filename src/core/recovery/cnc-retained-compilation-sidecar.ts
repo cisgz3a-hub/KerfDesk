@@ -72,6 +72,13 @@ export function retainedCncCompilationSidecar(
             retainedLayerIds.has(entry.layerId),
           ),
         }),
+    ...(sidecar.strategyFallbacks === undefined
+      ? {}
+      : {
+          strategyFallbacks: sidecar.strategyFallbacks.filter((entry) =>
+            retainedLayerIds.has(entry.layerId),
+          ),
+        }),
     // A cut that still runs is still close to the part, wherever that part is cut.
     ...(sidecar.keptPartCuts === undefined
       ? {}

@@ -14,6 +14,10 @@ export function AlarmRecoveryActions(props: {
   // (controller audit 2026-09-25 CG-4). Omitted means true.
   readonly homeFromAlarm?: boolean;
   readonly canUnlock: boolean;
+  // Homing failed to find or clear a switch (ALARM:8, 9; grblHAL 15). The
+  // commonest beginner cause is Home turned on for a machine without
+  // switches, so Unlock and Machine Setup come before Home (UX audit U5-P3-3).
+  readonly homingFailed?: boolean;
   readonly onHome: () => void;
   readonly onConfigureHoming: () => void;
   readonly onUnlock: () => void;
@@ -36,6 +40,9 @@ export function AlarmRecoveryActions(props: {
         <span style={alarmHintStyle}>Unlock first: this controller cannot home while halted.</span>
       </>
     );
+  }
+  if (props.homingEnabled && props.homingFailed === true) {
+    return <HomingFailedActions {...props} home={home} unlock={unlock} />;
   }
   return (
     <>
@@ -70,6 +77,45 @@ export function AlarmRecoveryActions(props: {
           {`${unlock} — Unlock`}
         </button>
       )}
+    </>
+  );
+}
+
+function HomingFailedActions(
+  props: Pick<
+    Parameters<typeof AlarmRecoveryActions>[0],
+    'canUnlock' | 'onHome' | 'onConfigureHoming' | 'onUnlock'
+  > & {
+    readonly home: ReturnType<typeof commandLabels>;
+    readonly unlock: string;
+  },
+): JSX.Element {
+  const { home, unlock } = props;
+  return (
+    <>
+      {props.canUnlock && (
+        <button
+          type="button"
+          onClick={props.onUnlock}
+          title={`Send ${unlock} to unlock without homing, on a machine with no homing switches. Turn Home off in Machine Setup first.`}
+        >
+          {`${unlock} — Unlock`}
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={props.onConfigureHoming}
+        title="Open Machine Setup to turn Home off on a machine with no homing switches."
+      >
+        Machine Setup
+      </button>
+      <button
+        type="button"
+        onClick={props.onHome}
+        title={`Send ${home.sequence} again after checking the switches and their cables.`}
+      >
+        {home.label}
+      </button>
     </>
   );
 }

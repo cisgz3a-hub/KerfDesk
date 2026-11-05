@@ -152,6 +152,7 @@ function fullPocketFallback(
       : paths.passLimited
         ? 'pass-limit'
         : 'complete',
+    strategyFallback: { kind: 'rest-full-pocket', reason },
     findings: [`Full offset-pocket fallback: ${reason} No previous-stock subtraction is used.`],
   };
 }

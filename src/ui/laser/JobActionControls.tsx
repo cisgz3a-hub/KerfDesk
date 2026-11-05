@@ -21,6 +21,7 @@ import { useFrameAction } from './use-frame-action';
 import { useFramedRunLaserState } from './use-framed-run-laser-state';
 import { useJobEstimate } from './use-job-estimate';
 import { useJobStartMarkPreparation } from './use-job-start-mark';
+import { useFocusThroughDisable } from '../common/use-focus-through-disable';
 
 type Props = {
   readonly disabled: boolean;
@@ -159,11 +160,15 @@ function JobActionButtons(props: {
   readonly docked: boolean | undefined;
 }): JSX.Element {
   const { model, docked } = props;
+  // Frame job turns itself off while it runs; focus waits beside it (U7-P3-1).
+  const frameRef = useFocusThroughDisable<HTMLButtonElement>(model.frameControl.disabled);
   const frame = (
     <button
+      ref={frameRef}
       type="button"
       className={docked ? 'lf-btn' : 'lf-btn lf-btn--go'}
       data-primary={docked ? model.frameIsNext : undefined}
+      data-search-target="frame-job"
       onClick={model.onFrame}
       disabled={model.frameControl.disabled}
       title={model.frameControl.title}
@@ -178,6 +183,7 @@ function JobActionButtons(props: {
       className={docked ? 'lf-btn lf-job-dock__start' : 'lf-btn lf-btn--go'}
       style={docked ? undefined : primaryActionStyle}
       data-primary={docked ? model.framedReady : undefined}
+      data-search-target="start-job"
       onClick={props.onStartJob}
       disabled={model.startControl.disabled}
       title={model.startControl.title}

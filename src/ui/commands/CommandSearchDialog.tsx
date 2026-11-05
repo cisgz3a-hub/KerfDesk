@@ -1,17 +1,18 @@
 // Command search (Ctrl+K, Help → Find a command…, or the menu-bar search
-// button). One box over every command the menus offer: type a few letters,
-// pick with the arrow keys, run with Enter. It renders the registry's own
-// commands, so a result runs exactly what the menu item runs, and a disabled
+// button). One box over every command the menus offer, and since ADR-604
+// Amendment 1 the machine-panel actions, Settings and Learn lessons too
+// (search-entries.ts): type a few letters, pick with the arrow keys, run with
+// Enter. A menu result runs exactly what the menu item runs, and a disabled
 // result shows the same reason the menu's hover help gives.
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { MachineKind } from '../../core/scene';
-import { COMMAND_HELP } from '../help/command-help-topics';
 import { commandHelpId } from '../help/help-topics';
 import { Dialog } from '../kit';
 import { commandFamilyLabel } from './command-family-label';
 import { runCommand, type AppCommand } from './command-registry';
-import { searchCommands } from './command-search';
+import { commandSearchEntry, searchEntries, type SearchEntry } from './command-search';
+import { searchExtraEntries } from './search-entries';
 import { useCommandSearchStore } from './command-search-store';
 import './command-search.css';
 import { shortcutLabel } from '../common/shortcut-label';
@@ -27,6 +28,7 @@ export function CommandSearchHost(props: {
     <CommandSearchDialog
       commands={props.commands}
       machineKind={props.machineKind}
+      extraEntries={searchExtraEntries}
       onClose={close}
     />
   );
@@ -35,23 +37,27 @@ export function CommandSearchHost(props: {
 export function CommandSearchDialog(props: {
   readonly commands: ReadonlyArray<AppCommand>;
   readonly machineKind: MachineKind;
+  /** The panel actions, Settings and lessons the app adds (ADR-604 Amendment 1). */
+  readonly extraEntries?: (machineKind: MachineKind, query: string) => SearchEntry[];
   readonly onClose: () => void;
 }): JSX.Element {
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
   const listId = useId();
-  const { commands, machineKind } = props;
-  const results = useMemo(
-    () =>
-      searchCommands(commands, query, (command) => commandFamilyLabel(command.family, machineKind)),
-    [commands, query, machineKind],
-  );
-  const active = results[Math.min(activeIndex, results.length - 1)]?.command;
+  const { commands, machineKind, extraEntries } = props;
+  const results = useMemo(() => {
+    const menu = commands.map((command) =>
+      commandSearchEntry(command, commandFamilyLabel(command.family, machineKind)),
+    );
+    return searchEntries([...menu, ...(extraEntries?.(machineKind, query) ?? [])], query);
+  }, [commands, query, machineKind, extraEntries]);
+  const active = results[Math.min(activeIndex, results.length - 1)]?.entry;
 
-  const run = (command: AppCommand): void => {
-    if (!command.enabled) return;
+  const run = (entry: SearchEntry): void => {
+    if (!entry.enabled) return;
     props.onClose();
-    runCommand(command);
+    if (entry.command === undefined) entry.invoke();
+    else runCommand(entry.command);
   };
   const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>): void => {
     const step = SELECTION_STEPS[event.key];
@@ -81,7 +87,7 @@ export function CommandSearchDialog(props: {
         aria-controls={listId}
         aria-autocomplete="list"
         {...(active === undefined ? {} : { 'aria-activedescendant': optionId(listId, active) })}
-        placeholder="Type what you want to do, such as box, offset or frame"
+        placeholder="Type what you want to do, such as frame, box or units"
         autoComplete="off"
         spellCheck={false}
         value={query}
@@ -94,9 +100,8 @@ export function CommandSearchDialog(props: {
       <CommandSearchResults
         listId={listId}
         query={query}
-        commands={results.map((result) => result.command)}
+        entries={results.map((result) => result.entry)}
         active={active}
-        machineKind={machineKind}
         onHover={setActiveIndex}
         onRun={run}
       />
@@ -110,11 +115,10 @@ export function CommandSearchDialog(props: {
 function CommandSearchResults(props: {
   readonly listId: string;
   readonly query: string;
-  readonly commands: ReadonlyArray<AppCommand>;
-  readonly active: AppCommand | undefined;
-  readonly machineKind: MachineKind;
+  readonly entries: ReadonlyArray<SearchEntry>;
+  readonly active: SearchEntry | undefined;
   readonly onHover: (index: number) => void;
-  readonly onRun: (command: AppCommand) => void;
+  readonly onRun: (entry: SearchEntry) => void;
 }): JSX.Element {
   const listRef = useRef<HTMLUListElement>(null);
   useEffect(() => {
@@ -122,25 +126,23 @@ function CommandSearchResults(props: {
       ?.querySelector('[aria-selected="true"]')
       ?.scrollIntoView?.({ block: 'nearest' });
   }, [props.active]);
-  if (props.commands.length === 0) {
+  if (props.entries.length === 0) {
     return (
       <p className="lf-command-search__empty" role="status">
-        No command matches “{props.query.trim()}”. Try another word, or browse Help → Visual
-        tutorials.
+        Nothing matches “{props.query.trim()}”. Try another word, or browse Help → Visual tutorials.
       </p>
     );
   }
   return (
     <ul ref={listRef} id={props.listId} role="listbox" className="lf-command-search__list">
-      {props.commands.map((command, index) => (
+      {props.entries.map((entry, index) => (
         <CommandSearchRow
-          key={command.id}
-          id={optionId(props.listId, command)}
-          command={command}
-          family={commandFamilyLabel(command.family, props.machineKind)}
-          selected={command === props.active}
+          key={entry.id}
+          id={optionId(props.listId, entry)}
+          entry={entry}
+          selected={entry === props.active}
           onHover={() => props.onHover(index)}
-          onRun={() => props.onRun(command)}
+          onRun={() => props.onRun(entry)}
         />
       ))}
     </ul>
@@ -149,35 +151,34 @@ function CommandSearchResults(props: {
 
 function CommandSearchRow(props: {
   readonly id: string;
-  readonly command: AppCommand;
-  readonly family: string;
+  readonly entry: SearchEntry;
   readonly selected: boolean;
   readonly onHover: () => void;
   readonly onRun: () => void;
 }): JSX.Element {
-  const { command } = props;
-  const detail = command.disabledReason ?? COMMAND_HELP[command.id]?.tooltip ?? command.title;
+  const { entry } = props;
   return (
     <li
       id={props.id}
       role="option"
       aria-selected={props.selected}
-      aria-disabled={!command.enabled}
+      aria-disabled={!entry.enabled}
       className="lf-command-search__option"
-      data-command-id={command.id}
+      data-command-id={entry.id}
+      data-entry-kind={entry.kind}
       // Keep focus in the search box; the click itself runs the command.
       onMouseDown={(event) => event.preventDefault()}
       onMouseMove={props.selected ? undefined : props.onHover}
       onClick={props.onRun}
     >
       <span className="lf-command-search__row">
-        <span className="lf-command-search__label">{command.label}</span>
-        <span className="lf-command-search__family">{props.family}</span>
-        {command.shortcut === undefined ? null : (
-          <kbd className="lf-command-search__shortcut">{shortcutLabel(command.shortcut)}</kbd>
+        <span className="lf-command-search__label">{entry.label}</span>
+        <span className="lf-command-search__family">{entry.family}</span>
+        {entry.shortcut === undefined ? null : (
+          <kbd className="lf-command-search__shortcut">{shortcutLabel(entry.shortcut)}</kbd>
         )}
       </span>
-      <span className="lf-command-search__detail">{detail}</span>
+      <span className="lf-command-search__detail">{entry.detail}</span>
     </li>
   );
 }
@@ -197,6 +198,6 @@ function nextIndex(index: number, step: number, count: number): number {
   return Math.max(0, Math.min(count - 1, current + step));
 }
 
-function optionId(listId: string, command: AppCommand): string {
-  return `${listId}-${command.id.replace(/[^a-z0-9-]/gi, '-')}`;
+function optionId(listId: string, entry: SearchEntry): string {
+  return `${listId}-${entry.id.replace(/[^a-z0-9-]/gi, '-')}`;
 }

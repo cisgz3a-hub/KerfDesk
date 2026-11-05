@@ -133,11 +133,21 @@ export function inkMaskFromPrepared(prepared: RawImageData): InkMask {
     const r = data[i * 4] ?? 255;
     const g = data[i * 4 + 1] ?? 255;
     const b = data[i * 4 + 2] ?? 255;
+    if (r === g && g === b) {
+      ink[i] = GREY_INK[r] as number;
+      continue;
+    }
     const luma = 0.299 * r + 0.587 * g + 0.114 * b;
     ink[i] = luma < INK_LUMA_MAX ? 1 : 0;
   }
   return { width, height, ink };
 }
+
+// The class of every grey level, by the same expression: prepared masks are
+// grey, so most pixels read the table.
+const GREY_INK = Uint8Array.from({ length: 256 }, (_, v) =>
+  0.299 * v + 0.587 * v + 0.114 * v < INK_LUMA_MAX ? 1 : 0,
+);
 
 function hasInk(mask: InkMask): boolean {
   for (const value of mask.ink) {

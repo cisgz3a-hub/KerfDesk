@@ -9,7 +9,10 @@ import type {
 } from '../job/job';
 import { DEFAULT_CNC_LAYER_SETTINGS, type Scene } from '../scene';
 import type { CncCompilationEvidence } from './cnc-compilation-artifact';
-import type { CncStackedCopyMerge } from '../job/cnc-compilation-sidecar-types';
+import type {
+  CncStackedCopyMerge,
+  CncStrategyFallback,
+} from '../job/cnc-compilation-sidecar-types';
 import type { CncOpenContourOmissions } from './cnc-open-contour-omissions';
 import type { VCarveLadder } from './vcarve-plan';
 
@@ -21,6 +24,13 @@ export function offsetDiagnosticsForStatus(
     ...(status.offsetFailed ? ([{ layerId, kind: 'geometry-failed' }] as const) : []),
     ...(status.passLimited ? ([{ layerId, kind: 'pass-limit' }] as const) : []),
   ];
+}
+
+export function strategyFallbacksForLayer(
+  layerId: string,
+  fallback: Omit<CncStrategyFallback, 'layerId'> | undefined,
+): ReadonlyArray<CncStrategyFallback> {
+  return fallback === undefined ? [] : [{ layerId, ...fallback }];
 }
 
 export function reliefOffsetDiagnosticsForStatus(
@@ -66,6 +76,7 @@ export function buildCncCompilationSidecar(
   openContourOmissions: CncOpenContourOmissions,
   mergedStackedCopies: ReadonlyArray<CncStackedCopyMerge> = [],
   profileEvidence: Pick<CncCompilationSidecar, 'profileOpenPaths' | 'keptPartCuts'> = {},
+  strategyFallbacks: ReadonlyArray<CncStrategyFallback> = [],
 ): CncCompilationSidecar {
   const exactOffsetDiagnostics = uniqueOffsetDiagnostics([
     ...offsetLadderDiagnostics,
@@ -94,6 +105,8 @@ export function buildCncCompilationSidecar(
     ...profileEvidence,
     // No legacy fallback reads this, so an absent field simply means none.
     ...(mergedStackedCopies.length === 0 ? {} : { mergedStackedCopies }),
+    // Read only for disclosure, so an absent field means none (S8-P2-1).
+    ...(strategyFallbacks.length === 0 ? {} : { strategyFallbacks }),
   };
 }
 

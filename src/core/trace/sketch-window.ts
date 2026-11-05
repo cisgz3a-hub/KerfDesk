@@ -35,9 +35,12 @@ export function integralLuma(luma: Uint8Array, width: number, height: number): F
   const integral = new Float64Array((height + 1) * stride);
   for (let y = 1; y <= height; y += 1) {
     let rowSum = 0;
+    const source = (y - 1) * width - 1;
+    const above = (y - 1) * stride;
+    const row = y * stride;
     for (let x = 1; x <= width; x += 1) {
-      rowSum += luma[(y - 1) * width + (x - 1)] ?? 255;
-      integral[y * stride + x] = (integral[(y - 1) * stride + x] ?? 0) + rowSum;
+      rowSum += luma[source + x] as number;
+      integral[row + x] = (integral[above + x] as number) + rowSum;
     }
   }
   return integral;

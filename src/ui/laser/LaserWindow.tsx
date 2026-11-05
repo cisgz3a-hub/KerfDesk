@@ -18,6 +18,7 @@ import { CncUtilitiesPanel } from '../machine/CncUtilitiesPanel';
 import { ConsolePanel } from './ConsolePanel';
 import { SuperConsoleLauncher } from './super-console/SuperConsoleLauncher';
 import { AlarmCard } from './AlarmBanner';
+import { alarmControllerKind } from './alarm-card-advice';
 import { operatorAbortAlarm } from './abort-alarm-recovery';
 import { ControllerPinNotice } from './ControllerPinNotice';
 import { HeldResumeTailNotice } from './HeldResumeTailNotice';
@@ -53,7 +54,8 @@ export function LaserWindow({ dockedJobActions = false }: Props = {}): JSX.Eleme
   const connection = useLaserStore((s) => s.connection);
   const alarmCode = useLaserStore((s) => s.alarmCode);
   const operatorAbort = useLaserStore(operatorAbortAlarm);
-  const controllerKind = useLaserStore((s) => s.activeControllerKind);
+  // The alarm card decodes with the firmware the controller showed (U5-P3-4).
+  const controllerKind = useLaserStore(alarmControllerKind);
   const control = useControllerActions();
   const autofocusBusy = useLaserStore((s) => s.autofocusBusy);
   const motionOperation = useLaserStore((s) => s.motionOperation);

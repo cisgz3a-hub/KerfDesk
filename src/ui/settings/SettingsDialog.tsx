@@ -39,7 +39,7 @@ export const SETTINGS_SECTIONS: ReadonlyArray<SectionSpec> = [
   {
     id: 'general',
     label: 'General',
-    title: 'Theme, workspace layout, recent projects and autosave',
+    title: 'Units, theme, workspace layout, recent projects and autosave',
   },
   {
     id: 'canvas',

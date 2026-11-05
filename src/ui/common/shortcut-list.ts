@@ -11,7 +11,6 @@
 import type { MachineKind } from '../../core/scene';
 import { machineDisplayName } from '../machine/machine-labels';
 import { DEFAULT_NUDGE_STEPS, type NudgeSteps } from '../state/nudge-preferences';
-import { shortcutLabel } from './shortcut-label';
 
 export type ShortcutRow = {
   readonly keys: string;
@@ -143,6 +142,8 @@ export function shortcutFamilies(
         // ADR-620's colour peek was documented only in code (UX audit U3-P3-3).
         { keys: 'Alt (hold)', action: 'show every object in its operation colour' },
         { keys: 'Space or right-drag', action: 'pan' },
+        // Bound in view-shortcuts.ts and named by Window → Toggle Side Panels (U6-P3-2).
+        { keys: 'F12', action: 'show or hide both side panels' },
       ],
     },
     {
@@ -157,17 +158,4 @@ export function shortcutFamilies(
       ],
     },
   ];
-}
-
-/** One line per family, e.g. `File: Ctrl+N new - Ctrl+O open`. */
-export function shortcutHint(
-  machineKind: MachineKind,
-  nudgeSteps: NudgeSteps = DEFAULT_NUDGE_STEPS,
-): string {
-  return shortcutFamilies(machineKind, nudgeSteps)
-    .map((entry) => {
-      const rows = entry.rows.map((row) => `${shortcutLabel(row.keys)} ${row.action}`).join(' - ');
-      return `${entry.family}: ${rows}`;
-    })
-    .join('\n');
 }
