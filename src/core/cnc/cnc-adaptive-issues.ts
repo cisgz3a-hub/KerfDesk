@@ -6,9 +6,16 @@ import {
   type Scene,
 } from '../scene';
 import { resolveAdaptivePocketOperation } from './adaptive-pocket-operation';
+import { cncStrategyFallbackNotice } from './cnc-strategy-fallback-notice';
 import { collectLayerPolylines } from './compile-cnc-job';
 
-export type CncAdaptivePocketIssue = { readonly layerId: string; readonly reason: string };
+/** `fallback`: the layer cuts offset rings instead, and `reason` says why in
+ * Preview's words (S8-P2-1). Otherwise an advisory about the adaptive plan. */
+export type CncAdaptivePocketIssue = {
+  readonly layerId: string;
+  readonly reason: string;
+  readonly fallback?: true;
+};
 
 export function findCncAdaptivePocketIssues(
   scene: Scene,
@@ -28,7 +35,11 @@ export function findCncAdaptivePocketIssues(
       layerCncTool(config, settings),
     );
     if (operation.kind === 'error')
-      issues.push({ layerId: layer.id, reason: 'Offset pocket fallback: ' + operation.reason });
+      issues.push({
+        layerId: layer.id,
+        reason: cncStrategyFallbackNotice({ kind: 'adaptive-offset', reason: operation.reason }),
+        fallback: true,
+      });
     else if (operation.kind === 'ok' && operation.plan.islandPartitions !== undefined)
       issues.push({
         layerId: layer.id,

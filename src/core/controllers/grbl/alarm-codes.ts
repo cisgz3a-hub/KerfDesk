@@ -112,15 +112,21 @@ const SHARED_ALARM_CODES: ReadonlyArray<AlarmDescription> = [
     title: 'Homing fail — could not clear limit switch',
     detail: 'The pull-off move after homing did not release the limit switch.',
     positionLost: true,
-    action: 'Increase the homing pull-off ($27) or check the switch wiring, then re-home ($H).',
+    // A beginner has no screen for $27; the switch and its cable come first
+    // (UX audit U5-P3-3).
+    action:
+      'Homing backed off its switch, but the switch stayed pressed. Check the switch and its cable, then Home again. (For experts: a larger homing pull-off, $27, can help.)',
   },
   {
     code: 9,
     title: 'Homing fail — could not find limit switch',
     detail: 'Homing did not reach a limit switch within the search distance.',
     positionLost: true,
+    // The commonest beginner cause is Home turned on for a machine without
+    // switches, and Home again drives each axis into the frame again
+    // (UX audit U5-P3-3).
     action:
-      'Check the switch wiring, or increase max travel ($130–$132) or decrease pull-off ($27), then re-home ($H).',
+      "Homing couldn't find a switch. If this machine has no homing switches, turn Home off in Machine Setup, then Unlock ($X). If it has switches, check that their cables are plugged in, then Home again. (For experts: max travel $130–$132, pull-off $27.)",
   },
 ];
 

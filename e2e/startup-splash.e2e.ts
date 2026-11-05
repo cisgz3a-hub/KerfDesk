@@ -6,7 +6,16 @@ import { once } from 'node:events';
 // These specs observe the splash itself, so navigation must not wait it out.
 test.use({ startupSplash: 'manual' });
 
+// Anything the app mounts waits for main.tsx's whole dev-server module graph
+// (about 1,240 modules). On a busy CI shard, or a loaded PC, that graph can
+// take far longer than the default expect timeout to arrive: a loaded PC
+// was still fetching it 65 s after navigation. Tests that wait on it take
+// MODULE_GRAPH_TEST_TIMEOUT_MS.
+const DESKTOP_MODULE_GRAPH_TIMEOUT_MS = 60_000;
+const MODULE_GRAPH_TEST_TIMEOUT_MS = 120_000;
+
 test('paints the splash before the bundle and honours reduced motion', async ({ page }) => {
+  test.setTimeout(MODULE_GRAPH_TEST_TIMEOUT_MS);
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   const waitForDesktopModule = await observeDesktopModule(page);
   const main = await holdRequest(page, /\/src\/ui\/app\/main\.tsx(?:\?|$)/);
@@ -41,6 +50,7 @@ test('paints the splash before the bundle and honours reduced motion', async ({ 
 });
 
 test('waits for a successful workspace paint after a canvas mounts', async ({ page }) => {
+  test.setTimeout(MODULE_GRAPH_TEST_TIMEOUT_MS);
   await page.route(/\/src\/ui\/app\/App\.tsx(?:\?|$)/, (route) =>
     route.fulfill({
       contentType: 'text/javascript',
@@ -51,7 +61,9 @@ test('waits for a successful workspace paint after a canvas mounts', async ({ pa
   );
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   const canvas = page.getByLabel('Unpainted fixture');
-  await expect(canvas).toBeVisible();
+  // The stubbed App is served at once, but it mounts only after the rest of
+  // main.tsx's graph has loaded (458 modules were still pending at 10 s).
+  await expect(canvas).toBeVisible({ timeout: DESKTOP_MODULE_GRAPH_TIMEOUT_MS });
   await expect(page.locator('#app-splash')).toBeVisible();
   await canvas.evaluate((element) => {
     element.setAttribute('data-workspace-painted', 'true');
@@ -276,7 +288,7 @@ async function observeDesktopModule(page: Page) {
   });
   return () =>
     expect(page.locator('html')).toHaveAttribute('data-workspace-module-loaded', 'true', {
-      timeout: 45_000,
+      timeout: DESKTOP_MODULE_GRAPH_TIMEOUT_MS,
     });
 }
 

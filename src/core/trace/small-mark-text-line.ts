@@ -112,6 +112,10 @@ type Dot = {
   readonly height: number;
 };
 
+/** A whole label read as a dot, with the sweep step of the line its foot sits
+ *  on; null when it is not a dot or sits on no line. */
+type LabelDot = { readonly dot: Dot; readonly step: number } | null;
+
 export function createTextLine(input: TextLineInput): TextLine {
   const directions = createTextDirections({
     width: input.width,
@@ -120,6 +124,19 @@ export function createTextLine(input: TextLineInput): TextLine {
     sourcePx: input.baselinePx,
     letterMax: LETTER_MAX_PX * input.baselinePx,
   });
+  // Every dot within a colon's reach of a label asks for that label's
+  // baseline, so a speckled page asked once per speck. The answer depends only
+  // on the label and this mask, so each label is read once.
+  const labelDots = new Map<number, LabelDot>();
+  const baselineDot = (label: number): LabelDot => {
+    const known = labelDots.get(label);
+    if (known !== undefined) return known;
+    const dot = labelDot(label, labelBox(input.boxes, label), input);
+    const step = dot === null ? null : baselineStep(dot, directions, input);
+    const read = dot === null || step === null ? null : { dot, step };
+    labelDots.set(label, read);
+    return read;
+  };
   return {
     holds: (region) => {
       const dot = compactDot(region, input.width);
@@ -127,12 +144,14 @@ export function createTextLine(input: TextLineInput): TextLine {
       return (
         baselineStep(dot, directions, input) !== null ||
         afterDescender(dot, directions, input) ||
-        stackedOverBaselineDot(dot, region.length, directions, input)
+        stackedOverBaselineDot(dot, region.length, directions, input, baselineDot)
       );
     },
     colonDot: (region) => {
       const dot = compactDot(region, input.width);
-      return dot !== null && stackedOverBaselineDot(dot, region.length, directions, input);
+      return (
+        dot !== null && stackedOverBaselineDot(dot, region.length, directions, input, baselineDot)
+      );
     },
     besideLetter: (region) => hasLetterWithin(region, input),
   };
@@ -362,6 +381,7 @@ function stackedOverBaselineDot(
   area: number,
   directions: TextDirections,
   input: TextLineInput,
+  baselineDot: (label: number) => LabelDot,
 ): boolean {
   if (!letterInReach(dot, directions)) return false;
   const own = input.labelOf(dot.points[0] ?? 0);
@@ -376,10 +396,9 @@ function stackedOverBaselineDot(
       const label = input.labelOf(p);
       if (seen.has(label)) continue;
       seen.add(label);
-      const other = labelBox(input.boxes, label);
       const areaOther = input.areas[label] ?? 0;
       if (Math.max(area, areaOther) > STACK_MAX_AREA_RATIO * Math.min(area, areaOther)) continue;
-      if (stackedOn(dot, labelDot(label, other, input), directions, input)) return true;
+      if (stackedOn(dot, baselineDot(label), input)) return true;
     }
   }
   return false;
@@ -394,15 +413,9 @@ function labelDot(label: number, box: Box, input: TextLineInput): Dot | null {
   return compactDot(points, input.width);
 }
 
-function stackedOn(
-  dot: Dot,
-  other: Dot | null,
-  directions: TextDirections,
-  input: TextLineInput,
-): boolean {
-  if (other === null) return false;
-  const step = baselineStep(other, directions, input);
-  if (step === null) return false;
+function stackedOn(dot: Dot, onLine: LabelDot, input: TextLineInput): boolean {
+  if (onLine === null) return false;
+  const { dot: other, step } = onLine;
   const along = alongLine(step);
   const [cx, cy] = centre(dot.box);
   const [ox, oy] = centre(other.box);

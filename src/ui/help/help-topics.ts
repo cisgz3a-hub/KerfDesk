@@ -68,6 +68,12 @@ export type HelpTopic = {
   readonly tooltip: string;
 };
 
+// The canvas takes no keyboard drawing, as in LightBurn, and the tools said
+// nothing about it (UX audit U7-P3-10, which also folds in U7-P3-6's pointer to
+// the Objects list).
+const DRAW_BY_POINTER =
+  'Drawing needs a mouse, pen or touch: by keyboard, add a shape from the design library or with Import (Ctrl+I), select it with Objects in the Artwork panel, and set its X, Y, W and H.';
+
 export const TOOL_HELP: Readonly<Record<ToolHelpKey, HelpTopic>> = {
   'trace-parts': {
     label: 'Edit trace parts',
@@ -101,27 +107,32 @@ export const TOOL_HELP: Readonly<Record<ToolHelpKey, HelpTopic>> = {
   rect: {
     label: 'Draw rectangle',
     tooltip:
-      'Draw a rectangle by dragging on the workspace. Hold Shift for a square, Ctrl to draw from the centre. Corners snap to nodes, midpoints, centres, crossings and the grid; hold Alt to place freely.',
+      'Draw a rectangle by dragging on the workspace. Hold Shift for a square, Ctrl to draw from the centre. Corners snap to nodes, midpoints, centres, crossings and the grid; hold Alt to place freely. ' +
+      DRAW_BY_POINTER,
   },
   ellipse: {
     label: 'Draw ellipse',
     tooltip:
-      'Draw an ellipse by dragging on the workspace. Hold Shift for a circle, Ctrl to draw from the centre. The drag snaps to nodes, midpoints, centres, crossings and the grid; hold Alt to place freely.',
+      'Draw an ellipse by dragging on the workspace. Hold Shift for a circle, Ctrl to draw from the centre. The drag snaps to nodes, midpoints, centres, crossings and the grid; hold Alt to place freely. ' +
+      DRAW_BY_POINTER,
   },
   polygon: {
     label: 'Draw polygon',
     tooltip:
-      'Draw a polygon by dragging to set its size on the workspace. The drag snaps like the other drawing tools; hold Alt to place freely.',
+      'Draw a polygon by dragging to set its size on the workspace. The drag snaps like the other drawing tools; hold Alt to place freely. ' +
+      DRAW_BY_POINTER,
   },
   star: {
     label: 'Draw star',
     tooltip:
-      'Draw a star by dragging to set its size on the workspace. The drag snaps like the other drawing tools; hold Alt to place freely.',
+      'Draw a star by dragging to set its size on the workspace. The drag snaps like the other drawing tools; hold Alt to place freely. ' +
+      DRAW_BY_POINTER,
   },
   polyline: {
     label: 'Draw polyline',
     tooltip:
-      'Draw connected line segments; click and drag to place a smooth curve node with Bezier handles. Start on the open end of existing artwork to continue it, and click its other end to close it. Press Enter or double-click to finish. Each click snaps to nodes, midpoints, centres, crossings and the grid; hold Alt to place freely.',
+      'Draw connected line segments; click and drag to place a smooth curve node with Bezier handles. Start on the open end of existing artwork to continue it, and click its other end to close it. Press Enter or double-click to finish. Each click snaps to nodes, midpoints, centres, crossings and the grid; hold Alt to place freely. ' +
+      DRAW_BY_POINTER,
   },
 };
 
