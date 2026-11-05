@@ -196,19 +196,28 @@ type DiagonalSides = {
 // pushed, never pushed twice, and never pushed when ink or `blocked`.
 class PaperFlood {
   private top = 0;
+  /** 1 on pixels no flood takes: ink, and `blocked` ones. */
+  private readonly closed: Uint8Array;
 
   constructor(
     readonly grid: PaperGrid,
     private readonly marks: Uint8Array,
-    private readonly blocked: Uint8Array | null,
+    blocked: Uint8Array | null,
     private readonly stack: Int32Array,
-  ) {}
+  ) {
+    if (blocked === null) {
+      this.closed = grid.ink;
+    } else {
+      this.closed = new Uint8Array(grid.ink.length);
+      for (let p = 0; p < blocked.length; p += 1) {
+        this.closed[p] = grid.ink[p] === 0 && blocked[p] === 0 ? 0 : 1;
+      }
+    }
+  }
 
   /** Whether a flood from `pixel` would take it: paper, unmarked, not blocked. */
   opens(pixel: number): boolean {
-    return (
-      this.marks[pixel] === 0 && this.grid.ink[pixel] === 0 && (this.blocked?.[pixel] ?? 0) === 0
-    );
+    return this.marks[pixel] === 0 && this.closed[pixel] === 0;
   }
 
   push(pixel: number): void {

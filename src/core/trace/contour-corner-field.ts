@@ -89,22 +89,19 @@ export function wedgeFieldFit(
   // ink). The wedge is compared where the field puts the edges; the apex the
   // dial draws stays the legs' own meeting point.
   const edge = drawnEdgeApex(field, apex, back, ahead, scale, paper, contrast);
-  const coverage = sourceCoverage(edge, back, ahead, scale);
   const ax = edge.x / scale;
   const ay = edge.y / scale;
+  const ox0 = Math.ceil((ax - WINDOW_PX) * scale - 0.5);
+  const oy0 = Math.ceil((ay - WINDOW_PX) * scale - 0.5);
+  const coverage = sourceCoverage(edge, back, ahead, scale, {
+    x: Math.floor((ox0 + 0.5) / scale - 0.5),
+    y: Math.floor((oy0 + 0.5) / scale - 0.5),
+  });
   let max = 0;
   let sum = 0;
   let count = 0;
-  for (
-    let oy = Math.ceil((ay - WINDOW_PX) * scale - 0.5);
-    (oy + 0.5) / scale <= ay + WINDOW_PX;
-    oy += 1
-  ) {
-    for (
-      let ox = Math.ceil((ax - WINDOW_PX) * scale - 0.5);
-      (ox + 0.5) / scale <= ax + WINDOW_PX;
-      ox += 1
-    ) {
+  for (let oy = oy0; (oy + 0.5) / scale <= ay + WINDOW_PX; oy += 1) {
+    for (let ox = ox0; (ox + 0.5) / scale <= ax + WINDOW_PX; ox += 1) {
       const model = bilinear(coverage, (ox + 0.5) / scale - 0.5, (oy + 0.5) / scale - 0.5);
       const seen = (paper - field.lumaAt(ox, oy)) / contrast;
       const error = Math.abs(Math.min(1, Math.max(0, seen)) - model);
@@ -177,45 +174,80 @@ export function fieldLuma(field: CrackSubPixelField, x: number, y: number): numb
   return bilinear((px, py) => field.lumaAt(px, py), x - 0.5, y - 0.5);
 }
 
-// The wedge's box coverage of each SOURCE pixel near the apex, memoised.
+// The wedge's box coverage of each SOURCE pixel near the apex, memoised in a
+// small grid from `corner`, the window's first source pixel (a pixel off the
+// grid is memoised by key).
 function sourceCoverage(
   apex: Vec2,
   back: WedgeLine,
   ahead: WedgeLine,
   scale: number,
+  corner: { readonly x: number; readonly y: number },
 ): (px: number, py: number) => number {
-  const convex = back.dx * ahead.dy - back.dy * ahead.dx > 0;
-  // A sample (x, y) is on a leg's ink side when dx * (y - apex.y) -
-  // dy * (x - apex.x) > 0. The row terms and the column terms are each
-  // computed once per pixel, by the same operations, so every test is the
-  // same comparison of the same two values.
-  const backColumn = new Float64Array(COVERAGE_SAMPLES);
-  const aheadColumn = new Float64Array(COVERAGE_SAMPLES);
+  const wedge: Wedge = {
+    apex,
+    back,
+    ahead,
+    scale,
+    convex: back.dx * ahead.dy - back.dy * ahead.dx > 0,
+    backColumn: new Float64Array(COVERAGE_SAMPLES),
+    aheadColumn: new Float64Array(COVERAGE_SAMPLES),
+  };
   const memo = new Map<number | string, number>();
+  const side = Math.ceil(2 * WINDOW_PX + 3);
+  const grid = new Float64Array(side * side).fill(Number.NaN);
   return (px, py) => {
+    const gx = px - corner.x;
+    const gy = py - corner.y;
+    if (gx >= 0 && gy >= 0 && gx < side && gy < side) {
+      const cell = gy * side + gx;
+      const known = grid[cell] as number;
+      if (!Number.isNaN(known)) return known;
+      return (grid[cell] = wedgeCoverage(wedge, px, py));
+    }
     const key = coverageKey(px, py);
     const known = memo.get(key);
     if (known !== undefined) return known;
-    for (let sx = 0; sx < COVERAGE_SAMPLES; sx += 1) {
-      const x = (px + (sx + 0.5) / COVERAGE_SAMPLES) * scale;
-      backColumn[sx] = back.dy * (x - apex.x);
-      aheadColumn[sx] = ahead.dy * (x - apex.x);
-    }
-    let covered = 0;
-    for (let sy = 0; sy < COVERAGE_SAMPLES; sy += 1) {
-      const y = (py + (sy + 0.5) / COVERAGE_SAMPLES) * scale;
-      const backRow = back.dx * (y - apex.y);
-      const aheadRow = ahead.dx * (y - apex.y);
-      for (let sx = 0; sx < COVERAGE_SAMPLES; sx += 1) {
-        const onBack = backRow - (backColumn[sx] as number) > 0;
-        const onAhead = aheadRow - (aheadColumn[sx] as number) > 0;
-        if (convex ? onBack && onAhead : onBack || onAhead) covered += 1;
-      }
-    }
-    const value = covered / (COVERAGE_SAMPLES * COVERAGE_SAMPLES);
+    const value = wedgeCoverage(wedge, px, py);
     memo.set(key, value);
     return value;
   };
+}
+
+type Wedge = {
+  readonly apex: Vec2;
+  readonly back: WedgeLine;
+  readonly ahead: WedgeLine;
+  readonly scale: number;
+  readonly convex: boolean;
+  readonly backColumn: Float64Array;
+  readonly aheadColumn: Float64Array;
+};
+
+// The share of source pixel (px, py)'s box samples on the wedge's ink side. A
+// sample (x, y) is on a leg's ink side when dx * (y - apex.y) -
+// dy * (x - apex.x) > 0. The row terms and the column terms are each computed
+// once per pixel, by the same operations, so every test is the same
+// comparison of the same two values.
+function wedgeCoverage(wedge: Wedge, px: number, py: number): number {
+  const { apex, back, ahead, scale, convex, backColumn, aheadColumn } = wedge;
+  for (let sx = 0; sx < COVERAGE_SAMPLES; sx += 1) {
+    const x = (px + (sx + 0.5) / COVERAGE_SAMPLES) * scale;
+    backColumn[sx] = back.dy * (x - apex.x);
+    aheadColumn[sx] = ahead.dy * (x - apex.x);
+  }
+  let covered = 0;
+  for (let sy = 0; sy < COVERAGE_SAMPLES; sy += 1) {
+    const y = (py + (sy + 0.5) / COVERAGE_SAMPLES) * scale;
+    const backRow = back.dx * (y - apex.y);
+    const aheadRow = ahead.dx * (y - apex.y);
+    for (let sx = 0; sx < COVERAGE_SAMPLES; sx += 1) {
+      const onBack = backRow - (backColumn[sx] as number) > 0;
+      const onAhead = aheadRow - (aheadColumn[sx] as number) > 0;
+      if (convex ? onBack && onAhead : onBack || onAhead) covered += 1;
+    }
+  }
+  return covered / (COVERAGE_SAMPLES * COVERAGE_SAMPLES);
 }
 
 // Pixels are integers; below 2^26 in size a number key is unique, and any
