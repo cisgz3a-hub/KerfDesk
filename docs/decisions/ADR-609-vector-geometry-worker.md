@@ -180,3 +180,50 @@ Verification: `vector-op-worker-client.test.ts` reports an `onerror` before `rea
 `background-vector-command.test.ts` covers Outward copy then Inward copy, an identical repeat and a
 refused click; `FreeOnlyEdition.test.tsx` keeps `proPromptOpen` false while a Free build explains
 a Pro tool, and `EditionProvider.test.tsx` still reports the licensed prompt.
+
+### Amendment 2 - Weld's absorbed-shapes check runs in the worker (2026-11-05)
+
+Performance audit S1, area S6, found S6-P2-1 (`docs/audits/2026-11-02-performance-s1/S6-geometry-commands.md`).
+`describeWeldChange` came in two days after this decision (`310cb363a`, 2026-10-20). It finds the
+shapes Weld absorbs, for the Combine Shapes dialog's warning, and it ran on the UI thread when the
+worker's union arrived. For each candidate it runs one clipper difference per neighbouring shape,
+so the work that stayed on the UI thread scaled with clipper's work, against the Consequences above.
+A plate under 1,999 overlapping circles froze the window for 5.2-6.0 s after the worker had
+finished, with "Updating preview…" and Cancel frozen. A scalloped plaque of 1,000 circles froze it
+for about 1.2 s.
+
+1. **A `weld-review` task.** The dialog posts the operands, rebound to their weld operations,
+   followed by the selected objects they came from, and `operandCount`. The worker welds the
+   operands with `weldVectorObjects`, then runs `describeWeldChange` against the selection, the
+   same two calls with the same inputs the dialog made, and replies with the union and the change.
+   The warning, the "Nothing to weld" refusal and Apply's enable state are therefore identical by
+   construction. `describeWeldChange` itself is unchanged.
+2. **The dialog no longer calls clipper after the reply.** It reads `changed` and `absorbedIds` from
+   the reply. Apply still commits the settled union through `finishWeldSelection`, so the weld,
+   the project and the G-code are unchanged. The plain `weld` task stays for other callers.
+3. **What it costs.** The selection crosses the boundary twice (operands and sources), which adds
+   one more packing pass on opening. The check now runs before the reply, so the result appears
+   once the worker has done both. The window stays live and Cancel terminates the worker
+   (decision 5). A single-difference rewrite of the check (one `differenceD` per candidate against
+   all covering pieces) measured 5.3-6.1 s → 0.34-0.38 s in the audit's prototype, but it named
+   the other one of two identical shapes in 1 of 3,600 random scenes, so it is left for a separate
+   decision.
+
+Measured on the maintainer's PC in Chrome against the Vite dev build (unminified React, so larger
+than production), the same spec on both trees, a plate under the circles:
+
+| Weld of | main: longest UI task | after: longest UI task | warning text |
+| --- | ---: | ---: | --- |
+| plate + 999 circles | 8,927 ms | 134 ms | identical (4,684 characters) |
+| plate + 1,999 circles | 40,134 ms | 181 ms | identical (10,501 characters) |
+
+The remaining tasks are opening the dialog (packing and preparing) and receiving the reply.
+
+Verification: `vector-op-worker-runtime.test.ts` sends `weld-review` through the full worker round
+trip for the parity fixture with an absorbed shape and for a scalloped plate, with operands from
+the real `prepareWeldSelection`, and requires the in-thread `weldVectorObjects` plus
+`describeWeldChange` result by `toStrictEqual` and `JSON.stringify`; a reply without its change is
+refused. `BooleanDialogHost.weld-worker.test.tsx` runs the dialog against a fake Worker and records
+every `describeWeldChange` call: none happens before the worker's reply, the one call happens inside
+the worker's handler, the warning names the absorbed shape, and Apply's project equals the
+in-thread Weld's. The existing dialog and `vector-path-weld-change` suites pass unchanged.

@@ -142,3 +142,13 @@ describe('laser Speed in inches (ADR-629)', () => {
     expect(commit).not.toHaveBeenCalled();
   });
 });
+
+describe('Speed tooltip (UX audit U3-P3-1)', () => {
+  it('says what speed does before its unit', async () => {
+    const { number } = await renderSpeed(1524);
+    expect(number.title).toMatch(
+      /^Speed: how fast the head moves while the laser fires. Slower burns darker/,
+    );
+    expect(number.title).toContain('Feed rate in in/min.');
+  });
+});

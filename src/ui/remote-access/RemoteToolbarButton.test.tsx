@@ -9,6 +9,7 @@ import {
 } from './remote-access-store';
 import { pairingFixture } from './pairing-test-support';
 import { RemoteAccessSection } from './RemoteAccessSection';
+import { REMOTE_TOOLBAR_PURPOSE } from './RemoteToolbarButton';
 
 const runtime = vi.hoisted(() => ({ desktop: true }));
 vi.mock('./desktop-only', () => ({ isRemoteAccessRenderer: () => runtime.desktop }));
@@ -94,7 +95,9 @@ describe('Phone & MCP toolbar button', () => {
           .disconnected('toolbar-test', 'Reopen the app to reconnect.'),
       );
       expect(trigger()?.dataset['remoteState']).toBe('disconnected');
-      expect(trigger()?.title).toBe('Phone & MCP: Disconnected. Reopen the app to reconnect.');
+      expect(trigger()?.title).toBe(
+        `${REMOTE_TOOLBAR_PURPOSE} Disconnected. Reopen the app to reconnect.`,
+      );
       const opened = await openPanel();
       expect(opened.querySelector('[role="status"]')?.textContent).toBe(
         'Disconnected. Reopen the app to reconnect.',
@@ -126,7 +129,7 @@ describe('Phone & MCP toolbar button', () => {
   it('shows the live connection state on the toolbar', async () => {
     await publish({ statusRevision: 1, clients: [phone] });
     expect(trigger()?.dataset['remoteState']).toBe('live');
-    expect(trigger()?.title).toBe('Phone & MCP: 1 approved connection');
+    expect(trigger()?.title).toBe(`${REMOTE_TOOLBAR_PURPOSE} 1 approved connection`);
     await publish({
       statusRevision: 2,
       requests: [
@@ -141,10 +144,10 @@ describe('Phone & MCP toolbar button', () => {
     });
     expect(trigger()?.dataset['remoteState']).toBe('attention');
     await publish({ statusRevision: 3, connected: false });
-    expect(trigger()?.title).toBe('Phone & MCP: Connecting to the remote service…');
+    expect(trigger()?.title).toBe(`${REMOTE_TOOLBAR_PURPOSE} Connecting to the remote service…`);
     await publish({ statusRevision: 4, enabled: false, connected: false, pairing: null });
     expect(trigger()?.dataset['remoteState']).toBe('off');
-    expect(trigger()?.title).toBe('Phone & MCP: Remote access is off');
+    expect(trigger()?.title).toBe(`${REMOTE_TOOLBAR_PURPOSE} Remote access is off`);
   });
 
   it('opens a quick panel with pairing, the MCP server URL and approved connections', async () => {

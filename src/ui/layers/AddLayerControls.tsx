@@ -1,3 +1,4 @@
+import { checkedSubmit } from '../kit/form-validity';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 
@@ -12,7 +13,8 @@ export function AddLayerControls(): JSX.Element {
     <form
       aria-label="Add layer controls"
       style={controlsStyle}
-      onSubmit={(event) => {
+      noValidate
+      onSubmit={checkedSubmit((event) => {
         event.preventDefault();
         const field = event.currentTarget.elements.namedItem(NEW_LAYER_COLOR_FIELD);
         if (field instanceof HTMLInputElement) {
@@ -20,7 +22,7 @@ export function AddLayerControls(): JSX.Element {
           createManualLayer(color);
           setActiveLayerColor(color);
         }
-      }}
+      })}
     >
       <input
         name={NEW_LAYER_COLOR_FIELD}

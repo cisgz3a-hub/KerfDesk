@@ -85,10 +85,12 @@ function DialogForm(props: {
         useStore.getState().projectDocumentEpoch === epoch,
     });
   };
+  // Every field clamps its value before it is rendered or saved (ADR-690).
+  const form = { as: 'form', onSubmit, clampsEveryValue: true } as const;
   // kit Dialog owns the a11y wiring (Escape closes, Tab cycles, focus
   // returns to the opener) and the aria-label.
   return (
-    <Dialog onClose={close} ariaLabel="Add or edit text" as="form" onSubmit={onSubmit} size="sm">
+    <Dialog onClose={close} ariaLabel="Add or edit text" {...form} size="sm">
       <div
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
       >

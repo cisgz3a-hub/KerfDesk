@@ -50,10 +50,11 @@ export function ConvertToBitmapDialog(props: {
   };
   // kit Dialog owns the a11y wiring; the inner <form> keeps its ref so the
   // Convert button (type=button by design - submit is verdict-gated) can
-  // read FormData.
+  // read FormData. Enter submits like that button: every value is clamped at
+  // submit, so nothing is left for the browser to refuse (ADR-690).
   return (
     <Dialog onClose={props.onCancel} ariaLabel="Convert to Bitmap" size="sm">
-      <form ref={formRef} onSubmit={onSubmit} style={formStyle}>
+      <form ref={formRef} noValidate onSubmit={onSubmit} style={formStyle}>
         <div
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
         >

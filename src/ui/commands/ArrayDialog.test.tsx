@@ -21,6 +21,32 @@ afterEach(async () => {
 });
 
 describe('ArrayDialog', () => {
+  // Performance audit S6-P2-2: the totals show n × size to 0.01 mm in 0.1 mm
+  // fields, which the browser's step check refused, so Create array did nothing.
+  it('creates a grid for a selection that is not a whole tenth of a millimetre', async () => {
+    const onApply = vi.fn();
+    await renderDialog({ onApply, bounds: { minX: 0, minY: 0, maxX: 142, maxY: 110.923 } });
+    expect(inputValue('Total height (mm)')).toBe('223.85');
+    await act(async () => button('Create array').click());
+    expect(onApply).toHaveBeenCalledWith(expect.objectContaining({ kind: 'grid', rows: 2 }));
+
+    onApply.mockClear();
+    await setInput('Vertical spacing (mm)', '2.054');
+    await act(async () => button('Create array').click());
+    expect(onApply).toHaveBeenCalledWith(expect.objectContaining({ spacingY: 2.054 }));
+  });
+
+  it('still refuses a value below a field’s minimum, at that field', async () => {
+    const onApply = vi.fn();
+    await renderDialog({ onApply });
+    await setInput('Vertical spacing (mm)', '-1');
+    const spacing = labelled('Vertical spacing (mm)').querySelector('input');
+    const reported = vi.spyOn(spacing!, 'reportValidity');
+    await act(async () => button('Create array').click());
+    expect(onApply).not.toHaveBeenCalled();
+    expect(reported).toHaveBeenCalledOnce();
+  });
+
   it('submits point rotation count and signed total angle', async () => {
     const onApply = vi.fn();
     await renderDialog({ onApply });
@@ -170,6 +196,7 @@ async function renderDialog(props: {
   readonly onApply: React.ComponentProps<typeof ArrayDialog>['onApply'];
   readonly onCancel?: () => void;
   readonly selected?: ReadonlyArray<SceneObject>;
+  readonly bounds?: React.ComponentProps<typeof ArrayDialog>['selectionBounds'];
 }): Promise<void> {
   host = document.createElement('div');
   document.body.appendChild(host);
@@ -177,7 +204,7 @@ async function renderDialog(props: {
   await act(async () =>
     root?.render(
       <ArrayDialog
-        selectionBounds={{ minX: 10, minY: 20, maxX: 30, maxY: 40 }}
+        selectionBounds={props.bounds ?? { minX: 10, minY: 20, maxX: 30, maxY: 40 }}
         scene={createProject().scene}
         {...(props.selected === undefined ? {} : { selected: props.selected })}
         onCancel={props.onCancel ?? vi.fn()}

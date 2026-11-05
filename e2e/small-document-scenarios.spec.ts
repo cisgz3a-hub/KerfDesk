@@ -143,7 +143,7 @@ test('Cancel New, Cancel Open and an invalid file keep the current artwork and p
   await kerfdesk.setOpenFiles([{ name: 'broken.lf2', text: '{this is not a project}' }]);
   await (await toolbarCommand(page, 'Open...')).click();
   await question.getByRole('button', { name: "Don't Save", exact: true }).click();
-  await expect(page.getByText(/Could not open broken\.lf2:/)).toBeVisible();
+  await expect(page.getByText(/broken\.lf2 is damaged or incomplete/)).toBeVisible();
   await expect(page).toHaveTitle(/project-basic\.lf2/);
   await expect(power).toHaveValue('73');
   await expect(page.getByLabel('Selection width', { exact: true })).toHaveValue('20');
@@ -172,7 +172,7 @@ test('a failed save from New leaves the edited artwork on the canvas', async ({
     .getByRole('dialog', { name: 'Save changes?', exact: true })
     .getByRole('button', { name: 'Save', exact: true })
     .click();
-  await expect(page.getByText(/Could not save project: The folder is read-only/)).toBeVisible();
+  await expect(page.getByText(/KerfDesk couldn't write to that file or folder/)).toBeVisible();
   await expect(page).toHaveTitle(/project-basic\.lf2/);
   await expect(power).toHaveValue('73');
   await expect(page.getByLabel('Selection width', { exact: true })).toHaveValue('20');

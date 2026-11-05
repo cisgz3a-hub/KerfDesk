@@ -1,12 +1,17 @@
 import { estimateStyle } from './JobControls.styles';
 import type { LiveJobEstimate } from './live-job-estimate';
 
+// A large job has no live time; it says where to get one, in words a beginner
+// knows (UX audit U3-P3-5: "large traces" named an internal for a photo).
+export const LARGE_JOB_TIME_TITLE =
+  'Large job: open Preview to calculate the time. The live estimate is paused so the canvas stays responsive.';
+
 export function startJobTitle(estimate: LiveJobEstimate, timeNoun: string): string {
   if (estimate.kind === 'estimated') return `Estimated ${timeNoun} time: ${estimate.label}`;
   if (estimate.kind === 'too-large') {
     return estimate.ordinary === true
       ? 'Estimating the job time in the background.'
-      : 'Large job: the live estimate is paused to keep the canvas responsive.';
+      : LARGE_JOB_TIME_TITLE;
   }
   if (estimate.kind === 'preparation-failed') {
     return `Live estimate unavailable: ${estimate.message}`;
@@ -32,8 +37,8 @@ export function EstimateBadge({
         estimating…
       </span>
     ) : (
-      <span style={estimateStyle} title="Live estimate paused so large traces stay responsive.">
-        large job
+      <span style={estimateStyle} title={LARGE_JOB_TIME_TITLE}>
+        time: see Preview
       </span>
     );
   }

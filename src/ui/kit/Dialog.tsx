@@ -8,6 +8,7 @@
 import { useId, useRef } from 'react';
 import { useDialogA11y } from '../common/use-dialog-a11y';
 import { useRegisterModal } from '../common/use-register-modal';
+import { checkedSubmit } from './form-validity';
 
 type DialogSize = 'sm' | 'md' | 'lg' | 'xl';
 
@@ -20,9 +21,13 @@ export function Dialog(props: {
   /** Optional feature-specific panel class; shared dialog chrome remains intact. */
   readonly panelClassName?: string;
   // 'form' renders the panel as a <form> so Enter submits (the
-  // CutSettings/Convert pattern); onSubmit must preventDefault itself.
+  // CutSettings/Convert pattern); onSubmit must preventDefault itself. A
+  // value between a number field's steps never blocks it (form-validity.ts).
   readonly as?: 'div' | 'form';
   readonly onSubmit?: (event: React.FormEvent<HTMLFormElement>) => void;
+  /** The form submits a draft its fields have already clamped, never the raw
+   * input text, so not even the browser's range checks apply (ADR-690). */
+  readonly clampsEveryValue?: boolean;
   /** 'surface' focuses the dialog itself on open, for dialogs that appear
    * unprompted: a keystroke meant for the field the operator was typing in
    * must not press a button. Tab still reaches every control. */
@@ -58,7 +63,13 @@ export function Dialog(props: {
       className="lf-dialog-backdrop"
     >
       {props.as === 'form' ? (
-        <form className={panelClass} onSubmit={props.onSubmit}>
+        <form
+          className={panelClass}
+          noValidate
+          onSubmit={
+            props.clampsEveryValue === true ? props.onSubmit : checkedSubmit(props.onSubmit)
+          }
+        >
           {heading}
           {props.children}
         </form>
