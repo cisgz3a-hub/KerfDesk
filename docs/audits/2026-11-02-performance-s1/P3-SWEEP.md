@@ -12,11 +12,11 @@
 |---|---|---|---|
 | S1-P3-1 | About 1.8 KB of transient renderer heap per job line; 968k lines = 1.85 GB heap, 3.0 GB browser; no leak | 1.5 GB whole app | _pending_ |
 | S1-P3-2 | The end of a long job blocks the UI thread 148–189 ms while the last moves run | 50 ms while a job runs | _pending_ |
-| S1-P3-3 | No guard for job-size scaling of Pause and Preview; the big-job harness is opt-in and GRBL-only | a guard | _pending_ |
+| S1-P3-3 | No guard for job-size scaling of Pause and Preview; the big-job harness is opt-in and GRBL-only | a guard | **Already fixed in its per-PR part (#1547, #1548)**: `stream-pause-beam-index.test.ts` counts the program lines a Marlin Pause reads (a Proxy over the program), and `preview-route-summary-guard.test.tsx` counts the route steps Preview reads on the UI thread. Both are work counts, not times. The nightly production-bundle job run that S1 also proposes is a **maintainer decision** (below) |
 | S2-P3-1 | Every edit of a small Fill design re-estimates the job on the UI thread: 185–251 ms at 200 objects | 200 ms block | **Already fixed (#1575).** ADR-598 Amd 4: ordinary jobs of 2,000 outline and fill units or more prepare in the worker for the ETA as for Preview, Frame, Start and Save (`ordinaryOutputPrefersWorker`, `live-job-estimate.ts:82,111`); mix-200 is 54k units |
 | S2-P3-2 | The 50,000-path trace re-resolves every path every frame and repaints its sprite on every resize step | 33 ms frame, 200 ms block | _pending_ |
 | S2-P3-3 | Thousands selected: a box per object per frame and selection-wide panel recomputes; drag-all commit 207–300 ms at 5,000 | 200 ms block | _pending_ |
-| S2-P3-4 | The canvas probes time only JavaScript, so GPU-bound frames are invisible | a guard | _pending_ |
+| S2-P3-4 | The canvas probes time only JavaScript, so GPU-bound frames are invisible | a guard | **Already fixed in its per-PR part (#1551, #1552)**: `draw-scene-moving-hairline.test.ts` counts strokes wider than a hairline in a moving 5,000-object frame, `draw-artwork-pulse.test.ts` bounds the pulse's bitmap work per frame, and `draw-scene-fill-pool-work.test.ts` counts pool plans and repaints during a drag. The nightly GPU frame-interval run that S2 also proposes is a **maintainer decision** (below) |
 | S3-P3-1 | Projects of 25 MiB or more are read one character at a time: a 90 MB photo project opens in 8.4–8.8 s | Open 5 s | **Fixed by this sweep (#1589)**. Inside a string the tokenizer takes everything up to the next quote, backslash or control character as one slice, instead of one character at a time; the quote, escape or control character goes through the same per-character code as before. 87 MB project-shaped file (the 2,000-object project plus four 22 MB base64 photos): 24.8 → 2.1 s (0.086 ×, calibration 139 → 151 ms), value deep-equal to `JSON.parse`'s |
 | S3-P3-2 | Large vector results block the UI on arrival: SVG 50k 801–863 ms, PDF 20k, Open 10,000 objects | 200 ms block | _pending_ |
 | S4-P2-1 (P3) | Everyday jobs under 20,000 units compile on the UI thread for Preview, Frame, Start, ETA and Save separately | 200 ms block | **Already fixed (#1575)** (ADR-598 Amd 4) |
@@ -30,7 +30,7 @@
 | S6-P3-2 | Exclude folds the selection one shape at a time: 500 shapes 2.5 s, 2,000 shapes 55 s | 2,000 shapes under 5 s | **Maintainer decision** (below) |
 | S6-P3-3 | Optimize / Combine Shapes' before/after preview rebuilds every outline on the UI thread: 2,000 outlines 262–328 ms | 100 ms opening task | **Fixed by this sweep (#1587)**. The thumbnail draws each outline to a thousandth of the selection's span, thinning points in object space before placing them. Display only. 2,000 traced outlines: 971 → 230 ms to build (Node, calibration about 4 × quiet), 400,000 → 82,417 points, path string 6.9 → 1.3 MB for the browser to parse |
 | S7-P3-1 | Shrink-to-fit re-shapes every line prefix through opentype.js: a 200-character paragraph previews 1.4–1.55 s after each key (text worker) | 100 ms response | **Fixed by this sweep (#1590)**. Each layout call shapes each distinct line string once and sums the cached glyph advances and kerning exactly as `forEachGlyph` does. The cache lives for one layout call, because opentype.js completes some fonts lazily while it draws (ADR-643). Outline hashes equal main's on every shrink, auto-height and plain case, with Roboto and the variable DancingScript, on the UI and worker routes (S7's `gt7.mjs`). Default frame, 200 characters: 2,182 → 664 ms on the UI route, 3,365 → 633 ms on the worker route; N4's 150 × 30 frame, 500 characters: 9,529 → 1,989 ms; 20 characters unchanged (calibration 113–193 ms, about 3–5 × quiet). Remaining to S7's 300 ms budget: the 18-step bisection itself, and the preview laying the text out a second time |
-| S7-P3-2 | A 2,000-character frame rebuilds its preview SVG path on every key: 51–280 ms a key, typing falls 1.2 s behind | 100 ms response | _pending_ |
+| S7-P3-2 | A 2,000-character frame rebuilds its preview SVG path on every key: 51–280 ms a key, typing falls 1.2 s behind | 100 ms response | **Fixed by this sweep (#1591)**. The frame preview memoizes its path on the render result, so keys that arrive while the next layout is in the worker build nothing; the path is drawn to a thousandth of the frame (it is 130 px tall). At about 250,000 outline points: 71 → 21 ms per build, path string 9.4 → 1.6 MB for the browser to parse (Node, calibration 103–115 ms). Display only |
 
 ### Machine job time (S4's route and overscan section)
 
@@ -49,6 +49,15 @@
 The other KNOWN items in S1–S6 are re-observations of P1/P2 findings fixed elsewhere (S1-P2-2, S2-P2-1/2, S3-P2-3), items owned by other audits (Q4-P2-1 trace speed against Potrace, K1-P1-1's window route, 21-P3-7), or confirmations that a fix holds (J10-P3-2, J10-P3-3, R1-P2-1).
 
 ## Maintainer decisions
+
+### S1-P3-3 and S2-P3-4 — Nightly runs on dedicated hardware
+
+The per-PR guards both areas ask for exist and count work (above). What remains is a scheduled run:
+
+- S1: the 18,527-line job on a production bundle, worker and window routes, with the longest task under 50 ms, Abort key → `0x18` under 50 ms timed from the key, and throughput at least 0.9 × the reference.
+- S2: `mix-5000` pan, zoom, hover and drag frame intervals under 33 ms at p95, which needs a real GPU (a software-raster CI runner measures something else).
+
+Both mean new scheduled CI with timing assertions, and S2 needs a GPU runner the repository does not have. **Recommendation:** add S1's as a nightly, non-blocking workflow on `ubuntu-latest` that reports rather than fails, and leave S2's until a GPU runner exists. Its counters above already catch the causes S2 found.
 
 ### S4-P3-3 — The time estimate stops at every rapid/feed junction
 
