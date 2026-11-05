@@ -7,6 +7,10 @@ import type { ControllerQualification } from './laser-controller-qualification';
 import type { ConnectionState } from './laser-store';
 
 export const PORT_OPEN_NO_ANSWER = 'Port open, no answer';
+/** The toolbar's form. Its status line sits under the machine name, and a
+ * failed read must not widen the row (ADR-642): the long form did by 2.5 px at
+ * 1920 px, where "Reading settings…" already fits. */
+export const NO_ANSWER_TOOLBAR = 'No answer';
 
 export function portOpenWithoutAnswer(laser: {
   readonly connection: ConnectionState;
