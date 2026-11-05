@@ -1654,7 +1654,11 @@ the completed physical Frame is the spatial source of truth.
    after validation is complete, using that click's file access permission.
 
 #### Error — save failure
-- Error toast: `Could not save project: <reason>`. Unpersisted changes remain unsaved and the user can retry. A failed selection does not replace the previous successful file handoff.
+- Error toast: `Could not save project: <reason>`. Unpersisted changes remain unsaved and the user can retry.
+  A refused write says it in plain words instead of the browser's exception text (UX audit U5-P3-11):
+  a read-only or not-allowed target says `KerfDesk couldn't write to that file or folder. Choose another place, such as Documents, with File > Save As. Your design is still open and nothing was lost.`,
+  a full disk says `There isn't enough free space to save there. …`, and any other write failure
+  keeps `Could not save project: <reason>.` followed by the same reassurance. A failed selection does not replace the previous successful file handoff.
 - If a late older request wrote the same physical file and restoring the newest captured bytes fails,
   the exact last successful file handoff is marked unsaved and the error toast says to save again.
   A later failed Save does not replace that owner. A failed replay that may have changed an alias
@@ -1737,7 +1741,10 @@ the completed physical Frame is the spatial source of truth.
 - Modal: `This project was saved with a newer version of KerfDesk. Update the app to open it.` No load.
 
 #### Error — file is not a valid .lf2
-- Modal: `Could not open <filename>: not a valid KerfDesk project.` No load.
+- Error toast: `<filename> is damaged or incomplete (it may have been cut off while saving or copying), so KerfDesk can't open it. Your current design is unchanged. Open an earlier copy of the file if you have one.` The parser's own text is under the toast's **Show the note**. An empty file says `<filename> is empty, so there is nothing to open.` No load (UX audit U5-P3-8).
+
+#### Edge — the project uses a font this computer doesn't have
+- After `Opened <filename>`, a warning toast: `This project uses a font that isn't on this computer (<font>). Its text will burn as saved; to edit that text, choose Import or System fonts... in the text panel.` Editing that text shows the same reason above **Done**, which stays off until a font is chosen (UX audit U5-P3-9).
 
 #### Edge — the file carries a camera calibration (ADR-440 Amendment 3)
 1. A file for the machine already in use (same profile, name and bed) keeps the camera

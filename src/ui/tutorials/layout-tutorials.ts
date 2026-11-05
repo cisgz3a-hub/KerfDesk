@@ -317,7 +317,7 @@ export const LAYOUT_TUTORIALS: readonly Tutorial[] = [
         visual: 'preview',
       },
     ],
-    tip: 'Colours identify operations automatically. Read the operation name and settings when deciding how an object will be made.',
+    tip: 'Artwork is drawn in plain ink. Hold Alt to see every object in its operation colour, matching the swatches in the operations list. Read the operation name and settings when deciding how an object will be made.',
     keywords: ['operations', 'layers', 'settings', 'output', 'show', 'run order', 'unique'],
     related: ['laser-cut', 'laser-fill', 'cnc-profile', 'preview'],
   },

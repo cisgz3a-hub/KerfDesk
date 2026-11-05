@@ -11,6 +11,7 @@ import { requestPersistentStorageOnce } from './persistent-storage-request';
 import {
   completeProjectSave,
   failProjectSave,
+  failProjectWrite,
   staleProjectSaveOutcome,
   type ProjectSaveOwner,
   type SaveProjectOutcome,
@@ -70,7 +71,7 @@ export async function handleSaveProject(
       rememberSavedProject(ctx.platform, prepared.target, outcome);
       return outcome;
     } catch (err) {
-      return failProjectSave(owner, errorMessage(err));
+      return failProjectWrite(owner, err);
     }
   } catch (error) {
     return failProjectSave(owner, errorMessage(error));

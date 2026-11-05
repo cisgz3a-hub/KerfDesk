@@ -384,6 +384,8 @@ describe('NumericEditsBar', () => {
     // Width doubled (20 -> 40) but height is untouched — no proportional snap.
     expect(object?.transform.scaleX).toBe(2);
     expect(object?.transform.scaleY).toBe(1);
+    // A drawn shape stretched on purpose gets no notice.
+    expect(useToastStore.getState().toasts).toHaveLength(0);
   });
 });
 

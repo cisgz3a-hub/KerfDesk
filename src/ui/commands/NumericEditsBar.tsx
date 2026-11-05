@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
-import { Icon } from '../kit/icons';
 import {
   evaluateNumericEntry,
   type NumericEntryKind,
@@ -19,6 +18,7 @@ import { useLengthUnit } from '../state/display-units';
 import { lengthUnitLabel, MM_PER_INCH, type DisplayLengthUnit } from '../display-length';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
+import { AspectLockButton, STRETCHED_IMAGE_NOTICE, stretchesImage } from './AspectLockButton';
 import { TransformAnchorPicker } from './TransformAnchorPicker';
 import './NumericEditsBar.css';
 
@@ -129,6 +129,7 @@ function useNumericEditModel(): NumericEditModel {
       return;
     }
     applySelectionTransforms(result.transforms);
+    if (stretchesImage(objects, edit)) pushToast(STRETCHED_IMAGE_NOTICE, 'info');
   };
   return {
     // A canvas pointerdown can select different artwork before field blur.
@@ -219,17 +220,11 @@ function SizeFields({
           })
         }
       />
-      <button
-        type="button"
-        className="lf-btn lf-numeric-aspect-lock"
-        aria-label="Lock aspect ratio"
-        title="Keep width and height proportional when resizing the selection."
-        aria-pressed={model.preserveAspect}
+      <AspectLockButton
+        locked={model.preserveAspect}
         disabled={!model.hasSelection}
-        onClick={() => model.setPreserveAspect((value) => !value)}
-      >
-        <Icon name={model.preserveAspect ? 'lock' : 'unlock'} size={14} />
-      </button>
+        onToggle={() => model.setPreserveAspect((value) => !value)}
+      />
       <NumberField
         label="Selection height"
         caption="H"

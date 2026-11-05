@@ -10,6 +10,7 @@ import {
 import { resolveImportBlob, type BlobSourceFile } from '../import/import-file-blob';
 import type { ToastVariant } from '../state/toast-store';
 import { mainThreadImportFallbackAdvisory } from './import-size-advisory';
+import { EMPTY_PROJECT_FILE } from './file-action-formatters';
 import { projectSealReady, trustIfSealedHere } from '../licensing/project-seal';
 import { unadmittedProFeatures } from '../state/pending-pro-project';
 
@@ -66,14 +67,20 @@ async function parseNativeProjectFile(
 ): Promise<ReturnType<typeof deserializeProject>> {
   if (blob === null) {
     const text = await readProjectText(file, options);
-    return admitSealedProject(deserializeProject(text), async () => text, options);
+    return admitSealedProject(deserializeNativeText(text), async () => text, options);
   }
+  if (blob.size === 0) return EMPTY_PROJECT_FILE;
   const pending = parseProjectOffThread(blob, options);
   if (pending !== null)
     return admitSealedProject(await pending, () => readProjectText(file, options), options);
   pushToast(mainThreadImportFallbackAdvisory(file.name), 'warning');
   const text = await readProjectText(file, options);
-  return admitSealedProject(deserializeProject(text), async () => text, options);
+  return admitSealedProject(deserializeNativeText(text), async () => text, options);
+}
+
+// An empty file says so, not "Unexpected end of JSON input" (UX audit U5-P3-8).
+function deserializeNativeText(text: string): ReturnType<typeof deserializeProject> {
+  return text.trim() === '' ? EMPTY_PROJECT_FILE : deserializeProject(text);
 }
 
 async function readProjectText(
