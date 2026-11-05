@@ -45,6 +45,7 @@
 import { inkMaskFromPrepared } from './centerline';
 import type { CrackSubPixelField } from './contour-boundary';
 import { contourTraceInputMatches, type ContourTraceInput } from './contour-input';
+import { fieldLuma } from './crack-field-planes';
 import { shouldTraceAlphaMask } from './trace-alpha';
 import { prepareTraceForContour, type RawImageData, type TraceOptions } from './trace-image';
 
@@ -329,20 +330,25 @@ function forEachCrack(
   mask: InkPlane,
   visit: (inkX: number, inkY: number, bgX: number, bgY: number) => unknown,
 ): void {
-  const { width, height } = mask;
+  const { width, height, ink } = mask;
   for (let y = -1; y < height; y += 1) {
+    const row = y * width;
+    const inRow = y >= 0;
+    const belowInGrid = y + 1 < height;
     for (let x = -1; x < width; x += 1) {
-      const here = inkAt(mask, x, y);
-      if (crack(here, inkAt(mask, x + 1, y), x, y, x + 1, y, visit) === false) return;
-      if (crack(here, inkAt(mask, x, y + 1), x, y, x, y + 1, visit) === false) return;
+      const here = rowInk(ink, row, x, width, inRow);
+      if (crack(here, rowInk(ink, row, x + 1, width, inRow), x, y, x + 1, y, visit) === false) {
+        return;
+      }
+      const below = rowInk(ink, row + width, x, width, belowInGrid);
+      if (crack(here, below, x, y, x, y + 1, visit) === false) return;
     }
   }
 }
 
-function inkAt(mask: InkPlane, x: number, y: number): boolean {
-  return (
-    x >= 0 && y >= 0 && x < mask.width && y < mask.height && mask.ink[y * mask.width + x] === 1
-  );
+// Whether pixel x of a mask row is ink (off-grid pixels are paper).
+function rowInk(ink: Uint8Array, row: number, x: number, width: number, inGrid: boolean): boolean {
+  return inGrid && x >= 0 && x < width && ink[row + x] === 1;
 }
 
 // Visits the crack between pixels a and b, ink side first, when they differ.
@@ -359,11 +365,25 @@ function crack(
   return aInk ? visit(ax, ay, bx, by) : visit(bx, by, ax, ay);
 }
 
+// The cracks forEachCrack visits: every change of class along a row and down
+// a column, the paper off the grid included.
 function crackCount(mask: InkPlane): number {
+  const { width, height, ink } = mask;
   let cracks = 0;
-  forEachCrack(mask, () => {
-    cracks += 1;
-  });
+  for (let y = 0; y < height; y += 1) {
+    let left = 0;
+    for (let x = 0, p = y * width; x < width; x += 1, p += 1) {
+      const here = ink[p] === 1 ? 1 : 0;
+      const above = y > 0 && ink[p - width] === 1 ? 1 : 0;
+      if (here !== left) cracks += 1;
+      if (here !== above) cracks += 1;
+      left = here;
+    }
+    cracks += left;
+  }
+  for (let p = (height - 1) * width; p >= 0 && p < height * width; p += 1) {
+    if (ink[p] === 1) cracks += 1;
+  }
   return cracks;
 }
 
@@ -420,6 +440,11 @@ function plateauTones(
 ): { readonly ink: number; readonly paper: number } {
   const ink = new Uint32Array(MAX_LEVEL + 1);
   const paper = new Uint32Array(MAX_LEVEL + 1);
+  const plane = fieldLuma(field, mask.width, mask.height);
+  if (plane !== null) {
+    countPlaneLevels(plane, mask.ink, ink, paper);
+    return { ink: medianLevel(ink, 0), paper: medianLevel(paper, MAX_LEVEL) };
+  }
   for (let y = 0; y < mask.height; y += 1) {
     for (let x = 0; x < mask.width; x += 1) {
       const level = Math.max(0, Math.min(MAX_LEVEL, Math.round(field.lumaAt(x, y))));
@@ -428,6 +453,21 @@ function plateauTones(
     }
   }
   return { ink: medianLevel(ink, 0), paper: medianLevel(paper, MAX_LEVEL) };
+}
+
+// plateauTones on the field's luma plane, whose whole levels in range the
+// rounding and the clamp keep as they are.
+function countPlaneLevels(
+  plane: Uint8Array,
+  mask: Uint8Array,
+  ink: Uint32Array,
+  paper: Uint32Array,
+): void {
+  for (let p = 0; p < plane.length; p += 1) {
+    const level = plane[p] as number;
+    if (mask[p] === 1) ink[level] = (ink[level] as number) + 1;
+    else paper[level] = (paper[level] as number) + 1;
+  }
 }
 
 function medianLevel(counts: Uint32Array, empty: number): number {

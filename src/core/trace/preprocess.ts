@@ -48,8 +48,16 @@ export function lumaAt(data: Uint8ClampedArray, pixelOffset: number): number {
   const r = data[pixelOffset] ?? 0;
   const g = data[pixelOffset + 1] ?? 0;
   const b = data[pixelOffset + 2] ?? 0;
+  // Grey pixels (most of a prepared or scanned page) read the table the same
+  // expression filled.
+  if (r === g && g === b && r >= 0 && r <= 255 && Number.isInteger(r))
+    return GREY_LUMA[r] as number;
   return Math.round(LUMA_R * r + LUMA_G * g + LUMA_B * b);
 }
+
+const GREY_LUMA = Uint8Array.from({ length: 256 }, (_, v) =>
+  Math.round(LUMA_R * v + LUMA_G * v + LUMA_B * v),
+);
 
 // Maximum 3×3 neighbourhood size; the reusable scratch buffer is sized once.
 const MEDIAN_WINDOW = 9;

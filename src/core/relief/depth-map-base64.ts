@@ -1,38 +1,12 @@
+import { decodeBase64Into, encodeBase64 } from '../util/base64-codec';
+
 const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+const BASE64_DATA = /^[A-Za-z0-9+/]*$/;
 
 /** Encode bytes as canonical padded base64 without browser or Node globals. */
 export function encodeCanonicalBase64(bytes: Uint8Array): string {
-  const chunks: string[] = [];
-  const chunkCharacters: string[] = [];
-  for (let offset = 0; offset < bytes.length; offset += 3) {
-    chunkCharacters.push(encodeTriplet(bytes, offset));
-    if (chunkCharacters.length >= 64 * 1024) {
-      chunks.push(chunkCharacters.join(''));
-      chunkCharacters.length = 0;
-    }
-  }
-  if (chunkCharacters.length > 0) chunks.push(chunkCharacters.join(''));
-  return chunks.join('');
-}
-
-function encodeTriplet(bytes: Uint8Array, offset: number): string {
-  const remaining = bytes.length - offset;
-  const packed =
-    (byteAt(bytes, offset) << 16) | (byteAt(bytes, offset + 1) << 8) | byteAt(bytes, offset + 2);
-  return (
-    alphabetAt((packed >>> 18) & 0x3f) +
-    alphabetAt((packed >>> 12) & 0x3f) +
-    (remaining > 1 ? alphabetAt((packed >>> 6) & 0x3f) : '=') +
-    (remaining > 2 ? alphabetAt(packed & 0x3f) : '=')
-  );
-}
-
-function alphabetAt(index: number): string {
-  return BASE64_ALPHABET[index] ?? '';
-}
-
-function byteAt(bytes: Uint8Array, index: number): number {
-  return bytes[index] ?? 0;
+  // The shared codec writes the same text (performance audit S7-P2-2).
+  return encodeBase64(bytes);
 }
 
 /** Result of decoding a canonical padded base64 payload without browser globals. */
@@ -62,11 +36,9 @@ function base64Padding(value: string): 0 | 1 | 2 {
   return value.endsWith('=') ? 1 : 0;
 }
 
+// One pattern test, not an indexOf per character (performance audit S7-P2-2).
 function hasOnlyBase64Data(value: string, dataLength: number): boolean {
-  for (let index = 0; index < dataLength; index += 1) {
-    if (BASE64_ALPHABET.indexOf(value[index] ?? '') < 0) return false;
-  }
-  return true;
+  return BASE64_DATA.test(dataLength === value.length ? value : value.slice(0, dataLength));
 }
 
 function hasOnlyExpectedPadding(value: string, dataLength: number): boolean {
@@ -116,17 +88,9 @@ function decodeCanonicalBytes(
       reason: 'Base64 payload does not fit in this runtime.',
     };
   }
-  let output = 0;
-  for (let index = 0; index < value.length; index += 4) {
-    const a = BASE64_ALPHABET.indexOf(value[index] ?? '');
-    const b = BASE64_ALPHABET.indexOf(value[index + 1] ?? '');
-    const c = value[index + 2] === '=' ? 0 : BASE64_ALPHABET.indexOf(value[index + 2] ?? '');
-    const d = value[index + 3] === '=' ? 0 : BASE64_ALPHABET.indexOf(value[index + 3] ?? '');
-    const packed = (a << 18) | (b << 12) | (c << 6) | d;
-    if (output < byteLength) bytes[output++] = (packed >>> 16) & 0xff;
-    if (output < byteLength) bytes[output++] = (packed >>> 8) & 0xff;
-    if (output < byteLength) bytes[output++] = packed & 0xff;
-  }
+  // The text is canonical here, so the shared codec reads the bytes the
+  // character-by-character loop did (performance audit S7-P2-2).
+  decodeBase64Into(value, bytes);
   return { kind: 'ok', bytes };
 }
 

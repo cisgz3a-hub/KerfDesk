@@ -1186,3 +1186,119 @@ and pulls the chain up to 1 px off the curve. Simplify keeps those points and th
 Potrace at the same mean error, and lose on corners kept (49 against Potrace's 75) and Hausdorff
 (about 2 px at bowl joins and stroke ends). The corner dial at that size is the next thing to
 measure.
+
+### Amendment 15 - tracer speed round, first pass: the same paths with fewer calls per pixel (2026-11-05)
+
+The maintainer approved a tracer speed round on 2026-11-05 ("Speed round, quality locked"): make
+tracing much faster with every traced path byte-identical. Performance audit S5 measured Line Art at
+about 8x Potrace 1.16 per Q5 image and 19-21x on the everyday 1024 px logo (Q4-P2-1, KNOWN). The
+round targets the logo under 0.5 s, the Q5 median under 50 ms and no preset slower than 1.0.28.
+This amendment is its first pass. It does not reach those targets (see **What remains**). S5-P3-1,
+Sharp preparing its source twice, was fixed separately by #1586.
+
+**Where the time went** (CPU profiles of origin/main `790b95c4a`). The profile is flat: dozens of
+passes over the whole grid, each 2-8% of the trace.
+
+- **Logo, Line Art:** the source is enlarged 2x and takes the sketch-window lane.
+  - Preparing the enlarged grid: about 42%. The light-solid detector is 19% of the trace and the
+    mask cleanup 14%.
+  - The clean-art check's native preparation: 14%.
+  - Contour walk and fit: 24%.
+  - The bilinear enlargement: 6%.
+  - The staircase checks: 7%.
+- **Q5, Line Art:**
+  - Finishing the contours: 46%. The compact fit is 17%, the corner dial 16% and the topology
+    repair 8%.
+  - Enlarged preparation: 22%.
+  - Native preparation: 16%. Speck removal's colon-dot test is 5% of that, because it judged each
+    neighbour's baseline again for every speck within reach.
+
+**Decision.** Each change below does the same arithmetic in the same order, or skips work whose
+answer cannot change.
+
+- **The enlargement interpolates each source row once** (`bilinear-rows.ts`). Every output pixel was
+  round(lerp(top, bottom, fy)) over two horizontal lerps. Those horizontal values depend only on the
+  source row and the output column, so they go into a row buffer that the next output rows reuse.
+  Before, a 2x enlargement interpolated each source row four times.
+- **Passes over the whole grid read the field's arrays** (`crack-field-planes.ts`,
+  `luma-crack-fields.ts`). The luma and sketch-window crack fields register their luma plane and
+  integral image under the reader closure itself.
+  - A copy that keeps the reader (`{ ...field, crackCrossingAt }`) keeps the arrays. A field that
+    replaces the reader cannot reach them.
+  - Readers: the automatic-detail classifier (localMean's box mean, the same reads and arithmetic),
+    the small-mark tone histograms, and the clean-art check's plateau tones.
+  - Inside the grid the arrays and the readers give the same value. `withoutFieldPlanes` makes
+    every pass take the readers, so a test can compare whole traces both ways.
+- **Light-solid recovery** (`light-solid-regions.ts`, split from `light-solid-fill.ts`):
+  - Region labelling, cut-out rejection and the iso spread no longer make a closure call or fill a
+    neighbour array per pixel. Visiting order and sums are unchanged.
+  - The detector stops as soon as cut-out rejection leaves no candidate. Surfaces are only marked
+    among candidates, so the result was already null.
+- **Mask cleanup:**
+  - The pinhole flood tests one `closed` mask (ink or blocked) instead of an optional array per
+    push.
+  - `lumaAt`, `lumaBuffer` and `inkMaskFromPrepared` read a grey pixel's value from a 256-entry
+    table filled by their own expression.
+  - The summed-area table drops its per-pixel fallbacks; every index lies in the plane.
+- **Speck removal's colon test** (`small-mark-text-line.ts`) reads each label's dot and baseline
+  once per mask. The answer depends only on the label and the mask, which does not change while
+  specks are judged.
+- **Corner dial:**
+  - Only the costliest candidate from a crack survives, so a candidate whose fillet gap, an upper
+    bound of its cost, cannot beat the best so far skips the circle fit and the field-wedge check.
+  - Leg runs read a typed copy of the crack chain (the same doubles, summed in the same order).
+    They find where a run must stop from precomputed distances to the next lattice barrier and the
+    next turn stop.
+  - The wedge's coverage memo is a small grid over the window's source pixels instead of a map.
+- **Clean-art check:** cracks are counted from the changes of class along rows and down columns,
+  the same count the crack walk makes. The walk reads mask rows directly, in the same order.
+
+**Identity.** SHA-256 of every traced path's JSON against `790b95c4a`, 952 traces: Q4 (72), Q5
+(40), the five full-size assets, the 4096 benchmark at the 2048 preview edge and a 12 MP photo at
+2048, each with all eight presets. They were equal after every change and again after merging
+#1586. The 4096 benchmark and trace-bench's sparse4096 page at 4096 add 12 traces (Line Art, Smooth,
+Sharp, Centerline, Edge Detection and Photo shading; the other two were left out for this PC's
+memory), also equal. G-code follows from the paths. Neither the compile nor the emitters change.
+
+**Measured.** esbuild bundles of `traceImageToColoredPaths`. Base `790b95c4a`, this branch and
+1.0.28 `33bc394c6` alternate round by round in one process. The first run is dropped, then the
+median of five. The PC was never quiet (other sessions' suites and harnesses throughout): the
+calibration loop read 87-298 ms against about 36 ms quiet. Only the ratios hold, and the same set
+repeated 2 h later read differently, so each ratio is a range of the clean sets.
+
+| Set | This / base | This / 1.0.28 |
+|---|---|---|
+| Logo 1024 px, Line Art | 0.77 | 0.91 |
+| Q5 (40), Line Art: sum / median | 0.87 / 0.90 | 0.97 / 0.88 |
+| Q5, Sharp: sum | 0.74 | 1.06 |
+| Q5, Smooth: sum | 0.86 | 0.92 |
+| Q5, Centerline, Line + fill, Edge Detection, Colour layers, Photo shading | 0.94-1.01 | 0.97-1.02 |
+| Logo, Sharp / Smooth | 0.71 / 0.86 | 1.26 / 0.81 |
+| 4096 benchmark at 2048, Sharp (with #1586) | 0.61 | 1.34-1.65 |
+| 4096 benchmark at 4096, Sharp (with #1586) | 0.67-0.83 | 0.91-1.17 |
+
+Potrace 1.16, test-only and run as a black box in the same sitting (its process-start floor read
+25-33 ms, about 3x quiet): Line Art is now about 5.6x Potrace on the Q5 median (S5: 8x) and about
+11x on the logo (S5: 19-21x).
+
+**Guard** (`trace-speed-round.test.ts`): counts of work per trace, not wall-clock.
+
+- Letter reaches on a speckled page: at most 1,672 (main made 5,918).
+- Field-wedge fits on the logo's lettering: at most 121 (main made 127).
+- Whole traces equal with and without the array passes, on four preset and fixture pairs.
+
+`bilinear-rows.test.ts` holds the enlargement to the per-pixel rule byte for byte at integer and
+fractional factors.
+
+**What remains** (none of the targets is met yet):
+
+- At quiet-PC scale the logo is about 1.2 s and the Q5 median about 100 ms.
+- Sharp on large pages is still above 1.0.28 where Amendment 13's step scan runs (grey edges at
+  2048).
+- Q5 is now dominated by finishing the contours (about 53%: compact fit, corner dial, topology).
+  The logo is dominated by preparing the enlarged grid.
+- Two further exact levers, both larger changes:
+  - Finishing rings on helper workers, as Amendment 10 proposed: each ring's finish depends only on
+    its boundary, the mask, the field and the options.
+  - Keeping masks as one byte per pixel instead of RGBA between the preparation stages. Several
+    stages convert back and forth.

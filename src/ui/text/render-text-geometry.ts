@@ -1,4 +1,5 @@
 import { findFontEntry, textToPolylines, type TextRenderResult } from '../../core/text';
+import { outlineTextToPolylines, type parseOutlineFont } from '../../core/text/text-to-polylines';
 import type { EmbeddedFont, TextAlignment } from '../../core/scene';
 import type { TextBoxSettings } from '../../core/scene/text-box';
 import { loadFont } from './font-loader';
@@ -17,8 +18,18 @@ export type RenderTextGeometryInput = {
 };
 
 /** Routes editable text to the outline-font or native CNC stroke renderer. */
-export async function renderTextGeometry(
+export function renderTextGeometry(input: RenderTextGeometryInput): Promise<TextRenderResult> {
+  return renderTextGeometryWith(input, undefined);
+}
+
+/**
+ * renderTextGeometry with the font parse supplied, so a batch of renders can
+ * share one parse of a font file (held-font-parser.ts). Without `parseFont`
+ * every render parses the file, as textToPolylines does.
+ */
+export async function renderTextGeometryWith(
   input: RenderTextGeometryInput,
+  parseFont: typeof parseOutlineFont | undefined,
 ): Promise<TextRenderResult> {
   const shared = {
     content: input.content,
@@ -38,9 +49,8 @@ export async function renderTextGeometry(
   }
   const fontBuffer = await loadFont(input.fontKey, input.embeddedFonts);
   const shaping = await prepareTextShaping(fontBuffer, input.content);
-  return textToPolylines({
-    ...shared,
-    fontBuffer,
-    ...(shaping === undefined ? {} : { shaping }),
-  });
+  const outline = { ...shared, fontBuffer, ...(shaping === undefined ? {} : { shaping }) };
+  return parseFont === undefined
+    ? textToPolylines(outline)
+    : outlineTextToPolylines(outline, await parseFont(fontBuffer));
 }

@@ -14,6 +14,7 @@ import {
   type PlungingReliefStage,
 } from './job-review-detail-facts';
 import { tabSpanGroupLabel } from './job-review-laser-tabs';
+import type { CncStrategyFallback } from '../../../core/job/cnc-compilation-sidecar-types';
 
 import { cncCuttingStageLabel } from '../../../core/scene/cnc-stage-recipe';
 import { nominalChiploadMm } from '../../../core/cnc/nominal-chipload';
@@ -31,6 +32,8 @@ export type JobReviewEffectiveOperation = {
   // Set when a compiled profile pass of the operation rises into a holding
   // tab, so its line names only tabs the passes carry (ADR-258 Amendment 4).
   readonly tabbedShapes?: true;
+  // Set when the operation cuts another strategy than it asks for (S8-P2-1).
+  readonly strategyFallback?: CncStrategyFallback['kind'];
 };
 
 /** Summarize selected values from the exact prepared Job. Matching displayed
@@ -62,7 +65,11 @@ export function buildEffectiveOperationReview(
   const reliefByLayer = compiledReliefFactsByLayer(job);
   const unrampedShapeLayers = unrampedShapeLayerIds(job, scene?.layers ?? []);
   const tabbedLayers = tabbedProfileLayerIds(job);
+  const fallbacks = new Map(
+    (job.cncCompilation?.strategyFallbacks ?? []).map((entry) => [entry.layerId, entry.kind]),
+  );
   return [...summariesByLayer].map(([layerId, summaries]) => {
+    const strategyFallback = fallbacks.get(layerId);
     const cncActualMaxDepth = vCarveDepthByLayer.get(layerId);
     const plungingReliefStages = plungingReliefByLayer.get(layerId);
     const relief = reliefByLayer.get(layerId);
@@ -74,6 +81,7 @@ export function buildEffectiveOperationReview(
       ...(relief === undefined ? {} : { relief }),
       ...(unrampedShapeLayers.has(layerId) ? { unrampedShapes: true as const } : {}),
       ...(tabbedLayers.has(layerId) ? { tabbedShapes: true as const } : {}),
+      ...(strategyFallback === undefined ? {} : { strategyFallback }),
     };
   });
 }

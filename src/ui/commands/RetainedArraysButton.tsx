@@ -7,7 +7,8 @@ import { useStore } from '../state';
 import { retainedArrayChanged } from '../state/retained-array-capture';
 import { retainedArraySource } from '../state/retained-array-regeneration';
 import { prepareVariableArray, type VariableArrayResult } from '../state/prepare-variable-array';
-import { renderVariableText } from '../text/render-variable-text';
+import { variableCopySlices } from '../state/variable-copy-slices';
+import { batchVariableTextRenderer } from '../text/render-variable-text';
 import { ArrayDialog } from './ArrayDialog';
 import { arrayFormFromSpec } from './array-form-from-spec';
 
@@ -75,6 +76,7 @@ function RetainedArrayEditor(props: {
   const source = retainedArraySource(captured, props.layout);
   const owner = useRef(0);
   const [preparing, setPreparing] = useState(false);
+  const [progress, setProgress] = useState<{ readonly done: number; readonly total: number }>();
   const [error, setError] = useState<string>();
   useEffect(
     () => () => {
@@ -92,8 +94,12 @@ function RetainedArrayEditor(props: {
     source,
     props.onClose,
     owner,
-    setPreparing,
+    (value) => {
+      setPreparing(value);
+      if (!value) setProgress(undefined);
+    },
     setError,
+    (done, total) => setProgress({ done, total }),
   );
   return (
     <ArrayDialog
@@ -108,6 +114,7 @@ function RetainedArrayEditor(props: {
       }
       hasVariableText={selected.some((object) => objectVariableTemplate(object) !== undefined)}
       preparing={preparing}
+      {...(progress === undefined ? {} : { progress })}
       {...(error === undefined ? {} : { errorMessage: error })}
       onApply={(spec, advanceVariables) => {
         void apply(spec, advanceVariables === true);
@@ -125,6 +132,7 @@ function createRetainedArrayApply(
   owner: { current: number },
   setPreparing: (value: boolean) => void,
   setError: (value: string | undefined) => void,
+  setProgress: (done: number, total: number) => void,
 ): (spec: ArraySpec, advanceVariables: boolean) => Promise<void> {
   const apply = async (spec: ArraySpec, advanceVariables: boolean): Promise<void> => {
     const token = ++owner.current;
@@ -139,6 +147,9 @@ function createRetainedArrayApply(
         spec,
         advanceVariables,
         isCurrent,
+        (done, total) => {
+          if (owner.current === token) setProgress(done, total);
+        },
       );
       if (!isCurrent()) return;
       if (materialized !== undefined && !materialized.ok) {
@@ -170,6 +181,7 @@ async function prepareRetainedValues(
   spec: ArraySpec,
   advanceVariables: boolean,
   isCurrent: () => boolean,
+  onProgress: (done: number, total: number) => void,
 ): Promise<VariableArrayResult | undefined> {
   const evaluationTime = layout.evaluationTime;
   if (evaluationTime === undefined) return undefined;
@@ -181,10 +193,13 @@ async function prepareRetainedValues(
     },
     spec,
     {
-      render: renderVariableText,
+      // One parse per font, in slices that let Cancel through (performance audit S7-P2-1).
+      render: batchVariableTextRenderer(),
       clock: () => new Date(evaluationTime),
       isCurrent,
       advanceVariables,
+      yieldNow: variableCopySlices(),
+      onProgress,
     },
   );
 }

@@ -139,6 +139,16 @@ describe('PreviewStatusOverlays', () => {
     expect(notice?.textContent).toContain('CAM and G-code are unchanged');
   });
 
+  it('names an operation the compile cut another way (S8-P2-1)', async () => {
+    const notice =
+      "Pocket: Adaptive can't open this pocket from one entry, so it will cut offset rings instead (full-width first pass). Choose Offset rings to remove this notice.";
+    const host = await renderStatus({ ...toolpath, cncFallbackNotices: [notice] } as Toolpath);
+
+    const banner = host.querySelector('[aria-label="Operations cut differently"]');
+    expect(banner?.getAttribute('role')).toBe('status');
+    expect(banner?.textContent).toBe(notice);
+  });
+
   it('shows route-too-large status instead of the empty-project hint', async () => {
     const host = await renderStatus({
       steps: [],

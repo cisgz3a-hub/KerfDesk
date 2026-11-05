@@ -2,6 +2,7 @@ import type { Toolpath } from '../../core/job';
 import type { Project } from '../../core/scene';
 import { rasterPreviewDisplayAdvisory } from './draw-raster-preview';
 import { hasOutOfBoundsObjects } from './out-of-bounds';
+import { previewCncFallbacksOf } from './preview-cnc-fallbacks';
 import { previewRouteSummary } from './preview-route-summary';
 import { previewHasBurnableContent, previewIssueFor, type PreviewIssue } from './preview-status';
 
@@ -17,17 +18,21 @@ export function previewStatusOverlayModel(project: Project, toolpath: Toolpath) 
     !previewHasBurnableContent(project, toolpath);
   const outOfBounds = hasOutOfBoundsObjects(project);
   const rasterDisplay = rasterPreviewDisplayAdvisory(project);
+  const cncFallbacks = previewCncFallbacksOf(toolpath);
   return {
     primaryIssue,
     displayDecimation,
     empty,
     outOfBounds,
     rasterDisplay,
-    visible:
-      primaryIssue !== null ||
-      displayDecimation !== null ||
-      empty ||
-      outOfBounds ||
+    cncFallbacks,
+    visible: [
+      primaryIssue !== null,
+      displayDecimation !== null,
+      empty,
+      outOfBounds,
       rasterDisplay !== null,
+      cncFallbacks.length > 0,
+    ].includes(true),
   };
 }
