@@ -1,11 +1,12 @@
 ## ADR-154 Amendment 5 - An adaptive pocket that falls back says so before Save, and names why (2026-11-05)
 
-**Status:** Accepted; software-verified through verifier, compile, Preview and Job Review tests,
+**Status:** Accepted; software-verified through compile, Preview and Job Review tests,
 with G-code byte-identical to main. | **Date:** 2026-11-05
 
-Amends ADR-154's disclosure rule (failures "block preflight instead of falling back silently") and
-Amendment 3's verifier. It fixes the output-identical part of performance audit S8-P2-1 and the
-first half of S8-P3-2 (`docs/audits/2026-11-02-performance-s1/S8-cnc-toolpaths.md`). Nothing here
+Amends ADR-154's disclosure rule (failures "block preflight instead of falling back silently"). It
+fixes the output-identical part of performance audit S8-P2-1
+(`docs/audits/2026-11-02-performance-s1/S8-cnc-toolpaths.md`). The verifier is unchanged here: its
+early exit at the first ring over the limit (S8-P3-2) is the performance P3 sweep's. Nothing here
 changes a toolpath, adds a guard, a Start refusal or a Save refusal (ADR-228 rule 7, PROJECT.md
 non-negotiable 21).
 
@@ -48,23 +49,17 @@ the compile knew, Preview did not say.
      notice. Its "Adjust Radial engagement" advice is dropped for fallbacks.
    - The layer panel's adaptive note says that a pocket one entry cannot open cuts offset rings, and
      that Preview and Job Review say when.
-3. **The verifier names the opening.** A ring over the engagement limit that is the first ring of
-   its sequence is refused as "Adaptive can't open this pocket from its entry", and the notice reads
-   "Adaptive can't open this pocket from one entry, so it will cut offset rings instead (full-width
-   first pass). Choose Offset rings to remove this notice." A later ring over the limit keeps the
-   old reason.
-4. **The verifier stops at the first ring over the limit.** Engagement is its first verdict, so the
-   refusal is certain there. Every refused plan gets the same verdict as before; only the
-   unread `maxSimulatedEngagementMm` of a refused plan and the reason's wording change.
+3. **The notice names the cause.** The verifier's engagement refusal reads "Adaptive can't open
+   this pocket from one entry, so it will cut offset rings instead (full-width first pass). Pockets
+   longer than they are wide do this. Choose Offset rings to remove this notice." Every refused
+   rectangle the S8 refuter traced went over the limit on its first ring, the slot past the entry
+   helix. Other refusals keep their own reason after "Adaptive will cut offset rings instead:".
 
 ### Consequences
 
 - G-code is unchanged: the fallback programs keep main's hashes (40 x 20 mm `141a145c18dda7c8`,
   270 x 170 mm `891b673353fb41e8`), equal Offset rings byte for byte, and the accepted 40 x 40 mm
   pocket keeps `cc06816c27214137`.
-- A refused rectangle verifies in a fraction of the time: the refuter's prototype measured x 0.017
-  on 270 x 170 mm. Accepted pockets are as slow as before; stamping only the new crescent of each
-  disk (S8-P3-2's other half) is still open.
 - Save still writes first and notices after, as rule 7 asks; Preview and Job Review now show the
   same notice before it.
 - Emit preflight still resolves the adaptive and rest operations again (S8-P3-1). It now reports

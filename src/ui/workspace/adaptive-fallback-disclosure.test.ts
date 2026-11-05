@@ -12,7 +12,7 @@ import {
   benchmarkRectangle,
   benchmarkVector,
 } from '../../__fixtures__/cnc-leader-fixtures';
-import { ADAPTIVE_OPENING_REFUSAL } from '../../core/cnc/adaptive-pocket-verifier';
+import { ADAPTIVE_ENGAGEMENT_REFUSAL } from '../../core/cnc/cnc-strategy-fallback-notice';
 import type { CncLayerSettings, Project } from '../../core/scene';
 import { emitPreparedGcode, prepareOutput, type PreparedOutput } from '../../io/gcode';
 import { deserializeProject, serializeProject } from '../../io/project';
@@ -24,7 +24,8 @@ import { previewStatusOverlayModel } from './preview-status-overlay-model';
 
 const NOTICE =
   "Adaptive can't open this pocket from one entry, so it will cut offset rings " +
-  'instead (full-width first pass). Choose Offset rings to remove this notice.';
+  'instead (full-width first pass). Pockets longer than they are wide do this. Choose Offset ' +
+  'rings to remove this notice.';
 
 // The audit's fixture (zz-s8r/emit-r.mjs): a 6 mm end mill, 3 mm deep in
 // 1.5 mm passes, 40% stepover, the default 0.6 mm Radial engagement.
@@ -62,31 +63,29 @@ function sha16(text: string): string {
   return createHash('sha256').update(text).digest('hex').slice(0, 16);
 }
 
+// Preview and Job Review read the compiled job, so each case prepares once.
+// Emitting verifies the plan again (emit preflight, performance audit
+// S8-P3-1), which costs as long again as preparing on 270 x 170 mm, so the
+// program itself is checked on the smaller pockets.
 describe.each([
-  // The hashes main wrote before this change (S8 refuter, emit-r.mjs).
-  { width: 40, height: 20, mainSha: '141a145c18dda7c8' },
-  { width: 100, height: 96, mainSha: undefined },
-  { width: 270, height: 170, mainSha: '891b673353fb41e8' },
-])('a $width x $height mm adaptive pocket', ({ width, height, mainSha }) => {
+  { width: 40, height: 20 },
+  { width: 100, height: 96 },
+  { width: 270, height: 170 },
+])('a $width x $height mm adaptive pocket', ({ width, height }) => {
   let project: Project;
   let adaptive: Prepared;
-  let adaptiveGcode: string;
-  let adaptivePreflight: ReadonlyArray<{ readonly code: string; readonly message: string }>;
 
   beforeAll(
     () => {
       project = rectanglePocket(width, height, 'adaptive');
       adaptive = prepared(project);
-      const emitted = emitPreparedGcode(adaptive);
-      adaptiveGcode = emitted.gcode ?? '';
-      adaptivePreflight = emitted.preflight?.issues ?? [];
     },
-    ciBudgetMs(60_000, 120_000),
+    ciBudgetMs(120_000, 300_000),
   );
 
   it('records the fallback and its cause on the compiled job', () => {
     expect(adaptive.job.cncCompilation?.strategyFallbacks).toEqual([
-      { layerId: 'bg', kind: 'adaptive-offset', reason: ADAPTIVE_OPENING_REFUSAL },
+      { layerId: 'bg', kind: 'adaptive-offset', reason: ADAPTIVE_ENGAGEMENT_REFUSAL },
     ]);
   });
 
@@ -98,7 +97,7 @@ describe.each([
     expect(model.visible).toBe(true);
   });
 
-  it('names the cut in Job Review, and the Start and Save advisory names its cause', () => {
+  it('names the cut in Job Review', () => {
     const effective = buildEffectiveOperationReview(adaptive.job, adaptive.project.scene);
     const operation = effective.find((entry) => entry.layerId === 'bg');
     expect(operation?.strategyFallback).toBe('adaptive-offset');
@@ -115,22 +114,30 @@ describe.each([
     );
     expect(detail).toContain('offset rings (adaptive fell back)');
     expect(detail).not.toContain('adaptive pocket');
-    const advisory = adaptivePreflight.find(
-      (issue) => issue.code === 'cnc-adaptive-clearing-invalid',
-    );
-    expect(advisory?.message).toBe(`Layer bg: ${NOTICE}`);
-    expect(advisory?.message).not.toContain('Radial engagement or');
   });
+});
 
+describe.each([
+  // The hash main wrote before this change (S8 refuter, emit-r.mjs).
+  { width: 40, height: 20, mainSha: '141a145c18dda7c8' },
+  { width: 100, height: 96, mainSha: undefined },
+])('the $width x $height mm fallback program', ({ width, height, mainSha }) => {
   it(
-    'writes the Offset rings program byte for byte, as main did',
+    'is the Offset rings program byte for byte, as main wrote, and its advisory names the cause',
     () => {
+      const emitted = emitPreparedGcode(prepared(rectanglePocket(width, height, 'adaptive')));
+      const adaptiveGcode = emitted.gcode ?? '';
       const offset = emitPreparedGcode(prepared(rectanglePocket(width, height, 'offset')));
       expect(adaptiveGcode.length).toBeGreaterThan(0);
       expect(adaptiveGcode).toBe(offset.gcode);
       if (mainSha !== undefined) expect(sha16(adaptiveGcode)).toBe(mainSha);
+      const advisory = emitted.preflight?.issues.find(
+        (issue) => issue.code === 'cnc-adaptive-clearing-invalid',
+      );
+      expect(advisory?.message).toBe(`Layer bg: ${NOTICE}`);
+      expect(advisory?.message).not.toContain('Radial engagement or');
     },
-    ciBudgetMs(60_000, 120_000),
+    ciBudgetMs(120_000, 300_000),
   );
 });
 

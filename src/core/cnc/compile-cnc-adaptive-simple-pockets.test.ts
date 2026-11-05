@@ -18,7 +18,7 @@ import {
 } from '../scene';
 import { findCncAdaptivePocketIssues } from './cnc-adaptive-issues';
 import { resolveAdaptivePocketOperation } from './adaptive-pocket-operation';
-import { ADAPTIVE_OPENING_REFUSAL } from './adaptive-pocket-verifier';
+import { ADAPTIVE_ENGAGEMENT_REFUSAL } from './cnc-strategy-fallback-notice';
 import { collectLayerPolylines, compileCncJob } from './compile-cnc-job';
 
 function polygonArtwork(points: ReadonlyArray<Vec2>): ImportedSvg {
@@ -122,20 +122,22 @@ describe('adaptive pockets at the default settings', () => {
         layer.cnc,
         layerCncTool(DEFAULT_CNC_MACHINE_CONFIG, layer.cnc),
       );
-      expect(operation).toEqual({ kind: 'error', reason: ADAPTIVE_OPENING_REFUSAL });
+      expect(operation).toEqual({ kind: 'error', reason: ADAPTIVE_ENGAGEMENT_REFUSAL });
       expect(cncGroupCount(scene)).toBe(1);
       // The compiled job keeps why, for Preview and Job Review (S8-P2-1).
       expect(
         compileCncJob(scene, DEFAULT_DEVICE_PROFILE, DEFAULT_CNC_MACHINE_CONFIG).cncCompilation
           ?.strategyFallbacks,
-      ).toEqual([{ layerId: layer.id, kind: 'adaptive-offset', reason: ADAPTIVE_OPENING_REFUSAL }]);
+      ).toEqual([
+        { layerId: layer.id, kind: 'adaptive-offset', reason: ADAPTIVE_ENGAGEMENT_REFUSAL },
+      ]);
       expect(
         findCncAdaptivePocketIssues(scene, DEFAULT_DEVICE_PROFILE, DEFAULT_CNC_MACHINE_CONFIG),
       ).toEqual([
         {
           layerId: layer.id,
           reason:
-            "Adaptive can't open this pocket from one entry, so it will cut offset rings instead (full-width first pass). Choose Offset rings to remove this notice.",
+            "Adaptive can't open this pocket from one entry, so it will cut offset rings instead (full-width first pass). Pockets longer than they are wide do this. Choose Offset rings to remove this notice.",
           fallback: true,
         },
       ]);

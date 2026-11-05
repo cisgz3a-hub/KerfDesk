@@ -1,13 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { ciBudgetMs } from '../../__fixtures__/ci-budget';
 import type { Polyline } from '../scene';
 import { planAdaptivePocket, type AdaptivePocketPlan } from './adaptive-pocket';
-import { AdaptiveCutterContact } from './adaptive-pocket-contact';
-import {
-  ADAPTIVE_ENGAGEMENT_REFUSAL,
-  ADAPTIVE_OPENING_REFUSAL,
-  verifyAdaptivePocket,
-} from './adaptive-pocket-verifier';
+import { verifyAdaptivePocket } from './adaptive-pocket-verifier';
 
 function square(x: number, y: number, size: number): Polyline {
   return rectangle(x, y, size, size);
@@ -214,84 +209,11 @@ describe('verifyAdaptivePocket', () => {
       ],
     };
     const result = verifyAdaptivePocket(contours, 4, unsafe);
-    // The slot is the first ring after the entry: the entry cannot open it.
-    expect(result).toMatchObject({ ok: false, reason: ADAPTIVE_OPENING_REFUSAL });
-  });
-
-  it('names a later ring over the limit apart from the opening', () => {
-    const contours = [square(0, 0, 20)];
-    const unsafe: AdaptivePocketPlan = {
-      ok: true,
-      optimalLoadMm: 0.5,
-      sequences: [
-        {
-          entryCenter: { x: 10, y: 10 },
-          entryRadiusMm: 0.5,
-          finishRings: [],
-          rings: [
-            // Inside the disk the helix cleared.
-            {
-              closed: false,
-              points: [
-                { x: 10.5, y: 10 },
-                { x: 10.2, y: 10 },
-              ],
-            },
-            {
-              closed: false,
-              points: [
-                { x: 10, y: 10 },
-                { x: 10, y: 18 },
-              ],
-            },
-          ],
-        },
-      ],
-    };
-    expect(verifyAdaptivePocket(contours, 4, unsafe)).toMatchObject({
+    expect(result).toMatchObject({
       ok: false,
-      reason: ADAPTIVE_ENGAGEMENT_REFUSAL,
+      reason: 'Adaptive verification simulated radial engagement above the configured limit.',
     });
   });
-
-  // Performance audit S8-P2-1 / S8-P3-2: a 6 mm bit cannot open a 100 x 96 mm
-  // pocket from its one entry helix, and the refusal is certain at the first
-  // ring. The verifier used to simulate every ring after it; it now stops.
-  it(
-    'stops simulating at the first ring over the limit',
-    () => {
-      const contours = [rectangle(10, 10, 100, 96)];
-      const plan = planAdaptivePocket(contours, 6, 0.6);
-      if (!plan.ok) throw new Error(plan.reason);
-      const first = plan.sequences[0];
-      const ring = first?.rings[0];
-      if (first === undefined || ring === undefined) throw new Error('expected a first ring');
-      expect(first.rings.length).toBeGreaterThan(10);
-      const evaluations = vi.spyOn(AdaptiveCutterContact.prototype, 'engagementMm');
-      try {
-        expect(verifyAdaptivePocket(contours, 6, plan)).toMatchObject({
-          ok: false,
-          reason: ADAPTIVE_OPENING_REFUSAL,
-        });
-        const whole = evaluations.mock.calls.length;
-        evaluations.mockClear();
-        const firstRingOnly: AdaptivePocketPlan = {
-          ...plan,
-          sequences: [{ ...first, rings: [ring] }],
-        };
-        expect(verifyAdaptivePocket(contours, 6, firstRingOnly)).toMatchObject({
-          ok: false,
-          reason: ADAPTIVE_OPENING_REFUSAL,
-        });
-        // The whole plan is measured no further than its first ring.
-        expect(whole).toBeGreaterThan(0);
-        expect(whole).toBe(evaluations.mock.calls.length);
-      } finally {
-        evaluations.mockRestore();
-      }
-    },
-    ciBudgetMs(20_000, 60_000),
-  );
 
   it('verifies the split U-pocket plan without cutting across its kept-material notch', () => {
     const contours = [uPocket()];
