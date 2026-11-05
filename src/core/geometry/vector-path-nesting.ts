@@ -31,6 +31,7 @@ import {
 } from 'clipper2-ts';
 import { ok, type Result } from '../result';
 import { canonicalizeVectorPaths } from './vector-path-canonical';
+import { paintNestedUnits, type NestedUnit } from './vector-path-nesting-paint';
 import { VECTOR_PATH_PRECISION_DECIMALS } from './vector-path-regions';
 import { tryVectorOp, type VectorOpError } from './vector-path-tools';
 
@@ -56,9 +57,6 @@ type Ring = {
   readonly bounds: RingBounds;
 };
 
-/** Region to add (even depth) or carve (odd depth). */
-type Unit = { readonly depth: number; readonly paths: PathsD };
-
 /**
  * The region a selection of separately normalized batches encloses when a
  * shape inside another is a hole, or, with `outermostOnly`, the outlines no
@@ -78,7 +76,7 @@ export function nestedSelectionRegion(
     if (outermostOnly) {
       return union(rings.filter((_, index) => depths[index] === 0).map((ring) => ring.path));
     }
-    return paintedRegion(selectionUnits(rings, depths));
+    return paintNestedUnits(selectionUnits(rings, depths));
   });
 }
 
@@ -129,39 +127,40 @@ function ringDepths(rings: ReadonlyArray<Ring>): number[] | null {
     .map((_, index) => index)
     .sort((a, b) => (rings[b]?.area ?? 0) - (rings[a]?.area ?? 0) || a - b);
   const depths: number[] = rings.map(() => 0);
+  const visited: number[][] = [];
   let nested = false;
-  order.forEach((index, position) => {
+  for (const index of order) {
     const ring = rings[index];
-    if (ring === undefined) return;
+    if (ring === undefined) continue;
     const own = ring.parent === null ? 0 : (depths[ring.parent] ?? 0) + 1;
-    const depth = deepestEncloser(rings, depths, { order, before: position }, ring, own);
+    const depth = deepestEncloser(rings, visited, ring, own);
     if (depth > own) nested = true;
     depths[index] = depth;
-  });
+    (visited[depth] ??= []).push(index);
+  }
   return nested ? depths : null;
 }
 
-// The rings visited before this one, which are the ones at least as large.
-type Larger = { readonly order: ReadonlyArray<number>; readonly before: number };
-
+// The depth is the deepest enclosing ring's plus one, so the visited rings (the
+// ones at least as large) are tried deepest first and the first that encloses
+// settles it (perf audit S6-P3-1). Asking every larger ring cost two clipper
+// differences each, which nested rings pay for every pair.
 function deepestEncloser(
   rings: ReadonlyArray<Ring>,
-  depths: ReadonlyArray<number>,
-  larger: Larger,
+  visited: ReadonlyArray<ReadonlyArray<number> | undefined>,
   ring: Ring,
   own: number,
 ): number {
-  let depth = own;
-  for (let position = 0; position < larger.before; position += 1) {
-    const index = larger.order[position] ?? -1;
-    const other = rings[index];
-    const deeper = (depths[index] ?? 0) + 1;
-    if (other === undefined || other.batch === ring.batch || deeper <= depth) continue;
-    if (boundsEnclose(other.bounds, ring.bounds) && encloses(other.path, ring.path)) {
-      depth = deeper;
+  for (let level = visited.length - 1; level >= own; level -= 1) {
+    for (const index of visited[level] ?? []) {
+      const other = rings[index];
+      if (other === undefined || other.batch === ring.batch) continue;
+      if (boundsEnclose(other.bounds, ring.bounds) && encloses(other.path, ring.path)) {
+        return level + 1;
+      }
     }
   }
-  return depth;
+  return own;
 }
 
 // Strictly: two copies of one shape do not enclose each other, so they union
@@ -177,13 +176,13 @@ function within(inner: PathD, outer: PathD): boolean {
 
 // A piece whose holes all sit directly inside its outline is one unit; one with
 // another batch's ring in between is a unit per ring, each at its own depth.
-function selectionUnits(rings: ReadonlyArray<Ring>, depths: ReadonlyArray<number>): Unit[] {
+function selectionUnits(rings: ReadonlyArray<Ring>, depths: ReadonlyArray<number>): NestedUnit[] {
   const holes = new Map<number, number[]>();
   rings.forEach((ring, index) => {
     if (!ring.isHole || ring.parent === null) return;
     holes.set(ring.parent, [...(holes.get(ring.parent) ?? []), index]);
   });
-  const units: Unit[] = [];
+  const units: NestedUnit[] = [];
   rings.forEach((ring, index) => {
     if (ring.isHole) return;
     const depth = depths[index] ?? 0;
@@ -199,21 +198,6 @@ function selectionUnits(rings: ReadonlyArray<Ring>, depths: ReadonlyArray<number
     }
   });
   return units;
-}
-
-// Level by level from the outside in: add the even depths, carve the odd ones.
-function paintedRegion(units: ReadonlyArray<Unit>): PathsD {
-  const deepest = units.reduce((most, unit) => Math.max(most, unit.depth), 0);
-  let region: PathsD = [];
-  for (let depth = 0; depth <= deepest; depth += 1) {
-    const level = units.filter((unit) => unit.depth === depth).flatMap((unit) => unit.paths);
-    if (level.length === 0) continue;
-    region =
-      depth % 2 === 0
-        ? unionD(region, level, FillRule.NonZero, VECTOR_PATH_PRECISION_DECIMALS)
-        : differenceD(region, level, FillRule.NonZero, VECTOR_PATH_PRECISION_DECIMALS);
-  }
-  return canonicalizeVectorPaths(region);
 }
 
 function union(paths: PathsD): PathsD {

@@ -182,3 +182,11 @@ it('discloses an unsigned commercial download and manual updates before the user
   expect(host.textContent).toContain('unknown publisher warning');
   expect(close).not.toHaveBeenCalled();
 });
+
+it('points a beginner at the first lesson under Continue with Free (UX audit U1-P3-9)', async () => {
+  await act(async () => root.render(<DesktopWelcomeDialog onClose={() => undefined} />));
+  const free = host.querySelector('[aria-label="Browser Free edition"]');
+  expect(free?.textContent).toContain(
+    'New to KerfDesk? Click Learn (top right), then Make your first project: 4 minutes, no machine needed.',
+  );
+});

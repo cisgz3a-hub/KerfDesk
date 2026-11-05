@@ -54,6 +54,41 @@ describe('ErrorBoundary', () => {
     expect(container.textContent).toContain('test-boom');
   });
 
+  // UX audit U5-P3-12: the screen leads with what to do; the message and stack
+  // are folded under Details for a problem report.
+  it('leads with the next step and folds the stack under Details', () => {
+    act(() => {
+      root.render(
+        <ErrorBoundary crashSave={{ isNeeded: () => true, run: vi.fn() }}>
+          <Boom shouldThrow={true} />
+        </ErrorBoundary>,
+      );
+    });
+    const lead = container.querySelector('h2 + p');
+    expect(lead?.textContent).toBe(
+      'KerfDesk hit a problem and closed this view. Your design is still here: press Save project to keep it, then Try again.',
+    );
+    const details = container.querySelector('details');
+    expect(details?.open).toBe(false);
+    expect(details?.querySelector('summary')?.textContent).toBe('Details for a problem report');
+    expect(details?.querySelector('pre')).not.toBeNull();
+    expect(details?.textContent).toContain('test-boom');
+    expect(container.textContent).toContain('support@kerfdesk.com');
+  });
+
+  it('says the design is saved when there is nothing to save', () => {
+    act(() => {
+      root.render(
+        <ErrorBoundary crashSave={{ isNeeded: () => false, run: vi.fn() }}>
+          <Boom shouldThrow={true} />
+        </ErrorBoundary>,
+      );
+    });
+    expect(container.querySelector('h2 + p')?.textContent).toBe(
+      'KerfDesk hit a problem and closed this view. Your design is saved: press Try again.',
+    );
+  });
+
   it('crash screen includes a Try again button and a Copy diagnostic button', () => {
     act(() => {
       root.render(

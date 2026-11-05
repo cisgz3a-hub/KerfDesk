@@ -64,7 +64,9 @@ export function TextStyleFields(props: {
           title="Squeeze wider text to this width, keeping its height. 0 for no limit."
           aria-label="Maximum text width in millimetres"
           value={style.maxWidthMm ?? 0}
-          onChange={(event) => update({ maxWidthMm: Number(event.currentTarget.value) || 0 })}
+          onChange={(event) =>
+            update({ maxWidthMm: Math.max(0, Number(event.currentTarget.value) || 0) })
+          }
         />
         mm
       </label>

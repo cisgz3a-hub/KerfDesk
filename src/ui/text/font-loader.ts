@@ -11,6 +11,7 @@
 
 import { embeddedFontBuffer, findFontEntry, type FontEntry } from '../../core/text';
 import type { EmbeddedFont } from '../../core/scene';
+import { missingFontReason } from './missing-font-notice';
 import robotoUrl from './fonts/Roboto-Regular.ttf?url';
 import poppinsUrl from './fonts/Poppins-Regular.ttf?url';
 import tinosUrl from './fonts/Tinos-Regular.ttf?url';
@@ -110,7 +111,7 @@ function requireEmbeddedFont(
   fonts: ReadonlyArray<EmbeddedFont> | undefined,
 ): EmbeddedFont {
   const embedded = fonts?.find((font) => font.key === key);
-  if (embedded === undefined) throw new Error(`Font "${key}" is not available. Relink it to edit.`);
+  if (embedded === undefined) throw new Error(missingFontReason(key));
   return embedded;
 }
 

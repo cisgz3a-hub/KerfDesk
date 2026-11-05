@@ -20,6 +20,7 @@ import { webCamera } from './web-camera';
 import { webSerial } from './web-serial';
 import { createHttpCameraBridge } from './camera-bridge';
 import { createLaunchQueueFileOpens } from './launch-queue-file-opens';
+import { pickerTypeDescription } from './picker-file-types';
 import { fileHandleFromFile, webRecentFiles } from './recent-file-handles';
 
 type FilePickerAcceptType = {
@@ -31,7 +32,12 @@ function acceptTypesFor(accept: ReadonlyArray<string>): FilePickerAcceptType[] {
   // The File System Access API wants a map of MIME types → extensions. For
   // our use cases the extension list is enough; we put it under a generic
   // octet-stream MIME so the dialog shows the chosen extensions.
-  return [{ description: 'Files', accept: { 'application/octet-stream': [...accept] } }];
+  return [
+    {
+      description: pickerTypeDescription(accept),
+      accept: { 'application/octet-stream': [...accept] },
+    },
+  ];
 }
 
 // Firefox and Safari have no file pickers. The app says so on load (ADR-688),
