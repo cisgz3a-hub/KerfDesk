@@ -17,15 +17,19 @@ export type RenderTextGeometryInput = {
   readonly textBox?: TextBoxSettings;
 };
 
+/** Routes editable text to the outline-font or native CNC stroke renderer. */
+export function renderTextGeometry(input: RenderTextGeometryInput): Promise<TextRenderResult> {
+  return renderTextGeometryWith(input, undefined);
+}
+
 /**
- * Routes editable text to the outline-font or native CNC stroke renderer.
- * `parseFont` lets a batch of renders share one parse of a font file
- * (held-font-parser.ts); without it every render parses the file, as
- * textToPolylines does.
+ * renderTextGeometry with the font parse supplied, so a batch of renders can
+ * share one parse of a font file (held-font-parser.ts). Without `parseFont`
+ * every render parses the file, as textToPolylines does.
  */
-export async function renderTextGeometry(
+export async function renderTextGeometryWith(
   input: RenderTextGeometryInput,
-  parseFont?: typeof parseOutlineFont,
+  parseFont: typeof parseOutlineFont | undefined,
 ): Promise<TextRenderResult> {
   const shared = {
     content: input.content,

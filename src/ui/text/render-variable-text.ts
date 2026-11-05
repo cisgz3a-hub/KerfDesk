@@ -9,7 +9,7 @@ import {
 } from '../../core/text/text-box-render';
 import { IDENTITY_TRANSFORM, type Project, type TextObject } from '../../core/scene';
 import type { VariableTextRenderer, VariableTextRenderInput } from '../../io/gcode';
-import { renderTextGeometry } from './render-text-geometry';
+import { renderTextGeometry, renderTextGeometryWith } from './render-text-geometry';
 import { applyTextWeld } from './apply-text-weld';
 import { heldFontParser } from './held-font-parser';
 import type { OutlineFontParser } from './text-geometry-compute';
@@ -89,20 +89,22 @@ async function styledRecordRender(
   project: Project,
   parseFont: OutlineFontParser | undefined,
 ): Promise<TextRenderResult> {
-  const rendered = await renderTextGeometry(
-    {
-      fontKey: text.fontKey,
-      embeddedFonts: project.embeddedFonts,
-      content: styledTextContent(content, text.textStyle),
-      sizeMm: text.sizeMm,
-      alignment: text.alignment,
-      lineHeight: text.lineHeight,
-      letterSpacing: text.letterSpacing,
-      color: text.color,
-      ...(text.textBox === undefined ? {} : { textBox: text.textBox }),
-    },
-    parseFont,
-  );
+  const input = {
+    fontKey: text.fontKey,
+    embeddedFonts: project.embeddedFonts,
+    content: styledTextContent(content, text.textStyle),
+    sizeMm: text.sizeMm,
+    alignment: text.alignment,
+    lineHeight: text.lineHeight,
+    letterSpacing: text.letterSpacing,
+    color: text.color,
+    ...(text.textBox === undefined ? {} : { textBox: text.textBox }),
+  };
+  // The default route keeps renderTextGeometry, which tests replace whole.
+  const rendered =
+    parseFont === undefined
+      ? await renderTextGeometry(input)
+      : await renderTextGeometryWith(input, parseFont);
   return text.pathText !== undefined || text.textBox !== undefined
     ? styleTextRender(rendered, text.textStyle, text.sizeMm)
     : rendered;
