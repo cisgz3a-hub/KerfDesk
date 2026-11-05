@@ -77,17 +77,18 @@ function drawSelectionBox(
   drawHandles(ctx, obj, view);
 }
 
+// The last thing drawn for its object, inside drawObjects' save and restore
+// for that object, so it sets the stroke without a save of its own: with
+// thousands selected, each frame drew a save and restore per box (S2-P3-3).
 function drawSecondarySelectionBox(
   ctx: CanvasRenderingContext2D,
   obj: SceneObject,
   view: ViewTransform,
 ): void {
-  ctx.save();
   ctx.strokeStyle = canvasTheme.selection;
   ctx.lineWidth = 1.5;
   ctx.setLineDash([4, 3]);
   strokeSelectionFrame(ctx, selectionFrameFor(obj), view);
-  ctx.restore();
 }
 
 function strokeSelectionFrame(

@@ -6,7 +6,7 @@ import {
   type Scene,
 } from '../../core/scene';
 import { isCurveClosedEnough } from '../../core/scene/polyline-closure';
-import { selectionUnits } from '../../core/scene/selection-units';
+import { selectionUnitCount as countSelectionUnits } from '../../core/scene/selection-units';
 import { isVectorPathObject, type VectorSceneObject } from '../../core/geometry';
 import { subpathCount } from '../../core/geometry/outer-shape-groups';
 import { isConvertibleVector, type ConvertibleVector } from '../raster/vector-to-bitmap';
@@ -42,10 +42,10 @@ export function selectionUnitCount(
   focusId: string | null = null,
 ): number {
   const selected = new Set(selectedIds);
-  return selectionUnits(
+  return countSelectionUnits(
     project.scene.objects.filter((object) => selected.has(object.id)),
     groupsWithinFocus(project.scene.groups ?? [], focusId),
-  ).length;
+  );
 }
 
 export function selectionHasUnlockedObject(

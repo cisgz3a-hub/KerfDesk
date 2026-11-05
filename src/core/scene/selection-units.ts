@@ -40,7 +40,19 @@ export function selectionUnits(
   });
 }
 
-// Keys every object by the first object of its unit.
+/** How many units `selectionUnits` makes, without measuring them: a unit is
+ *  never empty, so its box is never null. The menus ask this on every render,
+ *  for every object of a large selection (S2-P3-3). */
+export function selectionUnitCount(
+  objects: ReadonlyArray<SceneObject>,
+  groups: ReadonlyArray<SceneGroup>,
+): number {
+  const unitKeys = unitKeyById(objects, groups);
+  return new Set(objects.map((object) => unitKeys.get(object.id) ?? object.id)).size;
+}
+
+// Keys every grouped object by the first object of its unit; an object in no
+// group is a unit of one, keyed by its own id.
 function unitKeyById(
   objects: ReadonlyArray<SceneObject>,
   groups: ReadonlyArray<SceneGroup>,
@@ -48,7 +60,7 @@ function unitKeyById(
   const groupsByMember = groupMemberships(groups);
   const keys = new Map<string, string>();
   for (const { id } of objects) {
-    if (keys.has(id)) continue;
+    if (keys.has(id) || !groupsByMember.has(id)) continue;
     for (const memberId of connectedIds(id, groupsByMember)) keys.set(memberId, id);
   }
   return keys;

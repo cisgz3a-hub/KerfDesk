@@ -10,6 +10,7 @@ import {
 import {
   selectedOpenFillContourRepairSummary,
   selectedCloseableOpenFillContourCount,
+  selectedOpenFillContourCounts,
   selectedOpenFillContourCount,
 } from './fill-diagnostics';
 
@@ -46,6 +47,25 @@ describe('fill diagnostics', () => {
         new Set(['far-open', 'line-near-open']),
       ),
     ).toBe(1);
+  });
+
+  it('gives both menu counts from one scan, equal to the separate counts', () => {
+    const project = projectWithObjects([
+      vectorObject('near-open', '#000000', false, false, { x: 0.25, y: 0.25 }),
+      vectorObject('far-open', '#000000', false, false, { x: 1, y: 1 }),
+      vectorObject('closed-enough', '#000000', false, true),
+      vectorObject('line-near-open', '#ff0000', false, false, { x: 0.25, y: 0.25 }),
+    ]);
+    const others = new Set(['far-open', 'closed-enough', 'line-near-open']);
+
+    expect(selectedOpenFillContourCounts(project, 'near-open', others)).toEqual({
+      openCount: selectedOpenFillContourCount(project, 'near-open', others),
+      closeableCount: selectedCloseableOpenFillContourCount(project, 'near-open', others),
+    });
+    expect(selectedOpenFillContourCounts(project, 'near-open', others)).toEqual({
+      openCount: 2,
+      closeableCount: 1,
+    });
   });
 
   it('summarizes reviewed tolerance repair without counting locked or out-of-range contours', () => {
