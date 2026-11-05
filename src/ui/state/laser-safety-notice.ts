@@ -96,6 +96,8 @@ export type LaserSafetyNotice =
       readonly halted?: true;
       /** Home was refused because homing is off in the controller (UX audit U2-P2-2). */
       readonly homingOff?: true;
+      /** Refused while nothing ran: a later idle refusal replaces it (UX audit U5-P3-13). */
+      readonly idleCommand?: true;
     }
   | {
       readonly kind: 'cnc-transition-unconfirmed';

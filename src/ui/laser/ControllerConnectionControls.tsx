@@ -6,6 +6,7 @@ import { MachineModeToggle } from '../machine/MachineModeToggle';
 import { useStore } from '../state';
 import { browserLocalStorage } from '../state/browser-local-storage';
 import { useLaserStore } from '../state/laser-store';
+import { controllerAttention } from '../state/controller-attention';
 import { motionOwnerAwaitsMissingReply } from '../state/laser-motion-release';
 import { portOpenWithoutAnswer } from '../state/port-open-no-answer';
 import { loadAutoConnectPreference, saveAutoConnectPreference } from '../state/serial-port-memory';
@@ -51,17 +52,17 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
   );
   const reconnectRecommended = useLaserStore((state) => state.getControllerReconnectRecommended());
   const controlsBusy = useConnectionControlsBusy(props);
+  const attention = useLaserStore(controllerAttention);
   const wentSilent = useControllerWentSilent(connection.kind === 'connected');
   const neverAnswered = useLaserStore(portOpenWithoutAnswer);
   const stoppedResponding = useControllerStoppedResponding(connection.kind === 'connected');
   const disconnectController = useLaserStore((state) => state.disconnect);
   const connectController = useLaserStore((state) => state.connect);
-  const controllerKind = useStore((state) => state.project.device.controllerKind);
   const device = useStore((state) => state.project.device);
   const driverMismatch = useLiveDriverMismatch(device);
   const machineName = toolbarMachineName(device.name || 'Unnamed machine', driverMismatch);
   const supportsSerial = platform.serial.isSupported();
-  const isFileOnlyProfile = isFileOnlyController(controllerKind);
+  const isFileOnlyProfile = isFileOnlyController(device.controllerKind);
   const connect = (): void => {
     void connectMachine(platform).catch(controllerActionFailureHandler('Connect'));
   };
@@ -111,6 +112,7 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
         controllerWentSilent={wentSilent}
         controllerNeverAnswered={neverAnswered}
         controllerStoppedResponding={stoppedResponding}
+        controllerAttention={attention}
         onRetryQualification={retryControllerInformation}
         onReconnectQualification={reconnect}
         driverMismatch={

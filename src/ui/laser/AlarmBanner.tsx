@@ -9,6 +9,8 @@
 // alarm's own physical step (release the E-stop, clear the switch) comes
 // before the reset, and a lock from before the connection, latched from a
 // refusal or a report, says so (UX audit U5-P2-1, U5-P3-2; ADR-393 Amendment 1).
+// Once no reset is pending, the card's sentence names the next step only, and
+// a homing failure puts Unlock and Machine Setup first (alarm-card-advice.ts).
 //
 // Stock GRBL that refused a single-axis Home (`$HX`, error:3) stays in its
 // homing state and reports Home, not Alarm, until a reset; the banner offers
@@ -25,6 +27,7 @@ import type { JobStopRequest } from '../state/job-stop-request';
 import { resetOfferMessage } from '../state/controller-reset-required';
 import { AbortStoppedCard } from './AbortStoppedCard';
 import { AlarmRecoveryActions } from './AlarmRecoveryActions';
+import { alarmCardAction, isHomingFailureAlarm } from './alarm-card-advice';
 import { STATUS_ALARM_START_MESSAGE } from './start-job-readiness';
 
 export function AlarmBanner(props: {
@@ -42,7 +45,12 @@ export function AlarmBanner(props: {
   const alarm = props.code === null ? null : presentAlarm(props.controllerKind, props.code);
   const resetOffer = resetOfferMessage(props.resetRequired, props);
   const alarmAction =
-    resetOffer ?? alarmRecoveryAction(props.controllerKind, props.code, alarm?.action);
+    resetOffer ??
+    alarmRecoveryAction(
+      props.controllerKind,
+      props.code,
+      alarmCardAction(props.code, props.controllerKind, alarm?.action, props.homingEnabled),
+    );
   return (
     <div style={alarmStyle} role="alert">
       <AlarmHeading code={props.code} alarm={alarm} resetRequired={props.resetRequired} />
@@ -60,6 +68,7 @@ export function AlarmBanner(props: {
           homingEnabled={props.homingEnabled}
           homeFromAlarm={props.homeFromAlarm}
           canUnlock={props.canUnlock}
+          homingFailed={isHomingFailureAlarm(props.code, props.controllerKind)}
           onHome={props.onHome}
           onConfigureHoming={props.onConfigureHoming}
           onUnlock={props.onUnlock}
