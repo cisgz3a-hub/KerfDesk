@@ -9,6 +9,7 @@ import { ArrayDialogHost, resetArrayDialogMemory } from './ArrayDialogHost';
 const mocks = vi.hoisted(() => ({ render: vi.fn() }));
 vi.mock('../text/render-variable-text', () => ({
   renderVariableText: (input: unknown) => mocks.render(input),
+  batchVariableTextRenderer: () => (input: unknown) => mocks.render(input),
 }));
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -66,6 +67,15 @@ async function columns(value: string): Promise<void> {
     Simulate.change(input);
   });
 }
+// How many renders one copy of the fixture takes (its variable texts).
+function rendersPerCopy(): number {
+  const state = fixtureState();
+  const variable = state.project.scene.objects.filter(
+    (object) => object.kind === 'text' && object.variableTemplate !== undefined,
+  );
+  return variable.length;
+}
+
 async function submit(): Promise<void> {
   const form = host!.querySelector('form');
   if (form === null) throw new Error('Missing form');
@@ -132,6 +142,29 @@ describe('visible per-copy variable array workflow', () => {
       expect(useStore.getState().project).toBe(project);
     },
   );
+
+  // Performance audit S7-P2-1: the status used to say "Preparing" once and never paint again.
+  it('shows how many copies are ready while the rest render', async () => {
+    let release = (): void => undefined;
+    const wait = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const firstCopy = rendersPerCopy();
+    mocks.render.mockImplementation(async (input: Parameters<typeof renderFixture>[0]) => {
+      if (mocks.render.mock.calls.length > firstCopy) await wait;
+      return renderFixture(input);
+    });
+    const close = await mount();
+    await act(async () => Simulate.click(button('Grid')));
+    await selectDistinct();
+    await submit();
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
+    const status = host!.querySelector('[role="status"]')?.textContent ?? '';
+    expect(status).toMatch(/Preparing variable copies… 1 of [0-9]+/);
+    await act(async () => release());
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
+    expect(close).toHaveBeenCalledOnce();
+  });
 
   it.each(['Grid', 'Circular', 'Point Rotation'])(
     '%s cancels a pending render without applying any copies',

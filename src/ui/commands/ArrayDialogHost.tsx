@@ -4,7 +4,8 @@ import { useStore } from '../state';
 import type { ArrayActions } from '../state/array-actions';
 import { sceneObjectCopyClosure } from '../state/scene-object-copy-dependencies';
 import { prepareVariableArray } from '../state/prepare-variable-array';
-import { renderVariableText } from '../text/render-variable-text';
+import { variableCopySlices } from '../state/variable-copy-slices';
+import { batchVariableTextRenderer } from '../text/render-variable-text';
 import { ArrayDialog } from './ArrayDialog';
 import { objectVariableTemplate } from '../../core/variables/object-variable-template';
 import { rememberedArrayForm, type ArrayForm } from './array-dialog-form';
@@ -19,18 +20,13 @@ export function ArrayDialogHost(props: { readonly onClose: () => void }): JSX.El
   const selectedObjectId = useStore((state) => state.selectedObjectId);
   const additionalSelectedIds = useStore((state) => state.additionalSelectedIds);
   const arraySelection = useStore((state) => state.arraySelection);
-  const request = useRef(0);
+  const request = useRequestCounter();
   const submitted = useRef<ArrayForm | null>(null);
   const retainedName = useRef<string | undefined>(undefined);
   const [initial] = useState(() => lastApplied);
   const [preparing, setPreparing] = useState(false);
+  const [progress, setProgress] = useState<VariableCopyProgress>();
   const [errorMessage, setErrorMessage] = useState<string>();
-  useEffect(
-    () => () => {
-      request.current += 1;
-    },
-    [],
-  );
   const selected = useMemo(
     () => selectedObjects(project, selectedObjectId, additionalSelectedIds),
     [project, selectedObjectId, additionalSelectedIds],
@@ -69,6 +65,7 @@ export function ArrayDialogHost(props: { readonly onClose: () => void }): JSX.El
       request,
       arraySelection,
       setPreparing,
+      setProgress,
       setErrorMessage,
       applied,
       retainedName: retainedName.current,
@@ -85,6 +82,7 @@ export function ArrayDialogHost(props: { readonly onClose: () => void }): JSX.El
       onRetainChange={setCurrent(retainedName)}
       hasVariableText={selected.some((object) => objectVariableTemplate(object) !== undefined)}
       preparing={preparing}
+      {...(progress === undefined ? {} : { progress })}
       {...(errorMessage === undefined ? {} : { errorMessage })}
       onCancel={close}
       onApply={(spec, advanceVariables) => {
@@ -94,8 +92,12 @@ export function ArrayDialogHost(props: { readonly onClose: () => void }): JSX.El
   );
 }
 
+type VariableCopyProgress = { readonly done: number; readonly total: number };
+
 // Every copy's variable values are rendered before any is placed; a newer
-// request, a closed dialog or a changed design drops the result.
+// request, a closed dialog or a changed design drops the result. The copies
+// render in slices with one parse per font (performance audit S7-P2-1), so the
+// window paints the progress and Cancel stops the batch before any is placed.
 async function applyVariableArray(
   spec: ArraySpec,
   owner: number,
@@ -103,6 +105,7 @@ async function applyVariableArray(
     readonly request: { readonly current: number };
     readonly arraySelection: ArrayActions['arraySelection'];
     readonly setPreparing: (preparing: boolean) => void;
+    readonly setProgress: (progress: VariableCopyProgress | undefined) => void;
     readonly setErrorMessage: (message: string | undefined) => void;
     readonly applied: () => void;
     readonly retainedName: string | undefined;
@@ -113,16 +116,22 @@ async function applyVariableArray(
   const captured = useStore.getState();
   const isCurrent = (): boolean => currentArrayRequest(request, owner, captured);
   host.setPreparing(true);
+  host.setProgress(undefined);
   host.setErrorMessage(undefined);
   try {
     const result = await prepareVariableArray(captured, spec, {
-      render: renderVariableText,
+      render: batchVariableTextRenderer(),
       clock: () => new Date(),
       advanceVariables: host.advanceVariables,
       isCurrent,
+      yieldNow: variableCopySlices(),
+      onProgress: (done, total) => {
+        if (request.current === owner) host.setProgress({ done, total });
+      },
     });
     if (request.current !== owner) return;
     host.setPreparing(false);
+    host.setProgress(undefined);
     if (!result.ok) {
       host.setErrorMessage(result.message);
       return;
@@ -141,6 +150,7 @@ async function applyVariableArray(
   } catch (error) {
     if (request.current !== owner) return;
     host.setPreparing(false);
+    host.setProgress(undefined);
     host.setErrorMessage(error instanceof Error ? error.message : String(error));
   }
 }
@@ -191,6 +201,18 @@ function currentArrayRequest(
     current.selectedObjectId === captured.selectedObjectId &&
     current.additionalSelectedIds === captured.additionalSelectedIds
   );
+}
+
+// A closed dialog moves the counter on too, so a late result is dropped.
+function useRequestCounter(): { current: number } {
+  const request = useRef(0);
+  useEffect(
+    () => () => {
+      request.current += 1;
+    },
+    [],
+  );
+  return request;
 }
 
 function setCurrent<T>(ref: { current: T }): (value: T) => void {
