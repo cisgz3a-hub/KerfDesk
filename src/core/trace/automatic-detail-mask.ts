@@ -1,4 +1,5 @@
 import type { CrackSubPixelField } from './contour-boundary';
+import { fieldBoxThreshold, fieldLuma, type BoxThreshold } from './crack-field-planes';
 import { lightSolidIso } from './light-solid-fill';
 import type { RawImageData, TraceOptions } from './trace-image';
 
@@ -52,6 +53,12 @@ function classifyDetail(
 ): { width: number; height: number; luma: Float32Array; ink: Uint8Array } {
   const luma = new Float32Array(width * height);
   const ink = new Uint8Array(width * height);
+  const plane = fieldLuma(localField, width, height);
+  const box = fieldBoxThreshold(localField, width, height);
+  if (plane !== null && box !== null) {
+    classifyBoxDetail(plane, box, lo, hi, luma, ink);
+    return { width, height, luma, ink };
+  }
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
       const i = y * width + x;
@@ -63,6 +70,41 @@ function classifyDetail(
     }
   }
   return { width, height, luma, ink };
+}
+
+// classifyDetail on the field's own arrays: lumaAt is the plane, and
+// thresholdAt is sketch-window.ts localMean's box mean, the same reads and
+// the same arithmetic, so every class keeps its value.
+function classifyBoxDetail(
+  plane: Uint8Array,
+  box: BoxThreshold,
+  lo: number,
+  hi: number,
+  luma: Float32Array,
+  ink: Uint8Array,
+): void {
+  const { width, height, integral, radius, bias } = box;
+  const stride = width + 1;
+  for (let y = 0; y < height; y += 1) {
+    const top = Math.max(0, y - radius);
+    const bottom = Math.min(height, y + radius + 1);
+    const rowTop = top * stride;
+    const rowBottom = bottom * stride;
+    const rows = bottom - top;
+    for (let x = 0, i = y * width; x < width; x += 1, i += 1) {
+      const l = plane[i] as number;
+      luma[i] = l;
+      const left = Math.max(0, x - radius);
+      const right = Math.min(width, x + radius + 1);
+      const sum =
+        (integral[rowBottom + right] as number) -
+        (integral[rowTop + right] as number) -
+        (integral[rowBottom + left] as number) +
+        (integral[rowTop + left] as number);
+      const threshold = sum / Math.max(1, (right - left) * rows) - bias;
+      ink[i] = (l >= lo && l <= hi) || l < threshold ? 1 : 0;
+    }
+  }
 }
 
 function automaticCrackField(
