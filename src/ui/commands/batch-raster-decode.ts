@@ -12,12 +12,8 @@
 
 import type { RawImageData } from '../../core/trace';
 import { isPnmFileName } from '../../io/pnm/decode-pnm';
-import {
-  decodeBatchRasterBytes,
-  resampleBatchRaster,
-  type BatchRasterFormat,
-  type DecodedBatchRaster,
-} from '../import/batch-raster-pixels';
+import type { BatchRasterFormat, DecodedBatchRaster } from '../import/batch-raster-pixels';
+import { resampleBatchRaster } from '../import/batch-raster-resample';
 import { decodeBatchRasterOffThread, resampleRgbaOffThread } from '../import/import-worker-client';
 import { PREVIEW_MAX_EDGE_PX, scaleToCap } from '../trace/trace-decode-cap';
 
@@ -45,6 +41,9 @@ export async function decodeBatchRasterFile(
     signal === undefined ? {} : { signal },
   );
   if (offThread !== null) return offThread;
+  // Loaded only here, where no Worker exists: the TIFF decoder and its inflate
+  // library stay out of the boot bundle (S9-P3-2).
+  const { decodeBatchRasterBytes } = await import('../import/batch-raster-pixels');
   return decodeBatchRasterBytes(new Uint8Array(await file.arrayBuffer()), format);
 }
 

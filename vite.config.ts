@@ -7,6 +7,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 import { pdfResources } from './scripts/pdf-resources';
 import { browserFreeBuild } from './scripts/browser-free-build';
 import { startupArtwork } from './scripts/startup-artwork';
+import { bundleChunkReport } from './scripts/bundle-chunk-report';
 
 import {
   appVersion,
@@ -16,6 +17,10 @@ import {
 } from './src/platform/web/build-info';
 
 const PROJECT_ROOT = dirname(fileURLToPath(import.meta.url));
+// I/O modules that only workers or a rare in-window fallback load (see
+// manualChunks below and scripts/check-boot-bundle.mjs).
+const WORKER_SIDE_IO =
+  /\/src\/io\/(?:tiff\/|raster-decode\/|svg\/parse-svg-worker\.ts$|xml\/read-xml-document-from-blob\.ts$)/;
 const DESKTOP_RELEASE_VERSION_ENV = 'KERFDESK_DESKTOP_VERSION';
 const BUILD_APP_VERSION = resolveBuildAppVersion(
   appVersion(),
@@ -64,6 +69,7 @@ export default defineConfig({
   plugins: [
     browserFreeBuild(),
     startupArtwork(),
+    bundleChunkReport(),
     react(),
     pdfResources(),
     // Offline PWA (ADR-060). registerType 'prompt' (never auto-reload — see
@@ -248,6 +254,11 @@ export default defineConfig({
             return 'cnc-stroke-fonts';
           }
           if (normalized.includes('/src/core/')) return 'core';
+          // Worker-side parsers and decoders stay out of the boot `io` chunk:
+          // a module forced into a manual chunk takes its dependencies with
+          // it, which put linkedom, saxes, tiff and fflate in every first
+          // download (S9-P3-2). Left to Rollup, they load with what needs them.
+          if (WORKER_SIDE_IO.test(normalized)) return undefined;
           if (normalized.includes('/src/io/')) return 'io';
           if (normalized.includes('/src/ui/laser/') || normalized.includes('/src/ui/workspace/')) {
             return 'ui-workbench';

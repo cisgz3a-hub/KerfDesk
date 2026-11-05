@@ -1,5 +1,5 @@
 import type { ImportedSvg } from '../../core/scene';
-import { parseSvg } from '../../io/svg';
+import { parseSvg } from '../../io/svg/parse-svg';
 import { captureImportDocumentOwner } from '../app/import-dispatch';
 import type { ImportOutcome } from '../state/store';
 import type { LibraryEntry } from './design-library-types';

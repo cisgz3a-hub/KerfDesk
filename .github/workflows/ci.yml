@@ -128,6 +128,11 @@ jobs:
       - name: Build the web app
         run: pnpm build:web
 
+      # Counts the first visit's gzip bytes against a checked-in baseline and
+      # refuses worker-only libraries in it (performance audit S9-P3-2).
+      - name: Check the boot bundle size
+        run: pnpm check:boot-bundle
+
       - name: Build the Electron main process
         run: pnpm build:electron-main
 

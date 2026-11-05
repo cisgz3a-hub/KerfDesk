@@ -1,7 +1,10 @@
 import { prepareSvgFragment } from '../import/svg-image-hydration';
 import type { SvgArtworkFragment } from '../state/svg-fragment-mutation';
 import type { SceneObject } from '../../core/scene';
-import { parseSvg, type ParseSvgResult } from '../../io/svg';
+// The parser module itself, not the io/svg barrel: the barrel also re-exports
+// the worker-side parsers (linkedom, saxes), which must stay out of the boot
+// bundle (S9-P3-2).
+import { parseSvg, type ParseSvgResult } from '../../io/svg/parse-svg';
 import { parseSvgOffThread } from '../import/document-import-worker-client';
 import { importByteSize, resolveImportBlob, type BlobSourceFile } from '../import/import-file-blob';
 import type { ImportOutcome } from '../state/store';
