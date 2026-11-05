@@ -72,7 +72,15 @@ export function AdjustImageDialog(props: {
   };
 
   return (
-    <Dialog onClose={props.onCancel} ariaLabel="Adjust Image" as="form" onSubmit={submit} size="xl">
+    // OK applies the draft, which every field has already normalized and clamped.
+    <Dialog
+      onClose={props.onCancel}
+      ariaLabel="Adjust Image"
+      as="form"
+      onSubmit={submit}
+      clampsEveryValue
+      size="xl"
+    >
       <DialogHeader source={props.image.source} />
       <PreviewGrid sourceRef={sourceRef} processedRef={processedRef} />
       <AdjustFields

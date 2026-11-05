@@ -25,6 +25,9 @@ export function Dialog(props: {
   // value between a number field's steps never blocks it (form-validity.ts).
   readonly as?: 'div' | 'form';
   readonly onSubmit?: (event: React.FormEvent<HTMLFormElement>) => void;
+  /** The form submits a draft its fields have already clamped, never the raw
+   * input text, so not even the browser's range checks apply (ADR-690). */
+  readonly clampsEveryValue?: boolean;
   /** 'surface' focuses the dialog itself on open, for dialogs that appear
    * unprompted: a keystroke meant for the field the operator was typing in
    * must not press a button. Tab still reaches every control. */
@@ -60,7 +63,13 @@ export function Dialog(props: {
       className="lf-dialog-backdrop"
     >
       {props.as === 'form' ? (
-        <form className={panelClass} noValidate onSubmit={checkedSubmit(props.onSubmit)}>
+        <form
+          className={panelClass}
+          noValidate
+          onSubmit={
+            props.clampsEveryValue === true ? props.onSubmit : checkedSubmit(props.onSubmit)
+          }
+        >
           {heading}
           {props.children}
         </form>
