@@ -32,7 +32,7 @@ import {
   useControllerNotice,
   type ControllerNotice,
 } from './controller-notice';
-import { PORT_OPEN_NO_ANSWER } from '../state/port-open-no-answer';
+import { NO_ANSWER_TOOLBAR } from '../state/port-open-no-answer';
 import './ConnectionBar.css';
 
 export type ConnectionBarProps = {
@@ -90,7 +90,7 @@ function toolbarStatus(
 ): { readonly text: string; readonly quiet: boolean } {
   if (silent) return { text: 'Not responding', quiet: true };
   if (props.connection.kind === 'connected' && props.controllerNeverAnswered === true) {
-    return { text: PORT_OPEN_NO_ANSWER, quiet: true };
+    return { text: NO_ANSWER_TOOLBAR, quiet: true };
   }
   return { text: connectionStatusText(props.connection, props.qualification), quiet: false };
 }

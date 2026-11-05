@@ -44,6 +44,11 @@ export async function checkWorkspaceHover(page: Page): Promise<{
         requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
       ),
   );
+  // A pan or zoom just before this check owes one settled redraw
+  // MOTION_SETTLE_MS later (ADR-346 Amendment 1). The frames above ran the
+  // draw effect that marks it, so wait for that redraw rather than count it
+  // as a hover redraw.
+  await expect(canvas).toHaveAttribute('data-view-motion', 'still');
   await canvas.evaluate((element) => {
     const target = window as Window & { __workspaceHover?: HoverObservation };
     const original = CanvasRenderingContext2D.prototype.clearRect;
