@@ -10,6 +10,7 @@
 
 import { applyHomography, solveHomography, type Mat3 } from '../camera/homography';
 import type { Bounds, Vec2 } from '../scene/scene-object';
+import { maxOf } from '../util';
 
 export type WarpDeformGrid = 'warp' | 'deform';
 
@@ -231,7 +232,7 @@ function mapsCornersOntoHandles(
   unit: ReadonlyArray<Vec2>,
   corners: ReadonlyArray<Vec2>,
 ): boolean {
-  const scale = Math.max(1, ...corners.map((corner) => Math.hypot(corner.x, corner.y)));
+  const scale = Math.max(1, maxOf(corners.map((corner) => Math.hypot(corner.x, corner.y))));
   return unit.every((corner, index) => {
     const mapped = applyHomography(matrix, corner);
     const handle = corners[index];

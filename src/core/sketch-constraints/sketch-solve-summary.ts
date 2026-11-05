@@ -3,6 +3,7 @@ import { sketchAt } from './sketch-indexed';
 import { sketchJacobian, type SketchEvaluator, type SketchDerivative } from './sketch-jacobian';
 import { sketchMatrixRank } from './sketch-linear';
 import { parseConstrainedSketch, SKETCH_MAX_RADIUS_MM } from './sketch-validation';
+import { maxOf } from '../util';
 export const SKETCH_SOLVE_TOLERANCE_MM = 1e-5;
 export function summarizeSketchSolve(
   sketch: ConstrainedSketch2d,
@@ -21,7 +22,7 @@ export function summarizeSketchSolve(
       : value,
   );
   const residual = evaluate(values),
-    maximumResidualMm = Math.max(0, ...residual.map((item) => Math.abs(item.value)));
+    maximumResidualMm = Math.max(0, maxOf(residual.map((item) => Math.abs(item.value))));
   if (residual.some((item) => !Number.isFinite(item.value)))
     return {
       kind: 'invalid',

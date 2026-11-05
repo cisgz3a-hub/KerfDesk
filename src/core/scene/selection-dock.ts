@@ -12,6 +12,7 @@ import type { SceneGroup } from './scene';
 import type { SceneObject } from './scene-object';
 import type { SelectionTransform } from './selection-transform';
 import { selectionUnits, type SelectionUnit } from './selection-units';
+import { maxOf, minOf } from '../util';
 
 export type DockDirection = 'left' | 'right' | 'up' | 'down';
 
@@ -122,28 +123,28 @@ function dockDelta(
     case 'left': {
       const stop = Math.max(
         padding,
-        ...blockers.filter((w) => w.maxX <= box.minX + EPS).map((w) => w.maxX + padding),
+        maxOf(blockers.filter((w) => w.maxX <= box.minX + EPS).map((w) => w.maxX + padding)),
       );
       return Math.min(0, stop - box.minX);
     }
     case 'right': {
       const stop = Math.min(
         bed.width - padding,
-        ...blockers.filter((w) => w.minX >= box.maxX - EPS).map((w) => w.minX - padding),
+        minOf(blockers.filter((w) => w.minX >= box.maxX - EPS).map((w) => w.minX - padding)),
       );
       return Math.max(0, stop - box.maxX);
     }
     case 'up': {
       const stop = Math.max(
         padding,
-        ...blockers.filter((w) => w.maxY <= box.minY + EPS).map((w) => w.maxY + padding),
+        maxOf(blockers.filter((w) => w.maxY <= box.minY + EPS).map((w) => w.maxY + padding)),
       );
       return Math.min(0, stop - box.minY);
     }
     case 'down': {
       const stop = Math.min(
         bed.height - padding,
-        ...blockers.filter((w) => w.minY >= box.maxY - EPS).map((w) => w.minY - padding),
+        minOf(blockers.filter((w) => w.minY >= box.maxY - EPS).map((w) => w.minY - padding)),
       );
       return Math.max(0, stop - box.maxY);
     }
