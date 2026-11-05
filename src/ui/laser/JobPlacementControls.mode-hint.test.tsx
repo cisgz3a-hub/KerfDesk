@@ -2,7 +2,6 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
 import { JobPlacementControls, START_FROM_HINTS } from './JobPlacementControls';
 

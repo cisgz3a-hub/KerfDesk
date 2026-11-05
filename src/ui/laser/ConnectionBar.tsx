@@ -82,11 +82,24 @@ export type ConnectionBarProps = {
 
 type Props = ConnectionBarProps;
 
+/** The toolbar status line. A port that never heard the controller (U2-P3-3)
+ * shows as quiet as one that went silent. */
+function toolbarStatus(
+  props: Props,
+  silent: boolean,
+): { readonly text: string; readonly quiet: boolean } {
+  if (silent) return { text: 'Not responding', quiet: true };
+  if (props.connection.kind === 'connected' && props.controllerNeverAnswered === true) {
+    return { text: PORT_OPEN_NO_ANSWER, quiet: true };
+  }
+  return { text: connectionStatusText(props.connection, props.qualification), quiet: false };
+}
+
 export function ConnectionBar(props: Props): JSX.Element {
   const { connection } = props;
   const notice = useControllerNotice(props);
   const silent = connection.kind === 'connected' && props.controllerWentSilent === true;
-  const noAnswer = connection.kind === 'connected' && props.controllerNeverAnswered === true;
+  const status = toolbarStatus(props, silent);
   return (
     <section
       className="lf-connection-compact"
@@ -101,17 +114,11 @@ export function ConnectionBar(props: Props): JSX.Element {
         <div className="lf-connection-toolbar-controls">
           <CompactConnectionControls
             machineName={props.machineName ?? 'Unnamed machine'}
-            status={
-              silent
-                ? 'Not responding'
-                : noAnswer
-                  ? PORT_OPEN_NO_ANSWER
-                  : connectionStatusText(connection, props.qualification)
-            }
+            status={status.text}
             statusDot={
               <StatusDot
                 connection={connection}
-                silent={silent || noAnswer}
+                silent={status.quiet}
                 qualifying={qualifyingPhase(connection, props.qualification) !== null}
               />
             }
