@@ -7,10 +7,12 @@
 // contours lie outside it, so they cannot change the parity of a pixel on it.
 
 import { sceneLayerVisibility, type Layer, type SceneObject } from '../../core/scene';
+import { getCanvasColorScheme } from '../theme/canvas-color-scheme';
 import type { DisplayPolylineCache } from './display-polylines';
 import type { ResolvedVector } from './fill-pools';
 import {
   isVectorSceneObject,
+  objectDisplayToleranceMm,
   resolveObjectDisplay,
   type ArtworkPalette,
   type ObjectDisplay,
@@ -46,6 +48,9 @@ type Remembered = {
   readonly cache: DisplayPolylineCache | undefined;
   readonly mode: ObjectDisplayMode;
   readonly palette: ArtworkPalette;
+  readonly toleranceMm: number;
+  /** Paint colours follow the canvas colour scheme (canvas-vector-color.ts). */
+  readonly scheme: ReturnType<typeof getCanvasColorScheme>;
   readonly display: ObjectDisplay;
 };
 
@@ -65,7 +70,7 @@ export function placeObjects(
       planned.push(undefined);
       return { isVisible, onCanvas, vector: undefined };
     }
-    const display = onCanvas ? resolved(obj, view, inputs) : lastDisplay(obj, view, inputs);
+    const display = onCanvas ? currentDisplay(obj, view, inputs) : lastDisplay(obj, view, inputs);
     const vector = { object: obj, display };
     planned.push(vector);
     return { isVisible, onCanvas, vector: onCanvas ? vector : undefined };
@@ -91,9 +96,38 @@ function resolved(
     cache: inputs.displayPolylineCache,
     mode: inputs.mode,
     palette: inputs.palette,
+    toleranceMm: objectDisplayToleranceMm(obj, view),
+    scheme: getCanvasColorScheme(),
     display,
   });
   return display;
+}
+
+// On the canvas the display also depends on the view, but only through its
+// curve tolerance bucket: a pan, or a zoom within the bucket, draws the display
+// it resolved last frame instead of resolving every path again (perf audit
+// S2-P3-2: 50 ms a frame for the 50,000-path trace).
+function currentDisplay(
+  obj: VectorSceneObject,
+  view: ViewTransform,
+  inputs: DisplayInputs,
+): ObjectDisplay {
+  const last = remembered.get(obj);
+  return last !== undefined &&
+    sameInputs(last, inputs) &&
+    last.toleranceMm === objectDisplayToleranceMm(obj, view)
+    ? last.display
+    : resolved(obj, view, inputs);
+}
+
+function sameInputs(last: Remembered, inputs: DisplayInputs): boolean {
+  return (
+    last.layers === inputs.layers &&
+    last.cache === inputs.displayPolylineCache &&
+    last.mode === inputs.mode &&
+    last.palette === inputs.palette &&
+    last.scheme === getCanvasColorScheme()
+  );
 }
 
 function lastDisplay(
@@ -102,11 +136,7 @@ function lastDisplay(
   inputs: DisplayInputs,
 ): ObjectDisplay {
   const last = remembered.get(obj);
-  return last !== undefined &&
-    last.layers === inputs.layers &&
-    last.cache === inputs.displayPolylineCache &&
-    last.mode === inputs.mode &&
-    last.palette === inputs.palette
+  return last !== undefined && sameInputs(last, inputs)
     ? last.display
     : resolved(obj, view, inputs);
 }
