@@ -1979,7 +1979,7 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - `Delete` / `Backspace` — Delete selected
 - `Escape` — Deselect / cancel current operation
 - `Cmd/Ctrl+,` — Settings (ADR-499)
-- `Cmd/Ctrl+K` — Find a command: search every menu command by name or by what it does, then press Enter to run it. Greyed-out results say why they are unavailable. Also opened from Help → Find a command… and the menu bar's Search button (ADR-604)
+- `Cmd/Ctrl+K` — Find a command: search every menu command by name or by what it does, then press Enter to run it. Greyed-out results say why they are unavailable. Also opened from Help → Find a command… and the menu bar's Search button (ADR-604). It also lists the machine panel's Frame job, Start job, Set origin here and jog pad, Machine Setup, Materials, the Settings by name (Units, Theme…) and up to five Learn lessons for this machine; a panel result opens the panel at its control and focuses it, never pressing it (ADR-604 Amendment 1). Help → Keyboard Shortcuts… opens the shortcut list
 
 #### Transform
 - Arrow keys — Nudge 1 mm

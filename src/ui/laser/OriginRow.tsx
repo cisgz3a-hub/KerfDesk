@@ -74,6 +74,7 @@ function SetOriginButton(props: {
       type="button"
       className={`${props.needsAttention ? 'lf-btn lf-btn--attention' : 'lf-btn'}${props.jog ? ' lf-jog-origin' : ''}`}
       onClick={props.onSet}
+      data-search-target="set-origin"
       disabled={props.busy}
       title={
         props.needsAttention

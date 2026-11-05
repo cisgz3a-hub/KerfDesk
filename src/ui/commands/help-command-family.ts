@@ -2,6 +2,7 @@ import { APP_DISPLAY_NAME } from '../../core/app-branding';
 import { enabled, type AppCommand, type AppCommandContext } from './command-types';
 import { useTutorialStore } from '../tutorials/tutorial-store';
 import { openCommandSearch } from './command-search-store';
+import { openKeyboardShortcuts } from '../common/keyboard-shortcuts-event';
 import { LICENSE_NOTICE_EVENT, LICENSE_NOTICE_TITLE } from '../help/license-notice';
 
 export function findCommandCommand(): AppCommand {
@@ -12,6 +13,16 @@ export function findCommandCommand(): AppCommand {
     'Search every menu command by name or by what it does',
     openCommandSearch,
     'Ctrl+K',
+  );
+}
+
+export function keyboardShortcutsCommand(): AppCommand {
+  return enabled(
+    'help.keyboard-shortcuts',
+    'help',
+    'Keyboard Shortcuts...',
+    'List every keyboard shortcut',
+    openKeyboardShortcuts,
   );
 }
 

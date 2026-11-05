@@ -3,6 +3,7 @@ import type { Tutorial } from './tutorial-types';
 export const CNC_DETAIL_TUTORIALS: readonly Tutorial[] = [
   {
     id: 'cnc-relief',
+    pro: 'relief',
     title: 'Prepare a 3D relief carve',
     summary: 'Map a relief source into physical depth and inspect roughing and finishing choices.',
     category: 'CNC',

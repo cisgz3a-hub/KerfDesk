@@ -3,6 +3,7 @@ import type { Tutorial } from './tutorial-types';
 export const PRODUCTION_GENERATOR_TUTORIALS: readonly Tutorial[] = [
   {
     id: 'box',
+    pro: 'box-generator',
     title: 'Generate a finger-jointed box',
     summary:
       'Choose the finished dimensions, inspect how the panels fit, and add them to the canvas.',

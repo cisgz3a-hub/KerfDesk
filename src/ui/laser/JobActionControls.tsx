@@ -168,6 +168,7 @@ function JobActionButtons(props: {
       type="button"
       className={docked ? 'lf-btn' : 'lf-btn lf-btn--go'}
       data-primary={docked ? model.frameIsNext : undefined}
+      data-search-target="frame-job"
       onClick={model.onFrame}
       disabled={model.frameControl.disabled}
       title={model.frameControl.title}
@@ -182,6 +183,7 @@ function JobActionButtons(props: {
       className={docked ? 'lf-btn lf-job-dock__start' : 'lf-btn lf-btn--go'}
       style={docked ? undefined : primaryActionStyle}
       data-primary={docked ? model.framedReady : undefined}
+      data-search-target="start-job"
       onClick={props.onStartJob}
       disabled={model.startControl.disabled}
       title={model.startControl.title}
