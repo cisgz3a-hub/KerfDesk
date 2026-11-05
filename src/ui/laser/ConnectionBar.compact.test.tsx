@@ -135,6 +135,18 @@ describe('compact machine connection', () => {
     expect(host.querySelector('[data-silent]')).toBeNull();
   });
 
+  // UX audit U2-P3-3: a green "Connected" sat beside Machine Setup's "Your
+  // machine didn't answer … at 115200 baud".
+  it('reads Port open, no answer while nothing has answered on the open port', async () => {
+    const host = await renderBar({
+      connection: { kind: 'connected' },
+      controllerNeverAnswered: true,
+    });
+    expect(host.querySelector('.lf-connection-status-live')?.textContent).toBe(
+      'Port open, no answer',
+    );
+  });
+
   it('shows a failed connection while details are closed', async () => {
     const host = await renderBar({
       connection: { kind: 'failed', error: 'Failed to open serial port.' },

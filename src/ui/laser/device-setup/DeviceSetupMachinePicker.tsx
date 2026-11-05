@@ -17,6 +17,7 @@ import {
   chooseMachineEntryActions,
   draftIsCustomMachine,
   draftLacksPresetCommandSet,
+  fewMatchesHint,
   filterMachinePickerEntries,
   groupMachinePickerEntries,
   machineEntryIsSelected,
@@ -47,7 +48,9 @@ export function DeviceSetupMachinePicker({ state, dispatch }: DeviceSetupStepPro
   const { customOpen, choose, replaceNotice } = useMachineChoice(state, dispatch, entries);
   const selected = selectedMachineEntry(state, entries);
   const custom = selected === undefined && (customOpen || draftIsCustomMachine(state, entries));
-  const groups = groupMachinePickerEntries(filterMachinePickerEntries(entries, query, kind));
+  const matches = filterMachinePickerEntries(entries, query, kind);
+  const groups = groupMachinePickerEntries(matches);
+  const fewMatches = fewMatchesHint(matches, query);
   const list = useScrollChosenIntoView();
   return (
     <section className="lf-setup-picker" aria-label="Choose your machine">
@@ -89,6 +92,7 @@ export function DeviceSetupMachinePicker({ state, dispatch }: DeviceSetupStepPro
             ))}
           </div>
         ))}
+        {fewMatches !== null ? <p className="lf-setup-empty">{fewMatches}</p> : null}
         {groups.length === 0 ? (
           <p className="lf-setup-empty">
             No machine matches “{query}”. Choose My machine isn’t listed to enter its size and

@@ -5,6 +5,7 @@
 import { assertNever } from '../../../core/scene';
 import type { ConnectionState } from '../../state/laser-store';
 import type { ControllerQualification } from '../../state/laser-controller-qualification';
+import { controllerHeard } from '../../state/port-open-no-answer';
 import { usbIdLabel } from '../../state/serial-port-memory';
 import { connectionFailureText } from '../ConnectionBar';
 import type { BaudScanStatus } from './use-find-machine';
@@ -67,7 +68,7 @@ export function findMachinePhase(model: {
     baudRate: model.baudRate,
     connection: laser.connection,
     qualification: laser.qualification,
-    heardController: laser.statusReport !== null || laser.detectedControllerKind !== null,
+    heardController: controllerHeard(laser),
     detectedLabel: laser.detectedControllerKind,
     portUsb: usbIdLabel(laser.serialPortInfo),
     connectedBaudRate: laser.connectedBaudRate,

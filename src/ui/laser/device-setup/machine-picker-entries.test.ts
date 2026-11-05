@@ -9,6 +9,7 @@ import {
   chooseCustomMachineActions,
   chooseMachineEntryActions,
   draftIsCustomMachine,
+  fewMatchesHint,
   filterMachinePickerEntries,
   groupMachinePickerEntries,
   machinePickerEntries,
@@ -100,6 +101,33 @@ describe('machine list (ADR-637)', () => {
     expect(selectedMachineEntry(chosen, machinePickerEntries(chosen))?.name).toBe(
       'Shapeoko 3 (Standard)',
     );
+  });
+
+  // UX audit U2-P3-8: a Falcon A1 or Falcon 2 owner found only the A1 Pro.
+  it('names the only rows a search finds and points other models at the not-listed path', () => {
+    const entries = machinePickerEntries(starter());
+    const falcon = filterMachinePickerEntries(entries, 'falcon', 'all');
+    expect(fewMatchesHint(falcon, 'falcon')).toBe(
+      'Only Creality Falcon A1 Pro (vendor command set) is listed for “falcon”. For another model, choose My machine isn’t listed and connect: picking a near model can give it the wrong work area.',
+    );
+    expect(fewMatchesHint(entries, '')).toBeNull();
+    expect(fewMatchesHint(filterMachinePickerEntries(entries, 'laser', 'all'), 'laser')).toBeNull();
+  });
+
+  // UX audit U2-P3-5: the 4040-sized default stock sat over a 300 × 180 bed.
+  it('fits the untouched default stock to a smaller CNC preset', () => {
+    const cnc = choose(starter(), 'Genmitsu 3018-PRO');
+    expect(cnc.cncDraft.stock).toMatchObject({ widthMm: 300, heightMm: 180, thicknessMm: 6.35 });
+  });
+
+  it('keeps a stock the operator set when a CNC preset is chosen', () => {
+    const base = starter();
+    const sized = deviceSetupReducer(base, {
+      kind: 'edit-machine',
+      machine: { ...base.cncDraft, stock: { ...base.cncDraft.stock, widthMm: 350, heightMm: 250 } },
+    });
+    const cnc = choose(sized, 'Genmitsu 3018-PRO');
+    expect(cnc.cncDraft.stock).toMatchObject({ widthMm: 350, heightMm: 250 });
   });
 
   it('starts a CNC preset from the generic starter when a listed laser was chosen', () => {
