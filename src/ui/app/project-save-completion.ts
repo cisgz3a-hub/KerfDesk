@@ -56,6 +56,33 @@ export function failProjectSave(owner: ProjectSaveOwner, message: string): SaveP
   return 'error';
 }
 
+const SAVE_KEPT = 'Your design is still open and nothing was lost.';
+
+/** A failed write in a beginner's words: the browser's exception text ("An
+ *  attempt was made to modify an object where modifications are not
+ *  allowed.") names no next step (UX audit U5-P3-11). */
+export function projectWriteFailureMessage(error: unknown): string {
+  const name = error instanceof Error || error instanceof DOMException ? error.name : '';
+  const message = error instanceof Error ? error.message : String(error);
+  if (
+    /^(NoModificationAllowed|NotAllowed|Security|InvalidModification)Error$/.test(name) ||
+    /\b(EACCES|EPERM|EROFS)\b/.test(message)
+  ) {
+    return `KerfDesk couldn't write to that file or folder. Choose another place, such as Documents, with File > Save As. ${SAVE_KEPT}`;
+  }
+  if (name === 'QuotaExceededError' || /\bENOSPC\b/.test(message)) {
+    return `There isn't enough free space to save there. Free some space, or choose another drive with File > Save As. ${SAVE_KEPT}`;
+  }
+  return `Could not save project: ${message}. ${SAVE_KEPT} Try File > Save As to choose another place.`;
+}
+
+export function failProjectWrite(owner: ProjectSaveOwner, error: unknown): SaveProjectOutcome {
+  const stale = staleProjectSaveOutcome(owner);
+  if (stale !== null) return stale;
+  owner.pushToast(projectWriteFailureMessage(error), 'error');
+  return 'error';
+}
+
 export function staleProjectSaveOutcome(
   owner: ProjectSaveOwner,
 ): Extract<SaveProjectOutcome, 'stale-document' | 'stale-request'> | null {
