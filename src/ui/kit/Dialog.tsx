@@ -8,6 +8,7 @@
 import { useId, useRef } from 'react';
 import { useDialogA11y } from '../common/use-dialog-a11y';
 import { useRegisterModal } from '../common/use-register-modal';
+import { checkedSubmit } from './form-validity';
 
 type DialogSize = 'sm' | 'md' | 'lg' | 'xl';
 
@@ -20,7 +21,8 @@ export function Dialog(props: {
   /** Optional feature-specific panel class; shared dialog chrome remains intact. */
   readonly panelClassName?: string;
   // 'form' renders the panel as a <form> so Enter submits (the
-  // CutSettings/Convert pattern); onSubmit must preventDefault itself.
+  // CutSettings/Convert pattern); onSubmit must preventDefault itself. A
+  // value between a number field's steps never blocks it (form-validity.ts).
   readonly as?: 'div' | 'form';
   readonly onSubmit?: (event: React.FormEvent<HTMLFormElement>) => void;
   /** 'surface' focuses the dialog itself on open, for dialogs that appear
@@ -58,7 +60,7 @@ export function Dialog(props: {
       className="lf-dialog-backdrop"
     >
       {props.as === 'form' ? (
-        <form className={panelClass} onSubmit={props.onSubmit}>
+        <form className={panelClass} noValidate onSubmit={checkedSubmit(props.onSubmit)}>
           {heading}
           {props.children}
         </form>
