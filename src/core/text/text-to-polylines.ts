@@ -33,6 +33,7 @@ import { cncStrokeTextToPolylines } from './cnc-stroke-font';
 import { missingCharacters, textForLayout } from './glyph-coverage';
 import { needsTextShaping } from './text-shaping-required';
 import type { TextShaping } from './text-shaping-types';
+import { createShapingCache, shapedRunAdvance, type ShapingCache } from './shaped-run-width';
 import { shapedLineWidth, shapedTextGeometry } from './text-shaped-geometry';
 
 // Module surface we actually use. Lets the loader narrow the dynamic-
@@ -153,15 +154,17 @@ function outlineTextBoxLayout(
   font: opentype.Font,
   shaping?: TextShaping,
 ): TextBoxLayout | undefined {
-  return input.textBox === undefined
-    ? undefined
-    : layoutTextBox(
-        { ...input, content: textForLayout(input.content), textBox: input.textBox },
-        (line, size, start) =>
-          measureLineWidth(font, line, size, input.letterSpacing ?? 0, shaping, start),
-        (font.ascender - font.descender) / font.unitsPerEm,
-        shaping?.breakUnits,
-      );
+  if (input.textBox === undefined) return undefined;
+  // Shrink-to-fit lays the frame out up to 20 times and wrapping measures every
+  // growing prefix, so each distinct line string is shaped once here.
+  const cache = createShapingCache();
+  return layoutTextBox(
+    { ...input, content: textForLayout(input.content), textBox: input.textBox },
+    (line, size, start) =>
+      measureLineWidth(font, line, size, input.letterSpacing ?? 0, shaping, start, cache),
+    (font.ascender - font.descender) / font.unitsPerEm,
+    shaping?.breakUnits,
+  );
 }
 
 function renderOutlineLines(
@@ -321,12 +324,17 @@ function measureLineWidth(
   letterSpacing: number,
   shaping?: TextShaping,
   start = 0,
+  cache?: ShapingCache,
 ): number {
   if (shaping !== undefined)
     return shapedLineWidth(shaping, start, line.length, sizeMm, font.unitsPerEm, letterSpacing);
   // The pen advance of the shaped glyphs, kerning included, in mm. Tracking
   // falls between glyphs, so a ligature is one glyph and the line's last
   // glyph adds no trailing gap.
+  if (cache !== undefined) {
+    const { advance, glyphs } = shapedRunAdvance(font, line, sizeMm, SHAPING_OPTIONS, cache);
+    return advance + Math.max(0, glyphs - 1) * letterSpacing * sizeMm;
+  }
   let glyphs = 0;
   const advance = font.forEachGlyph(line, 0, 0, sizeMm, SHAPING_OPTIONS, () => {
     glyphs += 1;
