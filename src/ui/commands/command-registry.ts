@@ -22,7 +22,12 @@ import {
   supportReportCommand,
   termsCommand,
 } from './support-command-family';
-import { findCommandCommand, licenseNoticeCommand, tutorialsCommand } from './help-command-family';
+import {
+  findCommandCommand,
+  keyboardShortcutsCommand,
+  licenseNoticeCommand,
+  tutorialsCommand,
+} from './help-command-family';
 import { editCommands } from './edit-command-family';
 import { arrangeCommands } from './arrange-command-family';
 import { laserCommands } from './laser-command-family';
@@ -50,6 +55,7 @@ export function buildAppCommands(ctx: AppCommandContext): ReadonlyArray<AppComma
       findCommandCommand(),
       helpCommand(ctx),
       tutorialsCommand(),
+      keyboardShortcutsCommand(),
       safetyHelpCommand(ctx),
       connectionHelpCommand(ctx),
       reportBugCommand(),

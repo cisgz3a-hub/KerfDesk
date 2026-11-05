@@ -166,8 +166,24 @@ function errorNoticePatch(
   }
   if (isStoppedStreamErrorEcho(state.streamer)) return {};
   const previous =
-    state.safetyNotice?.kind === 'cnc-transition-unconfirmed' ? null : state.safetyNotice;
+    state.safetyNotice?.kind === 'cnc-transition-unconfirmed' ||
+    supersededIdleRejection(state.safetyNotice, state)
+      ? null
+      : state.safetyNotice;
   return { safetyNotice: previous ?? rejectionNotice(state, rejection, rejectedLine) };
+}
+
+// "First notice wins" guards the root cause of a job, Frame or jog against
+// the echoes of its own stop. Two settings writes refused while nothing runs
+// are unrelated, and the newer one is the one the beginner just tried: a
+// second refusal showed only as a bare "error:7" under the first one's notice
+// (UX audit U5-P3-13).
+function supersededIdleRejection(notice: LaserSafetyNotice | null, state: LaserState): boolean {
+  return (
+    notice?.kind === 'controller-error' &&
+    notice.idleCommand === true &&
+    controllerErrorContext(state) === 'command'
+  );
 }
 
 function rejectionNotice(
@@ -182,13 +198,17 @@ function rejectionNotice(
     const context = controllerErrorContext(state);
     return motionRefusedNotice(rejection.motionRefusal, context, rejection.raw, rejectedLine);
   }
-  return controllerErrorNotice(
+  const context = controllerErrorContext(state);
+  const notice = controllerErrorNotice(
     rejection.code,
-    controllerErrorContext(state),
+    context,
     rejection.raw,
     rejectedLine,
     state.activeControllerKind,
   );
+  return notice.kind === 'controller-error' && context === 'command'
+    ? { ...notice, idleCommand: true }
+    : notice;
 }
 
 function isStoppedStreamErrorEcho(streamer: StreamerState | null): boolean {

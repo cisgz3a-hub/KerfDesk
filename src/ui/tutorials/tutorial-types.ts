@@ -1,3 +1,5 @@
+import type { ProFeature } from '../licensing/pro-features';
+
 export const TUTORIAL_CATEGORIES = [
   'Getting started',
   'Drawing & editing',
@@ -115,4 +117,7 @@ export type Tutorial = {
   readonly tip: string;
   readonly keywords: readonly string[];
   readonly related: readonly string[];
+  /** The Pro tool the lesson teaches: KerfDesk Free marks it "Pro" and lists it
+   *  after the free lessons (UX audit U6-P3-4). */
+  readonly pro?: ProFeature;
 };

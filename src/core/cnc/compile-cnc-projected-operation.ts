@@ -46,5 +46,6 @@ export function compileCncProjectedOperation(
     profileGroups: isProfileCutType(settings.cutType) ? groups : [],
     reliefPlans: projected.plans,
     offsetLadderDiagnostics: [],
+    strategyFallbacks: [],
   };
 }

@@ -35,6 +35,7 @@ import type {
   CncOpenContourOmissionSource,
   CncProfileOpenPaths,
   CncStackedCopyMerge,
+  CncStrategyFallback,
 } from '../job/cnc-compilation-sidecar-types';
 import { cncOpenContourOmissions } from './cnc-open-contour-omissions';
 import { cncProfileOpenPaths } from './cnc-profile-outline-join';
@@ -70,6 +71,7 @@ import {
   hasVCarveOperation,
   offsetDiagnosticsForStatus,
   reliefOffsetDiagnosticsForStatus,
+  strategyFallbacksForLayer,
 } from './cnc-compilation-sidecar';
 import { compiledInlayGroups, secondaryClearingGroups } from './compile-cnc-operation-groups';
 import { restAwareVCarveGroup } from './vcarve-rest-finishing';
@@ -162,6 +164,7 @@ function compileCncSnapshot(
   const profileOpenPaths: CncProfileOpenPaths[] = [];
   const keptPartOperations: KeptPartCutOperation[] = [];
   const mergedStackedCopies: CncStackedCopyMerge[] = [];
+  const strategyFallbacks: CncStrategyFallback[] = [];
   const sourceObjects = scene.objects;
   const allSourceObjects = [...sourceObjects, ...(scene.outputDependencies ?? [])];
   const runs = artworkOperationRuns(scene);
@@ -191,6 +194,7 @@ function compileCncSnapshot(
     if (measured !== null) keptPartOperations.push(measured);
     mergedStackedCopies.push(...operation.stackedCopyMerges);
     offsetLadderDiagnostics.push(...operation.offsetLadderDiagnostics);
+    strategyFallbacks.push(...operation.strategyFallbacks);
     if (operation.stepoverOperation !== undefined) {
       stepoverOperations.push(operation.stepoverOperation);
     }
@@ -209,6 +213,7 @@ function compileCncSnapshot(
     // ADR-672 and ADR-433 Amendment 3: outlines cut on their line, and cuts
     // that reach a part another operation keeps.
     { profileOpenPaths, keptPartCuts: cncKeptPartCuts(keptPartOperations, leadWalls.walls) },
+    strategyFallbacks,
   );
   return {
     kind: 'compiled',
@@ -289,6 +294,7 @@ function compileCncOperation(
     ...(usesStepover
       ? { stepoverOperation: { layerId: layer.id, stepoverPercent: settings.stepoverPercent } }
       : {}),
+    strategyFallbacks: vectorGroups.strategyFallbacks,
   };
 }
 
@@ -310,21 +316,11 @@ function compileVectorOperationGroups(
       profileGroups: [],
       offsetLadderDiagnostics: [],
       stepoverUsed: false,
+      strategyFallbacks: [],
     };
   }
   const inlay = compiledInlayGroups(layer, settings, polylines, device, config, leadWalls);
-  if (inlay !== null) {
-    const groups = inlay.groups;
-    return {
-      clearingGroups: groups === null ? [] : [tagArtworkGroup(groups.female, priorityObjectId)],
-      profileGroups: groups === null ? [] : [tagArtworkGroup(groups.male, priorityObjectId)],
-      offsetLadderDiagnostics: offsetDiagnosticsForStatus(layer.id, {
-        offsetFailed: inlay.femalePocketOffsetFailed,
-        passLimited: inlay.femalePocketPassLimited,
-      }),
-      stepoverUsed: inlay.stepoverUsed,
-    };
-  }
+  if (inlay !== null) return inlayOperationGroups(inlay, layer.id, priorityObjectId);
   const secondary = secondaryClearingGroups(layer, settings, polylines, device, config);
   const clearingGroups = secondary.groups.map((group) => tagArtworkGroup(group, priorityObjectId));
   const compiledGroup = cncGroupForLayerResolvedWithEvidence(
@@ -353,6 +349,7 @@ function compileVectorOperationGroups(
       profileGroups: [],
       offsetLadderDiagnostics,
       stepoverUsed: secondary.stepoverUsed || compiledGroup.stepoverUsed,
+      strategyFallbacks: [],
     };
   }
   const tagged = tagFinishedGroup(
@@ -370,6 +367,25 @@ function compileVectorOperationGroups(
     profileGroups: profileCut ? profileGroups : [],
     offsetLadderDiagnostics,
     stepoverUsed: secondary.stepoverUsed || compiledGroup.stepoverUsed,
+    strategyFallbacks: strategyFallbacksForLayer(layer.id, compiledGroup.strategyFallback),
+  };
+}
+
+function inlayOperationGroups(
+  inlay: NonNullable<ReturnType<typeof compiledInlayGroups>>,
+  layerId: string,
+  priorityObjectId: string,
+): CncOperationGroups {
+  const groups = inlay.groups;
+  return {
+    clearingGroups: groups === null ? [] : [tagArtworkGroup(groups.female, priorityObjectId)],
+    profileGroups: groups === null ? [] : [tagArtworkGroup(groups.male, priorityObjectId)],
+    offsetLadderDiagnostics: offsetDiagnosticsForStatus(layerId, {
+      offsetFailed: inlay.femalePocketOffsetFailed,
+      passLimited: inlay.femalePocketPassLimited,
+    }),
+    stepoverUsed: inlay.stepoverUsed,
+    strategyFallbacks: [],
   };
 }
 

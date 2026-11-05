@@ -41,6 +41,10 @@ import { useStore } from '../state';
 import { svgObj } from '../state/test-helpers';
 import { useUiStore } from '../state/ui-store';
 import { AddTextDialog } from './AddTextDialog';
+import { pathTextTitle } from './PathTextFields';
+
+// The checkbox's hover names why it is off until a path exists (UX audit U6-P3-6).
+const PATH_TEXT_TOGGLE = `input[title="${pathTextTitle(true)}"], input[title="${pathTextTitle(false)}"]`;
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -69,7 +73,7 @@ it('saves where path text sits along and across its guide (ADR-480)', async () =
       if (!(content instanceof HTMLTextAreaElement)) throw new Error('Text area missing');
       content.value = 'Path text';
       Simulate.change(content);
-      const toggle = host.querySelector('input[title="Place text along a selected vector path."]');
+      const toggle = host.querySelector(PATH_TEXT_TOGGLE);
       if (!(toggle instanceof HTMLInputElement)) throw new Error('Path toggle missing');
       toggle.checked = true;
       Simulate.change(toggle);

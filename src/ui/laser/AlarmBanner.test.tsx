@@ -101,7 +101,7 @@ describe('AlarmBanner', () => {
   });
 
   it('offers Home and Unlock for an ordinary alarm', async () => {
-    const { host } = await render({ code: 9 });
+    const { host } = await render({ code: 5 });
     expect(buttons(host)).toEqual(['Home ($H)', '$X — Unlock']);
   });
 

@@ -8,9 +8,11 @@ import {
   type TextBoxBaseline,
 } from '../../core/text/text-box-render';
 import { IDENTITY_TRANSFORM, type Project, type TextObject } from '../../core/scene';
-import type { VariableTextRenderer } from '../../io/gcode';
-import { renderTextGeometry } from './render-text-geometry';
+import type { VariableTextRenderer, VariableTextRenderInput } from '../../io/gcode';
+import { renderTextGeometry, renderTextGeometryWith } from './render-text-geometry';
 import { applyTextWeld } from './apply-text-weld';
+import { heldFontParser } from './held-font-parser';
+import type { OutlineFontParser } from './text-geometry-compute';
 
 // Records in a frame or on a path keep the template's first baseline
 // (ADR-682). A batch reads that from one render of the template per text.
@@ -21,12 +23,28 @@ type TemplateBaseline = {
 const MAX_CACHED_TEMPLATES = 64;
 const templateBaselines = new Map<string, Promise<TemplateBaseline>>();
 
-export const renderVariableText: VariableTextRenderer = async ({ text, content, project }) => {
-  const rendered = await styledRecordRender(text, content, project);
+export const renderVariableText: VariableTextRenderer = (input) => renderRecord(input, undefined);
+
+/**
+ * renderVariableText for one batch of records, such as an array's copies
+ * (performance audit S7-P2-1): each font file is parsed once for the batch
+ * where ADR-643 shows that reusing the parse changes no result, and for every
+ * record otherwise. Make one per batch; it holds its parses until dropped.
+ */
+export function batchVariableTextRenderer(parseFont?: OutlineFontParser): VariableTextRenderer {
+  const parse = heldFontParser(parseFont);
+  return (input) => renderRecord(input, parse);
+}
+
+async function renderRecord(
+  { text, content, project }: VariableTextRenderInput,
+  parseFont: OutlineFontParser | undefined,
+): ReturnType<VariableTextRenderer> {
+  const rendered = await styledRecordRender(text, content, project, parseFont);
   const placedTemplate =
     content === text.content || (text.pathText === undefined && text.textBox === undefined)
       ? undefined
-      : await templateBaseline(text, project).catch(() => undefined);
+      : await templateBaseline(text, project, parseFont).catch(() => undefined);
   if (text.pathText !== undefined) {
     const guide = project.scene.objects.find(
       (object) => object.id === text.pathText?.guideObjectId,
@@ -62,15 +80,16 @@ export const renderVariableText: VariableTextRenderer = async ({ text, content, 
     ...applyTextWeld(styledBentRender(rendered, text), text.fontKey, text.weldOverlaps),
     ...missingReport(rendered),
   };
-};
+}
 
 // Styled but not yet bent or laid on a path.
 async function styledRecordRender(
   text: TextObject,
   content: string,
   project: Project,
+  parseFont: OutlineFontParser | undefined,
 ): Promise<TextRenderResult> {
-  const rendered = await renderTextGeometry({
+  const input = {
     fontKey: text.fontKey,
     embeddedFonts: project.embeddedFonts,
     content: styledTextContent(content, text.textStyle),
@@ -80,13 +99,22 @@ async function styledRecordRender(
     letterSpacing: text.letterSpacing,
     color: text.color,
     ...(text.textBox === undefined ? {} : { textBox: text.textBox }),
-  });
+  };
+  // The default route keeps renderTextGeometry, which tests replace whole.
+  const rendered =
+    parseFont === undefined
+      ? await renderTextGeometry(input)
+      : await renderTextGeometryWith(input, parseFont);
   return text.pathText !== undefined || text.textBox !== undefined
     ? styleTextRender(rendered, text.textStyle, text.sizeMm)
     : rendered;
 }
 
-function templateBaseline(text: TextObject, project: Project): Promise<TemplateBaseline> {
+function templateBaseline(
+  text: TextObject,
+  project: Project,
+  parseFont: OutlineFontParser | undefined,
+): Promise<TemplateBaseline> {
   const key = JSON.stringify([
     text.content,
     text.fontKey,
@@ -100,7 +128,7 @@ function templateBaseline(text: TextObject, project: Project): Promise<TemplateB
   ]);
   const cached = templateBaselines.get(key);
   if (cached !== undefined) return cached;
-  const pending = styledRecordRender(text, text.content, project).then((rendered) => ({
+  const pending = styledRecordRender(text, text.content, project, parseFont).then((rendered) => ({
     box: textBoxBaseline(rendered),
     acrossFromBaseline:
       text.pathText === undefined ? undefined : pathTextAcrossFromBaseline(rendered, text.pathText),

@@ -21,6 +21,7 @@ import {
 } from '../scene';
 import { carrySubpathNesting } from '../scene/subpath-nesting';
 import type { RawImageData } from './trace-image';
+import { resampleBilinear, type BilinearTaps } from './bilinear-rows';
 
 // Above this source area we do NOT supersample. Rationale: quadrupling an
 // already-large raster costs a 2x-wide buffer for no benefit — big rasters
@@ -154,41 +155,29 @@ export function upscaleBy(image: RawImageData, factor: number): RawImageData {
   if (!isValidUpscaleFactor(factor)) return image;
   const outWidth = image.width * factor;
   const outHeight = image.height * factor;
-  const data = new Uint8ClampedArray(outWidth * outHeight * 4);
-  const src = image.data;
-  // Every output column samples the same two source columns with the same
-  // weight in every row, so the column taps are computed once, not per pixel.
-  const left = new Int32Array(outWidth);
-  const right = new Int32Array(outWidth);
-  const weight = new Float64Array(outWidth);
-  for (let ox = 0; ox < outWidth; ox += 1) {
-    const sx = (ox + 0.5) / factor - 0.5;
-    const x0 = Math.floor(sx);
-    weight[ox] = sx - x0;
-    left[ox] = clampCoord(x0, image.width) * 4;
-    right[ox] = clampCoord(x0 + 1, image.width) * 4;
-  }
-  const rowBytes = image.width * 4;
-  for (let oy = 0; oy < outHeight; oy += 1) {
-    const sy = (oy + 0.5) / factor - 0.5;
-    const y0 = Math.floor(sy);
-    const fy = sy - y0;
-    const row0 = clampCoord(y0, image.height) * rowBytes;
-    const row1 = clampCoord(y0 + 1, image.height) * rowBytes;
-    let dst = oy * outWidth * 4;
-    for (let ox = 0; ox < outWidth; ox += 1) {
-      const fx = weight[ox] as number;
-      const l = left[ox] as number;
-      const r = right[ox] as number;
-      for (let c = 0; c < 4; c += 1) {
-        const top = lerp(src[row0 + l + c] ?? 0, src[row0 + r + c] ?? 0, fx);
-        const bottom = lerp(src[row1 + l + c] ?? 0, src[row1 + r + c] ?? 0, fx);
-        data[dst + c] = Math.round(lerp(top, bottom, fy));
-      }
-      dst += 4;
-    }
-  }
+  const data = resampleBilinear(
+    image,
+    integerTaps(image.width, factor),
+    integerTaps(image.height, factor),
+  );
   return { ...image, width: outWidth, height: outHeight, data };
+}
+
+// Output sample o of an integer enlargement reads the source at
+// (o + 0.5) / factor - 0.5, clamped at the edges.
+function integerTaps(size: number, factor: number): BilinearTaps {
+  const outSize = size * factor;
+  const low = new Int32Array(outSize);
+  const high = new Int32Array(outSize);
+  const weight = new Float64Array(outSize);
+  for (let o = 0; o < outSize; o += 1) {
+    const at = (o + 0.5) / factor - 0.5;
+    const base = Math.floor(at);
+    weight[o] = at - base;
+    low[o] = clampCoord(base, size);
+    high[o] = clampCoord(base + 1, size);
+  }
+  return { low, high, weight };
 }
 
 /**
@@ -201,36 +190,17 @@ export function upscaleToWorkingGrid(image: RawImageData, factor: number): RawIm
   if (!Number.isFinite(factor) || factor <= 1) return image;
   const width = Math.max(1, Math.round(image.width * factor));
   const height = Math.max(1, Math.round(image.height * factor));
-  const columns = bilinearTaps(image.width, width);
-  const rows = bilinearTaps(image.height, height);
-  const data = new Uint8ClampedArray(width * height * 4);
-  const src = image.data;
-  const rowBytes = image.width * 4;
-  for (let oy = 0; oy < height; oy += 1) {
-    const fy = rows.weight[oy] as number;
-    const row0 = (rows.low[oy] as number) * rowBytes;
-    const row1 = (rows.high[oy] as number) * rowBytes;
-    for (let ox = 0; ox < width; ox += 1) {
-      const fx = columns.weight[ox] as number;
-      const l = (columns.low[ox] as number) * 4;
-      const r = (columns.high[ox] as number) * 4;
-      const dst = (oy * width + ox) * 4;
-      for (let c = 0; c < 4; c += 1) {
-        const top = lerp(src[row0 + l + c] ?? 0, src[row0 + r + c] ?? 0, fx);
-        const bottom = lerp(src[row1 + l + c] ?? 0, src[row1 + r + c] ?? 0, fx);
-        data[dst + c] = Math.round(lerp(top, bottom, fy));
-      }
-    }
-  }
+  const data = resampleBilinear(
+    image,
+    bilinearTaps(image.width, width),
+    bilinearTaps(image.height, height),
+  );
   return { ...image, width, height, data };
 }
 
 // Source taps for each output sample along one axis: output pixel o samples
 // the source at (o + 0.5) * size / outSize - 0.5, clamped at the edges.
-function bilinearTaps(
-  size: number,
-  outSize: number,
-): { readonly low: Int32Array; readonly high: Int32Array; readonly weight: Float64Array } {
+function bilinearTaps(size: number, outSize: number): BilinearTaps {
   const low = new Int32Array(outSize);
   const high = new Int32Array(outSize);
   const weight = new Float64Array(outSize);
@@ -381,8 +351,4 @@ function clampCoord(value: number, size: number): number {
   if (value < 0) return 0;
   if (value >= size) return size - 1;
   return value;
-}
-
-function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
 }

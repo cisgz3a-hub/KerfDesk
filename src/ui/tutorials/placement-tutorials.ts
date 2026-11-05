@@ -51,6 +51,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
   },
   {
     id: 'registration',
+    pro: 'registration-jig',
     title: 'Engrave a leather keychain using a registration jig',
     summary:
       'Burn an outline on wood, place the leather keychain inside it, then engrave the leather.',
@@ -117,6 +118,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
   },
   {
     id: 'board',
+    pro: 'place-board',
     title: 'Place artwork on a measured board',
     summary:
       'Capture a rectangular, circular or photo-traced outline board, then place and check the design.',

@@ -2,6 +2,7 @@ import type { CncOpenContourOmissions } from './cnc-open-contour-omissions';
 import type {
   CncProfileOpenPaths,
   CncStackedCopyMerge,
+  CncStrategyFallback,
 } from '../job/cnc-compilation-sidecar-types';
 import type {
   CncGroup,
@@ -20,6 +21,7 @@ export type CompiledCncOperation = {
   readonly reliefPlans: ReadonlyArray<CncReliefPlanningEvidence>;
   readonly offsetLadderDiagnostics: ReadonlyArray<CncOffsetLadderCompilationEvidence>;
   readonly stepoverOperation?: CncStepoverCompilationEvidence;
+  readonly strategyFallbacks: ReadonlyArray<CncStrategyFallback>;
 };
 
 export function tagArtworkGroup(group: CncGroup, sourceObjectId: string): CncGroup {
@@ -31,4 +33,5 @@ export type CncOperationGroups = {
   readonly profileGroups: ReadonlyArray<CncGroup>;
   readonly offsetLadderDiagnostics: ReadonlyArray<CncOffsetLadderCompilationEvidence>;
   readonly stepoverUsed: boolean;
+  readonly strategyFallbacks: ReadonlyArray<CncStrategyFallback>;
 };

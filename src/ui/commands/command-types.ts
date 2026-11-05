@@ -145,6 +145,7 @@ export type CommandId =
   | 'help.about'
   | 'help.find-command'
   | 'help.tutorials'
+  | 'help.keyboard-shortcuts'
   | 'help.connection'
   | 'help.safety'
   | 'help.report-bug'

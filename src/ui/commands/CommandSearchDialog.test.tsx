@@ -141,9 +141,7 @@ describe('CommandSearchDialog', () => {
     );
     await type(input, 'zzz');
     expect(host.querySelector('[role="listbox"]')).toBeNull();
-    expect(host.querySelector('[role="status"]')?.textContent).toContain(
-      'No command matches “zzz”',
-    );
+    expect(host.querySelector('[role="status"]')?.textContent).toContain('Nothing matches “zzz”');
   });
 });
 
