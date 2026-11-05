@@ -45,8 +45,9 @@ fractional divider or rung count.
    whole form for the browser's verdict (Cut Settings' **Place tabs**) uses `formProblemReported`
    instead.
 3. **Forms that submit only clamped values skip even that.** Adjust Image's OK applies a draft that
-   every field has already normalized and clamped, never the raw input text, so its `Dialog` passes
-   `clampsEveryValue`. Convert to Bitmap's raw form sets `noValidate` alone: its handler clamps DPI
+   every field has already normalized and clamped, never the raw input text, and Add Text clamps
+   size, line height, spacing, bend and maximum width before rendering or saving. Their `Dialog`s
+   pass `clampsEveryValue`. Convert to Bitmap's raw form sets `noValidate` alone: its handler clamps DPI
    and brightness, and its Convert button (type `button`) never ran the browser's check, so Enter
    now submits the same way. Before, Enter refused a DPI the button would clamp.
 4. **Chosen over `step="any"` on the affected fields.** That would fix the fields found today, and
@@ -57,7 +58,8 @@ fractional divider or rung count.
 ### Consequences
 
 - The Grid array creates its copies for any selection size and any typed total or spacing. Adjust
-  Image accepts its own 304.8 DPI and Scan Offset a fractional speed.
+  Image accepts its own 304.8 DPI, Scan Offset a fractional speed, and Add Text clamps a typed size
+  of 9999 mm to 1,000 instead of refusing it.
 - No form's range, required or custom refusals change, except in the two clamping forms (decision
   3): the same field reports the same problem as before.
 - A fraction typed into a count reaches that dialog's handler, which rounds or refuses it in the app.
@@ -74,7 +76,8 @@ fractional divider or rung count.
 - `src/ui/commands/ArrayDialog.test.tsx`: Create array, clicked, submits a 2 × 2 grid for a
   142 × 110.923 mm selection, and again after typing a vertical spacing of 2.054 mm; a negative
   spacing is still refused at its field. Without this change the first case fails.
-- `AdjustImageDialog.test.tsx` and `ScanOffsetCommandDialog.test.tsx` pass unchanged. A first
-  draft that still refused whole-step fractions failed them.
+- `AdjustImageDialog.test.tsx`, `ScanOffsetCommandDialog.test.tsx` and `AddTextDialog.test.tsx`
+  pass unchanged. A first draft that still refused whole-step fractions and
+  out-of-range values in these clamping dialogs failed them on CI.
 - `e2e/array-grid-tenths.e2e.ts`: in Chrome, the dialog shows Total height 223.85, Create array
   closes it and the scene holds four rectangles. Without this change the dialog stays open.

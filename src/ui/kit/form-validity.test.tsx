@@ -85,11 +85,12 @@ describe('dialog form validity (performance audit S6-P2-2)', () => {
 });
 
 // Forms that submit only values they have already clamped, so the browser has
-// nothing to refuse: Adjust Image applies its normalized draft, and Convert to
-// Bitmap's Convert button never ran the browser's check, so Enter submits the
-// same way.
+// nothing to refuse: Adjust Image applies its normalized draft, Add Text clamps
+// every field before rendering, and Convert to Bitmap's Convert button never
+// ran the browser's check, so Enter submits the same way.
 const CLAMPS_EVERY_VALUE = new Set([
   'src/ui/raster/AdjustImageDialog.tsx',
+  'src/ui/text/AddTextDialog.tsx',
   'src/ui/raster/ConvertToBitmapDialog.tsx',
 ]);
 
