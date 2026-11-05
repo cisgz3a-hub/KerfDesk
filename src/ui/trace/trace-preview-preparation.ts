@@ -1,7 +1,7 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
-import { PREVIEW_MAX_EDGE_PX, loadImageAsRawData } from './image-loader';
+import { PREVIEW_MAX_EDGE_PX } from './image-loader';
+import { decodeTraceSourceImage } from './off-thread-trace-decode';
 import type { TracePreparationRequest } from './prepared-trace';
-import { rawImageHasTransparency } from './raw-image-transparency';
 import { checkTraceSignal, isTraceAbort } from './trace-cancellation';
 import {
   createTracePreparation,
@@ -53,10 +53,10 @@ export function decodeTraceSource(file: File): DecodedSource {
   // geometry survives a transient decoder failure. Pending/successful decodes
   // remain shared; only a later preview request can retry a rejected attempt.
   function decode(): Promise<DecodedTraceImage> {
-    const attempt = loadImageAsRawData(file, PREVIEW_MAX_EDGE_PX, controller.signal).then(
-      (img) => {
+    const attempt = decodeTraceSourceImage(file, PREVIEW_MAX_EDGE_PX, controller.signal).then(
+      ({ image: img, hasTransparency }) => {
         checkTraceSignal(controller.signal);
-        const decoded = { img, hasTransparency: rawImageHasTransparency(img) };
+        const decoded = { img, hasTransparency };
         source.decoded = decoded;
         source.sourceDataUrl = maskedTracePreviewDataUrl(file, img);
         return decoded;
