@@ -21,6 +21,15 @@ export type AdaptivePocketVerification =
       readonly maxSimulatedEngagementMm?: number;
     };
 
+// The first ring after an entry runs where only the entry helix (and, for an
+// island partition, its seed slot) has cleared. Over the limit there, the
+// entry cannot open the pocket: a pocket longer than it is wide meets a full
+// slot along its middle line beyond the helix disk (ADR-154 Amendment 3).
+export const ADAPTIVE_OPENING_REFUSAL =
+  "Adaptive can't open this pocket from its entry: the first ring past the entry helix would cut wider than Radial engagement allows.";
+export const ADAPTIVE_ENGAGEMENT_REFUSAL =
+  'Adaptive verification simulated radial engagement above the configured limit.';
+
 const COVERAGE_TARGET = 0.985;
 // The coverage target allows 1.5% of the stock in all, and once let a full-
 // depth pin stand at every crossing of an island plan's cut lines (CNC audit
@@ -56,6 +65,11 @@ export function verifyAdaptivePocket(
     earlyCells: 0,
   };
   let maxSimulatedEngagementMm = 0;
+  // One cell diagonal above the limit is allowed, as when the grid measured
+  // the contact. The contact is exact now, so this is margin, not measurement
+  // error; it is kept so that no verdict moves except through the measurement
+  // (ADR-154 Amendment 3).
+  const engagementCeilingMm = plan.optimalLoadMm + grid.cellMm * Math.SQRT2;
   // The plan's sequences are in the order the program cuts them, each one's
   // finishing rings straight after its roughing, at every depth. Within one
   // depth that is this order, so the simulation follows it.
@@ -68,22 +82,18 @@ export function verifyAdaptivePocket(
       toolDiameterMm / 2,
     );
     contact.addEntry(sequence.entryCenter, sequence.entryRadiusMm);
-    let previous = clearSeedRings(grid, order, contact, sequence.seedRings, entryEnd);
-    const gauge: ContactGauge = { runMm: Number.POSITIVE_INFINITY };
-    for (const ring of sequence.rings) {
-      const first = ring.points[0];
-      if (first === undefined) continue;
-      const connectorEngagement = cutSegment(grid, order, contact, previous, first, gauge);
-      maxSimulatedEngagementMm = Math.max(maxSimulatedEngagementMm, connectorEngagement);
-      for (let index = 1; index < ring.points.length; index += 1) {
-        const start = ring.points[index - 1];
-        const end = ring.points[index];
-        if (start !== undefined && end !== undefined) {
-          const segmentEngagement = cutSegment(grid, order, contact, start, end, gauge);
-          maxSimulatedEngagementMm = Math.max(maxSimulatedEngagementMm, segmentEngagement);
-        }
-      }
-      previous = ring.points[ring.points.length - 1] ?? first;
+    const seedEnd = clearSeedRings(grid, order, contact, sequence.seedRings, entryEnd);
+    const roughing = cutRoughingRings(
+      grid,
+      order,
+      contact,
+      sequence.rings,
+      seedEnd,
+      engagementCeilingMm,
+    );
+    maxSimulatedEngagementMm = Math.max(maxSimulatedEngagementMm, roughing.maxEngagementMm);
+    if (roughing.refusal !== null) {
+      return { ok: false, reason: roughing.refusal, gridMm: grid.cellMm, maxSimulatedEngagementMm };
     }
     clearFinishRings(grid, order, sequence.finishRings, toolDiameterMm / 2);
   }
@@ -91,10 +101,48 @@ export function verifyAdaptivePocket(
     grid,
     initialStock,
     maxSimulatedEngagementMm,
-    plan.optimalLoadMm,
     order.earlyCells,
     toolDiameterMm / 2,
   );
+}
+
+// One sequence's roughing rings, in cutting order. The engagement is the first
+// verdict, so a ring over the limit refuses the plan whatever the remaining
+// rings do, and the simulation stops there (performance audit S8-P3-2). Over
+// the limit on the sequence's first ring, the entry cannot open the pocket.
+function cutRoughingRings(
+  grid: Grid,
+  order: FinishOrder,
+  contact: AdaptiveCutterContact,
+  rings: ReadonlyArray<Polyline>,
+  start: Vec2,
+  engagementCeilingMm: number,
+): { readonly maxEngagementMm: number; readonly refusal: string | null } {
+  const gauge: ContactGauge = { runMm: Number.POSITIVE_INFINITY };
+  let previous = start;
+  let maxEngagementMm = 0;
+  let opening = true;
+  for (const ring of rings) {
+    const first = ring.points[0];
+    if (first === undefined) continue;
+    const connectorEngagement = cutSegment(grid, order, contact, previous, first, gauge);
+    maxEngagementMm = Math.max(maxEngagementMm, connectorEngagement);
+    for (let index = 1; index < ring.points.length; index += 1) {
+      const from = ring.points[index - 1];
+      const to = ring.points[index];
+      if (from !== undefined && to !== undefined) {
+        const segmentEngagement = cutSegment(grid, order, contact, from, to, gauge);
+        maxEngagementMm = Math.max(maxEngagementMm, segmentEngagement);
+      }
+    }
+    if (maxEngagementMm > engagementCeilingMm) {
+      const refusal = opening ? ADAPTIVE_OPENING_REFUSAL : ADAPTIVE_ENGAGEMENT_REFUSAL;
+      return { maxEngagementMm, refusal };
+    }
+    opening = false;
+    previous = ring.points[ring.points.length - 1] ?? first;
+  }
+  return { maxEngagementMm, refusal: null };
 }
 
 // Finishing rings run unmeasured (ADR-154 Amendment 3), so one must not run
@@ -106,29 +154,16 @@ export function verifyAdaptivePocket(
 // over one counts it early.
 type FinishOrder = { readonly buried: Uint8Array; buriedCells: number; earlyCells: number };
 
+// Reached only with the engagement within its limit: the simulation refuses
+// any plan over it as soon as a ring goes over.
 function verificationResult(
   grid: Grid,
   initialStock: number,
   maxSimulatedEngagementMm: number,
-  engagementLimitMm: number,
   earlyFinishCells: number,
   toolRadiusMm: number,
 ): AdaptivePocketVerification {
   const coverageRatio = (initialStock - countOccupied(grid.occupied)) / initialStock;
-  // One cell diagonal above the limit is allowed, as when the grid measured
-  // the contact. The contact is exact now, so this is margin, not measurement
-  // error; it is kept so that no verdict moves except through the measurement
-  // (ADR-154 Amendment 3).
-  const toleranceMm = grid.cellMm * Math.SQRT2;
-  if (maxSimulatedEngagementMm > engagementLimitMm + toleranceMm) {
-    return {
-      ok: false,
-      reason: 'Adaptive verification simulated radial engagement above the configured limit.',
-      coverageRatio,
-      gridMm: grid.cellMm,
-      maxSimulatedEngagementMm,
-    };
-  }
   if (coverageRatio < COVERAGE_TARGET) {
     return {
       ok: false,

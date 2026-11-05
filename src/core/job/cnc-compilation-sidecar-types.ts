@@ -58,6 +58,16 @@ export type CncStackedCopyMerge = {
   readonly count: number;
 };
 
+/** An operation that cuts another strategy than the one it asks for, and why
+ * (performance audit S8-P2-1): adaptive clearing the planner or verifier
+ * refused cuts the ordinary offset pocket, and stock-aware rest machining
+ * without a usable stock model clears the whole pocket with its finishing bit. */
+export type CncStrategyFallback = {
+  readonly layerId: string;
+  readonly kind: 'adaptive-offset' | 'rest-full-pocket';
+  readonly reason: string;
+};
+
 /** Structured-clone-safe CNC evidence retained with the exact compiled Job. */
 export type CncCompilationSidecar = {
   readonly vcarveOperations: ReadonlyArray<CncVCarveCompilationEvidence>;
@@ -73,4 +83,6 @@ export type CncCompilationSidecar = {
   readonly keptPartCuts?: ReadonlyArray<CncKeptPartCut>;
   /** Absent when no operation merged a copy, and on jobs from before the merge. */
   readonly mergedStackedCopies?: ReadonlyArray<CncStackedCopyMerge>;
+  /** Absent when no operation fell back, and on jobs from before S8-P2-1. */
+  readonly strategyFallbacks?: ReadonlyArray<CncStrategyFallback>;
 };

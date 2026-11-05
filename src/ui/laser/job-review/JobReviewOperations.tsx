@@ -179,6 +179,7 @@ function CncOperations(props: {
               effective?.relief,
               effective?.unrampedShapes,
               effective === undefined ? undefined : effective.tabbedShapes === true,
+              effective?.strategyFallback,
             )}
             effective={effective}
             effectiveOperations={props.effectiveOperations}

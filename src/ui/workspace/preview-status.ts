@@ -7,6 +7,7 @@
 import type { Toolpath } from '../../core/job';
 import type { Project } from '../../core/scene';
 import type { ExecutablePlanPreviewCarrier } from './executable-plan-preview-route';
+import type { PreviewCncFallbackCarrier } from './preview-cnc-fallbacks';
 import type { PreviewRouteSummaryCarrier } from './preview-route-summary';
 
 export type PreviewIssue =
@@ -30,7 +31,8 @@ export type PreviewIssue =
 
 export type PreviewToolpath = Toolpath &
   ExecutablePlanPreviewCarrier &
-  PreviewRouteSummaryCarrier & {
+  PreviewRouteSummaryCarrier &
+  PreviewCncFallbackCarrier & {
     readonly previewIssue?: PreviewIssue;
   };
 

@@ -19,6 +19,7 @@ import { PreviewResolutionBanner } from './preview-resolution';
 import type { PreviewIssue } from './preview-status';
 import { RasterPreviewDisplayBanner } from './RasterPreviewDisplayBanner';
 import { RoutePreviewDisplayBanner } from './RoutePreviewDisplayBanner';
+import { PreviewCncFallbackBanner } from './PreviewCncFallbackBanner';
 import { previewStatusOverlayModel } from './preview-status-overlay-model';
 import { previewRouteSummary } from './preview-route-summary';
 
@@ -84,6 +85,7 @@ export function PreviewStatusOverlays(props: {
       {model.rasterDisplay !== null ? (
         <RasterPreviewDisplayBanner advisory={model.rasterDisplay} style={bannerStyle} />
       ) : null}
+      <PreviewCncFallbackBanner notices={model.cncFallbacks} style={bannerStyle} />
       {model.empty ? (
         <div className="lf-chip" style={hintStyle} role="status">
           Nothing to preview — enable Output on at least one layer with objects.
