@@ -2,15 +2,19 @@ import { describe, expect, it } from 'vitest';
 import { combineVectorObjects, offsetVectorObjects, weldVectorObjects } from '../../core/geometry';
 import { planCutShapes } from '../../core/geometry/cut-shapes';
 import { offsetShapes, type OffsetShapesOptions } from '../../core/geometry/offset-shapes';
-import { IDENTITY_TRANSFORM, type ImportedSvg } from '../../core/scene';
+import { describeWeldChange } from '../../core/geometry/vector-path-weld-change';
+import { ok } from '../../core/result';
+import { createLayer, IDENTITY_TRANSFORM, type ImportedSvg } from '../../core/scene';
 import { packSceneObjectsMessage } from '../packed-scene-objects-transfer';
+import { prepareWeldSelection } from '../state/vector-path-weld-plan';
 import { packResultObject, unpackResultObject } from './vector-op-result-transfer';
 import {
   openLineObject,
   parityObjects,
+  ring,
   throughWorkerBoundary,
 } from './vector-op-worker.test-fixture';
-import { vectorOpResponse } from './vector-op-worker-runtime';
+import { vectorOpResponse, vectorOpResult } from './vector-op-worker-runtime';
 
 const IDS = { outward: 'offset-paths', inward: 'offset-inward-paths' };
 
@@ -121,7 +125,106 @@ describe('vector worker parity with the in-thread core calls (ADR-609)', () => {
     expect(inThread.kind).toBe('ok');
     expectIdentical(throughWorkerBoundary(sources, { kind: 'weld', id: 'welded-paths' }), inThread);
   });
+
+  // The dialog's Weld (ADR-609 Amendment 2): the operands are rebound by the
+  // real weld plan, and the change is described against the selection.
+  it.each([
+    ['the parity fixture with an absorbed speck', [...parityObjects(), speck()], ['speck']],
+    ['a scalloped plate', scallopedPlate(60), []],
+  ] as const)('Weld review of %s', (_label, selection, absorbedIds) => {
+    const scene = {
+      objects: [...selection],
+      layers: [createLayer({ id: 'cut', color: '#000000' })],
+      groups: [],
+    };
+    const prepared = prepareWeldSelection(scene, selection, 'welded-paths');
+    expect(prepared.operands).not.toStrictEqual(selection);
+    const welded = weldVectorObjects(prepared.operands, 'welded-paths');
+    if (welded.kind !== 'ok') throw new Error('the fixture must weld');
+    const change = describeWeldChange(selection, welded.value);
+    expect(change).toStrictEqual({ changed: true, absorbedIds });
+    const task = {
+      kind: 'weld-review',
+      id: 'welded-paths',
+      operandCount: prepared.operands.length,
+    } as const;
+    expectIdentical(
+      throughWorkerBoundary([...prepared.operands, ...selection], task),
+      ok({ object: welded.value, change }),
+    );
+  });
+
+  it('refuses a Weld review reply without its change', () => {
+    const task = { kind: 'weld-review', id: 'w', operandCount: 1 } as const;
+    const { response } = vectorOpResponse(1, [speck(), speck()], task);
+    if (response.kind !== 'objects') throw new Error('the speck must weld');
+    const { weldChange: _dropped, ...withoutChange } = response;
+    expect(() => vectorOpResult(task, withoutChange)).toThrow('no weld change');
+  });
 });
+
+/** A small square inside the plate's ring, which Weld absorbs. */
+function speck(): ImportedSvg {
+  const square = [
+    { x: 39, y: 8 },
+    { x: 43, y: 8 },
+    { x: 43, y: 12 },
+    { x: 39, y: 12 },
+    { x: 39, y: 8 },
+  ];
+  return {
+    kind: 'imported-svg',
+    id: 'speck',
+    source: 'speck.svg',
+    bounds: { minX: 39, minY: 8, maxX: 43, maxY: 12 },
+    transform: IDENTITY_TRANSFORM,
+    operationIds: ['cut'],
+    paths: [{ color: '#000000', polylines: [{ closed: true, points: square }] }],
+  };
+}
+
+/**
+ * A 300 x 200 mm plate with circles over its edge all round (performance audit
+ * S6-P2-1): every plate vertex is buried, so the plate is a candidate that is
+ * not covered, and its check walks every circle.
+ */
+function scallopedPlate(circles: number): ReadonlyArray<ImportedSvg> {
+  const closedRing = (cx: number, cy: number, radius: number, count: number) => {
+    const points = ring(cx, cy, radius, count);
+    return { closed: true, points: [...points, points[0]!] };
+  };
+  const object = (id: string, polyline: ReturnType<typeof closedRing>): ImportedSvg => ({
+    kind: 'imported-svg',
+    id,
+    source: `${id}.svg`,
+    bounds: { minX: 0, minY: 0, maxX: 300, maxY: 200 },
+    transform: IDENTITY_TRANSFORM,
+    operationIds: ['cut'],
+    paths: [{ color: '#000000', polylines: [polyline] }],
+  });
+  const plate = object('plate', {
+    closed: true,
+    points: [
+      { x: 0, y: 0 },
+      { x: 300, y: 0 },
+      { x: 300, y: 200 },
+      { x: 0, y: 200 },
+      { x: 0, y: 0 },
+    ],
+  });
+  const perimeter = 1_000;
+  const edge = Array.from({ length: circles }, (_, index) => {
+    let along = (index / circles) * perimeter;
+    let x = 0;
+    let y = 0;
+    if (along < 300) x = along;
+    else if ((along -= 300) < 200) [x, y] = [300, along];
+    else if ((along -= 200) < 300) [x, y] = [300 - along, 200];
+    else [x, y] = [0, 200 - (along - 300)];
+    return object(`scallop-${index}`, closedRing(x, y, 12, 48));
+  });
+  return [plate, ...edge];
+}
 
 describe('vector worker result transfer', () => {
   const result = (polylines: ImportedSvg['paths'][number]['polylines']): ImportedSvg => ({
