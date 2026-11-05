@@ -2,6 +2,7 @@ import { useContext, useEffect, useState } from 'react';
 import { DesktopDownloadContext, type DesktopDownloadResult } from './desktop-download-context';
 import { Dialog, Icon } from '../kit';
 import { DESKTOP_LICENCE_WINDOW } from '../../../public/desktop-licence-window.mjs';
+import { PROJECT_TUTORIALS } from '../tutorials/project-tutorials';
 import './desktop-welcome.css';
 
 // What the desktop app opens into: KerfDesk Free while ADR-623 Amendment 3 holds
@@ -17,6 +18,14 @@ const DESKTOP_COPY = DESKTOP_LICENCE_WINDOW
       licence: 'Pro tools unlock with a desktop licence.',
       download: 'Download the Windows app, which starts in Free until you unlock Pro',
     };
+
+// The welcome card is a beginner's first screen, so it names the first lesson
+// (UX audit U1-P3-9). The minutes come from the lesson itself.
+const FIRST_PROJECT_MINUTES = PROJECT_TUTORIALS.find((t) => t.id === 'first-project')?.minutes;
+export const FIRST_STEPS_HINT =
+  'New to KerfDesk? Click Learn (top right), then Make your first project' +
+  (FIRST_PROJECT_MINUTES === undefined ? '' : `: ${FIRST_PROJECT_MINUTES} minutes`) +
+  ', no machine needed.';
 
 type DownloadState = DesktopDownloadResult | { readonly status: 'loading' };
 
@@ -90,6 +99,7 @@ export function DesktopWelcomeDialog({ onClose }: { readonly onClose: () => void
             Continue with Free <Icon name="arrow-right" size={18} />
           </button>
           <p>No account. No time limit. No installation.</p>
+          <p className="lf-desktop-welcome__first-steps">{FIRST_STEPS_HINT}</p>
         </section>
         <p className="lf-desktop-welcome__footnote">
           You can get the desktop app later from the Free / Pro button.

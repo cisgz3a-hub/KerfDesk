@@ -38,6 +38,11 @@ export function remoteToolbarSummary(
   return { tone: 'live', text: `${clients} approved connection${clients === 1 ? '' : 's'}` };
 }
 
+// The label stays "MCP" (#1177); the hover says what it is for, since a
+// beginner meets the word on first launch (UX audit U1-P3-5).
+export const REMOTE_TOOLBAR_PURPOSE =
+  'Phone & MCP: control KerfDesk from your phone, or from an AI assistant over MCP (Model Context Protocol).';
+
 export function RemoteToolbarButton(): JSX.Element | null {
   return isRemoteAccessRenderer() ? <RemoteToolbarControl /> : null;
 }
@@ -62,7 +67,7 @@ function RemoteToolbarControl(): JSX.Element {
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
-        title={`Phone & MCP: ${summary.text}`}
+        title={`${REMOTE_TOOLBAR_PURPOSE} ${summary.text}`}
         data-remote-state={summary.tone}
         onClick={() => setOpen((value) => !value)}
         onBlur={(event) => {
