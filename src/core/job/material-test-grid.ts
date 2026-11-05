@@ -410,10 +410,6 @@ function materialTestLayerColor(row: number): string {
   return `#${(0x100000 + row).toString(16).padStart(6, '0')}`;
 }
 
-function maxOf(values: ReadonlyArray<number>): number {
-  return values.reduce((max, value) => Math.max(max, value), Number.NEGATIVE_INFINITY);
-}
-
 function clampInteger(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, Math.floor(Number.isFinite(value) ? value : min)));
 }
