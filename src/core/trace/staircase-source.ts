@@ -322,28 +322,41 @@ function medianOf(levels: Uint8Array, empty: number): number {
 
 // Every ink/paper crack of the mask, the image border included (off-grid
 // pixels are paper): from each pixel, the crack to its right, then the one
-// below it. A visit returning false stops the walk. Indexed directly, as this
-// walks every pixel of a page (perf audit S5-P3-1).
+// below it. A visit returning false stops the walk. Plain functions rather
+// than closures made per walk, as this walks every pixel of a page (perf audit
+// S5-P3-1).
 function forEachCrack(
   mask: InkPlane,
   visit: (inkX: number, inkY: number, bgX: number, bgY: number) => unknown,
 ): void {
-  const { width, height, ink } = mask;
+  const { width, height } = mask;
   for (let y = -1; y < height; y += 1) {
-    const row = y * width;
-    const below = y + 1 < height;
     for (let x = -1; x < width; x += 1) {
-      const here = y >= 0 && x >= 0 && ink[row + x] === 1;
-      const right = y >= 0 && x + 1 < width && ink[row + x + 1] === 1;
-      if (here !== right && (here ? visit(x, y, x + 1, y) : visit(x + 1, y, x, y)) === false) {
-        return;
-      }
-      const down = below && x >= 0 && ink[row + width + x] === 1;
-      if (here !== down && (here ? visit(x, y, x, y + 1) : visit(x, y + 1, x, y)) === false) {
-        return;
-      }
+      const here = inkAt(mask, x, y);
+      if (crack(here, inkAt(mask, x + 1, y), x, y, x + 1, y, visit) === false) return;
+      if (crack(here, inkAt(mask, x, y + 1), x, y, x, y + 1, visit) === false) return;
     }
   }
+}
+
+function inkAt(mask: InkPlane, x: number, y: number): boolean {
+  return (
+    x >= 0 && y >= 0 && x < mask.width && y < mask.height && mask.ink[y * mask.width + x] === 1
+  );
+}
+
+// Visits the crack between pixels a and b, ink side first, when they differ.
+function crack(
+  aInk: boolean,
+  bInk: boolean,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+  visit: (inkX: number, inkY: number, bgX: number, bgY: number) => unknown,
+): unknown {
+  if (aInk === bInk) return undefined;
+  return aInk ? visit(ax, ay, bx, by) : visit(bx, by, ax, ay);
 }
 
 function crackCount(mask: InkPlane): number {

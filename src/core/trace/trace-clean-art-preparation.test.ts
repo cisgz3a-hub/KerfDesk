@@ -3,6 +3,7 @@
 // preparation, and a source the check refuses on sight is not prepared for it,
 // so a Sharp trace prepares its source once, as before the amendment.
 
+import type * as TraceImage from './trace-image';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RawImageData, TraceOptions } from './trace-image';
 import { TRACE_PRESETS } from './trace-presets';
@@ -11,7 +12,7 @@ import { traceImageToColoredPaths } from './trace-to-paths';
 const preparations = vi.hoisted(() => ({ count: 0 }));
 
 vi.mock('./trace-image', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./trace-image')>();
+  const actual = await importOriginal<typeof TraceImage>();
   return {
     ...actual,
     prepareTraceForContour: (...args: Parameters<typeof actual.prepareTraceForContour>) => {
