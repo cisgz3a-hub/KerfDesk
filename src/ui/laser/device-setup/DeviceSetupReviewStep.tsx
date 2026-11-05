@@ -15,6 +15,7 @@ import { DeviceSetupCncReview } from './DeviceSetupCncReview';
 import { DeviceSetupFirmwareStep } from './DeviceSetupFirmwareStep';
 import { DeviceSetupLaserModeOff } from './DeviceSetupLaserModeOff';
 import { DeviceSetupReviewSections } from './DeviceSetupReviewSections';
+import { starterGuessText } from './device-setup-starter-guesses';
 import './device-setup-review.css';
 
 export function DeviceSetupReviewStep({
@@ -35,7 +36,11 @@ export function DeviceSetupReviewStep({
   );
   return (
     <section className="lf-setup-review">
-      <SoftwareStatus issues={issues} driverSwitch={driverSwitch} />
+      <SoftwareStatus
+        issues={issues}
+        driverSwitch={driverSwitch}
+        starterGuesses={starterGuessText(state)}
+      />
       <DeviceSetupLaserModeOff state={state} dispatch={dispatch} />
       {state.machineKind === 'cnc' ? (
         <p>
@@ -83,9 +88,11 @@ function useDraftDriverSwitch(draft: DeviceSetupStepProps['state']['draft']): st
 function SoftwareStatus({
   issues,
   driverSwitch,
+  starterGuesses,
 }: {
   readonly issues: ReadonlyArray<string>;
   readonly driverSwitch: string | null;
+  readonly starterGuesses: string | null;
 }): JSX.Element {
   const ready = issues.length === 0;
   const settled = ready && driverSwitch === null;
@@ -103,6 +110,9 @@ function SoftwareStatus({
               : 'Ready to save: Save reconnects'}
         </strong>
         <p>{reviewStatusText(issues, driverSwitch)}</p>
+        {starterGuesses !== null ? (
+          <p className="lf-setup-review-starter-guesses">{starterGuesses}</p>
+        ) : null}
         {!ready ? (
           <ul>
             {issues.map((issue) => (

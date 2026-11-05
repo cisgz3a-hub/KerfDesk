@@ -20,7 +20,12 @@ import { explicitMachineKindsForProfile } from '../../../core/devices/device-pro
 // Deep import: the devices barrel is at its public-export ratchet.
 import { presetCommandSetUpdate } from '../../../core/devices/preset-command-set';
 import { fillRunwayPolicyForDevice } from '../../../core/job/fill-runway-policy';
-import { DEFAULT_CNC_MACHINE_CONFIG, type MachineKind } from '../../../core/scene';
+import {
+  DEFAULT_CNC_MACHINE_CONFIG,
+  DEFAULT_CNC_STOCK,
+  type CncStock,
+  type MachineKind,
+} from '../../../core/scene';
 import { controllerProfileForSelection } from './device-setup-controller-selection';
 import { deviceSetupSupportsMachineKind } from './device-setup-capability';
 import type { DeviceSetupAction, DeviceSetupState } from './device-setup-flow';
@@ -129,6 +134,25 @@ export function filterMachinePickerEntries(
       (kind === 'all' || entry.machineKinds.includes(kind)) &&
       (needle === '' || entrySearchText(entry).includes(needle)),
   );
+}
+
+/**
+ * A search that finds only a few rows names them, so the owner of a sibling
+ * model (a Falcon A1 or Falcon 2 when only the A1 Pro is listed) is not led to
+ * pick the nearest row and its work area (UX audit U2-P3-8).
+ */
+export function fewMatchesHint(
+  matches: ReadonlyArray<MachinePickerEntry>,
+  query: string,
+): string | null {
+  const needle = query.trim();
+  if (needle === '' || matches.length === 0 || matches.length > 3) return null;
+  const names = matches.map((entry) => entry.name);
+  const listed =
+    names.length === 1
+      ? names[0]
+      : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  return `Only ${listed} ${names.length === 1 ? 'is' : 'are'} listed for “${needle}”. For another model, choose My machine isn’t listed and connect: picking a near model can give it the wrong work area.`;
 }
 
 function entrySearchText(entry: MachinePickerEntry): string {
@@ -270,10 +294,29 @@ export function chooseMachineEntryActions(
       kind: 'edit-machine',
       machine: {
         ...state.cncDraft,
+        stock: presetStock(state.cncDraft.stock, preset),
         params: { ...params, spindleMaxRpm: preset.spindleMaxRpm },
       },
     },
   ];
+}
+
+// The default stock is sized to the 4040's 400 × 400 mm bed; on a smaller
+// preset it was a sheet larger than the machine (UX audit U2-P3-5: 400 × 400
+// on a 300 × 180 3018-PRO). An untouched default shrinks to the work area; a
+// stock the operator set stays as it is.
+function presetStock(stock: CncStock, preset: CncMachinePreset): CncStock {
+  if (
+    stock.widthMm !== DEFAULT_CNC_STOCK.widthMm ||
+    stock.heightMm !== DEFAULT_CNC_STOCK.heightMm
+  ) {
+    return stock;
+  }
+  return {
+    ...stock,
+    widthMm: Math.min(stock.widthMm, preset.bedWidthMm),
+    heightMm: Math.min(stock.heightMm, preset.bedHeightMm),
+  };
 }
 
 /**

@@ -32,6 +32,7 @@ import {
   useControllerNotice,
   type ControllerNotice,
 } from './controller-notice';
+import { PORT_OPEN_NO_ANSWER } from '../state/port-open-no-answer';
 import './ConnectionBar.css';
 
 export type ConnectionBarProps = {
@@ -46,6 +47,8 @@ export type ConnectionBarProps = {
   readonly reconnectRecommended?: boolean;
   /** A controller that answered this session has gone quiet: "Not responding" (ADR-611 A1). */
   readonly controllerWentSilent?: boolean;
+  /** The port opened but nothing has answered on it (U2-P3-3). */
+  readonly controllerNeverAnswered?: boolean;
   /** The controller stopped answering status queries: Controller info titles it so (ADR-611 Amendment 2). */
   readonly controllerStoppedResponding?: boolean;
   readonly onRetryQualification?: () => void;
@@ -83,6 +86,7 @@ export function ConnectionBar(props: Props): JSX.Element {
   const { connection } = props;
   const notice = useControllerNotice(props);
   const silent = connection.kind === 'connected' && props.controllerWentSilent === true;
+  const noAnswer = connection.kind === 'connected' && props.controllerNeverAnswered === true;
   return (
     <section
       className="lf-connection-compact"
@@ -98,12 +102,16 @@ export function ConnectionBar(props: Props): JSX.Element {
           <CompactConnectionControls
             machineName={props.machineName ?? 'Unnamed machine'}
             status={
-              silent ? 'Not responding' : connectionStatusText(connection, props.qualification)
+              silent
+                ? 'Not responding'
+                : noAnswer
+                  ? PORT_OPEN_NO_ANSWER
+                  : connectionStatusText(connection, props.qualification)
             }
             statusDot={
               <StatusDot
                 connection={connection}
-                silent={silent}
+                silent={silent || noAnswer}
                 qualifying={qualifyingPhase(connection, props.qualification) !== null}
               />
             }
