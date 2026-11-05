@@ -20,6 +20,7 @@ import {
   reportedWorkOffsetMm,
 } from '../state/infer-machine-position';
 import { isRestoredWorkOrigin } from '../state/work-origin-state';
+import { isControllerHaltedNotice } from '../state/laser-safety-notice';
 import {
   laserStatusReportFieldsOff,
   missingPositionMessage,
@@ -42,8 +43,9 @@ export function StatusDisplay({
   const controllerSettings = useLaserStore((s) => s.controllerSettings);
   const fieldsOff = laserStatusReportFieldsOff({ capabilities, controllerSettings });
   const unit = useLengthUnit();
+  const halted = useLaserStore((s) => isControllerHaltedNotice(s.safetyNotice));
   if (report === null) return unavailableStatus(variant);
-  if (variant === 'state') return <StatusState report={report} />;
+  if (variant === 'state') return <StatusState report={report} halted={halted} />;
   const pos = inferCurrentMachinePosition(report, wcoCache, reportInches);
   const wcoMm = reportedWorkOffsetMm(wcoCache, reportInches);
   const feedMmPerMin = reportedFeedMmPerMin(report, reportInches);
@@ -53,7 +55,7 @@ export function StatusDisplay({
   const customOrigin = workOriginActive || hasCustomOrigin(wcoCache);
   return (
     <div style={panelStyle}>
-      {variant !== 'details' && <StatusState report={report} />}
+      {variant !== 'details' && <StatusState report={report} halted={halted} />}
       {pos !== null ? (
         <div style={posRowStyle}>
           <strong>MPos:</strong> X {dro(pos.x, unit)} Y {dro(pos.y, unit)} Z {dro(pos.z, unit)}
@@ -90,12 +92,17 @@ function unavailableStatus(variant: 'all' | 'state' | 'details'): JSX.Element {
   return <div style={variant === 'state' ? unknownStateStyle : dimStyle}>State: —</div>;
 }
 
+// A halted firmware (Marlin kill()) answers nothing, so its last report still
+// read "Idle" under a notice saying it halted (UX audit U5-P3-6).
 function StatusState({
   report,
+  halted,
 }: {
   readonly report: NonNullable<LaserState['statusReport']>;
+  readonly halted: boolean;
 }): JSX.Element {
-  const label = report.subState === null ? report.state : `${report.state}:${report.subState}`;
+  const reported = report.subState === null ? report.state : `${report.state}:${report.subState}`;
+  const label = halted ? "Halted (press the controller's reset button)" : reported;
   return (
     <div style={stateRowStyle}>
       <strong>State:</strong> {label}

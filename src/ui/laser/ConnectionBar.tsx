@@ -34,6 +34,8 @@ import {
 } from './controller-notice';
 import { PORT_OPEN_NO_ANSWER } from '../state/port-open-no-answer';
 import './ConnectionBar.css';
+import type { ControllerAttention } from '../state/controller-attention';
+import { StatusDot } from './ConnectionStatusDot';
 
 export type ConnectionBarProps = {
   readonly connection: ConnectionState;
@@ -76,6 +78,9 @@ export type ConnectionBarProps = {
   readonly setup?: ReactNode;
   /** The Laser / CNC switch, first in the row. */
   readonly mode?: ReactNode;
+  /** The controller is in Alarm or has halted its firmware: the pill says so in
+   *  red, so an alarm raised while another tab is open shows (UX audit U5-P3-1, U5-P3-6). */
+  readonly controllerAttention?: ControllerAttention | null;
   /** The live driver is not the saved profile's (U2-P2-1): say so, offer Reconnect now. */
   readonly driverMismatch?: { readonly text: string; readonly onReconnect: () => void } | undefined;
 };
@@ -84,22 +89,30 @@ type Props = ConnectionBarProps;
 
 /** The toolbar status line. A port that never heard the controller (U2-P3-3)
  * shows as quiet as one that went silent. */
+// An alarm or a halt shows beside Connected, so it is seen from any tab (UX
+// audit U5-P3-1, U5-P3-6).
 function toolbarStatus(
   props: Props,
   silent: boolean,
+  attention: ControllerAttention | null,
 ): { readonly text: string; readonly quiet: boolean } {
   if (silent) return { text: 'Not responding', quiet: true };
   if (props.connection.kind === 'connected' && props.controllerNeverAnswered === true) {
     return { text: PORT_OPEN_NO_ANSWER, quiet: true };
   }
-  return { text: connectionStatusText(props.connection, props.qualification), quiet: false };
+  const text = connectionStatusText(props.connection, props.qualification);
+  if (attention === null || text !== connectionStatusLabel(props.connection)) {
+    return { text, quiet: false };
+  }
+  return { text: `${text} · ${attention === 'halted' ? 'Halted' : 'Alarm'}`, quiet: false };
 }
 
 export function ConnectionBar(props: Props): JSX.Element {
   const { connection } = props;
   const notice = useControllerNotice(props);
   const silent = connection.kind === 'connected' && props.controllerWentSilent === true;
-  const status = toolbarStatus(props, silent);
+  const attention = connection.kind === 'connected' ? (props.controllerAttention ?? null) : null;
+  const status = toolbarStatus(props, silent, attention);
   return (
     <section
       className="lf-connection-compact"
@@ -120,6 +133,7 @@ export function ConnectionBar(props: Props): JSX.Element {
                 connection={connection}
                 silent={status.quiet}
                 qualifying={qualifyingPhase(connection, props.qualification) !== null}
+                attention={attention}
               />
             }
             machine={props.machine}
@@ -418,42 +432,3 @@ export function autoConnectSkippedText(reason: string, machineNoun: string): str
 
 const LINUX_SERIAL_ACCESS =
   'On Linux your account also needs serial access: run sudo usermod -aG dialout $USER (on Arch, uucp instead of dialout), then log out and back in.';
-
-function StatusDot(props: {
-  readonly connection: ConnectionState;
-  readonly silent: boolean;
-  readonly qualifying: boolean;
-}): JSX.Element {
-  const color =
-    props.silent || props.qualifying
-      ? 'var(--lf-warning)'
-      : connectionStatusColor(props.connection);
-  return (
-    <span
-      aria-hidden="true"
-      style={{
-        flexShrink: 0,
-        display: 'inline-block',
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-        background: color,
-      }}
-    />
-  );
-}
-
-function connectionStatusColor(connection: ConnectionState): string {
-  switch (connection.kind) {
-    case 'connected':
-      return 'var(--lf-success)';
-    case 'connecting':
-      return 'var(--lf-warning)';
-    case 'failed':
-      return 'var(--lf-danger)';
-    case 'disconnected':
-      return 'var(--lf-text-faint)';
-    default:
-      return assertNever(connection, 'ConnectionState');
-  }
-}

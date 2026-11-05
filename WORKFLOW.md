@@ -4089,7 +4089,10 @@ again) or **Discard changes**.
    **Read again** stays available. Either card offers **Use detected** (for example **Use detected
    GRBL v1.1 in draft**). When that choice changes anything else (RX window, streaming, output
    dialect, vendor commands, baud, power range, or a scan-offset calibration it clears), the card
-   lists each change as old → new and applies them only on **Apply to draft** (ADR-375).
+   lists each change as old → new and applies them only on **Apply to draft** (ADR-375). The
+   baud the controller answered at is kept, and the card says so (`Baud stays 115200: your
+   controller answered at this speed.`), so adopting Marlin no longer swaps a working 115200 for
+   its 250000 starter (UX audit U5-P3-7).
    Ruida remains file-only. CNC readback labels `$30` as a configured S maximum. Copying it into spindle RPM requires
    **Use S maximum as spindle RPM** and a reported CNC mode; otherwise the spindle ceiling stays
    unchanged. Configured travel is not measured usable travel.
