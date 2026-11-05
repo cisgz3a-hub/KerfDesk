@@ -233,6 +233,11 @@
   font-size: 10px;
   margin: 9px 0 0;
 }
+.lf-desktop-welcome__free p.lf-desktop-welcome__first-steps {
+  color: var(--lf-text);
+  font-size: 11px;
+  margin-top: 12px;
+}
 .lf-desktop-welcome__footnote {
   border-top: 1px solid var(--lf-border);
   padding-top: 14px;

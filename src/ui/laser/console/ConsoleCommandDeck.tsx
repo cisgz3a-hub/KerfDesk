@@ -1,5 +1,6 @@
 import type { KeyboardEvent } from 'react';
 import { type ConsoleQuickCommand, type ControllerDriver } from '../../../core/controllers';
+import { checkedSubmit } from '../../kit/form-validity';
 import {
   consoleQuickCommandDisabledReason,
   type ConsoleCommandAvailabilityState,
@@ -119,10 +120,11 @@ function ConsoleCommandForm(props: {
   return (
     <form
       style={formStyle}
-      onSubmit={(event) => {
+      noValidate
+      onSubmit={checkedSubmit((event) => {
         event.preventDefault();
         if (props.sendDisabledReason === null) props.onSend();
-      }}
+      })}
     >
       <input
         aria-label="Console command"

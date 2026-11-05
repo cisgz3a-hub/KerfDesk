@@ -1,5 +1,5 @@
 import { DOMParser as WorkerDomParser } from 'linkedom/worker';
-import { parseSvgDocument, type ParseSvgResult } from './parse-svg';
+import { parseSvgDocument, SVG_EMPTY_FILE_MESSAGE, type ParseSvgResult } from './parse-svg';
 import type { SvgStripCounts } from './sanitize';
 
 const SAFE_SVG_TAGS = new Set([
@@ -40,6 +40,7 @@ export function parseSvgInWorker(args: {
   readonly id: string;
   readonly source: string;
 }): ParseSvgResult {
+  if (args.svgText.trim() === '') throw new Error(SVG_EMPTY_FILE_MESSAGE);
   const document = new WorkerDomParser().parseFromString(
     args.svgText,
     'image/svg+xml',

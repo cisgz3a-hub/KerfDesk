@@ -6,11 +6,10 @@ import {
   type VectorSceneObject,
 } from '../../core/geometry';
 import {
-  describeWeldChange,
   NOTHING_TO_WELD_MESSAGE,
   type WeldChange,
 } from '../../core/geometry/vector-path-weld-change';
-import type { Result } from '../../core/result';
+import { ok, type Result } from '../../core/result';
 import { artworkOperationName, type ImportedSvg } from '../../core/scene';
 import { useStore } from '../state';
 import { selectedObjectIds } from '../state/scene-group-actions';
@@ -24,6 +23,7 @@ import {
 import { Button, Dialog, DialogActions } from '../kit';
 import { useVectorOpPreview } from './use-vector-op-preview';
 import type { VectorOpTask } from './vector-op-worker-protocol';
+import type { WeldReview } from './vector-op-worker-runtime';
 import { VectorComparisonPreview } from './VectorComparisonPreview';
 import {
   useBooleanDialogStore,
@@ -235,30 +235,47 @@ function useBooleanPreview(session: BooleanSession, operation: BooleanPreviewOpe
             op: operation as Exclude<BooleanPreviewOperation, 'weld'>,
             id: uniqueObjectId(scene, operation),
           }
-        : { kind: 'weld', id: weld.resultId },
+        : { kind: 'weld-review', id: weld.resultId, operandCount: weld.operands.length },
     [scene, operation, weld],
   );
-  const vector = useVectorOpPreview(weld === null ? sources : weld.operands, task);
-  const settled = vector.current?.result as Result<ImportedSvg, VectorOpError> | undefined;
+  // Weld's absorbed-shapes check needs the selection as well as the operands,
+  // and runs in the worker with the union (ADR-609 Amendment 2).
+  const posted = useMemo(
+    () => (weld === null ? sources : [...weld.operands, ...sources]),
+    [weld, sources],
+  );
+  const vector = useVectorOpPreview(posted, task);
+  const reply = vector.current?.result as BooleanReply | undefined;
+  const settled = useMemo(() => replyObject(reply), [reply]);
   const result: Result<ImportedSvg | WeldSelectionPlan, VectorOpError> | undefined =
     settled === undefined || weld === null ? settled : finishWeldSelection(weld, settled);
-  const weldChange = useMemo<WeldChange | null>(
-    () =>
-      weld !== null && settled?.kind === 'ok' ? describeWeldChange(sources, settled.value) : null,
-    [weld, settled, sources],
-  );
+  const weldChange: WeldChange | null =
+    weld !== null && reply?.kind === 'ok' && 'change' in reply.value ? reply.value.change : null;
   const preview: BooleanPreviewState = {
     ...previewStatus(result, vector.unavailable, vector.failed, weldChange),
     prepared: preparedCombine(session, sources, task, result),
   };
   // The last settled result stays visible, marked as updating, while the next one runs.
-  const shown = vector.settled?.result as Result<ImportedSvg, VectorOpError> | undefined;
-  const after = useMemo(() => (shown?.kind === 'ok' ? [shown.value] : []), [shown]);
+  const shown = vector.settled?.result as BooleanReply | undefined;
+  const after = useMemo(() => {
+    const object = replyObject(shown);
+    return object?.kind === 'ok' ? [object.value] : [];
+  }, [shown]);
   const absorbed = useMemo(
     () => sources.filter((source) => weldChange?.absorbedIds.includes(source.id) === true),
     [sources, weldChange],
   );
   return { sources, preview, after, absorbed };
+}
+
+type BooleanReply = Result<ImportedSvg | WeldReview, VectorOpError>;
+
+/** The reply's result object: a Combine result as it is, a Weld review's union. */
+function replyObject(
+  reply: BooleanReply | undefined,
+): Result<ImportedSvg, VectorOpError> | undefined {
+  if (reply === undefined || reply.kind === 'error') return reply;
+  return 'change' in reply.value ? ok(reply.value.object) : ok(reply.value);
 }
 
 function previewStatus(

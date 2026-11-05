@@ -101,12 +101,12 @@ export const TOOL_HELP: Readonly<Record<ToolHelpKey, HelpTopic>> = {
   rect: {
     label: 'Draw rectangle',
     tooltip:
-      'Draw a rectangle by dragging on the workspace. Corners snap to nodes, midpoints, centres, crossings and the grid; hold Alt to place freely.',
+      'Draw a rectangle by dragging on the workspace. Hold Shift for a square, Ctrl to draw from the centre. Corners snap to nodes, midpoints, centres, crossings and the grid; hold Alt to place freely.',
   },
   ellipse: {
     label: 'Draw ellipse',
     tooltip:
-      'Draw an ellipse or circle by dragging on the workspace. The drag snaps to nodes, midpoints, centres, crossings and the grid; hold Alt to place freely.',
+      'Draw an ellipse by dragging on the workspace. Hold Shift for a circle, Ctrl to draw from the centre. The drag snaps to nodes, midpoints, centres, crossings and the grid; hold Alt to place freely.',
   },
   polygon: {
     label: 'Draw polygon',

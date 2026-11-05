@@ -206,11 +206,12 @@ describe('PreviewStatusOverlays', () => {
     };
     const host = await renderStatus(toolpath, undefined, largeRasterProject);
 
+    // Plain words first (UX audit U3-P3-5), the grid sizes after.
     expect(host.textContent).toContain(
-      'Raster display resolution reduced after output compilation',
+      'Preview shows this image at a lower resolution so it stays fast. The engraving uses full resolution, and the G-code is unchanged.',
     );
     expect(host.textContent).toContain('3,000 × 2,500');
-    expect(host.textContent).toContain('Emitted S-values and G-code are unchanged');
+    expect(host.textContent).not.toContain('output compilation');
   });
 
   it('states source and drawn counts when route display is decimated', async () => {
