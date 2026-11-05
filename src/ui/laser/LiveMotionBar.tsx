@@ -40,6 +40,7 @@ import { describeUnowned } from './live-motion-unowned';
 import { LiveMotionAnnouncer, shownForAnnouncer } from './LiveMotionAnnouncer';
 import { LiveMotionAbortButton } from './LiveMotionAbortButton';
 import { useJobStartFocus } from './use-job-start-focus';
+import { useLiveMotionInset } from './use-live-motion-inset';
 
 const MAXIMUM_STACKING_ORDER = 2_147_483_647;
 const TOOL_CHANGE_CONTINUE_TITLE =
@@ -95,6 +96,7 @@ export function LiveMotionBar(): JSX.Element | null {
   );
   const barRef = useRef<HTMLElement>(null);
   useJobStartFocus(barRef, description?.abortLabel === 'ABORT JOB');
+  useLiveMotionInset(barRef, description !== null);
   const announcer = (
     <LiveMotionAnnouncer shown={shownForAnnouncer(description)} progress={streamProgress} />
   );

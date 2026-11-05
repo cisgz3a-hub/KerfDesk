@@ -308,6 +308,15 @@ body {
   cursor: default;
 }
 
+/* Dark's faint text is its muted text (#b3aca1, 6.96:1), so a disabled button
+   read the same as the enabled one beside it (UX audit U7-P3-5). It dims to
+   3.6:1 and takes a dashed border; the hover still gives its reason. */
+:root[data-theme='dark'] .lf-btn:disabled,
+:root[data-theme='dark'] .lf-btn[aria-disabled='true'] {
+  color: #7f786e;
+  border-style: dashed;
+}
+
 /* Attention pulse — coaches the one next required step (e.g. "Set origin
    here" on a no-homing machine before a job can run). Flat colors only, per
    the performance note above: the pulse animates background/border/color
@@ -628,6 +637,10 @@ body {
   align-items: center;
   justify-content: center;
   z-index: var(--lf-z-dialog);
+  /* Above the Live Motion bar while it shows (use-live-motion-inset.ts, UX
+     audit U7-P3-2): the dialog centres in the space the bar leaves. */
+  box-sizing: border-box;
+  padding-bottom: var(--lf-live-motion-inset, 0px);
 }
 
 .lf-dialog {
@@ -641,7 +654,7 @@ body {
   gap: 10px;
   font-family: var(--lf-font);
   font-size: var(--lf-text-md);
-  max-height: 90vh;
+  max-height: calc(90vh - var(--lf-live-motion-inset, 0px));
   overflow-y: auto;
   color-scheme: var(--lf-color-scheme);
 }

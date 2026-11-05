@@ -153,7 +153,8 @@ export const warnTitleStyle: CSSProperties = {
   color: 'var(--lf-warning-fg)',
 };
 
-export const warnHintStyle: CSSProperties = { fontWeight: 400, opacity: 0.85 };
+// Full colour: at 0.85 opacity the light theme's hint fell to 4.38:1 (UX audit U7-P3-9).
+export const warnHintStyle: CSSProperties = { fontWeight: 400 };
 
 export const warnListStyle: CSSProperties = {
   listStyle: 'none',
