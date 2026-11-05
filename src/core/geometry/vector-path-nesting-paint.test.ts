@@ -2,6 +2,7 @@
 // painting skip work, but must give exactly what painting every level against
 // the whole region gave. The reference below is that painter, unchanged.
 
+import type * as Clipper from 'clipper2-ts';
 import { differenceD, FillRule, unionD, type PathD, type PathsD } from 'clipper2-ts';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { canonicalizeVectorPaths } from './vector-path-canonical';
@@ -11,7 +12,7 @@ import { paintNestedUnits, type NestedUnit } from './vector-path-nesting-paint';
 const clipperWork = vi.hoisted(() => ({ calls: 0, differences: 0, points: 0 }));
 
 vi.mock('clipper2-ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('clipper2-ts')>();
+  const actual = await importOriginal<typeof Clipper>();
   const counted =
     <A extends unknown[], R>(run: (...args: A) => R, difference: boolean) =>
     (...args: A): R => {

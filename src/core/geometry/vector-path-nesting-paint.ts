@@ -132,38 +132,10 @@ type Edge = { readonly ring: number; readonly index: number; readonly a: Point; 
  * than a hair's angle. Edges are bucketed on a grid about one edge long.
  */
 function ringsApart(rings: PathsD): boolean {
-  const edges: Edge[] = [];
-  rings.forEach((ring, index) => {
-    if (ring.length < 3) return;
-    ring.forEach((a, at) => {
-      const b = ring[(at + 1) % ring.length];
-      if (b !== undefined) edges.push({ ring: index, index: at, a, b });
-    });
-  });
+  const edges = ringEdges(rings);
   if (edges.length === 0) return true;
-  const cell = Math.max(
-    4 * APART_MM,
-    edges.reduce((sum, edge) => sum + Math.hypot(edge.b.x - edge.a.x, edge.b.y - edge.a.y), 0) /
-      edges.length,
-  );
-  const cells = new Map<string, Edge[]>();
-  let filed = 0;
-  for (const edge of edges) {
-    const minX = Math.floor((Math.min(edge.a.x, edge.b.x) - APART_MM) / cell);
-    const maxX = Math.floor((Math.max(edge.a.x, edge.b.x) + APART_MM) / cell);
-    const minY = Math.floor((Math.min(edge.a.y, edge.b.y) - APART_MM) / cell);
-    const maxY = Math.floor((Math.max(edge.a.y, edge.b.y) + APART_MM) / cell);
-    filed += (maxX - minX + 1) * (maxY - minY + 1);
-    if (filed > CELLS_PER_EDGE * edges.length) return false;
-    for (let x = minX; x <= maxX; x += 1) {
-      for (let y = minY; y <= maxY; y += 1) {
-        const key = `${x},${y}`;
-        const list = cells.get(key);
-        if (list === undefined) cells.set(key, [edge]);
-        else list.push(edge);
-      }
-    }
-  }
+  const cells = filedEdges(edges);
+  if (cells === null) return false;
   for (const list of cells.values()) {
     for (let first = 0; first < list.length; first += 1) {
       for (let second = first + 1; second < list.length; second += 1) {
@@ -176,18 +148,49 @@ function ringsApart(rings: PathsD): boolean {
   return true;
 }
 
-function edgesClear(first: Edge, second: Edge, rings: PathsD): boolean {
-  const length = rings[first.ring]?.length ?? 0;
-  if (first.ring === second.ring && length > 0) {
-    // Neighbours share a vertex: only the far ends must keep clear (no spike,
-    // no edge folded back on the last).
-    if ((first.index + 1) % length === second.index) {
-      return toSegment(second.b, first) > APART_MM && toSegment(first.a, second) > APART_MM;
-    }
-    if ((second.index + 1) % length === first.index) {
-      return toSegment(first.b, second) > APART_MM && toSegment(second.a, first) > APART_MM;
+function ringEdges(rings: PathsD): Edge[] {
+  const edges: Edge[] = [];
+  rings.forEach((ring, index) => {
+    if (ring.length < 3) return;
+    ring.forEach((a, at) => {
+      const b = ring[(at + 1) % ring.length];
+      if (b !== undefined) edges.push({ ring: index, index: at, a, b });
+    });
+  });
+  return edges;
+}
+
+// Null when the edges would fill more cells than the check is worth.
+function filedEdges(edges: ReadonlyArray<Edge>): Map<string, Edge[]> | null {
+  const length = edges.reduce(
+    (sum, edge) => sum + Math.hypot(edge.b.x - edge.a.x, edge.b.y - edge.a.y),
+    0,
+  );
+  const cell = Math.max(4 * APART_MM, length / edges.length);
+  const cells = new Map<string, Edge[]>();
+  let filed = 0;
+  for (const edge of edges) {
+    const minX = Math.floor((Math.min(edge.a.x, edge.b.x) - APART_MM) / cell);
+    const maxX = Math.floor((Math.max(edge.a.x, edge.b.x) + APART_MM) / cell);
+    const minY = Math.floor((Math.min(edge.a.y, edge.b.y) - APART_MM) / cell);
+    const maxY = Math.floor((Math.max(edge.a.y, edge.b.y) + APART_MM) / cell);
+    filed += (maxX - minX + 1) * (maxY - minY + 1);
+    if (filed > CELLS_PER_EDGE * edges.length) return null;
+    for (let x = minX; x <= maxX; x += 1) {
+      for (let y = minY; y <= maxY; y += 1) {
+        const key = `${x},${y}`;
+        const list = cells.get(key);
+        if (list === undefined) cells.set(key, [edge]);
+        else list.push(edge);
+      }
     }
   }
+  return cells;
+}
+
+function edgesClear(first: Edge, second: Edge, rings: PathsD): boolean {
+  const neighbours = neighboursClear(first, second, rings[first.ring]?.length ?? 0);
+  if (neighbours !== null) return neighbours;
   if (segmentsCross(first, second)) return false;
   return (
     toSegment(first.a, second) > APART_MM &&
@@ -195,6 +198,19 @@ function edgesClear(first: Edge, second: Edge, rings: PathsD): boolean {
     toSegment(second.a, first) > APART_MM &&
     toSegment(second.b, first) > APART_MM
   );
+}
+
+// Neighbours share a vertex: only their far ends must keep clear (no spike, no
+// edge folded back on the last). Null when the edges are not neighbours.
+function neighboursClear(first: Edge, second: Edge, length: number): boolean | null {
+  if (first.ring !== second.ring || length === 0) return null;
+  if ((first.index + 1) % length === second.index) {
+    return toSegment(second.b, first) > APART_MM && toSegment(first.a, second) > APART_MM;
+  }
+  if ((second.index + 1) % length === first.index) {
+    return toSegment(first.b, second) > APART_MM && toSegment(second.a, first) > APART_MM;
+  }
+  return null;
 }
 
 function segmentsCross(first: Edge, second: Edge): boolean {
