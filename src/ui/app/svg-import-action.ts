@@ -47,11 +47,9 @@ export async function importSvgFiles(
       reportSvgImport(file.name, result, outcome, pushToast);
     } catch (error) {
       const toast = describeImportError(file.name, error);
-      pushToast(
-        isImportCancellation(error) ? `${file.name}: import cancelled.` : toast.message,
-        isImportCancellation(error) ? 'warning' : toast.variant,
-        toast.details === undefined ? undefined : { details: toast.details },
-      );
+      if (isImportCancellation(error)) pushToast(`${file.name}: import cancelled.`, 'warning');
+      else if (toast.details === undefined) pushToast(toast.message, toast.variant);
+      else pushToast(toast.message, toast.variant, { details: toast.details });
     } finally {
       controls.dispose();
     }
