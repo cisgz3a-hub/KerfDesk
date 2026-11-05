@@ -6,7 +6,7 @@ No KNOWN item in U5–U8 carries a refuter recommendation to fix beyond its own 
 
 Status key: **already fixed (#N)** on main before this sweep; **this sweep (#N)**; **maintainer decision** (why, with a recommendation); **refuted**.
 
-**Sweep PRs:** #1580 file and crash messages (merged); #1595 controller messages; #1598 help and search (wider Ctrl+K, ADR-604 Amendment 1, the maintainer's choice of 2026-11-05); #1604 accessibility and small screens; #U8PR the LightBurn beginner path. The repository was private during the sweep, so the open PRs wait for auto-merge until the ruleset is enforced again.
+**Sweep PRs:** #1580 file and crash messages (merged); #1595 controller messages; #1598 help and search (wider Ctrl+K, ADR-604 Amendment 1, the maintainer's choice of 2026-11-05); #1604 accessibility and small screens; #1605 the LightBurn beginner path. The repository was private during the sweep, so the open PRs wait for auto-merge until the ruleset is enforced again.
 
 **Follow-ups owed:** a Worker redeploy so phones get #1604's remote-app CSS (U7-P3-8).
 
@@ -59,8 +59,8 @@ Status key: **already fixed (#N)** on main before this sweep; **this sweep (#N)*
 
 | ID | Title | Status |
 |---|---|---|
-| U8-P3-1 | No lesson takes a beginner from machine to a finished burn ("Burn your first coaster") | this sweep (#U8PR) |
-| U8-P3-2 | Material Test's Cut keeps the engraving ranges; no reading or safety text | this sweep (#U8PR): reading and safety lines, the stale lesson tip, and an opt-in **Use cut starting ranges** (100 %, 60–600 mm/min, 1–5 passes, LightBurn's advice). Maintainer decision: whether Cut should start on those ranges by default. Recommendation: yes, once a diode and a CO2 profile split them, since one default serves both today |
-| U8-P3-3 | The origin picker never says what a wrong corner does | this sweep (#U8PR) |
-| U8-P3-4 | The Speed box refuses "100 mm/s" | this sweep (#U8PR) |
+| U8-P3-1 | No lesson takes a beginner from machine to a finished burn ("Burn your first coaster") | this sweep (#1605) |
+| U8-P3-2 | Material Test's Cut keeps the engraving ranges; no reading or safety text | this sweep (#1605): reading and safety lines, the stale lesson tip, and an opt-in **Use cut starting ranges** (100 %, 60–600 mm/min, 1–5 passes, LightBurn's advice). Maintainer decision: whether Cut should start on those ranges by default. Recommendation: yes, once a diode and a CO2 profile split them, since one default serves both today |
+| U8-P3-3 | The origin picker never says what a wrong corner does | this sweep (#1605) |
+| U8-P3-4 | The Speed box refuses "100 mm/s" | this sweep (#1605) |
 | U8-P3-5 | The setup card keeps saying "Machine type set to CNC" | already fixed (#1567) |
