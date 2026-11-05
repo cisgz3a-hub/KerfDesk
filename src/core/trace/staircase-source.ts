@@ -81,7 +81,8 @@ export function isStaircaseSource(
       : prepareTraceForContour(image, { ...options, pixelScale: 1 });
   if (native.crackField === null) return false;
   const mask = inkMaskFromPrepared(native.prepared);
-  return passesStepShare(mask, sheetTones(mask, native.crackField), native.crackField);
+  const cracks = crackCount(mask);
+  return passesStepShare(mask, sheetTones(mask, native.crackField), native.crackField, cracks);
 }
 
 /** A source two-level in tones other than black and white, rewritten as its
@@ -94,17 +95,24 @@ export function cleanStaircaseSource(
   native: ContourTraceInput,
 ): { readonly image: RawImageData; readonly options: TraceOptions } | null {
   const field = native.crackField;
-  if (field === null || isCleanArt(image)) return null;
-  if ((options.cutoffLuma ?? 0) !== 0 || shouldTraceAlphaMask(image, options)) return null;
-  // Faint lines and Sketch are detectors the operator chose, each with its own
-  // reading of what is ink; they are not one cut through the luma.
-  if (options.faintLineRecovery === true || options.sketchTrace === true) return null;
+  if (field === null || refusesCleanArt(image, options)) return null;
   const mask = withRingingInk(inkMaskFromPrepared(native.prepared), field);
+  const cracks = crackCount(mask);
   const tones = [sheetTones(mask, field), crackTones(mask, field)].find((candidate) =>
-    passesStepShare(mask, candidate, field),
+    passesStepShare(mask, candidate, field, cracks),
   );
   if (tones === undefined) return null;
   return { image: cleanArt(mask, field, tones), options: { ...options, ...CLEAN_ART_OPTIONS } };
+}
+
+/** True when the source cannot trace as clean art whatever its preparation
+ *  finds, so a caller can skip preparing it for the check. */
+export function refusesCleanArt(image: RawImageData, options: TraceOptions): boolean {
+  if (isCleanArt(image)) return true;
+  if ((options.cutoffLuma ?? 0) !== 0 || shouldTraceAlphaMask(image, options)) return true;
+  // Faint lines and Sketch are detectors the operator chose, each with its own
+  // reading of what is ink; they are not one cut through the luma.
+  return options.faintLineRecovery === true || options.sketchTrace === true;
 }
 
 // A fixed cut sits close above a mid-grey ink, and a JPEG's ringing lifts that
@@ -123,8 +131,9 @@ function withRingingInk(mask: InkPlane, field: CrackSubPixelField): InkPlane {
     for (let y = 0; y < height; y += 1) {
       for (let x = 0; x < width; x += 1) {
         const p = y * width + x;
-        if (from[p] === 1 || field.lumaAt(x, y) > mid) continue;
-        if (touchesInk(from, p, x, y, mask)) next[p] = 1;
+        // Most paper touches no ink: test that before reading the field.
+        if (from[p] === 1 || !touchesInk(from, p, x, y, mask)) continue;
+        if (field.lumaAt(x, y) <= mid) next[p] = 1;
       }
     }
     ink = next;
@@ -312,34 +321,61 @@ function medianOf(levels: Uint8Array, empty: number): number {
 }
 
 // Every ink/paper crack of the mask, the image border included (off-grid
-// pixels are paper). A visit returning false stops the walk.
+// pixels are paper): from each pixel, the crack to its right, then the one
+// below it. A visit returning false stops the walk. Plain functions rather
+// than closures made per walk, as this walks every pixel of a page (perf audit
+// S5-P3-1).
 function forEachCrack(
   mask: InkPlane,
   visit: (inkX: number, inkY: number, bgX: number, bgY: number) => unknown,
 ): void {
   const { width, height } = mask;
-  const inkAt = (x: number, y: number): boolean =>
-    x >= 0 && y >= 0 && x < width && y < height && mask.ink[y * width + x] === 1;
-  const pair = (ax: number, ay: number, bx: number, by: number): unknown => {
-    const aInk = inkAt(ax, ay);
-    if (aInk === inkAt(bx, by)) return undefined;
-    return aInk ? visit(ax, ay, bx, by) : visit(bx, by, ax, ay);
-  };
   for (let y = -1; y < height; y += 1) {
     for (let x = -1; x < width; x += 1) {
-      if (pair(x, y, x + 1, y) === false || pair(x, y, x, y + 1) === false) return;
+      const here = inkAt(mask, x, y);
+      if (crack(here, inkAt(mask, x + 1, y), x, y, x + 1, y, visit) === false) return;
+      if (crack(here, inkAt(mask, x, y + 1), x, y, x, y + 1, visit) === false) return;
     }
   }
+}
+
+function inkAt(mask: InkPlane, x: number, y: number): boolean {
+  return (
+    x >= 0 && y >= 0 && x < mask.width && y < mask.height && mask.ink[y * mask.width + x] === 1
+  );
+}
+
+// Visits the crack between pixels a and b, ink side first, when they differ.
+function crack(
+  aInk: boolean,
+  bInk: boolean,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+  visit: (inkX: number, inkY: number, bgX: number, bgY: number) => unknown,
+): unknown {
+  if (aInk === bInk) return undefined;
+  return aInk ? visit(ax, ay, bx, by) : visit(bx, by, ax, ay);
+}
+
+function crackCount(mask: InkPlane): number {
+  let cracks = 0;
+  forEachCrack(mask, () => {
+    cracks += 1;
+  });
+  return cracks;
 }
 
 // True when all but the allowed share of the mask's cracks are steps between
 // their tones. Stops at the first crack past the share, so a photograph is
 // refused after a few per cent of its cracks.
-function passesStepShare(mask: InkPlane, tones: CrackTones, field: CrackSubPixelField): boolean {
-  let cracks = 0;
-  forEachCrack(mask, () => {
-    cracks += 1;
-  });
+function passesStepShare(
+  mask: InkPlane,
+  tones: CrackTones,
+  field: CrackSubPixelField,
+  cracks: number,
+): boolean {
   const allowed = STAIRCASE_MAX_MEASURED_FRACTION * cracks;
   let measured = 0;
   forEachCrack(mask, (inkX, inkY, bgX, bgY) => {

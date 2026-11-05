@@ -213,7 +213,7 @@ export async function traceImageToColoredPaths(
     return traceUpscaledImage(image, options, factor, run, edgeInput, contourInput);
   }
   // Only the upscale route resamples the median stage (ADR-436); release it.
-  contourInput = releaseMedianStage(contourInput);
+  contourInput = releaseMedianStage(contourInput ?? source.nativeInput);
   return withCanonicalTraceCurves(
     await dispatchTrace(image, options, run, edgeInput, contourInput),
   );

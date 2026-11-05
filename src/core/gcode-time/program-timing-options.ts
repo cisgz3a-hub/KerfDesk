@@ -30,6 +30,8 @@ export type ProgramTimingOptions = {
    * (ADR-525). Omit to plan with unlimited lookahead, as for a program with
    * no controller to run it. */
   readonly plannerBlocks?: number;
+  /** GRBL 1.1 or grblHAL in laser mode: rapids blend into feed moves (MotionLimits). */
+  readonly laserModeMotion?: boolean;
 };
 
 export function validTimeScale(value: number | undefined): number {
@@ -74,7 +76,37 @@ export function deviceProgramTimingOptions(
     ...(laserPowerControl === undefined ? {} : { laserPowerControl }),
     ...(controllerKind === 'ruida' ? {} : { baudRate }),
     ...(plannerBlocks === undefined ? {} : { plannerBlocks }),
+    ...laserModeTiming(device, machineKind, controllerKind),
   };
+}
+
+function laserModeTiming(
+  device: DeviceProfile,
+  machineKind: 'laser' | 'cnc',
+  controllerKind: ControllerKind,
+): Pick<ProgramTimingOptions, 'laserModeMotion'> {
+  return deviceRunsRapidsAsLaserMotion(device, machineKind, controllerKind)
+    ? { laserModeMotion: true }
+    : {};
+}
+
+/**
+ * GRBL 1.1 in laser mode passes a G0 with axis words without syncing the
+ * spindle or stopping the planner (gnea/grbl bfb67f0 gcode.c:868-929,
+ * planner.c:399-449), and grblHAL keeps that rule. A CNC job, `$32=0`, and
+ * FluidNC, Marlin, Smoothieware and Ruida keep the stop until each is checked
+ * against its own firmware (perf audit S4-P3-3, ADR-255 Amendment 3).
+ */
+export function deviceRunsRapidsAsLaserMotion(
+  device: Pick<DeviceProfile, 'laserModeEnabled' | 'controllerKind'>,
+  machineKind: 'laser' | 'cnc',
+  controllerKind: ControllerKind = device.controllerKind ?? 'grbl-v1.1',
+): boolean {
+  return (
+    machineKind === 'laser' &&
+    device.laserModeEnabled &&
+    (controllerKind === 'grbl-v1.1' || controllerKind === 'grblhal')
+  );
 }
 
 /** The device's planner size for timing (ADR-525). A profile that names no

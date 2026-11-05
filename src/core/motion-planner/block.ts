@@ -25,6 +25,11 @@ export type Block = {
   /** A non-motion command drains the planner after this move, such as M5 or
    * a coolant/power-mode transition before the following motion. */
   readonly stopAfter?: boolean;
+  /** Planned by a controller that runs G0 and G1 as one kind of motion: GRBL
+   * 1.1 or grblHAL in laser mode, where a rapid with axis words does not sync
+   * the planner (gnea/grbl gcode.c, planner.c). Such a rapid/feed junction is
+   * limited by junction deviation alone (perf audit S4-P3-3). */
+  readonly laserModeMotion?: boolean;
   // Unit direction vector in the same dimensions as distance. Planar callers
   // can omit Z; the junction calculation treats it as zero.
   readonly direction: BlockDirection;

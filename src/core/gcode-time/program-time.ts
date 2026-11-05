@@ -134,7 +134,7 @@ function walkProgramMotion(
   machineKind: ProgramTimingOptions['machineKind'],
   visit: SegmentVisit,
 ): ProgramMotionTotals {
-  const limits = sanitizeLimits(rawLimits);
+  const limits = sanitizeLimits(rawLimits, options);
   const context = motionContext(options, machineKind);
   const power = model.segPower;
   const kinematics = limits.kinematics ?? 'cartesian';

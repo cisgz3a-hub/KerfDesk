@@ -8,10 +8,16 @@ import { blockMotion, type Block } from './block';
 // sin(θ/2) is computed from the dot product without an explicit acos.
 export function junctionVelocity(prev: Block, next: Block, accel: number, jd: number): number {
   if (prev.stopAfter === true) return 0;
-  // Rapid and feed motion retain the estimator's conservative stop boundary.
-  // Laser state is not a motion boundary: G1/S0 feed travel blends through a
-  // powered G1 span exactly as the emitted continuous sweep does.
-  if (blockMotion(prev) !== blockMotion(next) && !isContinuousFeedMatchedLaserJunction(prev, next))
+  // Rapid and feed motion keep the estimator's conservative stop boundary,
+  // except where the controller runs both as laser motion (GRBL 1.1 and
+  // grblHAL with $32=1). Laser state is not a motion boundary: G1/S0 feed
+  // travel blends through a powered G1 span exactly as the emitted continuous
+  // sweep does.
+  if (
+    blockMotion(prev) !== blockMotion(next) &&
+    !isContinuousFeedMatchedLaserJunction(prev, next) &&
+    !(prev.laserModeMotion === true && next.laserModeMotion === true)
+  )
     return 0;
   const cosTheta =
     prev.direction.x * next.direction.x +
