@@ -5,14 +5,22 @@
 // through setup, and one Undo restores the draft it started from.
 
 import { selectControllerDriver } from '../../../core/controllers';
-import type { ControllerKind, DeviceProfile } from '../../../core/devices';
+import {
+  DEFAULT_DEVICE_PROFILE,
+  type ControllerKind,
+  type DeviceProfile,
+} from '../../../core/devices';
 import { setupChangeRows, type SetupChangeRow } from './device-setup-accept-detected';
 import {
   deviceSetupReducer,
   type DeviceSetupAction,
   type DeviceSetupState,
 } from './device-setup-flow';
-import { draftIsListedMachine, machinePickerEntries } from './machine-picker-entries';
+import {
+  CUSTOM_MACHINE_NAME,
+  draftIsListedMachine,
+  machinePickerEntries,
+} from './machine-picker-entries';
 
 export type DeviceSetupAutoFillSummary = {
   /** Firmware the controller's banner named, when it differed from the draft. */
@@ -145,6 +153,12 @@ export function planControllerAutoFill(
       patch: report.detected,
       ...(listed ? { keepWorkArea: true } : {}),
     });
+    // An unlisted machine filled from its controller is no longer the starter,
+    // so it stops being called "Default 400×400" beside a different bed, as the
+    // untouched starter already does when chosen (UX audit U2-P3-1).
+    if (!listed && state.draft.name === DEFAULT_DEVICE_PROFILE.name) {
+      actions.push({ kind: 'edit', patch: { name: CUSTOM_MACHINE_NAME } });
+    }
   }
   if (actions.length === 0) return null;
   return { actions, summary: { controllerKind, baudRate, values } };

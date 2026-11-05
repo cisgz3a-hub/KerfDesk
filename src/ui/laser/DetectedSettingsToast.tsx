@@ -19,6 +19,11 @@ type DetectedSettingsArgs = {
 // Amendment 2); a reload starts afresh, so the first read still confirms.
 const announcedReviews = new Map<string, string>();
 
+// One card slot: Find's adopt-reconnect reads the settings twice within a
+// second, and two identical cards stacked (UX audit U2-P3-4). A later read
+// rewrites the card and restarts its timer instead.
+export const DETECTED_SETTINGS_TOAST_KEY = 'machine-settings-detected';
+
 export function DetectedSettingsToast(): null {
   const detected = useLaserStore((s) => s.detectedSettings);
   const controllerSettings = useLaserStore((s) => s.controllerSettings);
@@ -37,7 +42,7 @@ export function DetectedSettingsToast(): null {
     if (!shouldAnnounceDetectedSettings(deviceProfileSignature(current, machineKind), args)) {
       return;
     }
-    pushToast(describeDetectedSettingsToast(args), 'info');
+    pushToast(describeDetectedSettingsToast(args), 'info', { key: DETECTED_SETTINGS_TOAST_KEY });
   }, [
     controllerSettings,
     current,

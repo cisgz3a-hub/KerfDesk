@@ -236,8 +236,9 @@ describe('machine toolbar', () => {
     await act(async () => expand.click());
 
     expect(settingsNotifications()).toEqual([notification]);
+    await act(async () => dismissToasts());
     await act(async () => completeControllerSettingsRead(124));
-    expect(settingsNotifications()).toHaveLength(2);
+    expect(settingsNotifications()).toHaveLength(1);
   });
 
   it('announces a reconnect that reads the same settings only once (ADR-611 Amendment 2)', async () => {
@@ -246,31 +247,45 @@ describe('machine toolbar', () => {
     expect(settingsNotifications()).toHaveLength(1);
     expect(settingsNotifications()[0]?.message).toContain('homing and limit settings');
 
+    // Cleared between reads: the card is one slot, so a count shows only
+    // whether a read announced (U2-P3-4).
+    await act(async () => dismissToasts());
     await act(async () => completeUnchangedSettingsRead(124, true));
-    expect(settingsNotifications()).toHaveLength(1);
+    expect(settingsNotifications()).toHaveLength(0);
 
     await act(async () => completeUnchangedSettingsRead(125, false));
-    expect(settingsNotifications()).toHaveLength(2);
+    expect(settingsNotifications()).toHaveLength(1);
   });
 
   it('announces every read that offers profile updates', async () => {
     await renderToolbarAndRail();
     await act(async () => completeControllerSettingsRead(123));
+    await act(async () => dismissToasts());
     await act(async () => completeControllerSettingsRead(124));
-    expect(settingsNotifications()).toHaveLength(2);
-    expect(settingsNotifications()[1]?.message).toContain('safe profile updates');
+    expect(settingsNotifications()).toHaveLength(1);
+    expect(settingsNotifications()[0]?.message).toContain('safe profile updates');
+  });
+
+  // UX audit U2-P3-4: Find's adopt-reconnect read the settings twice, and two
+  // identical cards stacked.
+  it('keeps one card when a second read lands while the first is shown', async () => {
+    await renderToolbarAndRail();
+    await act(async () => completeControllerSettingsRead(123));
+    await act(async () => completeControllerSettingsRead(124));
+    expect(settingsNotifications()).toHaveLength(1);
   });
 
   it('confirms the first read for each machine profile', async () => {
     await renderToolbarAndRail();
     await act(async () => completeUnchangedSettingsRead(123, true));
+    await act(async () => dismissToasts());
     await act(async () => {
       useStore
         .getState()
         .replaceDeviceProfile({ ...FALCON_A1_PRO_GRBLHAL_PROFILE, bedWidth: 400, bedHeight: 400 });
     });
     await act(async () => completeUnchangedSettingsRead(124, true));
-    expect(settingsNotifications()).toHaveLength(2);
+    expect(settingsNotifications()).toHaveLength(1);
   });
 });
 
