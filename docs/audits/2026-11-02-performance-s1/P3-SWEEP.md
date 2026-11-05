@@ -26,7 +26,7 @@
 | S5-P3-1 | Sharp traces large pages 1.7–2.6 × slower than 1.0.28 for identical paths: the clean-art check prepares the source again | within 1.1 × 1.0.28 | _this sweep_ |
 | S5-P3-2 | The cooperative fallback (no trace worker) still traces in stretches of 205–285 ms | 200 ms block | _pending_ |
 | S5-P3-3 | Pressing Trace on a 12 MP photo or 4096 page decodes the source on the UI thread: 335–342 ms block | 100 ms on commit | _this sweep_ |
-| S6-P3-1 | Outer shapes only pays the whole nesting-depth search: 100 rings 443 ms against 67 ms in 1.0.23, same output | within 1.5 × 1.0.23 | **Fixed by this sweep (#GEO)** (ADR-410 Amd 5). Depths try the deepest enclosing ring first. Engine, S6 harness, base vs fix alternating, same result hash: 100 rings 824 → 35 ms (worst 1,596 → 87), 300 rings 6,776 → 108 ms (calibration 118–126 and 84–242 ms, so about 3 × a quiet PC; 1.0.23 was 26–36 ms at 100 rings on a quiet PC, about 11 ms here when scaled) |
+| S6-P3-1 | Outer shapes only pays the whole nesting-depth search: 100 rings 443 ms against 67 ms in 1.0.23, same output | within 1.5 × 1.0.23 | **Fixed by this sweep (#1583)** (ADR-410 Amd 5). Depths try the deepest enclosing ring first. Engine, S6 harness, base vs fix alternating, same result hash: 100 rings 824 → 35 ms (worst 1,596 → 87), 300 rings 6,776 → 108 ms (calibration 118–126 and 84–242 ms, so about 3 × a quiet PC; 1.0.23 was 26–36 ms at 100 rings on a quiet PC, about 11 ms here when scaled) |
 | S6-P3-2 | Exclude folds the selection one shape at a time: 500 shapes 2.5 s, 2,000 shapes 55 s | 2,000 shapes under 5 s | **Maintainer decision** (below) |
 | S6-P3-3 | Optimize / Combine Shapes' before/after preview rebuilds every outline on the UI thread: 2,000 outlines 262–328 ms | 100 ms opening task | _this sweep_ |
 
@@ -41,7 +41,7 @@
 
 | ID | Title | Status |
 |---|---|---|
-| N3-P3-1 (S6 KNOWN) | Offset's nesting step grows with the cube of the nesting depth: 100 rings 1.5 s, 300 rings 31 s | **Fixed by this sweep (#GEO)** (ADR-410 Amd 5). When every ring keeps 4 µm clear of every other edge, a level is painted only against the rings it can change. Same result hash on every S6 fixture; a seeded test compares with the level-by-level painter on 250 scenes (1,500 run locally). Offset 100 rings 3,801 → 391 ms, Offset outlines row 3,352 → 359 ms (calibration 108–128 ms); 300 rings 78 s → 2.6 s in a smoke run (timed set below when it lands). 20 everyday shapes and 200 overlapping circles unchanged (ratios 1.04 and 1.12, inside noise) |
+| N3-P3-1 (S6 KNOWN) | Offset's nesting step grows with the cube of the nesting depth: 100 rings 1.5 s, 300 rings 31 s | **Fixed by this sweep (#1583)** (ADR-410 Amd 5). When every ring keeps 4 µm clear of every other edge, a level is painted only against the rings it can change. Same result hash on every S6 fixture; a seeded test compares with the level-by-level painter on 250 scenes (1,500 run locally). Offset 100 rings 3,801 → 391 ms, Offset outlines row 3,352 → 359 ms (calibration 108–128 ms); 300 rings 78 s → 2.6 s in a smoke run (timed set below when it lands). 20 everyday shapes and 200 overlapping circles unchanged (ratios 1.04 and 1.12, inside noise) |
 
 The other KNOWN items in S1–S6 are re-observations of P1/P2 findings fixed elsewhere (S1-P2-2, S2-P2-1/2, S3-P2-3), items owned by other audits (Q4-P2-1 trace speed against Potrace, K1-P1-1's window route, 21-P3-7), or confirmations that a fix holds (J10-P3-2, J10-P3-3, R1-P2-1).
 
