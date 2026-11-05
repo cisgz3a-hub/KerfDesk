@@ -8,6 +8,7 @@ import {
 import type { MotionLimits } from '../../core/gcode-time';
 import {
   deviceMotionLimits,
+  deviceRunsRapidsAsLaserMotion,
   devicePlannerBlocks,
 } from '../../core/gcode-time/program-timing-options';
 import { laserPowerControlForDevice, type BuildRenderModelOptions } from '../../core/gcode-view';
@@ -114,7 +115,11 @@ export function deviceInspectionContext(
   machineKind: 'laser' | 'cnc',
   controllerKind?: ControllerKind,
 ): GcodeInspectionContext {
-  const timing = deviceInspectionTiming(device, controllerKind);
+  const deviceTiming = deviceInspectionTiming(device, controllerKind);
+  // Times the program as Job Review does for this machine (perf audit S4-P3-3).
+  const timing = deviceRunsRapidsAsLaserMotion(device, machineKind, controllerKind)
+    ? { ...deviceTiming, limits: { ...deviceTiming.limits, laserModeMotion: true } }
+    : deviceTiming;
   const controller = controllerKind === undefined ? {} : { controllerKind };
   if (machineKind === 'cnc') return { machineKind: 'cnc', timing, ...controller };
   return {
