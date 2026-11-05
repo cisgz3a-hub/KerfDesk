@@ -2,8 +2,8 @@
 //
 // Wraps the App tree. When a render or commit-phase error is thrown,
 // React calls our getDerivedStateFromError and we swap in CrashScreen
-// instead of the broken subtree. The crash screen shows the error
-// message + stack and offers these actions:
+// instead of the broken subtree. The crash screen says what to do next, keeps
+// the error message + stack folded under Details, and offers these actions:
 //
 //   * ABORT, while the machine is moving or the laser on (F60/F65), which
 //     reports its own failure on the screen (rolling audit v5 J2-P2-3).
@@ -112,6 +112,9 @@ function CrashScreen(props: {
   // blocking window.prompt would suspend the renderer — fatal if the crash
   // happened mid-job, when the ack pump and Abort must stay alive (H13).
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'manual'>('idle');
+  const [save] = useState<CrashLeadSave>(() =>
+    props.crashSave === undefined ? 'unknown' : props.crashSave.isNeeded() ? 'offered' : 'saved',
+  );
 
   const handleCopy = (): void => {
     if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText !== undefined) {
@@ -128,8 +131,14 @@ function CrashScreen(props: {
     <div role="alert" style={overlayStyle}>
       <CrashHostBoundary>{props.hosts}</CrashHostBoundary>
       <h2 style={titleStyle}>Something broke</h2>
-      <p style={messageStyle}>{props.error.message || 'Unknown error'}</p>
-      <pre style={stackStyle}>{props.error.stack ?? '(no stack available)'}</pre>
+      <p style={leadStyle}>{crashLead(save)}</p>
+      <details>
+        <summary title="Show the error text and stack trace for a problem report.">
+          Details for a problem report
+        </summary>
+        <p style={messageStyle}>{props.error.message || 'Unknown error'}</p>
+        <pre style={stackStyle}>{props.error.stack ?? '(no stack available)'}</pre>
+      </details>
       <div style={actionsStyle}>
         <CrashAbortButton softwareAbort={props.softwareAbort} />
         <CrashSaveButton crashSave={props.crashSave} />
@@ -159,10 +168,23 @@ function CrashScreen(props: {
         />
       )}
       <p style={hintStyle}>
-        No data leaves your machine. The diagnostic is for your own bug report.
+        No data leaves your machine. To report this, press Copy diagnostic and paste it into an
+        email to support@kerfdesk.com.
       </p>
     </div>
   );
+}
+
+// The crash screen leads with what the beginner can do, not the stack, which
+// sits folded under Details (UX audit U5-P3-12).
+export type CrashLeadSave = 'offered' | 'saved' | 'unknown';
+
+export function crashLead(save: CrashLeadSave): string {
+  const lead = 'KerfDesk hit a problem and closed this view.';
+  if (save === 'offered')
+    return `${lead} Your design is still here: press Save project to keep it, then Try again.`;
+  if (save === 'saved') return `${lead} Your design is saved: press Try again.`;
+  return `${lead} Press Try again to bring the workspace back.`;
 }
 
 // A crash-screen host that throws renders nothing instead. Past this boundary its
@@ -296,6 +318,7 @@ const overlayStyle: React.CSSProperties = {
   zIndex: 9999,
 };
 const titleStyle: React.CSSProperties = { margin: 0, fontSize: 20, color: 'var(--lf-danger-fg)' };
+const leadStyle: React.CSSProperties = { margin: '8px 0', fontSize: 15 };
 const messageStyle: React.CSSProperties = { margin: '8px 0', fontSize: 14 };
 const stackStyle: React.CSSProperties = {
   background: 'var(--lf-bg-input)',

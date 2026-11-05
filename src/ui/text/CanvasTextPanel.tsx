@@ -6,6 +6,7 @@ import type { DialogFields } from './use-text-dialog-fields';
 import type { useCanvasTextActions } from './use-canvas-text-actions';
 import { canvasTextPanelPosition } from './canvas-text-panel-position';
 import { CanvasVariableTextFields } from './CanvasVariableTextFields';
+import { CHOOSE_FONT_TO_EDIT } from './missing-font-notice';
 import type { CanvasTextVariables } from './use-canvas-text-variables';
 
 export function CanvasTextPanel(props: {
@@ -52,12 +53,14 @@ export function CanvasTextPanel(props: {
         {props.companion && (
           <p className="lf-canvas-text-help">Type in the box beside the live lettering.</p>
         )}
-        {props.error !== null && (
-          <p role="alert" className="lf-canvas-text-error">
-            {props.error}
-          </p>
-        )}
       </div>
+      {/* Outside the scroller, just above Done: the reason Done is off must be
+          on screen, not below the panel's visible edge (UX audit U5-P3-9). */}
+      {props.error !== null && (
+        <p role="alert" className="lf-canvas-text-error">
+          {props.error}
+        </p>
+      )}
       <div className="lf-canvas-text-actions">
         <span role="status">
           {actions.saving ? 'Saving…' : props.pending ? 'Updating…' : 'Live preview'}
@@ -67,6 +70,7 @@ export function CanvasTextPanel(props: {
           variant="primary"
           onClick={() => void actions.save()}
           disabled={actions.saving || !fields.fontAvailable || !fields.pathAvailable}
+          title={fields.fontAvailable ? 'Done' : CHOOSE_FONT_TO_EDIT}
         >
           Done
         </Button>

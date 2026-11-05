@@ -5,7 +5,7 @@ import { parseSvg, type ParseSvgResult } from '../../io/svg';
 import { parseSvgOffThread } from '../import/document-import-worker-client';
 import { importByteSize, resolveImportBlob, type BlobSourceFile } from '../import/import-file-blob';
 import type { ImportOutcome } from '../state/store';
-import type { ToastVariant } from '../state/toast-store';
+import type { ToastOptions, ToastVariant } from '../state/toast-store';
 import { createImportWorkerControls, isImportCancellation } from './import-worker-controls';
 import { describeImportBedFit, type ImportBedFitUndo } from './import-bed-fit-notice';
 import { describeImportWhiteKnockout } from './import-white-knockout-notice';
@@ -21,7 +21,7 @@ import {
 export async function importSvgFiles(
   files: ReadonlyArray<BlobSourceFile>,
   importObject: (object: SceneObject, batchIndex?: number) => ImportOutcome,
-  pushToast: (message: string, variant?: ToastVariant) => void,
+  pushToast: (message: string, variant?: ToastVariant, options?: ToastOptions) => void,
   options: {
     readonly nextSuccessIndex?: () => number;
     readonly importFragment?: (fragment: SvgArtworkFragment, batchIndex?: number) => ImportOutcome;
@@ -50,6 +50,7 @@ export async function importSvgFiles(
       pushToast(
         isImportCancellation(error) ? `${file.name}: import cancelled.` : toast.message,
         isImportCancellation(error) ? 'warning' : toast.variant,
+        toast.details === undefined ? undefined : { details: toast.details },
       );
     } finally {
       controls.dispose();
