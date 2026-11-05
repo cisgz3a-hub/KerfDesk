@@ -128,7 +128,9 @@ export function sizeTile(
   return {
     label: 'Job size',
     value: formatBoundsSize(bounds),
-    detail: `${formatBoundsRange(bounds)}${motionSuffix}`,
+    // The range is the G-code's own X/Y, which beside "Machine space" and the
+    // bed positions of out-of-bed lines read as one frame (UX audit U4-P3-7).
+    detail: `G-code ${formatBoundsRange(bounds)}${motionSuffix}`,
   };
 }
 

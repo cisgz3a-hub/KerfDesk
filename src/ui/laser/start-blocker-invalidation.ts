@@ -8,6 +8,8 @@
 // refuses nothing and gates nothing (ADR-228).
 
 import { createStore } from 'zustand/vanilla';
+import { USER_ORIGIN_REQUIRED_MESSAGE, VERIFIED_ORIGIN_REQUIRED_MESSAGE } from '../job-placement';
+import { useLaserStore } from '../state/laser-store';
 import { useStore } from '../state/store';
 import { useStartBlockerStore, type BlockedAttempt } from './start-blocker-store';
 
@@ -47,4 +49,20 @@ function ensureStartBlockerInvalidationSubscription(): void {
     if (useStartBlockerStore.getState().messages.length === 0) return;
     useStartBlockerStore.getState().clear();
   });
+  // Setting the origin answers "needs a custom work origin": the banner kept
+  // asking for it after Set origin here (UX audit U4-P3-6).
+  useLaserStore.subscribe((state, previous) => {
+    if (state.workOriginActive !== true || previous.workOriginActive === true) return;
+    retireOriginRequiredBlockers();
+  });
+}
+
+const ORIGIN_REQUIRED = new Set([USER_ORIGIN_REQUIRED_MESSAGE, VERIFIED_ORIGIN_REQUIRED_MESSAGE]);
+
+function retireOriginRequiredBlockers(): void {
+  const { messages, attempt, report, clear } = useStartBlockerStore.getState();
+  const left = messages.filter((message) => !ORIGIN_REQUIRED.has(message));
+  if (left.length === messages.length) return;
+  if (left.length === 0) clear();
+  else report(left, attempt);
 }

@@ -4,6 +4,7 @@ import { formatDuration } from '../../core/job';
 import { CANVAS_MOTION_SLOT_ID } from '../common/status-bar-slots';
 import { useCameraStore } from '../state/camera-store';
 import { cncPassPosition, type CncPassPosition } from '../state/canvas-pass-progress';
+import { isTerminalCanvasLifecycle } from '../state/live-canvas-run-timing';
 import type { CanvasMotionOverlay } from './draw-canvas-motion';
 
 const ELAPSED_TICK_MS = 1_000;
@@ -245,7 +246,7 @@ function badgeMessage(
     return `Updating start markers${reason === null ? '' : ` • ${reason}`}`;
   }
   const truth = overlay.plan.capability === 'realtime' ? 'Controller-reported' : 'Planned route';
-  const state = run.controllerState ?? lifecycleLabel(run.lifecycle);
+  const state = runStateLabel(run, overlay.plan.machineKind);
   const z =
     overlay.plan.machineKind === 'cnc' && run.reportedHead !== null
       ? ` • Z ${run.reportedHead.z.toFixed(2)} mm`
@@ -259,6 +260,20 @@ function badgeMessage(
   // plan capability and accuracy reason.
   const updating = overlay.planIsCurrent === false ? 'Updating start markers • ' : '';
   return `${updating}${truth} • ${state}${elapsedBadgeText(run, nowMs)}${feedBadgeText(run)}${spindleBadgeText(overlay, run)}${z}${passBadgeText(passes)}${reason}`;
+}
+
+// A run that has ended keeps the last report it saw ("Run" after an Abort, a
+// limit alarm or a pulled cable), so the ending wins (UX audit U4-P3-3). A
+// Door hold KerfDesk's Pause asked for reads as a pause (U4-P3-1).
+function runStateLabel(
+  run: NonNullable<CanvasMotionOverlay['run']>,
+  machineKind: CanvasMotionOverlay['plan']['machineKind'],
+): string {
+  if (isTerminalCanvasLifecycle(run.lifecycle)) return lifecycleLabel(run.lifecycle);
+  if (run.controllerState === 'Door') {
+    return machineKind === 'cnc' ? 'Paused, spindle off' : 'Paused, laser off';
+  }
+  return run.controllerState ?? lifecycleLabel(run.lifecycle);
 }
 
 function lifecycleLabel(lifecycle: NonNullable<CanvasMotionOverlay['run']>['lifecycle']): string {

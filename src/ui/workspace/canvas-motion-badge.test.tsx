@@ -362,7 +362,7 @@ describe('CanvasMotionBadge status placement', () => {
 function timedOverlay(opts: {
   readonly startedAtMs: number;
   readonly endedAtMs?: number | null;
-  readonly lifecycle?: 'running' | 'finished';
+  readonly lifecycle?: 'running' | 'finished' | 'stopped' | 'disconnected';
 }): CanvasMotionOverlay {
   const plan = cncPlan();
   return {
@@ -426,6 +426,42 @@ describe('CanvasMotionBadge elapsed time (ADR-221)', () => {
       expect(probe?.getAttribute('data-elapsed-seconds')).toBeNull();
       const status = host.querySelector('[data-testid="canvas-motion-status"]');
       expect(status?.textContent).not.toMatch(/ \d+s| \d+h /);
+    } finally {
+      await unmount();
+    }
+  });
+});
+
+describe('CanvasMotionBadge run state wording', () => {
+  // UX audit U4-P3-3: after Abort, a limit alarm or a pulled cable the badge
+  // still read "Controller-reported • Run".
+  it.each([
+    ['stopped', 'Stopped'],
+    ['disconnected', 'Disconnected'],
+  ] as const)('names a %s run by its ending, not its last report', async (lifecycle, label) => {
+    const { host, unmount } = await renderBadge(
+      timedOverlay({ startedAtMs: 1_000, endedAtMs: 7_000, lifecycle }),
+    );
+    try {
+      const status = host.querySelector('[data-testid="canvas-motion-status"]');
+      expect(status?.textContent).toContain(`• ${label}`);
+      expect(status?.textContent).not.toContain('• Run');
+    } finally {
+      await unmount();
+    }
+  });
+
+  // UX audit U4-P3-1: Pause holds in the door state so the beam goes dark.
+  it('reads a Door hold as a pause with the laser off', async () => {
+    const overlay = spindleOverlay({ spindle: 0, plan: laserPlan(), lifecycle: 'paused' });
+    const { host, unmount } = await renderBadge({
+      ...overlay,
+      run: { ...overlay.run!, controllerState: 'Door' },
+    });
+    try {
+      const status = host.querySelector('[data-testid="canvas-motion-status"]');
+      expect(status?.textContent).toContain('Paused, laser off');
+      expect(status?.textContent).not.toContain('• Door');
     } finally {
       await unmount();
     }

@@ -100,7 +100,8 @@ describe('.rd export post-compile checks', () => {
     if (!result.ok) return;
     const outOfBed = result.advisories.filter((issue) => issue.code === 'out-of-bed');
     expect(outOfBed.length).toBeGreaterThan(0);
-    for (const issue of outOfBed) expect(issue.message).toBe('Layer #000000: X out of bed: 930');
+    for (const issue of outOfBed)
+      expect(issue.message).toBe('Layer #000000: X out of bed: 930 (bed position)');
   });
 
   it('reports nothing for a job inside the bed and clear of every zone', () => {

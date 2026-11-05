@@ -34,7 +34,7 @@ export const RUN_TUTORIALS: readonly Tutorial[] = [
         title: 'Complete the physical Frame',
         examplePhase: 0,
         instruction:
-          'On the real machine, choose Frame job and watch the full generated motion envelope with the tool off. Wait for Frame to complete successfully; Start stays greyed out until it does.',
+          'On the real machine, choose Frame job and watch the head move around the outside of the job with the laser off. Wait for Frame to complete successfully; Start stays greyed out until it does.',
         focus: 'Frame job',
         result:
           'A completed Frame authorises the exact prepared job and unlocks Start. An interrupted Frame does not.',

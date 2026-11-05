@@ -98,7 +98,7 @@ describe('SafetyNoticeBanner', () => {
     try {
       const alert = host.querySelector('[role="alert"]');
       expect(alert?.textContent).toContain('Homing is turned off in the controller');
-      expect(alert?.textContent).not.toContain('interrupted-job checkpoint');
+      expect(alert?.textContent).not.toContain('interrupted job is still saved');
       const open = [...host.querySelectorAll('button')].find(
         (b) => b.textContent === 'Open Machine Setup',
       );

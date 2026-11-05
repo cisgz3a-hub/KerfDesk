@@ -45,6 +45,12 @@ export function SecondPassCompletionPrompt(props: {
   // cannot answer it (ADR-341 Amendment 3).
   return (
     <Dialog title="Job complete" size="sm" initialFocus="surface" onClose={() => dismiss(runId)}>
+      {/* The facts first, then the optional second pass, then the plain way to
+          burn it again (UX audit U4-P3-8: the first "Job complete" was only
+          about a second pass). */}
+      <p>
+        <strong>The job finished and the laser is off.</strong>
+      </p>
       <p>Would you like to darken selected areas?</p>
       <p>
         Paint the parts you want to engrave again or cut deeper, erase any spill, and adjust power
@@ -52,6 +58,7 @@ export function SecondPassCompletionPrompt(props: {
       </p>
       <p>
         Until you start another job, you can also open Paint a second pass from the Machine panel.
+        To burn the same job again, choose Not now, then Run same job again from start.
       </p>
       {unarchived ? (
         <p>

@@ -24,7 +24,9 @@ for (const viewport of [
     await selectWorkspacePanel(page, 'Machine');
     await startStreamingJob(page);
 
-    await expect(page.getByText('Pause is feed hold only.', { exact: false })).toBeAttached();
+    await expect(
+      page.getByText('Pause stops the head and switches the laser off.', { exact: false }),
+    ).toBeAttached();
     await expectNoOverlap(page);
     await page.screenshot({ path: test.info().outputPath('live-job-rail.png') });
 

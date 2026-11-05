@@ -114,8 +114,8 @@ function CheckpointGuidance(): JSX.Element | null {
   if (!checkpointHeld) return null;
   return (
     <p style={guidanceStyle}>
-      This warning is separate from the interrupted-job checkpoint. Reconnecting or resetting the
-      controller does not resume the job and does not erase that checkpoint.
+      The interrupted job is still saved. Reconnecting or resetting the controller does not resume
+      it and does not erase it.
     </p>
   );
 }

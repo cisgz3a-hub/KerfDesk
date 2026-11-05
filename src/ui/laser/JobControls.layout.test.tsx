@@ -109,7 +109,7 @@ describe('JobControls action hierarchy', () => {
       expect(
         precedes(
           button(view.host, 'Start'),
-          elementContaining(view.host, 'Pause is feed hold only'),
+          elementContaining(view.host, 'Pause stops the head and switches the laser off'),
         ),
       ).toBe(true);
       const labels = [...view.host.querySelectorAll('button')].map(
