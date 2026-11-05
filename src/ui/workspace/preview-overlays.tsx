@@ -16,45 +16,11 @@ import { useUiStore, type PreviewPlaybackSpeed } from '../state/ui-store';
 import { useStore } from '../state/store';
 import { PreviewEstimateBreakdown } from './preview-estimate-breakdown';
 import { PreviewResolutionBanner } from './preview-resolution';
-import type { PreviewIssue } from './preview-status';
+import { PreviewIssueBanner } from './preview-issue-banner';
 import { RasterPreviewDisplayBanner } from './RasterPreviewDisplayBanner';
 import { RoutePreviewDisplayBanner } from './RoutePreviewDisplayBanner';
 import { previewStatusOverlayModel } from './preview-status-overlay-model';
 import { previewRouteSummary } from './preview-route-summary';
-
-function PreviewIssueBanner(props: { readonly issue: PreviewIssue | null }): JSX.Element | null {
-  if (props.issue?.kind === 'too-complex') {
-    return (
-      <div className="lf-banner lf-banner--warning" style={bannerStyle} role="status">
-        Route preview is too large to draw safely. Simplify the trace or reduce detail, then preview
-        again.
-      </div>
-    );
-  }
-  if (props.issue?.kind === 'preparing-large-job') {
-    return (
-      <div className="lf-banner" style={bannerStyle} role="status">
-        Large job: preparing the route preview in the background. It will appear here when ready —
-        Start and Save do not wait for it.
-      </div>
-    );
-  }
-  if (props.issue?.kind === 'placement-unavailable') {
-    return (
-      <div className="lf-banner lf-banner--warning" style={bannerStyle} role="status">
-        Preview unavailable: {props.issue.messages.join(' ')}
-      </div>
-    );
-  }
-  if (props.issue?.kind === 'preparation-failed') {
-    return (
-      <div className="lf-banner lf-banner--danger" style={bannerStyle} role="alert">
-        Preview unavailable: {props.issue.messages.join(' ')}
-      </div>
-    );
-  }
-  return null;
-}
 
 export function PreviewStatusOverlays(props: {
   readonly project: Project;

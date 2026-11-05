@@ -4,6 +4,7 @@ import { Icon } from '../kit/icons';
 import { jobTimeNoun } from '../machine/machine-labels';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
+import { preparationProgressSuffix } from './preparation-progress-text';
 import { CONNECT_MACHINE_FIRST } from '../state/status-unknown-message';
 import { isFramedRunCandidate } from '../state/framed-run';
 import {
@@ -244,17 +245,6 @@ export function frameControlProps(busy: boolean, state: string | undefined, conn
   };
 }
 
-// Compiler phases as the operator experiences them, not as the pipeline names
-// them. Numeric progress only arrives for jobs the compiler fans out (CNC
-// regions); every other preparation reads the phase alone, and the phase-less
-// wording covers the seconds before the first report.
-const PREPARING_PHASE_TEXT: Record<OutputCompilationProgress['phase'], string> = {
-  normalizing: 'reading shapes',
-  planning: 'planning toolpaths',
-  merging: 'merging results',
-  finalizing: 'finishing',
-};
-
 function preparingFrameStatusText(
   progress: OutputCompilationProgress | null,
   stage: FramePreparationStage,
@@ -263,10 +253,7 @@ function preparingFrameStatusText(
     stage === 'finishing'
       ? 'Frame traced — finishing the exact job before Start is authorized'
       : 'Preparing the exact job for Frame';
-  if (progress === null) return `${lead}…`;
-  const phase = PREPARING_PHASE_TEXT[progress.phase];
-  if (progress.total <= 0) return `${lead} — ${phase}…`;
-  return `${lead} — ${phase} ${progress.completed}/${progress.total}…`;
+  return `${lead}${preparationProgressSuffix(progress)}…`;
 }
 
 function frameBlockedTitle(state: string | undefined, connected: boolean): string {
