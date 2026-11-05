@@ -13,6 +13,12 @@ import { useLengthUnit } from '../state/display-units';
 import { MM_PER_INCH, type DisplayLengthUnit } from '../display-length';
 import { dimensionEntry, dimensionEntryError } from './dimension-entry';
 
+// Power and speed say what they do, not just their unit (UX audit U3-P3-1).
+export const LASER_POWER_TITLE =
+  'Power: how hard the laser fires, as a percentage of full power. More power, or a slower speed, burns darker and deeper.';
+export const LASER_SPEED_LEAD =
+  'Speed: how fast the head moves while the laser fires. Slower burns darker and deeper.';
+
 const mmPerSecFormat = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 });
 
 /** Vendor material guides often give speed in mm/s; show the same speed that way. */
@@ -106,7 +112,7 @@ export function SpeedInput(props: {
       // names; only the labels and the number box round it.
       stops={display.unit === 'mm/min' ? stops : stops.map((stop) => stop / MM_PER_INCH)}
       describe={display.describe}
-      title={`Feed rate in ${display.unit} for this layer. The slider covers this machine's usual working speeds, ${formatFeed(range.min)} to ${formatFeed(range.max)} mm/min; type any speed up to its Output max feed, ${formatFeed(maxFeed)} mm/min (Machine Setup).`}
+      title={`${LASER_SPEED_LEAD} Feed rate in ${display.unit}. The slider covers this machine's usual working speeds, ${formatFeed(range.min)} to ${formatFeed(range.max)} mm/min; type any speed up to its Output max feed, ${formatFeed(maxFeed)} mm/min (Machine Setup).`}
     />
   );
 }

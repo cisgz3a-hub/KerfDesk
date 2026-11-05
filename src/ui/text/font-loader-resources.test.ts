@@ -36,7 +36,7 @@ it('does not let a warm cache conceal missing font data in the current document'
   expect(getCachedFont(KEY, [A])).toBe(buffer);
   expect(getCachedFont(KEY, [B])).toBeNull();
   expect(getCachedFont(KEY)).toBeNull();
-  await expect(loadFont(KEY, [])).rejects.toThrow('not available');
+  await expect(loadFont(KEY, [])).rejects.toThrow("isn't on this computer");
 });
 
 it('preserves the bundled font cache', async () => {
@@ -92,7 +92,7 @@ it('removes an obsolete CSS face and invalidates pending loads when the font is 
   await installed;
   const pending = ensureFontCss(KEY, [B]);
   await Promise.resolve();
-  await expect(ensureFontCss(KEY, [])).rejects.toThrow('not available');
+  await expect(ensureFontCss(KEY, [])).rejects.toThrow("isn't on this computer");
   expect(css.remove).toHaveBeenCalledWith(css.faces[0]);
   css.faces[1]!.finish();
   await pending;

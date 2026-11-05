@@ -2,7 +2,13 @@ import type { Layer, LayerOperationSettings } from '../../core/scene';
 import { useStore } from '../state';
 import { FeedCeilingNotice, useFeedCeiling } from './feed-ceiling';
 import { scanLineOverscanNote } from './fill-overscan-fallback';
-import { clamp, numericValue, SpeedInput, targetAriaContext } from './LayerSpeedInput';
+import {
+  clamp,
+  LASER_POWER_TITLE,
+  numericValue,
+  SpeedInput,
+  targetAriaContext,
+} from './LayerSpeedInput';
 import { LayerImageFields } from './LayerImageFields';
 import { mixedCheckboxProps, useMixedOperationNumber } from './mixed-operation-input';
 import type { MixedOperationFields } from './selected-operation-mixed';
@@ -350,7 +356,7 @@ function PowerInput(props: {
       parse={(s) => clamp(numericValue(s, operationTarget.settings.power), 0, 100)}
       min={0}
       max={100}
-      title="Laser power percentage for this layer."
+      title={LASER_POWER_TITLE}
     />
   );
 }

@@ -12,6 +12,7 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import type { TabLayoutMode } from '../../core/scene/layer';
+import { formProblemReported } from '../kit/form-validity';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { controlStyle, Field, NumberInput } from './CutSettingsInputs';
@@ -171,7 +172,7 @@ function PlacedTabControls(props: {
           }
           onClick={(event) => {
             const form = event.currentTarget.form;
-            if (form !== null && !form.reportValidity()) return;
+            if (form !== null && formProblemReported(form)) return;
             setToolMode({ kind: 'laser-tabs', layerColor: tabColor, operationId: layer.id });
             fitToSelection();
             form?.requestSubmit();

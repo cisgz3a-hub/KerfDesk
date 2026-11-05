@@ -140,6 +140,8 @@ export function shortcutFamilies(
         { keys: '+/-', action: 'zoom' },
         { keys: 'P', action: 'preview' },
         { keys: 'Alt+W', action: 'filled or wireframe view' },
+        // ADR-620's colour peek was documented only in code (UX audit U3-P3-3).
+        { keys: 'Alt (hold)', action: 'show every object in its operation colour' },
         { keys: 'Space or right-drag', action: 'pan' },
       ],
     },

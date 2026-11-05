@@ -9,13 +9,18 @@ import type { MarkLoadedOptions } from '../state/store-save-tracking-actions';
 import type { ToastVariant } from '../state/toast-store';
 import { describePendingProProject } from '../state/pending-pro-project';
 import { pushProjectLoadNotices } from '../state/project-load-notices';
+import { missingFontOpenNotice } from '../text/missing-font-notice';
 import { clearAutosaveAfterFileHandoff } from './autosave-file-cleanup';
-import { describeOpenResult } from './file-action-formatters';
+import { projectOpenFailure } from './file-action-formatters';
 
 export type ProjectOpenCompletionContext = {
   readonly setProject: (project: Project) => ProjectMachineCapabilityLoadResult;
   readonly markLoaded: (filename: string, options?: MarkLoadedOptions) => void;
-  readonly pushToast: (message: string, variant?: ToastVariant) => void;
+  readonly pushToast: (
+    message: string,
+    variant?: ToastVariant,
+    options?: { readonly details?: ReadonlyArray<string> },
+  ) => void;
 };
 
 /** Where Save writes a KerfDesk project opened from `ref` (ADR-550), when the
@@ -51,6 +56,8 @@ export function completeNativeProjectOpen(
       result.migratedFrom === undefined ? 'success' : 'info',
     );
     pushProjectLoadNotices(result, ctx.pushToast, { migration: false });
+    const missingFonts = missingFontOpenNotice(result.project);
+    if (missingFonts !== null) ctx.pushToast(missingFonts, 'warning');
     reportMachineCapabilityRepair(loadResult, ctx.pushToast);
     return true;
   }
@@ -60,7 +67,8 @@ export function completeNativeProjectOpen(
     );
     return false;
   }
-  ctx.pushToast(`Could not open ${fileName}: ${describeOpenResult(result)}`, 'error');
+  const failure = projectOpenFailure(fileName, result);
+  ctx.pushToast(failure.message, 'error', { details: failure.details });
   return false;
 }
 

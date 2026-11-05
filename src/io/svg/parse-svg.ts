@@ -352,7 +352,11 @@ function walkReferencedDefinition(
   if (content !== null) walkChildren(el, content, context, depth);
 }
 
+/** Thrown for an empty SVG file; the import toast words it (UX audit U5-P3-10). */
+export const SVG_EMPTY_FILE_MESSAGE = 'SVG file is empty';
+
 export function parseSvg(args: { svgText: string; id: string; source: string }): ParseSvgResult {
+  if (args.svgText.trim() === '') throw new Error(SVG_EMPTY_FILE_MESSAGE);
   // DOMPurify parses as HTML, which cannot read a DOCTYPE's internal subset.
   const { clean, stripped } = sanitizeSvg(expandInternalSubset(args.svgText));
 

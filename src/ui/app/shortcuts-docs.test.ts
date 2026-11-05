@@ -53,4 +53,11 @@ describe('Shortcuts dialog completeness (UI-07)', () => {
     expect(keys).toContain('Alt+T');
     expect(workflow).toContain('`Alt+T` - Trace Image');
   });
+
+  it('lists the Alt colour peek (UX audit U3-P3-3)', () => {
+    const rows = shortcutFamilies('laser').flatMap((family) => family.rows);
+    expect(rows.find((row) => row.keys === 'Alt (hold)')?.action).toBe(
+      'show every object in its operation colour',
+    );
+  });
 });

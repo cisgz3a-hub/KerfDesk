@@ -391,7 +391,11 @@ describe('file actions contextual failure handling', () => {
     ).resolves.toBe('error');
 
     expect(toast.messages).toEqual([
-      { message: 'Could not save project: disk full', variant: 'error' },
+      {
+        message:
+          'Could not save project: disk full. Your design is still open and nothing was lost. Try File > Save As to choose another place.',
+        variant: 'error',
+      },
     ]);
   });
 });

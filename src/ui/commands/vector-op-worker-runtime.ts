@@ -16,6 +16,7 @@ import {
   type CutShapesPlan,
 } from '../../core/geometry/cut-shapes';
 import { offsetShapes, type OffsetShapesResult } from '../../core/geometry/offset-shapes';
+import { describeWeldChange, type WeldChange } from '../../core/geometry/vector-path-weld-change';
 import { err, ok, type Result } from '../../core/result';
 import type { ImportedSvg } from '../../core/scene';
 import {
@@ -25,10 +26,14 @@ import {
 } from './vector-op-result-transfer';
 import type { VectorOpResponse, VectorOpTask } from './vector-op-worker-protocol';
 
+/** A Weld preview: the union, and what it changes against the selection. */
+export type WeldReview = { readonly object: ImportedSvg; readonly change: WeldChange };
+
 type VectorOpTaskResults = {
   readonly 'offset-shapes': Result<OffsetShapesResult, VectorOpError>;
   readonly combine: Result<ImportedSvg, VectorOpError>;
   readonly weld: Result<ImportedSvg, VectorOpError>;
+  readonly 'weld-review': Result<WeldReview, VectorOpError>;
   readonly 'offset-paths': Result<ImportedSvg, VectorOpError>;
   readonly 'cut-shapes': Result<CutShapesPlan, CutShapesError>;
 };
@@ -54,11 +59,27 @@ function runTask(sources: ReadonlyArray<VectorSceneObject>, task: VectorOpTask):
       return combineVectorObjects(sources, task.op, task.id);
     case 'weld':
       return weldVectorObjects(sources, task.id);
+    case 'weld-review':
+      return reviewWeld(sources, task.id, task.operandCount);
     case 'offset-paths':
       return offsetVectorObjects(sources, task.deltaMm, task.id);
     case 'cut-shapes':
       return planCutShapes(sources, new Set(task.usedIds));
   }
+}
+
+// The absorbed-shapes check runs clipper once per neighbouring shape: seconds
+// at 2,000 shapes, so it belongs here rather than on the UI thread
+// (performance audit S6-P2-1).
+function reviewWeld(
+  sources: ReadonlyArray<VectorSceneObject>,
+  id: string,
+  operandCount: number,
+): Result<WeldReview, VectorOpError> {
+  const welded = weldVectorObjects(sources.slice(0, operandCount), id);
+  if (welded.kind === 'error') return welded;
+  const change = describeWeldChange(sources.slice(operandCount), welded.value);
+  return ok({ object: welded.value, change });
 }
 
 /** Runs a task and encodes its result for the reply, with the buffers to transfer. */
@@ -80,6 +101,10 @@ export function vectorOpResponse(
     const objects = value.cuts.flatMap((entry) => entry.pieces.map(pack));
     return { response: { id, kind: 'objects', objects, cut }, transfer };
   }
+  if ('change' in value) {
+    const objects = [pack(value.object)];
+    return { response: { id, kind: 'objects', objects, weldChange: value.change }, transfer };
+  }
   const objects = 'kind' in value ? [pack(value)] : [pack(value.outward), pack(value.inward)];
   return { response: { id, kind: 'objects', objects }, transfer };
 }
@@ -97,6 +122,13 @@ export function vectorOpResult<T extends VectorOpTask>(
     return ok({ outward: objects[0] ?? null, inward: objects[1] ?? null }) as VectorOpResultFor<T>;
   }
   if (task.kind === 'cut-shapes') return ok(cutPlan(response, objects)) as VectorOpResultFor<T>;
+  if (task.kind === 'weld-review') {
+    if (response.weldChange === undefined) {
+      throw new Error('The vector worker reply has no weld change.');
+    }
+    const review: WeldReview = { object: required(objects[0]), change: response.weldChange };
+    return ok(review) as VectorOpResultFor<T>;
+  }
   return ok(required(objects[0])) as VectorOpResultFor<T>;
 }
 

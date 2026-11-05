@@ -6,12 +6,13 @@
 // messaging — and so this logic is unit-testable without React.
 
 import { KNOCKOUT_WHITE, type WhiteKnockout } from '../../core/geometry/white-fill-knockout';
-import type { ParseSvgResult } from '../../io/svg';
+import { SVG_EMPTY_FILE_MESSAGE, type ParseSvgResult } from '../../io/svg';
 import type { ImportOutcome } from '../state/store';
 
 export type ToastDescriptor = {
   readonly message: string;
   readonly variant: 'info' | 'success' | 'warning' | 'error';
+  readonly details?: ReadonlyArray<string>;
 };
 
 export function describeImportResult(
@@ -70,6 +71,20 @@ export function describeSvgPresentationWarnings(
 
 export function describeImportError(filename: string, err: unknown): ToastDescriptor {
   const reason = err instanceof Error ? err.message : String(err);
+  // The XML parser's words ("1:134: unexpected close tag") give a beginner no
+  // next step, so a broken or empty SVG says what to do and keeps the parser's
+  // text under the toast's details (UX audit U5-P3-10). The text crosses the
+  // import worker as a string, so it is matched here rather than by type.
+  if (reason === SVG_EMPTY_FILE_MESSAGE) {
+    return { message: `${filename} is empty, so nothing was imported.`, variant: 'error' };
+  }
+  if (reason.startsWith('SVG parse error:')) {
+    return {
+      message: `${filename} isn't a complete SVG file (it is damaged or was cut off), so nothing was imported. Export it again from your design program, or save it as plain SVG.`,
+      variant: 'error',
+      details: [reason],
+    };
+  }
   return {
     message: `Could not import ${filename}: ${reason}`,
     variant: 'error',
