@@ -9,8 +9,6 @@
 // preview shows what burns, not what is merely visible.
 
 import type { DeviceProfile } from '../../core/devices';
-import type { RasterGroup } from '../../core/job';
-import { compileRasterGroupsForLayer } from '../../core/job/compile-job-raster';
 import { rasterScanBounds } from '../../core/job/raster-bounds';
 import { rasterPassThroughDimensions } from '../../core/job/raster-pass-through-grid';
 import { pixelExtentForMm } from '../../core/raster';
@@ -36,7 +34,9 @@ import { IndexedDbPagedAssetRepository } from '../import/paged-asset-indexeddb';
 // to a fresh instance leaked an open connection on every preview cache miss.
 const previewAssetRepository = new IndexedDbPagedAssetRepository();
 import { hydratePagedRasterImage } from '../import/paged-raster-hydration';
-import { compiledRasterPreview, displayDimensions } from './compiled-raster-preview';
+import { displayDimensions } from './compiled-raster-preview';
+import type { RasterPreviewBitmap } from './raster-preview-bitmap';
+import { buildRasterPreviewBitmap } from './raster-preview-worker-client';
 import { drawMachineRasterBitmap } from './draw-raster-preview-bitmap';
 import {
   lookupPreviewCanvas,
@@ -189,17 +189,21 @@ function schedulePreviewCanvasBuild(
     let cancelled = false;
     let ownBuild: PendingPreviewBuild | undefined;
     let completedSynchronously = false;
+    let stopBuild = (): void => undefined;
     const cancel = scheduleBuild(() => {
       if (cancelled) return;
-      clearPendingBuild(obj, key, ownBuild);
-      const canvas = buildPreviewCanvas(obj, layer, device, sceneObjects);
-      storePreviewCanvas(obj, key, canvas);
-      if (canvas !== null) options.onRasterPreviewReady?.();
-      completedSynchronously = true;
+      stopBuild = buildPreviewCanvas(obj, layer, device, sceneObjects, (canvas) => {
+        if (cancelled) return;
+        clearPendingBuild(obj, key, ownBuild);
+        storePreviewCanvas(obj, key, canvas);
+        if (canvas !== null) options.onRasterPreviewReady?.();
+        completedSynchronously = true;
+      });
     });
     if (!completedSynchronously)
       ownBuild = setPendingBuild(obj, key, () => {
         cancelled = true;
+        stopBuild();
         cancel();
       });
     return;
@@ -209,15 +213,23 @@ function schedulePreviewCanvasBuild(
   // below only settles in a later microtask, so the entry is always registered
   // by the time the chain reads it.
   let ownBuild: PendingPreviewBuild | undefined = undefined;
+  let stopBuild = (): void => undefined;
   const controller = new AbortController();
   const cancel = scheduleBuild(() => {
     void hydratePagedRasterImage(obj, previewAssetRepository, controller.signal)
-      .then((hydrated) => {
-        if (cancelled) return;
-        const canvas = buildPreviewCanvas(hydrated, layer, device, sceneObjects);
-        storePreviewCanvas(obj, key, canvas);
-        if (canvas !== null) options.onRasterPreviewReady?.();
-      })
+      .then(
+        (hydrated) =>
+          new Promise<void>((settled) => {
+            if (cancelled) return settled();
+            stopBuild = buildPreviewCanvas(hydrated, layer, device, sceneObjects, (canvas) => {
+              if (!cancelled) {
+                storePreviewCanvas(obj, key, canvas);
+                if (canvas !== null) options.onRasterPreviewReady?.();
+              }
+              settled();
+            });
+          }),
+      )
       .catch((error: unknown) => {
         if (!cancelled) console.error('Raster preview asset hydration failed.', error);
       })
@@ -229,6 +241,7 @@ function schedulePreviewCanvasBuild(
   ownBuild = setPendingBuild(obj, key, () => {
     cancelled = true;
     controller.abort();
+    stopBuild();
     cancel();
   });
 }
@@ -267,16 +280,21 @@ function clearPendingBuild(
   if (builds.size === 0) pendingPreviewBuilds.delete(obj.id);
 }
 
+// The bitmap is compiled in a worker where one can run (perf audit S4-P3-1),
+// so `done` may report after this returns; the returned function stops it.
 function buildPreviewCanvas(
   obj: RasterImage,
   layer: Layer,
   device: DeviceProfile,
   sceneObjects: ReadonlyArray<SceneObject>,
-): HTMLCanvasElement | null {
-  const compilation = compileRasterGroupsForLayer([obj], layer, device, { sceneObjects });
-  const group: RasterGroup | undefined = compilation.groups[0];
-  if (group === undefined) return null;
-  const bitmap = compiledRasterPreview(group, device);
+  done: (canvas: HTMLCanvasElement | null) => void,
+): () => void {
+  return buildRasterPreviewBitmap(obj, layer, device, sceneObjects, (bitmap) =>
+    done(bitmap === null ? null : canvasFromBitmap(bitmap)),
+  );
+}
+
+function canvasFromBitmap(bitmap: RasterPreviewBitmap): HTMLCanvasElement | null {
   const canvas = document.createElement('canvas');
   canvas.width = bitmap.width;
   canvas.height = bitmap.height;

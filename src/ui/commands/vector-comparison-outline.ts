@@ -13,7 +13,7 @@ import {
   flattenColoredPathCurvesForTransform,
 } from '../../core/scene/curve-path';
 import { applyTransform } from '../../core/scene/transform';
-import type { Vec2 } from '../../core/scene';
+import type { Polyline, Transform, Vec2 } from '../../core/scene';
 
 /** Steps across the selection's longer side. */
 const OUTLINE_STEPS = 1000;
@@ -37,29 +37,38 @@ export function comparisonOutline(objects: ReadonlyArray<VectorSceneObject>): Co
       });
       if (flattened.kind !== 'ok') continue;
       for (const polyline of flattened.polylines) {
-        const { points } = polyline;
-        let drawn: Vec2 | null = null;
-        for (let index = 0; index < points.length; index += 1) {
-          const point = points[index];
-          if (point === undefined || !Number.isFinite(point.x) || !Number.isFinite(point.y)) {
-            continue;
-          }
-          const far =
-            drawn === null || Math.hypot(point.x - drawn.x, point.y - drawn.y) >= localStep;
-          if (!far && index !== points.length - 1) continue;
-          const world = applyTransform(point, transform);
-          parts.push(`${drawn === null ? 'M' : 'L'}${rounded(world.x)} ${rounded(world.y)}`);
-          drawn = point;
-          box.minX = Math.min(box.minX, world.x);
-          box.minY = Math.min(box.minY, world.y);
-          box.maxX = Math.max(box.maxX, world.x);
-          box.maxY = Math.max(box.maxY, world.y);
-        }
-        if (drawn !== null && polyline.closed) parts.push('Z');
+        drawPolyline(polyline, transform, localStep, parts, box);
       }
     }
   }
   return { d: parts.join(''), bounds: box.minX <= box.maxX ? box : null };
+}
+
+// Points closer than `localStep` (object space) to the last one drawn are
+// skipped, except a polyline's last point.
+function drawPolyline(
+  polyline: Polyline,
+  transform: Transform,
+  localStep: number,
+  parts: string[],
+  box: Box,
+): void {
+  const { points } = polyline;
+  let drawn: Vec2 | null = null;
+  for (let index = 0; index < points.length; index += 1) {
+    const point = points[index];
+    if (point === undefined || !Number.isFinite(point.x) || !Number.isFinite(point.y)) continue;
+    const far = drawn === null || Math.hypot(point.x - drawn.x, point.y - drawn.y) >= localStep;
+    if (!far && index !== points.length - 1) continue;
+    const world = applyTransform(point, transform);
+    parts.push(`${drawn === null ? 'M' : 'L'}${rounded(world.x)} ${rounded(world.y)}`);
+    drawn = point;
+    box.minX = Math.min(box.minX, world.x);
+    box.minY = Math.min(box.minY, world.y);
+    box.maxX = Math.max(box.maxX, world.x);
+    box.maxY = Math.max(box.maxY, world.y);
+  }
+  if (drawn !== null && polyline.closed) parts.push('Z');
 }
 
 // A thousandth of the longer side of the selection's box, taken from each
