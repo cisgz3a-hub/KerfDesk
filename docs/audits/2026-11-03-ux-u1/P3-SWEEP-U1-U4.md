@@ -28,7 +28,7 @@ U1 KNOWN with a refuter fix request: "Can't connect?" ends in a repository path 
 |---|---|---|
 | U2-P3-1 | An unlisted machine filled from its controller is saved as "Default 400×400" with a different bed | Fixed by this sweep (#1588): the fill renames the starter to "My machine". |
 | U2-P3-2 | Review says "Ready to save … internally consistent" for starter guesses | Fixed by this sweep (#1588): Review names an untouched starter work area or power scale (and a firmware starter's bed) as starter guesses; Save stays enabled. |
-| U2-P3-3 | Toolbar and sidebar say "Connected" while setup says "Your machine didn't answer" | Fixed by this sweep (#1588): "Port open, no answer" in the sidebar and Machine Setup. The toolbar says "No answer" (#1599, open), because the long form widened the connection row when the recovery card opened (ADR-642). |
+| U2-P3-3 | Toolbar and sidebar say "Connected" while setup says "Your machine didn't answer" | Fixed by this sweep (#1588): "Port open, no answer" in the sidebar and Machine Setup. The toolbar says "No answer" (#1599), because the long form widened the connection row when the recovery card opened (ADR-642). |
 | U2-P3-4 | Duplicate toasts with controller jargon; Marlin speaks GRBL | Jargon already fixed (#1559). Duplicate fixed by this sweep (#1588): the settings-read card is one keyed slot. |
 | U2-P3-5 | 3018-PRO preset: stock 400 × 400 on a 300 × 180 machine; Frame feed 6000 above the 1000 output max | Stock fixed by this sweep (#1588): an untouched default stock shrinks to the preset's work area. **Maintainer decision** on the Frame feed: Frame is capped only by the controller's live `$110`/`$111`, not by the profile maximum, so lowering it changes real Frame motion. Recommendation: cap a CNC preset's Frame feed at its output maximum when the preset is applied. |
 | U2-P3-6 | Connection help ends with a repo path, is a native alert, unreachable in Machine Setup | Already fixed (#1559): in-app dialog, published link, **Can't connect?** in the setup strip. |
@@ -68,4 +68,4 @@ U2 KNOWN raised to P2 (empty port picker, web): already fixed (#1559).
 
 34 P3s (including the two refuter-lowered P2s): 10 already fixed by #1554, #1559, #1561 and #1566; 21 fixed in whole or in part by this sweep; 2 owned by the U5–U8 sweep; 1 left only as a decision (U1-P3-1). Maintainer decisions: 6 (U1-P3-1, the MCP label, the 3018 Frame feed, the power ÷ speed notice, the image aspect-lock default, operation names by role).
 
-Merge status (2026-11-06): #1581 and #1588 are merged. #1609, #1599 and #1595 are open, because GitHub Actions can't start jobs at the moment. Each was checked locally with its related unit and e2e specs.
+Merge status (2026-11-06): #1581, #1588 and #1599 are merged. #1609 and #1595 are open, with auto-merge on, waiting for GitHub Actions to start jobs again. Each was checked locally with its related unit and e2e specs.
