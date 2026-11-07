@@ -9,7 +9,8 @@ Method: [../2026-10-21-rolling-v2/METHOD.md](../2026-10-21-rolling-v2/METHOD.md)
 | V3 | Fix: controller (#1558, #1559, #1567, #1568, #1569, #1595, #1599) | origin/main @ 5f09e1110 (refuter 5f09e1110; simulated GRBL in Vitest, browser gate never met) | [V3-fix-controller.md](V3-fix-controller.md) | 5 | 0 | 0 | 2 | 3 | 1 |
 | V4 | Fix: canvas and geometry (#1551, #1552, #1593, #1582, #1583) | origin/main @ 5f09e1110 (refuter 5f09e1110; Node only, Vitest and browser gates rarely met) | [V4-fix-canvas-geometry.md](V4-fix-canvas-geometry.md) | 2 | 0 | 0 | 0 | 2 | 1 |
 | V5 | Fix: photo, Image Studio and Trace (#1555, #1557, #1578, #1586, #1587, #1594) | origin/main @ 5f09e1110 (refuter 5f09e1110; Node only, browser gate never met) | [V5-fix-photo-image-trace.md](V5-fix-photo-image-trace.md) | 3 | 0 | 0 | 0 | 3 | 0 |
-| **Total so far** | | | | **17** | **0** | **3** | **2** | **12** | **4** |
+| V6 | Fix: text and CNC (#1589, #1590, #1591, #1602, #1603) | origin/main @ 5f09e1110 (refuter 5f09e1110; 50 e2e in Chrome by the auditor) | [V6-fix-text-cnc.md](V6-fix-text-cnc.md) | 3 | 0 | 0 | 0 | 3 | 1 |
+| **Total so far** | | | | **20** | **0** | **3** | **2** | **15** | **5** |
 
 ## Confirmed P1/P2 (coordinator-verified)
 
