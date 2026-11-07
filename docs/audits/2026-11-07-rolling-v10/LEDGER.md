@@ -7,7 +7,8 @@ Method: [../2026-10-21-rolling-v2/METHOD.md](../2026-10-21-rolling-v2/METHOD.md)
 | V1 | Fix: job pipeline (#1575, #1574, #1572, #1576, #1562, #1565, #1585) | origin/main @ 5f09e1110 (refuter 5f09e1110; Node only, browser gate never met) | [V1-fix-job-pipeline.md](V1-fix-job-pipeline.md) | 4 | 0 | 1 (found by refuter) | 0 | 3 | 2 |
 | V2 | Returning user: 1.0.29, 1.0.28 and older projects on main | origin/main @ 5f09e1110 (refuter 5f09e1110; Node only, browser gate never met) | [V2-returning-user.md](V2-returning-user.md) | 3 | 0 | 2 (refuter) | 0 | 1 | 0 |
 | V3 | Fix: controller (#1558, #1559, #1567, #1568, #1569, #1595, #1599) | origin/main @ 5f09e1110 (refuter 5f09e1110; simulated GRBL in Vitest, browser gate never met) | [V3-fix-controller.md](V3-fix-controller.md) | 5 | 0 | 0 | 2 | 3 | 1 |
-| **Total so far** | | | | **12** | **0** | **3** | **2** | **7** | **3** |
+| V4 | Fix: canvas and geometry (#1551, #1552, #1593, #1582, #1583) | origin/main @ 5f09e1110 (refuter 5f09e1110; Node only, Vitest and browser gates rarely met) | [V4-fix-canvas-geometry.md](V4-fix-canvas-geometry.md) | 2 | 0 | 0 | 0 | 2 | 1 |
+| **Total so far** | | | | **14** | **0** | **3** | **2** | **9** | **4** |
 
 ## Confirmed P1/P2 (coordinator-verified)
 
