@@ -30,5 +30,4 @@ Emitter revision: `heightmap-pixel-surface-20261108-v42`.
 ## Next loop
 
 The 3D development list in [L6](L6-cnc-3d.md) (relief raster angle first), F6-P3-1's rest budget,
-then a second pass over the areas this round found clean, with new inputs
-generators.
+then a second pass over the areas this round found clean, with new inputs.
