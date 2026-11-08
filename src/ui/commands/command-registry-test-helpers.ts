@@ -43,6 +43,7 @@ export function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandC
 // ADR-410 (LightBurn gap batch 3) editing tools.
 function baseCtxEditingTools(): Partial<AppCommandContext> {
   return {
+    leaveWhiteUnburned: vi.fn(),
     pasteInPlace: vi.fn(),
     invertSelection: vi.fn(),
     selectOpenShapes: vi.fn(),
@@ -128,6 +129,7 @@ function baseCtxFlags(): Partial<AppCommandContext> {
     canCombineSelection: false,
     hasFillableSelection: false,
     canCloseOpenFillContours: false,
+    canLeaveWhiteUnburned: false,
     canReviewCloseOpenFillContours: false,
     canApplyImageMask: false,
     hasMaskedRasterSelection: false,

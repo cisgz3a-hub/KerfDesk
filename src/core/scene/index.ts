@@ -73,6 +73,7 @@ export type {
   SceneObject,
   ShapeObject,
   ShapeSpec,
+  WhiteInk,
   TextAlignment,
   TextObject,
   TracedImage,

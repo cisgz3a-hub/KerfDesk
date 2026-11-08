@@ -215,6 +215,11 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'tools',
     tooltip: 'Review selected open Fill contours before closing a larger endpoint gap.',
   },
+  'tools.leave-white-unburned': {
+    family: 'tools',
+    tooltip:
+      'Cut solid white SVG shapes out of the fills under them and leave them unburned, as a new import does. One undo step.',
+  },
   'arrange.align-left': {
     family: 'arrange',
     tooltip: 'Align selected objects to the reference left edge.',

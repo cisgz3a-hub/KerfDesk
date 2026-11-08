@@ -5,11 +5,15 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { toMachineCoords } from '../../core/devices';
-import { compileJob } from '../../core/job/compile-job';
-import { applyTransform, type Project, type SceneObject, type Vec2 } from '../../core/scene';
+import { applyTransform, type Project } from '../../core/scene';
 import { emitGcode } from '../../io/gcode/emit-gcode';
+import {
+  burnInside,
+  burnLength,
+  importSvg,
+  whiteOutlines,
+} from '../../__fixtures__/white-fill-burn';
 import { applyImportWhiteKnockout } from './import-white-knockout';
-import { parseSvg } from '../../io/svg/parse-svg';
 import { describeSvgImport } from '../app/svg-import-action';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
@@ -41,101 +45,6 @@ const LOGO = `<svg xmlns="http://www.w3.org/2000/svg" width="80mm" height="40mm"
   <path d="${DIAMOND}" fill="#ffffff"/>
   <path d="M38 14 H72 M38 20 H66 M38 26 H70" stroke="#0000ff" stroke-width="0.5" fill="none"/>
 </svg>`;
-
-function importSvg(svgText: string, source = 'logo.svg') {
-  const parsed = parseSvg({ svgText, id: 'logo', source });
-  if (parsed.fragment === undefined) throw new Error('Missing SVG fragment');
-  const objects = parsed.fragment.entries.filter((entry) => entry.kind === 'imported-svg');
-  const outcome = useStore
-    .getState()
-    .importSvgFragment({ source, bounds: parsed.fragment.bounds, objects });
-  return { parsed, outcome };
-}
-
-/** The white shapes' outlines in machine coordinates, like the compiled burn. */
-function whiteOutlines(project: Project): Vec2[][] {
-  return project.scene.objects.flatMap((object: SceneObject) =>
-    'paths' in object
-      ? object.paths
-          .filter((path) => path.color === '#ffffff')
-          .flatMap((path) =>
-            path.polylines.map((line) =>
-              line.points.map((point) =>
-                toMachineCoords(applyTransform(point, object.transform), project.device),
-              ),
-            ),
-          )
-      : [],
-  );
-}
-
-function burnSegments(project: Project): Vec2[][] {
-  return compileJob(project.scene, project.device).groups.flatMap((group) =>
-    'segments' in group ? group.segments.map((segment) => [...segment.polyline]) : [],
-  );
-}
-
-function burnLength(project: Project): number {
-  let length = 0;
-  for (const line of burnSegments(project))
-    for (let index = 1; index < line.length; index += 1)
-      length += Math.hypot(
-        line[index]!.x - line[index - 1]!.x,
-        line[index]!.y - line[index - 1]!.y,
-      );
-  return length;
-}
-
-function inside(point: Vec2, polygon: readonly Vec2[]): boolean {
-  let hit = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
-    const a = polygon[i]!;
-    const b = polygon[j]!;
-    if (a.y > point.y !== b.y > point.y) {
-      const x = ((b.x - a.x) * (point.y - a.y)) / (b.y - a.y) + a.x;
-      if (point.x < x) hit = !hit;
-    }
-  }
-  return hit;
-}
-
-function edgeDistance(point: Vec2, polygon: readonly Vec2[]): number {
-  let best = Infinity;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
-    const a = polygon[j]!;
-    const b = polygon[i]!;
-    const dx = b.x - a.x;
-    const dy = b.y - a.y;
-    const t = Math.max(
-      0,
-      Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / (dx * dx + dy * dy || 1)),
-    );
-    best = Math.min(best, Math.hypot(point.x - (a.x + t * dx), point.y - (a.y + t * dy)));
-  }
-  return best;
-}
-
-/** Burned length strictly inside a white shape (0.05 mm clear of its edge). */
-function burnInside(project: Project, outlines: readonly Vec2[][]): number {
-  const step = 0.02;
-  let length = 0;
-  for (const line of burnSegments(project))
-    for (let index = 1; index < line.length; index += 1) {
-      const a = line[index - 1]!;
-      const b = line[index]!;
-      const span = Math.hypot(b.x - a.x, b.y - a.y);
-      const samples = Math.max(1, Math.ceil(span / step));
-      for (let sample = 0; sample < samples; sample += 1) {
-        const t = (sample + 0.5) / samples;
-        const point = { x: a.x + t * (b.x - a.x), y: a.y + t * (b.y - a.y) };
-        if (
-          outlines.some((outline) => inside(point, outline) && edgeDistance(point, outline) > 0.05)
-        )
-          length += span / samples;
-      }
-    }
-  return length;
-}
 
 beforeEach(resetStore);
 afterEach(resetStore);
@@ -189,8 +98,9 @@ it('names the white shapes in the import notice and drops white from the colour 
   const toasts = describeSvgImport('plate.svg', parsed, outcome).map((toast) => toast.message);
   expect(toasts[0]).toBe('Imported plate.svg — 1 object, 1 color');
   expect(toasts.at(-1)).toBe(
-    'plate.svg: 2 white shapes will not burn, as in the file: they were cut out of the shapes ' +
-      'under them. To burn the white too, Undo: it returns on its own operation.',
+    'plate.svg: 2 solid white shapes will not burn: the file shows bare material there, so they ' +
+      'were cut out of the shapes under them. To burn the white too, Undo: it returns on its ' +
+      'own operation.',
   );
 });
 
