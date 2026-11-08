@@ -5,6 +5,9 @@
 // - Restore saved origin and Home, then restore origin put the origin back.
 // - When no report carries WCO, the failure is the card's toast, with a message
 //   that says why, not a silent no-op.
+// - The next Frame then names the unrestored origin and the head's distance
+//   from it, and its OK puts that origin back, not one at the head (the V9
+//   refuter's P1 re-rate).
 // - $10=1 (MPos on every report) is the control.
 
 import { act } from 'react';
@@ -16,6 +19,7 @@ import { useStore } from '../state';
 import { RESTORE_ORIGIN_WORK_POSITION_ONLY_MESSAGE } from '../state/laser-origin-restore';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
+import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { AbortStoppedCard } from './AbortStoppedCard';
 import { operatorAbortAlarm, restoreOriginAfterAbort } from './abort-alarm-recovery';
 import {
@@ -27,6 +31,7 @@ import {
   STRESS_TIMEOUT_MS,
   tick,
 } from './recovery-stress-testing';
+import { runFrameNow } from './use-frame-action';
 
 vi.mock('../state/job-aware-dialogs', () => ({
   jobAwareAlert: vi.fn(),
@@ -271,6 +276,25 @@ describe('V3-P2-2: Restore saved origin after Abort, $10=0 against $10=1', () =>
         expect(useLaserStore.getState().alarmCode).toBeNull();
         expect(totalWco(h.simulator.state())).toMatchObject({ x: 0, y: 0 });
         await act(async () => root.unmount());
+
+        // GRBL sends WCO again; the operator presses Frame, as success would
+        // have told them to. The offer names the saved origin, and OK restores it.
+        reports.wcoNever = false;
+        await tick(3_000);
+        vi.mocked(jobAwareConfirm).mockClear();
+        const frameFrom = h.simulator.outbound().length;
+        await drive(runFrameNow(), 60_000);
+        const prompt = String(vi.mocked(jobAwareConfirm).mock.calls[0]?.[0] ?? '');
+        expect(prompt).toContain(
+          'The job you stopped ran from X 20, Y 30 mm from machine zero, and that origin was not restored.',
+        );
+        expect(prompt).toMatch(
+          /The head is [\d.]+ mm from it \(X [+−]?[\d.]+, Y [+−]?[\d.]+ mm\)\./,
+        );
+        expect(prompt).not.toContain('set the work origin at the current head position');
+        expect(g92Lines(programLines(h.simulator, frameFrom))).toHaveLength(1);
+        expect(totalWco(h.simulator.state())).toMatchObject(ORIGIN);
+        expect(useLaserStore.getState().workOriginSource).toBe('g92');
         host.remove();
       } finally {
         reports.workPosition = false;

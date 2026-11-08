@@ -145,13 +145,28 @@ describe('statusPositionPatch — the controller MPos behind hidden position evi
     expect(withheldControllerMPos(report)).toEqual({ x: -50, y: -40, z: -1 });
   });
 
-  it('keeps none with unconfirmed report units or a WPos-only report ($10=0)', () => {
+  it('keeps none with unconfirmed report units or a first WPos-only report without WCO', () => {
     const unitsUnknown = { ...suppressed, reportUnitsUnconfirmed: true };
     expect(withheldControllerMPos(statusPositionPatch(unitsUnknown, at).statusReport)).toBeNull();
     const workOnly = { ...at, mPos: null, wPos: { x: -50, y: -40, z: -1 } };
     expect(
       withheldControllerMPos(statusPositionPatch(suppressed, workOnly).statusReport),
     ).toBeNull();
+  });
+
+  // $10=0 (rolling audit v10 V3-P2-2): GRBL's WPos is MPos - WCO, and WCO:
+  // comes on one Idle report in ten, and on the next one after any offset change.
+  it('takes a WPos-only MPos from WCO, and keeps it while the WPos does not change', () => {
+    const work = { x: -50, y: -40, z: -1 };
+    const withWco = { ...at, mPos: null, wPos: work, wco: { x: 10, y: 5, z: 0 } };
+    const first = statusPositionPatch(suppressed, withWco).statusReport;
+    expect(withheldControllerMPos(first)).toEqual({ x: -40, y: -35, z: -1 });
+
+    const after = { ...suppressed, statusReport: first };
+    const unmoved = statusPositionPatch(after, { ...withWco, wco: null }).statusReport;
+    expect(withheldControllerMPos(unmoved)).toEqual({ x: -40, y: -35, z: -1 });
+    const moved = { ...withWco, wco: null, wPos: { ...work, x: -49 } };
+    expect(withheldControllerMPos(statusPositionPatch(after, moved).statusReport)).toBeNull();
   });
 
   it('withholds nothing from a report whose position is shown', () => {

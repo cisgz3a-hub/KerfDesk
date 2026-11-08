@@ -13,9 +13,12 @@ import { originAtConnectPatch } from './work-origin-state';
 // Kept beside the stored report rather than in a store field, it goes when that
 // report is replaced or cleared. A WPos-only report ($10=0) gives one only when
 // it also carries WCO: (GRBL's WPos is MPos - WCO, report.c), which stock GRBL
-// sends on one report in ten at Idle (V3-P2-2). Unconfirmed report units make
-// the number meaningless, so none is kept then.
+// sends on one report in ten at Idle (V3-P2-2). A later report with the same
+// WPos and no WCO: keeps it: GRBL sends WCO: on the next report after any
+// offset change, so an unchanged WPos without one means an unmoved head.
+// Unconfirmed report units make the number meaningless, so none is kept then.
 const withheldMPos = new WeakMap<StatusReport, NonNullable<StatusReport['mPos']>>();
+const withheldWPos = new WeakMap<StatusReport, NonNullable<StatusReport['wPos']>>();
 
 /** The MPos, in report units, that KerfDesk withheld from this report, or
  *  null. Only the hold-to-jog clamp and Restore saved origin's G92, which
@@ -98,11 +101,23 @@ export function statusPositionPatch(
 
 function withholdPosition(state: LaserState, report: StatusReport): StatusReport {
   const shown = { ...report, mPos: null, wPos: null, wco: null };
-  const controllerMPos = report.mPos ?? machinePositionFromWork(report);
-  if (state.reportUnitsUnconfirmed !== true && controllerMPos !== null) {
-    withheldMPos.set(shown, controllerMPos);
-  }
+  if (state.reportUnitsUnconfirmed === true) return shown;
+  const controllerMPos =
+    report.mPos ?? machinePositionFromWork(report) ?? unmovedSince(state.statusReport, report);
+  if (controllerMPos !== null) withheldMPos.set(shown, controllerMPos);
+  if (report.wPos !== null) withheldWPos.set(shown, report.wPos);
   return shown;
+}
+
+// The previous withheld report's machine position, when this WPos-only report
+// shows the same work position and no new offset.
+function unmovedSince(previous: StatusReport | null, report: StatusReport): StatusReport['mPos'] {
+  if (previous === null || report.wPos === null || report.wco !== null) return null;
+  const mPos = withheldMPos.get(previous);
+  const wPos = withheldWPos.get(previous);
+  if (mPos === undefined || wPos === undefined) return null;
+  const same = wPos.x === report.wPos.x && wPos.y === report.wPos.y && wPos.z === report.wPos.z;
+  return same ? mPos : null;
 }
 
 // GRBL computes WPos as MPos - WCO, so a report with both gives back the
