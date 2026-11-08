@@ -5,12 +5,20 @@
 // the window tries to send the same Abort as closing KerfDesk. Windows can end
 // KerfDesk before that Abort reaches the machine, so the notice never promises it
 // (ADR-548 Amendment 1).
+//
+// A laser the controller reports on at Idle counts as a job here, as the
+// ordinary close turns it off and the update close refuses for it (ADR-375
+// Amendment 9): a file that ends without M5 or a Console `G1 … M3 S…` leaves
+// the beam lit on one spot after KerfDesk is gone (rolling audit v11 W3-P2-1).
 
 import { create } from 'zustand';
 import type { StreamerState } from '../../core/controllers/grbl';
 import type { DesktopJobReport } from '../../platform/types';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
+import { unownedControllerOutput } from '../state/unowned-controller-output';
+import { machineKindOf } from '../../core/scene';
+import { useStore } from '../state';
 import { desktopCloseController } from './desktop-close-runtime';
 
 type LaserState = ReturnType<typeof useLaserStore.getState>;
@@ -24,14 +32,14 @@ export const SESSION_END_EVENT = 'kerfdesk:session-end';
 
 export const SESSION_END_MESSAGES: Readonly<Record<SessionEndPhase, string>> = {
   asked:
-    'Windows wants to restart, shut down or sign out while a job runs, and KerfDesk asked it to wait. ' +
-    'Let the job finish or Abort it before you restart. If Windows restarts anyway, it can close KerfDesk ' +
-    'before an Abort reaches the machine, and a spindle or constant-power laser can stay on until the ' +
-    'controller is reset.',
+    'Windows wants to restart, shut down or sign out while a job runs or the laser is on, and ' +
+    'KerfDesk asked it to wait. Let the job finish or Abort it, or use LASER OFF, before you ' +
+    'restart. If Windows restarts anyway, it can close KerfDesk before an Abort reaches the ' +
+    'machine, and a spindle or constant-power laser can stay on until the controller is reset.',
   ending:
-    'Windows is ending this session during the job. KerfDesk is sending Abort, but Windows can close ' +
-    'KerfDesk before it reaches the machine: use the physical E-stop or power cutoff if the machine may ' +
-    'still be running.',
+    'Windows is ending this session during the job or with the laser on. KerfDesk is sending Abort ' +
+    'or LASER OFF, but Windows can close KerfDesk before it reaches the machine: use the physical ' +
+    'E-stop or power cutoff if the machine may still be running.',
 };
 
 type SessionEndState = {
@@ -44,9 +52,13 @@ export const useSessionEndStore = create<SessionEndState>((set) => ({
   dismiss: () => set({ phase: null }),
 }));
 
-/** A job, or a latched Fire, that ending the session would cut off. */
+/** A job, a latched Fire, or a laser left on at Idle, that ending the session would cut off. */
 export function jobWouldBeCutOff(laser: LaserState): boolean {
-  return isActiveJob(laser.streamer) || laser.fireActive;
+  return (
+    isActiveJob(laser.streamer) ||
+    laser.fireActive ||
+    unownedControllerOutput(laser, machineKindOf(useStore.getState().project.machine)) !== null
+  );
 }
 
 /** What main is told: whether a job runs and, for a streamed job, how far it is. */

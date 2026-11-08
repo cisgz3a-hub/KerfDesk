@@ -6,10 +6,16 @@ import {
   type MachineNetworkProtocol,
 } from './machine-network-protocol.js';
 
+// A session the window can no longer reach still drives the controller. Main
+// sends it the stop Disconnect sends before letting it go (rolling audit v11
+// W3-P1-1): when the window's renderer is gone, when its reads stop for the
+// lease, and when the app quits. Only the window's own Close, which follows
+// the store's stop, closes without one.
 export class MachineNetworkBridge {
   private readonly sessions = new Map<string, MachineNetworkSession>();
   private pending: Socket | null = null;
   private readonly leases = new Map<string, ReturnType<typeof setTimeout>>();
+  private readonly stopping = new Set<Promise<void>>();
   async open(
     host: string,
     port: number,
@@ -17,6 +23,8 @@ export class MachineNetworkBridge {
   ): Promise<{ readonly sessionId: string }> {
     validateMachineNetworkProtocol(protocol);
     validateNetworkTarget(host, port);
+    // A stop still going out holds the controller's connection; it is bounded.
+    while (this.stopping.size > 0) await Promise.all(this.stopping);
     if (this.pending !== null || this.sessions.size > 0)
       throw new Error('Disconnect the current network session before opening another.');
     const socket = new Socket();
@@ -51,17 +59,48 @@ export class MachineNetworkBridge {
     this.sessions.delete(id);
     clearTimeout(this.leases.get(id));
     this.leases.delete(id);
+    // A stop the session sent itself (a refused write) may still be going out.
+    if (session !== undefined) this.track(session.settled());
   }
-  dispose(): void {
+  /** Stops and releases every session at once, so the next Connect is not
+   *  refused. `immediate` writes the whole stop now, for a process about to
+   *  end. Returns how many there were. */
+  stopAll(immediate = false): number {
     this.pending?.destroy();
     this.pending = null;
-    for (const id of this.sessions.keys()) this.close(id);
+    const ids = [...this.sessions.keys()];
+    for (const id of ids) this.stop(id, immediate);
+    return ids.length;
+  }
+  /** Resolves once every stop under way has gone out or given up. */
+  async settled(): Promise<void> {
+    while (this.stopping.size > 0) await Promise.all(this.stopping);
+  }
+  // The app is quitting: the stop is written synchronously, before it exits.
+  dispose(): void {
+    this.stopAll(true);
+  }
+  private stop(id: string, immediate = false): void {
+    const session = this.sessions.get(id);
+    this.sessions.delete(id);
+    clearTimeout(this.leases.get(id));
+    this.leases.delete(id);
+    if (session === undefined) return;
+    this.track(
+      session.stopAndClose('KerfDesk reset the controller and closed this network session.', {
+        immediate,
+      }),
+    );
+  }
+  private track(stopped: Promise<void>): void {
+    this.stopping.add(stopped);
+    void stopped.finally(() => this.stopping.delete(stopped));
   }
   private touch(id: string): void {
     if (!this.sessions.has(id)) return;
     clearTimeout(this.leases.get(id));
     // A crashed/closed renderer stops its local read loop; retain no orphan socket.
-    const lease = setTimeout(() => this.close(id), 15_000);
+    const lease = setTimeout(() => this.stop(id), 15_000);
     lease.unref();
     this.leases.set(id, lease);
   }

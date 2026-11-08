@@ -72,7 +72,12 @@ it('keeps the grblHAL channel byte-exact without sending or consuming Telnet neg
   expect(Buffer.concat(received)).toEqual(command);
   await expect(bridge.write(id, 1, command.toString('base64'))).rejects.toThrow('sequence');
   expect((await bridge.read(id)).closed).toBe(true);
-  expect(Buffer.concat(received)).toEqual(command);
+  // The refused replay never goes out; the stop Disconnect sends does (W3-P1-1).
+  bridge.close(id);
+  await bridge.settled();
+  expect(Buffer.concat(received)).toEqual(
+    Buffer.concat([command, Buffer.from([0x18]), Buffer.from('M5\nM9\n')]),
+  );
 });
 
 it.each(['fluidnc-telnet', 'grblhal-raw'] as const)(

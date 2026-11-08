@@ -14,6 +14,12 @@ const HEADERS = {
 export function closeDesktopMachineNetwork(): void {
   bridge.dispose();
 }
+/** Sends the stop on any network session the window can no longer reach and
+ *  releases it (rolling audit v11 W3-P1-1); `immediate` when the process is
+ *  about to end. Returns whether there was one. */
+export function stopDesktopMachineNetwork(immediate = false): boolean {
+  return bridge.stopAll(immediate) > 0;
+}
 let quitRegistered = false;
 
 export function withMachineNetworkRoutes(

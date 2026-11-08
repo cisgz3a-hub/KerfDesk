@@ -64,6 +64,62 @@ describe('renderer crash recovery', () => {
     expect(askToReload).not.toHaveBeenCalled();
   });
 
+  // Rolling audit v11 W3-P1-1: the machine's stop waits on no prompt or close guard.
+  it('stops the network machine on every renderer exit, before any prompt', async () => {
+    const { window, crash } = crashTarget();
+    let closing = false;
+    const order: string[] = [];
+    const stopMachine = vi.fn(() => {
+      order.push('stop');
+      return true;
+    });
+    const askToReload = vi.fn(async () => {
+      order.push('ask');
+      return false;
+    });
+    installRendererCrashRecovery(window, { isClosing: () => closing, stopMachine, askToReload });
+
+    crash('oom');
+    await settle();
+    expect(order).toEqual(['stop', 'ask']);
+    expect(askToReload).toHaveBeenCalledWith(rendererGonePrompt('oom', true));
+    closing = true;
+    crash('crashed');
+    crash('clean-exit');
+    await settle();
+    expect(stopMachine).toHaveBeenCalledTimes(3);
+    expect(askToReload).toHaveBeenCalledOnce();
+  });
+
+  it('still asks when the stop throws, and says nothing was sent', async () => {
+    const { window, crash } = crashTarget();
+    const reportFailure = vi.fn();
+    const askToReload = vi.fn(async () => false);
+    installRendererCrashRecovery(window, {
+      isClosing: () => false,
+      stopMachine: () => {
+        throw new Error('socket gone');
+      },
+      askToReload,
+      reportFailure,
+    });
+    crash('killed');
+    await settle();
+    expect(reportFailure).toHaveBeenCalledOnce();
+    expect(askToReload).toHaveBeenCalledWith(rendererGonePrompt('killed', false));
+  });
+
+  it('says the beam or spindle may still be on, E-stop first', () => {
+    const usb = rendererGonePrompt('crashed').detail;
+    expect(usb).toContain('the beam or spindle may still be on');
+    expect(usb).toContain('constant-power (M3) laser, a Fire beam or a spindle stays on');
+    expect(usb.indexOf('physical E-stop')).toBeLessThan(usb.indexOf('reload KerfDesk'));
+    expect(usb).not.toContain('may still finish');
+    const network = rendererGonePrompt('crashed', true).detail;
+    expect(network).toContain('sent the network machine a reset, then M5 and M9');
+    expect(network.indexOf('physical E-stop')).toBeLessThan(network.indexOf('reload KerfDesk'));
+  });
+
   it('asks once while a prompt is still open', async () => {
     const { window, crash } = crashTarget();
     let answer: (reload: boolean) => void = () => undefined;
