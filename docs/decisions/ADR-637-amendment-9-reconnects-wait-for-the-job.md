@@ -1,4 +1,4 @@
-## ADR-637 Amendment 8 - The driver-swapping reconnects wait while a job runs
+## ADR-637 Amendment 9 - The driver-swapping reconnects wait while a job runs
 
 **Status:** Accepted (rolling audit v10, area V3, finding V3-P2-1, confirmed by an independent
 refuter; the maintainer's standing instruction to fix confirmed audit findings). Amends Amendment 6

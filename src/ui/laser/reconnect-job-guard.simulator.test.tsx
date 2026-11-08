@@ -2,7 +2,7 @@
 // the toolbar's Reconnect now (and step 1's reconnect, which shares the guard)
 // is refused while a job runs, so the soft reset that closing the port sends
 // cannot end the burn. Once the job is over the same reconnect switches the
-// driver (ADR-637 Amendments 6 and 8).
+// driver (ADR-637 Amendments 6 and 9).
 
 import { describe, expect, it, vi } from 'vitest';
 import { useStore } from '../state';

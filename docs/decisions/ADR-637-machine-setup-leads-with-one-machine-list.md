@@ -157,7 +157,7 @@ the machine type from `$32`: a laser whose controller reports `$32=0` stays a la
 turn laser mode on with one guarded click, and becomes a CNC only when the operator says so. Job
 Review's laser-mode-off row gets **Send $32=1**.
 
-Amendment 8 (`ADR-637-amendment-8-reconnects-wait-for-the-job.md`) holds the toolbar's
+Amendment 9 (`ADR-637-amendment-9-reconnects-wait-for-the-job.md`) holds the toolbar's
 **Reconnect now** and step 1's **Reconnect using selected profile** while a job runs, as Save's
 driver switch already was: reconnecting resets the controller, which would end the job.
 

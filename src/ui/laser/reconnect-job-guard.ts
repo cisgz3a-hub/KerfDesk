@@ -1,5 +1,5 @@
 // The reconnects that only swap the driver refuse while a job is active
-// (rolling audit v10 V3-P2-1, ADR-637 Amendment 8).
+// (rolling audit v10 V3-P2-1, ADR-637 Amendment 9).
 //
 // Closing a GRBL-family port soft-resets the controller first
 // (laser-disconnect-stop.ts), and that reset ends a running or paused job.
