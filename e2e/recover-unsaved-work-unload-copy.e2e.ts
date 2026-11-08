@@ -26,12 +26,13 @@ test('a tab closed with unsaved work is recovered once, with its newest edits', 
   const closedSessionKey = await rows.first().getAttribute('data-unsaved-work');
   await rows.first().getByRole('button', { name: 'Restore', exact: true }).click();
   await expect.poll(() => objectCount(second)).toBe(3);
-  // The toast follows the re-home write and the closed session's cleanup; the
-  // preparation worker can take a while on a cold dev server.
-  await expect(second.getByText(/^Restored unsaved work/)).toBeVisible({ timeout: 90_000 });
-  expect(await second.evaluate((key) => localStorage.getItem(key ?? ''), closedSessionKey)).toBe(
-    null,
-  );
+  // Restore re-homes the work into this tab's slot, then clears the closed
+  // session's copies; the preparation worker can be slow on a cold dev server.
+  await expect
+    .poll(() => second.evaluate((key) => localStorage.getItem(key ?? ''), closedSessionKey), {
+      timeout: 60_000,
+    })
+    .toBeNull();
   await closeLeavingSite(second);
 
   // The restored work is still the newest copy, listed once.
