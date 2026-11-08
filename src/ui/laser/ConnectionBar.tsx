@@ -82,7 +82,14 @@ export type ConnectionBarProps = {
    *  red, so an alarm raised while another tab is open shows (UX audit U5-P3-1, U5-P3-6). */
   readonly controllerAttention?: ControllerAttention | null;
   /** The live driver is not the saved profile's (U2-P2-1): say so, offer Reconnect now. */
-  readonly driverMismatch?: { readonly text: string; readonly onReconnect: () => void } | undefined;
+  readonly driverMismatch?:
+    | {
+        readonly text: string;
+        /** Why Reconnect now is disabled (a job is running), or null. */
+        readonly blockedReason?: string | null;
+        readonly onReconnect: () => void;
+      }
+    | undefined;
 };
 
 type Props = ConnectionBarProps;
@@ -158,18 +165,7 @@ export function ConnectionBar(props: Props): JSX.Element {
         notice={notice}
       />
       {props.driverMismatch === undefined ? null : (
-        <p role="alert" className="lf-connection-driver-mismatch">
-          <span>{props.driverMismatch.text}</span>{' '}
-          <button
-            type="button"
-            className="lf-btn lf-btn--primary"
-            title="Close the port and reconnect with this machine profile's commands. Nothing moves."
-            disabled={props.disabled}
-            onClick={props.driverMismatch.onReconnect}
-          >
-            Reconnect now
-          </button>
-        </p>
+        <DriverMismatchNotice mismatch={props.driverMismatch} disabled={props.disabled} />
       )}
       {connection.kind === 'failed' && (
         <p role="alert" className="lf-connection-card-error">
@@ -185,6 +181,32 @@ export function ConnectionBar(props: Props): JSX.Element {
         </p>
       ) : null}
     </section>
+  );
+}
+
+// A job holds Reconnect now with its reason as the hover (V3-P2-1): closing the
+// port resets the controller, which would end the job.
+function DriverMismatchNotice(props: {
+  readonly mismatch: NonNullable<Props['driverMismatch']>;
+  readonly disabled: boolean;
+}): JSX.Element {
+  const blockedReason = props.mismatch.blockedReason ?? null;
+  return (
+    <p role="alert" className="lf-connection-driver-mismatch">
+      <span>{props.mismatch.text}</span>{' '}
+      <button
+        type="button"
+        className="lf-btn lf-btn--primary"
+        title={
+          blockedReason ??
+          "Close the port and reconnect with this machine profile's commands. Nothing moves."
+        }
+        disabled={props.disabled || blockedReason !== null}
+        onClick={props.mismatch.onReconnect}
+      >
+        Reconnect now
+      </button>
+    </p>
   );
 }
 

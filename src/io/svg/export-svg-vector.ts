@@ -45,6 +45,7 @@ import {
 } from '../../core/vector-export/decimal-grid';
 import { formatSvgPathData, quantizeCurves } from '../../core/vector-export/svg-path-data';
 import { svgMatrixAttribute, svgObjectMatrix, xmlText } from './export-svg-paths';
+import { maxOf, minOf } from '../../core/util';
 
 type VectorObject = Extract<SceneObject, { readonly paths: readonly ColoredPath[] }>;
 
@@ -126,7 +127,7 @@ function vectorGeometry(
     return singularGeometry(authored, matrix, precisionMm);
   }
   const axes = [Math.abs(object.transform.scaleX), Math.abs(object.transform.scaleY)];
-  if (Math.min(...axes) / Math.max(...axes) <= Number.EPSILON) {
+  if (minOf(axes) / maxOf(axes) <= Number.EPSILON) {
     const rebased = rebasedGeometry(authored, matrix, precisionMm);
     if (rebased !== null) return rebased;
   }

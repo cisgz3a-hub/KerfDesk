@@ -8,6 +8,7 @@
 // solution; duplicates across sign choices are merged.
 
 import type { Vec2 } from '../scene';
+import { maxOf } from '../util';
 
 export type Circle = { readonly center: Vec2; readonly radius: number };
 
@@ -31,8 +32,8 @@ export function tangentCircles(a: Circle, b: Circle, c: Circle): ReadonlyArray<T
     )
   )
     return [];
-  const scale = Math.max(
-    ...inputs.flatMap((circle) => [
+  const scale = maxOf(
+    inputs.flatMap((circle) => [
       Math.abs(circle.center.x - a.center.x),
       Math.abs(circle.center.y - a.center.y),
       circle.radius,

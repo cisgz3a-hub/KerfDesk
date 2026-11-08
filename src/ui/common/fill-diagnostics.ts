@@ -48,6 +48,20 @@ export function selectedCloseableOpenFillContourCount(
   return closeableCount(selectedOpenFillContours(project, selectedId, additional), toleranceMm);
 }
 
+/** Both menu counts from one scan of the selection: the scan visits every
+ *  selected object, and the menus ask on every render (S2-P3-3). */
+export function selectedOpenFillContourCounts(
+  project: Project,
+  selectedId: string | null,
+  additional: ReadonlySet<string>,
+): { readonly openCount: number; readonly closeableCount: number } {
+  const groups = selectedOpenFillContours(project, selectedId, additional);
+  return {
+    openCount: groups.reduce((sum, group) => sum + group.polylines.length, 0),
+    closeableCount: closeableCount(groups, CLOSE_OPEN_FILL_CONTOUR_TOLERANCE_MM),
+  };
+}
+
 export function selectedOpenFillContourRepairSummary(
   project: Project,
   selectedId: string | null,

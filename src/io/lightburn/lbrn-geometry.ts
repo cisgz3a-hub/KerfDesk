@@ -19,6 +19,7 @@ import {
 } from './lbrn-power-scale';
 import { parseLbrnVertexList, type LbrnVertex } from './lbrn-vertex-list';
 import { SVG_IMPORT_LIMITS } from '../svg/svg-import-budget';
+import { maxOf, minOf } from '../../core/util';
 
 export type LbrnGeometryResult = {
   readonly objects: ReadonlyArray<ImportedSvg>;
@@ -390,10 +391,10 @@ function parseXForm(shape: Element): LbrnMatrix {
 function combinedBounds(curves: ReadonlyArray<CurveSubpath>) {
   const bounds = curves.map(curveSubpathBounds);
   return {
-    minX: Math.min(...bounds.map((value) => value.minX)),
-    minY: Math.min(...bounds.map((value) => value.minY)),
-    maxX: Math.max(...bounds.map((value) => value.maxX)),
-    maxY: Math.max(...bounds.map((value) => value.maxY)),
+    minX: minOf(bounds.map((value) => value.minX)),
+    minY: minOf(bounds.map((value) => value.minY)),
+    maxX: maxOf(bounds.map((value) => value.maxX)),
+    maxY: maxOf(bounds.map((value) => value.maxY)),
   };
 }
 

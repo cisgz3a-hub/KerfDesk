@@ -5,6 +5,7 @@
 import { curveSubpathBounds, flattenCurveSubpath } from '../scene/curve-path';
 import type { Bounds, CurveSubpath, Vec2 } from '../scene/scene-object';
 import { groupContoursWithHoles, type ContourGroup } from './contour-nesting';
+import { maxOf } from '../util';
 
 type Ring = { points: ReadonlyArray<Vec2>; bounds: Bounds; tolerance: number };
 type Budget = { remaining: number };
@@ -63,8 +64,8 @@ function flattenRing(curve: CurveSubpath, segmentBudget: number): Ring | null {
 function separatedEdges(a: Ring, b: Ring, budget: Budget, self: boolean): boolean {
   const magnitude = Math.max(
     1,
-    ...Object.values(a.bounds).map(Math.abs),
-    ...Object.values(b.bounds).map(Math.abs),
+    maxOf(Object.values(a.bounds).map(Math.abs)),
+    maxOf(Object.values(b.bounds).map(Math.abs)),
   );
   const margin = a.tolerance + b.tolerance + magnitude * 1e-12;
   for (let i = 0; i < a.points.length; i += 1) {

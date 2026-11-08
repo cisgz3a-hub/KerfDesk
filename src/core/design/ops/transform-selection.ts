@@ -1,6 +1,7 @@
 import type { Bounds, Vec2 } from '../../scene';
 import { entityBounds } from '../sketch-bounds';
 import { sanitizeEntity, type Sketch, type SketchArc, type SketchEntity } from '../sketch-entity';
+import { maxOf, minOf } from '../../util';
 
 export type DesignTransformKind =
   | 'rotate-left'
@@ -26,10 +27,10 @@ export function transformSelection(
   const drawable = new Map(selected.map((entity) => [entity.id, entity]));
   const boxes = selected.map(transformBounds);
   const bounds = {
-    minX: Math.min(...boxes.map((box) => box.minX)),
-    minY: Math.min(...boxes.map((box) => box.minY)),
-    maxX: Math.max(...boxes.map((box) => box.maxX)),
-    maxY: Math.max(...boxes.map((box) => box.maxY)),
+    minX: minOf(boxes.map((box) => box.minX)),
+    minY: minOf(boxes.map((box) => box.minY)),
+    maxX: maxOf(boxes.map((box) => box.maxX)),
+    maxY: maxOf(boxes.map((box) => box.maxY)),
   };
   const pivot = { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 };
   if (!Number.isFinite(pivot.x) || !Number.isFinite(pivot.y)) return sketch;
@@ -158,10 +159,10 @@ function arcBounds(entity: SketchArc): Bounds {
     y: entity.center.y + entity.radiusMm * Math.sin((degrees * Math.PI) / 180),
   }));
   return {
-    minX: Math.min(...points.map((p) => p.x)),
-    maxX: Math.max(...points.map((p) => p.x)),
-    minY: Math.min(...points.map((p) => p.y)),
-    maxY: Math.max(...points.map((p) => p.y)),
+    minX: minOf(points.map((p) => p.x)),
+    maxX: maxOf(points.map((p) => p.x)),
+    minY: minOf(points.map((p) => p.y)),
+    maxY: maxOf(points.map((p) => p.y)),
   };
 }
 

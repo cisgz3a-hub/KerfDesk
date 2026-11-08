@@ -11,6 +11,7 @@ import { rodriguesToMatrix } from '../rodrigues';
 import type { BedArea, CameraModelAccuracy } from './camera-model-accuracy';
 import { bedMapper, type CameraPose, type Vec2 } from './camera-model';
 import type { CameraModelRecord } from './camera-model-record';
+import { maxOf, minOf } from '../../util';
 
 // Only the middle of a head camera's picture is used for stitching: the edges
 // of a close-up lens are the least sharp and the least accurate.
@@ -167,10 +168,10 @@ function pictureOutlineOnBed(
 function largestUprightBox(outline: ReadonlyArray<Vec2>): BedArea | null {
   const xs = outline.map((p) => p.x);
   const ys = outline.map((p) => p.y);
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
+  const minX = minOf(xs);
+  const maxX = maxOf(xs);
+  const minY = minOf(ys);
+  const maxY = maxOf(ys);
   const centre = { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
   const halfW = (maxX - minX) / 2;
   const halfH = (maxY - minY) / 2;

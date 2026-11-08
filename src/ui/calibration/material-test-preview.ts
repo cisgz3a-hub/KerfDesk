@@ -12,6 +12,7 @@ import {
   materialTestGridAxes,
   type MaterialTestGridOptions,
 } from '../../core/job/material-test-grid';
+import { maxOf, minOf } from '../../core/util';
 
 export type MaterialTestPreviewCell = {
   readonly row: number;
@@ -79,7 +80,7 @@ export function materialTestPreview(options: MaterialTestGridOptions): MaterialT
     }),
   );
   const doses = settled.map((cell) => cell.dose);
-  const deepest = Math.max(0, ...doses);
+  const deepest = Math.max(0, maxOf(doses));
   const cells = settled.map(({ dose, ...cell }) => ({
     ...cell,
     energy: deepest > 0 ? dose / deepest : 0,
@@ -92,7 +93,7 @@ export function materialTestPreview(options: MaterialTestGridOptions): MaterialT
     rows,
     columns,
     cells,
-    summary: previewSummary(mode, rows, columns, Math.min(...doses), deepest),
+    summary: previewSummary(mode, rows, columns, minOf(doses), deepest),
   };
 }
 

@@ -1,6 +1,7 @@
 import type { Vec2 } from '../scene/scene-object';
 import type { ReliefVectorMask } from '../scene/relief/relief-authoring';
 import { reliefBoundaryContains } from './relief-vector-boundary';
+import { maxOf, minOf } from '../util';
 
 type NormalizedFootprint = {
   readonly polygon: ReadonlyArray<Vec2>;
@@ -31,10 +32,10 @@ export function reliefVectorFootprintCovered(
 }
 
 function normalizedFootprint(corners: ReadonlyArray<Vec2>): NormalizedFootprint {
-  const minX = Math.min(...corners.map((p) => p.x)),
-    minY = Math.min(...corners.map((p) => p.y)),
-    width = Math.max(...corners.map((p) => p.x)) - minX,
-    height = Math.max(...corners.map((p) => p.y)) - minY;
+  const minX = minOf(corners.map((p) => p.x)),
+    minY = minOf(corners.map((p) => p.y)),
+    width = maxOf(corners.map((p) => p.x)) - minX,
+    height = maxOf(corners.map((p) => p.y)) - minY;
   if (!(width > 0 && height > 0) || !Number.isFinite(width) || !Number.isFinite(height))
     throw new Error('Relief cell footprint collapses or exceeds the finite coordinate range.');
   const normalize = (p: Vec2): Vec2 => ({ x: (p.x - minX) / width, y: (p.y - minY) / height });

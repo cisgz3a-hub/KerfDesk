@@ -38,6 +38,7 @@ import {
 } from './bend-geometry';
 import { sharpenRingSteps, type RingBend, type RingBendJudge } from './ring-bend-scan';
 import { bendIsRounded } from './round-bend-guard';
+import { maxOf } from '../../util';
 
 const QUICK_TURN_GATE_RAD = (20 * Math.PI) / 180;
 // One corner per physical corner: after a rebuild, nearby candidates (the
@@ -297,7 +298,7 @@ const RETRY_MIN_TURN_RAD = (90 * Math.PI) / 180;
 const RETRY_NEAR_SPAN_PX = 3;
 const RETRY_MIN_NEAR_TURN_RAD = (60 * Math.PI) / 180;
 // The widest tangent arm any attempt may use (base window or retry).
-const MAX_GATE_ARM_PX = Math.max(MAX_BEND_WINDOW_ARM_PX, ...RETRY_ARMS_PX);
+const MAX_GATE_ARM_PX = Math.max(MAX_BEND_WINDOW_ARM_PX, maxOf(RETRY_ARMS_PX));
 
 // `seg` holds the chain's edge lengths (see edgeLengths).
 function trySharpenOpen(

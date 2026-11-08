@@ -25,6 +25,7 @@ import {
 } from './colour-label-cleanup';
 import type { RawImageData } from './trace-image';
 import { colourAppearance } from './colour-appearance';
+import { maxOf } from '../util';
 
 export { TRANSPARENT_LABEL } from './colour-label-cleanup';
 
@@ -329,7 +330,7 @@ function paperBackground(
 ): number | null {
   const counts = borderCounts(labels, width, height);
   const total = counts.reduce((sum, c) => sum + c, 0);
-  const lightest = Math.max(...palette.map((colour) => colour.lab[0]));
+  const lightest = maxOf(palette.map((colour) => colour.lab[0]));
   let paper = -1;
   let paperL = Number.NEGATIVE_INFINITY;
   for (let l = 0; l < palette.length && total > 0; l += 1) {

@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import type { CanvasBitmapSize } from '../workspace/use-canvas-bitmap-size';
+import { maxOf, minOf } from '../../core/util';
 
 /** Keep the typing area reachable even when both side rails narrow the canvas. */
 export function canvasTextPanelPosition(
@@ -39,10 +40,10 @@ function inputRectangle(style: CSSProperties) {
     y: y + cx * (matrix[1] ?? 0) + cy * (matrix[3] ?? 1),
   }));
   return {
-    left: Math.min(...corners.map((point) => point.x)),
-    right: Math.max(...corners.map((point) => point.x)),
-    top: Math.min(...corners.map((point) => point.y)),
-    bottom: Math.max(...corners.map((point) => point.y)),
+    left: minOf(corners.map((point) => point.x)),
+    right: maxOf(corners.map((point) => point.x)),
+    top: minOf(corners.map((point) => point.y)),
+    bottom: maxOf(corners.map((point) => point.y)),
   };
 }
 

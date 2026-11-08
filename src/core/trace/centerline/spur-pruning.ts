@@ -14,6 +14,7 @@ import { runTraceSteps, type TraceSteps } from '../trace-steps';
 import { PruningWorklist, type MutablePruneChain as MutableChain } from './pruning-worklist';
 import { hasShortBranchSupport } from './short-branch-support';
 import { PassthroughQueue, firstIncidence } from './passthrough-queue';
+import { appendAll } from '../../util';
 
 export type SpurPruneOptions = {
   /** Multiplier on the junction's local stroke radius. */
@@ -372,7 +373,7 @@ function mergeThroughNode(first: MutableChain, second: MutableChain, nodeId: num
     second.a = second.b;
     second.b = t;
   }
-  first.points.push(...second.points.slice(1)); // drop the duplicated node point
+  appendAll(first.points, second.points.slice(1)); // drop the duplicated node point
   first.b = second.b;
   if (first.a === first.b && first.points.length >= 4) {
     first.closed = true;

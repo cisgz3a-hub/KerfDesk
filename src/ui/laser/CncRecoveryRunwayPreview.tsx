@@ -1,4 +1,5 @@
 import type { CncContourRunwayPreview } from '../../core/recovery/cnc-contour-runway-preview';
+import { maxOf, minOf } from '../../core/util';
 
 const WIDTH = 560;
 const HEIGHT = 260;
@@ -85,10 +86,10 @@ function projectPoints(points: CncContourRunwayPreview['recoveryPolyline']): {
 } {
   const xs = points.map(({ x }) => x);
   const ys = points.map(({ y }) => y);
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
+  const minX = minOf(xs);
+  const maxX = maxOf(xs);
+  const minY = minOf(ys);
+  const maxY = maxOf(ys);
   const spanX = Math.max(maxX - minX, 1);
   const spanY = Math.max(maxY - minY, 1);
   const scale = Math.min((WIDTH - PADDING * 2) / spanX, (HEIGHT - PADDING * 2) / spanY);

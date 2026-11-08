@@ -11,6 +11,7 @@ import {
   hasNewerSynchronousLocalAutosave,
   clearLocalAutosave,
   currentAutosaveSessionId,
+  localAutosaveSavedAt,
   replaceAutosaveSessionId,
   requireSupportedLocalAutosaveVersion,
   type LocalAutosaveClearResult,
@@ -311,7 +312,14 @@ export class AutosaveDurableService {
   private async clearSnapshotNow(
     snapshot: AutosaveDurableSnapshot,
   ): Promise<AutosaveDurableClearResult> {
-    const local = clearAutosave(snapshot);
+    // Clear only what this snapshot supersedes. A newer copy at the same key
+    // (an unload write after the interval save) is newer work and stays
+    // listed (V7-P1-1, ADR-688 Amendment 1).
+    const localSavedAt = localAutosaveSavedAt(snapshot.storageKey);
+    const local: LocalAutosaveClearResult =
+      localSavedAt !== null && localSavedAt > snapshot.savedAt
+        ? { kind: 'ok', keys: [] }
+        : clearAutosave(snapshot);
     if (snapshot.sessionId === undefined) return localClearResult(local);
     try {
       const expectedEpoch =

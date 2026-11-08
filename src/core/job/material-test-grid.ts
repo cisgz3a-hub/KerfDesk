@@ -31,6 +31,7 @@ import {
   materialTestLayout,
   type MaterialTestLayout,
 } from './material-test-layout';
+import { maxOf } from '../util';
 
 const MIN_COUNT = 1;
 const MAX_COUNT = 20;
@@ -170,7 +171,10 @@ function planMaterialTestGrid(options: MaterialTestGridOptions): GridPlan {
     gap: Math.max(0, finiteOr(options.gapMm ?? DEFAULT_GAP_MM, DEFAULT_GAP_MM)),
     rowLabels: rowAxis.labels,
     columnLabels: columnAxis.labels,
-    runwayMm: Math.max(0, ...layers.map((layer) => (mode === 'fill' ? layer.fillOverscanMm : 0))),
+    runwayMm: Math.max(
+      0,
+      maxOf(layers.map((layer) => (mode === 'fill' ? layer.fillOverscanMm : 0))),
+    ),
   });
   return {
     mode,
@@ -404,10 +408,6 @@ function squarePolyline(width: number, height: number): Polyline {
 
 function materialTestLayerColor(row: number): string {
   return `#${(0x100000 + row).toString(16).padStart(6, '0')}`;
-}
-
-function maxOf(values: ReadonlyArray<number>): number {
-  return values.reduce((max, value) => Math.max(max, value), Number.NEGATIVE_INFINITY);
 }
 
 function clampInteger(value: number, min: number, max: number): number {

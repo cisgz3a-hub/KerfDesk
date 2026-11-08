@@ -22,6 +22,7 @@ import {
 } from '../../core/scene';
 // Deep import: core/cnc's barrel is a ratcheted over-cap legacy barrel.
 import { reliefMachineSpaceGeometry } from '../../core/cnc/relief-machine-space';
+import { maxOf, minOf } from '../../core/util';
 
 const RECOMMENDED_STEPOVER_MIN_PERCENT = 10;
 const RECOMMENDED_STEPOVER_MAX_PERCENT = 85;
@@ -238,7 +239,7 @@ function projectedSpan(
   axis: Vec2,
 ): { readonly min: number; readonly max: number } {
   const along = polygon.map((point) => point.x * axis.x + point.y * axis.y);
-  return { min: Math.min(...along), max: Math.max(...along) };
+  return { min: minOf(along), max: maxOf(along) };
 }
 
 function oversizedReliefGridWarnings(project: Project, plan: CncReliefPlan): ReadonlyArray<string> {

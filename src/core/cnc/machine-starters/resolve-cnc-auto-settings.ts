@@ -12,6 +12,7 @@ import {
   resolveCncMachineStarter,
   type CncMachineStarterLiveCaps,
 } from '../resolve-cnc-machine-starter';
+import { minOf } from '../../util';
 
 /** Shared engineering assumption for automatic material-feed calculations. */
 export const DEFAULT_ASSUMED_FLUTE_COUNT = 2;
@@ -185,5 +186,5 @@ function lesserPositive(values: ReadonlyArray<number | undefined>): number | und
   const positive = values.filter(
     (value): value is number => value !== undefined && Number.isFinite(value) && value > 0,
   );
-  return positive.length === 0 ? undefined : Math.min(...positive);
+  return positive.length === 0 ? undefined : minOf(positive);
 }

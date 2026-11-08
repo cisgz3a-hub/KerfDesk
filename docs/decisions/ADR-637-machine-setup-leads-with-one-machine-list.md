@@ -162,6 +162,10 @@ the machines 1.0.29 had already made CNCs: such a CNC is asked whether it is a l
 in Machine Setup and in Job Review, whose Start waits for the answer. It never changes the type
 itself.
 
+Amendment 9 (`ADR-637-amendment-9-reconnects-wait-for-the-job.md`) holds the toolbar's
+**Reconnect now** and step 1's **Reconnect using selected profile** while a job runs, as Save's
+driver switch already was: reconnecting resets the controller, which would end the job.
+
 Verification: `device-setup-auto-fill.test.ts` (a listed laser and a CNC preset keep their type),
 `machine-picker-entries.test.ts` (the CNC reset), and `DeviceSetupMachinePicker.customised.test.tsx`
 (the draft's facts and type question, the replace notice for a CNC preset, **My machine isn't

@@ -11,6 +11,7 @@ import type { ViewTransform } from '../workspace/view-transform';
 import type { CanvasTextSession } from './canvas-text-store';
 import { cssFamilyForFont } from './font-loader';
 import type { DialogValues } from './use-text-dialog-fields';
+import { maxOf, minOf } from '../../core/util';
 
 export function canvasTextInputStyle(
   session: CanvasTextSession,
@@ -97,7 +98,7 @@ function inputMetrics(values: DialogValues, family: string) {
       (measured[index]?.width ?? line.length * size * 0.6) +
       Math.max(0, Array.from(line).length - 1) * values.letterSpacing * size,
   );
-  const maxWidth = Math.max(size * 0.5, ...widths);
+  const maxWidth = Math.max(size * 0.5, maxOf(widths));
   const padding = size * 0.3;
   const width = maxWidth + padding;
   const factor = values.alignment === 'left' ? 0 : values.alignment === 'center' ? 0.5 : 1;
@@ -107,8 +108,8 @@ function inputMetrics(values: DialogValues, family: string) {
   const minX =
     ink.length === 0
       ? 0
-      : Math.min(
-          ...ink.map(
+      : minOf(
+          ink.map(
             ({ metrics: m, index: i }) =>
               (maxWidth - (widths[i] ?? 0)) * factor - (m?.actualBoundingBoxLeft ?? 0),
           ),
@@ -116,8 +117,8 @@ function inputMetrics(values: DialogValues, family: string) {
   const minY =
     ink.length === 0
       ? -size * 0.75
-      : Math.min(
-          ...ink.map(
+      : minOf(
+          ink.map(
             ({ metrics: m, index: i }) =>
               i * lineHeight - (m?.actualBoundingBoxAscent ?? size * 0.75),
           ),

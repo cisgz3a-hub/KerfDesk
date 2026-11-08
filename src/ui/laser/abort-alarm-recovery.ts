@@ -41,6 +41,17 @@ export async function restoreOriginAfterAbort(
   await useLaserStore.getState().restoreWorkOrigin(savedMm);
 }
 
+/** Frame's offer while the saved origin is unrestored and the alarm is
+ *  already cleared: Home first on a machine with homing, else write the one
+ *  G92 at once (no Unlock: the controller is not locked). */
+export async function restoreAbortOriginFromIdle(
+  savedMm: { readonly x: number; readonly y: number },
+  homeFirst: boolean,
+): Promise<void> {
+  if (homeFirst) await clearAbortAlarm(true);
+  await useLaserStore.getState().restoreWorkOrigin(savedMm);
+}
+
 /** Unlock, then set the origin where the head stopped. */
 export async function setOriginHereAfterAbort(): Promise<void> {
   await clearAbortAlarm(false);

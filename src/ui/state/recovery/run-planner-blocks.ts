@@ -4,6 +4,7 @@
 
 import { DEFAULT_PLANNER_BLOCKS } from '../../../core/motion-planner/controller-planner-blocks';
 import type { ExecutionArtifactV1 } from './execution-artifact';
+import { maxOf } from '../../../core/util';
 
 /** The usable planner size the run's controller reported, when the run kept
  * it: the session's idle `Bf` blocks free, and the stock `$I` OPT block count
@@ -19,7 +20,7 @@ export function recordedPlannerBlocks(artifact: ExecutionArtifactV1): number | u
   const recorded = [idle, fromBuildInfo].filter(
     (blocks): blocks is number => blocks !== undefined && Number.isFinite(blocks) && blocks > 0,
   );
-  return recorded.length === 0 ? undefined : Math.max(...recorded);
+  return recorded.length === 0 ? undefined : maxOf(recorded);
 }
 
 /** The run's planner size: as recorded, else its controller family's default.

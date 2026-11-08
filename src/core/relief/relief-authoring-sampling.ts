@@ -9,6 +9,7 @@ import { canonicalBase64ByteLength, decodeCanonicalBase64 } from './depth-map-ba
 import { heightfieldMetadataError } from './heightfield-metadata-validator';
 import { reliefHeightfieldDigest } from './heightfield-digest';
 import { reliefBoundaryBounds, reliefBoundaryContains } from './relief-vector-boundary';
+import { maxOf, minOf } from '../util';
 
 export type ComponentSample = { readonly heightMm: number; readonly included: boolean };
 export type ReliefComponentSampler = (point: Vec2) => ComponentSample;
@@ -31,8 +32,8 @@ export function createComponentSampler(
     const projections = source.boundary.rings.flatMap((r) =>
       r.points.map((p) => p.x * dx + p.y * dy),
     );
-    const low = Math.min(...projections),
-      high = Math.max(...projections);
+    const low = minOf(projections),
+      high = maxOf(projections);
     return (p) => {
       if (!reliefBoundaryContains(source.boundary, p)) return { heightMm: 0, included: false };
       let height = source.heightMm;

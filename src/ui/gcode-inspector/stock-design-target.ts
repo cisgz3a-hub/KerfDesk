@@ -12,6 +12,7 @@ import { partialCellCenter } from '../../core/grid';
 import type { Heightmap } from '../../core/relief';
 import { reliefObjectToHeightmap } from '../../core/relief/relief-object-to-heightmap';
 import type { InspectionRelief, ProgramAffine } from './inspection-design';
+import { maxOf, minOf } from '../../core/util';
 
 /** A cell with no design to compare with: above the stock top, where no design lies. */
 export const NO_DESIGN = 1;
@@ -135,7 +136,7 @@ function spansWall(
   // Keep the existing conservative whole-cell wall test, and also account
   // for the shorter physical distance beside a partial terminal cell.
   return (
-    Math.max(...corners) - Math.min(...corners) > WALL_SLOPE * map.mmPerCell ||
+    maxOf(corners) - minOf(corners) > WALL_SLOPE * map.mmPerCell ||
     Math.max(Math.abs(b - a), Math.abs(d - c)) > WALL_SLOPE * dx ||
     Math.max(Math.abs(c - a), Math.abs(d - b)) > WALL_SLOPE * dy
   );
@@ -156,10 +157,10 @@ function footprint(
   const column = (x: number): number => Math.floor((x - cells.originX) / cells.mmPerCell);
   const row = (y: number): number => Math.floor((y - cells.originY) / cells.mmPerCell);
   return {
-    firstColumn: Math.max(0, column(Math.min(...corners.map((p) => p.x)))),
-    lastColumn: Math.min(cells.widthCells - 1, column(Math.max(...corners.map((p) => p.x)))),
-    firstRow: Math.max(0, row(Math.min(...corners.map((p) => p.y)))),
-    lastRow: Math.min(cells.heightCells - 1, row(Math.max(...corners.map((p) => p.y)))),
+    firstColumn: Math.max(0, column(minOf(corners.map((p) => p.x)))),
+    lastColumn: Math.min(cells.widthCells - 1, column(maxOf(corners.map((p) => p.x)))),
+    firstRow: Math.max(0, row(minOf(corners.map((p) => p.y)))),
+    lastRow: Math.min(cells.heightCells - 1, row(maxOf(corners.map((p) => p.y)))),
   };
 }
 

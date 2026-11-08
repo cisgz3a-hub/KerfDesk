@@ -27,6 +27,7 @@ import {
   withoutClosingPoint,
   type FollowedTabs,
 } from './edited-tab-anchors';
+import { maxOf, minOf } from '../util';
 
 type Landing = { readonly point: Vec2; readonly moved: boolean };
 
@@ -137,9 +138,9 @@ function at(start: Vec2, end: Vec2, share: number): Vec2 {
 
 function pointBounds(points: ReadonlyArray<Vec2>): Bounds {
   return {
-    minX: Math.min(...points.map((point) => point.x)),
-    minY: Math.min(...points.map((point) => point.y)),
-    maxX: Math.max(...points.map((point) => point.x)),
-    maxY: Math.max(...points.map((point) => point.y)),
+    minX: minOf(points.map((point) => point.x)),
+    minY: minOf(points.map((point) => point.y)),
+    maxX: maxOf(points.map((point) => point.x)),
+    maxY: maxOf(points.map((point) => point.y)),
   };
 }

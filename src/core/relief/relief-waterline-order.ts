@@ -15,6 +15,7 @@
 import type { CncPath3dPass } from '../job';
 import type { FinishingPoint } from './relief-finishing-path';
 import type { WaterlineSurface } from './relief-waterline-contours';
+import { appendAll } from '../util';
 
 export type WaterlineLevelPath = {
   // Level index: larger is deeper.
@@ -54,7 +55,8 @@ export function orderWaterlinePaths(
       if (end === undefined) break;
       const linked = nextLink(paths, used, level + 1, end, options);
       if (linked === null) break;
-      chain.push(...linked.link, ...startAt(paths, linked.candidate));
+      appendAll(chain, linked.link);
+      appendAll(chain, startAt(paths, linked.candidate));
       used[linked.candidate.index] = 1;
       remaining -= 1;
       level += 1;

@@ -5,12 +5,13 @@
 // rates aren't reported (Codex re-audit R4).
 
 import type { ControllerSettingsSnapshot } from '../../core/controllers/grbl';
+import { minOf } from '../../core/util';
 
 /** The XY feed the controller can actually sustain on every axis, or null when unreported. */
 export function reportedAxisFeedLimit(limits: ControllerSettingsSnapshot): number | null {
   const axisRates = [limits.maxFeedX, limits.maxFeedY].filter(
     (rate): rate is number => rate !== undefined,
   );
-  if (axisRates.length > 0) return Math.min(...axisRates);
+  if (axisRates.length > 0) return minOf(axisRates);
   return limits.maxFeed ?? null;
 }

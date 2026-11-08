@@ -10,6 +10,7 @@ import { BridgeQueue } from './bridge-queue';
 import { pointAtArcDistance } from './polyline-window';
 import { arcLength } from './spur-pruning';
 import type { StrokeGraph } from './stroke-graph';
+import { appendAll } from '../../util';
 
 /** A chain being assembled: mutable point list + liveness. */
 export type Chain = {
@@ -161,7 +162,7 @@ function mergeEnds(a: ChainEnd, b: ChainEnd): void {
   const first = b.chain.points[0];
   // A junction shares one point; a gap bridge must retain BOTH endpoints.
   const duplicate = last !== undefined && first !== undefined && samePoint(last, first);
-  a.chain.points.push(...b.chain.points.slice(duplicate ? 1 : 0));
+  appendAll(a.chain.points, b.chain.points.slice(duplicate ? 1 : 0));
   b.chain.alive = false;
   b.chain.points = [];
 }

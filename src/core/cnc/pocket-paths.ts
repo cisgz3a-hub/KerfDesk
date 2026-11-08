@@ -30,6 +30,7 @@ import { roundStrokeOutline } from '../geometry/round-stroke-outline';
 import { fillHatchingExactWithBudget } from '../job/fill-hatching';
 import type { Polyline } from '../scene';
 import { hasFinitePoints } from './profile-paths';
+import { appendAll } from '../util';
 
 const MIN_CLOSED_POINTS = 3;
 const MIN_STEPOVER_PERCENT = 10;
@@ -158,7 +159,7 @@ function coreRing(
     if (first.offsetFailed) offsetFailed = true;
     if (first.contours.length === 0) continue;
     const core = deepestRing(region, radius, lastInset + stepMm);
-    if (core.ring !== null) cores.push(...core.ring);
+    if (core.ring !== null) appendAll(cores, core.ring);
     offsetFailed ||= core.offsetFailed;
   }
   return { ring: cores.length === 0 ? null : cores, offsetFailed };
@@ -211,7 +212,7 @@ function innermostFirst(rings: ReadonlyArray<ReadonlyArray<Polyline>>): Readonly
   const out: Polyline[] = [];
   for (let k = rings.length - 1; k >= 0; k -= 1) {
     const ring = rings[k];
-    if (ring !== undefined) out.push(...ring);
+    if (ring !== undefined) appendAll(out, ring);
   }
   return out;
 }

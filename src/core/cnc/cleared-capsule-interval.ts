@@ -1,5 +1,6 @@
 import type { Vec2 } from '../scene';
 import type { BoundarySegment } from './vcarve-detail-geometry';
+import { maxOf, minOf } from '../util';
 
 export type UnitInterval = { readonly low: number; readonly high: number };
 
@@ -38,8 +39,8 @@ export function clearedCapsuleInterval(
   return parts.length === 0
     ? null
     : {
-        low: Math.min(...parts.map((part) => part.low)),
-        high: Math.max(...parts.map((part) => part.high)),
+        low: minOf(parts.map((part) => part.low)),
+        high: maxOf(parts.map((part) => part.high)),
       };
 }
 

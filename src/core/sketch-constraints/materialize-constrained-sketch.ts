@@ -7,6 +7,7 @@ import { solveConstrainedSketch } from './solve-constrained-sketch';
 import { sketchPathGeometry, sketchPathKeys } from './sketch-path-geometry';
 import { retainedSketchPaths, type RetainedSketchPaths } from './retained-sketch-paths';
 import { sketchAt } from './sketch-indexed';
+import { maxOf, minOf } from '../util';
 export { sketchPathKeys } from './sketch-path-geometry';
 export function materializeConstrainedSketch(
   sketch: ConstrainedSketch2d,
@@ -33,10 +34,10 @@ export function materializeConstrainedSketch(
       result: { kind: 'invalid', reason: 'The sketch has no line, profile or circle output.' },
     };
   const bounds = {
-    minX: Math.min(...positions.map((point) => point.x)),
-    minY: Math.min(...positions.map((point) => point.y)),
-    maxX: Math.max(...positions.map((point) => point.x)),
-    maxY: Math.max(...positions.map((point) => point.y)),
+    minX: minOf(positions.map((point) => point.x)),
+    minY: minOf(positions.map((point) => point.y)),
+    maxX: maxOf(positions.map((point) => point.x)),
+    maxY: maxOf(positions.map((point) => point.y)),
   };
   return { result, paths, bounds, previousPathKeys: retained.value.currentKeys };
 }

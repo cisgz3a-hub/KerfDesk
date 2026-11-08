@@ -7,6 +7,7 @@ import {
   type NestPlacement,
   type NestRect,
 } from './quick-nest';
+import { maxOf } from '../util';
 
 export type NestGoal = 'tidy' | 'compact' | 'grid';
 export type NestingInput = NestOptions & {
@@ -146,11 +147,9 @@ function gridNest(
     return { item, turn: nestTurn(angles[trial % angles.length] ?? 0) };
   });
   const cellWidth =
-    Math.max(...oriented.map(({ item, turn }) => (turn.rotated90 ? item.height : item.width))) +
-    padding;
+    maxOf(oriented.map(({ item, turn }) => (turn.rotated90 ? item.height : item.width))) + padding;
   const cellHeight =
-    Math.max(...oriented.map(({ item, turn }) => (turn.rotated90 ? item.width : item.height))) +
-    padding;
+    maxOf(oriented.map(({ item, turn }) => (turn.rotated90 ? item.width : item.height))) + padding;
   const columns = Math.floor((bin.maxX - bin.minX) / cellWidth);
   const rows = Math.floor((bin.maxY - bin.minY) / cellHeight);
   if (!Number.isFinite(columns) || !Number.isFinite(rows) || columns <= 0 || rows <= 0) {
