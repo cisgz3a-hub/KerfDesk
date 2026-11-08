@@ -3,7 +3,9 @@
 // takes no room from the canvas, and offers the machine last saved in Machine
 // Setup, or Machine Setup itself. Not now hides it until the next launch. It
 // gives the corner up to the G-code view's bar and the registration jig panel,
-// which sit there too, so it never covers their buttons.
+// which sit there too, so it never covers their buttons. The same corner asks
+// whether a CNC that KerfDesk 1.0.29 may have made from a laser is a laser
+// (ADR-637 Amendment 8).
 
 import { useMemo, useState } from 'react';
 import type { DeviceProfile } from '../../core/devices';
@@ -17,6 +19,15 @@ import { browserLocalStorage } from '../state/browser-local-storage';
 import { loadConfiguredSignatures } from '../state/device-setup-configured-persistence';
 import { loadLastMachine } from '../state/last-machine-persistence';
 import { machineSetupBannerState } from './machine-setup-banner-state';
+import type { ConvertedLaserSuspicion } from '../../core/preflight/converted-laser-profile';
+import {
+  CONVERTED_LASER_HEADING,
+  CONVERTED_LASER_RISK,
+  convertedLaserHintSentence,
+  convertedLaserQuestion,
+  useConvertedLaserAnswerStore,
+} from '../state/converted-laser-question';
+import { useLaserStore } from '../state/laser-store';
 
 export function MachineSetupBanner(): JSX.Element | null {
   const device = useStore((state) => state.project.device);
@@ -31,6 +42,10 @@ export function MachineSetupBanner(): JSX.Element | null {
     () => machineSetupBannerState({ device, dismissed, cornerTaken, ...saved }),
     [device, dismissed, cornerTaken, saved],
   );
+  const convertedLaser = useConvertedLaserBanner();
+  if (convertedLaser !== null && !dismissed && !cornerTaken) {
+    return <ConvertedLaserBanner question={convertedLaser} onDismiss={() => setDismissed(true)} />;
+  }
   if (banner.kind === 'hidden') return null;
   const size = bedSize(device);
   return (
@@ -61,6 +76,55 @@ export function MachineSetupBanner(): JSX.Element | null {
           </Button>
         )}
         <Button title="Hide this until KerfDesk next starts." onClick={() => setDismissed(true)}>
+          Not now
+        </Button>
+      </span>
+    </section>
+  );
+}
+
+// A CNC that KerfDesk 1.0.29 may have made from a laser is asked about as soon
+// as it is restored (ADR-637 Amendment 8). Job Review's Start waits for the
+// same answer, so Not now only hides this card.
+function useConvertedLaserBanner(): ConvertedLaserSuspicion | null {
+  const device = useStore((state) => state.project.device);
+  const machine = useStore((state) => state.project.machine);
+  const detectedSettings = useLaserStore((state) => state.detectedSettings);
+  const controllerBuildInfo = useLaserStore((state) => state.controllerBuildInfo);
+  const routerAnswered = useConvertedLaserAnswerStore((state) => state.routerAnswered);
+  return useMemo(
+    () =>
+      convertedLaserQuestion(
+        { device, machine },
+        { detectedSettings, controllerBuildInfo },
+        routerAnswered,
+      ),
+    [device, machine, detectedSettings, controllerBuildInfo, routerAnswered],
+  );
+}
+
+function ConvertedLaserBanner(props: {
+  readonly question: ConvertedLaserSuspicion;
+  readonly onDismiss: () => void;
+}): JSX.Element {
+  const hints = convertedLaserHintSentence(props.question);
+  return (
+    <section role="status" aria-label={CONVERTED_LASER_HEADING} style={convertedBannerStyle}>
+      <span>
+        <strong>{CONVERTED_LASER_HEADING}</strong> {CONVERTED_LASER_RISK}
+        {hints === null ? null : ` ${hints}`}
+      </span>
+      <span style={actionsStyle}>
+        <Button variant="primary" onClick={() => openMachineSetup()}>
+          It&apos;s a laser: open Machine Setup
+        </Button>
+        <Button onClick={() => useConvertedLaserAnswerStore.getState().answerRouter()}>
+          This is a CNC router
+        </Button>
+        <Button
+          title="Hide this until KerfDesk next starts. Job Review asks again before Start."
+          onClick={props.onDismiss}
+        >
           Not now
         </Button>
       </span>
@@ -104,6 +168,12 @@ const bannerStyle: React.CSSProperties = {
   color: 'var(--lf-text)',
   fontSize: 12,
   lineHeight: 1.45,
+};
+
+const convertedBannerStyle: React.CSSProperties = {
+  ...bannerStyle,
+  width: 380,
+  borderLeft: '3px solid var(--lf-danger)',
 };
 
 const actionsStyle: React.CSSProperties = {

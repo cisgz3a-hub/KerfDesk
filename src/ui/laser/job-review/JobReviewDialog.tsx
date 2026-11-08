@@ -24,6 +24,8 @@ import { JobReviewAcknowledgement } from './JobReviewAcknowledgement';
 import { JobReviewBeforeYouStart } from './JobReviewBeforeYouStart';
 import { JobReviewCncOwnerActions } from './JobReviewCncOwnerActions';
 import { JobReviewControllerSection } from './JobReviewControllerSection';
+import { JobReviewConvertedLaser } from './JobReviewConvertedLaser';
+import { CONVERTED_LASER_START_TITLE } from '../../state/converted-laser-question';
 import { JobReviewHeader } from './JobReviewHeader';
 import { JobReviewMachineSection } from './JobReviewMachineSection';
 import { JobReviewOperations } from './JobReviewOperations';
@@ -63,7 +65,9 @@ function OpenJobReview(props: {
       ? blocker.join('\n')
       : isEditing
         ? SAVE_EDIT_BEFORE_START_TITLE
-        : null;
+        : model.convertedLaser !== undefined
+          ? CONVERTED_LASER_START_TITLE
+          : null;
   const handleConfirm = (): void => {
     if (startDisabledReason === null) useJobReviewStore.getState().confirm();
   };
@@ -79,6 +83,7 @@ function OpenJobReview(props: {
         wholeOutput={model.registrationJigWholeOutput}
         isPreparing={isPreparing}
       />
+      <JobReviewConvertedLaser question={model.convertedLaser} onAnswered={requestReviewRebuild} />
       <JobReviewStats stats={model.stats} isPreparing={isPreparing} />
       {blocker !== null ? (
         <BlockerBanner blocker={blocker} purpose={purpose} onRetry={requestReviewRebuild} />

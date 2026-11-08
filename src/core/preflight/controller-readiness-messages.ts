@@ -10,6 +10,8 @@
 // `speed_map` (Spindle.cpp:150-156, Spindle.h:106), and M4 is refused by a
 // spindle that is neither a Laser nor reversible (GCode.cpp:654-658).
 
+import { LASER_POWER_SCALE_CEILING } from './converted-laser-profile';
+
 /** Where the controller keeps `$30`/`$32`: writable `$N=` settings, or
  *  FluidNC's YAML spindle configuration (the only read-only dump). */
 export type ReadinessSettingsSource = 'dollar-settings' | 'fluidnc-yaml';
@@ -130,9 +132,16 @@ export function spindleScaleMismatchMessage(
   source: ReadinessSettingsSource,
 ): string {
   const mismatch = `Controller $30 is ${controllerMaxPowerS} but this machine's spindle max RPM is ${spindleMaxRpm}.`;
-  return source === 'fluidnc-yaml'
-    ? `${mismatch} FluidNC reports $30 from the top of the spindle's speed_map in its YAML config: change speed_map there to reach ${spindleMaxRpm}, or update the machine profile, so S values map to real RPM.`
-    : `${mismatch} Set $30=${spindleMaxRpm} (or update the machine profile) so S values map to real RPM.`;
+  if (source === 'fluidnc-yaml') {
+    return `${mismatch} FluidNC reports $30 from the top of the spindle's speed_map in its YAML config: change speed_map there to reach ${spindleMaxRpm}, or update the machine profile, so S values map to real RPM.`;
+  }
+  // A `$30` at a laser's power scale may be a laser set up as a CNC (KerfDesk
+  // 1.0.29 did that at `$32=0`, ADR-637 Amendment 8). Raising `$30` would not
+  // make that safe, so the laser comes first.
+  if (controllerMaxPowerS <= LASER_POWER_SCALE_CEILING && spindleMaxRpm > controllerMaxPowerS) {
+    return `${mismatch} ${controllerMaxPowerS} is the scale lasers use: if this machine is a laser, it is set up as a CNC and this job fires the beam at full power, so do not start it; open Machine Setup and choose Laser. If it is a router, set $30=${spindleMaxRpm} (or update the machine profile) so S values map to real RPM.`;
+  }
+  return `${mismatch} Set $30=${spindleMaxRpm} (or update the machine profile) so S values map to real RPM.`;
 }
 
 // GRBL's laser mode passes zero spindle speed on every non-cutting motion and

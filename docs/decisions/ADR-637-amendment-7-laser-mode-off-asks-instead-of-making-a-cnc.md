@@ -82,8 +82,12 @@ writes no controller setting without the operator's click, a saved backup and a 
 ### Consequences
 
 - A generic diode with stock GRBL stays a laser from its first Connect and is one click (plus the
-  backup and the confirm) from laser mode on. The CNC output path cannot be reached from `$32`
-  alone.
+  backup and the confirm) from laser mode on. A new Connect can no longer reach the CNC output
+  path from `$32` alone.
+  - **Corrected by Amendment 8 (2026-11-08).** This first read "The CNC output path cannot be
+    reached from `$32` alone", which was false for every machine 1.0.29 had already saved this
+    way: such a machine restored as a CNC and Start sent `M3 S12000`, `G4 P3.000` and rapids with
+    no `S0` (rolling audit v10 V2-P2-2). Amendment 8 asks those machines before Start.
 - A router with `$32=0` that a beginner set up as a laser is turned into a CNC only by their own
   answer.
 - G-code is unchanged: the profile's laser-mode expectation feeds only the setup's comparison and

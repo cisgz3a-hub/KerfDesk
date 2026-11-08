@@ -45,7 +45,9 @@ reads them.
 Browser storage and projects saved by 1.0.28's own hooks and store, the same way (rolling audit v9
 R6): a temporary test under the export's `src` drove the Studio's Apply with its persistence hook
 mounted, and connected its laser store to the published A1 Pro banner and `$$` with its profile
-persistence hook mounted.
+persistence hook mounted. The 1.0.29 last machine was made by 1.0.29's own `initDeviceSetup`,
+`planControllerAutoFill`, `deviceSetupReducer`, `machineSetupProfile` and `rememberLastMachine`
+(rolling audit v10's refuter bundle of `df2279e26`).
 
 | File                                      | Read by                                        | Holds                                                                    |
 | ----------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------ |
@@ -53,6 +55,7 @@ persistence hook mounted.
 | `1.0.28-studio-older.lf2`                 | `design-kept-drawings-copies.test.tsx`         | That project after its first Apply (1 line), as an older autosave         |
 | `1.0.28-studio-newer.lf2`                 | `design-kept-drawings-copies.test.tsx`         | That project after its second Apply (3 lines)                             |
 | `1.0.28-a1-pro-widened-last-machine.json` | `falcon-a1-pro-connect-home.simulator.test.ts` | The last-machine document after Use detected values: bed 363 × 273 mm     |
+| `1.0.29-laser-made-cnc-last-machine.json` | `converted-laser-question.test.ts`, `converted-laser-question.e2e.ts` | The laser starter after 1.0.29's first Connect to a stock-GRBL `$$` (`$30=1000`, `$32=0`): saved as a CNC (U8-P2-1, V2-P2-2) |
 
 Add one set per release at release time. To make one, export the release into a folder inside your
 worktree, build the scene in a temporary test under its `src`, save with its

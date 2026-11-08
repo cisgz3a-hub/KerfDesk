@@ -5,6 +5,7 @@ import { compiledFocusTestWarnings } from './focus-test-warnings';
 // compiled facts come from the prepared job.
 
 import type { OverrideValues } from '../../../core/controllers/grbl';
+import type { ConvertedLaserSuspicion } from '../../../core/preflight/converted-laser-profile';
 import type { JobOriginPlacement } from '../../../core/job';
 import {
   DEFAULT_OUTPUT_SCOPE,
@@ -78,6 +79,9 @@ export interface JobReviewModel extends JobReviewOmissions, jig.ReviewFacts {
   readonly acknowledgement: JobReviewAcknowledgement;
   readonly outputQualityFacts: ReadonlyArray<JobReviewFact>;
   readonly effectiveOperations: ReturnType<typeof buildEffectiveOperationReview>;
+  /** A CNC that KerfDesk 1.0.29 may have made from a laser: Start waits until
+   * the operator says which it is (ADR-637 Amendment 8). Joined by the gate. */
+  readonly convertedLaser?: ConvertedLaserSuspicion;
 }
 
 export type JobReviewStreamThroughput = Pick<StreamThroughputInput, 'window' | 'controllerKind'>;

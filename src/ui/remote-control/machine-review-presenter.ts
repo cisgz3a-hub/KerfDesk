@@ -15,6 +15,10 @@ import { reviewMessageProjector } from './review-message-sharing';
 export const REVIEW_EDITING_MESSAGE =
   'A setting is being edited in the Job Review on the PC. Save or discard it there, then approve the new review.';
 
+/** Why a remote cannot approve while the PC's review asks the machine type. */
+export const REVIEW_MACHINE_TYPE_MESSAGE =
+  'The Job Review on the PC asks whether this machine is a laser. Answer it there, then approve the new review.';
+
 /** Approval names exactly one displayed ordinary review owner and model. */
 export function machineReviewPresenter(
   operation: OwnedMachineOperation,
@@ -50,7 +54,9 @@ export function machineReviewPresenter(
         return;
       }
       const editing = current.editingOperationIds.size > 0;
-      if (heldForPreparation(operation, current.state, current.pendingSignal, editing)) return;
+      const asking = current.state.model.convertedLaser !== undefined;
+      if (heldForPreparation(operation, current.state, current.pendingSignal, editing, asking))
+        return;
       if (current.state.model !== displayedModel) {
         displayedModel = current.state.model;
         displayedRevision = revision();
@@ -93,22 +99,25 @@ export function machineReviewPresenter(
 }
 // Preparing, blocked or cancelled, or a card mid-edit on the PC: the remote has
 // nothing to approve. Start waits for an unsaved edit (ADR-638) because the job
-// must run only the values the review shows.
+// must run only the values the review shows. A machine-type question waits for
+// the PC too: only its owner can say whether the machine is a laser (ADR-637
+// Amendment 8).
 function heldForPreparation(
   operation: OwnedMachineOperation,
   state: Extract<JobReviewState, { readonly kind: 'open' }>,
   signal: JobReviewSignal | null,
   editing: boolean,
+  asking: boolean,
 ): boolean {
   const blocked = preparationBlocked(state, signal);
-  if (!blocked && !editing) return false;
+  if (!blocked && !editing && !asking) return false;
   delete operation.review;
   operation.state = 'preparing';
   if (blocked && state.blocker !== null) {
     operation.message = state.blocker.join('\n');
     operation.privateMessage = true;
   } else if (!blocked) {
-    operation.message = REVIEW_EDITING_MESSAGE;
+    operation.message = asking ? REVIEW_MACHINE_TYPE_MESSAGE : REVIEW_EDITING_MESSAGE;
     delete operation.privateMessage;
   }
   return true;

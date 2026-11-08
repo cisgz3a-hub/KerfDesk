@@ -13,6 +13,8 @@ import type { DeviceSetupState } from './device-setup-flow';
 import { machineSetupProfile } from './device-setup-flow';
 import { computeFirmwareDiffs, type FirmwareDiff } from './device-setup-firmware-diff';
 import { switchDriverAfterSave } from './save-driver-switch';
+import { setupConvertedLaserQuestion } from './DeviceSetupConvertedLaser';
+import { useConvertedLaserAnswerStore } from '../../state/converted-laser-question';
 
 // A running or held job keeps the machine it started with, as the toolbar's
 // Laser/CNC switch does (ADR-416 Amendment 1). Save replaces the machine type,
@@ -82,6 +84,7 @@ export function useMachineSetupSave(input: {
     )) {
       pushToast(advisory, 'warning');
     }
+    keepRouterAnswer(input.state);
     input.onConfigured?.(profile);
     await syncFirmware(writes, writeGrblSetting, pushToast);
     input.onClose();
@@ -90,6 +93,16 @@ export function useMachineSetupSave(input: {
     await switchDriverAfterSave(platform);
   };
   return { saving, firmwareWriteCount: writes.length, lockedByJob, onSave };
+}
+
+// A CNC saved here is the operator's own choice (ADR-637 Amendment 7), so a
+// starter set up as a router is not asked whether it is a laser later. A CNC
+// Setup opened on while 1.0.29's question is still open is not an answer:
+// Save alone keeps that question (Amendment 8).
+function keepRouterAnswer(state: DeviceSetupState): void {
+  if (state.draftMachine.kind !== 'cnc') return;
+  if (setupConvertedLaserQuestion(state, useLaserStore.getState()) !== null) return;
+  useConvertedLaserAnswerStore.getState().answerRouter();
 }
 
 async function syncFirmware(

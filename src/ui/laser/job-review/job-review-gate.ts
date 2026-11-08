@@ -55,6 +55,7 @@ import {
 } from './job-review-presentation';
 import { frozenLaserPowerScaleWarnings } from '../connected-laser-power-scale';
 import { clearReviewedJobSnapshot, publishReviewedJobSnapshot } from './reviewed-job-snapshot';
+import { confirmableReview, withConvertedLaserQuestion } from './job-review-converted-laser';
 
 /** Everything one successful prepare ran against. Only ever replaced whole,
  * by another successful prepare, so the bundle that streams is provably the
@@ -124,10 +125,8 @@ export async function runJobReviewGate(args: {
         continue;
       }
       const rebuiltModel = modelFor(rebuilt.bundle);
-      if (
-        signal === 'confirm' &&
-        sameReviewedArtifact(current, displayedModel, rebuilt.bundle, rebuiltModel)
-      ) {
+      const same = sameReviewedArtifact(current, displayedModel, rebuilt.bundle, rebuiltModel);
+      if (signal === 'confirm' && confirmableReview(rebuiltModel, same)) {
         return confirmReviewedStart(rebuilt.bundle, rebuiltModel);
       }
       // Changed bytes/evidence need a new affirmative click after display.
@@ -244,7 +243,9 @@ export function modelFor(bundle: ReviewedStartBundle): ReturnType<typeof buildJo
   const externalPreview = useStore.getState().externalGcodePreview;
   const model = appendExternalGcodePreviewWarning(framedModel, externalPreview?.name);
   // The live command set too: Connect binds it from the profile (ADR-375).
-  return refreshControllerIdentityWarnings(model, device, liveLaser);
+  // A CNC that 1.0.29 may have made from a laser asks first (ADR-637 Amd 8).
+  const identified = refreshControllerIdentityWarnings(model, device, liveLaser);
+  return withConvertedLaserQuestion(identified, bundle.project, liveLaser);
 }
 
 // A Confirm click is the acknowledgement: the dialog showed the exact prompt
