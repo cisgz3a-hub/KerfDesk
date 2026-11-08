@@ -43,6 +43,7 @@ import {
   type Vec2,
 } from '../scene';
 import type { PreflightIssue } from './preflight';
+import { appendAll } from '../util';
 
 /** Per operation, the outlines that miss a setting and which settings. */
 type OperationLines = {
@@ -142,8 +143,8 @@ function collectObject(
   for (const path of object.paths) {
     if (!pathUsesOperation(object, path, operation)) continue;
     const starts = closedStarts(path, object);
-    collected.probes.push(...starts);
-    if (kerf) collected.kerfProbes.push(...starts);
+    appendAll(collected.probes, starts);
+    if (kerf) appendAll(collected.kerfProbes, starts);
     if (!subpaths(path).some((subpath) => !subpath.closed)) continue;
     operationLines(collected, operation);
     const settings = {

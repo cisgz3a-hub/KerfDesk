@@ -14,6 +14,7 @@ import type { RasterImage } from '../../core/scene';
 import type { TraceOptions } from '../../core/trace';
 import type { ImageDimensions } from './image-loader';
 import { PREVIEW_MAX_EDGE_PX, scaleToCap } from './trace-decode-cap';
+import { minOf } from '../../core/util';
 
 /** Two samples across the laser spot: a feature narrower than half a spot
  *  cannot be burned as a separate mark, so a finer trace grid gains nothing. */
@@ -96,7 +97,7 @@ export function traceTargetPxPerMm(
   const spot = machineKind === 'cnc' ? undefined : device?.laserSubProfile?.spotSizeMm;
   // The finer axis sets the density; an axis without a usable value is skipped.
   const axes = spot === undefined ? [] : [spot.x, spot.y].filter(isPositiveFinite);
-  const spotMm = axes.length === 0 ? DEFAULT_TRACE_SPOT_MM : Math.min(...axes);
+  const spotMm = axes.length === 0 ? DEFAULT_TRACE_SPOT_MM : minOf(axes);
   return TRACE_SAMPLES_PER_SPOT / spotMm;
 }
 

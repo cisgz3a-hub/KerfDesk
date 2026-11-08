@@ -6,6 +6,7 @@
 
 import type { BedTargetLayout, BedTargetMark } from './bed-target';
 import type { RingMark } from './ring-detect';
+import { maxOf, minOf } from '../../util';
 
 type Vec2 = { readonly x: number; readonly y: number };
 
@@ -87,7 +88,7 @@ export function matchBedTarget(
     mirrored: cross(sub(anchors.x, anchors.origin), sub(anchors.y, anchors.origin)) < 0,
   }));
   const needed = Math.max(MIN_MATCHED, Math.ceil(MIN_MATCHED_SHARE * layout.marks.length));
-  const largest = Math.max(...grown.map((g) => g.grid.size));
+  const largest = maxOf(grown.map((g) => g.grid.size));
   if (largest < needed) return { kind: 'failed', reason: 'too-few-marks' };
   const fitting = grown.filter((g) => g.outside === 0);
   const best = fitting.reduce<GrownGrid | null>(
@@ -243,10 +244,10 @@ function growGrid(
   const layoutCells = new Set(layout.marks.map((m) => key(m.col, m.row)));
   const cols = layout.marks.map((m) => m.col);
   const rows = layout.marks.map((m) => m.row);
-  const minCol = Math.min(...cols) - GROW_PAST_EDGE;
-  const maxCol = Math.max(...cols) + GROW_PAST_EDGE;
-  const minRow = Math.min(...rows) - GROW_PAST_EDGE;
-  const maxRow = Math.max(...rows) + GROW_PAST_EDGE;
+  const minCol = minOf(cols) - GROW_PAST_EDGE;
+  const maxCol = maxOf(cols) + GROW_PAST_EDGE;
+  const minRow = minOf(rows) - GROW_PAST_EDGE;
+  const maxRow = maxOf(rows) + GROW_PAST_EDGE;
   const reachable = (col: number, row: number): boolean =>
     col >= minCol && col <= maxCol && row >= minRow && row <= maxRow;
   const ringsOnly = rings.filter((ring) => !ring.anchor);

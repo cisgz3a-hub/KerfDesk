@@ -7,6 +7,7 @@
 import type * as ThreeNamespace from 'three';
 import type { Group, Material } from 'three';
 import type { StudioToolSpec } from './viewer3d-look';
+import { maxOf } from '../../core/util';
 
 type ThreeModule = typeof ThreeNamespace;
 type Profile = ReadonlyArray<readonly [number, number]>;
@@ -44,7 +45,7 @@ function bitInHolder(
   const polished = metal(three, 0xdfe3e8, 0.14);
   const cutter = spec.profile.map((point) => [point.radiusMm, point.heightMm] as const);
   const cutterTop = cutter.at(-1)?.[1] ?? 0;
-  const cutterRadius = Math.max(0.1, ...cutter.map(([radius]) => radius));
+  const cutterRadius = Math.max(0.1, maxOf(cutter.map(([radius]) => radius)));
   const shankRadius = Math.max(cutterRadius, spec.shankDiameterMm / 2);
   group.add(lathe(three, [[0, 0], ...cutter, [0, cutterTop]], carbide, 0));
   let top = cutterTop;

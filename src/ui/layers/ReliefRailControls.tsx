@@ -13,6 +13,7 @@ import type {
 import { openRailForRelief } from '../../core/relief/relief-rail-profile-links';
 import { reviseReliefDocument } from '../../core/relief/relief-authoring-document';
 import { NumberControl } from './ReliefComponentControls';
+import { maxOf, minOf } from '../../core/util';
 
 type CreationProps = {
   readonly document: ReliefAuthoringDocument;
@@ -123,10 +124,10 @@ function profileFromVector(object: SceneObject, heightMm: number): ReliefProfile
   points = increasingProfileDirection(points);
   const xs = points.map((p) => p.x),
     ys = points.map((p) => p.y);
-  const minX = Math.min(...xs),
-    maxX = Math.max(...xs),
-    minY = Math.min(...ys),
-    maxY = Math.max(...ys);
+  const minX = minOf(xs),
+    maxX = maxOf(xs),
+    minY = minOf(ys),
+    maxY = maxOf(ys);
   if (!(maxX > minX)) throw new Error('Profile must span a non-zero X width.');
   return points.map((p) => ({
     x: (p.x - minX) / (maxX - minX),

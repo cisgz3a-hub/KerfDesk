@@ -15,6 +15,7 @@ import {
   vcarveMedialRegionsFromTree,
   type VCarveMedialRegion,
 } from './vcarve-medial-region';
+import { appendAll } from '../util';
 
 const MAX_FLOOR_RINGS = 8192;
 // Clipper's default round-join arc tolerance as a fraction of the offset;
@@ -121,9 +122,9 @@ function linkFloorLoops(
         returnPoints.push(current);
         route.push(next);
       }
-      route.push(...nextLoop.slice(1));
+      appendAll(route, nextLoop.slice(1));
     }
-    route.push(...returnPoints.reverse());
+    appendAll(route, returnPoints.reverse());
     routes.push({ points: route, closed: true });
   }
   return routes;

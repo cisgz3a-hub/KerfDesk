@@ -5,6 +5,7 @@
 
 import type { JobOriginPlacement, JobPlacementSettings } from '../../core/job';
 import { findRegistrationBoxes, type Project } from '../../core/scene';
+import { minOf } from '../../core/util';
 
 export type RegistrationOutlineRun = {
   readonly placement: JobPlacementSettings;
@@ -39,8 +40,8 @@ export function placementOf(jobOrigin: JobOriginPlacement | undefined): JobPlace
 
 function outlineSetKey(project: Project): string {
   const boxes = [...findRegistrationBoxes(project.scene)].sort((a, b) => a.id.localeCompare(b.id));
-  const left = Math.min(...boxes.map((box) => box.transform.x));
-  const top = Math.min(...boxes.map((box) => box.transform.y));
+  const left = minOf(boxes.map((box) => box.transform.x));
+  const top = minOf(boxes.map((box) => box.transform.y));
   return JSON.stringify(
     boxes.map((box) => [
       box.id,

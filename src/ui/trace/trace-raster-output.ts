@@ -14,6 +14,7 @@ import { buildBitmapFromVectors } from '../raster/vector-to-bitmap';
 import { packPhotoBitmapGeometry } from '../raster/packed-photo-bitmap';
 import { positionTraceOverRasterSource } from '../state/scene-mutations';
 import { checkTraceSignal } from './trace-cancellation';
+import { maxOf } from '../../core/util';
 
 export type RasterTraceOperationInput = {
   readonly operation: Layer;
@@ -165,7 +166,7 @@ export function rasterTraceLinesPerMm(
     normalizedLinesPerMm(effectiveOperationForObject(operation, source).linesPerMm),
   );
   if (!operations.some((operation) => effectivePassThrough(source, operation))) {
-    return Math.max(...densities);
+    return maxOf(densities);
   }
   const nativeDensity = nativeTraceLinesPerMm(source, traced);
   if (nativeDensity > MAX_RASTER_LINES_PER_MM + 1e-6) {
@@ -173,7 +174,7 @@ export function rasterTraceLinesPerMm(
       `Pass Through needs ${nativeDensity.toFixed(2)} lines/mm to preserve this trace grid, above the supported ${MAX_RASTER_LINES_PER_MM} lines/mm. Disable Pass Through, resize the image, or choose Editable vectors.`,
     );
   }
-  return Math.max(nativeDensity, ...densities);
+  return Math.max(nativeDensity, maxOf(densities));
 }
 
 function effectivePassThrough(source: RasterImage, operation: Layer): boolean {
@@ -191,7 +192,7 @@ function nativeTraceLinesPerMm(source: RasterImage, traced: TracedImage): number
       'Pass Through cannot preserve a trace grid with an empty or invalid physical size. Resize the image before tracing.',
     );
   }
-  return Math.max(...densities);
+  return maxOf(densities);
 }
 
 function positiveGridDimension(value: number | undefined, fallback: number): number {

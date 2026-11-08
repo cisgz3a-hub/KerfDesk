@@ -3,6 +3,7 @@
 // dialog renders issues and disables generation — nothing here throws.
 
 import { edgePattern, MIN_FINGER_WIDTH_MM } from './edge-pattern';
+import { minOf } from '../util';
 
 export type BoxStyle = 'closed' | 'open-top' | 'slide-lid';
 export type BoxDimensionMode = 'inner' | 'outer';
@@ -248,8 +249,8 @@ function minFingerCellMm(spec: BoxSpec, dims: BoxDims): number {
     // Dividers rise the full cavity: inner height for every style.
     spans.push(dims.innerHeightMm + 2 * spec.thicknessMm);
   }
-  return Math.min(
-    ...spans.map(
+  return minOf(
+    spans.map(
       (fullSpanMm) =>
         edgePattern({
           fullSpanMm,

@@ -1,5 +1,6 @@
 import { getCanvasColorScheme } from './canvas-color-scheme';
 import { canvasTheme, DARK_CANVAS_BED } from './canvas-theme';
+import { maxOf, minOf } from '../../core/util';
 
 // Display-only: callers use this paint in Canvas2D or the live text overlay,
 // never in scene data, raster processing, export or job preparation.
@@ -9,7 +10,7 @@ export function canvasVectorDisplayColor(color: string): string {
   if (rgb === null || contrastWithDarkBed(rgb) >= 3) return color;
   // Default black/grey artwork uses the approved light ink. Low-contrast
   // chromatic colours are lightened with their relative channel order intact.
-  if (Math.max(...rgb) - Math.min(...rgb) <= 16) return canvasTheme.artworkInk;
+  if (maxOf(rgb) - minOf(rgb) <= 16) return canvasTheme.artworkInk;
   let amount = 0.1;
   let display = rgb;
   while (contrastWithDarkBed(display) < 3 && amount <= 1) {

@@ -10,6 +10,7 @@ import {
   type Transform,
 } from '../../core/scene';
 import { effectiveOperationForObject } from '../../core/scene/effective-operation';
+import { maxOf, minOf } from '../../core/util';
 
 // Stacked copies of one artwork (ADR-359). Duplicate-in-place followed by a
 // nudge, a second import of the same file, or a re-trace that kept the old
@@ -149,10 +150,10 @@ function unrotatedFootprint(obj: SceneObject): AABB {
   const xs = [obj.bounds.minX * sx, obj.bounds.maxX * sx];
   const ys = [obj.bounds.minY * sy, obj.bounds.maxY * sy];
   return {
-    minX: ox + Math.min(...xs),
-    maxX: ox + Math.max(...xs),
-    minY: oy + Math.min(...ys),
-    maxY: oy + Math.max(...ys),
+    minX: ox + minOf(xs),
+    maxX: ox + maxOf(xs),
+    minY: oy + minOf(ys),
+    maxY: oy + maxOf(ys),
   };
 }
 

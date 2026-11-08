@@ -25,6 +25,7 @@ import type { Layer, SceneObject } from '../scene';
 import type { ColourLayerOutput } from './colour-layer-options';
 import { hexOkLightness } from './colour-oklab';
 import { PAPER_MIN_LIGHTNESS } from './colour-quantize';
+import { maxOf } from '../util';
 
 const CUT_OUT_MIN_FRACTION = 0.25;
 const STACKED_MIN_FRACTION = 0.1;
@@ -64,7 +65,7 @@ export function colourLayerSettings(
     .map((e) => ({ color: e.color, darkness: Math.max(0, 1 - e.lightness) }));
   const settings = new Map<string, ColourLayerSetting>();
   for (const entry of lightestFirst) settings.set(entry.color, { power: 0, output: false });
-  const reference = Math.max(FULL_POWER_MIN_DARKNESS, ...burned.map((e) => e.darkness));
+  const reference = Math.max(FULL_POWER_MIN_DARKNESS, maxOf(burned.map((e) => e.darkness)));
   let previous = 0;
   for (const entry of burned) {
     const fraction =

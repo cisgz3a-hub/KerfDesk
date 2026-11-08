@@ -2,6 +2,7 @@
 // cubic roots are isolated between derivative roots so tangencies are retained.
 import { endpointArc, type CenterArc } from '../scene/curve-path';
 import { applyTransform, type PathSegment, type Transform, type Vec2 } from '../scene';
+import { maxOf, minOf } from '../util';
 
 export const EXTEND_EPS_MM = 1e-7;
 export type RayContact = { readonly distance: number; readonly overlap: boolean };
@@ -51,7 +52,7 @@ export function segmentRayParametricContacts(
         ).filter((t) => t > 0 && t < 1),
       ];
       const values = extrema.map((t) => evaluate(alongCoefficients, t));
-      return overlapContact(Math.min(...values), Math.max(...values));
+      return overlapContact(minOf(values), maxOf(values));
     }
     return unitRoots(sideCoefficients).flatMap((t) => contact(evaluate(alongCoefficients, t), t));
   }

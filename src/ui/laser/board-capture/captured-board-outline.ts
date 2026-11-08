@@ -5,6 +5,7 @@ import {
   type CapturedBoardGeometry,
   type Scene,
 } from '../../../core/scene';
+import { maxOf, minOf } from '../../../core/util';
 
 const OUTLINE_SIZE_TOLERANCE_MM = 1e-3;
 
@@ -50,8 +51,8 @@ function expectedSize(
   const xs = shape.pointsMm.map((point) => point.x);
   const ys = shape.pointsMm.map((point) => point.y);
   return {
-    width: Math.max(...xs) - Math.min(...xs),
-    height: Math.max(...ys) - Math.min(...ys),
+    width: maxOf(xs) - minOf(xs),
+    height: maxOf(ys) - minOf(ys),
   };
 }
 

@@ -12,6 +12,7 @@
 // corner is special — it sets the work origin, so it must be the bottom-left.
 
 import type { Vec2 } from './scene-object';
+import { maxOf, minOf } from '../util';
 
 // The five reference points on a captured board, shared by the on-canvas
 // alignment buttons (align artwork to this corner/centre of the outline) and the
@@ -158,10 +159,10 @@ function boundingBox(points: ReadonlyArray<Vec2>): Aabb {
   const xs = points.map((p) => p.x);
   const ys = points.map((p) => p.y);
   return {
-    minX: Math.min(...xs),
-    minY: Math.min(...ys),
-    maxX: Math.max(...xs),
-    maxY: Math.max(...ys),
+    minX: minOf(xs),
+    minY: minOf(ys),
+    maxX: maxOf(xs),
+    maxY: maxOf(ys),
   };
 }
 

@@ -8,6 +8,7 @@ import {
   calibrationLabelWidthMm,
   createCalibrationLabelObject,
 } from './calibration-labels';
+import { maxOf, minOf } from '../util';
 
 // A column label spans at most this share of the column pitch, so the clear
 // space between two labels is always wider than the space between two digits.
@@ -42,14 +43,15 @@ export function materialTestLayout(args: {
   const labelSize = labelSizeForCell(args.cellWidth, args.cellHeight);
   const labelGap = Math.max(0.5, Math.min(args.gap, 2));
   const labelGutter =
-    Math.max(...args.rowLabels.map((label) => calibrationLabelWidthMm(label, labelSize))) +
-    labelGap;
+    maxOf(args.rowLabels.map((label) => calibrationLabelWidthMm(label, labelSize))) + labelGap;
   // ADR-497 Amendment 1: the Interval Test's fit, applied to the column pitch.
   const columnLabelWidthMm = COLUMN_LABEL_PITCH_SHARE * (args.cellWidth + args.gap);
   const columnLabelSize = Math.min(
     labelSize,
-    ...args.columnLabels.map((label) =>
-      calibrationLabelSizeToFit(label, labelSize, columnLabelWidthMm),
+    minOf(
+      args.columnLabels.map((label) =>
+        calibrationLabelSizeToFit(label, labelSize, columnLabelWidthMm),
+      ),
     ),
   );
   const firstColumnLabel = args.columnLabels[0] ?? '';
