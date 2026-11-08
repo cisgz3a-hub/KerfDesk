@@ -15,5 +15,7 @@
 | 30° (3.175 mm cut) | 5 mm | −5.924 | capped at the cone's own depth, 5.925 | 4.998, the rest cleared beside the cone |
 
 Every groove is within 0.003 mm of the cone law (shallow, never deep) and its top edges land on the
-drawn outline to 0.002 mm, which is what VCarve's V-carving produces: the bit's cone touches both
-walls of the shape ([Vectric VCarve Pro 12.5, V-Carving toolpath](https://docs.vectric.com/docs/V12.5/VCarvePro/ENU/Help/form/v-carve-toolpath/)).
+drawn outline to 0.002 mm. That matches VCarve's description of V-carving: "a path defined by the
+combination of the angle of the tool specified and the width and shape of the vectors being
+machined" ([Vectric VCarve Pro 12.5, V-Carve Toolpath](https://docs.vectric.com/docs/V12.5/VCarvePro/ENU/Help/form/VCarve%20Toolpath%20Creator/),
+fetched 2026-11-08).
