@@ -11,3 +11,12 @@
 | Ramp entry | 5°, on-path profile 3 mm in two levels | every descending move is at 5.000° or less; level 2 drops straight from Z 1 to −1.5 into the slot level 1 cut, then ramps | clean |
 | Helix entry | pocket, helix 2–6 mm diameter, 3° | 12 arcs on a 3 mm radius (the 6 mm circle), descending at 2.03° | clean, never steeper than set |
 | Drill | 6 mm in 2 mm pecks | Z 0 → −2 → 0 → −4 → 0 → −6 | clean (GRBL has no canned `G83`, so the cycle is written out) |
+
+## T13b Feeds calculator (read)
+
+`feeds-calculator.ts` applies feed = RPM × flutes × chip load (mm/tooth), rounds to 10 mm/min, caps at
+the machine's maximum feed, takes plunge as a material fraction of feed (0.15–0.4) and depth per pass
+as a fraction of the bit diameter (0.1–0.5). The chip-load chart is labelled provisional and
+conservative in the code and the UI. Example: 1/8" two-flute bit in hardwood at 18,000 RPM →
+0.04 mm/tooth → 1440 mm/min, plunge 580, 1.3 mm per pass. The formula is the standard one; the chart
+is a starting point the operator is told to verify with a test cut. Clean.
