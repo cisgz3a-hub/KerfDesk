@@ -38,8 +38,9 @@ Every loop drives the real path (`createProject` → `emitGcode`, or `compileCnc
 | 2 | Raster engraving | row placement, tone mapping (Grayscale min/max), dither duty per algorithm, Negative, scan angle, Dot Width Correction | [done](L2-raster.md) — clean |
 | 3 | Vector cut and fill | inner-first order, kerf side for outers, holes and islands, multi-pass order, tabs, leads, overcut, perforation, fill styles | [done](L3-vector.md) — 1 P3 noted |
 | 6 | 3D CNC | relief roughing and finishing on depth maps and STLs, rest finishing, maturity against Vectric Aspire | [done](L6-cnc-3d.md) — 1 P2 and 1 P3 fixed; gap list |
-| 4 | Time estimate | estimate against an independent planner model | next loop |
-| 5 | CNC 2D output | profile, pocket, drill, Z safety and feeds through the oracle | next loop |
+| 4 | Time estimate | estimate against an independent planner model | [done](L4-time-estimate.md) — clean |
+| 5 | CNC 2D output | profile, pocket, drill, Z safety and feeds through the oracle | [done](L5-cnc-2d.md) — clean |
+| 7 | Bidirectional scan offset | row shift against LightBurn's rule, its seven twins | [done](L7-scan-offset.md) — 1 P2, held for the maintainer |
 
 Loop 6 ran before 4 and 5 because the maintainer asked for it by name and because it held the only
 open P2 left in CNC output (rolling-v2 16-P2-1).
