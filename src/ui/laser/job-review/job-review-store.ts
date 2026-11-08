@@ -140,6 +140,8 @@ export const useJobReviewStore = create<JobReviewStore>((set, get) => {
       const { state, editingOperationIds } = get();
       if (state.kind !== 'open' || state.isPreparing || state.blocker !== null) return;
       if (editingOperationIds.size > 0) return;
+      // Start waits for the machine-type answer too (ADR-637 Amendment 8).
+      if (state.model.convertedLaser !== undefined) return;
       fire('confirm');
     },
     cancel: () => fire('cancel'),

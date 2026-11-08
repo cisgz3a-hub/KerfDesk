@@ -8,6 +8,7 @@ import {
   deviceSetupStage,
   type DeviceSetupStage,
 } from './device-setup-steps';
+import { DeviceSetupConvertedLaser } from './DeviceSetupConvertedLaser';
 import { DeviceSetupStages, type DeviceSetupStagesProps } from './DeviceSetupStages';
 import { DeviceSetupSummary } from './DeviceSetupSummary';
 import { SETUP_SAVE_LOCKED_DURING_JOB } from './use-machine-setup-save';
@@ -81,6 +82,7 @@ export function DeviceSetupShell(props: ShellProps): JSX.Element {
             </h3>
             <p>{stageInfo.description}</p>
           </header>
+          <DeviceSetupConvertedLaser state={props.state} dispatch={props.dispatch} />
           <fieldset
             className="lf-setup-editor"
             disabled={props.saving}
