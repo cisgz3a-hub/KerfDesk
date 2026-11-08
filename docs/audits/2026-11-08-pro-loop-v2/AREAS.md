@@ -22,7 +22,7 @@ bit, nested islands, curves, tiny features, unusual settings.
 | T7 | Image tool transforms (rotate, mirror, crop, resample) | | next |
 | T8 | Text tool (outlines closed, fill rule, on-path) | | next |
 | T9 | Cut order and optimisation across nested parts | | next |
-| T10 | CNC V-carve depth against the cone law | | next |
+| T10 | CNC V-carve depth against the cone law | depth and top width for 30/60/90° bits | [done](T10-vcarve.md) — clean |
 | T11 | CNC tabs, ramps and helix entry | | next |
 | T12 | CNC pocket islands and adaptive clearing | | next |
 | T13 | CNC drill pecks and feeds calculator | | next |
