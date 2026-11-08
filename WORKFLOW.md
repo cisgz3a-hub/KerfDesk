@@ -1261,6 +1261,12 @@ that owns those fields, without changing the existing Frame/Start policy.
    Engrave. Engraved cells fill; cut cells show only their outline. Hovering a cell names its
    settings. While a field is invalid the last valid card stays, dimmed, until it is fixed. The
    preview only shows the card; it never changes what Generate makes.
+7. Under the preview, one line says how to read the card (Engrave: the cell you like best; Cut:
+   the fastest cell that cut cleanly through, else more power or passes) and one says to test on
+   scrap over something non-flammable and stay with the laser. A **Cut** still on the default
+   engraving ranges offers **Use cut starting ranges**: 100 % power, 60–600 mm/min down the rows,
+   1–5 passes across the columns, as LightBurn advises for a cut test. Nothing changes until it is
+   pressed (UX audit U8-P3-2).
 
 ### F-A7g. Recipes that apply themselves (ADR-496)
 
@@ -3949,6 +3955,9 @@ discarded.
    with picture, object count and save time. **Restore** first asks Save / Don't Save / Cancel for
    the open project, then restores as above.
 3. The list leaves out this window's own work and work open in another live window.
+4. Each session is one row with its newest copy, though a tab closed with unsaved work leaves an
+   interval copy and a newer close copy. Restore never removes a copy newer than the one restored
+   (ADR-688 Amendment 1).
 
 #### Edge — browser without file pickers (Firefox, Safari)
 1. A banner above the workspace reads **This browser can't open or save files. Use Chrome or Edge,

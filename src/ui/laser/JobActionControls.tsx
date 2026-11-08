@@ -23,6 +23,7 @@ import { useFramedRunLaserState } from './use-framed-run-laser-state';
 import { useJobEstimate } from './use-job-estimate';
 import { useJobStartMarkPreparation } from './use-job-start-mark';
 import { useFocusThroughDisable } from '../common/use-focus-through-disable';
+import { useFreshKeyActivation } from '../common/use-fresh-key-activation';
 
 type Props = {
   readonly disabled: boolean;
@@ -163,6 +164,8 @@ function JobActionButtons(props: {
   const { model, docked } = props;
   // Frame job turns itself off while it runs; focus waits beside it (U7-P3-1).
   const frameRef = useFocusThroughDisable<HTMLButtonElement>(model.frameControl.disabled);
+  // Focus comes back to it as Frame again: a held Enter must not frame twice.
+  const frameKeys = useFreshKeyActivation(model.frameLabel);
   const frame = (
     <button
       ref={frameRef}
@@ -171,6 +174,7 @@ function JobActionButtons(props: {
       data-primary={docked ? model.frameIsNext : undefined}
       data-search-target="frame-job"
       onClick={model.onFrame}
+      {...frameKeys}
       disabled={model.frameControl.disabled}
       title={model.frameControl.title}
     >

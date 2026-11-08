@@ -60,3 +60,7 @@ beginner on a production build, and a refuter confirmed both findings.
   cap. A future cap or Remove action needs its own decision, because removing a slot discards work.
 - Firefox and Safari users learn the limit before they invest work, and keep it in autosave.
 - No change to burns, G-code, Frame, Start, licensing or the project file format.
+
+**Amendment 1 (2026-11-08):** [Recover unsaved work lists each session once, with its newest copy,
+and a restore never clears a newer copy](ADR-688-amendment-1-one-row-per-session-and-no-newer-copy-is-cleared.md):
+fixes rolling audit v10 V7-P1-1.

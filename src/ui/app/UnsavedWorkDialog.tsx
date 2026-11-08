@@ -92,7 +92,8 @@ function UnsavedWorkList(props: {
     <ul style={listStyle} aria-label="Unsaved work from earlier sessions">
       {list.snapshots.slice(0, UNSAVED_WORK_LIST_LIMIT).map((snapshot) => (
         <UnsavedWorkRow
-          key={`${snapshot.storageKey}@${snapshot.savedAt}`}
+          // readRecent lists each session's slot once (ADR-688 Amendment 1).
+          key={snapshot.storageKey}
           snapshot={snapshot}
           onRestore={() => props.onRestore(snapshot)}
         />
