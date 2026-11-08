@@ -52,3 +52,19 @@ from-rest distance of a constant-acceleration move, and GRBL's per-axis limit (`
 ## Verified clean
 
 T1, T2 and T3, and the containment of all three fill styles.
+
+### T4-P3-1 fix attempts (2026-11-08, not shipped)
+
+Three variants were tried in `offset-fill.ts` and measured with the same judge on the star-with-hole
+bench (885 mm burned, worst gap 0.435 mm before):
+
+| Variant | Worst gap | Burn length |
+|---|---|---|
+| Half-step ring where a whole lobe vanishes before the next ring | 0.376 mm | 897 mm |
+| Half-step ring where any of its vertices is > 0.75 interval from the next rings | 0.250 mm | 1582 mm |
+| Only the uncovered stretches of that ring | 0.250 mm | 1537 mm |
+
+The last two close the gap but add 70–80 % burn, because the mitre spikes at every star tip count as
+uncovered at every pass. A real fix needs the region's medial axis (where the distance to the boundary
+peaks) and a single path along it where the peak exceeds the last ring by more than half an interval,
+as the CNC pocket's leftover-core cleanup does. Left open.
