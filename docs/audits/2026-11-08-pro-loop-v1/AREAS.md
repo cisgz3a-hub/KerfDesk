@@ -44,6 +44,7 @@ Every loop drives the real path (`createProject` → `emitGcode`, or `compileCnc
 | 8 | Other controllers | Marlin inline and fan, Smoothieware, FluidNC, grblHAL through the L1 matrix | [done](L8-other-controllers.md) — clean |
 | 9 | Material Test grid | each cell's label against its emitted burn | [done](L9-material-test.md) — clean |
 | 10 | Rotary scaling | chuck and roller Y scale and wrap limit against LightBurn | [done](L10-rotary.md) — clean |
+| 11 | Focus and interval tests | Z motion safety and labelled spacing | [done](L11-focus-interval-tests.md) — clean |
 
 Loop 6 ran before 4 and 5 because the maintainer asked for it by name and because it held the only
 open P2 left in CNC output (rolling-v2 16-P2-1).
