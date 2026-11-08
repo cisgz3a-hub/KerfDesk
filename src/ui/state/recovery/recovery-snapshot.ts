@@ -1,8 +1,6 @@
 import {
   executionArtifactIsCurrent,
-  isExecutionArtifact,
   isLegacyFingerprintArtifact,
-  type ExecutionArtifactV1,
   type RecoveryArtifactV1,
 } from './execution-artifact';
 import { memoizedExecutionArtifactBytes } from './execution-artifact-size';
@@ -15,6 +13,7 @@ import {
   type PersistedRecoverySlots,
   type RecoveryRepositorySnapshot,
 } from './recovery-model';
+import { isValidatedExecutionArtifact } from './validated-execution-artifacts';
 
 export async function hydrateRecoverySnapshot(
   backend: RecoveryStorageBackend,
@@ -108,21 +107,6 @@ function knownArtifactCanHydrate(
     isValidatedRecoveryArtifact(artifact) &&
     (artifact.kind === 'legacy-fingerprint-only' || executionArtifactIsCurrent(artifact))
   );
-}
-
-// Hydrated artifacts are immutable, and the coordinator hands the same
-// references back on every refresh. Full validation fingerprints the whole
-// program text, so it runs once per artifact identity instead of two or three
-// times per retained run on every refresh.
-const validatedExecutionArtifacts = new WeakSet<object>();
-
-function isValidatedExecutionArtifact(value: unknown): value is ExecutionArtifactV1 {
-  if (typeof value === 'object' && value !== null && validatedExecutionArtifacts.has(value)) {
-    return true;
-  }
-  if (!isExecutionArtifact(value)) return false;
-  validatedExecutionArtifacts.add(value);
-  return true;
 }
 
 function isValidatedRecoveryArtifact(value: unknown): value is RecoveryArtifactV1 {
