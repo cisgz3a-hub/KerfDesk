@@ -38,7 +38,7 @@ export function PathTextFields(props: {
           checked={props.enabled}
           disabled={props.guides.length === 0}
           onChange={(event) => props.setEnabled(event.target.checked)}
-          title="Place text along a selected vector path."
+          title={pathTextTitle(props.guides.length > 0)}
         />
       </label>
       {props.enabled && (
@@ -135,4 +135,12 @@ function guideLabel(guide: SceneObject): string {
   if (guide.kind === 'text') return guide.content;
   if (guide.kind === 'shape') return `${guide.spec.kind} (${guide.id})`;
   return guide.id;
+}
+
+// A greyed checkbox gave no reason, and "selected" suggested selecting a path,
+// when a path only has to exist (UX audit U6-P3-6).
+export function pathTextTitle(hasGuide: boolean): string {
+  return hasGuide
+    ? 'Place the text along a line, curve or shape in the project, then pick it under Guide.'
+    : 'Draw a line, curve or shape first; text can then follow it. Bend curves text without one.';
 }

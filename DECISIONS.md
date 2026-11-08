@@ -21393,7 +21393,8 @@ vitest/jsdom run overstated this traversal by about 6.5x and should not be compa
 ### Amendments
 
 ADR-337's amendments are separate decision files (ADR-344):
-`docs/decisions/ADR-337-amendment-1-accepted-run-archive-in-slices.md`.
+`docs/decisions/ADR-337-amendment-1-accepted-run-archive-in-slices.md`,
+`docs/decisions/ADR-337-amendment-2-staged-archive-is-validated-once.md`.
 
 ## ADR-338 - The bend scan reads the chain by index instead of copying it (2026-09-21)
 

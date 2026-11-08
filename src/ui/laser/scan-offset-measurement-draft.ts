@@ -12,6 +12,7 @@ import {
   type ScanOffsetSpeedUnit,
 } from '../../core/devices/scan-offset-measurement-format';
 import { scanOffsetMagnitudeLimitMm } from '../../core/devices/scan-offset-profile';
+import { maxOf } from '../../core/util';
 
 export type DraftScanOffsetMeasurement = {
   readonly speed: string;
@@ -95,7 +96,7 @@ export function nextDraftScanOffsetRow(
   const speeds = rows.map((row) => numberFromInput(row.speed)).filter(isFinitePositive);
   const increment =
     format.speedUnit === 'mm-per-second' ? NEXT_SPEED_MM_PER_SECOND : NEXT_SPEED_MM_PER_MIN;
-  const nextSpeed = speeds.length === 0 ? increment : Math.max(...speeds) + increment;
+  const nextSpeed = speeds.length === 0 ? increment : maxOf(speeds) + increment;
   return { speed: String(nextSpeed), offset: '' };
 }
 

@@ -26,6 +26,7 @@ import {
   type MaterialTestDraft,
   type MaterialTestNumberKey,
 } from './material-test-draft';
+import { MaterialTestGuidance } from './MaterialTestGuidance';
 
 const MATERIAL_TEST_DRAFT_KEY = 'laserforge.calibration.materialTestDraft.v1';
 // A Fill's stored runway, which an engraved grid never runs shorter (ADR-497).
@@ -90,12 +91,7 @@ export function MaterialTestDialog(props: {
       </div>
       {issues.length > 0 ? <p role="alert">{issues.join(' ')}</p> : null}
       <MaterialTestPreview options={previewOptions} maxFeedMmPerMin={props.maxFeedMmPerMin} />
-      <CalibrationFeedDisclosure draft={draft} maxFeedMmPerMin={props.maxFeedMmPerMin} />
-      <RunwayNote
-        draft={draft}
-        maxFeedMmPerMin={props.maxFeedMmPerMin}
-        accelMmPerSec2={props.accelMmPerSec2}
-      />
+      <MaterialTestNotes {...props} draft={draft} setDraft={setDraft} />
       <DialogActions>
         <CalibrationPresetButtons
           kind="kerfdesk-material-test"
@@ -112,6 +108,27 @@ export function MaterialTestDialog(props: {
         </Button>
       </DialogActions>
     </Dialog>
+  );
+}
+
+// The notes under the preview: feed, runway, and how to read and run the test
+// safely (MaterialTestGuidance, UX audit U8-P3-2).
+function MaterialTestNotes(props: {
+  readonly draft: MaterialTestDraft;
+  readonly setDraft: (draft: MaterialTestDraft) => void;
+  readonly maxFeedMmPerMin: number;
+  readonly accelMmPerSec2?: number;
+}): JSX.Element {
+  return (
+    <>
+      <MaterialTestGuidance draft={props.draft} apply={props.setDraft} />
+      <CalibrationFeedDisclosure draft={props.draft} maxFeedMmPerMin={props.maxFeedMmPerMin} />
+      <RunwayNote
+        draft={props.draft}
+        maxFeedMmPerMin={props.maxFeedMmPerMin}
+        accelMmPerSec2={props.accelMmPerSec2}
+      />
+    </>
   );
 }
 

@@ -17,6 +17,7 @@ import {
   VERIFIED_ORIGIN_REQUIRED_MESSAGE,
 } from '../job-placement';
 import { repairFailed, type BlockedStartRepair } from './start-blocked-repair';
+import { offerRestoreAbortOrigin, unrestoredAbortOrigin } from './unrestored-abort-origin';
 
 // The offer names the point of the design that lands at the head, which a
 // beginner otherwise found only as "FL" in the Placement panel (UX audit
@@ -56,14 +57,20 @@ export const VERIFIED_ORIGIN_SET_ORIGIN_OFFER_PROMPT = setOriginOfferPrompt(
 );
 
 export async function offerSetupFixForBlockedStart(message: string): Promise<BlockedStartRepair> {
-  const { anchor } = useStore.getState().jobPlacement;
-  if (message === USER_ORIGIN_REQUIRED_MESSAGE) {
-    return offerSetOriginHere(setOriginOfferPrompt('User Origin', anchor));
-  }
-  if (message === VERIFIED_ORIGIN_REQUIRED_MESSAGE) {
-    return offerSetOriginHere(setOriginOfferPrompt('Verified Origin', anchor));
-  }
-  return 'unrepaired';
+  const placement =
+    message === USER_ORIGIN_REQUIRED_MESSAGE
+      ? 'User Origin'
+      : message === VERIFIED_ORIGIN_REQUIRED_MESSAGE
+        ? 'Verified Origin'
+        : null;
+  if (placement === null) return 'unrepaired';
+  // An aborted job's origin that was not put back comes first: setting the
+  // origin at the head would re-run the job off the half-burned piece (V3-P2-2).
+  const saved = unrestoredAbortOrigin(useLaserStore.getState());
+  if (saved !== null) return offerRestoreAbortOrigin(placement, saved);
+  return offerSetOriginHere(
+    setOriginOfferPrompt(placement, useStore.getState().jobPlacement.anchor),
+  );
 }
 
 async function offerSetOriginHere(prompt: string): Promise<BlockedStartRepair> {

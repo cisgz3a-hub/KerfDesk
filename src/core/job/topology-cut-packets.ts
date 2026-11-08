@@ -20,6 +20,7 @@ import { createNearestEntryQuery } from './segment-entry-index';
 import { removeCutOverlaps } from './remove-cut-overlaps';
 import { containmentDepths } from './containment-depth';
 import { cleanupTopologyRoute, mergedOutlines, type PlannedCutPart } from './topology-cut-cleanup';
+import { minOf } from '../util';
 
 type Settings = Pick<ProjectOptimizationSettings, 'insideFirst' | 'pathDirection' | 'startPoint'> &
   Partial<
@@ -305,7 +306,7 @@ function sweepOrder(
 ): number[] | null {
   if (settings.cutDirection === undefined || lineCursor !== null) return null;
   const key = sweepKey(settings.cutDirection, settings.origin ?? 'front-left');
-  const keys = peers.map((packet) => Math.min(...packetSegments(packet).map(key)));
+  const keys = peers.map((packet) => minOf(packetSegments(packet).map(key)));
   return sweepIndices(keys, holds?.holds.length === peers.length ? holds : undefined);
 }
 

@@ -10,6 +10,7 @@ import {
   type MeasuredCrossSection,
   type StrokeWidthProfile,
 } from './stroke-width';
+import { appendAll } from '../../util';
 
 // At the default 4 px gate these are the existing 0.25 px width allowance
 // and 6 px averaging window. A seed needs three quarters of that window to
@@ -102,10 +103,13 @@ function supportedRuns(sections: ReadonlyArray<MeasuredCrossSection>, gate: RunG
   const closeRun = (): void => {
     if (seeded || run.length >= sustained) {
       if (kept === null) kept = run;
-      else kept.push(...between, ...run);
+      else {
+        appendAll(kept, between);
+        appendAll(kept, run);
+      }
       between = [];
     } else {
-      between.push(...run);
+      appendAll(between, run);
     }
     run = [];
     seeded = false;

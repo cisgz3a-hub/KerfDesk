@@ -364,6 +364,11 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'help',
     tooltip: 'Browse step-by-step visual tutorials for tools, artwork, and machine workflows.',
   },
+  'help.keyboard-shortcuts': {
+    family: 'help',
+    tooltip:
+      'Open the list of every keyboard shortcut, from file and edit keys to Frame, Start and Abort (Ctrl+.).',
+  },
   'help.connection': {
     family: 'help',
     tooltip: "Steps to fix a machine that won't connect, including USB driver help.",

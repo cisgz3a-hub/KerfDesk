@@ -41,6 +41,7 @@ import {
   type GrblMachineMode,
 } from './grbl-machine-mode';
 import type { ControllerEvent } from '../controller-event';
+import { maxOf, minOf } from '../../util';
 
 export type ControllerSettingsSnapshot = Partial<
   Pick<
@@ -435,11 +436,11 @@ function parseFiniteNumber(value: string | undefined): number | null {
 function pickGreaterPositive(a: number | null, b: number | null): number | null {
   const candidates = [a, b].filter((n): n is number => n !== null && n > 0);
   if (candidates.length === 0) return null;
-  return Math.max(...candidates);
+  return maxOf(candidates);
 }
 
 function pickLesserPositive(a: number | null, b: number | null): number | null {
   const candidates = [a, b].filter((n): n is number => n !== null && n > 0);
   if (candidates.length === 0) return null;
-  return Math.min(...candidates);
+  return minOf(candidates);
 }

@@ -22,6 +22,7 @@ vi.mock('../raster/vector-to-bitmap', async (importOriginal) => {
 });
 
 import { Toolbar } from './Toolbar';
+import { shortcutFamilies } from './shortcut-list';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -230,8 +231,11 @@ describe('Toolbar shortcut hint (audit M27/A.5)', () => {
         root.render(<Toolbar commands={[]} machineKind="laser" />);
       });
 
+      // The icon's hover names the window (UX audit U6-P3-2); the table the
+      // window renders is what lists every key.
       const hint = host.querySelector('button[aria-label="Keyboard Shortcuts"]');
-      const title = hint?.getAttribute('title') ?? '';
+      expect(hint?.getAttribute('title')).toMatch(/^Keyboard Shortcuts: list every key/);
+      const title = shortcutTableText('laser');
       // Shipped shortcuts the hint used to omit:
       expect(title).toContain('Ctrl+D'); // duplicate (shortcuts.ts)
       expect(title).toContain('Shift+F'); // fit-to-selection
@@ -291,8 +295,7 @@ describe('Toolbar shortcut hint (audit M27/A.5)', () => {
         root.render(<Toolbar commands={[]} machineKind="cnc" />);
       });
 
-      const hint = host.querySelector('button[aria-label="Keyboard Shortcuts"]');
-      const title = hint?.getAttribute('title') ?? '';
+      const title = shortcutTableText('cnc');
       expect(title).toContain('Router: Ctrl+Enter');
       expect(title).not.toContain('Laser:');
     } finally {
@@ -428,3 +431,13 @@ describe('Toolbar command buttons', () => {
     }
   });
 });
+
+// The shortcut table as "Family: keys action - …" lines, as the hover once was.
+function shortcutTableText(machineKind: 'laser' | 'cnc'): string {
+  return shortcutFamilies(machineKind)
+    .map(
+      (entry) =>
+        `${entry.family}: ${entry.rows.map((row) => `${row.keys} ${row.action}`).join(' - ')}`,
+    )
+    .join('\n');
+}

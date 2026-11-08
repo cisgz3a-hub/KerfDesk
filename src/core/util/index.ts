@@ -7,3 +7,4 @@ export {
 export { iterateLines } from './iterate-lines';
 export { numbersClose } from './numbers';
 export { finiteOr, finitePositiveOr, isFinitePositive } from './finite';
+export { appendAll, maxOf, minOf } from './spread-free';

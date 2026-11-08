@@ -3,20 +3,21 @@ import type { Tutorial } from './tutorial-types';
 export const STUDIO_TUTORIALS: readonly Tutorial[] = [
   {
     id: 'design-studio',
+    pro: 'design-studio',
     title: 'Draw in Design Studio',
     summary: 'Build a drawing in a dedicated space, then apply it to the project.',
     category: 'Drawing & editing',
     machine: 'all',
     minutes: 3,
-    location: 'Left drawing toolbar → Design',
+    location: 'Top toolbar → Design Studio',
     prerequisites: 'An open project.',
     visual: 'workspace',
     steps: [
       {
         title: 'Open the drawing space',
         instruction:
-          'Click Design on the left toolbar. Choose a drawing tool such as Line, Polyline, Rectangle, Circle or Arc. The bottom hint explains the active gesture.',
-        focus: 'Design → drawing tool',
+          'Click Design Studio in the top toolbar. Choose a drawing tool such as Line, Polyline, Rectangle, Circle or Arc. The bottom hint explains the active gesture.',
+        focus: 'Design Studio → drawing tool',
         result: 'You are editing the Studio drawing.',
       },
       {
@@ -42,6 +43,7 @@ export const STUDIO_TUTORIALS: readonly Tutorial[] = [
   },
   {
     id: 'design-precision',
+    pro: 'design-studio',
     title: 'Draw to exact dimensions',
     summary: 'Use snapping and shape properties to create a drawing that fits.',
     category: 'Drawing & editing',
@@ -79,6 +81,7 @@ export const STUDIO_TUTORIALS: readonly Tutorial[] = [
   },
   {
     id: 'design-edit',
+    pro: 'design-studio',
     title: 'Refine a Studio drawing',
     summary: 'Select, duplicate and round or flatten corners before applying a drawing.',
     category: 'Drawing & editing',

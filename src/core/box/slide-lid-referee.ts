@@ -6,6 +6,7 @@
 
 import type { Polyline } from '../scene';
 import { deriveBoxDims, type BoxSpec } from './box-spec';
+import { maxOf, minOf } from '../util';
 
 export type SlideLidRefereePart = {
   readonly panel: string;
@@ -96,7 +97,7 @@ function checkFront(
 ): string[] {
   const front = parts.find((part) => part.panel === 'front');
   if (front === undefined) return ['front: panel missing'];
-  const maxY = Math.max(...front.outline.points.map((p) => p.y));
+  const maxY = maxOf(front.outline.points.map((p) => p.y));
   // The fit offset recedes the front's top by play/4 — the lid clearance.
   if (Math.abs(maxY - (frontTop - playMm / 4)) > tolMm) {
     return [`front: tops out at ${maxY}, claimed ${frontTop - playMm / 4}`];
@@ -121,16 +122,16 @@ function checkLid(
   const xs = lid.outline.points.map((p) => p.x);
   const ys = lid.outline.points.map((p) => p.y);
   const issues: string[] = [];
-  const width = Math.max(...xs) - Math.min(...xs);
+  const width = maxOf(xs) - minOf(xs);
   if (Math.abs(width - (outerWidth - playMm / 2)) > tolMm) {
     issues.push(`lid: width ${width}, claimed ${outerWidth - playMm / 2}`);
   }
-  const length = Math.max(...ys) - Math.min(...ys);
+  const length = maxOf(ys) - minOf(ys);
   if (Math.abs(length - (channelEnd - playMm / 2)) > tolMm) {
     issues.push(`lid: length ${length}, claimed ${channelEnd - playMm / 2}`);
   }
   // Thumb notch: material on the leading edge is interrupted around center.
-  const leadingRuns = runsNear(lid.outline, Math.min(...ys), tolMm);
+  const leadingRuns = runsNear(lid.outline, minOf(ys), tolMm);
   if (leadingRuns.length < 2) {
     issues.push('lid: thumb notch missing on the leading edge');
   }

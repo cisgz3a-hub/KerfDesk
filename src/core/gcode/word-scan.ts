@@ -1,3 +1,4 @@
+import { minOf } from '../util';
 // Shared low-level G-code word scanning (ADR-255 stage 1). One regex and one
 // comment-stripper serve both modal parsers — the F-CNC10 simulator parser
 // (io/gcode/parse-gcode-program.ts) and the motion manifest
@@ -164,5 +165,5 @@ export function stripControllerComments(line: string): string {
   const unclosed = noParens.indexOf('(');
   const semicolon = noParens.indexOf(';');
   const ends = [unclosed, semicolon].filter((index) => index >= 0);
-  return (ends.length === 0 ? noParens : noParens.slice(0, Math.min(...ends))).trim();
+  return (ends.length === 0 ? noParens : noParens.slice(0, minOf(ends))).trim();
 }

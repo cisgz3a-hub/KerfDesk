@@ -1,5 +1,9 @@
 import { useEffect, useRef } from 'react';
+import { machineKindOf } from '../../core/scene';
 import { Icon } from '../kit/icons';
+import { useEdition } from '../licensing/edition';
+import { useStore } from '../state';
+import { freeLessonsFirst, TutorialProBadge } from './TutorialProBadge';
 import { searchTutorials, TUTORIALS } from './tutorial-catalog';
 import { useTutorialStore } from './tutorial-store';
 import { TUTORIAL_CATEGORIES, type Tutorial, type TutorialCategory } from './tutorial-types';
@@ -14,7 +18,9 @@ type LibraryProps = {
 export function TutorialLibrary({ query, setQuery, topic, setTopic }: LibraryProps): JSX.Element {
   const heading = useRef<HTMLHeadingElement>(null);
   const searching = query.trim().length > 0;
-  const results = searchTutorials(query, 'All', 'all');
+  // Ranked, with the other machine kind's lessons after this one's (U6-P3-1).
+  const machine = useStore((state) => machineKindOf(state.project.machine));
+  const results = searchTutorials(query, 'All', machine);
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => heading.current?.focus());
     return () => window.cancelAnimationFrame(frame);
@@ -108,9 +114,10 @@ function TutorialTopics({
 }
 
 function LessonList({ tutorials }: { readonly tutorials: readonly Tutorial[] }): JSX.Element {
+  const locked = !useEdition().pro;
   return (
     <ul className="lf-learn-lessons">
-      {tutorials.map((tutorial) => (
+      {freeLessonsFirst(tutorials, locked).map((tutorial) => (
         <li key={tutorial.id}>
           <button
             type="button"
@@ -118,7 +125,10 @@ function LessonList({ tutorials }: { readonly tutorials: readonly Tutorial[] }):
             title={`Open tutorial: ${tutorial.title}`}
             onClick={() => useTutorialStore.getState().openTutorial(tutorial.id)}
           >
-            <span>{tutorial.title}</span>
+            <span>
+              {tutorial.title}
+              <TutorialProBadge tutorial={tutorial} />
+            </span>
             <Icon name="arrow-right" size={18} />
           </button>
         </li>

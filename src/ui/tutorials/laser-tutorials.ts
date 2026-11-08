@@ -37,7 +37,7 @@ export const LASER_TUTORIALS: readonly Tutorial[] = [
         visual: 'preview',
       },
     ],
-    tip: 'Visible changes the canvas display. Output decides whether an operation is included in the job.',
+    tip: 'Show on canvas changes the canvas display. Include in output decides whether an operation is included in the job.',
     keywords: [
       'line',
       'laser',
@@ -121,7 +121,17 @@ export const LASER_TUTORIALS: readonly Tutorial[] = [
         visual: 'image',
       },
       {
-        title: 'Choose dots or varying power',
+        // The window a beginner needs first (UX audit U6-P3-5): its recipes
+        // set the dither, density and tones for the material.
+        title: 'Let Photo engraving set it up',
+        instruction:
+          'With the photo selected, choose Photo engraving in the toolbar (or Tools → Photo engraving...). Under Material recipe, pick your material, such as wood, slate or leather. The recipe sets the dither, row density and tones, and Auto tones read the photo to set its contrast. Apply, then fine-tune below only if you need to.',
+        focus: 'Photo engraving · Material recipe',
+        result: 'The image operation starts from settings made for that material.',
+        visual: 'image-tone',
+      },
+      {
+        title: 'Fine-tune by hand: dots or varying power',
         instruction:
           'Choose a Dither under Process: Image, or open More cut settings to compare them. Threshold separates light and dark; dithering uses dot patterns; Grayscale uses a power range and exposes Min Power.',
         focus: 'Dither',
@@ -148,6 +158,9 @@ export const LASER_TUTORIALS: readonly Tutorial[] = [
     ],
     tip: 'Pass-through skips KerfDesk image processing. Use it only when the source pixels are already prepared for that workflow.',
     keywords: [
+      'photo engraving',
+      'material recipe',
+      'auto tones',
       'image',
       'raster',
       'photo',
@@ -175,16 +188,16 @@ export const LASER_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose the target and recipe',
         instruction:
-          'Open Material Library. Choose the target Layer and then a Preset matching your material and thickness. Read Preset Match to check its machine and calibration context.',
-        focus: 'Layer · Preset · Preset Match',
+          'Open Material Library. Under Apply to operation, choose the target operation and then a Preset matching your material and thickness. Read Preset Match to check its machine and calibration context.',
+        focus: 'Apply to operation · Preset · Preset Match',
         result:
           'The selected recipe is paired with a specific operation before any settings are applied.',
       },
       {
         title: 'Apply once or keep a link',
         instruction:
-          'Choose Apply to layer to copy the recipe, or Link to layer to keep its source reference with a settings snapshot. Inspect the resulting operation values.',
-        focus: 'Apply to layer / Link to layer',
+          'Choose Apply to <operation> to copy the recipe, or Link to operation (under Link or delete this preset) to keep its source reference with a settings snapshot. Inspect the resulting operation values.',
+        focus: 'Apply to … / Link to operation',
         result:
           'The operation receives the chosen recipe, and a linked operation also records where it came from.',
         visual: 'layers',

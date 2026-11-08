@@ -82,7 +82,7 @@ export const IMAGE_TUTORIALS: readonly Tutorial[] = [
     category: 'Images & tracing',
     machine: 'all',
     minutes: 3,
-    location: 'Tools → Apply Image Mask, Crop Image or Remove Image Mask',
+    location: 'Tools → Apply Mask to Image, Crop Image or Remove Image Mask',
     prerequisites: 'Exactly one image and one closed vector mask selected together.',
     visual: 'mask',
     steps: [
@@ -96,8 +96,8 @@ export const IMAGE_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Apply a reversible mask',
         instruction:
-          'Select the picture and shape together. Choose Apply Image Mask. Zoom in to check the edge.',
-        focus: 'Apply Image Mask',
+          'Select the picture and shape together. Choose Apply Mask to Image. Zoom in to check the edge.',
+        focus: 'Apply Mask to Image',
         result: 'The picture appears inside the shape. The original pixels are kept.',
       },
       {
@@ -158,6 +158,7 @@ export const IMAGE_TUTORIALS: readonly Tutorial[] = [
   },
   {
     id: 'trace-batch',
+    pro: 'advanced-trace',
     title: 'Trace several image files',
     summary: 'Export a set of images as separate SVG, DXF, PDF, EPS or GeoJSON files.',
     category: 'Images & tracing',

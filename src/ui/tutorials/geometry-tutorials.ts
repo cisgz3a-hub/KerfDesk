@@ -56,7 +56,7 @@ export const GEOMETRY_TUTORIALS: readonly Tutorial[] = [
     preparation:
       'Overlap two closed shapes where they should connect. Give them the same operation and settings; select both and use Use one operation for selection when they currently have independent operations.',
     result: 'The union keeps the covered area and removes the internal overlap boundary.',
-    tip: 'Welding creates baked paths. For editable script text, use the Text formatting option Weld overlaps instead.',
+    tip: 'Welding creates baked paths. For editable script text, use the Text panel option Weld overlaps instead.',
   }),
   combineLesson({
     id: 'subtract',

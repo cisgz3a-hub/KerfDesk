@@ -42,6 +42,7 @@ import {
 import { effectiveOperationForObject } from '../scene/effective-operation';
 import type { MinFeatureRequest } from './min-feature-analysis';
 import type { MinFeaturePath } from './piece-index';
+import { appendAll } from '../util';
 
 /** Kerf assumed for a laser Line operation when neither its Kerf Offset nor
  * the laser head's spot size says otherwise: a typical diode or CO2 kerf in
@@ -166,7 +167,7 @@ function laserTargets(
     const cutIntent = laserCutIntent(effective);
     const key = `${kerf.mm}|${kerf.source}|${cutIntent}`;
     const group = groups.get(key) ?? { mm: kerf.mm, source: kerf.source, cutIntent, paths: [] };
-    group.paths.push(...objectPaths(object, operation, device));
+    appendAll(group.paths, objectPaths(object, operation, device));
     groups.set(key, group);
   }
   return [...groups.values()].map(

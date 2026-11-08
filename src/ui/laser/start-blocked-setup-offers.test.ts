@@ -9,6 +9,8 @@ import {
   USER_ORIGIN_REQUIRED_MESSAGE,
   VERIFIED_ORIGIN_REQUIRED_MESSAGE,
 } from '../job-placement';
+import { parseStatusReport } from '../../core/controllers/grbl';
+import { unrestoredOriginOfferPrompt } from './unrestored-abort-origin';
 import {
   offerSetupFixForBlockedStart,
   SET_ORIGIN_OFFER_PROMPT,
@@ -23,6 +25,11 @@ vi.mock('../state/job-aware-dialogs', () => ({
 const original = {
   setOriginHere: useLaserStore.getState().setOriginHere,
   resetOrigin: useLaserStore.getState().resetOrigin,
+  restoreWorkOrigin: useLaserStore.getState().restoreWorkOrigin,
+  jobStopRequest: useLaserStore.getState().jobStopRequest ?? null,
+  streamerEpoch: useLaserStore.getState().streamerEpoch,
+  statusReport: useLaserStore.getState().statusReport,
+  wcoCache: useLaserStore.getState().wcoCache,
 };
 
 beforeEach(() => {
@@ -118,5 +125,63 @@ describe('verified-origin set-origin offer (ADR-327)', () => {
       'unrepaired',
     );
     expect(useLaserStore.getState().setOriginHere).not.toHaveBeenCalled();
+  });
+});
+
+// Rolling audit v10 V3-P2-2 (re-rated P1): after ABORT JOB the origin the job
+// ran from is kept, and when it was not put back the offer names it and the
+// head's distance, and OK restores it instead of setting the origin at the head.
+describe('offer while an aborted job origin is unrestored', () => {
+  const SAVED = { x: 60, y: 40 };
+
+  beforeEach(() => {
+    useLaserStore.setState({
+      restoreWorkOrigin: vi.fn(async () => undefined),
+      streamerEpoch: 7,
+      jobStopRequest: { reason: 'operator', streamerEpoch: 7, originAtStopMm: SAVED },
+      statusReport: parseStatusReport('<Idle|MPos:69.800,45.750,0.000|FS:0,0>'),
+      wcoCache: null,
+    });
+  });
+
+  it('names the saved origin and the head distance, and OK restores it', async () => {
+    await expect(offerSetupFixForBlockedStart(USER_ORIGIN_REQUIRED_MESSAGE)).resolves.toBe('retry');
+    const prompt = vi.mocked(jobAwareConfirm).mock.calls[0]?.[0] ?? '';
+    expect(prompt).toBe(
+      unrestoredOriginOfferPrompt('User Origin', SAVED, { x: 9.8, y: 5.75 }, false),
+    );
+    expect(prompt).toContain(
+      'The job you stopped ran from X 60, Y 40 mm from machine zero, and that origin was not restored.',
+    );
+    expect(prompt).toContain('The head is 11.36 mm from it (X +9.8, Y +5.75 mm).');
+    expect(prompt).toContain('OK: put the saved origin back with one G92');
+    expect(prompt).toContain('use Set origin here in the Machine panel');
+    expect(prompt).not.toContain('set the work origin at the current head position');
+    expect(useLaserStore.getState().restoreWorkOrigin).toHaveBeenCalledWith(SAVED);
+    expect(useLaserStore.getState().setOriginHere).not.toHaveBeenCalled();
+  });
+
+  it('sets nothing when the operator declines', async () => {
+    vi.mocked(jobAwareConfirm).mockReturnValue(false);
+    await expect(offerSetupFixForBlockedStart(USER_ORIGIN_REQUIRED_MESSAGE)).resolves.toBe(
+      'unrepaired',
+    );
+    expect(useLaserStore.getState().restoreWorkOrigin).not.toHaveBeenCalled();
+    expect(useLaserStore.getState().setOriginHere).not.toHaveBeenCalled();
+  });
+
+  it('says so when the head position is unknown', () => {
+    expect(unrestoredOriginOfferPrompt('Verified Origin', SAVED, null, true)).toContain(
+      'KerfDesk cannot tell how far the head is from it.',
+    );
+    expect(unrestoredOriginOfferPrompt('Verified Origin', SAVED, null, true)).toContain(
+      'OK: home the machine',
+    );
+  });
+
+  it('keeps the plain offer for a stop that was not the operator Abort', async () => {
+    useLaserStore.setState({ jobStopRequest: { reason: 'app-closing', streamerEpoch: 7 } });
+    await offerSetupFixForBlockedStart(USER_ORIGIN_REQUIRED_MESSAGE);
+    expect(jobAwareConfirm).toHaveBeenCalledWith(SET_ORIGIN_OFFER_PROMPT);
   });
 });

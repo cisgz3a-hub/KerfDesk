@@ -1,6 +1,6 @@
 ## ADR-604 - Command search (Ctrl+K)
 
-**Status:** Accepted.
+**Status:** Accepted. Amended by [ADR-604 Amendment 1](ADR-604-amendment-1-command-search-finds-panel-actions-settings-and-lessons.md): panel actions, Settings and lessons are searched too.
 
 ## Context
 

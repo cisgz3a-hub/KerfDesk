@@ -1,13 +1,12 @@
 // Toolbar commands retain the app registry's handlers, help and enabled state.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { KEYBOARD_SHORTCUTS_EVENT } from './keyboard-shortcuts-event';
 import type { AppCommand } from '../commands/command-registry';
 import type { MachineKind } from '../../core/scene';
 import { useStore } from '../state';
-import { useNudgeStore } from '../state/nudge-preferences';
 import { ConnectionBadge } from './ConnectionBadge';
 import { InstallButton } from './InstallButton';
 import { ShortcutsDialog } from './ShortcutsDialog';
-import { shortcutHint } from './shortcut-list';
 import { ToolbarIcon } from './ToolbarIcon';
 import { ToolbarCommands } from './ToolbarCommands';
 import { DesignStudioButton } from './DesignStudioButton';
@@ -21,7 +20,12 @@ export function Toolbar(props: {
   readonly machineKind: MachineKind;
 }): JSX.Element {
   const [isShortcutsOpen, setShortcutsOpen] = useState(false);
-  const nudgeSteps = useNudgeStore((state) => state.nudgeSteps);
+  // Help → Keyboard Shortcuts... and command search open the same window (U6-P3-2).
+  useEffect(() => {
+    const open = (): void => setShortcutsOpen(true);
+    window.addEventListener(KEYBOARD_SHORTCUTS_EVENT, open);
+    return () => window.removeEventListener(KEYBOARD_SHORTCUTS_EVENT, open);
+  }, []);
   return (
     <header aria-label="Toolbar" className="lf-toolbar-shell">
       <ToolbarCommands commands={props.commands} />
@@ -39,7 +43,7 @@ export function Toolbar(props: {
           type="button"
           className="lf-btn lf-btn--ghost lf-toolbar-command lf-toolbar-command--icon-only"
           aria-label="Keyboard Shortcuts"
-          title={shortcutHint(props.machineKind, nudgeSteps)}
+          title="Keyboard Shortcuts: list every key (also in Help → Keyboard Shortcuts...)"
           onClick={() => setShortcutsOpen(true)}
         >
           <ToolbarIcon icon="shortcuts" />

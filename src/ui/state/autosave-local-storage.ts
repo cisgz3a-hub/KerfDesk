@@ -239,6 +239,18 @@ function readAutosaveAtKey(
   return result.kind === 'ok' ? result.snapshot : markUnreadable(state, storageKey, raw);
 }
 
+// When the readable copy at this key was saved, or null when there is none.
+export function localAutosaveSavedAt(storageKey: string): number | null {
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (raw === null) return null;
+    const value: unknown = JSON.parse(raw);
+    return isAutosaveRecord(value) ? value.savedAt : null;
+  } catch {
+    return null;
+  }
+}
+
 export function requireSupportedLocalAutosaveVersion(storageKey: string): void {
   const raw = localStorage.getItem(storageKey);
   if (raw === null) return;

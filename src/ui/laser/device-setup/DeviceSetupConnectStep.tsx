@@ -225,7 +225,8 @@ function ConnectionMismatch(
           <Button
             variant="primary"
             onClick={model.reconnect}
-            disabled={model.connectionBlocked !== null}
+            disabled={model.connectionBlocked !== null || model.reconnectBlocked !== null}
+            title={model.reconnectBlocked ?? undefined}
           >
             Reconnect using selected profile
           </Button>

@@ -44,7 +44,7 @@ export const CALIBRATION_TUTORIALS: readonly Tutorial[] = [
         visual: 'library',
       },
     ],
-    tip: 'This generator creates filled engraving swatches. A good-looking cell does not establish a through-cut recipe.',
+    tip: 'Choose Engrave for filled swatches, or Cut to find a through-cut: on Cut, Use cut starting ranges sets 100 % power and varies speed and passes. Stay with the laser while it runs.',
     keywords: ['material test', 'power', 'speed', 'grid', 'swatch', 'engraving', 'recipe'],
     related: ['materials', 'laser-fill', 'interval-test', 'frame-start', 'project-notes'],
   },

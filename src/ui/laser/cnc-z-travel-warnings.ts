@@ -13,6 +13,7 @@ import type { CncGroup, Job } from '../../core/job';
 import { parkHeightMm } from '../../core/output/cnc-grbl-transitions';
 import type { Project } from '../../core/scene';
 import { formatMm } from './job-review/job-review-format';
+import { maxOf } from '../../core/util';
 
 export function detectCncZTravelWarnings(
   project: Project,
@@ -25,9 +26,9 @@ export function detectCncZTravelWarnings(
   if (travel === undefined || !(travel > 0)) return [];
   const groups = job.groups.filter((group): group is CncGroup => group.kind === 'cnc');
   if (groups.length === 0) return [];
-  const deepestMm = Math.max(...groups.map(cncGroupMaximumDepthMm));
-  const safeZMm = Math.max(...groups.map((group) => group.safeZMm));
-  const liftMm = Math.max(...groups.map((group) => parkHeightMm(group, safeZMm)));
+  const deepestMm = maxOf(groups.map(cncGroupMaximumDepthMm));
+  const safeZMm = maxOf(groups.map((group) => group.safeZMm));
+  const liftMm = maxOf(groups.map((group) => parkHeightMm(group, safeZMm)));
   const spanMm = liftMm + deepestMm;
   if (!(spanMm > travel)) return [];
   const lift = liftMm > safeZMm ? 'park height' : 'safe Z';

@@ -29,15 +29,24 @@ export function OriginCornerPicker(props: {
   readonly onChange: (next: Origin) => void;
 }): JSX.Element {
   return (
-    <BedCornerPicker
-      value={props.value}
-      onChange={props.onChange}
-      marker="origin"
-      ariaLabel="Machine origin corner"
-      title="Sets the canvas-to-machine coordinate orientation and jog directions. Match the controller's coordinate layout. This does not set work zero or change homing settings."
-    />
+    <span style={originStyle}>
+      <BedCornerPicker
+        value={props.value}
+        onChange={props.onChange}
+        marker="origin"
+        ariaLabel="Machine origin corner"
+        title="Sets the canvas-to-machine coordinate orientation and jog directions. Match the controller's coordinate layout. This does not set work zero or change homing settings."
+      />
+      <span style={originHintStyle}>{ORIGIN_CHECK_HINT}</span>
+    </span>
   );
 }
+
+// What a wrong corner does and how to catch it before a burn, as LightBurn's
+// MirroredOrBackwards page maps each symptom to a corner (UX audit U8-P3-3).
+// The jog arrows follow this setting, so they show a wrong corner first.
+export const ORIGIN_CHECK_HINT =
+  "Most diode lasers: Front left. To check, press the jog pad's right arrow: the head should move right, and the up arrow should move it away from you. If a test burn comes out upside down, pick the other front/back corner; if it is mirrored, the other left/right corner.";
 
 export function HomingCornerPicker(props: {
   readonly value: Origin;
@@ -155,6 +164,13 @@ const textInputStyle: React.CSSProperties = { width: 140 };
 const timesStyle: React.CSSProperties = { fontSize: 12, color: 'var(--lf-text-faint)' };
 // Wraps so a narrow dialog puts the 156 px diagram under its label rather than
 // overflowing the field.
+const originStyle: React.CSSProperties = { display: 'inline-grid', gap: 4, minWidth: 0 };
+const originHintStyle: React.CSSProperties = {
+  maxWidth: 360,
+  fontSize: 12,
+  color: 'var(--lf-text-muted)',
+};
+
 const homingStyle: React.CSSProperties = {
   display: 'inline-flex',
   flexWrap: 'wrap',

@@ -1,11 +1,13 @@
 // The Alarm 3 card after the operator's own Abort (UX audit U4-P2-3, ADR-341
 // Amendment 11): what it says on each controller, and that only the operator's
-// Abort gets it.
+// Abort gets it. A failure after the unlock is a toast, since the card is gone
+// by then (rolling audit v10 V3-P2-2).
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useLaserStore } from '../state/laser-store';
+import { useToastStore } from '../state/toast-store';
 import {
   AbortStoppedCard,
   ABORT_SET_ORIGIN_HERE_NOTE,
@@ -71,8 +73,19 @@ function card(overrides: Partial<Parameters<typeof AbortStoppedCard>[0]> = {}): 
 
 afterEach(() => {
   useLaserStore.setState(original, true);
+  useToastStore.setState({ toasts: [] });
   vi.mocked(restoreOriginAfterAbort).mockClear();
 });
+
+/** The store while the operator's Abort still holds ALARM:3, so the card shows. */
+function holdAbortAlarm(): void {
+  useLaserStore.setState({
+    alarmCode: 3,
+    streamerEpoch: 4,
+    jobStopRequest: REQUEST,
+    streamReset: { streamerEpoch: 4, positionMayBeLost: true },
+  });
+}
 
 describe('operatorAbortAlarm', () => {
   const base = {
@@ -146,11 +159,31 @@ describe('AbortStoppedCard', () => {
     await homing.unmount();
   });
 
-  it('shows a failed restore in place', async () => {
+  it('shows a restore refused before the unlock in place, while the alarm holds', async () => {
+    holdAbortAlarm();
     vi.mocked(restoreOriginAfterAbort).mockRejectedValueOnce(new Error('no Idle'));
     const view = await render(card());
     await act(async () => view.host.querySelector('button')?.click());
     expect(view.host.textContent).toContain('no Idle');
+    expect(useToastStore.getState().toasts).toEqual([]);
+    await view.unmount();
+  });
+
+  it('toasts a restore that fails after the unlock cleared the alarm (V3-P2-2)', async () => {
+    holdAbortAlarm();
+    vi.mocked(restoreOriginAfterAbort).mockImplementationOnce(async () => {
+      // $X went out and the controller reported Idle: the card unmounts.
+      useLaserStore.setState({ alarmCode: null });
+      throw new Error('The saved origin was not written.');
+    });
+    const view = await render(card());
+    await act(async () => view.host.querySelector('button')?.click());
+    expect(useToastStore.getState().toasts).toEqual([
+      expect.objectContaining({
+        variant: 'error',
+        message: 'Restore saved origin: The saved origin was not written.',
+      }),
+    ]);
     await view.unmount();
   });
 });

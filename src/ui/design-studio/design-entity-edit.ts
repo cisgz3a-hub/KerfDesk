@@ -24,6 +24,7 @@ import type { LineEntity } from './design-fields-line';
 import type { PathEntity } from './design-fields-path';
 import type { RectEntity } from './design-fields-rect';
 import { DEG_TO_RAD, type MeasurementKey } from './design-field-types';
+import { minOf } from '../../core/util';
 
 type Edit<E> = (entity: E, value: number) => SketchEntity | null;
 type EditTable<E> = Partial<Readonly<Record<MeasurementKey, Edit<E>>>>;
@@ -152,7 +153,7 @@ function translatePathAxis(
 ): SketchEntity | null {
   const values = entity.points.map((point) => point[axis]);
   if (values.length === 0) return null;
-  const delta = value - Math.min(...values);
+  const delta = value - minOf(values);
   return {
     ...entity,
     points: entity.points.map((point) =>

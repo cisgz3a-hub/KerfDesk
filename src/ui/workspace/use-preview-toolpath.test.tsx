@@ -305,7 +305,7 @@ describe('usePreviewToolpath', () => {
     expect(workerMocks.prepareLargeJobOffThread).toHaveBeenCalledWith(
       project,
       expect.objectContaining({ initialPosition: { x: 300, y: 0, z: 0 } }),
-      undefined,
+      expect.any(Function),
       expect.any(AbortSignal),
     );
 
