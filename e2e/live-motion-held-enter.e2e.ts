@@ -4,7 +4,8 @@
 // 1 s hold paused, then resumed the burn once Resume showed. The keys come
 // from CDP as Windows delivers a held key (one keydown, a 500 ms delay, then a
 // repeat every 33 ms, then keyup), and the paced GRBL stand-in logs every
-// realtime byte it receives.
+// realtime byte it receives. Frame job hands focus back to itself when its
+// Frame ends (U7-P3-1), so a held Enter re-ran the Frame too (V9-P3-1).
 
 import { expect, test, type CDPSession, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
@@ -31,7 +32,7 @@ interface PacedGrbl {
   readonly state: () => string;
 }
 
-async function openFramedJob(page: Page): Promise<void> {
+async function connectWithRings(page: Page): Promise<void> {
   // 30 blocks/s keeps the 12-ring job running for the whole test.
   await page.addInitScript({ content: 'window.__PACED_GRBL_CONFIG__ = { blocksPerSecond: 30 };' });
   await page.addInitScript({ content: pacedSerialSource });
@@ -93,6 +94,10 @@ async function openFramedJob(page: Page): Promise<void> {
   await selectWorkspacePanel(page, 'Machine');
   await connectMachineAndDismissFirstSetup(page);
   await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
+}
+
+async function openFramedJob(page: Page): Promise<void> {
+  await connectWithRings(page);
   await page.getByRole('button', { name: 'Frame job', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Start', exact: true })).toBeEnabled({
     timeout: 120_000,
@@ -194,4 +199,41 @@ test('a held Enter on Start job starts the job and never pauses it', async ({ pa
   expect(count(bytes, CYCLE_START)).toBe(0);
   expect(count(bytes, SOFT_RESET)).toBe(0);
   expect(await simulatedState(page)).toBe('Run');
+});
+
+test('a held Enter on Frame job frames once, however long it is held', async ({ page }) => {
+  test.setTimeout(300_000);
+  await connectWithRings(page);
+  const frame = page.locator('[data-search-target="frame-job"]');
+  await expect(frame).toBeEnabled({ timeout: 120_000 });
+  // Count Frames as the button turning itself off.
+  await frame.evaluate((button) => {
+    const runs = { count: 0 };
+    (window as unknown as { __FRAME_RUNS__: typeof runs }).__FRAME_RUNS__ = runs;
+    let off = (button as HTMLButtonElement).disabled;
+    new MutationObserver(() => {
+      const now = (button as HTMLButtonElement).disabled;
+      if (now && !off) runs.count += 1;
+      off = now;
+    }).observe(button, { attributes: true, attributeFilter: ['disabled'] });
+  });
+  const frameRuns = () =>
+    page.evaluate(
+      () => (window as unknown as { __FRAME_RUNS__: { count: number } }).__FRAME_RUNS__.count,
+    );
+  await frame.click();
+  await expect.poll(frameRuns).toBe(1);
+  await expect(page.getByRole('button', { name: 'Frame again', exact: true })).toBeEnabled({
+    timeout: 120_000,
+  });
+
+  // The auditor's 4 s hold ran two extra Frames once focus came back.
+  await frame.focus();
+  await holdEnter(page, 4000);
+  await expect(frame).toBeEnabled({ timeout: 120_000 });
+  await expect(frame).toBeFocused();
+  await page.waitForTimeout(2000);
+  expect(await frameRuns()).toBe(2);
+  const bytes = await realtimeBytes(page);
+  expect(count(bytes, SOFT_RESET)).toBe(0);
 });

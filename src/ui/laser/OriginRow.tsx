@@ -20,6 +20,7 @@ import {
 } from '../state/host-recorded-origin';
 import { placementAfterSetOrigin } from './set-origin-placement';
 import { useFocusThroughDisable } from '../common/use-focus-through-disable';
+import { useFreshKeyActivation } from '../common/use-fresh-key-activation';
 
 // ADR-053 P4 — releasing motors ($SLP) is hard to undo cleanly (waking needs a
 // soft-reset, which clears G92 on stock GRBL and FluidNC), so confirm and spell out the correct order:
@@ -67,6 +68,8 @@ function SetOriginButton(props: {
 }): JSX.Element | null {
   // Set origin here turns itself off while it runs; focus waits beside it (U7-P3-1).
   const ref = useFocusThroughDisable<HTMLButtonElement>(props.busy);
+  // Focus comes back to it: a held Enter must not set the origin again.
+  const keys = useFreshKeyActivation('Set origin here');
   if (props.show === false) return null;
   return (
     <button
@@ -74,6 +77,7 @@ function SetOriginButton(props: {
       type="button"
       className={`${props.needsAttention ? 'lf-btn lf-btn--attention' : 'lf-btn'}${props.jog ? ' lf-jog-origin' : ''}`}
       onClick={props.onSet}
+      {...keys}
       data-search-target="set-origin"
       disabled={props.busy}
       title={
