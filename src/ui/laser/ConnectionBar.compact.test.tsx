@@ -238,6 +238,18 @@ describe('compact machine connection', () => {
     await renderBar({ connection: { kind: 'connected' } }, host);
     expect(button(host, 'Reconnect now')).toBeUndefined();
   });
+
+  it('disables Reconnect now with the job named while a job runs (V3-P2-1)', async () => {
+    const onReconnect = vi.fn();
+    const host = await renderBar({
+      connection: { kind: 'connected' },
+      driverMismatch: { text: 'Connected with …', blockedReason: 'A job is running.', onReconnect },
+    });
+    const reconnect = button(host, 'Reconnect now');
+    expect(reconnect?.disabled).toBe(true);
+    expect(reconnect?.title).toBe('A job is running.');
+    expect(reconnect?.title).not.toContain('Nothing moves');
+  });
 });
 
 let mountedRoot: Root | null = null;

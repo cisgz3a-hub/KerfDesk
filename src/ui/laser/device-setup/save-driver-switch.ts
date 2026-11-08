@@ -10,13 +10,13 @@ import type { PlatformAdapter } from '../../../platform/types';
 import { connectOptionsForDevice } from '../../commands/connect-options';
 import { useStore } from '../../state';
 import { useLaserStore } from '../../state/laser-store';
-import { isActiveJob } from '../../state/laser-store-helpers';
 import { useToastStore } from '../../state/toast-store';
 import {
   driverCommandsName,
   liveDriverMismatch,
   type LiveDriverMismatch,
 } from '../live-driver-mismatch';
+import { reconnectJobBlocker } from '../reconnect-job-guard';
 
 type LaserState = ReturnType<typeof useLaserStore.getState>;
 
@@ -51,7 +51,8 @@ export function saveDriverSwitchBlocker(
   if (laser.lastConnectionTransport === 'tcp') {
     return 'a network connection reopens only from its own Connect';
   }
-  if (isActiveJob(laser.streamer)) return 'a job is running';
+  const job = reconnectJobBlocker(laser.streamer);
+  if (job !== null) return job;
   if (laser.motionOperation !== null) return 'the machine is moving';
   if (laser.controllerOperation !== null) return 'a controller command is still running';
   const state = laser.statusReport?.state ?? null;
