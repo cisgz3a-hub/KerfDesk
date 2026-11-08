@@ -4,7 +4,7 @@
 
 import { Blob as NodeBlob } from 'node:buffer';
 import { describe, expect, it } from 'vitest';
-import type { WhiteInk } from '../../core/scene';
+import type { WhiteInk } from '../../core/scene/colored-path';
 import { parseSvg, type ParseSvgResult } from './parse-svg';
 import { readSvgDocumentFromBlob } from './parse-svg-blob';
 import { parseSvgWorkerDocument } from './parse-svg-worker';

@@ -6,7 +6,7 @@
 // and a mask hides some of the shape; cutting any of them out of the fills
 // under them leaves a hole, or a whole emblem, where the file shows ink.
 
-import type { WhiteInk } from '../../core/scene';
+import type { WhiteInk } from '../../core/scene/colored-path';
 import type { ResolvedSvgPaint } from './svg-paint-server';
 import type { PresentationState } from './svg-presentation';
 
