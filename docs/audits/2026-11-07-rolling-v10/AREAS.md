@@ -2,7 +2,7 @@
 
 **Requested by** the maintainer on 2026-11-07 ("continue looping even without merging PRs"). The coordinator chose the scope: the next check v9 and the performance and new-user audits point to.
 
-**Scope.** Live desktop is 1.0.29 (source `df2279e26`, published 2026-11-02 16:38 UTC). Main `5f09e1110` carries about 50 further PRs (#1550–#1604) from the performance audit S1 and the new-user experience audit U1. They include fixes to Start, Abort, job preparation, photo import, the canvas, text and the controller messages. None has been re-audited, and none has shipped. Ten of them (#1593–#1595, #1598–#1600, #1602–#1604) merged on 2026-11-05 while GitHub Actions could not run on main. Their required checks were green on each PR's own head, but no CI has run on the combined result; a local run of main's unit tests passed (38,920 tests, 0 real failures). Finding IDs are `V<area>-P<n>-<k>`.
+**Scope.** Live desktop is 1.0.29 (source `df2279e26`, published 2026-11-02 16:38 UTC). Main `5f09e1110` carries about 50 further PRs (#1550–#1604) from the performance audit S1 and the new-user experience audit U1. They include fixes to Start, Abort, job preparation, photo import, the canvas, text and the controller messages. None has been re-audited, and none has shipped. Nine of them (#1593–#1595, #1598–#1600, #1602–#1604) merged on 2026-11-05 while GitHub Actions could not run on main. Their required checks were green on each PR's own head, but no CI has run on the combined result; a local run of main's unit tests passed (38,920 tests, 0 real failures). Finding IDs are `V<area>-P<n>-<k>`.
 
 **PRs stay open.** The repository is private and its Actions are blocked (2026-11-06), so fix PRs from this round are opened and left unmerged until the maintainer restores CI.
 
@@ -17,7 +17,7 @@
 
 ### Lens L12, untested merge
 
-For the ten PRs merged without CI on main, check what CI would have caught: the full related e2e specs (not the PR subset), the desktop build, and the interaction with the other PRs that merged in the same hour.
+For the nine PRs merged without CI on main, check what CI would have caught: the full related e2e specs (not the PR subset), the desktop build, and the interaction with the other PRs that merged in the same hour.
 
 ## Areas (run order)
 
@@ -47,4 +47,4 @@ The open PRs #1592, #1596, #1597, #1601 and #1605–#1612 are the P3 sweeps and 
 - Never operate hardware. Controllers are simulated only. Agents never download or install software, and never launch the installed KerfDesk.
 - Known local gaps: the main checkout's `node_modules` lacks `fflate`, so suites importing `src/io/tiff` fail to load locally. CI installs it.
 
-**Status:** started 2026-11-07.
+**Status:** done 2026-11-08. All nine areas ledgered: P1 6 / P2 4 / P3 25; every P1 and P2 has a fix PR (#1614–#1620). See [LEDGER.md](LEDGER.md#round-result-2026-11-08).
