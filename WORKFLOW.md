@@ -3949,6 +3949,9 @@ discarded.
    with picture, object count and save time. **Restore** first asks Save / Don't Save / Cancel for
    the open project, then restores as above.
 3. The list leaves out this window's own work and work open in another live window.
+4. Each session is one row with its newest copy, though a tab closed with unsaved work leaves an
+   interval copy and a newer close copy. Restore never removes a copy newer than the one restored
+   (ADR-688 Amendment 1).
 
 #### Edge — browser without file pickers (Firefox, Safari)
 1. A banner above the workspace reads **This browser can't open or save files. Use Chrome or Edge,

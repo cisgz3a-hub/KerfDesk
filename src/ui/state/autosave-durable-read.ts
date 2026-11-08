@@ -65,7 +65,27 @@ export async function readDurableAutosaves(
   const candidates = await readCandidates(repository, warnings, unreadable);
   const eligible = await eligibleCandidates(locks, candidates, currentSessionId, warnings);
   eligible.sort((a, b) => b.savedAt - a.savedAt);
-  return { snapshots: eligible, warnings: [...new Set(warnings)], unreadable };
+  return { snapshots: newestPerSlot(eligible), warnings: [...new Set(warnings)], unreadable };
+}
+
+// A tab that closes with unsaved work leaves two copies under one key: the
+// interval's IndexedDB snapshot and the newer unload copy in localStorage.
+// They are one session's work, so only the newest is offered (V7-P1-1,
+// ADR-688 Amendment 1). A kept local copy takes the IndexedDB slot's epoch,
+// so its restore or discard clears only the older copy this read saw.
+function newestPerSlot(
+  newestFirst: ReadonlyArray<AutosaveDurableSnapshot>,
+): AutosaveDurableSnapshot[] {
+  const kept = new Map<string, AutosaveDurableSnapshot>();
+  for (const snapshot of newestFirst) {
+    const newer = kept.get(snapshot.storageKey);
+    if (newer === undefined) {
+      kept.set(snapshot.storageKey, snapshot);
+    } else if (newer.epoch === undefined && snapshot.epoch !== undefined) {
+      kept.set(snapshot.storageKey, { ...newer, epoch: snapshot.epoch });
+    }
+  }
+  return [...kept.values()];
 }
 
 async function readCandidates(
