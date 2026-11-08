@@ -23,9 +23,9 @@ bit, nested islands, curves, tiny features, unusual settings.
 | T8 | Text tool (outlines closed, fill rule, on-path) | | next |
 | T9 | Cut order across nested parts | holes before outlines, inner parts first | [done](T5-T6-T9-leads-perforation-order.md) — clean |
 | T10 | CNC V-carve depth against the cone law | depth and top width for 30/60/90° bits | [done](T10-vcarve.md) — clean |
-| T11 | CNC tabs, ramps and helix entry | | next |
+| T11 | CNC tabs, ramps and helix entry | tab height and width, entry angles | [done](T11-T13-cnc-entry-tabs-drill.md) — clean |
 | T12 | CNC pocket islands and adaptive clearing | | next |
-| T13 | CNC drill pecks and feeds calculator | | next |
+| T13 | CNC drill pecks | peck sequence | [done](T11-T13-cnc-entry-tabs-drill.md) — clean (feeds calculator next) |
 | T14 | Relief projection and two-sided split | | next |
 
 ## Overlap
