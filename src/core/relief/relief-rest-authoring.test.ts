@@ -99,6 +99,34 @@ describe('conservative relief rest selection', () => {
     for (const point of trimmed.points) expect(point.z).toBeCloseTo(-1 - 0.2 * point.x, 12);
     expect(reliefRestPasses(target, [fine], new Uint8Array(1600), 0.1).passes).toEqual([]);
   });
+  it('keeps one move per kept stretch of a straight move, not one per half cell (F6-P3-2)', () => {
+    const target = map(40, 0.25);
+    const selected = new Uint8Array(1600);
+    selected[20 * 40 + 22] = 1;
+    selected[20 * 40 + 36] = 1;
+    const fine: CncPass = {
+      kind: 'path3d',
+      closed: false,
+      points: [
+        { x: 0, y: 5.125, z: -1 },
+        { x: 6, y: 5.125, z: -2.2 },
+        { x: 10, y: 5.125, z: -3 },
+      ],
+    };
+    const result = reliefRestPasses(target, [fine], selected, 0.1);
+    expect(result.passes).toHaveLength(2);
+    const [first, second] = result.passes;
+    if (first?.kind !== 'path3d' || second?.kind !== 'path3d')
+      throw new Error('Expected 3D moves.');
+    // The first stretch runs through the original vertex at x = 6, so it keeps it.
+    expect(first.points.map((point) => point.x)).toHaveLength(3);
+    expect(first.points[1]).toEqual({ x: 6, y: 5.125, z: -2.2 });
+    expect(second.points).toHaveLength(2);
+    for (const pass of result.passes) {
+      if (pass.kind !== 'path3d') continue;
+      for (const point of pass.points) expect(point.z).toBeCloseTo(-1 - 0.2 * point.x, 12);
+    }
+  });
 });
 
 it('retains full fine selection when the predecessor cutter lattice cannot fit its sampling budget', () => {

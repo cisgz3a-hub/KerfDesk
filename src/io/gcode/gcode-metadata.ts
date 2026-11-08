@@ -180,7 +180,11 @@ export type GcodeMetadata = {
 // The last-100 PR audit keeps self-intersecting CNC artwork in placement
 // bounds and re-scores optimized routes after choosing closed starts; carries
 // forward v40 above.
-export const EMITTER_REVISION = 'audit-placement-and-route-20261102-v41';
+// ADR-580 Amd 2 carves a height-map relief on the surface through its pixel
+// centres, so its roughing and finishing Z change; 3D rest finishing keeps one
+// G1 per kept stretch of a move instead of one per half cell (CNC audit v1
+// F6-P3-2, same path); carries forward v41 above.
+export const EMITTER_REVISION = 'heightmap-pixel-surface-20261108-v42';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

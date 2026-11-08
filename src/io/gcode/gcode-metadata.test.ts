@@ -41,7 +41,7 @@ function laserAssumptions(
 
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
-    expect(EMITTER_REVISION).toBe('audit-placement-and-route-20261102-v41');
+    expect(EMITTER_REVISION).toBe('heightmap-pixel-surface-20261108-v42');
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {

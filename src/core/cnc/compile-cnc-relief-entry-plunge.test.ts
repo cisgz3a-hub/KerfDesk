@@ -25,13 +25,15 @@ import { rampEntryPlungesByLayer } from './contour-ramp-entry';
 const COLOR = '#a0522d';
 const SIZE_MM = 12;
 const SAMPLES = 120;
-const HOLE_MM = 6;
+const HOLE_MM = 5.2;
 const DEPTH_MM = 3;
 
-// A 12 mm relief standing at the stock top round a 6 mm square hole, 3 mm
+// A 12 mm relief standing at the stock top round a 5.2 mm square hole, 3 mm
 // deep. Kept 0.5 mm off the walls, the 3.175 mm end mill's centre has a loop
-// 2.7 mm round on each of the hole's two levels: shorter than its cut width.
-// (Holes from 5.7 to 6.2 mm give the same loop.)
+// shorter than its cut width on each of the hole's two levels. (A 6 mm hole
+// was this case while relief CAM read a height map at its highest pixel per
+// cell; read on its pixel-centre surface (ADR-580 Amendment 2) its loop is
+// long enough to ramp round.)
 function dimpleRelief(): ReliefObject {
   const pitch = SIZE_MM / SAMPLES;
   const middle = SIZE_MM / 2;
