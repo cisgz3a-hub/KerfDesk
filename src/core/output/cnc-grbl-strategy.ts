@@ -69,6 +69,7 @@ import {
 } from './cnc-grbl-transitions';
 import type { CncPassSpan, CncPassSpanEmission, CncPassSpanRecorder } from './cnc-pass-spans';
 import type { OutputEmitOptions, OutputStrategy } from './output-strategy';
+import { appendAll } from '../util';
 
 const LINE_END = '\n';
 
@@ -234,7 +235,7 @@ function appendHelicalContourPass(
   const prepared = prepareHelicalMotion(pass, plunge);
   if (prepared === null) return;
   positionForHelix(lines, head, prepared, safeZMm, plunge);
-  lines.push(...prepared.arcLines);
+  appendAll(lines, prepared.arcLines);
   head.z = prepared.finalZ;
   linkHelixToContour(lines, head, prepared, feed);
   appendCutMoves(

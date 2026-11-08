@@ -21,6 +21,7 @@ import type { BarcodeShape } from '../scene/scene-object';
 import { DEFAULT_FONT_KEY } from '../text';
 import { layoutBarcode, layoutPolylines, type BarcodeLayout } from './barcode-layout';
 import type { BarcodeUse } from './data-matrix-encode';
+import { appendAll } from '../util';
 
 /** Captions use the bundled sans font; its digits are tabular like OCR-B's. */
 export const BARCODE_CAPTION_FONT_KEY = DEFAULT_FONT_KEY;
@@ -129,7 +130,7 @@ function appendTranslated(
     ...polyline,
     points: polyline.points.map(move),
   }));
-  target.polylines.push(...polylines);
+  appendAll(target.polylines, polylines);
   // Curves must pair one-to-one with polylines; fall back to straight segments.
   const curves =
     rendered.curves !== undefined && rendered.curves.length === rendered.polylines.length
@@ -139,7 +140,7 @@ function appendTranslated(
           segments: curve.segments.map((segment) => moveSegment(segment, move)),
         }))
       : polylines.map(polylineToCurveSubpath);
-  target.curves.push(...curves);
+  appendAll(target.curves, curves);
 }
 
 function moveSegment(segment: PathSegment, move: (point: Vec2) => Vec2): PathSegment {

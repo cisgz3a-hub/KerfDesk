@@ -28,6 +28,7 @@ import { applyRegistrationOutputToScene } from './registration-output-actions';
 import type { AppState } from './store';
 import { pushUndo } from './scene-mutations';
 import { captureSetupHistoryContext } from './setup-history-context';
+import { maxOf, minOf } from '../../core/util';
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
 
@@ -193,8 +194,8 @@ function outlineSize(points: Extract<BoardShape, { readonly kind: 'outline' }>['
   const xs = points.map((point) => point.x);
   const ys = points.map((point) => point.y);
   return {
-    width: Math.max(...xs) - Math.min(...xs),
-    height: Math.max(...ys) - Math.min(...ys),
+    width: maxOf(xs) - minOf(xs),
+    height: maxOf(ys) - minOf(ys),
   };
 }
 

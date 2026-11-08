@@ -12,6 +12,7 @@ import {
 } from './canvas-motion-marker-layout';
 import type { CanvasBitmapSize } from './use-canvas-bitmap-size';
 import type { ViewTransform } from './view-transform';
+import { maxOf } from '../../core/util';
 
 const LABEL_FONT = '600 12px system-ui, sans-serif';
 const LABEL_HEIGHT = 24;
@@ -106,7 +107,7 @@ function labelBounds(
     width: Math.max(0, Math.min(bed.x + bed.width, canvas.x + canvas.width) - x),
     height: Math.max(0, Math.min(bed.y + bed.height, canvas.y + canvas.height) - y),
   };
-  const neededWidth = Math.max(0, ...markers.map((marker) => marker.width));
+  const neededWidth = Math.max(0, maxOf(markers.map((marker) => marker.width)));
   const neededHeight = markers.reduce((height, marker) => height + marker.height + EDGE_GAP, 0);
   // At extreme zoom-out or pan the bed may no longer fit two readable names.
   // Keep the plates in the viewport, with leaders to the unchanged anchors.

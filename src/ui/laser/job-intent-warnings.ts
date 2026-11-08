@@ -23,6 +23,7 @@ import { rasterThresholdWarnings } from './raster-threshold-warnings';
 import { scanQualityWarnings } from './scan-quality-warnings';
 import { stackedCopyWarnings } from './stacked-copy-warnings';
 import { detectUncalibratedJobWarnings } from './uncalibrated-job-warnings';
+import { maxOf, minOf } from '../../core/util';
 
 // ADR-234's feed-matched entry runway derives its length from the layer's
 // fill overscan, so overscan 0 silently reproduces the burn-from-rapid entry
@@ -109,8 +110,8 @@ function appendScanOffsetCoverageWarnings(project: Project, job: Job, warnings: 
     return;
   }
   const speeds = points.map((point) => point.speedMmPerMin);
-  const min = Math.min(...speeds);
-  const max = Math.max(...speeds);
+  const min = minOf(speeds);
+  const max = maxOf(speeds);
   const uncovered = feeds.filter((feed) => feed < min || feed > max);
   if (uncovered.length === 0) return;
   warnings.push(

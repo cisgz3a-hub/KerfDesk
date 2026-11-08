@@ -32,6 +32,7 @@ import { quantizeColours, TRANSPARENT_LABEL, type QuantizedColours } from './col
 import { normalizedColourCount, type ColourLayerOptions } from './colour-layer-options';
 import type { RawImageData, TraceOptions } from './trace-image';
 import type { TraceSteps } from './trace-steps';
+import { appendAll } from '../util';
 
 // Working-grid cap: above this many pixels the image is resampled down first
 // (the per-pixel OKLab buffer alone is 12 bytes a pixel).
@@ -168,8 +169,8 @@ function loopsToColoredPath(
       const g = geometry[piece.chain] as ChainGeometry;
       const oriented = piece.reversed ? reversedGeometry(g) : g;
       if (start === undefined) start = oriented.start;
-      segments.push(...oriented.segments);
-      points.push(...(points.length === 0 ? oriented.samples : oriented.samples.slice(1)));
+      appendAll(segments, oriented.segments);
+      appendAll(points, points.length === 0 ? oriented.samples : oriented.samples.slice(1));
     }
     if (start === undefined || segments.length === 0) continue;
     // Closed rings return to their start point (ADR-100 third amendment).

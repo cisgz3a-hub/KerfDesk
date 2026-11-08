@@ -24,6 +24,7 @@ import {
 } from '../scene';
 import { bendPointMapper, bendTextRender, clampBend } from './text-bend';
 import type { TextRenderResult } from './text-to-polylines';
+import { maxOf, minOf } from '../util';
 
 const ITALIC_SLANT = Math.tan((12 * Math.PI) / 180);
 const BOLD_SHARE = 0.03;
@@ -266,10 +267,10 @@ function contourBox(polyline: Polyline, curve: CurveSubpath | undefined): Bounds
   const xs = polyline.points.map((p) => p.x);
   const ys = polyline.points.map((p) => p.y);
   return {
-    minX: Math.min(...xs),
-    minY: Math.min(...ys),
-    maxX: Math.max(...xs),
-    maxY: Math.max(...ys),
+    minX: minOf(xs),
+    minY: minOf(ys),
+    maxX: maxOf(xs),
+    maxY: maxOf(ys),
   };
 }
 

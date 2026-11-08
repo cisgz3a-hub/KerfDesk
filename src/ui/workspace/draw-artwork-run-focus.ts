@@ -2,6 +2,7 @@ import { transformedBBox, type SceneObject } from '../../core/scene';
 import type { ArtworkRunFocus } from '../state/artwork-run-order-ui';
 import { canvasTheme } from '../theme/canvas-theme';
 import type { ViewTransform } from './view-transform';
+import { minOf } from '../../core/util';
 
 export function drawArtworkRunFocus(
   ctx: CanvasRenderingContext2D,
@@ -12,8 +13,8 @@ export function drawArtworkRunFocus(
   const active = objects.filter((object) => focus.objectIds.includes(object.id));
   if (active.length === 0) return;
   const boxes = active.map(transformedBBox);
-  const minX = Math.min(...boxes.map((box) => box.minX));
-  const minY = Math.min(...boxes.map((box) => box.minY));
+  const minX = minOf(boxes.map((box) => box.minX));
+  const minY = minOf(boxes.map((box) => box.minY));
   const x = view.offsetX + minX * view.scale;
   const y = view.offsetY + minY * view.scale;
   ctx.save();

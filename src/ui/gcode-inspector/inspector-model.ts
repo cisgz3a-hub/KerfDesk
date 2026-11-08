@@ -7,6 +7,7 @@ import type { ProgramTimeModel } from '../../core/gcode-time';
 import { SEG_KIND, type GcodeRenderModel } from '../../core/gcode-view';
 // Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
 import type { MoveDetail } from '../viewer3d/move-detail';
+import { maxOf } from '../../core/util';
 
 /**
  * The render model without the route and length arrays only timing used, and
@@ -61,4 +62,4 @@ export function inspectorProgramTime(
   return { ...kept, kindSeconds };
 }
 
-const KIND_COUNT = Math.max(...Object.values(SEG_KIND)) + 1;
+const KIND_COUNT = maxOf(Object.values(SEG_KIND)) + 1;

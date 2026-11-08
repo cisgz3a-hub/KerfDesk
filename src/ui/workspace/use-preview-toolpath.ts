@@ -15,6 +15,7 @@ import {
   type LargeJobPreparationOptions,
 } from './preparation-worker-client';
 import { mapToolpathToScene, registerPreviewJobOriginOffset } from './preview-scene-frame';
+import type { OutputCompilationProgress } from '../../io/gcode/prepare-output-async';
 import type { PreviewToolpath } from './preview-status';
 import { currentPrintCutOutputRegistration } from '../laser/print-cut-output';
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
@@ -227,9 +228,16 @@ function settleBuiltToolpath(args: {
   readonly setToolpath: (toolpath: PreviewToolpath) => void;
 }): void {
   const { built, setToolpath } = args;
+  // The worker's reports name the phase and, for CNC regions, how many are
+  // done, so a minutes-long pocket shows it is working (S8-P3-3).
+  let settled = false;
+  const onProgress = (progress: OutputCompilationProgress): void => {
+    if (settled || args.isCancelled()) return;
+    setToolpath({ ...built, previewIssue: { kind: 'preparing-large-job', progress } });
+  };
   const offThread =
     built.previewIssue?.kind === 'too-complex'
-      ? prepareLargeJobOffThread(args.project, args.options, undefined, args.signal)
+      ? prepareLargeJobOffThread(args.project, args.options, onProgress, args.signal)
       : null;
   if (offThread === null) {
     if (built.previewIssue === undefined)
@@ -240,6 +248,7 @@ function settleBuiltToolpath(args: {
   setToolpath({ ...built, previewIssue: { kind: 'preparing-large-job' } });
   offThread.then(
     (prepared) => {
+      settled = true;
       if (args.isCancelled()) return;
       registerPreviewJobOriginOffset(prepared.toolpath, prepared.jobOriginOffset ?? ZERO_OFFSET);
       if (prepared.toolpath.previewIssue === undefined)
@@ -247,6 +256,7 @@ function settleBuiltToolpath(args: {
       setToolpath(prepared.toolpath);
     },
     (error: unknown) => {
+      settled = true;
       // Superseded means a newer preparation already replaced this one, so the
       // canvas keeps waiting on that one instead of reporting a failure the
       // operator can neither act on nor have caused.

@@ -6,6 +6,7 @@
 
 import { isClosedEnough, type Polyline, type SceneObject, type Vec2 } from '../scene';
 import { isClosedPolygon, isVectorPathObject, materializeVectorObject } from './vector-path-tools';
+import { maxOf, minOf } from '../util';
 
 const MIN_SAMPLED_VERTICES = 12;
 const ABSOLUTE_TOLERANCE_MM = 0.02;
@@ -70,8 +71,8 @@ function boxCentre(points: ReadonlyArray<Vec2>): Vec2 {
   const xs = points.map((point) => point.x);
   const ys = points.map((point) => point.y);
   return {
-    x: (Math.min(...xs) + Math.max(...xs)) / 2,
-    y: (Math.min(...ys) + Math.max(...ys)) / 2,
+    x: (minOf(xs) + maxOf(xs)) / 2,
+    y: (minOf(ys) + maxOf(ys)) / 2,
   };
 }
 

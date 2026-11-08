@@ -1,3 +1,4 @@
+import { minOf } from '../util';
 export type CncReachPoint = { readonly x: number; readonly y: number; readonly z: number };
 export type CncReachFixture = {
   readonly id: string;
@@ -68,12 +69,14 @@ function segmentRectangleDistanceSquared(
   return Math.min(
     pointRectangleDistanceSquared(a, x1, x2, y1, y2),
     pointRectangleDistanceSquared(b, x1, x2, y1, y2),
-    ...[
-      [x1, y1],
-      [x1, y2],
-      [x2, y1],
-      [x2, y2],
-    ].map(([x = 0, y = 0]) => pointSegmentDistanceSquared(x, y, a, b)),
+    minOf(
+      [
+        [x1, y1],
+        [x1, y2],
+        [x2, y1],
+        [x2, y2],
+      ].map(([x = 0, y = 0]) => pointSegmentDistanceSquared(x, y, a, b)),
+    ),
   );
 }
 function segmentCrossesRectangle(

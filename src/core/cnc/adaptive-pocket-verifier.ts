@@ -56,6 +56,7 @@ export function verifyAdaptivePocket(
     earlyCells: 0,
   };
   let maxSimulatedEngagementMm = 0;
+  const ceilingMm = engagementCeilingMm(grid, plan.optimalLoadMm);
   // The plan's sequences are in the order the program cuts them, each one's
   // finishing rings straight after its roughing, at every depth. Within one
   // depth that is this order, so the simulation follows it.
@@ -68,23 +69,15 @@ export function verifyAdaptivePocket(
       toolDiameterMm / 2,
     );
     contact.addEntry(sequence.entryCenter, sequence.entryRadiusMm);
-    let previous = clearSeedRings(grid, order, contact, sequence.seedRings, entryEnd);
-    const gauge: ContactGauge = { runMm: Number.POSITIVE_INFINITY };
-    for (const ring of sequence.rings) {
-      const first = ring.points[0];
-      if (first === undefined) continue;
-      const connectorEngagement = cutSegment(grid, order, contact, previous, first, gauge);
-      maxSimulatedEngagementMm = Math.max(maxSimulatedEngagementMm, connectorEngagement);
-      for (let index = 1; index < ring.points.length; index += 1) {
-        const start = ring.points[index - 1];
-        const end = ring.points[index];
-        if (start !== undefined && end !== undefined) {
-          const segmentEngagement = cutSegment(grid, order, contact, start, end, gauge);
-          maxSimulatedEngagementMm = Math.max(maxSimulatedEngagementMm, segmentEngagement);
-        }
-      }
-      previous = ring.points[ring.points.length - 1] ?? first;
-    }
+    const previous = clearSeedRings(grid, order, contact, sequence.seedRings, entryEnd);
+    const cut = { grid, order, contact, ceilingMm };
+    const engagementMm = cutRoughingRings(cut, sequence.rings, previous);
+    maxSimulatedEngagementMm = Math.max(maxSimulatedEngagementMm, engagementMm);
+    // The verdict checks engagement before anything else, so a move over the
+    // limit settles it: simulating the rest only delayed the same refusal, by
+    // up to a minute and a half on a large recess (S8-P3-2).
+    if (maxSimulatedEngagementMm > ceilingMm)
+      return engagementRefusal(grid, maxSimulatedEngagementMm);
     clearFinishRings(grid, order, sequence.finishRings, toolDiameterMm / 2);
   }
   return verificationResult(
@@ -115,15 +108,10 @@ function verificationResult(
   toolRadiusMm: number,
 ): AdaptivePocketVerification {
   const coverageRatio = (initialStock - countOccupied(grid.occupied)) / initialStock;
-  // One cell diagonal above the limit is allowed, as when the grid measured
-  // the contact. The contact is exact now, so this is margin, not measurement
-  // error; it is kept so that no verdict moves except through the measurement
-  // (ADR-154 Amendment 3).
-  const toleranceMm = grid.cellMm * Math.SQRT2;
-  if (maxSimulatedEngagementMm > engagementLimitMm + toleranceMm) {
+  if (maxSimulatedEngagementMm > engagementCeilingMm(grid, engagementLimitMm)) {
     return {
       ok: false,
-      reason: 'Adaptive verification simulated radial engagement above the configured limit.',
+      reason: ENGAGEMENT_REFUSAL,
       coverageRatio,
       gridMm: grid.cellMm,
       maxSimulatedEngagementMm,
@@ -158,6 +146,60 @@ function verificationResult(
     };
   }
   return { ok: true, coverageRatio, gridMm: grid.cellMm, maxSimulatedEngagementMm };
+}
+
+// One cell diagonal above the limit is allowed, as when the grid measured
+// the contact. The contact is exact now, so this is margin, not measurement
+// error; it is kept so that no verdict moves except through the measurement
+// (ADR-154 Amendment 3).
+function engagementCeilingMm(grid: Grid, engagementLimitMm: number): number {
+  return engagementLimitMm + grid.cellMm * Math.SQRT2;
+}
+
+// A refusal settled by engagement carries no coverage when the simulation
+// stopped there: nothing reads a refusal's numbers but its reason.
+const ENGAGEMENT_REFUSAL =
+  'Adaptive verification simulated radial engagement above the configured limit.';
+
+function engagementRefusal(grid: Grid, maxSimulatedEngagementMm: number) {
+  return {
+    ok: false as const,
+    reason: ENGAGEMENT_REFUSAL,
+    gridMm: grid.cellMm,
+    maxSimulatedEngagementMm,
+  };
+}
+
+type RoughingCut = {
+  readonly grid: Grid;
+  readonly order: FinishOrder;
+  readonly contact: AdaptiveCutterContact;
+  readonly ceilingMm: number;
+};
+
+// One sequence's roughing rings, each joined from the last point cut. Returns
+// the largest sampled engagement, and stops after the first move above the
+// ceiling: the verdict is then settled.
+function cutRoughingRings(cut: RoughingCut, rings: ReadonlyArray<Polyline>, from: Vec2): number {
+  const { grid, order, contact } = cut;
+  const gauge: ContactGauge = { runMm: Number.POSITIVE_INFINITY };
+  let previous = from;
+  let maximum = 0;
+  for (const ring of rings) {
+    const first = ring.points[0];
+    if (first === undefined) continue;
+    maximum = Math.max(maximum, cutSegment(grid, order, contact, previous, first, gauge));
+    if (maximum > cut.ceilingMm) return maximum;
+    for (let index = 1; index < ring.points.length; index += 1) {
+      const start = ring.points[index - 1];
+      const end = ring.points[index];
+      if (start === undefined || end === undefined) continue;
+      maximum = Math.max(maximum, cutSegment(grid, order, contact, start, end, gauge));
+      if (maximum > cut.ceilingMm) return maximum;
+    }
+    previous = ring.points[ring.points.length - 1] ?? first;
+  }
+  return maximum;
 }
 
 // The largest set of stock cells that touch, edge or corner, after every pass.

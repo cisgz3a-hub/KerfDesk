@@ -29,6 +29,7 @@ import type { AppState } from './store';
 import { useToastStore } from './toast-store';
 import type { RetainArrayRequest } from './retained-array-capture';
 import { retainedProject } from './retain-array-project';
+import { appendAll } from '../../core/util';
 
 export { placedObject } from './array-selection-copies';
 
@@ -308,7 +309,7 @@ function laterCopies(
       placement,
       idFactory,
     );
-    objects.push(...copied.objects);
+    appendAll(objects, copied.objects);
     instanceMaps.push(copied.ids);
     selectedIds.push(
       ...selected.flatMap((object) => {

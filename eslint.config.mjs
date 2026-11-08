@@ -13,7 +13,13 @@ import importPlugin from 'eslint-plugin-import';
 import reactHooksPlugin from 'eslint-plugin-react-hooks';
 import prettierConfig from 'eslint-config-prettier';
 import globals from 'globals';
-import kerfdeskRules from './scripts/eslint/no-raw-project-set-state.mjs';
+import rawProjectSetStateRules from './scripts/eslint/no-raw-project-set-state.mjs';
+import spreadMathExtremumRules from './scripts/eslint/no-spread-math-extremum.mjs';
+
+// One plugin object: flat config refuses two different objects under one name.
+const kerfdeskRules = {
+  rules: { ...rawProjectSetStateRules.rules, ...spreadMathExtremumRules.rules },
+};
 
 const FILE_LINE_LIMIT = 400;
 const FUNCTION_LINE_LIMIT = 80;
@@ -342,6 +348,23 @@ export default tseslint.config(
     ignores: ['**/*.test.ts', '**/*.test.tsx', ...UI_TEST_SUPPORT_FILES],
     plugins: { kerfdesk: kerfdeskRules },
     rules: { 'kerfdesk/no-raw-project-set-state': 'error' },
+  },
+  // Audit S7-P2-3: no array spread into Math.min / Math.max in shipped code
+  // (scripts/eslint/no-spread-math-extremum.mjs). Tests and fixtures build
+  // small arrays and may keep the spread.
+  {
+    files: ['src/**/*.ts', 'src/**/*.tsx'],
+    ignores: [
+      '**/*.test.ts',
+      '**/*.test.tsx',
+      'src/__fixtures__/**',
+      '**/*.test-support.ts',
+      '**/*.test-support.tsx',
+      '**/*test-helpers.ts',
+      ...UI_TEST_SUPPORT_FILES,
+    ],
+    plugins: { kerfdesk: kerfdeskRules },
+    rules: { 'kerfdesk/no-spread-math-extremum': 'error' },
   },
   // H13: the job-aware wrapper module is the ONE place allowed to touch the
   // native blocking dialogs — everything else must go through it.

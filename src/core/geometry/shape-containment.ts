@@ -13,6 +13,7 @@ import {
 import { worldOutlinePoints } from './rubber-band-outline';
 import { segmentContainedInPolygon } from './segment-contained-in-polygon';
 import { isClosedPolygon, isVectorPathObject, materializeVectorObject } from './vector-path-tools';
+import { maxOf } from '../util';
 
 type Contour = { readonly points: ReadonlyArray<Vec2>; readonly bounds: Bounds };
 
@@ -67,8 +68,8 @@ export function smallerObjectIds(
   candidates: ReadonlyArray<SceneObject>,
 ): ReadonlyArray<string> {
   const sizes = references.map((object) => boxSize(transformedBBox(object)));
-  const maxWidth = Math.max(...sizes.map((size) => size.width));
-  const maxHeight = Math.max(...sizes.map((size) => size.height));
+  const maxWidth = maxOf(sizes.map((size) => size.width));
+  const maxHeight = maxOf(sizes.map((size) => size.height));
   return candidates
     .filter((candidate) => {
       const size = boxSize(transformedBBox(candidate));

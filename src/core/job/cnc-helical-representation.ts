@@ -4,6 +4,7 @@ import {
 } from '../cnc/coordinate-representation';
 import { circularArcGeometry, sampleCircularArcPoints } from '../geometry/arc-representation';
 import type { CncHelicalContourPass } from './job';
+import { appendAll } from '../util';
 
 type HelicalRepresentationPoint = {
   readonly x: number;
@@ -96,6 +97,9 @@ export function cncHelicalContourPoints(
     }
   }
   const finalZ = seamZs[seamZs.length - 1] ?? 0;
-  points.push(...pass.polyline.map((point) => ({ ...point, z: finalZ })));
+  appendAll(
+    points,
+    pass.polyline.map((point) => ({ ...point, z: finalZ })),
+  );
   return points;
 }

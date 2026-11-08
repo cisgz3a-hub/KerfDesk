@@ -36,6 +36,7 @@ import {
   vectorContainmentPoints,
   type ConvexClipOutline,
 } from './svg-vector-clip';
+import { appendAll } from '../../core/util';
 
 /** An element's geometry in document millimetres; curves[i] belongs to polylines[i]. */
 export type SvgVectorGeometry = {
@@ -133,8 +134,8 @@ function clippedLines(
     const clipped = clipLine(lines[index] ?? [], subpath.closed);
     if (clipped.kind === 'inside') {
       const whole = unclippedGeometry([subpath], matrix);
-      polylines.push(...whole.polylines);
-      curves.push(...whole.curves);
+      appendAll(polylines, whole.polylines);
+      appendAll(curves, whole.curves);
       continue;
     }
     for (const piece of clipped.pieces) {

@@ -4,6 +4,7 @@ import type { Polyline, Vec2 } from '../scene';
 import { radialEnvelopeSweepRadiiMm, type RadialEnvelope } from './radial-envelope';
 import { distinctLoopPoints } from './vcarve-medial-region';
 import { representedCncCoordinateMm } from './cnc-output-precision';
+import { maxOf } from '../util';
 
 export type VCarveSourceBoundaryCoverage = {
   /** Largest uncovered distance at sampled source witnesses; null when no cutting sweep exists. */
@@ -143,7 +144,7 @@ function sweepBounds(a: Vec3, b: Vec3, ra: number, rb: number): SweepBounds | nu
   // Every affine centre lies in this box and its radius is at most the larger
   // endpoint radius. Inflate for floating arithmetic, then only reject strict
   // separation. Invalid geometry retains the original scalar NaN behaviour.
-  const margin = PRUNING_ROUNDOFF_SCALE * Math.max(1, ...values.map(Math.abs));
+  const margin = PRUNING_ROUNDOFF_SCALE * Math.max(1, maxOf(values.map(Math.abs)));
   const radius = Math.max(ra, rb) + margin;
   return {
     minX: Math.min(a.x, b.x) - radius,

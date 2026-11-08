@@ -1,3 +1,4 @@
+import { minOf } from '../../util';
 // Connected components of a binary mask with hole ownership (ADR-441). Dark
 // pixels join 8-connected and light pixels 4-connected: with that pairing
 // every light region fully surrounded by one dark region is exactly a hole of
@@ -87,7 +88,7 @@ function label(
         labels[i] = parent.length - 1;
         continue;
       }
-      const root = Math.min(...neighbours.map((n) => find(parent, n)));
+      const root = minOf(neighbours.map((n) => find(parent, n)));
       labels[i] = root;
       for (const n of neighbours) parent[find(parent, n)] = root;
     }

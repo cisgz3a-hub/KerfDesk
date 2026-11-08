@@ -6,6 +6,7 @@
 import { type DeviceProfile, toMachineCoords } from '../devices';
 import { isAlongXScan, scanFrameBoundsOf, type RasterScanFrame } from '../raster/raster-scan-frame';
 import { applyTransform, type RasterImage, type Vec2 } from '../scene';
+import { maxOf, minOf } from '../util';
 
 export type RasterMachineBounds = {
   readonly minX: number;
@@ -22,10 +23,10 @@ export function rasterBoundsInMachineCoords(
   const xs = corners.map((p) => p.x);
   const ys = corners.map((p) => p.y);
   return {
-    minX: Math.min(...xs),
-    maxX: Math.max(...xs),
-    minY: Math.min(...ys),
-    maxY: Math.max(...ys),
+    minX: minOf(xs),
+    maxX: maxOf(xs),
+    minY: minOf(ys),
+    maxY: maxOf(ys),
   };
 }
 

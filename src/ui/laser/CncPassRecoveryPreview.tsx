@@ -4,6 +4,7 @@
 
 import type { Vec2 } from '../../core/scene';
 import type { CncPassRecoveryPassOption } from './cnc-pass-recovery-model';
+import { maxOf, minOf } from '../../core/util';
 
 const WIDTH = 560;
 const HEIGHT = 260;
@@ -97,10 +98,10 @@ function projectPoints(points: ReadonlyArray<Vec2>): {
 } {
   const xs = points.map(({ x }) => x);
   const ys = points.map(({ y }) => y);
-  const minX = xs.length === 0 ? 0 : Math.min(...xs);
-  const maxX = xs.length === 0 ? 1 : Math.max(...xs);
-  const minY = ys.length === 0 ? 0 : Math.min(...ys);
-  const maxY = ys.length === 0 ? 1 : Math.max(...ys);
+  const minX = xs.length === 0 ? 0 : minOf(xs);
+  const maxX = xs.length === 0 ? 1 : maxOf(xs);
+  const minY = ys.length === 0 ? 0 : minOf(ys);
+  const maxY = ys.length === 0 ? 1 : maxOf(ys);
   const spanX = Math.max(maxX - minX, 1);
   const spanY = Math.max(maxY - minY, 1);
   const scale = Math.min((WIDTH - PADDING * 2) / spanX, (HEIGHT - PADDING * 2) / spanY);

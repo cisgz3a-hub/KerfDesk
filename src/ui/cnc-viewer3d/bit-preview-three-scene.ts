@@ -10,6 +10,7 @@ import { bitPreviewProfile } from './bit-preview-profile';
 import { buildToolMesh, type ToolMeshHandle } from './viewer3d-tool';
 // Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
 import { disposeViewer3dRenderer } from '../viewer3d/viewer3d-context';
+import { maxOf } from '../../core/util';
 
 export type BitPreviewThreeModule = typeof ThreeNamespace;
 
@@ -91,7 +92,7 @@ function buildBitPreviewScene(
 
     const profile = bitPreviewProfile(tool);
     const profileHeightMm = profile.at(-1)?.heightMm ?? tool.diameterMm;
-    const profileDiameterMm = Math.max(...profile.map((point) => point.radiusMm * 2));
+    const profileDiameterMm = maxOf(profile.map((point) => point.radiusMm * 2));
     const spanMm = Math.max(profileHeightMm, profileDiameterMm, 1);
     const scene = new three.Scene();
     resources.scene = scene;

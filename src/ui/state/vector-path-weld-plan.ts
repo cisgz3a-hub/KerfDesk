@@ -24,6 +24,7 @@ import {
   reservedWeldOperationIds,
   type WeldOperationBucket,
 } from './vector-path-weld-bindings';
+import { appendAll } from '../../core/util';
 
 export type WeldSelectionPlan = {
   readonly object: ImportedSvg;
@@ -117,7 +118,7 @@ export function prepareWeldSelection(
     const layer = cloneEffectiveLayer(bucket.effectiveLayer, seedOperation);
     clonedLayers.push({ sourceLayerId: bucket.sourceLayerId, layer });
     identityScene = { ...identityScene, layers: [...identityScene.layers, layer] };
-    preparedObjects.push(...prepareWeldObjectsForBucket(bucket, layer.id));
+    appendAll(preparedObjects, prepareWeldObjectsForBucket(bucket, layer.id));
   }
 
   return {

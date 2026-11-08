@@ -7,6 +7,7 @@ import {
   type Scene,
 } from '../scene';
 import type { DeviceProfile } from '../devices';
+import { maxOf, minOf } from '../util';
 
 /** Relative to the physical Z position at the start of each sample. */
 export type FocusTestMotion = {
@@ -155,12 +156,12 @@ export function focusTestWarnings(
     machine.push(FOCUS_TEST_Z_UNCONFIRMED_WARNING);
   if (
     device.zTravelMm !== undefined &&
-    Math.max(0, ...offsets) - Math.min(0, ...offsets) > device.zTravelMm
+    Math.max(0, maxOf(offsets)) - Math.min(0, minOf(offsets)) > device.zTravelMm
   )
     machine.push(FOCUS_TEST_Z_TRAVEL_EXCEEDED_WARNING);
   return [
     ...machine,
-    `Focus Test moves Z from ${Math.min(...offsets).toFixed(3)} to ${Math.max(...offsets).toFixed(3)} mm relative to starting focus. Positive Z follows the controller axis direction. Each completed sample returns to starting Z; an interrupted job may not. Frame traces XY only: verify material clearance and both Z directions. Physical focus and travel remain unqualified.`,
+    `Focus Test moves Z from ${minOf(offsets).toFixed(3)} to ${maxOf(offsets).toFixed(3)} mm relative to starting focus. Positive Z follows the controller axis direction. Each completed sample returns to starting Z; an interrupted job may not. Frame traces XY only: verify material clearance and both Z directions. Physical focus and travel remain unqualified.`,
     'The 2D estimate excludes Focus Test Z travel and laser-off returns. Inspect G-code (3D) shows the exact emitted motion and its playback estimate. Sample labels are operation names, not engraved marks.',
   ];
 }

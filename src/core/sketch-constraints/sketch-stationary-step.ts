@@ -1,6 +1,7 @@
 import { sketchAt } from './sketch-indexed';
 import type { SketchEvaluator, SketchResidual } from './sketch-jacobian';
 import { sketchNullspace } from './sketch-nullspace';
+import { maxOf } from '../util';
 
 /** A collinear distance can be stationary in a perpendicular direction despite a feasible solve. */
 export function sketchStationaryStep(
@@ -12,7 +13,7 @@ export function sketchStationaryStep(
   const cost = sketchResidualCost(residual);
   const step = Math.max(
     1e-3,
-    Math.min(1000, Math.max(0, ...residual.map((item) => Math.abs(item.value)))),
+    Math.min(1000, Math.max(0, maxOf(residual.map((item) => Math.abs(item.value))))),
   );
   // Nullspace directions preserve all current first-order relations. Trying both
   // signs avoids assigning an orientation to a still-undetermined branch.
