@@ -7,8 +7,11 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import {
+  fillRunsBothWays,
   offsetForEmittedFeed,
   offsetForSpeed,
+  rasterRowShiftX,
+  scanRowShiftAlongTravelMm,
   shiftAlongTravel,
   validatedScanOffsetMm,
   type ScanOffsetPoint,
@@ -218,5 +221,34 @@ describe('shiftAlongTravel', () => {
       ),
       { numRuns: FUZZ_RUNS },
     );
+  });
+});
+
+// ADR-052 Amendment 2: every row of a two-way scan moves half the stored gap
+// along its own travel, as LightBurn moves each line by its half-gap Line Shift.
+describe('scan row shifts', () => {
+  it('moves both directions half the stored gap and leaves a one-way scan alone', () => {
+    expect(scanRowShiftAlongTravelMm(0.3, true)).toBeCloseTo(0.15, 12);
+    expect(scanRowShiftAlongTravelMm(-0.3, true)).toBeCloseTo(-0.15, 12);
+    expect(scanRowShiftAlongTravelMm(0.3, false)).toBe(0);
+    expect(rasterRowShiftX(0.3, false, true)).toBeCloseTo(0.15, 12);
+    expect(rasterRowShiftX(0.3, true, true)).toBeCloseTo(-0.15, 12);
+    expect(rasterRowShiftX(0.3, true, false)).toBeCloseTo(0, 12);
+  });
+
+  it('changes the forward-to-reverse gap by exactly the stored value', () => {
+    fc.assert(
+      fc.property(fc.double({ min: -5, max: 5, noNaN: true }), (offsetMm) => {
+        const gap = rasterRowShiftX(offsetMm, false, true) - rasterRowShiftX(offsetMm, true, true);
+        expect(gap).toBeCloseTo(offsetMm, 12);
+      }),
+      { numRuns: FUZZ_RUNS },
+    );
+  });
+
+  it('treats a hatch as two-way only when it carries a reverse row', () => {
+    expect(fillRunsBothWays([{ reverse: false }, { reverse: true }])).toBe(true);
+    expect(fillRunsBothWays([{ reverse: false }, { reverse: false }])).toBe(false);
+    expect(fillRunsBothWays([])).toBe(false);
   });
 });

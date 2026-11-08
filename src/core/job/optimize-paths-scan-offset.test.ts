@@ -35,7 +35,8 @@ describe('optimizePaths scan-offset routing', () => {
     const reverseFar = islandGroup(fillSegment(100, 99, true));
     const forwardNear = islandGroup(fillSegment(10, 11, false));
     const job: Job = { groups: [reverseFar, forwardNear] };
-    const calibrated = [{ speedMmPerMin: 1000, offsetMm: 100 }];
+    // Each row moves half the table value (ADR-052 Amendment 2).
+    const calibrated = [{ speedMmPerMin: 1000, offsetMm: 200 }];
 
     expect(optimizePaths(job).groups).toEqual([forwardNear, reverseFar]);
     expect(optimizePaths(job, DEFAULT_PROJECT_OPTIMIZATION, calibrated).groups).toEqual([

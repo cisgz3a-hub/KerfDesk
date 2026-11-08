@@ -184,7 +184,10 @@ export type GcodeMetadata = {
 // centres, so its roughing and finishing Z change; 3D rest finishing keeps one
 // G1 per kept stretch of a move instead of one per half cell (CNC audit v1
 // F6-P3-2, same path); carries forward v41 above.
-export const EMITTER_REVISION = 'heightmap-pixel-surface-20261108-v42';
+// ADR-052 Amd 2 moves every row of a calibrated two-way fill or image half the
+// scan offset along its own travel, as LightBurn does, instead of moving reverse
+// rows the whole offset; carries forward v42 above.
+export const EMITTER_REVISION = 'scan-offset-half-each-row-20261108-v43';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

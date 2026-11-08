@@ -21,9 +21,7 @@ export function ScanOffsetMeasurementFormatControls(props: {
             props.onChange({ ...props.format, convention: conventionFromValue(event.target.value) })
           }
         >
-          <option value="laserforge-full-reverse-only">
-            LaserForge full gap — reverse rows only
-          </option>
+          <option value="laserforge-full-reverse-only">KerfDesk full gap</option>
           <option value="lightburn-half-both-directions">LightBurn Line Shift — half gap</option>
         </select>
       </label>
@@ -43,8 +41,8 @@ export function ScanOffsetMeasurementFormatControls(props: {
       </label>
       <p style={explanationStyle}>
         {isLightBurn
-          ? 'LightBurn moves both scan directions by its Line Shift, so LaserForge saves twice that signed magnitude and keeps forward rows anchored. Speed values entered as mm/s are multiplied by 60.'
-          : 'LaserForge saves the full signed forward-versus-reverse separation in mm. Do not divide the measurement in half: it shifts reverse rows only, while forward rows remain on design coordinates.'}
+          ? 'LightBurn moves both scan directions by its Line Shift, so KerfDesk saves twice that signed magnitude and moves each row by the Line Shift, as LightBurn does. Speed values entered as mm/s are multiplied by 60.'
+          : 'KerfDesk saves the full signed forward-versus-reverse separation in mm. Do not divide the measurement in half: KerfDesk moves each row half of it, forward rows one way and reverse rows the other, so both land on the design.'}
       </p>
       {isLightBurn ? (
         <p role="note" style={limitationStyle}>
