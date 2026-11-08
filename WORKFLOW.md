@@ -1158,8 +1158,9 @@ that owns those fields, without changing the existing Frame/Start policy.
 4. In CNC, Sort cuts last is unavailable: CNC already runs profiles last.
 5. When a Line operation's closed outline runs before weaker output inside it (Fill, Image or a
    lighter score), Job Review and Save G-code warn "Cut runs before the engraving inside it", and
-   Job Review's row has **Cut last**, which runs Sort cuts last (ADR-480 Amendment 2). New
-   operations are not reordered on their own.
+   Job Review's row has **Cut last**, which runs Sort cuts last (ADR-480 Amendment 2). Each part
+   is checked on its own, so two coasters or a grid on one operation are warned like one
+   (Amendment 3). New operations are not reordered on their own.
 
 ---
 

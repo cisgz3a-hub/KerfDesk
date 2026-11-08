@@ -107,6 +107,21 @@ describe('cut before engraving warning', () => {
     ]);
   });
 
+  it('warns for two coasters on one operation as it does for one (rolling audit v10 V7-P2-3)', () => {
+    const project = coaster();
+    const twins = [
+      square('outline-2', CUT_COLOR, 110, 80),
+      square('name-2', ENGRAVE_COLOR, 140, 20),
+    ];
+    const two = {
+      ...project,
+      scene: { ...project.scene, objects: [...project.scene.objects, ...twins] },
+    };
+
+    expect(cutWarnings(two)).toEqual(cutWarnings(project));
+    expect(cutWarnings(two)).toHaveLength(1);
+  });
+
   it('says nothing when the engraving already runs first', () => {
     expect(cutWarnings(coaster('engrave-first'))).toEqual([]);
   });
