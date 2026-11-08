@@ -3,15 +3,23 @@
 // machine ($H)" with what happened, in plain words, and offers the origin the
 // job ran with back as the main action (abort-alarm-recovery.ts). Set origin
 // here stays beside it as the alternative, with the sentence the Review
-// recovery uses. A machine without homing is not told to home.
+// recovery uses. A machine without homing is not told to home. Each action
+// clears the alarm first, which unmounts this card, so a failure after that
+// is a toast, not a line on the card (V3-P2-2).
 
 import { useState } from 'react';
 import type { ControllerKind } from '../../core/devices';
 import type { MachineKind } from '../../core/scene';
 import type { JobStopRequest } from '../state/job-stop-request';
+import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { commandLabels, useActiveDriverCommands } from './AlarmRecoveryActions';
-import { restoreOriginAfterAbort, setOriginHereAfterAbort } from './abort-alarm-recovery';
+import {
+  operatorAbortAlarm,
+  restoreOriginAfterAbort,
+  setOriginHereAfterAbort,
+} from './abort-alarm-recovery';
+import { reportControllerActionFailure } from './report-controller-action-failure';
 import { formatOriginMm } from './laser-recovery-origin';
 
 export const ABORT_STOPPED_TITLE = 'You stopped the job';
@@ -32,14 +40,14 @@ type CardProps = {
   readonly onUnlock: () => void;
 };
 
-type ActionRun = (action: () => Promise<void>, done: string) => Promise<void>;
+type ActionRun = (action: () => Promise<void>, label: string, done: string) => Promise<void>;
 
 export function AbortStoppedCard(props: CardProps): JSX.Element {
   const saved = props.request.originAtStopMm ?? null;
   const homeFirst = props.homingEnabled && props.homeFromAlarm;
   const [running, setRunning] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
-  const run: ActionRun = async (action, done) => {
+  const run: ActionRun = async (action, label, done) => {
     if (running) return;
     setRunning(true);
     setFailure(null);
@@ -48,7 +56,12 @@ export function AbortStoppedCard(props: CardProps): JSX.Element {
       // The alarm is cleared by now, so this card is gone: the toast says it.
       useToastStore.getState().pushToast(done, 'success');
     } catch (error: unknown) {
-      setFailure(error instanceof Error ? error.message : String(error));
+      // A refusal before the unlock leaves the alarm, and this card, in place.
+      if (operatorAbortAlarm(useLaserStore.getState()) === null) {
+        reportControllerActionFailure(label, error);
+      } else {
+        setFailure(error instanceof Error ? error.message : String(error));
+      }
     } finally {
       setRunning(false);
     }
@@ -110,7 +123,11 @@ function OriginActions(props: {
           type="button"
           disabled={running}
           onClick={() =>
-            void run(() => restoreOriginAfterAbort(saved, homeFirst), restoredMessage(saved))
+            void run(
+              () => restoreOriginAfterAbort(saved, homeFirst),
+              restoreLabel,
+              restoredMessage(saved),
+            )
           }
           title={
             homeFirst
@@ -125,7 +142,9 @@ function OriginActions(props: {
         <button
           type="button"
           disabled={running}
-          onClick={() => void run(setOriginHereAfterAbort, SET_HERE_DONE_MESSAGE)}
+          onClick={() =>
+            void run(setOriginHereAfterAbort, 'Set origin here', SET_HERE_DONE_MESSAGE)
+          }
           title={`Send ${unlock}, then make the head's current position the work origin.`}
         >
           Set origin here

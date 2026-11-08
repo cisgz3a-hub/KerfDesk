@@ -7,11 +7,13 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createStreamer } from '../../../core/controllers/grbl';
 import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from '../../../core/devices';
 import { FALCON_A1_PRO_GRBLHAL_PROFILE } from '../../../core/devices/falcon-profiles';
 import { PlatformProvider } from '../../app/platform-context';
 import { initialLaserState } from '../../state/laser-store-helpers';
 import { useLaserStore, type LaserState } from '../../state/laser-store';
+import { RECONNECT_DURING_JOB_TITLE } from '../reconnect-job-guard';
 import { DeviceSetupConnectStep } from './DeviceSetupConnectStep';
 import { initDeviceSetup } from './device-setup-flow';
 
@@ -106,6 +108,18 @@ describe('Find my machine identity (ADR-375)', () => {
     expect(host.textContent).toContain('The connection does not match this setup.');
     expect(button('Reconnect using selected profile')).toBeDefined();
     expect(button('Read again').disabled).toBe(true);
+  });
+
+  it('holds Reconnect with the job named while a job runs (V3-P2-1)', () => {
+    renderStep(FALCON_A1_PRO_GRBLHAL_PROFILE, {
+      ...FALCON_CONNECTION,
+      activeControllerCommandSet: null,
+      detectedControllerKind: 'grblhal',
+      streamer: { ...createStreamer('G0 X1'), status: 'paused' as const },
+    });
+    const reconnect = button('Reconnect using selected profile');
+    expect(reconnect.disabled).toBe(true);
+    expect(reconnect.title).toBe(RECONNECT_DURING_JOB_TITLE);
   });
 
   it('names the command set the connection uses when it differs from the setup', () => {

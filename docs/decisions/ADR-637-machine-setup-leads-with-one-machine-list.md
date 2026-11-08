@@ -157,6 +157,10 @@ the machine type from `$32`: a laser whose controller reports `$32=0` stays a la
 turn laser mode on with one guarded click, and becomes a CNC only when the operator says so. Job
 Review's laser-mode-off row gets **Send $32=1**.
 
+Amendment 8 (`ADR-637-amendment-8-reconnects-wait-for-the-job.md`) holds the toolbar's
+**Reconnect now** and step 1's **Reconnect using selected profile** while a job runs, as Save's
+driver switch already was: reconnecting resets the controller, which would end the job.
+
 Verification: `device-setup-auto-fill.test.ts` (a listed laser and a CNC preset keep their type),
 `machine-picker-entries.test.ts` (the CNC reset), and `DeviceSetupMachinePicker.customised.test.tsx`
 (the draft's facts and type question, the replace notice for a CNC preset, **My machine isn't
