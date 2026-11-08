@@ -6,7 +6,7 @@
 // messaging — and so this logic is unit-testable without React.
 
 import { KNOCKOUT_WHITE, type WhiteKnockout } from '../../core/geometry/white-fill-knockout';
-import { SVG_EMPTY_FILE_MESSAGE, type ParseSvgResult } from '../../io/svg';
+import { SVG_EMPTY_FILE_MESSAGE, type ParseSvgResult } from '../../io/svg/parse-svg';
 import type { ImportOutcome } from '../state/store';
 
 export type ToastDescriptor = {

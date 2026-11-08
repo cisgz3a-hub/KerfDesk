@@ -4,11 +4,11 @@
 // ui/commands/batch-raster-decode.ts runs them in place only where no Worker
 // exists, as in the node test environment.
 
-import { resampleBuffer } from '../../core/image-resample';
-import type { RawImageData } from '../../core/trace';
 import { decodePnm } from '../../io/pnm/decode-pnm';
 import { decodeTiffPage } from '../../io/tiff/tiff-page';
 import { tiffPageCount } from '../../io/tiff/tiff-structure';
+
+export { resampleBatchRaster } from './batch-raster-resample';
 
 export type BatchRasterFormat = 'tiff' | 'pnm';
 
@@ -37,21 +37,4 @@ export function decodeBatchRasterBytes(
     sizeMm:
       page.densitySource === 'embedded' ? { widthMm: page.widthMm, heightMm: page.heightMm } : null,
   };
-}
-
-/** The raster resampled to exactly width x height. */
-export function resampleBatchRaster(
-  raster: Pick<DecodedBatchRaster, 'width' | 'height' | 'rgba'>,
-  width: number,
-  height: number,
-): RawImageData & { readonly data: Uint8ClampedArray<ArrayBuffer> } {
-  const source = { width: raster.width, height: raster.height, data: raster.rgba };
-  const sampled = resampleBuffer(source, width, height);
-  return { width: sampled.width, height: sampled.height, data: toOwnBuffer(sampled.data) };
-}
-
-function toOwnBuffer(data: Uint8ClampedArray): Uint8ClampedArray<ArrayBuffer> {
-  return data.buffer instanceof ArrayBuffer
-    ? (data as Uint8ClampedArray<ArrayBuffer>)
-    : new Uint8ClampedArray(data);
 }
