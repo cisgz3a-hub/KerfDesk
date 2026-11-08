@@ -26,7 +26,7 @@ bit, nested islands, curves, tiny features, unusual settings.
 | T11 | CNC tabs, ramps and helix entry | tab height and width, entry angles | [done](T11-T13-cnc-entry-tabs-drill.md) — clean |
 | T12 | CNC pocket islands | island and outside untouched, floor cleared at 40 and 70 % stepover | [done](T7-T12-image-transforms-pocket-islands.md), adaptive [done](T12b-adaptive-islands.md) — clean |
 | T13 | CNC drill pecks and feeds calculator | peck sequence; feed = RPM × flutes × chip load, capped | [done](T11-T13-cnc-entry-tabs-drill.md) — clean |
-| T14 | Relief projection | engraving depth below a sloped surface | [done](T14-relief-projection.md) — clean with #1622 (two-sided split next) |
+| T14 | Relief projection | engraving depth below a sloped surface | [done](T14-relief-projection.md) — clean with #1622; two-sided stock edit [done](T14b-two-sided-stock-edit.md) — clean |
 
 ## Overlap
 
