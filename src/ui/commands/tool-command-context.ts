@@ -2,6 +2,7 @@
 // (generators, calibration, trace, image, and vector-path actions). Split
 // from use-app-commands.ts to keep that file inside the size cap.
 
+import { countBurningImportedWhites } from '../../core/geometry/burning-imported-white';
 import type { usePlatform } from '../app/platform-context';
 import { handleSaveProcessedBitmap } from '../app/save-processed-bitmap';
 import { openToneCalibration } from '../calibration/tone-calibration-store';
@@ -58,6 +59,8 @@ type ToolCommandContext = Pick<
   | 'fillSelectionSeparately'
   | 'closeSelectedOpenFillContours'
   | 'reviewCloseOpenFillContours'
+  | 'leaveWhiteUnburned'
+  | 'canLeaveWhiteUnburned'
   | 'applyImageMask'
   | 'cropImage'
   | 'removeImageMask'
@@ -116,6 +119,10 @@ export function toolCommandContext(
     fillSelectionSeparately: app.fillSelectionSeparately,
     closeSelectedOpenFillContours: app.closeSelectedOpenFillContours,
     reviewCloseOpenFillContours: callbacks.requestCloseOpenFillContoursWithTolerance,
+    leaveWhiteUnburned: () => {
+      app.leaveSavedWhiteUnburned();
+    },
+    canLeaveWhiteUnburned: countBurningImportedWhites(app.project.scene) > 0,
     applyImageMask: applyImageMaskAction(app, selection.imageMaskPair),
     cropImage: cropImageAction(app, selection.selected, pushToast),
     removeImageMask: removeImageMaskAction(app, selection.selected),

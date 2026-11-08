@@ -94,7 +94,9 @@ export function describeImportError(filename: string, err: unknown): ToastDescri
 // Phase C re-import toast. Returned when importSvgObject detects an
 // existing object with the same source filename and replaces it in
 // place. Shows the kept/added/removed color counts so the user knows
-// their layer settings carried over.
+// their layer settings carried over. A part that is new starts from default
+// settings, which changes the burn, so that toast is a warning, not a success
+// (rolling audit v10 V7-P2-2).
 export function describeReimportOutcome(
   outcome: Extract<ImportOutcome, { kind: 'replaced' }>,
 ): ToastDescriptor {
@@ -104,10 +106,13 @@ export function describeReimportOutcome(
   if (outcome.removed > 0) parts.push(`${outcome.removed} removed`);
   const detail = parts.length > 0 ? ` (${parts.join(', ')})` : '';
   const settings = outcome.kept > 0 ? 'layer settings preserved' : 'new layer settings';
-  return {
-    message: `Re-imported ${outcome.source} — ${settings}${detail}`,
-    variant: 'success',
-  };
+  const message = `Re-imported ${outcome.source} — ${settings}${detail}`;
+  return outcome.added > 0
+    ? {
+        message: `${message}. New parts start from default settings: check them before you burn.`,
+        variant: 'warning',
+      }
+    : { message, variant: 'success' };
 }
 
 function describeStripped(s: ParseSvgResult['stripped']): string | null {
@@ -128,10 +133,12 @@ function describeStripped(s: ParseSvgResult['stripped']): string | null {
 
 // Paths with an explicit fill rule each keep their own entry, so count
 // distinct colours rather than paths (rolling v7 L7-P1-1). White shapes left
-// unburned are not a colour the operations hold (ADR-686).
+// unburned are not a colour the operations hold (ADR-686), unless white the
+// file paints see-through, shaded or masked still burns (Amendment 1).
 function importColorCount(result: ParseSvgResult, whiteKnockout?: WhiteKnockout): number {
   const colors = new Set(result.object?.paths.map((path) => path.color.toLowerCase()));
-  if (whiteKnockout !== undefined) colors.delete(KNOCKOUT_WHITE);
+  if ((whiteKnockout?.whiteShapes ?? 0) > 0 && whiteKnockout?.inkWhites === 0)
+    colors.delete(KNOCKOUT_WHITE);
   return colors.size;
 }
 

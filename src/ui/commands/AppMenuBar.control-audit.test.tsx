@@ -136,6 +136,7 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'tools.fill-selection': { callback: 'fillSelectionSeparately' },
   'tools.close-open-fill-contours': { callback: 'closeSelectedOpenFillContours' },
   'tools.close-fill-contours-with-tolerance': { callback: 'reviewCloseOpenFillContours' },
+  'tools.leave-white-unburned': { callback: 'leaveWhiteUnburned' },
   'arrange.align-left': { callback: 'alignSelection', args: ['left'] },
   'arrange.align-center-x': { callback: 'alignSelection', args: ['center-x'] },
   'arrange.align-right': { callback: 'alignSelection', args: ['right'] },

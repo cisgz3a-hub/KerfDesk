@@ -7,6 +7,10 @@
 //
 // Only white fills are paper, and only beside a darker fill in the same import:
 // a design drawn entirely in white (for dark material) keeps burning its shapes.
+// Only flat, opaque, unmasked white is paper: a path the parser marked
+// `whiteInk` (see-through, a gradient, masked) or the operator chose to burn
+// is ink like any colour, so it is a shape a paper white can cut into
+// (ADR-686 Amendments 1 and 3).
 
 import { differenceD, FillRule, intersectD, type PathsD } from 'clipper2-ts';
 import { IDENTITY_TRANSFORM, type ColoredPath, type ImportedSvg } from '../scene/scene-object';
@@ -26,6 +30,8 @@ export type WhiteFillKnockout = {
   readonly changed: ReadonlyMap<string, ImportedSvg>;
   /** Objects left with no paths once their white shapes are out. */
   readonly removedIds: ReadonlySet<string>;
+  /** For each changed object, the index each kept path had before (Re-import maps by it). */
+  readonly keptPaths: ReadonlyMap<string, ReadonlyArray<number>>;
   /** White shapes left out of the artwork. */
   readonly whiteShapes: number;
   /** Darker shapes a white shape cut into. */
@@ -34,10 +40,19 @@ export type WhiteFillKnockout = {
 
 /** What an import's notice reports about its white shapes. */
 export type WhiteKnockout = {
-  /** White shapes left unburned. */
+  /** White shapes left unburned (0 when the import only has ink whites). */
   readonly whiteShapes: number;
   /** Import parts that held only white shapes and so are gone. */
   readonly removedObjects: number;
+  /** Darker shapes the white shapes were cut out of. */
+  readonly knockedShapes: number;
+  /** White shapes the file paints as ink (see-through, gradient, masked), which burn. */
+  readonly inkWhites: number;
+};
+
+export type WhiteFillKnockoutOptions = {
+  /** Paths the knock-out leaves alone: neither paper nor a shape to cut into. */
+  readonly skip?: (object: ImportedSvg, path: ColoredPath) => boolean;
 };
 
 type Box = { minX: number; minY: number; maxX: number; maxY: number };
@@ -56,13 +71,19 @@ type WhiteRegion = { readonly order: number; readonly shape: FillShape; readonly
  * `objects` is the import in paint order. Null when the import has no white
  * fill beside a darker one, so nothing changes.
  */
-export function knockOutWhiteFills(objects: ReadonlyArray<SceneObject>): WhiteFillKnockout | null {
-  const shapes = objects.flatMap(fillShapes);
+export function knockOutWhiteFills(
+  objects: ReadonlyArray<SceneObject>,
+  options: WhiteFillKnockoutOptions = {},
+): WhiteFillKnockout | null {
+  const skip = options.skip;
+  const shapes = objects
+    .flatMap(fillShapes)
+    .filter((shape) => skip === undefined || !skip(shape.object, shape.path));
   const whites: WhiteRegion[] = [];
   let hasDark = false;
   shapes.forEach((shape, order) => {
-    if (!isWhite(shape.path)) {
-      hasDark = true;
+    if (!isPaperWhite(shape.path)) {
+      if (isDarkFill(shape.path)) hasDark = true;
       return;
     }
     // A white shape that cannot form an area is still paper: it is left out
@@ -82,7 +103,7 @@ export function knockOutWhiteFills(objects: ReadonlyArray<SceneObject>): WhiteFi
   };
   let knockedShapes = 0;
   shapes.forEach((shape, order) => {
-    if (isWhite(shape.path)) {
+    if (isPaperWhite(shape.path)) {
       pathsOf(shape.object)[shape.pathIndex] = null;
       return;
     }
@@ -102,30 +123,66 @@ export function knockOutWhiteFills(objects: ReadonlyArray<SceneObject>): WhiteFi
 
   const changed = new Map<string, ImportedSvg>();
   const removedIds = new Set<string>();
+  const keptPaths = new Map<string, number[]>();
   for (const [object, paths] of replaced) {
     const kept = paths.filter((path): path is ColoredPath => path !== null);
     if (kept.length === 0) {
       removedIds.add(object.id);
       continue;
     }
+    keptPaths.set(
+      object.id,
+      paths.flatMap((path, index) => (path === null ? [] : [index])),
+    );
     changed.set(object.id, {
       ...object,
       paths: kept,
       bounds: boundsForPaths(kept) ?? object.bounds,
     });
   }
-  return { changed, removedIds, whiteShapes: whites.length, knockedShapes };
+  return { changed, removedIds, keptPaths, whiteShapes: whites.length, knockedShapes };
 }
 
+/**
+ * White fills the import paints as ink, beside a darker fill: the import notice
+ * names them, since they burn although they are white (ADR-686 Amendment 1).
+ * The operator's own choice to burn white (`kept`) is not counted.
+ */
+export function countInkWhiteFills(objects: ReadonlyArray<SceneObject>): number {
+  const paths = objects.flatMap(fillShapes).map((shape) => shape.path);
+  if (!paths.some(isDarkFill)) return 0;
+  return paths.filter(
+    (path) => isWhiteColor(path) && path.whiteInk !== undefined && path.whiteInk !== 'kept',
+  ).length;
+}
+
+/**
+ * A fill that makes an import more than a white design (Decision 2): any other
+ * colour, or a gradient that shades out of white. See-through, masked or kept
+ * white is still white paint, so a design for slate drawn only in white keeps
+ * burning every shape, highlights included.
+ */
+export function isDarkFill(path: ColoredPath): boolean {
+  return !isWhiteColor(path) || path.whiteInk === 'gradient';
+}
+
+/** A fill the knock-out takes for bare material: flat, opaque, unmasked white. */
+export function isPaperWhite(path: ColoredPath): boolean {
+  return isWhiteColor(path) && path.whiteInk === undefined;
+}
+
+// An SVG import's Fill parts, the ones the knock-out reads. A fragment not yet
+// placed carries its mode as an operation override instead (svgSourceMode).
 function fillShapes(object: SceneObject): FillShape[] {
-  if (object.kind !== 'imported-svg' || object.svgImport?.mode !== 'fill') return [];
+  if (object.kind !== 'imported-svg') return [];
+  if ((object.svgImport?.mode ?? object.operationOverride?.mode) !== 'fill') return [];
   return object.paths.flatMap((path, pathIndex) => {
     const box = pathBox(path);
     return box === null ? [] : [{ object, pathIndex, path, box }];
   });
 }
 
-function isWhite(path: ColoredPath): boolean {
+function isWhiteColor(path: ColoredPath): boolean {
   return path.color.toLowerCase() === KNOCKOUT_WHITE;
 }
 

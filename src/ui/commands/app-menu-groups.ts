@@ -155,6 +155,7 @@ export const MENU_GROUPS: Partial<Record<CommandFamily, ReadonlyArray<MenuGroupL
         'tools.fill-selection',
         'tools.close-open-fill-contours',
         'tools.close-fill-contours-with-tolerance',
+        'tools.leave-white-unburned',
         'tools.close-paths-with-tolerance',
         'tools.radius-fillet',
         'tools.shear',

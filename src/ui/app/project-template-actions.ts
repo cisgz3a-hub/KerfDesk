@@ -80,7 +80,7 @@ export async function openTemplateFile(
     `Started a new project from ${file.name}. Save will ask for a destination.`,
     'success',
   );
-  pushProjectLoadNotices(notices, ctx.pushToast, { migration: true });
+  pushProjectLoadNotices(notices, ctx.pushToast, { migration: true, project });
   if (loaded.kind === 'capability-warning')
     ctx.pushToast(loadedMachineCapabilityWarningMessage(loaded.activeKind), 'warning');
 }

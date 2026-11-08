@@ -18,14 +18,16 @@ import {
   type ImportOutcome,
 } from './scene-mutations';
 import type { ImportFitOptions } from './import-bed-fit';
+import type { SavedWhiteKnockoutActions } from './saved-white-knockout';
 import { repairDanglingObjectDependencies } from './object-delete-actions';
 import { removeObjectIdsFromGroups } from './scene-group-actions';
 import {
   inheritSvgComponentOperations,
-  matchSvgSourceComponents,
+  matchSvgSources,
   replaceSvgArtworkOrder,
   replaceSvgGroups,
   svgSourceMode,
+  type SvgSourceMatch,
 } from './svg-fragment-reimport';
 
 export type SvgFragmentActions = {
@@ -44,7 +46,7 @@ export type SvgFragmentActions = {
     targetId: string,
     fragment: SvgArtworkFragment,
   ) => ImportOutcome | null;
-};
+} & SavedWhiteKnockoutActions;
 
 export type SvgArtworkFragment = {
   readonly source: string;
@@ -104,7 +106,7 @@ export function applySvgFragmentReimport(
     },
     removed,
   );
-  const matched = matchSvgSourceComponents(previous, fragment.objects);
+  const matched = matchSvgSources(previous, fragment.objects);
   const prepared = appendFragment(base, fragment, placement, matched, original);
   const inserted = prepared.scene.objects.slice(base.objects.length);
   const objects = [
@@ -137,7 +139,7 @@ function appendFragment(
   base: Scene,
   fragment: SvgArtworkFragment,
   placement: SvgMatrix,
-  previous: readonly (SceneObject | undefined)[] = [],
+  previous: readonly (SvgSourceMatch | undefined)[] = [],
   sourceScene: Scene = base,
 ): { readonly scene: Scene; readonly ids: readonly string[] } {
   if (fragment.objects.length === 0) throw new Error('SVG has no drawable content.');
@@ -187,7 +189,7 @@ function fragmentMutation(state: StateSlice, scene: Scene, ids: readonly string[
 function prepareFragmentObject(
   scene: Scene,
   incoming: SceneObject,
-  prior: SceneObject | undefined,
+  match: SvgSourceMatch | undefined,
   context: {
     readonly placement: SvgMatrix;
     readonly source: string;
@@ -196,6 +198,7 @@ function prepareFragmentObject(
   },
 ): { scene: Scene; object: SceneObject } {
   const { placement, source, importId, sourceScene } = context;
+  const prior = match?.prior;
   let object: SceneObject = {
     ...incoming,
     id: prior?.kind === incoming.kind ? prior.id : incoming.id,
@@ -212,7 +215,8 @@ function prepareFragmentObject(
   if (scene.objects.some((candidate) => candidate.id === object.id))
     throw new Error('SVG artwork identities collide.');
   if (prior?.kind === incoming.kind) {
-    object = inheritSvgComponentOperations(object, prior, sourceScene);
+    object = inheritSvgComponentOperations(object, prior, sourceScene, match?.pathMap);
+    if (match?.pathMap !== undefined) return bindKnockedOutPaths(scene, object, match.pathMap);
   } else {
     const created = createArtworkOperations(scene, object, {
       mode: svgSourceMode(object),
@@ -221,4 +225,32 @@ function prepareFragmentObject(
     for (const operation of created.operations) scene = addLayer(scene, operation);
   }
   return { scene, object };
+}
+
+// The white shapes an earlier import knocked out come back with the source.
+// Each gets a fresh operation, as a fresh import gives it, so the Undo that
+// burns the white again puts it on its own operation (ADR-686 Decision 3),
+// and the knock-out that runs next removes it with that operation.
+function bindKnockedOutPaths(
+  scene: Scene,
+  object: SceneObject,
+  pathMap: ReadonlyArray<number | undefined>,
+): { scene: Scene; object: SceneObject } {
+  if (!('paths' in object) || !pathMap.includes(undefined)) return { scene, object };
+  const loose = object.paths.filter((_path, index) => pathMap[index] === undefined);
+  // The inherited component has no source mode override left; its import has.
+  const created = createArtworkOperations(scene, { ...object, paths: loose } as SceneObject, {
+    mode: object.svgImport?.mode ?? svgSourceMode(object),
+  });
+  const createdPaths = 'paths' in created.object ? created.object.paths : [];
+  let next = 0;
+  const paths = object.paths.map((path, index) => {
+    if (pathMap[index] !== undefined) return path;
+    const operationIds = createdPaths[next]?.operationIds ?? created.object.operationIds ?? [];
+    next += 1;
+    return { ...path, operationIds };
+  });
+  let withOperations = scene;
+  for (const operation of created.operations) withOperations = addLayer(withOperations, operation);
+  return { scene: withOperations, object: { ...object, paths } as SceneObject };
 }

@@ -226,7 +226,10 @@ function reportRestoredProject(
   if (loadResult.kind === 'capability-warning') {
     pushToast(loadedMachineCapabilityWarningMessage(loadResult.activeKind), 'warning');
   }
-  pushProjectLoadNotices(record.loadNotices ?? {}, pushToast, { migration: true });
+  pushProjectLoadNotices(record.loadNotices ?? {}, pushToast, {
+    migration: true,
+    project: record.project,
+  });
 }
 
 export function recoveryAgeLabel(savedAt: number): string {

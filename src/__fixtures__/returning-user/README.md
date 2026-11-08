@@ -34,6 +34,7 @@ store, compile them to G-code, and compare with the sidecar.
 | `1.0.29-unaffected`                    | 1.0.29                                                    | Nothing a later release should change: the notices stay silent            |
 | `1.0.29-cnc-bowtie-pocket`             | 1.0.29                                                    | The 1.0.28 Pocket bowtie, cut at the canvas anchor                        |
 | `1.0.29-cnc-flat-drill`                | 1.0.29                                                    | The 1.0.28 flat Drill contour, cut at the canvas anchor                   |
+| `1.0.29-white-logos`                   | 1.0.29                                                    | U3's logo, a white-letter plate, a style and class logo, and the logo with its white on Output off |
 
 The 1.0.29 set was built through 1.0.29's store actions: Import, Draw, the laser tab tool, the
 toolbar and a handle drag, the operation settings, and the Photo engraving dialog's own preview,
@@ -41,6 +42,11 @@ recipe patch and Apply update. Its `1.0.29-fill-pool.burns.json` also holds the 
 (`whole-job`), since a pool burns only together, and `1.0.29-placed-tabs.burns.json` holds where
 1.0.29 burned each tab, read with `burned-tab-spans.ts` (`tabSpans`). `returning-user-1-0-29.test.ts`
 reads them.
+
+`1.0.29-white-logos` (rolling audit v10 V2-P2-1) was imported through 1.0.29's own `parseSvg` and
+store Import, so its white shapes burn over the black, and the last logo's white operation was set
+to Output off with `setLayerParam`. Its sidecar holds each import's burn (by `svgImport.source`)
+and the whole job. `returning-user-white-fills.test.ts` reads it.
 
 Browser storage and projects saved by 1.0.28's own hooks and store, the same way (rolling audit v9
 R6): a temporary test under the export's `src` drove the Studio's Apply with its persistence hook

@@ -1,4 +1,3 @@
-import { CLOSE_OPEN_FILL_CONTOUR_TOLERANCE_MM } from '../common/fill-diagnostics';
 import { disabled, enabled, type AppCommand, type AppCommandContext } from './command-types';
 import { registrationJigCommand } from './registration-command-family';
 import { cameraCommand } from './camera-command-family';
@@ -15,6 +14,7 @@ import { rotarySetupCommand } from './rotary-command-family';
 import { labsCommand } from './labs-command-family';
 import { printAndCutCommand } from './print-cut-command-family';
 import { artworkCreationCommands } from './artwork-creation-commands';
+import { fillRepairCommands } from './fill-repair-commands';
 import { useAiDialogStore } from '../ai/ai-dialog-store';
 
 export { fileCommands } from './file-command-family';
@@ -81,8 +81,7 @@ export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand>
           'Select vector artwork first.',
           ctx.fillSelectionSeparately,
         ),
-    closeOpenFillContoursCommand(ctx),
-    reviewCloseOpenFillContoursCommand(ctx),
+    ...fillRepairCommands(ctx),
     ctx.hasConvertibleSelection
       ? enabled(
           'tools.convert-to-bitmap',
@@ -173,44 +172,6 @@ function weldCommand(ctx: AppCommandContext): AppCommand {
         'Weld',
         'Select unlocked closed vector contours first.',
         ctx.weldSelection,
-      );
-}
-
-function closeOpenFillContoursCommand(ctx: AppCommandContext): AppCommand {
-  const label = 'Close Open Fill Contours';
-  return ctx.canCloseOpenFillContours
-    ? enabled(
-        'tools.close-open-fill-contours',
-        'tools',
-        label,
-        'Close selected near-closed Fill contours',
-        ctx.closeSelectedOpenFillContours,
-      )
-    : disabled(
-        'tools.close-open-fill-contours',
-        'tools',
-        label,
-        `Select open Fill contours with endpoints within ${CLOSE_OPEN_FILL_CONTOUR_TOLERANCE_MM} mm.`,
-        ctx.closeSelectedOpenFillContours,
-      );
-}
-
-function reviewCloseOpenFillContoursCommand(ctx: AppCommandContext): AppCommand {
-  const label = 'Close Fill Contours With Tolerance...';
-  return ctx.canReviewCloseOpenFillContours
-    ? enabled(
-        'tools.close-fill-contours-with-tolerance',
-        'tools',
-        label,
-        'Review selected open Fill contours before closing a larger endpoint gap',
-        ctx.reviewCloseOpenFillContours,
-      )
-    : disabled(
-        'tools.close-fill-contours-with-tolerance',
-        'tools',
-        label,
-        'Select open Fill contours on an output Fill layer.',
-        ctx.reviewCloseOpenFillContours,
       );
 }
 

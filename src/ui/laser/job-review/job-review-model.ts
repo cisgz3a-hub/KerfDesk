@@ -40,6 +40,7 @@ import { detectConstantPowerFirmwareWarnings } from './constant-power-firmware-w
 import { detectManualAirAssistWarnings } from './manual-air-assist-warnings';
 import { detectMinFeatureWarnings } from './min-feature-warnings';
 import { oldProjectBurnReviewWarnings } from '../../state/old-project-burn-review';
+import { burningWhiteReviewWarnings } from '../../state/saved-white-notice';
 import { detectPresetCorrectionWarnings } from './preset-correction-warnings';
 import { detectStaleCatalogBitWarnings } from './stale-catalog-bit-warnings';
 import { detectParkOutsideFrameWarningsFromMetrics } from './park-outside-frame-warnings';
@@ -126,6 +127,7 @@ export function buildJobReviewModel(args: JobReviewModelArgs): JobReviewModel {
       ...detectManualAirAssistWarnings(args.prepared.prepared.job, args.project.device),
       ...detectPresetCorrectionWarnings(args.project.device),
       ...oldProjectBurnReviewWarnings(args.project),
+      ...burningWhiteReviewWarnings(args.project),
       ...detectStaleCatalogBitWarnings(args.project, args.prepared.cncToolPlan),
       ...jobReviewCncReachWarnings(args.prepared),
       ...detectAirAssistStartWarnings(

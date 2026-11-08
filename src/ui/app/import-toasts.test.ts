@@ -95,6 +95,7 @@ describe('describeImportError', () => {
     expect(t.message).toContain('parse failed');
   });
   it('does not claim to preserve settings when no source component matched', () => {
+    // A new part starts from defaults, so it is a warning (rolling audit v10 V7-P2-2).
     expect(
       describeReimportOutcome({
         kind: 'replaced',
@@ -102,7 +103,26 @@ describe('describeImportError', () => {
         kept: 0,
         added: 1,
         removed: 1,
-      }).message,
-    ).toBe('Re-imported changed.svg — new layer settings (1 new, 1 removed)');
+      }),
+    ).toEqual({
+      message:
+        'Re-imported changed.svg — new layer settings (1 new, 1 removed). New parts start ' +
+        'from default settings: check them before you burn.',
+      variant: 'warning',
+    });
+  });
+  it('stays a success when every part kept its settings', () => {
+    expect(
+      describeReimportOutcome({
+        kind: 'replaced',
+        source: 'same.svg',
+        kept: 2,
+        added: 0,
+        removed: 1,
+      }),
+    ).toEqual({
+      message: 'Re-imported same.svg — layer settings preserved (2 kept, 1 removed)',
+      variant: 'success',
+    });
   });
 });

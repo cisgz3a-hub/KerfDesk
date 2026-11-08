@@ -1,6 +1,8 @@
+import type { Project } from '../../core/scene';
 import type { ProjectLoadNoticeFlags } from '../../io/project/project-load-metadata';
 import { oldProjectBurnMessages } from './old-project-burn-messages';
 import { rememberOldProjectBurn } from './old-project-burn-review';
+import { burningWhiteOpenNotice } from './saved-white-notice';
 import type { ToastVariant } from './toast-store';
 
 type PushToast = (message: string, variant?: ToastVariant) => void;
@@ -9,11 +11,17 @@ type PushToast = (message: string, variant?: ToastVariant) => void;
 // project: File > Open (and Recent, drop, the operating system, a local
 // snapshot), New from template, autosave recovery and a sheet switch
 // (ADR-673 Amendment 1). File > Open names a migration in its own "Opened"
-// toast, so it leaves `migration` out.
+// toast, so it leaves `migration` out. With `project`, a logo whose white still
+// burns is named too (ADR-686 Amendment 2): read from the artwork, so it holds
+// for an autosave or a sheet whatever build wrote it.
 export function pushProjectLoadNotices(
   flags: ProjectLoadNoticeFlags,
   pushToast: PushToast,
-  options: { readonly migration: boolean; readonly keepEarlierReview?: boolean },
+  options: {
+    readonly migration: boolean;
+    readonly keepEarlierReview?: boolean;
+    readonly project?: Project;
+  },
 ): void {
   if (options.migration && flags.migratedFrom !== undefined) {
     pushToast(
@@ -37,6 +45,8 @@ export function pushProjectLoadNotices(
     if (frames.length > 0) pushToast(frames.join(' '), 'warning');
     if (burn.length > 0) pushToast(burn.join(' '), 'warning');
   }
+  const white = options.project === undefined ? null : burningWhiteOpenNotice(options.project);
+  if (white !== null) pushToast(white, 'warning');
 }
 
 export function keptTracePhotosMessage(photos: number): string {

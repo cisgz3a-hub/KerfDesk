@@ -42,7 +42,12 @@ import {
 } from './scene-mutations';
 import { applyDrawShape } from './draw-shape-mutation';
 import { applyImportBedFit } from './import-bed-fit';
-import { applyImportWhiteKnockout, withWhiteKnockout } from './import-white-knockout';
+import {
+  applyImportWhiteKnockout,
+  reimportCountsAfterKnockout,
+  withWhiteKnockout,
+} from './import-white-knockout';
+import { savedWhiteKnockoutActions } from './saved-white-knockout';
 import {
   applyAddRegistrationBox,
   applyRemoveRegistrationBox,
@@ -63,6 +68,7 @@ export function objectInsertActions(
   | 'importSvgObject'
   | 'importSvgFragment'
   | 'reimportSvgFragment'
+  | 'leaveSavedWhiteUnburned'
   | 'reimportSvgObject'
   | 'upsertTextObject'
   | 'drawShape'
@@ -320,8 +326,9 @@ function applyTextAndEmbeddedFont(
 function svgFragmentActions(
   set: Setter,
   get: Getter,
-): Pick<AppState, 'importSvgFragment' | 'reimportSvgFragment'> {
+): Pick<AppState, 'importSvgFragment' | 'reimportSvgFragment' | 'leaveSavedWhiteUnburned'> {
   return {
+    ...savedWhiteKnockoutActions(set),
     importSvgFragment: (fragment, batchIndex = 0, options = {}) => {
       let outcome: ImportOutcome = { kind: 'added' };
       set((state) => {
@@ -357,7 +364,11 @@ function svgFragmentActions(
             state.materialLibrary,
           ),
         );
-        outcome = withWhiteKnockout(next.outcome, knocked.whiteKnockout);
+        const priorIds = new Set(state.project.scene.objects.map((object) => object.id));
+        outcome = withWhiteKnockout(
+          reimportCountsAfterKnockout(next.outcome, knocked.removedIds, priorIds),
+          knocked.whiteKnockout,
+        );
         return knocked.state;
       });
       if (outcome !== null) fitAllObjects(get);

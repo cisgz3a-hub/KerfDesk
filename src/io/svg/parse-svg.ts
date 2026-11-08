@@ -55,6 +55,7 @@ import { createSvgImportCounts, svgImportNotes, type SvgImportCounts } from './s
 import type { ParsedSvgFragment } from './svg-import-fragment';
 import { appendVectorEntry, createSvgEntryList, type SvgEntryList } from './svg-import-entries';
 import { svgImageElement } from './svg-image-element';
+import { svgWhiteInkField } from './svg-white-ink';
 import { createSvgStyleCascade, type SvgStyleCascade } from './svg-stylesheet';
 import { svgRenderedChildren } from './svg-conditional-processing';
 import { hasSvgMarkers } from './svg-markers';
@@ -310,6 +311,7 @@ function appendElementGeometry(el: Element, state: PresentationState, context: W
       ...(state.fillRule === undefined ? {} : { fillRule: state.fillRule }),
       polylines: entryPolylines,
       curves: entryCurves,
+      ...svgWhiteInkField(strokeColor, fill, state),
     },
     strokeColor === '',
   );
