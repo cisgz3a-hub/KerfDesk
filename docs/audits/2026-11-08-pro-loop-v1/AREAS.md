@@ -43,6 +43,7 @@ Every loop drives the real path (`createProject` → `emitGcode`, or `compileCnc
 | 7 | Bidirectional scan offset | row shift against LightBurn's rule, its seven twins | [done](L7-scan-offset.md) — 1 P2, held for the maintainer |
 | 8 | Other controllers | Marlin inline and fan, Smoothieware, FluidNC, grblHAL through the L1 matrix | [done](L8-other-controllers.md) — clean |
 | 9 | Material Test grid | each cell's label against its emitted burn | [done](L9-material-test.md) — clean |
+| 10 | Rotary scaling | chuck and roller Y scale and wrap limit against LightBurn | [done](L10-rotary.md) — clean |
 
 Loop 6 ran before 4 and 5 because the maintainer asked for it by name and because it held the only
 open P2 left in CNC output (rolling-v2 16-P2-1).

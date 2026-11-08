@@ -13,6 +13,7 @@ Method and areas: [AREAS.md](AREAS.md).
 | 7 | Bidirectional scan offset | [L7](L7-scan-offset.md) | 1 | 0 | 1 | 0 | 0 | no (reverses ADR-052; maintainer decision) |
 | 8 | Marlin, Smoothieware, FluidNC, grblHAL | [L8](L8-other-controllers.md) | 0 | 0 | 0 | 0 | 0 | — |
 | 9 | Material Test grid | [L9](L9-material-test.md) | 0 | 0 | 0 | 0 | 0 | — |
+| 10 | Rotary scaling | [L10](L10-rotary.md) | 0 | 0 | 0 | 0 | 0 | — |
 
 ## Confirmed findings
 
@@ -28,5 +29,5 @@ Emitter revision: `heightmap-pixel-surface-20261108-v42`.
 ## Next loop
 
 The 3D development list in [L6](L6-cnc-3d.md) (relief raster angle first), F6-P3-1's rest budget,
-and the areas not yet run here: rotary output and the focus and interval test
+and the areas not yet run here: the focus and interval test
 generators.
