@@ -40,13 +40,16 @@ export type ControllerSelectionChange = {
  * the compatibility policy's streaming, receive-window and dialect corrections,
  * a dropped vendor command set, the baud and power range the selection resets,
  * and a scan-offset calibration it clears. Machine Setup lists these before
- * "Use detected" applies them (ADR-375).
+ * "Use detected" applies them (ADR-375). `keptBaudRate` is the baud the
+ * controller answered at, which "Use detected" keeps (UX audit U5-P3-7).
  */
 export function controllerSelectionChanges(
   profile: DeviceProfile,
   controllerKind: ControllerKind,
+  keptBaudRate: number | null = null,
 ): ReadonlyArray<ControllerSelectionChange> {
-  const next = controllerProfileForSelection(profile, controllerKind);
+  const selected = controllerProfileForSelection(profile, controllerKind);
+  const next = keptBaudRate === null ? selected : { ...selected, baudRate: keptBaudRate };
   return [
     ...controllerCompatibleProfile(profile, controllerKind).corrections.flatMap(correctionChange),
     ...changed('Vendor commands', vendorCommandsText(profile), vendorCommandsText(next)),

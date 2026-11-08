@@ -22,7 +22,8 @@ type Outcome = {
     | 'licence'
     | 'support-report'
     | 'check-updates'
-    | 'license-notice';
+    | 'license-notice'
+    | 'keyboard-shortcuts';
 };
 
 // Independent command-to-action expectations. Each command is clicked through
@@ -226,6 +227,7 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'help.licence': { special: 'licence' },
   'help.find-command': { special: 'command-search' },
   'help.tutorials': { special: 'tutorials' },
+  'help.keyboard-shortcuts': { special: 'keyboard-shortcuts' },
   'help.connection': { callback: 'showConnectionHelp' },
   'help.safety': { callback: 'showSafety' },
   'help.report-bug': { url: 'https://kerfdesk.com/support.html#report' },
@@ -318,6 +320,10 @@ describe('every registered application menu action', () => {
       window.addEventListener('kerfdesk:support-report', supportReportEvent, { once: true });
       const checkUpdatesEvent = vi.fn();
       window.addEventListener('kerfdesk:check-updates', checkUpdatesEvent, { once: true });
+      const keyboardShortcutsEvent = vi.fn();
+      window.addEventListener('kerfdesk:keyboard-shortcuts', keyboardShortcutsEvent, {
+        once: true,
+      });
       const licenseNoticeEvent = vi.fn();
       window.addEventListener('kerfdesk:license-notice', licenseNoticeEvent, { once: true });
       const opened: Array<{ href: string; target: string; rel: string }> = [];
@@ -339,6 +345,10 @@ describe('every registered application menu action', () => {
         Number(outcome.special === 'license-notice'),
       );
       window.removeEventListener('kerfdesk:license-notice', licenseNoticeEvent);
+      expect(keyboardShortcutsEvent).toHaveBeenCalledTimes(
+        Number(outcome.special === 'keyboard-shortcuts'),
+      );
+      window.removeEventListener('kerfdesk:keyboard-shortcuts', keyboardShortcutsEvent);
       if (outcome.special === 'unavailable') {
         expect(button.disabled).toBe(true);
         expect(button.title).toContain('Z-motion generator');

@@ -16,6 +16,7 @@ import {
 import { MIN_QUIET_ZONE } from './barcode-spec';
 import type { BarcodeUse } from './data-matrix-encode';
 import { moduleContours } from './module-contours';
+import { minOf } from '../util';
 
 export type BarcodeCaption = {
   readonly text: string;
@@ -196,7 +197,7 @@ function captionSizeMm(linear: LinearBarcodeSymbol, moduleMm: number): number {
       ((run.toModule - run.fromModule) * moduleMm) /
       (Math.max(1, run.text.length) * APPROX_ADVANCE),
   );
-  return Math.min(CAPTION_SIZE_MODULES * moduleMm, ...fits);
+  return Math.min(CAPTION_SIZE_MODULES * moduleMm, minOf(fits));
 }
 
 function rectangle(minX: number, minY: number, maxX: number, maxY: number): Polyline {

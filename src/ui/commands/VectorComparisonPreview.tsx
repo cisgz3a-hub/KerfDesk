@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { VectorSceneObject } from '../../core/geometry';
 import { comparisonOutline } from './vector-comparison-outline';
+import { maxOf, minOf } from '../../core/util';
 
 /** Display both geometries in one world-coordinate view, without changing the job. */
 export function VectorComparisonPreview(props: {
@@ -14,10 +15,10 @@ export function VectorComparisonPreview(props: {
   const result = useMemo(() => comparisonOutline(props.after), [props.after]);
   const boxes = [original.bounds, result.bounds].filter((box) => box !== null);
   if (boxes.length === 0) return null;
-  const minX = Math.min(...boxes.map((box) => box.minX));
-  const minY = Math.min(...boxes.map((box) => box.minY));
-  const spanX = Math.max(1, Math.max(...boxes.map((box) => box.maxX)) - minX);
-  const spanY = Math.max(1, Math.max(...boxes.map((box) => box.maxY)) - minY);
+  const minX = minOf(boxes.map((box) => box.minX));
+  const minY = minOf(boxes.map((box) => box.minY));
+  const spanX = Math.max(1, maxOf(boxes.map((box) => box.maxX)) - minX);
+  const spanY = Math.max(1, maxOf(boxes.map((box) => box.maxY)) - minY);
   const margin = Math.max(spanX, spanY) * 0.08;
   return (
     <div>

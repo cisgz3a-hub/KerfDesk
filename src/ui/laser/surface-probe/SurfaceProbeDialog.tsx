@@ -8,6 +8,7 @@ import { usePlatformOptional } from '../../app/platform-context';
 import { Dialog, DialogActions } from '../../kit/Dialog';
 import { useLaserStore } from '../../state/laser-store';
 import { surfaceProbeBlockReason } from '../../state/laser-surface-probe-actions';
+import { maxOf, minOf } from '../../../core/util';
 
 const INITIAL = {
   minX: 0,
@@ -226,8 +227,8 @@ function SurfaceProbeReview({
   readonly measurement: SurfaceGridMeasurement;
 }): JSX.Element {
   const heights = measurement.points.map((point) => point.z);
-  const minimum = heights.length === 0 ? null : Math.min(...heights);
-  const maximum = heights.length === 0 ? null : Math.max(...heights);
+  const minimum = heights.length === 0 ? null : minOf(heights);
+  const maximum = heights.length === 0 ? null : maxOf(heights);
   return (
     <section aria-label="Measured surface review">
       <p>

@@ -1,4 +1,5 @@
 import type { CncTool } from '../../core/scene';
+import { maxOf } from '../../core/util';
 
 type Layout = { readonly axialScale: number; readonly radialScale: number };
 export function CncToolAssemblyPreview(props: { readonly tool: CncTool }): JSX.Element {
@@ -29,12 +30,12 @@ function assemblyLayout(tool: CncTool): Layout {
     1,
     tool.fluteLengthMm ?? 0,
     tool.stickoutMm ?? 0,
-    ...holders.map((s) => s.startMm + s.lengthMm),
+    maxOf(holders.map((s) => s.startMm + s.lengthMm)),
   );
   const maxDiameter = Math.max(
     tool.diameterMm,
     tool.shankDiameterMm ?? 0,
-    ...holders.map((s) => s.diameterMm),
+    maxOf(holders.map((s) => s.diameterMm)),
   );
   return { axialScale: 125 / maxHeight, radialScale: Math.min(4, 95 / maxDiameter) };
 }

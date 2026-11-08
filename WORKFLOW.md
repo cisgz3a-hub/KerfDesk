@@ -1979,7 +1979,7 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - `Delete` / `Backspace` — Delete selected
 - `Escape` — Deselect / cancel current operation
 - `Cmd/Ctrl+,` — Settings (ADR-499)
-- `Cmd/Ctrl+K` — Find a command: search every menu command by name or by what it does, then press Enter to run it. Greyed-out results say why they are unavailable. Also opened from Help → Find a command… and the menu bar's Search button (ADR-604)
+- `Cmd/Ctrl+K` — Find a command: search every menu command by name or by what it does, then press Enter to run it. Greyed-out results say why they are unavailable. Also opened from Help → Find a command… and the menu bar's Search button (ADR-604). It also lists the machine panel's Frame job, Start job, Set origin here and jog pad, Machine Setup, Materials, the Settings by name (Units, Theme…) and up to five Learn lessons for this machine; a panel result opens the panel at its control and focuses it, never pressing it (ADR-604 Amendment 1). Help → Keyboard Shortcuts… opens the shortcut list
 
 #### Transform
 - Arrow keys — Nudge 1 mm
@@ -4089,7 +4089,10 @@ again) or **Discard changes**.
    **Read again** stays available. Either card offers **Use detected** (for example **Use detected
    GRBL v1.1 in draft**). When that choice changes anything else (RX window, streaming, output
    dialect, vendor commands, baud, power range, or a scan-offset calibration it clears), the card
-   lists each change as old → new and applies them only on **Apply to draft** (ADR-375).
+   lists each change as old → new and applies them only on **Apply to draft** (ADR-375). The
+   baud the controller answered at is kept, and the card says so (`Baud stays 115200: your
+   controller answered at this speed.`), so adopting Marlin no longer swaps a working 115200 for
+   its 250000 starter (UX audit U5-P3-7).
    Ruida remains file-only. CNC readback labels `$30` as a configured S maximum. Copying it into spindle RPM requires
    **Use S maximum as spindle RPM** and a reported CNC mode; otherwise the spindle ceiling stays
    unchanged. Configured travel is not measured usable travel.

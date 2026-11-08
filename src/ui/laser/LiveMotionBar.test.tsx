@@ -405,7 +405,7 @@ describe('LiveMotionBar controller-owned hold', () => {
     const { host, root } = await render(<LiveMotionBar />);
     try {
       expect(host.textContent).toContain('CONTROLLER DOOR HOLD');
-      expect(host.textContent).toContain('door or lid input open');
+      expect(host.textContent).toMatch(/lid or door is open.*press Pause and then Resume here/);
     } finally {
       await act(async () => root.unmount());
     }

@@ -4,6 +4,7 @@ import {
   everyVCarveBoundarySegmentInBox,
 } from './vcarve-boundary-segment-index';
 import type { BoundarySegment } from './vcarve-detail-geometry';
+import { maxOf, minOf } from '../util';
 
 type Interval = { readonly start: number; readonly end: number };
 
@@ -81,8 +82,8 @@ function capsuleInterval(
   const intervals = [start, end, strip].filter((value): value is Interval => value !== null);
   if (intervals.length === 0) return null;
   return {
-    start: Math.min(...intervals.map((value) => value.start)),
-    end: Math.max(...intervals.map((value) => value.end)),
+    start: minOf(intervals.map((value) => value.start)),
+    end: maxOf(intervals.map((value) => value.end)),
   };
 }
 

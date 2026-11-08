@@ -1,4 +1,5 @@
 import type { Vec2 } from '../scene';
+import { maxOf } from '../util';
 
 export type VCarveMedialNode = Vec2 & { readonly clearanceMm: number };
 
@@ -23,7 +24,7 @@ export function vcarveMedialGraphNeedsRefinement(
   resolutionMm: number,
 ): boolean {
   if (graph.nodes.length === 0 || medialGraphComponentCount(graph) !== 1) return true;
-  const maximumClearanceMm = Math.max(...graph.nodes.map((node) => node.clearanceMm));
+  const maximumClearanceMm = maxOf(graph.nodes.map((node) => node.clearanceMm));
   return resolutionMm > maximumClearanceMm * 2;
 }
 

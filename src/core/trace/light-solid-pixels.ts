@@ -96,18 +96,20 @@ function withinSquare(mask: Uint8Array, width: number, height: number, radius: n
 function withinRows(rows: Uint8Array, width: number, height: number, radius: number): Uint8Array {
   const within = new Uint8Array(rows.length);
   const counts = new Int32Array(width);
-  const addRow = (y: number, sign: number): void => {
-    for (let x = 0; x < width; x += 1) {
-      counts[x] = (counts[x] as number) + sign * (rows[y * width + x] as number);
-    }
-  };
-  for (let y = 0; y < Math.min(radius, height); y += 1) addRow(y, 1);
+  for (let y = 0; y < Math.min(radius, height); y += 1) addRow(counts, rows, y * width, 1);
   for (let y = 0; y < height; y += 1) {
-    if (y + radius < height) addRow(y + radius, 1);
-    if (y > radius) addRow(y - radius - 1, -1);
-    for (let x = 0; x < width; x += 1) within[y * width + x] = (counts[x] as number) > 0 ? 1 : 0;
+    if (y + radius < height) addRow(counts, rows, (y + radius) * width, 1);
+    if (y > radius) addRow(counts, rows, (y - radius - 1) * width, -1);
+    const row = y * width;
+    for (let x = 0; x < width; x += 1) within[row + x] = (counts[x] as number) > 0 ? 1 : 0;
   }
   return within;
+}
+
+function addRow(counts: Int32Array, rows: Uint8Array, start: number, sign: number): void {
+  for (let x = 0; x < counts.length; x += 1) {
+    counts[x] = (counts[x] as number) + sign * (rows[start + x] as number);
+  }
 }
 
 /** How many of the first `length` queued pixels have `values` below `level`. */
@@ -139,26 +141,6 @@ export function chromaDistance(a: readonly number[], b: readonly number[]): numb
     Math.abs((a[1] as number) - (b[1] as number)),
     Math.abs((a[2] as number) - (b[2] as number)),
   );
-}
-
-/** Add pixel i's RGB to sums[offset..offset+2]; transparent pixels are paper. */
-export function addRgb(sums: number[], offset: number, rgba: Uint8ClampedArray, i: number): void {
-  const o = 4 * i;
-  const clear = rgba[o + 3] === 0;
-  for (let c = 0; c < 3; c += 1) {
-    sums[offset + c] = (sums[offset + c] as number) + (clear ? 255 : (rgba[o + c] as number));
-  }
-}
-
-/** Fill `out` with the 4-neighbours of pixel `i` (−1 beyond the image);
- *  returns whether `i` lies on the image border. */
-export function neighbours4(out: Int32Array, i: number, width: number, height: number): boolean {
-  const x = i % width;
-  out[0] = x > 0 ? i - 1 : -1;
-  out[1] = x < width - 1 ? i + 1 : -1;
-  out[2] = i >= width ? i - width : -1;
-  out[3] = i < (height - 1) * width ? i + width : -1;
-  return out[0] < 0 || out[1] < 0 || out[2] < 0 || out[3] < 0;
 }
 
 const DX8 = [-1, 1, 0, 0, -1, 1, -1, 1];

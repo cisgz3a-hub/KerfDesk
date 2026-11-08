@@ -21,13 +21,14 @@ type StudioTool = {
 function studioToolLesson(tool: StudioTool): Tutorial {
   return {
     id: tool.id,
+    pro: 'design-studio',
     title: `Studio: ${tool.name}`,
     summary: tool.summary,
     category: 'Drawing & editing',
     machine: 'all',
     minutes: 2,
     location: `Design Studio → ${tool.name}`,
-    prerequisites: 'Open Design Studio using Design on the workspace toolbar.',
+    prerequisites: 'Open Design Studio from the Design Studio button in the top toolbar.',
     visual: tool.visual,
     steps: [
       {

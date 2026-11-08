@@ -62,6 +62,7 @@
 // tracer code (ADR-017).
 
 import type { CrackSubPixelField } from './contour-boundary';
+import { fieldLuma } from './crack-field-planes';
 import {
   AUTO_BRIDGE_FRACTION,
   AUTO_DEBRIS_TILE_PX,
@@ -360,7 +361,16 @@ type Geometry = {
 function measureTones(ink: Uint8Array, field: CrackSubPixelField, width: number): Tones {
   const inkHist = new Uint32Array(256);
   const paperHist = new Uint32Array(256);
-  for (let p = 0; p < ink.length; p += 1) {
+  // A luma plane holds whole levels in range: clampLuma leaves them as they are.
+  const plane = fieldLuma(field, width, ink.length / width);
+  if (plane !== null) {
+    for (let p = 0; p < ink.length; p += 1) {
+      const luma = plane[p] as number;
+      if (ink[p] === 1) inkHist[luma] = (inkHist[luma] as number) + 1;
+      else paperHist[luma] = (paperHist[luma] as number) + 1;
+    }
+  }
+  for (let p = plane === null ? 0 : ink.length; p < ink.length; p += 1) {
     const x = p % width;
     const luma = clampLuma(field.lumaAt(x, (p - x) / width));
     const hist = ink[p] === 1 ? inkHist : paperHist;

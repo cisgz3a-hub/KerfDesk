@@ -51,9 +51,10 @@ export function straightLegs(
 ): { readonly back: Leg[]; readonly ahead: Leg[] } {
   const stops = turnStops(pts, limits.scale);
   const grace = limits.maxSkip + Math.max(2, Math.round(TURN_WINDOW_PX * limits.scale));
+  const chain = chainOf(pts);
   return {
-    back: legRuns(pts, -1, limits, stops, grace),
-    ahead: legRuns(pts, 1, limits, stops, grace),
+    back: legRuns(chain, -1, limits, stops, grace),
+    ahead: legRuns(chain, 1, limits, stops, grace),
   };
 }
 
@@ -92,35 +93,24 @@ function turnStops(pts: ReadonlyArray<Vec2>, scale: number): Uint8Array {
 // already fitted the run's line, so the leg reuses it (the same sums in the
 // same order) and only a run that did not grow at its index is fitted again.
 function legRuns(
-  pts: ReadonlyArray<Vec2>,
+  pts: Chain,
   step: 1 | -1,
   limits: LegRunLimits,
   stops: Uint8Array,
   grace: number,
 ): Leg[] {
-  const n = pts.length;
+  const { n } = pts;
   const { cap, tolerance, barriers } = limits;
   const legs = new Array<Leg>(n);
-  // Lattice barriers always end a run; turn stops only past the leg's first
-  // `grace` cracks (its own corner's rounding lies within them). The vertex is
-  // the one crossed when a run from i grows from `count` to `count + 1` points.
-  const blocked = (i: number, count: number): boolean => {
-    const vertex = step === 1 ? (i + count) % n : (((i - count + 1) % n) + n) % n;
-    return barriers[vertex] !== 0 || (count >= grace && stops[vertex] === 1);
-  };
+  const blocks = runBlocks(barriers, stops, n, step, grace);
   let run = 1;
   for (let k = 0; k < n; k += 1) {
     const i = step === 1 ? k : n - 1 - k;
-    run = Math.max(1, Math.min(cap, run - 1));
+    const limit = blocks(i);
     // The carried run may now start across a barrier (it lost its first point).
-    for (let c = 1; c < run; c += 1) {
-      if (blocked(i, c)) {
-        run = c;
-        break;
-      }
-    }
+    run = Math.min(Math.max(1, Math.min(cap, run - 1)), limit);
     let line: LegLine | null = null;
-    while (run < cap && !blocked(i, run)) {
+    while (run < cap && run < limit) {
       if (run >= 2) {
         const grown = straightLine(pts, i, run + 1, step, tolerance);
         if (grown === null) break;
@@ -134,25 +124,68 @@ function legRuns(
   return legs;
 }
 
+// Lattice barriers always end a run; turn stops only past the leg's first
+// `grace` cracks (its own corner's rounding lies within them). The vertex a
+// run from i crosses when it grows from `count` to `count + 1` points is
+// i + count (step 1) or i - count + 1 (step -1); a run from i may hold at most
+// the first blocked count, found from each vertex's distance to the next
+// barrier and the next stop in the run's direction.
+function runBlocks(
+  barriers: Uint8Array,
+  stops: Uint8Array,
+  n: number,
+  step: 1 | -1,
+  grace: number,
+): (i: number) => number {
+  const toBarrier = distancesAhead(barriers, n, step);
+  const toStop = distancesAhead(stops, n, step);
+  const at = (i: number): number => ((i % n) + n) % n;
+  return step === 1
+    ? (i) =>
+        Math.min(1 + (toBarrier[at(i + 1)] as number), grace + (toStop[at(i + grace)] as number))
+    : (i) =>
+        Math.min(1 + (toBarrier[at(i)] as number), grace + (toStop[at(i - grace + 1)] as number));
+}
+
+// For every vertex v, the steps from v (in direction `step`, round the ring)
+// to the nearest set vertex, itself included; 2n when none is set.
+function distancesAhead(marks: Uint8Array, n: number, step: 1 | -1): Int32Array {
+  const distance = new Int32Array(n).fill(2 * n);
+  let next = 2 * n;
+  for (let k = 2 * n - 1; k >= 0; k -= 1) {
+    const v = step === 1 ? k % n : n - 1 - (k % n);
+    next = marks[v] !== 0 ? 0 : Math.min(2 * n, next + 1);
+    if (k < n) distance[v] = next;
+  }
+  return distance;
+}
+
 // The run's line when all `count` points from i lie within the tolerance of
 // it, else null.
 function straightLine(
-  pts: ReadonlyArray<Vec2>,
+  pts: Chain,
   i: number,
   count: number,
   step: 1 | -1,
   tolerance: LegTolerance,
 ): LegLine | null {
   const leg = legLine(pts, i, count, step);
-  const n = pts.length;
+  const { n, xs, ys } = pts;
   const nx = -leg.dy;
   const ny = leg.dx;
-  const first = pts[((i % n) + n) % n] as Vec2;
-  const last = pts[(((i + (count - 1) * step) % n) + n) % n] as Vec2;
-  const allowed = tolerance.base + tolerance.slope * hypot2(last.x - first.x, last.y - first.y);
-  for (let k = 0, j = ((i % n) + n) % n; k < count; k += 1, j = wrapStep(j, step, n)) {
-    const p = pts[j] as Vec2;
-    if (Math.abs((p.x - leg.cx) * nx + (p.y - leg.cy) * ny) > allowed) return null;
+  const start = ((i % n) + n) % n;
+  const end = (((i + (count - 1) * step) % n) + n) % n;
+  const allowed =
+    tolerance.base +
+    tolerance.slope *
+      hypot2(
+        (xs[end] as number) - (xs[start] as number),
+        (ys[end] as number) - (ys[start] as number),
+      );
+  for (let k = 0, j = start; k < count; k += 1, j = wrapStep(j, step, n)) {
+    if (Math.abs(((xs[j] as number) - leg.cx) * nx + ((ys[j] as number) - leg.cy) * ny) > allowed) {
+      return null;
+    }
   }
   return leg;
 }
@@ -168,7 +201,7 @@ function wrapStep(j: number, step: 1 | -1, n: number): number {
 // Total-least-squares line through `count` points from i in direction `step`,
 // oriented along the chain's travel.
 export function fitLeg(pts: ReadonlyArray<Vec2>, i: number, count: number, step: 1 | -1): Leg {
-  return legOf(count, legLine(pts, i, count, step));
+  return legOf(count, legLine(chainOf(pts), i, count, step));
 }
 
 function legOf(count: number, line: LegLine): Leg {
@@ -185,15 +218,14 @@ type LegLine = Omit<Leg, 'count' | 'residualSq'> & {
 };
 
 // The leg's line and scatter sums (the straightness test needs no residual).
-function legLine(pts: ReadonlyArray<Vec2>, i: number, count: number, step: 1 | -1): LegLine {
-  const n = pts.length;
+function legLine(pts: Chain, i: number, count: number, step: 1 | -1): LegLine {
+  const { n, xs, ys } = pts;
   const start = ((i % n) + n) % n;
   let cx = 0;
   let cy = 0;
   for (let k = 0, j = start; k < count; k += 1, j = wrapStep(j, step, n)) {
-    const p = pts[j] as Vec2;
-    cx += p.x;
-    cy += p.y;
+    cx += xs[j] as number;
+    cy += ys[j] as number;
   }
   cx /= count;
   cy /= count;
@@ -201,9 +233,8 @@ function legLine(pts: ReadonlyArray<Vec2>, i: number, count: number, step: 1 | -
   let sxy = 0;
   let syy = 0;
   for (let k = 0, j = start; k < count; k += 1, j = wrapStep(j, step, n)) {
-    const p = pts[j] as Vec2;
-    const ex = p.x - cx;
-    const ey = p.y - cy;
+    const ex = (xs[j] as number) - cx;
+    const ey = (ys[j] as number) - cy;
     sxx += ex * ex;
     sxy += ex * ey;
     syy += ey * ey;
@@ -211,15 +242,37 @@ function legLine(pts: ReadonlyArray<Vec2>, i: number, count: number, step: 1 | -
   const angle = 0.5 * Math.atan2(2 * sxy, sxx - syy);
   let dx = Math.cos(angle);
   let dy = Math.sin(angle);
-  const first = pts[start] as Vec2;
-  const last = pts[(((i + (count - 1) * step) % n) + n) % n] as Vec2;
-  const travelX = (last.x - first.x) * step;
-  const travelY = (last.y - first.y) * step;
+  const end = (((i + (count - 1) * step) % n) + n) % n;
+  const travelX = ((xs[end] as number) - (xs[start] as number)) * step;
+  const travelY = ((ys[end] as number) - (ys[start] as number)) * step;
   if (dx * travelX + dy * travelY < 0) {
     dx = -dx;
     dy = -dy;
   }
   return { cx, cy, dx, dy, sxx, sxy, syy };
+}
+
+// A crack chain's coordinates as two arrays, read once per chain: the leg
+// sums walk thousands of runs over the same points, and the arrays hold the
+// same doubles the points do.
+type Chain = { readonly n: number; readonly xs: Float64Array; readonly ys: Float64Array };
+
+const chains = new WeakMap<ReadonlyArray<Vec2>, Chain>();
+
+function chainOf(pts: ReadonlyArray<Vec2>): Chain {
+  const known = chains.get(pts);
+  if (known !== undefined && known.n === pts.length) return known;
+  const n = pts.length;
+  const xs = new Float64Array(n);
+  const ys = new Float64Array(n);
+  for (let k = 0; k < n; k += 1) {
+    const p = pts[k] as Vec2;
+    xs[k] = p.x;
+    ys[k] = p.y;
+  }
+  const chain = { n, xs, ys };
+  chains.set(pts, chain);
+  return chain;
 }
 
 export function growLeg(
@@ -230,7 +283,8 @@ export function growLeg(
   tolerance: LegTolerance,
 ): number {
   let count = Math.min(limit, 2);
-  while (count < limit && straightLine(pts, start, count + 1, step, tolerance) !== null) {
+  const chain = chainOf(pts);
+  while (count < limit && straightLine(chain, start, count + 1, step, tolerance) !== null) {
     count += 1;
   }
   return count;

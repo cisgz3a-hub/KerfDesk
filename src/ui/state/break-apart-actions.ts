@@ -16,6 +16,7 @@ import { repairDanglingObjectDependencies, reportDependencyRepairs } from './obj
 import { refuseSceneLimitOverrun } from './scene-copy-room';
 import { canBreakApartTrace, curvePolyline, splitTracedImage } from './trace-break-apart';
 import { useToastStore } from './toast-store';
+import { appendAll } from '../../core/util';
 
 const BREAK_APART_FEWER = 'Break apart fewer objects, or delete some objects first.';
 
@@ -154,8 +155,11 @@ function buildReplacementObjects(
       if (selectedIds.has(object.id)) newSelectionIds.push(object.id);
       continue;
     }
-    out.push(...parts);
-    newSelectionIds.push(...parts.map((part) => part.id));
+    appendAll(out, parts);
+    appendAll(
+      newSelectionIds,
+      parts.map((part) => part.id),
+    );
     idsBySource.set(
       object.id,
       parts.map((part) => part.id),

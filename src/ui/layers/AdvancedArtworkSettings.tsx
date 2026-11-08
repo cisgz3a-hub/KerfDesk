@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { memo, useId, useRef } from 'react';
 import {
   artworkOperationName,
   sceneObjectUsesOperation,
@@ -42,7 +42,7 @@ export function AdvancedArtworkSettings(props: {
     },
   });
   const draftScale = parseEnglishDecimalInput(input.displayValue);
-  const results = powerResults(props.objects, props.layers, draftScale);
+  const results = useKeptPowerResults(props.objects, props.layers, draftScale);
   // The multiplier scales every operation of the selected artwork (ADR-646).
   const glow = useSettingsEditGlow({
     owner: 'artwork-power-multiplier',
@@ -94,7 +94,54 @@ export function AdvancedArtworkSettings(props: {
   );
 }
 
-function ResultingArtworkPower({
+type PowerResultInputs = {
+  readonly objects: ReadonlyArray<SceneObject>;
+  readonly layers: ReadonlyArray<Layer>;
+  readonly draftScale: number | null;
+  readonly results: ReturnType<typeof powerResults>;
+};
+
+// A drag stores every selected object again on each step, with only its
+// transform changed, and the rows name nothing a transform changes. So the
+// rows are kept while that is all that changed: a drag of thousands does not
+// rebuild and re-render a row per object per step (S2-P3-3).
+function useKeptPowerResults(
+  objects: ReadonlyArray<SceneObject>,
+  layers: ReadonlyArray<Layer>,
+  draftScale: number | null,
+): ReturnType<typeof powerResults> {
+  const kept = useRef<PowerResultInputs | null>(null);
+  const last = kept.current;
+  if (
+    last !== null &&
+    last.layers === layers &&
+    last.draftScale === draftScale &&
+    sameApartFromTransforms(last.objects, objects)
+  )
+    return last.results;
+  const results = powerResults(objects, layers, draftScale);
+  kept.current = { objects, layers, draftScale, results };
+  return results;
+}
+
+function sameApartFromTransforms(
+  before: ReadonlyArray<SceneObject>,
+  after: ReadonlyArray<SceneObject>,
+): boolean {
+  if (before.length !== after.length) return false;
+  return after.every((object, index) => {
+    const previous = before[index];
+    if (previous === object) return true;
+    if (previous === undefined) return false;
+    const was = previous as Readonly<Record<string, unknown>>;
+    const now = object as Readonly<Record<string, unknown>>;
+    const keys = Object.keys(now);
+    if (keys.length !== Object.keys(was).length) return false;
+    return keys.every((key) => key === 'transform' || (key in was && was[key] === now[key]));
+  });
+}
+
+const ResultingArtworkPower = memo(function ResultingArtworkPower({
   results,
 }: {
   readonly results: ReturnType<typeof powerResults>;
@@ -118,7 +165,7 @@ function ResultingArtworkPower({
       )}
     </div>
   );
-}
+});
 
 function powerResults(
   objects: ReadonlyArray<SceneObject>,

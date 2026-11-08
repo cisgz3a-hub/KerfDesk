@@ -1,4 +1,5 @@
 import type { Vec2 } from './scene-object';
+import { maxOf } from '../util';
 
 const MIN_RIM_POINTS = 4;
 const MIN_SPREAD_CONDITION = 0.02;
@@ -35,7 +36,7 @@ export function bestFitCircleFromRimPoints(points: ReadonlyArray<Vec2>): BestFit
   const rmsErrorMm = Math.sqrt(
     errors.reduce((sum, error) => sum + error * error, 0) / errors.length,
   );
-  const maxErrorMm = Math.max(...errors);
+  const maxErrorMm = maxOf(errors);
   if (!Number.isFinite(rmsErrorMm) || !Number.isFinite(maxErrorMm)) return null;
 
   return {

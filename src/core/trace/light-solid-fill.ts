@@ -37,22 +37,27 @@
 // colour keeps its own side of the edge.
 
 import {
-  addRgb,
   boxMoments,
   chromaDistance,
   chromaticity,
   countBelow,
-  neighbours4,
-  nearThickMaterial,
   neighbours8,
 } from './light-solid-pixels';
+import {
+  CANDIDATE,
+  labelRegions,
+  rejectCutOuts,
+  REJECTED,
+  SMOOTH_RADIUS_PX,
+  solidIso,
+  SURFACE,
+  type Context,
+  type Regions,
+} from './light-solid-regions';
 
 /** Solids must be at least this far (luma) below paper; lighter areas are
  *  paper tints. */
 const MIN_PAPER_DISTANCE = 12;
-/** Radius (source px) of the box mean the flatness test reads. A 5×5 mean
- *  divides independent pixel noise by five. */
-const SMOOTH_RADIUS_PX = 2;
 /** Largest smoothed-luma step between 4-neighbours inside a flat area. A step
  *  edge of contrast c moves the 5×5 mean by c/5 per pixel, so tones more than
  *  about 20 apart are separate areas, while luma noise of sd 8 moves it by
@@ -83,19 +88,6 @@ const SURFACE_TONE_TOLERANCE = 10;
 const SURFACE_CHROMA_TOLERANCE = 0.03;
 /** Smallest solid considered (source px²); smaller areas the local test fills. */
 const MIN_SOLID_PX = 16;
-/** Half-width (source px) up to which non-light material around a solid is
- *  an outline or divider; beyond it the material is a ground the solid is
- *  cut out of (a gold star in a black badge, pale letters on a dark plate). */
-const OUTLINE_HALF_WIDTH_PX = 8;
-/** Largest share of a solid's edge that may border such a ground. */
-const MAX_GROUND_CONTACT = 0.5;
-/** Iso on a solid's flat pixels: every luma is ink there. */
-const SOLID_ISO = 255;
-
-const REJECTED = 0;
-const CANDIDATE = 1;
-const SURFACE = 2;
-
 export type SolidPlane = {
   readonly width: number;
   readonly height: number;
@@ -110,25 +102,6 @@ export type SolidPlane = {
 };
 
 type Paper = { readonly luma: number; readonly chroma: readonly number[] };
-
-/** Flat mid-tone areas, as parallel arrays indexed by area id. */
-type Regions = {
-  readonly count: number[];
-  readonly sumSq: number[];
-  readonly tone: number[];
-  readonly rgb: number[];
-  readonly border: boolean[];
-  readonly status: number[];
-};
-
-type Context = {
-  readonly plane: SolidPlane;
-  readonly smooth: Float32Array;
-  readonly flat: Uint8Array;
-  readonly labels: Int32Array;
-  readonly queue: Int32Array;
-  readonly scale: number;
-};
 
 /**
  * Per-pixel iso over light solids that the local-contrast mask hollows, or
@@ -149,8 +122,6 @@ export function lightSolidIso(plane: SolidPlane, bandUpper: number): Float32Arra
   const paper = estimatePaper(histogram);
   if (paper === null) return null;
   const upper = paper.luma - MIN_PAPER_DISTANCE;
-  const midTone = (i: number): boolean =>
-    flat[i] === 1 && (smooth[i] as number) > bandUpper && (smooth[i] as number) <= upper;
   if (!hasMidTone(histogram, bandUpper, upper)) return null;
   const ctx: Context = {
     plane,
@@ -160,10 +131,12 @@ export function lightSolidIso(plane: SolidPlane, bandUpper: number): Float32Arra
     queue: new Int32Array(luma.length),
     scale,
   };
-  const regions = labelRegions(ctx, midTone);
+  const regions = labelRegions(ctx, { lower: bandUpper, upper });
   classifyRegions(regions, paper, scale);
   if (!regions.status.includes(CANDIDATE)) return null;
   rejectCutOuts(ctx, regions, upper);
+  // Surfaces are only ever marked among candidates.
+  if (!regions.status.includes(CANDIDATE)) return null;
   markDrawnSurfaces(ctx, regions, upper);
   spreadSurfaces(regions);
   if (!regions.status.includes(CANDIDATE)) return null;
@@ -272,45 +245,6 @@ function hasMidTone(histogram: ToneHistogram, lower: number, upper: number): boo
   return false;
 }
 
-/** 4-connected components of flat mid-tone pixels, with their statistics. */
-function labelRegions(ctx: Context, midTone: (i: number) => boolean): Regions {
-  const { plane, labels, queue, smooth } = ctx;
-  const { width, height, rgba } = plane;
-  const regions: Regions = { count: [], sumSq: [], tone: [], rgb: [], border: [], status: [] };
-  const around = new Int32Array(4);
-  for (let start = 0; start < smooth.length; start += 1) {
-    if (labels[start] !== -1 || !midTone(start)) continue;
-    const id = regions.count.length;
-    let sum = 0;
-    let sumSq = 0;
-    let border = false;
-    regions.rgb.push(0, 0, 0);
-    labels[start] = id;
-    queue[0] = start;
-    let tail = 1;
-    for (let head = 0; head < tail; head += 1) {
-      const i = queue[head] as number;
-      const v = smooth[i] as number;
-      sum += v;
-      sumSq += v * v;
-      addRgb(regions.rgb, 3 * id, rgba, i);
-      if (neighbours4(around, i, width, height)) border = true;
-      for (const n of around) {
-        if (n < 0 || labels[n] !== -1 || !midTone(n)) continue;
-        labels[n] = id;
-        queue[tail] = n;
-        tail += 1;
-      }
-    }
-    regions.count.push(tail);
-    regions.sumSq.push(sumSq);
-    regions.tone.push(sum / tail);
-    regions.border.push(border);
-    regions.status.push(REJECTED);
-  }
-  return regions;
-}
-
 /** Candidates: big enough, off the image border, flat as a whole, and
  *  chromatically distinct from paper. */
 function classifyRegions(regions: Regions, paper: Paper, scale: number): void {
@@ -326,37 +260,6 @@ function classifyRegions(regions: Regions, paper: Paper, scale: number): void {
       chromaDistance(regionChroma(regions, id), paper.chroma) >= MIN_CHROMA_DISTANCE;
     regions.status[id] = candidate ? CANDIDATE : REJECTED;
   }
-}
-
-/** Reject candidates whose edge mostly borders a dark ground rather than
- *  paper or a thin line: they are light shapes cut out of dark ink, which a
- *  brightness threshold leaves open too. Light pixels are paper-toned pixels
- *  and candidate solids. */
-function rejectCutOuts(ctx: Context, regions: Regions, paperLike: number): void {
-  const { plane, smooth, labels, scale } = ctx;
-  const { width, height } = plane;
-  const isCandidate = (id: number): boolean => id >= 0 && regions.status[id] === CANDIDATE;
-  const light = new Uint8Array(labels.length);
-  for (let i = 0; i < light.length; i += 1) {
-    light[i] = (smooth[i] as number) > paperLike || isCandidate(labels[i] as number) ? 1 : 0;
-  }
-  const halfWidth = Math.round(OUTLINE_HALF_WIDTH_PX * scale);
-  const span = { halfWidth, reach: halfWidth + Math.ceil(2 * scale) };
-  const near = nearThickMaterial(light, width, height, span);
-  const edge = new Array<number>(regions.count.length).fill(0);
-  const grounded = new Array<number>(regions.count.length).fill(0);
-  const around = new Int32Array(4);
-  for (let i = 0; i < labels.length; i += 1) {
-    const id = labels[i] as number;
-    if (!isCandidate(id)) continue;
-    neighbours4(around, i, width, height);
-    if (!around.some((n) => n >= 0 && labels[n] !== id)) continue;
-    edge[id] = (edge[id] as number) + 1;
-    if (near[i] === 1) grounded[id] = (grounded[id] as number) + 1;
-  }
-  edge.forEach((count, id) => {
-    if ((grounded[id] as number) > MAX_GROUND_CONTACT * count) regions.status[id] = REJECTED;
-  });
 }
 
 type EnclosureSearch = {
@@ -481,47 +384,6 @@ function spreadSurfaces(regions: Regions): void {
     );
     if (same) regions.status[id] = SURFACE;
   });
-}
-
-/** Iso field: SOLID_ISO on accepted solids' flat pixels, and their tone/paper
- *  midpoint on the transition pixels each solid owns. Ownership spreads from
- *  every flat mid-tone area at once, one ring per step, through non-flat
- *  pixels only, so a transition pixel belongs to the nearest area. */
-function solidIso(ctx: Context, regions: Regions, paperLuma: number): Float32Array {
-  const { plane, flat, labels, queue, scale } = ctx;
-  const { width, height } = plane;
-  const iso = new Float32Array(labels.length).fill(-Infinity);
-  const midpoint = regions.tone.map((tone) => Math.fround((tone + paperLuma) / 2));
-  const accepted = (id: number): boolean => regions.status[id] === CANDIDATE;
-  let tail = 0;
-  for (let i = 0; i < labels.length; i += 1) {
-    const id = labels[i] as number;
-    if (id < 0) continue;
-    if (accepted(id)) iso[i] = SOLID_ISO;
-    queue[tail] = i;
-    tail += 1;
-  }
-  // The transition around a flat area spans the smoothing window on both
-  // sides of the edge, plus a pixel of anti-aliasing.
-  const reach = Math.ceil((2 * SMOOTH_RADIUS_PX + 2) * scale);
-  const around = new Int32Array(8);
-  let head = 0;
-  for (let ring = 0; ring < reach && head < tail; ring += 1) {
-    const end = tail;
-    for (; head < end; head += 1) {
-      const i = queue[head] as number;
-      const owner = labels[i] as number;
-      neighbours8(around, i, width, height);
-      for (const n of around) {
-        if (n < 0 || flat[n] === 1 || labels[n] !== -1) continue;
-        labels[n] = owner;
-        if (accepted(owner)) iso[n] = midpoint[owner] as number;
-        queue[tail] = n;
-        tail += 1;
-      }
-    }
-  }
-  return iso;
 }
 
 function regionChroma(regions: Regions, id: number): number[] {

@@ -4,11 +4,14 @@
 // vendor command set, reset the baud and power range, and clear a scan-offset
 // calibration (device-setup-controller-selection.ts). Those changes are listed
 // and wait for Apply; a choice that changes nothing else applies at once.
-// Nothing reaches the project before Save.
+// Nothing reaches the project before Save. The baud the controller answered at
+// is kept: Marlin's 250000 starter replaced a working 115200, so the next
+// Reconnect "didn't answer" (UX audit U5-P3-7).
 
 import { useState } from 'react';
 import type { ControllerKind } from '../../../core/devices';
 import { Button } from '../../kit';
+import { useLaserStore } from '../../state/laser-store';
 import { controllerSelectionChanges } from './device-setup-controller-selection';
 import type { DeviceSetupStepProps } from './device-setup-flow';
 import { machineSetupControllerGuide } from './machine-setup-controller-guide';
@@ -18,10 +21,14 @@ export function DeviceSetupUseDetectedController(
 ): JSX.Element {
   const [confirming, setConfirming] = useState(false);
   const label = machineSetupControllerGuide(props.detected).label;
-  const changes = controllerSelectionChanges(props.state.draft, props.detected);
+  const answeredBaud = useLaserStore((state) => state.connectedBaudRate ?? null);
+  const changes = controllerSelectionChanges(props.state.draft, props.detected, answeredBaud);
   const apply = (): void => {
     setConfirming(false);
     props.dispatch({ kind: 'select-controller', controllerKind: props.detected });
+    // Choosing a controller resets the baud to its default, so the baud that
+    // answered is written after it, as the controller fill does.
+    if (answeredBaud !== null) props.dispatch({ kind: 'edit', patch: { baudRate: answeredBaud } });
   };
   if (!confirming || changes.length === 0) {
     return (
@@ -44,6 +51,9 @@ export function DeviceSetupUseDetectedController(
           </li>
         ))}
       </ul>
+      {answeredBaud === null ? null : (
+        <p>Baud stays {answeredBaud}: your controller answered at this speed.</p>
+      )}
       <div className="lf-setup-find-actions">
         <Button
           variant="primary"

@@ -97,6 +97,8 @@ export function legCandidates(
         break;
       }
       const b = (a + 1 + skip) % n;
+      // Only a candidate costlier than the best so far can replace it, so a
+      // cheaper one is not judged further (its field check is the costly part).
       const candidate = legCorner(
         pts,
         a,
@@ -104,7 +106,7 @@ export function legCandidates(
         legs.back[a] as Leg,
         legs.ahead[b] as Leg,
         scale,
-        input.thresholdPx,
+        { thresholdPx: input.thresholdPx, beat: costToBeat(best) },
         input.measured,
         input.field,
       );
@@ -115,6 +117,15 @@ export function legCandidates(
   return out;
 }
 
+function costToBeat(best: Candidate | null): number {
+  return best === null ? -Infinity : best.cost;
+}
+
+/** A candidate is dropped at or below the dial's threshold, and at or below
+ *  `beat`, the cost of the best candidate already found from the same crack
+ *  (a cheaper one could not replace it). */
+type CostBound = { readonly thresholdPx: number; readonly beat: number };
+
 function legCorner(
   pts: ReadonlyArray<Vec2>,
   a: number,
@@ -122,11 +133,12 @@ function legCorner(
   back: Leg,
   ahead: Leg,
   scale: number,
-  thresholdPx: number,
+  bound: CostBound,
   measured: boolean,
   field: CrackSubPixelField | undefined,
 ): Candidate | null {
   if (back.count < MIN_LEG_POINTS || ahead.count < MIN_LEG_POINTS) return null;
+  const { thresholdPx, beat } = bound;
   const n = pts.length;
   if (back.count + ahead.count + skip > n) return null;
   const meeting = legMeeting(pts, a, skip, back, ahead, scale, measured);
@@ -141,13 +153,16 @@ function legCorner(
   if (leg < MIN_LEG_PX * scale) return null;
   const filletGap = leg * Math.tan(Math.abs(turn) / 4);
   if (filletGap / scale <= thresholdPx) return null;
+  // The cost is at most filletGap / scale, so a gap that cannot beat the best
+  // so far needs no circle fit.
+  if (filletGap / scale <= beat) return null;
   // Two lines must explain the neighbourhood clearly better than ONE circle:
   // a digitized or wobbly arc fits a circle as well as it fits its own legs.
   const total = back.count + skip + ahead.count;
   const arcRms = circleRms(pts, (a - back.count + 1 + n) % n, total);
   const legRms = Math.sqrt((back.residualSq + ahead.residualSq) / (back.count + ahead.count));
   const cost = Math.min(filletGap, ARC_EXCESS_WEIGHT * Math.max(0, arcRms - legRms)) / scale;
-  if (cost <= thresholdPx) return null;
+  if (cost <= thresholdPx || cost <= beat) return null;
   if (measured && !measuredApexStands(pts, a, skip, apex, back, ahead, scale, meeting, field)) {
     return null;
   }

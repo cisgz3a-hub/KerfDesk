@@ -7,6 +7,7 @@ import {
   type Vec2,
 } from '../scene';
 import { contourSegments, segmentStart } from './trim-curve-split';
+import { maxOf, minOf } from '../util';
 
 type SegmentGeometry = {
   readonly segment: PathSegment;
@@ -43,10 +44,10 @@ export function curveSegmentHitGeometry(
       segment.kind === 'elliptical-arc'
         ? null
         : {
-            minX: Math.min(...points.map((point) => point.x)),
-            minY: Math.min(...points.map((point) => point.y)),
-            maxX: Math.max(...points.map((point) => point.x)),
-            maxY: Math.max(...points.map((point) => point.y)),
+            minX: minOf(points.map((point) => point.x)),
+            minY: minOf(points.map((point) => point.y)),
+            maxX: maxOf(points.map((point) => point.x)),
+            maxY: maxOf(points.map((point) => point.y)),
           };
     return { segment, from, sceneFrom, sceneTo, bounds };
   });

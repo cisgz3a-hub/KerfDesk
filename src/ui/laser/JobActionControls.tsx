@@ -4,6 +4,7 @@ import { Icon } from '../kit/icons';
 import { jobTimeNoun } from '../machine/machine-labels';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
+import { preparationProgressSuffix } from './preparation-progress-text';
 import { CONNECT_MACHINE_FIRST } from '../state/status-unknown-message';
 import { isFramedRunCandidate } from '../state/framed-run';
 import {
@@ -21,6 +22,7 @@ import { useFrameAction } from './use-frame-action';
 import { useFramedRunLaserState } from './use-framed-run-laser-state';
 import { useJobEstimate } from './use-job-estimate';
 import { useJobStartMarkPreparation } from './use-job-start-mark';
+import { useFocusThroughDisable } from '../common/use-focus-through-disable';
 
 type Props = {
   readonly disabled: boolean;
@@ -159,11 +161,15 @@ function JobActionButtons(props: {
   readonly docked: boolean | undefined;
 }): JSX.Element {
   const { model, docked } = props;
+  // Frame job turns itself off while it runs; focus waits beside it (U7-P3-1).
+  const frameRef = useFocusThroughDisable<HTMLButtonElement>(model.frameControl.disabled);
   const frame = (
     <button
+      ref={frameRef}
       type="button"
       className={docked ? 'lf-btn' : 'lf-btn lf-btn--go'}
       data-primary={docked ? model.frameIsNext : undefined}
+      data-search-target="frame-job"
       onClick={model.onFrame}
       disabled={model.frameControl.disabled}
       title={model.frameControl.title}
@@ -178,6 +184,7 @@ function JobActionButtons(props: {
       className={docked ? 'lf-btn lf-job-dock__start' : 'lf-btn lf-btn--go'}
       style={docked ? undefined : primaryActionStyle}
       data-primary={docked ? model.framedReady : undefined}
+      data-search-target="start-job"
       onClick={props.onStartJob}
       disabled={model.startControl.disabled}
       title={model.startControl.title}
@@ -244,17 +251,6 @@ export function frameControlProps(busy: boolean, state: string | undefined, conn
   };
 }
 
-// Compiler phases as the operator experiences them, not as the pipeline names
-// them. Numeric progress only arrives for jobs the compiler fans out (CNC
-// regions); every other preparation reads the phase alone, and the phase-less
-// wording covers the seconds before the first report.
-const PREPARING_PHASE_TEXT: Record<OutputCompilationProgress['phase'], string> = {
-  normalizing: 'reading shapes',
-  planning: 'planning toolpaths',
-  merging: 'merging results',
-  finalizing: 'finishing',
-};
-
 function preparingFrameStatusText(
   progress: OutputCompilationProgress | null,
   stage: FramePreparationStage,
@@ -263,10 +259,7 @@ function preparingFrameStatusText(
     stage === 'finishing'
       ? 'Frame traced — finishing the exact job before Start is authorized'
       : 'Preparing the exact job for Frame';
-  if (progress === null) return `${lead}…`;
-  const phase = PREPARING_PHASE_TEXT[progress.phase];
-  if (progress.total <= 0) return `${lead} — ${phase}…`;
-  return `${lead} — ${phase} ${progress.completed}/${progress.total}…`;
+  return `${lead}${preparationProgressSuffix(progress)}…`;
 }
 
 function frameBlockedTitle(state: string | undefined, connected: boolean): string {

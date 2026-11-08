@@ -23,6 +23,7 @@ import { EditionStatusButton } from '../licensing/EditionStatusButton';
 import { UpdateReadyButton } from '../licensing/UpdateReadyButton';
 import { CANVAS_MOTION_SLOT_ID } from './status-bar-slots';
 import './status-bar.css';
+import { useScrollOverflowCue } from './use-scroll-overflow-cue';
 
 export function StatusBar({ children }: { readonly children?: React.ReactNode }): JSX.Element {
   const project = useStore((s) => s.project);
@@ -37,11 +38,14 @@ export function StatusBar({ children }: { readonly children?: React.ReactNode })
   const layerCount = project.scene.layers.length;
   const outputLayerCount = project.scene.layers.filter((l) => l.output).length;
   const selectedFillWarning = fillWarning(project, selectedObjectId, additionalSelectedIds);
+  const telemetryRef = useScrollOverflowCue<HTMLDivElement>();
   return (
     <footer aria-label="Status bar" className="lf-status-bar" style={barStyle}>
       <div
+        ref={telemetryRef}
         className="lf-status-bar__telemetry"
         style={telemetryStyle}
+        title="Workspace status. When the line runs past the edge, scroll it sideways with the mouse wheel or, once focused, the arrow keys."
         role="group"
         tabIndex={0}
         aria-label="Workspace status details"

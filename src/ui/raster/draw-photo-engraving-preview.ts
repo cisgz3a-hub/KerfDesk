@@ -2,6 +2,7 @@ import { toSceneCoords, type DeviceProfile } from '../../core/devices';
 import { rasterScanFrame, scanToMachine } from '../../core/raster/raster-scan-frame';
 import { drawMachineRasterBitmap } from '../workspace/draw-raster-preview-bitmap';
 import type { PhotoEngravingPreviewResult } from './photo-engraving-preview';
+import { maxOf, minOf } from '../../core/util';
 
 /** Simulated material colours: the untouched surface and a full mark. */
 export type PhotoPreviewColours = { readonly surface: string; readonly mark: string };
@@ -47,10 +48,10 @@ export function drawPhotoEngravingPreview(
     { x: bounds.maxX, y: bounds.maxY },
     { x: bounds.minX, y: bounds.maxY },
   ].map((point) => toSceneCoords(scanToMachine(frame, point), device));
-  const minX = Math.min(...corners.map((point) => point.x));
-  const minY = Math.min(...corners.map((point) => point.y));
-  const widthMm = Math.max(...corners.map((point) => point.x)) - minX;
-  const heightMm = Math.max(...corners.map((point) => point.y)) - minY;
+  const minX = minOf(corners.map((point) => point.x));
+  const minY = minOf(corners.map((point) => point.y));
+  const widthMm = maxOf(corners.map((point) => point.x)) - minX;
+  const heightMm = maxOf(corners.map((point) => point.y)) - minY;
   const scale = Math.max(result.width, result.height) / Math.max(widthMm, heightMm, 0.001);
   canvas.width = Math.max(1, Math.round(widthMm * scale));
   canvas.height = Math.max(1, Math.round(heightMm * scale));

@@ -8,6 +8,7 @@ import {
   type CncProgramSection,
   type ProgramTool,
 } from './cnc-program-geometry';
+import { maxOf } from '../../core/util';
 
 /**
  * Review the exact emitted work-coordinate path. Every result is advisory.
@@ -39,7 +40,7 @@ export function cncProgramReachWarnings(
   const review: SectionReview = { geometry, tools: machine.tools, fixtures, warnings };
   const sectionCount = Math.max(
     plan.length,
-    ...geometry.sections.map((section) => section.planIndex + 1),
+    maxOf(geometry.sections.map((section) => section.planIndex + 1)),
   );
   for (let index = 0; index < sectionCount; index++)
     reviewSection(review, index, plan[index], sectionDepthsMm[index]);

@@ -40,6 +40,7 @@ import { describeUnowned } from './live-motion-unowned';
 import { LiveMotionAnnouncer, shownForAnnouncer } from './LiveMotionAnnouncer';
 import { LiveMotionAbortButton } from './LiveMotionAbortButton';
 import { useJobStartFocus } from './use-job-start-focus';
+import { useLiveMotionInset } from './use-live-motion-inset';
 
 const MAXIMUM_STACKING_ORDER = 2_147_483_647;
 const TOOL_CHANGE_CONTINUE_TITLE =
@@ -95,6 +96,7 @@ export function LiveMotionBar(): JSX.Element | null {
   );
   const barRef = useRef<HTMLElement>(null);
   useJobStartFocus(barRef, description?.abortLabel === 'ABORT JOB');
+  useLiveMotionInset(barRef, description !== null);
   const announcer = (
     <LiveMotionAnnouncer shown={shownForAnnouncer(description)} progress={streamProgress} />
   );
@@ -346,7 +348,10 @@ function streamHoldDescription(
 // Deliberately no Resume button here. Releasing a controller-owned hold is the
 // machine's own cycle-start, and the app's Resume path carries the ADR-180
 // accessory-state proof a hold the app never requested has not established.
-// Naming the state and what releases it is the whole fix.
+// Naming the state and what releases it is the whole fix. Most hobby lasers
+// have no cycle-start button, so a door hold also names the route that works
+// here: Pause makes the hold the app's own, and its Resume then releases it
+// (UX audit U4-P3-2, U5-P3-5).
 function controllerHoldDescription(hold: NonNullable<ControllerHold>): {
   readonly heading: string;
   readonly detail: string;
@@ -355,8 +360,8 @@ function controllerHoldDescription(hold: NonNullable<ControllerHold>): {
     return {
       heading: 'CONTROLLER DOOR HOLD',
       detail: hold.doorPin
-        ? 'The controller reports its door or lid input open and has stopped motion. Close it, then press cycle start on the machine'
-        : 'The controller is in its door-safety state and has stopped motion. Release it with cycle start on the machine',
+        ? `The lid or door is open, so the controller stopped the job. Close it, then ${DOOR_RELEASE}`
+        : `The lid or door was opened, so the controller stopped the job. ${capitalised(DOOR_RELEASE)}`,
     };
   }
   return {
@@ -364,6 +369,13 @@ function controllerHoldDescription(hold: NonNullable<ControllerHold>): {
     detail:
       'The controller is holding motion on its own feed hold, not a pause from here. Release it with cycle start on the machine',
   };
+}
+
+const DOOR_RELEASE =
+  "press Pause and then Resume here, or the machine's cycle-start button if it has one";
+
+function capitalised(text: string): string {
+  return `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
 }
 
 function jobHeading(

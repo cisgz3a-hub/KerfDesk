@@ -139,10 +139,27 @@ export function artworkOperationName(object: SceneObject): string {
     case 'traced-image':
     case 'raster-image':
     case 'relief':
-      return cleanName(fileStem(object.source), 'Artwork');
+      return sourceName(object.source);
     default:
       return object satisfies never;
   }
+}
+
+// Panels name every member of a selection on each render, and a drag of
+// thousands re-renders them per step (S2-P3-3), so each file name is cleaned
+// once. Bounded: cleared when full, and long sources are not kept.
+const SOURCE_NAME_CACHE_LIMIT = 4096;
+const SOURCE_NAME_MAX_KEY = 512;
+const sourceNames = new Map<string, string>();
+
+function sourceName(source: string): string {
+  const cached = sourceNames.get(source);
+  if (cached !== undefined) return cached;
+  const name = cleanName(fileStem(source), 'Artwork');
+  if (source.length > SOURCE_NAME_MAX_KEY) return name;
+  if (sourceNames.size >= SOURCE_NAME_CACHE_LIMIT) sourceNames.clear();
+  sourceNames.set(source, name);
+  return name;
 }
 
 export function nextOperationColor(operations: ReadonlyArray<Pick<Layer, 'color'>>): string {

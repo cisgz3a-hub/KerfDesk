@@ -11,6 +11,7 @@
 // hop, ADR-423). Farther away, the chain ends and the emitter retracts.
 
 import type { FinishingPoint } from './relief-finishing-path';
+import { appendAll } from '../util';
 
 // A finished cell's model lies within this of the height it was cut to.
 const FINISHED_TOLERANCE_MM = 0.001;
@@ -96,7 +97,8 @@ export function linkFinishingRuns(
     const first = points[0];
     if (chain !== null && end !== undefined && first !== undefined) {
       if (next.distance <= options.maxLinkMm) {
-        chain.push(...hop(end, first, surface, options.checkSpacingMm), ...points);
+        appendAll(chain, hop(end, first, surface, options.checkSpacingMm));
+        appendAll(chain, points);
         continue;
       }
       chains.push(chain);

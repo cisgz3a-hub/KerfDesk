@@ -300,6 +300,20 @@ function paintFilledGeometry(
   strokePolylinesBatched(ctx, obj, open, view);
 }
 
+/**
+ * The only part of the view an object's resolved display depends on: its
+ * curve flattening tolerance, bucketed by powers of two, so a wheel zoom
+ * reuses the cached flattening for about seven notches instead of flattening
+ * every curve on each one. A pan leaves it unchanged.
+ */
+export function objectDisplayToleranceMm(object: SceneObject, view: ViewTransform): number {
+  const objectScale = Math.max(
+    Math.abs(object.transform.scaleX),
+    Math.abs(object.transform.scaleY),
+  );
+  return displayCurveToleranceMm(view.scale * objectScale);
+}
+
 function displayPathFor(
   path: ColoredPath,
   object: SceneObject,
@@ -307,13 +321,7 @@ function displayPathFor(
   cache: DisplayPolylineCache | undefined,
   fill: boolean,
 ): DisplayPolylines {
-  const objectScale = Math.max(
-    Math.abs(object.transform.scaleX),
-    Math.abs(object.transform.scaleY),
-  );
-  // Bucketed by powers of two, so a wheel zoom reuses the cached flattening
-  // for about seven notches instead of flattening every curve on each one.
-  const toleranceMm = displayCurveToleranceMm(view.scale * objectScale);
+  const toleranceMm = objectDisplayToleranceMm(object, view);
   if (cache !== undefined) {
     return fill ? cache.getFillPath(path, toleranceMm) : cache.getPath(path, toleranceMm);
   }

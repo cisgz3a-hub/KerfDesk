@@ -6,7 +6,9 @@
 
 import type { Toolpath } from '../../core/job';
 import type { Project } from '../../core/scene';
+import type { OutputCompilationProgress } from '../../io/gcode/prepare-output-async';
 import type { ExecutablePlanPreviewCarrier } from './executable-plan-preview-route';
+import type { PreviewCncFallbackCarrier } from './preview-cnc-fallbacks';
 import type { PreviewRouteSummaryCarrier } from './preview-route-summary';
 
 export type PreviewIssue =
@@ -21,7 +23,8 @@ export type PreviewIssue =
     }
   // The scene is over the responsiveness budget and the ADR-244 preparation
   // worker is computing the real toolpath in the background.
-  | { readonly kind: 'preparing-large-job' }
+  // `progress` is the worker's latest report, when one has arrived (S8-P3-3).
+  | { readonly kind: 'preparing-large-job'; readonly progress?: OutputCompilationProgress }
   | { readonly kind: 'preparation-failed'; readonly messages: ReadonlyArray<string> }
   // resolveJobPlacement refused (e.g. custom origin with no live position);
   // carries the placement failure messages so the overlay can name the reason
@@ -30,7 +33,8 @@ export type PreviewIssue =
 
 export type PreviewToolpath = Toolpath &
   ExecutablePlanPreviewCarrier &
-  PreviewRouteSummaryCarrier & {
+  PreviewRouteSummaryCarrier &
+  PreviewCncFallbackCarrier & {
     readonly previewIssue?: PreviewIssue;
   };
 

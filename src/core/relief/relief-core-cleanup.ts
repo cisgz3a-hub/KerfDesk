@@ -36,6 +36,7 @@ import {
 import { roundStrokeOutline } from '../geometry/round-stroke-outline';
 import type { Polyline } from '../scene';
 import { evenOddHoles, openLoop } from './relief-roughing-order';
+import { appendAll } from '../util';
 
 // The pocket planner's bisection budget and tolerance: 24 halvings resolve any
 // bed-sized span far below 0.01 mm, which also sets the thinnest stock that
@@ -109,8 +110,8 @@ function clearStock(uncut: ReadonlyArray<Polyline>, cutRadiusMm: number): Relief
     if (stock.length === 0) return { paths, stockInside, offsetFailed: false, passLimited: false };
     const added = stock.map((piece) => piecePaths(piece, cutRadiusMm));
     for (const piece of added) {
-      paths.push(...piece.paths);
-      stockInside.push(...piece.stockInside);
+      appendAll(paths, piece.paths);
+      appendAll(stockInside, piece.stockInside);
     }
     const left = uncutArea(
       stock.flat(),

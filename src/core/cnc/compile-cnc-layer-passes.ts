@@ -7,6 +7,7 @@ import {
   type Polyline,
 } from '../scene';
 import type { CncPass } from '../job';
+import type { CncStrategyFallback } from '../job/cnc-compilation-sidecar-types';
 import {
   depthsWithTabTopPass,
   passNeedsTabs,
@@ -37,7 +38,10 @@ import {
 import type { FrameHandedness } from './machine-frame-handedness';
 import { applyRampEntry, enforceCutDirection } from './motion-polish';
 import { hasFinitePoints, profileToolpathPolylines } from './profile-paths';
-import { specializedPassesForLayer } from './compile-cnc-special-passes';
+import {
+  specializedPassesForLayer,
+  type SpecializedLayerPasses,
+} from './compile-cnc-special-passes';
 import { manualTabCentersForToolpaths, type CollectedCncContour } from './cnc-manual-tab-mapping';
 import type { VCarveLadder } from './vcarve-plan';
 import { cncSettingsForStage, cncStageRecipe } from './cnc-stage-settings';
@@ -74,6 +78,8 @@ export type CncLayerPassesResult = {
   // ordinary contour ladder ramps: V-carve, drill and adaptive passes and a
   // helical pocket's passes enter their own way (ADR-273 Amendment 2).
   readonly rampedEntry: boolean;
+  // Set when the layer cuts another strategy than it asks for (S8-P2-1).
+  readonly strategyFallback?: Omit<CncStrategyFallback, 'layerId'>;
 };
 
 export function passesForCncLayerWithEvidence(
@@ -94,7 +100,9 @@ export function passesForCncLayerWithEvidence(
     handedness,
     vcarveLadder,
   );
-  if (specialized !== null) return completePasses(specialized);
+  if (specialized.passes !== null) return completePasses(specialized.passes);
+  const { strategyFallback } = specialized;
+  const adaptiveFallback = strategyFallback === undefined ? {} : { strategyFallback };
 
   const contours = lineArtContoursForLayer(polylines, settings, tool.diameterMm, sourceContours);
   // The finishing wall and the tab windows ride the same offset as the
@@ -114,7 +122,9 @@ export function passesForCncLayerWithEvidence(
   // With a finish allowance, a hole too narrow to rough can still be finished
   // down the depth ladder (ADR-140 Amendment 1).
   if ((toolpaths.length === 0 && allowanceMm === 0) || depths.length === 0) {
-    return { ...raw, passes: [], rampedEntry: false };
+    // A layer that cuts nothing falls back to nothing either.
+    const { strategyFallback: _uncut, ...uncut } = raw;
+    return { ...uncut, passes: [], rampedEntry: false };
   }
 
   const passes = passesForDepths(
@@ -133,6 +143,7 @@ export function passesForCncLayerWithEvidence(
   );
   return {
     ...raw,
+    ...adaptiveFallback,
     passes:
       settings.rampEntryDeg === undefined || settings.rampEntryDeg <= 0
         ? passes
@@ -184,9 +195,9 @@ function resolvedSpecializedPasses(
   tool: CncTool,
   handedness: FrameHandedness,
   vcarveLadder?: VCarveLadder,
-): ReadonlyArray<CncPass> | null {
+): SpecializedLayerPasses {
   if (settings.cutType === 'v-carve' && vcarveLadder !== undefined) {
-    return vcarveLadder.passes;
+    return { passes: vcarveLadder.passes };
   }
   return specializedPassesForLayer(polylines, settings, tool, handedness);
 }
@@ -211,6 +222,9 @@ function rawToolpathsForLayer(
   if (restOperation.kind === 'ok') {
     return {
       toolpaths: restOperation.restToolpaths,
+      ...(restOperation.strategyFallback === undefined
+        ? {}
+        : { strategyFallback: restOperation.strategyFallback }),
       ...(restOperation.stockEvidence === undefined
         ? {}
         : { restStock: restOperation.stockEvidence }),
@@ -224,6 +238,7 @@ function rawToolpathsForLayer(
 
 type CncLayerToolpathsResult = {
   readonly restStock?: Cnc2dStockEvidence;
+  readonly strategyFallback?: Omit<CncStrategyFallback, 'layerId'>;
   readonly toolpaths: ReadonlyArray<Polyline>;
   readonly offsetFailed: boolean;
   readonly passLimited: boolean;

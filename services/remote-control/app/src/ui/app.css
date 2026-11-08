@@ -27,6 +27,7 @@
   --warning-fg: #805117;
   --warning-tint: #faf2e4;
   --info-tint: #eaeff5;
+  --info-fg: #3175d0;
   --selection: #3175d0;
   --canvas: #e6e3de;
   --bed: #fdfcfb;
@@ -67,6 +68,8 @@
   --warning-fg: #eac66f;
   --warning-tint: #3a3122;
   --info-tint: #2b3440;
+  /* 6.2:1 on --info-tint; the selection blue was 4.42:1 at 12.5 px (UX audit U7-P3-8). */
+  --info-fg: #8ab8f5;
   --canvas: #161513;
   --bed: #22201d;
   --grid: #2b2825;
@@ -377,7 +380,7 @@ textarea {
 }
 .chip.info {
   background: var(--info-tint);
-  color: var(--selection);
+  color: var(--info-fg);
 }
 
 .seg {
@@ -1069,7 +1072,9 @@ textarea {
   inset: 0;
   display: grid;
   place-items: center;
-  padding: 24px;
+  /* Clear of the floating tool rail (left 10 px, 54 px wide), which cut the
+     start of "Artwork sharing is off" (UX audit U7-P3-8). */
+  padding: 24px 24px 24px 76px;
   text-align: center;
   pointer-events: none;
 }
@@ -1275,7 +1280,8 @@ textarea {
 }
 .steps button {
   min-width: 54px;
-  min-height: 40px;
+  /* ADR-582 item 7 keeps 48 px touch targets (UX audit U7-P3-8). */
+  min-height: 48px;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--surface-2);

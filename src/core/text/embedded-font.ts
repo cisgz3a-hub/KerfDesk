@@ -1,7 +1,7 @@
 import type { EmbeddedFont } from '../scene';
+import { decodeBase64Into, encodeBase64 } from '../util/base64-codec';
 
 export const MAX_EMBEDDED_FONT_BYTES = 10 * 1024 * 1024;
-const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
 export function embeddedFontBuffer(font: EmbeddedFont): ArrayBuffer {
   const bytes = decodeBase64(font.dataBase64);
@@ -31,38 +31,11 @@ function assertSupportedFont(bytes: Uint8Array): void {
   }
 }
 
-function encodeBase64(bytes: Uint8Array): string {
-  let encoded = '';
-  for (let index = 0; index < bytes.length; index += 3) {
-    const first = bytes[index] ?? 0;
-    const second = bytes[index + 1];
-    const third = bytes[index + 2];
-    const bits = (first << 16) | ((second ?? 0) << 8) | (third ?? 0);
-    encoded += BASE64_ALPHABET[(bits >> 18) & 63] ?? '';
-    encoded += BASE64_ALPHABET[(bits >> 12) & 63] ?? '';
-    encoded += second === undefined ? '=' : (BASE64_ALPHABET[(bits >> 6) & 63] ?? '');
-    encoded += third === undefined ? '=' : (BASE64_ALPHABET[bits & 63] ?? '');
-  }
-  return encoded;
-}
-
+// The codec gives the text and bytes the old one-character loops gave, 8 to 100 times faster
+// (performance audit S7-P2-2): a 9.3 MB system font blocked the window for about a second.
 function decodeBase64(value: string): Uint8Array {
   const padding = value.endsWith('==') ? 2 : value.endsWith('=') ? 1 : 0;
   const output = new Uint8Array((value.length / 4) * 3 - padding);
-  let outputIndex = 0;
-  for (let index = 0; index < value.length; index += 4) {
-    const bits = decodeBase64Block(value, index);
-    if (outputIndex < output.length) output[outputIndex++] = (bits >> 16) & 255;
-    if (outputIndex < output.length) output[outputIndex++] = (bits >> 8) & 255;
-    if (outputIndex < output.length) output[outputIndex++] = bits & 255;
-  }
+  decodeBase64Into(value, output);
   return output;
-}
-
-function decodeBase64Block(value: string, index: number): number {
-  const digit = (offset: number): number => {
-    const char = value[index + offset] ?? '=';
-    return char === '=' ? 0 : BASE64_ALPHABET.indexOf(char);
-  };
-  return (digit(0) << 18) | (digit(1) << 12) | (digit(2) << 6) | digit(3);
 }

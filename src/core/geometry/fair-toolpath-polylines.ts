@@ -12,6 +12,7 @@
 
 import type { Polyline, Vec2 } from '../scene';
 import { fidelityResampleChain } from './fidelity-resample-chain';
+import { appendAll } from '../util';
 
 export type ToolpathFairOptions = {
   /** Physical size of one polyline unit (trace pixel), mm. Non-finite or
@@ -80,7 +81,7 @@ function fairOne(
     const resampled = fidelityResampleChain(smoothed, chain, minSegmentPx, maxDeviationPx);
     // Spans share endpoints; skip the first vertex of every span but the
     // first so shared pins are emitted once.
-    out.push(...(out.length === 0 ? resampled : resampled.slice(1)));
+    appendAll(out, out.length === 0 ? resampled : resampled.slice(1));
   }
   if (ring) {
     // The last span ends back at the first pin; replace the duplicate with
