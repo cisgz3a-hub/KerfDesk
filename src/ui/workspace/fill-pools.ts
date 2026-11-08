@@ -32,6 +32,7 @@ import { poolGeometry, type PoolGeometry } from './fill-pool-geometry';
 import { parityContours } from './fill-pool-regions';
 import type { ObjectDisplay, PathDisplay, VectorSceneObject } from './object-display';
 import { vectorObjectWorldBounds } from './object-viewport';
+import { RecentPlanValues } from './fill-pool-recent-keys';
 import type { Polyline } from '../../core/scene';
 
 export type ResolvedVector = {
@@ -72,6 +73,11 @@ export type PlannedPools = {
 
 /** Work counters for the count guards (Amendment 3): plans made, full overlap sweeps run. */
 export const fillPoolWork = { plans: 0, sweeps: 0 };
+
+/** How many pool keys keep their last overlap groups (the S9-P3-3 bound). */
+export function keptFillPoolGroupCount(): number {
+  return lastGroups.size;
+}
 
 type Member = {
   readonly index: number;
@@ -145,6 +151,7 @@ export function planPools(
       }
     }
   }
+  lastGroups.endPlan();
   const covering = drawnOverClusters(
     clusters.map(({ cluster }) => ({
       indexes: cluster.map((member) => member.index),
@@ -251,8 +258,9 @@ function clustersOf(key: string, members: ReadonlyArray<Member>): Member[][] {
 }
 
 // The last groups seen per pool key, so a drag of the anchoring member still
-// finds what it is moving away from. Overwritten every plan; holds one per key.
-const lastGroups = new Map<string, ClusterGroups>();
+// finds what it is moving away from. Kept for the keys of the last two plans
+// (fill-pool-recent-keys.ts): a pool that is gone no longer holds its objects.
+const lastGroups = new RecentPlanValues<ClusterGroups>();
 
 function groupsFor(
   cached: ClusterGroups | undefined,
