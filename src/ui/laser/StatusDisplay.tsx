@@ -26,6 +26,8 @@ import {
   missingPositionMessage,
   type StatusReportFieldsOff,
 } from '../state/status-report-fields';
+import { useStore } from '../state/store';
+import { controllerStateGloss } from './controller-state-gloss';
 import { controllerReportsWorkOffset } from './work-offset-assumption';
 import { useLengthUnit } from '../state/display-units';
 import { feedUnitLabel, MM_PER_INCH, type DisplayLengthUnit } from '../display-length';
@@ -101,11 +103,15 @@ function StatusState({
   readonly report: NonNullable<LaserState['statusReport']>;
   readonly halted: boolean;
 }): JSX.Element {
+  const machineKind = useStore((s) => (s.project.machine?.kind === 'cnc' ? 'cnc' : 'laser'));
   const reported = report.subState === null ? report.state : `${report.state}:${report.subState}`;
   const label = halted ? "Halted (press the controller's reset button)" : reported;
+  // A halted controller's last report is stale, so it gets no plain-words gloss.
+  const gloss = halted ? null : controllerStateGloss(report.state, report.subState, machineKind);
   return (
     <div style={stateRowStyle}>
       <strong>State:</strong> {label}
+      {gloss !== null ? <span style={glossStyle}> · {gloss}</span> : null}
     </div>
   );
 }
@@ -217,3 +223,5 @@ const dimStyle: React.CSSProperties = {
   paddingBottom: 10,
   borderBottom: '1px solid var(--lf-border)',
 };
+
+const glossStyle: React.CSSProperties = { color: 'var(--lf-text-muted)', fontWeight: 400 };

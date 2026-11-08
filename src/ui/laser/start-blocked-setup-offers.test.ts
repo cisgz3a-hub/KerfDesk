@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useStore } from '../state';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
+import { resetStore } from '../state/test-helpers';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import {
@@ -12,6 +14,7 @@ import { unrestoredOriginOfferPrompt } from './unrestored-abort-origin';
 import {
   offerSetupFixForBlockedStart,
   SET_ORIGIN_OFFER_PROMPT,
+  setOriginOfferPrompt,
   VERIFIED_ORIGIN_SET_ORIGIN_OFFER_PROMPT,
 } from './start-blocked-setup-offers';
 
@@ -45,6 +48,20 @@ afterEach(() => {
 });
 
 describe('set-origin offer', () => {
+  // UX audit U4-P3-6: the offer did not say which point of the design goes at
+  // the head.
+  it('names the point of the design that goes where the head is', async () => {
+    resetStore();
+    useStore.getState().setJobPlacement({ startFrom: 'user-origin', anchor: 'center' });
+    await offerSetupFixForBlockedStart(USER_ORIGIN_REQUIRED_MESSAGE);
+    expect(jobAwareConfirm).toHaveBeenCalledWith(setOriginOfferPrompt('User Origin', 'center'));
+    expect(setOriginOfferPrompt('User Origin', 'center')).toContain(
+      'The centre of your design goes there',
+    );
+    expect(SET_ORIGIN_OFFER_PROMPT).toContain('The front-left corner of your design goes there');
+    resetStore();
+  });
+
   it('sets the work origin at the current position and retries', async () => {
     await expect(offerSetupFixForBlockedStart(USER_ORIGIN_REQUIRED_MESSAGE)).resolves.toBe('retry');
     expect(jobAwareConfirm).toHaveBeenCalledWith(SET_ORIGIN_OFFER_PROMPT);

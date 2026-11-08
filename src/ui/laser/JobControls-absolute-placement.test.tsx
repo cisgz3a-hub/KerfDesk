@@ -9,6 +9,7 @@ import { resetStore } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
 import { frameVerificationForProject } from './frame-verification-testing';
 import { installAutoJobReview } from './job-review';
+import { FRAME_JOB_TITLE } from './JobActionControls';
 import { JobControls } from './JobControls';
 
 (
@@ -114,9 +115,7 @@ describe('JobControls Absolute Coordinates frame-first', () => {
       expect(buttonByText('Home').disabled).toBe(false);
       expect(buttonByText('Frame job').disabled).toBe(false);
       expect(buttonByText('Start').disabled).toBe(true);
-      expect(buttonByText('Frame job').title).toBe(
-        "Trace the job's generated motion envelope with the tool off. A clean Frame stays valid while its footprint and placement remain unchanged.",
-      );
+      expect(buttonByText('Frame job').title).toBe(FRAME_JOB_TITLE);
       expect(buttonByText('Start').title).toBe(
         'Start unlocks after a clean Frame of this footprint and placement. Press Frame job first.',
       );

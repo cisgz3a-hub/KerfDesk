@@ -298,7 +298,7 @@ describe('JobControls running safety copy', () => {
       });
 
       expect(host.textContent).toContain(
-        'Pause is feed hold only. Use ABORT JOB or the physical E-stop if unsafe.',
+        'Pause stops the head and switches the laser off. Use ABORT JOB or the physical E-stop if anything is unsafe.',
       );
       expect(
         [...host.querySelectorAll('button')].map((button) => button.textContent),

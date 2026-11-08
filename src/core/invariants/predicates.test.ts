@@ -59,8 +59,8 @@ describe('findOutOfBoundsCoords', () => {
   it('parses signed, leading-dot, trailing-dot, exponent, and lowercase motion words', () => {
     const issues = findOutOfBoundsCoords('g1 x+4.01e2 y.5\nG1 X1. Y-5e-1', bed);
     expect(issues.map((issue) => issue.reason)).toEqual([
-      'X out of bed: 401',
-      'Y out of bed: -0.5',
+      'X out of bed: 401 (bed position)',
+      'Y out of bed: -0.5 (bed position)',
     ]);
   });
 

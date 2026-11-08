@@ -6,23 +6,55 @@
 // refusal message; Frame job's repair (frame-blocker-repair) enforces that
 // before delegating here.
 
+import type { JobOriginAnchor } from '../../core/job';
+import { useStore } from '../state';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
-import { USER_ORIGIN_REQUIRED_MESSAGE, VERIFIED_ORIGIN_REQUIRED_MESSAGE } from '../job-placement';
+import {
+  DEFAULT_JOB_PLACEMENT,
+  USER_ORIGIN_REQUIRED_MESSAGE,
+  VERIFIED_ORIGIN_REQUIRED_MESSAGE,
+} from '../job-placement';
 import { repairFailed, type BlockedStartRepair } from './start-blocked-repair';
 import { offerRestoreAbortOrigin, unrestoredAbortOrigin } from './unrestored-abort-origin';
 
-const SET_ORIGIN_OFFER_BODY =
-  'OK: set the work origin at the current head position — the job runs from here — and ' +
-  'then Frame the updated placement before starting.\n' +
-  'Cancel: leave the job blocked.';
+// The offer names the point of the design that lands at the head, which a
+// beginner otherwise found only as "FL" in the Placement panel (UX audit
+// U4-P3-6).
+const ANCHOR_WORDS: Readonly<Record<JobOriginAnchor, string>> = {
+  'back-left': 'back-left corner',
+  'back-center': 'middle of the back edge',
+  'back-right': 'back-right corner',
+  'center-left': 'middle of the left edge',
+  center: 'centre',
+  'center-right': 'middle of the right edge',
+  'front-left': 'front-left corner',
+  'front-center': 'middle of the front edge',
+  'front-right': 'front-right corner',
+};
 
-export const SET_ORIGIN_OFFER_PROMPT =
-  'User Origin needs a custom work origin.\n\n' + SET_ORIGIN_OFFER_BODY;
+export function setOriginOfferPrompt(
+  mode: 'User Origin' | 'Verified Origin',
+  anchor: JobOriginAnchor,
+): string {
+  return (
+    `${mode} needs a custom work origin.\n\n` +
+    `OK: set the work origin where the head is now. The ${ANCHOR_WORDS[anchor]} of your design ` +
+    'goes there and the job runs from it. Then Frame the updated placement before starting.\n' +
+    'Cancel: leave the job blocked.'
+  );
+}
 
-export const VERIFIED_ORIGIN_SET_ORIGIN_OFFER_PROMPT =
-  'Verified Origin needs a custom work origin.\n\n' + SET_ORIGIN_OFFER_BODY;
+export const SET_ORIGIN_OFFER_PROMPT = setOriginOfferPrompt(
+  'User Origin',
+  DEFAULT_JOB_PLACEMENT.anchor,
+);
+
+export const VERIFIED_ORIGIN_SET_ORIGIN_OFFER_PROMPT = setOriginOfferPrompt(
+  'Verified Origin',
+  DEFAULT_JOB_PLACEMENT.anchor,
+);
 
 export async function offerSetupFixForBlockedStart(message: string): Promise<BlockedStartRepair> {
   const placement =
@@ -37,7 +69,7 @@ export async function offerSetupFixForBlockedStart(message: string): Promise<Blo
   const saved = unrestoredAbortOrigin(useLaserStore.getState());
   if (saved !== null) return offerRestoreAbortOrigin(placement, saved);
   return offerSetOriginHere(
-    placement === 'User Origin' ? SET_ORIGIN_OFFER_PROMPT : VERIFIED_ORIGIN_SET_ORIGIN_OFFER_PROMPT,
+    setOriginOfferPrompt(placement, useStore.getState().jobPlacement.anchor),
   );
 }
 

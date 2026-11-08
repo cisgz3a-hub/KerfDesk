@@ -362,7 +362,7 @@ describe('CanvasMotionBadge status placement', () => {
 function timedOverlay(opts: {
   readonly startedAtMs: number;
   readonly endedAtMs?: number | null;
-  readonly lifecycle?: 'running' | 'finished';
+  readonly lifecycle?: 'running' | 'finished' | 'stopped' | 'disconnected';
 }): CanvasMotionOverlay {
   const plan = cncPlan();
   return {

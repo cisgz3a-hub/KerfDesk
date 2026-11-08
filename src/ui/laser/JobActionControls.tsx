@@ -104,6 +104,8 @@ function useJobActionModel(props: { readonly disabled: boolean; readonly streami
   const markPending = useJobStartMarkPreparation((state) => state.pending);
   const expiredBecause = useFrameExpiryNote((state) => state.reason);
   const frameActive = laser.motionOperation?.kind === 'frame';
+  // The job itself, not controlsBusy: a Frame in progress is busy too.
+  const jobRunning = useLaserStore((s) => JOB_RUNNING.has(s.streamer?.status ?? 'idle'));
   const frameDeferred = frameIsDeferred(laser.motionOperation);
   const preparingFrame = framePending && !frameActive;
   const busy = [props.disabled, props.streaming, framePending, markPending].some(Boolean);
@@ -141,6 +143,7 @@ function useJobActionModel(props: { readonly disabled: boolean; readonly streami
       expiredBecause,
       preparingFrame,
       progress,
+      jobRunning,
     }),
     estimate,
   };
@@ -210,6 +213,8 @@ function JobActionButtons(props: {
   );
 }
 
+const JOB_RUNNING: ReadonlySet<string> = new Set(['streaming', 'paused', 'tool-change']);
+
 function framedRunStatusText(args: {
   readonly frameActive: boolean;
   readonly frameDeferred: boolean;
@@ -220,7 +225,11 @@ function framedRunStatusText(args: {
   readonly expiredBecause: string | null;
   readonly preparingFrame: boolean;
   readonly progress: OutputCompilationProgress | null;
+  readonly jobRunning: boolean;
 }): string {
+  // The running job holds its one-use Frame permit, so readiness reads as
+  // expired; that is not news while the framed job runs (UX audit U4-P3-3).
+  if (args.jobRunning) return 'Running the framed job';
   if (args.frameActive) {
     // A split Frame traces the compiled outline while the exact program is
     // still being prepared (ADR-353); no permit exists until it arrives.
@@ -242,13 +251,18 @@ function framedRunStatusText(args: {
 // the button waits for the controller instead of refusing after a click.
 // With no machine connected nothing will report, so the hint says to connect
 // rather than to wait (UX audit U1-P2-4).
+// Plain words for what Frame does (UX audit U4-P3-6: "generated motion
+// envelope with the tool off").
+export const FRAME_JOB_TITLE =
+  'Move the head around the outside of the job with the laser or spindle off, so you can check it fits your material. Start unlocks when the Frame completes and stays unlocked while the job and its placement are unchanged.';
+
 export function frameControlProps(busy: boolean, state: string | undefined, connected: boolean) {
   const ready = state === 'Idle' || state === 'Alarm';
   return {
     disabled: busy || !ready,
     title:
       state === 'Idle'
-        ? "Trace the job's generated motion envelope with the tool off. A clean Frame stays valid while its footprint and placement remain unchanged."
+        ? FRAME_JOB_TITLE
         : state === 'Alarm'
           ? 'The controller is in Alarm. Frame offers Home or Unlock first.'
           : frameBlockedTitle(state, connected),
