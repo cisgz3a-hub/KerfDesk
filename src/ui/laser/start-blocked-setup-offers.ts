@@ -17,7 +17,12 @@ import {
   VERIFIED_ORIGIN_REQUIRED_MESSAGE,
 } from '../job-placement';
 import { repairFailed, type BlockedStartRepair } from './start-blocked-repair';
-import { offerRestoreAbortOrigin, unrestoredAbortOrigin } from './unrestored-abort-origin';
+import {
+  abortRestoreHomesFirst,
+  offerRestoreAbortOrigin,
+  restartedOriginNote,
+  unrestoredAbortOrigin,
+} from './unrestored-abort-origin';
 
 // The offer names the point of the design that lands at the head, which a
 // beginner otherwise found only as "FL" in the Placement panel (UX audit
@@ -37,9 +42,10 @@ const ANCHOR_WORDS: Readonly<Record<JobOriginAnchor, string>> = {
 export function setOriginOfferPrompt(
   mode: 'User Origin' | 'Verified Origin',
   anchor: JobOriginAnchor,
+  note?: string,
 ): string {
   return (
-    `${mode} needs a custom work origin.\n\n` +
+    `${mode} needs a custom work origin.${note === undefined ? '' : ` ${note}`}\n\n` +
     `OK: set the work origin where the head is now. The ${ANCHOR_WORDS[anchor]} of your design ` +
     'goes there and the job runs from it. Then Frame the updated placement before starting.\n' +
     'Cancel: leave the job blocked.'
@@ -66,10 +72,14 @@ export async function offerSetupFixForBlockedStart(message: string): Promise<Blo
   if (placement === null) return 'unrepaired';
   // An aborted job's origin that was not put back comes first: setting the
   // origin at the head would re-run the job off the half-burned piece (V3-P2-2).
-  const saved = unrestoredAbortOrigin(useLaserStore.getState());
-  if (saved !== null) return offerRestoreAbortOrigin(placement, saved);
+  // Once machine zero may have moved, only Home makes it trustworthy (X1-P1-1).
+  const abort = unrestoredAbortOrigin(useLaserStore.getState());
+  if (abort !== null && (!abort.machineZeroMoved || abortRestoreHomesFirst())) {
+    return offerRestoreAbortOrigin(placement, abort);
+  }
+  const note = abort === null ? undefined : restartedOriginNote(abort.saved);
   return offerSetOriginHere(
-    setOriginOfferPrompt(placement, useStore.getState().jobPlacement.anchor),
+    setOriginOfferPrompt(placement, useStore.getState().jobPlacement.anchor, note),
   );
 }
 

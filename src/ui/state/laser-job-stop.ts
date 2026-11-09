@@ -367,13 +367,19 @@ async function stopWithOwnedReset(
   return { airOffSent: true, quickStop: 'none' };
 }
 
-function g92OriginAtStop(state: LaserState): Pick<JobStopRequest, 'originAtStopMm'> {
+function g92OriginAtStop(
+  state: LaserState,
+): Pick<JobStopRequest, 'originAtStopMm' | 'originMachineZeroEpoch'> {
   if (!state.workOriginActive || state.workOriginSource !== 'g92') return {};
   const offset = reportedWorkOffsetMm(
     state.wcoCache,
     state.controllerSettings?.reportInches === true,
   );
-  return offset === null ? {} : { originAtStopMm: { x: offset.x, y: offset.y } };
+  if (offset === null) return {};
+  return {
+    originAtStopMm: { x: offset.x, y: offset.y },
+    originMachineZeroEpoch: state.machineZeroEpoch ?? 0,
+  };
 }
 
 // A quickstop that may have reached the controller leaves homing and position
