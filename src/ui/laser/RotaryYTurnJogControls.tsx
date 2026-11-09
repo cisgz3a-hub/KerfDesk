@@ -46,6 +46,7 @@ export function RotaryYTurnJogControls(props: {
         type="button"
         className="lf-btn"
         aria-label={`Turn the part −${stepDeg}°`}
+        title={`Turn the part back ${stepDeg}° (one Y jog of that share of a turn).`}
         disabled={props.disabled}
         onClick={() => turn(-1)}
       >
@@ -69,6 +70,7 @@ export function RotaryYTurnJogControls(props: {
         type="button"
         className="lf-btn"
         aria-label={`Turn the part +${stepDeg}°`}
+        title={`Turn the part on ${stepDeg}°, the way a job's increasing Y turns it.`}
         disabled={props.disabled}
         onClick={() => turn(1)}
       >
