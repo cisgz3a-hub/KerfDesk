@@ -35,6 +35,28 @@ export type RotarySetup = {
   // Mirrors the engraving around the cylinder so text isn't backwards.
   // Absent/false = normal direction, byte-identical output.
   readonly reverseAxis?: boolean;
+  // Taper correction for a tumbler or glass that narrows along its length
+  // (ADR-694, LightBurn's Taper Warp). Absent or off keeps the single-diameter
+  // wrap, byte-identical.
+  readonly taper?: RotaryTaper;
+};
+
+// Which side of the bed the object's top (rim) points to, along X. LightBurn's
+// "Object Top"; its third choice, Top, has no place on a Y rotary, whose axis
+// lies along X.
+export type RotaryTaperTopSide = 'left' | 'right';
+
+export type RotaryTaper = {
+  readonly enabled: boolean;
+  readonly topDiameterMm: number;
+  readonly bottomDiameterMm: number;
+  // Top edge to bottom edge, measured along the side: the line the head runs
+  // along once the surface is level with the bed, as LightBurn asks.
+  readonly lengthMm: number;
+  readonly topSide: RotaryTaperTopSide;
+  // How far from the top edge the artwork's top-side edge sits, measured along
+  // the side. It fixes where on the cone each design X lies.
+  readonly artworkFromTopMm: number;
 };
 
 // Which part the test rotation turns once: the object (the wrap a job uses)
@@ -47,6 +69,25 @@ export const DEFAULT_ROTARY_SETUP: RotarySetup = {
   mmPerRotation: 360,
   objectDiameterMm: 60,
 };
+
+// The taper the output applies, or null when there is none or it is off.
+export function activeRotaryTaper(setup: RotarySetup): RotaryTaper | null {
+  const taper = setup.taper;
+  return taper !== undefined && taper.enabled ? taper : null;
+}
+
+// A cone the head can run along: positive ends and length, radii no further
+// apart than the side is long, and a gap that is not negative.
+export function rotaryTaperValid(taper: RotaryTaper): boolean {
+  return (
+    isPositiveFinite(taper.topDiameterMm) &&
+    isPositiveFinite(taper.bottomDiameterMm) &&
+    isPositiveFinite(taper.lengthMm) &&
+    Math.abs(taper.topDiameterMm - taper.bottomDiameterMm) / 2 < taper.lengthMm &&
+    Number.isFinite(taper.artworkFromTopMm) &&
+    taper.artworkFromTopMm >= 0
+  );
+}
 
 export function rotaryCircumferenceMm(setup: RotarySetup): number {
   return Math.PI * setup.objectDiameterMm;
@@ -86,10 +127,12 @@ export function rotaryRevolutionTravelMm(
 
 // The measurements a rotary mapping needs, independent of `enabled`.
 export function rotaryMeasurementsValid(setup: RotarySetup): boolean {
+  const taper = activeRotaryTaper(setup);
   return (
     isPositiveFinite(setup.objectDiameterMm) &&
     isPositiveFinite(setup.mmPerRotation) &&
-    (!rotaryUsesRollerDiameter(setup) || isPositiveFinite(setup.rollerDiameterMm))
+    (!rotaryUsesRollerDiameter(setup) || isPositiveFinite(setup.rollerDiameterMm)) &&
+    (taper === null || rotaryTaperValid(taper))
   );
 }
 

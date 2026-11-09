@@ -49,7 +49,7 @@ type Burn = {
 describe('single-line text frames saved before schema 19 (N4-P1-1, ADR-682 Amendment 1)', () => {
   it('opens with each frame keeping the old line rule', () => {
     const project = opened();
-    expect(project.schemaVersion).toBe(21);
+    expect(project.schemaVersion).toBe(22);
     const rules = Object.fromEntries(texts(project).map((text) => [text.id, text.textBox]));
     expect(rules['relief-name-tag']).toMatchObject({ legacyLineEm: 0.68, minSizeMm: 2000 / 680 });
     expect(rules['relief-plain-anna']).toMatchObject({ legacyLineEm: 0.68 });

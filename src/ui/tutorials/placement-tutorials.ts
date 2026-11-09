@@ -193,7 +193,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Enable the intended machine profile',
         instruction:
-          'Choose Enable rotary for this machine profile, then Roller or Chuck to match the installed device. Enter the measured Object diameter or its Circumference; for a tapered or soft part, use Measure with a strip where the artwork goes.',
+          'Choose Enable rotary for this machine profile, then Roller or Chuck to match the installed device. Enter the measured Object diameter or its Circumference; for a soft part, use Measure with a strip where the artwork goes. For a tumbler or glass that narrows, turn on Tapered part and enter both ends; without it the size round the part is right only where you measured. Focus still changes along a taper: focus at the middle of the artwork, or keep the design short along the part.',
         focus: 'Profile · type · diameter',
         result: 'The diameter and circumference stay linked, so either measurement sets both.',
       },

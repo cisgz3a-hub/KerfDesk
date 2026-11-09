@@ -15,6 +15,7 @@ import type { CncCompilationSidecar } from './cnc-compilation-sidecar-types';
 export type { CncCompilationSidecar } from './cnc-compilation-sidecar-types';
 import type { CutArcMoves, LeadContour } from './cut-segment-geometry';
 export type { CutArcMoves } from './cut-segment-geometry';
+import type { RotaryTaperProfile } from './rotary-taper-profile';
 
 import { representedCncCoordinateMm } from '../cnc/coordinate-representation';
 import { sampleCircularArcPoints } from '../geometry/arc-representation';
@@ -563,6 +564,9 @@ export type Job = {
     readonly maxY: number;
   } | null;
   readonly diagnostics?: ReadonlyArray<JobDiagnostic>;
+  /** The cone a machine-space rotary job was warped onto (ADR-694); absent on
+   * every other job. A later stage reads the local Y factor from it. */
+  readonly rotaryTaper?: RotaryTaperProfile;
   readonly cncCompilation?: CncCompilationSidecar;
   /** Laser finish placed by preparation (ADR-493). Absent keeps the default. */
   readonly laserFinish?: JobLaserFinish;

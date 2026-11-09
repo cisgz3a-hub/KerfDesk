@@ -21,7 +21,7 @@ describe('project start point persistence', () => {
     const original = { ...createProject(), startPoints };
     const prepared = prepareProjectForPersistence(original);
     expect(prepared.kind).toBe('ok');
-    if (prepared.kind === 'ok') expect(JSON.parse(prepared.json).schemaVersion).toBe(21);
+    if (prepared.kind === 'ok') expect(JSON.parse(prepared.json).schemaVersion).toBe(22);
     const result = deserializeProject(serializeProject(original));
     expect(result.kind).toBe('ok');
     if (result.kind === 'ok') {
@@ -51,7 +51,7 @@ describe('project start point persistence', () => {
     expect(migrateToCurrent(raw, 16)).toEqual({
       kind: 'ok',
       raw: { ...raw, schemaVersion: PROJECT_SCHEMA_VERSION },
-      steps: [16, 17, 18, 19, 20],
+      steps: [16, 17, 18, 19, 20, 21],
     });
     expect(JSON.stringify(raw)).toBe(before);
     expect(deserializeProject(before)).toMatchObject({
@@ -75,7 +75,7 @@ describe('project start point persistence', () => {
     const oldReader = await import('./deserialize-project');
     expect(oldReader.deserializeProject(saved)).toEqual({
       kind: 'schema-too-new',
-      sawVersion: 21,
+      sawVersion: 22,
     });
   });
 

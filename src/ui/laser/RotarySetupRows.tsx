@@ -76,13 +76,14 @@ export function SegmentButton(props: {
   readonly active: boolean;
   readonly onClick: () => void;
   readonly children: React.ReactNode;
+  readonly title?: string;
 }): JSX.Element {
   return (
     <button
       type="button"
       className="lf-button"
       aria-pressed={props.active}
-      title="Select the rotary attachment type."
+      title={props.title ?? 'Select the rotary attachment type.'}
       onClick={props.onClick}
       style={{ ...segmentButtonStyle, ...(props.active ? segmentActiveStyle : {}) }}
     >

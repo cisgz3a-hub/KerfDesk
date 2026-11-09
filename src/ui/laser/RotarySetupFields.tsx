@@ -19,6 +19,7 @@ import {
 } from './rotary-setup-edit';
 import { RotaryObjectFields, type RotaryEditUpdate } from './RotaryObjectFields';
 import { FieldRow, RotaryNumberField, SegmentButton, ToggleRow } from './RotarySetupRows';
+import { RotaryTaperFields } from './RotaryTaperFields';
 
 export function RotarySetupFields(props: {
   readonly edit: RotaryEdit;
@@ -50,6 +51,7 @@ export function RotarySetupFields(props: {
         </div>
       </FieldRow>
       <RotaryObjectFields edit={edit} onEdit={onEdit} />
+      <RotaryTaperFields taper={setup.taper} onEdit={onEdit} />
       {setup.type === 'roller' ? <RollerScaleFields setup={setup} onEdit={onEdit} /> : null}
       <MotionPerTurnField setup={setup} onEdit={onEdit} />
       <ToggleRow

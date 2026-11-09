@@ -3848,16 +3848,17 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    freezes further host refill and preserves the existing dwell/busy detection
    and warning threshold. These are software controls, not physical-stop proof.
 
-### F-B17. Rotary setup, test rotation and the Rotary switch (ADR-127, ADR-315, ADR-373)
+### F-B17. Rotary setup, test rotation and the Rotary switch (ADR-127, ADR-315, ADR-373, ADR-694)
 
 #### Success — set up the attachment
 1. **Tools → Rotary Setup**, or **Setup…** beside the Rotary switch. The dialog edits a draft;
    nothing reaches the profile until **Apply**.
 2. **Object diameter** and **Circumference** are one linked measurement: editing either updates
    the other, and a typed circumference is stored as its exact diameter. **Measure with a strip**
-   takes the flat length of a strip wrapped once round the part where the artwork goes and the
-   strip's thickness (default 0.1 mm), shows Ø = wrap / π − thickness, and **Use this diameter**
-   fills the field.
+   takes the flat length of a strip wrapped once round the part and the strip's thickness
+   (default 0.1 mm), shows Ø = wrap / π − thickness, and **Use this diameter** fills the field.
+   One reading is one diameter; with **Tapered part** on, the buttons are **Use for the top** and
+   **Use for the bottom**.
 3. A **chuck** scales Y by Motion per turn / (π × object diameter). A **roller** either scales it
    by Motion per turn / (π × **Roller diameter**), independent of the part's size, or leaves Y
    unscaled (**Scale Y from the roller diameter** off: the controller's Y steps/mm already move
@@ -3872,6 +3873,28 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    its settings (today the Creality Rotary Kit Pro as a chuck, 40 mm per rotation, for Falcon
    machines). Picking it fills in the type and Motion per turn, keeps the object's diameter and
    the toggles, and shows where the figures come from. Test rotation still checks them.
+6. **Tapered part (Taper Warp)** (ADR-694), off by default, takes LightBurn's Taper Warp inputs:
+   Top diameter, Bottom diameter, Length (top edge to bottom edge along the side), which side of
+   the bed the part's top points to (Left or Right), and **Artwork from top**, the distance along
+   the side from the part's top edge to the nearest edge of the artwork (measure it on the part
+   after Frame). A side-view diagram shows the part with its engraved side level. While it is on,
+   Object diameter follows the wider end and is disabled here and in Machine Setup. Off, the hint
+   says the size round a narrowing part is right only where its diameter was measured.
+   - Hold the part so the side being engraved is level with the bed (raise the narrow end), as
+     LightBurn asks. Focus still changes along the taper and nothing corrects it (nor does
+     LightBurn's Taper Warp); the hint says to focus at the middle of the artwork, or keep the design
+     short along the part. KerfDesk does not promise a perfect burn on a tapered part.
+   - The warp is applied to the output, never to the artwork: G-code (cut, fill and image), `.rd`,
+     Frame and its canvas outline, the estimate and the bounds check all see it. A design D mm tall
+     burns D mm round the part at every height, and one turn stays one turn. Rows round the part
+     stay level; a stroke along the side leans slightly away from the job's anchor row (2.3° at
+     30 mm from it on an Ø80→Ø70 cup), so anchor a Current Position job at its centre.
+   - The preview gives one turn round the top and round the bottom, and checks the artwork against
+     one turn where the part is narrowest under it. Job Review's Rotary fact names the taper, for
+     example "Chuck, taper Ø80 → Ø70 mm over 100 mm". A taper whose ends differ in radius by more
+     than its length disables Apply with a reason.
+   - A project with a taper saves as schema 22; a 1.0.30 or older reader refuses it rather than
+     burning the part unwarped. Older rotary projects open unchanged and emit identical G-code.
 
 #### Success — test rotation
 1. With the controller connected, Idle, unalarmed, no job or other motion, auto-focus idle and
