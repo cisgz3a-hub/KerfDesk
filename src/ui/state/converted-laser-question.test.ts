@@ -79,22 +79,30 @@ describe('the 1.0.29 laser made a CNC (rolling audit v10 V2-P2-2, ADR-637 Amendm
     expect(stored).toBe('cnc-router');
   });
 
-  it('is not asked about the same document saved as a laser, or a router with its spindle set', () => {
+  it('is not asked about the same document saved as a laser', () => {
     const laser = JSON.stringify({ ...JSON.parse(SAVED_BY_1_0_29), machineKind: 'laser' });
     expect(
       convertedLaserQuestion(restoredStartupProject(laser), STOCK_GRBL_DIODE, false),
     ).toBeNull();
+  });
 
-    const router = JSON.parse(SAVED_BY_1_0_29) as {
+  // Rolling audit v12 X2-P1-2 (ADR-637 Amendment 10): 1.0.29's advisory told
+  // the owner to set $30=12000 or update the machine profile. Doing either is
+  // not an answer.
+  it.each([
+    ['spindle max RPM set to 1000', 1000, { laserModeEnabled: false, maxPowerS: 1000 }],
+    ['$30 written to 12000', 12000, { laserModeEnabled: false, maxPowerS: 12000 }],
+  ])('is still asked after the owner followed 1.0.29 advice (%s)', (_name, rpm, settings) => {
+    const edited = JSON.parse(SAVED_BY_1_0_29) as {
       profile: { cncSubProfile: Record<string, unknown> };
     };
-    router.profile.cncSubProfile['spindleMaxRpm'] = 24000;
+    edited.profile.cncSubProfile['spindleMaxRpm'] = rpm;
     expect(
       convertedLaserQuestion(
-        restoredStartupProject(JSON.stringify(router)),
-        { detectedSettings: { laserModeEnabled: false, maxPowerS: 24000 } },
+        restoredStartupProject(JSON.stringify(edited)),
+        { detectedSettings: settings },
         false,
       ),
-    ).toBeNull();
+    ).not.toBeNull();
   });
 });

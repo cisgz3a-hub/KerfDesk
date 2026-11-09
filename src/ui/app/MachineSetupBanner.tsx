@@ -84,8 +84,9 @@ export function MachineSetupBanner(): JSX.Element | null {
 }
 
 // A CNC that KerfDesk 1.0.29 may have made from a laser is asked about as soon
-// as it is restored (ADR-637 Amendment 8). Job Review's Start waits for the
-// same answer, so Not now only hides this card.
+// as it is restored (ADR-637 Amendment 8). Job Review's Start and both CNC
+// recoveries wait for the same answer (Amendment 10), so Not now only hides
+// this card.
 function useConvertedLaserBanner(): ConvertedLaserSuspicion | null {
   const device = useStore((state) => state.project.device);
   const machine = useStore((state) => state.project.machine);
@@ -122,7 +123,7 @@ function ConvertedLaserBanner(props: {
           This is a CNC router
         </Button>
         <Button
-          title="Hide this until KerfDesk next starts. Job Review asks again before Start."
+          title="Hide this until KerfDesk next starts. KerfDesk asks again before any job or recovery starts."
           onClick={props.onDismiss}
         >
           Not now
