@@ -7,8 +7,10 @@ import {
   hasGWord,
   leadingGWord,
   parseMotionWords,
+  resolveAAxis,
   resolveTarget,
   SIM_ZERO_VEC3,
+  type ParsedMotionWords,
   type SimVec3,
 } from './grbl-sim-gcode';
 import {
@@ -235,6 +237,7 @@ function reduceJogLine(state: GrblSimState, line: string, opts: GrblSimOptions):
     return { state, effects: [emit('error:8', opts)] };
   }
   const words = parseMotionWords(line.slice('$J='.length));
+  if (unsupportedAWord(state, words)) return { state, effects: [emit('error:20', opts)] };
   if (!words.hasMotion || words.feed === null) return { state, effects: [emit('error:22', opts)] };
   const isAbsolute = words.setsAbsolute ?? false;
   const target = resolveTarget(state.mpos, totalWco(state), words, isAbsolute);
@@ -245,6 +248,7 @@ function reduceJogLine(state: GrblSimState, line: string, opts: GrblSimOptions):
     ...state,
     machine: 'Jog',
     mpos: target,
+    ...movedAAxis(state, words, isAbsolute),
     feed: words.feed,
     pendingMotions: state.pendingMotions + 1,
   };
@@ -319,6 +323,7 @@ function reduceMotionOrModalLine(
 ): GrblSimReaction {
   const g = leadingGWord(line);
   const words = parseMotionWords(line);
+  if (unsupportedAWord(state, words)) return { state, effects: [emit('error:20', opts)] };
   const isAbsolute = words.setsAbsolute ?? state.isAbsolute;
   let next: GrblSimState = {
     ...state,
@@ -334,6 +339,7 @@ function reduceMotionOrModalLine(
     next = {
       ...next,
       mpos: resolveTarget(state.mpos, offset, words, isAbsolute),
+      ...movedAAxis(state, words, isAbsolute),
       machine: 'Run',
       pendingMotions: state.pendingMotions + 1,
     };
@@ -382,8 +388,12 @@ function applyG92(state: GrblSimState, line: string): GrblSimState {
   const words = parseMotionWords(line);
   const g54 = state.g54 ?? SIM_ZERO_VEC3;
   const prior = state.g92 ?? SIM_ZERO_VEC3;
+  const aAxis = state.aAxis;
   return {
     ...state,
+    ...(aAxis === undefined || words.a === null
+      ? {}
+      : { aAxis: { ...aAxis, g92: aAxis.mpos - words.a } }),
     g92: {
       x: words.x === null ? prior.x : state.mpos.x - g54.x - words.x,
       y: words.y === null ? prior.y : state.mpos.y - g54.y - words.y,
@@ -413,4 +423,18 @@ function applyG10(state: GrblSimState, line: string): GrblSimState {
       z: axis(state.mpos.z, g92.z, prior.z, words.z),
     },
   };
+}
+
+// GRBL's parser has no A word on a three-axis build: error:20, unsupported
+// command (gcode.c). A four-axis grblHAL build moves it (ADR-695).
+function unsupportedAWord(state: GrblSimState, words: ParsedMotionWords): boolean {
+  return words.a !== null && state.aAxis === undefined;
+}
+
+function movedAAxis(
+  state: GrblSimState,
+  words: ParsedMotionWords,
+  isAbsolute: boolean,
+): Pick<GrblSimState, 'aAxis'> | Record<string, never> {
+  return state.aAxis === undefined ? {} : { aAxis: resolveAAxis(state.aAxis, words.a, isAbsolute) };
 }

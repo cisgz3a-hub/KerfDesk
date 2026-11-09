@@ -1,5 +1,6 @@
 import type { StatusQueryCapability } from '../../core/controllers';
 import type { ControllerKind } from '../../core/devices';
+import { reportedControllerAxes } from '../state/rotary-axis-frame';
 import type { Project } from '../../core/scene';
 import { cameraPlacementGeometryIssue } from '../camera/camera-model-frame';
 import type { useCameraStore } from '../state/camera-store';
@@ -22,6 +23,8 @@ export function machineSnapshot(
   return {
     connected: laser.connection.kind === 'connected',
     statusReport: laser.statusReport,
+    // grblHAL's `$I` axes, when read this session (ADR-695).
+    reportedAxisLetters: reportedControllerAxes(laser).axisLetters ?? null,
     alarmCode: laser.alarmCode,
     hasActiveStreamer: isActiveJob(laser.streamer),
     cncJobsSupported: laser.capabilities.cncJobs,

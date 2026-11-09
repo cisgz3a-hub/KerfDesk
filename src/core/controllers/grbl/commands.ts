@@ -109,6 +109,9 @@ export type JogParams = {
   readonly dx?: number;
   readonly dy?: number;
   readonly dz?: number;
+  // Turn of a rotary on a dedicated A axis, in the axis's own units (degrees
+  // on grblHAL and FluidNC; ADR-695). Only GRBL-family builders write it.
+  readonly da?: number;
   // Feed rate in mm/min. GRBL requires F for jog commands.
   readonly feed: number;
   // When true, emits a relative-mode jog ($J=G91...). When false, absolute.
@@ -126,6 +129,7 @@ export function buildJogCommand(params: JogParams): string {
   assertFiniteOptionalAxis(params.dx, 'dx');
   assertFiniteOptionalAxis(params.dy, 'dy');
   assertFiniteOptionalAxis(params.dz, 'dz');
+  assertFiniteOptionalAxis(params.da, 'da');
   if (!Number.isFinite(params.feed)) {
     throw new Error('buildJogCommand: feed must be finite.');
   }
@@ -142,6 +146,7 @@ export function buildJogCommand(params: JogParams): string {
   if (includeAxis(params.dx)) parts.push(`X${formatMm(params.dx)}`);
   if (includeAxis(params.dy)) parts.push(`Y${formatMm(params.dy)}`);
   if (includeAxis(params.dz)) parts.push(`Z${formatMm(params.dz)}`);
+  if (includeAxis(params.da)) parts.push(`A${formatMm(params.da)}`);
   parts.push(`F${formatGcodeFeedMmPerMin(params.feed)}`);
   return `$J=${parts.join(' ')}`;
 }
@@ -199,7 +204,7 @@ function assertFiniteOptionalAxis(value: number | undefined, label: string): voi
  *  caller instead (audit F11). Shared by the Marlin/Smoothie builders, whose
  *  axis-less `G0 F…` would silently do nothing too. */
 export function assertJogHasAxis(params: JogParams): void {
-  const moves = [params.dx, params.dy, params.dz].some(
+  const moves = [params.dx, params.dy, params.dz, params.da].some(
     (value) => typeof value === 'number' && (params.relative === false || value !== 0),
   );
   if (!moves) throw new Error('buildJogCommand: at least one axis distance must be nonzero.');

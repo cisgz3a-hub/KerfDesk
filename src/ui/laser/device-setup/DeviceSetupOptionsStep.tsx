@@ -7,7 +7,8 @@ import { positioningLightSupported } from '../../../core/devices/positioning-lig
 import { scanOffsetMagnitudeLimitMm } from '../../../core/devices/scan-offset-profile';
 import { AutofocusEditor } from '../AutofocusEditor';
 import { ZRows } from '../DeviceProfileRows';
-import { NEW_ROTARY_SETUP } from '../rotary-setup-edit';
+import { newRotarySetupFor } from '../rotary-setup-edit';
+import { rotaryAxesForController } from '../../../core/devices/rotary-axis';
 import { SafetyZonesPanel } from '../MachineSetupSafetyZones';
 // Deep import: the devices barrel is at its public-export ratchet.
 import { machineKinematics } from '../../../core/devices/device-profile';
@@ -148,7 +149,8 @@ function LaserCalibrationSections(props: {
       </OptionSection>
       <OptionSection title="Rotary attachment" status={rotaryStatus(draft)}>
         <DeviceSetupRotaryFields
-          value={draft.rotary ?? NEW_ROTARY_SETUP}
+          value={draft.rotary ?? newRotarySetupFor(draft)}
+          axes={rotaryAxesForController(draft)}
           onChange={(rotary) => update({ rotary })}
         />
       </OptionSection>

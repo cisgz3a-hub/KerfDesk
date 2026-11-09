@@ -1,4 +1,5 @@
 import { rotaryYScale, toSceneCoords } from '../../core/devices';
+import { dedicatedRotaryAxisOf } from '../../core/devices/rotary-axis';
 import { machineSpaceJob, rotaryAppliesTo } from '../../core/job';
 import { computeFrameJobMotionBounds } from '../../core/job/job-bounds';
 import { buildFramePerimeter } from '../../core/job/frame-perimeter';
@@ -27,6 +28,8 @@ export function framePerimeterForCanvas(
       point,
       rotaryYScale(rotary),
       rotary.reverseAxis === true,
+      // ADR-695: a dedicated A or Z axis zeroes at the anchor, as machineSpaceJob does.
+      dedicatedRotaryAxisOf(rotary) !== null,
     );
     return toSceneCoords(
       {

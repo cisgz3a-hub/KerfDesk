@@ -9,6 +9,8 @@
 // designs against), so it deliberately does NOT call this.
 
 import { isRotaryActive, rotaryYLimitMm, rotaryYScale, type DeviceProfile } from '../devices';
+import { dedicatedRotaryAxisOf } from '../devices/rotary-axis';
+import type { DedicatedRotaryAxis } from '../devices/rotary';
 import type { MachineConfig } from '../scene';
 import type { Job } from './job';
 import type { JobOriginPlacement } from './job-origin';
@@ -54,7 +56,21 @@ export function machineSpaceJob(
   machine: MachineConfig | undefined,
 ): Job {
   if (!rotaryAppliesTo(device, machine) || device.rotary === undefined) return job;
-  return applyRotaryYScale(job, rotaryYScale(device.rotary), device.rotary.reverseAxis === true);
+  return applyRotaryYScale(
+    job,
+    rotaryYScale(device.rotary),
+    device.rotary.reverseAxis === true,
+    dedicatedRotaryAxisOf(device.rotary) !== null,
+  );
+}
+
+// The dedicated axis (A or Z) this project's rotary writes its turn to, or
+// null when the rotary is off, on Y, or the project is CNC (ADR-695).
+export function rotaryOutputAxis(
+  device: DeviceProfile,
+  machine: MachineConfig | undefined,
+): DedicatedRotaryAxis | null {
+  return rotaryAppliesTo(device, machine) ? dedicatedRotaryAxisOf(device.rotary) : null;
 }
 
 // Y wrap limit (one revolution) for bounds checks, or null when rotary is
