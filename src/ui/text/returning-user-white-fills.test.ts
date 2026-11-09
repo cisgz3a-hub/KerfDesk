@@ -133,14 +133,17 @@ describe('a logo saved by 1.0.29 with white shapes that burn', () => {
       `Opened ${NAME}.lf2`,
       'This project has 5 white shapes from an SVG import that burn over the darker fill under ' +
         'them, as KerfDesk 1.0.29 and earlier imported white. Its burn is unchanged. To leave ' +
-        'the white unburned, as a new import does, choose Tools > Leave Imported White ' +
-        'Unburned, or Leave white unburned in Job Review. One Undo burns the white again.',
+        'the white unburned, choose Tools > Leave Imported White Unburned, or Leave white ' +
+        'unburned in Job Review. One Undo burns the white again. A file saved before this ' +
+        'version does not record see-through, gradient or masked white, so check the canvas ' +
+        'afterwards.',
     ]);
     expect(burningWhiteReviewWarnings(project)).toEqual([
       'White in an imported logo burns: 5 white shapes from an SVG import burn over the darker ' +
-        'fill under them, as KerfDesk 1.0.29 and earlier imported white. A new import leaves ' +
-        'solid white unburned. Use Leave white unburned to do the same here; one Undo burns the ' +
-        'white again.',
+        'fill under them, as KerfDesk 1.0.29 and earlier imported white. Use Leave white ' +
+        'unburned to cut the white out; one Undo burns it again. A file saved before this ' +
+        'version does not record see-through, gradient or masked white, so check the canvas ' +
+        'afterwards.',
     ]);
   });
 

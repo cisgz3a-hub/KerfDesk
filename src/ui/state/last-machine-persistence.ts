@@ -4,6 +4,7 @@
 // way back in. Reads and writes fail soft: a quota, privacy or parse error only
 // means startup keeps the generic starter and the banner offers Machine Setup.
 
+import { scrubParsedCameraIdentities } from '../../core/camera/model/public-camera-identity';
 import type { DeviceProfile } from '../../core/devices';
 import { explicitMachineKindsForProfile } from '../../core/devices/device-profile';
 import type { MachineKind } from '../../core/scene';
@@ -63,7 +64,9 @@ export function loadLastMachineSelection(
   const result = deserializeMachineProfileDocument(raw, 'restore');
   if (result.kind !== 'ok') return null;
   const profile = result.document.profile;
-  const storedKind: unknown = (JSON.parse(raw) as Record<string, unknown>)['machineKind'];
+  const stored = JSON.parse(raw) as Record<string, unknown>;
+  keepPublicCameraIdentities(storage, stored);
+  const storedKind: unknown = stored['machineKind'];
   const kinds = explicitMachineKindsForProfile(profile);
   const machineKind =
     storedKind === 'laser' || storedKind === 'cnc'
@@ -72,4 +75,15 @@ export function loadLastMachineSelection(
         ? 'cnc'
         : 'laser';
   return { profile, machineKind };
+}
+
+// A machine an older version remembered with a camera login (ADR-692) is
+// remembered again without it; reading already left it out of `profile`.
+function keepPublicCameraIdentities(storage: StorageLike, stored: Record<string, unknown>): void {
+  if (!scrubParsedCameraIdentities(stored['profile'])) return;
+  try {
+    storage.setItem(LAST_MACHINE_STORAGE_KEY, JSON.stringify(stored));
+  } catch {
+    // Storage unavailable: the next start tries again.
+  }
 }

@@ -10,14 +10,48 @@ import type { FinishingPoint } from './relief-finishing-path';
 import { createMaskStock } from './relief-mask-stock';
 import { stockCheckedPath } from './relief-mask-stock-path';
 import { CNC_MASK_EMISSION_XY_CLEARANCE_MM } from '../cnc/precision';
+import { zPassArrayMaterializationError, zPassDepths } from '../cnc/depth-passes';
+import { withProjectionTabs, type ProjectionTabWindows } from './relief-projection-tabs';
 
 const MAX_PROJECTED_POINTS = 250_000;
+// Emitted projected vertices across every level, the same order of size the
+// 2D profile ladders reach; past it the operator raises Depth per pass.
+const MAX_PROJECTED_LEVEL_POINTS = 4_000_000;
+const Z_EPS = 1e-6;
+
+/** What the compiled projection really cut, for Job Review (W6-P2-1). */
+export type ReliefProjectionFacts = {
+  // Most step-down levels any vector was cut in.
+  readonly levels: number;
+  // Deepest emitted tip, positive mm below the stock top; 0 when nothing cut.
+  readonly deepestMm: number;
+  readonly closedShapes: number;
+  // Closed loops whose passes rise into at least one tab.
+  readonly tabbedShapes: number;
+  // Closed loops cut through the stock bottom all the way round: freed parts.
+  readonly freedShapes: number;
+};
+
+export type ReliefProjectionOptions = {
+  // The layer's Depth per pass: the projection steps down from the surface by
+  // it, as Vectric's projected profiles keep their pass depth. Absent or
+  // unusable: one pass at the full vertical depth.
+  readonly depthPerPassMm?: number;
+  readonly stockThicknessMm?: number;
+  // Profile layers with Tabs on: the windows, and the tab top for a loop
+  // whose deepest checked tip is `deepestZ`, or null when it needs no tab.
+  readonly tabs?: ProjectionTabWindows & {
+    readonly tabTopZ: (deepestZ: number) => number | null;
+  };
+};
+
 export type ReliefProjectionPlan =
   | {
       readonly kind: 'ok';
       readonly passes: ReadonlyArray<CncPass>;
       readonly effectiveSpacingMm: number;
       readonly liftedVertices: number;
+      readonly facts: ReliefProjectionFacts;
     }
   | { readonly kind: 'error'; readonly reason: string };
 
@@ -28,29 +62,11 @@ export function reliefProjectionPlan(
   tool: CncTool,
   depthMm: number,
   requestedSpacingMm: number,
+  options: ReliefProjectionOptions = {},
 ): ReliefProjectionPlan {
-  if (!validProjectionParameters(depthMm, requestedSpacingMm))
-    return {
-      kind: 'error',
-      reason: 'Relief projection depth and sample spacing must be positive finite millimetres.',
-    };
-  const spacingMm = Math.min(requestedSpacingMm, map.mmPerCell / 4, tool.diameterMm / 10);
-  const count = pointCount(polylines, spacingMm);
-  if (!Number.isFinite(count) || count > MAX_PROJECTED_POINTS)
-    return {
-      kind: 'error',
-      reason:
-        'Projected vectors exceed the bounded point budget at the requested surface resolution.',
-    };
-  const budgetError = reliefCutterBudgetError(tool, map.mmPerCell);
-  if (budgetError !== null) return { kind: 'error', reason: budgetError };
-  const kernel = kernelForTool(tool, map.mmPerCell);
-  if (count * (2 * kernel.surfaceCandidateSpanCells + 3) ** 2 > 32_000_000)
-    return {
-      kind: 'error',
-      reason:
-        'Projected cutter contact exceeds the bounded work budget at the requested surface resolution.',
-    };
+  const admitted = admitProjection(map, polylines, tool, depthMm, requestedSpacingMm, options);
+  if (admitted.kind === 'error') return admitted;
+  const { spacingMm, levelDepths, kernel } = admitted;
   const contact = createSurfaceContactField(map, kernel);
   const stock = createMaskStock(map, kernel, CNC_MASK_EMISSION_XY_CLEARANCE_MM);
   const tipAt = (x: number, y: number, lower: number): number => {
@@ -58,14 +74,11 @@ export function reliefProjectionPlan(
     return Math.max(lower, tip - depthMm, stock?.tipAt(x, y) ?? Number.NEGATIVE_INFINITY);
   };
   const passes: CncPass[] = [];
+  const facts = { levels: 0, deepestZ: 0, closedShapes: 0, tabbedShapes: 0, freedShapes: 0 };
   let liftedVertices = 0;
   for (const line of polylines) {
     const raw = sampledPath(line, spacingMm);
-    if (
-      raw.some(
-        (p) => p.x < -1e-8 || p.y < -1e-8 || p.x > map.widthMm + 1e-8 || p.y > map.heightMm + 1e-8,
-      )
-    )
+    if (raw.some((p) => outsideMap(map, p)))
       return {
         kind: 'error',
         reason:
@@ -80,14 +93,136 @@ export function reliefProjectionPlan(
     const checked = checkedPath(points, { tipAt, spacingMm });
     const safe = stock === null ? checked : stockCheckedPath(checked, stock);
     if (safe.length > 1)
-      passes.push({
-        kind: 'path3d',
-        points: safe,
-        closed: line.closed,
-        lateralFeed: 'z-rate-capped',
-      });
+      addLadder(
+        passes,
+        facts,
+        line.closed,
+        projectedLadder(safe, levelDepths, line.closed, options),
+      );
   }
-  return { kind: 'ok', passes, effectiveSpacingMm: spacingMm, liftedVertices };
+  const { deepestZ, ...counts } = facts;
+  return {
+    kind: 'ok',
+    passes,
+    effectiveSpacingMm: spacingMm,
+    liftedVertices,
+    facts: { ...counts, deepestMm: Math.max(0, -deepestZ) },
+  };
+}
+
+// The facts as the loop gathers them, with the deepest tip still a Z.
+type MutableFacts = {
+  levels: number;
+  deepestZ: number;
+  closedShapes: number;
+  tabbedShapes: number;
+  freedShapes: number;
+};
+
+function addLadder(
+  passes: CncPass[],
+  facts: MutableFacts,
+  closed: boolean,
+  ladder: ReturnType<typeof projectedLadder>,
+): void {
+  for (const level of ladder.levels)
+    passes.push({ kind: 'path3d', points: level, closed, lateralFeed: 'z-rate-capped' });
+  facts.levels = Math.max(facts.levels, ladder.levels.length);
+  facts.deepestZ = Math.min(facts.deepestZ, ladder.deepestZ);
+  if (!closed) return;
+  facts.closedShapes += 1;
+  if (ladder.tabs > 0) facts.tabbedShapes += 1;
+  if (ladder.freed) facts.freedShapes += 1;
+}
+
+// The parameter, point and work budgets, checked before any contact is solved.
+function admitProjection(
+  map: Heightmap,
+  polylines: ReadonlyArray<Polyline>,
+  tool: CncTool,
+  depthMm: number,
+  requestedSpacingMm: number,
+  options: ReliefProjectionOptions,
+):
+  | {
+      readonly kind: 'ok';
+      readonly spacingMm: number;
+      readonly levelDepths: ReadonlyArray<number>;
+      readonly kernel: ReturnType<typeof kernelForTool>;
+    }
+  | { readonly kind: 'error'; readonly reason: string } {
+  const error = (reason: string) => ({ kind: 'error', reason }) as const;
+  if (!validProjectionParameters(depthMm, requestedSpacingMm))
+    return error('Relief projection depth and sample spacing must be positive finite millimetres.');
+  const stepMm = options.depthPerPassMm ?? depthMm;
+  const ladderError = zPassArrayMaterializationError(depthMm, stepMm);
+  if (ladderError !== null) return error(ladderError);
+  // Depths below the surface, shallow to deep; the last is the vertical depth.
+  const levelDepths = zPassDepths(depthMm, stepMm).map((z) => -z);
+  const spacingMm = Math.min(requestedSpacingMm, map.mmPerCell / 4, tool.diameterMm / 10);
+  const count = pointCount(polylines, spacingMm);
+  if (!Number.isFinite(count) || count > MAX_PROJECTED_POINTS)
+    return error(
+      'Projected vectors exceed the bounded point budget at the requested surface resolution.',
+    );
+  if (count * levelDepths.length > MAX_PROJECTED_LEVEL_POINTS)
+    return error(
+      'Projected step-down levels exceed the bounded point budget. Raise Depth per pass or shorten the projected vectors.',
+    );
+  const budgetError = reliefCutterBudgetError(tool, map.mmPerCell);
+  if (budgetError !== null) return error(budgetError);
+  const kernel = kernelForTool(tool, map.mmPerCell);
+  if (count * (2 * kernel.surfaceCandidateSpanCells + 3) ** 2 > 32_000_000)
+    return error(
+      'Projected cutter contact exceeds the bounded work budget at the requested surface resolution.',
+    );
+  return { kind: 'ok', spacingMm, levelDepths, kernel };
+}
+
+function outsideMap(map: Heightmap, p: { readonly x: number; readonly y: number }): boolean {
+  return p.x < -1e-8 || p.y < -1e-8 || p.x > map.widthMm + 1e-8 || p.y > map.heightMm + 1e-8;
+}
+
+// The step-down ladder of one checked projected path (W6-P2-1). The deepest
+// level is the checked path itself. Each shallower level is the same path
+// lifted by the depth it does not yet take: the path clears the cutter contact
+// offset by the full vertical depth, so lifted it clears the contact offset by
+// the level's own depth, and lifting never meets excluded stock. A closed loop
+// that reaches the tab top takes the same tabs on every level.
+function projectedLadder(
+  safe: ReadonlyArray<FinishingPoint>,
+  levelDepths: ReadonlyArray<number>,
+  closed: boolean,
+  options: ReliefProjectionOptions,
+): {
+  readonly levels: ReadonlyArray<ReadonlyArray<FinishingPoint>>;
+  readonly tabs: number;
+  readonly freed: boolean;
+  readonly deepestZ: number;
+} {
+  const finalDepth = levelDepths[levelDepths.length - 1] ?? 0;
+  const deepestZ = extremeZ(safe, 'min');
+  const tabTopZ = closed && options.tabs !== undefined ? options.tabs.tabTopZ(deepestZ) : null;
+  let tabs = 0;
+  const levels = levelDepths.map((depth) => {
+    const lift = finalDepth - depth;
+    const lifted = lift > 0 ? safe.map((p) => ({ ...p, z: p.z + lift })) : safe;
+    if (tabTopZ === null || options.tabs === undefined) return lifted;
+    const tabbed = withProjectionTabs(lifted, tabTopZ, options.tabs);
+    if (depth === finalDepth) tabs = tabbed.tabs;
+    return tabbed.points;
+  });
+  const last = levels[levels.length - 1] ?? [];
+  const stockMm = options.stockThicknessMm;
+  const freed =
+    closed && stockMm !== undefined && last.length > 0 && extremeZ(last, 'max') <= -stockMm + Z_EPS;
+  return { levels, tabs, freed, deepestZ };
+}
+
+function extremeZ(points: ReadonlyArray<FinishingPoint>, which: 'min' | 'max'): number {
+  let out = which === 'min' ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY;
+  for (const p of points) out = which === 'min' ? Math.min(out, p.z) : Math.max(out, p.z);
+  return out;
 }
 
 function validProjectionParameters(depthMm: number, spacingMm: number): boolean {

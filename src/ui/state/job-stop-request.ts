@@ -17,6 +17,9 @@ export type JobStopRequest = {
    * clear it at that reset, so the Alarm 3 card offers it back (ADR-341
    * Amendment 11). Absent when no G92 origin was set. */
   readonly originAtStopMm?: { readonly x: number; readonly y: number };
+  /** The store's machineZeroEpoch when originAtStopMm was read: a later one
+   *  means machine zero may have moved since (ADR-341 Amendment 13). */
+  readonly originMachineZeroEpoch?: number;
 };
 
 /** A soft reset KerfDesk sent against the stream of `streamerEpoch` (Abort,

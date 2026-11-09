@@ -112,6 +112,7 @@ function inspectionContextOf(source: GcodeInspectionSource): GcodeInspectionCont
     ...(source.timing === undefined ? {} : { timing: source.timing }),
     ...(source.workArea === undefined ? {} : { workArea: source.workArea }),
     ...(source.design === undefined ? {} : { design: source.design }),
+    ...(source.runReview === undefined ? {} : { runReview: source.runReview }),
   };
 }
 

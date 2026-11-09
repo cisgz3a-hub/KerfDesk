@@ -159,3 +159,12 @@ export function routerLaserModeMessage(source: ReadinessSettingsSource): string 
     ? FLUIDNC_CNC_LASER_MODE_ENABLED_MESSAGE
     : CNC_LASER_MODE_ENABLED_MESSAGE;
 }
+
+// ADR-180 Amendment 8 (rolling audit v11 W2-P2-1): KerfDesk never lifts the
+// bit on FluidNC, and FluidNC's door resume waits only the spindle's YAML
+// spinup_ms (Spindle.cpp spindleDelay, "@default 0") before the paused line
+// goes on. The paused-job panel says so, but a job started and paused from a
+// phone never shows that panel, so Start says it once for every route.
+// Settings: http://wiki.fluidnc.com/en/config/config_spindles (spinup_ms).
+export const FLUIDNC_RESUME_SPINUP_MESSAGE =
+  "FluidNC: if this job is paused, KerfDesk does not lift the bit, and Resume waits only the spindle's spinup_ms from the FluidNC config (0 unless set) before the cut goes on, so the bit is fed through the cut while it is still speeding up. Set spinup_ms in the spindle's section of the FluidNC config to its time to full speed, or after a pause use ABORT JOB and recover from the Interrupted job card instead of Resume.";

@@ -67,12 +67,12 @@ export const mcpMachineToolInfo = {
   pause_job: {
     title: 'Pause the running job',
     description:
-      'Pause the running job through the ordinary desktop pause with its controller confirmation. Requires machine-control approval and UUID requestId; no workspace revision is needed. Poll machine status for paused.',
+      'Pause the running job through the ordinary desktop pause with its controller confirmation. Requires machine-control approval and UUID requestId; no workspace revision is needed. Poll machine status for paused. On a CNC job the receipt and job.resumeAdvisory say what Resume will do from there; relay them to the user.',
   },
   resume_job: {
     title: 'Resume the paused job',
     description:
-      'Resume the paused job through the ordinary desktop resume. Only after the user explicitly asks; the machine moves and the tool may turn on. Requires machine-control approval and UUID requestId.',
+      'Resume the paused job through the ordinary desktop resume. Only after the user explicitly asks; the machine moves and the tool may turn on. Requires machine-control approval and UUID requestId. When get_machine_status has job.resumeAdvisory, show its message to the user word for word before resuming. If it has a confirmation (a paused CNC job whose Resume can feed a stopped or still-accelerating bit through the cut; the PC recommends abort_job), resume only if the user confirms after reading it, passing confirmAdvisory = job.resumeAdvisory.confirmation; without it Resume is refused with the warning.',
   },
   jog_hold_start: {
     title: 'Start a held jog',

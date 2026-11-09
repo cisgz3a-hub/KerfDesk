@@ -13,7 +13,9 @@
 // follows GRBL 1.1: Door:2 while decelerating, Door:0 parked, and after `~`
 // Door:3 while restoring, then Run. Laser mode skips the spindle restore delay.
 // Every realtime command but `?` is logged with its time in `realtime`; a
-// door opened again while restoring decelerates again.
+// door opened again while restoring decelerates again. `watchLine(source)`
+// stamps the first written line that matches a pattern from then on (the
+// first beam-on line of a stream, for example), read back by `watchedLine()`.
 (function installPacedGrblSerial() {
   const config = Object.assign(
     {
@@ -46,6 +48,8 @@
   // null, or { phase: 'decel' | 'parked' | 'restoring', until }.
   let door = null;
   const realtime = [];
+  // null, or { pattern, at, line } once watchLine is called.
+  let lineWatch = null;
 
   // Replies leave in USB-sized batches a couple of milliseconds after the
   // write that caused them, never synchronously inside it.
@@ -164,6 +168,10 @@
         logRealtime(code);
       } else if (character === '\n') {
         stats.written += 1;
+        if (lineWatch !== null && lineWatch.at === null && lineWatch.pattern.test(partial)) {
+          lineWatch.at = performance.now();
+          lineWatch.line = partial;
+        }
         rxQueue.push(partial);
         partial = '';
       } else if (character !== '\r') {
@@ -208,5 +216,17 @@
   });
   setInterval(tick, config.tickMs);
   setTimeout(tick, 0);
-  window.__PACED_GRBL__ = { stats, config, emit, realtime, status: () => status(), state };
+  function watchLine(source) {
+    lineWatch = { pattern: new RegExp(source), at: null, line: null };
+  }
+  window.__PACED_GRBL__ = {
+    stats,
+    config,
+    emit,
+    realtime,
+    status: () => status(),
+    state,
+    watchLine,
+    watchedLine: () => lineWatch,
+  };
 })();

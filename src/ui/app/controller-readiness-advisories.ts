@@ -47,9 +47,10 @@ export function controllerReadinessAdvisories(
     settingsCapability,
     firmwareKind,
   );
-  return [...readiness.errors, ...readiness.warnings].map(
-    (issue) => `${EXPORT_ADVISORY_PREFIX}: ${issue.message}`,
-  );
+  // Resume's spin-up is a fact about running the job, not about the file.
+  return [...readiness.errors, ...readiness.warnings]
+    .filter((issue) => issue.code !== 'fluidnc-resume-spinup')
+    .map((issue) => `${EXPORT_ADVISORY_PREFIX}: ${issue.message}`);
 }
 
 /** The firmware the banner named, else the driver in use (as Start reads it). */

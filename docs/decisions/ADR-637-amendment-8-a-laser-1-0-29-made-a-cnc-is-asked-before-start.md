@@ -41,6 +41,11 @@ output, and KerfDesk's CNC defaults (12000 RPM, 3 s spin-up, coolant off).
    - The controller, once read this session, does not report a spindle's `$30`. A `$30` above
      1000 is an RPM someone configured, so that machine is not asked.
    - Nobody has answered "This is a CNC router" yet.
+   - **Amended by Amendment 10 (2026-11-09).** The spindle and `$30` conditions above let a laser
+     whose owner followed 1.0.29's own `$30` advice go unasked, and the starter-only id missed
+     LightBurn imports and profiles with no id (rolling audit v12 X2-P1-2). Amendment 10 asks any
+     CNC-only profile 1.0.29 could have converted and ends the question only on an answer. CNC
+     recoveries ask it too (X2-P2-1).
 
    The other controller hints agree with a laser but do not tell one from a stock router: a
    reported `$32` (only GRBL 1.1 and its descendants have laser mode), `$30` at 1000 or under

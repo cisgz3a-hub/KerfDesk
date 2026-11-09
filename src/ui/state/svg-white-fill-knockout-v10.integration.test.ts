@@ -11,11 +11,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   burnInside,
   burnLength,
+  importAsOlderBuild,
   importSvg,
   whiteOutlines,
 } from '../../__fixtures__/white-fill-burn';
 import { countBurningImportedWhites } from '../../core/geometry/burning-imported-white';
-import type { Project, SceneObject } from '../../core/scene';
+import type { Project } from '../../core/scene';
 import { deserializeProject } from '../../io/project/deserialize-project';
 import { prepareProjectForPersistence } from '../../io/project/prepare-project-persistence';
 import { parseSvg } from '../../io/svg/parse-svg';
@@ -73,24 +74,6 @@ function reimport(svgText: string, source = 'logo.svg') {
     .getState()
     .reimportSvgFragment(target.id, { source, bounds: parsed.fragment.bounds, objects });
   return { parsed, outcome };
-}
-
-/** What 1.0.29 saved: the import as parsed, white on its own operation, no marks. */
-function importAsOlderBuild(svgText: string): Project {
-  importSvg(svgText);
-  useStore.getState().undo();
-  const project = useStore.getState().project;
-  const objects = project.scene.objects.map((object: SceneObject) =>
-    'paths' in object
-      ? {
-          ...object,
-          paths: object.paths.map(({ whiteInk: _mark, ...path }) => path),
-        }
-      : object,
-  ) as SceneObject[];
-  const older = { ...project, scene: { ...project.scene, objects } };
-  useStore.setState({ project: older, undoStack: [], redoStack: [] });
-  return older;
 }
 
 beforeEach(resetStore);
@@ -308,8 +291,9 @@ describe('V2-P2-1: a logo saved before the knock-out', () => {
     expect(toasts).toContain(
       'This project has 1 white shape from an SVG import that burns over the darker fill under ' +
         'it, as KerfDesk 1.0.29 and earlier imported white. Its burn is unchanged. To leave the ' +
-        'white unburned, as a new import does, choose Tools > Leave Imported White Unburned, or ' +
-        'Leave white unburned in Job Review. One Undo burns the white again.',
+        'white unburned, choose Tools > Leave Imported White Unburned, or Leave white unburned in ' +
+        'Job Review. One Undo burns the white again. A file saved before this version does not ' +
+        'record see-through, gradient or masked white, so check the canvas afterwards.',
     );
     const [row] = burningWhiteReviewWarnings(project);
     expect(row).toMatch(/^White in an imported logo burns: 1 white shape/);

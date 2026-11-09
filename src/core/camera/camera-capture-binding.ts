@@ -1,8 +1,10 @@
+import { publicCameraAddress } from './camera-address-login';
+
 export type CameraCaptureBinding = {
   readonly version: 1;
   readonly sourceKind: 'usb' | 'machine-jpeg' | 'machine-rtsp';
-  // Stable, non-secret source identity. URLs must be stripped of userinfo,
-  // query, and fragment before they reach this persisted core type.
+  // Stable, non-secret source identity. Network addresses are only ever held
+  // in their public form (ADR-692), also when an older file is read.
   readonly sourceId: string;
   // App-keyed network resource identity, including an explicitly empty query.
   // Absent for USB, ambiguous legacy bindings, or unavailable secure identity.
@@ -41,7 +43,7 @@ export function normalizeCameraCaptureBinding(value: unknown): CameraCaptureBind
   return {
     version: 1,
     sourceKind,
-    sourceId,
+    sourceId: persistedSourceId(sourceKind, sourceId),
     width,
     height,
     resizeMode,
@@ -68,22 +70,14 @@ export function cameraBindingCompatibility(
   return 'match';
 }
 
+/** A network camera's address as it may be saved: no login anywhere in it. */
 export function cameraSourceIdWithoutCredentials(raw: string): string {
-  try {
-    const url = new URL(raw.trim());
-    url.username = '';
-    url.password = '';
-    url.search = '';
-    url.hash = '';
-    return url.toString();
-  } catch {
-    return (
-      raw
-        .trim()
-        .replace(/\/\/[^/@]+@/, '//')
-        .split(/[?#]/, 1)[0] ?? 'camera'
-    );
-  }
+  return publicCameraAddress(raw);
+}
+
+// Older versions could save more than the public form; reading drops it.
+function persistedSourceId(kind: CameraCaptureBinding['sourceKind'], sourceId: string): string {
+  return kind === 'usb' ? sourceId : cameraSourceIdWithoutCredentials(sourceId);
 }
 
 function captureGeometryMatches(a: CameraCaptureBinding, b: CameraCaptureBinding): boolean {

@@ -129,7 +129,9 @@ function finishPasses(
     (group) => group.kind === 'cnc' && group.cutType === 'relief-finish',
   );
   if (finish?.kind !== 'cnc') throw new Error('finish group missing');
-  return finish.passes;
+  // The strategy's own passes: the step-down levels cut first where roughing
+  // did not reach (ADR-421 Amendment 2) are another subject.
+  return finish.passes.filter((pass) => pass.kind !== 'path3d' || pass.reliefStepDown !== true);
 }
 
 // The boss's waterline stays within its 2 mm half-width plus the ball's radius

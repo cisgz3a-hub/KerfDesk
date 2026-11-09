@@ -4,6 +4,7 @@ import { withSupportRoutes } from './support-routes.js';
 import type { ProtocolHandler } from './licensing-routes.js';
 import { withDesktopAi } from './desktop-ai.js';
 import { withDesktopArtcraft } from './desktop-artcraft.js';
+import { withDesktopCameraAddress } from './desktop-camera-address.js';
 import { withMachineNetworkRoutes } from './machine-network-routes.js';
 
 /** Keep existing window/activity/support guards in their original outer order. */
@@ -15,7 +16,10 @@ export function withDesktopWorkspaceRoutes(
   const routes =
     userDataPath === undefined
       ? fallback
-      : withDesktopArtcraft(withDesktopAi(fallback, userDataPath), userDataPath);
+      : withDesktopCameraAddress(
+          withDesktopArtcraft(withDesktopAi(fallback, userDataPath), userDataPath),
+          userDataPath,
+        );
   return withDesktopWindowCommands(
     withDesktopActivityRoute(withSupportRoutes(withMachineNetworkRoutes(routes), supportLog)),
   );

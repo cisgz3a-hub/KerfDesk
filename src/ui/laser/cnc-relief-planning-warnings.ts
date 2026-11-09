@@ -4,6 +4,7 @@
 
 import type { Job } from '../../core/job';
 import { reliefProjectionOrderWarnings } from './cnc-relief-projection-order-warnings';
+import { reliefRoughingReachWarnings } from './cnc-relief-roughing-reach-warnings';
 import { DEFAULT_RELIEF_SCALLOP_MM, MAX_HEIGHTMAP_CELLS } from '../../core/relief';
 // Deep imports: core/relief's barrel is a ratcheted over-cap legacy barrel.
 import { reliefScallopBallRadiusMm } from '../../core/relief/relief-finishing';
@@ -46,6 +47,7 @@ export function detectCncReliefPlanningWarnings(
       stepoverOperations(project, compiled, sourceGeometryChecks),
     ),
     ...compiledReliefPlanningWarnings(project, compiled?.reliefPlans ?? []),
+    ...reliefRoughingReachWarnings(project, compiled?.reliefPlans ?? []),
     ...reliefProjectionOrderWarnings(project, compiledJob),
     ...sourceReliefPlanningWarnings(project, compiled, sourceGeometryChecks),
     ...(sourceGeometryChecks === 'full'

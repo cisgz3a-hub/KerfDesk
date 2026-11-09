@@ -1,4 +1,9 @@
 import { createGcodeRenderModelBuilder } from '../../core/gcode-view/gcode-render-model-builder';
+import {
+  findLitRapids,
+  reviewExternalProgram,
+  type ExternalProgramContext,
+} from '../../core/external-program';
 import { createMarlinProgramReader } from '../../core/external-program/marlin-program-reader';
 import { createSegmentBuilder } from '../../core/gcode-view/segment-builder';
 import type {
@@ -17,6 +22,7 @@ import {
   type GcodeSourceLineIndex,
 } from './gcode-source-line-index';
 import {
+  hasGcodeInspectorAnalysis,
   INSPECTOR_RENDER_PRESSURE_THRESHOLD,
   type GcodeInspectorWorkerResult,
 } from './gcode-inspector-worker-protocol';
@@ -44,7 +50,25 @@ export function inspectGcodeText(
     consumed += line.length + 1;
     reader.line(line, fraction);
   });
-  return reader.finish(sourceIndex);
+  return withRunReview(reader.finish(sourceIndex), text, context.runReview);
+}
+
+// The Run dialog's review reads the whole program several times (1–1.5 s per
+// 500k lines). It runs here, once, beside the parse it reads, so the dialog
+// only displays it (ADR-630 Amendment 9, rolling audit v11 W7-P2-1).
+function withRunReview(
+  result: GcodeInspectorWorkerResult,
+  text: string,
+  context: ExternalProgramContext | undefined,
+): GcodeInspectorWorkerResult {
+  if (context === undefined || !hasGcodeInspectorAnalysis(result)) return result;
+  const review = reviewExternalProgram(
+    text,
+    result.parsed.model,
+    context,
+    result.analysis.findings,
+  );
+  return { ...result, runReview: { review, litRapids: findLitRapids(text) } };
 }
 
 export async function inspectGcodeSource(

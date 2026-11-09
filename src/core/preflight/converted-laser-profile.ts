@@ -1,22 +1,24 @@
 // A CNC machine that may be a laser KerfDesk 1.0.29 set up as a CNC (rolling
 // audit v10 V2-P2-2, ADR-637 Amendment 8). On its first Connect to a stock
-// GRBL with laser mode off ($32=0), 1.0.29's fill turned the generic laser
-// starter into a CNC, and Save kept it. Amendment 7 stopped that for new
-// Connects only, so those machines still restore as CNCs, and a CNC Start
-// sends `M3 S12000`, a 3 s dwell and rapids with no `S0`: on a diode, full
-// power held still, then lit travel.
+// GRBL with laser mode off ($32=0), 1.0.29's fill turned any unlisted laser
+// (the generic starter, a LightBurn import, a profile with no id) into a CNC,
+// and Save kept it. Amendment 7 stopped that for new Connects only, so those
+// machines still restore as CNCs, and a CNC Start sends `M3 S<max>`, a dwell
+// and rapids with no `S0`: on a diode, full power held still, then lit travel.
 //
 // Nothing in the saved machine proves which it is: a router owner who chose
-// CNC on the starter has the same document. So this only says whether to ask.
-// Pure: no storage and no React. The operator's answer is kept by the UI.
+// CNC on the starter has the same document. So this only says whether to ask,
+// and only the operator's answer ends the question (Amendment 10): spindle
+// edits and a spindle-scale `$30` are what 1.0.29's own advice told a laser
+// owner to make, so they are not answers. Pure: no storage and no React. The
+// operator's answer is kept by the UI.
 
 import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from '../devices';
 import { explicitMachineKindsForProfile } from '../devices/device-profile';
-import { DEFAULT_CNC_MACHINE_PARAMS, type CncMachineParams, type MachineConfig } from '../scene';
+import type { MachineConfig } from '../scene';
 
 /** The largest `$30` a laser's power scale uses. GRBL's own default is 1000,
- *  and laser kits ship 1000 or 255. A larger `$30` is a spindle's RPM, set by
- *  someone who configured a router. */
+ *  and laser kits ship 1000 or 255. A larger `$30` is a spindle's RPM scale. */
 export const LASER_POWER_SCALE_CEILING = 1000;
 
 /** What the connected controller reported, when it was read this session. */
@@ -41,12 +43,11 @@ export type ConvertedLaserSuspicion = {
 };
 
 /**
- * Whether to ask if this CNC machine is really a laser. All three must hold:
- * - it is a CNC made from KerfDesk's laser starter (its profile id, and CNC as
- *   its only output), as 1.0.29's fill left it;
- * - nobody set its spindle: max RPM, spin-up and coolant are KerfDesk's
- *   defaults;
- * - the controller, if read, does not report a spindle's `$30`.
+ * Whether to ask if this CNC machine is really a laser: it is a CNC whose
+ * profile 1.0.29's fill could have made from a laser. That is CNC as its only
+ * declared output on a profile that is not a listed machine: KerfDesk's laser
+ * starter, a LightBurn device import, or a profile with no id. Its spindle
+ * values and the controller's `$30` do not end the question (Amendment 10).
  * Returns null when there is nothing to ask.
  */
 export function convertedLaserSuspicion(input: {
@@ -54,32 +55,29 @@ export function convertedLaserSuspicion(input: {
   readonly machine: MachineConfig | undefined;
   readonly controller?: ConvertedLaserControllerReport | null;
 }): ConvertedLaserSuspicion | null {
-  const { machine } = input;
-  if (machine?.kind !== 'cnc') return null;
-  if (!madeFromLaserStarter(input.profile)) return null;
-  if (!spindleUntouched(machine.params)) return null;
-  const controller = input.controller ?? null;
-  if (controller?.maxPowerS !== undefined && controller.maxPowerS > LASER_POWER_SCALE_CEILING) {
-    return null;
-  }
-  return { hints: controllerHints(controller) };
+  if (input.machine?.kind !== 'cnc') return null;
+  if (!cncOnlyProfile(input.profile) || !laserBefore1029Fill(input.profile)) return null;
+  return { hints: controllerHints(input.controller ?? null) };
 }
 
 // 1.0.29's Save gave it CNC as its only output. The plain starter declares no
 // output kind, so a CNC on it is the toolbar's Laser/CNC switch, not the fill;
-// a starter that declares a laser head as well is its owner's two-tool machine.
-function madeFromLaserStarter(profile: DeviceProfile): boolean {
-  if (profile.profileId !== DEFAULT_DEVICE_PROFILE.profileId) return false;
+// a profile that declares a laser head as well is its owner's two-tool machine.
+function cncOnlyProfile(profile: DeviceProfile): boolean {
   const kinds = explicitMachineKindsForProfile(profile);
   return kinds.length === 1 && kinds[0] === 'cnc';
 }
 
-function spindleUntouched(params: CncMachineParams): boolean {
+// The profiles 1.0.29's fill converted at `$32=0`: any unlisted laser draft
+// (df2279e26 device-setup-auto-fill.ts machineKindFromLaserMode). A listed
+// machine kept its type, so a catalog router or laser is not asked.
+function laserBefore1029Fill(profile: DeviceProfile): boolean {
+  const id = profile.profileId;
   return (
-    params.spindleMaxRpm === DEFAULT_CNC_MACHINE_PARAMS.spindleMaxRpm &&
-    params.spindleSpinupSec === DEFAULT_CNC_MACHINE_PARAMS.spindleSpinupSec &&
-    // An absent coolant is off (machine.ts), as the default is.
-    (params.coolant ?? 'off') === (DEFAULT_CNC_MACHINE_PARAMS.coolant ?? 'off')
+    id === undefined ||
+    id === DEFAULT_DEVICE_PROFILE.profileId ||
+    id.startsWith('lightburn-') ||
+    profile.profileSource === 'lightburn'
   );
 }
 
@@ -91,8 +89,9 @@ function controllerHints(
   if (controller.laserModeEnabled !== undefined) {
     hints.push({ kind: 'laser-mode', enabled: controller.laserModeEnabled });
   }
-  if (controller.maxPowerS !== undefined && controller.maxPowerS > 0) {
-    hints.push({ kind: 'laser-power-scale', maxPowerS: controller.maxPowerS });
+  const scale = controller.maxPowerS;
+  if (scale !== undefined && scale > 0 && scale <= LASER_POWER_SCALE_CEILING) {
+    hints.push({ kind: 'laser-power-scale', maxPowerS: scale });
   }
   if (controller.protocolVersion?.startsWith('1.1') === true) {
     hints.push({ kind: 'grbl-1-1', protocolVersion: controller.protocolVersion });

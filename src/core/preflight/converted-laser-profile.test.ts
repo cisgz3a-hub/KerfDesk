@@ -21,7 +21,7 @@ function cncWith(params: Partial<CncMachineConfig['params']>): CncMachineConfig 
   };
 }
 
-describe('convertedLaserSuspicion (ADR-637 Amendment 8)', () => {
+describe('convertedLaserSuspicion (ADR-637 Amendments 8 and 10)', () => {
   it("asks about the laser starter 1.0.29 saved as a CNC, naming the controller's laser hints", () => {
     expect(
       convertedLaserSuspicion({
@@ -62,21 +62,50 @@ describe('convertedLaserSuspicion (ADR-637 Amendment 8)', () => {
     expect(convertedLaserSuspicion({ profile: STARTER_MADE_CNC, machine: undefined })).toBeNull();
   });
 
+  // 1.0.29's own `$30` advisory said "Set $30=12000 (or update the machine
+  // profile)", and its setup offered the S maximum as the spindle RPM: those
+  // edits are not an answer (rolling audit v12 X2-P1-2).
   it.each([
-    ['max RPM', { spindleMaxRpm: 24000 }],
-    ['spin-up', { spindleSpinupSec: 5 }],
+    ['max RPM set to the S scale', { spindleMaxRpm: 1000 }],
+    ['max RPM raised', { spindleMaxRpm: 24000 }],
+    ['no spin-up', { spindleSpinupSec: 0 }],
     ['coolant', { coolant: 'mist' as const }],
-  ])('does not ask once someone set the spindle (%s)', (_name, params) => {
+  ])('still asks after the spindle was edited (%s)', (_name, params) => {
     expect(
       convertedLaserSuspicion({
         profile: STARTER_MADE_CNC,
         machine: cncWith(params),
         controller: STOCK_GRBL_DIODE,
       }),
-    ).toBeNull();
+    ).not.toBeNull();
   });
 
-  it("does not ask about another machine, a two-tool starter, or the toolbar's CNC on the plain starter", () => {
+  it('still asks when the controller $30 was written to a spindle scale, naming no laser scale', () => {
+    expect(
+      convertedLaserSuspicion({
+        profile: STARTER_MADE_CNC,
+        machine: DEFAULT_CNC_MACHINE_CONFIG,
+        controller: { laserModeEnabled: false, maxPowerS: 12000 },
+      }),
+    ).toEqual({ hints: [{ kind: 'laser-mode', enabled: false }] });
+  });
+
+  it('asks about the other lasers 1.0.29 converted: a LightBurn import and a profile with no id', () => {
+    const lightburn: DeviceProfile = {
+      ...STARTER_MADE_CNC,
+      name: 'Shop diode 10W',
+      profileId: 'lightburn-shop-diode-10w',
+      profileSource: 'lightburn',
+    };
+    const { profileId: _id, ...noId } = STARTER_MADE_CNC;
+    for (const profile of [lightburn, noId]) {
+      expect(convertedLaserSuspicion({ profile, machine: DEFAULT_CNC_MACHINE_CONFIG })).toEqual({
+        hints: [],
+      });
+    }
+  });
+
+  it("does not ask about a listed machine, a two-tool profile, or the toolbar's CNC on the plain starter", () => {
     const listed = { ...STARTER_MADE_CNC, profileId: 'generic-3018-router' };
     const twoTools: DeviceProfile = {
       ...STARTER_MADE_CNC,
@@ -86,18 +115,5 @@ describe('convertedLaserSuspicion (ADR-637 Amendment 8)', () => {
     for (const profile of [listed, twoTools, DEFAULT_DEVICE_PROFILE]) {
       expect(convertedLaserSuspicion({ profile, machine: DEFAULT_CNC_MACHINE_CONFIG })).toBeNull();
     }
-  });
-
-  it("does not ask when the controller's $30 is a spindle's RPM, and does at a laser scale", () => {
-    const ask = (maxPowerS: number) =>
-      convertedLaserSuspicion({
-        profile: STARTER_MADE_CNC,
-        machine: DEFAULT_CNC_MACHINE_CONFIG,
-        controller: { laserModeEnabled: false, maxPowerS },
-      });
-    expect(ask(12000)).toBeNull();
-    expect(ask(1001)).toBeNull();
-    expect(ask(1000)).not.toBeNull();
-    expect(ask(255)).not.toBeNull();
   });
 });

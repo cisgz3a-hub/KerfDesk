@@ -51,6 +51,7 @@ const review = z.object({
 });
 
 const axis = z.enum(['x', 'y', 'z']);
+const advisoryCode = z.string().regex(/^[0-9a-f]{8}$/);
 const direction = z.union([z.literal(-1), z.literal(1)]);
 
 /** Bounded machine commands; no arbitrary console, G-code, laser firing or file exchange. */
@@ -78,7 +79,8 @@ export const mcpMachineInputSchemas = {
   capture_board_point: z.strictObject(admission),
   finish_board: z.strictObject(admission),
   pause_job: z.strictObject({ requestId: z.uuid() }),
-  resume_job: z.strictObject({ requestId: z.uuid() }),
+  // ADR-585 Amendment 2: echoes get_machine_status job.resumeAdvisory.confirmation.
+  resume_job: z.strictObject({ requestId: z.uuid(), confirmAdvisory: advisoryCode.optional() }),
   jog_hold_start: z.strictObject({
     ...admission,
     axis,
@@ -171,6 +173,7 @@ export const mcpMachineOutputSchemas = {
       progressPercent: z.number().min(0).max(100).optional(),
       elapsedSeconds: z.number().nonnegative().max(31_536_000).optional(),
       remainingSeconds: z.number().nonnegative().max(31_536_000).optional(),
+      resumeAdvisory: z.object({ message, confirmation: advisoryCode.optional() }).optional(),
     }),
     homing: z.enum(['confirmed', 'required', 'not_supported', 'unknown']).optional(),
     camera: z.object({ available: z.boolean() }).optional(),

@@ -3,7 +3,11 @@ import type { Heightmap } from '../relief/heightmap';
 import { toMachineCoords, toSceneCoords, type DeviceProfile } from '../devices';
 import type { CncGroup, CncPass } from '../job';
 import type { CncReliefPlanningEvidence } from '../job/job';
-import { reliefProjectionPlan } from '../relief/relief-projection-plan';
+import {
+  reliefProjectionPlan,
+  type ReliefProjectionFacts,
+  type ReliefProjectionOptions,
+} from '../relief/relief-projection-plan';
 import { reliefObjectToHeightmap } from '../relief/relief-object-to-heightmap';
 import {
   reliefMaterializationFailure,
@@ -12,6 +16,7 @@ import {
 import { inverseReliefPoint } from '../relief/relief-vector-boundary';
 import {
   applyTransform,
+  DEFAULT_CNC_STOCK,
   layerCncTool,
   type CncLayerSettings,
   type CncMachineConfig,
@@ -21,6 +26,8 @@ import {
 } from '../scene';
 import { reliefMachineSpaceGeometry } from './relief-machine-space';
 import { reliefGroup } from './cnc-relief-group';
+import { isProfileCutType } from './compile-cnc-helpers';
+import { cutCanFreePart, stockLimitedTabHeightMm } from './cnc-tabs';
 
 export type ReliefProjectionCompilation =
   | {
@@ -87,6 +94,7 @@ export function compileReliefProjectionGroups(
     tool,
     projection.depthMm,
     projection.sampleSpacingMm,
+    projectionOptions(settings, config, tool),
   );
   if (plan.kind === 'error') return reliefMaterializationFailure(target.source, plan.reason);
   const passes = projectedMachinePasses(plan.passes, space.residualTransform, device);
@@ -100,6 +108,7 @@ export function compileReliefProjectionGroups(
     tool,
     map,
     plan.liftedVertices,
+    plan.facts,
   );
   return {
     kind: 'compiled',
@@ -108,6 +117,43 @@ export function compileReliefProjectionGroups(
         ? []
         : [reliefGroup(layer, settings, device, config, tool, settings.cutType, undefined, passes)],
     plans: [evidence],
+  };
+}
+
+const TAB_EPS = 1e-9;
+
+// The layer's step-down and tabs as the projection honours them (W6-P2-1).
+// Tabs follow the 2D rules (cnc-tabs.ts, ADR-258 Amendments 1, 3 and 4),
+// judged on the loop's deepest emitted tip instead of the ignored Cut depth: a
+// set stock thickness keeps each tab one tab height above the stock bottom
+// (half the stock when the tab is no thinner than it) and drops tabs where the
+// floor under the cut holds the part; the shipped default thickness measures
+// the tab from the cut floor.
+function projectionOptions(
+  settings: CncLayerSettings,
+  config: CncMachineConfig,
+  tool: CncTool,
+): ReliefProjectionOptions {
+  const stockMm = config.stock.thicknessMm;
+  const base = { depthPerPassMm: settings.depthPerPassMm, stockThicknessMm: stockMm };
+  if (!isProfileCutType(settings.cutType) || !settings.tabsEnabled) return base;
+  const tabHeightMm = Math.max(0, settings.tabHeightMm);
+  const tabTopZ = (deepestZ: number): number | null => {
+    const depthMm = -deepestZ;
+    if (!cutCanFreePart(depthMm, tabHeightMm, stockMm)) return null;
+    const top =
+      stockMm === DEFAULT_CNC_STOCK.thicknessMm
+        ? deepestZ + Math.min(tabHeightMm, Math.max(0, depthMm))
+        : -stockMm + stockLimitedTabHeightMm(tabHeightMm, stockMm);
+    return top > deepestZ + TAB_EPS && top < 0 ? top : null;
+  };
+  return {
+    ...base,
+    tabs: {
+      tabsPerShape: settings.tabsPerShape,
+      windowMm: Math.max(0, settings.tabWidthMm) + Math.max(0, tool.diameterMm),
+      tabTopZ,
+    },
   };
 }
 
@@ -120,6 +166,7 @@ function projectionEvidence(
   tool: CncTool,
   map: Heightmap,
   liftedVertices: number,
+  facts: ReliefProjectionFacts,
 ): CncReliefPlanningEvidence {
   const projection = settings.reliefProjection;
   if (projection === undefined)
@@ -137,6 +184,7 @@ function projectionEvidence(
     targetRevision: targetRevision,
     verticalDepthMm: projection.depthMm,
     requestedSampleSpacingMm: projection.sampleSpacingMm,
+    projection: facts,
     ...(liftedVertices > 0
       ? {
           restFallbackReason: `${liftedVertices} projected samples were lifted for cutter reach or excluded stock; nominal vertical depth is not reached there.`,

@@ -4,7 +4,9 @@
 // the calibration draft pattern. Failures (private mode, quota) degrade to
 // "no preference" silently.
 
+import { cameraAddressHasLogin } from '../../core/camera/camera-address-login';
 import { cameraSourceIdWithoutCredentials } from '../../core/camera/camera-capture-binding';
+import type { CameraAddressVault } from '../../core/camera/camera-address-vault';
 import {
   phoneCameraAddressWithoutLogin,
   type PhoneCameraApp,
@@ -29,18 +31,40 @@ export function savePreferredCameraId(deviceId: string): void {
 }
 
 // The last RTSP camera URL is machine-local operator input (ADR-116) — same
-// storage rationale as the preferred deviceId.
+// storage rationale as the preferred deviceId. Only its public form is kept
+// here; the full address, login included, goes only to the desktop's secure
+// storage (ADR-692), and is otherwise known for this run alone.
 const RTSP_CAMERA_URL_KEY = 'laserforge.camera.rtspUrl.v1';
+
+let addressVault: CameraAddressVault | undefined;
+let fullAddressThisRun: string | null = null;
+
+/** Where the full remembered address is kept; absent outside the desktop app. */
+export function installCameraAddressVault(vault: CameraAddressVault | undefined): void {
+  addressVault = vault;
+  // An older record read before the vault was there moves into it now.
+  if (vault !== undefined && fullAddressThisRun !== null) void vault.write(fullAddressThisRun);
+}
+
+function rememberFullAddress(url: string): void {
+  const full = url.trim();
+  fullAddressThisRun = cameraAddressHasLogin(full) ? full : null;
+  void addressVault?.write(fullAddressThisRun).catch(() => false);
+}
 
 export function loadRtspCameraUrl(): string | null {
   try {
     const stored = localStorage.getItem(RTSP_CAMERA_URL_KEY);
     if (stored === null) return null;
     const safe = rtspUrlWithoutCredentials(stored);
-    try {
-      if (safe !== stored) localStorage.setItem(RTSP_CAMERA_URL_KEY, safe);
-    } catch {
-      // Cleanup is best effort; the sanitized readable choice remains usable.
+    if (safe !== stored) {
+      // An older version kept more than the public form here.
+      rememberFullAddress(stored);
+      try {
+        localStorage.setItem(RTSP_CAMERA_URL_KEY, safe);
+      } catch {
+        // Cleanup is best effort; the sanitized readable choice remains usable.
+      }
     }
     return safe;
   } catch {
@@ -49,11 +73,26 @@ export function loadRtspCameraUrl(): string | null {
 }
 
 export function saveRtspCameraUrl(url: string): void {
+  rememberFullAddress(url);
   try {
     localStorage.setItem(RTSP_CAMERA_URL_KEY, rtspUrlWithoutCredentials(url));
   } catch {
     // Storage unavailable: the URL simply won't survive reload.
   }
+}
+
+/** The remembered address to connect to: in full when it is kept, else its public form. */
+export async function rememberedRtspCameraUrl(): Promise<string | null> {
+  const remembered = loadRtspCameraUrl();
+  if (remembered === null) return null;
+  const full = fullAddressThisRun ?? (await addressVault?.read().catch(() => null)) ?? null;
+  return full !== null && rtspUrlWithoutCredentials(full) === remembered ? full : remembered;
+}
+
+/** Test seam: forget the vault and this run's full address. */
+export function resetCameraAddressVaultForTests(): void {
+  addressVault = undefined;
+  fullAddressThisRun = null;
 }
 
 export function rtspUrlWithoutCredentials(raw: string): string {

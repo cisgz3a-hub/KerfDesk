@@ -1,3 +1,4 @@
+import type { ExternalProgramReview, LitRapids } from '../../core/external-program';
 import type { BuildRenderModelResult } from '../../core/gcode-view';
 import type { GcodeInspectionSource } from './gcode-inspection-source';
 import type { GcodeInspectorAnalysis } from './gcode-inspector-analysis';
@@ -22,6 +23,15 @@ export type SuccessfulGcodeInspectorWorkerResult = GcodeInspectorWorkerResultBas
   /** Only what the Inspector reads; timing's working arrays stay in the worker (ADR-485). */
   readonly parsed: { readonly kind: 'ok'; readonly model: InspectorRenderModel };
   readonly analysis: GcodeInspectorAnalysis;
+  /** Present when the source asked for the Run dialog's review (ADR-630 Amendment 9). */
+  readonly runReview?: ExternalRunReview;
+};
+
+/** The Run dialog's whole-program passes, made beside the parse that feeds
+ * them so no render of the dialog repeats one (ADR-630 Amendment 9). */
+export type ExternalRunReview = {
+  readonly review: ExternalProgramReview;
+  readonly litRapids: LitRapids | null;
 };
 
 type FailedGcodeInspectorWorkerResult = GcodeInspectorWorkerResultBase & {

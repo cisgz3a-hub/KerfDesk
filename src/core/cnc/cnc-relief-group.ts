@@ -28,7 +28,9 @@ export function reliefGroup(
     toolDiameterMm: tool.diameterMm,
     ...cncGroupProvenance(settings, tool, {
       includeRequestedDepth: false,
-      includeDepthPerPass: cutType === 'relief-rough',
+      // Roughing levels and a projection's step-down ladder (rolling audit v11
+      // W6-P2-1) honour Depth per pass; finishing rides the surface in one.
+      includeDepthPerPass: cutType !== 'relief-finish',
       includeVResolution: false,
       // Generic provenance must not claim the layer's requested ramp.
       // A relief stage that actually ramps sets its angle explicitly below;

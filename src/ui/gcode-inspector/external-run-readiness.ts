@@ -50,15 +50,17 @@ const EXTERNAL_LASER_MODE_UNVERIFIED_START_PROMPT =
 
 /** The `$30`/`$32` acknowledgement for an external laser run. It cites the
  * Run review, which this path shows instead of Job Review, and leads with the
- * lit rapids when there are any. */
+ * lit rapids when there are any. `litRapids` is the Inspector worker's scan of
+ * `gcode` when there is one (ADR-630 Amendment 9). */
 export function externalLaserModeStartPrompt(
   project: Project,
   laser: ExternalReadinessSource,
   gcode: string,
+  litRapids?: LitRapids | null,
 ): string {
   const lit =
     machineKindOf(project.machine) === 'laser'
-      ? litRapidWarning(project, laser, findLitRapids(gcode))
+      ? litRapidWarning(project, laser, litRapids === undefined ? findLitRapids(gcode) : litRapids)
       : null;
   return lit === null
     ? EXTERNAL_LASER_MODE_UNVERIFIED_START_PROMPT

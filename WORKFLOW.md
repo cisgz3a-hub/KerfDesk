@@ -1172,7 +1172,8 @@ that owns those fields, without changing the existing Frame/Start policy.
    lighter score), Job Review and Save G-code warn "Cut runs before the engraving inside it", and
    Job Review's row has **Cut last**, which runs Sort cuts last (ADR-480 Amendment 2). Each part
    is checked on its own, so two coasters or a grid on one operation are warned like one
-   (Amendment 3). New operations are not reordered on their own.
+   (Amendment 3), and a cut with a lead-in or lead-out counts like any other (Amendment 4). New
+   operations are not reordered on their own.
 
 ---
 
@@ -9209,6 +9210,13 @@ as the pane's design record.
   Absolute Coordinates between the runs. It is never told to choose Absolute Coordinates (ADR-654
   Amendment 4). When the outline's own Start from is known and the artwork run differs, the jig's
   outline warning (F-B15a) is shown instead.
+- **Warning / camera placement on a rotary.** With the Rotary switch on, the advice says the camera
+  picture places the artwork only along the cylinder. At a placed Start from it says to keep that
+  Start from and not to choose Absolute Coordinates. At Absolute Coordinates it warns that the
+  cylinder turns back to work Y 0 before burning, and that the preview and the canvas Frame outline
+  do not show this. It says to choose Current Position (or User Origin), or to switch Rotary off if
+  no rotary is fitted. This rotary wording replaces the Place Board and jig wording. The camera
+  target's confirm lists the same warning (ADR-228 Amendment 2).
 - **Edge / minimized wizard.** The wizard can minimize into a small non-modal panel so the
   operator can watch the camera and reach the machine while the target engraves.
 - **Fix / a small offset (ADR-663 Amendment 2).** For a calibrated camera fixed above the bed,
@@ -10288,7 +10296,9 @@ The G-code Inspector is free in every edition (ADR-627).
    moves in `G55`-`G59` are left out and named in the warnings. Arcs count by their exact
    extent in the plane they run in: XY (`G17`), XZ (`G18`) or YZ (`G19`) (ADR-630 Amendment 2).
    A program that never moves frames the point where the head stands. A large file is prepared a
-   slice at a time.
+   slice at a time, and its review is made off the page beside the parse, once for each start;
+   the dialog never repeats it while the head frames or the job starts, so ABORT JOB and Ctrl+.
+   are handled at once (ADR-630 Amendment 9).
    On Marlin, the baseline is two separate lines, `G21` then `G90`, and significant whitespace is
    preserved. Review reads the first command on each line with that command's parameters; later
    G/M words do not execute as extra commands. Firmware-dependent motion and its dependent

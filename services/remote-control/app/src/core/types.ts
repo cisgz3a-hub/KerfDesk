@@ -121,6 +121,9 @@ export type MachineStatus = {
     progressPercent?: number;
     elapsedSeconds?: number;
     remainingSeconds?: number;
+    /** The PC's paused-CNC Resume warning; with a confirmation, Resume must echo it
+     *  (ADR-585 Amendment 2). */
+    resumeAdvisory?: { message: string; confirmation?: string };
   };
   homing?: 'confirmed' | 'required' | 'not_supported' | 'unknown';
   camera?: { available: boolean };

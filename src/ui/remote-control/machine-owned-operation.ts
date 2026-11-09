@@ -5,6 +5,7 @@ import { operationIsTerminal, type OwnedMachineOperation } from './machine-opera
 import type { MachineAuthority, MachineCommand, MachineOperationKind } from './machine-types';
 import type { RemoteAppStore } from './types';
 import { RemoteFault } from './fault';
+import { MachinePolicyRefusal } from './machine-resume-advisory';
 
 export type MachineAction = Exclude<
   MachineCommand,
@@ -165,6 +166,7 @@ export function recordMachineOperationFailure(
     : operation.committed !== false
       ? 'unknown'
       : 'failed';
+  if (error instanceof MachinePolicyRefusal) operation.policyMessage = true;
   operation.message =
     error instanceof RemoteFault
       ? error.message
