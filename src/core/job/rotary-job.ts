@@ -8,14 +8,9 @@
 // Only the on-canvas PREVIEW stays surface-true (that's what the operator
 // designs against), so it deliberately does NOT call this.
 
-import {
-  dedicatedRotaryAxisOf,
-  isRotaryActive,
-  rotaryYLimitMm,
-  rotaryYScale,
-  type DedicatedRotaryAxis,
-  type DeviceProfile,
-} from '../devices';
+import { isRotaryActive, rotaryYLimitMm, rotaryYScale, type DeviceProfile } from '../devices';
+import { dedicatedRotaryAxisOf } from '../devices/rotary-axis';
+import type { DedicatedRotaryAxis } from '../devices/rotary';
 import type { MachineConfig } from '../scene';
 import type { Job } from './job';
 import type { JobOriginPlacement } from './job-origin';

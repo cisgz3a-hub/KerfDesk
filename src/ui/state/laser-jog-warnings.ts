@@ -11,12 +11,12 @@
 
 import { firstZoneCrossedBySegment } from '../../core/preflight';
 import {
-  dedicatedRotaryAxisOf,
   isRotaryActive,
   machineBoundsForDevice,
   rotaryYLimitMm,
   type DeviceProfile,
 } from '../../core/devices';
+import { dedicatedRotaryAxisOf } from '../../core/devices/rotary-axis';
 import { nativePointToBed } from '../../core/devices/native-bed-frame';
 import { inferCurrentMachinePosition } from './infer-machine-position';
 import { resolveNativeBedFrame, selectNativeBedEvidence } from './native-bed-frame';

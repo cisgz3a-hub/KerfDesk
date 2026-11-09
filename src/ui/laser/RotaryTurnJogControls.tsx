@@ -6,9 +6,9 @@
 // is an ordinary jog through the store, with its readiness gate and cancel.
 
 import { useState } from 'react';
-import type { DedicatedRotaryAxis } from '../../core/devices';
+import type { DedicatedRotaryAxis } from '../../core/devices/rotary';
 import { rotaryAxisUnitLabel } from '../../core/devices/rotary-axis';
-import { rotaryOutputAxis } from '../../core/job';
+import { rotaryOutputAxis } from '../../core/job/rotary-job';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { clampJogFeed } from './jog-control-policy';

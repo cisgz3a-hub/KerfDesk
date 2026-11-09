@@ -7,7 +7,8 @@
 
 import type { FrameBounds } from '../../core/controllers/controller-driver';
 import type { JogParams } from '../../core/controllers/grbl';
-import { rotaryAxisSupported, type DedicatedRotaryAxis } from '../../core/devices';
+import { rotaryAxisSupported } from '../../core/devices/rotary-axis';
+import type { DedicatedRotaryAxis } from '../../core/devices/rotary';
 import {
   axisLettersFromAxsField,
   axisLettersFromBuildInfoLines,

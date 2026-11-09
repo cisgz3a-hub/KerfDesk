@@ -1,4 +1,5 @@
-import { dedicatedRotaryAxisOf, rotaryYScale, toSceneCoords } from '../../core/devices';
+import { rotaryYScale, toSceneCoords } from '../../core/devices';
+import { dedicatedRotaryAxisOf } from '../../core/devices/rotary-axis';
 import { machineSpaceJob, rotaryAppliesTo } from '../../core/job';
 import { computeFrameJobMotionBounds } from '../../core/job/job-bounds';
 import { buildFramePerimeter } from '../../core/job/frame-perimeter';

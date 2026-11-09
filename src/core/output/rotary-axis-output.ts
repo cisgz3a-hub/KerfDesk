@@ -11,7 +11,7 @@
 // is the only truthful start: the machine-space job puts its anchor (or, for
 // Absolute, its lowest edge) at 0.
 
-import type { DedicatedRotaryAxis } from '../devices';
+import type { DedicatedRotaryAxis } from '../devices/rotary';
 
 /** The line that makes the part's current turn the axis's zero. */
 export function rotaryAxisZeroLine(axis: DedicatedRotaryAxis): string {

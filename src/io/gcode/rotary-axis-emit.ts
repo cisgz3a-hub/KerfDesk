@@ -5,8 +5,9 @@
 // already uses the letter, gets no program at all: writing the turn as Y
 // would run the gantry with the laser on instead of turning the part.
 
-import { rotaryAxisSupported, type DedicatedRotaryAxis } from '../../core/devices';
-import { rotaryOutputAxis } from '../../core/job';
+import { rotaryAxisSupported } from '../../core/devices/rotary-axis';
+import type { DedicatedRotaryAxis } from '../../core/devices/rotary';
+import { rotaryOutputAxis } from '../../core/job/rotary-job';
 import { rotaryAxisZeroLine, routeRotaryAxisLines } from '../../core/output/rotary-axis-output';
 import type { OutputEmitOptions } from '../../core/output/output-strategy';
 import type { PreflightResult } from '../../core/preflight';

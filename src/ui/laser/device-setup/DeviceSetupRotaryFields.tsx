@@ -3,7 +3,8 @@
 // final atomic Save. Roller scaling follows Rotary Setup (ADR-373).
 
 import { useState } from 'react';
-import type { RotaryAxis, RotarySetup, RotaryType } from '../../../core/devices';
+import type { RotarySetup, RotaryType } from '../../../core/devices';
+import type { RotaryAxis } from '../../../core/devices/rotary';
 import { rotaryAxisOf, rotaryAxisUnitLabel } from '../../../core/devices/rotary-axis';
 import { NumberField } from '../../common/NumberField';
 import {

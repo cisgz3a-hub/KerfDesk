@@ -3,7 +3,8 @@
 // the post-compile checks a G-code save runs over the moves the file commands.
 
 import { encodeRdJob, type RdEncodeError } from '../../core/controllers/ruida';
-import { machineSpaceJob, rotaryOutputAxis, type JobOriginPlacement } from '../../core/job';
+import { machineSpaceJob, type JobOriginPlacement } from '../../core/job';
+import { rotaryOutputAxis } from '../../core/job/rotary-job';
 import { rotaryAxisUnsupportedMessage } from '../gcode/rotary-axis-emit';
 import type { PreflightIssue, PreflightOptions } from '../../core/preflight';
 import type { OutputScope, Project } from '../../core/scene';

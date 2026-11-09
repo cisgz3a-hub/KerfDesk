@@ -14,7 +14,8 @@ import {
   type ReportedControllerAxes,
 } from '../../core/devices/rotary-axis';
 import { rotaryConnectorAxisFor } from '../../core/devices/rotary-presets';
-import { rotaryAppliesTo, rotaryOutputAxis } from '../../core/job';
+import { rotaryAppliesTo } from '../../core/job';
+import { rotaryOutputAxis } from '../../core/job/rotary-job';
 import type { Project } from '../../core/scene';
 import type { MachineStartSnapshot } from './start-job-readiness';
 

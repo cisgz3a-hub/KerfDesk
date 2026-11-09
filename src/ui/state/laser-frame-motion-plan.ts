@@ -9,7 +9,7 @@ import { isWorkZEvidenceCurrentForStart } from './work-z-zero-evidence';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { FrameBounds } from '../../core/controllers/controller-driver';
 import { buildFramePerimeter } from '../../core/job/frame-perimeter';
-import { rotaryOutputAxis } from '../../core/job';
+import { rotaryOutputAxis } from '../../core/job/rotary-job';
 import type { Project } from '../../core/scene';
 import {
   reportedControllerAxes,
