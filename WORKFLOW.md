@@ -9209,6 +9209,13 @@ as the pane's design record.
   Absolute Coordinates between the runs. It is never told to choose Absolute Coordinates (ADR-654
   Amendment 4). When the outline's own Start from is known and the artwork run differs, the jig's
   outline warning (F-B15a) is shown instead.
+- **Warning / camera placement on a rotary.** With the Rotary switch on, the advice says the camera
+  picture places the artwork only along the cylinder. At a placed Start from it says to keep that
+  Start from and not to choose Absolute Coordinates. At Absolute Coordinates it warns that the
+  cylinder turns back to work Y 0 before burning, and that the preview and the canvas Frame outline
+  do not show this. It says to choose Current Position (or User Origin), or to switch Rotary off if
+  no rotary is fitted. This rotary wording replaces the Place Board and jig wording. The camera
+  target's confirm lists the same warning (ADR-228 Amendment 2).
 - **Edge / minimized wizard.** The wizard can minimize into a small non-modal panel so the
   operator can watch the camera and reach the machine while the target engraves.
 - **Fix / a small offset (ADR-663 Amendment 2).** For a calibrated camera fixed above the bed,
