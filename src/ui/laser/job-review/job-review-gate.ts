@@ -208,8 +208,8 @@ export function modelFor(bundle: ReviewedStartBundle): ReturnType<typeof buildJo
       ),
       controllerKind: liveLaser.activeControllerKind,
     },
-    // ADR-315 Amd 1: rotary image rows are checked against the live $101.
-    rotaryStepsPerMmY: liveLaser.controllerSettings?.stepsPerMmY ?? null,
+    // ADR-315 Amd 1: rotary image rows are checked against the live axis steps.
+    rotaryAxisSteps: liveLaser.controllerSettings ?? null,
   });
   // FluidNC disclosures need the live identities, not just the profile, so
   // they join here rather than inside buildJobReviewModel. Advisory only.
