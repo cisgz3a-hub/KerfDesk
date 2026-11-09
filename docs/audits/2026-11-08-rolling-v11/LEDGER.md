@@ -14,7 +14,8 @@ Security findings are listed by class and severity only until their fix merges (
 | W6 | Relief and design generators | origin/main @ a3965a77d (refuter a3965a77d; Node with the real relief compiler and a G-code simulator) | [W6-relief-generators.md](W6-relief-generators.md) | 3 | 0 | 1 (refuter) | 1 | 1 | 26 |
 | W7 | G-code Inspector, Run and viewer | origin/main @ a3965a77d (refuter a3965a77d; headless Chrome with a paced simulated GRBL) | [W7-gcode-viewers-inspector.md](W7-gcode-viewers-inspector.md) | 2 | 0 | 1 (refuter) | 0 | 1 | 21 |
 | W8 | AI features (the optional desktop assistant) | origin/main @ a3965a77d (refuter a3965a77d; stubbed provider, no real calls) | [W8-ai-features.md](W8-ai-features.md) | 2 | 0 | 0 | 0 | 2 | 7 |
-| **Total so far** | | | | **29** | **2** | **7** | **5** | **15** | **175** |
+| W9 | Browser build, website and docs drift | origin/main @ b047e7bb6 (refuter b047e7bb6; Chrome 156 power-state and throttling measurements) | [W9-platform-web-docs.md](W9-platform-web-docs.md) | 5 | 0 | 0 | 2 | 3 | 9 |
+| **Total (W1–W9)** | | | | **34** | **2** | **7** | **7** | **18** | **184** |
 
 ## Confirmed P1/P2 (coordinator-verified)
 
@@ -32,3 +33,86 @@ Security findings are listed by class and severity only until their fix merges (
 | W6-P2-1 (P1, refuter) | W6 | **A relief projection cuts its whole depth in one pass with no tabs, so a closed shape projected through the stock comes free while Job Review lists tabs or a holding floor.** The projection ignores the layer's Cut depth, Depth per pass and Tabs, which the layer card still shows: a 16 × 16 mm square projected 2 mm below a 5 mm relief floor cuts the whole loop at Z−7 through 6.35 mm stock in one pass with no tabs; Job Review says "tabs 4 per shape (6 × 2 mm)", or with 6 mm stock "tabs … skipped: the 5 mm floor holds the part" (false), and counts passes from the ignored settings ("3 passes" for one). A leftover Cut depth also drives a false spoilboard warning. P1 by CNC v1 F3-P1-1 (a part cut free with tabs on and no warning) | **READ** (main): `relief-projection-plan.ts:74-85` (one Z per point: surface minus depth; no step-down, no tabs), `cnc-relief-group.ts:31-32` (depth-per-pass provenance only for roughing), `cnc-through-cut-tab-warnings.ts:86` (reads the ignored Cut depth). Auditor and refuter REPRO (Node, real compiler: `zz-w6r/`) | fix card proposed |
 | W6-P2-2 | W6 | **Where the roughing bit cannot enter, the finishing ball cuts the region full width and full depth.** An 8 × 5 mm channel with a 1/4" rough and a 1/8" ball finish: roughing emits nothing there, and the ball slots it 5 mm deep at F1000 (13.86 mm²/mm against 4.80 for a roughing pass; a 40.4 mm slot when the channel runs along the rows), about 3× the app's own 0.5 × D depth guide. Job Review can read "relief roughing 3 levels to 4.5 mm" though the channel was not roughed. P2 by the meta audit's full-width-slot precedent | **READ** (main): `compile-cnc-relief.ts:109`. Auditor and refuter REPRO (G-code simulator) | fix card proposed |
 | W7-P2-1 (P1, refuter) | W7 | **Running a large outside G-code file freezes the window on every Run dialog redraw, and Abort waits behind it.** The dialog rebuilds the whole-file review in its render with no memo: 1.0–1.4 s per render at 500k lines (3.0 s at 1M). It re-renders on every controller, motion, connection and streamer status change, and stays open after Start until recovery retirement finishes, so the block lands at the start of a beam-on stream every time: an `M4` photo engrave at 500k lines blocked 3.4–4.3 s after the first line and Abort (Ctrl+.) reached the controller 539 and 661 ms late (a press at a block start would wait 1.2–2.4 s). During a Frame, Abort reached the controller 5.9 s late and a Frame jog was written 662 ms after the press. P1 by S1-P2-1 and S4-P2-3 | **READ** (main): `RunGcodeFileDialog.tsx:104-124` (`prepareExternalRun` → `reviewExternalProgram` inline in render; only the cheap values above it use `useMemo`), `use-command-store-state.ts:30-35`, `use-gcode-inspector-slot.tsx:27-28`, `laser-start-arming-completion.ts:50-56`. Refuter REPRO (Chrome CPU profile, paced simulated GRBL: `zz-w7r/out-500k.json`, `out-abort.json`) | fix card proposed |
+| W9-P2-1 | W9 | **In the browser build a background or minimised tab loses the job's keep-awake, and nothing tells the user.** The screen wake lock (ADR-117's only browser keep-awake) is released when the tab is hidden: in Chrome 156 the OS power state drops from `0x2` to `0x0`, and a new request while hidden is refused. The app never asks while hidden, so the "Keep-awake unavailable" notice ADR-117 requires never shows. No other code keeps the PC awake, and Windows does not count serial traffic as activity, so the PC can idle-sleep and stop the stream; under GRBL `M3` the beam stays lit over the stopped head. Background throttling does not starve the worker-driven stream (measured over 7 minutes hidden). P1 if Chrome holds no power request while a Web Serial port is open; that link is unproven (`zz-w9r/power-state.ps1` settles it on a real job) | **READ** (main): `use-active-job-wake-lock.ts:92` (returns before the request while hidden, skipping `warnUnavailableOnce`). Auditor REPRO (Vitest), refuter Chrome 156 power-state measurement | fix card proposed |
+| W9-P2-2 | W9 | **Firefox and Safari users are told their work is safe in the browser's autosave, with no way to get it out.** Every Save and Export goes through the file picker, which throws there; there is no download fallback; `persist()` is only asked after a save that cannot succeed; Safari deletes a site's stored data after 7 days of use without a visit (WebKit policy, re-fetched), and Chrome cannot read another browser's autosave, so the "open KerfDesk in Chrome or Edge" advice cannot move the work. P2: the opening banner says the browser cannot save files | Auditor and refuter READ (the save, export and persist paths) | fix card proposed |
+
+## Round result (2026-11-09)
+
+All nine areas went through an auditor, a fresh refuter and a coordinator check in main's code (`5f09e1110`, then `a3965a77d`, then `b047e7bb6`).
+
+**Totals.**
+- 34 findings raised and 2 refuted, leaving P1 7 / P2 7 / P3 18.
+- One P1 is a v2 P3 the W5 refuter re-rated: 14-P3-1.
+- 184 earlier findings were rechecked and are still open or partly open (KNOWN).
+- One finding is a security issue. It is listed by class only until its fix merges.
+
+The refuters raised six findings to P1: W2-P2-1, W4-P2-1, W6-P2-1, W7-P2-1, W5-P1-1 and 14-P3-1. In each case the refuter reproduced what the auditor had only reasoned about.
+
+**Earlier audits.** Almost every P1 and P2 from rolling v2, v3 and v5 in these areas is now fixed on main:
+- licensing: 02-P2-1 and 02-P2-2;
+- remote: H8-P1-1, H8-P1-2 and most of 01;
+- camera: every earlier camera P1 and P2;
+- importers: 13-P1-1, 21-P1-1, J6-P1-1, L7-P1-1 and L7-P1-2.
+
+What remains is a large P3 backlog, about 180 items, listed per area in each report.
+
+### P1 and P2
+
+| ID | What | Fix |
+|---|---|---|
+| W2-P2-1 (P1) | A phone or MCP Resume of a paused CNC job gives none of the PC's spin-up warning (FluidNC router at `$32=0`) | card "Phone Resume warns about spindle spin-up" |
+| W3-P1-1 | A renderer crash mid-job leaves an `M3` beam or spindle on; main sent no stop | fixed by #1628 |
+| W3-P2-1 | Windows shutdown with the laser lit at Idle sent no `M5` | fixed by #1628 |
+| W4-P2-1 (P1) | On a rotary, the camera advice to choose Absolute Coordinates burns about 61° around the cylinder | card "Rotary jobs aren't told to use Absolute" |
+| W4-P2-2 | Security: credential leak into persisted or shared files (redacted) | card (details in the coordinator's scratchpad only) |
+| W5-P1-1 | A near-zero DXF bulge turns a straight edge into a large loop or shrinks the design | card "DXF and HPGL import" |
+| 14-P3-1 (P1) | CSS translations in SVG are silently ignored, so artwork burns elsewhere | card "SVG import honours CSS translate" |
+| W5-P2-1 | A DXF spanning more than 1,000,000 mm imports silently, then the project cannot be saved | card "DXF and HPGL import" |
+| W5-P2-2 | HPGL import has no coordinate range check | card "DXF and HPGL import" |
+| W6-P2-1 (P1) | A relief projection cuts its whole depth in one pass with no tabs, while Job Review lists tabs | card "Relief projection steps down and keeps tabs" |
+| W6-P2-2 | Where roughing cannot enter, the finishing ball slots full depth | card "Relief projection…" |
+| W7-P2-1 (P1) | The Run dialog re-reviews a large external file on every redraw; Abort was measured 0.54–5.9 s late | card "Run dialog stops re-reviewing big files" |
+| W9-P2-1 | A background browser tab loses the job's keep-awake silently (P1 if Chrome holds no power request for an open serial port) | card proposed with this result |
+| W9-P2-2 | Firefox and Safari work lives only in an evictable autosave with no way out | card proposed with this result |
+
+**The pattern.** Four of the seven P1s are a guard or warning that one route has and a twin route lacks:
+- W2: PC Resume vs phone Resume.
+- W4: the Place Board and jig advice vs the rotary.
+- W6: layer passes and tabs vs relief projection.
+- 14-P3-1: SVG attributes vs CSS.
+
+Two more are failure paths that only a live measurement or an exact repro showed:
+- W7: the dialog stays open into the stream.
+- W5-P1-1: floating-point noise in a bulge.
+
+### Maintainer decisions open
+
+- **BQ-20:** should Illustrator SVGs import at Illustrator's own size? Today they import at 75 % (14-P2-1).
+- **S9-P3-1:** the startup hold.
+- **S8-P2-1:** the cut change.
+- **S8-P3-3:** whether a 600 × 400 mm sign counts as ordinary.
+- **Worker redeploy:** eight Worker-visible changes since 2026-10-21 reach phones only after a redeploy.
+- **W9-P2-1:** confirm on a real job with `power-state.ps1`, which is in the coordinator's scratchpad.
+
+### P3s (18) and the KNOWN backlog
+
+Proposed sweeps, one session per group, run after the fix PRs above merge:
+- **Licensing gating:** W1-P3-1, -3, -4 and -5.
+- **Remote messages:** W2-P3-1 to W2-P3-4.
+- **Camera:** W4-P3-1 and W4-P3-2.
+- **Importers:** W5-P3-2, plus the 14-P3-x and K items.
+- **Relief and box:** W6-P3-1, plus 16-P3-x and 25-P3-x.
+- **Inspector:** W7-P3-1, plus the 26-P3-x items.
+- **AI:** W8-P3-1 and W8-P3-2.
+- **Browser and docs:** W9-P3-1 to W9-P3-3, plus the 19, 22 and 24 items.
+
+The KNOWN items carry over from v2, v3 and v5. Each area report lists them.
+
+### Not verified (memory)
+
+The PC had 0.6–2.7 GB free. Most checks were Node runs of the real modules. Real browsers were used only where the gate allowed: W5, W7, W9, and the W8 tests.
+
+No area could run:
+- hardware or a real serial port;
+- the packaged Electron app;
+- the live Worker, licensing server, update feed or AI provider (by rule).

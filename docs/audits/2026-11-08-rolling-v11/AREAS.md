@@ -58,4 +58,4 @@ W1 runs first and W2 second: both are trust boundaries where a P1 harms users be
 - Never operate hardware. Never download or install software. Never launch the installed KerfDesk.
 - Never send real data to external services. For W2, W3 and W8, use local stubs; never call the live Worker, the updater feed or an AI provider with real credentials.
 
-**Status:** started 2026-11-08, after rolling v10 closed (PR #1613).
+**Status:** done 2026-11-09. All nine areas ledgered: P1 7 / P2 7 / P3 18 (34 raised, 2 refuted); W3 fixed by #1628, the rest owned by fix cards. See [LEDGER.md](LEDGER.md#round-result-2026-11-09).
