@@ -49,7 +49,6 @@ function TaperMeasurements(props: {
   const { taper, onEdit } = props;
   const set = (patch: Parameters<typeof editRotaryTaper>[1]): void =>
     onEdit((edit) => editRotaryTaper(edit, patch));
-  const setTop = (topSide: RotaryTaperTopSide): void => set({ topSide });
   return (
     <div role="group" aria-label="Tapered part" style={panelStyle}>
       <TaperDiagram taper={taper} />
@@ -80,24 +79,7 @@ function TaperMeasurements(props: {
         disabled={false}
         onCommit={(lengthMm) => set({ lengthMm })}
       />
-      <FieldRow label="Top of the part">
-        <div role="group" aria-label="Top of the part" style={segmentStyle}>
-          <SegmentButton
-            active={taper.topSide === 'left'}
-            title="The part's top points to the left of the bed."
-            onClick={() => setTop('left')}
-          >
-            Left
-          </SegmentButton>
-          <SegmentButton
-            active={taper.topSide === 'right'}
-            title="The part's top points to the right of the bed."
-            onClick={() => setTop('right')}
-          >
-            Right
-          </SegmentButton>
-        </div>
-      </FieldRow>
+      <TopSideField topSide={taper.topSide} onChange={(topSide) => set({ topSide })} />
       <FieldRow label="Artwork from top">
         <NumberField
           ariaLabel="Taper artwork from top"
@@ -121,6 +103,33 @@ function TaperMeasurements(props: {
         design short along the part.
       </p>
     </div>
+  );
+}
+
+// LightBurn's Object Top, limited to the two sides a Y rotary's axis can face.
+function TopSideField(props: {
+  readonly topSide: RotaryTaperTopSide;
+  readonly onChange: (topSide: RotaryTaperTopSide) => void;
+}): JSX.Element {
+  return (
+    <FieldRow label="Top of the part">
+      <div role="group" aria-label="Top of the part" style={segmentStyle}>
+        <SegmentButton
+          active={props.topSide === 'left'}
+          title="The part's top points to the left of the bed."
+          onClick={() => props.onChange('left')}
+        >
+          Left
+        </SegmentButton>
+        <SegmentButton
+          active={props.topSide === 'right'}
+          title="The part's top points to the right of the bed."
+          onClick={() => props.onChange('right')}
+        >
+          Right
+        </SegmentButton>
+      </div>
+    </FieldRow>
   );
 }
 
