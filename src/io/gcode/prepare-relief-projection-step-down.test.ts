@@ -98,7 +98,10 @@ function project(options: {
       layers: [
         {
           ...createLayer({ id: 'target', color: '#a0522d', name: 'Relief' }),
-          output: true,
+          // The plaque was carved in an earlier job, so the projection starts at
+          // its surface (a roughed-only target this job carves starts above it,
+          // ADR-572 Amendment 4).
+          output: false,
           cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, depthPerPassMm: 1.5 },
         },
         {
@@ -166,9 +169,12 @@ describe('relief projection honours Depth per pass and Tabs (W6-P2-1)', () => {
     expect(Math.max(...zs(passes[1]))).toBeCloseTo(-4, 3);
     expect(detail).toContain('projected 2 mm under the relief surface in 2 passes of up to 1 mm');
     expect(detail).toContain('deepest 7 mm');
+    // X6-P1-1 (ADR-572 Amendment 4): the tab windows stand at Z-4, 1 mm above
+    // the 5 mm floor, so the tabs keep only the 1 mm of floor under them.
     expect(detail).toContain(
-      'tabs 4 per shape (6 × 2 mm above the stock bottom) on 1 of 1 closed shape',
+      'tabs 4 per shape (6 mm) on 1 of 1 closed shape, only 1 mm thick: the relief floor under them',
     );
+    expect(detail).toContain('(2 mm set)');
     expect(detail).not.toContain('floor holds');
     // Not freed, but still past the 6 mm stock bottom between the tabs.
     expect(warnings.join('\n')).toContain('reaches 7 mm into 6 mm stock — 1.00 mm past the bottom');
@@ -193,7 +199,8 @@ describe('relief projection honours Depth per pass and Tabs (W6-P2-1)', () => {
     // Deepest tip Z-7, tab 2 mm: the windows stand at Z-5, the plaque floor.
     expect(passes.every(passRisesIntoTab)).toBe(true);
     expect(Math.max(...zs(passes[1]))).toBeCloseTo(-5, 3);
-    expect(detail).toContain('6 × 2 mm above the cut floor');
+    // The 5 mm floor in the shipped 6.35 mm leaves 1.35 mm under the windows.
+    expect(detail).toContain('only 1.3 mm thick: the relief floor under them');
   });
 
   it('says the floor holds the part when a set stock leaves one under the deepest cut', () => {

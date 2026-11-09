@@ -41,7 +41,11 @@ export function reliefProjectionOrderWarnings(
         ' for target "' +
         plan.source +
         '". ' +
-        'This output order does not establish the named surface before projection. Prepare that surface first or change the operation/tool order, and review the 3D preview.',
+        // Rolling audit v12 X6-P2-1: name the first-pass load this order brings.
+        'This output order does not establish the named surface before projection: the ' +
+        "projection's levels step down from the finished surface, so its first pass also takes " +
+        'the roughing allowance and terrace still standing there. ' +
+        'Prepare that surface first or change the operation/tool order, and review the 3D preview.',
     );
   }
   return warnings;

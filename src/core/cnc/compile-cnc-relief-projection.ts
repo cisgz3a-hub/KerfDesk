@@ -9,6 +9,7 @@ import {
   type ReliefProjectionOptions,
 } from '../relief/relief-projection-plan';
 import { reliefObjectToHeightmap } from '../relief/relief-object-to-heightmap';
+import { DEFAULT_RELIEF_ALLOWANCE_MM } from '../relief/relief-roughing';
 import {
   reliefMaterializationFailure,
   type ReliefMaterializationFailure,
@@ -16,8 +17,10 @@ import {
 import { inverseReliefPoint } from '../relief/relief-vector-boundary';
 import {
   applyTransform,
+  DEFAULT_CNC_LAYER_SETTINGS,
   DEFAULT_CNC_STOCK,
   layerCncTool,
+  sceneObjectUsesOperation,
   type CncLayerSettings,
   type CncMachineConfig,
   type Layer,
@@ -46,6 +49,9 @@ export function compileReliefProjectionGroups(
   device: DeviceProfile,
   config: CncMachineConfig,
   polylines: ReadonlyArray<Polyline>,
+  // X6-P2-1: the job's layers and the objects it carves, to tell whether the
+  // target is only roughed before this operation. Absent: from its surface.
+  carve?: ProjectionTargetCarve,
 ): ReliefProjectionCompilation {
   const projection = settings.reliefProjection;
   if (projection === undefined) return { kind: 'compiled', groups: [], plans: [] };
@@ -94,7 +100,7 @@ export function compileReliefProjectionGroups(
     tool,
     projection.depthMm,
     projection.sampleSpacingMm,
-    projectionOptions(settings, config, tool),
+    projectionOptions(settings, config, tool, roughedOnlyStockMm(target, config, carve)),
   );
   if (plan.kind === 'error') return reliefMaterializationFailure(target.source, plan.reason);
   const passes = projectedMachinePasses(plan.passes, space.residualTransform, device);
@@ -122,6 +128,39 @@ export function compileReliefProjectionGroups(
 
 const TAB_EPS = 1e-9;
 
+/** The job's layers and the objects it carves (X6-P2-1). */
+export type ProjectionTargetCarve = {
+  readonly layers: ReadonlyArray<Layer>;
+  readonly carvedObjects: ReadonlyArray<SceneObject>;
+};
+
+// X6-P2-1: a target this job carves with roughing only still stands up to its
+// finish allowance plus one roughing step above its surface (a terrace), so
+// the projection's first level starts that far up. A finished target, or one
+// carved earlier (not in this job), stands at its surface. A finished target
+// cut after this operation is the order warning's case.
+function roughedOnlyStockMm(
+  target: SceneObject,
+  config: CncMachineConfig,
+  carve: ProjectionTargetCarve | undefined,
+): number {
+  if (carve === undefined || !carve.carvedObjects.some((o) => o.id === target.id)) return 0;
+  const owner = carve.layers.find((l) => l.output && sceneObjectUsesOperation(target, l));
+  if (owner === undefined) return 0;
+  const roughing = owner.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
+  const finishTool = roughing.reliefFinishToolId;
+  if (finishTool !== undefined && config.tools.some((tool) => tool.id === finishTool)) return 0;
+  const allowance = roughing.finishAllowanceMm ?? DEFAULT_RELIEF_ALLOWANCE_MM;
+  const terrace = Math.min(
+    roughing.depthPerPassMm,
+    roughing.reliefFineStepMm ?? Number.POSITIVE_INFINITY,
+  );
+  return [allowance, terrace].reduce(
+    (sum, value) => sum + (Number.isFinite(value) && value > 0 ? value : 0),
+    0,
+  );
+}
+
 // The layer's step-down and tabs as the projection honours them (W6-P2-1).
 // Tabs follow the 2D rules (cnc-tabs.ts, ADR-258 Amendments 1, 3 and 4),
 // judged on the loop's deepest emitted tip instead of the ignored Cut depth: a
@@ -133,9 +172,14 @@ function projectionOptions(
   settings: CncLayerSettings,
   config: CncMachineConfig,
   tool: CncTool,
+  startAboveMm: number,
 ): ReliefProjectionOptions {
   const stockMm = config.stock.thicknessMm;
-  const base = { depthPerPassMm: settings.depthPerPassMm, stockThicknessMm: stockMm };
+  const base = {
+    depthPerPassMm: settings.depthPerPassMm,
+    stockThicknessMm: stockMm,
+    startAboveMm,
+  };
   if (!isProfileCutType(settings.cutType) || !settings.tabsEnabled) return base;
   const tabHeightMm = Math.max(0, settings.tabHeightMm);
   const tabTopZ = (deepestZ: number): number | null => {

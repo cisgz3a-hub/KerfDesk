@@ -18,6 +18,9 @@ const MAX_PROJECTED_POINTS = 250_000;
 // 2D profile ladders reach; past it the operator raises Depth per pass.
 const MAX_PROJECTED_LEVEL_POINTS = 4_000_000;
 const Z_EPS = 1e-6;
+// A loop whose every point keeps no more than this above the stock bottom is
+// cut free: a bridge this thin does not hold a part (X6-P1-1).
+const FREE_MM = 0.1;
 
 /** What the compiled projection really cut, for Job Review (W6-P2-1). */
 export type ReliefProjectionFacts = {
@@ -30,6 +33,14 @@ export type ReliefProjectionFacts = {
   readonly tabbedShapes: number;
   // Closed loops cut through the stock bottom all the way round: freed parts.
   readonly freedShapes: number;
+  // Rolling audit v12 X6-P1-1: the thinnest material left where a tabbed loop
+  // stays attached (at or above its tab top), measured from the stock bottom
+  // to the lower of the emitted tip and the relief surface. A tab can only be
+  // as thick as the floor the relief leaves under it. Absent without tabs.
+  readonly thinnestTabMm?: number;
+  // X6-P2-1: how far above the relief surface the ladder starts, because the
+  // target is only roughed before this operation. Absent when it starts there.
+  readonly startAboveMm?: number;
 };
 
 export type ReliefProjectionOptions = {
@@ -38,6 +49,10 @@ export type ReliefProjectionOptions = {
   // unusable: one pass at the full vertical depth.
   readonly depthPerPassMm?: number;
   readonly stockThicknessMm?: number;
+  // X6-P2-1: the stock the target relief leaves above its surface before this
+  // operation (its roughing allowance and terraces when it is only roughed).
+  // The ladder steps down from there. Absent or 0: from the surface.
+  readonly startAboveMm?: number;
   // Profile layers with Tabs on: the windows, and the tab top for a loop
   // whose deepest checked tip is `deepestZ`, or null when it needs no tab.
   readonly tabs?: ProjectionTabWindows & {
@@ -74,7 +89,14 @@ export function reliefProjectionPlan(
     return Math.max(lower, tip - depthMm, stock?.tipAt(x, y) ?? Number.NEGATIVE_INFINITY);
   };
   const passes: CncPass[] = [];
-  const facts = { levels: 0, deepestZ: 0, closedShapes: 0, tabbedShapes: 0, freedShapes: 0 };
+  const facts: MutableFacts = {
+    levels: 0,
+    deepestZ: 0,
+    closedShapes: 0,
+    tabbedShapes: 0,
+    freedShapes: 0,
+    thinnestTabMm: Number.POSITIVE_INFINITY,
+  };
   let liftedVertices = 0;
   for (const line of polylines) {
     const raw = sampledPath(line, spacingMm);
@@ -97,16 +119,24 @@ export function reliefProjectionPlan(
         passes,
         facts,
         line.closed,
-        projectedLadder(safe, levelDepths, line.closed, options),
+        projectedLadder(safe, levelDepths, line.closed, options, (x, y) =>
+          sampleSurface(map, x, y),
+        ),
       );
   }
-  const { deepestZ, ...counts } = facts;
+  const { deepestZ, thinnestTabMm, ...counts } = facts;
+  const aboveMm = startAbove(options);
   return {
     kind: 'ok',
     passes,
     effectiveSpacingMm: spacingMm,
     liftedVertices,
-    facts: { ...counts, deepestMm: Math.max(0, -deepestZ) },
+    facts: {
+      ...counts,
+      deepestMm: Math.max(0, -deepestZ),
+      ...(Number.isFinite(thinnestTabMm) ? { thinnestTabMm: Math.max(0, thinnestTabMm) } : {}),
+      ...(aboveMm > 0 ? { startAboveMm: aboveMm } : {}),
+    },
   };
 }
 
@@ -117,6 +147,7 @@ type MutableFacts = {
   closedShapes: number;
   tabbedShapes: number;
   freedShapes: number;
+  thinnestTabMm: number;
 };
 
 function addLadder(
@@ -131,8 +162,11 @@ function addLadder(
   facts.deepestZ = Math.min(facts.deepestZ, ladder.deepestZ);
   if (!closed) return;
   facts.closedShapes += 1;
-  if (ladder.tabs > 0) facts.tabbedShapes += 1;
   if (ladder.freed) facts.freedShapes += 1;
+  else if (ladder.tabs > 0) {
+    facts.tabbedShapes += 1;
+    facts.thinnestTabMm = Math.min(facts.thinnestTabMm, ladder.thinnestTabMm);
+  }
 }
 
 // The parameter, point and work budgets, checked before any contact is solved.
@@ -155,10 +189,12 @@ function admitProjection(
   if (!validProjectionParameters(depthMm, requestedSpacingMm))
     return error('Relief projection depth and sample spacing must be positive finite millimetres.');
   const stepMm = options.depthPerPassMm ?? depthMm;
-  const ladderError = zPassArrayMaterializationError(depthMm, stepMm);
+  const aboveMm = startAbove(options);
+  const ladderError = zPassArrayMaterializationError(depthMm + aboveMm, stepMm);
   if (ladderError !== null) return error(ladderError);
   // Depths below the surface, shallow to deep; the last is the vertical depth.
-  const levelDepths = zPassDepths(depthMm, stepMm).map((z) => -z);
+  // A roughed-only target starts the ladder above the surface (X6-P2-1).
+  const levelDepths = zPassDepths(depthMm + aboveMm, stepMm).map((z) => -z - aboveMm);
   const spacingMm = Math.min(requestedSpacingMm, map.mmPerCell / 4, tool.diameterMm / 10);
   const count = pointCount(polylines, spacingMm);
   if (!Number.isFinite(count) || count > MAX_PROJECTED_POINTS)
@@ -179,6 +215,11 @@ function admitProjection(
   return { kind: 'ok', spacingMm, levelDepths, kernel };
 }
 
+function startAbove(options: ReliefProjectionOptions): number {
+  const above = options.startAboveMm ?? 0;
+  return Number.isFinite(above) && above > 0 ? above : 0;
+}
+
 function outsideMap(map: Heightmap, p: { readonly x: number; readonly y: number }): boolean {
   return p.x < -1e-8 || p.y < -1e-8 || p.x > map.widthMm + 1e-8 || p.y > map.heightMm + 1e-8;
 }
@@ -189,20 +230,29 @@ function outsideMap(map: Heightmap, p: { readonly x: number; readonly y: number 
 // offset by the full vertical depth, so lifted it clears the contact offset by
 // the level's own depth, and lifting never meets excluded stock. A closed loop
 // that reaches the tab top takes the same tabs on every level.
+//
+// What the loop leaves is judged on the emitted last level against the relief
+// surface (rolling audit v12 X6-P1-1, X6-P3-2): at each point the material
+// stands from the stock bottom up to the lower of the tip and the surface. A
+// tab window above an already deeper relief rides in air, so its tab is only
+// the floor left there; a loop with no point keeping more than FREE_MM is cut
+// free, tabs or not; and the deepest tip is the deepest emitted one.
 function projectedLadder(
   safe: ReadonlyArray<FinishingPoint>,
   levelDepths: ReadonlyArray<number>,
   closed: boolean,
   options: ReliefProjectionOptions,
+  surfaceAt: (x: number, y: number) => number,
 ): {
   readonly levels: ReadonlyArray<ReadonlyArray<FinishingPoint>>;
   readonly tabs: number;
   readonly freed: boolean;
   readonly deepestZ: number;
+  readonly thinnestTabMm: number;
 } {
   const finalDepth = levelDepths[levelDepths.length - 1] ?? 0;
-  const deepestZ = extremeZ(safe, 'min');
-  const tabTopZ = closed && options.tabs !== undefined ? options.tabs.tabTopZ(deepestZ) : null;
+  const tabTopZ =
+    closed && options.tabs !== undefined ? options.tabs.tabTopZ(extremeZ(safe, 'min')) : null;
   let tabs = 0;
   const levels = levelDepths.map((depth) => {
     const lift = finalDepth - depth;
@@ -213,10 +263,33 @@ function projectedLadder(
     return tabbed.points;
   });
   const last = levels[levels.length - 1] ?? [];
-  const stockMm = options.stockThicknessMm;
-  const freed =
-    closed && stockMm !== undefined && last.length > 0 && extremeZ(last, 'max') <= -stockMm + Z_EPS;
-  return { levels, tabs, freed, deepestZ };
+  const left = leftAlong(last, options.stockThicknessMm, surfaceAt);
+  const freed = closed && left !== null && last.length > 0 && left.most <= FREE_MM;
+  const thinnestTabMm =
+    left === null || tabTopZ === null ? Number.POSITIVE_INFINITY : left.thinnestAt(tabTopZ);
+  return { levels, tabs, freed, deepestZ: extremeZ(last, 'min'), thinnestTabMm };
+}
+
+// The material each point of a level leaves above the stock bottom.
+function leftAlong(
+  level: ReadonlyArray<FinishingPoint>,
+  stockMm: number | undefined,
+  surfaceAt: (x: number, y: number) => number,
+): { readonly most: number; readonly thinnestAt: (tabTopZ: number) => number } | null {
+  if (stockMm === undefined) return null;
+  const left = level.map((p) => Math.min(p.z, surfaceAt(p.x, p.y)) + stockMm);
+  let most = Number.NEGATIVE_INFINITY;
+  for (const value of left) most = Math.max(most, value);
+  return {
+    most,
+    thinnestAt: (tabTopZ) => {
+      let thinnest = Number.POSITIVE_INFINITY;
+      level.forEach((p, i) => {
+        if (p.z >= tabTopZ - Z_EPS) thinnest = Math.min(thinnest, left[i] ?? thinnest);
+      });
+      return thinnest;
+    },
+  };
 }
 
 function extremeZ(points: ReadonlyArray<FinishingPoint>, which: 'min' | 'max'): number {

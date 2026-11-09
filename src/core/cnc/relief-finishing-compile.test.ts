@@ -411,7 +411,8 @@ describe('relief finishing compile (H.8)', () => {
       (group) => group.kind === 'cnc' && group.cutType === 'relief-finish',
     );
     if (finish?.kind !== 'cnc') throw new Error('small-tool finish group missing');
-    const rowYs = finishingRows(finish.passes).map((row) => row.y);
+    // Rows only: the 0.1 mm ball steps down first where roughing missed (ADR-421 Amd 3).
+    const rowYs = finishingRows(withoutStepDown(finish.passes)).map((row) => row.y);
     expect(rowYs.length).toBeGreaterThan(20);
     const maxGap = Math.max(...rowYs.slice(1).map((y, index) => Math.abs(y - (rowYs[index] ?? y))));
     const radius = SMALL_BALL_NOSE.diameterMm / 2;

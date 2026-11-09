@@ -180,8 +180,13 @@ function overcutTabNote(
       keptMm < settings.tabHeightMm
         ? `are ${formatMm(keptMm)} mm thick above the stock bottom, thinned from the ` +
           `${formatMm(settings.tabHeightMm)} mm set to half the ${formatMm(stockThicknessMm)} mm stock`
-        : `stay ${formatMm(settings.tabHeightMm)} mm thick above the stock bottom`;
-    return `Its holding tabs ${thickness}, which relies on Stock thickness being right. `;
+        : `reach ${formatMm(settings.tabHeightMm)} mm above the stock bottom`;
+    // Rolling audit v12 X6-P1-1: a tab keeps only the stock that is there, so a
+    // relief or pocket cut deeper under it first leaves it thinner.
+    return (
+      `Its holding tabs ${thickness}, which relies on Stock thickness being right; a relief or ` +
+      'pocket cut deeper under them first leaves them thinner. '
+    );
   }
   const inStockMm = stockThicknessMm + tabTopZMm(tabs.depthMm, tabs.tabHeightMm);
   return inStockMm > 0
