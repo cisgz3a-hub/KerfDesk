@@ -184,7 +184,11 @@ export type GcodeMetadata = {
 // centres, so its roughing and finishing Z change; 3D rest finishing keeps one
 // G1 per kept stretch of a move instead of one per half cell (CNC audit v1
 // F6-P3-2, same path); carries forward v41 above.
-export const EMITTER_REVISION = 'heightmap-pixel-surface-20261108-v42';
+// ADR-159 Amd 3 imports a DXF bulge or SVG arc whose sagitta is below 1e-9 of
+// its chord as a straight line, so a file with noise bulges (1e-17) or radii
+// ~1e16 times the chord now burns its edge straight instead of a loop; other
+// output is unchanged. v43 is held by open PR #1623; carries forward v42 above.
+export const EMITTER_REVISION = 'near-straight-arcs-are-lines-20261109-v44';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

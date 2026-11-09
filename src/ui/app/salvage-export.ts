@@ -27,6 +27,8 @@ export type SalvageExportCtx = {
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
   readonly isCurrent?: () => boolean;
   readonly writeTarget?: (target: SaveTarget, contents: string | Blob) => Promise<void>;
+  /** Objects past the coordinate limit the copy leaves out (ADR-307 Amendment 5). */
+  readonly leftOut?: ReadonlyArray<string>;
 };
 
 export type SalvageExportOutcome = 'exported' | 'cancelled' | 'stale' | 'error';
@@ -98,21 +100,39 @@ async function writeRecoveryTarget(
   try {
     await (ctx.writeTarget === undefined ? target.write(raw) : ctx.writeTarget(target, raw));
     if (ctx.isCurrent?.() === false) return 'stale';
-    ctx.pushToast(
-      `Exported a raw recovery copy to ${target.displayName}. It preserves your work but may ` +
-        'need repair before it reopens cleanly.',
-      'warning',
-    );
+    ctx.pushToast(exportedMessage(ctx, target), 'warning');
     return 'exported';
   } catch (err) {
     return recoveryError(ctx, err);
   }
 }
 
+function exportedMessage(ctx: SalvageExportCtx, target: SaveTarget): string {
+  const leftOut = ctx.leftOut ?? [];
+  if (leftOut.length > 0) {
+    return (
+      `Exported a recovery copy to ${target.displayName} without ` +
+      `${recoveryLeftOutText(leftOut)}, which a project file cannot hold. ` +
+      'It opens as a normal project.'
+    );
+  }
+  return (
+    `Exported a raw recovery copy to ${target.displayName}. It preserves your work but may ` +
+    'need repair before it reopens cleanly.'
+  );
+}
+
 function recoveryError(ctx: SalvageExportCtx, err: unknown): SalvageExportOutcome {
   if (ctx.isCurrent?.() === false) return 'stale';
   ctx.pushToast(`Could not export a recovery copy: ${errMsg(err)}`, 'error');
   return 'error';
+}
+
+/** Names the left-out objects, at most three by label. */
+export function recoveryLeftOutText(leftOut: ReadonlyArray<string>): string {
+  return leftOut.length <= 3
+    ? leftOut.join(', ')
+    : `${leftOut.slice(0, 3).join(', ')} and ${leftOut.length - 3} more`;
 }
 
 export function recoveryName(savedName: string | null): string {
