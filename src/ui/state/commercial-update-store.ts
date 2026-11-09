@@ -1,6 +1,6 @@
 // The desktop app's own update status (ADR-547), published by
-// CommercialUpdates inside the licensed edition and read by the status bar's
-// Update ready button and the canvas update prompt. A dedicated Zustand slice
+// CommercialUpdates inside the licensed edition and read by the toolbar's
+// Update button (ADR-561 Amendment 7) and the canvas update prompt. A dedicated Zustand slice
 // keeps them decoupled, as pwa-update-store does for the web app. Null in the
 // web app and until the main process first answers.
 

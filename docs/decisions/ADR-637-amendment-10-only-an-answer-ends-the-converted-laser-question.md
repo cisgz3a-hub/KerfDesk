@@ -77,7 +77,9 @@ promised that "no job starts on that CNC until they answer". Two gaps broke that
   - A 1.0.29 CNC project opened on another computer whose last machine is the plain starter is not
     asked (Amendment 8). The laser-worded `$30` advisory still warns at a laser-scale `$30`.
   - An external G-code run (the G-code Inspector's Run) streams the operator's own file, not a CNC job
-    KerfDesk compiled for this machine, so it is not asked.
+    KerfDesk compiled for this machine, so it is not asked. **Replaced by Amendment 11
+    (2026-11-09):** on a CNC-typed machine the Run review also drops its lit-rapid warning and
+    laser-mode check, so the Run now asks too (rolling audit v12 X7-P3-3).
 - G-code is unchanged.
 - **1.0.30 update notes.** Amendment 8's line still holds, and is now true for every converted
   machine: "If KerfDesk 1.0.29 set your laser up as a CNC when you first connected it, KerfDesk now

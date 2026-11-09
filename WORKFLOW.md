@@ -9700,9 +9700,20 @@ Selecting **Download update** immediately shows that the request is starting. Th
 
 #### Success - update prompt on the canvas (ADR-561 Amendment 5)
 
-1. When a manual update is offered, a non-modal **Update available** card appears at the top centre of the canvas with the new version and up to three improvement notes. **Update** starts the same download as **Download update**; **Not now** clears the card until KerfDesk next starts. The status bar button and Help → Check for Updates remain.
+1. When a manual update is offered, a non-modal **Update available** card appears at the top centre of the canvas with the new version and up to three improvement notes. **Update** starts the same download as **Download update**; **Not now** clears the card until KerfDesk next starts. The toolbar's **Update** button and Help → Check for Updates remain.
 2. After **Update**, the card shows download progress (**Hide** keeps downloading in the background). Once verified it shows **Update ready to install** with **Install now** (the explicit install-and-close action above), **When I close** (install on a normal close) and **Not now**. Downloading never installs by itself.
 3. The card does not appear, and hides, while a job, Fire, owned or external motion, MPG, a modal dialog or the updates panel owns the window; it returns once that ends. A failure after the user acted in the card is reported there with **Details**, which opens Help → Check for Updates.
+
+#### Success - Update button in the toolbar (ADR-561 Amendment 7)
+
+1. While a desktop update is offered, downloading or downloaded, a filled copper **Update** button with a gentle glow sits first among the toolbar's right-hand controls, in laser and CNC workspaces. The glow holds still when the system asks for reduced motion.
+2. An offered update downloads on one click; the button shows the progress (**Updating 42%**, **Verifying…**). On macOS and Linux the click opens the verified download page instead.
+3. Once verified, the click asks "Install KerfDesk X.Y.Z now?" with **Install now**, **Not now** and **Details…**. **Install now** is **Install and close KerfDesk**: unsaved work gets the usual Save, Don't Save or Cancel, then KerfDesk closes and the installer opens.
+4. While a job runs or is paused, or Fire, motion, Frame preparation, Job Review or MPG owns the window, the button reads **Update after job** and does nothing. When the work ends it is offered again; nothing installs or closes by itself.
+
+#### Edge case - browser build
+
+The web app keeps its status bar **Update** button (ADR-227, ADR-228); applying it reloads the page.
 
 1. On each packaged unsigned Preview launch, KerfDesk makes at most one anonymous
    metadata request to `https://dl.kerfdesk.com/desktop/previews/latest.json`.
@@ -9813,7 +9824,7 @@ Selecting **Download update** immediately shows that the request is starting. Th
    shows the installed version and where updates stand (checking, downloading,
    ready to install when KerfDesk closes, not covered by the licence, waiting for
    the licence to be confirmed, failed), offers Check now and the beta choice, and
-   the status bar shows **Update ready** once a version has downloaded (ADR-547).
+   the toolbar shows **Update ready** once a version has downloaded (ADR-547, ADR-561 Amendment 7).
    A failed licence confirmation holds a covered paid or trial update back, and the
    panel says so rather than that the licence's updates ended (ADR-547 Amendment 1).
    The newest eligible

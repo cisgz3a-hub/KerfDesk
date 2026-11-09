@@ -220,7 +220,7 @@ function NotNow({ onClick }: { readonly onClick: () => void }): JSX.Element {
   return (
     <Button
       onClick={onClick}
-      title="Hide this until KerfDesk next starts. The status bar keeps the update button."
+      title="Hide this until KerfDesk next starts. The toolbar keeps the Update button."
     >
       Not now
     </Button>

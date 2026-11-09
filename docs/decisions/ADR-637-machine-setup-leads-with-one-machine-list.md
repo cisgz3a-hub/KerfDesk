@@ -171,6 +171,10 @@ Amendment 8: every CNC-only profile 1.0.29 could have made from a laser (the sta
 import, a profile with no id) is asked whatever its spindle settings or `$30`, only the operator's
 answer ends the question, and both CNC recoveries ask it before they start.
 
+Amendment 11 (`ADR-637-amendment-11-the-inspector-run-asks-the-converted-laser-question.md`) has
+the G-code Inspector's Run ask it too: on a CNC-typed machine its review drops the laser checks, so
+its Start waits for the same answer.
+
 Verification: `device-setup-auto-fill.test.ts` (a listed laser and a CNC preset keep their type),
 `machine-picker-entries.test.ts` (the CNC reset), and `DeviceSetupMachinePicker.customised.test.tsx`
 (the draft's facts and type question, the replace notice for a CNC preset, **My machine isn't

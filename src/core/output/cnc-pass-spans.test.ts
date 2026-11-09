@@ -13,8 +13,11 @@ const point = fc
   .map(({ x, y }) => ({ x: x / 4, y: y / 4 }));
 const depth = fc.integer({ min: -100, max: -1 }).map((z) => z / 10);
 
+// A contour whose points all coincide cuts nothing, so the emitter writes no
+// span for it; the properties below count passes that move.
 const contourPass: fc.Arbitrary<CncPass> = fc
   .record({ polyline: fc.array(point, { minLength: 2, maxLength: 8 }), zMm: depth })
+  .filter(({ polyline }) => polyline.some((p) => p.x !== polyline[0]?.x || p.y !== polyline[0]?.y))
   .map(({ polyline, zMm }) => ({ kind: 'contour', zMm, polyline, closed: false }));
 
 const path3dPass: fc.Arbitrary<CncPass> = fc
