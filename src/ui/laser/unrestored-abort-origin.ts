@@ -10,6 +10,14 @@
 // 4-10 mm off the half-burned piece. While the saved origin stands unrestored,
 // the offer names it and the head's distance from it, and its OK puts the saved
 // origin back. Set origin here stays in the Machine panel, named in Cancel.
+//
+// The saved origin is in machine coordinates, and a power-up or the reset a
+// board does when its port opens re-zeroes those on a machine without homing
+// (rolling audit v12 X1-P1-1, ADR-341 Amendment 13). After either, OK writing
+// it put the re-run as far off as the head had been from machine zero. So once
+// machine zero may have moved: with homing the offer homes first and says why;
+// without homing it restores nothing, and the plain offer to set the origin at
+// the head says the saved one can no longer be put back.
 
 import { useStore } from '../state';
 import { currentJobStopRequest } from '../state/job-stop-request';
@@ -24,14 +32,42 @@ import { repairFailed, type BlockedStartRepair } from './start-blocked-repair';
 
 type SavedMm = { readonly x: number; readonly y: number };
 
+export type UnrestoredAbortOrigin = {
+  readonly saved: SavedMm;
+  /** Machine zero may have moved since the Abort read the origin. */
+  readonly machineZeroMoved: boolean;
+};
+
 /** The origin the operator's Abort recorded for the current stream, or null.
  *  Frame asks only while no origin is set, so a recorded one is unrestored. */
 export function unrestoredAbortOrigin(
-  state: Pick<LaserState, 'jobStopRequest' | 'streamerEpoch'>,
-): SavedMm | null {
+  state: Pick<LaserState, 'jobStopRequest' | 'streamerEpoch' | 'machineZeroEpoch'>,
+): UnrestoredAbortOrigin | null {
   const request = currentJobStopRequest(state);
-  if (request?.reason !== 'operator') return null;
-  return request.originAtStopMm ?? null;
+  if (request?.reason !== 'operator' || request.originAtStopMm === undefined) return null;
+  return {
+    saved: request.originAtStopMm,
+    machineZeroMoved: request.originMachineZeroEpoch !== (state.machineZeroEpoch ?? 0),
+  };
+}
+
+/** Whether putting the saved origin back homes first: the profile has homing
+ *  and the controller homes from an alarm, as the Abort card decides. */
+export function abortRestoreHomesFirst(): boolean {
+  return (
+    useStore.getState().project.device.homing.enabled &&
+    useLaserStore.getState().capabilities.homeFromAlarm !== false
+  );
+}
+
+/** Said before the plain set-origin offer when machine zero may have moved on
+ *  a machine without homing, so the saved origin cannot be put back. */
+export function restartedOriginNote(saved: SavedMm): string {
+  return (
+    `The job you stopped ran from ${originWhere(saved)}, but the controller has restarted ` +
+    'since then, and without homing its machine zero may have moved, so that origin cannot ' +
+    'be put back. Move the head to where the job should start first.'
+  );
 }
 
 /** The head minus the saved origin, in mm, or null while KerfDesk cannot
@@ -49,17 +85,20 @@ export function headOffsetFromSavedMm(
   return head === null ? null : { x: head.x - saved.x, y: head.y - saved.y };
 }
 
-/** The offer's text: the saved origin, the head's distance from it, and what
- *  OK and Cancel do. */
+/** The offer's text: the saved origin, the head's distance from it (or, when
+ *  machine zero may have moved, why Home comes first), and what OK and Cancel do. */
 export function unrestoredOriginOfferPrompt(
   placement: 'User Origin' | 'Verified Origin',
   saved: SavedMm,
   headOffset: SavedMm | null,
   homeFirst: boolean,
+  machineZeroMoved = false,
 ): string {
-  const where = `X ${formatOriginMm(saved.x)}, Y ${formatOriginMm(saved.y)} mm from machine zero`;
-  const distance =
-    headOffset === null
+  const where = originWhere(saved);
+  const distance = machineZeroMoved
+    ? 'The controller has restarted since then, so its machine zero may have moved: Home ' +
+      'measures it again before the origin goes back.'
+    : headOffset === null
       ? 'KerfDesk cannot tell how far the head is from it.'
       : `The head is ${formatOriginMm(Math.hypot(headOffset.x, headOffset.y))} mm from it ` +
         `(X ${signedMm(headOffset.x)}, Y ${signedMm(headOffset.y)} mm).`;
@@ -77,19 +116,19 @@ export function unrestoredOriginOfferPrompt(
   );
 }
 
-/** The Frame offer while the aborted job's origin is unrestored: OK restores it. */
+/** The Frame offer while the aborted job's origin is unrestored: OK restores it.
+ *  The caller makes it only while machine zero is unmoved or the restore homes. */
 export async function offerRestoreAbortOrigin(
   placement: 'User Origin' | 'Verified Origin',
-  saved: SavedMm,
+  { saved, machineZeroMoved }: UnrestoredAbortOrigin,
 ): Promise<BlockedStartRepair> {
-  const laser = useLaserStore.getState();
-  const homeFirst =
-    useStore.getState().project.device.homing.enabled && laser.capabilities.homeFromAlarm !== false;
+  const homeFirst = abortRestoreHomesFirst();
   const prompt = unrestoredOriginOfferPrompt(
     placement,
     saved,
-    headOffsetFromSavedMm(laser, saved),
+    headOffsetFromSavedMm(useLaserStore.getState(), saved),
     homeFirst,
+    machineZeroMoved,
   );
   if (!jobAwareConfirm(prompt)) return 'unrepaired';
   try {
@@ -105,6 +144,10 @@ export async function offerRestoreAbortOrigin(
       'success',
     );
   return 'retry';
+}
+
+function originWhere(saved: SavedMm): string {
+  return `X ${formatOriginMm(saved.x)}, Y ${formatOriginMm(saved.y)} mm from machine zero`;
 }
 
 function signedMm(value: number): string {

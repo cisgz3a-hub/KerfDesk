@@ -10,7 +10,7 @@ import {
   VERIFIED_ORIGIN_REQUIRED_MESSAGE,
 } from '../job-placement';
 import { parseStatusReport } from '../../core/controllers/grbl';
-import { unrestoredOriginOfferPrompt } from './unrestored-abort-origin';
+import { restartedOriginNote, unrestoredOriginOfferPrompt } from './unrestored-abort-origin';
 import {
   offerSetupFixForBlockedStart,
   SET_ORIGIN_OFFER_PROMPT,
@@ -30,6 +30,7 @@ const original = {
   streamerEpoch: useLaserStore.getState().streamerEpoch,
   statusReport: useLaserStore.getState().statusReport,
   wcoCache: useLaserStore.getState().wcoCache,
+  machineZeroEpoch: useLaserStore.getState().machineZeroEpoch ?? 0,
 };
 
 beforeEach(() => {
@@ -138,7 +139,13 @@ describe('offer while an aborted job origin is unrestored', () => {
     useLaserStore.setState({
       restoreWorkOrigin: vi.fn(async () => undefined),
       streamerEpoch: 7,
-      jobStopRequest: { reason: 'operator', streamerEpoch: 7, originAtStopMm: SAVED },
+      jobStopRequest: {
+        reason: 'operator',
+        streamerEpoch: 7,
+        originAtStopMm: SAVED,
+        originMachineZeroEpoch: 3,
+      },
+      machineZeroEpoch: 3,
       statusReport: parseStatusReport('<Idle|MPos:69.800,45.750,0.000|FS:0,0>'),
       wcoCache: null,
     });
@@ -177,6 +184,33 @@ describe('offer while an aborted job origin is unrestored', () => {
     expect(unrestoredOriginOfferPrompt('Verified Origin', SAVED, null, true)).toContain(
       'OK: home the machine',
     );
+  });
+
+  // Rolling audit v12 X1-P1-1: a new connection or a power-up re-zeroes machine
+  // position on a machine without homing, so the saved origin cannot go back.
+  it('after machine zero may have moved, without homing, offers only the origin at the head', async () => {
+    useLaserStore.setState({ machineZeroEpoch: 4 });
+    await expect(offerSetupFixForBlockedStart(USER_ORIGIN_REQUIRED_MESSAGE)).resolves.toBe('retry');
+    const prompt = vi.mocked(jobAwareConfirm).mock.calls[0]?.[0] ?? '';
+    expect(prompt).toContain(restartedOriginNote(SAVED));
+    expect(prompt).toContain(
+      'The job you stopped ran from X 60, Y 40 mm from machine zero, but the controller has restarted',
+    );
+    expect(prompt).toContain('OK: set the work origin where the head is now.');
+    expect(prompt).not.toContain('put the saved origin back');
+    expect(prompt).not.toContain('The head is');
+    expect(useLaserStore.getState().restoreWorkOrigin).not.toHaveBeenCalled();
+    expect(useLaserStore.getState().setOriginHere).toHaveBeenCalledTimes(1);
+  });
+
+  it('after machine zero may have moved, with homing, says Home comes first', () => {
+    const prompt = unrestoredOriginOfferPrompt('User Origin', SAVED, { x: 1, y: 2 }, true, true);
+    expect(prompt).toContain(
+      'The controller has restarted since then, so its machine zero may have moved: Home ' +
+        'measures it again before the origin goes back.',
+    );
+    expect(prompt).toContain('OK: home the machine');
+    expect(prompt).not.toContain('The head is');
   });
 
   it('keeps the plain offer for a stop that was not the operator Abort', async () => {
