@@ -89,6 +89,8 @@ function buildFalconJog(params: JogParams): string {
     ['X', params.dx],
     ['Y', params.dy],
     ['Z', params.dz],
+    // A rotary on the A1 Pro's rotary connector (ADR-695).
+    ['A', params.da],
   ] as const;
   const words = axes.flatMap(([axis, value]) =>
     value === undefined || (!absolute && value === 0) ? [] : [`${axis}${value.toFixed(3)}`],

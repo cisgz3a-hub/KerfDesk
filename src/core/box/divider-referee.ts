@@ -122,39 +122,72 @@ function checkJunctions(
   const uSpan = divider.axis === 'x' ? expected.uSpanX : expected.uSpanY;
   const tabsLeft = faceRuns(divider.outline, 'x', 0, playMm === 0 ? 0 : playMm);
   const tabsRight = faceRuns(divider.outline, 'x', uSpan, playMm === 0 ? 0 : playMm);
+  // An open-front box has no front wall: an X-divider ends there in one
+  // flush edge, and only the back wall carries its slots (ADR-693).
+  const openFront = spec.style === 'open-front' && divider.axis === 'x';
   const issues: string[] = [];
-  for (const wallId of wallPair) {
+  for (const [side, wallId, tabs] of [
+    ['left', wallPair[0], tabsLeft],
+    ['right', wallPair[1], tabsRight],
+  ] as const) {
+    if (side === 'left' && openFront) {
+      issues.push(...checkOpenEnd(tabsLeft, expected.heightSpanMm, playMm, tolMm, label));
+      continue;
+    }
     const wall = walls.find((candidate) => candidate.panel === wallId);
     if (wall === undefined) {
       issues.push(`${label}: mating wall ${wallId} missing`);
       continue;
     }
     issues.push(
-      ...checkWallSlots({ wall, wallId, label, startMm, expected, t, playMm, tolMm, tabsLeft }),
+      ...checkWallSlots({ wall, wallId, label, startMm, expected, t, playMm, tolMm, tabs }),
     );
-  }
-  if (playMm === 0) {
-    for (const [side, runs] of [
-      ['left', tabsLeft],
-      ['right', tabsRight],
-    ] as const) {
-      if (runs.length !== expected.tabCells.length) {
-        issues.push(
-          `${label}: ${side} face carries ${runs.length} tabs; expected ${expected.tabCells.length}`,
-        );
-        continue;
-      }
-      expected.tabCells.forEach((cell, k) => {
-        const run = runs[k];
-        if (run !== undefined && (run.fromMm !== cell.fromMm || run.toMm !== cell.toMm)) {
-          issues.push(
-            `${label}: ${side} tab ${k} at ${run.fromMm}..${run.toMm}, claimed ${cell.fromMm}..${cell.toMm}`,
-          );
-        }
-      });
-    }
+    if (playMm === 0) issues.push(...checkFaceTabs(tabs, expected, `${label}: ${side}`));
   }
   return issues;
+}
+
+// At play 0 a tabbed face carries exactly the claimed tab runs.
+function checkFaceTabs(
+  runs: ReadonlyArray<{ fromMm: number; toMm: number }>,
+  expected: ExpectedGrid,
+  label: string,
+): string[] {
+  if (runs.length !== expected.tabCells.length) {
+    return [`${label} face carries ${runs.length} tabs; expected ${expected.tabCells.length}`];
+  }
+  const issues: string[] = [];
+  expected.tabCells.forEach((cell, k) => {
+    const run = runs[k];
+    if (run !== undefined && (run.fromMm !== cell.fromMm || run.toMm !== cell.toMm)) {
+      issues.push(
+        `${label} tab ${k} at ${run.fromMm}..${run.toMm}, claimed ${cell.fromMm}..${cell.toMm}`,
+      );
+    }
+  });
+  return issues;
+}
+
+// The open end is one straight edge over the divider's full height (each
+// end recedes play/4 under the fit offset).
+function checkOpenEnd(
+  runs: ReadonlyArray<{ fromMm: number; toMm: number }>,
+  heightSpanMm: number,
+  playMm: number,
+  tolMm: number,
+  label: string,
+): string[] {
+  const run = runs[0];
+  const slackMm = playMm === 0 ? 0 : playMm / 4 + tolMm;
+  if (
+    runs.length !== 1 ||
+    run === undefined ||
+    Math.abs(run.fromMm) > slackMm ||
+    Math.abs(run.toMm - heightSpanMm) > slackMm
+  ) {
+    return [`${label}: open front end ${JSON.stringify(runs)} is not one flush edge`];
+  }
+  return [];
 }
 
 type WallSlotArgs = {
@@ -166,13 +199,14 @@ type WallSlotArgs = {
   readonly t: number;
   readonly playMm: number;
   readonly tolMm: number;
-  readonly tabsLeft: ReadonlyArray<{ fromMm: number; toMm: number }>;
+  /** The divider's tab runs on the face that meets this wall. */
+  readonly tabs: ReadonlyArray<{ fromMm: number; toMm: number }>;
 };
 
 // One wall's slot column: exact position/extent at play 0; the offset
 // contract (length play == c, thickness play == c/2) otherwise.
 function checkWallSlots(args: WallSlotArgs): string[] {
-  const { wall, wallId, label, startMm, expected, t, playMm, tolMm, tabsLeft } = args;
+  const { wall, wallId, label, startMm, expected, t, playMm, tolMm, tabs } = args;
   const issues: string[] = [];
   const column = wall.cutouts
     .map(bbox)
@@ -198,7 +232,7 @@ function checkWallSlots(args: WallSlotArgs): string[] {
         issues.push(`${label}: wall ${wallId} slot ${k} column off the divider slab`);
       }
     } else {
-      const lengthPlay = slotTo - slotFrom - (cell.toMm - cell.fromMm) + tabShrink(tabsLeft, cell);
+      const lengthPlay = slotTo - slotFrom - (cell.toMm - cell.fromMm) + tabShrink(tabs, cell);
       if (Math.abs(lengthPlay - playMm) > 2 * tolMm) {
         issues.push(`${label}: wall ${wallId} slot ${k} length play ${lengthPlay} ≠ ${playMm}`);
       }

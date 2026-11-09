@@ -48,8 +48,14 @@ export function partFrame(panel: BoxPanel, spec: BoxSpec): PartFrame | null {
     case 'right':
       return frame({ x: dims.outerWidthMm - t, y: 0, z: 0 }, Y, Z, X);
     case 'lid':
-      // The slide lid rides the channel band directly under the top strip.
-      return frame({ x: 0, y: 0, z: dims.outerHeightMm - 2 * t }, X, Y, Z);
+      // The slide lid rides the channel band directly under the top strip;
+      // the lift-off lid rests on the wall rim (ADR-693).
+      return spec.style === 'lift-lid'
+        ? frame({ x: 0, y: 0, z: dims.outerHeightMm - t }, X, Y, Z)
+        : frame({ x: 0, y: 0, z: dims.outerHeightMm - 2 * t }, X, Y, Z);
+    case 'lid-lip':
+      // Glued under the lid top, inside the rim, between the wall faces.
+      return frame({ x: t, y: t, z: dims.outerHeightMm - 2 * t }, X, Y, Z);
     case 'divider':
       return dividerFrame(panel, spec, t);
   }

@@ -3,12 +3,13 @@ import {
   activeRotaryTaper,
   rotaryMeasurementsValid,
   rotaryTaperValid,
+  type RotaryAxis,
   type RotarySetup,
 } from '../../core/devices/rotary';
 import type { RotaryPreset } from '../../core/devices/rotary-presets';
 import { Button, Dialog, DialogActions } from '../kit';
 import { errorStyle } from './rotary-setup-dialog.styles';
-import { NEW_ROTARY_SETUP, startRotaryEdit } from './rotary-setup-edit';
+import { editRotaryAxisConfirmed, NEW_ROTARY_SETUP, startRotaryEdit } from './rotary-setup-edit';
 import { RotarySetupFields } from './RotarySetupFields';
 import { RotaryTestRotationPanel } from './RotaryTestRotationPanel';
 import { useRotaryTestRotation } from './use-rotary-test-rotation';
@@ -22,6 +23,8 @@ export function RotarySetupDialog(props: {
   readonly onGenerateCalibration: (setup: RotarySetup) => void;
   /** Published rotaries for this machine (ADR-503). */
   readonly presets?: ReadonlyArray<RotaryPreset>;
+  /** The axes this controller can turn a rotary on (ADR-695). Absent: Y only. */
+  readonly axes?: ReadonlyArray<RotaryAxis>;
   readonly artwork?: RotaryArtworkExtent | null;
   readonly outputDescription?: string;
 }): JSX.Element {
@@ -35,6 +38,7 @@ export function RotarySetupDialog(props: {
         edit={edit}
         onEdit={setEdit}
         {...(props.presets === undefined ? {} : { presets: props.presets })}
+        {...(props.axes === undefined ? {} : { axes: props.axes })}
       />
       <RotaryWrapPreview
         setup={setup}
@@ -44,7 +48,12 @@ export function RotarySetupDialog(props: {
           : { outputDescription: props.outputDescription })}
       />
       {!valid ? <p style={errorStyle}>{invalidRotaryMessage(setup)}</p> : null}
-      <RotaryTestRotationPanel setup={setup} valid={valid} test={test} />
+      <RotaryTestRotationPanel
+        setup={setup}
+        valid={valid}
+        test={test}
+        onConfirmAxis={(axis) => setEdit((current) => editRotaryAxisConfirmed(current, axis))}
+      />
       <RotaryActions
         setup={setup}
         valid={valid}

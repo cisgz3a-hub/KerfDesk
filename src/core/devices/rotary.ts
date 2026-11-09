@@ -18,6 +18,12 @@
 
 export type RotaryType = 'roller' | 'chuck';
 
+// Which controller axis turns the rotary (ADR-695, LightBurn's Rotary Axis):
+// Y when the rotary takes the Y motor's place, A or Z for a dedicated rotary
+// port. Rules and controller support live in rotary-axis.ts.
+export type RotaryAxis = 'Y' | 'A' | 'Z';
+export type DedicatedRotaryAxis = Exclude<RotaryAxis, 'Y'>;
+
 export type RotarySetup = {
   readonly enabled: boolean;
   readonly type: RotaryType;
@@ -31,6 +37,14 @@ export type RotarySetup = {
   // ignores it; Rotary Setup never saves one on a chuck, but a hand-edited
   // file may carry one.
   readonly rollerDiameterMm?: number;
+  // The axis that turns the rotary. Absent is Y, so every earlier project
+  // keeps its output byte for byte (ADR-695). mmPerRotation is in this axis's
+  // own commanded units: degrees on A, millimetres on Y and Z.
+  readonly axis?: RotaryAxis;
+  // The dedicated axis the operator last saw a Test rotation turn the rotary
+  // on. A job on an A or Z rotary warns until it matches `axis`, because the
+  // wiring of a dedicated port is the one thing KerfDesk cannot read.
+  readonly axisConfirmed?: DedicatedRotaryAxis;
   // Spin the object the opposite way (mount reversed / inverting gearing).
   // Mirrors the engraving around the cylinder so text isn't backwards.
   // Absent/false = normal direction, byte-identical output.

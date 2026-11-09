@@ -10,6 +10,7 @@ import {
   rotaryYScale,
   type RotarySetup,
 } from '../../core/devices/rotary';
+import { rotaryAxisOf, rotaryAxisUnitLabel } from '../../core/devices/rotary-axis';
 
 export function rotaryTypeLabel(setup: RotarySetup): string {
   return setup.type === 'roller' ? 'Roller' : 'Chuck';
@@ -29,10 +30,15 @@ export function rotaryAttachmentSummary(setup: RotarySetup): string {
   return `${summary} (rollers Ø${formatRotaryMm(setup.rollerDiameterMm)} mm)`;
 }
 
-/** "Y ×1.91, one revolution = 360 machine mm": the scale and the wrap limit. */
+/** "Y ×1.91, one revolution = 360 machine mm": the axis, its scale and the
+ * wrap limit, in the axis's own units ("A ×1.43, one revolution = 360°" on a
+ * degree-counting A axis, ADR-695). */
 export function rotaryMappingSummary(setup: RotarySetup): string {
+  const axis = rotaryAxisOf(setup);
   const scale = rotaryYScale(setup).toFixed(2);
-  return `Y ×${scale}, one revolution = ${formatRotaryMm(rotaryYLimitMm(setup))} machine mm`;
+  const turn = formatRotaryMm(rotaryYLimitMm(setup));
+  const unit = rotaryAxisUnitLabel(axis);
+  return `${axis} ×${scale}, one revolution = ${turn}${unit === '°' ? '°' : ` ${unit}`}`;
 }
 
 /** The Job Review machine fact: what the next job's Y mapping will be. */

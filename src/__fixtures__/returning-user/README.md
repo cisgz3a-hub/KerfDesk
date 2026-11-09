@@ -36,6 +36,7 @@ store, compile them to G-code, and compare with the sidecar.
 | `1.0.29-cnc-flat-drill`                | 1.0.29                                                    | The 1.0.28 flat Drill contour, cut at the canvas anchor                   |
 | `1.0.29-white-logos`                   | 1.0.29                                                    | U3's logo, a white-letter plate, a style and class logo, and the logo with its white on Output off |
 | `1.0.29-white-logo-copies`             | 1.0.29                                                    | U3's logo with two Array copies and a moved Duplicate, which lost `svgImport` |
+| `1.0.29-rotary`                        | 1.0.29                                                    | The Creality chuck preset (40 mm per turn, Ø80) on, a line square and a 90° fill |
 
 The 1.0.29 set was built through 1.0.29's store actions: Import, Draw, the laser tab tool, the
 toolbar and a handle drag, the operation settings, and the Photo engraving dialog's own preview,
@@ -48,6 +49,11 @@ reads them.
 store Import, so its white shapes burn over the black, and the last logo's white operation was set
 to Output off with `setLayerParam`. Its sidecar holds each import's burn (by `svgImport.source`)
 and the whole job. `returning-user-white-fills.test.ts` reads it.
+
+`1.0.29-rotary` (rolling audit v12 X8, ADR-695) was built through 1.0.29's store: Draw, the operation
+settings and Rotary Setup's Apply (`updateDeviceProfile`). It has no rotary axis, so it must open on Y.
+Its sidecar holds the rotary as saved and the whole job's burn from Absolute, Current Position
+(centre at X120 Y80) and User Origin (front-left). `returning-user-rotary-1-0-29.test.ts` reads it.
 
 `1.0.29-white-logo-copies` (rolling audit v12 X2-P1-1) is U3's logo imported the same way, then
 copied with 1.0.29's Array (`placeSelectionCopies`, two copies beside it) and Duplicate (moved below

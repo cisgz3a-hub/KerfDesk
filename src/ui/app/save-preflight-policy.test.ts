@@ -78,6 +78,7 @@ describe('partitionSavePreflight', () => {
       'program-materialization-failed',
       'relief-materialization-failed',
       'relief-needs-cnc',
+      'rotary-axis-unexecutable',
     ]);
     expect(COMPILE_INTEGRITY_PREFLIGHT_CODES.has('out-of-bed')).toBe(false);
   });

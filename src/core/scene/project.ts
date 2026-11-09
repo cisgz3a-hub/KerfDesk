@@ -41,8 +41,9 @@ import type { ProductionNestDefinition } from '../nesting/production-nest';
 // v21 gives that rule back to frames a v19 writer converted and saved, read from
 // their stored geometry (ADR-682 Amendment 3). The file itself changes only by
 // the field v20 added; the bump makes the check run once.
-// v22 carries a rotary taper (ADR-694). An older reader would burn a tapered
-// tumbler with no warp, 11 % short round its narrow end.
+// v22 carries a rotary taper (ADR-694) and a dedicated rotary axis (ADR-695).
+// An older reader would burn a tapered tumbler with no warp, or drive an A or Z
+// rotary as Y.
 export const PROJECT_SCHEMA_VERSION = 22 as const;
 
 export type EmbeddedFont = {

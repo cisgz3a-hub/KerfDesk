@@ -96,7 +96,10 @@ Frame, G-code for cut, fill and image, the rotary bounds check and Job Review.
     earlier file has one. A 1.0.30 reader refuses a schema 22 file instead of burning a tapered
     part unwarped. Absent or off, the warp returns the same job object, so output is
     byte-identical. A golden set saved and emitted by the published 1.0.30 (five rotary setups,
-    three placements, with cut, fill and image) emits the same bytes on this build.
+    three placements, with cut, fill and image) emits the same bytes on this build. ADR-695's
+    dedicated rotary axis landed first without a bump of its own; v22 covers both fields. A machine
+    profile (`.lfmachine`) with an active taper is written as machine-profile schema 2, ADR-695's
+    schema for a dedicated axis, so a reader without tapers refuses it instead of dropping the taper.
 12. **Wording.** The strip helper says one reading is right only at that height: measure where
     the artwork goes, or both ends for Tapered part. The tutorial says the same and adds the focus
     advice. Neither promises a perfect burn on a taper.
@@ -112,6 +115,8 @@ Frame, G-code for cut, fill and image, the rotary bounds check and Job Review.
   goes) leaves about ±2 % across a 30 mm logo and ±6.7 % across a full-length wrap on the same cup.
 - The G-code inspector's 3D wrap still draws a cylinder of Object diameter, and its dose shading
   does not yet read the taper. This is a follow-up and does not change output.
+- The surface-feed match (ADR-127 Amendment 2, PR #1672) must multiply the Y scale by
+  `rotaryTaperYFactorAt` at each move; whichever of the two lands second adds it.
 - The design is not edited, so turning the taper off restores the untapered output exactly.
 
 ### Verification

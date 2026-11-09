@@ -6,21 +6,29 @@
 
 import type { Polyline, Vec2 } from '../scene';
 import { validateBoxSpec, type BoxSpec, type BoxSpecIssue } from './box-spec';
-import { buildPanelClaims, type PanelId } from './panel-claims';
+import { buildPanelClaims, WALL_NAMES, type PanelId } from './panel-claims';
 import { panelOutline } from './panel-outline';
 import { applyPanelFit, type PanelRings } from './panel-fit';
 import { layoutPanelOffsets, type PanelExtent } from './layout';
 import { dividerLayout, hasDividers } from './divider-layout';
 import { dividerName, dividerPanelRings, wallSlotCutouts } from './divider-panels';
 import { buildSlideLidParts } from './slide-lid-panels';
+import { buildLiftLidParts, liftLidBodySpec } from './lift-lid-panels';
 import { checkBoxAssembly } from './assembly-referee';
 import { checkDividerAssembly } from './divider-referee';
 import { checkSlideLidAssembly } from './slide-lid-referee';
+import { checkLiftLidAssembly } from './lift-lid-referee';
+
+/**
+ * A generated part: one of the six box walls, or a loose part — a divider
+ * (ADR-116 V2), the slide or lift-off lid (ADR-116 V3, ADR-693), or the
+ * lift-off lid's locating lip (ADR-693).
+ */
+export type BoxPartKind = PanelId | 'divider' | 'lid' | 'lid-lip';
 
 export type BoxPanel = {
   readonly name: string;
-  /** 'divider'/'lid' entries are the ADR-116 V2/V3 loose parts. */
-  readonly panel: PanelId | 'divider' | 'lid';
+  readonly panel: BoxPartKind;
   readonly divider?: { readonly axis: 'x' | 'y'; readonly index: number };
   /** Closed outline in sheet mm (layout offset already applied). */
   readonly outline: Polyline;
@@ -39,24 +47,15 @@ export type GenerateBoxResult =
     }
   | { readonly kind: 'error'; readonly message: string };
 
-const PANEL_NAMES: Readonly<Record<PanelId, string>> = {
-  bottom: 'Bottom',
-  top: 'Top',
-  front: 'Front',
-  back: 'Back',
-  left: 'Left',
-  right: 'Right',
-};
-
 type FittedBoxPanel = {
   readonly name: string;
-  readonly panel: PanelId | 'divider' | 'lid';
+  readonly panel: BoxPartKind;
   readonly divider?: BoxPanel['divider'];
 } & PanelRings;
 
 type PreparedBoxPanel = {
   readonly name: string;
-  readonly panel: PanelId | 'divider' | 'lid';
+  readonly panel: BoxPartKind;
   readonly divider?: BoxPanel['divider'];
   readonly rings: PanelRings;
 };
@@ -126,8 +125,10 @@ function fitPanelWithAssemblyProof(
 ):
   | { readonly kind: 'fitted'; readonly panel: FittedBoxPanel; readonly proofPanel: FittedBoxPanel }
   | { readonly kind: 'error'; readonly message: string } {
-  // The loose lid's thumb notch is a handhold, not a square-tab seat.
-  const relief = part.panel === 'lid' ? ({ kind: 'none' } as const) : spec.relief;
+  // The slide lid's tongue shoulders seat on the channel posts, so the lid
+  // takes relief like any panel; its thumb-notch arc is never a seat
+  // (panel-fit relieves square corners only, ADR-116 Amd 1).
+  const relief = spec.relief;
   const fit = applyPanelFit(part.rings, { clearanceMm: spec.clearanceMm, relief });
   if (fit.kind !== 'fitted') {
     return { kind: 'error', message: `${part.name} panel: ${fit.detail}.` };
@@ -186,14 +187,11 @@ function verifyFittedAssembly(
   if (spec.clearanceMm < 0) return [];
   const options = { playMm: spec.clearanceMm };
   const walls = panels.flatMap((panel) =>
-    panel.panel === 'divider' || panel.panel === 'lid'
-      ? []
-      : [{ panel: panel.panel, outline: panel.outline, cutouts: panel.cutouts }],
+    isWall(panel.panel)
+      ? [{ panel: panel.panel, outline: panel.outline, cutouts: panel.cutouts }]
+      : [],
   );
-  const issues =
-    spec.style === 'slide-lid'
-      ? checkSlideLidAssembly(panels, spec, options)
-      : checkBoxAssembly(walls, spec, options);
+  const issues = styleAssemblyIssues(panels, walls, spec, options);
   if (!includesDividers) return issues;
   return [
     ...issues,
@@ -212,27 +210,50 @@ function verifyFittedAssembly(
   ];
 }
 
-// Walls (with any divider slots) per style: claim-model panels for closed
-// and open-top, the dedicated slide-lid builder otherwise.
+function isWall(panel: BoxPartKind): panel is PanelId {
+  return panel !== 'divider' && panel !== 'lid' && panel !== 'lid-lip';
+}
+
+// The lid styles prove their body and what the lid adds; every other style
+// is a plain claim-model box.
+function styleAssemblyIssues(
+  panels: ReadonlyArray<FittedBoxPanel>,
+  walls: ReadonlyArray<{ panel: PanelId; outline: Polyline; cutouts: ReadonlyArray<Polyline> }>,
+  spec: BoxSpec,
+  options: { readonly playMm: number },
+): ReadonlyArray<string> {
+  if (spec.style === 'slide-lid') return checkSlideLidAssembly(panels, spec, options);
+  if (spec.style === 'lift-lid') {
+    return [
+      ...checkBoxAssembly(walls, liftLidBodySpec(spec), options),
+      ...checkLiftLidAssembly(panels, spec, options),
+    ];
+  }
+  return checkBoxAssembly(walls, spec, options);
+}
+
+// Walls (with any divider slots) per style: claim-model panels for closed,
+// open-top and open-front, the dedicated lid builders otherwise.
 function nominalParts(
   spec: BoxSpec,
   slots: ReadonlyMap<PanelId, ReadonlyArray<Polyline>> | null,
 ): ReadonlyArray<PreparedBoxPanel> {
-  if (spec.style === 'slide-lid') {
-    return buildSlideLidParts(spec).map((part) => ({
+  if (spec.style === 'slide-lid' || spec.style === 'lift-lid') {
+    const parts = spec.style === 'slide-lid' ? buildSlideLidParts(spec) : buildLiftLidParts(spec);
+    return parts.map((part) => ({
       name: part.name,
       panel: part.panel,
       rings: {
         outline: part.rings.outline,
         cutouts: [
           ...part.rings.cutouts,
-          ...(part.panel === 'lid' ? [] : (slots?.get(part.panel) ?? [])),
+          ...(isWall(part.panel) ? (slots?.get(part.panel) ?? []) : []),
         ],
       },
     }));
   }
   return buildPanelClaims(spec).map((claims) => ({
-    name: PANEL_NAMES[claims.panel],
+    name: WALL_NAMES[claims.panel],
     panel: claims.panel,
     rings: {
       outline: panelOutline(claims),

@@ -4,11 +4,13 @@
 
 import { useState } from 'react';
 import type { RotarySetup, RotaryType } from '../../../core/devices';
-import { activeRotaryTaper } from '../../../core/devices/rotary';
+import { activeRotaryTaper, type RotaryAxis } from '../../../core/devices/rotary';
+import { rotaryAxisOf, rotaryAxisUnitLabel } from '../../../core/devices/rotary-axis';
 import { NumberField } from '../../common/NumberField';
 import {
   editRollerDiameter,
   editRollerScaling,
+  editRotaryAxis,
   editRotaryFields,
   editRotaryType,
   startRotaryEdit,
@@ -18,16 +20,13 @@ import { Row, numInputStyle, unitStyle } from '../device-settings-shared';
 
 export function DeviceSetupRotaryFields(props: {
   readonly value: RotarySetup;
+  /** The axes the draft's controller can turn a rotary on (ADR-695). */
+  readonly axes?: ReadonlyArray<RotaryAxis>;
   readonly onChange: (value: RotarySetup) => void;
 }): JSX.Element {
   const { value, onChange } = props;
-  // Remembers the roller diameter while scaling is off or Chuck is chosen.
-  const [parkedRoller, setParkedRoller] = useState(() => startRotaryEdit(value).parkedRoller);
-  const edit: RotaryEdit = { setup: value, parkedRoller };
-  const apply = (next: RotaryEdit): void => {
-    setParkedRoller(next.parkedRoller);
-    onChange(next.setup);
-  };
+  const axis = rotaryAxisOf(value);
+  const { edit, apply } = useDraftRotaryEdit(value, onChange);
   const scaledRoller = value.type === 'roller' && value.rollerDiameterMm !== undefined;
   return (
     <div style={bodyStyle}>
@@ -54,6 +53,11 @@ export function DeviceSetupRotaryFields(props: {
           <option value="chuck">Chuck</option>
         </select>
       </Row>
+      <RotaryAxisRow
+        axis={axis}
+        axes={props.axes ?? ['Y']}
+        onChange={(next) => apply(editRotaryAxis(edit, next))}
+      />
       <RotaryNumber
         label="Object diameter"
         value={value.objectDiameterMm}
@@ -68,6 +72,7 @@ export function DeviceSetupRotaryFields(props: {
         label="Motion per turn"
         value={value.mmPerRotation}
         disabled={value.type === 'roller' && !scaledRoller}
+        unit={rotaryAxisUnitLabel(axis) === '°' ? '°' : 'mm'}
         onCommit={(next) => apply(editRotaryFields(edit, { mmPerRotation: next }))}
       />
       <Row label="Direction">
@@ -90,6 +95,52 @@ export function DeviceSetupRotaryFields(props: {
         Generate test pattern reports.
       </p>
     </div>
+  );
+}
+
+// Remembers the roller diameter while scaling is off or Chuck is chosen, and
+// Motion per turn in the units the axis is not using (ADR-695).
+function useDraftRotaryEdit(
+  value: RotarySetup,
+  onChange: (value: RotarySetup) => void,
+): { readonly edit: RotaryEdit; readonly apply: (next: RotaryEdit) => void } {
+  const [parked, setParked] = useState<Omit<RotaryEdit, 'setup'>>(() => {
+    const { setup: _setup, ...rest } = startRotaryEdit(value);
+    return rest;
+  });
+  return {
+    edit: { ...parked, setup: value },
+    apply: (next) => {
+      const { setup, ...rest } = next;
+      setParked(rest);
+      onChange(setup);
+    },
+  };
+}
+
+// ADR-695: Y when the rotary takes the Y motor's place, A or Z for its own
+// connector. A saved axis this controller cannot take stays listed.
+function RotaryAxisRow(props: {
+  readonly axis: RotaryAxis;
+  readonly axes: ReadonlyArray<RotaryAxis>;
+  readonly onChange: (axis: RotaryAxis) => void;
+}): JSX.Element {
+  const shown = props.axes.includes(props.axis) ? props.axes : [...props.axes, props.axis];
+  return (
+    <Row label="Rotary axis">
+      <select
+        value={props.axis}
+        onChange={(event) => props.onChange(event.target.value as RotaryAxis)}
+        aria-label="Rotary axis"
+        title="Y when the rotary is plugged in where the Y motor was; A or Z for a dedicated rotary connector."
+      >
+        {shown.map((option) => (
+          <option key={option} value={option}>
+            {option === 'Y' ? 'Y (Y motor port)' : `${option} (rotary connector)`}
+          </option>
+        ))}
+      </select>
+    </Row>
   );
 }
 
@@ -128,6 +179,7 @@ function RotaryNumber(props: {
   readonly label: string;
   readonly value: number;
   readonly disabled?: boolean;
+  readonly unit?: string;
   readonly onCommit: (value: number) => void;
 }): JSX.Element {
   return (
@@ -142,7 +194,7 @@ function RotaryNumber(props: {
         onCommit={props.onCommit}
         style={numInputStyle}
       />
-      <span style={unitStyle}>mm</span>
+      <span style={unitStyle}>{props.unit ?? 'mm'}</span>
     </Row>
   );
 }

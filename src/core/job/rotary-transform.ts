@@ -19,8 +19,9 @@ export function restoreRotarySurfacePoint(
   point: Vec2,
   yScale: number,
   reverse = false,
+  zeroAtAnchor = false,
 ): Vec2 {
-  const map = rotaryYMap(job, yScale, reverse);
+  const map = rotaryYMap(job, yScale, reverse, zeroAtAnchor);
   if (map === null) return point;
   const forward = reverse ? map.reverseOriginY - point.y : point.y - map.forwardOriginY;
   return { x: point.x, y: map.baseY + forward / yScale };
@@ -41,12 +42,20 @@ type RotaryYMap = {
 // engraving around the cylinder. An Absolute job mirrors Y within the wrap
 // window [0, extent], so its bounds stay that window either way. A placed job
 // mirrors about its anchor, which stays where the cylinder already is.
-function rotaryYMap(job: Job, scale: number, reverse: boolean): RotaryYMap | null {
+// zeroAtAnchor (ADR-695): a dedicated A or Z axis starts each job at 0, so the
+// anchor lands there instead of on the head's work Y.
+function rotaryYMap(
+  job: Job,
+  scale: number,
+  reverse: boolean,
+  zeroAtAnchor = false,
+): RotaryYMap | null {
   const range = jobYRange(job);
   if (range === null) return null;
   const anchor = job.rotaryAnchorY;
   if (anchor !== undefined) {
-    return { baseY: anchor, forwardOriginY: anchor, reverseOriginY: anchor, scale, reverse };
+    const origin = zeroAtAnchor ? 0 : anchor;
+    return { baseY: anchor, forwardOriginY: origin, reverseOriginY: origin, scale, reverse };
   }
   const extent = (range.max - range.min) * scale;
   return { baseY: range.min, forwardOriginY: 0, reverseOriginY: extent, scale, reverse };
@@ -68,8 +77,13 @@ function mapRotaryYRange(
   return map.reverse ? { minY: high, maxY: low } : { minY: low, maxY: high };
 }
 
-export function applyRotaryYScale(job: Job, yScale: number, reverse = false): Job {
-  const map = rotaryYMap(job, yScale, reverse);
+export function applyRotaryYScale(
+  job: Job,
+  yScale: number,
+  reverse = false,
+  zeroAtAnchor = false,
+): Job {
+  const map = rotaryYMap(job, yScale, reverse, zeroAtAnchor);
   if (map === null) return job;
   if (yScale === 1 && !reverse && map.baseY === map.forwardOriginY) return job;
   const mapCut = <T extends CutSegment>(s: T): T => mapSegment(s, map);

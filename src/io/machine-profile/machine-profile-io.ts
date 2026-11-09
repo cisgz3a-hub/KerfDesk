@@ -22,6 +22,7 @@ import { knownOptionalChoices, validateMachineProfileShape } from './machine-pro
 import { recoverProfileCommands } from './machine-profile-autofocus';
 import { optionalRotarySetup } from '../project/project-device-profile-validator';
 import { firstError } from '../project/project-shape-primitives';
+import { rotaryAxisSchema, schemaTooNew } from './machine-profile-rotary-version';
 
 export const MACHINE_PROFILE_FORMAT = 'laserforge-machine-profile';
 export const MACHINE_PROFILE_SCHEMA_VERSION = 1;
@@ -51,7 +52,8 @@ const ORIGINS = ['front-left', 'front-right', 'rear-left', 'rear-right', 'center
 const PROFILE_SOURCES = ['built-in', 'custom', 'imported', 'lightburn'] as const;
 
 export function serializeMachineProfileDocument(document: MachineProfileDocument): string {
-  return `${JSON.stringify(canonicalDocument(document), null, 2)}\n`;
+  // ADR-695: a dedicated rotary axis is written as a schema older readers refuse.
+  return `${JSON.stringify(rotaryAxisSchema(canonicalDocument(document)), null, 2)}\n`;
 }
 
 /** Stable profile-only representation used for forensic identities. Unlike a
@@ -91,7 +93,7 @@ export function deserializeMachineProfileDocument(
   if (typeof schemaVersion !== 'number' || !Number.isFinite(schemaVersion)) {
     return { kind: 'invalid', reason: 'missing or non-numeric schemaVersion' };
   }
-  if (schemaVersion > MACHINE_PROFILE_SCHEMA_VERSION) {
+  if (schemaTooNew(schemaVersion, MACHINE_PROFILE_SCHEMA_VERSION)) {
     return { kind: 'schema-too-new', sawVersion: schemaVersion };
   }
   if (schemaVersion < MACHINE_PROFILE_SCHEMA_VERSION) {

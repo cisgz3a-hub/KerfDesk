@@ -16,15 +16,50 @@ const SPEC: BoxSpec = {
   partSpacingMm: 8,
 };
 
+// Inner 60 × 40 at T = 3: the lid's shoulders sit at y = 40 and its tongue
+// runs on to y = 43; the thumb notch (radius 8) stays below y = 8.
+const NOTCH_REGION_MAX_Y = 10;
+const SHOULDER_Y = 40;
+
 describe('generateBox slide-lid relief', () => {
   it('does not carve seat relief into the decorative thumb notch', () => {
-    const relieved = generateBox(SPEC);
-    const plain = generateBox({ ...SPEC, relief: { kind: 'none' } });
+    const relieved = localOutline(generateBox(SPEC), 'lid');
+    const plain = localOutline(generateBox({ ...SPEC, relief: { kind: 'none' } }), 'lid');
 
-    expect(localOutline(relieved, 'lid')).toEqual(localOutline(plain, 'lid'));
-    expect(localOutline(relieved, 'bottom')).not.toEqual(localOutline(plain, 'bottom'));
+    expect(notchPoints(relieved)).toEqual(notchPoints(plain));
+    expect(notchPoints(plain).length).toBeGreaterThan(10);
+  });
+
+  it('relieves the tongue shoulders so the lid seats on the channel posts (ADR-116 Amd 1)', () => {
+    const relieved = localOutline(generateBox(SPEC), 'lid');
+    const plain = localOutline(generateBox({ ...SPEC, relief: { kind: 'none' } }), 'lid');
+    const nearShoulder = (points: ReadonlyArray<Vec2>): number =>
+      points.filter((point) => Math.abs(point.y - SHOULDER_Y) < 1.5).length;
+
+    expect(nearShoulder(relieved)).toBeGreaterThan(nearShoulder(plain));
+    // Each reflex shoulder corner gets a dogbone that dips past the shoulder
+    // line into the lid body.
+    const dogboneDepth = Math.min(
+      ...relieved.filter((p) => p.y < SHOULDER_Y && p.y > 30).map((p) => p.y),
+    );
+    expect(dogboneDepth).toBeLessThan(SHOULDER_Y - 0.05);
+  });
+
+  it('still relieves the walls', () => {
+    expect(localOutline(generateBox(SPEC), 'bottom')).not.toEqual(
+      localOutline(generateBox({ ...SPEC, relief: { kind: 'none' } }), 'bottom'),
+    );
   });
 });
+
+// The distinct vertices in the notch region (rings may repeat their seam
+// vertex depending on which clipper pass produced them).
+function notchPoints(points: ReadonlyArray<Vec2>): ReadonlyArray<string> {
+  const keys = points
+    .filter((point) => point.y < NOTCH_REGION_MAX_Y)
+    .map((point) => `${point.x.toFixed(3)},${point.y.toFixed(3)}`);
+  return [...new Set(keys)].sort();
+}
 
 function localOutline(result: GenerateBoxResult, panelId: BoxPanel['panel']): ReadonlyArray<Vec2> {
   expect(result.kind).toBe('generated');

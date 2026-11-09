@@ -25,6 +25,8 @@ const BASE: BoxSpec = {
 const REPRESENTATIVE_TOPOLOGIES: ReadonlyArray<BoxSpec> = [
   { ...BASE, style: 'open-top', dividersXCount: 2, dividersYCount: 1 },
   { ...BASE, style: 'closed', dividersXCount: 1, dividersYCount: 3 },
+  { ...BASE, style: 'lift-lid', clearanceMm: 0.2, dividersXCount: 2, dividersYCount: 1 },
+  { ...BASE, style: 'open-front', dividersXCount: 3 },
 ];
 
 const SLIDE_LID: BoxSpec = {
