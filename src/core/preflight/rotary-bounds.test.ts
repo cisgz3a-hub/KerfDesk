@@ -23,6 +23,14 @@ describe('rotaryWrapIssue', () => {
     expect(message).not.toContain('42.97');
   });
 
+  it('names a pen the design does not fit in its own millimetres (refuter example)', () => {
+    // A 40 mm design on a Ø10 pen in the same chuck was "spans 50.930 mm … (40.000 mm)".
+    const pen = 40 / (Math.PI * 10);
+    expect(rotaryWrapIssue(program(40 * pen), 40, { yScale: pen, objectDiameterMm: 10 })).toMatch(
+      /^The artwork wraps 40\.0 mm round the part \(1\.27 turns\), more than one turn of the Ø10 mm object \(31\.4 mm\)/,
+    );
+  });
+
   it('is silent within one turn', () => {
     expect(rotaryWrapIssue(program(250 * K), 40, { yScale: K, objectDiameterMm: 80 })).toBeNull();
   });

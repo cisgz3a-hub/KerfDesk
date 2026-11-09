@@ -101,15 +101,20 @@ function layer(id: string, color: string, patch: Partial<Layer>): Layer {
 }
 
 /** A Line layer (square, circle, diamond), a 90° Fill and a 45° Fill. */
-function vectorProject(device: DeviceProfile): Project {
+function vectorProject(device: DeviceProfile, size = 1): Project {
   const base = createProject(device);
+  const at = (v: number) => v * size;
   let scene = base.scene;
   scene = addObject(
     scene,
-    svg('LINE', '#ff0000', [square(20, 20, 20), circle(70, 30, 10), diamond(110, 30, 10)]),
+    svg('LINE', '#ff0000', [
+      square(at(20), at(20), at(20)),
+      circle(at(70), at(30), at(10)),
+      diamond(at(110), at(30), at(10)),
+    ]),
   );
-  scene = addObject(scene, svg('F90', '#00ff00', [square(20, 60, 20)]));
-  scene = addObject(scene, svg('F45', '#0000ff', [square(60, 60, 20)]));
+  scene = addObject(scene, svg('F90', '#00ff00', [square(at(20), at(60), at(20))]));
+  scene = addObject(scene, svg('F45', '#0000ff', [square(at(60), at(60), at(20))]));
   scene = addLayer(scene, layer('L1', '#ff0000', { speed: LINE_SPEED }));
   scene = addLayer(
     scene,
@@ -204,6 +209,19 @@ const SETUPS: ReadonlyArray<readonly [string, RotarySetup]> = [
   ['Creality chuck reversed', { ...CREALITY_CHUCK_80, reverseAxis: true }],
 ];
 
+// Y scale above 1 (the X8 refuter's overburn cases): a Ø10 pen in the same
+// chuck (k 1.27) and a geared roller (150 mm per turn of a Ø26 roller, k 1.84).
+const SPEED_SETUPS: ReadonlyArray<readonly [string, RotarySetup]> = [
+  ...SETUPS,
+  ['Ø10 pen in the Creality chuck', { ...CREALITY_CHUCK_80, objectDiameterMm: 10 }],
+  ['geared roller 150 mm/turn Ø26', { ...ROLLER_25_80, mmPerRotation: 150, rollerDiameterMm: 26 }],
+];
+
+/** The test artwork spans 60 mm round the part; a pen needs it smaller. */
+function designSizeFor(rotary: RotarySetup): number {
+  return Math.min(1, (0.8 * Math.PI * rotary.objectDiameterMm) / 60);
+}
+
 const LAYER_SPEED: Readonly<Record<string, number>> = {
   L1: LINE_SPEED,
   L2: FILL_SPEED,
@@ -213,11 +231,11 @@ const LAYER_SPEED: Readonly<Record<string, number>> = {
 describe('rotary strokes move the surface at the layer speed (ADR-127 Amd 2)', () => {
   it.each(
     PROFILES.flatMap(([name, profile]) =>
-      SETUPS.map(([setup, rotary]) => [name, setup, profile, rotary] as const),
+      SPEED_SETUPS.map(([setup, rotary]) => [name, setup, profile, rotary] as const),
     ),
   )('%s, %s', (_name, _setup, profile, rotary) => {
     const device = { ...profile, maxFeed: Math.max(profile.maxFeed, 20000), rotary };
-    const result = emitGcode(vectorProject(device));
+    const result = emitGcode(vectorProject(device, designSizeFor(rotary)));
     expect(result.preflight.ok).toBe(true);
     const k = rotaryYScale(rotary);
     const burns = litMoves(result.gcode);
