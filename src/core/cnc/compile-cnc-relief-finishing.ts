@@ -10,6 +10,8 @@ import {
   reliefFinishStrategyFor,
 } from '../relief/relief-finishing-strategy';
 import type { Heightmap } from '../relief/heightmap';
+import { finishingStepDown } from '../relief/relief-finishing-step-down';
+import type { ReliefRoughingReach } from '../relief/relief-roughing-reach';
 import { reliefObjectToHeightmap } from '../relief/relief-object-to-heightmap';
 import {
   reliefMaterializationFailure,
@@ -56,7 +58,11 @@ export function reliefFinishingGroup(
   settings: CncLayerSettings,
   device: DeviceProfile,
   config: CncMachineConfig,
-  finishedFlats: ReadonlyArray<ReliefFinishedFlats | undefined>,
+  roughed: {
+    readonly finishedFlats: ReadonlyArray<ReliefFinishedFlats | undefined>;
+    // W6-P2-2: per relief, the stock its roughing left, or undefined.
+    readonly reaches?: ReadonlyArray<ReliefRoughingReach | undefined>;
+  },
 ): FinishingCompilation {
   const tool = config.tools.find((tool) => tool.id === settings.reliefFinishToolId);
   if (tool === undefined) return { kind: 'compiled', group: null, plans: [], records: [] };
@@ -64,7 +70,10 @@ export function reliefFinishingGroup(
     plans: CncReliefPlanningEvidence[] = [],
     records: ReliefFinishingRecord[] = [];
   for (const [index, relief] of reliefs.entries()) {
-    const result = finishRelief(relief, layer, settings, device, tool, finishedFlats[index]);
+    const result = finishRelief(relief, layer, settings, device, tool, {
+      finished: roughed.finishedFlats[index],
+      reach: roughed.reaches?.[index],
+    });
     if (result.kind === 'relief-materialization-failed') return result;
     passes.push(...result.machinePasses);
     plans.push(result.plan);
@@ -97,7 +106,10 @@ function finishRelief(
   settings: CncLayerSettings,
   device: DeviceProfile,
   tool: CncTool,
-  finished: ReliefFinishedFlats | undefined,
+  roughed: {
+    readonly finished: ReliefFinishedFlats | undefined;
+    readonly reach: ReliefRoughingReach | undefined;
+  },
 ):
   | {
       readonly kind: 'compiled';
@@ -120,7 +132,8 @@ function finishRelief(
   });
   if (result.kind === 'error') return reliefMaterializationFailure(relief.source, result.reason);
   const map = result.heightmap;
-  const localPasses = reliefFinishingPlan(map, {
+  const { finished, reach } = roughed;
+  const rows = reliefFinishingPlan(map, {
     tool,
     kernel: kernelForTool(tool, map.mmPerCell),
     scallopMm,
@@ -131,6 +144,17 @@ function finishRelief(
       ? {}
       : { finishedAt: (x: number, y: number) => finishedFlatDepthAt(finished, x, y) }),
   }).filter((pass) => pass.kind === 'path3d');
+  // W6-P2-2: where roughing left stock, step the finishing bit down first.
+  const stepDown =
+    reach === undefined
+      ? { passes: [], levels: 0 }
+      : finishingStepDown(
+          rows,
+          reach,
+          tool,
+          cncSettingsForStage(settings, 'relief-finish', tool).depthPerPassMm,
+        );
+  const localPasses = [...stepDown.passes, ...rows];
   const machinePasses = localPasses.map((pass) => ({
     ...pass,
     points: pass.points.map((p) => ({
@@ -142,7 +166,12 @@ function finishRelief(
     kind: 'compiled',
     record: { relief, map, passes: localPasses },
     machinePasses,
-    plan: { ...finishingGridEvidence(layer, relief, map, tool), rowSpacingMm, scallopMm },
+    plan: {
+      ...finishingGridEvidence(layer, relief, map, tool),
+      rowSpacingMm,
+      scallopMm,
+      ...(stepDown.levels > 0 ? { finishingStepLevels: stepDown.levels } : {}),
+    },
   };
 }
 function finishingGridEvidence(

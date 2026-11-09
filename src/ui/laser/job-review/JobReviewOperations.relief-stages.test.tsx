@@ -125,13 +125,21 @@ describe('Job Review relief levels with independent stage recipes', () => {
         root?.render(<JobReviewOperations machineKind="cnc" effectiveOperations={effective} />);
       });
 
+      // The floor meets the stock past the relief's edge, which roughing keeps a
+      // widened bit clear of, so the finishing ball steps down along it first
+      // (ADR-421 Amendment 2) and the line says roughing did not reach there.
+      const reach = effective[0]?.relief;
+      const missed =
+        `, not reaching about ${Math.round(reach?.roughingMissedAreaMm2 ?? 0)} mm² ` +
+        `(finishing steps down ${reach?.finishingStepLevels} levels there)`;
+      expect(reach?.finishingStepLevels).toBeGreaterThan(1);
       const shapeParts = withShape
         ? '1 pass on the other shapes · stepover 40% · tabs 4 per shape (6 × 2 mm), none on reliefs'
         : 'stepover 40%';
       expect(
         [...host.querySelectorAll('[data-review-detail]')].map((line) => line.textContent),
       ).toContain(
-        `relief roughing 2 levels to 2.5 mm · ${shapeParts} · ramp entry 5° (relief finishing plunges) · Manual feeds`,
+        `relief roughing 2 levels to 2.5 mm${missed} · ${shapeParts} · ramp entry 5° (relief finishing plunges) · Manual feeds`,
       );
       expect(effective[0]?.relief).toEqual({
         roughingLevelDepthsMm: [1.5, 2.5],
@@ -139,6 +147,8 @@ describe('Job Review relief levels with independent stage recipes', () => {
         // The finishing ball cuts the roughing allowance down to the floor.
         maxDepthMm: 3,
         cutsOtherShapes: withShape,
+        roughingMissedAreaMm2: expect.any(Number),
+        finishingStepLevels: expect.any(Number),
       });
       expect(effective[0]?.plungingReliefStages).toEqual(['relief-finish']);
       expect(host.textContent).toContain('Relief finishing · Review finishing ball');

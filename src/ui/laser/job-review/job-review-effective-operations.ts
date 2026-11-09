@@ -14,6 +14,10 @@ import {
   type PlungingReliefStage,
 } from './job-review-detail-facts';
 import { tabSpanGroupLabel } from './job-review-laser-tabs';
+import {
+  compiledProjectionFactsByLayer,
+  type CompiledProjectionFacts,
+} from './job-review-projection-detail';
 import type { CncStrategyFallback } from '../../../core/job/cnc-compilation-sidecar-types';
 
 import { cncCuttingStageLabel } from '../../../core/scene/cnc-stage-recipe';
@@ -26,6 +30,8 @@ export type JobReviewEffectiveOperation = {
   readonly cncActualMaxDepthMm?: number;
   readonly plungingReliefStages?: ReadonlyArray<PlungingReliefStage>;
   readonly relief?: CompiledReliefFacts;
+  // A projected operation's compiled levels, depth and tabs (W6-P2-1).
+  readonly projection?: CompiledProjectionFacts;
   // Set when the operation asks for a ramp and compiled shapes other than
   // reliefs, none of whose groups records one (ADR-273 Amendment 2).
   readonly unrampedShapes?: true;
@@ -63,6 +69,7 @@ export function buildEffectiveOperationReview(
   }
   const plungingReliefByLayer = plungingReliefStagesByLayer(job);
   const reliefByLayer = compiledReliefFactsByLayer(job);
+  const projectionByLayer = compiledProjectionFactsByLayer(job);
   const unrampedShapeLayers = unrampedShapeLayerIds(job, scene?.layers ?? []);
   const tabbedLayers = tabbedProfileLayerIds(job);
   const fallbacks = new Map(
@@ -73,12 +80,14 @@ export function buildEffectiveOperationReview(
     const cncActualMaxDepth = vCarveDepthByLayer.get(layerId);
     const plungingReliefStages = plungingReliefByLayer.get(layerId);
     const relief = reliefByLayer.get(layerId);
+    const projection = projectionByLayer.get(layerId);
     return {
       layerId,
       summaries,
       ...(cncActualMaxDepth === undefined ? {} : { cncActualMaxDepthMm: cncActualMaxDepth.value }),
       ...(plungingReliefStages === undefined ? {} : { plungingReliefStages }),
       ...(relief === undefined ? {} : { relief }),
+      ...(projection === undefined ? {} : { projection }),
       ...(unrampedShapeLayers.has(layerId) ? { unrampedShapes: true as const } : {}),
       ...(tabbedLayers.has(layerId) ? { tabbedShapes: true as const } : {}),
       ...(strategyFallback === undefined ? {} : { strategyFallback }),
@@ -124,6 +133,7 @@ function compiledReliefFactsByLayer(job: Job): ReadonlyMap<string, CompiledRelie
     maxDepthByLayer.set(group.layerId, Math.max(maxDepthByLayer.get(group.layerId) ?? 0, depthMm));
   }
   const reliefCounts = compiledReliefCounts(job);
+  const reach = compiledRoughingReach(job);
   const facts = new Map<string, CompiledReliefFacts>();
   for (const [layerId, levels] of levelsByLayer) {
     facts.set(layerId, {
@@ -131,9 +141,32 @@ function compiledReliefFactsByLayer(job: Job): ReadonlyMap<string, CompiledRelie
       reliefCount: reliefCounts.get(layerId) ?? 0,
       maxDepthMm: maxDepthByLayer.get(layerId) ?? 0,
       cutsOtherShapes: otherShapeLayers.has(layerId),
+      ...reach.get(layerId),
     });
   }
   return facts;
+}
+
+// W6-P2-2: the area each operation's roughing missed and the step-down levels
+// its finishing cut there, from the job's relief planning evidence.
+function compiledRoughingReach(
+  job: Job,
+): ReadonlyMap<string, Pick<CompiledReliefFacts, 'roughingMissedAreaMm2' | 'finishingStepLevels'>> {
+  const out = new Map<string, { roughingMissedAreaMm2?: number; finishingStepLevels?: number }>();
+  for (const plan of job.cncCompilation?.reliefPlans ?? []) {
+    const entry = out.get(plan.layerId) ?? {};
+    if (plan.stage === 'roughing' && plan.roughingMissedAreaMm2 !== undefined) {
+      entry.roughingMissedAreaMm2 = (entry.roughingMissedAreaMm2 ?? 0) + plan.roughingMissedAreaMm2;
+    }
+    if (plan.stage === 'finishing' && plan.finishingStepLevels !== undefined) {
+      entry.finishingStepLevels = Math.max(
+        entry.finishingStepLevels ?? 0,
+        plan.finishingStepLevels,
+      );
+    }
+    out.set(plan.layerId, entry);
+  }
+  return out;
 }
 
 // The job's relief planning evidence holds one roughing entry per compiled

@@ -233,12 +233,11 @@ function CncDepthFields(props: {
 }): JSX.Element {
   const { layer, settings, onCommit } = props;
   const lengthUnit = useLengthUnit();
-  const isVCarve = settings.cutType === 'v-carve';
-  const flatDepthEnabled = settings.vCarveFlatDepthEnabled ?? true;
-  const isTaperedInlay = settings.cutType === 'inlay-pair' && settings.taperedInlay !== undefined;
-  const showDepth = !isTaperedInlay && (!isVCarve || flatDepthEnabled);
+  const { isVCarve, flatDepthEnabled, isTaperedInlay, showDepth, showStockButton } =
+    depthFieldShape(settings);
   return (
     <>
+      <ProjectedDepthNote settings={settings} />
       {isVCarve ? (
         <label className="lf-cnc-switch">
           <input
@@ -264,7 +263,7 @@ function CncDepthFields(props: {
           settings={settings}
           onCommit={onCommit}
         />
-        {!isVCarve && !isTaperedInlay && props.stockThicknessMm > 0 ? (
+        {showStockButton && props.stockThicknessMm > 0 ? (
           <button
             type="button"
             className="lf-cnc-link-button lf-cnc-depth-grid__stock"
@@ -276,6 +275,38 @@ function CncDepthFields(props: {
         ) : null}
       </div>
     </>
+  );
+}
+
+// Which depth controls apply to this operation.
+function depthFieldShape(settings: CncLayerSettings): {
+  readonly isVCarve: boolean;
+  readonly flatDepthEnabled: boolean;
+  readonly isTaperedInlay: boolean;
+  readonly showDepth: boolean;
+  readonly showStockButton: boolean;
+} {
+  const isVCarve = settings.cutType === 'v-carve';
+  const flatDepthEnabled = settings.vCarveFlatDepthEnabled ?? true;
+  const isTaperedInlay = settings.cutType === 'inlay-pair' && settings.taperedInlay !== undefined;
+  // W6-P2-1: a projection cuts its Vertical depth under the relief surface, so
+  // Cut depth does nothing there; Depth per pass steps that depth down.
+  const isProjected = settings.reliefProjection !== undefined;
+  return {
+    isVCarve,
+    flatDepthEnabled,
+    isTaperedInlay,
+    showDepth: !isTaperedInlay && !isProjected && (!isVCarve || flatDepthEnabled),
+    showStockButton: !isVCarve && !isTaperedInlay && !isProjected,
+  };
+}
+
+function ProjectedDepthNote(props: { readonly settings: CncLayerSettings }): JSX.Element | null {
+  return props.settings.reliefProjection === undefined ? null : (
+    <p className="lf-cnc-settings-hint">
+      Projected onto a relief: the cut goes Vertical depth (Advanced) under the relief surface,
+      stepping down by Depth per pass.
+    </p>
   );
 }
 

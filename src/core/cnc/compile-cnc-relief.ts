@@ -23,7 +23,13 @@ import type { CncReliefPlanningEvidence } from '../job/job';
 // Deep import: core/relief's barrel is a ratcheted over-cap legacy barrel
 // (scripts/index-export-baseline.json) and may only shrink, so the ladder
 // variant cannot be added to it.
-import { reliefRoughingLadder, type ReliefRoughingLadder } from '../relief/relief-roughing';
+import {
+  DEFAULT_RELIEF_ALLOWANCE_MM,
+  reliefRoughingLadder,
+  type ReliefRoughingLadder,
+} from '../relief/relief-roughing';
+import { reliefRoughingReach, type ReliefRoughingReach } from '../relief/relief-roughing-reach';
+import type { Heightmap } from '../relief/heightmap';
 import { reliefRoughingMotion } from '../relief/relief-roughing-motion';
 import { ReliefLevelArrayMaterializationError } from '../relief/relief-roughing-level-materialization';
 
@@ -93,14 +99,18 @@ export function compileReliefGroupsForLayer(
   const plans: CncReliefPlanningEvidence[] = [];
   // ADR-450: per relief, the flats its roughing finished for the ball to skip.
   const finishedFlats: Array<ReliefFinishedFlats | undefined> = [];
+  // W6-P2-2: per relief, the stock its roughing left, for the ball to step down.
+  const reaches: Array<ReliefRoughingReach | undefined> = [];
   let offsetFailed = false;
   let passLimited = false;
   let stepoverUsed = false;
+  const nextTool = nextReliefTool(config, settings, tool);
   for (const relief of reliefs) {
-    const roughing = appendReliefPasses(passes, relief, settings, device, tool);
+    const roughing = appendReliefPasses(passes, relief, settings, device, { tool, nextTool });
     if (roughing.kind === 'relief-materialization-failed') return roughing;
     plans.push({ ...roughing.plan, layerId: layer.id });
     finishedFlats.push(roughing.finishedFlats);
+    reaches.push(roughing.reach);
     if (roughing.offsetFailed) offsetFailed = true;
     if (roughing.passLimited) passLimited = true;
     if (roughing.stepoverUsed) stepoverUsed = true;
@@ -111,7 +121,10 @@ export function compileReliefGroupsForLayer(
       reliefGroup(layer, settings, device, config, tool, 'relief-rough', undefined, passes),
     );
   }
-  const finishing = reliefFinishingGroup(reliefs, layer, settings, device, config, finishedFlats);
+  const finishing = reliefFinishingGroup(reliefs, layer, settings, device, config, {
+    finishedFlats,
+    reaches,
+  });
   if (finishing.kind === 'relief-materialization-failed') return finishing;
   plans.push(...finishing.plans);
   if (finishing.group !== null) groups.push(finishing.group);
@@ -124,6 +137,16 @@ export function compileReliefGroupsForLayer(
     groups,
     evidence: { offsetFailed, passLimited, stepoverUsed, plans },
   };
+}
+
+// W6-P2-2: the bit that meets what roughing misses (the finishing bit, else
+// the roughing bit itself), whose width says what counts as missed.
+function nextReliefTool(
+  config: CncMachineConfig,
+  settings: CncLayerSettings,
+  tool: CncTool,
+): CncTool {
+  return config.tools.find((t) => t.id === settings.reliefFinishToolId) ?? tool;
 }
 
 function reliefObjectsForLayer(
@@ -147,6 +170,7 @@ function reliefLadderFor(
       readonly kind: 'compiled';
       readonly ladder: ReliefRoughingLadder;
       readonly plan: ReliefPlanEvidence;
+      readonly map: Heightmap;
     }
   | ReliefMaterializationFailure {
   const passArrayError = zPassArrayMaterializationError(
@@ -192,6 +216,7 @@ function reliefLadderFor(
   return {
     kind: 'compiled',
     ladder,
+    map: heightmap.heightmap,
     plan: {
       source: relief.source,
       targetObjectId: relief.id,
@@ -246,7 +271,7 @@ function appendReliefPasses(
   relief: ReliefObject,
   settings: CncLayerSettings,
   device: DeviceProfile,
-  tool: CncTool,
+  { tool, nextTool }: { readonly tool: CncTool; readonly nextTool: CncTool },
 ):
   | {
       readonly kind: 'compiled';
@@ -255,6 +280,7 @@ function appendReliefPasses(
       readonly stepoverUsed: boolean;
       readonly plan: ReliefPlanEvidence;
       readonly finishedFlats: ReliefFinishedFlats | undefined;
+      readonly reach: ReliefRoughingReach | undefined;
     }
   | ReliefMaterializationFailure {
   const residualTransform = reliefMachineSpaceTransform(relief.transform).residualTransform;
@@ -271,6 +297,12 @@ function appendReliefPasses(
     cutterRadiusMm: tool.diameterMm / 2,
     ...(settings.rampEntryDeg === undefined ? {} : { rampAngleDeg: settings.rampEntryDeg }),
   });
+  // W6-P2-2: sweep the moves just planned to find what this bit could not reach.
+  const reach = reliefRoughingReach(result.map, motion, tool, {
+    depthPerPassMm: settings.depthPerPassMm,
+    allowanceMm: reliefAllowanceMm(settings.finishAllowanceMm),
+    minWidthMm: nextTool.diameterMm / 2,
+  });
   for (const pass of motion) {
     if (pass.kind === 'contour') {
       passes.push({ ...pass, polyline: pass.polyline.map(place) });
@@ -283,7 +315,21 @@ function appendReliefPasses(
     offsetFailed: result.ladder.offsetFailed,
     passLimited: result.ladder.passLimited,
     stepoverUsed: true,
-    plan: result.plan,
+    plan: { ...result.plan, ...reachEvidence(reach) },
     finishedFlats: result.ladder.finishedFlats,
+    reach: reach.kind === 'checked' ? reach.reach : undefined,
   };
+}
+
+function reachEvidence(
+  reach: ReturnType<typeof reliefRoughingReach>,
+): Pick<ReliefPlanEvidence, 'roughingMissedAreaMm2' | 'roughingReachUnchecked'> {
+  if (reach.kind === 'unchecked') return { roughingReachUnchecked: true };
+  return reach.reach.missedCells > 0 ? { roughingMissedAreaMm2: reach.reach.missedAreaMm2 } : {};
+}
+
+// The finishing allowance the roughing ladder leaves (relief-roughing.ts).
+function reliefAllowanceMm(allowanceMm: number | undefined): number {
+  const value = allowanceMm ?? DEFAULT_RELIEF_ALLOWANCE_MM;
+  return Number.isFinite(value) && value > 0 ? value : 0;
 }
