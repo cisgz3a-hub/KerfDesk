@@ -15,6 +15,7 @@ export function reliefRoughingReachWarnings(
   plans: ReadonlyArray<CncReliefPlan>,
 ): ReadonlyArray<string> {
   return plans.flatMap((plan) => {
+    if (plan.stage === 'rest-finishing') return restReachWarnings(project, plan);
     if (plan.stage !== 'roughing') return [];
     const where = `Relief "${plan.source}" on layer "${layerName(project, plan.layerId)}"`;
     if (plan.roughingReachUnchecked === true) {
@@ -54,6 +55,32 @@ export function reliefRoughingReachWarnings(
         'finishing feed, before its finishing pass. A smaller roughing bit clears it faster.',
     ];
   });
+}
+
+// Rolling audit v12 X6-P2-2: the finishing bit's own misses, which the rest
+// bit steps down through before its rest rows.
+function restReachWarnings(project: Project, plan: CncReliefPlan): ReadonlyArray<string> {
+  const where = `Relief "${plan.source}" on layer "${layerName(project, plan.layerId)}"`;
+  if (plan.predecessorReachUnchecked === true) {
+    return [
+      `${where}: the check for stock the finishing bit cannot reach exceeded its work budget, ` +
+        `so the ${plan.toolDiameterMm} mm rest bit is not stepped down there. Check the 3D ` +
+        'preview after finishing before rest finishing.',
+    ];
+  }
+  const areaMm2 = plan.predecessorMissedAreaMm2;
+  if (areaMm2 === undefined || areaMm2 <= 0) return [];
+  const levels = plan.finishingStepLevels ?? 0;
+  const cut =
+    levels > 0
+      ? `The ${plan.toolDiameterMm} mm rest bit cuts it first in ${levels} step-down ` +
+        `${levels === 1 ? 'level' : 'levels'} of one depth per pass, at its own feed, before its ` +
+        'rest rows.'
+      : `The ${plan.toolDiameterMm} mm rest bit does not step down there. Check the 3D preview.`;
+  return [
+    `${where}: the finishing bit cannot reach about ${Math.max(1, Math.round(areaMm2))} mm² ` +
+      `of the relief and leaves it more than one depth per pass above the finished surface. ${cut}`,
+  ];
 }
 
 function layerName(project: Project, layerId: string): string {

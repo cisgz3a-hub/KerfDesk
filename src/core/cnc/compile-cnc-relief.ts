@@ -302,6 +302,7 @@ function appendReliefPasses(
     depthPerPassMm: settings.depthPerPassMm,
     allowanceMm: reliefAllowanceMm(settings.finishAllowanceMm),
     minWidthMm: nextTool.diameterMm / 2,
+    nextToolRadiusMm: nextTool.diameterMm / 2,
   });
   for (const pass of motion) {
     if (pass.kind === 'contour') {

@@ -23,6 +23,9 @@ export type CncReliefPlanningEvidence = {
     readonly closedShapes: number;
     readonly tabbedShapes: number;
     readonly freedShapes: number;
+    // Rolling audit v12 X6-P1-1 / X6-P2-1: see ReliefProjectionFacts.
+    readonly thinnestTabMm?: number;
+    readonly startAboveMm?: number;
   };
   // Roughing only (W6-P2-2): area of the relief the roughing bit left more
   // than one depth per pass above the finished surface, in mm².
@@ -32,6 +35,12 @@ export type CncReliefPlanningEvidence = {
   // Finishing only (W6-P2-2): step-down levels the finishing bit cut where
   // roughing did not reach, before its finishing pass.
   readonly finishingStepLevels?: number;
+  // Rest finishing only (rolling audit v12 X6-P2-2): area of the relief the
+  // finishing bit left more than one rest depth per pass above the surface,
+  // in mm², which the rest bit steps down through first; or that the sweep
+  // exceeded its work budget and did not run.
+  readonly predecessorMissedAreaMm2?: number;
+  readonly predecessorReachUnchecked?: true;
   readonly widthCells: number;
   readonly heightCells: number;
   readonly cellSizeMm: number;
