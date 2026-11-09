@@ -44,9 +44,9 @@ import { oldProjectBurnReviewWarnings } from '../../state/old-project-burn-revie
 import { burningWhiteReviewWarnings } from '../../state/saved-white-notice';
 import { detectPresetCorrectionWarnings } from './preset-correction-warnings';
 import { detectStaleCatalogBitWarnings } from './stale-catalog-bit-warnings';
+import { detectRotaryRowStepWarnings } from './rotary-row-step-warnings';
 import { detectParkOutsideFrameWarningsFromMetrics } from './park-outside-frame-warnings';
 import { detectRotaryRasterQualificationWarnings } from './rotary-raster-qualification-warnings';
-import { detectRotaryRowStepWarnings } from './rotary-row-step-warnings';
 import {
   detectStreamThroughputWarnings,
   type StreamThroughputInput,
@@ -153,14 +153,14 @@ export function buildJobReviewModel(args: JobReviewModelArgs): JobReviewModel {
         args.prepared.metrics.motionBounds,
         args.prepared.metrics.parkTarget,
       ),
-      ...detectRotaryRasterQualificationWarnings(
-        args.prepared.prepared.project,
-        args.prepared.prepared.job,
-      ),
       ...detectRotaryRowStepWarnings(
         args.prepared.prepared.project,
         args.prepared.prepared.job,
         args.rotaryStepsPerMmY,
+      ),
+      ...detectRotaryRasterQualificationWarnings(
+        args.prepared.prepared.project,
+        args.prepared.prepared.job,
       ),
       ...detectArchiveCapacityWarnings(
         args.prepared,
