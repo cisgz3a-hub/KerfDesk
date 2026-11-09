@@ -144,18 +144,29 @@ describe('Job Review on the CNC 1.0.29 made from a laser', () => {
     capture.stop();
   });
 
-  it('asks nothing of a router whose spindle was set up', async () => {
+  // Rolling audit v12 X2-P1-2: 1.0.29's advice to "update the machine profile"
+  // set the spindle max RPM to the laser's S scale. The program is then full
+  // power at `$30=1000`, and nothing else names the laser, so the question stays.
+  it('still asks a converted laser whose spindle RPM was set to its S scale', async () => {
     restoreThe1029Machine();
     const machine = useStore.getState().project.machine;
     if (machine?.kind !== 'cnc') throw new Error('expected the CNC');
     useStore.setState({
       project: {
         ...useStore.getState().project,
-        machine: { ...machine, params: { ...machine.params, spindleMaxRpm: 24000 } },
+        machine: { ...machine, params: { ...machine.params, spindleMaxRpm: 1000 } },
       },
     });
-    const { review, capture } = await openReview();
-    expect(capture.models[0]?.convertedLaser).toBeUndefined();
+    const { review, capture, gcode } = await openReview();
+    expect(gcode).toContain('M3 S1000');
+    expect(capture.models[0]?.convertedLaser).toEqual({
+      hints: [
+        { kind: 'laser-mode', enabled: false },
+        { kind: 'laser-power-scale', maxPowerS: 1000 },
+      ],
+    });
+    useJobReviewStore.getState().confirm();
+    expect(useJobReviewStore.getState().pendingSignal).toBeNull();
     useJobReviewStore.getState().cancel();
     await review;
     capture.stop();
