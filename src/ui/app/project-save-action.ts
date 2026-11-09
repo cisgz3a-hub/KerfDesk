@@ -16,11 +16,16 @@ import {
   type ProjectSaveOwner,
   type SaveProjectOutcome,
 } from './project-save-completion';
-import { handleSalvageExportProject, type SalvageExportCtx } from './salvage-export';
+import {
+  handleSalvageExportProject,
+  recoveryLeftOutText,
+  type SalvageExportCtx,
+} from './salvage-export';
 import { rememberRecentProject } from '../recent-projects/recent-project-record';
 import { prepareProjectSave } from './prepare-project-save';
 import { projectSaveNeedsWorker } from './project-save-size';
 import { exportLargeProjectRecovery } from './large-project-recovery';
+import { planRecoveryCopy } from './recovery-copy-plan';
 import { clearAutosaveAfterFileHandoff } from './autosave-file-cleanup';
 import { getProjectSaveCheckpoint } from './project-save-checkpoint';
 
@@ -159,15 +164,13 @@ async function offerSalvageExport(
 ): Promise<void> {
   // Quote the refusal itself: a project over the object or font limit has
   // nothing wrong with its machine or output settings (audit 13-P2-1).
-  const wantsSalvage = jobAwareConfirm(
-    `This project cannot be saved as-is: ${reason.replace(/\.$/, '')}. ` +
-      'Export a raw recovery copy to a new file instead? It preserves your work but may need ' +
-      'repair before it reopens cleanly.',
-  );
-  if (!wantsSalvage) return;
+  const plan = planRecoveryCopy(ctx.project);
+  if (!jobAwareConfirm(salvagePrompt(reason, plan.leftOut))) return;
+  const copyCtx = plan.project === ctx.project ? ctx : { ...ctx, project: plan.project };
   const salvage: SalvageExportCtx = {
     platform: ctx.platform,
-    project: ctx.project,
+    project: copyCtx.project,
+    leftOut: plan.leftOut,
     savedName: ctx.savedName,
     pushToast: ctx.pushToast,
     isCurrent: () => staleProjectSaveOutcome(owner) === null,
@@ -176,8 +179,27 @@ async function offerSalvageExport(
         reportRecoveryRestoreFailure(owner, target, error, ownReplay),
       ),
   };
-  if (projectSaveNeedsWorker(ctx.project)) await exportLargeProjectRecovery(ctx, owner, salvage);
+  if (projectSaveNeedsWorker(copyCtx.project))
+    await exportLargeProjectRecovery(copyCtx, owner, salvage);
   else await handleSalvageExportProject(salvage);
+}
+
+// An object past the coordinate limit is left out of the copy so it reopens
+// (ADR-307 Amendment 5); otherwise the copy is raw and may need repair.
+function salvagePrompt(reason: string, leftOut: ReadonlyArray<string>): string {
+  const refusal = `This project cannot be saved as-is: ${reason.replace(/\.$/, '')}. `;
+  if (leftOut.length > 0) {
+    return (
+      refusal +
+      `Export a recovery copy without ${recoveryLeftOutText(leftOut)} to a new file instead? ` +
+      'Everything else is kept, and the copy opens as a normal project.'
+    );
+  }
+  return (
+    refusal +
+    'Export a raw recovery copy to a new file instead? It preserves your work but may need ' +
+    'repair before it reopens cleanly.'
+  );
 }
 
 async function reportRecoveryRestoreFailure(

@@ -55,16 +55,29 @@ export const AUTOSAVE_RECOVERY_VERSION_MESSAGE =
 
 type PushToast = ReturnType<typeof useToastStore.getState>['pushToast'];
 
+// A project the loader refuses is not a storage problem: quote the refusal,
+// which names the object (ADR-307 Amendment 5, audit W5-P2-1), instead of
+// blaming image size and sending the operator to a Save that fails too.
+export function autosaveInvalidProjectMessage(reason: string): string {
+  return `Autosave cannot keep a recovery copy, and Save will refuse it too: ${reason.replace(/\.$/, '')}.`;
+}
+
+function autosaveFailureMessage(failure: AutosaveWriteFailure | undefined): string {
+  if (failure?.kind !== 'failed') return AUTOSAVE_FAILURE_MESSAGE;
+  if (failure.error instanceof AutosavePreparationTimeoutError) return AUTOSAVE_TIMEOUT_MESSAGE;
+  if (failure.reason === 'invalid-project' && failure.error instanceof Error) {
+    return autosaveInvalidProjectMessage(failure.error.message);
+  }
+  return AUTOSAVE_FAILURE_MESSAGE;
+}
+
 /** Warns once per session for each cause, naming the cause the failure carries. */
 export function createAutosaveFailureReporter(
   pushToast: PushToast,
 ): (failure?: AutosaveWriteFailure) => void {
   const warned = new Set<string>();
   return (failure) => {
-    const message =
-      failure?.kind === 'failed' && failure.error instanceof AutosavePreparationTimeoutError
-        ? AUTOSAVE_TIMEOUT_MESSAGE
-        : AUTOSAVE_FAILURE_MESSAGE;
+    const message = autosaveFailureMessage(failure);
     if (warned.has(message)) return;
     warned.add(message);
     pushToast(message, 'warning');
