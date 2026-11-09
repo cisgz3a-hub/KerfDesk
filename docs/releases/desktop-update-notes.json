@@ -3,10 +3,10 @@
   "sinceSourceSha": "df2279e2607784f40ca9e1fc4f508cbcb17478c5",
   "highlights": [
     "Safer burns: a held Enter can't resume a pause, a network laser stops at once if the window crashes, even while closing, a laser left on delays shutdown, Abort restores the origin even on $10=0, and Reconnect waits for the job.",
-    "Machine Setup's Save switches to that machine's driver. A laser with laser mode off is asked to turn it on, most lasers 1.0.29 saved as a CNC are asked before Start, and a controller locked before connecting is offered Reset.",
-    "Beginner help: plain wording from first run to Job complete, a Before you start check, a first-burn lesson and cut test, Cut last for each part, a wider Ctrl+K search, and a notice when a file opens with a missing font.",
-    "Logos: white parts are cut out on SVG import, older logos are offered it, and Re-import removes their white shapes. SVG CSS transforms and DXF/HPGL arcs now import as drawn, so re-importing such a file may move parts.",
-    "Large jobs prepare in the background with progress and Leave Preview. Photo, Trace and text work run off the screen thread, selections and pans stay smooth, and GRBL job times are closer to the real burn.",
-    "Saved height-map reliefs carve their true surface and may cut up to 0.2 mm differently on slopes. Recover unsaved work never clears a newer copy. In a browser, a hidden tab warns during a job and Firefox and Safari save by download."
+    "Machine Setup's Save switches to that machine's driver. If 1.0.29 set your laser up as a CNC, KerfDesk asks whether it's a laser before any job or recovery starts, and a controller locked before connecting is offered Reset.",
+    "Beginner help: plain wording from first run to Job complete, a Before you start check, a first-burn lesson and cut test, Cut last for each part and for cuts with leads, wider Ctrl+K search, and a missing-font notice.",
+    "Logos: white parts are cut out on SVG import, older logos and their copies are offered it, and Re-import removes their white shapes. SVG CSS transforms and DXF/HPGL arcs import as drawn, so a re-import may move parts.",
+    "Large jobs prepare in the background with progress and Leave Preview, and the Run dialog reviews a big file once. Photo, Trace and text work run off the screen thread, and GRBL job times are closer to the real burn.",
+    "Camera logins are no longer kept in saved or shared files; if you shared a project or profile with a network camera, change its password. Recover unsaved work never clears a newer copy. Saved reliefs may cut slightly differently."
   ]
 }
