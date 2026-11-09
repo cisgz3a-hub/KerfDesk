@@ -5,10 +5,16 @@
 // machine that will sleep. The Electron side needs 'screen-wake-lock' in the
 // trusted-renderer-policy permission allowlist; the web side works wherever
 // Chromium ships the API.
+//
+// A browser releases the lock whenever the page is hidden and refuses a new
+// one until it is visible, so a hidden page during a job is reported
+// (hidden-job-keep-awake-notice.ts) and the lock is asked for again as soon as
+// the page is visible (rolling audit v11 W9-P2-1, ADR-117 Amendment 1).
 
 import { useEffect } from 'react';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
+import { createHiddenJobKeepAwakeNotice } from './hidden-job-keep-awake-notice';
 
 const KEEP_AWAKE_UNAVAILABLE_MESSAGE =
   '[lf2] Keep-awake unavailable — the OS may sleep the screen mid-job. ' +
@@ -57,6 +63,15 @@ export function useActiveJobWakeLock(): void {
   useEffect(() => installActiveJobWakeLock(), []);
 }
 
+function once(action: () => void): () => void {
+  let done = false;
+  return () => {
+    if (done) return;
+    done = true;
+    action();
+  };
+}
+
 function createScreenWakeLockController(env: WakeLockEnvironment): {
   readonly start: () => void;
   readonly stop: () => void;
@@ -65,9 +80,9 @@ function createScreenWakeLockController(env: WakeLockEnvironment): {
   let wanted = false;
   let requesting = false;
   let disposed = false;
-  let warned = false;
   let sentinel: ScreenWakeLockSentinel | null = null;
   const nav = env.navigator as ScreenWakeLockNavigator;
+  const hidden = createHiddenJobKeepAwakeNotice(env.document);
 
   const clearSentinel = (): void => {
     sentinel?.removeEventListener('release', onRelease);
@@ -77,19 +92,20 @@ function createScreenWakeLockController(env: WakeLockEnvironment): {
   // One line, once per session: the job keeps running either way, but the
   // operator must know the display may sleep before trusting an hours-long
   // burn to it. Repeat visibility flaps re-attempt silently.
-  const warnUnavailableOnce = (): void => {
-    if (warned) return;
-    warned = true;
-    useLaserStore.getState().pushSystemNotice(KEEP_AWAKE_UNAVAILABLE_MESSAGE);
-  };
+  const warnUnavailableOnce = once(() =>
+    useLaserStore.getState().pushSystemNotice(KEEP_AWAKE_UNAVAILABLE_MESSAGE),
+  );
 
   const request = async (): Promise<void> => {
     if (disposed || !wanted || requesting || sentinel !== null) return;
+    if (env.document.visibilityState === 'hidden') {
+      hidden.noteHidden();
+      return;
+    }
     if (nav.wakeLock === undefined) {
       warnUnavailableOnce();
       return;
     }
-    if (env.document.visibilityState === 'hidden') return;
     requesting = true;
     try {
       const next = await nav.wakeLock.request('screen');
@@ -117,7 +133,11 @@ function createScreenWakeLockController(env: WakeLockEnvironment): {
   }
 
   const onVisibilityChange = (): void => {
-    if (!disposed && wanted && env.document.visibilityState !== 'hidden') void request();
+    if (disposed || !wanted) return;
+    const visible = env.document.visibilityState !== 'hidden';
+    if (visible) hidden.noteVisible();
+    else hidden.noteHidden();
+    if (visible) void request();
   };
 
   env.document.addEventListener('visibilitychange', onVisibilityChange);
@@ -125,10 +145,12 @@ function createScreenWakeLockController(env: WakeLockEnvironment): {
   return {
     start: () => {
       wanted = true;
+      hidden.reset();
       void request();
     },
     stop: () => {
       wanted = false;
+      hidden.clear();
       const current = sentinel;
       clearSentinel();
       void current?.release().catch(() => undefined);
@@ -136,6 +158,7 @@ function createScreenWakeLockController(env: WakeLockEnvironment): {
     dispose: () => {
       disposed = true;
       wanted = false;
+      hidden.clear();
       env.document.removeEventListener('visibilitychange', onVisibilityChange);
       const current = sentinel;
       clearSentinel();

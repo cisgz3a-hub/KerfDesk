@@ -13,6 +13,10 @@ export type ConnectionAttemptState = {
   /** Who refills the live connection's job stream: a worker, or the app
    *  window, whose stalls can starve the controller (ADR-676). */
   readonly jobStreamHost?: 'worker' | 'window' | null;
+  /** The platform the live connection runs in. A browser ('web') lets the
+   *  computer sleep while its tab is hidden, which Job Review says before
+   *  Start (ADR-117 Amendment 1). Null while disconnected. */
+  readonly connectionHost?: 'web' | 'electron' | 'mock' | null;
   /** Revision of the latest connect attempt or intentional disconnect. The live
    *  connection belongs to whoever started the attempt with this revision; any
    *  later connect or disconnect moves it on. Undefined reads as 0. */

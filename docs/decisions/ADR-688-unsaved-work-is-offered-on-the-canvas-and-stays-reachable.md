@@ -64,3 +64,7 @@ beginner on a production build, and a refuter confirmed both findings.
 **Amendment 1 (2026-11-08):** [Recover unsaved work lists each session once, with its newest copy,
 and a restore never clears a newer copy](ADR-688-amendment-1-one-row-per-session-and-no-newer-copy-is-cleared.md):
 fixes rolling audit v10 V7-P1-1.
+
+**Amendment 2 (2026-11-09):** [Firefox and Safari save and export by downloading, and nothing
+calls their autosave safe](ADR-688-amendment-2-firefox-and-safari-save-by-downloading.md): fixes
+rolling audit v11 W9-P2-2. Amends Decisions 4 and 5 and the autosave Consequence.
