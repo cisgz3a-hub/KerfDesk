@@ -18,7 +18,7 @@
 
 export type RotaryType = 'roller' | 'chuck';
 
-// Which controller axis turns the rotary (ADR-693, LightBurn's Rotary Axis):
+// Which controller axis turns the rotary (ADR-695, LightBurn's Rotary Axis):
 // Y when the rotary takes the Y motor's place, A or Z for a dedicated rotary
 // port. Rules and controller support live in rotary-axis.ts.
 export type RotaryAxis = 'Y' | 'A' | 'Z';
@@ -38,7 +38,7 @@ export type RotarySetup = {
   // file may carry one.
   readonly rollerDiameterMm?: number;
   // The axis that turns the rotary. Absent is Y, so every earlier project
-  // keeps its output byte for byte (ADR-693). mmPerRotation is in this axis's
+  // keeps its output byte for byte (ADR-695). mmPerRotation is in this axis's
   // own commanded units: degrees on A, millimetres on Y and Z.
   readonly axis?: RotaryAxis;
   // The dedicated axis the operator last saw a Test rotation turn the rotary

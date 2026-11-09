@@ -121,7 +121,7 @@ describe('rotary test rotation on the GRBL simulator', () => {
     expect(sim.state().mpos.y).toBe(0);
   });
 
-  // ADR-693: a rotary on a dedicated A axis turns by A words, in degrees.
+  // ADR-695: a rotary on a dedicated A axis turns by A words, in degrees.
   const A_CHUCK: RotarySetup = {
     ...DEFAULT_ROTARY_SETUP,
     enabled: true,

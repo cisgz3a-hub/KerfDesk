@@ -15,7 +15,7 @@ import { renderVariableText } from '../text/render-variable-text';
 import { startRotaryEdit } from './rotary-setup-edit';
 import { rotaryReviewSummary } from './rotary-summary';
 
-// ADR-693: a project the published 1.0.29 (`df2279e26`) saved with its rotary
+// ADR-695: a project the published 1.0.29 (`df2279e26`) saved with its rotary
 // on (Creality chuck preset, Ø80, a line square and a 90° fill), built through
 // 1.0.29's own store and measured there; see the folder's README. It has no
 // rotary axis, so it opens on Y and burns what 1.0.29 burned.

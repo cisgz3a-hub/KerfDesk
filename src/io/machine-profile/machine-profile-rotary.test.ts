@@ -83,7 +83,7 @@ describe('machine profile rotary validation', () => {
   });
 });
 
-// ADR-693: a dedicated rotary axis must not reach a reader that would drive it
+// ADR-695: a dedicated rotary axis must not reach a reader that would drive it
 // as Y, so only such a profile is written as schema 2, which 1.0.30 refuses.
 describe('machine profile rotary axis', () => {
   it('writes schema 2 for an A rotary and reads it back', () => {

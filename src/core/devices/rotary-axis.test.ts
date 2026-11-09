@@ -11,7 +11,7 @@ import {
 } from './rotary-axis';
 import { ROTARY_PRESETS, rotaryPresetsFor } from './rotary-presets';
 
-describe('rotary axis (ADR-693)', () => {
+describe('rotary axis (ADR-695)', () => {
   it('is Y for every setup saved before it', () => {
     expect(rotaryAxisOf({})).toBe('Y');
     expect(rotaryAxisOf(undefined)).toBe('Y');
@@ -56,7 +56,7 @@ describe('rotary axis (ADR-693)', () => {
   });
 });
 
-describe('rotary presets (ADR-503, ADR-693)', () => {
+describe('rotary presets (ADR-503, ADR-695)', () => {
   it('cites a source for every preset and names its port', () => {
     for (const preset of ROTARY_PRESETS) {
       expect(preset.source).toMatch(/https:\/\//);

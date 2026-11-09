@@ -1,4 +1,4 @@
-// The emit stage for a rotary on a dedicated A or Z axis (ADR-693). The
+// The emit stage for a rotary on a dedicated A or Z axis (ADR-695). The
 // emitters and preflight run on the machine-space job with the turn in Y, as
 // for a Y rotary; this stage then writes the turn under the chosen letter and
 // zeroes it first. A controller with no such axis word, or a program that

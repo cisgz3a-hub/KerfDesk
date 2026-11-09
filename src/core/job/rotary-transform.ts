@@ -42,7 +42,7 @@ type RotaryYMap = {
 // engraving around the cylinder. An Absolute job mirrors Y within the wrap
 // window [0, extent], so its bounds stay that window either way. A placed job
 // mirrors about its anchor, which stays where the cylinder already is.
-// zeroAtAnchor (ADR-693): a dedicated A or Z axis starts each job at 0, so the
+// zeroAtAnchor (ADR-695): a dedicated A or Z axis starts each job at 0, so the
 // anchor lands there instead of on the head's work Y.
 function rotaryYMap(
   job: Job,

@@ -24,7 +24,7 @@ export function buildRelativeJogCommand(params: JogParams): string {
   const includeAxis = (value: number | undefined): value is number =>
     typeof value === 'number' && (absolute || value !== 0);
   assertJogHasAxis(params);
-  // Marlin and Smoothieware keep a rotary on Y (ADR-693): no A word is written.
+  // Marlin and Smoothieware keep a rotary on Y (ADR-695): no A word is written.
   if (params.da !== undefined) {
     throw new Error('This controller has no A axis for a rotary. Use a Y-port rotary.');
   }

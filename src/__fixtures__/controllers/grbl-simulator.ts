@@ -52,7 +52,7 @@ const JOG_CANCEL_BYTE = '\x85';
 
 export type CreateGrblSimulatorOptions = Partial<GrblSimOptions> & {
   /** A four-axis build with an A axis, as a grblHAL rotary machine has: A words
-   *  move it and reports carry it after XYZ (ADR-693). Unset: three axes, and an
+   *  move it and reports carry it after XYZ (ADR-695). Unset: three axes, and an
    *  A word is error:20 as on stock GRBL. */
   readonly fourthAxisA?: boolean;
   /** Override or extend the default $$ settings table. */
@@ -320,7 +320,7 @@ function powerUpState(
     : booted;
 }
 
-/** A four-axis build starts with A at 0 and no offset (ADR-693). */
+/** A four-axis build starts with A at 0 and no offset (ADR-695). */
 function withFourthAxisA(state: GrblSimState, fourthAxisA: boolean | undefined): GrblSimState {
   return fourthAxisA === true ? { ...state, aAxis: { mpos: 0, g92: 0 } } : state;
 }

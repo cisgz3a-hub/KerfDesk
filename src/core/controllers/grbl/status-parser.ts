@@ -82,7 +82,7 @@ export type StatusReport = {
   readonly mPos: { x: number; y: number; z: number } | null;
   readonly wPos: { x: number; y: number; z: number } | null;
   /** Values in the report's MPos/WPos: one per configured axis on grblHAL
-   *  and FluidNC. Optional so hand-built mocks need not set it (ADR-693). */
+   *  and FluidNC. Optional so hand-built mocks need not set it (ADR-695). */
   readonly reportedAxisCount?: number | null;
   readonly feed: number | null;
   readonly spindle: number | null;
@@ -334,7 +334,7 @@ function pickAxisField(
 }
 
 // How many axis values MPos/WPos carry: one per configured axis on grblHAL
-// and FluidNC, three on stock GRBL. A rotary on A needs a fourth (ADR-693).
+// and FluidNC, three on stock GRBL. A rotary on A needs a fourth (ADR-695).
 function pickReportedAxisCount(fields: ReadonlyArray<string>): number | null {
   for (const f of fields) {
     if (!f.startsWith('MPos:') && !f.startsWith('WPos:')) continue;

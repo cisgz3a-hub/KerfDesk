@@ -1,4 +1,4 @@
-// Start checks for the rotary's axis (ADR-693).
+// Start checks for the rotary's axis (ADR-695).
 // - A controller whose own report has no such axis cannot take the program:
 //   its A or Z words would be refused or move nothing. That is a factual
 //   refusal, on Start and on Frame alike.

@@ -84,7 +84,7 @@ export function editRotaryType(edit: RotaryEdit, type: RotaryType): RotaryEdit {
 }
 
 /** A published rotary's type, axis and motion per turn; the work and the
- * toggles stay (ADR-503, ADR-693). A preset that names no axis keeps the
+ * toggles stay (ADR-503, ADR-695). A preset that names no axis keeps the
  * operator's choice. */
 export function editRotaryPreset(
   edit: RotaryEdit,
@@ -102,7 +102,7 @@ export function editRotaryPreset(
 }
 
 /**
- * The rotary's axis (ADR-693). Motion per turn is in the axis's own units, so
+ * The rotary's axis (ADR-695). Motion per turn is in the axis's own units, so
  * moving between millimetres (Y, Z) and degrees (A) parks the old value and
  * brings back the last one used in the new units; a first switch to A starts
  * at 360°, one turn of a degree-counting axis. Y is stored as no field, so a
@@ -125,7 +125,7 @@ export function editRotaryAxis(edit: RotaryEdit, axis: RotaryAxis): RotaryEdit {
   };
 }
 
-/** The operator saw a Test rotation turn the rotary on this axis (ADR-693). */
+/** The operator saw a Test rotation turn the rotary on this axis (ADR-695). */
 export function editRotaryAxisConfirmed(edit: RotaryEdit, axis: DedicatedRotaryAxis): RotaryEdit {
   return { ...edit, setup: { ...edit.setup, axisConfirmed: axis } };
 }

@@ -1,4 +1,4 @@
-// rotary-axis — which controller axis turns the rotary (ADR-693).
+// rotary-axis — which controller axis turns the rotary (ADR-695).
 //
 // LightBurn's Rotary Setup offers the same three: "Select Y Axis if you are
 // unplugging your Y Axis stepper motor wire and plugging it into the rotary
@@ -29,7 +29,7 @@ export function isDedicatedRotaryAxis(value: unknown): value is DedicatedRotaryA
   return value === 'A' || value === 'Z';
 }
 
-/** The axis a setup turns; absent is Y, as every setup before ADR-693 was. */
+/** The axis a setup turns; absent is Y, as every setup before ADR-695 was. */
 export function rotaryAxisOf(setup: Pick<RotarySetup, 'axis'> | undefined): RotaryAxis {
   return setup?.axis ?? 'Y';
 }

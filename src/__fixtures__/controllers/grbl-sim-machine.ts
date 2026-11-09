@@ -376,7 +376,7 @@ function reduceSoftReset(state: GrblSimState, opts: GrblSimOptions): GrblSimReac
   };
 }
 
-// A four-axis build reports A after XYZ in MPos and WCO (ADR-693).
+// A four-axis build reports A after XYZ in MPos and WCO (ADR-695).
 function reportedAxes(
   state: GrblSimState,
   wco: SimVec3,

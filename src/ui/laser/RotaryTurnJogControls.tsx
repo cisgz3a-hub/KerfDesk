@@ -1,4 +1,4 @@
-// Turn a rotary on a dedicated A or Z axis from the jog pad (ADR-693). With
+// Turn a rotary on a dedicated A or Z axis from the jog pad (ADR-695). With
 // the rotary on A or Z the Y arrows move the head, so the part gets its own
 // turn buttons, as LightBurn's Move window has rotational arrows that jog A
 // "degrees of movement" per click

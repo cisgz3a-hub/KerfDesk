@@ -30,7 +30,7 @@ export function RotaryTestRotationPanel(props: {
   readonly setup: RotarySetup;
   readonly valid: boolean;
   readonly test: RotaryTestControls;
-  /** The operator saw a finished turn move the rotary on this axis (ADR-693). */
+  /** The operator saw a finished turn move the rotary on this axis (ADR-695). */
   readonly onConfirmAxis?: (axis: DedicatedRotaryAxis) => void;
 }): JSX.Element {
   const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');

@@ -31,7 +31,7 @@ export function rotaryAttachmentSummary(setup: RotarySetup): string {
 
 /** "Y ×1.91, one revolution = 360 machine mm": the axis, its scale and the
  * wrap limit, in the axis's own units ("A ×1.43, one revolution = 360°" on a
- * degree-counting A axis, ADR-693). */
+ * degree-counting A axis, ADR-695). */
 export function rotaryMappingSummary(setup: RotarySetup): string {
   const axis = rotaryAxisOf(setup);
   const scale = rotaryYScale(setup).toFixed(2);

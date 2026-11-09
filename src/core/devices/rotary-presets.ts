@@ -1,4 +1,4 @@
-// Rotary attachments with published settings (ADR-503, ADR-693). Only figures
+// Rotary attachments with published settings (ADR-503, ADR-695). Only figures
 // a maker publishes go here, each with its source; every rotary still wants a
 // Test rotation on its machine, because the motion per turn depends on how the
 // controller drives the port the rotary plugs into. Each preset names that

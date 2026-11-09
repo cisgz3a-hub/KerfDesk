@@ -1,4 +1,4 @@
-// Frame on a rotary with a dedicated A or Z axis (ADR-693). The framed job's
+// Frame on a rotary with a dedicated A or Z axis (ADR-695). The framed job's
 // Y slot is the part's turn, zeroed at the turn the part is at now, exactly
 // as the job will be: the Frame starts with the same `G92 A0`, traces the
 // perimeter with the turn written under the axis letter, and always comes back

@@ -19,7 +19,7 @@ import { Row, numInputStyle, unitStyle } from '../device-settings-shared';
 
 export function DeviceSetupRotaryFields(props: {
   readonly value: RotarySetup;
-  /** The axes the draft's controller can turn a rotary on (ADR-693). */
+  /** The axes the draft's controller can turn a rotary on (ADR-695). */
   readonly axes?: ReadonlyArray<RotaryAxis>;
   readonly onChange: (value: RotarySetup) => void;
 }): JSX.Element {
@@ -96,7 +96,7 @@ export function DeviceSetupRotaryFields(props: {
 }
 
 // Remembers the roller diameter while scaling is off or Chuck is chosen, and
-// Motion per turn in the units the axis is not using (ADR-693).
+// Motion per turn in the units the axis is not using (ADR-695).
 function useDraftRotaryEdit(
   value: RotarySetup,
   onChange: (value: RotarySetup) => void,
@@ -115,7 +115,7 @@ function useDraftRotaryEdit(
   };
 }
 
-// ADR-693: Y when the rotary takes the Y motor's place, A or Z for its own
+// ADR-695: Y when the rotary takes the Y motor's place, A or Z for its own
 // connector. A saved axis this controller cannot take stays listed.
 function RotaryAxisRow(props: {
   readonly axis: RotaryAxis;

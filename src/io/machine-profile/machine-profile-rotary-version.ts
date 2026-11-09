@@ -1,5 +1,5 @@
-// The machine profile schema a rotary axis needs (ADR-693). A reader from
-// before ADR-693 drops `rotary.axis` and would drive an A or Z rotary as Y, so
+// The machine profile schema a rotary axis needs (ADR-695). A reader from
+// before ADR-695 drops `rotary.axis` and would drive an A or Z rotary as Y, so
 // a profile with a dedicated axis is written as schema 2, which that reader
 // refuses as too new. Every other profile stays schema 1, readable by it.
 

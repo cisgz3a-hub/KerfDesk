@@ -1,4 +1,4 @@
-// ADR-693 against the GRBL simulator with the real store, Frame and Start:
+// ADR-695 against the GRBL simulator with the real store, Frame and Start:
 // - a four-axis grblHAL with the rotary on A frames and burns by turning A,
 //   zeroed first with G92 A0, and the head never moves in Y;
 // - a stock three-axis GRBL with the rotary on the Y port (Y swap) frames and

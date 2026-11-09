@@ -175,7 +175,7 @@ export function emitPreparedGcodeWithCncPassSpans(
     return { gcode: '', preflight: emission.preflight, spans: null };
   }
   const { cnc: cncEmission, body: yBody } = emission.value;
-  // ADR-693: a rotary on A or Z writes its turn under that letter. Preflight
+  // ADR-695: a rotary on A or Z writes its turn under that letter. Preflight
   // still reads the turn as Y, the rotary's machine-space slot.
   const routed = routeRotaryAxisBody(prepared.project, yBody);
   if (routed.kind === 'refused') return { gcode: '', preflight: routed.preflight, spans: null };

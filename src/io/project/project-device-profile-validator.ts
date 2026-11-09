@@ -128,7 +128,7 @@ export function optionalRotarySetup(obj: Record<string, unknown>, path: string):
     requirePositiveNumber(value, `${path}.mmPerRotation`),
     requirePositiveNumber(value, `${path}.objectDiameterMm`),
     optionalPositiveNumber(value, `${path}.rollerDiameterMm`),
-    // ADR-693: absent is Y, as every file before it.
+    // ADR-695: absent is Y, as every file before it.
     optionalLiteral(value, `${path}.axis`, ['Y', 'A', 'Z']),
     optionalLiteral(value, `${path}.axisConfirmed`, ['A', 'Z']),
     optionalBoolean(value, `${path}.reverseAxis`),

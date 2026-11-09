@@ -23,7 +23,7 @@ export function machineSnapshot(
   return {
     connected: laser.connection.kind === 'connected',
     statusReport: laser.statusReport,
-    // grblHAL's `$I` axes, when read this session (ADR-693).
+    // grblHAL's `$I` axes, when read this session (ADR-695).
     reportedAxisLetters: reportedControllerAxes(laser).axisLetters ?? null,
     alarmCode: laser.alarmCode,
     hasActiveStreamer: isActiveJob(laser.streamer),

@@ -110,7 +110,7 @@ export type JogParams = {
   readonly dy?: number;
   readonly dz?: number;
   // Turn of a rotary on a dedicated A axis, in the axis's own units (degrees
-  // on grblHAL and FluidNC; ADR-693). Only GRBL-family builders write it.
+  // on grblHAL and FluidNC; ADR-695). Only GRBL-family builders write it.
   readonly da?: number;
   // Feed rate in mm/min. GRBL requires F for jog commands.
   readonly feed: number;

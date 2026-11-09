@@ -21,7 +21,7 @@ export function RotarySetupDialog(props: {
   readonly onGenerateCalibration: (setup: RotarySetup) => void;
   /** Published rotaries for this machine (ADR-503). */
   readonly presets?: ReadonlyArray<RotaryPreset>;
-  /** The axes this controller can turn a rotary on (ADR-693). Absent: Y only. */
+  /** The axes this controller can turn a rotary on (ADR-695). Absent: Y only. */
   readonly axes?: ReadonlyArray<RotaryAxis>;
   readonly artwork?: RotaryArtworkExtent | null;
   readonly outputDescription?: string;

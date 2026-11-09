@@ -21,7 +21,7 @@ import {
 } from './rotary-setup-edit';
 import { rotaryMappingSummary } from './rotary-summary';
 
-// ADR-693: the rotary axis through the edit model, Frame, Job Review and the
+// ADR-695: the rotary axis through the edit model, Frame, Job Review and the
 // controller words it needs.
 const CHUCK: RotarySetup = {
   enabled: true,

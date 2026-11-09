@@ -18,7 +18,7 @@ describe('Rotary Setup presets (ADR-503)', () => {
     expect(rotaryPresetsFor(FALCON_COMPATIBLE_PROFILE).map((preset) => preset.id)).toEqual([
       'creality-rotary-kit-pro-chuck',
     ]);
-    // ADR-693: the A1 Pro's rotary has its own connector, never the Y port.
+    // ADR-695: the A1 Pro's rotary has its own connector, never the Y port.
     expect(rotaryPresetsFor(FALCON_A1_PRO_GRBLHAL_PROFILE).map((preset) => preset.id)).toEqual([
       'creality-rotary-kit-pro-chuck-a1-pro',
     ]);

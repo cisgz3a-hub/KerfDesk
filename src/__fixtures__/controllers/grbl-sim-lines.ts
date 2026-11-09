@@ -426,7 +426,7 @@ function applyG10(state: GrblSimState, line: string): GrblSimState {
 }
 
 // GRBL's parser has no A word on a three-axis build: error:20, unsupported
-// command (gcode.c). A four-axis grblHAL build moves it (ADR-693).
+// command (gcode.c). A four-axis grblHAL build moves it (ADR-695).
 function unsupportedAWord(state: GrblSimState, words: ParsedMotionWords): boolean {
   return words.a !== null && state.aAxis === undefined;
 }

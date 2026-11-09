@@ -1,4 +1,4 @@
-## ADR-693 - A rotary turns on Y, A or Z
+## ADR-695 - A rotary turns on Y, A or Z
 
 **Status:** Accepted. Builds the missing feature rolling audit v12 X8-P2-1 raised (re-rated P1 by its refuter: no
 A or Z rotary axis; `docs/audits/2026-11-09-rolling-v12/X8-rotary-complete.md`) and X8-P3-3 (one

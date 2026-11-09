@@ -34,7 +34,7 @@ export const COMPILE_INTEGRITY_PREFLIGHT_CODES: ReadonlySet<PreflightCode> = new
     'non-finite-coordinate',
     'coordinate-unencodable',
     'fluidnc-line-unexecutable',
-    // ADR-693: a rotary on an axis the controller has no word for, or whose
+    // ADR-695: a rotary on an axis the controller has no word for, or whose
     // letter the program already uses, has no truthful program to send.
     'rotary-axis-unexecutable',
     'cnc-tool-geometry-invalid',

@@ -1,5 +1,5 @@
 // rotary-axis-output — write a rotary's turn under its dedicated axis
-// (ADR-693). Every laser emitter writes the machine-space job's Y slot as `Y`;
+// (ADR-695). Every laser emitter writes the machine-space job's Y slot as `Y`;
 // on an A or Z rotary that slot is the part's turn, so this stage renames each
 // Y word in the finished lines to the axis letter. The head's Y is then never
 // commanded: it stays over the part where the operator put it, as LightBurn's

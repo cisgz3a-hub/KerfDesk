@@ -110,7 +110,7 @@ export function frameRouteNoGoWarnings(
   const project = framedProject(candidate, jobProject);
   const returnTarget = frameReturnTarget(candidate, external);
   // A dedicated rotary axis turns the part; the head stays at its own Y
-  // (ADR-693), so the bed and no-go checks see that Y, not the turn.
+  // (ADR-695), so the bed and no-go checks see that Y, not the turn.
   const dedicatedAxis = rotaryOutputAxis(project.device, project.machine) !== null;
   if (dedicatedAxis && returnTarget === undefined) return [];
   const projectBounds = frameBoundsForProject(bounds, project);

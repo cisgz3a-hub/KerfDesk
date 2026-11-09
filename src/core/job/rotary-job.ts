@@ -70,7 +70,7 @@ export function machineSpaceJob(
 }
 
 // The dedicated axis (A or Z) this project's rotary writes its turn to, or
-// null when the rotary is off, on Y, or the project is CNC (ADR-693).
+// null when the rotary is off, on Y, or the project is CNC (ADR-695).
 export function rotaryOutputAxis(
   device: DeviceProfile,
   machine: MachineConfig | undefined,

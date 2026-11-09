@@ -27,7 +27,7 @@ export function RotarySetupFields(props: {
   readonly onEdit: RotaryEditUpdate;
   /** Published rotaries for this machine, if any (ADR-503). */
   readonly presets?: ReadonlyArray<RotaryPreset>;
-  /** The axes this controller can turn a rotary on (ADR-693). */
+  /** The axes this controller can turn a rotary on (ADR-695). */
   readonly axes?: ReadonlyArray<RotaryAxis>;
 }): JSX.Element {
   const { edit, onEdit } = props;

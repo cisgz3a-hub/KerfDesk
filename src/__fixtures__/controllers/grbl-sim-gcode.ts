@@ -11,7 +11,7 @@ export type ParsedMotionWords = {
   readonly x: number | null;
   readonly y: number | null;
   readonly z: number | null;
-  /** A rotary's A word (ADR-693); only a four-axis simulator moves it. */
+  /** A rotary's A word (ADR-695); only a four-axis simulator moves it. */
   readonly a: number | null;
   readonly feed: number | null;
   readonly spindle: number | null;
@@ -104,7 +104,7 @@ export function hasGWord(body: string, value: number): boolean {
   return new RegExp(`(?:^|\\s)[Gg]${target}(?:\\s|$)`).test(body);
 }
 
-/** A grblHAL-style fourth axis, A, counted in its own units (ADR-693). Only
+/** A grblHAL-style fourth axis, A, counted in its own units (ADR-695). Only
  *  G92 offsets it; G54 is modelled for XYZ alone. */
 export type SimAAxis = { readonly mpos: number; readonly g92: number };
 

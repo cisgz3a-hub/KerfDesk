@@ -50,7 +50,7 @@ store Import, so its white shapes burn over the black, and the last logo's white
 to Output off with `setLayerParam`. Its sidecar holds each import's burn (by `svgImport.source`)
 and the whole job. `returning-user-white-fills.test.ts` reads it.
 
-`1.0.29-rotary` (rolling audit v12 X8, ADR-693) was built through 1.0.29's store: Draw, the operation
+`1.0.29-rotary` (rolling audit v12 X8, ADR-695) was built through 1.0.29's store: Draw, the operation
 settings and Rotary Setup's Apply (`updateDeviceProfile`). It has no rotary axis, so it must open on Y.
 Its sidecar holds the rotary as saved and the whole job's burn from Absolute, Current Position
 (centre at X120 Y80) and User Origin (front-left). `returning-user-rotary-1-0-29.test.ts` reads it.

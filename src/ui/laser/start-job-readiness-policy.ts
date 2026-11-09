@@ -58,7 +58,7 @@ export function demotedPolicyWarnings(
   jobOrigin?: JobOriginPlacement,
 ): string[] {
   const warnings: string[] = placementWarnings(project, machine, jobOrigin);
-  // ADR-693: an A or Z rotary no one has seen turn, or an A1 Pro rotary left on Y.
+  // ADR-695: an A or Z rotary no one has seen turn, or an A1 Pro rotary left on Y.
   warnings.push(...rotaryAxisStartWarnings(project));
   const machineKind = machineKindOf(project.machine);
   if (machineKind === 'cnc' && machine.cncJobsSupported === false) {
@@ -343,7 +343,7 @@ function nonExecutableProgramMessages(preflight: {
 }
 
 /** Every factual refusal of a built Start program: its integrity, and a rotary
- * on an axis the controller's own report does not have (ADR-693). */
+ * on an axis the controller's own report does not have (ADR-695). */
 export function preparedStartRefusal(
   gcode: string,
   preflight: Parameters<typeof preparedProgramIntegrityIssue>[2],

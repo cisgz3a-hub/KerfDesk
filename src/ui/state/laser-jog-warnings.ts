@@ -91,7 +91,7 @@ export function configuredMotionBounds(
   // Rotary is a laser attachment (never applied to CNC output), so a router
   // keeps the bed's own Y range.
   const rotary = machineKind === 'cnc' ? undefined : device.rotary;
-  // A rotary on A or Z leaves Y on the bed (ADR-693).
+  // A rotary on A or Z leaves Y on the bed (ADR-695).
   return isRotaryActive(rotary) && dedicatedRotaryAxisOf(rotary) === null
     ? { ...baseBounds, minY: 0, maxY: rotaryYLimitMm(rotary) }
     : baseBounds;

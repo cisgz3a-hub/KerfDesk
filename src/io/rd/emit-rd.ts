@@ -53,7 +53,7 @@ export function emitPreparedRdFile(
   if (!prepared.ok) {
     return { ok: false, messages: prepared.preflight.issues.map((issue) => issue.message) };
   }
-  // A Ruida rotary turns on its own Y (ADR-693): a dedicated A or Z setup has
+  // A Ruida rotary turns on its own Y (ADR-695): a dedicated A or Z setup has
   // no .rd form, so it gets no file rather than one that moves the gantry.
   const rotaryAxis = rotaryOutputAxis(prepared.project.device, prepared.project.machine);
   if (rotaryAxis !== null) {

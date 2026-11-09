@@ -119,7 +119,7 @@ export type PreflightCode =
   | 'non-finite-coordinate'
   | 'coordinate-unencodable'
   | 'fluidnc-line-unexecutable'
-  // ADR-693: the rotary's A or Z axis cannot be written for this controller,
+  // ADR-695: the rotary's A or Z axis cannot be written for this controller,
   // or the program already uses that letter for something else.
   | 'rotary-axis-unexecutable'
   | 'cnc-tool-geometry-invalid'

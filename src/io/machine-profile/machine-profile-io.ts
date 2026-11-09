@@ -52,7 +52,7 @@ const ORIGINS = ['front-left', 'front-right', 'rear-left', 'rear-right', 'center
 const PROFILE_SOURCES = ['built-in', 'custom', 'imported', 'lightburn'] as const;
 
 export function serializeMachineProfileDocument(document: MachineProfileDocument): string {
-  // ADR-693: a dedicated rotary axis is written as a schema older readers refuse.
+  // ADR-695: a dedicated rotary axis is written as a schema older readers refuse.
   return `${JSON.stringify(rotaryAxisSchema(canonicalDocument(document)), null, 2)}\n`;
 }
 

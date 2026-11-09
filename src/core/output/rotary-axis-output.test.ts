@@ -5,7 +5,7 @@ import {
   routeRotaryAxisLines,
 } from './rotary-axis-output';
 
-// ADR-693: the turn written as Y by every emitter goes out under A or Z.
+// ADR-695: the turn written as Y by every emitter goes out under A or Z.
 describe('routeRotaryAxisLine', () => {
   it('renames Y words to the axis and leaves every other word', () => {
     expect(routeRotaryAxisLine('G1 X10.000 Y-2.500 F1500 S300', 'A')).toBe(

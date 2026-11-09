@@ -40,7 +40,7 @@ export const ROTARY_TEST_PAUSE_MS = 1000;
 export type RotaryTestPlan = {
   readonly target: RotaryRevolutionTarget;
   // Commanded travel for one revolution of the target, on the rotary's axis:
-  // millimetres on Y and Z, degrees on A (ADR-693).
+  // millimetres on Y and Z, degrees on A (ADR-695).
   readonly travelMm: number;
   readonly axis: RotaryAxis;
   readonly feedMmPerMin: number;
@@ -86,7 +86,7 @@ export function planRotaryTestRotation(
   };
 }
 
-// One turn on the rotary's own axis (ADR-693): Y for a Y-port rotary, the
+// One turn on the rotary's own axis (ADR-695): Y for a Y-port rotary, the
 // A or Z word for a dedicated rotary port.
 function rotaryTurnJog(axis: RotaryAxis, travel: number, feed: number): JogParams {
   if (axis === 'A') return { da: travel, feed };

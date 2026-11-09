@@ -29,7 +29,7 @@ export type GrblSimState = {
   readonly machine: GrblSimMachineLabel;
   readonly locked: boolean;
   readonly mpos: SimVec3;
-  /** A fourth axis, A, as a four-axis grblHAL build has (ADR-693). Absent on a
+  /** A fourth axis, A, as a four-axis grblHAL build has (ADR-695). Absent on a
    *  three-axis build, which refuses an A word with error:20. */
   readonly aAxis?: SimAAxis;
   readonly g92: SimVec3 | null;

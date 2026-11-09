@@ -1,4 +1,4 @@
-// Rotary Setup's axis choice (ADR-693), LightBurn's "Rotary Axis": Y when the
+// Rotary Setup's axis choice (ADR-695), LightBurn's "Rotary Axis": Y when the
 // rotary takes the Y motor's place, A or Z for a dedicated rotary port. Only
 // the axes this controller can take are offered; a saved axis it cannot take
 // stays shown, with why, so it is never silently changed.

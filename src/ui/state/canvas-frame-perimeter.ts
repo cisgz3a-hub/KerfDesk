@@ -27,7 +27,7 @@ export function framePerimeterForCanvas(
       point,
       rotaryYScale(rotary),
       rotary.reverseAxis === true,
-      // ADR-693: a dedicated A or Z axis zeroes at the anchor, as machineSpaceJob does.
+      // ADR-695: a dedicated A or Z axis zeroes at the anchor, as machineSpaceJob does.
       dedicatedRotaryAxisOf(rotary) !== null,
     );
     return toSceneCoords(

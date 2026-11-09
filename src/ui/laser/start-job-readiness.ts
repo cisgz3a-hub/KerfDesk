@@ -118,7 +118,7 @@ export type MachineStartSnapshot = {
   readonly connected?: boolean;
   readonly statusReport: StatusReport | null;
   // The axis letters grblHAL's `$I` reported (`[AXS:4:XYZA]` → "XYZA"), or
-  // null when unread. Checked against a dedicated rotary axis (ADR-693).
+  // null when unread. Checked against a dedicated rotary axis (ADR-695).
   readonly reportedAxisLetters?: string | null;
   readonly alarmCode: number | null;
   readonly hasActiveStreamer: boolean;

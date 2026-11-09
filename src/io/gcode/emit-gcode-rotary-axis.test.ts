@@ -18,7 +18,7 @@ import {
 import { emitRdFile } from '../rd/emit-rd';
 import { emitGcode } from './emit-gcode';
 
-// ADR-693: a rotary on a dedicated A or Z axis. The turn goes out under that
+// ADR-695: a rotary on a dedicated A or Z axis. The turn goes out under that
 // letter, zeroed first with G92, and the head's Y is never commanded. A Y-port
 // rotary (GRBL Y swap) keeps its bytes.
 

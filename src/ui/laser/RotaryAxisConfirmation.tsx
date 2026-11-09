@@ -1,5 +1,5 @@
 // The one-time check a dedicated rotary axis needs before its first burn
-// (ADR-693). KerfDesk can read whether a controller has an A axis, but not
+// (ADR-695). KerfDesk can read whether a controller has an A axis, but not
 // which connector the rotary is plugged into, or whether the firmware sends
 // that axis there. So after a Test rotation finishes on A or Z, the operator
 // says whether the rotary turned; until then Job Review warns.
