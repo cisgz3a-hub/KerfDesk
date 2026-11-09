@@ -3926,7 +3926,8 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    and the 0.100 mm line interval is 1.27 steps, so its rows land 0.079 or 0.157 mm apart and
    band", and names the two intervals that fit (here 12.73 or 6.37 lines/mm).
 2. Below one step per row the warning gives the share of rows that burn twice.
-3. When the controller reported no `$101`, one warning says the rows could not be checked.
+3. A rotary on A or Z is checked against `$103` or `$102` the same way. When the controller
+   reported no steps for the rotary's axis, one warning says the rows could not be checked.
 4. The warning changes nothing on its own; the operator sets the line interval.
 
 #### Success — the Rotary switch

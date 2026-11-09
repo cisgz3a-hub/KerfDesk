@@ -3,7 +3,7 @@ import { DEFAULT_DEVICE_PROFILE, type RotarySetup } from '../../../core/devices'
 import type { Job, RasterGroup } from '../../../core/job';
 import {
   detectRotaryRowStepWarnings,
-  ROTARY_ROW_STEPS_UNKNOWN_WARNING,
+  rotaryRowStepsUnknownWarning,
 } from './rotary-row-step-warnings';
 
 // Rolling audit v12 X8-P2-3 (refuter's table, own step model): a solid 10 mm
@@ -42,7 +42,9 @@ function project(rotary: RotarySetup | undefined) {
 
 describe('detectRotaryRowStepWarnings (ADR-315 Amd 1)', () => {
   it('names the banding gaps and the intervals that fit, Ø80 at 80 steps/mm', () => {
-    expect(detectRotaryRowStepWarnings(project(chuck(80)), rasterJob(), 80)).toEqual([
+    expect(
+      detectRotaryRowStepWarnings(project(chuck(80)), rasterJob(), { stepsPerMmY: 80 }),
+    ).toEqual([
       'Image layer L1 on this rotary: one Y step ($101 = 80 steps/mm) turns the part 0.079 mm, ' +
         'and the 0.100 mm line interval is 1.27 steps, so its rows land 0.079 or 0.157 mm apart ' +
         'and band. For even rows, set the line interval to 12.73 lines/mm (0.079 mm, 1 step) or ' +
@@ -51,7 +53,9 @@ describe('detectRotaryRowStepWarnings (ADR-315 Amd 1)', () => {
   });
 
   it('says rows burn twice when the interval is under one step, Ø150 at 80 steps/mm', () => {
-    const [warning] = detectRotaryRowStepWarnings(project(chuck(150)), rasterJob(), 80);
+    const [warning] = detectRotaryRowStepWarnings(project(chuck(150)), rasterJob(), {
+      stepsPerMmY: 80,
+    });
     expect(warning).toContain('the 0.100 mm line interval is 0.68 steps');
     expect(warning).toContain('so about 32 % of its rows land on the row before and burn twice');
     expect(warning).toContain('6.79 lines/mm (0.147 mm, 1 step)');
@@ -63,10 +67,26 @@ describe('detectRotaryRowStepWarnings (ADR-315 Amd 1)', () => {
     [100, 150, '0.85 steps', '15 % of its rows', '8.49 lines/mm'],
     [160, 150, '1.36 steps', '0.074 or 0.147 mm apart', '13.58 lines/mm'],
   ])('$101 = %i on Ø%i', (steps, diameter, ratio, effect, suggestion) => {
-    const [warning] = detectRotaryRowStepWarnings(project(chuck(diameter)), rasterJob(), steps);
+    const [warning] = detectRotaryRowStepWarnings(project(chuck(diameter)), rasterJob(), {
+      stepsPerMmY: steps,
+    });
     expect(warning).toContain(ratio);
     expect(warning).toContain(effect);
     expect(warning).toContain(suggestion);
+  });
+
+  it('checks a rotary on its own A axis against $103 (ADR-695)', () => {
+    // The A1 Pro reports $103=8.900 steps per degree; 360° per turn of an Ø80 glass.
+    const onA: RotarySetup = { ...chuck(80), axis: 'A', mmPerRotation: 360 };
+    const [warning] = detectRotaryRowStepWarnings(project(onA), rasterJob(), {
+      stepsPerMmY: 80,
+      stepsPerUnitA: 8.9,
+    });
+    expect(warning).toContain('one A step ($103 = 8.9 steps/°) turns the part 0.078 mm');
+    expect(warning).toContain('1.27 steps');
+    expect(detectRotaryRowStepWarnings(project(onA), rasterJob(), { stepsPerMmY: 80 })).toEqual([
+      rotaryRowStepsUnknownWarning('A'),
+    ]);
   });
 
   it('is silent when the interval is a whole number of steps', () => {
@@ -78,21 +98,27 @@ describe('detectRotaryRowStepWarnings (ADR-315 Amd 1)', () => {
       groups: [{ ...(job.groups[0] as RasterGroup), pixelHeight: Math.round(10 * fits) }],
     };
     // 127 rows over 10 mm is 1.0002 steps per row.
-    expect(detectRotaryRowStepWarnings(project(chuck(80)), exact, 80)).toEqual([]);
+    expect(detectRotaryRowStepWarnings(project(chuck(80)), exact, { stepsPerMmY: 80 })).toEqual([]);
   });
 
   it('warns once when the controller reported no $101, and checks nothing without one', () => {
     expect(detectRotaryRowStepWarnings(project(chuck(80)), rasterJob(), null)).toEqual([
-      ROTARY_ROW_STEPS_UNKNOWN_WARNING,
+      rotaryRowStepsUnknownWarning('Y'),
     ]);
     expect(detectRotaryRowStepWarnings(project(chuck(80)), rasterJob(), undefined)).toEqual([]);
   });
 
   it('is silent on a flat bed, with the rotary off, or without an image', () => {
-    expect(detectRotaryRowStepWarnings(project(undefined), rasterJob(), 80)).toEqual([]);
     expect(
-      detectRotaryRowStepWarnings(project({ ...chuck(80), enabled: false }), rasterJob(), 80),
+      detectRotaryRowStepWarnings(project(undefined), rasterJob(), { stepsPerMmY: 80 }),
     ).toEqual([]);
-    expect(detectRotaryRowStepWarnings(project(chuck(80)), { groups: [] }, 80)).toEqual([]);
+    expect(
+      detectRotaryRowStepWarnings(project({ ...chuck(80), enabled: false }), rasterJob(), {
+        stepsPerMmY: 80,
+      }),
+    ).toEqual([]);
+    expect(
+      detectRotaryRowStepWarnings(project(chuck(80)), { groups: [] }, { stepsPerMmY: 80 }),
+    ).toEqual([]);
   });
 });
