@@ -39,6 +39,16 @@ export type PanelClaims = {
   readonly sides: Readonly<Record<SideId, ReadonlyArray<SideInterval>>>;
 };
 
+/** Display names of the six box walls, as the sheet and scene label them. */
+export const WALL_NAMES: Readonly<Record<PanelId, string>> = {
+  bottom: 'Bottom',
+  top: 'Top',
+  front: 'Front',
+  back: 'Back',
+  left: 'Left',
+  right: 'Right',
+};
+
 const PANEL_ORDER: ReadonlyArray<PanelId> = ['bottom', 'top', 'front', 'back', 'left', 'right'];
 
 type PanelDef = {
@@ -104,12 +114,19 @@ export function buildPanelClaims(spec: BoxSpec): ReadonlyArray<PanelClaims> {
     y: axisPattern(spec, spanByAxis.y),
     z: axisPattern(spec, spanByAxis.z),
   };
-  const present = new Set<PanelId>(
-    PANEL_ORDER.filter((panel) => spec.style === 'closed' || panel !== 'top'),
-  );
+  const absent = absentPanel(spec);
+  const present = new Set<PanelId>(PANEL_ORDER.filter((panel) => panel !== absent));
   return [...present].map((panel) =>
     claimsForPanel(panel, present, spanByAxis, patternByAxis, spec.thicknessMm),
   );
+}
+
+// Closed boxes have all six panels; open-front drops the front (ADR-693);
+// every other style is built on open-top claims (the slide and lift-off
+// lid builders run them on a surrogate box and add their own lid parts).
+function absentPanel(spec: BoxSpec): PanelId | null {
+  if (spec.style === 'closed') return null;
+  return spec.style === 'open-front' ? 'front' : 'top';
 }
 
 function claimsForPanel(
@@ -189,7 +206,8 @@ function cornerAt(panel: PanelId, side: SideId, sideEnd: AxisEnd): Readonly<Reco
 }
 
 // Highest-priority present panel among the three that touch the corner cube.
-// v1 only ever omits the top, so the fallback chain is z-panel then y-panel.
+// At most one panel is ever absent — the top or (open-front) the front — so
+// the z-panel is missing only on an open top, where the y-panel is present.
 function cornerClaimant(
   corner: Readonly<Record<Axis, AxisEnd>>,
   present: ReadonlySet<PanelId>,

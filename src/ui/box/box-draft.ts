@@ -3,7 +3,7 @@
 // reporting (F-K1 empty state), and the persistence field list. String
 // drafts keep half-typed numbers editable; the spec is derived per render.
 
-import type { BoxSpec, BoxSpecField } from '../../core/box';
+import type { BoxSpec, BoxSpecField, BoxStyle } from '../../core/box';
 
 export type BoxMachineContext =
   | { readonly kind: 'laser' }
@@ -59,7 +59,8 @@ export const BOX_DRAFT_PERSISTED_FIELDS: ReadonlyArray<keyof BoxDraft> = [
 
 // CNC glue fit vs laser press fit (ADR-106 fit division of labor).
 const CNC_DEFAULT_CLEARANCE_MM = 0.15;
-// A slide lid must slide: the laser default rises for that style (F-K7).
+// A slide lid must slide and a lift-off lid's lip must drop in: the laser
+// default rises for those styles (F-K7, F-K10).
 export const SLIDE_LID_MIN_CLEARANCE_DRAFT = '0.2';
 const DEFAULT_LASER_THICKNESS_MM = 3;
 const FINGER_WIDTH_TO_THICKNESS = 3;
@@ -151,7 +152,7 @@ export function parseBoxDraft(draft: BoxDraft, machine: BoxMachineContext): BoxD
       dimensionMode: draft.mode === 'outer' ? 'outer' : 'inner',
       thicknessMm: Number(draft.thickness),
       targetFingerWidthMm: Number(draft.fingerWidth),
-      style: draft.style === 'open-top' || draft.style === 'slide-lid' ? draft.style : 'closed',
+      style: parseBoxStyle(draft.style),
       clearanceMm: Number(draft.clearance),
       relief:
         machine.kind === 'cnc' && draft.relief !== 'off'
@@ -162,6 +163,18 @@ export function parseBoxDraft(draft: BoxDraft, machine: BoxMachineContext): BoxD
       dividersYCount: Number(draft.dividersY),
     },
   };
+}
+
+const BOX_STYLES: ReadonlyArray<BoxStyle> = [
+  'closed',
+  'open-top',
+  'slide-lid',
+  'lift-lid',
+  'open-front',
+];
+
+function parseBoxStyle(value: string): BoxStyle {
+  return BOX_STYLES.find((style) => style === value) ?? 'closed';
 }
 
 export const BOX_FIELD_LABELS: Readonly<Record<BoxSpecField, string>> = {

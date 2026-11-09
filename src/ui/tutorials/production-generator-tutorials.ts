@@ -25,7 +25,7 @@ export const PRODUCTION_GENERATOR_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose joints and panels',
         instruction:
-          'Choose Closed, Open top or Slide lid. Set Finger width, Clearance and any dividers. For a routed box, inspect Corner relief and use the actual Relief tool diameter.',
+          'Choose Closed, Open top, Slide lid, Lift-off lid or Open front. Set Finger width, Clearance and any dividers. For a routed box, inspect Corner relief and use the actual Relief tool diameter.',
         focus: 'Style · fingers · clearance',
         result: 'The preview shows the panels, mating fingers and dividers for this construction.',
       },
