@@ -9,7 +9,7 @@ import { UpdatesPanel } from './UpdatesPanel';
 import { useCommercialUpdateStatus } from './use-commercial-update-status';
 
 /**
- * Keeps the desktop app's update status for the status bar and the canvas
+ * Keeps the desktop app's update status for the toolbar button and the canvas
  * prompt, and answers Help > Check for Updates with the updates panel (ADR-547).
  */
 export function CommercialUpdates({

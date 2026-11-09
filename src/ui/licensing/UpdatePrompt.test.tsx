@@ -7,7 +7,7 @@ import { useLaserStore } from '../state/laser-store';
 import { CommercialUpdates } from './CommercialUpdates';
 import { CHECK_UPDATES_EVENT } from './update-status-text';
 import { UpdatePrompt } from './UpdatePrompt';
-import { UpdateReadyButton } from './UpdateReadyButton';
+import { ToolbarUpdateButton } from './ToolbarUpdateButton';
 
 let host: HTMLDivElement;
 let root: Root;
@@ -64,7 +64,7 @@ async function mount(adapter: ReturnType<typeof client>): Promise<void> {
       <>
         <CommercialUpdates client={adapter as unknown as LicenceAdapter} updatesUntil={null} />
         <UpdatePrompt />
-        <UpdateReadyButton />
+        <ToolbarUpdateButton />
       </>,
     ),
   );
@@ -79,9 +79,14 @@ async function wait(milliseconds: number): Promise<void> {
 
 const prompt = (): HTMLElement | null => host.querySelector('[aria-label="KerfDesk update"]');
 
+// The prompt's own buttons; the toolbar's Update button is read by toolbar().
 function button(text: string): HTMLButtonElement | undefined {
-  return [...host.querySelectorAll('button')].find((item) => item.textContent === text);
+  return [...host.querySelectorAll<HTMLButtonElement>('button:not(.lf-toolbar-update)')].find(
+    (item) => item.textContent === text,
+  );
 }
+
+const toolbar = (): HTMLButtonElement | null => host.querySelector('.lf-toolbar-update');
 
 describe('canvas update prompt (ADR-561 Amendment 5)', () => {
   it('offers an available update with its notes and clears on Not now without downloading', async () => {
@@ -96,7 +101,7 @@ describe('canvas update prompt (ADR-561 Amendment 5)', () => {
     expect(prompt()?.textContent).toContain('Faster previews');
     await act(async () => button('Not now')?.click());
     expect(prompt()).toBeNull();
-    expect(button('Update available')).toBeDefined();
+    expect(toolbar()?.dataset['updateState']).toBe('download');
     expect(adapter.downloadUpdate).not.toHaveBeenCalled();
     await wait(30_000);
     expect(prompt()).toBeNull();
@@ -131,8 +136,8 @@ describe('canvas update prompt (ADR-561 Amendment 5)', () => {
     await act(async () => open.click());
     expect(adapter.downloadUpdate).toHaveBeenCalledOnce();
     expect(prompt()).toBeNull();
-    // The status bar keeps the notice until the new version is installed.
-    expect(button('Update available')).toBeDefined();
+    // The toolbar keeps the notice until the new version is installed.
+    expect(toolbar()?.dataset['updateState']).toBe('download');
     expect(adapter.installUpdateOnQuit).not.toHaveBeenCalled();
   });
 
