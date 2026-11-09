@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "sinceSourceSha": "33bc394c67e37011961af46b799e1d7d30efcedf",
+  "sinceSourceSha": "df2279e2607784f40ca9e1fc4f508cbcb17478c5",
   "highlights": [
-    "Older CNC jobs: crossing loops and flat Drill contours now count toward Job Origin, so some jobs saved in 1.0.28 or earlier cut in a new, correct place. Opening one names how far its cut moved.",
-    "Safer Marlin jobs: a line the controller skips ends the job, and Pause and network failures send their beam-off first. A busy page no longer stops a healthy job, and Frame waits for a report after Set origin.",
-    "Photo engraving has portrait recipes, Auto tones and an On material preview. Trace keeps text marks at any angle, holds hard art in any ink colour and draws large 1-bit curves smoother.",
-    "Text frames converted by 1.0.28 are repaired, single-line frames keep their line rule, and output names every missing glyph. Placed tabs follow resizes and Studio rebuilds; full stops and i-dots stay.",
-    "Fill pools match what output burns, GRBL Compatible fills get constant-power advice, and a grblHAL Resume left Idle at a job end warns instead of blocking. The A1 Pro uses its homed travel.",
-    "Camera setup probes RTSP logins and shows its status in Machine Setup, the phone pairing scanner reads the PC code on every phone, and Studio keeps drawings applied before a crash."
+    "Safer burns: a held Enter can't resume a paused job, a network laser stops if the window crashes, a laser left on delays shutdown, Abort restores the origin even on $10=0, and Reconnect waits for the job.",
+    "Machine Setup's Save switches to that machine's driver. A laser with laser mode off is asked to turn it on, one 1.0.29 saved as a CNC is asked before Start, and a controller locked before connecting is offered Reset.",
+    "Beginner help: plain wording from first run to Job complete, a Before you start safety check, a first-burn lesson and cut test, Cut last warnings for each part, and a wider Ctrl+K search with Keyboard Shortcuts.",
+    "Logos: white parts are cut out on SVG import, older logos are offered it, and Re-import keeps settings. SVG CSS transforms, DXF and HPGL arcs import as drawn, and phone photos preview at their burn grid.",
+    "Large jobs prepare in the background with progress and Leave Preview. Photo, Trace and text work run off the screen thread, big selections and pans stay smooth, and GRBL job times are closer to the real burn.",
+    "Recover unsaved work lists each session once and never clears a newer copy. Screen readers hear job changes and dialogs take focus. CNC Preview shows when adaptive clearing falls back; height maps carve their true surface."
   ]
 }
