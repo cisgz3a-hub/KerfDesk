@@ -57,6 +57,12 @@ export function hasUnconfirmedResetCleanup(
   );
 }
 
+/** Whether a welcome banner now answers a reset KerfDesk sent on this port
+ *  (Abort, Reset, the stop before Disconnect), which keeps machine position. */
+export function awaitsOwnedResetBoundary(refs: ResetCleanupRefs): boolean {
+  return refs.pendingResetCleanup?.options.requireResetBoundary === true;
+}
+
 /** The settings snapshot that the owned reset awaiting this banner carries, or
  * null when the banner closes no reset KerfDesk sent on this port (ADR-648). */
 export function ownedResetRetainedSettings(

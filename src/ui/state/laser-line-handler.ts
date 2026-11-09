@@ -19,7 +19,12 @@ import {
 } from '../../core/controllers/grbl';
 import { detectControllerFromBanner, type ControllerEvent } from '../../core/controllers';
 import { parseActiveWcsFromModalResponses } from '../../core/controllers/grbl/work-offset-readback';
-import { flushResetCleanup, ownedResetRetainedSettings } from './laser-reset-cleanup';
+import {
+  awaitsOwnedResetBoundary,
+  flushResetCleanup,
+  ownedResetRetainedSettings,
+} from './laser-reset-cleanup';
+import { machineZeroMovedPatch } from './work-origin-state';
 import {
   noteControllerSettingsRead,
   retainedControllerSettingsPatch,
@@ -372,6 +377,8 @@ function handleWelcomeLine(
   // The banner of a reset KerfDesk sent on this port keeps the `$$`/`$I`
   // snapshot; any other banner discards it (ADR-648).
   const retainedSettings = ownedResetRetainedSettings(refs);
+  // Any other banner is a power-up or a board reset KerfDesk did not send.
+  const ownedReset = awaitsOwnedResetBoundary(refs);
   refs.settingsCollector = idleCollector();
   refs.settingsCollectorSessionEpoch = null;
   clearCncLiveCaps();
@@ -427,6 +434,7 @@ function handleWelcomeLine(
     homingState: 'unknown',
     homingProof: null,
     trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
+    ...(ownedReset ? {} : machineZeroMovedPatch(state)),
     ...mismatchLog,
     ...(ownedLiftReset ? ownedLiftResetPatch(state) : rebootDuringJobPatch(state)),
   });

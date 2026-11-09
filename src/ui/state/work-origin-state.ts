@@ -39,7 +39,25 @@ export type WorkOriginState = BitFileSequenceState & {
   readonly originStatusFence?: number | null;
   /** Optional so hand-built test states stay valid; absent reads as unseen. */
   readonly originAtConnect?: OriginAtConnect | null;
+  /** Counts the times machine zero may have moved unmeasured (machineZeroMovedPatch).
+   *  Optional so hand-built test states stay valid; absent reads as 0. */
+  readonly machineZeroEpoch?: number;
 };
+
+/**
+ * Machine zero may have moved without KerfDesk measuring it: a new connection
+ * (opening the port resets an Arduino- or ESP32-class board, link-loss-restart.ts)
+ * or a welcome banner that answers no reset KerfDesk sent (a power-up). Stock
+ * GRBL clears machine position only at power-up, not at a soft reset
+ * (grbl/main.c), so an origin saved in machine coordinates before either no
+ * longer lands where it was unless the machine is homed (rolling audit v12
+ * X1-P1-1, ADR-341 Amendment 13).
+ */
+export function machineZeroMovedPatch(
+  state: Pick<WorkOriginState, 'machineZeroEpoch'>,
+): Pick<WorkOriginState, 'machineZeroEpoch'> {
+  return { machineZeroEpoch: (state.machineZeroEpoch ?? 0) + 1 };
+}
 
 type OriginAtConnectEvidence = Pick<
   LaserState,
