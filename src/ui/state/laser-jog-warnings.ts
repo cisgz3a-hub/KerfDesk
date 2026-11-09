@@ -16,6 +16,7 @@ import {
   rotaryYLimitMm,
   type DeviceProfile,
 } from '../../core/devices';
+import { dedicatedRotaryAxisOf } from '../../core/devices/rotary-axis';
 import { nativePointToBed } from '../../core/devices/native-bed-frame';
 import { inferCurrentMachinePosition } from './infer-machine-position';
 import { resolveNativeBedFrame, selectNativeBedEvidence } from './native-bed-frame';
@@ -90,7 +91,8 @@ export function configuredMotionBounds(
   // Rotary is a laser attachment (never applied to CNC output), so a router
   // keeps the bed's own Y range.
   const rotary = machineKind === 'cnc' ? undefined : device.rotary;
-  return isRotaryActive(rotary)
+  // A rotary on A or Z leaves Y on the bed (ADR-695).
+  return isRotaryActive(rotary) && dedicatedRotaryAxisOf(rotary) === null
     ? { ...baseBounds, minY: 0, maxY: rotaryYLimitMm(rotary) }
     : baseBounds;
 }

@@ -54,7 +54,7 @@ import {
   largeJobPreparationWarning,
   largeRasterPreparationWarning,
   partitionEmitPreflight,
-  preparedProgramIntegrityIssue,
+  preparedStartRefusal,
 } from './start-job-readiness-policy';
 import { hydratePagedRasterProject } from '../import/paged-raster-hydration';
 import { collectPrintCutFrameWarnings } from './print-cut-frame-warnings';
@@ -117,6 +117,9 @@ export type MachineStartSnapshot = {
   /** Explicit for connected sessions before their first position report. */
   readonly connected?: boolean;
   readonly statusReport: StatusReport | null;
+  // The axis letters grblHAL's `$I` reported (`[AXS:4:XYZA]` → "XYZA"), or
+  // null when unread. Checked against a dedicated rotary axis (ADR-695).
+  readonly reportedAxisLetters?: string | null;
   readonly alarmCode: number | null;
   readonly hasActiveStreamer: boolean;
   readonly motionOperationActive?: boolean;
@@ -334,12 +337,7 @@ export function finalizeStartPreparation(
   const { gcode, preflight } = emitStartProgram(prepared, options, coordinates.emitOptions);
   const emitSplit = partitionEmitPreflight(preflight);
   if (emitSplit.blocking.length > 0) return { ok: false, messages: emitSplit.blocking };
-  const programIssue = preparedProgramIntegrityIssue(
-    gcode,
-    options.project.device.rxBufferBytes,
-    preflight,
-    options.machine.activeControllerKind,
-  );
+  const programIssue = preparedStartRefusal(gcode, preflight, options.project, options.machine);
   if (programIssue !== null) return { ok: false, messages: programIssue };
   if (options.requireFrame) {
     const verifiedFrameIssue = requiredFrameIssueFromPrepared({

@@ -5,8 +5,10 @@
 // chuck always scales from Motion per turn.
 
 import { useState } from 'react';
-import type { RotarySetup, RotaryType } from '../../core/devices/rotary';
+import type { RotaryAxis, RotarySetup, RotaryType } from '../../core/devices/rotary';
+import { rotaryAxisOf, rotaryAxisUnitLabel } from '../../core/devices/rotary-axis';
 import type { RotaryPreset } from '../../core/devices/rotary-presets';
+import { RotaryAxisField } from './RotaryAxisField';
 import { hintStyle, segmentStyle } from './rotary-setup-dialog.styles';
 import {
   displayRotaryMm,
@@ -25,6 +27,8 @@ export function RotarySetupFields(props: {
   readonly onEdit: RotaryEditUpdate;
   /** Published rotaries for this machine, if any (ADR-503). */
   readonly presets?: ReadonlyArray<RotaryPreset>;
+  /** The axes this controller can turn a rotary on (ADR-695). */
+  readonly axes?: ReadonlyArray<RotaryAxis>;
 }): JSX.Element {
   const { edit, onEdit } = props;
   const { setup } = edit;
@@ -39,6 +43,7 @@ export function RotarySetupFields(props: {
         label="Enable rotary for this machine profile"
         onChange={(enabled) => onEdit((current) => editRotaryFields(current, { enabled }))}
       />
+      <RotaryAxisField setup={setup} axes={props.axes ?? ['Y']} onEdit={onEdit} />
       <FieldRow label="Rotary type">
         <div role="group" aria-label="Rotary type" style={segmentStyle}>
           <SegmentButton active={setup.type === 'roller'} onClick={() => setType('roller')}>
@@ -140,7 +145,7 @@ function MotionPerTurnField(props: {
       ariaLabel="Rotary millimetres per rotation"
       title={motionPerTurnTitle(setup, used)}
       value={setup.mmPerRotation}
-      unit="machine mm"
+      unit={rotaryAxisUnitLabel(rotaryAxisOf(setup))}
       disabled={!used}
       onCommit={(mmPerRotation) =>
         props.onEdit((current) => editRotaryFields(current, { mmPerRotation }))
@@ -151,7 +156,9 @@ function MotionPerTurnField(props: {
 
 function motionPerTurnTitle(setup: RotarySetup, used: boolean): string {
   if (!used) return 'Not used until Y is scaled from the roller diameter.';
+  const axis = rotaryAxisOf(setup);
+  const travel = axis === 'A' ? 'Commanded A travel, in degrees,' : `Machine ${axis} travel`;
   return setup.type === 'chuck'
-    ? 'Machine Y travel that turns the chuck one full revolution.'
-    : 'Machine Y travel that turns the driven roller one full revolution.';
+    ? `${travel} that turns the chuck one full revolution.`
+    : `${travel} that turns the driven roller one full revolution.`;
 }

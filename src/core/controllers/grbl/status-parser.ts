@@ -81,6 +81,9 @@ export type StatusReport = {
   readonly subState: number | null;
   readonly mPos: { x: number; y: number; z: number } | null;
   readonly wPos: { x: number; y: number; z: number } | null;
+  /** Values in the report's MPos/WPos: one per configured axis on grblHAL
+   *  and FluidNC. Optional so hand-built mocks need not set it (ADR-695). */
+  readonly reportedAxisCount?: number | null;
   readonly feed: number | null;
   readonly spindle: number | null;
   /** Live laser output in percent of full power, from Smoothieware's `L:`
@@ -180,6 +183,7 @@ export function parseStatusReport(line: string): StatusReport | null {
     subState: stateParsed.subState,
     mPos: pickAxisField(fields, 'MPos'),
     wPos: pickAxisField(fields, 'WPos'),
+    reportedAxisCount: pickReportedAxisCount(fields),
     feed: pickFsValue(fields, 0),
     spindle: pickFsValue(fields, 1),
     executingLineNumber: pickLineNumber(fields),
@@ -325,6 +329,17 @@ function pickAxisField(
       return { x, y, z };
     }
     return null;
+  }
+  return null;
+}
+
+// How many axis values MPos/WPos carry: one per configured axis on grblHAL
+// and FluidNC, three on stock GRBL. A rotary on A needs a fourth (ADR-695).
+function pickReportedAxisCount(fields: ReadonlyArray<string>): number | null {
+  for (const f of fields) {
+    if (!f.startsWith('MPos:') && !f.startsWith('WPos:')) continue;
+    const parts = f.slice(f.indexOf(':') + 1).split(',');
+    return parts.every((token) => parseCanonicalStatusNumber(token) !== null) ? parts.length : null;
   }
   return null;
 }
