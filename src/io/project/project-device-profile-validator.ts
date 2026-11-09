@@ -132,6 +132,23 @@ export function optionalRotarySetup(obj: Record<string, unknown>, path: string):
     optionalLiteral(value, `${path}.axis`, ['Y', 'A', 'Z']),
     optionalLiteral(value, `${path}.axisConfirmed`, ['A', 'Z']),
     optionalBoolean(value, `${path}.reverseAxis`),
+    optionalRotaryTaper(value, `${path}.taper`),
+  ]);
+}
+
+// ADR-694. Shape only here; a taper whose ends are further apart than its side
+// is long loads, and the rotary then reports its measurements unusable.
+function optionalRotaryTaper(obj: Record<string, unknown>, path: string): string | null {
+  const value = valueAtPath(obj, path);
+  if (value === undefined) return null;
+  if (!isObject(value)) return `missing or invalid \`${path}\``;
+  return firstError([
+    requireBoolean(value, `${path}.enabled`),
+    requirePositiveNumber(value, `${path}.topDiameterMm`),
+    requirePositiveNumber(value, `${path}.bottomDiameterMm`),
+    requirePositiveNumber(value, `${path}.lengthMm`),
+    requireLiteral(value, `${path}.topSide`, ['left', 'right']),
+    requireNonNegativeNumber(value, `${path}.artworkFromTopMm`),
   ]);
 }
 

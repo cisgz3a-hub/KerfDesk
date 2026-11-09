@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { buildMotionManifest } from '../../core/job/motion-manifest';
-import { DEFAULT_OUTPUT_SCOPE, createProject } from '../../core/scene';
+import { DEFAULT_OUTPUT_SCOPE, PROJECT_SCHEMA_VERSION, createProject } from '../../core/scene';
 import type { WorkSteps, WorkStepsRunner } from '../../core/recovery/work-steps';
 import type { CanvasMotionPlan } from '../state/canvas-motion-plan';
 import { initialLaserState } from '../state/laser-store-helpers';
@@ -62,8 +62,11 @@ const RUN_ID = 'run-archive-slices';
 const ARCHIVE_TEST_TIMEOUT_MS = 30_000;
 const NOW = new Date('2026-11-04T09:00:00.000Z');
 /** sha256 of the archive `stageFreshExecutionArtifact` stored for this fixture
- * on main ede14589b, before the archive was sliced. */
+ * on main ede14589b, before the archive was sliced. That build wrote project
+ * schema 21; schema 22 (ADR-694) only adds an optional rotary taper, so the
+ * digest reads the archived project's schema version as the one it wrote. */
 const GOLDEN_ARCHIVE_DIGEST = '58b026e93a5bac50f8c1b626599cf5981ea05d9ee11964d7e76d73f5213ff4a4';
+const GOLDEN_PROJECT_SCHEMA_VERSION = 21;
 
 function program(moves: number): string {
   const lines = ['G21', 'G90', '; café', 'M4 S0'];
@@ -183,7 +186,12 @@ function canonicalDigest(value: unknown): string {
     hash.update(`O${keys.length}`);
     for (const key of keys) {
       hash.update(`K${key}`);
-      visit(record[key]);
+      const entry = record[key];
+      visit(
+        key === 'schemaVersion' && entry === PROJECT_SCHEMA_VERSION
+          ? GOLDEN_PROJECT_SCHEMA_VERSION
+          : entry,
+      );
     }
   };
   visit(value);

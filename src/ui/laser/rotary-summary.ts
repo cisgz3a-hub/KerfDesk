@@ -3,6 +3,7 @@
 // Job Review machine facts (ADR-373), so all three describe the same thing.
 
 import {
+  activeRotaryTaper,
   rotaryMeasurementsValid,
   rotaryUsesRollerDiameter,
   rotaryYLimitMm,
@@ -21,7 +22,7 @@ export function rotaryTypeLabel(setup: RotarySetup): string {
  * (ADR-373 Amendment 1), so the switch and Job Review name the mode.
  */
 export function rotaryAttachmentSummary(setup: RotarySetup): string {
-  const summary = `${rotaryTypeLabel(setup)}, Ø${formatRotaryMm(setup.objectDiameterMm)} mm`;
+  const summary = `${rotaryTypeLabel(setup)}, ${rotaryObjectSummary(setup)}`;
   if (setup.type === 'chuck') return summary;
   if (!rotaryUsesRollerDiameter(setup) || setup.rollerDiameterMm === undefined) {
     return `${summary} (Y not scaled)`;
@@ -46,6 +47,15 @@ export function rotaryReviewSummary(setup: RotarySetup): string {
   if (!rotaryMeasurementsValid(setup))
     return 'Enabled, but its measurements are unusable: not applied';
   return `Enabled · ${rotaryAttachmentSummary(setup)} · ${rotaryMappingSummary(setup)}`;
+}
+
+// "Ø60 mm", or a taper's ends and length (ADR-694): "taper Ø80 → Ø70 mm over 100 mm".
+function rotaryObjectSummary(setup: RotarySetup): string {
+  const taper = activeRotaryTaper(setup);
+  if (taper === null) return `Ø${formatRotaryMm(setup.objectDiameterMm)} mm`;
+  const top = formatRotaryMm(taper.topDiameterMm);
+  const bottom = formatRotaryMm(taper.bottomDiameterMm);
+  return `taper Ø${top} → Ø${bottom} mm over ${formatRotaryMm(taper.lengthMm)} mm`;
 }
 
 // At most two decimals and no trailing zeros: 60 → "60", 188.4956 → "188.5".

@@ -1,8 +1,9 @@
 // Strip measurement for Rotary Setup (ADR-373). A paper strip or flexible tape
-// wrapped once round the part reads its circumference where the artwork goes,
-// which calipers cannot do on a tapered cup or a soft sleeve. The strip's own
+// wrapped once round the part reads its circumference at one height, which
+// calipers cannot do on a soft sleeve or a cup's tapered wall. The strip's own
 // thickness puts its centre line outside the surface, so the part's diameter
-// is wrap length / π minus the strip thickness.
+// is wrap length / π minus the strip thickness. One reading is one diameter: a
+// tapered part needs both ends, for Tapered part (ADR-694).
 
 import { useState } from 'react';
 import { rotaryDiameterFromWrapLengthMm } from '../../core/devices/rotary';
@@ -21,9 +22,14 @@ import { FieldRow } from './RotarySetupRows';
 // Printer paper is about 0.1 mm; a steel or cloth tape measure is similar.
 const DEFAULT_STRIP_THICKNESS_MM = 0.1;
 
+export type RotaryMeasureTarget = {
+  readonly label: string;
+  readonly onUse: (diameterMm: number) => void;
+};
+
 export function RotaryMeasureHelper(props: {
   readonly diameterMm: number;
-  readonly onUse: (diameterMm: number) => void;
+  readonly targets: ReadonlyArray<RotaryMeasureTarget>;
 }): JSX.Element {
   const [thicknessMm, setThicknessMm] = useState(DEFAULT_STRIP_THICKNESS_MM);
   // Starts at the wrap the current diameter would give, so nothing changes
@@ -36,8 +42,9 @@ export function RotaryMeasureHelper(props: {
   return (
     <div role="group" aria-label="Measure the object with a strip" style={panelStyle}>
       <p style={hintStyle}>
-        Wrap a paper strip or flexible tape once around the part where the artwork goes, mark where
-        it meets itself, lay it flat and measure between the marks.
+        Wrap a paper strip or flexible tape once around the part, mark where it meets itself, lay it
+        flat and measure between the marks. On a tapered part one reading is right only at that
+        height: measure where the artwork goes, or measure both ends and use Tapered part.
       </p>
       <FieldRow label="Wrap length">
         <NumberField
@@ -70,9 +77,11 @@ export function RotaryMeasureHelper(props: {
             ? `Diameter: Ø${diameterMm} mm`
             : 'The strip is thicker than this wrap length allows.'}
         </span>
-        <Button disabled={!usable} onClick={() => props.onUse(diameterMm)}>
-          Use this diameter
-        </Button>
+        {props.targets.map((target) => (
+          <Button key={target.label} disabled={!usable} onClick={() => target.onUse(diameterMm)}>
+            {target.label}
+          </Button>
+        ))}
       </div>
     </div>
   );

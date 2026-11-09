@@ -4,7 +4,7 @@
 
 import { useState } from 'react';
 import type { RotarySetup, RotaryType } from '../../../core/devices';
-import type { RotaryAxis } from '../../../core/devices/rotary';
+import { activeRotaryTaper, type RotaryAxis } from '../../../core/devices/rotary';
 import { rotaryAxisOf, rotaryAxisUnitLabel } from '../../../core/devices/rotary-axis';
 import { NumberField } from '../../common/NumberField';
 import {
@@ -61,6 +61,8 @@ export function DeviceSetupRotaryFields(props: {
       <RotaryNumber
         label="Object diameter"
         value={value.objectDiameterMm}
+        // ADR-694: a tapered part's wider end sets it, in Rotary Setup.
+        disabled={activeRotaryTaper(value) !== null}
         onCommit={(next) => apply(editRotaryFields(edit, { objectDiameterMm: next }))}
       />
       {value.type === 'roller' ? (

@@ -65,6 +65,8 @@ const MIGRATORS: Readonly<Record<number, Migrator>> = {
   19: (raw) => ({ ...raw, schemaVersion: 20 }),
   // Schema 21 gives back the line rule of a frame 1.0.28 converted and saved.
   20: migrateV20RecoverFrameLineRule,
+  // Schema 22 adds an optional rotary taper; no earlier file has one.
+  21: (raw) => ({ ...raw, schemaVersion: 22 }),
 };
 
 function migrateV3ToV4(raw: RawProject): RawProject | MigrationFailure {

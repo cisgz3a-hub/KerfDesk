@@ -69,7 +69,8 @@ function opened(): { readonly project: Project; readonly toasts: string[] } {
   const text = gunzipSync(readFileSync(resolve(FOLDER, `${NAME}.lf2.gz`))).toString('utf8');
   const result = deserializeProject(text);
   if (result.kind !== 'ok') throw new Error(`${NAME} did not open`);
-  expect(result.migratedFrom).toBeUndefined();
+  // 1.0.29 wrote schema 21; step 21 (ADR-694's optional rotary taper) changes nothing here.
+  expect(result.migratedFrom).toBe(21);
   const done = completeNativeProjectOpen(
     {
       setProject: useStore.getState().setProject,
@@ -130,7 +131,7 @@ describe('a logo saved by 1.0.29 with white shapes that burn', () => {
     expectSameBurn(await burnOf(project, null), saved['whole-job'], 'whole job');
     // Any later toast is the autosave hand-off cleanup, which has no store here.
     expect(toasts.slice(0, 2)).toEqual([
-      `Opened ${NAME}.lf2`,
+      `Opened ${NAME}.lf2 — migrated from schema v21`,
       'This project has 5 white shapes from an SVG import that burn over the darker fill under ' +
         'them, as KerfDesk 1.0.29 and earlier imported white. Its burn is unchanged. To leave ' +
         'the white unburned, choose Tools > Leave Imported White Unburned, or Leave white ' +

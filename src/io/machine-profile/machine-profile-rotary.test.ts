@@ -117,3 +117,36 @@ describe('machine profile rotary axis', () => {
     expect(deserializeMachineProfileDocument(text).kind).toBe('invalid');
   });
 });
+
+describe('machine profile rotary taper (ADR-694)', () => {
+  const taper = {
+    enabled: true,
+    topDiameterMm: 80,
+    bottomDiameterMm: 70,
+    lengthMm: 100,
+    topSide: 'left' as const,
+    artworkFromTopMm: 0,
+  };
+  const rotary = {
+    enabled: true,
+    type: 'chuck' as const,
+    mmPerRotation: 40,
+    objectDiameterMm: 80,
+  };
+
+  it('writes schema 2 for an active taper, so a reader without tapers refuses it', () => {
+    const text = serialize({ ...DEFAULT_DEVICE_PROFILE, rotary: { ...rotary, taper } });
+    expect(JSON.parse(text).schemaVersion).toBe(MACHINE_PROFILE_ROTARY_AXIS_SCHEMA_VERSION);
+    const result = deserializeMachineProfileDocument(text);
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') expect(result.document.profile.rotary?.taper).toEqual(taper);
+  });
+
+  it('keeps schema 1 for a taper saved off', () => {
+    const text = serialize({
+      ...DEFAULT_DEVICE_PROFILE,
+      rotary: { ...rotary, taper: { ...taper, enabled: false } },
+    });
+    expect(JSON.parse(text).schemaVersion).toBe(MACHINE_PROFILE_SCHEMA_VERSION);
+  });
+});

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import {
+  activeRotaryTaper,
   rotaryMeasurementsValid,
+  rotaryTaperValid,
   type RotaryAxis,
   type RotarySetup,
 } from '../../core/devices/rotary';
@@ -45,9 +47,7 @@ export function RotarySetupDialog(props: {
           ? {}
           : { outputDescription: props.outputDescription })}
       />
-      {!valid ? (
-        <p style={errorStyle}>Diameters and motion per turn must be greater than zero.</p>
-      ) : null}
+      {!valid ? <p style={errorStyle}>{invalidRotaryMessage(setup)}</p> : null}
       <RotaryTestRotationPanel
         setup={setup}
         valid={valid}
@@ -64,6 +64,13 @@ export function RotarySetupDialog(props: {
       />
     </Dialog>
   );
+}
+
+function invalidRotaryMessage(setup: RotarySetup): string {
+  const taper = activeRotaryTaper(setup);
+  return taper !== null && !rotaryTaperValid(taper)
+    ? 'A tapered part needs positive diameters and length, ends no further apart in radius than its length, and a gap of zero or more.'
+    : 'Diameters and motion per turn must be greater than zero.';
 }
 
 function RotaryActions(props: {
