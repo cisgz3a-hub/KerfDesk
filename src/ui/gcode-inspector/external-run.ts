@@ -10,7 +10,7 @@
 
 import { deviceForActiveHead } from '../../core/cnc/cnc-head-feeds';
 import { streamingModeForController, type ControllerKind } from '../../core/devices';
-import type { ExternalProgramEnvelope } from '../../core/external-program';
+import type { ExternalProgramEnvelope, LitRapids } from '../../core/external-program';
 import type { KerfDeskBitFile } from '../../core/external-program/kerfdesk-bit-file';
 import { machineKindOf, type MachineKind, type Project } from '../../core/scene';
 import { confirmCncSetup } from '../laser/cnc-setup-acknowledgement';
@@ -37,6 +37,9 @@ export type ExternalRun = {
   readonly start: { readonly x: number; readonly y: number; readonly z: number };
   /** The bit its KerfDesk per-bit header names, read from the file as opened. */
   readonly bitFile?: KerfDeskBitFile;
+  /** The lit rapids the Inspector worker found in `gcode`, so Start's
+   * acknowledgement does not scan the program again (ADR-630 Amendment 9). */
+  readonly litRapids?: LitRapids | null;
 };
 
 /** A clean Frame of one external program, as the controller stood after it. */
@@ -227,7 +230,7 @@ export async function startExternalProgram(frame: ExternalFrame): Promise<boolea
     captureLaserModeStartSnapshot(laser),
     jobAwareConfirm,
     gcode,
-    externalLaserModeStartPrompt(project, laser, gcode),
+    externalLaserModeStartPrompt(project, laser, gcode, frame.run.litRapids),
   );
   if (laserModeStartEvidence === null) return false;
   const cncSetupAttestation = confirmCncSetup(

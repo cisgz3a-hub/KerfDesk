@@ -10296,7 +10296,9 @@ The G-code Inspector is free in every edition (ADR-627).
    moves in `G55`-`G59` are left out and named in the warnings. Arcs count by their exact
    extent in the plane they run in: XY (`G17`), XZ (`G18`) or YZ (`G19`) (ADR-630 Amendment 2).
    A program that never moves frames the point where the head stands. A large file is prepared a
-   slice at a time.
+   slice at a time, and its review is made off the page beside the parse, once for each start;
+   the dialog never repeats it while the head frames or the job starts, so ABORT JOB and Ctrl+.
+   are handled at once (ADR-630 Amendment 9).
    On Marlin, the baseline is two separate lines, `G21` then `G90`, and significant whitespace is
    preserved. Review reads the first command on each line with that command's parameters; later
    G/M words do not execute as extra commands. Firmware-dependent motion and its dependent
