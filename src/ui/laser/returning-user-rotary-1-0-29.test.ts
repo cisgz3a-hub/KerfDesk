@@ -49,7 +49,9 @@ function sidecar(): Sidecar {
 function opened(): Project {
   const result = deserializeProject(fileText());
   if (result.kind !== 'ok') throw new Error(`${NAME} did not open: ${JSON.stringify(result)}`);
-  expect(result.migratedFrom).toBeUndefined();
+  // 1.0.29 wrote schema 21. Schema 22 adds an optional rotary taper (ADR-694)
+  // and axis (ADR-695); step 21 changes nothing in this file.
+  expect(result.migratedFrom).toBe(21);
   expect(result.oldProjectBurn).toBeUndefined();
   return result.project;
 }
