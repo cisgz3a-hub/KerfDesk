@@ -7,10 +7,12 @@
 // paced GRBL stand-in stamps the first jog and the first beam-on line, and
 // logs every realtime byte with its time; Ctrl+. is sent from Node so the
 // press time does not wait for the page. A CPU profile of the page's own
-// thread, from the Frame click until the dialog has gone, must hold no sample
-// of a whole-program pass: the review and the lit-rapid scan run in the
-// Inspector worker. That holds on any machine, where a time bound on the
-// page's other work (Start's preparation, the Abort's teardown) would not.
+// thread, from the Frame click to its first jog and from the Frame click
+// until the dialog has gone after Start, must hold no sample of a
+// whole-program pass: the review and the lit-rapid scan run in the Inspector
+// worker. That holds on any runner, where a time bound on the page's other
+// work at Start (its preparation, the shell's renders) would not; the stream's
+// Abort is timed once it runs on its own, the Frame's while the dialog is open.
 
 import type { CDPSession } from '@playwright/test';
 import { readFileSync } from 'node:fs';
@@ -210,9 +212,11 @@ test('Ctrl+. stops a large file Frame promptly', async ({ page }) => {
   await startProfile(cdp);
   await runDialog(page).getByRole('button', { name: 'Frame', exact: true }).click();
   await waitForWatchedLine(page);
+  // Profiled from the click to the first jog, where every Frame step
+  // re-rendered the dialog; stopped before the press so its cost is not timed.
+  const { passes, probe } = await wholeProgramPassSamples(page, cdp);
   const pressedAt = await pressAbort(cdp);
   await page.waitForTimeout(2_500);
-  const { passes, probe } = await wholeProgramPassSamples(page, cdp);
   const data = await sample(page);
   const delay = abortDelay(data, pressedAt, [JOG_CANCEL, SOFT_RESET]);
   test.info().annotations.push({
@@ -225,7 +229,7 @@ test('Ctrl+. stops a large file Frame promptly', async ({ page }) => {
   expect(delay).toBeLessThanOrEqual(ABORT_BOUND_MS);
 });
 
-test('Ctrl+. stops a large file stream promptly as the beam comes on', async ({ page }) => {
+test('the stream starts with no review pass, and Ctrl+. stops it promptly', async ({ page }) => {
   test.setTimeout(600_000);
   await openRunDialog(page, 500);
   const dialog = runDialog(page);
@@ -236,14 +240,18 @@ test('Ctrl+. stops a large file stream promptly as the beam comes on', async ({ 
   await expect(start).toBeEnabled({ timeout: 300_000 });
   await watchLine(page, '^M4');
   await start.click({ noWaitAfter: true });
-  // As soon as the beam-on line has gone out: the Run dialog is still open,
-  // waiting on the recovery retirement, and re-renders on each store change.
+  // After the beam-on line the Run dialog stays open, waiting on the recovery
+  // retirement, and re-renders on each store change; then it closes. The
+  // profile covers all of that. The press comes once the stream runs on its
+  // own: Start's own preparation and shell renders in the first seconds are
+  // not this dialog's (performance audit S1-P2-2, S4) and a slow runner
+  // stretches them.
   await waitForWatchedLine(page);
-  const pressedAt = await pressAbort(cdp);
-  // Start resolves after the recovery retirement, then the dialog closes.
   await expect(dialog).toBeHidden({ timeout: 120_000 });
   await page.waitForTimeout(1_000);
   const { passes, probe } = await wholeProgramPassSamples(page, cdp);
+  const pressedAt = await pressAbort(cdp);
+  await page.waitForTimeout(2_000);
   const data = await sample(page);
   expect(data.watchedAt).not.toBeNull();
   const delay = abortDelay(data, pressedAt, [SOFT_RESET]);

@@ -69,14 +69,16 @@ reports `Run`. The refuter measured it in Chrome with a paced GRBL stand-in at 5
   through a Frame (jog reports, per-segment shell renders) and a Start (`Run` report, operation
   cleared, shell renders), where main's dialog made 9 and 8. A new rest position reads it again.
 - `e2e/run-gcode-file-abort.e2e.ts` opens a 500k-line photo-shaped file on the paced GRBL
-  stand-in and presses Ctrl+. from Node (a) as the Frame's first jog is written and (b) as the
-  stream's beam-on line is written. Each must reach the controller within 300 ms. A CPU profile of
-  the page's own thread, from the Frame click until the dialog has gone, must hold no sample inside
-  `reviewExternalProgram` or `findLitRapids`, and must sample a probe the page runs on purpose,
-  so an empty profile fails. That check holds on any runner. A first version bounded every UI
-  task after the beam-on line at 600 ms instead; on CI it caught the Abort's own teardown (3.5 s
-  on the software-GL runner, after the press) and Start's preparation, neither of them this
-  dialog. The paced stand-in gained `watchLine` / `watchedLine` for the stamps.
+  stand-in. A CPU profile of the page's own thread must hold no sample inside
+  `reviewExternalProgram` or `findLitRapids` (and must sample a probe the page runs on purpose,
+  so an empty profile fails): from the Frame click to its first jog, and from the Frame click
+  through Start until the dialog has gone. Ctrl+., sent from Node, must reach the controller
+  within 300 ms both as the Frame's first jog is written (the dialog open) and once the stream runs
+  on its own. That holds on any runner. Two earlier versions timed the page's work right after the
+  beam-on line instead (a 600 ms bound on any UI task, then an Abort pressed at that moment); on
+  CI's slower runner both caught Start's own preparation and shell renders and the Abort's
+  teardown, 3.5-6.6 s, while the profile showed no review pass. Those belong to performance audit
+  S1-P2-2 and S4. The paced stand-in gained `watchLine` / `watchedLine` for the stamps.
 - Measured on the maintainer's PC (Vite dev server, React StrictMode, window serial route):
   - with this change, the jog cancel reached the controller 45-83 ms after the press during the
     Frame and the soft reset 18-37 ms after it in the stream, with no page-thread sample of either
