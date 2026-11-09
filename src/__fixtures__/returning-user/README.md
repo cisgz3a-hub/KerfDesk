@@ -35,6 +35,7 @@ store, compile them to G-code, and compare with the sidecar.
 | `1.0.29-cnc-bowtie-pocket`             | 1.0.29                                                    | The 1.0.28 Pocket bowtie, cut at the canvas anchor                        |
 | `1.0.29-cnc-flat-drill`                | 1.0.29                                                    | The 1.0.28 flat Drill contour, cut at the canvas anchor                   |
 | `1.0.29-white-logos`                   | 1.0.29                                                    | U3's logo, a white-letter plate, a style and class logo, and the logo with its white on Output off |
+| `1.0.29-white-logo-copies`             | 1.0.29                                                    | U3's logo with two Array copies and a moved Duplicate, which lost `svgImport` |
 
 The 1.0.29 set was built through 1.0.29's store actions: Import, Draw, the laser tab tool, the
 toolbar and a handle drag, the operation settings, and the Photo engraving dialog's own preview,
@@ -47,6 +48,12 @@ reads them.
 store Import, so its white shapes burn over the black, and the last logo's white operation was set
 to Output off with `setLayerParam`. Its sidecar holds each import's burn (by `svgImport.source`)
 and the whole job. `returning-user-white-fills.test.ts` reads it.
+
+`1.0.29-white-logo-copies` (rolling audit v12 X2-P1-1) is U3's logo imported the same way, then
+copied with 1.0.29's Array (`placeSelectionCopies`, two copies beside it) and Duplicate (moved below
+with `applyObjectTransform`). 1.0.29's copies drop `svgImport`, so only the original keeps it
+(`withSvgImport: 1` in the sidecar). Its sidecar holds each object's burn and the whole job.
+`returning-user-white-copies.test.ts` reads it.
 
 Browser storage and projects saved by 1.0.28's own hooks and store, the same way (rolling audit v9
 R6): a temporary test under the export's `src` drove the Studio's Apply with its persistence hook

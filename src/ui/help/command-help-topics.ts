@@ -218,7 +218,7 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   'tools.leave-white-unburned': {
     family: 'tools',
     tooltip:
-      'Cut solid white SVG shapes out of the fills under them and leave them unburned, as a new import does. One undo step.',
+      'Cut solid white SVG shapes out of the fills under them and leave them unburned. One undo step.',
   },
   'arrange.align-left': {
     family: 'arrange',

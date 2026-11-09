@@ -23,6 +23,10 @@ operator's choice with Undo, and a returning user does not expect a saved burn t
 
 ### Decision
 
+*Amended by Amendment 4: copies that lost `svgImport` are counted and knocked out one by one, the
+count is exactly what the button removes (darker fills with Output off and imports left as parsed
+count nothing), and the texts no longer claim parity with a new import.*
+
 1. **Open never changes the burn.** Every reader of a saved project (File > Open and its routes,
    autosave Restore, New from template, a sheet switch) passes the project to
    `pushProjectLoadNotices`, which reads the artwork itself (`countBurningImportedWhites`), whatever

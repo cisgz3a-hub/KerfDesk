@@ -1,0 +1,46 @@
+{
+  "measuredOn": "1.0.29",
+  "withSvgImport": 1,
+  "burns": {
+    "logo-0": {
+      "width": 30,
+      "height": 29.8,
+      "minX": 185,
+      "minY": 185.1,
+      "length": 8015.11,
+      "dose": 2404533
+    },
+    "3f8856a1-2c08-4f1d-a0f4-106c9ef5ca55": {
+      "width": 30,
+      "height": 29.8,
+      "minX": 230,
+      "minY": 185.1,
+      "length": 8015.108,
+      "dose": 2404532.4
+    },
+    "eee91b93-2b1b-4079-b865-202d13ab912c": {
+      "width": 30,
+      "height": 29.8,
+      "minX": 275,
+      "minY": 185.1,
+      "length": 8015.108,
+      "dose": 2404532.4
+    },
+    "2228abd8-8bb9-4c2c-a46a-a8e0bb8b5048": {
+      "width": 30,
+      "height": 29.8,
+      "minX": 185,
+      "minY": 235.1,
+      "length": 8015.11,
+      "dose": 2404533
+    },
+    "whole-job": {
+      "width": 120,
+      "height": 79.8,
+      "minX": 185,
+      "minY": 185.1,
+      "length": 32060.436,
+      "dose": 9618130.8
+    }
+  }
+}

@@ -17,7 +17,7 @@ export function LeaveWhiteUnburnedButton(): JSX.Element | null {
     <button
       type="button"
       onClick={() => useStore.getState().leaveSavedWhiteUnburned()}
-      title="Cut solid white SVG shapes out of the fills under them and leave them out, as a new import does. One undo step."
+      title="Cut solid white SVG shapes out of the fills under them and leave them out. One undo step."
       style={buttonStyle}
     >
       Leave white unburned

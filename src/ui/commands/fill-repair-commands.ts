@@ -41,7 +41,7 @@ function leaveWhiteUnburnedCommand(ctx: AppCommandContext): AppCommand {
         'tools.leave-white-unburned',
         'tools',
         label,
-        'Cut solid white SVG shapes out of the fills under them, as a new import does',
+        'Cut solid white SVG shapes out of the fills under them',
         ctx.leaveWhiteUnburned,
       )
     : disabled(

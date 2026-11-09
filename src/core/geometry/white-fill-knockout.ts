@@ -53,6 +53,9 @@ export type WhiteKnockout = {
 export type WhiteFillKnockoutOptions = {
   /** Paths the knock-out leaves alone: neither paper nor a shape to cut into. */
   readonly skip?: (object: ImportedSvg, path: ColoredPath) => boolean;
+  /** Which parts are Fill artwork. By default the import's own mode; a copy that
+   *  lost it is judged by its operations (ADR-686 Amendment 4). */
+  readonly isFill?: (object: ImportedSvg) => boolean;
 };
 
 type Box = { minX: number; minY: number; maxX: number; maxY: number };
@@ -75,9 +78,9 @@ export function knockOutWhiteFills(
   objects: ReadonlyArray<SceneObject>,
   options: WhiteFillKnockoutOptions = {},
 ): WhiteFillKnockout | null {
-  const skip = options.skip;
+  const { skip, isFill = isImportFillPart } = options;
   const shapes = objects
-    .flatMap(fillShapes)
+    .flatMap((object) => fillShapes(object, isFill))
     .filter((shape) => skip === undefined || !skip(shape.object, shape.path));
   const whites: WhiteRegion[] = [];
   let hasDark = false;
@@ -143,13 +146,19 @@ export function knockOutWhiteFills(
   return { changed, removedIds, keptPaths, whiteShapes: whites.length, knockedShapes };
 }
 
+function isImportFillPart(object: ImportedSvg): boolean {
+  return (object.svgImport?.mode ?? object.operationOverride?.mode) === 'fill';
+}
+
 /**
  * White fills the import paints as ink, beside a darker fill: the import notice
  * names them, since they burn although they are white (ADR-686 Amendment 1).
  * The operator's own choice to burn white (`kept`) is not counted.
  */
 export function countInkWhiteFills(objects: ReadonlyArray<SceneObject>): number {
-  const paths = objects.flatMap(fillShapes).map((shape) => shape.path);
+  const paths = objects
+    .flatMap((object) => fillShapes(object, isImportFillPart))
+    .map((shape) => shape.path);
   if (!paths.some(isDarkFill)) return 0;
   return paths.filter(
     (path) => isWhiteColor(path) && path.whiteInk !== undefined && path.whiteInk !== 'kept',
@@ -173,9 +182,8 @@ export function isPaperWhite(path: ColoredPath): boolean {
 
 // An SVG import's Fill parts, the ones the knock-out reads. A fragment not yet
 // placed carries its mode as an operation override instead (svgSourceMode).
-function fillShapes(object: SceneObject): FillShape[] {
-  if (object.kind !== 'imported-svg') return [];
-  if ((object.svgImport?.mode ?? object.operationOverride?.mode) !== 'fill') return [];
+function fillShapes(object: SceneObject, isFill: (object: ImportedSvg) => boolean): FillShape[] {
+  if (object.kind !== 'imported-svg' || !isFill(object)) return [];
   return object.paths.flatMap((path, pathIndex) => {
     const box = pathBox(path);
     return box === null ? [] : [{ object, pathIndex, path, box }];
