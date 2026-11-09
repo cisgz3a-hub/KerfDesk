@@ -41,6 +41,11 @@ import {
   type Project,
 } from '../../core/scene';
 import { cncNoteContours } from '../layers/cnc-note-contours';
+import { projectionStockWarning } from './cnc-projection-stock-warnings';
+import {
+  compiledProjectionFactsByLayer,
+  type CompiledProjectionFacts,
+} from './job-review/job-review-projection-detail';
 import { formatMm } from './job-review/job-review-format';
 
 export function detectCncThroughCutTabWarnings(
@@ -61,9 +66,29 @@ export function detectCncThroughCutTabWarnings(
     return tabbed.has(layer.id);
   };
 
+  // W6-P2-1: a projection is judged on what it compiled, not on Cut depth.
+  let projections: ReadonlyMap<string, CompiledProjectionFacts> | undefined;
+  const projectionFacts = (layer: Layer): CompiledProjectionFacts | undefined => {
+    projections ??= compiledProjectionFactsByLayer(
+      compiledJob ?? compileCncJob(project.scene, project.device, machine),
+    );
+    return projections.get(layer.id);
+  };
+
   const warnings: string[] = [];
   for (const layer of project.scene.layers) {
     if (!layer.output) continue;
+    const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
+    if (settings.reliefProjection !== undefined) {
+      const warning = projectionStockWarning(
+        layer,
+        settings,
+        projectionFacts(layer),
+        stockThicknessMm,
+      );
+      if (warning !== null) warnings.push(warning);
+      continue;
+    }
     // Relief depth belongs to each relief object. A stale layer depth is not
     // physical evidence when every object on the operation is a relief; the
     // prepared-job warning below uses the exact rough/finish pass depth.

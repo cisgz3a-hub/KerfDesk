@@ -289,6 +289,9 @@ export type CncPath3dPass = {
   readonly stayDownLink?: true;
   // ADR-489: see CncContourPass.airFloorZMm.
   readonly airFloorZMm?: number;
+  // ADR-421 Amendment 2: a level the finishing bit cuts where relief roughing
+  // did not reach, ahead of its finishing rows. Provenance only.
+  readonly reliefStepDown?: true;
 };
 
 export type CncArcPass = {
@@ -545,31 +548,9 @@ export type CncStepoverCompilationEvidence = {
   readonly stepoverPercent: number;
 };
 
-/** Materialized planning grid and finishing geometry for one relief source. */
-export type CncReliefPlanningEvidence = {
-  readonly layerId: string;
-  /** Projection target identity in the actual ordered job, independent of display filenames. */
-  readonly targetObjectId?: string;
-  readonly source: string;
-  readonly stage: 'roughing' | 'finishing' | 'rest-finishing' | 'projection';
-  readonly predecessorToolId?: string;
-  readonly targetRevision?: number;
-  readonly residualThresholdMm?: number;
-  readonly maximumResidualMm?: number;
-  readonly selectedCells?: number;
-  readonly restFallbackReason?: string;
-  readonly verticalDepthMm?: number;
-  readonly requestedSampleSpacingMm?: number;
-  readonly widthCells: number;
-  readonly heightCells: number;
-  readonly cellSizeMm: number;
-  readonly toolDiameterMm: number;
-  readonly toolKind: CncToolKind;
-  // Tapered ball nose only: the tip ball whose radius bounds the scallop.
-  readonly toolTipDiameterMm?: number;
-  readonly rowSpacingMm?: number;
-  readonly scallopMm?: number;
-};
+// The relief planning evidence lives beside the job (job.ts holds the raw
+// line backstop); re-exported so every reader keeps importing it from here.
+export type { CncReliefPlanningEvidence } from './cnc-relief-planning-evidence';
 
 export type Job = {
   readonly groups: ReadonlyArray<Group>;

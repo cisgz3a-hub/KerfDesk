@@ -26,6 +26,7 @@ import {
 import type { MaterialLibraryDocument } from '../../../io/material-library';
 import { materialBindingStatus } from '../../layers/material-binding-status';
 import { closedShapesGetTabs, cncDepthParts } from './job-review-cnc-depth';
+import { cncProjectionParts, type CompiledProjectionFacts } from './job-review-projection-detail';
 import { formatMm } from './job-review-format';
 import { laserTabsPart } from './job-review-laser-tabs';
 import type { CncStrategyFallback } from '../../../core/job/cnc-compilation-sidecar-types';
@@ -185,6 +186,10 @@ export type CompiledReliefFacts = {
   readonly maxDepthMm: number;
   // Whether the operation's other shapes compiled groups of their own.
   readonly cutsOtherShapes: boolean;
+  // W6-P2-2: area the roughing bit could not reach, and the step-down levels
+  // the finishing bit cut there; absent when roughing reached everything.
+  readonly roughingMissedAreaMm2?: number;
+  readonly finishingStepLevels?: number;
 };
 
 /** The read-only strategy a CNC operation cuts with, joined for one line.
@@ -202,7 +207,18 @@ export function cncOperationDetail(
   unrampedShapes = false,
   compiledTabs?: boolean,
   strategyFallback?: CncStrategyFallback['kind'],
+  projection?: CompiledProjectionFacts,
 ): string {
+  // W6-P2-1: a projection cuts its Vertical depth under the relief surface,
+  // so its depth and tabs come from the compiled projection, not Cut depth.
+  if (projection !== undefined) {
+    return [
+      ...cncProjectionParts(settings, projection, stockThicknessMm),
+      ...cncDirectionPart(settings),
+      ...cncEntryPart(settings, [], true, unrampedShapes),
+      feedSourcePart(settings),
+    ].join(SEPARATOR);
+  }
   // A relief roughs to its own depth, level by level, and takes no tabs. An
   // operation that cut only reliefs cut no shape of its cut type, so that
   // type's depth, tabs and strategy parts would describe nothing.
@@ -235,7 +251,7 @@ function reliefRoughingPart(relief: CompiledReliefFacts | undefined): ReadonlyAr
   if (relief === undefined) return [];
   const levels = relief.roughingLevelDepthsMm;
   const deepestMm = levels[levels.length - 1];
-  if (deepestMm === undefined) return ['no relief roughing levels'];
+  if (deepestMm === undefined) return [`no relief roughing levels${missedNote(relief)}`];
   const to = `to ${formatIntervalMm(deepestMm)} mm`;
   // The reliefs of one operation share a roughing group, so its levels are
   // the distinct depths across them all, not a count for each relief.
@@ -244,7 +260,18 @@ function reliefRoughingPart(relief: CompiledReliefFacts | undefined): ReadonlyAr
     return [`relief roughing at ${depths} ${to} across ${relief.reliefCount} reliefs`];
   }
   const noun = levels.length === 1 ? 'level' : 'levels';
-  return [`relief roughing ${levels.length} ${noun} ${to}`];
+  return [`relief roughing ${levels.length} ${noun} ${to}${missedNote(relief)}`];
+}
+
+// W6-P2-2: the levels above do not reach everywhere, so name what they miss.
+function missedNote(relief: CompiledReliefFacts): string {
+  const areaMm2 = relief.roughingMissedAreaMm2;
+  if (areaMm2 === undefined || areaMm2 <= 0) return '';
+  const area = `about ${Math.max(1, Math.round(areaMm2))} mm²`;
+  const steps = relief.finishingStepLevels ?? 0;
+  if (steps === 0) return `, not reaching ${area}`;
+  const noun = steps === 1 ? 'level' : 'levels';
+  return `, not reaching ${area} (finishing steps down ${steps} ${noun} there)`;
 }
 
 // Relief roughing rings step by the stepover on every cut type, V-carve too.

@@ -146,7 +146,7 @@ function ProjectionControls({ layer, settings, onCommit, onCommitSettings }: Pro
             value={projection.depthMm}
             positiveOnly
             step={0.05}
-            title="Vertical offset below the target surface. The operation's vectors follow this relief instead of a flat depth."
+            title="Vertical offset below the target surface, cut in steps of Depth per pass. The operation's vectors follow this relief instead of a flat depth."
             onCommit={(depthMm) => onCommit({ reliefProjection: { ...projection, depthMm } })}
           />
           <NumberField
