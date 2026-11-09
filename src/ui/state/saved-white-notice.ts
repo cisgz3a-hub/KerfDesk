@@ -11,6 +11,11 @@ import type { Project } from '../../core/scene';
 
 const BURNING_WHITE_PREFIX = 'White in an imported logo burns: ';
 
+// An older file stored every white as plain white (ADR-686 Amendment 4).
+const OLDER_FILE_SENTENCE =
+  'A file saved before this version does not record see-through, gradient or masked white, ' +
+  'so check the canvas afterwards.';
+
 /** The Job Review row, or nothing when no imported white still burns. */
 export function burningWhiteReviewWarnings(project: Project): ReadonlyArray<string> {
   const count = countBurningImportedWhites(project.scene);
@@ -19,8 +24,9 @@ export function burningWhiteReviewWarnings(project: Project): ReadonlyArray<stri
   return [
     `${BURNING_WHITE_PREFIX}${one ? '1 white shape' : `${count} white shapes`} from an SVG ` +
       `import ${one ? 'burns' : 'burn'} over the darker fill under ${one ? 'it' : 'them'}, as ` +
-      'KerfDesk 1.0.29 and earlier imported white. A new import leaves solid white unburned. ' +
-      'Use Leave white unburned to do the same here; one Undo burns the white again.',
+      'KerfDesk 1.0.29 and earlier imported white. Use Leave white unburned to cut the white ' +
+      'out; one Undo burns it again. ' +
+      OLDER_FILE_SENTENCE,
   ];
 }
 
@@ -37,7 +43,8 @@ export function burningWhiteOpenNotice(project: Project): string | null {
     `This project has ${one ? '1 white shape' : `${count} white shapes`} from an SVG import ` +
     `that ${one ? 'burns' : 'burn'} over the darker fill under ${one ? 'it' : 'them'}, as ` +
     'KerfDesk 1.0.29 and earlier imported white. Its burn is unchanged. To leave the white ' +
-    'unburned, as a new import does, choose Tools > Leave Imported White Unburned, or Leave ' +
-    'white unburned in Job Review. One Undo burns the white again.'
+    'unburned, choose Tools > Leave Imported White Unburned, or Leave white unburned in Job ' +
+    'Review. One Undo burns the white again. ' +
+    OLDER_FILE_SENTENCE
   );
 }

@@ -104,3 +104,21 @@ export function burnInside(project: Project, outlines: readonly Vec2[][]): numbe
     }
   return length;
 }
+
+/** What 1.0.29 saved: the import as parsed, white on its own operation, no marks. */
+export function importAsOlderBuild(svgText: string): Project {
+  importSvg(svgText);
+  useStore.getState().undo();
+  const project = useStore.getState().project;
+  const objects = project.scene.objects.map((object: SceneObject) =>
+    'paths' in object
+      ? {
+          ...object,
+          paths: object.paths.map(({ whiteInk: _mark, ...path }) => path),
+        }
+      : object,
+  ) as SceneObject[];
+  const older = { ...project, scene: { ...project.scene, objects } };
+  useStore.setState({ project: older, undoStack: [], redoStack: [] });
+  return older;
+}

@@ -1,15 +1,21 @@
 // "Leave white unburned" for a project saved before the knock-out (rolling
 // audit v10 V2-P2-1, ADR-686 Amendment 2). Every SVG import in the project gets
-// the knock-out a fresh import gets, in one Undo step. A white whose operations
-// all have Output off is left alone, as the open notice leaves it out.
+// the import's knock-out, in one Undo step. A white whose operations all have
+// Output off is left alone, as the open notice leaves it out. A project saved
+// before Amendment 1 does not record see-through, gradient or masked white, so
+// that white is cut out as solid white (Amendment 4 says so in the notice).
 //
 // The history copy marks the white shapes it would have cut as `kept`, so Undo
 // is the operator's choice to burn the white: the notice and Job Review stop
 // asking. An import whose white covers every darker shape is left as parsed,
-// as a fresh import leaves it, and its white is marked `kept` too, so the
-// offer always ends once taken.
+// as a fresh import leaves it, and the open count leaves it out as well. Copies
+// that lost their import identity are knocked out one by one (Amendment 4).
 
-import { isWhiteOutputOff, svgImportGroups } from '../../core/geometry/burning-imported-white';
+import {
+  isWhiteOutputOff,
+  savedKnockoutOptions,
+  svgImportGroups,
+} from '../../core/geometry/burning-imported-white';
 import { knockOutWhiteFills } from '../../core/geometry/white-fill-knockout';
 import type { ColoredPath, Project, Scene, SceneObject } from '../../core/scene';
 import { withoutRemovedParts, withWhiteKept } from './import-white-knockout';
@@ -29,30 +35,24 @@ export function knockOutSavedWhiteFills(project: Project): SavedWhiteKnockout | 
   const original = project.scene;
   const burns = (object: SceneObject, path: ColoredPath): boolean =>
     !isWhiteOutputOff(original, object, path);
+  const options = savedKnockoutOptions(original);
   let scene: Scene = original;
   let whiteShapes = 0;
   const touched = new Set<string>();
   const removedIds = new Set<string>();
-  const leftAsParsed = new Set<string>();
   for (const group of svgImportGroups(original)) {
-    const knockout = knockOutWhiteFills(group, {
-      skip: (object, path) => isWhiteOutputOff(original, object, path),
-    });
-    if (knockout === null) continue;
-    const ids = group.map((object) => object.id);
-    ids.forEach((id) => touched.add(id));
-    if (knockout.removedIds.size === group.length) {
-      ids.forEach((id) => leftAsParsed.add(id));
-      continue;
-    }
+    const knockout = knockOutWhiteFills(group, options);
+    // As a fresh import, a group whose white covers every darker shape stays as
+    // parsed; the open count leaves it out too (Amendment 4).
+    if (knockout === null || knockout.removedIds.size === group.length) continue;
+    group.forEach((object) => touched.add(object.id));
     scene = withoutRemovedParts(scene, knockout.changed, knockout.removedIds);
     knockout.removedIds.forEach((id) => removedIds.add(id));
     whiteShapes += knockout.whiteShapes;
   }
   if (touched.size === 0) return null;
-  const knocked = withWhiteKept({ ...project, scene }, leftAsParsed, burns);
   return {
-    project: knocked,
+    project: { ...project, scene },
     undoProject: withWhiteKept(project, touched, burns),
     whiteShapes,
     removedIds,
@@ -110,7 +110,7 @@ export const LEAVE_WHITE_UNBURNED = 'Leave white unburned';
 export function leftUnburnedMessage(whiteShapes: number): string {
   const one = whiteShapes === 1;
   return (
-    `${one ? '1 white shape is' : `${whiteShapes} white shapes are`} left unburned, as a new ` +
-    `import of the file leaves ${one ? 'it' : 'them'}. Undo burns ${one ? 'it' : 'them'} again.`
+    `${one ? '1 white shape is' : `${whiteShapes} white shapes are`} left unburned. ` +
+    `Undo burns ${one ? 'it' : 'them'} again.`
   );
 }
