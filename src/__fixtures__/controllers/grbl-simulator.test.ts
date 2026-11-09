@@ -5,6 +5,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SerialConnection } from '../../platform/types';
 import { createGrblSimulator, type CreateGrblSimulatorOptions } from './grbl-simulator';
+import { defaultGrblSimSettings } from './grbl-sim-settings';
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -312,5 +313,39 @@ describe('grbl-simulator', () => {
   it('captures the baud rate the host opened with', async () => {
     const { sim } = await openSim();
     expect(sim.port.openRequests()).toEqual([{ baudRate: 115200 }]);
+  });
+});
+
+// DISABLE_LASER_DURING_HOLD (gnea/grbl config.h:587, on by default; protocol.c:536-540): a feed
+// hold in laser mode stops the laser with the motion, and cycle start brings the power back. A
+// router ($32=0) keeps its spindle turning through the hold.
+describe('feed hold and the laser (pro loop v3 C4-P3-1)', () => {
+  it('reports the laser off while held in laser mode, and back on after ~', async () => {
+    const { conn, lines } = await openSim({ motionMs: 500 });
+    await pump(5);
+    await conn.write('G1 X5 F600 S100\n');
+    await pump(2);
+    await conn.write('!');
+    await conn.write('?');
+    await pump(2);
+    expect(lines.at(-1)).toMatch(/^<Hold:0\|.*\|FS:\d+,0\|/);
+    await conn.write('~');
+    await conn.write('?');
+    await pump(2);
+    expect(lines.at(-1)).toMatch(/^<Run\|.*\|FS:\d+,100\|/);
+  });
+
+  it('keeps a router spindle turning through a hold', async () => {
+    const { conn, lines } = await openSim({
+      motionMs: 500,
+      settings: [...defaultGrblSimSettings(), [32, '0'] as const],
+    });
+    await pump(5);
+    await conn.write('G1 X5 F600 S100\n');
+    await pump(2);
+    await conn.write('!');
+    await conn.write('?');
+    await pump(2);
+    expect(lines.at(-1)).toMatch(/^<Hold:0\|.*\|FS:\d+,100\|/);
   });
 });
