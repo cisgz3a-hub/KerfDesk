@@ -19,6 +19,7 @@ export function compileCncProjectedOperation(
   device: DeviceProfile,
   config: CncMachineConfig,
   sourceGeometry?: CncOperationSourceGeometry,
+  layers?: ReadonlyArray<Layer>,
 ): CompiledCncOperation | ReliefMaterializationFailure {
   const contours = sourceGeometry?.contours ?? collectLayerContours(sourceObjects, layer, device);
   const polylines = sourceGeometry?.polylines ?? layerPolylinesFromContours(layer, contours);
@@ -29,6 +30,7 @@ export function compileCncProjectedOperation(
     device,
     config,
     polylines,
+    layers === undefined ? undefined : { layers, carvedObjects: sourceObjects },
   );
   if (projected.kind === 'relief-materialization-failed') return projected;
   const groups = withDesignBounds(
