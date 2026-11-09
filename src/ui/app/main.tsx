@@ -15,6 +15,7 @@ import {
   createDesktopSerialAdapter,
   createDesktopMachineNetwork,
   createDesktopAiAssistant,
+  createDesktopCameraAddressVault,
   desktopCameraBridgeConnection,
   createDesktopSupportLogReader,
   createDesktopWindowCommands,
@@ -78,6 +79,7 @@ const adapter: PlatformAdapter = isElectronRenderer()
             // A worker streams each network session, off this thread (ADR-676).
             machineNetwork: createDesktopMachineNetwork(undefined, createNetworkSessionOpener()),
             cameraBridge: createHttpCameraBridge(() => desktopCameraBridgeConnection()),
+            cameraAddressVault: createDesktopCameraAddressVault(),
           }
         : {}),
     }

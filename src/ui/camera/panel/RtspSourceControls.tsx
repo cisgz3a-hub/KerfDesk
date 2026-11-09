@@ -6,7 +6,11 @@
 
 import { useState } from 'react';
 import { usePlatform } from '../../app';
-import { loadRtspCameraUrl, saveRtspCameraUrl } from '../../state/camera-preference-storage';
+import {
+  loadRtspCameraUrl,
+  rememberedRtspCameraUrl,
+  saveRtspCameraUrl,
+} from '../../state/camera-preference-storage';
 import { type CameraSourceState, useCameraStore } from '../../state/camera-store';
 import { CameraSourceView } from '../CameraSourceView';
 import type { ActiveCameraSource } from '../frame-source';
@@ -36,8 +40,15 @@ export function RtspSourceControls(): JSX.Element {
   const rtspAdvisory =
     rtspSource?.liveness.kind === 'unmonitored' ? rtspSource.liveness.advisory : null;
   const connect = (): void => {
-    saveRtspCameraUrl(url);
-    void startRtspSource(bridge, url);
+    void (async () => {
+      // The remembered address, shown in its public form, connects in full
+      // when the desktop's secure storage kept it (ADR-692).
+      const typed = url.trim();
+      let target = typed;
+      if (typed === loadRtspCameraUrl()) target = (await rememberedRtspCameraUrl()) ?? typed;
+      else saveRtspCameraUrl(url);
+      await startRtspSource(bridge, target);
+    })();
   };
 
   return (
@@ -51,8 +62,9 @@ export function RtspSourceControls(): JSX.Element {
         RTSP camera…
       </summary>
       <p style={noteStyle}>
-        For machines whose camera streams RTSP (e.g. rtsp://192.168.10.1:8554/). Credentials are
-        used for this connection but are never saved.
+        For machines whose camera streams RTSP (e.g. rtsp://192.168.10.1:8554/). A login in the
+        address never goes into a project or machine file; KerfDesk Desktop keeps it only in this
+        computer&apos;s secure storage, to reconnect.
       </p>
       <div style={rowStyle}>
         <input

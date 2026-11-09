@@ -1,4 +1,4 @@
-import { cameraSourceIdWithoutCredentials } from '../../core/camera/camera-capture-binding';
+import { cameraAddressWithoutUserinfo } from '../../core/camera/camera-address-login';
 
 const KEY_STORAGE = 'laserforge.camera.resourceIdentityKey.v1';
 const KEY_BYTES = 32;
@@ -19,7 +19,8 @@ export async function cameraQueryFingerprint(raw: string): Promise<string | unde
       ['sign'],
     );
     // Empty query is known resource data, distinct from an unknown legacy binding.
-    const payload = JSON.stringify([cameraSourceIdWithoutCredentials(raw), url.search]);
+    // Keyed as it always was, so identities saved before still match.
+    const payload = JSON.stringify([cameraAddressWithoutUserinfo(raw), url.search]);
     const signature = await subtle.sign('HMAC', key, new TextEncoder().encode(payload));
     return `hmac-sha256:${hex(new Uint8Array(signature))}`;
   } catch {
