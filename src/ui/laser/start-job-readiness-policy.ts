@@ -19,6 +19,7 @@ import {
 import type { ControllerKind } from '../../core/devices';
 import {
   PREPARATION_COMPILED_SEGMENT_BUDGET,
+  rotaryAppliesTo,
   type Job,
   type JobOriginPlacement,
   type JobPlacementSettings,
@@ -96,8 +97,9 @@ function placementWarnings(
   // The outline's own Start from is the one advice that keeps the artwork in
   // the burned outline, so it stands in for the camera warning.
   const outline = layout === 'jig' ? registrationOutlineWarning(project, machine, jobOrigin) : null;
+  const rotary = rotaryAppliesTo(project.device, project.machine);
   return [
-    outline ?? cameraPlacementStartFromWarning(machine, jobOrigin, layout),
+    outline ?? cameraPlacementStartFromWarning(machine, jobOrigin, layout, rotary),
     layout === 'place-board' ? placeBoardAbsoluteWarning(jobOrigin) : null,
   ].filter((warning): warning is string => warning !== null);
 }
@@ -121,17 +123,43 @@ function registrationLayout(project: Project): RegistrationLayout {
  * from User Origin, so it is told that instead (ADR-654 Amendment 3). A
  * registration jig is the other: both runs anchor to its outline, so the
  * artwork run must keep the outline's Start from (ADR-654 Amendment 4).
+ * An active rotary comes before all of these: Absolute turns the cylinder
+ * back to work Y 0, so it is never advised there and is warned about
+ * (ADR-228 Amendment 2). No jobOrigin is how Start resolves Absolute.
  */
 export function cameraPlacementStartFromWarning(
   machine: Pick<MachineStartSnapshot, 'cameraPlacementActive'>,
   jobOrigin: JobOriginPlacement | undefined,
   layout: RegistrationLayout = null,
+  rotary = false,
 ): string | null {
-  if (machine.cameraPlacementActive !== true || jobOrigin === undefined) return null;
-  if (jobOrigin.startFrom === 'absolute') return null;
+  if (machine.cameraPlacementActive !== true) return null;
+  if (rotary) return rotaryCameraWarning(jobOrigin?.startFrom ?? 'absolute');
+  if (jobOrigin === undefined || jobOrigin.startFrom === 'absolute') return null;
   if (layout === 'place-board') return placeBoardCameraWarning(jobOrigin.startFrom);
   if (layout === 'jig') return jigCameraWarning(jobOrigin.startFrom);
   return `Camera placement is on, but Start from is ${START_FROM_NAMES[jobOrigin.startFrom]}. The camera picture shows positions on the bed, so this job burns where ${START_FROM_NAMES[jobOrigin.startFrom]} puts it, not where the artwork sits on the camera picture. Choose Absolute Coordinates to burn it where it is placed, and watch the Frame.`;
+}
+
+const ROTARY_TURN_FROM: Readonly<Record<Exclude<JobStartMode, 'absolute'>, string>> = {
+  'current-position': 'the turn of the cylinder under the laser now',
+  'user-origin': 'the turn of the cylinder at your User Origin',
+  'verified-origin': 'the turn of the cylinder at your Verified Origin',
+};
+
+const ROTARY_CAMERA_LEAD =
+  'Camera placement is on, and so is the rotary. On a rotary the camera picture places the artwork only along the cylinder:';
+
+/** ADR-228 Amendment 2 (rolling audit v11 W4-P2-1): on a rotary, Absolute
+ * rebases the job to work Y 0 (ADR-127), away from the face the operator
+ * turned to the laser, while the preview and the canvas Frame outline stay on
+ * the artwork. A placed Start from keeps that turn (ADR-127 Amendment 1). */
+export function rotaryCameraWarning(startFrom: JobStartMode): string {
+  if (startFrom === 'absolute') {
+    return `${ROTARY_CAMERA_LEAD} where it burns around the cylinder is set by Start from, and Start from is Absolute Coordinates. On a rotary, Absolute turns the cylinder back so the job starts at work Y 0, not on the face under the laser, and neither the preview nor the canvas Frame outline shows that turn. Choose Current Position (or User Origin), turn the face to engrave under the laser, and watch the Frame. If no rotary is fitted, switch Rotary off beside Start first.`;
+  }
+  const mode = START_FROM_NAMES[startFrom];
+  return `${ROTARY_CAMERA_LEAD} where it burns around the cylinder is set by ${mode}, which starts it on ${ROTARY_TURN_FROM[startFrom]}. Keep ${mode}, and do not choose Absolute Coordinates: on a rotary that turns the cylinder back to work Y 0 before burning, away from that face. Watch the Frame.`;
 }
 
 function jigCameraWarning(startFrom: Exclude<JobStartMode, 'absolute'>): string {
