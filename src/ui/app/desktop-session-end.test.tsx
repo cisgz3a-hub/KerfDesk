@@ -2,9 +2,10 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sessionEndScript } from '../../../electron/session-end-guard';
-import { createStreamer, step } from '../../core/controllers/grbl';
+import { createStreamer, parseStatusReport, step } from '../../core/controllers/grbl';
 import type { DesktopJobReport, PlatformAdapter } from '../../platform/types';
 import { useLaserStore } from '../state/laser-store';
+import { statusPositionPatch } from '../state/laser-status-position';
 import { desktopCloseController } from './desktop-close-runtime';
 import {
   desktopJobReport,
@@ -21,6 +22,14 @@ let dispose: () => void = () => undefined;
 
 function running(): void {
   useLaserStore.setState({ streamer: step(createStreamer('G1 X1')).state });
+}
+
+/** A connected laser the controller reports on at Idle, with nothing here running it. */
+function litAtIdle(): void {
+  const report = parseStatusReport('<Idle|MPos:0.000,0.000,0.000|FS:0,0|A:S>');
+  if (report === null) throw new Error('bad fixture');
+  useLaserStore.setState({ connection: { kind: 'connected' } });
+  useLaserStore.setState(statusPositionPatch(useLaserStore.getState(), report));
 }
 
 /** What main runs in the window when Windows ends the session. */
@@ -128,6 +137,21 @@ describe('the window side of a Windows session end (ADR-548)', () => {
     expect(SESSION_END_MESSAGES.ending).toContain('physical E-stop');
     for (const message of Object.values(SESSION_END_MESSAGES))
       expect(message).not.toMatch(/sends Abort first|sent Abort/);
+  });
+
+  // Rolling audit v11 W3-P2-1: the ordinary close sends M5 here, so session end waits and sends it.
+  it('counts a laser left on at Idle, and turns it off when Windows will not wait', () => {
+    const sendConsoleCommand = vi.fn(async (_line: string) => undefined);
+    litAtIdle();
+    useLaserStore.setState({ sendConsoleCommand });
+    const report = vi.fn(async (_report: DesktopJobReport) => undefined);
+    dispose = installDesktopSessionEnd(window, report);
+    expect(report).toHaveBeenCalledExactlyOnceWith({ busy: true });
+
+    fromMain('asked');
+    expect(sendConsoleCommand).not.toHaveBeenCalled();
+    fromMain('ending');
+    expect(sendConsoleCommand).toHaveBeenCalledExactlyOnceWith('M5');
   });
 
   it('ignores a malformed event', () => {
