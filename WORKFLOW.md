@@ -345,6 +345,18 @@ startup crash is shown at once. It introduces no startup interaction or modal.
    error. Images still need absolute positions and sizes; unusable percentage image geometry is
    skipped with the existing warning.
 
+#### Edge — SVG artwork placed with CSS transforms (ADR-574 Amendment 1)
+1. Artwork lands where a browser draws it. The CSS `transform` property (in a `style` attribute
+   or a `<style>` rule) and the `translate`, `rotate` and `scale` properties apply in CSS order,
+   about `transform-origin`, with units such as `px` (one user unit), `mm`, `in` and `turn`, and
+   percentages of the view box or, with `transform-box: fill-box`, of the element's own box.
+2. The `transform` attribute keeps SVG's own grammar: plain numbers, no units. An attribute a
+   browser cannot read (such as `rotate(0.25turn)` or `translate(20px)`) is ignored, as a browser
+   ignores it, and a warning toast counts the elements imported without it.
+3. CSS a browser can place but KerfDesk cannot evaluate (`em` or `vw` units, `calc()`, `var()`, a
+   stroke box) is approximated, and a warning toast says how many elements may sit elsewhere in a
+   browser.
+
 #### Edge — SVG `<text>` elements
 1. Phase A ignores `<text>` elements (text → paths conversion is Phase D).
 2. Toast (info): `<filename> · 4 text elements ignored. Convert text to paths in your design tool, or wait for Phase D.`

@@ -19,6 +19,8 @@ export type SvgImportCounts = {
   circularUse: number;
   markers: number;
   unresolvedPaintOpacity: number;
+  transformInvalid: number;
+  transformUnresolved: number;
   readonly skippedImages: Record<Exclude<SvgImageSkipReason, 'no-data'>, number>;
 };
 
@@ -34,6 +36,8 @@ export function createSvgImportCounts(): SvgImportCounts {
     circularUse: 0,
     markers: 0,
     unresolvedPaintOpacity: 0,
+    transformInvalid: 0,
+    transformUnresolved: 0,
     skippedImages: { format: 0, effects: 0, size: 0, fit: 0, shear: 0 },
   };
 }
@@ -99,6 +103,14 @@ function presentationNotes(counts: SvgImportCounts): string[] {
     [
       counts.unresolvedPaintOpacity,
       'Imported $ SVG element(s) with unresolved fill or stroke opacity treated as fully opaque; opacity using CSS variables (custom or environment), attribute substitutions, or layout-dependent values may hide artwork that is included. Resolve these expressions in your SVG editor before importing for exact visibility.',
+    ],
+    [
+      counts.transformInvalid,
+      'Imported $ SVG element(s) without a transform value that a browser also ignores as invalid, such as a transform attribute with units or turn angles (only the CSS transform property accepts those). Check their placement against the design.',
+    ],
+    [
+      counts.transformUnresolved,
+      'Imported $ SVG element(s) with a CSS transform KerfDesk could only approximate (such as font- or window-relative units, calc() or var(), or a stroke-box reference box); a browser may place them differently. Check their placement against the design.',
     ],
   ] as const;
   return notes
