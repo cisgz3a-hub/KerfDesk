@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "sinceSourceSha": "33bc394c67e37011961af46b799e1d7d30efcedf",
+  "sinceSourceSha": "df2279e2607784f40ca9e1fc4f508cbcb17478c5",
   "highlights": [
-    "Older CNC jobs: crossing loops and flat Drill contours now count toward Job Origin, so some jobs saved in 1.0.28 or earlier cut in a new, correct place. Opening one names how far its cut moved.",
-    "Safer Marlin jobs: a line the controller skips ends the job, and Pause and network failures send their beam-off first. A busy page no longer stops a healthy job, and Frame waits for a report after Set origin.",
-    "Photo engraving has portrait recipes, Auto tones and an On material preview. Trace keeps text marks at any angle, holds hard art in any ink colour and draws large 1-bit curves smoother.",
-    "Text frames converted by 1.0.28 are repaired, single-line frames keep their line rule, and output names every missing glyph. Placed tabs follow resizes and Studio rebuilds; full stops and i-dots stay.",
-    "Fill pools match what output burns, GRBL Compatible fills get constant-power advice, and a grblHAL Resume left Idle at a job end warns instead of blocking. The A1 Pro uses its homed travel.",
-    "Camera setup probes RTSP logins and shows its status in Machine Setup, the phone pairing scanner reads the PC code on every phone, and Studio keeps drawings applied before a crash."
+    "Safer burns: a held Enter can't resume a pause, a network laser stops at once if the window crashes, even while closing, a laser left on delays shutdown, Abort restores the origin even on $10=0, and Reconnect waits for the job.",
+    "Machine Setup's Save switches to that machine's driver. If 1.0.29 set your laser up as a CNC, KerfDesk asks whether it's a laser before any job or recovery starts, and a controller locked before connecting is offered Reset.",
+    "Beginner help: plain wording from first run to Job complete, a Before you start check, a first-burn lesson and cut test, Cut last for each part and for cuts with leads, wider Ctrl+K search, and a missing-font notice.",
+    "Logos: white parts are cut out on SVG import, older logos and their copies are offered it, and Re-import removes their white shapes. SVG CSS transforms and DXF/HPGL arcs import as drawn, so a re-import may move parts.",
+    "Large jobs prepare in the background with progress and Leave Preview, and the Run dialog reviews a big file once. Photo, Trace and text work run off the screen thread, and GRBL job times are closer to the real burn.",
+    "Camera logins are no longer kept in saved or shared files; if you shared a project or profile with a network camera, change its password. Recover unsaved work never clears a newer copy. Saved reliefs may cut slightly differently."
   ]
 }
