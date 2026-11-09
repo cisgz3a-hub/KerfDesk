@@ -33,6 +33,7 @@ The lenses are L10 (fix verification, [v8](../2026-10-29-rolling-v8/AREAS.md)), 
 | X5 | `fix-ux-sweep` | #1595, #1598, #1599, #1604, #1605, #1609 | U-audit P3s | L10, L9 (truthful wording), L12 |
 | X6 | `fix-cnc-relief` | #1603, #1606, #1607, #1622 | S8-P2-1 and P3s, F6/16 relief findings | L10, L3, L6 |
 | X7 | `cross-fix-journeys` | All of the above together | Whole jobs end to end; main's CI over the merge train | L10, L4, L9, L12 |
+| X8 | `rotary-complete` | Rotary code as a whole (added 2026-11-09 at the maintainer's request) | "Put in a round glass … and burn perfect burn while it rotates": LightBurn parity, wrap accuracy on simulated controllers | L1, L3, L4, L9, LightBurn parity |
 
 X1 runs first because it covers Abort, Pause, crashes and shutdown. X2 runs second because returning users are where the v10 P1s came from.
 
@@ -57,4 +58,4 @@ The following are other work. Treat what they fix or have already found as KNOWN
 - **Security findings:** redacted in committed text until fixed.
 - **Fix PRs:** opened with Auto-fix on and auto-merge using the MERGE method.
 
-**Status:** started 2026-11-09.
+**Status:** DONE 2026-11-10. 37 raised, 0 refuted: P1 7, P2 9, P3 21, 15 KNOWN. See the round result in [LEDGER.md](LEDGER.md).
