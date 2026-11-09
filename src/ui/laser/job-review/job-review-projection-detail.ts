@@ -21,6 +21,10 @@ export type CompiledProjectionFacts = {
   readonly closedShapes: number;
   readonly tabbedShapes: number;
   readonly freedShapes: number;
+  // Rolling audit v12 X6-P1-1: the thinnest material a tabbed loop is held by.
+  readonly thinnestTabMm?: number;
+  // X6-P2-1: the ladder starts this far above a roughed-only relief surface.
+  readonly startAboveMm?: number;
 };
 
 /** Compiled projection facts per operation, from the job's planning evidence. */
@@ -43,10 +47,45 @@ export function compiledProjectionFactsByLayer(
             closedShapes: seen.closedShapes + facts.closedShapes,
             tabbedShapes: seen.tabbedShapes + facts.tabbedShapes,
             freedShapes: seen.freedShapes + facts.freedShapes,
+            ...combined('thinnestTabMm', seen.thinnestTabMm, facts.thinnestTabMm, Math.min),
+            ...combined('startAboveMm', seen.startAboveMm, facts.startAboveMm, Math.max),
           },
     );
   }
   return out;
+}
+
+function combined<K extends 'thinnestTabMm' | 'startAboveMm'>(
+  key: K,
+  a: number | undefined,
+  b: number | undefined,
+  pick: (a: number, b: number) => number,
+): Partial<Record<K, number>> {
+  if (a === undefined && b === undefined) return {};
+  const value = a === undefined ? b : b === undefined ? a : pick(a, b);
+  return { [key]: value } as Partial<Record<K, number>>;
+}
+
+/** The tab height the compiler cuts towards (ADR-258 Amendments 3 and 4). */
+export function projectionSetTabHeightMm(
+  settings: CncLayerSettings,
+  stockThicknessMm: number | undefined,
+): number {
+  const stock = stockThicknessMm ?? DEFAULT_CNC_STOCK.thicknessMm;
+  return stock === DEFAULT_CNC_STOCK.thicknessMm
+    ? settings.tabHeightMm
+    : stockLimitedTabHeightMm(settings.tabHeightMm, stock);
+}
+
+/** The tabs are thinner than set: the relief floor under them is lower (X6-P1-1). */
+export function projectionTabsThin(
+  settings: CncLayerSettings,
+  facts: CompiledProjectionFacts,
+  stockThicknessMm: number | undefined,
+): number | null {
+  const thinnest = facts.thinnestTabMm;
+  if (thinnest === undefined || facts.tabbedShapes === 0) return null;
+  return thinnest < projectionSetTabHeightMm(settings, stockThicknessMm) - 0.01 ? thinnest : null;
 }
 
 /** The depth and tab parts of a projected operation's detail line. */
@@ -56,13 +95,16 @@ export function cncProjectionParts(
   stockThicknessMm: number | undefined,
 ): ReadonlyArray<string> {
   const noun = facts.levels === 1 ? 'pass' : 'passes';
+  const aboveMm = facts.startAboveMm ?? 0;
+  const totalMm = facts.verticalDepthMm + aboveMm;
   const step =
-    facts.levels > 1
-      ? ` of up to ${formatMm(Math.min(settings.depthPerPassMm, facts.verticalDepthMm))} mm`
-      : '';
+    facts.levels > 1 ? ` of up to ${formatMm(Math.min(settings.depthPerPassMm, totalMm))} mm` : '';
+  // X6-P2-1: a roughed-only relief still stands above its surface.
+  const from =
+    aboveMm > 0 ? ` from ${formatMm(aboveMm)} mm above it (the relief is only roughed first)` : '';
   const depth =
     `projected ${formatMm(facts.verticalDepthMm)} mm under the relief surface in ` +
-    `${facts.levels} ${noun}${step}, deepest ${formatMm(facts.deepestMm)} mm`;
+    `${facts.levels} ${noun}${step}${from}, deepest ${formatMm(facts.deepestMm)} mm`;
   return [depth, ...projectionTabsPart(settings, facts, stockThicknessMm)];
 }
 
@@ -77,14 +119,21 @@ function projectionTabsPart(
   if (!settings.tabsEnabled) return ['tabs off'];
   if (facts.tabbedShapes > 0) {
     const stock = stockThicknessMm ?? DEFAULT_CNC_STOCK.thicknessMm;
-    const heightMm =
-      stock === DEFAULT_CNC_STOCK.thicknessMm
-        ? settings.tabHeightMm
-        : stockLimitedTabHeightMm(settings.tabHeightMm, stock);
+    const heightMm = projectionSetTabHeightMm(settings, stockThicknessMm);
+    const on = `on ${facts.tabbedShapes} of ${shapes(facts.closedShapes)}`;
+    // X6-P1-1: a tab is only as thick as the floor the relief leaves under it.
+    const thin = projectionTabsThin(settings, facts, stockThicknessMm);
+    if (thin !== null) {
+      return [
+        `tabs ${settings.tabsPerShape} per shape (${formatMm(settings.tabWidthMm)} mm) ${on}, ` +
+          `only ${formatMm(thin)} mm thick: the relief floor under them is that far above the ` +
+          `stock bottom (${formatMm(heightMm)} mm set)`,
+      ];
+    }
     const from = stock === DEFAULT_CNC_STOCK.thicknessMm ? 'the cut floor' : 'the stock bottom';
     return [
       `tabs ${settings.tabsPerShape} per shape (${formatMm(settings.tabWidthMm)} × ` +
-        `${formatMm(heightMm)} mm above ${from}) on ${facts.tabbedShapes} of ${shapes(facts.closedShapes)}`,
+        `${formatMm(heightMm)} mm above ${from}) ${on}`,
     ];
   }
   if (stockThicknessMm !== undefined && stockThicknessMm > facts.deepestMm) {

@@ -182,6 +182,7 @@ function compileCncSnapshot(
       sourceGeometry?.get(operationIndex) ?? leadWalls.geometry.get(operationIndex),
       allSourceObjects,
       leadWalls.walls,
+      scene.layers,
     );
     if (operation.kind === 'relief-materialization-failed') return operation;
     clearingGroups.push(...operation.clearingGroups);
@@ -231,6 +232,7 @@ function compileCncOperation(
   sourceGeometry?: CncOperationSourceGeometry,
   allSourceObjects: Scene['objects'] = sourceObjects,
   leadWalls: ReadonlyArray<ProfileLeadKeptWall> = [],
+  layers?: ReadonlyArray<Layer>,
 ): CompiledCncOperation | ReliefMaterializationFailure {
   const { layer, priorityObjectId } = run;
   const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
@@ -244,6 +246,7 @@ function compileCncOperation(
       device,
       config,
       sourceGeometry,
+      layers,
     );
   }
   const relief = compileReliefGroupsForLayer(sourceObjects, layer, settings, device, config);

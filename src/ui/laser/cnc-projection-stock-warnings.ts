@@ -10,7 +10,14 @@
 
 import { isProfileCutType } from '../../core/cnc';
 import { DEFAULT_CNC_STOCK, type CncLayerSettings, type Layer } from '../../core/scene';
-import type { CompiledProjectionFacts } from './job-review/job-review-projection-detail';
+import {
+  projectionSetTabHeightMm,
+  projectionTabsThin,
+  type CompiledProjectionFacts,
+} from './job-review/job-review-projection-detail';
+
+// Bridges thinner than this are named as likely to break (X6-P1-1).
+const THIN_TAB_MM = 1;
 import { formatMm } from './job-review/job-review-format';
 
 export function projectionStockWarning(
@@ -29,10 +36,26 @@ export function projectionStockWarning(
       ? 'Enable Tabs or reduce the Vertical depth.'
       : stockThicknessMm === DEFAULT_CNC_STOCK.thicknessMm
         ? 'Stock thickness is still the default, so its tabs are measured from the cut floor and sit below the stock. Set Stock thickness to keep them.'
-        : 'Reduce the Vertical depth or Tab height.';
+        : // X6-P1-1: tabs on and set, yet nothing holds: the relief floor
+          // under the windows is at the stock bottom, so they ride in air.
+          'Its tab windows leave no more than 0.1 mm, because the relief floor under them is ' +
+          'already at the stock bottom. Raise the relief floor there, use thicker stock, or ' +
+          'hold the parts down.';
     return (
       `${cut}: it cuts ${shapes} through the stock all the way round with no holding tab — ` +
       `the parts come free on the final pass. ${fix}`
+    );
+  }
+  const thin = projectionTabsThin(settings, facts, stockThicknessMm);
+  if (thin !== null) {
+    const setMm = projectionSetTabHeightMm(settings, stockThicknessMm);
+    return (
+      `${cut}${pastBottom(facts, stockThicknessMm)}: its holding tabs are only ` +
+      `${formatMm(thin)} mm thick, not the ${formatMm(setMm)} mm ` +
+      `set, because the relief floor under them stands only ${formatMm(thin)} mm above the ` +
+      'stock bottom and a tab keeps only the material there. ' +
+      (thin < THIN_TAB_MM ? 'Tabs this thin can break and free the parts. ' : '') +
+      'Raise the relief floor at the tabs, use thicker stock, or hold the parts down.'
     );
   }
   if (facts.deepestMm > stockThicknessMm + 1e-6) {
@@ -52,6 +75,13 @@ export function projectionStockWarning(
     );
   }
   return null;
+}
+
+// The spoilboard fact, kept in the louder thin-tab note.
+function pastBottom(facts: CompiledProjectionFacts, stockThicknessMm: number): string {
+  return facts.deepestMm > stockThicknessMm + 1e-6
+    ? ` — ${(facts.deepestMm - stockThicknessMm).toFixed(2)} mm past the bottom, into the spoilboard`
+    : '';
 }
 
 // A projected profile whose closed shapes asked for tabs and got none because

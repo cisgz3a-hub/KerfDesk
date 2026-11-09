@@ -30,6 +30,7 @@ import { kernelForTool } from '../sim';
 import { reliefGroup } from './cnc-relief-group';
 import { cncSettingsForStage } from './cnc-stage-settings';
 import { finishingCellSizeMm, type ReliefFinishingRecord } from './compile-cnc-relief-finishing';
+import { restStepDown, type RestStepDown } from './compile-cnc-relief-rest-step-down';
 import { reliefMachineSpaceGeometry } from './relief-machine-space';
 import { materialOnRightInMap } from './relief-material-side';
 
@@ -138,15 +139,19 @@ function restForRelief(
     wallOnRight: materialOnRightInMap(space.residualTransform, device, settings),
   });
   const selected = reliefRestPasses(map, fullPasses, prediction.selected, kernel.radiusMm);
-  const passes = selected.passes
-    .filter((pass) => pass.kind === 'path3d')
-    .map((pass) => ({
-      ...pass,
-      points: pass.points.map((p) => ({
-        ...toMachineCoords(applyTransform(p, space.residualTransform), device),
-        z: p.z,
-      })),
-    }));
+  const rows = selected.passes.filter((pass) => pass.kind === 'path3d');
+  // X6-P2-2: where the finishing bit missed stock, step the rest bit down first.
+  const stepDown = restStepDown(record.relief, record.passes, rows, settings, {
+    rest: tool,
+    finishing: predecessor,
+  });
+  const passes = [...stepDown.passes, ...rows].map((pass) => ({
+    ...pass,
+    points: pass.points.map((p) => ({
+      ...toMachineCoords(applyTransform(p, space.residualTransform), device),
+      z: p.z,
+    })),
+  }));
   return {
     kind: 'compiled',
     passes,
@@ -155,6 +160,7 @@ function restForRelief(
       scallopMm,
       thresholdMm,
       fallbackReason: prediction.fallbackReason ?? selected.fallbackReason,
+      stepDown,
     }),
   };
 }
@@ -168,6 +174,7 @@ function restEvidence(
     scallopMm: number;
     thresholdMm: number;
     fallbackReason: string | undefined;
+    stepDown: RestStepDown;
   },
 ): CncReliefPlanningEvidence {
   return {
@@ -190,6 +197,11 @@ function restEvidence(
     maximumResidualMm: prediction.maximumResidualMm,
     selectedCells: prediction.selectedCells,
     ...(values.fallbackReason === undefined ? {} : { restFallbackReason: values.fallbackReason }),
+    ...(values.stepDown.levels > 0 ? { finishingStepLevels: values.stepDown.levels } : {}),
+    ...(values.stepDown.missedAreaMm2 === undefined
+      ? {}
+      : { predecessorMissedAreaMm2: values.stepDown.missedAreaMm2 }),
+    ...(values.stepDown.unchecked === true ? { predecessorReachUnchecked: true as const } : {}),
     ...(record.relief.reliefSource.kind === 'heightfield-v1'
       ? { targetRevision: record.relief.reliefSource.revision }
       : {}),
