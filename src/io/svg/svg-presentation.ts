@@ -1,6 +1,11 @@
 import type { ColoredPath } from '../../core/scene';
 import type { SvgMatrix } from './svg-curve-transform';
-import { multiplySvgMatrix, parseSvgTransform } from './svg-transform-attribute';
+import { multiplySvgMatrix } from './svg-transform-attribute';
+import {
+  svgElementTransform,
+  type SvgFillBoxMeasure,
+  type SvgTransformDeclarations,
+} from './svg-element-transform';
 import { inheritedSvgFillRule } from './svg-fill-rule';
 import {
   BLACK_PAINT,
@@ -39,6 +44,12 @@ export type PresentationState = {
   readonly color: SvgColorValue;
   readonly fillRule: ColoredPath['fillRule'];
   readonly transform: SvgMatrix;
+  /** This element's winning transform declarations, for a child's `inherit`. */
+  readonly transformDeclarations: SvgTransformDeclarations;
+  /** An invalid transform value was ignored here or on an ancestor, as a browser does. */
+  readonly transformInvalid: boolean;
+  /** A transform value here or on an ancestor could only be approximated (ADR-574 Amd 1). */
+  readonly transformUnresolved: boolean;
   readonly unsupportedEffects: readonly string[];
   readonly clips: readonly SvgClipReference[];
   /** display:none or zero opacity: nothing inside renders, whatever it says. */
@@ -68,6 +79,9 @@ export const INITIAL_PRESENTATION_STATE: PresentationState = {
   color: BLACK_PAINT,
   fillRule: undefined,
   transform: IDENTITY_MATRIX,
+  transformDeclarations: {},
+  transformInvalid: false,
+  transformUnresolved: false,
   clips: [],
   unsupportedEffects: [],
   hiddenSubtree: false,
@@ -88,6 +102,7 @@ export function presentationStateFor(
   el: Element,
   parent: PresentationState,
   cascadeStyles: SvgStyleCascade,
+  measureFillBox?: SvgFillBoxMeasure,
 ): PresentationState {
   // Parsed once and passed down: each of the eight lookups below used to re-read
   // and re-split the whole style attribute for the same element. Matching
@@ -108,10 +123,12 @@ export function presentationStateFor(
     parent.fillOpacity,
     parent.fillOpacityUnresolved,
   );
-  const transform = multiplySvgMatrix(
-    parent.transform,
-    parseSvgTransform(presentationValue(el, styles, 'transform')),
-  );
+  const own = svgElementTransform(el, styles, {
+    parent: parent.transformDeclarations,
+    viewport: parent.viewport,
+    ...(measureFillBox === undefined ? {} : { measureFillBox }),
+  });
+  const transform = multiplySvgMatrix(parent.transform, own.matrix);
   const property = (name: string) => presentationValue(el, styles, name);
 
   return {
@@ -120,6 +137,9 @@ export function presentationStateFor(
     color,
     fillRule: inheritedSvgFillRule(presentationValue(el, styles, 'fill-rule'), parent.fillRule),
     transform,
+    transformDeclarations: own.declarations,
+    transformInvalid: parent.transformInvalid || own.problem === 'invalid',
+    transformUnresolved: parent.transformUnresolved || own.problem === 'unresolved',
     unsupportedEffects: [
       ...parent.unsupportedEffects,
       ...['filter', 'mask'].filter((name) => {

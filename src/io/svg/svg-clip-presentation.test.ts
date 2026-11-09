@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { clipContentTransform } from './svg-clip-presentation';
-import { parseSvgTransform } from './svg-transform-attribute';
+import { parseSvgTransformAttribute } from './svg-transform-attribute';
 
 function clipRect(transform: string): Element {
   const doc = new DOMParser().parseFromString(
@@ -23,7 +23,9 @@ describe('clipContentTransform', () => {
     'scale(2,3)',
     'translate(1, 2) scale(2)',
   ])('reads %j as the general transform reader does', (transform) => {
-    expect(clipContentTransform(clipRect(transform))).toEqual(parseSvgTransform(transform));
+    expect(clipContentTransform(clipRect(transform))).toEqual(
+      parseSvgTransformAttribute(transform),
+    );
   });
 
   it('reads the compact numbers themselves', () => {
