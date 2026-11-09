@@ -1,7 +1,10 @@
 // The design the carved stock is compared with (ADR-487): for each cell of
 // the stock, the depth the relief designs want there. Each relief is read
 // from the heightmap the compiler carves it from (reliefObjectToHeightmap, at
-// the scale relief planning uses), placed in the program where the compiler
+// the scale relief planning uses; a height map on the surface through its
+// pixel centres, as relief CAM carves it under ADR-580 Amendment 2, not the
+// highest pixel under each cell, which stands above that surface on a slope
+// and read a true carving as cut too deep), placed in the program where the compiler
 // placed it (inspection-design.ts), and sampled between its cells. Where
 // reliefs overlap the deeper wins, as it does on the machine. Cells no relief
 // covers, and cells a relief's mask leaves out, have no design to compare
@@ -50,6 +53,7 @@ export function designTarget(
       targetScaleX: geometry.targetScaleX,
       targetScaleY: geometry.targetScaleY,
       mmPerCell,
+      exactSurface: true,
     });
     if (result.kind === 'error') continue;
     if (sampleRelief(target, cells, result.heightmap, toProgram)) landed = true;

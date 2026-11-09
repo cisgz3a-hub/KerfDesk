@@ -179,6 +179,11 @@ describe('comparing the carved stock with the relief design (ADR-487)', () => {
     // gouged.
     expect(result.cells * grid.mmPerCell ** 2).toBeCloseTo(900, -1);
     expect(result.gouged).toBe(0);
+    // At Job Review's default 0.1 mm too: the design is the surface through the
+    // pixel centres that CAM carves (ADR-580 Amendment 2). Read as the highest
+    // pixel under each cell, it stood above the dome's slopes, and the true
+    // carving showed 2% cut too deep, up to 0.21 mm.
+    expect(compareWithDesign(grid.depth, target, 0.1).gouged).toBe(0);
     // The dome's rim is deep, so its edge is a wall (ADR-412 Amendment 2) that
     // the 1/16" ball finishes leaving its own 0.794 mm radius as a fillet at
     // the foot. Inside that band the carving lands on the design.
@@ -207,7 +212,11 @@ describe('comparing the carved stock with the relief design (ADR-487)', () => {
     // nothing is gouged.
     expect(result.within / result.cells).toBeLessThan(0.75);
     expect(result.gouged / result.cells).toBeGreaterThan(0.05);
-    expect(result.deepestGougeMm).toBeGreaterThan(0.5);
+    // The dome is (x² + y²) / 150 mm deep from its centre, so a 2 mm shift
+    // along x changes it by |4x + 4| / 150: up to 0.43 mm across the 30 mm
+    // square, well past the 0.25 mm tolerance. (Over 0.5 mm was reached only
+    // while the design read each cell's highest pixel, ADR-580 Amendment 2.)
+    expect(result.deepestGougeMm).toBeGreaterThan(0.35);
   });
 
   it('leaves cells outside every relief without a design', () => {
