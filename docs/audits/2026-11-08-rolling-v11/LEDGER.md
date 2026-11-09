@@ -13,7 +13,8 @@ Security findings are listed by class and severity only until their fix merges (
 | W5 | Import and export formats | origin/main @ a3965a77d (refuter a3965a77d; Node with the real importers, headless Chrome 156 for SVG ground truth) | [W5-import-export-formats.md](W5-import-export-formats.md) | 6 (incl. 14-P3-1 re-rated) | 1 | 2 (refuter) | 2 | 1 | 29 |
 | W6 | Relief and design generators | origin/main @ a3965a77d (refuter a3965a77d; Node with the real relief compiler and a G-code simulator) | [W6-relief-generators.md](W6-relief-generators.md) | 3 | 0 | 1 (refuter) | 1 | 1 | 26 |
 | W7 | G-code Inspector, Run and viewer | origin/main @ a3965a77d (refuter a3965a77d; headless Chrome with a paced simulated GRBL) | [W7-gcode-viewers-inspector.md](W7-gcode-viewers-inspector.md) | 2 | 0 | 1 (refuter) | 0 | 1 | 21 |
-| **Total so far** | | | | **27** | **2** | **7** | **5** | **13** | **168** |
+| W8 | AI features (the optional desktop assistant) | origin/main @ a3965a77d (refuter a3965a77d; stubbed provider, no real calls) | [W8-ai-features.md](W8-ai-features.md) | 2 | 0 | 0 | 0 | 2 | 7 |
+| **Total so far** | | | | **29** | **2** | **7** | **5** | **15** | **175** |
 
 ## Confirmed P1/P2 (coordinator-verified)
 
