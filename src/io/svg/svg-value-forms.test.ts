@@ -3,7 +3,7 @@ import { readSvgArtworkOrigin, SVG_ARTWORK_ORIGIN_ATTRIBUTE } from './svg-artwor
 import { inheritedSvgFillRule } from './svg-fill-rule';
 import { svgOverflow } from './svg-overflow';
 import { parseSvgPaint } from './svg-paint';
-import { svgTransformFunctions } from './svg-transform-attribute';
+import { parseSvgTransformAttribute } from './svg-transform-attribute';
 import { parseSvgLengthMmOrNull, parseSvgLengthUserUnitsOrNull } from './svg-units';
 
 // The written forms each SVG value reader accepts and refuses.
@@ -70,26 +70,19 @@ describe('SVG paint references', () => {
 });
 
 describe('SVG transform lists', () => {
-  const functions = (text: string) =>
-    svgTransformFunctions(text).map((match) => [match.index, match[1], match[2]]);
-
-  it('lists each function with its arguments, where it starts', () => {
-    expect(functions('translate(1 2) rotate (90,5,5)')).toEqual([
-      [0, 'translate', '1 2'],
-      [15, 'rotate', '90,5,5'],
-    ]);
+  // A browser reads the attribute strictly (ADR-574 Amendment 1): a function
+  // name stands alone, and a list that does not close is ignored whole.
+  it('reads functions separated by space or one comma, with space before a bracket', () => {
+    expect(parseSvgTransformAttribute('translate(1 2) rotate (90,5,5)')).not.toBeNull();
+    expect(parseSvgTransformAttribute('translate(1 2),scale(2)')).not.toBeNull();
   });
 
-  it('starts each name at its first letter', () => {
-    expect(functions('xscale(2)')).toEqual([[0, 'xscale', '2']]);
-    expect(functions('9scale(2)')).toEqual([[1, 'scale', '2']]);
-  });
-
-  it('lists only functions that close', () => {
-    expect(functions('scale(2) rotate(4')).toEqual([[0, 'scale', '2']]);
-    expect(functions('rotate(4')).toEqual([]);
-    expect(functions('scale ( calc(1) 2)')).toEqual([[0, 'scale', ' calc(1']]);
-  });
+  it.each(['xscale(2)', '9scale(2)', 'scale(2) rotate(4', 'rotate(4', 'scale ( calc(1) 2)'])(
+    'ignores %j whole',
+    (text) => {
+      expect(parseSvgTransformAttribute(text)).toBeNull();
+    },
+  );
 });
 
 describe('SVG artwork origin metadata', () => {

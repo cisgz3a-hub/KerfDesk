@@ -161,7 +161,11 @@ export function statusReportLine(state: GrblSimState): string {
     state.machine === 'Hold' ? 'Hold:0' : state.machine === 'Door' ? door : state.machine;
   const isMoving = state.machine === 'Run' || state.machine === 'Jog' || state.machine === 'Hold';
   const feed = isMoving ? Math.round(state.feed) : 0;
-  const spindle = isMoving ? Math.round(state.spindle) : 0;
+  // DISABLE_LASER_DURING_HOLD (config.h:587, on by default): in laser mode a
+  // feed hold stops the laser with the motion (protocol.c:536-540); a router's
+  // spindle keeps turning. The programmed power returns with cycle start.
+  const heldDark = state.machine === 'Hold' && state.settings.get(32) === '1';
+  const spindle = isMoving && !heldDark ? Math.round(state.spindle) : 0;
   const wco = totalWco(state);
   const overrides = grblSimOverrideField(state.overrides, state.machine === 'Door');
   // GRBL prints Pn: after FS: and only while an input is active (report.c).
