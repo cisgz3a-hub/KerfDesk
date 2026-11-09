@@ -72,7 +72,7 @@ describe('machine profile read modes', () => {
       expect(deserializeMachineProfileDocument(text, 'restore').kind).toBe('invalid');
       expect(deserializeMachineProfileDocument(text).kind).toBe('invalid');
     }
-    const newer = documentText({}, { schemaVersion: MACHINE_PROFILE_SCHEMA_VERSION + 1 });
+    const newer = documentText({}, { schemaVersion: MACHINE_PROFILE_SCHEMA_VERSION + 2 });
     expect(deserializeMachineProfileDocument(newer, 'restore').kind).toBe('schema-too-new');
   });
 });

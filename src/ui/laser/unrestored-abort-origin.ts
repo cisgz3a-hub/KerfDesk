@@ -25,6 +25,7 @@
 // X8-P3-2). The restore itself is unchanged: machine Y counts rotation.
 
 import { rotaryWrapLimitMm } from '../../core/job';
+import { rotaryOutputAxis } from '../../core/job/rotary-job';
 import { useStore } from '../state';
 import { currentJobStopRequest } from '../state/job-stop-request';
 import { inferCurrentMachinePosition } from '../state/infer-machine-position';
@@ -163,6 +164,8 @@ export async function offerRestoreAbortOrigin(
 /** The project's active rotary, or null on a flat bed or a CNC. */
 export function activeAbortOriginRotary(): AbortOriginRotary | null {
   const { device, machine } = useStore.getState().project;
+  // On A or Z (ADR-695) machine Y is the head again; the turn is not in Y.
+  if (rotaryOutputAxis(device, machine) !== null) return null;
   const turnMm = rotaryWrapLimitMm(device, machine);
   if (turnMm === null || !(turnMm > 0)) return null;
   return { turnMm, roller: device.rotary?.type === 'roller' };

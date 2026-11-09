@@ -37,6 +37,7 @@ import {
 } from './gcode-metadata';
 import { prepareOutput } from './prepare-output';
 import type { PreparedOutput } from './prepare-output';
+import { rotaryAxisFinishOptions, routeRotaryAxisBody } from './rotary-axis-emit';
 import {
   isProgramMaterializationRangeError,
   programMaterializationFailure,
@@ -150,7 +151,7 @@ export function emitPreparedGcodeWithCncPassSpans(
   // its own start instead of rapiding to work zero (arbitrary on no-homing),
   // unless preparation placed a laser finish position (ADR-493).
   const finish = {
-    ...finishOptionsForJob(job, options.jobOrigin),
+    ...rotaryAxisFinishOptions(prepared.project, finishOptionsForJob(job, options.jobOrigin)),
     laserPowerScaleVersion: prepared.laserPowerScaleVersion ?? CURRENT_LASER_POWER_SCALE_VERSION,
   };
   const emission = materializeProgram(() => {
@@ -173,13 +174,18 @@ export function emitPreparedGcodeWithCncPassSpans(
   if (emission.kind === 'too-large') {
     return { gcode: '', preflight: emission.preflight, spans: null };
   }
-  const { cnc: cncEmission, body } = emission.value;
+  const { cnc: cncEmission, body: yBody } = emission.value;
+  // ADR-695: a rotary on A or Z writes its turn under that letter. Preflight
+  // still reads the turn as Y, the rotary's machine-space slot.
+  const routed = routeRotaryAxisBody(prepared.project, yBody);
+  if (routed.kind === 'refused') return { gcode: '', preflight: routed.preflight, spans: null };
+  const body = routed.body;
   // Preflight the motion body, NOT the header — the provenance comments are
   // inert to every invariant (all strip comments) but keeping them out of the
   // preflight input makes that guarantee explicit.
   const preflight = appendFluidncLineIssues(
     appendSecondaryToolFeedIssues(
-      runEmitPreflight(prepared.project, body, options, rotaryStage),
+      runEmitPreflight(prepared.project, yBody, options, rotaryStage),
       job,
     ),
     prepared.project,

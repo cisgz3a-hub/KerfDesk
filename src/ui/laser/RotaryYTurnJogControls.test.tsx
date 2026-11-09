@@ -70,6 +70,15 @@ describe('RotaryYTurnJogControls', () => {
     expect(host?.textContent).toBe('');
   });
 
+  it('leaves a rotary on its own A or Z axis to that axis’s turn buttons (ADR-695)', async () => {
+    await render({ ...CHUCK, axis: 'A', mmPerRotation: 360 });
+    expect(host?.textContent).toBe('');
+    await act(async () => root?.unmount());
+    root = null;
+    await render({ ...CHUCK, axis: 'Z' });
+    expect(host?.textContent).toBe('');
+  });
+
   it('turns the chuck 15° per click and names the surface it moves', async () => {
     const { onJog } = await render(CHUCK);
     expect(host?.textContent).toContain('= 10.47 mm of surface');

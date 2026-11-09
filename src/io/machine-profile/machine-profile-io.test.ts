@@ -420,12 +420,12 @@ describe('LaserForge machine profile documents', () => {
       deserializeMachineProfileDocument(
         JSON.stringify({
           format: MACHINE_PROFILE_FORMAT,
-          schemaVersion: MACHINE_PROFILE_SCHEMA_VERSION + 1,
+          schemaVersion: MACHINE_PROFILE_SCHEMA_VERSION + 2,
           profile: profileWithCalibration(),
           source: { kind: 'custom', label: 'Future' },
           reviewNotes: [],
         }),
       ),
-    ).toEqual({ kind: 'schema-too-new', sawVersion: MACHINE_PROFILE_SCHEMA_VERSION + 1 });
+    ).toEqual({ kind: 'schema-too-new', sawVersion: MACHINE_PROFILE_SCHEMA_VERSION + 2 });
   });
 });

@@ -4,9 +4,12 @@
 
 import {
   rotaryUsesRollerDiameter,
+  type DedicatedRotaryAxis,
   type RotaryRevolutionTarget,
   type RotarySetup,
 } from '../../core/devices/rotary';
+import { rotaryAxisUnitLabel } from '../../core/devices/rotary-axis';
+import { AxisConfirmation, rotaryAxisTestBlockReason } from './RotaryAxisConfirmation';
 import { Button } from '../kit';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
@@ -27,10 +30,14 @@ export function RotaryTestRotationPanel(props: {
   readonly setup: RotarySetup;
   readonly valid: boolean;
   readonly test: RotaryTestControls;
+  /** The operator saw a finished turn move the rotary on this axis (ADR-695). */
+  readonly onConfirmAxis?: (axis: DedicatedRotaryAxis) => void;
 }): JSX.Element {
   const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
   const maxFeed = useStore((s) => s.project.device.maxFeed);
-  const blockReason = useLaserStore((s) => rotaryTestBlockReason(s, machineKind));
+  const controllerKind = useStore((s) => s.project.device.controllerKind);
+  const storeBlock = useLaserStore((s) => rotaryTestBlockReason(s, machineKind));
+  const blockReason = rotaryAxisTestBlockReason(props.setup, controllerKind) ?? storeBlock;
   const { view } = props.test;
   const plans = rotaryTestTargets(props.setup).map((entry) => ({
     ...entry,
@@ -67,6 +74,11 @@ export function RotaryTestRotationPanel(props: {
       <p role="status" style={hintStyle}>
         {rotaryTestStatusText(view, testable, props.setup)}
       </p>
+      <AxisConfirmation
+        setup={props.setup}
+        view={view}
+        {...(props.onConfirmAxis === undefined ? {} : { onConfirm: props.onConfirmAxis })}
+      />
       {blockReason !== null && view.kind !== 'running' ? (
         <p style={hintStyle}>{blockReason}</p>
       ) : null}
@@ -96,8 +108,9 @@ function runningText(plan: RotaryTestPlan, phase: RotaryTestPhase): string {
   if (phase === 'pausing') return 'One revolution done. Check the mark, then it turns back.';
   if (phase === 'returning') return 'Turning back to where it started.';
   return (
-    `Turning one revolution: ${formatRotaryMm(plan.travelMm)} machine mm at ` +
-    `${plan.feedMmPerMin} mm/min, about ${Math.ceil(plan.legSeconds)} s.`
+    `Turning one revolution on ${plan.axis}: ${formatRotaryMm(plan.travelMm)} ` +
+    `${rotaryAxisUnitLabel(plan.axis)} at ${plan.feedMmPerMin} ` +
+    `${plan.axis === 'A' ? '°/min' : 'mm/min'}, about ${Math.ceil(plan.legSeconds)} s.`
   );
 }
 

@@ -11,6 +11,7 @@
 import { useState } from 'react';
 import { rotaryCircumferenceMm } from '../../core/devices';
 import { rotaryWrapLimitMm } from '../../core/job';
+import { rotaryOutputAxis } from '../../core/job/rotary-job';
 import { useStore } from '../state';
 import type { JogVector } from './jog-control-policy';
 import { formatRotaryMm } from './rotary-summary';
@@ -34,6 +35,8 @@ export function RotaryYTurnJogControls(props: {
   const [stepDeg, setStepDeg] = useState<number>(DEFAULT_TURN_STEP_DEG);
   const turnMm = rotaryWrapLimitMm(device, machine);
   const rotary = device.rotary;
+  // A rotary on A or Z has its own turn buttons (ADR-695); Y would move the head.
+  if (rotaryOutputAxis(device, machine) !== null) return null;
   if (turnMm === null || !(turnMm > 0) || rotary === undefined) return null;
   const reverse = rotary.reverseAxis === true;
   const surfaceMm = (stepDeg / 360) * rotaryCircumferenceMm(rotary);

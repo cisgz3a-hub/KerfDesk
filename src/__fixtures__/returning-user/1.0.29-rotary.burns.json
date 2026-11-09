@@ -1,0 +1,35 @@
+{
+  "measuredOn": "1.0.29",
+  "rotary": {
+    "enabled": true,
+    "type": "chuck",
+    "mmPerRotation": 40,
+    "objectDiameterMm": 80
+  },
+  "burns": {
+    "absolute": {
+      "width": 60,
+      "height": 3.183,
+      "minX": 100,
+      "minY": 0,
+      "length": 141.826,
+      "dose": 52093.8
+    },
+    "current-position-center": {
+      "width": 60,
+      "height": 3.184,
+      "minX": 90,
+      "minY": 78.408,
+      "length": 141.888,
+      "dose": 52118.4
+    },
+    "user-origin-front-left": {
+      "width": 60,
+      "height": 3.183,
+      "minX": 0,
+      "minY": 0,
+      "length": 141.826,
+      "dose": 52093.8
+    }
+  }
+}
