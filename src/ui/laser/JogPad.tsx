@@ -24,6 +24,7 @@ import { JogArrowGrid } from './JogArrowGrid';
 import { JogPadAirAssist } from './JogPadAirAssist';
 import { JogSettingsRow } from './JogSettingsRow';
 import { MomentaryFireControl } from './MomentaryFireControl';
+import { RotaryTurnJogControls } from './RotaryTurnJogControls';
 import { clampJogFeed, type JogVector } from './jog-control-policy';
 import { holdJogAim } from './jog-hold-aim';
 import { useJogControlPreferences } from './jog-control-preferences';
@@ -113,6 +114,8 @@ export function JogPad({
         onStep={setStep}
         onFeed={setSelectedFeed}
       />
+      {/* X8-P3-4: a rotary turns the part in degrees, not machine mm. */}
+      <RotaryTurnJogControls disabled={arrowsDisabled} feed={feed} onJog={sendVector} />
       <FocusJogControls
         device={device}
         machineKind={machineKind}

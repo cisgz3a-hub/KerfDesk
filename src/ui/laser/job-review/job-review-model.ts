@@ -46,6 +46,7 @@ import { detectPresetCorrectionWarnings } from './preset-correction-warnings';
 import { detectStaleCatalogBitWarnings } from './stale-catalog-bit-warnings';
 import { detectParkOutsideFrameWarningsFromMetrics } from './park-outside-frame-warnings';
 import { detectRotaryRasterQualificationWarnings } from './rotary-raster-qualification-warnings';
+import { detectRotarySurfaceSpeedWarnings } from './rotary-surface-speed-warnings';
 import {
   detectStreamThroughputWarnings,
   type StreamThroughputInput,
@@ -150,6 +151,10 @@ export function buildJobReviewModel(args: JobReviewModelArgs): JobReviewModel {
         args.prepared.metrics.parkTarget,
       ),
       ...detectRotaryRasterQualificationWarnings(
+        args.prepared.prepared.project,
+        args.prepared.prepared.job,
+      ),
+      ...detectRotarySurfaceSpeedWarnings(
         args.prepared.prepared.project,
         args.prepared.prepared.job,
       ),

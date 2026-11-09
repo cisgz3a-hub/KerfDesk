@@ -39,7 +39,11 @@ export function rotaryReviewSummary(setup: RotarySetup): string {
   if (!setup.enabled) return 'Configured, disabled';
   if (!rotaryMeasurementsValid(setup))
     return 'Enabled, but its measurements are unusable: not applied';
-  return `Enabled · ${rotaryAttachmentSummary(setup)} · ${rotaryMappingSummary(setup)}`;
+  // ADR-127 Amd 2: a scaled Y gets matched feeds, so the layer speed holds on
+  // the part's surface in every direction (rolling audit v12 X8-P1-1).
+  const speed =
+    rotaryYScale(setup) === 1 ? '' : " · each move's feed holds the layer speed on the part";
+  return `Enabled · ${rotaryAttachmentSummary(setup)} · ${rotaryMappingSummary(setup)}${speed}`;
 }
 
 // At most two decimals and no trailing zeros: 60 → "60", 188.4956 → "188.5".

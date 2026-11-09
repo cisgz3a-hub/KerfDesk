@@ -21,6 +21,7 @@ import {
 } from '../gcode/motion-words';
 import { fillRunwayCommentText } from './fill-runway-comment';
 import type { LaserPowerScaleVersion } from './laser-power-scale-version';
+import { surfaceMatchedFeed, type RotaryFeedMatch } from './rotary-surface-feed';
 import {
   LINE_END,
   feedComment,
@@ -44,6 +45,8 @@ type FillGroupEmissionContext = {
   readonly device: DeviceProfile;
   readonly dialect: GrblGcodeDialect;
   readonly cursor: LaserOutputCursor;
+  /** ADR-127 Amd 2: present on a scaled rotary job. */
+  readonly rotaryFeed?: RotaryFeedMatch | undefined;
 };
 
 // One planned sweep. Seek to its entry runway with the device's laser-off
@@ -79,11 +82,22 @@ export function emitScanlineFillGroup(group: FillGroup, groupContext: FillGroupE
   return chunks.join(LINE_END) + LINE_END;
 }
 
-function emitFillSweep(plan: FillSweepPlan, context: FillSweepEmissionContext): string {
+function emitFillSweep(plan: FillSweepPlan, groupSweepContext: FillSweepEmissionContext): string {
   const spans = plan.sweep.spans;
   const first = spans[0];
   const last = spans[spans.length - 1];
   if (first === undefined || last === undefined) return '';
+  // ADR-127 Amd 2: a sweep and its runways share one line, so one feed moves
+  // the rotary's surface at the layer speed along all of it.
+  const context: FillSweepEmissionContext = {
+    ...groupSweepContext,
+    feed: surfaceMatchedFeed(
+      groupSweepContext.feed,
+      first.start,
+      last.end,
+      groupSweepContext.rotaryFeed,
+    ),
+  };
   const run = expandFillHatchWithRunways([first.start, last.end], plan);
   if (run === null) return '';
   const { device, dialect, cursor } = context;

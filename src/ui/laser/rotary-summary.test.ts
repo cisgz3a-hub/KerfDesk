@@ -54,7 +54,8 @@ describe('rotary summary', () => {
   it('tells Job Review whether and how the next job maps Y', () => {
     expect(rotaryReviewSummary({ ...ROLLER, enabled: false })).toBe('Configured, disabled');
     expect(rotaryReviewSummary({ ...ROLLER, rollerDiameterMm: 25 })).toBe(
-      'Enabled · Roller, Ø60 mm (rollers Ø25 mm) · Y ×0.51, one revolution = 96 machine mm',
+      'Enabled · Roller, Ø60 mm (rollers Ø25 mm) · Y ×0.51, one revolution = 96 machine mm' +
+        " · each move's feed holds the layer speed on the part",
     );
     expect(rotaryReviewSummary({ ...ROLLER, objectDiameterMm: 0 })).toMatch(/not applied/);
   });
