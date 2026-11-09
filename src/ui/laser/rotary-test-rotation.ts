@@ -15,9 +15,11 @@
 import type { JogParams } from '../../core/controllers/grbl';
 import {
   rotaryRevolutionTravelMm,
+  type RotaryAxis,
   type RotaryRevolutionTarget,
   type RotarySetup,
 } from '../../core/devices/rotary';
+import { rotaryAxisOf } from '../../core/devices/rotary-axis';
 import type { MachineKind } from '../../core/scene';
 import type { LaserState } from '../state/laser-store';
 import { useLaserStore } from '../state/laser-store';
@@ -37,8 +39,10 @@ export const ROTARY_TEST_PAUSE_MS = 1000;
 
 export type RotaryTestPlan = {
   readonly target: RotaryRevolutionTarget;
-  // Machine-Y mm for one revolution of the target.
+  // Commanded travel for one revolution of the target, on the rotary's axis:
+  // millimetres on Y and Z, degrees on A (ADR-693).
   readonly travelMm: number;
+  readonly axis: RotaryAxis;
   readonly feedMmPerMin: number;
   readonly legSeconds: number;
   // Out, then back by exactly the same distance.
@@ -66,6 +70,7 @@ export function planRotaryTestRotation(
 ): RotaryTestPlan | null {
   const travelMm = rotaryRevolutionTravelMm(setup, target);
   if (travelMm === null || !Number.isFinite(travelMm) || travelMm <= 0) return null;
+  const axis = rotaryAxisOf(setup);
   const paced = (travelMm * 60) / TEST_REVOLUTION_SECONDS;
   const feed = clampJogFeed(
     Math.min(TEST_MAX_FEED_MM_PER_MIN, Math.max(TEST_MIN_FEED_MM_PER_MIN, paced)),
@@ -76,11 +81,17 @@ export function planRotaryTestRotation(
     travelMm,
     feedMmPerMin: feed,
     legSeconds: (travelMm / feed) * 60,
-    legs: [
-      { dy: travelMm, feed },
-      { dy: -travelMm, feed },
-    ],
+    axis,
+    legs: [rotaryTurnJog(axis, travelMm, feed), rotaryTurnJog(axis, -travelMm, feed)],
   };
+}
+
+// One turn on the rotary's own axis (ADR-693): Y for a Y-port rotary, the
+// A or Z word for a dedicated rotary port.
+function rotaryTurnJog(axis: RotaryAxis, travel: number, feed: number): JogParams {
+  if (axis === 'A') return { da: travel, feed };
+  if (axis === 'Z') return { dz: travel, feed };
+  return { dy: travel, feed };
 }
 
 // Why the test cannot start now, or null. The jog action re-checks the same

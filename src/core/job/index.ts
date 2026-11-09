@@ -53,7 +53,12 @@ export { estimateJobDuration } from './estimate-duration';
 export { formatDuration } from './format-duration';
 export { optimizePaths } from './optimize-paths';
 export { applyRotaryYScale } from './rotary-transform';
-export { machineSpaceJob, rotaryAppliesTo, rotaryWrapLimitMm } from './rotary-job';
+export {
+  machineSpaceJob,
+  rotaryAppliesTo,
+  rotaryOutputAxis,
+  rotaryWrapLimitMm,
+} from './rotary-job';
 export {
   generateRotaryCalibrationPattern,
   type RotaryCalibrationPattern,

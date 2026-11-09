@@ -3,7 +3,8 @@
 // the post-compile checks a G-code save runs over the moves the file commands.
 
 import { encodeRdJob, type RdEncodeError } from '../../core/controllers/ruida';
-import { machineSpaceJob, type JobOriginPlacement } from '../../core/job';
+import { machineSpaceJob, rotaryOutputAxis, type JobOriginPlacement } from '../../core/job';
+import { rotaryAxisUnsupportedMessage } from '../gcode/rotary-axis-emit';
 import type { PreflightIssue, PreflightOptions } from '../../core/preflight';
 import type { OutputScope, Project } from '../../core/scene';
 import { prepareOutput, type PreparedOutput, type PrepareOutputOptions } from '../gcode';
@@ -51,6 +52,15 @@ export function emitPreparedRdFile(
 ): EmitRdResult {
   if (!prepared.ok) {
     return { ok: false, messages: prepared.preflight.issues.map((issue) => issue.message) };
+  }
+  // A Ruida rotary turns on its own Y (ADR-693): a dedicated A or Z setup has
+  // no .rd form, so it gets no file rather than one that moves the gantry.
+  const rotaryAxis = rotaryOutputAxis(prepared.project.device, prepared.project.machine);
+  if (rotaryAxis !== null) {
+    return {
+      ok: false,
+      messages: [rotaryAxisUnsupportedMessage(prepared.project, rotaryAxis) ?? ''],
+    };
   }
   // Ruida export is the twin of emitGcode: apply the same rotary machine-space
   // scaling so a saved .rd matches the streamed G-code (identity for

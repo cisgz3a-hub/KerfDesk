@@ -11,6 +11,8 @@ export type ParsedMotionWords = {
   readonly x: number | null;
   readonly y: number | null;
   readonly z: number | null;
+  /** A rotary's A word (ADR-693); only a four-axis simulator moves it. */
+  readonly a: number | null;
   readonly feed: number | null;
   readonly spindle: number | null;
   readonly setsAbsolute: boolean | null; // G90 -> true, G91 -> false
@@ -23,6 +25,7 @@ type MutableWords = {
   x: number | null;
   y: number | null;
   z: number | null;
+  a: number | null;
   feed: number | null;
   spindle: number | null;
   setsAbsolute: boolean | null;
@@ -33,6 +36,7 @@ export function parseMotionWords(body: string): ParsedMotionWords {
     x: null,
     y: null,
     z: null,
+    a: null,
     feed: null,
     spindle: null,
     setsAbsolute: null,
@@ -40,7 +44,10 @@ export function parseMotionWords(body: string): ParsedMotionWords {
   for (const match of body.matchAll(WORD_RE)) {
     applyWord(acc, (match[1] ?? '').toUpperCase(), Number.parseFloat(match[2] ?? ''));
   }
-  return { ...acc, hasMotion: acc.x !== null || acc.y !== null || acc.z !== null };
+  return {
+    ...acc,
+    hasMotion: acc.x !== null || acc.y !== null || acc.z !== null || acc.a !== null,
+  };
 }
 
 function applyWord(acc: MutableWords, letter: string, value: number): void {
@@ -48,6 +55,7 @@ function applyWord(acc: MutableWords, letter: string, value: number): void {
   if (letter === 'X') acc.x = value;
   else if (letter === 'Y') acc.y = value;
   else if (letter === 'Z') acc.z = value;
+  else if (letter === 'A') acc.a = value;
   else if (letter === 'F') acc.feed = value;
   else if (letter === 'S') acc.spindle = value;
   else if (letter === 'G' && (value === 90 || value === 91)) acc.setsAbsolute = value === 90;
@@ -94,4 +102,14 @@ export function leadingGWord(body: string): number | null {
 export function hasGWord(body: string, value: number): boolean {
   const target = String(value).replace('.', '\\.');
   return new RegExp(`(?:^|\\s)[Gg]${target}(?:\\s|$)`).test(body);
+}
+
+/** A grblHAL-style fourth axis, A, counted in its own units (ADR-693). Only
+ *  G92 offsets it; G54 is modelled for XYZ alone. */
+export type SimAAxis = { readonly mpos: number; readonly g92: number };
+
+/** Where an A word sends the fourth axis, or the axis unchanged. */
+export function resolveAAxis(axis: SimAAxis, word: number | null, isAbsolute: boolean): SimAAxis {
+  if (word === null) return axis;
+  return { ...axis, mpos: isAbsolute ? axis.g92 + word : axis.mpos + word };
 }

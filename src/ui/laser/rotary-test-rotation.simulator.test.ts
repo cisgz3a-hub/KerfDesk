@@ -42,8 +42,11 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
-async function connectIdle(falcon = false): Promise<GrblSimulator> {
-  const sim = createGrblSimulator({ motionMs: 300 });
+async function connectIdle(falcon = false, fourthAxisA = false): Promise<GrblSimulator> {
+  const sim = createGrblSimulator({
+    motionMs: 300,
+    ...(fourthAxisA ? { firmware: 'grblhal' as const, fourthAxisA: true } : {}),
+  });
   if (falcon) useStore.getState().updateDeviceProfile(FALCON_A1_PRO_GRBLHAL_PROFILE);
   const options = falcon ? connectOptionsForDevice(FALCON_A1_PRO_GRBLHAL_PROFILE) : {};
   await useLaserStore.getState().connect(sim.adapter, options);
@@ -116,6 +119,41 @@ describe('rotary test rotation on the GRBL simulator', () => {
     expect(written.some((line) => line.includes('$J='))).toBe(false);
     expect(written.filter((line) => LASER_ON_WORD.test(line))).toEqual([]);
     expect(sim.state().mpos.y).toBe(0);
+  });
+
+  // ADR-693: a rotary on a dedicated A axis turns by A words, in degrees.
+  const A_CHUCK: RotarySetup = {
+    ...DEFAULT_ROTARY_SETUP,
+    enabled: true,
+    type: 'chuck',
+    axis: 'A',
+    mmPerRotation: 360,
+  };
+
+  it('turns a rotary on A once on a four-axis grblHAL and turns it back', async () => {
+    const sim = await connectIdle(false, true);
+    const before = sim.outbound().length;
+    const plan = planRotaryTestRotation(A_CHUCK, 'drive', 6000);
+    if (plan === null) throw new Error('Expected a plan');
+
+    await expect(runToEnd(plan)).resolves.toEqual({ kind: 'done' });
+
+    const turns = sim
+      .outbound()
+      .slice(before)
+      .filter((line) => line.startsWith('$J='));
+    expect(turns).toEqual(['$J=G91 G21 A360.000 F1500\n', '$J=G91 G21 A-360.000 F1500\n']);
+    expect(sim.state().aAxis?.mpos).toBe(0);
+    expect(sim.state().mpos).toEqual({ x: 0, y: 0, z: 0 });
+  });
+
+  it('fails the turn on a three-axis GRBL, which has no A word', async () => {
+    await connectIdle();
+    const plan = planRotaryTestRotation(A_CHUCK, 'drive', 6000);
+    if (plan === null) throw new Error('Expected a plan');
+
+    const outcome = await runToEnd(plan);
+    expect(outcome.kind).toBe('failed');
   });
 
   it.each(['cancelJog', 'stopJob'] as const)(

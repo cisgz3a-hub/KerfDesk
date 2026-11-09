@@ -11,6 +11,7 @@
 
 import { firstZoneCrossedBySegment } from '../../core/preflight';
 import {
+  dedicatedRotaryAxisOf,
   isRotaryActive,
   machineBoundsForDevice,
   rotaryYLimitMm,
@@ -90,7 +91,8 @@ export function configuredMotionBounds(
   // Rotary is a laser attachment (never applied to CNC output), so a router
   // keeps the bed's own Y range.
   const rotary = machineKind === 'cnc' ? undefined : device.rotary;
-  return isRotaryActive(rotary)
+  // A rotary on A or Z leaves Y on the bed (ADR-693).
+  return isRotaryActive(rotary) && dedicatedRotaryAxisOf(rotary) === null
     ? { ...baseBounds, minY: 0, maxY: rotaryYLimitMm(rotary) }
     : baseBounds;
 }

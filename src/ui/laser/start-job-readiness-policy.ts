@@ -41,6 +41,11 @@ import { cncAccessoryStartIssue, cncOverrideStartIssue } from '../state/cnc-acce
 import { placementOf } from '../state/registration-outline-run';
 import type { StatusReportFieldsOff } from '../state/status-report-fields';
 import { detectCncParkZTopWarnings } from './cnc-park-z-top';
+import {
+  reportedAxesOf,
+  rotaryAxisMissingIssue,
+  rotaryAxisStartWarnings,
+} from './rotary-axis-start-warnings';
 import { cncWorkZeroStartIssue } from './cnc-start-advisories';
 import type { MachineStartSnapshot } from './start-job-readiness';
 
@@ -53,6 +58,8 @@ export function demotedPolicyWarnings(
   jobOrigin?: JobOriginPlacement,
 ): string[] {
   const warnings: string[] = placementWarnings(project, machine, jobOrigin);
+  // ADR-693: an A or Z rotary no one has seen turn, or an A1 Pro rotary left on Y.
+  warnings.push(...rotaryAxisStartWarnings(project));
   const machineKind = machineKindOf(project.machine);
   if (machineKind === 'cnc' && machine.cncJobsSupported === false) {
     warnings.push(CNC_REQUIRES_GRBL_MESSAGE);
@@ -333,4 +340,24 @@ function nonExecutableProgramMessages(preflight: {
   return messages.length > 0
     ? messages
     : ['The prepared job contains no executable controller commands. Nothing was framed or sent.'];
+}
+
+/** Every factual refusal of a built Start program: its integrity, and a rotary
+ * on an axis the controller's own report does not have (ADR-693). */
+export function preparedStartRefusal(
+  gcode: string,
+  preflight: Parameters<typeof preparedProgramIntegrityIssue>[2],
+  project: Pick<Project, 'device' | 'machine'>,
+  machine: Pick<MachineStartSnapshot, 'activeControllerKind' | 'statusReport'> &
+    Pick<MachineStartSnapshot, 'reportedAxisLetters'>,
+): ReadonlyArray<string> | null {
+  const integrity = preparedProgramIntegrityIssue(
+    gcode,
+    project.device.rxBufferBytes,
+    preflight,
+    machine.activeControllerKind,
+  );
+  if (integrity !== null) return integrity;
+  const axis = rotaryAxisMissingIssue(project, reportedAxesOf(machine));
+  return axis === null ? null : [axis];
 }

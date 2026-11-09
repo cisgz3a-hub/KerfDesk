@@ -51,6 +51,10 @@ const SOFT_RESET_BYTE = '\x18';
 const JOG_CANCEL_BYTE = '\x85';
 
 export type CreateGrblSimulatorOptions = Partial<GrblSimOptions> & {
+  /** A four-axis build with an A axis, as a grblHAL rotary machine has: A words
+   *  move it and reports carry it after XYZ (ADR-693). Unset: three axes, and an
+   *  A word is error:20 as on stock GRBL. */
+  readonly fourthAxisA?: boolean;
   /** Override or extend the default $$ settings table. */
   readonly settings?: ReadonlyArray<readonly [number, string]>;
   /** Emit the welcome banner when the port opens (default true). */
@@ -188,6 +192,7 @@ export function createGrblSimulator(options: CreateGrblSimulatorOptions = {}): G
     rxBufferBytes,
     jogCancelFlushesInput,
     storedOffsets,
+    fourthAxisA,
     ...optionOverrides
   } = options;
   if (jogCancelFlushesInput === true && plannerBlocks !== undefined) {
@@ -198,7 +203,10 @@ export function createGrblSimulator(options: CreateGrblSimulatorOptions = {}): G
   for (const [id, value] of settingOverrides ?? []) settings.set(id, value);
 
   const port = createFakeSerialPort();
-  let state = powerUpState(settings, homingInitLock === true, storedOffsets, opts.firmware);
+  let state = withFourthAxisA(
+    powerUpState(settings, homingInitLock === true, storedOffsets, opts.firmware),
+    fourthAxisA,
+  );
 
   const runEffect = (effect: GrblSimEffect): void => {
     if (effect.kind === 'emit') {
@@ -310,4 +318,9 @@ function powerUpState(
   return homingInitLock && settings.get(22) === '1'
     ? { ...booted, machine: 'Alarm', locked: true }
     : booted;
+}
+
+/** A four-axis build starts with A at 0 and no offset (ADR-693). */
+function withFourthAxisA(state: GrblSimState, fourthAxisA: boolean | undefined): GrblSimState {
+  return fourthAxisA === true ? { ...state, aAxis: { mpos: 0, g92: 0 } } : state;
 }

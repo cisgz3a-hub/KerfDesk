@@ -24,6 +24,7 @@ import { JogArrowGrid } from './JogArrowGrid';
 import { JogPadAirAssist } from './JogPadAirAssist';
 import { JogSettingsRow } from './JogSettingsRow';
 import { MomentaryFireControl } from './MomentaryFireControl';
+import { RotaryTurnJogControls } from './RotaryTurnJogControls';
 import { clampJogFeed, type JogVector } from './jog-control-policy';
 import { holdJogAim } from './jog-hold-aim';
 import { useJogControlPreferences } from './jog-control-preferences';
@@ -122,6 +123,7 @@ export function JogPad({
         onJog={sendFocus}
         onZeroZ={handleZeroZ}
       />
+      <RotaryTurnJogControls disabled={disabled} />
     </div>
   );
 }

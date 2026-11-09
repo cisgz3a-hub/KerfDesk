@@ -2,7 +2,7 @@
 // the machine reducer (grbl-sim-machine.ts) and the line parser
 // (grbl-sim-lines.ts). See grbl-sim-machine.ts for what is modelled.
 
-import { addVec3, SIM_ZERO_VEC3, type SimVec3 } from './grbl-sim-gcode';
+import { addVec3, SIM_ZERO_VEC3, type SimAAxis, type SimVec3 } from './grbl-sim-gcode';
 import type { GrblSimOverrides } from './grbl-sim-overrides';
 
 export type GrblSimMachineLabel =
@@ -29,6 +29,9 @@ export type GrblSimState = {
   readonly machine: GrblSimMachineLabel;
   readonly locked: boolean;
   readonly mpos: SimVec3;
+  /** A fourth axis, A, as a four-axis grblHAL build has (ADR-693). Absent on a
+   *  three-axis build, which refuses an A word with error:20. */
+  readonly aAxis?: SimAAxis;
   readonly g92: SimVec3 | null;
   readonly g54: SimVec3 | null;
   /** The selected work coordinate system `$G` reports; absent reads as G54.

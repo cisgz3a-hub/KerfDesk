@@ -9,3 +9,4 @@ export {
   deserializeMachineProfileDocument,
   serializeMachineProfileDocument,
 } from './machine-profile-io';
+export { MACHINE_PROFILE_ROTARY_AXIS_SCHEMA_VERSION } from './machine-profile-rotary-version';

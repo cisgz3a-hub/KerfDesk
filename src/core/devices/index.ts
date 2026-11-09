@@ -118,4 +118,11 @@ export {
   rotaryYLimitMm,
   rotaryYScale,
 } from './rotary';
-export type { RotarySetup, RotaryType } from './rotary';
+export type { DedicatedRotaryAxis, RotaryAxis, RotarySetup, RotaryType } from './rotary';
+export {
+  dedicatedRotaryAxisOf,
+  rotaryAxesForController,
+  rotaryAxisNeedsConfirmation,
+  rotaryAxisOf,
+  rotaryAxisSupported,
+} from './rotary-axis';
