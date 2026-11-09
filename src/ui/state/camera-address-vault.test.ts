@@ -7,7 +7,7 @@ import {
   CAMERA_LOGIN_FORMS,
   STAND_IN_SECRET,
 } from '../../core/camera/camera-login-forms.test-fixture';
-import type { CameraAddressVault } from '../../platform/types';
+import type { CameraAddressVault } from '../../core/camera/camera-address-vault';
 import {
   installCameraAddressVault,
   loadRtspCameraUrl,

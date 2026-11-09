@@ -6,7 +6,7 @@
 
 import { cameraAddressHasLogin } from '../../core/camera/camera-address-login';
 import { cameraSourceIdWithoutCredentials } from '../../core/camera/camera-capture-binding';
-import type { CameraAddressVault } from '../../platform/types';
+import type { CameraAddressVault } from '../../core/camera/camera-address-vault';
 import {
   phoneCameraAddressWithoutLogin,
   type PhoneCameraApp,

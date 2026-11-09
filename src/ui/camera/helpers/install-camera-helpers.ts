@@ -19,7 +19,6 @@ import { BROWSER_FREE_BUILD } from '../../../platform/build-capabilities';
 import { usePlatform } from '../../app/platform-context';
 import { useStore } from '../../state';
 import {
-  installCameraAddressVault,
   loadLastCameraSource,
   saveLastCameraSource,
   savePreferredCameraId,
@@ -59,15 +58,15 @@ export function installCameraHelpers(deps: CameraStartDeps): () => void {
 
 export function useCameraHelpers(): void {
   const platform = usePlatform();
-  useEffect(() => {
-    // Before anything starts a camera, so a remembered login can be found.
-    installCameraAddressVault(platform.cameraAddressVault);
-    return installCameraHelpers({
-      camera: platform.camera,
-      bridge: platform.cameraBridge,
-      bridgeAvailable: localCameraBridgeAvailable(platform.id, window.location.hostname),
-    });
-  }, [platform]);
+  useEffect(
+    () =>
+      installCameraHelpers({
+        camera: platform.camera,
+        bridge: platform.cameraBridge,
+        bridgeAvailable: localCameraBridgeAvailable(platform.id, window.location.hostname),
+      }),
+    [platform],
+  );
 }
 
 function rememberRunningCamera(): () => void {

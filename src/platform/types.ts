@@ -501,14 +501,6 @@ export type CameraBridgeAdapter = {
   readonly health: () => Promise<CameraBridgeHealth>;
 };
 
-// The remembered RTSP camera address in full, kept only in the operating
-// system's secure storage (ADR-692). Desktop only; `write` resolves false when
-// nothing could be kept there, and null forgets it.
-export type CameraAddressVault = {
-  readonly read: () => Promise<string | null>;
-  readonly write: (address: string | null) => Promise<boolean>;
-};
-
 // Unsigned desktop Preview update discovery (ADR-249). This is notification
 // only: the adapter can report a newer version and supply one fixed website
 // address, but it has no download, execute, install, or restart capability.
@@ -555,7 +547,6 @@ export type PlatformAdapter = {
   // Optional local camera bridge for RTSP/network cameras. Web-only runs can
   // report unavailable; Electron starts the bridge in the main process.
   readonly cameraBridge?: CameraBridgeAdapter;
-  readonly cameraAddressVault?: CameraAddressVault;
 
   // Installed only by the Electron renderer adapter. Main enables the endpoint
   // only for a packaged Preview; stable desktop uses its signed updater path.

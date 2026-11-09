@@ -3,7 +3,7 @@
 // app://app. Every failure reads as "nothing kept", so the camera panel falls
 // back to the public address the window remembers itself.
 
-import type { CameraAddressVault } from '../types';
+import type { CameraAddressVault } from '../../core/camera/camera-address-vault';
 
 const URL_ = 'app://app/api/camera-address/rtsp';
 const HEADER = { 'X-KerfDesk-Camera-Address': '1' };

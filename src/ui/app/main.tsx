@@ -22,6 +22,7 @@ import {
   isElectronRenderer,
 } from '../../platform/electron';
 import type { PlatformAdapter } from '../../platform/types';
+import { installCameraAddressVault } from '../state/camera-preference-storage';
 import { webAdapter } from '../../platform/web';
 import { createHttpCameraBridge } from '../../platform/web/camera-bridge';
 import { createNetworkSessionOpener } from '../../platform/web/network-serial-connection';
@@ -79,7 +80,6 @@ const adapter: PlatformAdapter = isElectronRenderer()
             // A worker streams each network session, off this thread (ADR-676).
             machineNetwork: createDesktopMachineNetwork(undefined, createNetworkSessionOpener()),
             cameraBridge: createHttpCameraBridge(() => desktopCameraBridgeConnection()),
-            cameraAddressVault: createDesktopCameraAddressVault(),
           }
         : {}),
     }
@@ -89,6 +89,11 @@ const desktopLicenceClient =
     ? createDesktopLicenceAdapter()
     : undefined;
 if (desktopLicenceClient !== undefined) startLicensedEditionLocked();
+// The remembered RTSP login lives only in the OS's secure storage (ADR-692),
+// installed before any camera can start.
+if (adapter.id === 'electron' && window.location.protocol === 'app:') {
+  installCameraAddressVault(createDesktopCameraAddressVault());
+}
 
 function prepareDesktopWorkspace(): void {
   // Native licensing routes open at the ready handshake. Start the key load
