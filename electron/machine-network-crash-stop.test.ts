@@ -108,7 +108,7 @@ describe('a renderer crash during a network job (W3-P1-1)', () => {
       const { window, crash } = crashWindow();
       installRendererCrashRecovery(window, {
         isClosing: () => false,
-        stopMachine: () => bridge.stopAll() > 0,
+        stopMachine: () => bridge.stopAll(),
         askToReload: async (prompt) => {
           prompts.push(prompt);
           return false;
@@ -136,7 +136,7 @@ describe('a renderer crash during a network job (W3-P1-1)', () => {
     const { window, crash } = crashWindow();
     installRendererCrashRecovery(window, {
       isClosing: () => true,
-      stopMachine: () => bridge.stopAll() > 0,
+      stopMachine: () => bridge.stopAll(),
       askToReload,
     });
     crash('crashed');
@@ -153,7 +153,7 @@ describe('a renderer crash during a network job (W3-P1-1)', () => {
     const { window, crash } = crashWindow();
     installRendererCrashRecovery(window, {
       isClosing: () => false,
-      stopMachine: () => bridge.stopAll() > 0,
+      stopMachine: () => bridge.stopAll(),
       askToReload: async (prompt) => {
         prompts.push(prompt);
         return false;
@@ -237,7 +237,7 @@ describe('Windows ending the session during network work (W3-P1-1, W3-P2-1)', ()
     // A laser left on at Idle reports busy, as a job does (W3-P2-1).
     activity.set({ busy: true });
     const log = vi.fn();
-    installSessionEndGuard(window, activity, log, () => bridge.stopAll(true) > 0);
+    installSessionEndGuard(window, activity, log, () => bridge.stopAll(true));
     const query = { reasons: ['shutdown'], preventDefault: vi.fn() };
     window.emit('query-session-end', query);
     expect(query.preventDefault).toHaveBeenCalledOnce();
@@ -254,7 +254,7 @@ describe('Windows ending the session during network work (W3-P1-1, W3-P2-1)', ()
     const { bridge, sessionId, wire } = await controller('grblhal-raw');
     const window = sessionEndWindow();
     const activity = createDesktopJobActivity();
-    installSessionEndGuard(window, activity, vi.fn(), () => bridge.stopAll() > 0);
+    installSessionEndGuard(window, activity, vi.fn(), () => bridge.stopAll());
     window.emit('session-end', { reasons: ['shutdown'], preventDefault: vi.fn() });
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(bytesIn(wire)).toEqual(Buffer.alloc(0));
