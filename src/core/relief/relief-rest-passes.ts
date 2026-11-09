@@ -26,9 +26,14 @@ export function reliefRestPasses(
       continue;
     }
     let run: FinishingPoint[] = [];
+    // The run's last point lies strictly inside the move being split, so the
+    // next kept piece of that move replaces it: the same straight XYZ line,
+    // one G1 instead of one per half cell (CNC audit v1 F6-P3-2, ADR-421 item 3).
+    let lastInsideMove = false;
     const flush = (): void => {
       if (run.length > 1) out.push({ ...pass, points: run, closed: false });
       run = [];
+      lastInsideMove = false;
     };
     for (let index = 1; index < pass.points.length; index += 1) {
       const a = pass.points[index - 1],
@@ -40,7 +45,9 @@ export function reliefRestPasses(
           to = pointAt(a, b, k / count);
         if (selectedAt(map, footprint, from) || selectedAt(map, footprint, to)) {
           if (run.length === 0) run.push(from);
-          run.push(to);
+          if (lastInsideMove) run[run.length - 1] = to;
+          else run.push(to);
+          lastInsideMove = k < count;
         } else flush();
       }
     }

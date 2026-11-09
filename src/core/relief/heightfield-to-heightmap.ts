@@ -5,6 +5,7 @@ import {
 } from './depth-map-base64';
 import type { PartialCellGrid } from '../grid';
 import { reliefHeightfieldDigest } from './heightfield-digest';
+import { heightfieldExactSurface } from './heightfield-exact-surface';
 import { heightfieldMetadataError } from './heightfield-metadata-validator';
 import { heightfieldTargetGrid, targetCellFraction } from './heightfield-target-grid';
 import { DEFAULT_HEIGHTMAP_CELL_MM, heightmapCellSize, type Heightmap } from './heightmap';
@@ -16,6 +17,11 @@ export type HeightfieldHeightmapOptions = {
   readonly mmPerCell?: number;
   readonly targetScaleX?: number;
   readonly targetScaleY?: number;
+  /**
+   * Relief CAM: attach the triangulated pixel-centre surface (ADR-580
+   * Amendment 2) when the field has no excluded mask area and fits the budget.
+   */
+  readonly exactSurface?: boolean;
 };
 
 export type HeightfieldMaterializationRuntime = {
@@ -78,10 +84,28 @@ export function heightfieldToHeightmap(
   }
   return {
     kind: 'ok',
-    heightmap: materialized.heightmap,
+    heightmap: withExactSurface(source, decoded, grid, materialized.heightmap, options),
     widthMm: target.widthMm,
     heightMm: target.heightMm,
   };
+}
+
+// ADR-580 Amendment 2: relief CAM reads an unexcluded field on its pixel-centre
+// surface; anything else keeps the highest pixel under each cell.
+function withExactSurface(
+  source: ReliefHeightfield,
+  decoded: DecodedHeightfield,
+  grid: PartialCellGrid,
+  heightmap: Heightmap,
+  options: HeightfieldHeightmapOptions,
+): Heightmap {
+  if (options.exactSurface !== true || heightmap.inclusion !== undefined) return heightmap;
+  const exact = heightfieldExactSurface(
+    source,
+    grid,
+    (sx, sy) => mappedDepth(source, decoded, sx, sy).depth,
+  );
+  return exact === undefined ? heightmap : { ...heightmap, ...exact };
 }
 
 type DecodedHeightfield = {
