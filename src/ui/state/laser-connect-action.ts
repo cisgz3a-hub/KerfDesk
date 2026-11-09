@@ -304,7 +304,10 @@ function reportBackgroundStreaming(
   optedOut: boolean,
 ): void {
   // Job Review warns about a lit stop only where the window refills the stream.
-  set({ jobStreamHost: connection.hostedStreaming === undefined ? 'window' : 'worker' });
+  set({
+    jobStreamHost: connection.hostedStreaming === undefined ? 'window' : 'worker',
+    connectionHost: host,
+  });
   if (connection.backgroundStreamingUnavailable !== true) {
     if (optedOut) set((state) => ({ log: pushLog(state, BACKGROUND_STREAMING_OFF_LOG) }));
     return;

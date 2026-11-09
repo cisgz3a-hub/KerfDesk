@@ -38,17 +38,19 @@ function ConfirmSavePanel(props: { readonly request: ConfirmSaveRequest }): JSX.
   );
 }
 
-// ADR-688: in a browser without file pickers Save always fails, so it is not
-// offered. Cancel leads and takes the initial focus: it keeps the work, which
-// stays in this browser's autosave.
+// ADR-688: in a browser that can neither pick nor download a file, Save always
+// fails, so it is not offered. Cancel leads and takes the initial focus: it
+// keeps the work on screen. Firefox and Safari download instead, so they get
+// the ordinary question (ADR-688 Amendment 2); this panel says plainly what an
+// autosave-only copy risks rather than calling it safe.
 function CannotSavePanel(props: { readonly request: ConfirmSaveRequest }): JSX.Element {
   const choose = useConfirmSaveStore((s) => s.choose);
   return (
     <Dialog size="sm" title="Unsaved changes" onClose={() => choose('cancel')}>
       <p style={bodyStyle}>
         {sentenceSubject(props.request.projectName)} has unsaved changes, and this browser
-        can&apos;t save files. Cancel keeps working on them here; they stay in this browser&apos;s
-        autosave. To keep them as a file, open KerfDesk in Chrome or Edge, or use the desktop app.
+        can&apos;t save files. Cancel keeps working on them here, but only in this browser&apos;s
+        autosave: the browser can delete it, and no other browser or the desktop app can see it.
       </p>
       <p style={hintStyle}>
         Don&apos;t Save discards the changes permanently and goes on to {props.request.action}.

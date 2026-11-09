@@ -15,7 +15,7 @@ import { projectWithCurrentJobSetup } from '../state/project-job-setup';
 import { clearAutosaveForDiscard } from './autosave-file-cleanup';
 import { createAutosaveProjectSnapshot } from '../state/autosave-project-snapshot';
 import { checkpointBeforeProjectDecision } from './project-decision-checkpoint';
-import { platformCanPickFiles } from './browser-file-access';
+import { platformCanSaveFiles } from './browser-file-access';
 
 export async function confirmDiscardAsync(
   platform: PlatformAdapter,
@@ -26,7 +26,7 @@ export async function confirmDiscardAsync(
   const state = useStore.getState();
   if (!state.dirty) return true;
   const documentEpoch = state.projectDocumentEpoch;
-  const canSave = platformCanPickFiles(platform);
+  const canSave = platformCanSaveFiles(platform);
   const choice = await requestChoice(state.savedName ?? 'this project', action, canSave);
   // A pending Open or recovery can replace the document while the question is
   // visible. The choice names the original document, never its replacement.

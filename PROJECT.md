@@ -52,6 +52,8 @@ User profile:
 ## Delivery targets
 
 - **Web app/PWA:** unchanged first-class delivery target on Chromium browsers (Chrome, Edge, Brave, Arc) on any OS. WebSerial provides machine connection; the File System Access API handles projects. It remains PWA-installable and fully offline (ADR-060).
+  - *Firefox and Safari:* no file pickers, so Open works only by dropping a file on the canvas, and Save, Save As and every export download the file instead (ADR-688 Amendment 2).
+  - *Keep-awake:* a browser keeps the computer awake only while the KerfDesk tab is visible, so a hidden or minimised tab can let it sleep mid-job. The app says so before a browser Start and while it happens (ADR-117 Amendment 1).
   - *Brave note:* WebSerial is shipped but Brave may gate it behind a Shields/flags toggle in some versions (upstream issue brave-browser#24404, status last re-verified 2026-05-28 — still open). Surface a one-line "Enable WebSerial in Brave settings" hint in the F-B1 connect error path.
 - **Windows desktop preview packaging:** the checked-in Preview workflow builds an unsigned KerfDesk NSIS package for Windows 10/11 x64. Publication still requires an authorized exact-version tag and recorded real-OS qualification.
 - **macOS desktop preview packaging:** the checked-in Preview workflow builds separate unsigned and unnotarized KerfDesk DMGs for macOS 13+ x64 and arm64. Publication still requires an authorized exact-version tag and recorded real-OS qualification.
