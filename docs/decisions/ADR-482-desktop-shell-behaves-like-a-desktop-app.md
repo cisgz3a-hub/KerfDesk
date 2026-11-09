@@ -2,7 +2,8 @@
 
 **Date:** 2026-09-27
 **Status:** Implemented; the crash reload amended by ADR-482 Amendment 1 (a network machine is
-stopped first, and the prompt names a lit beam). Software verification recorded below. Not yet tried on Windows hardware.
+stopped first, and the prompt names a lit beam) and Amendment 2 (the stop runs before the close
+guard, and the prompt says only what was sent). Software verification recorded below. Not yet tried on Windows hardware.
 
 This builds on ADR-024 (the Windows desktop app), ADR-117 (the Electron permission allowlist) and
 ADR-366 (desktop serial grants). It keeps every security

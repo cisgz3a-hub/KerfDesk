@@ -12,6 +12,10 @@ import {
   type ColoredPolyline,
   type ExpandOutcome,
 } from './dxf-expand';
+import {
+  importedArtworkInRange,
+  importedArtworkRangeRefusal,
+} from '../project/imported-artwork-range';
 import { joinTouchingDxfPieces } from './dxf-join-touching';
 
 // Content CAD does not display is listed after the skipped entity types, in
@@ -42,13 +46,20 @@ export function buildDxfResult(
   if (paths.length === 0) {
     return { kind: 'ok', object: null, pathCount: 0, notes, skippedSummary };
   }
+  const bounds = pathsBounds(paths);
+  // The per-entity gate cannot see the shift to the corner, INSERT placement
+  // or spline output, so the placed drawing is checked against the loader's
+  // limit here (ADR-307 Amendment 5, audit W5-P2-1).
+  if (!importedArtworkInRange(bounds, paths)) {
+    return { kind: 'error', reason: importedArtworkRangeRefusal('DXF', bounds) };
+  }
   return {
     kind: 'ok',
     object: {
       kind: 'imported-svg',
       id: args.id,
       source: args.source,
-      bounds: pathsBounds(paths),
+      bounds,
       transform: IDENTITY_TRANSFORM,
       paths,
     },

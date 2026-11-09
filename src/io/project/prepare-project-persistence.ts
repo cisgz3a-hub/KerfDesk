@@ -2,6 +2,7 @@ import type { Project } from '../../core/scene';
 import { withReferencedEmbeddedFonts } from '../../core/text/embedded-font-set';
 import { deserializeProject } from './deserialize-project';
 import { deserializeFailureReason, errorMessage } from './deserialize-failure-reason';
+import { nameRefusedSceneObject } from './refused-scene-object';
 import { serializeProject } from './serialize-project';
 import { firstPersistenceSemanticDrift } from './persistence-semantic-integrity';
 import { isTextLengthLimitError, PROJECT_TEXT_TOO_LARGE_REASON } from './project-text-limit';
@@ -28,7 +29,11 @@ export function prepareProjectForPersistence(project: Project): PreparedProjectP
 
   const validated = deserializeProject(serialized);
   if (validated.kind !== 'ok') {
-    return { kind: 'invalid', reason: deserializeFailureReason(validated) };
+    // Name the object, not the validator path (ADR-307 Amendment 5).
+    return {
+      kind: 'invalid',
+      reason: nameRefusedSceneObject(project, deserializeFailureReason(validated)),
+    };
   }
   let normalizedJson: string;
   try {

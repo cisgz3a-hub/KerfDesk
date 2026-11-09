@@ -44,6 +44,7 @@ import {
 } from './job-review-model';
 import { detectFluidncDivergenceWarnings } from './fluidnc-divergence-warnings';
 import { liveWindowStreamLitStopWarnings } from './window-stream-lit-stop-warnings';
+import { browserKeepAwakeWarnings } from './browser-keep-awake-warning';
 import { type JobReviewPurpose } from './job-review-store';
 import { refreshControllerIdentityWarnings } from '../controller-identity-warnings';
 import { appendExternalGcodePreviewWarning } from '../../state/external-gcode-preview-disclosure';
@@ -230,7 +231,8 @@ export function modelFor(bundle: ReviewedStartBundle): ReturnType<typeof buildJo
   // area when it ran (ADR-232 Amendment 1, ADR-637 Amendment 5); its findings
   // sit beside the job's.
   const frameNoGo = bundle.frameNoGoWarnings ?? [];
-  const extra = [...frameNoGo, ...frozenPower, ...fluidnc];
+  // A browser tab lets the computer sleep once it is hidden (ADR-117 Amd 1).
+  const extra = [...frameNoGo, ...frozenPower, ...fluidnc, ...browserKeepAwakeWarnings(liveLaser)];
   const disclosed =
     extra.length === 0 && litStop.length === 0
       ? baseModel

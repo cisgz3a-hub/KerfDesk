@@ -8,6 +8,7 @@
 // polylines; job compilation re-flattens native curves at the much finer
 // DEFAULT_MACHINE_CURVE_TOLERANCE_MM (compilation-polylines.ts).
 
+import { NEAR_STRAIGHT_SAGITTA_PER_CHORD } from '../../core/geometry/near-straight-arc';
 import type { Vec2 } from '../../core/scene';
 
 export const DEFAULT_FLATNESS_MM = 0.25;
@@ -127,6 +128,9 @@ export function arcToCubics(
   let rx = rxIn;
   let ry = ryIn;
   const lambda = (x1p * x1p) / (rx * rx) + (y1p * y1p) / (ry * ry);
+  if (isNearStraightSmallArc(lambda, rx, ry, arc.largeArc, Math.hypot(dx, dy) * 2)) {
+    return [straightCubic(start, end)];
+  }
   if (lambda > 1) {
     const s = Math.sqrt(lambda);
     rx *= s;
@@ -179,6 +183,39 @@ export function arcToCubics(
   const last = cubics.at(-1);
   if (last !== undefined) cubics[cubics.length - 1] = { ...last, p3: end };
   return cubics;
+}
+
+// Past float32 range Chromium refuses the path data and draws nothing (rolling
+// audit v11 W5-P3-1, refuted); those radii keep their existing handling.
+const FLOAT32_MAX = 3.4028234663852886e38;
+
+// A small arc whose radius dwarfs its chord is its chord: Chromium draws
+// A1e17 1e17 0 0 1 10 10 as a 10 x 10 line. Through its centre, ~1e16 chords
+// away, rounding bowed the cubic metres off the line (ADR-159 Amendment 3,
+// audit W5-P1-1). In the unit-circle frame the half-chord is sqrt(lambda); the
+// ellipse is at most max(rx, ry) times that frame, which bounds the sagitta.
+function isNearStraightSmallArc(
+  lambda: number,
+  rx: number,
+  ry: number,
+  largeArc: boolean,
+  chord: number,
+): boolean {
+  if (largeArc || !(lambda < 1) || chord === 0) return false;
+  if (!(Math.max(rx, ry) <= FLOAT32_MAX)) return false;
+  const unitSagitta = lambda / (1 + Math.sqrt(1 - lambda));
+  return Math.max(rx, ry) * unitSagitta <= NEAR_STRAIGHT_SAGITTA_PER_CHORD * chord;
+}
+
+function straightCubic(start: Vec2, end: Vec2): Cubic {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  return {
+    p0: start,
+    p1: { x: start.x + dx / 3, y: start.y + dy / 3 },
+    p2: { x: start.x + (2 * dx) / 3, y: start.y + (2 * dy) / 3 },
+    p3: end,
+  };
 }
 
 function arcSegmentToCubic(

@@ -5,6 +5,7 @@
 // in core/geometry/arc-sampling (shared with the G-code program parser).
 
 import { arcStepRad, sampleArcPoints } from '../../core/geometry';
+import { isNearStraightBulge } from '../../core/geometry/near-straight-arc';
 import type { Vec2 } from '../../core/scene';
 
 const FULL_TURN = Math.PI * 2;
@@ -25,7 +26,8 @@ export function bulgeSegment(p1: Vec2, p2: Vec2, bulge: number): Vec2[] {
   const dx = p2.x - p1.x;
   const dy = p2.y - p1.y;
   const chord = Math.hypot(dx, dy);
-  if (chord === 0 || bulge === 0) return [p2];
+  // The same straight test as the canonical curve, so polyline and curve agree.
+  if (chord === 0 || isNearStraightBulge(bulge)) return [p2];
   const sweep = 4 * Math.atan(bulge);
   const radius = chord / (2 * Math.sin(Math.abs(sweep) / 2));
   // Signed distance from chord midpoint to arc center along the left normal.
