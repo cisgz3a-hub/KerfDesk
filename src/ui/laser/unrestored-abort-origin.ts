@@ -18,7 +18,14 @@
 // machine zero may have moved: with homing the offer homes first and says why;
 // without homing it restores nothing, and the plain offer to set the origin at
 // the head says the saved one can no longer be put back.
+//
+// On a Y-port rotary, machine Y turns the part instead of moving the head
+// (ADR-127 Amendment 1), so the offer names that offset as degrees of turn
+// and warns that a part on rollers may have slipped (rolling audit v12
+// X8-P3-2). The restore itself is unchanged: machine Y counts rotation.
 
+import { rotaryWrapLimitMm } from '../../core/job';
+import { rotaryOutputAxis } from '../../core/job/rotary-job';
 import { useStore } from '../state';
 import { currentJobStopRequest } from '../state/job-stop-request';
 import { inferCurrentMachinePosition } from '../state/infer-machine-position';
@@ -31,6 +38,10 @@ import { formatOriginMm } from './laser-recovery-origin';
 import { repairFailed, type BlockedStartRepair } from './start-blocked-repair';
 
 type SavedMm = { readonly x: number; readonly y: number };
+
+/** An active rotary: machine Y mm per turn of the part, and whether it rides
+ *  on rollers (which can slip). */
+export type AbortOriginRotary = { readonly turnMm: number; readonly roller: boolean };
 
 export type UnrestoredAbortOrigin = {
   readonly saved: SavedMm;
@@ -93,6 +104,7 @@ export function unrestoredOriginOfferPrompt(
   headOffset: SavedMm | null,
   homeFirst: boolean,
   machineZeroMoved = false,
+  rotary: AbortOriginRotary | null = null,
 ): string {
   const where = originWhere(saved);
   const distance = machineZeroMoved
@@ -100,8 +112,10 @@ export function unrestoredOriginOfferPrompt(
       'measures it again before the origin goes back.'
     : headOffset === null
       ? 'KerfDesk cannot tell how far the head is from it.'
-      : `The head is ${formatOriginMm(Math.hypot(headOffset.x, headOffset.y))} mm from it ` +
-        `(X ${signedMm(headOffset.x)}, Y ${signedMm(headOffset.y)} mm).`;
+      : rotary === null
+        ? `The head is ${formatOriginMm(Math.hypot(headOffset.x, headOffset.y))} mm from it ` +
+          `(X ${signedMm(headOffset.x)}, Y ${signedMm(headOffset.y)} mm).`
+        : rotaryOffsetText(headOffset, rotary);
   const ok = homeFirst
     ? 'OK: home the machine (the head moves to its home switches), then put the saved origin ' +
       'back, and Frame the job from it.'
@@ -129,6 +143,7 @@ export async function offerRestoreAbortOrigin(
     headOffsetFromSavedMm(useLaserStore.getState(), saved),
     homeFirst,
     machineZeroMoved,
+    activeAbortOriginRotary(),
   );
   if (!jobAwareConfirm(prompt)) return 'unrepaired';
   try {
@@ -144,6 +159,34 @@ export async function offerRestoreAbortOrigin(
       'success',
     );
   return 'retry';
+}
+
+/** The project's active rotary, or null on a flat bed or a CNC. */
+export function activeAbortOriginRotary(): AbortOriginRotary | null {
+  const { device, machine } = useStore.getState().project;
+  // On A or Z (ADR-695) machine Y is the head again; the turn is not in Y.
+  if (rotaryOutputAxis(device, machine) !== null) return null;
+  const turnMm = rotaryWrapLimitMm(device, machine);
+  if (turnMm === null || !(turnMm > 0)) return null;
+  return { turnMm, roller: device.rotary?.type === 'roller' };
+}
+
+// X8-P3-2: X is still the head; Y is how far the part has turned.
+function rotaryOffsetText(headOffset: SavedMm, rotary: AbortOriginRotary): string {
+  const degrees = (360 * headOffset.y) / rotary.turnMm;
+  const turned =
+    Math.abs(degrees) < 0.5
+      ? 'the part is at the same turn'
+      : `the part has turned ${signedDegrees(degrees)} since (${signedMm(headOffset.y)} machine mm of Y)`;
+  const slip = rotary.roller
+    ? ' A part on rollers may also have slipped, so check where the seam is before you run.'
+    : '';
+  return `The head is ${signedMm(headOffset.x)} mm from it in X, and ${turned}.${slip}`;
+}
+
+function signedDegrees(value: number): string {
+  const text = String(Math.round(Math.abs(value)));
+  return `${value < 0 ? '−' : '+'}${text}°`;
 }
 
 function originWhere(saved: SavedMm): string {

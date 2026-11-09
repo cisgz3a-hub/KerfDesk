@@ -89,6 +89,8 @@ export function applyRotaryYScale(
   const mapCut = <T extends CutSegment>(s: T): T => mapSegment(s, map);
   return {
     ...job,
+    // ADR-127 Amd 2: the emitters match each move's feed to the surface.
+    ...(yScale === 1 ? {} : { rotarySurfaceYScale: yScale }),
     ...(job.contourEntryBounds == null
       ? {}
       : {

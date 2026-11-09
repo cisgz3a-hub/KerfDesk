@@ -572,6 +572,11 @@ export type Job = {
   readonly laserFinish?: JobLaserFinish;
   /** Placed job's anchor Y, kept by an active rotary (ADR-127 Amd 1); absent: Y 0. */
   readonly rotaryAnchorY?: number;
+  /** Machine Y mm per surface mm of a machine-space rotary job whose Y is
+   * scaled (ADR-127 Amendment 2). The laser emitters scale each move's feed by
+   * it so the part's surface moves at the layer speed. Absent on every other
+   * job, whose output is unchanged. */
+  readonly rotarySurfaceYScale?: number;
 };
 
 /** Where a laser job leaves the head (ADR-493): `point` is in this job's program

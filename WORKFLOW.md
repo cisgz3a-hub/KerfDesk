@@ -3940,7 +3940,29 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    where the cylinder is.
 4. Bounds checks keep X on the bed but check Y only by how far it spans: one turn of the object is
    the limit, and a job taller than that warns. Where the job sits in Y never warns, with or without
-   a known work offset.
+   a known work offset. The warning names the artwork's own size round the part and the turns it
+   needs, for example "The artwork wraps 270.0 mm round the part (1.07 turns), more than one turn
+   of the Ø80 mm object (251.3 mm)" (ADR-127 Amendment 2).
+
+#### Success — speed on the part (ADR-127 Amendment 2)
+1. The layer Speed is the speed across the part's surface in every direction, as on a flat bed.
+   Each burn move's F is the machine feed that gives it: a stroke round an Ø80 glass in the
+   Creality chuck (Y ×0.16) is written at 0.16 × the layer speed, a stroke along it at the layer
+   speed, and a diagonal in between.
+2. Image rows run along X and keep the layer speed and their bytes.
+3. When a roller's Y scale is above 1 and a stroke round the part would need more than the Max
+   feed, the feed stops at the Max feed and Job Review warns, naming the layer speed that keeps the
+   burn even.
+4. The ETA and the G-code Inspector read the same program, so they time and shade these strokes
+   as burned.
+
+#### Success — turning the part by hand (ADR-127 Amendment 2)
+1. With a rotary on, the jog pad shows **Turn the part**: −/+ buttons and a step of 1°, 5°, 15°,
+   30°, 45°, 90° or 180°, with the surface millimetres one step moves. Each click is one Y jog of
+   that share of a turn; "+" turns the part the way a job's increasing Y does, Reverse included.
+2. After an Abort on a rotary, Frame's offer to put the saved origin back describes the part's
+   turn in degrees ("the part has turned +111° since"), and on rollers says the part may have
+   slipped.
 
 #### Success — image rows fit the rotary's steps (ADR-315 Amendment 1)
 1. The controller places each image row on a whole Y step, and on a rotary one step turns the part
@@ -3963,7 +3985,7 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    whose measurements cannot map Y opens Rotary Setup instead of switching on.
 3. Switching changes the job's Y mapping, so a completed Frame expires. Job Review's Rotary fact
    names the mapping, for example "Enabled · Roller, Ø60 mm (rollers Ø25 mm) · Y ×0.51, one
-   revolution = 96 machine mm". Rotary stays a warning-only Job Review fact; Frame remains the
+   revolution = 96 machine mm · each move's feed holds the layer speed on the part". Rotary stays a warning-only Job Review fact; Frame remains the
    only ordinary Start gate.
 
 ---

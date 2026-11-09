@@ -50,6 +50,7 @@ import {
 } from './rotary-row-step-warnings';
 import { detectParkOutsideFrameWarningsFromMetrics } from './park-outside-frame-warnings';
 import { detectRotaryRasterQualificationWarnings } from './rotary-raster-qualification-warnings';
+import { detectRotarySurfaceSpeedWarnings } from './rotary-surface-speed-warnings';
 import {
   detectStreamThroughputWarnings,
   type StreamThroughputInput,
@@ -105,6 +106,16 @@ type JobReviewModelArgs = {
   readonly rotaryAxisSteps?: RotaryAxisStepSettings | null;
 };
 
+/** The rotary disclosures (ADR-315 and its Amendment 1, ADR-127 Amendment 2). */
+function rotaryReviewWarnings(args: JobReviewModelArgs): ReadonlyArray<string> {
+  const { project, job } = args.prepared.prepared;
+  return [
+    ...detectRotaryRowStepWarnings(project, job, args.rotaryAxisSteps),
+    ...detectRotaryRasterQualificationWarnings(project, job),
+    ...detectRotarySurfaceSpeedWarnings(project, job),
+  ];
+}
+
 export function buildJobReviewModel(args: JobReviewModelArgs): JobReviewModel {
   if (args.prepared.laserSecondPassChain !== undefined) return buildSecondPassReviewModel(args);
   const machineKind = machineKindOf(args.project.machine);
@@ -156,15 +167,7 @@ export function buildJobReviewModel(args: JobReviewModelArgs): JobReviewModel {
         args.prepared.metrics.motionBounds,
         args.prepared.metrics.parkTarget,
       ),
-      ...detectRotaryRowStepWarnings(
-        args.prepared.prepared.project,
-        args.prepared.prepared.job,
-        args.rotaryAxisSteps,
-      ),
-      ...detectRotaryRasterQualificationWarnings(
-        args.prepared.prepared.project,
-        args.prepared.prepared.job,
-      ),
+      ...rotaryReviewWarnings(args),
       ...detectArchiveCapacityWarnings(
         args.prepared,
         machineKind === 'laser',

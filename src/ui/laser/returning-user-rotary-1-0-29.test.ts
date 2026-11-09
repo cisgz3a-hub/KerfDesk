@@ -75,7 +75,8 @@ describe('a rotary project saved by 1.0.29', () => {
     if (rotary === undefined) throw new Error('no rotary');
     expect(startRotaryEdit(rotary).setup).toEqual(rotary);
     expect(rotaryReviewSummary(rotary)).toBe(
-      'Enabled · Chuck, Ø80 mm · Y ×0.16, one revolution = 40 machine mm',
+      'Enabled · Chuck, Ø80 mm · Y ×0.16, one revolution = 40 machine mm' +
+        " · each move's feed holds the layer speed on the part", // ADR-127 Amd 2
     );
   });
 
