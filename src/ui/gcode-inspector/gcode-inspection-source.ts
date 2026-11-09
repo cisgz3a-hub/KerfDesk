@@ -5,6 +5,7 @@ import {
   type DeviceProfile,
   type ControllerKind,
 } from '../../core/devices';
+import type { ExternalProgramContext } from '../../core/external-program';
 import type { MotionLimits } from '../../core/gcode-time';
 import {
   deviceMotionLimits,
@@ -51,6 +52,10 @@ export type GcodeInspectionContext = Pick<
   readonly design?: GcodeInspectionDesign;
   /** The laser the program burns with, for the burn preview (ADR-487). */
   readonly laser?: GcodeInspectionLaser;
+  /** The Run dialog's review context: a text source is reviewed where it is
+   * parsed, off the UI thread, once per program, start and context (ADR-630
+   * Amendment 9). */
+  readonly runReview?: ExternalProgramContext;
 };
 
 /** A laser's full power, its beam and any rotary the work turns on. */

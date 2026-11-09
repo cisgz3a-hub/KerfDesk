@@ -4,19 +4,26 @@
 // one policy refusal of $ commands (ADR-630 Amendment 1).
 
 import { useMemo, useState } from 'react';
-import { reviewExternalProgram, type ExternalProgram } from '../../core/external-program';
+import type { ExternalProgram, LitRapids } from '../../core/external-program';
 import { kerfDeskBitChangeLabels } from '../../core/external-program/kerfdesk-bit-changes';
-import { kerfDeskBitFile } from '../../core/external-program/kerfdesk-bit-file';
+import {
+  kerfDeskBitFile,
+  type KerfDeskBitFile,
+} from '../../core/external-program/kerfdesk-bit-file';
 import { machineKindOf } from '../../core/scene';
 import { Button, Dialog, DialogActions } from '../kit';
 import { liveLaserMaxPowerS } from '../laser/connected-laser-power-scale';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { deviceInspectionContext } from './gcode-inspection-source';
-import { hasGcodeInspectorAnalysis } from './gcode-inspector-worker-protocol';
+import type { GcodeInspectorAnalysis } from './gcode-inspector-analysis';
+import {
+  hasGcodeInspectorAnalysis,
+  type GcodeInspectorWorkerResult,
+} from './gcode-inspector-worker-protocol';
 import { useGcodeInspection } from './use-gcode-inspection';
 import type { ExternalFrame } from './external-run';
-import { prepareExternalRun } from './prepare-external-run';
+import { prepareExternalRun, type PreparedExternalRun } from './prepare-external-run';
 import { RunGcodeFileControls } from './RunGcodeFileControls';
 import { useLiveRunStart, useNormalizedProgram, type RunStart } from './use-external-program';
 import './run-gcode-file.css';
@@ -57,10 +64,14 @@ export function RunGcodeFileDialog(props: RunGcodeFileDialogProps): JSX.Element 
   );
 }
 
-// The exact sendable bytes are parsed and timed again through the existing
-// cancellable worker, from where the head stands: the first move, relative
-// moves and arcs start there. While framing, and while that Frame holds, the
-// start is pinned so the head's passing positions do not re-read the program.
+// The exact sendable bytes are parsed, timed and reviewed again through the
+// existing cancellable worker, from where the head stands: the first move,
+// relative moves and arcs start there. While framing, and while that Frame
+// holds, the start is pinned so the head's passing positions do not re-read
+// the program. This dialog re-renders on every controller, motion and
+// streamer change, through the Frame and into the stream Start begins, so no
+// render makes a whole-program pass: the worker returns the review with the
+// parse, and the prepared run is kept per inspection (ADR-630 Amendment 9).
 function InspectExternalRun(
   props: RunGcodeFileDialogProps & {
     readonly program: ExternalProgram;
@@ -75,60 +86,58 @@ function InspectExternalRun(
   const [pinned, setPinned] = useState<RunStart | null>(null);
   const [frame, setFrame] = useState<ExternalFrame | null>(null);
   const start = pinned ?? live;
+  const machineKind = machineKindOf(project.machine);
+  const { controllerKind } = props.program;
   // The sent bytes have no comments, so KerfDesk's bit-change labels are read
   // from the file as opened.
   const bitChanges = useMemo(() => kerfDeskBitChangeLabels(props.text), [props.text]);
   const bitFile = useMemo(() => kerfDeskBitFile(props.text), [props.text]);
   const source = useMemo(
     () => ({
-      ...deviceInspectionContext(
-        project.device,
-        machineKindOf(project.machine),
-        props.program.controllerKind,
-      ),
+      ...deviceInspectionContext(project.device, machineKind, controllerKind),
       kind: 'text' as const,
       text: props.program.gcode,
       boundsFromStart: true,
       ...(start === null ? {} : { initialPositionMm: start }),
+      runReview: {
+        machineKind,
+        laserMaxPowerS,
+        ...(controllerKind === undefined ? {} : { controllerKind }),
+        start: start ?? DRAWN_ORIGIN,
+        kerfDeskBitChanges: bitChanges,
+      },
     }),
-    [props.program, project.device, project.machine, start],
+    [
+      props.program.gcode,
+      controllerKind,
+      project.device,
+      machineKind,
+      start,
+      laserMaxPowerS,
+      bitChanges,
+    ],
   );
   const inspection = useGcodeInspection(source);
+  const result =
+    inspection.kind === 'ready' && inspection.source === source ? inspection.result : null;
+  const prepared = useMemo(
+    () =>
+      result === null
+        ? null
+        : prepareInspectedRun(props.name, props.program, start ?? DRAWN_ORIGIN, result, bitFile),
+    [result, props.name, props.program, start, bitFile],
+  );
   if (inspection.kind === 'error')
     return <RefusedRun reasons={[inspection.reason]} onClose={props.onClose} />;
-  if (inspection.kind !== 'ready' || inspection.source !== source)
-    return <Preparing onClose={props.onClose} />;
-  const result = inspection.result;
-  if (!hasGcodeInspectorAnalysis(result))
-    return <RefusedRun reasons={[result.parsed.reason]} onClose={props.onClose} />;
-  const prepared = prepareExternalRun(
-    props.name,
-    props.program,
-    start ?? DRAWN_ORIGIN,
-    (gcode) =>
-      reviewExternalProgram(
-        gcode,
-        result.parsed.model,
-        {
-          machineKind: machineKindOf(project.machine),
-          laserMaxPowerS,
-          ...(props.program.controllerKind === undefined
-            ? {}
-            : { controllerKind: props.program.controllerKind }),
-          start: start ?? DRAWN_ORIGIN,
-          kerfDeskBitChanges: bitChanges,
-        },
-        result.analysis.findings,
-      ),
-    bitFile,
-  );
+  if (result === null || prepared === null) return <Preparing onClose={props.onClose} />;
   return prepared.kind === 'refused' ? (
     <RefusedRun reasons={prepared.reasons} onClose={props.onClose} />
   ) : (
     <RunGcodeFileControls
       prepared={prepared}
       frameState={{ frame, onFramed: setFrame }}
-      analysis={result.analysis}
+      analysis={prepared.analysis}
+      litRapids={prepared.litRapids}
       start={start}
       onPin={setPinned}
       onClose={props.onClose}
@@ -136,6 +145,34 @@ function InspectExternalRun(
       onArming={props.onArming}
     />
   );
+}
+
+export const RUN_REVIEW_MISSING =
+  'The Inspector returned no Run review for this program. Close this dialog and choose Run on machine again.';
+
+type InspectedRun =
+  | Extract<PreparedExternalRun, { readonly kind: 'refused' }>
+  | (Extract<PreparedExternalRun, { readonly kind: 'ready' }> & {
+      readonly analysis: GcodeInspectorAnalysis;
+      readonly litRapids: LitRapids | null;
+    });
+
+// Display only: every whole-program pass behind it was made in the worker.
+function prepareInspectedRun(
+  name: string,
+  program: ExternalProgram,
+  start: RunStart,
+  result: GcodeInspectorWorkerResult,
+  bitFile: KerfDeskBitFile | null,
+): InspectedRun {
+  if (!hasGcodeInspectorAnalysis(result))
+    return { kind: 'refused', reasons: [result.parsed.reason] };
+  const { runReview } = result;
+  if (runReview === undefined) return { kind: 'refused', reasons: [RUN_REVIEW_MISSING] };
+  const prepared = prepareExternalRun(name, program, start, () => runReview.review, bitFile);
+  return prepared.kind === 'refused'
+    ? prepared
+    : { ...prepared, analysis: result.analysis, litRapids: runReview.litRapids };
 }
 
 function Preparing(props: { readonly onClose: () => void }): JSX.Element {

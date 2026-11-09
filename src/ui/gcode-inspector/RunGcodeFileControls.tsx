@@ -5,7 +5,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { streamingModeForController } from '../../core/devices';
-import { findLitRapids } from '../../core/external-program';
+import type { LitRapids } from '../../core/external-program';
 import { formatDuration } from '../../core/job/format-duration';
 import { machineKindOf } from '../../core/scene';
 import { formatLengthWithUnit } from '../display-length';
@@ -134,6 +134,8 @@ export function RunGcodeFileControls(props: {
   readonly prepared: ReadyRun;
   readonly frameState: FrameState;
   readonly analysis: GcodeInspectorAnalysis;
+  /** Read by the Inspector worker beside the review (ADR-630 Amendment 9). */
+  readonly litRapids: LitRapids | null;
   /** Null until the connected machine reports where the head stands. */
   readonly start: RunStart | null;
   readonly onPin: (start: RunStart | null) => void;
@@ -155,7 +157,6 @@ export function RunGcodeFileControls(props: {
   );
   const { frame, busy, error } = actions;
   const fitIssue = useControllerFitIssue(prepared.run.gcode);
-  const litRapids = useMemo(() => findLitRapids(prepared.run.gcode), [prepared.run.gcode]);
   // A spent or expired Frame no longer holds the start: read the program again
   // from wherever the head is now.
   const frameSpent = frame !== null && laser.frameVerification !== frame.verification;
@@ -175,7 +176,7 @@ export function RunGcodeFileControls(props: {
         analysis={props.analysis}
         machineKind={machineKindOf(project.machine)}
         startKnown={props.start !== null}
-        controllerWarnings={externalControllerWarnings(project, laser, litRapids)}
+        controllerWarnings={externalControllerWarnings(project, laser, props.litRapids)}
         bedWarnings={[
           ...externalOutlineBedWarnings(prepared.run.envelope, laser, project.device),
           ...externalZTopWarnings(prepared.review.zLifts, laser, project),
