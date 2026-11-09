@@ -170,9 +170,9 @@ function prepareInspectedRun(
   const { runReview } = result;
   if (runReview === undefined) return { kind: 'refused', reasons: [RUN_REVIEW_MISSING] };
   const prepared = prepareExternalRun(name, program, start, () => runReview.review, bitFile);
-  return prepared.kind === 'refused'
-    ? prepared
-    : { ...prepared, analysis: result.analysis, litRapids: runReview.litRapids };
+  if (prepared.kind === 'refused') return prepared;
+  const { litRapids } = runReview;
+  return { ...prepared, run: { ...prepared.run, litRapids }, analysis: result.analysis, litRapids };
 }
 
 function Preparing(props: { readonly onClose: () => void }): JSX.Element {

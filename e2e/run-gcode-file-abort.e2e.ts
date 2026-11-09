@@ -6,7 +6,11 @@
 // during a Frame and 0.54-0.66 s late once the beam-on stream had begun. The
 // paced GRBL stand-in stamps the first jog and the first beam-on line, and
 // logs every realtime byte with its time; Ctrl+. is sent from Node so the
-// press time does not wait for the page.
+// press time does not wait for the page. A CPU profile of the page's own
+// thread, from the Frame click until the dialog has gone, must hold no sample
+// of a whole-program pass: the review and the lit-rapid scan run in the
+// Inspector worker. That holds on any machine, where a time bound on the
+// page's other work (Start's preparation, the Abort's teardown) would not.
 
 import type { CDPSession } from '@playwright/test';
 import { readFileSync } from 'node:fs';
@@ -27,16 +31,16 @@ const NAME = 'photo.nc';
 // From the press to the controller. Before the fix: 539-661 ms in the stream
 // and 5,874 ms in a Frame; after it, tens of milliseconds on this route.
 const ABORT_BOUND_MS = 300;
-// The longest UI-thread task after the first jog or beam-on line. Before the
-// fix every render held the thread 1.0-1.4 s (up to 6.7 s in a Frame).
-const STALL_BOUND_MS = 600;
+// The Run dialog's whole-program passes, which belong in the worker.
+const WHOLE_PROGRAM_PASSES = ['reviewExternalProgram', 'findLitRapids'];
+// A function the page runs on purpose, so a profile that saw nothing fails.
+const PROFILE_PROBE = 'runReviewProfileProbe';
 const SOFT_RESET = 0x18;
 const JOG_CANCEL = 0x85;
 
 interface Sample {
   readonly watchedAt: number | null;
   readonly realtime: readonly { readonly byte: number; readonly t: number }[];
-  readonly longTasks: readonly { readonly start: number; readonly end: number }[];
 }
 
 async function openRunDialog(page: Page, blocksPerSecond: number): Promise<void> {
@@ -45,20 +49,6 @@ async function openRunDialog(page: Page, blocksPerSecond: number): Promise<void>
     content: `window.__PACED_GRBL_CONFIG__ = { blocksPerSecond: ${blocksPerSecond} };`,
   });
   await page.addInitScript({ content: pacedSerialSource });
-  await page.addInitScript(() => {
-    const tasks: { start: number; end: number }[] = [];
-    (window as unknown as { __RUN_LONG_TASKS__: typeof tasks }).__RUN_LONG_TASKS__ = tasks;
-    try {
-      new PerformanceObserver((list) => {
-        for (const entry of list.getEntries()) {
-          const start = performance.timeOrigin + entry.startTime;
-          tasks.push({ start, end: start + entry.duration });
-        }
-      }).observe({ type: 'longtask', buffered: true });
-    } catch {
-      // No Long Tasks API: the Abort bound still applies.
-    }
-  });
   await page.goto('/');
   await expectToolbarCommandVisible(page, 'Open...', { timeout: 180_000 });
   const notifications = page.getByRole('button', { name: /^Dismiss notification:/ });
@@ -148,7 +138,6 @@ function sample(page: Page): Promise<Sample> {
         realtime: { byte: number; t: number }[];
         watchedLine: () => { at: number | null } | null;
       };
-      __RUN_LONG_TASKS__: { start: number; end: number }[];
     };
     const at = scope.__PACED_GRBL__.watchedLine()?.at ?? null;
     return {
@@ -157,7 +146,6 @@ function sample(page: Page): Promise<Sample> {
         byte: entry.byte,
         t: performance.timeOrigin + entry.t,
       })),
-      longTasks: scope.__RUN_LONG_TASKS__,
     };
   });
 }
@@ -170,13 +158,48 @@ function abortDelay(data: Sample, pressedAt: number, bytes: readonly number[]): 
   return reached === undefined ? null : Math.round(reached.t - pressedAt);
 }
 
-/** The longest stretch the UI thread was held after `from`. */
-function longestStallAfter(data: Sample, from: number): number {
-  return data.longTasks.reduce(
-    (longest, task) => Math.max(longest, Math.round(task.end - Math.max(task.start, from))),
-    0,
-  );
+async function startProfile(cdp: CDPSession): Promise<void> {
+  await cdp.send('Profiler.enable');
+  await cdp.send('Profiler.start');
 }
+
+/** Profile samples on the page's thread inside each whole-program pass, and
+ * inside the probe the page runs just before the profile stops. */
+async function wholeProgramPassSamples(
+  page: Page,
+  cdp: CDPSession,
+): Promise<{ readonly passes: Record<string, number>; readonly probe: number }> {
+  await page.evaluate(() => {
+    const runReviewProfileProbe = (): void => {
+      const until = performance.now() + 30;
+      while (performance.now() < until) {
+        // Spin: the profile must sample this.
+      }
+    };
+    runReviewProfileProbe();
+  });
+  const { profile } = await cdp.send('Profiler.stop');
+  const nodes = new Map(profile.nodes.map((node) => [node.id, node]));
+  const parents = new Map<number, number>();
+  for (const node of profile.nodes) {
+    for (const child of node.children ?? []) parents.set(child, node.id);
+  }
+  const counts: Record<string, number> = Object.fromEntries(
+    [...WHOLE_PROGRAM_PASSES, PROFILE_PROBE].map((name) => [name, 0]),
+  );
+  for (const sampled of profile.samples ?? []) {
+    const seen = new Set<string>();
+    for (let at: number | undefined = sampled; at !== undefined; at = parents.get(at)) {
+      const name = nodes.get(at)?.callFrame.functionName ?? '';
+      if (name in counts) seen.add(name);
+    }
+    for (const name of seen) counts[name] = (counts[name] ?? 0) + 1;
+  }
+  const { [PROFILE_PROBE]: probe = 0, ...passes } = counts;
+  return { passes, probe };
+}
+
+const NO_PASSES = Object.fromEntries(WHOLE_PROGRAM_PASSES.map((name) => [name, 0]));
 
 test('Ctrl+. stops a large file Frame promptly', async ({ page }) => {
   test.setTimeout(600_000);
@@ -184,19 +207,22 @@ test('Ctrl+. stops a large file Frame promptly', async ({ page }) => {
   await openRunDialog(page, 4);
   const cdp = await page.context().newCDPSession(page);
   await watchLine(page, '^\\$J=');
+  await startProfile(cdp);
   await runDialog(page).getByRole('button', { name: 'Frame', exact: true }).click();
   await waitForWatchedLine(page);
   const pressedAt = await pressAbort(cdp);
   await page.waitForTimeout(2_500);
+  const { passes, probe } = await wholeProgramPassSamples(page, cdp);
   const data = await sample(page);
   const delay = abortDelay(data, pressedAt, [JOG_CANCEL, SOFT_RESET]);
-  const stall = longestStallAfter(data, data.watchedAt ?? pressedAt);
-  test
-    .info()
-    .annotations.push({ type: 'frame-abort', description: `${delay} ms; stall ${stall} ms` });
+  test.info().annotations.push({
+    type: 'frame-abort',
+    description: `${delay} ms; page-thread passes ${JSON.stringify(passes)}`,
+  });
+  expect(probe).toBeGreaterThan(0);
+  expect(passes).toEqual(NO_PASSES);
   expect(delay).not.toBeNull();
   expect(delay).toBeLessThanOrEqual(ABORT_BOUND_MS);
-  expect(stall).toBeLessThanOrEqual(STALL_BOUND_MS);
 });
 
 test('Ctrl+. stops a large file stream promptly as the beam comes on', async ({ page }) => {
@@ -204,6 +230,7 @@ test('Ctrl+. stops a large file stream promptly as the beam comes on', async ({ 
   await openRunDialog(page, 500);
   const dialog = runDialog(page);
   const cdp = await page.context().newCDPSession(page);
+  await startProfile(cdp);
   await dialog.getByRole('button', { name: 'Frame', exact: true }).click();
   const start = dialog.getByRole('button', { name: 'Start', exact: true });
   await expect(start).toBeEnabled({ timeout: 300_000 });
@@ -213,15 +240,19 @@ test('Ctrl+. stops a large file stream promptly as the beam comes on', async ({ 
   // waiting on the recovery retirement, and re-renders on each store change.
   await waitForWatchedLine(page);
   const pressedAt = await pressAbort(cdp);
-  await page.waitForTimeout(3_000);
+  // Start resolves after the recovery retirement, then the dialog closes.
+  await expect(dialog).toBeHidden({ timeout: 120_000 });
+  await page.waitForTimeout(1_000);
+  const { passes, probe } = await wholeProgramPassSamples(page, cdp);
   const data = await sample(page);
   expect(data.watchedAt).not.toBeNull();
   const delay = abortDelay(data, pressedAt, [SOFT_RESET]);
-  const stall = longestStallAfter(data, data.watchedAt ?? pressedAt);
-  test
-    .info()
-    .annotations.push({ type: 'stream-abort', description: `${delay} ms; stall ${stall} ms` });
+  test.info().annotations.push({
+    type: 'stream-abort',
+    description: `${delay} ms; page-thread passes ${JSON.stringify(passes)}`,
+  });
+  expect(probe).toBeGreaterThan(0);
+  expect(passes).toEqual(NO_PASSES);
   expect(delay).not.toBeNull();
   expect(delay).toBeLessThanOrEqual(ABORT_BOUND_MS);
-  expect(stall).toBeLessThanOrEqual(STALL_BOUND_MS);
 });

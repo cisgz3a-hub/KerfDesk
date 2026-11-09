@@ -46,7 +46,10 @@ reports `Run`. The refuter measured it in Chrome with a paced GRBL stand-in at 5
    somewhere new, a CNC Frame that leaves the bit at safe Z, another controller, machine mode,
    device or `$30`. Each is a new worker inspection, during which the dialog says it is preparing
    the program.
-4. A result with analysis but no review cannot happen on this path; if it ever did, the dialog
+4. **Start reuses the worker's lit rapids.** The prepared run carries them (`ExternalRun.litRapids`),
+   so the `$30`/`$32` acknowledgement at Start (`externalLaserModeStartPrompt`) does not scan the
+   program again. A caller without them still scans.
+5. A result with analysis but no review cannot happen on this path; if it ever did, the dialog
    refuses with a reason (`RUN_REVIEW_MISSING`) rather than make the pass on the UI thread.
 
 ### Not in this decision
@@ -54,8 +57,10 @@ reports `Run`. The refuter measured it in Chrome with a paced GRBL stand-in at 5
 - The dialog still stays open after Start until the recovery retirement finishes (ADR-630): with
   no whole-program pass in its renders, closing it earlier changes nothing the operator can feel,
   and the lock that keeps Close from hiding an arming Start stays as it is.
-- The one-off passes at the Start click, before any byte is sent (the laser-mode and CNC
-  confirmations, `startJob`'s preparation), belong to performance audit S1-P2-2 and S4.
+- The other one-off passes at the Start click, before any byte is sent, belong to performance audit
+  S1-P2-2 and S4: `startJob`'s preparation and, in `installInitialStream`, the scan of every line
+  for the controller state an opened program may change (`externalProgramControllerStatePatch`,
+  Amendment 6). In a 6x CPU-throttled profile that scan was about 1.1 s of the Start task.
 
 ### Verification
 
@@ -65,13 +70,17 @@ reports `Run`. The refuter measured it in Chrome with a paced GRBL stand-in at 5
   cleared, shell renders), where main's dialog made 9 and 8. A new rest position reads it again.
 - `e2e/run-gcode-file-abort.e2e.ts` opens a 500k-line photo-shaped file on the paced GRBL
   stand-in and presses Ctrl+. from Node (a) as the Frame's first jog is written and (b) as the
-  stream's beam-on line is written. Each must reach the controller within 300 ms, with no UI task
-  longer than 600 ms after that line. The paced stand-in gained `watchLine` / `watchedLine` for
-  those stamps.
+  stream's beam-on line is written. Each must reach the controller within 300 ms. A CPU profile of
+  the page's own thread, from the Frame click until the dialog has gone, must hold no sample inside
+  `reviewExternalProgram` or `findLitRapids`, and must sample a probe the page runs on purpose,
+  so an empty profile fails. That check holds on any runner. A first version bounded every UI
+  task after the beam-on line at 600 ms instead; on CI it caught the Abort's own teardown (3.5 s
+  on the software-GL runner, after the press) and Start's preparation, neither of them this
+  dialog. The paced stand-in gained `watchLine` / `watchedLine` for the stamps.
 - Measured on the maintainer's PC (Vite dev server, React StrictMode, window serial route):
-  - with this change, the jog cancel reached the controller 45 ms after the press during the Frame
-    (longest UI task after the first jog 83 ms), and the soft reset 18 ms after it in the stream
-    (longest task after the beam-on line 126 ms);
+  - with this change, the jog cancel reached the controller 45-83 ms after the press during the
+    Frame and the soft reset 18-37 ms after it in the stream, with no page-thread sample of either
+    pass;
   - with main's dialog the same spec fails: the Frame's first jog was not written within 180 s of
     the click, and Start was not unlocked within 300 s, because each render's review blocked the
     Frame's next step (StrictMode doubles each render in development; the refuter's single-render

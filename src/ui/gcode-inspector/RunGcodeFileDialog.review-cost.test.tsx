@@ -173,6 +173,8 @@ describe('Run dialog review cost (ADR-630 Amendment 9)', () => {
     expect(startJob).toHaveBeenCalledOnce();
     expect(onStarted).toHaveBeenCalledOnce();
     expect(reviews).toHaveBeenCalledTimes(1);
+    // Start's laser-mode acknowledgement reuses the worker's lit-rapid scan.
+    expect(litRapidScans).toHaveBeenCalledTimes(1);
   });
 
   it('reviews again when the head comes to rest somewhere new', async () => {
