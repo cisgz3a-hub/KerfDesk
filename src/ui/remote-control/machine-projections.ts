@@ -25,6 +25,8 @@ import { RemoteFault } from './fault';
 import { useCameraStore } from '../state/camera-store';
 import { describeLiveJobTiming } from '../state/live-job-timing';
 import { disconnectMachineBlockMessage } from './machine-actions';
+import { REMOTE_POLICY_MESSAGE_MAX, remoteResumeAdvisory } from './machine-resume-advisory';
+import { safeLabel } from './projections';
 
 type Laser = ReturnType<typeof useLaserStore.getState>;
 type App = ReturnType<typeof useStore.getState>;
@@ -171,7 +173,14 @@ function jobProjection(laser: Laser): Record<string, unknown> {
       ? null
       : (stream.completed / stream.queued.length) * 100;
   const state = jobState(laser, active);
-  return { active, state, ...(finite(progress, 0, 100) ? { progressPercent: progress } : {}) };
+  const resumeAdvisory = remoteResumeAdvisory(laser);
+  return {
+    active,
+    state,
+    ...(finite(progress, 0, 100) ? { progressPercent: progress } : {}),
+    // The PC's paused-CNC Resume warning, word for word (W2-P2-1).
+    ...(resumeAdvisory === null ? {} : { resumeAdvisory }),
+  };
 }
 function jobState(laser: Laser, active: boolean) {
   if (laser.controllerOperation?.kind === 'start-arming') return 'starting';
@@ -249,16 +258,26 @@ export function machineOperationProjection(
     committed: operation.committed,
     ...(operation.message === undefined
       ? {}
-      : {
-          message:
-            operation.privateMessage === true && options.canShareArtwork?.() !== true
-              ? 'Review this preparation problem in KerfDesk on the PC.'
-              : projectMessage(operation.message, 'Check this operation in KerfDesk on the PC.'),
-        }),
+      : { message: operationMessage(operation, operation.message, options, projectMessage) }),
     ...(operation.review === undefined
       ? {}
       : { review: reviewProjection(operation.review, options, page) }),
   };
+}
+function operationMessage(
+  operation: OwnedMachineOperation,
+  message: string,
+  options: RemoteControlOptions,
+  projectMessage: (value: string, fallback: string) => string,
+): string {
+  const fallback = 'Check this operation in KerfDesk on the PC.';
+  // The CNC Resume advisory is fixed policy text with no artwork in it: a scene label
+  // that happens to read "cut" or "bit" must not hide it (ADR-585 Amendment 2).
+  if (operation.policyMessage === true)
+    return safeLabel(message, fallback, REMOTE_POLICY_MESSAGE_MAX);
+  if (operation.privateMessage === true && options.canShareArtwork?.() !== true)
+    return 'Review this preparation problem in KerfDesk on the PC.';
+  return projectMessage(message, fallback);
 }
 function reviewProjection(
   review: NonNullable<OwnedMachineOperation['review']>,
