@@ -9,6 +9,9 @@
 //                       laser output bit-identical at clearance 0
 //   determinism         same spec ⇒ JSON-identical output, twice
 //   cutouts             multi-ring fit invariants (ADR-116 V1)
+//   dividers            slot/tab/lap complementarity, open fronts included
+//   slide-lid           channel, front, tongue and lid (ADR-116 V3, Amd 1)
+//   lift-lid            body joints, lid footprint, lip play (ADR-693)
 //   sabotage-detection  the referee FAILS on all four broken-math classes
 // Run alone for the scorecard:
 //   pnpm exec vitest run src/__fixtures__/property/box-benchmark.test.ts
@@ -24,11 +27,12 @@ import {
   generateFitCoupon,
   type FitCouponSpec,
 } from '../../core/box/fit-coupon';
-import type { BoxSpec } from '../../core/box/box-spec';
 import { generateBox } from '../../core/box/generate-box';
 import { buildPanelClaims } from '../../core/box/panel-claims';
 import { panelOutline } from '../../core/box/panel-outline';
 import { applyPanelFit } from '../../core/box/panel-fit';
+import { validateBoxSpec, type BoxSpec } from '../../core/box/box-spec';
+import { scoreLiftLid } from './box-benchmark-lift-lid';
 import {
   BENCHMARK_SEED,
   composeDividerInput,
@@ -63,6 +67,7 @@ describe('box generator benchmark', () => {
         scoreCutouts(),
         scoreDividers(),
         scoreSlideLid(),
+        scoreLiftLid(),
         scoreFitCoupon(),
         scoreSabotageDetection(),
       ];
@@ -245,13 +250,15 @@ function scoreDividers(): Score {
   ];
   let passed = 0;
   let total = 0;
-  for (const style of ['closed', 'open-top'] as const) {
+  for (const style of ['closed', 'open-top', 'open-front'] as const) {
     for (const [nx, ny] of grids) {
       const gridSpec: BoxSpec = {
         ...spec(120, 90, 40, 3, 9, style),
         dividersXCount: nx,
         dividersYCount: ny,
       };
+      // An open front rejects dividers across its depth (ADR-693).
+      if (validateBoxSpec(gridSpec).kind !== 'valid') continue;
       total += 1;
       if (checkDividerAssembly(composeDividerInput(gridSpec), gridSpec).length === 0) passed += 1;
       total += 1;

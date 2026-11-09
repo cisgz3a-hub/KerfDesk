@@ -6,7 +6,11 @@
 // corner-centred overcut did.
 
 import { describe, expect, it } from 'vitest';
-import { bitReachesSeatCorners } from '../../__fixtures__/property/box-benchmark-support';
+import {
+  bitReachesSeatCorners,
+  minDistance,
+} from '../../__fixtures__/property/box-benchmark-support';
+import { profileToolpathPolylines } from '../cnc/profile-paths';
 import type { BoxSpec } from './box-spec';
 import { generateFitCoupon } from './fit-coupon';
 import { generateBox, type BoxPanel } from './generate-box';
@@ -40,21 +44,52 @@ function unreachedParts(spec: BoxSpec, toolMm: number): string[] {
   });
   return relieved.flatMap((panel, index) => {
     const nominal = plain[index];
-    // The loose lid's thumb notch is a handhold, never a seat.
+    // The slide lid's thumb-notch arc is a handhold, never a seat; its
+    // tongue shoulders are checked on their own below.
     if (nominal === undefined || panel.panel === 'lid') return [];
     return bitReachesSeatCorners(nominal, panel, toolMm) ? [] : [panel.name];
   });
 }
 
 describe('CNC corner relief — the compensated bit reaches every seat corner', () => {
-  for (const style of ['closed', 'open-top', 'slide-lid'] as const) {
+  for (const style of ['closed', 'open-top', 'slide-lid', 'lift-lid', 'open-front'] as const) {
     for (const clearanceMm of [0.15, 0.3]) {
       it(`${style} box with dividers at ${clearanceMm} mm clearance`, () => {
-        const spec: BoxSpec = { ...BASE, style, clearanceMm, dividersXCount: 2, dividersYCount: 1 };
+        // An open front takes dividers across its width only.
+        const dividersYCount = style === 'open-front' ? 0 : 1;
+        const spec: BoxSpec = { ...BASE, style, clearanceMm, dividersXCount: 2, dividersYCount };
         expect(unreachedParts(spec, TOOL_MM)).toEqual([]);
       });
     }
   }
+
+  it('reaches both slide-lid tongue shoulders so the lid seats on the posts (ADR-116 Amd 1)', () => {
+    const clearanceMm = 0.15;
+    const spec: BoxSpec = { ...BASE, style: 'slide-lid', clearanceMm };
+    const lid = panelsOf({
+      ...spec,
+      relief: { kind: 'corner-overcut', toolDiameterMm: TOOL_MM },
+    }).find((panel) => panel.panel === 'lid');
+    expect(lid).toBeDefined();
+    if (lid === undefined) return;
+    const local = (ring: BoxPanel['outline']): BoxPanel['outline'] => ({
+      closed: ring.closed,
+      points: ring.points.map((p) => ({ x: p.x - lid.offsetMm.x, y: p.y - lid.offsetMm.y })),
+    });
+    const toolPath = profileToolpathPolylines([local(lid.outline)], 'outside', TOOL_MM);
+    expect(toolPath).toHaveLength(1);
+    const path = toolPath[0]!;
+    const closed = { ...path, points: [...path.points, path.points[0]!] };
+    // Inner 100 × 80, T = 6: outer 112 × 92, shoulders at 92 − 12 = 80. The
+    // fit offset moves each reflex corner c/4 into the material on both axes.
+    const inset = clearanceMm / 4;
+    for (const corner of [
+      { x: 6 + inset, y: 80 - inset },
+      { x: 112 - 6 - inset, y: 80 - inset },
+    ]) {
+      expect(minDistance(corner, closed)).toBeLessThanOrEqual(TOOL_MM / 2 + 2e-3);
+    }
+  });
 
   it('holds for a 1/8 in bit in thin stock and a 6 mm bit in thick stock', () => {
     expect(

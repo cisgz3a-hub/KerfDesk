@@ -1,4 +1,4 @@
-import { deriveBoxDims, type BoxSpec } from './box-spec';
+import { deriveBoxDims, wallHeightMm, type BoxSpec } from './box-spec';
 import { edgePattern } from './edge-pattern';
 
 const MAX_COUNT = Number.MAX_SAFE_INTEGER;
@@ -36,7 +36,7 @@ export function estimateBoxWork(spec: BoxSpec): BoxWorkEstimate {
   const dims = deriveBoxDims(spec);
   const x = patternCount(spec, dims.outerWidthMm, 'axisCells.x', saturated);
   const y = patternCount(spec, dims.outerDepthMm, 'axisCells.y', saturated);
-  const z = patternCount(spec, dims.outerHeightMm, 'axisCells.z', saturated);
+  const z = patternCount(spec, wallHeightMm(spec, dims), 'axisCells.z', saturated);
   const dx = inputCount(spec.dividersXCount ?? 0, 'dividersX', saturated);
   const dy = inputCount(spec.dividersYCount ?? 0, 'dividersY', saturated);
   const dividerCount = sum('dividerCount', [[dx], [dy]], saturated);
@@ -47,7 +47,14 @@ export function estimateBoxWork(spec: BoxSpec): BoxWorkEstimate {
   const dividerVisits = product('dividerCellVisits', [dividerCount, junction], saturated);
   const crossLaps = product('crossLapPairs', [dx, dy], saturated);
   const parts = sum('predictedParts', [[literal(basePartCount(spec))], [dividerCount]], saturated);
-  const rings = sum('predictedRings', [[parts], [literal(2), dividerCount, tabCells]], saturated);
+  // Each divider slots both walls it meets; an open front has no front wall
+  // for its X-dividers to slot (ADR-693).
+  const xSlottedWalls = literal(spec.style === 'open-front' ? 1 : 2);
+  const rings = sum(
+    'predictedRings',
+    [[parts], [xSlottedWalls, dx, tabCells], [literal(2), dy, tabCells]],
+    saturated,
+  );
   const nominalPoints = nominalPointUpper(
     spec,
     { x, y, z, dividerCount, tabCells, dx, dy },
@@ -95,7 +102,8 @@ function claimCellVisits(
   z: Count,
   saturated: Set<string>,
 ): Count {
-  return spec.style === 'closed'
+  // An open front drops one panel of a closed box, so the closed count bounds it.
+  return spec.style === 'closed' || spec.style === 'open-front'
     ? sum(
         'claimCellVisits',
         [
@@ -147,23 +155,26 @@ function baseOutlinePointUpper(
   saturated: Set<string>,
 ): Count {
   const { x, y, z } = counts;
-  if (spec.style === 'closed') {
+  if (spec.style === 'closed' || spec.style === 'open-front') {
     return sum(
       'nominalPointUpper',
       [[literal(16), x], [literal(16), y], [literal(16), z], [literal(78)]],
       saturated,
     );
   }
-  if (spec.style === 'open-top') {
+  if (spec.style === 'open-top' || spec.style === 'lift-lid') {
+    // A lift-off lid adds two closed rectangles (5 points each) to its body.
+    const lidPoints = spec.style === 'lift-lid' ? 10 : 0;
     return sum(
       'nominalPointUpper',
-      [[literal(8), x], [literal(8), y], [literal(16), z], [literal(73)]],
+      [[literal(8), x], [literal(8), y], [literal(16), z], [literal(73 + lidPoints)]],
       saturated,
     );
   }
+  // Slide lid: the lid's tongue adds four points (ADR-116 Amd 1).
   return sum(
     'nominalPointUpper',
-    [[literal(8), x], [literal(8), y], [literal(12), z], [literal(88)]],
+    [[literal(8), x], [literal(8), y], [literal(12), z], [literal(92)]],
     saturated,
   );
 }
@@ -176,8 +187,16 @@ function fitMode(spec: BoxSpec): BoxWorkEstimate['fitMode'] {
   return hasRelief ? 'relief' : 'identity';
 }
 
+const BASE_PART_COUNT: Readonly<Record<BoxSpec['style'], number>> = {
+  closed: 6,
+  'open-top': 5,
+  'slide-lid': 6,
+  'lift-lid': 7,
+  'open-front': 5,
+};
+
 function basePartCount(spec: BoxSpec): number {
-  return spec.style === 'open-top' ? 5 : 6;
+  return BASE_PART_COUNT[spec.style];
 }
 
 function inputCount(value: number, field: string, saturated: Set<string>): Count {

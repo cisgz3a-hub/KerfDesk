@@ -8853,8 +8853,12 @@ as the pane's design record.
    loose lid with a half-round thumb notch on its leading edge.
 2. The side-wall channels run from the front edge to one thickness
    inside the wall body; the assembled lid slides over the shortened
-   front and stops against the in-wall post (the captive top strip stays
-   fingered into the back wall).
+   front and its shoulders stop against the in-wall posts (the captive
+   top strip stays fingered into the back wall). A tongue one inner width
+   wide runs on between the posts to the back wall, so the lid band has
+   no slit at the back and the lid cannot wander sideways (ADR-116
+   Amd 1). In CNC mode the tongue shoulders get dogbones; the thumb notch
+   never does.
 3. The lid and its slots are sized with the mandatory play so the lid
    physically slides; laser default clearance rises to 0.2 mm for this
    style (CNC keeps 0.15 mm).
@@ -8926,6 +8930,65 @@ as the pane's design record.
 
 1. Without a 2D context (headless/jsdom) the preview renders an empty
    canvas without crashing, matching BoxPreview's guard.
+
+### F-K10. Lift-off lid (ADR-693)
+
+#### Success
+
+1. Style **Lift-off lid** produces seven parts: an open-top body
+   (bottom, front, back, left, right), a **Lid** the size of the outer
+   footprint, and a **Lid lip** the size of the opening less the
+   clearance.
+2. The operator glues the lip centred under the lid. Setting the lip
+   into the box opening and the lid flush with the walls while the glue
+   cures aligns them. The lid rests on the wall rim and the lip locates
+   it, with the clearance shared between both sides of the lip.
+3. The entered inner height is the usable cavity under the lip; outer
+   height = inner + 3T. Dividers stop under the lip. The laser default
+   clearance rises to 0.2 mm when this style is chosen (CNC keeps
+   0.15 mm).
+
+#### Error — zero clearance
+
+1. Clearance 0 with this style reports "A lift-off lid needs clearance
+   to drop into the box — use 0.2 mm or more."; **Generate** stays
+   disabled.
+
+#### Empty
+
+1. (Not applicable — the style always yields its seven parts.)
+
+#### Edge — outer dimensions
+
+1. In Outer mode the entered height includes the lid; the walls stand
+   one thickness under it.
+
+### F-K11. Open front (ADR-693)
+
+#### Success
+
+1. Style **Open front** produces five panels: bottom, top, back, left
+   and right — a cubby or shelf unit. The bottom and top run straight
+   across the opening and the side walls finish flush with them.
+2. The depth adds only the back wall (outer depth = inner + T), so the
+   entered inner depth reaches from the opening to the back wall.
+3. **Dividers across width** stand on the bottom, end flush with the
+   opening and tab only into the back wall.
+
+#### Error — dividers across depth
+
+1. Any **Dividers across depth** count reports "An open-front box takes
+   dividers across its width only — dividers across its depth would
+   close off the opening."; **Generate** stays disabled.
+
+#### Empty
+
+1. (Not applicable — the style always yields its five panels.)
+
+#### Edge — CNC
+
+1. The open edges have no seats, so they get no dogbones; every joint
+   and divider slot does, as in F-K3.
 
 ## Phase L flows (Image Studio — ADR-242)
 

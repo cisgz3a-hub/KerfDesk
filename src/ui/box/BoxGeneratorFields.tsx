@@ -72,6 +72,8 @@ function DimensionFields(props: {
           ['closed', 'Closed (6 panels)'],
           ['open-top', 'Open top (5 panels)'],
           ['slide-lid', 'Slide lid (6 panels)'],
+          ['lift-lid', 'Lift-off lid (7 panels)'],
+          ['open-front', 'Open front (5 panels)'],
         ]}
         onChange={setField('style')}
       />
