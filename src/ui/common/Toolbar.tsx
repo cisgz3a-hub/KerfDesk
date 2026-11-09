@@ -13,6 +13,7 @@ import { DesignStudioButton } from './DesignStudioButton';
 import { WorkspaceLayoutSelect } from './WorkspaceLayoutSelect';
 import { TutorialButton } from '../tutorials/TutorialButton';
 import { RemoteToolbarButton } from '../remote-access/RemoteToolbarButton';
+import { ToolbarUpdateButton } from '../licensing/ToolbarUpdateButton';
 import './Toolbar.css';
 
 export function Toolbar(props: {
@@ -32,6 +33,8 @@ export function Toolbar(props: {
       <DesignStudioButton />
       <ToolbarProjectName />
       <div className="lf-toolbar-utilities">
+        {/* Desktop update, first on the right so it never folds into More (ADR-561 Amd 7). */}
+        <ToolbarUpdateButton />
         <RemoteToolbarButton />
         <ConnectionBadge />
         {/* Learn keeps its visible label: it is a destination, not a modifier,

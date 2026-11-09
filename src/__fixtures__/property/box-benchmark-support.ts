@@ -33,7 +33,7 @@ export function buildCorpus(): ReadonlyArray<BoxSpec> {
       dimensionMode: rand() < 0.5 ? 'inner' : 'outer',
       thicknessMm: t,
       targetFingerWidthMm: (1.5 + rand() * 3.5) * t,
-      style: rand() < 0.5 ? 'closed' : 'open-top',
+      style: corpusStyle(rand()),
       clearanceMm: 0,
       relief: { kind: 'none' },
       partSpacingMm: 8,
@@ -43,12 +43,20 @@ export function buildCorpus(): ReadonlyArray<BoxSpec> {
   specs.push(
     spec(60, 40, 30, 3, 9, 'closed'),
     spec(60, 40, 30, 3, 9, 'open-top'),
+    spec(60, 40, 30, 3, 9, 'open-front'),
+    spec(500, 22, 22, 1, 1.5, 'open-front'),
     spec(20, 20, 20, 6, 30, 'closed'),
     spec(600, 600, 600, 25, 40, 'closed'),
     spec(500, 22, 22, 1, 1.5, 'open-top'),
     spec(40, 40, 4.5, 1, 5, 'closed'),
   );
   return specs.filter((candidate) => validateBoxSpec(candidate).kind === 'valid');
+}
+
+// The claim-model styles; the lid styles have their own categories.
+function corpusStyle(draw: number): BoxSpec['style'] {
+  if (draw < 1 / 3) return 'closed';
+  return draw < 2 / 3 ? 'open-top' : 'open-front';
 }
 
 export function spec(

@@ -7,7 +7,7 @@ import { useToastStore } from '../state/toast-store';
 import { BrowserUpdatesNotice, CommercialUpdates } from './CommercialUpdates';
 import { LICENCE_SETTINGS_EVENT } from './edition';
 import { CHECK_UPDATES_EVENT } from './update-status-text';
-import { UpdateReadyButton } from './UpdateReadyButton';
+import { ToolbarUpdateButton } from './ToolbarUpdateButton';
 
 let host: HTMLDivElement;
 let root: Root;
@@ -59,7 +59,7 @@ async function mount(adapter: LicenceAdapter): Promise<void> {
     root.render(
       <>
         <CommercialUpdates client={adapter} updatesUntil={null} />
-        <UpdateReadyButton />
+        <ToolbarUpdateButton />
       </>,
     ),
   );
@@ -75,8 +75,16 @@ function button(text: string): HTMLButtonElement | undefined {
   return [...host.querySelectorAll('button')].find((item) => item.textContent === text);
 }
 
+const toolbar = (): HTMLButtonElement | null => host.querySelector('.lf-toolbar-update');
+
+function openPanel(): void {
+  act(() => {
+    window.dispatchEvent(new Event(CHECK_UPDATES_EVENT));
+  });
+}
+
 describe('desktop updates in the window (ADR-547)', () => {
-  it('follows a check to a ready update and shows it in the status bar', async () => {
+  it('follows a check to a ready update and shows it in the toolbar', async () => {
     const adapter = client(
       status('checking'),
       status('downloading', '2026.41.0'),
@@ -181,9 +189,9 @@ describe('desktop updates in the window (ADR-547)', () => {
     await mount(adapter);
     await wait(0);
     await wait(30_000);
-    expect(button('Update available')?.title).toContain('Download it when you are ready');
+    expect(toolbar()?.title).toContain('KerfDesk 2026.41.0 is available');
     expect(downloadUpdate).not.toHaveBeenCalled();
-    await act(async () => button('Update available')?.click());
+    openPanel();
     expect(host.textContent).not.toContain('Get new versions early (beta)');
     expect(host.textContent).not.toContain('New versions download in the background');
     await act(async () => button('Download update')?.click());
@@ -191,7 +199,9 @@ describe('desktop updates in the window (ADR-547)', () => {
     expect(host.textContent).toContain('Downloading KerfDesk');
     expect(installUpdateOnQuit).not.toHaveBeenCalled();
     await wait(3_000);
-    expect(button('Update ready')?.title).toContain('Choose Install when I close KerfDesk');
+    // This service has no install-now action, so the toolbar sends the user to the panel.
+    expect(toolbar()?.title).toContain('choose when it installs');
+    expect(host.textContent).toContain('Choose Install when I close KerfDesk');
     const install = button('Install when I close KerfDesk');
     expect(install?.title).toContain('does not close the app or interrupt a job');
     expect(installUpdateOnQuit).not.toHaveBeenCalled();
@@ -239,7 +249,7 @@ describe('desktop updates in the window (ADR-547)', () => {
         }),
     );
     await wait(30_000);
-    await act(async () => button('Update available')?.click());
+    openPanel();
     await act(async () => {
       button('Download update')?.click();
       button('Download update')?.click();
@@ -260,7 +270,7 @@ describe('desktop updates in the window (ADR-547)', () => {
     };
     await mount(adapter);
     await wait(0);
-    await act(async () => button('Update ready')?.click());
+    openPanel();
     await act(async () => button('Install when I close KerfDesk')?.click());
     expect(host.textContent).toContain('try Check now again');
     expect(host.textContent).not.toContain('installer will open after');
@@ -281,7 +291,7 @@ describe('desktop updates in the window (ADR-547)', () => {
     };
     await mount(adapter);
     await wait(0);
-    await act(async () => button('Update available')?.click());
+    openPanel();
     expect(button('Install and close KerfDesk')).toBeUndefined();
     expect(installUpdateAndClose).not.toHaveBeenCalled();
     await act(async () => button('Download update')?.click());
@@ -312,7 +322,7 @@ describe('desktop updates in the window (ADR-547)', () => {
     };
     await mount(adapter);
     await wait(0);
-    await act(async () => button('Update ready')?.click());
+    openPanel();
     await act(async () => {
       button('Install and close KerfDesk')?.click();
       button('Install and close KerfDesk')?.click();

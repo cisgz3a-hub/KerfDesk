@@ -56,9 +56,9 @@ U2 KNOWN raised to P2 (empty port picker, web): already fixed (#1559).
 |---|---|---|
 | U4-P2-2 (P3, refuter) | Focus is one grey line under the jog pad | Already fixed (#1566): focus hint and the Before you start block. |
 | U4-P3-1 | Pause shows "Door"; its tooltip says "feed hold only" | Fixed by this sweep (#1609). |
-| U4-P3-2 | A machine door hold says "Release it with cycle start" and offers no Resume | Handled by the U5–U8 sweep (#1595, open): same text and fix as U5-P3-5. |
+| U4-P3-2 | A machine door hold says "Release it with cycle start" and offers no Resume | Handled by the U5–U8 sweep (#1595): same text and fix as U5-P3-5. |
 | U4-P3-3 | Stale state: "Frame expired" during a run; "Run" after Abort, alarm or a pulled cable | Fixed by this sweep (#1609). |
-| U4-P3-4 | ALARM:1 card still says "press Reset" after Reset; re-home with homing off | Handled by the U5–U8 sweep (#1595, open): same bug as U5-P3-2. |
+| U4-P3-4 | ALARM:1 card still says "press Reset" after Reset; re-home with homing off | Handled by the U5–U8 sweep (#1595): same bug as U5-P3-2. |
 | U4-P3-5 | Cable-pulled card: moving, not burning; "Reconnect and home" with no homing | Fixed by this sweep (#1609). |
 | U4-P3-6 | Frame and origin wording; stale "Last Frame attempt blocked" | Fixed by this sweep (#1609). |
 | U4-P3-7 | Job Review mixes coordinate frames | Fixed by this sweep (#1609): the size range is labelled G-code, out-of-bed lines bed positions. |
@@ -68,4 +68,4 @@ U2 KNOWN raised to P2 (empty port picker, web): already fixed (#1559).
 
 34 P3s (including the two refuter-lowered P2s): 10 already fixed by #1554, #1559, #1561 and #1566; 21 fixed in whole or in part by this sweep; 2 owned by the U5–U8 sweep; 1 left only as a decision (U1-P3-1). Maintainer decisions: 6 (U1-P3-1, the MCP label, the 3018 Frame feed, the power ÷ speed notice, the image aspect-lock default, operation names by role).
 
-Merge status (2026-11-06): #1581, #1588 and #1599 are merged. #1609 and #1595 are open, with auto-merge on, waiting for GitHub Actions to start jobs again. Each was checked locally with its related unit and e2e specs.
+Merge status (2026-11-09): all merged: #1581, #1588, #1599, #1609 and #1610, and the U5–U8 sweep's #1595. The sweep is closed; only the six maintainer decisions above remain.

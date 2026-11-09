@@ -5,7 +5,7 @@
 import { edgePattern, MIN_FINGER_WIDTH_MM } from './edge-pattern';
 import { minOf } from '../util';
 
-export type BoxStyle = 'closed' | 'open-top' | 'slide-lid';
+export type BoxStyle = 'closed' | 'open-top' | 'slide-lid' | 'lift-lid' | 'open-front';
 export type BoxDimensionMode = 'inner' | 'outer';
 
 export type BoxRelief =
@@ -66,22 +66,25 @@ export type BoxSpecValidation =
     };
 
 /**
- * Derive both dimension sets. Outer = inner + 2T per axis, except the
- * height, which adds one T per horizontal layer the style stacks around the
- * cavity: closed 2T (bottom + top), open-top T (bottom only, ADR-106 Amd 1),
- * slide-lid 3T (bottom + lid + captive top strip, ADR-116 V3). The entered
- * inner height therefore always stays the usable cavity height.
+ * Derive both dimension sets. Each axis adds one T per layer the style
+ * stacks around the cavity. Width always has two walls. Depth has two,
+ * except open-front, which has only the back (ADR-693). Height: closed 2T
+ * (bottom + top), open-top T (bottom only, ADR-106 Amd 1), slide-lid 3T
+ * (bottom + lid + captive top strip, ADR-116 V3), lift-lid 3T (bottom + lid
+ * lip band + lid top, ADR-693), open-front 2T. The entered inner
+ * dimensions therefore always stay the usable cavity.
  */
 export function deriveBoxDims(spec: BoxSpec): BoxDims {
   const t2 = 2 * spec.thicknessMm;
-  const zExtra = heightLayers(spec.style) * spec.thicknessMm;
+  const yExtra = depthLayers(spec.style) * spec.thicknessMm;
+  const zExtra = HEIGHT_LAYERS[spec.style] * spec.thicknessMm;
   if (spec.dimensionMode === 'inner') {
     return {
       innerWidthMm: spec.widthMm,
       innerDepthMm: spec.depthMm,
       innerHeightMm: spec.heightMm,
       outerWidthMm: spec.widthMm + t2,
-      outerDepthMm: spec.depthMm + t2,
+      outerDepthMm: spec.depthMm + yExtra,
       outerHeightMm: spec.heightMm + zExtra,
     };
   }
@@ -90,14 +93,29 @@ export function deriveBoxDims(spec: BoxSpec): BoxDims {
     outerDepthMm: spec.depthMm,
     outerHeightMm: spec.heightMm,
     innerWidthMm: spec.widthMm - t2,
-    innerDepthMm: spec.depthMm - t2,
+    innerDepthMm: spec.depthMm - yExtra,
     innerHeightMm: spec.heightMm - zExtra,
   };
 }
 
-function heightLayers(style: BoxStyle): number {
-  if (style === 'open-top') return 1;
-  return style === 'slide-lid' ? 3 : 2;
+const HEIGHT_LAYERS: Readonly<Record<BoxStyle, number>> = {
+  closed: 2,
+  'open-top': 1,
+  'slide-lid': 3,
+  'lift-lid': 3,
+  'open-front': 2,
+};
+
+function depthLayers(style: BoxStyle): number {
+  return style === 'open-front' ? 1 : 2;
+}
+
+/**
+ * Height of the fingered walls: the full outer height, except a lift-off
+ * lid, whose loose lid top sits on the wall rim (ADR-693).
+ */
+export function wallHeightMm(spec: BoxSpec, dims: BoxDims): number {
+  return spec.style === 'lift-lid' ? dims.outerHeightMm - spec.thicknessMm : dims.outerHeightMm;
 }
 
 /** Validate a spec; generation must be gated on `kind === 'valid'`. */
@@ -194,6 +212,13 @@ function collectClearanceIssues(spec: BoxSpec, minCellMm: number, issues: BoxSpe
     });
     return;
   }
+  if (spec.style === 'lift-lid' && spec.clearanceMm <= 0) {
+    issues.push({
+      field: 'clearance',
+      message: 'A lift-off lid needs clearance to drop into the box — use 0.2 mm or more.',
+    });
+    return;
+  }
   const clearanceLimitMm = Math.min(minCellMm, spec.thicknessMm) / 2;
   if (Math.abs(spec.clearanceMm) >= clearanceLimitMm) {
     issues.push({
@@ -217,6 +242,14 @@ function collectDividerIssues(spec: BoxSpec, issues: BoxSpecIssue[]): void {
       continue;
     }
     if (count === 0) continue;
+    if (field === 'dividersY' && spec.style === 'open-front') {
+      issues.push({
+        field,
+        message:
+          'An open-front box takes dividers across its width only — dividers across its depth would close off the opening.',
+      });
+      continue;
+    }
     const pitchMm = (innerMm - count * spec.thicknessMm) / (count + 1);
     if (pitchMm < 2 * spec.thicknessMm) {
       issues.push({
@@ -244,7 +277,7 @@ function collectDividerReliefIssues(spec: BoxSpec, issues: BoxSpecIssue[]): void
 // junction cells when dividers are present — bounds both relief feasibility
 // and the clearance the joint can absorb.
 function minFingerCellMm(spec: BoxSpec, dims: BoxDims): number {
-  const spans = [dims.outerWidthMm, dims.outerDepthMm, dims.outerHeightMm];
+  const spans = [dims.outerWidthMm, dims.outerDepthMm, wallHeightMm(spec, dims)];
   if ((spec.dividersXCount ?? 0) > 0 || (spec.dividersYCount ?? 0) > 0) {
     // Dividers rise the full cavity: inner height for every style.
     spans.push(dims.innerHeightMm + 2 * spec.thicknessMm);

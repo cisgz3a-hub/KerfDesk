@@ -329,6 +329,12 @@ and the seeded benchmark — new categories must score 100% without
 regressing v1. Deferred with names in ADR-116: lip/hinged/living-hinge
 lids, polygon prisms, dovetails, CNC dado 2.5D, T-slot hardware joints.
 
+**K.3 — more box styles [Built; hardware fit CLAIMED].** ADR-693 adds
+`lift-lid` (open-top body, lid on the rim, glued locating lip with the
+full clearance as play) and `open-front` (cubby/shelf, back-only depth,
+dividers across the width ending flush at the opening). ADR-116 Amd 1
+gives the slide lid a tongue to the back wall: no slit, located sideways.
+
 ### Phase L — v0.11 "Image Studio" [In progress — IE-1 under construction]
 
 Full in-app raster editing of `RasterImage` engrave/trace sources — the pixel-repair loop

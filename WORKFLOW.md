@@ -8853,8 +8853,12 @@ as the pane's design record.
    loose lid with a half-round thumb notch on its leading edge.
 2. The side-wall channels run from the front edge to one thickness
    inside the wall body; the assembled lid slides over the shortened
-   front and stops against the in-wall post (the captive top strip stays
-   fingered into the back wall).
+   front and its shoulders stop against the in-wall posts (the captive
+   top strip stays fingered into the back wall). A tongue one inner width
+   wide runs on between the posts to the back wall, so the lid band has
+   no slit at the back and the lid cannot wander sideways (ADR-116
+   Amd 1). In CNC mode the tongue shoulders get dogbones; the thumb notch
+   never does.
 3. The lid and its slots are sized with the mandatory play so the lid
    physically slides; laser default clearance rises to 0.2 mm for this
    style (CNC keeps 0.15 mm).
@@ -8926,6 +8930,65 @@ as the pane's design record.
 
 1. Without a 2D context (headless/jsdom) the preview renders an empty
    canvas without crashing, matching BoxPreview's guard.
+
+### F-K10. Lift-off lid (ADR-693)
+
+#### Success
+
+1. Style **Lift-off lid** produces seven parts: an open-top body
+   (bottom, front, back, left, right), a **Lid** the size of the outer
+   footprint, and a **Lid lip** the size of the opening less the
+   clearance.
+2. The operator glues the lip centred under the lid. Setting the lip
+   into the box opening and the lid flush with the walls while the glue
+   cures aligns them. The lid rests on the wall rim and the lip locates
+   it, with the clearance shared between both sides of the lip.
+3. The entered inner height is the usable cavity under the lip; outer
+   height = inner + 3T. Dividers stop under the lip. The laser default
+   clearance rises to 0.2 mm when this style is chosen (CNC keeps
+   0.15 mm).
+
+#### Error — zero clearance
+
+1. Clearance 0 with this style reports "A lift-off lid needs clearance
+   to drop into the box — use 0.2 mm or more."; **Generate** stays
+   disabled.
+
+#### Empty
+
+1. (Not applicable — the style always yields its seven parts.)
+
+#### Edge — outer dimensions
+
+1. In Outer mode the entered height includes the lid; the walls stand
+   one thickness under it.
+
+### F-K11. Open front (ADR-693)
+
+#### Success
+
+1. Style **Open front** produces five panels: bottom, top, back, left
+   and right — a cubby or shelf unit. The bottom and top run straight
+   across the opening and the side walls finish flush with them.
+2. The depth adds only the back wall (outer depth = inner + T), so the
+   entered inner depth reaches from the opening to the back wall.
+3. **Dividers across width** stand on the bottom, end flush with the
+   opening and tab only into the back wall.
+
+#### Error — dividers across depth
+
+1. Any **Dividers across depth** count reports "An open-front box takes
+   dividers across its width only — dividers across its depth would
+   close off the opening."; **Generate** stays disabled.
+
+#### Empty
+
+1. (Not applicable — the style always yields its five panels.)
+
+#### Edge — CNC
+
+1. The open edges have no seats, so they get no dogbones; every joint
+   and divider slot does, as in F-K3.
 
 ## Phase L flows (Image Studio — ADR-242)
 
@@ -9677,9 +9740,20 @@ Selecting **Download update** immediately shows that the request is starting. Th
 
 #### Success - update prompt on the canvas (ADR-561 Amendment 5)
 
-1. When a manual update is offered, a non-modal **Update available** card appears at the top centre of the canvas with the new version and up to three improvement notes. **Update** starts the same download as **Download update**; **Not now** clears the card until KerfDesk next starts. The status bar button and Help → Check for Updates remain.
+1. When a manual update is offered, a non-modal **Update available** card appears at the top centre of the canvas with the new version and up to three improvement notes. **Update** starts the same download as **Download update**; **Not now** clears the card until KerfDesk next starts. The toolbar's **Update** button and Help → Check for Updates remain.
 2. After **Update**, the card shows download progress (**Hide** keeps downloading in the background). Once verified it shows **Update ready to install** with **Install now** (the explicit install-and-close action above), **When I close** (install on a normal close) and **Not now**. Downloading never installs by itself.
 3. The card does not appear, and hides, while a job, Fire, owned or external motion, MPG, a modal dialog or the updates panel owns the window; it returns once that ends. A failure after the user acted in the card is reported there with **Details**, which opens Help → Check for Updates.
+
+#### Success - Update button in the toolbar (ADR-561 Amendment 7)
+
+1. While a desktop update is offered, downloading or downloaded, a filled copper **Update** button with a gentle glow sits first among the toolbar's right-hand controls, in laser and CNC workspaces. The glow holds still when the system asks for reduced motion.
+2. An offered update downloads on one click; the button shows the progress (**Updating 42%**, **Verifying…**). On macOS and Linux the click opens the verified download page instead.
+3. Once verified, the click asks "Install KerfDesk X.Y.Z now?" with **Install now**, **Not now** and **Details…**. **Install now** is **Install and close KerfDesk**: unsaved work gets the usual Save, Don't Save or Cancel, then KerfDesk closes and the installer opens.
+4. While a job runs or is paused, or Fire, motion, Frame preparation, Job Review or MPG owns the window, the button reads **Update after job** and does nothing. When the work ends it is offered again; nothing installs or closes by itself.
+
+#### Edge case - browser build
+
+The web app keeps its status bar **Update** button (ADR-227, ADR-228); applying it reloads the page.
 
 1. On each packaged unsigned Preview launch, KerfDesk makes at most one anonymous
    metadata request to `https://dl.kerfdesk.com/desktop/previews/latest.json`.
@@ -9790,7 +9864,7 @@ Selecting **Download update** immediately shows that the request is starting. Th
    shows the installed version and where updates stand (checking, downloading,
    ready to install when KerfDesk closes, not covered by the licence, waiting for
    the licence to be confirmed, failed), offers Check now and the beta choice, and
-   the status bar shows **Update ready** once a version has downloaded (ADR-547).
+   the toolbar shows **Update ready** once a version has downloaded (ADR-547, ADR-561 Amendment 7).
    A failed licence confirmation holds a covered paid or trial update back, and the
    panel says so rather than that the licence's updates ended (ADR-547 Amendment 1).
    The newest eligible
