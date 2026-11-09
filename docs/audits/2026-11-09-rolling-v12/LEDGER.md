@@ -7,7 +7,8 @@ Method: [../2026-10-21-rolling-v2/METHOD.md](../2026-10-21-rolling-v2/METHOD.md)
 | X1 | Fix: job safety (#1615, #1616, #1620, #1628, #1612) | origin/main @ 743d37bc4 (refuter 743d37bc4; Vitest with the simulated GRBL, Node with the real main-process modules, Chrome 156 for V1-P1-1) | [X1-fix-job-safety.md](X1-fix-job-safety.md) | 3 | 0 | 1 | 1 | 1 | 1 |
 | X2 | Returning user (1.0.29 saves on main: #1617, #1618, #1619, #1622, #1635 + byte identity) | origin/main @ af1573c77 (refuter af1573c77; coordinator re-read be671b158; Node with 1.0.29's own store and main's loader, Vitest for the recovery flows) | [X2-returning-user.md](X2-returning-user.md) | 6 | 0 | 2 | 1 | 3 | 1 |
 | X3 | Fix: design, text and import (#1614, #1617, #1601, #1602, #1592, #1635, #1636) | origin/main @ be671b158 (refuter be671b158; coordinator re-read a468f7bea; Node with main's real modules, Vitest 653 tests for the seven PRs; refuter ran HarfBuzz-shaped text) | [X3-fix-design-text-import.md](X3-fix-design-text-import.md) | 2 | 0 | 0 | 1 | 1 | 2 |
-| **Total so far** | | | | **11** | **0** | **3** | **3** | **5** | **4** |
+| X4 | Fix: performance sweep (#1593, #1594, #1597, #1606, #1607, #1608, #1611) | origin/main @ a468f7bea (refuter a468f7bea; Node with main's real modules against each PR's parent: 1,308 traces and 45 CNC outputs byte-identical, Fill-pool and pan caches against uncached runs; Vitest 61 tests) | [X4-fix-perf-sweep.md](X4-fix-perf-sweep.md) | 1 | 0 | 0 | 0 | 1 | 1 |
+| **Total so far** | | | | **12** | **0** | **3** | **3** | **6** | **5** |
 
 ## Confirmed P1/P2 (coordinator-verified)
 
