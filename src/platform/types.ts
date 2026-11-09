@@ -189,18 +189,13 @@ export type SaveTarget = {
    * unsupported carrier, unresolved alias or failed lookup remains unknown. */
   readonly compareDestination?: (other: SaveTarget) => Promise<SaveDestinationComparison>;
   readonly write: (data: string | Blob) => Promise<void>;
-  /** 'download': write hands the bytes to the browser's downloads, which
-   * report nothing back, so a save to it never counts as a proven copy on
-   * disk (ADR-688 Amendment 2). Absent = written in place. */
-  readonly delivery?: 'download';
+  readonly delivery?: 'download'; // an unconfirmed browser download (ADR-688 Amendment 2)
 };
 
-/** A picked directory that can mint named targets later. Merely reserving the
- * directory never creates or truncates a file. */
+/** A picked directory that mints named targets later; reserving it never creates a file. */
 export type SaveDirectoryTarget = {
   readonly file: (displayName: string) => SaveTarget;
-  /** Whether the folder already holds an entry with this name, so a caller
-   * that must not replace files can pick another name first. */
+  /** Whether the folder holds this name, so a caller that must not replace files renames. */
   readonly exists?: (displayName: string) => Promise<boolean>;
   /** Immediate file names only; inspecting a reserved folder never changes it. */
   readonly listFiles?: () => Promise<ReadonlyArray<string>>;
@@ -524,9 +519,7 @@ export type PlatformAdapter = {
   readonly machineNetwork?: MachineNetworkAdapter;
   readonly id: 'web' | 'electron' | 'mock';
   readonly filePickersAvailable?: () => boolean; // false in Firefox/Safari; absent = yes (ADR-688)
-  /** True where Save and exports download the file because there is no save
-   * picker (Firefox, Safari). Absent = no (ADR-688 Amendment 2). */
-  readonly savesByDownload?: () => boolean;
+  readonly savesByDownload?: () => boolean; // no save picker; saves download (ADR-688 Amd 2)
 
   // Show a file-open picker; resolves to the chosen files (empty if the user cancels).
   readonly pickFilesForOpen: (req: FileOpenRequest) => Promise<ReadonlyArray<FileHandle>>;
