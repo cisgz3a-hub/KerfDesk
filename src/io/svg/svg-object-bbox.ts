@@ -14,11 +14,12 @@ import type { SvgIdResolver } from './svg-id-resolver';
 import { svgPresentationStyles } from './svg-presentation';
 import { svgGeometryLength } from './svg-geometry-length';
 import type { SvgStyleCascade } from './svg-stylesheet';
+import { multiplySvgMatrix, translateSvgMatrix } from './svg-transform-attribute';
 import {
-  multiplySvgMatrix,
-  parseSvgTransform,
-  translateSvgMatrix,
-} from './svg-transform-attribute';
+  svgElementTransform,
+  type SvgFillBoxMeasure,
+  type SvgTransformDeclarations,
+} from './svg-element-transform';
 import { parseSvgLengthUserUnitsOrNull } from './svg-units';
 import {
   createSvgUseBudget,
@@ -40,6 +41,12 @@ const SHAPES = new Set(['path', 'rect', 'circle', 'ellipse', 'line', 'polyline',
 // Matches the importer's walk: these never render in place.
 const NOT_RENDERED = new Set(['defs', 'symbol', 'clippath', 'mask', 'marker', 'pattern']);
 const MAX_DEPTH = 256;
+/**
+ * fill-box transforms measured per import. Each measurement walks the
+ * element's subtree, so nested fill boxes past this many are approximated by
+ * the view box and reported instead (ADR-574 Amendment 1).
+ */
+export const SVG_FILL_BOX_MEASURE_LIMIT = 256;
 
 type Context = {
   readonly resolveId: SvgIdResolver;
@@ -47,10 +54,18 @@ type Context = {
   /** Elements being measured through, so a circular <use> is left out as in the walk. */
   readonly active: Set<Element>;
   readonly budget: SvgUseBudget;
+  readonly measureFillBox: SvgFillBoxMeasure;
 };
 type Box = { minX: number; minY: number; maxX: number; maxY: number };
-/** A user space: its matrix, and the viewport its percentages resolve against. */
-type Space = { readonly matrix: SvgMatrix; readonly viewport: SvgViewportSize };
+/**
+ * A user space: its matrix, the viewport its percentages resolve against, and
+ * the transform declarations of the element that owns it (for `inherit`).
+ */
+type Space = {
+  readonly matrix: SvgMatrix;
+  readonly viewport: SvgViewportSize;
+  readonly declarations: SvgTransformDeclarations;
+};
 type UseSize = { readonly width: number | null; readonly height: number | null };
 export type SvgObjectBoxSpace = {
   readonly viewport: SvgViewportSize;
@@ -63,13 +78,24 @@ export function svgObjectBoundingBox(
   resolveId: SvgIdResolver,
   cascade: SvgStyleCascade,
   boxSpace?: SvgObjectBoxSpace,
+  measureFillBox?: SvgFillBoxMeasure,
 ): Bounds | null {
   const box: Box = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
   const active = new Set<Element>();
   for (let at = element.parentElement; at !== null; at = at.parentElement) active.add(at);
   const budget = createSvgUseBudget(element.ownerDocument.documentElement);
-  const space = { matrix: IDENTITY, viewport: boxSpace?.viewport ?? svgViewportAt(element) };
-  const context = { resolveId, cascade, active, budget };
+  const space = {
+    matrix: IDENTITY,
+    viewport: boxSpace?.viewport ?? svgViewportAt(element),
+    declarations: {},
+  };
+  const context = {
+    resolveId,
+    cascade,
+    active,
+    budget,
+    measureFillBox: measureFillBox ?? createSvgFillBoxMeasure(resolveId, cascade),
+  };
   // A viewport-owned clip already carries the viewBox matrix, so measure its
   // child geometry in content coordinates, never its placement or clipped area.
   if (boxSpace?.content === true) childrenBounds(element, space, context, box, 0);
@@ -116,8 +142,34 @@ function childrenBounds(
 function elementSpace(element: Element, space: Space, context: Context): Space | null {
   const styles = svgPresentationStyles(element, context.cascade);
   if ((styles.get('display') ?? element.getAttribute('display'))?.trim() === 'none') return null;
-  const transform = parseSvgTransform(styles.get('transform') ?? element.getAttribute('transform'));
-  return { ...space, matrix: multiplySvgMatrix(space.matrix, transform) };
+  const own = svgElementTransform(element, styles, {
+    parent: space.declarations,
+    viewport: space.viewport,
+    measureFillBox: context.measureFillBox,
+  });
+  return {
+    ...space,
+    matrix: multiplySvgMatrix(space.matrix, own.matrix),
+    declarations: own.declarations,
+  };
+}
+
+/**
+ * Measures fill-box reference boxes for one import, sharing one budget of
+ * SVG_FILL_BOX_MEASURE_LIMIT measurements, nested ones included.
+ */
+export function createSvgFillBoxMeasure(
+  resolveId: SvgIdResolver,
+  cascade: SvgStyleCascade,
+  limit = SVG_FILL_BOX_MEASURE_LIMIT,
+): SvgFillBoxMeasure {
+  let remaining = limit;
+  const measure: SvgFillBoxMeasure = (element, viewport) => {
+    if (remaining <= 0) return 'unresolved';
+    remaining -= 1;
+    return svgObjectBoundingBox(element, resolveId, cascade, { viewport, content: false }, measure);
+  };
+  return measure;
 }
 
 // A nested <svg>, or the <symbol> or <svg> a <use> instantiates, maps its
@@ -133,6 +185,7 @@ function viewportBounds(
   const viewport = svgViewportTransform(element, space.viewport, size);
   if (viewport === null) return;
   const content = {
+    ...space,
     matrix: multiplySvgMatrix(space.matrix, viewport.matrix),
     viewport: viewport.viewport,
   };

@@ -30,6 +30,8 @@ import { multiplySvgMatrix, translateSvgMatrix } from './svg-transform-attribute
 import { elementToSubPaths } from './shape-to-polylines';
 import { createSvgIdResolver, type SvgIdResolver } from './svg-id-resolver';
 import { createSvgClipResolver, type SvgClipResolver } from './svg-clip-resolve';
+import { createSvgFillBoxMeasure } from './svg-object-bbox';
+import type { SvgFillBoxMeasure } from './svg-element-transform';
 import { createSvgVectorClipper, type SvgVectorClipper } from './svg-vector-clip-geometry';
 import { linearScaleMagnitude } from './transform-scale';
 import {
@@ -98,6 +100,7 @@ type WalkContext = {
   readonly budget: SvgImportBudget;
   readonly resolveId: SvgIdResolver;
   readonly cascadeStyles: SvgStyleCascade;
+  readonly measureFillBox: SvgFillBoxMeasure;
   readonly clipResolver: SvgClipResolver;
   readonly clipVector: SvgVectorClipper;
   readonly resolvePaint: SvgPaintResolver;
@@ -119,6 +122,7 @@ function walkGeometry(
     svgEl,
     { ...INITIAL_PRESENTATION_STATE, transform, viewport: rootViewportSize(svgEl) },
     context.cascadeStyles,
+    context.measureFillBox,
   );
   const rootState = rootSvgViewportState(svgEl, presented, {
     bounds: viewport.bounds,
@@ -151,7 +155,7 @@ function walkElement(
 ): void {
   if (depth > MAX_WALK_DEPTH) return;
   if (context.useBudget.nesting > 0) spendSvgUseElement(context.useBudget);
-  const state = presentationStateFor(el, parent, context.cascadeStyles);
+  const state = presentationStateFor(el, parent, context.cascadeStyles, context.measureFillBox);
   const tag = el.tagName.toLowerCase();
   // Text is not imported; a <text> counts once, however many <tspan>s it holds.
   if (tag === 'text') context.counts.text += 1;
@@ -203,8 +207,10 @@ function appendImage(el: Element, state: PresentationState, context: WalkContext
     id: identity.id + '-' + entries.length,
     source: identity.source,
   });
-  if (image.kind === 'svg-image') entries.push(image);
-  else if (image.reason === 'no-data') context.counts.image += 1;
+  if (image.kind === 'svg-image') {
+    entries.push(image);
+    recordTransformProblems(state, context.counts);
+  } else if (image.reason === 'no-data') context.counts.image += 1;
   else context.counts.skippedImages[image.reason] += 1;
 }
 
@@ -331,6 +337,7 @@ function recordVectorPresentation(
   const { counts } = context;
   if (state.unsupportedEffects.includes('mask')) counts.masked += 1;
   if (state.unsupportedEffects.includes('filter')) counts.filtered += 1;
+  recordTransformProblems(state, counts);
   if (paint.stroke.color !== '' && paint.fill.color !== '') counts.fillAndStroke += 1;
   const imported = paint.stroke.color !== '' ? paint.stroke : paint.fill;
   const unresolvedOpacity =
@@ -338,6 +345,13 @@ function recordVectorPresentation(
   if (unresolvedOpacity) counts.unresolvedPaintOpacity += 1;
   if (imported.server === 'gradient') counts.gradient += 1;
   if (hasSvgMarkers(el, state.markers, context.resolveId)) counts.markers += 1;
+}
+
+// Transforms a browser ignores, or that could only be approximated, are
+// disclosed per imported element (ADR-574 Amendment 1).
+function recordTransformProblems(state: PresentationState, counts: SvgImportCounts): void {
+  if (state.transformInvalid) counts.transformInvalid += 1;
+  if (state.transformUnresolved) counts.transformUnresolved += 1;
 }
 
 function walkReferencedDefinition(
@@ -348,7 +362,7 @@ function walkReferencedDefinition(
   size: UseSize,
 ): void {
   spendSvgUseElement(context.useBudget);
-  const state = presentationStateFor(el, parent, context.cascadeStyles);
+  const state = presentationStateFor(el, parent, context.cascadeStyles, context.measureFillBox);
   const content =
     el.tagName.toLowerCase() === 'defs' ? state : nestedSvgViewportState(el, state, size);
   if (content !== null) walkChildren(el, content, context, depth);
@@ -405,6 +419,7 @@ export function parseSvgDocument(
       fragment,
       resolveId,
       cascadeStyles,
+      measureFillBox: createSvgFillBoxMeasure(resolveId, cascadeStyles),
       clipResolver,
       clipVector: createSvgVectorClipper(clipResolver),
       resolvePaint: createSvgPaintResolver(resolveId, cascadeStyles),
