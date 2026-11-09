@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, type RotarySetup } from '../../core/devices';
 import { createProject } from '../../core/scene';
 import { useStore } from '../state';
-import { RotaryTurnJogControls, rotaryTurnJogMm } from './RotaryTurnJogControls';
+import { RotaryYTurnJogControls, rotaryYTurnJogMm } from './RotaryYTurnJogControls';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -42,7 +42,7 @@ async function render(rotary: RotarySetup | undefined, onJog = vi.fn()) {
   document.body.appendChild(host);
   await act(async () => {
     root = createRoot(host as HTMLDivElement);
-    root.render(<RotaryTurnJogControls disabled={false} feed={3000} onJog={onJog} />);
+    root.render(<RotaryYTurnJogControls disabled={false} feed={3000} onJog={onJog} />);
   });
   return { host, onJog };
 }
@@ -55,10 +55,10 @@ function button(label: string): HTMLButtonElement {
   return found;
 }
 
-describe('RotaryTurnJogControls', () => {
+describe('RotaryYTurnJogControls', () => {
   it('converts degrees to the machine Y of one turn of the part', () => {
-    expect(rotaryTurnJogMm(90, 40, false)).toBe(10);
-    expect(rotaryTurnJogMm(15, 40, true)).toBeCloseTo(-40 / 24, 12);
+    expect(rotaryYTurnJogMm(90, 40, false)).toBe(10);
+    expect(rotaryYTurnJogMm(15, 40, true)).toBeCloseTo(-40 / 24, 12);
   });
 
   it('is absent without an active rotary', async () => {

@@ -1,4 +1,4 @@
-// RotaryTurnJogControls — turn the part on a Y-port rotary by degrees (rolling
+// RotaryYTurnJogControls — turn the part on a Y-port rotary by degrees (rolling
 // audit v12 X8-P3-4). The jog pad's Y step is machine millimetres, which on a
 // rotary turn the part by a scale only Rotary Setup knows: with the Creality
 // chuck (40 mm per turn) a 10 mm step is 90°. LightBurn's Move window turns
@@ -19,12 +19,12 @@ const TURN_STEPS_DEG = [1, 5, 15, 30, 45, 90, 180] as const;
 const DEFAULT_TURN_STEP_DEG = 15;
 
 /** Machine Y mm that turn the part `degrees`; `turnMm` is one full turn. */
-export function rotaryTurnJogMm(degrees: number, turnMm: number, reverse: boolean): number {
+export function rotaryYTurnJogMm(degrees: number, turnMm: number, reverse: boolean): number {
   const mm = (degrees / 360) * turnMm;
   return reverse ? -mm : mm;
 }
 
-export function RotaryTurnJogControls(props: {
+export function RotaryYTurnJogControls(props: {
   readonly disabled: boolean;
   readonly feed: number;
   readonly onJog: (vector: JogVector) => void;
@@ -38,7 +38,7 @@ export function RotaryTurnJogControls(props: {
   const reverse = rotary.reverseAxis === true;
   const surfaceMm = (stepDeg / 360) * rotaryCircumferenceMm(rotary);
   const turn = (direction: 1 | -1): void =>
-    props.onJog({ dy: direction * rotaryTurnJogMm(stepDeg, turnMm, reverse), feed: props.feed });
+    props.onJog({ dy: direction * rotaryYTurnJogMm(stepDeg, turnMm, reverse), feed: props.feed });
   return (
     <div role="group" aria-label="Turn the part" style={rowStyle}>
       <span>Turn the part</span>
@@ -53,7 +53,7 @@ export function RotaryTurnJogControls(props: {
       </button>
       <select
         className="lf-select"
-        aria-label="Rotary turn step"
+        aria-label="Rotary Y turn step"
         value={stepDeg}
         disabled={props.disabled}
         onChange={(event) => setStepDeg(Number(event.target.value))}
