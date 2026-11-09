@@ -1172,7 +1172,8 @@ that owns those fields, without changing the existing Frame/Start policy.
    lighter score), Job Review and Save G-code warn "Cut runs before the engraving inside it", and
    Job Review's row has **Cut last**, which runs Sort cuts last (ADR-480 Amendment 2). Each part
    is checked on its own, so two coasters or a grid on one operation are warned like one
-   (Amendment 3). New operations are not reordered on their own.
+   (Amendment 3), and a cut with a lead-in or lead-out counts like any other (Amendment 4). New
+   operations are not reordered on their own.
 
 ---
 

@@ -16,7 +16,8 @@ import {
   type OutlineRing,
 } from './cut-before-engraving-pieces';
 import type { PolygonEdgeIndex } from './geometry/polygon-edge-index';
-import type { CutGroup, Job } from './job';
+import type { CutGroup, CutSegment, Job } from './job';
+import type { Vec2 } from './scene';
 import { lineOperationStrength } from './sort-cuts-last';
 import { ContourBoxIndex } from './trace/contour-box-index';
 
@@ -121,9 +122,10 @@ function cutsHolding(
 
 function closedOutlines(group: CutGroup, strength: number, firstOrder: number): CutRing[] {
   return group.segments
-    .filter((segment) => segment.closed && segment.polyline.length >= 3)
-    .map((segment, at) => {
-      const ring: OutlineRing = { ...boxOf(segment.polyline), polyline: segment.polyline };
+    .map(outlineOf)
+    .filter((polyline): polyline is ReadonlyArray<Vec2> => polyline !== null)
+    .map((polyline, at) => {
+      const ring: OutlineRing = { ...boxOf(polyline), polyline };
       return {
         ...ring,
         layerId: group.layerId,
@@ -132,4 +134,15 @@ function closedOutlines(group: CutGroup, strength: number, firstOrder: number): 
         edges: polygonEdges(ring),
       };
     });
+}
+
+// A contour that frees a part. Preparation turns a contour with a lead-in or
+// lead-out into one open burn (ADR-626), whose contour range is still the
+// closed outline it cuts (rolling audit v12 X3-P2-1, ADR-480 Amendment 4).
+function outlineOf(segment: CutSegment): ReadonlyArray<Vec2> | null {
+  const range = segment.leadContour;
+  if (range === undefined && !segment.closed) return null;
+  const polyline =
+    range === undefined ? segment.polyline : segment.polyline.slice(range.from, range.to + 1);
+  return polyline.length >= 3 ? polyline : null;
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { compileCncJob } from './cnc/compile-cnc-job';
 import { cutsBeforeEngraving } from './cut-before-engraving';
 import { DEFAULT_DEVICE_PROFILE } from './devices';
+import { applyLaserLeads } from './job/apply-laser-leads';
 import { compileJob, type Job } from './job';
 import {
   createLayer,
@@ -368,6 +369,54 @@ describe('cutsBeforeEngraving with several cut operations', () => {
     const scene = coaster([name, outline, elsewhere], [engraveLayer(), cutLayer(), frameLayer()]);
 
     expect(findings(scene)).toEqual([]);
+  });
+});
+
+// Rolling audit v12 X3-P2-1: preparation turns a led contour into one open
+// burn, and Job Review, Save G-code and Start read the prepared job.
+describe('cutsBeforeEngraving with lead-ins and lead-outs', () => {
+  function ledFindings(scene: Scene) {
+    const compiled = compileJob(scene, DEFAULT_DEVICE_PROFILE);
+    const led = applyLaserLeads(compiled, { bed: null, device: DEFAULT_DEVICE_PROFILE, scene });
+    const cuts = led.groups.flatMap((group) => (group.kind === 'cut' ? group.segments : []));
+    return { cuts, found: cutsBeforeEngraving(led) };
+  }
+  const leads = { leadInEnabled: true, leadOutEnabled: true, leadLengthMm: 2 };
+
+  it.each([
+    ['a lead-in', { leadInEnabled: true, leadLengthMm: 2 }],
+    ['a lead-out', { leadOutEnabled: true, leadLengthMm: 2 }],
+    ['both leads and an overcut', { ...leads, overcutMm: 2 }],
+    ['straight leads', { ...leads, leadStyle: 'line' as const, leadLengthMm: 5 }],
+  ])('finds a coaster cut with %s before the name inside it', (_, settings) => {
+    const { cuts, found } = ledFindings(
+      coaster([outline, name], [cutLayer(settings), engraveLayer()]),
+    );
+
+    expect(cuts.some((segment) => segment.leadContour !== undefined && !segment.closed)).toBe(true);
+    expect(found).toEqual(WARNED);
+  });
+
+  it('finds two coasters and a round coaster with leads', () => {
+    const round = shape('round', CUT_COLOR, [circleRing(250, 50, 40)]);
+    const roundName = rect('round-name', ENGRAVE_COLOR, 240, 40, 20);
+    const scene = coaster(
+      [...coasterAt(0), ...coasterAt(1), round, roundName],
+      [cutLayer(leads), engraveLayer()],
+    );
+
+    expect(ledFindings(scene).found).toEqual(WARNED);
+  });
+
+  it('is quiet with leads once the engraving runs first, or lies outside', () => {
+    const beside = square('beside', ENGRAVE_COLOR, 120, 20);
+
+    expect(ledFindings(coaster([name, outline], [engraveLayer(), cutLayer(leads)])).found).toEqual(
+      [],
+    );
+    expect(
+      ledFindings(coaster([outline, beside], [cutLayer(leads), engraveLayer()])).found,
+    ).toEqual([]);
   });
 });
 
