@@ -23,6 +23,9 @@ stroke round the part therefore moved its surface at `F / k`:
   9,425 mm/min round the glass, which is 15.9 % of the energy of a stroke along it. A 90° Fill got
   16 % and a 45° Fill 72 %.
 - **Stock roller, Ø25, 40 mm per turn:** `k = 0.509`, about 2× too fast.
+- **`k > 1` overburned instead** (the X8 refuter's table): a Ø10 pen in the same chuck got 127 %
+  of the set energy round the part, a geared roller (150 mm per turn, Ø25) 184 %, and the
+  never-edited new roller (360 mm per turn, Ø25) 458 %. On glass, overburning risks chipping.
 - **Job Review** said only "Y ×0.16" and warned nothing.
 
 KerfDesk's own G-code inspector already modelled this correctly. `burn-grid.ts`'s `surfaceFeed`

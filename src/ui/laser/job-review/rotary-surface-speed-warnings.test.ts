@@ -32,7 +32,6 @@ function project(rotary: RotarySetup | undefined) {
       maxFeed: 6000,
       ...(rotary === undefined ? {} : { rotary }),
     },
-    machine: undefined,
   };
 }
 

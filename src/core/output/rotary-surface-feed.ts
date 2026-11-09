@@ -54,8 +54,13 @@ export function surfaceMatchedFeed(
   return Math.min(matched, ceiling);
 }
 
+/** The emitter contexts' optional match. */
+export type RotaryFeedContext = { readonly rotaryFeed?: RotaryFeedMatch | undefined };
+
 /** One disclosure line for the program, so a reader of the file knows why the
- * F words change between moves of one layer. */
-export function rotaryFeedComment(match: RotaryFeedMatch): string {
-  return `; rotary: each move's F is scaled so the part's surface moves at the layer speed (Y x${match.yScale.toFixed(4)})`;
+ * F words change between moves of one layer; nothing without a match. */
+export function rotaryFeedComment(match: RotaryFeedMatch | undefined): string {
+  if (match === undefined) return '';
+  return `; rotary: each move's F is scaled so the part's surface moves at the layer speed (Y x${match.yScale.toFixed(4)})
+`;
 }

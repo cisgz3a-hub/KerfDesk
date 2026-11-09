@@ -129,37 +129,45 @@ type Burn = {
   readonly feed: number;
 };
 
+type Modal = { x: number; y: number; feed: number; power: number; motion: string };
+
+/** Applies one line's words to the modal state; true when it names X or Y. */
+function applyWords(code: string, state: Modal): boolean {
+  let moved = false;
+  for (const word of code.match(/[A-Z]-?\d*\.?\d+/g) ?? []) {
+    const letter = word[0] ?? '';
+    const value = Number(word.slice(1));
+    if (letter === 'G' && (value === 0 || value === 1)) state.motion = `G${value}`;
+    const key = MODAL_WORDS[letter];
+    if (key !== undefined) state[key] = value;
+    if (letter === 'X' || letter === 'Y') moved = true;
+  }
+  return moved;
+}
+
+const MODAL_WORDS: Readonly<Record<string, 'x' | 'y' | 'feed' | 'power'>> = {
+  X: 'x',
+  Y: 'y',
+  F: 'feed',
+  S: 'power',
+};
+
 /** A modal reader of the emitted program: every lit G1 with its feed. */
 function litMoves(gcode: string): Burn[] {
   const burns: Burn[] = [];
-  let x = 0;
-  let y = 0;
-  let feed = Number.NaN;
-  let power = 0;
-  let motion = 'G0';
+  const state: Modal = { x: 0, y: 0, feed: Number.NaN, power: 0, motion: 'G0' };
   let currentLayer = '';
   for (const raw of gcode.split('\n')) {
     const layerComment = /^; (?:offset )?(?:fill )?layer (\S+)/.exec(raw);
     if (layerComment !== null) currentLayer = layerComment[1] ?? '';
     const code = raw.replace(/;.*$/, '').trim();
-    if (code === '') continue;
-    let nx = x;
-    let ny = y;
-    let moved = false;
-    for (const word of code.match(/[A-Z]-?\d*\.?\d+/g) ?? []) {
-      const letter = word[0];
-      const value = Number(word.slice(1));
-      if (letter === 'G' && (value === 0 || value === 1)) motion = `G${value}`;
-      else if (letter === 'X') [nx, moved] = [value, true];
-      else if (letter === 'Y') [ny, moved] = [value, true];
-      else if (letter === 'F') feed = value;
-      else if (letter === 'S') power = value;
-    }
-    if (moved && motion === 'G1' && power > 0 && (nx !== x || ny !== y)) {
-      burns.push({ layer: currentLayer, dx: nx - x, dy: ny - y, feed });
-    }
-    x = nx;
-    y = ny;
+    const { x, y } = state;
+    if (!applyWords(code, state)) continue;
+    const dx = state.x - x;
+    const dy = state.y - y;
+    const lit = state.motion === 'G1' && state.power > 0;
+    if (lit && (dx !== 0 || dy !== 0))
+      burns.push({ layer: currentLayer, dx, dy, feed: state.feed });
   }
   return burns;
 }
