@@ -41,7 +41,7 @@ function laserAssumptions(
 
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
-    expect(EMITTER_REVISION).toBe('heightmap-pixel-surface-20261108-v42');
+    expect(EMITTER_REVISION).toBe('near-straight-arcs-are-lines-20261109-v44');
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {

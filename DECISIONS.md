@@ -6159,6 +6159,13 @@ NOT verified: the packaged Electron runtime grant, and a real hours-long
 burn with display sleep armed — CLAIMED in AUDIT.md until the maintainer
 runs one.
 
+### Amendments
+
+ADR-117's amendments are separate decision files (ADR-344):
+`docs/decisions/ADR-117-amendment-1-a-hidden-browser-tab-is-told-it-lost-keep-awake.md` (a
+browser tab hidden during a job is reported in the log, the tab title and a toast, and a browser
+Start's Job Review says to keep the tab in front or turn off sleep; rolling audit v11 W9-P2-1).
+
 ## ADR-118 — Interrupted-job checkpoint: fingerprint-verified resume after a crash (2026-07-07)
 
 **Status:** amended (repository schema v3, versioned exact-artifact provenance, and execution

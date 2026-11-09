@@ -89,12 +89,21 @@ export function installSessionEndGuard(
   window: SessionEndTarget,
   activity: DesktopJobActivity = DESKTOP_JOB_ACTIVITY,
   log: (message: string) => void = (message) => console.warn(message),
-  stopMachine: () => boolean = () => false,
+  stopMachine: () => Promise<{ readonly sessions: number; readonly sent: number }> = () =>
+    Promise.resolve({ sessions: 0, sent: 0 }),
 ): void {
   const ending = (reasons: ReadonlyArray<string>): void => {
     log(`Windows is ending the session (${describe(reasons)}) during a job; ${TRYING_ABORT}`);
     notify(window, 'ending', reasons);
-    if (stopMachine()) log('Sent the network machine a reset, then M5 and M9.');
+    // The writes leave before this returns; the log only follows if there is time.
+    void stopMachine().then(
+      ({ sessions, sent }) => {
+        if (sent > 0) log('Sent the network machine a reset, then M5 and M9.');
+        else if (sessions > 0)
+          log('Could not send the network machine a stop: its connection had failed.');
+      },
+      (error: unknown) => log(`Could not send the network machine a stop: ${String(error)}`),
+    );
   };
   // A new or crashed page has no job; it reports one when a job starts.
   window.webContents.on('did-finish-load', () => activity.set(IDLE));

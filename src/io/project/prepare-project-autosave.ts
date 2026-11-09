@@ -22,6 +22,7 @@ import type { Project } from '../../core/scene';
 import { withReferencedEmbeddedFonts } from '../../core/text/embedded-font-set';
 import { deserializeProject } from './deserialize-project';
 import { deserializeFailureReason, errorMessage } from './deserialize-failure-reason';
+import { nameRefusedSceneObject } from './refused-scene-object';
 import { serializeProject } from './serialize-project';
 
 export type PreparedProjectAutosave =
@@ -40,7 +41,11 @@ export function prepareProjectForAutosave(project: Project): PreparedProjectAuto
   }
   const validated = deserializeProject(serialized);
   if (validated.kind !== 'ok') {
-    return { kind: 'invalid', reason: deserializeFailureReason(validated) };
+    // Name the object, not the validator path (ADR-307 Amendment 5).
+    return {
+      kind: 'invalid',
+      reason: nameRefusedSceneObject(project, deserializeFailureReason(validated)),
+    };
   }
   return { kind: 'ok', json: serialized };
 }

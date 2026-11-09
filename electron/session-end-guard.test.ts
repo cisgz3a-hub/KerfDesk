@@ -58,7 +58,7 @@ describe('Windows ending the session during a job (ADR-548)', () => {
   it('has main stop a network machine only when the session really ends during work', () => {
     const window = fakeWindow();
     const activity = createDesktopJobActivity();
-    const stopMachine = vi.fn(() => true);
+    const stopMachine = vi.fn(async () => ({ sessions: 1, sent: 1 }));
     installSessionEndGuard(window, activity, vi.fn(), stopMachine);
     window.emit('session-end', sessionEvent('shutdown'));
     activity.set({ busy: true });

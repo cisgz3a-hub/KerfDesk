@@ -44,9 +44,21 @@ export function completeProjectSave(
     owner.pushToast(SAVE_COMPLETED_WITH_NEWER_EDITS_MESSAGE, 'warning');
     return 'saved-with-newer-edits';
   }
+  // A download reports nothing back: the browser may still ask where to put
+  // it, or the user may cancel it. The autosave stays as the copy that is
+  // known to exist (ADR-688 Amendment 2).
+  if (target.delivery === 'download') {
+    owner.pushToast(projectDownloadedMessage(target.displayName), 'success');
+    return 'saved';
+  }
   clearAutosaveAfterFileHandoff(owner.pushToast);
   owner.pushToast(reusedTarget ? 'Saved' : `Saved project to ${target.displayName}`, 'success');
   return 'saved';
+}
+
+/** What Save says where it downloads the project (Firefox, Safari). */
+export function projectDownloadedMessage(fileName: string): string {
+  return `Downloaded ${fileName}. Check that it reached your Downloads folder; drag it onto the canvas to open it again.`;
 }
 
 export function failProjectSave(owner: ProjectSaveOwner, message: string): SaveProjectOutcome {

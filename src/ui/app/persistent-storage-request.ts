@@ -7,7 +7,9 @@
 // Firefox answers persist() with a permission prompt, so it is never asked at
 // launch (WORKFLOW.md F-A1). It is asked once per page session, after the first
 // project save the operator makes themselves: the moment their work shows it is
-// worth keeping. Chromium decides silently from its own heuristics, and the
+// worth keeping. In a browser without file pickers (Firefox, Safari) the
+// autosave is where unsaved work lives, so there it is asked after the first
+// autosave write instead (ADR-688 Amendment 2). Chromium decides silently from its own heuristics, and the
 // desktop build's permission policy denies it, so there the call is harmless.
 // A denial or an error leaves things exactly as they were, so both are ignored,
 // and the save never waits for the answer.

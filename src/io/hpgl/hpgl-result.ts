@@ -5,6 +5,10 @@ import {
   type ColoredPath,
   type Vec2,
 } from '../../core/scene';
+import {
+  importedArtworkInRange,
+  importedArtworkRangeRefusal,
+} from '../project/imported-artwork-range';
 import { HpglError, type HpglPath, type HpglState, type ParseHpglResult } from './hpgl-types';
 
 export function hpglResult(
@@ -40,6 +44,11 @@ export function hpglResult(
       ...(path.fillRule === undefined ? {} : { fillRule: path.fillRule }),
     };
   });
+  // The loader refuses coordinates past its limit, so a plot that lands past
+  // it could never be saved (ADR-307 Amendment 5, audit W5-P2-2).
+  if (!importedArtworkInRange(bounds, paths)) {
+    throw new HpglError('out-of-range', importedArtworkRangeRefusal('HPGL', bounds));
+  }
   return {
     kind: 'ok',
     object: {

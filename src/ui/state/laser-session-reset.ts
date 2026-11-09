@@ -38,6 +38,7 @@ type SessionScopedState = FinishedJobState &
     | 'positioningLightEnabled'
     | 'bitFileRun'
     | 'bitFileSequence'
+    | 'connectionHost'
   >;
 
 /**
@@ -103,5 +104,7 @@ export function sessionScopedJobStateReset(): SessionScopedState {
     // A set of per-bit files ends with the session that ran it (bit-file-sequence.ts).
     bitFileRun: null,
     bitFileSequence: null,
+    // Job Review's browser keep-awake note follows the live connection (ADR-117 Amd 1).
+    connectionHost: null,
   };
 }

@@ -1,4 +1,5 @@
 import { parametricEllipseCurve } from '../../core/geometry';
+import { isNearStraightBulge } from '../../core/geometry/near-straight-arc';
 import type { CurveSubpath, Vec2 } from '../../core/scene';
 
 const FULL_TURN = Math.PI * 2;
@@ -30,7 +31,9 @@ export function bulgeCurveSegment(from: Vec2, to: Vec2, bulge: number): CurveSub
   const dy = to.y - from.y;
   const chord = Math.hypot(dx, dy);
   if (chord === 0) return [];
-  if (bulge === 0) return [{ kind: 'line', to }];
+  // A noise bulge (1e-17) is a straight edge; through its far centre it looped
+  // tens of millimetres off the edge (ADR-159 Amendment 3, audit W5-P1-1).
+  if (isNearStraightBulge(bulge)) return [{ kind: 'line', to }];
   const sweep = 4 * Math.atan(bulge);
   const radius = chord / (2 * Math.sin(Math.abs(sweep) / 2));
   const centerOffset = chord / (2 * Math.tan(sweep / 2));
