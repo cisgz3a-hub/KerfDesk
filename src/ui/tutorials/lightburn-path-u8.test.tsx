@@ -145,6 +145,31 @@ describe('a speed typed per second (U8-P3-4)', () => {
     expect(inches.kind === 'ok' ? inches.value : null).toBeCloseTo(25.4 * 60);
   });
 
+  // Rolling audit v12 X5-P3-4: the unit covers the whole expression, as
+  // "1/2 in" does in a length box; "1/2 mm/s" committed 1 mm/min.
+  it('applies a per-second unit to the whole expression', () => {
+    const close = (text: string, unit: 'mm' | 'in' = 'mm'): number | null => {
+      const result = feed(text, unit);
+      return result.kind === 'ok' ? result.value : null;
+    };
+    expect(close('1/2 mm/s')).toBeCloseTo(30);
+    expect(close('60/2 mm/s')).toBeCloseTo(1_800);
+    expect(close('1/2 in/s')).toBeCloseTo(762);
+    expect(close('1/2 in/s', 'in')).toBeCloseTo(762);
+    expect(close('50+50 mm/s')).toBeCloseTo(6_000);
+    expect(close('(50+50) mm/s')).toBeCloseTo(6_000);
+    expect(close('.5 mm/s')).toBeCloseTo(30);
+  });
+
+  it('refuses a per-second unit inside the expression rather than misread it', () => {
+    for (const text of ['100 mm/s + 5', '2 mm/s * 3', '1 mm/s + 1 mm/s']) {
+      expect(feed(text)).toEqual({
+        kind: 'invalid',
+        message: 'write mm/s once, after the whole speed, such as 1/2 mm/s',
+      });
+    }
+  });
+
   it('keeps mm/min and bare numbers as they were', () => {
     expect(feed('100')).toEqual({ kind: 'ok', value: 100 });
     expect(feed('100 mm/min')).toEqual({ kind: 'ok', value: 100 });
