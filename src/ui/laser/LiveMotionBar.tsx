@@ -145,6 +145,7 @@ function LiveMotionPrimaryAction({ status }: { readonly status: StreamerStatus |
   );
   const machineKind = useLaserStore((state) => state.activeJobMachineKind);
   const isControllerRunning = useLaserStore((state) => state.statusReport?.state === 'Run');
+  const isControllerHolding = useLaserStore((state) => isControllerHold(state.statusReport?.state));
   const toolChangeBlockMessage = useLaserStore(toolChangeContinueBlockMessage);
   const laserModeEnabled = useLaserStore(cncJobLaserModeEnabled);
   const liftPhase = useLaserStore(cncPauseLiftPhase);
@@ -162,7 +163,11 @@ function LiveMotionPrimaryAction({ status }: { readonly status: StreamerStatus |
     const pending = { action: pauseResumeTransition.action, pauseJob, resumeJob };
     return <LiveMotionActionButton {...pendingPauseResumeButton(pending)} />;
   }
-  const canPause = status === 'streaming' || (status === 'done' && isControllerRunning);
+  // Every line sent, the planner still running: a door or feed hold there
+  // parks the finishing tail, and the door text names Pause then Resume, so
+  // Pause stays offered (rolling audit v12 X5-P2-1; ADR-207 Amendment 4).
+  const canPause =
+    status === 'streaming' || (status === 'done' && (isControllerRunning || isControllerHolding));
   if (canPause) {
     return (
       <LiveMotionActionButton
@@ -376,6 +381,10 @@ const DOOR_RELEASE =
 
 function capitalised(text: string): string {
   return `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
+}
+
+function isControllerHold(state: string | undefined): boolean {
+  return state === 'Door' || state === 'Hold';
 }
 
 function jobHeading(
