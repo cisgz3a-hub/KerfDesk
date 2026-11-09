@@ -1,3 +1,4 @@
+import { projectJsonWithPublicCameraIdentities } from '../../io/project/public-camera-identity-json';
 import {
   nonemptyName,
   personalArtworkProject,
@@ -41,7 +42,8 @@ export function parsePersonalArtwork(raw: unknown): PersonalArtwork {
     id: raw['id'],
     name: nonemptyName(raw['name']),
     category: raw['category'],
-    projectJson: raw['projectJson'],
+    // Entries saved by an older version keep no camera login (ADR-692).
+    projectJson: projectJsonWithPublicCameraIdentities(raw['projectJson']),
     selectedObjectIds: raw['selectedObjectIds'] as string[],
   };
   personalArtworkProject(entry);

@@ -40,9 +40,10 @@ export function personalArtworkRepository(
         const done = finished(tx);
         const request = tx.objectStore('artwork').getAll();
         await done;
-        return (request.result as unknown[])
-          .map(parsePersonalArtwork)
-          .sort((a, b) => a.name.localeCompare(b.name));
+        const stored = request.result as unknown[];
+        const entries = stored.map(parsePersonalArtwork);
+        await keepRewritten(db, entries, stored);
+        return entries.sort((a, b) => a.name.localeCompare(b.name));
       } finally {
         db.close();
       }
@@ -84,6 +85,27 @@ export function personalArtworkRepository(
       }
     },
   };
+}
+
+// An entry an older version kept with more than reading now keeps (a camera
+// login, ADR-692) is written back as read. Best effort: the list still shows.
+async function keepRewritten(
+  db: IDBDatabase,
+  entries: readonly PersonalArtwork[],
+  stored: readonly unknown[],
+): Promise<void> {
+  const changed = entries.filter(
+    (entry, i) => entry.projectJson !== (stored[i] as { projectJson?: unknown }).projectJson,
+  );
+  if (changed.length === 0) return;
+  try {
+    const tx = db.transaction('artwork', 'readwrite');
+    const done = finished(tx);
+    for (const entry of changed) tx.objectStore('artwork').put(entry);
+    await done;
+  } catch {
+    // The next listing tries again.
+  }
 }
 
 function finished(transaction: IDBTransaction): Promise<void> {

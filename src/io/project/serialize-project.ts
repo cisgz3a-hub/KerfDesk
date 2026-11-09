@@ -14,6 +14,7 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
+import { withPublicCameraIdentities } from '../../core/camera/model/public-camera-identity';
 import { isBooleanCompoundObject } from '../../core/scene/boolean-compound';
 import type { ImportedSvg } from '../../core/scene/scene-object';
 import { compactLineGeometry } from '../../core/scene/compact-line-geometry';
@@ -81,6 +82,8 @@ function hasTypedRelief(object: SceneObject): boolean {
 function withCurveGeometry(project: Project): Project {
   return {
     ...project,
+    // A saved camera is named only by its public address (ADR-692).
+    device: withPublicCameraIdentities(project.device),
     scene: {
       ...project.scene,
       objects: project.scene.objects.map(withSerializableObject),

@@ -5,6 +5,7 @@
 // compares later pictures with it. Machine-local like the other camera
 // preferences: it describes this computer's camera, not the project.
 
+import { cameraSourceIdWithoutCredentials } from '../../../core/camera/camera-capture-binding';
 import type { CameraModelRecord } from '../../../core/camera/model/camera-model-record';
 import type { ViewThumbnail } from '../../../core/camera/model/view-shift';
 
@@ -12,12 +13,46 @@ const KEY_PREFIX = 'laserforge.camera.viewReference.v1:';
 
 /** One reference per calibration: the camera it was fitted on, and when. */
 function keyFor(record: CameraModelRecord): string {
+  renameOlderKeys();
   return `${KEY_PREFIX}${record.capture?.sourceId ?? 'unbound'}@${record.calibratedAt}`;
+}
+
+let olderKeysRenamed = false;
+
+// Older versions could name a network camera here by more than its public
+// address (ADR-692); such a reference moves to the key it has now, once a run.
+function renameOlderKeys(): void {
+  if (olderKeysRenamed) return;
+  olderKeysRenamed = true;
+  try {
+    for (let i = localStorage.length - 1; i >= 0; i -= 1) {
+      const key = localStorage.key(i);
+      if (key === null || !key.startsWith(KEY_PREFIX)) continue;
+      const at = key.lastIndexOf('@');
+      const sourceId = key.slice(KEY_PREFIX.length, at);
+      if (at < KEY_PREFIX.length || !sourceId.includes('://')) continue;
+      const renamed = `${KEY_PREFIX}${cameraSourceIdWithoutCredentials(sourceId)}${key.slice(at)}`;
+      if (renamed === key) continue;
+      const value = localStorage.getItem(key);
+      localStorage.removeItem(key);
+      if (value !== null && localStorage.getItem(renamed) === null) {
+        localStorage.setItem(renamed, value);
+      }
+    }
+  } catch {
+    // Storage unavailable: nothing is kept to rename.
+  }
+}
+
+/** Test seam: the next use renames older keys again. */
+export function resetViewReferenceKeyRenameForTests(): void {
+  olderKeysRenamed = false;
 }
 
 export function saveViewReference(record: CameraModelRecord, thumb: ViewThumbnail): void {
   try {
     // Keep one reference per camera: an older calibration's goes with it.
+    renameOlderKeys();
     const prefix = `${KEY_PREFIX}${record.capture?.sourceId ?? 'unbound'}@`;
     for (let i = localStorage.length - 1; i >= 0; i -= 1) {
       const key = localStorage.key(i);
