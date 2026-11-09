@@ -25,13 +25,19 @@ const BASE: BoxSpec = {
   partSpacingMm: 8,
 };
 
-// Height layers around the cavity: bottom + top, bottom only, or bottom +
-// lid band + captive top strip.
+// Height layers around the cavity: bottom + top, bottom only, bottom + lid
+// band + captive top strip, or bottom + lid lip + lid top.
 const HEIGHT_LAYERS: Readonly<Record<BoxSpec['style'], number>> = {
   closed: 2,
   'open-top': 1,
   'slide-lid': 3,
+  'lift-lid': 3,
+  'open-front': 2,
 };
+const STYLES = Object.keys(HEIGHT_LAYERS) as ReadonlyArray<BoxSpec['style']>;
+
+// Walls across the depth: an open front has only the back.
+const frontWallMm = (spec: BoxSpec): number => (spec.style === 'open-front' ? 0 : spec.thicknessMm);
 
 function requestedOuter(spec: BoxSpec): Outer {
   if (spec.dimensionMode === 'outer') {
@@ -40,7 +46,7 @@ function requestedOuter(spec: BoxSpec): Outer {
   const t = spec.thicknessMm;
   return {
     W: spec.widthMm + 2 * t,
-    D: spec.depthMm + 2 * t,
+    D: spec.depthMm + t + frontWallMm(spec),
     H: spec.heightMm + HEIGHT_LAYERS[spec.style] * t,
   };
 }
@@ -48,7 +54,7 @@ function requestedOuter(spec: BoxSpec): Outer {
 function dividerStarts(spec: BoxSpec, outer: Outer, axis: 'x' | 'y'): number[] {
   const t = spec.thicknessMm;
   const count = (axis === 'x' ? spec.dividersXCount : spec.dividersYCount) ?? 0;
-  const inner = (axis === 'x' ? outer.W : outer.D) - 2 * t;
+  const inner = axis === 'x' ? outer.W - 2 * t : outer.D - t - frontWallMm(spec);
   const pitch = (inner - count * t) / (count + 1);
   return Array.from({ length: count }, (_, i) => t + (i + 1) * pitch + i * t);
 }
@@ -62,7 +68,9 @@ function localOf(panel: BoxPanel, p: P3, spec: BoxSpec, outer: Outer): P3 {
     case 'top':
       return { x: p.x, y: p.y, z: p.z - (outer.H - t) };
     case 'lid':
-      return { x: p.x, y: p.y, z: p.z - (outer.H - 2 * t) };
+      return { x: p.x, y: p.y, z: p.z - (outer.H - (spec.style === 'lift-lid' ? t : 2 * t)) };
+    case 'lid-lip':
+      return { x: p.x - t, y: p.y - t, z: p.z - (outer.H - 2 * t) };
     case 'front':
       return { x: p.x, y: p.z, z: p.y };
     case 'back':
@@ -101,15 +109,17 @@ function partContains(panel: BoxPanel, p: P3, spec: BoxSpec, outer: Outer): bool
   return inside;
 }
 
-// The slide lid's band [H−2T, H−T] holds the full-width lid (minus its thumb
-// notch) up to the posts; the strip band above holds only the side strips.
+// The slide lid's band [H−2T, H−T] is solid wall to wall: the full-width lid
+// (minus its thumb notch) up to the posts, then the posts and the lid's
+// tongue between them up to the back wall — no slit (ADR-116 Amd 1). The
+// strip band above holds only the side strips.
 function slideLidBands(spec: BoxSpec, outer: Outer, p: P3): boolean | null {
   const t = spec.thicknessMm;
   const inX = p.x > t && p.x < outer.W - t;
   if (p.z < outer.H - 2 * t) return null;
   if (p.y > outer.D - t) return true;
   if (p.z >= outer.H - t) return !inX;
-  if (p.y >= outer.D - 2 * t) return !inX;
+  if (p.y >= outer.D - 2 * t) return true;
   const notchR = Math.min(8, (outer.W - 2 * t) / 4, (outer.D - 2 * t) / 2);
   return Math.hypot(p.x - outer.W / 2, p.y) > notchR;
 }
@@ -125,11 +135,17 @@ function insideOuterBox(outer: Outer, p: P3): boolean {
 function inCavity(spec: BoxSpec, outer: Outer, p: P3): boolean {
   const t = spec.thicknessMm;
   const cavityTop = outer.H - (HEIGHT_LAYERS[spec.style] - 1) * t;
-  return between(p.x, t, outer.W - t) && between(p.y, t, outer.D - t) && between(p.z, t, cavityTop);
+  return (
+    between(p.x, t, outer.W - t) &&
+    between(p.y, frontWallMm(spec), outer.D - t) &&
+    between(p.z, t, cavityTop)
+  );
 }
 
 function requestedSolid(spec: BoxSpec, outer: Outer, p: P3): boolean {
   if (!insideOuterBox(outer, p)) return false;
+  // A lift-off lid's top and the lip inside the rim close the top 2T solid.
+  if (spec.style === 'lift-lid' && p.z >= outer.H - 2 * spec.thicknessMm) return true;
   const band = spec.style === 'slide-lid' ? slideLidBands(spec, outer, p) : null;
   if (band !== null) return band;
   if (!inCavity(spec, outer, p)) return true;
@@ -175,16 +191,22 @@ function sampleAssembly(spec: BoxSpec, samples: number, seed: number): Mismatch 
   return { overlaps, voids, extras };
 }
 
-// A slide lid rejects zero clearance; 0.001 mm keeps its play below the
-// sampling resolution without leaving the fitted code path.
+// Both lids reject zero clearance; 0.001 mm keeps their play below the
+// sampling resolution without leaving the fitted code path. An open front
+// takes dividers across its width only.
 function nominal(spec: BoxSpec): BoxSpec {
-  return spec.style === 'slide-lid' ? { ...spec, clearanceMm: 0.001 } : spec;
+  const lidded = spec.style === 'slide-lid' || spec.style === 'lift-lid';
+  return {
+    ...spec,
+    ...(lidded ? { clearanceMm: 0.001 } : {}),
+    ...(spec.style === 'open-front' ? { dividersYCount: 0 } : {}),
+  };
 }
 
 const CLEAN: Mismatch = { overlaps: 0, voids: 0, extras: 0 };
 
 describe('assembled box matches the requested dimensions', () => {
-  for (const style of ['closed', 'open-top', 'slide-lid'] as const) {
+  for (const style of STYLES) {
     for (const dimensionMode of ['inner', 'outer'] as const) {
       for (const dividers of [0, 1, 2]) {
         it(`${style}, ${dimensionMode} dimensions, ${dividers} dividers per axis`, () => {
@@ -206,7 +228,7 @@ describe('assembled box matches the requested dimensions', () => {
     let checked = 0;
     for (let i = 0; i < 60; i += 1) {
       const t = [1.5, 3, 4, 6, 12, 18][Math.floor(rand() * 6)]!;
-      const style = (['closed', 'open-top', 'slide-lid'] as const)[Math.floor(rand() * 3)]!;
+      const style = STYLES[Math.floor(rand() * STYLES.length)]!;
       const spec = nominal({
         ...BASE,
         widthMm: 20 + rand() * 300,
@@ -223,6 +245,6 @@ describe('assembled box matches the requested dimensions', () => {
       checked += 1;
       expect({ index: i, ...sampleAssembly(spec, 4_000, i + 7) }).toEqual({ index: i, ...CLEAN });
     }
-    expect(checked).toBeGreaterThan(20);
+    expect(checked).toBeGreaterThan(25);
   });
 });

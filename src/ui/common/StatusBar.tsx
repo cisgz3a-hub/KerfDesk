@@ -1,6 +1,7 @@
 // StatusBar — WORKFLOW.md F-A16. Bottom bar with cursor position, selection
 // summary, object / operation counts, device name, bed dimensions, and the
-// right-aligned Update button when a new version is ready (ADR-227). In the web
+// right-aligned web-app Update button when a new version is ready (ADR-227; the
+// desktop update button sits in the toolbar, ADR-561 Amendment 7). In the web
 // app the action rail also links the pricing and policy pages (ADR-524
 // Amendment 3). Job estimate is Phase C. Also hosts the canvas motion status slot (see
 // `status-bar-slots.ts`) so machine-status text lands here instead of on the
@@ -20,7 +21,6 @@ import { DesktopPreviewUpdateButton } from './DesktopPreviewUpdateButton';
 import { PwaUpdateButton } from './PwaUpdateButton';
 import { SiteLinks } from './SiteLinks';
 import { EditionStatusButton } from '../licensing/EditionStatusButton';
-import { UpdateReadyButton } from '../licensing/UpdateReadyButton';
 import { CANVAS_MOTION_SLOT_ID } from './status-bar-slots';
 import './status-bar.css';
 import { useScrollOverflowCue } from './use-scroll-overflow-cue';
@@ -82,7 +82,6 @@ export function StatusBar({ children }: { readonly children?: React.ReactNode })
         {children}
         <SiteLinks />
         <EditionStatusButton />
-        <UpdateReadyButton />
         <DesktopPreviewUpdateButton />
         <PwaUpdateButton />
       </div>

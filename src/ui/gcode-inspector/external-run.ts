@@ -20,6 +20,11 @@ import { prepareTransientFrameController } from '../laser/use-frame-action';
 import { startUntrackedRun } from '../laser/untracked-start-retirement';
 import { useStore } from '../state';
 import { reportedWorkPositionMm } from '../state/canvas-motion-plan';
+import {
+  CONVERTED_LASER_HEADING,
+  CONVERTED_LASER_RISK,
+  convertedLaserQuestion,
+} from '../state/converted-laser-question';
 import type { FrameVerification } from '../state/frame-verification';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { captureLaserModeStartSnapshot } from '../state/laser-mode-start-evidence';
@@ -58,6 +63,10 @@ export const EXTERNAL_MODE_CHANGED =
   'The machine mode changed after the Frame. Frame the program again.';
 export const EXTERNAL_HEAD_MOVED =
   'The head is not where the program was read from. It is read again from where the head stands; Frame again.';
+// A CNC that KerfDesk 1.0.29 may have made from a laser runs no program until
+// its owner says whether it is a laser (ADR-637 Amendment 11): on that machine
+// type the Run review's lit-rapid warning and laser-mode check do not apply.
+export const EXTERNAL_ASKS_IF_LASER = `${CONVERTED_LASER_HEADING} ${CONVERTED_LASER_RISK} Answer it first: on the canvas card or in Machine Setup, choose "It's a laser" or "This is a CNC router", then start the program.`;
 
 // Closer than this, two reported positions are the same spot (reports carry
 // three decimals of a millimetre).
@@ -188,10 +197,17 @@ export function externalStartIssue(
   laser: LaserState = useLaserStore.getState(),
   project: Project = useStore.getState().project,
 ): string | null {
+  // Asked before the Frame too, so the operator sees it before framing.
+  const asking = externalConvertedLaserIssue(laser, project);
+  if (asking !== null) return asking;
   if (frame === null || laser.frameVerification !== frame.verification) {
     return EXTERNAL_FRAME_FIRST;
   }
   return externalHandoffIssue(frame, laser, project);
+}
+
+function externalConvertedLaserIssue(laser: LaserState, project: Project): string | null {
+  return convertedLaserQuestion(project, laser) === null ? null : EXTERNAL_ASKS_IF_LASER;
 }
 
 /** The checks that must still hold at the final Start handoff, after the
@@ -205,6 +221,8 @@ function externalHandoffIssue(frame: ExternalFrame, laser: LaserState, project: 
     return EXTERNAL_FRAME_CHANGED;
   }
   if (machineKindOf(project.machine) !== frame.machineKind) return EXTERNAL_MODE_CHANGED;
+  const asking = externalConvertedLaserIssue(laser, project);
+  if (asking !== null) return asking;
   if (
     !controllerStartPreparationStillCurrent(frame.controller, laser, {
       ignoreAdvisoryControllerEvidence: true,

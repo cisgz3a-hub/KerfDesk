@@ -1,0 +1,97 @@
+/* The toolbar's Update button (ADR-561 Amendment 7). A filled copper button,
+   so it reads apart from the borderless toolbar commands. The glow is a flat
+   accent ring on a pseudo-element whose opacity breathes: no blur and no
+   box-shadow (tokens.css performance note), and only opacity animates, which
+   the compositor runs without repainting the toolbar at the status poll. */
+.lf-toolbar-shell .lf-toolbar-command.lf-toolbar-update {
+  position: relative;
+  background: var(--lf-accent);
+  border-color: var(--lf-accent);
+  color: var(--lf-on-fill, #fff);
+  font-weight: 600;
+}
+.lf-toolbar-shell .lf-toolbar-command.lf-toolbar-update:hover:not([aria-disabled='true']) {
+  background: var(--lf-accent-hover);
+  border-color: var(--lf-accent-hover);
+}
+.lf-toolbar-shell .lf-toolbar-command.lf-toolbar-update:active:not([aria-disabled='true']) {
+  background: var(--lf-accent-active);
+}
+.lf-toolbar-shell .lf-toolbar-command.lf-toolbar-update:focus-visible {
+  outline: 2px solid var(--lf-focus-accent);
+  outline-offset: 2px;
+}
+/* Downloading and the failure note are information, not a call to act. */
+.lf-toolbar-shell .lf-toolbar-command.lf-toolbar-update[data-update-state='downloading'],
+.lf-toolbar-shell .lf-toolbar-command.lf-toolbar-update[data-update-state='failed'] {
+  background: var(--lf-tint-accent);
+  border-color: var(--lf-accent);
+  color: var(--lf-accent-fg);
+}
+/* Waiting for machine work: visible, plainly unavailable, never pulsing. */
+.lf-toolbar-shell .lf-toolbar-command.lf-toolbar-update[data-update-state='waiting'],
+.lf-toolbar-shell .lf-toolbar-command.lf-toolbar-update[aria-disabled='true'] {
+  background: var(--lf-bg-1);
+  border-color: var(--lf-accent);
+  border-style: dashed;
+  color: var(--lf-text-muted);
+  cursor: default;
+}
+
+.lf-toolbar-update::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border: 2px solid var(--lf-accent);
+  border-radius: calc(var(--lf-radius-md) + 4px);
+  opacity: 0;
+  pointer-events: none;
+}
+.lf-toolbar-update[data-glow='true']:not([aria-disabled='true'])::after {
+  opacity: 0.35;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .lf-toolbar-update[data-glow='true']:not([aria-disabled='true'])::after {
+    animation: lf-update-glow 2.4s ease-in-out infinite;
+  }
+}
+@keyframes lf-update-glow {
+  0%,
+  100% {
+    opacity: 0.15;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.lf-toolbar-update-confirm {
+  display: grid;
+  gap: 8px;
+  width: 300px;
+  padding: 12px;
+  line-height: 1.45;
+}
+.lf-toolbar-update-confirm p {
+  margin: 0;
+  color: var(--lf-text-muted);
+  font-size: 12px;
+}
+.lf-toolbar-update-confirm__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Standard screen-reader-only pattern; absolute so it adds no toolbar gap. */
+.lf-visually-hidden-update {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}

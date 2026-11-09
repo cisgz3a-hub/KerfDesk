@@ -36,10 +36,31 @@ export function dividerPanelRings(
     (cross) => cross.startMm,
   );
   return {
-    outline: dividerRing(layout, spec, uSpanMm, crossSlabs, placement.axis),
+    outline: dividerRing(layout, spec, {
+      uSpanMm,
+      crossSlabsMm: crossSlabs,
+      axis: placement.axis,
+      openStart: dividerFrontIsOpen(placement, spec),
+    }),
     cutouts: [],
   };
 }
+
+/**
+ * An X-divider in an open-front box has no front wall to tab into: its
+ * front end (u = 0) is a plain edge flush with the opening (ADR-693).
+ */
+export function dividerFrontIsOpen(placement: DividerPlacement, spec: BoxSpec): boolean {
+  return placement.axis === 'x' && spec.style === 'open-front';
+}
+
+type DividerRingShape = {
+  readonly uSpanMm: number;
+  readonly crossSlabsMm: ReadonlyArray<number>;
+  readonly axis: DividerPlacement['axis'];
+  /** No wall at u = 0: the body runs to the edge there, with no tabs. */
+  readonly openStart: boolean;
+};
 
 /** Slot cutout rectangles per wall, keyed by the wall panel id. */
 export function wallSlotCutouts(
@@ -47,6 +68,7 @@ export function wallSlotCutouts(
   spec: BoxSpec,
 ): ReadonlyMap<PanelId, ReadonlyArray<Polyline>> {
   const map = new Map<PanelId, ReadonlyArray<Polyline>>();
+  // On an open front the 'front' entry is simply never read: no such wall.
   const frontBack = layout.xDividers.flatMap((placement) => slotColumn(layout, spec, placement));
   const leftRight = layout.yDividers.flatMap((placement) => slotColumn(layout, spec, placement));
   if (frontBack.length > 0) {
@@ -78,21 +100,18 @@ function slotColumn(layout: DividerLayout, spec: BoxSpec, placement: DividerPlac
 // CCW ring: bottom edge (with cross-lap notches for Y-dividers), right side
 // with tab bumps, top edge (with notches for X-dividers), left side with tab
 // bumps. Tab cells always start and end with wall-owned even cells, so both
-// bottom and top corners sit at u = T on the body line.
-function dividerRing(
-  layout: DividerLayout,
-  spec: BoxSpec,
-  uSpanMm: number,
-  crossSlabsMm: ReadonlyArray<number>,
-  axis: DividerPlacement['axis'],
-): Polyline {
+// bottom and top corners sit at u = T on the body line — or at u = 0 on an
+// open start, whose left side is one straight edge.
+function dividerRing(layout: DividerLayout, spec: BoxSpec, shape: DividerRingShape): Polyline {
+  const { uSpanMm, crossSlabsMm, axis } = shape;
   const t = spec.thicknessMm;
+  const startU = shape.openStart ? 0 : t;
   const vSpan = layout.heightSpanMm;
   const lapDepth = vSpan / 2;
   const tabs = tabCells(layout);
   const points: Vec2[] = [];
   // Bottom edge, left to right; Y-dividers carry the bottom cross-laps.
-  points.push({ x: t, y: 0 });
+  points.push({ x: startU, y: 0 });
   if (axis === 'y') {
     for (const slab of [...crossSlabsMm].sort((a, b) => a - b)) {
       points.push({ x: slab, y: 0 });
@@ -119,15 +138,16 @@ function dividerRing(
       points.push({ x: slab, y: vSpan });
     }
   }
-  points.push({ x: t, y: vSpan });
+  points.push({ x: startU, y: vSpan });
   // Left side, top to bottom, tab bumps mirrored.
-  for (const cell of [...tabs].reverse()) {
+  const leftTabs = shape.openStart ? [] : [...tabs].reverse();
+  for (const cell of leftTabs) {
     points.push({ x: t, y: cell.toMm });
     points.push({ x: 0, y: cell.toMm });
     points.push({ x: 0, y: cell.fromMm });
     points.push({ x: t, y: cell.fromMm });
   }
-  points.push({ x: t, y: 0 });
+  points.push({ x: startU, y: 0 });
   return { closed: true, points };
 }
 

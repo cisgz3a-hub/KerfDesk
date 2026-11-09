@@ -134,15 +134,21 @@ function shortFront(spec: BoxSpec): Polyline {
   return { closed: true, points: cleanRing(points) };
 }
 
-// Full-width lid: rides through both wall channels, stops against the
-// channel post, thumb notch centered on the leading edge.
+// Full-width lid: rides through both wall channels with its shoulders
+// stopping against the channel posts, and a tongue one inner width wide
+// running on between the posts to the back wall's inner face (ADR-116
+// Amd 1). Without the tongue the lid ended one thickness short of the back
+// wall, leaving a slit into the cavity, and nothing located it sideways in
+// the through-channels. Thumb notch centered on the leading edge.
 function lidPanel(spec: BoxSpec): Polyline {
   const dims = deriveBoxDims(spec);
-  const lengthMm = dims.outerDepthMm - 2 * spec.thicknessMm;
+  const t = spec.thicknessMm;
+  const shoulderMm = dims.outerDepthMm - 2 * t;
+  const tongueEndMm = dims.outerDepthMm - t;
   const radiusMm = Math.min(
     THUMB_NOTCH_MAX_RADIUS_MM,
     dims.innerWidthMm / THUMB_NOTCH_SPAN_FRACTION,
-    lengthMm / 2,
+    shoulderMm / 2,
   );
   const centerX = dims.outerWidthMm / 2;
   const points: Vec2[] = [{ x: 0, y: 0 }];
@@ -156,8 +162,12 @@ function lidPanel(spec: BoxSpec): Polyline {
     });
   }
   points.push({ x: dims.outerWidthMm, y: 0 });
-  points.push({ x: dims.outerWidthMm, y: lengthMm });
-  points.push({ x: 0, y: lengthMm });
+  points.push({ x: dims.outerWidthMm, y: shoulderMm });
+  points.push({ x: dims.outerWidthMm - t, y: shoulderMm });
+  points.push({ x: dims.outerWidthMm - t, y: tongueEndMm });
+  points.push({ x: t, y: tongueEndMm });
+  points.push({ x: t, y: shoulderMm });
+  points.push({ x: 0, y: shoulderMm });
   points.push({ x: 0, y: 0 });
   return { closed: true, points };
 }
