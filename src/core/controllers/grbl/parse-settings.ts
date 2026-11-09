@@ -97,6 +97,9 @@ export type ControllerSettingsSnapshot = Partial<
   readonly stepsPerMmX?: number;
   readonly stepsPerMmY?: number;
   readonly stepsPerMmZ?: number;
+  // `$103`: steps per unit of a 4th (A) axis, degrees on a rotary. Job Review
+  // checks rotary image rows against it (ADR-315 Amendment 1, ADR-695).
+  readonly stepsPerUnitA?: number;
   // `$30=0` was reported. `maxPowerS` holds only a positive S range, because a
   // zero top must never reach a profile, but the report itself is evidence:
   // the controller has no S range at all (ADR-567 Amendment 1).
@@ -339,14 +342,19 @@ function isStockGrblSetting(id: number): boolean {
 
 function stepsPerMmFields(
   map: ReadonlyMap<number, string>,
-): Pick<ControllerSettingsSnapshot, 'stepsPerMmX' | 'stepsPerMmY' | 'stepsPerMmZ'> {
+): Pick<
+  ControllerSettingsSnapshot,
+  'stepsPerMmX' | 'stepsPerMmY' | 'stepsPerMmZ' | 'stepsPerUnitA'
+> {
   const stepsPerMmX = parsePositiveNumber(map.get(100));
   const stepsPerMmY = parsePositiveNumber(map.get(101));
   const stepsPerMmZ = parsePositiveNumber(map.get(102));
+  const stepsPerUnitA = parsePositiveNumber(map.get(103));
   return {
     ...(stepsPerMmX === undefined ? {} : { stepsPerMmX }),
     ...(stepsPerMmY === undefined ? {} : { stepsPerMmY }),
     ...(stepsPerMmZ === undefined ? {} : { stepsPerMmZ }),
+    ...(stepsPerUnitA === undefined ? {} : { stepsPerUnitA }),
   };
 }
 

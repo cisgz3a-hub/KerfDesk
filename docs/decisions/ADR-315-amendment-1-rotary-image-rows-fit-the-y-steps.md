@@ -37,10 +37,11 @@ rotation ([forum](https://forum.lightburnsoftware.com/t/banding-lines-artifact-a
    - **What it says:** the surface step, the line interval in steps, and the effect (the two gaps,
      or the share of rows that burn twice). It names the two intervals that fit, as lines/mm and
      mm: the nearest whole step count below the current interval and the one above it.
-2. **When `$101` is unknown.** If the live controller reported no `$101`, one warning says the
-   check could not be made and what to set.
+2. **The rotary's own axis.** A rotary on Y is checked against `$101`. One on a dedicated axis (ADR-695) is checked against `$102` (Z) or `$103` (A, steps per degree; `$103` is parsed for this). The rotary scale is already in that axis's units per surface mm, so the step maths is the same: the A1 Pro's published `$103 = 8.9` on an Ø80 glass is 0.078 mm a step, 1.27 steps at 0.1 mm.
+3. **When the steps are unknown.** If the live controller reported no steps for that axis, one warning
+   says the check could not be made and what to set.
    - A caller without a live session (the camera's transient job) checks nothing.
-3. **Advisory only.**
+4. **Advisory only.**
    - The line interval is not changed: snapping would change the image's density, and so its
      darkness, without the operator choosing it. LightBurn does not snap either.
    - The `$101` value is read from the live controller when Job Review is built, as ADR-331's
