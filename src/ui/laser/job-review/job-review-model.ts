@@ -44,6 +44,7 @@ import { oldProjectBurnReviewWarnings } from '../../state/old-project-burn-revie
 import { burningWhiteReviewWarnings } from '../../state/saved-white-notice';
 import { detectPresetCorrectionWarnings } from './preset-correction-warnings';
 import { detectStaleCatalogBitWarnings } from './stale-catalog-bit-warnings';
+import { detectRotaryRowStepWarnings } from './rotary-row-step-warnings';
 import { detectParkOutsideFrameWarningsFromMetrics } from './park-outside-frame-warnings';
 import { detectRotaryRasterQualificationWarnings } from './rotary-raster-qualification-warnings';
 import { detectRotarySurfaceSpeedWarnings } from './rotary-surface-speed-warnings';
@@ -97,6 +98,9 @@ type JobReviewModelArgs = {
   /** Live streaming window for the connected controller (ADR-331); callers
    * without a live session omit it and get no throughput advisory. */
   readonly streamThroughput?: JobReviewStreamThroughput;
+  /** The live controller's Y steps per mm ($101), null when it reported none;
+   *  omitted without a live session (ADR-315 Amendment 1). Advisory only. */
+  readonly rotaryStepsPerMmY?: number | null;
 };
 
 export function buildJobReviewModel(args: JobReviewModelArgs): JobReviewModel {
@@ -149,6 +153,11 @@ export function buildJobReviewModel(args: JobReviewModelArgs): JobReviewModel {
       ...detectParkOutsideFrameWarningsFromMetrics(
         args.prepared.metrics.motionBounds,
         args.prepared.metrics.parkTarget,
+      ),
+      ...detectRotaryRowStepWarnings(
+        args.prepared.prepared.project,
+        args.prepared.prepared.job,
+        args.rotaryStepsPerMmY,
       ),
       ...detectRotaryRasterQualificationWarnings(
         args.prepared.prepared.project,

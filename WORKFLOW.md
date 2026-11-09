@@ -3941,6 +3941,16 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    turn in degrees ("the part has turned +111° since"), and on rollers says the part may have
    slipped.
 
+#### Success — image rows fit the rotary's steps (ADR-315 Amendment 1)
+1. The controller places each image row on a whole Y step, and on a rotary one step turns the part
+   `1 / (Y scale × $101)` mm. When an image layer's line interval is not a whole number of those
+   steps, Job Review warns, for example "one Y step ($101 = 80 steps/mm) turns the part 0.079 mm,
+   and the 0.100 mm line interval is 1.27 steps, so its rows land 0.079 or 0.157 mm apart and
+   band", and names the two intervals that fit (here 12.73 or 6.37 lines/mm).
+2. Below one step per row the warning gives the share of rows that burn twice.
+3. When the controller reported no `$101`, one warning says the rows could not be checked.
+4. The warning changes nothing on its own; the operator sets the line interval.
+
 #### Success — the Rotary switch
 1. Once the profile has a rotary setup, a laser project's Job actions dock shows a **Rotary**
    toggle above Frame and Start with the attachment and size, for example
