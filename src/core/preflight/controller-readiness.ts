@@ -5,6 +5,7 @@ import type { Project } from '../scene';
 import {
   CNC_LASER_MODE_ENABLED_MESSAGE,
   FLUIDNC_CNC_LASER_MODE_ENABLED_MESSAGE,
+  FLUIDNC_RESUME_SPINUP_MESSAGE,
   LASER_MODE_DISABLED_MESSAGE,
   laserMaxPowerMismatchMessage,
   laserModeDisabledMessage,
@@ -43,7 +44,11 @@ export type ControllerReadinessWarningCode =
   // grblHAL's $32 is a three-way mode enum, so a lathe reports $32=2. That is
   // operator information, never a refusal (CLAUDE.md rule 7): it goes in the
   // Job Review warnings list like any other controller-setting judgement.
-  | 'lathe-mode';
+  | 'lathe-mode'
+  // FluidNC's Resume waits only the YAML spinup_ms (0 unless set) before the
+  // paused line goes on in the cut (ADR-180 Amendment 8). A run-time fact, so
+  // it is stated at Start, not on Save/export.
+  | 'fluidnc-resume-spinup';
 
 /** How the connected firmware exposes settings — mirrors
  *  ControllerCapabilities['settings'] without importing the driver layer. */
@@ -125,7 +130,10 @@ export function runControllerReadiness(
   // is the spindle's max RPM, not the laser S scale (F-CNC provenance header:
   // "; assumes: ... $32=0 (router mode)").
   if (cncMachine !== null) {
-    return cncReadiness(cncMachine.params.spindleMaxRpm, controller, absentPolicy, source);
+    return cncReadiness(cncMachine.params.spindleMaxRpm, controller, absentPolicy, {
+      source,
+      fluidnc: source === 'fluidnc-yaml' || firmwareKind === 'fluidnc',
+    });
   }
   // Missing laser settings are review warnings; known mismatches are still
   // errors inside laserReadiness. Neither refuses Start — the Start path
@@ -157,8 +165,9 @@ function cncReadiness(
   spindleMaxRpm: number,
   controller: ControllerSettingsSnapshot,
   absentPolicy: AbsentSettingPolicy,
-  source: ReadinessSettingsSource,
+  firmware: { readonly source: ReadinessSettingsSource; readonly fluidnc: boolean },
 ): ControllerReadinessResult {
+  const { source } = firmware;
   const errors: ReadinessErrors = [];
   const warnings: ReadinessWarnings = [];
   const reportedMaxS = reportedMaxPowerS(controller);
@@ -191,6 +200,10 @@ function cncReadiness(
     }
   } else if (controller.laserModeEnabled) {
     errors.push({ code: 'laser-mode-enabled', message: routerLaserModeMessage(source) });
+  }
+  // With $32=1 the laser-mode error above already says Resume has no spin-up.
+  if (firmware.fluidnc && controller.laserModeEnabled !== true) {
+    warnings.push({ code: 'fluidnc-resume-spinup', message: FLUIDNC_RESUME_SPINUP_MESSAGE });
   }
   return { ok: errors.length === 0, errors, warnings };
 }

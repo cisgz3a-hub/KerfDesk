@@ -15,6 +15,8 @@ export type OwnedMachineOperation = {
   message?: string;
   /** Raw preparation diagnostics stay PC-only without sharing, even after a source disappears. */
   privateMessage?: true;
+  /** A fixed desktop policy text (the CNC Resume advisory) shown whole, up to 2048 characters. */
+  policyMessage?: true;
   motionId?: LaserMotionOperationId;
   /** The motion this operation already sent its one native Cancel for (ADR-585 Amendment 1). */
   cancelledMotionId?: LaserMotionOperationId;
