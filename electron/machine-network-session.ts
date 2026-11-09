@@ -27,6 +27,7 @@ export class MachineNetworkSession {
   private closed = false;
   private failure: string | undefined;
   private stopping: Promise<void> | null = null;
+  private resetSent: Promise<boolean> | null = null;
   private stopReceive: ((chunk: Buffer) => void) | null = null;
   private waiting: {
     readonly resolve: (result: ReadResult) => void;
@@ -125,17 +126,26 @@ export class MachineNetworkSession {
    * goes at once; `immediate` sends M5 and M9 with it, for a process about to
    * exit, rather than after the restart banner. A session already closed sends
    * nothing; its socket is gone.
+   *
+   * Resolves once the reset was written, or could not be: true only when the
+   * OS took it, so nobody is told a stop went out that did not (rolling audit
+   * v12 X1-P3-1). M5, M9 and the close carry on after it.
    */
   stopAndClose(
     error?: string,
     options: { readonly discardReceived?: boolean; readonly immediate?: boolean } = {},
-  ): Promise<void> {
-    if (!this.end(error, options)) return this.stopping ?? Promise.resolve();
-    this.stopping = this.sendStop(options.immediate === true).finally(() => {
+  ): Promise<boolean> {
+    if (!this.end(error, options)) return this.resetSent ?? Promise.resolve(false);
+    let reportReset: (sent: boolean) => void = () => undefined;
+    this.resetSent = new Promise((resolve) => {
+      reportReset = resolve;
+    });
+    this.stopping = this.sendStop(options.immediate === true, reportReset).finally(() => {
+      reportReset(false);
       this.stopReceive = null;
       this.socket.destroy();
     });
-    return this.stopping;
+    return this.resetSent;
   }
   /** Resolves once a stop this session sent has gone out or given up. */
   settled(): Promise<void> {
@@ -153,20 +163,28 @@ export class MachineNetworkSession {
     this.deliver();
     return true;
   }
-  private async sendStop(immediate: boolean): Promise<void> {
+  private async sendStop(immediate: boolean, reportReset: (sent: boolean) => void): Promise<void> {
     if (this.socket.destroyed) return;
     if (immediate) {
       // Written and ended synchronously, so both reach the OS before the process exits.
-      this.socket.write(this.wire(Buffer.concat([RESET, STOP_LINES])));
-    } else {
-      const restarted = this.awaitRestartBanner();
-      if (!(await this.writeStop(RESET))) return;
-      await restarted;
-      if (!(await this.writeStop(STOP_LINES))) return;
+      const written = this.writeStop(Buffer.concat([RESET, STOP_LINES]));
+      const ended = this.endGracefully();
+      reportReset(await written);
+      await ended;
+      return;
     }
-    // Destroying at once would reset the connection, and a TCP reset can make
-    // the controller's side drop bytes it has not read yet.
-    await new Promise<void>((resolve) => {
+    const restarted = this.awaitRestartBanner();
+    const sent = await this.writeStop(RESET);
+    reportReset(sent);
+    if (!sent) return;
+    await restarted;
+    if (!(await this.writeStop(STOP_LINES))) return;
+    await this.endGracefully();
+  }
+  // Destroying at once would reset the connection, and a TCP reset can make
+  // the controller's side drop bytes it has not read yet.
+  private endGracefully(): Promise<void> {
+    return new Promise<void>((resolve) => {
       const timer = setTimeout(resolve, STOP_CLOSE_WAIT_MS);
       timer.unref();
       this.socket.once('close', () => {
@@ -193,6 +211,7 @@ export class MachineNetworkSession {
     if (this.socket.destroyed) return Promise.resolve(false);
     return new Promise((resolve) => {
       const timer = setTimeout(() => resolve(false), STOP_WRITE_WAIT_MS);
+      timer.unref();
       this.socket.write(this.wire(data), (error?: Error | null) => {
         clearTimeout(timer);
         resolve(error == null);
