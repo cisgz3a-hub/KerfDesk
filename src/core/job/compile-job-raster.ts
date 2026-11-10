@@ -27,8 +27,8 @@ import type { JobDiagnostic, RasterGroup } from './job';
 import { streamedRasterRowProvider } from './compile-job-raster-stream';
 import {
   imageSlicing,
+  rasterRunGroups,
   slicedRasterValues,
-  type ImageSlicing,
   type SlicePass,
 } from './compile-job-raster-sliced';
 import { effectiveObjectMinPowerPercent, effectiveObjectPowerPercent } from './object-power-scale';
@@ -126,11 +126,14 @@ function appendObjectRasterGroups(
     layer,
     scans.runs.reduce((total, run) => total + run.passes, 0),
   );
+  const compile = (angleDeg: number, slicePass?: SlicePass): RasterGroup | null =>
+    compileRasterGroup(obj, layer, device, {
+      ...options,
+      scanFrame: rasterScanFrame(angleDeg),
+      ...(slicePass === undefined ? {} : { slicePass }),
+    });
   for (const run of scans.runs) {
-    const groups =
-      slicing === null
-        ? sharedRunGroups(obj, layer, device, options, run, byAngle)
-        : slicedRunGroups(obj, layer, device, options, run, slicing);
+    const groups = rasterRunGroups(run, slicing, byAngle, compile);
     if (groups === null) {
       out.diagnostics.push({
         kind: 'raster-source-luma-mismatch',
@@ -143,48 +146,6 @@ function appendObjectRasterGroups(
     }
     for (const group of groups) out.groups.push(group);
   }
-}
-
-function sharedRunGroups(
-  obj: RasterImage,
-  layer: Layer,
-  device: DeviceProfile,
-  options: Omit<CompileRasterGroupOptions, 'scanFrame'>,
-  run: ScanPassRun,
-  byAngle: Map<number, RasterGroup>,
-): ReadonlyArray<RasterGroup> | null {
-  const group =
-    byAngle.get(run.angleDeg) ??
-    compileRasterGroup(obj, layer, device, {
-      ...options,
-      scanFrame: rasterScanFrame(run.angleDeg),
-    });
-  if (group === null) return null;
-  byAngle.set(run.angleDeg, group);
-  return [group.passes === run.passes ? group : { ...group, passes: run.passes }];
-}
-
-// ADR-699: a 3D Sliced image burns one group per pass, each its own slice, in
-// pass order across the angle runs. The depth grid is built once per angle.
-function slicedRunGroups(
-  obj: RasterImage,
-  layer: Layer,
-  device: DeviceProfile,
-  options: Omit<CompileRasterGroupOptions, 'scanFrame'>,
-  run: ScanPassRun,
-  slicing: ImageSlicing,
-): ReadonlyArray<RasterGroup> | null {
-  const groups: RasterGroup[] = [];
-  for (let pass = 0; pass < run.passes; pass += 1) {
-    const group = compileRasterGroup(obj, layer, device, {
-      ...options,
-      scanFrame: rasterScanFrame(run.angleDeg),
-      slicePass: slicing.nextPass(),
-    });
-    if (group === null) return null;
-    groups.push({ ...group, passes: 1 });
-  }
-  return groups;
 }
 
 // A rotary maps Y through a scale that only keeps rows along X straight, so it

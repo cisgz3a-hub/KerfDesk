@@ -200,7 +200,7 @@ describe('native cut-settings submission', () => {
             new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }),
           );
         });
-        const chosen = key === 'End' ? 'grayscale' : 'stucki';
+        const chosen = key === 'End' ? '3d-sliced' : 'stucki';
         expect(swatch(view.host, chosen).checked).toBe(true);
         expect(document.activeElement).toBe(swatch(view.host, chosen));
         await submit(view.form, 'click');

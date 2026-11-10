@@ -12,6 +12,7 @@ import type { LayerOperationSettings } from '../scene';
 import type { RasterPowerValues } from '../raster/raster-power-values';
 import { imageSliceCount, slicePassValues } from '../raster/slice-3d';
 import type { RasterGroup } from './job';
+import type { ScanPassRun } from './scan-pass-angles';
 
 export type SlicePass = {
   readonly slices: number;
@@ -86,4 +87,31 @@ export function slicedRasterValues(
     rowProvider: (y) =>
       input.toDeviceUnits(slicePassValues(depthRow(y), passIndex, slices, input.sOn)),
   };
+}
+
+/**
+ * The groups one run of passes at one angle compiles to. ADR-492: without
+ * slicing, runs at the same angle share one compiled grid. ADR-699: a 3D
+ * Sliced image burns one group per pass, each its own slice, in pass order
+ * across the runs; its depth grid is built once per angle.
+ */
+export function rasterRunGroups(
+  run: ScanPassRun,
+  slicing: ImageSlicing | null,
+  byAngle: Map<number, RasterGroup>,
+  compile: (angleDeg: number, slicePass?: SlicePass) => RasterGroup | null,
+): ReadonlyArray<RasterGroup> | null {
+  if (slicing === null) {
+    const group = byAngle.get(run.angleDeg) ?? compile(run.angleDeg);
+    if (group === null) return null;
+    byAngle.set(run.angleDeg, group);
+    return [group.passes === run.passes ? group : { ...group, passes: run.passes }];
+  }
+  const groups: RasterGroup[] = [];
+  for (let pass = 0; pass < run.passes; pass += 1) {
+    const group = compile(run.angleDeg, slicing.nextPass());
+    if (group === null) return null;
+    groups.push({ ...group, passes: 1 });
+  }
+  return groups;
 }
