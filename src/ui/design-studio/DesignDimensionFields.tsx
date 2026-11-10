@@ -40,12 +40,18 @@ export function DesignDimensionFields(): JSX.Element | null {
       >
         <input
           type="checkbox"
+          title="Driving: the dimension owns its value and re-solves the shape. Untick for a reference that only reports."
           checked={dimension.driving}
           onChange={(event) => setDimensionDriving(dimension.id, event.target.checked)}
         />
         <span style={labelStyle}>Driving</span>
       </label>
-      <button type="button" style={buttonStyle} onClick={deleteSelected}>
+      <button
+        type="button"
+        style={buttonStyle}
+        title="Remove this dimension. The geometry it measured stays as it is (Delete)."
+        onClick={deleteSelected}
+      >
         Delete dimension
       </button>
     </>
