@@ -9459,6 +9459,10 @@ as the pane's design record.
   is refused with **Set the camera back to … or calibrate again at this size**.
 - **Error / no WebGL2.** A browser with graphics acceleration off says the corrected picture cannot
   be drawn instead of showing an uncorrected one.
+- **Edge / large bridge camera while a job runs.** An RTSP or polled machine camera is drawn from
+  each new picture, decoded away from the window at about the canvas's size, and uploaded once; at
+  most 10 pictures a second, and 2 a second while a job streams. A 4K camera on the canvas keeps
+  every window task under the 50 ms job-time budget (ADR-440 Amendment 10).
 - **Empty / nothing to show.** Without a saved calibration the overlay row is absent and the canvas
   is untouched; with no still and no running camera nothing renders.
 - **Edge / reload and old files.** A corrupt saved calibration is dropped on load (never trusted).
