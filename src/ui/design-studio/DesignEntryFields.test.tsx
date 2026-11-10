@@ -26,7 +26,7 @@ function typeInto(input: HTMLInputElement, text: string): void {
 
 it('stays disabled until a gesture starts, then a canvas digit lands in the first box', async () => {
   const host = await mountControl(<DesignOptionsBar />);
-  expect(box(host, 'Length in mm').disabled).toBe(true);
+  expect(box(host, 'Draw length in mm').disabled).toBe(true);
   await act(async () =>
     studio.getState().setDraft({
       tool: 'line',
@@ -35,7 +35,7 @@ it('stays disabled until a gesture starts, then a canvas digit lands in the firs
       modifiers: NO_MODIFIERS,
     }),
   );
-  const length = box(host, 'Length in mm');
+  const length = box(host, 'Draw length in mm');
   expect(length.disabled).toBe(false);
   expect(length.value).toBe('5.00');
   await act(async () => useDesignEntryFocus.getState().requestEntryFocus('4'));
@@ -62,7 +62,7 @@ it('marks a refused value and keeps the gesture untouched', async () => {
       modifiers: NO_MODIFIERS,
     }),
   );
-  const length = box(host, 'Length in mm');
+  const length = box(host, 'Draw length in mm');
   await act(async () => typeInto(length, '0'));
   await act(async () => {
     length.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));

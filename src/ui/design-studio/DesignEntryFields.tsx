@@ -61,7 +61,7 @@ function EntryInput(props: {
         value={entry.shown}
         disabled={!live}
         placeholder="—"
-        aria-label={`${field.label} in ${field.unit === 'mm' ? 'mm' : 'degrees'}`}
+        aria-label={`Draw ${noun} in ${field.unit === 'mm' ? 'mm' : 'degrees'}`}
         aria-invalid={entry.error !== null}
         data-locked={field.locked ? 'true' : undefined}
         title={
