@@ -24,6 +24,7 @@ import type { MeasurementKey } from './design-entity-fields';
 import type { DesignToolKind } from './design-tool';
 import type { DesignPointSequence } from './design-point-sequence';
 import type { SketchExtension } from '../../core/design/ops/extend-sketch';
+import { DEFAULT_POLAR_STEP_DEG, type DesignTracking } from './design-tracking';
 
 export type DesignView = {
   readonly pxPerMm: number;
@@ -80,6 +81,13 @@ export type DesignSession = {
   // baked into cursorMm and any live draft.
   readonly activeSnap: SnapTarget | null;
   readonly snapEnabled: boolean;
+  // Polar and alignment tracking (ADR-272 Amendment 6). Its own toggle, like
+  // AutoCAD's POLAR/OTRACK: Snap names real points, tracking only lines up.
+  readonly trackEnabled: boolean;
+  readonly polarStepDeg: number;
+  // The guides that moved the pointer last, for the canvas to draw. A readout
+  // like activeSnap: the tracked point is already baked into cursorMm.
+  readonly activeTracking: DesignTracking | null;
   readonly orthoEnabled: boolean;
   readonly showGrid: boolean;
   readonly gridMm: number;
@@ -123,6 +131,9 @@ export function createDesignSession(sketch: Sketch = EMPTY_SKETCH): DesignSessio
     activeMeasurement: null,
     activeSnap: null,
     snapEnabled: true,
+    trackEnabled: true,
+    polarStepDeg: DEFAULT_POLAR_STEP_DEG,
+    activeTracking: null,
     orthoEnabled: false,
     showGrid: true,
     gridMm: DEFAULT_DESIGN_GRID_MM,

@@ -26,7 +26,13 @@ import {
   updatePointToolPointer,
 } from './design-point-pointer';
 import { useDesignStudioStore } from './design-studio-store';
-import { applyOrthoMm, snapPointMm } from './design-snap';
+import { applyOrthoMm, snapPointMm, type ResolvedSnap } from './design-snap';
+import {
+  alignMovePointer,
+  gestureAnchorMm,
+  trackingReferences,
+  TRACKING_RADIUS_PX,
+} from './design-tracking';
 import type { DesignSurface } from './design-surface';
 import { EXTEND_PICK_RADIUS_PX } from './design-extend';
 import type { DesignToolKind } from './design-tool';
@@ -109,6 +115,7 @@ export function useDesignPointer(
     const store = useDesignStudioStore.getState();
     store.setCursorMm(null);
     store.setActiveSnap(null);
+    store.setActiveTracking(null);
   }, []);
 
   return {
@@ -180,26 +187,66 @@ function resolvePointerMm(
   if (session === null || raw === null) return null;
   if (session.tool === 'extend') {
     store.setActiveSnap(null);
+    store.setActiveTracking(null);
     return raw;
   }
-  const resolved = truthfulPointToolSnap(
+  const pxPerMm = surface.pxPerMm();
+  const trackingMm = TRACKING_RADIUS_PX / (pxPerMm > 0 ? pxPerMm : 1);
+  const resolved = withMoveAlignment(
     session,
-    snapPointMm({
-      sketch: session.history.present,
-      rawMm: raw,
-      pxPerMm: surface.pxPerMm(),
-      snapEnabled: session.snapEnabled,
-      gridMm: session.gridMm,
-      // While dragging, the moving shapes must not be snap targets: they follow
-      // the cursor, so snapping to them makes the pointer chase geometry that is
-      // chasing the pointer — worst on a circle, whose centre and quadrants are
-      // all live targets travelling with it.
-      ...(session.move === null ? {} : { excludeEntityIds: session.move.ids }),
-    }),
-    raw,
+    truthfulPointToolSnap(
+      session,
+      snapPointMm({
+        sketch: session.history.present,
+        rawMm: raw,
+        pxPerMm,
+        snapEnabled: session.snapEnabled,
+        gridMm: session.gridMm,
+        fromMm: gestureAnchorMm(session),
+        tracking: {
+          // A moving selection tracks its BOX, below; its grab point does not.
+          enabled: session.trackEnabled && session.move === null,
+          polar: tracksDirection(session),
+          polarStepDeg: session.polarStepDeg,
+          toleranceMm: trackingMm,
+          references: trackingReferences(session),
+        },
+        // While dragging, the moving shapes must not be snap targets: they follow
+        // the cursor, so snapping to them makes the pointer chase geometry that is
+        // chasing the pointer — worst on a circle, whose centre and quadrants are
+        // all live targets travelling with it.
+        ...(session.move === null ? {} : { excludeEntityIds: session.move.ids }),
+      }),
+      raw,
+    ),
+    trackingMm,
   );
   store.setActiveSnap(resolved.target);
+  store.setActiveTracking(resolved.tracking ?? null);
   return resolved.pointMm;
+}
+
+// Polar tracking follows a DIRECTION from the start: a line, a polyline
+// segment, or an arc's radius to its start. Ortho supersedes it.
+function tracksDirection(
+  session: NonNullable<ReturnType<typeof useDesignStudioStore.getState>['session']>,
+): boolean {
+  if (session.orthoEnabled) return false;
+  return session.tool === 'line' || session.tool === 'path' || session.tool === 'arc';
+}
+
+// A dragged selection lines its box up with its neighbours (ADR-272 Amendment
+// 6) unless an object snap already put the grab point on something real.
+function withMoveAlignment(
+  session: NonNullable<ReturnType<typeof useDesignStudioStore.getState>['session']>,
+  resolved: ResolvedSnap,
+  toleranceMm: number,
+): ResolvedSnap {
+  if (!session.snapEnabled || !session.trackEnabled || resolved.target !== null) return resolved;
+  const aligned = alignMovePointer(session, resolved.pointMm, toleranceMm);
+  return aligned === null
+    ? resolved
+    : { pointMm: aligned.pointMm, target: null, tracking: aligned.tracking };
 }
 
 // One live gesture at a time, most specific first: a resize outranks a move,
