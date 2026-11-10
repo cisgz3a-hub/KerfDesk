@@ -211,7 +211,8 @@ function deleteMaterialPreset(set: MaterialLibrarySet, presetId: string): boolea
   return deleted;
 }
 
-function recipeMatchesLayer(layer: Layer, recipe: MaterialRecipe): boolean {
+/** The layer already holds what applying this recipe would give it. */
+export function recipeMatchesLayer(layer: Layer, recipe: MaterialRecipe): boolean {
   const patch = materialRecipePatch(recipe);
   const current = materialRecipePatch(captureMaterialRecipe(layer));
   // Applying a recipe removes a tone curve (ADR-670 Amendment 2), so a layer

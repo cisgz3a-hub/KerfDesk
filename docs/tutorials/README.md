@@ -8,6 +8,10 @@ The reader shows one written step, one matching picture and a short expected res
 
 The left and right arrow keys also step through a lesson. Escape backs out one level, from the lesson to the library and then to the workspace. Close and Done return directly to the workspace. All tutorials returns to the library with the same search and open topic.
 
+## Guided first job
+
+"Burn your first coaster" also has a live counterpart (ADR-698, WORKFLOW F-LEARN2): **Guide me in KerfDesk** on the lesson, or Help → Guided first job…, opens a side panel in the workspace. It outlines the real control for each of six steps (Connect, Machine Setup, artwork, material preset, Frame job, Start) and moves on when the app's state changes. Like a lesson it opens only when asked, and it never connects, frames, starts or changes a setting; its one write is the sample circle the operator asks for. Its code is in `src/ui/first-job/`, outside the lazy-loaded reader, because it reads live controller and Frame state.
+
 ## Design rationale
 
 Use help at the moment someone needs it. Avoid compulsory first-run walkthroughs. Keep entry points visible and lessons easy to close and reopen. The working project and any open tool draft remain in place underneath the learning surface.

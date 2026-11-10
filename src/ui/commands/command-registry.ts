@@ -24,6 +24,7 @@ import {
 } from './support-command-family';
 import {
   findCommandCommand,
+  firstJobGuideCommand,
   keyboardShortcutsCommand,
   licenseNoticeCommand,
   tutorialsCommand,
@@ -55,6 +56,7 @@ export function buildAppCommands(ctx: AppCommandContext): ReadonlyArray<AppComma
       findCommandCommand(),
       helpCommand(ctx),
       tutorialsCommand(),
+      firstJobGuideCommand(),
       keyboardShortcutsCommand(),
       safetyHelpCommand(ctx),
       connectionHelpCommand(ctx),

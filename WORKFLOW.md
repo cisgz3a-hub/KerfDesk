@@ -11075,6 +11075,7 @@ the edge it sits on, and a midpoint over the same edge.
 2. Global entry points show a searchable library with categories and machine filters. A contextual entry opens that feature's lesson directly, regardless of the library's current filters.
 3. The user reads the prerequisite/location, chooses a numbered step, and compares the illustrated Before/Action/Result stages. Optional playback changes only the example. Next, Back and Restart navigate the lesson.
 4. **Finish lesson** records completion on this device. Closing or Escape returns focus to the originating control when it remains available. Closing nested help leaves the underlying editor/dialog open.
+5. **Burn your first coaster** also offers **Guide me in KerfDesk**, which closes the lesson and opens the guided first job (F-LEARN2, ADR-698) to do the same journey with the real controls.
 
 ### Error
 
@@ -11087,3 +11088,36 @@ No search matches: show a clear empty state and **Show all tutorials**, which cl
 ### Edge
 
 Tutorials never open automatically, submit forms, invoke tool commands, change artwork or send controller commands. Every lesson remains reachable from Learn, including those for controls that no longer carry their own button. Reduced motion keeps explicit static example-stage controls. The learning surface registers as a modal to isolate application shortcuts, appears above studio dialogs, and stays below the live-motion control bar. Completion is a reading aid, not a qualification or prerequisite for using a tool or starting a job.
+
+## F-LEARN2. Guided first job (ADR-698)
+
+### Success
+
+1. The user opens **Help → Guided first job…**, presses **Guide me in KerfDesk** in the "Burn your first coaster" lesson, or finds it with Ctrl+K. A panel opens over the bottom-left of the canvas; the workspace stays usable around it.
+2. The panel lists six steps and expands the first one not done: **Connect your laser**, **Choose your machine**, **Put something on the canvas**, **Pick a material preset**, **Frame it**, **Start and stay with it**. The real control for that step (Connect, the Machine Setup button, the Artwork panel's Materials tab, Frame job, Start) is outlined; **Show me** opens its panel and focuses it without pressing it.
+3. Each step completes when the app's state does: the controller connects; Machine Setup is saved for the connected profile and controller; artwork is on the canvas (the operator may press **Add a sample circle**, a 40 mm circle in the middle of the bed, one undo step); a job material is chosen or an output operation in use holds or links a library preset; a clean Frame of the current job completes; a job starts. The panel then says the job is under way, to stay with the laser and that ABORT JOB stops it.
+4. Start still goes through the Frame gate and Job Review exactly as in F-B6; the guide adds no check, warning or refusal of its own.
+5. **Close** hides the panel; Help → Guided first job reopens it at the current step. **Start over** clears skipped steps for another job.
+
+### Edge
+
+- An edit after Frame expires the Frame as usual; the guide goes back to **Frame it**. Disconnecting goes back to **Connect your laser**.
+- **Choose your machine** and **Pick a material preset** offer **Skip this step** for an operator using the maker's settings or a material test; Frame and Start cannot be skipped.
+- With the machine set to CNC the panel says it follows a laser job; the Frame and Start steps work the same.
+- The guide never opens by itself, connects, homes, frames, starts or changes a setting. Dialogs, Job Review, toasts and Live Motion sit above it.
+
+## F-LEARN3. Simple view (ADR-698)
+
+### Success
+
+1. **Window → Simple View** or **Settings → General → Simple view → Hide advanced operation settings** turns it on. The choice belongs to this computer and is off until the operator turns it on.
+2. With laser artwork selected, the Operation tab shows the process (Line, Fill, Image), Power, Speed, Passes and every notice it shows anyway (starter values, mixed settings, process notices, who an edit reaches, Include in output). Fill's spacing and angle, the Image essentials, **Scan both ways**, **Air assist** and **More cut settings** give way to a short note.
+3. The note lists, with its value, each hidden setting this process uses whose value differs from a new operation's (for example `Line spacing: 0.05 mm`, `Air assist: on`, `Overcut: 1.5 mm`), or that differs between the selected artworks. With none, it says the other settings are at their usual values.
+4. **Show all settings** turns Simple view off and every control returns. Window → Simple View turns it back on.
+5. On the Artwork tab, **Advanced artwork settings** (the Power multiplier) is hidden only while it is 100% for every selected artwork.
+
+### Edge
+
+- Simple view changes only what the operation panel shows: no value, project, recipe, Preview, Job Review warning, Pause, Abort, run control or G-code changes, and it adds no undo step.
+- A Cut Settings dialog already open stays open when Simple view turns on.
+- CNC operation settings and the Cut Settings dialog show every setting in this increment.

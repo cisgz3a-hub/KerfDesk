@@ -88,6 +88,7 @@ export const MENU_GROUPS: Partial<Record<CommandFamily, ReadonlyArray<MenuGroupL
         'window.toggle-preview',
         'window.save-preview-image',
         'window.toggle-wireframe',
+        'window.simple-view',
         ...GUIDE_IDS,
         'window.fit-view',
         'window.project-notes',
