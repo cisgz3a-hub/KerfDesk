@@ -52,6 +52,9 @@ export function LaserOperationFields(props: {
     mixedFields: props.mixedFields,
     reconcileKey: props.reconcileKey,
     commit,
+    owner: props.editObjectOverride
+      ? { operationId: props.baseOperation.id, objectIds: props.objectIds }
+      : { operationId: props.baseOperation.id },
   };
   const modeMixed = props.mixedFields.mode === true;
   return (

@@ -1109,7 +1109,8 @@ that owns those fields, without changing the existing Frame/Start policy.
 - > device.maxFeed: snaps to maxFeed. The Artwork Speed field shows an inline note under the
   essentials ("15,000 mm/min is above this machine's Output max feed, so it runs at 10,000
   mm/min.") with a one-click **Raise Output max feed to 15,000 mm/min** that raises the ceiling
-  and applies the request; a stored speed above the ceiling shows the same note. The Job Review
+  and applies the request as one undo step (ADR-361 Amendment 1); a stored speed above the
+  ceiling shows the same note. The Job Review
   Speed cell warns with a toast: `Capped to Output max feed 10,000 mm/min. Change it in Machine
   Setup > Output max feed.` Advisory only (ADR-361).
 
