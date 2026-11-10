@@ -403,7 +403,7 @@ byte-identical for unchanged input. Design + research:
 | DS-3b | Floating precision inspector: per-shape editable dimensions, derived measurements (area / perimeter / circumference / chord / arc length), and a draughting-style dimension call-out drawn on the shape while a field is touched | Built |
 | DS-3c | Typed numeric entry during a draw gesture (length / angle / width / height / radius / diameter / sweep locks typed into the options bar; click-move-click drafts), per-tool options bar (ADR-272 Amendment 5) | Built |
 | DS-4 | Object-snap engine (`core/design/snap/`): endpoint / midpoint / centre / quadrant / intersection / on-edge, ranked so geometry always beats the grid, each with its own on-canvas glyph and a status-bar readout | Built |
-| DS-4b | Polar/angle tracking, tangent and perpendicular snaps, alignment guides between objects | Planned |
+| DS-4b | Polar/angle tracking, tangent and perpendicular snaps, alignment guides between objects — deferred snaps from the gesture start, polar step picker, point and moving-box alignment, drawn guides in 2D and 3D (ADR-272 Amendment 6) | Built |
 | DS-5 | Apply → commits designed geometry as one project undo entry; rect/circle land parametric, line/arc/path bake exact. **End-to-end slice closed** — verified from sketch through `compileJob` to emitted G-code | Built |
 | DS-6 | Corner ops in `core/design/ops/`: fillet (tangent arc at the shared chord tolerance) and chamfer (exact, no sampling), both refusing a size that will not fit rather than clamping | Built (core) |
 | DS-6b | Fillet and chamfer wired to the Modify rail with a context-sensitive options bar (trim/extend still planned) | Built |

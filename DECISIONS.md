@@ -14869,6 +14869,54 @@ exact form.
 5. A typed angle uses the convention the canvas readout already prints, so
    typing the number the canvas shows reproduces what it shows.
 
+### Amendment 6 (2026-11-10) - Tangent and perpendicular snaps, polar tracking, and alignment guides (DS-4b)
+
+DS-4 snapped to points that exist on their own (endpoints, midpoints, centres,
+quadrants, crossings, edges). Clause 5 also named ortho/POLAR tracking, and the
+Context named tangent and perpendicular snapping as absent; a line could not be
+drawn tangent to a hole, square to an edge, at 30 degrees without typing it, or
+level with another part's corner.
+
+1. **Tangent and perpendicular are deferred snaps.** Each exists only relative
+   to the point the live gesture started from (a drag's anchor, a polyline's
+   last corner, an arc's centre while its start is placed), which
+   `resolveSnap` now accepts as `fromMm`. They are computed exactly from the
+   entity's definition: tangent points of a circle or arc from `acos(r / d)`;
+   the perpendicular foot of a line, rectangle edge or path segment by
+   projection (only within the segment); perpendicular to a circle or arc is
+   the radial point, which is also what lets a circle drawn from a centre touch
+   another circle. Arc targets are kept only on the drawn sweep. Ellipses and
+   rounded rectangle corners offer neither: an ellipse tangent needs an
+   iterative solve, and a wrong tangent is worse than none. Both rank below
+   quadrant and above on-edge, so a real point still wins; each has its own
+   glyph (a circle under a bar; the right-angle mark) and status-bar name.
+2. **Tracking sits between object snaps and the grid.** It never pulls the
+   pointer off a real point, and the grid applies only when neither caught it.
+   *Polar tracking* pulls the pointer onto the nearest multiple of a step (5,
+   10, 15 default, 30, 45 or 90 degrees) from the gesture start, for the tools
+   where a direction means something (line, polyline, arc start) - not a
+   rectangle's diagonal or a circle's radius. Ortho supersedes it, as in
+   AutoCAD. *Alignment guides* line the pointer's X and/or Y up with the named
+   points of other objects and with the corners already placed in the gesture
+   (so a polyline closes square). Where a polar ray crosses an alignment line,
+   the crossing wins (AutoCAD object-snap tracking). A dragged selection lines
+   its BOX up instead - left / centre / right and bottom / middle / top against
+   every other object's box (the smart guides of Figma and Illustrator), each
+   axis independently.
+3. **One Track toggle, under Snap.** Track (Shift+T, on by default) and a
+   polar-step picker sit beside Snap and Ortho. Snap stays the master switch:
+   Snap off leaves the pointer exactly where it is, tracking included, which
+   is also AutoCAD's rule that object tracking needs object snap. Tracking
+   reach is 6 screen pixels, smaller than the 10-pixel object-snap reach.
+4. **The guides are drawn.** Every tracked point carries the dotted guide
+   segments that placed it, painted in the snap colour on the 2D interaction
+   layer and as dashed lines in the 3D overlay; a polar ray also names its
+   angle, and the status bar reads "Track: 30°" or "Track: aligned".
+5. Pure maths lives in `core/design/snap/` (`deferred-snaps.ts`,
+   `tracking.ts`); the session only says where the gesture started and what it
+   may line up with. Nothing is persisted, and `.lf2`, compile and G-code are
+   untouched.
+
 ## ADR-273 - CNC exports record incident-grade tool, settings, and profile provenance (2026-08-01)
 
 **Date:** 2026-08-01

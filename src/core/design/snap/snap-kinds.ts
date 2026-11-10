@@ -21,6 +21,11 @@ export type SnapKind =
   // The 0/90/180/270-degree rim points of a circle or arc.
   | 'quadrant'
   | 'intersection'
+  // Deferred snaps (ADR-272 Amendment 6): defined only relative to the point
+  // the gesture started from - where a line from there touches a circle, or
+  // meets an edge at a right angle.
+  | 'tangent'
+  | 'perpendicular'
   // Anywhere along an edge — the fallback, LightBurn calls this Line.
   | 'on-line';
 
@@ -39,6 +44,8 @@ const PRIORITY: ReadonlyArray<SnapKind> = [
   'midpoint',
   'center',
   'quadrant',
+  'tangent',
+  'perpendicular',
   'on-line',
 ];
 
