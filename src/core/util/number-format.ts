@@ -5,6 +5,10 @@
 // format that four or more files had written out separately, moved here under
 // a name that says exactly what it prints. Seeing them side by side is the
 // first step to choosing one; that choice is a product decision.
+//
+// These are for text people read. Code that writes machine commands (G-code,
+// jog and probe lines) keeps its own formatter and must not import from here,
+// so changing a display format can never change what a controller receives.
 
 /** At most two decimals, trailing zeros dropped: 1.5 → "1.5", 2 → "2". */
 export function formatUpTo2Decimals(value: number): string {
