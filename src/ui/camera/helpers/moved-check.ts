@@ -13,13 +13,18 @@
 import { isHeadCameraModel } from '../../../core/camera/model/head-camera';
 import type { CameraModelRecord } from '../../../core/camera/model/camera-model-record';
 import { compareViews } from '../../../core/camera/model/view-motion';
-import { MOVED_MM, viewThumbnail } from '../../../core/camera/model/view-shift';
+import { MOVED_MM, viewThumbnail, type ViewThumbnail } from '../../../core/camera/model/view-shift';
 import type { RgbaImage } from '../../../core/camera/rgba-image';
 import { useStore } from '../../state';
 import { useCameraStore } from '../../state/camera-store';
 import { useToastStore } from '../../state/toast-store';
 import { activeCameraModelNow, ownCameraModel } from '../active-camera-model';
 import { cameraModelForFrame } from '../camera-model-frame';
+import {
+  frameRescaleFromView,
+  frameRescaleVerdict,
+  recordFrameRescale,
+} from '../frame-rescale-check';
 import {
   cameraCaptureBindingForFrame,
   captureSourceFrame,
@@ -54,6 +59,7 @@ export function checkCameraMoved(source: ActiveCameraSource, frame: RgbaImage): 
   const reference = loadViewReference(own);
   if (reference === null) return publish(unknown);
   const binding = cameraCaptureBindingForFrame(source, frame.width, frame.height);
+  checkFrameRescale(model, binding, frame, reference);
   const forFrame = cameraModelForFrame(model, binding, frame.width, frame.height);
   if (forFrame.kind === 'issue') return publish(unknown);
   const current = viewThumbnail(frame, reference.width);
@@ -80,6 +86,32 @@ export function checkCameraMoved(source: ActiveCameraSource, frame: RgbaImage): 
         }
       : steady,
   );
+}
+
+// A picture of another size than the calibration's is compared with the kept
+// view first (ADR-440 Amendment 9): only a resize is placed with the lens
+// scaled to it.
+function checkFrameRescale(
+  model: CameraModelRecord,
+  binding: ReturnType<typeof cameraCaptureBindingForFrame>,
+  frame: RgbaImage,
+  reference: ViewThumbnail,
+): void {
+  const { width, height } = frame;
+  if (width === model.lens.imageWidth && height === model.lens.imageHeight) return;
+  if (frameRescaleVerdict(model, width, height) === 'resize') return;
+  const measuring = cameraModelForFrame(model, binding, width, height, { rescale: 'measuring' });
+  if (measuring.kind === 'issue') return;
+  const { bedWidth, bedHeight } = useStore.getState().project.device;
+  const verdict = frameRescaleFromView({
+    reference,
+    frame,
+    scaledLens: measuring.lens,
+    pose: measuring.pose,
+    bedWidthMm: bedWidth,
+    bedHeightMm: bedHeight,
+  });
+  if (verdict !== null) recordFrameRescale(model, width, height, verdict);
 }
 
 /** Take a picture now and keep it as the camera's reference for `record`. */

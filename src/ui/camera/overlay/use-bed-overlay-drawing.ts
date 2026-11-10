@@ -11,6 +11,7 @@ import type { SurfaceHeightArea } from '../../../core/camera/model/height-areas'
 import type { RgbaImage } from '../../../core/camera/rgba-image';
 import type { ViewTransform } from '../../workspace/view-transform';
 import { cameraModelForFrame } from '../camera-model-frame';
+import { useFrameRescaleVerdicts } from '../frame-rescale-check';
 import type { LiveCaptureElement } from '../frame-capture';
 import { cameraCaptureBindingForFrame, type ActiveCameraSource } from '../frame-source';
 import type { CameraCaptureBinding } from '../../../core/camera/camera-capture-binding';
@@ -85,11 +86,13 @@ export function useBedOverlayDrawing(
     };
   }, [canvas]);
 
-  // A new view, opacity or frame: draw it now.
+  // A new view, opacity or frame, or a frame size just proved a resize
+  // (ADR-440 Amendment 9): draw it now.
+  const rescaleVerdicts = useFrameRescaleVerdicts();
   useEffect(() => {
     inputRef.current = { frame, scene };
     if (renderer !== null && !renderer.lost) setIssue(drawOverlay(renderer, frame, scene));
-  }, [renderer, frame, scene]);
+  }, [renderer, frame, scene, rescaleVerdicts]);
 
   const live = frame?.kind === 'live' ? frame.element : null;
   const streaming = frame?.kind === 'live' && frame.source.kind === 'machine-rtsp';

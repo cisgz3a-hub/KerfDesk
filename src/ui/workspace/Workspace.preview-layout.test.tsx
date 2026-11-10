@@ -3,6 +3,7 @@ import { act, useEffect, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { savedCameraModel } from '../../core/camera/model/model-fixtures';
+import { recordFrameRescale, resetFrameRescaleChecks } from '../camera/frame-rescale-check';
 import { findRegistrationBoxBounds } from '../../core/scene';
 import type { BedOverlayUniforms } from '../camera/overlay/bed-overlay-shader';
 import { WorkspaceCameraOverlay } from '../camera/WorkspaceCameraOverlay';
@@ -85,6 +86,10 @@ beforeEach(() => {
     },
   });
   // A saved synthetic still only: no capture source, media stream or machine.
+  // Its small stand-in size counts as a proved resize of the calibration
+  // (ADR-440 Amendment 9); this test is about the stage, not the rescale.
+  resetFrameRescaleChecks();
+  recordFrameRescale(savedCameraModel(), 16, 9, 'resize');
   useCameraStore.setState({
     overlayVisible: true,
     overlayOpacityPercent: 50,

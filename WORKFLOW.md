@@ -9451,7 +9451,12 @@ as the pane's design record.
   remains available, but saved network geometry cannot be verified for precision placement.
 - **Error / another camera or picture shape.** A frame from a different camera, or of a different
   aspect ratio than the calibration, is not drawn; the canvas says why. The same camera at another
-  resolution of the same shape is drawn with the lens scaled to it.
+  resolution of the same shape is drawn with the lens scaled to it only once that size is shown to
+  be a resize and not a cut-out of the sensor (ADR-440 Amendment 9): a fixed camera is compared
+  with the view kept at calibration when it starts and on each refreshed picture, and **Check
+  camera…** proves it from the target's rings. Until then the canvas says the picture is W × H, not
+  the size it was calibrated at, and how to check it; a size found not to show the calibrated view
+  is refused with **Set the camera back to … or calibrate again at this size**.
 - **Error / no WebGL2.** A browser with graphics acceleration off says the corrected picture cannot
   be drawn instead of showing an uncorrected one.
 - **Empty / nothing to show.** Without a saved calibration the overlay row is absent and the canvas
