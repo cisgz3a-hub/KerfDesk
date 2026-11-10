@@ -43,10 +43,7 @@ import {
   type PreparedCurrentStart,
 } from './job-review-model';
 import { detectFluidncDivergenceWarnings } from './fluidnc-divergence-warnings';
-import {
-  leadWithLitStop,
-  liveWindowStreamLitStopWarnings,
-} from './window-stream-lit-stop-warnings';
+import { withLitStopFirst } from './window-stream-lit-stop-warnings';
 import { browserKeepAwakeWarnings } from './browser-keep-awake-warning';
 import { type JobReviewPurpose } from './job-review-store';
 import { refreshControllerIdentityWarnings } from '../controller-identity-warnings';
@@ -222,10 +219,6 @@ export function modelFor(bundle: ReviewedStartBundle): ReturnType<typeof buildJo
     detected: liveLaser.detectedControllerKind,
     gcode: bundle.prepared.gcode,
   });
-  // Who refills this connection's stream is live too. A beam that can stay on
-  // over a stopped head leads the list, Frame and identity notes included
-  // (ADR-676 Amendment 5).
-  const litStop = liveWindowStreamLitStopWarnings(liveLaser, bundle.prepared.gcode);
   const frozenPower =
     bundle.prepared.laserSecondPassChain === undefined
       ? []
@@ -253,11 +246,10 @@ export function modelFor(bundle: ReviewedStartBundle): ReturnType<typeof buildJo
   // The live command set too: Connect binds it from the profile (ADR-375).
   // A CNC that 1.0.29 may have made from a laser asks first (ADR-637 Amd 8).
   const identified = refreshControllerIdentityWarnings(model, device, liveLaser);
-  return withConvertedLaserQuestion(
-    leadWithLitStop(identified, litStop),
-    bundle.project,
-    liveLaser,
-  );
+  // Who refills this connection's stream is live too. A beam that can stay on
+  // over a stopped head leads the whole list (ADR-676 Amendment 5).
+  const litStopFirst = withLitStopFirst(identified, liveLaser, bundle.prepared.gcode);
+  return withConvertedLaserQuestion(litStopFirst, bundle.project, liveLaser);
 }
 
 // A Confirm click is the acknowledgement: the dialog showed the exact prompt

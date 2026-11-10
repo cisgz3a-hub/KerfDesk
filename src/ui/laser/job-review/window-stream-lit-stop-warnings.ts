@@ -55,12 +55,14 @@ export function detectWindowStreamLitStopWarnings(args: {
   return [`${HEAD} ${riskSentence(finding.kind, finding.line)} ${route}`];
 }
 
+type LiveStreamHost = Pick<
+  LaserState,
+  'connection' | 'jobStreamHost' | 'windowStreamReason' | 'activeControllerKind'
+>;
+
 /** The same warning, read from the live laser session at review time. */
 export function liveWindowStreamLitStopWarnings(
-  live: Pick<
-    LaserState,
-    'connection' | 'jobStreamHost' | 'windowStreamReason' | 'activeControllerKind'
-  >,
+  live: LiveStreamHost,
   gcode: string,
 ): ReadonlyArray<string> {
   return detectWindowStreamLitStopWarnings({
@@ -81,6 +83,16 @@ export function leadWithLitStop<M extends { readonly warnings: ReadonlyArray<str
   if (litStop.length === 0) return model;
   const rest = model.warnings.filter((warning) => !litStop.includes(warning));
   return { ...model, warnings: [...litStop, ...rest] };
+}
+
+/** Job Review's last step: the live session's lit-stop warning for this
+ *  program, put ahead of everything the review already lists. */
+export function withLitStopFirst<M extends { readonly warnings: ReadonlyArray<string> }>(
+  model: M,
+  live: LiveStreamHost,
+  gcode: string,
+): M {
+  return leadWithLitStop(model, liveWindowStreamLitStopWarnings(live, gcode));
 }
 
 function scannedFirmware(kind: ControllerKind): 'grbl' | 'marlin' | null {
