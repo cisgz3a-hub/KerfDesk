@@ -77,13 +77,10 @@ test('a 4K RTSP camera on the overlay keeps every UI task under 50 ms', async ({
   await page.evaluate(
     async ({ port, width }) => {
       /* eslint-disable @typescript-eslint/no-explicit-any */
-      const { useStore } = (await import(/* @vite-ignore */ '/src/ui/state/store.ts')) as any;
-      const { useCameraStore } = (await import(
-        /* @vite-ignore */ '/src/ui/state/camera-store.ts'
-      )) as any;
-      const fixtures = (await import(
-        /* @vite-ignore */ '/src/core/camera/model/model-fixtures.ts'
-      )) as any;
+      const im = (path: string) => import(/* @vite-ignore */ path) as Promise<any>;
+      const { useStore } = await im('/src/ui/state/store.ts');
+      const { useCameraStore } = await im('/src/ui/state/camera-store.ts');
+      const fixtures = await im('/src/core/camera/model/model-fixtures.ts');
       /* eslint-enable @typescript-eslint/no-explicit-any */
       const source = {
         kind: 'machine-rtsp',
