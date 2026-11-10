@@ -28,6 +28,16 @@ export type OverlayFrame =
       readonly kind: 'live';
       readonly element: LiveCaptureElement;
       readonly source: ActiveCameraSource;
+    }
+  | {
+      // A bridge camera's newest picture, decoded off the UI thread at the
+      // canvas's size (ADR-440 Amendment 10); width and height are the
+      // picture's own, which the camera model is fitted to.
+      readonly kind: 'bitmap';
+      readonly bitmap: ImageBitmap;
+      readonly width: number;
+      readonly height: number;
+      readonly source: ActiveCameraSource;
     };
 
 export type OverlayScene = {
@@ -172,6 +182,7 @@ function drawOverlay(
     frame.kind === 'still'
       ? frame.capture
       : cameraCaptureBindingForFrame(frame.source, size.width, size.height);
+  // Only a new picture is drawn: a bitmap is its own new frame.
   const fitted = cameraModelForFrame(scene.model, capture, size.width, size.height);
   if (fitted.kind === 'issue') {
     renderer.clear();
@@ -198,6 +209,7 @@ function drawOverlay(
 function frameSize(
   frame: OverlayFrame,
 ): { readonly width: number; readonly height: number } | null {
+  if (frame.kind === 'bitmap') return { width: frame.width, height: frame.height };
   const size =
     frame.kind === 'still'
       ? { width: frame.image.width, height: frame.image.height }
@@ -225,6 +237,7 @@ const stillTextures = new WeakMap<RgbaImage, ImageData>();
 
 function textureSource(frame: OverlayFrame): TexImageSource {
   if (frame.kind === 'live') return frame.element;
+  if (frame.kind === 'bitmap') return frame.bitmap;
   const cached = stillTextures.get(frame.image);
   if (cached !== undefined) return cached;
   const image = new ImageData(
