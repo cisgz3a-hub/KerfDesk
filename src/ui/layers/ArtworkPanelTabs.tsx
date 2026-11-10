@@ -34,6 +34,7 @@ export function ArtworkPanelTabs(props: {
           tabIndex={props.active === view.id ? 0 : -1}
           title={`Show ${view.label.toLowerCase()}`}
           className="lf-btn lf-btn--ghost lf-artwork-view-tab"
+          data-search-target={view.id === 'materials' ? 'materials-tab' : undefined}
           onClick={() => props.onSelect(view.id)}
           onKeyDown={(event) => {
             const next = nextTabIndex(event.key, index, views.length);

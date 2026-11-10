@@ -14917,6 +14917,94 @@ level with another part's corner.
    may line up with. Nothing is persisted, and `.lf2`, compile and G-code are
    untouched.
 
+### Amendment 7 (2026-11-10) - The Dimension tool: inferred from the pick, driving vs driven, dimension-driven edit (DS-7)
+
+Clause 5 made dimension-driven editing the fourth precision mechanism and
+adopted Fusion's and Onshape's unified infer-from-selection tool and their
+driving/driven distinction; nothing implemented it, so a sketch could be
+measured (DS-3b) but no measurement could own its geometry.
+
+1. **A dimension is part of the sketch.** `Sketch.dimensions` holds records of
+   seven kinds: line length, polyline segment length, rectangle width and
+   height, circle diameter, arc or circle radius, and the angle between two
+   lines. Absent when there are none, so a sketch without dimensions is exactly
+   what it was. They reach `.lf2` inside the existing ADR-590 Design Studio
+   document; the field is optional and ignorable, so no schema version changes,
+   and the project validator refuses a malformed record or one naming a missing
+   entity like any other malformed sketch field. Browser-stored sketches are
+   sanitized on restore. Dimensions never reach output: Apply, compile and
+   G-code are untouched.
+2. **One tool, kind inferred from the pick.** A rectangle edge gives its width
+   or height (the nearer edge decides), a polyline segment its length, a circle
+   its diameter, an arc its radius. A line waits for a second click: another
+   line makes the angle between them (measured between the halves that leave
+   the intersection toward each line's far end), anything else places the
+   line's length. Parallel lines and ellipses are not dimensioned. Clicking a
+   placed dimension's drawn line selects it for editing.
+3. **Driving and driven.** A new dimension is driving at the current reading,
+   so placing it moves nothing. Typing a value in the options bar re-solves the
+   geometry LOCALLY and exactly, as one undo step: a line's end moves along the
+   line; an open polyline's later points move with the resized segment, a
+   closed outline moves only that segment's end vertex; a rectangle keeps its
+   origin corner; a circle or arc keeps its centre (and an arc its start and
+   sweep); an angle turns the second line about the intersection, on the side
+   it was. A value leaving degenerate geometry, or an angle outside 0-180
+   degrees, is refused in the box with the reason. A driven dimension is a
+   reference, drawn in parentheses, and cannot be typed into until made
+   driving (it then takes its current reading).
+4. **A driving dimension owns its geometry.** Every state that enters Studio
+   history - commits and the live phase of a drag - has its driving dimensions
+   re-imposed, and dimensions whose geometry is gone (deleted, or changed kind,
+   as a stretched circle becoming an ellipse) are dropped. An inspector edit of
+   a field a driving dimension owns (length, width, height, diameter, radius)
+   is typed THROUGH the dimension, so the value sticks and the dimension reads
+   it. No change propagates past the dimension's own entity: a coupled system
+   still needs the solver clause 5 declines.
+5. Dimensions are drawn in 2D with the DS-3b call-out painter (the one being
+   edited in the selection colour). The 3D surface picks and edits them through
+   the options bar but does not draw them, as Amendment 2 left call-outs
+   2D-only. Esc releases a waiting pick or the edited dimension before the
+   selection; Delete removes the edited dimension, not geometry.
+
+### Amendment 8 (2026-11-10) - Trim to boundary on the Modify rail (DS-6c)
+
+DS-6b shipped Extend and left Trim planned, so a part drawn with crossing
+construction lines could be extended to a boundary but never cut back to one.
+
+1. **Quick trim, LightBurn's and AutoCAD's.** Every other entity is a cutting
+   edge, construction geometry included (that is what construction lines are
+   for). Hovering previews, dashed in the main workspace's trim colour, the
+   piece between the crossing just before the pointer and the one just after
+   it; a click removes it as one undo step and re-previews what is now under
+   the pointer, so a row of pieces is a row of clicks. Escape disarms the tool,
+   as it does Extend.
+2. **What remains keeps its kind where it can.** Trimming a line leaves one or
+   two lines; an open polyline leaves one or two open polylines; a closed
+   polyline or a square-cornered rectangle opens into one polyline; a circle
+   becomes the arc that remains; an arc leaves one or two arcs. Every piece
+   keeps the entity's layer and construction flag; the first keeps its id, a
+   second takes a fresh one. A piece shorter than the smallest entity is
+   dropped.
+3. **Nothing is deleted by accident.** A piece with no crossing on either side
+   - or a closed outline crossed fewer than twice - is reported in the status
+   bar and left alone: removing a whole entity is Delete's job. Ellipses and
+   round-cornered rectangles are reported as not trimmable yet, because their
+   remaining piece is not an entity the model holds (an elliptical arc; a
+   rectangle with a corner missing would be a path of sampled arcs).
+4. **Exact crossings.** Cutting edges reduce to straight segments and circular
+   arcs (`core/design/ops/trim-crossings.ts`) solved analytically, the
+   standard `extend-boundaries.ts` holds; only an ellipse edge is taken from
+   its sampled outline, and the cut then lands on the drawn outline.
+5. **Why a second trim.** The main workspace's Trim (`core/geometry/trim-*`)
+   edits scene curve paths and resolves curve/curve crossings on a chord grid;
+   reusing it would turn a sketch circle into a curve path and lose the arc
+   entity the Studio keeps exact. This follows the Extend precedent
+   (`extend-sketch.ts` beside `geometry/extend-shapes.ts`): the op lives on the
+   sketch model, beside its partner, and the scene trim is unchanged.
+6. Dimensions naming a trimmed entity follow Amendment 7: a dimension whose
+   geometry changed kind (a circle's diameter once it is an arc) is dropped.
+   `.lf2`, compile and G-code are untouched.
+
 ## ADR-273 - CNC exports record incident-grade tool, settings, and profile provenance (2026-08-01)
 
 **Date:** 2026-08-01

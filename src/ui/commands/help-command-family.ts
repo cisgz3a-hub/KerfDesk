@@ -1,6 +1,7 @@
 import { APP_DISPLAY_NAME } from '../../core/app-branding';
 import { enabled, type AppCommand, type AppCommandContext } from './command-types';
 import { useTutorialStore } from '../tutorials/tutorial-store';
+import { openFirstJobGuide } from '../first-job/first-job-guide-store';
 import { openCommandSearch } from './command-search-store';
 import { openKeyboardShortcuts } from '../common/keyboard-shortcuts-event';
 import { LICENSE_NOTICE_EVENT, LICENSE_NOTICE_TITLE } from '../help/license-notice';
@@ -33,6 +34,17 @@ export function tutorialsCommand(): AppCommand {
     'Visual tutorials…',
     'Learn tools through illustrated steps',
     () => useTutorialStore.getState().openTutorial(),
+  );
+}
+
+// ADR-698: the step-by-step panel that waits for the real controls.
+export function firstJobGuideCommand(): AppCommand {
+  return enabled(
+    'help.first-job-guide',
+    'help',
+    'Guided first job…',
+    'Walk through connect, machine, artwork, material, Frame and Start with the real controls',
+    openFirstJobGuide,
   );
 }
 

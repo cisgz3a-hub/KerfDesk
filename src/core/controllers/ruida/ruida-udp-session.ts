@@ -8,9 +8,10 @@
 // is a keepalive, not a verdict on the datagram. Comparing the raw wire byte
 // with 0xCC would read every real ACK (0xC6 with magic 0x88) as a failure
 // (controller audit drivers-6). This module only slices/frames/acks — no
-// sockets, no clock — so it is fully testable; the Electron UDP socket + IPC
-// bridge that would feed it is NOT built yet, which is why Ruida profiles stay
-// transport:'file-only'.
+// sockets, no clock — so it is fully testable. The desktop app feeds it from
+// the Electron main process's UDP bridge (electron/ruida-network-*.ts) through
+// the Ruida network store (ui/state/ruida-network, ADR-697); the line-based
+// controller store still sees Ruida profiles as transport:'file-only'.
 //
 // Audit RU-8, before any socket is wired: the payload is split only between
 // commands (meerk40t controller.py L83-94 queues whole commands), and a reply

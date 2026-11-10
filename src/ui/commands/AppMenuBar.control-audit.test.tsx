@@ -3,6 +3,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useArtworkCreationStore } from '../layers/artwork-creation-store';
 import { useTutorialStore } from '../tutorials/tutorial-store';
+import { useFirstJobGuideStore } from '../first-job/first-job-guide-store';
+import { useSimpleViewStore } from '../state/simple-view';
 import { useCommandSearchStore } from './command-search-store';
 import { AppMenuBar } from './AppMenuBar';
 import { buildAppCommands } from './command-registry';
@@ -23,7 +25,9 @@ type Outcome = {
     | 'support-report'
     | 'check-updates'
     | 'license-notice'
-    | 'keyboard-shortcuts';
+    | 'keyboard-shortcuts'
+    | 'simple-view'
+    | 'first-job-guide';
 };
 
 // Independent command-to-action expectations. Each command is clicked through
@@ -224,10 +228,12 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'window.fit-view': { callback: 'resetView' },
   'window.project-notes': { callback: 'projectNotes' },
   'window.undo-history': { callback: 'undoHistory' },
+  'window.simple-view': { special: 'simple-view' },
   'help.about': { callback: 'showAbout' },
   'help.licence': { special: 'licence' },
   'help.find-command': { special: 'command-search' },
   'help.tutorials': { special: 'tutorials' },
+  'help.first-job-guide': { special: 'first-job-guide' },
   'help.keyboard-shortcuts': { special: 'keyboard-shortcuts' },
   'help.connection': { callback: 'showConnectionHelp' },
   'help.safety': { callback: 'showSafety' },
@@ -254,6 +260,8 @@ beforeEach(() => {
   useTutorialStore.setState({ isOpen: false, tutorialId: null });
   useCommandSearchStore.setState({ open: false });
   useArtworkCreationStore.getState().close();
+  useSimpleViewStore.setState({ enabled: false });
+  useFirstJobGuideStore.setState({ open: false });
 });
 
 afterEach(async () => {
@@ -375,6 +383,8 @@ describe('every registered application menu action', () => {
         expect(useTutorialStore.getState()).toMatchObject({ isOpen: true, tutorialId: null });
       else expect(useTutorialStore.getState().isOpen).toBe(false);
       expect(useCommandSearchStore.getState().open).toBe(outcome.special === 'command-search');
+      expect(useSimpleViewStore.getState().enabled).toBe(outcome.special === 'simple-view');
+      expect(useFirstJobGuideStore.getState().open).toBe(outcome.special === 'first-job-guide');
       expect(opened).toEqual(
         outcome.url === undefined
           ? []

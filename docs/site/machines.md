@@ -17,9 +17,9 @@ KerfDesk runs laser and CNC jobs on your machine over a USB cable. It is built f
 | FluidNC | USB cable only, not Wi-Fi | Runs on the GRBL driver, tested against a GRBL simulator. Its settings live in FluidNC's own config file, so KerfDesk doesn't change them. |
 | Marlin | USB cable | Tested against a scripted Marlin simulator. Laser jobs only, for a LASER_FEATURE build with inline power or a laser wired to the fan output. Your firmware settings need to match your KerfDesk profile. |
 | Smoothieware | USB cable | Tested against a scripted Smoothieware simulator. Laser jobs only, using Smoothieware's own laser module settings. |
-| Ruida (.rd export) | No live connection: export an .rd file and run it from the machine's panel or a USB stick | Experimental and vector-only. Checked by decoding the file back inside KerfDesk, not on hardware. No real Ruida controller has accepted one yet. |
+| Ruida (.rd export) | Export an .rd file and run it from the machine's panel or a USB stick. The desktop app also has an experimental network connection (Ethernet or Wi-Fi) that frames, starts, pauses and stops a job | Experimental and vector-only. Checked by decoding the file back inside KerfDesk, and the network connection against a simulator, not on hardware. No real Ruida controller has accepted either yet. |
 
-KerfDesk connects to machines over USB only, not over Wi-Fi or a network. Trocen, TopWisdom and galvo controllers aren't supported.
+KerfDesk connects to GRBL-family, Marlin and Smoothieware machines over USB; the desktop app also reaches a Ruida over the network (experimental). Trocen, TopWisdom and galvo controllers aren't supported.
 
 ## What you need to connect
 

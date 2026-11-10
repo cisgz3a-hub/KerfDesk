@@ -157,8 +157,13 @@ function handleEscapeLadder(): void {
     store.setMarquee(null);
     return;
   }
-  // Extend is a click tool: one Escape always disarms it, retaining the selection.
-  if (session.tool === 'extend') {
+  // A waiting Dimension pick, or the dimension being edited, lets go first.
+  if (session.dimensionPendingLineId !== null || session.activeDimensionId !== null) {
+    store.setActiveDimension(null);
+    return;
+  }
+  // Extend and Trim are click tools: one Escape always disarms them, retaining the selection.
+  if (session.tool === 'extend' || session.tool === 'trim') {
     store.setTool('select');
     return;
   }

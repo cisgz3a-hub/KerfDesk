@@ -3,7 +3,7 @@
 // still holds gets the stop first (rolling audit v11 W3-P1-1).
 
 import { dialog, type BrowserWindow } from 'electron';
-import { stopDesktopMachineNetwork } from './machine-network-routes.js';
+import { stopDesktopMachines } from './desktop-machine-stop.js';
 import { installRendererCrashRecovery } from './renderer-crash-recovery.js';
 
 export function installDesktopRendererCrashRecovery(
@@ -12,7 +12,7 @@ export function installDesktopRendererCrashRecovery(
 ): void {
   installRendererCrashRecovery(window, {
     isClosing,
-    stopMachine: () => stopDesktopMachineNetwork(),
+    stopMachine: () => stopDesktopMachines(),
     askToReload: async (prompt) => {
       const result = await dialog.showMessageBox(window, {
         type: 'warning',

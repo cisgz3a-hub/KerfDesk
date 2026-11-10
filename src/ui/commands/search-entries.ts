@@ -11,12 +11,24 @@ import { isRemoteAccessRenderer } from '../remote-access/desktop-only';
 import { openSettings, type SettingsSectionId } from '../settings/settings-dialog-store';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
+import type { RailPanelId } from '../state/ui-rail-panel';
 import { rankTutorials } from '../tutorials/tutorial-catalog';
 import { useTutorialStore } from '../tutorials/tutorial-store';
 import type { SearchEntry } from './command-search';
 
-/** The `data-search-target` names the machine panel's controls carry. */
-export type SearchTarget = 'frame-job' | 'start-job' | 'set-origin' | 'jog';
+/** The `data-search-target` names the side panels' controls carry. The guided
+ *  first job (ADR-698) reveals the same controls. */
+export type SearchTarget =
+  | 'frame-job'
+  | 'start-job'
+  | 'set-origin'
+  | 'jog'
+  | 'connect'
+  | 'machine-setup'
+  | 'materials-tab';
+
+// Every target lives in the machine panel except the Artwork panel's tab.
+const TARGET_PANEL: Partial<Record<SearchTarget, RailPanelId>> = { 'materials-tab': 'layers' };
 
 type PanelSpec = {
   readonly target: SearchTarget;
@@ -73,6 +85,12 @@ const SETTINGS: ReadonlyArray<SettingSpec> = [
   { key: 'theme', label: 'Theme', section: 'general', keywords: 'dark light colour appearance' },
   { key: 'layout', label: 'Workspace layout', section: 'general', keywords: 'panels arrangement' },
   { key: 'recent', label: 'Recent projects', section: 'general', keywords: 'history files' },
+  {
+    key: 'simple-view',
+    label: 'Simple view',
+    section: 'general',
+    keywords: 'beginner basic easy advanced hide fewer settings',
+  },
   { key: 'autosave', label: 'Autosave', section: 'general', keywords: 'recover backup save' },
   {
     key: 'snapping',
@@ -184,10 +202,10 @@ function lessonEntries(machineKind: MachineKind, query: string): SearchEntry[] {
     }));
 }
 
-/** Opens the machine panel at the control and focuses it, after the search
- *  window has closed and given focus back. */
+/** Opens the control's side panel at the control and focuses it, after the
+ *  search window has closed and given focus back. */
 export function revealSearchTarget(target: SearchTarget, label: string): void {
-  useUiStore.getState().focusRailPanel('machine');
+  useUiStore.getState().focusRailPanel(TARGET_PANEL[target] ?? 'machine');
   window.setTimeout(() => {
     // Frame and Start also sit in the docked job bar; the visible copy wins.
     const control =
@@ -197,7 +215,10 @@ export function revealSearchTarget(target: SearchTarget, label: string): void {
     if (control === null) {
       useToastStore
         .getState()
-        .pushToast(`${label} is in the machine panel. Open it from Window to use it.`, 'info');
+        .pushToast(
+          `${label} is in the ${TARGET_PANEL[target] === 'layers' ? 'Artwork' : 'machine'} panel. Open it from Window to use it.`,
+          'info',
+        );
       return;
     }
     control.scrollIntoView?.({ block: 'center' });
