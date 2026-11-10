@@ -56,7 +56,7 @@ export function cameraBindingCompatibility(
   current: CameraCaptureBinding,
 ): CameraBindingCompatibility {
   if (saved === undefined) return 'unbound';
-  if (saved.sourceKind !== current.sourceKind || saved.sourceId !== current.sourceId) {
+  if (!sameCameraSource(saved, current)) {
     return 'source-mismatch';
   }
   if (
@@ -73,6 +73,17 @@ export function cameraBindingCompatibility(
 /** A network camera's address as it may be saved: no login anywhere in it. */
 export function cameraSourceIdWithoutCredentials(raw: string): string {
   return publicCameraAddress(raw);
+}
+
+/** True when both name one camera source, compared in the form that is saved. */
+export function sameCameraSource(
+  a: Pick<CameraCaptureBinding, 'sourceKind' | 'sourceId'>,
+  b: Pick<CameraCaptureBinding, 'sourceKind' | 'sourceId'>,
+): boolean {
+  return (
+    a.sourceKind === b.sourceKind &&
+    persistedSourceId(a.sourceKind, a.sourceId) === persistedSourceId(b.sourceKind, b.sourceId)
+  );
 }
 
 // Older versions could save more than the public form; reading drops it.

@@ -13,7 +13,7 @@ import {
 import type { CameraDevice } from '../../../platform/types';
 import { useState } from 'react';
 import { useStore } from '../../state';
-import { loadPhoneCamera } from '../../state/camera-preference-storage';
+import { loadPhoneCamera } from '../../state/remembered-camera-addresses';
 import { useCameraStore } from '../../state/camera-store';
 import { useOwnCameraModel } from '../active-camera-model';
 import { publicCameraSourceId } from '../frame-source';
@@ -86,7 +86,7 @@ export function savedCameraLabel(
       return label === undefined || label === '' ? 'USB camera' : label;
     }
     case 'machine-jpeg':
-      return capture.sourceId === phoneCameraId
+      return phoneCameraId !== undefined && publicCameraSourceId(capture.sourceId) === phoneCameraId
         ? `Phone camera at ${hostOf(capture.sourceId)}`
         : `Machine camera at ${hostOf(capture.sourceId)}`;
     case 'machine-rtsp':

@@ -9,6 +9,7 @@ import { createCameraAddressStore } from './camera-address-store';
 const SECRET = 'stand-in-secret-0';
 const ADDRESS = `rtsp://192.168.1.10:554/user=viewer&password=${SECRET}&channel=1`;
 const URL_ = 'app://app/api/camera-address/rtsp';
+const PHONE_URL = 'app://app/api/camera-address/phone';
 const TRUSTED = { 'X-KerfDesk-Camera-Address': '1', 'Sec-Fetch-Site': 'same-origin' };
 
 const directories: string[] = [];
@@ -44,33 +45,46 @@ async function filesText(directory: string): Promise<string> {
 describe('the remembered RTSP address in secure storage (ADR-692)', () => {
   it('is kept only encrypted, and comes back in full', async () => {
     const { directory, store } = await setup();
-    expect(await store.write(ADDRESS)).toBe(true);
+    expect(await store.write('rtsp', ADDRESS)).toBe(true);
     expect(await filesText(directory)).not.toContain(SECRET);
-    expect(await store.read()).toBe(ADDRESS);
-    expect(await store.write(null)).toBe(false);
-    expect(await store.read()).toBeNull();
+    expect(await store.read('rtsp')).toBe(ADDRESS);
+    expect(await store.write('rtsp', null)).toBe(false);
+    expect(await store.read('rtsp')).toBeNull();
     expect(await readdir(directory)).toEqual([]);
   });
 
   it('keeps nothing when the operating system offers no encryption', async () => {
     const { directory, store, secureStorage } = await setup('win32', 'v11', false);
-    expect(await store.write(ADDRESS)).toBe(false);
+    expect(await store.write('rtsp', ADDRESS)).toBe(false);
     expect(secureStorage.encryptStringAsync).not.toHaveBeenCalled();
     expect(await readdir(directory)).toEqual([]);
-    expect(await store.read()).toBeNull();
+    expect(await store.read('rtsp')).toBeNull();
   });
 
   it('keeps nothing on Linux under the fallback key that every computer shares', async () => {
     const { directory, store } = await setup('linux', 'v10');
-    expect(await store.write(ADDRESS)).toBe(false);
+    expect(await store.write('rtsp', ADDRESS)).toBe(false);
     expect(await readdir(directory)).toEqual([]);
+  });
+
+  it('keeps the RTSP and phone addresses apart, each only for its own scheme', async () => {
+    const { directory, store } = await setup();
+    const phone = `http://192.168.1.50:8080/${SECRET}/shot.jpg`;
+    expect(await store.write('rtsp', ADDRESS)).toBe(true);
+    expect(await store.write('phone', phone)).toBe(true);
+    expect(await filesText(directory)).not.toContain(SECRET);
+    expect(await store.read('rtsp')).toBe(ADDRESS);
+    expect(await store.read('phone')).toBe(phone);
+    await store.write('rtsp', null);
+    expect(await store.read('rtsp')).toBeNull();
+    expect(await store.read('phone')).toBe(phone);
   });
 
   it('reads a damaged file as nothing kept', async () => {
     const { store, secureStorage } = await setup();
-    await store.write(ADDRESS);
+    await store.write('rtsp', ADDRESS);
     secureStorage.decryptStringAsync.mockRejectedValueOnce(new Error('bad key'));
-    expect(await store.read()).toBeNull();
+    expect(await store.read('rtsp')).toBeNull();
   });
 });
 
@@ -112,6 +126,23 @@ describe('the app route for the remembered address', () => {
       expect(await response.text()).not.toContain(SECRET);
     }
     expect((await handler(new Request(`${URL_}?x=1`, { headers: TRUSTED }))).status).toBe(404);
+  });
+
+  it('answers the phone slot only with an http address', async () => {
+    const { handler } = await routes();
+    const phone = (address: unknown) =>
+      new Request(PHONE_URL, {
+        method: 'POST',
+        headers: { ...TRUSTED, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address }),
+      });
+    expect((await handler(phone(ADDRESS))).status).toBe(400);
+    const ok = await handler(phone('http://192.168.1.50:8080/shot.jpg'));
+    expect(await ok.json()).toEqual({ saved: true });
+    const other = await handler(
+      new Request('app://app/api/camera-address/other', { headers: TRUSTED }),
+    );
+    expect(other.status).toBe(404);
   });
 
   it('refuses an address that is not an RTSP address', async () => {

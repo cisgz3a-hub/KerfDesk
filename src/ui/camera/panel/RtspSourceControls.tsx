@@ -10,7 +10,7 @@ import {
   loadRtspCameraUrl,
   rememberedRtspCameraUrl,
   saveRtspCameraUrl,
-} from '../../state/camera-preference-storage';
+} from '../../state/remembered-camera-addresses';
 import { type CameraSourceState, useCameraStore } from '../../state/camera-store';
 import { CameraSourceView } from '../CameraSourceView';
 import type { ActiveCameraSource } from '../frame-source';
@@ -62,9 +62,9 @@ export function RtspSourceControls(): JSX.Element {
         RTSP camera…
       </summary>
       <p style={noteStyle}>
-        For machines whose camera streams RTSP (e.g. rtsp://192.168.10.1:8554/). A login in the
-        address never goes into a project or machine file; KerfDesk Desktop keeps it only in this
-        computer&apos;s secure storage, to reconnect.
+        For machines whose camera streams RTSP (e.g. rtsp://192.168.10.1:8554/). A project or
+        machine file names only the camera&apos;s host. KerfDesk Desktop keeps the full address,
+        login included, only in this computer&apos;s secure storage, to reconnect.
       </p>
       <div style={rowStyle}>
         <input

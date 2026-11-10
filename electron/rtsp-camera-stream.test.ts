@@ -8,8 +8,21 @@ const { spawnMock, installedFfmpeg } = vi.hoisted(() => ({
 }));
 vi.mock('node:child_process', () => ({ default: { spawn: spawnMock }, spawn: spawnMock }));
 vi.mock('./ffmpeg-path.js', () => ({ FFMPEG_MISSING_REASON: 'No FFmpeg.', installedFfmpeg }));
+// The relay FFmpeg opens (ADR-692 Amendment 1) is stood in for here.
+vi.mock('./rtsp-login-relay.js', () => ({
+  openRtspLoginRelay: vi.fn(async () => ({
+    url: 'rtsp://127.0.0.1:9/relay',
+    loginProblem: () => null,
+    close: () => undefined,
+  })),
+}));
 
 import { streamWithFfmpeg } from './rtsp-camera-stream';
+
+// The relay opens before FFmpeg starts; let it.
+async function relayOpened(): Promise<void> {
+  for (let i = 0; i < 10; i += 1) await Promise.resolve();
+}
 
 const PREVIEW_ACTIVITY_TIMEOUT_MS = 10_000;
 
@@ -65,16 +78,17 @@ afterEach(() => {
 });
 
 describe('starting FFmpeg for a network camera (ADR-551)', () => {
-  it('runs the installed FFmpeg by its full path', () => {
+  it('runs the installed FFmpeg by its full path', async () => {
     spawnMock.mockReturnValue(fakeFfmpeg());
     streamWithFfmpeg(
       new URL('rtsp://192.168.1.20/live'),
       fakeResponse() as unknown as ServerResponse,
     );
+    await relayOpened();
     expect(spawnMock.mock.calls[0]?.[0]).toBe('/opt/ffmpeg/bin/ffmpeg');
   });
 
-  it('refuses the preview without starting anything when FFmpeg is not installed', () => {
+  it('refuses the preview without starting anything when FFmpeg is not installed', async () => {
     installedFfmpeg.mockReturnValueOnce(null);
     const response = fakeResponse();
     const lifecycle = { onLive: vi.fn(), onFailure: vi.fn(), onClosed: vi.fn() };
@@ -83,6 +97,7 @@ describe('starting FFmpeg for a network camera (ADR-551)', () => {
       response as unknown as ServerResponse,
       lifecycle,
     );
+    await relayOpened();
     expect(spawnMock).not.toHaveBeenCalled();
     expect(lifecycle.onFailure).toHaveBeenCalledWith('No FFmpeg.');
     expect(response.end).toHaveBeenCalledOnce();
@@ -90,7 +105,7 @@ describe('starting FFmpeg for a network camera (ADR-551)', () => {
 });
 
 describe('streamWithFfmpeg lifecycle', () => {
-  it('aborts an unexpected continuous-stream EOF instead of ending cleanly', () => {
+  it('aborts an unexpected continuous-stream EOF instead of ending cleanly', async () => {
     const ffmpeg = fakeFfmpeg();
     const response = fakeResponse();
     spawnMock.mockReturnValue(ffmpeg);
@@ -100,6 +115,7 @@ describe('streamWithFfmpeg lifecycle', () => {
       response as unknown as ServerResponse,
       lifecycle,
     );
+    await relayOpened();
     ffmpeg.stdout.emit('data', Buffer.from('frame'));
 
     expect(lifecycle.onLive).toHaveBeenCalledOnce();
@@ -118,7 +134,7 @@ describe('streamWithFfmpeg lifecycle', () => {
     ffmpeg.emit('exit', 0, null);
   });
 
-  it('reports an active client close without relabeling a prior stream failure', () => {
+  it('reports an active client close without relabeling a prior stream failure', async () => {
     const ffmpeg = fakeFfmpeg();
     const response = fakeResponse();
     const lifecycle = { onLive: vi.fn(), onFailure: vi.fn(), onClosed: vi.fn() };
@@ -128,6 +144,7 @@ describe('streamWithFfmpeg lifecycle', () => {
       response as unknown as ServerResponse,
       lifecycle,
     );
+    await relayOpened();
 
     response.emit('close');
 
@@ -139,11 +156,12 @@ describe('streamWithFfmpeg lifecycle', () => {
   it.each([
     { label: 'code 0', code: 0, signal: null },
     { label: 'SIGTERM', code: null, signal: 'SIGTERM' },
-  ])('aborts an unexpected FFmpeg $label exit', ({ code, signal }) => {
+  ])('aborts an unexpected FFmpeg $label exit', async ({ code, signal }) => {
     const ffmpeg = fakeFfmpeg();
     const response = fakeResponse();
     spawnMock.mockReturnValue(ffmpeg);
     streamWithFfmpeg(new URL('rtsp://192.168.1.20/live'), response as unknown as ServerResponse);
+    await relayOpened();
     ffmpeg.stdout.emit('data', Buffer.from('frame'));
 
     ffmpeg.emit('exit', code, signal);
@@ -152,11 +170,12 @@ describe('streamWithFfmpeg lifecycle', () => {
     expect(response.end).not.toHaveBeenCalled();
   });
 
-  it('aborts when a running preview stops producing output', () => {
+  it('aborts when a running preview stops producing output', async () => {
     const ffmpeg = fakeFfmpeg();
     const response = fakeResponse();
     spawnMock.mockReturnValue(ffmpeg);
     streamWithFfmpeg(new URL('rtsp://192.168.1.20/live'), response as unknown as ServerResponse);
+    await relayOpened();
     ffmpeg.stdout.emit('data', Buffer.from('frame-a'));
     vi.advanceTimersByTime(PREVIEW_ACTIVITY_TIMEOUT_MS - 1);
     expect(response.destroy).not.toHaveBeenCalled();
@@ -170,12 +189,13 @@ describe('streamWithFfmpeg lifecycle', () => {
     ffmpeg.emit('exit', 1, null);
   });
 
-  it('suspends the activity timeout while response backpressure pauses output', () => {
+  it('suspends the activity timeout while response backpressure pauses output', async () => {
     const ffmpeg = fakeFfmpeg();
     const response = fakeResponse();
     response.write.mockReturnValue(false);
     spawnMock.mockReturnValue(ffmpeg);
     streamWithFfmpeg(new URL('rtsp://192.168.1.20/live'), response as unknown as ServerResponse);
+    await relayOpened();
 
     ffmpeg.stdout.emit('data', Buffer.from('frame'));
     vi.advanceTimersByTime(PREVIEW_ACTIVITY_TIMEOUT_MS);

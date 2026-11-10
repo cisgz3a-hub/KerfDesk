@@ -4,6 +4,7 @@ import type { CameraBridgeAdapter } from '../../platform/types';
 import type * as frameSource from '../camera/frame-source';
 import { cameraCaptureBindingForFrame, captureSourceFrame } from '../camera/frame-source';
 import {
+  SNAPSHOT_CAMERA_LOGIN_MESSAGES,
   SNAPSHOT_CAMERA_NO_PICTURE,
   SNAPSHOT_CAMERA_POLL_INTERVAL_MS,
 } from './camera-snapshot-source';
@@ -48,7 +49,7 @@ describe('startSnapshotSource', () => {
     const first = useCameraStore.getState().sourceState;
     if (first.kind !== 'live') throw new Error('First source not live');
     const firstBinding = cameraCaptureBindingForFrame(first.source, 2, 2);
-    expect(firstBinding.sourceId).toBe('http://192.168.1.50/frame');
+    expect(firstBinding.sourceId).toBe('http://192.168.1.50/');
     expect(JSON.stringify(firstBinding)).not.toMatch(/secret|operator|token|camera=1/);
     await useCameraStore
       .getState()
@@ -100,6 +101,12 @@ describe('startSnapshotSource', () => {
 
   it('says so when the phone sends no picture', async () => {
     vi.mocked(captureSourceFrame).mockResolvedValue(null);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({ kind: 'unavailable', reason: 'timed out' }, { status: 503 }),
+      ),
+    );
     await useCameraStore.getState().startSnapshotSource(bridge, PHONE_URL);
     expect(useCameraStore.getState().sourceState).toEqual({
       kind: 'error',
@@ -107,6 +114,27 @@ describe('startSnapshotSource', () => {
       message: SNAPSHOT_CAMERA_NO_PICTURE,
     });
   });
+
+  // ADR-692 Amendment 1: a login the camera refused is named, not "no picture".
+  it.each(['needed', 'refused', 'unsupported'] as const)(
+    'names a %s login, as the bridge last heard it',
+    async (login) => {
+      vi.mocked(captureSourceFrame).mockResolvedValue(null);
+      const fetch = vi.fn(async (_url: string) =>
+        Response.json({ kind: 'unavailable', reason: 'login', login }, { status: 503 }),
+      );
+      vi.stubGlobal('fetch', fetch);
+      await useCameraStore.getState().startSnapshotSource(bridge, PHONE_URL);
+      expect(useCameraStore.getState().sourceState).toEqual({
+        kind: 'error',
+        sourceKind: 'machine-jpeg',
+        message: SNAPSHOT_CAMERA_LOGIN_MESSAGES[login],
+      });
+      // One question to the bridge, which answers without asking the camera again.
+      expect(fetch).toHaveBeenCalledOnce();
+      expect(fetch.mock.calls[0]?.[0]).toMatch(/^http:\/\/127\.0\.0\.1:51731\/frame\.jpg/);
+    },
+  );
 
   it('needs the camera bridge', async () => {
     await useCameraStore.getState().startSnapshotSource(undefined, PHONE_URL);

@@ -5,15 +5,15 @@ import {
   rtspUrlWithoutCredentials,
   savePhoneCamera,
   saveRtspCameraUrl,
-} from './camera-preference-storage';
+} from './remembered-camera-addresses';
 
 beforeEach(() => localStorage.clear());
 
 describe('RTSP camera preference security', () => {
   it('never persists username or password', () => {
     saveRtspCameraUrl('rtsp://operator:secret@192.168.1.20/live');
-    expect(loadRtspCameraUrl()).toBe('rtsp://192.168.1.20/live');
-    expect(localStorage.getItem('laserforge.camera.rtspUrl.v1')).toBe('rtsp://192.168.1.20/live');
+    expect(loadRtspCameraUrl()).toBe('rtsp://192.168.1.20/');
+    expect(localStorage.getItem('laserforge.camera.rtspUrl.v1')).toBe('rtsp://192.168.1.20/');
   });
 
   it('scrubs credentials from a legacy stored preference on read', () => {
@@ -21,8 +21,8 @@ describe('RTSP camera preference security', () => {
       'laserforge.camera.rtspUrl.v1',
       'rtsp://old-user:old-password@192.168.1.21/stream',
     );
-    expect(loadRtspCameraUrl()).toBe('rtsp://192.168.1.21/stream');
-    expect(localStorage.getItem('laserforge.camera.rtspUrl.v1')).toBe('rtsp://192.168.1.21/stream');
+    expect(loadRtspCameraUrl()).toBe('rtsp://192.168.1.21/');
+    expect(localStorage.getItem('laserforge.camera.rtspUrl.v1')).toBe('rtsp://192.168.1.21/');
   });
 
   it('best-effort scrubs malformed URL-like input', () => {
@@ -57,9 +57,9 @@ describe('phone camera preference (ADR-448)', () => {
         address: 'http://operator:first@secret-tail@192.168.1.50/frame?token=secret#private',
       }),
     );
-    expect(loadPhoneCamera()).toEqual({ app: 'other', address: 'http://192.168.1.50/frame' });
+    expect(loadPhoneCamera()).toEqual({ app: 'other', address: 'http://192.168.1.50/' });
     expect(localStorage.getItem('laserforge.camera.phone.v1')).toBe(
-      JSON.stringify({ app: 'other', address: 'http://192.168.1.50/frame' }),
+      JSON.stringify({ app: 'other', address: 'http://192.168.1.50/' }),
     );
   });
 });

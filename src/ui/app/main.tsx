@@ -22,7 +22,7 @@ import {
   isElectronRenderer,
 } from '../../platform/electron';
 import type { PlatformAdapter } from '../../platform/types';
-import { installCameraAddressVault } from '../state/camera-preference-storage';
+import { installCameraAddressVault } from '../state/remembered-camera-addresses';
 import { webAdapter } from '../../platform/web';
 import { createHttpCameraBridge } from '../../platform/web/camera-bridge';
 import { createNetworkSessionOpener } from '../../platform/web/network-serial-connection';

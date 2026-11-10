@@ -8,11 +8,13 @@
 import type { CameraAdapter, CameraBridgeAdapter } from '../../../platform/types';
 import {
   loadLastCameraSource,
-  loadPhoneCamera,
   loadPreferredCameraId,
-  rememberedRtspCameraUrl,
   type LastCameraSource,
 } from '../../state/camera-preference-storage';
+import {
+  rememberedPhoneCamera,
+  rememberedRtspCameraUrl,
+} from '../../state/remembered-camera-addresses';
 import { useCameraStore, type MachineCameraState } from '../../state/camera-store';
 import type { ActiveCameraSource } from '../frame-source';
 import { phoneSnapshotUrl } from '../phone-camera-address';
@@ -89,7 +91,7 @@ async function startAddressCamera(kind: 'rtsp' | 'phone', deps: CameraStartDeps)
     if (url !== null) await useCameraStore.getState().startRtspSource(deps.bridge, url);
     return;
   }
-  const phone = loadPhoneCamera();
+  const phone = await rememberedPhoneCamera();
   const url = phone === null ? null : phoneSnapshotUrl(phone.app, phone.address);
   if (url !== null) await useCameraStore.getState().startSnapshotSource(deps.bridge, url);
 }

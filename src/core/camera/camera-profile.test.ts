@@ -153,7 +153,7 @@ describe('camera profile and alignment', () => {
         ...alignedCamera,
         source: { kind: 'rtsp', url: 'rtsp://user:secret@192.168.10.1:8554/live?token=x' },
       }).source,
-    ).toEqual({ kind: 'rtsp', url: 'rtsp://192.168.10.1:8554/live' });
+    ).toEqual({ kind: 'rtsp', url: 'rtsp://192.168.10.1:8554/' });
   });
 });
 

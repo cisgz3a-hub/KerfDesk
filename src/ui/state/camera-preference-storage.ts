@@ -4,14 +4,6 @@
 // the calibration draft pattern. Failures (private mode, quota) degrade to
 // "no preference" silently.
 
-import { cameraAddressHasLogin } from '../../core/camera/camera-address-login';
-import { cameraSourceIdWithoutCredentials } from '../../core/camera/camera-capture-binding';
-import type { CameraAddressVault } from '../../core/camera/camera-address-vault';
-import {
-  phoneCameraAddressWithoutLogin,
-  type PhoneCameraApp,
-} from '../camera/phone-camera-address';
-
 const PREFERRED_CAMERA_KEY = 'laserforge.camera.preferredDeviceId.v1';
 
 export function loadPreferredCameraId(): string | null {
@@ -30,111 +22,8 @@ export function savePreferredCameraId(deviceId: string): void {
   }
 }
 
-// The last RTSP camera URL is machine-local operator input (ADR-116) — same
-// storage rationale as the preferred deviceId. Only its public form is kept
-// here; the full address, login included, goes only to the desktop's secure
-// storage (ADR-692), and is otherwise known for this run alone.
-const RTSP_CAMERA_URL_KEY = 'laserforge.camera.rtspUrl.v1';
-
-let addressVault: CameraAddressVault | undefined;
-let fullAddressThisRun: string | null = null;
-
-/** Where the full remembered address is kept; absent outside the desktop app. */
-export function installCameraAddressVault(vault: CameraAddressVault | undefined): void {
-  addressVault = vault;
-  // An older record read before the vault was there moves into it now.
-  if (vault !== undefined && fullAddressThisRun !== null) void vault.write(fullAddressThisRun);
-}
-
-function rememberFullAddress(url: string): void {
-  const full = url.trim();
-  fullAddressThisRun = cameraAddressHasLogin(full) ? full : null;
-  void addressVault?.write(fullAddressThisRun).catch(() => false);
-}
-
-export function loadRtspCameraUrl(): string | null {
-  try {
-    const stored = localStorage.getItem(RTSP_CAMERA_URL_KEY);
-    if (stored === null) return null;
-    const safe = rtspUrlWithoutCredentials(stored);
-    if (safe !== stored) {
-      // An older version kept more than the public form here.
-      rememberFullAddress(stored);
-      try {
-        localStorage.setItem(RTSP_CAMERA_URL_KEY, safe);
-      } catch {
-        // Cleanup is best effort; the sanitized readable choice remains usable.
-      }
-    }
-    return safe;
-  } catch {
-    return null;
-  }
-}
-
-export function saveRtspCameraUrl(url: string): void {
-  rememberFullAddress(url);
-  try {
-    localStorage.setItem(RTSP_CAMERA_URL_KEY, rtspUrlWithoutCredentials(url));
-  } catch {
-    // Storage unavailable: the URL simply won't survive reload.
-  }
-}
-
-/** The remembered address to connect to: in full when it is kept, else its public form. */
-export async function rememberedRtspCameraUrl(): Promise<string | null> {
-  const remembered = loadRtspCameraUrl();
-  if (remembered === null) return null;
-  const full = fullAddressThisRun ?? (await addressVault?.read().catch(() => null)) ?? null;
-  return full !== null && rtspUrlWithoutCredentials(full) === remembered ? full : remembered;
-}
-
-/** Test seam: forget the vault and this run's full address. */
-export function resetCameraAddressVaultForTests(): void {
-  addressVault = undefined;
-  fullAddressThisRun = null;
-}
-
-export function rtspUrlWithoutCredentials(raw: string): string {
-  return cameraSourceIdWithoutCredentials(raw);
-}
-
-// The phone camera's app and address (ADR-448): machine-local operator input
-// like the RTSP URL, and stored without any login for the same reason.
-const PHONE_CAMERA_KEY = 'laserforge.camera.phone.v1';
-
-export type StoredPhoneCamera = { readonly app: PhoneCameraApp; readonly address: string };
-
-export function loadPhoneCamera(): StoredPhoneCamera | null {
-  try {
-    const stored: unknown = JSON.parse(localStorage.getItem(PHONE_CAMERA_KEY) ?? 'null');
-    if (typeof stored !== 'object' || stored === null) return null;
-    const { app, address } = stored as Record<string, unknown>;
-    if ((app !== 'ip-webcam' && app !== 'other') || typeof address !== 'string') return null;
-    const safe = phoneCameraAddressWithoutLogin(address);
-    try {
-      if (safe !== address) {
-        localStorage.setItem(PHONE_CAMERA_KEY, JSON.stringify({ app, address: safe }));
-      }
-    } catch {
-      // Cleanup is best effort; never return the credentials from the legacy record.
-    }
-    return { app, address: safe };
-  } catch {
-    return null;
-  }
-}
-
-export function savePhoneCamera(camera: StoredPhoneCamera): void {
-  try {
-    localStorage.setItem(
-      PHONE_CAMERA_KEY,
-      JSON.stringify({ app: camera.app, address: phoneCameraAddressWithoutLogin(camera.address) }),
-    );
-  } catch {
-    // Storage unavailable: the address simply won't survive reload.
-  }
-}
+// The remembered RTSP and phone camera addresses live in
+// remembered-camera-addresses.ts (ADR-692 Amendment 1).
 
 // Compact vs large (monitoring) camera panel — a viewing preference, so
 // machine-local like the rest (F-CAM9).

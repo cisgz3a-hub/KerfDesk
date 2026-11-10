@@ -5,7 +5,7 @@ import { cameraSourceIdWithoutCredentials } from '../../../core/camera/camera-ca
 import { savedCameraModel } from '../../../core/camera/model/model-fixtures';
 import { clickElement, mountControl } from '../../image-editor/control-audit-test-support';
 import { useStore } from '../../state';
-import { savePhoneCamera } from '../../state/camera-preference-storage';
+import { savePhoneCamera } from '../../state/remembered-camera-addresses';
 import { useCameraStore, type CameraSourceState } from '../../state/camera-store';
 import { resetStore } from '../../state/test-helpers';
 import { activeCameraModel, ownCameraModel } from '../active-camera-model';
