@@ -118,7 +118,7 @@ it('ready Inspector routes every camera control, look, layout toggle and travel/
   expect(host.querySelector('[aria-label="Program readouts"]')).toBeNull();
   await clickControl(host, 'Show readouts');
   expect(host.querySelector('[aria-label="Program readouts"]')).not.toBeNull();
-  await clickControl(host, 'PNG');
+  await clickControl(host, 'Save image');
   expect(scene.captureImage).toHaveBeenCalledTimes(1);
   await clickControl(host, 'Hide source');
   expect(host.querySelector('[aria-label="Program source"]')).toBeNull();

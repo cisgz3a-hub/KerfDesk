@@ -1,5 +1,5 @@
 // Shared read-only working surface for the canvas and the full Inspector.
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 // Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
 import type { Viewer3dPick } from '../viewer3d/scene-pick';
 import type { InspectorRenderModel } from './inspector-model';
@@ -10,7 +10,8 @@ import type { GcodeInspectorAnalysis } from './gcode-inspector-analysis';
 import type { GcodeSourceLineIndex } from './gcode-source-line-index';
 import { InspectorSourcePane } from './InspectorSourcePane';
 import { InspectorTimeline } from './InspectorTimeline';
-import { InspectorViewerHeader } from './InspectorViewerHeader';
+import { InspectorViewerHeader, type InspectorLayout } from './InspectorViewerHeader';
+import { timelineBands } from './timeline-bands';
 import { InspectorPreviewStock } from './InspectorPreviewStock';
 import { InspectorViewport } from './InspectorViewport';
 import { secondsAtPick } from './pick-readout';
@@ -31,12 +32,15 @@ type InspectorViewProps =
       readonly source: GcodeInspectionSource;
       readonly sourceIndex: GcodeSourceLineIndex;
       readonly variant?: 'full';
+      readonly lead?: React.ReactNode;
     }
   | {
       readonly model: InspectorRenderModel;
       readonly analysis: GcodeInspectorAnalysis;
       readonly source?: GcodeInspectionSource;
       readonly variant: 'preview';
+      /** What the header row starts with: the canvas view's name and Refresh. */
+      readonly lead?: React.ReactNode;
     };
 type Session = ReturnType<typeof useInspectorSession>;
 
@@ -55,12 +59,10 @@ export function InspectorView(props: InspectorViewProps): JSX.Element {
   return (
     <div className="gcode-viewer-body" ref={bodyRef}>
       <div className="gcode-viewer-column">
-        <InspectorViewerHeader
-          liveMode={liveMode}
-          liveMatched={live.matched}
-          onFollowLiveToggle={() => session.setFollowLive(!session.followLive)}
-          look={session.look}
-          onLookChange={session.setLook}
+        <SessionHeader
+          model={props.model}
+          session={session}
+          lead={props.lead}
           layout={{
             full,
             sourceVisible,
@@ -96,7 +98,7 @@ export function InspectorView(props: InspectorViewProps): JSX.Element {
             <PreviewOverlays {...{ session, scene }} model={props.model} />
           ) : null}
         </InspectorViewport>
-        <SessionTimeline session={session} />
+        <SessionTimeline model={props.model} session={session} />
       </div>
       {props.variant !== 'preview' && sourceVisible ? (
         <InspectorSourcePane
@@ -174,30 +176,65 @@ function PreviewLens(props: {
 }): JSX.Element {
   const s = props.session;
   return (
-    <div style={previewLensStyle}>
-      <InspectorLensControl
-        model={props.model}
-        time={s.time}
-        theme={s.theme}
-        look={s.look}
-        sections={s.sections}
-        lens={s.lens}
-        onLensChange={s.setLens}
-        hiddenEntries={s.legendHidden}
-        onToggleEntry={s.toggleEntry}
-        variant="overlay"
-      />
-    </div>
+    <InspectorLensControl
+      model={props.model}
+      time={s.time}
+      theme={s.theme}
+      look={s.look}
+      sections={s.sections}
+      lens={s.lens}
+      onLensChange={s.setLens}
+      hiddenEntries={s.legendHidden}
+      onToggleEntry={s.toggleEntry}
+      variant="overlay"
+    />
   );
 }
 
-function SessionTimeline({ session }: { readonly session: Session }): JSX.Element {
-  const { live, liveMode } = session;
+function SessionHeader(props: {
+  readonly model: InspectorRenderModel;
+  readonly session: Session;
+  readonly lead: React.ReactNode;
+  readonly layout: InspectorLayout;
+}): JSX.Element {
+  const { session, model } = props;
+  // The size of what the job cuts, not the travel to and from the origin.
+  const bounds = model.stats.cutBounds ?? model.stats.programBounds;
+  return (
+    <InspectorViewerHeader
+      liveMode={session.liveMode}
+      liveMatched={session.live.matched}
+      onFollowLiveToggle={() => session.setFollowLive(!session.followLive)}
+      look={session.look}
+      onLookChange={session.setLook}
+      layout={props.layout}
+      lead={props.lead}
+      stats={{
+        seconds: session.time.motionSeconds,
+        widthMm: bounds === null ? null : bounds.maxX - bounds.minX,
+        heightMm: bounds === null ? null : bounds.maxY - bounds.minY,
+        cutMm: model.stats.cutMm,
+      }}
+    />
+  );
+}
+
+function SessionTimeline(props: {
+  readonly model: InspectorRenderModel;
+  readonly session: Session;
+}): JSX.Element {
+  const { session, model } = props;
+  const { live, liveMode, time } = session;
+  const bands = useMemo(
+    () => timelineBands(model, time.segTimeEndSec, time.motionSeconds),
+    [model, time],
+  );
   return (
     <InspectorTimeline
       playback={session.playback}
       trail={{ seconds: session.trailSeconds, onChange: session.setTrailSeconds }}
       totalRouteMm={session.time.motionSeconds}
+      bands={bands}
       live={
         liveMode
           ? {
@@ -312,11 +349,3 @@ function useInspectorScene(
   );
   return { canvasRef, handleRef, state, reason, camera, stock, burn };
 }
-
-const previewLensStyle: React.CSSProperties = {
-  position: 'absolute',
-  left: 0,
-  bottom: 44,
-  width: 250,
-  maxWidth: '100%',
-};

@@ -39,7 +39,7 @@ export function InspectorLensControl(props: InspectorLensControlProps): JSX.Elem
     [model, time, lens, theme, look, sections],
   );
   return (
-    <div style={props.variant === 'overlay' ? overlayStyle : undefined}>
+    <div className={props.variant === 'overlay' ? 'gcode-viewer-lens' : undefined}>
       {props.variant === 'overlay' ? <strong style={titleStyle}>Colour by</strong> : null}
       <select
         value={props.lens}
@@ -137,22 +137,6 @@ function SwatchList(props: {
     </ul>
   );
 }
-
-const overlayStyle: React.CSSProperties = {
-  position: 'absolute',
-  left: 10,
-  bottom: 10,
-  zIndex: 2,
-  width: 230,
-  maxWidth: 'calc(100% - 20px)',
-  boxSizing: 'border-box',
-  padding: '6px 8px',
-  borderRadius: 'var(--lf-radius-lg)',
-  border: '1px solid var(--lf-border)',
-  background: 'var(--lf-bg-1)',
-  boxShadow: 'var(--lf-shadow)',
-  fontSize: 'var(--lf-text-xs)',
-};
 
 const titleStyle: React.CSSProperties = { display: 'block', marginBottom: 4 };
 const selectStyle: React.CSSProperties = { width: '100%', marginBottom: 6 };
