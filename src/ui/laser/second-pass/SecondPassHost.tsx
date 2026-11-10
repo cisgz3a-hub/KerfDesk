@@ -81,6 +81,7 @@ function SecondPassEditor(props: {
           {error ? <p role="alert">{error}</p> : <p role="status">Opening saved job…</p>}
           <DialogActions>
             <button
+              type="button"
               className="lf-btn"
               onClick={close}
               title="Close this window without changing the saved job or moving the machine."

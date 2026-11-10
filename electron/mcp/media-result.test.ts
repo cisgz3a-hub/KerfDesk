@@ -99,7 +99,7 @@ describe.each([false, true])('camera image protocol (modern=%s)', (modern) => {
       );
       const result = await client.callTool({ name: 'get_camera_snapshot', arguments: {} });
       expect(result.isError).toBe(true);
-      expect(result.structuredContent?.error).toMatchObject({ code: 'failed' });
+      expect(result.structuredContent).toMatchObject({ error: { code: 'failed' } });
       expect(result.content.every((part) => part.type === 'text')).toBe(true);
       expect(textOf(result)).not.toContain('/9j/');
     },
@@ -129,7 +129,7 @@ describe('scene sharing boundary', () => {
       );
       const result = await client.callTool({ name: 'get_workspace_scene', arguments: {} });
       expect(result.isError).toBe(true);
-      expect(result.structuredContent?.error).toMatchObject({ code: 'failed' });
+      expect(result.structuredContent).toMatchObject({ error: { code: 'failed' } });
       expect(JSON.stringify(result)).not.toContain('private-image');
     },
   );

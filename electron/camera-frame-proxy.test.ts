@@ -322,7 +322,7 @@ describe('upstream serialization (single-threaded embedded cameras)', () => {
     let active = 0;
     let maxActive = 0;
     let hits = 0;
-    const upstream = createServer((req, res) => {
+    const upstream = createServer((_req, res) => {
       hits += 1;
       active += 1;
       maxActive = Math.max(maxActive, active);

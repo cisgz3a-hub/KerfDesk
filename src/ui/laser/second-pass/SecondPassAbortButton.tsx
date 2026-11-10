@@ -11,6 +11,7 @@ export function SecondPassAbortButton(): JSX.Element | null {
   if (!activeJob && !activeMotion) return null;
   return (
     <button
+      type="button"
       className="lf-btn lf-btn--danger"
       title="Stop the current job or Frame motion and turn the laser off."
       onClick={() => void useLaserStore.getState().stopJob()}

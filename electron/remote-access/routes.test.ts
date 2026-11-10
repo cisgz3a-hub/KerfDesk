@@ -13,6 +13,7 @@ function fixture() {
     {
       read,
       write: vi.fn(async () => undefined),
+      discard: vi.fn(async () => true),
       create: () => ({
         schemaVersion: 1,
         deviceId: randomUUID(),
@@ -106,7 +107,7 @@ describe('private native remote routes', () => {
   it('invalidates old detach and completion ownership when a new renderer attaches', async () => {
     const f = fixture();
     const old = await attach(f);
-    const pending = f.queue.request('get_workspace', {}, 'client', false).catch((e) => e);
+    const pending = f.queue.request('get_workspace', {}, 'client', false).catch((e: unknown) => e);
     const delivered = f.queue.poll(old).requests[0]!;
     const current = await attach(f);
     expect(await pending).toMatchObject({ code: 'unavailable' });
@@ -133,7 +134,9 @@ describe('private native remote routes', () => {
       }),
     );
     await expect(success).resolves.toEqual({ revision: 'current', mode: 'laser' });
-    const failure = f.queue.request('update_operation', {}, 'client', true).catch((e) => e);
+    const failure = f.queue
+      .request('update_operation', {}, 'client', true)
+      .catch((e: unknown) => e);
     const second = f.queue.poll(sessionId).requests[0]!.id;
     await f.handle(
       request('complete', {
@@ -143,8 +146,8 @@ describe('private native remote routes', () => {
       }),
     );
     const error = await failure;
-    expect(error.code).toBe('unsupported_operation');
-    expect(error.message).not.toContain('secret native path');
+    expect(error).toMatchObject({ code: 'unsupported_operation' });
+    expect(error).toHaveProperty('message', expect.not.stringContaining('secret native path'));
     f.runtime.closed();
     f.queue.detach();
   });

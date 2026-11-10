@@ -3,6 +3,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type * as LicensingDevice from './licensing-device';
 
 const mocks = vi.hoisted(() => ({
   quitHandlers: [] as Array<() => void>,
@@ -29,7 +30,7 @@ vi.mock('electron', () => ({
   shell: { openExternal: vi.fn() },
 }));
 vi.mock('./licensing-device.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./licensing-device')>()),
+  ...(await importOriginal<typeof LicensingDevice>()),
   licensingDeviceId: () => mocks.readDevice(),
 }));
 

@@ -83,7 +83,7 @@ function afterJob(wire: ReadonlyArray<Wire>): string {
           : '<end>',
     )
     .join('');
-  return all.slice(all.indexOf(JOB) + JOB.length).replace(/\x18/g, '<reset>');
+  return all.slice(all.indexOf(JOB) + JOB.length).replaceAll('\x18', '<reset>');
 }
 
 function crashWindow() {
@@ -206,7 +206,7 @@ describe('other closes no window stop precedes (W3-P1-1)', () => {
     const { bridge, sessionId, wire } = await controller('grblhal-raw', false);
     await bridge.write(sessionId, 1, Buffer.from(JOB).toString('base64'));
     const started = Date.now();
-    bridge.stopAll();
+    void bridge.stopAll();
     await bridge.settled();
     expect(Date.now() - started).toBeLessThan(2_500);
     expect(bytesIn(wire).toString('latin1')).toBe(`${JOB}\x18M5\nM9\n`);
