@@ -11,8 +11,14 @@ import { findMarks } from '../../core/camera/marks/find-marks';
 import {
   MAX_SCALE_ERROR,
   matchMarkPair,
+  type MarkPair,
   type MarkPairResult,
 } from '../../core/camera/marks/match-mark-pair';
+import {
+  orientMarkPair,
+  reversedPair,
+  type ArtworkBox,
+} from '../../core/camera/marks/pair-orientation';
 import type { RgbaImage } from '../../core/camera/rgba-image';
 import {
   combinedBBox,
@@ -49,6 +55,8 @@ export function locatePrintCutMarks(args: {
   readonly targets: PrintAndCutDesignTargets;
   /** The design marks' sizes where known, mm. */
   readonly markSizeMm: number | DesignMarkSizeRangeMm | null;
+  /** The design's printed artwork beside the marks, to tell which way round they are. */
+  readonly artwork?: ReadonlyArray<ArtworkBox>;
 }): MarkPairResult | null {
   const region = { x: 0, y: 0, width: args.bedWidthMm, height: args.bedHeightMm };
   const pixelsPerMm = markPixelsPerMm(args.bedWidthMm, args.bedHeightMm);
@@ -67,7 +75,51 @@ export function locatePrintCutMarks(args: {
     minSizeMm: size === null ? MIN_MARK_MM : 0.6 * (typeof size === 'number' ? size : size.minMm),
     maxSizeMm: size === null ? MAX_MARK_MM : 1.6 * (typeof size === 'number' ? size : size.maxMm),
   });
-  return matchMarkPair([args.targets.first, args.targets.second], marks);
+  const targets = [args.targets.first, args.targets.second] as const;
+  const result = matchMarkPair(targets, marks);
+  if (result.kind !== 'found' || args.artwork === undefined) return result;
+  const oriented = orientMarkPair({
+    pair: result.pair,
+    targets,
+    artwork: args.artwork,
+    image,
+    region,
+    pixelsPerMm,
+  });
+  const orientation =
+    oriented.kind === 'print' ? (oriented.flipped ? 'print-flipped' : 'print') : oriented.kind;
+  return { kind: 'found', pair: { ...oriented.pair, orientation } };
+}
+
+/**
+ * The boxes of the design's artwork other than the two marks: what the
+ * printed sheet should carry beside them (ADR-443 Amendment 3).
+ */
+export function designArtworkBoxes(
+  project: Project,
+  targets: PrintAndCutDesignTargets,
+): ArtworkBox[] {
+  const boxes: ArtworkBox[] = [];
+  for (const object of project.scene.objects) {
+    const box = combinedBBox([object]);
+    if (box === null) continue;
+    const isMark = [targets.first, targets.second].some(
+      (target) =>
+        markSizeAt({ ...project, scene: { ...project.scene, objects: [object] } }, target) !== null,
+    );
+    if (!isMark) boxes.push(box);
+  }
+  return boxes;
+}
+
+/**
+ * What the operator must confirm when the camera could not tell which way
+ * round the sheet lies; null when it could (ADR-443 Amendment 3).
+ */
+export function cameraOrientationNote(pair: MarkPair): string | null {
+  if (pair.orientation !== 'ambiguous') return null;
+  const other = reversedPair(pair).rotationDeg;
+  return `The camera could not tell which way round the sheet lies: it reads as turned ${pair.rotationDeg.toFixed(1)}°, but the same two marks also fit a sheet turned ${other.toFixed(1)}°, which would put the cut half a turn off the print. Check that the sheet is turned ${pair.rotationDeg.toFixed(0)}° (the Frame traces it) before applying.`;
 }
 
 /**
@@ -125,6 +177,16 @@ export function targetsFromSelection(
     : null;
 }
 
+const ORIENTATION_WORDS: Readonly<Record<NonNullable<MarkPair['orientation']> | 'none', string>> = {
+  none: '',
+  nearest: '',
+  print: ' The print beside the marks confirms which way round the sheet lies.',
+  'print-flipped':
+    ' The print beside the marks shows the sheet is turned this way: taken the other way round, the marks would have put the cut half a turn off.',
+  ambiguous:
+    ' The print beside the marks could not show which way round the sheet lies: confirm the turn below.',
+};
+
 /** What the camera found, in words for the dialog. */
 export function markPairMessage(result: MarkPairResult, targets: PrintAndCutDesignTargets): string {
   const designed = Math.hypot(
@@ -138,7 +200,7 @@ export function markPairMessage(result: MarkPairResult, targets: PrintAndCutDesi
   }
   const { pair } = result;
   const percent = (pair.scale - 1) * 100;
-  const found = `The camera found both marks ${(pair.scale * designed).toFixed(1)} mm apart (designed ${designed.toFixed(1)} mm, print scale ${percent >= 0 ? '+' : ''}${percent.toFixed(2)} %), turned ${pair.rotationDeg.toFixed(1)}°.`;
+  const found = `The camera found both marks ${(pair.scale * designed).toFixed(1)} mm apart (designed ${designed.toFixed(1)} mm, print scale ${percent >= 0 ? '+' : ''}${percent.toFixed(2)} %), turned ${pair.rotationDeg.toFixed(1)}°.${ORIENTATION_WORDS[pair.orientation ?? 'none']}`;
   if (pair.otherPairs === 0) return found;
   const others =
     pair.otherPairs === 1

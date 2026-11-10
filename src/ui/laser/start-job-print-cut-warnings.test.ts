@@ -70,9 +70,8 @@ describe('Print-and-Cut Frame warnings', () => {
     expect(result.warnings).toEqual(
       expect.arrayContaining([
         expect.stringContaining('box and your artwork are both set to burn'),
-        expect.stringContaining(
-          'Print-and-Cut registration and job-origin placement are both active',
-        ),
+        // Rolling audit v13 Y3-P3-1: it names the cause and the fix.
+        expect.stringContaining('lines up with the print only from Absolute Coordinates'),
       ]),
     );
   });

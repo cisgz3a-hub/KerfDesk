@@ -30,6 +30,8 @@ type PrintAndCutDialogProps = {
   /** The centres of the two selected objects, when exactly two are selected. */
   readonly selectionTargets?: PrintAndCutDesignTargets | null;
   readonly camera?: PrintAndCutCamera;
+  /** The camera could not tell which way round the sheet lies (ADR-443 Amendment 3). */
+  readonly orientationNote?: string | null;
   readonly onTargetsChanged?: () => void;
   readonly onCapture: (which: 'first' | 'second') => void;
   readonly onCancel: () => void;
@@ -44,6 +46,7 @@ export function PrintAndCutDialog(props: PrintAndCutDialogProps): JSX.Element {
     props.firstMachinePoint,
     props.secondMachinePoint,
     props.captureBasisError ?? null,
+    props.orientationNote ?? null,
   );
   const { invalidReason } = registration;
   const changeTargets = (next: PrintAndCutDesignTargets): void => {
@@ -160,17 +163,32 @@ type ConfirmedRegistration = {
   readonly second: Vec2 | null;
 };
 
+// The registration's own figures, then the camera's orientation (ADR-443
+// Amendment 3): either asks the operator to confirm before Apply.
+function unusualReason(
+  draft: RegistrationDraft,
+  basisError: string | null,
+  orientationNote: string | null,
+): string | null {
+  if (basisError !== null) return null;
+  const reasons = [draft.unusual, draft.error === null ? orientationNote : null].filter(
+    (reason): reason is string => reason !== null,
+  );
+  return reasons.length > 0 ? reasons.join(' ') : null;
+}
+
 function useRegistrationState(
   targets: PrintAndCutDesignTargets,
   first: Vec2 | null,
   second: Vec2 | null,
   basisError: string | null,
+  orientationNote: string | null,
 ): RegistrationState {
   const [confirmed, setConfirmed] = useState<ConfirmedRegistration | null>(null);
   const draft = registrationDraft(targets, first, second);
   // Points captured in different bases measure nothing.
   const measured = basisError === null ? draft.measured : null;
-  const unusual = basisError === null ? draft.unusual : null;
+  const unusual = unusualReason(draft, basisError, orientationNote);
   // Own the exact immutable targets and captures, not their rounded display.
   // A fresh capture asks again even when it repeats the same coordinates.
   const confirmedUnusual =

@@ -19,6 +19,12 @@ export type MarkPair = {
   readonly offsetMm: number;
   /** Other pairs that also fit the spacing. */
   readonly otherPairs: number;
+  /**
+   * How the order was settled (ADR-443 Amendment 3): by the print, by the
+   * print against the nearer order, by nearness alone, or not at all. Absent
+   * when nothing beyond nearness was asked.
+   */
+  readonly orientation?: 'print' | 'print-flipped' | 'nearest' | 'ambiguous';
 };
 
 export type MarkPairResult =
