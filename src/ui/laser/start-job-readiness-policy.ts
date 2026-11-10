@@ -97,7 +97,10 @@ const START_FROM_NAMES: Readonly<Record<Exclude<JobStartMode, 'absolute'>, strin
 // Amendment 6). Said in Job Review, never refused.
 function placementWarnings(
   project: Project,
-  machine: Pick<MachineStartSnapshot, 'cameraPlacementActive' | 'registrationOutline'>,
+  machine: Pick<
+    MachineStartSnapshot,
+    'cameraPlacementActive' | 'cameraMovedWarning' | 'registrationOutline'
+  >,
   jobOrigin: JobOriginPlacement | undefined,
 ): string[] {
   const layout = registrationLayout(project);
@@ -108,6 +111,9 @@ function placementWarnings(
   return [
     outline ?? cameraPlacementStartFromWarning(machine, jobOrigin, layout, rotary),
     layout === 'place-board' ? placeBoardAbsoluteWarning(jobOrigin) : null,
+    // ADR-663 Amendment 5: artwork placed on a picture from a camera that may
+    // have moved may burn away from where it shows.
+    machine.cameraPlacementActive === true ? (machine.cameraMovedWarning ?? null) : null,
   ].filter((warning): warning is string => warning !== null);
 }
 
