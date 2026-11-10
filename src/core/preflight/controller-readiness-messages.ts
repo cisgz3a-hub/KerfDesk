@@ -93,6 +93,39 @@ export function laserPowerRangeEmptyMessage(
   }
 }
 
+const SPINDLE_FULL_SPEED_AT_S0 =
+  'drives full PWM for every S, so the spindle runs at full speed even at S0 while M3 or M4 is on';
+const GRBLHAL_SPINDLE_ON_OFF =
+  'switches to on/off spindle control, so S no longer sets the spindle RPM';
+
+/** The CNC counterpart of `laserPowerRangeEmptyMessage` (ADR-567 Amendment
+ *  3): the same firmware facts, said of a spindle. Stock GRBL's full-PWM
+ *  result runs the spindle at full speed for every S; grblHAL's not-variable
+ *  spindle is switched on and off only. A Job Review warning, never a Start
+ *  guard (ADR-565). */
+export function spindlePowerRangeEmptyMessage(
+  maxS: number,
+  minS: number | undefined,
+  spindleMaxRpm: number,
+  firmware: PowerRangeFirmware,
+): string {
+  const range =
+    minS === undefined
+      ? `Controller reports $30=${maxS}, so there is no S spindle speed range.`
+      : `Controller $30=${maxS} is not above $31=${minS}, so there is no S spindle speed range.`;
+  const advice = `Set $30=${spindleMaxRpm}, the spindle's max RPM, with $31 below it before cutting.`;
+  switch (firmware) {
+    case 'grbl':
+      return `${range} Stock GRBL then ${SPINDLE_FULL_SPEED_AT_S0}. ${advice}`;
+    case 'grblhal':
+      return `${range} grblHAL then ${GRBLHAL_SPINDLE_ON_OFF}. ${advice}`;
+    case 'fluidnc':
+      return `${range} FluidNC reports $30 from the top of the spindle's speed_map in its YAML config, so check speed_map before cutting.`;
+    case 'unknown':
+      return `${range} Stock GRBL then ${SPINDLE_FULL_SPEED_AT_S0}; grblHAL instead ${GRBLHAL_SPINDLE_ON_OFF}. ${advice}`;
+  }
+}
+
 /** `$31` above zero with `$30` above it (controller audit v4 E1-P3-2). Stock
  *  GRBL's `spindle_compute_pwm_value` maps S linearly from `$31` up to `$30`
  *  and gives any S > 0 at or below `$31` the lowest PWM step (1 of 255), so
