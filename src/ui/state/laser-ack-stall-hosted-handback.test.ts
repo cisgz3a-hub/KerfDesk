@@ -3,6 +3,7 @@ import { createStreamer, step } from '../../core/controllers/grbl';
 import { marlinDriver } from '../../core/controllers';
 import type { HostedStreamRefill, SerialConnection } from '../../platform/types';
 import { makeLineHandlerHarness } from './laser-line-handler.test-support';
+import { createLaserStoreRefs } from './laser-store-refs';
 import { createSafeWrite } from './laser-safe-write';
 import { handleLine } from './laser-line-handler';
 import { acknowledgementStalledNotice } from './laser-safety-notice';
@@ -37,7 +38,7 @@ function stalledHostedHarness() {
     onWriteError: () => () => undefined,
   };
   const writes: string[] = [];
-  const { refs: initialRefs, set, get } = makeLineHandlerHarness();
+  const { set, get } = makeLineHandlerHarness();
   const connection: SerialConnection = {
     write: async (line) => {
       writes.push(line);
@@ -47,7 +48,10 @@ function stalledHostedHarness() {
     close: async () => undefined,
     hostedStreaming: hosted,
   };
-  const refs = { ...initialRefs, driver: marlinDriver, nextTranscriptId: 1, connection };
+  const refs = createLaserStoreRefs();
+  refs.driver = marlinDriver;
+  refs.nextTranscriptId = 1;
+  refs.connection = connection;
   set({
     activeControllerKind: 'marlin',
     capabilities: marlinDriver.capabilities,
