@@ -26,6 +26,13 @@ const SHARED_MODULES = [
   'src/ui/common/sleep.ts',
 ];
 
+// Folders that may import nothing outside themselves, by their own test. A
+// helper they need is a deliberate copy.
+const ISOLATED_FOLDERS = [
+  // user-macro-dependency-boundary.test.ts: only `react` and `./` imports.
+  'src/ui/laser/console/user-macros/',
+];
+
 const NOT_SHIPPED =
   /\.(test|spec)\.|__fixtures__|test-support|test-fixture|-testing\.|[\\/]testing[\\/]|\.d\.ts$/;
 
@@ -143,6 +150,7 @@ it(
     const copies: string[] = [];
     for (const file of shippedFiles('src')) {
       if (SHARED_MODULES.includes(file)) continue;
+      if (ISOLATED_FOLDERS.some((folder) => file.startsWith(folder))) continue;
       const source = parse(file);
       for (const helper of helpers(source)) {
         const body = normalBody(source, helper.fn);
