@@ -91,5 +91,27 @@ Out of scope, unchanged:
   simulate this from the emitted G-code on six controllers and three setups.
 - On the chuck, those strokes now take `1 / k` times longer than before (6.3× on the Creality
   preset), and the ETA shows it.
+- **Returning users: a deliberate burn change.** A rotary project saved by 1.0.29 or 1.0.30 opens
+  unchanged, but its line, cut and fill moves now run at the layer speed on the part. So they burn
+  darker (chuck, small scale) or lighter (k > 1 rollers, small parts) than those releases burned
+  them; image rows do not change.
+  - The returning-user tests (`returning-user-rotary-1-0-30.test.ts`) keep 1.0.30's hashes. With the
+    feed match switched off, every program must still hash to 1.0.30's, which pins geometry, power,
+    order and image rows.
+  - With the match on, only F words may differ, image lines not at all, and each lit move's new F
+    must move the surface at the feed 1.0.30 wrote for it.
+  - The sidecars are not rewritten.
 - **HARDWARE-GATED / CLAIMED.** The rule follows the controllers' documented feed semantics, but no
   physical rotary has burned with it yet, as for ADR-127 itself.
+
+### With a taper (ADR-694)
+
+The taper warp scales Y by `f(x) = R_ref / r(x)` before `k`. A machine Y move at X then turns the
+part's surface at radius `r(x)` by `ΔY / (k · f(x))`, so the local scale is `k · f(x)`.
+
+- The feed match carries the taper's profile and uses `k · rotaryTaperYFactorAt(profile, midpoint X)`
+  for each move. It applies on a taper even when `k = 1`.
+- On the Ø80 → Ø70 tumbler a stroke round the part at the rim and one at the base both move the
+  surface at the layer speed, so they get equal dose. Without the factor the base ran at 87 %.
+- A Fill sweep still takes one feed from its midpoint X. On an angled hatch along a taper, its far
+  ends are then a few percent off. A 90° hatch has a constant X and is exact.
