@@ -39,8 +39,8 @@ export function rotaryFeedMatchFor(job: Job, maxFeedMmPerMin: number): RotaryFee
 }
 
 /** The machine feed that moves the surface at `layerFeed` along from → to
- * (machine coordinates). Without a match, or for a zero-length move, the
- * layer feed itself. */
+ * (machine coordinates), held at the feed ceiling. Without a match, or for a
+ * zero-length move, the layer feed itself. */
 export function surfaceMatchedFeed(
   layerFeed: number,
   from: { readonly x: number; readonly y: number },
@@ -48,18 +48,44 @@ export function surfaceMatchedFeed(
   match: RotaryFeedMatch | undefined,
 ): number {
   if (match === undefined) return layerFeed;
+  return Math.min(unheldMatchedFeed(layerFeed, from, to, match), feedCeiling(layerFeed, match));
+}
+
+/** How many times the dose the set speed gives a move gets once the ceiling
+ * holds its feed (ADR-127 Amd 2 D4): 1 when the matched feed fits. Job Review
+ * reads it from the moves themselves, so a taper's narrow end and a k <= 1
+ * roller are counted (rolling audit v13 Y5-P2-1). */
+export function surfaceFeedDoseRise(
+  layerFeed: number,
+  from: { readonly x: number; readonly y: number },
+  to: { readonly x: number; readonly y: number },
+  match: RotaryFeedMatch | undefined,
+): number {
+  if (match === undefined) return 1;
+  const wanted = unheldMatchedFeed(layerFeed, from, to, match);
+  const ceiling = feedCeiling(layerFeed, match);
+  return wanted > ceiling ? wanted / ceiling : 1;
+}
+
+function unheldMatchedFeed(
+  layerFeed: number,
+  from: { readonly x: number; readonly y: number },
+  to: { readonly x: number; readonly y: number },
+  match: RotaryFeedMatch,
+): number {
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   const machineMm = Math.hypot(dx, dy);
   const localScale = match.yScale * rotaryTaperYFactorAt(match.taper, (from.x + to.x) / 2);
   const surfaceMm = Math.hypot(dx, dy / localScale);
   if (!(machineMm > 0) || !(surfaceMm > 0)) return layerFeed;
-  const matched = (layerFeed * machineMm) / surfaceMm;
-  const ceiling =
-    Number.isFinite(match.maxFeedMmPerMin) && match.maxFeedMmPerMin > 0
-      ? Math.max(layerFeed, match.maxFeedMmPerMin)
-      : Number.POSITIVE_INFINITY;
-  return Math.min(matched, ceiling);
+  return (layerFeed * machineMm) / surfaceMm;
+}
+
+function feedCeiling(layerFeed: number, match: RotaryFeedMatch): number {
+  return Number.isFinite(match.maxFeedMmPerMin) && match.maxFeedMmPerMin > 0
+    ? Math.max(layerFeed, match.maxFeedMmPerMin)
+    : Number.POSITIVE_INFINITY;
 }
 
 /** The emitter contexts' optional match. */
