@@ -9,6 +9,7 @@ import { Dialog, DialogActions } from '../../kit/Dialog';
 import { useLaserStore } from '../../state/laser-store';
 import { surfaceProbeBlockReason } from '../../state/laser-surface-probe-actions';
 import { maxOf, minOf } from '../../../core/util';
+import { ProbeCircuitLine } from '../ProbeCircuitLine';
 
 const INITIAL = {
   minX: 0,
@@ -135,6 +136,8 @@ export function SurfaceProbeDialog(props: { readonly onClose: () => void }): JSX
         />
         Current Z clears the entire region, the probe is connected, and the spindle is off.
       </label>
+      {/* Touch-off's live test-touch line (ADR-103 Amendment 4). */}
+      <ProbeCircuitLine testedNext="Measure grid once the region is clear." />
       {blocked !== null && !busy && <p>{blocked}</p>}
       {message !== '' && <p role="status">{message}</p>}
       {measurement !== null && <SurfaceProbeReview measurement={measurement} />}

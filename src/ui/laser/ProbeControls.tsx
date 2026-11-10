@@ -10,16 +10,13 @@ import { useStore } from '../state';
 import { runningJobMachineKind } from '../state/job-motion-machine';
 import { useLaserStore } from '../state/laser-store';
 import { describeProbeResult } from '../state/probe-actions';
-import {
-  probeCircuitBlockReason,
-  probeCircuitCheck,
-  type ProbeCircuitCheck,
-} from '../state/probe-test-touch';
+import { probeCircuitBlockReason } from '../state/probe-test-touch';
 import { useToastStore } from '../state/toast-store';
 import {
   CornerProbeGeometryFields,
   type CornerProbeGeometryDraft,
 } from './CornerProbeGeometryFields';
+import { ProbeCircuitLine } from './ProbeCircuitLine';
 import { ProbeNumberField } from './ProbeNumberField';
 import {
   effectiveProbeBitDiameterMm,
@@ -125,7 +122,7 @@ export function ProbeControls(): JSX.Element | null {
         {probeHint(mode, toolChangeHold)}
         {' Spindle must be off.'}
       </p>
-      <ProbeCircuitLine />
+      <ProbeCircuitLine testedNext="Place the plate, then Run probe." />
       <ProbeFields
         key={contextKey}
         mode={mode}
@@ -170,18 +167,6 @@ function useProbeLiveState(): ProbeLiveState {
   return { isConnected, isIdle, isBusy, circuitBlock };
 }
 
-/** The live probe input and its test touch (ADR-103 Amendment 2). */
-function ProbeCircuitLine(): JSX.Element | null {
-  const circuit = useLaserStore(probeCircuitCheck);
-  const shown = useLaserStore((s) => s.connection.kind === 'connected' && !s.probeBusy);
-  if (!shown) return null;
-  return (
-    <p role="status" aria-label="Probe circuit" style={circuitStyle(circuit)}>
-      {probeCircuitLine(circuit)}
-    </p>
-  );
-}
-
 function probeControlReadiness(input: ProbeLiveState & { readonly toolSupported: boolean }): {
   readonly ready: boolean;
   readonly title: string;
@@ -199,25 +184,6 @@ function probeControlReadiness(input: ProbeLiveState & { readonly toolSupported:
   return {
     ready: true,
     title: 'Start the probing cycle. The bit moves toward the plate at the seek feed.',
-  };
-}
-
-function probeCircuitLine(circuit: ProbeCircuitCheck): string {
-  switch (circuit) {
-    case 'untested':
-      return 'Probe circuit: not tested. Hold the plate against the bit until this reads closed, then take it away.';
-    case 'closed':
-      return 'Probe circuit: closed. Take the plate away from the bit.';
-    case 'tested':
-      return 'Probe circuit: tested. Place the plate, then Run probe.';
-  }
-}
-
-function circuitStyle(circuit: ProbeCircuitCheck): React.CSSProperties {
-  return {
-    ...hintStyle,
-    color: circuit === 'tested' ? 'var(--lf-success-fg)' : 'var(--lf-text)',
-    fontWeight: circuit === 'tested' ? 400 : 600,
   };
 }
 
