@@ -1,4 +1,5 @@
 import type { OldProjectBurnNotice } from '../../io/project/project-load-metadata';
+import { rotaryFeedChangeMessage } from '../../io/project/old-project-rotary-feed';
 
 // The words for what an upgraded project burns differently, shared by the load
 // notices and Job Review (ADR-682 Amendment 3).
@@ -17,6 +18,7 @@ export function oldProjectBurnMessages(notice: OldProjectBurnNotice): {
       movedRecordsMessage(notice),
       imageDoseMessage(notice),
       cncJobOriginMessage(notice),
+      rotaryFeedMessage(notice),
     ].flatMap(present),
   };
 }
@@ -96,6 +98,12 @@ function cncJobOriginMessage({ cncJobOrigin }: OldProjectBurnNotice): string | n
     'contour, so the cut sits where the canvas shows it. If the stock is clamped for the old cut, ' +
     'move it or the origin, and Frame before you run it.'
   );
+}
+
+// Rolling audit v13 Y5-P2-2 (ADR-127 Amendment 2).
+function rotaryFeedMessage({ rotaryFeed }: OldProjectBurnNotice): string | null {
+  const change = rotaryFeed?.[0];
+  return change === undefined ? null : rotaryFeedChangeMessage(change);
 }
 
 function labelOf(image: { readonly label: string }): string {

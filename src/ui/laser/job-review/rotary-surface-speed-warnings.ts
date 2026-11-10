@@ -1,35 +1,65 @@
-import { rotaryYScale } from '../../../core/devices';
-import type { Job } from '../../../core/job';
-import { rotaryAppliesTo } from '../../../core/job';
+import type { CutSegment, Job } from '../../../core/job';
+import { machineSpaceJob, rotaryAppliesTo } from '../../../core/job';
+import {
+  rotaryFeedMatchFor,
+  surfaceFeedDoseRise,
+  type RotaryFeedMatch,
+} from '../../../core/output/rotary-surface-feed';
 import type { Project } from '../../../core/scene';
 
 /** ADR-127 Amendment 2: each move's feed is matched so the part's surface
- * moves at the layer speed. A roller that needs more than one machine mm per
- * surface mm (Y scale above 1) asks the controller for more feed round the
- * part than along it; past the profile's Max feed the emitter holds the feed
- * there, and those strokes run slower on the part and burn darker. Exact
- * prepared-job disclosure only; it never changes output or blocks Start. */
+ * moves at the layer speed. A stroke round the part that needs more feed than
+ * the profile's Max feed is held there, so it runs slower on the part and
+ * burns darker (D4). Rolling audit v13 Y5-P2-1 / Y5-P3-1: the check reads the
+ * job's own moves through the emitter's feed maths, so a taper's narrow end
+ * and a k <= 1 roller count, a stroke along X never does, and the words name
+ * no axis or unit. Exact prepared-job disclosure only; it never changes
+ * output or blocks Start. */
 export function detectRotarySurfaceSpeedWarnings(
-  project: Pick<Project, 'device' | 'machine'>,
+  project: Pick<Project, 'device' | 'machine'> & {
+    readonly scene?: Pick<Project['scene'], 'layers'>;
+  },
   job: Job,
 ): ReadonlyArray<string> {
-  const rotary = project.device.rotary;
-  if (!rotaryAppliesTo(project.device, project.machine) || rotary === undefined) return [];
-  const scale = rotaryYScale(rotary);
-  const maxFeed = project.device.maxFeed;
-  if (!(scale > 1) || !(maxFeed > 0)) return [];
-  let fastest = 0;
-  for (const group of job.groups) {
+  if (!rotaryAppliesTo(project.device, project.machine)) return [];
+  const machineJob = machineSpaceJob(job, project.device, project.machine);
+  const match = rotaryFeedMatchFor(machineJob, project.device.maxFeed);
+  if (match === undefined) return [];
+  const worst = new Map<string, { readonly speed: number; readonly rise: number }>();
+  for (const group of machineJob.groups) {
     if (group.kind !== 'cut' && group.kind !== 'fill') continue;
-    if (group.speed * scale > maxFeed) fastest = Math.max(fastest, group.speed);
+    const rise = largestDoseRise(group.speed, group.segments, match);
+    const seen = worst.get(group.layerId);
+    if (rise > 1 && (seen === undefined || rise > seen.rise)) {
+      worst.set(group.layerId, { speed: group.speed, rise });
+    }
   }
-  if (fastest === 0) return [];
-  const heldMmPerMin = Math.floor(maxFeed / scale);
-  return [
-    `This rotary turns Y ×${scale.toFixed(2)}, so a ${fastest} mm/min stroke round the part ` +
-      `needs ${Math.ceil(fastest * scale)} mm/min of Y feed, more than the Max feed ` +
-      `(${maxFeed} mm/min). Strokes round the part run at ${heldMmPerMin} mm/min on its ` +
-      `surface and burn darker than strokes along it. For an even burn, set the vector ` +
-      `layers to ${heldMmPerMin} mm/min or less.`,
-  ];
+  const taper = match.taper === undefined ? '' : ', most at the narrow end of the taper';
+  return [...worst].map(([layerId, { speed, rise }]) => {
+    const name = project.scene?.layers.find((layer) => layer.id === layerId)?.name ?? layerId;
+    return (
+      `Layer ${name}: on this rotary its strokes round the part need more feed than the Max ` +
+      `feed (${project.device.maxFeed} mm/min), so they are held there and run slower on the ` +
+      `part${taper}. They burn up to ${Math.round(rise * 100)} % of the energy you set. For an ` +
+      `even burn, set this layer to ${Math.floor(speed / rise)} mm/min or less.`
+    );
+  });
+}
+
+function largestDoseRise(
+  speed: number,
+  segments: ReadonlyArray<CutSegment>,
+  match: RotaryFeedMatch,
+): number {
+  let largest = 1;
+  for (const segment of segments) {
+    const points = segment.polyline;
+    for (let i = 1; i < points.length; i += 1) {
+      const from = points[i - 1];
+      const to = points[i];
+      if (from === undefined || to === undefined) continue;
+      largest = Math.max(largest, surfaceFeedDoseRise(speed, from, to, match));
+    }
+  }
+  return largest;
 }
