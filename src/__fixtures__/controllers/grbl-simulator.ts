@@ -84,6 +84,12 @@ export type CreateGrblSimulatorOptions = Partial<GrblSimOptions> & {
    */
   readonly jogCancelFlushesInput?: boolean;
   /**
+   * With `jogCancelFlushesInput`: how long the main loop stays busy before it
+   * reads bytes that just arrived (default 1 ms). Longer than Cancel's 500 ms
+   * reply grace, a jog line is still unread when 0x85 flushes it (ADR-696).
+   */
+  readonly lineParseDelayMs?: number;
+  /**
    * Work offsets an earlier session left in non-volatile storage. Power-up
    * loads G54 on every firmware, and G92 only as grblHAL with `$384` off, its
    * default; machine position still starts at zero (grblHAL gcode.c:833-838,
@@ -191,6 +197,7 @@ export function createGrblSimulator(options: CreateGrblSimulatorOptions = {}): G
     blockRetireMs,
     rxBufferBytes,
     jogCancelFlushesInput,
+    lineParseDelayMs,
     storedOffsets,
     fourthAxisA,
     ...optionOverrides
@@ -255,7 +262,9 @@ export function createGrblSimulator(options: CreateGrblSimulatorOptions = {}): G
         );
   const feeder: HostByteFeeder =
     backpressure ??
-    (jogCancelFlushesInput === true ? createDelayedParseFeeder(deps) : createImmediateFeeder(deps));
+    (jogCancelFlushesInput === true
+      ? createDelayedParseFeeder(deps, lineParseDelayMs)
+      : createImmediateFeeder(deps));
   const inertRxWindow = createRxWindow(0);
   const inertPlanner = createPlanner(0);
 

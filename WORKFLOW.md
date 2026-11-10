@@ -2403,6 +2403,12 @@ inches hides the position until `$G` or the next Frame (ADR-375 Amendment 11).
    already sent, then writes `0x85` (ADR-375, ADR-640). After the old command handoff settles, the app queries state. If
    GRBL reports `Jog`, the first byte lost the Idle-to-Jog race, so `0x85` is sent again. No queued
    settlement marker is written until a fresh `Idle`; a second post-marker `Idle` releases ownership.
+   A line the controller had not read when `0x85` arrived is never answered, so Cancel reports the
+   missing reply after 8 s. Once the controller reports Idle, a GRBL, grblHAL or FluidNC board is
+   sent one `$G`: these answer lines in order, so its `[GC:` proves the unanswered line was
+   discarded unread, and ownership is released on the same session, with no reset and the work
+   origin kept. Until then, or where that proof is not available, Disconnect and Connect stay
+   available (ADR-640, ADR-696).
 2. An owned G54 selection remains active after cancellation; the stored G55-G59 offsets remain
    intact.
 
@@ -2433,8 +2439,11 @@ inches hides the position until `$G` or the next Frame (ADR-375 Amendment 11).
 5. Otherwise the jog asks for full travel and relies on the release.
 6. A release just after the jog went out waits for its reply before `0x85`, as Cancel does
    (F-B4). If a motion line's reply never comes, Cancel says so after 8 s and the jog stays owned,
-   since the reply may still arrive; once the controller reports Idle, Disconnect and Connect stay
-   available to clear it (ADR-640).
+   since the reply may still arrive. Once the controller reports Idle, a GRBL-family board is asked
+   for `$G` (after 1 s of Idle, or 15 s when the firmware did not identify itself); its `[GC:`
+   proves the jog line was discarded unread, and the jog is released without a reconnect, so a G92
+   origin and a homed machine survive. Disconnect and Connect stay available meanwhile, and remain
+   the way out if `$G` is not answered (ADR-640, ADR-696).
 
 ### F-B6. Start job
 
