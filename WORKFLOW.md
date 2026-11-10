@@ -2155,7 +2155,11 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    - Marlin's cutter: lit until its laser safety timeout, 1 s in stock builds.
    - Marlin's fan output: lit until the window recovers, or until the E-stop.
 
-   The warning never refuses Start.
+   Its advice depends on why the window streams (ADR-676 Amendment 5): with the preference off,
+   turn it on and reconnect; with an identical USB adapter, leave only one plugged in and
+   reconnect; when the worker could not start, reconnecting is likely to fail the same way. Each
+   asks you not to edit the project while the job runs. The warning leads the list, ahead of
+   Frame and controller-identity notes, and never refuses Start.
 5. Pause releases background refill. Confirmed Resume and tool-change Continue restore it for
    the same live job. Abort, disconnect or a replacement job cannot inherit an old refill queue.
    Marlin's Abort and Disconnect send their stop lines right behind the refill's handback, so

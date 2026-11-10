@@ -8,14 +8,17 @@
 // A worker streams USB GRBL-family and Marlin connections and desktop network
 // sessions, so this appears only where that path is unavailable: a USB
 // adapter without a unique identity, Background streaming turned off, or a
-// worker that could not start. Advisory only, never a Start gate (ADR-565):
-// the transport can still deliver the job.
+// worker that could not start. The advice names the route that can reach the
+// worker from there (ADR-676 Amendment 5): reconnecting cannot help where the
+// setting is already on. Advisory only, never a Start gate (ADR-565): the
+// transport can still deliver the job.
 
 import type { ControllerKind } from '../../../core/devices';
 import {
   findStoppedHeadPower,
   type StoppedHeadPower,
 } from '../../../core/gcode/stopped-head-power';
+import type { WindowStreamReason } from '../../state/laser-connect-attempt';
 import type { LaserState } from '../../state/laser-store';
 
 export const WINDOW_STREAM_LIT_STOP_PREFIX =
@@ -23,12 +26,23 @@ export const WINDOW_STREAM_LIT_STOP_PREFIX =
 
 const HEAD = `${WINDOW_STREAM_LIT_STOP_PREFIX}, not from a background worker. While the window is busy (a large edit, Undo or an import) nothing refills the controller, so it runs out of moves and stops the head.`;
 
-const WORKER_ROUTE =
-  'To stream it from a worker instead, turn Background streaming on in Machine Setup and reconnect; on USB, also leave only one adapter of this kind plugged in. Until then, do not edit the project while it runs.';
+const HOLD_EDITS = 'Until then, do not edit the project while it runs.';
+
+/** How to reach a worker from this connection, by why the window streams. */
+const WORKER_ROUTE: Readonly<Record<WindowStreamReason, string>> = {
+  'opted-out': `Background streaming is off in Machine Setup for this machine. To stream it from a worker instead, turn it on and reconnect. ${HOLD_EDITS}`,
+  'adapter-not-unique': `Background streaming is on, but its worker could not tell this USB adapter apart: another port KerfDesk may use has the same USB IDs, or this one reports none. Leave only one adapter of this kind plugged in and reconnect. ${HOLD_EDITS}`,
+  'worker-unavailable':
+    'Background streaming is on, but its worker could not start for this connection, so reconnecting is likely to end the same way. Do not edit the project while it runs.',
+  'no-worker':
+    'This connection has no background worker to stream it. Do not edit the project while it runs.',
+};
 
 export function detectWindowStreamLitStopWarnings(args: {
   readonly connected: boolean;
   readonly jobStreamHost: 'worker' | 'window' | null | undefined;
+  /** Why the window streams; unknown reads as a transport with no worker. */
+  readonly windowStreamReason?: WindowStreamReason | null | undefined;
   readonly controllerKind: ControllerKind;
   readonly gcode: string;
 }): ReadonlyArray<string> {
@@ -37,20 +51,36 @@ export function detectWindowStreamLitStopWarnings(args: {
   if (firmware === null) return [];
   const finding = findStoppedHeadPower(args.gcode, firmware);
   if (finding === null) return [];
-  return [`${HEAD} ${riskSentence(finding.kind, finding.line)} ${WORKER_ROUTE}`];
+  const route = WORKER_ROUTE[args.windowStreamReason ?? 'no-worker'];
+  return [`${HEAD} ${riskSentence(finding.kind, finding.line)} ${route}`];
 }
 
 /** The same warning, read from the live laser session at review time. */
 export function liveWindowStreamLitStopWarnings(
-  live: Pick<LaserState, 'connection' | 'jobStreamHost' | 'activeControllerKind'>,
+  live: Pick<
+    LaserState,
+    'connection' | 'jobStreamHost' | 'windowStreamReason' | 'activeControllerKind'
+  >,
   gcode: string,
 ): ReadonlyArray<string> {
   return detectWindowStreamLitStopWarnings({
     connected: live.connection.kind === 'connected',
     jobStreamHost: live.jobStreamHost,
+    windowStreamReason: live.windowStreamReason,
     controllerKind: live.activeControllerKind,
     gcode,
   });
+}
+
+/** Puts the lit-stop warning first, ahead of every finding added before it,
+ *  whoever added it (ADR-676 decision 5 and Amendment 5). */
+export function leadWithLitStop<M extends { readonly warnings: ReadonlyArray<string> }>(
+  model: M,
+  litStop: ReadonlyArray<string>,
+): M {
+  if (litStop.length === 0) return model;
+  const rest = model.warnings.filter((warning) => !litStop.includes(warning));
+  return { ...model, warnings: [...litStop, ...rest] };
 }
 
 function scannedFirmware(kind: ControllerKind): 'grbl' | 'marlin' | null {

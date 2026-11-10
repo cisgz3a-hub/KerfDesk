@@ -19,6 +19,7 @@ import {
   type LaserSafetyNotice,
 } from './laser-safety-notice';
 import { airOffLines, noResetStopLines } from './laser-quick-stop';
+import { NO_JOB_STREAM_HOST } from './laser-connect-attempt';
 import { sessionScopedJobStateReset } from './laser-session-reset';
 import { liveCanvasLifecyclePatch } from './live-canvas-run';
 import type { LaserState } from './laser-store';
@@ -443,7 +444,7 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     ...sessionScopedJobStateReset(),
     connection: { kind: 'disconnected' },
     serialPortInfo: null,
-    jobStreamHost: null,
+    ...NO_JOB_STREAM_HOST,
     connectedBaudRate: null,
     statusReport: null,
     controllerSessionEpoch: state.controllerSessionEpoch + 1,
