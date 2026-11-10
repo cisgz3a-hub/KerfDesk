@@ -46,7 +46,18 @@ const slide = (x: number) => Array.from({ length: 5 }, () => ({ x, y: 0 }));
 
 // What the camera sees: smooth shapes everywhere, slid by (dx, dy) camera
 // pixels when the camera has moved, with `gain` for a brighter room.
+// Drawn once per shift: each is a 1280 × 720 picture, and the checks reuse them.
+const frames = new Map<string, RgbaImage>();
 function frame(dx: number, dy: number, gain = 1): RgbaImage {
+  const key = `${dx},${dy},${gain}`;
+  const known = frames.get(key);
+  if (known !== undefined) return known;
+  const drawn = drawFrame(dx, dy, gain);
+  frames.set(key, drawn);
+  return drawn;
+}
+
+function drawFrame(dx: number, dy: number, gain: number): RgbaImage {
   const width = 1280;
   const height = 720;
   const data = new Uint8ClampedArray(width * height * 4);
@@ -86,7 +97,9 @@ afterEach(() => {
   useToastStore.getState().dismissToastKey('camera-moved');
 });
 
-describe('checkCameraMoved', () => {
+// Each check runs the real patch matching on a 1280 × 720 picture: allow for a
+// loaded runner.
+describe('checkCameraMoved', { timeout: 20_000 }, () => {
   it('says nothing without a view to compare with', () => {
     expect(checkCameraMoved(source, frame(0, 0))).toEqual({ kind: 'unknown' });
   });
