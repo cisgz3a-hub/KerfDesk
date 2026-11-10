@@ -2,6 +2,7 @@
 // in the same way PDF vector pages are imported (pdf-vector-page.ts). One
 // PostScript point is one SVG user unit; width and height carry millimetres.
 
+import { unionBox } from '../../core/geometry/box-math';
 import { curveSubpathBounds } from '../../core/scene';
 import type { PsBox } from './ps-source';
 import type { PaintedPath, Subpath, Vec } from './ps-types';
@@ -12,7 +13,7 @@ export type SvgPage = { readonly svg: string; readonly outsideBox: boolean };
 
 export function paintedSvg(painted: readonly PaintedPath[], declared: PsBox | null): SvgPage {
   const extent = paintedExtent(painted);
-  const box = declared === null ? extent : union(declared, extent);
+  const box = declared === null ? extent : unionBox(declared, extent);
   const outsideBox = declared !== null && !contains(declared, extent);
   const width = box.maxX - box.minX;
   const height = box.maxY - box.minY;
@@ -85,15 +86,6 @@ function paintedExtent(painted: readonly PaintedPath[]): PsBox {
       maxY = Math.max(maxY, b.maxY);
     }
   return { minX, minY, maxX, maxY };
-}
-
-function union(a: PsBox, b: PsBox): PsBox {
-  return {
-    minX: Math.min(a.minX, b.minX),
-    minY: Math.min(a.minY, b.minY),
-    maxX: Math.max(a.maxX, b.maxX),
-    maxY: Math.max(a.maxY, b.maxY),
-  };
 }
 
 function contains(outer: PsBox, inner: PsBox): boolean {

@@ -1,7 +1,6 @@
 // EPS, PostScript and Illustrator 3–8 import (ADR-700): the file's drawing is
 // converted to SVG text, then imported exactly as an SVG file would be.
 
-import { convertPostscript } from '../../io/postscript';
 import type { SceneObject } from '../../core/scene';
 import type { SvgArtworkFragment } from '../state/svg-fragment-mutation';
 import type { ImportOutcome } from '../state/store';
@@ -35,6 +34,8 @@ export async function importPostscriptFile(
   file: File,
   ctx: ImportPostscriptContext,
 ): Promise<void> {
+  // The reader loads on first use, keeping it out of the boot bundle.
+  const { convertPostscript } = await import('../../io/postscript');
   const result = convertPostscript(await readImagePrefix(file, file.size));
   if (result.kind === 'error') {
     ctx.pushToast(`${file.name}: ${result.reason}`, 'error');
