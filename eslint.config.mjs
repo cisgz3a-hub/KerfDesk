@@ -46,6 +46,7 @@ const moduleBoundaries = {
     // patterns are considered. `mode: 'file'` pins it to one file path.
     { type: 'platform-types', pattern: 'src/platform/types.ts', mode: 'file' },
     { type: 'platform-types', pattern: 'src/platform/build-capabilities.ts', mode: 'file' },
+    { type: 'platform-types', pattern: 'src/platform/ruida-network-types.ts', mode: 'file' },
     { type: 'platform-web', pattern: 'src/platform/web', mode: 'folder' },
     { type: 'platform-electron', pattern: 'src/platform/electron', mode: 'folder' },
     { type: 'core', pattern: 'src/core', mode: 'folder' },
@@ -77,8 +78,9 @@ const boundaryRules = [
   { from: { type: 'core' }, allow: { to: { type: 'core' } } },
   // io may import core + io
   { from: { type: 'io' }, allow: { to: { type: ['core', 'io'] } } },
-  // platform/types may import core (interface uses core domain types)
-  { from: { type: 'platform-types' }, allow: { to: { type: 'core' } } },
+  // platform/types may import core (interface uses core domain types) and its
+  // sibling type files (ruida-network-types.ts, ADR-697)
+  { from: { type: 'platform-types' }, allow: { to: { type: ['core', 'platform-types'] } } },
   // platform implementations import core + the platform-types interface
   { from: { type: 'platform-web' }, allow: { to: { type: ['core', 'platform-types'] } } },
   { from: { type: 'platform-electron' }, allow: { to: { type: ['core', 'platform-types'] } } },

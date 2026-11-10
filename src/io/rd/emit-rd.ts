@@ -2,13 +2,9 @@
 // pipeline (preview = save, ADR-040), encodes the .rd byte stream, then runs
 // the post-compile checks a G-code save runs over the moves the file commands.
 
-import {
-  encodeRdJob,
-  rdFootprint,
-  rdReferencePointFor,
-  type RdEncodeError,
-  type RdFootprint,
-} from '../../core/controllers/ruida';
+import { encodeRdJob, type RdEncodeError } from '../../core/controllers/ruida';
+import { rdFootprint, type RdFootprint } from '../../core/controllers/ruida/rd-frame-job';
+import { rdReferencePointFor } from '../../core/controllers/ruida/rd-encoder';
 import { machineSpaceJob, type JobOriginPlacement } from '../../core/job';
 import { rotaryOutputAxis } from '../../core/job/rotary-job';
 import { rotaryAxisUnsupportedMessage } from '../gcode/rotary-axis-emit';

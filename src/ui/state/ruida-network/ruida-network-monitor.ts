@@ -12,7 +12,7 @@ import {
   RUIDA_MEM_CURRENT_Y,
   RUIDA_MEM_MACHINE_STATUS,
   type RuidaMachineStatus,
-} from '../../../core/controllers/ruida';
+} from '../../../core/controllers/ruida/ruida-live-commands';
 import type { RuidaLinkExchange } from './ruida-link-exchange';
 
 export const RUIDA_STATUS_POLL_MS = 400;

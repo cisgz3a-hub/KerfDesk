@@ -5,7 +5,7 @@
 
 import { useState } from 'react';
 import { selectControllerDriver } from '../../core/controllers';
-import type { RuidaNetworkAdapter } from '../../platform/types';
+import type { RuidaNetworkAdapter } from '../../platform/ruida-network-types';
 import { usePlatform } from '../app/platform-context';
 import { useStore } from '../state';
 import {

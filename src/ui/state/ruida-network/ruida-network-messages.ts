@@ -2,7 +2,7 @@
 // KerfDesk knows and no more: UDP gives no proof a datagram arrived, and this
 // link is simulator-tested only.
 
-import type { RuidaMachineStatus } from '../../../core/controllers/ruida';
+import type { RuidaMachineStatus } from '../../../core/controllers/ruida/ruida-live-commands';
 import type { RuidaExchangeFailure } from './ruida-link-exchange';
 
 export const RUIDA_NOT_QUALIFIED =

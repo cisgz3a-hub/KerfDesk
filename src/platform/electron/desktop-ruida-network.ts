@@ -4,7 +4,7 @@
 // datagrams only; the Ruida session state machine and the store above it
 // decide what is sent, and nothing here ever resends.
 
-import type { RuidaDatagramLink, RuidaNetworkAdapter } from '../types';
+import type { RuidaDatagramLink, RuidaNetworkAdapter } from '../ruida-network-types';
 import {
   RUIDA_NETWORK_ROUTE,
   machineNetworkRequest,

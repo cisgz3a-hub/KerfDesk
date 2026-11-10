@@ -6,20 +6,22 @@
 // verdict fails the exchange and nothing is resent: UDP has no sequence
 // numbers, so a resend after a lost ACK would run the same commands twice.
 
+import { swizzleBytes } from '../../../core/controllers/ruida';
+import {
+  decodeRuidaReply,
+  ruidaGetSetting,
+  type RuidaMemoryReply,
+} from '../../../core/controllers/ruida/ruida-live-commands';
 import {
   createRuidaSession,
-  decodeRuidaReply,
   onRuidaAckTimeout,
   onRuidaResponse,
-  ruidaGetSetting,
   stepRuidaSession,
-  swizzleBytes,
   RUIDA_ACK_TIMEOUT_MS,
-  type RuidaMemoryReply,
   type RuidaSessionFailure,
   type RuidaSessionState,
-} from '../../../core/controllers/ruida';
-import type { RuidaDatagramLink, RuidaNetworkAdapter } from '../../../platform/types';
+} from '../../../core/controllers/ruida/ruida-udp-session';
+import type { RuidaDatagramLink, RuidaNetworkAdapter } from '../../../platform/ruida-network-types';
 
 export type RuidaExchangeFailure =
   | RuidaSessionFailure

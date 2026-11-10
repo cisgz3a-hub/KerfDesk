@@ -7,20 +7,22 @@
 // on this connection traced; its advisories are warnings, never refusals.
 
 import { create } from 'zustand';
+import { RUIDA_SWIZZLE_MAGIC } from '../../../core/controllers/ruida';
+import {
+  encodeRdFrameJob,
+  sameRdFootprint,
+  type RdFootprint,
+} from '../../../core/controllers/ruida/rd-frame-job';
 import {
   decodeRuidaMachineStatus,
-  encodeRdFrameJob,
   ruidaStatusBusy,
-  sameRdFootprint,
   RUIDA_MEM_MACHINE_STATUS,
   RUIDA_PAUSE_PROCESS,
   RUIDA_RESTORE_PROCESS,
   RUIDA_STOP_PROCESS,
-  RUIDA_SWIZZLE_MAGIC,
-  type RdFootprint,
   type RuidaMachineStatus,
-} from '../../../core/controllers/ruida';
-import type { RuidaDatagramLink, RuidaNetworkAdapter } from '../../../platform/types';
+} from '../../../core/controllers/ruida/ruida-live-commands';
+import type { RuidaDatagramLink, RuidaNetworkAdapter } from '../../../platform/ruida-network-types';
 import { RuidaLinkExchange } from './ruida-link-exchange';
 import {
   RUIDA_FRAME_FIRST,

@@ -6,11 +6,11 @@
 import { createSocket, type RemoteInfo, type Socket } from 'node:dgram';
 import { EventEmitter } from 'node:events';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { swizzleByte } from '../src/core/controllers/ruida';
 import {
   ruidaCommandDatagram,
-  swizzleByte,
   RUIDA_STOP_PROCESS,
-} from '../src/core/controllers/ruida';
+} from '../src/core/controllers/ruida/ruida-live-commands';
 import { installRendererCrashRecovery, type RendererGoneReason } from './renderer-crash-recovery';
 import { RuidaNetworkBridge, validateRuidaTarget } from './ruida-network-bridge';
 import { withRuidaNetworkRoutes } from './ruida-network-routes';

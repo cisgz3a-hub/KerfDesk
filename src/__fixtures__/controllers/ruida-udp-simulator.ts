@@ -9,18 +9,20 @@
 // of that exchange; it does NOT prove a real controller behaves this way.
 
 import {
-  encodeRuidaReply,
   swizzleByte,
   unswizzleBytes,
   RUIDA_ACK,
-  RUIDA_ENQ,
-  RUIDA_MEM_CURRENT_X,
-  RUIDA_MEM_CURRENT_Y,
-  RUIDA_MEM_MACHINE_STATUS,
   RUIDA_NAK,
   RUIDA_SWIZZLE_MAGIC,
 } from '../../core/controllers/ruida';
-import type { RuidaDatagramLink, RuidaNetworkAdapter } from '../../platform/types';
+import {
+  encodeRuidaReply,
+  RUIDA_MEM_CURRENT_X,
+  RUIDA_MEM_CURRENT_Y,
+  RUIDA_MEM_MACHINE_STATUS,
+} from '../../core/controllers/ruida/ruida-live-commands';
+import { RUIDA_ENQ } from '../../core/controllers/ruida/ruida-udp-session';
+import type { RuidaDatagramLink, RuidaNetworkAdapter } from '../../platform/ruida-network-types';
 import { decodeRdStream, type RdDecodedEvent } from './ruida-decoder';
 
 /** What the controller does with one datagram. `lose-ack` takes it and loses
