@@ -16,6 +16,7 @@ import { useCameraStore } from '../state/camera-store';
 import { useUiStore } from '../state/ui-store';
 import { computeView } from '../workspace/view-transform';
 import type { LiveCaptureElement } from './frame-capture';
+import { recordFrameRescale, resetFrameRescaleChecks } from './frame-rescale-check';
 import { cameraCaptureBindingForFrame } from './frame-source';
 import type { BedOverlayUniforms } from './overlay/bed-overlay-shader';
 import { usePieceScanStore } from './pieces/piece-scan-store';
@@ -75,8 +76,8 @@ const USB: CameraCaptureBinding = {
   resizeMode: 'none',
 };
 
-// Half the calibrated resolution, same 16:9 shape.
-function still(width = 640, height = 360): RgbaImage {
+// The calibrated resolution by default.
+function still(width = 1280, height = 720): RgbaImage {
   return { data: new Uint8ClampedArray(width * height * 4).fill(200), width, height };
 }
 
@@ -84,6 +85,7 @@ let container: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
+  resetFrameRescaleChecks();
   gl.available = true;
   gl.draws.length = 0;
   gl.clears = 0;
@@ -172,14 +174,25 @@ describe('WorkspaceCameraOverlay', () => {
     expect(container.innerHTML).toBe('');
   });
 
+  // ADR-440 Amendment 9 (rolling audit v13 Y1-P1-1): a picture of another
+  // size may be a cut-out of the sensor, so it is drawn only once it is shown
+  // to be a resize.
   it.each([360, 361])(
-    'draws a resized still at 640 × %s within the model aspect tolerance',
+    'draws a resized still at 640 × %s within the model aspect tolerance once proved a resize',
     (height) => {
       saveModel();
       useCameraStore.setState({
         overlayStill: still(640, height),
         overlayStillCapture: { ...USB, width: 640, height },
       });
+      render();
+      expect(gl.draws).toHaveLength(0);
+      expect(container.textContent).toContain(
+        `The camera picture is 640 × ${height}, not the 1280 × 720 it was calibrated at`,
+      );
+      const model = useStore.getState().project.device.cameraModel;
+      if (model === undefined) throw new Error('expected a saved model');
+      act(() => recordFrameRescale(model, 640, height, 'resize'));
       render();
       const drawn = gl.draws.at(-1)?.uniforms;
       const view = computeView(BOX.width, BOX.height, 400, 400, {
@@ -319,8 +332,8 @@ describe('WorkspaceCameraOverlay', () => {
           frameUrl: 'http://bridge/frame.jpg',
           queryFingerprint: `hmac-sha256:${String(channel).repeat(64)}`,
         },
-        640,
-        360,
+        1280,
+        720,
       );
     const first = capture(1);
     const second = capture(2);
@@ -338,7 +351,7 @@ describe('WorkspaceCameraOverlay', () => {
     const cropped: CameraCaptureBinding = { ...USB, resizeMode: 'crop-and-scale' };
     saveModel();
     useCameraStore.setState({
-      overlayStill: still(),
+      overlayStill: still(640, 360),
       overlayStillCapture: { ...cropped, width: 640, height: 360 },
     });
     render();

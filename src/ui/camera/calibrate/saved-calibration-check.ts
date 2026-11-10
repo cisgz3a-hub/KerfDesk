@@ -13,6 +13,7 @@ import {
   type PhotographedMark,
 } from '../../../core/camera/model/model-drift';
 import { cameraModelForFrame } from '../camera-model-frame';
+import { recordFrameRescale } from '../frame-rescale-check';
 
 export type SavedCalibrationCheck =
   | { readonly kind: 'measured'; readonly drift: ModelDrift; readonly saved: CameraModelRecord }
@@ -32,7 +33,11 @@ export function checkSavedCalibration(args: {
   readonly marks: ReadonlyArray<PhotographedMark>;
   readonly targetHeightMm: number;
 }): SavedCalibrationCheck {
-  const model = cameraModelForFrame(args.saved, args.capture, args.frameWidth, args.frameHeight);
+  // The rings re-detected in this photo are the check of a new frame size too
+  // (ADR-440 Amendment 9), so an unproved size is measured, not refused.
+  const model = cameraModelForFrame(args.saved, args.capture, args.frameWidth, args.frameHeight, {
+    rescale: 'measuring',
+  });
   if (model.kind === 'issue') {
     return {
       kind: 'not-comparable',
@@ -46,7 +51,23 @@ export function checkSavedCalibration(args: {
       message: 'The saved calibration does not see any of the rings in this photo.',
     };
   }
+  const resized =
+    args.frameWidth !== args.saved.lens.imageWidth ||
+    args.frameHeight !== args.saved.lens.imageHeight;
+  if (resized) {
+    recordFrameRescale(
+      args.saved,
+      args.frameWidth,
+      args.frameHeight,
+      drift.rmsMm <= unchangedAllowanceMm(args.saved) ? 'resize' : 'differs',
+    );
+  }
   return { kind: 'measured', drift, saved: args.saved };
+}
+
+// How far the saved model may sit from a new photo's rings and still count as unchanged.
+function unchangedAllowanceMm(saved: CameraModelRecord): number {
+  return Math.max(UNCHANGED_FLOOR_MM, UNCHANGED_RATIO * saved.accuracy.rmsErrorMm);
 }
 
 export type SavedCalibrationVerdict = {
@@ -65,7 +86,7 @@ export function savedCalibrationVerdict(
   layoutSuspect = false,
 ): SavedCalibrationVerdict {
   const { drift, saved } = check;
-  const allowed = Math.max(UNCHANGED_FLOOR_MM, UNCHANGED_RATIO * saved.accuracy.rmsErrorMm);
+  const allowed = unchangedAllowanceMm(saved);
   const figures = `${drift.rmsMm.toFixed(2)} mm on average, ${drift.maxMm.toFixed(2)} mm at worst, over ${drift.marks} rings`;
   if (drift.rmsMm <= allowed) {
     return {
