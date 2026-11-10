@@ -129,7 +129,7 @@ describe('background streaming with two identical USB adapters attached', () => 
 
     expect(openedWrappers({ laser, arduino })).toEqual(['laser window']);
     expect(workers).toHaveLength(0);
-    expect(connection.backgroundStreamingUnavailable).toBe(true);
+    expect(connection.backgroundStreamingUnavailable).toBe('adapter-not-unique');
     expect(connection.hostedStreaming).toBeUndefined();
     await connection.write('?');
     await waitFor(() => laser.window.transmitted.includes('?'), 'the status query');

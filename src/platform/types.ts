@@ -279,7 +279,7 @@ export type ExternalFileOpenSource = {
 export type SerialOpenRequest = {
   readonly baudRate: number;
   /** Prefer a worker-owned port and refill. If unavailable before opening, the
-   * exact picked port stays usable on the window (backgroundStreamingUnavailable). */
+   * exact picked port stays usable on the window; backgroundStreamingUnavailable says why. */
   readonly hostedStreaming?: boolean;
 };
 
@@ -323,7 +323,7 @@ export type SerialConnection = {
   // Explicit permission revocation. Normal Disconnect must retain the pairing.
   readonly forget?: () => Promise<void>;
   readonly hostedStreaming?: HostedStreamRefill;
-  readonly backgroundStreamingUnavailable?: boolean;
+  readonly backgroundStreamingUnavailable?: 'adapter-not-unique' | 'worker-unavailable';
 };
 
 /** Browser-exposed transport identity. VID/PID describe the USB adapter/model;

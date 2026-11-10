@@ -112,24 +112,30 @@ async function closeStalePairedPorts(): Promise<void> {
   }
 }
 
+/** Why a requested worker left the port to the window. */
+type WindowFallback = NonNullable<SerialConnection['backgroundStreamingUnavailable']>;
+
 function makePortRef(port: SerialPort): SerialPortRef {
   const info = serialPortIdentity(port);
   return {
     ...(info === null ? {} : { info }),
     open: async (req: SerialOpenRequest): Promise<SerialConnection> => {
       requireSerialPortReleased(port);
+      // Named for Job Review's lit-stop advice (ADR-676 Amendment 5).
+      const fallback: { backgroundStreamingUnavailable?: WindowFallback } = {};
       if (req.hostedStreaming === true) {
         const hosted = await tryOpenNativeSerialConnection({
           port,
           options: { baudRate: req.baudRate, bufferSize: SERIAL_BUFFER_BYTES },
+          onFallback: (reason) => {
+            fallback.backgroundStreamingUnavailable = reason;
+          },
         });
         if (hosted !== null) return hosted;
+        fallback.backgroundStreamingUnavailable ??= 'worker-unavailable';
       }
       await openWithRetry(port, req.baudRate);
-      return {
-        ...makeConnection(port),
-        ...(req.hostedStreaming === true ? { backgroundStreamingUnavailable: true } : {}),
-      };
+      return { ...makeConnection(port), ...fallback };
     },
     forget: async () => {
       try {
