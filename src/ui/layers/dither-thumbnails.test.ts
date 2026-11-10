@@ -8,7 +8,10 @@ import {
   thumbnailRampLuma,
 } from './dither-thumbnails';
 
-const BINARY = DITHER_ALGORITHMS.filter((algorithm) => algorithm !== 'grayscale');
+// Grayscale and 3D Sliced (ADR-699) draw ramps, not dots.
+const BINARY = DITHER_ALGORITHMS.filter(
+  (algorithm) => algorithm !== 'grayscale' && algorithm !== '3d-sliced',
+);
 
 // Paints the path's runs back into a pixel mask, one cell per thumbnail pixel.
 function paintedPixels(path: string): ReadonlyArray<boolean> {
@@ -58,6 +61,18 @@ describe('dither picker thumbnails', () => {
     expect(opacities.at(-1)).toBeLessThan(0.05);
     opacities.slice(1).forEach((opacity, index) => {
       expect(opacity).toBeLessThan(opacities[index] ?? 0);
+    });
+  });
+
+  it('draws 3D Sliced as a ramp of a few depth steps', () => {
+    const thumbnail = ditherThumbnail('3d-sliced');
+    if (thumbnail.kind !== 'ramp') throw new Error('3d-sliced should be a ramp');
+    const opacities = thumbnail.stops.map((stop) => stop.opacity);
+    expect(opacities[0]).toBe(1);
+    expect(opacities.at(-1)).toBe(0);
+    expect(new Set(opacities).size).toBeLessThanOrEqual(6);
+    opacities.slice(1).forEach((opacity, index) => {
+      expect(opacity).toBeLessThanOrEqual(opacities[index] ?? 0);
     });
   });
 

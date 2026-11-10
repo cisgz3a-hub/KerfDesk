@@ -14,7 +14,12 @@ export function CutSettingsFillRampFields(props: { readonly layer: Layer }): JSX
   return (
     <fieldset className="lf-fieldset lf-cut-settings-group">
       <legend className="lf-legend">Ramp</legend>
-      <input type="hidden" name="fillRampShown" value="1" />
+      <input
+        type="hidden"
+        name="fillRampShown"
+        value="1"
+        title="Hidden marker that the Ramp fields were shown, used when saving cut settings."
+      />
       <p className="lf-laser-help">
         Slopes the sides of the fill for rubber stamps: power rises from Min power at each edge to
         full Power over the ramp length. 0 turns the ramp off. A ramped fill burns as a scan of
