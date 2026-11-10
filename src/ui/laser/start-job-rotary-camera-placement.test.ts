@@ -44,7 +44,8 @@ const CHUCK: RotarySetup = {
 const SCALE = 360 / (Math.PI * 60);
 const CAMERA_ADVICE = 'Camera placement is on';
 const ABSOLUTE_ADVICE = 'Choose Absolute Coordinates';
-const ROTARY_LEAD = 'Camera placement is on, and so is the rotary.';
+const ROTARY_LEAD = 'Camera placement is on, and so is the rotary (turned by Y).';
+const PICTURE_X_LOST = 'not where the artwork sits on the camera picture';
 
 const READY_CONTROLLER = { maxPowerS: 1000, minPowerS: 0, laserModeEnabled: true };
 const IDLE_STATUS = {
@@ -139,20 +140,44 @@ describe('camera placement advice: rotary x camera x Start from (W4-P2-1)', () =
       }
     });
 
-    it('gives the rotary advice on an active rotary, and never advises Absolute', () => {
+    it('on a Y rotary, never advises Absolute and says what each mode does along the cylinder', () => {
       const warnings = cameraWarnings(squareProject(CHUCK), true, origin);
       expect(warnings).toHaveLength(1);
       const [warning] = warnings;
       expect(warning).toContain(ROTARY_LEAD);
       expect(warning).not.toContain(ABSOLUTE_ADVICE);
       if (absolute) {
-        expect(warning).toContain('Start from is Absolute Coordinates');
+        // Absolute keeps the picture's X but rebases the turn (ADR-127).
+        expect(warning).toContain('keeps the artwork where it sits on the camera picture');
         expect(warning).toContain('starts at work Y 0');
-        expect(warning).toContain('Choose Current Position');
+        expect(warning).toContain('jog the head over the artwork on the camera picture');
+        expect(warning).toContain('then choose Current Position');
       } else {
-        expect(warning).toContain(`Keep ${name}, and do not choose Absolute Coordinates`);
+        // A placed mode keeps the turn but re-centres X (rolling audit v13 Y3-P1-1).
+        expect(warning).toContain(`${name} starts the job on the face of the cylinder`);
+        expect(warning).toContain(PICTURE_X_LOST);
+        expect(warning).toContain('head over the artwork on the camera picture');
+        expect(warning).toContain('Do not choose Absolute Coordinates');
       }
     });
+
+    it.each(['A', 'Z'] as const)(
+      'on an %s rotary, accepts Absolute and advises it over a placed mode',
+      (axis) => {
+        const warnings = cameraWarnings(squareProject({ ...CHUCK, axis }), true, origin);
+        if (absolute) {
+          // Every A/Z job first sets the current turn as zero (ADR-695): Absolute
+          // keeps the picture's X and starts on the face under the laser.
+          expect(warnings).toEqual([]);
+          return;
+        }
+        expect(warnings).toHaveLength(1);
+        expect(warnings[0]).toContain(`(turned by ${axis})`);
+        expect(warnings[0]).toContain(PICTURE_X_LOST);
+        expect(warnings[0]).toContain(ABSOLUTE_ADVICE);
+        expect(warnings[0]).toContain(`sets that turn as ${axis} 0`);
+      },
+    );
 
     it('treats a rotary that is switched off, or set up on a CNC, as the flat bed', () => {
       const off = cameraWarnings(squareProject({ ...CHUCK, enabled: false }), true, origin);
@@ -166,10 +191,10 @@ describe('camera placement advice: rotary x camera x Start from (W4-P2-1)', () =
   it('puts the rotary before the Place Board and jig wording, which keep their Start from', () => {
     const latched = { cameraPlacementActive: true };
     for (const layout of ['place-board', 'jig'] as const) {
-      expect(cameraPlacementStartFromWarning(latched, USER, layout, true)).toBe(
+      expect(cameraPlacementStartFromWarning(latched, USER, layout, 'Y')).toBe(
         rotaryCameraWarning('user-origin'),
       );
-      expect(cameraPlacementStartFromWarning(latched, undefined, layout, true)).toBe(
+      expect(cameraPlacementStartFromWarning(latched, undefined, layout, 'Y')).toBe(
         rotaryCameraWarning('absolute'),
       );
     }
@@ -195,7 +220,40 @@ function burnYRange(gcode: string): { readonly min: number; readonly max: number
   return { min: Math.min(...ys), max: Math.max(...ys) };
 }
 
-describe('why Absolute is never advised on a rotary (the audit repro)', () => {
+function burnXRange(gcode: string): { readonly min: number; readonly max: number } {
+  const xs = gcode
+    .split('\n')
+    .filter((line) => /^G1\b/.test(line) && !/\bS0\b/.test(line))
+    .flatMap((line) => {
+      const match = /X(-?\d+(?:\.\d+)?)/.exec(line);
+      return match === null ? [] : [Number(match[1])];
+    });
+  return { min: Math.min(...xs), max: Math.max(...xs) };
+}
+
+// Rolling audit v13 Y3-P1-1: the head parked away from the artwork, which the
+// W4 cases (head X = the artwork's centre) could not see.
+describe('what each Start from does along the cylinder (head away from the artwork)', () => {
+  const AWAY: JobOriginPlacement = {
+    startFrom: 'current-position',
+    anchor: 'center',
+    currentPosition: { x: 260, y: 80 },
+  };
+
+  it('Absolute burns where the artwork sits on the picture; Current Position burns at the head', () => {
+    const absolute = burnXRange(emitGcode(squareProject(CHUCK)).gcode);
+    const current = burnXRange(emitGcode(squareProject(CHUCK), { jobOrigin: AWAY }).gcode);
+    // The square sits at X 110-130 on the camera picture.
+    expect(absolute.min).toBeCloseTo(110, 3);
+    expect(absolute.max).toBeCloseTo(130, 3);
+    // Centred on the head at X 260: 140 mm along the part from the picture.
+    expect(current.min).toBeCloseTo(250, 3);
+    expect(current.max).toBeCloseTo(270, 3);
+    expect(cameraWarnings(squareProject(CHUCK), true, AWAY)[0]).toContain(PICTURE_X_LOST);
+  });
+});
+
+describe('why Absolute is never advised on a Y rotary (the audit repro)', () => {
   it('moves the burn from around the cylinder turn to work Y 0', () => {
     const current = burnYRange(emitGcode(squareProject(CHUCK), { jobOrigin: CURRENT }).gcode);
     const absolute = burnYRange(emitGcode(squareProject(CHUCK)).gcode);

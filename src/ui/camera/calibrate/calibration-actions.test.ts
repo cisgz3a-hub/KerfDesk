@@ -20,6 +20,7 @@ import { useStore } from '../../state';
 import { captureSourceFrame, type ActiveCameraSource } from '../frame-source';
 import {
   addCalibrationTargetToCanvas,
+  CAMERA_TARGET_ROTARY_MESSAGE,
   engraveCalibrationTarget,
   photographTarget,
   targetAreaForBed,
@@ -204,6 +205,40 @@ describe('addCalibrationTargetToCanvas', () => {
 });
 
 describe('engraveCalibrationTarget', () => {
+  // ADR-228 Amendment 3 (rolling audit v13 Y3): the rings belong on the flat
+  // bed; with the rotary on they would be wrapped round a part or rebased.
+  it.each(['Y', 'A', 'Z'] as const)(
+    'refuses with the rotary on (turned by %s), and says to switch it off',
+    async (axis) => {
+      const before = useStore.getState().project;
+      useStore.setState({
+        project: {
+          ...before,
+          device: {
+            ...before.device,
+            rotary: {
+              enabled: true,
+              type: 'chuck',
+              mmPerRotation: 360,
+              objectDiameterMm: 60,
+              axis,
+            },
+          },
+        },
+      });
+      const alert = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
+      const start = vi.fn(async () => true);
+      try {
+        expect(await engraveCalibrationTarget(SETTINGS, start)).toBe(false);
+        expect(start).not.toHaveBeenCalled();
+        expect(alert).toHaveBeenCalledWith(CAMERA_TARGET_ROTARY_MESSAGE);
+      } finally {
+        alert.mockRestore();
+        useStore.setState({ project: before });
+      }
+    },
+  );
+
   it('streams the target in place of the scene without touching the open project', async () => {
     const before = useStore.getState().project;
     let streamed: Project | null = null;

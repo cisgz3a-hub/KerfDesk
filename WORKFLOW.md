@@ -9329,13 +9329,17 @@ as the pane's design record.
   Absolute Coordinates between the runs. It is never told to choose Absolute Coordinates (ADR-654
   Amendment 4). When the outline's own Start from is known and the artwork run differs, the jig's
   outline warning (F-B15a) is shown instead.
-- **Warning / camera placement on a rotary.** With the Rotary switch on, the advice says the camera
-  picture places the artwork only along the cylinder. At a placed Start from it says to keep that
-  Start from and not to choose Absolute Coordinates. At Absolute Coordinates it warns that the
-  cylinder turns back to work Y 0 before burning, and that the preview and the canvas Frame outline
-  do not show this. It says to choose Current Position (or User Origin), or to switch Rotary off if
-  no rotary is fitted. This rotary wording replaces the Place Board and jig wording. The camera
-  target's confirm lists the same warning (ADR-228 Amendment 2).
+- **Warning / camera placement on a rotary (ADR-228 Amendments 2 and 3).** With the Rotary switch on,
+  the advice depends on the axis that turns the part. On **A or Z**, Absolute Coordinates burns
+  where the artwork sits on the camera picture and starts on the face under the laser, so it gets no
+  warning; Current Position, User Origin or Verified Origin is told that it puts the job at the head
+  or origin along the cylinder, away from the picture, and to choose Absolute Coordinates. On **Y**
+  no single mode keeps both: at Absolute it warns that the cylinder turns back to work Y 0 and says
+  to jog the head over the artwork on the picture, turn the face to the laser and choose Current
+  Position (or switch Rotary off if none is fitted); at a placed mode it says the job goes to the
+  head or origin along the cylinder too, and to jog or set the origin over the artwork first. This
+  rotary wording replaces the Place Board and jig wording. **Engrave target** refuses while the
+  rotary is on, asking for it to be switched off: the rings belong on the flat bed.
 - **Edge / minimized wizard.** The wizard can minimize into a small non-modal panel so the
   operator can watch the camera and reach the machine while the target engraves.
 - **Fix / a small offset (ADR-663 Amendment 2).** For a calibrated camera fixed above the bed,
