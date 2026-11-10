@@ -4,6 +4,7 @@ import { reportedControllerAxes } from '../state/rotary-axis-frame';
 import type { Project } from '../../core/scene';
 import { ownCameraModel } from '../camera/active-camera-model';
 import { cameraPlacementGeometryIssue } from '../camera/camera-model-frame';
+import { canvasTargetInScene } from '../camera/calibrate/canvas-target-burn';
 import { cameraMovedStartWarning } from '../camera/helpers/camera-moved-start-warning';
 import type { useCameraStore } from '../state/camera-store';
 import type { useLaserStore } from '../state/laser-store';
@@ -55,6 +56,8 @@ export function machineSnapshot(
     cameraPlacementActive: camera.placementActive,
     cameraConfirmedPositionEpoch: camera.confirmedPositionEpoch,
     cameraPlacementGeometryIssue: cameraPlacementGeometryIssue(project.device.cameraModel),
+    // The camera target's rings, put on the canvas and unmoved (ADR-441 Amendment 10).
+    cameraTargetOnCanvas: canvasTargetInScene(project),
     // ADR-663 Amendment 5: a showing "camera may have moved" warning.
     cameraMovedWarning: cameraMovedStartWarning(project.device, camera.sourceState),
     // The running camera's own calibration, for where its picture is only

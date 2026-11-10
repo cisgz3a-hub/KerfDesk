@@ -165,6 +165,8 @@ export type MachineStartSnapshot = {
   readonly cameraPlacementActive?: boolean;
   readonly cameraConfirmedPositionEpoch?: number | null;
   readonly cameraPlacementGeometryIssue?: string | null;
+  // The camera calibration target's rings are on the canvas (ADR-441 Amendment 10).
+  readonly cameraTargetOnCanvas?: boolean;
   // The Camera panel's "camera may have moved" warning, while it shows for
   // the running camera (ADR-663 Amendment 5).
   readonly cameraMovedWarning?: string | null;

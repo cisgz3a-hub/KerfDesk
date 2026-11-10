@@ -160,7 +160,11 @@ async function acknowledgeOrigin(serial: SimulatedTransport, kind: OriginKind): 
   expect(useLaserStore.getState().workOriginSource).toBe(originDetails[kind].source);
   expect(useLaserStore.getState().workOriginActive).toBe(true);
   expect(useToastStore.getState().toasts).toContainEqual(
-    expect.objectContaining({ message: originDetails[kind].toast, variant: 'success' }),
+    // It goes on to say what happened to Start from (ADR-441 Amendment 10).
+    expect.objectContaining({
+      message: expect.stringContaining(originDetails[kind].toast),
+      variant: 'success',
+    }),
   );
 }
 

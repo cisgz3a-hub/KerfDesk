@@ -9267,9 +9267,13 @@ as the pane's design record.
   step and says what to do next. The operator Frames and Starts it like any job, then presses
   **Expand** on the minimised wizard for the photo. Disabled with a reason while the canvas is in
   CNC mode (ADR-441 Amendment 5). The bed frame is recorded at the Start that burns the rings: an
-  Absolute Start whose job holds every ring where the target put it (ADR-440 Amendment 5). If no
-  such Start was seen and Machine Setup has changed since the target was added, the photo step
-  says so and asks for the target to be added again, instead of fitting it in the old frame.
+  Absolute Start whose job holds every ring where the target put it (ADR-440 Amendment 5). Only
+  rings seen to burn at Absolute are calibrated on (ADR-441 Amendment 10): **Set origin** keeps
+  Absolute while the unmoved rings are on the canvas, and its toast says so; Job Review warns when a
+  Start would stream them from Current Position, User Origin or Verified Origin; and the photo step
+  refuses rings burned from another mode (naming it) or never seen to burn, asking for a Start at
+  Absolute or Engrave target. If Machine Setup has changed since the target was added and no burn
+  was seen, the photo step says that instead, and asks for the target to be added again.
 - **Warning / not homed.** While connected, the target step says to home first on a homing machine
   that is not homed, and on a machine without homing that the camera lines up only while the
   controller keeps its zero. Advice only: **Engrave target** stays available. A calibration whose
