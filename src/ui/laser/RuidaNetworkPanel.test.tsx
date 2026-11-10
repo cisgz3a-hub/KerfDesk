@@ -71,7 +71,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function render(platform: Partial<PlatformAdapter>): void {
+async function render(platform: Partial<PlatformAdapter>): Promise<void> {
   act(() =>
     root.render(
       <PlatformProvider adapter={platform as PlatformAdapter}>
@@ -79,6 +79,11 @@ function render(platform: Partial<PlatformAdapter>): void {
       </PlatformProvider>,
     ),
   );
+  // The panel body loads lazily, out of the boot bundle.
+  await act(async () => {
+    await import('../ruida-network/RuidaNetworkDetails');
+    await vi.advanceTimersByTimeAsync(0);
+  });
 }
 
 function button(name: string): HTMLButtonElement {
@@ -95,12 +100,12 @@ async function click(name: string, ms = 0): Promise<void> {
 }
 
 describe('RuidaNetworkPanel', () => {
-  it('is absent in the browser and for a serial controller', () => {
+  it('is absent in the browser and for a serial controller', async () => {
     useStore.setState({ project: ruidaProject() });
-    render({});
+    await render({});
     expect(host.textContent).toBe('');
     useStore.setState({ project: ruidaProject('grbl-v1.1') });
-    render({ ruidaNetwork: simulatedRuidaNetwork(new RuidaUdpSimulator()) });
+    await render({ ruidaNetwork: simulatedRuidaNetwork(new RuidaUdpSimulator()) });
     expect(host.textContent).toBe('');
   });
 
@@ -108,7 +113,7 @@ describe('RuidaNetworkPanel', () => {
     const project = ruidaProject();
     useStore.setState({ project });
     const sim = new RuidaUdpSimulator();
-    render({ ruidaNetwork: simulatedRuidaNetwork(sim) });
+    await render({ ruidaNetwork: simulatedRuidaNetwork(sim) });
     expect(host.textContent).toContain('not been qualified on a real controller');
 
     const input = host.querySelector('input');
