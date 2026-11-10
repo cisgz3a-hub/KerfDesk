@@ -2,6 +2,7 @@ import type { StatusQueryCapability } from '../../core/controllers';
 import type { ControllerKind } from '../../core/devices';
 import { reportedControllerAxes } from '../state/rotary-axis-frame';
 import type { Project } from '../../core/scene';
+import { ownCameraModel } from '../camera/active-camera-model';
 import { cameraPlacementGeometryIssue } from '../camera/camera-model-frame';
 import { cameraMovedStartWarning } from '../camera/helpers/camera-moved-start-warning';
 import type { useCameraStore } from '../state/camera-store';
@@ -56,6 +57,9 @@ export function machineSnapshot(
     cameraPlacementGeometryIssue: cameraPlacementGeometryIssue(project.device.cameraModel),
     // ADR-663 Amendment 5: a showing "camera may have moved" warning.
     cameraMovedWarning: cameraMovedStartWarning(project.device, camera.sourceState),
+    // The running camera's own calibration, for where its picture is only
+    // estimated (ADR-441 Amendment 9).
+    cameraCalibration: ownCameraModel(project.device, camera.sourceState) ?? null,
     registrationOutline: registrationOutlinePlacement(project, laser.registrationOutlineRun),
     homingState: laser.homingState,
     trustedPositionEpoch: laser.trustedPositionEpoch ?? 0,

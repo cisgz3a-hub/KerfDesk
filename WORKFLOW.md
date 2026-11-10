@@ -9295,7 +9295,13 @@ as the pane's design record.
 - **Edge / target smaller than the picture.** The fit keeps only the lens terms the rings pin
   down. When a quarter or more of what the camera sees lies outside the target, the result says
   that the accuracy is measured on the rings and the rest of the picture is estimated
-  (Amendment 4).
+  (Amendment 4), and how far off it may be there and where (ADR-441 Amendment 9: the rings are
+  refitted with the other lens models that fit them as well, and with each half of them alone,
+  and their spread past the target is the estimate). When that is over 1.5 mm the result is
+  **Accurate on the target; elsewhere on the bed up to about N mm off**, also in Camera settings,
+  and suggests a larger sheet. The camera overlay tints where the picture may be more than 1.5 mm
+  off, and Job Review says so for a job placed there at Absolute Coordinates with camera placement
+  on.
 - **Edge / target engraved with other settings.** When the rings found form a complete grid
   smaller than the layout looked for, and the camera sees where the missing rings would be, the
   result is rough and names the setting to correct. A check then suggests keeping the saved

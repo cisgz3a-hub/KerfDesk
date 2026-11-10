@@ -1,3 +1,5 @@
+import type { CameraModelRecord } from '../../core/camera/model/camera-model-record';
+import { cameraOffTargetWarnings } from './camera-off-target-warning';
 import type { OverrideValues, StatusReport } from '../../core/controllers/grbl';
 import type { GrblBuildInfo } from '../../core/controllers/grbl/build-info';
 import type { StatusQueryCapability } from '../../core/controllers';
@@ -166,6 +168,8 @@ export type MachineStartSnapshot = {
   // The Camera panel's "camera may have moved" warning, while it shows for
   // the running camera (ADR-663 Amendment 5).
   readonly cameraMovedWarning?: string | null;
+  // The running camera's own calibration (ADR-441 Amendment 9).
+  readonly cameraCalibration?: CameraModelRecord | null;
   // Where this project's jig outline last burned from in this session, so the
   // artwork run can be checked against it (ADR-057 Amendment 6). null: unseen.
   readonly registrationOutline?: JobPlacementSettings | null;
@@ -374,6 +378,7 @@ export function finalizeStartPreparation(
       ...compiledWorkAdvisories(prepared.job),
       ...detectCompiledVCarveDepthWarningsForJob(prepared.project, prepared.job),
       ...demotedPolicyWarnings(options.project, options.machine, options.placement.jobOrigin),
+      ...cameraOffTargetWarnings(options.machine, options.placement.jobOrigin, prepared),
       ...advisoryWarnings,
       ...emitSplit.warnings,
       ...collectPrintCutFrameWarnings(
