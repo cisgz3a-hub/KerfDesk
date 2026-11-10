@@ -1,9 +1,8 @@
-// PlatformAdapter — the narrow interface that lets the UI / IO layers run
-// against both web (File System Access API) and Electron (native dialogs +
-// fs). Injected at React root per ADR-011. Phase A scope: file-pick (open) +
-// file-pick (save). Phase B adds serial-port connection methods.
+// PlatformAdapter — the narrow interface that lets the UI / IO layers run against
+// web and Electron alike (files, serial, network). Injected at React root per ADR-011.
 
 import type { AiAssistant } from '../core/ai/assistant';
+import type { RuidaNetworkAdapter } from './ruida-network-types';
 
 /**
  * A device's licence as the app sees it (ADR-540). The app always opens;
@@ -517,6 +516,7 @@ export type PlatformAdapter = {
   /** Optional user-configured desktop provider; requests are explicit and drafts require review. */
   readonly aiAssistant?: AiAssistant;
   readonly machineNetwork?: MachineNetworkAdapter;
+  readonly ruidaNetwork?: RuidaNetworkAdapter; // Desktop only: browsers have no UDP (ADR-697).
   readonly id: 'web' | 'electron' | 'mock';
   readonly filePickersAvailable?: () => boolean; // false in Firefox/Safari; absent = yes (ADR-688)
   readonly savesByDownload?: () => boolean; // no save picker; saves download (ADR-688 Amd 2)

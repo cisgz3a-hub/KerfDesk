@@ -14,6 +14,7 @@ import {
   laserPowerRangeEmptyMessage,
   readinessSettingsSource,
   routerLaserModeMessage,
+  spindlePowerRangeEmptyMessage,
   spindleScaleMismatchMessage,
   type PowerRangeFirmware,
   type ReadinessSettingsSource,
@@ -37,7 +38,8 @@ export type ControllerReadinessErrorCode =
 export type ControllerReadinessWarningCode =
   | 'min-power-nonzero'
   // $30 at or below $31: no S value sets power. Stock GRBL then fires full
-  // power even at S0 (ADR-567 Amendment 1). A warning, never a refusal.
+  // power even at S0 (ADR-567 Amendment 1), and runs a spindle at full speed
+  // (Amendment 3). A warning, never a refusal.
   | 'power-range-empty'
   | 'power-scale-unverified'
   | 'laser-mode-unverified'
@@ -132,7 +134,7 @@ export function runControllerReadiness(
   if (cncMachine !== null) {
     return cncReadiness(cncMachine.params.spindleMaxRpm, controller, absentPolicy, {
       source,
-      fluidnc: source === 'fluidnc-yaml' || firmwareKind === 'fluidnc',
+      kind: powerRangeFirmware(source, firmwareKind),
     });
   }
   // Missing laser settings are review warnings; known mismatches are still
@@ -165,7 +167,7 @@ function cncReadiness(
   spindleMaxRpm: number,
   controller: ControllerSettingsSnapshot,
   absentPolicy: AbsentSettingPolicy,
-  firmware: { readonly source: ReadinessSettingsSource; readonly fluidnc: boolean },
+  firmware: { readonly source: ReadinessSettingsSource; readonly kind: PowerRangeFirmware },
 ): ControllerReadinessResult {
   const { source } = firmware;
   const errors: ReadinessErrors = [];
@@ -190,6 +192,7 @@ function cncReadiness(
       message: spindleScaleMismatchMessage(reportedMaxS, spindleMaxRpm, source),
     });
   }
+  warnings.push(...spindlePowerRangeWarning(controller, spindleMaxRpm, firmware.kind));
   if (controller.machineMode?.kind === 'lathe') {
     warnings.push({ code: 'lathe-mode', message: CNC_LATHE_MODE_MESSAGE });
   } else if (controller.laserModeEnabled === undefined) {
@@ -202,10 +205,37 @@ function cncReadiness(
     errors.push({ code: 'laser-mode-enabled', message: routerLaserModeMessage(source) });
   }
   // With $32=1 the laser-mode error above already says Resume has no spin-up.
-  if (firmware.fluidnc && controller.laserModeEnabled !== true) {
+  if (firmware.kind === 'fluidnc' && controller.laserModeEnabled !== true) {
     warnings.push({ code: 'fluidnc-resume-spinup', message: FLUIDNC_RESUME_SPINUP_MESSAGE });
   }
   return { ok: errors.length === 0, errors, warnings };
+}
+
+// $30 at or below $31 on a spindle machine (ADR-567 Amendment 3). A $30 that
+// differs from the spindle max RPM is already a spindle-scale-mismatch, and
+// its fix ($30 = max RPM) also restores the range unless $31 sits at or above
+// that RPM, so the range is named only when that fix would not clear it.
+function spindlePowerRangeWarning(
+  controller: ControllerSettingsSnapshot,
+  spindleMaxRpm: number,
+  firmware: PowerRangeFirmware,
+): ReadinessWarnings {
+  const reportedMaxS = reportedMaxPowerS(controller);
+  if (reportedMaxS === undefined || !laserPowerRangeIsEmpty(controller)) return [];
+  const mismatchFixRestoresRange =
+    reportedMaxS !== spindleMaxRpm && (controller.minPowerS ?? 0) < spindleMaxRpm;
+  if (mismatchFixRestoresRange) return [];
+  return [
+    {
+      code: 'power-range-empty',
+      message: spindlePowerRangeEmptyMessage(
+        reportedMaxS,
+        controller.minPowerS,
+        spindleMaxRpm,
+        firmware,
+      ),
+    },
+  ];
 }
 
 function powerRangeFirmware(

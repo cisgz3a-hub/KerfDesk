@@ -25,6 +25,7 @@ fidelity**. Be specific about what that means:
 | GRBL-family streaming | **Not qualified.** Used informally on a Creality Falcon A1 Pro and a Neotronics 4040, both running GRBL-family firmware (exact builds unconfirmed). |
 | FluidNC · Marlin · Smoothieware | Simulator-verified only |
 | Ruida `.rd` export | Encode→decode round-trip proven; **never accepted by a real controller** |
+| Ruida network control (desktop) | Simulator only; **never run against a real controller** |
 | Laser raster/image engrave | **Not qualified.** Code + tests, plus informal use such as a photo engraving on a Neotronics 4040. |
 | **The entire CNC / router surface** | **Not qualified.** Code + tests, plus informal cuts on a Neotronics 4040. |
 | Box generator physical fit | Never cut and assembled |
@@ -172,7 +173,7 @@ capability-gated per firmware.
 | FluidNC | WebSerial | Simulator only (settings read-only) |
 | Marlin | WebSerial | Simulator only |
 | Smoothieware | WebSerial | Simulator only |
-| Ruida | File export only | `.rd` round-trip proven; never accepted by hardware |
+| Ruida | `.rd` file export; experimental UDP network link on the desktop (ADR-697) | `.rd` round-trip proven, never accepted by hardware; network link simulator only |
 
 No controller family or machine is qualified. An earlier claim that the Falcon was
 hardware-verified, and that this proved the driver refactor on real hardware, was withdrawn after
@@ -186,6 +187,8 @@ CNC machine presets ship in the catalog.
 Streaming is exercised end-to-end against scripted firmware simulators
 ([`src/__fixtures__/controllers/`](src/__fixtures__/controllers/) — GRBL, Marlin, Smoothieware and
 a Ruida decoder, over a fake serial port) driving the real application store rather than a mock.
+The desktop Ruida network link is exercised against a scripted Ruida UDP simulator built on that
+decoder, driving the real Ruida network store.
 grblHAL and FluidNC ride the GRBL driver with capability deltas rather than having simulators of
 their own.
 

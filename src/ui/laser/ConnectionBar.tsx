@@ -239,6 +239,7 @@ function connectButton(props: Props, label: string, disabled: boolean): JSX.Elem
     <button
       type="button"
       className="lf-btn lf-btn--primary"
+      data-search-target="connect"
       onClick={props.onConnect}
       disabled={disabled}
       title={connectTitle(props)}

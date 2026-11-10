@@ -35,6 +35,7 @@ import {
 } from './design-tracking';
 import type { DesignSurface } from './design-surface';
 import { EXTEND_PICK_RADIUS_PX } from './design-extend';
+import { TRIM_PICK_RADIUS_PX } from './design-trim';
 import type { DesignToolKind } from './design-tool';
 
 export type DesignPointerHandlers = {
@@ -88,6 +89,10 @@ export function useDesignPointer(
       store.setCursorMm(at);
       if (session.tool === 'extend') {
         store.previewExtension(at, EXTEND_PICK_RADIUS_PX, endpointDistance(surface, event));
+        return;
+      }
+      if (session.tool === 'trim') {
+        store.previewTrim(at, trimToleranceMm(surface));
         return;
       }
       if (session.pointSequence !== null) {
@@ -180,16 +185,10 @@ function resolvePointerMm(
   const store = useDesignStudioStore.getState();
   const session = store.session;
   const raw = surface.toMm(event);
-  if (raw === null && session?.tool === 'extend') {
-    store.setCursorMm(null);
-    store.setActiveSnap(null);
-  }
-  if (session === null || raw === null) return null;
-  if (session.tool === 'extend') {
-    store.setActiveSnap(null);
-    store.setActiveTracking(null);
-    return raw;
-  }
+  if (session === null) return null;
+  // Extend and Trim pick what is under the pointer; snapping would move it.
+  if (session.tool === 'extend' || session.tool === 'trim') return unsnappedPick(raw);
+  if (raw === null) return null;
   const pxPerMm = surface.pxPerMm();
   const trackingMm = TRACKING_RADIUS_PX / (pxPerMm > 0 ? pxPerMm : 1);
   const resolved = withMoveAlignment(
@@ -233,6 +232,14 @@ function tracksDirection(
 ): boolean {
   if (session.orthoEnabled) return false;
   return session.tool === 'line' || session.tool === 'path' || session.tool === 'arc';
+}
+
+function unsnappedPick(raw: Vec2 | null): Vec2 | null {
+  const store = useDesignStudioStore.getState();
+  if (raw === null) store.setCursorMm(null);
+  store.setActiveSnap(null);
+  store.setActiveTracking(null);
+  return raw;
 }
 
 // A dragged selection lines its box up with its neighbours (ADR-272 Amendment
@@ -336,6 +343,11 @@ function applyCornerAt(at: Vec2, op: 'fillet' | 'chamfer', pxPerMm: number): voi
   store.applyCorner(pick, op);
 }
 
+function trimToleranceMm(surface: DesignSurface): number {
+  const pxPerMm = surface.pxPerMm();
+  return TRIM_PICK_RADIUS_PX / (pxPerMm > 0 ? pxPerMm : 1);
+}
+
 function endpointDistance(
   surface: DesignSurface,
   event: React.PointerEvent<HTMLCanvasElement>,
@@ -361,6 +373,17 @@ function runDesignClickTool(
   }
   if (tool === 'fillet' || tool === 'chamfer') {
     applyCornerAt(at, tool, surface.pxPerMm());
+    return true;
+  }
+  if (tool === 'trim') {
+    useDesignStudioStore.getState().trimAt(at, trimToleranceMm(surface), crypto.randomUUID());
+    return true;
+  }
+  if (tool === 'dimension') {
+    const pxPerMm = surface.pxPerMm();
+    useDesignStudioStore
+      .getState()
+      .dimensionAt(at, HIT_RADIUS_PX / (pxPerMm > 0 ? pxPerMm : 1), crypto.randomUUID());
     return true;
   }
   return false;

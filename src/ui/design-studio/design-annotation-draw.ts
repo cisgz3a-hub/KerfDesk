@@ -32,10 +32,11 @@ export function paintAnnotation(
   view: DesignView,
   annotation: DimensionAnnotation,
   label: string,
+  stroke: string = canvasTheme.measureStroke,
 ): void {
   ctx.save();
-  ctx.strokeStyle = canvasTheme.measureStroke;
-  ctx.fillStyle = canvasTheme.measureStroke;
+  ctx.strokeStyle = stroke;
+  ctx.fillStyle = stroke;
   ctx.lineWidth = LINE_WIDTH_PX;
   ctx.setLineDash([]);
   switch (annotation.kind) {

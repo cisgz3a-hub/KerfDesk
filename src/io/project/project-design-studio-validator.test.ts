@@ -117,3 +117,35 @@ describe('persisted design layer settings and membership', () => {
     },
   );
 });
+
+describe('persisted dimensions (ADR-272 Amendment 7)', () => {
+  it('round-trips a driving dimension through saving and reopening', () => {
+    const source = document();
+    const withDimension: DesignStudioDocument = {
+      ...source,
+      sketch: {
+        ...source.sketch,
+        dimensions: [
+          { id: 'len', kind: 'line-length', entityId: 'shape', driving: true, value: 14 },
+        ],
+      },
+    };
+    const result = reopen(withDimension);
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') expect(result.project.designStudioDocument).toEqual(withDimension);
+  });
+
+  it.each([
+    [{ id: 'd', kind: 'line-length', entityId: 'missing', driving: true }, 'entityId'],
+    [{ id: 'd', kind: 'angle', entityId: 'shape', driving: true }, 'sketch.dimension'],
+    [{ id: 'd', kind: 'line-length', entityId: 'shape', driving: 'yes' }, 'sketch.dimension'],
+  ])('rejects a malformed dimension %#', (dimension, reason) => {
+    const source = document();
+    const result = reopen({
+      ...source,
+      sketch: { ...source.sketch, dimensions: [dimension as never] },
+    });
+    expect(result.kind).toBe('invalid');
+    if (result.kind === 'invalid') expect(result.reason).toContain(reason);
+  });
+});

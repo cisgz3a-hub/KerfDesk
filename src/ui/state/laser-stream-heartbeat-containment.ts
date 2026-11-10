@@ -8,6 +8,7 @@ import {
   writeFailedNotice,
 } from './laser-safety-notice';
 import { noResetStopLines, driverQuickStops, quickStopPatch } from './laser-quick-stop';
+import { hostedRefillArmed, releaseHostedRefill } from './laser-hosted-refill';
 import { frameProofReset } from './laser-session-reset';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { TranscriptSource } from './laser-transcript';
@@ -48,19 +49,50 @@ export function streamWriteOwner(state: LaserState): StreamWriteOwner {
   };
 }
 
+/** Connections whose stall containment is waiting on the worker's refill
+ * handback. The stream still reads 'streaming' meanwhile, so the status poll
+ * would otherwise start a second containment on its next tick. */
+const handbacksPending = new WeakSet<NonNullable<LiveRefs['connection']>>();
+
 /** A responsive controller may hold its program temporarily. Only the
  * existing dwell/busy-aware hold watchdog calls this at its full notice
- * deadline. Freeze first; recover on the same port when a reset is supported. */
+ * deadline. Freeze first; recover on the same port when a reset is supported.
+ * A worker-held Marlin refill comes back before the freeze (ADR-676 Amd 4). */
 export function containStalledStreamAcknowledgements(
   set: SetFn,
   refs: LiveRefs,
   safeWrite: SafeWriteFn,
 ): void {
-  let stopped: LaserState | null = null;
+  const connection = refs.connection;
+  if (connection !== null && handbacksPending.has(connection)) return;
   const resetRequested = isGrblFamilyDriver(refs.driver) && refs.driver.realtime.softReset !== null;
+  if (!resetRequested && connection !== null && hostedRefillArmed(refs)) {
+    void containAfterHostedRefillHandback(set, refs, safeWrite, connection);
+    return;
+  }
+  const stopped = freezeStalledStream(set, refs, resetRequested);
+  if (stopped === null || refs.connection === null) return;
+  if (resetRequested) {
+    void runGrblDisconnectTransaction(set, refs, safeWrite, {
+      retainConnection: true,
+      action: 'stop',
+    }).catch(() => undefined);
+  } else void requestQueuedStallStop(set, refs, safeWrite, stopped);
+}
+
+/** Marks a still-streaming job errored and publishes the stall. Returns the
+ * state it froze, or null when there was nothing (left) to freeze. */
+function freezeStalledStream(
+  set: SetFn,
+  refs: LiveRefs,
+  resetRequested: boolean,
+  streamerEpoch?: number,
+): LaserState | null {
+  let stopped: LaserState | null = null;
   const notice = acknowledgementStalledNotice(resetRequested);
   set((state) => {
     if (state.streamer?.status !== 'streaming') return {};
+    if (streamerEpoch !== undefined && state.streamerEpoch !== streamerEpoch) return {};
     stopped = state;
     return {
       ...publishControllerIncident(refs, state, notice.message),
@@ -71,13 +103,53 @@ export function containStalledStreamAcknowledgements(
       ...frameProofReset(),
     };
   });
-  if (stopped === null || refs.connection === null) return;
-  if (resetRequested) {
-    void runGrblDisconnectTransaction(set, refs, safeWrite, {
-      retainConnection: true,
-      action: 'stop',
-    }).catch(() => undefined);
-  } else void requestQueuedStallStop(set, refs, safeWrite, stopped);
+  return stopped;
+}
+
+function streamingState(set: SetFn): LaserState | null {
+  let streaming: LaserState | null = null;
+  set((state) => {
+    if (state.streamer?.status === 'streaming') streaming = state;
+    return state;
+  });
+  return streaming;
+}
+
+// Rolling audit v8 N1-P3-1, the twin of Abort and Disconnect's N1-P2-1 (ADR-676
+// Amendments 1 and 4). Marking the stream errored while the worker still held
+// the refill let an `ok` reaching the worker in that instant send one more job
+// line this side's frozen ledger lacked; its reply then settled a stop line.
+// So the release is posted first, then every stop line at once, and only the
+// freeze waits for the worker's reply. Until then an `ok` steps this side's
+// stream exactly as the worker's refill did. The release reply arrives as a
+// microtask, so the freeze runs before the next serial line is handled.
+async function containAfterHostedRefillHandback(
+  set: SetFn,
+  refs: LiveRefs,
+  safeWrite: SafeWriteFn,
+  connection: NonNullable<LiveRefs['connection']>,
+): Promise<void> {
+  const stalled = streamingState(set);
+  if (stalled === null) return;
+  handbacksPending.add(connection);
+  // Capture M9 cleanup from the queue before the freeze retires it.
+  const lines = noResetStopLines(refs.driver, stalled);
+  const released = releaseHostedRefill(refs);
+  const written = Promise.allSettled(lines.map((line) => safeWrite(line, 'stop', 'system')));
+  try {
+    await released;
+  } catch {
+    // A failed handshake leaves the worker's state unknown; freezing this
+    // side is still the safe step.
+  } finally {
+    handbacksPending.delete(connection);
+  }
+  if (refs.connection !== connection) return;
+  const epoch = stalled.streamerEpoch;
+  if (freezeStalledStream(set, refs, false, epoch) === null) return;
+  const results = await written;
+  if (results.every((result) => result.status === 'fulfilled') && driverQuickStops(refs.driver))
+    set((current) => (current.streamerEpoch === epoch ? quickStopPatch(current) : {}));
 }
 
 async function requestQueuedStallStop(

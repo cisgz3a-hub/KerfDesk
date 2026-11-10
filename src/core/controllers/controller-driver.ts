@@ -6,7 +6,10 @@
 
 import type { ControllerCommandSet, ControllerKind } from '../devices/device-profile';
 import type { FrameStartPoint } from '../scene/start-points';
-import type { ControllerCapabilities } from './controller-capabilities';
+import type {
+  ControllerCapabilities,
+  DatagramNetworkCapabilities,
+} from './controller-capabilities';
 import type { ControllerEvent } from './controller-event';
 import type { JogParams } from './grbl/commands';
 import type { ConsoleCommandResult } from './grbl/console-command';
@@ -160,6 +163,9 @@ export type ControllerDriver = {
   readonly label: string;
   readonly defaultBaudRate: number;
   readonly capabilities: ControllerCapabilities;
+  /** Present when the desktop app can reach this controller over its own
+   *  datagram link (ADR-697); absent for every serial driver. */
+  readonly datagramNetwork?: DatagramNetworkCapabilities;
   readonly realtime: ControllerRealtime;
   readonly commands: ControllerCommands;
   /** Classify one inbound line into the firmware-neutral event union. */

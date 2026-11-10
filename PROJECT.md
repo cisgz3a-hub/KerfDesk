@@ -275,9 +275,12 @@ Verified end-to-end against scripted firmware simulators
 - **I.4 — Smoothieware** (ADR-096, amended by ADR-322): realtime ? status,
   M999 halt recovery, native M221 power mode, fractional vector/raster S power,
   and queued host pause. Generic realtime hold/resume is unavailable. Simulator-verified only.
-- **I.5 — Ruida** (ADR-097): EXPERIMENTAL `.rd` export (encode→decode round-trip
-  proven; NOT accepted by real hardware yet); `transport: 'file-only'` — no live
-  link; pure UDP session state machine as groundwork.
+- **I.5 — Ruida** (ADR-097, ADR-697): EXPERIMENTAL `.rd` export (encode→decode round-trip
+  proven; NOT accepted by real hardware yet). The line-based controller store still treats Ruida as
+  `transport: 'file-only'`. On the desktop app an experimental UDP link (ADR-697) streams the
+  `.rd` job, frames it with a travel-only job, and sends Pause, Resume, Abort and status reads;
+  jog, home, console and settings stay off. Simulator-tested only; NOT qualified on a real
+  controller. Browsers have no UDP, so the web app stays export-only.
 - **I.6 — Controller/profile compatibility** (ADR-157): detected firmware,
   streaming mode, receive window, output dialect and active driver are reconciled.
   The buffered receive window is bounded by the capacity the controller reports
@@ -406,8 +409,9 @@ byte-identical for unchanged input. Design + research:
 | DS-4b | Polar/angle tracking, tangent and perpendicular snaps, alignment guides between objects — deferred snaps from the gesture start, polar step picker, point and moving-box alignment, drawn guides in 2D and 3D (ADR-272 Amendment 6) | Built |
 | DS-5 | Apply → commits designed geometry as one project undo entry; rect/circle land parametric, line/arc/path bake exact. **End-to-end slice closed** — verified from sketch through `compileJob` to emitted G-code | Built |
 | DS-6 | Corner ops in `core/design/ops/`: fillet (tangent arc at the shared chord tolerance) and chamfer (exact, no sampling), both refusing a size that will not fit rather than clamping | Built (core) |
-| DS-6b | Fillet and chamfer wired to the Modify rail with a context-sensitive options bar (trim/extend still planned) | Built |
-| DS-7 | Dimensions: infer-from-selection tool, driving vs driven, dimension-driven edit | Planned |
+| DS-6b | Fillet and chamfer wired to the Modify rail with a context-sensitive options bar (Extend shipped after; Trim is DS-6c) | Built |
+| DS-6c | Trim to boundary: quick trim of the hovered piece between its nearest crossings, exact for lines, polylines, square rectangles, circles and arcs (ADR-272 Amendment 8) | Built |
+| DS-7 | Dimensions: infer-from-selection tool, driving vs driven, dimension-driven edit — seven kinds (length, segment, width, height, diameter, radius, angle), local exact re-solve, driving values enforced on every Studio state, saved in the Studio document (ADR-272 Amendment 7) | Built |
 | DS-8 | Layered carve (ADR-272 Amendment 1): design layers with per-layer cut type / depth / bit, layers panel with assign-selection, per-bit simulate pass, Apply → one operation per layer feeding the existing multi-bit tool-change job | Built |
 | DS-8b | The canvas becomes the 3D design space (ADR-272 Amendment 2): stock on a grid, drawing on its top face through the shared gesture machine, carve live underneath, Fusion input mapping (left = tool, middle pan, Shift+middle/right orbit, wheel zoom-to-cursor), Top/Iso presets, Design/Bits tiers in the viewport toolbar, 2D canvas kept as fallback toggle | In progress |
 | DS-9 | `SketchShape` arm on `ShapeSpec` — parametric round-trip through `.lf2` | Planned |
@@ -419,7 +423,8 @@ Requires a new `PROJECT.md` revision and a `DECISIONS.md` entry. Anticipated, no
 - ~~Additional `OutputStrategy` implementations (Marlin et al).~~ **Built —
   see Phase I above (ADR-094..097).** Remaining follow-ups: hardware qualification (Falcon
   A1 Pro and Neotronics 4040, firmware builds unconfirmed; community Marlin/Smoothie/FluidNC verification), Ruida
-  real-controller validation then the Electron UDP transport, wizard
+  real-controller validation of the export and of the Electron UDP transport (built first at the
+  maintainer's request, ADR-697), wizard
   controller-family step polish. Trocen/TopWisdom/galvo stay out of scope.
 - Phase J: Linux desktop build. Packaging, the `.lf2` file type, remembered serial ports and CI install checks shipped under ADR-607; publishing Linux and commercial Mac downloads is designed in ADR-613 and waits for the maintainer's switch; macOS Preview moved into the current ADR-247/248 Desktop Preview track. (Renumbered from Phase I — the multi-controller track took that slot at integration; ADR-104.)
 

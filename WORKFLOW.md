@@ -8739,6 +8739,37 @@ as the pane's design record.
 1. The export refuses with "Layer … uses Fill/Image raster output, which the
    experimental .rd encoder does not support yet."
 
+### F-H5. Run a Ruida job over the network (desktop, EXPERIMENTAL — ADR-697)
+
+Simulator-tested only; no real Ruida has run this path.
+
+#### Success
+1. Machine details shows **Ruida network connection (experimental)** on the
+   desktop app for a Ruida profile, with the not-qualified warning. The user
+   enters the controller's IPv4 address from its panel and clicks **Connect
+   Ruida**. KerfDesk reads the status bits; only an answer counts as connected.
+2. **Frame (laser off)** sends a travel-only .rd job around the job's bounds,
+   with the job's placement. It counts as complete once the controller has
+   reported busy and then idle twice.
+3. **Start** sends the exact bytes Save .rd would write, datagram by datagram,
+   and lists the job's warnings. **Pause**, **Resume** and **Abort** send
+   Pause, Restore and Stop Process. The job ends when the controller reports
+   idle.
+
+#### Refusals and failures
+1. Start without a completed Frame of the same footprint on this connection:
+   "Frame this job first…"; nothing is sent.
+2. Current Position placement is refused (the link does not read the head
+   position back); Save .rd still exports it.
+3. A controller that reports itself busy, or does not answer, is sent nothing.
+4. A datagram refused four times or left without a verdict for 1 s ends the
+   send without a resend; KerfDesk sends Stop Process and says whether the
+   controller acknowledged it. An unacknowledged stop says to press Stop on
+   the panel.
+5. Port 40200 already in use (LightBurn, RDWorks): Connect fails and names them.
+6. A crashed window, a window that stops reading for 15 s, quitting, or
+   Windows ending the session: the main process sends Stop Process.
+
 ## Phase K flows (box generator — ADR-106)
 
 ### F-K1. Generate a finger-joint box
@@ -10590,7 +10621,7 @@ into the drawing.
 The Design Studio is a full-window overlay for drawing a part to size by hand.
 Flow IDs use the `F-DS` prefix (`F-L` belongs to Image Studio, `F-CNC` to the
 router flows). Each flow names the stage that built it; typed entry during a
-draw gesture is F-DS13 (DS-3c); tracking and deferred snaps are F-DS14 (DS-4b).
+draw gesture is F-DS13 (DS-3c); tracking and deferred snaps are F-DS14 (DS-4b); dimensions are F-DS15 (DS-7); Trim is F-DS16 (DS-6c).
 
 Nothing in this surface refuses anything (rule 7). Closing never prompts, an
 unfinished tool explains itself in the status bar rather than being disabled, and
@@ -11158,6 +11189,79 @@ shown.
    pointer where it is. A rectangle or circle tracks alignment only, never a
    polar angle.
 
+### F-DS15. Dimension a part and drive it by value (DS-7, ADR-272 Amendment 7)
+
+1. Arm **Dimension** (D). Click a rectangle edge for its width or height, a
+   polyline segment for its length, a circle for its diameter, or an arc for
+   its radius. The dimension appears at once, driving, at the current size.
+2. Click a line: the status bar asks for a second pick. Click another line for
+   the angle between them, or anywhere else for the line's length.
+3. The options bar shows the dimension being edited: type a value and press
+   Enter. The shape re-solves to it as one undo step.
+4. Untick **Driving** to make it a reference: it is drawn in parentheses and
+   follows the geometry. Tick it again to drive at the current reading.
+5. Click a placed dimension's line to edit it again; **Delete dimension** (or
+   the Delete key) removes it and leaves the geometry.
+
+#### Success
+
+The shape measures exactly the typed value in the inspector, the dimension
+reads it, and one Ctrl+Z restores both.
+
+#### Error - a value that cannot be honoured
+
+1. A size at or below 0.01 mm, an angle of 0 or 180 degrees or more, or text
+   that is not a number turns the box red with the reason; the geometry is
+   unchanged. Parallel lines and ellipses offer no dimension.
+
+#### Empty - no dimensions
+
+1. A sketch without dimensions saves, applies and cuts exactly as before.
+
+#### Edge - ownership and removal
+
+1. While a dimension drives, a stretch, grip or node edit cannot change that
+   quantity: the driving value is re-imposed. Typing the same quantity in the
+   properties box drives the dimension instead, so the typed value sticks.
+2. Deleting a dimensioned shape, or turning a circle into an ellipse by
+   stretching it, drops the dimensions that named it.
+3. Only the dimensioned entity moves: a line joined to the resized one does
+   not follow (there is no constraint solver, ADR-272 clause 5).
+4. In the 3D surface dimensions are picked and edited but drawn only in 2D.
+
+### F-DS16. Trim a piece back to its crossings (DS-6c, ADR-272 Amendment 8)
+
+1. Arm **Trim** (T) on the Modify rail.
+2. Hover a piece of a line, polyline, rectangle, circle or arc that other
+   geometry crosses. The piece between the nearest crossing on each side is
+   highlighted dashed in the trim colour, and the status bar says a click will
+   trim it.
+3. Click. The piece is removed as one undo step; the highlight moves to
+   whatever piece is now under the pointer, so keep clicking to trim a row.
+
+#### Success
+
+A line trimmed in the middle becomes two lines; a closed outline opens into a
+polyline; a circle becomes an arc. Each piece keeps its layer and construction
+flag, and Ctrl+Z restores the entity whole.
+
+#### Error - nothing to trim to
+
+1. A piece nothing crosses, or a closed outline crossed fewer than twice, is
+   reported in the status bar and left alone: Delete removes a whole shape.
+2. Ellipses and round-cornered rectangles are reported as not trimmable yet.
+
+#### Empty - nothing under the pointer
+
+1. No highlight; the status bar describes the tool. A click does nothing.
+
+#### Edge - cutting edges and dimensions
+
+1. Every other entity cuts, construction geometry included; an ellipse cuts
+   along its drawn outline.
+2. A dimension on a circle that becomes an arc is dropped with it (F-DS15).
+3. Escape disarms Trim and keeps the selection, as it does Extend.
+
 ## F-LEARN1. Contextual visual tutorials
 
 ### Success
@@ -11166,6 +11270,7 @@ shown.
 2. Global entry points show a searchable library with categories and machine filters. A contextual entry opens that feature's lesson directly, regardless of the library's current filters.
 3. The user reads the prerequisite/location, chooses a numbered step, and compares the illustrated Before/Action/Result stages. Optional playback changes only the example. Next, Back and Restart navigate the lesson.
 4. **Finish lesson** records completion on this device. Closing or Escape returns focus to the originating control when it remains available. Closing nested help leaves the underlying editor/dialog open.
+5. **Burn your first coaster** also offers **Guide me in KerfDesk**, which closes the lesson and opens the guided first job (F-LEARN2, ADR-698) to do the same journey with the real controls.
 
 ### Error
 
@@ -11178,3 +11283,36 @@ No search matches: show a clear empty state and **Show all tutorials**, which cl
 ### Edge
 
 Tutorials never open automatically, submit forms, invoke tool commands, change artwork or send controller commands. Every lesson remains reachable from Learn, including those for controls that no longer carry their own button. Reduced motion keeps explicit static example-stage controls. The learning surface registers as a modal to isolate application shortcuts, appears above studio dialogs, and stays below the live-motion control bar. Completion is a reading aid, not a qualification or prerequisite for using a tool or starting a job.
+
+## F-LEARN2. Guided first job (ADR-698)
+
+### Success
+
+1. The user opens **Help → Guided first job…**, presses **Guide me in KerfDesk** in the "Burn your first coaster" lesson, or finds it with Ctrl+K. A panel opens over the bottom-left of the canvas; the workspace stays usable around it.
+2. The panel lists six steps and expands the first one not done: **Connect your laser**, **Choose your machine**, **Put something on the canvas**, **Pick a material preset**, **Frame it**, **Start and stay with it**. The real control for that step (Connect, the Machine Setup button, the Artwork panel's Materials tab, Frame job, Start) is outlined; **Show me** opens its panel and focuses it without pressing it.
+3. Each step completes when the app's state does: the controller connects; Machine Setup is saved for the connected profile and controller; artwork is on the canvas (the operator may press **Add a sample circle**, a 40 mm circle in the middle of the bed, one undo step); a job material is chosen or an output operation in use holds or links a library preset; a clean Frame of the current job completes; a job starts. The panel then says the job is under way, to stay with the laser and that ABORT JOB stops it.
+4. Start still goes through the Frame gate and Job Review exactly as in F-B6; the guide adds no check, warning or refusal of its own.
+5. **Close** hides the panel; Help → Guided first job reopens it at the current step. **Start over** clears skipped steps for another job.
+
+### Edge
+
+- An edit after Frame expires the Frame as usual; the guide goes back to **Frame it**. Disconnecting goes back to **Connect your laser**.
+- **Choose your machine** and **Pick a material preset** offer **Skip this step** for an operator using the maker's settings or a material test; Frame and Start cannot be skipped.
+- With the machine set to CNC the panel says it follows a laser job; the Frame and Start steps work the same.
+- The guide never opens by itself, connects, homes, frames, starts or changes a setting. Dialogs, Job Review, toasts and Live Motion sit above it.
+
+## F-LEARN3. Simple view (ADR-698)
+
+### Success
+
+1. **Window → Simple View** or **Settings → General → Simple view → Hide advanced operation settings** turns it on. The choice belongs to this computer and is off until the operator turns it on.
+2. With laser artwork selected, the Operation tab shows the process (Line, Fill, Image), Power, Speed, Passes and every notice it shows anyway (starter values, mixed settings, process notices, who an edit reaches, Include in output). Fill's spacing and angle, the Image essentials, **Scan both ways**, **Air assist** and **More cut settings** give way to a short note.
+3. The note lists, with its value, each hidden setting this process uses whose value differs from a new operation's (for example `Line spacing: 0.05 mm`, `Air assist: on`, `Overcut: 1.5 mm`), or that differs between the selected artworks. With none, it says the other settings are at their usual values.
+4. **Show all settings** turns Simple view off and every control returns. Window → Simple View turns it back on.
+5. On the Artwork tab, **Advanced artwork settings** (the Power multiplier) is hidden only while it is 100% for every selected artwork.
+
+### Edge
+
+- Simple view changes only what the operation panel shows: no value, project, recipe, Preview, Job Review warning, Pause, Abort, run control or G-code changes, and it adds no undo step.
+- A Cut Settings dialog already open stays open when Simple view turns on.
+- CNC operation settings and the Cut Settings dialog show every setting in this increment.

@@ -37,6 +37,7 @@ export function DeviceSetupControls(): JSX.Element {
         onClick={() => openMachineSetup()}
         {...helpProps('control:laser.machine-setup.launch')}
         aria-label="Machine Setup"
+        data-search-target="machine-setup"
       >
         <Icon name="sliders" size={15} />
       </Button>
