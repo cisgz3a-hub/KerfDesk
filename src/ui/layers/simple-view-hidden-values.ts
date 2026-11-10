@@ -40,6 +40,7 @@ const tabsBySpacing = (s: LayerOperationSettings): boolean =>
 const perforated = (s: LayerOperationSettings): boolean => s.perforationEnabled === true;
 const leads = (s: LayerOperationSettings): boolean =>
   s.leadInEnabled === true || s.leadOutEnabled === true;
+const rampOn = (s: LayerOperationSettings): boolean => (s.fillRampLengthMm ?? 0) > 0;
 const scanBothWays = (s: LayerOperationSettings): boolean =>
   s.mode === 'image' ? s.imageBidirectional : s.fillBidirectional;
 
@@ -181,6 +182,9 @@ export const SIMPLE_VIEW_HIDDEN_SPECS: Readonly<Record<HiddenKey, HiddenSpec>> =
   leadAngleDeg: { label: 'Lead angle', modes: LINE, baseline: undefined, unit: '°', when: leads },
   leadSide: { label: 'Lead side', modes: LINE, baseline: undefined, when: leads },
   photoToneCurve: { label: 'Material tone curve', modes: IMAGE, baseline: undefined },
+  // ADR-699: a Fill ramp changes the burn whenever its length is set.
+  fillRampLengthMm: { label: 'Ramp length', modes: FILL, baseline: 0, unit: 'mm' },
+  fillRampOuterEdge: { label: 'Ramp outer edge', modes: FILL, baseline: false, when: rampOn },
 };
 
 export type HiddenSettingValue = {
