@@ -28,7 +28,9 @@ function job(speed: number, roundTheParts: boolean): Job {
         { x: 0, y: 0 },
         { x: 20, y: 0 },
       ];
-  return { groups: [{ kind: 'fill', speed, segments: [{ polyline }] }] } as unknown as Job;
+  return {
+    groups: [{ kind: 'fill', layerId: 'L1', speed, segments: [{ polyline }] }],
+  } as unknown as Job;
 }
 
 function project(rotary: RotarySetup, controllerKind: 'grblhal' | 'grbl-v1.1' = 'grblhal') {
@@ -42,16 +44,16 @@ describe('the rotary axis max rate in Job Review', () => {
       maxRateA: 2000,
     });
     expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toContain('A 1.43° per mm of surface');
-    expect(warnings[0]).toContain('4298 °/min of A');
-    expect(warnings[0]).toContain('$113=2000');
+    expect(warnings[0]).toContain("the rotary's A axis to turn faster than its max rate");
+    expect(warnings[0]).toContain('215 %');
+    expect(warnings[0]).toContain('$113=2000 °/min');
     expect(warnings[0]).toContain('1396 mm/min or less');
   });
 
   it('warns on a Z rotary against $112', () => {
     const onZ = project({ ...CHUCK_A, axis: 'Z', mmPerRotation: 40 }, 'grbl-v1.1');
     const warnings = detectRotarySurfaceSpeedWarnings(onZ, job(6000, true), { maxRateZ: 500 });
-    expect(warnings[0]).toContain('$112=500');
+    expect(warnings[0]).toContain('$112=500 mm/min');
   });
 
   it('stays silent for a fill along X, and without a reported rate', () => {
@@ -61,7 +63,7 @@ describe('the rotary axis max rate in Job Review', () => {
     expect(detectRotarySurfaceSpeedWarnings(project(CHUCK_A), job(3000, true), null)).toEqual([]);
   });
 
-  it('keeps the Y-port Max feed wording', () => {
+  it('leaves the Y-port Max feed warning to its own check', () => {
     const roller: RotarySetup = {
       enabled: true,
       type: 'roller',
@@ -71,7 +73,8 @@ describe('the rotary axis max rate in Job Review', () => {
     };
     const yProject = createProject({ ...DEFAULT_DEVICE_PROFILE, rotary: roller, maxFeed: 6000 });
     const [warning] = detectRotarySurfaceSpeedWarnings(yProject, job(4000, true));
-    expect(warning).toMatch(/^This rotary turns Y ×1\.84, so a 4000 mm\/min stroke round the part/);
+    expect(warning).toContain('need more feed than the Max feed (6000 mm/min)');
+    expect(warning).not.toContain('max rate');
   });
 });
 

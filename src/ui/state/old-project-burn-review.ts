@@ -2,6 +2,7 @@ import { cncAnchorShiftSince1028 } from '../../core/cnc/cnc-anchor-shift-since-1
 import type { Project } from '../../core/scene';
 import type { OldProjectBurnNotice } from '../../io/project/project-load-metadata';
 import { mergedBurnNotices } from '../../io/project/old-project-burn-notice';
+import { rotaryFeedChange } from '../../io/project/old-project-rotary-feed';
 import { oldProjectBurnMessages } from './old-project-burn-messages';
 
 // A migrated project no longer records what it was saved by, so Job Review reads
@@ -29,6 +30,8 @@ export function oldProjectBurnReviewWarnings(project: Project): ReadonlyArray<st
     movedRecords: present(remembered.movedRecords),
     imageDose: present(remembered.imageDose),
     cncJobOrigin: remembered.cncJobOrigin.length === 0 ? [] : liveCncJobOrigin(project),
+    // The rotary as it stands now: switched off or rescaled since the load, it changes.
+    rotaryFeed: (remembered.rotaryFeed?.length ?? 0) === 0 ? [] : rotaryFeedChange(project),
   });
   return [...frames, ...burn];
 }

@@ -3950,9 +3950,13 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    Creality chuck (Y ×0.16) is written at 0.16 × the layer speed, a stroke along it at the layer
    speed, and a diagonal in between.
 2. Image rows run along X and keep the layer speed and their bytes.
-3. When a roller's Y scale is above 1 and a stroke round the part would need more than the Max
-   feed, the feed stops at the Max feed and Job Review warns, naming the layer speed that keeps the
-   burn even.
+3. When a stroke round the part would need more than the Max feed (a roller whose Y scale is
+   above 1, or the narrow end of a taper on any rotary), the feed stops at the Max feed and Job
+   Review warns from the job's own moves: "They burn up to 122 % of the energy you set. For an even
+   burn, set this layer to 4909 mm/min or less" (ADR-127 Amendment 3). Strokes along X never warn.
+5. A rotary project saved by 1.0.30 or earlier, with a scaled rotary and line, cut or fill output,
+   says on open (and in Job Review) that its strokes round the part now burn with another energy,
+   for example "up to 6.28× the energy they did" on the Creality chuck (ADR-127 Amendment 3).
 4. The ETA and the G-code Inspector read the same program, so they time and shade these strokes
    as burned.
 
@@ -3964,13 +3968,15 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    turn in degrees ("the part has turned +111° since"), and on rollers says the part may have
    slipped.
 
-#### Success — image rows fit the rotary's steps (ADR-315 Amendment 1)
+#### Success — image rows fit the rotary's steps (ADR-315 Amendments 1 and 2)
 1. The controller places each image row on a whole Y step, and on a rotary one step turns the part
-   `1 / (Y scale × $101)` mm. When an image layer's line interval is not a whole number of those
-   steps, Job Review warns, for example "one Y step ($101 = 80 steps/mm) turns the part 0.079 mm,
-   and the 0.100 mm line interval is 1.27 steps, so its rows land 0.079 or 0.157 mm apart and
-   band", and names the two intervals that fit (here 12.73 or 6.37 lines/mm).
-2. Below one step per row the warning gives the share of rows that burn twice.
+   `1 / (Y scale × $101)` mm. Job Review checks the rows as the program writes them (row centres,
+   3 decimals) and the controller steps them. When they band or double, it warns, for example "one
+   Y step ($101 = 80 steps/mm) turns the part 0.0785 mm, and the 0.1000 mm line interval is 1.27
+   steps, so its rows land 0.0785 or 0.1571 mm apart and band", and names only intervals that land
+   evenly once typed as printed (here 0.1571 mm, 6.37 lines/mm, 2 steps).
+2. When rows double, the warning counts them ("136 of its 382 rows land on the row before and burn
+   twice"). When no interval the layer accepts lands every row, it says so and names the closest.
 3. A rotary on A or Z is checked against `$103` or `$102` the same way. When the controller
    reported no steps for the rotary's axis, one warning says the rows could not be checked.
 4. The warning changes nothing on its own; the operator sets the line interval.

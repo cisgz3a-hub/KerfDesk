@@ -30,6 +30,9 @@ export type OldProjectBurnNotice = {
   /** A CNC job whose cut moved, in machine mm, when the Job Origin anchor began
    *  to count every contour it cuts (rolling audit v9 R8-P2-1). At most one. */
   readonly cncJobOrigin: ReadonlyArray<{ readonly xMm: number; readonly yMm: number }>;
+  /** A rotary project whose strokes round the part changed energy when each
+   *  move's feed was matched to the surface (ADR-127 Amd 2). At most one. */
+  readonly rotaryFeed?: ReadonlyArray<{ readonly yScale: number }>;
 };
 
 export type LoadedProject = ProjectLoadNoticeFlags & {
