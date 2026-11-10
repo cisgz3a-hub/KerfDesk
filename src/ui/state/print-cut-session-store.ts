@@ -27,13 +27,23 @@ type PrintCutSessionState = {
     coordinateBasis?: CaptureCoordinateBasis,
   ) => void;
   readonly clear: () => void;
+  /**
+   * The camera could not tell which way round the sheet lies (ADR-443
+   * Amendment 3): said for the operator to confirm before applying. Any new
+   * capture clears it.
+   */
+  readonly cameraOrientationNote: string | null;
+  readonly noteCameraOrientation: (note: string | null) => void;
 };
 
 export const usePrintCutSessionStore = create<PrintCutSessionState>((set) => ({
   first: null,
   second: null,
+  cameraOrientationNote: null,
+  noteCameraOrientation: (note) => set({ cameraOrientationNote: note }),
   capture: (which, point, epoch, coordinateFrameKey, source, coordinateBasis) =>
     set({
+      cameraOrientationNote: null,
       [which]: {
         point,
         epoch,
@@ -42,7 +52,7 @@ export const usePrintCutSessionStore = create<PrintCutSessionState>((set) => ({
         ...(coordinateBasis === undefined ? {} : { coordinateBasis }),
       },
     }),
-  clear: () => set({ first: null, second: null }),
+  clear: () => set({ first: null, second: null, cameraOrientationNote: null }),
 }));
 
 export type PrintCutRegistrationState =

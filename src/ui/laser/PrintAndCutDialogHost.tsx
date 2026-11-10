@@ -59,6 +59,7 @@ export function PrintAndCutDialogHost(props: { readonly onClose: () => void }): 
       captureEnabled={head.machineMm !== null}
       captureUnavailableReason={head.unavailableReason}
       captureBasisError={basisError}
+      orientationNote={session.cameraOrientationNote}
       onTargetsChanged={camera.invalidate}
       selectionTargets={targetsFromSelection(project, selectedObjectId, additionalSelectedIds)}
       camera={{

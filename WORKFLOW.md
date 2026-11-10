@@ -9610,6 +9610,13 @@ as the pane's design record.
   print scale is more than 2 % off, or the turn is near 180°, the dialog says why and applies it
   only once **Use this registration anyway** is ticked. Job Review repeats the note at Start and
   never refuses (Amendment 1).
+- **Edge / sheet turned or upside down (Amendment 3).** Two marks fit either way round, so the
+  camera checks both against the print: the order that lays the design's artwork on printed ink
+  wins, even past a quarter turn or upside down, and the dialog says so. When the print cannot tell
+  (no artwork beside the marks, or artwork as symmetric as they are) and the sheet reads as turned
+  more than 45°, the dialog says it could not tell which way round the sheet lies and Apply waits
+  for **Use this registration anyway**. Job Review's line for a Start from other than Absolute
+  says the cut lines up with the print only from Absolute Coordinates.
 - **Edge / repeated marks.** When other pairs of marks are the same distance apart, the pair
   nearest the design's targets is used and the dialog says how many others fitted.
 - **Edge / no pair.** When no two marks are the design's spacing apart (within 2 %), the points

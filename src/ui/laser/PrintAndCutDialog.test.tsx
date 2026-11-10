@@ -275,3 +275,34 @@ function buttonByText(container: HTMLElement, text: string): HTMLButtonElement {
   if (!(button instanceof HTMLButtonElement)) throw new Error(`${text} button missing`);
   return button;
 }
+
+// Rolling audit v13 Y3-P2-1 (ADR-443 Amendment 3): the camera could not tell
+// which way round the sheet lies, so the operator confirms before Apply.
+describe('camera orientation note', () => {
+  it('holds Apply until the operator confirms the turn the camera could not settle', () => {
+    const onApply = vi.fn();
+    act(() =>
+      root.render(
+        <PrintAndCutDialog
+          initialTargets={{ first: { x: 0, y: 0 }, second: { x: 100, y: 0 } }}
+          firstMachinePoint={{ x: 20, y: 30 }}
+          secondMachinePoint={{ x: 20, y: 130 }}
+          captureEnabled={true}
+          orientationNote="The camera could not tell which way round the sheet lies."
+          onCapture={vi.fn()}
+          onCancel={vi.fn()}
+          onApply={onApply}
+          onDisable={vi.fn()}
+        />,
+      ),
+    );
+    expect(host.textContent).toContain('The camera could not tell which way round the sheet lies.');
+    expect(buttonByText(host, 'Apply registration').disabled).toBe(true);
+    const confirm = host.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    if (confirm === null) throw new Error('confirmation missing');
+    act(() => confirm.click());
+    expect(buttonByText(host, 'Apply registration').disabled).toBe(false);
+    act(() => buttonByText(host, 'Apply registration').click());
+    expect(onApply).toHaveBeenCalledTimes(1);
+  });
+});

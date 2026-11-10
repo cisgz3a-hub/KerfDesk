@@ -12,7 +12,13 @@ import { useCameraTraceLifetime } from '../camera/use-camera-trace-lifetime';
 import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
-import { designMarkSizeMm, locatePrintCutMarks, markPairMessage } from './print-cut-camera';
+import {
+  cameraOrientationNote,
+  designArtworkBoxes,
+  designMarkSizeMm,
+  locatePrintCutMarks,
+  markPairMessage,
+} from './print-cut-camera';
 import { printCutCameraRequest, type PrintCutCameraRequest } from './print-cut-camera-request';
 
 export type PrintCutCamera = {
@@ -76,6 +82,7 @@ export function usePrintCutCamera(): PrintCutCamera {
         heightAreas: camera.heightAreas,
         targets,
         markSizeMm: designMarkSizeMm(project, targets),
+        artwork: designArtworkBoxes(project, targets),
       });
       if (result === null)
         return setMessage('Could not build the bed image from the camera frame.');
@@ -105,4 +112,5 @@ function capturePair(request: PrintCutCameraRequest, pair: MarkPair): void {
   const session = usePrintCutSessionStore.getState();
   session.capture('first', pair.first.centre, request.epoch, request.frameKey, 'camera', 'bed');
   session.capture('second', pair.second.centre, request.epoch, request.frameKey, 'camera', 'bed');
+  session.noteCameraOrientation(cameraOrientationNote(pair));
 }
