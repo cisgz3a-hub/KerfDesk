@@ -348,6 +348,29 @@ export type MachineNetworkAdapter = {
   ) => SerialAdapter;
 };
 
+/** One open Ruida UDP link (ADR-697): datagrams to the controller's port 50200,
+ * replies from it. Delivery is never retried here; the session above decides. */
+export type RuidaDatagramLink = {
+  /** Sends one framed datagram. Rejects when the link is closed or the send
+   * could not be handed to the OS; never resent. */
+  readonly send: (datagram: Uint8Array) => Promise<void>;
+  /** Every datagram the controller sends, in arrival order. */
+  readonly onDatagram: (handler: (datagram: Uint8Array) => void) => () => void;
+  /** Once, when the link closes for any reason; `reason` when it failed. */
+  readonly onClose: (handler: (reason?: string) => void) => () => void;
+  readonly close: () => Promise<void>;
+};
+
+export type RuidaNetworkAdapter = {
+  /** Explicit private-network IPv4 address; no discovery, no auto-reconnect.
+   * `magic` is the controller's swizzle magic, for the stop the desktop sends
+   * on a session its window can no longer reach. */
+  readonly open: (host: string, magic: number) => Promise<RuidaDatagramLink>;
+  /** Calls `expire` after `ms` of time this thread was running, so a stalled
+   * window does not read its own stall as a silent controller. */
+  readonly deadline: (ms: number, expire: () => void) => () => void;
+};
+
 export type SerialPortRef = {
   readonly info?: SerialPortIdentity;
   // Open the port at the requested baud rate. The returned SerialConnection
@@ -517,6 +540,8 @@ export type PlatformAdapter = {
   /** Optional user-configured desktop provider; requests are explicit and drafts require review. */
   readonly aiAssistant?: AiAssistant;
   readonly machineNetwork?: MachineNetworkAdapter;
+  /** Desktop only: browsers have no UDP (ADR-697). */
+  readonly ruidaNetwork?: RuidaNetworkAdapter;
   readonly id: 'web' | 'electron' | 'mock';
   readonly filePickersAvailable?: () => boolean; // false in Firefox/Safari; absent = yes (ADR-688)
   readonly savesByDownload?: () => boolean; // no save picker; saves download (ADR-688 Amd 2)

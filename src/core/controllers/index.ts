@@ -5,6 +5,7 @@
 export type { ControllerEvent } from './controller-event';
 export type {
   ControllerCapabilities,
+  DatagramNetworkCapabilities,
   FirmwareSetupPanel,
   JogCapability,
   SettingsCapability,

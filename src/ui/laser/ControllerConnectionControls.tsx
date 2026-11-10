@@ -29,6 +29,7 @@ import { LaserModuleRow } from './LaserModuleRow';
 import { DeviceSetupControls } from './device-setup';
 import { controllerActionFailureHandler } from './report-controller-action-failure';
 import { MachineNetworkConnect } from './MachineNetworkConnect';
+import { RuidaNetworkPanel } from './RuidaNetworkPanel';
 import { RECONNECT_DURING_JOB_TITLE, reconnectWithSavedProfile } from './reconnect-job-guard';
 import {
   useControllerStoppedResponding,
@@ -146,6 +147,7 @@ function MachineDetailsContent(): JSX.Element {
     <>
       <LaserModuleRow />
       <MachineNetworkConnect />
+      <RuidaNetworkPanel />
     </>
   );
 }
@@ -173,11 +175,16 @@ function ConnectionHints(props: {
   readonly supportsSerial: boolean;
   readonly isFileOnlyProfile: boolean;
 }): JSX.Element | null {
+  // The desktop app reaches a Ruida over the network (ADR-697); browsers cannot.
+  const networkLink = usePlatform().ruidaNetwork !== undefined;
   if (props.isFileOnlyProfile) {
     return (
       <p className="lf-connection-hint" style={hintStyle}>
         This profile is file-export only: use Save G-code… to write an experimental .rd job and run
-        it from the machine panel. Live Ruida streaming is not available in this build.
+        it from the machine panel.{' '}
+        {networkLink
+          ? 'An experimental, simulator-tested network connection is under Machine details.'
+          : 'Live Ruida control needs the desktop app.'}
       </p>
     );
   }

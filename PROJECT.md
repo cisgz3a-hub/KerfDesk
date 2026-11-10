@@ -275,9 +275,12 @@ Verified end-to-end against scripted firmware simulators
 - **I.4 — Smoothieware** (ADR-096, amended by ADR-322): realtime ? status,
   M999 halt recovery, native M221 power mode, fractional vector/raster S power,
   and queued host pause. Generic realtime hold/resume is unavailable. Simulator-verified only.
-- **I.5 — Ruida** (ADR-097): EXPERIMENTAL `.rd` export (encode→decode round-trip
-  proven; NOT accepted by real hardware yet); `transport: 'file-only'` — no live
-  link; pure UDP session state machine as groundwork.
+- **I.5 — Ruida** (ADR-097, ADR-697): EXPERIMENTAL `.rd` export (encode→decode round-trip
+  proven; NOT accepted by real hardware yet). The line-based controller store still treats Ruida as
+  `transport: 'file-only'`. On the desktop app an experimental UDP link (ADR-697) streams the
+  `.rd` job, frames it with a travel-only job, and sends Pause, Resume, Abort and status reads;
+  jog, home, console and settings stay off. Simulator-tested only; NOT qualified on a real
+  controller. Browsers have no UDP, so the web app stays export-only.
 - **I.6 — Controller/profile compatibility** (ADR-157): detected firmware,
   streaming mode, receive window, output dialect and active driver are reconciled.
   The buffered receive window is bounded by the capacity the controller reports
@@ -419,7 +422,8 @@ Requires a new `PROJECT.md` revision and a `DECISIONS.md` entry. Anticipated, no
 - ~~Additional `OutputStrategy` implementations (Marlin et al).~~ **Built —
   see Phase I above (ADR-094..097).** Remaining follow-ups: hardware qualification (Falcon
   A1 Pro and Neotronics 4040, firmware builds unconfirmed; community Marlin/Smoothie/FluidNC verification), Ruida
-  real-controller validation then the Electron UDP transport, wizard
+  real-controller validation of the export and of the Electron UDP transport (built first at the
+  maintainer's request, ADR-697), wizard
   controller-family step polish. Trocen/TopWisdom/galvo stay out of scope.
 - Phase J: Linux desktop build. Packaging, the `.lf2` file type, remembered serial ports and CI install checks shipped under ADR-607; publishing Linux and commercial Mac downloads is designed in ADR-613 and waits for the maintainer's switch; macOS Preview moved into the current ADR-247/248 Desktop Preview track. (Renumbered from Phase I — the multi-controller track took that slot at integration; ADR-104.)
 

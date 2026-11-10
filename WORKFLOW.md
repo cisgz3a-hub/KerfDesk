@@ -8735,6 +8735,37 @@ as the pane's design record.
 1. The export refuses with "Layer … uses Fill/Image raster output, which the
    experimental .rd encoder does not support yet."
 
+### F-H5. Run a Ruida job over the network (desktop, EXPERIMENTAL — ADR-697)
+
+Simulator-tested only; no real Ruida has run this path.
+
+#### Success
+1. Machine details shows **Ruida network connection (experimental)** on the
+   desktop app for a Ruida profile, with the not-qualified warning. The user
+   enters the controller's IPv4 address from its panel and clicks **Connect
+   Ruida**. KerfDesk reads the status bits; only an answer counts as connected.
+2. **Frame (laser off)** sends a travel-only .rd job around the job's bounds,
+   with the job's placement. It counts as complete once the controller has
+   reported busy and then idle twice.
+3. **Start** sends the exact bytes Save .rd would write, datagram by datagram,
+   and lists the job's warnings. **Pause**, **Resume** and **Abort** send
+   Pause, Restore and Stop Process. The job ends when the controller reports
+   idle.
+
+#### Refusals and failures
+1. Start without a completed Frame of the same footprint on this connection:
+   "Frame this job first…"; nothing is sent.
+2. Current Position placement is refused (the link does not read the head
+   position back); Save .rd still exports it.
+3. A controller that reports itself busy, or does not answer, is sent nothing.
+4. A datagram refused four times or left without a verdict for 1 s ends the
+   send without a resend; KerfDesk sends Stop Process and says whether the
+   controller acknowledged it. An unacknowledged stop says to press Stop on
+   the panel.
+5. Port 40200 already in use (LightBurn, RDWorks): Connect fails and names them.
+6. A crashed window, a window that stops reading for 15 s, quitting, or
+   Windows ending the session: the main process sends Stop Process.
+
 ## Phase K flows (box generator — ADR-106)
 
 ### F-K1. Generate a finger-joint box

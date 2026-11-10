@@ -7,6 +7,7 @@ export { createDesktopJobActivityReporter } from './job-activity';
 export { createDesktopWindowCommands } from './desktop-window';
 export { createDesktopSerialAdapter } from './desktop-serial';
 export { createDesktopMachineNetwork } from './desktop-machine-network';
+export { createDesktopRuidaNetwork } from './desktop-ruida-network';
 export { createDesktopAiAssistant } from './desktop-ai';
 export { desktopCameraBridgeConnection } from './desktop-camera-bridge';
 export { createDesktopCameraAddressVault } from './desktop-camera-address-vault';

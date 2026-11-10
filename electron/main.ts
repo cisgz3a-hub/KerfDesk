@@ -87,7 +87,7 @@ import { readLicensingConfig } from './licensing-config.js';
 import { refusedDebugSwitch } from './debug-switch-policy.js';
 import { startDesktopSupportLog } from './support-log.js';
 import { installSessionEndGuard } from './session-end-guard.js';
-import { stopDesktopMachineNetwork } from './machine-network-routes.js';
+import { stopDesktopMachines } from './desktop-machine-stop.js';
 import { installTaskbarJobProgress } from './taskbar-job-progress.js';
 import { withDesktopWorkspaceRoutes } from './desktop-routes.js';
 import { createDesktopBackgroundStartup } from './desktop-startup.js';
@@ -410,7 +410,7 @@ async function createWindow(): Promise<void> {
   // network machine its stop, written at once because Electron ends the process
   // when `session-end` returns (ADR-548 Amendment 2); the taskbar button shows
   // the job's progress (ADR-553).
-  installSessionEndGuard(window, undefined, undefined, () => stopDesktopMachineNetwork(true));
+  installSessionEndGuard(window, undefined, undefined, () => stopDesktopMachines(true));
   installTaskbarJobProgress(window);
   // A crashed renderer, or a window closed on macOS where the app keeps running,
   // leaves no workspace behind it.
