@@ -9459,6 +9459,10 @@ as the pane's design record.
   is refused with **Set the camera back to … or calibrate again at this size**.
 - **Error / no WebGL2.** A browser with graphics acceleration off says the corrected picture cannot
   be drawn instead of showing an uncorrected one.
+- **Edge / large bridge camera while a job runs.** An RTSP or polled machine camera is drawn from
+  each new picture, decoded away from the window at about the canvas's size, and uploaded once; at
+  most 10 pictures a second, and 2 a second while a job streams. A 4K camera on the canvas keeps
+  every window task under the 50 ms job-time budget (ADR-440 Amendment 10).
 - **Empty / nothing to show.** Without a saved calibration the overlay row is absent and the canvas
   is untouched; with no still and no running camera nothing renders.
 - **Edge / reload and old files.** A corrupt saved calibration is dropped on load (never trusted).
@@ -9728,6 +9732,10 @@ as the pane's design record.
 - **Edge / head in the way.** When the head or gantry covered part of the job, the panel says what
   share was hidden. The operator jogs the head clear and presses **Take the after picture
   again**.
+- **Edge / large camera while the job runs (Amendment 2).** Each timelapse frame and the burn
+  check's first picture are read, flattened and encoded in a background worker, so a 4K camera or
+  a calibrated whole-bed job never holds the window: Abort, Pause and the window's streaming
+  answer at once. A phone or MCP camera still is made the same way, at most one a second.
 - **Edge / long job.** A long job keeps at most 480 frames, spread evenly over the whole job.
 - **Edge / panel closed.** While either choice is ticked, the camera stays on with the panel
   closed.
