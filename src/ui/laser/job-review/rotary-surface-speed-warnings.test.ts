@@ -20,7 +20,15 @@ function job(speed: number, kind: 'cut' | 'raster' = 'cut'): Job {
     speed,
     passes: 1,
     airAssist: false,
-    segments: [],
+    // One stroke round the part: only those layers are named (ADR-695 Amendment 1).
+    segments: [
+      {
+        polyline: [
+          { x: 0, y: 0 },
+          { x: 0, y: 10 },
+        ],
+      } as unknown as CutGroup['segments'][number],
+    ],
   };
   return { groups: kind === 'cut' ? [cut] : [] };
 }

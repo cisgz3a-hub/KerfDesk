@@ -11,7 +11,8 @@
 // because a locked controller rejects the G92 (error:9).
 
 import { currentJobStopRequest, currentStreamWasReset } from '../state/job-stop-request';
-import type { JobStopRequest } from '../state/job-stop-request';
+import type { JobStopRequest, RotaryStartTurn } from '../state/job-stop-request';
+import { turnRotaryBackToJobStart } from './abort-rotary-turn';
 import { useLaserStore, type LaserState } from '../state/laser-store';
 import { waitForControllerStatus } from './frame-status-wait';
 
@@ -36,9 +37,12 @@ export function operatorAbortAlarm(
 export async function restoreOriginAfterAbort(
   savedMm: { readonly x: number; readonly y: number },
   homeFirst: boolean,
+  turn?: RotaryStartTurn,
 ): Promise<void> {
   await clearAbortAlarm(homeFirst);
   await useLaserStore.getState().restoreWorkOrigin(savedMm);
+  // ADR-695 Amendment 1: an A or Z rotary turns back to where the job started.
+  if (turn !== undefined) await turnRotaryBackToJobStart(turn);
 }
 
 /** Frame's offer while the saved origin is unrestored and the alarm is
@@ -47,9 +51,11 @@ export async function restoreOriginAfterAbort(
 export async function restoreAbortOriginFromIdle(
   savedMm: { readonly x: number; readonly y: number },
   homeFirst: boolean,
+  turn?: RotaryStartTurn,
 ): Promise<void> {
   if (homeFirst) await clearAbortAlarm(true);
   await useLaserStore.getState().restoreWorkOrigin(savedMm);
+  if (turn !== undefined) await turnRotaryBackToJobStart(turn);
 }
 
 /** Unlock, then set the origin where the head stopped. */

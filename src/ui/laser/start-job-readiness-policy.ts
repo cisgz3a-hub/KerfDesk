@@ -61,7 +61,7 @@ export function demotedPolicyWarnings(
 ): string[] {
   const warnings: string[] = placementWarnings(project, machine, jobOrigin);
   // ADR-695: an A or Z rotary no one has seen turn, or an A1 Pro rotary left on Y.
-  warnings.push(...rotaryAxisStartWarnings(project));
+  warnings.push(...rotaryAxisStartWarnings(project, machine));
   const machineKind = machineKindOf(project.machine);
   if (machineKind === 'cnc' && machine.cncJobsSupported === false) {
     warnings.push(CNC_REQUIRES_GRBL_MESSAGE);
