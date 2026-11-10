@@ -11,6 +11,7 @@
 // the lead.
 
 import type { Vec2 } from '../scene';
+import { boundsOfPoints } from '../geometry/box-math';
 
 const JOIN_NEIGHBOURHOOD_MM = 0.2;
 const CELL_MM = 1;
@@ -39,7 +40,7 @@ export function crossesOwnContour(
 ): boolean {
   const walk = ringWalk(ring);
   const join = positionAlong(ring, walk, at);
-  const box = boundsOf(lead);
+  const box = boundsOfPoints(lead);
   for (const edge of edgesNear(walk, box)) {
     const a = ring[edge - 1] as Vec2;
     const b = ring[edge] as Vec2;
@@ -259,20 +260,6 @@ type Box = {
   readonly maxX: number;
   readonly maxY: number;
 };
-
-function boundsOf(points: ReadonlyArray<Vec2>): Box {
-  let minX = Number.POSITIVE_INFINITY;
-  let minY = Number.POSITIVE_INFINITY;
-  let maxX = Number.NEGATIVE_INFINITY;
-  let maxY = Number.NEGATIVE_INFINITY;
-  for (const point of points) {
-    minX = Math.min(minX, point.x);
-    minY = Math.min(minY, point.y);
-    maxX = Math.max(maxX, point.x);
-    maxY = Math.max(maxY, point.y);
-  }
-  return { minX, minY, maxX, maxY };
-}
 
 function edgeMeetsBox(a: Vec2, b: Vec2, box: Box): boolean {
   return (

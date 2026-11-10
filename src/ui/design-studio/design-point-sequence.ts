@@ -10,6 +10,7 @@ import {
 } from '../../core/design';
 import type { Polyline, Vec2 } from '../../core/scene';
 import { applyOrthoMm } from './design-snap';
+import { distance } from '../../core/geometry/point-math';
 
 export type PathPointSequence = {
   readonly kind: 'path';
@@ -77,8 +78,7 @@ export function constrainPathTarget(
 ): Vec2 {
   const { closeToleranceMm, hasObjectSnap, orthoEnabled } = constraint;
   const first = sequence.points[0];
-  const distanceToFirstMm =
-    first === undefined ? Number.POSITIVE_INFINITY : distanceMm(first, atMm);
+  const distanceToFirstMm = first === undefined ? Number.POSITIVE_INFINITY : distance(first, atMm);
   if (
     first !== undefined &&
     sequence.points.length >= 3 &&
@@ -101,7 +101,7 @@ export function advancePathSequence(
   const first = sequence.points[0];
   const last = sequence.points[sequence.points.length - 1];
   if (first === undefined || last === undefined) return { kind: 'continue', sequence };
-  const distanceToFirstMm = distanceMm(first, atMm);
+  const distanceToFirstMm = distance(first, atMm);
   if (
     sequence.points.length >= 3 &&
     distanceToFirstMm <= closeToleranceMm &&
@@ -109,7 +109,7 @@ export function advancePathSequence(
   ) {
     return { kind: 'commit', points: sequence.points };
   }
-  if (distanceMm(last, atMm) < MIN_ENTITY_SIZE_MM) {
+  if (distance(last, atMm) < MIN_ENTITY_SIZE_MM) {
     return { kind: 'continue', sequence: withoutLastClickSnapshot(sequence) };
   }
   return {
@@ -138,7 +138,7 @@ export function finishOpenPath(
 
 export function pathSequencePreviewPoints(sequence: PathPointSequence): ReadonlyArray<Vec2> {
   const last = sequence.points[sequence.points.length - 1];
-  if (last === undefined || distanceMm(last, sequence.pointerMm) < MIN_ENTITY_SIZE_MM) {
+  if (last === undefined || distance(last, sequence.pointerMm) < MIN_ENTITY_SIZE_MM) {
     return sequence.points;
   }
   return [...sequence.points, sequence.pointerMm];
@@ -152,8 +152,8 @@ export function constrainArcTarget(
   const { hasObjectSnap, orthoEnabled } = constraint;
   const constrained = hasObjectSnap ? atMm : applyOrthoMm(sequence.centerMm, atMm, orthoEnabled);
   if (sequence.startMm === null) return constrained;
-  const radiusMm = distanceMm(sequence.centerMm, sequence.startMm);
-  const distanceToTargetMm = distanceMm(sequence.centerMm, constrained);
+  const radiusMm = distance(sequence.centerMm, sequence.startMm);
+  const distanceToTargetMm = distance(sequence.centerMm, constrained);
   if (distanceToTargetMm < MIN_ENTITY_SIZE_MM) return constrained;
   const scale = radiusMm / distanceToTargetMm;
   return {
@@ -164,7 +164,7 @@ export function constrainArcTarget(
 
 export function advanceArcSequence(sequence: ArcPointSequence, atMm: Vec2): ArcSequenceAdvance {
   if (sequence.startMm === null) {
-    if (distanceMm(sequence.centerMm, atMm) < MIN_ENTITY_SIZE_MM) {
+    if (distance(sequence.centerMm, atMm) < MIN_ENTITY_SIZE_MM) {
       return { kind: 'continue', sequence: { ...sequence, pointerMm: atMm } };
     }
     return {
@@ -184,8 +184,8 @@ export function updateArcSequence(sequence: ArcPointSequence, pointerMm: Vec2): 
 
 export function arcSnapMatchesRadius(sequence: ArcPointSequence, atMm: Vec2): boolean {
   if (sequence.startMm === null) return true;
-  const radiusMm = distanceMm(sequence.centerMm, sequence.startMm);
-  const targetRadiusMm = distanceMm(sequence.centerMm, atMm);
+  const radiusMm = distance(sequence.centerMm, sequence.startMm);
+  const targetRadiusMm = distance(sequence.centerMm, atMm);
   const epsilonMm = Number.EPSILON * 64 * Math.max(1, radiusMm, targetRadiusMm);
   return Math.abs(targetRadiusMm - radiusMm) <= epsilonMm;
 }
@@ -209,8 +209,8 @@ export function pointSequencePreviewPolylines(
 function arcGeometry(sequence: ArcPointSequence, endMm: Vec2): Omit<SketchArc, 'id'> | null {
   const startMm = sequence.startMm;
   if (startMm === null) return null;
-  const radiusMm = distanceMm(sequence.centerMm, startMm);
-  if (radiusMm < MIN_ENTITY_SIZE_MM || distanceMm(sequence.centerMm, endMm) < MIN_ENTITY_SIZE_MM) {
+  const radiusMm = distance(sequence.centerMm, startMm);
+  if (radiusMm < MIN_ENTITY_SIZE_MM || distance(sequence.centerMm, endMm) < MIN_ENTITY_SIZE_MM) {
     return null;
   }
   const startAngleDeg = angleDeg(sequence.centerMm, startMm);
@@ -233,11 +233,7 @@ function withoutLastClickSnapshot(sequence: PathPointSequence): PathPointSequenc
   };
 }
 
-function distanceMm(a: Vec2, b: Vec2): number {
-  return Math.hypot(a.x - b.x, a.y - b.y);
-}
-
 function samePointMm(a: Vec2, b: Vec2): boolean {
   const coordinateScale = Math.max(1, Math.abs(a.x), Math.abs(a.y), Math.abs(b.x), Math.abs(b.y));
-  return distanceMm(a, b) <= Number.EPSILON * 64 * coordinateScale;
+  return distance(a, b) <= Number.EPSILON * 64 * coordinateScale;
 }

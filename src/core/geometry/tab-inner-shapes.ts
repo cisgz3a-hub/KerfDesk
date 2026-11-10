@@ -10,6 +10,7 @@ import type { Vec2 } from '../scene';
 import { ContourBoxIndex } from '../trace/contour-box-index';
 import type { ContourBox } from '../trace/contour-bounds';
 import { strictlyContains } from './tab-contour-containment';
+import { boundsOfPoints } from './box-math';
 
 type ShapeBox = ContourBox & { readonly index: number };
 
@@ -29,7 +30,7 @@ export function evenlyNestedShapes(
   shapes: ReadonlyArray<ReadonlyArray<Vec2> | null>,
 ): ReadonlyArray<boolean> {
   const boxes = shapes.map((points, index) =>
-    points === null ? null : { ...boxOf(points), index },
+    points === null ? null : { ...boundsOfPoints(points), index },
   );
   const scale = largestCoordinate(boxes);
   const candidatesFor =
@@ -84,20 +85,6 @@ function indexedCandidates(
 function everyShape(boxes: ReadonlyArray<ShapeBox | null>): () => ReadonlyArray<number> {
   const all = boxes.flatMap((box) => (box === null ? [] : [box.index]));
   return () => all;
-}
-
-function boxOf(points: ReadonlyArray<Vec2>): ContourBox {
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-  for (const point of points) {
-    minX = Math.min(minX, point.x);
-    minY = Math.min(minY, point.y);
-    maxX = Math.max(maxX, point.x);
-    maxY = Math.max(maxY, point.y);
-  }
-  return { minX, minY, maxX, maxY };
 }
 
 // NaN when any point is not a number, Infinity when a shape has no points.

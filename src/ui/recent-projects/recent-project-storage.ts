@@ -15,6 +15,7 @@ import {
   sameRecentProjectSnapshot,
   type RecentProjectConditionalUpdate,
 } from './recent-project-transaction';
+import { isRecord } from '../../core/util/is-record';
 
 const DATABASE_NAME = 'kerfdesk-recent-projects';
 const DATABASE_VERSION = 1;
@@ -304,8 +305,4 @@ function decodeRef(value: unknown): RecentFileRef | null | undefined {
   const { path, token } = value;
   if (value['kind'] !== 'desktop-path' || typeof path !== 'string' || path === '') return undefined;
   return typeof token === 'string' ? { kind: 'desktop-path', path, token } : undefined;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

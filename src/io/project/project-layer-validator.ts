@@ -1,5 +1,7 @@
 import { DITHER_ALGORITHMS } from '../../core/scene';
 import { cutExtrasFieldErrors } from './project-cut-extras-validator';
+import { isFiniteNumber } from '../../core/util/finite';
+import { isRecord } from '../../core/util/is-record';
 
 export function validateLayerSubLayers(value: unknown, path: string): string | null {
   if (value === undefined) return null;
@@ -8,7 +10,7 @@ export function validateLayerSubLayers(value: unknown, path: string): string | n
 }
 
 function validateLayerSubLayer(value: unknown, path: string): string | null {
-  if (!isObject(value)) return `missing or invalid \`${path}\``;
+  if (!isRecord(value)) return `missing or invalid \`${path}\``;
   return firstError([
     requireString(value, `${path}.id`),
     requireString(value, `${path}.label`),
@@ -18,7 +20,7 @@ function validateLayerSubLayer(value: unknown, path: string): string | null {
 }
 
 export function validateLayerOperationSettings(value: unknown, path: string): string | null {
-  if (!isObject(value)) return `missing or invalid \`${path}\``;
+  if (!isRecord(value)) return `missing or invalid \`${path}\``;
   if ('focusTest' in value) return `${path}.focusTest is only valid on the parent operation`;
   return firstError([
     requireLiteral(value, `${path}.mode`, ['line', 'fill', 'image']),
@@ -166,10 +168,3 @@ function optionalLiteral(
 function valueAtPath(obj: Record<string, unknown>, path: string): unknown {
   return obj[path.slice(path.lastIndexOf('.') + 1)];
 }
-
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
-}
-
-const isObject = (v: unknown): v is Record<string, unknown> =>
-  typeof v === 'object' && v !== null && !Array.isArray(v);

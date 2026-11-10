@@ -18,6 +18,7 @@ import {
   sceneObjectUsesOperation,
   type Project,
 } from '../../core/scene';
+import { formatUpTo2Decimals } from '../../core/util/number-format';
 
 export function detectCncFinishAllowanceWarnings(project: Project): ReadonlyArray<string> {
   const machine = project.machine;
@@ -35,20 +36,15 @@ export function detectCncFinishAllowanceWarnings(project: Project): ReadonlyArra
     const stepMm = cncSettingsForStage(settings, 'profile-finish', tool).depthPerPassMm;
     const loose =
       allowanceMm >= wallDiameterMm
-        ? ` At ${mm(allowanceMm)} mm the roughing and finishing slots would not meet, leaving a ring of stock loose between them.`
+        ? ` At ${formatUpTo2Decimals(allowanceMm)} mm the roughing and finishing slots would not meet, leaving a ring of stock loose between them.`
         : '';
     warnings.push(
-      `${layer.name}: the ${mm(allowanceMm)} mm finish allowance is at least the ${mm(radiusMm)} mm ` +
+      `${layer.name}: the ${formatUpTo2Decimals(allowanceMm)} mm finish allowance is at least the ${formatUpTo2Decimals(radiusMm)} mm ` +
         `radius of ${tool.name}, so one full-depth finishing pass would cut with half the bit or ` +
-        `more in solid stock.${loose} KerfDesk roughs ${mm(radiusMm)} mm proud of the wall instead ` +
-        `and steps the finishing pass down ${mm(stepMm)} mm at a time. Set Finish allowance ` +
-        `below ${mm(radiusMm)} mm for one light finishing pass.`,
+        `more in solid stock.${loose} KerfDesk roughs ${formatUpTo2Decimals(radiusMm)} mm proud of the wall instead ` +
+        `and steps the finishing pass down ${formatUpTo2Decimals(stepMm)} mm at a time. Set Finish allowance ` +
+        `below ${formatUpTo2Decimals(radiusMm)} mm for one light finishing pass.`,
     );
   }
   return warnings;
-}
-
-// Two decimals: a 1/8 in bit's 1.5875 mm radius must not read as 1.6 mm.
-function mm(value: number): string {
-  return String(Number(value.toFixed(2)));
 }

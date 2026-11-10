@@ -9,6 +9,7 @@ import { IndexedDbPagedAssetRepository } from './paged-asset-indexeddb';
 import { encodePagedAssetBase64 } from './paged-raster-hydration';
 import { importPngOffThread, type PngImportWorkerProgress } from './png-import-worker-client';
 import type { ImageDensity } from '../common/image-density';
+import { isAbortError } from '../../core/util/error-message';
 
 export type QualifiedPngRaster = {
   readonly natural: { readonly width: number; readonly height: number };
@@ -192,8 +193,4 @@ function bytesToDataUrl(bytes: Uint8Array, mimeType: string): string {
 
 export function isPngCandidate(file: File): boolean {
   return file.type.toLowerCase() === 'image/png' || /\.png$/i.test(file.name);
-}
-
-function isAbortError(error: unknown): boolean {
-  return error instanceof Error && error.name === 'AbortError';
 }

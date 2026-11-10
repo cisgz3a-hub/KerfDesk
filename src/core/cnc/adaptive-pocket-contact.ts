@@ -9,6 +9,7 @@ import {
   type Arcs,
   type RimMove,
 } from './adaptive-pocket-rim-arcs';
+import { growBox } from '../geometry/box-math';
 
 // Exact cutter contact for the adaptive verifier (ADR-154 Amendment 3).
 //
@@ -127,7 +128,7 @@ export class AdaptiveCutterContact {
       maxX: point.x + near,
       maxY: point.y + near,
     });
-    if (clearing.open.length > 0) this.clearIn(clearing, point, grow(clearing.openBounds, r));
+    if (clearing.open.length > 0) this.clearIn(clearing, point, growBox(clearing.openBounds, r));
     return clearing.open;
   }
 
@@ -202,15 +203,6 @@ function entryArcs(point: Vec2, r: number, entry: Entry): Arcs {
   return entry.pathRadiusMm <= r
     ? outer
     : subtract(outer, rimArcsInDisk(point, r, entry.centre, entry.pathRadiusMm - r));
-}
-
-function grow(bounds: Bounds, margin: number): Bounds {
-  return {
-    minX: bounds.minX - margin,
-    minY: bounds.minY - margin,
-    maxX: bounds.maxX + margin,
-    maxY: bounds.maxY + margin,
-  };
 }
 
 // The squared distance between two boxes, zero when they overlap.

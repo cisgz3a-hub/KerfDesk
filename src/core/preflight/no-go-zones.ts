@@ -8,6 +8,7 @@ import {
   stripGcodeComment,
   type MotionBoundsOffset,
 } from '../invariants';
+import { pointInBox, boxesOverlap } from '../geometry/box-math';
 
 export type NoGoZoneCollision = {
   readonly lineNumber: number;
@@ -53,7 +54,7 @@ export function zonesOverlappingRect(
   rect: Rect,
   zones: ReadonlyArray<NoGoZone>,
 ): ReadonlyArray<NoGoZone> {
-  return zones.filter((zone) => zone.enabled && rectsIntersect(rect, rectForZone(zone)));
+  return zones.filter((zone) => zone.enabled && boxesOverlap(rect, rectForZone(zone)));
 }
 
 export function findNoGoZoneCollisions(
@@ -146,7 +147,7 @@ function appendCollision(
   const hit = activeZones.find(({ rect }) => {
     const cutterEnvelope = expandRect(rect, cutterRadiusMm);
     return (
-      rectsIntersect(cutterEnvelope, bedRect) &&
+      boxesOverlap(cutterEnvelope, bedRect) &&
       motionIntersectsRect(current, next, line, motion, cutterEnvelope)
     );
   });
@@ -224,7 +225,7 @@ function relativePoint(axes: Axes, base: Point): Point {
 }
 
 function segmentIntersectsRect(a: Point, b: Point, rect: Rect): boolean {
-  if (pointInRect(a, rect) || pointInRect(b, rect)) return true;
+  if (pointInBox(a, rect) || pointInBox(b, rect)) return true;
   return (
     segmentsIntersect(a, b, { x: rect.minX, y: rect.minY }, { x: rect.maxX, y: rect.minY }) ||
     segmentsIntersect(a, b, { x: rect.maxX, y: rect.minY }, { x: rect.maxX, y: rect.maxY }) ||
@@ -260,16 +261,6 @@ function pointOnSegment(point: Point, a: Point, b: Point): boolean {
     point.y >= Math.min(a.y, b.y) &&
     point.y <= Math.max(a.y, b.y)
   );
-}
-
-function pointInRect(point: Point, rect: Rect): boolean {
-  return (
-    point.x >= rect.minX && point.x <= rect.maxX && point.y >= rect.minY && point.y <= rect.maxY
-  );
-}
-
-function rectsIntersect(a: Rect, b: Rect): boolean {
-  return a.minX <= b.maxX && a.maxX >= b.minX && a.minY <= b.maxY && a.maxY >= b.minY;
 }
 
 function rectForZone(zone: NoGoZone): Rect {

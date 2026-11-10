@@ -28,6 +28,7 @@ import { createRendererMachineAuthorities } from './renderer-machine-authority';
 import type { MachineAuthority } from '../remote-control/machine-types';
 import type { PlatformAdapter } from '../../platform/types';
 import { createRemoteChangeObserver } from './remote-change-observer';
+import { isRecord } from '../../core/util/is-record';
 
 const SHARED_ARTWORK_READS = new Set([
   'get_workspace_preview',
@@ -57,11 +58,9 @@ type Active = {
   sharesArtwork: boolean;
   controller: AbortController;
 };
-const object = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
 function validRequest(value: unknown): value is RequestEnvelope {
   return (
-    object(value) &&
+    isRecord(value) &&
     typeof value.id === 'string' &&
     value.id.length <= 128 &&
     typeof value.command === 'string' &&
@@ -69,7 +68,7 @@ function validRequest(value: unknown): value is RequestEnvelope {
     value.clientId.length <= 128 &&
     typeof value.canWrite === 'boolean' &&
     typeof value.canControl === 'boolean' &&
-    object(value.args)
+    isRecord(value.args)
   );
 }
 type HoldBeat = { clientId: string; operationId: string };
@@ -86,9 +85,9 @@ function optionalList(value: unknown, valid: (item: unknown) => boolean): boolea
   return value === undefined || (Array.isArray(value) && value.length <= 64 && value.every(valid));
 }
 const validBeat = (beat: unknown) =>
-  object(beat) && shortId(beat.clientId) && shortId(beat.operationId);
+  isRecord(beat) && shortId(beat.clientId) && shortId(beat.operationId);
 function validPoll(value: unknown): value is PollResult {
-  if (!object(value) || !Array.isArray(value.requests) || !Array.isArray(value.cancelled))
+  if (!isRecord(value) || !Array.isArray(value.requests) || !Array.isArray(value.cancelled))
     return false;
   return (
     value.requests.length <= 1 &&
@@ -155,7 +154,8 @@ export class RemoteRendererSession {
   }
   private revoke = (event: Event): void => {
     const detail: unknown = (event as CustomEvent<unknown>).detail;
-    const clientId = object(detail) && typeof detail.clientId === 'string' ? detail.clientId : null;
+    const clientId =
+      isRecord(detail) && typeof detail.clientId === 'string' ? detail.clientId : null;
     this.adapter.holdRelease?.(clientId);
     this.authorities.revoke(clientId);
     for (const request of this.requests.values())
@@ -179,7 +179,7 @@ export class RemoteRendererSession {
     this.ui.attaching();
     try {
       const value = await remoteRequest('attach', {}, null);
-      if (!object(value) || typeof value.sessionId !== 'string')
+      if (!isRecord(value) || typeof value.sessionId !== 'string')
         throw new Error('Invalid remote session.');
       if (!this.ownsAttachment(attachment)) {
         await remoteRequest('detach', {}, value.sessionId).catch(() => undefined);

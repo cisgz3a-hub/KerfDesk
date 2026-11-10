@@ -44,6 +44,7 @@ import { resolveTraceSourceOptions, shouldTraceAlphaMask } from './trace-alpha';
 import { dedicatedTraceSteps } from './dedicated-trace-backends';
 import { invertImage } from './raster-prep';
 import { withSourceAutoSketch } from './auto-sketch-trace';
+import { distance } from '../geometry/point-math';
 
 export { boundsFromColoredPaths } from './trace-bounds';
 
@@ -509,10 +510,6 @@ function distancePointToLine(p: Vec2, a: Vec2, b: Vec2): number {
   const len = Math.hypot(dx, dy);
   if (len <= GEOMETRY_EPS) return distance(p, a);
   return Math.abs(dy * p.x - dx * p.y + b.x * a.y - b.y * a.x) / len;
-}
-
-function distance(a: Vec2, b: Vec2): number {
-  return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
 function samePoint(a: Vec2, b: Vec2): boolean {

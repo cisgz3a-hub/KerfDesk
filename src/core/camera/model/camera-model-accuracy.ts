@@ -4,6 +4,8 @@
 // camera is trusted and a later photo of the same target can be checked
 // against it. Pure core.
 
+import { isRecord } from '../../util/is-record';
+
 export type BedArea = {
   readonly x: number;
   readonly y: number;
@@ -168,10 +170,6 @@ function normalizeMark(value: unknown): SavedMarkError | undefined {
 
 function rounded(value: number): number {
   return Math.round(value * SAVED_DECIMALS) / SAVED_DECIMALS;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function finite(value: unknown): number | undefined {

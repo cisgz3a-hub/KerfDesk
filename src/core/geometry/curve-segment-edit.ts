@@ -20,6 +20,7 @@ import {
   nearestOnLine,
   segmentBoundsCanHit,
 } from './curve-segment-hit-geometry';
+import { lerpPoint, distance } from './point-math';
 
 const SAME_POINT_MM = 1e-9;
 const COARSE_SAMPLES = 32;
@@ -170,10 +171,6 @@ export function dragCurveSegment(
   return { ...curve, segments };
 }
 
-function lerpPoint(a: Vec2, b: Vec2, t: number): Vec2 {
-  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
-}
-
 export type CurveSegmentHit = {
   readonly segmentIndex: number;
   readonly t: number;
@@ -232,10 +229,6 @@ function nearestOnSegment(
   const t = (low + high) / 2;
   const point = at(t);
   return { t, point, distance: distance(point, target) };
-}
-
-function distance(a: Vec2, b: Vec2): number {
-  return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
 function samePoint(a: Vec2, b: Vec2): boolean {

@@ -77,6 +77,4 @@ export function boxAround(point: Vec2, radius: number): Box {
   };
 }
 
-export function boxesOverlap(a: Box, b: Box): boolean {
-  return a.minX <= b.maxX && b.minX <= a.maxX && a.minY <= b.maxY && b.minY <= a.maxY;
-}
+export { boxesOverlap } from '../../../core/geometry/box-math';

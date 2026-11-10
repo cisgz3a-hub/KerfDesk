@@ -24,6 +24,7 @@ import {
 import { sceneLayerVisibilityLookup, resolveVisibleOperationForPath } from '../scene/visibility';
 import { contourSegments, segmentPoint, type ContourSegments } from './trim-curve-split';
 import { isVectorPathObject, type VectorSceneObject } from './vector-path-tools';
+import { unionBox, boundsOfPoints } from './box-math';
 
 export type TrimContour = {
   readonly key: string;
@@ -196,7 +197,7 @@ export function flattenContour(
   // Chords can lie strictly inside a tangent curve. Broad-phase bounds must
   // contain the canonical curve, including when sampling hits its segment cap.
   const canonical = transformedBounds(curveSubpathBounds(contour), transform);
-  return { points, params, chordParams, bounds: unionBounds(boundsOf(points), canonical) };
+  return { points, params, chordParams, bounds: unionBox(boundsOfPoints(points), canonical) };
 }
 
 /** Parameters of the chord ends on one segment, ending at 1. */
@@ -232,31 +233,10 @@ function localPolylineBounds(paths: ReadonlyArray<ColoredPath>): Bounds | null {
   if (points.length === 0) return null;
   return paths
     .flatMap((path) => path.curves ?? [])
-    .reduce((bounds, curve) => unionBounds(bounds, curveSubpathBounds(curve)), boundsOf(points));
+    .reduce((bounds, curve) => unionBox(bounds, curveSubpathBounds(curve)), boundsOfPoints(points));
 }
 
-function unionBounds(a: Bounds, b: Bounds): Bounds {
-  return {
-    minX: Math.min(a.minX, b.minX),
-    minY: Math.min(a.minY, b.minY),
-    maxX: Math.max(a.maxX, b.maxX),
-    maxY: Math.max(a.maxY, b.maxY),
-  };
-}
-
-export function boundsOf(points: ReadonlyArray<Vec2>): Bounds {
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-  for (const point of points) {
-    minX = Math.min(minX, point.x);
-    minY = Math.min(minY, point.y);
-    maxX = Math.max(maxX, point.x);
-    maxY = Math.max(maxY, point.y);
-  }
-  return { minX, minY, maxX, maxY };
-}
+export { boundsOfPoints as boundsOf } from './box-math';
 
 function expand(bounds: Bounds): Bounds {
   return {

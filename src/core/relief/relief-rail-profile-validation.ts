@@ -1,17 +1,16 @@
 import type { ReliefRailProfileSource } from '../scene/relief/relief-rail-profile';
 import { railProfileTriangles } from './relief-rail-profile';
+import { isRecord } from '../util/is-record';
+import { isFiniteNumber } from '../util/finite';
 
-type RecordValue = Record<string, unknown>;
-const record = (v: unknown): v is RecordValue =>
-  typeof v === 'object' && v !== null && !Array.isArray(v);
-const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const text = (v: unknown): v is string => typeof v === 'string' && v.length > 0 && v.length <= 1024;
 const all = (values: readonly boolean[]): boolean => values.every(Boolean);
 const point = (v: unknown): v is { x: number; y: number } =>
-  record(v) && finite(v['x']) && finite(v['y']);
+  isRecord(v) && isFiniteNumber(v['x']) && isFiniteNumber(v['y']);
 
 export function reliefRailProfileError(raw: unknown, legacy = false): string | null {
-  if (!record(raw) || raw['kind'] !== 'rail-profile-v1') return 'Unsupported rail/profile source.';
+  if (!isRecord(raw) || raw['kind'] !== 'rail-profile-v1')
+    return 'Unsupported rail/profile source.';
   const steps = raw['samplingSteps'],
     width = raw['widthMm'],
     sections = raw['sections'];
@@ -33,7 +32,7 @@ export function reliefRailProfileError(raw: unknown, legacy = false): string | n
   }
 }
 function railError(raw: unknown): string | null {
-  if (!record(raw)) return 'Missing open rail.';
+  if (!isRecord(raw)) return 'Missing open rail.';
   const points = raw['points'];
   if (
     !Array.isArray(points) ||
@@ -59,7 +58,7 @@ function sectionsError(sections: unknown[]): string | null {
   const ids = new Set<string>();
   let previous = -1;
   for (const raw of sections) {
-    if (!record(raw)) return 'Invalid rail profile section.';
+    if (!isRecord(raw)) return 'Invalid rail profile section.';
     const position = raw['position'],
       width = raw['widthScale'];
     if (
@@ -78,7 +77,7 @@ function sectionsError(sections: unknown[]): string | null {
   }
   const first = sections[0],
     last = sections[sections.length - 1];
-  return record(first) && record(last) && first['position'] === 0 && last['position'] === 1
+  return isRecord(first) && isRecord(last) && first['position'] === 0 && last['position'] === 1
     ? null
     : 'Positioned profiles must include both rail ends, 0 and 1.';
 }
@@ -97,25 +96,25 @@ function profileError(raw: unknown): string | null {
 }
 function transformValid(raw: unknown): boolean {
   return (
-    record(raw) &&
+    isRecord(raw) &&
     all([
-      finite(raw['x']),
-      finite(raw['y']),
-      finite(raw['rotationDeg']),
-      finite(raw['scaleX']) && raw['scaleX'] > 0,
-      finite(raw['scaleY']) && raw['scaleY'] > 0,
+      isFiniteNumber(raw['x']),
+      isFiniteNumber(raw['y']),
+      isFiniteNumber(raw['rotationDeg']),
+      isFiniteNumber(raw['scaleX']) && raw['scaleX'] > 0,
+      isFiniteNumber(raw['scaleY']) && raw['scaleY'] > 0,
       typeof raw['mirrorX'] === 'boolean',
       typeof raw['mirrorY'] === 'boolean',
     ])
   );
 }
 export function reliefSourceWork(source: unknown): number {
-  if (!record(source) || source['kind'] !== 'rail-profile-v1') return 1;
+  if (!isRecord(source) || source['kind'] !== 'rail-profile-v1') return 1;
   const rail = source['rail'],
     second = source['secondRail'],
     sections = source['sections'];
   const count = (v: unknown): number =>
-    record(v) && Array.isArray(v['points']) ? v['points'].length : 0;
+    isRecord(v) && Array.isArray(v['points']) ? v['points'].length : 0;
   return (
     2 *
       (typeof source['samplingSteps'] === 'number'
@@ -134,25 +133,25 @@ function railSectionWork(sections: unknown): number {
   if (sections.length > 32) return Infinity;
   let profilePoints = 0;
   for (const section of sections)
-    if (record(section) && Array.isArray(section['profile']))
+    if (isRecord(section) && Array.isArray(section['profile']))
       profilePoints = Math.max(profilePoints, section['profile'].length);
   return sections.length + 2 * profilePoints;
 }
 
 function stepsValid(value: unknown): boolean {
-  return finite(value) && Number.isInteger(value) && value >= 1 && value <= 128;
+  return isFiniteNumber(value) && Number.isInteger(value) && value >= 1 && value <= 128;
 }
 function widthValid(value: unknown): boolean {
-  return finite(value) && value > 0;
+  return isFiniteNumber(value) && value > 0;
 }
 function sectionCollectionValid(value: unknown): boolean {
   return Array.isArray(value) && value.length >= 2 && value.length <= 32;
 }
 function positionValid(value: unknown, previous: number): boolean {
-  return finite(value) && value >= 0 && value <= 1 && value > previous;
+  return isFiniteNumber(value) && value >= 0 && value <= 1 && value > previous;
 }
 function scaleValid(value: unknown): boolean {
-  return finite(value) && value > 0 && value <= 10;
+  return isFiniteNumber(value) && value > 0 && value <= 10;
 }
 function graphPointValid(value: { x: number; y: number }, previous: number): boolean {
   return value.x > previous && value.x >= 0 && value.x <= 1 && value.y >= 0;

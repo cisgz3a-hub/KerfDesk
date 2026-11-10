@@ -10,6 +10,7 @@ import { placeTracedLayers, type TracedPageLayout } from './traced-page-box';
 import { traceImageToColoredPaths } from './trace-to-paths';
 import { DEFAULT_TRACE_OPTIONS, type RawImageData, type TraceOptions } from './trace-image';
 import { isLineTraceMode } from './trace-paint';
+import { errorMessage } from '../util/error-message';
 
 export type BatchTracePhysicalSize = {
   readonly widthMm: number;
@@ -263,13 +264,9 @@ async function runJob(
     const reason = stage.current === 'decode' ? 'decode-failed' : 'trace-failed';
     return {
       kind: 'failed',
-      skip: { sourceName: source.sourceName, reason, message: errorText(error) },
+      skip: { sourceName: source.sourceName, reason, message: errorMessage(error) },
     };
   }
-}
-
-function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 async function traceJob(

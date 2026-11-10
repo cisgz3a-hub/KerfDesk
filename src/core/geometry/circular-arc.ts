@@ -1,5 +1,6 @@
 import type { Vec2 } from '../scene';
 import { sampleArcPoints } from './arc-sampling';
+import { isFinitePoint, distance } from './point-math';
 
 export type CircularArc2d = {
   readonly start: Vec2;
@@ -25,7 +26,7 @@ const AXIS_EPSILON_MM = 1e-9;
 const FULL_TURN_RAD = Math.PI * 2;
 
 export function circularArcGeometry(arc: CircularArc2d): CircularArcGeometry {
-  if (!finitePoint(arc.start) || !finitePoint(arc.end) || !finitePoint(arc.center)) {
+  if (!isFinitePoint(arc.start) || !isFinitePoint(arc.end) || !isFinitePoint(arc.center)) {
     return { kind: 'invalid' };
   }
   const radiusMm = distance(arc.start, arc.center);
@@ -93,12 +94,4 @@ function circularArcSweepRad(
 function linePoints(start: Vec2, end: Vec2): Vec2[] {
   if (distance(start, end) <= AXIS_EPSILON_MM) return [start];
   return [start, end];
-}
-
-function finitePoint(point: Vec2): boolean {
-  return Number.isFinite(point.x) && Number.isFinite(point.y);
-}
-
-function distance(a: Vec2, b: Vec2): number {
-  return Math.hypot(a.x - b.x, a.y - b.y);
 }

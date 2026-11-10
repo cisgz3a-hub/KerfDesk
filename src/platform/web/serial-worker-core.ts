@@ -50,6 +50,7 @@ import {
   extractSerialLines,
 } from './serial-wire';
 import type { SerialWorkerRequest, SerialWorkerResponse } from './serial-worker-protocol';
+import { errorMessage } from '../../core/util/error-message';
 
 export type SerialWorkerCoreDeps = {
   readonly post: (message: SerialWorkerResponse) => void;
@@ -191,7 +192,7 @@ function write(
   void writeBytes(state, request.data).then(
     () => deps.post({ kind: 'write-ack', id: request.id }),
     (error: unknown) =>
-      deps.post({ kind: 'write-error', id: request.id, message: describeError(error) }),
+      deps.post({ kind: 'write-error', id: request.id, message: errorMessage(error) }),
   );
 }
 
@@ -279,7 +280,7 @@ function handleLine(state: WorkerState, deps: SerialWorkerCoreDeps, line: string
         stopRefill(state);
         if (state.refillFailureReported) return;
         state.refillFailureReported = true;
-        deps.post({ kind: 'stream-write-error', message: describeError(error) });
+        deps.post({ kind: 'stream-write-error', message: errorMessage(error) });
         deps.post({ kind: 'refill-stopped' });
       });
     }
@@ -444,8 +445,4 @@ function releaseLock(release: () => void): void {
   } catch {
     // already released
   }
-}
-
-function describeError(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

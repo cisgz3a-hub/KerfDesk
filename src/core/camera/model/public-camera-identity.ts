@@ -6,6 +6,7 @@
 import { cameraSourceIdWithoutCredentials } from '../camera-capture-binding';
 import type { CameraProfile } from '../camera-profile';
 import type { CameraModelRecord } from './camera-model-record';
+import { isRecord } from '../../util/is-record';
 
 type SavedCameraFields = {
   readonly cameraModel?: CameraModelRecord | undefined;
@@ -79,8 +80,4 @@ function scrubParsedRecord(record: unknown): boolean {
   if (safe === sourceId) return false;
   capture['sourceId'] = safe;
   return true;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

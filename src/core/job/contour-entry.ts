@@ -24,6 +24,7 @@ import type { Job } from './job';
 import type { JobBounds } from './job-bounds';
 import { fillRunwayPolicyForDevice } from './fill-runway-policy';
 import { feedMatchedFillRunwayMm } from './fill-sweep-plan';
+import { pointInBox } from '../geometry/box-math';
 
 // An edge shorter than the emitter's 3-decimal coordinate resolution cannot
 // define a tangent direction; skip it and derive the entry direction from
@@ -169,20 +170,11 @@ function bedBoundedLeadMm(
   const bounds = 'minX' in bed ? bed : { minX: 0, minY: 0, maxX: bed.widthMm, maxY: bed.heightMm };
   // The explicit envelope contract never invents travel for an outside start.
   // Legacy size-only input retains archived output, including its old clamp.
-  if ('minX' in bed && !insideBounds(from, bounds)) return 0;
+  if ('minX' in bed && !pointInBox(from, bounds)) return 0;
   let roomMm = leadMm;
   if (dirX > 0) roomMm = Math.min(roomMm, (bounds.maxX - from.x) / dirX);
   else if (dirX < 0) roomMm = Math.min(roomMm, (from.x - bounds.minX) / -dirX);
   if (dirY > 0) roomMm = Math.min(roomMm, (bounds.maxY - from.y) / dirY);
   else if (dirY < 0) roomMm = Math.min(roomMm, (from.y - bounds.minY) / -dirY);
   return Math.max(0, roomMm);
-}
-
-function insideBounds(point: Vec2, bounds: JobBounds): boolean {
-  return (
-    point.x >= bounds.minX &&
-    point.x <= bounds.maxX &&
-    point.y >= bounds.minY &&
-    point.y <= bounds.maxY
-  );
 }

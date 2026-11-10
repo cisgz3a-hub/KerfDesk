@@ -3,6 +3,8 @@ import type {
   MaterialRecipeOperation,
 } from '../../core/material-library';
 import type { LaserTechnology } from '../../core/devices';
+import { isPositiveFiniteNumber } from '../../core/util/finite';
+import { isNonEmptyString } from '../../core/util/text';
 
 const RECIPE_CONFIDENCES = ['starter', 'calibrated', 'imported', 'unsupported'] as const;
 const LASER_TECHNOLOGIES = ['diode', 'co2', 'fiber', 'unknown'] as const;
@@ -112,7 +114,7 @@ function parseLaserNumbers(
   const metadata: { opticalPowerW?: number; wavelengthNm?: number } = {};
   for (const field of ['opticalPowerW', 'wavelengthNm'] as const) {
     if (value[field] === undefined) continue;
-    if (!isPositiveFinite(value[field])) {
+    if (!isPositiveFiniteNumber(value[field])) {
       return invalidPresetMetadata(index, field);
     }
     metadata[field] = value[field];
@@ -125,14 +127,6 @@ function invalidPresetMetadata(
   field: string,
 ): { readonly kind: 'invalid'; readonly reason: string } {
   return { kind: 'invalid', reason: `entries[${index}].${field} is invalid` };
-}
-
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === 'string' && value.trim().length > 0;
-}
-
-function isPositiveFinite(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0;
 }
 
 function isRecipeConfidence(value: unknown): value is MaterialRecipeConfidence {

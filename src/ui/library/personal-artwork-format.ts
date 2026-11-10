@@ -4,6 +4,7 @@ import {
   personalArtworkProject,
   type PersonalArtwork,
 } from './personal-artwork-model';
+import { isRecord } from '../../core/util/is-record';
 
 export function serializePersonalArtworkLibrary(entries: readonly PersonalArtwork[]): string {
   return `${JSON.stringify({ format: 'kerfdesk-artwork-library', version: 1, entries }, null, 2)}\n`;
@@ -48,8 +49,4 @@ export function parsePersonalArtwork(raw: unknown): PersonalArtwork {
   };
   personalArtworkProject(entry);
   return entry;
-}
-
-function isRecord(raw: unknown): raw is Record<string, unknown> {
-  return typeof raw === 'object' && raw !== null && !Array.isArray(raw);
 }

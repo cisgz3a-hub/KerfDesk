@@ -6,6 +6,7 @@ import { Button, Dialog, DialogActions } from '../kit';
 import { persistCalibrationDraft, restoreCalibrationDraft } from './calibration-draft-storage';
 import { calibrationGridStyle } from './calibration-dialog-styles';
 import { calibrationDraftIssues } from './calibration-draft-validation';
+import { numberFromDraft } from '../../core/util/text';
 
 type IntervalTestDraft = {
   readonly steps: string;
@@ -83,7 +84,7 @@ export function IntervalTestDialog(props: {
       <IntervalTestFields draft={draft} setField={setField} />
       {issues.length > 0 ? <p role="alert">{issues.join(' ')}</p> : null}
       <CalibrationFeedDisclosure
-        requestedSpeed={numberValue(draft.speed)}
+        requestedSpeed={numberFromDraft(draft.speed)}
         maxFeedMmPerMin={props.maxFeedMmPerMin}
       />
       <DialogActions>
@@ -144,18 +145,14 @@ function IntervalTestFields(props: {
 
 function parseDraft(draft: IntervalTestDraft): IntervalTestGridOptions {
   return {
-    steps: numberValue(draft.steps),
-    speed: numberValue(draft.speed),
-    power: numberValue(draft.power),
-    intervalMinMm: numberValue(draft.intervalMinMm),
-    intervalMaxMm: numberValue(draft.intervalMaxMm),
-    swatchSizeMm: numberValue(draft.swatchSizeMm),
-    gapMm: numberValue(draft.gapMm),
+    steps: numberFromDraft(draft.steps),
+    speed: numberFromDraft(draft.speed),
+    power: numberFromDraft(draft.power),
+    intervalMinMm: numberFromDraft(draft.intervalMinMm),
+    intervalMaxMm: numberFromDraft(draft.intervalMaxMm),
+    swatchSizeMm: numberFromDraft(draft.swatchSizeMm),
+    gapMm: numberFromDraft(draft.gapMm),
   };
-}
-
-function numberValue(value: string): number {
-  return value.trim() === '' ? Number.NaN : Number(value);
 }
 
 function formatFeed(value: number): string {

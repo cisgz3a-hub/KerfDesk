@@ -6,6 +6,7 @@ import { selectionBounds } from './design-handles';
 import { ShapeInspector } from './ShapeInspector';
 import './design-selection-panel.css';
 import { shortcutLabel } from '../common/shortcut-label';
+import { formatUpTo3Decimals } from '../../core/util/number-format';
 
 const NAMES = {
   rect: 'Rectangle',
@@ -70,10 +71,6 @@ export function DesignSelectionPanel({
   );
 }
 
-function formatMm(value: number): string {
-  return Number(value.toFixed(3)).toString();
-}
-
 function TransformSelection(): JSX.Element {
   const transform = useDesignStudioStore((s) => s.transformSelection);
   return (
@@ -129,11 +126,11 @@ function SelectionLayout({
           <dl className="design-selection__bounds" aria-label="Selection size">
             <div>
               <dt>Width</dt>
-              <dd>{formatMm(bounds.maxX - bounds.minX)} mm</dd>
+              <dd>{formatUpTo3Decimals(bounds.maxX - bounds.minX)} mm</dd>
             </div>
             <div>
               <dt>Height</dt>
-              <dd>{formatMm(bounds.maxY - bounds.minY)} mm</dd>
+              <dd>{formatUpTo3Decimals(bounds.maxY - bounds.minY)} mm</dd>
             </div>
           </dl>
           <div className="design-selection__actions">

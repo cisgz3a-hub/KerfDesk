@@ -12,6 +12,7 @@ import {
   effectiveOperationForObject,
   operationOverrideForObject,
 } from '../../core/scene/effective-operation';
+import { formatUpTo3Decimals } from '../../core/util/number-format';
 
 // Image-mode energy advisory (ADR-359). Every raster row burns at the
 // operation's power and speed, and rows sit 1/(lines/mm) apart, so energy per
@@ -114,7 +115,7 @@ function defaultMessage(context: EnergyContext): string {
   const { dose } = context;
   return (
     `Image "${context.source}" on "${context.operationName}" burns ${formatCount(dose.linesPerMm)} lines/mm ` +
-    `(rows ${formatMm(1 / dose.linesPerMm)} mm apart): ${formatCount(context.ratio)}× the energy per area ` +
+    `(rows ${formatUpTo3Decimals(1 / dose.linesPerMm)} mm apart): ${formatCount(context.ratio)}× the energy per area ` +
     `of ${LAYER_DEFAULTS.linesPerMm} lines/mm at the same power and speed.`
   );
 }
@@ -163,7 +164,7 @@ function fillIn(project: Project, linesPerMm: number): string {
     'white lines and dots can fill in and the image can burn darker than the canvas shows.';
   if (spotMm === undefined || !(spotMm > 0)) return ` Fine ${effect}`;
   return (
-    ` The profile's nominal ${formatMm(spotMm)} mm spot spans about ${formatCount(spotMm * linesPerMm)} ` +
+    ` The profile's nominal ${formatUpTo3Decimals(spotMm)} mm spot spans about ${formatCount(spotMm * linesPerMm)} ` +
     `row intervals. Actual burn width depends on focus and material, so fine ${effect}`
   );
 }
@@ -194,10 +195,6 @@ function relativeAdvice(context: EnergyContext): string {
 
 function formatCount(value: number): string {
   return Number(value.toFixed(1)).toString();
-}
-
-function formatMm(value: number): string {
-  return Number(value.toFixed(3)).toString();
 }
 
 function formatPercent(value: number): string {

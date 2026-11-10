@@ -15,6 +15,7 @@ import type { TraceOptions } from '../../core/trace';
 import type { ImageDimensions } from './image-loader';
 import { PREVIEW_MAX_EDGE_PX, scaleToCap } from './trace-decode-cap';
 import { minOf } from '../../core/util';
+import { isFinitePositive } from '../../core/util/finite';
 
 /** Two samples across the laser spot: a feature narrower than half a spot
  *  cannot be burned as a separate mark, so a finer trace grid gains nothing. */
@@ -96,7 +97,7 @@ export function traceTargetPxPerMm(
 ): number {
   const spot = machineKind === 'cnc' ? undefined : device?.laserSubProfile?.spotSizeMm;
   // The finer axis sets the density; an axis without a usable value is skipped.
-  const axes = spot === undefined ? [] : [spot.x, spot.y].filter(isPositiveFinite);
+  const axes = spot === undefined ? [] : [spot.x, spot.y].filter(isFinitePositive);
   const spotMm = axes.length === 0 ? DEFAULT_TRACE_SPOT_MM : minOf(axes);
   return TRACE_SAMPLES_PER_SPOT / spotMm;
 }
@@ -297,8 +298,4 @@ function scaled<K extends keyof TraceOptions>(
   factor: number,
 ): Partial<TraceOptions> {
   return value === undefined || !Number.isFinite(value) ? {} : { [key]: value * factor };
-}
-
-function isPositiveFinite(value: number): boolean {
-  return Number.isFinite(value) && value > 0;
 }

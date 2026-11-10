@@ -36,6 +36,7 @@ import {
   isDeviceSetupStep,
   type DeviceSetupStep,
 } from './device-setup-steps';
+import { isFinitePositive } from '../../../core/util/finite';
 
 export { deviceSetupSupportsMachineKind } from './device-setup-capability';
 export {
@@ -378,8 +379,8 @@ export function machineSetupValidationIssues(state: DeviceSetupState): ReadonlyA
     const setupError = validateCncMachiningSetup(state.cncSetupDraft);
     if (setupError !== null) issues.push(setupError);
     const params = state.cncDraft.params;
-    if (!positive(params.safeZMm)) issues.push('CNC safe Z must be greater than zero.');
-    if (!positive(params.spindleMaxRpm)) {
+    if (!isFinitePositive(params.safeZMm)) issues.push('CNC safe Z must be greater than zero.');
+    if (!isFinitePositive(params.spindleMaxRpm)) {
       issues.push('CNC spindle maximum must be greater than zero.');
     }
     if (!Number.isFinite(params.spindleSpinupSec) || params.spindleSpinupSec < 0) {
@@ -410,8 +411,4 @@ function adjacentStep(state: DeviceSetupState, delta: number): DeviceSetupStep {
   if (index < 0) return order[0] ?? state.step;
   const clamped = Math.min(order.length - 1, Math.max(0, index + delta));
   return order[clamped] ?? state.step;
-}
-
-function positive(value: number): boolean {
-  return Number.isFinite(value) && value > 0;
 }

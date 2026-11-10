@@ -15,6 +15,4 @@ export function deserializeFailureReason(
   return `legacy schemaVersion ${result.sawVersion}`;
 }
 
-export function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
+export { errorMessage } from '../../core/util/error-message';

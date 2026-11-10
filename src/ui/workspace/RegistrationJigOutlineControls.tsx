@@ -20,6 +20,7 @@ import {
   RemoveRegistrationJigSetButton,
   type RegistrationJigShape,
 } from './RegistrationJigOutlineFields';
+import { numberFromDraft } from '../../core/util/text';
 
 const DEFAULT_WIDTH_MM = 80;
 const DEFAULT_HEIGHT_MM = 40;
@@ -325,17 +326,17 @@ function jigSetSpec(
   return {
     outline:
       shape === 'circle'
-        ? { kind: 'circle', diameterMm: finiteNumber(diameterMm) }
-        : { kind: 'rectangle', widthMm: finiteNumber(widthMm), heightMm: finiteNumber(heightMm) },
-    rows: finiteNumber(rows),
-    columns: finiteNumber(columns),
-    spacingX: finiteNumber(spacingX),
-    spacingY: finiteNumber(spacingY),
+        ? { kind: 'circle', diameterMm: numberFromDraft(diameterMm) }
+        : {
+            kind: 'rectangle',
+            widthMm: numberFromDraft(widthMm),
+            heightMm: numberFromDraft(heightMm),
+          },
+    rows: numberFromDraft(rows),
+    columns: numberFromDraft(columns),
+    spacingX: numberFromDraft(spacingX),
+    spacingY: numberFromDraft(spacingY),
   };
-}
-
-function finiteNumber(value: string): number {
-  return value.trim() === '' ? Number.NaN : Number(value);
 }
 
 function jigWord(count: number): string {

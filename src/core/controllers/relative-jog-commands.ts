@@ -8,8 +8,8 @@ import type { FrameBounds } from './controller-driver';
 import { buildFramePerimeter } from '../job/frame-perimeter';
 import { assertJogHasAxis, type JogParams } from './grbl/commands';
 import { formatGcodeFeedMmPerMin } from '../gcode/feed-word';
+import { formatFixed3Decimals } from '../util/number-format';
 
-const fmt = (n: number): string => n.toFixed(3);
 const fmtFeed = formatGcodeFeedMmPerMin;
 
 /** Relative jog without a native jog protocol: assert mm units, switch to
@@ -29,9 +29,9 @@ export function buildRelativeJogCommand(params: JogParams): string {
     throw new Error('This controller has no A axis for a rotary. Use a Y-port rotary.');
   }
   const axes: string[] = [];
-  if (includeAxis(params.dx)) axes.push(`X${fmt(params.dx)}`);
-  if (includeAxis(params.dy)) axes.push(`Y${fmt(params.dy)}`);
-  if (includeAxis(params.dz)) axes.push(`Z${fmt(params.dz)}`);
+  if (includeAxis(params.dx)) axes.push(`X${formatFixed3Decimals(params.dx)}`);
+  if (includeAxis(params.dy)) axes.push(`Y${formatFixed3Decimals(params.dy)}`);
+  if (includeAxis(params.dz)) axes.push(`Z${formatFixed3Decimals(params.dz)}`);
   const move = `G0 ${axes.join(' ')} F${fmtFeed(params.feed)}`.replace('  ', ' ');
   if (absolute) return `G21\nG90\n${move}`;
   return `G21\nG91\n${move}\nG90`;
@@ -41,5 +41,9 @@ export function buildRelativeJogCommand(params: JogParams): string {
 export function buildAbsoluteFrameLines(bounds: FrameBounds, feed: number): ReadonlyArray<string> {
   const f = fmtFeed(feed);
   const corners = buildFramePerimeter(bounds, bounds.startPoint);
-  return ['G21\n', 'G90\n', ...corners.map((c) => `G0 X${fmt(c.x)} Y${fmt(c.y)} F${f}\n`)];
+  return [
+    'G21\n',
+    'G90\n',
+    ...corners.map((c) => `G0 X${formatFixed3Decimals(c.x)} Y${formatFixed3Decimals(c.y)} F${f}\n`),
+  ];
 }

@@ -9,6 +9,8 @@
 // a pixel reach is a property of the hand and the screen, which is why the
 // Design Studio (SNAP_RADIUS_PX) and LightBurn's object-snap distance use it.
 
+import { isRecord } from '../../core/util/is-record';
+
 export type SnapSettings = {
   // Master switch, toggled by the # button on the canvas.
   readonly enabled: boolean;
@@ -95,8 +97,4 @@ export function sameSnapSettings(a: SnapSettings, b: SnapSettings): boolean {
 function clampNumber(value: unknown, fallback: number, min: number, max: number): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
   return Math.min(max, Math.max(min, value));
-}
-
-function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

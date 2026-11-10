@@ -39,6 +39,7 @@ import {
   type SpanFit,
   type SpanPasses,
 } from './compact-curve-span';
+import { negatePoint } from '../geometry/point-math';
 
 export type CompactFitOptions = {
   /** Max orthogonal deviation of the curve from the ring, px (Optimize). */
@@ -219,7 +220,7 @@ function proposeJoints(
   // decide what the merge can span (giving up after the first pass left a
   // disc at 4 cubics for every Optimize and moved the R=900 commit-grid
   // disc off round).
-  const fit = straight ?? fitSpan(span, tStart, negate(tEnd), tolerance, Infinity);
+  const fit = straight ?? fitSpan(span, tStart, negatePoint(tEnd), tolerance, Infinity);
   const key = pieceKey(ctx.ring.length, lo, hi);
   if (Math.min(fit.cubicError, fit.lineError) <= tolerance) {
     ctx.pieces.set(key, fit);
@@ -351,8 +352,8 @@ function evaluateSpan(ctx: Context, joints: Joints, t: number, k: number): Evalu
     known ??
     lineSpanFit(span, tStart, tEnd, startCorner, endCorner, tolerance) ??
     (k === 1
-      ? fitSpan(span, tStart, negate(tEnd))
-      : fitSpan(span, tStart, negate(tEnd), tolerance, undefined, true, ctx.split.get(key)));
+      ? fitSpan(span, tStart, negatePoint(tEnd))
+      : fitSpan(span, tStart, negatePoint(tEnd), tolerance, undefined, true, ctx.split.get(key)));
   const cubicError = fit.complete ? fit.cubicError : Infinity;
   const lineOk = lineMeetsJoints(span, tStart, tEnd, startCorner, endCorner);
   return { ...fit, cubicError, lineOk, error: Math.min(cubicError, fit.lineError) };
@@ -480,10 +481,6 @@ function farthestFrom(ring: ReadonlyArray<Vec2>, index: number): number {
     }
   });
   return Math.min(Math.max(best, 1), ring.length - 1);
-}
-
-function negate(v: Vec2): Vec2 {
-  return { x: -v.x, y: -v.y };
 }
 
 // Drop consecutive duplicates (keeping a corner object) and a repeated start.

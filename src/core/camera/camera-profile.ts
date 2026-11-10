@@ -4,6 +4,9 @@
 import { buildCameraTransforms } from './camera-transform';
 import { clamp } from '../math';
 import { cameraSourceIdWithoutCredentials } from './camera-capture-binding';
+import { isRecord } from '../util/is-record';
+import { isFiniteNumber } from '../util/finite';
+import { isNonEmptyString } from '../util/text';
 
 export type CameraPoint = {
   readonly x: number;
@@ -307,18 +310,6 @@ function isDistortion(value: unknown): value is CameraLensCalibration['distortio
     isFiniteNumber(value['p2']) &&
     isFiniteNumber(value['k3'])
   );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === 'string' && value.trim().length > 0;
-}
-
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
 }
 
 function isPositiveNumber(value: unknown): value is number {

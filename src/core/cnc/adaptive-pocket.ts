@@ -8,6 +8,7 @@ import {
   toPolyline,
 } from './adaptive-pocket-geometry';
 import { sequencesForComponent, type AdaptivePocketSequence } from './adaptive-pocket-sequences';
+import { isFinitePositive } from '../util/finite';
 
 export type { AdaptivePocketSequence } from './adaptive-pocket-sequences';
 
@@ -68,7 +69,7 @@ function requestIssue(
   toolDiameterMm: number,
   optimalLoadMm: number,
 ): string | null {
-  if (!positiveFinite(toolDiameterMm) || !positiveFinite(optimalLoadMm)) {
+  if (!isFinitePositive(toolDiameterMm) || !isFinitePositive(optimalLoadMm)) {
     return 'Adaptive bit diameter and optimal load must be positive and finite.';
   }
   if (optimalLoadMm > toolDiameterMm / 2) {
@@ -77,8 +78,4 @@ function requestIssue(
   return contours.some((contour) => !contour.closed || contour.points.length < MIN_POINTS)
     ? 'Adaptive clearing requires closed pocket contours.'
     : null;
-}
-
-function positiveFinite(value: number): boolean {
-  return Number.isFinite(value) && value > 0;
 }

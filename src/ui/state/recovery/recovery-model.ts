@@ -10,6 +10,8 @@ import {
   artifactOriginMatchesPayload,
   type StoredRecoveryArtifactOrigin,
 } from './recovery-artifact-origin';
+import { isNonNegativeInteger } from '../../../core/util/finite';
+import { isRecord } from '../../../core/util/is-record';
 
 export {
   CURRENT_EXECUTION_ARTIFACT_ORIGIN,
@@ -376,14 +378,6 @@ function isClaim(value: unknown): value is RecoveryClaim {
 
 function isInterruption(value: unknown): value is JobInterruption {
   return parseOptionalJobInterruption(value)?.interruption !== undefined;
-}
-
-function isNonNegativeInteger(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value >= 0;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 export type { LegacyFingerprintOnlyArtifactV1 };

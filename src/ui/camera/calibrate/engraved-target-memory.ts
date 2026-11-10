@@ -16,6 +16,8 @@ import {
 import type { BedArea } from '../../../core/camera/model/camera-model-accuracy';
 import { DEFAULT_RING_DIAMETER_MM } from '../../../core/camera/target/bed-target';
 import type { DeviceProfile } from '../../../core/devices';
+import { isRecord } from '../../../core/util/is-record';
+import { isFiniteNumber } from '../../../core/util/finite';
 
 export type EngravedTarget = {
   /** Where the rings were engraved, bed mm. */
@@ -199,12 +201,4 @@ type SevenNumbers = readonly [number, number, number, number, number, number, nu
 
 function allFinite(values: ReadonlyArray<unknown>): values is SevenNumbers {
   return values.length === 7 && values.every(isFiniteNumber);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
 }

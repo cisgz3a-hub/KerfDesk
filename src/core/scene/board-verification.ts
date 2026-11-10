@@ -6,6 +6,7 @@ import {
   type OutlineBoardGeometry,
 } from './board-outline-registration';
 import type { Vec2 } from './scene-object';
+import { isFinitePoint } from '../geometry/point-math';
 
 export type CapturedBoardGeometry =
   | {
@@ -244,8 +245,4 @@ function circleRimCrossAxisErrorMm(
     case 'rim-left':
       return Math.abs(dy);
   }
-}
-
-function isFinitePoint(point: Vec2): boolean {
-  return Number.isFinite(point.x) && Number.isFinite(point.y);
 }

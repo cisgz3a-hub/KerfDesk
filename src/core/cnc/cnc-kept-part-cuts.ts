@@ -35,6 +35,7 @@ import {
   profileLeadCutWidthMm,
   type ProfileLeadKeptWall,
 } from './profile-lead-kept-walls';
+import { segmentBox, boundsOfPoints } from '../geometry/box-math';
 
 /** One compiled profile operation: its passes and the radius its cutter sweeps. */
 export type KeptPartCutOperation = {
@@ -158,7 +159,7 @@ function distinctToolpaths(groups: ReadonlyArray<CncGroup>): Toolpath[] {
       if (seen.has(key)) continue;
       seen.add(key);
       const points = pass.closed ? [...xy, first] : xy;
-      out.push({ points, box: pointsBox(points) });
+      out.push({ points, box: boundsOfPoints(points) });
     }
   }
   return out;
@@ -216,29 +217,4 @@ function boxesNear(a: Box, b: Box, margin: number): boolean {
     a.minY - margin <= b.maxY &&
     a.maxY + margin >= b.minY
   );
-}
-
-function segmentBox(a: Vec2, b: Vec2): Box {
-  return {
-    minX: Math.min(a.x, b.x),
-    minY: Math.min(a.y, b.y),
-    maxX: Math.max(a.x, b.x),
-    maxY: Math.max(a.y, b.y),
-  };
-}
-
-// A loop, not Math.min(...points): a toolpath can hold more vertices than a
-// call's argument list allows.
-function pointsBox(points: ReadonlyArray<Vec2>): Box {
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-  for (const point of points) {
-    minX = Math.min(minX, point.x);
-    minY = Math.min(minY, point.y);
-    maxX = Math.max(maxX, point.x);
-    maxY = Math.max(maxY, point.y);
-  }
-  return { minX, minY, maxX, maxY };
 }

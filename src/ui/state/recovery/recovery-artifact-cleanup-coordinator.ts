@@ -2,6 +2,7 @@ import type { RunId } from './execution-artifact';
 import { cleanupDisplacedRecoveryArtifacts } from './recovery-artifact-cleanup';
 import type { RecoveryStorageBackend } from './recovery-backend';
 import type { RecoveryRepositorySnapshot } from './recovery-model';
+import { errorMessage } from '../../../core/util/error-message';
 
 const ORPHAN_RECONCILIATION_RETRY_MS = 30_000;
 
@@ -80,8 +81,4 @@ export class RecoveryArtifactCleanupCoordinator {
     clearTimeout(this.reconciliationTimer);
     this.reconciliationTimer = null;
   }
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

@@ -16,6 +16,8 @@ import type { Vec2 } from '../scene';
 import { orthogonalError } from './centerline/curve-fit-error';
 import { projectSpan, reverseSpan, SQ_BELOW, SQ_PRUNE_MIN } from './compact-curve-project';
 import { cubicSelfIntersects } from './compact-curve-shape';
+import { subtractPoints } from '../geometry/point-math';
+import { modulo } from '../math/wrap';
 
 // Newton reparameterization passes per span; a pass that does not lower the
 // error ends the refinement (a tolerance-free rule).
@@ -378,8 +380,8 @@ export function walkRing(
   let i = from;
   for (let step = 0; step < n; step += 1) {
     if (i === limit) break;
-    const a = ring[mod(i, n)] as Vec2;
-    const b = ring[mod(i + direction, n)] as Vec2;
+    const a = ring[modulo(i, n)] as Vec2;
+    const b = ring[modulo(i + direction, n)] as Vec2;
     const seg = hypot2(b.x - a.x, b.y - a.y);
     if (seg >= remaining && seg > 0) {
       const t = remaining / seg;
@@ -388,7 +390,7 @@ export function walkRing(
     remaining -= seg;
     i += direction;
   }
-  return ring[mod(i, n)] as Vec2;
+  return ring[modulo(i, n)] as Vec2;
 }
 
 /** Forward unit tangent at unrolled index `i`, from the points `window` px
@@ -402,7 +404,7 @@ export function ringTangent(
   lo: number,
   hi: number,
 ): Vec2 {
-  const at = ring[mod(i, ring.length)] as Vec2;
+  const at = ring[modulo(i, ring.length)] as Vec2;
   if (i === lo || i === hi) {
     const direction = i === lo ? 1 : -1;
     const limit = i === lo ? hi : lo;
@@ -410,20 +412,14 @@ export function ringTangent(
     const full = walkRing(ring, i, direction, window, limit);
     const d = { x: -3 * at.x + 4 * half.x - full.x, y: -3 * at.y + 4 * half.y - full.y };
     const forward = direction === 1 ? d : { x: -d.x, y: -d.y };
-    return unit(forward, direction === 1 ? sub(full, at) : sub(at, full));
+    return unit(forward, direction === 1 ? subtractPoints(full, at) : subtractPoints(at, full));
   }
   const ahead = walkRing(ring, i, 1, window, hi);
   const behind = walkRing(ring, i, -1, window, lo);
-  return unit(sub(ahead, behind), sub(ahead, at));
+  return unit(subtractPoints(ahead, behind), subtractPoints(ahead, at));
 }
 
-export function mod(i: number, n: number): number {
-  return ((i % n) + n) % n;
-}
-
-function sub(a: Vec2, b: Vec2): Vec2 {
-  return { x: a.x - b.x, y: a.y - b.y };
-}
+export { modulo as mod } from '../math/wrap';
 
 function unit(v: Vec2, fallback: Vec2): Vec2 {
   const len = hypot2(v.x, v.y);

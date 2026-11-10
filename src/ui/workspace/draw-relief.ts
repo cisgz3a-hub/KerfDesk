@@ -23,6 +23,7 @@ import {
 import { drawPartialGridBitmapAtTransform } from './draw-raster';
 import { heightmapToCanvas } from './relief-heightmap-bitmap';
 import type { ViewTransform } from './view-transform';
+import { isAbortError } from '../../core/util/error-message';
 
 // Display sampling: enough cells to read the shape, cheap to rebuild.
 const DISPLAY_CELLS_ACROSS = 256;
@@ -105,7 +106,7 @@ export function scheduleReliefPreviews(
     (error: unknown) => {
       if (pendingHeightfieldPreview !== batch) return;
       pendingHeightfieldPreview = null;
-      if (isAbort(error) || isCncRemovalGridSuperseded(error)) onReady?.();
+      if (isAbortError(error) || isCncRemovalGridSuperseded(error)) onReady?.();
       else if (onReady !== undefined) window.setTimeout(onReady, TRANSIENT_RETRY_DELAY_MS);
     },
   );
@@ -241,10 +242,6 @@ function drawHeightfieldPreviewFailure(
   ctx.textBaseline = PREVIEW_FAILURE_TEXT_BASELINE;
   ctx.fillText(message, x + PREVIEW_FAILURE_PADDING_X_PX, y + PREVIEW_FAILURE_TEXT_OFFSET_Y_PX);
   ctx.restore();
-}
-
-function isAbort(error: unknown): boolean {
-  return error instanceof Error && error.name === 'AbortError';
 }
 
 /** Reset preview cache and cancellation state between isolated tests. */

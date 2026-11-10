@@ -10,6 +10,7 @@ import {
   automaticOverscanMm,
   scanFeedMmPerMin,
 } from '../../core/job/automatic-overscan';
+import { formatGroupedUpTo1Decimal } from '../../core/util/number-format';
 
 export function AutoOverscanSwitch(props: {
   readonly checked: boolean;
@@ -57,10 +58,10 @@ export function automaticOverscanNote(input: {
   });
   const capped = runwayMm >= input.maxMm ? `, held at the ${input.maxMm} mm maximum` : '';
   return (
-    `Automatic runs ${formatNumber(runwayMm)} mm${capped}: the run-up from rest at ` +
-    `${formatNumber(feed)} mm/min with ${formatNumber(input.device.accelMmPerSec2)} mm/s² ` +
+    `Automatic runs ${formatGroupedUpTo1Decimal(runwayMm)} mm${capped}: the run-up from rest at ` +
+    `${formatGroupedUpTo1Decimal(feed)} mm/min with ${formatGroupedUpTo1Decimal(input.device.accelMmPerSec2)} mm/s² ` +
     `acceleration${coreXyAlongScanNote(input.device.accelMmPerSec2, input.scanAngleDeg, kinematics, '')} ` +
-    `along a ${formatNumber(input.scanAngleDeg)}° scan, plus 10%. It follows the ` +
+    `along a ${formatGroupedUpTo1Decimal(input.scanAngleDeg)}° scan, plus 10%. It follows the ` +
     'speed, the angle and Machine Setup whenever the job is prepared. If the machine acceleration ' +
     'was not read from the controller, check the scan edges on scrap.'
   );
@@ -80,11 +81,7 @@ export function coreXyAlongScanNote(
   if (kinematics !== 'corexy') return '';
   const reached = alongScanAccelMmPerSec2(accelMmPerSec2, scanAngleDeg, kinematics);
   if (Math.abs(reached - accelMmPerSec2) < 0.05) return '';
-  return ` (${formatNumber(reached)} mm/s²${along} on this CoreXY machine)`;
-}
-
-function formatNumber(value: number): string {
-  return value.toLocaleString('en-US', { maximumFractionDigits: 1 });
+  return ` (${formatGroupedUpTo1Decimal(reached)} mm/s²${along} on this CoreXY machine)`;
 }
 
 const controlStyle: React.CSSProperties = {

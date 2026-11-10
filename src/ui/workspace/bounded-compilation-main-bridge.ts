@@ -10,6 +10,7 @@ import type {
   BoundedCompilationId,
   BoundedCompilationWorkerLike,
 } from './bounded-compilation-worker-pool-protocol';
+import { toError } from '../../core/util/error-message';
 
 type ActiveRequest = {
   readonly requestId: number;
@@ -141,7 +142,7 @@ export class BoundedCompilationMainBridge<TPayload, TResult> {
       })
       .then(
         (results) => this.resolve(source, active, results),
-        (error: unknown) => this.reject(source, active, asError(error)),
+        (error: unknown) => this.reject(source, active, toError(error)),
       );
   }
 
@@ -154,7 +155,7 @@ export class BoundedCompilationMainBridge<TPayload, TResult> {
     try {
       transfer = results.flatMap((result) => this.resultTransferables(result));
     } catch (error) {
-      this.reject(source, active, asError(error));
+      this.reject(source, active, toError(error));
       return;
     }
     if (!this.takeActive(source, active)) return;
@@ -207,7 +208,7 @@ export class BoundedCompilationMainBridge<TPayload, TResult> {
     try {
       source.port.postMessage(response, transfer);
     } catch (error) {
-      this.failSource(source, `compilation bridge response failed: ${asError(error).message}`);
+      this.failSource(source, `compilation bridge response failed: ${toError(error).message}`);
     }
   }
 
@@ -242,10 +243,6 @@ export class BoundedCompilationMainBridge<TPayload, TResult> {
     for (const source of this.sources) count += source.active.size;
     return count;
   }
-}
-
-function asError(error: unknown): Error {
-  return error instanceof Error ? error : new Error(String(error));
 }
 
 function positiveLimit(value: number, label: string): number {

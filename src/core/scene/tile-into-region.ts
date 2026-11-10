@@ -6,6 +6,7 @@
 // region. 'fill' auto-counts how many fit; 'grid' takes an explicit rows × cols.
 
 import type { Bounds } from './scene-object';
+import { finiteNonNegative } from '../util/finite';
 
 export type TileLayout = (
   | {
@@ -49,8 +50,8 @@ export function tileIntoRegion(
     return [];
   if (cellW <= 0 || cellH <= 0 || regionW <= 0 || regionH <= 0) return [];
 
-  const gapX = finiteNonNeg(layout.gapXMm);
-  const gapY = finiteNonNeg(layout.gapYMm);
+  const gapX = finiteNonNegative(layout.gapXMm);
+  const gapY = finiteNonNegative(layout.gapYMm);
   const maxColsThatFit = fitCount(regionW, cellW, gapX);
   const maxRowsThatFit = fitCount(regionH, cellH, gapY);
   if (Math.min(maxColsThatFit, maxRowsThatFit) === 0) return [];
@@ -91,10 +92,4 @@ function fitCount(regionSpan: number, cellSpan: number, gap: number): number {
 function clampCount(value: number): number {
   if (!Number.isFinite(value)) return 1;
   return Math.max(1, Math.min(MAX_TILE_PER_AXIS, Math.floor(value)));
-}
-
-// A non-finite gap (e.g. the form yielding Infinity from a huge literal) would
-// propagate NaN into every offset and poison the placement/G-code; clamp it.
-function finiteNonNeg(value: number): number {
-  return Number.isFinite(value) ? Math.max(0, value) : 0;
 }

@@ -8,6 +8,7 @@ import { computeJobBounds, type CutSegment, type Group } from './job';
 import { pointSegmentDistSq } from './min-feature/segment-distance';
 import type { Vec2 } from './scene';
 import type { ContourBox } from './trace/contour-bounds';
+import { midpoint } from './geometry/point-math';
 
 /** Segments closer than this are one piece: a Fill's scan rows join up, the
  * letters of one word may or may not, two coasters' names never do. */
@@ -234,10 +235,6 @@ function onOutline(index: PolygonEdgeIndex, point: Vec2): boolean {
     ON_OUTLINE_MM,
     (a, b) => pointSegmentDistSq(point.x, point.y, a.x, a.y, b.x, b.y) <= limit,
   );
-}
-
-function midpoint(a: Vec2, b: Vec2): Vec2 {
-  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
 }
 
 function find(parent: Int32Array, at: number): number {

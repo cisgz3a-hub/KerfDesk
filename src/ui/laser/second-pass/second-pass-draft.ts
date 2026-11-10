@@ -1,6 +1,7 @@
 import type { LaserSecondPassSelection } from '../../../core/laser-second-pass';
 import type { GcodeFingerprint } from '../../../core/recovery';
 import type { ExecutionArtifactV1 } from '../../state/recovery';
+import { isNonNegativeSafeInteger, isPositiveFiniteNumber } from '../../../core/util/finite';
 
 const LEGACY_KEY = 'kerfdesk.second-pass-draft.v1';
 const KEY = 'kerfdesk.second-pass-drafts.v2';
@@ -92,16 +93,12 @@ function validFingerprint(value: unknown): value is GcodeFingerprint {
   if (!value || typeof value !== 'object') return false;
   const fingerprint = value as Record<string, unknown>;
   return (
-    nonNegativeInteger(fingerprint['fnv1a']) &&
+    isNonNegativeSafeInteger(fingerprint['fnv1a']) &&
     fingerprint['fnv1a'] <= 0xffffffff &&
-    nonNegativeInteger(fingerprint['chars']) &&
-    nonNegativeInteger(fingerprint['lines']) &&
+    isNonNegativeSafeInteger(fingerprint['chars']) &&
+    isNonNegativeSafeInteger(fingerprint['lines']) &&
     fingerprint['lines'] > 0
   );
-}
-
-function nonNegativeInteger(value: unknown): value is number {
-  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 }
 
 function validStroke(value: unknown): value is LaserSecondPassSelection['strokes'][number] {
@@ -110,8 +107,8 @@ function validStroke(value: unknown): value is LaserSecondPassSelection['strokes
   return (
     typeof s['id'] === 'string' &&
     (s['mode'] === 'paint' || s['mode'] === 'erase') &&
-    positiveNumber(s['radiusMm']) &&
-    positiveNumber(s['powerScale']) &&
+    isPositiveFiniteNumber(s['radiusMm']) &&
+    isPositiveFiniteNumber(s['powerScale']) &&
     Array.isArray(s['points']) &&
     s['points'].length > 0 &&
     s['points'].every((p: unknown) => {
@@ -125,8 +122,4 @@ function validStroke(value: unknown): value is LaserSecondPassSelection['strokes
       );
     })
   );
-}
-
-function positiveNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0;
 }

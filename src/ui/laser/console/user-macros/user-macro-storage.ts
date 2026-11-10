@@ -7,6 +7,7 @@ import {
   type UserMacroCollection,
 } from './user-macro-collection';
 import { parseUserMacroTemplate } from './user-macro-template';
+import { isRecord } from '../../../../core/util/is-record';
 
 export const USER_MACRO_STORAGE_KEY = 'curvedesk.console.user-macros.v1';
 export const USER_MACRO_SCHEMA_VERSION = 1;
@@ -122,8 +123,4 @@ function parseStoredMacro(value: unknown): UserMacro | null {
 function hasDuplicateName(collection: UserMacroCollection, name: string): boolean {
   const key = macroNameKey(name);
   return collection.some((macro) => macroNameKey(macro.name) === key);
-}
-
-function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

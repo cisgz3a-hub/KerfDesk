@@ -23,6 +23,7 @@ import type {
   ReliefHeightmapWorkerItem,
   ReliefHeightmapWorkerResult,
 } from './cnc-removal-grid-worker-protocol';
+import { toError } from '../../core/util/error-message';
 
 type MainResult = RemovalGrid | ReliefSurfaceMeshWithNormals | null;
 
@@ -186,7 +187,7 @@ class CncPreviewWorkerClientRuntime implements CncPreviewWorkerClient {
     try {
       worker.postMessage(request);
     } catch (error) {
-      this.failWorker(worker, asError(error));
+      this.failWorker(worker, toError(error));
     }
   }
 
@@ -292,10 +293,6 @@ function abortError(): Error {
   const error = new Error('CNC preview preparation aborted');
   error.name = 'AbortError';
   return error;
-}
-
-function asError(error: unknown): Error {
-  return error instanceof Error ? error : new Error(String(error));
 }
 
 function mainPendingFor(

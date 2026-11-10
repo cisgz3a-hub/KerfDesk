@@ -1,4 +1,5 @@
 import type { Vec2 } from './scene-object';
+import { distance } from '../geometry/point-math';
 
 export function simplifyClosedRing(points: ReadonlyArray<Vec2>, tolerance: number): Vec2[] {
   const [first, second] = farthestPair(points);
@@ -65,8 +66,4 @@ function segmentDistance(point: Vec2, a: Vec2, b: Vec2): number {
           ),
         );
   return distance(point, { x: a.x + ratio * (b.x - a.x), y: a.y + ratio * (b.y - a.y) });
-}
-
-function distance(a: Vec2, b: Vec2): number {
-  return Math.hypot(a.x - b.x, a.y - b.y);
 }

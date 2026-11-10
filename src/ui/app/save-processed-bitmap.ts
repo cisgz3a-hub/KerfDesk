@@ -17,6 +17,7 @@ import type { ToastVariant } from '../state/toast-store';
 import { hydratePagedRasterImage } from '../import/paged-raster-hydration';
 import { validateRasterLumaBase64 } from '../../io/project/project-raster-luma-validator';
 import { pickPreparedSaveTarget } from './pick-prepared-save-target';
+import { errorMessage } from '../../core/util/error-message';
 
 const FORBIDDEN_FILENAME_CHARS = new Set(['<', '>', ':', '"', '/', '\\', '|', '?', '*']);
 
@@ -79,7 +80,7 @@ export async function handleSaveProcessedBitmap(ctx: SaveProcessedBitmapCtx): Pr
     await target.write(png);
     ctx.pushToast(`Saved processed bitmap to ${target.displayName}`, 'success');
   } catch (err) {
-    ctx.pushToast(`Could not save processed bitmap: ${errMsg(err)}`, 'error');
+    ctx.pushToast(`Could not save processed bitmap: ${errorMessage(err)}`, 'error');
   }
 }
 
@@ -130,8 +131,4 @@ function sanitizeFilenameStem(stem: string): string {
 function isSafeFilenameChar(char: string): boolean {
   if (char.charCodeAt(0) < 32) return false;
   return !FORBIDDEN_FILENAME_CHARS.has(char);
-}
-
-function errMsg(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }

@@ -1,9 +1,8 @@
 import type { Polyline, Vec2 } from '../../core/scene';
 import { finitePoint, note, reservePoints, type HpglState } from './hpgl-types';
+import { samePoint } from '../../core/geometry/point-math';
 
-export function equalPoint(a: Vec2, b: Vec2): boolean {
-  return a.x === b.x && a.y === b.y;
-}
+export { samePoint as equalPoint } from '../../core/geometry/point-math';
 
 export function movePlotterPoint(state: HpglState, point: Vec2, countWork = true): void {
   finitePoint(point, state.command);
@@ -37,7 +36,7 @@ export function closedPolyline(points: readonly Vec2[]): Polyline {
   const first = points[0];
   const last = points[points.length - 1];
   const closed =
-    points.length > 2 && first !== undefined && last !== undefined && equalPoint(first, last);
+    points.length > 2 && first !== undefined && last !== undefined && samePoint(first, last);
   return { points: closed ? points.slice(0, -1) : points, closed };
 }
 

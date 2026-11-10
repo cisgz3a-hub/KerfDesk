@@ -23,6 +23,7 @@ import {
   smallHeadingStyle,
   stackStyle,
 } from './MachineSetupStyles';
+import { errorMessage } from '../../core/util/error-message';
 
 type ImportReview =
   | { readonly kind: 'machine'; readonly document: MachineProfileDocument }
@@ -237,10 +238,6 @@ function importError(
 ): string {
   if (result.kind === 'invalid') return result.reason;
   return `Unsupported machine profile schema: ${result.sawVersion}`;
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 function slugify(value: string): string {

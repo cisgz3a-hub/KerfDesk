@@ -26,6 +26,7 @@ import type { ColourLayerOutput } from './colour-layer-options';
 import { hexOkLightness } from './colour-oklab';
 import { PAPER_MIN_LIGHTNESS } from './colour-quantize';
 import { maxOf } from '../util';
+import { roundToTenth } from '../util/rounding';
 
 const CUT_OUT_MIN_FRACTION = 0.25;
 const STACKED_MIN_FRACTION = 0.1;
@@ -73,7 +74,7 @@ export function colourLayerSettings(
         ? Math.max(entry.darkness / reference, CUT_OUT_MIN_FRACTION)
         : Math.max((entry.darkness - previous) / reference, STACKED_MIN_FRACTION);
     previous = entry.darkness;
-    settings.set(entry.color, { power: round(base * fraction), output: true });
+    settings.set(entry.color, { power: roundToTenth(base * fraction), output: true });
   }
   return settings;
 }
@@ -88,10 +89,6 @@ function paperColour(
   const lightest = lightestFirst[0];
   if (!paperTraced || lightest === undefined) return undefined;
   return lightest.lightness >= PAPER_MIN_LIGHTNESS ? lightest.color : undefined;
-}
-
-function round(value: number): number {
-  return Math.round(value * 10) / 10;
 }
 
 /** Give each colour's freshly created operation its power and output (see

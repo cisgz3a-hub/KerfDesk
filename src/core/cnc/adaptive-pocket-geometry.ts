@@ -12,6 +12,7 @@ import {
 import { tryVectorOp } from '../geometry/vector-path-tools';
 import type { Polyline, Vec2 } from '../scene';
 import { filletClosedCorners } from './adaptive-corner-fillet';
+import { withoutNegativeZero } from '../util/rounding';
 
 const PRECISION_DECIMALS = 3;
 const EPSILON = 1e-9;
@@ -70,7 +71,10 @@ export function offsetAdaptivePaths(
 }
 
 export function toPolyline(path: PathD): Polyline {
-  const points = path.map((point) => ({ x: clean(point.x), y: clean(point.y) }));
+  const points = path.map((point) => ({
+    x: withoutNegativeZero(point.x),
+    y: withoutNegativeZero(point.y),
+  }));
   const first = points[0];
   return { closed: true, points: first === undefined ? points : [...points, first] };
 }
@@ -113,8 +117,4 @@ function toPaths(polylines: ReadonlyArray<Polyline>): PathsD {
 
 function pointsEqual(a: Vec2, b: Vec2): boolean {
   return Math.abs(a.x - b.x) <= EPSILON && Math.abs(a.y - b.y) <= EPSILON;
-}
-
-function clean(value: number): number {
-  return Object.is(value, -0) ? 0 : value;
 }

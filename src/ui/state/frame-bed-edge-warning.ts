@@ -22,6 +22,7 @@ import { inferCurrentMachinePosition } from './infer-machine-position';
 import { configuredMotionBounds, nativePointsOnBed } from './laser-jog-warnings';
 import type { LaserState } from './laser-store';
 import { resolveNativeBedFrame, selectNativeBedEvidence } from './native-bed-frame';
+import { formatUpTo3Decimals } from '../../core/util/number-format';
 
 type Point = { readonly x: number; readonly y: number };
 
@@ -62,13 +63,9 @@ export function frameBedEdgeWarning(
   const size = formatBed({ widthMm: bed.maxX - bed.minX, heightMm: bed.maxY - bed.minY });
   return (
     `The Frame reaches ${farthest}, past the edge of the ${size} bed ` +
-    `(X ${mm(bed.minX)} to ${mm(bed.maxX)}, Y ${mm(bed.minY)} to ${mm(bed.maxY)} mm). ` +
+    `(X ${formatUpTo3Decimals(bed.minX)} to ${formatUpTo3Decimals(bed.maxX)}, Y ${formatUpTo3Decimals(bed.minY)} to ${formatUpTo3Decimals(bed.maxY)} mm). ` +
     (assumed ? `${FRAME_BED_ASSUMED_CORNER_NOTE} ` : '') +
     'The Frame is sent unchanged; watch the move and stop it, or use the physical E-stop, if ' +
     'needed. Move the origin or the design to keep the job on the bed.'
   );
-}
-
-function mm(value: number): string {
-  return Number(value.toFixed(3)).toString();
 }

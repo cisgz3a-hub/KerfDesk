@@ -15,6 +15,7 @@ import {
 } from './laser-motion-cancel-context';
 import { pendingTransportWriteCount } from './laser-start-queue-fence';
 import { cancelPendingManualMotions } from './manual-motion-intent';
+import { sleep } from '../common/sleep';
 
 const CANCEL_QUEUE_TIMEOUT_MS = 8_000;
 const CANCEL_QUEUE_POLL_MS = 10;
@@ -391,10 +392,4 @@ async function confirmCancelledMotionIdle(
     }
     throw error;
   }
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
 }

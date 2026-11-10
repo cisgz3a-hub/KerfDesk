@@ -1,6 +1,7 @@
 import { combinedBBox } from './hit-test';
 import type { Bounds, SceneObject } from './scene-object';
 import type { FitToRegionOptions } from './fit-to-region';
+import { boxCentre } from '../geometry/box-math';
 
 const MIN_FIT_DIMENSION_MM = 0.000001;
 
@@ -28,8 +29,8 @@ export function fitSelectionToRegion(
   const fittedScale =
     options.marginFraction * Math.min(regionWidth / selectionWidth, regionHeight / selectionHeight);
   const scale = options.grow ? fittedScale : Math.min(1, fittedScale);
-  const sourceCenter = centerOf(bounds);
-  const targetCenter = centerOf(region);
+  const sourceCenter = boxCentre(bounds);
+  const targetCenter = boxCentre(region);
   return objects.map((object) => ({
     ...object,
     transform: {
@@ -40,8 +41,4 @@ export function fitSelectionToRegion(
       scaleY: object.transform.scaleY * scale,
     },
   }));
-}
-
-function centerOf(bounds: Bounds): { readonly x: number; readonly y: number } {
-  return { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 };
 }

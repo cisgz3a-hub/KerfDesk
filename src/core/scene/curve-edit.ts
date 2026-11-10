@@ -1,4 +1,5 @@
 import type { CubicPathSegment, CurveSubpath, PathSegment, Vec2 } from './scene-object';
+import { isFinitePoint, addPoints, distance } from '../geometry/point-math';
 
 const EPSILON = 1e-9;
 
@@ -37,7 +38,7 @@ export function moveCurveAnchor(
   delta: Vec2,
 ): CurveSubpath | null {
   const anchor = curveNodePoint(path, nodeIndex);
-  if (anchor === null || !finitePoint(delta)) return null;
+  if (anchor === null || !isFinitePoint(delta)) return null;
   const segments = [...path.segments];
   const incomingIndex = incomingSegmentIndex(path, nodeIndex);
   const outgoingIndex = nodeIndex < segments.length ? nodeIndex : null;
@@ -51,7 +52,7 @@ export function moveCurveAnchor(
   }
   return {
     ...path,
-    start: nodeIndex === 0 ? add(path.start, delta) : path.start,
+    start: nodeIndex === 0 ? addPoints(path.start, delta) : path.start,
     segments,
   };
 }
@@ -62,7 +63,7 @@ export function moveCurveControl(
   side: 'incoming' | 'outgoing',
   to: Vec2,
 ): CurveSubpath | null {
-  if (curveNodePoint(path, nodeIndex) === null || !finitePoint(to)) return null;
+  if (curveNodePoint(path, nodeIndex) === null || !isFinitePoint(to)) return null;
   const segmentIndex =
     side === 'incoming'
       ? incomingSegmentIndex(path, nodeIndex)
@@ -207,13 +208,17 @@ function outgoingSegmentIndex(path: CurveSubpath, nodeIndex: number): number | n
 }
 
 function translateIncoming(segment: PathSegment, delta: Vec2): PathSegment {
-  if (segment.kind !== 'cubic') return { ...segment, to: add(segment.to, delta) };
-  return { ...segment, control2: add(segment.control2, delta), to: add(segment.to, delta) };
+  if (segment.kind !== 'cubic') return { ...segment, to: addPoints(segment.to, delta) };
+  return {
+    ...segment,
+    control2: addPoints(segment.control2, delta),
+    to: addPoints(segment.to, delta),
+  };
 }
 
 function translateOutgoing(segment: PathSegment, delta: Vec2): PathSegment {
   return segment.kind === 'cubic'
-    ? { ...segment, control1: add(segment.control1, delta) }
+    ? { ...segment, control1: addPoints(segment.control1, delta) }
     : segment;
 }
 
@@ -224,18 +229,6 @@ function lineAsCubic(from: Vec2, to: Vec2): CubicPathSegment {
     control2: { x: from.x + (2 * (to.x - from.x)) / 3, y: from.y + (2 * (to.y - from.y)) / 3 },
     to,
   };
-}
-
-function finitePoint(point: Vec2): boolean {
-  return Number.isFinite(point.x) && Number.isFinite(point.y);
-}
-
-function add(a: Vec2, b: Vec2): Vec2 {
-  return { x: a.x + b.x, y: a.y + b.y };
-}
-
-function distance(a: Vec2, b: Vec2): number {
-  return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
 function normalized(vector: Vec2): Vec2 | null {

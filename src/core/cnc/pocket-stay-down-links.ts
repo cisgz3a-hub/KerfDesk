@@ -21,6 +21,7 @@
 import type { CncContourPass, CncHelicalContourPass, CncPass, CncPath3dPass } from '../job';
 import type { Vec3 } from '../geometry/vec3';
 import type { CncLayerSettings, Polyline, Vec2 } from '../scene';
+import { crossAbout } from '../geometry/point-math';
 
 export type PocketLinkRegion = {
   // The closed contours the pocket clears, islands included.
@@ -381,13 +382,9 @@ function pointSegmentDistance(p: Vec2, a: Vec2, b: Vec2): number {
 }
 
 function segmentsIntersect(p1: Vec2, p2: Vec2, q1: Vec2, q2: Vec2): boolean {
-  const d1 = cross(q1, q2, p1);
-  const d2 = cross(q1, q2, p2);
-  const d3 = cross(p1, p2, q1);
-  const d4 = cross(p1, p2, q2);
+  const d1 = crossAbout(q1, q2, p1);
+  const d2 = crossAbout(q1, q2, p2);
+  const d3 = crossAbout(p1, p2, q1);
+  const d4 = crossAbout(p1, p2, q2);
   return ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0));
-}
-
-function cross(a: Vec2, b: Vec2, c: Vec2): number {
-  return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
 }

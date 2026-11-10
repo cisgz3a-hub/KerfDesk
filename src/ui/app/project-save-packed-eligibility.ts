@@ -1,4 +1,6 @@
 import type { Project } from '../../core/scene';
+import { isFiniteNumber } from '../../core/util/finite';
+import { isRecord } from '../../core/util/is-record';
 
 type RecordValue = Record<string, unknown>;
 const POINT_KEYS = ['x', 'y'];
@@ -15,7 +17,7 @@ export function projectSaveGeometryCanPack(project: Project): boolean {
   try {
     if (!Array.isArray(project.scene?.objects)) return false;
     for (const object of project.scene.objects) {
-      if (!record(object)) return false;
+      if (!isRecord(object)) return false;
       if ('paths' in object && !pathsCanPack(object['paths'])) return false;
     }
     return true;
@@ -27,7 +29,7 @@ export function projectSaveGeometryCanPack(project: Project): boolean {
 function pathsCanPack(value: unknown): boolean {
   if (!Array.isArray(value)) return false;
   for (const path of value) {
-    if (!record(path) || !Array.isArray(path['polylines'])) return false;
+    if (!isRecord(path) || !Array.isArray(path['polylines'])) return false;
     for (const polyline of path['polylines']) if (!polylineCanPack(polyline)) return false;
     if (path['curves'] !== undefined && !curvesCanPack(path['curves'])) return false;
   }
@@ -52,7 +54,7 @@ function curvesCanPack(value: unknown): boolean {
 }
 
 function segmentCanPack(value: unknown): boolean {
-  if (!record(value) || !pointCanPack(value['to'])) return false;
+  if (!isRecord(value) || !pointCanPack(value['to'])) return false;
   switch (value['kind']) {
     case 'line':
       return keys(value, LINE_KEYS);
@@ -72,30 +74,22 @@ function segmentCanPack(value: unknown): boolean {
 function arcCanPack(value: RecordValue): boolean {
   return (
     keys(value, ARC_KEYS) &&
-    finite(value['radiusX']) &&
-    finite(value['radiusY']) &&
-    finite(value['rotationDeg']) &&
+    isFiniteNumber(value['radiusX']) &&
+    isFiniteNumber(value['radiusY']) &&
+    isFiniteNumber(value['rotationDeg']) &&
     typeof value['largeArc'] === 'boolean' &&
     typeof value['sweep'] === 'boolean'
   );
 }
 
 function pointCanPack(value: unknown): boolean {
-  return keys(value, POINT_KEYS) && finite(value['x']) && finite(value['y']);
-}
-
-function finite(value: unknown): boolean {
-  return typeof value === 'number' && Number.isFinite(value);
+  return keys(value, POINT_KEYS) && isFiniteNumber(value['x']) && isFiniteNumber(value['y']);
 }
 
 function keys(value: unknown, expected: readonly string[]): value is RecordValue {
   return (
-    record(value) &&
+    isRecord(value) &&
     Object.keys(value).length === expected.length &&
     expected.every((key) => Object.hasOwn(value, key))
   );
-}
-
-function record(value: unknown): value is RecordValue {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

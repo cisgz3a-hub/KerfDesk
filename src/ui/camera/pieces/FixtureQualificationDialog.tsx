@@ -12,6 +12,7 @@ import { fixtureBasis } from '../../state/fixture-template-actions';
 import { fixtureCameraContextNow } from './fixture-camera-context';
 import { commitFixtureTemplate } from './fixture-template-commit';
 import { Button, Dialog, DialogActions } from '../../kit';
+import { numberFromDraft } from '../../../core/util/text';
 
 type ObservationForm = {
   readonly expectedX: string;
@@ -127,8 +128,8 @@ function useQualificationReview(props: {
         ...(owner.camera === undefined ? {} : { camera: owner.camera }),
         notes,
         points: rows.map((row) => ({
-          expectedMm: { x: coordinate(row.expectedX), y: coordinate(row.expectedY) },
-          observedMm: { x: coordinate(row.observedX), y: coordinate(row.observedY) },
+          expectedMm: { x: numberFromDraft(row.expectedX), y: numberFromDraft(row.expectedY) },
+          observedMm: { x: numberFromDraft(row.observedX), y: numberFromDraft(row.observedY) },
         })),
       }),
     [owner, notes, rows],
@@ -165,10 +166,6 @@ function emptyObservation(template: FixtureTemplate): ObservationForm {
     observedY: '',
   };
 }
-function coordinate(value: string): number {
-  return value.trim() === '' ? Number.NaN : Number(value);
-}
-
 function FixtureObservationFields({
   review,
 }: {

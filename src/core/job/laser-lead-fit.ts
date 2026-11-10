@@ -32,6 +32,7 @@ import {
   type LeadPath,
   type LeadShape,
 } from './laser-lead-path';
+import { pointInBox } from '../geometry/box-math';
 
 export type LeadFitContext = {
   readonly obstacles: LeadObstacles;
@@ -151,7 +152,7 @@ function freeEndInScrap(freeEnd: Vec2, at: Vec2, context: LeadFitContext): boole
     if (ignoredRings.has(index)) continue;
     const ring = obstacles.rings[index];
     if (ring === undefined) continue;
-    const holdsEnd = withinBounds(freeEnd, ring.bounds) && pointInPolygon(freeEnd, ring.points);
+    const holdsEnd = pointInBox(freeEnd, ring.bounds) && pointInPolygon(freeEnd, ring.points);
     if (holdsEnd !== context.ringHoldsContour(index)) return false;
   }
   return true;
@@ -191,15 +192,6 @@ function onBed(path: LeadPath, bed: JobBounds | null, arcsEmitted: boolean): boo
     extent.maxX <= bed.maxX + BED_SLACK_MM &&
     extent.minY >= bed.minY - BED_SLACK_MM &&
     extent.maxY <= bed.maxY + BED_SLACK_MM
-  );
-}
-
-function withinBounds(point: Vec2, bounds: JobBounds): boolean {
-  return (
-    point.x >= bounds.minX &&
-    point.x <= bounds.maxX &&
-    point.y >= bounds.minY &&
-    point.y <= bounds.maxY
   );
 }
 

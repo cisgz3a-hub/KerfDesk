@@ -8,6 +8,7 @@
 
 import { endpointArc, pointOnArc } from '../scene/curve-path';
 import type { CubicPathSegment, CurveSubpath, PathSegment, Vec2 } from '../scene';
+import { lerpPoint } from './point-math';
 
 export type ContourSegments = {
   readonly start: Vec2;
@@ -51,10 +52,12 @@ export function contourPoint(contour: ContourSegments, p: number): Vec2 {
 export function segmentPoint(from: Vec2, segment: PathSegment, t: number): Vec2 {
   if (t <= 0) return from;
   if (t >= 1) return segment.to;
-  if (segment.kind === 'line') return lerp(from, segment.to, t);
+  if (segment.kind === 'line') return lerpPoint(from, segment.to, t);
   if (segment.kind === 'cubic') return cubicPoint(from, segment, t);
   const arc = endpointArc(from, segment);
-  return arc === null ? lerp(from, segment.to, t) : pointOnArc(arc, arc.theta1 + arc.delta * t);
+  return arc === null
+    ? lerpPoint(from, segment.to, t)
+    : pointOnArc(arc, arc.theta1 + arc.delta * t);
 }
 
 /** The open piece of the contour running forward from `from` to `to` (0 <= from < to <= n). */
@@ -127,12 +130,12 @@ export function splitCubic(
   t: number,
 ): readonly [CubicControls, CubicControls] {
   const [p0, p1, p2, p3] = controls;
-  const a = lerp(p0, p1, t);
-  const b = lerp(p1, p2, t);
-  const c = lerp(p2, p3, t);
-  const d = lerp(a, b, t);
-  const e = lerp(b, c, t);
-  const f = lerp(d, e, t);
+  const a = lerpPoint(p0, p1, t);
+  const b = lerpPoint(p1, p2, t);
+  const c = lerpPoint(p2, p3, t);
+  const d = lerpPoint(a, b, t);
+  const e = lerpPoint(b, c, t);
+  const f = lerpPoint(d, e, t);
   return [
     [p0, a, d, f],
     [f, e, c, p3],
@@ -149,10 +152,6 @@ function cubicPoint(from: Vec2, segment: CubicPathSegment, t: number): Vec2 {
     x: a * from.x + b * segment.control1.x + c * segment.control2.x + d * segment.to.x,
     y: a * from.y + b * segment.control1.y + c * segment.control2.y + d * segment.to.y,
   };
-}
-
-function lerp(a: Vec2, b: Vec2, t: number): Vec2 {
-  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
 }
 
 function samePoint(a: Vec2, b: Vec2): boolean {

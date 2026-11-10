@@ -5,6 +5,8 @@
 // fields through canonicalHeadPositions so nothing unexpected rides along.
 
 import type { DeviceProfile, LaserFinishPosition, SavedHeadPosition } from './device-profile';
+import { isRecord } from '../util/is-record';
+import { isFiniteNumber } from '../util/finite';
 
 export function isLaserFinishPosition(value: unknown): value is LaserFinishPosition {
   if (!isRecord(value)) return false;
@@ -49,12 +51,4 @@ export function canonicalHeadPositions(
           savedPositions: saved.map(({ name, frame, xMm, yMm }) => ({ name, frame, xMm, yMm })),
         }),
   };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
 }

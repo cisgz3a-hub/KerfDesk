@@ -63,10 +63,7 @@ export function nudgedCameraModel(record: CameraModelRecord, offsetMm: Vec2): Ca
   return { ...record, pose: shiftedPose(record.pose, offsetMm) };
 }
 
-/** How big a nudge is, mm. */
-export function nudgeSizeMm(offsetMm: Vec2): number {
-  return Math.hypot(offsetMm.x, offsetMm.y);
-}
+export { vectorLength as nudgeSizeMm } from '../../geometry/point-math';
 
 /**
  * Whether the nudge ring was burned while the native offset was unknown (not

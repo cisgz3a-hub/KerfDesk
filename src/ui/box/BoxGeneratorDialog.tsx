@@ -23,6 +23,7 @@ import {
 } from './use-box-generation';
 import { useBoxDraftClose } from './use-box-draft-close';
 import { useBoxGeneratorForm } from './use-box-generator-form';
+import { formatRoundedTo2Decimals } from '../../core/util/number-format';
 
 export function BoxGeneratorDialog(props: {
   readonly machine: BoxMachineContext;
@@ -177,13 +178,9 @@ function summaryLine(
   const label = displayed === null ? 'Requested' : current === null ? 'Last generated' : 'Current';
   const dims = deriveBoxDims(spec);
   return (
-    `${label} · Outer ${fmt(dims.outerWidthMm)} × ${fmt(dims.outerDepthMm)} × ${fmt(dims.outerHeightMm)} mm · ` +
-    `Inner ${fmt(dims.innerWidthMm)} × ${fmt(dims.innerDepthMm)} × ${fmt(dims.innerHeightMm)} mm`
+    `${label} · Outer ${formatRoundedTo2Decimals(dims.outerWidthMm)} × ${formatRoundedTo2Decimals(dims.outerDepthMm)} × ${formatRoundedTo2Decimals(dims.outerHeightMm)} mm · ` +
+    `Inner ${formatRoundedTo2Decimals(dims.innerWidthMm)} × ${formatRoundedTo2Decimals(dims.innerDepthMm)} × ${formatRoundedTo2Decimals(dims.innerHeightMm)} mm`
   );
-}
-
-function fmt(value: number): string {
-  return String(Math.round(value * 100) / 100);
 }
 
 const summaryStyle: CSSProperties = {

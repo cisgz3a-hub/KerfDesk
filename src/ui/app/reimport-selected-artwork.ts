@@ -6,6 +6,7 @@ import type { ToastVariant } from '../state/toast-store';
 import { captureImportDocumentOwner } from './import-dispatch';
 import { importDxfFiles } from './dxf-import-action';
 import { importSvgFiles } from './svg-import-action';
+import { errorMessage } from '../../core/util/error-message';
 
 type PushToast = (message: string, variant?: ToastVariant) => void;
 
@@ -45,7 +46,7 @@ export async function handleReimportSelectedArtwork(args: {
   try {
     files = await args.platform.pickFilesForOpen({ accept: [extension], multiple: false });
   } catch (error) {
-    pushToast(`Could not re-import ${args.target.source}: ${messageOf(error)}`, 'error');
+    pushToast(`Could not re-import ${args.target.source}: ${errorMessage(error)}`, 'error');
     return;
   }
   if (!ownerIsCurrent()) return;
@@ -93,10 +94,6 @@ export async function handleReimportSelectedArtwork(args: {
           },
         },
   );
-}
-
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 function captureSourceObjects(

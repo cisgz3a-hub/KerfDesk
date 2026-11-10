@@ -8,6 +8,7 @@ import {
   type Vec2,
 } from '../../../core/scene';
 import type { CapturedBoardGeometry } from '../../../core/scene/board-verification';
+import { distance } from '../../../core/geometry/point-math';
 
 const MIN_CAPTURE_SEPARATION_MM = 1;
 export const CIRCLE_RIM_POINT_COUNT = 4;
@@ -155,7 +156,7 @@ function applyCapture(
   if (state.captureEpoch !== null && !registrationEpochMatches(state.captureEpoch, captureEpoch)) {
     return state;
   }
-  if (state.corners.some((sample) => distanceMm(sample, point) < MIN_CAPTURE_SEPARATION_MM)) {
+  if (state.corners.some((sample) => distance(sample, point) < MIN_CAPTURE_SEPARATION_MM)) {
     return state;
   }
   return {
@@ -312,10 +313,6 @@ export function useBoardCapture(): BoardCapture {
     isSessionCurrent: () => sessionToken.current === renderedSessionToken,
     reset: () => resetSession({ type: 'reset' }),
   };
-}
-
-function distanceMm(a: Vec2, b: Vec2): number {
-  return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
 function registrationEpochMatches(

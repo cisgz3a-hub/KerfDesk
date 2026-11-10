@@ -1,4 +1,5 @@
 import type { CameraAlignment, CameraAlignmentPoint, CameraPoint } from './camera-profile';
+import { crossAbout } from '../geometry/point-math';
 
 export type CameraTransformResult =
   | {
@@ -303,7 +304,7 @@ function hasNonCollinearTriple(points: ReadonlyArray<CameraPoint>): boolean {
         const second = points[b];
         const third = points[c];
         if (first === undefined || second === undefined || third === undefined) continue;
-        if (Math.abs(signedDoubleArea(first, second, third)) > EPSILON) return true;
+        if (Math.abs(crossAbout(first, second, third)) > EPSILON) return true;
       }
     }
   }
@@ -321,7 +322,7 @@ function hasStablePointSpread(points: ReadonlyArray<CameraPoint>): boolean {
         const second = points[b];
         const third = points[c];
         if (first === undefined || second === undefined || third === undefined) continue;
-        maxArea = Math.max(maxArea, Math.abs(signedDoubleArea(first, second, third)));
+        maxArea = Math.max(maxArea, Math.abs(crossAbout(first, second, third)));
       }
     }
   }
@@ -349,10 +350,6 @@ function pointDistanceSquared(a: CameraPoint, b: CameraPoint): number {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
   return dx * dx + dy * dy;
-}
-
-function signedDoubleArea(a: CameraPoint, b: CameraPoint, c: CameraPoint): number {
-  return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
 }
 
 function isPoint(value: unknown): value is CameraPoint {

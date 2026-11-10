@@ -10,6 +10,7 @@
 
 import { NEAR_STRAIGHT_SAGITTA_PER_CHORD } from '../../core/geometry/near-straight-arc';
 import type { Vec2 } from '../../core/scene';
+import { midpoint } from '../../core/geometry/point-math';
 
 export const DEFAULT_FLATNESS_MM = 0.25;
 
@@ -27,12 +28,12 @@ export function flattenCubic(
     out.push(p3);
     return;
   }
-  const p01 = mid(p0, p1);
-  const p12 = mid(p1, p2);
-  const p23 = mid(p2, p3);
-  const p012 = mid(p01, p12);
-  const p123 = mid(p12, p23);
-  const p0123 = mid(p012, p123);
+  const p01 = midpoint(p0, p1);
+  const p12 = midpoint(p1, p2);
+  const p23 = midpoint(p2, p3);
+  const p012 = midpoint(p01, p12);
+  const p123 = midpoint(p12, p23);
+  const p0123 = midpoint(p012, p123);
   flattenCubic(p0, p01, p012, p0123, tolerance, out);
   flattenCubic(p0123, p123, p23, p3, tolerance, out);
 }
@@ -263,10 +264,6 @@ function angleBetween(ux: number, uy: number, vx: number, vy: number): number {
 }
 
 // --- shared math ---
-
-function mid(a: Vec2, b: Vec2): Vec2 {
-  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-}
 
 function perpDistance(a: Vec2, b: Vec2, p: Vec2): number {
   const len = Math.hypot(b.x - a.x, b.y - a.y);

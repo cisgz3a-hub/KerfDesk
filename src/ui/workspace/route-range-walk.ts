@@ -6,6 +6,7 @@ import {
   type CanvasPreviewMotion,
   type CanvasPreviewMotionSequence,
 } from '../state/canvas-preview-motion';
+import { distance3, lerp3 } from '../../core/geometry/vec3';
 
 export type RouteSegment = {
   readonly from: Vec2;
@@ -67,13 +68,13 @@ function visitMotionRange(
     const from = motion.pointsMm[index - 1];
     const to = motion.pointsMm[index];
     if (from === undefined || to === undefined) continue;
-    const length = distance(from, to);
+    const length = distance3(from, to);
     const segmentEndMm = segmentStartMm + length;
     const clippedStart = Math.max(segmentStartMm, fromRouteMm);
     const clippedEnd = Math.min(segmentEndMm, toRouteMm);
     if (length > Number.EPSILON && clippedEnd > clippedStart) {
-      const start = interpolate(from, to, (clippedStart - segmentStartMm) / length);
-      const end = interpolate(from, to, (clippedEnd - segmentStartMm) / length);
+      const start = lerp3(from, to, (clippedStart - segmentStartMm) / length);
+      const end = lerp3(from, to, (clippedEnd - segmentStartMm) / length);
       visit({
         from: mapControllerPointToScene(start, plan),
         to: mapControllerPointToScene(end, plan),
@@ -190,7 +191,7 @@ function walkMotionLines(
     const from = motion.pointsMm[index - 1];
     const to = motion.pointsMm[index];
     if (from === undefined || to === undefined) continue;
-    const length = distance(from, to);
+    const length = distance3(from, to);
     const segmentEndMm = segmentStartMm + length;
     const clippedStart = Math.max(segmentStartMm, fromRouteMm);
     const clippedEnd = Math.min(segmentEndMm, toRouteMm);
@@ -241,20 +242,4 @@ function firstMotionEndingAfter(
     else low = middle + 1;
   }
   return low;
-}
-
-function distance(a: ExecutablePlanPoint, b: ExecutablePlanPoint): number {
-  return Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
-}
-
-function interpolate(
-  a: ExecutablePlanPoint,
-  b: ExecutablePlanPoint,
-  t: number,
-): ExecutablePlanPoint {
-  return {
-    x: a.x + (b.x - a.x) * t,
-    y: a.y + (b.y - a.y) * t,
-    z: a.z + (b.z - a.z) * t,
-  };
 }

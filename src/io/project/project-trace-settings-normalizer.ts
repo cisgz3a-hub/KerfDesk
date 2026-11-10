@@ -1,5 +1,6 @@
 import type { TraceSettingsRecord, TraceSettingsValue } from '../../core/scene/scene-object';
 import { isObject } from './project-shape-primitives';
+import { isNonNegativeFiniteNumber } from '../../core/util/finite';
 
 // ADR-408: recorded Trace dialog settings are Re-trace convenience metadata,
 // never output-bearing. Like library provenance, a structurally malformed,
@@ -107,8 +108,8 @@ function optionalBoundary(value: unknown): Boundary | undefined | null {
   if (value === undefined) return undefined;
   if (!isObject(value)) return null;
   const { x, y, width, height } = value;
-  if (!isNonNegativeFinite(x) || !isNonNegativeFinite(y)) return null;
-  if (!isNonNegativeFinite(width) || !isNonNegativeFinite(height)) return null;
+  if (!isNonNegativeFiniteNumber(x) || !isNonNegativeFiniteNumber(y)) return null;
+  if (!isNonNegativeFiniteNumber(width) || !isNonNegativeFiniteNumber(height)) return null;
   if (width === 0 || height === 0) return null;
   return { x, y, width, height };
 }
@@ -121,10 +122,6 @@ function isSettingsValue(value: unknown): value is TraceSettingsValue {
 
 function isBoundedText(value: unknown): value is string {
   return typeof value === 'string' && value.length <= MAX_TEXT_LENGTH;
-}
-
-function isNonNegativeFinite(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
 }
 
 function literals<T extends string>(map: Readonly<Record<T, unknown>>): ReadonlyArray<T> {

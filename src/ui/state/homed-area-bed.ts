@@ -20,6 +20,7 @@ import type { DeviceProfile } from '../../core/devices';
 import type { NativeXyBounds } from '../../core/devices/native-bed-frame';
 import { currentSessionSettings } from './manual-motion-limits';
 import type { NativeBedEvidence } from './native-bed-frame';
+import { formatUpTo3Decimals } from '../../core/util/number-format';
 
 export type BedSize = { readonly widthMm: number; readonly heightMm: number };
 
@@ -93,8 +94,8 @@ export function bedCorrectionShift(origin: DeviceProfile['origin'], change: Wide
   const x = origin.endsWith('-right') ? dx : origin === 'center' ? dx / 2 : 0;
   const y = origin.startsWith('front-') ? dy : origin === 'center' ? dy / 2 : 0;
   const moves = [
-    ...(x === 0 ? [] : [`${formatMm(x)} mm in machine X`]),
-    ...(y === 0 ? [] : [`${formatMm(y)} mm in machine Y`]),
+    ...(x === 0 ? [] : [`${formatUpTo3Decimals(x)} mm in machine X`]),
+    ...(y === 0 ? [] : [`${formatUpTo3Decimals(y)} mm in machine Y`]),
   ];
   return moves.length === 0
     ? 'Artwork already placed keeps its machine position.'
@@ -102,9 +103,5 @@ export function bedCorrectionShift(origin: DeviceProfile['origin'], change: Wide
 }
 
 export function formatBed(size: BedSize): string {
-  return `${formatMm(size.widthMm)} × ${formatMm(size.heightMm)} mm`;
-}
-
-function formatMm(value: number): string {
-  return Number(value.toFixed(3)).toString();
+  return `${formatUpTo3Decimals(size.widthMm)} × ${formatUpTo3Decimals(size.heightMm)} mm`;
 }

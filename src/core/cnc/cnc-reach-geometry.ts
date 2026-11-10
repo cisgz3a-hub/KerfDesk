@@ -1,4 +1,5 @@
 import { minOf } from '../util';
+import { lerp3 } from '../geometry/vec3';
 export type CncReachPoint = { readonly x: number; readonly y: number; readonly z: number };
 export type CncReachFixture = {
   readonly id: string;
@@ -33,8 +34,8 @@ export function reachEnvelopeIntersectsFixture(
     fixture.topZMm - envelope.startMm,
   );
   if (interval === null) return false;
-  const a = pointAt(from, to, interval[0]);
-  const b = pointAt(from, to, interval[1]);
+  const a = lerp3(from, to, interval[0]);
+  const b = lerp3(from, to, interval[1]);
   return (
     segmentRectangleDistanceSquared(a, b, fixture) <= (envelope.diameterMm / 2 + toleranceMm) ** 2
   );
@@ -52,9 +53,6 @@ function zInterval(
   const start = Math.max(0, Math.min(t1, t2));
   const end = Math.min(1, Math.max(t1, t2));
   return start <= end ? [start, end] : null;
-}
-function pointAt(a: CncReachPoint, b: CncReachPoint, t: number): CncReachPoint {
-  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + (b.z - a.z) * t };
 }
 function segmentRectangleDistanceSquared(
   a: CncReachPoint,

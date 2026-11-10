@@ -1,4 +1,5 @@
 import type { CncToolKind } from '../../scene/machine';
+import { formatFixed3Decimals } from '../../util/number-format';
 
 export const CORNER_PROBE_EXTERNAL_MARGIN_MM = 1;
 export const DEFAULT_FINAL_PARK_MM = 5;
@@ -54,7 +55,7 @@ export function validateCornerProbeGeometry(
   const measuredFlankHeightMm = params.plateThicknessMm - params.sideDropMm;
   if (measuredFlankHeightMm + FLOAT_TOLERANCE_MM < MIN_FLANK_HEIGHT_MM) {
     return invalid(
-      `Side probe drop leaves ${formatMm(measuredFlankHeightMm)} mm above the stock; at least ${MIN_FLANK_HEIGHT_MM} mm is required.`,
+      `Side probe drop leaves ${formatFixed3Decimals(measuredFlankHeightMm)} mm above the stock; at least ${MIN_FLANK_HEIGHT_MM} mm is required.`,
     );
   }
   const flankHeightMm = Math.max(MIN_FLANK_HEIGHT_MM, measuredFlankHeightMm);
@@ -64,7 +65,7 @@ export function validateCornerProbeGeometry(
     params.plateCenterOffsetYmm < minimumCenterOffsetMm
   ) {
     return invalid(
-      `Both plate center offsets must be at least ${formatMm(minimumCenterOffsetMm)} mm for this cutter.`,
+      `Both plate center offsets must be at least ${formatFixed3Decimals(minimumCenterOffsetMm)} mm for this cutter.`,
     );
   }
   const minimumSideClearanceMm =
@@ -73,7 +74,7 @@ export function validateCornerProbeGeometry(
     CORNER_PROBE_EXTERNAL_MARGIN_MM;
   if (params.sideClearanceMm < minimumSideClearanceMm) {
     return invalid(
-      `Side clearance must be at least ${formatMm(minimumSideClearanceMm)} mm for this plate position and cutter.`,
+      `Side clearance must be at least ${formatFixed3Decimals(minimumSideClearanceMm)} mm for this plate position and cutter.`,
     );
   }
   return {
@@ -85,10 +86,6 @@ export function validateCornerProbeGeometry(
 
 function invalid(reason: string): CornerProbeGeometryResult {
   return { kind: 'invalid', reason };
-}
-
-function formatMm(value: number): string {
-  return value.toFixed(3);
 }
 
 function hasGcodePrecision(value: number): boolean {

@@ -31,6 +31,7 @@ import { savePreflightFrameOptions } from './save-gcode-emission';
 import { captureProjectOutputSnapshot } from '../laser/project-output-snapshot';
 import { outputTextRenderer } from '../text/output-text-renderer';
 import type { OutputSnapshotRequest } from '../laser/output-preparation-protocol';
+import { errorMessage } from '../../core/util/error-message';
 
 const RD_EXPERIMENTAL_WARNING =
   'EXPERIMENTAL .rd export: the encoding follows public Ruida research and has NOT been verified on a real controller. Preview the file on the machine panel and test on scrap first.';
@@ -139,8 +140,4 @@ function showRdFailure(messages: ReadonlyArray<string>): void {
 function suggestedRdName(savedName: string | null): string {
   const base = savedName === null ? 'job' : savedName.replace(/\.lf2$/i, '');
   return `${base}.rd`;
-}
-
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }

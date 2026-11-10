@@ -23,6 +23,7 @@ import {
   shareOutsideTarget,
   targetLayoutMismatch,
 } from '../../../core/camera/target/target-coverage';
+import { roundToTenth } from '../../../core/util/rounding';
 
 export function cameraModelFromCalibration(args: {
   readonly calibration: BedCalibration;
@@ -118,7 +119,7 @@ export function calibrationGrade(record: CameraModelRecord): CalibrationGrade {
   if (record.accuracy.onlyAtTargetHeight === true && rmsErrorMm <= FAIR_RMS_MM) {
     return {
       tone: 'fair',
-      headline: `Lined up at the height of the ${mm(record.accuracy.targetHeightMm)} mm target sheet only.`,
+      headline: `Lined up at the height of the ${roundToTenth(record.accuracy.targetHeightMm)} mm target sheet only.`,
       advice: joined(
         'The camera looks almost straight down, so one photo cannot tell how high it is. On the target sheet the picture is exact, but on thicker or thinner material it may be off by several millimetres. Measure the height of the camera lens above the bed, enter it under Change settings (Camera height), and take the photo again.',
         lowCoverage,
@@ -154,7 +155,7 @@ function goodOnTheRings(record: CameraModelRecord, advice: string | null): Calib
   if (offTarget !== null && offTarget.worstMm > GOOD_EXTRAPOLATED_MM) {
     return {
       tone: 'fair',
-      headline: `Accurate on the target; elsewhere on the bed up to about ${mm(offTarget.worstMm)} mm off.`,
+      headline: `Accurate on the target; elsewhere on the bed up to about ${roundToTenth(offTarget.worstMm)} mm off.`,
       advice,
     };
   }
@@ -178,7 +179,7 @@ function extrapolationAdvice(record: CameraModelRecord): string | null {
   const estimate =
     offTarget === null
       ? 'outside the target the picture is estimated.'
-      : `outside the target the picture is estimated, and may be up to about ${mm(offTarget.worstMm)} mm off ${bedRegion(offTarget)}.`;
+      : `outside the target the picture is estimated, and may be up to about ${roundToTenth(offTarget.worstMm)} mm off ${bedRegion(offTarget)}.`;
   const fix = large
     ? ' Engrave the target on a larger sheet, one that covers more of the bed the camera sees, to measure more of it.'
     : '';
@@ -204,10 +205,6 @@ export function bedRegion(estimate: Pick<ExtrapolationEstimate, 'worstAt' | 'bed
   if (across !== null && down !== null) return `near the ${down}-${across} corner of the bed`;
   if (across !== null || down !== null) return `near the ${down ?? across} edge of the bed`;
   return 'in the middle of the bed';
-}
-
-function mm(value: number): number {
-  return Math.round(value * 10) / 10;
 }
 
 function joined(...parts: ReadonlyArray<string | null>): string | null {

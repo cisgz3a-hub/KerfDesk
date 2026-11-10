@@ -16,6 +16,8 @@ import {
   validRecipeDependencies,
   validStepDependencies,
 } from './process-recipe-selectors-io';
+import { isRecord } from '../../core/util/is-record';
+import { isNonEmptyString } from '../../core/util/text';
 
 export function parseProcessRecipes(
   value: unknown,
@@ -89,7 +91,7 @@ type RecipeHeader = Pick<ProcessRecipe, 'id' | 'name' | 'description' | 'revisio
 function validRecipeHeader(
   value: Record<string, unknown>,
 ): value is Record<string, unknown> & RecipeHeader {
-  const label = value.roles === undefined ? nonempty : boundedLabel;
+  const label = value.roles === undefined ? isNonEmptyString : boundedLabel;
   return (
     label(value.id) &&
     label(value.name) &&
@@ -123,7 +125,7 @@ function validRecipeTools(
   boundedMetadata: boolean,
 ): boolean {
   if (kind === 'laser') return value === undefined;
-  const label = boundedMetadata ? boundedLabel : nonempty;
+  const label = boundedMetadata ? boundedLabel : isNonEmptyString;
   return (
     Array.isArray(value) &&
     (!boundedMetadata || value.length <= 256) &&
@@ -190,7 +192,7 @@ function validStepHeader(
   value: Record<string, unknown>,
   boundedMetadata: boolean,
 ): value is Record<string, unknown> & StepHeader {
-  const label = boundedMetadata ? boundedLabel : nonempty;
+  const label = boundedMetadata ? boundedLabel : isNonEmptyString;
   return (
     label(value.name) &&
     typeof value.color === 'string' &&
@@ -213,7 +215,7 @@ function validCncSettings(
   boundedMetadata: boolean,
 ): boolean {
   if (kind === 'laser') return raw === undefined;
-  const label = boundedMetadata ? boundedLabel : nonempty;
+  const label = boundedMetadata ? boundedLabel : isNonEmptyString;
   return isRecord(raw) && sameJson(normalized, raw) && label(raw.toolId);
 }
 
@@ -247,14 +249,8 @@ function sameJson(a: unknown, b: unknown): boolean {
   return [...keys].every((key) => sameJson(a[key], b[key]));
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-function nonempty(value: unknown): value is string {
-  return typeof value === 'string' && value.trim().length > 0;
-}
 function boundedLabel(value: unknown): value is string {
-  return nonempty(value) && value.length <= 200;
+  return isNonEmptyString(value) && value.length <= 200;
 }
 function invalid(reason: string): { readonly kind: 'invalid'; readonly reason: string } {
   return { kind: 'invalid', reason };

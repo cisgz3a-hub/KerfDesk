@@ -6,6 +6,7 @@
 import type { PerforationPattern } from '../geometry/perforation';
 import type { LayerOperationSettings } from '../scene';
 import { DEFAULT_OVERSCAN_MM, MAX_FILL_OVERSCAN_MM } from './compile-job-defaults';
+import { finiteOr, isDefinedFinitePositive } from '../util/finite';
 
 export const DEFAULT_PERFORATION_CUT_MM = 3;
 export const DEFAULT_PERFORATION_SKIP_MM = 1;
@@ -35,7 +36,7 @@ export function perforationPatternFor(settings: CutExtras): PerforationPattern |
   if (settings.perforationEnabled !== true) return null;
   const cutMm = settings.perforationCutMm ?? DEFAULT_PERFORATION_CUT_MM;
   const skipMm = settings.perforationSkipMm ?? DEFAULT_PERFORATION_SKIP_MM;
-  if (!isPositive(cutMm) || !isPositive(skipMm)) return null;
+  if (!isDefinedFinitePositive(cutMm) || !isDefinedFinitePositive(skipMm)) return null;
   // A project file can hold lengths below the Cut Settings minimum. Clamp them,
   // so the dash count stays bounded by the path length: at 1e-300 mm the dash
   // loop would never advance (audit 2026-10-21 geometry P3-4).
@@ -47,7 +48,7 @@ export function perforationPatternFor(settings: CutExtras): PerforationPattern |
 
 /** How far a closed Line contour runs past its start on the final pass; 0 is off. */
 export function overcutMmFor(settings: CutExtras): number {
-  return isPositive(settings.overcutMm) ? settings.overcutMm : 0;
+  return isDefinedFinitePositive(settings.overcutMm) ? settings.overcutMm : 0;
 }
 
 /** Laser-off run-up each image scan line gets on both ends. */
@@ -62,7 +63,7 @@ export function automaticTabLayoutFor(settings: TabSettings): AutomaticTabLayout
   // Exactly the automatic count tabs-bridges.ts has always used.
   const count = Math.max(1, Math.floor(settings.tabsPerShape));
   if (settings.tabLayout !== 'spacing') return { kind: 'count', count };
-  const spacingMm = isPositive(settings.tabSpacingMm)
+  const spacingMm = isDefinedFinitePositive(settings.tabSpacingMm)
     ? settings.tabSpacingMm
     : DEFAULT_TAB_SPACING_MM;
   const maxPerShape = Math.max(0, Math.floor(finiteOr(settings.tabMaxPerShape ?? 0, 0)));
@@ -79,20 +80,12 @@ export function tabCountForPerimeter(layout: AutomaticTabLayout, perimeterMm: nu
 /** Share of the cut power the tab spans are burned at; 0 leaves them uncut. */
 export function tabCutPowerPercentFor(settings: TabSettings): number {
   const value = settings.tabCutPowerPercent;
-  return isPositive(value) ? Math.min(100, value) : 0;
+  return isDefinedFinitePositive(value) ? Math.min(100, value) : 0;
 }
 
 /** Distance the head needs to reach `feedMmPerMin` from rest: v² / 2a. */
 export function accelerationDistanceMm(feedMmPerMin: number, accelMmPerSec2: number): number {
-  if (!isPositive(feedMmPerMin) || !isPositive(accelMmPerSec2)) return 0;
+  if (!isDefinedFinitePositive(feedMmPerMin) || !isDefinedFinitePositive(accelMmPerSec2)) return 0;
   const speedMmPerSec = feedMmPerMin / 60;
   return (speedMmPerSec * speedMmPerSec) / (2 * accelMmPerSec2);
-}
-
-function finiteOr(value: number, fallback: number): number {
-  return Number.isFinite(value) ? value : fallback;
-}
-
-function isPositive(value: number | undefined): value is number {
-  return value !== undefined && Number.isFinite(value) && value > 0;
 }

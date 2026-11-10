@@ -3,15 +3,13 @@
 import { endpointArc, type CenterArc } from '../scene/curve-path';
 import { applyTransform, type PathSegment, type Transform, type Vec2 } from '../scene';
 import { maxOf, minOf } from '../util';
+import { dot, cross } from './point-math';
 
 export const EXTEND_EPS_MM = 1e-7;
 export type RayContact = { readonly distance: number; readonly overlap: boolean };
 /** Canonical segment parameter, absent only for a non-unique collinear overlap. */
 export type ParametricRayContact = RayContact & { readonly parameter: number | null };
-const cross = (a: Vec2, b: Vec2): number => a.x * b.y - a.y * b.x;
 const minus = (a: Vec2, b: Vec2): Vec2 => ({ x: a.x - b.x, y: a.y - b.y });
-const dot = (a: Vec2, b: Vec2): number => a.x * b.x + a.y * b.y;
-
 export function segmentRayContacts(
   origin: Vec2,
   direction: Vec2,

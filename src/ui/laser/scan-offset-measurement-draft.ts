@@ -13,6 +13,7 @@ import {
 } from '../../core/devices/scan-offset-measurement-format';
 import { scanOffsetMagnitudeLimitMm } from '../../core/devices/scan-offset-profile';
 import { maxOf } from '../../core/util';
+import { isFinitePositive } from '../../core/util/finite';
 
 export type DraftScanOffsetMeasurement = {
   readonly speed: string;
@@ -211,8 +212,4 @@ function displayNumber(value: number): string {
 function numberFromInput(value: string): number {
   if (value.trim() === '') return Number.NaN;
   return Number(value);
-}
-
-function isFinitePositive(value: number): boolean {
-  return Number.isFinite(value) && value > 0;
 }

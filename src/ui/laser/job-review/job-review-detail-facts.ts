@@ -30,6 +30,7 @@ import { cncProjectionParts, type CompiledProjectionFacts } from './job-review-p
 import { formatMm } from './job-review-format';
 import { laserTabsPart } from './job-review-laser-tabs';
 import type { CncStrategyFallback } from '../../../core/job/cnc-compilation-sidecar-types';
+import { formatGroupedUpTo3Decimals } from '../../../core/util/number-format';
 
 const FILL_STYLE_LABELS: Readonly<Record<LayerOperationSettings['fillStyle'], string>> = {
   scanline: 'Scanline',
@@ -67,7 +68,7 @@ function lineDetail(settings: LayerOperationSettings, placedTabCount: number): s
 function fillDetail(settings: LayerOperationSettings): string {
   return [
     `${FILL_STYLE_LABELS[settings.fillStyle]} fill`,
-    `${formatIntervalMm(settings.hatchSpacingMm)} mm hatch at ${settings.hatchAngleDeg}°`,
+    `${formatGroupedUpTo3Decimals(settings.hatchSpacingMm)} mm hatch at ${settings.hatchAngleDeg}°`,
     settings.fillBidirectional ? 'bidirectional' : 'one-way',
     ...(settings.fillCrossHatch ? ['cross-hatch'] : []),
     ...passAngleStepPart(settings),
@@ -75,10 +76,6 @@ function fillDetail(settings: LayerOperationSettings): string {
     ...localScanOffsetPart(settings),
     ...powerModePart(settings),
   ].join(SEPARATOR);
-}
-
-function formatIntervalMm(value: number): string {
-  return value.toLocaleString('en-US', { maximumFractionDigits: 3 });
 }
 
 function imageDetail(settings: LayerOperationSettings): string {
@@ -122,7 +119,7 @@ const AUTOMATIC_OVERSCAN_PART = 'automatic overscan from speed and acceleration'
 function imageScanPatternParts(settings: LayerOperationSettings): ReadonlyArray<string> {
   const angleDeg = normalizedScanAngleDeg(settings.imageScanAngleDeg);
   return [
-    ...(angleDeg === 0 ? [] : [`scan at ${formatIntervalMm(angleDeg)}°`]),
+    ...(angleDeg === 0 ? [] : [`scan at ${formatGroupedUpTo3Decimals(angleDeg)}°`]),
     ...(settings.imageCrossHatch === true ? ['cross-hatch'] : []),
     ...passAngleStepPart(settings),
   ];
@@ -131,7 +128,8 @@ function imageScanPatternParts(settings: LayerOperationSettings): ReadonlyArray<
 function passAngleStepPart(settings: LayerOperationSettings): ReadonlyArray<string> {
   if (!passAngleStepApplies(settings)) return [];
   const stepDeg = settings.passAngleStepDeg ?? 0;
-  const signed = stepDeg > 0 ? `+${formatIntervalMm(stepDeg)}` : formatIntervalMm(stepDeg);
+  const signed =
+    stepDeg > 0 ? `+${formatGroupedUpTo3Decimals(stepDeg)}` : formatGroupedUpTo3Decimals(stepDeg);
   return [`angle ${signed}° per pass`];
 }
 
@@ -168,7 +166,10 @@ function leadPart(settings: LayerOperationSettings): ReadonlyArray<string> {
 function localScanOffsetPart(settings: LayerOperationSettings): ReadonlyArray<string> {
   const offsetMm = settings.bidirectionalScanOffsetMm;
   if (offsetMm === undefined) return [];
-  const signed = offsetMm > 0 ? `+${formatIntervalMm(offsetMm)}` : formatIntervalMm(offsetMm);
+  const signed =
+    offsetMm > 0
+      ? `+${formatGroupedUpTo3Decimals(offsetMm)}`
+      : formatGroupedUpTo3Decimals(offsetMm);
   return [`local scan offset ${signed} mm — replaces device table only for bidirectional output`];
 }
 
@@ -252,7 +253,7 @@ function reliefRoughingPart(relief: CompiledReliefFacts | undefined): ReadonlyAr
   const levels = relief.roughingLevelDepthsMm;
   const deepestMm = levels[levels.length - 1];
   if (deepestMm === undefined) return [`no relief roughing levels${missedNote(relief)}`];
-  const to = `to ${formatIntervalMm(deepestMm)} mm`;
+  const to = `to ${formatGroupedUpTo3Decimals(deepestMm)} mm`;
   // The reliefs of one operation share a roughing group, so its levels are
   // the distinct depths across them all, not a count for each relief.
   if (relief.reliefCount > 1) {

@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
+import { isFinitePositive } from '../../core/util/finite';
 
 type ImageSize = { readonly width: number; readonly height: number };
 export type TracePreviewImageRect = ImageSize & {
@@ -13,10 +14,11 @@ export function fitTracePreviewImage(
   width: number,
   height: number,
 ): TracePreviewImageRect | null {
-  if (image === undefined || !positive(image.width) || !positive(image.height)) return null;
-  if (!positive(width) || !positive(height)) return null;
+  if (image === undefined || !isFinitePositive(image.width) || !isFinitePositive(image.height))
+    return null;
+  if (!isFinitePositive(width) || !isFinitePositive(height)) return null;
   const scale = Math.min(width / image.width, height / image.height);
-  if (!positive(scale)) return null;
+  if (!isFinitePositive(scale)) return null;
   const drawnWidth = image.width * scale;
   const drawnHeight = image.height * scale;
   return {
@@ -80,8 +82,4 @@ function setMeasuredSize(
       ? previous
       : { width: next.width, height: next.height },
   );
-}
-
-function positive(value: number): boolean {
-  return Number.isFinite(value) && value > 0;
 }

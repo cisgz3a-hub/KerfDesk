@@ -10,6 +10,9 @@ import {
   type Origin,
   type ScanOffsetPoint,
 } from '../../core/devices';
+import { isRecord } from '../../core/util/is-record';
+import { isPositiveFiniteNumber, isNonNegativeFiniteNumber } from '../../core/util/finite';
+import { isNonEmptyString } from '../../core/util/text';
 
 export type MaterialLibraryDeviceHint = {
   readonly name: string;
@@ -126,11 +129,11 @@ function isDeviceHint(value: Record<string, unknown>): value is MaterialLibraryD
 function hasRequiredDeviceHintFields(value: Record<string, unknown>): boolean {
   return (
     isNonEmptyString(value.name) &&
-    isPositiveFinite(value.bedWidth) &&
-    isPositiveFinite(value.bedHeight) &&
-    isPositiveFinite(value.maxFeed) &&
-    isPositiveFinite(value.maxPowerS) &&
-    isNonNegativeFinite(value.minPowerS) &&
+    isPositiveFiniteNumber(value.bedWidth) &&
+    isPositiveFiniteNumber(value.bedHeight) &&
+    isPositiveFiniteNumber(value.maxFeed) &&
+    isPositiveFiniteNumber(value.maxPowerS) &&
+    isNonNegativeFiniteNumber(value.minPowerS) &&
     typeof value.laserModeEnabled === 'boolean' &&
     isOrigin(value.origin)
   );
@@ -197,7 +200,7 @@ function hasLaserSubProfileIdentity(value: Record<string, unknown>): boolean {
 
 function hasLaserSubProfileNumbers(value: Record<string, unknown>): boolean {
   for (const field of ['opticalPowerW', 'wavelengthNm', 'focusLengthMm'] as const) {
-    if (value[field] !== undefined && !isPositiveFinite(value[field])) return false;
+    if (value[field] !== undefined && !isPositiveFiniteNumber(value[field])) return false;
   }
   return true;
 }
@@ -210,24 +213,8 @@ function hasLaserSubProfileNotes(value: Record<string, unknown>): boolean {
 function isLaserSpotSize(value: unknown): boolean {
   return (
     value === undefined ||
-    (isRecord(value) && isPositiveFinite(value.x) && isPositiveFinite(value.y))
+    (isRecord(value) && isPositiveFiniteNumber(value.x) && isPositiveFiniteNumber(value.y))
   );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === 'string' && value.trim().length > 0;
-}
-
-function isPositiveFinite(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0;
-}
-
-function isNonNegativeFinite(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
 }
 
 function isOrigin(value: unknown): value is Origin {

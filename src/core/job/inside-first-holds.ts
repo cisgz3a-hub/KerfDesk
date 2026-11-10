@@ -17,6 +17,7 @@
 
 import { ContourBoxIndex } from '../trace/contour-box-index';
 import { boundsContains, type SegmentBounds } from './segment-bounds';
+import { isFiniteBox } from '../geometry/box-math';
 
 export type HoldItem = {
   readonly depth: number;
@@ -38,7 +39,7 @@ export function insideFirstHolds(items: ReadonlyArray<HoldItem>): InsideFirstHol
   const holds: number[][] = items.map(() => []);
   const heldBy: number[][] = items.map(() => []);
   const boxes = items.flatMap((item, index) =>
-    item.container !== null && finiteBounds(item.container) ? [{ ...item.container, index }] : [],
+    item.container !== null && isFiniteBox(item.container) ? [{ ...item.container, index }] : [],
   );
   if (boxes.length === 0) return { holds, heldBy, any: false };
   const index = ContourBoxIndex.create(boxes);
@@ -65,7 +66,7 @@ function containersHeldBy(
   const item = items[target] as HoldItem;
   const found = new Set<number>();
   for (const member of item.members) {
-    if (member === null || !finiteBounds(member)) continue;
+    if (member === null || !isFiniteBox(member)) continue;
     for (const candidate of index.query(member)) {
       const container = candidate.index;
       if (container === target || (items[container]?.depth ?? 0) >= item.depth) continue;
@@ -92,13 +93,4 @@ export function releaseHolds(
     waiting[container] = left;
     if (left === 0) released?.(container);
   }
-}
-
-function finiteBounds(box: SegmentBounds): boolean {
-  return (
-    Number.isFinite(box.minX) &&
-    Number.isFinite(box.minY) &&
-    Number.isFinite(box.maxX) &&
-    Number.isFinite(box.maxY)
-  );
 }

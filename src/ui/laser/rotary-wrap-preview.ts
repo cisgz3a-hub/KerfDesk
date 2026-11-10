@@ -10,6 +10,7 @@ import {
 } from '../../core/devices/rotary';
 import { rotaryTaperRadiusAt } from '../../core/job/rotary-taper-profile';
 import { combinedBBox, type Scene } from '../../core/scene';
+import { isFinitePositive } from '../../core/util/finite';
 
 export type RotaryArtworkExtent = { readonly widthMm: number; readonly heightMm: number };
 export function rotaryArtworkExtent(scene: Scene): RotaryArtworkExtent | null {
@@ -33,7 +34,7 @@ export function rotaryWrapPreview(setup: RotarySetup, artwork?: RotaryArtworkExt
   const machineTravelMm = rotaryYLimitMm(setup);
   const scale = rotaryYScale(setup);
   if (
-    ![circumferenceMm, machineTravelMm, scale, wrapLimitMm].every(positiveFinite) ||
+    ![circumferenceMm, machineTravelMm, scale, wrapLimitMm].every(isFinitePositive) ||
     !Number.isFinite(heightMm) ||
     heightMm < 0
   )
@@ -84,10 +85,6 @@ function rotaryTaperPreview(taper: RotaryTaper, artworkWidthMm: number | null): 
     bottomTurnMm: Math.PI * taper.bottomDiameterMm,
     narrowestTurnMm: 2 * Math.PI * narrowestRadiusMm,
   };
-}
-
-function positiveFinite(value: number): boolean {
-  return Number.isFinite(value) && value > 0;
 }
 
 function rotaryScaleSource(setup: RotarySetup): string {

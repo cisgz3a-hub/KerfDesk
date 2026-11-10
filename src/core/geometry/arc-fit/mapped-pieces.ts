@@ -14,6 +14,7 @@ import { flattenCurveSubpath, type CurveSubpath, type PathSegment, type Vec2 } f
 import { ARC_FIT_BREAK_SPACING_MM, ARC_FIT_SOURCE_SAMPLE_ERROR_MM } from './arc-fit-limits';
 import { unit } from './arc-primitives';
 import type { SmoothRun } from './fit-runs';
+import { lerpPoint, distance } from '../point-math';
 
 type PieceEnds = {
   readonly start: Vec2;
@@ -110,7 +111,7 @@ export function sampleMappedPiece(piece: MappedPiece): PieceSamples {
       Math.ceil(distance(piece.start, piece.end) / ARC_FIT_BREAK_SPACING_MM),
     );
     const points = Array.from({ length: count + 1 }, (_, index) =>
-      index === count ? piece.end : lerp(piece.start, piece.end, index / count),
+      index === count ? piece.end : lerpPoint(piece.start, piece.end, index / count),
     );
     const tangents = points.map(() => piece.startTangent);
     return { points, tangentsIn: tangents, tangentsOut: tangents };
@@ -228,14 +229,6 @@ function distinct(points: ReadonlyArray<Vec2>): Vec2[] {
     if (previous === undefined || !samePoint(previous, point)) out.push(point);
   }
   return out;
-}
-
-function lerp(a: Vec2, b: Vec2, t: number): Vec2 {
-  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
-}
-
-function distance(a: Vec2, b: Vec2): number {
-  return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
 function samePoint(a: Vec2, b: Vec2): boolean {

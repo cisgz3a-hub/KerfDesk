@@ -12,6 +12,7 @@ import {
 } from '../../core/devices';
 import { numbersClose } from '../../core/util';
 import type { HelpTopicId } from '../help/help-topics';
+import { isPositiveFiniteNumber } from '../../core/util/finite';
 
 type Row = {
   readonly label: string;
@@ -77,8 +78,8 @@ export function describeReviewItems(
   const ignored: ReviewItem[] = [];
   const detectedZTravelMm = controller.zTravelMm ?? patch.zTravelMm;
   if (
-    isPositive(controller.zMaxFeed) &&
-    isPositive(detectedZTravelMm) &&
+    isPositiveFiniteNumber(controller.zMaxFeed) &&
+    isPositiveFiniteNumber(detectedZTravelMm) &&
     !profileSupportsCapability(current, 'z-axis')
   ) {
     needsReview.push({
@@ -193,10 +194,6 @@ function pushOptionalNumericRow(
     newText: format(next),
     changed: true,
   });
-}
-
-function isPositive(value: number | undefined): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0;
 }
 
 function addCapability(

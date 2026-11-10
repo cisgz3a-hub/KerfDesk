@@ -14,6 +14,7 @@ import {
 } from '../../core/scene/curve-path';
 import { applyTransform } from '../../core/scene/transform';
 import type { Polyline, Transform, Vec2 } from '../../core/scene';
+import { roundToThousandth } from '../../core/util/rounding';
 
 /** Steps across the selection's longer side. */
 const OUTLINE_STEPS = 1000;
@@ -61,7 +62,9 @@ function drawPolyline(
     const far = drawn === null || Math.hypot(point.x - drawn.x, point.y - drawn.y) >= localStep;
     if (!far && index !== points.length - 1) continue;
     const world = applyTransform(point, transform);
-    parts.push(`${drawn === null ? 'M' : 'L'}${rounded(world.x)} ${rounded(world.y)}`);
+    parts.push(
+      `${drawn === null ? 'M' : 'L'}${roundToThousandth(world.x)} ${roundToThousandth(world.y)}`,
+    );
     drawn = point;
     box.minX = Math.min(box.minX, world.x);
     box.minY = Math.min(box.minY, world.y);
@@ -95,8 +98,4 @@ function outlineStep(objects: ReadonlyArray<VectorSceneObject>): number {
   }
   const span = Math.max(maxX - minX, maxY - minY);
   return Number.isFinite(span) && span > 0 ? span / OUTLINE_STEPS : 0;
-}
-
-function rounded(value: number): number {
-  return Math.round(value * 1000) / 1000;
 }

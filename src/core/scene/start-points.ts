@@ -1,4 +1,7 @@
 /** A position around the frame perimeter, in its traversal order. */
+import { isRecord } from '../util/is-record';
+import { isFiniteNumber } from '../util/finite';
+
 export type FrameStartPoint = {
   readonly edge: 0 | 1 | 2 | 3;
   readonly fraction: number;
@@ -38,7 +41,7 @@ function normalizeJob(value: unknown): JobStartPoint | undefined {
   if (!isRecord(value)) return undefined;
   const x = value['x'];
   const y = value['y'];
-  if (!finite(x) || !finite(y)) return undefined;
+  if (!isFiniteNumber(x) || !isFiniteNumber(y)) return undefined;
   if (value['relative'] !== undefined && value['relative'] !== true) return undefined;
   if (value['relative'] === true) {
     return unitInterval(x) && unitInterval(y) ? { x, y, relative: true } : undefined;
@@ -46,14 +49,6 @@ function normalizeJob(value: unknown): JobStartPoint | undefined {
   return { x, y };
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function finite(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
-}
-
 function unitInterval(value: unknown): value is number {
-  return finite(value) && value >= 0 && value <= 1;
+  return isFiniteNumber(value) && value >= 0 && value <= 1;
 }

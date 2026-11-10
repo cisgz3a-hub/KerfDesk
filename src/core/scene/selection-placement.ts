@@ -10,6 +10,7 @@ import {
   type SelectionAnchor,
   type SelectionTransformResult,
 } from './selection-transform';
+import { isFinitePositive } from '../util/finite';
 
 /** +1 turns clockwise on screen (scene +Y points down), -1 counter-clockwise. */
 export type QuarterTurnDirection = 1 | -1;
@@ -63,7 +64,7 @@ export function buildSelectionMoveToBedEdit(
   bed: BedSize,
   anchor: SelectionAnchor,
 ): SelectionTransformResult {
-  if (!isPositiveFinite(bed.width) || !isPositiveFinite(bed.height)) {
+  if (!isFinitePositive(bed.width) || !isFinitePositive(bed.height)) {
     return { kind: 'error', reason: 'invalid-dimension' };
   }
   const bbox = combinedBBox(objects);
@@ -98,8 +99,4 @@ function quarterTurnPoint(point: Vec2, pivot: Vec2, direction: QuarterTurnDirect
 function normalizeDeg(deg: number): number {
   const normalized = deg % FULL_TURN_DEG;
   return normalized < 0 ? normalized + FULL_TURN_DEG : normalized;
-}
-
-function isPositiveFinite(value: number): boolean {
-  return Number.isFinite(value) && value > 0;
 }

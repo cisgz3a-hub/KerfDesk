@@ -5,6 +5,7 @@ import {
 } from '../../core/devices';
 import { numInputStyle, Row, unitStyle } from './device-settings-shared';
 import { useDebouncedCommit } from '../layers/use-debounced-commit';
+import { isPositiveFiniteNumber } from '../../core/util/finite';
 
 type DeviceRowsProps = {
   readonly device: DeviceProfile;
@@ -14,7 +15,7 @@ type DeviceRowsProps = {
 export function ZRows(props: DeviceRowsProps): JSX.Element {
   const { device, update } = props;
   const supportsZAxis = profileSupportsCapability(device, 'z-axis');
-  const canConfirmZTravel = supportsZAxis && isPositive(device.zTravelMm);
+  const canConfirmZTravel = supportsZAxis && isPositiveFiniteNumber(device.zTravelMm);
   return (
     <>
       <Row label="Powered Z">
@@ -117,10 +118,6 @@ function setCapability(
     return current.includes(capability) ? current : [...current, capability];
   }
   return current.filter((item) => item !== capability);
-}
-
-function isPositive(value: number | undefined): boolean {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0;
 }
 
 const inlineLabelStyle: React.CSSProperties = {

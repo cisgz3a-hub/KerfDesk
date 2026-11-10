@@ -3,6 +3,7 @@ import type { CncTaperedInlaySettings } from '../../core/scene/cnc-tapered-inlay
 import { NumberField } from './CncLayerPrimitives';
 import { taperedInlayValuePatch } from './tapered-inlay-value-patch';
 import { taperedInlayPlugDepth } from '../../core/cnc/tapered-inlay-settings';
+import { roundToThousandth } from '../../core/util/rounding';
 
 type LengthKey = Exclude<keyof CncTaperedInlaySettings, 'kind'>;
 const INLAY_ROWS: ReadonlyArray<{ key: LengthKey; label: string; min: number; title: string }> = [
@@ -101,10 +102,11 @@ export function CncTaperedInlayFields(props: {
         />
       ))}
       <p className="lf-cnc-settings-hint">
-        Pocket program floor: Z−{format(intent.pocketStartDepthMm + intent.pocketDepthMm)} mm. Plug
-        program floor: Z−{format(intent.plugStartDepthMm + taperedInlayPlugDepth(intent))} mm. The
-        plug is V-carved from a start depth, so its walls follow the pocket walls on every detail,
-        including narrow ones that stay shallower than the pocket depth.
+        Pocket program floor: Z−
+        {roundToThousandth(intent.pocketStartDepthMm + intent.pocketDepthMm)} mm. Plug program
+        floor: Z−{roundToThousandth(intent.plugStartDepthMm + taperedInlayPlugDepth(intent))} mm.
+        The plug is V-carved from a start depth, so its walls follow the pocket walls on every
+        detail, including narrow ones that stay shallower than the pocket depth.
       </p>
       <p className="lf-cnc-settings-hint">
         This operation intentionally retains the pair linkage. Review both generated pieces after a
@@ -113,8 +115,4 @@ export function CncTaperedInlayFields(props: {
       </p>
     </>
   );
-}
-
-function format(value: number): number {
-  return Math.round(value * 1000) / 1000;
 }

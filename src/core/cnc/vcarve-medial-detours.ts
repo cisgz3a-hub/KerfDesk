@@ -5,6 +5,7 @@ import {
   type VCarveMedialRegion,
 } from './vcarve-medial-region';
 import { nearestVCarveRouteLink, type VCarveRouteLink } from './vcarve-medial-detour-link';
+import { samePoint } from '../geometry/point-math';
 
 export type VCarveJoinedRoutes = {
   readonly routes: ReadonlyArray<Polyline>;
@@ -72,8 +73,4 @@ function rotatedClosedCircuit(
   const rotated = [...points.slice(startIndex), ...points.slice(0, startIndex)];
   const first = rotated[0];
   return first === undefined ? [] : [...rotated, first];
-}
-
-function samePoint(a: Vec2, b: Vec2): boolean {
-  return a.x === b.x && a.y === b.y;
 }

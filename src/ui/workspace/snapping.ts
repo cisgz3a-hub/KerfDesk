@@ -1,6 +1,7 @@
 import { transformedBBox, type Project, type SceneObject, type Transform } from '../../core/scene';
 import type { SnapSettings } from './snap-settings';
 import { visibleSnapTargetPredicate } from './snap-target-visibility';
+import { isFinitePositive } from '../../core/util/finite';
 
 export type SnapAxis = 'x' | 'y';
 
@@ -61,7 +62,7 @@ export function snapMoveTransform(args: {
 }
 
 function canSnap(settings: SnapSettings, distanceMm: number): boolean {
-  return settings.enabled && isPositiveFinite(distanceMm);
+  return settings.enabled && isFinitePositive(distanceMm);
 }
 
 function noSnap(transform: Transform): SnapMoveResult {
@@ -156,7 +157,7 @@ function gridSnapCandidates(args: {
   readonly movedBox: Aabb;
   readonly settings: SnapSettings;
 }): ReadonlyArray<SnapCandidate> {
-  if (!isPositiveFinite(args.settings.gridMm)) return [];
+  if (!isFinitePositive(args.settings.gridMm)) return [];
   return snapPositions(args.movedBox, args.axis).map((movingPosition) => {
     const targetPosition = Math.round(movingPosition / args.settings.gridMm) * args.settings.gridMm;
     return {
@@ -205,8 +206,4 @@ function gridGuide(axis: SnapAxis, positionMm: number, movedBox: Aabb): SnapGuid
   return axis === 'x'
     ? { axis, positionMm, fromMm: movedBox.minY, toMm: movedBox.maxY }
     : { axis, positionMm, fromMm: movedBox.minX, toMm: movedBox.maxX };
-}
-
-function isPositiveFinite(value: number): boolean {
-  return Number.isFinite(value) && value > 0;
 }

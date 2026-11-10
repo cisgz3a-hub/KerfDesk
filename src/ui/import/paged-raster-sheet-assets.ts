@@ -5,6 +5,7 @@ import {
   type ProjectAssetArchive,
   type ProjectAssetArchiveBudget,
 } from './project-asset-archives';
+import { asRecord } from '../../core/util/is-record';
 
 type CachedArchive = { ids: ReadonlySet<string>; chars: number; entries: number };
 const archiveCache = new WeakMap<object, Map<string, CachedArchive>>();
@@ -61,24 +62,18 @@ function archivedAssetIds(
 }
 
 function sheetObjects(raw: unknown): ReadonlyArray<unknown> {
-  const scene = record(raw)?.['scene'];
-  const objects = record(scene)?.['objects'];
+  const scene = asRecord(raw)?.['scene'];
+  const objects = asRecord(scene)?.['objects'];
   return Array.isArray(objects) ? objects : [];
 }
 
 function addObjectAssetIds(object: unknown, ids: Set<string>): void {
-  const item = record(object);
+  const item = asRecord(object);
   if (item?.['kind'] !== 'raster-image') return;
-  const asset = record(item['imageAsset']);
+  const asset = asRecord(item['imageAsset']);
   if (asset?.['repository'] !== 'curvedesk-import-assets-v1') return;
   for (const key of ['sourceAssetId', 'lumaAssetId']) {
     const id = asset[key];
     if (typeof id === 'string' && id !== '') ids.add(id);
   }
-}
-
-function record(value: unknown): Record<string, unknown> | null {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
 }

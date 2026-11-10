@@ -16,6 +16,7 @@ import {
   type SimilarityTransform,
   type TwoPointRegistration,
 } from './similarity-transform';
+import { distance } from '../geometry/point-math';
 
 /** Captured spacing may differ from the design's by this share, as print scaling does. */
 export const MAX_REGISTRATION_SCALE_ERROR = 0.02;
@@ -73,10 +74,6 @@ export function registrationFigures(
       : null,
   ].filter((reason): reason is string => reason !== null);
   return { measured, unusual: reasons.length === 0 ? null : reasons.join(' ') };
-}
-
-function distance(a: Vec2, b: Vec2): number {
-  return Math.hypot(b.x - a.x, b.y - a.y);
 }
 
 // Degrees in (-180, 180].

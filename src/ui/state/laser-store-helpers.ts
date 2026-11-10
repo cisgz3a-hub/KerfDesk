@@ -56,9 +56,7 @@ export const TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE =
 export const TOOL_CHANGE_XY_ORIGIN_MESSAGE =
   'A tool change re-zeroes Z only. The rest of the job is placed on the X/Y origin it started with, so the XYZ corner probe and Set or Reset origin wait until the job ends. Use the Z probe or Zero Z for the new bit.';
 
-export function serialWriteErrorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
+export { errorMessage as serialWriteErrorMessage } from '../../core/util/error-message';
 
 export function pushLog(state: LaserState, line: string): ReadonlyArray<string> {
   return [...state.log, line].slice(-LOG_MAX);

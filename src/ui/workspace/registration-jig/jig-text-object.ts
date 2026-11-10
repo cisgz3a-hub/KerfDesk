@@ -19,6 +19,7 @@ import {
   textSizeInRange,
 } from '../../../core/text/text-limits';
 import { renderStyledText } from '../../text/render-styled-text';
+import { boxCentre } from '../../../core/geometry/box-math';
 
 export function isAdvancedJigText(object: TextObject): boolean {
   const binding = JSON.stringify(object.paths[0]?.operationIds ?? null);
@@ -94,16 +95,12 @@ function textPlacement(
   const transform = existing?.transform ?? IDENTITY_TRANSFORM;
   const anchor = existing ?? findRegistrationBoxes(project.scene)[0];
   const target = anchor
-    ? applyTransform(center(anchor.bounds), anchor.transform)
+    ? applyTransform(boxCentre(anchor.bounds), anchor.transform)
     : { x: project.device.bedWidth / 2, y: project.device.bedHeight / 2 };
-  const nextCenter = applyTransform(center(bounds), transform);
+  const nextCenter = applyTransform(boxCentre(bounds), transform);
   return {
     ...transform,
     x: transform.x + target.x - nextCenter.x,
     y: transform.y + target.y - nextCenter.y,
   };
-}
-
-function center(bounds: Bounds): { readonly x: number; readonly y: number } {
-  return { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 };
 }

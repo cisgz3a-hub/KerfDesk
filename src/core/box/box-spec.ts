@@ -4,6 +4,7 @@
 
 import { edgePattern, MIN_FINGER_WIDTH_MM } from './edge-pattern';
 import { minOf } from '../util';
+import { formatRoundedTo2Decimals } from '../util/number-format';
 
 export type BoxStyle = 'closed' | 'open-top' | 'slide-lid' | 'lift-lid' | 'open-front';
 export type BoxDimensionMode = 'inner' | 'outer';
@@ -171,7 +172,7 @@ function collectInteriorIssues(spec: BoxSpec, issues: BoxSpecIssue[]): void {
     if (innerMm <= 0) {
       issues.push({
         field,
-        message: `Outer ${field} ${fmt(enteredMm)} mm leaves no interior at thickness ${fmt(spec.thicknessMm)} mm.`,
+        message: `Outer ${field} ${formatRoundedTo2Decimals(enteredMm)} mm leaves no interior at thickness ${formatRoundedTo2Decimals(spec.thicknessMm)} mm.`,
       });
     }
   }
@@ -192,14 +193,14 @@ function collectReliefIssues(
   if (minCellMm <= toolMm) {
     issues.push({
       field: 'reliefTool',
-      message: `Finger width ${fmt(minCellMm)} mm is not larger than the ${fmt(toolMm)} mm relief tool — tabs cannot be relieved. Increase finger width or use a smaller bit.`,
+      message: `Finger width ${formatRoundedTo2Decimals(minCellMm)} mm is not larger than the ${formatRoundedTo2Decimals(toolMm)} mm relief tool — tabs cannot be relieved. Increase finger width or use a smaller bit.`,
     });
     return;
   }
   if (minCellMm < 2 * toolMm) {
     warnings.push({
       field: 'reliefTool',
-      message: `Finger width ${fmt(minCellMm)} mm is under twice the ${fmt(toolMm)} mm relief tool; joints will be mostly relief. Consider a wider finger.`,
+      message: `Finger width ${formatRoundedTo2Decimals(minCellMm)} mm is under twice the ${formatRoundedTo2Decimals(toolMm)} mm relief tool; joints will be mostly relief. Consider a wider finger.`,
     });
   }
 }
@@ -223,7 +224,7 @@ function collectClearanceIssues(spec: BoxSpec, minCellMm: number, issues: BoxSpe
   if (Math.abs(spec.clearanceMm) >= clearanceLimitMm) {
     issues.push({
       field: 'clearance',
-      message: `Clearance must stay under ${fmt(clearanceLimitMm)} mm (half the smallest finger or the thickness).`,
+      message: `Clearance must stay under ${formatRoundedTo2Decimals(clearanceLimitMm)} mm (half the smallest finger or the thickness).`,
     });
   }
 }
@@ -254,7 +255,7 @@ function collectDividerIssues(spec: BoxSpec, issues: BoxSpecIssue[]): void {
     if (pitchMm < 2 * spec.thicknessMm) {
       issues.push({
         field,
-        message: `${count} dividers leave ${fmt(pitchMm)} mm compartments — under twice the ${fmt(spec.thicknessMm)} mm thickness.`,
+        message: `${count} dividers leave ${formatRoundedTo2Decimals(pitchMm)} mm compartments — under twice the ${formatRoundedTo2Decimals(spec.thicknessMm)} mm thickness.`,
       });
     }
   }
@@ -269,7 +270,7 @@ function collectDividerReliefIssues(spec: BoxSpec, issues: BoxSpecIssue[]): void
   if (spec.relief.toolDiameterMm < spec.thicknessMm) return;
   issues.push({
     field: 'reliefTool',
-    message: `Divider slots are ${fmt(spec.thicknessMm)} mm wide — the ${fmt(spec.relief.toolDiameterMm)} mm relief tool cannot seat in them.`,
+    message: `Divider slots are ${formatRoundedTo2Decimals(spec.thicknessMm)} mm wide — the ${formatRoundedTo2Decimals(spec.relief.toolDiameterMm)} mm relief tool cannot seat in them.`,
   });
 }
 
@@ -298,10 +299,6 @@ function checkPositive(issues: BoxSpecIssue[], field: BoxSpecField, value: numbe
   if (!Number.isFinite(value) || value <= 0) {
     issues.push({ field, message: 'Must be greater than 0.' });
   }
-}
-
-function fmt(value: number): string {
-  return String(Math.round(value * 100) / 100);
 }
 
 export { MIN_FINGER_WIDTH_MM };

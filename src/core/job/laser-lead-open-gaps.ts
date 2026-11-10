@@ -18,6 +18,7 @@
 
 import { joinCurveEndpointsWithin, type JoinableCurve } from '../geometry/path-endpoint-join';
 import type { CurveSubpath, Vec2 } from '../scene';
+import { polylineLength } from '../geometry/point-math';
 
 /** An open outline's free ends lie closer together than this share of its
  * length. */
@@ -57,7 +58,7 @@ function asOutline(curve: CurveSubpath, index: number): OpenOutline | null {
   const first = points[0] as Vec2;
   const last = points[points.length - 1] as Vec2;
   const gapMm = Math.hypot(last.x - first.x, last.y - first.y);
-  return gapMm <= OPEN_OUTLINE_SHARE * pathLengthMm(points) ? { index, points, gapMm } : null;
+  return gapMm <= OPEN_OUTLINE_SHARE * polylineLength(points) ? { index, points, gapMm } : null;
 }
 
 // Three points that are not on one line, so the closed path has an inside.
@@ -71,14 +72,4 @@ function enclosesArea(points: ReadonlyArray<Vec2>): boolean {
     doubled += (a.x - first.x) * (b.y - first.y) - (b.x - first.x) * (a.y - first.y);
   }
   return Math.abs(doubled) > 0;
-}
-
-function pathLengthMm(points: ReadonlyArray<Vec2>): number {
-  let length = 0;
-  for (let index = 1; index < points.length; index += 1) {
-    const a = points[index - 1] as Vec2;
-    const b = points[index] as Vec2;
-    length += Math.hypot(b.x - a.x, b.y - a.y);
-  }
-  return length;
 }

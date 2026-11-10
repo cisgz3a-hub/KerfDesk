@@ -11,6 +11,7 @@ import { previewBarcode, type BarcodePreview } from './barcode-form';
 import { BarcodeFields } from './BarcodeFields';
 import { BarcodePreviewSvg } from './BarcodePreviewSvg';
 import { useBarcodeForm } from './use-barcode-form';
+import { formatRoundedTo2Decimals } from '../../core/util/number-format';
 
 export type BarcodeSubmit = (spec: BarcodeShape, value: string) => Promise<string | null>;
 
@@ -110,13 +111,9 @@ function PreviewMessages(props: {
 function summary(preview: Extract<BarcodePreview, { readonly kind: 'ready' }>): string {
   const { layout } = preview;
   return (
-    `${layout.description} · ${mm(layout.widthMm)} × ${mm(layout.heightMm)} mm · ` +
-    `module ${mm(layout.moduleMm)} mm`
+    `${layout.description} · ${formatRoundedTo2Decimals(layout.widthMm)} × ${formatRoundedTo2Decimals(layout.heightMm)} mm · ` +
+    `module ${formatRoundedTo2Decimals(layout.moduleMm)} mm`
   );
-}
-
-function mm(value: number): string {
-  return String(Math.round(value * 100) / 100);
 }
 
 const messagesStyle: CSSProperties = {

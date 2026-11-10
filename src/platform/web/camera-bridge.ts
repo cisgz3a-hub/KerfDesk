@@ -19,6 +19,7 @@ import type {
   CameraBridgeStreamStatus,
   MachineCameraDiscovery,
 } from '../types';
+import { isRecord } from '../../core/util/is-record';
 
 const DEFAULT_BRIDGE_ORIGIN = 'http://127.0.0.1:51731';
 const STREAM_STATUS_TIMEOUT_MS = 3_000;
@@ -370,8 +371,4 @@ function invalidBridgeResponse(): CameraBridgeProbeResult {
 
 function isOptionalString(value: unknown): value is string | undefined {
   return value === undefined || typeof value === 'string';
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

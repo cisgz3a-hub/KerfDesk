@@ -1,4 +1,6 @@
 import type { Vec2 } from '../scene';
+import { dot } from '../geometry/point-math';
+import { isFinitePositive } from '../util/finite';
 
 const MAX_CONTINUATION_ANGLE_DEG = 35;
 const DEGREES_PER_HALF_TURN = 180;
@@ -108,7 +110,7 @@ function tangentIntoChain(
   end: WeldPolylineEnd,
   tangentSamplePx: number,
 ): TangentBuild {
-  if (!isPositiveFinite(tangentSamplePx)) return { tangent: null, pointVisits: 0 };
+  if (!isFinitePositive(tangentSamplePx)) return { tangent: null, pointVisits: 0 };
   const anchorIndex = end === 'start' ? 0 : points.length - 1;
   const step = end === 'start' ? 1 : -1;
   const anchor = points[anchorIndex];
@@ -136,12 +138,4 @@ function tangentIntoChain(
     tangent: length <= VECTOR_EPSILON ? null : { x: dx / length, y: dy / length },
     pointVisits,
   };
-}
-
-function dot(a: Vec2, b: Vec2): number {
-  return a.x * b.x + a.y * b.y;
-}
-
-function isPositiveFinite(value: number): boolean {
-  return Number.isFinite(value) && value > 0;
 }

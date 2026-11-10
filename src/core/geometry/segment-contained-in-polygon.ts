@@ -3,6 +3,7 @@
 import type { Vec2 } from '../scene';
 import { pointInPolygon } from './point-in-polygon';
 import type { PolygonEdgeIndex } from './polygon-edge-index';
+import { segmentBox } from './box-math';
 
 const EPS = 1e-9;
 
@@ -79,15 +80,6 @@ function roundingMargin(index: PolygonEdgeIndex, from: Vec2, to: Vec2): number {
     Math.abs(to.y),
   );
   return 1e-9 * scale;
-}
-
-function segmentBox(from: Vec2, to: Vec2) {
-  return {
-    minX: Math.min(from.x, to.x),
-    minY: Math.min(from.y, to.y),
-    maxX: Math.max(from.x, to.x),
-    maxY: Math.max(from.y, to.y),
-  };
 }
 
 function insideOrOn(point: Vec2, polygon: ReadonlyArray<Vec2>): boolean {

@@ -4,6 +4,7 @@
 
 import { useLaserStore, type LaserState } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
+import { sleep } from '../common/sleep';
 
 /** 'retry' — the blocking condition is repaired; rerun the Start flow once.
  * 'handled' — a physical operator step is underway (the frame trace); skip
@@ -39,10 +40,4 @@ export function repairFailed(action: string, cause: unknown): BlockedStartRepair
   const reason = cause instanceof Error ? cause.message : String(cause);
   useToastStore.getState().pushToast(`${action}: ${reason}`, 'warning');
   return 'unrepaired';
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
 }

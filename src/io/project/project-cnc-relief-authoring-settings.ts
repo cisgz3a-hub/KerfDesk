@@ -1,11 +1,7 @@
 import type { CncLayerSettings } from '../../core/scene';
+import { isRecord } from '../../core/util/is-record';
+import { isPositiveFiniteNumber, isNonNegativeFiniteNumber } from '../../core/util/finite';
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-const positive = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isFinite(value) && value > 0;
-const nonNegative = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isFinite(value) && value >= 0;
 const identifier = (value: unknown): value is string =>
   typeof value === 'string' && value.trim().length > 0 && value.length <= 1024;
 
@@ -17,10 +13,10 @@ export function validateCncReliefAuthoringSettings(
   if (tool !== undefined && !identifier(tool))
     return `${path}.reliefRestFinishToolId must name a cutter.`;
   const threshold = raw['reliefRestResidualMm'];
-  if (threshold !== undefined && !nonNegative(threshold))
+  if (threshold !== undefined && !isNonNegativeFiniteNumber(threshold))
     return `${path}.reliefRestResidualMm must be finite non-negative millimetres.`;
   const scallop = raw['reliefRestScallopMm'];
-  if (scallop !== undefined && !positive(scallop))
+  if (scallop !== undefined && !isPositiveFiniteNumber(scallop))
     return `${path}.reliefRestScallopMm must be finite positive millimetres.`;
   return projectionError(raw['reliefProjection'], path);
 }
@@ -29,9 +25,9 @@ function projectionError(projection: unknown, path: string): string | null {
   if (
     !isRecord(projection) ||
     !identifier(projection['reliefObjectId']) ||
-    !positive(projection['depthMm']) ||
+    !isPositiveFiniteNumber(projection['depthMm']) ||
     projection['depthConvention'] !== 'vertical' ||
-    !positive(projection['sampleSpacingMm'])
+    !isPositiveFiniteNumber(projection['sampleSpacingMm'])
   )
     return `${path}.reliefProjection requires a target relief, positive depth/sample spacing in millimetres and the vertical depth convention.`;
   return null;
@@ -46,17 +42,17 @@ export function normalizeCncReliefAuthoringSettings(
     ...(identifier(raw['reliefRestFinishToolId'])
       ? { reliefRestFinishToolId: raw['reliefRestFinishToolId'] }
       : {}),
-    ...(nonNegative(raw['reliefRestResidualMm'])
+    ...(isNonNegativeFiniteNumber(raw['reliefRestResidualMm'])
       ? { reliefRestResidualMm: raw['reliefRestResidualMm'] }
       : {}),
-    ...(positive(raw['reliefRestScallopMm'])
+    ...(isPositiveFiniteNumber(raw['reliefRestScallopMm'])
       ? { reliefRestScallopMm: raw['reliefRestScallopMm'] }
       : {}),
     ...(isRecord(projection) &&
     identifier(projection['reliefObjectId']) &&
-    positive(projection['depthMm']) &&
+    isPositiveFiniteNumber(projection['depthMm']) &&
     projection['depthConvention'] === 'vertical' &&
-    positive(projection['sampleSpacingMm'])
+    isPositiveFiniteNumber(projection['sampleSpacingMm'])
       ? {
           reliefProjection: {
             reliefObjectId: projection['reliefObjectId'],

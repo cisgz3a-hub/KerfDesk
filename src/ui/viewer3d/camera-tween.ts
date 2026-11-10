@@ -6,6 +6,7 @@
 // to Front reads as the part turning, not as the camera cutting away.
 
 import type { Vec3 } from './camera-presets';
+import { lerp3 } from '../../core/geometry/vec3';
 
 export type CameraPose = {
   readonly position: Vec3;
@@ -29,7 +30,7 @@ export function tweenPose(from: CameraPose, to: CameraPose, t: number): CameraPo
   const toDistance = length(toOffset);
   const direction = slerpUnit(normalize(fromOffset), normalize(toOffset), t);
   const distance = fromDistance + (toDistance - fromDistance) * t;
-  const target = lerp(from.target, to.target, t);
+  const target = lerp3(from.target, to.target, t);
   return { target, position: add(target, scale(direction, distance)) };
 }
 
@@ -38,7 +39,7 @@ export function tweenPose(from: CameraPose, to: CameraPose, t: number): CameraPo
 // so the swing stays level.
 function slerpUnit(a: Vec3, b: Vec3, t: number): Vec3 {
   const cosine = Math.min(1, Math.max(-1, dot(a, b)));
-  if (cosine > 0.9999) return normalize(lerp(a, b, t));
+  if (cosine > 0.9999) return normalize(lerp3(a, b, t));
   const axis = cosine < -0.9999 ? halfTurnAxis(a) : normalize(cross(a, b));
   const angle = Math.acos(cosine) * t;
   return rotateAbout(a, axis, angle);
@@ -72,10 +73,6 @@ function subtract(a: Vec3, b: Vec3): Vec3 {
 
 function scale(v: Vec3, factor: number): Vec3 {
   return { x: v.x * factor, y: v.y * factor, z: v.z * factor };
-}
-
-function lerp(a: Vec3, b: Vec3, t: number): Vec3 {
-  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + (b.z - a.z) * t };
 }
 
 function dot(a: Vec3, b: Vec3): number {

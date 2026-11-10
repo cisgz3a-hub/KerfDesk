@@ -18,6 +18,7 @@ import {
 import { effectiveCalibrationSpeed } from './material-test-axes';
 import { MIN_HATCH_SPACING_MM } from './fill-hatching';
 import { formatGcodeFeedMmPerMin } from '../gcode/feed-word';
+import { finiteOr } from '../util/finite';
 
 const MIN_STEPS = 1;
 const MAX_STEPS = 20;
@@ -68,7 +69,7 @@ export function generateIntervalTestGrid(options: IntervalTestGridOptions): Inte
   const steps = clampInteger(options.steps, MIN_STEPS, MAX_STEPS);
   // Like counts/power/intervals, numeric callers normalize to the supported
   // domain. Draft UIs validate before calling; zero is never an executable feed.
-  const requestedSpeed = Math.max(MIN_SPEED_MM_MIN, clampFinite(options.speed, MIN_SPEED_MM_MIN));
+  const requestedSpeed = Math.max(MIN_SPEED_MM_MIN, finiteOr(options.speed, MIN_SPEED_MM_MIN));
   const effectiveSpeed = effectiveCalibrationSpeed(requestedSpeed, options.maxFeedMmPerMin);
   const power = clampPower(options.power);
   const [intervalLow, intervalHigh] = orderedPair(
@@ -77,9 +78,9 @@ export function generateIntervalTestGrid(options: IntervalTestGridOptions): Inte
   );
   const swatchSize = Math.max(
     MIN_SWATCH_SIZE_MM,
-    clampFinite(options.swatchSizeMm, MIN_SWATCH_SIZE_MM),
+    finiteOr(options.swatchSizeMm, MIN_SWATCH_SIZE_MM),
   );
-  const gap = Math.max(0, clampFinite(options.gapMm ?? DEFAULT_GAP_MM, DEFAULT_GAP_MM));
+  const gap = Math.max(0, finiteOr(options.gapMm ?? DEFAULT_GAP_MM, DEFAULT_GAP_MM));
   const origin = options.origin ?? DEFAULT_ORIGIN;
   const intervals = linspace(intervalHigh, intervalLow, steps);
   const labelSize = labelSizeForSwatch(swatchSize);
@@ -263,15 +264,11 @@ function clampInteger(value: number, min: number, max: number): number {
 }
 
 function clampPower(value: number): number {
-  return Math.max(MIN_POWER_PERCENT, Math.min(MAX_POWER_PERCENT, clampFinite(value, 0)));
+  return Math.max(MIN_POWER_PERCENT, Math.min(MAX_POWER_PERCENT, finiteOr(value, 0)));
 }
 
 function clampInterval(value: number): number {
-  return Math.max(MIN_INTERVAL_MM, clampFinite(value, DEFAULT_INTERVAL_MM));
-}
-
-function clampFinite(value: number, fallback: number): number {
-  return Number.isFinite(value) ? value : fallback;
+  return Math.max(MIN_INTERVAL_MM, finiteOr(value, DEFAULT_INTERVAL_MM));
 }
 
 function roundMm(value: number): number {

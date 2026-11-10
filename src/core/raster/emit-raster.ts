@@ -41,6 +41,7 @@ import type { RasterRowProviderOrder } from '../job/job';
 import type { RasterPowerValues } from './raster-power-values';
 import type { LaserPowerScaleVersion } from '../output/laser-power-scale-version';
 import { gcodeCommentLabel } from '../gcode-comments';
+import { isFinitePositive } from '../util/finite';
 
 const DECIMAL_PLACES = 3;
 const LINE_END = '\n';
@@ -346,7 +347,7 @@ function validate(input: EmitRasterInput): void {
     );
   }
   validateBounds(input.bounds);
-  if (!isPositiveFinite(input.feedMmPerMin)) {
+  if (!isFinitePositive(input.feedMmPerMin)) {
     throw new Error('emitRasterGroup: feedMmPerMin must be finite and > 0');
   }
   if (!Number.isFinite(input.overscanMm) || input.overscanMm < 0) {
@@ -362,13 +363,9 @@ function validate(input: EmitRasterInput): void {
 }
 
 function validateControlledLaserOffTravelFeed(value: number | undefined): void {
-  if (value !== undefined && !isPositiveFinite(value)) {
+  if (value !== undefined && !isFinitePositive(value)) {
     throw new Error('emitRasterGroup: controlled laser-off travel feed must be finite and > 0');
   }
-}
-
-function isPositiveFinite(value: number): boolean {
-  return Number.isFinite(value) && value > 0;
 }
 
 function normalizedPasses(passes: number | undefined): number {

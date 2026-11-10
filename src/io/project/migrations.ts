@@ -15,6 +15,7 @@ import { migrateV18SingleLineTextEm } from './migrate-v18-single-line-text-em';
 import { migrateV20RecoverFrameLineRule } from './migrate-v20-recover-frame-line-rule';
 import { migrateV3ReliefSources } from './migrate-v4-relief-heightfields';
 import { isMigrationFailure, type MigrationFailure } from './migration-failure';
+import { asRecord } from '../../core/util/is-record';
 
 export type RawProject = Record<string, unknown>;
 export type Migrator = (raw: RawProject) => RawProject | MigrationFailure;
@@ -76,8 +77,8 @@ function migrateV3ToV4(raw: RawProject): RawProject | MigrationFailure {
 }
 
 function migrateV3JobSetup(raw: RawProject): RawProject {
-  const device = record(raw['device']);
-  const homing = record(device?.['homing']);
+  const device = asRecord(raw['device']);
+  const homing = asRecord(device?.['homing']);
   return {
     ...raw,
     schemaVersion: 4,
@@ -96,7 +97,7 @@ function migrateV3JobSetup(raw: RawProject): RawProject {
 }
 
 function migrateV1ToV2(raw: RawProject): RawProject {
-  const scene = record(raw['scene']);
+  const scene = asRecord(raw['scene']);
   if (scene === null || !Array.isArray(scene['objects'])) return raw;
   return {
     ...raw,
@@ -106,13 +107,13 @@ function migrateV1ToV2(raw: RawProject): RawProject {
 }
 
 function addCurveGeometryToObject(value: unknown): unknown {
-  const object = record(value);
+  const object = asRecord(value);
   if (object === null || !Array.isArray(object['paths'])) return value;
   return { ...object, paths: object['paths'].map(addCurveGeometryToColoredPath) };
 }
 
 function addCurveGeometryToColoredPath(value: unknown): unknown {
-  const path = record(value);
+  const path = asRecord(value);
   if (path === null || !Array.isArray(path['polylines'])) return value;
   // A zero-point legacy polyline would synthesize a phantom {0,0} curve start
   // the source file never contained; drop it from BOTH channels so the
@@ -123,13 +124,13 @@ function addCurveGeometryToColoredPath(value: unknown): unknown {
 }
 
 function hasAnyPoint(value: unknown): boolean {
-  const polyline = record(value);
+  const polyline = asRecord(value);
   if (polyline === null || !Array.isArray(polyline['points'])) return true;
   return polyline['points'].length > 0;
 }
 
 function rawPolylineToCurve(value: unknown): unknown {
-  const polyline = record(value);
+  const polyline = asRecord(value);
   if (polyline === null || !Array.isArray(polyline['points'])) return value;
   const points = polyline['points'];
   return {
@@ -137,12 +138,6 @@ function rawPolylineToCurve(value: unknown): unknown {
     segments: points.slice(1).map((to) => ({ kind: 'line', to })),
     closed: polyline['closed'] === true,
   };
-}
-
-function record(value: unknown): Record<string, unknown> | null {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
 }
 
 export function migrateToCurrent(

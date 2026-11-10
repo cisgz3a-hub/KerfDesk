@@ -30,6 +30,7 @@ import {
   outlineGeometryLargeEnough,
   outlineRotationDeg,
 } from './use-board-outline-handlers';
+import { errorMessageOr } from '../../../core/util/error-message';
 
 type SetMessage = Dispatch<SetStateAction<string | null>>;
 const CROSS_AXIS_NOTICE_MM = 5;
@@ -125,7 +126,7 @@ function useCapturePointHandler(
       await capturePoint(args, position);
     } catch (error) {
       setError(
-        errorMessage(
+        errorMessageOr(
           error,
           'Could not set the work origin. Check the machine is idle, then try again.',
         ),
@@ -206,7 +207,7 @@ function tryCommitRectangle(
   try {
     commit(geometry);
   } catch (error) {
-    setError(errorMessage(error, 'Could not create the captured board outline.'));
+    setError(errorMessageOr(error, 'Could not create the captured board outline.'));
   }
 }
 
@@ -228,7 +229,7 @@ function createCircleFinishHandler(
       if (args.capture.state.circleMethod === 'rim-fit') await args.setOriginHere();
       commit({ kind: 'circle', center, radiusMm: diameterMm / 2 });
     } catch (error) {
-      setError(errorMessage(error, 'Could not set the calculated circle center as origin.'));
+      setError(errorMessageOr(error, 'Could not set the calculated circle center as origin.'));
       throw error;
     } finally {
       setBusy(false);
@@ -259,7 +260,7 @@ function createBoardCorrectionHandler(
       args.capture.updateGeometry(correction.geometry, registrationEpoch);
       setCorrectionNotice(target, correction, setNotice);
     } catch (error) {
-      setError(errorMessage(error, 'Could not update the captured board.'));
+      setError(errorMessageOr(error, 'Could not update the captured board.'));
       throw error;
     }
   };
@@ -413,8 +414,4 @@ function registrationEpochMatches(
     left.trustedPositionEpoch === right.trustedPositionEpoch &&
     left.workOriginVersion === right.workOriginVersion
   );
-}
-
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message.trim() !== '' ? error.message : fallback;
 }

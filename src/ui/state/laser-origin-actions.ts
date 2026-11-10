@@ -41,6 +41,7 @@ import {
   setOriginAtProgramPoint,
 } from './laser-origin-restore';
 import { workOffsetOffFor, workOffsetOffMessage } from './status-report-fields';
+import { sleep } from '../common/sleep';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -325,12 +326,6 @@ async function waitForOriginWcoFrame(get: GetFn, assertCurrent: () => void): Pro
     assertCurrent();
   }
   return get().wcoCache !== null;
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
 }
 
 function transientXyOriginPatch(

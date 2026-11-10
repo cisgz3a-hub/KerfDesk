@@ -2,6 +2,7 @@ import { clamp } from '../math';
 import { transformCurveSubpathUniform, type Bounds, type ColoredPath } from '../scene';
 import { carrySubpathNesting } from '../scene/subpath-nesting';
 import type { RawImageData } from './trace-image';
+import { isFinitePositive } from '../util/finite';
 
 export type TraceBoundary = {
   readonly x: number;
@@ -15,7 +16,7 @@ export function normalizeTraceBoundary(
   imageWidth: number,
   imageHeight: number,
 ): TraceBoundary | null {
-  if (boundary == null || !isPositiveFinite(imageWidth) || !isPositiveFinite(imageHeight)) {
+  if (boundary == null || !isFinitePositive(imageWidth) || !isFinitePositive(imageHeight)) {
     return null;
   }
   if (
@@ -89,8 +90,4 @@ export function offsetBounds(bounds: Bounds, offsetX: number, offsetY: number): 
     maxX: bounds.maxX + offsetX,
     maxY: bounds.maxY + offsetY,
   };
-}
-
-function isPositiveFinite(value: number): boolean {
-  return Number.isFinite(value) && value > 0;
 }

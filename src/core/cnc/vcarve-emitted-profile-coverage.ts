@@ -1,4 +1,4 @@
-import type { Vec3 } from '../geometry/vec3';
+import { type Vec3, lerp3 } from '../geometry/vec3';
 import {
   buildVCarveEmittedCapsules,
   vcarveCapsuleContainsChord,
@@ -122,7 +122,7 @@ function referenceChordCovered(
       hint = globalMatch;
       continue;
     }
-    const midpoint = interpolateVec3(span.a, span.b, 0.5);
+    const midpoint = lerp3(span.a, span.b, 0.5);
     const midpointDistance = (span.distanceA + span.distanceB) / 2;
     pending.push(
       {
@@ -228,12 +228,4 @@ function matchingCapsuleByBounds(
     if (vcarveCapsuleContainsChord(capsule, a, b, envelope, toleranceMm)) return index;
   }
   return null;
-}
-
-function interpolateVec3(a: Vec3, b: Vec3, t: number): Vec3 {
-  return {
-    x: a.x + (b.x - a.x) * t,
-    y: a.y + (b.y - a.y) * t,
-    z: a.z + (b.z - a.z) * t,
-  };
 }

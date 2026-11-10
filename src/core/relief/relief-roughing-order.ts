@@ -19,6 +19,7 @@
 
 import { pointInPolygon } from '../geometry/point-in-polygon';
 import type { Polyline, Vec2 } from '../scene';
+import { boundsOfPoints } from '../geometry/box-math';
 
 const MIN_LOOP_POINTS = 3;
 
@@ -92,7 +93,7 @@ export function insideOutNearest(
   pieces: ReadonlyArray<RingPiece>,
   distance: (points: ReadonlyArray<Vec2>, from: Vec2) => number,
 ): (from: Vec2 | undefined) => RingPiece | undefined {
-  const bounds = pieces.map((piece) => boundsOf(piece.loops[0]?.points ?? []));
+  const bounds = pieces.map((piece) => boundsOfPoints(piece.loops[0]?.points ?? []));
   const inner = pieces.map(() => 0);
   for (const piece of pieces) {
     if (piece.parent !== null) inner[piece.parent] = (inner[piece.parent] ?? 0) + 1;
@@ -141,21 +142,6 @@ type Bounds = {
   readonly maxX: number;
   readonly maxY: number;
 };
-
-// A piece's outer contour bounds its islands too.
-function boundsOf(points: ReadonlyArray<Vec2>): Bounds {
-  let minX = Number.POSITIVE_INFINITY;
-  let minY = Number.POSITIVE_INFINITY;
-  let maxX = Number.NEGATIVE_INFINITY;
-  let maxY = Number.NEGATIVE_INFINITY;
-  for (const point of points) {
-    minX = Math.min(minX, point.x);
-    minY = Math.min(minY, point.y);
-    maxX = Math.max(maxX, point.x);
-    maxY = Math.max(maxY, point.y);
-  }
-  return { minX, minY, maxX, maxY };
-}
 
 function boundsDistance(box: Bounds, from: Vec2): number {
   const dx = Math.max(box.minX - from.x, 0, from.x - box.maxX);

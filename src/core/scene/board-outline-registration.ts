@@ -6,6 +6,7 @@ import {
 import type { BoardOutlineDraft, ViewAxisSigns } from './board-outline';
 import { outlineBounds } from './board-outline';
 import type { Vec2 } from './scene-object';
+import { isFinitePoint, distance } from '../geometry/point-math';
 
 export type OutlineBoardGeometry = {
   readonly kind: 'outline';
@@ -31,7 +32,7 @@ export function outlineRegistration(g: OutlineBoardGeometry): OutlineRegistratio
     from: g.localPointsMm[index] as Vec2,
     to: machineToView(machine, g.viewSigns),
   }));
-  if (pairs.some(({ from, to }) => from === undefined || !finitePoint(to))) return null;
+  if (pairs.some(({ from, to }) => from === undefined || !isFinitePoint(to))) return null;
   const result = fitSimilarity(pairs);
   if (!result.ok) return null;
   return {
@@ -106,7 +107,7 @@ export function outlineGeometryFromCaptures(
     firstIndex === secondIndex ||
     !draft.anchorIndices.includes(firstIndex) ||
     !draft.anchorIndices.includes(secondIndex) ||
-    captures.some((point) => !finitePoint(point))
+    captures.some((point) => !isFinitePoint(point))
   ) {
     return { ok: false, reason: 'The outline anchors and head positions must be valid.' };
   }
@@ -150,7 +151,7 @@ export function correctOutlineGeometry(
   readonly predictionErrorMm: number;
   readonly maxResidualMm: number;
 } | null {
-  if (!g.anchorIndices.includes(index) || !finitePoint(confirmedMachine)) return null;
+  if (!g.anchorIndices.includes(index) || !isFinitePoint(confirmedMachine)) return null;
   const points = outlineMachinePoints(g);
   const predicted = points?.[index];
   if (predicted === undefined) return null;
@@ -174,12 +175,4 @@ function machineToView(point: Vec2, signs: ViewAxisSigns): Vec2 {
 
 function viewToMachine(point: Vec2, signs: ViewAxisSigns): Vec2 {
   return { x: signs.x * point.x, y: signs.y * point.y };
-}
-
-function finitePoint(point: Vec2): boolean {
-  return Number.isFinite(point.x) && Number.isFinite(point.y);
-}
-
-function distance(a: Vec2, b: Vec2): number {
-  return Math.hypot(a.x - b.x, a.y - b.y);
 }

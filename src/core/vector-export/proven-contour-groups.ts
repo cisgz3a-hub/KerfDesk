@@ -6,6 +6,7 @@ import { curveSubpathBounds, flattenCurveSubpath } from '../scene/curve-path';
 import type { Bounds, CurveSubpath, Vec2 } from '../scene/scene-object';
 import { groupContoursWithHoles, type ContourGroup } from './contour-nesting';
 import { maxOf } from '../util';
+import { segmentBox } from '../geometry/box-math';
 
 type Ring = { points: ReadonlyArray<Vec2>; bounds: Bounds; tolerance: number };
 type Budget = { remaining: number };
@@ -84,7 +85,7 @@ function separatedPair(a: Ring, i: number, b: Ring, j: number, margin: number): 
   const r = b.points[j],
     s = b.points[(j + 1) % b.points.length];
   if (p === undefined || q === undefined || r === undefined || s === undefined) return false;
-  if (separateBounds(edgeBounds(p, q), edgeBounds(r, s), margin)) return true;
+  if (separateBounds(segmentBox(p, q), segmentBox(r, s), margin)) return true;
   const distance = Math.min(
     pointSegmentDistance(p, r, s),
     pointSegmentDistance(q, r, s),
@@ -92,15 +93,6 @@ function separatedPair(a: Ring, i: number, b: Ring, j: number, margin: number): 
     pointSegmentDistance(s, p, q),
   );
   return !crosses(p, q, r, s) && distance > margin;
-}
-
-function edgeBounds(a: Vec2, b: Vec2): Bounds {
-  return {
-    minX: Math.min(a.x, b.x),
-    minY: Math.min(a.y, b.y),
-    maxX: Math.max(a.x, b.x),
-    maxY: Math.max(a.y, b.y),
-  };
 }
 
 function separateBounds(a: Bounds, b: Bounds, margin: number): boolean {

@@ -1,6 +1,7 @@
 import type { PlatformAdapter } from '../../platform/types';
 import type { RecoveryRepository, RunId } from '../state/recovery';
 import { serializeExecutionArtifactExport } from './execution-artifact-export-codec';
+import { errorMessage } from '../../core/util/error-message';
 
 export type ExportExecutionArtifactResult =
   | { readonly ok: true; readonly displayName: string }
@@ -56,8 +57,4 @@ function suggestedArtifactName(createdAtIso: string, runId: RunId): string {
   const date = /^\d{4}-\d{2}-\d{2}/.exec(createdAtIso)?.[0] ?? 'undated';
   const safeRunId = runId.replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'run';
   return `kerfdesk-execution-${date}-${safeRunId}.lfexecution.json`;
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

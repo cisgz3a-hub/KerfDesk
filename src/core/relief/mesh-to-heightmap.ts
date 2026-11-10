@@ -34,6 +34,7 @@ import {
 import { meshBounds, FLOATS_PER_TRIANGLE, type TriangleMesh } from './triangle-mesh';
 import { rasterizeTriangleFootprintMaxZ } from './triangle-footprint-raster';
 import { rasterizeTriangleMaxZ, type RasterTarget } from './triangle-raster';
+import { isFinitePositive } from '../util/finite';
 
 /**
  * How a cell reads the mesh: at its centre, its highest point over the whole
@@ -233,7 +234,7 @@ type TargetSizeResult =
   | { readonly kind: 'error'; readonly reason: string };
 
 function targetSize(options: MeshHeightmapOptions, aspect: number): TargetSizeResult {
-  if (!positiveFinite(options.targetWidthMm) || !positiveFinite(options.reliefDepthMm)) {
+  if (!isFinitePositive(options.targetWidthMm) || !isFinitePositive(options.reliefDepthMm)) {
     return {
       kind: 'error',
       reason: 'Target width and relief depth must be finite positive numbers.',
@@ -241,7 +242,7 @@ function targetSize(options: MeshHeightmapOptions, aspect: number): TargetSizeRe
   }
   const targetScaleX = options.targetScaleX ?? 1;
   const targetScaleY = options.targetScaleY ?? 1;
-  if (!positiveFinite(targetScaleX) || !positiveFinite(targetScaleY)) {
+  if (!isFinitePositive(targetScaleX) || !isFinitePositive(targetScaleY)) {
     return { kind: 'error', reason: 'Target XY scale must be finite and positive.' };
   }
   return {
@@ -249,10 +250,6 @@ function targetSize(options: MeshHeightmapOptions, aspect: number): TargetSizeRe
     widthMm: options.targetWidthMm * targetScaleX,
     heightMm: aspect * options.targetWidthMm * targetScaleY,
   };
-}
-
-function positiveFinite(value: number): boolean {
-  return Number.isFinite(value) && value > 0;
 }
 
 function rasterizeMesh(

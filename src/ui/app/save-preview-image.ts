@@ -8,6 +8,7 @@ import type { PlatformAdapter } from '../../platform/types';
 import { canvasTheme } from '../theme/canvas-theme';
 import { pickPreparedSaveTarget } from './pick-prepared-save-target';
 import type { ToastVariant } from '../state/toast-store';
+import { errorMessage } from '../../core/util/error-message';
 
 export type SavePreviewImageCtx = {
   readonly platform: PlatformAdapter;
@@ -36,7 +37,7 @@ export async function saveWorkspacePreviewImage(ctx: SavePreviewImageCtx): Promi
     await target.write(png);
     ctx.pushToast(`Saved the preview image to ${target.displayName}`, 'success');
   } catch (error) {
-    ctx.pushToast(`Could not save the preview image: ${message(error)}`, 'error');
+    ctx.pushToast(`Could not save the preview image: ${errorMessage(error)}`, 'error');
   }
 }
 
@@ -74,8 +75,4 @@ function compositeToPng(layers: ReadonlyArray<HTMLCanvasElement>): Promise<Blob>
 function projectStem(savedName: string | null): string {
   const stem = (savedName ?? 'project').replace(/\.[^.]*$/u, '').replace(/[<>:"/\\|?*]/gu, '-');
   return stem.trim() === '' ? 'project' : stem.trim();
-}
-
-function message(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

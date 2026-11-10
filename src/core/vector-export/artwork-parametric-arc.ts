@@ -6,6 +6,7 @@
 
 import { endpointArc } from '../scene/curve-path';
 import type { EllipticalArcPathSegment, Vec2 } from '../scene/scene-object';
+import { distance, isFinitePoint } from '../geometry/point-math';
 
 export type ArtworkParametricArc = {
   readonly center: Vec2;
@@ -186,7 +187,7 @@ export function flattenArtworkArc(
   tolerance: number,
   budget: number,
 ): Vec2[] | null {
-  if (![from, to, arc.center, arc.u, arc.v].every(finitePoint)) return null;
+  if (![from, to, arc.center, arc.u, arc.v].every(isFinitePoint)) return null;
   if (![arc.theta1, arc.delta].every(Number.isFinite)) return null;
   const out: Vec2[] = [];
   const extrema = artworkArcExtrema(arc);
@@ -224,7 +225,7 @@ function subdivide(
     x: arc.center.x + scale * (arc.u.x * Math.cos(middle) + arc.v.x * Math.sin(middle)),
     y: arc.center.y + scale * (arc.u.y * Math.cos(middle) + arc.v.y * Math.sin(middle)),
   };
-  if (!finitePoint(control)) return false;
+  if (!isFinitePoint(control)) return false;
   if (pointSegmentDistance(control, from, to) <= tolerance) {
     out.push(to);
     return true;
@@ -281,14 +282,6 @@ export function artworkArcParameterError(
     distance(v, otherV) +
     phaseError * (Math.hypot(otherU.x, otherU.y) + Math.hypot(otherV.x, otherV.y))
   );
-}
-
-function distance(a: Vec2, b: Vec2): number {
-  return Math.hypot(a.x - b.x, a.y - b.y);
-}
-
-function finitePoint(p: Vec2): boolean {
-  return Number.isFinite(p.x) && Number.isFinite(p.y);
 }
 
 function pointSegmentDistance(p: Vec2, a: Vec2, b: Vec2): number {

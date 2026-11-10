@@ -11,6 +11,7 @@ import {
   type MaterialTestParameter,
 } from '../../core/job/material-test-axes';
 import type { CalibrationDraftField } from './calibration-draft-validation';
+import { numberFromDraft } from '../../core/util/text';
 
 export type MaterialTestMode = 'fill' | 'line';
 
@@ -175,29 +176,27 @@ export function parseMaterialTestDraft(draft: MaterialTestDraft): MaterialTestGr
     mode: materialTestMode(draft),
     rowParameter,
     columnParameter,
-    rows: numberValue(draft.rows),
-    columns: numberValue(draft.columns),
-    speedMin: numberValue(draft.speedMin),
-    speedMax: numberValue(draft.speedMax),
-    powerMin: numberValue(draft.powerMin),
-    powerMax: numberValue(draft.powerMax),
-    passesMin: numberValue(draft.passesMin),
-    passesMax: numberValue(draft.passesMax),
-    intervalMinMm: numberValue(draft.intervalMin),
-    intervalMaxMm: numberValue(draft.intervalMax),
-    speed: numberValue(draft.speed),
-    power: numberValue(draft.power),
-    passes: numberValue(draft.passes),
-    intervalMm: numberValue(draft.interval),
-    cellWidthMm: numberValue(draft.cellWidthMm),
-    cellHeightMm: numberValue(draft.cellHeightMm),
-    gapMm: numberValue(draft.gapMm),
+    rows: numberFromDraft(draft.rows),
+    columns: numberFromDraft(draft.columns),
+    speedMin: numberFromDraft(draft.speedMin),
+    speedMax: numberFromDraft(draft.speedMax),
+    powerMin: numberFromDraft(draft.powerMin),
+    powerMax: numberFromDraft(draft.powerMax),
+    passesMin: numberFromDraft(draft.passesMin),
+    passesMax: numberFromDraft(draft.passesMax),
+    intervalMinMm: numberFromDraft(draft.intervalMin),
+    intervalMaxMm: numberFromDraft(draft.intervalMax),
+    speed: numberFromDraft(draft.speed),
+    power: numberFromDraft(draft.power),
+    passes: numberFromDraft(draft.passes),
+    intervalMm: numberFromDraft(draft.interval),
+    cellWidthMm: numberFromDraft(draft.cellWidthMm),
+    cellHeightMm: numberFromDraft(draft.cellHeightMm),
+    gapMm: numberFromDraft(draft.gapMm),
   };
 }
 
-export function numberValue(value: string): number {
-  return value.trim() === '' ? Number.NaN : Number(value);
-}
+export { numberFromDraft as numberValue } from '../../core/util/text';
 
 function parameterFields(
   name: string,

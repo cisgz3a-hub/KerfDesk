@@ -25,6 +25,7 @@ import {
 import { segmentStart } from './trim-curve-split';
 import { EXTEND_EPS_MM, segmentRayContacts, type RayContact } from './extend-ray';
 import type { VectorSceneObject } from './vector-path-tools';
+import { isFinitePoint } from './point-math';
 
 export type ExtendStatus =
   | 'ready'
@@ -91,7 +92,7 @@ export function findExtendTarget(
   point: Vec2,
   toleranceMm: number,
 ): ExtendTarget | null {
-  if (!Number.isFinite(toleranceMm) || toleranceMm < 0 || !finitePoint(point)) return null;
+  if (!Number.isFinite(toleranceMm) || toleranceMm < 0 || !isFinitePoint(point)) return null;
   const session = 'model' in sceneOrModel ? sceneOrModel : createExtendModel(sceneOrModel);
   let nearest: EndpointPick | null = null;
   const probe = { minX: point.x, maxX: point.x, minY: point.y, maxY: point.y };
@@ -151,7 +152,7 @@ function resolveTarget(model: TrimModel, contour: TrimContour, end: 'start' | 'e
   const base = { contour, end, from, to: null, distanceMm: 0 };
   const index = end === 'start' ? 0 : contour.segments.segments.length - 1;
   const segment = contour.segments.segments[index];
-  if (segment === undefined || !finitePoint(from) || localPoint(from, contour.transform) === null)
+  if (segment === undefined || !isFinitePoint(from) || localPoint(from, contour.transform) === null)
     return { ...base, status: 'degenerate' };
   const localInside = inwardPoint(segmentStart(contour.segments, index), segment, end);
   if (localInside === null) return { ...base, status: 'degenerate' };
@@ -348,9 +349,6 @@ function appendTangent(path: ColoredPath, target: ExtendTarget, point: Vec2): Co
   return { ...path, polylines, ...(curves === undefined ? {} : { curves }) };
 }
 
-function finitePoint(point: Vec2): boolean {
-  return Number.isFinite(point.x) && Number.isFinite(point.y);
-}
 function localPoint(point: Vec2, transform: Transform): Vec2 | null {
   const sx = transform.scaleX * (transform.mirrorX ? -1 : 1);
   const sy = transform.scaleY * (transform.mirrorY ? -1 : 1);
@@ -362,5 +360,5 @@ function localPoint(point: Vec2, transform: Transform): Vec2 | null {
     x: (x * Math.cos(radians) + y * Math.sin(radians)) / sx,
     y: (-x * Math.sin(radians) + y * Math.cos(radians)) / sy,
   };
-  return finitePoint(local) ? local : null;
+  return isFinitePoint(local) ? local : null;
 }

@@ -2,6 +2,7 @@ import { offsetClosedPolylinesWithRoundJoinsChecked } from '../geometry/kerf-off
 import { insetContoursChecked } from '../geometry/offset-ladder';
 import { differenceClosedPolylinesChecked } from '../geometry/polygon-difference';
 import type { Polyline, Vec2 } from '../scene';
+import { isFinitePoint } from '../geometry/point-math';
 
 const COVERAGE_SLACK_MM = 0.002;
 
@@ -46,8 +47,4 @@ function hasArea(polyline: Polyline): boolean {
     if (direction.x * offset.y - direction.y * offset.x !== 0) return true;
   }
   return false;
-}
-
-function isFinitePoint(point: Vec2): boolean {
-  return Number.isFinite(point.x) && Number.isFinite(point.y);
 }

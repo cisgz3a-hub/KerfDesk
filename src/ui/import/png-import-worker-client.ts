@@ -5,6 +5,7 @@ import type {
 } from './png-paged-import';
 import { IndexedDbPagedAssetRepository } from './paged-asset-indexeddb';
 import type { PngImportWorkerRequest, PngImportWorkerResponse } from './png-import-worker-protocol';
+import { toError } from '../../core/util/error-message';
 
 export type PngImportWorkerProgress =
   | { readonly phase: 'queued'; readonly queuePosition: number }
@@ -253,8 +254,4 @@ function abortError(): Error {
   const error = new Error('PNG import request cancelled');
   error.name = 'AbortError';
   return error;
-}
-
-function toError(error: unknown): Error {
-  return error instanceof Error ? error : new Error(String(error));
 }

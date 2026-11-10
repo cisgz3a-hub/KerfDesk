@@ -8,6 +8,8 @@ import {
   type VCarveBoundaryBox,
 } from './vcarve-boundary-segment-index';
 import type { BoundarySegment } from './vcarve-detail-geometry';
+import { boxContains } from '../geometry/box-math';
+import { crossAbout } from '../geometry/point-math';
 
 type PreparedContour = VCarveBoundaryBox & {
   readonly contour: Polyline;
@@ -71,19 +73,10 @@ export function strictContourContainmentDepth(
 
 function strictlyContainsPreparedContour(outer: PreparedContour, inner: PreparedContour): boolean {
   const probe = inner.contour.points[0];
-  if (probe === undefined || !boundsContain(outer, inner) || boundariesIntersect(outer, inner)) {
+  if (probe === undefined || !boxContains(outer, inner) || boundariesIntersect(outer, inner)) {
     return false;
   }
   return pointInPolygon(probe, outer.contour.points);
-}
-
-function boundsContain(outer: VCarveBoundaryBox, inner: VCarveBoundaryBox): boolean {
-  return (
-    outer.minX <= inner.minX &&
-    outer.minY <= inner.minY &&
-    outer.maxX >= inner.maxX &&
-    outer.maxY >= inner.maxY
-  );
 }
 
 function prepareContour(contour: Polyline, sourceIndex: number): PreparedContour {
@@ -171,10 +164,10 @@ function distinctClosedPointCount(polyline: Polyline): number {
 }
 
 function segmentsIntersect(a: Vec2, b: Vec2, c: Vec2, d: Vec2, precision: number): boolean {
-  const abC = cross(a, b, c);
-  const abD = cross(a, b, d);
-  const cdA = cross(c, d, a);
-  const cdB = cross(c, d, b);
+  const abC = crossAbout(a, b, c);
+  const abD = crossAbout(a, b, d);
+  const cdA = crossAbout(c, d, a);
+  const cdB = crossAbout(c, d, b);
   // Transforms can move a touching vertex a few ULPs off its edge. Preserve
   // contact at coordinate precision, using the same padding as the index.
   const abPrecision = (Math.abs(b.x - a.x) + Math.abs(b.y - a.y)) * precision;
@@ -184,10 +177,6 @@ function segmentsIntersect(a: Vec2, b: Vec2, c: Vec2, d: Vec2, precision: number
   if (Math.abs(cdA) <= cdPrecision && onSegment(c, d, a, precision)) return true;
   if (Math.abs(cdB) <= cdPrecision && onSegment(c, d, b, precision)) return true;
   return abC > 0 !== abD > 0 && cdA > 0 !== cdB > 0;
-}
-
-function cross(a: Vec2, b: Vec2, point: Vec2): number {
-  return (b.x - a.x) * (point.y - a.y) - (b.y - a.y) * (point.x - a.x);
 }
 
 function onSegment(a: Vec2, b: Vec2, point: Vec2, precision: number): boolean {

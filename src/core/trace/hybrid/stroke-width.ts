@@ -6,6 +6,7 @@
 
 import type { Vec2 } from '../../scene';
 import type { InkMask } from '../centerline/distance-field';
+import { negatePoint } from '../../geometry/point-math';
 
 const MARCH_STEP_PX = 0.25;
 /** A stroke whose width spread (p10..p90) stays under this fraction of its
@@ -55,7 +56,7 @@ export function strokeWidthProfile(
     const normal = normalAt(samples, i);
     if (p === undefined || normal === null) continue;
     const ahead = march(mask, p, normal, limit);
-    const behind = march(mask, p, negate(normal), limit);
+    const behind = march(mask, p, negatePoint(normal), limit);
     measured.push(
       ahead >= limit || behind >= limit
         ? null
@@ -164,8 +165,4 @@ function isInk(mask: InkMask, x: number, y: number): boolean {
   const py = Math.floor(y);
   if (px < 0 || py < 0 || px >= mask.width || py >= mask.height) return false;
   return mask.ink[py * mask.width + px] === 1;
-}
-
-function negate(v: Vec2): Vec2 {
-  return { x: -v.x, y: -v.y };
 }

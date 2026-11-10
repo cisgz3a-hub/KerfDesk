@@ -1,5 +1,6 @@
 import type { Vec2 } from '../scene';
 import { CNC_COORDINATE_DECIMAL_PLACES, CNC_COORDINATE_QUANTUM_MM } from './cnc-output-precision';
+import { crossAbout } from '../geometry/point-math';
 
 export type BoundarySegment = {
   readonly ax: number;
@@ -23,9 +24,7 @@ export function emitXyKey(point: Vec2): string {
   )}`;
 }
 
-export function samePoint(a: Vec2, b: Vec2): boolean {
-  return a.x === b.x && a.y === b.y;
-}
+export { samePoint } from '../geometry/point-math';
 
 export function segmentToSegmentDistance(a: Vec2, b: Vec2, segment: BoundarySegment): number {
   const c = { x: segment.ax, y: segment.ay };
@@ -51,19 +50,15 @@ export function pointToSegmentDistance(x: number, y: number, segment: BoundarySe
 }
 
 function segmentsIntersect(a: Vec2, b: Vec2, c: Vec2, d: Vec2): boolean {
-  const abC = cross(a, b, c);
-  const abD = cross(a, b, d);
-  const cdA = cross(c, d, a);
-  const cdB = cross(c, d, b);
+  const abC = crossAbout(a, b, c);
+  const abD = crossAbout(a, b, d);
+  const cdA = crossAbout(c, d, a);
+  const cdB = crossAbout(c, d, b);
   if (abC === 0 && onSegment(a, b, c)) return true;
   if (abD === 0 && onSegment(a, b, d)) return true;
   if (cdA === 0 && onSegment(c, d, a)) return true;
   if (cdB === 0 && onSegment(c, d, b)) return true;
   return abC > 0 !== abD > 0 && cdA > 0 !== cdB > 0;
-}
-
-function cross(a: Vec2, b: Vec2, point: Vec2): number {
-  return (b.x - a.x) * (point.y - a.y) - (b.y - a.y) * (point.x - a.x);
 }
 
 function onSegment(a: Vec2, b: Vec2, point: Vec2): boolean {

@@ -11,6 +11,7 @@
 // error (rule 7).
 
 import type { Vec2 } from '../../scene';
+import { addPoints, subtractPoints, scalePoint, vectorLength } from '../../geometry/point-math';
 
 export type CornerSetback = {
   // Where the corner leaves the incoming leg, heading back toward A.
@@ -43,19 +44,19 @@ export function cornerSetback(
   setbackMm: number,
 ): CornerSetback | null {
   if (!Number.isFinite(setbackMm) || setbackMm <= 0) return null;
-  const toPrevious = subtract(previousMm, cornerMm);
-  const toNext = subtract(nextMm, cornerMm);
-  const previousLength = length(toPrevious);
-  const nextLength = length(toNext);
+  const toPrevious = subtractPoints(previousMm, cornerMm);
+  const toNext = subtractPoints(nextMm, cornerMm);
+  const previousLength = vectorLength(toPrevious);
+  const nextLength = vectorLength(toNext);
   if (previousLength < MIN_LEG_MM || nextLength < MIN_LEG_MM) return null;
   if (setbackMm > previousLength || setbackMm > nextLength) return null;
-  const towardPrevious = scale(toPrevious, 1 / previousLength);
-  const towardNext = scale(toNext, 1 / nextLength);
+  const towardPrevious = scalePoint(toPrevious, 1 / previousLength);
+  const towardNext = scalePoint(toNext, 1 / nextLength);
   const interiorRad = angleBetween(towardPrevious, towardNext);
   if (interiorRad < MIN_INTERIOR_RAD || interiorRad > Math.PI - MIN_INTERIOR_RAD) return null;
   return {
-    startMm: add(cornerMm, scale(towardPrevious, setbackMm)),
-    endMm: add(cornerMm, scale(towardNext, setbackMm)),
+    startMm: addPoints(cornerMm, scalePoint(towardPrevious, setbackMm)),
+    endMm: addPoints(cornerMm, scalePoint(towardNext, setbackMm)),
     interiorRad,
     towardPrevious,
     towardNext,
@@ -89,9 +90,9 @@ export function filletCentreMm(
   const half = setback.interiorRad / 2;
   const sine = Math.sin(half);
   if (Math.abs(sine) < MIN_LEG_MM) return null;
-  const bisector = normalize(add(setback.towardPrevious, setback.towardNext));
+  const bisector = normalize(addPoints(setback.towardPrevious, setback.towardNext));
   if (bisector === null) return null;
-  return add(cornerMm, scale(bisector, radiusMm / sine));
+  return addPoints(cornerMm, scalePoint(bisector, radiusMm / sine));
 }
 
 export function angleOfMm(fromMm: Vec2, toMm: Vec2): number {
@@ -107,25 +108,9 @@ export function shortestSweepRad(fromRad: number, toRad: number): number {
   return raw;
 }
 
-function add(a: Vec2, b: Vec2): Vec2 {
-  return { x: a.x + b.x, y: a.y + b.y };
-}
-
-function subtract(a: Vec2, b: Vec2): Vec2 {
-  return { x: a.x - b.x, y: a.y - b.y };
-}
-
-function scale(a: Vec2, factor: number): Vec2 {
-  return { x: a.x * factor, y: a.y * factor };
-}
-
-function length(a: Vec2): number {
-  return Math.hypot(a.x, a.y);
-}
-
 function normalize(a: Vec2): Vec2 | null {
-  const magnitude = length(a);
-  return magnitude < MIN_LEG_MM ? null : scale(a, 1 / magnitude);
+  const magnitude = vectorLength(a);
+  return magnitude < MIN_LEG_MM ? null : scalePoint(a, 1 / magnitude);
 }
 
 function angleBetween(unitA: Vec2, unitB: Vec2): number {

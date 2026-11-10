@@ -21,6 +21,7 @@
 
 import type { GcodeWordMatch } from '../gcode';
 import type { ProgramBoundsTracker } from './program-bounds';
+import { roundToTenth } from '../util/rounding';
 
 export type PlacedAxis = 'X' | 'Y' | 'Z';
 
@@ -83,7 +84,7 @@ export function createPlacementReader(): (
       probing = false;
       endingProgram = false;
     }
-    const g = words.filter((word) => word.letter === 'G').map((word) => tenth(word.value));
+    const g = words.filter((word) => word.letter === 'G').map((word) => roundToTenth(word.value));
     for (const code of g) {
       if (PROBES.includes(code)) probing = true;
       else if (OTHER_MOTION.includes(code)) probing = false;
@@ -150,8 +151,4 @@ function wordValue(words: ReadonlyArray<GcodeWordMatch>, letter: string): number
   let value: number | null = null;
   for (const word of words) if (word.letter === letter) value = word.value;
   return value;
-}
-
-function tenth(value: number): number {
-  return Math.round(value * 10) / 10;
 }

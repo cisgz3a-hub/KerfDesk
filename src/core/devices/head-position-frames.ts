@@ -15,6 +15,7 @@ import type { Vec2 } from '../scene';
 import type { DeviceProfile, SavedPositionFrame } from './device-profile';
 import { bedPointToNative, nativePointToBed, type NativeBedFrame } from './native-bed-frame';
 import { toMachineCoords, toSceneCoords } from './origin-transform';
+import { roundToThousandth } from '../util/rounding';
 
 /** A head position the operator typed, saved or picked on the canvas. */
 export type HeadPosition = {
@@ -64,18 +65,12 @@ export function nativeToHeadPosition(
     const bed =
       context.nativeFrame === null ? native : nativePointToBed(native, context.nativeFrame);
     const scene = toSceneCoords(bed, context.device);
-    return { frame, xMm: roundMicron(scene.x), yMm: roundMicron(scene.y) };
+    return { frame, xMm: roundToThousandth(scene.x), yMm: roundToThousandth(scene.y) };
   }
   if (context.workOffsetMm === null) return null;
   return {
     frame,
-    xMm: roundMicron(native.x - context.workOffsetMm.x),
-    yMm: roundMicron(native.y - context.workOffsetMm.y),
+    xMm: roundToThousandth(native.x - context.workOffsetMm.x),
+    yMm: roundToThousandth(native.y - context.workOffsetMm.y),
   };
-}
-
-// Status reports carry three decimals; a saved or shown position keeps the
-// same precision instead of float noise such as 12.300000000000001.
-function roundMicron(value: number): number {
-  return Math.round(value * 1000) / 1000;
 }

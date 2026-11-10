@@ -17,6 +17,7 @@ import type { Job, RasterGroup } from '../../../core/job';
 import { rotaryAppliesTo } from '../../../core/job';
 import type { ControllerSettingsSnapshot } from '../../../core/preflight';
 import type { Project } from '../../../core/scene';
+import { formatFixed3Decimals } from '../../../core/util/number-format';
 
 /** Within this many steps of a whole number, rows land evenly enough. */
 const STEP_FIT_TOLERANCE = 0.02;
@@ -101,10 +102,10 @@ function rowStepWarning(
   const effect =
     steps < 1
       ? `so about ${Math.round((1 - steps) * 100)} % of its rows land on the row before and burn twice`
-      : `so its rows land ${mm(fewer * stepMm)} or ${mm((fewer + 1) * stepMm)} mm apart and band`;
+      : `so its rows land ${formatFixed3Decimals(fewer * stepMm)} or ${formatFixed3Decimals((fewer + 1) * stepMm)} mm apart and band`;
   return (
     `Image layer ${layerId} on this rotary: one ${stepsText} turns ` +
-    `the part ${mm(stepMm)} mm, and the ${mm(pitchMm)} mm line interval is ` +
+    `the part ${formatFixed3Decimals(stepMm)} mm, and the ${formatFixed3Decimals(pitchMm)} mm line interval is ` +
     `${steps.toFixed(2)} steps, ${effect}. For even rows, set the line interval to ` +
     `${linesPerMm(fewer, stepsPerSurfaceMm)} or ${linesPerMm(fewer + 1, stepsPerSurfaceMm)}.`
   );
@@ -112,9 +113,5 @@ function rowStepWarning(
 
 function linesPerMm(steps: number, stepsPerSurfaceMm: number): string {
   const lines = stepsPerSurfaceMm / steps;
-  return `${lines.toFixed(2)} lines/mm (${mm(1 / lines)} mm, ${steps} step${steps === 1 ? '' : 's'})`;
-}
-
-function mm(value: number): string {
-  return value.toFixed(3);
+  return `${lines.toFixed(2)} lines/mm (${formatFixed3Decimals(1 / lines)} mm, ${steps} step${steps === 1 ? '' : 's'})`;
 }

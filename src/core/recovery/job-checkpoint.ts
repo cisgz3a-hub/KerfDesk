@@ -20,6 +20,8 @@ import { JOB_ORIGIN_ANCHORS, type JobOriginAnchor, type JobOriginPlacement } fro
 import type { OutputScope, Vec2 } from '../scene';
 import { parseOptionalJobInterruption, type JobInterruption } from './job-interruption';
 import { runWorkSteps, TEXT_STEP_CHARS, type WorkSteps } from './work-steps';
+import { isRecord } from '../util/is-record';
+import { isNonNegativeInteger } from '../util/finite';
 
 // v3 (R1): the checkpoint stores the RESOLVED job origin, not the placement
 // settings. A 'current-position' start freezes the live head XY into
@@ -318,10 +320,6 @@ function isStringArray(value: unknown): value is ReadonlyArray<string> {
   return Array.isArray(value) && value.every((item) => typeof item === 'string');
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 function isFingerprint(value: unknown): value is GcodeFingerprint {
   if (!isRecord(value)) return false;
   const lines = value['lines'];
@@ -331,8 +329,4 @@ function isFingerprint(value: unknown): value is GcodeFingerprint {
     isNonNegativeInteger(lines) &&
     lines >= 1
   );
-}
-
-function isNonNegativeInteger(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value >= 0;
 }

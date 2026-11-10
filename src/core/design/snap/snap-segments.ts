@@ -56,6 +56,4 @@ export function closestPointOnSegment(point: Vec2, segment: SnapSegment): Vec2 {
   return { x: segment.fromMm.x + clamped * dx, y: segment.fromMm.y + clamped * dy };
 }
 
-export function distanceMm(a: Vec2, b: Vec2): number {
-  return Math.hypot(a.x - b.x, a.y - b.y);
-}
+export { distance as distanceMm } from '../../geometry/point-math';

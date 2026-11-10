@@ -12,6 +12,7 @@ import { OperationSliderField } from './OperationSliderField';
 import { useLengthUnit } from '../state/display-units';
 import { MM_PER_INCH, type DisplayLengthUnit } from '../display-length';
 import { dimensionEntry, dimensionEntryError } from './dimension-entry';
+import { clamp } from '../../core/math/clamp';
 
 // Power and speed say what they do, not just their unit (UX audit U3-P3-1).
 export const LASER_POWER_TITLE =
@@ -126,6 +127,4 @@ export function numericValue(s: string, fallback: number): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
-export function clamp(n: number, lo: number, hi: number): number {
-  return Math.max(lo, Math.min(hi, n));
-}
+export { clamp } from '../../core/math/clamp';

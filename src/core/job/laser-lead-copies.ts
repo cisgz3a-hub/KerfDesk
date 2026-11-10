@@ -6,6 +6,7 @@
 
 import type { Vec2 } from '../scene';
 import { polylineBounds, type SegmentBounds } from './segment-bounds';
+import { polylineLength } from '../geometry/point-math';
 
 /** A closed outline as copy matching reads it. */
 export type LeadOutline = {
@@ -29,7 +30,7 @@ export function leadOutline(points: ReadonlyArray<Vec2>): LeadOutline {
   return {
     points,
     bounds: polylineBounds(points) ?? { minX: 0, minY: 0, maxX: 0, maxY: 0 },
-    lengthMm: outlineLength(points),
+    lengthMm: polylineLength(points),
   };
 }
 
@@ -170,14 +171,4 @@ function walksAlong(
 
 function near(a: Vec2, b: Vec2): boolean {
   return Math.abs(a.x - b.x) <= COPY_MM && Math.abs(a.y - b.y) <= COPY_MM;
-}
-
-function outlineLength(points: ReadonlyArray<Vec2>): number {
-  let length = 0;
-  for (let index = 1; index < points.length; index += 1) {
-    const a = points[index - 1] as Vec2;
-    const b = points[index] as Vec2;
-    length += Math.hypot(b.x - a.x, b.y - a.y);
-  }
-  return length;
 }

@@ -1,3 +1,5 @@
+import { isNonNegativeSafeInteger } from '../../../core/util/finite';
+
 const MAX_TEXT_CHARS = 16_384;
 
 export const MAX_RAW_LINE_CHARS = 4_096;
@@ -19,7 +21,7 @@ export function isOptionalProfileSource(value: unknown): boolean {
 }
 
 export function isOptionalUsbId(value: unknown): boolean {
-  return value === undefined || (isSafeNonNegativeInteger(value) && value <= 65_535);
+  return value === undefined || (isNonNegativeSafeInteger(value) && value <= 65_535);
 }
 
 export function isOptionalRunId(value: unknown): boolean {
@@ -60,17 +62,11 @@ export function isBoundedString(
 }
 
 export function isPositiveInteger(value: unknown): boolean {
-  return isSafeNonNegativeInteger(value) && value >= 1;
+  return isNonNegativeSafeInteger(value) && value >= 1;
 }
 
-export function isSafeNonNegativeInteger(value: unknown): value is number {
-  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
-}
+export { isNonNegativeSafeInteger as isSafeNonNegativeInteger } from '../../../core/util/finite';
 
-export function isFiniteNonNegative(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
-}
+export { isNonNegativeFiniteNumber as isFiniteNonNegative } from '../../../core/util/finite';
 
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
+export { isRecord } from '../../../core/util/is-record';

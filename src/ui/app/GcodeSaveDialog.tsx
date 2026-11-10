@@ -14,6 +14,7 @@ import {
   type PrebuiltGcodeSave,
   type SaveGcodeCtx,
 } from './file-actions';
+import { errorMessage } from '../../core/util/error-message';
 
 type PreparationState =
   | { readonly kind: 'preparing' }
@@ -102,8 +103,4 @@ function preparationMessage(state: PreparationState): string {
     case 'failed':
       return 'No final file was selected or modified because output preparation did not succeed.';
   }
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

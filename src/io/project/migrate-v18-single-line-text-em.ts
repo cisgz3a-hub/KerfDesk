@@ -1,5 +1,6 @@
 import { LEGACY_SIZE_UNITS, UNITS_PER_EM } from '../../core/text/single-line-frame-rule';
 import type { RawProject } from './migrations';
+import { asRecord } from '../../core/util/is-record';
 
 // Schema 19 makes Size the em for single-line fonts, as it already was for
 // outline fonts (ADR-682). Older writers scaled these four fonts by a
@@ -11,7 +12,7 @@ import type { RawProject } from './migrations';
 // em (ADR-682 Amendment 1).
 
 export function migrateV18SingleLineTextEm(raw: RawProject): RawProject {
-  const scene = record(raw['scene']);
+  const scene = asRecord(raw['scene']);
   return {
     ...raw,
     schemaVersion: 19,
@@ -22,12 +23,12 @@ export function migrateV18SingleLineTextEm(raw: RawProject): RawProject {
 }
 
 function emSizedText(value: unknown): unknown {
-  const text = record(value);
+  const text = asRecord(value);
   if (text === null || text['kind'] !== 'text' || typeof text['fontKey'] !== 'string') return value;
   const legacyUnits = LEGACY_SIZE_UNITS.get(text['fontKey']);
   if (legacyUnits === undefined) return value;
   const factor = UNITS_PER_EM / legacyUnits;
-  const box = record(text['textBox']);
+  const box = asRecord(text['textBox']);
   return {
     ...text,
     ...scaled(text, 'sizeMm', factor),
@@ -54,10 +55,4 @@ function scaled(
 ): Record<string, number> {
   const value = owner[key];
   return typeof value === 'number' && Number.isFinite(value) ? { [key]: value * factor } : {};
-}
-
-function record(value: unknown): Record<string, unknown> | null {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
 }
