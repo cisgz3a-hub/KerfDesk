@@ -92,7 +92,7 @@ describe('draw a rectangle end to end', () => {
     expect(session().history.present.entities).toHaveLength(1);
   });
 
-  it('drops a click that never became a drag', () => {
+  it('keeps a click that never became a drag anchored for a second click', () => {
     store().setDraft({
       tool: 'rect',
       anchorMm: { x: 5, y: 5 },
@@ -100,8 +100,12 @@ describe('draw a rectangle end to end', () => {
       modifiers: NO_MODIFIERS,
     });
     store().commitDraft('nothing');
-    expect(session().draft).toBeNull();
+    expect(session().draft?.released).toBe(true);
     expect(session().history.present.entities).toHaveLength(0);
+    expect(session().history.past).toHaveLength(0);
+    // A second click on the same spot still draws nothing and keeps waiting.
+    store().commitDraft('still-nothing');
+    expect(session().draft?.released).toBe(true);
     expect(session().history.past).toHaveLength(0);
   });
 

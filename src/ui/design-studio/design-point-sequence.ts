@@ -11,6 +11,7 @@ import {
 import type { Polyline, Vec2 } from '../../core/scene';
 import { applyOrthoMm } from './design-snap';
 import { distance } from '../../core/geometry/point-math';
+import { lockPolarPoint, lockSweepEnd, type EntryLocks } from '../../core/design/entry';
 
 export type PathPointSequence = {
   readonly kind: 'path';
@@ -20,6 +21,9 @@ export type PathPointSequence = {
   // dblclick event. Remember the state before the latest click so that event
   // can discard only its second constituent click, even when it drifted.
   readonly pointsBeforeLastClick?: ReadonlyArray<Vec2>;
+  // Length / angle typed for the NEXT segment (ADR-272 Amendment 5). Dropped
+  // as soon as that segment's corner is placed: each segment is typed afresh.
+  readonly locks?: EntryLocks;
 };
 
 export type ArcPointSequence = {
@@ -27,6 +31,9 @@ export type ArcPointSequence = {
   readonly centerMm: Vec2;
   readonly startMm: Vec2 | null;
   readonly pointerMm: Vec2;
+  // Radius / start angle while placing the start, sweep while placing the end
+  // (ADR-272 Amendment 5). Dropped when the start is placed.
+  readonly locks?: EntryLocks;
 };
 
 export type DesignPointSequence = PathPointSequence | ArcPointSequence;
@@ -115,7 +122,7 @@ export function advancePathSequence(
   return {
     kind: 'continue',
     sequence: {
-      ...sequence,
+      kind: 'path',
       points: [...sequence.points, atMm],
       pointerMm: atMm,
       pointsBeforeLastClick: sequence.points,
@@ -138,10 +145,36 @@ export function finishOpenPath(
 
 export function pathSequencePreviewPoints(sequence: PathPointSequence): ReadonlyArray<Vec2> {
   const last = sequence.points[sequence.points.length - 1];
-  if (last === undefined || distance(last, sequence.pointerMm) < MIN_ENTITY_SIZE_MM) {
+  const target = lockedPathTarget(sequence, sequence.pointerMm);
+  if (last === undefined || distance(last, target) < MIN_ENTITY_SIZE_MM) {
     return sequence.points;
   }
-  return [...sequence.points, sequence.pointerMm];
+  return [...sequence.points, target];
+}
+
+// Where the next corner lands once a typed length / angle is honoured, measured
+// from the last placed corner.
+export function lockedPathTarget(sequence: PathPointSequence, atMm: Vec2): Vec2 {
+  const last = sequence.points[sequence.points.length - 1];
+  const locks = sequence.locks;
+  if (last === undefined || locks === undefined) return atMm;
+  return lockPolarPoint(last, atMm, { lengthMm: locks.length, angleDeg: locks.angle });
+}
+
+// The arc's next point once typed values are honoured: a radius and start
+// angle place the start about the centre; a sweep places the end.
+export function lockedArcTarget(sequence: ArcPointSequence, atMm: Vec2): Vec2 {
+  const locks = sequence.locks;
+  if (locks === undefined) return atMm;
+  if (sequence.startMm === null) {
+    return lockPolarPoint(sequence.centerMm, atMm, {
+      lengthMm: locks.radius,
+      angleDeg: locks.angle,
+    });
+  }
+  return locks.sweep === undefined
+    ? atMm
+    : lockSweepEnd(sequence.centerMm, sequence.startMm, locks.sweep);
 }
 
 export function constrainArcTarget(
@@ -169,7 +202,7 @@ export function advanceArcSequence(sequence: ArcPointSequence, atMm: Vec2): ArcS
     }
     return {
       kind: 'continue',
-      sequence: { ...sequence, startMm: atMm, pointerMm: atMm },
+      sequence: { kind: 'arc', centerMm: sequence.centerMm, startMm: atMm, pointerMm: atMm },
     };
   }
   const geometry = arcGeometry(sequence, atMm);
@@ -196,10 +229,11 @@ export function pointSequencePreviewPolylines(
   if (sequence.kind === 'path') {
     return [{ points: pathSequencePreviewPoints(sequence), closed: false }];
   }
+  const pointerMm = lockedArcTarget(sequence, sequence.pointerMm);
   if (sequence.startMm === null) {
-    return [{ points: [sequence.centerMm, sequence.pointerMm], closed: false }];
+    return [{ points: [sequence.centerMm, pointerMm], closed: false }];
   }
-  const geometry = arcGeometry(sequence, sequence.pointerMm);
+  const geometry = arcGeometry(sequence, pointerMm);
   if (geometry === null) {
     return [{ points: [sequence.centerMm, sequence.startMm], closed: false }];
   }

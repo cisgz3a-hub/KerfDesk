@@ -4,7 +4,7 @@
 // transitions it wires up. Every function here is total — it returns the session
 // unchanged rather than throwing when an operation cannot apply (rule 7).
 
-import { addEntity, replaceEntity, type SketchEntity } from '../../core/design';
+import { addEntity, replaceEntity, sanitizeEntity, type SketchEntity } from '../../core/design';
 import { translateEntities } from '../../core/design/ops';
 import type { Vec2 } from '../../core/scene';
 import { applyCornerOp, type CornerOp } from './design-corner-apply';
@@ -20,19 +20,23 @@ import { sessionSketch, withSketch, type DesignSession } from './design-session'
 export function setSessionTool(session: DesignSession, tool: DesignToolKind): DesignSession {
   return session.tool === tool
     ? session
-    : { ...session, tool, pointSequence: null, extendPreview: null };
+    : { ...session, tool, draft: null, pointSequence: null, extendPreview: null };
 }
 
 // The draft becomes an entity, the entity becomes one history step, and the new
 // entity becomes the selection — so the operator can immediately edit what they
-// just drew. A degenerate draft simply clears (a click is not a draw). The new
-// entity lands on the active carve layer (ADR-272 Amendment 1).
+// just drew. A degenerate draft is a click, not a draw: it stays anchored and
+// RELEASED, so the next click (or Enter in a typed box) finishes the shape —
+// the click-move-click form typed entry needs (ADR-272 Amendment 5). Esc drops
+// it. The new entity lands on the active carve layer (ADR-272 Amendment 1).
 export function commitSessionDraft(session: DesignSession, id: string): DesignSession {
-  if (session.draft === null) return session;
-  const drafted = draftToEntity(session.draft, id);
-  const entity = drafted === null ? null : { ...drafted, layerId: session.activeLayerId };
+  const draft = session.draft;
+  if (draft === null) return session;
+  const entity = { ...draftToEntity(draft, id), layerId: session.activeLayerId };
+  if (sanitizeEntity(entity) === null) {
+    return draft.released === true ? session : { ...session, draft: { ...draft, released: true } };
+  }
   const cleared: DesignSession = { ...session, draft: null };
-  if (entity === null) return cleared;
   const next = addEntity(sessionSketch(session), entity);
   if (next === sessionSketch(session)) return cleared;
   return { ...withSketch(cleared, next), selectedIds: new Set([entity.id]) };
