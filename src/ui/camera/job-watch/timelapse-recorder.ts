@@ -5,6 +5,8 @@
 // video shows the work square-on; if the first frame cannot be flattened, the
 // whole recording uses plain frames so the video keeps one size.
 
+import type { PictureClient } from '../picture-worker/camera-picture-client';
+import type { PictureReply } from '../picture-worker/picture-work';
 import { watchPixelsPerMm } from '../../../core/camera/job-watch/job-area';
 import {
   addTimelapseFrame,
@@ -19,6 +21,8 @@ import {
   watchCameraStillRunning,
   type WatchCamera,
   type WatchIo,
+  flattenSpecFor,
+  JPEG_QUALITY,
 } from './job-watch-camera';
 import { useJobWatchStore } from './job-watch-store';
 
@@ -73,6 +77,22 @@ export function startTimelapse(args: RecorderArgs): TimelapseRecorder {
   const tick = async (): Promise<void> => {
     const now = io.now();
     if (!args.jobRunning() || !timelapseFrameDue(recording.timelapse, now)) return;
+    const client = io.picture ?? null;
+    if (client !== null) {
+      const worked = await workedFrame(recording, args, client);
+      if (recording.stopped) return;
+      if (worked === 'no-frame') {
+        recording.failures += 1;
+        if (recording.failures >= MAX_FAILED_CAPTURES) end('The camera stopped sending pictures.');
+        return;
+      }
+      recording.failures = 0;
+      if (worked !== null) {
+        recording.timelapse = addTimelapseFrame(recording.timelapse, worked, now);
+        publish(recording, args);
+      }
+      return;
+    }
     const frame = await io.captureFrame(camera.source);
     if (recording.stopped) return;
     if (frame === null) {
@@ -123,6 +143,39 @@ function publish(
       note: patch.note === undefined ? (current?.note ?? null) : patch.note,
     },
   });
+}
+
+// The frame read, flattened and encoded by the picture worker, off the UI
+// thread (ADR-490 Amendment 2); the rules are encodedFrame's. A first frame
+// that cannot be flattened turns the recording plain from the next frame.
+async function workedFrame(
+  recording: Recording,
+  args: RecorderArgs,
+  client: PictureClient,
+): Promise<Blob | null | 'no-frame'> {
+  const bitmap = await client.capture(args.camera.source);
+  if (bitmap === null) return 'no-frame';
+  const plain = {
+    op: 'jpeg',
+    frame: bitmap,
+    maxSidePx: TIMELAPSE_MAX_SIDE_PX,
+    quality: JPEG_QUALITY,
+  } as const;
+  if (!recording.flat || args.region === null) return jpegOf(await client.run(plain));
+  const ppm = watchPixelsPerMm(args.region, FLAT_LIMITS);
+  const spec = flattenSpecFor(args.camera, bitmap.width, bitmap.height, args.region, ppm);
+  if (spec.kind === 'ok') {
+    const reply = await client.run({ ...plain, flatten: spec.spec });
+    if (reply.kind !== 'unseen') return jpegOf(reply);
+  } else {
+    bitmap.close();
+  }
+  if (recording.timelapse.frames.length === 0) recording.flat = false;
+  return null;
+}
+
+function jpegOf(reply: PictureReply): Blob | null {
+  return reply.kind === 'jpeg' ? reply.blob : null;
 }
 
 // A flat picture while the recording is flat; if the very first frame cannot

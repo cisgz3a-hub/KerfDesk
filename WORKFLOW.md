@@ -9728,6 +9728,10 @@ as the pane's design record.
 - **Edge / head in the way.** When the head or gantry covered part of the job, the panel says what
   share was hidden. The operator jogs the head clear and presses **Take the after picture
   again**.
+- **Edge / large camera while the job runs (Amendment 2).** Each timelapse frame and the burn
+  check's first picture are read, flattened and encoded in a background worker, so a 4K camera or
+  a calibrated whole-bed job never holds the window: Abort, Pause and the window's streaming
+  answer at once. A phone or MCP camera still is made the same way, at most one a second.
 - **Edge / long job.** A long job keeps at most 480 frames, spread evenly over the whole job.
 - **Edge / panel closed.** While either choice is ticked, the camera stays on with the panel
   closed.
