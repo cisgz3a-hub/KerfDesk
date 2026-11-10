@@ -7163,7 +7163,9 @@ and lifts the command's CNC-only gate.)*
    retry asks for a new one, and so do a streamed job and a new controller
    session. Touches during a tool-change hold count. The cycle's own
    contacts never count. The surface grid (Measure grid) needs the same
-   test touch and uses it up too (ADR-103 Amendment 3).
+   test touch and uses it up too (ADR-103 Amendment 3). Its dialog shows
+   the same live **Probe circuit** line, which ends "tested. Measure grid
+   once the region is clear." (ADR-103 Amendment 4).
 3. Z cycle: fast G38.2 seek down, 2 mm back-off, slow re-touch, then
    `G10 L20 P0 Z<thickness>` — work Z0 lands on the STOCK TOP (plate
    underside) — and a retract. Every line owns the controller response

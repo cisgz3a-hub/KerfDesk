@@ -126,3 +126,49 @@ it('keeps Measure grid off and names the probe test until a test touch shows', a
     await act(async () => root.unmount());
   }
 });
+
+// ADR-103 Amendment 4: the dialog shows touch-off's live "Probe circuit" line,
+// so the operator sees the touch land and the grid become ready.
+it('shows the live probe circuit line through the test touch', async () => {
+  useStore.setState({
+    project: {
+      ...originalProject,
+      device: { ...originalProject.device, capabilities: ['z-axis'], zProbePresent: true },
+    },
+  });
+  const epoch = useLaserStore.getState().controllerSessionEpoch;
+  useLaserStore.setState({
+    connection: { kind: 'connected' },
+    statusReport: parseStatusReport('<Idle|MPos:0,0,10|FS:0,0>'),
+    controllerSettings: { reportInches: false },
+    controllerSettingsObservation: { sessionEpoch: 0, observedAt: 1 },
+    probeTestTouch: null,
+  });
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  const circuit = (): string =>
+    host.querySelector('[aria-label="Probe circuit"]')?.textContent ?? '';
+  const measure = (): HTMLButtonElement | undefined =>
+    [...host.querySelectorAll('button')].find((item) => item.textContent === 'Measure grid');
+  try {
+    await act(async () => root.render(<SurfaceProbeDialog onClose={vi.fn()} />));
+    await act(async () => host.querySelector<HTMLInputElement>('input[type=checkbox]')?.click());
+    expect(circuit()).toContain('Probe circuit: not tested');
+    await act(async () =>
+      useLaserStore.setState({
+        statusReport: parseStatusReport('<Idle|MPos:0,0,10|FS:0,0|Pn:P>'),
+        probeTestTouch: { controllerSessionEpoch: epoch },
+      }),
+    );
+    expect(circuit()).toContain('Probe circuit: closed');
+    expect(measure()?.disabled).toBe(true);
+    await act(async () =>
+      useLaserStore.setState({ statusReport: parseStatusReport('<Idle|MPos:0,0,10|FS:0,0>') }),
+    );
+    expect(circuit()).toContain('Probe circuit: tested. Measure grid once the region is clear.');
+    expect(measure()?.disabled).toBe(false);
+  } finally {
+    await act(async () => root.unmount());
+  }
+});
