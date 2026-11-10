@@ -363,6 +363,13 @@ function runDesignClickTool(
     applyCornerAt(at, tool, surface.pxPerMm());
     return true;
   }
+  if (tool === 'dimension') {
+    const pxPerMm = surface.pxPerMm();
+    useDesignStudioStore
+      .getState()
+      .dimensionAt(at, HIT_RADIUS_PX / (pxPerMm > 0 ? pxPerMm : 1), crypto.randomUUID());
+    return true;
+  }
   return false;
 }
 

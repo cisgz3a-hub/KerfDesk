@@ -10617,7 +10617,7 @@ into the drawing.
 The Design Studio is a full-window overlay for drawing a part to size by hand.
 Flow IDs use the `F-DS` prefix (`F-L` belongs to Image Studio, `F-CNC` to the
 router flows). Each flow names the stage that built it; typed entry during a
-draw gesture is F-DS13 (DS-3c); tracking and deferred snaps are F-DS14 (DS-4b).
+draw gesture is F-DS13 (DS-3c); tracking and deferred snaps are F-DS14 (DS-4b); dimensions are F-DS15 (DS-7).
 
 Nothing in this surface refuses anything (rule 7). Closing never prompts, an
 unfinished tool explains itself in the status bar rather than being disabled, and
@@ -11184,6 +11184,46 @@ shown.
 2. Ortho turns polar tracking off; Snap off turns all of it off and leaves the
    pointer where it is. A rectangle or circle tracks alignment only, never a
    polar angle.
+
+### F-DS15. Dimension a part and drive it by value (DS-7, ADR-272 Amendment 7)
+
+1. Arm **Dimension** (D). Click a rectangle edge for its width or height, a
+   polyline segment for its length, a circle for its diameter, or an arc for
+   its radius. The dimension appears at once, driving, at the current size.
+2. Click a line: the status bar asks for a second pick. Click another line for
+   the angle between them, or anywhere else for the line's length.
+3. The options bar shows the dimension being edited: type a value and press
+   Enter. The shape re-solves to it as one undo step.
+4. Untick **Driving** to make it a reference: it is drawn in parentheses and
+   follows the geometry. Tick it again to drive at the current reading.
+5. Click a placed dimension's line to edit it again; **Delete dimension** (or
+   the Delete key) removes it and leaves the geometry.
+
+#### Success
+
+The shape measures exactly the typed value in the inspector, the dimension
+reads it, and one Ctrl+Z restores both.
+
+#### Error - a value that cannot be honoured
+
+1. A size at or below 0.01 mm, an angle of 0 or 180 degrees or more, or text
+   that is not a number turns the box red with the reason; the geometry is
+   unchanged. Parallel lines and ellipses offer no dimension.
+
+#### Empty - no dimensions
+
+1. A sketch without dimensions saves, applies and cuts exactly as before.
+
+#### Edge - ownership and removal
+
+1. While a dimension drives, a stretch, grip or node edit cannot change that
+   quantity: the driving value is re-imposed. Typing the same quantity in the
+   properties box drives the dimension instead, so the typed value sticks.
+2. Deleting a dimensioned shape, or turning a circle into an ellipse by
+   stretching it, drops the dimensions that named it.
+3. Only the dimensioned entity moves: a line joined to the resized one does
+   not follow (there is no constraint solver, ADR-272 clause 5).
+4. In the 3D surface dimensions are picked and edited but drawn only in 2D.
 
 ## F-LEARN1. Contextual visual tutorials
 

@@ -4,6 +4,7 @@
 // project undo. The one crossing point is Apply.
 
 import { EMPTY_SKETCH, type Sketch } from '../../core/design';
+import { enforceDimensions, sanitizeDimensions } from '../../core/design/dimensions';
 import type { DesignApplyRecord } from '../state/design-apply-record';
 import type { PersistedDesignSession } from './design-session-storage';
 import type { ResizeHandle } from './design-handles';
@@ -88,6 +89,10 @@ export type DesignSession = {
   // The guides that moved the pointer last, for the canvas to draw. A readout
   // like activeSnap: the tracked point is already baked into cursorMm.
   readonly activeTracking: DesignTracking | null;
+  // The Dimension tool (ADR-272 Amendment 7): a picked line waiting for a
+  // second pick, and the dimension the options bar is editing.
+  readonly dimensionPendingLineId: string | null;
+  readonly activeDimensionId: string | null;
   readonly orthoEnabled: boolean;
   readonly showGrid: boolean;
   readonly gridMm: number;
@@ -134,6 +139,8 @@ export function createDesignSession(sketch: Sketch = EMPTY_SKETCH): DesignSessio
     trackEnabled: true,
     polarStepDeg: DEFAULT_POLAR_STEP_DEG,
     activeTracking: null,
+    dimensionPendingLineId: null,
+    activeDimensionId: null,
     orthoEnabled: false,
     showGrid: true,
     gridMm: DEFAULT_DESIGN_GRID_MM,
@@ -157,7 +164,9 @@ export function sessionSketch(session: DesignSession): Sketch {
  * apply record carry over so a reload costs nothing but the undo depth.
  */
 export function restoreDesignSession(saved: PersistedDesignSession): DesignSession {
-  const base = createDesignSession(saved.sketch);
+  // A stored sketch is untrusted: malformed dimensions are dropped and the
+  // rest re-imposed before anything reads them (ADR-272 Amendment 7).
+  const base = createDesignSession(enforceDimensions(sanitizeDimensions(saved.sketch)));
   return withValidActiveLayer({
     ...base,
     activeLayerId: saved.activeLayerId,
