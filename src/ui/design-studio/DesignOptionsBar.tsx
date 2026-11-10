@@ -13,6 +13,7 @@ import { DESIGN_TOOL_BY_KIND } from './design-tool';
 import { useDesignStudioStore } from './design-studio-store';
 import { DesignEntryFields } from './DesignEntryFields';
 import { hasTypedEntry } from './design-typed-entry';
+import { DesignDimensionFields } from './DesignDimensionFields';
 
 export function DesignOptionsBar(): JSX.Element | null {
   const session = useDesignStudioStore((state) => state.session);
@@ -40,6 +41,7 @@ export function DesignOptionsBar(): JSX.Element | null {
         />
       ) : null}
       {hasTypedEntry(session.tool) ? <DesignEntryFields /> : null}
+      {session.tool === 'dimension' ? <DesignDimensionFields /> : null}
       <span style={hintStyle}>{tool.hint}</span>
     </div>
   );

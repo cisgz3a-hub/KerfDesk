@@ -12,6 +12,7 @@
 // refusal (rule 7).
 
 import type { Sketch } from '../../core/design';
+import { enforceDimensions } from '../../core/design/dimensions';
 
 export const DESIGN_HISTORY_DEPTH = 200;
 
@@ -28,8 +29,12 @@ export function createDesignHistory(present: Sketch): DesignHistory {
 }
 
 // Records a new state. A commit that does not change the sketch is ignored, so
-// a click that moved nothing does not consume an undo step.
-export function commitSketch(history: DesignHistory, next: Sketch): DesignHistory {
+// a click that moved nothing does not consume an undo step. Every state that
+// enters history has its driving dimensions re-imposed (ADR-272 Amendment 7):
+// a driving dimension owns its geometry, so a stretch, a typed field, or a
+// node drag cannot leave it saying one thing while the shape says another.
+export function commitSketch(history: DesignHistory, proposed: Sketch): DesignHistory {
+  const next = enforceDimensions(proposed);
   if (next === history.present) return history;
   const grown = [...history.past, history.present];
   const overflow = Math.max(0, grown.length - DESIGN_HISTORY_DEPTH);
@@ -44,7 +49,8 @@ export function commitSketch(history: DesignHistory, next: Sketch): DesignHistor
 // Replaces the present WITHOUT recording a step. Used only for the live phase of a
 // drag: the gesture pushes exactly one entry when it ends, so dragging a shape 200
 // pixels does not bury the previous action under 200 undo steps.
-export function replacePresent(history: DesignHistory, present: Sketch): DesignHistory {
+export function replacePresent(history: DesignHistory, proposed: Sketch): DesignHistory {
+  const present = enforceDimensions(proposed);
   return present === history.present ? history : { ...history, present };
 }
 

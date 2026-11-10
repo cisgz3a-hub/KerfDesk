@@ -157,6 +157,11 @@ function handleEscapeLadder(): void {
     store.setMarquee(null);
     return;
   }
+  // A waiting Dimension pick, or the dimension being edited, lets go first.
+  if (session.dimensionPendingLineId !== null || session.activeDimensionId !== null) {
+    store.setActiveDimension(null);
+    return;
+  }
   // Extend is a click tool: one Escape always disarms it, retaining the selection.
   if (session.tool === 'extend') {
     store.setTool('select');

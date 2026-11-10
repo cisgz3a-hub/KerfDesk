@@ -14,6 +14,7 @@
 //     attached to the hand rather than sliding around.
 
 import { useCallback, useEffect, useRef } from 'react';
+import { placedDimensions } from './design-dimension-annotation';
 import { findEntity, type SketchEntity } from '../../core/design';
 import { useStore } from '../state';
 import { subscribeCanvasColorScheme } from '../theme/canvas-color-scheme';
@@ -200,6 +201,8 @@ function useLayerPaint(
         measuredField: measured.field,
         snap: session.activeSnap,
         tracking: session.activeTracking,
+        dimensions: placedDimensions(session.history.present),
+        activeDimensionId: session.activeDimensionId,
         extendPreview: session.tool === 'extend' ? session.extendPreview : null,
         widthPx,
         heightPx,

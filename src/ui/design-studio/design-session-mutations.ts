@@ -16,11 +16,20 @@ import type { DesignToolKind } from './design-tool';
 import { commitSketch, replacePresent } from './design-history';
 import { entitiesInRectMm } from './design-hit-test';
 import { sessionSketch, withSketch, type DesignSession } from './design-session';
+import { fieldEditThroughDimension } from './design-dimension-session';
 
 export function setSessionTool(session: DesignSession, tool: DesignToolKind): DesignSession {
   return session.tool === tool
     ? session
-    : { ...session, tool, draft: null, pointSequence: null, extendPreview: null };
+    : {
+        ...session,
+        tool,
+        draft: null,
+        pointSequence: null,
+        extendPreview: null,
+        dimensionPendingLineId: null,
+        activeDimensionId: null,
+      };
 }
 
 // The draft becomes an entity, the entity becomes one history step, and the new
@@ -169,6 +178,10 @@ export function editSessionField(
   const sketch = sessionSketch(session);
   const entity = sketch.entities.find((candidate) => candidate.id === id);
   if (entity === undefined) return session;
+  // A field a driving dimension owns is typed THROUGH the dimension (ADR-272
+  // Amendment 7), or enforcement would put the old value straight back.
+  const throughDimension = fieldEditThroughDimension(session, id, key, value);
+  if (throughDimension !== null) return throughDimension;
   const edited = applyEntityField(entity, key, value);
   if (edited === null) return session;
   return withSketch(session, replaceEntity(sketch, edited));
