@@ -24,6 +24,8 @@ import {
   captureSourceFrame,
   type ActiveCameraSource,
 } from '../frame-source';
+import { pictureClient, type PictureClient } from '../picture-worker/camera-picture-client';
+import type { FlattenSpec } from '../picture-worker/picture-work';
 
 export type WatchCamera = {
   readonly source: ActiveCameraSource;
@@ -67,6 +69,44 @@ export type FlatPicture =
   | { readonly kind: 'ok'; readonly image: RgbaImage }
   | { readonly kind: 'issue'; readonly message: string };
 
+/**
+ * How to flatten a frame of `width` × `height` over `region` (the camera
+ * model fitted to that size), or why it cannot be; the flattening itself is
+ * the picture worker's (ADR-490 Amendment 2).
+ */
+export function flattenSpecFor(
+  camera: WatchCamera,
+  width: number,
+  height: number,
+  region: BedArea,
+  pixelsPerMm: number,
+):
+  | { readonly kind: 'ok'; readonly spec: FlattenSpec }
+  | { readonly kind: 'issue'; readonly message: string } {
+  if (camera.fixedModel === null) {
+    return {
+      kind: 'issue',
+      message: camera.modelIssue ?? 'The camera needs to be fixed over the bed and calibrated.',
+    };
+  }
+  const capture = cameraCaptureBindingForFrame(camera.source, width, height);
+  const fitted = cameraModelForFrame(camera.fixedModel, capture, width, height);
+  if (fitted.kind === 'issue') return fitted;
+  return {
+    kind: 'ok',
+    spec: {
+      lens: fitted.lens,
+      pose: fitted.pose,
+      region,
+      pixelsPerMm,
+      surfaceHeightMm: camera.surfaceHeightMm,
+      heightAreas: camera.heightAreas,
+    },
+  };
+}
+
+export const UNSEEN_REGION_MESSAGE = 'The camera does not see this part of the bed.';
+
 /** One frame flattened over `region`, or why it cannot be. */
 export function flattenedPicture(
   camera: WatchCamera,
@@ -89,9 +129,7 @@ export function flattenedPicture(
     surfaceHeightMm: camera.surfaceHeightMm,
     heightAreas: camera.heightAreas,
   });
-  return image === null
-    ? { kind: 'issue', message: 'The camera does not see this part of the bed.' }
-    : { kind: 'ok', image };
+  return image === null ? { kind: 'issue', message: UNSEEN_REGION_MESSAGE } : { kind: 'ok', image };
 }
 
 export type WatchIo = {
@@ -99,6 +137,13 @@ export type WatchIo = {
   readonly encodeJpeg: (image: RgbaImage, maxSidePx: number) => Promise<Blob | null>;
   readonly now: () => number;
   readonly wait: (ms: number) => Promise<void>;
+  /**
+   * The picture worker (ADR-490 Amendment 2, rolling audit v13 Y4-P1-1): while
+   * a job runs, frames are read, flattened and encoded there, not on the UI
+   * thread Abort is sent from. Absent or null where workers are unavailable;
+   * the in-window path above is then used.
+   */
+  readonly picture?: PictureClient | null;
 };
 
 export const defaultWatchIo: WatchIo = {
@@ -106,9 +151,12 @@ export const defaultWatchIo: WatchIo = {
   encodeJpeg: encodeJpegPicture,
   now: () => Date.now(),
   wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  get picture() {
+    return pictureClient();
+  },
 };
 
-const JPEG_QUALITY = 0.82;
+export const JPEG_QUALITY = 0.82;
 
 /** `image` scaled to fit `maxSidePx` and encoded as JPEG; null when the browser cannot. */
 export function encodeJpegPicture(image: RgbaImage, maxSidePx: number): Promise<Blob | null> {
