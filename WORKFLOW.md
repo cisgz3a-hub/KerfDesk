@@ -1253,6 +1253,23 @@ that owns those fields, without changing the existing Frame/Start policy.
 5. The runway is only as right as Machine Setup's acceleration: read $120 and $121 from the
    controller where the firmware reports them, and check the scan edges on scrap.
 
+### F-A7e2. Fill Ramp for rubber stamps (ADR-699)
+
+1. Draw or import the stamp so its letters are holes in a filled plate: a border shape with the
+   letters inside, mirrored for a stamp. Put it on a Fill operation (Scanline or Island Fill).
+2. **More cut settings → Fill detail → Ramp**: set **Ramp length** (how far in from each edge power
+   takes to reach full Power; 0 turns it off) and **Ramp min power** (the power at the very edge,
+   just above where the laser starts to mark). Leave **Ramp outer edge** off so the plate's border
+   is cut square, as LightBurn advises; turn it on to slope that edge too.
+3. The fill now burns as a scan of varying power at its line interval and angle: Min power at
+   every letter wall, rising to full Power at the ramp length, so each letter stands on a sloped
+   shoulder. Preview, the time estimate and G-code show the graded power; Job Review reads
+   "ramp N mm from min power M%" and whether the outer edge is square or ramped.
+4. Follow Shape fills keep a flat burn and hide the Ramp fields. A ramp whose grid would need more
+   than 8,000,000 cells burns flat with a Job Review warning; raise the line interval or split the
+   artwork. Ruida `.rd` export refuses a ramped fill, as it refuses images.
+5. Depth depends on the laser and stock. Test the length and floor on scrap first.
+
 ### F-A7f. Material Test grids that vary any two settings (ADR-497)
 
 **Focus Test (ADR-602).** Tools → Focus Test generates 2–101 Line samples at distinct relative Z offsets, with per-sample operation names showing the exact 0.001 mm represented offset (names are not engraved). The 2D estimate excludes Z travel and dark returns; Inspect G-code (3D) shows complete emitted motion and its playback estimate. Set a known starting focus, sweep range, spacing, line length, cut power/feed and Z travel feed. Positive Z follows the controller axis direction. Generate replaces the scene through the normal one-step Undo action; save/reopen retains the offsets in schema 18. Preview and inspect the emitted program, complete Frame for the unchanged placement, then use ordinary Start and Job Review. Frame traces XY only. Review warns about missing Z qualification and configured travel exceedance, without adding a Start gate. GRBL-family output switches the laser off before Z motion, restores absolute XY positioning before burns, and returns to starting Z after each completed sample. An interrupted run may leave Z displaced; line-resume is unavailable because the original physical Z datum cannot be reconstructed. Restore starting focus and use ordinary Frame/Start for a whole test. Focus content cannot be emitted in CNC mode. Travel-feed edits preserve Frame identity; changing an offset requires another Frame. Compare the narrowest physical line and set focus manually; software tests do not establish material results or hardware clearance. Unsupported controller dialects and changing a focus operation away from Line mode cannot produce a valid focus program and report that output failure.
@@ -4823,6 +4840,12 @@ correct M4-mode raster G-code from Compile.
      and threshold change with the tone, for portraits. While Use original pixels (Pass-through in Adjust Image) is
      on and a binary swatch is chosen, a note under the swatches says the image
      burns as Grayscale until that box is off.
+     **3D Sliced** (ADR-699, after LightBurn) treats the image as a depth map: darker burns
+     deeper. **Passes** sets the slice count; each pass burns, at full Power, every pixel at least
+     that many slices deep, darkest first, so a pixel is burned on as many passes as its darkness
+     earns and white never. Its swatch shows a few steps of depth; Job Review names the pass
+     count ("3D Sliced: N passes, one slice each"), and the time estimate counts every pass.
+     Negative inverts the depth. Use original pixels burns it as Grayscale instead.
    - **Lines/mm**: number input, 5..25, default 10.
 6. Workspace shows the image where it will burn; no separate "preview
    the dither" overlay in v1 — the image itself is the preview.

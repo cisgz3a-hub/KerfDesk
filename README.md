@@ -91,10 +91,12 @@ LongMill), design in Inkscape / Illustrator / Affinity, and expect a LightBurn-s
 - Three operation modes: **Line** (vector outline cut), **Fill/Scan** (hatch the interior) and
   **Image** (dithered raster engrave). Sub-layers let one operation stack fill *then* line.
 - Fill: scanline hatch with configurable angle and spacing, bidirectional/snake, cross-hatch,
-  plus **Follow Shape** (concentric offset) and **Island Fill** styles.
-- Image: 11 dither/conversion modes (threshold, Floyd–Steinberg, Jarvis, Stucki, Atkinson,
-  Burkes, three Sierra variants, ordered Bayer, grayscale), 5–25 lines/mm, dot-width correction,
-  negative and pass-through.
+  plus **Follow Shape** (concentric offset) and **Island Fill** styles, and a LightBurn-style
+  **Ramp** that slopes the walls of a fill from Min power at its edges, for rubber stamps.
+- Image: 13 dither/conversion modes (threshold, Floyd–Steinberg, Jarvis, Stucki, Atkinson,
+  Burkes, three Sierra variants, Blue Noise, ordered Bayer, grayscale and **3D Sliced**, which
+  burns a depth map one threshold pass per slice), 5–25 lines/mm, dot-width correction, negative
+  and pass-through.
 - Image trace with five presets across three in-house engines: filled-contour (Line Art, Smooth,
   Sharp), **centerline/medial-axis**, and Canny **edge detection**.
 - Kerf compensation, automatic holding tabs, **lead-in/lead-out** that finds the scrap side of

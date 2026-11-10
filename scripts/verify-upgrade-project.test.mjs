@@ -82,7 +82,7 @@ test('current project qualification refuses historical, future and malformed sch
     17,
     18,
     19,
-    23,
+    24,
     '16',
     '17',
     '18',
@@ -90,6 +90,7 @@ test('current project qualification refuses historical, future and malformed sch
     '20',
     '21',
     '22',
+    '23',
     null,
     undefined,
   ]) {
@@ -101,7 +102,7 @@ test('current project qualification refuses historical, future and malformed sch
 });
 
 test('upgrade qualification retains selected starts through Save As and schema 16 migration', () => {
-  for (const schemaVersion of [16, 17, 18, 19, 20, 21, CURRENT_QUALIFICATION_PROJECT_SCHEMA]) {
+  for (const schemaVersion of [16, 17, 18, 19, 20, 21, 22, CURRENT_QUALIFICATION_PROJECT_SCHEMA]) {
     const previous = { ...selectedStartsFixture, schemaVersion };
     assert.deepEqual(
       validateUpgradeProject(encoded(selectedStartsFixture), previous, knownUpgrade),
@@ -198,7 +199,7 @@ test('the known upgrade contract accepts historical retention and current migrat
 test('known upgrade qualification keeps schema, scene and machine evidence strict', () => {
   for (const schemaVersion of [
     11,
-    23,
+    24,
     '12',
     '13',
     '14',
@@ -210,6 +211,7 @@ test('known upgrade qualification keeps schema, scene and machine evidence stric
     '20',
     '21',
     '22',
+    '23',
     null,
     undefined,
   ]) {
@@ -239,7 +241,7 @@ test('known upgrade qualification keeps schema, scene and machine evidence stric
 });
 
 test('known upgrade preserves schema 13/14/15/16/17/18/19 saves and verifies their migration to the current writer', () => {
-  for (const schemaVersion of [13, 14, 15, 16, 17, 18, 19, 20, 21]) {
+  for (const schemaVersion of [13, 14, 15, 16, 17, 18, 19, 20, 21, 22]) {
     const previous = { ...historicalFixture, schemaVersion };
     assert.deepEqual(validateUpgradeProject(encoded(previous), previous, knownUpgrade), previous);
     assert.deepEqual(validateUpgradeProject(encoded(fixture), previous, knownUpgrade), fixture);

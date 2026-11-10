@@ -735,7 +735,10 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
   CNC profile arc/line lead-in/out (`core/cnc/profile-lead.ts`, ADR-250;
   profile-outside/inside only), and laser Line lead-in/out on closed shapes,
   off by default, with the scrap side found per contour
-  (`core/job/apply-laser-leads.ts`, ADR-626, explicitly requested 2026-10-18);
+  (`core/job/apply-laser-leads.ts`, ADR-626, explicitly requested 2026-10-18),
+  and LightBurn-style depth engraving: the 3D Sliced image mode and the Fill Ramp for rubber
+  stamps (`core/raster/slice-3d.ts`, `core/raster/fill-ramp-grid.ts`, ADR-699, explicitly
+  requested 2026-11-10);
   a narrow ordered sub-layer "fill then line" operation stack is partially in
   place. **These landed without dedicated ADR headings** — the build plan
   reserved ADR-054..091 for its tickets, and the earlier citations here of

@@ -25,8 +25,10 @@ function gradient(width: number, height: number): DitherInput {
 }
 
 const SMAX = 1000;
+// Grayscale and 3D Sliced (ADR-699: its preview is depth-proportional) shade.
 const BINARY_ALGORITHMS = DITHER_ALGORITHMS.filter(
-  (algorithm): algorithm is Exclude<DitherAlgorithm, 'grayscale'> => algorithm !== 'grayscale',
+  (algorithm): algorithm is Exclude<DitherAlgorithm, 'grayscale' | '3d-sliced'> =>
+    algorithm !== 'grayscale' && algorithm !== '3d-sliced',
 );
 
 describe('dither — threshold', () => {

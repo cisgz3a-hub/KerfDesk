@@ -99,6 +99,8 @@ function diagnosticWarning(diagnostic: CompileDiagnostic): string {
       return kerfSideAssumedWarning(diagnostic);
     case 'fill-collapsed-at-precision':
       return FILL_COLLAPSED_AT_PRECISION_WARNING(diagnostic.layerName);
+    case 'fill-ramp-too-large':
+      return `Fill operation "${diagnostic.layerName}" has a Ramp, but its ramp grid would need ${diagnostic.cells.toLocaleString('en-US')} cells, more than the 8,000,000 a ramp may use. It burns flat at full power, without the ramp. Raise its Line interval or split the artwork to keep the ramp.`;
     case 'image-scan-angle-rotary':
       return `Image "${diagnostic.source}" on layer "${diagnostic.layerName}" asks for a scan angle, cross-hatch or an angle change per pass. The rotary only keeps rows along X straight, so every pass of this image scans along X.`;
     case 'raster-source-luma-mismatch':

@@ -348,6 +348,9 @@ export const DITHER_ALGORITHMS = [
   'blue-noise',
   'ordered',
   'grayscale',
+  // ADR-699: a depth map burned as one threshold pass per slice. Older builds
+  // refuse it like any value they do not list.
+  '3d-sliced',
 ] as const;
 
 export type DitherAlgorithm = (typeof DITHER_ALGORITHMS)[number];

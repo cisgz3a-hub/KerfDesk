@@ -16,6 +16,7 @@ import {
 import { DEFAULT_OVERSCAN_MM, MAX_FILL_OVERSCAN_MM } from '../../../core/job/compile-job-defaults';
 import { laserLeadSpecFor } from '../../../core/job/laser-lead-settings';
 import { passAngleStepApplies } from '../../../core/job/scan-pass-angles';
+import { fillRampParts, slicedImagePart } from './job-review-depth-parts';
 import { normalizedScanAngleDeg } from '../../../core/raster/raster-scan-frame';
 import {
   DEFAULT_CNC_STOCK,
@@ -72,6 +73,7 @@ function fillDetail(settings: LayerOperationSettings): string {
     settings.fillBidirectional ? 'bidirectional' : 'one-way',
     ...(settings.fillCrossHatch ? ['cross-hatch'] : []),
     ...passAngleStepPart(settings),
+    ...fillRampParts(settings),
     ...fillOverscanParts(settings),
     ...localScanOffsetPart(settings),
     ...powerModePart(settings),
@@ -80,7 +82,7 @@ function fillDetail(settings: LayerOperationSettings): string {
 
 function imageDetail(settings: LayerOperationSettings): string {
   return [
-    `${capitalizeToken(settings.ditherAlgorithm)} dither`,
+    ...imageModeParts(settings),
     `${settings.linesPerMm} lines/mm`,
     settings.imageBidirectional ? 'bidirectional' : 'one-way',
     ...(settings.negativeImage ? ['negative'] : []),
@@ -91,6 +93,10 @@ function imageDetail(settings: LayerOperationSettings): string {
     ...imageScanPatternParts(settings),
     ...localScanOffsetPart(settings),
   ].join(SEPARATOR);
+}
+
+function imageModeParts(settings: LayerOperationSettings): ReadonlyArray<string> {
+  return [slicedImagePart(settings) ?? `${capitalizeToken(settings.ditherAlgorithm)} dither`];
 }
 
 // ADR-495: automatic overscan follows the speed and the machine, so Job Review

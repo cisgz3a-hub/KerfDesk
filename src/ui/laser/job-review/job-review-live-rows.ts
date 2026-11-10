@@ -253,7 +253,7 @@ function scanDirectionReviewEntry(
   return {
     key: `${group.layerId}:${group.kind}:${direction.reason}`,
     reviewFact: fact(
-      `${group.kind === 'raster' ? 'Image' : 'Fill'} direction — ${name}`,
+      `${group.kind === 'raster' && group.fillRamp !== true ? 'Image' : 'Fill'} direction — ${name}`,
       `${direction.bidirectional ? 'Bidirectional' : 'One-way'} — ${scanDirectionReasonLabel(direction.reason)}`,
       scanDirectionFactTone(direction.reason),
     ),
