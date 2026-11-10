@@ -11,6 +11,8 @@
 import { isKeyboardActivationTarget } from '../common/keyboard-targets';
 import { designToolForShortcut } from './design-tool';
 import { useDesignStudioStore } from './design-studio-store';
+import { isEntrySeedKey, useDesignEntryFocus } from './design-entry-focus';
+import { isEntryGestureLive } from './design-typed-entry';
 
 export function handleDesignStudioKey(
   event: React.KeyboardEvent<HTMLDivElement>,
@@ -32,7 +34,9 @@ export function handleDesignStudioKey(
     event.preventDefault();
     return;
   }
-  if (handleArrowNudge(event)) return;
+  // A number typed mid-gesture goes into the options bar's first open box
+  // (ADR-272 Amendment 5) — no click on the box first.
+  if (seedTypedEntry(event) || handleArrowNudge(event)) return;
   if (event.key === 'Delete' || event.key === 'Backspace') {
     store.deleteSelected();
     event.preventDefault();
@@ -78,6 +82,14 @@ function handlePlainKey(event: React.KeyboardEvent<HTMLDivElement>, onFit: () =>
     store.setTool(tool.kind);
     event.preventDefault();
   }
+}
+
+function seedTypedEntry(event: React.KeyboardEvent<HTMLDivElement>): boolean {
+  const session = useDesignStudioStore.getState().session;
+  if (session === null || !isEntrySeedKey(event.key) || !isEntryGestureLive(session)) return false;
+  useDesignEntryFocus.getState().requestEntryFocus(event.key);
+  event.preventDefault();
+  return true;
 }
 
 // Arrow keys nudge the selection: one grid step, or 1 mm with Shift for fine work.
