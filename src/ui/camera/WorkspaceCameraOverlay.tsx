@@ -19,6 +19,7 @@ import { useUiStore } from '../state/ui-store';
 import { useActiveCameraModel } from './active-camera-model';
 import { useCameraPlacementLatch } from './camera-placement-latch';
 import { computeView } from '../workspace/view-transform';
+import { CameraEstimatedArea } from './accuracy/CameraEstimatedArea';
 import { CameraAccuracyMap } from './accuracy/CameraAccuracyMap';
 import { CameraSourceView } from './CameraSourceView';
 import { BedPictureOverlay } from './head/BedPictureOverlay';
@@ -68,29 +69,13 @@ function ModelOverlay(props: { readonly model: CameraModelRecord }): JSX.Element
   return (
     <div ref={boxRef} style={boxStyle} aria-hidden={notice === null}>
       <canvas ref={setCanvas} style={canvasStyle} />
-      {accuracyMapVisible && scene !== null ? (
-        <CameraAccuracyMap
-          model={props.model}
-          view={scene.view}
-          width={scene.cssWidth}
-          height={scene.cssHeight}
-        />
-      ) : null}
       {scene === null ? null : (
-        <HeightAreaOutlines
-          areas={scene.heightAreas}
-          view={scene.view}
-          width={scene.cssWidth}
-          height={scene.cssHeight}
-        />
-      )}
-      {scene === null || pieceScan === null ? null : (
-        <PieceOutlines
-          pieces={pieceScan.pieces}
-          excluded={pieceScan.excluded}
-          view={scene.view}
-          width={scene.cssWidth}
-          height={scene.cssHeight}
+        <SceneLayers
+          model={props.model}
+          scene={scene}
+          estimated={notice === null}
+          accuracyMap={accuracyMapVisible}
+          pieceScan={pieceScan}
         />
       )}
       {liveSource === null ? null : (
@@ -105,6 +90,33 @@ function ModelOverlay(props: { readonly model: CameraModelRecord }): JSX.Element
         </div>
       )}
     </div>
+  );
+}
+
+// What is drawn over the picture on the canvas's own grid: where the picture
+// is estimated (ADR-441 Amendment 9), the accuracy map, height areas, pieces.
+function SceneLayers(props: {
+  readonly model: CameraModelRecord;
+  readonly scene: OverlayScene;
+  readonly estimated: boolean;
+  readonly accuracyMap: boolean;
+  readonly pieceScan: ReturnType<typeof usePieceScanStore.getState>['scan'];
+}): JSX.Element {
+  const { scene } = props;
+  const size = { view: scene.view, width: scene.cssWidth, height: scene.cssHeight };
+  return (
+    <>
+      {props.estimated ? <CameraEstimatedArea model={props.model} {...size} /> : null}
+      {props.accuracyMap ? <CameraAccuracyMap model={props.model} {...size} /> : null}
+      <HeightAreaOutlines areas={scene.heightAreas} {...size} />
+      {props.pieceScan === null ? null : (
+        <PieceOutlines
+          pieces={props.pieceScan.pieces}
+          excluded={props.pieceScan.excluded}
+          {...size}
+        />
+      )}
+    </>
   );
 }
 

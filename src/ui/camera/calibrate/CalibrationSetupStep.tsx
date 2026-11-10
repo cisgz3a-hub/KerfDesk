@@ -51,7 +51,7 @@ export function CalibrationSetupStep(props: { readonly note: string | null }): J
               label="Sheet width (mm)"
               value={settings.sheetWidthMm}
               step={10}
-              title="Width of the sheet, left to right. About A4 (300 × 200 mm) calibrates the whole bed well; a sheet larger than the bed covers the bed."
+              title="Width of the sheet, left to right. About A4 (300 × 200 mm) is measured exactly on the sheet; past it the picture is estimated, and the result says how far off it may be there. A larger sheet measures more of the bed; one larger than the bed covers all of it."
               onChange={(value) => updateSettings({ sheetWidthMm: value ?? settings.sheetWidthMm })}
             />
             <NumberField

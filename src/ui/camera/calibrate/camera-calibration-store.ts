@@ -145,8 +145,11 @@ export const DEFAULT_CALIBRATION_SETTINGS: CalibrationSettings = {
   powerPercent: 35,
   speedMmPerMin: 3000,
   marginMm: 5,
-  // About A4: a sheet most workshops have. Measured, it keeps the picture
-  // within 0.2 mm on the sheet and 1.3 mm across a 400 mm bed (Amendment 8).
+  // About A4: a sheet most workshops have. It keeps the picture within about
+  // 0.2 mm on the sheet; beyond it the picture is extrapolated, and with a
+  // wide or off-centre camera it was measured 2.6-36 mm off at the far bed
+  // (rolling audit v13 Y1-P2-1). The grade estimates that and says so
+  // (ADR-441 Amendment 9); a larger sheet measures more of the bed.
   sheetWidthMm: 300,
   sheetHeightMm: 200,
   headCamera: false,
