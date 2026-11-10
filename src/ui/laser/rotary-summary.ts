@@ -48,8 +48,8 @@ export function rotaryReviewSummary(setup: RotarySetup): string {
     return 'Enabled, but its measurements are unusable: not applied';
   // ADR-127 Amd 2: a scaled Y gets matched feeds, so the layer speed holds on
   // the part's surface in every direction (rolling audit v12 X8-P1-1).
-  const speed =
-    rotaryYScale(setup) === 1 ? '' : " · each move's feed holds the layer speed on the part";
+  const matched = rotaryYScale(setup) !== 1 || activeRotaryTaper(setup) !== null;
+  const speed = matched ? " · each move's feed holds the layer speed on the part" : '';
   return `Enabled · ${rotaryAttachmentSummary(setup)} · ${rotaryMappingSummary(setup)}${speed}`;
 }
 
