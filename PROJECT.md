@@ -712,7 +712,9 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
 - Cloud, accounts, sharing, sync, subscriptions, and dormant monetization code. Activation, entitlement, trials, device binding and the Pro paywall exist only as the maintainer-approved commercial desktop channel (ADR-523, ADR-540, ADR-247 Amendment 1); anything beyond it needs its own ADR and the maintainer's explicit permission.
 - DXF, PDF/PDF-compatible AI, HPGL/PLT and BMP/GIF/TIFF import are in scope
   under ADR-098 and ADR-357. PDF uses explicit page selection and complete-path
-  conversion or a whole-page rendered image. Legacy non-PDF AI, unsupported
+  conversion or a whole-page rendered image. EPS/PostScript and Illustrator 3–8
+  (PostScript-based) AI import through a clean-room PostScript subset reader
+  (ADR-700); embedded images and unsupported operators in them, unsupported
   HPGL drawing commands and unsupported TIFF encodings remain explicit errors.
 - In-app AI depth inference and bundled model weights remain out of scope until P2R.5 receives its
   own model/license/runtime/privacy ADR. Externally produced relative-depth maps are accepted input

@@ -34,7 +34,7 @@ export function fileCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> 
       'file.import',
       'file',
       'Import...',
-      'Import SVG, DXF, PDF/AI, HPGL/PLT, images or STL artwork',
+      'Import SVG, DXF, PDF, AI, EPS, HPGL/PLT, images or STL artwork',
       ctx.importArtwork,
       'Ctrl+I',
     ),
