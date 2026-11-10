@@ -14,6 +14,7 @@ import { snapKindLabel } from './design-snap';
 import { DESIGN_TOOL_BY_KIND } from './design-tool';
 import { useDesignStudioStore } from './design-studio-store';
 import { extensionHint } from './design-extend';
+import type { DesignTracking } from './design-tracking';
 
 export function DesignStatusBar(): JSX.Element | null {
   const session = useDesignStudioStore((state) => state.session);
@@ -34,6 +35,7 @@ export function DesignStatusBar(): JSX.Element | null {
           session.activeSnap === null ? 'Snap' : `Snap: ${snapKindLabel(session.activeSnap.kind)}`
         }
       />
+      <Chip on={session.trackEnabled} label={trackingChipLabel(session.activeTracking)} />
       <Chip on={session.orthoEnabled} label="Ortho" />
       <Chip on={session.showGrid} label={`Grid ${session.gridMm} mm`} />
       <span style={countStyle}>{entityCount === 1 ? '1 entity' : `${entityCount} entities`}</span>
@@ -52,6 +54,11 @@ export function DesignStatusBar(): JSX.Element | null {
       ) : null}
     </footer>
   );
+}
+
+function trackingChipLabel(tracking: DesignTracking | null): string {
+  if (tracking === null) return 'Track';
+  return tracking.polarDeg === null ? 'Track: aligned' : `Track: ${tracking.polarDeg}°`;
 }
 
 function Chip(props: { readonly on: boolean; readonly label: string }): JSX.Element {

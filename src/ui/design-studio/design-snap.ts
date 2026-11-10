@@ -8,7 +8,15 @@
 // Screen-pixel reach is converted to millimetres here, so the snap feels the same
 // at every zoom while the engine itself stays a pure millimetre function.
 
-import { resolveSnap, type SnapKind, type SnapTarget } from '../../core/design/snap';
+import {
+  alignOnRay,
+  alignToPoints,
+  polarTrack,
+  resolveSnap,
+  type SnapKind,
+  type SnapTarget,
+} from '../../core/design/snap';
+import type { DesignTracking } from './design-tracking';
 import type { Sketch } from '../../core/design';
 import type { Vec2 } from '../../core/scene';
 
@@ -27,6 +35,20 @@ export type ResolvedSnap = {
   // The geometric target that captured the point, or null when the point came from
   // the grid or was left alone.
   readonly target: SnapTarget | null;
+  // The tracking guides that placed the point, when tracking rather than an
+  // object snap or the grid did (ADR-272 Amendment 6).
+  readonly tracking?: DesignTracking;
+};
+
+export type TrackingQuery = {
+  readonly enabled: boolean;
+  // Polar rays from the gesture start. Off for a rectangle's diagonal or a
+  // circle's radius, where a direction means nothing, and while Ortho is on,
+  // which is the stricter form of the same constraint.
+  readonly polar: boolean;
+  readonly polarStepDeg: number;
+  readonly toleranceMm: number;
+  readonly references: ReadonlyArray<Vec2>;
 };
 
 export function snapPointMm(args: {
@@ -38,8 +60,29 @@ export function snapPointMm(args: {
   readonly kinds?: ReadonlySet<SnapKind>;
   readonly excludeEntityId?: string;
   readonly excludeEntityIds?: ReadonlySet<string>;
+  // Where the live gesture started: enables tangent / perpendicular snaps and
+  // polar tracking.
+  readonly fromMm?: Vec2 | null;
+  readonly tracking?: TrackingQuery;
 }): ResolvedSnap {
+  // Snap is the master switch: off leaves the pointer exactly where it is,
+  // tracking included (AutoCAD's object tracking likewise needs object snap).
   if (!args.snapEnabled) return { pointMm: args.rawMm, target: null };
+  const geometric = objectSnap(args);
+  if (geometric !== null) return { pointMm: geometric.atMm, target: geometric };
+  // Tracking sits between the two: weaker than a real point, stronger than the grid.
+  const tracked =
+    args.tracking?.enabled === true
+      ? trackPoint(args.rawMm, args.fromMm ?? null, args.tracking)
+      : null;
+  if (tracked !== null) return tracked;
+  return {
+    pointMm: snapToGridMm(args.rawMm, { enabled: true, gridMm: args.gridMm }),
+    target: null,
+  };
+}
+
+function objectSnap(args: Parameters<typeof snapPointMm>[0]): SnapTarget | null {
   const toleranceMm = SNAP_RADIUS_PX / (args.pxPerMm > 0 ? args.pxPerMm : 1);
   const geometric = resolveSnap({
     sketch: args.sketch,
@@ -48,11 +91,29 @@ export function snapPointMm(args: {
     ...(args.kinds === undefined ? {} : { kinds: args.kinds }),
     ...(args.excludeEntityId === undefined ? {} : { excludeEntityId: args.excludeEntityId }),
     ...(args.excludeEntityIds === undefined ? {} : { excludeEntityIds: args.excludeEntityIds }),
+    ...(args.fromMm == null ? {} : { fromMm: args.fromMm }),
   });
-  if (geometric !== null) return { pointMm: geometric.target.atMm, target: geometric.target };
+  return geometric?.target ?? null;
+}
+
+// A polar ray from the anchor first - and where it crosses an alignment line,
+// that crossing - else a plain alignment with the drawing's named points.
+function trackPoint(rawMm: Vec2, fromMm: Vec2 | null, query: TrackingQuery): ResolvedSnap | null {
+  const { polarStepDeg, references, toleranceMm } = query;
+  const polar =
+    fromMm === null || !query.polar ? null : polarTrack(fromMm, rawMm, polarStepDeg, toleranceMm);
+  if (fromMm !== null && polar?.polarDeg !== undefined) {
+    const polarDeg = polar.polarDeg;
+    const crossed = alignOnRay({ ...polar, polarDeg }, fromMm, rawMm, references, toleranceMm);
+    const placed = crossed ?? polar;
+    return { pointMm: placed.atMm, target: null, tracking: { guides: placed.guides, polarDeg } };
+  }
+  const aligned = alignToPoints(rawMm, references, toleranceMm);
+  if (aligned === null) return null;
   return {
-    pointMm: snapToGridMm(args.rawMm, { enabled: true, gridMm: args.gridMm }),
+    pointMm: aligned.atMm,
     target: null,
+    tracking: { guides: aligned.guides, polarDeg: null },
   };
 }
 
@@ -89,6 +150,10 @@ export function snapKindLabel(kind: SnapKind): string {
       return 'quadrant';
     case 'intersection':
       return 'intersection';
+    case 'tangent':
+      return 'tangent';
+    case 'perpendicular':
+      return 'perpendicular';
     case 'on-line':
       return 'edge';
   }

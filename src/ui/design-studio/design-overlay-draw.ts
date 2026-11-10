@@ -32,6 +32,7 @@ import type { DesignMarquee, DesignView } from './design-session';
 import { mmToPx } from './design-view';
 import type { SketchExtension } from '../../core/design/ops/extend-sketch';
 import { paintExtension } from './design-extend-draw';
+import type { DesignTracking } from './design-tracking';
 
 export type DesignOverlayPaint = {
   readonly extendPreview?: SketchExtension | null;
@@ -45,6 +46,8 @@ export type DesignOverlayPaint = {
   readonly measuredField: EntityField | null;
   // The geometric snap under the pointer, marked with a per-kind glyph.
   readonly snap: SnapTarget | null;
+  // Polar / alignment guides that moved the pointer (ADR-272 Amendment 6).
+  readonly tracking?: DesignTracking | null;
   readonly widthPx: number;
   readonly heightPx: number;
 };
@@ -64,6 +67,7 @@ export function paintDesignOverlay(ctx: CanvasRenderingContext2D, paint: DesignO
   if (paint.pointSequence !== null) paintPointSequence(ctx, paint.view, paint.pointSequence);
   paintMeasurement(ctx, paint);
   if (paint.extendPreview != null) paintExtension(ctx, paint.view, paint.extendPreview);
+  if (paint.tracking != null) paintTracking(ctx, paint.view, paint.tracking);
   // Drawn last so the snap glyph is never hidden behind a draft or a dimension.
   if (paint.snap !== null) paintSnapMarker(ctx, paint.view, paint.snap);
 }
@@ -133,6 +137,39 @@ function paintDraft(ctx: CanvasRenderingContext2D, view: DesignView, draft: Desi
     case 'circle':
       paintDraftCircle(ctx, view, draft);
       break;
+  }
+}
+
+const TRACKING_DASH_PX: ReadonlyArray<number> = [2, 4];
+
+// Dotted guides in the snap colour, so a tracked point reads as "lined up"
+// and never as geometry. A polar ray also names its angle.
+function paintTracking(
+  ctx: CanvasRenderingContext2D,
+  view: DesignView,
+  tracking: DesignTracking,
+): void {
+  ctx.save();
+  ctx.strokeStyle = canvasTheme.snapGuide;
+  ctx.lineWidth = 1;
+  ctx.setLineDash(TRACKING_DASH_PX);
+  for (const guide of tracking.guides) {
+    const from = mmToPx(view, guide.fromMm);
+    const to = mmToPx(view, guide.toMm);
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.stroke();
+  }
+  ctx.restore();
+  const ray = tracking.guides[0];
+  if (tracking.polarDeg !== null && ray !== undefined) {
+    const at = mmToPx(view, ray.toMm);
+    drawLabel(
+      ctx,
+      { x: at.x, y: at.y - LABEL_HEIGHT_PX - LABEL_OFFSET_PX },
+      `${tracking.polarDeg}°`,
+    );
   }
 }
 

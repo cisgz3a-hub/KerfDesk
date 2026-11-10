@@ -127,6 +127,7 @@ function handleViewToggle(
     s: store.toggleSnap,
     o: store.toggleOrtho,
     g: store.toggleGrid,
+    t: store.toggleTracking,
   };
   const run = toggles[key];
   if (run === undefined) return;

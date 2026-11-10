@@ -199,6 +199,7 @@ function useLayerPaint(
         measuredEntity: measured.entity,
         measuredField: measured.field,
         snap: session.activeSnap,
+        tracking: session.activeTracking,
         extendPreview: session.tool === 'extend' ? session.extendPreview : null,
         widthPx,
         heightPx,

@@ -7,6 +7,7 @@
 // colour, mirroring the 2D painter, so the two surfaces tell one story.
 
 import { entityToPolylines, type Sketch, type SketchEntity } from '../../../core/design';
+import type { TrackingLine } from '../../../core/design/snap';
 import { entityDesignLayer, sketchLayers } from '../../../core/design/layers';
 import type { Polyline, Vec2 } from '../../../core/scene';
 import { localFromScene } from '../../cnc-viewer3d/viewer3d-picking';
@@ -56,6 +57,8 @@ export type ViewportOverlayInput = {
   readonly draft: DesignDraft | null;
   readonly pointSequence?: DesignPointSequence | null;
   readonly snapMm: Vec2 | null;
+  // Polar / alignment guides (ADR-272 Amendment 6), drawn dashed in the snap colour.
+  readonly guides?: ReadonlyArray<TrackingLine>;
   readonly frame: OverlayFrame;
 };
 
@@ -84,6 +87,11 @@ export function buildViewportOverlay(input: ViewportOverlayInput): ViewportOverl
     push(canvasTheme.selection, false, pointSequencePreviewPolylines(input.pointSequence));
   }
   push(`${canvasTheme.selection}|dash`, true, extensionPolylines(input.extendPreview));
+  push(
+    `${canvasTheme.snapGuide}|dash`,
+    true,
+    (input.guides ?? []).map((guide) => ({ points: [guide.fromMm, guide.toMm], closed: false })),
+  );
 
   const buckets = [...segments.entries()]
     .filter(([, bucket]) => bucket.points.length > 0)

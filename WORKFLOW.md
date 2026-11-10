@@ -10586,7 +10586,7 @@ into the drawing.
 The Design Studio is a full-window overlay for drawing a part to size by hand.
 Flow IDs use the `F-DS` prefix (`F-L` belongs to Image Studio, `F-CNC` to the
 router flows). Each flow names the stage that built it; typed entry during a
-draw gesture is F-DS13 (DS-3c).
+draw gesture is F-DS13 (DS-3c); tracking and deferred snaps are F-DS14 (DS-4b).
 
 Nothing in this surface refuses anything (rule 7). Closing never prompts, an
 unfinished tool explains itself in the status bar rather than being disabled, and
@@ -11110,6 +11110,49 @@ and its direction follows the pointer for every quantity that was not typed.
    spans.
 3. A Polyline's locks clear when its corner is placed, so each segment is typed
    afresh.
+
+### F-DS14. Track angles, tangents and alignments while drawing (DS-4b, ADR-272 Amendment 6)
+
+1. With Snap and **Track** on (the default; Shift+T toggles Track), start a
+   Line, Polyline or Arc. Moving the pointer near a multiple of the polar step
+   (15 degrees by default; change it in the picker beside Track) pulls it onto
+   that ray; a dotted guide runs from the start and the angle is labelled.
+2. Hover a circle or arc from the start point: its tangent points and radial
+   points snap, marked with the tangent glyph or the right-angle glyph. Hover a
+   line or straight edge: the foot of the perpendicular from the start snaps.
+3. Move level with another object's corner, midpoint, centre or quadrant, or
+   with a corner already placed in this gesture: the pointer lines up on X
+   and/or Y and a dotted guide connects the two. Where a polar ray crosses such
+   a line, the pointer takes the crossing.
+4. Drag a selection: its box lines up with other objects' left / centre /
+   right and bottom / middle / top, with a guide along the shared line.
+
+#### Success
+
+The status bar names the snap ("Snap: tangent") or the tracking ("Track: 30°",
+"Track: aligned"), and the committed point is exactly on the guide or target
+shown.
+
+#### Error - nothing to track
+
+1. A tangent needs a start outside the circle, and a foot must land within the
+   segment; when neither exists no target is offered. Ellipses and rounded
+   rectangle corners offer no tangent or perpendicular. Nothing is reported as
+   a failure.
+
+#### Empty - no gesture yet
+
+1. Before the first point, only alignment guides act (there is no start to
+   track an angle or a tangent from).
+
+#### Edge - priorities and switches
+
+1. A real point (endpoint, intersection, midpoint, centre, quadrant) always
+   beats tangent and perpendicular, which beat an edge; every object snap
+   beats tracking, and tracking beats the grid.
+2. Ortho turns polar tracking off; Snap off turns all of it off and leaves the
+   pointer where it is. A rectangle or circle tracks alignment only, never a
+   polar angle.
 
 ## F-LEARN1. Contextual visual tutorials
 

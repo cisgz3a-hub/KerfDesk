@@ -80,6 +80,7 @@ import {
 } from '../../core/design/ops/transform-selection';
 import { findSketchExtension } from '../../core/design/ops/extend-sketch';
 import { extendSessionAt } from './design-extend';
+import type { DesignTracking } from './design-tracking';
 
 type DesignStudioState = {
   readonly documentEpoch: number;
@@ -110,6 +111,9 @@ type DesignStudioState = {
   readonly transformSelection: (kind: DesignTransformKind) => void;
   readonly toggleSnap: () => void;
   readonly toggleOrtho: () => void;
+  readonly toggleTracking: () => void;
+  readonly setPolarStepDeg: (stepDeg: number) => void;
+  readonly setActiveTracking: (tracking: DesignTracking | null) => void;
   readonly toggleGrid: () => void;
   readonly setSketch: (sketch: Sketch) => void;
   readonly drawEntity: (entity: SketchEntity) => void;
@@ -176,11 +180,7 @@ export const useDesignStudioStore = create<DesignStudioState>((set) => ({
   setActiveSnap: (activeSnap) => set(mapSession((session) => ({ ...session, activeSnap }))),
   ...selectionActions(set),
 
-  toggleSnap: () =>
-    set(mapSession((session) => ({ ...session, snapEnabled: !session.snapEnabled }))),
-  toggleOrtho: () =>
-    set(mapSession((session) => ({ ...session, orthoEnabled: !session.orthoEnabled }))),
-  toggleGrid: () => set(mapSession((session) => ({ ...session, showGrid: !session.showGrid }))),
+  ...viewToggleActions(set),
 
   setSketch: (sketch) => set(mapSession((session) => withSketch(session, sketch))),
   drawEntity: (entity) =>
@@ -253,6 +253,32 @@ export const useDesignStudioStore = create<DesignStudioState>((set) => ({
   toggleSurface3d: () =>
     set(mapSession((session) => ({ ...session, surface3d: !session.surface3d }))),
 }));
+
+function viewToggleActions(
+  set: (change: (state: DesignStudioState) => Partial<DesignStudioState>) => void,
+): Pick<
+  DesignStudioState,
+  | 'toggleSnap'
+  | 'toggleOrtho'
+  | 'toggleGrid'
+  | 'toggleTracking'
+  | 'setPolarStepDeg'
+  | 'setActiveTracking'
+> {
+  return {
+    toggleSnap: () =>
+      set(mapSession((session) => ({ ...session, snapEnabled: !session.snapEnabled }))),
+    toggleOrtho: () =>
+      set(mapSession((session) => ({ ...session, orthoEnabled: !session.orthoEnabled }))),
+    toggleGrid: () => set(mapSession((session) => ({ ...session, showGrid: !session.showGrid }))),
+    toggleTracking: () =>
+      set(mapSession((session) => ({ ...session, trackEnabled: !session.trackEnabled }))),
+    setPolarStepDeg: (polarStepDeg) =>
+      set(mapSession((session) => (polarStepDeg > 0 ? { ...session, polarStepDeg } : session))),
+    setActiveTracking: (activeTracking) =>
+      set(mapSession((session) => ({ ...session, activeTracking }))),
+  };
+}
 
 function selectionActions(
   set: (change: (state: DesignStudioState) => Partial<DesignStudioState>) => void,

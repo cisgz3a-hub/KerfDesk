@@ -15,6 +15,7 @@ import { useDesignApply } from './use-design-apply';
 import { useDesignStudioStore } from './design-studio-store';
 import { TutorialButton } from '../tutorials/TutorialButton';
 import { shortcutLabel } from '../common/shortcut-label';
+import { POLAR_STEP_CHOICES_DEG } from './design-tracking';
 
 export function DesignTopBar(props: { readonly onFit: () => void }): JSX.Element | null {
   const session = useDesignStudioStore((state) => state.session);
@@ -64,6 +65,7 @@ export function DesignTopBar(props: { readonly onFit: () => void }): JSX.Element
         on={session.orthoEnabled}
         onClick={toggleOrtho}
       />
+      <TrackingControls />
       <BarToggle
         label="Grid"
         title={shortcutLabel('Show the grid (Shift+G)')}
@@ -97,6 +99,42 @@ export function DesignTopBar(props: { readonly onFit: () => void }): JSX.Element
         onClick={closeStudio}
       />
     </header>
+  );
+}
+
+// Polar and alignment tracking (ADR-272 Amendment 6): one toggle, plus the
+// polar step. Its own toggle like AutoCAD's POLAR/OTRACK, because Snap lands
+// on real points while tracking only lines things up.
+function TrackingControls(): JSX.Element | null {
+  const trackEnabled = useDesignStudioStore((state) => state.session?.trackEnabled ?? false);
+  const polarStepDeg = useDesignStudioStore((state) => state.session?.polarStepDeg ?? 15);
+  const toggleTracking = useDesignStudioStore((state) => state.toggleTracking);
+  const setPolarStepDeg = useDesignStudioStore((state) => state.setPolarStepDeg);
+  return (
+    <>
+      <BarToggle
+        label="Track"
+        title={shortcutLabel(
+          'Track polar angles from the start point and line up with other objects (Shift+T)',
+        )}
+        on={trackEnabled}
+        onClick={toggleTracking}
+      />
+      <select
+        aria-label="Polar tracking step"
+        title="Polar tracking step: the pointer is pulled onto every multiple of this angle"
+        value={polarStepDeg}
+        disabled={!trackEnabled}
+        onChange={(event) => setPolarStepDeg(Number(event.target.value))}
+        style={selectStyle}
+      >
+        {POLAR_STEP_CHOICES_DEG.map((step) => (
+          <option key={step} value={step}>
+            {step}°
+          </option>
+        ))}
+      </select>
+    </>
   );
 }
 
@@ -186,3 +224,12 @@ const dividerStyle: React.CSSProperties = {
 };
 
 const spacerStyle: React.CSSProperties = { marginLeft: 'auto' };
+
+const selectStyle: React.CSSProperties = {
+  fontSize: 12,
+  padding: '2px 4px',
+  borderRadius: 6,
+  border: '1px solid var(--lf-border)',
+  background: 'var(--lf-bg-input)',
+  color: 'var(--lf-text)',
+};
