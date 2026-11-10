@@ -13,6 +13,7 @@ import { canvasJobTimingPlan } from '../state/canvas-job-timing-plan';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { readJobCheckpoint, writeJobCheckpoint } from '../state/job-checkpoint-storage';
 import { useLaserStore } from '../state/laser-store';
+import { abortRotaryZero } from './abort-rotary-turn';
 import type { LaserModeStartSnapshot } from '../state/laser-mode-start-evidence';
 import { confirmLaserModeStartEvidence } from './laser-mode-start-acknowledgement';
 import { resumeConfirmation } from './resume-confirmation';
@@ -162,7 +163,7 @@ function reviewResume(
 } | null {
   const resume =
     machineKindOf(project.machine) === 'laser'
-      ? buildLaserResumeProgram(gcode, fromLine, project.device)
+      ? buildLaserResumeProgram(gcode, fromLine, project.device, undefined, abortRotaryZero())
       : buildResumeProgram(gcode, fromLine, resumeBuildOptions(project));
   if (resume.kind === 'error') {
     jobAwareAlert(`Cannot resume from line ${fromLine}:\n\n${resume.reason}`);

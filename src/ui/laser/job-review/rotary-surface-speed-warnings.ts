@@ -1,7 +1,10 @@
 import type { CutSegment, Job } from '../../../core/job';
 import { machineSpaceJob, rotaryAppliesTo } from '../../../core/job';
+import type { ControllerSettingsSnapshot } from '../../../core/controllers/grbl/parse-settings';
+import { rotaryAxisOf } from '../../../core/devices/rotary-axis';
 import {
   rotaryFeedMatchFor,
+  surfaceFeedAxisShare,
   surfaceFeedDoseRise,
   type RotaryFeedMatch,
 } from '../../../core/output/rotary-surface-feed';
@@ -20,11 +23,21 @@ export function detectRotarySurfaceSpeedWarnings(
     readonly scene?: Pick<Project['scene'], 'layers'>;
   },
   job: Job,
+  rates?: RotaryAxisRateSettings | null,
 ): ReadonlyArray<string> {
   if (!rotaryAppliesTo(project.device, project.machine)) return [];
   const machineJob = machineSpaceJob(job, project.device, project.machine);
   const match = rotaryFeedMatchFor(machineJob, project.device.maxFeed);
-  if (match === undefined) return [];
+  const axisWarnings = detectRotaryAxisRateWarnings(project, machineJob, match, rates);
+  if (match === undefined) return axisWarnings;
+  return [...maxFeedWarnings(project, machineJob, match), ...axisWarnings];
+}
+
+function maxFeedWarnings(
+  project: Parameters<typeof detectRotarySurfaceSpeedWarnings>[0],
+  machineJob: Job,
+  match: RotaryFeedMatch,
+): ReadonlyArray<string> {
   const worst = new Map<string, { readonly speed: number; readonly rise: number }>();
   for (const group of machineJob.groups) {
     if (group.kind !== 'cut' && group.kind !== 'fill') continue;
@@ -62,4 +75,75 @@ function largestDoseRise(
     }
   }
   return largest;
+}
+
+/** The live controller's Z and A max rates (`$112`, `$113`); ADR-695 Amendment 1. */
+export type RotaryAxisRateSettings = Pick<ControllerSettingsSnapshot, 'maxRateZ' | 'maxRateA'>;
+
+// ADR-695 Amendment 1 (rolling audit v13 Y5-P1-4): a rotary on A or Z is also
+// held by that axis's own max rate, which the controller's planner applies to
+// every move whatever F asks for. Warning only: a lower F would change nothing.
+function detectRotaryAxisRateWarnings(
+  project: Parameters<typeof detectRotarySurfaceSpeedWarnings>[0],
+  machineJob: Job,
+  match: RotaryFeedMatch | undefined,
+  rates: RotaryAxisRateSettings | null | undefined,
+): ReadonlyArray<string> {
+  const axis = rotaryAxisOf(project.device.rotary);
+  if (axis === 'Y') return [];
+  const rate = axis === 'A' ? rates?.maxRateA : rates?.maxRateZ;
+  if (rate === undefined || !(rate > 0)) return [];
+  const worst = worstAxisRiseByLayer(machineJob, match, rate);
+  const setting = axis === 'A' ? '$113' : '$112';
+  const unit = axis === 'A' ? '°/min' : 'mm/min';
+  return [...worst].map(([layerId, { speed, rise }]) => {
+    const name = project.scene?.layers.find((layer) => layer.id === layerId)?.name ?? layerId;
+    return (
+      `Layer ${name}: its strokes round the part need the rotary's ${axis} axis to turn faster ` +
+      `than its max rate (${setting}=${rate} ${unit}), so the controller slows them and they ` +
+      `burn up to ${Math.round(rise * 100)} % of the energy you set. For an even burn, set this ` +
+      `layer to ${Math.floor(speed / rise)} mm/min or less, or raise ${setting} if the rotary ` +
+      'can turn faster.'
+    );
+  });
+}
+
+// Over the layer's moves, the largest dose rise from the Max feed hold and the
+// axis rate together: the planner slows a move by share ÷ rate.
+function largestAxisRise(
+  speed: number,
+  segments: ReadonlyArray<CutSegment>,
+  match: RotaryFeedMatch | undefined,
+  rate: number,
+): number {
+  let largest = 1;
+  for (const segment of segments) {
+    const points = segment.polyline;
+    for (let i = 1; i < points.length; i += 1) {
+      const from = points[i - 1];
+      const to = points[i];
+      if (from === undefined || to === undefined) continue;
+      const share = surfaceFeedAxisShare(speed, from, to, match);
+      if (share <= rate) continue;
+      largest = Math.max(largest, surfaceFeedDoseRise(speed, from, to, match) * (share / rate));
+    }
+  }
+  return largest;
+}
+
+function worstAxisRiseByLayer(
+  machineJob: Job,
+  match: RotaryFeedMatch | undefined,
+  rate: number,
+): Map<string, { readonly speed: number; readonly rise: number }> {
+  const worst = new Map<string, { readonly speed: number; readonly rise: number }>();
+  for (const group of machineJob.groups) {
+    if (group.kind !== 'cut' && group.kind !== 'fill') continue;
+    const rise = largestAxisRise(group.speed, group.segments, match, rate);
+    const seen = worst.get(group.layerId);
+    if (rise > 1 && (seen === undefined || rise > seen.rise)) {
+      worst.set(group.layerId, { speed: group.speed, rise });
+    }
+  }
+  return worst;
 }

@@ -7,6 +7,7 @@ import {
   laserResumeDialectForDevice,
   type LaserResumeDevice,
 } from '../../core/controllers/grbl/laser-resume-dialect';
+import type { ResumeRotaryZero } from '../../core/controllers/grbl/resume-rotary';
 
 const LASER_RESUME_OPTIONS = {
   machineKind: 'laser' as const,
@@ -19,15 +20,18 @@ const LASER_RESUME_OPTIONS = {
  * archived resume step recorded when its saved bytes are being reproduced.
  * `device` is the profile the program was emitted with: its controller decides
  * the power commands the resume re-arms the beam with (ADR-364). */
+
 export function buildLaserResumeProgram(
   sourceGcode: string,
   fromLine: number,
   device: LaserResumeDevice,
   transform: LaserResumeTransformVersion = LASER_RESUME_TRANSFORM_VERSION,
+  rotaryZero?: ResumeRotaryZero,
 ) {
   return buildResumeProgram(sourceGcode, fromLine, {
     ...LASER_RESUME_OPTIONS,
     laserTransform: transform,
     laserDialect: laserResumeDialectForDevice(device),
+    ...(rotaryZero === undefined ? {} : { rotaryZero }),
   });
 }

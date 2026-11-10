@@ -50,7 +50,10 @@ import {
 } from './rotary-row-step-warnings';
 import { detectParkOutsideFrameWarningsFromMetrics } from './park-outside-frame-warnings';
 import { detectRotaryRasterQualificationWarnings } from './rotary-raster-qualification-warnings';
-import { detectRotarySurfaceSpeedWarnings } from './rotary-surface-speed-warnings';
+import {
+  detectRotarySurfaceSpeedWarnings,
+  type RotaryAxisRateSettings,
+} from './rotary-surface-speed-warnings';
 import {
   detectStreamThroughputWarnings,
   type StreamThroughputInput,
@@ -103,7 +106,7 @@ type JobReviewModelArgs = {
   readonly streamThroughput?: JobReviewStreamThroughput;
   /** The live controller's $101/$102/$103, null when it reported no settings;
    *  omitted without a live session (ADR-315 Amendment 1). Advisory only. */
-  readonly rotaryAxisSteps?: RotaryAxisStepSettings | null;
+  readonly rotaryAxisSteps?: (RotaryAxisStepSettings & RotaryAxisRateSettings) | null;
 };
 
 /** The rotary disclosures (ADR-315 and its Amendment 1, ADR-127 Amendment 2). */
@@ -112,7 +115,7 @@ function rotaryReviewWarnings(args: JobReviewModelArgs): ReadonlyArray<string> {
   return [
     ...detectRotaryRowStepWarnings(project, job, args.rotaryAxisSteps),
     ...detectRotaryRasterQualificationWarnings(project, job),
-    ...detectRotarySurfaceSpeedWarnings(project, job),
+    ...detectRotarySurfaceSpeedWarnings(project, job, args.rotaryAxisSteps),
   ];
 }
 

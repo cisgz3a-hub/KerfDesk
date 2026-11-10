@@ -81,6 +81,7 @@ import {
   bindPreparedLaserPowerScale,
   type LaserPowerScale,
 } from './connected-laser-power-scale';
+import type { RotaryTurnSinceAbort } from './abort-rotary-turn';
 
 export { STATUS_ALARM_START_MESSAGE } from './start-job-input';
 
@@ -122,6 +123,8 @@ export type MachineStartSnapshot = {
   // The axis letters grblHAL's `$I` reported (`[AXS:4:XYZA]` → "XYZA"), or
   // null when unread. Checked against a dedicated rotary axis (ADR-695).
   readonly reportedAxisLetters?: string | null;
+  // ADR-695 Amendment 1: after an Abort on an A or Z rotary, the turn since.
+  readonly rotaryTurnSinceAbort?: RotaryTurnSinceAbort | null;
   readonly alarmCode: number | null;
   readonly hasActiveStreamer: boolean;
   readonly motionOperationActive?: boolean;
