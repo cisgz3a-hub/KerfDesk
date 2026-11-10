@@ -1,18 +1,19 @@
-// The desktop window's remembered RTSP address in secure storage (ADR-692):
-// main keeps it under the operating system's encryption and hands it back over
-// app://app. Every failure reads as "nothing kept", so the camera panel falls
-// back to the public address the window remembers itself.
+// The desktop window's remembered camera addresses in secure storage (ADR-692
+// and Amendment 1): main keeps them under the operating system's encryption
+// and hands one back over app://app, one route per slot. Every failure reads as
+// "nothing kept", so the camera panel falls back to the public address the
+// window remembers itself.
 
 import type { CameraAddressVault } from '../../core/camera/camera-address-vault';
 
-const URL_ = 'app://app/api/camera-address/rtsp';
+const ROUTE = 'app://app/api/camera-address/';
 const HEADER = { 'X-KerfDesk-Camera-Address': '1' };
 
 export function createDesktopCameraAddressVault(fetcher: typeof fetch = fetch): CameraAddressVault {
   return {
-    read: async () => {
+    read: async (slot) => {
       try {
-        const response = await fetcher(URL_, {
+        const response = await fetcher(`${ROUTE}${slot}`, {
           method: 'GET',
           headers: { ...HEADER, Accept: 'application/json' },
           cache: 'no-store',
@@ -28,9 +29,9 @@ export function createDesktopCameraAddressVault(fetcher: typeof fetch = fetch): 
         return null;
       }
     },
-    write: async (address) => {
+    write: async (slot, address) => {
       try {
-        const response = await fetcher(URL_, {
+        const response = await fetcher(`${ROUTE}${slot}`, {
           method: 'POST',
           headers: { ...HEADER, 'Content-Type': 'application/json' },
           body: JSON.stringify({ address }),

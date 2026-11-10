@@ -47,7 +47,7 @@ describe.each(CAMERA_LOGIN_FORMS)('a camera reached with a login in the $label f
     expect(JSON.stringify(capture)).not.toContain(STAND_IN_SECRET);
   });
 
-  it('still owns the calibration an older version saved for it', async () => {
+  it.runIf(form.connects)('still owns the calibration an older version saved for it', async () => {
     // An address no URL parser reads has no keyed identity, now as before.
     const queryFingerprint = await cameraQueryFingerprint(form.address);
     // What an older version saved: the address with only userinfo, query and fragment gone.

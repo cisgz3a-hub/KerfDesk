@@ -69,13 +69,13 @@ describe('camera capture identity', () => {
     expect(cameraCaptureBindingForFrame(JPEG_SOURCE, 1280, 720)).toEqual({
       version: 1,
       sourceKind: 'machine-jpeg',
-      sourceId: 'http://192.168.10.1:8080/media/getCapturePhoto',
+      sourceId: 'http://192.168.10.1:8080/',
       width: 1280,
       height: 720,
       resizeMode: 'unknown',
     });
     expect(publicCameraSourceId('rtsp://user:secret@192.168.1.5/live?token=secret#x')).toBe(
-      'rtsp://192.168.1.5/live',
+      'rtsp://192.168.1.5/',
     );
   });
 
@@ -98,7 +98,7 @@ describe('camera capture identity', () => {
       1280,
       720,
     );
-    expect(first.sourceId).toBe(JPEG_SOURCE.cameraUrl);
+    expect(first.sourceId).toBe('http://192.168.10.1:8080/');
     expect(first.queryFingerprint).toMatch(/^hmac-sha256:[0-9a-f]{64}$/);
     expect(first.queryFingerprint).not.toBe(second.queryFingerprint);
     expect(JSON.stringify(first)).not.toContain('channel=1');

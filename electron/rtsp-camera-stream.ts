@@ -6,7 +6,12 @@
 import { spawn } from 'node:child_process';
 import type { ServerResponse } from 'node:http';
 import { writeJson } from './bridge-json.js';
+import type { CameraLoginProblem } from './camera-frame-login.js';
 import { FFMPEG_MISSING_REASON, installedFfmpeg } from './ffmpeg-path.js';
+import { rtspLoginReason } from './rtsp-probe.js';
+import { openRtspLoginRelay, type RtspLoginRelay } from './rtsp-login-relay.js';
+
+const RELAY_FAILED_REASON = 'The camera bridge could not start its connection to the camera.';
 
 // Bound concurrent ffmpeg transcodes so a burst of stream requests cannot
 // exhaust the machine (S03-001 DoS hardening).
@@ -50,7 +55,9 @@ function createPreviewActivityWatch(onTimeout: () => void): PreviewActivityWatch
 }
 
 // Always the full path of the installed FFmpeg, never a bare name (ADR-551).
-function spawnPreviewFfmpeg(executable: string, url: URL) {
+// Its input is the bridge's loopback relay, never the camera address, which
+// other programs could read in FFmpeg's arguments (ADR-692 Amendment 1).
+function spawnPreviewFfmpeg(executable: string, input: string) {
   return spawn(
     executable,
     [
@@ -60,7 +67,7 @@ function spawnPreviewFfmpeg(executable: string, url: URL) {
       '-rtsp_transport',
       'tcp',
       '-i',
-      url.toString(),
+      input,
       '-an',
       '-vf',
       'fps=10',
@@ -87,16 +94,43 @@ export function streamWithFfmpeg(
 ): void {
   const executable = installedFfmpeg();
   if (executable === null) return refuseWithoutFfmpeg(res, lifecycle);
-  const ffmpeg = spawnPreviewFfmpeg(executable, url);
   const releaseSlot = acquireFfmpegSlot();
+  let clientGone = false;
+  res.once('close', () => {
+    clientGone = true;
+  });
+  void openRtspLoginRelay(url).then(
+    (relay) => {
+      if (!clientGone) return startPreview(executable, relay, res, releaseSlot, lifecycle);
+      relay.close();
+      releaseSlot();
+    },
+    () => {
+      releaseSlot();
+      lifecycle?.onFailure(RELAY_FAILED_REASON);
+      if (!clientGone) writeJson(res, { kind: 'unavailable', reason: RELAY_FAILED_REASON }, 502);
+    },
+  );
+}
+
+function startPreview(
+  executable: string,
+  relay: RtspLoginRelay,
+  res: ServerResponse,
+  releaseSlot: () => void,
+  lifecycle?: RtspPreviewLifecycleObserver,
+): void {
+  const ffmpeg = spawnPreviewFfmpeg(executable, relay.url);
   let clientClosed = false;
   let responseStarted = false;
   let settled = false;
   let activityWatch: PreviewActivityWatch | null = null;
 
-  const failStream = (err: Error): void => {
+  const failStream = (fallback: Error): void => {
     if (settled) return;
     settled = true;
+    const login = relay.loginProblem();
+    const err = login === null ? fallback : new Error(rtspLoginReason(login));
     activityWatch?.stop();
     lifecycle?.onFailure(err.message);
     ffmpeg.kill('SIGTERM');
@@ -149,12 +183,14 @@ export function streamWithFfmpeg(
   });
   ffmpeg.on('error', () => {
     releaseSlot();
+    relay.close();
     // Spawn errors and decoder output may echo the input URL, including login
     // or query credentials. Only app-owned diagnostic text crosses the bridge.
     failStream(new Error('FFmpeg camera preview could not start.'));
   });
   ffmpeg.on('exit', () => {
     releaseSlot();
+    relay.close();
     if (settled) return;
     failStream(new Error('FFmpeg camera preview ended unexpectedly.'));
   });
@@ -197,21 +233,40 @@ const MAX_SINGLE_FRAME_BYTES = 8 * 1024 * 1024;
 
 export type RtspFrameCaptureResult =
   | { readonly kind: 'ok'; readonly jpeg: Buffer }
-  | { readonly kind: 'failed'; readonly reason: string };
+  | { readonly kind: 'failed'; readonly reason: string; readonly login?: CameraLoginProblem };
 
 /**
  * Decode exactly one JPEG frame from a private-network RTSP camera (ADR-116).
  * Still capture must not depend on the browser's MJPEG-in-canvas semantics,
  * so the /frame.jpg route asks ffmpeg for a single image instead.
  */
-export function captureRtspFrameJpeg(url: URL): Promise<RtspFrameCaptureResult> {
+export async function captureRtspFrameJpeg(url: URL): Promise<RtspFrameCaptureResult> {
   const executable = installedFfmpeg();
-  if (executable === null)
-    return Promise.resolve({ kind: 'failed', reason: FFMPEG_MISSING_REASON });
+  if (executable === null) return { kind: 'failed', reason: FFMPEG_MISSING_REASON };
   if (!hasFreeFfmpegSlot()) {
-    return Promise.resolve({ kind: 'failed', reason: 'Too many concurrent camera streams.' });
+    return { kind: 'failed', reason: 'Too many concurrent camera streams.' };
   }
   const releaseSlot = acquireFfmpegSlot();
+  let relay: RtspLoginRelay;
+  try {
+    relay = await openRtspLoginRelay(url);
+  } catch {
+    releaseSlot();
+    return { kind: 'failed', reason: RELAY_FAILED_REASON };
+  }
+  const result = await captureThroughRelay(executable, relay, releaseSlot);
+  relay.close();
+  const login = relay.loginProblem();
+  return result.kind === 'failed' && login !== null
+    ? { kind: 'failed', reason: rtspLoginReason(login), login }
+    : result;
+}
+
+function captureThroughRelay(
+  executable: string,
+  relay: RtspLoginRelay,
+  releaseSlot: () => void,
+): Promise<RtspFrameCaptureResult> {
   return new Promise((resolve) => {
     const ffmpeg = spawn(
       executable,
@@ -222,7 +277,7 @@ export function captureRtspFrameJpeg(url: URL): Promise<RtspFrameCaptureResult> 
         '-rtsp_transport',
         'tcp',
         '-i',
-        url.toString(),
+        relay.url,
         '-an',
         '-frames:v',
         '1',

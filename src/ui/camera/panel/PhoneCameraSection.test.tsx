@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter } from '../../../platform/types';
 import { PlatformProvider } from '../../app/platform-context';
 import { clickElement, mountControl } from '../../image-editor/control-audit-test-support';
-import { loadPhoneCamera, savePhoneCamera } from '../../state/camera-preference-storage';
+import { loadPhoneCamera, savePhoneCamera } from '../../state/remembered-camera-addresses';
 import { useCameraStore, type CameraSourceState } from '../../state/camera-store';
 import { MachineCameraSection } from './MachineCameraSection';
 import { PhoneCameraSection } from './PhoneCameraSection';
@@ -108,7 +108,7 @@ describe('PhoneCameraSection', () => {
     await typeAddress(host, url);
     await clickElement(button(host, 'Use phone'));
     expect(startSnapshotSource).toHaveBeenCalledWith(undefined, url);
-    expect(loadPhoneCamera()).toEqual({ app: 'other', address: 'http://192.168.1.50/frame' });
+    expect(loadPhoneCamera()).toEqual({ app: 'other', address: 'http://192.168.1.50/' });
     expect(host.textContent).toContain('Paste the full address again when reconnecting');
   });
 

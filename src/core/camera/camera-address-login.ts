@@ -1,12 +1,20 @@
-// The public form of a network camera address (ADR-692): the only form that
-// may be saved or shared. The full address is used for the live connection
-// and, on the desktop, kept only in the operating system's secure storage.
+// The public form of a network camera address (ADR-692 and its Amendment 1):
+// the only form that may be saved or shared, and the only one kept in plain
+// local storage. It is the scheme, host and port and nothing else; which camera
+// a calibration belongs to is decided by the keyed fingerprint. An address that
+// cannot be read one way only keeps its scheme alone. The full address is used
+// for the live connection and, on the desktop, kept only in the operating
+// system's secure storage.
 
-const LOGIN_FIELD_PARTS = /user|usr|login|account|pass|pwd|psw|auth|token|secret|key/i;
-const LOGIN_FIELD_NAMES = new Set(['pw', 'uid', 'sid', 'name']);
-const FIELD = /(^|[/&;_,])([A-Za-z][A-Za-z0-9.-]*)=/g;
+const SCHEME = /^[a-z][a-z0-9+.-]*:(?=\/\/)/i;
+// Read one way only: any `@` belongs to the part before the host.
+const READ_ONE_WAY = /^[a-z][a-z0-9+.-]*:\/\/(?:[^/?#]*@)?[^/?#@]*(?:[/?#][^@]*)?$/i;
+const PLAIN_HOST = /^(?:[a-z0-9-]+(?:\.[a-z0-9-]+)*|\[[0-9a-f:.]+\])$/i;
 
-/** The address with its userinfo, query and fragment removed. */
+/**
+ * The address with its userinfo, query and fragment removed: what the keyed
+ * identity hashes. Never saved in plain.
+ */
 export function cameraAddressWithoutUserinfo(raw: string): string {
   try {
     const url = new URL(raw.trim());
@@ -25,28 +33,23 @@ export function cameraAddressWithoutUserinfo(raw: string): string {
   }
 }
 
-/** The address with no login in any part of it: the form that may be saved. */
+/** Scheme, host and port: the form that may be saved, shared or kept in plain. */
 export function publicCameraAddress(raw: string): string {
-  const parsed = withoutPathLogin(cameraAddressWithoutUserinfo(raw));
-  if (!parsed.includes('@')) return parsed;
-  // Read again from the last `@`; leaving out too much is the safe side.
-  const scheme = /^[a-z][a-z0-9+.-]*:\/\//i.exec(raw.trim())?.[0] ?? '';
-  const rest = raw.trim().slice(scheme.length).split(/[?#]/, 1)[0] ?? '';
-  return withoutPathLogin(
-    cameraAddressWithoutUserinfo(`${scheme}${rest.slice(rest.lastIndexOf('@') + 1)}`),
-  );
+  const text = raw.trim();
+  const scheme = SCHEME.exec(text)?.[0]?.toLowerCase();
+  const schemeOnly = scheme === undefined ? 'camera' : `${scheme}//`;
+  if (!READ_ONE_WAY.test(text)) return schemeOnly;
+  let url: URL;
+  try {
+    url = new URL(text);
+  } catch {
+    return schemeOnly;
+  }
+  return PLAIN_HOST.test(url.hostname) ? `${url.protocol}//${url.host}/` : schemeOnly;
 }
 
-function withoutPathLogin(address: string): string {
-  const authority = /^[a-z][a-z0-9+.-]*:\/\/[^/]*/i.exec(address)?.[0];
-  if (authority === undefined) return address;
-  const path = address.slice(authority.length);
-  const cut = loginFieldStart(path);
-  return cut === undefined ? address : `${authority}${path.slice(0, cut)}`;
-}
-
-/** True when `raw` carries anything its public form leaves out. */
-export function cameraAddressHasLogin(raw: string): boolean {
+/** True when `raw` holds more than its public form, so only secure storage may keep it. */
+export function cameraAddressHasPrivateParts(raw: string): boolean {
   let whole: string;
   try {
     whole = new URL(raw.trim()).toString();
@@ -54,30 +57,4 @@ export function cameraAddressHasLogin(raw: string): boolean {
     whole = raw.trim();
   }
   return publicCameraAddress(raw) !== whole;
-}
-
-/** Where the first login field starts in `path`, or undefined when it has none. */
-function loginFieldStart(path: string): number | undefined {
-  const plain = firstLoginField(path);
-  if (plain !== undefined) return plain;
-  // Encoded text is checked decoded too; any doubt drops the whole path.
-  let decoded: string;
-  try {
-    decoded = decodeURIComponent(path);
-  } catch {
-    return path.includes('%') ? Math.min(1, path.length) : undefined;
-  }
-  return decoded !== path && firstLoginField(decoded) !== undefined
-    ? Math.min(1, path.length)
-    : undefined;
-}
-
-function firstLoginField(path: string): number | undefined {
-  for (const match of path.matchAll(FIELD)) {
-    const name = match[2] ?? '';
-    if (LOGIN_FIELD_PARTS.test(name) || LOGIN_FIELD_NAMES.has(name.toLowerCase())) {
-      return (match.index ?? 0) + (match[1] ?? '').length;
-    }
-  }
-  return undefined;
 }

@@ -11,9 +11,11 @@ import { serializeProject } from '../../io/project/serialize-project';
 import type { CameraBridgeAdapter } from '../../platform/types';
 import { cameraCaptureBindingForFrame, captureSourceFrame } from '../camera/frame-source';
 import { useCameraStore } from './camera-store';
-import { loadRtspCameraUrl, saveRtspCameraUrl } from './camera-preference-storage';
+import { loadRtspCameraUrl, saveRtspCameraUrl } from './remembered-camera-addresses';
 
 const BASE = 'rtsp://192.168.1.10/cam/realmonitor';
+// What is saved of it (ADR-692 Amendment 1): scheme, host and port.
+const PUBLIC = 'rtsp://192.168.1.10/';
 const BRIDGE: CameraBridgeAdapter = {
   isSupported: () => true,
   probeRtspCamera: async ({ url }) => ({
@@ -51,7 +53,7 @@ describe('RTSP resource capture binding', () => {
   it('does not reuse ambiguous legacy calibration for the remembered default feed', async () => {
     saveRtspCameraUrl(`${BASE}?channel=2`);
     const remembered = loadRtspCameraUrl();
-    expect(remembered).toBe(BASE);
+    expect(remembered).toBe(PUBLIC);
     const current = await capture(remembered ?? '');
     const { queryFingerprint: _identity, ...legacy } = current;
     expect(cameraBindingCompatibility(legacy, current)).toBe('unbound');
@@ -82,7 +84,7 @@ describe('RTSP resource capture binding', () => {
   it('ignores changed URL userinfo and fragments for the same resource', async () => {
     const first = await capture('rtsp://user:password@192.168.1.10/cam/realmonitor?channel=1#one');
     const second = await capture('rtsp://other:changed@192.168.1.10/cam/realmonitor?channel=1#two');
-    expect(first.sourceId).toBe(BASE);
+    expect(first.sourceId).toBe(PUBLIC);
     expect(cameraBindingCompatibility(first, second)).toBe('match');
   });
 
@@ -120,7 +122,7 @@ describe('RTSP resource capture binding', () => {
       'source-mismatch',
     );
     saveRtspCameraUrl(url);
-    expect(loadRtspCameraUrl()).toBe(BASE);
+    expect(loadRtspCameraUrl()).toBe(PUBLIC);
   });
 
   it('requires a new matching binding after the app-local key is lost', async () => {
@@ -181,6 +183,6 @@ describe('RTSP resource capture binding', () => {
     if (active.kind !== 'live') return;
     const binding = cameraCaptureBindingForFrame(active.source, 1280, 720);
     expect(binding.queryFingerprint).toBe(discovered.queryFingerprint);
-    expect(binding.sourceId).toBe('http://camera.local/frame.jpg');
+    expect(binding.sourceId).toBe('http://camera.local/');
   });
 });

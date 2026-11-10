@@ -163,15 +163,15 @@ describe('desktop preference persistence regressions', () => {
     'keeps a sanitized readable %s camera preference when cleanup cannot be saved',
     async (kind, key, value) => {
       localStorage.setItem(key, value);
-      const camera = await import('./camera-preference-storage');
+      const camera = await import('./remembered-camera-addresses');
       const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
         throw new DOMException('Synthetic read-only preference migration', 'QuotaExceededError');
       });
       const readable = kind === 'RTSP' ? camera.loadRtspCameraUrl() : camera.loadPhoneCamera();
       expect(readable).toEqual(
         kind === 'RTSP'
-          ? 'rtsp://192.0.2.10:554/live'
-          : { app: 'other', address: 'https://192.0.2.10/video' },
+          ? 'rtsp://192.0.2.10:554/'
+          : { app: 'other', address: 'https://192.0.2.10/' },
       );
       expect(JSON.stringify(readable)).not.toContain('audit-password');
       expect(localStorage.getItem(key)).toBe(value);

@@ -11,12 +11,14 @@ describe('the desktop window’s remembered camera address (ADR-692)', () => {
         : Response.json({ address: ADDRESS }),
     );
     const vault = createDesktopCameraAddressVault(fetcher as typeof fetch);
-    expect(await vault.write(ADDRESS)).toBe(true);
-    expect(await vault.read()).toBe(ADDRESS);
+    expect(await vault.write('rtsp', ADDRESS)).toBe(true);
+    expect(await vault.read('rtsp')).toBe(ADDRESS);
+    await vault.read('phone');
     const [url, init] = fetcher.mock.calls[0] ?? [];
     expect(url).toBe('app://app/api/camera-address/rtsp');
     expect(new Headers(init?.headers).get('X-KerfDesk-Camera-Address')).toBe('1');
     expect(JSON.parse(String(init?.body))).toEqual({ address: ADDRESS });
+    expect(fetcher.mock.calls.at(-1)?.[0]).toBe('app://app/api/camera-address/phone');
   });
 
   it('reads every failure as nothing kept', async () => {
@@ -28,8 +30,8 @@ describe('the desktop window’s remembered camera address (ADR-692)', () => {
       }),
     ]) {
       const vault = createDesktopCameraAddressVault(fetcher as typeof fetch);
-      expect(await vault.read()).toBeNull();
-      expect(await vault.write(ADDRESS)).toBe(false);
+      expect(await vault.read('rtsp')).toBeNull();
+      expect(await vault.write('rtsp', ADDRESS)).toBe(false);
     }
   });
 });

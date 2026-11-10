@@ -10,8 +10,21 @@ const { spawnMock, installedFfmpeg } = vi.hoisted(() => ({
 vi.mock('node:child_process', () => ({ default: { spawn: spawnMock }, spawn: spawnMock }));
 // FFmpeg is started only by its full path from PATH (ADR-551); the test machine may have none.
 vi.mock('./ffmpeg-path.js', () => ({ FFMPEG_MISSING_REASON: 'No FFmpeg.', installedFfmpeg }));
+// The relay FFmpeg opens (ADR-692 Amendment 1) is stood in for here.
+vi.mock('./rtsp-login-relay.js', () => ({
+  openRtspLoginRelay: vi.fn(async () => ({
+    url: 'rtsp://127.0.0.1:9/relay',
+    loginProblem: () => null,
+    close: () => undefined,
+  })),
+}));
 
 import { captureRtspFrameJpeg, hasFreeFfmpegSlot, streamWithFfmpeg } from './rtsp-camera-stream';
+
+// The relay opens before FFmpeg starts; let it.
+async function relayOpened(): Promise<void> {
+  for (let i = 0; i < 10; i += 1) await Promise.resolve();
+}
 
 function fakeFfmpeg() {
   return Object.assign(new EventEmitter(), {
@@ -52,6 +65,7 @@ function latestChild() {
 describe('RTSP capture process boundary', () => {
   it('waits for stdout to close before returning a complete JPEG', async () => {
     const result = captureRtspFrameJpeg(CAMERA);
+    await relayOpened();
     const child = latestChild();
     const settled = vi.fn();
     void result.then(settled);
@@ -72,6 +86,7 @@ describe('RTSP capture process boundary', () => {
 
   it('keeps timed-out children counted until their processes actually close', async () => {
     const captures = Array.from({ length: 4 }, () => captureRtspFrameJpeg(CAMERA));
+    await relayOpened();
     expect(hasFreeFfmpegSlot()).toBe(false);
     await vi.advanceTimersByTimeAsync(10_000);
     await expect(Promise.all(captures)).resolves.toEqual(
@@ -92,6 +107,7 @@ describe('RTSP capture process boundary', () => {
 
   it('does not forward decoder stderr containing camera credentials on capture failure', async () => {
     const result = captureRtspFrameJpeg(CAMERA);
+    await relayOpened();
     const child = latestChild();
     child.stderr.emit('data', Buffer.from(PRIVATE_DIAGNOSTIC));
     child.emit('exit', 1);
@@ -104,6 +120,7 @@ describe('RTSP capture process boundary', () => {
 
   it('reports an empty successful process as a failed capture', async () => {
     const result = captureRtspFrameJpeg(CAMERA);
+    await relayOpened();
     latestChild().emit('close', 0);
     await expect(result).resolves.toEqual({
       kind: 'failed',
@@ -113,6 +130,7 @@ describe('RTSP capture process boundary', () => {
 
   it('returns a safe spawn error and releases its slot when the failed process closes', async () => {
     const captures = Array.from({ length: 4 }, () => captureRtspFrameJpeg(CAMERA));
+    await relayOpened();
     const child = latestChild();
     child.emit('error', new Error(PRIVATE_DIAGNOSTIC));
     await expect(captures[3]).resolves.toEqual({
@@ -124,7 +142,7 @@ describe('RTSP capture process boundary', () => {
     expect(hasFreeFfmpegSlot()).toBe(true);
   });
 
-  it('does not forward decoder stderr to preview state or the public response', () => {
+  it('does not forward decoder stderr to preview state or the public response', async () => {
     const response = Object.assign(new EventEmitter(), {
       headersSent: false,
       writeHead: vi.fn(),
@@ -133,6 +151,7 @@ describe('RTSP capture process boundary', () => {
     });
     const lifecycle = { onLive: vi.fn(), onFailure: vi.fn(), onClosed: vi.fn() };
     streamWithFfmpeg(CAMERA, response as unknown as ServerResponse, lifecycle);
+    await relayOpened();
     const child = latestChild();
     child.stderr.emit('data', Buffer.from(PRIVATE_DIAGNOSTIC));
     child.emit('exit', 1);

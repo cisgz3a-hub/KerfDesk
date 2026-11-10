@@ -14,7 +14,13 @@ import type { ServerResponse } from 'node:http';
 import { writeJson } from './bridge-json.js';
 import { cameraFrameUrlPolicy } from './camera-frame-proxy-policy.js';
 import { cancelCameraFrameBody, readCameraFrameBody } from './camera-frame-body.js';
-import type { CameraFrameSources } from './camera-frame-sources.js';
+import type { CameraFrameFailure, CameraFrameSources } from './camera-frame-sources.js';
+import {
+  CAMERA_LOGIN_REASONS,
+  fetchWithCameraLogin,
+  forgetCameraFrameLogin,
+  type CameraLoginProblem,
+} from './camera-frame-login.js';
 import { FFMPEG_MISSING_REASON } from './ffmpeg-path.js';
 import { captureRtspFrameJpeg, hasFfmpeg } from './rtsp-camera-stream.js';
 
@@ -96,6 +102,8 @@ export function handleFrameSourceRequest(
     writeJson(res, policy);
     return;
   }
+  // A new Connect asks the camera afresh, login and all.
+  forgetCameraFrameLogin(policy.url.toString());
   writeJson(res, {
     kind: 'ok',
     frameUrl: proxiedFrameUrl(sources.register(policy.url.toString()), bridgePort),
@@ -108,7 +116,8 @@ export async function handleFrameRequest(
   bridgePort: number,
   sources: CameraFrameSources,
 ): Promise<void> {
-  const cameraUrl = sources.cameraUrl(requestUrl.searchParams.get('source') ?? '');
+  const sourceId = requestUrl.searchParams.get('source') ?? '';
+  const cameraUrl = sources.cameraUrl(sourceId);
   if (cameraUrl === undefined) {
     writeJson(res, { kind: 'invalid', reason: MISSING_SOURCE_REASON }, 404);
     return;
@@ -120,65 +129,79 @@ export async function handleFrameRequest(
     writeJson(res, policy);
     return;
   }
-  if (policy.transport === 'rtsp') {
-    await serveRtspFrame(policy.url, res);
+  // A camera that just failed is not asked again yet (ADR-692 Amendment 1).
+  const held = sources.heldBack(sourceId);
+  if (held !== null) {
+    writeJson(res, { kind: 'unavailable', ...held }, 503);
     return;
   }
-  await serveHttpFrame(policy.url, res);
+  const failure =
+    policy.transport === 'rtsp'
+      ? await serveRtspFrame(policy.url, res)
+      : await serveHttpFrame(policy.url, res);
+  sources.noteFrame(sourceId, failure);
 }
 
 // Exported for direct proxy-behavior tests: this is the fetch+serve half, BELOW
 // the loopback/origin policy in handleFrameRequest, so tests exercise it against
 // a loopback mock camera (the full /frame.jpg path now refuses loopback, ELE-02).
-export async function serveHttpFrame(url: URL, res: ServerResponse): Promise<void> {
+export async function serveHttpFrame(
+  url: URL,
+  res: ServerResponse,
+): Promise<CameraFrameFailure | null> {
   const frame = await fetchFrameBytesQueued(url.toString(), HTTP_FRAME_TIMEOUT_MS);
   if (frame.kind !== 'ok') {
-    writeJson(res, { kind: 'unavailable', reason: frame.reason }, 502);
-    return;
+    const failure = frameFailure(frame.reason, frame.login);
+    writeJson(res, { kind: 'unavailable', ...failure }, 502);
+    return failure;
   }
   res.writeHead(200, { 'Content-Type': frame.contentType, 'Cache-Control': 'no-store' });
   res.end(frame.bytes);
+  return null;
 }
 
-async function serveRtspFrame(url: URL, res: ServerResponse): Promise<void> {
+async function serveRtspFrame(url: URL, res: ServerResponse): Promise<CameraFrameFailure | null> {
   if (!(await hasFfmpeg())) {
     writeJson(res, { kind: 'unavailable', reason: FFMPEG_MISSING_REASON });
-    return;
+    return null;
   }
   const result = await captureRtspFrameJpeg(url);
   if (result.kind !== 'ok') {
-    writeJson(res, { kind: 'unavailable', reason: result.reason }, 502);
-    return;
+    const failure = frameFailure(result.reason, result.login);
+    writeJson(res, { kind: 'unavailable', ...failure }, 502);
+    return failure;
   }
   res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'no-store' });
   res.end(result.jpeg);
+  return null;
+}
+
+function frameFailure(reason: string, login: CameraLoginProblem | undefined): CameraFrameFailure {
+  return login === undefined ? { reason } : { reason, login };
 }
 
 export type FetchFrameResult =
   | { readonly kind: 'ok'; readonly bytes: Buffer; readonly contentType: string }
-  | { readonly kind: 'failed'; readonly reason: string };
+  | {
+      readonly kind: 'failed';
+      readonly reason: string;
+      /** Set when the camera asked for a login that was missing, refused or not sendable. */
+      readonly login?: CameraLoginProblem;
+    };
 
 /** Server-side GET of a camera snapshot; exported for direct timeout tests. */
 export async function fetchFrameBytes(url: string, timeoutMs: number): Promise<FetchFrameResult> {
   try {
-    const target = new URL(url);
-    const login = target.username !== '' || target.password !== '';
-    const headers = login
-      ? {
-          Authorization: `Basic ${Buffer.from(
-            `${decodeURIComponent(target.username)}:${decodeURIComponent(target.password)}`,
-          ).toString('base64')}`,
-        }
-      : undefined;
-    target.username = '';
-    target.password = '';
-    // redirect: 'error' — a compromised private device must not be able to
-    // bounce the proxy to a public URL (SSRF hardening).
-    const response = await fetch(target.toString(), {
-      signal: AbortSignal.timeout(timeoutMs),
-      redirect: 'error',
-      ...(headers === undefined ? {} : { headers }),
-    });
+    // A login goes only to a camera that asks, in the form it asks for.
+    const fetched = await fetchWithCameraLogin(url, AbortSignal.timeout(timeoutMs));
+    if (fetched.kind === 'login') {
+      return {
+        kind: 'failed',
+        reason: CAMERA_LOGIN_REASONS[fetched.problem],
+        login: fetched.problem,
+      };
+    }
+    const response = fetched.response;
     if (!response.ok) {
       await cancelCameraFrameBody(response);
       return { kind: 'failed', reason: `Camera returned HTTP ${response.status}.` };
