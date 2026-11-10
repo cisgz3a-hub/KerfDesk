@@ -30,11 +30,12 @@ const CONTROLLER_STATE_TIMEOUT_MESSAGE = 'Timed out waiting for controller state
 // settles and releases the owner itself on the controller's next Idle report.
 const MOTION_STOP_TIMEOUT_MESSAGE =
   'Timed out waiting for motion to stop after Cancel. KerfDesk releases motion control when the controller next reports Idle; use ABORT MOTION to stop the machine now.';
-// A reply that never came keeps the owner: it may still arrive, and only a
-// new serial session proves it will not. Once the controller reports Idle,
-// Disconnect and Connect stay available for that (ADR-640).
+// A reply that never came keeps the owner: it may still arrive. Once the
+// controller reports Idle, a GRBL-family controller's answer to one `$G`
+// proves whether it was dropped and releases the owner in place (ADR-696);
+// Disconnect and Connect stay available meanwhile (ADR-640).
 const MISSING_MOTION_REPLY_MESSAGE =
-  'The controller did not answer the last motion command within 8 seconds. Once the machine has stopped, Disconnect and connect again to clear it; use ABORT MOTION to stop it now.';
+  'The controller did not answer the last motion command within 8 seconds. Once the machine reports Idle, KerfDesk asks it to confirm it has read every line and then releases motion control; if motion stays locked, Disconnect and connect again. Use ABORT MOTION to stop the machine now.';
 const AUTOMATIC_RELEASE_FAILURE_HEADING = 'Releasing the stopped motion needs attention';
 
 export async function runCancelJog(

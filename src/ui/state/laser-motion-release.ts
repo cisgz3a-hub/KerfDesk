@@ -22,8 +22,12 @@ import type { StatusReport } from '../../core/controllers/grbl';
 import type { LaserState } from './laser-store';
 import type { GetFn, SafeWriteFn, SetFn } from './laser-line-shared';
 import { settleAbandonedMotionOperation } from './laser-motion-cancel';
-import type { MotionCancelRefs } from './laser-motion-cancel-context';
 import { isAbandonedMotionOperation } from './laser-motion-operation';
+import {
+  noteStrandedMotionBusy,
+  probeStrandedMotionReply,
+  type MotionReplyProbeRefs,
+} from './laser-motion-reply-probe';
 import { pushLog } from './laser-store-helpers';
 
 /** One retry covers a transient timeout; a settlement that keeps failing is
@@ -32,11 +36,12 @@ import { pushLog } from './laser-store-helpers';
 const MAX_AUTOMATIC_RELEASE_ATTEMPTS = 2;
 
 /** A cancelled owner that only a missing reply holds: nothing is settling it,
- * the controller reports Idle, and an acknowledgement is still owed. The owner
- * stays, because that reply may yet arrive, and only a new serial session
- * proves it will not. Disconnect and Connect therefore stay available here,
- * where Cancel's failure tells the operator to use them; before, they were
- * locked with every other motion owner and only ABORT MOTION got out (ADR-640). */
+ * the controller reports Idle, and an acknowledgement is still owed. On a
+ * GRBL-family controller one ordered `$G` proves a dropped reply and the owner
+ * is released in place (ADR-696). Until then, and where that proof is not
+ * available, Disconnect and Connect stay available here, where Cancel's failure
+ * tells the operator to use them; before ADR-640 they were locked with every
+ * other motion owner and only ABORT MOTION got out. */
 export function motionOwnerAwaitsMissingReply(
   state: Pick<LaserState, 'motionOperation' | 'pendingUntrackedAcks' | 'statusReport'>,
 ): boolean {
@@ -51,11 +56,14 @@ export function motionOwnerAwaitsMissingReply(
 export function releaseAbandonedMotionAtIdle(
   set: SetFn,
   get: GetFn,
-  refs: MotionCancelRefs,
+  refs: MotionReplyProbeRefs,
   safeWrite: SafeWriteFn,
   report: StatusReport,
 ): void {
-  if (report.state !== 'Idle' || report.mpgActive === true) return;
+  if (report.state !== 'Idle' || report.mpgActive === true) {
+    noteStrandedMotionBusy(refs);
+    return;
+  }
   const state = get();
   const operation = state.motionOperation;
   if (!isAbandonedMotionOperation(operation)) return;
@@ -66,7 +74,12 @@ export function releaseAbandonedMotionAtIdle(
   // own ok, and the poller sends M114 only once every earlier ack drained
   // (the same reasoning observeOwnedMotionStatus applies).
   const owedAcks = refs.driver.commands.queuedStatusQuery === null ? state.pendingUntrackedAcks : 0;
-  if (owedAcks > 0 || (operation.pendingMotionTransportWrites ?? 0) > 0) return;
+  if ((operation.pendingMotionTransportWrites ?? 0) > 0) return;
+  if (owedAcks > 0) {
+    // Only a reply the controller may have dropped holds this owner.
+    probeStrandedMotionReply(set, get, refs, safeWrite, Date.now());
+    return;
+  }
   // Another settlement or command owns the controller's replies right now;
   // the next Idle report tries again.
   if (refs.controllerCommand !== null || refs.controllerStatusWait != null) return;

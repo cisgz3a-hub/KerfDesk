@@ -128,4 +128,59 @@ describe('JogPad hold released just after its jog went out', () => {
       host.remove();
     }
   }, 30_000);
+
+  it('a jog line still unread when 0x85 goes out frees the pad without a reconnect', async () => {
+    // A main loop busy past Cancel's 500 ms reply grace has not read the jog
+    // when 0x85 discards it, so its reply never comes. One ordered $G proves
+    // that, and the owner is released on the same serial session (ADR-696).
+    useStore.getState().updateDeviceProfile(FALCON_COMPATIBLE_PROFILE);
+    const sim = createGrblSimulator({
+      motionMs: 4_000,
+      jogCancelFlushesInput: true,
+      lineParseDelayMs: 600,
+    });
+    await useLaserStore
+      .getState()
+      .connect(sim.adapter, connectOptionsForDevice(FALCON_COMPATIBLE_PROFILE));
+    await pump(6_000);
+    expect(useLaserStore.getState().statusReport?.state).toBe('Idle');
+    useJogControlPreferences.setState({ stepMm: 10, requestedFeedMmPerMin: 3000 });
+
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    await act(async () => {
+      root = createRoot(host);
+      root.render(<JogPad disabled={false} />);
+    });
+    try {
+      const right = [...host.querySelectorAll('button')].find(
+        (button) => button.getAttribute('aria-label') === 'Jog +X 10 mm',
+      );
+      if (right === undefined) throw new Error('right jog button missing');
+      const before = sim.outbound().length;
+      await act(async () => {
+        right.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+      });
+      await pump(250);
+      await act(async () => {
+        right.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, button: 0 }));
+        right.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }));
+      });
+      await pump(16_000);
+
+      const written = sim.outbound().slice(before);
+      expect(written.indexOf('$G\n')).toBeGreaterThan(written.indexOf(RT_JOG_CANCEL));
+      expect(written).not.toContain('\x18');
+      expect(sim.state().mpos.x).toBe(0);
+      const state = useLaserStore.getState();
+      expect(state.connection.kind).toBe('connected');
+      expect(state.pendingUntrackedAcks).toBe(0);
+      expect(state.motionOperation).toBeNull();
+      expect(jogFrameCommandBlockMessage(state)).toBeNull();
+    } finally {
+      await act(async () => (root as Root | null)?.unmount());
+      host.remove();
+    }
+  }, 60_000);
 });

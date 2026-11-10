@@ -43,7 +43,12 @@ export type DelayedParseFeeder = {
   readonly wipePlanner: () => void;
 };
 
-export function createDelayedParseFeeder(deps: DelayedParseDeps): DelayedParseFeeder {
+/** `parseDelayMs`: how long the main loop stays busy before it reads bytes
+ *  that just arrived. */
+export function createDelayedParseFeeder(
+  deps: DelayedParseDeps,
+  parseDelayMs: number = GRBL_SIM_LINE_PARSE_DELAY_MS,
+): DelayedParseFeeder {
   let rx = createRxWindow(Number.POSITIVE_INFINITY);
   let nextPass: ReturnType<typeof setTimeout> | null = null;
   const read = (): void => {
@@ -61,7 +66,7 @@ export function createDelayedParseFeeder(deps: DelayedParseDeps): DelayedParseFe
       nextPass ??= setTimeout(() => {
         nextPass = null;
         read();
-      }, GRBL_SIM_LINE_PARSE_DELAY_MS);
+      }, parseDelayMs);
     },
     // An event that frees the main loop lets it read at once, unless bytes
     // that just arrived still wait for the pass that follows them.
