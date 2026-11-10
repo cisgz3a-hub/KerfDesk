@@ -67,7 +67,7 @@ export function DesignHierarchyMoveControls({
       </label>
       <MovePosition
         scene={scene}
-        children={children}
+        destinationChildren={children}
         position={position}
         setPosition={setPosition}
       />
@@ -114,12 +114,12 @@ function HierarchyMoveFooter({
 }
 function MovePosition({
   scene,
-  children,
+  destinationChildren,
   position,
   setPosition,
 }: {
   readonly scene: Scene;
-  readonly children: ReadonlyArray<DesignNodeRef>;
+  readonly destinationChildren: ReadonlyArray<DesignNodeRef>;
   readonly position: string;
   readonly setPosition: (position: string) => void;
 }): JSX.Element {
@@ -135,7 +135,7 @@ function MovePosition({
       >
         <option value="last">Last child</option>
         <option value="first">First child</option>
-        {children.map((ref) => (
+        {destinationChildren.map((ref) => (
           <option key={nodeOrderKey(ref)} value={nodeOrderKey(ref)}>
             Before {nodeName(scene, ref)}
           </option>

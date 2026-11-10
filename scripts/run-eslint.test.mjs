@@ -23,7 +23,7 @@ test('lint and lint:fix use sequential fresh heaps and forward arguments without
     }),
     0,
   );
-  assert.equal(calls.length, 4);
+  assert.equal(calls.length, 5);
   for (const [index, [executable, args, options]] of calls.entries()) {
     assert.equal(executable, process.execPath);
     assert.deepEqual(args, [
@@ -53,7 +53,7 @@ for (const failure of [
 test('ordinary lint errors retain failure while allowing later diagnostics and fixes', () => {
   let calls = 0;
   assert.equal(runEslint(['--fix'], { spawn: () => ({ status: ++calls === 1 ? 1 : 0 }) }), 1);
-  assert.equal(calls, 4);
+  assert.equal(calls, 5);
 });
 
 test('global options and explicit paths retain the original single ESLint invocation', () => {
@@ -95,7 +95,7 @@ test('real ESLint preserves scope, cross-partition cycles, type-aware rules and 
     await put(
       'eslint.config.mjs',
       `import config from ${JSON.stringify(new URL('../eslint.config.mjs', import.meta.url).href)};
-export default [...config, { files: ['src/**/*.ts'], languageOptions: { parserOptions: { project: './tsconfig.json', tsconfigRootDir: import.meta.dirname } }, settings: { 'import/resolver': { typescript: { project: './tsconfig.json' }, node: { extensions: ['.ts', '.js'] } } } }];\n`,
+export default [...config, { files: ['src/**/*.ts'], languageOptions: { parserOptions: { project: './tsconfig.json', tsconfigRootDir: import.meta.dirname } }, settings: { 'import/resolver': { typescript: { project: './tsconfig.json' }, node: { extensions: ['.ts', '.js'] } } } }, { files: ['e2e/**/*.ts'], languageOptions: { parserOptions: { project: './e2e/tsconfig.json', tsconfigRootDir: import.meta.dirname } } }];\n`,
     );
     await put(
       'tsconfig.json',
@@ -121,6 +121,20 @@ export default [...config, { files: ['src/**/*.ts'], languageOptions: { parserOp
       'src/ui/laser/cycle.ts',
       "import { state } from '../state/cycle';\nexport function laser() { return state(); }\n",
     );
+    // The specs are a partition of their own, with their own TypeScript project.
+    await put(
+      'e2e/tsconfig.json',
+      JSON.stringify({
+        compilerOptions: {
+          target: 'ES2022',
+          module: 'ESNext',
+          moduleResolution: 'Bundler',
+          strict: true,
+        },
+        include: ['./**/*.ts'],
+      }),
+    );
+    await put('e2e/floating.e2e.ts', 'export {};\nPromise.resolve();\n');
     await put('src/future/added.ts', 'export const future = 1;\n');
     await put('future-directory/added.js', 'const future = 1;\n');
     await put(
@@ -153,6 +167,12 @@ export default [...config, { files: ['src/**/*.ts'], languageOptions: { parserOp
       parts
         .find((f) => f.file === 'src/ui/state/cycle.ts')
         .messages.some((m) => m.ruleId === '@typescript-eslint/no-floating-promises'),
+    );
+    assert.ok(
+      parts
+        .find((f) => f.file === 'e2e/floating.e2e.ts')
+        .messages.some((m) => m.ruleId === '@typescript-eslint/no-floating-promises'),
+      'the typed promise rule runs on browser specs',
     );
     // The installed import plugin's default extension set omits TypeScript.
     // Supplement the exact-config comparison above with an explicit extension

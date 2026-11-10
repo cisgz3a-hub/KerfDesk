@@ -203,7 +203,8 @@ describe('which commercial builds check for updates (ADR-613)', () => {
       string,
       unknown
     >;
-    for (const field of ['platform', 'codeSigning', 'updates', 'artifacts']) delete payload[field];
+    for (const field of ['platform', 'codeSigning', 'updates', 'artifacts'])
+      Reflect.deleteProperty(payload, field);
     return licensingConfigFromMetadata({
       kerfdeskUnsignedInstaller: true,
       kerfdeskUpdateChannelTrusted: false,

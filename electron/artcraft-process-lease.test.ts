@@ -3,10 +3,11 @@ import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as ProcessIdentity from './artcraft-process-identity';
 import { readEditorProcessIdentity } from './artcraft-process-identity';
 import { checkEditorLease, saveEditorLease } from './artcraft-process-lease';
 vi.mock('./artcraft-process-identity', async (original) => ({
-  ...(await original<typeof import('./artcraft-process-identity')>()),
+  ...(await original<typeof ProcessIdentity>()),
   readEditorProcessIdentity: vi.fn(),
 }));
 const directories: string[] = [];

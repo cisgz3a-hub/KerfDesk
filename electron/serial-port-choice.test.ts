@@ -24,8 +24,8 @@ const ports: ReadonlyArray<ElectronSerialPortSummary> = [
 
 describe('serial-port-choice', () => {
   it('builds a human-readable label from the most useful port fields', () => {
-    expect(serialPortLabel(ports[0])).toBe('USB-SERIAL CH340 (COM5) - COM5 - USB 1a86:7523');
-    expect(serialPortLabel(ports[1])).toBe('COM7');
+    expect(serialPortLabel(ports[0]!)).toBe('USB-SERIAL CH340 (COM5) - COM5 - USB 1a86:7523');
+    expect(serialPortLabel(ports[1]!)).toBe('COM7');
   });
 
   // Controller audit electron-native-4: the IDs read as Device Manager shows them.

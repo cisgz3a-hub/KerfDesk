@@ -6,13 +6,12 @@ import tseslint from 'typescript-eslint';
 const FILE_LINE_LIMIT = 400;
 const FUNCTION_LINE_LIMIT = 80;
 const COMPLEXITY_LIMIT = 12;
+const TEST_FILES = ['electron/**/*.test.ts', 'electron/**/*.test-support.ts'];
 
 export default tseslint.config(
   {
     ignores: [
       'dist-electron/**',
-      'electron/**/*.test.ts',
-      'electron/**/*.test-support.ts',
       // Generated single-file MCP App (services/remote-control/scripts/build-app.mjs --check).
       'electron/mcp/workspace-app-ui.ts',
     ],
@@ -26,7 +25,8 @@ export default tseslint.config(
       ecmaVersion: 2022,
       sourceType: 'module',
       parserOptions: {
-        project: './electron/tsconfig.json',
+        // The build project leaves the tests out; they have their own.
+        project: ['./electron/tsconfig.json', './electron/tsconfig.test.json'],
         tsconfigRootDir: import.meta.dirname,
       },
       globals: {
@@ -57,6 +57,15 @@ export default tseslint.config(
       '@typescript-eslint/prefer-promise-reject-errors': 'error',
       '@typescript-eslint/consistent-type-definitions': 'off',
       '@typescript-eslint/array-type': 'off',
+    },
+  },
+  // Tests and their support files: the same relaxations the root config gives
+  // `src` tests, so scaffolding may use long describe blocks and `!` on fixtures.
+  {
+    files: TEST_FILES,
+    rules: {
+      'max-lines-per-function': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'off',
     },
   },
   prettierConfig,

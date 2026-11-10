@@ -9,6 +9,8 @@ import { installPackagedNativeSmoke } from './native-smoke.js';
 
 it('retains the real UI without scripts or automatic exit and records no automated success', async () => {
   const folder = await mkdtemp(join(tmpdir(), 'kerfdesk-interactive-observation-'));
+  // Checked before the test writes anything, so the cleanup can only remove a temporary folder.
+  if (dirname(folder) !== tmpdir()) throw new Error('Unexpected test path');
   try {
     const contents = Object.assign(new EventEmitter(), {
       executeJavaScript: vi.fn(),
@@ -39,7 +41,6 @@ it('retains the real UI without scripts or automatic exit and records no automat
     expect(app.exit).not.toHaveBeenCalled();
     expect(window.listenerCount('ready-to-show')).toBe(0);
   } finally {
-    if (dirname(folder) !== tmpdir()) throw new Error('Unexpected test path');
     await rm(folder, { recursive: true, force: true });
   }
 });

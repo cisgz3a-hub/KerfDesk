@@ -184,7 +184,7 @@ describe.each([false, true])('authoring SDK contract (modern=%s)', (modern) => {
     ]);
     const result = await client.readResource({ uri: KERFDESK_WORKSPACE_UI_URI });
     expect(result.contents).toHaveLength(1);
-    const resource = result.contents[0];
+    const resource = result.contents[0]!;
     expect(resource.mimeType).toBe('text/html;profile=mcp-app');
     expect(resource._meta).toEqual({
       ui: { prefersBorder: true, csp: { connectDomains: [], resourceDomains: [] } },
@@ -253,7 +253,10 @@ describe.each([false, true])('authoring SDK contract (modern=%s)', (modern) => {
         expect.any(AbortSignal),
         expect.anything(),
       );
-      expect(result.structuredContent?.history).toEqual({ canUndo: true, canRedo: false });
+      expect(result.structuredContent).toHaveProperty('history', {
+        canUndo: true,
+        canRedo: false,
+      });
     }
     const args = {
       ...admission,
@@ -288,7 +291,7 @@ describe.each([false, true])('authoring SDK contract (modern=%s)', (modern) => {
       arguments: { ...admission, artworkIds: ['art-1'], action: 'duplicate' },
     });
     expect(result.isError).toBe(true);
-    expect(result.structuredContent?.error).toMatchObject({ code: 'needs_pro' });
+    expect(result.structuredContent).toMatchObject({ error: { code: 'needs_pro' } });
     expect(request).toHaveBeenCalledTimes(1);
   });
 });
@@ -341,7 +344,7 @@ describe('preview output boundary', () => {
     const client = await clientFor({ request: async () => raw }, false);
     const result = await client.callTool({ name: 'get_workspace_preview', arguments: {} });
     expect(result.isError).toBe(true);
-    expect(result.structuredContent?.error).toMatchObject({ code: 'failed' });
+    expect(result.structuredContent).toMatchObject({ error: { code: 'failed' } });
     expect(result.content.every((part) => part.type === 'text')).toBe(true);
     expect(JSON.stringify(result)).not.toContain('private.example');
   });
