@@ -85,13 +85,18 @@ function RuidaConnectRow({
       {disconnected || ruida.phase === 'connecting' ? (
         <button
           type="button"
+          title="Open UDP to the entered controller address and read its status."
           disabled={!disconnected || host.trim() === ''}
           onClick={() => void ruida.connect(network, host.trim())}
         >
           Connect Ruida
         </button>
       ) : (
-        <button type="button" onClick={() => void ruida.disconnect()}>
+        <button
+          type="button"
+          title="Close the Ruida link. A running job gets Stop Process first."
+          onClick={() => void ruida.disconnect()}
+        >
           Disconnect Ruida
         </button>
       )}
@@ -123,7 +128,12 @@ function RuidaJobControls({ ruida }: { readonly ruida: RuidaNetworkState }): JSX
         {ruida.sending !== null &&
           ` · sent ${ruida.sending.acknowledged}/${ruida.sending.total} datagrams`}
       </p>
-      <button type="button" disabled={!idle} onClick={() => void withJob('frame')}>
+      <button
+        type="button"
+        title="Trace the job's outline with the laser off, where the job will run."
+        disabled={!idle}
+        onClick={() => void withJob('frame')}
+      >
         Frame (laser off)
       </button>
       <button
@@ -136,15 +146,26 @@ function RuidaJobControls({ ruida }: { readonly ruida: RuidaNetworkState }): JSX
       </button>
       <button
         type="button"
+        title="Send Pause Process to the controller."
         disabled={ruida.phase !== 'running' || sending}
         onClick={() => void ruida.pause()}
       >
         Pause
       </button>
-      <button type="button" disabled={ruida.phase !== 'paused'} onClick={() => void ruida.resume()}>
+      <button
+        type="button"
+        title="Send Restore Process to continue the paused job."
+        disabled={ruida.phase !== 'paused'}
+        onClick={() => void ruida.resume()}
+      >
         Resume
       </button>
-      <button type="button" disabled={!active} onClick={() => void ruida.abort()}>
+      <button
+        type="button"
+        title="Stop sending and send Stop Process. Keep a hand on the machine's Stop key."
+        disabled={!active}
+        onClick={() => void ruida.abort()}
+      >
         Abort
       </button>
       {compileError !== '' && <p role="alert">{compileError}</p>}
