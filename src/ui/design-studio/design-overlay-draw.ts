@@ -31,12 +31,15 @@ import { pointSequencePreviewPolylines, type DesignPointSequence } from './desig
 import type { DesignMarquee, DesignView } from './design-session';
 import { mmToPx } from './design-view';
 import type { SketchExtension } from '../../core/design/ops/extend-sketch';
+import type { SketchTrim } from '../../core/design/ops/trim-sketch';
 import { paintExtension } from './design-extend-draw';
 import type { DesignTracking } from './design-tracking';
 import type { PlacedDimension } from './design-dimension-annotation';
 
 export type DesignOverlayPaint = {
   readonly extendPreview?: SketchExtension | null;
+  // The piece the Trim tool would remove (ADR-272 Amendment 8).
+  readonly trimPreview?: SketchTrim | null;
   readonly view: DesignView;
   readonly draft: DesignDraft | null;
   readonly pointSequence: DesignPointSequence | null;
@@ -76,6 +79,7 @@ export function paintDesignOverlay(ctx: CanvasRenderingContext2D, paint: DesignO
   if (paint.pointSequence !== null) paintPointSequence(ctx, paint.view, paint.pointSequence);
   paintMeasurement(ctx, paint);
   if (paint.extendPreview != null) paintExtension(ctx, paint.view, paint.extendPreview);
+  if (paint.trimPreview != null) paintTrimPreview(ctx, paint.view, paint.trimPreview);
   if (paint.tracking != null) paintTracking(ctx, paint.view, paint.tracking);
   // Drawn last so the snap glyph is never hidden behind a draft or a dimension.
   if (paint.snap !== null) paintSnapMarker(ctx, paint.view, paint.snap);
@@ -150,6 +154,25 @@ function paintDraft(ctx: CanvasRenderingContext2D, view: DesignView, draft: Desi
 }
 
 const TRACKING_DASH_PX: ReadonlyArray<number> = [2, 4];
+
+// The doomed piece, dashed in the trim colour the main workspace's Trim uses.
+function paintTrimPreview(ctx: CanvasRenderingContext2D, view: DesignView, trim: SketchTrim): void {
+  const first = trim.removed[0];
+  if (first === undefined) return;
+  ctx.save();
+  ctx.strokeStyle = canvasTheme.trimHighlight;
+  ctx.lineWidth = 3;
+  ctx.setLineDash([6, 3]);
+  ctx.beginPath();
+  const start = mmToPx(view, first);
+  ctx.moveTo(start.x, start.y);
+  for (const point of trim.removed.slice(1)) {
+    const at = mmToPx(view, point);
+    ctx.lineTo(at.x, at.y);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
 
 // Dotted guides in the snap colour, so a tracked point reads as "lined up"
 // and never as geometry. A polar ray also names its angle.
