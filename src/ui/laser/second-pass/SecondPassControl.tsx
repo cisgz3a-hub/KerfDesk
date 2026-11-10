@@ -16,6 +16,7 @@ export function SecondPassControl(props: {
   if (props.machineKind !== 'laser' || finished === null) return null;
   return (
     <button
+      type="button"
       className="lf-btn lf-btn--sm"
       title="Open the job that just finished to paint or erase areas for another pass."
       disabled={props.busy}

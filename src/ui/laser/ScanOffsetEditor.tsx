@@ -38,7 +38,7 @@ export function ScanOffsetEditor(props: ScanOffsetEditorProps): JSX.Element {
         title="Calibrated bidirectional scan compensation. Positive values shift reverse raster/fill sweeps along their travel direction. This only changes generated G-code; it does not write firmware."
       >
         <p style={conventionNoteStyle}>
-          Stored values are LaserForge mm/min plus the full signed separation; reverse rows move and
+          Stored values are KerfDesk mm/min plus the full signed separation; reverse rows move and
           forward rows stay on design coordinates. A LightBurn Line Shift is half the pair gap, so
           double its signed magnitude here. LightBurn Initial Offset and .lbso import are not
           represented; Raster Diagnostics provides assisted conversion.

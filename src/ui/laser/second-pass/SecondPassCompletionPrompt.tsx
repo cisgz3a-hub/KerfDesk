@@ -68,6 +68,7 @@ export function SecondPassCompletionPrompt(props: {
       ) : null}
       <DialogActions>
         <button
+          type="button"
           className="lf-btn"
           onClick={() => dismiss(runId)}
           title="Close this offer. Until you start another job, Paint a second pass in the Machine panel opens this job."
@@ -75,6 +76,7 @@ export function SecondPassCompletionPrompt(props: {
           Not now
         </button>
         <button
+          type="button"
           className="lf-btn lf-btn--primary"
           onClick={() => openEditor(runId, returnFocusTo.current)}
           title="Open this completed job to paint areas for another pass and adjust their power."

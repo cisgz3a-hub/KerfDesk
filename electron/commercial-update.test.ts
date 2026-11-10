@@ -156,9 +156,10 @@ describe('commercial signed and licence-aware updates', () => {
       if (field === 'size') info.files[0]!.size = 1235;
       if (field === 'version') info.version = '1.3.0';
       if (field === 'elevation') Object.assign(info.files[0]!, { isAdminRightsRequired: true });
+      if (field === 'web-installer') Object.assign(info, { packages: {} });
       updater.checkForUpdates.mockResolvedValue({
         isUpdateAvailable: true,
-        updateInfo: field === 'web-installer' ? { ...info, packages: {} } : info,
+        updateInfo: info,
       });
       await expect(checkCommercialUpdates(updater, options)).rejects.toThrow('does not match');
       expect(updater.downloadUpdate).not.toHaveBeenCalled();

@@ -111,7 +111,7 @@ describe('laser start program assertions', () => {
       expect(() => assertActiveDriverAcceptsMachineKind('cnc', fluidncDriver)).not.toThrow();
       for (const driver of [marlinDriver, smoothiewareDriver, ruidaDriver]) {
         expect(() => assertActiveDriverAcceptsMachineKind('cnc', driver)).toThrow(
-          /cannot accept LaserForge CNC jobs/i,
+          /cannot accept KerfDesk CNC jobs/i,
         );
       }
     });

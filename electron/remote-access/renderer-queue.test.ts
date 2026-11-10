@@ -25,7 +25,7 @@ describe('native renderer queue ownership', () => {
     const queue = createRemoteRendererQueue();
     const session = queue.attach();
     const ordinary = Array.from({ length: 32 }, () =>
-      queue.request('review_job', {}, 'client', false).catch((e) => e),
+      queue.request('review_job', {}, 'client', false).catch((e: unknown) => e),
     );
     const first = queue.poll(session).requests[0]!;
     const abort = queue.request('abort_job', {}, 'client', false, undefined, true);
@@ -62,7 +62,9 @@ describe('native renderer queue ownership', () => {
     const queue = createRemoteRendererQueue();
     const session = queue.attach();
     const controller = new AbortController();
-    const first = queue.request('add_text', {}, 'client', true, controller.signal).catch((e) => e);
+    const first = queue
+      .request('add_text', {}, 'client', true, controller.signal)
+      .catch((e: unknown) => e);
     const previous = queue.poll(session).requests[0]!;
     const second = queue.request('get_workspace', {}, 'client', false);
     controller.abort();
@@ -79,7 +81,7 @@ describe('native renderer queue ownership', () => {
   it('invalidates an old window and cancels all its pending work', async () => {
     const queue = createRemoteRendererQueue();
     const old = queue.attach();
-    const pending = queue.request('get_workspace', {}, 'client', false).catch((e) => e);
+    const pending = queue.request('get_workspace', {}, 'client', false).catch((e: unknown) => e);
     const delivered = queue.poll(old).requests[0]!;
     const current = queue.attach();
     expect(await pending).toMatchObject({ code: 'unavailable' });
@@ -96,14 +98,15 @@ describe('native renderer queue ownership', () => {
     const queue = createRemoteRendererQueue();
     const session = queue.attach();
     const requests = Array.from({ length: 32 }, () =>
-      queue.request('get_workspace', {}, 'client', false).catch((e) => e),
+      queue.request('get_workspace', {}, 'client', false).catch((e: unknown) => e),
     );
     await expect(queue.request('get_workspace', {}, 'client', false)).rejects.toMatchObject({
       code: 'unavailable',
     });
     const delivered = queue.poll(session).requests[0]!;
     await vi.advanceTimersByTimeAsync(20_000);
-    for (const result of await Promise.all(requests)) expect(result.code).toBe('cancelled');
+    for (const result of await Promise.all(requests))
+      expect(result).toMatchObject({ code: 'cancelled' });
     expect(queue.poll(session)).toEqual({ requests: [], cancelled: [delivered.id] });
     queue.detach();
   });

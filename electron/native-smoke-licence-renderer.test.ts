@@ -15,7 +15,7 @@ const free = {
   channel: 'commercial',
   state: 'activation-required',
   edition: 'free',
-  tier: null,
+  tier: null as string | null,
   perpetualUpdates: false,
   accessExpiresAt: null,
   updatesUntil: null,

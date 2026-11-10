@@ -22,7 +22,7 @@ export function ScanOffsetMeasurementFormatControls(props: {
           }
         >
           <option value="laserforge-full-reverse-only">
-            LaserForge full gap — reverse rows only
+            KerfDesk full gap — reverse rows only
           </option>
           <option value="lightburn-half-both-directions">LightBurn Line Shift — half gap</option>
         </select>
@@ -43,14 +43,14 @@ export function ScanOffsetMeasurementFormatControls(props: {
       </label>
       <p style={explanationStyle}>
         {isLightBurn
-          ? 'LightBurn moves both scan directions by its Line Shift, so LaserForge saves twice that signed magnitude and keeps forward rows anchored. Speed values entered as mm/s are multiplied by 60.'
-          : 'LaserForge saves the full signed forward-versus-reverse separation in mm. Do not divide the measurement in half: it shifts reverse rows only, while forward rows remain on design coordinates.'}
+          ? 'LightBurn moves both scan directions by its Line Shift, so KerfDesk saves twice that signed magnitude and keeps forward rows anchored. Speed values entered as mm/s are multiplied by 60.'
+          : 'KerfDesk saves the full signed forward-versus-reverse separation in mm. Do not divide the measurement in half: it shifts reverse rows only, while forward rows remain on design coordinates.'}
       </p>
       {isLightBurn ? (
         <p role="note" style={limitationStyle}>
           Pair-alignment magnitude is converted, but correction sign and absolute placement still
-          require a LaserForge coupon. LightBurn Initial Offset and .lbso import are not
-          represented, so also verify raster-to-vector placement.
+          require a KerfDesk coupon. LightBurn Initial Offset and .lbso import are not represented,
+          so also verify raster-to-vector placement.
         </p>
       ) : null}
     </div>

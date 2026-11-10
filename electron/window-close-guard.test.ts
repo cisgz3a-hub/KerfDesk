@@ -23,7 +23,7 @@ function harness(updateClose = false) {
     decideUnsaved: vi.fn((): 'leave' | 'stay' => 'leave'),
     decideUnavailable: vi.fn((): 'leave' | 'stay' => 'stay'),
     forceClose: vi.fn(() => events.emit('closed')),
-    beforeClose: vi.fn(async () => undefined),
+    beforeClose: vi.fn(async (): Promise<void> => undefined),
     isQuitRequested: () => quitting,
     isUpdateCloseRequested: () => updateClose,
     cancelQuit: vi.fn(() => (quitting = false)),

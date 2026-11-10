@@ -9,6 +9,10 @@
 // the row before and burn twice. A rotary on A or Z (ADR-695) is checked
 // against $103 or $102 the same way. The program commands the right rows, so
 // this is a disclosure with the intervals that fit, never an output change.
+// Amendment 2 (rolling audit v13 Y5-P1-3): the check and the advice model the
+// rows as the emitter writes them and the controller steps them
+// (rotary-row-placement.ts), so a one-step interval that doubles rows warns,
+// and the advice names only intervals that land evenly as printed.
 
 import { rotaryYScale } from '../../../core/devices';
 import type { RotaryAxis } from '../../../core/devices/rotary';
@@ -17,10 +21,13 @@ import type { Job, RasterGroup } from '../../../core/job';
 import { rotaryAppliesTo } from '../../../core/job';
 import type { ControllerSettingsSnapshot } from '../../../core/preflight';
 import type { Project } from '../../../core/scene';
-import { formatFixed3Decimals } from '../../../core/util/number-format';
-
-/** Within this many steps of a whole number, rows land evenly enough. */
-const STEP_FIT_TOLERANCE = 0.02;
+import {
+  fittingRowIntervals,
+  rotaryRowPlacement,
+  rowsLandEvenly,
+  type FittingInterval,
+  type RowIntervalAdvice,
+} from './rotary-row-placement';
 
 /** The controller's steps for each rotary axis, as $$ reports them. */
 export type RotaryAxisStepSettings = Pick<
@@ -62,15 +69,14 @@ export function detectRotaryRowStepWarnings(
     return [rotaryRowStepsUnknownWarning(axis)];
   }
   // k is in the axis's own units per surface mm (degrees on A), as its steps are.
-  const stepsPerSurfaceMm = rotaryYScale(rotary) * stepsPerUnit;
+  const scale = rotaryYScale(rotary);
   const stepsText = `${axis} step (${AXIS_STEPS[axis].setting} = ${stepsPerUnit} ${AXIS_STEPS[axis].unit})`;
   const warnings: string[] = [];
   const seen = new Set<string>();
   for (const group of rasters) {
-    const pitchMm = rowPitchMm(group);
-    if (pitchMm === null || seen.has(group.layerId)) continue;
+    if (rowPitchMm(group) === null || seen.has(group.layerId)) continue;
     seen.add(group.layerId);
-    const warning = rowStepWarning(group.layerId, pitchMm, stepsPerSurfaceMm, stepsText);
+    const warning = rowStepWarning(group, { scale, stepsPerUnit, stepsText });
     if (warning !== null) warnings.push(warning);
   }
   return warnings;
@@ -88,30 +94,55 @@ function rowPitchMm(group: RasterGroup): number | null {
   return height / group.pixelHeight;
 }
 
-function rowStepWarning(
-  layerId: string,
-  pitchMm: number,
-  stepsPerSurfaceMm: number,
-  stepsText: string,
-): string | null {
-  const steps = pitchMm * stepsPerSurfaceMm;
-  const whole = Math.round(steps);
-  if (whole >= 1 && Math.abs(steps - whole) <= STEP_FIT_TOLERANCE) return null;
+type AxisSteps = {
+  readonly scale: number;
+  readonly stepsPerUnit: number;
+  readonly stepsText: string;
+};
+
+function rowStepWarning(group: RasterGroup, axis: AxisSteps): string | null {
+  const heightMm = group.bounds.maxY - group.bounds.minY;
+  const pitchMm = heightMm / group.pixelHeight;
+  const rows = group.pixelHeight;
+  const placement = rotaryRowPlacement(rows, pitchMm, axis.scale, axis.stepsPerUnit);
+  if (rowsLandEvenly(placement)) return null;
+  const stepsPerSurfaceMm = axis.scale * axis.stepsPerUnit;
   const stepMm = 1 / stepsPerSurfaceMm;
-  const fewer = Math.max(1, Math.floor(steps));
+  const steps = pitchMm * stepsPerSurfaceMm;
+  const gaps = placement.gapSteps.slice(0, 2).map((gap) => mm(gap * stepMm));
   const effect =
-    steps < 1
-      ? `so about ${Math.round((1 - steps) * 100)} % of its rows land on the row before and burn twice`
-      : `so its rows land ${formatFixed3Decimals(fewer * stepMm)} or ${formatFixed3Decimals((fewer + 1) * stepMm)} mm apart and band`;
+    placement.doubled > 0
+      ? `so ${placement.doubled} of its ${rows} rows land on the row before and burn twice`
+      : `so its rows land ${gaps.join(' or ')} mm apart and band`;
+  const advice = intervalAdvice(
+    fittingRowIntervals(heightMm, steps, axis.scale, axis.stepsPerUnit),
+  );
   return (
-    `Image layer ${layerId} on this rotary: one ${stepsText} turns ` +
-    `the part ${formatFixed3Decimals(stepMm)} mm, and the ${formatFixed3Decimals(pitchMm)} mm line interval is ` +
-    `${steps.toFixed(2)} steps, ${effect}. For even rows, set the line interval to ` +
-    `${linesPerMm(fewer, stepsPerSurfaceMm)} or ${linesPerMm(fewer + 1, stepsPerSurfaceMm)}.`
+    `Image layer ${group.layerId} on this rotary: one ${axis.stepsText} turns ` +
+    `the part ${mm(stepMm)} mm, and the ${mm(pitchMm)} mm line interval is ` +
+    `${steps.toFixed(2)} steps, ${effect}. ${advice}`
   );
 }
 
-function linesPerMm(steps: number, stepsPerSurfaceMm: number): string {
-  const lines = stepsPerSurfaceMm / steps;
-  return `${lines.toFixed(2)} lines/mm (${formatFixed3Decimals(1 / lines)} mm, ${steps} step${steps === 1 ? '' : 's'})`;
+function intervalAdvice(advice: RowIntervalAdvice): string {
+  const best = advice.options[0];
+  if (best === undefined)
+    return 'No line interval this layer accepts lands every row on its own step.';
+  if (!advice.even) {
+    return (
+      `No line interval this layer accepts lands every row on its own step; ` +
+      `${described(best)} comes closest, with ${best.placement.doubled} of ` +
+      `${best.placement.rows} rows doubled.`
+    );
+  }
+  return `For even rows, set the line interval to ${advice.options.map(described).join(' or ')}.`;
+}
+
+function described(option: FittingInterval): string {
+  const plural = option.steps === 1 ? '' : 's';
+  return `${option.intervalMm} mm (${option.linesPerMm.toFixed(2)} lines/mm, ${option.steps} step${plural})`;
+}
+
+function mm(value: number): string {
+  return value.toFixed(4);
 }

@@ -50,7 +50,7 @@ function convertedOverscan(
   return {
     distanceMm,
     warnings: [
-      `${layerName}: LightBurn Scan overscan ${percent}% was converted to ${convertedMm} mm at ${speedMmSec} mm/s${capped}; review it after changing speed because LaserForge stores a fixed physical runway.`,
+      `${layerName}: LightBurn Scan overscan ${percent}% was converted to ${convertedMm} mm at ${speedMmSec} mm/s${capped}; review it after changing speed because KerfDesk stores a fixed physical runway.`,
     ],
   };
 }

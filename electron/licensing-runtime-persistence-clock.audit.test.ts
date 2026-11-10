@@ -13,6 +13,10 @@ const BEFORE_EPOCH = Date.parse('1969-12-31T00:00:00.000Z');
 async function withDiskStore(run: (store: LicensingStore) => Promise<void>): Promise<void> {
   const temporaryRoot = resolve(tmpdir());
   const directory = await mkdtemp(join(temporaryRoot, 'kerfdesk-test-licence-clock-'));
+  // Checked before anything is written, so the cleanup below can only remove a temporary folder.
+  const child = relative(temporaryRoot, directory);
+  if (child === '' || child === '..' || child.startsWith(`..${sep}`) || isAbsolute(child))
+    throw new Error('Unexpected temporary licence-store path');
   const store = createLicensingStore({
     userDataPath: directory,
     platform: 'win32',
@@ -28,9 +32,6 @@ async function withDiskStore(run: (store: LicensingStore) => Promise<void>): Pro
   try {
     await run(store);
   } finally {
-    const child = relative(temporaryRoot, directory);
-    if (child === '' || child === '..' || child.startsWith(`..${sep}`) || isAbsolute(child))
-      throw new Error('Unexpected temporary licence-store path');
     await rm(directory, { recursive: true, force: true });
   }
 }

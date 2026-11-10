@@ -9,7 +9,9 @@ class BackpressuredSocket extends EventEmitter {
   writableLength = 0;
   destroyed = false;
   readonly writes: Buffer[] = [];
-  setNoDelay(): void {}
+  setNoDelay(): void {
+    // The session only needs the call to exist.
+  }
   write(data: Buffer, callback?: (error?: Error | null) => void): boolean {
     this.writes.push(data);
     this.writableLength += data.length;

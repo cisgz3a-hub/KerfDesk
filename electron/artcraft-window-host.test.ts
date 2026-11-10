@@ -1,9 +1,10 @@
+import type * as ChildProcessModule from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ spawn: vi.fn() }));
 vi.mock('node:child_process', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:child_process')>();
+  const actual = await importOriginal<typeof ChildProcessModule>();
   return { ...actual, spawn: mocks.spawn, default: { ...actual, spawn: mocks.spawn } };
 });
 import { ArtcraftWindowChannel } from './artcraft-window-channel.js';

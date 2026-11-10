@@ -28,6 +28,7 @@ export function SecondPassCanvas(props: SecondPassCanvasProps): JSX.Element {
     <div className="second-pass-stage">
       <div className="second-pass-zoom">
         <button
+          type="button"
           className="lf-btn lf-btn--sm"
           onClick={() => viewport.zoom(1.5)}
           aria-label="Zoom in"
@@ -36,6 +37,7 @@ export function SecondPassCanvas(props: SecondPassCanvasProps): JSX.Element {
           <Icon name="plus" size={16} />
         </button>
         <button
+          type="button"
           className="lf-btn lf-btn--sm"
           onClick={() => viewport.zoom(1 / 1.5)}
           aria-label="Zoom out"
@@ -44,6 +46,7 @@ export function SecondPassCanvas(props: SecondPassCanvasProps): JSX.Element {
           <Icon name="minus" size={16} />
         </button>
         <button
+          type="button"
           className="lf-btn lf-btn--sm"
           title="Fit the complete saved engraving in the canvas."
           onClick={viewport.fit}
