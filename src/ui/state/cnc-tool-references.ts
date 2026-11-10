@@ -1,42 +1,4 @@
-import { sceneObjectUsesOperation, type Layer, type Scene } from '../../core/scene';
-
-export type BlockingCncSecondaryToolReference = {
-  readonly layerId: string;
-  readonly layerColor: string;
-  readonly role: 'V-carve clearing' | 'relief finishing' | 'pocket roughing';
-};
-
-/** References whose stage is active and whose selector is reachable in the
- * operation editor. Dormant hidden fields are cleanup candidates, not reasons
- * to trap a custom bit in the library. */
-export function blockingCncSecondaryToolReferences(
-  scene: Scene,
-  toolId: string,
-): ReadonlyArray<BlockingCncSecondaryToolReference> {
-  const references: BlockingCncSecondaryToolReference[] = [];
-  for (const layer of scene.layers) {
-    const settings = layer.cnc;
-    if (settings === undefined) continue;
-    if (
-      settings.vClearToolId === toolId &&
-      settings.cutType === 'v-carve' &&
-      (settings.vCarveFlatDepthEnabled ?? true)
-    ) {
-      references.push(reference(layer, 'V-carve clearing'));
-    }
-    if (
-      settings.pocketRoughToolId === toolId &&
-      settings.cutType === 'pocket' &&
-      settings.pocketStrategy !== 'adaptive'
-    ) {
-      references.push(reference(layer, 'pocket roughing'));
-    }
-    if (settings.reliefFinishToolId === toolId && layerHasReliefObject(scene, layer)) {
-      references.push(reference(layer, 'relief finishing'));
-    }
-  }
-  return references;
-}
+import { type Scene } from '../../core/scene';
 
 /** Removes every secondary assignment to a deleted custom bit. The operation
  * remains available and its selector falls back to the active bit. */
@@ -62,17 +24,4 @@ export function sceneWithoutCncSecondaryToolReferences(scene: Scene, toolId: str
     return { ...layer, cnc: next };
   });
   return changed ? { ...scene, layers } : scene;
-}
-
-function layerHasReliefObject(scene: Scene, layer: Layer): boolean {
-  return scene.objects.some(
-    (object) => object.kind === 'relief' && sceneObjectUsesOperation(object, layer),
-  );
-}
-
-function reference(
-  layer: Layer,
-  role: BlockingCncSecondaryToolReference['role'],
-): BlockingCncSecondaryToolReference {
-  return { layerId: layer.id, layerColor: layer.color, role };
 }

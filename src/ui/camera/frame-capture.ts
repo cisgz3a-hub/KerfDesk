@@ -4,11 +4,6 @@
 
 import type { RgbaImage } from '../../core/camera';
 
-// Live detection runs on a reduced frame: the X-corner response is O(pixels)
-// and a ~480px-wide frame detects reliably while staying well under a
-// preview-rate budget. Full-resolution capture is used for the solve itself.
-export const LIVE_DETECT_TARGET_WIDTH_PX = 480;
-
 /** Maximum time to wait for a one-shot MediaStream frame. */
 export const STREAM_FRAME_TIMEOUT_MS = 5_000;
 
