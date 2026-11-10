@@ -3,7 +3,10 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const eslint = fileURLToPath(new URL('../node_modules/eslint/bin/eslint.js', import.meta.url));
-const subtrees = ['src/core', 'src/ui/state', 'src/ui/laser'];
+// The specs have their own TypeScript project (e2e/tsconfig.json) for the typed
+// promise rules. It reaches most of src through the store's types, so it gets a
+// heap of its own: sharing one with the root project ran out of memory in CI.
+const subtrees = ['src/core', 'src/ui/state', 'src/ui/laser', 'e2e'];
 
 // Only split the input files. Each fresh process keeps the same config,
 // TypeScript project and import resolver, including imports outside its input.

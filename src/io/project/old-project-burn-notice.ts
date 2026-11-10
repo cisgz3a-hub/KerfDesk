@@ -20,6 +20,7 @@ import {
 } from '../../core/text/single-line-frame-rule';
 import { evaluateVariableTemplate } from '../../core/variables';
 import { frameTextWithoutRule } from './migrate-v20-recover-frame-line-rule';
+import { FIRST_MATCHED_FEED_SCHEMA, rotaryFeedChange } from './old-project-rotary-feed';
 import type { RawProject } from './migrations';
 import {
   projectLoadResult,
@@ -87,8 +88,9 @@ function oldProjectBurnNotice(
     movedRecords: movedRecords(version, project),
     imageDose: version < FIRST_EM_SCHEMA ? imageDoseChanges(project) : [],
     cncJobOrigin: version < FIRST_RULE_SCHEMA ? cncJobOriginShift(project) : [],
+    rotaryFeed: version < FIRST_MATCHED_FEED_SCHEMA ? rotaryFeedChange(project) : [],
   };
-  return Object.values(notice).some((list) => list.length > 0) ? notice : undefined;
+  return Object.values(notice).some((list) => (list?.length ?? 0) > 0) ? notice : undefined;
 }
 
 export function mergedBurnNotices(
@@ -102,6 +104,7 @@ export function mergedBurnNotices(
     movedRecords: [...first.movedRecords, ...second.movedRecords],
     imageDose: [...first.imageDose, ...second.imageDose],
     cncJobOrigin: [...first.cncJobOrigin, ...second.cncJobOrigin].slice(0, 1),
+    rotaryFeed: [...(first.rotaryFeed ?? []), ...(second.rotaryFeed ?? [])].slice(0, 1),
   };
 }
 

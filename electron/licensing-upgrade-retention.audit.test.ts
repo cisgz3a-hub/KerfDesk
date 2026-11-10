@@ -1,129 +1,21 @@
 // @vitest-environment node
-import { createHash, generateKeyPairSync, sign } from 'node:crypto';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { basename, dirname, join } from 'node:path';
+import { readFile } from 'node:fs/promises';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { LicensingConfig } from './licensing-config.js';
-import { createLicensingRuntime } from './licensing-runtime.js';
-import { createLicensingStore, type LicenceRecord } from './licensing-store.js';
-import type { LicenceClaims, SignedEntitlement } from './licensing-verification.js';
+import { type LicenceRecord } from './licensing-store.js';
+import {
+  ISSUED,
+  DAY,
+  device,
+  token,
+  key,
+  signed,
+  LATE,
+  rights,
+  harness,
+  removeAuditProfiles,
+} from './licensing-upgrade-retention.audit.test-support.js';
 
-const ISSUED = Date.parse('2026-10-03T01:00:00.000Z') / 1000;
-const DAY = 86_400;
-const device = createHash('sha256').update('upgrade audit computer').digest('base64url');
-const otherDevice = createHash('sha256').update('different audit computer').digest('base64url');
-const pair = generateKeyPairSync('ed25519');
-const keys = { upgrade: pair.publicKey.export({ format: 'der', type: 'spki' }).toString('base64') };
-const token = Buffer.alloc(32, 19).toString('base64url');
-const key = 'KD1.synthetic-upgrade-audit';
-const directories: string[] = [];
-
-afterEach(async () => {
-  for (const path of directories.splice(0)) {
-    if (dirname(path) !== tmpdir() || !basename(path).startsWith('kerfdesk-upgrade-audit-'))
-      throw new Error('Refusing to remove an unowned profile.');
-    await rm(path, { recursive: true, force: true });
-  }
-});
-
-function signed(value: unknown, release = false) {
-  const bytes = Buffer.from(JSON.stringify(value));
-  const encoding = release ? 'base64' : 'base64url';
-  return {
-    ...(release ? { schemaVersion: 1, algorithm: 'Ed25519' } : {}),
-    keyId: 'upgrade',
-    payload: bytes.toString(encoding),
-    signature: sign(null, bytes, pair.privateKey).toString(encoding),
-  };
-}
-
-// A trial checks in every three days (ADR-592). Deadline tests use a trial whose
-// last online confirmation was two days before its original expiry.
-const LATE = ISSUED + 28 * DAY;
-
-function rights(tier: 'paid' | 'trial', confirmedAt = ISSUED): LicenceClaims {
-  const expires = tier === 'trial' ? ISSUED + 30 * DAY : null;
-  return {
-    schemaVersion: 1,
-    product: 'kerfdesk-desktop',
-    licenseId: 'upgrade-licence',
-    activationId: 'upgrade-seat',
-    deviceId: device,
-    tier,
-    issuedAt: confirmedAt,
-    accessExpiresAt: expires,
-    updatesUntil: expires ?? ISSUED + 365 * DAY,
-    perpetualUpdates: false,
-    maxDevices: 3,
-  };
-}
-
-function config(version: string, publishedAt = ISSUED - DAY): LicensingConfig {
-  return {
-    channel: 'commercial',
-    apiOrigin: 'https://upgrade-audit.invalid',
-    entitlementKeys: keys,
-    releaseKeys: keys,
-    release: signed(
-      {
-        schemaVersion: 1,
-        product: 'kerfdesk-desktop',
-        kind: 'release-identity',
-        channel: 'stable',
-        version,
-        sourceSha: 'c998b4d82971fdacfbb1e2d36cc93c2d30080245',
-        sourceRef: 'synthetic-upgrade-audit',
-        publishedAt: new Date(publishedAt * 1000).toISOString(),
-      },
-      true,
-    ),
-  };
-}
-
-// The cryptographic signatures are real. This explicitly fake OS cipher lets
-// portable tests exercise real disk/store/runtime handoff. Native Windows
-// safeStorage and exact published modules are qualified separately.
-const encode = (value: unknown): Buffer =>
-  Buffer.from(Buffer.from(JSON.stringify(value)).map((byte) => byte ^ 0x5a));
-async function harness(tier: 'paid' | 'trial', confirmedAt = ISSUED) {
-  const profile = await mkdtemp(join(tmpdir(), 'kerfdesk-upgrade-audit-'));
-  directories.push(profile);
-  const file = join(profile, 'commercial-licence.v1');
-  const store = createLicensingStore({
-    userDataPath: profile,
-    platform: 'win32',
-    secureStorage: {
-      isAsyncEncryptionAvailable: async () => true,
-      encryptStringAsync: async (value) => encode(JSON.parse(value)),
-      decryptStringAsync: async (value) => ({
-        result: value.map((byte) => byte ^ 0x5a).toString(),
-        shouldReEncrypt: false,
-      }),
-    },
-  });
-  let now = confirmedAt;
-  const entitlement = signed(rights(tier, confirmedAt));
-  const fetch = vi.fn<(_: string, init: RequestInit) => Promise<Response>>(async () =>
-    Response.json({ entitlement, activationToken: token }),
-  );
-  const runtime = (version = '1.0.8', boundDevice = device, publishedAt = ISSUED - DAY) =>
-    createLicensingRuntime({
-      config: config(version, publishedAt),
-      currentVersion: version,
-      store,
-      deviceId: async () => boundDevice,
-      deviceName: 'Synthetic upgrade audit',
-      fetch,
-      now: () => now * 1000,
-    });
-  const old = runtime('1.0.7');
-  const admitted = tier === 'paid' ? await old.activate(key) : await old.startTrial();
-  expect(admitted).toMatchObject({ state: 'ready', edition: 'pro', tier });
-  fetch.mockClear();
-  fetch.mockRejectedValue(new Error('Synthetic offline boundary; no HTTP is performed.'));
-  return { store, file, fetch, runtime, time: (seconds: number) => (now = seconds), entitlement };
-}
+afterEach(removeAuditProfiles);
 
 describe('saved commercial rights through a fresh 1.0.8 runtime', () => {
   it.each(['paid', 'trial'] as const)(
@@ -446,84 +338,4 @@ describe('an upgraded trial keeps its original expiry and clock boundaries', () 
     expect(await runtime.status()).toMatchObject({ state: 'trial-expired', edition: 'free' });
     expect(await h.runtime().status()).toMatchObject({ state: 'clock-error', edition: 'free' });
   });
-});
-
-type Tamper = { name: string; change: (envelope: SignedEntitlement) => SignedEntitlement };
-function payloadChange(
-  envelope: SignedEntitlement,
-  patch: Record<string, unknown>,
-): SignedEntitlement {
-  const claims = JSON.parse(Buffer.from(envelope.payload, 'base64url').toString());
-  return {
-    ...envelope,
-    payload: Buffer.from(JSON.stringify({ ...claims, ...patch })).toString('base64url'),
-  };
-}
-const TAMPERS: Tamper[] = [
-  {
-    name: 'extended signed expiry',
-    change: (e) => payloadChange(e, { accessExpiresAt: ISSUED + 365 * DAY }),
-  },
-  {
-    name: 'changed signed tier',
-    change: (e) => payloadChange(e, { tier: 'paid', accessExpiresAt: null }),
-  },
-  {
-    name: 'changed signed product',
-    change: (e) => payloadChange(e, { product: 'another-product' }),
-  },
-  { name: 'changed signed device', change: (e) => payloadChange(e, { deviceId: otherDevice }) },
-  { name: 'unknown signing key', change: (e) => ({ ...e, keyId: 'unknown-key' }) },
-  { name: 'noncanonical payload', change: (e) => ({ ...e, payload: `${e.payload}=` }) },
-  {
-    name: 'altered signature',
-    change: (e) => ({
-      ...e,
-      signature: `${e.signature[0] === 'A' ? 'B' : 'A'}${e.signature.slice(1)}`,
-    }),
-  },
-];
-
-describe('fresh upgrade rejects altered saved authority without erasing the record', () => {
-  it.each(TAMPERS)('rejects $name in a previously saved trial', async ({ change }) => {
-    const h = await harness('trial');
-    const saved = await h.store.read();
-    if (saved?.credential === undefined) throw new Error('Expected the old saved credential.');
-    await h.store.write({
-      ...saved,
-      credential: { ...saved.credential, entitlement: change(saved.credential.entitlement) },
-    });
-    const tampered = await readFile(h.file);
-    expect(await h.runtime().status()).toMatchObject({ state: 'invalid-licence', edition: 'free' });
-    expect(await readFile(h.file)).toEqual(tampered);
-    expect(h.fetch).not.toHaveBeenCalled();
-  });
-
-  it.each(['paid', 'trial'] as const)(
-    'rejects copied %s rights on a different installation',
-    async (tier) => {
-      const h = await harness(tier);
-      const before = await readFile(h.file);
-      expect(await h.runtime('1.0.8', otherDevice).status()).toMatchObject({
-        state: 'invalid-licence',
-        edition: 'free',
-      });
-      expect(await readFile(h.file)).toEqual(before);
-    },
-  );
-
-  it.each([0, 2, null])(
-    'preserves unsupported record schema %s for explicit recovery',
-    async (schemaVersion) => {
-      const h = await harness('paid');
-      await writeFile(h.file, encode({ ...(await h.store.read()), schemaVersion }));
-      const before = await readFile(h.file);
-      expect(await h.runtime().status()).toMatchObject({
-        state: 'invalid-licence',
-        edition: 'free',
-        storeUnreadable: true,
-      });
-      expect(await readFile(h.file)).toEqual(before);
-    },
-  );
 });

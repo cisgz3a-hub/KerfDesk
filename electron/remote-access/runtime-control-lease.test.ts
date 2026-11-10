@@ -2,6 +2,7 @@
 import { randomUUID } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RemoteIdentity } from './credential-store.js';
+import type * as RelayClient from './relay-client.js';
 import type { RemoteScope } from './relay-types.js';
 import { REMOTE_CONTROL_TTL_MS } from './relay-types.js';
 import { createRemoteRendererQueue } from './renderer-queue.js';
@@ -24,7 +25,7 @@ const captured = vi.hoisted(() => ({
   },
 }));
 vi.mock('./relay-client.js', async (original) => ({
-  ...(await original<typeof import('./relay-client.js')>()),
+  ...(await original<typeof RelayClient>()),
   createRemoteRelayClient: (options: Options) => {
     captured.options = options;
     return captured.relay;
@@ -49,7 +50,12 @@ async function fixture() {
   const queue = createRemoteRendererQueue();
   queue.attach();
   const runtime = createRemoteAccessRuntime(
-    { read: async () => identity, write: async () => undefined, create: () => identity },
+    {
+      read: async () => identity,
+      write: async () => undefined,
+      discard: async () => true,
+      create: () => identity,
+    },
     queue,
     () => elapsed,
   );

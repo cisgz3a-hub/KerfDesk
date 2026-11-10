@@ -52,7 +52,9 @@ function opened(): Project {
   // 1.0.29 wrote schema 21. Schema 22 adds an optional rotary taper (ADR-694)
   // and axis (ADR-695); step 21 changes nothing in this file.
   expect(result.migratedFrom).toBe(21);
-  expect(result.oldProjectBurn).toBeUndefined();
+  // Its strokes round the part now burn 6.28x the energy 1.0.29 gave them, and
+  // the file says so (ADR-127 Amd 2, rolling audit v13 Y5-P2-2).
+  expect(result.oldProjectBurn?.rotaryFeed).toEqual([{ yScale: 40 / (Math.PI * 80) }]);
   return result.project;
 }
 

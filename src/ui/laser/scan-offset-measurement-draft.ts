@@ -165,7 +165,7 @@ function appendValidatedMeasurement(context: ValidationContext): void {
   }
   if (Math.abs(offset) > context.offsetLimitMm) {
     context.errors.push(
-      `Measurement ${rowNumber}: converted LaserForge offset must be between -${context.offsetLimitMm} and ${context.offsetLimitMm} mm for this bed.`,
+      `Measurement ${rowNumber}: converted KerfDesk offset must be between -${context.offsetLimitMm} and ${context.offsetLimitMm} mm for this bed.`,
     );
     return;
   }
