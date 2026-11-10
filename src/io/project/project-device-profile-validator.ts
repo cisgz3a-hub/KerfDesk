@@ -11,6 +11,7 @@ import {
   invalidSavedHeadPositionIndex,
   isLaserFinishPosition,
 } from '../../core/devices/head-position-shape';
+import { ROTARY_AXES } from '../../core/devices/rotary-axis';
 import {
   firstError,
   isObject,
@@ -129,7 +130,7 @@ export function optionalRotarySetup(obj: Record<string, unknown>, path: string):
     requirePositiveNumber(value, `${path}.objectDiameterMm`),
     optionalPositiveNumber(value, `${path}.rollerDiameterMm`),
     // ADR-695: absent is Y, as every file before it.
-    optionalLiteral(value, `${path}.axis`, ['Y', 'A', 'Z']),
+    optionalLiteral(value, `${path}.axis`, ROTARY_AXES),
     optionalLiteral(value, `${path}.axisConfirmed`, ['A', 'Z']),
     optionalBoolean(value, `${path}.reverseAxis`),
     optionalRotaryTaper(value, `${path}.taper`),

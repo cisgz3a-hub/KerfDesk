@@ -9,12 +9,6 @@ import {
 import type { DeviceProfile } from '../devices';
 import { maxOf, minOf } from '../util';
 
-/** Relative to the physical Z position at the start of each sample. */
-export type FocusTestMotion = {
-  readonly offsetMm: number;
-  readonly travelFeedMmPerMin: number;
-};
-
 export type FocusTestOptions = {
   readonly steps: number;
   readonly minOffsetMm: number;

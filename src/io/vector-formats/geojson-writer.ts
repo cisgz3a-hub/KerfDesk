@@ -44,6 +44,7 @@ import {
 } from './vector-artwork';
 import { collapsesOnGrid, contoursKeptAfterCollapse } from './collapsed-ring-subtrees';
 import { fillRegionPolygons, twiceSignedArea } from './fill-region-rings';
+import { samePoint } from '../../core/geometry/point-math';
 
 export const DEFAULT_GEOJSON_FLATTEN_TOLERANCE_MM = 0.01;
 
@@ -226,10 +227,6 @@ function dedupe(points: ReadonlyArray<GridPoint>): GridPoint[] {
     if (last === undefined || !samePoint(last, point)) out.push(point);
   }
   return out;
-}
-
-function samePoint(a: GridPoint, b: GridPoint): boolean {
-  return a.x === b.x && a.y === b.y;
 }
 
 class Extent {

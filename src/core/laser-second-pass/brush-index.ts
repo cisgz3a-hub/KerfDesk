@@ -4,6 +4,7 @@ import type {
   LaserSecondPassSelection,
   LaserSecondPassStroke,
 } from './types';
+import { boxesOverlap } from '../geometry/box-math';
 
 export type BrushCapsule = {
   readonly from: LaserSecondPassPoint;
@@ -126,10 +127,6 @@ export function buildBrushIndex(selection: LaserSecondPassSelection): BrushIndex
   return { capsules, root: capsules.length === 0 ? null : makeNode(capsules, 0, capsules.length) };
 }
 
-function overlaps(a: LaserSecondPassBounds, b: LaserSecondPassBounds): boolean {
-  return a.minX <= b.maxX && a.maxX >= b.minX && a.minY <= b.maxY && a.maxY >= b.minY;
-}
-
 export function visitBrushCandidates(
   index: BrushIndex,
   bounds: LaserSecondPassBounds,
@@ -138,14 +135,14 @@ export function visitBrushCandidates(
   const pending: BrushNode[] = index.root === null ? [] : [index.root];
   while (pending.length > 0) {
     const node = pending.pop();
-    if (node === undefined || !overlaps(bounds, node.bounds)) continue;
+    if (node === undefined || !boxesOverlap(bounds, node.bounds)) continue;
     if (node.children.length > 0) {
       pending.push(...node.children);
       continue;
     }
     for (let item = node.start; item < node.end; item += 1) {
       const candidate = index.capsules[item];
-      if (candidate !== undefined && overlaps(bounds, candidate.bounds)) visit(candidate);
+      if (candidate !== undefined && boxesOverlap(bounds, candidate.bounds)) visit(candidate);
     }
   }
 }

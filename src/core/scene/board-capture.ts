@@ -13,6 +13,7 @@
 
 import type { Vec2 } from './scene-object';
 import { maxOf, minOf } from '../util';
+import { isFinitePoint } from '../geometry/point-math';
 
 // The five reference points on a captured board, shared by the on-canvas
 // alignment buttons (align artwork to this corner/centre of the outline) and the
@@ -143,16 +144,12 @@ export function boardCornersFromOrigin(
  * Returns 0 for non-finite inputs (no throw); callers clamp to a minimum size.
  */
 export function diameterFromCenterEdge(center: Vec2, edge: Vec2): number {
-  if (!isFiniteVec(center) || !isFiniteVec(edge)) return 0;
+  if (!isFinitePoint(center) || !isFinitePoint(edge)) return 0;
   return 2 * Math.hypot(edge.x - center.x, edge.y - center.y);
 }
 
 function allFinite(points: ReadonlyArray<Vec2>): boolean {
-  return points.every(isFiniteVec);
-}
-
-function isFiniteVec(p: Vec2): boolean {
-  return Number.isFinite(p.x) && Number.isFinite(p.y);
+  return points.every(isFinitePoint);
 }
 
 function boundingBox(points: ReadonlyArray<Vec2>): Aabb {

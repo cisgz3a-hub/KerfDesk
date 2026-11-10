@@ -39,6 +39,7 @@ import {
   traceSizeOutput,
   type TraceSizeSettings,
 } from './TraceSizeFields';
+import { errorMessage } from '../../core/util/error-message';
 
 export type MultiFileTraceSettings = TracePageSettings &
   TraceSizeSettings & {
@@ -280,7 +281,7 @@ export async function chooseMultiFileTraceImages(
     // The picker must be the first await so it runs inside the click's user activation.
     return await pickPlatformBatchTraceImageFiles(platform);
   } catch (err) {
-    pushToast(`Could not choose trace images: ${errMsg(err)}`, 'error');
+    pushToast(`Could not choose trace images: ${errorMessage(err)}`, 'error');
     return null;
   }
 }
@@ -357,12 +358,8 @@ async function reserveTraceOutput(
     // directory API): each file is offered through its own save dialog. Any
     // other failure is reported and nothing starts, as Save Tiled G-code does.
     if (isSaveDirectoryUnsupported(err)) return perFile;
-    pushToast(`Could not trace images: ${errMsg(err)}`, 'error');
+    pushToast(`Could not trace images: ${errorMessage(err)}`, 'error');
     return null;
   }
   return directory === null ? null : traceFileWriterForDirectory(directory);
-}
-
-function errMsg(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }

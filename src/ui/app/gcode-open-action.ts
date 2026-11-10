@@ -30,11 +30,6 @@ type OpenPreview = ReturnType<typeof useStore.getState>['openExternalGcodePrevie
 
 const GCODE_ACCEPT = ['.nc', '.gcode', '.tap'];
 
-export function isGcodeFile(file: Pick<GcodeSourceFile, 'name'>): boolean {
-  const name = file.name.toLowerCase();
-  return GCODE_ACCEPT.some((extension) => name.endsWith(extension));
-}
-
 async function pickGcodeFile(
   platform: PlatformAdapter,
   pushToast: PushToast,

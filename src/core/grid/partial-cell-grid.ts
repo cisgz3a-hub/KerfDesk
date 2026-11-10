@@ -3,6 +3,8 @@
 // the requested square pitch; only the terminal cell on an axis may be short.
 
 /** A finite rectangular grid with square interior pitch and exact outer extents. */
+import { isFinitePositive } from '../util/finite';
+
 export type PartialCellGrid = {
   readonly widthCells: number;
   readonly heightCells: number;
@@ -22,7 +24,7 @@ export type PartialGridCell = {
 
 /** The least safe integer count whose requested cells cover the exact extent. */
 export function partialCellCount(extentMm: number, mmPerCell: number): number | null {
-  if (!positiveFinite(extentMm) || !positiveFinite(mmPerCell)) return null;
+  if (!isFinitePositive(extentMm) || !isFinitePositive(mmPerCell)) return null;
   const quotient = extentMm / mmPerCell;
   if (!Number.isFinite(quotient)) return null;
   // A positive extent smaller than the smallest representable fraction of the
@@ -154,8 +156,4 @@ function axisCellCount(grid: PartialCellGrid, axis: PartialCellAxis): number {
 
 function axisExtentMm(grid: PartialCellGrid, axis: PartialCellAxis): number {
   return axis === 'x' ? grid.widthMm : grid.heightMm;
-}
-
-function positiveFinite(value: number): boolean {
-  return Number.isFinite(value) && value > 0;
 }

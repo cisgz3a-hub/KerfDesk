@@ -1,4 +1,5 @@
 import type { ImportedSvg, SceneObject } from './scene-object';
+import { isRecord } from '../util/is-record';
 
 export type BooleanCompoundOperation = 'weld' | 'subtract' | 'intersect' | 'exclude';
 export type BooleanCompoundOperand = {
@@ -31,7 +32,7 @@ export function validateBooleanCompound(
 ): string | null {
   if (value === undefined) return null;
   if (
-    !record(value) ||
+    !isRecord(value) ||
     typeof value['operation'] !== 'string' ||
     !['weld', 'subtract', 'intersect', 'exclude'].includes(value['operation'])
   )
@@ -61,12 +62,12 @@ function validateCompoundOperand(
   validate: (object: unknown, path: string) => string | null,
   ids: Set<string>,
 ): string | null {
-  if (!record(value) || typeof value['sourceId'] !== 'string' || value['sourceId'].trim() === '')
+  if (!isRecord(value) || typeof value['sourceId'] !== 'string' || value['sourceId'].trim() === '')
     return `invalid ${at}.sourceId`;
   if (!isCompoundSourceKind(value['sourceKind'])) return `invalid ${at}.sourceKind`;
   const object = value['object'];
   if (
-    !record(object) ||
+    !isRecord(object) ||
     object['kind'] !== 'imported-svg' ||
     object['booleanCompound'] !== undefined
   )
@@ -84,10 +85,6 @@ function isCompoundSourceKind(value: unknown): value is BooleanCompoundOperand['
     typeof value === 'string' && ['imported-svg', 'traced-image', 'shape', 'text'].includes(value)
   );
 }
-function record(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
 export function retainedBooleanOperandCount(objects: ReadonlyArray<SceneObject>): number {
   return objects.reduce(
     (sum, object) =>

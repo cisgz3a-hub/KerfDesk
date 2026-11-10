@@ -23,6 +23,7 @@ import type { CncStrategyFallback } from '../../../core/job/cnc-compilation-side
 import { cncCuttingStageLabel } from '../../../core/scene/cnc-stage-recipe';
 import { nominalChiploadMm } from '../../../core/cnc/nominal-chipload';
 import { effectiveGcodeFeedMmPerMin } from '../../../core/gcode/feed-word';
+import { formatGroupedUpTo3Decimals } from '../../../core/util/number-format';
 
 export type JobReviewEffectiveOperation = {
   readonly layerId: string;
@@ -257,9 +258,9 @@ function cncGroupSummary(group: CncGroup): string {
     actualDepth +
     (group.cuttingStage === undefined ? '' : `${cncCuttingStageLabel(group.cuttingStage)} · `) +
     `${tool} · ${group.passes.length} ${plural(group.passes.length, 'pass', 'passes')}` +
-    ` · ${formatNumber(effectiveGcodeFeedMmPerMin(group.feedMmPerMin))} mm/min feed` +
-    ` · ${formatNumber(effectiveGcodeFeedMmPerMin(group.plungeMmPerMin))} mm/min plunge` +
-    ` · ${formatNumber(Math.max(0, Math.round(group.spindleRpm)))} RPM · ${coolant}` +
+    ` · ${formatGroupedUpTo3Decimals(effectiveGcodeFeedMmPerMin(group.feedMmPerMin))} mm/min feed` +
+    ` · ${formatGroupedUpTo3Decimals(effectiveGcodeFeedMmPerMin(group.plungeMmPerMin))} mm/min plunge` +
+    ` · ${formatGroupedUpTo3Decimals(Math.max(0, Math.round(group.spindleRpm)))} RPM · ${coolant}` +
     nominalChiploadSummary(group)
   );
 }
@@ -285,8 +286,8 @@ function laserGroupSummary(
     group.kind !== 'raster' && group.powerMode !== undefined ? ` · ${group.powerMode} power` : '';
   const speed =
     group.requestedSpeed === undefined
-      ? `${formatNumber(group.speed)} mm/min`
-      : `${formatNumber(group.speed)} mm/min effective (${formatNumber(group.requestedSpeed)} requested)`;
+      ? `${formatGroupedUpTo3Decimals(group.speed)} mm/min`
+      : `${formatGroupedUpTo3Decimals(group.speed)} mm/min effective (${formatGroupedUpTo3Decimals(group.requestedSpeed)} requested)`;
   const baseLayer = scene?.layers.find((layer) => layer.id === group.layerId);
   const overrideFacts =
     group.operationSettings === undefined
@@ -296,7 +297,7 @@ function laserGroupSummary(
         : ` · requested ${baseLayer?.name ?? group.layerId}; effective artwork override: ${laserOperationDetail(group.operationSettings)}`;
   const contourEntry = contourEntrySummary(group, entriesSkipped);
   return (
-    `${kind} · ${formatNumber(group.power)}% power` +
+    `${kind} · ${formatGroupedUpTo3Decimals(group.power)}% power` +
     ` · ${speed}` +
     ` · ${group.passes} ${plural(group.passes, 'pass', 'passes')}` +
     ` · air ${group.airAssist ? 'on' : 'off'}${powerMode}${contourEntry}${overrideFacts}`
@@ -326,13 +327,9 @@ function contourEntrySummary(group: Exclude<Group, CncGroup>, skipped: boolean):
     const runway = group.exitRunwayMm === undefined ? 'contour entry' : 'contour entry and exit';
     return skipped
       ? ` · ${runway} not added (bed position unknown)`
-      : ` · ${runway} ${formatNumber(group.entryRunwayMm)} mm effective (laser off)`;
+      : ` · ${runway} ${formatGroupedUpTo3Decimals(group.entryRunwayMm)} mm effective (laser off)`;
   }
   return '';
-}
-
-function formatNumber(value: number): string {
-  return value.toLocaleString('en-US', { maximumFractionDigits: 3 });
 }
 
 function formatCoordinateText(text: string): string {
@@ -341,7 +338,7 @@ function formatCoordinateText(text: string): string {
 
 function formatRequestedNumber(value: number): string {
   const text = requestedCncCoordinateText(value);
-  return text === String(value) ? text : formatNumber(Number(text));
+  return text === String(value) ? text : formatGroupedUpTo3Decimals(Number(text));
 }
 
 function plural(count: number, singular: string, pluralForm: string): string {

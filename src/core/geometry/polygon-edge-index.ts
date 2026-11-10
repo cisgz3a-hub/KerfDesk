@@ -7,6 +7,7 @@
 // included, exactly as the unindexed scans walk the boundary.
 import type { Vec2 } from '../scene';
 import { ContourBoxIndex } from '../trace/contour-box-index';
+import { isFinitePoint } from './point-math';
 
 type EdgeBox = {
   readonly minX: number;
@@ -35,7 +36,7 @@ export class PolygonEdgeIndex {
     for (let edge = 0; edge < polygon.length; edge += 1) {
       const a = polygon[edge];
       const b = polygon[(edge + 1) % polygon.length];
-      if (a === undefined || b === undefined || !finitePoint(a) || !finitePoint(b)) return null;
+      if (a === undefined || b === undefined || !isFinitePoint(a) || !isFinitePoint(b)) return null;
       boxes.push({
         minX: Math.min(a.x, b.x),
         minY: Math.min(a.y, b.y),
@@ -93,8 +94,4 @@ export class PolygonEdgeIndex {
     }
     return false;
   }
-}
-
-function finitePoint(point: Vec2): boolean {
-  return Number.isFinite(point.x) && Number.isFinite(point.y);
 }

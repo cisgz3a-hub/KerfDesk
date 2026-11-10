@@ -1,15 +1,7 @@
 import type { Vec2 } from '../scene';
 import type { FrameStartPoint } from '../scene/start-points';
 import type { JobBounds } from './job-bounds';
-
-function frameCorners(bounds: JobBounds): readonly [Vec2, Vec2, Vec2, Vec2] {
-  return [
-    { x: bounds.minX, y: bounds.minY },
-    { x: bounds.maxX, y: bounds.minY },
-    { x: bounds.maxX, y: bounds.maxY },
-    { x: bounds.minX, y: bounds.maxY },
-  ];
-}
+import { boxCorners } from '../geometry/box-math';
 
 /** Same closed perimeter for the canvas and every controller. An interior
  * start splits one edge; it never shortens the rectangle or adds a diagonal. */
@@ -17,7 +9,7 @@ export function buildFramePerimeter(
   bounds: JobBounds,
   start: FrameStartPoint = { edge: 0, fraction: 0 },
 ): readonly [Vec2, ...Vec2[]] {
-  const corners = frameCorners(bounds);
+  const corners = boxCorners(bounds);
   const edge = start.fraction === 1 ? (start.edge + 1) % 4 : start.edge;
   const fraction = start.fraction === 1 ? 0 : start.fraction;
   const from = corners[edge] ?? corners[0];
@@ -31,7 +23,7 @@ export function buildFramePerimeter(
 
 /** Project onto the closest boundary edge. Corner ties resolve deterministically. */
 export function nearestFrameStartPoint(bounds: JobBounds, point: Vec2): FrameStartPoint {
-  const corners = frameCorners(bounds);
+  const corners = boxCorners(bounds);
   let best: FrameStartPoint = { edge: 0, fraction: 0 };
   let nearestDistance = Number.POSITIVE_INFINITY;
   for (const edge of [0, 1, 2, 3] as const) {

@@ -32,6 +32,7 @@ import type { ControllerKind, DeviceProfile } from '../../core/devices';
 import { deviceProfileWithInteractivePatch } from '../../core/devices/device-profile-patch';
 import { useStore } from './store';
 import { cncLiveCapsFromController } from './cnc-controller-caps';
+import { isPositiveFiniteNumber } from '../../core/util/finite';
 
 export type DetectedSettingsRefs = {
   // The pure state machine. Owned by the laser-store's `refs` object;
@@ -170,10 +171,7 @@ export function shouldShowDetectedSettingsReview(detected: DetectedSettingsResul
   ) {
     return true;
   }
-  if (isPositive(controller.zMaxFeed) && isPositive(controller.zTravelMm)) return true;
+  if (isPositiveFiniteNumber(controller.zMaxFeed) && isPositiveFiniteNumber(controller.zTravelMm))
+    return true;
   return detected.settingsRows.some((row) => !row.known);
-}
-
-function isPositive(value: number | undefined): boolean {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0;
 }

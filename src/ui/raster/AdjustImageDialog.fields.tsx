@@ -13,6 +13,7 @@ import * as styles from './AdjustImageDialog.styles';
 import type { AdjustImageDraft } from './AdjustImageDialog.types';
 import type { UserImagePreset } from './AdjustImageDialog.user-presets';
 import { imageDensityBounds, type NumberBounds } from './image-density-bounds';
+import { roundToDecimals } from '../../core/util/rounding';
 
 export function AdjustFields(props: {
   readonly draft: AdjustImageDraft;
@@ -140,7 +141,7 @@ function LineIntervalField(props: {
       name="lineIntervalMm"
       label="Line Interval"
       value={linesPerMmToLineIntervalMm(props.linesPerMm)}
-      format={(value) => String(displayNumber(value, 4))}
+      format={(value) => String(roundToDecimals(value, 4))}
       normalize={(value) => linesPerMmToLineIntervalMm(lineIntervalMmToLinesPerMm(value))}
       min={props.bounds.min}
       max={props.bounds.max}
@@ -163,7 +164,7 @@ function DpiField(props: {
       name="imageDpi"
       label="DPI"
       value={linesPerMmToDpi(props.linesPerMm)}
-      format={(value) => String(displayNumber(value, 2))}
+      format={(value) => String(roundToDecimals(value, 2))}
       normalize={(value) => linesPerMmToDpi(dpiToLinesPerMm(value))}
       min={props.bounds.min}
       max={props.bounds.max}
@@ -281,10 +282,6 @@ function CheckboxField(props: {
       />
     </label>
   );
-}
-
-function displayNumber(value: number, decimals: number): number {
-  return Number(value.toFixed(decimals));
 }
 
 function numberFieldTitle(name: string, label: string): string {

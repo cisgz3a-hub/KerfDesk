@@ -16,6 +16,7 @@ import type { Project } from '../../core/scene';
 import { serializeProject } from '../../io/project';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import type { ToastVariant } from '../state/toast-store';
+import { errorMessage } from '../../core/util/error-message';
 
 const RECOVERY_SUFFIX = '-recovery.lf2';
 const DEFAULT_RECOVERY_NAME = `untitled${RECOVERY_SUFFIX}`;
@@ -124,7 +125,7 @@ function exportedMessage(ctx: SalvageExportCtx, target: SaveTarget): string {
 
 function recoveryError(ctx: SalvageExportCtx, err: unknown): SalvageExportOutcome {
   if (ctx.isCurrent?.() === false) return 'stale';
-  ctx.pushToast(`Could not export a recovery copy: ${errMsg(err)}`, 'error');
+  ctx.pushToast(`Could not export a recovery copy: ${errorMessage(err)}`, 'error');
   return 'error';
 }
 
@@ -139,8 +140,4 @@ export function recoveryName(savedName: string | null): string {
   if (savedName === null || savedName.trim() === '') return DEFAULT_RECOVERY_NAME;
   const base = savedName.replace(/\.lf2$/i, '');
   return `${base}${RECOVERY_SUFFIX}`;
-}
-
-function errMsg(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }

@@ -3,6 +3,7 @@ import { ContourContactCache } from './contour-contact-cache';
 import { ContourOrientation } from './contour-orientation';
 import { contourBox, visitContourBoxPairsSteps, type ContourBox } from './contour-spatial';
 import type { TraceSteps } from './trace-steps';
+import { samePoint } from '../geometry/point-math';
 
 type ContourEdge = ContourBox & {
   readonly a: Vec2;
@@ -72,8 +73,4 @@ function segmentsMeet(a: ContourEdge, b: ContourEdge, orientation: ContourOrient
     orientation.sign(a.a, a.b, b.a) * orientation.sign(a.a, a.b, b.b) <= 0 &&
     orientation.sign(b.a, b.b, a.a) * orientation.sign(b.a, b.b, a.b) <= 0
   );
-}
-
-function samePoint(a: Vec2, b: Vec2): boolean {
-  return a.x === b.x && a.y === b.y;
 }

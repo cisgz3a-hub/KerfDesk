@@ -1,8 +1,6 @@
 import type { deserializeProject } from '../../io/project';
 
-export function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
+export { errorMessage } from '../../core/util/error-message';
 
 export function suggestedGcodeName(savedName: string | null): string {
   if (savedName === null) return 'untitled.gcode';

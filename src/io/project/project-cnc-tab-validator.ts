@@ -1,4 +1,5 @@
-type RawObject = Record<string, unknown>;
+import { isRecord } from '../../core/util/is-record';
+import { isNonNegativeInteger } from '../../core/util/finite';
 
 // Structure only, deliberately with no length limit. Anchors seed per closed
 // contour rather than per object, and an SVG import buckets every same-colour
@@ -18,7 +19,7 @@ export function validateCncTabAnchors(value: unknown, path: string): string | nu
 }
 
 function validateAnchor(value: unknown, path: string): string | null {
-  if (!isObject(value)) return `missing or invalid \`${path}\``;
+  if (!isRecord(value)) return `missing or invalid \`${path}\``;
   if (typeof value['layerColor'] !== 'string') {
     return `missing or invalid \`${path}.layerColor\``;
   }
@@ -30,14 +31,6 @@ function validateAnchor(value: unknown, path: string): string | null {
   }
   if (!isNormalizedNumber(value['pathT'])) return `missing or invalid \`${path}.pathT\``;
   return null;
-}
-
-function isObject(value: unknown): value is RawObject {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isNonNegativeInteger(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value >= 0;
 }
 
 function isNormalizedNumber(value: unknown): value is number {

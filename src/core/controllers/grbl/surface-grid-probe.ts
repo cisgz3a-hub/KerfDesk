@@ -3,6 +3,7 @@ import {
   parseActiveWcsFromModalResponses,
   type ActiveWorkCoordinateSystem,
 } from './work-offset-readback';
+import { roundToThousandth } from '../../util/rounding';
 
 export type SurfaceGridRequest = {
   readonly minX: number;
@@ -99,8 +100,12 @@ export function surfaceGridPositions(
       points.push({
         row,
         column,
-        x: round(request.minX + ((request.maxX - request.minX) * column) / (request.columns - 1)),
-        y: round(request.minY + ((request.maxY - request.minY) * row) / (request.rows - 1)),
+        x: roundToThousandth(
+          request.minX + ((request.maxX - request.minX) * column) / (request.columns - 1),
+        ),
+        y: roundToThousandth(
+          request.minY + ((request.maxY - request.minY) * row) / (request.rows - 1),
+        ),
       });
     }
   }
@@ -214,8 +219,5 @@ export function surfaceGridCsv(measurement: SurfaceGridMeasurement): string {
 }
 
 export function surfaceNumber(n: number): string {
-  return round(n).toFixed(3);
-}
-function round(n: number): number {
-  return Math.round(n * 1000) / 1000;
+  return roundToThousandth(n).toFixed(3);
 }

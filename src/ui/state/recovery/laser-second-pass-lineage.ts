@@ -3,6 +3,8 @@ import type { LaserSecondPassWriterVersion } from '../../../core/laser-second-pa
 import type { LaserResumeTransformVersion } from '../../../core/controllers/grbl/resume-program';
 import { isLaserResumeTransformVersion } from '../../../core/controllers/grbl/laser-resume-reentry';
 import { fingerprintsEqual, type GcodeFingerprint } from '../../../core/recovery';
+import { isPositiveFiniteNumber, isNonNegativeFiniteNumber } from '../../../core/util/finite';
+import { isRecord } from '../../../core/util/is-record';
 
 /** One recorded laser resume. `version` names the resume transform that built
  * its bytes; a step saved before transforms were versioned omits it and was
@@ -123,7 +125,7 @@ function isSelection(value: unknown): value is LaserSecondPassSelection {
   if (!isRecord(value)) return false;
   return (
     value['version'] === 1 &&
-    isPositive(value['maxPowerS']) &&
+    isPositiveFiniteNumber(value['maxPowerS']) &&
     Array.isArray(value['strokes']) &&
     value['strokes'].length > 0 &&
     value['strokes'].every(isStroke) &&
@@ -137,8 +139,8 @@ function isStroke(value: unknown): boolean {
     typeof value['id'] === 'string' &&
     value['id'].length > 0 &&
     (value['mode'] === 'paint' || value['mode'] === 'erase') &&
-    isPositive(value['radiusMm']) &&
-    isNonNegative(value['powerScale']) &&
+    isPositiveFiniteNumber(value['radiusMm']) &&
+    isNonNegativeFiniteNumber(value['powerScale']) &&
     Array.isArray(value['points']) &&
     value['points'].length > 0 &&
     value['points'].every(isPoint)
@@ -153,16 +155,4 @@ function isPoint(value: unknown): boolean {
     typeof value['y'] === 'number' &&
     Number.isFinite(value['y'])
   );
-}
-
-function isPositive(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0;
-}
-
-function isNonNegative(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

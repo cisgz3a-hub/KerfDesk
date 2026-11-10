@@ -28,6 +28,7 @@ import {
   useConvertedLaserAnswerStore,
 } from '../state/converted-laser-question';
 import { useLaserStore } from '../state/laser-store';
+import { formatGroupedUpTo1Decimal } from '../../core/util/number-format';
 
 export function MachineSetupBanner(): JSX.Element | null {
   const device = useStore((state) => state.project.device);
@@ -143,11 +144,7 @@ function savedMachines(_revision: number): {
 }
 
 function bedSize(profile: DeviceProfile): string {
-  return `${formatMm(profile.bedWidth)} × ${formatMm(profile.bedHeight)} mm`;
-}
-
-function formatMm(value: number): string {
-  return value.toLocaleString('en-US', { maximumFractionDigits: 1 });
+  return `${formatGroupedUpTo1Decimal(profile.bedWidth)} × ${formatGroupedUpTo1Decimal(profile.bedHeight)} mm`;
 }
 
 const bannerStyle: React.CSSProperties = {

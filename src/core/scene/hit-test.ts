@@ -26,6 +26,8 @@ import {
   sceneLayerVisibilityLookup,
   sceneObjectHasVisibleLayerFromMap,
 } from './visibility';
+import { pointInPolygon } from '../geometry/point-in-polygon';
+import { boxCorners } from '../geometry/box-math';
 
 const VECTOR_STROKE_HIT_TOLERANCE_MM = 2;
 const BOUNDS_EDGE_EPSILON_MM = 1e-9;
@@ -339,22 +341,8 @@ function pointToSegmentDistance(point: Vec2, a: Vec2, b: Vec2): number {
   return Math.hypot(point.x - closest.x, point.y - closest.y);
 }
 
-function pointInPolygon(point: Vec2, polygon: ReadonlyArray<Vec2>): boolean {
-  let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
-    const a = polygon[i];
-    const b = polygon[j];
-    if (a === undefined || b === undefined) continue;
-    const crossesY = a.y > point.y !== b.y > point.y;
-    if (!crossesY) continue;
-    const xAtY = ((b.x - a.x) * (point.y - a.y)) / (b.y - a.y) + a.x;
-    if (point.x < xAtY) inside = !inside;
-  }
-  return inside;
-}
-
 function pointInTransformedObjectBounds(point: Vec2, obj: SceneObject): boolean {
-  const polygon = boundsCorners(obj.bounds).map((corner) => applyTransform(corner, obj.transform));
+  const polygon = boxCorners(obj.bounds).map((corner) => applyTransform(corner, obj.transform));
   if (pointInPolygon(point, polygon)) return true;
   for (let index = 0; index < polygon.length; index += 1) {
     const start = polygon[index];
@@ -400,16 +388,7 @@ export function transformedBBox(obj: SceneObject): AABB {
  * extents, which understates any rotated placement.
  */
 export function transformedBounds(bounds: Bounds, transform: Transform): AABB {
-  return aabbOfCorners(boundsCorners(bounds), transform);
-}
-
-function boundsCorners(bounds: Bounds): ReadonlyArray<Vec2> {
-  return [
-    { x: bounds.minX, y: bounds.minY },
-    { x: bounds.maxX, y: bounds.minY },
-    { x: bounds.maxX, y: bounds.maxY },
-    { x: bounds.minX, y: bounds.maxY },
-  ];
+  return aabbOfCorners(boxCorners(bounds), transform);
 }
 
 export function combinedBBox(objects: ReadonlyArray<SceneObject>): AABB | null {

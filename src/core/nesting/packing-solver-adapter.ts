@@ -22,6 +22,8 @@ import type {
   ProductionNestPlacement,
 } from './production-nest';
 import type { NestRotation } from './quick-nest';
+import { isRecord } from '../util/is-record';
+import { isFiniteNumber } from '../util/finite';
 
 export type AdvancedNestRequest =
   | { readonly kind: 'ready'; readonly instance: string }
@@ -157,7 +159,7 @@ export function readAdvancedNest(
   try {
     const data: unknown = JSON.parse(certificate);
     if (
-      !record(data) ||
+      !isRecord(data) ||
       !Array.isArray(data.bins) ||
       data.bins.length > input.definition.sheets.length
     )
@@ -167,7 +169,7 @@ export function readAdvancedNest(
     const copies = productionNestCopies(input);
     const sheets = data.bins.map((raw) => {
       if (
-        !record(raw) ||
+        !isRecord(raw) ||
         !integer(raw.id) ||
         raw.copies !== 1 ||
         !Array.isArray(raw.items) ||
@@ -231,25 +233,19 @@ export function advancedNestImproves(
     best.sheets.reduce((n, s) => n + s.footprintAreaMm2, 0)
   );
 }
-function record(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-function finite(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
-}
 function integer(value: unknown): value is number {
-  return finite(value) && Number.isInteger(value) && value >= 0;
+  return isFiniteNumber(value) && Number.isInteger(value) && value >= 0;
 }
 
 function validPlacement(
   value: unknown,
 ): value is { id: number; x: number; y: number; angle: NestRotation; mirror: false } {
   return (
-    record(value) &&
+    isRecord(value) &&
     integer(value.id) &&
     value.mirror === false &&
-    finite(value.x) &&
-    finite(value.y) &&
+    isFiniteNumber(value.x) &&
+    isFiniteNumber(value.y) &&
     [0, 90, 180, 270].includes(value.angle as number)
   );
 }

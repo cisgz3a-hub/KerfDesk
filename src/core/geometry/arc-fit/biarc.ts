@@ -52,20 +52,6 @@ export function biarcBetween(p0: Vec2, t0: Vec2, p1: Vec2, t1: Vec2): Biarc | nu
   return { first, second: reversePrimitive(backward), junction, junctionTangent };
 }
 
-/**
- * Whether the biarc stays within the bound of the source polyline `points`
- * (from its start to its end). The source is split where it first crosses the
- * common normal at the junction, which passes through both centres, so each
- * arc is checked against exactly the source between its own end rays.
- */
-export function biarcFitsPoints(
-  biarc: Biarc,
-  points: ReadonlyArray<Vec2>,
-  toleranceMm: ArcFitTolerance,
-): boolean {
-  return biarcFitsPiece(biarc, points, 0, points.length - 1, toleranceMm);
-}
-
 export function biarcFitsPiece(
   biarc: Biarc,
   points: ReadonlyArray<Vec2>,

@@ -62,8 +62,6 @@ export const operationPatchSchema = z
   })
   .refine(atLeastOne);
 export type RemoteOperationPatchFull = z.output<typeof operationPatchSchema>;
-export type RemoteCncPatch = z.output<typeof cncPatchSchema>;
-
 const createOperation = {
   color: z
     .string()
@@ -180,7 +178,6 @@ const batchItem = z.strictObject({
 });
 const applyEdits = z.strictObject({ ...admission, edits: z.array(batchItem).min(1).max(40) });
 
-export type DesignCommand = keyof typeof designArgs | 'apply_edits';
 export const DESIGN_WRITE_COMMANDS = new Set<string>([...Object.keys(designArgs), 'apply_edits']);
 type SingleDesignWrite = {
   [C in keyof typeof designArgs]: {

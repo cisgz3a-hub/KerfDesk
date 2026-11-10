@@ -41,36 +41,6 @@ const NO_INLAY_PLANNING_EVIDENCE: StraightInlayPairPlanningEvidence = {
   stepoverUsed: false,
 };
 
-export function compileStraightInlayGroups(
-  polylines: ReadonlyArray<Polyline>,
-  settings: CncLayerSettings,
-  config: CncMachineConfig,
-  buildGroup: (
-    groupSettings: CncLayerSettings,
-    tool: CncTool,
-    passes: ReadonlyArray<CncPass>,
-  ) => CncGroup | null,
-  pairDirectionX: 1 | -1 = 1,
-): {
-  readonly female: CncGroup;
-  readonly male: CncGroup;
-  readonly femalePocketPassLimited: boolean;
-} | null {
-  const compiled = compileStraightInlayGroupsWithEvidence(
-    polylines,
-    settings,
-    config,
-    buildGroup,
-    pairDirectionX,
-  );
-  return compiled === null || compiled.groups === null
-    ? null
-    : {
-        ...compiled.groups,
-        femalePocketPassLimited: compiled.femalePocketPassLimited,
-      };
-}
-
 export function compileStraightInlayGroupsWithEvidence(
   polylines: ReadonlyArray<Polyline>,
   settings: CncLayerSettings,

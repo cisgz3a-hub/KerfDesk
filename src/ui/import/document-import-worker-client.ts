@@ -7,6 +7,7 @@ import type {
   DocumentImportWorkerRequest,
   DocumentImportWorkerResponse,
 } from './document-import-worker-protocol';
+import { stopWorker } from '../common/stop-worker';
 
 export type DocumentImportProgress = {
   readonly phase: 'queued' | 'reading' | 'parsing';
@@ -236,7 +237,7 @@ function rejectAllPending(message: string): void {
 }
 
 function retireWorker(): void {
-  workerInstance?.terminate();
+  if (workerInstance !== null) stopWorker(workerInstance);
   workerInstance = null;
 }
 

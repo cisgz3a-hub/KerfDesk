@@ -1,5 +1,6 @@
 import type { Vec2 } from '../scene';
 import { CNC_COORDINATE_QUANTUM_MM, formatCncCoordinateMm } from './cnc-output-precision';
+import { lerpPoint } from '../geometry/point-math';
 
 const QUANTUM = CNC_COORDINATE_QUANTUM_MM;
 const MAX_ARRAY_LENGTH = 0xffff_ffff;
@@ -47,7 +48,7 @@ export function rampCapacities(
 
 /** The earliest point on this exact segment that can express the requested drop. */
 export function rampSegmentEnd(a: Vec2, b: Vec2, tangent: number, quanta: number): Vec2 {
-  return along(a, b, rampSegmentEndFraction(a, b, tangent, quanta));
+  return lerpPoint(a, b, rampSegmentEndFraction(a, b, tangent, quanta));
 }
 
 /** Budget placed XY while allowing a caller to interpolate its matching source span. */
@@ -58,7 +59,7 @@ export function rampSegmentEndFraction(a: Vec2, b: Vec2, tangent: number, quanta
   // endpoint always has enough capacity, including its own binary rounding.
   for (let iteration = 0; iteration < 53; iteration += 1) {
     const middle = (lower + upper) / 2;
-    if (rampSegmentCapacity(a, along(a, b, middle), tangent, quanta) < quanta) lower = middle;
+    if (rampSegmentCapacity(a, lerpPoint(a, b, middle), tangent, quanta) < quanta) lower = middle;
     else upper = middle;
   }
   return upper;
@@ -87,8 +88,4 @@ export function assertRampPointCount(count: number): void {
   if (!Number.isSafeInteger(count) || count > MAX_ARRAY_LENGTH) {
     throw new RangeError('Contour ramp point count exceeds the ECMAScript Array length limit.');
   }
-}
-
-function along(a: Vec2, b: Vec2, t: number): Vec2 {
-  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
 }

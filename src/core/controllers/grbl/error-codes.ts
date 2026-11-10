@@ -168,5 +168,3 @@ const ERRORS_BY_CODE = new Map(ERRORS.map((e) => [e.code, e]));
 export function describeError(code: number): ErrorDescription | null {
   return ERRORS_BY_CODE.get(code) ?? null;
 }
-
-export const ALL_ERROR_CODES: ReadonlyArray<ErrorDescription> = ERRORS;

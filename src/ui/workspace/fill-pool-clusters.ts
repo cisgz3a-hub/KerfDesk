@@ -6,6 +6,7 @@
 // N6-P3-3: a quarter of the union-find it replaced).
 
 import type { AABB } from '../../core/scene';
+import { boxesOverlap } from '../../core/geometry/box-math';
 
 /** Positions in `boxes` grouped by overlap: each group ascending, groups by first position. */
 export function overlappingGroups(boxes: ReadonlyArray<AABB>): number[][] {
@@ -169,10 +170,7 @@ function merge(label: Int32Array, groups: number[][], a: number, b: number): voi
   gone.length = 0;
 }
 
-/** Whether two boxes meet, edges included: the overlap `overlappingGroups` links by. */
-export function boxesOverlap(a: AABB, b: AABB): boolean {
-  return a.minX <= b.maxX && b.minX <= a.maxX && a.minY <= b.maxY && b.minY <= a.maxY;
-}
+export { boxesOverlap } from '../../core/geometry/box-math';
 
 /**
  * The groups `overlappingGroups(boxes)` gives, from the groups of every other

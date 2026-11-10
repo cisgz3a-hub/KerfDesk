@@ -6,6 +6,8 @@ import {
   edgesNearBounds,
   type BoundaryIndex,
 } from './adaptive-pocket-boundary-index';
+import { crossAbout, isFinitePoint, distance } from '../geometry/point-math';
+import { isFinitePositive } from '../util/finite';
 
 // The wall-adjacent offset chord error and emitted XY words are each bounded to 0.001 mm. Keep
 // only their combined allowance here; this must never scale with the coarser removal grid.
@@ -102,9 +104,9 @@ function circleCutIsContained(
   pathRadiusMm: number,
   geometry: ContainmentGeometry,
 ): boolean {
-  if (!finitePoint(center)) return false;
-  if (!positiveFinite(pathRadiusMm)) return false;
-  if (!positiveFinite(geometry.toolRadiusMm)) return false;
+  if (!isFinitePoint(center)) return false;
+  if (!isFinitePositive(pathRadiusMm)) return false;
+  if (!isFinitePositive(geometry.toolRadiusMm)) return false;
   const start = { x: center.x + pathRadiusMm, y: center.y };
   if (!pointCutIsContained(start, geometry)) return false;
   const reachMm = pathRadiusMm + geometry.toolRadiusMm;
@@ -133,7 +135,7 @@ function distanceFromCircle(pathRadiusMm: number, minimumMm: number, maximumMm: 
 }
 
 function segmentCutIsContained(start: Vec2, end: Vec2, geometry: ContainmentGeometry): boolean {
-  if (!finitePoint(start) || !finitePoint(end)) return false;
+  if (!isFinitePoint(start) || !isFinitePoint(end)) return false;
   const margin = geometry.toolRadiusMm;
   for (const [edgeStart, edgeEnd] of edgesNearBounds(geometry.boundary, {
     minX: Math.min(start.x, end.x) - margin,
@@ -148,7 +150,7 @@ function segmentCutIsContained(start: Vec2, end: Vec2, geometry: ContainmentGeom
 }
 
 function pointCutIsContained(point: Vec2, geometry: ContainmentGeometry): boolean {
-  if (!finitePoint(point)) return false;
+  if (!isFinitePoint(point)) return false;
   if (!pointInContours(point, geometry.contours)) return false;
   const margin = geometry.toolRadiusMm;
   for (const [start, end] of edgesNearBounds(geometry.boundary, {
@@ -174,10 +176,10 @@ function segmentToSegmentDistance(a: Vec2, b: Vec2, c: Vec2, d: Vec2): number {
 }
 
 function segmentsIntersect(a: Vec2, b: Vec2, c: Vec2, d: Vec2): boolean {
-  const abC = cross(a, b, c);
-  const abD = cross(a, b, d);
-  const cdA = cross(c, d, a);
-  const cdB = cross(c, d, b);
+  const abC = crossAbout(a, b, c);
+  const abD = crossAbout(a, b, d);
+  const cdA = crossAbout(c, d, a);
+  const cdB = crossAbout(c, d, b);
   if (abC === 0 && pointOnSegment(c, a, b)) return true;
   if (abD === 0 && pointOnSegment(d, a, b)) return true;
   if (cdA === 0 && pointOnSegment(a, c, d)) return true;
@@ -194,10 +196,6 @@ function pointOnSegment(point: Vec2, start: Vec2, end: Vec2): boolean {
   );
 }
 
-function cross(a: Vec2, b: Vec2, point: Vec2): number {
-  return (b.x - a.x) * (point.y - a.y) - (b.y - a.y) * (point.x - a.x);
-}
-
 function pointToSegmentDistance(point: Vec2, start: Vec2, end: Vec2): number {
   const dx = end.x - start.x;
   const dy = end.y - start.y;
@@ -212,20 +210,8 @@ function pointToSegmentDistance(point: Vec2, start: Vec2, end: Vec2): number {
   return distance(point, { x: start.x + t * dx, y: start.y + t * dy });
 }
 
-function distance(a: Vec2, b: Vec2): number {
-  return Math.hypot(b.x - a.x, b.y - a.y);
-}
-
 function pointInContours(point: Vec2, contours: ReadonlyArray<Polyline>): boolean {
   let inside = false;
   for (const contour of contours) if (pointInPolygon(point, contour.points)) inside = !inside;
   return inside;
-}
-
-function finitePoint(point: Vec2): boolean {
-  return Number.isFinite(point.x) && Number.isFinite(point.y);
-}
-
-function positiveFinite(value: number): boolean {
-  return Number.isFinite(value) && value > 0;
 }

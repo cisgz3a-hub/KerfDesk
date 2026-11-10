@@ -5,6 +5,7 @@ import { usePlatformOptional } from '../app/platform-context';
 import { Button } from '../kit';
 import { useToastStore } from '../state/toast-store';
 import { parseCalibrationPreset, serializeCalibrationPreset } from './calibration-draft-storage';
+import { errorMessage } from '../../core/util/error-message';
 
 export function CalibrationPresetButtons<T extends object>(props: {
   readonly kind: string;
@@ -32,7 +33,7 @@ export function CalibrationPresetButtons<T extends object>(props: {
       );
       toast(`Saved test settings to ${target.displayName}.`, 'success');
     } catch (error) {
-      toast(`Could not save the preset: ${messageOf(error)}`, 'error');
+      toast(`Could not save the preset: ${errorMessage(error)}`, 'error');
     }
   };
   const open = async (): Promise<void> => {
@@ -45,7 +46,7 @@ export function CalibrationPresetButtons<T extends object>(props: {
       );
       toast(`Loaded test settings from ${file.name}.`, 'success');
     } catch (error) {
-      toast(`Could not load the preset: ${messageOf(error)}`, 'error');
+      toast(`Could not load the preset: ${errorMessage(error)}`, 'error');
     }
   };
   return (
@@ -58,8 +59,4 @@ export function CalibrationPresetButtons<T extends object>(props: {
       </Button>
     </span>
   );
-}
-
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

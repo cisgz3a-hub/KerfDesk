@@ -4,8 +4,6 @@
 // sRGB transfer per IEC 61966-2-1. Pure core.
 
 export type OkLab = readonly [number, number, number];
-export type Srgb = readonly [number, number, number];
-
 const SRGB_TO_LINEAR = buildSrgbToLinear();
 
 function buildSrgbToLinear(): Float64Array {

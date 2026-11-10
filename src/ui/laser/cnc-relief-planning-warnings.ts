@@ -24,6 +24,7 @@ import {
 // Deep import: core/cnc's barrel is a ratcheted over-cap legacy barrel.
 import { reliefMachineSpaceGeometry } from '../../core/cnc/relief-machine-space';
 import { maxOf, minOf } from '../../core/util';
+import { uniqueValues } from '../../core/util/unique';
 
 const RECOMMENDED_STEPOVER_MIN_PERCENT = 10;
 const RECOMMENDED_STEPOVER_MAX_PERCENT = 85;
@@ -54,7 +55,7 @@ export function detectCncReliefPlanningWarnings(
       ? [...mixedReliefLayerWarnings(project), ...overlappingReliefWarnings(project)]
       : []),
   ];
-  return unique(warnings);
+  return uniqueValues(warnings);
 }
 
 function stepoverOperations(
@@ -401,10 +402,6 @@ function scallopWarning(
 
 function layerNameFor(project: Project, layerId: string): string {
   return project.scene.layers.find((layer) => layer.id === layerId)?.name ?? layerId;
-}
-
-function unique(warnings: ReadonlyArray<string>): ReadonlyArray<string> {
-  return [...new Set(warnings)];
 }
 
 function format(value: number): string {

@@ -1,8 +1,9 @@
 import type { RawProject } from './migrations';
+import { asRecord } from '../../core/util/is-record';
 
 /** Legacy writers had no Focus Z semantics; unknown metadata cannot acquire them. */
 export function migrateV17FocusIntent(raw: RawProject): RawProject {
-  const scene = record(raw['scene']);
+  const scene = asRecord(raw['scene']);
   return {
     ...raw,
     schemaVersion: 18,
@@ -13,9 +14,9 @@ export function migrateV17FocusIntent(raw: RawProject): RawProject {
 }
 
 function legacyLayer(value: unknown): unknown {
-  const layer = record(withoutFocus(value));
+  const layer = asRecord(withoutFocus(value));
   if (layer === null) return value;
-  const binding = record(layer['materialBinding']);
+  const binding = asRecord(layer['materialBinding']);
   return {
     ...layer,
     ...(Array.isArray(layer['subLayers'])
@@ -28,19 +29,13 @@ function legacyLayer(value: unknown): unknown {
 }
 
 function legacySubLayer(value: unknown): unknown {
-  const subLayer = record(value);
+  const subLayer = asRecord(value);
   return subLayer === null ? value : { ...subLayer, settings: withoutFocus(subLayer['settings']) };
 }
 
 function withoutFocus(value: unknown): unknown {
-  const settings = record(value);
+  const settings = asRecord(value);
   if (settings === null) return value;
   const { focusTest: _focus, ...ordinary } = settings;
   return ordinary;
-}
-
-function record(value: unknown): Record<string, unknown> | null {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
 }

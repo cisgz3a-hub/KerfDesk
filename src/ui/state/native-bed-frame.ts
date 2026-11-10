@@ -11,6 +11,7 @@ import {
 } from '../../core/devices/native-bed-frame';
 import type { SessionObservationStamp } from './laser-controller-observation';
 import { memoizeOnInputs } from './memoize-on-inputs';
+import { isDefinedFinitePositive } from '../../core/util/finite';
 
 export type NativeBedEvidence = {
   readonly controllerSessionEpoch?: number;
@@ -156,8 +157,8 @@ function stockNativeBounds(
   const y = settings.bedHeight;
   const direction = settings.homingDirectionMask;
   if (
-    !positiveTravel(x) ||
-    !positiveTravel(y) ||
+    !isDefinedFinitePositive(x) ||
+    !isDefinedFinitePositive(y) ||
     direction === undefined ||
     !Number.isInteger(direction) ||
     direction < 0 ||
@@ -175,8 +176,4 @@ function stockNativeBounds(
     minY: envelope.y.minMm,
     maxY: envelope.y.maxMm,
   };
-}
-
-function positiveTravel(value: number | undefined): value is number {
-  return value !== undefined && Number.isFinite(value) && value > 0;
 }

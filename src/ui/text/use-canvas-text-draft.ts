@@ -9,6 +9,7 @@ import {
 import type { DialogValues } from './use-text-dialog-fields';
 import type { TextGeometryRenderer } from './text-worker-session';
 import { useTextWorkerSession } from './use-text-worker-session';
+import { errorMessage } from '../../core/util/error-message';
 
 export type TextDraftResult = {
   readonly object: TextObject | null;
@@ -93,9 +94,7 @@ export async function buildCanvasTextObject(
   };
 }
 
-export function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
+export { errorMessage } from '../../core/util/error-message';
 
 function useStableTextValues(values: DialogValues): DialogValues {
   const {

@@ -11,6 +11,7 @@ import {
   type RotarySetup,
 } from '../../core/devices/rotary';
 import { rotaryAxisOf, rotaryAxisUnitLabel } from '../../core/devices/rotary-axis';
+import { formatUpTo2Decimals } from '../../core/util/number-format';
 
 export function rotaryTypeLabel(setup: RotarySetup): string {
   return setup.type === 'roller' ? 'Roller' : 'Chuck';
@@ -27,7 +28,7 @@ export function rotaryAttachmentSummary(setup: RotarySetup): string {
   if (!rotaryUsesRollerDiameter(setup) || setup.rollerDiameterMm === undefined) {
     return `${summary} (Y not scaled)`;
   }
-  return `${summary} (rollers Ø${formatRotaryMm(setup.rollerDiameterMm)} mm)`;
+  return `${summary} (rollers Ø${formatUpTo2Decimals(setup.rollerDiameterMm)} mm)`;
 }
 
 /** "Y ×1.91, one revolution = 360 machine mm": the axis, its scale and the
@@ -36,7 +37,7 @@ export function rotaryAttachmentSummary(setup: RotarySetup): string {
 export function rotaryMappingSummary(setup: RotarySetup): string {
   const axis = rotaryAxisOf(setup);
   const scale = rotaryYScale(setup).toFixed(2);
-  const turn = formatRotaryMm(rotaryYLimitMm(setup));
+  const turn = formatUpTo2Decimals(rotaryYLimitMm(setup));
   const unit = rotaryAxisUnitLabel(axis);
   return `${axis} ×${scale}, one revolution = ${turn}${unit === '°' ? '°' : ` ${unit}`}`;
 }
@@ -56,13 +57,10 @@ export function rotaryReviewSummary(setup: RotarySetup): string {
 // "Ø60 mm", or a taper's ends and length (ADR-694): "taper Ø80 → Ø70 mm over 100 mm".
 function rotaryObjectSummary(setup: RotarySetup): string {
   const taper = activeRotaryTaper(setup);
-  if (taper === null) return `Ø${formatRotaryMm(setup.objectDiameterMm)} mm`;
-  const top = formatRotaryMm(taper.topDiameterMm);
-  const bottom = formatRotaryMm(taper.bottomDiameterMm);
-  return `taper Ø${top} → Ø${bottom} mm over ${formatRotaryMm(taper.lengthMm)} mm`;
+  if (taper === null) return `Ø${formatUpTo2Decimals(setup.objectDiameterMm)} mm`;
+  const top = formatUpTo2Decimals(taper.topDiameterMm);
+  const bottom = formatUpTo2Decimals(taper.bottomDiameterMm);
+  return `taper Ø${top} → Ø${bottom} mm over ${formatUpTo2Decimals(taper.lengthMm)} mm`;
 }
 
-// At most two decimals and no trailing zeros: 60 → "60", 188.4956 → "188.5".
-export function formatRotaryMm(value: number): string {
-  return String(Number(value.toFixed(2)));
-}
+export { formatUpTo2Decimals as formatRotaryMm } from '../../core/util/number-format';

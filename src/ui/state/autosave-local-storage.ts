@@ -12,6 +12,7 @@ import {
   type AutosaveWriteResult,
 } from './autosave-record';
 import { isAutosaveQuotaExceededError } from './autosave-storage-error';
+import { uniqueValues } from '../../core/util/unique';
 
 const LEGACY_AUTOSAVE_KEY = 'lf2:autosave:v1';
 const AUTOSAVE_KEY_PREFIX = `${LEGACY_AUTOSAVE_KEY}:`;
@@ -282,7 +283,7 @@ export function autosaveSessionIdForStorageKey(storageKey: string): string | und
 }
 
 function localAutosaveCandidateKeys(diagnostics: LocalReadDiagnostics): ReadonlyArray<string> {
-  return uniqueStrings([
+  return uniqueValues([
     autosaveStorageKeyForSession(currentAutosaveSessionId()),
     ...readAutosaveIndex(diagnostics),
     ...enumerateAutosaveKeys(diagnostics),
@@ -351,7 +352,7 @@ function updateAutosaveHistoryState(update: AutosaveHistoryState): void {
 }
 
 function registerAutosaveKey(storageKey: string): void {
-  writeAutosaveIndex(uniqueStrings([...readAutosaveIndex(), storageKey]));
+  writeAutosaveIndex(uniqueValues([...readAutosaveIndex(), storageKey]));
 }
 
 function unregisterAutosaveKey(storageKey: string): void {
@@ -412,10 +413,6 @@ function isAutosaveIndexRecord(value: unknown): value is AutosaveIndexRecord {
     Array.isArray(record['keys']) &&
     record['keys'].every((key) => typeof key === 'string')
   );
-}
-
-function uniqueStrings(values: ReadonlyArray<string>): ReadonlyArray<string> {
-  return [...new Set(values)];
 }
 
 function recordMatchesStorageKey(record: AutosaveRecord, storageKey: string): boolean {

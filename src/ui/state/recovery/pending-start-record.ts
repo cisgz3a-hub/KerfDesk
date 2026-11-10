@@ -5,6 +5,8 @@
 import type { JobCheckpoint } from '../../../core/recovery';
 import type { RunId } from './execution-artifact';
 import { parsePendingStartIntent } from './start-intent';
+import { isNonNegativeInteger } from '../../../core/util/finite';
+import { isRecord } from '../../../core/util/is-record';
 
 export type PendingStartRecord = {
   readonly runId: RunId;
@@ -88,12 +90,4 @@ function parseRecoveryPendingStart(
     kind: 'supervised-recovery',
     sourceRecovery: { runId: sourceRunId, revision, attemptId },
   };
-}
-
-function isNonNegativeInteger(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value >= 0;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

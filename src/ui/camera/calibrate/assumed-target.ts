@@ -18,6 +18,7 @@ import {
   rememberedEngravedTarget,
   type EngravedTarget,
 } from './engraved-target-memory';
+import { roundToTenth } from '../../../core/util/rounding';
 
 export type AssumedTarget = {
   readonly area: BedArea;
@@ -215,18 +216,14 @@ function ringSetting(settings: LayoutSettings): number {
 
 function layoutWords(settings: LayoutSettings, area: BedArea, bed: string): string {
   const ring = ringSetting(settings);
-  const rings = ring === DEFAULT_RING_DIAMETER_MM ? '' : `, ${round(ring)} mm rings`;
+  const rings = ring === DEFAULT_RING_DIAMETER_MM ? '' : `, ${roundToTenth(ring)} mm rings`;
   if (settings.headCamera) {
     return `a ${size(area.width, area.height)} square in the middle of a ${bed} bed${rings}`;
   }
   const sheet = size(area.width + 2 * settings.marginMm, area.height + 2 * settings.marginMm);
-  return `${size(area.width, area.height)} with a ${round(settings.marginMm)} mm margin on a ${sheet} sheet in the middle of a ${bed} bed${rings}`;
+  return `${size(area.width, area.height)} with a ${roundToTenth(settings.marginMm)} mm margin on a ${sheet} sheet in the middle of a ${bed} bed${rings}`;
 }
 
 function size(width: number, height: number): string {
-  return `${round(width)} × ${round(height)} mm`;
-}
-
-function round(value: number): number {
-  return Math.round(value * 10) / 10;
+  return `${roundToTenth(width)} × ${roundToTenth(height)} mm`;
 }

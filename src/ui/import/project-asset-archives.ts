@@ -1,6 +1,7 @@
 import type { Project } from '../../core/scene';
 import type { ProductionManifest } from '../../core/scene/production-manifest';
 import type { RetainedArrayLayout } from '../../core/scene/retained-array';
+import { asRecord } from '../../core/util/is-record';
 
 export type ProjectAssetArchive = {
   readonly owner: object;
@@ -18,17 +19,17 @@ export function projectAssetArchiveBudget(): ProjectAssetArchiveBudget {
 export function projectAssetArchives(project: object): ReadonlyArray<ProjectAssetArchive> {
   const raw = project as Record<string, unknown>;
   const entries: ProjectAssetArchive[] = [];
-  const book = record(raw['sheetBook']);
+  const book = asRecord(raw['sheetBook']);
   const inactive = book?.['inactive'];
   if (Array.isArray(inactive)) {
     if (inactive.length > 99) throw new Error('Too many archived project sheets.');
     for (const sheet of inactive) {
-      const item = record(sheet);
+      const item = asRecord(sheet);
       if (item !== null)
         addArchive(entries, item, 'projectJson', `Sheet ${String(item['name'])}`, 'sheet');
     }
   }
-  const manifest = record(raw['productionManifest']);
+  const manifest = asRecord(raw['productionManifest']);
   if (manifest !== null) addProductionArchives(entries, manifest);
   addArrayArchives(entries, raw['arrayLayouts']);
   return entries;
@@ -38,7 +39,7 @@ function addArrayArchives(entries: ProjectAssetArchive[], value: unknown): void 
   if (!Array.isArray(value)) return;
   if (value.length > 32) throw new Error('Too many retained array layouts.');
   for (const layout of value) {
-    const item = record(layout);
+    const item = asRecord(layout);
     if (item === null) continue;
     addArchive(entries, item, 'sourceProjectJson', `Array ${String(item['name'])} source`, 'array');
     addArchive(
@@ -60,7 +61,7 @@ function addProductionArchives(
   if (!Array.isArray(rows)) return;
   if (rows.length > 500) throw new Error('Too many archived production rows.');
   for (const row of rows) {
-    const item = record(row);
+    const item = asRecord(row);
     if (item !== null)
       addArchive(
         entries,
@@ -91,7 +92,7 @@ export function readProjectAssetArchive(
   budget.remainingEntries--;
   if (budget.remainingChars < 0 || budget.remainingEntries < 0)
     throw new Error('Workflow project archives exceed the 50 million character copy budget.');
-  const raw = record(JSON.parse(entry.json));
+  const raw = asRecord(JSON.parse(entry.json));
   if (raw === null) throw new Error(`${entry.label} is not a project document.`);
   if (raw['sheetBook'] !== undefined)
     throw new Error('Nested project sheet books are not supported.');
@@ -188,9 +189,4 @@ function replacement(
   fallback: string,
 ): string {
   return values.get(owner)?.get(key) ?? fallback;
-}
-function record(value: unknown): Record<string, unknown> | null {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
 }

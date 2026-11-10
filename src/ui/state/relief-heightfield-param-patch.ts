@@ -1,6 +1,7 @@
 import type { ReliefObject } from '../../core/scene';
 import type { HeightfieldReliefObject, ReliefHeightfieldMapping } from '../../core/scene/relief';
 import { resolveReliefHeightfieldWidthPatch } from './relief-heightfield-width-resolution';
+import { isDefinedFinitePositive } from '../../core/util/finite';
 
 /** Operator-editable relief parameters accepted by the shared relief state action. */
 export type ReliefParamPatch = {
@@ -18,11 +19,11 @@ export type ReliefParamPatch = {
 /** Retains only factual values that the durable relief model can represent exactly. */
 export function normalizeReliefPatch(patch: ReliefParamPatch): ReliefParamPatch {
   const out: ReliefParamPatch = {};
-  if (positiveFinite(patch.targetWidthMm)) out.targetWidthMm = patch.targetWidthMm;
-  if (positiveFinite(patch.reliefDepthMm)) out.reliefDepthMm = patch.reliefDepthMm;
+  if (isDefinedFinitePositive(patch.targetWidthMm)) out.targetWidthMm = patch.targetWidthMm;
+  if (isDefinedFinitePositive(patch.reliefDepthMm)) out.reliefDepthMm = patch.reliefDepthMm;
   if (patch.emptyCells !== undefined) out.emptyCells = patch.emptyCells;
   if (patch.polarity !== undefined) out.polarity = patch.polarity;
-  if (positiveFinite(patch.gamma)) out.gamma = patch.gamma;
+  if (isDefinedFinitePositive(patch.gamma)) out.gamma = patch.gamma;
   if (isU16Code(patch.inputLowCode)) out.inputLowCode = patch.inputLowCode;
   if (isU16Code(patch.inputHighCode)) out.inputHighCode = patch.inputHighCode;
   if (isInclusionThreshold(patch.inclusionThreshold)) {
@@ -156,10 +157,6 @@ function widthPatchChangesSource(
   widthMm: number | undefined,
 ): boolean {
   return widthMm !== undefined && widthMm !== relief.reliefSource.physicalWidthMm;
-}
-
-function positiveFinite(value: number | undefined): value is number {
-  return value !== undefined && Number.isFinite(value) && value > 0;
 }
 
 const MAX_U16_CODE = 0xffff;

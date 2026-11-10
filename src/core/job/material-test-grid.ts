@@ -32,6 +32,7 @@ import {
   type MaterialTestLayout,
 } from './material-test-layout';
 import { maxOf } from '../util';
+import { finiteOr } from '../util/finite';
 
 const MIN_COUNT = 1;
 const MAX_COUNT = 20;
@@ -412,8 +413,4 @@ function materialTestLayerColor(row: number): string {
 
 function clampInteger(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, Math.floor(Number.isFinite(value) ? value : min)));
-}
-
-function finiteOr(value: number, fallback: number): number {
-  return Number.isFinite(value) ? value : fallback;
 }

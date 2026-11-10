@@ -5,6 +5,7 @@
 
 import { dither } from '../../core/raster';
 import type { DitherAlgorithm } from '../../core/scene';
+import { roundToThousandth } from '../../core/util/rounding';
 
 export const DITHER_THUMBNAIL_COLUMNS = 22;
 export const DITHER_THUMBNAIL_ROWS = 11;
@@ -75,11 +76,7 @@ function burned(power: Float64Array, x: number, y: number): boolean {
 // Grayscale varies power along the ramp only, so the first row carries it.
 function rampStops(power: Float64Array): ReadonlyArray<RampStop> {
   return Array.from({ length: DITHER_THUMBNAIL_COLUMNS }, (_, x) => ({
-    offset: round3((x + 0.5) / DITHER_THUMBNAIL_COLUMNS),
-    opacity: round3((power[x] ?? 0) / S_MAX),
+    offset: roundToThousandth((x + 0.5) / DITHER_THUMBNAIL_COLUMNS),
+    opacity: roundToThousandth((power[x] ?? 0) / S_MAX),
   }));
-}
-
-function round3(value: number): number {
-  return Math.round(value * 1000) / 1000;
 }

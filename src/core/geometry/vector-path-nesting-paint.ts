@@ -19,6 +19,8 @@
 import { areaD, differenceD, FillRule, unionD, type PathD, type PathsD } from 'clipper2-ts';
 import { canonicalizeVectorPaths } from './vector-path-canonical';
 import { VECTOR_PATH_PRECISION_DECIMALS } from './vector-path-regions';
+import { crossAbout } from './point-math';
+import { boxesOverlap, boxContains, unionBox } from './box-math';
 
 /** Region to add (even depth) or carve (odd depth). */
 export type NestedUnit = { readonly depth: number; readonly paths: PathsD };
@@ -72,17 +74,17 @@ type Encloser = { readonly path: PathD; readonly winding: number; readonly area:
 function paintApart(region: PathsD, level: ReadonlyArray<NestedUnit>, add: boolean): PathsD | null {
   const unitBoxes = level.map((unit) => boxOf(unit.paths));
   if (!boxesApart(unitBoxes)) return null;
-  const box = unitBoxes.reduce(joinBoxes);
+  const box = unitBoxes.reduce(unionBox);
   const probes = level.map((unit) => unit.paths[0]?.[0]);
   const aside: PathD[] = [];
   const enclosers: Encloser[] = [];
   for (const path of region) {
     const bounds = boxOf([path]);
-    if (!boxesMeet(bounds, box)) {
+    if (!boxesOverlap(bounds, box)) {
       aside.push(path);
       continue;
     }
-    if (!boxHolds(bounds, box)) return null;
+    if (!boxContains(bounds, box)) return null;
     // The ring keeps clear of the level, so it winds the same way around every
     // point of a unit; units it winds differently around would be split by it.
     const windings = probes.map((probe) => (probe === undefined ? 0 : windingAt(path, probe)));
@@ -116,8 +118,8 @@ function windingAt(path: PathD, point: Point): number {
     const to = path[(index + 1) % path.length];
     if (to === undefined) return;
     if (from.y <= point.y) {
-      if (to.y > point.y && cross(from, to, point) > 0) winding += 1;
-    } else if (to.y <= point.y && cross(from, to, point) < 0) {
+      if (to.y > point.y && crossAbout(from, to, point) > 0) winding += 1;
+    } else if (to.y <= point.y && crossAbout(from, to, point) < 0) {
       winding -= 1;
     }
   });
@@ -214,15 +216,11 @@ function neighboursClear(first: Edge, second: Edge, length: number): boolean | n
 }
 
 function segmentsCross(first: Edge, second: Edge): boolean {
-  const d1 = cross(second.a, second.b, first.a);
-  const d2 = cross(second.a, second.b, first.b);
-  const d3 = cross(first.a, first.b, second.a);
-  const d4 = cross(first.a, first.b, second.b);
+  const d1 = crossAbout(second.a, second.b, first.a);
+  const d2 = crossAbout(second.a, second.b, first.b);
+  const d3 = crossAbout(first.a, first.b, second.a);
+  const d4 = crossAbout(first.a, first.b, second.b);
   return d1 * d2 <= 0 && d3 * d4 <= 0;
-}
-
-function cross(from: Point, to: Point, point: Point): number {
-  return (to.x - from.x) * (point.y - from.y) - (to.y - from.y) * (point.x - from.x);
 }
 
 function toSegment(point: Point, edge: Edge): number {
@@ -260,30 +258,8 @@ function boxesApart(boxes: ReadonlyArray<Box>): boolean {
     for (let b = a + 1; b < boxes.length; b += 1) {
       const first = boxes[a];
       const second = boxes[b];
-      if (first !== undefined && second !== undefined && boxesMeet(first, second)) return false;
+      if (first !== undefined && second !== undefined && boxesOverlap(first, second)) return false;
     }
   }
   return true;
-}
-
-function boxesMeet(a: Box, b: Box): boolean {
-  return a.minX <= b.maxX && b.minX <= a.maxX && a.minY <= b.maxY && b.minY <= a.maxY;
-}
-
-function boxHolds(outer: Box, inner: Box): boolean {
-  return (
-    outer.minX <= inner.minX &&
-    outer.minY <= inner.minY &&
-    outer.maxX >= inner.maxX &&
-    outer.maxY >= inner.maxY
-  );
-}
-
-function joinBoxes(a: Box, b: Box): Box {
-  return {
-    minX: Math.min(a.minX, b.minX),
-    minY: Math.min(a.minY, b.minY),
-    maxX: Math.max(a.maxX, b.maxX),
-    maxY: Math.max(a.maxY, b.maxY),
-  };
 }

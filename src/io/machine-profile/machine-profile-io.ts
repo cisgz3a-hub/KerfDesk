@@ -23,6 +23,9 @@ import { recoverProfileCommands } from './machine-profile-autofocus';
 import { optionalRotarySetup } from '../project/project-device-profile-validator';
 import { firstError } from '../project/project-shape-primitives';
 import { rotaryAxisSchema, schemaTooNew } from './machine-profile-rotary-version';
+import { isRecord } from '../../core/util/is-record';
+import { isPositiveFiniteNumber, isNonNegativeFiniteNumber } from '../../core/util/finite';
+import { isNonEmptyString } from '../../core/util/text';
 
 export const MACHINE_PROFILE_FORMAT = 'laserforge-machine-profile';
 export const MACHINE_PROFILE_SCHEMA_VERSION = 1;
@@ -264,10 +267,10 @@ function parseNoGoZones(
       !isNonEmptyString(zone['id']) ||
       !isNonEmptyString(zone['name']) ||
       typeof zone['enabled'] !== 'boolean' ||
-      !isNonNegativeFinite(zone['x']) ||
-      !isNonNegativeFinite(zone['y']) ||
-      !isPositiveFinite(zone['width']) ||
-      !isPositiveFinite(zone['height'])
+      !isNonNegativeFiniteNumber(zone['x']) ||
+      !isNonNegativeFiniteNumber(zone['y']) ||
+      !isPositiveFiniteNumber(zone['width']) ||
+      !isPositiveFiniteNumber(zone['height'])
     ) {
       return invalidNoGoZone(index);
     }
@@ -423,22 +426,6 @@ function canonicalZMetadata(profile: DeviceProfile): Partial<DeviceProfile> {
 
 function invalidNoGoZone(index: number): { readonly kind: 'invalid'; readonly reason: string } {
   return { kind: 'invalid', reason: `profile.noGoZones[${index}] is invalid` };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === 'string' && value.trim().length > 0;
-}
-
-function isPositiveFinite(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0;
-}
-
-function isNonNegativeFinite(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
 }
 
 function isProfileSource(value: unknown): value is MachineProfileSource {

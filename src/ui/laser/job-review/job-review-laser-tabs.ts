@@ -9,6 +9,7 @@ import {
 } from '../../../core/job/operation-cut-extras';
 import type { LayerOperationSettings } from '../../../core/scene';
 import { formatMm } from './job-review-format';
+import { formatGroupedUpTo1Decimal } from '../../../core/util/number-format';
 
 type TabSettings = Pick<
   LayerOperationSettings,
@@ -27,14 +28,14 @@ export function laserTabsPart(settings: TabSettings, placedTabCount = 0): string
   const percent = tabCutPowerPercentFor(settings);
   return [
     `${automaticTabsText(settings)} × ${formatMm(settings.tabSizeMm)} mm`,
-    ...(percent > 0 ? [`cut at ${formatPercent(percent)}%`] : []),
+    ...(percent > 0 ? [`cut at ${formatGroupedUpTo1Decimal(percent)}%`] : []),
     ...(placedTabCount > 0 ? [`${placedTabCount} placed by hand`] : []),
   ].join(', ');
 }
 
 /** The Line group that burns the tab spans, named apart from its cut. */
 export function tabSpanGroupLabel(percent: number): string {
-  return `Line tabs (${formatPercent(percent)}% of cut power)`;
+  return `Line tabs (${formatGroupedUpTo1Decimal(percent)}% of cut power)`;
 }
 
 function automaticTabsText(settings: TabSettings): string {
@@ -43,8 +44,4 @@ function automaticTabsText(settings: TabSettings): string {
   if (layout.kind === 'count') return `tabs ${settings.tabsPerShape}`;
   const cap = layout.maxPerShape > 0 ? ` (at most ${layout.maxPerShape})` : '';
   return `tabs every ${formatMm(layout.spacingMm)} mm${cap}`;
-}
-
-function formatPercent(value: number): string {
-  return value.toLocaleString('en-US', { maximumFractionDigits: 1 });
 }

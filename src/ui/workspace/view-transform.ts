@@ -10,6 +10,7 @@
 import type { Project, Vec2 } from '../../core/scene';
 import { MAX_ZOOM, MIN_ZOOM } from '../state/ui-store';
 import { CANVAS_PADDING_PX } from './canvas-layout';
+import { finiteOr, isFinitePositive } from '../../core/util/finite';
 
 const MIN_USABLE_PX = 1;
 
@@ -68,7 +69,7 @@ export function pxToMmForCanvas(
     project.device.bedHeight,
     view,
   );
-  return isPositiveFinite(v.scale) ? 1 / v.scale : 1;
+  return isFinitePositive(v.scale) ? 1 / v.scale : 1;
 }
 
 export function canvasMouseToScene(
@@ -79,8 +80,8 @@ export function canvasMouseToScene(
 ): Vec2 | null {
   if (canvas === null) return null;
   const rect = canvas.getBoundingClientRect();
-  if (!isPositiveFinite(rect.width) || !isPositiveFinite(rect.height)) return null;
-  if (!isPositiveFinite(canvas.width) || !isPositiveFinite(canvas.height)) return null;
+  if (!isFinitePositive(rect.width) || !isFinitePositive(rect.height)) return null;
+  if (!isFinitePositive(canvas.width) || !isFinitePositive(canvas.height)) return null;
   const px = ((e.clientX - rect.left) / rect.width) * canvas.width;
   const py = ((e.clientY - rect.top) / rect.height) * canvas.height;
   const v = computeView(
@@ -90,7 +91,7 @@ export function canvasMouseToScene(
     project.device.bedHeight,
     view,
   );
-  if (!isPositiveFinite(v.scale)) return null;
+  if (!isFinitePositive(v.scale)) return null;
   return { x: (px - v.offsetX) / v.scale, y: (py - v.offsetY) / v.scale };
 }
 
@@ -113,16 +114,16 @@ export function zoomAtCursorPx(args: {
   readonly view: ViewState;
 }): ViewState {
   const { cursorPx, factor, canvas, bed, view } = args;
-  if (!isPositiveFinite(factor)) return normalizeViewState(view);
+  if (!isFinitePositive(factor)) return normalizeViewState(view);
   const safeView = normalizeViewState(view);
   const v0 = computeView(canvas.width, canvas.height, bed.width, bed.height, safeView);
-  if (!isPositiveFinite(v0.scale)) return safeView;
+  if (!isFinitePositive(v0.scale)) return safeView;
   const sceneBeforeX = (cursorPx.x - v0.offsetX) / v0.scale;
   const sceneBeforeY = (cursorPx.y - v0.offsetY) / v0.scale;
   const nextZoomFactor = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, safeView.zoomFactor * factor));
   const nextView: ViewState = { ...safeView, zoomFactor: nextZoomFactor };
   const v1 = computeView(canvas.width, canvas.height, bed.width, bed.height, nextView);
-  if (!isPositiveFinite(v1.scale)) return safeView;
+  if (!isFinitePositive(v1.scale)) return safeView;
   const sceneAfterX = (cursorPx.x - v1.offsetX) / v1.scale;
   const sceneAfterY = (cursorPx.y - v1.offsetY) / v1.scale;
   // Positive panX shifts content right => scene under cursor decreases.
@@ -146,8 +147,8 @@ export function clientToCanvasPx(
 ): { readonly x: number; readonly y: number } | null {
   if (canvas === null) return null;
   const rect = canvas.getBoundingClientRect();
-  if (!isPositiveFinite(rect.width) || !isPositiveFinite(rect.height)) return null;
-  if (!isPositiveFinite(canvas.width) || !isPositiveFinite(canvas.height)) return null;
+  if (!isFinitePositive(rect.width) || !isFinitePositive(rect.height)) return null;
+  if (!isFinitePositive(canvas.width) || !isFinitePositive(canvas.height)) return null;
   return {
     x: ((client.clientX - rect.left) / rect.width) * canvas.width,
     y: ((client.clientY - rect.top) / rect.height) * canvas.height,
@@ -163,13 +164,5 @@ function normalizeViewState(view: ViewState): ViewState {
 }
 
 function positiveFiniteOr(value: number, fallback: number): number {
-  return isPositiveFinite(value) ? value : fallback;
-}
-
-function finiteOr(value: number, fallback: number): number {
-  return Number.isFinite(value) ? value : fallback;
-}
-
-function isPositiveFinite(value: number): boolean {
-  return Number.isFinite(value) && value > 0;
+  return isFinitePositive(value) ? value : fallback;
 }

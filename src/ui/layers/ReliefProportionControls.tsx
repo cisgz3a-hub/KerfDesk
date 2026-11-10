@@ -9,6 +9,7 @@ import { meshBounds } from '../../core/relief';
 import type { MeshReliefObject } from '../../core/scene/relief';
 import type { ReliefParamPatch } from '../state/relief-param-actions';
 import { useStore } from '../state';
+import { formatUpTo2Decimals } from '../../core/util/number-format';
 
 /** The patch a Width or Depth edit commits, carrying its partner when locked. */
 export function proportionalReliefPatch(
@@ -69,15 +70,13 @@ export function ReliefProportionControls(props: {
           onClick={() => setReliefParams(relief.id, { reliefDepthMm: depth })}
           title="Set Depth so the model's height keeps its true ratio to its width (nothing squashed or stretched)."
         >
-          {matches ? 'Model proportions' : `Use model proportions (${formatMm(depth)} mm)`}
+          {matches
+            ? 'Model proportions'
+            : `Use model proportions (${formatUpTo2Decimals(depth)} mm)`}
         </button>
       )}
     </div>
   );
-}
-
-function formatMm(value: number): string {
-  return String(Number(value.toFixed(2)));
 }
 
 const rowStyle: React.CSSProperties = {

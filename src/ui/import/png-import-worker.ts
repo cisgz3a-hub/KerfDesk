@@ -2,6 +2,7 @@
 
 import { importPngStreamToPagedAssets } from './png-paged-import';
 import type { PngImportWorkerRequest, PngImportWorkerResponse } from './png-import-worker-protocol';
+import { errorMessage, isAbortError } from '../../core/util/error-message';
 
 const controllers = new Map<number, AbortController>();
 
@@ -32,7 +33,7 @@ async function importPng(
     if (controller.signal.aborted && isAbortError(error)) {
       post({ id: request.id, kind: 'cancelled' });
     } else {
-      post({ id: request.id, kind: 'error', message: toMessage(error) });
+      post({ id: request.id, kind: 'error', message: errorMessage(error) });
     }
   } finally {
     controllers.delete(request.id);
@@ -45,12 +46,4 @@ function post(response: PngImportWorkerResponse): void {
     return;
   }
   self.postMessage(response);
-}
-
-function isAbortError(error: unknown): boolean {
-  return error instanceof Error && error.name === 'AbortError';
-}
-
-function toMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

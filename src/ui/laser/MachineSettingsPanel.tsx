@@ -18,6 +18,7 @@ import {
   type GrblSettingPresentation,
   type MachineSettingsPresentationContext,
 } from './machine-settings-presentation';
+import { errorMessage } from '../../core/util/error-message';
 
 type MachineSettingsPanelProps = {
   readonly defaultOpen?: boolean;
@@ -50,7 +51,7 @@ export function MachineSettingsPanel(props: MachineSettingsPanelProps = {}): JSX
   const handleRead = (): void => {
     void readMachineSettings()
       .then(() => pushToast('Reading machine settings ($$)...', 'info'))
-      .catch((err: unknown) => pushToast(errMsg(err), 'error'));
+      .catch((err: unknown) => pushToast(errorMessage(err), 'error'));
   };
 
   const handleExport = (): void => {
@@ -289,10 +290,6 @@ function riskLabel(risk: GrblSettingRow['writeRisk']): string {
     case 'unknown':
       return 'Unknown';
   }
-}
-
-function errMsg(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }
 
 const panelStyle: React.CSSProperties = {

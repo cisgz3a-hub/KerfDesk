@@ -13,6 +13,7 @@ import {
 import type { BoardCapture } from './use-board-capture';
 import { boardCaptureOriginOwner } from './board-capture-origin-owner';
 import { outlineScaleNotice } from './board-finish-checks';
+import { errorMessageOr } from '../../../core/util/error-message';
 
 type SetMessage = Dispatch<SetStateAction<string | null>>;
 
@@ -59,7 +60,7 @@ export function createOutlineFinishHandler(
       owner.assertAfterWrite();
       commit(result.geometry);
     } catch (error) {
-      setError(errorMessage(error, 'Could not set the outline board origin.'));
+      setError(errorMessageOr(error, 'Could not set the outline board origin.'));
       throw error;
     } finally {
       setBusy(false);
@@ -86,8 +87,4 @@ export function outlineGeometryLargeEnough(
 function setScaleNotice(scale: number, setNotice: SetMessage): void {
   const notice = outlineScaleNotice(scale);
   if (notice !== null) setNotice(notice);
-}
-
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message.trim() !== '' ? error.message : fallback;
 }

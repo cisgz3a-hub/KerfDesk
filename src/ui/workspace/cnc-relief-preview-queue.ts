@@ -4,6 +4,7 @@ import type {
   ReliefHeightmapWorkerItem,
   ReliefHeightmapWorkerResult,
 } from './cnc-removal-grid-worker-protocol';
+import { toError } from '../../core/util/error-message';
 
 type ReliefPreviewQueueHost = {
   readonly ensureWorker: () => Worker | null;
@@ -125,7 +126,7 @@ class ReliefPreviewQueueRuntime implements ReliefPreviewQueue {
     try {
       worker.postMessage(active.request);
     } catch (error) {
-      this.host.failWorker(worker, asError(error));
+      this.host.failWorker(worker, toError(error));
     }
     return true;
   }
@@ -145,7 +146,7 @@ class ReliefPreviewQueueRuntime implements ReliefPreviewQueue {
     try {
       worker?.postMessage({ id, kind: 'cancel-relief' });
     } catch (error) {
-      if (worker !== null) this.host.failWorker(worker, asError(error));
+      if (worker !== null) this.host.failWorker(worker, toError(error));
     }
   }
 }
@@ -163,8 +164,4 @@ function abortError(): Error {
   const error = new Error('relief preview preparation aborted');
   error.name = 'AbortError';
   return error;
-}
-
-function asError(error: unknown): Error {
-  return error instanceof Error ? error : new Error(String(error));
 }

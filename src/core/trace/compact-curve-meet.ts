@@ -28,6 +28,7 @@
 
 import type { Vec2 } from '../scene';
 import { hypot2 } from '../geometry/fast-hypot';
+import { midpoint } from '../geometry/point-math';
 
 export type CurvePiece = {
   readonly p0: Vec2;
@@ -196,17 +197,13 @@ function span(piece: Part): number {
 
 function halve(piece: CurvePiece): [Part, Part] {
   const { p0, p1, p2, p3 } = piece;
-  const p01 = mid(p0, p1);
-  const p12 = mid(p1, p2);
-  const p23 = mid(p2, p3);
-  const p012 = mid(p01, p12);
-  const p123 = mid(p12, p23);
-  const p0123 = mid(p012, p123);
+  const p01 = midpoint(p0, p1);
+  const p12 = midpoint(p1, p2);
+  const p23 = midpoint(p2, p3);
+  const p012 = midpoint(p01, p12);
+  const p123 = midpoint(p12, p23);
+  const p0123 = midpoint(p012, p123);
   return [part(p0, p01, p012, p0123), part(p0123, p123, p23, p3)];
-}
-
-function mid(a: Vec2, b: Vec2): Vec2 {
-  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
 }
 
 // Distance between the chords p0-p3 of two pieces.

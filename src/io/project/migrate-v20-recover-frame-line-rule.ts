@@ -5,6 +5,7 @@ import {
   type SingleLineFrameText,
 } from '../../core/text/single-line-frame-rule';
 import type { RawProject } from './migrations';
+import { asRecord } from '../../core/util/is-record';
 
 // Schema 21. Step 18 gives a converted frame its old line rule, but 1.0.28 ran
 // step 18 without that rule and saved the result, so a schema-19 file reaches
@@ -13,7 +14,7 @@ import type { RawProject } from './migrations';
 // draw. Such a frame gets its rule back. A frame the file cannot place keeps the
 // em rule and Open and Job Review say so (ADR-682 Amendment 3).
 export function migrateV20RecoverFrameLineRule(raw: RawProject): RawProject {
-  const scene = record(raw['scene']);
+  const scene = asRecord(raw['scene']);
   return {
     ...raw,
     schemaVersion: 21,
@@ -24,10 +25,10 @@ export function migrateV20RecoverFrameLineRule(raw: RawProject): RawProject {
 }
 
 function withRecoveredRule(value: unknown): unknown {
-  const text = record(value);
+  const text = asRecord(value);
   if (text === null) return value;
   const frame = frameTextWithoutRule(text);
-  const stored = record(text['bounds']);
+  const stored = asRecord(text['bounds']);
   if (frame === null || stored === null) return value;
   const legacyLineEm = legacyLineEmOf(frame.fontKey);
   if (legacyLineEm === undefined || !drawnByOldRule(frame, stored, text['paths'])) return value;
@@ -57,7 +58,7 @@ function drawnByOldRule(
 
 /** A text whose frame could have lost the rule; anything malformed is left for the validator. */
 export function frameTextWithoutRule(text: Record<string, unknown>): SingleLineFrameText | null {
-  const box = record(text['textBox']);
+  const box = asRecord(text['textBox']);
   if (text['kind'] !== 'text' || box === null || box['legacyLineEm'] !== undefined) return null;
   if (typeof text['fontKey'] !== 'string' || typeof text['content'] !== 'string') return null;
   const shape = box as unknown as SingleLineFrameText['textBox'];
@@ -71,10 +72,4 @@ export function frameTextWithoutRule(text: Record<string, unknown>): SingleLineF
     box['minSizeMm'],
   ];
   return numbers.every(Number.isFinite) ? (text as unknown as SingleLineFrameText) : null;
-}
-
-function record(value: unknown): Record<string, unknown> | null {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
 }

@@ -19,6 +19,7 @@ import { currentWorkZMm, reportedWorkOffsetMm } from './infer-machine-position';
 import { useStore } from './store';
 import type { LiveRefs, LaserState } from './laser-store';
 import type { SafeWrite } from './laser-safe-write';
+import { errorMessage } from '../../core/util/error-message';
 
 export type SurfaceProbeSet = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState>),
@@ -169,7 +170,7 @@ export class SurfaceProbeTransaction {
     try {
       await this.write(query, 'probe', 'system', this.assertOwner);
     } catch (error) {
-      cancelFreshControllerStatusWait(this.refs, surfaceProbeMessage(error));
+      cancelFreshControllerStatusWait(this.refs, errorMessage(error));
       await wait.catch(() => undefined);
       throw error;
     }
@@ -235,6 +236,4 @@ function sameOffset(
     Math.abs(a.x - b.x) <= 0.003 && Math.abs(a.y - b.y) <= 0.003 && Math.abs(a.z - b.z) <= 0.003
   );
 }
-export function surfaceProbeMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
+export { errorMessage as surfaceProbeMessage } from '../../core/util/error-message';

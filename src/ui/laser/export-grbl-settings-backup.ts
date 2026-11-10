@@ -1,6 +1,7 @@
 import { isGrblhalPasswordSetting } from '../../core/controllers/controller-password-settings';
 import { createGrblSettingsBackup, type GrblSettingRow } from '../../core/controllers/grbl';
 import type { PlatformAdapter } from '../../platform/types';
+import { errorMessage } from '../../core/util/error-message';
 
 export type ExportGrblSettingsBackupResult =
   | { readonly ok: true; readonly displayName: string; readonly holdsPasswords: boolean }
@@ -52,7 +53,7 @@ export async function exportGrblSettingsBackup(
     return {
       ok: false,
       reason: 'write-failed',
-      message: `Could not export machine settings backup: ${errMsg(err)}`,
+      message: `Could not export machine settings backup: ${errorMessage(err)}`,
     };
   }
 }
@@ -66,8 +67,4 @@ export function settingsBackupHoldsPasswords(rows: ReadonlyArray<GrblSettingRow>
 function suggestedBackupName(createdAt: string): string {
   const date = createdAt.slice(0, 10);
   return `kerfdesk-grbl-settings-${date}.lfgrbl-settings.json`;
-}
-
-function errMsg(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }

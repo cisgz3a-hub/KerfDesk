@@ -13,6 +13,7 @@
 // Pure: no clock, no randomness, no I/O.
 
 import type { FinishingPoint } from './relief-finishing-path';
+import { lerp3 } from '../geometry/vec3';
 
 const EPS = 1e-9;
 
@@ -111,7 +112,7 @@ function edgePair(
 ): readonly [FinishingPoint, FinishingPoint] {
   const span = toS - fromS;
   const t = span > EPS ? Math.min(1, Math.max(0, (at - fromS) / span)) : 1;
-  const cut = lerp(from, to, t);
+  const cut = lerp3(from, to, t);
   const tab = raised(cut, layout.tabTopZ);
   return layout.inside(at + layout.probe) ? [cut, tab] : [tab, cut];
 }
@@ -158,8 +159,4 @@ function cumulativeLengths(points: ReadonlyArray<FinishingPoint>): number[] {
 function circularDistance(s: number, anchor: number, perimeter: number): number {
   const d = Math.abs((((s - anchor) % perimeter) + perimeter) % perimeter);
   return Math.min(d, perimeter - d);
-}
-
-function lerp(a: FinishingPoint, b: FinishingPoint, t: number): FinishingPoint {
-  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + (b.z - a.z) * t };
 }

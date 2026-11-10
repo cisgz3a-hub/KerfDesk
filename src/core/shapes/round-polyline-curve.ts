@@ -6,6 +6,7 @@ import {
   type Vec2,
 } from '../scene';
 import { fitCubicsThroughPoints } from '../trace/fit-cubics';
+import { distance } from '../geometry/point-math';
 
 const NEAR_POINT_EPSILON_MM = 1e-9;
 
@@ -63,8 +64,4 @@ function sourcePoints(polyline: Polyline): ReadonlyArray<Vec2> {
   if (first === undefined || last === undefined) return unique;
   const isRepeatedStart = Math.hypot(last.x - first.x, last.y - first.y) < NEAR_POINT_EPSILON_MM;
   return isRepeatedStart ? unique.slice(0, -1) : unique;
-}
-
-function distance(a: Vec2, b: Vec2): number {
-  return Math.hypot(b.x - a.x, b.y - a.y);
 }

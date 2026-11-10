@@ -1,5 +1,6 @@
 import { DraftNumberInput } from '../kit/DraftNumberInput';
 import { boundsAdmitting } from './CutSettingsInputs';
+import { roundToDecimals } from '../../core/util/rounding';
 
 export function CutSettingsFillDensityFields(props: {
   readonly lineIntervalMm: number;
@@ -26,7 +27,7 @@ export function CutSettingsFillDensityFields(props: {
           step="any"
           className="lf-input"
           value={props.lineIntervalMm}
-          format={(value) => String(displayNumber(value, 4))}
+          format={(value) => String(roundToDecimals(value, 4))}
           normalize={clampFillLineInterval}
           onValueChange={props.onChange}
           style={numberStyle}
@@ -43,7 +44,7 @@ export function CutSettingsFillDensityFields(props: {
           step="any"
           className="lf-input"
           value={25.4 / props.lineIntervalMm}
-          format={(value) => String(displayNumber(value, 2))}
+          format={(value) => String(roundToDecimals(value, 2))}
           normalize={(value) => lineIntervalMmToLinesPerInch(linesPerInchToLineIntervalMm(value))}
           onValueChange={(value) => props.onChange(linesPerInchToLineIntervalMm(value))}
           style={numberStyle}
@@ -72,9 +73,9 @@ function fillDensityBounds(storedLineIntervalMm: number): {
   readonly linesPerInch: ReturnType<typeof boundsAdmitting>;
 } {
   return {
-    intervalMm: boundsAdmitting(displayNumber(storedLineIntervalMm, 4), 0.05, 10),
+    intervalMm: boundsAdmitting(roundToDecimals(storedLineIntervalMm, 4), 0.05, 10),
     linesPerInch: boundsAdmitting(
-      displayNumber(25.4 / storedLineIntervalMm, 2),
+      roundToDecimals(25.4 / storedLineIntervalMm, 2),
       lineIntervalMmToLinesPerInch(10),
       lineIntervalMmToLinesPerInch(0.05),
     ),
@@ -91,10 +92,6 @@ function linesPerInchToLineIntervalMm(linesPerInch: number): number {
 
 function clampFillLineInterval(lineIntervalMm: number): number {
   return Math.max(0.05, Math.min(10, lineIntervalMm));
-}
-
-function displayNumber(value: number, decimals: number): number {
-  return Number(value.toFixed(decimals));
 }
 
 const controlStyle: React.CSSProperties = {

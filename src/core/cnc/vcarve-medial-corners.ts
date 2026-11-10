@@ -6,6 +6,7 @@ import {
   type VCarveBoundarySegment,
   type VCarveMedialRegion,
 } from './vcarve-medial-region';
+import { clamp } from '../math/clamp';
 
 const MAX_SHARP_CORNER_PROBES = 256;
 const MAX_CORNER_NODE_CANDIDATES = 64;
@@ -151,8 +152,4 @@ function offsetPoint(origin: Vec2, direction: Vec2, distance: number): Vec2 {
 function unit(x: number, y: number): Vec2 | null {
   const length = Math.hypot(x, y);
   return length > 1e-12 ? { x: x / length, y: y / length } : null;
-}
-
-function clamp(value: number, minimum: number, maximum: number): number {
-  return Math.max(minimum, Math.min(maximum, value));
 }

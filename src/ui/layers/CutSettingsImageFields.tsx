@@ -27,6 +27,8 @@ import {
 } from './CutSettingsAutoOverscan';
 import { boundsAdmitting } from './CutSettingsInputs';
 import { normalizedScanAngleDeg } from '../../core/raster/raster-scan-frame';
+import { formatGroupedUpTo1Decimal } from '../../core/util/number-format';
+import { roundToDecimals } from '../../core/util/rounding';
 
 export function CutSettingsImageFields(props: {
   readonly layer: Layer;
@@ -172,7 +174,7 @@ function ImageOverscanField(props: { readonly layer: Layer }): JSX.Element {
             device.accelMmPerSec2,
             scanAngleDeg,
             kinematics,
-            ` along its ${formatNumber(scanAngleDeg)}° scan`,
+            ` along its ${formatGroupedUpTo1Decimal(scanAngleDeg)}° scan`,
           )}
           neededMm={neededMm}
         />
@@ -190,18 +192,15 @@ function ManualOverscanNote(props: {
   const { feed, accel, alongScan, neededMm } = props;
   return (
     <p className="lf-laser-help">
-      At the saved speed of {formatNumber(feed)} mm/min and {formatNumber(accel)} mm/s² acceleration
-      {alongScan}, the saved model needs about {formatNumber(neededMm)} mm to reach full speed from
-      rest. Confirm the setting with a scan-edge test on this machine.
+      At the saved speed of {formatGroupedUpTo1Decimal(feed)} mm/min and{' '}
+      {formatGroupedUpTo1Decimal(accel)} mm/s² acceleration
+      {alongScan}, the saved model needs about {formatGroupedUpTo1Decimal(neededMm)} mm to reach
+      full speed from rest. Confirm the setting with a scan-edge test on this machine.
       {neededMm > MAX_IMAGE_OVERSCAN_MM
         ? ` That is more than the ${MAX_IMAGE_OVERSCAN_MM} mm maximum, so lower the speed if the image edges burn darker.`
         : ''}
     </p>
   );
-}
-
-function formatNumber(value: number): string {
-  return value.toLocaleString('en-US', { maximumFractionDigits: 1 });
 }
 
 function ImageExtraFields(props: {
@@ -288,7 +287,7 @@ function ImageDensityFields(props: {
           step="any"
           className="lf-input"
           value={linesPerMmToLineIntervalMm(props.linesPerMm)}
-          format={(value) => String(displayNumber(value, 4))}
+          format={(value) => String(roundToDecimals(value, 4))}
           normalize={(value) => linesPerMmToLineIntervalMm(lineIntervalMmToLinesPerMm(value))}
           onValueChange={(value) => props.onChange(lineIntervalMmToLinesPerMm(value))}
           style={numberStyle}
@@ -305,7 +304,7 @@ function ImageDensityFields(props: {
           step="any"
           className="lf-input"
           value={linesPerMmToDpi(props.linesPerMm)}
-          format={(value) => String(displayNumber(value, 2))}
+          format={(value) => String(roundToDecimals(value, 2))}
           normalize={(value) => linesPerMmToDpi(dpiToLinesPerMm(value))}
           onValueChange={(value) => props.onChange(dpiToLinesPerMm(value))}
           style={numberStyle}
@@ -374,10 +373,6 @@ function Field(props: { readonly label: string; readonly children: React.ReactNo
       <span style={controlStyle}>{props.children}</span>
     </label>
   );
-}
-
-function displayNumber(value: number, decimals: number): number {
-  return Number(value.toFixed(decimals));
 }
 
 const controlStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6 };

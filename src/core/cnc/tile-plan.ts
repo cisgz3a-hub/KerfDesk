@@ -20,6 +20,7 @@ import { resolveTileRegistration, type ResolvedTileRegistration } from './tile-r
 import { orderGroupsIntoToolSections } from './cnc-tool-sections';
 import type { EffectiveCncTileGrid } from './effective-cnc-tile-grid';
 import { vcarveConservativeZ } from './vcarve-cutting-constraints';
+import { lerp3 } from '../geometry/vec3';
 
 const MIN_CLIPPED_POINTS = 2;
 
@@ -313,15 +314,7 @@ function clipSegment(a: Xyz, b: Xyz, rect: CncTile['rect']): [Xyz, Xyz] | null {
       if (r < t1) t1 = r;
     }
   }
-  return [lerpPoint(a, b, t0), lerpPoint(a, b, t1)];
-}
-
-function lerpPoint(a: Xyz, b: Xyz, t: number): Xyz {
-  return {
-    x: a.x + (b.x - a.x) * t,
-    y: a.y + (b.y - a.y) * t,
-    z: a.z + (b.z - a.z) * t,
-  };
+  return [lerp3(a, b, t0), lerp3(a, b, t1)];
 }
 
 function samePoint(a: Xyz, b: Xyz): boolean {

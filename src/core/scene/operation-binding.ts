@@ -3,6 +3,7 @@ import { isBooleanCompoundObject } from './boolean-compound';
 import type { ImportedSvg } from './scene-object';
 import { layerSubLayerOperationId, type Layer } from './layer';
 import type { ColoredPath, SceneObject } from './scene-object';
+import { uniqueValues } from '../util/unique';
 
 type OperationIdentity = Pick<Layer, 'id' | 'color' | 'bindingOperationId'>;
 
@@ -76,11 +77,6 @@ function bindOrdinaryObjectToOperations(
     operationIds: uniqueIds,
     paths: object.paths.map(withoutPathOperationIds),
   } as SceneObject;
-}
-
-export function addSceneObjectOperation(object: SceneObject, operationId: string): SceneObject {
-  const current = object.operationIds ?? [];
-  return bindSceneObjectToOperations(object, [...current, operationId]);
 }
 
 export function appendSceneObjectOperationBinding(
@@ -255,16 +251,16 @@ function transformOrdinaryOperationBindings(
 ): SceneObject {
   if (!('paths' in object) || object.paths.length === 0) {
     const ids = object.operationIds ?? operationIdsForObject(object, operations);
-    return { ...object, operationIds: uniqueOperationIds(transform(ids)) } as SceneObject;
+    return { ...object, operationIds: uniqueValues(transform(ids)) } as SceneObject;
   }
   if (object.operationIds !== undefined) {
     return {
       ...object,
-      operationIds: uniqueOperationIds(transform(object.operationIds)),
+      operationIds: uniqueValues(transform(object.operationIds)),
       paths: object.paths.map((path) =>
         path.operationIds === undefined
           ? path
-          : { ...path, operationIds: uniqueOperationIds(transform(path.operationIds)) },
+          : { ...path, operationIds: uniqueValues(transform(path.operationIds)) },
       ),
     } as SceneObject;
   }
@@ -276,7 +272,7 @@ function transformOrdinaryOperationBindings(
         operations
           .filter((operation) => pathUsesOperation(object, path, operation))
           .map((operation) => operation.id);
-      return { ...path, operationIds: uniqueOperationIds(transform(ids)) };
+      return { ...path, operationIds: uniqueValues(transform(ids)) };
     }),
   } as SceneObject;
 }
@@ -286,10 +282,6 @@ function hasExplicitOperationBinding(object: SceneObject): boolean {
     return (object.operationIds?.length ?? 0) > 0;
   }
   return object.paths.some((path) => (path.operationIds ?? object.operationIds ?? []).length > 0);
-}
-
-function uniqueOperationIds(ids: ReadonlyArray<string>): ReadonlyArray<string> {
-  return [...new Set(ids)];
 }
 
 function remapPathOperationBindings(

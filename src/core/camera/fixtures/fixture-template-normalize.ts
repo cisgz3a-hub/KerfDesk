@@ -10,6 +10,7 @@ import {
   type FixtureQualification,
   type FixtureTemplate,
 } from './fixture-template';
+import { isRecord } from '../../util/is-record';
 
 export function normalizeFixtureTemplates(
   value: unknown,
@@ -28,7 +29,11 @@ export function normalizeFixtureTemplates(
     : undefined;
 }
 export function normalizeFixtureTemplate(value: unknown): FixtureTemplate | undefined {
-  if (!record(value) || value['version'] !== 1 || !withinBytes(value, FIXTURE_LIMITS.templateBytes))
+  if (
+    !isRecord(value) ||
+    value['version'] !== 1 ||
+    !withinBytes(value, FIXTURE_LIMITS.templateBytes)
+  )
     return undefined;
   const id = text(value['id'], 160),
     name = text(value['name'], 120);
@@ -73,7 +78,7 @@ function normalizeOptionalFields(
   };
 }
 function normalizeBasis(value: unknown): FixtureBasis | undefined {
-  if (!record(value) || value['kind'] !== 'scene-mm') return undefined;
+  if (!isRecord(value) || value['kind'] !== 'scene-mm') return undefined;
   const deviceProfileId = text(value['deviceProfileId'], 160);
   const bedWidthMm = positive(value['bedWidthMm']),
     bedHeightMm = positive(value['bedHeightMm']);
@@ -87,7 +92,7 @@ function normalizeSlots(value: unknown): FixtureTemplate['slots'] | undefined {
   const slots: Array<{ id: string; piece: DetectedPiece }> = [];
   let pointCount = 0;
   for (const item of value) {
-    if (!record(item)) return undefined;
+    if (!isRecord(item)) return undefined;
     const id = text(item['id'], 160),
       piece = normalizePiece(item['piece']);
     if (id === undefined || piece === undefined) return undefined;
@@ -98,7 +103,7 @@ function normalizeSlots(value: unknown): FixtureTemplate['slots'] | undefined {
   return new Set(slots.map((slot) => slot.id)).size === slots.length ? slots : undefined;
 }
 function normalizePiece(value: unknown): DetectedPiece | undefined {
-  if (!record(value) || !record(value['rect'])) return undefined;
+  if (!isRecord(value) || !isRecord(value['rect'])) return undefined;
   const outline = normalizeOutline(value['outline']);
   const rect = normalizeRect(value['rect']),
     centroid = point(value['centroid']),
@@ -153,7 +158,7 @@ function normalizeSample(
   slots: FixtureTemplate['slots'],
 ): FixtureTemplate['sample'] | null {
   if (value === undefined) return undefined;
-  if (!record(value)) return null;
+  if (!isRecord(value)) return null;
   const slotId = text(value['slotId'], 160),
     design = normalizeDesign(value['design']);
   return slotId === undefined || design === undefined || !slots.some((slot) => slot.id === slotId)
@@ -161,7 +166,7 @@ function normalizeSample(
     : { slotId, design };
 }
 function normalizeDesign(value: unknown): DesignFrame | undefined {
-  if (!record(value)) return undefined;
+  if (!isRecord(value)) return undefined;
   const centre = point(value['centre']),
     width = positive(value['width']),
     height = positive(value['height']),
@@ -174,7 +179,7 @@ function normalizeDesign(value: unknown): DesignFrame | undefined {
     : { centre, width, height, turnDeg };
 }
 function normalizeCamera(value: unknown): FixtureCameraContext | undefined {
-  if (!record(value)) return undefined;
+  if (!isRecord(value)) return undefined;
   const model = normalizeCameraModelRecord(value['model']),
     surfaceHeightMm = nonNegative(value['surfaceHeightMm']),
     heightAreas = normalizeAreas(value['heightAreas']);
@@ -186,7 +191,7 @@ function normalizeAreas(value: unknown): ReadonlyArray<SurfaceHeightArea> | unde
   if (!Array.isArray(value) || value.length > FIXTURE_LIMITS.heightAreas) return undefined;
   const areas: SurfaceHeightArea[] = [];
   for (const item of value) {
-    if (!record(item)) return undefined;
+    if (!isRecord(item)) return undefined;
     const id = text(item['id'], 160),
       x = finite(item['x']),
       y = finite(item['y']),
@@ -207,7 +212,7 @@ function normalizeAreas(value: unknown): ReadonlyArray<SurfaceHeightArea> | unde
   return new Set(areas.map((area) => area.id)).size === areas.length ? areas : undefined;
 }
 export function normalizeQualification(value: unknown): FixtureQualification | undefined {
-  if (!record(value) || value['method'] !== 'manual-observation') return undefined;
+  if (!isRecord(value) || value['method'] !== 'manual-observation') return undefined;
   const recordedAt = timestamp(value['recordedAt']),
     notes = text(value['notes'], 2000, true),
     basis = normalizeBasis(value['basis']);
@@ -236,16 +241,13 @@ function normalizeObservationPoints(value: unknown): FixtureQualification['point
     return undefined;
   const points: FixtureQualification['points'][number][] = [];
   for (const item of value) {
-    if (!record(item)) return undefined;
+    if (!isRecord(item)) return undefined;
     const expectedMm = point(item['expectedMm']),
       observedMm = point(item['observedMm']);
     if (expectedMm === undefined || observedMm === undefined) return undefined;
     points.push({ expectedMm, observedMm });
   }
   return points;
-}
-function record(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 function finite(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= 1_000_000
@@ -261,7 +263,7 @@ function nonNegative(value: unknown): number | undefined {
   return number !== undefined && number >= 0 ? number : undefined;
 }
 function point(value: unknown): Vec2 | undefined {
-  if (!record(value)) return undefined;
+  if (!isRecord(value)) return undefined;
   const x = finite(value['x']),
     y = finite(value['y']);
   return x === undefined || y === undefined ? undefined : { x, y };

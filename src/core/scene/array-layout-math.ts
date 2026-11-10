@@ -1,6 +1,8 @@
 // Number hygiene shared by the array layouts: malformed direct-call input
 // never produces a non-finite placement.
 
+import { normalizeDegrees } from '../math/wrap';
+
 export function positiveCount(value: number): number {
   if (!Number.isFinite(value)) return 1;
   return Math.max(1, Math.floor(value));
@@ -18,10 +20,7 @@ export function span(min: number, max: number): number {
   return Math.max(0, finite(max) - finite(min));
 }
 
-export function normalizeDegrees(value: number): number {
-  const normalized = value % 360;
-  return normalized < 0 ? normalized + 360 : normalized;
-}
+export { normalizeDegrees } from '../math/wrap';
 
 /** Exact at the quarter turns, so a copy at 90° lands exactly below the centre. */
 export function unitVectorForDegrees(value: number): { readonly x: number; readonly y: number } {

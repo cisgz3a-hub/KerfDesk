@@ -7,6 +7,7 @@
 import type { Bounds, Vec2 } from '../scene';
 import { boundsOverlap, type TrimContour } from './trim-contours';
 import { analyticChordPair, collectAnalyticCrossings } from './trim-analytic-crossings';
+import { segmentBox } from './box-math';
 
 export type TrimCrossing = {
   /** Position on the contour (segment + t). */
@@ -64,7 +65,7 @@ function collectCrossings(
   for (let edge = 0; edge < outline.points.length - 1; edge += 1) {
     const a = outline.points[edge] as Vec2;
     const b = outline.points[edge + 1] as Vec2;
-    forEachChordNear(grid, segmentBounds(a, b), seen, edge + 1, (chord) => {
+    forEachChordNear(grid, segmentBox(a, b), seen, edge + 1, (chord) => {
       if (analyticChordPair(contour, chord, outline, edge)) return;
       const crossing = crossingOn(contour, chord, a, b);
       if (crossing !== null) found.push(crossing);
@@ -78,7 +79,7 @@ function collectSelfCrossings(contour: TrimContour, grid: ChordGrid, found: Trim
   for (let edge = 0; edge <= last; edge += 1) {
     const a = contour.points[edge] as Vec2;
     const b = contour.points[edge + 1] as Vec2;
-    forEachChordNear(grid, segmentBounds(a, b), seen, edge + 1, (chord) => {
+    forEachChordNear(grid, segmentBox(a, b), seen, edge + 1, (chord) => {
       if (chord <= edge + 1 || (contour.closed && edge === 0 && chord === last)) return;
       const onChord = crossingOn(contour, chord, a, b);
       if (onChord === null) return;
@@ -176,7 +177,7 @@ function buildChordGrid(contour: TrimContour): ChordGrid {
   const cells: number[][] = Array.from({ length: perAxis * perAxis }, () => []);
   const grid = { bounds, cols: perAxis, rows: perAxis, cellWidth, cellHeight, cells };
   for (let chord = 0; chord < chords; chord += 1) {
-    const box = segmentBounds(contour.points[chord] as Vec2, contour.points[chord + 1] as Vec2);
+    const box = segmentBox(contour.points[chord] as Vec2, contour.points[chord + 1] as Vec2);
     forEachCell(grid, box, (cell) => cells[cell]?.push(chord));
   }
   return grid;
@@ -211,13 +212,4 @@ function forEachCell(grid: ChordGrid, box: Bounds, visit: (cell: number) => void
 
 function cellIndex(value: number, min: number, size: number, count: number): number {
   return Math.min(count - 1, Math.max(0, Math.floor((value - min) / size)));
-}
-
-function segmentBounds(a: Vec2, b: Vec2): Bounds {
-  return {
-    minX: Math.min(a.x, b.x),
-    minY: Math.min(a.y, b.y),
-    maxX: Math.max(a.x, b.x),
-    maxY: Math.max(a.y, b.y),
-  };
 }

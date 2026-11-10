@@ -13,6 +13,7 @@ import {
 } from '../scene/scene-object';
 import { applyTransform } from '../scene/transform';
 import { materializedStrokeFields } from './stroke-transform';
+import { withoutNegativeZero } from '../util/rounding';
 
 export type VectorSceneObject = Extract<
   SceneObject,
@@ -234,9 +235,5 @@ function pointsEqual(a: Vec2, b: Vec2): boolean {
 }
 
 function cleanPoint(point: Vec2): Vec2 {
-  return { x: cleanCoord(point.x), y: cleanCoord(point.y) };
-}
-
-function cleanCoord(value: number): number {
-  return Object.is(value, -0) ? 0 : value;
+  return { x: withoutNegativeZero(point.x), y: withoutNegativeZero(point.y) };
 }

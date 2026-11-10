@@ -36,6 +36,7 @@ import {
   sceneObjectCopyClosure,
 } from './scene-object-copy-dependencies';
 import { useToastStore } from './toast-store';
+import { boxCentre } from '../../core/geometry/box-math';
 
 const REGISTRATION_JIG_ARTWORK_FIT_FRACTION = 0.9;
 
@@ -100,7 +101,7 @@ export function applyCenterArtworkInRegistrationJigSet(
     selected,
     fitted,
     boxes,
-    centerOf(selectionBounds),
+    boxCentre(selectionBounds),
   );
 
   const replacedIds = registrationJigReplacedArtworkIds(
@@ -166,7 +167,7 @@ function buildJigArtworkLayout(
     new Set(selected.map((object) => object.id)),
   );
   for (const [boxIndex, box] of boxes.entries()) {
-    const targetCenter = centerOf(transformedBBox(box));
+    const targetCenter = boxCentre(transformedBBox(box));
     const delta = { x: targetCenter.x - sourceCenter.x, y: targetCenter.y - sourceCenter.y };
     if (boxIndex === 0) {
       for (const object of fitted) {
@@ -259,8 +260,8 @@ export function applyRegistrationJigArtworkSize(
     if (bounds === null || box === undefined) {
       return { state, outcome: { kind: 'error', reason: 'no-jig-artwork' } };
     }
-    const sourceCenter = centerOf(bounds);
-    const targetCenter = centerOf(transformedBBox(box));
+    const sourceCenter = boxCentre(bounds);
+    const targetCenter = boxCentre(transformedBBox(box));
     for (const object of resizedObjects) {
       movedById.set(
         object.id,
@@ -347,13 +348,4 @@ function completeSelectedGroups(
 ): ReadonlyArray<SceneGroup> {
   const selectedIds = new Set(selected.map((object) => object.id));
   return (scene.groups ?? []).filter((group) => group.objectIds.every((id) => selectedIds.has(id)));
-}
-
-function centerOf(bounds: {
-  readonly minX: number;
-  readonly minY: number;
-  readonly maxX: number;
-  readonly maxY: number;
-}): { readonly x: number; readonly y: number } {
-  return { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 };
 }

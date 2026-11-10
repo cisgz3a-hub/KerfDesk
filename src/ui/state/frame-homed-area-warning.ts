@@ -14,6 +14,7 @@ import { frameRouteOnBed } from './frame-no-go-warnings';
 import { bedWiderThanHomedArea, formatBed, grblHalHomedEnvelope } from './homed-area-bed';
 import type { LaserState } from './laser-store';
 import { resolveNativeBedFrame, selectNativeBedEvidence } from './native-bed-frame';
+import { formatUpTo3Decimals } from '../../core/util/number-format';
 
 type Point = { readonly x: number; readonly y: number };
 
@@ -48,7 +49,7 @@ export function frameHomedAreaWarning(
   const bed = formatBed({ widthMm: project.device.bedWidth, heightMm: project.device.bedHeight });
   return (
     `The Frame reaches ${farthest} on the bed, past the controller's homed area ` +
-    `(X ${mm(box.minX)} to ${mm(box.maxX)}, Y ${mm(box.minY)} to ${mm(box.maxY)} mm after the homing pull-off). ` +
+    `(X ${formatUpTo3Decimals(box.minX)} to ${formatUpTo3Decimals(box.maxX)}, Y ${formatUpTo3Decimals(box.minY)} to ${formatUpTo3Decimals(box.maxY)} mm after the homing pull-off). ` +
     `This profile's bed is ${bed}${widened === null ? '' : ", the controller's whole travel"}; ` +
     `correct it to ${formatBed(homed)} in Machine Setup. ` +
     'The Frame is sent unchanged; watch the move and stop it, or use the physical E-stop, if needed.'
@@ -71,11 +72,7 @@ export function farthestOutside(
   }
   if (worst === null) return null;
   return [
-    ...(worst.x ? [`X ${mm(worst.point.x)}`] : []),
-    ...(worst.y ? [`Y ${mm(worst.point.y)}`] : []),
+    ...(worst.x ? [`X ${formatUpTo3Decimals(worst.point.x)}`] : []),
+    ...(worst.y ? [`Y ${formatUpTo3Decimals(worst.point.y)}`] : []),
   ].join(', ');
-}
-
-function mm(value: number): string {
-  return Number(value.toFixed(3)).toString();
 }

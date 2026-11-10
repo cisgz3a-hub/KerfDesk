@@ -10,6 +10,8 @@ import {
   type MachineHoursRecord,
   type MaintenanceReminder,
 } from './machine-hours';
+import { isNonNegativeFiniteNumber } from '../../core/util/finite';
+import { isRecord } from '../../core/util/is-record';
 
 export const MACHINE_HOURS_STORAGE_KEY = 'kerfdesk.machine-hours.v1';
 
@@ -53,7 +55,12 @@ export function persistMachineHours(storage: StorageLike, book: MachineHoursBook
 function parseRecord(value: unknown): MachineHoursRecord | null {
   if (!isRecord(value)) return null;
   const { name, runMs, jobs, reminders } = value;
-  if (typeof name !== 'string' || !isCount(runMs) || !isCount(jobs) || !Array.isArray(reminders)) {
+  if (
+    typeof name !== 'string' ||
+    !isNonNegativeFiniteNumber(runMs) ||
+    !isNonNegativeFiniteNumber(jobs) ||
+    !Array.isArray(reminders)
+  ) {
     return null;
   }
   return {
@@ -74,17 +81,9 @@ function parseReminder(value: unknown): MaintenanceReminder | null {
   if (
     typeof everyHours !== 'number' ||
     !(everyHours >= MIN_REMINDER_HOURS && everyHours <= MAX_REMINDER_HOURS) ||
-    !isCount(doneAtRunMs)
+    !isNonNegativeFiniteNumber(doneAtRunMs)
   ) {
     return null;
   }
   return { id, label, everyHours, doneAtRunMs };
-}
-
-function isCount(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

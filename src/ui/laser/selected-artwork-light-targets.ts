@@ -8,6 +8,7 @@ import {
 import { registrationJigObjectIdentity } from '../../core/scene/registration-jig-artwork';
 import { selectionUnits } from '../../core/scene/selection-units';
 import { groupsWithinFocus } from '../state/design-hierarchy-store';
+import { formatRoundedTo2Decimals } from '../../core/util/number-format';
 
 export type ArtworkLightTarget = {
   readonly id: string;
@@ -52,8 +53,8 @@ export function selectedArtworkLightTargets(
         (unit.objects.length === 1 && first !== undefined
           ? artworkOperationName(first)
           : 'Group (' + unit.objects.length + ' artworks)');
-      const width = formatDimension(unit.box.maxX - unit.box.minX);
-      const height = formatDimension(unit.box.maxY - unit.box.minY);
+      const width = formatRoundedTo2Decimals(unit.box.maxX - unit.box.minX);
+      const height = formatRoundedTo2Decimals(unit.box.maxY - unit.box.minY);
       return {
         id: JSON.stringify(objectIds),
         objectIds,
@@ -61,8 +62,4 @@ export function selectedArtworkLightTargets(
       };
     }),
   );
-}
-
-function formatDimension(value: number): string {
-  return String(Math.round(value * 100) / 100);
 }

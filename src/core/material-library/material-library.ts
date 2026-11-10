@@ -1,4 +1,6 @@
 import { DITHER_ALGORITHMS, type DitherAlgorithm, type Layer, type LayerMode } from '../scene';
+import { isRecord } from '../util/is-record';
+import { isFiniteNumber, finiteOr } from '../util/finite';
 
 export type MaterialRecipe = {
   readonly mode: LayerMode;
@@ -163,10 +165,6 @@ export function isMaterialRecipe(value: unknown): value is MaterialRecipe {
   return hasRecipeModes(value) && hasRecipeNumbers(value) && hasRecipeBooleans(value);
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 function isLayerMode(value: unknown): value is LayerMode {
   return LAYER_MODES.some((mode) => mode === value);
 }
@@ -256,10 +254,6 @@ function hasImageBooleans(value: Record<string, unknown>): boolean {
   );
 }
 
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
-}
-
 function isValidPower(value: unknown): value is number {
   return isFiniteNumber(value) && value >= 0 && value <= 100;
 }
@@ -278,10 +272,6 @@ function isPositiveInteger(value: unknown): value is number {
 
 function clampFinite(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, finiteOr(value, min)));
-}
-
-function finiteOr(value: number, fallback: number): number {
-  return Number.isFinite(value) ? value : fallback;
 }
 
 function optionalScanOffset(

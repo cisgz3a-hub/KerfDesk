@@ -16,6 +16,7 @@ import {
   type VCarveMedialRegion,
 } from './vcarve-medial-region';
 import { appendAll } from '../util';
+import { samePoint } from '../geometry/point-math';
 
 const MAX_FLOOR_RINGS = 8192;
 // Clipper's default round-join arc tolerance as a fraction of the offset;
@@ -170,10 +171,6 @@ function stableStartIndex(points: ReadonlyArray<Vec2>): number {
     }
   }
   return best;
-}
-
-function samePoint(a: Vec2, b: Vec2): boolean {
-  return a.x === b.x && a.y === b.y;
 }
 
 const NO_FLAT_CORE: VCarveFlatCorePlan = {

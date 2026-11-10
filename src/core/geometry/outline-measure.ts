@@ -14,6 +14,7 @@ import {
   type Vec2,
 } from '../scene';
 import { contourSegments, segmentPoint, segmentStart } from './trim-curve-split';
+import { polylineLength } from './point-math';
 
 const CURVE_SAMPLES = 64;
 const UNIFORM_SCALE_TOLERANCE = 1e-9;
@@ -127,16 +128,6 @@ function sampleSegment(
     points.push(applyTransform(segmentPoint(from, segment, step / steps), transform));
   }
   return points;
-}
-
-function polylineLength(points: ReadonlyArray<Vec2>): number {
-  let length = 0;
-  for (let index = 1; index < points.length; index += 1) {
-    const a = points[index - 1] as Vec2;
-    const b = points[index] as Vec2;
-    length += Math.hypot(b.x - a.x, b.y - a.y);
-  }
-  return length;
 }
 
 function evenOddArea(rings: ReadonlyArray<ReadonlyArray<Vec2>>): number {

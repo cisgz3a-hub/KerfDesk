@@ -6,6 +6,7 @@ import {
   type BoundedCompilationBridgeRequest,
 } from './bounded-compilation-bridge-protocol';
 import type { BoundedCompilationId } from './bounded-compilation-worker-pool-protocol';
+import { toError } from '../../core/util/error-message';
 
 type Pending<TResult> = {
   readonly requestId: number;
@@ -71,7 +72,7 @@ export class BoundedCompilationBridgeClient<TPayload, TResult> {
       try {
         this.port.postMessage(request);
       } catch (error) {
-        this.rejectPending(pending, asError(error));
+        this.rejectPending(pending, toError(error));
       }
     });
   }
@@ -188,10 +189,6 @@ function abortError(): Error {
   const error = new Error('compilation job aborted');
   error.name = 'AbortError';
   return error;
-}
-
-function asError(error: unknown): Error {
-  return error instanceof Error ? error : new Error(String(error));
 }
 
 function positiveLimit(value: number, label: string): number {

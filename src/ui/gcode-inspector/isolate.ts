@@ -6,6 +6,7 @@
 // Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
 import type { Viewer3dClipPlane } from '../viewer3d/scene-isolate';
 import type { InspectorRenderModel } from './inspector-model';
+import { roundToThousandth } from '../../core/util/rounding';
 
 export type SectionAxis = 'x' | 'y';
 
@@ -57,10 +58,12 @@ export function zStops(model: InspectorRenderModel): ReadonlyArray<number> | nul
   if (model.stats.zLevels.length > MAX_Z_STOPS) {
     const span = bounds.maxZ - bounds.minZ;
     return Array.from({ length: MAX_Z_STOPS + 1 }, (_, step) =>
-      roundMicron(bounds.minZ + (span * step) / MAX_Z_STOPS),
+      roundToThousandth(bounds.minZ + (span * step) / MAX_Z_STOPS),
     );
   }
-  const heights = new Set([bounds.minZ, ...model.stats.zLevels, bounds.maxZ].map(roundMicron));
+  const heights = new Set(
+    [bounds.minZ, ...model.stats.zLevels, bounds.maxZ].map(roundToThousandth),
+  );
   return [...heights].sort((low, high) => low - high);
 }
 
@@ -76,8 +79,4 @@ export function moveFilterMask(
     visible[index] = hidden.has(entryOf(index)) ? 0 : 1;
   }
   return visible;
-}
-
-function roundMicron(value: number): number {
-  return Math.round(value * 1000) / 1000;
 }

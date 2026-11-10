@@ -16,6 +16,7 @@ import {
   type Vec2,
 } from '../scene';
 import { isVectorPathObject, materializeVectorObject } from './vector-path-tools';
+import { samePoint } from './point-math';
 
 const GRID_PER_MM = 1000;
 
@@ -155,8 +156,4 @@ function encode(points: ReadonlyArray<Vec2>): string {
 
 function smaller(a: string, b: string): string {
   return a <= b ? a : b;
-}
-
-function samePoint(a: Vec2, b: Vec2): boolean {
-  return a.x === b.x && a.y === b.y;
 }

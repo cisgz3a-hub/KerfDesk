@@ -34,6 +34,7 @@ import { pushLog } from './laser-store-helpers';
 import { withheldControllerMPos } from './laser-status-position';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { WorkCoordinateOffset } from './origin-actions';
+import { sleep } from '../common/sleep';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -419,10 +420,4 @@ function writtenOffset(state: LaserState, savedMm: SavedXyOffsetMm): WorkCoordin
   if (prior === null) return null;
   const scale = state.controllerSettings?.reportInches === true ? 1 / 25.4 : 1;
   return { x: savedMm.x * scale, y: savedMm.y * scale, z: prior.z };
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
 }

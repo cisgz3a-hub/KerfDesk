@@ -9,6 +9,7 @@
 import type { Vec2 } from '../scene';
 import { ContourBoxIndex } from '../trace/contour-box-index';
 import type { SegmentBounds } from './segment-bounds';
+import { isFiniteBox } from '../geometry/box-math';
 
 export type LeadRing = {
   /** The ring's outline; its last point may repeat its first. */
@@ -59,7 +60,7 @@ export class LeadObstacles {
   ): LeadObstacles {
     const chords = collectChords(lines);
     const boxes = rings.flatMap((ring, index) =>
-      finiteBounds(ring.bounds) ? [{ ...ring.bounds, ring: index }] : [],
+      isFiniteBox(ring.bounds) ? [{ ...ring.bounds, ring: index }] : [],
     );
     const grid: Grid = { cells: new Map(), wide: [] };
     for (let chord = 0; chord < chords.line.length; chord += 1) insertChord(grid, chords, chord);
@@ -272,14 +273,5 @@ function chordDistanceSq(a: Vec2, b: Vec2, cx: number, cy: number, dx: number, d
     segmentDistanceSq(b, cx, cy, dx, dy),
     segmentDistanceSq({ x: cx, y: cy }, a.x, a.y, b.x, b.y),
     segmentDistanceSq({ x: dx, y: dy }, a.x, a.y, b.x, b.y),
-  );
-}
-
-function finiteBounds(bounds: SegmentBounds): boolean {
-  return (
-    Number.isFinite(bounds.minX) &&
-    Number.isFinite(bounds.minY) &&
-    Number.isFinite(bounds.maxX) &&
-    Number.isFinite(bounds.maxY)
   );
 }

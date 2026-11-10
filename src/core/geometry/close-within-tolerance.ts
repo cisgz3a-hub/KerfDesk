@@ -17,6 +17,7 @@ import {
   type Vec2,
 } from '../scene';
 import { closeOpenPaths, isCloseablePolyline } from './path-direction-edits';
+import { midpoint, addPoints } from './point-math';
 
 export type CloseToleranceMode = 'bridge' | 'move-ends';
 
@@ -90,10 +91,6 @@ function worldGap([a, b]: readonly [Vec2, Vec2], transform: Transform): number {
   return Math.hypot(p.x - q.x, p.y - q.y);
 }
 
-function midpoint(a: Vec2, b: Vec2): Vec2 {
-  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-}
-
 function meetPolyline(polyline: Polyline): Polyline {
   const first = polyline.points[0];
   const last = polyline.points.at(-1);
@@ -111,18 +108,14 @@ function meetCurve(curve: CurveSubpath): CurveSubpath {
   const segments = curve.segments.map((segment, index) => {
     let next: PathSegment = segment;
     if (index === 0 && next.kind === 'cubic')
-      next = { ...next, control1: shift(next.control1, startShift) };
+      next = { ...next, control1: addPoints(next.control1, startShift) };
     if (index === curve.segments.length - 1) {
       next =
         next.kind === 'cubic'
-          ? { ...next, control2: shift(next.control2, endShift), to: meet }
+          ? { ...next, control2: addPoints(next.control2, endShift), to: meet }
           : { ...next, to: meet };
     }
     return next;
   });
   return { start: meet, segments, closed: true };
-}
-
-function shift(point: Vec2, by: Vec2): Vec2 {
-  return { x: point.x + by.x, y: point.y + by.y };
 }

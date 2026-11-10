@@ -1,3 +1,5 @@
+import { isFinitePositive } from '../../util/finite';
+
 export type AxisBounds = { readonly minMm: number; readonly maxMm: number };
 export type MachineEnvelope = {
   readonly x: AxisBounds;
@@ -63,7 +65,7 @@ export function validateEnvelopeSettings(
   if (!isDirectionMask(settings.homingDirectionMask)) {
     return { ok: false, reason: 'GRBL homing direction mask must be an integer from 0 to 7.' };
   }
-  if (!isPositiveFinite(settings.homingPullOffMm)) {
+  if (!isFinitePositive(settings.homingPullOffMm)) {
     return {
       ok: false,
       reason: 'KerfDesk requires a finite positive homing pull-off safety margin.',
@@ -71,7 +73,7 @@ export function validateEnvelopeSettings(
   }
   if (
     ![settings.maxTravelMm.x, settings.maxTravelMm.y, settings.maxTravelMm.z].every(
-      isPositiveFinite,
+      isFinitePositive,
     )
   ) {
     return { ok: false, reason: 'GRBL maximum travels must be finite and positive.' };
@@ -84,7 +86,7 @@ function deriveAxisBounds(
   homingDirectionInverted: boolean,
   homingForceOrigin: boolean,
 ): AxisBounds {
-  if (!isPositiveFinite(maxTravelMm))
+  if (!isFinitePositive(maxTravelMm))
     throw new Error('Maximum travel must be finite and positive.');
   return homingForceOrigin && homingDirectionInverted
     ? { minMm: 0, maxMm: maxTravelMm }
@@ -98,8 +100,4 @@ function assertDirectionMask(value: number): void {
 
 function isDirectionMask(value: number): boolean {
   return Number.isInteger(value) && value >= 0 && value <= 7;
-}
-
-function isPositiveFinite(value: number): boolean {
-  return Number.isFinite(value) && value > 0;
 }

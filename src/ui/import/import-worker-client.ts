@@ -20,6 +20,7 @@ import type {
   PreparedDepthMapImportResult,
   PreparedReliefHeightfieldImportResult,
 } from './depth-map-import-preparation';
+import { stopWorker } from '../common/stop-worker';
 
 export type ImportWorkerProgress = {
   readonly phase: 'queued' | 'reading' | 'parsing' | 'preparing';
@@ -326,7 +327,7 @@ function rejectAllPendingAndRetireWorker(message: string): void {
 }
 
 function retireWorker(): void {
-  workerInstance?.terminate();
+  if (workerInstance !== null) stopWorker(workerInstance);
   workerInstance = null;
 }
 

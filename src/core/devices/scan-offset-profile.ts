@@ -1,3 +1,6 @@
+import { isFiniteNumber } from '../util/finite';
+import { isRecord } from '../util/is-record';
+
 export type ScanOffsetPoint = {
   readonly speedMmPerMin: number;
   readonly offsetMm: number;
@@ -153,12 +156,4 @@ function isScanOffsetPoint(value: unknown): value is ScanOffsetPoint {
 
 function isPositiveFinite(value: unknown): value is number {
   return isFiniteNumber(value) && value > 0;
-}
-
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

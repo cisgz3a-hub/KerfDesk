@@ -3,6 +3,8 @@
 import { normalizeCncToolAssembly } from '../../core/cnc/cnc-tool-assembly';
 import { isValidCncTipAngleDeg } from '../../core/cnc-tip-angle';
 import { DEFAULT_CNC_TOOLS, type CncTool } from '../../core/scene';
+import { isRecord } from '../../core/util/is-record';
+import { isFiniteNumber, isPositiveInteger } from '../../core/util/finite';
 
 // Tools are rebuilt field-by-field like stock/params: `diameterMm: 1e999`
 // parses to Infinity and previously rode `> 0` straight into the CNC offset
@@ -31,7 +33,7 @@ export function normalizeCncTools(raw: unknown): Array<CncTool> {
 }
 
 function normalizeCncTool(tool: unknown): CncTool | null {
-  if (!isObject(tool)) return null;
+  if (!isRecord(tool)) return null;
   const core = normalizeCncToolCore(tool);
   if (core === null) return null;
   return { ...core, ...normalizeCncToolMetadata(tool), ...normalizeCncToolAssembly(tool) };
@@ -67,17 +69,13 @@ function normalizeCncToolMetadata(tool: Record<string, unknown>): Record<string,
   if (isFiniteNumber(tool['shankDiameterMm']) && tool['shankDiameterMm'] > 0) {
     metadata['shankDiameterMm'] = tool['shankDiameterMm'];
   }
-  if (validFluteCount(tool['fluteCount'])) metadata['fluteCount'] = tool['fluteCount'];
+  if (isPositiveInteger(tool['fluteCount'])) metadata['fluteCount'] = tool['fluteCount'];
   if (catalogId !== null) metadata['catalogId'] = catalogId;
   return metadata;
 }
 
 function keepsTipDiameter(kind: unknown): boolean {
   return kind === 'engraving' || kind === 'tapered-ball-nose';
-}
-
-function validFluteCount(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value > 0;
 }
 
 function boundedToolString(value: unknown): string | null {
@@ -88,12 +86,4 @@ function boundedToolString(value: unknown): string | null {
 
 function isCncToolKindValue(value: unknown): value is (typeof CNC_TOOL_KINDS)[number] {
   return typeof value === 'string' && (CNC_TOOL_KINDS as ReadonlyArray<string>).includes(value);
-}
-
-function isObject(v: unknown): v is Record<string, unknown> {
-  return typeof v === 'object' && v !== null && !Array.isArray(v);
-}
-
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
 }

@@ -18,6 +18,7 @@ import {
   type LensModel,
   type Vec2,
 } from './camera-model';
+import { isRecord } from '../../util/is-record';
 
 export type { CameraModelAccuracy } from './camera-model-accuracy';
 
@@ -176,10 +177,6 @@ function normalizePose(value: unknown): CameraPose | undefined {
     rvec: [rvec[0] ?? 0, rvec[1] ?? 0, rvec[2] ?? 0],
     tvec: [tvec[0] ?? 0, tvec[1] ?? 0, tvec[2] ?? 0],
   };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function finite(value: unknown): number | undefined {

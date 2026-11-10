@@ -6,7 +6,6 @@ import { isActiveJob, setupCommandBlockMessage } from '../state/laser-store-help
 import { hasPendingControllerWrite } from '../state/laser-start-queue-fence';
 import { useLaserStore } from '../state/laser-store';
 import { useStore } from '../state/store';
-import type { MachineExecutionOwner } from '../state/machine-execution-owner';
 import type { MachineExecutionContext } from './machine-execution';
 import type { OwnedMachineOperation } from './machine-operation-state';
 import type { MachineCommand } from './machine-types';
@@ -246,8 +245,3 @@ export async function executePauseResume(
   // A fixed policy text, not artwork: the receipt keeps it whole (ADR-585 Amendment 2).
   if (pause) operation.policyMessage = true;
 }
-
-export type HoldExecution = (
-  operation: OwnedMachineOperation,
-  owner: MachineExecutionOwner,
-) => Promise<void>;

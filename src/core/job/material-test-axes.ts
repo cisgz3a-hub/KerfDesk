@@ -7,6 +7,7 @@ import { effectiveGcodeFeedMmPerMin, formatGcodeFeedMmPerMin } from '../gcode/fe
 import { LAYER_DEFAULTS } from '../scene';
 import { formatCalibrationNumber } from './calibration-labels';
 import { MIN_HATCH_SPACING_MM } from './fill-hatching';
+import { finiteOr } from '../util/finite';
 
 export type MaterialTestParameter = 'speed' | 'power' | 'passes' | 'interval';
 
@@ -170,8 +171,4 @@ function clampInterval(value: number): number {
     MIN_TEST_INTERVAL_MM,
     Math.min(MAX_TEST_INTERVAL_MM, finiteOr(value, LAYER_DEFAULTS.hatchSpacingMm)),
   );
-}
-
-function finiteOr(value: number, fallback: number): number {
-  return Number.isFinite(value) ? value : fallback;
 }

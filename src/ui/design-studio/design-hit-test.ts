@@ -22,6 +22,7 @@
 import { entityBounds, entityToPolylines, type Sketch, type SketchEntity } from '../../core/design';
 import { pointInPolygon } from '../../core/geometry';
 import type { Polyline, Vec2 } from '../../core/scene';
+import { distance } from '../../core/geometry/point-math';
 
 // Click slop in screen pixels, converted to mm by the caller. Generous enough to
 // hit a 1 px line with a trackpad, tight enough not to grab a neighbour.
@@ -137,10 +138,6 @@ export function distanceToSegment(point: Vec2, from: Vec2, to: Vec2): number {
   const t = ((point.x - from.x) * dx + (point.y - from.y) * dy) / lengthSquared;
   const clamped = Math.min(1, Math.max(0, t));
   return distance({ x: from.x + clamped * dx, y: from.y + clamped * dy }, point);
-}
-
-function distance(a: Vec2, b: Vec2): number {
-  return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
 // Every entity whose materialized geometry falls entirely inside the rectangle —

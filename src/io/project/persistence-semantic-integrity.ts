@@ -1,3 +1,5 @@
+import { isRecord } from '../../core/util/is-record';
+
 type JsonRecord = Record<string, unknown>;
 
 // Open remains deliberately tolerant of legacy/malformed optional fields, but
@@ -62,8 +64,4 @@ function firstRecordDifference(left: JsonRecord, right: JsonRecord, path: string
     if (difference !== null) return difference;
   }
   return null;
-}
-
-function isRecord(value: unknown): value is JsonRecord {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

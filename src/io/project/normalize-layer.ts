@@ -12,6 +12,12 @@ import {
   type LayerOperationSettings,
 } from '../../core/scene';
 import { normalizeCncFeedSource } from './normalize-cnc-feed-source';
+import { isRecord } from '../../core/util/is-record';
+import {
+  isNonNegativeFiniteNumber,
+  isPositiveFiniteNumber,
+  isPositiveInteger,
+} from '../../core/util/finite';
 
 const POCKET_STRATEGIES = new Set<string>(['offset', 'raster-x', 'raster-y', 'adaptive']);
 const LINE_ART_CONTOUR_SIDES = new Set<string>(['inner', 'outer', 'both']);
@@ -37,11 +43,11 @@ function booleanPassthrough(key: string, value: unknown): Record<string, unknown
 }
 
 function positiveNumberPassthrough(key: string, value: unknown): Record<string, unknown> {
-  return isPositiveNumber(value) ? { [key]: value } : {};
+  return isPositiveFiniteNumber(value) ? { [key]: value } : {};
 }
 
 export function normalizeLayer(layer: unknown): unknown {
-  if (!isObject(layer)) return layer;
+  if (!isRecord(layer)) return layer;
   const out: Record<string, unknown> = { ...layer };
   if (typeof out['name'] !== 'string' || out['name'].trim().length === 0) {
     out['name'] = 'Operation';
@@ -84,7 +90,7 @@ function normalizeScanMotionOverrides(out: Record<string, unknown>): void {
 function normalizeCncLayerField(out: Record<string, unknown>): void {
   const raw = out['cnc'];
   if (raw === undefined) return;
-  if (!isObject(raw)) {
+  if (!isRecord(raw)) {
     delete out['cnc'];
     return;
   }
@@ -108,7 +114,7 @@ function normalizeCncLayerField(out: Record<string, unknown>): void {
     depthMm: positiveOr(raw['depthMm'], d.depthMm),
     depthPerPassMm: positiveOr(raw['depthPerPassMm'], d.depthPerPassMm),
     // 0 = automatic medial sampling and flat-core pitch (H.3).
-    vResolutionMm: isNonNegativeNumber(raw['vResolutionMm'])
+    vResolutionMm: isNonNegativeFiniteNumber(raw['vResolutionMm'])
       ? raw['vResolutionMm']
       : d.vResolutionMm,
     feedMmPerMin: positiveOr(raw['feedMmPerMin'], d.feedMmPerMin),
@@ -129,7 +135,7 @@ function optionalCncLayerFields(raw: Record<string, unknown>): Record<string, un
   return {
     ...(typeof raw['toolId'] === 'string' ? { toolId: raw['toolId'] } : {}),
     ...enumPassthrough('pocketStrategy', raw['pocketStrategy'], POCKET_STRATEGIES),
-    ...(isPositiveNumber(raw['adaptiveOptimalLoadMm'])
+    ...(isPositiveFiniteNumber(raw['adaptiveOptimalLoadMm'])
       ? { adaptiveOptimalLoadMm: raw['adaptiveOptimalLoadMm'] }
       : {}),
     ...normalizeInlayFields(raw),
@@ -143,7 +149,7 @@ function optionalCncLayerFields(raw: Record<string, unknown>): Record<string, un
     ...(typeof raw['reliefFinishToolId'] === 'string'
       ? { reliefFinishToolId: raw['reliefFinishToolId'] }
       : {}),
-    ...(isPositiveNumber(raw['reliefScallopMm'])
+    ...(isPositiveFiniteNumber(raw['reliefScallopMm'])
       ? { reliefScallopMm: raw['reliefScallopMm'] }
       : {}),
     ...enumPassthrough(
@@ -154,7 +160,7 @@ function optionalCncLayerFields(raw: Record<string, unknown>): Record<string, un
     ...enumPassthrough('reliefRasterAxis', raw['reliefRasterAxis'], RELIEF_RASTER_AXES),
     ...positiveNumberPassthrough('reliefFineStepMm', raw['reliefFineStepMm']),
     ...enumPassthrough('reliefFlatFinish', raw['reliefFlatFinish'], RELIEF_FLAT_FINISHES),
-    ...(isPositiveNumber(raw['rampEntryDeg']) ? { rampEntryDeg: raw['rampEntryDeg'] } : {}),
+    ...(isPositiveFiniteNumber(raw['rampEntryDeg']) ? { rampEntryDeg: raw['rampEntryDeg'] } : {}),
     ...positiveNumberPassthrough('vCarveRampEntryDeg', raw['vCarveRampEntryDeg']),
     ...booleanPassthrough('vCarveFlatDepthEnabled', raw['vCarveFlatDepthEnabled']),
     ...normalizeHelixEntry(raw['helixEntry']),
@@ -168,7 +174,7 @@ function optionalCncLayerFields(raw: Record<string, unknown>): Record<string, un
     ...booleanPassthrough('pocketLiftBetweenRings', raw['pocketLiftBetweenRings']),
     // Finish allowance: non-negative (0 = off), so a hand-edited negative value
     // is dropped rather than inflating the roughing offset the wrong way.
-    ...(isNonNegativeNumber(raw['finishAllowanceMm'])
+    ...(isNonNegativeFiniteNumber(raw['finishAllowanceMm'])
       ? { finishAllowanceMm: raw['finishAllowanceMm'] }
       : {}),
     // ADR-218 traced double-line side; unknown values are dropped so the
@@ -182,14 +188,14 @@ function optionalCncLayerFields(raw: Record<string, unknown>): Record<string, un
 }
 
 function normalizeProfileLead(value: unknown): Record<string, unknown> {
-  if (!isObject(value)) return {};
+  if (!isRecord(value)) return {};
   const shape = value['shape'];
   if (typeof shape !== 'string' || !PROFILE_LEAD_SHAPES.has(shape)) return {};
   return {
     profileLead: {
       shape,
-      ...(isPositiveNumber(value['radiusMm']) ? { radiusMm: value['radiusMm'] } : {}),
-      ...(isPositiveNumber(value['sweepDeg']) ? { sweepDeg: value['sweepDeg'] } : {}),
+      ...(isPositiveFiniteNumber(value['radiusMm']) ? { radiusMm: value['radiusMm'] } : {}),
+      ...(isPositiveFiniteNumber(value['sweepDeg']) ? { sweepDeg: value['sweepDeg'] } : {}),
     },
   };
 }
@@ -200,10 +206,10 @@ function optionalCncFeedSource(raw: Record<string, unknown>): Record<string, unk
 }
 
 function normalizeStagePresetSnapshots(value: unknown): unknown {
-  if (!isObject(value)) return value;
+  if (!isRecord(value)) return value;
   return Object.fromEntries(
     Object.entries(value).map(([key, stage]) => {
-      if (!isObject(stage)) return [key, stage];
+      if (!isRecord(stage)) return [key, stage];
       const { cuttingPreset: _preset, ...settings } = stage;
       return [key, { ...settings, ...optionalCncCuttingPreset(stage) }];
     }),
@@ -217,24 +223,24 @@ function optionalCncCuttingPreset(raw: Record<string, unknown>): Record<string, 
 
 function normalizeInlayFields(raw: Record<string, unknown>): Record<string, unknown> {
   return {
-    ...(isPositiveNumber(raw['inlayPocketDepthMm'])
+    ...(isPositiveFiniteNumber(raw['inlayPocketDepthMm'])
       ? { inlayPocketDepthMm: raw['inlayPocketDepthMm'] }
       : {}),
-    ...(isNonNegativeNumber(raw['inlayAllowanceMm'])
+    ...(isNonNegativeFiniteNumber(raw['inlayAllowanceMm'])
       ? { inlayAllowanceMm: raw['inlayAllowanceMm'] }
       : {}),
-    ...(isPositiveNumber(raw['inlayPairSpacingMm'])
+    ...(isPositiveFiniteNumber(raw['inlayPairSpacingMm'])
       ? { inlayPairSpacingMm: raw['inlayPairSpacingMm'] }
       : {}),
   };
 }
 
 function normalizeHelixEntry(value: unknown): Record<string, unknown> {
-  if (!isObject(value)) return {};
+  if (!isRecord(value)) return {};
   if (
-    !isPositiveNumber(value['maxDiameterMm']) ||
-    !isPositiveNumber(value['minDiameterMm']) ||
-    !isPositiveNumber(value['angleDeg']) ||
+    !isPositiveFiniteNumber(value['maxDiameterMm']) ||
+    !isPositiveFiniteNumber(value['minDiameterMm']) ||
+    !isPositiveFiniteNumber(value['angleDeg']) ||
     value['minDiameterMm'] > value['maxDiameterMm']
   ) {
     return {};
@@ -249,7 +255,7 @@ function normalizeHelixEntry(value: unknown): Record<string, unknown> {
 }
 
 function positiveOr(value: unknown, fallback: number): number {
-  return isPositiveNumber(value) ? value : fallback;
+  return isPositiveFiniteNumber(value) ? value : fallback;
 }
 
 function normalizeCommonLayerFields(out: Record<string, unknown>): void {
@@ -262,7 +268,7 @@ function normalizeCommonLayerFields(out: Record<string, unknown>): void {
   if (typeof out['tabsEnabled'] !== 'boolean') {
     out['tabsEnabled'] = LAYER_DEFAULTS.tabsEnabled;
   }
-  if (!isPositiveNumber(out['tabSizeMm'])) {
+  if (!isPositiveFiniteNumber(out['tabSizeMm'])) {
     out['tabSizeMm'] = LAYER_DEFAULTS.tabSizeMm;
   }
   if (!isPositiveInteger(out['tabsPerShape'])) {
@@ -279,13 +285,13 @@ function normalizeCommonLayerFields(out: Record<string, unknown>): void {
 // uncut) unless they hold a usable value, like the ADR-415 settings.
 function normalizeTabLayoutFields(out: Record<string, unknown>): void {
   if (out['tabLayout'] !== 'count' && out['tabLayout'] !== 'spacing') delete out['tabLayout'];
-  if (!isPositiveNumber(out['tabSpacingMm'])) delete out['tabSpacingMm'];
+  if (!isPositiveFiniteNumber(out['tabSpacingMm'])) delete out['tabSpacingMm'];
   const maxPerShape = out['tabMaxPerShape'];
-  if (!isNonNegativeNumber(maxPerShape) || !Number.isInteger(maxPerShape)) {
+  if (!isNonNegativeFiniteNumber(maxPerShape) || !Number.isInteger(maxPerShape)) {
     delete out['tabMaxPerShape'];
   }
   const power = out['tabCutPowerPercent'];
-  if (!isNonNegativeNumber(power) || power > 100) delete out['tabCutPowerPercent'];
+  if (!isNonNegativeFiniteNumber(power) || power > 100) delete out['tabCutPowerPercent'];
 }
 
 // ADR-626: the optional lead settings stay absent (no leads) unless they
@@ -294,7 +300,7 @@ function normalizeLeadFields(out: Record<string, unknown>): void {
   if (typeof out['leadInEnabled'] !== 'boolean') delete out['leadInEnabled'];
   if (typeof out['leadOutEnabled'] !== 'boolean') delete out['leadOutEnabled'];
   if (out['leadStyle'] !== 'arc' && out['leadStyle'] !== 'line') delete out['leadStyle'];
-  if (!isPositiveNumber(out['leadLengthMm'])) delete out['leadLengthMm'];
+  if (!isPositiveFiniteNumber(out['leadLengthMm'])) delete out['leadLengthMm'];
   const angle = out['leadAngleDeg'];
   if (typeof angle !== 'number' || !Number.isFinite(angle)) delete out['leadAngleDeg'];
   const side = out['leadSide'];
@@ -312,10 +318,10 @@ function normalizeFillLayerFields(out: Record<string, unknown>): void {
   if (typeof out['hatchAngleDeg'] !== 'number') {
     out['hatchAngleDeg'] = LAYER_DEFAULTS.hatchAngleDeg;
   }
-  if (!isPositiveNumber(out['hatchSpacingMm'])) {
+  if (!isPositiveFiniteNumber(out['hatchSpacingMm'])) {
     out['hatchSpacingMm'] = LAYER_DEFAULTS.hatchSpacingMm;
   }
-  if (!isNonNegativeNumber(out['fillOverscanMm'])) {
+  if (!isNonNegativeFiniteNumber(out['fillOverscanMm'])) {
     out['fillOverscanMm'] = LAYER_DEFAULTS.fillOverscanMm;
   }
   if (typeof out['fillBidirectional'] !== 'boolean') {
@@ -330,7 +336,7 @@ function normalizeImageLayerFields(out: Record<string, unknown>): void {
   if (!DITHER_ALGORITHMS.some((algorithm) => algorithm === out['ditherAlgorithm'])) {
     out['ditherAlgorithm'] = LAYER_DEFAULTS.ditherAlgorithm;
   }
-  if (!isPositiveNumber(out['linesPerMm'])) {
+  if (!isPositiveFiniteNumber(out['linesPerMm'])) {
     out['linesPerMm'] = LAYER_DEFAULTS.linesPerMm;
   }
   if (!isPercent(out['minPower'])) {
@@ -345,7 +351,7 @@ function normalizeImageLayerFields(out: Record<string, unknown>): void {
   if (typeof out['passThrough'] !== 'boolean') {
     out['passThrough'] = LAYER_DEFAULTS.passThrough;
   }
-  if (!isNonNegativeNumber(out['dotWidthCorrectionMm'])) {
+  if (!isNonNegativeFiniteNumber(out['dotWidthCorrectionMm'])) {
     out['dotWidthCorrectionMm'] = LAYER_DEFAULTS.dotWidthCorrectionMm;
   }
 }
@@ -361,7 +367,7 @@ function normalizeSubLayers(out: Record<string, unknown>): void {
 }
 
 function normalizeSubLayer(value: unknown, fallbackLabel: string): unknown {
-  if (!isObject(value)) return value;
+  if (!isRecord(value)) return value;
   return {
     ...value,
     settings: normalizeLayerOperationSettings(value['settings']),
@@ -373,30 +379,12 @@ function normalizeSubLayer(value: unknown, fallbackLabel: string): unknown {
 function normalizeLayerOperationSettings(value: unknown): LayerOperationSettings {
   const settings: Record<string, unknown> = {
     ...captureLayerOperationSettings(LAYER_DEFAULTS),
-    ...(isObject(value) ? value : {}),
+    ...(isRecord(value) ? value : {}),
   };
   normalizeCommonLayerFields(settings);
   normalizeFillLayerFields(settings);
   normalizeImageLayerFields(settings);
   return captureLayerOperationSettings(settings as unknown as LayerOperationSettings);
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isNonNegativeNumber(value: unknown): value is number {
-  // Number.isFinite rejects Infinity/NaN (JSON `1e999` → Infinity) so a corrupt
-  // CNC-layer numeric cannot ride through normalization into emitted G-code.
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
-}
-
-function isPositiveNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0;
-}
-
-function isPositiveInteger(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value > 0;
 }
 
 function isPercent(value: unknown): value is number {

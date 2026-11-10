@@ -17,6 +17,7 @@
 // https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/motion_control.c#L832-L835
 
 import { deriveMachineEnvelope, type AxisBounds } from './machine-envelope';
+import { isFinitePositive } from '../../util/finite';
 
 export type JogTravelFirmware = 'grbl' | 'grblhal';
 
@@ -76,7 +77,7 @@ const UNKNOWN_STEP_MARGIN_MM = 0.05;
 export function jogTravelLimits(settings: JogTravelSettings): JogTravelLimits | null {
   const { x: travelX, y: travelY } = settings.travelMm;
   const mask = settings.homingDirectionMask;
-  if (!isPositiveFinite(travelX) || !isPositiveFinite(travelY) || !isDirectionMask(mask)) {
+  if (!isFinitePositive(travelX) || !isFinitePositive(travelY) || !isDirectionMask(mask)) {
     return null;
   }
   // Only the X and Y bits matter here; a grblHAL mask can carry more axes.
@@ -99,7 +100,7 @@ export function jogTravelLimits(settings: JogTravelSettings): JogTravelLimits | 
  *  park lift is checked against its top (ADR-491 Amendment 2). */
 export function zTravelLimits(settings: ZTravelSettings): AxisBounds | null {
   const mask = settings.homingDirectionMask;
-  if (!isPositiveFinite(settings.travelZMm) || !isDirectionMask(mask)) return null;
+  if (!isFinitePositive(settings.travelZMm) || !isDirectionMask(mask)) return null;
   const homesNegative = (mask & 4) !== 0;
   if (settings.forceOrigin === null && homesNegative) return null;
   const envelope = deriveMachineEnvelope(
@@ -132,7 +133,7 @@ function insetAxis(
 }
 
 function positionMarginMm(stepsPerMm: number | undefined): number {
-  if (stepsPerMm === undefined || !isPositiveFinite(stepsPerMm)) return UNKNOWN_STEP_MARGIN_MM;
+  if (stepsPerMm === undefined || !isFinitePositive(stepsPerMm)) return UNKNOWN_STEP_MARGIN_MM;
   return Math.max(ROUNDING_MARGIN_MM, 0.5 / stepsPerMm + REPORT_ROUNDING_MM);
 }
 
@@ -143,10 +144,6 @@ function switchPullOffMm(settings: InsetSettings): number {
   return pullOff !== undefined && Number.isFinite(pullOff) && pullOff >= 0
     ? pullOff
     : UNKNOWN_PULL_OFF_MM;
-}
-
-function isPositiveFinite(value: number): boolean {
-  return Number.isFinite(value) && value > 0;
 }
 
 function isDirectionMask(value: number): boolean {

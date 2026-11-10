@@ -21,6 +21,7 @@ import {
 } from './compact-curve-meet';
 import { traceRingCurve } from './trace-curves';
 import { runTraceSteps, type TraceSteps } from './trace-steps';
+import { midpoint, samePoint } from '../geometry/point-math';
 
 /** A piece and its position along its ring. */
 export type Piece = ContourBox & CurvePiece & { readonly index: number };
@@ -285,7 +286,7 @@ function atLeastPieces(pieces: CurvePiece[], count: number): CurvePiece[] {
   while (out.length > 0 && out.length < count) {
     out = out.flatMap((piece) => {
       if (!isStraight(piece)) return cutCubic(piece, 2);
-      const middle = mid(piece.p0, piece.p3);
+      const middle = midpoint(piece.p0, piece.p3);
       return [linePiece(piece.p0, middle), linePiece(middle, piece.p3)];
     });
   }
@@ -296,12 +297,12 @@ function atLeastPieces(pieces: CurvePiece[], count: number): CurvePiece[] {
 function cutCubic(cubic: CurvePiece, count: number): CurvePiece[] {
   if (count <= 1) return [cubic];
   const { p0, p1, p2, p3 } = cubic;
-  const p01 = mid(p0, p1);
-  const p12 = mid(p1, p2);
-  const p23 = mid(p2, p3);
-  const p012 = mid(p01, p12);
-  const p123 = mid(p12, p23);
-  const p0123 = mid(p012, p123);
+  const p01 = midpoint(p0, p1);
+  const p12 = midpoint(p1, p2);
+  const p23 = midpoint(p2, p3);
+  const p012 = midpoint(p01, p12);
+  const p123 = midpoint(p12, p23);
+  const p0123 = midpoint(p012, p123);
   const half = Math.ceil(count / 2);
   return [
     ...cutCubic({ p0, p1: p01, p2: p012, p3: p0123 }, half),
@@ -319,12 +320,4 @@ function polygonLength(piece: CurvePiece): number {
     Math.hypot(piece.p2.x - piece.p1.x, piece.p2.y - piece.p1.y) +
     Math.hypot(piece.p3.x - piece.p2.x, piece.p3.y - piece.p2.y)
   );
-}
-
-function mid(a: Vec2, b: Vec2): Vec2 {
-  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-}
-
-function samePoint(a: Vec2, b: Vec2): boolean {
-  return a.x === b.x && a.y === b.y;
 }

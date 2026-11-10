@@ -8,6 +8,7 @@ import {
 // Deep import: core/scene's barrel is ratcheted and may only shrink.
 import { withoutInactiveLaserLeadSettings, withoutLaserLeadSettings } from '../scene/layer';
 import { cloneRecipeCnc, type ProcessRecipeStep } from './process-recipe';
+import { isRecord } from '../util/is-record';
 
 export function recipeStepFromLayer(layer: Layer): ProcessRecipeStep {
   return {
@@ -67,7 +68,7 @@ export function recipeStepEditedFields(
 
 function mergeUnedited(baseline: unknown, current: unknown, desired: unknown): unknown {
   if (same(baseline, current)) return desired;
-  if (!record(baseline) || !record(current) || !record(desired)) return current;
+  if (!isRecord(baseline) || !isRecord(current) || !isRecord(desired)) return current;
   const keys = new Set([
     ...Object.keys(baseline),
     ...Object.keys(current),
@@ -82,7 +83,7 @@ function mergeUnedited(baseline: unknown, current: unknown, desired: unknown): u
 }
 function changedLeaves(baseline: unknown, current: unknown, prefix = ''): string[] {
   if (same(baseline, current)) return [];
-  if (!record(baseline) || !record(current)) return [prefix];
+  if (!isRecord(baseline) || !isRecord(current)) return [prefix];
   const keys = new Set([...Object.keys(baseline), ...Object.keys(current)]);
   return [...keys].flatMap((key) =>
     changedLeaves(baseline[key], current[key], prefix === '' ? key : `${prefix}.${key}`),
@@ -90,7 +91,4 @@ function changedLeaves(baseline: unknown, current: unknown, prefix = ''): string
 }
 function same(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
-}
-function record(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }

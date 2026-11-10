@@ -9,6 +9,7 @@ import {
   useVariableCsvImportOwner,
   type VariableCsvImportClaim,
 } from './use-variable-csv-import-owner';
+import { errorMessage } from '../../core/util/error-message';
 
 type VariableCsvImportProps = {
   readonly setCsv: (csv: VariableCsvDataset | undefined) => void;
@@ -93,8 +94,4 @@ async function importVariableCsv(
 
 function isClaimCurrent(claim: VariableCsvImportClaim): boolean {
   return isVariableCsvImportClaimCurrent(claim, useStore.getState().projectDocumentEpoch);
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

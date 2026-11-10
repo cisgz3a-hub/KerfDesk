@@ -7,6 +7,7 @@ import {
   captureBitmapLayerSettings,
 } from '../raster/bitmap-operation-settings';
 import { useStore } from '../state';
+import { isAbortError } from '../../core/util/error-message';
 
 export type BitmapConversionOutcome =
   | { readonly kind: 'converted' | 'cancelled' | 'stale' }
@@ -76,10 +77,6 @@ export async function convertSelectedVectorsToBitmap(
     unsubscribe();
     signal?.removeEventListener('abort', cancel);
   }
-}
-
-function isAbortError(error: unknown): boolean {
-  return error instanceof Error && error.name === 'AbortError';
 }
 
 function conversionOwnerIsCurrent(owner: {

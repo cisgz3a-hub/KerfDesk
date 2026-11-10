@@ -30,6 +30,7 @@ import {
 import type { LaserMotionOperationId } from '../state/laser-motion-operation';
 import { clampJogFeed } from './jog-control-policy';
 import { isDeliberateCancellation } from './report-controller-action-failure';
+import { errorMessage } from '../../core/util/error-message';
 
 // One revolution in about this long: slow enough to follow a mark round.
 const TEST_REVOLUTION_SECONDS = 10;
@@ -169,7 +170,9 @@ async function runTurn(
     watch.dispose();
     // A cancel from any surface (Stop here, Esc, the Live Motion bar) poisons
     // a turn still waiting for Idle; that is a stop, not a fault.
-    return signal.aborted || isDeliberateCancellation(error) ? STOPPED : failed(errorText(error));
+    return signal.aborted || isDeliberateCancellation(error)
+      ? STOPPED
+      : failed(errorMessage(error));
   }
   const release = await watch.released(signal);
   if (signal.aborted) return STOPPED;
@@ -262,8 +265,4 @@ function pause(ms: number, signal: AbortSignal): Promise<void> {
 
 function failed(message: string): RotaryTestOutcome {
   return { kind: 'failed', message };
-}
-
-function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

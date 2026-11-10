@@ -1,5 +1,6 @@
 import type { CurveSubpath, PathSegment, Vec2 } from '../scene';
 import type { StrokeFont } from './stroke-font-text';
+import { samePoint } from '../geometry/point-math';
 
 type SvgStrokeGlyphData = {
   readonly advance: number;
@@ -271,10 +272,6 @@ function isCommand(value: SvgCommand | number | string | undefined): value is Sv
 
 function isRelative(command: SvgCommand): boolean {
   return command === command.toLowerCase();
-}
-
-function samePoint(left: Vec2, right: Vec2): boolean {
-  return left.x === right.x && left.y === right.y;
 }
 
 function reflect(point: Vec2, around: Vec2): Vec2 {

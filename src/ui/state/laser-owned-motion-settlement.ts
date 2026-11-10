@@ -9,6 +9,7 @@ import type { LaserMotionOperationId } from './laser-motion-operation';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { SafeWriteFn } from './laser-line-shared';
 import { pendingTransportWriteCount } from './laser-start-queue-fence';
+import { sleep } from '../common/sleep';
 
 const OWNED_QUEUE_TIMEOUT_MS = 8_000;
 const OWNED_QUEUE_POLL_MS = 10;
@@ -194,10 +195,4 @@ async function waitForOwnedQueue(
     await sleep(OWNED_QUEUE_POLL_MS);
   }
   throw new Error(`${label} is still waiting for its controller acknowledgement.`);
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
 }

@@ -1,5 +1,6 @@
 import type { DeviceProfile } from '../devices';
 import { findCncMachineStarter, type CncMachineStarterValues } from './cnc-machine-starter-catalog';
+import { isDefinedFinitePositive } from '../util/finite';
 
 export type CncMachineStarterLiveCaps = {
   readonly xMaxFeedMmPerMin?: number;
@@ -131,7 +132,7 @@ export function resolveCncMachineStarter(
 }
 
 function applyCapCandidate(state: ResolutionState, candidate: CapCandidate): ResolutionState {
-  if (!isPositiveFinite(candidate.limit)) return state;
+  if (!isDefinedFinitePositive(candidate.limit)) return state;
   const valueBefore = state.values[candidate.field];
   const valueAfter = Math.min(valueBefore, candidate.limit);
   return {
@@ -151,11 +152,7 @@ function applyCapCandidate(state: ResolutionState, candidate: CapCandidate): Res
 }
 
 function lesserPositive(left: number | undefined, right: number | undefined): number | undefined {
-  if (isPositiveFinite(left) && isPositiveFinite(right)) return Math.min(left, right);
-  if (isPositiveFinite(left)) return left;
-  return isPositiveFinite(right) ? right : undefined;
-}
-
-function isPositiveFinite(value: number | undefined): value is number {
-  return value !== undefined && Number.isFinite(value) && value > 0;
+  if (isDefinedFinitePositive(left) && isDefinedFinitePositive(right)) return Math.min(left, right);
+  if (isDefinedFinitePositive(left)) return left;
+  return isDefinedFinitePositive(right) ? right : undefined;
 }

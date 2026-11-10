@@ -1,3 +1,6 @@
+import { isRecord } from '../../core/util/is-record';
+import { isNonNegativeSafeInteger, isFiniteNumber } from '../../core/util/finite';
+
 export const AUTOSAVE_INDEXEDDB_SCHEMA_VERSION = 1 as const;
 
 export type AutosaveIndexedDbRecord = {
@@ -65,7 +68,7 @@ export function parseAutosaveManifest(value: unknown): StoredAutosaveManifest {
     value['schemaVersion'] !== AUTOSAVE_INDEXEDDB_SCHEMA_VERSION ||
     !isNonemptyString(value['storageKey']) ||
     !isNonemptyString(value['sessionId']) ||
-    !isEpoch(value['epoch']) ||
+    !isNonNegativeSafeInteger(value['epoch']) ||
     !referencesMatchManifestEpoch(value['epoch'], current, previous)
   ) {
     throw new Error('Autosave manifest is malformed.');
@@ -88,7 +91,7 @@ export function parseAutosaveSnapshot(value: unknown): StoredAutosaveSnapshot {
     value['schemaVersion'] !== AUTOSAVE_INDEXEDDB_SCHEMA_VERSION ||
     !isNonemptyString(value['storageKey']) ||
     !isNonemptyString(value['sessionId']) ||
-    !isEpoch(value['epoch']) ||
+    !isNonNegativeSafeInteger(value['epoch']) ||
     !isFiniteNumber(value['savedAt']) ||
     typeof value['projectJson'] !== 'string'
   ) {
@@ -116,26 +119,18 @@ export function autosaveSnapshotKey(
 
 function parseReference(value: unknown): StoredAutosaveSnapshotReference | null {
   if (value === null) return null;
-  if (!isRecord(value) || !isEpoch(value['epoch']) || !isFiniteNumber(value['savedAt'])) {
+  if (
+    !isRecord(value) ||
+    !isNonNegativeSafeInteger(value['epoch']) ||
+    !isFiniteNumber(value['savedAt'])
+  ) {
     throw new Error('Autosave manifest is malformed.');
   }
   return { epoch: value['epoch'], savedAt: value['savedAt'] };
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 function isNonemptyString(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0;
-}
-
-function isEpoch(value: unknown): value is number {
-  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
-}
-
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
 }
 
 function referencesMatchManifestEpoch(

@@ -13,6 +13,7 @@ import {
   type PersonalArtwork,
 } from './personal-artwork-model';
 import type { PersonalArtworkRepository } from './personal-artwork-storage';
+import { errorMessage } from '../../core/util/error-message';
 
 export type PersonalArtworkRun = (
   action: (isCurrent: () => boolean) => Promise<void>,
@@ -75,7 +76,7 @@ export function personalArtworkActions(
           },
         );
       } catch (cause) {
-        onError(personalArtworkError(cause));
+        onError(errorMessage(cause));
       }
     },
   };
@@ -117,6 +118,4 @@ async function exportLibrary(
   await target.write(json);
 }
 
-export function personalArtworkError(cause: unknown): string {
-  return cause instanceof Error ? cause.message : String(cause);
-}
+export { errorMessage as personalArtworkError } from '../../core/util/error-message';

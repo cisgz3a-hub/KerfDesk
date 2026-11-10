@@ -24,6 +24,7 @@ import {
 } from '../../core/devices/rotary-axis';
 import type { DeviceProfile } from '../../core/devices/device-profile';
 import { rotaryConnectorAxisFor, type RotaryPreset } from '../../core/devices/rotary-presets';
+import { roundToThousandth } from '../../core/util/rounding';
 
 // Only the field's starting value, for the operator to replace with the
 // driven roller's measured diameter.
@@ -161,14 +162,10 @@ export function editObjectCircumference(edit: RotaryEdit, circumferenceMm: numbe
   });
 }
 
-// Field values are shown to three decimals (a micrometre). Rounding here keeps
-// a linked field from rewriting what the operator is typing with float noise.
-export function displayRotaryMm(value: number): number {
-  return Math.round(value * 1000) / 1000;
-}
+export { roundToThousandth as displayRotaryMm } from '../../core/util/rounding';
 
 export function displayObjectCircumferenceMm(setup: RotarySetup): number {
-  return displayRotaryMm(rotaryCircumferenceMm(setup));
+  return roundToThousandth(rotaryCircumferenceMm(setup));
 }
 
 function parkedFrom(edit: RotaryEdit): ParkedRoller {

@@ -27,6 +27,7 @@ import {
 import { closedMaskContours } from '../raster/image-mask';
 import { maskRowCrossings, type MaskContours } from '../raster/mask-scanline';
 import type { PreflightIssue } from './preflight';
+import { boxCorners } from '../geometry/box-math';
 
 /** Share of a mask's area that may hang off its image before Job Review names it. */
 export const MASK_OVERHANG_TOLERANCE = 0.05;
@@ -138,15 +139,6 @@ function rowLengths(
 // The image's rectangle in scene space; a convex quad under any transform.
 function imageFootprint(image: RasterImage): ReadonlyArray<Vec2> {
   return boxCorners(image.bounds).map((corner) => applyTransform(corner, image.transform));
-}
-
-function boxCorners(box: AABB): ReadonlyArray<Vec2> {
-  return [
-    { x: box.minX, y: box.minY },
-    { x: box.maxX, y: box.minY },
-    { x: box.maxX, y: box.maxY },
-    { x: box.minX, y: box.maxY },
-  ];
 }
 
 // A point on the image's edge counts as inside: the mask reaches no further.

@@ -8,6 +8,4 @@ export function recoveryFailure<T>(error: RecoveryRepositoryError): RecoveryRepo
   return { ok: false, error };
 }
 
-export function recoveryErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
+export { errorMessage as recoveryErrorMessage } from '../../../core/util/error-message';

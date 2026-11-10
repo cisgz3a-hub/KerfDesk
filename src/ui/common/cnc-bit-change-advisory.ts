@@ -7,7 +7,6 @@ import {
   type CncTool,
   type Layer,
   type Project,
-  type Scene,
 } from '../../core/scene';
 
 export const CNC_RETAINED_FEEDS_WARNING =
@@ -18,29 +17,6 @@ export const CNC_SECONDARY_RETAINED_FEEDS_WARNING =
 
 export const CNC_SECONDARY_RETAINED_RELIEF_FEEDS_WARNING =
   "Secondary finishing bit selected. This layer's feed, plunge, and spindle RPM are shared with the primary bit. Relief finishing follows the surface and scallop setting, not depth/pass. Verify the shared values for the finishing bit before cutting.";
-
-/**
- * True when at least one operation follows the machine's Active bit while its
- * numeric cutting values remain manual/unscoped. A stale explicit id also
- * follows Active because layerCncTool falls back when that id is absent from
- * the machine. Material recipes are excluded: a successful machine update
- * recalculates those values for the new cutter.
- */
-export function hasActiveBitDependentRetainedFeeds(
-  scene: Scene,
-  machine: CncMachineConfig,
-): boolean {
-  return scene.layers.some((layer) => {
-    if (!layer.output || !scene.objects.some((object) => sceneObjectUsesOperation(object, layer))) {
-      return false;
-    }
-    const settings = layer.cnc;
-    if (settings === undefined) return true;
-    const followsActive =
-      settings.toolId === undefined || !machine.tools.some((tool) => tool.id === settings.toolId);
-    return followsActive && settings.feedSource?.kind !== 'material-recipe';
-  });
-}
 
 /** Detects an output operation whose effective cutter changed while all four
  * cutter-dependent numeric values stayed exact and no material recipe remains

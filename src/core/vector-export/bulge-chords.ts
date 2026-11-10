@@ -23,6 +23,7 @@ import type {
   Vec2,
 } from '../scene/scene-object';
 import type { BulgeEdge } from './bulge-arc-fit';
+import { midpoint } from '../geometry/point-math';
 
 const MAX_SUBDIVISION_DEPTH = 24;
 
@@ -67,12 +68,12 @@ function subdivide(
     out.push(p3);
     return;
   }
-  const p01 = mid(p0, p1);
-  const p12 = mid(p1, p2);
-  const p23 = mid(p2, p3);
-  const p012 = mid(p01, p12);
-  const p123 = mid(p12, p23);
-  const m = mid(p012, p123);
+  const p01 = midpoint(p0, p1);
+  const p12 = midpoint(p1, p2);
+  const p23 = midpoint(p2, p3);
+  const p012 = midpoint(p01, p12);
+  const p123 = midpoint(p12, p23);
+  const m = midpoint(p012, p123);
   subdivide(p0, p01, p012, m, tolerance, depth + 1, out);
   subdivide(m, p123, p23, p3, tolerance, depth + 1, out);
 }
@@ -88,10 +89,6 @@ function flattenEllipticalArc(
   );
   if (result.kind !== 'ok') throw new Error('An elliptical arc needs too many DXF vertices.');
   return result.polyline.points.slice(1);
-}
-
-function mid(a: Vec2, b: Vec2): Vec2 {
-  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
 }
 
 /** Distance from `p` to the closed segment a–b. */

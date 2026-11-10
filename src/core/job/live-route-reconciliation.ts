@@ -1,5 +1,6 @@
 import { motionBlocksHaveProgramLineNumbers } from './motion-block-columns';
 import type { MotionBlock, MotionManifest, MotionPoint } from './motion-manifest';
+import { distance3 } from '../geometry/vec3';
 
 export type RouteCandidate = {
   readonly blockIndex: number;
@@ -162,7 +163,7 @@ function collectBlockCandidates(
     // Scalars, not a projection object: this runs per segment on every status
     // report, inside the store update.
     const t = projectionParameter(position, from, to);
-    const segmentLength = distance(from, to);
+    const segmentLength = distance3(from, to);
     const routeMm = block.routeStartMm + blockDistance + t * segmentLength;
     blockDistance += segmentLength;
     if (routeMm + BACKTRACK_ALLOWANCE_MM < confirmedRouteMm) continue;
@@ -194,8 +195,4 @@ function distanceToProjection(
     point.y - (from.y + (to.y - from.y) * t),
     point.z - (from.z + (to.z - from.z) * t),
   );
-}
-
-function distance(a: MotionPoint, b: MotionPoint): number {
-  return Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
 }

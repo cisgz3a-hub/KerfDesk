@@ -7,6 +7,7 @@ import {
 } from '../../core/relief/depth-map-base64';
 import { reliefHeightfieldDigest } from '../../core/relief/heightfield-digest';
 import { isObject } from './project-shape-primitives';
+import { isNonNegativeSafeInteger, isPositiveFiniteNumber } from '../../core/util/finite';
 
 const SOURCE_KINDS = [
   'depth-map',
@@ -112,8 +113,8 @@ function validateMetadata(value: Record<string, unknown>, path: string): string 
     validOrMissing(value['schemaVersion'] === 1, `${path}.schemaVersion`),
     validOrMissing(positiveSafeInteger(value['width']), `${path}.width`),
     validOrMissing(positiveSafeInteger(value['height']), `${path}.height`),
-    validOrMissing(positiveFinite(value['physicalWidthMm']), `${path}.physicalWidthMm`),
-    validOrMissing(positiveFinite(value['physicalHeightMm']), `${path}.physicalHeightMm`),
+    validOrMissing(isPositiveFiniteNumber(value['physicalWidthMm']), `${path}.physicalWidthMm`),
+    validOrMissing(isPositiveFiniteNumber(value['physicalHeightMm']), `${path}.physicalHeightMm`),
     validOrMissing(value['encoding'] === 'u16le-base64-v1', `${path}.encoding`),
     validOrMissing(typeof value['samplesBase64'] === 'string', `${path}.samplesBase64`),
     validateMapping(value['mapping'], `${path}.mapping`),
@@ -122,7 +123,7 @@ function validateMetadata(value: Record<string, unknown>, path: string): string 
       value['algorithmRevision'] === 'heightfield-map-v1',
       `${path}.algorithmRevision`,
     ),
-    validOrMissing(nonNegativeSafeInteger(value['revision']), `${path}.revision`),
+    validOrMissing(isNonNegativeSafeInteger(value['revision']), `${path}.revision`),
     validOrMissing(validDigest(value['digest']), `${path}.digest`),
   ]);
 }
@@ -202,7 +203,7 @@ function validateMapping(value: unknown, path: string): string | null {
     validOrMissing(u16Code(value['inputLowCode']), `${path}.inputLowCode`),
     validOrMissing(u16Code(value['inputHighCode']), `${path}.inputHighCode`),
     validateCurve(value['curve'], `${path}.curve`),
-    validOrMissing(positiveFinite(value['maxDepthMm']), `${path}.maxDepthMm`),
+    validOrMissing(isPositiveFiniteNumber(value['maxDepthMm']), `${path}.maxDepthMm`),
     validateCrop(value['crop'], `${path}.crop`),
     validateAspect(value['aspect'], `${path}.aspect`),
     validateThreshold(value['inclusionThreshold'], `${path}.inclusionThreshold`),
@@ -216,7 +217,7 @@ function validatePolarity(value: unknown, path: string): string | null {
 
 function validateCurve(value: unknown, path: string): string | null {
   return validOrMissing(
-    isObject(value) && value['kind'] === 'gamma-v1' && positiveFinite(value['gamma']),
+    isObject(value) && value['kind'] === 'gamma-v1' && isPositiveFiniteNumber(value['gamma']),
     path,
   );
 }
@@ -297,14 +298,6 @@ function validateProducer(value: unknown, path: string): string | null {
 
 function positiveSafeInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
-}
-
-function nonNegativeSafeInteger(value: unknown): value is number {
-  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
-}
-
-function positiveFinite(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0;
 }
 
 function u16Code(value: unknown): value is number {

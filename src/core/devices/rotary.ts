@@ -16,6 +16,8 @@
 //
 // All collapse to: emitted-Y limit for one object revolution = scale · π · d.
 
+import { isDefinedFinitePositive } from '../util/finite';
+
 export type RotaryType = 'roller' | 'chuck';
 
 // Which controller axis turns the rotary (ADR-695, LightBurn's Rotary Axis):
@@ -94,9 +96,9 @@ export function activeRotaryTaper(setup: RotarySetup): RotaryTaper | null {
 // apart than the side is long, and a gap that is not negative.
 export function rotaryTaperValid(taper: RotaryTaper): boolean {
   return (
-    isPositiveFinite(taper.topDiameterMm) &&
-    isPositiveFinite(taper.bottomDiameterMm) &&
-    isPositiveFinite(taper.lengthMm) &&
+    isDefinedFinitePositive(taper.topDiameterMm) &&
+    isDefinedFinitePositive(taper.bottomDiameterMm) &&
+    isDefinedFinitePositive(taper.lengthMm) &&
     Math.abs(taper.topDiameterMm - taper.bottomDiameterMm) / 2 < taper.lengthMm &&
     Number.isFinite(taper.artworkFromTopMm) &&
     taper.artworkFromTopMm >= 0
@@ -143,9 +145,9 @@ export function rotaryRevolutionTravelMm(
 export function rotaryMeasurementsValid(setup: RotarySetup): boolean {
   const taper = activeRotaryTaper(setup);
   return (
-    isPositiveFinite(setup.objectDiameterMm) &&
-    isPositiveFinite(setup.mmPerRotation) &&
-    (!rotaryUsesRollerDiameter(setup) || isPositiveFinite(setup.rollerDiameterMm)) &&
+    isDefinedFinitePositive(setup.objectDiameterMm) &&
+    isDefinedFinitePositive(setup.mmPerRotation) &&
+    (!rotaryUsesRollerDiameter(setup) || isDefinedFinitePositive(setup.rollerDiameterMm)) &&
     (taper === null || rotaryTaperValid(taper))
   );
 }
@@ -171,8 +173,4 @@ export function rotaryDiameterFromWrapLengthMm(
 
 function perRevolutionScale(mmPerRotation: number, surfaceMmPerRevolution: number): number {
   return surfaceMmPerRevolution > 0 ? mmPerRotation / surfaceMmPerRevolution : 1;
-}
-
-function isPositiveFinite(value: number | undefined): boolean {
-  return value !== undefined && Number.isFinite(value) && value > 0;
 }

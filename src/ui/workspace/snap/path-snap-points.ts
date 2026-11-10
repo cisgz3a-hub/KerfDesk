@@ -23,6 +23,8 @@ import {
   type Vec2,
 } from '../../../core/scene';
 import { ellipticalArcMidpoint } from '../../../core/scene/curve-path';
+import { midpoint, samePoint } from '../../../core/geometry/point-math';
+import { boxCentre, boundsOfPoints } from '../../../core/geometry/box-math';
 
 export const POINT_NODE = 0;
 export const POINT_MIDPOINT = 1;
@@ -112,7 +114,7 @@ function addPolyline(collector: PointCollector, polyline: Polyline, subpath: num
     if (!samePoint(first, last)) {
       collector.add(midpoint(last, first), POINT_MIDPOINT, subpath, points.length - 1);
     }
-    collector.add(boxCentre(pointsBox(points)), POINT_CENTER, subpath, -1);
+    collector.add(boxCentre(boundsOfPoints(points)), POINT_CENTER, subpath, -1);
   }
   return points.length;
 }
@@ -128,40 +130,4 @@ export function segmentMidpoint(from: Vec2, segment: PathSegment): Vec2 {
     };
   }
   return ellipticalArcMidpoint(from, segment);
-}
-
-function midpoint(a: Vec2, b: Vec2): Vec2 {
-  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-}
-
-function samePoint(a: Vec2, b: Vec2): boolean {
-  return a.x === b.x && a.y === b.y;
-}
-
-function boxCentre(box: {
-  readonly minX: number;
-  readonly minY: number;
-  readonly maxX: number;
-  readonly maxY: number;
-}): Vec2 {
-  return { x: (box.minX + box.maxX) / 2, y: (box.minY + box.maxY) / 2 };
-}
-
-function pointsBox(points: ReadonlyArray<Vec2>): {
-  readonly minX: number;
-  readonly minY: number;
-  readonly maxX: number;
-  readonly maxY: number;
-} {
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-  for (const point of points) {
-    minX = Math.min(minX, point.x);
-    minY = Math.min(minY, point.y);
-    maxX = Math.max(maxX, point.x);
-    maxY = Math.max(maxY, point.y);
-  }
-  return { minX, minY, maxX, maxY };
 }

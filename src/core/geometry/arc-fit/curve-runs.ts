@@ -12,6 +12,7 @@ import type { Vec2 } from '../../scene';
 import { ARC_FIT_CORNER_DEG, ARC_FIT_SMOOTH_JOINT_DEG } from './arc-fit-limits';
 import type { SmoothRun } from './fit-runs';
 import { sampleMappedPiece, type MappedPiece } from './mapped-pieces';
+import { dot } from '../point-math';
 
 export type FitRun =
   | { readonly kind: 'smooth'; readonly run: SmoothRun }
@@ -69,8 +70,4 @@ function runOf(group: ReadonlyArray<MappedPiece>): FitRun {
     }
   }
   return { kind: 'smooth', run: { points, tangentsIn, tangentsOut } };
-}
-
-function dot(a: Vec2, b: Vec2): number {
-  return a.x * b.x + a.y * b.y;
 }

@@ -1,4 +1,9 @@
 import type { ReliefHeightfield } from '../scene/relief';
+import {
+  isPositiveFiniteNumber,
+  isNonNegativeFiniteNumber,
+  isNonNegativeSafeInteger,
+} from '../util/finite';
 
 type HeightfieldTargetBinding = {
   readonly targetWidthMm: number;
@@ -36,7 +41,10 @@ function heightfieldDimensionsError(source: ReliefHeightfield): string | null {
 }
 
 function heightfieldPhysicalSizeError(source: ReliefHeightfield): string | null {
-  if (!positiveFinite(source.physicalWidthMm) || !positiveFinite(source.physicalHeightMm)) {
+  if (
+    !isPositiveFiniteNumber(source.physicalWidthMm) ||
+    !isPositiveFiniteNumber(source.physicalHeightMm)
+  ) {
     return 'Relief heightfield physical dimensions must be finite and positive.';
   }
   return null;
@@ -47,17 +55,17 @@ function heightfieldTargetBindingError(
   options: HeightfieldTargetBinding,
 ): string | null {
   if (
-    !positiveFinite(options.targetWidthMm) ||
+    !isPositiveFiniteNumber(options.targetWidthMm) ||
     !nearlyEqual(options.targetWidthMm, source.physicalWidthMm)
   ) {
     return 'Relief target width must match the canonical field width.';
   }
   const mapping = record(source.mapping);
   const maxDepthMm = mapping?.['maxDepthMm'];
-  if (!positiveFinite(options.reliefDepthMm)) {
+  if (!isPositiveFiniteNumber(options.reliefDepthMm)) {
     return 'Relief depth must match the canonical field mapping.';
   }
-  if (positiveFinite(maxDepthMm) && !nearlyEqual(options.reliefDepthMm, maxDepthMm)) {
+  if (isPositiveFiniteNumber(maxDepthMm) && !nearlyEqual(options.reliefDepthMm, maxDepthMm)) {
     return 'Relief depth must match the canonical field mapping.';
   }
   return null;
@@ -76,7 +84,7 @@ function heightfieldRevisionError(source: ReliefHeightfield): string | null {
   if (source.algorithmRevision !== 'heightfield-map-v1') {
     return 'Relief heightfield mapping revision is unsupported.';
   }
-  if (!nonnegativeSafeInteger(source.revision)) {
+  if (!isNonNegativeSafeInteger(source.revision)) {
     return 'Relief heightfield revision is invalid.';
   }
   return null;
@@ -89,7 +97,9 @@ function mappingError(source: ReliefHeightfield): string | null {
     mappingPolarityError(mapping),
     mappingLevelsError(mapping),
     mappingCurveError(mapping),
-    positiveFinite(mapping['maxDepthMm']) ? null : 'Relief heightfield maximum depth is invalid.',
+    isPositiveFiniteNumber(mapping['maxDepthMm'])
+      ? null
+      : 'Relief heightfield maximum depth is invalid.',
     normalizedCropError(mapping['crop']),
     mappingAspectError(mapping),
     mappingInclusionError(mapping),
@@ -112,7 +122,7 @@ function mappingLevelsError(mapping: Record<string, unknown>): string | null {
 
 function mappingCurveError(mapping: Record<string, unknown>): string | null {
   const curve = record(mapping['curve']);
-  if (curve === null || curve['kind'] !== 'gamma-v1' || !positiveFinite(curve['gamma'])) {
+  if (curve === null || curve['kind'] !== 'gamma-v1' || !isPositiveFiniteNumber(curve['gamma'])) {
     return 'Relief heightfield curve is invalid.';
   }
   return null;
@@ -152,10 +162,10 @@ function normalizedCropError(value: unknown): string | null {
   const width = crop['width'];
   const height = crop['height'];
   if (
-    !nonnegativeFinite(x) ||
-    !nonnegativeFinite(y) ||
-    !positiveFinite(width) ||
-    !positiveFinite(height) ||
+    !isNonNegativeFiniteNumber(x) ||
+    !isNonNegativeFiniteNumber(y) ||
+    !isPositiveFiniteNumber(width) ||
+    !isPositiveFiniteNumber(height) ||
     x + width > 1 ||
     y + height > 1
   ) {
@@ -164,20 +174,8 @@ function normalizedCropError(value: unknown): string | null {
   return null;
 }
 
-function positiveFinite(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0;
-}
-
-function nonnegativeFinite(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
-}
-
 function positiveSafeInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
-}
-
-function nonnegativeSafeInteger(value: unknown): value is number {
-  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 }
 
 function u16Code(value: unknown): value is number {

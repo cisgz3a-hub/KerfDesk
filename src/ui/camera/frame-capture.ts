@@ -4,11 +4,6 @@
 
 import type { RgbaImage } from '../../core/camera';
 
-// Live detection runs on a reduced frame: the X-corner response is O(pixels)
-// and a ~480px-wide frame detects reliably while staying well under a
-// preview-rate budget. Full-resolution capture is used for the solve itself.
-export const LIVE_DETECT_TARGET_WIDTH_PX = 480;
-
 /** Maximum time to wait for a one-shot MediaStream frame. */
 export const STREAM_FRAME_TIMEOUT_MS = 5_000;
 
@@ -51,12 +46,6 @@ export function captureElementFrame(element: LiveCaptureElement, scale = 1): Rgb
 /** Copy the video's current frame into an RGBA buffer at `scale` (1 = native). */
 export function captureVideoFrame(video: HTMLVideoElement, scale = 1): RgbaImage | null {
   return captureElementFrame(video, scale);
-}
-
-/** The downscale factor that brings `videoWidth` to the live-detect budget. */
-export function liveDetectScale(videoWidth: number): number {
-  if (videoWidth <= LIVE_DETECT_TARGET_WIDTH_PX) return 1;
-  return LIVE_DETECT_TARGET_WIDTH_PX / videoWidth;
 }
 
 /**

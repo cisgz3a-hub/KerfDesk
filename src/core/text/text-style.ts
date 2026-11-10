@@ -25,6 +25,7 @@ import {
 import { bendPointMapper, bendTextRender, clampBend } from './text-bend';
 import type { TextRenderResult } from './text-to-polylines';
 import { maxOf, minOf } from '../util';
+import { unionBox } from '../geometry/box-math';
 
 const ITALIC_SLANT = Math.tan((12 * Math.PI) / 180);
 const BOLD_SHARE = 0.03;
@@ -234,7 +235,7 @@ function glyphClusters(
       if (cluster === undefined) byGlyph.set(glyph, { entries: [entry], box: entry.box });
       else {
         cluster.entries.push(entry);
-        cluster.box = union(cluster.box, entry.box);
+        cluster.box = unionBox(cluster.box, entry.box);
       }
     });
     clusters.push(...byGlyph.values());
@@ -244,7 +245,7 @@ function glyphClusters(
     const last = clusters.at(-1);
     if (last !== undefined && box.minX < last.box.maxX) {
       last.entries.push(entry);
-      last.box = union(last.box, box);
+      last.box = unionBox(last.box, box);
     } else {
       clusters.push({ entries: [entry], box });
     }
@@ -274,25 +275,16 @@ function contourBox(polyline: Polyline, curve: CurveSubpath | undefined): Bounds
   };
 }
 
-function union(a: Bounds, b: Bounds): Bounds {
-  return {
-    minX: Math.min(a.minX, b.minX),
-    minY: Math.min(a.minY, b.minY),
-    maxX: Math.max(a.maxX, b.maxX),
-    maxY: Math.max(a.maxY, b.maxY),
-  };
-}
-
 function pathsBounds(paths: ReadonlyArray<ColoredPath>): Bounds | null {
   let box: Bounds | null = null;
   for (const path of paths) {
     const parts = path.curves ?? [];
     for (const curve of parts)
-      box = box === null ? curveSubpathBounds(curve) : union(box, curveSubpathBounds(curve));
+      box = box === null ? curveSubpathBounds(curve) : unionBox(box, curveSubpathBounds(curve));
     if (parts.length > 0) continue;
     for (const polyline of path.polylines) {
       const next = contourBox(polyline, undefined);
-      if (next !== null) box = box === null ? next : union(box, next);
+      if (next !== null) box = box === null ? next : unionBox(box, next);
     }
   }
   return box;

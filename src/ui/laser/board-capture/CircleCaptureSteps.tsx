@@ -5,6 +5,7 @@ import { Button, NumberInput } from '../../kit';
 import { CircleCenterConfirmation } from './CircleCenterConfirmation';
 import { CIRCLE_RIM_POINT_COUNT, type CircleCaptureMethod } from './use-board-capture';
 import { MIN_BOARD_DIMENSION_MM } from './constants';
+import { errorMessageOr } from '../../../core/util/error-message';
 
 export function CircleCaptureSteps(props: {
   readonly method: CircleCaptureMethod;
@@ -171,7 +172,7 @@ function CircleDiameterForm(props: {
     void props
       .onDraw(props.center, diameter)
       .catch((cause: unknown) =>
-        setError(errorMessage(cause, 'Could not create the circle outline.')),
+        setError(errorMessageOr(cause, 'Could not create the circle outline.')),
       )
       .finally(() => setSaving(false));
   };
@@ -240,10 +241,6 @@ function markedCaptureTitle(count: number, livePosition: Vec2 | null): string {
 
 function captureKey(points: ReadonlyArray<Vec2>): string {
   return points.map((point) => `${point.x},${point.y}`).join('|');
-}
-
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message.trim() !== '' ? error.message : fallback;
 }
 
 const columnStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 6 };

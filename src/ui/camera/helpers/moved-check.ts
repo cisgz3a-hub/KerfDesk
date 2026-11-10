@@ -25,18 +25,14 @@ import {
   frameRescaleVerdict,
   recordFrameRescale,
 } from '../frame-rescale-check';
-import {
-  cameraCaptureBindingForFrame,
-  captureSourceFrame,
-  type ActiveCameraSource,
-} from '../frame-source';
+import { cameraCaptureBindingForFrame, type ActiveCameraSource } from '../frame-source';
 import {
   cameraMovedWarningDismissed,
   furthestChangeMm,
   useCameraMovedStore,
   type CameraMovedState,
 } from './camera-moved-store';
-import { loadViewReference, saveViewReference } from './view-reference';
+import { loadViewReference } from './view-reference';
 
 export {
   cameraMovedWarningDismissed,
@@ -112,19 +108,6 @@ function checkFrameRescale(
     bedHeightMm: bedHeight,
   });
   if (verdict !== null) recordFrameRescale(model, width, height, verdict);
-}
-
-/** Take a picture now and keep it as the camera's reference for `record`. */
-export async function rememberCameraView(
-  record: CameraModelRecord,
-  capture: typeof captureSourceFrame = captureSourceFrame,
-): Promise<void> {
-  const { sourceState } = useCameraStore.getState();
-  if (sourceState.kind !== 'live' || isHeadCameraModel(record)) return;
-  const frame = await capture(sourceState.source).catch(() => null);
-  if (frame === null) return;
-  saveViewReference(record, viewThumbnail(frame));
-  markCameraSteady();
 }
 
 /** The view was just confirmed good (a calibration saved, a check kept). */

@@ -1,7 +1,6 @@
 import {
   applyTransform,
   findRegistrationBoxes,
-  type AABB,
   type Project,
   type Scene,
   type SceneObject,
@@ -11,6 +10,7 @@ import { reliefAuthoringLinkIds } from '../../../core/relief/relief-authoring-li
 import { registrationJigArtworkInstances } from '../../../core/scene/registration-jig-artwork';
 import { sceneObjectCopyDependencyIds } from '../../state/scene-object-copy-dependencies';
 import { maxOf, minOf } from '../../../core/util';
+import { pointInBox } from '../../../core/geometry/box-math';
 
 // The jig editor opens on a clean canvas (ADR-652): it shows the jig's outlines
 // and the artwork that belongs to them, never the rest of the main canvas. That
@@ -112,16 +112,7 @@ function sitsOnOutline(object: SceneObject, outline: SceneObject): boolean {
     const dy = (centre.y - (local.minY + ry)) / ry;
     return dx * dx + dy * dy <= 1;
   }
-  return inside(centre, local);
-}
-
-function inside(point: Vec2, bounds: AABB): boolean {
-  return (
-    point.x >= bounds.minX &&
-    point.x <= bounds.maxX &&
-    point.y >= bounds.minY &&
-    point.y <= bounds.maxY
-  );
+  return pointInBox(centre, local);
 }
 
 // The inverse of applyTransform: translate, rotate, mirror, then scale back.

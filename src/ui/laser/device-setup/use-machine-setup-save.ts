@@ -15,6 +15,7 @@ import { computeFirmwareDiffs, type FirmwareDiff } from './device-setup-firmware
 import { switchDriverAfterSave } from './save-driver-switch';
 import { setupConvertedLaserQuestion } from './DeviceSetupConvertedLaser';
 import { useConvertedLaserAnswerStore } from '../../state/converted-laser-question';
+import { errorMessage } from '../../../core/util/error-message';
 
 // A running or held job keeps the machine it started with, as the toolbar's
 // Laser/CNC switch does (ADR-416 Amendment 1). Save replaces the machine type,
@@ -136,8 +137,4 @@ function queuedFirmwareDiffs(
   }).filter(
     (diff) => diff.differs && diff.writable && state.queuedFirmwareWriteIds.includes(diff.id),
   );
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

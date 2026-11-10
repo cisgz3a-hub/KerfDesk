@@ -1,5 +1,6 @@
 import type { Vec2 } from './scene-object';
 import { maxOf } from '../util';
+import { isFinitePoint } from '../geometry/point-math';
 
 const MIN_RIM_POINTS = 4;
 const MIN_SPREAD_CONDITION = 0.02;
@@ -114,8 +115,4 @@ function angularCoverageDeg(points: ReadonlyArray<Vec2>, center: Vec2): number {
     largestGap = Math.max(largestGap, gap);
   }
   return ((Math.PI * 2 - largestGap) * 180) / Math.PI;
-}
-
-function isFinitePoint(point: Vec2): boolean {
-  return Number.isFinite(point.x) && Number.isFinite(point.y);
 }

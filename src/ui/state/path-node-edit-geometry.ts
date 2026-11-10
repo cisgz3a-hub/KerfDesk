@@ -14,6 +14,7 @@ import {
 import { deleteCurveNodes } from '../../core/geometry/curve-node-delete';
 import type { PathNodeRef } from './path-node-edit-actions';
 import { replaceCompatibilityPolylines } from './path-node-edit-path';
+import { samePoint } from '../../core/geometry/point-math';
 
 export function editPathsNodesByDelta(
   paths: ReadonlyArray<ColoredPath>,
@@ -347,14 +348,10 @@ function hasSelectedPointInRange(
   return false;
 }
 
-function pointsEqual(a: Vec2, b: Vec2): boolean {
-  return a.x === b.x && a.y === b.y;
-}
-
 function hasDuplicateClosingPoint(points: ReadonlyArray<Vec2>): boolean {
   const first = points[0];
   const last = points[points.length - 1];
-  return first !== undefined && last !== undefined && pointsEqual(first, last);
+  return first !== undefined && last !== undefined && samePoint(first, last);
 }
 
 function groupPathNodeRefsByPolyline(

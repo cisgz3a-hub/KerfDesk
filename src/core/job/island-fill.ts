@@ -1,4 +1,5 @@
 import type { Polyline, Vec2 } from '../scene';
+import { distance } from '../geometry/point-math';
 
 const ISLAND_MERGE_TOLERANCE_MM = 0.25;
 const CENTER_ISLAND_RATIO = 0.1;
@@ -197,10 +198,6 @@ function boundsCenter(bounds: Bounds): Vec2 {
     x: (bounds.minX + bounds.maxX) / 2,
     y: (bounds.minY + bounds.maxY) / 2,
   };
-}
-
-function distance(a: Vec2, b: Vec2): number {
-  return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
 function find(parent: number[], x: number): number {

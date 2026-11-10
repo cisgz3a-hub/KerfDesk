@@ -1,4 +1,5 @@
 import type { Polyline, Vec2 } from '../scene';
+import { clamp } from '../math/clamp';
 
 const EPSILON = 1e-9;
 
@@ -98,8 +99,4 @@ function withoutDuplicateClosure(points: ReadonlyArray<Vec2>): ReadonlyArray<Vec
 
 function pointsEqual(a: Vec2, b: Vec2): boolean {
   return Math.abs(a.x - b.x) <= EPSILON && Math.abs(a.y - b.y) <= EPSILON;
-}
-
-function clamp(value: number, minimum: number, maximum: number): number {
-  return Math.max(minimum, Math.min(maximum, value));
 }

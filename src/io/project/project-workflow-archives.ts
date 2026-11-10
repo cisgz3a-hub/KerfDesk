@@ -1,3 +1,5 @@
+import { asRecord } from '../../core/util/is-record';
+
 const MAX_ARCHIVE_CHARS = 50_000_000;
 const MAX_ARCHIVE_ENTRIES = 50_100;
 
@@ -20,7 +22,7 @@ export function visitWorkflowArchives(
     } catch {
       return 'Invalid workflow project archive JSON';
     }
-    const record = objectRecord(raw);
+    const record = asRecord(raw);
     if (record === null) return 'Invalid workflow project archive';
     visit(record);
     pending.push(...archiveStrings(record));
@@ -30,8 +32,8 @@ export function visitWorkflowArchives(
 
 function archiveStrings(value: object): string[] {
   const raw = value as Record<string, unknown>;
-  const sheets = objectRecord(raw['sheetBook']);
-  const manifest = objectRecord(raw['productionManifest']);
+  const sheets = asRecord(raw['sheetBook']);
+  const manifest = asRecord(raw['productionManifest']);
   return [
     ...arrayRecords(sheets?.['inactive']).flatMap((sheet) => stringField(sheet, 'projectJson')),
     ...stringField(manifest, 'designProjectJson'),
@@ -49,13 +51,8 @@ function stringField(value: Record<string, unknown> | null, field: string): stri
 function arrayRecords(value: unknown): Record<string, unknown>[] {
   return Array.isArray(value)
     ? value.flatMap((entry) => {
-        const record = objectRecord(entry);
+        const record = asRecord(entry);
         return record === null ? [] : [record];
       })
     : [];
-}
-function objectRecord(value: unknown): Record<string, unknown> | null {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
 }

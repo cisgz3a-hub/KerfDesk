@@ -15,6 +15,8 @@ import { differenceClosedPolylinesChecked } from '../geometry/polygon-difference
 import { roundStrokeOutline } from '../geometry/round-stroke-outline';
 import { tryVectorOp } from '../geometry/vector-path-tools';
 import type { Polyline, Vec2 } from '../scene';
+import { isFinitePositive } from '../util/finite';
+import { withoutNegativeZero } from '../util/rounding';
 
 export type RestPocketPlan =
   | {
@@ -89,8 +91,8 @@ export function planRestPocketResidualToolpaths(
   stepoverPercent: number,
 ): RestPocketPlan {
   if (
-    !positiveFinite(finishDiameterMm) ||
-    !positiveFinite(stepoverPercent) ||
+    !isFinitePositive(finishDiameterMm) ||
+    !isFinitePositive(stepoverPercent) ||
     stepoverPercent > 100
   )
     return {
@@ -163,7 +165,7 @@ function requestIssue(
   roughToolDiameterMm: number,
   finishToolDiameterMm: number,
 ): string | null {
-  if (!positiveFinite(roughToolDiameterMm) || !positiveFinite(finishToolDiameterMm)) {
+  if (!isFinitePositive(roughToolDiameterMm) || !isFinitePositive(finishToolDiameterMm)) {
     return 'Rest-machining bit diameters must be positive and finite.';
   }
   if (roughToolDiameterMm <= finishToolDiameterMm) {
@@ -334,7 +336,10 @@ function toPaths(polylines: ReadonlyArray<Polyline>): PathsD {
 }
 
 function toPolyline(path: PathD): Polyline {
-  const points = path.map((point) => ({ x: clean(point.x), y: clean(point.y) }));
+  const points = path.map((point) => ({
+    x: withoutNegativeZero(point.x),
+    y: withoutNegativeZero(point.y),
+  }));
   const first = points[0];
   const last = points[points.length - 1];
   return {
@@ -348,12 +353,4 @@ function toPolyline(path: PathD): Polyline {
 
 function pointsEqual(a: Vec2, b: Vec2): boolean {
   return Math.abs(a.x - b.x) <= EPSILON && Math.abs(a.y - b.y) <= EPSILON;
-}
-
-function positiveFinite(value: number): boolean {
-  return Number.isFinite(value) && value > 0;
-}
-
-function clean(value: number): number {
-  return Object.is(value, -0) ? 0 : value;
 }

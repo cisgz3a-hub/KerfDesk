@@ -3,6 +3,7 @@
 // returns to its start, whether or not the source repeated the first point.
 
 import type { Polyline, Vec2 } from '../scene';
+import { withoutNegativeZero } from '../util/rounding';
 
 export type PathWalk = {
   readonly points: ReadonlyArray<Vec2>;
@@ -44,7 +45,10 @@ export function pointAtDistance(walk: PathWalk, distanceMm: number): Vec2 {
   const edgeStart = cumulative[low - 1] ?? 0;
   const edge = (cumulative[low] ?? 0) - edgeStart;
   const t = edge <= EPS ? 0 : Math.max(0, Math.min(1, (distanceMm - edgeStart) / edge));
-  return { x: clean(a.x + (b.x - a.x) * t), y: clean(a.y + (b.y - a.y) * t) };
+  return {
+    x: withoutNegativeZero(a.x + (b.x - a.x) * t),
+    y: withoutNegativeZero(a.y + (b.y - a.y) * t),
+  };
 }
 
 export function samePoint(a: Vec2, b: Vec2): boolean {
@@ -57,8 +61,4 @@ function walkPoints(polyline: Polyline): ReadonlyArray<Vec2> {
   const last = points[points.length - 1];
   if (!polyline.closed || first === undefined || last === undefined) return points;
   return samePoint(first, last) ? points : [...points, first];
-}
-
-function clean(value: number): number {
-  return Object.is(value, -0) ? 0 : value;
 }

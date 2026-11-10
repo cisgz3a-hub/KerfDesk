@@ -9,6 +9,7 @@ import { inferCurrentMachinePosition } from '../../state/infer-machine-position'
 import { useLaserStore } from '../../state/laser-store';
 import { jogFrameCommandBlockMessage } from '../../state/laser-store-helpers';
 import type { BoardRegistrationEpoch } from './use-board-capture';
+import { errorMessageOr } from '../../../core/util/error-message';
 
 type VerificationSession = {
   readonly requestId: number;
@@ -210,7 +211,7 @@ function saveCorrection(
       state.setSession(null);
     })
     .catch((cause: unknown) => {
-      state.setError(errorMessage(cause, 'Could not update that board point.'));
+      state.setError(errorMessageOr(cause, 'Could not update that board point.'));
     })
     .finally(() => state.setSaving(false));
 }
@@ -243,7 +244,9 @@ function createCancelAction(
         state.setSession((current) => (current?.requestId === session.requestId ? null : current));
       })
       .catch((cause: unknown) => {
-        state.setError(errorMessage(cause, 'Could not confirm that the board-point move stopped.'));
+        state.setError(
+          errorMessageOr(cause, 'Could not confirm that the board-point move stopped.'),
+        );
       })
       .finally(() => state.setCancelling(false));
   };
@@ -272,7 +275,7 @@ function markMoveDispatched(state: VerificationState, requestId: number): void {
 function reportMoveFailure(state: VerificationState, requestId: number, cause: unknown): void {
   if (state.nextRequestId.current !== requestId) return;
   state.setSession(null);
-  state.setError(errorMessage(cause, 'Could not move to that board point.'));
+  state.setError(errorMessageOr(cause, 'Could not move to that board point.'));
 }
 
 function verificationReady(
@@ -371,8 +374,4 @@ function registrationEpochMatches(
 
 function staleRegistrationMessage(): string {
   return 'The board outline or machine coordinates changed. Capture the board again before checking it.';
-}
-
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message.trim() !== '' ? error.message : fallback;
 }

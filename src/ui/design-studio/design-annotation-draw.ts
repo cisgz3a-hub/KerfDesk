@@ -14,6 +14,7 @@ import { canvasTheme } from '../theme/canvas-theme';
 import type { DimensionAnnotation } from './design-measure-annotation';
 import { mmToPx } from './design-view';
 import type { DesignView } from './design-session';
+import { midpoint } from '../../core/geometry/point-math';
 
 const ARROW_LENGTH_PX = 8;
 const ARROW_HALF_WIDTH_PX = 3;
@@ -175,10 +176,6 @@ function markCentre(ctx: CanvasRenderingContext2D, centre: Vec2): void {
   const arm = POINT_RADIUS_PX;
   strokeLine(ctx, { x: centre.x - arm, y: centre.y }, { x: centre.x + arm, y: centre.y });
   strokeLine(ctx, { x: centre.x, y: centre.y - arm }, { x: centre.x, y: centre.y + arm });
-}
-
-function midpoint(a: Vec2, b: Vec2): Vec2 {
-  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
 }
 
 function polarPx(centre: Vec2, radiusPx: number, angleRad: number): Vec2 {

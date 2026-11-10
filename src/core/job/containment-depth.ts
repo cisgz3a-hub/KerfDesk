@@ -35,6 +35,7 @@
 import { pointInPolygon } from '../geometry';
 import type { Vec2 } from '../scene';
 import { boundsCenter, boundsContains, polylineBounds, type SegmentBounds } from './segment-bounds';
+import { isFiniteBox } from '../geometry/box-math';
 
 export type ContainmentSegment = {
   readonly polyline: ReadonlyArray<Vec2>;
@@ -237,22 +238,13 @@ function unionBounds(
   for (const index of containers) {
     const box = bounds[index];
     if (box == null) continue;
-    if (!isFiniteBounds(box)) return null;
+    if (!isFiniteBox(box)) return null;
     minX = Math.min(minX, box.minX);
     minY = Math.min(minY, box.minY);
     maxX = Math.max(maxX, box.maxX);
     maxY = Math.max(maxY, box.maxY);
   }
   return Number.isFinite(minX) ? { minX, minY, maxX, maxY } : null;
-}
-
-function isFiniteBounds(box: SegmentBounds): boolean {
-  return (
-    Number.isFinite(box.minX) &&
-    Number.isFinite(box.minY) &&
-    Number.isFinite(box.maxX) &&
-    Number.isFinite(box.maxY)
-  );
 }
 
 function cellIndex(offset: number, cellSize: number, side: number): number {

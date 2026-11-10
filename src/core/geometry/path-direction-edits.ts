@@ -13,6 +13,8 @@ import {
   type Transform,
   type Vec2,
 } from '../scene';
+// The exact comparison; `samePoint` below allows a tolerance.
+import { samePoint as coincident } from './point-math';
 
 export type ClosePathsResult = {
   readonly paths: ReadonlyArray<ColoredPath>;
@@ -164,8 +166,4 @@ function worldGapMm(path: ColoredPath, index: number, transform: Transform): num
 
 function samePoint(a: Vec2, b: Vec2): boolean {
   return Math.abs(a.x - b.x) <= 1e-9 && Math.abs(a.y - b.y) <= 1e-9;
-}
-
-function coincident(a: Vec2, b: Vec2): boolean {
-  return a.x === b.x && a.y === b.y;
 }

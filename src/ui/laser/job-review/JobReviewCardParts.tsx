@@ -170,6 +170,4 @@ export function CompiledSummary(props: {
   );
 }
 
-export function formatReviewNumber(value: number): string {
-  return value.toLocaleString('en-US', { maximumFractionDigits: 3 });
-}
+export { formatGroupedUpTo3Decimals as formatReviewNumber } from '../../../core/util/number-format';

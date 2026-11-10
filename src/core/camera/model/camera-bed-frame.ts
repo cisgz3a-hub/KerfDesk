@@ -18,6 +18,8 @@ import type { BedArea } from './camera-model-accuracy';
 import type { CameraModelRecord } from './camera-model-record';
 import type { Vec2 } from './camera-model';
 import { movedModel } from './head-camera';
+import { isRecord } from '../../util/is-record';
+import { roundToTenth } from '../../util/rounding';
 
 export type CameraBedFrame = {
   readonly origin: Origin;
@@ -134,8 +136,8 @@ function movedNote(fitted: CameraBedFrame, now: CameraBedFrame): string {
   const sameBed = fitted.bedWidthMm === now.bedWidthMm && fitted.bedHeightMm === now.bedHeightMm;
   const when = sameBed
     ? 'with other machine travel settings'
-    : `on a ${mm(fitted.bedWidthMm)} × ${mm(fitted.bedHeightMm)} mm bed`;
-  return `The camera was calibrated ${when}. KerfDesk moves its picture ${mm(Math.hypot(shift.x, shift.y))} mm to match the machine as it is set up now.`;
+    : `on a ${roundToTenth(fitted.bedWidthMm)} × ${roundToTenth(fitted.bedHeightMm)} mm bed`;
+  return `The camera was calibrated ${when}. KerfDesk moves its picture ${roundToTenth(Math.hypot(shift.x, shift.y))} mm to match the machine as it is set up now.`;
 }
 
 /**
@@ -156,11 +158,7 @@ export function withConfirmedBedFrame(
 }
 
 function unrecordedFrameMessage(now: CameraBedFrame): string {
-  return `This camera was calibrated before KerfDesk recorded the bed it was calibrated on, so KerfDesk cannot tell whether its picture still lines up with the burn. If Machine Setup still has the origin ${originWords(now.origin)} and the bed at ${mm(now.bedWidthMm)} × ${mm(now.bedHeightMm)} mm, as when the camera was calibrated, choose Confirm bed and origin in the Camera panel. If either has changed since, calibrate the camera again.`;
-}
-
-function mm(value: number): number {
-  return Math.round(value * 10) / 10;
+  return `This camera was calibrated before KerfDesk recorded the bed it was calibrated on, so KerfDesk cannot tell whether its picture still lines up with the burn. If Machine Setup still has the origin ${originWords(now.origin)} and the bed at ${roundToTenth(now.bedWidthMm)} × ${roundToTenth(now.bedHeightMm)} mm, as when the camera was calibrated, choose Confirm bed and origin in the Camera panel. If either has changed since, calibrate the camera again.`;
 }
 
 /**
@@ -260,10 +258,6 @@ const ORIGINS: ReadonlySet<string> = new Set([
 
 function isOrigin(value: unknown): value is Origin {
   return typeof value === 'string' && ORIGINS.has(value);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function finite(value: unknown): number | undefined {

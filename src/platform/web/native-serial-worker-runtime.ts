@@ -4,6 +4,7 @@ import type {
   NativeSerialWorkerRequest,
   NativeSerialWorkerResponse,
 } from './native-serial-worker-protocol';
+import { errorMessage } from '../../core/util/error-message';
 
 type RuntimeDeps = {
   readonly serial: Pick<Serial, 'getPorts'> | null;
@@ -90,7 +91,7 @@ function handleRequest(
     state.phase = 'opening';
     state.opening = openPort(state, deps, onDisconnect, request).catch((error: unknown) => {
       if (state.phase !== 'closing') {
-        deps.post({ kind: 'native-open-error', id: request.id, message: describeError(error) });
+        deps.post({ kind: 'native-open-error', id: request.id, message: errorMessage(error) });
       }
       void close();
     });
@@ -261,8 +262,4 @@ async function uniqueMatchingPort(
 
 function validUsbId(value: number | undefined): boolean {
   return value !== undefined && Number.isInteger(value) && value >= 0 && value <= 0xffff;
-}
-
-function describeError(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

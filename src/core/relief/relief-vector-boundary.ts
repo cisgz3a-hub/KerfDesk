@@ -1,7 +1,7 @@
 import type { Polyline, Transform, Vec2 } from '../scene/scene-object';
-import { applyTransform } from '../scene/transform';
 import { pointInPolygon } from '../geometry/point-in-polygon';
 import type { ReliefVectorMask } from '../scene/relief/relief-authoring';
+import { crossAbout } from '../geometry/point-math';
 
 export function inverseReliefPoint(point: Vec2, transform: Transform): Vec2 {
   const angle = (-transform.rotationDeg * Math.PI) / 180;
@@ -117,21 +117,6 @@ function crossingBoundaryError(segments: ReadonlyArray<BoundarySegment>): string
     }
   return null;
 }
-export function reliefMaskInLocalSpace(
-  rings: ReadonlyArray<Polyline>,
-  sourceTransform: Transform,
-  targetTransform: Transform,
-): ReliefVectorMask {
-  return {
-    rings: rings.map((ring) => ({
-      closed: ring.closed,
-      points: stripClosingPoint(ring.points).map((p) =>
-        inverseReliefPoint(applyTransform(p, sourceTransform), targetTransform),
-      ),
-    })),
-  };
-}
-
 function stripClosingPoint(points: ReadonlyArray<Vec2>): ReadonlyArray<Vec2> {
   const a = points[0],
     b = points[points.length - 1];
@@ -139,12 +124,9 @@ function stripClosingPoint(points: ReadonlyArray<Vec2>): ReadonlyArray<Vec2> {
     ? points.slice(0, -1)
     : points;
 }
-function cross(a: Vec2, b: Vec2, p: Vec2): number {
-  return (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
-}
 function onSegment(p: Vec2, a: Vec2, b: Vec2): boolean {
   return (
-    Math.abs(cross(a, b, p)) <= 1e-10 &&
+    Math.abs(crossAbout(a, b, p)) <= 1e-10 &&
     p.x >= Math.min(a.x, b.x) - 1e-10 &&
     p.x <= Math.max(a.x, b.x) + 1e-10 &&
     p.y >= Math.min(a.y, b.y) - 1e-10 &&
@@ -157,6 +139,7 @@ function segmentsMeet(a: Vec2, b: Vec2, c: Vec2, d: Vec2): boolean {
     onSegment(d, a, b) ||
     onSegment(a, c, d) ||
     onSegment(b, c, d) ||
-    (cross(a, b, c) > 0 !== cross(a, b, d) > 0 && cross(c, d, a) > 0 !== cross(c, d, b) > 0)
+    (crossAbout(a, b, c) > 0 !== crossAbout(a, b, d) > 0 &&
+      crossAbout(c, d, a) > 0 !== crossAbout(c, d, b) > 0)
   );
 }

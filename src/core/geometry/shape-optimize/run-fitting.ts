@@ -28,6 +28,7 @@ import { farthestReach } from '../arc-fit/fit-runs';
 import { mergeCocircular } from '../arc-fit/merge-cocircular';
 import { runTangents } from './run-tangents';
 import { fitTangentCubicWithin } from './tangent-cubic';
+import { dot } from '../point-math';
 
 export type WorldPiece =
   | { readonly kind: 'line'; readonly end: Vec2 }
@@ -230,8 +231,4 @@ function worldPiece(primitive: FitPrimitive): WorldPiece {
 
 function direction(from: Vec2, to: Vec2): Vec2 {
   return unit(to.x - from.x, to.y - from.y);
-}
-
-function dot(a: Vec2, b: Vec2): number {
-  return a.x * b.x + a.y * b.y;
 }

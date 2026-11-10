@@ -1,3 +1,6 @@
+import { isNonNegativeInteger } from '../util/finite';
+import { isRecord } from '../util/is-record';
+
 export type JobInterruptionKind =
   | 'disconnect'
   | 'controller-error'
@@ -143,10 +146,6 @@ function parsePlannerBacklog(value: unknown): PlannerBacklog | undefined | null 
   return { ackedAtStatus, queuedBlocks, ...(bound === undefined ? {} : { bound }) };
 }
 
-function isNonNegativeInteger(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value >= 0;
-}
-
 function isJobInterruptionKind(value: unknown): value is JobInterruptionKind {
   return (
     typeof value === 'string' &&
@@ -160,8 +159,4 @@ function isJobInterruptionKind(value: unknown): value is JobInterruptionKind {
       'unknown',
     ].includes(value)
   );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

@@ -17,6 +17,7 @@ import {
   restoreCalibrationDraft,
 } from '../calibration/calibration-draft-storage';
 import type { BoxMachineContext } from './box-draft';
+import { numberFromDraft } from '../../core/util/text';
 
 type FitTestDraft = {
   readonly thickness: string;
@@ -67,14 +68,14 @@ export function BoxFitTestDialog(props: {
     };
   const relief: BoxRelief =
     props.machine.kind === 'cnc'
-      ? { kind: 'corner-overcut', toolDiameterMm: draftNumber(draft.toolDiameter) }
+      ? { kind: 'corner-overcut', toolDiameterMm: numberFromDraft(draft.toolDiameter) }
       : { kind: 'none' };
   const spec: FitCouponSpec = {
-    thicknessMm: draftNumber(draft.thickness),
-    fingerWidthMm: draftNumber(draft.fingerWidth),
-    startClearanceMm: draftNumber(draft.start),
-    stepClearanceMm: draftNumber(draft.step),
-    rungCount: draftNumber(draft.rungs),
+    thicknessMm: numberFromDraft(draft.thickness),
+    fingerWidthMm: numberFromDraft(draft.fingerWidth),
+    startClearanceMm: numberFromDraft(draft.start),
+    stepClearanceMm: numberFromDraft(draft.step),
+    rungCount: numberFromDraft(draft.rungs),
     relief,
   };
   const result = generateFitCoupon(spec);
@@ -118,10 +119,6 @@ export function BoxFitTestDialog(props: {
       </DialogActions>
     </Dialog>
   );
-}
-
-function draftNumber(value: string): number {
-  return value.trim() === '' ? Number.NaN : Number(value);
 }
 
 function FitTestFields(props: {

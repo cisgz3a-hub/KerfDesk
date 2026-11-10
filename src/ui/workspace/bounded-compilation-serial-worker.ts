@@ -4,6 +4,7 @@ import type {
   BoundedCompilationTask,
   BoundedCompilationWorkerLike,
 } from './bounded-compilation-worker-pool-protocol';
+import { toError } from '../../core/util/error-message';
 
 type SerialEntry<TPayload, TResult> = {
   readonly runId: number;
@@ -82,7 +83,7 @@ export class BoundedCompilationSerialWorker<TPayload, TResult> {
         this.finish(entry, new Error('serial compilation worker response was not cloneable'));
       this.postCurrent(entry, worker);
     } catch (error) {
-      this.finish(entry, asError(error));
+      this.finish(entry, toError(error));
     }
   }
 
@@ -104,7 +105,7 @@ export class BoundedCompilationSerialWorker<TPayload, TResult> {
         payload: task.payload,
       });
     } catch (error) {
-      this.finish(entry, asError(error));
+      this.finish(entry, toError(error));
     }
   }
 
@@ -180,8 +181,4 @@ function abortError(): Error {
   const error = new Error('compilation job aborted');
   error.name = 'AbortError';
   return error;
-}
-
-function asError(error: unknown): Error {
-  return error instanceof Error ? error : new Error(String(error));
 }

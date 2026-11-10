@@ -22,6 +22,8 @@ import {
 import { parseProcessRecipes } from './process-recipe-io';
 import type { MaterialExperiment } from '../../core/material-library/material-experiment';
 import { canonicalMaterialExperiment, parseMaterialExperiments } from './material-experiment-io';
+import { isRecord } from '../../core/util/is-record';
+import { isNonEmptyString } from '../../core/util/text';
 
 export const MATERIAL_LIBRARY_FORMAT = 'laserforge-material-library';
 export const MATERIAL_LIBRARY_SCHEMA_VERSION = 3;
@@ -388,12 +390,4 @@ function invalidField(
   field: string,
 ): { readonly kind: 'invalid'; readonly reason: string } {
   return { kind: 'invalid', reason: `entries[${index}].${field} must be a non-empty string` };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === 'string' && value.trim().length > 0;
 }

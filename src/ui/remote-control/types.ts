@@ -29,7 +29,6 @@ export type RemoteWriteCommand =
   | 'place_on_board'
   | 'undo'
   | 'redo';
-export type RemoteCommand = RemoteReadCommand | RemoteWriteCommand;
 export type WriteAdmission = { readonly expectedRevision: string; readonly requestId: string };
 export type RemoteTransform =
   | { readonly type: 'move'; readonly dxMm: number; readonly dyMm: number }

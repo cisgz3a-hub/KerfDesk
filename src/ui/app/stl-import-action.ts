@@ -53,10 +53,6 @@ type StlImportContext = {
   readonly target?: () => StlImportTarget | null;
 };
 
-export function isStlFile(file: File): boolean {
-  return file.name.toLowerCase().endsWith('.stl');
-}
-
 export async function importStlFiles(
   files: ReadonlyArray<File>,
   ctx: StlImportContext,

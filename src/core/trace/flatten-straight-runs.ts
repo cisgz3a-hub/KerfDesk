@@ -29,6 +29,7 @@
 
 import type { Vec2 } from '../scene';
 import { fitLineThroughRun, quadraticFitFromStats, runFrameStats, type FitLine } from './run-fit';
+import { distance } from '../geometry/point-math';
 
 // A run must be at least this long to flatten — protects small-glyph detail:
 // a 1px amplitude cap is heavy-handed on a 10px letter stem (measured on the
@@ -197,7 +198,7 @@ function longestFlattenableRunEnd(
     if (shape === 'too-bumpy') break;
     if (shape !== 'flatten') continue;
     if (end - start + 1 < MIN_RUN_POINTS) continue;
-    if (chordLength(ring[start] as Vec2, ring[end] as Vec2) >= MIN_RUN_LENGTH_PX * scale) {
+    if (distance(ring[start] as Vec2, ring[end] as Vec2) >= MIN_RUN_LENGTH_PX * scale) {
       best = end;
     }
   }
@@ -354,7 +355,7 @@ function runStartVertex(
 // near-parallel lines intersect arbitrarily far away.
 function jointVertex(vertex: Vec2, a: FitLine, b: FitLine, snapLimit: number): Vec2 {
   const p = intersectLines(a, b);
-  if (p !== null && chordLength(p, vertex) <= snapLimit) return p;
+  if (p !== null && distance(p, vertex) <= snapLimit) return p;
   const pa = projectOntoLine(a, vertex);
   const pb = projectOntoLine(b, vertex);
   return { x: (pa.x + pb.x) / 2, y: (pa.y + pb.y) / 2 };
@@ -372,10 +373,6 @@ function intersectLines(a: FitLine, b: FitLine): Vec2 | null {
 function projectOntoLine(line: FitLine, p: Vec2): Vec2 {
   const u = (p.x - line.px) * line.dx + (p.y - line.py) * line.dy;
   return { x: line.px + u * line.dx, y: line.py + u * line.dy };
-}
-
-function chordLength(a: Vec2, b: Vec2): number {
-  return Math.hypot(b.x - a.x, b.y - a.y);
 }
 
 function rotateToFarthest(points: ReadonlyArray<Vec2>): Vec2[] {

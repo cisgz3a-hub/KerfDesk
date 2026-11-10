@@ -1,4 +1,5 @@
 import { maxOf, minOf } from '../util';
+import { isFinitePoint } from './point-math';
 export type FitPoint = { readonly x: number; readonly y: number };
 export type FitPair = { readonly from: FitPoint; readonly to: FitPoint };
 export type FittedSimilarity = {
@@ -21,7 +22,7 @@ export function fitSimilarity(
   | { readonly ok: true; readonly fit: SimilarityFit }
   | { readonly ok: false; readonly reason: string } {
   if (pairs.length < 2) return failure('At least two point pairs are required.');
-  if (pairs.some(({ from, to }) => !finitePoint(from) || !finitePoint(to))) {
+  if (pairs.some(({ from, to }) => !isFinitePoint(from) || !isFinitePoint(to))) {
     return failure('Similarity fit coordinates must be finite.');
   }
   const fromCenter = centroid(pairs.map(({ from }) => from));
@@ -52,7 +53,7 @@ export function fitSimilarity(
     rotationRad,
     translation: { x: toCenter.x - centered.x, y: toCenter.y - centered.y },
   };
-  if (!finitePoint(transform.translation)) {
+  if (!isFinitePoint(transform.translation)) {
     return failure('Similarity fit transform exceeds the supported numeric range.');
   }
   const residualsMm = pairs.map(({ from, to }) => {
@@ -86,10 +87,6 @@ function centroid(points: ReadonlyArray<FitPoint>): FitPoint {
     y: 0,
   });
   return { x: sum.x / points.length, y: sum.y / points.length };
-}
-
-function finitePoint(point: FitPoint): boolean {
-  return Number.isFinite(point.x) && Number.isFinite(point.y);
 }
 
 function sourceSpread(pairs: ReadonlyArray<FitPair>): number {

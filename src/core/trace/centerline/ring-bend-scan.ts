@@ -18,6 +18,7 @@
 import type { Vec2 } from '../../scene';
 import type { TraceSteps } from '../trace-steps';
 import { edgeLength } from './bend-geometry';
+import { modulo } from '../../math/wrap';
 
 /** A bend replaces ring positions [from, to) with its corner vertex. The
  *  positions may run below 0 or past n and wrap. */
@@ -183,9 +184,9 @@ class RingScan {
     const mid = Math.floor(n / 2);
     // Visiting order starts at stored position i - mid, unless the window
     // begins there; then it starts at the corner.
-    const first = wrap(i - mid, n);
+    const first = modulo(i - mid, n);
     const startsAtCorner = bend.from - (i - mid) === 0;
-    const from = wrap(bend.from, n);
+    const from = modulo(bend.from, n);
     const corner = spliceRing(pts, this.seg, from, bend.to - bend.from, bend.corner);
     this.seg = corner.seg;
     // Sums up to the corner's incoming edge survive a splice that moved
@@ -235,13 +236,13 @@ class RingScan {
     const { seg, start } = this;
     const n = seg.length;
     const total = this.ringArcs().at[n] as number;
-    const open = total - (seg[wrap(start - 1, n)] as number);
+    const open = total - (seg[modulo(start - 1, n)] as number);
     if (open * (1 - ARC_SLACK) > this.judge.maxGateArmPx * CLOSED_ARM_LENGTH_DIVISOR) {
       return open / CLOSED_ARM_LENGTH_DIVISOR;
     }
     // The exact ordered sum arcLengthOf takes over the rotated ring.
     let exact = 0;
-    for (let k = 0; k < n - 1; k += 1) exact += seg[wrap(start + k, n)] as number;
+    for (let k = 0; k < n - 1; k += 1) exact += seg[modulo(start + k, n)] as number;
     return exact / CLOSED_ARM_LENGTH_DIVISOR;
   }
 }
@@ -282,7 +283,7 @@ function spliceRing(
   // Only the corner's two edges are new.
   const size = pts.length;
   seg[at] = ringEdge(pts, at);
-  seg[wrap(at - 1, size)] = ringEdge(pts, wrap(at - 1, size));
+  seg[modulo(at - 1, size)] = ringEdge(pts, modulo(at - 1, size));
   return { at, shift, seg };
 }
 
@@ -311,7 +312,7 @@ function ringStretchAt(
   const view = copyStretch(pts, i - before, count);
   // The copy's edges are the stored edges it spans, minus the one leaving it.
   const copied = new Float64Array(Math.max(0, count - 1));
-  for (let k = 0; k + 1 < count; k += 1) copied[k] = seg[wrap(i - before + k, n)] as number;
+  for (let k = 0; k + 1 < count; k += 1) copied[k] = seg[modulo(i - before + k, n)] as number;
   return { view, seg: copied, at: before, capped, extent };
 }
 
@@ -370,7 +371,7 @@ function sideExtent(arcs: RingArcs, i: number, dir: -1 | 1, reach: number, cap: 
 function copyStretch(pts: ReadonlyArray<Vec2>, start: number, count: number): Vec2[] {
   const n = pts.length;
   const stretch = new Array<Vec2>(count);
-  for (let k = 0; k < count; k += 1) stretch[k] = pts[wrap(start + k, n)] as Vec2;
+  for (let k = 0; k < count; k += 1) stretch[k] = pts[modulo(start + k, n)] as Vec2;
   return stretch;
 }
 
@@ -408,18 +409,14 @@ function forgetAround(
     // Arc of the edges from s - margin steps out back to `margin` steps out.
     let inner = 0;
     for (let s = 0; s < n - 1; s += 1) {
-      const k = wrap(edge + s * dir, n);
+      const k = modulo(edge + s * dir, n);
       if (s > NEIGHBOURHOOD_MARGIN_POINTS) {
         // The edge between k and its neighbour toward the corner.
-        inner += seg[dir === 1 ? wrap(k - 1, n) : k] as number;
+        inner += seg[dir === 1 ? modulo(k - 1, n) : k] as number;
         if (inner > walkEnd) break;
         if (inner > loose(reachOf(k))) continue;
       }
       settled.delete(pts[k] as Vec2);
     }
   }
-}
-
-function wrap(k: number, n: number): number {
-  return ((k % n) + n) % n;
 }

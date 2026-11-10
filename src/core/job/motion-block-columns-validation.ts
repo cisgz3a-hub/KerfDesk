@@ -7,6 +7,7 @@ import {
   type MotionBlockColumnData,
 } from './motion-block-columns';
 import { runWorkSteps, type WorkSteps } from '../recovery/work-steps';
+import { isNonNegativeSafeInteger } from '../util/finite';
 
 // Checkpoints for the accepted run's archive (ADR-337 Amendment 1). A block's
 // route check reads every one of its points, so a step is bounded by blocks
@@ -75,7 +76,8 @@ function* hasColumnShapeSteps(value: unknown): WorkSteps<boolean> {
   if (typeof value !== 'object' || value === null) return false;
   const data = value as Record<string, unknown>;
   const count = data['count'];
-  if (data['encoding'] !== MOTION_BLOCK_COLUMNS_ENCODING || !isIndex(count)) return false;
+  if (data['encoding'] !== MOTION_BLOCK_COLUMNS_ENCODING || !isNonNegativeSafeInteger(count))
+    return false;
   return hasBlockColumns(data, count) && (yield* hasPointColumnsSteps(data));
 }
 
@@ -154,8 +156,4 @@ function* finiteColumnSteps(column: Float64Array): WorkSteps<boolean> {
     if (!column.subarray(start, start + VALUE_STEP).every(Number.isFinite)) return false;
   }
   return true;
-}
-
-function isIndex(value: unknown): value is number {
-  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 }

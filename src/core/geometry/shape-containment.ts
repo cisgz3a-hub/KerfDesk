@@ -14,6 +14,7 @@ import { worldOutlinePoints } from './rubber-band-outline';
 import { segmentContainedInPolygon } from './segment-contained-in-polygon';
 import { isClosedPolygon, isVectorPathObject, materializeVectorObject } from './vector-path-tools';
 import { maxOf } from '../util';
+import { boundsOfPoints } from './box-math';
 
 type Contour = { readonly points: ReadonlyArray<Vec2>; readonly bounds: Bounds };
 
@@ -27,7 +28,7 @@ export function worldClosedContours(objects: ReadonlyArray<SceneObject>): Readon
         (polyline) =>
           polyline.points.length >= 3 && (isClosedPolygon(polyline) || isClosedEnough(polyline)),
       )
-      .map((polyline) => ({ points: polyline.points, bounds: pointBounds(polyline.points) }));
+      .map((polyline) => ({ points: polyline.points, bounds: boundsOfPoints(polyline.points) }));
   });
 }
 
@@ -43,7 +44,7 @@ export function containedObjectIds(
     .filter((candidate) => {
       const points = worldOutlinePoints(candidate);
       if (points.length === 0) return false;
-      const bounds = pointBounds(points);
+      const bounds = boundsOfPoints(points);
       const outlines: ReadonlyArray<Polyline> = isVectorPathObject(candidate)
         ? materializeVectorObject(candidate).paths.flatMap((path) => path.polylines)
         : [{ closed: true, points }];
@@ -91,18 +92,4 @@ function boundsInside(inner: Bounds, outer: Bounds): boolean {
     inner.maxX <= outer.maxX &&
     inner.maxY <= outer.maxY
   );
-}
-
-function pointBounds(points: ReadonlyArray<Vec2>): Bounds {
-  let minX = Number.POSITIVE_INFINITY;
-  let minY = Number.POSITIVE_INFINITY;
-  let maxX = Number.NEGATIVE_INFINITY;
-  let maxY = Number.NEGATIVE_INFINITY;
-  for (const point of points) {
-    minX = Math.min(minX, point.x);
-    minY = Math.min(minY, point.y);
-    maxX = Math.max(maxX, point.x);
-    maxY = Math.max(maxY, point.y);
-  }
-  return { minX, minY, maxX, maxY };
 }

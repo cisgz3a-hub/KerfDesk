@@ -19,6 +19,7 @@ import {
   type SketchPath,
   type SketchRectangle,
 } from './sketch-entity';
+import { addPoints } from '../geometry/point-math';
 
 const DEG_TO_RAD = Math.PI / 180;
 const FULL_TURN_RAD = Math.PI * 2;
@@ -76,7 +77,7 @@ function ellipsePolyline(entity: SketchEllipse): Polyline {
     y: entity.center.y - entity.radiusYMm,
   };
   return {
-    points: withoutClosingDuplicate(local.points).map((point) => translate(point, offset)),
+    points: withoutClosingDuplicate(local.points).map((point) => addPoints(point, offset)),
     closed: true,
   };
 }
@@ -91,17 +92,13 @@ function rectanglePolylines(entity: SketchRectangle): ReadonlyArray<Polyline> {
   });
   return local.map((polyline) => ({
     ...polyline,
-    points: polyline.points.map((point) => translate(point, entity.origin)),
+    points: polyline.points.map((point) => addPoints(point, entity.origin)),
   }));
 }
 
 function pathPolyline(entity: SketchPath): Polyline {
   const points = entity.closed ? withoutClosingDuplicate(entity.points) : entity.points;
   return { points, closed: entity.closed };
-}
-
-function translate(point: Vec2, offset: Vec2): Vec2 {
-  return { x: point.x + offset.x, y: point.y + offset.y };
 }
 
 // A closed Polyline carries closure in its flag, not in a repeated last point.

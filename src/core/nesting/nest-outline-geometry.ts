@@ -3,6 +3,7 @@ import { nestRotation, type NestPlacement, type NestRect } from './quick-nest';
 import { outlinesCloserThan } from './outline-clearance';
 import type { NestOutline, OutlineNestItem } from './outline-compact-nest';
 import { maxOf, minOf } from '../util';
+import { finiteNonNegative } from '../util/finite';
 const AREA_EPSILON = 1e-7;
 
 export type PlacedState = {
@@ -147,6 +148,4 @@ export function rectangleOutline(width: number, height: number): NestOutline {
   ];
 }
 
-export function finiteNonNegative(value: number): number {
-  return Number.isFinite(value) ? Math.max(0, value) : 0;
-}
+export { finiteNonNegative } from '../util/finite';

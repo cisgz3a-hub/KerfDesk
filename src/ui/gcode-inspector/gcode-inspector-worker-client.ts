@@ -5,6 +5,7 @@ import type {
   GcodeInspectorWorkerResult,
 } from './gcode-inspector-worker-protocol';
 import type { PreviewChunk } from './inspection-preview';
+import { stopWorker } from '../common/stop-worker';
 
 export type GcodeInspectorProgress = {
   readonly phase: 'queued' | 'reading' | 'parsing' | 'timing';
@@ -174,7 +175,7 @@ function rejectAllPending(message: string): void {
 }
 
 function retireWorker(): void {
-  workerInstance?.terminate();
+  if (workerInstance !== null) stopWorker(workerInstance);
   workerInstance = null;
 }
 

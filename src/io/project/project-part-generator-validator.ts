@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import type { ImportedSvg } from '../../core/scene/scene-object';
 import type {
   PartGeneratorSource,
   PartGeneratorResult,
@@ -71,13 +70,6 @@ export function validatePartGeneratorSource(value: unknown): string | null {
   const parsed = parsePartGeneratorSource(value);
   return parsed.kind === 'invalid' ? parsed.reason : null;
 }
-export function normalizePartGeneratorObject(object: ImportedSvg): ImportedSvg {
-  const parsed = parsePartGeneratorSource(object.partGenerator);
-  return parsed.kind === 'ok' && parsed.value !== undefined
-    ? { ...object, partGenerator: parsed.value }
-    : object;
-}
-
 export function parsePartGeneratorDefinition(
   value: unknown,
 ): PartGeneratorResult<PartGeneratorDefinition> {

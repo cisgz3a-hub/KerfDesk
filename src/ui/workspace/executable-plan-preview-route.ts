@@ -11,6 +11,7 @@ import {
 import { comparePreviewRoutesAtEmitPrecision } from './preview-route-parity';
 import { mapToolpathToScene } from './preview-scene-frame';
 import { previewRouteExceedsBudget } from './preview-route-budget';
+import { distance3 } from '../../core/geometry/vec3';
 
 export {
   comparePreviewRoutesAtEmitPrecision,
@@ -195,7 +196,7 @@ function planMotionSteps(motion: ExecutablePlanV1['motions'][number]): ReadonlyA
     const from = motion.pointsMm[index - 1];
     const to = motion.pointsMm[index];
     if (from === undefined || to === undefined) continue;
-    const length = pointDistance(from, to);
+    const length = distance3(from, to);
     if (length <= Number.EPSILON) continue;
     steps.push({
       kind: 'travel',
@@ -218,8 +219,4 @@ function zSpan(
 
 function xy(point: ExecutablePlanPoint): Vec2 {
   return { x: point.x, y: point.y };
-}
-
-function pointDistance(from: ExecutablePlanPoint, to: ExecutablePlanPoint): number {
-  return Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z);
 }

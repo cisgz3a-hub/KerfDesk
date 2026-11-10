@@ -12,9 +12,6 @@ export const FLUIDNC_GCODE_MAX_PAYLOAD_BYTES = 127;
 /** Maximum ordinary printable payload characters the direct Lineedit retains. */
 export const FLUIDNC_LINEEDIT_MAX_RETAINED_CHARS = 254;
 
-/** Compatibility alias for the direct-channel retention boundary. */
-export const FLUIDNC_MAX_LINE_CHARS = FLUIDNC_LINEEDIT_MAX_RETAINED_CHARS;
-
 export type FluidncLineBoundary = {
   /** 1-based line number within the emitted program. */
   readonly lineNumber: number;

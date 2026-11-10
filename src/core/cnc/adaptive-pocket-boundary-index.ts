@@ -1,4 +1,6 @@
 import type { Polyline, Vec2 } from '../scene';
+import { isFinitePoint } from '../geometry/point-math';
+import { isFinitePositive } from '../util/finite';
 
 export type BoundaryEdge = readonly [Vec2, Vec2];
 
@@ -23,7 +25,7 @@ export function boundaryIndex(
   contours: ReadonlyArray<Polyline>,
   toolRadiusMm: number,
 ): BoundaryIndex | null {
-  if (!positiveFinite(toolRadiusMm)) return null;
+  if (!isFinitePositive(toolRadiusMm)) return null;
   const edges = contourEdges(contours);
   const bounds = edgeBounds(edges);
   if (edges.length === 0 || bounds === null) return null;
@@ -98,7 +100,7 @@ function edgeBounds(edges: ReadonlyArray<BoundaryEdge>): Bounds | null {
   let bounds: Bounds | null = null;
   for (const [start, end] of edges) {
     for (const point of [start, end]) {
-      if (!finitePoint(point)) return null;
+      if (!isFinitePoint(point)) return null;
       bounds =
         bounds === null
           ? { minX: point.x, minY: point.y, maxX: point.x, maxY: point.y }
@@ -124,14 +126,6 @@ function contourEdges(contours: ReadonlyArray<Polyline>): ReadonlyArray<Boundary
     }
   }
   return edges;
-}
-
-function finitePoint(point: Vec2): boolean {
-  return Number.isFinite(point.x) && Number.isFinite(point.y);
-}
-
-function positiveFinite(value: number): boolean {
-  return Number.isFinite(value) && value > 0;
 }
 
 function withoutDuplicateClosure(points: ReadonlyArray<Vec2>): ReadonlyArray<Vec2> {

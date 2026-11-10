@@ -1,5 +1,6 @@
 import type { Vec2 } from '../../core/scene';
 import { formatDisplayLengthFixed, type DisplayLengthUnit } from '../display-length';
+import { normalizeDegrees } from '../../core/math/wrap';
 
 export type MeasureDraft = {
   readonly start: Vec2;
@@ -37,7 +38,7 @@ export function measureReadout(
   const dxMm = draft.end.x - draft.start.x;
   const dyMm = draft.end.y - draft.start.y;
   const distanceMm = Math.hypot(dxMm, dyMm);
-  const angleDeg = normalizeAngleDeg((Math.atan2(dyMm, dxMm) * 180) / Math.PI);
+  const angleDeg = normalizeDegrees((Math.atan2(dyMm, dxMm) * 180) / Math.PI);
   return {
     dxMm,
     dyMm,
@@ -48,11 +49,6 @@ export function measureReadout(
       unit,
     )} | ${angleDeg.toFixed(1)} deg`,
   };
-}
-
-function normalizeAngleDeg(angle: number): number {
-  const normalized = angle % 360;
-  return normalized < 0 ? normalized + 360 : normalized;
 }
 
 // Two decimals of a millimetre, four of an inch; never a negative zero.

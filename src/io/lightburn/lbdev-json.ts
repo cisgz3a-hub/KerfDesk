@@ -15,6 +15,7 @@ import {
   type LightBurnDeviceParse,
   type ParsedLightBurnDevice,
 } from './lbdev-device';
+import { isRecord } from '../../core/util/is-record';
 
 type JsonRecord = Readonly<Record<string, unknown>>;
 
@@ -106,8 +107,4 @@ function textOf(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
   const trimmed = value.trim();
   return trimmed === '' ? undefined : trimmed;
-}
-
-function isRecord(value: unknown): value is JsonRecord {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

@@ -108,9 +108,7 @@ export function confirmedRouteBatch(
   return { process: process.path, travel, endRouteMm };
 }
 
-export function boundsTouch(a: SceneBounds, b: SceneBounds): boolean {
-  return a.minX <= b.maxX && a.maxX >= b.minX && a.minY <= b.maxY && a.maxY >= b.minY;
-}
+export { boxesOverlap as boundsTouch } from '../../core/geometry/box-math';
 
 function segmentTouches(
   bounds: SceneBounds,

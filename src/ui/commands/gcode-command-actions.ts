@@ -4,7 +4,7 @@
 // renders exactly what Save/Start would emit — the Inspector simply omits the
 // variable-text advance, which belongs to a real export.
 
-import { handleSaveGcode } from '../app/file-actions';
+import { type handleSaveGcode } from '../app/file-actions';
 import { handleOpenGcodeInspector } from '../app/gcode-open-action';
 import { handleInspectCurrentGcode } from '../app/inspect-current-gcode-action';
 import { currentSaveGcodeContext } from '../app/save-gcode-context';
@@ -27,14 +27,6 @@ export type GcodeActionDeps = {
   readonly pushToast: PushToast;
   readonly openInspector: (programName: string, source: GcodeInspectionSource) => void;
 };
-
-export function saveGcodeAction(deps: GcodeActionDeps): () => void {
-  return () =>
-    void handleSaveGcode({
-      ...saveGcodeContext(deps),
-      advanceVariablesAfter: deps.app.advanceVariablesAfter,
-    });
-}
 
 /**
  * Opens the IN-DEPTH Inspector on the current project: 3D plus readouts,

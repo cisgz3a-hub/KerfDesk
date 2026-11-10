@@ -72,10 +72,6 @@ export function bakeReliefComponent(
   };
 }
 
-export function detachedReliefDocument(field: ReliefHeightfield): ReliefAuthoringDocument {
-  return createReliefAuthoringDocument(field);
-}
-
 export function createBlankReliefAuthoringDocument(input: {
   readonly width: number;
   readonly height: number;

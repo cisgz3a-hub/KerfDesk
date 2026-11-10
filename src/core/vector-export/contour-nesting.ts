@@ -23,6 +23,7 @@
 
 import { curveSubpathBounds, flattenCurveSubpath } from '../scene/curve-path';
 import type { Bounds, CurveSubpath, Vec2 } from '../scene/scene-object';
+import { boxContains } from '../geometry/box-math';
 
 export type ContourGroup = {
   /** Index into the input array of the outer (even-depth) contour. */
@@ -54,7 +55,7 @@ export function groupContoursWithHoles(
     let count = 0;
     for (let k = 0; k < order; k += 1) {
       const candidate = bySize[k] as Ring;
-      if (!(candidate.area > ring.area) || !boundsContain(candidate.bounds, ring.bounds)) continue;
+      if (!(candidate.area > ring.area) || !boxContains(candidate.bounds, ring.bounds)) continue;
       if (!ringInside(ring, candidate)) continue;
       count += 1;
       if (best === null || candidate.area < best.area) best = candidate;
@@ -101,15 +102,6 @@ function signedArea(points: ReadonlyArray<Vec2>): number {
     twice += a.x * b.y - b.x * a.y;
   }
   return twice / 2;
-}
-
-function boundsContain(outer: Bounds, inner: Bounds): boolean {
-  return (
-    outer.minX <= inner.minX &&
-    outer.minY <= inner.minY &&
-    outer.maxX >= inner.maxX &&
-    outer.maxY >= inner.maxY
-  );
 }
 
 function ringInside(inner: Ring, outer: Ring): boolean {
