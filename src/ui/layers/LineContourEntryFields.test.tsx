@@ -17,7 +17,12 @@ describe('shared Line contour-entry setting', () => {
     const mounted = await mount(
       <LayerRowSettingsFields
         layer={layer}
-        operationTarget={{ settings: layer, selectedObjectCount: 0, commit }}
+        operationTarget={{
+          settings: layer,
+          selectedObjectCount: 0,
+          commit,
+          owner: { operationId: layer.id },
+        }}
       />,
     );
     try {

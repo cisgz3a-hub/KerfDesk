@@ -1,12 +1,11 @@
 import type { DeviceProfile } from '../../core/devices';
-import { deviceProfileWithInteractivePatch } from '../../core/devices/device-profile-patch';
 import {
   moveLayer as moveSceneLayer,
   sceneObjectHasVisibleLayer,
   type Project,
   type SelectionTransform,
 } from '../../core/scene';
-import { jobPlacementAfterDeviceChange, jobPlacementAfterProfileSelection } from '../job-placement';
+import { jobPlacementAfterProfileSelection } from '../job-placement';
 import { fitToSelection } from './viewport-actions';
 import { applyDuplicate, pushUndo } from './scene-mutations';
 import { limitProjectHistory } from './undo-stack';
@@ -22,9 +21,9 @@ import { withObjectTransform } from '../../core/shapes/rectangle-resize';
 import type { AppState } from './store';
 import {
   cncMachineForProfile,
-  projectAfterDeviceProfileChange,
   projectAfterDeviceProfileReplacement,
 } from './cnc-machine-setup-scene';
+import { deviceProfileChangeState } from './device-profile-change';
 import { projectWithParkedCnc } from './parked-cnc-machine';
 import { captureSetupHistoryContext, setupHistoryContextFor } from './setup-history-context';
 import {
@@ -56,6 +55,7 @@ export function sceneActions(
   AppState,
   | 'setLayerParam'
   | 'setLayerParamWithArtworkOverrides'
+  | 'raiseOutputMaxFeedForSpeed'
   | 'moveLayer'
   | 'updateDeviceProfile'
   | 'replaceDeviceProfile'
@@ -87,17 +87,12 @@ export function sceneActions(
         };
       }),
     updateDeviceProfile: (patch) =>
-      set((s) => {
-        captureSetupHistoryContext(s.project, s);
-        const nextDevice = deviceProfileWithInteractivePatch(s.project.device, patch);
-        return {
-          project: projectAfterDeviceProfileChange(s.project, nextDevice, s.cncLiveCaps),
-          jobPlacement: jobPlacementAfterDeviceChange(s.jobPlacement, s.project.device, nextDevice),
-          undoStack: pushUndo(s.project, s.undoStack),
-          redoStack: [],
-          dirty: true,
-        };
-      }),
+      set((s) => ({
+        ...deviceProfileChangeState(s, patch),
+        undoStack: pushUndo(s.project, s.undoStack),
+        redoStack: [],
+        dirty: true,
+      })),
     replaceDeviceProfile: (profile) => set((s) => deviceProfileReplacementState(s, profile)),
     ...machineSetupActions(set),
   };

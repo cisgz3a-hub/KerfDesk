@@ -1,5 +1,6 @@
 import type { Layer, LayerOperationSettings } from '../../core/scene';
 import { useStore } from '../state';
+import type { OperationSettingsOwner } from '../state/layer-param-actions';
 import { FeedCeilingNotice, useFeedCeiling } from './feed-ceiling';
 import { scanLineOverscanNote } from './fill-overscan-fallback';
 import {
@@ -29,6 +30,9 @@ export type LayerOperationControlTarget = {
   readonly mixedFields?: MixedOperationFields;
   readonly reconcileKey?: unknown;
   readonly commit: (patch: Partial<LayerOperationSettings>) => void;
+  /** Where `commit` writes. Actions that pair a settings edit with another
+   * change in one undo step (the feed-ceiling Raise) write here directly. */
+  readonly owner: OperationSettingsOwner;
 };
 
 type LayerRowSettingsFieldsProps = {
@@ -123,10 +127,7 @@ export function LaserEssentialsFields(
         </div>
       </div>
       {/* Outside the <label> rows: the note carries its own button. */}
-      <FeedCeilingNotice
-        ceiling={speedCeiling}
-        onRaise={(speed) => operationTarget.commit({ speed })}
-      />
+      <FeedCeilingNotice ceiling={speedCeiling} owner={operationTarget.owner} />
     </section>
   );
 }

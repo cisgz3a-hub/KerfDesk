@@ -104,3 +104,24 @@ follow-up change set; see Consequences.
   - the remaining UI items: ui-panel-3/4/5/6/8, realtime-2, jog-home-origin-3,
     cnc-controller-6;
   - grblHAL `$SLP` (drivers-4) and the Electron items (electron-native-1..4).
+
+### Amendment 1 - One Raise is one undo step (2026-11-10)
+
+Rolling audit 2026-10-21 noted, beside finding 06-P2-5 (ADR-638 Amendment 2), that the Speed
+note's **Raise Output max feed** button made two undo steps: `updateDeviceProfile` raised the
+ceiling, then the field's own commit re-applied the speed. One Undo left a state the operator never
+chose. Back at the old speed with the ceiling still raised, nothing showed the ceiling had changed.
+With the ceiling back down and the raised speed kept, compile silently capped the speed again.
+
+The button now calls one store action, `raiseOutputMaxFeedForSpeed`, which applies
+`updateDeviceProfile`'s change and the speed write in one `set` with one history snapshot. The
+machine change still captures the Machine Setup history context (`captureSetupHistoryContext`)
+against the snapshot it pushes, so Undo and Redo restore that context as before. The speed lands
+where the field writes: the operation, or the selected artworks' own settings when they own it
+(ADR-317). Each operation control target now names that place (`owner`). The values written are
+unchanged.
+
+Verification: `feed-ceiling.raise-undo.test.tsx` types 15,000 mm/min against a 10,000 ceiling in
+the artwork inspector and clicks Raise, once for an operation speed and once for an artwork that
+owns its speed. Each Raise adds one undo step and emits `F15000`. One Undo restores both the 10,000
+ceiling and the 10,000 speed (`F10000`), and Redo reapplies both.
