@@ -11,7 +11,6 @@
 // --- Real-time commands (single byte) ---
 
 import { formatGcodeFeedMmPerMin } from '../../gcode/feed-word';
-import { formatFixed3Decimals } from '../../util/number-format';
 
 /** Status report request. GRBL replies with <state|...>. Poll at ~5 Hz. */
 export const RT_STATUS = '?';
@@ -144,10 +143,10 @@ export function buildJogCommand(params: JogParams): string {
   const parts: string[] = [];
   parts.push(absolute ? 'G90' : 'G91');
   parts.push('G21'); // mm
-  if (includeAxis(params.dx)) parts.push(`X${formatFixed3Decimals(params.dx)}`);
-  if (includeAxis(params.dy)) parts.push(`Y${formatFixed3Decimals(params.dy)}`);
-  if (includeAxis(params.dz)) parts.push(`Z${formatFixed3Decimals(params.dz)}`);
-  if (includeAxis(params.da)) parts.push(`A${formatFixed3Decimals(params.da)}`);
+  if (includeAxis(params.dx)) parts.push(`X${formatMm(params.dx)}`);
+  if (includeAxis(params.dy)) parts.push(`Y${formatMm(params.dy)}`);
+  if (includeAxis(params.dz)) parts.push(`Z${formatMm(params.dz)}`);
+  if (includeAxis(params.da)) parts.push(`A${formatMm(params.da)}`);
   parts.push(`F${formatGcodeFeedMmPerMin(params.feed)}`);
   return `$J=${parts.join(' ')}`;
 }
@@ -189,6 +188,10 @@ export type RealtimeOverrideByte =
   | typeof RT_SPINDLE_OV_MINUS_10
   | typeof RT_SPINDLE_OV_PLUS_1
   | typeof RT_SPINDLE_OV_MINUS_1;
+
+function formatMm(n: number): string {
+  return n.toFixed(3);
+}
 
 function assertFiniteOptionalAxis(value: number | undefined, label: string): void {
   if (value !== undefined && !Number.isFinite(value)) {

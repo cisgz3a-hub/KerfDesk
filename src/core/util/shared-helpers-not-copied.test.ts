@@ -9,13 +9,16 @@ import { expect, it } from 'vitest';
 // copies now import one shared function. This test keeps it that way: it fails
 // when a shipped file declares a private function whose body is, token for
 // token, the body of a function one of the modules below already exports.
+// `core/util/number-format.ts` is left out on purpose. It holds formats for
+// text people read. Code that writes machine commands keeps its own formatter
+// (`G0 X${value.toFixed(3)}`), so a later change to a display format can never
+// change what a controller receives.
 const SHARED_MODULES = [
   'src/core/util/is-record.ts',
   'src/core/util/error-message.ts',
   'src/core/util/finite.ts',
   'src/core/util/text.ts',
   'src/core/util/rounding.ts',
-  'src/core/util/number-format.ts',
   'src/core/util/unique.ts',
   'src/core/math/clamp.ts',
   'src/core/math/wrap.ts',
