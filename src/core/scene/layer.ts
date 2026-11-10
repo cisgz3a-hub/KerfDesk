@@ -88,6 +88,14 @@ export type LayerOperationSettings = {
   // calibration, which compiles byte-identically to the output before it. An
   // Image operation applies it to the luma it dithers, after Negative.
   readonly photoToneCurve?: PhotoToneCurve | undefined;
+  // ADR-699, after LightBurn's Fill Ramp. Absent or 0 is no ramp, which
+  // compiles byte-identically to the output before it. With a length set, a
+  // scanline or island Fill burns as a raster whose power rises from Min power
+  // at the shape's edges to full power that far inside. Edges facing the
+  // outside of the artwork ramp only with fillRampOuterEdge. Schema 23 makes an
+  // older reader refuse a project rather than burn the fill flat.
+  readonly fillRampLengthMm?: number | undefined;
+  readonly fillRampOuterEdge?: boolean | undefined;
 };
 
 // ADR-626: an arc meets the cut tangentially; a line meets it at an angle.
@@ -217,6 +225,8 @@ export const LAYER_OPERATION_SETTING_KEYS = [
   'leadAngleDeg',
   'leadSide',
   'photoToneCurve',
+  'fillRampLengthMm',
+  'fillRampOuterEdge',
 ] as const satisfies ReadonlyArray<keyof LayerOperationSettings>;
 
 const LAYER_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
@@ -310,6 +320,8 @@ export const OPTIONAL_CUT_SETTING_KEYS = [
   'leadAngleDeg',
   'leadSide',
   'photoToneCurve',
+  'fillRampLengthMm',
+  'fillRampOuterEdge',
 ] as const satisfies ReadonlyArray<keyof LayerOperationSettings>;
 
 // Written only when set, so a capture of an operation that never used them
@@ -364,9 +376,12 @@ function operationSettingEqual(
   right: LayerOperationSettings,
   key: (typeof LAYER_OPERATION_SETTING_KEYS)[number],
 ): boolean {
-  return key === 'photoToneCurve'
-    ? photoToneCurvesEqual(left.photoToneCurve, right.photoToneCurve)
-    : left[key] === right[key];
+  if (key === 'photoToneCurve')
+    return photoToneCurvesEqual(left.photoToneCurve, right.photoToneCurve);
+  // ADR-699: absent is the same as off.
+  if (key === 'fillRampLengthMm') return (left[key] ?? 0) === (right[key] ?? 0);
+  if (key === 'fillRampOuterEdge') return (left[key] === true) === (right[key] === true);
+  return left[key] === right[key];
 }
 
 /** ADR-626: the settings without leads. A stored setting set (saved defaults,

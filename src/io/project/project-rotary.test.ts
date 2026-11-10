@@ -87,7 +87,7 @@ describe('project rotary taper persistence (ADR-694)', () => {
     const result = deserializeProject(JSON.stringify({ ...raw, schemaVersion: 21 }));
     expect(result.kind).toBe('ok');
     if (result.kind !== 'ok') return;
-    expect(result.project.schemaVersion).toBe(22);
+    expect(result.project.schemaVersion).toBe(23);
     expect(result.project.device.rotary).toEqual(ROLLER);
     expect(result.project.device.rotary).not.toHaveProperty('taper');
   });

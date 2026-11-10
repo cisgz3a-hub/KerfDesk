@@ -44,7 +44,9 @@ import type { ProductionNestDefinition } from '../nesting/production-nest';
 // v22 carries a rotary taper (ADR-694) and a dedicated rotary axis (ADR-695).
 // An older reader would burn a tapered tumbler with no warp, or drive an A or Z
 // rotary as Y.
-export const PROJECT_SCHEMA_VERSION = 22 as const;
+// v23 carries a Fill ramp and the 3D Sliced image mode (ADR-699). An older
+// reader would burn a ramped fill flat; 3D Sliced it already refuses.
+export const PROJECT_SCHEMA_VERSION = 23 as const;
 
 export type EmbeddedFont = {
   readonly key: string;

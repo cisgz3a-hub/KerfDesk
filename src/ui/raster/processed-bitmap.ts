@@ -100,7 +100,8 @@ export function buildProcessedRasterBitmap(
   );
   const sValues = dither(
     { luma: maskedLuma, width, height },
-    { algorithm: imageDitherAlgorithm(layer), sMax, sMin },
+    // ADR-699: 3D Sliced shows the whole stack, darker where more slices burn.
+    { algorithm: imageDitherAlgorithm(layer), sMax, sMin, sliceCount: layer.passes },
   );
   const rgba = new Uint8ClampedArray(rasterPreviewRgba(sValues, sMax, width, height));
   return { kind: 'ok', width, height, rgba };

@@ -26,6 +26,7 @@ import {
 } from '../../core/job/laser-lead-settings';
 import { DITHER_ALGORITHMS, type Layer, type LayerMode } from '../../core/scene';
 import { numberField, reconciledNumberField, submittedNumber } from './cut-settings-number-field';
+import { MAX_FILL_RAMP_LENGTH_MM } from './CutSettingsFillRampFields';
 
 export type LayerPatch = Partial<Omit<Layer, 'id' | 'color'>>;
 export type CutSettingsLimits = {
@@ -83,6 +84,7 @@ export function readCutSettingsPatch(
     ...readScanPatternPatch(data, layer, mode),
     ...readAutoOverscanPatch(data, mode),
     ...fillSettings,
+    ...readFillRampPatch(data, layer, mode, power),
     ditherAlgorithm: parseDither(String(data.get('ditherAlgorithm') ?? layer.ditherAlgorithm)),
     linesPerMm,
     ...readScanOverridePatch(data, layer, mode),
@@ -315,6 +317,31 @@ function readScanPatternPatch(data: FormData, layer: Layer, mode: LayerMode): La
     ...step,
     imageScanAngleDeg: numberField(data, 'imageScanAngleDeg', layer.imageScanAngleDeg ?? 0, 0, 180),
     imageCrossHatch: data.has('imageCrossHatch'),
+  };
+}
+
+// ADR-699: only a form showing the Ramp fields changes them. Ramp min power is
+// the operation's Min power, which a Fill reads only for its ramp.
+function readFillRampPatch(
+  data: FormData,
+  layer: Layer,
+  mode: LayerMode,
+  power: number,
+): LayerPatch {
+  if (mode !== 'fill' || !data.has('fillRampShown')) return {};
+  const lengthMm = numberField(
+    data,
+    'fillRampLengthMm',
+    layer.fillRampLengthMm ?? 0,
+    0,
+    Math.max(MAX_FILL_RAMP_LENGTH_MM, layer.fillRampLengthMm ?? 0),
+  );
+  const outerEdge = data.has('fillRampOuterEdge');
+  // Absent means off: a form left alone adds no keys to the operation.
+  return {
+    ...(lengthMm === (layer.fillRampLengthMm ?? 0) ? {} : { fillRampLengthMm: lengthMm }),
+    ...(outerEdge === (layer.fillRampOuterEdge === true) ? {} : { fillRampOuterEdge: outerEdge }),
+    minPower: numberField(data, 'fillRampMinPower', layer.minPower, 0, power),
   };
 }
 

@@ -21,6 +21,9 @@
 //                        actually accept analogue S values; produces
 //                        smooth gradients but most diode lasers don't
 //                        respond linearly to S.
+//   - '3d-sliced'        a depth map (ADR-699). Compilation burns one
+//                        threshold pass per slice (slice-3d.ts); here, for
+//                        previews, S is proportional to the slice depth.
 //
 // All modes return Float64Array (length = width*height) of integer S values
 // already scaled to [0, sMax]. A numeric rather than fixed-width integer
@@ -33,6 +36,7 @@
 
 import type { DitherAlgorithm } from '../scene';
 import { diffuseBlueNoiseRow } from './dither-blue-noise';
+import { imageSliceCount, slicedDepthValue } from './slice-3d';
 
 export type { DitherAlgorithm } from '../scene';
 
@@ -56,6 +60,9 @@ export type DitherOptions = {
   // For 'threshold' only: pixel luma below this becomes a burn pixel.
   // Default 128 (middle grey). Ignored by other algorithms.
   readonly thresholdLuma?: number;
+  // For '3d-sliced' only: the slice count (the operation's passes). Absent
+  // previews the depth unquantized, as 255 slices.
+  readonly sliceCount?: number;
 };
 
 const DEFAULT_THRESHOLD = 128;
@@ -72,6 +79,8 @@ export function dither(input: DitherInput, options: DitherOptions): Float64Array
       return ditherOrdered(input, options);
     case 'grayscale':
       return ditherGrayscale(input, options);
+    case '3d-sliced':
+      return ditherIndependentRow(input.luma, 0, options);
   }
 }
 
@@ -88,21 +97,33 @@ export function ditherIndependentRow(
   const cutoff = options.thresholdLuma ?? DEFAULT_THRESHOLD;
   const sMax = normalizeS(options.sMax);
   const sMin = Math.min(sMax, normalizeS(options.sMin ?? 0));
+  const slices = imageSliceCount(options.sliceCount ?? TWO_FIFTY_FIVE);
   for (let x = 0; x < luma.length; x += 1) {
     const value = luma[x] ?? TWO_FIFTY_FIVE;
-    out[x] = independentDitherValue(algorithm, value, x, rowIndex, cutoff, sMin, sMax);
+    out[x] =
+      algorithm === '3d-sliced'
+        ? slicedDepthValue(value, slices, sMax)
+        : independentDitherValue(algorithm, value, x, rowIndex, cutoff, sMin, sMax);
   }
   return out;
 }
 
-type IndependentDitherMode = Extract<DitherAlgorithm, 'threshold' | 'ordered' | 'grayscale'>;
+type IndependentDitherMode = Extract<
+  DitherAlgorithm,
+  'threshold' | 'ordered' | 'grayscale' | '3d-sliced'
+>;
 
 function isIndependentDitherMode(algorithm: DitherAlgorithm): algorithm is IndependentDitherMode {
-  return algorithm === 'threshold' || algorithm === 'ordered' || algorithm === 'grayscale';
+  return (
+    algorithm === 'threshold' ||
+    algorithm === 'ordered' ||
+    algorithm === 'grayscale' ||
+    algorithm === '3d-sliced'
+  );
 }
 
 function independentDitherValue(
-  algorithm: IndependentDitherMode,
+  algorithm: Exclude<IndependentDitherMode, '3d-sliced'>,
   value: number,
   x: number,
   rowIndex: number,

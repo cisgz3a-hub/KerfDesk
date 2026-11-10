@@ -16,6 +16,9 @@ import {
 import { DEFAULT_OVERSCAN_MM, MAX_FILL_OVERSCAN_MM } from '../../../core/job/compile-job-defaults';
 import { laserLeadSpecFor } from '../../../core/job/laser-lead-settings';
 import { passAngleStepApplies } from '../../../core/job/scan-pass-angles';
+import { isSlicedImageOperation } from '../../../core/job/compile-job-raster-sliced';
+import { fillRampApplies } from '../../../core/job/fill-ramp';
+import { imageSliceCount } from '../../../core/raster/slice-3d';
 import { normalizedScanAngleDeg } from '../../../core/raster/raster-scan-frame';
 import {
   DEFAULT_CNC_STOCK,
@@ -72,6 +75,7 @@ function fillDetail(settings: LayerOperationSettings): string {
     settings.fillBidirectional ? 'bidirectional' : 'one-way',
     ...(settings.fillCrossHatch ? ['cross-hatch'] : []),
     ...passAngleStepPart(settings),
+    ...fillRampParts(settings),
     ...fillOverscanParts(settings),
     ...localScanOffsetPart(settings),
     ...powerModePart(settings),
@@ -80,7 +84,7 @@ function fillDetail(settings: LayerOperationSettings): string {
 
 function imageDetail(settings: LayerOperationSettings): string {
   return [
-    `${capitalizeToken(settings.ditherAlgorithm)} dither`,
+    ...imageModeParts(settings),
     `${settings.linesPerMm} lines/mm`,
     settings.imageBidirectional ? 'bidirectional' : 'one-way',
     ...(settings.negativeImage ? ['negative'] : []),
@@ -91,6 +95,32 @@ function imageDetail(settings: LayerOperationSettings): string {
     ...imageScanPatternParts(settings),
     ...localScanOffsetPart(settings),
   ].join(SEPARATOR);
+}
+
+// ADR-699: 3D Sliced burns one pass per slice, so the pass count is the depth
+// resolution, and Job Review says so.
+function imageModeParts(settings: LayerOperationSettings): ReadonlyArray<string> {
+  if (!isSlicedImageOperation(settings)) {
+    const name =
+      settings.ditherAlgorithm === '3d-sliced'
+        ? '3D Sliced'
+        : capitalizeToken(settings.ditherAlgorithm);
+    return [`${name} dither`];
+  }
+  const slices = imageSliceCount(settings.passes);
+  const scans = settings.imageCrossHatch === true ? ', each scanned twice (cross-hatch)' : '';
+  return [
+    `3D Sliced: ${slices} ${slices === 1 ? 'pass' : 'passes'}, one slice each${scans}, darker burned deeper`,
+  ];
+}
+
+// ADR-699: the ramp grades power from Min power at the edges, so both show.
+function fillRampParts(settings: LayerOperationSettings): ReadonlyArray<string> {
+  if (!fillRampApplies(settings)) return [];
+  return [
+    `ramp ${formatMm(settings.fillRampLengthMm ?? 0)} mm from min power ${settings.minPower}%`,
+    settings.fillRampOuterEdge === true ? 'outer edge ramped' : 'outer edge square',
+  ];
 }
 
 // ADR-495: automatic overscan follows the speed and the machine, so Job Review
