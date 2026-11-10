@@ -204,6 +204,7 @@ function useLayerPaint(
         dimensions: placedDimensions(session.history.present),
         activeDimensionId: session.activeDimensionId,
         extendPreview: session.tool === 'extend' ? session.extendPreview : null,
+        trimPreview: session.tool === 'trim' ? session.trimPreview : null,
         widthPx,
         heightPx,
       });

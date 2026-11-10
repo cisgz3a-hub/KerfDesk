@@ -27,6 +27,7 @@ export function setSessionTool(session: DesignSession, tool: DesignToolKind): De
         draft: null,
         pointSequence: null,
         extendPreview: null,
+        trimPreview: null,
         dimensionPendingLineId: null,
         activeDimensionId: null,
       };

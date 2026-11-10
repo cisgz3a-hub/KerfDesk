@@ -10586,7 +10586,7 @@ into the drawing.
 The Design Studio is a full-window overlay for drawing a part to size by hand.
 Flow IDs use the `F-DS` prefix (`F-L` belongs to Image Studio, `F-CNC` to the
 router flows). Each flow names the stage that built it; typed entry during a
-draw gesture is F-DS13 (DS-3c); tracking and deferred snaps are F-DS14 (DS-4b); dimensions are F-DS15 (DS-7).
+draw gesture is F-DS13 (DS-3c); tracking and deferred snaps are F-DS14 (DS-4b); dimensions are F-DS15 (DS-7); Trim is F-DS16 (DS-6c).
 
 Nothing in this surface refuses anything (rule 7). Closing never prompts, an
 unfinished tool explains itself in the status bar rather than being disabled, and
@@ -11193,6 +11193,39 @@ reads it, and one Ctrl+Z restores both.
 3. Only the dimensioned entity moves: a line joined to the resized one does
    not follow (there is no constraint solver, ADR-272 clause 5).
 4. In the 3D surface dimensions are picked and edited but drawn only in 2D.
+
+### F-DS16. Trim a piece back to its crossings (DS-6c, ADR-272 Amendment 8)
+
+1. Arm **Trim** (T) on the Modify rail.
+2. Hover a piece of a line, polyline, rectangle, circle or arc that other
+   geometry crosses. The piece between the nearest crossing on each side is
+   highlighted dashed in the trim colour, and the status bar says a click will
+   trim it.
+3. Click. The piece is removed as one undo step; the highlight moves to
+   whatever piece is now under the pointer, so keep clicking to trim a row.
+
+#### Success
+
+A line trimmed in the middle becomes two lines; a closed outline opens into a
+polyline; a circle becomes an arc. Each piece keeps its layer and construction
+flag, and Ctrl+Z restores the entity whole.
+
+#### Error - nothing to trim to
+
+1. A piece nothing crosses, or a closed outline crossed fewer than twice, is
+   reported in the status bar and left alone: Delete removes a whole shape.
+2. Ellipses and round-cornered rectangles are reported as not trimmable yet.
+
+#### Empty - nothing under the pointer
+
+1. No highlight; the status bar describes the tool. A click does nothing.
+
+#### Edge - cutting edges and dimensions
+
+1. Every other entity cuts, construction geometry included; an ellipse cuts
+   along its drawn outline.
+2. A dimension on a circle that becomes an arc is dropped with it (F-DS15).
+3. Escape disarms Trim and keeps the selection, as it does Extend.
 
 ## F-LEARN1. Contextual visual tutorials
 
