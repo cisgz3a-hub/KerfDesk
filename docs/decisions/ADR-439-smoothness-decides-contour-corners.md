@@ -437,3 +437,124 @@ quality 75 and allows no Line Art or Smooth node more than 1 px from the clean g
 
 **Follow-up:** Sharp keeps 4 anti-aliased JPEG nodes of 1.0 to 1.35 px. ADR-530 Amendment 12 lists
 Sharp's native walk of a JPEG.
+
+### Amendment 4 - binary apexes on a short leg are held to the chain's reach (2026-11-10)
+
+Amendment 2's follow-up: on the 72 glyph images (Tinos A M N V W k v x y z R K 4 7 and Roboto
+y v w A k K M W 4 7 at 24, 32 and 48 px), 1-bit at pixel centres, Line Art and Smooth drew 11 sharp
+nodes 1 px or more off the true outline on 9 images and Sharp 5 on 5. The worst was Roboto A at
+24 px, 2.01 px off the outline and 2.37 px off the ink. Potrace 1.16 drew none.
+
+**Cause.** Every such node is a binary leg apex that passes Amendment 1, in one of two shapes:
+
+- **A flat end.** A narrow stroke ends in a cut one or two pixels wide (Roboto A's foot, the foot
+  of Tinos 7's stem, a Tinos K serif's end, the flat top of a W's middle peak). Its two sides
+  converge and meet two to four pixels past the cut.
+- **A short tilted face.** The top of Roboto y's or K's arm is a flat run of three pixels. Its leg
+  runs on over the step into the next face, so the dial fits a 45 or 30 degree corner where the
+  true one is 71 or 48 degrees, and places the apex a pixel above the flat.
+
+Both needles thread between rows of paper centres, so Amendment 1's bound cannot see them. Under
+pixel-centre sampling a wedge cut flat and a wedge with its tip sample the same pixels, and true
+acute tips stand as far off the ink (2.07 to 2.08 px at the 30 degree corners of the 120 degree
+triangle at 32 px).
+
+**Measured discriminator: the shorter leg.** This was measured over every binary leg apex that
+survives Amendment 1, on the 72 glyph images and the Q4 79-image set, in all three presets. A true
+corner here is an apex under 0.5 px from the true outline and within 1.5 px of a true corner.
+
+- True corners standing more than 1.1 px past the chain have a shorter leg of 11 cracks or more.
+  Sharp's Tinos v at 32 px and M at 24 px have 11, the triangle and star tips 21 to 36.
+- True corners with a shorter leg under 10 cracks stand at most 1.07 px past the chain (Roboto A
+  and 7 at 48 px).
+- The spikes' shorter legs have 5 to 8 cracks, and they stand 1.14 to 2.65 px past the chain.
+  The exceptions are the long-legged ones under Follow-ups.
+- The short leg is the cut itself, or a serif's face. Its direction comes from a run too short to
+  place a tip that far out.
+
+**Decision** (`contour-corner-reach.ts`, `contour-corners.ts`):
+
+- A binary leg apex that Amendment 1 keeps is moved when two things hold:
+  - its shorter leg has fewer than 10 cracks;
+  - it stands more than 1.1 px from the cracks it replaces, measured as Decision 3 measures the
+    standoff (`distanceToGap`).
+  Both lengths are in source pixels (times the pixel scale).
+- It moves along its longer leg's line, the better-determined one, to the farthest point the chain
+  reaches along that line. That point is the least distance, along the longer leg from the apex,
+  of the longer leg's last crack, the skipped cracks and the shorter leg's cracks. Beyond it only
+  the shorter leg's direction claims ink. If the chain does not reach back toward the apex, the
+  apex stays.
+- The corner is kept, with its crack span and cost, so which corners exist and the count's
+  monotonicity in Smoothness are unchanged. Lattice apexes and measured loops are untouched.
+
+**Rejected, measured:**
+
+- **One threshold on a single feature.** Candidates were the extrapolation over the leg length,
+  the standoff alone, the wedge's width at the standoff, the end's width across the bisector, the
+  gap's asymmetry and the acuteness. None removed more than 2 of the 11 Line Art spikes without
+  also moving a true corner. With up to 5 true corners moved, the best (standoff over the
+  shorter leg's length) removed 4.
+- **Dropping the corner, as Amendment 1 does.** It removed the same spikes. But the binary tail
+  then rounded the end of the Q4 bars and tilted a long side:
+  - Smooth's 3 px bar at 32 px went from +0.8% to +18.6% area (tie to loss);
+  - the 2 px bar at 200 px went from -0.01% to -5.2% (win to tie);
+  - Smooth scored 56 / 15 / 8.
+- **Moving the apex to the foot of the longer leg's last crack.** This cut 2 px off the 2 px bar's
+  end (Hausdorff 1.22 -> 1.68 px).
+- **Moving it before Amendment 1's test.** This moved apexes that Amendment 1 drops back into the
+  outline. False corners rose from 10 to 25 on Line Art, and Sharp scored 44 / 24 / 11.
+- **No leg condition.** Moving every apex more than 1.1 px out clipped the triangle tips. At 32 px
+  the 120 degree triangle went from 0.19 to 1.84 px Hausdorff, and Line Art kept 234 corners
+  against 236.
+- **A shorter leg under 16 cracks.** This clipped true notches: Tinos 4 at 48 px went from 0.76 to
+  1.57 px Hausdorff, and Sharp's Tinos v at 32 px from 0.35 to 1.16 px. Under 8 cracks kept three
+  more spikes (Roboto k at 32 px; Sharp's Tinos k and K at 48 px).
+- **A standoff of 0.9 or 1.0 px.** This moved true corners. At 1.0 px, Roboto A at 48 px went from
+  1.17 to 1.27 px Hausdorff on Smooth. At 0.9 px, Roboto 7 at 48 px went from 0.61 to 1.60 px on
+  Line Art, and Tinos W at 48 px's mean error from 0.148 to 0.208 px.
+
+**Measurements** (main `8493f590c`, then this):
+
+| 1-bit, 72 glyph images: sharp nodes 1 px or more off the outline | Main | This | Potrace |
+|---|---|---|---|
+| Line Art | 11 on 9, worst 2.01 px | 5 on 4, worst 1.51 px | 0 |
+| Smooth | 11 on 9, worst 2.01 px | 5 on 4, worst 1.51 px | 0 |
+| Sharp | 5 on 5, worst 1.42 px | 3 on 3, worst 1.16 px | 0 |
+
+- **The same 72 images, scored as Q4 scores them** (Line Art / Smooth / Sharp):
+  - glyph turns kept sharp, of 1134: 647 / 594 / 917 -> 647 / 595 / 919;
+  - false corners: 14 / 12 / 28 -> 13 / 11 / 28;
+  - median Hausdorff: 1.10 / 1.17 / 0.97 -> 1.08 / 1.11 / 0.93 px.
+  The one image that got worse is Tinos A at 24 px: its 31% area error on Line Art rose to 33%, and
+  its 35% on Smooth to 42%.
+- **Held out.** These were not used to set the two thresholds, and no new spike appeared:
+  - the same letters at 20, 28, 40 and 56 px: Line Art and Smooth 22 on 17 -> 18 on 14 (worst
+    3.25 px, unchanged), Sharp 7 on 7 -> 6 on 6;
+  - Tinos E F H L T X Z Y w h n and Roboto V N x z Z Y T L E at 24, 32 and 48 px: Line Art and
+    Smooth 8 on 7 -> 5 on 4, Sharp 9 on 8 -> 8 on 7.
+- **Q4 scorecard, 79 images** (win / tie / lose against Potrace):
+  - Line Art 53 / 18 / 8 -> 54 / 18 / 7;
+  - Sharp 49 / 22 / 8, unchanged;
+  - Smooth 57 / 15 / 7 -> 58 / 14 / 7.
+  True corners kept (236 / 279 / 228 of 331) and false corners (10 / 36 / 7) are unchanged. Only
+  the bars change:
+  - the 3 px bar at 32 px goes from 1.42 to 0.91 px Hausdorff: a loss becomes a win on Line Art,
+    and a tie a win on Smooth;
+  - the 2 px bar at 200 px goes from 1.22 to 1.29 px and from -0.01% to -0.51% area, and is still
+    a win.
+- The anti-aliased 72 images are unchanged: 0 / 0 / 0.
+- Test: `contour-corner-reach.test.ts` traces 1-bit Roboto A and K at 24 px, Roboto k and y at
+  32 px, Tinos 7 at 24 px and Tinos k at 48 px. It allows no node turning 90 degrees or more to
+  stand 1 px or more off the true outline. On main every one of them fails.
+
+**Follow-ups:**
+
+- Five Line Art and Smooth nodes remain (1.07 to 1.51 px), all with legs long enough to place
+  their apex as well as a true tip's:
+  - the flat tops of Tinos W's middle peaks at 24 and 48 px (0.5 to 1 px wide; legs 13 to 36
+    cracks);
+  - Roboto 7 at 32 px (legs 16 and 33);
+  - Tinos K at 48 px's lower serif. Its shorter leg has 8 cracks, but it stands only 0.92 px past
+    the chain, inside the standoff, and lowering the standoff moves true corners.
+- Sharp keeps Tinos W at 24 px, Tinos 7 at 48 px and Roboto M at 24 px.
+- Only a prior can decide these. Type cuts its convex tips; geometric art does not.

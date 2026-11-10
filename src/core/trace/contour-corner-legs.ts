@@ -299,7 +299,9 @@ function along(leg: Leg, p: Vec2): number {
   return (p.x - leg.cx) * leg.dx + (p.y - leg.cy) * leg.dy;
 }
 
-function distanceToGap(pts: ReadonlyArray<Vec2>, a: number, skip: number, p: Vec2): number {
+/** Distance from `p` to the chain from crack `a` through the `skip` skipped
+ *  cracks to crack `a + skip + 1`. */
+export function distanceToGap(pts: ReadonlyArray<Vec2>, a: number, skip: number, p: Vec2): number {
   const n = pts.length;
   let best = Infinity;
   for (let k = 0; k <= skip; k += 1) {
