@@ -18,6 +18,7 @@ import { rotaryAppliesTo } from '../../core/job';
 import { rotaryOutputAxis } from '../../core/job/rotary-job';
 import type { Project } from '../../core/scene';
 import type { MachineStartSnapshot } from './start-job-readiness';
+import { formatRotaryTurn } from './abort-rotary-turn';
 
 type AxisSnapshot = Pick<MachineStartSnapshot, 'statusReport' | 'reportedAxisLetters'>;
 
@@ -38,8 +39,40 @@ export function rotaryAxisMissingIssue(
   return rotaryAxisMissingMessage(axis, reported);
 }
 
-export function rotaryAxisStartWarnings(project: Pick<Project, 'device' | 'machine'>): string[] {
+export function rotaryAxisStartWarnings(
+  project: Pick<Project, 'device' | 'machine'>,
+  machine?: Pick<MachineStartSnapshot, 'rotaryTurnSinceAbort'>,
+): string[] {
   if (!rotaryAppliesTo(project.device, project.machine)) return [];
+  const turned = abortTurnWarning(project, machine?.rotaryTurnSinceAbort ?? null);
+  if (turned !== null) return [turned, ...axisSetupWarnings(project)];
+  return axisSetupWarnings(project);
+}
+
+// ADR-695 Amendment 1: a re-run after an Abort zeroes the turn where the part
+// is now, so it lands as far round as the part turned since the stopped job.
+function abortTurnWarning(
+  project: Pick<Project, 'device' | 'machine'>,
+  turned: MachineStartSnapshot['rotaryTurnSinceAbort'],
+): string | null {
+  const axis = rotaryOutputAxis(project.device, project.machine);
+  if (turned === null || turned === undefined || axis !== turned.axis) return null;
+  if (turned.since === null) {
+    return (
+      `KerfDesk cannot read where the rotary's ${axis} axis is since the job you stopped. This ` +
+      "job starts from the part's current turn: turn the part back to where that job started first."
+    );
+  }
+  if (Math.abs(turned.since) < (axis === 'A' ? 0.5 : 0.05)) return null;
+  const back = formatRotaryTurn(axis, -turned.since);
+  return (
+    `Since the job you stopped started, the part has turned ${formatRotaryTurn(axis, turned.since)}. ` +
+    "This job starts from the part's current turn, so it lands that far round from the first " +
+    `burn. Use Restore saved origin, or turn the part ${back} with the rotary turn buttons first.`
+  );
+}
+
+function axisSetupWarnings(project: Pick<Project, 'device' | 'machine'>): string[] {
   const rotary = project.device.rotary;
   if (rotary === undefined) return [];
   const axis = rotaryAxisOf(rotary);

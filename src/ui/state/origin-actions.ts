@@ -43,6 +43,8 @@ export type WorkCoordinateOffset = {
   readonly x: number;
   readonly y: number;
   readonly z: number;
+  /** A fourth axis's offset (grblHAL, FluidNC), in its own units (ADR-695 Amendment 1). */
+  readonly a?: number;
 };
 
 /**

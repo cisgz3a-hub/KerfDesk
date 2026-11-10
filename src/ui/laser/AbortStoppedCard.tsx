@@ -10,7 +10,7 @@
 import { useState } from 'react';
 import type { ControllerKind } from '../../core/devices';
 import type { MachineKind } from '../../core/scene';
-import type { JobStopRequest } from '../state/job-stop-request';
+import type { JobStopRequest, RotaryStartTurn } from '../state/job-stop-request';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { commandLabels, useActiveDriverCommands } from './AlarmRecoveryActions';
@@ -72,7 +72,9 @@ export function AbortStoppedCard(props: CardProps): JSX.Element {
       <p style={detailStyle}>{abortStoppedDetail(saved, props.controllerKind, homeFirst)}</p>
       {saved !== null && (
         <p style={detailStyle}>
-          {restoreExplanation(homeFirst)} {ABORT_SET_ORIGIN_HERE_NOTE}
+          {restoreExplanation(homeFirst)}
+          {props.request.rotaryStartTurn === undefined ? '' : ` ${ROTARY_TURN_BACK_NOTE}`}{' '}
+          {ABORT_SET_ORIGIN_HERE_NOTE}
           {props.machineKind === 'cnc' ? ' The reset cleared work Z too: zero Z again.' : ''}
         </p>
       )}
@@ -80,6 +82,9 @@ export function AbortStoppedCard(props: CardProps): JSX.Element {
         {saved === null ? null : (
           <OriginActions
             saved={saved}
+            {...(props.request.rotaryStartTurn === undefined
+              ? {}
+              : { turn: props.request.rotaryStartTurn })}
             homeFirst={homeFirst}
             canUnlock={props.canUnlock}
             running={running}
@@ -106,6 +111,8 @@ export function AbortStoppedCard(props: CardProps): JSX.Element {
 /** Restore saved origin (the main action) and Set origin here. */
 function OriginActions(props: {
   readonly saved: Saved;
+  /** A dedicated-axis rotary's start turn: Restore turns the part back to it. */
+  readonly turn?: RotaryStartTurn;
   readonly homeFirst: boolean;
   readonly canUnlock: boolean;
   readonly running: boolean;
@@ -124,7 +131,10 @@ function OriginActions(props: {
           disabled={running}
           onClick={() =>
             void run(
-              () => restoreOriginAfterAbort(saved, homeFirst),
+              () =>
+                props.turn === undefined
+                  ? restoreOriginAfterAbort(saved, homeFirst)
+                  : restoreOriginAfterAbort(saved, homeFirst, props.turn),
               restoreLabel,
               restoredMessage(saved),
             )
@@ -213,6 +223,11 @@ export function abortStoppedDetail(
     ? `The laser is off. The controller reset; grblHAL keeps your origin (${where}) through a reset.`
     : `The laser is off. The controller reset, so your origin was cleared. It was at ${where}.`;
 }
+
+// ADR-695 Amendment 1: on an A or Z rotary the re-run zeroes the turn again.
+export const ROTARY_TURN_BACK_NOTE =
+  'It also turns the rotary back to the turn the job started from, so a re-run lands on the ' +
+  'half-burned part.';
 
 function restoreExplanation(homeFirst: boolean): string {
   return homeFirst

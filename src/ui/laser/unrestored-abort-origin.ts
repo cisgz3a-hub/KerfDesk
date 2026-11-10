@@ -34,6 +34,8 @@ import { useLaserStore, type LaserState } from '../state/laser-store';
 import { withheldControllerMPos } from '../state/laser-status-position';
 import { useToastStore } from '../state/toast-store';
 import { restoreAbortOriginFromIdle } from './abort-alarm-recovery';
+import { formatRotaryTurn, rotaryTurnSinceStart } from './abort-rotary-turn';
+import type { RotaryStartTurn } from '../state/job-stop-request';
 import { formatOriginMm } from './laser-recovery-origin';
 import { repairFailed, type BlockedStartRepair } from './start-blocked-repair';
 
@@ -47,6 +49,8 @@ export type UnrestoredAbortOrigin = {
   readonly saved: SavedMm;
   /** Machine zero may have moved since the Abort read the origin. */
   readonly machineZeroMoved: boolean;
+  /** A dedicated-axis rotary's start turn (ADR-695 Amendment 1). */
+  readonly turn?: RotaryStartTurn;
 };
 
 /** The origin the operator's Abort recorded for the current stream, or null.
@@ -59,6 +63,7 @@ export function unrestoredAbortOrigin(
   return {
     saved: request.originAtStopMm,
     machineZeroMoved: request.originMachineZeroEpoch !== (state.machineZeroEpoch ?? 0),
+    ...(request.rotaryStartTurn === undefined ? {} : { turn: request.rotaryStartTurn }),
   };
 }
 
@@ -134,20 +139,23 @@ export function unrestoredOriginOfferPrompt(
  *  The caller makes it only while machine zero is unmoved or the restore homes. */
 export async function offerRestoreAbortOrigin(
   placement: 'User Origin' | 'Verified Origin',
-  { saved, machineZeroMoved }: UnrestoredAbortOrigin,
+  { saved, machineZeroMoved, turn }: UnrestoredAbortOrigin,
 ): Promise<BlockedStartRepair> {
   const homeFirst = abortRestoreHomesFirst();
-  const prompt = unrestoredOriginOfferPrompt(
-    placement,
-    saved,
-    headOffsetFromSavedMm(useLaserStore.getState(), saved),
-    homeFirst,
-    machineZeroMoved,
-    activeAbortOriginRotary(),
-  );
+  const prompt =
+    unrestoredOriginOfferPrompt(
+      placement,
+      saved,
+      headOffsetFromSavedMm(useLaserStore.getState(), saved),
+      homeFirst,
+      machineZeroMoved,
+      activeAbortOriginRotary(),
+    ) + abortTurnOfferNote(turn);
   if (!jobAwareConfirm(prompt)) return 'unrepaired';
   try {
-    await restoreAbortOriginFromIdle(saved, homeFirst);
+    await (turn === undefined
+      ? restoreAbortOriginFromIdle(saved, homeFirst)
+      : restoreAbortOriginFromIdle(saved, homeFirst, turn));
   } catch (cause) {
     return repairFailed('Restore saved origin failed', cause);
   }
@@ -159,6 +167,20 @@ export async function offerRestoreAbortOrigin(
       'success',
     );
   return 'retry';
+}
+
+/** ADR-695 Amendment 1: on an A or Z rotary, how far the part has turned since
+ *  the stopped job started, and that OK turns it back. */
+export function abortTurnOfferNote(turn: RotaryStartTurn | undefined): string {
+  if (turn === undefined) return '';
+  const since = rotaryTurnSinceStart(useLaserStore.getState(), turn);
+  const how =
+    since === null
+      ? `KerfDesk cannot read the rotary's ${turn.axis} axis right now`
+      : `the part has turned ${formatRotaryTurn(turn.axis, since)} since the job started`;
+  return `
+
+On the rotary, ${how}. OK also turns it back to where the job started.`;
 }
 
 /** The project's active rotary, or null on a flat bed or a CNC. */
