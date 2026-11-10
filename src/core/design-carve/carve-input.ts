@@ -50,14 +50,6 @@ export function carveLayerTool(
   return input.tools.find((tool) => tool.id === toolId) ?? input.activeTool;
 }
 
-/** Half tip angle in radians, with the shared 60-degree fallback. */
-export function vBitHalfAngleRad(tool: CncTool): number {
-  const angle = tool.tipAngleDeg;
-  const usable = angle !== undefined && Number.isFinite(angle) && angle > 0 && angle < 180;
-  const tipDeg = usable ? angle : FALLBACK_V_TIP_ANGLE_DEG;
-  return (tipDeg * Math.PI) / 360;
-}
-
 /** Grid dimensions covering the stock at the requested cell size. */
 export function carveGrid(stock: CarveStock, mmPerCell: number): CarveGrid {
   const cell = Math.max(MIN_CARVE_CELL_MM, mmPerCell);

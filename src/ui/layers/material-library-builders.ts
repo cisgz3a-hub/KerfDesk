@@ -16,17 +16,6 @@ import {
   type MaterialPreset,
 } from '../../io/material-library';
 
-export function buildBlankLibrary(device: DeviceProfile): MaterialLibraryDocument {
-  return {
-    format: MATERIAL_LIBRARY_FORMAT,
-    librarySchemaVersion: MATERIAL_LIBRARY_SCHEMA_VERSION,
-    libraryId: `laserforge-${slug(device.name)}`,
-    name: `${device.name} Library`,
-    deviceHint: createMaterialLibraryDeviceHint(device),
-    entries: [],
-  };
-}
-
 export function buildStarterLibrary(
   profile: DeviceProfile,
   presets: ReadonlyArray<StarterMaterialPreset>,

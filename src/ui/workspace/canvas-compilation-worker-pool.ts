@@ -73,11 +73,6 @@ export async function runCanvasCompilationWork(request: {
   return bridgeClient.submit(request);
 }
 
-export function resetCanvasCompilationWorkerPoolForTests(): void {
-  bridgeClient?.dispose();
-  bridgeClient = null;
-}
-
 function canvasTask(task: CncCompilationTask): CanvasCompilationTaskPayload {
   return { kind: 'cnc-vcarve-region', input: task.payload };
 }

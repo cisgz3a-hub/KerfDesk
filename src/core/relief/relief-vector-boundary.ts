@@ -1,5 +1,4 @@
 import type { Polyline, Transform, Vec2 } from '../scene/scene-object';
-import { applyTransform } from '../scene/transform';
 import { pointInPolygon } from '../geometry/point-in-polygon';
 import type { ReliefVectorMask } from '../scene/relief/relief-authoring';
 import { crossAbout } from '../geometry/point-math';
@@ -118,21 +117,6 @@ function crossingBoundaryError(segments: ReadonlyArray<BoundarySegment>): string
     }
   return null;
 }
-export function reliefMaskInLocalSpace(
-  rings: ReadonlyArray<Polyline>,
-  sourceTransform: Transform,
-  targetTransform: Transform,
-): ReliefVectorMask {
-  return {
-    rings: rings.map((ring) => ({
-      closed: ring.closed,
-      points: stripClosingPoint(ring.points).map((p) =>
-        inverseReliefPoint(applyTransform(p, sourceTransform), targetTransform),
-      ),
-    })),
-  };
-}
-
 function stripClosingPoint(points: ReadonlyArray<Vec2>): ReadonlyArray<Vec2> {
   const a = points[0],
     b = points[points.length - 1];

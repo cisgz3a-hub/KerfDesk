@@ -51,14 +51,6 @@ export function arcSegmentBurns(
   return moves === null ? null : arcMoveBurns(first, moves, context);
 }
 
-export function arcMoveBurnLines(
-  start: Vec2,
-  moves: ReadonlyArray<ArcMove>,
-  context: BurnWordContext,
-): string[] {
-  return [...arcMoveBurns(start, moves, context).lines];
-}
-
 function arcMoveBurns(
   start: Vec2,
   moves: ReadonlyArray<ArcMove>,

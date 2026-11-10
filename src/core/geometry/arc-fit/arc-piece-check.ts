@@ -44,14 +44,6 @@ export type SourcePiece = {
  */
 export type ArcFitTolerance = number | { readonly toleranceMm: number; readonly exactArcs: true };
 
-export function primitiveFitsPoints(
-  primitive: FitPrimitive,
-  points: ReadonlyArray<Vec2>,
-  toleranceMm: ArcFitTolerance,
-): boolean {
-  return primitiveFitsPiece(primitive, { points, from: 0, to: points.length - 1 }, toleranceMm);
-}
-
 export function primitiveFitsPiece(
   primitive: FitPrimitive,
   piece: SourcePiece,

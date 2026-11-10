@@ -175,11 +175,6 @@ type TransparencyEdges = {
   readonly lift: Map<number, number> | null;
 };
 
-/** The fringe mask alone (see `transparencyEdges`). */
-export function transparencyFringe(source: RawImageData): Uint8Array | null {
-  return transparencyEdges(source).fringe;
-}
-
 /** Anti-aliased edges against transparency (ADR-461 Amendment 1).
  *  Fringe: partial-alpha pixels under half the alpha of nearby ink of the
  *  same colour that connect (8-way, through such fringe) to an alpha=0 pixel;

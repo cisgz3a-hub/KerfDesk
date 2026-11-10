@@ -48,26 +48,6 @@ import { cncSettingsForStage, cncStageRecipe } from './cnc-stage-settings';
 import { preserveProfileFinishStages } from './profile-finishing-stage';
 import { pocketPassLinks } from './pocket-stay-down-links';
 
-export function passesForCncLayer(
-  polylines: ReadonlyArray<Polyline>,
-  settings: CncLayerSettings,
-  tool: CncTool,
-  config: CncMachineConfig,
-  handedness: FrameHandedness,
-  sourceContours: ReadonlyArray<CollectedCncContour> = [],
-  vcarveLadder?: VCarveLadder,
-): ReadonlyArray<CncPass> {
-  return passesForCncLayerWithEvidence(
-    polylines,
-    settings,
-    tool,
-    config,
-    handedness,
-    sourceContours,
-    vcarveLadder,
-  ).passes;
-}
-
 export type CncLayerPassesResult = {
   readonly restStock?: Cnc2dStockEvidence;
   readonly passes: ReadonlyArray<CncPass>;

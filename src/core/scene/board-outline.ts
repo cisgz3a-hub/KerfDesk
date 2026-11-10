@@ -106,20 +106,6 @@ export function sizeBoardOutline(
   }));
 }
 
-export function boardOutlineDraft(
-  points: ReadonlyArray<Vec2>,
-  widthMm: number,
-  heightMm: number,
-): BoardOutlineDraft | null {
-  const normalized = normalizeBoardOutline(points);
-  if (normalized === null) return null;
-  const localPointsMm = sizeBoardOutline(normalized, widthMm, heightMm);
-  if (localPointsMm === null) return null;
-  const anchorIndices = boardOutlineAnchors(localPointsMm);
-  const captureOrder = defaultCaptureOrder(localPointsMm, anchorIndices);
-  return captureOrder === null ? null : { localPointsMm, anchorIndices, captureOrder };
-}
-
 export function outlineBounds(points: ReadonlyArray<Vec2>): Bounds {
   return points.reduce(
     (bounds, point) => ({

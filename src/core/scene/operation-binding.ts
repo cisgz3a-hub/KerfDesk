@@ -79,11 +79,6 @@ function bindOrdinaryObjectToOperations(
   } as SceneObject;
 }
 
-export function addSceneObjectOperation(object: SceneObject, operationId: string): SceneObject {
-  const current = object.operationIds ?? [];
-  return bindSceneObjectToOperations(object, [...current, operationId]);
-}
-
 export function appendSceneObjectOperationBinding(
   object: SceneObject,
   operationId: string,

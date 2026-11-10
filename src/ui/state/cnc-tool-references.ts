@@ -1,9 +1,4 @@
-import {
-  sceneObjectUsesOperation,
-  type CncLayerSettings,
-  type Layer,
-  type Scene,
-} from '../../core/scene';
+import { sceneObjectUsesOperation, type Layer, type Scene } from '../../core/scene';
 
 export type BlockingCncSecondaryToolReference = {
   readonly layerId: string;
@@ -43,21 +38,6 @@ export function blockingCncSecondaryToolReferences(
   return references;
 }
 
-/** Removes only hidden/inactive references. Callers must refuse deletion first
- * when blockingCncSecondaryToolReferences returns a result. */
-export function sceneWithoutDormantCncSecondaryToolReferences(scene: Scene, toolId: string): Scene {
-  let changed = false;
-  const layers = scene.layers.map((layer) => {
-    const settings = layer.cnc;
-    if (settings === undefined) return layer;
-    const next = withoutDormantReferences(scene, layer, settings, toolId);
-    if (next === settings) return layer;
-    changed = true;
-    return { ...layer, cnc: next };
-  });
-  return changed ? { ...scene, layers } : scene;
-}
-
 /** Removes every secondary assignment to a deleted custom bit. The operation
  * remains available and its selector falls back to the active bit. */
 export function sceneWithoutCncSecondaryToolReferences(scene: Scene, toolId: string): Scene {
@@ -82,34 +62,6 @@ export function sceneWithoutCncSecondaryToolReferences(scene: Scene, toolId: str
     return { ...layer, cnc: next };
   });
   return changed ? { ...scene, layers } : scene;
-}
-
-function withoutDormantReferences(
-  scene: Scene,
-  layer: Layer,
-  settings: CncLayerSettings,
-  toolId: string,
-): CncLayerSettings {
-  let next = settings;
-  if (
-    next.vClearToolId === toolId &&
-    (next.cutType !== 'v-carve' || !(next.vCarveFlatDepthEnabled ?? true))
-  ) {
-    const { vClearToolId: _removed, ...rest } = next;
-    next = rest;
-  }
-  if (
-    next.pocketRoughToolId === toolId &&
-    (next.cutType !== 'pocket' || next.pocketStrategy === 'adaptive')
-  ) {
-    const { pocketRoughToolId: _removed, ...rest } = next;
-    next = rest;
-  }
-  if (next.reliefFinishToolId === toolId && !layerHasReliefObject(scene, layer)) {
-    const { reliefFinishToolId: _removed, ...rest } = next;
-    next = rest;
-  }
-  return next;
 }
 
 function layerHasReliefObject(scene: Scene, layer: Layer): boolean {

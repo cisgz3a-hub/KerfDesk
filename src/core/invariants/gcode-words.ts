@@ -45,16 +45,6 @@ export function isGcodeMotionCommand(line: string): boolean {
   return /^G[0123](?=$|\s|[A-Za-z])/i.test(line);
 }
 
-// G2 (clockwise) / G3 (counter-clockwise) circular interpolation. Matches the
-// single-digit form the emitter writes, consistent with isGcodeMotionCommand.
-export function isArcMotion(line: string): boolean {
-  return /^G[23](?=$|\s|[A-Za-z])/i.test(line);
-}
-
-export function isClockwiseArc(line: string): boolean {
-  return /^G2(?=$|\s|[A-Za-z])/i.test(line);
-}
-
 // A single materialized G-code body is scanned by several independent
 // invariant predicates in one preflight pass. Splitting the whole string per
 // predicate re-allocates a line array of the entire (up to ~96 MB) output each

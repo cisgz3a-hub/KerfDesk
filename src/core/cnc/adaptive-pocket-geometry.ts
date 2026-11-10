@@ -38,19 +38,6 @@ export function componentRegions(region: PathsD): ReadonlyArray<PathsD> {
   ]);
 }
 
-export function hasNestedContours(contours: ReadonlyArray<Polyline>): boolean {
-  return contours.some((contour, index) => {
-    const probe = contour.points[0];
-    return (
-      probe !== undefined &&
-      contours.some(
-        (candidate, candidateIndex) =>
-          candidateIndex !== index && pointInPath(probe, toPaths([candidate])[0] ?? []),
-      )
-    );
-  });
-}
-
 export function offsetAdaptivePaths(
   paths: PathsD,
   deltaMm: number,

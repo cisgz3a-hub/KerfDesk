@@ -58,7 +58,7 @@ function rotaryAxesForKind(kind: ControllerKind): ReadonlyArray<RotaryAxis> {
   switch (kind) {
     case 'grblhal':
     case 'fluidnc':
-      return ['Y', 'A', 'Z'];
+      return ROTARY_AXES;
     case 'grbl-v1.1':
       return ['Y', 'Z'];
     case 'marlin':

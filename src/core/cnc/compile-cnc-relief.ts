@@ -257,15 +257,6 @@ export function reliefOffsetLadderDiagnostics(
   return { offsetFailed, passLimited };
 }
 
-export function reliefOffsetLadderFailed(
-  objects: ReadonlyArray<SceneObject>,
-  layer: Layer,
-  settings: CncLayerSettings,
-  config: CncMachineConfig,
-): boolean {
-  return reliefOffsetLadderDiagnostics(objects, layer, settings, config)?.offsetFailed ?? false;
-}
-
 function appendReliefPasses(
   passes: CncPass[],
   relief: ReliefObject,

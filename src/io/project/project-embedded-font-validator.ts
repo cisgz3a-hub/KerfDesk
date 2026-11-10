@@ -1,4 +1,3 @@
-import type { EmbeddedFont } from '../../core/scene';
 import { MAX_EMBEDDED_FONT_BYTES } from '../../core/text';
 import { MAX_EMBEDDED_FONTS } from '../../core/text/embedded-font-set';
 import { isObject } from './project-shape-primitives';
@@ -45,13 +44,6 @@ function validateEmbeddedFont(
 
 function isCanonicalBase64(value: string): boolean {
   return value.length > 0 && value.length % 4 === 0 && /^[A-Za-z0-9+/]+={0,2}$/.test(value);
-}
-
-export function embeddedFontByKey(
-  fonts: ReadonlyArray<EmbeddedFont> | undefined,
-  key: string,
-): EmbeddedFont | null {
-  return fonts?.find((font) => font.key === key) ?? null;
 }
 
 function estimatedDecodedBytes(value: string): number {

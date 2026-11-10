@@ -195,8 +195,6 @@ function controllerRebootMessage(link: ControllerLink): string {
   );
 }
 
-export const CONTROLLER_REBOOT_DURING_JOB_MESSAGE = controllerRebootMessage('usb');
-
 export function controllerRebootNotice(link: ControllerLink = 'usb'): LaserSafetyNotice {
   return { kind: 'controller-reboot', message: controllerRebootMessage(link) };
 }
@@ -213,8 +211,6 @@ function disconnectDuringJobMessage(link: ControllerLink): string {
     'origin (Home, if the machine has homing) before running the job again.'
   );
 }
-
-export const DISCONNECT_DURING_JOB_MESSAGE = disconnectDuringJobMessage('usb');
 
 export function disconnectDuringJobNotice(link: ControllerLink = 'usb'): LaserSafetyNotice {
   return { kind: 'disconnect-during-job', message: disconnectDuringJobMessage(link) };
@@ -244,8 +240,6 @@ function disconnectDuringMotionMessage(link: ControllerLink): string {
   );
 }
 
-export const DISCONNECT_DURING_MOTION_MESSAGE = disconnectDuringMotionMessage('usb');
-
 // The same kind as a job's notice, so every physical-stop and recovery rule
 // that reads it is unchanged; only the banner's title differs (ADR-639).
 export function disconnectDuringMotionNotice(link: ControllerLink = 'usb'): LaserSafetyNotice {
@@ -262,8 +256,6 @@ function disconnectDuringFireMessage(link: ControllerLink): string {
     'confirm M5 reached the controller. Use physical E-stop or power cutoff now.'
   );
 }
-
-export const DISCONNECT_DURING_FIRE_MESSAGE = disconnectDuringFireMessage('usb');
 
 export function disconnectDuringFireNotice(link: ControllerLink = 'usb'): LaserSafetyNotice {
   return { kind: 'disconnect-during-fire', message: disconnectDuringFireMessage(link) };

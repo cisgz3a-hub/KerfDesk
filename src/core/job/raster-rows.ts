@@ -43,8 +43,3 @@ function providedRasterRow(group: RasterGroup, providerY: number): RasterPowerVa
   }
   return row;
 }
-
-export function rasterValue(group: RasterGroup, x: number, y: number): number {
-  if (x < 0 || x >= group.pixelWidth) return 0;
-  return rasterRow(group, y)[x] ?? 0;
-}

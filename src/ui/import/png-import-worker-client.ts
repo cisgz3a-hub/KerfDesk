@@ -6,6 +6,7 @@ import type {
 import { IndexedDbPagedAssetRepository } from './paged-asset-indexeddb';
 import type { PngImportWorkerRequest, PngImportWorkerResponse } from './png-import-worker-protocol';
 import { toError } from '../../core/util/error-message';
+import { stopWorker } from '../common/stop-worker';
 
 export type PngImportWorkerProgress =
   | { readonly phase: 'queued'; readonly queuePosition: number }
@@ -222,11 +223,7 @@ async function rejectAllPendingAfterCleanup(message: string): Promise<void> {
 function retireWorker(): void {
   const worker = workerInstance;
   workerInstance = null;
-  if (worker === null) return;
-  worker.onmessage = null;
-  worker.onerror = null;
-  worker.onmessageerror = null;
-  worker.terminate();
+  if (worker !== null) stopWorker(worker);
 }
 
 async function cleanupRequestAssets(pending: Pending): Promise<boolean> {

@@ -31,22 +31,6 @@ export function currentHierarchyFocus(scene: Scene, epoch: number | undefined): 
     : null;
 }
 
-export function isInsideGroup(
-  groups: NonNullable<Scene['groups']>,
-  id: string,
-  ancestorId: string,
-): boolean {
-  const byId = new Map(groups.map((group) => [group.id, group]));
-  const seen = new Set<string>();
-  let cursor = byId.get(id);
-  while (cursor !== undefined && !seen.has(cursor.id)) {
-    if (cursor.parentId === ancestorId) return true;
-    seen.add(cursor.id);
-    cursor = cursor.parentId === undefined ? undefined : byId.get(cursor.parentId);
-  }
-  return false;
-}
-
 export function groupsWithinFocus(
   groups: NonNullable<Scene['groups']>,
   focusId: string | null,

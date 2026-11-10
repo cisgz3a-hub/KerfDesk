@@ -24,7 +24,6 @@ import type { CarvedStock } from './use-carved-stock';
 import { useInspectorMaterials } from './use-inspector-materials';
 import type { LaserBurn } from './use-laser-burn';
 
-export type InspectorVariant = 'full' | 'preview';
 type InspectorViewProps =
   | {
       readonly model: InspectorRenderModel;

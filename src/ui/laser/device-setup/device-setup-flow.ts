@@ -396,15 +396,6 @@ export function canAdvanceDeviceSetup(state: DeviceSetupState): boolean {
   return deviceSetupStage(state.step) !== 'review';
 }
 
-export function isFirstDeviceSetupStep(step: DeviceSetupStep, machineKind: MachineKind): boolean {
-  return deviceSetupStage(step) === deviceSetupStepOrder(machineKind)[0];
-}
-
-export function isLastDeviceSetupStep(step: DeviceSetupStep, machineKind: MachineKind): boolean {
-  const order = deviceSetupStepOrder(machineKind);
-  return step === order[order.length - 1];
-}
-
 function adjacentStep(state: DeviceSetupState, delta: number): DeviceSetupStep {
   const order = deviceSetupStepOrder(state.machineKind);
   const index = order.indexOf(deviceSetupStage(state.step));

@@ -181,35 +181,6 @@ export function autoMedianFilter(
   return repairIsolatedMedianChanges(image, filtered, IMPULSE_NOISE_LUMA_DELTA, minimumRatio);
 }
 
-// Fraction of pixels whose luma the median changed by more than the impulse
-// delta, without distinguishing connected detail from isolated noise. Retained
-// as a raw diagnostic metric; automatic cleanup uses the structural check above.
-//
-// Uses UN-rounded luma (not the module's rounded lumaAt) on purpose: the
-// original edge-trace impulse detector compared un-rounded luma, and the
-// > 40 delta test can flip on rounding at the boundary. Preserving the exact
-// arithmetic keeps Edge Detection's AUTO decision bit-identical after the
-// move.
-export function impulseNoiseRatio(image: RawImageData, filtered: RawImageData): number {
-  const pixels = image.width * image.height;
-  if (pixels === 0) return 0;
-  let impulses = 0;
-  for (let i = 0; i < pixels; i += 1) {
-    const a = rawLumaAt(image.data, i * 4);
-    const b = rawLumaAt(filtered.data, i * 4);
-    if (Math.abs(a - b) > IMPULSE_NOISE_LUMA_DELTA) impulses += 1;
-  }
-  return impulses / pixels;
-}
-
-function rawLumaAt(data: Uint8ClampedArray, pixelOffset: number): number {
-  return (
-    LUMA_R * (data[pixelOffset] ?? 0) +
-    LUMA_G * (data[pixelOffset + 1] ?? 0) +
-    LUMA_B * (data[pixelOffset + 2] ?? 0)
-  );
-}
-
 // Connected-component despeckle on a binary (or near-binary) image.
 // For each region of ink pixels (luma < 128) with size < minPixels,
 // flips the whole region to white. Background regions are untouched

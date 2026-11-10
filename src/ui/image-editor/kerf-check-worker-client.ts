@@ -21,6 +21,7 @@ import type {
   KerfCheckWorkerRequest,
   KerfCheckWorkerResponse,
 } from './kerf-check-worker-protocol';
+import { stopWorker } from '../common/stop-worker';
 
 /** Cancellable ownership of one target-scoped background kerf check. */
 export type KerfCheckWorkerHandle = {
@@ -143,10 +144,6 @@ function failAllAndRetire(message: string): void {
 }
 
 function retireWorker(): void {
-  if (workerInstance === null) return;
-  workerInstance.onmessage = null;
-  workerInstance.onerror = null;
-  workerInstance.onmessageerror = null;
-  workerInstance.terminate();
+  if (workerInstance !== null) stopWorker(workerInstance);
   workerInstance = null;
 }

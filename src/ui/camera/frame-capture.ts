@@ -53,12 +53,6 @@ export function captureVideoFrame(video: HTMLVideoElement, scale = 1): RgbaImage
   return captureElementFrame(video, scale);
 }
 
-/** The downscale factor that brings `videoWidth` to the live-detect budget. */
-export function liveDetectScale(videoWidth: number): number {
-  if (videoWidth <= LIVE_DETECT_TARGET_WIDTH_PX) return 1;
-  return LIVE_DETECT_TARGET_WIDTH_PX / videoWidth;
-}
-
 /**
  * Grab one full-resolution frame from a MediaStream without needing a mounted
  * <video> (the Update Overlay path). Resolves null when no frame arrives —

@@ -87,8 +87,6 @@ export type SketchEntity =
   | SketchRectangle
   | SketchPath;
 
-export type SketchEntityKind = SketchEntity['kind'];
-
 export type Sketch = {
   readonly entities: ReadonlyArray<SketchEntity>;
   // Carve layers (ADR-272 Amendment 1). Absent or empty behaves as exactly the

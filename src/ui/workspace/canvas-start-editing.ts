@@ -23,10 +23,6 @@ export type StartEditingContext = {
 const contexts = new WeakMap<CanvasMotionPlan, StartEditingContext>();
 const jobEditReasons = new WeakMap<StartEditingContext, string | null>();
 
-export function registerStartEditing(plan: CanvasMotionPlan, context: StartEditingContext): void {
-  contexts.set(plan, context);
-}
-
 export function startEditingContext(
   plan: CanvasMotionPlan,
   project?: Project,

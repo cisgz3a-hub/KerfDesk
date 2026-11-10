@@ -6,11 +6,7 @@ import {
   RELIEF_AUTHORING_MAX_STROKES,
   RELIEF_AUTHORING_MAX_WORK,
 } from '../scene/relief/relief-authoring';
-import type {
-  ReliefAuthoringDocument,
-  ReliefSculptStroke,
-  ReliefVectorMask,
-} from '../scene/relief/relief-authoring';
+import type { ReliefSculptStroke, ReliefVectorMask } from '../scene/relief/relief-authoring';
 import { reliefBoundaryError } from './relief-vector-boundary';
 import { reliefStrokeDabs } from './relief-sculpt';
 import { isRecord } from '../util/is-record';
@@ -303,7 +299,4 @@ function transformValid(v: unknown): boolean {
       typeof v['mirrorY'] === 'boolean',
     ])
   );
-}
-export function admittedReliefDocument(value: unknown): value is ReliefAuthoringDocument {
-  return reliefAuthoringError(value) === null;
 }

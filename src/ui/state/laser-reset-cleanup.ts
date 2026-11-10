@@ -47,16 +47,6 @@ export function hasOwnedControllerReset(operation: LaserControllerOperation | nu
   return operation?.kind === 'recovery' && operation.phase === 'reset';
 }
 
-export function hasUnconfirmedResetCleanup(
-  refs: ResetCleanupRefs,
-  operation: LaserControllerOperation | null,
-): boolean {
-  return (
-    refs.pendingResetCleanup?.options.requireResetBoundary === true &&
-    hasOwnedControllerReset(operation)
-  );
-}
-
 /** Whether a welcome banner now answers a reset KerfDesk sent on this port
  *  (Abort, Reset, the stop before Disconnect), which keeps machine position. */
 export function awaitsOwnedResetBoundary(refs: ResetCleanupRefs): boolean {
