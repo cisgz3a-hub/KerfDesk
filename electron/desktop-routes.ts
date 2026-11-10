@@ -6,6 +6,7 @@ import { withDesktopAi } from './desktop-ai.js';
 import { withDesktopArtcraft } from './desktop-artcraft.js';
 import { withDesktopCameraAddress } from './desktop-camera-address.js';
 import { withMachineNetworkRoutes } from './machine-network-routes.js';
+import { withRuidaNetworkRoutes } from './ruida-network-routes.js';
 
 /** Keep existing window/activity/support guards in their original outer order. */
 export function withDesktopWorkspaceRoutes(
@@ -21,6 +22,8 @@ export function withDesktopWorkspaceRoutes(
           userDataPath,
         );
   return withDesktopWindowCommands(
-    withDesktopActivityRoute(withSupportRoutes(withMachineNetworkRoutes(routes), supportLog)),
+    withDesktopActivityRoute(
+      withSupportRoutes(withMachineNetworkRoutes(withRuidaNetworkRoutes(routes)), supportLog),
+    ),
   );
 }

@@ -47,9 +47,9 @@ export const CONTROLLERS = [
   {
     family: 'Ruida (.rd export)',
     connection:
-      'No live connection. Export an .rd file and run it from the machine’s panel or a USB stick.',
+      'Export an .rd file and run it from the machine’s panel or a USB stick. The desktop app also has an experimental network connection (Ethernet or Wi-Fi) that frames, starts, pauses and stops a job.',
     tested:
-      'Experimental and vector-only. Checked by decoding the file back inside KerfDesk, not on hardware. No real Ruida controller has accepted one yet.',
+      'Experimental and vector-only. Checked by decoding the file back inside KerfDesk, and the network connection against a simulator, not on hardware. No real Ruida controller has accepted either yet.',
     status: 'shipped-code-and-tests',
   },
 ];
@@ -148,7 +148,7 @@ export const CHECKLIST = [
   },
   {
     title: 'Check for USB',
-    body: 'KerfDesk needs a USB serial connection. A machine you can only reach over Wi-Fi or a network won’t connect. Ruida CO₂ machines get an experimental file export instead.',
+    body: 'KerfDesk needs a USB serial connection. A machine you can only reach over Wi-Fi or a network won’t connect. Ruida CO₂ machines get an experimental file export, and on the desktop app an experimental network connection.',
   },
   {
     title: 'Use a browser that can connect',

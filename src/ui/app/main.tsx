@@ -14,6 +14,7 @@ import {
   createDesktopJobActivityReporter,
   createDesktopSerialAdapter,
   createDesktopMachineNetwork,
+  createDesktopRuidaNetwork,
   createDesktopAiAssistant,
   createDesktopCameraAddressVault,
   desktopCameraBridgeConnection,
@@ -79,6 +80,8 @@ const adapter: PlatformAdapter = isElectronRenderer()
             aiAssistant: createDesktopAiAssistant(),
             // A worker streams each network session, off this thread (ADR-676).
             machineNetwork: createDesktopMachineNetwork(undefined, createNetworkSessionOpener()),
+            // Ruida over UDP, through the main process's bridge (ADR-697).
+            ruidaNetwork: createDesktopRuidaNetwork(),
             cameraBridge: createHttpCameraBridge(() => desktopCameraBridgeConnection()),
           }
         : {}),
