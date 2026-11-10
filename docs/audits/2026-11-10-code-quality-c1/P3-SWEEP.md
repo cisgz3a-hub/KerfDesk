@@ -43,7 +43,7 @@ Pull request #1699 gives 61 small helpers one home each and replaces more than 5
 
 A copy was replaced only when its body matched the shared function token for token, after comments and spacing were dropped and parameters renamed by position. A body that reads a module-level name, such as a tolerance constant, was never replaced, because the same name can hold a different value in each file. So no result changes.
 
-`src/core/util/shared-helpers-not-copied.test.ts` fails when a shipped file declares a private function whose body is the body of a shared export.
+`src/core/util/shared-helpers-not-copied.test.ts` fails when a shipped file declares a private function whose body is the body of a shared export. Two exceptions are deliberate. The `user-macros` folder may import nothing outside itself, so it keeps its own copy. And code that writes machine commands keeps its own number formatter: `number-format.ts` is for text people read, and a later change to a display format must never change what a controller receives.
 
 ### Left for the maintainer
 
