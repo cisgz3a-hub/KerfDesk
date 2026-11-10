@@ -67,6 +67,25 @@ export function surfaceFeedDoseRise(
   return wanted > ceiling ? wanted / ceiling : 1;
 }
 
+/** The rotary axis's share of a move's emitted feed: how fast that axis
+ * itself must turn, in its own units per minute (ADR-695 Amendment 1). The
+ * controller's planner holds every move so no axis passes its own max rate. */
+export function surfaceFeedAxisShare(
+  layerFeed: number,
+  from: { readonly x: number; readonly y: number },
+  to: { readonly x: number; readonly y: number },
+  match: RotaryFeedMatch | undefined,
+): number {
+  const dy = Math.abs(to.y - from.y);
+  const machineMm = Math.hypot(to.x - from.x, dy);
+  if (!(machineMm > 0) || dy === 0) return 0;
+  const emitted =
+    match === undefined
+      ? layerFeed
+      : Math.min(unheldMatchedFeed(layerFeed, from, to, match), feedCeiling(layerFeed, match));
+  return (emitted * dy) / machineMm;
+}
+
 function unheldMatchedFeed(
   layerFeed: number,
   from: { readonly x: number; readonly y: number },

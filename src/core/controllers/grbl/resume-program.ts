@@ -16,6 +16,7 @@ import { createNativeLaserBeam, type NativeLaserBeam } from './native-laser-resu
 import { nativeLaserResume, scanNativeBeamLine } from './native-laser-resume';
 import { focusResumeIssue } from './focus-resume-issue';
 import { canTrackHeadStopBlock } from './resume-head-stop-block';
+import { withRotaryReentry, type ResumeRotaryZero } from './resume-rotary';
 
 export { resumeTravelMm } from './resume-travel';
 
@@ -59,6 +60,9 @@ export type ResumeOptions = {
    * (laserResumeDialectForDevice). Transform 3 rebuilds the beam in them;
    * transforms 1 and 2 always wrote GRBL's, and so replay their archives. */
   readonly laserDialect?: LaserResumeDialect;
+  /** A dedicated A or Z rotary program: the machine turn the job started
+   *  from, which the re-entry turns back to (ADR-695 Amendment 1). */
+  readonly rotaryZero?: ResumeRotaryZero;
 };
 
 type GcodeWord = { readonly letter: string; readonly value: number };
@@ -89,10 +93,13 @@ export function buildResumeProgram(
   if (originalTail.every((line) => stripComments(line).trim() === '')) {
     return { kind: 'error', reason: 'Nothing left to run from that line.' };
   }
-  const { preamble, tail } = resumeBody(state, beam, originalTail, transform);
+  const body = resumeBody(state, beam, originalTail, transform);
+  const rotary = withRotaryReentry(body.preamble, lines, fromLine, options.rotaryZero);
+  if (rotary.kind === 'error') return rotary;
+  const { preamble } = rotary;
   return {
     kind: 'ok',
-    lines: [...preamble, ...tail],
+    lines: [...preamble, ...body.tail],
     fromLine,
     preambleCount: preamble.length,
   };

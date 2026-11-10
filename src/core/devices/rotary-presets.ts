@@ -54,7 +54,7 @@ export const ROTARY_PRESETS: ReadonlyArray<RotaryPreset> = [
     setup: { type: 'chuck', axis: 'A', mmPerRotation: 360 },
     source:
       `Creality’s Falcon A1/A1 Pro rotating kit guide says to connect the rotary to the A axis (${CREALITY_A1_GUIDE}). ` +
-      'Two published A1 Pro $I reads list the axes XYZA, with $103=8.900 steps per degree (https://github.com/barebaric/rayforge/pull/461), so 360° is one turn of a 3200-step rotary motor. ' +
+      'Two published A1 Pro $I reads list the axes XYZA, with $103=8.900 steps per degree (https://github.com/barebaric/rayforge/pull/461), so 360° is 3204 steps; a 3200-step motor turn would be 8.889 per degree, so check the seam after ten turns. ' +
       'LightBurn forum users report one turn at 360 on an A1, one of them on Z (https://forum.lightburnsoftware.com/t/rotary-setup-falcon-a1-pro/189774). ' +
       'Not checked on a machine: if Test rotation does not turn the chuck, choose Z. KerfDesk asks you to confirm a Test rotation before the first burn.',
   },
