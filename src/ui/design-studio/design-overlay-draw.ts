@@ -33,6 +33,7 @@ import { mmToPx } from './design-view';
 import type { SketchExtension } from '../../core/design/ops/extend-sketch';
 import { paintExtension } from './design-extend-draw';
 import type { DesignTracking } from './design-tracking';
+import type { PlacedDimension } from './design-dimension-annotation';
 
 export type DesignOverlayPaint = {
   readonly extendPreview?: SketchExtension | null;
@@ -48,6 +49,9 @@ export type DesignOverlayPaint = {
   readonly snap: SnapTarget | null;
   // Polar / alignment guides that moved the pointer (ADR-272 Amendment 6).
   readonly tracking?: DesignTracking | null;
+  // Placed dimensions (ADR-272 Amendment 7) and the one being edited.
+  readonly dimensions?: ReadonlyArray<PlacedDimension>;
+  readonly activeDimensionId?: string | null;
   readonly widthPx: number;
   readonly heightPx: number;
 };
@@ -62,6 +66,11 @@ const TAU = Math.PI * 2;
 
 export function paintDesignOverlay(ctx: CanvasRenderingContext2D, paint: DesignOverlayPaint): void {
   ctx.clearRect(0, 0, paint.widthPx, paint.heightPx);
+  for (const placed of paint.dimensions ?? []) {
+    const stroke =
+      placed.id === paint.activeDimensionId ? canvasTheme.selection : canvasTheme.measureStroke;
+    paintAnnotation(ctx, paint.view, placed.annotation, placed.label, stroke);
+  }
   if (paint.marquee !== null) paintMarquee(ctx, paint.view, paint.marquee);
   if (paint.draft !== null) paintDraft(ctx, paint.view, paint.draft);
   if (paint.pointSequence !== null) paintPointSequence(ctx, paint.view, paint.pointSequence);

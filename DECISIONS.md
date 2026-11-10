@@ -14917,6 +14917,55 @@ level with another part's corner.
    may line up with. Nothing is persisted, and `.lf2`, compile and G-code are
    untouched.
 
+### Amendment 7 (2026-11-10) - The Dimension tool: inferred from the pick, driving vs driven, dimension-driven edit (DS-7)
+
+Clause 5 made dimension-driven editing the fourth precision mechanism and
+adopted Fusion's and Onshape's unified infer-from-selection tool and their
+driving/driven distinction; nothing implemented it, so a sketch could be
+measured (DS-3b) but no measurement could own its geometry.
+
+1. **A dimension is part of the sketch.** `Sketch.dimensions` holds records of
+   seven kinds: line length, polyline segment length, rectangle width and
+   height, circle diameter, arc or circle radius, and the angle between two
+   lines. Absent when there are none, so a sketch without dimensions is exactly
+   what it was. They reach `.lf2` inside the existing ADR-590 Design Studio
+   document; the field is optional and ignorable, so no schema version changes,
+   and the project validator refuses a malformed record or one naming a missing
+   entity like any other malformed sketch field. Browser-stored sketches are
+   sanitized on restore. Dimensions never reach output: Apply, compile and
+   G-code are untouched.
+2. **One tool, kind inferred from the pick.** A rectangle edge gives its width
+   or height (the nearer edge decides), a polyline segment its length, a circle
+   its diameter, an arc its radius. A line waits for a second click: another
+   line makes the angle between them (measured between the halves that leave
+   the intersection toward each line's far end), anything else places the
+   line's length. Parallel lines and ellipses are not dimensioned. Clicking a
+   placed dimension's drawn line selects it for editing.
+3. **Driving and driven.** A new dimension is driving at the current reading,
+   so placing it moves nothing. Typing a value in the options bar re-solves the
+   geometry LOCALLY and exactly, as one undo step: a line's end moves along the
+   line; an open polyline's later points move with the resized segment, a
+   closed outline moves only that segment's end vertex; a rectangle keeps its
+   origin corner; a circle or arc keeps its centre (and an arc its start and
+   sweep); an angle turns the second line about the intersection, on the side
+   it was. A value leaving degenerate geometry, or an angle outside 0-180
+   degrees, is refused in the box with the reason. A driven dimension is a
+   reference, drawn in parentheses, and cannot be typed into until made
+   driving (it then takes its current reading).
+4. **A driving dimension owns its geometry.** Every state that enters Studio
+   history - commits and the live phase of a drag - has its driving dimensions
+   re-imposed, and dimensions whose geometry is gone (deleted, or changed kind,
+   as a stretched circle becoming an ellipse) are dropped. An inspector edit of
+   a field a driving dimension owns (length, width, height, diameter, radius)
+   is typed THROUGH the dimension, so the value sticks and the dimension reads
+   it. No change propagates past the dimension's own entity: a coupled system
+   still needs the solver clause 5 declines.
+5. Dimensions are drawn in 2D with the DS-3b call-out painter (the one being
+   edited in the selection colour). The 3D surface picks and edits them through
+   the options bar but does not draw them, as Amendment 2 left call-outs
+   2D-only. Esc releases a waiting pick or the edited dimension before the
+   selection; Delete removes the edited dimension, not geometry.
+
 ## ADR-273 - CNC exports record incident-grade tool, settings, and profile provenance (2026-08-01)
 
 **Date:** 2026-08-01

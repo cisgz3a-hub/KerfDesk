@@ -532,3 +532,25 @@
     flex-wrap: wrap;
   }
 }
+
+/* Simple view (ADR-698): the hidden settings this burn uses, then the way back. */
+.lf-simple-view-note {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px dashed var(--lf-border);
+  border-radius: 6px;
+}
+
+.lf-simple-view-note p {
+  margin: 0;
+}
+
+.lf-simple-view-note__values {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}

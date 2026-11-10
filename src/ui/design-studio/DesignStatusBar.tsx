@@ -43,9 +43,11 @@ export function DesignStatusBar(): JSX.Element | null {
         {tool.planned === true ? `${tool.label} — not built yet. ` : ''}
         {session.tool === 'extend'
           ? extensionHint(session.extendPreview)
-          : session.pointSequence === null
-            ? tool.hint
-            : designPointSequenceHint(session.pointSequence)}
+          : session.dimensionPendingLineId !== null
+            ? 'Click a second line for the angle between them, or anywhere else for this line’s length.'
+            : session.pointSequence === null
+              ? tool.hint
+              : designPointSequenceHint(session.pointSequence)}
       </span>
       {trimmed > 0 ? (
         <span style={countStyle} title="Older undo steps were dropped to bound memory.">

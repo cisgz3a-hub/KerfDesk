@@ -21,6 +21,8 @@ import { mixedCheckboxProps } from './mixed-operation-input';
 import { useCutSettingsLauncher } from './use-cut-settings-launcher';
 import { LaserProcessField } from './LaserProcessField';
 import { StarterValuesNotice, usesStarterValues } from './StarterValuesNotice';
+import { SimpleViewSettingsNote } from './SimpleViewSettingsNote';
+import { useSimpleView } from '../state/simple-view';
 import './laser-operation-settings.css';
 
 export function LaserOperationFields(props: {
@@ -54,6 +56,9 @@ export function LaserOperationFields(props: {
     commit,
   };
   const modeMixed = props.mixedFields.mode === true;
+  // Simple view (ADR-698) keeps Process, Power, Speed, Passes and every notice;
+  // the rest gives way to a note that lists any of it this burn uses.
+  const simple = useSimpleView();
   return (
     <div className="lf-laser-operation-fields">
       {hasMixedFields(props.mixedFields) ? (
@@ -74,20 +79,18 @@ export function LaserOperationFields(props: {
       {!hasMixedFields(props.mixedFields) && usesStarterValues(props.operation) ? (
         <StarterValuesNotice />
       ) : null}
-      {modeMixed ? null : <ProcessEssentials layer={props.operation} target={target} />}
-      <div className="lf-laser-toggles">
-        <ScanDirectionField layer={props.operation} operationTarget={target} />
-        <AirAssistField
-          checked={props.operation.airAssist}
-          mixed={props.mixedFields.airAssist === true}
-          onChange={(airAssist) => commit({ airAssist })}
+      {simple ? (
+        <SimpleViewSettingsNote settings={target.settings} mixedFields={props.mixedFields} />
+      ) : (
+        <AdvancedLaserFields
+          operation={props.operation}
+          target={target}
+          airAssistMixed={props.mixedFields.airAssist === true}
+          modeMixed={modeMixed}
+          cutSettingsBlocked={cutSettingsBlocked}
+          onOpenCutSettings={openSettings}
         />
-      </div>
-      <MoreCutSettingsButton
-        mode={modeMixed ? null : props.operation.mode}
-        disabled={cutSettingsBlocked}
-        onOpen={openSettings}
-      />
+      )}
       {settingsOpen ? (
         <LayerRowCutSettings
           key={props.reconcileKey}
@@ -102,6 +105,37 @@ export function LaserOperationFields(props: {
         />
       ) : null}
     </div>
+  );
+}
+
+// What Simple view hides (ADR-698): the process's second-tier settings, the
+// one-line switches and the way into Cut Settings.
+function AdvancedLaserFields(props: {
+  readonly operation: Layer;
+  readonly target: LayerOperationControlTarget;
+  readonly airAssistMixed: boolean;
+  readonly modeMixed: boolean;
+  readonly cutSettingsBlocked: boolean;
+  readonly onOpenCutSettings: () => void;
+}): JSX.Element {
+  const { operation, target } = props;
+  return (
+    <>
+      {props.modeMixed ? null : <ProcessEssentials layer={operation} target={target} />}
+      <div className="lf-laser-toggles">
+        <ScanDirectionField layer={operation} operationTarget={target} />
+        <AirAssistField
+          checked={operation.airAssist}
+          mixed={props.airAssistMixed}
+          onChange={(airAssist) => target.commit({ airAssist })}
+        />
+      </div>
+      <MoreCutSettingsButton
+        mode={props.modeMixed ? null : operation.mode}
+        disabled={props.cutSettingsBlocked}
+        onOpen={props.onOpenCutSettings}
+      />
+    </>
   );
 }
 

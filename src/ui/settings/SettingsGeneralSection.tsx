@@ -8,6 +8,7 @@ import { LAYOUT_OPTIONS } from '../common/WorkspaceLayoutSelect';
 import { RecentProjectLimitField } from '../recent-projects/RecentProjectLimitField';
 import { AUTOSAVE_INTERVAL_MS } from '../state/autosave';
 import { useDisplayUnitsStore } from '../state/display-units';
+import { useSimpleViewStore } from '../state/simple-view';
 import type { DisplayLengthUnit } from '../display-length';
 import { useWorkspaceLayoutStore } from '../state/workspace-layout-store';
 import { setAppThemePreference } from '../theme/app-theme';
@@ -25,6 +26,7 @@ export function SettingsGeneralSection(): JSX.Element {
       <ThemeChoice />
       <UnitsChoice />
       <LayoutChoice />
+      <SimpleViewChoice />
       <fieldset style={settingsGroupStyle}>
         <legend style={settingsHeadingStyle}>Recent projects</legend>
         <RecentProjectLimitField />
@@ -38,6 +40,32 @@ export function SettingsGeneralSection(): JSX.Element {
         </p>
       </section>
     </>
+  );
+}
+
+// Simple view (ADR-698), the same store as Window → Simple View.
+function SimpleViewChoice(): JSX.Element {
+  const enabled = useSimpleViewStore((state) => state.enabled);
+  const setEnabled = useSimpleViewStore((state) => state.setEnabled);
+  const title =
+    'Show only power, speed and passes for each laser operation. Any other setting a burn uses stays listed with its value.';
+  return (
+    <fieldset style={settingsGroupStyle}>
+      <legend style={settingsHeadingStyle}>Simple view</legend>
+      <label style={settingsRowStyle} title={title}>
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(event) => setEnabled(event.currentTarget.checked)}
+          title={title}
+        />
+        <span>Hide advanced operation settings</span>
+      </label>
+      <p style={settingsNoteStyle}>
+        Changes only what the operation panel shows. Job Review, Pause, Abort and every value stay
+        as they are.
+      </p>
+    </fieldset>
   );
 }
 

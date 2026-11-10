@@ -13,6 +13,7 @@
 
 import type { Vec2 } from '../scene';
 import type { DesignLayer } from './layers/design-layer';
+import type { SketchDimension } from './dimensions/sketch-dimension';
 import { isFinitePoint } from '../geometry/point-math';
 
 export type SketchEntityBase = {
@@ -93,6 +94,10 @@ export type Sketch = {
   // default layer; the field materializes on the first layer edit so sketches
   // built before layers existed stay valid.
   readonly layers?: ReadonlyArray<DesignLayer>;
+  // Dimensions placed with the Dimension tool (ADR-272 Amendment 7). Absent
+  // when there are none, so a sketch without dimensions is byte-for-byte what
+  // it was before they existed.
+  readonly dimensions?: ReadonlyArray<SketchDimension>;
 };
 
 export const EMPTY_SKETCH: Sketch = { entities: [] };

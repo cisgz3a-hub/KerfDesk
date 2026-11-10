@@ -1,3 +1,4 @@
+import { useSimpleViewStore } from '../state/simple-view';
 import type { AppThemePreference } from '../theme/app-theme';
 import { enabled, type AppCommand, type AppCommandContext } from './command-types';
 
@@ -75,5 +76,30 @@ export function windowPanelCommands(ctx: AppCommandContext): ReadonlyArray<AppCo
     'Restore both side panels to the standard workspace layout',
     ctx.resetWorkspaceLayout,
   );
-  return [layers, machine, toggleSidePanels, resetLayout, ...themeCommands(ctx)];
+  return [
+    layers,
+    machine,
+    toggleSidePanels,
+    resetLayout,
+    simpleViewCommand(),
+    ...themeCommands(ctx),
+  ];
+}
+
+// Simple view (ADR-698). The menu re-renders on the store (use-app-commands),
+// so reading it here keeps the check mark current.
+export function simpleViewCommand(): AppCommand {
+  const on = useSimpleViewStore.getState().enabled;
+  return {
+    ...enabled(
+      'window.simple-view',
+      'window',
+      'Simple View',
+      on
+        ? 'Show every operation setting again'
+        : 'Show only power, speed and passes for each laser operation, plus any other setting this burn uses',
+      () => useSimpleViewStore.getState().toggle(),
+    ),
+    active: on,
+  };
 }
