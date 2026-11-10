@@ -163,6 +163,9 @@ export type MachineStartSnapshot = {
   readonly cameraPlacementActive?: boolean;
   readonly cameraConfirmedPositionEpoch?: number | null;
   readonly cameraPlacementGeometryIssue?: string | null;
+  // The Camera panel's "camera may have moved" warning, while it shows for
+  // the running camera (ADR-663 Amendment 5).
+  readonly cameraMovedWarning?: string | null;
   // Where this project's jig outline last burned from in this session, so the
   // artwork run can be checked against it (ADR-057 Amendment 6). null: unseen.
   readonly registrationOutline?: JobPlacementSettings | null;

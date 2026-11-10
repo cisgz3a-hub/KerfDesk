@@ -131,16 +131,31 @@ export function measureViewShift(
   return { dxPx: found.best.x + step.x, dyPx: found.best.y + step.y, score: found.shift.score };
 }
 
-type Grid = {
+/** Edge maps of a reference and a current view over a mask. With a box, only
+ * the reference pixels inside it are compared: one patch of the surround. */
+export type Grid = {
   readonly a: Float32Array;
   readonly b: Float32Array;
   readonly mask: Uint8Array;
   readonly width: number;
   readonly height: number;
+  readonly box?: PixelBox;
 };
 
+/** A half-open box of thumbnail pixels, [x0, x1) × [y0, y1). */
+export type PixelBox = {
+  readonly x0: number;
+  readonly y0: number;
+  readonly x1: number;
+  readonly y1: number;
+};
+
+function boxOf(grid: Grid): PixelBox {
+  return grid.box ?? { x0: 0, y0: 0, x1: grid.width, y1: grid.height };
+}
+
 // The best whole-pixel shift within `reach` of `around`, refined to a fraction.
-function bestShift(
+export function bestShift(
   grid: Grid,
   reach: number,
   around: { readonly x: number; readonly y: number },
@@ -173,7 +188,7 @@ function bestShift(
 }
 
 // Half the size: edges averaged over 2 × 2 pixels, kept where most were surround.
-function halved(grid: Grid): Grid {
+export function halved(grid: Grid): Grid {
   const width = Math.floor(grid.width / 2);
   const height = Math.floor(grid.height / 2);
   const a = new Float32Array(width * height);
@@ -196,7 +211,22 @@ function halved(grid: Grid): Grid {
       mask[y * width + x] = sm >= 3 ? 1 : 0;
     }
   }
-  return { a, b, mask, width, height };
+  const box = grid.box;
+  return box === undefined
+    ? { a, b, mask, width, height }
+    : {
+        a,
+        b,
+        mask,
+        width,
+        height,
+        box: {
+          x0: Math.floor(box.x0 / 2),
+          y0: Math.floor(box.y0 / 2),
+          x1: Math.ceil(box.x1 / 2),
+          y1: Math.ceil(box.y1 / 2),
+        },
+      };
 }
 
 /**
@@ -232,7 +262,7 @@ export function viewShiftOnBedOffsetMm(args: ViewShiftOnBedArgs): Vec2 | null {
 }
 
 // Sobel gradient magnitude; the one-pixel border stays zero.
-function edgeMap(thumb: ViewThumbnail): Float32Array {
+export function edgeMap(thumb: ViewThumbnail): Float32Array {
   const { width, height, data } = thumb;
   const out = new Float32Array(width * height);
   const p = (x: number, y: number): number => data[y * width + x] ?? 0;
@@ -262,14 +292,15 @@ function edgeMap(thumb: ViewThumbnail): Float32Array {
 // pixels p + (dx, dy), over the pairs that stay inside the picture.
 function maskedCorrelation(grid: Grid, dx: number, dy: number): number {
   const { a, b, mask, width, height } = grid;
+  const box = boxOf(grid);
   let n = 0;
   let sa = 0;
   let sb = 0;
   let saa = 0;
   let sbb = 0;
   let sab = 0;
-  for (let y = Math.max(0, -dy); y < Math.min(height, height - dy); y += 1) {
-    for (let x = Math.max(0, -dx); x < Math.min(width, width - dx); x += 1) {
+  for (let y = Math.max(box.y0, -dy); y < Math.min(box.y1, height - dy); y += 1) {
+    for (let x = Math.max(box.x0, -dx); x < Math.min(box.x1, width - dx); x += 1) {
       const i = y * width + x;
       if (mask[i] !== 1) continue;
       const va = a[i] ?? 0;
@@ -293,7 +324,7 @@ function maskedCorrelation(grid: Grid, dx: number, dy: number): number {
 // One Lucas-Kanade step on the normalised edge maps over the surround: the
 // sub-pixel (u, v) that best explains current(p + best + (u, v)) = reference(p),
 // to first order. Null when the surround has too little edge structure.
-function gradientStep(
+export function gradientStep(
   grid: Grid,
   best: { readonly x: number; readonly y: number },
 ): { x: number; y: number } | null {
@@ -329,9 +360,12 @@ function gradientStep(
 // The surround pixels whose shifted partner, and its four neighbours, are in the picture.
 function surroundPairs(grid: Grid, best: { readonly x: number; readonly y: number }): number[] {
   const { mask, width, height } = grid;
+  const box = boxOf(grid);
   const pairs: number[] = [];
-  for (let y = Math.max(1, 1 - best.y); y < Math.min(height - 1, height - 1 - best.y); y += 1) {
-    for (let x = Math.max(1, 1 - best.x); x < Math.min(width - 1, width - 1 - best.x); x += 1) {
+  const yEnd = Math.min(box.y1, height - 1, height - 1 - best.y);
+  const xEnd = Math.min(box.x1, width - 1, width - 1 - best.x);
+  for (let y = Math.max(box.y0, 1, 1 - best.y); y < yEnd; y += 1) {
+    for (let x = Math.max(box.x0, 1, 1 - best.x); x < xEnd; x += 1) {
       if (mask[y * width + x] === 1) pairs.push(y * width + x);
     }
   }

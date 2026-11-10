@@ -9352,17 +9352,22 @@ as the pane's design record.
   made with it known, gets a warning on the result step. **Fix** then still moves the
   calibration, but marks it as made before the bed position was known. Once homed, the
   calibration row says so.
-- **Warn / the camera seems to have moved (ADR-663 Amendment 3).** KerfDesk keeps a small view of
-  what a fixed calibrated camera sees when its calibration is saved, a check keeps it, or a nudge
-  fix is applied. Each new held picture, and one picture a few seconds after the camera starts, is
-  compared with it over the part of the view outside the bed (10 mm clear of its edge). A
-  confident match (score 0.6 or more, the surround at least 4 % of the view) that puts the middle
-  of the bed 1 mm or more off shows **The camera may have moved, by about N mm** in the Camera
-  panel, with **Fix a small offset…**, **Check camera…** and **Dismiss**, and one toast when the
-  panel is closed. **Dismiss** keeps that warning quiet while the camera stays where it was then;
-  a view confirmed steady since (a nudge fix, a kept check), or a further shift of 1 mm or more,
-  warns again. A weaker match, too little surround, a head camera or no kept view says
-  nothing; Camera settings says how to start the warning for a calibration without a view.
+- **Warn / the camera seems to have moved (ADR-663 Amendments 3 and 5).** KerfDesk keeps a small
+  view of what a fixed calibrated camera sees when its calibration is saved, a check keeps it, or a
+  nudge fix is applied. Each new held picture, and one picture a few seconds after the camera
+  starts, is compared with it over the part of the view outside the bed (10 mm clear of its edge),
+  patch by patch, and the patches' moves are fitted on the bed, so a camera that turned or tipped
+  is measured as well as one that slid. When a point of the bed (its centre or a corner) shows 1 mm
+  or more off, the Camera panel shows **The camera may have moved: the picture may be up to about
+  N mm off**, with **Fix a small offset…** (left out when the camera turned, which it cannot fix),
+  **Check camera…** and **Dismiss**, and one toast when the panel is closed. Two checks in a row
+  that no longer match say **what it sees around the bed no longer matches its calibration**. A
+  warning stays until a confident match finds the camera back, a calibration, check or nudge is
+  kept, or **Dismiss**; a weaker match never takes it away. **Dismiss** keeps that warning quiet
+  while the camera stays where it was then; a further shift of 1 mm or more at any bed point warns
+  again. While camera placement is on, Job Review says the same. Too little surround, a plain
+  surround, a head camera or no kept view says nothing; Camera settings says how to start the
+  warning for a calibration without a view.
 - **Check / has the camera moved?** With a calibration saved, **Check camera…** opens the wizard
   at the photo, using the saved target's area and height. The photo is measured against the saved
   calibration. The result says either that the camera has not moved, or how far and which way on

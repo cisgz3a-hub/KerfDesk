@@ -3,6 +3,7 @@ import type { ControllerKind } from '../../core/devices';
 import { reportedControllerAxes } from '../state/rotary-axis-frame';
 import type { Project } from '../../core/scene';
 import { cameraPlacementGeometryIssue } from '../camera/camera-model-frame';
+import { cameraMovedStartWarning } from '../camera/helpers/camera-moved-start-warning';
 import type { useCameraStore } from '../state/camera-store';
 import type { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
@@ -53,6 +54,8 @@ export function machineSnapshot(
     cameraPlacementActive: camera.placementActive,
     cameraConfirmedPositionEpoch: camera.confirmedPositionEpoch,
     cameraPlacementGeometryIssue: cameraPlacementGeometryIssue(project.device.cameraModel),
+    // ADR-663 Amendment 5: a showing "camera may have moved" warning.
+    cameraMovedWarning: cameraMovedStartWarning(project.device, camera.sourceState),
     registrationOutline: registrationOutlinePlacement(project, laser.registrationOutlineRun),
     homingState: laser.homingState,
     trustedPositionEpoch: laser.trustedPositionEpoch ?? 0,
