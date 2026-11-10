@@ -189,7 +189,12 @@ function Finished(): JSX.Element {
         once. Let the work cool before you lift it out.
       </p>
       <div className="lf-first-job__actions">
-        <button type="button" className="lf-btn lf-btn--primary" onClick={close}>
+        <button
+          type="button"
+          className="lf-btn lf-btn--primary"
+          title="Close the guide. Help → Guided first job opens it again."
+          onClick={close}
+        >
           Close the guide
         </button>
         <button
