@@ -80,6 +80,7 @@ import {
 } from '../../core/design/ops/transform-selection';
 import { findSketchExtension } from '../../core/design/ops/extend-sketch';
 import { extendSessionAt } from './design-extend';
+import { previewTrimSession, trimSessionAt } from './design-trim';
 import { deleteSessionDimension } from './design-dimension-session';
 import { dimensionActions, viewToggleActions } from './design-store-slices';
 import type { DesignTracking } from './design-tracking';
@@ -105,6 +106,9 @@ export type DesignStudioState = {
     distanceToEndpoint?: (endpoint: Vec2) => number,
   ) => void;
   readonly setActiveSnap: (target: SnapTarget | null) => void;
+  // The Trim tool (ADR-272 Amendment 8): preview on hover, trim on click.
+  readonly previewTrim: (point: Vec2, toleranceMm: number) => void;
+  readonly trimAt: (point: Vec2, toleranceMm: number, newId: string) => void;
   readonly setSelection: (ids: ReadonlyArray<string>) => void;
   readonly selectAll: () => void;
   readonly duplicateSelection: () => void;
@@ -321,14 +325,17 @@ function selectionActions(
 
 function extendCursorActions(
   set: (change: (state: DesignStudioState) => Partial<DesignStudioState>) => void,
-): Pick<DesignStudioState, 'setCursorMm' | 'previewExtension' | 'extendAt'> {
+): Pick<
+  DesignStudioState,
+  'setCursorMm' | 'previewExtension' | 'extendAt' | 'previewTrim' | 'trimAt'
+> {
   return {
     setCursorMm: (cursorMm) =>
       set(
         mapSession((session) => ({
           ...session,
           cursorMm,
-          ...(cursorMm === null ? { extendPreview: null } : {}),
+          ...(cursorMm === null ? { extendPreview: null, trimPreview: null } : {}),
         })),
       ),
     previewExtension: (point, tolerance, distanceToEndpoint) =>
@@ -345,6 +352,10 @@ function extendCursorActions(
       ),
     extendAt: (point, tolerance, distanceToEndpoint) =>
       set(mapSession((session) => extendSessionAt(session, point, tolerance, distanceToEndpoint))),
+    previewTrim: (point, toleranceMm) =>
+      set(mapSession((session) => previewTrimSession(session, point, toleranceMm))),
+    trimAt: (point, toleranceMm, newId) =>
+      set(mapSession((session) => trimSessionAt(session, point, toleranceMm, newId))),
   };
 }
 

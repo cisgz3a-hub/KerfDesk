@@ -14966,6 +14966,45 @@ measured (DS-3b) but no measurement could own its geometry.
    2D-only. Esc releases a waiting pick or the edited dimension before the
    selection; Delete removes the edited dimension, not geometry.
 
+### Amendment 8 (2026-11-10) - Trim to boundary on the Modify rail (DS-6c)
+
+DS-6b shipped Extend and left Trim planned, so a part drawn with crossing
+construction lines could be extended to a boundary but never cut back to one.
+
+1. **Quick trim, LightBurn's and AutoCAD's.** Every other entity is a cutting
+   edge, construction geometry included (that is what construction lines are
+   for). Hovering previews, dashed in the main workspace's trim colour, the
+   piece between the crossing just before the pointer and the one just after
+   it; a click removes it as one undo step and re-previews what is now under
+   the pointer, so a row of pieces is a row of clicks. Escape disarms the tool,
+   as it does Extend.
+2. **What remains keeps its kind where it can.** Trimming a line leaves one or
+   two lines; an open polyline leaves one or two open polylines; a closed
+   polyline or a square-cornered rectangle opens into one polyline; a circle
+   becomes the arc that remains; an arc leaves one or two arcs. Every piece
+   keeps the entity's layer and construction flag; the first keeps its id, a
+   second takes a fresh one. A piece shorter than the smallest entity is
+   dropped.
+3. **Nothing is deleted by accident.** A piece with no crossing on either side
+   - or a closed outline crossed fewer than twice - is reported in the status
+   bar and left alone: removing a whole entity is Delete's job. Ellipses and
+   round-cornered rectangles are reported as not trimmable yet, because their
+   remaining piece is not an entity the model holds (an elliptical arc; a
+   rectangle with a corner missing would be a path of sampled arcs).
+4. **Exact crossings.** Cutting edges reduce to straight segments and circular
+   arcs (`core/design/ops/trim-crossings.ts`) solved analytically, the
+   standard `extend-boundaries.ts` holds; only an ellipse edge is taken from
+   its sampled outline, and the cut then lands on the drawn outline.
+5. **Why a second trim.** The main workspace's Trim (`core/geometry/trim-*`)
+   edits scene curve paths and resolves curve/curve crossings on a chord grid;
+   reusing it would turn a sketch circle into a curve path and lose the arc
+   entity the Studio keeps exact. This follows the Extend precedent
+   (`extend-sketch.ts` beside `geometry/extend-shapes.ts`): the op lives on the
+   sketch model, beside its partner, and the scene trim is unchanged.
+6. Dimensions naming a trimmed entity follow Amendment 7: a dimension whose
+   geometry changed kind (a circle's diameter once it is an arc) is dropped.
+   `.lf2`, compile and G-code are untouched.
+
 ## ADR-273 - CNC exports record incident-grade tool, settings, and profile provenance (2026-08-01)
 
 **Date:** 2026-08-01

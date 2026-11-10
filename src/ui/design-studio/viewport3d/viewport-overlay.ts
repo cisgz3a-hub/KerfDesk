@@ -59,6 +59,8 @@ export type ViewportOverlayInput = {
   readonly snapMm: Vec2 | null;
   // Polar / alignment guides (ADR-272 Amendment 6), drawn dashed in the snap colour.
   readonly guides?: ReadonlyArray<TrackingLine>;
+  // The piece Trim would remove (ADR-272 Amendment 8), dashed in the trim colour.
+  readonly trimRemoved?: ReadonlyArray<Vec2>;
   readonly frame: OverlayFrame;
 };
 
@@ -87,6 +89,9 @@ export function buildViewportOverlay(input: ViewportOverlayInput): ViewportOverl
     push(canvasTheme.selection, false, pointSequencePreviewPolylines(input.pointSequence));
   }
   push(`${canvasTheme.selection}|dash`, true, extensionPolylines(input.extendPreview));
+  if (input.trimRemoved !== undefined && input.trimRemoved.length > 1) {
+    push(`${canvasTheme.trimHighlight}|dash`, true, [{ points: input.trimRemoved, closed: false }]);
+  }
   push(
     `${canvasTheme.snapGuide}|dash`,
     true,

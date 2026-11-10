@@ -25,6 +25,7 @@ import type { MeasurementKey } from './design-entity-fields';
 import type { DesignToolKind } from './design-tool';
 import type { DesignPointSequence } from './design-point-sequence';
 import type { SketchExtension } from '../../core/design/ops/extend-sketch';
+import type { SketchTrim } from '../../core/design/ops/trim-sketch';
 import { DEFAULT_POLAR_STEP_DEG, type DesignTracking } from './design-tracking';
 
 export type DesignView = {
@@ -61,6 +62,8 @@ export type DesignSession = {
   readonly view: DesignView | null;
   readonly cursorMm: Vec2 | null;
   readonly extendPreview: SketchExtension | null;
+  // The piece the Trim tool would remove at the pointer (ADR-272 Amendment 8).
+  readonly trimPreview: SketchTrim | null;
   // In-progress gesture. Deliberately OUTSIDE history: a draft is not a state
   // worth undoing, only the entity it commits to is.
   readonly draft: DesignDraft | null;
@@ -128,6 +131,7 @@ export function createDesignSession(sketch: Sketch = EMPTY_SKETCH): DesignSessio
     view: null,
     cursorMm: null,
     extendPreview: null,
+    trimPreview: null,
     draft: null,
     pointSequence: null,
     marquee: null,
@@ -202,6 +206,7 @@ export function withSketch(session: DesignSession, next: Sketch): DesignSession 
     ...session,
     history: commitSketch(session.history, next),
     extendPreview: null,
+    trimPreview: null,
     selectedIds: retainedSelection(session.selectedIds, next),
     dirtySinceApply: true,
   });
