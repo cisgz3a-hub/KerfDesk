@@ -65,4 +65,4 @@ Treat these as KNOWN:
 - Security findings are redacted in committed text until fixed.
 - Fix PRs use Auto-fix and auto-merge with the MERGE method.
 
-**Status:** started 2026-11-10.
+**Status:** DONE 2026-11-10: 33 raised, 0 refuted, P1 12, P2 6, P3 15, 53 KNOWN. See the round result in [LEDGER.md](LEDGER.md).
