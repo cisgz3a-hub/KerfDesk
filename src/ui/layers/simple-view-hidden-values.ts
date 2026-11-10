@@ -220,7 +220,7 @@ export function simpleViewHiddenValues(
  *  inspected artwork: a multiplier that lowers the burn stays in sight. */
 export function showsPowerMultiplier(
   simple: boolean,
-  objects: ReadonlyArray<{ readonly powerScale?: number | undefined }>,
+  objects: ReadonlyArray<{ readonly powerScale?: number }>,
 ): boolean {
   return !simple || objects.some((object) => objectPowerScalePercent(object) !== 100);
 }
