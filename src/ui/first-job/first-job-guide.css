@@ -1,0 +1,134 @@
+/* Guided first job (ADR-698): a non-modal panel over the canvas's top-left
+ * corner, beside the tool strip and above the toast stack (Toasts.css keeps
+ * the bottom-left 140-320 px), under every dialog and toast, so Job Review
+ * and Abort always win. Portaled to <body>, so it sets the app font itself. */
+.lf-first-job {
+  position: fixed;
+  left: 56px;
+  top: 140px;
+  z-index: var(--lf-z-menu);
+  width: min(340px, calc(100vw - 72px));
+  max-height: max(220px, calc(100vh - 480px));
+  font-family: var(--lf-font);
+  overflow-y: auto;
+  padding: 12px 14px;
+  background: var(--lf-bg-1);
+  color: var(--lf-text);
+  border: 1px solid var(--lf-border-strong);
+  border-radius: 8px;
+  box-shadow: var(--lf-shadow);
+  font-size: var(--lf-text-md);
+}
+
+.lf-first-job__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.lf-first-job__title {
+  margin: 0;
+  font-size: var(--lf-text-xl);
+}
+
+.lf-first-job__count,
+.lf-first-job__note,
+.lf-first-job__done {
+  margin: 2px 0 0;
+  color: var(--lf-text-muted);
+  font-size: var(--lf-text-sm);
+}
+
+.lf-first-job__note {
+  margin-top: 8px;
+}
+
+.lf-first-job__steps {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lf-first-job__step {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.lf-first-job__step[data-state='waiting'],
+.lf-first-job__step[data-state='skipped'] {
+  color: var(--lf-text-muted);
+}
+
+.lf-first-job__mark {
+  flex: 0 0 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--lf-border-strong);
+  font-size: var(--lf-text-xs);
+}
+
+.lf-first-job__step[data-state='current'] .lf-first-job__mark {
+  border-color: var(--lf-accent);
+  color: var(--lf-accent-fg);
+  font-weight: 700;
+}
+
+.lf-first-job__step[data-state='done'] .lf-first-job__mark {
+  border-color: var(--lf-accent);
+  background: var(--lf-accent-wash);
+  color: var(--lf-accent-fg);
+}
+
+.lf-first-job__body {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.lf-first-job__instruction {
+  margin: 4px 0 0;
+  line-height: 1.4;
+}
+
+.lf-first-job__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.lf-first-job__finished p {
+  margin: 10px 0 0;
+  line-height: 1.4;
+}
+
+/* The current step's real control. An outline, not a size change, so nothing
+ * moves under the pointer. */
+body[data-first-job-target='connect'] [data-search-target='connect'],
+body[data-first-job-target='machine-setup'] [data-search-target='machine-setup'],
+body[data-first-job-target='materials-tab'] [data-search-target='materials-tab'],
+body[data-first-job-target='frame-job'] [data-search-target='frame-job'],
+body[data-first-job-target='start-job'] [data-search-target='start-job'] {
+  outline: 3px solid var(--lf-accent);
+  outline-offset: 2px;
+  animation: lf-first-job-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes lf-first-job-pulse {
+  50% {
+    outline-color: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-first-job-target] [data-search-target] {
+    animation: none;
+  }
+}

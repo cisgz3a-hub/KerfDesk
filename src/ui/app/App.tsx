@@ -60,6 +60,7 @@ import { ExternalGcodePreviewBanner } from './ExternalGcodePreviewBanner';
 import { DesktopCloseNotice } from './DesktopCloseNotice';
 import { DesktopSessionEndNotice } from './DesktopSessionEndNotice';
 import { TutorialHost } from '../tutorials/TutorialHost';
+import { FirstJobGuideHost } from '../first-job/FirstJobGuide';
 import { RecentProjectsHost } from '../recent-projects/RecentProjectsHost';
 import { SupportReportHost } from '../support/SupportReportHost';
 import { RemotePairingHost } from '../remote-access/RemotePairingHost';
@@ -139,6 +140,7 @@ function AppWorkspace(): JSX.Element {
       <ImageEditorHost />
       <DesignStudioHost />
       <TutorialHost />
+      <FirstJobGuideHost />
       <RemotePairingHost />
       <WorkspaceLifecycle />
     </div>

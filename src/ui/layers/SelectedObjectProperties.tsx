@@ -22,6 +22,8 @@ import {
   SelectedShapeGeometryFields,
 } from './SelectedShapeGeometryFields';
 import { AdvancedArtworkSettings } from './AdvancedArtworkSettings';
+import { useSimpleView } from '../state/simple-view';
+import { showsPowerMultiplier } from './simple-view-hidden-values';
 import { artworkDisplayName, artworkDisplayNames } from './artwork-display-names';
 
 export function SelectedObjectProperties(): JSX.Element | null {
@@ -140,6 +142,7 @@ function ArtworkAdjustmentFields(props: ArtworkPropertiesInspectorProps): JSX.El
   const { context } = props;
   const parametricShape = singleParametricShape(context.objects);
   const rasterImage = rasterImageForObject(context.primaryObject);
+  const simple = useSimpleView();
   return (
     <div className="lf-artwork-disclosure__body">
       <h3 className="lf-operation-inspector__heading">Artwork adjustments</h3>
@@ -161,7 +164,7 @@ function ArtworkAdjustmentFields(props: ArtworkPropertiesInspectorProps): JSX.El
         }
       />
       {props.isCncMachine ? null : <SelectedImageAdjustments image={rasterImage} />}
-      {props.isCncMachine ? null : (
+      {props.isCncMachine || !showsPowerMultiplier(simple, context.objects) ? null : (
         <AdvancedArtworkSettings
           objects={context.objects}
           layers={props.layers}

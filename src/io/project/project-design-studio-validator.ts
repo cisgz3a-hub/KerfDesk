@@ -1,5 +1,6 @@
 import { DESIGN_CUT_TYPES, DEFAULT_DESIGN_LAYER_ID } from '../../core/design/layers/design-layer';
 import type { DesignStudioDocument } from '../../core/design/design-studio-document';
+import { isWellFormedDimension } from '../../core/design/dimensions/sketch-dimension';
 import {
   firstError,
   isObject,
@@ -110,7 +111,29 @@ function validateSketch(value: unknown): string | null {
     if (Array.isArray(entity['points'])) points += entity['points'].length;
     if (points > MAX_POINTS) return 'sketch.points budget';
   }
-  return validateIds(ids, 'sketch.entities', MAX_ENTITIES) ?? validateLayers(value['layers']);
+  return (
+    validateIds(ids, 'sketch.entities', MAX_ENTITIES) ??
+    validateLayers(value['layers']) ??
+    validateDimensions(value['dimensions'], new Set(ids))
+  );
+}
+
+// Dimensions (ADR-272 Amendment 7) are optional. Each must be well formed and
+// name entities that exist; a record that does not is refused like any other
+// malformed sketch field, never guessed at.
+function validateDimensions(value: unknown, entityIds: ReadonlySet<string>): string | null {
+  if (value === undefined) return null;
+  if (!Array.isArray(value) || value.length > MAX_ENTITIES) return 'sketch.dimensions';
+  const ids: string[] = [];
+  for (const dimension of value) {
+    if (!isWellFormedDimension(dimension)) return 'sketch.dimension';
+    if (!entityIds.has(dimension.entityId)) return 'sketch.dimension entityId';
+    if (dimension.otherEntityId !== undefined && !entityIds.has(dimension.otherEntityId)) {
+      return 'sketch.dimension otherEntityId';
+    }
+    ids.push(dimension.id);
+  }
+  return validateIds(ids, 'sketch.dimensions', MAX_ENTITIES);
 }
 
 function point(value: unknown): boolean {

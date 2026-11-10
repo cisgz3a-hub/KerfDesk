@@ -410,7 +410,7 @@ byte-identical for unchanged input. Design + research:
 | DS-5 | Apply → commits designed geometry as one project undo entry; rect/circle land parametric, line/arc/path bake exact. **End-to-end slice closed** — verified from sketch through `compileJob` to emitted G-code | Built |
 | DS-6 | Corner ops in `core/design/ops/`: fillet (tangent arc at the shared chord tolerance) and chamfer (exact, no sampling), both refusing a size that will not fit rather than clamping | Built (core) |
 | DS-6b | Fillet and chamfer wired to the Modify rail with a context-sensitive options bar (trim/extend still planned) | Built |
-| DS-7 | Dimensions: infer-from-selection tool, driving vs driven, dimension-driven edit | Planned |
+| DS-7 | Dimensions: infer-from-selection tool, driving vs driven, dimension-driven edit — seven kinds (length, segment, width, height, diameter, radius, angle), local exact re-solve, driving values enforced on every Studio state, saved in the Studio document (ADR-272 Amendment 7) | Built |
 | DS-8 | Layered carve (ADR-272 Amendment 1): design layers with per-layer cut type / depth / bit, layers panel with assign-selection, per-bit simulate pass, Apply → one operation per layer feeding the existing multi-bit tool-change job | Built |
 | DS-8b | The canvas becomes the 3D design space (ADR-272 Amendment 2): stock on a grid, drawing on its top face through the shared gesture machine, carve live underneath, Fusion input mapping (left = tool, middle pan, Shift+middle/right orbit, wheel zoom-to-cursor), Top/Iso presets, Design/Bits tiers in the viewport toolbar, 2D canvas kept as fallback toggle | In progress |
 | DS-9 | `SketchShape` arm on `ShapeSpec` — parametric round-trip through `.lf2` | Planned |

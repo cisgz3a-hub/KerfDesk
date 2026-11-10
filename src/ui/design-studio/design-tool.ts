@@ -124,10 +124,9 @@ export const DESIGN_TOOLS: ReadonlyArray<DesignToolDefinition> = [
     kind: 'dimension',
     rail: 'create',
     label: 'Dimension',
-    hint: 'Pick geometry; the dimension type follows what you picked. Type a value to drive it.',
+    hint: 'Click a line, edge, circle or arc to dimension it; click a second line for the angle between them. Type a value in the options bar to drive the shape.',
     shortcut: 'd',
     needsSelection: false,
-    planned: true,
   },
   {
     kind: 'trim',

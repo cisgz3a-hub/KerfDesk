@@ -86,7 +86,8 @@ export const FIRST_BURN_TUTORIAL: Tutorial = {
       visual: 'preview',
     },
   ],
-  tip: 'Only the laser maker knows safe settings for your machine; a material test on scrap is the next best start. Wait for the cut piece to cool before lifting it out.',
+  tip: 'Only the laser maker knows safe settings for your machine; a material test on scrap is the next best start. Wait for the cut piece to cool before lifting it out. To do it with the real controls highlighted one at a time, use Help → Guided first job.',
+  guided: 'first-job',
   keywords: [
     'first burn',
     'beginner',

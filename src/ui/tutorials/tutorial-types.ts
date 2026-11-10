@@ -120,4 +120,7 @@ export type Tutorial = {
   /** The Pro tool the lesson teaches: KerfDesk Free marks it "Pro" and lists it
    *  after the free lessons (UX audit U6-P3-4). */
   readonly pro?: ProFeature;
+  /** The lesson has a live guide in the workspace (ADR-698): the reader offers
+   *  to close and open it. */
+  readonly guided?: 'first-job';
 };
