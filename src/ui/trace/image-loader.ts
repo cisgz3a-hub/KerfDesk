@@ -75,6 +75,7 @@ type HeaderImageInfo = {
   readonly stored: ImageDimensions;
   readonly oriented: ImageDimensions;
   readonly orientation: ExifOrientation;
+  readonly format: 'png' | 'jpeg';
 };
 
 export async function loadImageAsRawData(
@@ -122,13 +123,13 @@ export async function decodeImageOntoCanvas<T>(
   if (header !== null) {
     assertSafeDecodeDimensions(header.oriented);
     const target = scaleToCap(header.oriented.width, header.oriented.height, maxEdge);
-    const resizedBitmap = await decodeResizedImageBitmap(file, header.oriented, target, signal);
-    if (resizedBitmap !== null) {
+    const bitmap = await decodeImageBitmap(file, header, target, signal);
+    if (bitmap !== null) {
       try {
         checkTraceSignal(signal);
-        return rasterizeImage(resizedBitmap, target.width, target.height, read);
+        return rasterizeImage(bitmap, target.width, target.height, read);
       } finally {
-        resizedBitmap.close();
+        bitmap.close();
       }
     }
   }
@@ -169,24 +170,36 @@ export function fitDecodeToStoredGrid(
     : resampled;
 }
 
-async function decodeResizedImageBitmap(
+// A resize decodes through createImageBitmap, off the UI thread. So does a PNG
+// at its own size: drawn from an <img>, its decode ran inside the canvas
+// snapshot on the UI thread (about 0.5 s for 9 MP). The pixels are identical
+// either way, measured in Chromium over 8- and 16-bit grey, RGB, palette with
+// tRNS, grey-alpha and RGBA, gAMA, cHRM, sRGB, a Display P3 ICC profile,
+// Adam7, APNG and eXIf turns. A JPEG keeps the element: the canvas converts
+// its YUV on the GPU, which differs by 1 in some bytes from a bitmap decode.
+async function decodeImageBitmap(
   file: File,
-  source: ImageDimensions,
+  header: HeaderImageInfo,
   target: ImageDimensions,
   signal?: AbortSignal,
 ): Promise<ImageBitmap | null> {
+  const source = header.oriented;
   const needsResize = source.width !== target.width || source.height !== target.height;
-  if (!needsResize || typeof createImageBitmap !== 'function') return null;
+  if ((!needsResize && header.format !== 'png') || typeof createImageBitmap !== 'function') {
+    return null;
+  }
   try {
     // The resize size is the ORIENTED size, so the orientation must be the
     // image's own. Explicit rather than trusting a default the specification
     // has changed: without it a turned phone photo came back squashed.
-    const decoded = createImageBitmap(file, {
-      resizeWidth: target.width,
-      resizeHeight: target.height,
-      resizeQuality: 'high',
-      imageOrientation: 'from-image',
-    });
+    const decoded = needsResize
+      ? createImageBitmap(file, {
+          resizeWidth: target.width,
+          resizeHeight: target.height,
+          resizeQuality: 'high',
+          imageOrientation: 'from-image',
+        })
+      : createImageBitmap(file, { imageOrientation: 'from-image' });
     void decoded.then(
       (bitmap) => {
         if (signal?.aborted === true) bitmap.close();
@@ -344,12 +357,14 @@ async function readHeaderImageInfo(
   signal?: AbortSignal,
 ): Promise<HeaderImageInfo | null> {
   const header = await readImageHeader(file, signal);
-  const parsed = (await readPngHeader(file, header, signal)) ?? parseJpegHeader(header);
+  const png = await readPngHeader(file, header, signal);
+  const parsed = png ?? parseJpegHeader(header);
   if (parsed === null) return null;
   return {
     stored: parsed.stored,
     oriented: orientedDimensions(parsed.stored, parsed.orientation),
     orientation: parsed.orientation,
+    format: png === null ? 'jpeg' : 'png',
   };
 }
 
