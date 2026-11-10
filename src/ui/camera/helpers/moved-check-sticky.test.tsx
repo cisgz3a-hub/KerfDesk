@@ -48,7 +48,18 @@ const record = savedCameraModel({
 const initialCamera = useCameraStore.getState();
 
 // The machine as the camera saw it, slid by (dx, dy) camera pixels.
+// Drawn once per shift: each is a 1280 × 720 picture, and the checks reuse them.
+const frames = new Map<string, RgbaImage>();
 function frame(dx: number, dy: number): RgbaImage {
+  const key = `${dx},${dy}`;
+  const known = frames.get(key);
+  if (known !== undefined) return known;
+  const drawn = drawFrame(dx, dy);
+  frames.set(key, drawn);
+  return drawn;
+}
+
+function drawFrame(dx: number, dy: number): RgbaImage {
   return picture((x, y) => {
     const sx = x - dx;
     const sy = y - dy;
@@ -62,7 +73,13 @@ function frame(dx: number, dy: number): RgbaImage {
 }
 
 // Something else entirely: the camera knocked to look elsewhere.
+let elsewhereFrame: RgbaImage | null = null;
 function elsewhere(): RgbaImage {
+  elsewhereFrame ??= drawElsewhere();
+  return elsewhereFrame;
+}
+
+function drawElsewhere(): RgbaImage {
   return picture(
     (x, y) => 128 + 60 * Math.sin(0.21 * x - 0.11 * y) * Math.cos(0.17 * y + 0.05 * x),
   );
@@ -106,7 +123,9 @@ afterEach(() => {
   useToastStore.getState().dismissToastKey('camera-moved');
 });
 
-describe('a camera-moved warning stays until the view is confirmed', () => {
+// Each check runs the real patch matching on a 1280 × 720 picture: allow for a
+// loaded runner.
+describe('a camera-moved warning stays until the view is confirmed', { timeout: 20_000 }, () => {
   it('is not withdrawn by a later weak match, and the notice keeps showing', async () => {
     const moved = checkCameraMoved(source, frame(12, -7));
     expect(moved.kind).toBe('moved');
@@ -172,7 +191,7 @@ describe('a camera-moved warning stays until the view is confirmed', () => {
   });
 });
 
-describe('Job Review reads the camera-moved warning', () => {
+describe('Job Review reads the camera-moved warning', { timeout: 20_000 }, () => {
   it('carries a showing warning into the Start snapshot, said while camera placement is on', () => {
     checkCameraMoved(source, frame(12, -7));
     const project = useStore.getState().project;

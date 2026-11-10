@@ -395,7 +395,7 @@ export function compareViews(args: {
 }): ViewComparison {
   const { reference, current, lens, pose, bedWidthMm, bedHeightMm } = args;
   const thumb = { thumbWidth: current.width, thumbHeight: current.height };
-  const mask = surroundMask({ lens, pose, ...thumb, bedWidthMm, bedHeightMm });
+  const mask = cachedSurroundMask({ lens, pose, ...thumb, bedWidthMm, bedHeightMm });
   const patches = surroundPatchShifts(reference, current, mask);
   if (patches !== null && patches.textured >= MIN_TEXTURED_PATCHES) {
     if (patches.matched.length < Math.max(3, Math.ceil(patches.textured / 2))) {
@@ -430,4 +430,26 @@ export function compareViews(args: {
     displacementsMm: bedSamplePoints(bedWidthMm, bedHeightMm).map(() => offset),
     worstMm: Math.hypot(offset.x, offset.y),
   };
+}
+
+// The surround mask maps every thumbnail pixel through the lens; it depends
+// only on the model, the thumbnail size and the bed, so a running camera's
+// checks share it instead of recomputing it each time.
+const maskCache = new Map<string, Uint8Array>();
+
+function cachedSurroundMask(args: Parameters<typeof surroundMask>[0]): Uint8Array {
+  const key = JSON.stringify([
+    args.lens,
+    args.pose,
+    args.thumbWidth,
+    args.thumbHeight,
+    args.bedWidthMm,
+    args.bedHeightMm,
+  ]);
+  const known = maskCache.get(key);
+  if (known !== undefined) return known;
+  const mask = surroundMask(args);
+  if (maskCache.size >= 4) maskCache.clear();
+  maskCache.set(key, mask);
+  return mask;
 }
