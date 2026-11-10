@@ -8,6 +8,8 @@ import {
   constrainArcTarget,
   constrainPathTarget,
   finishOpenPath,
+  lockedArcTarget,
+  lockedPathTarget,
   POINT_SEQUENCE_CLOSE_RADIUS_PX,
   updateArcSequence,
   updatePointSequence,
@@ -112,11 +114,14 @@ function handlePathClick(
     return;
   }
   const toleranceMm = POINT_SEQUENCE_CLOSE_RADIUS_PX / positiveScale(pxPerMm);
-  const targetMm = constrainPathTarget(sequence, atMm, {
-    orthoEnabled: session.orthoEnabled,
-    hasObjectSnap: session.activeSnap !== null,
-    closeToleranceMm: toleranceMm,
-  });
+  const targetMm = lockedPathTarget(
+    sequence,
+    constrainPathTarget(sequence, atMm, {
+      orthoEnabled: session.orthoEnabled,
+      hasObjectSnap: session.activeSnap !== null,
+      closeToleranceMm: toleranceMm,
+    }),
+  );
   const advanced = advancePathSequence(sequence, targetMm, {
     closeToleranceMm: toleranceMm,
     hasObjectSnap: session.activeSnap !== null,
@@ -140,10 +145,13 @@ function handleArcClick(atMm: Vec2, session: DesignSession, newEntityId: () => s
     store.setPointSequence(beginArcSequence(atMm));
     return;
   }
-  const targetMm = constrainArcTarget(sequence, atMm, {
-    orthoEnabled: session.orthoEnabled,
-    hasObjectSnap: session.activeSnap !== null,
-  });
+  const targetMm = lockedArcTarget(
+    sequence,
+    constrainArcTarget(sequence, atMm, {
+      orthoEnabled: session.orthoEnabled,
+      hasObjectSnap: session.activeSnap !== null,
+    }),
+  );
   const advanced = advanceArcSequence(sequence, targetMm);
   if (advanced.kind === 'continue') {
     store.setPointSequence(advanced.sequence);

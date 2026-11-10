@@ -62,15 +62,7 @@ export function useDesignPointer(
         handlePointToolClick(at, session, surface.pxPerMm(), newEntityId);
         return;
       }
-      if (isDraftTool(session.tool)) {
-        store.setDraft({
-          tool: session.tool,
-          anchorMm: at,
-          pointerMm: at,
-          modifiers: modifiersOf(event),
-        });
-        return;
-      }
+      if (pressDraftTool(at, event, newEntityId)) return;
       const pxPerMm = surface.pxPerMm();
       if (runDesignClickTool(at, session.tool, surface, event)) return;
       // A grip beats everything under it: the grips sit ON the selection's
@@ -227,6 +219,33 @@ function advanceGesture(at: Vec2, event: React.PointerEvent<HTMLCanvasElement>):
     });
   }
   if (session.marquee !== null) store.setMarquee({ ...session.marquee, pointerMm: at });
+}
+
+// A press with a drag tool armed starts its draft - or, when an earlier click
+// left the draft anchored (ADR-272 Amendment 5), is the second click of a
+// click-move-click draw: it lands the far point and commits, exactly as a
+// drag's release would have.
+function pressDraftTool(
+  at: Vec2,
+  event: React.PointerEvent<HTMLCanvasElement>,
+  newEntityId: () => string,
+): boolean {
+  const store = useDesignStudioStore.getState();
+  const session = store.session;
+  if (session === null) return false;
+  if (session.draft?.released === true) {
+    advanceGesture(at, event);
+    useDesignStudioStore.getState().commitDraft(newEntityId());
+    return true;
+  }
+  if (!isDraftTool(session.tool)) return false;
+  store.setDraft({
+    tool: session.tool,
+    anchorMm: at,
+    pointerMm: at,
+    modifiers: modifiersOf(event),
+  });
+  return true;
 }
 
 function finishGesture(

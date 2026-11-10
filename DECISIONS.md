@@ -14825,6 +14825,50 @@ no gesture at all — only two typed numbers in the inspector.
 6. There is deliberately **no ellipse drawing tool**. The arm exists to make the
    stretch honest; a tool for it is separable work.
 
+### Amendment 5 (2026-11-10) - Typed numeric entry during a draw gesture, and the draw tools' options bar (DS-3c)
+
+Clause 5 promised typed numeric entry as one of the four precision mechanisms
+that stand in for a solver, but a shape could only be typed AFTER it was drawn
+(the DS-3b inspector). Drawing "a 40 by 25 rectangle from here" meant drawing
+something roughly that size and then correcting it - the gesture itself had no
+exact form.
+
+1. **A typed value is a lock on the live gesture, not a replacement for it.**
+   Each draw tool names what an operator types - Line: length, angle;
+   Rectangle: width, height; Circle: radius or diameter; Polyline: the next
+   segment's length and angle; Arc: radius and start angle, then sweep. The
+   boxes sit in the existing options bar (DS-6b) and show live values while
+   drawing. A typed box locks its quantity and the pointer keeps steering the
+   rest, so "50" Enter on a line draws 50 mm toward the cursor and "50" Tab
+   "30" Enter draws it at exactly 30 degrees. This is AutoCAD dynamic input and
+   Fusion sketch entry; LightBurn has no in-gesture entry to copy. Locks are
+   applied when the gesture is READ, never baked into the stored pointer, so
+   one pure function (`core/design/entry`) produces the preview, the 3D overlay
+   and the committed entity alike.
+2. **Keyboard contract.** A digit, decimal point or minus typed on the canvas
+   mid-gesture lands in the first unlocked box, so the mouse never leaves the
+   drawing. Tab locks and moves on; Enter locks and finishes the step (a draft
+   commits, a polyline places its next corner, an arc places its start or end);
+   Enter with nothing typed ends a polyline open, as AutoCAD does; Esc drops the
+   typing and hands the keyboard back to the canvas, and the existing Esc
+   ladder then cancels the gesture. Emptying a box releases its lock. Values
+   accept the shared numeric-entry grammar (`1in`, `100/3`, `2*(3+4)`). A
+   size of zero or less, or a sweep of a full turn, is refused in the box with
+   the reason; nothing else changes (rule 7).
+3. **A click that never became a drag now anchors instead of vanishing.** The
+   line, rectangle and circle tools were drag-only, and nobody can type while
+   holding a drag. A press-and-release that moved less than the minimum entity
+   size keeps the draft anchored; the next click (or Enter) finishes it, and Esc
+   drops it. Dragging works exactly as before. The F-DS5a "a click is not a
+   draw" clause is superseded only in that the click is no longer discarded: it
+   still commits nothing and consumes no undo step.
+4. **Locks ride on the gesture.** They live on `DesignDraft` and on the point
+   sequences, outside history, so a commit, a cancel, or a tool switch takes
+   them with it, and a polyline's next segment is typed afresh. Nothing is
+   persisted, and `.lf2` and the pipeline are untouched.
+5. A typed angle uses the convention the canvas readout already prints, so
+   typing the number the canvas shows reproduces what it shows.
+
 ## ADR-273 - CNC exports record incident-grade tool, settings, and profile provenance (2026-08-01)
 
 **Date:** 2026-08-01

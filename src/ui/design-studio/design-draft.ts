@@ -11,6 +11,7 @@
 // the main workspace's drawing tools, so the two surfaces do not disagree.
 
 import type { SketchEntity } from '../../core/design';
+import { hasEntryLocks, lockPolarPoint, type EntryLocks } from '../../core/design/entry';
 import type { Vec2 } from '../../core/scene';
 
 export type DraftModifiers = {
@@ -29,15 +30,24 @@ export type DesignDraft = {
   readonly anchorMm: Vec2;
   readonly pointerMm: Vec2;
   readonly modifiers: DraftModifiers;
+  // Values typed into the options bar during this gesture (ADR-272 Amendment
+  // 5). Applied when the draft is READ, so the pointer still steers whatever
+  // was not typed.
+  readonly locks?: EntryLocks;
+  // True once a press was released without drawing anything: the anchor is
+  // placed and the next click (or Enter in a typed box) finishes the shape.
+  // Click-move-click is what makes typing a value practical — nobody can type
+  // while holding a drag.
+  readonly released?: boolean;
 };
 
 const DEGREES_PER_CONSTRAINED_STEP = 45;
 const DEG_TO_RAD = Math.PI / 180;
 const RAD_TO_DEG = 180 / Math.PI;
 
-// Turns the gesture into an entity, or null while it is still too small to mean
-// anything. Null is "keep drawing", never an error.
-export function draftToEntity(draft: DesignDraft, id: string): SketchEntity | null {
+// Turns the gesture into an entity. It may still be too small to mean anything;
+// sanitizeEntity says so, and that is "keep drawing", never an error.
+export function draftToEntity(draft: DesignDraft, id: string): SketchEntity {
   switch (draft.tool) {
     case 'line':
       return { kind: 'line', id, start: draft.anchorMm, end: lineEndMm(draft) };
@@ -51,6 +61,13 @@ export function draftToEntity(draft: DesignDraft, id: string): SketchEntity | nu
 // Shift locks the direction to the nearest 45 degrees while preserving the
 // pointer's distance, so a constrained line does not also change length.
 export function lineEndMm(draft: DesignDraft): Vec2 {
+  const free = freeLineEndMm(draft);
+  const locks = draft.locks;
+  if (locks === undefined || !hasEntryLocks(locks)) return free;
+  return lockPolarPoint(draft.anchorMm, free, { lengthMm: locks.length, angleDeg: locks.angle });
+}
+
+function freeLineEndMm(draft: DesignDraft): Vec2 {
   const dx = draft.pointerMm.x - draft.anchorMm.x;
   const dy = draft.pointerMm.y - draft.anchorMm.y;
   if (!draft.modifiers.constrain) return draft.pointerMm;
@@ -84,13 +101,7 @@ export function draftRectMm(draft: DesignDraft): {
   readonly widthMm: number;
   readonly heightMm: number;
 } {
-  let width = Math.abs(draft.pointerMm.x - draft.anchorMm.x);
-  let height = Math.abs(draft.pointerMm.y - draft.anchorMm.y);
-  if (draft.modifiers.constrain) {
-    const side = Math.max(width, height);
-    width = side;
-    height = side;
-  }
+  const { width, height } = draftRectSpan(draft);
   if (draft.modifiers.fromCentre) {
     return {
       origin: { x: draft.anchorMm.x - width, y: draft.anchorMm.y - height },
@@ -110,6 +121,25 @@ export function draftRectMm(draft: DesignDraft): {
   };
 }
 
+// How far the rectangle reaches from its anchor on each axis: the whole size
+// from a corner, half of it from the centre. A typed size is always the
+// rectangle's whole width, so from the centre the pointer spans half of it.
+// Shift still squares: one typed side sets both.
+function draftRectSpan(draft: DesignDraft): { readonly width: number; readonly height: number } {
+  const { constrain, fromCentre } = draft.modifiers;
+  const reachX = Math.abs(draft.pointerMm.x - draft.anchorMm.x);
+  const reachY = Math.abs(draft.pointerMm.y - draft.anchorMm.y);
+  const side = Math.max(reachX, reachY);
+  const locks = draft.locks ?? {};
+  const lockedWidth = locks.width ?? (constrain ? locks.height : undefined);
+  const lockedHeight = locks.height ?? (constrain ? locks.width : undefined);
+  const span = fromCentre ? 2 : 1;
+  return {
+    width: lockedWidth === undefined ? (constrain ? side : reachX) : lockedWidth / span,
+    height: lockedHeight === undefined ? (constrain ? side : reachY) : lockedHeight / span,
+  };
+}
+
 function rectEntity(draft: DesignDraft, id: string): SketchEntity {
   const rect = draftRectMm(draft);
   return {
@@ -126,6 +156,10 @@ function rectEntity(draft: DesignDraft, id: string): SketchEntity {
 // points on the rim), which is how a two-point circle is normally drawn.
 export function circleCentreMm(draft: DesignDraft): Vec2 {
   if (!draft.modifiers.fromCentre) return draft.anchorMm;
+  const locked = draft.locks?.radius;
+  if (locked !== undefined) {
+    return lockPolarPoint(draft.anchorMm, draft.pointerMm, { lengthMm: locked });
+  }
   return {
     x: (draft.anchorMm.x + draft.pointerMm.x) / 2,
     y: (draft.anchorMm.y + draft.pointerMm.y) / 2,
@@ -133,6 +167,8 @@ export function circleCentreMm(draft: DesignDraft): Vec2 {
 }
 
 export function circleRadiusMm(draft: DesignDraft): number {
+  const locked = draft.locks?.radius;
+  if (locked !== undefined) return locked;
   const dx = draft.pointerMm.x - draft.anchorMm.x;
   const dy = draft.pointerMm.y - draft.anchorMm.y;
   const distance = Math.hypot(dx, dy);

@@ -10616,8 +10616,8 @@ into the drawing.
 
 The Design Studio is a full-window overlay for drawing a part to size by hand.
 Flow IDs use the `F-DS` prefix (`F-L` belongs to Image Studio, `F-CNC` to the
-router flows). Stages DS-2 and DS-3 are what these flows describe today; flows
-for the modify operations, dimensions, and the 2.5D view land with DS-6..DS-8.
+router flows). Each flow names the stage that built it; typed entry during a
+draw gesture is F-DS13 (DS-3c).
 
 Nothing in this surface refuses anything (rule 7). Closing never prompts, an
 unfinished tool explains itself in the status bar rather than being disabled, and
@@ -10764,7 +10764,9 @@ is selected so it can be acted on immediately.
 #### Error — a degenerate gesture
 
 1. A press-and-release that never moved commits nothing and consumes no undo
-   step. A click is not a draw. Nothing is reported as a failure.
+   step. Since DS-3c it is not discarded either: the shape stays anchored at
+   the press, follows the pointer, and the next click or a typed value finishes
+   it (F-DS13). Esc drops it. Nothing is reported as a failure.
 
 #### Empty — no drag yet
 
@@ -11097,6 +11099,48 @@ the edge it sits on, and a midpoint over the same edge.
 #### Edge — same bit on every layer
 
 1. One tool section, no tool-change pause: exactly the pre-layer behavior.
+
+### F-DS13. Type a length, angle, or size while drawing (DS-3c, ADR-272 Amendment 5)
+
+1. Arm Line, Rectangle, Circle, Polyline, or Arc. The options bar shows that
+   tool's entry boxes - Length and Angle; Width and Height; Radius and
+   Diameter; Length and Angle for the next Polyline segment; an Arc's Radius
+   and Angle, then Sweep. They are disabled until the first point is placed.
+2. Place the first point: press-and-drag as before, or click once and move
+   away - a click now anchors the shape instead of discarding it.
+3. Type a number without clicking anywhere. It lands in the first unlocked box.
+   Tab locks it and moves to the next box; the locked box takes an accent
+   border and the pointer keeps steering whatever is not typed.
+4. Press Enter. The shape commits at the typed values (one entity, one undo
+   step), a Polyline places its next corner, or an Arc places its start or end.
+   Enter with nothing typed ends a Polyline open.
+
+#### Success
+
+The committed entity measures exactly the typed values in the DS-3b inspector,
+and its direction follows the pointer for every quantity that was not typed.
+
+#### Error - a value that draws nothing
+
+1. A zero or negative size, a sweep of 360 degrees or more, or text that is not
+   a number is refused in that box: it turns red, its tooltip gives the reason,
+   and the gesture and its other locks are unchanged.
+
+#### Empty - nothing typed
+
+1. The boxes track the live values and Enter behaves like the click it stands
+   in for.
+
+#### Edge - releasing, cancelling, and the next segment
+
+1. Emptying a box releases its lock. Esc in a box drops the typing and returns
+   the keyboard to the canvas; the next Esc cancels the gesture, taking every
+   lock with it. A tool switch does the same.
+2. Shift still squares a rectangle: one typed side sets both. With Alt (from
+   the centre), a typed width is the whole width, not the half the pointer
+   spans.
+3. A Polyline's locks clear when its corner is placed, so each segment is typed
+   afresh.
 
 ## F-LEARN1. Contextual visual tutorials
 
