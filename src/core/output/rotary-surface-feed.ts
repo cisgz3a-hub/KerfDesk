@@ -9,26 +9,33 @@
 // glass in the Creality chuck. Each move instead gets F·Lm/Ls, so the surface
 // moves at the layer speed in every direction. A move along X (every image
 // row) has Lm = Ls and keeps F exactly.
+//
+// On a taper (ADR-694) the warp scales Y by f(x) = R_ref / r(x) before k, so
+// the local machine Y per surface mm at a move is k · f(x): the part turns
+// ΔY / (k · R_ref) rad and its surface at radius r(x) moves ΔY / (k · f(x)).
 
 import type { Job } from '../job';
+import { rotaryTaperYFactorAt, type RotaryTaperProfile } from '../job/rotary-taper-profile';
 
 export type RotaryFeedMatch = {
   /** Machine Y mm per surface mm (the rotary's Y scale, k). */
   readonly yScale: number;
   /** The device's feed ceiling; a k > 1 roller cannot ask for more. */
   readonly maxFeedMmPerMin: number;
+  /** The cone of a tapered part (ADR-694); k then varies with X. */
+  readonly taper?: RotaryTaperProfile | undefined;
 };
 
 /** The feed match for a machine-space rotary job with vector burns, or
  * undefined for any other job, whose output must stay byte-identical. Image
  * rows run along X (ADR-492 item 9), so an image-only rotary job needs none. */
 export function rotaryFeedMatchFor(job: Job, maxFeedMmPerMin: number): RotaryFeedMatch | undefined {
-  const yScale = job.rotarySurfaceYScale;
-  if (yScale === undefined || !(yScale > 0) || !Number.isFinite(yScale) || yScale === 1) {
-    return undefined;
-  }
+  const yScale = job.rotarySurfaceYScale ?? 1;
+  const taper = job.rotaryTaper;
+  if (!(yScale > 0) || !Number.isFinite(yScale)) return undefined;
+  if (yScale === 1 && taper === undefined) return undefined;
   if (!job.groups.some((group) => group.kind === 'cut' || group.kind === 'fill')) return undefined;
-  return { yScale, maxFeedMmPerMin };
+  return { yScale, maxFeedMmPerMin, ...(taper === undefined ? {} : { taper }) };
 }
 
 /** The machine feed that moves the surface at `layerFeed` along from → to
@@ -44,7 +51,8 @@ export function surfaceMatchedFeed(
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   const machineMm = Math.hypot(dx, dy);
-  const surfaceMm = Math.hypot(dx, dy / match.yScale);
+  const localScale = match.yScale * rotaryTaperYFactorAt(match.taper, (from.x + to.x) / 2);
+  const surfaceMm = Math.hypot(dx, dy / localScale);
   if (!(machineMm > 0) || !(surfaceMm > 0)) return layerFeed;
   const matched = (layerFeed * machineMm) / surfaceMm;
   const ceiling =
