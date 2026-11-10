@@ -79,7 +79,7 @@ async function render(
 
 function button(text: string): HTMLButtonElement {
   const found = Array.from(host.querySelectorAll('button')).find(
-    (element) => element.textContent === text,
+    (element) => element.textContent === text || element.getAttribute('aria-label') === text,
   );
   if (found === undefined) throw new Error(`Missing button: ${text}`);
   return found;

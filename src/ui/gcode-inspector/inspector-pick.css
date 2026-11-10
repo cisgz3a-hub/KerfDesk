@@ -7,9 +7,10 @@
   gap: 3px;
   max-width: 250px;
   padding: 7px 10px;
-  border: 1px solid var(--lf-border);
+  border: 1px solid var(--lf-viewer-edge);
   border-radius: 8px;
-  background: var(--lf-bg-1);
+  color: var(--lf-viewer-ink);
+  background: var(--lf-viewer-glass-solid);
   box-shadow: 0 6px 18px rgb(0 0 0 / 28%);
   font-size: var(--lf-text-xs);
   font-variant-numeric: tabular-nums;
@@ -18,11 +19,11 @@
 }
 
 .gcode-viewer-move-tip span {
-  color: var(--lf-text-muted);
+  color: var(--lf-viewer-ink-muted);
 }
 
 .gcode-viewer-move-tip em {
-  color: var(--lf-text-muted);
+  color: var(--lf-viewer-ink-muted);
   font-style: normal;
   opacity: 0.75;
 }
