@@ -5,13 +5,11 @@ import type { GcodeInspectionSource } from '../gcode-inspector';
 import { importImageFile } from '../commands/import-image-action';
 import type { ImportOutcome } from '../state/store';
 import type { ToastOptions, ToastVariant } from '../state/toast-store';
-import { importDxfFiles } from './dxf-import-action';
-import { importHpglFile } from './hpgl-import-action';
+import { dispatchVectorFile } from './import-vector-dispatch';
 import { openGcodeFileInInspector } from './gcode-open-action';
 import { importStlFiles } from './stl-import-action';
 import type { StlImportTarget } from './stl-import-size';
 import { useStore } from '../state/store';
-import { importSvgFiles } from './svg-import-action';
 import { importPsdFile } from './psd-import-action';
 import { requestPagedArtwork } from '../import/request-paged-artwork';
 import { describeImportBedFit } from './import-bed-fit-notice';
@@ -23,6 +21,9 @@ export const ARTWORK_IMPORT_EXTENSIONS = [
   '.dxf',
   '.pdf',
   '.ai',
+  '.eps',
+  '.epsf',
+  '.ps',
   '.hpgl',
   '.plt',
   '.png',
@@ -48,7 +49,17 @@ export type ImportDispatchActions = {
   readonly openGcodeInspector?: (name: string, source: GcodeInspectionSource) => void;
 };
 
-type ImportFileKind = 'svg' | 'dxf' | 'pdf' | 'tiff' | 'hpgl' | 'image' | 'stl' | 'gcode' | 'psd';
+type ImportFileKind =
+  | 'svg'
+  | 'dxf'
+  | 'pdf'
+  | 'postscript'
+  | 'tiff'
+  | 'hpgl'
+  | 'image'
+  | 'stl'
+  | 'gcode'
+  | 'psd';
 type RecognizedImportFile = { readonly file: File; readonly kind: ImportFileKind };
 
 /**
@@ -156,7 +167,7 @@ function recognizedImportFiles(
   const ignored = files.length - recognized.length;
   if (ignored > 0) {
     actions.pushToast(
-      `Ignored ${ignored} unsupported file(s). Import SVG, DXF, PDF, compatible AI, HPGL/PLT, images, STL or G-code.`,
+      `Ignored ${ignored} unsupported file(s). Import SVG, DXF, PDF, AI, EPS, HPGL/PLT, images, STL or G-code.`,
       'warning',
     );
   }
@@ -270,6 +281,7 @@ async function dispatchOneFile(
     });
     return;
   }
+  if (await dispatchVectorFile(file, kind, actions, nextSuccessIndex)) return;
   if (kind === 'pdf' || kind === 'tiff') {
     await requestPagedArtwork(file, kind, owner.isCurrent, (object) => {
       const outcome =
@@ -279,31 +291,6 @@ async function dispatchOneFile(
       actions.pushToast('Added artwork: ' + file.name, 'success');
       const fitNotice = describeImportBedFit(file.name, outcome);
       if (fitNotice !== null) actions.pushToast(fitNotice.message, fitNotice.variant);
-    });
-    return;
-  }
-  if (kind === 'svg') {
-    await importSvgFiles([file], actions.importSvgObject, actions.pushToast, {
-      nextSuccessIndex,
-      ...(actions.importSvgFragment === undefined
-        ? {}
-        : { importFragment: actions.importSvgFragment }),
-    });
-    return;
-  }
-  if (kind === 'dxf') {
-    await importDxfFiles([file], {
-      importObject: actions.importSvgObject,
-      pushToast: actions.pushToast,
-      nextSuccessIndex,
-    });
-    return;
-  }
-  if (kind === 'hpgl') {
-    await importHpglFile(file, {
-      importObject: actions.importSvgObject,
-      pushToast: actions.pushToast,
-      nextSuccessIndex,
     });
     return;
   }
@@ -383,6 +370,10 @@ const IMPORT_KINDS_BY_EXTENSION: Readonly<Record<string, ImportFileKind>> = {
   dxf: 'dxf',
   pdf: 'pdf',
   ai: 'pdf',
+  eps: 'postscript',
+  epsf: 'postscript',
+  epsi: 'postscript',
+  ps: 'postscript',
   hpgl: 'hpgl',
   plt: 'hpgl',
   tif: 'tiff',
