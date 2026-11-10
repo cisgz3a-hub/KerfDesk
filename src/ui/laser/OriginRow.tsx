@@ -18,7 +18,7 @@ import {
   HOST_RECORDED_RESET_UNKNOWN_MESSAGE,
   hostRecordedMachinePosition,
 } from '../state/host-recorded-origin';
-import { placementAfterSetOrigin } from './set-origin-placement';
+import { placementAfterSetOrigin, setOriginToast } from './set-origin-placement';
 import { useFocusThroughDisable } from '../common/use-focus-through-disable';
 import { useFreshKeyActivation } from '../common/use-fresh-key-activation';
 
@@ -306,8 +306,7 @@ function makeOriginHandlers(deps: OriginHandlerDeps): {
       void deps
         .setOrigin()
         .then(() => {
-          placementAfterSetOrigin(documentEpoch);
-          deps.pushToast('Origin set to current head position (G92).', 'success');
+          deps.pushToast(setOriginToast(placementAfterSetOrigin(documentEpoch)), 'success');
         })
         .catch(reportOriginActionFailure);
     },
@@ -395,8 +394,13 @@ function AdvancedOriginControls(props: {
     if (!jobAwareConfirm(SET_PERSISTENT_ORIGIN_CONFIRM)) return;
     void setPersistentOrigin()
       .then(() => {
-        placementAfterSetOrigin(documentEpoch);
-        pushToast('Persistent G54 XY origin set; temporary offsets cleared.', 'success');
+        pushToast(
+          setOriginToast(
+            placementAfterSetOrigin(documentEpoch),
+            'Persistent G54 XY origin set; temporary offsets cleared.',
+          ),
+          'success',
+        );
       })
       .catch(reportOriginActionFailure);
   };

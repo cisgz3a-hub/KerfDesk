@@ -99,7 +99,7 @@ function placementWarnings(
   project: Project,
   machine: Pick<
     MachineStartSnapshot,
-    'cameraPlacementActive' | 'cameraMovedWarning' | 'registrationOutline'
+    'cameraPlacementActive' | 'cameraMovedWarning' | 'cameraTargetOnCanvas' | 'registrationOutline'
   >,
   jobOrigin: JobOriginPlacement | undefined,
 ): string[] {
@@ -111,6 +111,7 @@ function placementWarnings(
   return [
     outline ?? cameraPlacementStartFromWarning(machine, jobOrigin, layout, rotary),
     layout === 'place-board' ? placeBoardAbsoluteWarning(jobOrigin) : null,
+    machine.cameraTargetOnCanvas === true ? cameraTargetStartFromWarning(jobOrigin) : null,
     // ADR-663 Amendment 5: artwork placed on a picture from a camera that may
     // have moved may burn away from where it shows.
     machine.cameraPlacementActive === true ? (machine.cameraMovedWarning ?? null) : null,
@@ -118,6 +119,18 @@ function placementWarnings(
 }
 
 type RegistrationLayout = 'place-board' | 'jig' | null;
+
+/** ADR-441 Amendment 10 (rolling audit v13 Y3-P1-2): the camera target's rings
+ * are labelled at the photo by where the target put them, which only Absolute
+ * Coordinates burns. Said here; the photo step refuses rings not seen to burn
+ * there. */
+export function cameraTargetStartFromWarning(
+  jobOrigin: JobOriginPlacement | undefined,
+): string | null {
+  if (jobOrigin === undefined || jobOrigin.startFrom === 'absolute') return null;
+  const mode = START_FROM_NAMES[jobOrigin.startFrom];
+  return `These are the camera calibration target's rings, and Start from is ${mode}. The calibration photo reads each ring as burned where the target put it on the bed, which only Absolute Coordinates does: from ${mode} they burn somewhere else, and the calibration photo will refuse them. Choose Absolute Coordinates, and watch the Frame.`;
+}
 
 // A Place Board outline (ADR-124, ADR-654) anchors the job to the board; any
 // other registration outline is the two-run jig (ADR-057), anchored the same way.

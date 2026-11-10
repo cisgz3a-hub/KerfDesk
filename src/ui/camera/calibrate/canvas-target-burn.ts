@@ -8,7 +8,12 @@
 
 import { DEFAULT_RING_DIAMETER_MM } from '../../../core/camera/target/bed-target';
 import { generateCameraBedTarget } from '../../../core/job/camera-bed-target-pattern';
-import { filterSceneForOutputScope, type Scene, type Transform } from '../../../core/scene';
+import {
+  filterSceneForOutputScope,
+  type Project,
+  type Scene,
+  type Transform,
+} from '../../../core/scene';
 import type { FramedRunCandidate } from '../../state/framed-run';
 import { useLaserStore } from '../../state/laser-store';
 import { cameraBedFrameFor, type NativeBedEvidence } from '../../state/native-bed-frame';
@@ -42,17 +47,23 @@ export function stampCanvasTargetBurn(
   evidence: NativeBedEvidence,
   now: Date = new Date(),
 ): boolean {
-  // Only Absolute Coordinates burn the rings where the target put them.
+  // Only Absolute Coordinates burn the rings where the target put them. A
+  // Start from another mode is remembered too, so the photo step can say why
+  // it cannot calibrate on them (rolling audit v13 Y3-P1-2).
   const startFrom = started.preparedStart.jobOrigin?.startFrom ?? 'absolute';
-  if (startFrom !== 'absolute') return false;
   const { device } = started.project;
   const scene = filterSceneForOutputScope(started.project.scene, started.outputScope);
   let stamped = false;
   for (const headCamera of [false, true]) {
     const target = rememberedEngravedTarget(device, headCamera);
     if (target?.onCanvas !== true || !streamsRings(scene, target)) continue;
+    const { burnSeen: _seen, burnedFrom: _from, ...rest } = target;
+    if (startFrom !== 'absolute') {
+      rememberEngravedTarget(device, headCamera, { ...rest, burnedFrom: startFrom });
+      continue;
+    }
     rememberEngravedTarget(device, headCamera, {
-      ...target,
+      ...rest,
       bedFrame: cameraBedFrameFor(device, evidence),
       engravedAt: now.toISOString(),
       burnSeen: true,
@@ -60,6 +71,14 @@ export function stampCanvasTargetBurn(
     stamped = true;
   }
   return stamped;
+}
+
+/** True when the scene holds the rings of a target put on the canvas, unmoved. */
+export function canvasTargetInScene(project: Pick<Project, 'device' | 'scene'>): boolean {
+  return [false, true].some((headCamera) => {
+    const target = rememberedEngravedTarget(project.device, headCamera);
+    return target?.onCanvas === true && streamsRings(project.scene, target);
+  });
 }
 
 // Every ring of the target's layout is in the job, where the target put it.
