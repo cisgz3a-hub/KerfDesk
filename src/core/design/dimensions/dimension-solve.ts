@@ -12,6 +12,7 @@
 // A value that would leave degenerate geometry is refused (null), never clamped.
 
 import type { Vec2 } from '../../scene';
+import { distance } from '../../geometry/point-math';
 import { MIN_ENTITY_SIZE_MM, sanitizeEntity } from '../sketch-entity';
 import type { Sketch, SketchEntity, SketchLine, SketchPath } from '../sketch-entity';
 import { replaceEntity } from '../sketch-edit';
@@ -257,10 +258,6 @@ function rotate(point: Vec2, pivot: Vec2, turn: number): Vec2 {
   const dx = point.x - pivot.x;
   const dy = point.y - pivot.y;
   return { x: pivot.x + dx * cos - dy * sin, y: pivot.y + dx * sin + dy * cos };
-}
-
-function distance(a: Vec2, b: Vec2): number {
-  return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
 function sameValue(a: number, b: number): boolean {

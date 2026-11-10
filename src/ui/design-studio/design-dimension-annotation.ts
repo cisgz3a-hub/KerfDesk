@@ -15,6 +15,7 @@ import {
 } from '../../core/design/dimensions';
 import { distanceToSegment } from './design-hit-test';
 import type { Vec2 } from '../../core/scene';
+import { addPoints } from '../../core/geometry/point-math';
 import type { DimensionAnnotation } from './design-measure-annotation';
 
 export type PlacedDimension = {
@@ -93,8 +94,8 @@ export function dimensionAtPoint(
 function annotationDistance(annotation: DimensionAnnotation, point: Vec2): number {
   switch (annotation.kind) {
     case 'linear': {
-      const from = shift(annotation.fromMm, annotation.offsetMm);
-      const to = shift(annotation.toMm, annotation.offsetMm);
+      const from = addPoints(annotation.fromMm, annotation.offsetMm);
+      const to = addPoints(annotation.toMm, annotation.offsetMm);
       return distanceToSegment(point, from, to);
     }
     case 'radial':
@@ -227,10 +228,6 @@ function angleAnnotation(sketch: Sketch, dimension: SketchDimension): DimensionA
     startDeg,
     sweepDeg,
   };
-}
-
-function shift(point: Vec2, by: Vec2): Vec2 {
-  return { x: point.x + by.x, y: point.y + by.y };
 }
 
 function modulo(degrees: number): number {
