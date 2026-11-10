@@ -3,6 +3,8 @@
 // the post-compile checks a G-code save runs over the moves the file commands.
 
 import { encodeRdJob, type RdEncodeError } from '../../core/controllers/ruida';
+import { rdFootprint, type RdFootprint } from '../../core/controllers/ruida/rd-frame-job';
+import { rdReferencePointFor } from '../../core/controllers/ruida/rd-encoder';
 import { machineSpaceJob, type JobOriginPlacement } from '../../core/job';
 import { rotaryOutputAxis } from '../../core/job/rotary-job';
 import { rotaryAxisUnsupportedMessage } from '../gcode/rotary-axis-emit';
@@ -30,6 +32,8 @@ export type EmitRdResult =
       // findings plus the post-compile checks over the file's moves (audit
       // RU-7). handleSaveRd toasts them after the write.
       readonly advisories: ReadonlyArray<PreflightIssue>;
+      /** Where the job runs, for the Ruida network Frame and Start (ADR-697). */
+      readonly footprint: RdFootprint;
     }
   | { readonly ok: false; readonly messages: ReadonlyArray<string> };
 
@@ -78,9 +82,13 @@ export function emitPreparedRdFile(
   );
   if (!encoded.ok) return { ok: false, messages: [describeRdEncodeError(encoded.error)] };
   const checks = runRdPreflight(prepared.project, encoded.motion, preflightFrame(options));
+  const footprint = rdFootprint(encoded.motion, rdReferencePointFor(options.jobOrigin));
+  if (footprint === null)
+    return { ok: false, messages: [describeRdEncodeError({ kind: 'empty-job' })] };
   return {
     ok: true,
     bytes: encoded.bytes,
+    footprint,
     advisories: withoutRepeats([...(prepared.advisories ?? []), ...checks]),
   };
 }

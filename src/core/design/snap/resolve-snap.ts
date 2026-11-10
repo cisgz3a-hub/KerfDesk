@@ -12,6 +12,7 @@
 
 import type { Vec2 } from '../../scene';
 import type { Sketch } from '../sketch-entity';
+import { deferredSnapTargets } from './deferred-snaps';
 import { entitySnapPoints } from './entity-snap-points';
 import { intersectionTargets } from './snap-intersections';
 import { ALL_SNAP_KINDS, isBetterSnap, type SnapKind, type SnapTarget } from './snap-kinds';
@@ -29,6 +30,9 @@ export type SnapQuery = {
   // each shape in it follows the cursor, so leaving them snappable makes the
   // pointer chase geometry that is chasing the pointer.
   readonly excludeEntityIds?: ReadonlySet<string>;
+  // Where the live gesture started. Tangent and perpendicular targets exist
+  // only relative to it (ADR-272 Amendment 6); without it they are not offered.
+  readonly fromMm?: Vec2;
 };
 
 export type SnapResult = {
@@ -62,9 +66,12 @@ function candidateTargets(
 ): ReadonlyArray<SnapTarget> {
   const isExcluded = (id: string): boolean =>
     id === query.excludeEntityId || query.excludeEntityIds?.has(id) === true;
-  const named = query.sketch.entities
-    .filter((entity) => !isExcluded(entity.id))
-    .flatMap((entity) => entitySnapPoints(entity));
+  const live = query.sketch.entities.filter((entity) => !isExcluded(entity.id));
+  const named = live.flatMap((entity) => entitySnapPoints(entity));
+  const deferred =
+    query.fromMm !== undefined && (kinds.has('tangent') || kinds.has('perpendicular'))
+      ? deferredSnapTargets(live, query.fromMm)
+      : [];
   const segments = sketchSegments(query.sketch, isExcluded);
   const onLine = kinds.has('on-line')
     ? segments.map(
@@ -80,5 +87,5 @@ function candidateTargets(
   const crossings = kinds.has('intersection')
     ? intersectionTargets(segments, query.pointMm, query.toleranceMm)
     : [];
-  return [...named, ...crossings, ...onLine];
+  return [...named, ...crossings, ...deferred, ...onLine];
 }

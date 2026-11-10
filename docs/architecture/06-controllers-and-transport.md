@@ -42,7 +42,7 @@ cutting accessory.
 | FluidNC | ADR-094 I.2 | Simulator only; settings read-only |
 | Marlin | ADR-095 (`:4101`) | Simulator only — queued `M114`, stream-side pause, `G28 X Y`, `M400` settle |
 | Smoothieware | ADR-096 (`:4129`) | Simulator only — fractional `S` (e.g. `S0.500` at 0–1.0 scale) |
-| Ruida | ADR-097 (`:4153`) | **Experimental** `.rd` export, `transport: 'file-only'`, never accepted by real hardware |
+| Ruida | ADR-097 (`:4153`), ADR-697 | **Experimental** `.rd` export, `transport: 'file-only'` for the line store, never accepted by real hardware; desktop UDP link simulator only |
 
 No machine is qualified. This table used to mark both GRBL rows hardware-verified on the
 maintainer's Falcon A1 Pro (2026-07-02), and inferred from that pass that the ADR-094 driver
@@ -138,8 +138,11 @@ file line number, and **the two must not drift**.
   operator, with no discovery or automatic replay. Setup retries retain the chosen protocol;
   loss does not silently select a remembered USB port. This is software support, not physical
   controller qualification or background-worker streaming.
-- **Ruida:** `transport: 'file-only'` — no live link. The pure UDP session state machine exists as
-  groundwork only (`PROJECT.md:242-244`).
+- **Ruida:** `transport: 'file-only'` for the line-based laser store. On the desktop, ADR-697 adds a
+  separate UDP link: the main process's bridge (`electron/ruida-network-*.ts`) carries datagrams for
+  the Ruida network store (`src/ui/state/ruida-network/`), which drives the pure UDP session state
+  machine for Start, a travel-only Frame, Pause, Resume, Abort and status reads. Simulator-tested
+  only; not qualified on a real controller.
 
 ## Console and diagnostics
 

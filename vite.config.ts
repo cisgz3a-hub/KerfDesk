@@ -19,8 +19,9 @@ import {
 const PROJECT_ROOT = dirname(fileURLToPath(import.meta.url));
 // I/O modules that only workers or a rare in-window fallback load (see
 // manualChunks below and scripts/check-boot-bundle.mjs).
+// Also the PostScript reader (ADR-700): it loads on the first EPS/AI import.
 const WORKER_SIDE_IO =
-  /\/src\/io\/(?:tiff\/|raster-decode\/|svg\/parse-svg-worker\.ts$|xml\/read-xml-document-from-blob\.ts$)/;
+  /\/src\/io\/(?:tiff\/|raster-decode\/|postscript\/|svg\/parse-svg-worker\.ts$|xml\/read-xml-document-from-blob\.ts$)/;
 const DESKTOP_RELEASE_VERSION_ENV = 'KERFDESK_DESKTOP_VERSION';
 const BUILD_APP_VERSION = resolveBuildAppVersion(
   appVersion(),

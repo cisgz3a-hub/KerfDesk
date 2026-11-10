@@ -2,10 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SceneObject } from '../../core/scene';
 import { dispatchImportFilesInOrder, importFileKind } from './import-dispatch';
 
-const calls = vi.hoisted(() => ({ page: vi.fn(), image: vi.fn(), hpgl: vi.fn() }));
+const calls = vi.hoisted(() => ({ page: vi.fn(), image: vi.fn(), hpgl: vi.fn(), ps: vi.fn() }));
 vi.mock('../import/request-paged-artwork', () => ({ requestPagedArtwork: calls.page }));
 vi.mock('../commands/import-image-action', () => ({ importImageFile: calls.image }));
 vi.mock('./hpgl-import-action', () => ({ importHpglFile: calls.hpgl }));
+vi.mock('./postscript-import-action', async (original) => ({
+  ...(await original<Record<string, unknown>>()),
+  importPostscriptFile: calls.ps,
+}));
 
 function actions() {
   return {
@@ -35,6 +39,9 @@ describe('additional import formats', () => {
   it.each([
     ['plan.PDF', 'pdf'],
     ['drawing.ai', 'pdf'],
+    ['logo.eps', 'postscript'],
+    ['logo.EPSF', 'postscript'],
+    ['plot.ps', 'postscript'],
     ['drawing.hpgl', 'hpgl'],
     ['drawing.plt', 'hpgl'],
     ['photo.BMP', 'image'],
@@ -43,6 +50,29 @@ describe('additional import formats', () => {
     ['scan.TIFF', 'tiff'],
   ])('classifies %s as %s', (name, kind) => {
     expect(importFileKind({ name, type: '' })).toBe(kind);
+  });
+
+  it('routes EPS and Illustrator 3–8 files to the PostScript reader, PDF-based AI to PDF', async () => {
+    calls.ps.mockImplementation(async (_file, callbacks) => {
+      callbacks.importObject(vector, callbacks.nextSuccessIndex());
+    });
+    calls.page.mockImplementationOnce(pageResult(vector));
+    const ctx = actions();
+    await dispatchImportFilesInOrder(
+      [
+        new File(['%!PS-Adobe-3.0 EPSF-3.0\n'], 'logo.eps'),
+        new File(['%!PS-Adobe-2.0 EPSF-1.2\n%%Creator:Adobe Illustrator(TM) 3.2\n'], 'old.ai'),
+        new File(['%PDF-1.5\n%AI file with PDF\n'], 'modern.ai'),
+      ],
+      ctx,
+    );
+    expect(calls.ps.mock.calls.map(([file]) => (file as File).name)).toEqual([
+      'logo.eps',
+      'old.ai',
+    ]);
+    expect(calls.page).toHaveBeenCalledOnce();
+    const indexes = ctx.importSvgObject.mock.calls.map((call) => (call as unknown[])[1]);
+    expect(indexes).toEqual([0, 1, 2]);
   });
 
   it('routes plotter artwork through HPGL and shares successful placement indexes', async () => {

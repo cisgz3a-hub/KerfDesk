@@ -31,10 +31,15 @@ import { pointSequencePreviewPolylines, type DesignPointSequence } from './desig
 import type { DesignMarquee, DesignView } from './design-session';
 import { mmToPx } from './design-view';
 import type { SketchExtension } from '../../core/design/ops/extend-sketch';
+import type { SketchTrim } from '../../core/design/ops/trim-sketch';
 import { paintExtension } from './design-extend-draw';
+import type { DesignTracking } from './design-tracking';
+import type { PlacedDimension } from './design-dimension-annotation';
 
 export type DesignOverlayPaint = {
   readonly extendPreview?: SketchExtension | null;
+  // The piece the Trim tool would remove (ADR-272 Amendment 8).
+  readonly trimPreview?: SketchTrim | null;
   readonly view: DesignView;
   readonly draft: DesignDraft | null;
   readonly pointSequence: DesignPointSequence | null;
@@ -45,6 +50,11 @@ export type DesignOverlayPaint = {
   readonly measuredField: EntityField | null;
   // The geometric snap under the pointer, marked with a per-kind glyph.
   readonly snap: SnapTarget | null;
+  // Polar / alignment guides that moved the pointer (ADR-272 Amendment 6).
+  readonly tracking?: DesignTracking | null;
+  // Placed dimensions (ADR-272 Amendment 7) and the one being edited.
+  readonly dimensions?: ReadonlyArray<PlacedDimension>;
+  readonly activeDimensionId?: string | null;
   readonly widthPx: number;
   readonly heightPx: number;
 };
@@ -59,11 +69,18 @@ const TAU = Math.PI * 2;
 
 export function paintDesignOverlay(ctx: CanvasRenderingContext2D, paint: DesignOverlayPaint): void {
   ctx.clearRect(0, 0, paint.widthPx, paint.heightPx);
+  for (const placed of paint.dimensions ?? []) {
+    const stroke =
+      placed.id === paint.activeDimensionId ? canvasTheme.selection : canvasTheme.measureStroke;
+    paintAnnotation(ctx, paint.view, placed.annotation, placed.label, stroke);
+  }
   if (paint.marquee !== null) paintMarquee(ctx, paint.view, paint.marquee);
   if (paint.draft !== null) paintDraft(ctx, paint.view, paint.draft);
   if (paint.pointSequence !== null) paintPointSequence(ctx, paint.view, paint.pointSequence);
   paintMeasurement(ctx, paint);
   if (paint.extendPreview != null) paintExtension(ctx, paint.view, paint.extendPreview);
+  if (paint.trimPreview != null) paintTrimPreview(ctx, paint.view, paint.trimPreview);
+  if (paint.tracking != null) paintTracking(ctx, paint.view, paint.tracking);
   // Drawn last so the snap glyph is never hidden behind a draft or a dimension.
   if (paint.snap !== null) paintSnapMarker(ctx, paint.view, paint.snap);
 }
@@ -133,6 +150,58 @@ function paintDraft(ctx: CanvasRenderingContext2D, view: DesignView, draft: Desi
     case 'circle':
       paintDraftCircle(ctx, view, draft);
       break;
+  }
+}
+
+const TRACKING_DASH_PX: ReadonlyArray<number> = [2, 4];
+
+// The doomed piece, dashed in the trim colour the main workspace's Trim uses.
+function paintTrimPreview(ctx: CanvasRenderingContext2D, view: DesignView, trim: SketchTrim): void {
+  const first = trim.removed[0];
+  if (first === undefined) return;
+  ctx.save();
+  ctx.strokeStyle = canvasTheme.trimHighlight;
+  ctx.lineWidth = 3;
+  ctx.setLineDash([6, 3]);
+  ctx.beginPath();
+  const start = mmToPx(view, first);
+  ctx.moveTo(start.x, start.y);
+  for (const point of trim.removed.slice(1)) {
+    const at = mmToPx(view, point);
+    ctx.lineTo(at.x, at.y);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+// Dotted guides in the snap colour, so a tracked point reads as "lined up"
+// and never as geometry. A polar ray also names its angle.
+function paintTracking(
+  ctx: CanvasRenderingContext2D,
+  view: DesignView,
+  tracking: DesignTracking,
+): void {
+  ctx.save();
+  ctx.strokeStyle = canvasTheme.snapGuide;
+  ctx.lineWidth = 1;
+  ctx.setLineDash(TRACKING_DASH_PX);
+  for (const guide of tracking.guides) {
+    const from = mmToPx(view, guide.fromMm);
+    const to = mmToPx(view, guide.toMm);
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.stroke();
+  }
+  ctx.restore();
+  const ray = tracking.guides[0];
+  if (tracking.polarDeg !== null && ray !== undefined) {
+    const at = mmToPx(view, ray.toMm);
+    drawLabel(
+      ctx,
+      { x: at.x, y: at.y - LABEL_HEIGHT_PX - LABEL_OFFSET_PX },
+      `${tracking.polarDeg}°`,
+    );
   }
 }
 

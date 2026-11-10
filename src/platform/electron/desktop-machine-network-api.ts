@@ -34,16 +34,25 @@ export function runningTimeDeadline(timeoutMs: number, expire: () => void): () =
   return () => clearTimeout(timer);
 }
 
-export function machineNetworkRequest(fetcher: typeof fetch = fetch): MachineNetworkRequest {
+/** The desktop main process's Ruida UDP routes (electron/ruida-network-routes.ts, ADR-697). */
+export const RUIDA_NETWORK_ROUTE = {
+  url: 'app://app/api/ruida-network/',
+  header: 'X-KerfDesk-Ruida-Network',
+} as const;
+
+export function machineNetworkRequest(
+  fetcher: typeof fetch = fetch,
+  route: { readonly url: string; readonly header: string } = MACHINE_NETWORK_ROUTE,
+): MachineNetworkRequest {
   return async (action, body) => {
     const controller = new AbortController();
     const cancelDeadline = runningTimeDeadline(action === 'open' ? 8000 : 5000, () =>
       controller.abort(),
     );
     try {
-      const response = await fetcher(`${MACHINE_NETWORK_ROUTE.url}${action}`, {
+      const response = await fetcher(`${route.url}${action}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', [MACHINE_NETWORK_ROUTE.header]: '1' },
+        headers: { 'Content-Type': 'application/json', [route.header]: '1' },
         body: JSON.stringify(body),
         signal: controller.signal,
         cache: 'no-store',

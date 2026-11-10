@@ -26,7 +26,7 @@ beforeEach(() => {
   studio.setState({ session: createDesignSession(), stash: null });
 });
 
-it('arms all nine shipped tools', async () => {
+it('arms all eleven shipped tools', async () => {
   const host = await mountControl(
     <>
       <DesignToolRails />
@@ -40,11 +40,13 @@ it('arms all nine shipped tools', async () => {
     ['Rectangle', 'rect'],
     ['Circle', 'circle'],
     ['Arc', 'arc'],
+    ['Dimension', 'dimension'],
     ['Fillet', 'fillet'],
     ['Chamfer', 'chamfer'],
+    ['Trim', 'trim'],
     ['Extend', 'extend'],
   ];
-  expect(host.querySelectorAll('aside button')).toHaveLength(9);
+  expect(host.querySelectorAll('aside button')).toHaveLength(11);
   for (const [label, kind] of choices) {
     await clickControl(host, label!);
     expect(studio.getState().session?.tool).toBe(kind);

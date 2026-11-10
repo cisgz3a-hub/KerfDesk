@@ -4,12 +4,16 @@
 // LightBurn's convention, and the reason its toolbars stay readable: controls that
 // belong to the ARMED TOOL live here and swap with it, rather than crowding one
 // static bar. A tool with nothing to configure shows its hint instead of an empty
-// strip, so the row never looks broken.
+// strip, so the row never looks broken. A draw tool puts its typed-entry boxes
+// here (ADR-272 Amendment 5, DS-3c): the same row a fillet types its radius into.
 
 import { useState } from 'react';
 import { formatFieldNumber, parseFieldNumber } from './design-field-format';
 import { DESIGN_TOOL_BY_KIND } from './design-tool';
 import { useDesignStudioStore } from './design-studio-store';
+import { DesignEntryFields } from './DesignEntryFields';
+import { hasTypedEntry } from './design-typed-entry';
+import { DesignDimensionFields } from './DesignDimensionFields';
 
 export function DesignOptionsBar(): JSX.Element | null {
   const session = useDesignStudioStore((state) => state.session);
@@ -36,6 +40,8 @@ export function DesignOptionsBar(): JSX.Element | null {
           title="Chamfer setback in mm, measured along both legs. Click a corner to flatten it."
         />
       ) : null}
+      {hasTypedEntry(session.tool) ? <DesignEntryFields /> : null}
+      {session.tool === 'dimension' ? <DesignDimensionFields /> : null}
       <span style={hintStyle}>{tool.hint}</span>
     </div>
   );

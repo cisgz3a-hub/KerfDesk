@@ -8758,6 +8758,37 @@ as the pane's design record.
 1. The export refuses with "Layer … uses Fill/Image raster output, which the
    experimental .rd encoder does not support yet."
 
+### F-H5. Run a Ruida job over the network (desktop, EXPERIMENTAL — ADR-697)
+
+Simulator-tested only; no real Ruida has run this path.
+
+#### Success
+1. Machine details shows **Ruida network connection (experimental)** on the
+   desktop app for a Ruida profile, with the not-qualified warning. The user
+   enters the controller's IPv4 address from its panel and clicks **Connect
+   Ruida**. KerfDesk reads the status bits; only an answer counts as connected.
+2. **Frame (laser off)** sends a travel-only .rd job around the job's bounds,
+   with the job's placement. It counts as complete once the controller has
+   reported busy and then idle twice.
+3. **Start** sends the exact bytes Save .rd would write, datagram by datagram,
+   and lists the job's warnings. **Pause**, **Resume** and **Abort** send
+   Pause, Restore and Stop Process. The job ends when the controller reports
+   idle.
+
+#### Refusals and failures
+1. Start without a completed Frame of the same footprint on this connection:
+   "Frame this job first…"; nothing is sent.
+2. Current Position placement is refused (the link does not read the head
+   position back); Save .rd still exports it.
+3. A controller that reports itself busy, or does not answer, is sent nothing.
+4. A datagram refused four times or left without a verdict for 1 s ends the
+   send without a resend; KerfDesk sends Stop Process and says whether the
+   controller acknowledged it. An unacknowledged stop says to press Stop on
+   the panel.
+5. Port 40200 already in use (LightBurn, RDWorks): Connect fails and names them.
+6. A crashed window, a window that stops reading for 15 s, quitting, or
+   Windows ending the session: the main process sends Stop Process.
+
 ## Phase K flows (box generator — ADR-106)
 
 ### F-K1. Generate a finger-joint box
@@ -10608,8 +10639,8 @@ into the drawing.
 
 The Design Studio is a full-window overlay for drawing a part to size by hand.
 Flow IDs use the `F-DS` prefix (`F-L` belongs to Image Studio, `F-CNC` to the
-router flows). Stages DS-2 and DS-3 are what these flows describe today; flows
-for the modify operations, dimensions, and the 2.5D view land with DS-6..DS-8.
+router flows). Each flow names the stage that built it; typed entry during a
+draw gesture is F-DS13 (DS-3c); tracking and deferred snaps are F-DS14 (DS-4b); dimensions are F-DS15 (DS-7); Trim is F-DS16 (DS-6c).
 
 Nothing in this surface refuses anything (rule 7). Closing never prompts, an
 unfinished tool explains itself in the status bar rather than being disabled, and
@@ -10756,7 +10787,9 @@ is selected so it can be acted on immediately.
 #### Error — a degenerate gesture
 
 1. A press-and-release that never moved commits nothing and consumes no undo
-   step. A click is not a draw. Nothing is reported as a failure.
+   step. Since DS-3c it is not discarded either: the shape stays anchored at
+   the press, follows the pointer, and the next click or a typed value finishes
+   it (F-DS13). Esc drops it. Nothing is reported as a failure.
 
 #### Empty — no drag yet
 
@@ -11090,6 +11123,164 @@ the edge it sits on, and a midpoint over the same edge.
 
 1. One tool section, no tool-change pause: exactly the pre-layer behavior.
 
+### F-DS13. Type a length, angle, or size while drawing (DS-3c, ADR-272 Amendment 5)
+
+1. Arm Line, Rectangle, Circle, Polyline, or Arc. The options bar shows that
+   tool's entry boxes - Length and Angle; Width and Height; Radius and
+   Diameter; Length and Angle for the next Polyline segment; an Arc's Radius
+   and Angle, then Sweep. They are disabled until the first point is placed.
+2. Place the first point: press-and-drag as before, or click once and move
+   away - a click now anchors the shape instead of discarding it.
+3. Type a number without clicking anywhere. It lands in the first unlocked box.
+   Tab locks it and moves to the next box; the locked box takes an accent
+   border and the pointer keeps steering whatever is not typed.
+4. Press Enter. The shape commits at the typed values (one entity, one undo
+   step), a Polyline places its next corner, or an Arc places its start or end.
+   Enter with nothing typed ends a Polyline open.
+
+#### Success
+
+The committed entity measures exactly the typed values in the DS-3b inspector,
+and its direction follows the pointer for every quantity that was not typed.
+
+#### Error - a value that draws nothing
+
+1. A zero or negative size, a sweep of 360 degrees or more, or text that is not
+   a number is refused in that box: it turns red, its tooltip gives the reason,
+   and the gesture and its other locks are unchanged.
+
+#### Empty - nothing typed
+
+1. The boxes track the live values and Enter behaves like the click it stands
+   in for.
+
+#### Edge - releasing, cancelling, and the next segment
+
+1. Emptying a box releases its lock. Esc in a box drops the typing and returns
+   the keyboard to the canvas; the next Esc cancels the gesture, taking every
+   lock with it. A tool switch does the same.
+2. Shift still squares a rectangle: one typed side sets both. With Alt (from
+   the centre), a typed width is the whole width, not the half the pointer
+   spans.
+3. A Polyline's locks clear when its corner is placed, so each segment is typed
+   afresh.
+
+### F-DS14. Track angles, tangents and alignments while drawing (DS-4b, ADR-272 Amendment 6)
+
+1. With Snap and **Track** on (the default; Shift+T toggles Track), start a
+   Line, Polyline or Arc. Moving the pointer near a multiple of the polar step
+   (15 degrees by default; change it in the picker beside Track) pulls it onto
+   that ray; a dotted guide runs from the start and the angle is labelled.
+2. Hover a circle or arc from the start point: its tangent points and radial
+   points snap, marked with the tangent glyph or the right-angle glyph. Hover a
+   line or straight edge: the foot of the perpendicular from the start snaps.
+3. Move level with another object's corner, midpoint, centre or quadrant, or
+   with a corner already placed in this gesture: the pointer lines up on X
+   and/or Y and a dotted guide connects the two. Where a polar ray crosses such
+   a line, the pointer takes the crossing.
+4. Drag a selection: its box lines up with other objects' left / centre /
+   right and bottom / middle / top, with a guide along the shared line.
+
+#### Success
+
+The status bar names the snap ("Snap: tangent") or the tracking ("Track: 30°",
+"Track: aligned"), and the committed point is exactly on the guide or target
+shown.
+
+#### Error - nothing to track
+
+1. A tangent needs a start outside the circle, and a foot must land within the
+   segment; when neither exists no target is offered. Ellipses and rounded
+   rectangle corners offer no tangent or perpendicular. Nothing is reported as
+   a failure.
+
+#### Empty - no gesture yet
+
+1. Before the first point, only alignment guides act (there is no start to
+   track an angle or a tangent from).
+
+#### Edge - priorities and switches
+
+1. A real point (endpoint, intersection, midpoint, centre, quadrant) always
+   beats tangent and perpendicular, which beat an edge; every object snap
+   beats tracking, and tracking beats the grid.
+2. Ortho turns polar tracking off; Snap off turns all of it off and leaves the
+   pointer where it is. A rectangle or circle tracks alignment only, never a
+   polar angle.
+
+### F-DS15. Dimension a part and drive it by value (DS-7, ADR-272 Amendment 7)
+
+1. Arm **Dimension** (D). Click a rectangle edge for its width or height, a
+   polyline segment for its length, a circle for its diameter, or an arc for
+   its radius. The dimension appears at once, driving, at the current size.
+2. Click a line: the status bar asks for a second pick. Click another line for
+   the angle between them, or anywhere else for the line's length.
+3. The options bar shows the dimension being edited: type a value and press
+   Enter. The shape re-solves to it as one undo step.
+4. Untick **Driving** to make it a reference: it is drawn in parentheses and
+   follows the geometry. Tick it again to drive at the current reading.
+5. Click a placed dimension's line to edit it again; **Delete dimension** (or
+   the Delete key) removes it and leaves the geometry.
+
+#### Success
+
+The shape measures exactly the typed value in the inspector, the dimension
+reads it, and one Ctrl+Z restores both.
+
+#### Error - a value that cannot be honoured
+
+1. A size at or below 0.01 mm, an angle of 0 or 180 degrees or more, or text
+   that is not a number turns the box red with the reason; the geometry is
+   unchanged. Parallel lines and ellipses offer no dimension.
+
+#### Empty - no dimensions
+
+1. A sketch without dimensions saves, applies and cuts exactly as before.
+
+#### Edge - ownership and removal
+
+1. While a dimension drives, a stretch, grip or node edit cannot change that
+   quantity: the driving value is re-imposed. Typing the same quantity in the
+   properties box drives the dimension instead, so the typed value sticks.
+2. Deleting a dimensioned shape, or turning a circle into an ellipse by
+   stretching it, drops the dimensions that named it.
+3. Only the dimensioned entity moves: a line joined to the resized one does
+   not follow (there is no constraint solver, ADR-272 clause 5).
+4. In the 3D surface dimensions are picked and edited but drawn only in 2D.
+
+### F-DS16. Trim a piece back to its crossings (DS-6c, ADR-272 Amendment 8)
+
+1. Arm **Trim** (T) on the Modify rail.
+2. Hover a piece of a line, polyline, rectangle, circle or arc that other
+   geometry crosses. The piece between the nearest crossing on each side is
+   highlighted dashed in the trim colour, and the status bar says a click will
+   trim it.
+3. Click. The piece is removed as one undo step; the highlight moves to
+   whatever piece is now under the pointer, so keep clicking to trim a row.
+
+#### Success
+
+A line trimmed in the middle becomes two lines; a closed outline opens into a
+polyline; a circle becomes an arc. Each piece keeps its layer and construction
+flag, and Ctrl+Z restores the entity whole.
+
+#### Error - nothing to trim to
+
+1. A piece nothing crosses, or a closed outline crossed fewer than twice, is
+   reported in the status bar and left alone: Delete removes a whole shape.
+2. Ellipses and round-cornered rectangles are reported as not trimmable yet.
+
+#### Empty - nothing under the pointer
+
+1. No highlight; the status bar describes the tool. A click does nothing.
+
+#### Edge - cutting edges and dimensions
+
+1. Every other entity cuts, construction geometry included; an ellipse cuts
+   along its drawn outline.
+2. A dimension on a circle that becomes an arc is dropped with it (F-DS15).
+3. Escape disarms Trim and keeps the selection, as it does Extend.
+
 ## F-LEARN1. Contextual visual tutorials
 
 ### Success
@@ -11098,6 +11289,7 @@ the edge it sits on, and a midpoint over the same edge.
 2. Global entry points show a searchable library with categories and machine filters. A contextual entry opens that feature's lesson directly, regardless of the library's current filters.
 3. The user reads the prerequisite/location, chooses a numbered step, and compares the illustrated Before/Action/Result stages. Optional playback changes only the example. Next, Back and Restart navigate the lesson.
 4. **Finish lesson** records completion on this device. Closing or Escape returns focus to the originating control when it remains available. Closing nested help leaves the underlying editor/dialog open.
+5. **Burn your first coaster** also offers **Guide me in KerfDesk**, which closes the lesson and opens the guided first job (F-LEARN2, ADR-698) to do the same journey with the real controls.
 
 ### Error
 
@@ -11110,3 +11302,36 @@ No search matches: show a clear empty state and **Show all tutorials**, which cl
 ### Edge
 
 Tutorials never open automatically, submit forms, invoke tool commands, change artwork or send controller commands. Every lesson remains reachable from Learn, including those for controls that no longer carry their own button. Reduced motion keeps explicit static example-stage controls. The learning surface registers as a modal to isolate application shortcuts, appears above studio dialogs, and stays below the live-motion control bar. Completion is a reading aid, not a qualification or prerequisite for using a tool or starting a job.
+
+## F-LEARN2. Guided first job (ADR-698)
+
+### Success
+
+1. The user opens **Help → Guided first job…**, presses **Guide me in KerfDesk** in the "Burn your first coaster" lesson, or finds it with Ctrl+K. A panel opens over the bottom-left of the canvas; the workspace stays usable around it.
+2. The panel lists six steps and expands the first one not done: **Connect your laser**, **Choose your machine**, **Put something on the canvas**, **Pick a material preset**, **Frame it**, **Start and stay with it**. The real control for that step (Connect, the Machine Setup button, the Artwork panel's Materials tab, Frame job, Start) is outlined; **Show me** opens its panel and focuses it without pressing it.
+3. Each step completes when the app's state does: the controller connects; Machine Setup is saved for the connected profile and controller; artwork is on the canvas (the operator may press **Add a sample circle**, a 40 mm circle in the middle of the bed, one undo step); a job material is chosen or an output operation in use holds or links a library preset; a clean Frame of the current job completes; a job starts. The panel then says the job is under way, to stay with the laser and that ABORT JOB stops it.
+4. Start still goes through the Frame gate and Job Review exactly as in F-B6; the guide adds no check, warning or refusal of its own.
+5. **Close** hides the panel; Help → Guided first job reopens it at the current step. **Start over** clears skipped steps for another job.
+
+### Edge
+
+- An edit after Frame expires the Frame as usual; the guide goes back to **Frame it**. Disconnecting goes back to **Connect your laser**.
+- **Choose your machine** and **Pick a material preset** offer **Skip this step** for an operator using the maker's settings or a material test; Frame and Start cannot be skipped.
+- With the machine set to CNC the panel says it follows a laser job; the Frame and Start steps work the same.
+- The guide never opens by itself, connects, homes, frames, starts or changes a setting. Dialogs, Job Review, toasts and Live Motion sit above it.
+
+## F-LEARN3. Simple view (ADR-698)
+
+### Success
+
+1. **Window → Simple View** or **Settings → General → Simple view → Hide advanced operation settings** turns it on. The choice belongs to this computer and is off until the operator turns it on.
+2. With laser artwork selected, the Operation tab shows the process (Line, Fill, Image), Power, Speed, Passes and every notice it shows anyway (starter values, mixed settings, process notices, who an edit reaches, Include in output). Fill's spacing and angle, the Image essentials, **Scan both ways**, **Air assist** and **More cut settings** give way to a short note.
+3. The note lists, with its value, each hidden setting this process uses whose value differs from a new operation's (for example `Line spacing: 0.05 mm`, `Air assist: on`, `Overcut: 1.5 mm`), or that differs between the selected artworks. With none, it says the other settings are at their usual values.
+4. **Show all settings** turns Simple view off and every control returns. Window → Simple View turns it back on.
+5. On the Artwork tab, **Advanced artwork settings** (the Power multiplier) is hidden only while it is 100% for every selected artwork.
+
+### Edge
+
+- Simple view changes only what the operation panel shows: no value, project, recipe, Preview, Job Review warning, Pause, Abort, run control or G-code changes, and it adds no undo step.
+- A Cut Settings dialog already open stays open when Simple view turns on.
+- CNC operation settings and the Cut Settings dialog show every setting in this increment.
