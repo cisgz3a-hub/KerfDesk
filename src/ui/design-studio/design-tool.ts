@@ -132,10 +132,9 @@ export const DESIGN_TOOLS: ReadonlyArray<DesignToolDefinition> = [
     kind: 'trim',
     rail: 'modify',
     label: 'Trim',
-    hint: 'Click a segment to cut it back to its nearest intersection.',
+    hint: 'Hover a piece between crossings to preview it, then click to cut it back to them. Undo restores it.',
     shortcut: 't',
     needsSelection: false,
-    planned: true,
   },
   {
     kind: 'extend',
