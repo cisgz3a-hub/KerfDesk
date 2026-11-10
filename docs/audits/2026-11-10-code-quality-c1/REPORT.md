@@ -202,7 +202,7 @@ Shipped `src/` files at exactly 400 counted lines: `laser-interactive-command.ts
 
 ## Suggested order of work
 
-1. Merge #1677 so `main` is green.
+1. Done: #1677 merged on 2026-11-10 and `main` (`4c4b98fd0`) has the fix for C1-P1-1.
 2. Owner: add the merge queue to the ruleset (C1-P1-2).
 3. Typecheck and lint the Electron tests, and fix the 22 errors (C1-P2-1).
 4. Replace the hand-kept script test list with a glob, and fix `build-artcraft-preview.test.mjs` (C1-P2-2).
