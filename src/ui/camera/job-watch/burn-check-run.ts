@@ -21,7 +21,14 @@ import {
   planBedPositionKnown,
   planPlacesOnBed,
 } from './job-burn-route';
-import { flattenedPicture, type WatchCamera, type WatchIo } from './job-watch-camera';
+import {
+  flattenedPicture,
+  flattenSpecFor,
+  UNSEEN_REGION_MESSAGE,
+  type FlatPicture,
+  type WatchCamera,
+  type WatchIo,
+} from './job-watch-camera';
 import type { BurnCheckView } from './job-watch-store';
 
 const BURN_LIMITS = { maxPixelsPerMm: 4, maxSidePx: 2400, maxPixels: 4_000_000 };
@@ -85,11 +92,7 @@ export async function takeBeforePicture(args: {
   if (region === null) return { kind: 'unavailable', reason: 'This job has nothing to burn.' };
   const pixelsPerMm = watchPixelsPerMm(region, BURN_LIMITS);
   const headBefore = args.headNow();
-  const frame = await io.captureFrame(camera.source);
-  if (frame === null) {
-    return { kind: 'unavailable', reason: 'The camera did not send a picture as the job started.' };
-  }
-  const picture = flattenedPicture(camera, frame, region, pixelsPerMm);
+  const picture = await beforeImage(camera, io, region, pixelsPerMm);
   if (picture.kind === 'issue') return { kind: 'unavailable', reason: picture.message };
   const reached = args.confirmedRouteMm();
   const firstBurn = firstBurnRouteMm(plan) ?? Number.POSITIVE_INFINITY;
@@ -104,6 +107,37 @@ export async function takeBeforePicture(args: {
       headBefore,
       checkFromRouteMm: reached > firstBurn ? reached + START_GUARD_MM : 0,
     },
+  };
+}
+
+const NO_START_PICTURE = 'The camera did not send a picture as the job started.';
+
+// The before picture, flattened in the picture worker where there is one
+// (ADR-490 Amendment 2): taken as the job starts, when an Abort is likeliest.
+async function beforeImage(
+  camera: WatchCamera,
+  io: WatchIo,
+  region: BedArea,
+  pixelsPerMm: number,
+): Promise<FlatPicture> {
+  const client = io.picture ?? null;
+  if (client === null) {
+    const frame = await io.captureFrame(camera.source);
+    if (frame === null) return { kind: 'issue', message: NO_START_PICTURE };
+    return flattenedPicture(camera, frame, region, pixelsPerMm);
+  }
+  const bitmap = await client.capture(camera.source);
+  if (bitmap === null) return { kind: 'issue', message: NO_START_PICTURE };
+  const spec = flattenSpecFor(camera, bitmap.width, bitmap.height, region, pixelsPerMm);
+  if (spec.kind === 'issue') {
+    bitmap.close();
+    return spec;
+  }
+  const reply = await client.run({ op: 'flat-image', frame: bitmap, flatten: spec.spec });
+  if (reply.kind === 'flat-image') return { kind: 'ok', image: reply.image };
+  return {
+    kind: 'issue',
+    message: reply.kind === 'unseen' ? UNSEEN_REGION_MESSAGE : NO_START_PICTURE,
   };
 }
 
