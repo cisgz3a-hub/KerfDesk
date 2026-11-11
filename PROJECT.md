@@ -432,7 +432,10 @@ Requires a new `PROJECT.md` revision and a `DECISIONS.md` entry. Anticipated, no
   A1 Pro and Neotronics 4040, firmware builds unconfirmed; community Marlin/Smoothie/FluidNC verification), Ruida
   real-controller validation of the export and of the Electron UDP transport (built first at the
   maintainer's request, ADR-697), wizard
-  controller-family step polish. Trocen/TopWisdom/galvo stay out of scope.
+  controller-family step polish. USB lasers (ADR-702): a WebUSB link for the CH341 K40 boards
+  and JCZ LMC galvo boards, which Phase I items I.7–I.9 drive; real-board validation of each is
+  owed. Trocen, TopWisdom, EZCad3 (DLC) and BSL galvo stay out of scope: no public protocol
+  source exists for them (ADR-702).
 - Phase J: Linux desktop build. Packaging, the `.lf2` file type, remembered serial ports and CI install checks shipped under ADR-607; publishing Linux and commercial Mac downloads is designed in ADR-613 and waits for the maintainer's switch; macOS Preview moved into the current ADR-247/248 Desktop Preview track. (Renumbered from Phase I — the multi-controller track took that slot at integration; ADR-104.)
 
 **Public source availability does not collapse the phase plan.** ADR-005, ADR-006, ADR-007 are discipline choices, not technical-impossibility choices. See ADR-017 for the dependency policy, ADR-247/248 for the preview-distribution posture and ADR-543 for the source licence.
@@ -706,7 +709,10 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
 
 - ~~Raster engrave (Fill, Image modes).~~ **Shipped in Phase F** (F.1 Fill, F.2 Image) — no longer out of scope.
 - ~~Marlin, Smoothieware, and Ruida export.~~ **Shipped under Phase I** with
-  simulator/evidence labels; Trocen and TopWisdom remain out of scope.
+  simulator/evidence labels. ~~K40 (Lihuiyu, Moshiboard) and EZCad2 galvo.~~ **In scope under
+  ADR-702** (USB link) and its family ADRs, simulator-tested only. Trocen, TopWisdom, EZCad3
+  and BSL remain out of scope until a public protocol source or a maintainer-supplied capture
+  exists.
 - ~~Linux desktop build.~~ **Packaged under ADR-607** (AppImage and `.deb`, x64); publishing Linux downloads is ADR-613. Windows and macOS Preview packaging is in scope under ADR-247/248.
 - ~~Node editing of imported paths.~~ **Shipped as bounded node/Bezier editing** with schema-v2 canonical-curve invalidation rules (ADR-159, ADR-164); a general geometry kernel remains out of scope.
 - Boolean ops.
