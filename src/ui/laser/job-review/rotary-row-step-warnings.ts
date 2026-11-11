@@ -17,6 +17,9 @@
 // part too and are checked the same way, read from the machine-space job; an
 // offered interval must land evenly at every phase; layers go by their names,
 // and a Fill (ramped or not) is advised on its Interval.
+// ADR-705 Amendment 2 (rolling audit v14 Z4-P2-1): a Moshiboard places every
+// coordinate on a whole mil of machine Y, so the same check runs on that grid
+// for a Moshi Y-port rotary (detectRotaryRowGridWarnings).
 
 import { rotaryYScale } from '../../../core/devices';
 import type { RotaryAxis } from '../../../core/devices/rotary';
@@ -78,12 +81,32 @@ export function detectRotaryRowStepWarnings(
   if (stepsPerUnit === undefined || !(stepsPerUnit > 0)) {
     return [rotaryRowStepsUnknownWarning(axis)];
   }
-  // k is in the axis's own units per surface mm (degrees on A), as its steps are.
-  const steps: AxisSteps = {
-    scale: rotaryYScale(rotary),
+  return detectRotaryRowGridWarnings(project, job, {
     stepsPerUnit,
     stepsText: `${axis} step (${AXIS_STEPS[axis].setting} = ${stepsPerUnit} ${AXIS_STEPS[axis].unit})`,
-  };
+  });
+}
+
+/** The positions the controller can place the rotary axis on: `stepsPerUnit`
+ *  per mm (or per degree), named in the warning by `stepsText`. */
+export type RotaryRowGrid = { readonly stepsPerUnit: number; readonly stepsText: string };
+
+/** The same disclosure for a known position grid, such as a Moshiboard's
+ *  whole mils (ADR-705 Amendment 2). It never changes output or blocks Start. */
+export function detectRotaryRowGridWarnings(
+  project: Pick<Project, 'device' | 'machine'> & {
+    readonly scene?: Pick<Project['scene'], 'layers'>;
+  },
+  job: Job,
+  grid: RotaryRowGrid,
+): ReadonlyArray<string> {
+  const rotary = project.device.rotary;
+  if (!rotaryAppliesTo(project.device, project.machine) || rotary === undefined) return [];
+  const rasters = job.groups.filter((group): group is RasterGroup => group.kind === 'raster');
+  const fills = job.groups.filter(isScanlineFill);
+  if (rasters.length === 0 && fills.length === 0) return [];
+  // k is in the axis's own units per surface mm (degrees on A), as its steps are.
+  const steps: AxisSteps = { scale: rotaryYScale(rotary), ...grid };
   const name = (layerId: string) =>
     project.scene?.layers.find((layer) => layer.id === layerId)?.name ?? layerId;
   const seen = new Set<string>();

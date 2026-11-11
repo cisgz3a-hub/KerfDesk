@@ -35,4 +35,4 @@ The same as v13:
 - security findings redacted until fixed;
 - fix PRs use auto-merge with the MERGE method and Auto-fix.
 
-**Status:** started 2026-11-10. Z1, Z2 and Z3 ledgered 2026-11-11 ([LEDGER.md](LEDGER.md)); Z4 next.
+**Status:** DONE 2026-11-11. All four areas ledgered; round result in [LEDGER.md](LEDGER.md#round-result-2026-11-11).

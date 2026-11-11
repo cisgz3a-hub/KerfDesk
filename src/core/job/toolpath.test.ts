@@ -300,9 +300,10 @@ describe('buildToolpath', () => {
       {
         kind: 'cut',
         color: '#000',
+        // Half the 2 mm offset along the sweep's travel (ADR-052 Amendment 2).
         polyline: [
-          { x: 18, y: 5 },
-          { x: 8, y: 5 },
+          { x: 19, y: 5 },
+          { x: 9, y: 5 },
         ],
         length: 10,
       },

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type KerfDeskFixture, type Page } from './fixtures/kerfdesk-test';
-import { saveProjectAs } from './fixtures/project-save';
+import { lapseClickActivation } from './fixtures/gcode-save';
 import { toolbarCommand } from './fixtures/workspace-ui';
 
 const base = JSON.parse(
@@ -20,7 +20,12 @@ async function openLargeProject(page: Page, fixture: KerfDeskFixture): Promise<v
   await expect(page).toHaveTitle(/\*$/);
 }
 
-test('large manual Save prepares in a real worker and opens its picker only after Choose file', async ({
+const pickerSaves = async (fixture: KerfDeskFixture): Promise<number> =>
+  (await fixture.events()).filter((event) => event.kind === 'picker-save').length;
+
+// Annoyance audit A4-P2-4, ADR-656 Amendment 4: validated while the click is
+// still active, the project goes straight to the file picker.
+test('large manual Save prepares in a real worker and opens its picker with no second click', async ({
   page,
   kerfdesk,
 }) => {
@@ -28,7 +33,10 @@ test('large manual Save prepares in a real worker and opens its picker only afte
   const workers: string[] = [];
   page.on('worker', (worker) => workers.push(worker.url()));
   await openLargeProject(page, kerfdesk);
-  await saveProjectAs(page, kerfdesk, { expectPreparation: true });
+  await (await toolbarCommand(page, 'Save As...')).click();
+  // Nothing else is clicked: the picker opens from the Save As click itself.
+  await expect.poll(() => pickerSaves(kerfdesk), { timeout: 60_000 }).toBe(1);
+  await expect(page.getByRole('dialog', { name: 'Save project', exact: true })).toBeHidden();
   await expect
     .poll(() => workers.some((url) => url.includes('project-save-preparation-worker')))
     .toBe(true);
@@ -44,12 +52,33 @@ test('large manual Save prepares in a real worker and opens its picker only afte
   await expect(page).not.toHaveTitle(/\*$/);
 });
 
+test('a large Save validated after the click lapsed asks for Choose file, then saves', async ({
+  page,
+  kerfdesk,
+}) => {
+  test.setTimeout(120_000);
+  await openLargeProject(page, kerfdesk);
+  await lapseClickActivation(page);
+  await (await toolbarCommand(page, 'Save As...')).click();
+  const dialog = page.getByRole('dialog', { name: 'Save project', exact: true });
+  const choose = dialog.getByRole('button', { name: 'Choose file…', exact: true });
+  await expect(choose).toBeEnabled({ timeout: 60_000 });
+  await expect(dialog).toContainText('Your project is ready.');
+  expect(await pickerSaves(kerfdesk)).toBe(0);
+  await choose.click();
+  await expect.poll(() => pickerSaves(kerfdesk)).toBe(1);
+  await expect.poll(async () => Object.keys(await kerfdesk.savedFiles())).toEqual([filename]);
+  await expect(page).not.toHaveTitle(/\*$/);
+});
+
 test('Cancel after large manual Save preparation keeps edits without selecting or writing a file', async ({
   page,
   kerfdesk,
 }) => {
   test.setTimeout(120_000);
   await openLargeProject(page, kerfdesk);
+  // The slow save: its dialog waits for a click, so Cancel can be pressed.
+  await lapseClickActivation(page);
   await (await toolbarCommand(page, 'Save As...')).click();
   const dialog = page.getByRole('dialog', { name: 'Save project', exact: true });
   await expect(dialog.getByRole('button', { name: 'Choose file…', exact: true })).toBeEnabled({

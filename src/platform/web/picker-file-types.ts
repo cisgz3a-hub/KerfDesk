@@ -21,6 +21,7 @@ const TYPE_NAMES: ReadonlyArray<readonly [ReadonlyArray<string>, string]> = [
   [['.lfart'], 'KerfDesk artwork'],
   [['.lfrelief'], 'KerfDesk relief component'],
   [['.rd'], 'Ruida file'],
+  [['.egv'], 'Lihuiyu engrave file'],
   [['.stl'], 'STL model'],
   [['.csv'], 'CSV table'],
   [['.txt'], 'Text file'],

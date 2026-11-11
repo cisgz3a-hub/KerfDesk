@@ -216,10 +216,10 @@ describe('handleSaveTiledGcode', () => {
     });
 
     expect(written).toEqual([]);
-    expect(messages).toEqual([]);
-    expect(alert).toHaveBeenCalledWith(
-      expect.stringContaining('spindleSpinupSec must be non-negative'),
-    );
+    // One error toast, no native alert (ADR-656 Amendment 4).
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toMatch(/^Cannot export tiles: .*spindleSpinupSec must be non-negative/);
+    expect(alert).not.toHaveBeenCalled();
   });
 
   it('writes every tile and warns once for retained secondary-cutter values', async () => {

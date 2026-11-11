@@ -6,12 +6,8 @@
 import type { Project } from '../../core/scene';
 import { prepareOutput } from '../../io/gcode';
 import { withTextGlyphCheck } from '../../io/gcode/prepare-output-snapshot';
-import {
-  emitPreparedRdFile,
-  rdPreparationOptions,
-  type EmitRdOptions,
-  type EmitRdResult,
-} from '../../io/rd';
+import { rdPreparationOptions, type EmitRdOptions, type EmitRdResult } from '../../io/rd';
+import { emitPreparedRdWithJobWarnings } from '../laser/rd-job-warnings';
 import type { SaveTarget } from '../../platform/types';
 import type { ResolvedJobPlacement } from '../job-placement';
 import {
@@ -23,7 +19,7 @@ import {
   isOutputPreparationAbort,
   outputPreparationFailure,
 } from '../laser/output-preparation-errors';
-import { jobAwareAlert } from '../state/job-aware-dialogs';
+import { pushExportRefusal } from './export-refusal';
 import type { SaveGcodeCtx } from './file-actions';
 import { advanceExportVariables } from './advance-export-variables';
 import { pickPreparedSaveTarget } from './pick-prepared-save-target';
@@ -56,7 +52,7 @@ export async function handleSaveRd(
       ? await emitRdChecked(ctx.project, options)
       : await prepareBackgroundRd(ctx, options, snapshot);
   if (result === null) return;
-  if (!result.ok) return showRdFailure(result.messages);
+  if (!result.ok) return showRdFailure(ctx, result.messages);
   const target = await pickRdTarget(ctx);
   if (target !== null) await writeRdResult(ctx, target, result);
 }
@@ -65,7 +61,7 @@ export async function handleSaveRd(
 // (ADR-591 Amendment 2).
 async function emitRdChecked(project: Project, options: EmitRdOptions): Promise<EmitRdResult> {
   const prepared = prepareOutput(project, rdPreparationOptions(options));
-  return emitPreparedRdFile(
+  return emitPreparedRdWithJobWarnings(
     await withTextGlyphCheck(prepared, project, outputTextRenderer),
     options,
   );
@@ -96,14 +92,14 @@ async function prepareBackgroundRd(
     ...(snapshot === undefined ? {} : { snapshot }),
   });
   if (pending === null) {
-    showBackgroundUnavailable();
+    showRdFailure(ctx, [BACKGROUND_OUTPUT_PREPARATION_UNAVAILABLE_MESSAGE]);
     return null;
   }
   try {
     return await pending;
   } catch (error) {
     if (isOutputPreparationAbort(error)) throw error;
-    showRdFailure([outputPreparationFailure(error).message]);
+    showRdFailure(ctx, [outputPreparationFailure(error).message]);
     return null;
   }
 }
@@ -122,19 +118,16 @@ async function writeRdResult(
     for (const advisory of result.advisories) {
       ctx.pushToast(advisory.message, 'warning');
     }
+    for (const warning of result.jobWarnings ?? []) ctx.pushToast(warning, 'warning');
     ctx.pushToast(RD_EXPERIMENTAL_WARNING, 'warning');
   } catch (err) {
     ctx.pushToast(`Could not save .rd file: ${errorMessage(err)}`, 'error');
   }
 }
 
-function showBackgroundUnavailable(): void {
-  showRdFailure([BACKGROUND_OUTPUT_PREPARATION_UNAVAILABLE_MESSAGE]);
-}
-
-function showRdFailure(messages: ReadonlyArray<string>): void {
-  const lines = messages.map((message) => `• ${message}`).join('\n');
-  jobAwareAlert(`Cannot save .rd file:\n\n${lines}`);
+// One error toast, reasons folded, instead of a native alert (ADR-656 Amendment 4).
+function showRdFailure(ctx: SaveGcodeCtx, messages: ReadonlyArray<string>): void {
+  pushExportRefusal(ctx.pushToast, 'Cannot save .rd file', messages);
 }
 
 function suggestedRdName(savedName: string | null): string {

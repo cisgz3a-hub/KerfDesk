@@ -157,11 +157,13 @@ describe('shared split runway endpoints on the controller grid', () => {
   it.each([-0.4, 0, 0.4])(
     'keeps both Image rows monotonic at a half-grid tie, offset=%s',
     (offset) => {
+      // ADR-052 Amendment 2: forward rows +half the offset, reverse rows -half.
+      const half = offset / 2;
       expect(inspect(image(PIXEL_WIDTH, offset))).toEqual([
-        [0, 0.5, 0.837, 0.5],
-        [5.86, 0.5, 6.697, 0.5],
-        [represented(6.697 - offset), 1.5, represented(7 * PIXEL_WIDTH - offset), 1.5],
-        [represented(PIXEL_WIDTH - offset), 1.5, represented(-offset), 1.5],
+        [represented(half), 0.5, represented(0.837 + half), 0.5],
+        [represented(5.86 + half), 0.5, represented(6.697 + half), 0.5],
+        [represented(6.697 - half), 1.5, represented(7 * PIXEL_WIDTH - half), 1.5],
+        [represented(PIXEL_WIDTH - half), 1.5, represented(-half), 1.5],
       ]);
     },
   );

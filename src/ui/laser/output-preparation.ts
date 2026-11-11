@@ -7,7 +7,7 @@ import { prepareOutputSnapshot, type PrepareOutputOptions } from '../../io/gcode
 import { withTextGlyphCheck } from '../../io/gcode/prepare-output-snapshot';
 import { prepareOutputForStructuredClone } from '../../io/gcode/prepared-output-persistence';
 import { archiveCanvasMotionPlan } from '../state/recovery/execution-artifact-canvas';
-import { emitPreparedRdFile } from '../../io/rd';
+import { emitPreparedRdWithJobWarnings } from './rd-job-warnings';
 import type { Project } from '../../core/scene';
 import { emitSavePreparedOutput } from './save-output-emission';
 import { prepareStartJobSnapshot } from './start-job-readiness';
@@ -105,7 +105,7 @@ async function prepareRdOutput(
   const prepared = await prepareWithOptionalSnapshot(project, request, context);
   // The same options as the direct path: placement picks the reference point
   // and the preflight frame decides the post-compile checks (audit RU-2/RU-7).
-  return { kind: 'rd', result: emitPreparedRdFile(prepared, request.options) };
+  return { kind: 'rd', result: emitPreparedRdWithJobWarnings(prepared, request.options) };
 }
 
 async function prepareSaveOutput(

@@ -15,6 +15,7 @@ import type { PlatformAdapter } from '../../platform/types';
 import { PlatformProvider } from '../app/platform-context';
 import { useStore } from '../state';
 import { prepareRuidaNetworkJob } from '../state/ruida-network/ruida-network-job';
+import { linkJobRequest } from '../state/link-job-request';
 import { resetRuidaNetworkStoreForTests } from '../state/ruida-network/ruida-network-store';
 import { RuidaNetworkPanel } from './RuidaNetworkPanel';
 
@@ -134,7 +135,9 @@ describe('RuidaNetworkPanel', () => {
 
     await click('Start', 10);
     // The bytes Save .rd would write for the same placement.
-    const expected = await prepareRuidaNetworkJob(project, useStore.getState().jobPlacement);
+    const expected = await prepareRuidaNetworkJob(
+      linkJobRequest(project, useStore.getState().jobPlacement),
+    );
     if (!expected.ok) throw new Error('no .rd');
     expect(sim.files[1]).toEqual(decodeRdStream(expected.job.bytes));
     expect(sim.files[1]?.filter((event) => event.kind === 'cut')).toHaveLength(1);

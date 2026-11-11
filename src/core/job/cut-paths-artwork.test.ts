@@ -60,8 +60,8 @@ it('uses the calibrated fill sweep and excludes laser-off runways', () => {
     {
       closed: false,
       points: [
-        { x: 9, y: 5 },
-        { x: -1, y: 5 },
+        { x: 9.5, y: 5 },
+        { x: -0.5, y: 5 },
       ],
     },
   ]);

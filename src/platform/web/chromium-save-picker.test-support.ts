@@ -131,6 +131,41 @@ export function lapseUserActivation(): () => void {
   };
 }
 
+/** Chromium keeps a click or key press active for this long. Measured as
+ * 5,001 to 5,016 ms in Chrome 157 and 5,009 ms in the Electron renderer
+ * (ADR-656 Amendment 4). */
+export const CHROMIUM_ACTIVATION_LIFESPAN_MS = 5000;
+
+/** `navigator.userActivation` as Chromium keeps it: active from a gesture until
+ * its lifespan has run, read from `Date.now()` so fake timers move it. Starts
+ * with a gesture at install, as a save does at its click. */
+export function installTransientActivation(): {
+  /** A fresh click or key press, e.g. on Choose file…. */
+  readonly gesture: () => void;
+  readonly restore: () => void;
+} {
+  const original = Object.getOwnPropertyDescriptor(navigator, 'userActivation');
+  let gestureAt = Date.now();
+  Object.defineProperty(navigator, 'userActivation', {
+    configurable: true,
+    value: {
+      get isActive(): boolean {
+        return Date.now() - gestureAt < CHROMIUM_ACTIVATION_LIFESPAN_MS;
+      },
+      hasBeenActive: true,
+    },
+  });
+  return {
+    gesture: () => {
+      gestureAt = Date.now();
+    },
+    restore: () => {
+      if (original === undefined) Reflect.deleteProperty(navigator, 'userActivation');
+      else Object.defineProperty(navigator, 'userActivation', original);
+    },
+  };
+}
+
 // jsdom's DOMException is not an Error, unlike the browser's, and the adapter
 // recognises file-system errors as Errors by name.
 function notFound(): Error {

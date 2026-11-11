@@ -2,6 +2,7 @@ import { machineKindOf } from '../../core/scene';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
+import { abortAllLinkMachineWork, activeLinkMachineWork } from '../state/link-machine-work';
 import {
   controllerOperationOwner,
   isUnsafeControllerOperation,
@@ -31,7 +32,9 @@ export const FIRE_NOT_CONFIRMED_OFF_WARNING =
 export const desktopCloseController = new DesktopCloseController(() => {
   const laser = useLaserStore.getState();
   return {
-    active: isActiveJob(laser.streamer),
+    // A Moshi or Ruida link job counts as a job: close stops it, Update waits
+    // for it (code quality audit C2 D1-P2-3; ADR-705 Amendment 3).
+    active: isActiveJob(laser.streamer) || activeLinkMachineWork() !== null,
     fireLatched: laser.fireActive,
     output: unownedControllerOutput(laser, machineKindOf(useStore.getState().project.machine)),
     motionOwner: laser.motionOperation?.operationId ?? null,
@@ -75,6 +78,9 @@ function observedControllerBusy(laser: ReturnType<typeof useLaserStore.getState>
 // A laser the controller reports on at Idle with nothing here running it gets
 // the same M5, with M9 for air, as LASER OFF sends (rolling audit v5 J2-P2-1).
 async function stopBeforeClose(output: UnownedControllerOutput | null): Promise<void> {
+  // A link job gets its own stop (the Moshi estop, the Ruida Stop Process),
+  // started at once like the laser stop below, and awaited with it.
+  const linkStops = abortAllLinkMachineWork();
   if (useLaserStore.getState().fireActive) await useLaserStore.getState().setFireActive(false);
   else if (output !== null) {
     await useLaserStore.getState().sendConsoleCommand(outputOffCommand(output));
@@ -88,6 +94,7 @@ async function stopBeforeClose(output: UnownedControllerOutput | null): Promise<
   ) {
     await laser.stopJob('app-closing');
   }
+  await linkStops;
 }
 
 function controllerOwner(laser: ReturnType<typeof useLaserStore.getState>): object | string | null {

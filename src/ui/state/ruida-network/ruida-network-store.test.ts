@@ -11,7 +11,7 @@ import {
   simulatedRuidaNetwork,
   type RuidaSimScript,
 } from '../../../__fixtures__/controllers/ruida-udp-simulator';
-import { RUIDA_STATUS_POLL_MS } from './ruida-network-monitor';
+import { IDLE_READS_WITHOUT_BUSY, RUIDA_STATUS_POLL_MS } from './ruida-network-monitor';
 import { RUIDA_FRAME_FIRST } from './ruida-network-messages';
 import {
   resetRuidaNetworkStoreForTests,
@@ -145,6 +145,17 @@ describe('frame first', () => {
     expect(store().positionMm).toEqual({ x: 12.5, y: -2 });
   });
 
+  it('runs the job completion (variable advance) once the job finishes', async () => {
+    const { sim } = await connected();
+    const completed = vi.fn();
+    const reviewed = { ...job(project()), completed };
+    await framed(sim, reviewed);
+    expect(completed).not.toHaveBeenCalled();
+    await store().start(reviewed);
+    await runWhile('running');
+    expect(completed).toHaveBeenCalledTimes(1);
+  });
+
   it('needs a new Frame once the job moves', async () => {
     const { sim } = await connected();
     await framed(sim, job(project(1)));
@@ -153,13 +164,41 @@ describe('frame first', () => {
     expect(sim.files).toHaveLength(1);
   });
 
-  it('does not count a frame the controller never reported running', async () => {
+  // Code quality audit C2 D1-P2-2: a frame that ends before any status read
+  // sees it busy used to leave the store framing forever.
+  it('counts a frame no read caught running only after a bounded run of idle reads', async () => {
     const { sim } = await connected({ runReads: 0 });
-    await store().frame(job(project()));
-    await vi.advanceTimersByTimeAsync(RUIDA_STATUS_POLL_MS * 6);
+    const frameJob = job(project());
+    await store().frame(frameJob);
+    // Reads at 0, 0.4 and 0.8 s are not enough on their own.
+    await vi.advanceTimersByTimeAsync(RUIDA_STATUS_POLL_MS * (IDLE_READS_WITHOUT_BUSY - 2));
     expect(store().phase).toBe('framing');
     expect(store().framed).toBeNull();
+    await vi.advanceTimersByTimeAsync(RUIDA_STATUS_POLL_MS * 2);
+    expect(store().phase).toBe('idle');
+    expect(store().framed).toEqual(frameJob.footprint);
+    expect(store().message).toContain('short frame');
     expect(sim.files).toHaveLength(1);
+  });
+
+  it('a short job no read caught running still finishes', async () => {
+    const { sim } = await connected({ runReads: 0 });
+    const reviewed = job(project());
+    await store().frame(reviewed);
+    await runWhile('framing');
+    await store().start(reviewed);
+    await runWhile('running');
+    expect(store().phase).toBe('idle');
+    expect(store().message).toContain('Job finished');
+    expect(sim.files).toHaveLength(2);
+  });
+
+  it('shows the job warnings from its Frame on (C2 D1-P2-1)', async () => {
+    await connected();
+    await store().frame(job(project()));
+    expect(store().advisories).toEqual(['A warning.']);
+    await runWhile('framing');
+    expect(store().advisories).toEqual(['A warning.']);
   });
 
   it('sends nothing to a controller that reports it is busy', async () => {
