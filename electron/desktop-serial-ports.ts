@@ -15,6 +15,7 @@ import type {
   SerialPortRevokedDetails,
   WebContents,
 } from 'electron';
+import type { DevicePermissionRouter } from './device-permission-router.js';
 import { handleSelectSerialPort } from './desktop-serial-chooser.js';
 import {
   readSerialPortGrants,
@@ -49,6 +50,7 @@ export type DesktopSerialPortOptions = {
   readonly trustedOrigins: ReadonlySet<string>;
   readonly userDataPath: string;
   readonly platform?: NodeJS.Platform;
+  readonly devicePermissions?: DevicePermissionRouter;
 };
 
 export function installDesktopSerialPorts(
@@ -73,12 +75,13 @@ function rememberPicks(
     serialPortGrantsWriter(file),
     identity,
   );
-  ses.setDevicePermissionHandler(
-    (details) =>
-      details.deviceType === 'serial' &&
-      isTrustedRendererOrigin(details.origin, options.trustedOrigins) &&
-      grants.allows(details.device),
-  );
+  const decide = (details: DevicePermissionHandlerHandlerDetails): boolean =>
+    details.deviceType === 'serial' &&
+    isTrustedRendererOrigin(details.origin, options.trustedOrigins) &&
+    grants.allows(details.device);
+  // Shared with the USB lasers (ADR-702): the session has one handler.
+  if (options.devicePermissions === undefined) ses.setDevicePermissionHandler(decide);
+  else options.devicePermissions.route('serial', decide);
   ses.on('serial-port-revoked', (_event, details) => grants.revoke(details.port));
   return grants;
 }
