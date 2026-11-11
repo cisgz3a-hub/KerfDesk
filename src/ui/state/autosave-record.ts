@@ -123,6 +123,15 @@ export function hasUnsupportedAutosaveEnvelope(value: unknown): boolean {
   );
 }
 
+// The project's schema version when it is the first property of the text, as
+// this app writes it. Read from the head of the text, never by parsing it.
+const LEADING_SCHEMA_VERSION = /^\{\s*"schemaVersion"\s*:\s*(\d+)\s*[,}]/;
+
+function leadingProjectSchemaVersion(json: string): number | null {
+  const match = LEADING_SCHEMA_VERSION.exec(json.slice(0, 64));
+  return match === null ? null : Number(match[1]);
+}
+
 // Mutators inspect the persisted version too: a read-time warning alone would
 // still let interval writes, beforeunload, or manual-save cleanup destroy it.
 // Current project versions need no normalization on this mutation path.
@@ -131,6 +140,12 @@ export function requireSupportedAutosaveVersion(value: unknown): void {
   if (typeof value !== 'object' || value === null) return;
   const json = (value as Record<string, unknown>)['projectJson'];
   if (typeof json !== 'string') return;
+  // Every interval commit checks the two snapshots it is about to rotate. A
+  // snapshot this build wrote says so in its first 20 characters; parsing the
+  // whole text to read that one number cost 624 ms and several hundred
+  // megabytes on a dense trace, twice per commit (ADR-305 Amendment 1). Text
+  // that leads with anything else is still parsed and judged as before.
+  if (leadingProjectSchemaVersion(json) === PROJECT_SCHEMA_VERSION) return;
   let project: unknown;
   try {
     project = JSON.parse(json);
