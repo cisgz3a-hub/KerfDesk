@@ -9,6 +9,7 @@ import type { FrameStartPoint } from '../scene/start-points';
 import type {
   ControllerCapabilities,
   DatagramNetworkCapabilities,
+  UsbLinkCapabilities,
 } from './controller-capabilities';
 import type { ControllerEvent } from './controller-event';
 import type { JogParams } from './grbl/commands';
@@ -166,6 +167,11 @@ export type ControllerDriver = {
   /** Present when the desktop app can reach this controller over its own
    *  datagram link (ADR-697); absent for every serial driver. */
   readonly datagramNetwork?: DatagramNetworkCapabilities;
+  /** Present when the app can reach this controller over its own USB link
+   *  (ADR-703); absent for every serial driver. */
+  readonly usbLink?: UsbLinkCapabilities;
+  /** The binary job file a file-only driver saves; absent: .rd (ADR-097). */
+  readonly fileFormat?: 'rd' | 'egv';
   readonly realtime: ControllerRealtime;
   readonly commands: ControllerCommands;
   /** Classify one inbound line into the firmware-neutral event union. */

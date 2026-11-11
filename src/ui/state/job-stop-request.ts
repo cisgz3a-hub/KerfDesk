@@ -5,6 +5,7 @@
 // epoch, so it never describes a later run.
 
 import type { GrblState, StatusReport, StreamerStatus } from '../../core/controllers/grbl';
+import type { MachineKind } from '../../core/scene';
 import { cncPauseLiftMayBeMoving, type CncPauseLift } from './cnc-pause-lift-state';
 
 export type JobStopReason = 'operator' | 'app-closing';
@@ -25,6 +26,10 @@ export type JobStopRequest = {
    *  offset (WCO) while the job runs. A re-run turns the part back to it
    *  before zeroing again (ADR-695 Amendment 1). */
   readonly rotaryStartTurn?: RotaryStartTurn;
+  /** Laser or CNC, as the stopped job started (`activeJobMachineKind`), read
+   *  before the stop clears it. Only a laser job's origin goes back by itself
+   *  after the operator's Abort (ADR-341 Amendment 14). */
+  readonly jobMachineKind?: MachineKind;
 };
 
 /** Where a dedicated-axis rotary job started, in machine units of its axis. */

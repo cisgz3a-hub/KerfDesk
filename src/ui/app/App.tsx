@@ -13,6 +13,7 @@ import { CanvasGcodeView, CanvasViewSwitch } from '../gcode-inspector';
 import { useCanvasViewStore } from '../state/canvas-view-store';
 import { UpdatePrompt } from '../licensing/UpdatePrompt';
 import { LiveMotionBar, useAbortShortcut, useStartShortcut } from '../laser';
+import { useAbortAutoRestore } from '../laser/abort-auto-restore';
 import { MachineSetupDialogHost } from '../laser/device-setup';
 import { BoardCapturePanel } from '../laser/board-capture';
 import { JobReviewDialog } from '../laser/job-review';
@@ -162,6 +163,7 @@ function WorkspaceLifecycle(): null {
   usePolylineFairingUpgrade();
   useSingleArtworkSelection();
   useStartShortcut();
+  useAbortAutoRestore();
   useShortcuts();
   useSpacePan();
   useOperationColorPeek();
