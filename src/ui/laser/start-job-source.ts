@@ -60,6 +60,9 @@ export type StartPreparationHooks = {
    * preparation finishes in one turn, so it never reports them early. */
   readonly onFrameBounds?: (preview: FrameBoundsPreview) => void;
   readonly frameMotionOwner?: FramePreparationMotionOwner;
+  /** Variable text's clock, for a compile that must reproduce a program the
+   * operator is already looking at (Job Review, O5-P2-2). Default: now. */
+  readonly evaluatedAtIso?: string;
 };
 
 export type PreparedRecoverySource = {
@@ -107,6 +110,7 @@ export async function prepareCurrentStartJob(
       registration,
       useSnapshot,
       hooks,
+      ...(hooks.evaluatedAtIso === undefined ? {} : { evaluatedAtIso: hooks.evaluatedAtIso }),
       ...(signal === undefined ? {} : { signal }),
     });
   }

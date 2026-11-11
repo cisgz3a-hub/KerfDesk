@@ -29,8 +29,10 @@ export type BoxDraft = {
 };
 
 export const BOX_DRAFT_KEY = 'laserforge.box.generatorDraft.v1';
-// Laser and CNC keep their own last-entered box: a laser press fit (0 clearance,
-// no relief) must never become a router's starting values, or the reverse.
+// Laser and CNC keep their own last-entered box: a laser's 0 clearance and no
+// relief (a press fit only when the cutting layer compensates kerf; the Box Fit
+// Test finds the right value otherwise, ADR-119 Amendment 1) must never become
+// a router's starting values, or the reverse.
 // The laser keeps the original key so existing laser drafts survive.
 export const CNC_BOX_DRAFT_KEY = 'laserforge.box.generatorDraft.cnc.v1';
 

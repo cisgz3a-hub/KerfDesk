@@ -97,6 +97,13 @@ export function BoxFitTestDialog(props: {
         Cut both strips, press each rung together, and enter the best rung’s clearance (start + rung
         × step, counted from the narrow-margin end) in the Box Generator.
       </p>
+      {props.machine.kind === 'cnc' ? null : (
+        <p style={hintStyle}>
+          Cut the strips on the layer you will cut the box with. If even the first rung is loose,
+          that layer is not compensating for the laser kerf: start the ladder below 0 (a negative
+          clearance presses tighter) or set the layer’s kerf offset.
+        </p>
+      )}
       {result.kind === 'invalid' ? (
         <div role="alert" style={issueBlockStyle}>
           {result.issues.map((issue) => (
@@ -148,7 +155,8 @@ function FitTestFields(props: {
       <CalibrationNumberField
         label="Ladder start"
         value={draft.start}
-        min={0}
+        // Negative rungs are press fits; core validation bounds them.
+        min={undefined}
         max={undefined}
         step="any"
         onChange={setField('start')}

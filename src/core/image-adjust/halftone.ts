@@ -45,7 +45,7 @@ export function halftoneScreenInPlace(
   if (r.width <= 0 || r.height <= 0) return;
   const rad = (params.angleDeg * Math.PI) / 180;
   const screen: ScreenSpec = {
-    spacing: Math.max(2, params.spacingPx),
+    spacing: wholePixelPitch(params.spacingPx),
     cos: Math.cos(rad),
     sin: Math.sin(rad),
     shape: params.shape,
@@ -69,6 +69,14 @@ export function halftoneScreenInPlace(
       writeMono(doc, base, black, alpha);
     }
   }
+}
+
+// Whole pixels, as the pitch fields step (ADR-242 Amendment 2): a fractional
+// pitch lands its cells on the pixel grid unevenly, so on the axes the
+// threshold array cannot apply and coverage missed ink by up to 11%, and
+// solid black kept white rows (oracle audit O6-P3-1).
+function wholePixelPitch(spacingPx: number): number {
+  return Number.isFinite(spacingPx) ? Math.max(2, Math.round(spacingPx)) : 2;
 }
 
 type ScreenSpec = {
