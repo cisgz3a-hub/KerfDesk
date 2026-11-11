@@ -8,6 +8,7 @@ import type { RasterImage } from '../../core/scene';
 import { Button } from '../kit';
 import { DraftNumberInput } from '../kit/DraftNumberInput';
 import { DitherSwatchPicker } from '../layers/DitherSwatchPicker';
+import { IMAGE_GAMMA_DIRECTION_HINT } from './gamma-direction';
 import { imageDensityBounds } from './image-density-bounds';
 import { PhotoToneCalibrationField } from './PhotoToneCalibrationField';
 import { PHOTO_RECIPES, photoRecipe } from './photo-recipes';
@@ -176,7 +177,7 @@ function PhotoToneFields(props: PhotoEngravingFieldsProps): JSX.Element {
         onChange={(gamma) => onChange({ gamma })}
       />
       <p className="lf-photo-engraving__hint">
-        Higher gamma lightens midtones. Keep detail in the eyes, cheeks and hair before adding
+        {IMAGE_GAMMA_DIRECTION_HINT} Keep detail in the eyes, cheeks and hair before adding
         contrast.
       </p>
     </>

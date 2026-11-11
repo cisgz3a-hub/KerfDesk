@@ -1,5 +1,6 @@
 import type { RasterImage } from '../../core/scene';
 import { useImageEditorStore } from '../image-editor/image-editor-store';
+import { IMAGE_GAMMA_DIRECTION_HINT } from '../raster/gamma-direction';
 import { useStore } from '../state';
 import { useDebouncedCommit } from './use-debounced-commit';
 
@@ -95,7 +96,11 @@ function AdjustmentInput(props: {
         onBlur={debounced.onBlur}
         style={inputStyle}
         aria-label={`${props.label} for ${props.image.source}`}
-        title={`Adjust ${props.label.toLowerCase()} for the selected image.`}
+        title={
+          props.field === 'gamma'
+            ? IMAGE_GAMMA_DIRECTION_HINT
+            : `Adjust ${props.label.toLowerCase()} for the selected image.`
+        }
       />
     </label>
   );

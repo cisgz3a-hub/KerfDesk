@@ -1,5 +1,10 @@
 import type { StreamerState } from '../../core/controllers/grbl';
-import { DEFAULT_PROJECT_VARIABLE_DATA, type OutputScope, type Project } from '../../core/scene';
+import {
+  DEFAULT_PROJECT_VARIABLE_DATA,
+  type OutputScope,
+  type Project,
+  type ProjectVariableData,
+} from '../../core/scene';
 import { useStore } from '../state';
 import { useLaserStore, type LaserState } from '../state/laser-store';
 import { settledCleanly } from '../state/post-job-clean-settle';
@@ -101,6 +106,69 @@ function streamOwnerChanged(
     state.streamerEpoch > (epoch ?? initial.streamerEpoch + 1) ||
     (state.activeRunId !== null && state.activeRunId !== runId)
   );
+}
+
+/**
+ * A sealed laser recovery finishes the part its interrupted run started, and
+ * that run consumed nothing, so a recovery that completes advances the serial
+ * and CSV record once, as the run would have (oracle audit O1, O5-P1-1). It
+ * advances the open project only while that project still holds the variable
+ * data the run burned: after Next, a new CSV or another file, it consumes
+ * nothing, as a changed Start does.
+ */
+export function armRecoveryVariableStreamAdvancement(
+  runProject: Project,
+  runId: RunId,
+  outputScope?: OutputScope,
+): ReturnType<typeof armVariableStreamAdvancement> {
+  const open = useStore.getState().project;
+  if (!sameVariableData(open.variables, runProject.variables)) {
+    return { accept: () => undefined, cancel: () => undefined };
+  }
+  return armVariableStreamAdvancement(open, runId, outputScope);
+}
+
+function sameVariableData(
+  a: Project['variables'] | undefined,
+  b: Project['variables'] | undefined,
+): boolean {
+  const left = a ?? DEFAULT_PROJECT_VARIABLE_DATA;
+  const right = b ?? DEFAULT_PROJECT_VARIABLE_DATA;
+  return (
+    left.recordIndex === right.recordIndex &&
+    left.serialValue === right.serialValue &&
+    left.advancement === right.advancement &&
+    sameSequence(left.sequence, right.sequence) &&
+    sameCsv(left.csv, right.csv)
+  );
+}
+
+function sameSequence(
+  a: ProjectVariableData['sequence'],
+  b: ProjectVariableData['sequence'],
+): boolean {
+  if (a === undefined || b === undefined) return a === b;
+  return (
+    a.recordStartIndex === b.recordStartIndex &&
+    a.recordEndIndex === b.recordEndIndex &&
+    a.serialStartValue === b.serialStartValue &&
+    a.serialEndValue === b.serialEndValue &&
+    a.advanceBy === b.advanceBy
+  );
+}
+
+function sameCsv(a: ProjectVariableData['csv'], b: ProjectVariableData['csv']): boolean {
+  if (a === undefined || b === undefined) return a === b;
+  return (
+    a.sourceName === b.sourceName &&
+    sameStrings(a.headers, b.headers) &&
+    a.records.length === b.records.length &&
+    a.records.every((record, index) => sameStrings(record, b.records[index] ?? []))
+  );
+}
+
+function sameStrings(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((value, index) => value === b[index]);
 }
 
 export function cancelVariableStreamAdvancement(): void {
