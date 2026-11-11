@@ -105,6 +105,8 @@ Ordinary Start folds every acknowledgement into one click (`job-review/job-revie
 | A1-P3-9 | Export refusals are native alerts ("Cannot save G-code:", "Cannot export tiles:", "Cannot save .rd file:") | `app/prepare-gcode-save.ts:39,71`, `save-tiled-gcode.ts:74-92`, `save-rd-action.ts:137` | Error toast with the `details` fold |
 | A1-P3-10 | Desktop "No serial ports found" box loops on Retry, does not close when a port arrives, and points to Help, which cannot be opened while the box is up | `electron/serial-port-wait.ts:19-20,60-73` | Close on port arrival; add a Troubleshooting button |
 
+**Fix status (F6, ADR-656 Amendment 4):** A1-P3-9 is fixed. Reproduced: an empty canvas raised the alert and left the Save G-code dialog open behind it with only Cancel. All three refusals are now one error toast with further reasons folded, or are listed inside the Save G-code dialog with one Close when it is already open. Record: [F6-fix-save-dialogs.md](F6-fix-save-dialogs.md).
+
 ### A1 checked and sound
 
 - Closing the desktop app shows one box only (Save / Don't Save / Cancel, ADR-549).
@@ -256,6 +258,7 @@ A recovery attempt that failed blocks Review for five minutes (`state/recovery/r
 - **Deliberate in part:** ADR-656 (bytes before the picker). Its decision 2 says to open the picker at once while the click is still live; `pick-prepared-save-target.ts:31` does, but these two dialogs never take that path.
 - **Frequency:** every export; every first save of a real project.
 - **Lighter form:** open the picker straight away when preparation finishes in time; show the dialog only when it is slow.
+- **Fix status (F6, ADR-656 Amendment 4):** fixed as the lighter form says, for Save G-code and project Save As. A CNC export keeps its dialog, because Save as… or the setup sheet package is a choice. Record: [F6-fix-save-dialogs.md](F6-fix-save-dialogs.md).
 
 ### A4-P2-5 — In Preview the canvas silently becomes pan-only, but keyboard edits still change the design
 
@@ -288,6 +291,8 @@ A recovery attempt that failed blocks Review for five minutes (`state/recovery/r
 | A4-P3-3 | Opening a project with a different machine setup is refused during a job; a different bed size alone triggers it. Deliberate, ADR-416 Amendment 2; the message is good | `state/job-machine-lock.ts:34-56` | Offer "Open with the current machine setup" |
 | A4-P3-4 | Number fields clamp silently on leaving (9999 becomes 6000). Deliberate, M25 | `layers/use-debounced-commit.ts:79-90` | Flash the field or say "Limited to 6000" once |
 | A4-P3-5 | The rotary test pattern and camera target ask to replace artwork with a native OK/Cancel; other generators use Save / Don't Save / Cancel | `laser/RotarySetupHost.tsx:29-34`, `CalibrationSetupStep.tsx:193` | Route both through `confirmDiscard` |
+
+**Fix status (F6, ADR-656 Amendment 4):** A4-P3-2 is reduced, not closed. Reproduced as four steps for a large project with no file. It is now at most three (Save changes?, the OS save picker, the OS open picker): a project validated within 5 s opens its save picker by itself. Left open: when the save picker stays open for more than 5 s, the open picker has no click left to run on and Open ends in an error toast; pressing Open again works. That holds for small projects on `main` too. Record: [F6-fix-save-dialogs.md](F6-fix-save-dialogs.md).
 
 ### A4 checked and sound
 

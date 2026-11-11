@@ -8,6 +8,7 @@ import {
 import { toolbarCommand } from './fixtures/workspace-ui';
 import { runMenuCommand } from './fixtures/recovery-flow';
 import { saveTopologyGcode } from './fixtures/topology-repairs';
+import { expectGcodeSaveRefused } from './fixtures/gcode-save';
 
 test.setTimeout(360_000);
 test.use({ viewport: { width: 1440, height: 1000 }, actionTimeout: 30_000 });
@@ -199,13 +200,11 @@ test('Focus samples below output precision have no motion and Undo restores the 
   await width.press('Enter');
   const savedBefore = (await kerfdesk.events()).filter((event) => event.kind === 'file-saved');
   await runMenuCommand(page, 'File', 'Save G-code...');
-  const save = page.getByRole('dialog', { name: 'Save G-code', exact: true });
-  await expect(save).toContainText('No final file was selected or modified');
-  await expect(save.getByRole('button', { name: 'Save as…', exact: true })).toBeDisabled();
+  // Refused once, with no dialog left to cancel (ADR-656 Amendment 4).
+  await expectGcodeSaveRefused(page, /\S/);
   expect((await kerfdesk.events()).filter((event) => event.kind === 'file-saved')).toEqual(
     savedBefore,
   );
-  await save.getByRole('button', { name: 'Cancel', exact: true }).click();
   await runMenuCommand(page, 'File', 'Inspect G-code (3D)...');
   const inspector = page.getByRole('dialog', { name: /G-code Inspector: .*current canvas/ });
   await expect(inspector.getByText('No motion found', { exact: true })).toBeVisible();
