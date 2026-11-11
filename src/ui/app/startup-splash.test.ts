@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { dismissStartupSplash } from './startup-splash';
+import { dismissStartupSplash, SPLASH_HELD_VERSION_KEY } from './startup-splash';
 
 let frames: Map<number, FrameRequestCallback>;
 let nextFrame: number;
@@ -40,6 +40,8 @@ beforeEach(() => {
   nextFrame = 0;
   visibility = 'visible';
   reducedMotion = false;
+  // Every case starts as the first launch of this version on the device.
+  localStorage.clear();
   delete document.documentElement.dataset.desktopWindowVisible;
   vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibility);
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback): number => {
@@ -80,6 +82,7 @@ describe('startup splash', () => {
     expect(splash()).not.toBeNull();
     vi.advanceTimersByTime(1);
     expect(splash()).toBeNull();
+    expect(localStorage.getItem(SPLASH_HELD_VERSION_KEY)).toBe(__APP_VERSION__);
   });
 
   it('excludes hidden intervals from the hold and removes its visibility listener', () => {
@@ -266,5 +269,137 @@ describe('startup splash', () => {
     dismissStartupSplash();
     expect(addListener).not.toHaveBeenCalled();
     expect(frames.size).toBe(0);
+  });
+});
+
+describe('startup splash after this version has been shown (ADR-049 Amendment 3)', () => {
+  const fading = (): boolean => splash()?.classList.contains('app-splash--hidden') === true;
+  const inert = (): boolean => document.getElementById('app-root')?.hasAttribute('inert') === true;
+
+  it('releases a later launch as soon as the workspace has painted', () => {
+    localStorage.setItem(SPLASH_HELD_VERSION_KEY, __APP_VERSION__);
+    const shortcut = vi.fn();
+    window.addEventListener('keydown', shortcut);
+    paintWorkspace();
+    dismissStartupSplash();
+    expect(inert()).toBe(true);
+    frame();
+    frame();
+    expect(performance.now()).toBeLessThan(100);
+    expect(fading()).toBe(true);
+    expect(splash()?.style.transitionDuration).toBe('750ms');
+    // Input comes back with the splash's removal, not before it.
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'r', cancelable: true }));
+    expect(shortcut).not.toHaveBeenCalled();
+    expect(inert()).toBe(true);
+    vi.advanceTimersByTime(800);
+    expect(splash()).toBeNull();
+    expect(inert()).toBe(false);
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'r', cancelable: true }));
+    expect(shortcut).toHaveBeenCalledOnce();
+    window.removeEventListener('keydown', shortcut);
+  });
+
+  it('still waits for the workspace to paint on a later launch', () => {
+    localStorage.setItem(SPLASH_HELD_VERSION_KEY, __APP_VERSION__);
+    const canvas = document.createElement('canvas');
+    document.getElementById('app-root')?.append(canvas);
+    dismissStartupSplash();
+    frame();
+    frame(2000);
+    expect(fading()).toBe(false);
+    canvas.dataset.workspacePainted = 'true';
+    frame();
+    frame();
+    expect(fading()).toBe(true);
+  });
+
+  it('releases a later desktop launch on paint, shown or not, and at the licence window', () => {
+    localStorage.setItem(SPLASH_HELD_VERSION_KEY, __APP_VERSION__);
+    document.documentElement.dataset.desktopWindowVisible = 'false';
+    const gate = document.createElement('section');
+    gate.dataset.licenceState = 'checking';
+    document.getElementById('app-root')?.append(gate);
+    dismissStartupSplash({ desktop: true });
+    frame();
+    frame(500);
+    expect(fading()).toBe(false);
+    gate.dataset.licenceState = 'activation-required';
+    frame();
+    frame();
+    expect(performance.now()).toBeLessThan(1000);
+    expect(fading()).toBe(true);
+  });
+
+  it('keeps the five-second missing-workspace fallback on a later launch', () => {
+    localStorage.setItem(SPLASH_HELD_VERSION_KEY, __APP_VERSION__);
+    dismissStartupSplash();
+    frame();
+    frame(4983);
+    expect(fading()).toBe(false);
+    frame(1);
+    frame();
+    expect(fading()).toBe(true);
+  });
+
+  it('removes the splash on paint without a fade for reduced motion', () => {
+    localStorage.setItem(SPLASH_HELD_VERSION_KEY, __APP_VERSION__);
+    reducedMotion = true;
+    paintWorkspace();
+    dismissStartupSplash();
+    frame();
+    frame();
+    expect(splash()).toBeNull();
+    expect(inert()).toBe(false);
+  });
+
+  it('holds in full again after an update, then remembers the new version', () => {
+    localStorage.setItem(SPLASH_HELD_VERSION_KEY, 'an-older-version');
+    paintWorkspace();
+    dismissStartupSplash();
+    frame();
+    frame(3999);
+    expect(fading()).toBe(false);
+    expect(localStorage.getItem(SPLASH_HELD_VERSION_KEY)).toBe('an-older-version');
+    frame(1);
+    frame();
+    expect(fading()).toBe(true);
+    expect(localStorage.getItem(SPLASH_HELD_VERSION_KEY)).toBe(__APP_VERSION__);
+  });
+
+  it('owes the hold again when the first launch of a version ends early', () => {
+    paintWorkspace();
+    dismissStartupSplash();
+    frame();
+    frame(2000);
+    // A reload or a crash screen before the hold is served records nothing.
+    crashWorkspace();
+    frame();
+    frame();
+    expect(fading()).toBe(true);
+    expect(localStorage.getItem(SPLASH_HELD_VERSION_KEY)).not.toBe(__APP_VERSION__);
+  });
+
+  it.each(['getItem', 'setItem'] as const)('does not hold when storage %s throws', (method) => {
+    vi.spyOn(Storage.prototype, method).mockImplementation(() => {
+      throw new DOMException('denied', 'SecurityError');
+    });
+    paintWorkspace();
+    dismissStartupSplash();
+    frame();
+    frame();
+    expect(performance.now()).toBeLessThan(100);
+    expect(fading()).toBe(true);
+  });
+
+  it('does not hold when the storage getter itself is denied', () => {
+    vi.spyOn(window, 'localStorage', 'get').mockImplementation(() => {
+      throw new DOMException('denied', 'SecurityError');
+    });
+    paintWorkspace();
+    dismissStartupSplash();
+    frame();
+    frame();
+    expect(fading()).toBe(true);
   });
 });

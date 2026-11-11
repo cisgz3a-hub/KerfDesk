@@ -1,6 +1,39 @@
+import { browserLocalStorage } from '../state/browser-local-storage';
+
 const WORKSPACE_WAIT_MS = 5000;
 const MINIMUM_VISIBLE_MS = 4000;
 const FADE_MS = 750;
+/** The app version whose first launch on this device has held the splash. */
+export const SPLASH_HELD_VERSION_KEY = 'kerfdesk-startup-splash-held-version-v1';
+
+/**
+ * How long this launch holds the splash (ADR-049 Amendment 3): the full hold
+ * for a version this device has not shown yet, a fresh install or an update,
+ * and none on every other launch. Without working storage no launch can be
+ * told from the first, and a hold on every one is the cost, so none holds.
+ */
+function versionHoldMs(): number {
+  try {
+    const storage = browserLocalStorage();
+    if (storage === null) return 0;
+    const held = storage.getItem(SPLASH_HELD_VERSION_KEY);
+    if (held === __APP_VERSION__) return 0;
+    // A store that reads but cannot write would hold on every launch. Prove
+    // the write now; the version itself is recorded once the hold is served.
+    storage.setItem(SPLASH_HELD_VERSION_KEY, held ?? '');
+    return MINIMUM_VISIBLE_MS;
+  } catch {
+    return 0;
+  }
+}
+
+function rememberVersionHold(): void {
+  try {
+    browserLocalStorage()?.setItem(SPLASH_HELD_VERSION_KEY, __APP_VERSION__);
+  } catch {
+    // The next launch holds once more.
+  }
+}
 
 function fadeSplash(splash: HTMLElement, releaseInput: () => void): void {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -24,7 +57,10 @@ function fadeSplash(splash: HTMLElement, releaseInput: () => void): void {
   const timer = window.setTimeout(remove, FADE_MS + 50);
 }
 
-/** Reveal a painted workspace after the splash has actually been visible. */
+/**
+ * Reveal a painted workspace: at once on an ordinary launch, and after the
+ * splash has actually been visible on the first launch of a version.
+ */
 export function dismissStartupSplash(options: { readonly desktop?: boolean } = {}): void {
   const splash = document.getElementById('app-splash');
   const root = document.getElementById('app-root');
@@ -42,6 +78,7 @@ export function dismissStartupSplash(options: { readonly desktop?: boolean } = {
   }
   root?.setAttribute('inert', '');
   window.addEventListener('keydown', blockKeyboard, true);
+  const holdMs = versionHoldMs();
   const installedAt = performance.now();
   let visibleMs = 0;
   let visibleSince: number | null = null;
@@ -91,8 +128,11 @@ export function dismissStartupSplash(options: { readonly desktop?: boolean } = {
         '#app-root [data-licence-state]:not([data-licence-state="checking"])',
       ) !== null;
     const timedOut = performance.now() - installedAt >= WORKSPACE_WAIT_MS;
-    if (crashed || ((painted || timedOut) && visibleMs >= MINIMUM_VISIBLE_MS)) {
+    const held = (painted || timedOut) && visibleMs >= holdMs;
+    if (crashed || held) {
       stopWatching();
+      // A crash screen cut the hold short, so this version still owes one.
+      if (held && holdMs > 0) rememberVersionHold();
       // Give a newly painted canvas its own paint opportunity before the fade.
       requestAnimationFrame(() => fadeSplash(splash, releaseInput));
       return;

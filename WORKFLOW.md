@@ -60,11 +60,17 @@ The splash becomes visible only after its complete markup is parsed, even when t
 arrives in chunks. The workspace does not accept pointer or keyboard input behind it.
 Workspace overlays, including the controller pause panel, stay beneath the startup screen
 through its hold and fade. Live machine controls regain their normal priority after dismissal.
-Reduced motion uses a static indicator. Both web and desktop hold the screen for at least four
-visible seconds from its first frame after the workspace module starts, then fade it over
-750 ms once the workspace canvas has had a paint opportunity. Time before that frame or while
-the browser document or native desktop window is hidden does not consume the hold
-(ADR-049 Amendment 2). A
+Reduced motion uses a static indicator. On the first launch of each app version on a device (a
+fresh install or an update; a desktop release, or any deployed change to the web app), both web
+and desktop hold the screen for at least four visible seconds from its first frame after the
+workspace module starts, then fade it over 750 ms once the workspace canvas has had a paint
+opportunity. Time before that frame or while the browser document or native desktop window is
+hidden does not consume the hold (ADR-049 Amendment 2).
+Every other launch and every reload starts the same fade as soon as the workspace canvas, or
+the settled licence window, has had its paint opportunity, with no hold; input returns when
+the screen is gone, as before. The version that has had its hold is remembered on the device
+once the hold completes, so a launch cut short holds again; when the browser refuses storage,
+no launch holds (ADR-049 Amendment 3). A
 startup crash is shown at once. It introduces no startup interaction or modal.
 
 1. App opens to **empty workspace** state (see F-A2).
