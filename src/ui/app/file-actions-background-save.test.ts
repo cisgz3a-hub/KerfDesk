@@ -93,8 +93,12 @@ describe('background Save preparation failures', () => {
       expect(write).not.toHaveBeenCalled();
       expect(advanceVariablesAfter).not.toHaveBeenCalled();
       expect(notifications.some((toast) => toast.variant === 'success')).toBe(false);
-      expect(alert).toHaveBeenCalledOnce();
-      expect(alert.mock.calls[0]?.[0]).toContain(message);
+      // The refusal is one error toast, never a native alert (ADR-656 Amendment 4).
+      expect(alert).not.toHaveBeenCalled();
+      const refusals = notifications.filter((toast) => toast.variant === 'error');
+      expect(refusals).toHaveLength(1);
+      expect(refusals[0]?.message).toMatch(/^Cannot save G-code: /);
+      expect(refusals[0]?.message).toContain(message);
     },
   );
 });

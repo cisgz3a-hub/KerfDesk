@@ -85,7 +85,8 @@ export type EmitRasterInput = {
   // to compensate for beam thickness; power changes inside a line are not
   // trimmed (ADR-458 Amendment 1). 0 disables.
   readonly dotWidthCorrectionMm?: number;
-  // ADR-052 bidirectional scan-lag compensation. Applied to reverse rows only.
+  // ADR-052 bidirectional scan-lag compensation: every row of a two-way scan
+  // moves half of it along its own travel (Amendment 2).
   readonly scanOffsetMm?: number;
   readonly bidirectional?: boolean;
   readonly laserModeCommand?: 'M3' | 'M4';

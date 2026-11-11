@@ -95,10 +95,11 @@ describe('emitRasterGroup row streaming', () => {
     const gcode = emitRasterGroup(materialized);
     expect(emitRasterGroup(streamed)).toBe(gcode);
     expect([...gcode.matchAll(/G0 X([^ ]+) Y([^ ]+) S0/g)].map((match) => match.slice(1))).toEqual([
-      ['0.000', '0.500'],
-      ['3.750', '2.500'],
-      ['0.000', '0.500'],
-      ['3.750', '2.500'],
+      // ADR-052 Amendment 2: forward rows +0.125, reverse rows -0.125.
+      ['0.125', '0.500'],
+      ['3.875', '2.500'],
+      ['0.125', '0.500'],
+      ['3.875', '2.500'],
     ]);
   });
 });

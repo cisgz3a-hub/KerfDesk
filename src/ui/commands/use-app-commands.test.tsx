@@ -1,6 +1,6 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StatusReport, StreamerState } from '../../core/controllers/grbl';
 import { mockPlatform } from '../../__fixtures__/file-actions';
 import { repairArtwork, repairRectangle } from '../../__fixtures__/vector-repair-fixtures';
@@ -9,7 +9,7 @@ import { PlatformProvider } from '../app/platform-context';
 import { useStore } from '../state';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { useLaserStore } from '../state/laser-store';
-import { useUiStore } from '../state/ui-store';
+import { useGcodeSaveFlowStore } from '../app/gcode-save-flow';
 import type { AppCommand } from './command-registry';
 import { useAppCommands, type CommandShellCallbacks } from './use-app-commands';
 
@@ -25,7 +25,7 @@ let latest: ReadonlyArray<AppCommand> = [];
 beforeEach(() => {
   useStore.getState().newProject();
   useLaserStore.setState(initialLaserState());
-  useUiStore.getState().closeGcodeSaveDialog();
+  useGcodeSaveFlowStore.setState({ flow: null });
   renders = 0;
   latest = [];
 });
@@ -37,7 +37,7 @@ afterEach(() => {
   host = null;
   useStore.getState().newProject();
   useLaserStore.setState(initialLaserState());
-  useUiStore.getState().closeGcodeSaveDialog();
+  useGcodeSaveFlowStore.setState({ flow: null });
 });
 
 describe('useAppCommands store subscriptions', () => {
@@ -91,10 +91,11 @@ describe('useAppCommands store subscriptions', () => {
     }
   });
 
-  it('routes Save G-code through the transactional prebuild dialog', () => {
+  it('routes Save G-code through the prepare-then-pick save flow', async () => {
     render();
     latest.find((command) => command.id === 'file.save-gcode')?.invoke();
-    expect(useUiStore.getState().gcodeSaveDialogOpen).toBe(true);
+    expect(useGcodeSaveFlowStore.getState().flow?.kind).toBe('working');
+    await vi.waitFor(() => expect(useGcodeSaveFlowStore.getState().flow).toBeNull());
   });
 
   it('disables Union for a mixed selection while keeping Weld available for its vector subset', () => {

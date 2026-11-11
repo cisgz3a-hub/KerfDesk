@@ -4,7 +4,7 @@
 // emitRdFile's output — locking the fix that passes the Uint8Array view itself
 // instead of its underlying .buffer.
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { createLayer, createProject, IDENTITY_TRANSFORM, type Project } from '../../core/scene';
 import { emitRdFile } from '../../io/rd';
@@ -143,8 +143,10 @@ describe('handleSaveRd', () => {
     expect(machineFrame.advisories).toEqual([]);
   });
 
-  it('alerts and writes nothing when the job cannot be emitted', async () => {
+  it('says why in one error toast and writes nothing when the job cannot be emitted', async () => {
     let picked = false;
+    const alert = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
+    const pushToast = vi.fn();
     const ctx: SaveGcodeCtx = {
       platform: mockPlatform(async () => {
         picked = true;
@@ -152,12 +154,20 @@ describe('handleSaveRd', () => {
       }),
       project: createProject(), // no output geometry → emitRdFile refuses
       savedName: null,
-      pushToast: () => undefined,
+      pushToast,
     };
 
     await handleSaveRd(ctx, { ok: true });
 
     // Refused before ever reaching the file picker.
     expect(picked).toBe(false);
+    // One error toast, never a native alert (ADR-656 Amendment 4).
+    expect(alert).not.toHaveBeenCalled();
+    expect(pushToast).toHaveBeenCalledExactlyOnceWith(
+      expect.stringMatching(/^Cannot save \.rd file: /),
+      'error',
+      expect.objectContaining({ key: 'export-refused' }),
+    );
+    alert.mockRestore();
   });
 });

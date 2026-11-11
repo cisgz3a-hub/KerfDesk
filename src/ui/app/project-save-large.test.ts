@@ -16,6 +16,7 @@ import { readAutosave, writeAutosave } from '../state/autosave';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { prepareProjectRecoveryMessage } from './project-save-preparation';
 import { projectSaveNeedsWorker } from './project-save-size';
+import { lapseUserActivation } from '../../platform/web/chromium-save-picker.test-support';
 
 vi.mock('../state/job-aware-dialogs', () => ({ jobAwareConfirm: vi.fn(() => false) }));
 
@@ -51,7 +52,17 @@ function context(
 async function ready(): Promise<void> {
   await vi.waitFor(() => expect(useProjectSaveDialogStore.getState().request?.phase).toBe('ready'));
 }
+// The dialog appears once preparation has run for PREPARING_DIALOG_DELAY_MS.
+async function preparingShown(): Promise<void> {
+  await vi.waitFor(() =>
+    expect(useProjectSaveDialogStore.getState().request?.phase).toBe('preparing'),
+  );
+}
+// Every save here is the slow one: the click's activation has lapsed when the
+// project is validated (project-save-fast-path.test.ts covers the quick one).
+let restoreActivation: () => void = () => undefined;
 beforeEach(() => {
+  restoreActivation = lapseUserActivation();
   localStorage.clear();
   sessionStorage.clear();
   useStore.getState().newProject();
@@ -61,6 +72,7 @@ beforeEach(() => {
   vi.mocked(jobAwareConfirm).mockClear().mockReturnValue(false);
 });
 afterEach(() => {
+  restoreActivation();
   useConfirmSaveStore.getState().choose('cancel');
   useProjectSaveDialogStore.getState().request?.cancel();
   useStore.getState().newProject();
@@ -77,7 +89,8 @@ describe('large captured project saves', () => {
     });
     const ctx = context(pick);
     const saving = handleSaveProject(ctx);
-    expect(useProjectSaveDialogStore.getState().request?.phase).toBe('preparing');
+    expect(useProjectSaveDialogStore.getState().request).toBeNull();
+    await preparingShown();
     expect(pick).not.toHaveBeenCalled();
     currentProjectSaveWorker().respond(prepareProjectSaveMessage(ctx.project));
     await ready();
@@ -125,7 +138,7 @@ describe('large captured project saves', () => {
       if (phase === 'ready') {
         worker.respond(prepareProjectSaveMessage(ctx.project));
         await ready();
-      }
+      } else await preparingShown();
       useProjectSaveDialogStore.getState().request!.cancel();
       await expect(saving).resolves.toBe('cancelled');
       expect(pick).not.toHaveBeenCalled();
@@ -248,7 +261,9 @@ describe('large captured project saves', () => {
     await vi.waitFor(() => expect(ProjectSaveTestWorker.instances).toHaveLength(2));
     expect(jobAwareConfirm).toHaveBeenCalledOnce();
     expect(pick).not.toHaveBeenCalled();
-    expect(useProjectSaveDialogStore.getState().request?.purpose).toBe('recovery');
+    await vi.waitFor(() =>
+      expect(useProjectSaveDialogStore.getState().request?.purpose).toBe('recovery'),
+    );
     expect(currentProjectSaveWorker().postMessage).toHaveBeenCalledExactlyOnceWith({
       project: bad,
       mode: 'recovery',

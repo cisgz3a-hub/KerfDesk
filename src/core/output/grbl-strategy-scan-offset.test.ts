@@ -15,7 +15,7 @@ describe('grblStrategy scan-offset compensation (ADR-052)', () => {
     scanningOffsets: [{ speedMmPerMin: 6000, offsetMm: 0.25 }],
   };
 
-  it('threads calibrated scan offset into raster reverse rows only', () => {
+  it('threads calibrated scan offset into raster rows, half each way (ADR-052 Amendment 2)', () => {
     const job: Job = {
       groups: [
         {
@@ -48,14 +48,14 @@ describe('grblStrategy scan-offset compensation (ADR-052)', () => {
     const out = emitWithDevice(job, calibratedDevice);
 
     // Raster rows carry the compact motion spelling on this dialect (ADR-332):
-    // the reverse row's shift is the assertion, not the spacing. The runway G1
+    // each row's half-offset shift is the assertion, not the spacing. The runway G1
     // holds the S0 the preceding rapid already set, so the beam stays dark
     // without restating it.
-    expect(out).toContain('G0X-1Y0.5S0\nG1X0F6000');
-    expect(out).toContain('G0X4.75Y1.5S0\nG1X3.75');
+    expect(out).toContain('G0X-0.875Y0.5S0\nG1X0.125F6000');
+    expect(out).toContain('G0X4.875Y1.5S0\nG1X3.875');
   });
 
-  it('leaves forward fill sweeps unchanged and shifts reverse sweeps along travel', () => {
+  it('moves forward and reverse fill sweeps half the offset along their own travel', () => {
     const job: Job = {
       groups: [
         {
@@ -91,8 +91,8 @@ describe('grblStrategy scan-offset compensation (ADR-052)', () => {
 
     const out = emitWithDevice(job, calibratedDevice);
 
-    expect(out).toContain('G0 X10.000 Y0.000 S0\nG1X20Y0F6000S300');
-    expect(out).toContain('G0 X19.750 Y5.000 S0\nG1X9.75Y5F6000S300');
+    expect(out).toContain('G0 X10.125 Y0.000 S0\nG1X20.125Y0F6000S300');
+    expect(out).toContain('G0 X19.875 Y5.000 S0\nG1X9.875Y5F6000S300');
   });
 
   it('shifts angled reverse fill sweeps along their own travel vector', () => {
@@ -127,7 +127,7 @@ describe('grblStrategy scan-offset compensation (ADR-052)', () => {
 
     const out = emitWithDevice(job, angledDevice);
 
-    expect(out).toContain('G0 X9.000 Y9.000 S0\nG1X-1Y-1F6000S300');
+    expect(out).toContain('G0 X9.500 Y9.500 S0\nG1X-0.5Y-0.5F6000S300');
   });
 
   it('looks up fill compensation at the same rounded feed emitted to GRBL', () => {
@@ -165,7 +165,7 @@ describe('grblStrategy scan-offset compensation (ADR-052)', () => {
 
     const out = emitWithDevice(job, fractionalDevice);
 
-    expect(out).toContain('G0 X19.750 Y5.000 S0');
+    expect(out).toContain('G0 X19.875 Y5.000 S0');
     expect(out).toContain('F6000');
   });
 });

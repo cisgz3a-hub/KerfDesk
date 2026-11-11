@@ -52,6 +52,14 @@ export const CONTROLLERS = [
       'Experimental and vector-only. Checked by decoding the file back inside KerfDesk, and the network connection against a simulator, not on hardware. No real Ruida controller has accepted either yet.',
     status: 'shipped-code-and-tests',
   },
+  {
+    family: 'Lihuiyu M2/M3 Nano (stock K40)',
+    connection:
+      'Save an .egv file for MeerK40t-style senders, or connect the K40’s board over USB (its CH341 chip) to frame, start, pause and stop a job.',
+    tested:
+      'Experimental. Checked by decoding the output back inside KerfDesk and against a simulated board, not on hardware. An M2 board has no software power control: the machine’s knob sets the power.',
+    status: 'simulator-only',
+  },
 ];
 
 export const CONNECT_NEEDS = [

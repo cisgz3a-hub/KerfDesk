@@ -11,7 +11,11 @@ import { DEFAULT_JOB_PLACEMENT } from '../job-placement';
 import type { ImportOutcome } from '../state/store';
 import { projectSaveRequestEpochCallbacks, projectWithLine } from '../../__fixtures__/file-actions';
 import { projectWithObject, shapeObject } from './shortcuts-test-helpers';
-import { useUiStore } from '../state/ui-store';
+import { useGcodeSaveFlowStore } from './gcode-save-flow';
+import { useStore } from '../state';
+
+const saveUnderWay = (): boolean => useGcodeSaveFlowStore.getState().flow !== null;
+const saveSettled = (): Promise<void> => vi.waitFor(() => expect(saveUnderWay()).toBe(false));
 
 const mockPlatform: PlatformAdapter = {
   id: 'mock',
@@ -51,8 +55,7 @@ function fileCtx(
 }
 
 describe('handleFileShortcut - LightBurn-compatible Save G-code binding', () => {
-  it('leaves Ctrl+E free and handles Ctrl+Shift+E as Save G-code', () => {
-    useUiStore.getState().closeGcodeSaveDialog();
+  it('leaves Ctrl+E free and handles Ctrl+Shift+E as Save G-code', async () => {
     const plainEvent = fakeKeydown({ key: 'e', ctrlKey: true });
     expect([handleFileShortcut(plainEvent, fileCtx()), plainEvent.defaultPrevented]).toEqual([
       false,
@@ -65,12 +68,14 @@ describe('handleFileShortcut - LightBurn-compatible Save G-code binding', () => 
       true,
       true,
     ]);
-    expect(useUiStore.getState().gcodeSaveDialogOpen).toBe(true);
-    useUiStore.getState().closeGcodeSaveDialog();
+    expect(saveUnderWay()).toBe(true);
+    await saveSettled();
   });
 
-  it('opens the prebuild dialog before any picker for Ctrl+Shift+E', () => {
+  it('prepares before any picker for Ctrl+Shift+E, then opens it with no second action', async () => {
     const [pickFileForSave, pushToast] = [vi.fn(async () => null), vi.fn()];
+    // The save compiles the open project as it stands at the key press.
+    useStore.setState({ project: projectWithLine() });
     const context = fileCtx({
       project: projectWithLine(),
       settingsCapability: 'none',
@@ -80,10 +85,14 @@ describe('handleFileShortcut - LightBurn-compatible Save G-code binding', () => 
     expect(
       handleFileShortcut(fakeKeydown({ key: 'e', ctrlKey: true, shiftKey: true }), context),
     ).toBe(true);
-    expect(useUiStore.getState().gcodeSaveDialogOpen).toBe(true);
+    expect(saveUnderWay()).toBe(true);
     expect(pickFileForSave).not.toHaveBeenCalled();
     expect(pushToast).not.toHaveBeenCalled();
-    useUiStore.getState().closeGcodeSaveDialog();
+    // Ready within the key press's activation: the file dialog opens by itself
+    // (ADR-656 Amendment 4).
+    await saveSettled();
+    expect(pickFileForSave).toHaveBeenCalledOnce();
+    useStore.getState().newProject();
   });
 });
 
