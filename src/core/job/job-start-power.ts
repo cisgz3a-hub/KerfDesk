@@ -20,6 +20,8 @@ export function vectorPowerReachesController(power: number, device?: DeviceProfi
   if (!(power > 0)) return false;
   if (device === undefined) return true;
   if (device.controllerKind === 'ruida') return encodePower14(power).some((byte) => byte !== 0);
+  // A Moshiboard has no power value: any power above 0 fires at its dial (ADR-705).
+  if (device.controllerKind === 'moshi') return true;
   // Smoothie and Marlin fan emission use their raster compilation ranges;
   // GRBL's canonical scaleS retains its own fractional-range rounding.
   const scale =

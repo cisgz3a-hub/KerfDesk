@@ -101,7 +101,9 @@ overrides:
   nanoid@>=3.0.0 <3.3.18: 3.3.18
   # GHSA-qw65-cvwx-89v3, GHSA-58mr-gqgx-xq4g and GHSA-hrr3-gc8f-f4qj: keep AJV's 3.x API
   # while rejecting malformed authorities in the release build toolchain.
-  fast-uri@>=3.0.0 <3.1.8: 3.1.8
+  # November 2026: 3.1.9 also clears GHSA-w74x-v6f9-j3xg, GHSA-xhq7-xmqj-769h,
+  # GHSA-wjr9-j795-jxcr and GHSA-333x-w4r6-6crp (electron-builder and workbox AJV).
+  fast-uri@>=3.0.0 <3.1.9: 3.1.9
   # October 2026 toolchain advisories: preserve existing APIs and avoid new
   # runtime dependencies. Source maps arrive through Vite/coverage, template
   # compilation through ESLint boundaries, and librsvg through Wrangler.
@@ -110,9 +112,16 @@ overrides:
   source-map-js@<1.2.2: 1.2.2
   handlebars@<4.7.10: 4.7.10
   sharp@<0.35.5: 0.35.5
-  undici@>=6.0.0 <6.28.1: 6.28.1
-  undici@>=7.0.0 <7.29.1: 7.29.1
+  # November 2026: undici 6.29.1 (node-gyp) and 7.30.1 (@electron/get, miniflare)
+  # clear GHSA-4qv8-2p9j-2685, GHSA-xjj6-f33q-929c, GHSA-2m5v-pch6-74hx,
+  # GHSA-qrxm-fqhp-jwvm, GHSA-9fm3-97px-rjf6, GHSA-4w7w-5xrc-9h26,
+  # GHSA-f72v-6w45-q472 and GHSA-55wc-3pg8-jfw6 without leaving either major.
+  undici@>=6.0.0 <6.29.1: 6.29.1
+  undici@>=7.0.0 <7.30.1: 7.30.1
   postcss@<8.5.28: 8.5.28
+  # GHSA-m5mm-p8h7-m29v: unescaped </script in a serialized function body.
+  # workbox's @rollup/plugin-terser asks for ^7.0.3, so 7.1.3 stays in-range.
+  serialize-javascript@<7.1.3: 7.1.3
   # Build-only cache correctness update; preserve the parent's ^4.0.0 API.
   # The max-stale advisory is disputed, so this is not a verified security fix.
   'cacheable-request@7.0.4>http-cache-semantics': 4.3.0
