@@ -14,21 +14,43 @@ import { waitForControllerStatus } from './frame-status-wait';
 import { clampJogFeed } from './jog-control-policy';
 
 const TURN_BACK_FEED = 1500;
+// Time for the jog to start and for the Idle report after it, on top of the turn.
+const TURN_BACK_SETTLE_MS = 5_000;
 // Below this the part is already where the job started (degrees on A, mm on Z).
 const SAME_TURN = 0.01;
 
-type TurnState = Pick<LaserState, 'statusReport' | 'wcoCache' | 'controllerSettings'>;
+type TurnState = Pick<
+  LaserState,
+  'statusReport' | 'wcoCache' | 'controllerSettings' | 'machineZeroEpoch'
+>;
 
 /** After an operator Abort of an A or Z rotary job: its axis and how far the
  *  part has turned since that job started (null: not readable). */
-export type RotaryTurnSinceAbort = { readonly axis: 'A' | 'Z'; readonly since: number | null };
+export type RotaryTurnSinceAbort = {
+  readonly axis: 'A' | 'Z';
+  readonly since: number | null;
+  /** The controller restarted since: the saved turn names nothing now. */
+  readonly restarted?: true;
+};
 
 /** The turn since an aborted A or Z rotary job started, for Job Review. */
 export function rotaryTurnSinceAbort(
   state: TurnState & Pick<LaserState, 'jobStopRequest' | 'streamerEpoch'>,
 ): RotaryTurnSinceAbort | null {
   const turn = currentJobStopRequest(state)?.rotaryStartTurn;
-  return turn === undefined ? null : { axis: turn.axis, since: rotaryTurnSinceStart(state, turn) };
+  if (turn === undefined) return null;
+  if (rotaryStartTurnStale(state, turn)) return { axis: turn.axis, since: null, restarted: true };
+  return { axis: turn.axis, since: rotaryTurnSinceStart(state, turn) };
+}
+
+/** ADR-695 Amendment 2 (rolling audit v14 Z2-P1-1): a power-up or port reopen
+ *  since the Abort cleared machine position, so the saved turn is not a place
+ *  on the part any more. Nothing may turn the part to it. */
+export function rotaryStartTurnStale(
+  state: Pick<LaserState, 'machineZeroEpoch'>,
+  turn: RotaryStartTurn,
+): boolean {
+  return turn.machineZeroEpoch !== (state.machineZeroEpoch ?? 0);
 }
 
 /** The rotary axis's machine position now, or null while it is not reported. */
@@ -69,6 +91,12 @@ export function formatRotaryTurn(axis: 'A' | 'Z', value: number): string {
 
 /** Turn the part back to the turn the stopped job started from, laser off. */
 export async function turnRotaryBackToJobStart(turn: RotaryStartTurn): Promise<void> {
+  if (rotaryStartTurnStale(useLaserStore.getState(), turn)) {
+    throw new Error(
+      'The controller has restarted since the job you stopped, so the part was not turned. ' +
+        'Turn it back to where that job started by hand.',
+    );
+  }
   const delta = rotaryTurnSinceStart(useLaserStore.getState(), turn);
   if (delta === null) {
     throw new Error(
@@ -80,11 +108,15 @@ export async function turnRotaryBackToJobStart(turn: RotaryStartTurn): Promise<v
   const feed = clampJogFeed(TURN_BACK_FEED, useStore.getState().project.device.maxFeed);
   const back = -delta;
   await useLaserStore.getState().jog(turn.axis === 'A' ? { da: back, feed } : { dz: back, feed });
+  // The turn takes |back| / feed minutes (rolling audit v14 Z2-P2-1: a fixed
+  // 3 s gave up on a correct turn of more than about 75 degrees).
+  const turnMs = (Math.abs(back) / feed) * 60_000;
   const settled = await waitForControllerStatus(
     (state) =>
       state.statusReport?.state === 'Idle' &&
       state.motionOperation === null &&
       state.controllerOperation === null,
+    turnMs * 1.5 + TURN_BACK_SETTLE_MS,
   );
   if (!settled) throw new Error('The rotary did not finish turning back. Check the part.');
 }
@@ -92,5 +124,8 @@ export async function turnRotaryBackToJobStart(turn: RotaryStartTurn): Promise<v
 /** The turn the stopped job started from, for Start from line to re-enter at
  *  (ADR-695 Amendment 1); undefined when no Abort recorded one. */
 export function abortRotaryZero(): RotaryStartTurn | undefined {
-  return currentJobStopRequest(useLaserStore.getState())?.rotaryStartTurn;
+  const state = useLaserStore.getState();
+  const turn = currentJobStopRequest(state)?.rotaryStartTurn;
+  // After a restart Start from line is refused rather than re-enter a stale turn.
+  return turn === undefined || rotaryStartTurnStale(state, turn) ? undefined : turn;
 }

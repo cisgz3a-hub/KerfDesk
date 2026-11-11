@@ -12,7 +12,7 @@
 
 import { currentJobStopRequest, currentStreamWasReset } from '../state/job-stop-request';
 import type { JobStopRequest, RotaryStartTurn } from '../state/job-stop-request';
-import { turnRotaryBackToJobStart } from './abort-rotary-turn';
+import { rotaryStartTurnStale, turnRotaryBackToJobStart } from './abort-rotary-turn';
 import { useLaserStore, type LaserState } from '../state/laser-store';
 import { waitForControllerStatus } from './frame-status-wait';
 
@@ -42,7 +42,7 @@ export async function restoreOriginAfterAbort(
   await clearAbortAlarm(homeFirst);
   await useLaserStore.getState().restoreWorkOrigin(savedMm);
   // ADR-695 Amendment 1: an A or Z rotary turns back to where the job started.
-  if (turn !== undefined) await turnRotaryBackToJobStart(turn);
+  await turnBackUnlessRestarted(turn);
 }
 
 /** Frame's offer while the saved origin is unrestored and the alarm is
@@ -55,7 +55,14 @@ export async function restoreAbortOriginFromIdle(
 ): Promise<void> {
   if (homeFirst) await clearAbortAlarm(true);
   await useLaserStore.getState().restoreWorkOrigin(savedMm);
-  if (turn !== undefined) await turnRotaryBackToJobStart(turn);
+  await turnBackUnlessRestarted(turn);
+}
+
+// ADR-695 Amendment 2: after a power-up or port reopen the saved turn names no
+// place on the part, so the part is never jogged to it; the offers say so.
+async function turnBackUnlessRestarted(turn: RotaryStartTurn | undefined): Promise<void> {
+  if (turn === undefined || rotaryStartTurnStale(useLaserStore.getState(), turn)) return;
+  await turnRotaryBackToJobStart(turn);
 }
 
 /** Unlock, then set the origin where the head stopped. */

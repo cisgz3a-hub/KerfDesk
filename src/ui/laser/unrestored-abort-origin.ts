@@ -34,7 +34,7 @@ import { useLaserStore, type LaserState } from '../state/laser-store';
 import { withheldControllerMPos } from '../state/laser-status-position';
 import { useToastStore } from '../state/toast-store';
 import { restoreAbortOriginFromIdle } from './abort-alarm-recovery';
-import { formatRotaryTurn, rotaryTurnSinceStart } from './abort-rotary-turn';
+import { formatRotaryTurn, rotaryStartTurnStale, rotaryTurnSinceStart } from './abort-rotary-turn';
 import type { RotaryStartTurn } from '../state/job-stop-request';
 import { formatOriginMm } from './laser-recovery-origin';
 import { repairFailed, type BlockedStartRepair } from './start-blocked-repair';
@@ -173,6 +173,13 @@ export async function offerRestoreAbortOrigin(
  *  the stopped job started, and that OK turns it back. */
 export function abortTurnOfferNote(turn: RotaryStartTurn | undefined): string {
   if (turn === undefined) return '';
+  if (rotaryStartTurnStale(useLaserStore.getState(), turn)) {
+    return (
+      '\n\nOn the rotary, the controller has restarted since the job you stopped, so KerfDesk ' +
+      'no longer knows the turn it started from. OK does not turn the part: turn it back to where ' +
+      'that job started by hand, or set it up again.'
+    );
+  }
   const since = rotaryTurnSinceStart(useLaserStore.getState(), turn);
   const how =
     since === null

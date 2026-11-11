@@ -114,7 +114,7 @@ describe('Abort and re-run on an A rotary, four-axis grblHAL simulator', () => {
       const firstZero = h.simulator.state().aAxis?.g92 ?? NaN;
       expect(firstZero).toBeCloseTo(37, 3);
       const request = operatorAbortAlarm(useLaserStore.getState());
-      expect(request?.rotaryStartTurn).toEqual({ axis: 'A', machine: firstZero });
+      expect(request?.rotaryStartTurn).toMatchObject({ axis: 'A', machine: firstZero });
       // The part stopped somewhere round the turn, away from where it started.
       const since = rotaryTurnSinceAbort(useLaserStore.getState())?.since ?? 0;
       expect(Math.abs(since)).toBeGreaterThan(1);
