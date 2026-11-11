@@ -23,7 +23,8 @@ export type ControllerKind =
   | 'fluidnc'
   | 'marlin'
   | 'smoothieware'
-  | 'ruida';
+  | 'ruida'
+  | 'moshi';
 
 /** Single source of truth for validators (catalog, .lfmachine shape, .lf2
  *  normalize). Grows in lockstep with the ControllerKind union. */
@@ -34,6 +35,7 @@ export const KNOWN_CONTROLLER_KINDS: ReadonlyArray<ControllerKind> = [
   'marlin',
   'smoothieware',
   'ruida',
+  'moshi',
 ];
 
 export function isKnownControllerKind(value: unknown): value is ControllerKind {
